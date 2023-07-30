@@ -20,13 +20,13 @@ namespace VSL_NAMESPACE {
 	struct Dimention {};
 
 	template<>
-	struct Dimention<1> {
+	struct Dimention<1> : D1 {
 		using value = VSL_NAMESPACE::D1;
 	};
 
 
 	template<>
-	struct Dimention<2> {
+	struct Dimention<2> : D2 {
 		using value = VSL_NAMESPACE::D2;
 	};
 
@@ -36,10 +36,12 @@ namespace VSL_NAMESPACE {
 		using value = VSL_NAMESPACE::D3;
 	};
 
+
 	template<typename D>
 	concept __has_char_dimantion = requires{
 		{D::dimention} -> std::convertible_to<char>;
 	};
+
 
 	template<typename D>
 	concept is_dimention = __has_char_dimantion<D> &&

@@ -2,8 +2,9 @@
 #include "../../../VSL/dimention.h"
 
 #include "../../define.h"
-
 #include "../../concepts.h"
+
+#include <iostream>
 
 namespace AHO_NAMESPACE {
 	namespace coordinate {
@@ -12,7 +13,7 @@ namespace AHO_NAMESPACE {
 			T value;
 
 			constexpr X(const T& t) : value(t) {};
-			constexpr X() {};
+			constexpr X() : value{} {};
 
 			constexpr X<T> operator +() { static_assert(plusable<T>); return { value }; };
 			constexpr X<T> operator -() { static_assert(minusable<T>); return { -value }; };
@@ -43,7 +44,7 @@ namespace AHO_NAMESPACE {
 			T value;
 
 			constexpr Y(const T& t) : value(t) {};
-			constexpr Y() {};
+			constexpr Y() : value{} {};
 
 			constexpr Y<T> operator +() { static_assert(plusable<T>); return { value }; };
 			constexpr Y<T> operator -() { static_assert(minusable<T>); return { -value }; };
@@ -74,7 +75,7 @@ namespace AHO_NAMESPACE {
 			T value;
 
 			constexpr Z(const T& t) : value(t) {};
-			constexpr Z() {};
+			constexpr Z() : value{} {};
 
 			constexpr Z<T> operator +() { static_assert(plusable<T>); return { value }; };
 			constexpr Z<T> operator -() { static_assert(minusable<T>); return { -value }; };
@@ -100,6 +101,255 @@ namespace AHO_NAMESPACE {
 			Z<R> cast() const { return { (R)value }; }
 		};
 
+		template<typename T>
+		std::ostream& operator <<(std::ostream& out, const X<T>& x) {
+			out << "x : " << x.value;
+			return out;
+		};
+
+		template<typename T>
+		std::ostream& operator <<(std::ostream& out, const Y<T>& y) {
+			out << "y : " << y.value;
+			return out;
+		};
+
+		template<typename T>
+		std::ostream& operator <<(std::ostream& out, const Z<T>& z) {
+			out << "z : " << z.value;
+			return out;
+		};
+
+		template <bool ...Booleans>
+		constexpr size_t _CountTruesFunc() {
+			size_t n = 0;
+			bool bools[] = { Booleans... };
+			for (bool f : bools)
+				if (f)
+					n++;
+			return n;
+		}
+
+		template <bool ...Booleans>
+		struct _CountTrues {
+			constexpr static size_t value = _CountTruesFunc<Booleans...>();
+		};
+
+		template<bool EnableX = false, bool EnableY = false, bool EnableZ = false>
+		struct _MakeCoordinateInfo;
+
+		template <VSL_NAMESPACE::is_dimention D, bool EnableX, bool EnableY = false, bool EnableZ = false>
+		struct _CoordinateInfo {
+			using dimention = D;
+			constexpr static bool EnabledX = EnableX;
+			constexpr static bool EnabledY = EnableY;
+			constexpr static bool EnabledZ = EnableZ;
+			constexpr static bool IndexX = _CountTruesFunc<EnableX>();
+			constexpr static bool IndexY = _CountTruesFunc<EnableX, EnableY>();
+			constexpr static bool IndexZ = _CountTruesFunc<EnableX, EnableY, EnableZ>();
+
+			consteval static typename _MakeCoordinateInfo<true, EnableY, EnableZ>::value EnablingX() {};
+			consteval static typename _MakeCoordinateInfo<EnableX, true, EnableZ>::value EnablingY() {};
+			consteval static typename _MakeCoordinateInfo<EnableX, EnableY, true>::value EnablingZ() {};
+
+			/*
+			consteval static typename _MakeCoordinateInfo<false, EnableY, EnableZ>::value DisablingX() {};
+			consteval static typename _MakeCoordinateInfo<EnableX, false, EnableZ>::value DisablingY() {};
+			consteval static typename _MakeCoordinateInfo<EnableX, EnableY, false>::value DisablingZ() {};
+			*/
+		};
+
+		template<bool EnableX, bool EnableY, bool EnableZ>
+		struct _MakeCoordinateInfo {
+			using value = _CoordinateInfo<typename VSL_NAMESPACE::Dimention<_CountTrues<EnableX, EnableY, EnableZ>::value>::value, EnableX, EnableY, EnableZ>;
+		};
+
+		template<VSL_NAMESPACE::is_dimention D>
+		struct _DefaultCoordinateInfo {};
+
+		template<>
+		struct _DefaultCoordinateInfo<VSL_NAMESPACE::D1> {
+			using value = _CoordinateInfo<VSL_NAMESPACE::D1, true>;
+		};
+
+		template<>
+		struct _DefaultCoordinateInfo<VSL_NAMESPACE::D2> {
+			using value = _CoordinateInfo<VSL_NAMESPACE::D2, true, true>;
+		};
+
+		template<>
+		struct _DefaultCoordinateInfo<VSL_NAMESPACE::D3> {
+			using value = _CoordinateInfo<VSL_NAMESPACE::D3, true, true, true>;
+		};
+
+		template <typename ElementType, typename _CoordinateInfo>
+		struct _CoordinateSet {};
+
+#define AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper, Lower) \
+				template <typename T> \
+				constexpr _CoordinateSet<ElementType, coordinate_info>& operator +=(const Upper<T>& e) { Lower += e; return *this; } \
+				template <typename T> \
+				constexpr _CoordinateSet<ElementType, coordinate_info>& operator -=(const Upper<T>& e) { Lower -= e; return *this; } \
+
+#define AHO_DEFINE_SPECIAL_COORDINATE_SET1(Upper, Lower) \
+			template <typename ElementType> \
+			struct _CoordinateSet<ElementType, typename _MakeCoordinateInfo< \
+								  std::same_as<X<ElementType>, Upper<ElementType>>, \
+								  std::same_as<Y<ElementType>, Upper<ElementType>>, \
+								  std::same_as<Z<ElementType>, Upper<ElementType>>  \
+							  >::value> { \
+				using coordinate_info = typename _MakeCoordinateInfo< \
+								  std::same_as<X<ElementType>, Upper<ElementType>>, \
+								  std::same_as<Y<ElementType>, Upper<ElementType>>, \
+								  std::same_as<Z<ElementType>, Upper<ElementType>>  \
+							  >::value; \
+				union { Upper<ElementType> Lower, ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 1); }; \
+				constexpr _CoordinateSet() : Lower(Upper<ElementType>()) {}; \
+				constexpr _CoordinateSet(const Upper<ElementType>& Lower) : Lower(Lower) {}; \
+				AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper, Lower); \
+			};
+
+#define AHO_DEFINE_SPECIAL_COORDINATE_SET2(Upper1, Upper2, Lower1, Lower2) \
+			template <typename ElementType> \
+			struct _CoordinateSet<ElementType, typename _MakeCoordinateInfo< \
+							      (std::same_as<X<ElementType>, Upper1<ElementType>> || std::same_as<X<ElementType>, Upper2<ElementType>>), \
+							      (std::same_as<Y<ElementType>, Upper1<ElementType>> || std::same_as<Y<ElementType>, Upper2<ElementType>>), \
+							      (std::same_as<Z<ElementType>, Upper1<ElementType>> || std::same_as<Z<ElementType>, Upper2<ElementType>>)  \
+							  >::value> { \
+				using coordinate_info = typename _MakeCoordinateInfo< \
+							      (std::same_as<X<ElementType>, Upper1<ElementType>> || std::same_as<X<ElementType>, Upper2<ElementType>>), \
+							      (std::same_as<Y<ElementType>, Upper1<ElementType>> || std::same_as<Y<ElementType>, Upper2<ElementType>>), \
+							      (std::same_as<Z<ElementType>, Upper1<ElementType>> || std::same_as<Z<ElementType>, Upper2<ElementType>>)  \
+							  >::value; \
+				union { Upper1<ElementType> Lower1, ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 1); }; \
+				union { Upper2<ElementType> Lower2, ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 2); }; \
+				constexpr _CoordinateSet() : Lower1(Upper1<ElementType>()), Lower2(Upper2<ElementType>()) {}; \
+				constexpr _CoordinateSet(const Upper1<ElementType>& Lower1, const Upper2<ElementType>& Lower2) : Lower1(Lower1), Lower2(Lower2) {}; \
+				AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper1, Lower1); \
+				AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper2, Lower2); \
+			};
+
+		AHO_DEFINE_SPECIAL_COORDINATE_SET1(X, x);
+		AHO_DEFINE_SPECIAL_COORDINATE_SET1(Y, y);
+		AHO_DEFINE_SPECIAL_COORDINATE_SET1(Z, z);
+
+		AHO_DEFINE_SPECIAL_COORDINATE_SET2(X, Y, x, y);
+		AHO_DEFINE_SPECIAL_COORDINATE_SET2(X, Z, x, z);
+		AHO_DEFINE_SPECIAL_COORDINATE_SET2(Y, Z, y, z);
+
+		template <typename ElementType>
+		struct _CoordinateSet<ElementType, typename _MakeCoordinateInfo<true, true, true>::value> {
+			using coordinate_info = _MakeCoordinateInfo<true, true, true>::value;
+			union { X<ElementType> x, ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 1); };
+			union { Y<ElementType> y, ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 2); };
+			union { Z<ElementType> z, ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 3); };
+			constexpr _CoordinateSet() : x(X<ElementType>()), y(Y<ElementType>()),z(Z<ElementType>()) {}
+			constexpr _CoordinateSet(const X<ElementType>& x, const Y<ElementType>& y, const Z<ElementType>& z) : x(x), y(y), z(z) {}
+
+			AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(X, x);
+			AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Y, y);
+			AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Z, z);
+		};
+
+		template <typename CI1, typename CI2>
+		struct _SumCoordinateInfo {
+			using value = typename _MakeCoordinateInfo<CI1::EnabledX || CI2::EnabledX, CI1::EnabledY || CI2::EnabledY, CI1::EnabledZ || CI2::EnabledZ>::value;
+		};
+
+		template<typename T1, typename CI1, typename T2, typename CI2>
+		constexpr _CoordinateSet<decltype(std::declval<T1>() + std::declval<T2>()), typename _SumCoordinateInfo<CI1, CI2>::value> operator +(const _CoordinateSet<T1, CI1>& e1, const _CoordinateSet<T2, CI2>& e2) {
+			_CoordinateSet<decltype(std::declval<T1>() + std::declval<T2>()), typename _SumCoordinateInfo<CI1, CI2>::value> result;
+			if constexpr (CI1::EnabledX) {
+				result += e1.x;
+			}
+			if constexpr (CI1::EnabledY) {
+				result += e1.y;
+			}
+			if constexpr (CI1::EnabledZ) {
+				result += e1.z;
+			}
+
+			if constexpr (CI2::EnabledX) {
+				result += e2.x;
+			}
+			if constexpr (CI2::EnabledY) {
+				result += e2.y;
+			}
+			if constexpr (CI2::EnabledZ) {
+				result += e2.z;
+			}
+
+			return result;
+		}
+
+		template<typename T1, typename CI1, typename T2>
+		constexpr _CoordinateSet<decltype(std::declval<T1>() + std::declval<T2>()), typename _SumCoordinateInfo<CI1, _MakeCoordinateInfo<true, false, false>::value>::value> operator +(const _CoordinateSet<T1, CI1>& e1, const X<T2>& e2) {
+			_CoordinateSet<decltype(std::declval<T1>() + std::declval<T2>()), typename _SumCoordinateInfo<CI1, _MakeCoordinateInfo<true, false, false>::value>::value> result;
+			if constexpr (CI1::EnabledX) {
+				result += e1.x;
+			}
+			if constexpr (CI1::EnabledY) {
+				result += e1.y;
+			}
+			if constexpr (CI1::EnabledZ) {
+				result += e1.z;
+			}
+
+			result += e2;
+
+			return result;
+		}
+
+		template<typename T1, typename CI1, typename T2>
+		constexpr _CoordinateSet<decltype(std::declval<T1>() + std::declval<T2>()), typename _SumCoordinateInfo<CI1, _MakeCoordinateInfo<false, true, false>::value>::value> operator +(const _CoordinateSet<T1, CI1>& e1, const Y<T2>& e2) {
+			_CoordinateSet<decltype(std::declval<T1>() + std::declval<T2>()), typename _SumCoordinateInfo<CI1, _MakeCoordinateInfo<false, true, false>::value>::value> result;
+			if constexpr (CI1::EnabledX) {
+				result += e1.x;
+			}
+			if constexpr (CI1::EnabledY) {
+				result += e1.y;
+			}
+			if constexpr (CI1::EnabledZ) {
+				result += e1.z;
+			}
+
+			result += e2;
+
+			return result;
+		}
+
+		template<typename T1, typename CI1, typename T2>
+		constexpr _CoordinateSet<decltype(std::declval<T1>() + std::declval<T2>()), typename _SumCoordinateInfo<CI1, _MakeCoordinateInfo<false, false, true>::value>::value> operator +(const _CoordinateSet<T1, CI1>& e1, const Z<T2>& e2) {
+			_CoordinateSet<decltype(std::declval<T1>() + std::declval<T2>()), typename _SumCoordinateInfo<CI1, _MakeCoordinateInfo<false, false, true>::value>::value> result;
+			if constexpr (CI1::EnabledX) {
+				result += e1.x;
+			}
+			if constexpr (CI1::EnabledY) {
+				result += e1.y;
+			}
+			if constexpr (CI1::EnabledZ) {
+				result += e1.z;
+			}
+
+			result += e2;
+
+			return result;
+		}
+
+		template<typename T1, typename T2>
+		constexpr _CoordinateSet<decltype(std::declval<T1>() + std::declval<T2>()), typename _MakeCoordinateInfo<true, true, false>::value> operator +(const X<T1>& e1, const Y<T2>& e2) {
+			return { e1 , e2 };
+		}
+
+		template<typename T1, typename T2>
+		constexpr _CoordinateSet<decltype(std::declval<T1>() + std::declval<T2>()), typename _MakeCoordinateInfo<true, false, true>::value> operator +(const X<T1>& e1, const Z<T2>& e2) {
+			return { e1 , e2 };
+		}
+
+		template<typename T1, typename T2>
+		constexpr _CoordinateSet<decltype(std::declval<T1>() + std::declval<T2>()), typename _MakeCoordinateInfo<false, true, true>::value> operator +(const Y<T1>& e1, const Y<T2>& e2) {
+			return { e1 , e2 };
+		}
+
 		constexpr X<double> operator"" AHO_LITERAL(x)(long double v) { return { (double)v }; };
 		constexpr X<int> operator"" AHO_LITERAL(x)(size_t v) { return { (int)v }; };
 		constexpr X<float> operator"" AHO_LITERAL(f_x)(long double v) { return { (float)v }; };
@@ -118,106 +368,8 @@ namespace AHO_NAMESPACE {
 		constexpr Z<size_t> operator"" AHO_LITERAL(l_z)(size_t v) { return { v }; };
 		constexpr Z<double> z(1.0);
 
-		template <bool ...Booleans>
-		constexpr size_t _CountTruesFunc() {
-			size_t n = 0;
-			bool bools[] = { Booleans... };
-			for (bool f : bools)
-				if (f)
-					n++;
-			return n;
-		}
-
-		template <bool ...Booleans>
-		struct _CountTrues {
-			constexpr static size_t value = _CountTruesFunc<Booleans...>();
-		};
-
-		template <VSL_NAMESPACE::is_dimention D, bool EnableX, bool EnableY = false, bool EnableZ = false>
-		struct _CoodinateInfo {
-			using dimention = D;
-			constexpr static bool EnabledX = EnableX;
-			constexpr static bool EnabledY = EnableY;
-			constexpr static bool EnabledZ = EnableZ;
-			constexpr static bool IndexX = _CountTruesFunc<EnableX>();
-			constexpr static bool IndexY = _CountTruesFunc<EnableX, EnableY>();
-			constexpr static bool IndexZ = _CountTruesFunc<EnableX, EnableY, EnableZ>();
-		};
-
-		template<bool EnableX = false, bool EnableY = false, bool EnableZ = false>
-		struct _MakeCoodinateInfo {
-			using value = _CoodinateInfo<typename VSL_NAMESPACE::Dimention<_CountTrues<EnableX, EnableY, EnableZ>::value>::value, EnableX, EnableY, EnableZ>;
-		};
-
-		template<VSL_NAMESPACE::is_dimention D>
-		struct _DefaultCoodinateInfo {};
-
-		template<>
-		struct _DefaultCoodinateInfo<VSL_NAMESPACE::D1> {
-			using value = _CoodinateInfo<VSL_NAMESPACE::D1, true>;
-		};
-
-		template<>
-		struct _DefaultCoodinateInfo<VSL_NAMESPACE::D2> {
-			using value = _CoodinateInfo<VSL_NAMESPACE::D2, true, true>;
-		};
-
-		template<>
-		struct _DefaultCoodinateInfo<VSL_NAMESPACE::D3> {
-			using value = _CoodinateInfo<VSL_NAMESPACE::D3, true, true, true>;
-		};
-
-		template <typename ElementType, typename _CoordinateInfo>
-		struct _CoordinateSet {};
-
-#define AHO_DEFINE_SPECIAL_COORDINATE_SET1(Upper, Lower) \
-		template <typename ElementType> \
-		struct _CoordinateSet<ElementType, typename _MakeCoodinateInfo< \
-							      ::std::same_as<X<ElementType>, Upper<ElementType>>, \
-								  ::std::same_as<Y<ElementType>, Upper<ElementType>>, \
-								  ::std::same_as<Z<ElementType>, Upper<ElementType>>  \
-							  >::value> { \
-			using coordinate_info = typename _MakeCoodinateInfo< \
-								  ::std::same_as<X<ElementType>, Upper<ElementType>>, \
-								  ::std::same_as<Y<ElementType>, Upper<ElementType>>, \
-								  ::std::same_as<Z<ElementType>, Upper<ElementType>>  \
-							  >::value; \
-			union { Upper<ElementType> Lower, c1; }; \
-		};
-
-#define AHO_DEFINE_SPECIAL_COORDINATE_SET2(Upper1, Upper2, Lower1, Lower2) \
-		template <typename ElementType> \
-		struct _CoordinateSet<ElementType, typename _MakeCoodinateInfo< \
-							      (::std::same_as<X<ElementType>, Upper1<ElementType>> || ::std::same_as<X<ElementType>, Upper2<ElementType>>), \
-							      (::std::same_as<Y<ElementType>, Upper1<ElementType>> || ::std::same_as<Y<ElementType>, Upper2<ElementType>>), \
-							      (::std::same_as<Z<ElementType>, Upper1<ElementType>> || ::std::same_as<Z<ElementType>, Upper2<ElementType>>)  \
-							  >::value> { \
-			using coordinate_info = typename _MakeCoodinateInfo< \
-							      (::std::same_as<X<ElementType>, Upper1<ElementType>> || ::std::same_as<X<ElementType>, Upper2<ElementType>>), \
-							      (::std::same_as<Y<ElementType>, Upper1<ElementType>> || ::std::same_as<Y<ElementType>, Upper2<ElementType>>), \
-							      (::std::same_as<Z<ElementType>, Upper1<ElementType>> || ::std::same_as<Z<ElementType>, Upper2<ElementType>>)  \
-							  >::value; \
-			union { Upper1<ElementType> Lower1, c1; }; \
-			union { Upper2<ElementType> Lower2, c2; }; \
-		};
-
-		AHO_DEFINE_SPECIAL_COORDINATE_SET1(X, x);
-		AHO_DEFINE_SPECIAL_COORDINATE_SET1(Y, y);
-		AHO_DEFINE_SPECIAL_COORDINATE_SET1(Z, z);
-
-		AHO_DEFINE_SPECIAL_COORDINATE_SET2(X, Y, x, y);
-		AHO_DEFINE_SPECIAL_COORDINATE_SET2(X, Z, x, z);
-		AHO_DEFINE_SPECIAL_COORDINATE_SET2(Y, Z, y, z);
-
-		template <typename ElementType>
-		struct _CoordinateSet<ElementType, _MakeCoodinateInfo<true, true, true>::value> {
-			using coordinate_info = _MakeCoodinateInfo<true, true, true>::value;
-			union { X<ElementType> x, c1; };
-			union { Y<ElementType> y, c2; };
-			union { Z<ElementType> z, c3; };
-		};
-
 		using coordinate::X;
 		using coordinate::Y;
 		using coordinate::Z;
 	}
+}

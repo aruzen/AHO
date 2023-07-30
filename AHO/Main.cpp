@@ -24,6 +24,7 @@
 #include <AHO/define.h>
 #include <AHO/core/math/Mat.h>
 #include <AHO/core/math/coordinate.h>
+
 #include <AHO/core/Vector.h>
 #include <AHO/core/Point.h>
 #include <AHO/core/Triangle.h>
@@ -36,15 +37,18 @@
 
 int main() {
 	using namespace aho;
-	using namespace ::aho::coordinate;
+	using namespace aho::coordinate;
 
-	constexpr auto n = _CountTrues<true, false, true>::value;
-	vsl::loggingln(n);
+	auto x_z = 10x + 10z;
 
-	_CoordinateSet<int, _MakeCoodinateInfo<true, false, true>::value> x_z;
+	x_z -= 5z;
+	auto x_y_z = x_z + 7y;
+	
+	vsl::loggingln(x_z._cnmn1, ", ",  x_z._cnmn2);
+	vsl::loggingln(x_y_z.x, ", ", x_y_z.y, ", ", x_y_z.z);
 
-	vsl::loggingln(sizeof(x_z));
-	return 0;
+
+	/*
 	try {
 		using namespace vsl;
 		Vulkan vk("test", { "VK_KHR_win32_surface", "VK_KHR_surface" });
@@ -74,4 +78,5 @@ int main() {
 		vsl::loggingln(e.what());
 		return 1;
 	}
+	*/
 }

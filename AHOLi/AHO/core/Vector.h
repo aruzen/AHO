@@ -23,7 +23,7 @@ namespace AHO_NAMESPACE {
 	concept is_vector = requires{
 		typename T::dimention;
 		typename T::element_type;
-		::std::convertible_to<T, _Vector<typename T::element_type, typename T::dimention>>;
+		std::convertible_to<T, _Vector<typename T::element_type, typename T::dimention>>;
 	};
 
 	namespace d1 {

@@ -1,6 +1,12 @@
 #pragma once
 
+#ifndef AHO_NAMESPACE
 #define AHO_NAMESPACE aho
+#endif
+
+#ifndef AHO_COORDINATE_NUMBERD_MEMBER_NAME
+#define AHO_COORDINATE_NUMBERD_MEMBER_NAME _cnmn
+#endif
 
 #define AHO_POOP_PUBLIC_SECURITY
 

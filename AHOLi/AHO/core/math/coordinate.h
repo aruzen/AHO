@@ -15,27 +15,27 @@ namespace AHO_NAMESPACE {
 			constexpr X(const T& t) : value(t) {};
 			constexpr X() : value{} {};
 
-			constexpr X<T> operator +() { static_assert(plusable<T>); return { value }; };
-			constexpr X<T> operator -() { static_assert(minusable<T>); return { -value }; };
-			template <add_as<T> R>
+			constexpr X<T> operator +() { static_assert(concepts::plusable<T>); return { value }; };
+			constexpr X<T> operator -() { static_assert(concepts::minusable<T>); return { -value }; };
+			template <concepts::add_as<T> R>
 			constexpr X<decltype(std::declval<T>() + std::declval<R>())> operator +(X<R> t) { return { value + t.value }; };
-			template <subtract_as<T> R>
+			template <concepts::subtract_as<T> R>
 			constexpr X<decltype(std::declval<T>() - std::declval<R>())> operator -(X<R> t) { return { value - t.value }; };
-			template <multiply_as<T> R>
+			template <concepts::multiply_as<T> R>
 			constexpr X<decltype(std::declval<T>()* std::declval<R>())> operator *(X<R> t) { return { value * t.value }; };
-			template <division_as<T> R>
+			template <concepts::division_as<T> R>
 			constexpr X<decltype(std::declval<T>() / std::declval<R>())> operator /(X<R> t) { return { value / t.value }; };
 
-			template <add_as<T> R>
+			template <concepts::add_as<T> R>
 			constexpr X<T>& operator +=(X<R> t) { value += t.value; return *this; };
-			template <subtract_as<T> R>
+			template <concepts::subtract_as<T> R>
 			constexpr X<T>& operator -=(X<R> t) { value -= t.value; return *this; };
-			template <multiply_as<T> R>
+			template <concepts::multiply_as<T> R>
 			constexpr X<T>& operator *=(X<R> t) { value *= t.value; return *this; };
-			template <division_as<T> R>
+			template <concepts::division_as<T> R>
 			constexpr X<T>& operator /=(X<R> t) { value /= t.value; return *this; };
 
-			template <cast_as<T> R>
+			template <concepts::cast_as<T> R>
 			X<R> cast() const { return { (R)value }; }
 		};
 
@@ -46,27 +46,27 @@ namespace AHO_NAMESPACE {
 			constexpr Y(const T& t) : value(t) {};
 			constexpr Y() : value{} {};
 
-			constexpr Y<T> operator +() { static_assert(plusable<T>); return { value }; };
-			constexpr Y<T> operator -() { static_assert(minusable<T>); return { -value }; };
-			template <add_as<T> R>
+			constexpr Y<T> operator +() { static_assert(concepts::plusable<T>); return { value }; };
+			constexpr Y<T> operator -() { static_assert(concepts::minusable<T>); return { -value }; };
+			template <concepts::add_as<T> R>
 			constexpr Y<decltype(std::declval<T>() + std::declval<R>())> operator +(Y<R> t) { return { value + t.value }; };
-			template <subtract_as<T> R>
+			template <concepts::subtract_as<T> R>
 			constexpr Y<decltype(std::declval<T>() - std::declval<R>())> operator -(Y<R> t) { return { value - t.value }; };
-			template <multiply_as<T> R>
+			template <concepts::multiply_as<T> R>
 			constexpr Y<decltype(std::declval<T>()* std::declval<R>())> operator *(Y<R> t) { return { value * t.value }; };
-			template <division_as<T> R>
+			template <concepts::division_as<T> R>
 			constexpr Y<decltype(std::declval<T>() / std::declval<R>())> operator /(Y<R> t) { return { value / t.value }; };
 
-			template <add_as<T> R>
+			template <concepts::add_as<T> R>
 			constexpr Y<T>& operator +=(Y<R> t) { value += t.value; return *this; };
-			template <subtract_as<T> R>
+			template <concepts::subtract_as<T> R>
 			constexpr Y<T>& operator -=(Y<R> t) { value -= t.value; return *this; };
-			template <multiply_as<T> R>
+			template <concepts::multiply_as<T> R>
 			constexpr Y<T>& operator *=(Y<R> t) { value *= t.value; return *this; };
-			template <division_as<T> R>
+			template <concepts::division_as<T> R>
 			constexpr Y<T>& operator /=(Y<R> t) { value /= t.value; return *this; };
 
-			template <cast_as<T> R>
+			template <concepts::cast_as<T> R>
 			Y<R> cast() const { return { (R)value }; }
 		};
 
@@ -77,27 +77,27 @@ namespace AHO_NAMESPACE {
 			constexpr Z(const T& t) : value(t) {};
 			constexpr Z() : value{} {};
 
-			constexpr Z<T> operator +() { static_assert(plusable<T>); return { value }; };
-			constexpr Z<T> operator -() { static_assert(minusable<T>); return { -value }; };
-			template <add_as<T> R>
+			constexpr Z<T> operator +() { static_assert(concepts::plusable<T>); return { value }; };
+			constexpr Z<T> operator -() { static_assert(concepts::minusable<T>); return { -value }; };
+			template <concepts::add_as<T> R>
 			constexpr Z<decltype(std::declval<T>() + std::declval<R>())> operator +(Z<R> t) { return { value + t.value }; };
-			template <subtract_as<T> R>
+			template <concepts::subtract_as<T> R>
 			constexpr Z<decltype(std::declval<T>() - std::declval<R>())> operator -(Z<R> t) { return { value - t.value }; };
-			template <multiply_as<T> R>
+			template <concepts::multiply_as<T> R>
 			constexpr Z<decltype(std::declval<T>()* std::declval<R>())> operator *(Z<R> t) { return { value * t.value }; };
-			template <division_as<T> R>
+			template <concepts::division_as<T> R>
 			constexpr Z<decltype(std::declval<T>() / std::declval<R>())> operator /(Z<R> t) { return { value / t.value }; };
 
-			template <add_as<T> R>
+			template <concepts::add_as<T> R>
 			constexpr Z<T>& operator +=(Z<R> t) { value += t.value; return *this; };
-			template <subtract_as<T> R>
+			template <concepts::subtract_as<T> R>
 			constexpr Z<T>& operator -=(Z<R> t) { value -= t.value; return *this; };
-			template <multiply_as<T> R>
+			template <concepts::multiply_as<T> R>
 			constexpr Z<T>& operator *=(Z<R> t) { value *= t.value; return *this; };
-			template <division_as<T> R>
+			template <concepts::division_as<T> R>
 			constexpr Z<T>& operator /=(Z<R> t) { value /= t.value; return *this; };
 
-			template <cast_as<T> R>
+			template <concepts::cast_as<T> R>
 			Z<R> cast() const { return { (R)value }; }
 		};
 

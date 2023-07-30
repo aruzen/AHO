@@ -25,7 +25,7 @@ namespace AHO_NAMESPACE {
 
 		constexpr Triangle<R, D> operator +(AHO_NAMESPACE::_Point<R, D> t) const;
 
-		template<AHO_NAMESPACE::points_view_able T>
+		template<AHO_NAMESPACE::concepts::points_view_able T>
 		constexpr Polygon<R, D> operator +(T t) const;
 
 		constexpr std::array<AHO_NAMESPACE::_Point<R, D>, 2> points() const;
@@ -53,7 +53,7 @@ namespace AHO_NAMESPACE {
 
 		constexpr Triangle<R, D> operator +(AHO_NAMESPACE::_Point<R, D> t) const;
 
-		template<AHO_NAMESPACE::points_view_able T>
+		template<AHO_NAMESPACE::concepts::points_view_able T>
 		constexpr Polygon<R, D> operator +(T t) const;
 
 		constexpr std::array<AHO_NAMESPACE::_Point<R, D>, 2> points() const;
@@ -76,7 +76,7 @@ namespace AHO_NAMESPACE {
 	}
 
 	template<typename R, VSL_NAMESPACE::is_dimention D>
-	template<AHO_NAMESPACE::points_view_able T>
+	template<AHO_NAMESPACE::concepts::points_view_able T>
 	inline constexpr Polygon<R, D> Line<R, D>::operator+(T t) const
 	{
 		return Polygon<R, D>();
@@ -120,7 +120,7 @@ namespace AHO_NAMESPACE {
 	}
 
 	template<typename R, VSL_NAMESPACE::is_dimention D>
-	template<AHO_NAMESPACE::points_view_able T>
+	template<AHO_NAMESPACE::concepts::points_view_able T>
 	inline constexpr Polygon<R, D> PtrLine<R, D>::operator+(T t) const
 	{
 		return Polygon<R, D>();

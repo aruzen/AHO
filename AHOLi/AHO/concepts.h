@@ -4,7 +4,7 @@
 #include <concepts>
 #include <optional>
 
-namespace AHO_NAMESPACE {
+namespace AHO_NAMESPACE::concepts {
 	template<typename T>
 	concept plusable = requires(T t) {
 		+t;
@@ -27,7 +27,7 @@ namespace AHO_NAMESPACE {
 
 	template<typename T, typename R>
 	concept multiply_as = requires(T t, R r) {
-		t * r;
+		t* r;
 	};
 
 	template<typename T, typename R>
@@ -53,10 +53,10 @@ namespace AHO_NAMESPACE {
 		return false;
 	}
 
-	template<typename T,typename... Args>
-	concept sames_as =  (0 == sizeof...(Args) && true) ||
-						(1 == sizeof...(Args) && std::same_as<T, Args...>) ||
-						(2 <= sizeof...(Args) && __sames_as<T, Args...>());
+	template<typename T, typename... Args>
+	concept sames_as = (0 == sizeof...(Args) && true) ||
+		(1 == sizeof...(Args) && std::same_as<T, Args...>) ||
+		(2 <= sizeof...(Args) && __sames_as<T, Args...>());
 
 	template<typename T>
 	concept is_standard_object = requires(T t) {

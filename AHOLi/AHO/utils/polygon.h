@@ -5,7 +5,7 @@
 #include "../core/ov.h"
 #include <ranges>
 
-namespace AHO_NAMESPACE {
+namespace AHO_NAMESPACE::concepts {
 	template<typename T>
 	concept __have_elment_dimention = requires {
 		typename T::dimention;

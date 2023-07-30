@@ -25,7 +25,7 @@ namespace AHO_NAMESPACE {
 		constexpr Triangle(AHO_NAMESPACE::_Point<R, D> pos1, AHO_NAMESPACE::_Point<R, D> pos2, AHO_NAMESPACE::_Point<R, D> pos3)
 			: pos1(pos1), pos2(pos2), pos3(pos3) {}
 
-		template<AHO_NAMESPACE::points_view_able T>
+		template<AHO_NAMESPACE::concepts::points_view_able T>
 		constexpr Polygon<R, D> operator +(T t) const;
 
 		constexpr double area() const;
@@ -57,7 +57,7 @@ namespace AHO_NAMESPACE {
 		constexpr PtrTriangle(AHO_NAMESPACE::_Point<R, D>* pos1, AHO_NAMESPACE::_Point<R, D>* pos2, AHO_NAMESPACE::_Point<R, D>* pos3)
 			: pos1(pos1), pos2(pos2), pos3(pos3) {}
 
-		template<AHO_NAMESPACE::points_view_able T>
+		template<AHO_NAMESPACE::concepts::points_view_able T>
 		constexpr Polygon<R, D> operator +(T t) const;
 
 		constexpr double area() const;
@@ -80,7 +80,7 @@ namespace AHO_NAMESPACE {
 	// --------------------------------------------------------------------------------------------------------------------
 
 	template<typename R, VSL_NAMESPACE::is_dimention D>
-	template<AHO_NAMESPACE::points_view_able T>
+	template<AHO_NAMESPACE::concepts::points_view_able T>
 	inline constexpr Polygon<R, D> Triangle<R, D>::operator+(T t) const
 	{
 		return Polygon<R, D>();
@@ -139,7 +139,7 @@ namespace AHO_NAMESPACE {
 	// --------------------------------------------------------------------------------------------------------------------
 
 	template<typename R, VSL_NAMESPACE::is_dimention D>
-	template<AHO_NAMESPACE::points_view_able T>
+	template<AHO_NAMESPACE::concepts::points_view_able T>
 	inline constexpr Polygon<R, D> PtrTriangle<R, D>::operator+(T t) const
 	{
 		return Polygon<R, D>();

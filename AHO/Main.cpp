@@ -47,8 +47,6 @@ int main() {
 	vsl::loggingln(x_z._cnmn1, ", ",  x_z._cnmn2);
 	vsl::loggingln(x_y_z.x, ", ", x_y_z.y, ", ", x_y_z.z);
 
-
-	/*
 	try {
 		using namespace vsl;
 		Vulkan vk("test", { "VK_KHR_win32_surface", "VK_KHR_surface" });
@@ -78,5 +76,5 @@ int main() {
 		vsl::loggingln(e.what());
 		return 1;
 	}
-	*/
+	/**/
 }

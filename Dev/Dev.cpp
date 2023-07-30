@@ -31,6 +31,24 @@ inline B<T>::B(Args ...args) {
 	T(&i, args...);
 }
 
+template<typename T>
+consteval bool __sames_as() {
+	return true;
+}
+
+template<typename T, typename R, typename... Args>
+consteval bool __sames_as() {
+	if constexpr (std::same_as<T, R>) {
+		return __sames_as<T, Args...>();
+	}
+	return false;
+}
+
+template<typename T, typename... Args>
+concept sames_as = (0 == sizeof...(Args) && true) ||
+				   (1 == sizeof...(Args) && std::same_as<T, Args...>) ||
+				   (2 <= sizeof...(Args) && __sames_as<T, Args...>());
+
 int main()
 {
 	B b(1, 1);

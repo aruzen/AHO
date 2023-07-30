@@ -40,13 +40,23 @@ namespace AHO_NAMESPACE {
 		(R)t;
 	};
 
+	template<typename T>
+	consteval bool __sames_as() {
+		return true;
+	}
+
 	template<typename T, typename R, typename... Args>
-	concept __sames_as = std::same_as<T, R> && (0 == sizeof...(Args) || __sames_as<T, Args...>);
+	consteval bool __sames_as() {
+		if constexpr (std::same_as<T, R>) {
+			return __sames_as<T, Args...>();
+		}
+		return false;
+	}
 
 	template<typename T,typename... Args>
 	concept sames_as =  (0 == sizeof...(Args) && true) ||
 						(1 == sizeof...(Args) && std::same_as<T, Args...>) ||
-						(2 <= sizeof...(Args) && __sames_as<T, Args...>);
+						(2 <= sizeof...(Args) && __sames_as<T, Args...>());
 
 	template<typename T>
 	concept is_standard_object = requires(T t) {

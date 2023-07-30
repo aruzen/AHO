@@ -80,7 +80,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>C:\Users\aruze\source\repos\AHO\AHOLi;D:\sdks\VulkanSDK\1.2.176.1\Include;D:\apuri\_libs\glfw\include;D:\apuri\_libs\glm;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Users\user\source\repos\aruzen\AHO\AHOLi;$(VULKAN_SDK)\Include;$(GLFW)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
@@ -137,6 +137,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpplatest</LanguageStandard>
+      <BuildStlModules>false</BuildStlModules>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -144,7 +145,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalDependencies>"D:\apuri\_libs\glfw\lib-vc2019\glfw3.lib";"D:\sdks\VulkanSDK\1.2.176.1\Lib\vulkan-1.lib";%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>"$(GLFW)\lib-vc2019\glfw3.lib";"$(VULKAN_SDK)\Lib\vulkan-1.lib";%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

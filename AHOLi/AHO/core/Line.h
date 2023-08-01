@@ -11,146 +11,148 @@
 #include <array>
 
 namespace AHO_NAMESPACE {
-	template<typename R, VSL_NAMESPACE::is_dimention D>
+	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
 	struct Line {
 		using dimention = D;
 		using element_type = R;
+		using coordinste_info = CI;
 
-		AHO_NAMESPACE::_Point<R, D> pos1, pos2;
+		AHO_NAMESPACE::_Point<R, D, CI> pos1, pos2;
 
 		constexpr Line() {}
 
-		constexpr Line(AHO_NAMESPACE::_Point<R, D> pos1, AHO_NAMESPACE::_Point<R, D> pos2)
+		constexpr Line(AHO_NAMESPACE::_Point<R, D, CI> pos1, AHO_NAMESPACE::_Point<R, D, CI> pos2)
 			: pos1(pos1), pos2(pos2) {}
 
-		constexpr Triangle<R, D> operator +(AHO_NAMESPACE::_Point<R, D> t) const;
+		constexpr Triangle<R, D, CI> operator +(AHO_NAMESPACE::_Point<R, D, CI> t) const;
 
 		template<AHO_NAMESPACE::concepts::points_view_able T>
-		constexpr Polygon<R, D> operator +(T t) const;
+		constexpr Polygon<R, D, CI> operator +(T t) const;
 
-		constexpr std::array<AHO_NAMESPACE::_Point<R, D>, 2> points() const;
+		constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>, 2> points() const;
 
-		constexpr std::array<Line<R, D>, 1> lines() const;
+		constexpr std::array<Line<R, D, CI>, 1> lines() const;
 
-		constexpr std::array<AHO_NAMESPACE::_Point<R, D>*, 2> ptrpoints();
+		constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 2> ptrpoints();
 
-		constexpr std::array<PtrLine<R, D>, 1> ptrlines();
+		constexpr std::array<PtrLine<R, D, CI>, 1> ptrlines();
 
-		constexpr PtrLine<R, D> adress();
+		constexpr PtrLine<R, D, CI> adress();
 	};
 
-	template<typename R, VSL_NAMESPACE::is_dimention D>
+	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
 	struct PtrLine {
 		using dimention = D;
 		using element_type = R;
+		using coordinste_info = CI;
 
-		AHO_NAMESPACE::_Point<R, D>* pos1, pos2;
+		AHO_NAMESPACE::_Point<R, D, CI>* pos1, pos2;
 
 		constexpr PtrLine() {}
 
-		constexpr PtrLine(AHO_NAMESPACE::_Point<R, D>* pos1, AHO_NAMESPACE::_Point<R, D>* pos2)
+		constexpr PtrLine(AHO_NAMESPACE::_Point<R, D, CI>* pos1, AHO_NAMESPACE::_Point<R, D, CI>* pos2)
 			: pos1(pos1), pos2(pos2) {}
 
-		constexpr Triangle<R, D> operator +(AHO_NAMESPACE::_Point<R, D> t) const;
+		constexpr Triangle<R, D, CI> operator +(AHO_NAMESPACE::_Point<R, D, CI> t) const;
 
 		template<AHO_NAMESPACE::concepts::points_view_able T>
-		constexpr Polygon<R, D> operator +(T t) const;
+		constexpr Polygon<R, D, CI> operator +(T t) const;
 
-		constexpr std::array<AHO_NAMESPACE::_Point<R, D>, 2> points() const;
+		constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>, 2> points() const;
 
-		constexpr std::array<Line<R, D>, 1> lines() const;
+		constexpr std::array<Line<R, D, CI>, 1> lines() const;
 
-		constexpr std::array<AHO_NAMESPACE::_Point<R, D>*, 2> ptrpoints() const;
+		constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 2> ptrpoints() const;
 
-		constexpr std::array<PtrLine<R, D>, 1> ptrlines() const;
+		constexpr std::array<PtrLine<R, D, CI>, 1> ptrlines() const;
 
-		constexpr Line<R, D> indirect() const;
+		constexpr Line<R, D, CI> indirect() const;
 	};
 
 	// --------------------------------------------------------------------------------------------------------------------
 
-	template<typename R, VSL_NAMESPACE::is_dimention D>
-	inline constexpr Triangle<R, D> Line<R, D>::operator+(AHO_NAMESPACE::_Point<R, D> t) const
+	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
+	inline constexpr Triangle<R, D, CI> Line<R, D, CI>::operator+(AHO_NAMESPACE::_Point<R, D, CI> t) const
 	{
-		return Triangle<R, D>(pos1, pos2, t);
+		return Triangle<R, D, CI>(pos1, pos2, t);
 	}
 
-	template<typename R, VSL_NAMESPACE::is_dimention D>
+	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
 	template<AHO_NAMESPACE::concepts::points_view_able T>
-	inline constexpr Polygon<R, D> Line<R, D>::operator+(T t) const
+	inline constexpr Polygon<R, D, CI> Line<R, D, CI>::operator+(T t) const
 	{
-		return Polygon<R, D>();
+		return Polygon<R, D, CI>();
 	}
 
-	template<typename R, VSL_NAMESPACE::is_dimention D>
-	inline constexpr std::array<AHO_NAMESPACE::_Point<R, D>, 2> Line<R, D>::points() const
+	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
+	inline constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>, 2> Line<R, D, CI>::points() const
 	{
 		return { pos1, pos2 };
 	}
-	template<typename R, VSL_NAMESPACE::is_dimention D>
-	inline constexpr std::array<Line<R, D>, 1> Line<R, D>::lines() const
+	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
+	inline constexpr std::array<Line<R, D, CI>, 1> Line<R, D, CI>::lines() const
 	{
 		return { *this };
 	}
 
-	template<typename R, VSL_NAMESPACE::is_dimention D>
-	inline constexpr std::array<AHO_NAMESPACE::_Point<R, D>*, 2> Line<R, D>::ptrpoints()
+	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
+	inline constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 2> Line<R, D, CI>::ptrpoints()
 	{
-		return std::array<AHO_NAMESPACE::_Point<R, D>*, 2>(&pos1, &pos2);
+		return std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 2>(&pos1, &pos2);
 	}
 
-	template<typename R, VSL_NAMESPACE::is_dimention D>
-	inline constexpr std::array<PtrLine<R, D>, 1> Line<R, D>::ptrlines()
+	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
+	inline constexpr std::array<PtrLine<R, D, CI>, 1> Line<R, D, CI>::ptrlines()
 	{
 		return { adress() };
 	}
 
-	template<typename R, VSL_NAMESPACE::is_dimention D>
-	inline constexpr PtrLine<R, D> Line<R, D>::adress()
+	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
+	inline constexpr PtrLine<R, D, CI> Line<R, D, CI>::adress()
 	{
-		return PtrLine<R, D>(&pos1, &pos2);
+		return PtrLine<R, D, CI>(&pos1, &pos2);
 	}
 
 	// --------------------------------------------------------------------------------------------------------------------
 
-	template<typename R, VSL_NAMESPACE::is_dimention D>
-	inline constexpr Triangle<R, D> PtrLine<R, D>::operator+(AHO_NAMESPACE::_Point<R, D> t) const
+	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
+	inline constexpr Triangle<R, D, CI> PtrLine<R, D, CI>::operator+(AHO_NAMESPACE::_Point<R, D, CI> t) const
 	{
-		return Triangle<R, D>(*pos1, *pos2, t);
+		return Triangle<R, D, CI>(*pos1, *pos2, t);
 	}
 
-	template<typename R, VSL_NAMESPACE::is_dimention D>
+	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
 	template<AHO_NAMESPACE::concepts::points_view_able T>
-	inline constexpr Polygon<R, D> PtrLine<R, D>::operator+(T t) const
+	inline constexpr Polygon<R, D, CI> PtrLine<R, D, CI>::operator+(T t) const
 	{
-		return Polygon<R, D>();
+		return Polygon<R, D, CI>();
 	}
 
-	template<typename R, VSL_NAMESPACE::is_dimention D>
-	inline constexpr std::array<AHO_NAMESPACE::_Point<R, D>, 2> PtrLine<R, D>::points() const
+	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
+	inline constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>, 2> PtrLine<R, D, CI>::points() const
 	{
 		return { *pos1, *pos2 };
 	}
-	template<typename R, VSL_NAMESPACE::is_dimention D>
-	inline constexpr std::array<Line<R, D>, 1> PtrLine<R, D>::lines() const
+	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
+	inline constexpr std::array<Line<R, D, CI>, 1> PtrLine<R, D, CI>::lines() const
 	{
 		return { indirect() };
 	}
 
-	template<typename R, VSL_NAMESPACE::is_dimention D>
-	inline constexpr std::array<AHO_NAMESPACE::_Point<R, D>*, 2> PtrLine<R, D>::ptrpoints() const
+	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
+	inline constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 2> PtrLine<R, D, CI>::ptrpoints() const
 	{
-		return std::array<AHO_NAMESPACE::_Point<R, D>*, 2>(pos1, pos2);
+		return std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 2>(pos1, pos2);
 	}
 
-	template<typename R, VSL_NAMESPACE::is_dimention D>
-	inline constexpr std::array<PtrLine<R, D>, 1> PtrLine<R, D>::ptrlines() const
+	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
+	inline constexpr std::array<PtrLine<R, D, CI>, 1> PtrLine<R, D, CI>::ptrlines() const
 	{
 		return { *this };
 	}
-	template<typename R, VSL_NAMESPACE::is_dimention D>
-	inline constexpr Line<R, D> PtrLine<R, D>::indirect() const
+	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
+	inline constexpr Line<R, D, CI> PtrLine<R, D, CI>::indirect() const
 	{
-		return Line<R, D>(*pos1, *pos2);
+		return Line<R, D, CI>(*pos1, *pos2);
 	}
 }

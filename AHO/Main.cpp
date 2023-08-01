@@ -46,8 +46,18 @@ int main() {
 	x_z -= 5z;
 	auto x_y_z = x_z + 7y;
 	
+
 	vsl::loggingln(x_z._cnmn1, ", ",  x_z._cnmn2);
 	vsl::loggingln(x_y_z.x, ", ", x_y_z.y, ", ", x_y_z.z);
+
+	Vector vec1(1, 1);
+	Vector vec2(2.0, 2.0);
+	_Vector<int, vsl::D2, decltype(x + z)::coordinate_info> x_z_vec(10x + 25z);
+	auto vec3 = vec1 + vec2;
+
+	vsl::loggingln(x_z_vec.value.x, ", ", x_z_vec.value.z);
+
+	// Polygon();
 
 	/*
 	try {

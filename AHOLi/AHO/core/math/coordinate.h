@@ -22,7 +22,7 @@ namespace AHO_NAMESPACE {
 			template <concepts::subtract_as<T> R>
 			constexpr X<decltype(std::declval<T>() - std::declval<R>())> operator -(X<R> t) { return { value - t.value }; };
 			template <concepts::multiply_as<T> R>
-			constexpr X<decltype(std::declval<T>()* std::declval<R>())> operator *(X<R> t) { return { value * t.value }; };
+			constexpr X<decltype(std::declval<T>() * std::declval<R>())> operator *(X<R> t) { return { value * t.value }; };
 			template <concepts::division_as<T> R>
 			constexpr X<decltype(std::declval<T>() / std::declval<R>())> operator /(X<R> t) { return { value / t.value }; };
 
@@ -184,6 +184,14 @@ namespace AHO_NAMESPACE {
 		template <typename ElementType, typename _CoordinateInfo>
 		struct _CoordinateSet {};
 
+#define AHO_COORDINATE_NUMBERD_MEMBER_1 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 1)
+#define AHO_COORDINATE_NUMBERD_MEMBER_2 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 2)
+#define AHO_COORDINATE_NUMBERD_MEMBER_3 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 3)
+
+#define ___AN1 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_1, .value)
+#define ___AN2 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_2, .value)
+#define ___AN3 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_3, .value)
+
 #define AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper, Lower) \
 				template <typename T> \
 				constexpr _CoordinateSet<ElementType, coordinate_info>& operator +=(const Upper<T>& e) { Lower += e; return *this; } \
@@ -202,7 +210,7 @@ namespace AHO_NAMESPACE {
 								  std::same_as<Y<ElementType>, Upper<ElementType>>, \
 								  std::same_as<Z<ElementType>, Upper<ElementType>>  \
 							  >::value; \
-				union { Upper<ElementType> Lower, ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 1); }; \
+				union { Upper<ElementType> Lower, AHO_COORDINATE_NUMBERD_MEMBER_1; }; \
 				constexpr _CoordinateSet() : Lower(Upper<ElementType>()) {}; \
 				constexpr _CoordinateSet(const Upper<ElementType>& Lower) : Lower(Lower) {}; \
 				AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper, Lower); \
@@ -220,8 +228,8 @@ namespace AHO_NAMESPACE {
 							      (std::same_as<Y<ElementType>, Upper1<ElementType>> || std::same_as<Y<ElementType>, Upper2<ElementType>>), \
 							      (std::same_as<Z<ElementType>, Upper1<ElementType>> || std::same_as<Z<ElementType>, Upper2<ElementType>>)  \
 							  >::value; \
-				union { Upper1<ElementType> Lower1, ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 1); }; \
-				union { Upper2<ElementType> Lower2, ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 2); }; \
+				union { Upper1<ElementType> Lower1, AHO_COORDINATE_NUMBERD_MEMBER_1; }; \
+				union { Upper2<ElementType> Lower2, AHO_COORDINATE_NUMBERD_MEMBER_2; }; \
 				constexpr _CoordinateSet() : Lower1(Upper1<ElementType>()), Lower2(Upper2<ElementType>()) {}; \
 				constexpr _CoordinateSet(const Upper1<ElementType>& Lower1, const Upper2<ElementType>& Lower2) : Lower1(Lower1), Lower2(Lower2) {}; \
 				AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper1, Lower1); \
@@ -239,9 +247,9 @@ namespace AHO_NAMESPACE {
 		template <typename ElementType>
 		struct _CoordinateSet<ElementType, typename _MakeCoordinateInfo<true, true, true>::value> {
 			using coordinate_info = _MakeCoordinateInfo<true, true, true>::value;
-			union { X<ElementType> x, ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 1); };
-			union { Y<ElementType> y, ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 2); };
-			union { Z<ElementType> z, ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 3); };
+			union { X<ElementType> x, AHO_COORDINATE_NUMBERD_MEMBER_1; };
+			union { Y<ElementType> y, AHO_COORDINATE_NUMBERD_MEMBER_2; };
+			union { Z<ElementType> z, AHO_COORDINATE_NUMBERD_MEMBER_3; };
 			constexpr _CoordinateSet() : x(X<ElementType>()), y(Y<ElementType>()),z(Z<ElementType>()) {}
 			constexpr _CoordinateSet(const X<ElementType>& x, const Y<ElementType>& y, const Z<ElementType>& z) : x(x), y(y), z(z) {}
 

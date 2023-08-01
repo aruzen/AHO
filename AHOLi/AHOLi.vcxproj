@@ -173,6 +173,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="AHO\concepts.h" />
+    <ClInclude Include="AHO\core\collision.h" />
     <ClInclude Include="AHO\core\math\angle.h" />
     <ClInclude Include="AHO\core\index.h" />
     <ClInclude Include="AHO\core\Line.h" />

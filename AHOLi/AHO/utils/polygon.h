@@ -5,57 +5,59 @@
 #include "../core/ov.h"
 #include <ranges>
 
-namespace AHO_NAMESPACE::concepts {
-	template<typename T>
-	concept __have_elment_dimention = requires {
-		typename T::dimention;
-		typename T::element_type;
-	};
+namespace AHO_NAMESPACE {
+	namespace concepts {
+		template<typename T>
+		concept __have_elment_dimention = requires {
+			typename T::dimention;
+			typename T::element_type;
+		};
 
-	template<typename T>
-	concept is_line = requires(T t) {
-		__have_elment_dimention<T>;
-		(Line<typename T::element_type, typename T::dimention>)t;
-	};
+		template<typename T>
+		concept is_line = requires(T t) {
+			__have_elment_dimention<T>;
+			(Line<typename T::element_type, typename T::dimention>)t;
+		};
 
-	template<typename T>
-	concept is_triangle = requires(T t) {
-		__have_elment_dimention<T>;
-		(Triangle<typename T::element_type, typename T::dimention>)t;
-	};
+		template<typename T>
+		concept is_triangle = requires(T t) {
+			__have_elment_dimention<T>;
+			(Triangle<typename T::element_type, typename T::dimention>)t;
+		};
 
-	template<typename T>
-	concept is_points_object = requires (T t) {
-		typename T::element_type;
-		typename T::dimention;
-		VSL_NAMESPACE::is_dimention<typename T::dimention>;
-		{t.points()} -> std::ranges::range;
-		{*t.points().begin()} -> is_point;
-		std::views::common(t.points());
-	};
+		template<typename T>
+		concept is_points_object = requires (T t) {
+			typename T::element_type;
+			typename T::dimention;
+			VSL_NAMESPACE::is_dimention<typename T::dimention>;
+			{t.points()} -> std::ranges::range;
+			{*t.points().begin()} -> is_point;
+			std::views::common(t.points());
+		};
 
-	template<typename T>
-	concept is_lines_object = requires (T t) {
-		typename T::element_type;
-		typename T::dimention;
-		VSL_NAMESPACE::is_dimention<typename T::dimention>;
-		{t.lines()} -> std::ranges::range;
-		{*t.lines().begin()} -> is_line;
-		std::views::common(t.lines());
-	};
+		template<typename T>
+		concept is_lines_object = requires (T t) {
+			typename T::element_type;
+			typename T::dimention;
+			VSL_NAMESPACE::is_dimention<typename T::dimention>;
+			{t.lines()} -> std::ranges::range;
+			{*t.lines().begin()} -> is_line;
+			std::views::common(t.lines());
+		};
 
-	template<typename T>
-	concept is_triangles_object = requires (T t) {
-		typename T::element_type;
-		typename T::dimention;
-		VSL_NAMESPACE::is_dimention<typename T::dimention>;
-		{t.triangles()} -> std::ranges::range;
-		{*t.triangles().begin()} -> is_triangle;
-		std::views::common(t.triangles());
-	};
+		template<typename T>
+		concept is_triangles_object = requires (T t) {
+			typename T::element_type;
+			typename T::dimention;
+			VSL_NAMESPACE::is_dimention<typename T::dimention>;
+			{t.triangles()} -> std::ranges::range;
+			{*t.triangles().begin()} -> is_triangle;
+			std::views::common(t.triangles());
+		};
 
-	template<typename T>
-	concept points_view_able = is_points_object<T> || is_point<T>;
+		template<typename T>
+		concept points_view_able = is_points_object<T> || is_point<T>;
+	}
 
 	namespace views {
 		template<typename InnerView>
@@ -97,9 +99,10 @@ namespace AHO_NAMESPACE::concepts {
 
 		template<typename T>
 		auto points(T&& t) {
-			if constexpr (is_point<std::remove_reference_t<T>>) {
+			if constexpr (AHO_NAMESPACE::concepts::is_point<std::remove_reference_t<T>>) {
 				return std::views::single(std::declval<T>());
-			} else if constexpr (is_points_object<std::remove_reference_t<T>>) {
+			}
+			else if constexpr (concepts::is_points_object<std::remove_reference_t<T>>) {
 				return cast<_Point<typename std::remove_reference_t<T>::element_type, typename std::remove_reference_t<T>::dimention>>(t.points());
 			}
 		}

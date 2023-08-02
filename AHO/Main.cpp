@@ -57,11 +57,17 @@ int main() {
 
 	vsl::loggingln(x_z_vec.value.x, ", ", x_z_vec.value.z);
 
+	Triangle triangle({ 0, 0 }, { 0, 4 }, { 2, 2 });
+
+
+	vsl::loggingln("area : ", triangle.area());
+
 	// Polygon();
 
-	/*
 	try {
 		using namespace vsl;
+		using namespace vsl::pipeline_stage;
+
 		Vulkan vk("test", { "VK_KHR_win32_surface", "VK_KHR_surface" });
 		Window main_window("main");
 		auto pd = PhysicalDevices(vk).search();
@@ -76,6 +82,8 @@ int main() {
 
 		vsl::Shader const_triangle_shader(ld, "shaders/const_triangle.vert.spv");
 		vsl::Shader red_shader(ld, "shaders/red.frag.spv");
+
+		pipeline << PipelineStage<PipelineStageType::Vertex>("triangle", const_triangle_shader);
 
 		while (Window::Update() && main_window) {
 

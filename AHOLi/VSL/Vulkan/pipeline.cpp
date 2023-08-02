@@ -20,14 +20,7 @@ VSL_NAMESPACE::Pipeline<V>::Pipeline() {
 	dynamicState.pDynamicStates = DEFAULT_DYNAMIC_STATE.data();
 }
 
-template<bool V>
-VSL_NAMESPACE::Pipeline<V>& VSL_NAMESPACE::Pipeline<V>::operator <<(_PipelineStageData stage)
-{
-	return *this;
-}
-
-template<bool V>
-VSL_NAMESPACE::PipelineStage<VSL_NAMESPACE::PipelineStageType::Vertex, V>::PipelineStage(std::string name, VSL_NAMESPACE::Shader shader)
+VSL_NAMESPACE::PipelineStage<VSL_NAMESPACE::PipelineStageType::Vertex>::PipelineStage(std::string name, VSL_NAMESPACE::Shader shader)
 {
 	type = VSL_NAMESPACE::PipelineStageType::Vertex;
 
@@ -39,8 +32,7 @@ VSL_NAMESPACE::PipelineStage<VSL_NAMESPACE::PipelineStageType::Vertex, V>::Pipel
 	_data->stage.module = shader._data->shaderModule;
 }
 
-template<bool V>
-VSL_NAMESPACE::PipelineStage<VSL_NAMESPACE::PipelineStageType::Fragment, V>::PipelineStage(std::string name, VSL_NAMESPACE::Shader shader)
+VSL_NAMESPACE::PipelineStage<VSL_NAMESPACE::PipelineStageType::Fragment>::PipelineStage(std::string name, VSL_NAMESPACE::Shader shader)
 {
 	type = VSL_NAMESPACE::PipelineStageType::Fragment;
 
@@ -52,9 +44,12 @@ VSL_NAMESPACE::PipelineStage<VSL_NAMESPACE::PipelineStageType::Fragment, V>::Pip
 	_data->stage.module = shader._data->shaderModule;
 }
 
+template<bool V, VSL_NAMESPACE::PipelineStageType Type>
+VSL_NAMESPACE::Pipeline<V>& operator <<(VSL_NAMESPACE::Pipeline<V>& out, const VSL_NAMESPACE::PipelineStage<Type>& stage) {
+
+}
+
 template struct vsl::Pipeline<true>;
-template struct vsl::PipelineStage<VSL_NAMESPACE::PipelineStageType::Vertex, true>;
-template struct vsl::PipelineStage<VSL_NAMESPACE::PipelineStageType::Fragment, true>;
 template struct vsl::Pipeline<false>;
-template struct vsl::PipelineStage<VSL_NAMESPACE::PipelineStageType::Vertex, false>;
-template struct vsl::PipelineStage<VSL_NAMESPACE::PipelineStageType::Fragment, false>;
+template struct vsl::PipelineStage<VSL_NAMESPACE::PipelineStageType::Vertex>;
+template struct vsl::PipelineStage<VSL_NAMESPACE::PipelineStageType::Fragment>;

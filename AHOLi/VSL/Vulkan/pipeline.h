@@ -20,24 +20,27 @@ namespace VSL_NAMESPACE {
 	struct Pipeline {
 		Pipeline();
 
-		Pipeline<V>& operator <<(_PipelineStageData stage);
-
 		std::shared_ptr<VSL_NAMESPACE::_impl::Pipeline_impl> _data;
 	};
 
-	template<PipelineStageType Type, bool V>
-	struct PipelineStage : public Pipeline<V>::Stage {};
+	template<PipelineStageType Type>
+	struct PipelineStage {};
+
+	namespace pipeline_stage {
+		template<bool V, PipelineStageType Type>
+		Pipeline<V>& operator <<(Pipeline<V>& out, const PipelineStage<Type>& y);
+	}
 }
 
-template<bool V>
-struct VSL_NAMESPACE::PipelineStage<VSL_NAMESPACE::PipelineStageType::Vertex, V> : public _PipelineStageData {
+template<>
+struct VSL_NAMESPACE::PipelineStage<VSL_NAMESPACE::PipelineStageType::Vertex> : public _PipelineStageData {
 	PipelineStage(std::string name, VSL_NAMESPACE::Shader shader);
 
 	std::shared_ptr<VSL_NAMESPACE::_impl::ShaderStage_impl> _data;
 };
 
-template<bool V>
-struct VSL_NAMESPACE::PipelineStage<VSL_NAMESPACE::PipelineStageType::Fragment, V> : public _PipelineStageData {
+template<>
+struct VSL_NAMESPACE::PipelineStage<VSL_NAMESPACE::PipelineStageType::Fragment> : public _PipelineStageData {
 	PipelineStage(std::string name, VSL_NAMESPACE::Shader shader);
 
 	std::shared_ptr<VSL_NAMESPACE::_impl::ShaderStage_impl> _data;

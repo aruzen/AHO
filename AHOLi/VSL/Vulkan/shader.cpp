@@ -22,14 +22,10 @@ vsl::Shader::Shader(vsl::LogicalDeviceAcsessor device, std::filesystem::path pat
 			throw vsl::exceptions::RuntimeException("file", "failed to open file!", std::source_location::current());
 		}
 
-		std::string str = "";
-		std::getline(file, str);
-		loggingln(str);
-
-		// size_t fileSize = (size_t)file.tellg();
-		code.resize(/*fileSize*/ 1000);
+		size_t fileSize = (size_t)file.tellg();
+		code.resize(fileSize);
 		file.seekg(0);
-		// file.read(code.data(), fileSize);
+		file.read(code.data(), fileSize);
 		file.close();
 	}
 

@@ -7,41 +7,66 @@
 
 namespace VSL_NAMESPACE {
 	enum class PipelineStageType : unsigned char {
-		Vertex = 1,
-		Fragment = 2
+		Error,
+		Stages,
+		VertexInput,
+		InputAssemblyState,
+		Viewport,
+		Rasterization,
+		Multisample,
+		DepthStencil,
+		ColorBlend
 	};
 
-	struct _PipelineStageData {
-		PipelineStageType type;
-		void* _info;
+	enum class ShaderPipelineStageType : unsigned char {
+		Error,
+		Vertex,
+		Fragment
 	};
 
-	template<bool V = VSL_NAMESPACE::validation>
+	struct _ShaderPipelineStageData {
+		ShaderPipelineStageType type;
+		std::shared_ptr<VSL_NAMESPACE::_impl::ShaderStage_impl> _data;
+	};
+
+	template<typename... Args>
 	struct Pipeline {
-		Pipeline();
+		Pipeline(const Args& ...args);
 
 		std::shared_ptr<VSL_NAMESPACE::_impl::Pipeline_impl> _data;
+
+		template <typename Addition>
+		Pipeline<Addition, Args...> add(const Addition& a);
 	};
 
-	template<PipelineStageType Type>
-	struct PipelineStage {};
+	template<ShaderPipelineStageType Type>
+	struct ShaderPipelineStage {};
+
+	struct ShaderPipelineStages {
+
+	};
 
 	namespace pipeline_stage {
-		template<bool V, PipelineStageType Type>
-		Pipeline<V>& operator <<(Pipeline<V>& out, const PipelineStage<Type>& y);
+		template<ShaderPipelineStageType Type, typename... Args>
+		Pipeline<Args...>& operator <<(Pipeline<Args...>& out, const ShaderPipelineStage<Type>& y);
 	}
 }
 
 template<>
-struct VSL_NAMESPACE::PipelineStage<VSL_NAMESPACE::PipelineStageType::Vertex> : public _PipelineStageData {
-	PipelineStage(std::string name, VSL_NAMESPACE::Shader shader);
+struct VSL_NAMESPACE::ShaderPipelineStage<VSL_NAMESPACE::ShaderPipelineStageType::Vertex> : public _ShaderPipelineStageData {
+	ShaderPipelineStage(std::string name, VSL_NAMESPACE::Shader shader);
 
-	std::shared_ptr<VSL_NAMESPACE::_impl::ShaderStage_impl> _data;
+	struct ShaderPipelineStageResult {
+
+	};
+
+	ShaderPipelineStageResult operator ()();
+	ShaderPipelineStages operator+();
 };
 
 template<>
-struct VSL_NAMESPACE::PipelineStage<VSL_NAMESPACE::PipelineStageType::Fragment> : public _PipelineStageData {
-	PipelineStage(std::string name, VSL_NAMESPACE::Shader shader);
+struct VSL_NAMESPACE::ShaderPipelineStage<VSL_NAMESPACE::ShaderPipelineStageType::Fragment> : public _ShaderPipelineStageData {
+	ShaderPipelineStage(std::string name, VSL_NAMESPACE::Shader shader);
 
 	std::shared_ptr<VSL_NAMESPACE::_impl::ShaderStage_impl> _data;
 };

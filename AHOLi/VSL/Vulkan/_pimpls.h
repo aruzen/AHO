@@ -94,8 +94,22 @@ namespace VSL_NAMESPACE::_impl {
 		~View_impl();
 	};
 
-	struct Pipeline_impl {
+	struct CreateInfo {
+		vk::PipelineVertexInputStateCreateInfo vertexInput;
+		vk::PipelineInputAssemblyStateCreateInfo inputAssembly;
+		std::vector<vk::Viewport> viewports;
+		std::vector<vk::Rect2D> scissors;
+		vk::PipelineRasterizationStateCreateInfo rasterization;
+		vk::PipelineMultisampleStateCreateInfo multisample;
+		vk::PipelineColorBlendAttachmentState colorBlend;
+	};
 
+	struct Pipeline_impl {
+		vk::Pipeline pipeline;
+		vk::PipelineLayout pipelineLayout;
+		std::shared_ptr<CreateInfo> info;
+
+		~Pipeline_impl();
 	};
 
 	struct ShaderStage_impl {

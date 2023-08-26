@@ -135,6 +135,12 @@
     <ClInclude Include="AHO\core\collision.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="VSL\Vulkan\stages\vertex_input.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\Vulkan\stages\input_assembly.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -180,6 +186,15 @@
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="VSL\Vulkan\pipeline.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\Vulkan\stages\vertex_input.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\Vulkan\stages\input_assembly.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\Vulkan\viewport.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>

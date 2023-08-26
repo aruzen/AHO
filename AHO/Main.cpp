@@ -83,7 +83,7 @@ int main() {
 		vsl::Shader const_triangle_shader(ld, "shaders/const_triangle.vert.spv");
 		vsl::Shader red_shader(ld, "shaders/red.frag.spv");
 
-		pipeline << PipelineStage<PipelineStageType::Vertex>("triangle", const_triangle_shader);
+		pipeline << ShaderPipelineStage<ShaderPipelineStageType::Vertex>("triangle", const_triangle_shader);
 
 		while (Window::Update() && main_window) {
 

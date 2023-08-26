@@ -43,6 +43,12 @@ namespace VSL_NAMESPACE {
 		}
 	};
 
+	template <typename ElementType>
+	struct __VSLD2PointDefault {
+		using element_type = ElementType;
+		ElementType x, y;
+	};
+
 	template<typename T>
 	struct __VSLD2Point {
 		static constexpr int SPECIALIZED_ID = 0;
@@ -140,7 +146,6 @@ namespace VSL_NAMESPACE {
 		}
 	};
 
-	/*
 	template<typename T>
 	struct __VSLD2Rectangle {};
 
@@ -179,5 +184,4 @@ namespace VSL_NAMESPACE {
 			}
 		}
 	};
-	*/
 }

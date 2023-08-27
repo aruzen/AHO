@@ -3,7 +3,7 @@
 #include "../pv.h"
 
 namespace VSL_NAMESPACE::pipeline_layout {
-	struct InputAssembly {
+	struct DepthStencil {
 		void injection(struct VSL_NAMESPACE::_impl::CreateInfo& info);
 	};
 }

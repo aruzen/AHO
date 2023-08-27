@@ -200,6 +200,7 @@
     <ClInclude Include="VSL\Vulkan\pipeline.h" />
     <ClInclude Include="VSL\Vulkan\shader.h" />
     <ClInclude Include="VSL\Vulkan\stages\input_assembly.h" />
+    <ClInclude Include="VSL\Vulkan\stages\multisample.h" />
     <ClInclude Include="VSL\Vulkan\stages\rasterization.h" />
     <ClInclude Include="VSL\Vulkan\stages\vertex_input.h" />
     <ClInclude Include="VSL\Vulkan\_dimention.h" />
@@ -225,6 +226,7 @@
     <ClCompile Include="VSL\Vulkan\pipeline.cpp" />
     <ClCompile Include="VSL\Vulkan\shader.cpp" />
     <ClCompile Include="VSL\Vulkan\stages\input_assembly.cpp" />
+    <ClCompile Include="VSL\Vulkan\stages\multisample.cpp" />
     <ClCompile Include="VSL\Vulkan\stages\rasterization.cpp" />
     <ClCompile Include="VSL\Vulkan\stages\vertex_input.cpp" />
     <ClCompile Include="VSL\Vulkan\surface.cpp" />

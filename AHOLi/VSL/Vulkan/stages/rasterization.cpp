@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "rasterization.h"
 #include "../_pimpls.h"
 

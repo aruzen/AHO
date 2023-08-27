@@ -107,6 +107,12 @@ namespace VSL_NAMESPACE {
 		}
 	};
 
+	template <typename ElementType>
+	struct __VSLD2SizeDefault {
+		using element_type = ElementType;
+		ElementType height, weight;
+	};
+
 	template<typename T>
 	struct __VSLD2Size {};
 
@@ -144,6 +150,12 @@ namespace VSL_NAMESPACE {
 				weight = (*this)[1];
 			}
 		}
+	};
+
+	template <typename ElementType>
+	struct __VSLD2RectangleDefault {
+		using element_type = ElementType;
+		ElementType x, y, height, weight;
 	};
 
 	template<typename T>

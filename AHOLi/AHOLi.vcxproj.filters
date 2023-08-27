@@ -141,6 +141,9 @@
     <ClInclude Include="VSL\Vulkan\stages\input_assembly.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="VSL\Vulkan\stages\rasterization.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -195,6 +198,9 @@
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="VSL\Vulkan\viewport.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\Vulkan\stages\rasterization.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>

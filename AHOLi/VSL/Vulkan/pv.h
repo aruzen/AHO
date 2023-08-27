@@ -11,6 +11,7 @@ namespace VSL_NAMESPACE::_impl {
 	struct Surface_impl;
 	struct Swapchain_impl;
 	struct View_impl;
+	// struct Viewport_impl;
 	struct CreateInfo;
 	struct Pipeline_impl;
 	struct ShaderStage_impl;

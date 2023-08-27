@@ -94,6 +94,10 @@ namespace VSL_NAMESPACE::_impl {
 		~View_impl();
 	};
 
+	/* struct Viewport_impl {
+		std::shared_ptr<Swapchain_impl> swapchain;
+	}; */
+
 	struct CreateInfo {
 		vk::PipelineVertexInputStateCreateInfo vertexInput;
 		vk::PipelineInputAssemblyStateCreateInfo inputAssembly;

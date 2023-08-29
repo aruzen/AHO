@@ -147,6 +147,9 @@
     <ClInclude Include="VSL\Vulkan\stages\multisample.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="VSL\Vulkan\render_pass.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -213,6 +216,15 @@
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="VSL\Vulkan\stages\depth_stencil.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\Vulkan\stages\color_blend.h">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\Vulkan\stages\color_blend.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\Vulkan\render_pass.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>

@@ -15,6 +15,8 @@
 
 #include <optional>
 #include <memory>
+#include <map>
+#include <any>
 
 namespace VSL_NAMESPACE::_impl {
 	struct Vulkan_impl_accesor {
@@ -99,21 +101,24 @@ namespace VSL_NAMESPACE::_impl {
 	}; */
 
 	struct CreateInfo {
+		vk::PipelineLayoutCreateInfo pipelineLayout;
 		vk::PipelineVertexInputStateCreateInfo vertexInput;
 		vk::PipelineInputAssemblyStateCreateInfo inputAssembly;
 		std::vector<vk::Viewport> viewports;
 		std::vector<vk::Rect2D> scissors;
 		vk::PipelineRasterizationStateCreateInfo rasterization;
 		vk::PipelineMultisampleStateCreateInfo multisample;
-		vk::PipelineColorBlendAttachmentState colorBlend;
+		vk::PipelineColorBlendStateCreateInfo colorBlend;
+
+		std::map<std::string, std::any> pool;
 	};
 
-	struct Pipeline_impl {
-		vk::Pipeline pipeline;
+	struct PipelineLayout_impl {
 		vk::PipelineLayout pipelineLayout;
 		std::shared_ptr<CreateInfo> info;
+		std::shared_ptr<LogicalDevice_impl> device;
 
-		~Pipeline_impl();
+		~PipelineLayout_impl();
 	};
 
 	struct ShaderStage_impl {
@@ -124,8 +129,14 @@ namespace VSL_NAMESPACE::_impl {
 		std::shared_ptr<LogicalDevice_impl> device;
 		vk::ShaderModule shaderModule;
 
-
 		~Shader_impl();
+	};
+
+	struct RenderPass_impl {
+		std::shared_ptr<LogicalDevice_impl> device;
+		vk::RenderPass renderPass;
+
+		~RenderPass_impl();
 	};
 
 	namespace helper {

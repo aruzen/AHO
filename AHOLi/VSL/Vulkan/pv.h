@@ -13,7 +13,8 @@ namespace VSL_NAMESPACE::_impl {
 	struct View_impl;
 	// struct Viewport_impl;
 	struct CreateInfo;
-	struct Pipeline_impl;
+	struct PipelineLayout_impl;
 	struct ShaderStage_impl;
 	struct Shader_impl;
+	struct RenderPass_impl;
 }

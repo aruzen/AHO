@@ -13,10 +13,10 @@ const auto DEFAULT_DYNAMIC_STATE = std::array<vk::DynamicState, 2>{
 
 template<VSL_NAMESPACE::pipeline_layout_injecter T, VSL_NAMESPACE::pipeline_layout_injecter... Args>
 void expansionPipelineLayoutArgs(std::shared_ptr<VSL_NAMESPACE::_impl::PipelineLayout_impl> _data, VSL_NAMESPACE::_impl::CreateInfo& info, const T& t, const Args& ...args) {
-	if constexpr (VSL_NAMESPACE::pipeline_data_injecter<T>) {
+	if constexpr (VSL_NAMESPACE::pipeline_layout_data_injecter<T>) {
 		t.injection(_data);
 	}
-	if constexpr (VSL_NAMESPACE::pipeline_data_injecter<T>) {
+	if constexpr (VSL_NAMESPACE::pipeline_layout_createinfo_injecter<T>) {
 		t.injection(info);
 	}
 	expansionPipelineLayoutArgs(_data, info, args...);
@@ -30,17 +30,21 @@ VSL_NAMESPACE::PipelineLayout<Args...>::PipelineLayout(VSL_NAMESPACE::LogicalDev
 	_data->info = std::shared_ptr<VSL_NAMESPACE::_impl::CreateInfo>(new VSL_NAMESPACE::_impl::CreateInfo);
 	_data->device = device._data;
 
-	_data->defaultCreateInfo.dynamicStateCount = static_cast<uint32_t>(DEFAULT_DYNAMIC_STATE.size());
-	_data->defaultCreateInfo.pDynamicStates = DEFAULT_DYNAMIC_STATE.data();
-	
-	expansionPipelineArgs(_data, *_data->info, args...);
-
+	_data->info->dynamicState.dynamicStateCount = static_cast<uint32_t>(DEFAULT_DYNAMIC_STATE.size());
+	_data->info->dynamicState.pDynamicStates = DEFAULT_DYNAMIC_STATE.data();
 	_data->info->pipelineLayout.setLayoutCount = 0; // Optional
 	_data->info->pipelineLayout.pSetLayouts = nullptr; // Optional
 	_data->info->pipelineLayout.pushConstantRangeCount = 0; // Optional
 	_data->info->pipelineLayout.pPushConstantRanges = nullptr; // Optional
 
-	_data->pipelineLayout = device._data->device.createPipelineLayout(pipelineLayoutInfo);
+	expansionPipelineLayoutArgs(_data, *_data->info, args...);
+
+	_data->info->_viewport.viewportCount = _data->info->viewports.size();
+	_data->info->_viewport.pViewports = _data->info->viewports.data();
+	_data->info->_viewport.scissorCount = _data->info->scissors.size();
+	_data->info->_viewport.pScissors = _data->info->scissors.data();
+
+	_data->pipelineLayout = device._data->device.createPipelineLayout(_data->info->pipelineLayout);
 }
 
 VSL_NAMESPACE::_impl::PipelineLayout_impl::~PipelineLayout_impl()
@@ -68,11 +72,6 @@ VSL_NAMESPACE::ShaderPipelineLayoutStage<VSL_NAMESPACE::ShaderPipelineLayoutStag
 	_data->stage.stage = vk::ShaderStageFlagBits::eFragment;
 	_data->stage.pName = name.c_str();
 	_data->stage.module = shader._data->shaderModule;
-}
-
-template<VSL_NAMESPACE::ShaderPipelineLayoutStageType Type, typename... Args>
-VSL_NAMESPACE::PipelineLayout<Args...>& operator <<(VSL_NAMESPACE::PipelineLayout<Args...>& out, const VSL_NAMESPACE::ShaderPipelineLayoutStage<Type>& stage) {
-
 }
 
 template struct vsl::PipelineLayout<>;

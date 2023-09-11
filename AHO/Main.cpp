@@ -17,6 +17,7 @@
 #include <VSL/Vulkan/swapchain.h>
 #include <VSL/Vulkan/view.h>
 #include <VSL/Vulkan/shader.h>
+#include <VSL/Vulkan/pipeline_layout.h>
 #include <VSL/Vulkan/pipeline.h>
 
 // #define AHO_POOP_PUBLIC_SECURITY
@@ -70,20 +71,23 @@ int main() {
 
 		Vulkan vk("test", { "VK_KHR_win32_surface", "VK_KHR_surface" });
 		Window main_window("main");
-		auto pd = PhysicalDevices(vk).search();
+		auto physical_devices = PhysicalDevices(vk).search();
 		auto surface = main_window.addPlugin<Surface<vsl::validation>>(vk);
 
-		LogicalDevice ld(pd, surface);
+		LogicalDevice device(physical_devices, surface);
 
-		Swapchain swapchain(ld);
+		Swapchain swapchain(device);
 		View view(swapchain);
 
-		Pipeline pipeline;
+		PipelineLayout layout(device);
+		Pipeline pipeline(layout);
 
-		vsl::Shader const_triangle_shader(ld, "shaders/const_triangle.vert.spv");
-		vsl::Shader red_shader(ld, "shaders/red.frag.spv");
+		pipeline;
 
-		pipeline << ShaderPipelineStage<ShaderPipelineStageType::Vertex>("triangle", const_triangle_shader);
+		vsl::Shader const_triangle_shader(device, "shaders/const_triangle.vert.spv");
+		vsl::Shader red_shader(device, "shaders/red.frag.spv");
+
+		// pipeline << ShaderPipelineStage<ShaderPipelineStageType::Vertex>("triangle", const_triangle_shader);
 
 		while (Window::Update() && main_window) {
 

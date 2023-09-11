@@ -78,7 +78,7 @@
     <ClInclude Include="VSL\Vulkan\_dimention.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="VSL\Vulkan\pipeline.h">
+    <ClInclude Include="VSL\Vulkan\pipeline_layout.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="VSL\Vulkan\shader.h">
@@ -150,6 +150,18 @@
     <ClInclude Include="VSL\Vulkan\render_pass.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="VSL\Vulkan\pipeline.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\Vulkan\stages\color_blend.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\Vulkan\stages\depth_stencil.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\Vulkan\stages\shader_group.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -194,7 +206,7 @@
     <ClCompile Include="VSL\Vulkan\shader.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\pipeline.cpp">
+    <ClCompile Include="VSL\Vulkan\pipeline_layout.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="VSL\Vulkan\stages\vertex_input.cpp">
@@ -212,19 +224,19 @@
     <ClCompile Include="VSL\Vulkan\stages\multisample.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\stages\depth_stencil.h">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="VSL\Vulkan\stages\depth_stencil.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="VSL\Vulkan\stages\color_blend.h">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="VSL\Vulkan\stages\color_blend.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="VSL\Vulkan\render_pass.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\Vulkan\pipeline.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\Vulkan\stages\shader_group.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>

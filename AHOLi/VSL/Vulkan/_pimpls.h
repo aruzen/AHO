@@ -101,6 +101,8 @@ namespace VSL_NAMESPACE::_impl {
 	}; */
 
 	struct CreateInfo {
+		vk::PipelineShaderStageCreateInfo shaderStage;
+		vk::PipelineDynamicStateCreateInfo dynamicState;
 		vk::PipelineLayoutCreateInfo pipelineLayout;
 		vk::PipelineVertexInputStateCreateInfo vertexInput;
 		vk::PipelineInputAssemblyStateCreateInfo inputAssembly;
@@ -109,6 +111,10 @@ namespace VSL_NAMESPACE::_impl {
 		vk::PipelineRasterizationStateCreateInfo rasterization;
 		vk::PipelineMultisampleStateCreateInfo multisample;
 		vk::PipelineColorBlendStateCreateInfo colorBlend;
+		
+		std::optional<vk::PipelineDepthStencilStateCreateInfo> depthStencil;
+
+		vk::PipelineViewportStateCreateInfo _viewport;
 
 		std::map<std::string, std::any> pool;
 	};

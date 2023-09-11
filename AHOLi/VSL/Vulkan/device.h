@@ -84,5 +84,4 @@ VSL_NAMESPACE::PhysicalDevices<S, Validation> VSL_NAMESPACE::Vulkan<Validation>:
 	return VSL_NAMESPACE::PhysicalDevices<S, Validation>(*this);
 }
 
-template struct VSL_NAMESPACE::Vulkan<true>;
 template struct VSL_NAMESPACE::PhysicalDevices<VSL_NAMESPACE::_PhysicalDevicesSercher, true>;

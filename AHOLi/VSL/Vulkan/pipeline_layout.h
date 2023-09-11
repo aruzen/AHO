@@ -6,7 +6,9 @@
 #include "shader.h"
 
 namespace VSL_NAMESPACE {
-	enum class PipelineLayoutStageType : unsigned char {
+	// struct Pipeline;
+
+	/* enum class PipelineLayoutStageType : unsigned char {
 		Error,
 		Stages,
 		VertexInput,
@@ -16,7 +18,7 @@ namespace VSL_NAMESPACE {
 		Multisample,
 		DepthStencil,
 		ColorBlend
-	};
+	};*/
 
 	enum class ShaderPipelineLayoutStageType : unsigned char {
 		Error,
@@ -43,11 +45,13 @@ namespace VSL_NAMESPACE {
 	concept pipeline_layout_injecter = pipeline_layout_createinfo_injecter<T> 
 								|| pipeline_layout_data_injecter<T>;
 
-	template<pipeline_layout_injecter... Args>
-	struct PipelineLayout {
-		PipelineLayout(VSL_NAMESPACE::LogicalDeviceAcsessor device, const Args& ...args);
-
+	struct PipelineLayoutAccesor {
 		std::shared_ptr<VSL_NAMESPACE::_impl::PipelineLayout_impl> _data;
+	};
+
+	template<pipeline_layout_injecter... Args>
+	struct PipelineLayout : public PipelineLayoutAccesor {
+		PipelineLayout(VSL_NAMESPACE::LogicalDeviceAcsessor device, const Args& ...args);
 
 		template <typename Addition>
 		PipelineLayout<Addition, Args...> add(const Addition& a);
@@ -56,13 +60,7 @@ namespace VSL_NAMESPACE {
 	template<ShaderPipelineLayoutStageType Type>
 	struct ShaderPipelineLayoutStage {};
 
-	struct ShaderPipelineLayoutStages {
-
-	};
-
 	namespace pipeline_stage {
-		template<ShaderPipelineLayoutStageType Type, typename... Args>
-		PipelineLayout<Args...>& operator <<(PipelineLayout<Args...>& out, const ShaderPipelineLayoutStage<Type>& y);
 	}
 }
 
@@ -70,12 +68,7 @@ template<>
 struct VSL_NAMESPACE::ShaderPipelineLayoutStage<VSL_NAMESPACE::ShaderPipelineLayoutStageType::Vertex> : public _ShaderPipelineLayoutStageData {
 	ShaderPipelineLayoutStage(std::string name, VSL_NAMESPACE::Shader shader);
 
-	struct ShaderPipelineLayoutStageResult {
-
-	};
-
-	ShaderPipelineLayoutStageResult operator ()();
-	ShaderPipelineLayoutStages operator+();
+	std::shared_ptr<VSL_NAMESPACE::_impl::ShaderStage_impl> _data;
 };
 
 template<>

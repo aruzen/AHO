@@ -20,7 +20,7 @@ VSL_NAMESPACE::Viewport<T>::Viewport(const element_type& x, const element_type& 
 	this->x = x;
 	this->y = y;
 	this->width = width;
-	this->height = height
+	this->height = height;
 }
 
 template<VSL_NAMESPACE::is_rectangle T>
@@ -36,10 +36,10 @@ VSL_NAMESPACE::Viewport<T>::Viewport(SwapchainAcsessor swapchain) {
 template<VSL_NAMESPACE::is_rectangle T>
 void VSL_NAMESPACE::Viewport<T>::injection(VSL_NAMESPACE::_impl::CreateInfo& info) {
 	vk::Viewport viewport;
-	viewport.x = x;
-	viewport.y = y;
-	viewport.width = width;
-	viewport.height = height;
+	viewport.x = this->x;
+	viewport.y = this->y;
+	viewport.width = this->width;
+	viewport.height = this->height;
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
 	info.viewports.push_back(viewport);

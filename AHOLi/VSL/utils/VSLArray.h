@@ -166,7 +166,7 @@ namespace VSL_NAMESPACE {
 
 	template<typename T>
 		requires is_rectangle<T>
-	struct __VSLD2Rectangle : __VSLD2Point<T>, __VSLD2Size<T> {
+	struct __VSLD2Rectangle<T> : __VSLD2Point<T>, __VSLD2Size<T> {
 
 		__VSLD2Rectangle(T* t) : __VSLD2Point<T>(t), __VSLD2Size<T>(t) {}
 	};

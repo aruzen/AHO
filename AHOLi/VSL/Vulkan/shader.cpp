@@ -9,7 +9,8 @@
 #include <fstream>
 #include <source_location>
 
-vsl::Shader::Shader(vsl::LogicalDeviceAcsessor device, std::filesystem::path path)
+template<VSL_NAMESPACE::ShaderType _Type>
+vsl::Shader<_Type>::Shader(vsl::LogicalDeviceAcsessor device, std::filesystem::path path)
 {
 	_data = std::shared_ptr<_impl::Shader_impl>(new _impl::Shader_impl);
 	_data->device = device._data;
@@ -40,3 +41,6 @@ VSL_NAMESPACE::_impl::Shader_impl::~Shader_impl()
 {
 	device->device.destroyShaderModule(shaderModule);
 }
+
+template struct vsl::Shader<VSL_NAMESPACE::ShaderType::Vertex>;
+template struct vsl::Shader<VSL_NAMESPACE::ShaderType::Fragment>;

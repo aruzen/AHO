@@ -7,8 +7,8 @@
 VSL_NAMESPACE::Pipeline::Pipeline(PipelineLayoutAccesor layout)
 {
 	vk::GraphicsPipelineCreateInfo pipelineInfo;
-	pipelineInfo.stageCount = 2;
-	pipelineInfo.pStages = shaderStages;
+	pipelineInfo.stageCount = layout._data->info->shaderStages.size();
+	pipelineInfo.pStages = layout._data->info->shaderStages.data();
 	pipelineInfo.pVertexInputState = &layout._data->info->vertexInput;
 	pipelineInfo.pInputAssemblyState = &layout._data->info->inputAssembly;
 	pipelineInfo.pViewportState = &layout._data->info->_viewport;

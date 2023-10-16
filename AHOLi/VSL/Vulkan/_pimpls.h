@@ -101,7 +101,7 @@ namespace VSL_NAMESPACE::_impl {
 	}; */
 
 	struct CreateInfo {
-		vk::PipelineShaderStageCreateInfo shaderStage;
+		std::vector<vk::PipelineShaderStageCreateInfo> shaderStages;
 		vk::PipelineDynamicStateCreateInfo dynamicState;
 		vk::PipelineLayoutCreateInfo pipelineLayout;
 		vk::PipelineVertexInputStateCreateInfo vertexInput;
@@ -144,6 +144,13 @@ namespace VSL_NAMESPACE::_impl {
 
 		~RenderPass_impl();
 	};
+
+	namespace pipeline_layout {
+		struct ShaderGroup_impl {
+			std::string name;
+			std::shared_ptr<Shader_impl> shaders;
+		};
+	}
 
 	namespace helper {
 		struct QueueFamilyIndices {

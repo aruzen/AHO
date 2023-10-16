@@ -20,14 +20,8 @@ namespace VSL_NAMESPACE {
 		ColorBlend
 	};*/
 
-	enum class ShaderPipelineLayoutStageType : unsigned char {
-		Error,
-		Vertex,
-		Fragment
-	};
-
 	struct _ShaderPipelineLayoutStageData {
-		ShaderPipelineLayoutStageType type;
+		// ShaderType type;
 		std::shared_ptr<VSL_NAMESPACE::_impl::ShaderStage_impl> _data;
 	};
 
@@ -42,8 +36,8 @@ namespace VSL_NAMESPACE {
 	};
 
 	template<typename T>
-	concept pipeline_layout_injecter = pipeline_layout_createinfo_injecter<T> 
-								|| pipeline_layout_data_injecter<T>;
+	concept pipeline_layout_injecter = pipeline_layout_createinfo_injecter<T>
+		|| pipeline_layout_data_injecter<T>;
 
 	struct PipelineLayoutAccesor {
 		std::shared_ptr<VSL_NAMESPACE::_impl::PipelineLayout_impl> _data;
@@ -57,23 +51,10 @@ namespace VSL_NAMESPACE {
 		PipelineLayout<Addition, Args...> add(const Addition& a);
 	};
 
-	template<ShaderPipelineLayoutStageType Type>
-	struct ShaderPipelineLayoutStage {};
+	template<ShaderType Type>
+	struct ShaderPipelineLayoutStage {
+		ShaderPipelineLayoutStage(std::string name, VSL_NAMESPACE::Shader<Type> shader);
 
-	namespace pipeline_stage {
-	}
+		std::shared_ptr<VSL_NAMESPACE::_impl::ShaderStage_impl> _data;
+	};
 }
-
-template<>
-struct VSL_NAMESPACE::ShaderPipelineLayoutStage<VSL_NAMESPACE::ShaderPipelineLayoutStageType::Vertex> : public _ShaderPipelineLayoutStageData {
-	ShaderPipelineLayoutStage(std::string name, VSL_NAMESPACE::Shader shader);
-
-	std::shared_ptr<VSL_NAMESPACE::_impl::ShaderStage_impl> _data;
-};
-
-template<>
-struct VSL_NAMESPACE::ShaderPipelineLayoutStage<VSL_NAMESPACE::ShaderPipelineLayoutStageType::Fragment> : public _ShaderPipelineLayoutStageData {
-	ShaderPipelineLayoutStage(std::string name, VSL_NAMESPACE::Shader shader);
-
-	std::shared_ptr<VSL_NAMESPACE::_impl::ShaderStage_impl> _data;
-};

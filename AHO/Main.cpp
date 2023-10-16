@@ -67,7 +67,6 @@ int main() {
 
 	try {
 		using namespace vsl;
-		using namespace vsl::pipeline_stage;
 
 		Vulkan vk("test", { "VK_KHR_win32_surface", "VK_KHR_surface" });
 		Window main_window("main");
@@ -84,8 +83,8 @@ int main() {
 
 		pipeline;
 
-		vsl::Shader const_triangle_shader(device, "shaders/const_triangle.vert.spv");
-		vsl::Shader red_shader(device, "shaders/red.frag.spv");
+		vsl::Shader<ShaderType::Vertex> const_triangle_shader(device, "shaders/const_triangle.vert.spv");
+		vsl::Shader<ShaderType::Fragment> red_shader(device, "shaders/red.frag.spv");
 
 		// pipeline << ShaderPipelineStage<ShaderPipelineStageType::Vertex>("triangle", const_triangle_shader);
 

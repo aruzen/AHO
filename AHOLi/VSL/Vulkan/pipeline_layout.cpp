@@ -52,28 +52,21 @@ VSL_NAMESPACE::_impl::PipelineLayout_impl::~PipelineLayout_impl()
 	device->device.destroyPipelineLayout(pipelineLayout);
 }
 
-VSL_NAMESPACE::ShaderPipelineLayoutStage<VSL_NAMESPACE::ShaderPipelineLayoutStageType::Vertex>::ShaderPipelineLayoutStage(std::string name, VSL_NAMESPACE::Shader shader)
+template<VSL_NAMESPACE::ShaderType Type>
+VSL_NAMESPACE::ShaderPipelineLayoutStage<Type>::ShaderPipelineLayoutStage(std::string name, VSL_NAMESPACE::Shader<Type> shader)
 {
-	type = VSL_NAMESPACE::ShaderPipelineLayoutStageType::Vertex;
-
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::ShaderStage_impl>(new VSL_NAMESPACE::_impl::ShaderStage_impl);
 
-	_data->stage.stage = vk::ShaderStageFlagBits::eVertex;
-	_data->stage.pName = name.c_str();
-	_data->stage.module = shader._data->shaderModule;
-}
-
-VSL_NAMESPACE::ShaderPipelineLayoutStage<VSL_NAMESPACE::ShaderPipelineLayoutStageType::Fragment>::ShaderPipelineLayoutStage(std::string name, VSL_NAMESPACE::Shader shader)
-{
-	type = VSL_NAMESPACE::ShaderPipelineLayoutStageType::Fragment;
-
-	_data = std::shared_ptr<VSL_NAMESPACE::_impl::ShaderStage_impl>(new VSL_NAMESPACE::_impl::ShaderStage_impl);
-
-	_data->stage.stage = vk::ShaderStageFlagBits::eFragment;
+	if constexpr (Type == VSL_NAMESPACE::ShaderType::Vertex) {
+		_data->stage.stage = vk::ShaderStageFlagBits::eVertex;
+	}
+	else if (Type == VSL_NAMESPACE::ShaderType::Fragment) {
+		_data->stage.stage = vk::ShaderStageFlagBits::eFragment;
+	}
 	_data->stage.pName = name.c_str();
 	_data->stage.module = shader._data->shaderModule;
 }
 
 template struct vsl::PipelineLayout<>;
-template struct vsl::ShaderPipelineLayoutStage<VSL_NAMESPACE::ShaderPipelineLayoutStageType::Vertex>;
-template struct vsl::ShaderPipelineLayoutStage<VSL_NAMESPACE::ShaderPipelineLayoutStageType::Fragment>;
+template struct vsl::ShaderPipelineLayoutStage<VSL_NAMESPACE::ShaderType::Vertex>;
+template struct vsl::ShaderPipelineLayoutStage<VSL_NAMESPACE::ShaderType::Fragment>;

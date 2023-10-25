@@ -8,7 +8,7 @@
 #include <GLFW/glfw3.h>
 #pragma warning( push )
 #include <compare>
-// #define VULKAN_HPP_HAS_SPACESHIP_OPERATOR
+#define VULKAN_HPP_HAS_SPACESHIP_OPERATOR
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <vulkan/vulkan.hpp>
 #pragma warning( pop )
@@ -136,6 +136,9 @@ namespace VSL_NAMESPACE::_impl {
 		vk::ShaderModule shaderModule;
 
 		~Shader_impl();
+	};
+
+	struct ShaderGroup_impl {
 	};
 
 	struct RenderPass_impl {

@@ -23,7 +23,7 @@ namespace vsl {
 		std::shared_ptr<vsl::_impl::Shader_impl> _data;
 	};
 
-	consteval ShaderType __Get_ShaderType(std::string name) {
+	consteval ShaderType ___Get_ShaderType(std::string name) {
 		if (name.contains(".vert.")) {
 			return ShaderType::Vertex;
 		} else if (name.contains(".frag.")) {

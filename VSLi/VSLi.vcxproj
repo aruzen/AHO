@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -19,10 +19,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <VCProjectVersion>16.0</VCProjectVersion>
+    <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{55176023-7102-43d4-bc8d-903381f6014e}</ProjectGuid>
-    <RootNamespace>AHOLi</RootNamespace>
+    <ProjectGuid>{2575ca0b-3e3a-4b25-8302-4b6ee06ef91d}</ProjectGuid>
+    <RootNamespace>VSLi</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -70,21 +70,11 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LinkIncremental>true</LinkIncremental>
-    <IncludePath>C:\Users\aruze\source\repos\AHO\AHOLi;D:\sdks\VulkanSDK\1.2.176.1\Include;D:\apuri\_libs\glfw\include;D:\apuri\_libs\glm;$(IncludePath)</IncludePath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LinkIncremental>false</LinkIncremental>
-    <IncludePath>C:\Users\aruze\source\repos\AHO\AHOLi;D:\sdks\VulkanSDK\1.2.176.1\Include;D:\apuri\_libs\glfw\include;D:\apuri\_libs\glm;$(IncludePath)</IncludePath>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LinkIncremental>true</LinkIncremental>
-    <IncludePath>..\VSLi\;$(VULKAN_SDK)\Include;$(GLFW)\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(VULKAN_SDK)\Include;$(GLFW)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LinkIncremental>false</LinkIncremental>
-    <IncludePath>..\VSLi\;$(VULKAN_SDK)\Include;$(GLFW)\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(VULKAN_SDK)\Include;$(GLFW)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -94,16 +84,12 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>
       </SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
-    <Lib>
-      <AdditionalDependencies>"D:\apuri\_libs\glfw\lib-vc2019\glfw3.lib";"D:\sdks\VulkanSDK\1.2.176.1\Lib\vulkan-1.lib";%(AdditionalDependencies)</AdditionalDependencies>
-    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -115,7 +101,6 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -124,9 +109,6 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
-    <Lib>
-      <AdditionalDependencies>"D:\apuri\_libs\glfw\lib-vc2019\glfw3.lib";"D:\sdks\VulkanSDK\1.2.176.1\Lib\vulkan-1.lib";%(AdditionalDependencies)</AdditionalDependencies>
-    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -137,7 +119,6 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <BuildStlModules>false</BuildStlModules>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -145,7 +126,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalDependencies>"$(TargetDir)\VSLi.lib";"$(GLFW)\lib-vc2019\glfw3.lib";"$(VULKAN_SDK)\Lib\vulkan-1.lib";%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>"$(GLFW)\lib-vc2019\glfw3.lib";"$(VULKAN_SDK)\Lib\vulkan-1.lib";%(AdditionalDependencies)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -168,36 +149,75 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalDependencies>"$(TargetDir)\VSLi.lib";"$(GLFW)\lib-vc2019\glfw3.lib";"$(VULKAN_SDK)\Lib\vulkan-1.lib";%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>"$(GLFW)\lib-vc2019\glfw3.lib";"$(VULKAN_SDK)\Lib\vulkan-1.lib";%(AdditionalDependencies)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="AHO\concepts.h" />
-    <ClInclude Include="AHO\core\collision.h" />
-    <ClInclude Include="AHO\core\math\angle.h" />
-    <ClInclude Include="AHO\core\index.h" />
-    <ClInclude Include="AHO\core\Line.h" />
-    <ClInclude Include="AHO\core\math\coordinate.h" />
-    <ClInclude Include="AHO\core\math\Mat.h" />
-    <ClInclude Include="AHO\core\ov.h" />
-    <ClInclude Include="AHO\core\Point.h" />
-    <ClInclude Include="AHO\core\Polygon.h" />
-    <ClInclude Include="AHO\core\Vector.h" />
-    <ClInclude Include="AHO\core\Triangle.h" />
-    <ClInclude Include="AHO\define.h" />
-    <ClInclude Include="AHO\utils\polygon.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="pch.h" />
-    <ClInclude Include="Test\tests.h" />
+    <ClInclude Include="VSL\concepts.h" />
+    <ClInclude Include="VSL\debug.h" />
+    <ClInclude Include="VSL\define.h" />
+    <ClInclude Include="VSL\dimention.h" />
+    <ClInclude Include="VSL\exceptions.h" />
+    <ClInclude Include="VSL\test.h" />
+    <ClInclude Include="VSL\Type.h" />
+    <ClInclude Include="VSL\utils\ShaderCompiler.h" />
+    <ClInclude Include="VSL\utils\VSLArray.h" />
+    <ClInclude Include="VSL\Vulkan\command.h" />
+    <ClInclude Include="VSL\Vulkan\device.h" />
+    <ClInclude Include="VSL\Vulkan\pipeline.h" />
+    <ClInclude Include="VSL\Vulkan\pipeline_layout.h" />
+    <ClInclude Include="VSL\Vulkan\pv.h" />
+    <ClInclude Include="VSL\Vulkan\render_pass.h" />
+    <ClInclude Include="VSL\Vulkan\shader.h" />
+    <ClInclude Include="VSL\Vulkan\stages\color_blend.h" />
+    <ClInclude Include="VSL\Vulkan\stages\depth_stencil.h" />
+    <ClInclude Include="VSL\Vulkan\stages\input_assembly.h" />
+    <ClInclude Include="VSL\Vulkan\stages\multisample.h" />
+    <ClInclude Include="VSL\Vulkan\stages\rasterization.h" />
+    <ClInclude Include="VSL\Vulkan\stages\shader_group.h" />
+    <ClInclude Include="VSL\Vulkan\stages\vertex_input.h" />
+    <ClInclude Include="VSL\Vulkan\surface.h" />
+    <ClInclude Include="VSL\Vulkan\swapchain.h" />
+    <ClInclude Include="VSL\Vulkan\view.h" />
+    <ClInclude Include="VSL\Vulkan\viewport.h" />
+    <ClInclude Include="VSL\Vulkan\Vulkan.h" />
+    <ClInclude Include="VSL\Vulkan\_dimention.h" />
+    <ClInclude Include="VSL\Vulkan\_pimpls.h" />
+    <ClInclude Include="VSL\Window.h" />
+    <ClInclude Include="VSL\window_plugin.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="Test\tests.cpp" />
+    <ClCompile Include="VSL\debug.cpp" />
+    <ClCompile Include="VSL\exceptions.cpp" />
+    <ClCompile Include="VSL\utils\ShaderCompiler.cpp" />
+    <ClCompile Include="VSL\Vulkan\command.cpp" />
+    <ClCompile Include="VSL\Vulkan\device.cpp" />
+    <ClCompile Include="VSL\Vulkan\pipeline.cpp" />
+    <ClCompile Include="VSL\Vulkan\pipeline_layout.cpp" />
+    <ClCompile Include="VSL\Vulkan\render_pass.cpp" />
+    <ClCompile Include="VSL\Vulkan\shader.cpp" />
+    <ClCompile Include="VSL\Vulkan\stages\color_blend.cpp" />
+    <ClCompile Include="VSL\Vulkan\stages\depth_stencil.cpp" />
+    <ClCompile Include="VSL\Vulkan\stages\input_assembly.cpp" />
+    <ClCompile Include="VSL\Vulkan\stages\multisample.cpp" />
+    <ClCompile Include="VSL\Vulkan\stages\rasterization.cpp" />
+    <ClCompile Include="VSL\Vulkan\stages\shader_group.cpp" />
+    <ClCompile Include="VSL\Vulkan\stages\vertex_input.cpp" />
+    <ClCompile Include="VSL\Vulkan\surface.cpp" />
+    <ClCompile Include="VSL\Vulkan\swapchain.cpp" />
+    <ClCompile Include="VSL\Vulkan\view.cpp" />
+    <ClCompile Include="VSL\Vulkan\viewport.cpp" />
+    <ClCompile Include="VSL\Vulkan\Vulkan.cpp" />
+    <ClCompile Include="VSL\Window.cpp" />
+    <ClCompile Include="VSL\window_plugin.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

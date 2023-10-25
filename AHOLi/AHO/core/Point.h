@@ -2,7 +2,7 @@
 #include "../define.h"
 #include "../concepts.h"
 
-#include "../../VSL/dimention.h"
+#include <VSL/dimention.h>
 
 #include "math/coordinate.h"
 

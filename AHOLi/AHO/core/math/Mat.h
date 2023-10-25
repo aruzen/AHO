@@ -6,7 +6,7 @@
 #include <optional>
 
 #include "../../concepts.h"
-#include "../../../VSL/dimention.h"
+#include <VSL/dimention.h>
 
 namespace AHO_NAMESPACE {
 	namespace matrix {

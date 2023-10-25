@@ -1,7 +1,7 @@
 #pragma once
 #include "../define.h"
 
-#include "../../VSL/dimention.h"
+#include <VSL/dimention.h>
 
 #include "index.h"
 

@@ -1,5 +1,5 @@
 #pragma once
-#include "../../../VSL/dimention.h"
+#include <VSL/dimention.h>
 
 #include "../../define.h"
 #include "../../concepts.h"

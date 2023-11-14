@@ -2,6 +2,7 @@
 #include "../define.h"
 
 namespace VSL_NAMESPACE::_impl {
+	struct Vulkan_impl_accessor;
 	template<bool V>
 	struct Vulkan_impl;
 	struct PhysicalDevice_impl;
@@ -14,8 +15,12 @@ namespace VSL_NAMESPACE::_impl {
 	// struct Viewport_impl;
 	struct CreateInfo;
 	struct PipelineLayout_impl;
-	struct ShaderStage_impl;
+	// struct ShaderStage_impl;
 	struct Shader_impl;
-	struct ShaderGroup_impl;
 	struct RenderPass_impl;
+	struct Pipeline_impl;
+
+	namespace pipeline_layout {
+		struct ShaderGroup_impl;
+	}
 }

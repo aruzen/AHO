@@ -7,12 +7,16 @@
 #include "../shader.h"
 
 namespace VSL_NAMESPACE::pipeline_layout {
-	
 	struct ShaderGroup {
-		std::shared_ptr<VSL_NAMESPACE::_impl::ShaderGroup_impl> _data;
+		std::shared_ptr<_impl::pipeline_layout::ShaderGroup_impl> _data;
 
-		ShaderGroup();
+		ShaderGroup(std::initializer_list<ShaderAccessor> shaders, std::string name);
 
-		void injection(struct VSL_NAMESPACE::_impl::CreateInfo& info);
+		void addShader(ShaderAccessor shader);
+
+		void removeShader(std::string name);
+		void removeShader(ShaderAccessor shader);
+
+		void injection(struct _impl::CreateInfo& info);
 	};
 }

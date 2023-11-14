@@ -19,11 +19,11 @@
 #include <any>
 
 namespace VSL_NAMESPACE::_impl {
-	struct Vulkan_impl_accesor {
+	struct Vulkan_impl_accessor {
 		vk::Instance instance;
 		vk::DebugUtilsMessengerEXT debugMessenger;
 
-		virtual ~Vulkan_impl_accesor() {};
+		virtual ~Vulkan_impl_accessor() {};
 	};
 
 	template<bool V>
@@ -32,7 +32,7 @@ namespace VSL_NAMESPACE::_impl {
 	};
 
 	struct PhysicalDevice_impl {
-		std::shared_ptr<Vulkan_impl_accesor> vulkan;
+		std::shared_ptr<Vulkan_impl_accessor> vulkan;
 
 
 		vk::PhysicalDevice device;
@@ -43,13 +43,13 @@ namespace VSL_NAMESPACE::_impl {
 	};
 
 	struct PhysicalDevices_impl {
-		std::shared_ptr<Vulkan_impl_accesor> vulkan;
+		std::shared_ptr<Vulkan_impl_accessor> vulkan;
 
 		std::vector<vk::PhysicalDevice> devices = {};
 	};
 
 	struct Surface_impl {
-		std::shared_ptr<Vulkan_impl_accesor> vulkan;
+		std::shared_ptr<Vulkan_impl_accessor> vulkan;
 
 		vk::SurfaceKHR surface;
 		void* window;
@@ -127,18 +127,19 @@ namespace VSL_NAMESPACE::_impl {
 		~PipelineLayout_impl();
 	};
 
+	/*
 	struct ShaderStage_impl {
 		vk::PipelineShaderStageCreateInfo stage;
 	};
+	*/
 
 	struct Shader_impl {
+		std::string name;
 		std::shared_ptr<LogicalDevice_impl> device;
 		vk::ShaderModule shaderModule;
+		vk::PipelineShaderStageCreateInfo shaderStageCreateInfo;
 
 		~Shader_impl();
-	};
-
-	struct ShaderGroup_impl {
 	};
 
 	struct RenderPass_impl {
@@ -148,10 +149,19 @@ namespace VSL_NAMESPACE::_impl {
 		~RenderPass_impl();
 	};
 
+	struct Pipeline_impl {
+		std::shared_ptr<LogicalDevice_impl> device;
+		std::shared_ptr<PipelineLayout_impl> layout;
+
+		vk::Pipeline pipeline;
+
+		~Pipeline_impl();
+	};
+
 	namespace pipeline_layout {
 		struct ShaderGroup_impl {
 			std::string name;
-			std::shared_ptr<Shader_impl> shaders;
+			std::vector<std::shared_ptr<Shader_impl>> shaders;
 		};
 	}
 

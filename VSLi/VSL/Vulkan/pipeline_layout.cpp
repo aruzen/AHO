@@ -25,7 +25,7 @@ void expansionPipelineLayoutArgs(std::shared_ptr<VSL_NAMESPACE::_impl::PipelineL
 void expansionPipelineLayoutArgs(std::shared_ptr<VSL_NAMESPACE::_impl::PipelineLayout_impl> _data, VSL_NAMESPACE::_impl::CreateInfo& info) {}
 
 template<VSL_NAMESPACE::pipeline_layout_injecter... Args>
-VSL_NAMESPACE::PipelineLayout<Args...>::PipelineLayout(VSL_NAMESPACE::LogicalDeviceAcsessor device, const Args& ...args) {
+VSL_NAMESPACE::PipelineLayout<Args...>::PipelineLayout(VSL_NAMESPACE::LogicalDeviceAccessor device, const Args& ...args) {
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::PipelineLayout_impl>(new VSL_NAMESPACE::_impl::PipelineLayout_impl);
 	_data->info = std::shared_ptr<VSL_NAMESPACE::_impl::CreateInfo>(new VSL_NAMESPACE::_impl::CreateInfo);
 	_data->device = device._data;
@@ -52,8 +52,8 @@ VSL_NAMESPACE::_impl::PipelineLayout_impl::~PipelineLayout_impl()
 	device->device.destroyPipelineLayout(pipelineLayout);
 }
 
-template<VSL_NAMESPACE::ShaderType Type>
-VSL_NAMESPACE::ShaderPipelineLayoutStage<Type>::ShaderPipelineLayoutStage(std::string name, VSL_NAMESPACE::Shader<Type> shader)
+/*template<VSL_NAMESPACE::ShaderType Type>
+VSL_NAMESPACE::ShaderPipelineLayoutStage<Type>::ShaderPipelineLayoutStage(VSL_NAMESPACE::Shader<Type> shader)
 {
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::ShaderStage_impl>(new VSL_NAMESPACE::_impl::ShaderStage_impl);
 
@@ -65,8 +65,8 @@ VSL_NAMESPACE::ShaderPipelineLayoutStage<Type>::ShaderPipelineLayoutStage(std::s
 	}
 	_data->stage.pName = name.c_str();
 	_data->stage.module = shader._data->shaderModule;
-}
+}*/
 
 template struct vsl::PipelineLayout<>;
-template struct vsl::ShaderPipelineLayoutStage<VSL_NAMESPACE::ShaderType::Vertex>;
-template struct vsl::ShaderPipelineLayoutStage<VSL_NAMESPACE::ShaderType::Fragment>;
+// template struct vsl::ShaderPipelineLayoutStage<VSL_NAMESPACE::ShaderType::Vertex>;
+// template struct vsl::ShaderPipelineLayoutStage<VSL_NAMESPACE::ShaderType::Fragment>;

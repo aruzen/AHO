@@ -35,6 +35,7 @@
 
 /*
 * https://vulkan-tutorial.com/en/Drawing_a_triangle/Graphics_pipeline_basics/Shader_modules
+* https://vulkan-tutorial.com/en/Drawing_a_triangle/Graphics_pipeline_basics/Render_passes
 */
 
 int main() {
@@ -79,7 +80,9 @@ int main() {
 		View view(swapchain);
 
 		PipelineLayout layout(device);
-		Pipeline pipeline(layout);
+		RenderPass pass(swapchain);
+
+		Pipeline pipeline(layout, pass);
 
 		pipeline;
 

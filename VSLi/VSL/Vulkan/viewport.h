@@ -15,7 +15,7 @@ namespace VSL_NAMESPACE {
 		Viewport();
 		Viewport(T* t);
 		Viewport(const element_type& x, const element_type& y, const element_type& width, const element_type& height);
-		Viewport(SwapchainAcsessor swapchain);
+		Viewport(SwapchainAccessor swapchain);
 	
 		void injection(struct VSL_NAMESPACE::_impl::CreateInfo& info);
 	};

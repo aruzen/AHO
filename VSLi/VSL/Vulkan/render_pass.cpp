@@ -3,7 +3,7 @@
 
 #include "_pimpls.h"
 
-VSL_NAMESPACE::RenderPass::RenderPass(SwapchainAcsessor swapchain)
+VSL_NAMESPACE::RenderPass::RenderPass(SwapchainAccessor swapchain)
 {
     _data = std::shared_ptr<VSL_NAMESPACE::_impl::RenderPass_impl>(new VSL_NAMESPACE::_impl::RenderPass_impl);
     _data->device = swapchain._data->device;

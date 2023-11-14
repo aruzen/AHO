@@ -214,20 +214,19 @@ std::string VSL_NAMESPACE::PhysicalDevice::name() {
 	return _data->props.value().deviceName;
 }
 
-template<typename S, bool V>
-VSL_NAMESPACE::PhysicalDevices<S, V>::PhysicalDevices
-(const VSL_NAMESPACE::Vulkan<V>& vulkan)
+template<typename S>
+VSL_NAMESPACE::PhysicalDevices<S>::PhysicalDevices(VSL_NAMESPACE::VulkanAccessor vulkan)
 {
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::PhysicalDevices_impl>(new VSL_NAMESPACE::_impl::PhysicalDevices_impl);
 	_data->devices = vulkan._data->instance.enumeratePhysicalDevices();
-	_data->vulkan = std::dynamic_pointer_cast<vsl::_impl::Vulkan_impl_accesor>(vulkan._data);
+	_data->vulkan = vulkan._accessor;
 }
 
-template<typename S, bool V>
-VSL_NAMESPACE::PhysicalDevices<S, V>::~PhysicalDevices() {}
+template<typename S>
+VSL_NAMESPACE::PhysicalDevices<S>::~PhysicalDevices() {}
 
-template<typename S, bool V>
-std::vector<VSL_NAMESPACE::PhysicalDevice> VSL_NAMESPACE::PhysicalDevices<S, V>::get()
+template<typename S>
+std::vector<VSL_NAMESPACE::PhysicalDevice> VSL_NAMESPACE::PhysicalDevices<S>::get()
 {
 	std::vector<VSL_NAMESPACE::PhysicalDevice> devices;
 	for (auto& d : _data->devices) {
@@ -239,8 +238,8 @@ std::vector<VSL_NAMESPACE::PhysicalDevice> VSL_NAMESPACE::PhysicalDevices<S, V>:
 	return devices;
 }
 
-template<typename S, bool V>
-VSL_NAMESPACE::PhysicalDevice VSL_NAMESPACE::PhysicalDevices<S, V>::search()
+template<typename S>
+VSL_NAMESPACE::PhysicalDevice VSL_NAMESPACE::PhysicalDevices<S>::search()
 {
 	S s;
 	int max_score = -1;
@@ -258,8 +257,8 @@ VSL_NAMESPACE::PhysicalDevice VSL_NAMESPACE::PhysicalDevices<S, V>::search()
 }
 
 #ifdef VSL_NAMESPACE_TEST
-template<typename S, bool V>
-void VSL_NAMESPACE::PhysicalDevices<S, V>::test()
+template<typename S>
+void VSL_NAMESPACE::PhysicalDevices<S>::test()
 {
 	std::vector<VSL_NAMESPACE::PhysicalDevice> devices;
 	for (auto& d : _data->devices) {
@@ -333,11 +332,6 @@ VSL_NAMESPACE::_impl::LogicalDevice_impl::~LogicalDevice_impl() {
 	device.destroy();
 }
 
-template struct VSL_NAMESPACE::Vulkan<true>;
-template struct VSL_NAMESPACE::_LogicalDeviceGraphicCreator<true>;
-template struct VSL_NAMESPACE::PhysicalDevices<VSL_NAMESPACE::_PhysicalDevicesSercher, true>;
+template struct VSL_NAMESPACE::PhysicalDevices<VSL_NAMESPACE::_PhysicalDevicesSercher>;
 template struct VSL_NAMESPACE::LogicalDevice<VSL_NAMESPACE::_LogicalDeviceGraphicCreator<true>>;
-template struct VSL_NAMESPACE::Vulkan<false>;
-template struct VSL_NAMESPACE::_LogicalDeviceGraphicCreator<false>;
-template struct VSL_NAMESPACE::PhysicalDevices<VSL_NAMESPACE::_PhysicalDevicesSercher, false>;
 template struct VSL_NAMESPACE::LogicalDevice<VSL_NAMESPACE::_LogicalDeviceGraphicCreator<false>>;

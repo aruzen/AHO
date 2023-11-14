@@ -24,7 +24,7 @@ VSL_NAMESPACE::Viewport<T>::Viewport(const element_type& x, const element_type& 
 }
 
 template<VSL_NAMESPACE::is_rectangle T>
-VSL_NAMESPACE::Viewport<T>::Viewport(SwapchainAcsessor swapchain) {
+VSL_NAMESPACE::Viewport<T>::Viewport(SwapchainAccessor swapchain) {
 	// _data = std::shared_ptr<vsl::_impl::Viewport_impl>(new vsl::_impl::Viewport_impl);
 	
 	this->x = 0;

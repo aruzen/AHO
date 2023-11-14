@@ -11,7 +11,7 @@ namespace VSL_NAMESPACE {
 	struct SurfaceAccessor;
 
 	namespace PhysicalDeviceType {
-		class _PhysicalDeviceType : public VSL_NAMESPACE::Type<_PhysicalDeviceType> {
+		class _PhysicalDeviceType : public Type<_PhysicalDeviceType> {
 		public:
 			consteval _PhysicalDeviceType(const char* name_, char index_) :Type(name_, index_) {}
 		};
@@ -26,19 +26,19 @@ namespace VSL_NAMESPACE {
 	};
 
 	struct _PhysicalDevicesSercher {
-		int benchmark(VSL_NAMESPACE::PhysicalDevice device);
+		int benchmark(PhysicalDevice device);
 	};
 
 	template<bool V>
 	struct _LogicalDeviceGraphicCreator {
-		std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> create(VSL_NAMESPACE::PhysicalDevice device, VSL_NAMESPACE::SurfaceAccessor surface);
+		std::shared_ptr<_impl::LogicalDevice_impl> create(PhysicalDevice device, SurfaceAccessor surface);
 	};
 
-	template<typename S, bool Validation>
+	template<typename S>
 	struct PhysicalDevices {
 		using BenchMarcker = typename S;
 
-		PhysicalDevices(const VSL_NAMESPACE::Vulkan<Validation>& vulkan);
+		PhysicalDevices(VulkanAccessor vulkan);
 		~PhysicalDevices();
 
 		std::vector<PhysicalDevice> get();
@@ -57,19 +57,19 @@ namespace VSL_NAMESPACE {
 		uint32_t driverVersion();
 		uint32_t vendorID();
 		uint32_t deviceID();
-		VSL_NAMESPACE::PhysicalDeviceType::_PhysicalDeviceType type();
+		PhysicalDeviceType::_PhysicalDeviceType type();
 		std::string name();
 		std::shared_ptr<_impl::PhysicalDevice_impl> _data;
 	};
 
-	struct LogicalDeviceAcsessor {
-		std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> _data = nullptr;
+	struct LogicalDeviceAccessor {
+		std::shared_ptr<_impl::LogicalDevice_impl> _data = nullptr;
 	};
 
-	template<typename C = VSL_NAMESPACE::_LogicalDeviceGraphicCreator<VSL_NAMESPACE::validation>, bool V = VSL_NAMESPACE::validation>
-	struct LogicalDevice : public LogicalDeviceAcsessor {
-		LogicalDevice(VSL_NAMESPACE::PhysicalDevice device, vsl::SurfaceAccessor surface);
-		LogicalDevice(VSL_NAMESPACE::PhysicalDevice device, std::shared_ptr<vsl::SurfaceAccessor> surface);
+	template<typename C = _LogicalDeviceGraphicCreator<validation>, bool V = validation>
+	struct LogicalDevice : public LogicalDeviceAccessor {
+		LogicalDevice(PhysicalDevice device, vsl::SurfaceAccessor surface);
+		LogicalDevice(PhysicalDevice device, std::shared_ptr<vsl::SurfaceAccessor> surface);
 
 #ifdef VSL_NAMESPACE_TEST
 		void test();
@@ -79,9 +79,7 @@ namespace VSL_NAMESPACE {
 
 template<bool Validation>
 template<typename S>
-VSL_NAMESPACE::PhysicalDevices<S, Validation> VSL_NAMESPACE::Vulkan<Validation>::devices()
+VSL_NAMESPACE::PhysicalDevices<S> VSL_NAMESPACE::Vulkan<Validation>::devices()
 {
 	return VSL_NAMESPACE::PhysicalDevices<S, Validation>(*this);
 }
-
-template struct VSL_NAMESPACE::PhysicalDevices<VSL_NAMESPACE::_PhysicalDevicesSercher, true>;

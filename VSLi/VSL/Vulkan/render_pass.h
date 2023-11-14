@@ -10,6 +10,6 @@ namespace VSL_NAMESPACE {
 	struct RenderPass {
 		std::shared_ptr<VSL_NAMESPACE::_impl::RenderPass_impl> _data;
 
-		RenderPass(SwapchainAcsessor swapchain);
+		RenderPass(SwapchainAccessor swapchain);
 	};
 }

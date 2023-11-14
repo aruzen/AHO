@@ -20,19 +20,21 @@ namespace VSL_NAMESPACE {
 		ColorBlend
 	};*/
 
+	/*
 	struct _ShaderPipelineLayoutStageData {
 		// ShaderType type;
-		std::shared_ptr<VSL_NAMESPACE::_impl::ShaderStage_impl> _data;
+		std::shared_ptr<_impl::ShaderStage_impl> _data;
 	};
+	*/
 
 	template<typename T>
 	concept pipeline_layout_createinfo_injecter = requires (T t) {
-		t.injection(std::declval<VSL_NAMESPACE::_impl::CreateInfo>());
+		t.injection(std::declval<_impl::CreateInfo>());
 	};
 
 	template<typename T>
 	concept pipeline_layout_data_injecter = requires (T t) {
-		t.injection(std::declval<std::shared_ptr<VSL_NAMESPACE::_impl::PipelineLayout_impl>>());
+		t.injection(std::declval<std::shared_ptr<_impl::PipelineLayout_impl>>());
 	};
 
 	template<typename T>
@@ -40,21 +42,23 @@ namespace VSL_NAMESPACE {
 		|| pipeline_layout_data_injecter<T>;
 
 	struct PipelineLayoutAccesor {
-		std::shared_ptr<VSL_NAMESPACE::_impl::PipelineLayout_impl> _data;
+		std::shared_ptr<_impl::PipelineLayout_impl> _data;
 	};
 
 	template<pipeline_layout_injecter... Args>
 	struct PipelineLayout : public PipelineLayoutAccesor {
-		PipelineLayout(VSL_NAMESPACE::LogicalDeviceAcsessor device, const Args& ...args);
+		PipelineLayout(LogicalDeviceAccessor device, const Args& ...args);
 
 		template <typename Addition>
 		PipelineLayout<Addition, Args...> add(const Addition& a);
 	};
 
+	/*
 	template<ShaderType Type>
 	struct ShaderPipelineLayoutStage {
-		ShaderPipelineLayoutStage(std::string name, VSL_NAMESPACE::Shader<Type> shader);
+		ShaderPipelineLayoutStage(std::string name, Shader<Type> shader);
 
-		std::shared_ptr<VSL_NAMESPACE::_impl::ShaderStage_impl> _data;
+		std::shared_ptr<_impl::ShaderStage_impl> _data;
 	};
+	*/
 }

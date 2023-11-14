@@ -15,15 +15,19 @@ namespace VSL_NAMESPACE {
 	struct PhysicalDevice;
 	struct _PhysicalDevicesSercher;
 
-	template<typename S = VSL_NAMESPACE::_PhysicalDevicesSercher, bool Validation = VSL_NAMESPACE::validation>
+	template<typename S = VSL_NAMESPACE::_PhysicalDevicesSercher>
 	struct PhysicalDevices;
 
 	const std::vector<const char*> validationLayers = {
 			"VK_EXT_debug_utils"
 	};
 
+	struct VulkanAccessor {
+		std::shared_ptr<_impl::Vulkan_impl_accessor> _accessor;
+	};
+
 	template<bool Validation = VSL_NAMESPACE::validation>
-	struct Vulkan {
+	struct Vulkan : VulkanAccessor {
 	public: 
 		bool checkValidationLayerSupport();
 
@@ -32,7 +36,7 @@ namespace VSL_NAMESPACE {
 		~Vulkan();
 
 		template<typename S = VSL_NAMESPACE::_PhysicalDevicesSercher>
-		PhysicalDevices<S, Validation> devices();
+		PhysicalDevices<S> devices();
 
 #ifdef VSL_NAMESPACE_TEST 
 		void test();

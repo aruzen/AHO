@@ -83,6 +83,7 @@ template<bool Validation>
 VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vector<const char*>& requireExtensions)
 {
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::Vulkan_impl<Validation>>(new VSL_NAMESPACE::_impl::Vulkan_impl<Validation>);
+	_accessor = std::dynamic_pointer_cast<_impl::Vulkan_impl_accessor>(_data);
 
 	if constexpr (Validation) {
 		checkValidationLayerSupport();
@@ -91,7 +92,7 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vecto
 	vk::ApplicationInfo appInfo;
 	appInfo.pApplicationName = app_name;
 	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-	appInfo.pEngineName = "VSL_NAMESPACE Engine";
+	appInfo.pEngineName = "VSL_Engine";
 	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
 	appInfo.apiVersion = VK_API_VERSION_1_0;
 
@@ -144,6 +145,7 @@ template<bool Validation>
 VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name)
 {
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::Vulkan_impl<Validation>>(new VSL_NAMESPACE::_impl::Vulkan_impl<Validation>);
+	_accessor = std::dynamic_pointer_cast<_impl::Vulkan_impl_accessor>(_data);
 
 	if constexpr (Validation) {
 		checkValidationLayerSupport();

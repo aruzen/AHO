@@ -8,7 +8,7 @@
 #include <any>
 
 namespace VSL_NAMESPACE {
-	struct SurfaceAccessor;
+	struct Surface;
 
 	namespace PhysicalDeviceType {
 		class _PhysicalDeviceType : public Type<_PhysicalDeviceType> {
@@ -31,7 +31,7 @@ namespace VSL_NAMESPACE {
 
 	template<bool V>
 	struct _LogicalDeviceGraphicCreator {
-		std::shared_ptr<_impl::LogicalDevice_impl> create(PhysicalDevice device, SurfaceAccessor surface);
+		std::shared_ptr<_impl::LogicalDevice_impl> create(PhysicalDevice device, Surface surface);
 	};
 
 	template<typename S>
@@ -66,13 +66,13 @@ namespace VSL_NAMESPACE {
 		std::shared_ptr<_impl::LogicalDevice_impl> _data = nullptr;
 	};
 
-	template<typename C = _LogicalDeviceGraphicCreator<validation>, bool V = validation>
+	template<typename C = _LogicalDeviceGraphicCreator<validation>>
 	struct LogicalDevice : public LogicalDeviceAccessor {
-		LogicalDevice(PhysicalDevice device, vsl::SurfaceAccessor surface);
-		LogicalDevice(PhysicalDevice device, std::shared_ptr<vsl::SurfaceAccessor> surface);
+		LogicalDevice(PhysicalDevice device, vsl::Surface surface);
+		LogicalDevice(PhysicalDevice device, std::shared_ptr<vsl::Surface> surface);
 
 #ifdef VSL_NAMESPACE_TEST
-		void test();
+		// void test();
 #endif // VSL_NAMESPACE_TEST
 	};
 }

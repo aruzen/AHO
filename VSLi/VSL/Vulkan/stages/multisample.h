@@ -1,9 +1,10 @@
 #pragma once
 #include "../../define.h"
 #include "../pv.h"
+#include "../pipeline_layout.h"
 
 namespace VSL_NAMESPACE::pipeline_layout {
 	struct Multisample {
-		void injection(struct VSL_NAMESPACE::_impl::CreateInfo& info);
+		void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
 	};
 }

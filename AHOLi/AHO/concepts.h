@@ -1,6 +1,7 @@
 #pragma once
 #include "define.h"
 
+#include <type_traits>
 #include <concepts>
 #include <optional>
 

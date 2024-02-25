@@ -2,8 +2,10 @@
 #include "rasterization.h"
 #include "../_pimpls.h"
 
-void VSL_NAMESPACE::pipeline_layout::Rasterization::injection(VSL_NAMESPACE::_impl::CreateInfo& info)
+void VSL_NAMESPACE::pipeline_layout::Rasterization::injection(VSL_NAMESPACE::PipelineLayoutAccessor pl)
 {
+	auto& info = *pl._data->info;
+
 	info.rasterization.depthClampEnable = false;
 	info.rasterization.rasterizerDiscardEnable = false;
 	info.rasterization.polygonMode = vk::PolygonMode::eFill;

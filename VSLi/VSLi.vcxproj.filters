@@ -117,6 +117,9 @@
     <ClInclude Include="VSL\window_plugin.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="VSL\Vulkan\frame_buffer.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -189,6 +192,12 @@
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="VSL\window_plugin.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\Vulkan\frame_buffer.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\Vulkan\_pimpls.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>

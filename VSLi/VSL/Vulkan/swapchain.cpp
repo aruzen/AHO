@@ -8,8 +8,7 @@
 
 using namespace vsl::_impl::helper;
 
-template<bool V>
-vsl::Swapchain<V>::Swapchain(vsl::LogicalDeviceAccessor device)
+vsl::Swapchain::Swapchain(vsl::LogicalDeviceAccessor device)
 {
 	_data = std::shared_ptr<_impl::Swapchain_impl>(new _impl::Swapchain_impl);
 	_data->device = device._data;
@@ -58,5 +57,3 @@ VSL_NAMESPACE::_impl::Swapchain_impl::~Swapchain_impl()
 {
 	device->device.destroySwapchainKHR(swapChain);
 }
-
-template struct vsl::Swapchain<>;

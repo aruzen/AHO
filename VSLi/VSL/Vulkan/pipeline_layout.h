@@ -6,59 +6,53 @@
 #include "shader.h"
 
 namespace VSL_NAMESPACE {
-	// struct Pipeline;
-
-	/* enum class PipelineLayoutStageType : unsigned char {
-		Error,
-		Stages,
-		VertexInput,
-		InputAssemblyState,
-		Viewport,
-		Rasterization,
-		Multisample,
-		DepthStencil,
-		ColorBlend
-	};*/
-
-	/*
-	struct _ShaderPipelineLayoutStageData {
-		// ShaderType type;
-		std::shared_ptr<_impl::ShaderStage_impl> _data;
-	};
-	*/
-
-	template<typename T>
-	concept pipeline_layout_createinfo_injecter = requires (T t) {
-		t.injection(std::declval<_impl::CreateInfo>());
-	};
-
-	template<typename T>
-	concept pipeline_layout_data_injecter = requires (T t) {
-		t.injection(std::declval<std::shared_ptr<_impl::PipelineLayout_impl>>());
-	};
-
-	template<typename T>
-	concept pipeline_layout_injecter = pipeline_layout_createinfo_injecter<T>
-		|| pipeline_layout_data_injecter<T>;
-
-	struct PipelineLayoutAccesor {
+	struct PipelineLayoutAccessor {
 		std::shared_ptr<_impl::PipelineLayout_impl> _data;
+	protected:
+		void init_start(LogicalDeviceAccessor device);
+		void init_finish();
+	};
+
+	template<typename T>
+	concept pipeline_layout_injecter = requires (T t) {
+		t.injection(std::declval<VSL_NAMESPACE::PipelineLayoutAccessor>());
 	};
 
 	template<pipeline_layout_injecter... Args>
-	struct PipelineLayout : public PipelineLayoutAccesor {
-		PipelineLayout(LogicalDeviceAccessor device, const Args& ...args);
+	struct PipelineLayout : public PipelineLayoutAccessor {
+		PipelineLayout(LogicalDeviceAccessor device, Args&& ...args);
 
-		template <typename Addition>
-		PipelineLayout<Addition, Args...> add(const Addition& a);
+		template <VSL_NAMESPACE::pipeline_layout_injecter Addition>
+		void add(Addition&& a);
 	};
 
-	/*
-	template<ShaderType Type>
-	struct ShaderPipelineLayoutStage {
-		ShaderPipelineLayoutStage(std::string name, Shader<Type> shader);
 
-		std::shared_ptr<_impl::ShaderStage_impl> _data;
-	};
-	*/
+	// ----------------------------------------------------------------------------------------------------------------------
+
+	namespace helper {
+		extern void expansionPipelineLayoutArgs(PipelineLayoutAccessor& pl);
+
+		template<VSL_NAMESPACE::pipeline_layout_injecter T, VSL_NAMESPACE::pipeline_layout_injecter... Args>
+		void expansionPipelineLayoutArgs(PipelineLayoutAccessor& pl, T&& t, Args&& ...args) {
+			std::forward<T>(t).injection(pl);
+			expansionPipelineLayoutArgs(pl, std::forward<Args>(args)...);
+		}
+	}
+
+	template<VSL_NAMESPACE::pipeline_layout_injecter... Args>
+	PipelineLayout<Args...>::PipelineLayout(VSL_NAMESPACE::LogicalDeviceAccessor device, Args&& ...args) {
+		init_start(device);
+
+		helper::expansionPipelineLayoutArgs(*this, std::forward<Args>(args)...);
+
+		init_finish();
+	}
+
+	template <VSL_NAMESPACE::pipeline_layout_injecter... Args>
+	template <VSL_NAMESPACE::pipeline_layout_injecter Addition>
+	void PipelineLayout<Args...>::add(Addition&& a) {
+		std::forward<Addition>(a).injection(*this);
+
+		init_finish();
+	}
 }

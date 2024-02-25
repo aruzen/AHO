@@ -182,7 +182,9 @@ namespace AHO_NAMESPACE {
 		};
 
 		template <typename ElementType, typename _CoordinateInfo>
-		struct _CoordinateSet {};
+		struct _CoordinateSet {
+			static constexpr bool is_coordinate_set = true;
+		};
 
 #define AHO_COORDINATE_NUMBERD_MEMBER_1 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 1)
 #define AHO_COORDINATE_NUMBERD_MEMBER_2 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 2)
@@ -205,11 +207,13 @@ namespace AHO_NAMESPACE {
 								  std::same_as<Y<ElementType>, Upper<ElementType>>, \
 								  std::same_as<Z<ElementType>, Upper<ElementType>>  \
 							  >::value> { \
+				using element_type = ElementType; \
 				using coordinate_info = typename _MakeCoordinateInfo< \
 								  std::same_as<X<ElementType>, Upper<ElementType>>, \
 								  std::same_as<Y<ElementType>, Upper<ElementType>>, \
 								  std::same_as<Z<ElementType>, Upper<ElementType>>  \
 							  >::value; \
+				static constexpr bool is_coordinate_set = true; \
 				union { Upper<ElementType> Lower, AHO_COORDINATE_NUMBERD_MEMBER_1; }; \
 				constexpr _CoordinateSet() : Lower(Upper<ElementType>()) {}; \
 				constexpr _CoordinateSet(const Upper<ElementType>& Lower) : Lower(Lower) {}; \
@@ -223,11 +227,13 @@ namespace AHO_NAMESPACE {
 							      (std::same_as<Y<ElementType>, Upper1<ElementType>> || std::same_as<Y<ElementType>, Upper2<ElementType>>), \
 							      (std::same_as<Z<ElementType>, Upper1<ElementType>> || std::same_as<Z<ElementType>, Upper2<ElementType>>)  \
 							  >::value> { \
+				using element_type = ElementType; \
 				using coordinate_info = typename _MakeCoordinateInfo< \
 							      (std::same_as<X<ElementType>, Upper1<ElementType>> || std::same_as<X<ElementType>, Upper2<ElementType>>), \
 							      (std::same_as<Y<ElementType>, Upper1<ElementType>> || std::same_as<Y<ElementType>, Upper2<ElementType>>), \
 							      (std::same_as<Z<ElementType>, Upper1<ElementType>> || std::same_as<Z<ElementType>, Upper2<ElementType>>)  \
 							  >::value; \
+				static constexpr bool is_coordinate_set = true; \
 				union { Upper1<ElementType> Lower1, AHO_COORDINATE_NUMBERD_MEMBER_1; }; \
 				union { Upper2<ElementType> Lower2, AHO_COORDINATE_NUMBERD_MEMBER_2; }; \
 				constexpr _CoordinateSet() : Lower1(Upper1<ElementType>()), Lower2(Upper2<ElementType>()) {}; \
@@ -246,7 +252,10 @@ namespace AHO_NAMESPACE {
 
 		template <typename ElementType>
 		struct _CoordinateSet<ElementType, typename _MakeCoordinateInfo<true, true, true>::value> {
+			using element_type = ElementType;
 			using coordinate_info = _MakeCoordinateInfo<true, true, true>::value;
+
+			static constexpr bool is_coordinate_set = true;
 			union { X<ElementType> x, AHO_COORDINATE_NUMBERD_MEMBER_1; };
 			union { Y<ElementType> y, AHO_COORDINATE_NUMBERD_MEMBER_2; };
 			union { Z<ElementType> z, AHO_COORDINATE_NUMBERD_MEMBER_3; };
@@ -375,9 +384,16 @@ namespace AHO_NAMESPACE {
 		constexpr Z<float> operator"" AHO_LITERAL(f_z)(long double v) { return { (float)v }; };
 		constexpr Z<size_t> operator"" AHO_LITERAL(l_z)(size_t v) { return { v }; };
 		constexpr Z<double> z(1.0);
-
-		using coordinate::X;
-		using coordinate::Y;
-		using coordinate::Z;
 	}
+
+	namespace concepts {
+		template<typename R>
+		concept is_coordinate_set = requires {
+			std::enable_if<R::is_coordinate_set>::type;
+		};
+	}
+
+	using coordinate::X;
+	using coordinate::Y;
+	using coordinate::Z;
 }

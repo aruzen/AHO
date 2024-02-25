@@ -18,9 +18,17 @@
 #include <VSL/Vulkan/view.h>
 #include <VSL/Vulkan/shader.h>
 #include <VSL/Vulkan/pipeline_layout.h>
+#include <VSL/Vulkan/stages/shader_group.h>
+#include <VSL/Vulkan/stages/color_blend.h>
+#include <VSL/Vulkan/stages/input_assembly.h>
+#include <VSL/Vulkan/stages/multisample.h>
+#include <VSL/Vulkan/stages/rasterization.h>
+#include <VSL/Vulkan/stages/vertex_input.h>
 #include <VSL/Vulkan/pipeline.h>
+#include <VSL/Vulkan/frame_buffer.h>
 
-// #define AHO_POOP_PUBLIC_SECURITY
+#define AHO_POOP_PUBLIC_SECURITY
+#pragma warning( disable : 4455 )
 
 #include <AHO/define.h>
 #include <AHO/core/math/Mat.h>
@@ -34,14 +42,15 @@
 #include <chrono>
 
 /*
-* https://vulkan-tutorial.com/en/Drawing_a_triangle/Graphics_pipeline_basics/Shader_modules
-* https://vulkan-tutorial.com/en/Drawing_a_triangle/Graphics_pipeline_basics/Render_passes
+* https://vulkan-tutorial.com/en/Drawing_a_triangle/Drawing/Framebuffers
 */
 
 int main() {
 	using namespace aho;
 	using namespace aho::coordinate;
 	using namespace aho::angle;
+
+	namespace pl = vsl::pipeline_layout;
 
 	auto x_z = 10x + 10z;
 
@@ -54,7 +63,8 @@ int main() {
 
 	Vector vec1(1, 1);
 	Vector vec2(2.0, 2.0);
-	_Vector<int, vsl::D2, decltype(x + z)::coordinate_info> x_z_vec(10x + 25z);
+	_Vector<decltype(10x + 25z)::element_type, decltype(10x + 25z)::coordinate_info::dimention, decltype(10x + 25z)::coordinate_info>
+		x_z_vec(10x + 25z);
 	auto vec3 = vec1 + vec2;
 
 	vsl::loggingln(x_z_vec.value.x, ", ", x_z_vec.value.z);
@@ -64,30 +74,38 @@ int main() {
 
 	vsl::loggingln("area : ", triangle.area());
 
-	// Polygon();
-
 	try {
 		using namespace vsl;
 
 		Vulkan vk("test", { "VK_KHR_win32_surface", "VK_KHR_surface" });
-		Window main_window("main");
-		auto physical_devices = PhysicalDevices(vk).search();
-		auto surface = main_window.addPlugin<Surface<vsl::validation>>(vk);
+		Window main_window("vsl");
+		auto physical_device = PhysicalDevices(vk).search();
+		auto surface = main_window.addPlugin<Surface>(vk);
 
-		LogicalDevice device(physical_devices, surface);
+		LogicalDevice device(physical_device, surface);
+		vsl::loggingln("selected : ", physical_device.name(), "(", physical_device.apiVersion(), ")");
 
 		Swapchain swapchain(device);
 		View view(swapchain);
 
-		PipelineLayout layout(device);
-		RenderPass pass(swapchain);
-
-		Pipeline pipeline(layout, pass);
-
-		pipeline;
-
 		vsl::Shader<ShaderType::Vertex> const_triangle_shader(device, "shaders/const_triangle.vert.spv");
 		vsl::Shader<ShaderType::Fragment> red_shader(device, "shaders/red.frag.spv");
+		
+		PipelineLayout layout(device, 
+			pl::ShaderGroup("red_triangle", { const_triangle_shader, red_shader }),
+			pl::ColorBlend(),
+			pl::InputAssembly(),
+			pl::Multisample(),
+			pl::Rasterization(),
+			pl::VertexInput());
+
+		RenderPass render_pass(swapchain);
+
+		Pipeline pipeline(layout, render_pass);
+
+		FrameBuffer frame_buffer(swapchain, view, render_pass);
+
+		pipeline;
 
 		// pipeline << ShaderPipelineStage<ShaderPipelineStageType::Vertex>("triangle", const_triangle_shader);
 

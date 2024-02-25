@@ -166,6 +166,7 @@
     <ClInclude Include="VSL\utils\VSLArray.h" />
     <ClInclude Include="VSL\Vulkan\command.h" />
     <ClInclude Include="VSL\Vulkan\device.h" />
+    <ClInclude Include="VSL\Vulkan\frame_buffer.h" />
     <ClInclude Include="VSL\Vulkan\pipeline.h" />
     <ClInclude Include="VSL\Vulkan\pipeline_layout.h" />
     <ClInclude Include="VSL\Vulkan\pv.h" />
@@ -200,6 +201,7 @@
     <ClCompile Include="VSL\utils\ShaderCompiler.cpp" />
     <ClCompile Include="VSL\Vulkan\command.cpp" />
     <ClCompile Include="VSL\Vulkan\device.cpp" />
+    <ClCompile Include="VSL\Vulkan\frame_buffer.cpp" />
     <ClCompile Include="VSL\Vulkan\pipeline.cpp" />
     <ClCompile Include="VSL\Vulkan\pipeline_layout.cpp" />
     <ClCompile Include="VSL\Vulkan\render_pass.cpp" />
@@ -216,6 +218,7 @@
     <ClCompile Include="VSL\Vulkan\view.cpp" />
     <ClCompile Include="VSL\Vulkan\viewport.cpp" />
     <ClCompile Include="VSL\Vulkan\Vulkan.cpp" />
+    <ClCompile Include="VSL\Vulkan\_pimpls.cpp" />
     <ClCompile Include="VSL\Window.cpp" />
     <ClCompile Include="VSL\window_plugin.cpp" />
   </ItemGroup>

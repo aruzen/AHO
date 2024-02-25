@@ -27,7 +27,7 @@ namespace VSL_NAMESPACE::_impl {
 	};
 
 	template<bool V>
-	struct Vulkan_impl : public Vulkan_impl_accesor {
+	struct Vulkan_impl : public Vulkan_impl_accessor {
 		virtual ~Vulkan_impl() override;
 	};
 
@@ -156,6 +156,14 @@ namespace VSL_NAMESPACE::_impl {
 		vk::Pipeline pipeline;
 
 		~Pipeline_impl();
+	};
+
+	struct FrameBuffer_impl {
+		std::shared_ptr<LogicalDevice_impl> device;
+
+		std::vector<vk::Framebuffer> swapChainFramebuffers;
+
+		~FrameBuffer_impl();
 	};
 
 	namespace pipeline_layout {

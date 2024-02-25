@@ -50,7 +50,7 @@ namespace VSL_NAMESPACE {
 		static bool NoCheckUpdate();
 
 		template<typename T, typename... Args>
-			requires vsl::concepts::initializer<T, VSL_NAMESPACE::PureWindow::WindowData*, Args&&...>&& std::derived_from<T, VSL_NAMESPACE::PureWindow::Plugin>
+		//	requires vsl::concepts::initializer<T, VSL_NAMESPACE::PureWindow::WindowData*, Args&&...>&& std::derived_from<T, VSL_NAMESPACE::PureWindow::Plugin>
 		std::shared_ptr<T> addPlugin(Args&&... args);
 
 		bool close();
@@ -62,18 +62,19 @@ namespace VSL_NAMESPACE {
 		std::shared_ptr<WindowData> _data;
 	};
 
-	class Window : public PureWindow{
+	class Window : public PureWindow {
 	public:
 		Window(std::string name, int width = 800, int height = 600);
 	};
 
 
 	template<typename T, typename ...Args>
-	requires vsl::concepts::initializer<T, VSL_NAMESPACE::PureWindow::WindowData*, Args&&...>&& std::derived_from<T, VSL_NAMESPACE::PureWindow::Plugin>
+	// requires vsl::concepts::initializer<T, VSL_NAMESPACE::PureWindow::WindowData*, Args&&...>&& std::derived_from<T, VSL_NAMESPACE::PureWindow::Plugin>
 	inline std::shared_ptr<T> VSL_NAMESPACE::PureWindow::addPlugin(Args && ...args)
 	{
 		auto t = std::shared_ptr<T>(new T(_data.get(), std::forward<Args>(args)...));
 		auto p = std::static_pointer_cast<Plugin>(t);
+
 		if constexpr (std::derived_from<T, vsl::PureWindow::OnUpdateable>) {
 			auto o = std::static_pointer_cast<OnUpdateable>(t);
 			_data->updateables.push_back(o);

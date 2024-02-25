@@ -9,12 +9,12 @@
 namespace AHO_NAMESPACE {
 	template<typename R = int,
 			 VSL_NAMESPACE::is_dimention D = VSL_NAMESPACE::VSL_DEFAULT_DIMENTION_STRUCT,
-	 		 typename CoordinateInfo = AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<D>::value>
+	 		 typename CoordinateInfo = typename AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<D>::value>
 	struct _Vector {
 	};
 
 	template<typename R = int, typename... Args>
-		requires concepts::sames_as<R, Args...>
+		requires concepts::sames_as<R, Args...> && !concepts::is_coordinate_set<R>
 	struct Vector : public _Vector<R, 
 								   typename VSL_NAMESPACE::Dimention<sizeof...(Args) + 1>::value, 
 								   typename AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<

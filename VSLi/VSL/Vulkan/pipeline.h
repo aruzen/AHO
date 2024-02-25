@@ -7,7 +7,7 @@
 
 namespace VSL_NAMESPACE {
 	struct Pipeline {
-		Pipeline(PipelineLayoutAccesor layout, RenderPass pass);
+		Pipeline(PipelineLayoutAccessor layout, RenderPass pass);
 
 		std::shared_ptr<_impl::Pipeline_impl> _data;
 	};

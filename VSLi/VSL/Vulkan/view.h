@@ -6,9 +6,11 @@
 #include "swapchain.h"
 
 namespace vsl {
-	template<typename D = VSL_NAMESPACE::VSL_DEFAULT_DIMENTION_STRUCT, bool V = vsl::validation>
+	template<typename D = VSL_NAMESPACE::VSL_DEFAULT_DIMENTION_STRUCT>
 	struct View {
-		View(vsl::Swapchain<V> device);
+		View(vsl::Swapchain device);
+
+		size_t size();
 
 		std::shared_ptr<_impl::View_impl> _data;
 	};

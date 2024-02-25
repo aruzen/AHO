@@ -34,7 +34,9 @@ VSL_NAMESPACE::Viewport<T>::Viewport(SwapchainAccessor swapchain) {
 }
 
 template<VSL_NAMESPACE::is_rectangle T>
-void VSL_NAMESPACE::Viewport<T>::injection(VSL_NAMESPACE::_impl::CreateInfo& info) {
+void VSL_NAMESPACE::Viewport<T>::injection(VSL_NAMESPACE::PipelineLayoutAccessor pl) {
+	auto& info = *pl._data->info;
+
 	vk::Viewport viewport;
 	viewport.x = this->x;
 	viewport.y = this->y;

@@ -19,6 +19,7 @@ namespace VSL_NAMESPACE::_impl {
 	struct Shader_impl;
 	struct RenderPass_impl;
 	struct Pipeline_impl;
+	struct FrameBuffer_impl;
 
 	namespace pipeline_layout {
 		struct ShaderGroup_impl;

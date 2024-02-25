@@ -6,8 +6,8 @@
 #include "_pimpls.h"
 #include "_dimention.h"
 
-template<typename D, bool V>
-VSL_NAMESPACE::View<D, V>::View(vsl::Swapchain<V> swapchain)
+template<typename D>
+VSL_NAMESPACE::View<D>::View(vsl::Swapchain swapchain)
 {
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::View_impl>(new VSL_NAMESPACE::_impl::View_impl);
 	_data->swapChainImageViews.resize(swapchain._data->swapChainImages.size());
@@ -31,6 +31,12 @@ VSL_NAMESPACE::View<D, V>::View(vsl::Swapchain<V> swapchain)
 
 		_data->swapChainImageViews[i] = _data->device->device.createImageView(createInfo);
 	}
+}
+
+template<typename D>
+size_t vsl::View<D>::size()
+{
+	return _data->swapChainImageViews.size();
 }
 
 VSL_NAMESPACE::_impl::View_impl::~View_impl()

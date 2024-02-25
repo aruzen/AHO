@@ -9,14 +9,13 @@
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 
-template<bool Validation>
-vsl::Surface<Validation>::Surface(vsl::PureWindow::WindowData* data, VSL_NAMESPACE::Vulkan<Validation> instance)
+vsl::Surface::Surface(vsl::PureWindow::WindowData* data, VSL_NAMESPACE::VulkanAccessor instance)
 {
 	_data = std::shared_ptr<vsl::_impl::Surface_impl>(new vsl::_impl::Surface_impl);
-	_data->vulkan = instance._data;
+	_data->vulkan = instance._accessor;
 
 	VkSurfaceKHR surface;
-	glfwCreateWindowSurface(instance._data->instance, (GLFWwindow*)data->window_handle, nullptr, &surface);
+	glfwCreateWindowSurface(instance._accessor->instance, (GLFWwindow*)data->window_handle, nullptr, &surface);
 	_data->surface = vk::SurfaceKHR(surface);
 	_data->window = data->window_handle;
 	/*
@@ -32,6 +31,3 @@ VSL_NAMESPACE::_impl::Surface_impl::~Surface_impl()
 {
 	vulkan->instance.destroySurfaceKHR(surface);
 }
-
-template struct vsl::Surface<true>;
-template struct vsl::Surface<false>;

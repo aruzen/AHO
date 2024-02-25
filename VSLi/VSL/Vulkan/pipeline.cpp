@@ -5,12 +5,13 @@
 #include "_pimpls.h"
 
 
-VSL_NAMESPACE::Pipeline::Pipeline(PipelineLayoutAccesor layout, RenderPass pass)
+VSL_NAMESPACE::Pipeline::Pipeline(PipelineLayoutAccessor layout, RenderPass pass)
 {
 	_data = std::shared_ptr<_impl::Pipeline_impl>(new _impl::Pipeline_impl);
+	_data->device = layout._data->device;
 
 	vk::GraphicsPipelineCreateInfo pipelineInfo;
-	pipelineInfo.stageCount = layout._data->info->shaderStages.size();
+	pipelineInfo.stageCount = (uint32_t)layout._data->info->shaderStages.size();
 	pipelineInfo.pStages = layout._data->info->shaderStages.data();
 	pipelineInfo.pVertexInputState = &layout._data->info->vertexInput;
 	pipelineInfo.pInputAssemblyState = &layout._data->info->inputAssembly;
@@ -33,9 +34,16 @@ VSL_NAMESPACE::Pipeline::Pipeline(PipelineLayoutAccesor layout, RenderPass pass)
 
 	vk::PipelineCacheCreateInfo pipelineInfoCache;
 	// pipelineInfoCache.flags = vk::PipelineCacheCreateFlagBits::
-	auto cache = layout._data->device->device.createPipelineCache(pipelineInfoCache);
+	auto cache = _data->device->device.createPipelineCache(pipelineInfoCache);
 
-	_data->pipeline = layout._data->device->device.createGraphicsPipeline(cache, pipelineInfo).value;
+	_data->pipeline = _data->device->device.createGraphicsPipeline(cache, pipelineInfo).value;
+	/*
+	if (vkCreateGraphicsPipelines(
+		layout._data->device->device, VK_NULL_HANDLE, 1,
+		reinterpret_cast<const VkGraphicsPipelineCreateInfo*>(&pipelineInfo), nullptr,
+		reinterpret_cast<VkPipeline*>(&_data->pipeline)) != VK_SUCCESS) {
+		// throw std::runtime_error("failed to create graphics pipeline!");
+	}*/
 }
 
 

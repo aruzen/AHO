@@ -1,8 +1,9 @@
 #include "pch.h"
 #include "shader_group.h"
 #include "../_pimpls.h"
+#include "../pipeline_layout.h"
 
-VSL_NAMESPACE::pipeline_layout::ShaderGroup::ShaderGroup(std::initializer_list<ShaderAccessor> shaders, std::string name) {
+VSL_NAMESPACE::pipeline_layout::ShaderGroup::ShaderGroup(std::string name, std::initializer_list<ShaderAccessor> shaders) {
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::pipeline_layout::ShaderGroup_impl>(new VSL_NAMESPACE::_impl::pipeline_layout::ShaderGroup_impl);
 	_data->name = name;
 	for (auto& shader : shaders) {
@@ -28,8 +29,11 @@ void VSL_NAMESPACE::pipeline_layout::ShaderGroup::removeShader(ShaderAccessor sh
 	}
 }
 
-void VSL_NAMESPACE::pipeline_layout::ShaderGroup::injection(VSL_NAMESPACE::_impl::CreateInfo& info)
+void VSL_NAMESPACE::pipeline_layout::ShaderGroup::injection(VSL_NAMESPACE::PipelineLayoutAccessor pl)
 {
+	auto& info = *pl._data->info;
+
 	for (auto& itr : _data->shaders)
 		info.shaderStages.push_back(itr->shaderStageCreateInfo);
 }
+

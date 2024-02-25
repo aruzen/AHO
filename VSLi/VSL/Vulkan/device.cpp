@@ -107,7 +107,7 @@ vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities, GL
 }
 
 template<bool V>
-std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> VSL_NAMESPACE::_LogicalDeviceGraphicCreator<V>::create(VSL_NAMESPACE::PhysicalDevice device, VSL_NAMESPACE::SurfaceAccessor surface)
+std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> VSL_NAMESPACE::_LogicalDeviceGraphicCreator<V>::create(VSL_NAMESPACE::PhysicalDevice device, VSL_NAMESPACE::Surface surface)
 {
 	std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> _data = std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl>(new VSL_NAMESPACE::_impl::LogicalDevice_impl);
 
@@ -218,7 +218,7 @@ template<typename S>
 VSL_NAMESPACE::PhysicalDevices<S>::PhysicalDevices(VSL_NAMESPACE::VulkanAccessor vulkan)
 {
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::PhysicalDevices_impl>(new VSL_NAMESPACE::_impl::PhysicalDevices_impl);
-	_data->devices = vulkan._data->instance.enumeratePhysicalDevices();
+	_data->devices = vulkan._accessor->instance.enumeratePhysicalDevices();
 	_data->vulkan = vulkan._accessor;
 }
 
@@ -311,8 +311,8 @@ int VSL_NAMESPACE::_PhysicalDevicesSercher::benchmark(VSL_NAMESPACE::PhysicalDev
 	return rateDeviceSuitability(device._data->device);
 }
 
-template<typename C, bool V>
-VSL_NAMESPACE::LogicalDevice<C, V>::LogicalDevice(VSL_NAMESPACE::PhysicalDevice _device, vsl::SurfaceAccessor _surface)
+template<typename C>
+VSL_NAMESPACE::LogicalDevice<C>::LogicalDevice(VSL_NAMESPACE::PhysicalDevice _device, vsl::Surface _surface)
 {
 	C c;
 	_data = c.create(_device, _surface);
@@ -320,10 +320,10 @@ VSL_NAMESPACE::LogicalDevice<C, V>::LogicalDevice(VSL_NAMESPACE::PhysicalDevice 
 	_data->parentSurface = _surface._data;
 }
 
-template<typename C, bool V>
-VSL_NAMESPACE::LogicalDevice<C, V>::LogicalDevice(VSL_NAMESPACE::PhysicalDevice _device, std::shared_ptr<vsl::SurfaceAccessor> _surface) {
+template<typename C>
+VSL_NAMESPACE::LogicalDevice<C>::LogicalDevice(VSL_NAMESPACE::PhysicalDevice _device, std::shared_ptr<vsl::Surface> _surface) {
 	C c;
-	_data = c.create(_device, (vsl::SurfaceAccessor)(*_surface));
+	_data = c.create(_device, (vsl::Surface)(*_surface));
 	_data->parentDevice = _device._data;
 	_data->parentSurface = _surface->_data;
 }

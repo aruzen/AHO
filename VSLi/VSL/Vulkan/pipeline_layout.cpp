@@ -9,23 +9,9 @@
 const auto DEFAULT_DYNAMIC_STATE = std::array<vk::DynamicState, 2>{
 			vk::DynamicState::eViewport,
 			vk::DynamicState::eScissor
-};
+};		
 
-template<VSL_NAMESPACE::pipeline_layout_injecter T, VSL_NAMESPACE::pipeline_layout_injecter... Args>
-void expansionPipelineLayoutArgs(std::shared_ptr<VSL_NAMESPACE::_impl::PipelineLayout_impl> _data, VSL_NAMESPACE::_impl::CreateInfo& info, const T& t, const Args& ...args) {
-	if constexpr (VSL_NAMESPACE::pipeline_layout_data_injecter<T>) {
-		t.injection(_data);
-	}
-	if constexpr (VSL_NAMESPACE::pipeline_layout_createinfo_injecter<T>) {
-		t.injection(info);
-	}
-	expansionPipelineLayoutArgs(_data, info, args...);
-}
-
-void expansionPipelineLayoutArgs(std::shared_ptr<VSL_NAMESPACE::_impl::PipelineLayout_impl> _data, VSL_NAMESPACE::_impl::CreateInfo& info) {}
-
-template<VSL_NAMESPACE::pipeline_layout_injecter... Args>
-VSL_NAMESPACE::PipelineLayout<Args...>::PipelineLayout(VSL_NAMESPACE::LogicalDeviceAccessor device, const Args& ...args) {
+void VSL_NAMESPACE::PipelineLayoutAccessor::init_start(LogicalDeviceAccessor device) {
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::PipelineLayout_impl>(new VSL_NAMESPACE::_impl::PipelineLayout_impl);
 	_data->info = std::shared_ptr<VSL_NAMESPACE::_impl::CreateInfo>(new VSL_NAMESPACE::_impl::CreateInfo);
 	_data->device = device._data;
@@ -36,15 +22,19 @@ VSL_NAMESPACE::PipelineLayout<Args...>::PipelineLayout(VSL_NAMESPACE::LogicalDev
 	_data->info->pipelineLayout.pSetLayouts = nullptr; // Optional
 	_data->info->pipelineLayout.pushConstantRangeCount = 0; // Optional
 	_data->info->pipelineLayout.pPushConstantRanges = nullptr; // Optional
+}
 
-	expansionPipelineLayoutArgs(_data, *_data->info, args...);
+namespace VSL_NAMESPACE::helper {
+	void expansionPipelineLayoutArgs(VSL_NAMESPACE::PipelineLayoutAccessor& pl) {}
+}
 
-	_data->info->_viewport.viewportCount = _data->info->viewports.size();
+void VSL_NAMESPACE::PipelineLayoutAccessor::init_finish() {
+	_data->info->_viewport.viewportCount = (uint32_t)_data->info->viewports.size();
 	_data->info->_viewport.pViewports = _data->info->viewports.data();
-	_data->info->_viewport.scissorCount = _data->info->scissors.size();
+	_data->info->_viewport.scissorCount = (uint32_t)_data->info->scissors.size();
 	_data->info->_viewport.pScissors = _data->info->scissors.data();
 
-	_data->pipelineLayout = device._data->device.createPipelineLayout(_data->info->pipelineLayout);
+	_data->pipelineLayout = _data->device->device.createPipelineLayout(_data->info->pipelineLayout);
 }
 
 VSL_NAMESPACE::_impl::PipelineLayout_impl::~PipelineLayout_impl()
@@ -52,21 +42,4 @@ VSL_NAMESPACE::_impl::PipelineLayout_impl::~PipelineLayout_impl()
 	device->device.destroyPipelineLayout(pipelineLayout);
 }
 
-/*template<VSL_NAMESPACE::ShaderType Type>
-VSL_NAMESPACE::ShaderPipelineLayoutStage<Type>::ShaderPipelineLayoutStage(VSL_NAMESPACE::Shader<Type> shader)
-{
-	_data = std::shared_ptr<VSL_NAMESPACE::_impl::ShaderStage_impl>(new VSL_NAMESPACE::_impl::ShaderStage_impl);
-
-	if constexpr (Type == VSL_NAMESPACE::ShaderType::Vertex) {
-		_data->stage.stage = vk::ShaderStageFlagBits::eVertex;
-	}
-	else if (Type == VSL_NAMESPACE::ShaderType::Fragment) {
-		_data->stage.stage = vk::ShaderStageFlagBits::eFragment;
-	}
-	_data->stage.pName = name.c_str();
-	_data->stage.module = shader._data->shaderModule;
-}*/
-
 template struct vsl::PipelineLayout<>;
-// template struct vsl::ShaderPipelineLayoutStage<VSL_NAMESPACE::ShaderType::Vertex>;
-// template struct vsl::ShaderPipelineLayoutStage<VSL_NAMESPACE::ShaderType::Fragment>;

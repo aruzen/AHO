@@ -2,8 +2,10 @@
 #include "color_blend.h"
 #include "../_pimpls.h"
 
-void VSL_NAMESPACE::pipeline_layout::ColorBlend::injection(VSL_NAMESPACE::_impl::CreateInfo& info)
+void VSL_NAMESPACE::pipeline_layout::ColorBlend::injection(VSL_NAMESPACE::PipelineLayoutAccessor pl)
 {
+	auto& info = *pl._data->info;
+
 	vk::PipelineColorBlendAttachmentState &colorBlendAttachment
 	 = std::any_cast<vk::PipelineColorBlendAttachmentState&>(info.pool["colorBlendAttachment"] = vk::PipelineColorBlendAttachmentState());
 	colorBlendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR

@@ -8,10 +8,12 @@
 #include "render_pass.h"
 
 namespace VSL_NAMESPACE {
-	template<typename D = VSL_NAMESPACE::VSL_DEFAULT_DIMENTION_STRUCT>
-	struct FrameBuffer {
-		FrameBuffer(Swapchain swapchain, View<D> view, RenderPass render_pass);
-
+	struct FrameBufferAccessor {
 		std::shared_ptr<_impl::FrameBuffer_impl> _data;
+	};
+
+	template<typename D = VSL_NAMESPACE::VSL_DEFAULT_DIMENTION_STRUCT>
+	struct FrameBuffer : public FrameBufferAccessor {
+		FrameBuffer(Swapchain swapchain, View<D> view, RenderPass render_pass);
 	};
 }

@@ -66,11 +66,12 @@ namespace VSL_NAMESPACE {
 	struct __VSLD2Point<T> {
 		static constexpr int SPECIALIZED_ID = 1;
 
-		typename T::element_type& x, & y;
+		using element_type = T::element_type;
+		element_type& x, & y;
 
 		__VSLD2Point(T* t) : x(t->x), y(t->y) {
 			if constexpr (VSL_NAMESPACE::validation) {
-				VSL_NAMESPACE::loggingln(typeid(*this).name(), " : ",  typeid(T).name(), " (processed by is_point)");
+				VSL_NAMESPACE::loggingln(typeid(*this).name(), " : ", typeid(T).name(), " (processed by is_point)");
 			}
 		}
 	};
@@ -79,7 +80,7 @@ namespace VSL_NAMESPACE {
 		requires convert_to_vsl_at_least_array<T, 2> && !is_point<T>
 	struct __VSLD2Point<T> : __VSLArray<T, typename T::element_type, vsl_array_size<T>()> {
 		static constexpr int SPECIALIZED_ID = 2;
-		
+
 		using element_type = T::element_type;
 		element_type& x, & y;
 
@@ -91,7 +92,7 @@ namespace VSL_NAMESPACE {
 	};
 
 	template <typename T>
-		requires convert_to_vsl_at_least_array<T, 2> && has_element_index<T> && !is_point<T>
+		requires convert_to_vsl_at_least_array<T, 2>&& has_element_index<T> && !is_point<T>
 	struct __VSLD2Point<T> : __VSLArray<T, typename T::element_type, vsl_array_size<T>()> {
 		static constexpr int SPECIALIZED_ID = 3;
 
@@ -126,7 +127,8 @@ namespace VSL_NAMESPACE {
 	template<typename T>
 		requires is_size<T>
 	struct __VSLD2Size<T> {
-		typename T::element_type& height, & weight;
+		using element_type = T::element_type;
+		element_type& height, & weight;
 
 		__VSLD2Size(T* t) {
 			height = t->height;
@@ -175,7 +177,7 @@ namespace VSL_NAMESPACE {
 		requires convert_to_vsl_at_least_array<T, 4>
 	struct __VSLD2Rectangle<T> : __VSLArray<T, typename T::element_type, vsl_array_size<T>()> {
 		using element_type = T::element_type;
-		element_type& x, & y,& height,& weight;
+		element_type& x, & y, & height, & weight;
 
 		__VSLD2Rectangle(T* t) : __VSLArray<T, element_type, vsl_array_size<T>()>(t) {
 			if constexpr (has_element_index<T>) {
@@ -193,6 +195,58 @@ namespace VSL_NAMESPACE {
 			else {
 				height = (*this)[2];
 				weight = (*this)[3];
+			}
+		}
+	};
+
+	template<typename ElementType>
+	struct __VSLDRGBColorDefault {
+		using element_type = ElementType;
+		element_type r, g, b;
+	};
+
+	template<typename ElementType>
+	struct __VSLDRGBColorAccessor {
+		using element_type = ElementType;
+		__VSLDRGBColorAccessor(element_type& r, element_type& g, element_type& b)
+			: r(r), g(g), b(b) {}
+
+		element_type& r, & g, & b;
+	};
+
+	template<typename T>
+	struct __VSLDRGBColor {};
+
+	template<typename T>
+	concept is_rgb = requires (T t) {
+		typename T::element_type;
+		{ t.r } -> std::same_as<typename T::element_type>;
+		{ t.g } -> std::same_as<typename T::element_type>;
+		{ t.b } -> std::same_as<typename T::element_type>;
+	};
+
+	template<typename T>
+		requires is_size<T>
+	struct __VSLDRGBColor<T> : public __VSLDRGBColorAccessor<typename T::element_type> {
+		using element_type = T::element_type;
+
+		__VSLDRGBColor(T* t)
+			: __VSLDRGBColorAccessor<typename T::element_type>(t->r, t->g, t->b) {}
+	};
+
+	template <typename T>
+		requires convert_to_vsl_at_least_array<T, 3>
+	struct __VSLDRGBColor<T>
+		: public __VSLDRGBColorAccessor<typename T::element_type>
+		, public __VSLArray<T, typename T::element_type, vsl_array_size<T>()> {
+
+		using element_type = T::element_type;
+
+		__VSLDRGBColor(T* t) : __VSLDRGBColorAccessor<typename T::element_type>((*this)[0], (*this)[1], (*this)[2]), __VSLArray<T, element_type, vsl_array_size<T>()>(t) {
+			if constexpr (has_element_index<T>) {
+				this->r = (*this)[T::element_index];
+				this->g = (*this)[T::element_index + 1];
+				this->b = (*this)[T::element_index + 2];
 			}
 		}
 	};

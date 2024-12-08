@@ -72,10 +72,22 @@ namespace VSL_NAMESPACE::_impl {
 		~LogicalDevice_impl();
 	};
 
+	struct CommandPool_impl {
+		std::shared_ptr<LogicalDevice_impl> device;
+
+		vk::CommandPool commandPool;
+	};
+
+	struct CommandBuffer_impl {
+		std::shared_ptr<CommandPool_impl> commandPool;
+
+		std::vector<vk::CommandBuffer> commandBuffers;
+	};
+
 	struct CommandManager_impl {
 		std::shared_ptr<LogicalDevice_impl> device;
 
-		vk::Queue graphicsQueue, presentQueuea;
+		// vk::Queue graphicsQueue, presentQueue;
 	};
 
 	struct Swapchain_impl {
@@ -160,6 +172,8 @@ namespace VSL_NAMESPACE::_impl {
 
 	struct FrameBuffer_impl {
 		std::shared_ptr<LogicalDevice_impl> device;
+		std::shared_ptr<Swapchain_impl> swapchain;
+		size_t currentIndex = 0;
 
 		std::vector<vk::Framebuffer> swapChainFramebuffers;
 

@@ -26,6 +26,9 @@
 #include <VSL/Vulkan/stages/vertex_input.h>
 #include <VSL/Vulkan/pipeline.h>
 #include <VSL/Vulkan/frame_buffer.h>
+#include <VSL/Vulkan/commands/render_pass_begin.h>
+#include <VSL/Vulkan/commands/render_pass_end.h>
+#include <VSL/Vulkan/commands/bind_pipe_line.h>
 
 #define AHO_POOP_PUBLIC_SECURITY
 #pragma warning( disable : 4455 )
@@ -42,7 +45,7 @@
 #include <chrono>
 
 /*
-* https://vulkan-tutorial.com/en/Drawing_a_triangle/Drawing/Framebuffers
+* https://vulkan-tutorial.com/en/Drawing_a_triangle/Drawing/Command_buffers
 */
 
 int main() {
@@ -56,9 +59,9 @@ int main() {
 
 	x_z -= 5z;
 	auto x_y_z = x_z + 7y;
-	
 
-	vsl::loggingln(x_z._cnmn1, ", ",  x_z._cnmn2);
+
+	vsl::loggingln(x_z._cnmn1, ", ", x_z._cnmn2);
 	vsl::loggingln(x_y_z.x, ", ", x_y_z.y, ", ", x_y_z.z);
 
 	Vector vec1(1, 1);
@@ -90,8 +93,8 @@ int main() {
 
 		vsl::Shader<ShaderType::Vertex> const_triangle_shader(device, "shaders/const_triangle.vert.spv");
 		vsl::Shader<ShaderType::Fragment> red_shader(device, "shaders/red.frag.spv");
-		
-		PipelineLayout layout(device, 
+
+		PipelineLayout layout(device,
 			pl::ShaderGroup("red_triangle", { const_triangle_shader, red_shader }),
 			pl::ColorBlend(),
 			pl::InputAssembly(),
@@ -105,12 +108,11 @@ int main() {
 
 		FrameBuffer frame_buffer(swapchain, view, render_pass);
 
-		pipeline;
-
-		// pipeline << ShaderPipelineStage<ShaderPipelineStageType::Vertex>("triangle", const_triangle_shader);
+		CommandManager manager(device);
 
 		while (Window::Update() && main_window) {
-
+			auto phase = manager.startPhase();
+			phase << std::make_shared<command::RenderPassBegin>(render_pass, frame_buffer);
 		}
 	}
 	catch (std::exception& e) {

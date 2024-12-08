@@ -11,6 +11,7 @@ VSL_NAMESPACE::FrameBuffer<D>::FrameBuffer(Swapchain swapchain, View<D> view, Re
 {
     _data = std::shared_ptr<VSL_NAMESPACE::_impl::FrameBuffer_impl>(new VSL_NAMESPACE::_impl::FrameBuffer_impl);
     _data->device = swapchain._data->device;
+    _data->swapchain = swapchain._data;
 
     _data->swapChainFramebuffers.resize(swapchain._data->swapChainImages.size());
     for (size_t i = 0; i < swapchain._data->swapChainImages.size(); i++) {

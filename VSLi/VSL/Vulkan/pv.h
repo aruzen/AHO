@@ -8,6 +8,9 @@ namespace VSL_NAMESPACE::_impl {
 	struct PhysicalDevice_impl;
 	struct PhysicalDevices_impl;
 	struct LogicalDevice_impl;
+	struct CommandPool_impl;
+	struct CommandBuffer_impl;
+	struct Command_impl;
 	struct CommandManager_impl;
 	struct Surface_impl;
 	struct Swapchain_impl;
@@ -16,7 +19,7 @@ namespace VSL_NAMESPACE::_impl {
 	struct CreateInfo;
 	struct PipelineLayout_impl;
 	// struct ShaderStage_impl;
-	struct Shader_impl;
+	struct Shader_impl; 
 	struct RenderPass_impl;
 	struct Pipeline_impl;
 	struct FrameBuffer_impl;

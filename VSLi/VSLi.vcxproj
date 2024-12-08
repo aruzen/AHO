@@ -153,8 +153,10 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="VSL\Vulkan\commands\bind_pipe_line.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="VSL\Vulkan\commands\render_pass_end.h" />
     <ClInclude Include="VSL\concepts.h" />
     <ClInclude Include="VSL\debug.h" />
     <ClInclude Include="VSL\define.h" />
@@ -165,12 +167,16 @@
     <ClInclude Include="VSL\utils\ShaderCompiler.h" />
     <ClInclude Include="VSL\utils\VSLArray.h" />
     <ClInclude Include="VSL\Vulkan\command.h" />
+    <ClInclude Include="VSL\Vulkan\commands\render_pass_begin.h" />
+    <ClInclude Include="VSL\Vulkan\commands\set_scissor.h" />
+    <ClInclude Include="VSL\Vulkan\commands\set_viewport.h" />
     <ClInclude Include="VSL\Vulkan\device.h" />
     <ClInclude Include="VSL\Vulkan\frame_buffer.h" />
     <ClInclude Include="VSL\Vulkan\pipeline.h" />
     <ClInclude Include="VSL\Vulkan\pipeline_layout.h" />
     <ClInclude Include="VSL\Vulkan\pv.h" />
     <ClInclude Include="VSL\Vulkan\render_pass.h" />
+    <ClInclude Include="VSL\Vulkan\scissor.h" />
     <ClInclude Include="VSL\Vulkan\shader.h" />
     <ClInclude Include="VSL\Vulkan\stages\color_blend.h" />
     <ClInclude Include="VSL\Vulkan\stages\depth_stencil.h" />
@@ -190,21 +196,27 @@
     <ClInclude Include="VSL\window_plugin.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="VSL\Vulkan\commands\bind_pipe_line.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="VSL\Vulkan\commands\render_pass_end.cpp" />
     <ClCompile Include="VSL\debug.cpp" />
     <ClCompile Include="VSL\exceptions.cpp" />
     <ClCompile Include="VSL\utils\ShaderCompiler.cpp" />
     <ClCompile Include="VSL\Vulkan\command.cpp" />
+    <ClCompile Include="VSL\Vulkan\commands\render_pass_begin.cpp" />
+    <ClCompile Include="VSL\Vulkan\commands\set_scissor.cpp" />
+    <ClCompile Include="VSL\Vulkan\commands\set_vieport.cpp" />
     <ClCompile Include="VSL\Vulkan\device.cpp" />
     <ClCompile Include="VSL\Vulkan\frame_buffer.cpp" />
     <ClCompile Include="VSL\Vulkan\pipeline.cpp" />
     <ClCompile Include="VSL\Vulkan\pipeline_layout.cpp" />
     <ClCompile Include="VSL\Vulkan\render_pass.cpp" />
+    <ClCompile Include="VSL\Vulkan\scissor.cpp" />
     <ClCompile Include="VSL\Vulkan\shader.cpp" />
     <ClCompile Include="VSL\Vulkan\stages\color_blend.cpp" />
     <ClCompile Include="VSL\Vulkan\stages\depth_stencil.cpp" />

@@ -22,6 +22,7 @@ void VSL_NAMESPACE::utils::ShaderCompiler::load()
 		dates[name.substr(0, name.size() - 4)] = fs::last_write_time(path);
 		compiled.push_back(path);
 	}
+
 	for (const fs::directory_entry& x : fs::directory_iterator(shaders_path / "raw")) {
 		auto path = x.path();
 		if (!path.has_extension() || !(path.extension() == ".vert" || path.extension() == ".frag"))
@@ -34,8 +35,8 @@ void VSL_NAMESPACE::utils::ShaderCompiler::load()
 
 void VSL_NAMESPACE::utils::ShaderCompiler::compile()
 {
-	if (!fs::exists(glslc_path) || !glslc_path.has_filename())
-		return;
+	// if (!fs::exists(glslc_path) || !glslc_path.has_filename())
+	//	return;
 	for (auto p : target) {
 		auto src_file = fs::absolute(p);
 		auto&& src = src_file.string();

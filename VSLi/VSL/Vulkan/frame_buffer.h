@@ -10,6 +10,8 @@
 namespace VSL_NAMESPACE {
 	struct FrameBufferAccessor {
 		std::shared_ptr<_impl::FrameBuffer_impl> _data;
+
+		void setTargetFrame(std::uint32_t frameIdx);
 	};
 
 	template<typename D = VSL_NAMESPACE::VSL_DEFAULT_DIMENTION_STRUCT>

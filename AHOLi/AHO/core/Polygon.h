@@ -22,7 +22,7 @@ namespace AHO_NAMESPACE {
 		std::map<AHO_NAMESPACE::_Point<R, D, CoordinateInfo>, Size> points;
 
 		constexpr Polygon() {}; 
-		constexpr Polygon(std::initializer_list<AHO_NAMESPACE::Triangle<R, D, CI>> init) {};
+		constexpr Polygon(std::initializer_list<AHO_NAMESPACE::Triangle<R, D, CoordinateInfo>> init) {};
 
 		template<AHO_NAMESPACE::concepts::points_view_able T>
 		constexpr Polygon<R, D, CoordinateInfo, Size, Alloc> operator +(T t);

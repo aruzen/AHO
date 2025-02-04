@@ -33,15 +33,19 @@ bool VSL_NAMESPACE::Vulkan<Validation>::checkValidationLayerSupport() {
 	return true;
 }
 
-static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-	VkDebugUtilsMessageTypeFlagsEXT messageType,
+static VkBool32 VKAPI_PTR debugCallback(
+	VkDebugUtilsMessageSeverityFlagBitsEXT           messageSeverity,
+	VkDebugUtilsMessageTypeFlagsEXT                  messageTypes,
 	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 	void* pUserData) {
 
 	using namespace std;
 
-	VSL_NAMESPACE::loggingln("validation : "s + pCallbackData->pMessage);
+	string message(pCallbackData->pMessage);
+	if (message.substr(0, 20).contains("Error"))
+		VSL_NAMESPACE::loggingln("\033[31mvalidation\033[0m : "s + pCallbackData->pMessage);
+	else
+		VSL_NAMESPACE::loggingln("\033[32mvalidation\033[0m : "s + pCallbackData->pMessage);
 
 	return VK_FALSE;
 }
@@ -53,7 +57,7 @@ void populateDebugMessengerCreateInfo(vk::DebugUtilsMessengerCreateInfoEXT& crea
 	createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
 		vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
 		vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
-	createInfo.pfnUserCallback = debugCallback;
+	createInfo.pfnUserCallback = (vk::PFN_DebugUtilsMessengerCallbackEXT)debugCallback;
 }
 
 vk::Result CreateDebugUtilsMessengerEXT(vk::Instance instance, const vk::DebugUtilsMessengerCreateInfoEXT& pCreateInfo, const vk::AllocationCallbacks* pAllocator, vk::DebugUtilsMessengerEXT& pDebugMessenger) {
@@ -89,13 +93,20 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vecto
 		checkValidationLayerSupport();
 	}
 
+	/* 使っているAPIのバージョン検索
+	auto apiVersion = vk::enumerateInstanceVersion();
+	std::cout << "Available Vulkan API Version: "
+		<< VK_VERSION_MAJOR(apiVersion) << "."
+		<< VK_VERSION_MINOR(apiVersion) << "."
+		<< VK_VERSION_PATCH(apiVersion) << std::endl;
+	*/
+
 	vk::ApplicationInfo appInfo;
 	appInfo.pApplicationName = app_name;
 	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
 	appInfo.pEngineName = "VSL_Engine";
 	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-	appInfo.apiVersion = VK_API_VERSION_1_0;
-
+	appInfo.apiVersion = VK_MAKE_API_VERSION(0, 1, 3, 277);
 	uint32_t glfwExtensionCount = 0;
 	const char** glfwExtensions;
 
@@ -108,10 +119,13 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vecto
 
 	vk::DebugUtilsMessengerCreateInfoEXT debugCreateInfo;
 	if constexpr (Validation) {
-		for (const auto& e : validationLayers)
+		for (const auto& e : validationExtensions)
 			extensions.push_back(e);
 		populateDebugMessengerCreateInfo(debugCreateInfo);
 		createInfo.pNext = &debugCreateInfo;
+		// validation layer
+		createInfo.enabledLayerCount = 1;
+		createInfo.ppEnabledLayerNames = validationLayers.data();
 	}
 
 	for (auto e : requireExtensions)
@@ -126,7 +140,7 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vecto
 	
 	if constexpr (Validation) {
 		std::vector<vk::ExtensionProperties> extensions = vk::enumerateInstanceExtensionProperties();
-		VSL_NAMESPACE::loggingln("available extensions:\n");
+		VSL_NAMESPACE::loggingln("available extensions:");
 
 		for (const auto& extension : extensions) {
 			VSL_NAMESPACE::loggingln(extension.extensionName);
@@ -170,10 +184,13 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name)
 
 	vk::DebugUtilsMessengerCreateInfoEXT debugCreateInfo;
 	if constexpr (Validation) {
-		for (const auto& e : validationLayers)
+		for (const auto& e : validationExtensions)
 			extensions.push_back(e);
 		populateDebugMessengerCreateInfo(debugCreateInfo);
 		createInfo.pNext = &debugCreateInfo;
+		// validation layer
+		createInfo.enabledLayerCount = 1;
+		createInfo.ppEnabledLayerNames = validationLayers.data();
 	}
 
 	createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
@@ -185,7 +202,7 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name)
 
 	if constexpr (Validation) {
 		auto extensions = vk::enumerateInstanceExtensionProperties();
-		VSL_NAMESPACE::loggingln("available extensions:\n");
+		VSL_NAMESPACE::loggingln("available extensions:");
 
 		for (const auto& extension : extensions) {
 			VSL_NAMESPACE::loggingln(extension.extensionName);

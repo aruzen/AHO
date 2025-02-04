@@ -10,5 +10,7 @@ namespace VSL_NAMESPACE {
 		Pipeline(PipelineLayoutAccessor layout, RenderPass pass);
 
 		std::shared_ptr<_impl::Pipeline_impl> _data;
+
+		void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
 	};
 }

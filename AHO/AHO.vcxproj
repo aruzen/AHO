@@ -156,6 +156,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\raw\const_triangle.vert" />
+    <None Include="shaders\raw\input.frag" />
+    <None Include="shaders\raw\input.vert" />
     <None Include="shaders\raw\red.frag" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

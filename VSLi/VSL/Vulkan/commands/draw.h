@@ -3,9 +3,10 @@
 #include "../pv.h"
 #include "../command.h"
 
+#include <optional>
+
 namespace VSL_NAMESPACE::command {
-	struct RenderPassEnd : public __Command {
+	struct Draw : public __Command {
 		void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
 	};
 }
-

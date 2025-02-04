@@ -9,7 +9,7 @@ VSL_NAMESPACE::command::RenderPassBegin::RenderPassBegin(RenderPass renderPass, 
 	: renderPass(renderPass), frameBuffer(frameBuffer), target_idx(imageIdx), clear_color(color) {}
 
 
-void VSL_NAMESPACE::command::RenderPassBegin::invoke(CommandPool pool, CommandBuffer buffer)
+void VSL_NAMESPACE::command::RenderPassBegin::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager)
 {
 	vk::RenderPassBeginInfo renderPassInfo;
 	renderPassInfo.renderPass = renderPass._data->renderPass;
@@ -24,5 +24,5 @@ void VSL_NAMESPACE::command::RenderPassBegin::invoke(CommandPool pool, CommandBu
 	renderPassInfo.clearValueCount = 1;
 	renderPassInfo.pClearValues = &clearColor;
 
-	buffer._data->commandBuffers[0].beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
+	buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
 }

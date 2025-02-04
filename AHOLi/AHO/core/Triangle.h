@@ -50,7 +50,7 @@ namespace AHO_NAMESPACE {
 		using dimention = D;
 		using element_type = R;
 
-		AHO_NAMESPACE::_Point<R, D, CI>* pos1, pos2, pos3;
+		AHO_NAMESPACE::_Point<R, D, CI>* pos1,* pos2,* pos3;
 
 		constexpr PtrTriangle() {}
 

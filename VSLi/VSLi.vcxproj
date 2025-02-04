@@ -71,10 +71,10 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(VULKAN_SDK)\Include;$(GLFW)\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(VULKAN_SDK)\include;$(GLFW)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(VULKAN_SDK)\Include;$(GLFW)\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(VULKAN_SDK)\include;$(GLFW)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -153,9 +153,11 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="VSL\consteval_string.h" />
     <ClInclude Include="VSL\Vulkan\commands\bind_pipe_line.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="VSL\Vulkan\commands\draw.h" />
     <ClInclude Include="VSL\Vulkan\commands\render_pass_end.h" />
     <ClInclude Include="VSL\concepts.h" />
     <ClInclude Include="VSL\debug.h" />
@@ -168,8 +170,6 @@
     <ClInclude Include="VSL\utils\VSLArray.h" />
     <ClInclude Include="VSL\Vulkan\command.h" />
     <ClInclude Include="VSL\Vulkan\commands\render_pass_begin.h" />
-    <ClInclude Include="VSL\Vulkan\commands\set_scissor.h" />
-    <ClInclude Include="VSL\Vulkan\commands\set_viewport.h" />
     <ClInclude Include="VSL\Vulkan\device.h" />
     <ClInclude Include="VSL\Vulkan\frame_buffer.h" />
     <ClInclude Include="VSL\Vulkan\pipeline.h" />
@@ -177,6 +177,7 @@
     <ClInclude Include="VSL\Vulkan\pv.h" />
     <ClInclude Include="VSL\Vulkan\render_pass.h" />
     <ClInclude Include="VSL\Vulkan\scissor.h" />
+    <ClInclude Include="VSL\Vulkan\synchronize.h" />
     <ClInclude Include="VSL\Vulkan\shader.h" />
     <ClInclude Include="VSL\Vulkan\stages\color_blend.h" />
     <ClInclude Include="VSL\Vulkan\stages\depth_stencil.h" />
@@ -190,6 +191,7 @@
     <ClInclude Include="VSL\Vulkan\view.h" />
     <ClInclude Include="VSL\Vulkan\viewport.h" />
     <ClInclude Include="VSL\Vulkan\Vulkan.h" />
+    <ClInclude Include="VSL\Vulkan\window_plugin\hook_window_resize.h" />
     <ClInclude Include="VSL\Vulkan\_dimention.h" />
     <ClInclude Include="VSL\Vulkan\_pimpls.h" />
     <ClInclude Include="VSL\Window.h" />
@@ -203,14 +205,13 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="VSL\Vulkan\commands\draw.cpp" />
     <ClCompile Include="VSL\Vulkan\commands\render_pass_end.cpp" />
     <ClCompile Include="VSL\debug.cpp" />
     <ClCompile Include="VSL\exceptions.cpp" />
     <ClCompile Include="VSL\utils\ShaderCompiler.cpp" />
     <ClCompile Include="VSL\Vulkan\command.cpp" />
     <ClCompile Include="VSL\Vulkan\commands\render_pass_begin.cpp" />
-    <ClCompile Include="VSL\Vulkan\commands\set_scissor.cpp" />
-    <ClCompile Include="VSL\Vulkan\commands\set_vieport.cpp" />
     <ClCompile Include="VSL\Vulkan\device.cpp" />
     <ClCompile Include="VSL\Vulkan\frame_buffer.cpp" />
     <ClCompile Include="VSL\Vulkan\pipeline.cpp" />
@@ -227,10 +228,10 @@
     <ClCompile Include="VSL\Vulkan\stages\vertex_input.cpp" />
     <ClCompile Include="VSL\Vulkan\surface.cpp" />
     <ClCompile Include="VSL\Vulkan\swapchain.cpp" />
+    <ClCompile Include="VSL\Vulkan\synchronize.cpp" />
     <ClCompile Include="VSL\Vulkan\view.cpp" />
     <ClCompile Include="VSL\Vulkan\viewport.cpp" />
     <ClCompile Include="VSL\Vulkan\Vulkan.cpp" />
-    <ClCompile Include="VSL\Vulkan\_pimpls.cpp" />
     <ClCompile Include="VSL\Window.cpp" />
     <ClCompile Include="VSL\window_plugin.cpp" />
   </ItemGroup>

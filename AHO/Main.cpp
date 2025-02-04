@@ -1,34 +1,42 @@
 #include <Test/tests.h>
 
-#include <VSL/define.h>
+#include <VSL/concepts.h>
 #include <VSL/debug.h>
-#include <VSL/Type.h>
+#include <VSL/define.h>
+#include <VSL/dimention.h>
 #include <VSL/exceptions.h>
-
-#include <VSL/utils/ShaderCompiler.h>
-#include <VSL/utils/VSLArray.h>
-
+#include <VSL/test.h>
+#include <VSL/Type.h>
 #include <VSL/Window.h>
 #include <VSL/window_plugin.h>
-#include <VSL/Vulkan/Vulkan.h>
-#include <VSL/Vulkan/device.h>
-#include <VSL/Vulkan/surface.h>
+#include <VSL/utils/ShaderCompiler.h>
+#include <VSL/utils/VSLArray.h>
 #include <VSL/Vulkan/command.h>
-#include <VSL/Vulkan/swapchain.h>
-#include <VSL/Vulkan/view.h>
-#include <VSL/Vulkan/shader.h>
+#include <VSL/Vulkan/device.h>
+#include <VSL/Vulkan/frame_buffer.h>
+#include <VSL/Vulkan/pipeline.h>
 #include <VSL/Vulkan/pipeline_layout.h>
-#include <VSL/Vulkan/stages/shader_group.h>
+#include <VSL/Vulkan/pv.h>
+#include <VSL/Vulkan/render_pass.h>
+#include <VSL/Vulkan/scissor.h>
+#include <VSL/Vulkan/shader.h>
+#include <VSL/Vulkan/surface.h>
+#include <VSL/Vulkan/swapchain.h>
+#include <VSL/Vulkan/synchronize.h>
+#include <VSL/Vulkan/view.h>
+#include <VSL/Vulkan/viewport.h>
+#include <VSL/Vulkan/Vulkan.h>
+#include <VSL/Vulkan/commands/bind_pipe_line.h>
+#include <VSL/Vulkan/commands/draw.h>
+#include <VSL/Vulkan/commands/render_pass_begin.h>
+#include <VSL/Vulkan/commands/render_pass_end.h>
 #include <VSL/Vulkan/stages/color_blend.h>
+#include <VSL/Vulkan/stages/depth_stencil.h>
 #include <VSL/Vulkan/stages/input_assembly.h>
 #include <VSL/Vulkan/stages/multisample.h>
 #include <VSL/Vulkan/stages/rasterization.h>
+#include <VSL/Vulkan/stages/shader_group.h>
 #include <VSL/Vulkan/stages/vertex_input.h>
-#include <VSL/Vulkan/pipeline.h>
-#include <VSL/Vulkan/frame_buffer.h>
-#include <VSL/Vulkan/commands/render_pass_begin.h>
-#include <VSL/Vulkan/commands/render_pass_end.h>
-#include <VSL/Vulkan/commands/bind_pipe_line.h>
 
 #define AHO_POOP_PUBLIC_SECURITY
 #pragma warning( disable : 4455 )
@@ -45,7 +53,9 @@
 #include <chrono>
 
 /*
-* https://vulkan-tutorial.com/en/Drawing_a_triangle/Drawing/Command_buffers
+* https://vulkan-tutorial.com/Drawing_a_triangle/Swap_chain_recreation
+*
+* https://vulkan-tutorial.com/Vertex_buffers/Vertex_input_description
 */
 
 int main() {
@@ -73,47 +83,88 @@ int main() {
 	vsl::loggingln(x_z_vec.value.x, ", ", x_z_vec.value.z);
 
 	Triangle triangle({ 0, 0 }, { 0, 4 }, { 2, 2 });
+	Point p1{ 0, 0 }, p2{ 2, 2 };
+	Line line(p1, p2);
+	PtrLine pline(&p1, &p2);
+	auto t = line + Point{ 1, 1 };
 
-
+	// auto adr = line.adress();
+	vsl::loggingln("type : ", typeid(t).name());
 	vsl::loggingln("area : ", triangle.area());
 
+	//*
 	try {
 		using namespace vsl;
+		vsl::utils::ShaderCompiler shader_compiler("glslc", "shaders/");
+		shader_compiler.load();
+		shader_compiler.compile();
 
 		Vulkan vk("test", { "VK_KHR_win32_surface", "VK_KHR_surface" });
-		Window main_window("vsl");
+		// loggingln(vk.)
+		Window main_window("vsl", 800, 700);
 		auto physical_device = PhysicalDevices(vk).search();
 		auto surface = main_window.addPlugin<Surface>(vk);
 
 		LogicalDevice device(physical_device, surface);
+		loggingln("available extensions:");
+		for (auto device : PhysicalDevices(vk).get())
+			loggingln(physical_device.name(), "(", physical_device.apiVersion(), ")");
 		vsl::loggingln("selected : ", physical_device.name(), "(", physical_device.apiVersion(), ")");
+
+		SynchroManager synchro_manager(device);
 
 		Swapchain swapchain(device);
 		View view(swapchain);
+		auto s1 = make_shader<"shaders/const_triangle.vert.spv">(device);
+		auto s2 = make_shader<"shaders/red.frag.spv">(device);
+		pl::ShaderGroup red_triangle_shaders("red_triangle", { s1, s2 }),
+			colorfull_triangle_shaders("colorfull_triangle", { make_shader<"shaders/const_triangle2.vert.spv">(device), make_shader<"shaders/colorfull.frag.spv">(device) });
+		// input_sahders("2d_input", { make_shader<"shaders/input.vert.spv">(device), make_shader<"shaders/input.frag.spv">(device) });
+		
+		Scissor scissor(swapchain);
+		Viewport viewport(swapchain);
+		Viewport left_viewport(viewport), right_viewport(viewport);
+		left_viewport.width /= 2;
+		right_viewport.width /= 2;
+		right_viewport.x = left_viewport.width;
 
-		vsl::Shader<ShaderType::Vertex> const_triangle_shader(device, "shaders/const_triangle.vert.spv");
-		vsl::Shader<ShaderType::Fragment> red_shader(device, "shaders/red.frag.spv");
 
 		PipelineLayout layout(device,
-			pl::ShaderGroup("red_triangle", { const_triangle_shader, red_shader }),
 			pl::ColorBlend(),
 			pl::InputAssembly(),
 			pl::Multisample(),
 			pl::Rasterization(),
-			pl::VertexInput());
+			pl::VertexInput(),
+			scissor);
 
 		RenderPass render_pass(swapchain);
 
-		Pipeline pipeline(layout, render_pass);
-
-		FrameBuffer frame_buffer(swapchain, view, render_pass);
-
 		CommandManager manager(device);
 
+		FrameBuffer frame_buffer(swapchain, view, render_pass);
+		Pipeline red_triangle(layout.copy().add(red_triangle_shaders), render_pass);
+		Pipeline colorfull_triangle(layout.copy().add(colorfull_triangle_shaders), render_pass);
+		// Pipeline input_vertices(layout.copy().add(input_sahders), render_pass);
+
+		auto imageAvailable = synchro_manager.createSemaphore("imageAvailable", manager.getBuffer().getSize()),
+			renderFinished = synchro_manager.createSemaphore("renderFinished", manager.getBuffer().getSize());
+		auto inFlight = synchro_manager.createFence("inFlight", manager.getBuffer().getSize(), true);
 		while (Window::Update() && main_window) {
-			auto phase = manager.startPhase();
-			phase << std::make_shared<command::RenderPassBegin>(render_pass, frame_buffer);
+			{
+				auto phase = manager.startPhase(swapchain, imageAvailable, renderFinished, inFlight);
+				frame_buffer.setTargetFrame(phase.getImageIndex());
+
+				phase << std::make_shared<command::RenderPassBegin>(render_pass, frame_buffer);
+
+				phase << left_viewport << red_triangle << std::make_shared<command::Draw>();
+				phase << right_viewport << colorfull_triangle << std::make_shared<command::Draw>();
+
+				phase << std::make_shared<command::RenderPassEnd>();
+			}
+			manager.next();
 		}
+		inFlight.wait();
+		/**/
 	}
 	catch (std::exception& e) {
 		vsl::loggingln(e.what());

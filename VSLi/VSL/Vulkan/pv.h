@@ -23,6 +23,9 @@ namespace VSL_NAMESPACE::_impl {
 	struct RenderPass_impl;
 	struct Pipeline_impl;
 	struct FrameBuffer_impl;
+	struct Semaphore_impl;
+	struct Fence_impl;
+	struct SynchroManager_impl;
 
 	namespace pipeline_layout {
 		struct ShaderGroup_impl;

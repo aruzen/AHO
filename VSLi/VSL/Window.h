@@ -11,7 +11,7 @@
 
 namespace VSL_NAMESPACE {
 	namespace window_plugin {
-		struct ShouldClose;
+		struct QuietClose;
 	}
 
 	class PureWindow
@@ -24,7 +24,7 @@ namespace VSL_NAMESPACE {
 
 		struct WindowData;
 		struct OnUpdateable {
-			virtual bool onUpdate(vsl::PureWindow::WindowData * data) = 0;
+			virtual bool onUpdate(vsl::PureWindow) = 0;
 		};
 
 		struct WindowData {
@@ -39,12 +39,13 @@ namespace VSL_NAMESPACE {
 
 			void destroy();
 		};
+
+		static std::vector<std::shared_ptr<WindowData>> _WINDOWS;
 	private:
-		static std::vector<WindowData*> windows;
 		static bool inited;
 	public:
 		PureWindow(std::string name, int width = 800, int height = 600);
-		~PureWindow();
+		PureWindow(std::shared_ptr<WindowData> _data);
 
 		static bool Update();
 		static bool NoCheckUpdate();
@@ -53,18 +54,20 @@ namespace VSL_NAMESPACE {
 		//	requires vsl::concepts::initializer<T, VSL_NAMESPACE::PureWindow::WindowData*, Args&&...>&& std::derived_from<T, VSL_NAMESPACE::PureWindow::Plugin>
 		std::shared_ptr<T> addPlugin(Args&&... args);
 
-		bool close();
 		std::string name();
+		bool close();
 
 		operator bool();
+		bool operator ==(const PureWindow& o);
+		bool operator ==(const PureWindow::WindowData* o);
 
-	private:
 		std::shared_ptr<WindowData> _data;
 	};
 
 	class Window : public PureWindow {
 	public:
 		Window(std::string name, int width = 800, int height = 600);
+		~Window();
 	};
 
 
@@ -72,16 +75,17 @@ namespace VSL_NAMESPACE {
 	// requires vsl::concepts::initializer<T, VSL_NAMESPACE::PureWindow::WindowData*, Args&&...>&& std::derived_from<T, VSL_NAMESPACE::PureWindow::Plugin>
 	inline std::shared_ptr<T> VSL_NAMESPACE::PureWindow::addPlugin(Args && ...args)
 	{
-		auto t = std::shared_ptr<T>(new T(_data.get(), std::forward<Args>(args)...));
-		auto p = std::static_pointer_cast<Plugin>(t);
+		auto t = std::shared_ptr<T>(new T(this, std::forward<Args>(args)...));
+		std::shared_ptr<Plugin> p = std::static_pointer_cast<Plugin>(t);
 
 		if constexpr (std::derived_from<T, vsl::PureWindow::OnUpdateable>) {
 			auto o = std::static_pointer_cast<OnUpdateable>(t);
 			_data->updateables.push_back(o);
 		}
 
-		t->id = _data->plugins_next_id;
-		_data->plugins[_data->plugins_next_id] = p;
+		if (t->id == 0)
+			p->id = _data->plugins_next_id;
+		_data->plugins[t->id] = p;
 		_data->plugins_next_id++;
 
 		return t;

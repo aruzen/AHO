@@ -39,8 +39,10 @@ namespace VSL_NAMESPACE::_impl {
 		vk::PhysicalDevice device;
 		std::optional<vk::PhysicalDeviceProperties> props;
 		std::optional<vk::PhysicalDeviceFeatures> features;
+		std::optional<vk::PhysicalDeviceMemoryProperties> memProps;
 
 		void makeProps();
+		void makeMemProps();
 	};
 
 	struct PhysicalDevices_impl {
@@ -210,11 +212,27 @@ namespace VSL_NAMESPACE::_impl {
 		~SynchroManager_impl();
 	};
 
+	struct Buffer_impl {
+		std::shared_ptr<LogicalDevice_impl> device;
+		vk::Buffer buffer;
+		vk::DeviceMemory deviceMem;
+		size_t allocatedSize = 0;
+
+		~Buffer_impl();
+	};
+
 	namespace pipeline_layout {
 		struct ShaderGroup_impl {
 			std::string name;
 			std::vector<std::shared_ptr<Shader_impl>> shaders;
 		};
+
+		/*
+		struct VertexInput_impl {
+			std::shared_ptr<std::vector<vk::VertexInputBindingDescription>> vertexBindingDescriptions;
+			std::shared_ptr<std::vector<vk::VertexInputAttributeDescription>> vertexAttributeDescriptions;
+		};
+		*/
 	}
 
 	namespace helper {

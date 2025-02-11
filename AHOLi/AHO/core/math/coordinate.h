@@ -12,6 +12,9 @@ namespace AHO_NAMESPACE {
 		struct X {
 			T value;
 
+			constexpr static char UpperChar = 'X';
+			constexpr static char LowerChar = 'x';
+
 			constexpr X(const T& t) : value(t) {};
 			constexpr X() : value{} {};
 
@@ -22,7 +25,7 @@ namespace AHO_NAMESPACE {
 			template <concepts::subtract_as<T> R>
 			constexpr X<decltype(std::declval<T>() - std::declval<R>())> operator -(X<R> t) { return { value - t.value }; };
 			template <concepts::multiply_as<T> R>
-			constexpr X<decltype(std::declval<T>() * std::declval<R>())> operator *(X<R> t) { return { value * t.value }; };
+			constexpr X<decltype(std::declval<T>()* std::declval<R>())> operator *(X<R> t) { return { value * t.value }; };
 			template <concepts::division_as<T> R>
 			constexpr X<decltype(std::declval<T>() / std::declval<R>())> operator /(X<R> t) { return { value / t.value }; };
 
@@ -42,6 +45,9 @@ namespace AHO_NAMESPACE {
 		template <typename T>
 		struct Y {
 			T value;
+
+			constexpr static char UpperChar = 'Y';
+			constexpr static char LowerChar = 'y';
 
 			constexpr Y(const T& t) : value(t) {};
 			constexpr Y() : value{} {};
@@ -73,6 +79,9 @@ namespace AHO_NAMESPACE {
 		template <typename T>
 		struct Z {
 			T value;
+
+			constexpr static char UpperChar = 'Z';
+			constexpr static char LowerChar = 'z';
 
 			constexpr Z(const T& t) : value(t) {};
 			constexpr Z() : value{} {};
@@ -259,7 +268,7 @@ namespace AHO_NAMESPACE {
 			union { X<ElementType> x, AHO_COORDINATE_NUMBERD_MEMBER_1; };
 			union { Y<ElementType> y, AHO_COORDINATE_NUMBERD_MEMBER_2; };
 			union { Z<ElementType> z, AHO_COORDINATE_NUMBERD_MEMBER_3; };
-			constexpr _CoordinateSet() : x(X<ElementType>()), y(Y<ElementType>()),z(Z<ElementType>()) {}
+			constexpr _CoordinateSet() : x(X<ElementType>()), y(Y<ElementType>()), z(Z<ElementType>()) {}
 			constexpr _CoordinateSet(const X<ElementType>& x, const Y<ElementType>& y, const Z<ElementType>& z) : x(x), y(y), z(z) {}
 
 			AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(X, x);
@@ -392,6 +401,32 @@ namespace AHO_NAMESPACE {
 			std::enable_if<R::is_coordinate_set>::type;
 		};
 	}
+
+	template <typename ElementType, typename CoordinationInfo>
+	std::ostream& operator <<(std::ostream& out, const coordinate::_CoordinateSet<ElementType, CoordinationInfo>& set) {
+		if constexpr (std::same_as<typename CoordinationInfo::dimention, VSL_NAMESPACE::D1>) {
+			out << set.AHO_COORDINATE_NUMBERD_MEMBER_1;
+		}
+
+		if constexpr (std::same_as<typename CoordinationInfo::dimention, VSL_NAMESPACE::D2>) {
+			out << "(" << decltype(set.AHO_COORDINATE_NUMBERD_MEMBER_1)::LowerChar
+				<< ", " << decltype(set.AHO_COORDINATE_NUMBERD_MEMBER_2)::LowerChar << ")"
+				<< "="
+				<< "(" << set.AHO_COORDINATE_NUMBERD_MEMBER_1.value
+				<< ", " << set.AHO_COORDINATE_NUMBERD_MEMBER_2.value << ")";
+		}
+
+		if constexpr (std::same_as<typename CoordinationInfo::dimention, VSL_NAMESPACE::D3>) {
+			out << "(" << decltype(set.AHO_COORDINATE_NUMBERD_MEMBER_1)::LowerChar
+				<< ", " << decltype(set.AHO_COORDINATE_NUMBERD_MEMBER_2)::LowerChar
+				<< ", " << decltype(set.AHO_COORDINATE_NUMBERD_MEMBER_3)::LowerChar << ")"
+				<< "="
+				<< "(" << set.AHO_COORDINATE_NUMBERD_MEMBER_1.value
+				<< ", " << set.AHO_COORDINATE_NUMBERD_MEMBER_2.value
+				<< ", " << set.AHO_COORDINATE_NUMBERD_MEMBER_3.value << ")";
+		}
+		return out;
+	};
 
 	using coordinate::X;
 	using coordinate::Y;

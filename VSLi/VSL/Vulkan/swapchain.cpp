@@ -8,12 +8,12 @@
 
 using namespace vsl::_impl::helper;
 
-vsl::Swapchain::Swapchain(vsl::LogicalDeviceAccessor device)
+vsl::Swapchain::Swapchain(vsl::LogicalDeviceAccessor device, std::optional<std::shared_ptr<Surface>> _surface)
 {
 	_data = std::shared_ptr<_impl::Swapchain_impl>(new _impl::Swapchain_impl);
 	_data->device = device._data;
 
-	std::shared_ptr<_impl::Surface_impl> surface = device._data->parentSurface;
+	std::shared_ptr<_impl::Surface_impl> surface = _surface ? _surface.value()->_data : device._data->parentSurface;;
 	std::shared_ptr<_impl::PhysicalDevice_impl> pdevice = device._data->parentDevice;
 
 	vk::SwapchainCreateInfoKHR createInfo{};

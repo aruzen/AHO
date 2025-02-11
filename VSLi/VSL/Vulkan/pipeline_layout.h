@@ -24,8 +24,8 @@ namespace VSL_NAMESPACE {
 
 		PipelineLayout(std::shared_ptr<_impl::PipelineLayout_impl> _data);
 
-		template <VSL_NAMESPACE::pipeline_layout_injecter Addition>
-		PipelineLayout add(Addition&& a);
+		template <VSL_NAMESPACE::pipeline_layout_injecter... Additions>
+		PipelineLayout add(Additions&&... a);
 
 		PipelineLayout copy();
 	};
@@ -52,9 +52,9 @@ namespace VSL_NAMESPACE {
 		init_finish();
 	}/**/
 
-	template <VSL_NAMESPACE::pipeline_layout_injecter Addition>
-	PipelineLayout PipelineLayout::add(Addition&& a) {
-		std::forward<Addition>(a).injection(*this);
+	template <VSL_NAMESPACE::pipeline_layout_injecter... Additions>
+	PipelineLayout PipelineLayout::add(Additions&&... a) {
+		helper::expansionPipelineLayoutArgs(*this, std::forward<Additions>(a)...);
 
 		init_finish();
 

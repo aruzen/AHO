@@ -11,6 +11,7 @@
 #include <VSL/window_plugin.h>
 #include <VSL/utils/ShaderCompiler.h>
 #include <VSL/utils/VSLArray.h>
+#include <VSL/Vulkan/buffer.h>
 #include <VSL/Vulkan/command.h>
 #include <VSL/Vulkan/device.h>
 #include <VSL/Vulkan/frame_buffer.h>
@@ -27,6 +28,7 @@
 #include <VSL/Vulkan/viewport.h>
 #include <VSL/Vulkan/Vulkan.h>
 #include <VSL/Vulkan/commands/bind_pipe_line.h>
+#include <VSL/Vulkan/commands/bind_vertex_buffers.h>
 #include <VSL/Vulkan/commands/draw.h>
 #include <VSL/Vulkan/commands/render_pass_begin.h>
 #include <VSL/Vulkan/commands/render_pass_end.h>
@@ -84,14 +86,15 @@ int main() {
 
 	Triangle triangle({ 0, 0 }, { 0, 4 }, { 2, 2 });
 	Point p1{ 0, 0 }, p2{ 2, 2 };
+	Point pf1{ 0.0f, 0.0f };
 	Line line(p1, p2);
 	PtrLine pline(&p1, &p2);
 	auto t = line + Point{ 1, 1 };
 
-	// auto adr = line.adress();
 	vsl::loggingln("type : ", typeid(t).name());
 	vsl::loggingln("area : ", triangle.area());
-
+	vsl::loggingln("Point{ 0.0f, 0.0f }::graphic_type == FloatVec2 : ", decltype(pf1)::graphic_type == vsl::data_format::FloatVec2);
+	vsl::loggingln("DrawManip is available : ", vsl::command::is_manipulator<vsl::command::DrawManip>);
 	//*
 	try {
 		using namespace vsl;
@@ -100,9 +103,9 @@ int main() {
 		shader_compiler.compile();
 
 		Vulkan vk("test", { "VK_KHR_win32_surface", "VK_KHR_surface" });
-		// loggingln(vk.)
-		Window main_window("vsl", 800, 700);
 		auto physical_device = PhysicalDevices(vk).search();
+
+		Window main_window("vsl", 800, 700);
 		auto surface = main_window.addPlugin<Surface>(vk);
 
 		LogicalDevice device(physical_device, surface);
@@ -114,13 +117,14 @@ int main() {
 		SynchroManager synchro_manager(device);
 
 		Swapchain swapchain(device);
+
 		View view(swapchain);
 		auto s1 = make_shader<"shaders/const_triangle.vert.spv">(device);
 		auto s2 = make_shader<"shaders/red.frag.spv">(device);
 		pl::ShaderGroup red_triangle_shaders("red_triangle", { s1, s2 }),
-			colorfull_triangle_shaders("colorfull_triangle", { make_shader<"shaders/const_triangle2.vert.spv">(device), make_shader<"shaders/colorfull.frag.spv">(device) });
-		// input_sahders("2d_input", { make_shader<"shaders/input.vert.spv">(device), make_shader<"shaders/input.frag.spv">(device) });
-		
+			colorfull_triangle_shaders("colorfull_triangle", { make_shader<"shaders/const_triangle2.vert.spv">(device), make_shader<"shaders/colorfull.frag.spv">(device) }),
+			input_sahders("2d_input", { make_shader<"shaders/input.vert.spv">(device), make_shader<"shaders/input.frag.spv">(device) });
+
 		Scissor scissor(swapchain);
 		Viewport viewport(swapchain);
 		Viewport left_viewport(viewport), right_viewport(viewport);
@@ -134,17 +138,42 @@ int main() {
 			pl::InputAssembly(),
 			pl::Multisample(),
 			pl::Rasterization(),
-			pl::VertexInput(),
 			scissor);
 
 		RenderPass render_pass(swapchain);
 
 		CommandManager manager(device);
 
-		FrameBuffer frame_buffer(swapchain, view, render_pass);
-		Pipeline red_triangle(layout.copy().add(red_triangle_shaders), render_pass);
-		Pipeline colorfull_triangle(layout.copy().add(colorfull_triangle_shaders), render_pass);
-		// Pipeline input_vertices(layout.copy().add(input_sahders), render_pass);
+		struct vertex {
+			d2::PointF pos;
+			d3::PointF color;
+		};
+
+		std::array<vertex, 3> triangle = {
+			vertex{ { 0.0f_x + -0.5f_y }, { 1.0f_x + 0.0f_y + 0.0f_z }},
+			vertex{ { 0.5f_x + 0.5f_y }, { 0.0f_x + 1.0f_y + 0.0f_z }},
+			vertex{ { -0.5f_x + 0.5f_y }, { 0.0f_x + 0.0f_y + 1.0f_z }},
+		};
+
+		auto vert_input = pl::VertexInput().add_shape({ data_format::FloatVec2, data_format::FloatRGB });
+
+		FrameBuffer frame_buffer(swapchain, view, render_pass);;
+		// Pipeline red_triangle(layout.copy().add(red_triangle_shaders, pl::VertexInput()), render_pass);
+		// Pipeline colorfull_triangle(layout.copy().add(colorfull_triangle_shaders, pl::VertexInput()), render_pass);
+		Pipeline input_vertices(layout.copy().add(input_sahders, vert_input), render_pass);
+
+		Buffer<MemoryType::VertexBuffer, MemoryProperty::HostVisible | MemoryProperty::HostCoherent>
+			buf(device, sizeof(triangle));
+
+		buf.copy(triangle);
+		{
+			auto ptr = buf.data();
+			for (size_t i = 0; i < sizeof(triangle) / sizeof(float); i++) {
+				std::cout << *((float*)ptr.data + i) << ", ";
+			}
+		}
+
+		loggingln(offsetof(vertex, pos), offsetof(vertex, color));
 
 		auto imageAvailable = synchro_manager.createSemaphore("imageAvailable", manager.getBuffer().getSize()),
 			renderFinished = synchro_manager.createSemaphore("renderFinished", manager.getBuffer().getSize());
@@ -154,12 +183,13 @@ int main() {
 				auto phase = manager.startPhase(swapchain, imageAvailable, renderFinished, inFlight);
 				frame_buffer.setTargetFrame(phase.getImageIndex());
 
-				phase << std::make_shared<command::RenderPassBegin>(render_pass, frame_buffer);
+				phase << command::RenderPassBegin(render_pass, frame_buffer);
 
-				phase << left_viewport << red_triangle << std::make_shared<command::Draw>();
-				phase << right_viewport << colorfull_triangle << std::make_shared<command::Draw>();
+				// phase << left_viewport << red_triangle << command::Draw(3);
+				// phase << right_viewport << colorfull_triangle << command::Draw(3);
+				phase << viewport << input_vertices << command::BindVertexBuffer(buf) << command::Draw(3);
 
-				phase << std::make_shared<command::RenderPassEnd>();
+				phase << command::RenderPassEnd();
 			}
 			manager.next();
 		}

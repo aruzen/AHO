@@ -69,11 +69,12 @@ VSL_NAMESPACE::DefaultPhase::DefaultPhase(CommandManager _manager, SwapchainAcce
 	std::optional<SemaphoreHolder> nextImageAvailable,
 	std::optional<SemaphoreHolder> calculationFinish,
 	std::optional<FenceHolder> inFlightFence)
-	: manager(_manager._data)
+	: manager(_manager)
 	, swapchain(swapchain)
 	, nextImageAvailable(nextImageAvailable)
 	, calculationFinish(calculationFinish)
 	, inFlightFence(inFlightFence) {
+	auto&& manager = this->manager._data;
 	auto&& currentFrame = manager->commandBuffer->currentBufferIdx;
 
 	if (inFlightFence.has_value()) {
@@ -98,10 +99,26 @@ VSL_NAMESPACE::DefaultPhase::DefaultPhase(CommandManager _manager, SwapchainAcce
 	manager->commandBuffer->commandBuffers[currentFrame].begin(beginInfo);
 }
 
-VSL_NAMESPACE::DefaultPhase& VSL_NAMESPACE::DefaultPhase::operator<<(std::shared_ptr<command::__Command> cmd)
+VSL_NAMESPACE::DefaultPhaseStreamOperator VSL_NAMESPACE::DefaultPhase::operator<<(std::shared_ptr<command::__Command> cmd)
 {
-	cmd->invoke(CommandPool{ manager->commandPool }, CommandBuffer{ manager->commandBuffer }, manager);
+	DefaultPhaseStreamOperator op{ this };
+	op << cmd;
+	return op;
+}
 
+VSL_NAMESPACE::DefaultPhaseStreamOperator& VSL_NAMESPACE::DefaultPhaseStreamOperator::operator<<(std::shared_ptr<command::__Command> cmd)
+{
+	cmd->invoke(parent->manager.getPool(), parent->manager.getBuffer(), parent->manager);
+	if (auto vholder = std::dynamic_pointer_cast<command::__VertexHolder>(cmd); vholder)
+		this->vertexSize = vholder->get_vertex_size();
+	return *this;
+}
+
+VSL_NAMESPACE::DefaultPhaseStreamOperator& VSL_NAMESPACE::DefaultPhaseStreamOperator::operator<<(std::shared_ptr<command::__Manipulator> manip)
+{
+	manip->manipulate(this, parent->manager.getPool(), parent->manager.getBuffer(), parent->manager);
+	if (auto vholder = std::dynamic_pointer_cast<command::__VertexHolder>(manip); vholder)
+		this->vertexSize = vholder->get_vertex_size();
 	return *this;
 }
 
@@ -111,7 +128,9 @@ std::uint32_t VSL_NAMESPACE::DefaultPhase::getImageIndex() {
 
 
 VSL_NAMESPACE::DefaultPhase::~DefaultPhase() {
+	auto&& manager = this->manager._data;
 	auto&& currentFrame = manager->commandBuffer->currentBufferIdx;
+
 	manager->commandBuffer->commandBuffers[currentFrame].end();
 
 	std::uint32_t imageIdx = getImageIndex();
@@ -176,6 +195,11 @@ VSL_NAMESPACE::CommandPool VSL_NAMESPACE::CommandManager::getPool()
 VSL_NAMESPACE::CommandBuffer VSL_NAMESPACE::CommandManager::getBuffer()
 {
 	return CommandBuffer{ _data->commandBuffer };
+}
+
+std::uint32_t VSL_NAMESPACE::CommandManager::getCurrentBufferIdx()
+{
+	return _data->commandBuffer->currentBufferIdx;
 }
 
 void VSL_NAMESPACE::CommandManager::next() {

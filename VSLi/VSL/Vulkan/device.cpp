@@ -174,6 +174,11 @@ void VSL_NAMESPACE::_impl::PhysicalDevice_impl::makeProps()
 	props = device.getProperties();
 }
 
+void VSL_NAMESPACE::_impl::PhysicalDevice_impl::makeMemProps()
+{
+	memProps = device.getMemoryProperties();
+}
+
 VSL_NAMESPACE::PhysicalDevice::PhysicalDevice(std::shared_ptr<_impl::PhysicalDevice_impl> _data) :_data(_data) {}
 
 VSL_NAMESPACE::PhysicalDevice::~PhysicalDevice() {}

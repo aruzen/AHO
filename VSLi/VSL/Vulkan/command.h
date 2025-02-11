@@ -28,6 +28,9 @@ namespace VSL_NAMESPACE {
 	};
 
 	struct CommandManager;
+	struct DefaultPhase;
+	struct DefaultPhaseStreamOperator;
+
 	namespace command {
 		struct __Command {
 			virtual void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) = 0;
@@ -37,29 +40,25 @@ namespace VSL_NAMESPACE {
 		concept is_command = requires(T t) {
 			t.invoke(std::declval<CommandPool>(), std::declval<CommandBuffer>(), std::declval<CommandManager>());
 		};
+
+		struct __VertexHolder {
+			virtual size_t get_vertex_size() = 0;
+		};
+
+		template<typename T>
+		concept is_vertex_holder = requires(const T & t) {
+			{ t.get_vertex_size() } -> std::convertible_to<size_t>;
+		};
+
+		struct __Manipulator {
+			virtual void manipulate(DefaultPhaseStreamOperator* op, CommandPool pool, CommandBuffer buffer, CommandManager manager) = 0;
+		};
+
+		template <typename T>
+		concept is_manipulator = requires(T t) {
+			t.manipulate(std::declval<DefaultPhaseStreamOperator*>(), std::declval<CommandPool>(), std::declval<CommandBuffer>(), std::declval<CommandManager>());
+		};
 	}
-
-	struct DefaultPhase {
-		DefaultPhase(CommandManager manager, SwapchainAccessor swapchain,
-			std::optional<SemaphoreHolder> nextImageAvailable = std::nullopt,
-			std::optional<SemaphoreHolder> calculationFinish = std::nullopt,
-			std::optional<FenceHolder> inFlightFence = std::nullopt);
-
-		std::shared_ptr<VSL_NAMESPACE::_impl::CommandManager_impl> manager;
-		SwapchainAccessor swapchain;
-		std::optional<SemaphoreHolder> nextImageAvailable = std::nullopt, calculationFinish = std::nullopt;
-		std::optional<FenceHolder> inFlightFence = std::nullopt;
-
-		std::uint32_t imageIndex;
-
-		DefaultPhase& operator<<(std::shared_ptr<command::__Command> cmd);
-		template <command::is_command T>
-		DefaultPhase& operator<<(T cmd);
-
-		std::uint32_t getImageIndex();
-
-		virtual ~DefaultPhase();
-	};
 
 	struct CommandManager {
 		CommandManager(std::shared_ptr<VSL_NAMESPACE::_impl::CommandManager_impl> data);
@@ -76,6 +75,43 @@ namespace VSL_NAMESPACE {
 		void next();
 	};
 
+	struct DefaultPhase {
+		DefaultPhase(CommandManager manager, SwapchainAccessor swapchain,
+			std::optional<SemaphoreHolder> nextImageAvailable = std::nullopt,
+			std::optional<SemaphoreHolder> calculationFinish = std::nullopt,
+			std::optional<FenceHolder> inFlightFence = std::nullopt);
+
+		CommandManager manager;
+		SwapchainAccessor swapchain;
+		std::optional<SemaphoreHolder> nextImageAvailable = std::nullopt, calculationFinish = std::nullopt;
+		std::optional<FenceHolder> inFlightFence = std::nullopt;
+
+		std::uint32_t imageIndex;
+
+		DefaultPhaseStreamOperator operator<<(std::shared_ptr<command::__Command> cmd);
+		DefaultPhaseStreamOperator operator<<(std::shared_ptr<command::__Manipulator> cmd);
+		template <typename T>
+			requires (command::is_command<T>) || (command::is_manipulator<T>)
+		DefaultPhaseStreamOperator operator<<(T cmd);
+
+		std::uint32_t getImageIndex();
+
+		virtual ~DefaultPhase();
+	};
+
+	struct DefaultPhaseStreamOperator {
+		DefaultPhase* parent;
+
+		size_t vertexSize;
+
+		DefaultPhaseStreamOperator& operator<<(std::shared_ptr<command::__Command> cmd);
+		template <command::is_command T>
+		DefaultPhaseStreamOperator& operator<<(T cmd);
+		DefaultPhaseStreamOperator& operator<<(std::shared_ptr<command::__Manipulator> manip);
+		template <command::is_manipulator T>
+		DefaultPhaseStreamOperator& operator<<(T cmd);
+	};
+
 	// ============================================================================
 
 	template<class P, typename... Args>
@@ -84,12 +120,30 @@ namespace VSL_NAMESPACE {
 		return P(*this, swapchain, std::forward<Args>(args)...);
 	}
 
-	template<command::is_command T>
-	inline DefaultPhase& DefaultPhase::operator<<(T cmd)
+	template <typename T>
+		requires (command::is_command<T>) || (command::is_manipulator<T>)
+	DefaultPhaseStreamOperator DefaultPhase::operator<<(T cmd)
 	{
-		CommandManager cm(manager);
-		(&cmd)->invoke(cm.getPool(), cm.getBuffer(), cm);
+		DefaultPhaseStreamOperator op{ this };
+		op << cmd;
+		return op;
+	}
 
+	template<command::is_command T>
+	DefaultPhaseStreamOperator& DefaultPhaseStreamOperator::operator<<(T cmd)
+	{
+		(&cmd)->invoke(parent->manager.getPool(), parent->manager.getBuffer(), parent->manager);
+		if constexpr (command::is_vertex_holder<T>)
+			this->vertexSize = (&cmd)->get_vertex_size();
+		return *this;
+	}
+
+	template<command::is_manipulator T>
+	DefaultPhaseStreamOperator& DefaultPhaseStreamOperator::operator<<(T manip)
+	{
+		(&manip)->manipulate(this, parent->manager.getPool(), parent->manager.getBuffer(), parent->manager);
+		if constexpr (command::is_vertex_holder<T>)
+			this->vertexSize = (&manip)->get_vertex_size();
 		return *this;
 	}
 }

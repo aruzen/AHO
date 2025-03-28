@@ -51,19 +51,19 @@
 #include <AHO/core/Vector.h>
 #include <AHO/core/Point.h>
 #include <AHO/core/Triangle.h>
+#include <AHO/core/color.h>
 
 #include <chrono>
 
 /*
-* https://vulkan-tutorial.com/Drawing_a_triangle/Swap_chain_recreation
-*
-* https://vulkan-tutorial.com/Vertex_buffers/Vertex_input_description
+* https://vulkan-tutorial.com/en/Vertex_buffers/Staging_buffer
+* 
+* 
 */
 
 int main() {
 	using namespace aho;
-	using namespace aho::coordinate;
-	using namespace aho::angle;
+	using namespace aho::literals;
 
 	namespace pl = vsl::pipeline_layout;
 
@@ -144,53 +144,56 @@ int main() {
 
 		CommandManager manager(device);
 
-		struct vertex {
-			d2::PointF pos;
-			d3::PointF color;
-		};
-
-		std::array<vertex, 3> triangle = {
-			vertex{ { 0.0f_x + -0.5f_y }, { 1.0f_x + 0.0f_y + 0.0f_z }},
-			vertex{ { 0.5f_x + 0.5f_y }, { 0.0f_x + 1.0f_y + 0.0f_z }},
-			vertex{ { -0.5f_x + 0.5f_y }, { 0.0f_x + 0.0f_y + 1.0f_z }},
-		};
-
 		auto vert_input = pl::VertexInput().add_shape({ data_format::FloatVec2, data_format::FloatRGB });
 
 		FrameBuffer frame_buffer(swapchain, view, render_pass);;
-		// Pipeline red_triangle(layout.copy().add(red_triangle_shaders, pl::VertexInput()), render_pass);
-		// Pipeline colorfull_triangle(layout.copy().add(colorfull_triangle_shaders, pl::VertexInput()), render_pass);
 		Pipeline input_vertices(layout.copy().add(input_sahders, vert_input), render_pass);
-
-		Buffer<MemoryType::VertexBuffer, MemoryProperty::HostVisible | MemoryProperty::HostCoherent>
-			buf(device, sizeof(triangle));
-
-		buf.copy(triangle);
-		{
-			auto ptr = buf.data();
-			for (size_t i = 0; i < sizeof(triangle) / sizeof(float); i++) {
-				std::cout << *((float*)ptr.data + i) << ", ";
-			}
-		}
-
-		loggingln(offsetof(vertex, pos), offsetof(vertex, color));
 
 		auto imageAvailable = synchro_manager.createSemaphore("imageAvailable", manager.getBuffer().getSize()),
 			renderFinished = synchro_manager.createSemaphore("renderFinished", manager.getBuffer().getSize());
 		auto inFlight = synchro_manager.createFence("inFlight", manager.getBuffer().getSize(), true);
+
+		struct vertex {
+			d2::PointF pos;
+			RGB color;
+		};
+
+		vertex center = { { 0.0f_x + 0.0f_y }, HSV(0.0f, 0.0f, 0.1f).rgb() };
+		vertex top = { { 0.0f_x + -0.1f_y }, HSV(0.0f, 1.0f, 0.5f).rgb() };
+		vertex right = { { 0.1f_x + 0.1f_y }, HSV(120.0f, 1.0f, 0.5f).rgb() };
+		vertex left = { { -0.1f_x + 0.1f_y }, HSV(240.0f, 1.0f, 0.5f).rgb() };
+
+		std::cout << center.color << std::endl;
+
+		using SimpleBuffer = Buffer<MemoryType::VertexBuffer, MemoryProperty::HostVisible | MemoryProperty::HostCoherent>;
+		std::array<SimpleBuffer, 3>
+			buffers = { SimpleBuffer(device, sizeof(std::array<vertex, 3>)),
+				SimpleBuffer(device, sizeof(std::array<vertex, 3>)),
+				SimpleBuffer(device, sizeof(std::array<vertex, 3>)) };
+
+		size_t frame = 0;
 		while (Window::Update() && main_window) {
 			{
 				auto phase = manager.startPhase(swapchain, imageAvailable, renderFinished, inFlight);
 				frame_buffer.setTargetFrame(phase.getImageIndex());
 
+				std::array<std::array<vertex, 3>, 3> polygons = {
+					std::array<vertex, 3>{ top, right, center },
+					std::array<vertex, 3>{ center, right, left },
+					std::array<vertex, 3>{ top, center, left }
+				};
+
 				phase << command::RenderPassBegin(render_pass, frame_buffer);
 
-				// phase << left_viewport << red_triangle << command::Draw(3);
-				// phase << right_viewport << colorfull_triangle << command::Draw(3);
-				phase << viewport << input_vertices << command::BindVertexBuffer(buf) << command::Draw(3);
+				phase << viewport << input_vertices;
+				for (size_t i = 0; i < 3; i++) {
+					buffers[i].copy(polygons[i]);
+					phase << command::BindVertexBuffer(buffers[i]) << command::Draw(3);
+				}
 
 				phase << command::RenderPassEnd();
 			}
+			frame++;
 			manager.next();
 		}
 		inFlight.wait();

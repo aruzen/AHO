@@ -1,4 +1,6 @@
+#ifdef _MSC_VER
 #include "pch.h"
+#endif
 #include "bind_pipe_line.h"
 #include "../_pimpls.h"
 

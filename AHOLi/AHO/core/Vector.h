@@ -14,7 +14,7 @@ namespace AHO_NAMESPACE {
 	};
 
 	template<typename R = int, typename... Args>
-		requires concepts::sames_as<R, Args...> && !concepts::is_coordinate_set<R>
+		requires concepts::sames_as<R, Args...> && (!concepts::is_coordinate_set<R>)
 	struct Vector : public _Vector<R, 
 								   typename VSL_NAMESPACE::Dimention<sizeof...(Args) + 1>::value, 
 								   typename AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<

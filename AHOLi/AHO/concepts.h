@@ -6,6 +6,27 @@
 #include <optional>
 
 namespace AHO_NAMESPACE::concepts {
+    namespace helper {
+
+        template<size_t Index, typename... Args>
+        struct GetType {};
+
+        template<size_t Index, typename T, typename... Args>
+            requires (Index == 0)
+        struct GetType<Index, T, Args...> {
+            using value = T;
+        };
+
+        template<size_t Index, typename T, typename... Args>
+            requires (Index != 0)
+        struct GetType<Index, T, Args...> {
+            using value = GetType<Index-1, Args...>;
+        };
+
+        template<size_t Index, typename T, typename... Args>
+        using get_type_v = GetType<Index, T, Args...>::value;
+    }
+
 	template<typename T>
 	concept plusable = requires(T t) {
 		+t;
@@ -56,7 +77,7 @@ namespace AHO_NAMESPACE::concepts {
 
 	template<typename T, typename... Args>
 	concept sames_as = (0 == sizeof...(Args) && true) ||
-		(1 == sizeof...(Args) && std::same_as<T, Args...>) ||
+		(1 == sizeof...(Args) && std::same_as<T, typename helper::GetType<0, Args...>::value>) ||
 		(2 <= sizeof...(Args) && __sames_as<T, Args...>());
 
 	template<typename T>

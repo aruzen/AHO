@@ -36,7 +36,7 @@ namespace VSL_NAMESPACE {
 
 	template<typename S>
 	struct PhysicalDevices {
-		using BenchMarcker = typename S;
+		using BenchMarcker = S;
 
 		PhysicalDevices(VulkanAccessor vulkan);
 		~PhysicalDevices();
@@ -81,5 +81,5 @@ template<bool Validation>
 template<typename S>
 VSL_NAMESPACE::PhysicalDevices<S> VSL_NAMESPACE::Vulkan<Validation>::devices()
 {
-	return VSL_NAMESPACE::PhysicalDevices<S, Validation>(*this);
+	return VSL_NAMESPACE::PhysicalDevices<S>(*this);
 }

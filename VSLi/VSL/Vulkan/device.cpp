@@ -1,4 +1,6 @@
+#ifdef _MSC_VER
 #include "pch.h"
+#endif
 #include "../define.h"
 #include "device.h"
 
@@ -54,9 +56,9 @@ bool checkDeviceExtensionSupport(vk::PhysicalDevice device) {
 }
 
 struct SwapChainSupportDetails {
-	vk::SurfaceCapabilitiesKHR capabilities;
-	std::vector<vk::SurfaceFormatKHR> formats;
-	std::vector<vk::PresentModeKHR> presentModes;
+	vk::SurfaceCapabilitiesKHR capabilities {};
+	std::vector<vk::SurfaceFormatKHR> formats {};
+	std::vector<vk::PresentModeKHR> presentModes {};
 };
 
 SwapChainSupportDetails querySwapChainSupport(vk::PhysicalDevice device, vk::SurfaceKHR surface) {

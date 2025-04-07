@@ -1,4 +1,6 @@
+#ifdef _MSC_VER
 #include "pch.h"
+#endif
 #include "define.h"
 #include "debug.h"
 

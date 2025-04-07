@@ -1,4 +1,6 @@
+#ifdef _MSC_VER
 #include "pch.h"
+#endif
 #include "rasterization.h"
 #include "../_pimpls.h"
 

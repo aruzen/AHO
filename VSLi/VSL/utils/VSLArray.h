@@ -77,7 +77,7 @@ namespace VSL_NAMESPACE {
 	};
 
 	template <typename T>
-		requires convert_to_vsl_at_least_array<T, 2> && !is_point<T>
+		requires convert_to_vsl_at_least_array<T, 2> && (!is_point<T>)
 	struct __VSLD2Point<T> : __VSLArray<T, typename T::element_type, vsl_array_size<T>()> {
 		static constexpr int SPECIALIZED_ID = 2;
 
@@ -92,7 +92,7 @@ namespace VSL_NAMESPACE {
 	};
 
 	template <typename T>
-		requires convert_to_vsl_at_least_array<T, 2>&& has_element_index<T> && !is_point<T>
+		requires convert_to_vsl_at_least_array<T, 2>&& has_element_index<T> && (!is_point<T>)
 	struct __VSLD2Point<T> : __VSLArray<T, typename T::element_type, vsl_array_size<T>()> {
 		static constexpr int SPECIALIZED_ID = 3;
 

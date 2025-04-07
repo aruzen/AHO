@@ -1,4 +1,6 @@
+#ifdef _MSC_VER
 #include "pch.h"
+#endif
 #include "color_blend.h"
 #include "../_pimpls.h"
 

@@ -3,8 +3,13 @@
 
 #include <compare>
 
+#ifdef _MSC_VER
 #define VK_USE_PLATFORM_WIN32_KHR
+#elifdef __APPLE_CC__
+#define VK_USE_PLATFORM_MACOS_MVK
+#endif
 #define GLFW_INCLUDE_VULKAN
+
 #include <GLFW/glfw3.h>
 #pragma warning( push )
 #include <compare>

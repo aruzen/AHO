@@ -190,9 +190,9 @@ namespace AHO_NAMESPACE {
 #define AHO_COORDINATE_NUMBERD_MEMBER_2 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 2)
 #define AHO_COORDINATE_NUMBERD_MEMBER_3 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 3)
 
-#define ___AN1 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_1, .value)
-#define ___AN2 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_2, .value)
-#define ___AN3 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_3, .value)
+#define ___AN1 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_1, ).value
+#define ___AN2 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_2, ).value
+#define ___AN3 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_3, ).value
 
 #define AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper, Lower) \
 				template <typename T> \
@@ -368,21 +368,21 @@ namespace AHO_NAMESPACE {
 		}
 
 		constexpr X<double> operator"" AHO_LITERAL(x)(long double v) { return { (double)v }; };
-		constexpr X<int> operator"" AHO_LITERAL(x)(size_t v) { return { (int)v }; };
+		constexpr X<int> operator"" AHO_LITERAL(x)(unsigned long long v) { return { (int)v }; };
 		constexpr X<float> operator"" AHO_LITERAL(f_x)(long double v) { return { (float)v }; };
-		constexpr X<size_t> operator"" AHO_LITERAL(l_x)(size_t v) { return { v }; };
+		constexpr X<size_t> operator"" AHO_LITERAL(l_x)(unsigned long long v) { return { v }; };
 		constexpr X<double> x(1.0);
 
 		constexpr Y<double> operator"" AHO_LITERAL(y)(long double v) { return { (double)v }; };
-		constexpr Y<int> operator"" AHO_LITERAL(y)(size_t v) { return { (int)v }; };
+		constexpr Y<int> operator"" AHO_LITERAL(y)(unsigned long long v) { return { (int)v }; };
 		constexpr Y<float> operator"" AHO_LITERAL(f_y)(long double v) { return { (float)v }; };
-		constexpr Y<size_t> operator"" AHO_LITERAL(l_y)(size_t v) { return { v }; };
+		constexpr Y<size_t> operator"" AHO_LITERAL(l_y)(unsigned long long v) { return { v }; };
 		constexpr Y<double> y(1.0);
 
 		constexpr Z<double> operator"" AHO_LITERAL(z)(long double v) { return { (double)v }; };
-		constexpr Z<int> operator"" AHO_LITERAL(z)(size_t v) { return { (int)v }; };
+		constexpr Z<int> operator"" AHO_LITERAL(z)(unsigned long long v) { return { (int)v }; };
 		constexpr Z<float> operator"" AHO_LITERAL(f_z)(long double v) { return { (float)v }; };
-		constexpr Z<size_t> operator"" AHO_LITERAL(l_z)(size_t v) { return { v }; };
+		constexpr Z<size_t> operator"" AHO_LITERAL(l_z)(unsigned long long v) { return { v }; };
 		constexpr Z<double> z(1.0);
 	}
 

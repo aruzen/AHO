@@ -1,4 +1,6 @@
+#ifdef _MSC_VER
 #include "pch.h"
+#endif
 #include "define.h"
 #include "Window.h"
 
@@ -16,8 +18,15 @@ VSL_NAMESPACE::PureWindow::PureWindow(std::string _name, int _width, int _height
 	_data = std::shared_ptr<WindowData>(new WindowData);
 
 	if (!inited) {
-		glfwInit();
-		inited = true;
+        if (glfwInit() == GLFW_TRUE) {
+            inited = true;
+        } else {
+            const char *error_txt = nullptr;
+            int error = glfwGetError(&error_txt);
+            std::cerr << "Failed to initialize GLFW: " << (error == GLFW_NO_ERROR ? "Unknown error" : error_txt)
+                      << std::endl;
+            return; // TODO throw error
+        }
 	}
 	windows.push_back(_data.get());
 

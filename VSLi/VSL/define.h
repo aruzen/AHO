@@ -19,7 +19,7 @@
 #define VSL_DEFAULT_DIMENTION_STRUCT ___VSL_JOIN(D , VSL_DEFAULT_DIMENTION)
 
 #ifndef VSL_VALIDATION
-#ifdef  _DEBUG
+#if defined(_DEBUG) || defined(__APPLE_CC__)
 #define VSL_VALIDATION true
 #else 
 #define VSL_VALIDATION false

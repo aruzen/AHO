@@ -1,4 +1,6 @@
+#ifdef _MSC_VER
 #include "pch.h"
+#endif
 #include "input_assembly.h"
 #include "../_pimpls.h"
 

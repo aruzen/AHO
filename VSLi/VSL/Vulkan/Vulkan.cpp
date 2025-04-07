@@ -1,4 +1,6 @@
+#ifdef _MSC_VER
 #include "pch.h"
+#endif
 #include "../define.h"
 #include "Vulkan.h"
 
@@ -87,9 +89,17 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vecto
 
 	if constexpr (Validation) {
 		checkValidationLayerSupport();
-	}
 
-	vk::ApplicationInfo appInfo;
+        std::vector<vk::ExtensionProperties> extensions = vk::enumerateInstanceExtensionProperties();
+        VSL_NAMESPACE::loggingln("available extensions:\n");
+
+        for (const auto &extension: extensions) {
+            VSL_NAMESPACE::loggingln(extension.extensionName);
+        }
+    }
+
+
+    vk::ApplicationInfo appInfo;
 	appInfo.pApplicationName = app_name;
 	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
 	appInfo.pEngineName = "VSL_Engine";
@@ -119,25 +129,22 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vecto
 
 	createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
 	createInfo.ppEnabledExtensionNames = extensions.data();
+    // TODO
+    createInfo.setFlags(vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR);
 
 	if (!(_data->instance = vk::createInstance(createInfo))) {
 		throw VSL_NAMESPACE::exceptions::RuntimeException("VulkanInstance", "create failed.");
 	}
-	
+
 	if constexpr (Validation) {
-		std::vector<vk::ExtensionProperties> extensions = vk::enumerateInstanceExtensionProperties();
-		VSL_NAMESPACE::loggingln("available extensions:\n");
-
-		for (const auto& extension : extensions) {
-			VSL_NAMESPACE::loggingln(extension.extensionName);
-		}
-
 		setupDebugMessenger(_data);
 	} else {
 		fclose(stdin);
 		fclose(stdout);
 		fclose(stderr);
+#ifdef _MSC_VER
 		FreeConsole();
+#endif
 	}
 }
 
@@ -150,7 +157,7 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name)
 	if constexpr (Validation) {
 		checkValidationLayerSupport();
 	}
-	
+
 	vk::ApplicationInfo appInfo;
 	appInfo.pApplicationName = app_name;
 	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -196,7 +203,9 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name)
 		fclose(stdin);
 		fclose(stdout);
 		fclose(stderr);
-		FreeConsole();
+#ifdef _MSC_VER
+        FreeConsole();
+#endif
 	}
 }
 
@@ -210,7 +219,7 @@ void vsl::_impl::helper::DestroyDebugUtilsMessengerEXT(vk::Instance& instance, v
 template<bool Validation>
 VSL_NAMESPACE::Vulkan<Validation>::~Vulkan()
 {
-	
+
 }
 
 #ifdef VSL_NAMESPACE_TEST

@@ -1,5 +1,3 @@
-#include <Test/tests.h>
-
 #include <VSL/define.h>
 #include <VSL/debug.h>
 #include <VSL/Type.h>
@@ -30,7 +28,7 @@
 #include <VSL/Vulkan/commands/render_pass_end.h>
 #include <VSL/Vulkan/commands/bind_pipe_line.h>
 
-#define AHO_POOP_PUBLIC_SECURITY
+// #define AHO_POOP_PUBLIC_SECURITY
 #pragma warning( disable : 4455 )
 
 #include <AHO/define.h>
@@ -40,7 +38,7 @@
 
 #include <AHO/core/Vector.h>
 #include <AHO/core/Point.h>
-#include <AHO/core/Triangle.h>
+// #include <AHO/core/Triangle.h>
 
 #include <chrono>
 
@@ -55,10 +53,11 @@ int main() {
 
 	namespace pl = vsl::pipeline_layout;
 
-	auto x_z = 10x + 10z;
+	auto x_z = 10_x + 10_z;
 
-	x_z -= 5z;
-	auto x_y_z = x_z + 7y;
+	x_z -= 5_z;
+
+	auto x_y_z = x_z + 7_y;
 
 
 	vsl::loggingln(x_z._cnmn1, ", ", x_z._cnmn2);
@@ -66,21 +65,25 @@ int main() {
 
 	Vector vec1(1, 1);
 	Vector vec2(2.0, 2.0);
-	_Vector<decltype(10x + 25z)::element_type, decltype(10x + 25z)::coordinate_info::dimention, decltype(10x + 25z)::coordinate_info>
-		x_z_vec(10x + 25z);
+	_Vector<decltype(10_x + 25_z)::element_type, decltype(10_x + 25_z)::coordinate_info::dimention, decltype(10_x + 25_z)::coordinate_info>
+		x_z_vec(10_x + 25_z);
 	auto vec3 = vec1 + vec2;
 
 	vsl::loggingln(x_z_vec.value.x, ", ", x_z_vec.value.z);
 
-	Triangle triangle({ 0, 0 }, { 0, 4 }, { 2, 2 });
+	// Triangle triangle({ 0, 0 }, { 0, 4 }, { 2, 2 });
 
 
-	vsl::loggingln("area : ", triangle.area());
+	// vsl::loggingln("area : ", triangle.area());
 
 	try {
 		using namespace vsl;
 
+#ifdef _MSC_VER
 		Vulkan vk("test", { "VK_KHR_win32_surface", "VK_KHR_surface" });
+#elifdef __APPLE_CC__
+        Vulkan vk("test", { "VK_KHR_portability_enumeration", "VK_KHR_surface", "VK_EXT_metal_surface" });
+#endif
 		Window main_window("vsl");
 		auto physical_device = PhysicalDevices(vk).search();
 		auto surface = main_window.addPlugin<Surface>(vk);
@@ -91,9 +94,14 @@ int main() {
 		Swapchain swapchain(device);
 		View view(swapchain);
 
-		vsl::Shader<ShaderType::Vertex> const_triangle_shader(device, "shaders/const_triangle.vert.spv");
+#ifdef _MSC_VER
+        vsl::Shader<ShaderType::Vertex> const_triangle_shader(device, "shaders/const_triangle.vert.spv");
 		vsl::Shader<ShaderType::Fragment> red_shader(device, "shaders/red.frag.spv");
-
+#elifdef __APPLE_CC__
+        loggingln(std::filesystem::current_path());
+        vsl::Shader<ShaderType::Vertex> const_triangle_shader(device, "../../AHO/shaders/const_triangle.vert.spv");
+        vsl::Shader<ShaderType::Fragment> red_shader(device, "../../AHO/shaders/red.frag.spv");
+#endif
 		PipelineLayout layout(device,
 			pl::ShaderGroup("red_triangle", { const_triangle_shader, red_shader }),
 			pl::ColorBlend(),

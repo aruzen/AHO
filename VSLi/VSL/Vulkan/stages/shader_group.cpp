@@ -1,4 +1,6 @@
+#ifdef _MSC_VER
 #include "pch.h"
+#endif
 #include "shader_group.h"
 #include "../_pimpls.h"
 #include "../pipeline_layout.h"

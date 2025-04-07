@@ -1,4 +1,6 @@
+#ifdef _MSC_VER
 #include "pch.h"
+#endif
 #include "../define.h"
 
 #include "_pimpls.h"
@@ -58,8 +60,7 @@ VSL_NAMESPACE::DefaultPhase::~DefaultPhase() {
 }
 
 
-template<typename P>
-VSL_NAMESPACE::CommandManager<P>::CommandManager(VSL_NAMESPACE::LogicalDeviceAccessor device) : pool(device), buffer(pool)
+VSL_NAMESPACE::CommandManager::CommandManager(VSL_NAMESPACE::LogicalDeviceAccessor device) : pool(device), buffer(pool)
 {
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::CommandManager_impl>(new VSL_NAMESPACE::_impl::CommandManager_impl);
 	vk::Device de = device._data->device;
@@ -67,10 +68,4 @@ VSL_NAMESPACE::CommandManager<P>::CommandManager(VSL_NAMESPACE::LogicalDeviceAcc
 	// _data->presentQueuea = de.getQueue(device._data->presentFamily, 0);
 }
 
-template<class P>
-P VSL_NAMESPACE::CommandManager<P>::startPhase()
-{
-	return P(pool, buffer);
-}
 
-template VSL_NAMESPACE::CommandManager<VSL_NAMESPACE::DefaultPhase>;

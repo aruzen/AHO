@@ -1,4 +1,6 @@
+#ifdef _MSC_VER
 #include "pch.h"
+#endif
 #include "render_pass.h"
 
 #include "_pimpls.h"

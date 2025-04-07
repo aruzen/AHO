@@ -37,7 +37,7 @@ namespace AHO_NAMESPACE {
 
 		template<typename R, size_t Row, size_t Column>
 		struct Mat : public std::array<std::array<R, Column>, Row> {
-			using element_type = typename R;
+			using element_type = R;
 
 			using RowType = std::array<R, Column>;
 

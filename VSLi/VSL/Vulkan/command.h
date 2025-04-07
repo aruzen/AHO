@@ -33,7 +33,6 @@ namespace VSL_NAMESPACE {
 		virtual ~DefaultPhase();
 	};
 
-	template<class P = DefaultPhase>
 	struct CommandManager {
 		CommandManager(VSL_NAMESPACE::LogicalDeviceAccessor device);
 
@@ -41,8 +40,15 @@ namespace VSL_NAMESPACE {
 		CommandPool pool;
 		CommandBuffer buffer;
 
+        template<class P = DefaultPhase>
 		P startPhase();
 	};
+
+    template<class P>
+    P VSL_NAMESPACE::CommandManager::startPhase()
+    {
+        return P(pool, buffer);
+    }
 
 	// ============================================================================
 }

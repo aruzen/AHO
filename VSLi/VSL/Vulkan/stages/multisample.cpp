@@ -1,5 +1,7 @@
+#ifdef _MSC_VER
 #include "pch.h"
-#include "Multisample.h"
+#endif
+#include "multisample.h"
 #include "../_pimpls.h"
 
 void VSL_NAMESPACE::pipeline_layout::Multisample::injection(VSL_NAMESPACE::PipelineLayoutAccessor pl)

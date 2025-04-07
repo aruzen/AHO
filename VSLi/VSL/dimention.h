@@ -5,15 +5,15 @@
 
 namespace VSL_NAMESPACE {
 	struct D1 {
-		inline static char dimention = 1;
+		constexpr static char dimention = 1;
 	};
 
 	struct D2 {
-		inline static char dimention = 2;
+		constexpr static char dimention = 2;
 	};
 
 	struct D3 {
-		inline static char dimention = 3;
+		constexpr static char dimention = 3;
 	};
 
 	template<int d>

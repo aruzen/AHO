@@ -5,7 +5,7 @@
 
 namespace VSL_NAMESPACE::command {
 	struct RenderPassEnd : public __Command {
-		void invoke(CommandPool pool, CommandBuffer buffer);
+		void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
 	};
 }
 

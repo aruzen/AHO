@@ -21,6 +21,6 @@ namespace VSL_NAMESPACE::command {
 		size_t target_idx;
 		std::optional<__VSLDRGBColorAccessor<float>> clear_color;
 
-		void invoke(CommandPool pool, CommandBuffer buffer);
+		void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
 	};
 }

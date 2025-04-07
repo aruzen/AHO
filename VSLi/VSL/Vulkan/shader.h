@@ -1,5 +1,6 @@
 #pragma once
 #include "../define.h"
+#include "../consteval_string.h"
 #include "pv.h"
 
 #include <filesystem>
@@ -24,14 +25,31 @@ namespace vsl {
 
 		Shader(vsl::LogicalDeviceAccessor device, std::filesystem::path path);
 		Shader(vsl::LogicalDeviceAccessor device, std::filesystem::path path, std::string name);
+		
+		template<helper::constant_string_holder Path>
+		Shader(vsl::LogicalDeviceAccessor device);
+
+		template<helper::constant_string_holder Path>
+		Shader(vsl::LogicalDeviceAccessor device, std::string name);
 	};
 
-	consteval ShaderType ___Get_ShaderType(std::string name) {
-		if (name.contains(".vert.")) {
+	template<helper::constant_string_holder Txt>
+	consteval ShaderType ___Get_ShaderType() {
+		if (std::string(Txt.value).contains(".vert.")) {
 			return ShaderType::Vertex;
-		} else if (name.contains(".frag.")) {
+		} else if (std::string(Txt.value).contains(".frag.")) {
 			return ShaderType::Fragment;
 		}
 		return ShaderType::Error;
+	}
+
+	template<helper::constant_string_holder Path>
+	auto make_shader(vsl::LogicalDeviceAccessor device) {
+		return Shader<___Get_ShaderType<Path>()>(device, Path.value);
+	}
+
+	template<helper::constant_string_holder Path>
+	auto make_shader(vsl::LogicalDeviceAccessor device, std::string name) {
+		return Shader<___Get_ShaderType<Path>()>(device, Path.value, name);
 	}
 }

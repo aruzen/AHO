@@ -177,6 +177,7 @@
     <ClInclude Include="AHO\core\math\angle.h" />
     <ClInclude Include="AHO\core\index.h" />
     <ClInclude Include="AHO\core\Line.h" />
+    <ClInclude Include="AHO\core\color.h" />
     <ClInclude Include="AHO\core\math\coordinate.h" />
     <ClInclude Include="AHO\core\math\Mat.h" />
     <ClInclude Include="AHO\core\ov.h" />

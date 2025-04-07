@@ -11,6 +11,6 @@ namespace VSL_NAMESPACE::command {
 
 		Pipeline pipeline;
 
-		void invoke(CommandPool pool, CommandBuffer buffer);
+		void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
 	};
 }

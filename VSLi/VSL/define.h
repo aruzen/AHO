@@ -25,3 +25,21 @@
 #define VSL_VALIDATION false
 #endif
 #endif // !VSL_DEFAULT_DIMENTION
+
+#define ___VSL_JOIN_S_2(s1, s2) s1 ## s2
+#define ___VSL_JOIN_S_3(s1, s2, s3) s1 ## s2 ## s3
+#define ___VSL_JOIN_S_4(s1, s2, s3, s4) s1 ## s2 ## s3 ## s4
+#define ___VSL_JOIN_S_5(s1, s2, s3, s4, s5) s1 ## s2 ## s3 ## s4 ## s5
+#define ___VSL_JOIN_S_6(s1, s2, s3, s4, s5, s6) s1 ## s2 ## s3 ## s4 ## s5 ## s6
+#define ___VSL_JOIN_S_7(s1, s2, s3, s4, s5, s6, s7) s1 ## s2 ## s3 ## s4 ## s5 ## s6 ## s7
+#define ___VSL_JOIN_S_8(s1, s2, s3, s4, s5, s6, s7, s8) s1 ## s2 ## s3 ## s4 ## s5 ## s6 ## s7 ## s8
+#define ___VSL_JOIN_S_9(s1, s2, s3, s4, s5, s6, s7, s8, s9) s1 ## s2 ## s3 ## s4 ## s5 ## s6 ## s7 ## s8 ## s9
+
+#define ___VSL_JOIN_2(s1, s2) ___VSL_JOIN_S_2(s1, s2)
+#define ___VSL_JOIN_3(s1, s2, s3) ___VSL_JOIN_S_3(s1, s2, s3)
+#define ___VSL_JOIN_4(s1, s2, s3, s4) ___VSL_JOIN_S_4(s1, s2, s3, s4)
+#define ___VSL_JOIN_5(s1, s2, s3, s4, s5) ___VSL_JOIN_S_5(s1, s2, s3, s4, s5)
+#define ___VSL_JOIN_6(s1, s2, s3, s4, s5, s6) ___VSL_JOIN_S_6(s1, s2, s3, s4, s5, s6)
+#define ___VSL_JOIN_7(s1, s2, s3, s4, s5, s6, s7) ___VSL_JOIN_S_7(s1, s2, s3, s4, s5, s6, s7)
+#define ___VSL_JOIN_8(s1, s2, s3, s4, s5, s6, s7, s8) ___VSL_JOIN_S_8(s1, s2, s3, s4, s5, s6, s7, s8)
+#define ___VSL_JOIN_9(s1, s2, s3, s4, s5, s6, s7, s8, s9) ___VSL_JOIN_S_9(s1, s2, s3, s4, s5, s6, s7, s8, s9)

@@ -22,5 +22,9 @@
   <ItemGroup>
     <None Include="shaders\raw\const_triangle.vert" />
     <None Include="shaders\raw\red.frag" />
+    <None Include="shaders\raw\input.vert" />
+    <None Include="shaders\raw\input.frag" />
+    <None Include="shaders\raw\const_triangle2.vert" />
+    <None Include="shaders\raw\colorfull.frag" />
   </ItemGroup>
 </Project>

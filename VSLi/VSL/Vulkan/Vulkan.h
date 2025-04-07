@@ -18,8 +18,12 @@ namespace VSL_NAMESPACE {
 	template<typename S = VSL_NAMESPACE::_PhysicalDevicesSercher>
 	struct PhysicalDevices;
 
-	const std::vector<const char*> validationLayers = {
+	static std::vector<const char*> validationExtensions = {
 			"VK_EXT_debug_utils"
+	};
+
+	static std::vector<const char*> validationLayers = {
+			"VK_LAYER_KHRONOS_validation"
 	};
 
 	struct VulkanAccessor {

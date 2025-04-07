@@ -8,8 +8,9 @@ void VSL_NAMESPACE::pipeline_layout::ColorBlend::injection(VSL_NAMESPACE::Pipeli
 {
 	auto& info = *pl._data->info;
 
-	vk::PipelineColorBlendAttachmentState &colorBlendAttachment
-	 = std::any_cast<vk::PipelineColorBlendAttachmentState&>(info.pool["colorBlendAttachment"] = vk::PipelineColorBlendAttachmentState());
+	auto& colorBlendAttachment = std::any_cast<vk::PipelineColorBlendAttachmentState&>
+		(info.pool["colorBlendAttachment"] = vk::PipelineColorBlendAttachmentState());
+
 	colorBlendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR
 		| vk::ColorComponentFlagBits::eG
 		| vk::ColorComponentFlagBits::eB

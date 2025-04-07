@@ -5,32 +5,29 @@
 
 #include "_pimpls.h"
 
-template<VSL_NAMESPACE::is_rectangle T>
-VSL_NAMESPACE::Scissor<T>::Scissor() {
-	// _data = std::shared_ptr<vsl::_impl::Scissor_impl>(new vsl::_impl::Scissor_impl);
+VSL_NAMESPACE::Scissor::Scissor() {}
+
+VSL_NAMESPACE::Scissor::Scissor(float x, float y, float width, float height) : x(x), y(y), width(width), height(height) {}
+
+VSL_NAMESPACE::Scissor::Scissor(__VSLD2RectangleAccessor<float> rect) : x(rect.x), y(rect.y), width(rect.width), height(rect.height) {}
+
+VSL_NAMESPACE::Scissor::Scissor(SwapchainAccessor swapchain) : x(0), y(0)
+, height(swapchain._data->swapChainExtent.height)
+, width(swapchain._data->swapChainExtent.width) {}
+
+void VSL_NAMESPACE::Scissor::injection(VSL_NAMESPACE::PipelineLayoutAccessor pl) {
+	auto& info = *pl._data->info;
+
+	vk::Rect2D scissor;
+	scissor.offset = { x, y};
+	scissor.extent = { width, height };
+	info.scissors.push_back(scissor);
 }
 
-template<VSL_NAMESPACE::is_rectangle T>
-VSL_NAMESPACE::Scissor<T>::Scissor(T* t) : __VSLD2Rectangle<T>(t) {
-	// _data = std::shared_ptr<vsl::_impl::Scissor_impl>(new vsl::_impl::Scissor_impl);
-}
+void VSL_NAMESPACE::Scissor::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
+	vk::Rect2D scissor;
+	scissor.offset = { x, y };
+	scissor.extent = { width, height };
 
-template<VSL_NAMESPACE::is_rectangle T>
-VSL_NAMESPACE::Scissor<T>::Scissor(const element_type& x, const element_type& y, const element_type& width, const element_type& height) {
-	// _data = std::shared_ptr<vsl::_impl::Scissor_impl>(new vsl::_impl::Scissor_impl);
-
-	this->x = x;
-	this->y = y;
-	this->width = width;
-	this->height = height;
-}
-
-template<VSL_NAMESPACE::is_rectangle T>
-VSL_NAMESPACE::Scissor<T>::Scissor(SwapchainAccessor swapchain) {
-	// _data = std::shared_ptr<vsl::_impl::Scissor_impl>(new vsl::_impl::Scissor_impl);
-	
-	this->x = 0;
-	this->y = 0;
-	this->height = swapchain._data->swapChainExtent.height;
-	this->width = swapchain._data->swapChainExtent.width;
+	buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].setScissorWithCount({ scissor });
 }

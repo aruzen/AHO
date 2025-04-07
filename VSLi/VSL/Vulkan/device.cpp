@@ -155,13 +155,14 @@ std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> VSL_NAMESPACE::_Logica
 	createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
 	createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
+	/*
 	if constexpr (V) {
 		createInfo.enabledLayerCount = static_cast<uint32_t>(VSL_NAMESPACE::validationLayers.size());
 		createInfo.ppEnabledLayerNames = VSL_NAMESPACE::validationLayers.data();
 	}
 	else {
 		createInfo.enabledLayerCount = 0;
-	}
+	}*/
 
 	_data->device = device._data->device.createDevice(createInfo);
 	_data->graphicsFamily = indices.graphicsFamily.value();
@@ -173,6 +174,11 @@ std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> VSL_NAMESPACE::_Logica
 void VSL_NAMESPACE::_impl::PhysicalDevice_impl::makeProps()
 {
 	props = device.getProperties();
+}
+
+void VSL_NAMESPACE::_impl::PhysicalDevice_impl::makeMemProps()
+{
+	memProps = device.getMemoryProperties();
 }
 
 VSL_NAMESPACE::PhysicalDevice::PhysicalDevice(std::shared_ptr<_impl::PhysicalDevice_impl> _data) :_data(_data) {}

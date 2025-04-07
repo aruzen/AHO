@@ -8,98 +8,44 @@
 
 namespace AHO_NAMESPACE {
 	namespace coordinate {
-		template <typename T>
-		struct X {
-			T value;
+#define COORDINATE_ELEMENT_TYPE_DEFINITION_EXPANDER(Upper, Lower) \
+template <typename T> \
+struct Upper { \
+	T value; \
+ \
+	constexpr static char UpperChar = #Upper[0]; \
+	constexpr static char LowerChar = #Lower[0]; \
+ \
+	constexpr Upper(const T& t) : value(t) {}; \
+	constexpr Upper() : value{} {}; \
+ \
+	constexpr Upper<T> operator +() const { static_assert(concepts::plusable<T>); return { value }; }; \
+	constexpr Upper<T> operator -() const { static_assert(concepts::minusable<T>); return { -value }; }; \
+	template <concepts::add_as<T> R> \
+	constexpr Upper<decltype(std::declval<T>() + std::declval<R>())> operator +(const Upper<R>& t) const { return { value + t.value }; }; \
+	template <concepts::subtract_as<T> R> \
+	constexpr Upper<decltype(std::declval<T>() - std::declval<R>())> operator -(const Upper<R>& t) const { return { value - t.value }; }; \
+	template <concepts::multiply_as<T> R> \
+	constexpr Upper<decltype(std::declval<T>()* std::declval<R>())> operator *(const Upper<R>& t) const { return { value * t.value }; }; \
+	template <concepts::division_as<T> R> \
+	constexpr Upper<decltype(std::declval<T>() / std::declval<R>())> operator /(const Upper<R>& t) const { return { value / t.value }; }; \
+ \
+	template <concepts::add_as<T> R> \
+	constexpr Upper<T>& operator +=(const Upper<R>& t) { value += t.value; return *this; }; \
+	template <concepts::subtract_as<T> R> \
+	constexpr Upper<T>& operator -=(const Upper<R>& t) { value -= t.value; return *this; }; \
+	template <concepts::multiply_as<T> R> \
+	constexpr Upper<T>& operator *=(const Upper<R>& t) { value *= t.value; return *this; }; \
+	template <concepts::division_as<T> R> \
+	constexpr Upper<T>& operator /=(const Upper<R>& t) { value /= t.value; return *this; }; \
+ \
+	template <concepts::cast_as<T> R> \
+	Upper<R> cast() const { return { (R)value }; } \
+};
 
-			constexpr X(const T& t) : value(t) {};
-			constexpr X() : value{} {};
-
-			constexpr X<T> operator +() { static_assert(concepts::plusable<T>); return { value }; };
-			constexpr X<T> operator -() { static_assert(concepts::minusable<T>); return { -value }; };
-			template <concepts::add_as<T> R>
-			constexpr X<decltype(std::declval<T>() + std::declval<R>())> operator +(X<R> t) { return { value + t.value }; };
-			template <concepts::subtract_as<T> R>
-			constexpr X<decltype(std::declval<T>() - std::declval<R>())> operator -(X<R> t) { return { value - t.value }; };
-			template <concepts::multiply_as<T> R>
-			constexpr X<decltype(std::declval<T>() * std::declval<R>())> operator *(X<R> t) { return { value * t.value }; };
-			template <concepts::division_as<T> R>
-			constexpr X<decltype(std::declval<T>() / std::declval<R>())> operator /(X<R> t) { return { value / t.value }; };
-
-			template <concepts::add_as<T> R>
-			constexpr X<T>& operator +=(X<R> t) { value += t.value; return *this; };
-			template <concepts::subtract_as<T> R>
-			constexpr X<T>& operator -=(X<R> t) { value -= t.value; return *this; };
-			template <concepts::multiply_as<T> R>
-			constexpr X<T>& operator *=(X<R> t) { value *= t.value; return *this; };
-			template <concepts::division_as<T> R>
-			constexpr X<T>& operator /=(X<R> t) { value /= t.value; return *this; };
-
-			template <concepts::cast_as<T> R>
-			X<R> cast() const { return { (R)value }; }
-		};
-
-		template <typename T>
-		struct Y {
-			T value;
-
-			constexpr Y(const T& t) : value(t) {};
-			constexpr Y() : value{} {};
-
-			constexpr Y<T> operator +() { static_assert(concepts::plusable<T>); return { value }; };
-			constexpr Y<T> operator -() { static_assert(concepts::minusable<T>); return { -value }; };
-			template <concepts::add_as<T> R>
-			constexpr Y<decltype(std::declval<T>() + std::declval<R>())> operator +(Y<R> t) { return { value + t.value }; };
-			template <concepts::subtract_as<T> R>
-			constexpr Y<decltype(std::declval<T>() - std::declval<R>())> operator -(Y<R> t) { return { value - t.value }; };
-			template <concepts::multiply_as<T> R>
-			constexpr Y<decltype(std::declval<T>()* std::declval<R>())> operator *(Y<R> t) { return { value * t.value }; };
-			template <concepts::division_as<T> R>
-			constexpr Y<decltype(std::declval<T>() / std::declval<R>())> operator /(Y<R> t) { return { value / t.value }; };
-
-			template <concepts::add_as<T> R>
-			constexpr Y<T>& operator +=(Y<R> t) { value += t.value; return *this; };
-			template <concepts::subtract_as<T> R>
-			constexpr Y<T>& operator -=(Y<R> t) { value -= t.value; return *this; };
-			template <concepts::multiply_as<T> R>
-			constexpr Y<T>& operator *=(Y<R> t) { value *= t.value; return *this; };
-			template <concepts::division_as<T> R>
-			constexpr Y<T>& operator /=(Y<R> t) { value /= t.value; return *this; };
-
-			template <concepts::cast_as<T> R>
-			Y<R> cast() const { return { (R)value }; }
-		};
-
-		template <typename T>
-		struct Z {
-			T value;
-
-			constexpr Z(const T& t) : value(t) {};
-			constexpr Z() : value{} {};
-
-			constexpr Z<T> operator +() { static_assert(concepts::plusable<T>); return { value }; };
-			constexpr Z<T> operator -() { static_assert(concepts::minusable<T>); return { -value }; };
-			template <concepts::add_as<T> R>
-			constexpr Z<decltype(std::declval<T>() + std::declval<R>())> operator +(Z<R> t) { return { value + t.value }; };
-			template <concepts::subtract_as<T> R>
-			constexpr Z<decltype(std::declval<T>() - std::declval<R>())> operator -(Z<R> t) { return { value - t.value }; };
-			template <concepts::multiply_as<T> R>
-			constexpr Z<decltype(std::declval<T>()* std::declval<R>())> operator *(Z<R> t) { return { value * t.value }; };
-			template <concepts::division_as<T> R>
-			constexpr Z<decltype(std::declval<T>() / std::declval<R>())> operator /(Z<R> t) { return { value / t.value }; };
-
-			template <concepts::add_as<T> R>
-			constexpr Z<T>& operator +=(Z<R> t) { value += t.value; return *this; };
-			template <concepts::subtract_as<T> R>
-			constexpr Z<T>& operator -=(Z<R> t) { value -= t.value; return *this; };
-			template <concepts::multiply_as<T> R>
-			constexpr Z<T>& operator *=(Z<R> t) { value *= t.value; return *this; };
-			template <concepts::division_as<T> R>
-			constexpr Z<T>& operator /=(Z<R> t) { value /= t.value; return *this; };
-
-			template <concepts::cast_as<T> R>
-			Z<R> cast() const { return { (R)value }; }
-		};
+		COORDINATE_ELEMENT_TYPE_DEFINITION_EXPANDER(X, x);
+		COORDINATE_ELEMENT_TYPE_DEFINITION_EXPANDER(Y, y);
+		COORDINATE_ELEMENT_TYPE_DEFINITION_EXPANDER(Z, z);
 
 		template<typename T>
 		std::ostream& operator <<(std::ostream& out, const X<T>& x) {
@@ -190,9 +136,15 @@ namespace AHO_NAMESPACE {
 #define AHO_COORDINATE_NUMBERD_MEMBER_2 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 2)
 #define AHO_COORDINATE_NUMBERD_MEMBER_3 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 3)
 
+#ifdef _MSC_VER
+#define ___AN1 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_1, .value)
+#define ___AN2 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_2, .value)
+#define ___AN3 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_3, .value)
+#elif __APPLE__
 #define ___AN1 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_1, ).value
 #define ___AN2 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_2, ).value
 #define ___AN3 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_3, ).value
+#endif
 
 #define AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper, Lower) \
 				template <typename T> \
@@ -259,7 +211,7 @@ namespace AHO_NAMESPACE {
 			union { X<ElementType> x, AHO_COORDINATE_NUMBERD_MEMBER_1; };
 			union { Y<ElementType> y, AHO_COORDINATE_NUMBERD_MEMBER_2; };
 			union { Z<ElementType> z, AHO_COORDINATE_NUMBERD_MEMBER_3; };
-			constexpr _CoordinateSet() : x(X<ElementType>()), y(Y<ElementType>()),z(Z<ElementType>()) {}
+			constexpr _CoordinateSet() : x(X<ElementType>()), y(Y<ElementType>()), z(Z<ElementType>()) {}
 			constexpr _CoordinateSet(const X<ElementType>& x, const Y<ElementType>& y, const Z<ElementType>& z) : x(x), y(y), z(z) {}
 
 			AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(X, x);
@@ -366,24 +318,25 @@ namespace AHO_NAMESPACE {
 		constexpr _CoordinateSet<decltype(std::declval<T1>() + std::declval<T2>()), typename _MakeCoordinateInfo<false, true, true>::value> operator +(const Y<T1>& e1, const Y<T2>& e2) {
 			return { e1 , e2 };
 		}
+        namespace literals {
+		    constexpr X<double> operator"" AHO_LITERAL(x)(long double v) { return { (double)v }; };
+		    constexpr X<int> operator"" AHO_LITERAL(x)(unsigned long long v) { return { (int)v }; };
+		    constexpr X<float> operator"" AHO_LITERAL(f_x)(long double v) { return { (float)v }; };
+		    constexpr X<size_t> operator"" AHO_LITERAL(l_x)(unsigned long long v) { return { v }; };
+		    constexpr X<double> x(1.0);
 
-		constexpr X<double> operator"" AHO_LITERAL(x)(long double v) { return { (double)v }; };
-		constexpr X<int> operator"" AHO_LITERAL(x)(unsigned long long v) { return { (int)v }; };
-		constexpr X<float> operator"" AHO_LITERAL(f_x)(long double v) { return { (float)v }; };
-		constexpr X<size_t> operator"" AHO_LITERAL(l_x)(unsigned long long v) { return { v }; };
-		constexpr X<double> x(1.0);
+		    constexpr Y<double> operator"" AHO_LITERAL(y)(long double v) { return { (double)v }; };
+		    constexpr Y<int> operator"" AHO_LITERAL(y)(unsigned long long v) { return { (int)v }; };
+		    constexpr Y<float> operator"" AHO_LITERAL(f_y)(long double v) { return { (float)v }; };
+		    constexpr Y<size_t> operator"" AHO_LITERAL(l_y)(unsigned long long v) { return { v }; };
+		    constexpr Y<double> y(1.0);
 
-		constexpr Y<double> operator"" AHO_LITERAL(y)(long double v) { return { (double)v }; };
-		constexpr Y<int> operator"" AHO_LITERAL(y)(unsigned long long v) { return { (int)v }; };
-		constexpr Y<float> operator"" AHO_LITERAL(f_y)(long double v) { return { (float)v }; };
-		constexpr Y<size_t> operator"" AHO_LITERAL(l_y)(unsigned long long v) { return { v }; };
-		constexpr Y<double> y(1.0);
-
-		constexpr Z<double> operator"" AHO_LITERAL(z)(long double v) { return { (double)v }; };
-		constexpr Z<int> operator"" AHO_LITERAL(z)(unsigned long long v) { return { (int)v }; };
-		constexpr Z<float> operator"" AHO_LITERAL(f_z)(long double v) { return { (float)v }; };
-		constexpr Z<size_t> operator"" AHO_LITERAL(l_z)(unsigned long long v) { return { v }; };
-		constexpr Z<double> z(1.0);
+		    constexpr Z<double> operator"" AHO_LITERAL(z)(long double v) { return { (double)v }; };
+		    constexpr Z<int> operator"" AHO_LITERAL(z)(unsigned long long v) { return { (int)v }; };
+		    constexpr Z<float> operator"" AHO_LITERAL(f_z)(long double v) { return { (float)v }; };
+		    constexpr Z<size_t> operator"" AHO_LITERAL(l_z)(unsigned long long v) { return { v }; };
+		    constexpr Z<double> z(1.0);
+        }
 	}
 
 	namespace concepts {
@@ -392,6 +345,36 @@ namespace AHO_NAMESPACE {
 			std::enable_if<R::is_coordinate_set>::type;
 		};
 	}
+
+	namespace literals {
+		using namespace coordinate::literals;
+	}
+
+	template <typename ElementType, typename CoordinationInfo>
+	std::ostream& operator <<(std::ostream& out, const coordinate::_CoordinateSet<ElementType, CoordinationInfo>& set) {
+		if constexpr (std::same_as<typename CoordinationInfo::dimention, VSL_NAMESPACE::D1>) {
+			out << set.AHO_COORDINATE_NUMBERD_MEMBER_1;
+		}
+
+		if constexpr (std::same_as<typename CoordinationInfo::dimention, VSL_NAMESPACE::D2>) {
+			out << "(" << decltype(set.AHO_COORDINATE_NUMBERD_MEMBER_1)::LowerChar
+				<< ", " << decltype(set.AHO_COORDINATE_NUMBERD_MEMBER_2)::LowerChar << ")"
+				<< "="
+				<< "(" << set.AHO_COORDINATE_NUMBERD_MEMBER_1.value
+				<< ", " << set.AHO_COORDINATE_NUMBERD_MEMBER_2.value << ")";
+		}
+
+		if constexpr (std::same_as<typename CoordinationInfo::dimention, VSL_NAMESPACE::D3>) {
+			out << "(" << decltype(set.AHO_COORDINATE_NUMBERD_MEMBER_1)::LowerChar
+				<< ", " << decltype(set.AHO_COORDINATE_NUMBERD_MEMBER_2)::LowerChar
+				<< ", " << decltype(set.AHO_COORDINATE_NUMBERD_MEMBER_3)::LowerChar << ")"
+				<< "="
+				<< "(" << set.AHO_COORDINATE_NUMBERD_MEMBER_1.value
+				<< ", " << set.AHO_COORDINATE_NUMBERD_MEMBER_2.value
+				<< ", " << set.AHO_COORDINATE_NUMBERD_MEMBER_3.value << ")";
+		}
+		return out;
+	};
 
 	using coordinate::X;
 	using coordinate::Y;

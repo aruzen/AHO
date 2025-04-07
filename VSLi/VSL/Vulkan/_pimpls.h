@@ -22,6 +22,7 @@
 #include <memory>
 #include <map>
 #include <any>
+#include <set>
 
 namespace VSL_NAMESPACE::_impl {
 	struct Vulkan_impl_accessor {
@@ -43,8 +44,10 @@ namespace VSL_NAMESPACE::_impl {
 		vk::PhysicalDevice device;
 		std::optional<vk::PhysicalDeviceProperties> props;
 		std::optional<vk::PhysicalDeviceFeatures> features;
+		std::optional<vk::PhysicalDeviceMemoryProperties> memProps;
 
 		void makeProps();
+		void makeMemProps();
 	};
 
 	struct PhysicalDevices_impl {
@@ -86,13 +89,18 @@ namespace VSL_NAMESPACE::_impl {
 	struct CommandBuffer_impl {
 		std::shared_ptr<CommandPool_impl> commandPool;
 
+		std::uint32_t currentBufferIdx;
+
 		std::vector<vk::CommandBuffer> commandBuffers;
 	};
 
 	struct CommandManager_impl {
 		std::shared_ptr<LogicalDevice_impl> device;
 
-		// vk::Queue graphicsQueue, presentQueue;
+		std::shared_ptr<CommandPool_impl> commandPool;
+		std::shared_ptr<CommandBuffer_impl> commandBuffer;
+
+		vk::Queue graphicsQueue, presentQueue;
 	};
 
 	struct Swapchain_impl {
@@ -133,6 +141,7 @@ namespace VSL_NAMESPACE::_impl {
 
 		vk::PipelineViewportStateCreateInfo _viewport;
 
+		std::vector<vk::DynamicState> enabledDynamicStates;
 		std::map<std::string, std::any> pool;
 	};
 
@@ -171,6 +180,7 @@ namespace VSL_NAMESPACE::_impl {
 		std::shared_ptr<PipelineLayout_impl> layout;
 
 		vk::Pipeline pipeline;
+		std::vector<vk::Semaphore> waitSemaphores;
 
 		~Pipeline_impl();
 	};
@@ -185,11 +195,49 @@ namespace VSL_NAMESPACE::_impl {
 		~FrameBuffer_impl();
 	};
 
+	struct SynchroManager_impl;
+	struct Semaphore_impl {
+		std::shared_ptr<SynchroManager_impl> _manager;
+
+		std::vector<vk::Semaphore> semaphores;
+	};
+
+	struct Fence_impl {
+		std::shared_ptr<SynchroManager_impl> _manager;
+
+		std::vector<vk::Fence> fences;
+	};
+
+	struct SynchroManager_impl {
+		std::shared_ptr<LogicalDevice_impl> device;
+
+		std::map<std::string, std::shared_ptr<Semaphore_impl>> semaphores;
+		std::map<std::string, std::shared_ptr<Fence_impl>> fences;
+
+		~SynchroManager_impl();
+	};
+
+	struct Buffer_impl {
+		std::shared_ptr<LogicalDevice_impl> device;
+		vk::Buffer buffer;
+		vk::DeviceMemory deviceMem;
+		size_t allocatedSize = 0;
+
+		~Buffer_impl();
+	};
+
 	namespace pipeline_layout {
 		struct ShaderGroup_impl {
 			std::string name;
 			std::vector<std::shared_ptr<Shader_impl>> shaders;
 		};
+
+		/*
+		struct VertexInput_impl {
+			std::shared_ptr<std::vector<vk::VertexInputBindingDescription>> vertexBindingDescriptions;
+			std::shared_ptr<std::vector<vk::VertexInputAttributeDescription>> vertexAttributeDescriptions;
+		};
+		*/
 	}
 
 	namespace helper {

@@ -28,7 +28,11 @@ inline void VSL_NAMESPACE::helper::join(std::stringstream& ss){}
 template<typename Head, typename ...Args>
 inline void VSL_NAMESPACE::helper::join(std::stringstream& ss, const Head& h, const Args & ...args)
 {
-	ss << h;
+
+	if constexpr (std::same_as<Head, bool>)
+		ss << (h ? "true" : "false");
+	else
+		ss << h;
 	VSL_NAMESPACE::helper::join(ss, args...);
 }
 

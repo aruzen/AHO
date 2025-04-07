@@ -3,6 +3,7 @@
 #include "pv.h"
 
 #include "device.h"
+#include <optional>
 
 namespace VSL_NAMESPACE {
 	struct SwapchainAccessor {
@@ -10,6 +11,6 @@ namespace VSL_NAMESPACE {
 	};
 
 	struct Swapchain : public SwapchainAccessor {
-		Swapchain(LogicalDeviceAccessor device);
+		Swapchain(LogicalDeviceAccessor device, std::optional<std::shared_ptr<Surface>> surface = std::nullopt);
 	};
 }

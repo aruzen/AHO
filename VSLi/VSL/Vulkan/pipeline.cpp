@@ -11,6 +11,7 @@ VSL_NAMESPACE::Pipeline::Pipeline(PipelineLayoutAccessor layout, RenderPass pass
 {
 	_data = std::shared_ptr<_impl::Pipeline_impl>(new _impl::Pipeline_impl);
 	_data->device = layout._data->device;
+	_data->layout = layout._data;
 
 	vk::GraphicsPipelineCreateInfo pipelineInfo;
 	pipelineInfo.stageCount = (uint32_t)layout._data->info->shaderStages.size();
@@ -51,4 +52,9 @@ VSL_NAMESPACE::Pipeline::Pipeline(PipelineLayoutAccessor layout, RenderPass pass
 
 VSL_NAMESPACE::_impl::Pipeline_impl::~Pipeline_impl() {
 	device->device.destroyPipeline(pipeline);
+}
+
+void VSL_NAMESPACE::Pipeline::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager)
+{
+	buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].bindPipeline(vk::PipelineBindPoint::eGraphics, _data->pipeline);
 }

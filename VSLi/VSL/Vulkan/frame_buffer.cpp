@@ -17,16 +17,23 @@ VSL_NAMESPACE::FrameBuffer<D>::FrameBuffer(Swapchain swapchain, View<D> view, Re
 
     _data->swapChainFramebuffers.resize(swapchain._data->swapChainImages.size());
     for (size_t i = 0; i < swapchain._data->swapChainImages.size(); i++) {
+        vk::ImageView attachments[] = {
+            view._data->swapChainImageViews[i]
+        };
         vk::FramebufferCreateInfo framebufferInfo{};
         framebufferInfo.renderPass = render_pass._data->renderPass;
-        framebufferInfo.attachmentCount = (uint32_t)view._data->swapChainImageViews.size();
-        framebufferInfo.pAttachments = view._data->swapChainImageViews.data();
+        framebufferInfo.attachmentCount = 1;
+        framebufferInfo.pAttachments = attachments;
         framebufferInfo.width = swapchain._data->swapChainExtent.width;
         framebufferInfo.height = swapchain._data->swapChainExtent.height;
         framebufferInfo.layers = 1;
 
         _data->swapChainFramebuffers[i] = _data->device->device.createFramebuffer(framebufferInfo);
     }
+}
+
+void VSL_NAMESPACE::FrameBufferAccessor::setTargetFrame(std::uint32_t frameIdx) {
+    _data->currentIndex = frameIdx;
 }
 
 VSL_NAMESPACE::_impl::FrameBuffer_impl::~FrameBuffer_impl()

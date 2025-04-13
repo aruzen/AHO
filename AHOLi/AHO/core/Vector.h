@@ -5,6 +5,7 @@
 #include <VSL/dimention.h>
 
 #include <compare>
+#include <cmath>
 
 namespace AHO_NAMESPACE {
 	template<typename R = int,

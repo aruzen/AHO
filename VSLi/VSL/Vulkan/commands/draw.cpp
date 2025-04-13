@@ -1,4 +1,6 @@
+#ifdef _MSC_VER
 #include "pch.h"
+#endif
 #include "draw.h"
 #include "../_pimpls.h"
 

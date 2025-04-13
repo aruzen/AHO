@@ -27,7 +27,7 @@ namespace AHO_NAMESPACE {
 		constexpr Triangle<R, D, CI> operator +(AHO_NAMESPACE::_Point<R, D, CI> t) const;
 
 		template<AHO_NAMESPACE::concepts::points_view_able T>
-			requires !AHO_NAMESPACE::concepts::is_point<T>
+			requires (!AHO_NAMESPACE::concepts::is_point<T>)
 		constexpr Polygon<R, D, CI> operator +(T t) const;
 
 		constexpr auto length() const;
@@ -87,7 +87,7 @@ namespace AHO_NAMESPACE {
 
 	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
 	template<AHO_NAMESPACE::concepts::points_view_able T>
-		requires !AHO_NAMESPACE::concepts::is_point<T>
+		requires (!AHO_NAMESPACE::concepts::is_point<T>)
 	inline constexpr Polygon<R, D, CI> Line<R, D, CI>::operator+(T t) const
 	{
 		return Polygon<R, D, CI>();
@@ -125,7 +125,7 @@ namespace AHO_NAMESPACE {
 	template<concepts::cast_as<R> T>
 	inline constexpr Line<T, D, CI> Line<R, D, CI>::cast()
 	{
-		return Line<T, D, CI>(pos1.cast<T>(), pos2.cast<T>());
+		return Line<T, D, CI>(pos1.template cast<T>(), pos2.template cast<T>());
 	}
 
 	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>

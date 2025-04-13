@@ -2,6 +2,7 @@
 #include "define.h"
 
 #include <concepts>
+#include <utility>
 
 namespace VSL_NAMESPACE::concepts {
 	template<typename Parent, typename Target, typename T>

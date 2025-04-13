@@ -59,7 +59,7 @@ void populateDebugMessengerCreateInfo(vk::DebugUtilsMessengerCreateInfoEXT& crea
 	createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
 		vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
 		vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
-	createInfo.pfnUserCallback = (vk::PFN_DebugUtilsMessengerCallbackEXT)debugCallback;
+    createInfo.pfnUserCallback = (vk::PFN_DebugUtilsMessengerCallbackEXT)debugCallback;
 }
 
 vk::Result CreateDebugUtilsMessengerEXT(vk::Instance instance, const vk::DebugUtilsMessengerCreateInfoEXT& pCreateInfo, const vk::AllocationCallbacks* pAllocator, vk::DebugUtilsMessengerEXT& pDebugMessenger) {
@@ -95,11 +95,13 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vecto
 		checkValidationLayerSupport();
 
         std::vector<vk::ExtensionProperties> extensions = vk::enumerateInstanceExtensionProperties();
-        VSL_NAMESPACE::loggingln("available extensions:\n");
-
-        for (const auto &extension: extensions) {
+        VSL_NAMESPACE::loggingln("available extensions:");
+        for (const auto &extension: extensions)
             VSL_NAMESPACE::loggingln(extension.extensionName);
-        }
+        std::vector<vk::LayerProperties> layers = vk::enumerateInstanceLayerProperties();
+        VSL_NAMESPACE::loggingln("available layers:");
+        for (const auto& layer : layers)
+            VSL_NAMESPACE::loggingln(layer.layerName);
     }
 
 
@@ -151,15 +153,8 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vecto
 	}
 
 	if constexpr (Validation) {
-		std::vector<vk::ExtensionProperties> extensions = vk::enumerateInstanceExtensionProperties();
-		VSL_NAMESPACE::loggingln("available extensions:");
-
-		for (const auto& extension : extensions) {
-			VSL_NAMESPACE::loggingln(extension.extensionName);
-		}
-
-		setupDebugMessenger(_data);
-	} else {
+        setupDebugMessenger(_data);
+    } else {
 		fclose(stdin);
 		fclose(stdout);
 		fclose(stderr);
@@ -175,9 +170,18 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name)
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::Vulkan_impl<Validation>>(new VSL_NAMESPACE::_impl::Vulkan_impl<Validation>);
 	_accessor = std::dynamic_pointer_cast<_impl::Vulkan_impl_accessor>(_data);
 
-	if constexpr (Validation) {
-		checkValidationLayerSupport();
-	}
+    if constexpr (Validation) {
+        checkValidationLayerSupport();
+
+        std::vector<vk::ExtensionProperties> extensions = vk::enumerateInstanceExtensionProperties();
+        VSL_NAMESPACE::loggingln("available extensions:");
+        for (const auto &extension: extensions)
+            VSL_NAMESPACE::loggingln(extension.extensionName);
+        std::vector<vk::LayerProperties> layers = vk::enumerateInstanceLayerProperties();
+        VSL_NAMESPACE::loggingln("available layers:");
+        for (const auto& layer : layers)
+            VSL_NAMESPACE::loggingln(layer.layerName);
+    }
 
 	vk::ApplicationInfo appInfo;
 	appInfo.pApplicationName = app_name;
@@ -215,13 +219,6 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name)
 	}
 
 	if constexpr (Validation) {
-		auto extensions = vk::enumerateInstanceExtensionProperties();
-		VSL_NAMESPACE::loggingln("available extensions:");
-
-		for (const auto& extension : extensions) {
-			VSL_NAMESPACE::loggingln(extension.extensionName);
-		}
-
 		setupDebugMessenger(_data);
 	} else {
 		fclose(stdin);

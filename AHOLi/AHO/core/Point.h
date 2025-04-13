@@ -78,9 +78,9 @@ namespace AHO_NAMESPACE {
 	struct _Point<R, VSL_NAMESPACE::D1, CI> {
 		using dimention = typename VSL_NAMESPACE::D1;
 		using element_type = R;
-		
-		static constexpr VSL_NAMESPACE::data_format::___Format graphic_type
-			= VSL_NAMESPACE::data_format::convert_graphic_type<R>().toVec<(size_t)dimention::dimention>();
+
+        constexpr static VSL_NAMESPACE::data_format::___Format graphic_type = VSL_NAMESPACE::data_format::convert_graphic_type<R>()
+                .template toVec<(size_t)dimention::dimention>();
 
 		coordinate::_CoordinateSet<R, CI> value;
 
@@ -137,7 +137,7 @@ namespace AHO_NAMESPACE {
 		using element_type = R;
 		
 		static constexpr VSL_NAMESPACE::data_format::___Format graphic_type
-			= VSL_NAMESPACE::data_format::convert_graphic_type<R>().toVec<(size_t)dimention::dimention>();
+			= VSL_NAMESPACE::data_format::convert_graphic_type<R>().template toVec<(size_t)dimention::dimention>();
 
 		coordinate::_CoordinateSet<R, CI> value;
 
@@ -194,7 +194,7 @@ namespace AHO_NAMESPACE {
 		using element_type = R;
 
 		static constexpr VSL_NAMESPACE::data_format::___Format graphic_type
-			= VSL_NAMESPACE::data_format::convert_graphic_type<R>().toVec<dimention::dimention>();
+			= VSL_NAMESPACE::data_format::convert_graphic_type<R>().template toVec<(size_t)dimention::dimention>();
 
 		coordinate::_CoordinateSet<R, CI> value;
 

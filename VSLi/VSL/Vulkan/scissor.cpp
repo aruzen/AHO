@@ -19,15 +19,17 @@ void VSL_NAMESPACE::Scissor::injection(VSL_NAMESPACE::PipelineLayoutAccessor pl)
 	auto& info = *pl._data->info;
 
 	vk::Rect2D scissor;
-	scissor.offset = { x, y};
-	scissor.extent = { width, height };
+	scissor.offset = vk::Offset2D{ x, y };
+	scissor.extent = vk::Extent2D{ width, height };
 	info.scissors.push_back(scissor);
 }
 
 void VSL_NAMESPACE::Scissor::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
 	vk::Rect2D scissor;
-	scissor.offset = { x, y };
-	scissor.extent = { width, height };
+	scissor.offset = vk::Offset2D{ x, y };
+	scissor.extent = vk::Extent2D{ width, height };
 
-	buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].setScissorWithCount({ scissor });
+    vkCmdSetScissorWithCount((VkCommandBuffer)buffer._data->commandBuffers[buffer.getCurrentBufferIdx()],
+                             1, &(VkRect2D&)scissor);
+    // buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].setScissorWithCount({ scissor });
 }

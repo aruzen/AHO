@@ -5,6 +5,7 @@
 
 #include "../utils/Flags.h"
 #include <optional>
+#include <cstring>
 
 namespace VSL_NAMESPACE {
 	enum class MemoryType : unsigned int {

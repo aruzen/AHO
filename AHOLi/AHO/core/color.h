@@ -193,7 +193,7 @@ struct Upper { \
 		struct RGB {
 			using element_type = ElementType;
 			static constexpr VSL_NAMESPACE::data_format::___Format graphic_type
-				= VSL_NAMESPACE::data_format::convert_graphic_type<ElementType>().toVec<3>();
+				= VSL_NAMESPACE::data_format::convert_graphic_type<ElementType>().template toVec<3>();
 
 			R<ElementType> r;
 			G<ElementType> g;
@@ -342,7 +342,7 @@ struct Upper { \
 		struct RGBA : public RGB<ElementType> {
 			using element_type = ElementType;
 			static constexpr VSL_NAMESPACE::data_format::___Format graphic_type
-				= VSL_NAMESPACE::data_format::convert_graphic_type<ElementType>().toVec<4>();
+				= VSL_NAMESPACE::data_format::convert_graphic_type<ElementType>().template toVec<4>();
 
 			A<ElementType> a;
 
@@ -495,7 +495,7 @@ struct Upper { \
 			using saturation_type = SaturationAndValueType;
 			using value_type = SaturationAndValueType;
 			static constexpr VSL_NAMESPACE::data_format::___Format graphic_type
-				= VSL_NAMESPACE::data_format::convert_graphic_type<HueType>().toVec<3>();
+				= VSL_NAMESPACE::data_format::convert_graphic_type<HueType>().template toVec<3>();
 
 			H<hue_type> h;
 			S<saturation_type> s;
@@ -635,7 +635,7 @@ struct Upper { \
 			using value_type = SaturationAndValueType;
 			using alpha_type = SaturationAndValueType;
 			static constexpr VSL_NAMESPACE::data_format::___Format graphic_type
-				= VSL_NAMESPACE::data_format::convert_graphic_type<HueType>().toVec<4>();
+				= VSL_NAMESPACE::data_format::convert_graphic_type<HueType>().template toVec<4>();
 
 			A<alpha_type> a;
 
@@ -890,9 +890,9 @@ struct Upper { \
 		namespace literals {
 #define LITERAL_EXPANDER(Upper, Lower) \
 		constexpr Upper<double> operator"" AHO_LITERAL(Lower)(long double v) { return { (double)v }; }; \
-		constexpr Upper<int> operator"" AHO_LITERAL(Lower)(size_t v) { return { (int)v }; }; \
+		constexpr Upper<int> operator"" AHO_LITERAL(Lower)(unsigned long long v) { return { (int)v }; }; \
 		constexpr Upper<float> operator"" AHO_LITERAL(f_ ## Lower)(long double v) { return { (float)v }; }; \
-		constexpr Upper<size_t> operator"" AHO_LITERAL(l_ ## Lower)(size_t v) { return { v }; }; \
+		constexpr Upper<size_t> operator"" AHO_LITERAL(l_ ## Lower)(unsigned long long v) { return { v }; }; \
 		constexpr Upper<double> Lower(1.0);		
 
 			LITERAL_EXPANDER(R, r);

@@ -55,7 +55,6 @@ namespace VSL_NAMESPACE::pipeline_layout {
 	template<concepts::is_static_convertible_graphic_type ...Args>
 	VSL_NAMESPACE::pipeline_layout::VertexInput::VertexInput() {
 		add<Args...>();
-		return *this;
 	}
 
 	template<concepts::is_convertible_graphic_type ...Args>

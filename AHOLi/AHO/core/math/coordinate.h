@@ -365,18 +365,18 @@ struct Upper { \
 		}
 
 		if constexpr (std::same_as<typename CoordinationInfo::dimention, VSL_NAMESPACE::D3>) {
-			out << "(" << decltype(set.AHO_COORDINATE_NUMBERD_MEMBER_1)::LowerChar
-				<< ", " << decltype(set.AHO_COORDINATE_NUMBERD_MEMBER_2)::LowerChar
-				<< ", " << decltype(set.AHO_COORDINATE_NUMBERD_MEMBER_3)::LowerChar << ")"
-				<< "="
-				<< "(" << set.AHO_COORDINATE_NUMBERD_MEMBER_1.value
-				<< ", " << set.AHO_COORDINATE_NUMBERD_MEMBER_2.value
-				<< ", " << set.AHO_COORDINATE_NUMBERD_MEMBER_3.value << ")";
-		}
-		return out;
-	};
+            out << "(" << decltype(set.AHO_COORDINATE_NUMBERD_MEMBER_1)::LowerChar
+                << ", " << decltype(set.AHO_COORDINATE_NUMBERD_MEMBER_2)::LowerChar
+                << ", " << decltype(set.AHO_COORDINATE_NUMBERD_MEMBER_3)::LowerChar << ")"
+                << "="
+                << "(" << set.AHO_COORDINATE_NUMBERD_MEMBER_1.value
+                << ", " << set.AHO_COORDINATE_NUMBERD_MEMBER_2.value
+                << ", " << set.AHO_COORDINATE_NUMBERD_MEMBER_3.value << ")";
+        }
+        return out;
+    };
 
-	using coordinate::X;
-	using coordinate::Y;
-	using coordinate::Z;
+    using coordinate::X;
+    using coordinate::Y;
+    using coordinate::Z;
 }

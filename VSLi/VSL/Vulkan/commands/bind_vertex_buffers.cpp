@@ -1,4 +1,6 @@
+#ifdef _MSC_VER
 #include "pch.h"
+#endif
 #include "../_pimpls.h"
 
 #include "bind_vertex_buffers.h"

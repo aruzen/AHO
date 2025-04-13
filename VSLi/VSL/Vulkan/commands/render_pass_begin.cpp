@@ -17,7 +17,7 @@ void VSL_NAMESPACE::command::RenderPassBegin::invoke(CommandPool pool, CommandBu
 	renderPassInfo.renderPass = renderPass._data->renderPass;
 	renderPassInfo.framebuffer = frameBuffer._data->swapChainFramebuffers[target_idx];
 
-	renderPassInfo.renderArea.offset = { 0, 0 };
+	renderPassInfo.renderArea.offset = vk::Offset2D{ 0, 0 };
 	renderPassInfo.renderArea.extent = frameBuffer._data->swapchain->swapChainExtent;
 
 	vk::ClearValue clearColor = clear_color.has_value()

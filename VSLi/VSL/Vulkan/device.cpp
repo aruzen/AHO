@@ -40,7 +40,9 @@ vsl::_impl::helper::QueueFamilyIndices  vsl::_impl::helper::findQueueFamilies(vk
 using namespace vsl::_impl::helper;
 
 const std::vector<const char*> deviceExtensions = {
-	VK_KHR_SWAPCHAIN_EXTENSION_NAME
+	VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+    "VK_KHR_portability_subset",
+    "VK_EXT_extended_dynamic_state"
 };
 
 bool checkDeviceExtensionSupport(vk::PhysicalDevice device) {
@@ -148,12 +150,16 @@ std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> VSL_NAMESPACE::_Logica
 
 	vk::PhysicalDeviceFeatures deviceFeatures;
 
-	vk::DeviceCreateInfo createInfo;
+    vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT extendedDynamicStateFeatures;
+    extendedDynamicStateFeatures.extendedDynamicState = true;
+
+    vk::DeviceCreateInfo createInfo;
 	createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
 	createInfo.pQueueCreateInfos = queueCreateInfos.data();
 	createInfo.pEnabledFeatures = &deviceFeatures;
 	createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
 	createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+    createInfo.pNext = &extendedDynamicStateFeatures;
 
 	/*
 	if constexpr (V) {

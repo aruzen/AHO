@@ -27,7 +27,6 @@ void VSL_NAMESPACE::PipelineLayoutAccessor::init_finish() {
 	_data->info->_viewport.viewportCount = (uint32_t)_data->info->viewports.size();
 	_data->info->_viewport.scissorCount = (uint32_t)_data->info->scissors.size();
 
-
 	auto& enabledDynamicStates = _data->info->enabledDynamicStates;
 	if (_data->info->_viewport.viewportCount != 0)
 		_data->info->_viewport.pViewports = _data->info->viewports.data();
@@ -59,5 +58,3 @@ VSL_NAMESPACE::_impl::PipelineLayout_impl::~PipelineLayout_impl()
 {
 	device->device.destroyPipelineLayout(pipelineLayout);
 }
-
-template struct vsl::PipelineLayout<>;

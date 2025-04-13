@@ -4,6 +4,9 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(AHO-all)
+set(CMAKE_C_COMPILER "/opt/homebrew/Cellar/gcc/14.2.0_1/bin/gcc-14" CACHE STRING "clang compiler" FORCE)
+set(CMAKE_CXX_COMPILER "/opt/homebrew/Cellar/gcc/14.2.0_1/bin/g++-14" CACHE STRING "clang++ compiler" FORCE)
+string(REPLACE "-fcolor-diagnostics" "-fdiagnostics-color=auto" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

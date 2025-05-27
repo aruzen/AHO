@@ -6,5 +6,5 @@
 void VSL_NAMESPACE::command::BindVertexBuffer::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager)
 {
 	buffer._data->commandBuffers[buffer.getCurrentBufferIdx()]
-		.bindVertexBuffers(0, { this->buffer._data->buffer }, { 0 });
+		.bindVertexBuffers(0, { this->buffer->_data->buffer }, { 0 });
 }

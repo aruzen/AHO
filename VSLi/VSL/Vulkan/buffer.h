@@ -2,12 +2,16 @@
 #include "../define.h"
 
 #include "device.h"
+#include "command.h"
 
 #include "../utils/Flags.h"
 #include <optional>
 
+#include "../exceptions.h"
+
 namespace VSL_NAMESPACE {
 	enum class MemoryType : unsigned int {
+		None = 0,
 		// データ転送の「送信元」バッファ。他のバッファや画像へデータをコピーするために使用。
 		// 例: CPU から GPU にデータを送るための Staging Buffer。
 		TransferSource = 0x00000001,
@@ -111,6 +115,7 @@ namespace VSL_NAMESPACE {
 
 
 	enum class MemoryProperty {
+		None = 0,
 		// GPU 専用メモリ: メモリが GPU に最適化され、CPU からはアクセスできない。
 		// 例: 高速な VRAM (GPU のメインメモリ) に割り当てられるメモリ。
 		DeviceLocal = 0x00000001,
@@ -156,17 +161,28 @@ namespace VSL_NAMESPACE {
 	___VSL_EXPAND_FLAGS_OPERATOR(MemoryType);
 	___VSL_EXPAND_FLAGS_OPERATOR(MemoryProperty);
 
+	namespace exceptions {
+		struct MemoryNotHostVisibleException : VSL_NAMESPACE::exceptions::RuntimeException {
+			MemoryNotHostVisibleException(std::string traceinfo = "");
+			MemoryNotHostVisibleException(std::source_location sourece);
+		};
+	}
+
 	struct BufferAccessor {
 		struct LocalBufferHolder {
 			BufferAccessor* parent;
+			size_t size, offset;
 			void* data;
+
 			~LocalBufferHolder();
-			// void flush();
+			void flush();
 		};
 
 		std::shared_ptr<_impl::Buffer_impl> _data;
+		
 
-		LocalBufferHolder data(std::optional<size_t> size = std::nullopt, size_t offset = 0);
+		virtual LocalBufferHolder data(std::optional<size_t> size = std::nullopt, size_t offset = 0) = 0;
+		virtual void flush(LocalBufferHolder holder) = 0;
 
 		template<typename... Args>
 		bool copy(const Args&... args);
@@ -174,14 +190,52 @@ namespace VSL_NAMESPACE {
 		template<typename... Args>
 		void uncheck_copy(const Args&... args);
 
+		/*
+		same copyByBuffer
+		*/
+		bool copy(BufferAccessor* buf);
+
+		bool copyByBuffer(BufferAccessor* buf);
+
 		size_t size();
 
-		static std::shared_ptr<_impl::Buffer_impl> make_buffer(LogicalDeviceAccessor device, size_t size, MemoryType memType, MemoryProperty memProperty, SharingMode sharingMode);
+		static std::shared_ptr<_impl::Buffer_impl> MakeBuffer(LogicalDeviceAccessor device, size_t size, MemoryType memType, MemoryProperty memProperty, SharingMode sharingMode);
+		static void FlushBuffer(LocalBufferHolder holder, MemoryType memType, MemoryProperty memProperty, SharingMode sharingMode);
+		static LocalBufferHolder GetData(VSL_NAMESPACE::BufferAccessor* data, std::optional<size_t> size, size_t offset, MemoryType memType, MemoryProperty memProperty, SharingMode sharingMode);
 	};
 
 	template <MemoryType MemType, MemoryProperty MemProperty, SharingMode SharingMode = SharingMode::Exclusive>
 	struct Buffer : public BufferAccessor {
-		Buffer(LogicalDeviceAccessor device, size_t size);
+		Buffer(LogicalDeviceAccessor device, size_t size, std::optional<CommandManager> manager = std::nullopt);
+
+		virtual LocalBufferHolder data(std::optional<size_t> size = std::nullopt, size_t offset = 0);
+		virtual void flush(LocalBufferHolder holder);
+	};
+
+	template <MemoryType MemType = MemoryType::None,
+		MemoryProperty MemProperty = MemoryProperty::None,
+		SharingMode ShareMode = SharingMode::Exclusive>
+	struct StagingBuffer : Buffer<MemoryType::TransferSource | MemType,
+								  MemoryProperty::HostCoherent | MemoryProperty::HostVisible | MemProperty,
+								  ShareMode> {
+		constexpr static MemoryType Type = MemoryType::TransferSource | MemType;
+		constexpr static MemoryProperty Property = MemoryProperty::HostCoherent | MemoryProperty::HostVisible | MemProperty;
+		constexpr static SharingMode Mode = ShareMode;
+
+		StagingBuffer(LogicalDeviceAccessor device, size_t size, std::optional<CommandManager> manager = std::nullopt) : Buffer<Type, Property, Mode>(device, size) {};
+	};
+
+	template <MemoryType MemType = MemoryType::None,
+		MemoryProperty MemProperty = MemoryProperty::None,
+		SharingMode ShareMode = SharingMode::Exclusive>
+	struct DeviceLocalBuffer : Buffer<MemoryType::TransferDestination | MemType,
+		MemoryProperty::DeviceLocal | MemProperty,
+		ShareMode> {
+		constexpr static MemoryType Type = MemoryType::TransferSource | MemType;
+		constexpr static MemoryProperty Property = MemoryProperty::HostCoherent | MemoryProperty::HostVisible | MemProperty;
+		constexpr static SharingMode Mode = ShareMode;
+
+		DeviceLocalBuffer(LogicalDeviceAccessor device, size_t size, std::optional<CommandManager> manager = std::nullopt) : Buffer<Type, Property, Mode>(device, size) {};
 	};
 
 	// ==========================================================================================================
@@ -218,8 +272,31 @@ namespace VSL_NAMESPACE {
 	}
 
 	template <VSL_NAMESPACE::MemoryType MemType, VSL_NAMESPACE::MemoryProperty MemProperty, VSL_NAMESPACE::SharingMode SharingMode>
-	VSL_NAMESPACE::Buffer<MemType, MemProperty, SharingMode>::Buffer(LogicalDeviceAccessor device, size_t size)
+	VSL_NAMESPACE::Buffer<MemType, MemProperty, SharingMode>::Buffer(LogicalDeviceAccessor device, size_t size, std::optional<CommandManager> manager) {
+		_data = this->MakeBuffer(device, size, MemType, MemProperty, SharingMode);
+
+		if (manager.has_value())
+			_data->commandManager = manager->_data;
+		else if (defaults::COMMAND_MANAGER)
+			_data->commandManager = defaults::COMMAND_MANAGER->_data;
+	}
+
+	template <VSL_NAMESPACE::MemoryType MemType, VSL_NAMESPACE::MemoryProperty MemProperty, VSL_NAMESPACE::SharingMode SharingMode>
+	VSL_NAMESPACE::BufferAccessor::LocalBufferHolder VSL_NAMESPACE::Buffer<MemType, MemProperty, SharingMode>::data(std::optional<size_t> size, size_t offset) {
+		if constexpr (not contain<MemProperty, MemoryProperty::HostVisible>()) {
+			static_assert("Not host-visible memory!");
+		}
+		
+		return this->GetData(this, size, offset, MemType, MemProperty, SharingMode);
+	}
+
+	template<MemoryType MemType, MemoryProperty MemProperty, SharingMode SharingMode>
+	inline void Buffer<MemType, MemProperty, SharingMode>::flush(LocalBufferHolder holder)
 	{
-		_data = make_buffer(device, size, MemType, MemProperty, SharingMode);
+		if constexpr (not contain<MemProperty, MemoryProperty::HostVisible>()) {
+			static_assert("Not host-visible memory!");
+		}
+
+		this->FlushBuffer(holder, MemType, MemProperty, SharingMode);
 	}
 }

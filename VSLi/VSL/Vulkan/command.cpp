@@ -8,6 +8,11 @@
 #include "command.h"
 #include "surface.h"
 
+
+namespace VSL_NAMESPACE::defaults {
+	std::shared_ptr<VSL_NAMESPACE::_impl::CommandManager_impl> COMMAND_MANAGER = nullptr;
+}
+
 VSL_NAMESPACE::CommandPool::CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor device)
 {
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::CommandPool_impl>(new VSL_NAMESPACE::_impl::CommandPool_impl);
@@ -63,6 +68,10 @@ void VSL_NAMESPACE::CommandBuffer::reset()
 void VSL_NAMESPACE::CommandBuffer::reset(std::uint32_t idx)
 {
 	_data->commandBuffers[idx].reset();
+}
+
+VSL_NAMESPACE::_impl::CommandBuffer_impl::~CommandBuffer_impl() {
+	commandPool->device->device.freeCommandBuffers(commandPool->commandPool, this->commandBuffers);
 }
 
 VSL_NAMESPACE::DefaultPhase::DefaultPhase(CommandManager _manager, SwapchainAccessor swapchain,
@@ -202,6 +211,18 @@ std::uint32_t VSL_NAMESPACE::CommandManager::getCurrentBufferIdx()
 	return _data->commandBuffer->currentBufferIdx;
 }
 
+VSL_NAMESPACE::CommandBuffer VSL_NAMESPACE::CommandManager::makeExclusiveBuffer(size_t size)
+{
+	return CommandBuffer(CommandPool{ _data->commandPool }, size);
+}
+
 void VSL_NAMESPACE::CommandManager::next() {
 	CommandBuffer{ _data->commandBuffer }.next();
+}
+
+VSL_NAMESPACE::CommandManager VSL_NAMESPACE::CommandManager::setDefault()
+{
+	auto before_manager = defaults::COMMAND_MANAGER;
+	defaults::COMMAND_MANAGER = _data;
+	return VSL_NAMESPACE::CommandManager{ before_manager };
 }

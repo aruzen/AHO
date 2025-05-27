@@ -93,8 +93,6 @@ int main() {
 
 	vsl::loggingln("type : ", typeid(t).name());
 	vsl::loggingln("area : ", triangle.area());
-	vsl::loggingln("Point{ 0.0f, 0.0f }::graphic_type == FloatVec2 : ", decltype(pf1)::graphic_type == vsl::data_format::FloatVec2);
-	vsl::loggingln("DrawManip is available : ", vsl::command::is_manipulator<vsl::command::DrawManip>);
 	//*
 	try {
 		using namespace vsl;
@@ -123,7 +121,7 @@ int main() {
 		auto s2 = make_shader<"shaders/red.frag.spv">(device);
 		pl::ShaderGroup red_triangle_shaders("red_triangle", { s1, s2 }),
 			colorfull_triangle_shaders("colorfull_triangle", { make_shader<"shaders/const_triangle2.vert.spv">(device), make_shader<"shaders/colorfull.frag.spv">(device) }),
-			input_sahders("2d_input", { make_shader<"shaders/input.vert.spv">(device), make_shader<"shaders/input.frag.spv">(device) });
+			input_shaders("2d_input", { make_shader<"shaders/input.vert.spv">(device), make_shader<"shaders/input.frag.spv">(device) });
 
 		Scissor scissor(swapchain);
 		Viewport viewport(swapchain);
@@ -146,8 +144,8 @@ int main() {
 
 		auto vert_input = pl::VertexInput().add_shape({ data_format::FloatVec2, data_format::FloatRGB });
 
-		FrameBuffer frame_buffer(swapchain, view, render_pass);;
-		Pipeline input_vertices(layout.copy().add(input_sahders, vert_input), render_pass);
+		FrameBuffer frame_buffer(swapchain, view, render_pass);
+		Pipeline input_vertices(layout.copy().add(input_shaders, vert_input), render_pass);
 
 		auto imageAvailable = synchro_manager.createSemaphore("imageAvailable", manager.getBuffer().getSize()),
 			renderFinished = synchro_manager.createSemaphore("renderFinished", manager.getBuffer().getSize());
@@ -158,14 +156,16 @@ int main() {
 			RGB color;
 		};
 
-		vertex center = { { 0.0f_x + 0.0f_y }, HSV(0.0f, 0.0f, 0.1f).rgb() };
-		vertex top = { { 0.0f_x + -0.1f_y }, HSV(0.0f, 1.0f, 0.5f).rgb() };
-		vertex right = { { 0.1f_x + 0.1f_y }, HSV(120.0f, 1.0f, 0.5f).rgb() };
-		vertex left = { { -0.1f_x + 0.1f_y }, HSV(240.0f, 1.0f, 0.5f).rgb() };
+		vertex center = { { 0.0f_x + 0.0f_y }, HSV(0.0, 0.0f, 0.1f).rgb() };
+		vertex top   = { { 0.0f_x + -0.1f_y }, HSV(0.0f, 1.0f, 0.5f).rgb() };
+		vertex right  = { { 0.1f_x + 0.1f_y }, HSV(120.0f, 1.0f, 0.5f).rgb() };
+		vertex left  = { { -0.1f_x + 0.1f_y }, HSV(240.0f, 1.0f, 0.5f).rgb() };
 
 		std::cout << center.color << std::endl;
 
 		using SimpleBuffer = Buffer<MemoryType::VertexBuffer, MemoryProperty::HostVisible | MemoryProperty::HostCoherent>;
+		using StagedBuffer = Buffer<MemoryType::TransferSource, MemoryProperty::HostVisible | MemoryProperty::HostCoherent>;
+
 		std::array<SimpleBuffer, 3>
 			buffers = { SimpleBuffer(device, sizeof(std::array<vertex, 3>)),
 				SimpleBuffer(device, sizeof(std::array<vertex, 3>)),

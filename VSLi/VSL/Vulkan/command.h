@@ -5,7 +5,15 @@
 #include "swapchain.h"
 
 namespace VSL_NAMESPACE {
+	struct CommandManager;
+	struct DefaultPhase;
+	struct DefaultPhaseStreamOperator;
+
 	static std::uint32_t DEFAULT_BUFFER_SIZE = 2;
+
+	namespace defaults {
+		extern std::shared_ptr<VSL_NAMESPACE::_impl::CommandManager_impl> COMMAND_MANAGER;
+	}
 
 	struct CommandPool {
 		CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor device);
@@ -26,10 +34,6 @@ namespace VSL_NAMESPACE {
 
 		std::shared_ptr<VSL_NAMESPACE::_impl::CommandBuffer_impl> _data;
 	};
-
-	struct CommandManager;
-	struct DefaultPhase;
-	struct DefaultPhaseStreamOperator;
 
 	namespace command {
 		struct __Command {
@@ -72,7 +76,13 @@ namespace VSL_NAMESPACE {
 		CommandPool getPool();
 		CommandBuffer getBuffer();
 		std::uint32_t getCurrentBufferIdx();
+		CommandBuffer makeExclusiveBuffer(size_t size = 1);
 		void next();
+
+		/*
+		* 元のCommandBuffer{ defaults::COMMAND_MANAGER }を返す。
+		*/
+		CommandManager setDefault();
 	};
 
 	struct DefaultPhase {

@@ -11,7 +11,7 @@ namespace VSL_NAMESPACE::command {
 			requires ((unsigned int)(MemType & MemoryType::VertexBuffer) != 0)
 		BindVertexBuffer(Buffer<MemType, MemProperty, SharingMode>);
 
-		BufferAccessor buffer;
+		BufferAccessor* buffer;
 
 		void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
 	};
@@ -20,5 +20,5 @@ namespace VSL_NAMESPACE::command {
 
 	template<MemoryType MemType, MemoryProperty MemProperty, SharingMode SharingMode>
 		requires ((unsigned int)(MemType& MemoryType::VertexBuffer) != 0)
-	VSL_NAMESPACE::command::BindVertexBuffer::BindVertexBuffer(Buffer<MemType, MemProperty, SharingMode> buffer) : buffer(buffer) {}
+	VSL_NAMESPACE::command::BindVertexBuffer::BindVertexBuffer(Buffer<MemType, MemProperty, SharingMode> buffer) : buffer(&buffer) {}
 }

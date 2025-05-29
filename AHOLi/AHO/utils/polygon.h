@@ -61,13 +61,13 @@ namespace AHO_NAMESPACE {
 
 	namespace views {
 		template<typename InnerView>
-		struct wrapp_view : std::ranges::view_interface<wrapp_view<InnerView>> {
+		struct wrap_view : std::ranges::view_interface<wrap_view<InnerView>> {
 			using inner_view_t = InnerView;
 			using iterator = decltype(std::declval<InnerView>().begin());
 
 			inner_view_t view;
 
-			wrapp_view(inner_view_t f) : view(f) {};
+			wrap_view(inner_view_t f) : view(f) {};
 
 			iterator begin() {
 				return view.begin();

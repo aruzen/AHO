@@ -200,7 +200,7 @@ namespace VSL_NAMESPACE {
 
 		size_t size();
 
-		static std::shared_ptr<_impl::Buffer_impl> MakeBuffer(LogicalDeviceAccessor device, size_t size, MemoryType memType, MemoryProperty memProperty, SharingMode sharingMode);
+		static std::shared_ptr<_impl::Buffer_impl> MakeBuffer(LogicalDeviceAccessor device, size_t size, MemoryType memType, MemoryProperty memProperty, SharingMode sharingMode, std::optional<CommandManager> manager);
 		static void FlushBuffer(LocalBufferHolder holder, MemoryType memType, MemoryProperty memProperty, SharingMode sharingMode);
 		static LocalBufferHolder GetData(VSL_NAMESPACE::BufferAccessor* data, std::optional<size_t> size, size_t offset, MemoryType memType, MemoryProperty memProperty, SharingMode sharingMode);
 	};
@@ -274,12 +274,7 @@ namespace VSL_NAMESPACE {
 
 	template <VSL_NAMESPACE::MemoryType MemType, VSL_NAMESPACE::MemoryProperty MemProperty, VSL_NAMESPACE::SharingMode SharingMode>
 	VSL_NAMESPACE::Buffer<MemType, MemProperty, SharingMode>::Buffer(LogicalDeviceAccessor device, size_t size, std::optional<CommandManager> manager) {
-		_data = this->MakeBuffer(device, size, MemType, MemProperty, SharingMode);
-
-		if (manager.has_value())
-			_data->commandManager = manager->_data;
-		else if (defaults::COMMAND_MANAGER)
-			_data->commandManager = defaults::COMMAND_MANAGER->_data;
+		_data = this->MakeBuffer(device, size, MemType, MemProperty, SharingMode, manager);
 	}
 
 	template <VSL_NAMESPACE::MemoryType MemType, VSL_NAMESPACE::MemoryProperty MemProperty, VSL_NAMESPACE::SharingMode SharingMode>

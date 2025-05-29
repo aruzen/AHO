@@ -72,7 +72,7 @@ void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::flush() {
 	parent->flush(*this);
 }
 
-std::shared_ptr<VSL_NAMESPACE::_impl::Buffer_impl> VSL_NAMESPACE::BufferAccessor::MakeBuffer(LogicalDeviceAccessor device, size_t size, MemoryType memType, MemoryProperty memProperty, SharingMode sharingMode)
+std::shared_ptr<VSL_NAMESPACE::_impl::Buffer_impl> VSL_NAMESPACE::BufferAccessor::MakeBuffer(LogicalDeviceAccessor device, size_t size, MemoryType memType, MemoryProperty memProperty, SharingMode sharingMode, std::optional<CommandManager> manager)
 {
 	auto data = std::make_shared<_impl::Buffer_impl>();
 	data->device = device._data;
@@ -94,6 +94,11 @@ std::shared_ptr<VSL_NAMESPACE::_impl::Buffer_impl> VSL_NAMESPACE::BufferAccessor
 	data->allocatedSize = allocInfo.allocationSize;
 
 	device._data->device.bindBufferMemory(data->buffer, data->deviceMem, 0);
+
+    if (manager.has_value())
+        data->commandManager = manager->_data;
+    else if (defaults::COMMAND_MANAGER)
+        data->commandManager = defaults::COMMAND_MANAGER;
 
 	return data;
 }

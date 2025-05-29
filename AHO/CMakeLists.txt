@@ -7,17 +7,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # リテラルの_がないことを無視する
 add_compile_options(-Wno-user-defined-literals)
-
-# インクルードディレクトリを追加
-include_directories(~/repos/AHO/AHOLi ~/repos/AHO/VSLi)
-
-# ライブラリディレクトリを追加
-link_directories(lib)
+add_compile_options(-fconcepts-diagnostics-depth=7)
 
 # 実行ファイルを作成
 add_executable(AHO
         ../AHO/Main.cpp)
 
-
 # ライブラリをリンク
-target_link_libraries(AHO VSL)
+link_directories(lib)
+
+find_package(Boost REQUIRED COMPONENTS system)
+target_include_directories(AHO PRIVATE ${Boost_INCLUDE_DIRS} ~/repos/AHO/AHOLi ~/repos/AHO/VSLi)
+target_link_libraries(AHO PRIVATE ${Boost_LIBRARIES} VSL)

@@ -17,7 +17,9 @@ struct Upper { \
 	constexpr static char LowerChar = #Lower[0]; \
  \
 	constexpr Upper(const T& t) : value(t) {}; \
-	constexpr Upper() : value{} {}; \
+	constexpr Upper() : value{} {};                                  \
+ \
+    constexpr auto operator<=>(const Upper<T>&) const = default;\
  \
 	constexpr Upper<T> operator +() const { static_assert(concepts::plusable<T>); return { value }; }; \
 	constexpr Upper<T> operator -() const { static_assert(concepts::minusable<T>); return { -value }; }; \
@@ -169,6 +171,10 @@ struct Upper { \
 				union { Upper<ElementType> Lower, AHO_COORDINATE_NUMBERD_MEMBER_1; }; \
 				constexpr _CoordinateSet() : Lower(Upper<ElementType>()) {}; \
 				constexpr _CoordinateSet(const Upper<ElementType>& Lower) : Lower(Lower) {}; \
+                constexpr bool operator<(const _CoordinateSet<element_type, coordinate_info>& o) const { \
+                    return this->_cnmn1 < o._cnmn1; \
+                } \
+			    constexpr auto operator<=>(const _CoordinateSet<element_type, coordinate_info>&) const = default; \
 				AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper, Lower); \
 			};
 
@@ -190,7 +196,11 @@ struct Upper { \
 				union { Upper2<ElementType> Lower2, AHO_COORDINATE_NUMBERD_MEMBER_2; }; \
 				constexpr _CoordinateSet() : Lower1(Upper1<ElementType>()), Lower2(Upper2<ElementType>()) {}; \
 				constexpr _CoordinateSet(const Upper1<ElementType>& Lower1, const Upper2<ElementType>& Lower2) : Lower1(Lower1), Lower2(Lower2) {}; \
-				AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper1, Lower1); \
+                constexpr bool operator<(const _CoordinateSet<element_type, coordinate_info>& o) const { \
+                    return (this->_cnmn1 != o._cnmn1 ? this->_cnmn1 < o._cnmn1 : this->_cnmn2 < o._cnmn2); \
+                } \
+                constexpr auto operator<=>(const _CoordinateSet<element_type, coordinate_info>&) const = default;   \
+                AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper1, Lower1); \
 				AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper2, Lower2); \
 			};
 
@@ -211,15 +221,22 @@ struct Upper { \
 			union { X<ElementType> x, AHO_COORDINATE_NUMBERD_MEMBER_1; };
 			union { Y<ElementType> y, AHO_COORDINATE_NUMBERD_MEMBER_2; };
 			union { Z<ElementType> z, AHO_COORDINATE_NUMBERD_MEMBER_3; };
+
 			constexpr _CoordinateSet() : x(X<ElementType>()), y(Y<ElementType>()), z(Z<ElementType>()) {}
 			constexpr _CoordinateSet(const X<ElementType>& x, const Y<ElementType>& y, const Z<ElementType>& z) : x(x), y(y), z(z) {}
+            constexpr bool operator<(const _CoordinateSet<element_type, coordinate_info>& o) const {
+                return (this->_cnmn1 != o._cnmn1 ? this->_cnmn1 < o._cnmn1 :
+                        (this->_cnmn2 != o._cnmn2 ? this->_cnmn2 < o._cnmn2 :
+                         this->_cnmn3 < o._cnmn3));
+            }
+            constexpr auto operator<=>(const _CoordinateSet<element_type, coordinate_info>&) const = default;
 
 			AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(X, x);
 			AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Y, y);
 			AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Z, z);
 		};
 
-		template <typename CI1, typename CI2>
+        template <typename CI1, typename CI2>
 		struct _SumCoordinateInfo {
 			using value = typename _MakeCoordinateInfo<CI1::EnabledX || CI2::EnabledX, CI1::EnabledY || CI2::EnabledY, CI1::EnabledZ || CI2::EnabledZ>::value;
 		};

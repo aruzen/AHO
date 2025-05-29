@@ -26,7 +26,7 @@ namespace AHO_NAMESPACE {
 
 		template<typename T>
 		concept is_matrix = requires(T & t) {
-			to_matrixable<T>;
+            { to_matrixable<T> };
 			t + std::declval<Mat<typename T::element_type, T::type().row, T::type().colomn>>();
 			t - std::declval<Mat<typename T::element_type, T::type().row, T::type().colomn>>();
 			t* std::declval<Mat<typename T::element_type, T::type().row, T::type().colomn>>();

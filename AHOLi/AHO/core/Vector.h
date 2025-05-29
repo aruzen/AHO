@@ -12,7 +12,7 @@ namespace AHO_NAMESPACE {
 			 VSL_NAMESPACE::is_dimention D = VSL_NAMESPACE::VSL_DEFAULT_DIMENTION_STRUCT,
 	 		 typename CoordinateInfo = typename AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<D>::value>
 	struct _Vector {
-	};
+    };
 
 	template<typename R = int, typename... Args>
 		requires concepts::sames_as<R, Args...> && (!concepts::is_coordinate_set<R>)
@@ -35,7 +35,7 @@ namespace AHO_NAMESPACE {
 		concept is_vector = requires{
 			typename T::dimention;
 			typename T::element_type;
-			std::convertible_to<T, _Vector<typename T::element_type, typename T::dimention>>;
+            { std::convertible_to<T, _Vector<typename T::element_type, typename T::dimention>> };
 		};
 	}
 
@@ -79,6 +79,7 @@ namespace AHO_NAMESPACE {
 	struct _Vector<R, VSL_NAMESPACE::D1, CI> {
 		using dimention = typename VSL_NAMESPACE::D1;
 		using element_type = R;
+        using coordinate_info = CI;
 
 		coordinate::_CoordinateSet<R, CI> value;
 
@@ -106,10 +107,6 @@ namespace AHO_NAMESPACE {
 			requires (!concepts::is_vector<T>)
 		constexpr auto operator *(const T& m) const;
 
-		template<typename T>
-			requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D1>, T>
-		constexpr auto operator *(const T& m) const;
-
 		template<concepts::division_as<R> T>
 		constexpr auto operator /(const T& m) const;
 
@@ -128,6 +125,15 @@ namespace AHO_NAMESPACE {
 		template<concepts::cast_as<R> T>
 		constexpr _Vector<T, VSL_NAMESPACE::D1, CI> cast() const;
 
+        template<typename T>
+        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D1>, T>
+        constexpr auto dot(const T& m) const;
+
+        template<typename T>
+        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D1>, T>
+        [[deprecated("cross() is undefined in 1D. Consider checking vector dimension.")]]
+        constexpr auto cross(const T& m) const;
+
 		constexpr auto length() const;
 	};
 
@@ -135,6 +141,7 @@ namespace AHO_NAMESPACE {
 	struct _Vector<R, VSL_NAMESPACE::D2, CI> {
 		using dimention = typename VSL_NAMESPACE::D2;
 		using element_type = R;
+        using coordinate_info = CI;
 
 		coordinate::_CoordinateSet<R, CI> value;
 
@@ -162,10 +169,6 @@ namespace AHO_NAMESPACE {
 			requires (!concepts::is_vector<T>)
 		constexpr auto operator *(const T& m) const;
 
-		template<typename T>
-			requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2>, T>
-		constexpr auto operator *(const T& m) const;
-
 		template<concepts::division_as<R> T>
 		constexpr auto operator /(const T& m) const;
 
@@ -184,6 +187,14 @@ namespace AHO_NAMESPACE {
 		template<concepts::cast_as<R> T>
 		constexpr _Vector<T, VSL_NAMESPACE::D2, CI> cast() const;
 
+        template<typename T>
+        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2>, T>
+        constexpr auto dot(const T& m) const;
+
+        template<typename T>
+        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2>, T>
+        constexpr auto cross(const T& m) const;
+
 		constexpr auto length() const;
 	};
 
@@ -191,6 +202,7 @@ namespace AHO_NAMESPACE {
 	struct _Vector<R, VSL_NAMESPACE::D3, CI> {
 		using dimention = typename VSL_NAMESPACE::D3;
 		using element_type = R;
+        using coordinate_info = CI;
 
 		coordinate::_CoordinateSet<R, CI> value;
 
@@ -218,10 +230,6 @@ namespace AHO_NAMESPACE {
 			requires (!concepts::is_vector<T>)
 		constexpr auto operator *(const T& m) const;
 
-		template<typename T>
-			requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>, T>
-		constexpr auto operator *(const T& m) const;
-
 		template<concepts::division_as<R> T>
 		constexpr auto operator /(const T& m) const;
 
@@ -240,8 +248,26 @@ namespace AHO_NAMESPACE {
 		template<concepts::cast_as<R> T>
 		constexpr _Vector<T, VSL_NAMESPACE::D3, CI> cast() const;
 
+        template<typename T>
+        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>, T>
+        constexpr auto dot(const T& m) const;
+
+        template<typename T>
+        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>, T>
+        constexpr auto cross(const T& m) const;
+
 		constexpr auto length() const;
 	};
+
+    namespace product::dot {
+        template<typename Dim, typename CI, typename R1, typename R2>
+        constexpr auto operator *(_Vector<R1, Dim, CI> v1, _Vector<R2, Dim, CI> v2);
+    }
+
+    namespace product::cross {
+        template<typename Dim, typename CI, typename R1, typename R2>
+        constexpr auto operator *(_Vector<R1, Dim, CI> v1, _Vector<R2, Dim, CI> v2);
+    }
 
 	// ---------------------------------------------------------------------------------------------------------------------
 
@@ -278,14 +304,6 @@ namespace AHO_NAMESPACE {
 		requires (!concepts::is_vector<T>)
 	constexpr auto _Vector<R, VSL_NAMESPACE::D1, CI>::operator *(const T& m) const {
 		return _Vector<decltype(std::declval<R>() * std::declval<T>()), VSL_NAMESPACE::D1, CI>(value.___AN1 * m);
-	}
-
-	template<typename R, typename CI>
-	template<typename T>
-		requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D1>, T>
-	inline constexpr auto _Vector<R, VSL_NAMESPACE::D1, CI>::operator*(const T& m) const
-	{
-		return (decltype(std::declval<R>() * std::declval<T>()))0;
 	}
 
 	template<typename R, typename CI>
@@ -329,11 +347,26 @@ namespace AHO_NAMESPACE {
 		return _Vector<T, VSL_NAMESPACE::D1, CI>((T)value.___AN1);
 	}
 
+    template<typename R, typename CI>
+    template<typename T>
+        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D1>, T>
+    inline constexpr auto _Vector<R, VSL_NAMESPACE::D1, CI>::dot(const T& m) const
+    {
+        return (decltype(std::declval<R>() * std::declval<T>()))value.___AN1 * m.value.___AN1;
+    }
 
-	template<typename R, typename CI>
+    template<typename R, typename CI>
+    template<typename T>
+    requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D1>, T>
+    inline constexpr auto _Vector<R, VSL_NAMESPACE::D1, CI>::cross(const T& m) const
+    {
+        return (decltype(std::declval<R>() * std::declval<T>()))0;
+    }
+
+    template<typename R, typename CI>
 	constexpr auto _Vector<R, VSL_NAMESPACE::D1, CI>::length() const
 	{
-		return value.___AN1;
+		return std::abs(value.___AN1);
 	}
 
 	// ---------------------------------------------------------------------------------------------------------------------
@@ -371,14 +404,6 @@ namespace AHO_NAMESPACE {
 		requires (!concepts::is_vector<T>)
 	constexpr auto _Vector<R, VSL_NAMESPACE::D2, CI>::operator *(const T& m) const {
 		return _Vector<decltype(std::declval<R>() * std::declval<T>()), VSL_NAMESPACE::D2>(value.___AN1 * m, value.___AN2 * m);
-	}
-
-	template<typename R, typename CI>
-	template<typename T>
-		requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2>, T>
-	inline constexpr auto _Vector<R, VSL_NAMESPACE::D2, CI>::operator*(const T& m) const
-	{
-		return value.___AN1 * m.value.___AN1 + value.___AN2 * m.value.___AN2;
 	}
 
 	template<typename R, typename CI>
@@ -426,11 +451,27 @@ namespace AHO_NAMESPACE {
 		return _Vector<T, VSL_NAMESPACE::D2, CI>((T)value.___AN1, (T)value.___AN2);
 	}
 
+    template<typename R, typename CI>
+    template<typename T>
+        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2>, T>
+    constexpr auto _Vector<R, VSL_NAMESPACE::D2, CI>::dot(const T& m) const {
+        return value.___AN1 * m.value.___AN1 + value.___AN2 * m.value.___AN2;
+    }
+
+    template<typename R, typename CI>
+    template<typename T>
+        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2>, T>
+    constexpr auto _Vector<R, VSL_NAMESPACE::D2, CI>::cross(const T& m) const {
+        return _Vector<decltype(value.___AN1 * m.value.___AN2),
+                VSL_NAMESPACE::D1,
+                typename coordinate::_MakeCoordinateInfo<(!CI::EnabledX), (!CI::EnabledY), (!CI::EnabledZ)>::value>
+                (value.___AN1 * m.value.___AN2 - value.___AN2 * m.value.___AN1);
+    }
 
 	template<typename R, typename CI>
 	constexpr auto _Vector<R, VSL_NAMESPACE::D2, CI>::length() const
 	{
-		return std::sqrt(value.___AN1 * value.___AN1 + value.___AN2 * value.___AN2);
+		return std::sqrt(std::abs(value.___AN1 * value.___AN1 + value.___AN2 * value.___AN2));
 	}
 
 	// ---------------------------------------------------------------------------------------------------------------------
@@ -470,14 +511,6 @@ namespace AHO_NAMESPACE {
 		requires (!concepts::is_vector<T>)
 	constexpr auto _Vector<R, VSL_NAMESPACE::D3, CI>::operator *(const T& m) const {
 		return _Vector<decltype(std::declval<R>() * std::declval<T>()), VSL_NAMESPACE::D3, CI>(value.___AN1 * m, value.___AN2 * m, value.___AN3 * m);
-	}
-
-	template<typename R, typename CI>
-	template<typename T>
-		requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>, T>
-	inline constexpr auto _Vector<R, VSL_NAMESPACE::D3, CI>::operator *(const T& m) const
-	{
-		return value.___AN1 * m.value.___AN1 + value.___AN2 * m.value.___AN2 + value.___AN3 * m.value.___AN3;
 	}
 
 	template<typename R, typename CI>
@@ -529,9 +562,41 @@ namespace AHO_NAMESPACE {
 		return _Vector<T, VSL_NAMESPACE::D3, CI>((T)value.___AN1, (T)value.___AN2, (T)value.___AN3);
 	}
 
+    template<typename R, typename CI>
+    template<typename T>
+    requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>, T>
+    inline constexpr auto _Vector<R, VSL_NAMESPACE::D3, CI>::dot(const T& m) const
+    {
+        return value.___AN1 * m.value.___AN1 + value.___AN2 * m.value.___AN2 + value.___AN3 * m.value.___AN3;
+    }
+
+    template<typename R, typename CI>
+    template<typename T>
+    requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>, T>
+    inline constexpr auto _Vector<R, VSL_NAMESPACE::D3, CI>::cross(const T& m) const
+    {
+        return value.___AN1 * m.value.___AN1 + value.___AN2 * m.value.___AN2 + value.___AN3 * m.value.___AN3;
+    }
+
 	template<typename R, typename CI>
 	constexpr auto _Vector<R, VSL_NAMESPACE::D3, CI>::length() const
 	{
-		return std::sqrt(value.___AN1 * value.___AN1 + value.___AN2 * value.___AN2 + value.___AN3 * value.___AN3);
+		return std::sqrt(std::abs(value.___AN1 * value.___AN1 + value.___AN2 * value.___AN2 + value.___AN3 * value.___AN3));
 	}
+
+    // ---------------------------------------------------------------------------------------------------------------------
+
+    namespace product::dot {
+        template<typename Dim, typename CI, typename R1, typename R2>
+        constexpr auto operator *(_Vector<R1, Dim, CI> v1, _Vector<R2, Dim, CI> v2) {
+            return v1.dot(v2);
+        }
+    }
+
+    namespace product::cross {
+        template<typename Dim, typename CI, typename R1, typename R2>
+        constexpr auto operator *(_Vector<R1, Dim, CI> v1, _Vector<R2, Dim, CI> v2) {
+            return v1.cross(v2);
+        }
+    }
 }

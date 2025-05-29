@@ -28,6 +28,6 @@ namespace AHO_NAMESPACE {
 			 VSL_NAMESPACE::is_dimention D = VSL_NAMESPACE::VSL_DEFAULT_DIMENTION_STRUCT,
 			 typename CoordinateInfo = AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<D>::value,
 			 typename Size = size_t, 
-			 typename Alloc = std::allocator<IndexedTriangle<Size>>>
+			 typename Alloc = std::vector<IndexedTriangle<Size>>::allocator_type>
 	struct Polygon;
 }

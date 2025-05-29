@@ -21,8 +21,8 @@ namespace AHO_NAMESPACE {
 		concept is_point = requires(T t) {
 			typename std::remove_reference_t<T>::dimention;
 			typename std::remove_reference_t<T>::element_type;
-			std::convertible_to<std::remove_reference_t<T>, _Point<typename std::remove_reference_t<T>::element_type, typename std::remove_reference_t<T>::dimention>>;
-			(_Point<typename std::remove_reference_t<T>::element_type, typename std::remove_reference_t<T>::dimention>)t;
+            { std::convertible_to<std::remove_reference_t<T>, _Point<typename std::remove_reference_t<T>::element_type, typename std::remove_reference_t<T>::dimention, typename std::remove_reference_t<T>::coordinate_info>> };
+			(_Point<typename std::remove_reference_t<T>::element_type, typename std::remove_reference_t<T>::dimention, typename std::remove_reference_t<T>::coordinate_info>)t;
 		};
 	}
 
@@ -78,6 +78,7 @@ namespace AHO_NAMESPACE {
 	struct _Point<R, VSL_NAMESPACE::D1, CI> {
 		using dimention = typename VSL_NAMESPACE::D1;
 		using element_type = R;
+        using coordinate_info = CI;
 
         constexpr static VSL_NAMESPACE::data_format::___Format graphic_type = VSL_NAMESPACE::data_format::convert_graphic_type<R>()
                 .template toVec<(size_t)dimention::dimention>();
@@ -135,6 +136,7 @@ namespace AHO_NAMESPACE {
 	struct _Point<R, VSL_NAMESPACE::D2, CI> {
 		using dimention = typename VSL_NAMESPACE::D2;
 		using element_type = R;
+        using coordinate_info = CI;
 		
 		static constexpr VSL_NAMESPACE::data_format::___Format graphic_type
 			= VSL_NAMESPACE::data_format::convert_graphic_type<R>().template toVec<(size_t)dimention::dimention>();
@@ -192,6 +194,7 @@ namespace AHO_NAMESPACE {
 	struct _Point<R, VSL_NAMESPACE::D3, CI> {
 		using dimention = typename VSL_NAMESPACE::D3;
 		using element_type = R;
+        using coordinate_info = CI;
 
 		static constexpr VSL_NAMESPACE::data_format::___Format graphic_type
 			= VSL_NAMESPACE::data_format::convert_graphic_type<R>().template toVec<(size_t)dimention::dimention>();
@@ -339,7 +342,7 @@ namespace AHO_NAMESPACE {
 	template<typename R, typename CI>
 	constexpr bool _Point<R, VSL_NAMESPACE::D2, CI>::operator<(const _Point<R, VSL_NAMESPACE::D2, CI>& p) const
 	{
-		return length() < p.length();
+		return value < p.value;
 	}
 
 	template<typename R, typename CI>

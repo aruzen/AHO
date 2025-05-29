@@ -178,4 +178,4 @@ namespace VSL_NAMESPACE::helper {
                                          ___VSL_JOIN_3(expr1, char8_t, expr2)  \
                                          ___VSL_JOIN_3(expr1, wchar_t, expr2)  \
                                          ___VSL_JOIN_3(expr1, char16_t, expr2) \
-                                         ___VSL_JOIN_3(expr1, char32_t, expr2) \
+                                         ___VSL_JOIN_3(expr1, char32_t, expr2)

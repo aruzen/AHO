@@ -15,7 +15,7 @@ namespace AHO_NAMESPACE {
 	struct Line {
 		using dimention = D;
 		using element_type = R;
-		using coordinste_info = CI;
+		using coordinate_info = CI;
 
 		AHO_NAMESPACE::_Point<R, D, CI> pos1, pos2;
 
@@ -50,7 +50,7 @@ namespace AHO_NAMESPACE {
 	struct PtrLine {
 		using dimention = D;
 		using element_type = R;
-		using coordinste_info = CI;
+		using coordinate_info = CI;
 
 		AHO_NAMESPACE::_Point<R, D, CI>* pos1,* pos2;
 
@@ -183,4 +183,8 @@ namespace AHO_NAMESPACE {
 	{
 		return Line<R, D, CI>(*pos1, *pos2);
 	}
+
+
+    static_assert(concepts::is_line<Line<double, VSL_NAMESPACE::D2, coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D2>::value>>);
+    static_assert(concepts::is_points_object<Line<double, VSL_NAMESPACE::D2, coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D2>::value>>);
 }

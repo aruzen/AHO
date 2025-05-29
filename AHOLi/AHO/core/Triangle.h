@@ -17,6 +17,7 @@ namespace AHO_NAMESPACE {
 	struct Triangle {
 		using dimention = D;
 		using element_type = R;
+        using coordinate_info = CI;
 
 		AHO_NAMESPACE::_Point<R, D, CI> pos1, pos2, pos3;
 
@@ -89,9 +90,12 @@ namespace AHO_NAMESPACE {
 	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
 	inline constexpr double Triangle<R, D, CI>::area() const
 	{
+        using namespace product::cross;
+        if constexpr (std::same_as<D, VSL_NAMESPACE::D1>)
+            return 0;
 		auto v1 = pos2 - pos1;
 		auto v2 = pos3 - pos1;
-		return 0.5 * (v1 * v2);
+        return 0.5 * (v1 * v2).length();
 	}
 
 	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
@@ -103,7 +107,7 @@ namespace AHO_NAMESPACE {
 	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
 	inline constexpr std::array<AHO_NAMESPACE::Line<R, D, CI>, 3> Triangle<R, D, CI>::lines() const
 	{
-		return std::array<AHO_NAMESPACE::Line<R, D, CI>, 3>({ pos1, pos2 }, { pos2, pos3 }, { pos3, pos1 });
+		return std::array<AHO_NAMESPACE::Line<R, D, CI>, 3>({ AHO_NAMESPACE::Line<R, D, CI>{ pos1, pos2 }, { pos2, pos3 }, { pos3, pos1 } });
 	}
 
 	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
@@ -148,9 +152,12 @@ namespace AHO_NAMESPACE {
 	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
 	inline constexpr double PtrTriangle<R, D, CI>::area() const
 	{
-		auto v1 = pos2 - pos1;
-		auto v2 = pos3 - pos1;
-		return 0.5 * (v1 * v2);
+        using namespace product::cross;
+        if constexpr (std::same_as<D, VSL_NAMESPACE::D1>)
+            return 0;
+		auto v1 = *pos2 - *pos1;
+		auto v2 = *pos3 - *pos1;
+		return 0.5 * (v1 * v2).length();;
 	}
 
 	template<typename R, VSL_NAMESPACE::is_dimention D, typename CI>
@@ -194,4 +201,8 @@ namespace AHO_NAMESPACE {
 	{
 		return Triangle<R, D, CI>(*pos1, *pos2, *pos3);
 	}
+
+    static_assert(concepts::is_triangle<Triangle<double, VSL_NAMESPACE::D2, coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D2>::value>>);
+    static_assert(concepts::is_lines_object<Triangle<double, VSL_NAMESPACE::D2, aho::coordinate::_CoordinateInfo<vsl::D2, true, true>>>);
+    static_assert(concepts::is_points_object<Triangle<double, VSL_NAMESPACE::D2, coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D2>::value>>);
 }

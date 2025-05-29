@@ -50,6 +50,7 @@
 #include <AHO/core/Vector.h>
 #include <AHO/core/Point.h>
 #include <AHO/core/Triangle.h>
+#include <AHO/core/Polygon.h>
 #include <AHO/core/color.h>
 
 #include <chrono>
@@ -58,47 +59,14 @@
 * https://vulkan-tutorial.com/en/Vertex_buffers/Staging_buffer
 */
 
+#include <boost/bimap.hpp>
+
 int main() {
     using namespace aho;
+    using namespace aho::coordinate;
     using namespace aho::literals;
-
     namespace pl = vsl::pipeline_layout;
 
-    auto x_z = 10_x + 10_z;
-
-    x_z -= 5_z;
-
-    auto x_y_z = x_z + 7_y;
-
-
-    vsl::loggingln(x_z._cnmn1, ", ", x_z._cnmn2);
-    vsl::loggingln(x_y_z.x, ", ", x_y_z.y, ", ", x_y_z.z);
-
-    Vector vec1(1, 1);
-    Vector vec2(2.0, 2.0);
-    _Vector<decltype(10_x + 25_z)::element_type, decltype(10_x + 25_z)::coordinate_info::dimention, decltype(10_x +
-                                                                                                             25_z)::coordinate_info>
-            x_z_vec(10_x + 25_z);
-    auto vec3 = vec1 + vec2;
-
-    vsl::loggingln(x_z_vec.value.x, ", ", x_z_vec.value.z);
-
-    Triangle triangle(Point{1.0f, 1.0f}, {1.0f, 3.0f}, {3.0f, 1.0f});
-    Point p1{0, 0}, p2{2, 2};
-    Point pf1{0.0f, 0.0f};
-    Line line(p1, p2);
-    PtrLine pline(&p1, &p2);
-    auto t = line + Point{1, 1};
-
-    vsl::loggingln("area : ", triangle.area());
-    vsl::loggingln(triangle.pos1.value.x);
-    /*
-    vsl::loggingln("type : ", typeid(t).name());
-    vsl::loggingln("Point{ 0.0f, 0.0f }::graphic_type == FloatVec2 : ",
-                   decltype(pf1)::graphic_type == vsl::data_format::FloatVec2);
-    vsl::loggingln("DrawManip is available : ", vsl::command::is_manipulator<vsl::command::DrawManip>);
-     */
-    /*
     try {
         using namespace vsl;
         vsl::utils::ShaderCompiler shader_compiler("glslc", "shaders/");

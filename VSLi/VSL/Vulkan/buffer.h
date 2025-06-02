@@ -253,7 +253,7 @@ namespace VSL_NAMESPACE {
 		}
 
 		template<typename T>
-		bool uncheck_copy_with_shift_offset(void* data, size_t& offset, const T& t) {
+		void uncheck_copy_with_shift_offset(void* data, size_t& offset, const T& t) {
 			memcpy(data, &t, sizeof(T));
 		}
 	}

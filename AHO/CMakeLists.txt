@@ -20,7 +20,7 @@ add_executable(AHO
         ../AHOLi/AHO/io/Key.hpp
         ../AHOLi/AHO/io/KeyBoard.cpp
         ../AHOLi/AHO/io/KeyBoard.hpp
-        ../AHOLi/AHO/const_values.hpp)
+)
 
 # ライブラリをリンク
 link_directories(lib)

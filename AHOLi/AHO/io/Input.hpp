@@ -6,7 +6,6 @@
 #define AHO_ALL_INPUT_HPP
 
 #include "../define.h"
-#include "../const_values.hpp"
 
 #include <string>
 #include <vector>

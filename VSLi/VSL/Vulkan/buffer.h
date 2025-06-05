@@ -196,6 +196,11 @@ namespace VSL_NAMESPACE {
 		*/
 		bool copy(BufferAccessor* buf);
 
+        /*
+		same copyByBuffer
+		*/
+        bool copy(std::derived_from<BufferAccessor> auto& buf);
+
 		bool copyByBuffer(BufferAccessor* buf);
 
 		size_t size();
@@ -216,27 +221,27 @@ namespace VSL_NAMESPACE {
 	template <MemoryType MemType = MemoryType::None,
 		MemoryProperty MemProperty = MemoryProperty::None,
 		SharingMode ShareMode = SharingMode::Exclusive>
-	struct StagingBuffer : Buffer<MemoryType::TransferSource | MemType,
+	struct StagingBuffer : public Buffer<MemoryType::TransferSource | MemType,
 								  MemoryProperty::HostCoherent | MemoryProperty::HostVisible | MemProperty,
 								  ShareMode> {
 		constexpr static MemoryType Type = MemoryType::TransferSource | MemType;
 		constexpr static MemoryProperty Property = MemoryProperty::HostCoherent | MemoryProperty::HostVisible | MemProperty;
 		constexpr static SharingMode Mode = ShareMode;
 
-		StagingBuffer(LogicalDeviceAccessor device, size_t size, std::optional<CommandManager> manager = std::nullopt) : Buffer<Type, Property, Mode>(device, size) {};
+		StagingBuffer(LogicalDeviceAccessor device, size_t size, std::optional<CommandManager> manager = std::nullopt) : Buffer<Type, Property, Mode>(device, size, manager) {};
 	};
 
 	template <MemoryType MemType = MemoryType::None,
 		MemoryProperty MemProperty = MemoryProperty::None,
 		SharingMode ShareMode = SharingMode::Exclusive>
-	struct DeviceLocalBuffer : Buffer<MemoryType::TransferDestination | MemType,
+	struct DeviceLocalBuffer : public Buffer<MemoryType::TransferDestination | MemType,
 		MemoryProperty::DeviceLocal | MemProperty,
 		ShareMode> {
-		constexpr static MemoryType Type = MemoryType::TransferSource | MemType;
-		constexpr static MemoryProperty Property = MemoryProperty::HostCoherent | MemoryProperty::HostVisible | MemProperty;
+		constexpr static MemoryType Type = MemoryType::TransferDestination | MemType;
+		constexpr static MemoryProperty Property = MemoryProperty::DeviceLocal | MemProperty;
 		constexpr static SharingMode Mode = ShareMode;
 
-		DeviceLocalBuffer(LogicalDeviceAccessor device, size_t size, std::optional<CommandManager> manager = std::nullopt) : Buffer<Type, Property, Mode>(device, size) {};
+		DeviceLocalBuffer(LogicalDeviceAccessor device, size_t size, std::optional<CommandManager> manager = std::nullopt) : Buffer<Type, Property, Mode>(device, size, manager) {};
 	};
 
 	// ==========================================================================================================
@@ -264,6 +269,10 @@ namespace VSL_NAMESPACE {
 		size_t offset = 0;
 		return helper::copy_with_shift_offset(buff.data, size(), offset, args...);
 	}
+
+    bool vsl::BufferAccessor::copy(std::derived_from<BufferAccessor> auto& buf) {
+        return copyByBuffer(&buf);
+    }
 
 	template<typename... Args>
 	void VSL_NAMESPACE::BufferAccessor::uncheck_copy(const Args&... args) {

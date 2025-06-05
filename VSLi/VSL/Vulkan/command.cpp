@@ -11,10 +11,6 @@
 #include "surface.h"
 
 
-namespace VSL_NAMESPACE::defaults {
-	std::shared_ptr<VSL_NAMESPACE::_impl::CommandManager_impl> COMMAND_MANAGER = nullptr;
-}
-
 VSL_NAMESPACE::CommandPool::CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor device)
 {
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::CommandPool_impl>(new VSL_NAMESPACE::_impl::CommandPool_impl);

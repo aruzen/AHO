@@ -72,7 +72,7 @@ void VSL_NAMESPACE::pipeline_layout::VertexInput::injection(VSL_NAMESPACE::Pipel
 	auto& vertexBindingDescriptions = std::any_cast<VIBDs&>(info.pool["vertexBindingDescriptions"] = VIBDs());
 	auto& vertexAttributeDescriptions = std::any_cast<VIADs&>(info.pool["vertexAttributeDescriptions"] = VIADs());
 
-	std::uint32_t nextBinding = 0, nextLocation = 0, nextOffset = 0;
+	std::uint32_t nextBinding = 0, nextLocation = 0;
 	for (auto& def : this->definitions) {
 		vk::VertexInputBindingDescription vertexBindingDescription;
 		vertexBindingDescription.binding = def.binding != (std::uint32_t)-1 ? def.binding : nextBinding;
@@ -84,6 +84,7 @@ void VSL_NAMESPACE::pipeline_layout::VertexInput::injection(VSL_NAMESPACE::Pipel
 		vertexBindingDescription.inputRate = (vk::VertexInputRate)def.updateTiming;
 		vertexBindingDescriptions.push_back(vertexBindingDescription);
 
+        std::uint32_t nextOffset = 0;
 		for (auto& layout : def.layouts) {
 			vk::VertexInputAttributeDescription vertexAttributeDescription;
 			vertexAttributeDescription.location = layout.location != (std::uint32_t)-1 ? layout.location : nextLocation;

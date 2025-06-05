@@ -11,7 +11,16 @@ add_compile_options(-fconcepts-diagnostics-depth=7)
 
 # 実行ファイルを作成
 add_executable(AHO
-        ../AHO/Main.cpp)
+        ../AHO/Main.cpp
+        ../AHOLi/AHO/io/Input.cpp
+        ../AHOLi/AHO/io/Input.hpp
+        ../AHOLi/AHO/io/InputManager.cpp
+        ../AHOLi/AHO/io/InputManager.hpp
+        ../AHOLi/AHO/io/Key.cpp
+        ../AHOLi/AHO/io/Key.hpp
+        ../AHOLi/AHO/io/KeyBoard.cpp
+        ../AHOLi/AHO/io/KeyBoard.hpp
+        ../AHOLi/AHO/const_values.hpp)
 
 # ライブラリをリンク
 link_directories(lib)

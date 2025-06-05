@@ -41,6 +41,10 @@ add_library(VSL STATIC
         ../VSLi/VSL/Vulkan/Vulkan.cpp
         ../VSLi/VSL/debug.cpp
         VSL/Vulkan/stages/dynamic_state.cpp
+        VSL/Vulkan/commands/bind_index_buffers.cpp
+        VSL/Vulkan/commands/draw_indexed.cpp
+        VSL/defaults.cpp
+        VSL/defaults.hpp
 )
 
 # Vulkan SDK のパスを指定

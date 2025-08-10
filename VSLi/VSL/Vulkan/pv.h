@@ -27,7 +27,11 @@ namespace VSL_NAMESPACE::_impl {
 	struct Fence_impl;
 	struct SynchroManager_impl;
 	struct Buffer_impl;
-
+    struct ResourceBindingLayout_impl;
+    struct GraphicResourcePool_impl;
+    struct GraphicResourceManager_impl;
+    struct GraphicResource_impl;
+    struct Image_impl;
 	namespace pipeline_layout {
 		struct ShaderGroup_impl;
 		// struct VertexInput_impl;

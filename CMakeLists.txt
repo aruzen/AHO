@@ -21,6 +21,7 @@ add_subdirectory(AHO)
 add_subdirectory(AHOLi)
 add_subdirectory(Dev)
 add_subdirectory(VSLi)
+add_subdirectory(Fractal)
 
 # GLFWのインクルードディレクトリとリンクディレクトリを設定
 include_directories(${GLFW_INCLUDE_DIRS})

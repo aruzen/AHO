@@ -16,9 +16,9 @@
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 
-vsl::Surface::Surface(vsl::PureWindow* window, VSL_NAMESPACE::VulkanAccessor instance)
+VSL_NAMESPACE::Surface::Surface(VSL_NAMESPACE::PureWindow* window, VSL_NAMESPACE::VulkanAccessor instance)
 {
-	_data = std::shared_ptr<vsl::_impl::Surface_impl>(new vsl::_impl::Surface_impl);
+	_data = std::shared_ptr<VSL_NAMESPACE::_impl::Surface_impl>(new VSL_NAMESPACE::_impl::Surface_impl);
 	_data->vulkan = instance._accessor;
 
 	VkSurfaceKHR surface;

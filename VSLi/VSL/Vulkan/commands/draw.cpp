@@ -3,6 +3,7 @@
 #endif
 #include "draw.h"
 #include "../_pimpls.h"
+#include "../phase.hpp"
 
 VSL_NAMESPACE::command::DrawManip VSL_NAMESPACE::command::draw;
 
@@ -14,5 +15,5 @@ void VSL_NAMESPACE::command::Draw::invoke(CommandPool pool, CommandBuffer buffer
 
 void VSL_NAMESPACE::command::DrawManip::manipulate(DefaultPhaseStreamOperator* op, CommandPool pool, CommandBuffer buffer, CommandManager manager)
 {
-	buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].draw(op->vertexSize, 1, 0, 0);
+	buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].draw(op->vertexSize.value(), 1, 0, 0);
 }

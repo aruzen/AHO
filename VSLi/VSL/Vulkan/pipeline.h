@@ -1,4 +1,5 @@
 #pragma once
+
 #include "../define.h"
 #include "pv.h"
 
@@ -6,11 +7,19 @@
 #include "render_pass.h"
 
 namespace VSL_NAMESPACE {
-	struct Pipeline {
-		Pipeline(PipelineLayoutAccessor layout, RenderPass pass);
+    struct PipelineAccessor {
+        std::shared_ptr<_impl::Pipeline_impl> _data;
+    };
 
-		std::shared_ptr<_impl::Pipeline_impl> _data;
+    struct GraphicsPipeline : public PipelineAccessor {
+        GraphicsPipeline(PipelineLayoutAccessor layout, RenderPass pass);
 
-		void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
-	};
+        void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
+    };
+
+    struct ComputePipeline : public PipelineAccessor {
+        ComputePipeline(PipelineLayoutAccessor layout);
+
+        void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
+    };
 }

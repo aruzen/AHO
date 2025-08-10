@@ -3,6 +3,7 @@
 
 #include "device.h"
 #include "command.h"
+#include "image.hpp"
 
 #include "../utils/Flags.h"
 #include <optional>
@@ -201,7 +202,11 @@ namespace VSL_NAMESPACE {
 		*/
         bool copy(std::derived_from<BufferAccessor> auto& buf);
 
+        bool copy(Image image, std::optional<vsl::FenceHolder> waitFence = std::nullopt);
+
 		bool copyByBuffer(BufferAccessor* buf);
+
+        bool copyByImage(Image image, std::optional<vsl::FenceHolder> waitFence = std::nullopt);
 
 		size_t size();
 
@@ -265,7 +270,7 @@ namespace VSL_NAMESPACE {
 
 	template<typename... Args>
 	bool VSL_NAMESPACE::BufferAccessor::copy(const Args&... args) {
-		auto buff = data();
+		auto buff = this->data();
 		size_t offset = 0;
 		return helper::copy_with_shift_offset(buff.data, size(), offset, args...);
 	}

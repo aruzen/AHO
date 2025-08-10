@@ -39,15 +39,11 @@ vsl::Shader<_Type>::Shader(vsl::LogicalDeviceAccessor device, std::filesystem::p
 
 	_data->shaderModule = _data->device->device.createShaderModule(createInfo);
 
-	_data->name = path.filename().string();
+	_data->name = "main";
 
 	_data->shaderStageCreateInfo.pName = _data->name.c_str();
 	_data->shaderStageCreateInfo.module = _data->shaderModule;
-	if constexpr (_Type == ShaderType::Vertex) {
-		_data->shaderStageCreateInfo.stage = vk::ShaderStageFlagBits::eVertex;
-	} else if constexpr (_Type == ShaderType::Fragment) {
-		_data->shaderStageCreateInfo.stage = vk::ShaderStageFlagBits::eFragment;
-	}
+    _data->shaderStageCreateInfo.stage = (vk::ShaderStageFlagBits)_Type;
 }
 
 template<VSL_NAMESPACE::ShaderType _Type>
@@ -77,7 +73,7 @@ vsl::Shader<_Type>::Shader(vsl::LogicalDeviceAccessor device, std::filesystem::p
 
 	_data->shaderModule = _data->device->device.createShaderModule(createInfo);
 
-	_data->name = name;
+	_data->name = "main";
 
 	_data->shaderStageCreateInfo.pName = _data->name.c_str();
 	_data->shaderStageCreateInfo.module = _data->shaderModule;

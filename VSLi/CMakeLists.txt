@@ -45,6 +45,16 @@ add_library(VSL STATIC
         VSL/Vulkan/commands/draw_indexed.cpp
         VSL/defaults.cpp
         VSL/defaults.hpp
+        VSL/Vulkan/descriptor.cpp
+        VSL/Vulkan/descriptor.hpp
+        VSL/Vulkan/stages/resource_binding.h
+        VSL/Vulkan/stages/resource_binding.h
+        VSL/Vulkan/commands/bind_graphic_resource.cpp
+        VSL/Vulkan/phase.cpp
+        VSL/Vulkan/stages/resource_binding.cpp
+        VSL/Vulkan/commands/dispatch.cpp
+        VSL/Vulkan/image.cpp
+        VSL/Vulkan/commands/pipeline_barrier.cpp
 )
 
 # Vulkan SDK のパスを指定

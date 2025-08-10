@@ -4,7 +4,17 @@
 #include "synchronize.h"
 
 #include "_pimpls.h"
+#include "../exceptions.h"
 
+/*
+ * FIXME
+ * おそらくValidationLayer側のバグであるがで1回目のreset時のみエラーが出る
+ *  frame #0: 0x0000000181ba4158 libc++abi.dylib`__cxa_throw
+ *  frame #1: 0x0000000181b14a4c libc++.1.dylib`std::exception_ptr std::make_exception_ptr[abi:ue170006]<std::__1::future_error>(std::__1::future_error) + 104
+ *  frame #2: 0x0000000181b14978 libc++.1.dylib`std::__1::promise<void>::~promise() + 112
+ *  frame #3: 0x0000000108843cc4 libVkLayer_khronos_validation.dylib`vvl::Fence::Reset() + 124
+ */
+#include <future>
 
 void VSL_NAMESPACE::SemaphoreHolder::destroy() {
 	for (auto semaphore : _data->semaphores)
@@ -34,7 +44,13 @@ void VSL_NAMESPACE::FenceHolder::reset() {
 
 void VSL_NAMESPACE::FenceHolder::reset(std::uint32_t target_idx)
 {
-	_data->_manager->device->device.resetFences(_data->fences[target_idx]);
+    try {
+        auto result = _data->_manager->device->device.resetFences(1, &_data->fences[target_idx]);
+        if (result != vk::Result::eSuccess)
+            loggingln("resetFence failed.");
+    } catch (...) {
+        loggingln("Exception caught in resetFences");
+    }
 }
 
 void VSL_NAMESPACE::FenceHolder::destroy() {

@@ -1,0 +1,52 @@
+#version 450
+
+layout(local_size_x = 1, local_size_y = 1) in;
+
+layout(std430, binding = 0) buffer PrevRow {
+    uint prevRow[];
+};
+
+layout(std430, binding = 1) buffer CurrRow {
+    uint currRow[];
+};
+
+layout(std140, binding = 2) uniform UniformBufferObject {
+    uint baseNumber;
+    uint rowIndex;
+} ubo;
+
+layout(binding = 3, rgba8) uniform writeonly image2D img;
+
+layout(std430, binding = 4) buffer DebugOutput {
+    float firstValue;
+    float secondValue;
+};
+
+vec4 hue2rgb(float h) {
+    h = mod(h, 1.0) * 6.0;
+    float c = 1.0;
+    float x = 1.0 - abs(mod(h, 2.0) - 1.0);
+
+    if (h < 1.0) return vec4(c, x, 0.0, 1.0);
+    else if (h < 2.0) return vec4(x, c, 0.0, 1.0);
+    else if (h < 3.0) return vec4(0.0, c, x, 1.0);
+    else if (h < 4.0) return vec4(0.0, x, c, 1.0);
+    else if (h < 5.0) return vec4(x, 0.0, c, 1.0);
+    else return vec4(c, 0.0, x, 1.0);
+}
+
+void main() {
+    uint x = gl_GlobalInvocationID.x;
+    uint y = ubo.rowIndex;
+
+    uint val = 0;
+    if (x == 0 || x == y) {
+        val = 1;
+    } else {
+        val = (prevRow[x - 1] + prevRow[x]) % ubo.baseNumber;
+    }
+
+    currRow[x] = val;
+
+    imageStore(img, ivec2(x, y), hue2rgb(float(val)/float(ubo.baseNumber)));
+}

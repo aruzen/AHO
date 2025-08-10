@@ -335,6 +335,101 @@ struct Upper { \
 		constexpr _CoordinateSet<decltype(std::declval<T1>() + std::declval<T2>()), typename _MakeCoordinateInfo<false, true, true>::value> operator +(const Y<T1>& e1, const Y<T2>& e2) {
 			return { e1 , e2 };
 		}
+
+        template<typename T1, typename CI1, typename T2, typename CI2>
+        constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _SumCoordinateInfo<CI1, CI2>::value> operator -(const _CoordinateSet<T1, CI1>& e1, const _CoordinateSet<T2, CI2>& e2) {
+            _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _SumCoordinateInfo<CI1, CI2>::value> result;
+            if constexpr (CI1::EnabledX) {
+                result -= e1.x;
+            }
+            if constexpr (CI1::EnabledY) {
+                result -= e1.y;
+            }
+            if constexpr (CI1::EnabledZ) {
+                result -= e1.z;
+            }
+
+            if constexpr (CI2::EnabledX) {
+                result -= e2.x;
+            }
+            if constexpr (CI2::EnabledY) {
+                result -= e2.y;
+            }
+            if constexpr (CI2::EnabledZ) {
+                result -= e2.z;
+            }
+
+            return result;
+        }
+
+        template<typename T1, typename CI1, typename T2>
+        constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _SumCoordinateInfo<CI1, _MakeCoordinateInfo<true, false, false>::value>::value> operator -(const _CoordinateSet<T1, CI1>& e1, const X<T2>& e2) {
+            _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _SumCoordinateInfo<CI1, _MakeCoordinateInfo<true, false, false>::value>::value> result;
+            if constexpr (CI1::EnabledX) {
+                result -= e1.x;
+            }
+            if constexpr (CI1::EnabledY) {
+                result -= e1.y;
+            }
+            if constexpr (CI1::EnabledZ) {
+                result -= e1.z;
+            }
+
+            result -= e2;
+
+            return result;
+        }
+
+        template<typename T1, typename CI1, typename T2>
+        constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _SumCoordinateInfo<CI1, _MakeCoordinateInfo<false, true, false>::value>::value> operator -(const _CoordinateSet<T1, CI1>& e1, const Y<T2>& e2) {
+            _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _SumCoordinateInfo<CI1, _MakeCoordinateInfo<false, true, false>::value>::value> result;
+            if constexpr (CI1::EnabledX) {
+                result -= e1.x;
+            }
+            if constexpr (CI1::EnabledY) {
+                result -= e1.y;
+            }
+            if constexpr (CI1::EnabledZ) {
+                result -= e1.z;
+            }
+
+            result -= e2;
+
+            return result;
+        }
+
+        template<typename T1, typename CI1, typename T2>
+        constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _SumCoordinateInfo<CI1, _MakeCoordinateInfo<false, false, true>::value>::value> operator -(const _CoordinateSet<T1, CI1>& e1, const Z<T2>& e2) {
+            _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _SumCoordinateInfo<CI1, _MakeCoordinateInfo<false, false, true>::value>::value> result;
+            if constexpr (CI1::EnabledX) {
+                result -= e1.x;
+            }
+            if constexpr (CI1::EnabledY) {
+                result -= e1.y;
+            }
+            if constexpr (CI1::EnabledZ) {
+                result -= e1.z;
+            }
+
+            result -= e2;
+
+            return result;
+        }
+
+        template<typename T1, typename T2>
+        constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _MakeCoordinateInfo<true, true, false>::value> operator -(const X<T1>& e1, const Y<T2>& e2) {
+            return { e1 , e2 };
+        }
+
+        template<typename T1, typename T2>
+        constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _MakeCoordinateInfo<true, false, true>::value> operator -(const X<T1>& e1, const Z<T2>& e2) {
+            return { e1 , e2 };
+        }
+
+        template<typename T1, typename T2>
+        constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _MakeCoordinateInfo<false, true, true>::value> operator -(const Y<T1>& e1, const Y<T2>& e2) {
+            return { e1 , e2 };
+        }
         namespace literals {
 		    constexpr X<double> operator"" AHO_LITERAL(x)(long double v) { return { (double)v }; };
 		    constexpr X<int> operator"" AHO_LITERAL(x)(unsigned long long v) { return { (int)v }; };

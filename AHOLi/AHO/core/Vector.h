@@ -6,11 +6,11 @@
 
 #include <compare>
 #include <cmath>
+#include "ov.h"
+#include "math/coordinate.h"
 
 namespace AHO_NAMESPACE {
-	template<typename R = int,
-			 VSL_NAMESPACE::is_dimention D = VSL_NAMESPACE::VSL_DEFAULT_DIMENTION_STRUCT,
-	 		 typename CoordinateInfo = typename AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<D>::value>
+	template<typename R, VSL_NAMESPACE::is_dimention D, typename CoordinateInfo>
 	struct _Vector {
     };
 
@@ -135,6 +135,12 @@ namespace AHO_NAMESPACE {
         constexpr auto cross(const T& m) const;
 
 		constexpr auto length() const;
+
+        constexpr _Vector<R, VSL_NAMESPACE::D1, CI>& normalize();
+
+        constexpr auto get_normalized() const;
+
+        constexpr operator Mat<R, 1, 1>() const;
 	};
 
 	template<typename R, typename CI>
@@ -196,6 +202,14 @@ namespace AHO_NAMESPACE {
         constexpr auto cross(const T& m) const;
 
 		constexpr auto length() const;
+
+        constexpr _Vector<R, VSL_NAMESPACE::D2, CI>& normalize();
+
+        constexpr auto get_normalized() const;
+
+        constexpr operator Mat<R, 1, 2>() const;
+
+        constexpr operator Mat<R, 2, 2>() const;
 	};
 
 	template<typename R, typename CI>
@@ -257,6 +271,14 @@ namespace AHO_NAMESPACE {
         constexpr auto cross(const T& m) const;
 
 		constexpr auto length() const;
+
+        constexpr _Vector<R, VSL_NAMESPACE::D3, CI>& normalize();
+
+        constexpr auto get_normalized() const;
+
+        constexpr operator Mat<R, 1, 4>() const;
+
+        constexpr operator Mat<R, 4, 4>() const;
 	};
 
     namespace product::dot {
@@ -269,7 +291,12 @@ namespace AHO_NAMESPACE {
         constexpr auto operator *(_Vector<R1, Dim, CI> v1, _Vector<R2, Dim, CI> v2);
     }
 
-	// ---------------------------------------------------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------------------------------
+
+    template<typename L, typename R, typename Dim, typename CI>
+    constexpr auto operator *(const L& l, _Vector<R, Dim, CI> v1);
+
+    // ---------------------------------------------------------------------------------------------------------------------
 
 	template<typename R, typename CI>
 	constexpr bool _Vector<R, VSL_NAMESPACE::D1, CI>::operator<(const _Vector<R, VSL_NAMESPACE::D1, CI>& p) const
@@ -368,6 +395,25 @@ namespace AHO_NAMESPACE {
 	{
 		return std::abs(value.___AN1);
 	}
+
+    template<typename R, typename CI>
+    constexpr _Vector<R, VSL_NAMESPACE::D1, CI>& _Vector<R, VSL_NAMESPACE::D1, CI>::normalize()
+    {
+        this->value.___AN1 = 1;
+        return *this;
+    }
+
+    template<typename R, typename CI>
+    constexpr auto _Vector<R, VSL_NAMESPACE::D1, CI>::get_normalized() const
+    {
+        return _Vector<R, VSL_NAMESPACE::D1, CI>{ 1 };
+    }
+
+    template<typename R, typename CI>
+    constexpr _Vector<R, VSL_NAMESPACE::D1, CI>::operator Mat<R, 1, 1>() const
+    {
+        return Mat<R, 1, 1>({ { value.___AN1} });
+    }
 
 	// ---------------------------------------------------------------------------------------------------------------------
 
@@ -474,6 +520,31 @@ namespace AHO_NAMESPACE {
 		return std::sqrt(std::abs(value.___AN1 * value.___AN1 + value.___AN2 * value.___AN2));
 	}
 
+    template<typename R, typename CI>
+    constexpr _Vector<R, VSL_NAMESPACE::D2, CI>& _Vector<R, VSL_NAMESPACE::D2, CI>::normalize()
+    {
+        *this /= length();
+        return *this;
+    }
+
+    template<typename R, typename CI>
+    constexpr auto _Vector<R, VSL_NAMESPACE::D2, CI>::get_normalized() const
+    {
+        return *this / length();
+    }
+
+    template<typename R, typename CI>
+    constexpr _Vector<R, VSL_NAMESPACE::D2, CI>::operator Mat<R, 1, 2>() const
+    {
+        return Mat<R, 1, 2>({ { value.___AN1, value.___AN2 } });
+    }
+
+    template<typename R, typename CI>
+    constexpr _Vector<R, VSL_NAMESPACE::D2, CI>::operator Mat<R, 2, 2>() const
+    {
+        return Mat<R, 2, 2>({ { value.___AN1, 0 }, { 0, value.___AN2 } });
+    }
+
 	// ---------------------------------------------------------------------------------------------------------------------
 
 	template<typename R, typename CI>
@@ -575,7 +646,11 @@ namespace AHO_NAMESPACE {
     requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>, T>
     inline constexpr auto _Vector<R, VSL_NAMESPACE::D3, CI>::cross(const T& m) const
     {
-        return value.___AN1 * m.value.___AN1 + value.___AN2 * m.value.___AN2 + value.___AN3 * m.value.___AN3;
+        return _Vector<R, VSL_NAMESPACE::D3, CI>{
+                value.y.value * m.value.z.value - value.z.value * m.value.y.value,
+                value.z.value * m.value.x.value - value.x.value * m.value.z.value,
+                value.x.value * m.value.y.value - value.y.value * m.value.x.value
+        };
     }
 
 	template<typename R, typename CI>
@@ -583,6 +658,31 @@ namespace AHO_NAMESPACE {
 	{
 		return std::sqrt(std::abs(value.___AN1 * value.___AN1 + value.___AN2 * value.___AN2 + value.___AN3 * value.___AN3));
 	}
+
+    template<typename R, typename CI>
+    constexpr _Vector<R, VSL_NAMESPACE::D3, CI>& _Vector<R, VSL_NAMESPACE::D3, CI>::normalize()
+    {
+        *this /= length();
+        return *this;
+    }
+
+    template<typename R, typename CI>
+    constexpr auto _Vector<R, VSL_NAMESPACE::D3, CI>::get_normalized() const
+    {
+        return *this / length();
+    }
+
+    template<typename R, typename CI>
+    constexpr _Vector<R, VSL_NAMESPACE::D3, CI>::operator Mat<R, 1, 4>() const
+    {
+        return Mat<R, 1, 4>({ { value.___AN1, value.___AN2, value.___AN3, 0 } });
+    }
+
+    template<typename R, typename CI>
+    constexpr _Vector<R, VSL_NAMESPACE::D3, CI>::operator Mat<R, 4, 4>() const
+    {
+        return Mat<R, 4, 4>({ { value.___AN1, 0, 0, 0 }, { 0, value.___AN2, 0, 0 }, { 0, 0, value.___AN3, 0 } });
+    }
 
     // ---------------------------------------------------------------------------------------------------------------------
 
@@ -598,5 +698,12 @@ namespace AHO_NAMESPACE {
         constexpr auto operator *(_Vector<R1, Dim, CI> v1, _Vector<R2, Dim, CI> v2) {
             return v1.cross(v2);
         }
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------------
+
+    template<typename L, typename R, typename Dim, typename CI>
+    constexpr auto operator *(const L& l, _Vector<R, Dim, CI> v1) {
+        return v1 * l;
     }
 }

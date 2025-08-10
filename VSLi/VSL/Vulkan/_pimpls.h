@@ -182,7 +182,6 @@ namespace VSL_NAMESPACE::_impl {
 		std::shared_ptr<PipelineLayout_impl> layout;
 
 		vk::Pipeline pipeline;
-		std::vector<vk::Semaphore> waitSemaphores;
 
 		~Pipeline_impl();
 	};
@@ -232,6 +231,49 @@ namespace VSL_NAMESPACE::_impl {
 
 		~Buffer_impl();
 	};
+
+    struct ResourceBindingLayout_impl {
+        std::shared_ptr<LogicalDevice_impl> device;
+
+        std::vector<vk::DescriptorSetLayoutBinding> layoutBindings;
+        vk::DescriptorSetLayout layout;
+
+        ~ResourceBindingLayout_impl();
+    };
+
+    struct GraphicResourcePool_impl;
+    struct GraphicResourceManager_impl {
+        std::shared_ptr<LogicalDevice_impl> device;
+
+        std::vector<std::shared_ptr<GraphicResourcePool_impl>> pools;
+
+        ~GraphicResourceManager_impl();
+    };
+
+    struct GraphicResource_impl;
+    struct GraphicResourcePool_impl {
+        std::shared_ptr<_impl::GraphicResourceManager_impl> manager;
+
+        vk::DescriptorPool descriptorPool;
+        std::vector<std::shared_ptr<GraphicResource_impl>> resources;
+
+        ~GraphicResourcePool_impl();
+    };
+
+    struct GraphicResource_impl {
+        std::shared_ptr<_impl::GraphicResourcePool_impl> pool;
+        std::weak_ptr<_impl::ResourceBindingLayout_impl> layout;
+
+        vk::DescriptorSet descriptorSet;
+    };
+
+    struct Image_impl {
+        std::shared_ptr<LogicalDevice_impl> device;
+        vk::Image image;
+        vk::ImageView view;
+        vk::DeviceMemory memory;
+        std::uint32_t width, height;
+    };
 
 	namespace pipeline_layout {
 		struct ShaderGroup_impl {

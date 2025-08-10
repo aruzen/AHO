@@ -13,12 +13,6 @@ namespace AHO_NAMESPACE {
 
 			constexpr Radian operator +() const { return { value }; }
 			constexpr Radian operator -() const { return { -value }; }
-			constexpr Radian operator +(const Radian& r) const { return { value + r.value }; }
-			constexpr Radian operator -(const Radian& r) const { return { value - r.value }; }
-			constexpr Radian operator *(const double& m) const { return { value * m }; }
-			constexpr Radian operator *(const size_t& m) const { return { value * m }; }
-			constexpr Radian operator /(const double& m) const { return { value / m }; }
-			constexpr Radian operator /(const size_t& m) const { return { value / m }; }
 
 			constexpr Radian& operator +=(Radian r) { value += r.value; return *this; }
 			constexpr Radian& operator -=(Radian r) { value -= r.value; return *this; }
@@ -43,12 +37,6 @@ namespace AHO_NAMESPACE {
 
 			constexpr Degree operator +() const { return { value }; }
 			constexpr Degree operator -() const { return { -value }; }
-			constexpr Degree operator +(const Degree& r) const { return { value + r.value }; }
-			constexpr Degree operator -(const Degree& r) const { return { value - r.value }; }
-			constexpr Degree operator *(const double& m) const { return { value * m }; }
-			constexpr Degree operator *(const size_t& m) const { return { value * m }; }
-			constexpr Degree operator /(const double& m) const { return { value / m }; }
-			constexpr Degree operator /(const size_t& m) const { return { value / m }; }
 
 			constexpr Degree& operator +=(Degree r) { value += r.value; return *this; }
 			constexpr Degree& operator -=(Degree r) { value -= r.value; return *this; }
@@ -66,7 +54,39 @@ namespace AHO_NAMESPACE {
 			constexpr operator Radian() const;
 		};
 
-		constexpr Radian::operator Degree() const {
+        constexpr Radian operator +(const Radian& o, const Radian& r) { return { o.value + r.value }; }
+        constexpr Radian operator -(const Radian& o, const Radian& r) { return { o.value - r.value }; }
+        constexpr Radian operator *(const Radian& o, const double& m) { return { o.value * m }; }
+        constexpr Radian operator *(const Radian& o, const size_t& m) { return { o.value * m }; }
+        constexpr Radian operator *(const Radian& o, const float& m) { return { o.value * m }; }
+        constexpr Radian operator /(const Radian& o, const double& m) { return { o.value / m }; }
+        constexpr Radian operator /(const Radian& o, const size_t& m) { return { o.value / m }; }
+        constexpr Radian operator /(const Radian& o, const float& m) { return { o.value / m }; }
+        constexpr Radian operator *(const double& m, const Radian& o) { return { m * o.value }; }
+        constexpr Radian operator *(const size_t& m, const Radian& o) { return { m * o.value }; }
+        constexpr Radian operator *(const float& m, const Radian& o) { return { m * o.value }; }
+        constexpr Radian operator /(const double& m, const Radian& o) { return { m / o.value }; }
+        constexpr Radian operator /(const size_t& m, const Radian& o) { return { m / o.value }; }
+        constexpr Radian operator /(const float& m, const Radian& o) { return { m / o.value }; }
+
+
+        constexpr Degree operator +(const Degree& o, const Degree& r) { return { o.value + r.value }; }
+        constexpr Degree operator -(const Degree& o, const Degree& r) { return { o.value - r.value }; }
+        constexpr Degree operator *(const Degree& o, const double& m) { return { o.value * m }; }
+        constexpr Degree operator *(const Degree& o, const size_t& m) { return { o.value * m }; }
+        constexpr Degree operator *(const Degree& o, const  float& m) { return { o.value * m }; }
+        constexpr Degree operator /(const Degree& o, const double& m) { return { o.value / m }; }
+        constexpr Degree operator /(const Degree& o, const size_t& m) { return { o.value / m }; }
+        constexpr Degree operator /(const Degree& o, const  float& m) { return { o.value / m }; }
+        constexpr Degree operator *(const double& m, const Degree& o) { return {  m * o.value }; }
+        constexpr Degree operator *(const size_t& m, const Degree& o) { return {  m * o.value }; }
+        constexpr Degree operator *(const  float& m, const Degree& o) { return {  m * o.value }; }
+        constexpr Degree operator /(const double& m, const Degree& o) { return {  m / o.value }; }
+        constexpr Degree operator /(const size_t& m, const Degree& o) { return {  m / o.value }; }
+        constexpr Degree operator /(const  float& m, const Degree& o) { return {  m / o.value }; }
+
+
+        constexpr Radian::operator Degree() const {
 			return { value * 180.0 / std::numbers::pi };
 		}
 

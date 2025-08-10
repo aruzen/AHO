@@ -3,15 +3,16 @@
 
 #include <string>
 #include <source_location>
+#include <exception>
 
 namespace VSL_NAMESPACE::exceptions {
-	struct VSLException{
-		std::string name, message, traceinfo;
+	struct VSLException : public std::exception {
+		std::string reason;
 
-		std::string what();
+        virtual const char* what();
 	};
 
-	struct RuntimeException : VSLException{
+	struct RuntimeException : public VSLException{
 		RuntimeException(std::string type, std::string message = "", std::string traceinfo = "");
 		RuntimeException(std::string type, std::string message, std::source_location sourece);
 	};

@@ -10,9 +10,7 @@
 #include "Vector.h"
 
 namespace AHO_NAMESPACE {
-	template<typename R = int, 
-		VSL_NAMESPACE::is_dimention D = VSL_NAMESPACE::VSL_DEFAULT_DIMENTION_STRUCT,
-		typename CoordinateInfo = AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<D>::value>
+	template<typename R, VSL_NAMESPACE::is_dimention D, typename CoordinateInfo>
 	struct _Point {
 	};
 

@@ -342,6 +342,11 @@ VSL_NAMESPACE::LogicalDevice<C>::LogicalDevice(VSL_NAMESPACE::PhysicalDevice _de
 	_data->parentSurface = _surface->_data;
 }
 
+template<typename C>
+size_t VSL_NAMESPACE::LogicalDevice<C>::getSwapImageSize() {
+    return _data->imageCount;
+}
+
 VSL_NAMESPACE::_impl::LogicalDevice_impl::~LogicalDevice_impl() {
 	device.destroy();
 }

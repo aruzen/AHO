@@ -13,7 +13,6 @@ VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException::MemoryNotHostVisibleEx
 	VSL_NAMESPACE::exceptions::RuntimeException("MemoryNotHostVisibleException", "This buffer's memory is not host-visible. Mapping is not allowed.", sourece) {}
 
 std::uint32_t findMemoryType(VSL_NAMESPACE::LogicalDeviceAccessor device, std::uint32_t typeFilter, vk::MemoryPropertyFlags properties) {
-
 	if (not device._data->parentDevice->memProps.has_value())
 		device._data->parentDevice->makeMemProps();
 	auto& memProperties = device._data->parentDevice->memProps.value();
@@ -27,6 +26,10 @@ std::uint32_t findMemoryType(VSL_NAMESPACE::LogicalDeviceAccessor device, std::u
 bool VSL_NAMESPACE::BufferAccessor::copy(BufferAccessor* buf)
 {
 	return copyByBuffer(buf);
+}
+
+bool vsl::BufferAccessor::copy(vsl::Image image, std::optional<vsl::FenceHolder> waitFence) {
+    return copyByImage(image, waitFence);
 }
 
 bool VSL_NAMESPACE::BufferAccessor::copyByBuffer(BufferAccessor* buf) {
@@ -60,6 +63,44 @@ bool VSL_NAMESPACE::BufferAccessor::copyByBuffer(BufferAccessor* buf) {
 	commandManager._data->graphicsQueue.waitIdle();
 
 	return false;
+}
+
+bool vsl::BufferAccessor::copyByImage(vsl::Image image, std::optional<vsl::FenceHolder> waitFence) {
+    vk::BufferImageCopy region;
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;  // tightly packed
+    region.bufferImageHeight = 0;
+    region.imageSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = vk::Offset3D{0, 0, 0};
+    region.imageExtent = vk::Extent3D{image._data->width, image._data->height, 1};
+
+    waitFence.value().reset(0);
+
+    auto commandManager = CommandManager{ _data->commandManager.value() };
+    auto commandBuf = commandManager.makeExclusiveBuffer();
+
+    auto vkCommandBuf = commandBuf._data->commandBuffers[0];
+
+    vk::CommandBufferBeginInfo beginInfo;
+    vkCommandBuf.begin(beginInfo);
+    vkCommandBuf.copyImageToBuffer(
+            image._data->image, vk::ImageLayout::eGeneral,
+            _data->buffer,
+            region
+    );
+    vkCommandBuf.end();
+
+    vk::SubmitInfo submitInfo;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &vkCommandBuf;
+
+    // TODO
+    commandManager._data->graphicsQueue.submit({ submitInfo }, waitFence.value()._data->fences[0]);
+    waitFence.value().wait();
+    return false;
 }
 
 size_t VSL_NAMESPACE::BufferAccessor::size()
@@ -127,7 +168,15 @@ GetData(VSL_NAMESPACE::BufferAccessor* data, std::optional<size_t> size, size_t 
 	VSL_NAMESPACE::BufferAccessor::LocalBufferHolder holder = { data, size ? size.value() : data->_data->allocatedSize, offset };
 	holder.data =
 		data->_data->device->device.mapMemory(data->_data->deviceMem, offset, size ? size.value() : data->_data->allocatedSize);
-	return holder;
+
+    vk::MappedMemoryRange mappedRange;
+    mappedRange.memory = data->_data->deviceMem;
+    mappedRange.offset = 0;
+    mappedRange.size = VK_WHOLE_SIZE;  // またはコピー範囲のサイズ
+
+    data->_data->device->device.invalidateMappedMemoryRanges({mappedRange});
+
+    return holder;
 }
 
 

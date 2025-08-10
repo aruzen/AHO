@@ -3,6 +3,7 @@
 #endif
 #include "draw_indexed.h"
 #include "../_pimpls.h"
+#include "../phase.hpp"
 
 VSL_NAMESPACE::command::DrawIndexedManip VSL_NAMESPACE::command::drawIndexed;
 
@@ -14,5 +15,5 @@ void VSL_NAMESPACE::command::DrawIndexed::invoke(CommandPool pool, CommandBuffer
 
 void VSL_NAMESPACE::command::DrawIndexedManip::manipulate(DefaultPhaseStreamOperator* op, CommandPool pool, CommandBuffer buffer, CommandManager manager)
 {
-	buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].drawIndexed(op->vertexSize, 1, 0, 0, 0);
+	buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].drawIndexed(op->vertexSize.value(), 1, 0, 0, 0);
 }

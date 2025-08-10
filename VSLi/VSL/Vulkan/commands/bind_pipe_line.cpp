@@ -4,7 +4,7 @@
 #include "bind_pipe_line.h"
 #include "../_pimpls.h"
 
-VSL_NAMESPACE::command::BindPipeline::BindPipeline(Pipeline pipeline): pipeline(pipeline) {}
+VSL_NAMESPACE::command::BindPipeline::BindPipeline(PipelineAccessor pipeline): pipeline(pipeline) {}
 
 void VSL_NAMESPACE::command::BindPipeline::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager)
 {

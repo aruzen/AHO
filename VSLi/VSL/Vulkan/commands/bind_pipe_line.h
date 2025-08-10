@@ -7,9 +7,9 @@
 
 namespace VSL_NAMESPACE::command {
 	struct BindPipeline : __Command {
-		BindPipeline(Pipeline pipeline);
+		BindPipeline(PipelineAccessor pipeline);
 
-		Pipeline pipeline;
+        PipelineAccessor pipeline;
 
 		void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
 	};

@@ -32,6 +32,7 @@
 #include <VSL/Vulkan/commands/bind_graphic_resource.hpp>
 #include <VSL/Vulkan/commands/draw.h>
 #include <VSL/Vulkan/commands/draw_indexed.h>
+#include <VSL/Vulkan/commands/dispatch.hpp>
 #include <VSL/Vulkan/commands/render_pass_begin.h>
 #include <VSL/Vulkan/commands/render_pass_end.h>
 #include <VSL/Vulkan/stages/color_blend.h>
@@ -45,6 +46,11 @@
 #include <VSL/Vulkan/stages/vertex_input.h>
 #include <VSL/defaults.hpp>
 #include <VSL/Vulkan/descriptor.hpp>
+#include <VSL/Vulkan/image.hpp>
+#include <VSL/Vulkan/commands/pipeline_barrier.hpp>
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "../thirdparty/stb_image_write.h"
 
 // #define AHO_POOP_PUBLIC_SECURITY
 #pragma warning( disable : 4455 )
@@ -65,10 +71,6 @@
 
 #include <chrono>
 
-/*
-* https://vulkan-tutorial.com/en/Vertex_buffers/Staging_buffer
-*/
-
 #include <boost/bimap.hpp>
 
 int main() {
@@ -82,7 +84,7 @@ int main() {
 #ifdef _MSC_VER
         vsl::utils::ShaderCompiler shader_compiler("glslc", "shaders/");
 #elifdef __APPLE_CC__
-        vsl::utils::ShaderCompiler shader_compiler("glslc", "../../AHO/shaders/");
+        vsl::utils::ShaderCompiler shader_compiler("glslc", "../../Fractal/shaders/");
 #endif
         shader_compiler.load();
         shader_compiler.compile();
@@ -91,7 +93,7 @@ int main() {
         Vulkan vk("test", { "VK_KHR_win32_surface", "VK_KHR_surface" });
 #elifdef __APPLE_CC__
         Vulkan vk("test", {"VK_KHR_portability_enumeration", "VK_KHR_surface",
-                           "VK_EXT_metal_surface" });
+                           "VK_EXT_metal_surface"});
 #endif
         auto physical_device = PhysicalDevices(vk).search();
 
@@ -104,197 +106,101 @@ int main() {
         vsl::loggingln("selected : ", physical_device.name(), "(", physical_device.apiVersion(), ")");
 
         SynchroManager synchro_manager(device);
-
-        Swapchain swapchain(device);
-
-        View view(swapchain);
 #ifdef _MSC_VER
-        auto s1 = make_shader<"shaders/const_triangle.vert.spv">(device);
-        auto s2 = make_shader<"shaders/red.frag.spv">(device);
-        pl::ShaderGroup red_triangle_shaders("red_triangle", { s1, s2 }),
-            colorfull_triangle_shaders("colorfull_triangle", { make_shader<"shaders/const_triangle2.vert.spv">(device), make_shader<"shaders/colorfull.frag.spv">(device) }),
-            input_sahders("2d_input", { make_shader<"shaders/input.vert.spv">(device), make_shader<"shaders/input.frag.spv">(device) });
+        pl::ShaderGroup fractal_shaders("fractal",
+                                        {make_shader<"shaders/fractal.comp.spv">(device)});
 #elifdef __APPLE_CC__
-        auto s1 = make_shader<"../../AHO/shaders/const_triangle.vert.spv">(device);
-        auto s2 = make_shader<"../../AHO/shaders/red.frag.spv">(device);
-        pl::ShaderGroup red_triangle_shaders("red_triangle", {s1, s2}),
-                input_d3_shaders("d3_input",
-                                           {make_shader<"../../AHO/shaders/3Dnormal.vert.spv">(device),
-                                            make_shader<"../../AHO/shaders/colorfull.frag.spv">(device)}),
-                input_d2_shaders("2d_input", {make_shader<"../../AHO/shaders/input.vert.spv">(device),
-                                           make_shader<"../../AHO/shaders/input.frag.spv">(device)});
+        pl::ShaderGroup fractal_shaders("fractal",
+                                        {make_shader<"../../Fractal/shaders/fractal.comp.spv">(device)});
 #endif
-
-        Scissor scissor(swapchain);
-        Viewport viewport(swapchain);
-        Viewport left_viewport(viewport), right_viewport(viewport);
-        left_viewport.width /= 2;
-        right_viewport.width /= 2;
-        right_viewport.x = left_viewport.width;
-
-
-        PipelineLayout layout(device,
-                              pl::ColorBlend(),
-                              pl::InputAssembly(),
-                              pl::Multisample(),
-                              pl::Rasterization(),
-                              // pl::DynamicState(),
-                              scissor,
-                              viewport);
-
-        RenderPass render_pass(swapchain);
-
         CommandManager manager(device);
         manager.setDefault();
 
-        auto vert_input = pl::VertexInput().add_shape({data_format::FloatVec2}).add_shape({data_format::FloatRGB});
+        GraphicResourceManager resourceManager(device);
 
-        FrameBuffer frame_buffer(swapchain, view, render_pass);
+        auto resourceBindingLayout = ResourceBindingLayout(device, {
+                ResourceBindingPoint(0, ResourceType::StorageBuffer, ShaderType::Compute),
+                ResourceBindingPoint(1, ResourceType::StorageBuffer, ShaderType::Compute),
+                ResourceBindingPoint(2, ResourceType::UniformBuffer, ShaderType::Compute),
+                ResourceBindingPoint(3, ResourceType::StorageImage, ShaderType::Compute),
+                ResourceBindingPoint(4, ResourceType::StorageBuffer, ShaderType::Compute),
+        });
+        auto [pool, resource] = resourceManager.make({resourceBindingLayout});
 
-        auto resourceBindingLayout = std::vector(device.getSwapImageSize(), ResourceBindingLayout(device, 0, ResourceType::UniformBuffer, ShaderType::Vertex));
-        Pipeline input_vertices(layout.copy().add(pl::ResourceBinding(resourceBindingLayout), input_d3_shaders, vert_input), render_pass);
-
-        auto imageAvailable = synchro_manager.createSemaphore("imageAvailable", manager.getBuffer().getSize()),
-                renderFinished = synchro_manager.createSemaphore("renderFinished", manager.getBuffer().getSize());
-        auto inFlight = synchro_manager.createFence("inFlight", manager.getBuffer().getSize(), true);
-
-        /*
-        vertex center = {{0.0_f_x + 0.0_f_y}, HSV(0.0f, 0.0f, 0.1f).rgb()};
-        vertex top = {{0.0_f_x + -0.1_f_y}, HSV(0.0f, 1.0f, 0.5f).rgb()};
-        vertex right = {{0.1_f_x + 0.1_f_y}, HSV(120.0f, 1.0f, 0.5f).rgb()};
-        vertex left = {{-0.1_f_x + 0.1_f_y}, HSV(240.0f, 1.0f, 0.5f).rgb()};
-         */
-
-        struct ubo_t {
-            alignas(16) Mat4x4<float> model;
-            alignas(16) Mat4x4<float> view;
-            alignas(16) Mat4x4<float> proj;
+        struct alignas(16) ubo_t {
+            std::uint32_t baseNumber;
+            std::uint32_t rowIndex;
         } ubo;
 
-        std::array<RGB, 4> colors = {
-                RGB{1.0f, 0.0f, 0.0f},
-                RGB{0.0f, 1.0f, 0.0f},
-                RGB{0.0f, 0.0f, 1.0f},
-                RGB{1.0f, 1.0f, 1.0f}
+        struct alignas(16) debug_t {
+            float firstColumn;
+            float secondColumn;
         };
 
-        std::array<d2::PointF, 4> vertices = {
-                d2::PointF{-0.5f, -0.5f},
-                d2::PointF{0.5f, -0.5f},
-                d2::PointF{0.5f, 0.5f},
-                d2::PointF{-0.5f, 0.5f}
-        };
+        using StorageBuffer = Buffer<vsl::MemoryType::StorageBuffer, vsl::MemoryProperty::DeviceLocal>;
+        using UboBuffer = Buffer<vsl::MemoryType::UniformBuffer,
+                vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>;
+        using DebugBuffer = Buffer<vsl::MemoryType::StorageBuffer,
+                vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>;
+        StorageBuffer prevRow(device, sizeof(std::uint32_t) * 1024);
+        StorageBuffer currRow(device, sizeof(std::uint32_t) * 1024);
+        UboBuffer uboBuffer(device, sizeof(ubo_t));
+        Image fractalImage(device, 1024, 1024);
+        DebugBuffer debugBuffer(device, sizeof(debug_t));
 
-        std::array<d2::PointF, 4> vertices2 = {
-                d2::PointF{-0.5f, -0.5f},
-                d2::PointF{0.5f, -0.5f},
-                d2::PointF{0.5f, 0.5f},
-                d2::PointF{-0.5f, 0.5f}
-        };
+        resource[0].update(prevRow, 0);
+        resource[0].update(currRow, 1);
+        resource[0].update(uboBuffer, 2);
+        resource[0].update(fractalImage, 3);
+        resource[0].update(debugBuffer, 4);
 
-        const std::array<uint32_t, 6> indices = {
-                0, 1, 2, 2, 3, 0
-        };
+        Buffer<vsl::MemoryType::TransferDestination,
+                vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent >
+                                                   imageStagingBuffer(device, 1024 * 1024 * 4);
 
-        using UboBuffer = Buffer<vsl::MemoryType::UniformBuffer, vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>;
-        std::vector<UboBuffer> uboBuffers;
-        uboBuffers.reserve(device.getSwapImageSize());
-        std::generate_n(std::back_inserter(uboBuffers), device.getSwapImageSize(), [&]() { return UboBuffer(device, sizeof(ubo_t)); });
-        GraphicResourceManager resourceManager(device);
-        auto [pool, resource] = resourceManager.make(resourceBindingLayout, uboBuffers);
-
-        DeviceLocalBuffer<vsl::MemoryType::VertexBuffer> colorBuffer(device, sizeof(RGB)*colors.size());
-        DeviceLocalBuffer<vsl::MemoryType::VertexBuffer> vertBuffer(device, sizeof(d2::PointF)*vertices.size());
-        DeviceLocalBuffer<vsl::MemoryType::VertexBuffer> vert2Buffer(device, sizeof(d2::PointF)*vertices2.size());
-        DeviceLocalBuffer<vsl::MemoryType::IndexBuffer> indexBuffer(device, sizeof(uint32_t)*indices.size());
-
-        StagingBuffer vertStagingBuffer(device, sizeof(d2::PointF)*vertices.size());
-        {
-            StagingBuffer colorStagingBuffer(device, sizeof(RGB)*colors.size());
-            colorStagingBuffer.copy(colors);
-            colorBuffer.copy(colorStagingBuffer);
+        PipelineLayout fractal_compute_layout(device, pl::ResourceBinding({resourceBindingLayout}), fractal_shaders);
+        ComputePipeline fractal_compute(fractal_compute_layout);
 
 
-            StagingBuffer indexStagingBuffer(device, sizeof(uint32_t)*indices.size());
-            indexStagingBuffer.copy(indices);
-            indexBuffer.copy(indexStagingBuffer);
+        auto inFlight = synchro_manager.createFence("inFlight", manager.getBuffer().getSize(), true),
+             inCopy = synchro_manager.createFence("inCopy", 1, true);
 
-            vertStagingBuffer.copy(vertices);
-            vertBuffer.copy(vertStagingBuffer);
-            vertStagingBuffer.copy(vertices2);
-            vert2Buffer.copy(vertStagingBuffer);
-        }
+        ubo.baseNumber = 4;
+        for (size_t i = 0; i < 1024; i++) {
+            ubo.rowIndex = i;
+            uboBuffer.copy(ubo);
+            resource[0].update(uboBuffer, 2);
 
-        InputManager input_manager(main_window);
-        auto key1 = input_manager.get<input::Key>(input::KeyCode::Num1);
-        auto key2 = input_manager.get<input::Key>(input::KeyCode::Num2);
-        auto keyUp = input_manager.get<input::Key>(input::KeyCode::Up);
-        auto keyDown = input_manager.get<input::Key>(input::KeyCode::Down);
-        auto keyLeft = input_manager.get<input::Key>(input::KeyCode::Left);
-        auto keyRight = input_manager.get<input::Key>(input::KeyCode::Right);
-
-        auto* target = &vertices;
-        auto* targetBuffer = &vertBuffer;
-
-        while (Window::Update() && main_window && input_manager) {
-            static auto startTime = std::chrono::high_resolution_clock::now();
-
-            auto currentTime = std::chrono::high_resolution_clock::now();
-            float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-            ubo.model = matrix::make_rotation(time * 5.0_rad, Vector(0.0f, 0.0f, 1.0f));
-            ubo.view = matrix::make_view(Point(2.0f, 2.0f, 2.0f), Point(0.0f, 0.0f, 0.0f), Vector(0.0f, 0.0f, 1.0f));
-            ubo.proj = matrix::make_identity<float, 4>();
-            for (auto r : ubo.proj) {
-                for (auto e: r)
-                    std::cout << e << " ";
-                std::cout << std::endl;
+            if (i % 2 == 0) {
+                resource[0].update(prevRow, 0);
+                resource[0].update(currRow, 1);
+            } else {
+                resource[0].update(prevRow, 1);
+                resource[0].update(currRow, 0);
             }
-
             {
-                auto phase = manager.startPhase(swapchain, imageAvailable, renderFinished, inFlight);
-                frame_buffer.setTargetFrame(phase.getImageIndex());
-
-                uboBuffers[phase.getImageIndex()].copy(ubo);
-                resource[phase.getImageIndex()].update(uboBuffers[phase.getImageIndex()], 0);
-
-                if (key1->up()) {
-                    target = &vertices;
-                    targetBuffer = &vertBuffer;
-                }
-                if (key2->up()) {
-                    target = &vertices2;
-                    targetBuffer = &vert2Buffer;
-                }
-
-                d2::VectorF move;
-                if (keyUp->pressed()) {
-                    move.value -= 0.05_f_y;
-                }
-                if (keyDown->pressed()) {
-                    move.value += 0.05_f_y;
-                }
-                if (keyLeft->pressed()) {
-                    move.value -= 0.05_f_x;
-                }
-                if (keyRight->pressed()) {
-                    move.value += 0.05_f_x;
-                }
-                if (move.length() != 0) {
-                    std::cout << vertices[0].value << ":" << vertices2[0].value << std::endl;
-                    for (auto& v : *target)
-                        v += move;
-                    vertStagingBuffer.copy(*target);
-                    targetBuffer->copy(vertStagingBuffer);
-                }
-                phase << command::RenderPassBegin(render_pass, frame_buffer);
-                phase << command::BindGraphicResource(resource[phase.getImageIndex()], BindingDestination::Graphics, input_vertices);
-                phase << input_vertices << command::BindVertexBuffer(vert2Buffer, colorBuffer) << command::BindIndexBuffer(indexBuffer) << command::DrawIndexed(indices.size());
-                phase << input_vertices << command::BindVertexBuffer(vertBuffer, colorBuffer) << command::BindIndexBuffer(indexBuffer) << command::DrawIndexed(indices.size());
-                phase << command::RenderPassEnd();
+                auto phase = manager.startPhase(std::nullopt, std::nullopt, inFlight);
+                phase << fractal_compute
+                      << command::PipelineBarrierChange(fractalImage)
+                      << command::BindGraphicResource(resource[0], BindingDestination::Compute, fractal_compute)
+                      << command::Dispatch(1 + i, 1, 1);
             }
-            manager.next();
+            inFlight.wait();
         }
-        inFlight.wait();
+        imageStagingBuffer.copyByImage(fractalImage, inCopy);
+        inCopy.wait();
+
+        auto data = (std::uint32_t*)imageStagingBuffer.data().data;
+
+        int result = stbi_write_png("output.png",
+                                    1024,
+                                    1024,
+                                    4,
+                                    data,
+                                    1024 * 4);
+        if (!result) {
+            throw std::runtime_error("Failed to write PNG file!");
+        }
         defaults::release();
     }
     catch (std::exception &e) {
@@ -305,5 +211,4 @@ int main() {
         vsl::loggingln(e.what());
         return 1;
     }
-    /**/
 }

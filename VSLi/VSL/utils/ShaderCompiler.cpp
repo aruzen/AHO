@@ -27,7 +27,7 @@ void VSL_NAMESPACE::utils::ShaderCompiler::load()
 
 	for (const fs::directory_entry& x : fs::directory_iterator(shaders_path / "raw")) {
 		auto path = x.path();
-		if (!path.has_extension() || !(path.extension() == ".vert" || path.extension() == ".frag"))
+		if (!path.has_extension() || !(path.extension() == ".vert" || path.extension() == ".frag" || path.extension() == ".comp"))
 			continue;
 		if (dates.contains(path.filename().string()) && fs::last_write_time(path) < dates[path.filename().string()])
 			continue;

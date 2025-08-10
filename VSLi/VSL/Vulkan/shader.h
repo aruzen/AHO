@@ -55,7 +55,9 @@ namespace vsl {
 			return ShaderType::Vertex;
 		} else if (std::string(Txt.value).contains(".frag.")) {
 			return ShaderType::Fragment;
-		}
+		} else if (std::string(Txt.value).contains(".comp.")) {
+            return ShaderType::Compute;
+        }
 		return ShaderType::Error;
 	}
 

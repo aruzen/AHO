@@ -149,6 +149,10 @@ std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> VSL_NAMESPACE::_Logica
 	}
 
 	vk::PhysicalDeviceFeatures deviceFeatures;
+    if constexpr (validation) {
+        deviceFeatures.vertexPipelineStoresAndAtomics = true;
+        deviceFeatures.fragmentStoresAndAtomics = true;
+    }
 
     vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT extendedDynamicStateFeatures;
     extendedDynamicStateFeatures.extendedDynamicState = true;

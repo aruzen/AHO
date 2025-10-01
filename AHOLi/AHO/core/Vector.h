@@ -8,6 +8,7 @@
 #include <cmath>
 #include "ov.h"
 #include "math/coordinate.h"
+#include "math/Mat.h"
 
 namespace AHO_NAMESPACE {
 	template<typename R, VSL_NAMESPACE::is_dimention D, typename CoordinateInfo>

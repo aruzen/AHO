@@ -20,6 +20,7 @@ add_executable(AHO
         ../AHOLi/AHO/io/Key.hpp
         ../AHOLi/AHO/io/KeyBoard.cpp
         ../AHOLi/AHO/io/KeyBoard.hpp
+        ../AHOLi/AHO/io/Mouse.cpp
 )
 
 # ライブラリをリンク

@@ -25,11 +25,10 @@ add_executable(Fractal
 # ライブラリをリンク
 link_directories(lib)
 
-find_package(Boost REQUIRED COMPONENTS system)
-message("boost: ${Boost_INCLUDE_DIRS}, ${Boost}")
+# TODO: ~/repos/AHO/AHOLi ~/repos/AHO/VSLi & VSL これダメ
 target_include_directories(Fractal PRIVATE ${Boost_INCLUDE_DIRS} ~/repos/AHO/AHOLi ~/repos/AHO/VSLi)
 target_link_libraries(Fractal PRIVATE ${Boost_LIBRARIES} VSL)
 
-find_package(glfw3 REQUIRED)
 target_include_directories(Fractal PRIVATE ${GLFW_INCLUDE_DIRS})
-target_link_libraries(Fractal PRIVATE glfw)
+target_link_directories(Fractal PRIVATE ${GLFW_LIBRARY_DIRS})
+target_link_libraries(Fractal PRIVATE ${GLFW_LIBRARIES})

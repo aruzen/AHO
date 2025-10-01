@@ -57,15 +57,9 @@ add_library(VSL STATIC
         VSL/Vulkan/commands/pipeline_barrier.cpp
 )
 
-# Vulkan SDK のパスを指定
-find_package(Vulkan 1.4 REQUIRED)
-message("Vulkan: ${Vulkan_INCLUDE_DIRS}, ${Vulkan_LIBRARIES}")
 target_include_directories(VSL PRIVATE ${Vulkan_INCLUDE_DIRS})
 target_link_libraries(VSL PRIVATE ${Vulkan_LIBRARIES})
 
-# GLFW のパスを指定
-find_package(glfw3 REQUIRED)
-message("glfw3: ${GLFW_INCLUDE_DIRS}, ${glfw}")
 target_include_directories(VSL PRIVATE ${GLFW_INCLUDE_DIRS})
 target_link_libraries(VSL PRIVATE glfw)
 

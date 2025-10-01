@@ -7,7 +7,6 @@
 namespace VSL_NAMESPACE {
     struct CommandManager;
     struct DefaultPhase;
-    struct DefaultPhaseStreamOperator;
 
     static std::uint32_t DEFAULT_BUFFER_SIZE = 2;
 
@@ -87,17 +86,6 @@ namespace VSL_NAMESPACE {
         concept is_vert_size_require = requires(const T &t) {
             { t.setPipeline(std::declval<std::optional<size_t>>()) };
         };
-
-        struct __Manipulator {
-            virtual void manipulate(DefaultPhaseStreamOperator *op, CommandPool pool, CommandBuffer buffer,
-                                    CommandManager manager) = 0;
-        };
-
-        template<typename T>
-        concept is_manipulator = requires(T t) {
-            t.manipulate(std::declval<DefaultPhaseStreamOperator *>(), std::declval<CommandPool>(),
-                         std::declval<CommandBuffer>(), std::declval<CommandManager>());
-        };
     }
 
     struct CommandManager {
@@ -125,4 +113,12 @@ namespace VSL_NAMESPACE {
         */
         CommandManager setDefault();
     };
+}
+
+// ============================================================================
+
+template<class P, typename... Args>
+P VSL_NAMESPACE::CommandManager::startPhase(Args&&... args)
+{
+    return P(*this, std::forward<Args>(args)...);
 }

@@ -14,9 +14,9 @@ namespace VSL_NAMESPACE::command {
 		void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
 	};
 
-	struct DrawIndexedManip : public __Manipulator {
-		void manipulate(DefaultPhaseStreamOperator* op, CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
-	};
+	struct DrawIndexedManip : public DrawIndexed, public __VertexSizeRequire{
+        void setVertexSize(std::optional<size_t> vertexSize) override;
+    };
 
 	extern DrawIndexedManip drawIndexed;
 }

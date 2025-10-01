@@ -424,35 +424,28 @@ namespace AHO_NAMESPACE {
             return make_rotation(Radian(deg), axis);
         }
 
-        template<typename R, typename CI>
-        requires (std::same_as<typename CI::dimention, VSL_NAMESPACE::D3>) || (std::same_as<CI, VSL_NAMESPACE::D3>)
+        template<typename R, typename CI> requires (std::same_as<typename CI::dimention, VSL_NAMESPACE::D3>) || (std::same_as<CI, VSL_NAMESPACE::D3>)
+
         Mat4x4<R> make_view(_Point<R, CI> _eye, _Point<R, CI> target, _Vector<R, CI> up) {
             _Vector<R, CI> eye(_eye.value);
-            auto f = _Vector<R, CI>(eye.value - target.value).normalize().value; // forward
-            auto r = _Vector<R, CI>(f).cross(up).normalize().value; // right
-            auto u = _Vector<R, CI>(r).cross(_Vector<R, CI>(f)).normalize().value;             // up (recomputed)
+            auto f = _Vector<R, CI>(target.value - eye.value).normalize().value; // forward
+            auto s = _Vector<R, CI>(f).cross(up).normalize().value; // right
+            auto u = _Vector<R, CI>(s).cross(_Vector<R, CI>(f)).normalize().value;             // up (recomputed)
 
-            return make({
-                                std::array<R, 4>{
-                                        r.x.value,
-                                        r.y.value,
-                                        r.z.value,
-                                        -_Vector<R, CI>(r).dot(eye)
-                                },
-                                std::array<R, 4>{
-                                        u.x.value,
-                                        u.y.value,
-                                        u.z.value,
-                                        -_Vector<R, CI>(u).dot(eye)
-                                },
-                                std::array<R, 4>{
-                                        -f.x.value,
-                                        -f.y.value,
-                                        -f.z.value,
-                                        -_Vector<R, CI>(f).dot(eye)
-                                },
-                                std::array<R, 4>{0.0f, 0.0f, 0.0f, 1.0f}
-                        });
+            Mat4x4<R> result = make_identity<float, 4>();
+            result[0][0] = s.x.value;
+            result[1][0] = s.y.value;
+            result[2][0] = s.z.value;
+            result[0][1] = u.x.value;
+            result[1][1] = u.y.value;
+            result[2][1] = u.z.value;
+            result[0][2] = -f.x.value;
+            result[1][2] = -f.y.value;
+            result[2][2] = -f.z.value;
+            result[3][0] = -_Vector<R, CI>(s).dot(eye);
+            result[3][1] = -_Vector<R, CI>(u).dot(eye);
+            result[3][2] = _Vector<R, CI>(f).dot(eye);
+            return result;
         }
 
 
@@ -462,17 +455,17 @@ namespace AHO_NAMESPACE {
             R nf = static_cast<R>(1.0) / (near - far);
 
             return make({
-                                std::array<R, 4>{ f / aspect, 0.0f, 0.0f,                             0.0f },
-                                std::array<R, 4>{ 0.0f,       f,    0.0f,                             0.0f },
-                                std::array<R, 4>{ 0.0f,       0.0f, (far + near) * nf, (2 * far * near) * nf },
-                                std::array<R, 4>{ 0.0f,       0.0f, -1.0f,                            0.0f }
+                                std::array<R, 4>{f / aspect, 0.0f, 0.0f, 0.0f},
+                                std::array<R, 4>{0.0f, f, 0.0f, 0.0f},
+                                std::array<R, 4>{0.0f, 0.0f, (far + near) * nf, -1.0f},
+                                std::array<R, 4>{0.0f, 0.0f, (2 * far * near) * nf, 0.0f}
                         });
 
         }
 
         template<typename T>
         Mat4x4<T> make_perspective(Degree fov, T aspect, T near, T far) {
-            return make_perspective((Radian)fov, aspect, near, far);
+            return make_perspective((Radian) fov, aspect, near, far);
         }
     }
 }

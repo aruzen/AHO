@@ -21,11 +21,19 @@ add_executable(AHO
         ../AHOLi/AHO/io/KeyBoard.cpp
         ../AHOLi/AHO/io/KeyBoard.hpp
         ../AHOLi/AHO/io/Mouse.cpp
+        ../AHOLi/AHO/Engine.cpp
 )
 
 # ライブラリをリンク
 link_directories(lib)
 
-find_package(Boost REQUIRED COMPONENTS system)
+# TODO: ~/repos/AHO/AHOLi ~/repos/AHO/VSLi & VSL これダメ
 target_include_directories(AHO PRIVATE ${Boost_INCLUDE_DIRS} ~/repos/AHO/AHOLi ~/repos/AHO/VSLi)
 target_link_libraries(AHO PRIVATE ${Boost_LIBRARIES} VSL)
+
+target_include_directories(AHO PRIVATE ${GLFW_INCLUDE_DIRS})
+target_link_directories(AHO PRIVATE ${GLFW_LIBRARY_DIRS})
+target_link_libraries(AHO PRIVATE ${GLFW_LIBRARIES})
+
+find_package(glm CONFIG REQUIRED)
+target_link_libraries(AHO PRIVATE glm::glm)

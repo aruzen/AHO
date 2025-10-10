@@ -76,8 +76,6 @@ namespace VSL_NAMESPACE {
 		LogicalDevice(PhysicalDevice device, vsl::Surface surface);
 		LogicalDevice(PhysicalDevice device, std::shared_ptr<vsl::Surface> surface);
 
-        size_t getSwapImageSize();
-
 #ifdef VSL_NAMESPACE_TEST
 		// void test();
 #endif // VSL_NAMESPACE_TEST

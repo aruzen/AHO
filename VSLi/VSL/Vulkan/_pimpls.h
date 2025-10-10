@@ -67,15 +67,9 @@ namespace VSL_NAMESPACE::_impl {
 
 	struct LogicalDevice_impl {
 		std::shared_ptr<PhysicalDevice_impl> parentDevice;
-		std::shared_ptr<Surface_impl> parentSurface;
 
+        uint32_t graphicsFamily = 0, presentFamily = 0;
 		vk::Device device;
-		uint32_t graphicsFamily = 0, presentFamily = 0;
-		vk::SurfaceFormatKHR surfaceFormat;
-		vk::PresentModeKHR presentMode;
-		vk::Extent2D extent;
-		uint32_t imageCount;
-		vk::SurfaceTransformFlagBitsKHR preTransform;
 
 		~LogicalDevice_impl();
 	};
@@ -107,6 +101,12 @@ namespace VSL_NAMESPACE::_impl {
 
 	struct Swapchain_impl {
 		std::shared_ptr<LogicalDevice_impl> device;
+
+        vk::SurfaceFormatKHR surfaceFormat;
+        vk::PresentModeKHR presentMode;
+        vk::Extent2D extent;
+        uint32_t imageCount;
+        vk::SurfaceTransformFlagBitsKHR preTransform;
 
 		vk::SwapchainKHR swapChain;
 		std::vector<vk::Image> swapChainImages;

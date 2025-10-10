@@ -16,11 +16,9 @@ VSL_NAMESPACE::CommandPool::CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor dev
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::CommandPool_impl>(new VSL_NAMESPACE::_impl::CommandPool_impl);
 	_data->device = device._data;
 
-	auto queueFamilyIndices = VSL_NAMESPACE::_impl::helper::findQueueFamilies(device._data->parentDevice->device, device._data->parentSurface->surface);
-
 	vk::CommandPoolCreateInfo poolInfo;
 	poolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
-	poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+	poolInfo.queueFamilyIndex = device._data->graphicsFamily;
 
 	_data->commandPool = device._data->device.createCommandPool(poolInfo);
 }

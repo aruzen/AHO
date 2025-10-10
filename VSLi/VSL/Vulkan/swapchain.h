@@ -8,9 +8,11 @@
 namespace VSL_NAMESPACE {
 	struct SwapchainAccessor {
 		std::shared_ptr<_impl::Swapchain_impl> _data;
+
+        size_t getSwapImageSize();
 	};
 
 	struct Swapchain : public SwapchainAccessor {
-		Swapchain(LogicalDeviceAccessor device, std::optional<std::shared_ptr<Surface>> surface = std::nullopt);
+		Swapchain(LogicalDeviceAccessor device, std::shared_ptr<Surface> surface);
 	};
 }

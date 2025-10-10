@@ -46,68 +46,15 @@ const std::vector<const char*> deviceExtensions = {
 };
 
 bool checkDeviceExtensionSupport(vk::PhysicalDevice device) {
-	std::vector<vk::ExtensionProperties> availableExtensions = device.enumerateDeviceExtensionProperties();
+    std::vector<vk::ExtensionProperties> availableExtensions = device.enumerateDeviceExtensionProperties();
 
-	std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
+    std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
 
-	for (const auto& extension : availableExtensions) {
-		requiredExtensions.erase(extension.extensionName);
-	}
+    for (const auto& extension : availableExtensions) {
+        requiredExtensions.erase(extension.extensionName);
+    }
 
-	return requiredExtensions.empty();
-}
-
-struct SwapChainSupportDetails {
-	vk::SurfaceCapabilitiesKHR capabilities {};
-	std::vector<vk::SurfaceFormatKHR> formats {};
-	std::vector<vk::PresentModeKHR> presentModes {};
-};
-
-SwapChainSupportDetails querySwapChainSupport(vk::PhysicalDevice device, vk::SurfaceKHR surface) {
-	SwapChainSupportDetails details;
-	details.capabilities = device.getSurfaceCapabilitiesKHR(surface);
-	details.formats = device.getSurfaceFormatsKHR(surface);
-	details.presentModes = device.getSurfacePresentModesKHR(surface);
-	return details;
-}
-
-vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats) {
-	for (const auto& availableFormat : availableFormats) {
-		if (availableFormat.format == vk::Format::eB8G8R8A8Srgb
-			&& availableFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
-			return availableFormat;
-		}
-	}
-	return availableFormats[0];
-}
-
-vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes) {
-	for (const auto& availablePresentMode : availablePresentModes) {
-		if (availablePresentMode == vk::PresentModeKHR::eMailbox) {
-			return availablePresentMode;
-		}
-	}
-	return vk::PresentModeKHR::eFifo;
-}
-
-vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities, GLFWwindow* window) {
-	if (capabilities.currentExtent.width != UINT32_MAX) {
-		return capabilities.currentExtent;
-	}
-	else {
-		int width, height;
-		glfwGetFramebufferSize(window, &width, &height);
-
-		vk::Extent2D actualExtent = {
-			static_cast<uint32_t>(width),
-			static_cast<uint32_t>(height)
-		};
-
-		actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
-		actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
-
-		return actualExtent;
-	}
+    return requiredExtensions.empty();
 }
 
 template<bool V>
@@ -116,27 +63,11 @@ std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> VSL_NAMESPACE::_Logica
 	std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> _data = std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl>(new VSL_NAMESPACE::_impl::LogicalDevice_impl);
 
 	QueueFamilyIndices indices = findQueueFamilies(device._data->device, surface._data->surface);
-	bool extensionsSupported = checkDeviceExtensionSupport(device._data->device), swapChainAdequate = false;
-	SwapChainSupportDetails swapChainSupport;
-	if (extensionsSupported) {
-		swapChainSupport = querySwapChainSupport(device._data->device, surface._data->surface);
-		swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
-	}
 
-	if (!extensionsSupported && !swapChainAdequate && !indices.isComplete())
-		throw VSL_NAMESPACE::exceptions::RuntimeException("CommandManager", "PhysicalDevices do not have requirements.", "VSL_NAMESPACE::CommandManager<V, C>::CommandManager");
+    if (not checkDeviceExtensionSupport(device._data->device) || not indices.isComplete())
+        throw VSL_NAMESPACE::exceptions::RuntimeException("CommandManager", "PhysicalDevices do not have requirements.", "VSL_NAMESPACE::CommandManager<V, C>::CommandManager");
 
-	_data->surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
-	_data->presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
-	_data->extent = chooseSwapExtent(swapChainSupport.capabilities, (GLFWwindow*)surface._data->window);
-	_data->imageCount = swapChainSupport.capabilities.minImageCount + 1;
-	_data->preTransform = swapChainSupport.capabilities.currentTransform;
-	if (swapChainSupport.capabilities.maxImageCount > 0 &&
-		_data->imageCount > swapChainSupport.capabilities.maxImageCount) {
-		_data->imageCount = swapChainSupport.capabilities.maxImageCount;
-	}
-
-	std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
+    std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
 	std::set<uint32_t> uniqueQueueFamilies = { indices.graphicsFamily.value(), indices.presentFamily.value() };
 
 	float queuePriority = 1.0f;
@@ -335,7 +266,6 @@ VSL_NAMESPACE::LogicalDevice<C>::LogicalDevice(VSL_NAMESPACE::PhysicalDevice _de
 	C c;
 	_data = c.create(_device, _surface);
 	_data->parentDevice = _device._data;
-	_data->parentSurface = _surface._data;
 }
 
 template<typename C>
@@ -343,12 +273,6 @@ VSL_NAMESPACE::LogicalDevice<C>::LogicalDevice(VSL_NAMESPACE::PhysicalDevice _de
 	C c;
 	_data = c.create(_device, (vsl::Surface)(*_surface));
 	_data->parentDevice = _device._data;
-	_data->parentSurface = _surface->_data;
-}
-
-template<typename C>
-size_t VSL_NAMESPACE::LogicalDevice<C>::getSwapImageSize() {
-    return _data->imageCount;
 }
 
 VSL_NAMESPACE::_impl::LogicalDevice_impl::~LogicalDevice_impl() {

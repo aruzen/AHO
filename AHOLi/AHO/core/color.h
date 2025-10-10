@@ -505,38 +505,38 @@ struct Upper { \
 			constexpr HSV(const HueType& h, const SaturationAndValueType& s, const SaturationAndValueType& v) : h(h), s(s), v(v){}
 
 			constexpr HSV<HueType, SaturationAndValueType> operator + (const HSV<HueType, SaturationAndValueType>& o) const {
-				return { this->v + o.v, this->s + o.s, this->v + o.v };
+				return { this->h + o.h, this->s + o.s, this->v + o.v };
 			}
 			constexpr HSVA<HueType, SaturationAndValueType> operator + (const HSVA<HueType, SaturationAndValueType>& o) const {
-				return { this->v + o.v, this->s + o.s, this->v + o.v, o.a };
+				return { this->h + o.h, this->s + o.s, this->v + o.v, o.a };
 			}
 			constexpr HSV<HueType, SaturationAndValueType> operator + (const H<HueType>& h) const {
-				return { this->v + v, this->s, this->v };
+				return { this->h + h, this->s, this->v };
 			}
 			constexpr HSV<HueType, SaturationAndValueType> operator + (const S<saturation_type>& s) const {
-				return { this->v, this->s + s, this->v };
+				return { this->h, this->s + s, this->v };
 			}
 			constexpr HSV<HueType, SaturationAndValueType> operator + (const V<value_type>& v) const {
-				return { this->v, this->s, this->v + v };
+				return { this->h, this->s, this->v + v };
 			}
 			constexpr HSVA<HueType, SaturationAndValueType> operator + (const A<SaturationAndValueType>& a) const {
-				return { this->v, this->s, this->v, a };
+				return { this->h, this->s, this->v, a };
 			}
 
 			constexpr HSV<HueType, SaturationAndValueType> operator - (const HSV<HueType, SaturationAndValueType>& o) const {
-				return { this->v - o.v, this->s - o.s, this->v - o.v };
+				return { this->h - o.h, this->s - o.s, this->v - o.v };
 			}
 			constexpr HSV<HueType, SaturationAndValueType> operator - (const H<HueType>& h) const {
-				return { this->v - v, this->s, this->v };
+				return { this->h - h, this->s, this->v };
 			}
 			constexpr HSV<HueType, SaturationAndValueType> operator - (const S<saturation_type>& s) const {
-				return { this->v, this->s - s, this->v };
+				return { this->h, this->s - s, this->v };
 			}
 			constexpr HSV<HueType, SaturationAndValueType> operator - (const V<value_type>& v) const {
-				return { this->v, this->s, this->v - v };
+				return { this->h, this->s, this->v - v };
 			}
 			constexpr HSVA<HueType, SaturationAndValueType> operator - (const A<SaturationAndValueType>& a) const {
-				return { this->v, this->s, this->v, a };
+				return { this->h, this->s, this->v, a };
 			}
 
 			constexpr HSV<HueType, SaturationAndValueType>& operator += (const HSV<HueType, SaturationAndValueType>& o) {

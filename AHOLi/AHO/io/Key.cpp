@@ -7,9 +7,9 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-aho::input::Key::Key(void *context, aho::input::KeyCode code) : context(context), code(code) {}
+aho::input::Key::Key(void *context, aho::input::KeyCode code) : context(context), _code(code) {}
 
-aho::input::Key::Key(void *context, aho::input::KeyID code) : context(context), code(code){}
+aho::input::Key::Key(void *context, aho::input::KeyID code) : context(context), _code(code){}
 
 aho::input::ButtonState aho::input::Key::state() {
     return _state;
@@ -31,7 +31,7 @@ bool aho::input::Key::pressed() {
 }
 
 void aho::input::Key::update() {
-    switch (glfwGetKey((GLFWwindow*)context, (int)code.code())) {
+    switch (glfwGetKey((GLFWwindow*)context, (int)_code.code())) {
         default:
         case GLFW_RELEASE:
             if (pressed())
@@ -45,4 +45,8 @@ void aho::input::Key::update() {
             else
                 _state = ButtonState::Down;
     }
+}
+
+aho::input::KeyID aho::input::Key::code() {
+    return _code;
 }

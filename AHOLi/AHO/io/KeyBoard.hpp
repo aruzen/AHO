@@ -10,8 +10,7 @@
 
 namespace AHO_NAMESPACE::input {
     class KeyBoard : abstract::Characters {
-        template<typename T, typename... Args>
-        friend std::shared_ptr<T> InputManager::get(Args && ...args);
+        friend aho::InputManager;
 
         void* context = nullptr;
 

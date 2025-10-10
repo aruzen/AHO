@@ -12,7 +12,13 @@
 #include <unordered_set>
 #include <array>
 
+#include "../core/Point.h"
+#include "../core/Vector.h"
 
+
+namespace aho{
+    struct InputManager;
+}
 namespace AHO_NAMESPACE::input {
     enum class KeyCode {
         Space = 32,
@@ -137,18 +143,19 @@ namespace AHO_NAMESPACE::input {
         Menu = 348,
     };
 
-    class KeyID {
-        KeyCode _code;
-    public:
-        constexpr explicit KeyID(int code) : _code((KeyCode) code) {}
-
-        constexpr explicit KeyID(KeyCode code) : _code(code) {}
-
-        [[nodiscard]] constexpr KeyCode code() const {
-            return _code;
-        }
-
-        [[nodiscard]] constexpr std::string name() const;
+    enum class MouseCode {
+        Button1 = 0,
+        Button2 = 1,
+        Button3 = 2,
+        Button4 = 3,
+        Button5 = 4,
+        Button6 = 5,
+        Button7 = 6,
+        Button8 = 7,
+        LastButton = Button8,
+        LeftClick = Button1,
+        RightClick = Button2,
+        MiddleButton = Button3,
     };
 
     constexpr std::array<KeyCode, 120> KeyCodes = {
@@ -274,9 +281,38 @@ namespace AHO_NAMESPACE::input {
             KeyCode::Menu,
     };
 
+    constexpr std::array<MouseCode, 8> MouseCodes{
+            MouseCode::LeftClick,
+            MouseCode::RightClick,
+            MouseCode::MiddleButton,
+            MouseCode::Button4,
+            MouseCode::Button5,
+            MouseCode::Button6,
+            MouseCode::Button7,
+            MouseCode::LastButton,
+    };
+
     enum class ButtonState {
         Idle, Pressed, Down, Up
     };
+
+    template<typename CodeType>
+    class CodeID {
+        CodeType _code;
+    public:
+        constexpr explicit CodeID(int code) : _code((KeyCode) code) {}
+
+        constexpr explicit CodeID(CodeType code) : _code(code) {}
+
+        [[nodiscard]] constexpr CodeType code() const {
+            return _code;
+        }
+
+        [[nodiscard]] constexpr std::string name() const;
+    };
+
+    using KeyID = CodeID<KeyCode>;
+    using MouseID = CodeID<MouseCode>;
 
     namespace abstract {
         template<typename T>
@@ -288,12 +324,19 @@ namespace AHO_NAMESPACE::input {
             virtual void update() {};
         };
 
+        struct Adaptable {
+        };
+
         struct Button : public Input<ButtonState> {
             virtual bool down() = 0;
 
             virtual bool up() = 0;
 
             virtual bool pressed() = 0;
+        };
+
+        struct Cursor : public Input<d2::PointD> {
+            virtual d2::VectorD delta() = 0;
         };
 
         struct Text : public Input<std::string> {

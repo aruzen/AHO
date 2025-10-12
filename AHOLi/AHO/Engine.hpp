@@ -53,8 +53,10 @@
 #include <VSL/Vulkan/stages/resource_binding.h>
 #include <VSL/Vulkan/stages/shader_group.h>
 #include <VSL/Vulkan/stages/vertex_input.h>
-#include <VSL/defaults.hpp>
 
+namespace AHO_NAMESPACE::window {
+    struct Window;
+}
 
 namespace AHO_NAMESPACE::engine {
     struct EnginePrespecification {
@@ -81,22 +83,7 @@ namespace AHO_NAMESPACE::engine {
 
         std::shared_ptr<EngineData> _data;
 
-        virtual std::optional<VSL_NAMESPACE::Window> supportWindow() { return std::nullopt; };
-
-        virtual std::optional<std::shared_ptr<VSL_NAMESPACE::Surface>> supportSurface() { return std::nullopt; };
-    };
-
-    struct StandardEngine : public EngineAccessor {
-        VSL_NAMESPACE::Window boot_window;
-        std::shared_ptr<VSL_NAMESPACE::Surface> surface;
-
-        StandardEngine(std::string applicationName, bool bootOn = true);
-
-        void boot(std::string applicationName);
-
-        std::optional<vsl::Window> supportWindow() override;
-
-        std::optional<std::shared_ptr<vsl::Surface>> supportSurface() override;
+        virtual std::optional<AHO_NAMESPACE::window::Window> supportWindow();
     };
 }
 

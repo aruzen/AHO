@@ -43,8 +43,6 @@ add_library(VSL STATIC
         VSL/Vulkan/stages/dynamic_state.cpp
         VSL/Vulkan/commands/bind_index_buffers.cpp
         VSL/Vulkan/commands/draw_indexed.cpp
-        VSL/defaults.cpp
-        VSL/defaults.hpp
         VSL/Vulkan/descriptor.cpp
         VSL/Vulkan/descriptor.hpp
         VSL/Vulkan/stages/resource_binding.h

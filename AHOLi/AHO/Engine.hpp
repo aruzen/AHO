@@ -55,6 +55,7 @@
 #include <VSL/Vulkan/stages/vertex_input.h>
 #include <VSL/defaults.hpp>
 
+
 namespace AHO_NAMESPACE::engine {
     struct EnginePrespecification {
         std::string name;

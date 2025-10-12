@@ -221,10 +221,6 @@ namespace VSL_NAMESPACE::_impl {
 	struct Buffer_impl {
 		std::shared_ptr<LogicalDevice_impl> device;
 
-		// 無い場合はDefaltCommandManagerをコンストラクタで代入し、
-		// それもない場合は求められたときRuntimeErrorを返す
-		std::optional<std::shared_ptr<VSL_NAMESPACE::_impl::CommandManager_impl>> commandManager = std::nullopt;
-
 		vk::Buffer buffer;
 		vk::DeviceMemory deviceMem;
 		size_t allocatedSize = 0;

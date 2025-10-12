@@ -109,10 +109,3 @@ VSL_NAMESPACE::CommandBuffer VSL_NAMESPACE::CommandManager::makeExclusiveBuffer(
 void VSL_NAMESPACE::CommandManager::next() {
 	CommandBuffer{ _data->commandBuffer }.next();
 }
-
-VSL_NAMESPACE::CommandManager VSL_NAMESPACE::CommandManager::setDefault()
-{
-	auto before_manager = defaults::COMMAND_MANAGER;
-	defaults::COMMAND_MANAGER = _data;
-	return VSL_NAMESPACE::CommandManager{ before_manager };
-}

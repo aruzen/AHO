@@ -10,10 +10,6 @@ namespace VSL_NAMESPACE {
 
     static std::uint32_t DEFAULT_BUFFER_SIZE = 2;
 
-    namespace defaults {
-        extern std::shared_ptr<VSL_NAMESPACE::_impl::CommandManager_impl> COMMAND_MANAGER;
-    }
-
     struct CommandPool {
         CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor device);
 
@@ -107,11 +103,6 @@ namespace VSL_NAMESPACE {
         CommandBuffer makeExclusiveBuffer(size_t size = 1);
 
         void next();
-
-        /*
-        * 元のCommandBuffer{ defaults::COMMAND_MANAGER }を返す。
-        */
-        CommandManager setDefault();
     };
 }
 

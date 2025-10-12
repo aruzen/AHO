@@ -10,11 +10,6 @@
 namespace VSL_NAMESPACE {
 	struct Surface;
 
-    namespace defaults {
-        extern std::shared_ptr<VSL_NAMESPACE::_impl::PhysicalDevice_impl> PHYSICAL_DEVICE;
-        extern std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> LOGICAL_DEVICE;
-    }
-
 	namespace PhysicalDeviceType {
 		class _PhysicalDeviceType : public Type<_PhysicalDeviceType> {
 		public:

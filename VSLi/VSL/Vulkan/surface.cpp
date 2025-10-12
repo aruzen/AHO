@@ -16,20 +16,24 @@
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 
+#include <memory>
+
+#include "../window_plugin.h"
+
 VSL_NAMESPACE::Surface::Surface(VSL_NAMESPACE::PureWindow* window, VSL_NAMESPACE::VulkanAccessor instance)
 {
-	_data = std::shared_ptr<VSL_NAMESPACE::_impl::Surface_impl>(new VSL_NAMESPACE::_impl::Surface_impl);
+	_data = std::make_shared<VSL_NAMESPACE::_impl::Surface_impl>();
 	_data->vulkan = instance._accessor;
+    _data->window = window->_data->window_handle;
 
 	VkSurfaceKHR surface;
-	if (glfwCreateWindowSurface(instance._accessor->instance, (GLFWwindow*)window->_data->window_handle, nullptr, &surface) != VK_SUCCESS) {
+    if (glfwCreateWindowSurface(_data->vulkan->instance, (GLFWwindow*)_data->window, nullptr, &surface) != VK_SUCCESS) {
         const char * error_txt = nullptr;
         int error = glfwGetError(&error_txt);
         std::cerr << "Failed to create window surface: " << (error == GLFW_NO_ERROR ? "Unknown error" : error_txt) << std::endl;
         return; // TODO throw error
     }
 	_data->surface = vk::SurfaceKHR(surface);
-	_data->window = window->_data->window_handle;
 	/*
 	vk::Win32SurfaceCreateInfoKHR createInfo;
 	createInfo.hwnd = glfwGetWin32Window((GLFWwindow*)data->window_handle);

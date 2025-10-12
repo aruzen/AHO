@@ -16,13 +16,15 @@ string(REPLACE "-fcolor-diagnostics" "-fdiagnostics-color=auto" CMAKE_CXX_FLAGS 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+add_compile_options(-fconcepts-diagnostics-depth=7)
 # Debug option
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -DDEBUG -fstandalone-debug -fno-omit-frame-pointer")
     set(CMAKE_C_FLAGS_DEBUG   "-O0 -g3 -DDEBUG -fstandalone-debug -fno-omit-frame-pointer")
+    add_compile_options(-Wno-user-defined-literals)
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -DDEBUG -gdwarf-4 -fvar-tracking-assignments -fno-omit-frame-pointer")
-    set(CMAKE_C_FLAGS_DEBUG   "-O0 -g3 -DDEBUG -gdwarf-4 -fvar-tracking-assignments -fno-omit-frame-pointer")
+    set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g2 -DDEBUG -gdwarf-4 -fvar-tracking-assignments -fno-omit-frame-pointer")
+    set(CMAKE_C_FLAGS_DEBUG   "-O0 -g2 -DDEBUG -gdwarf-4 -fvar-tracking-assignments -fno-omit-frame-pointer")
 endif()
 
 # Release option

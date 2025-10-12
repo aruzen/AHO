@@ -45,13 +45,10 @@ vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR> &
     return vk::PresentModeKHR::eFifo;
 }
 
-vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities, GLFWwindow *window) {
+vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities, int width, int height) {
     if (capabilities.currentExtent.width != UINT32_MAX) {
         return capabilities.currentExtent;
     } else {
-        int width, height;
-        glfwGetFramebufferSize(window, &width, &height);
-
         vk::Extent2D actualExtent = {
                 static_cast<uint32_t>(width),
                 static_cast<uint32_t>(height)
@@ -66,23 +63,28 @@ vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities, GL
     }
 }
 
-vsl::Swapchain::Swapchain(vsl::LogicalDeviceAccessor device, std::shared_ptr<Surface> surface) {
+vsl::Swapchain::Swapchain(vsl::LogicalDeviceAccessor device, std::shared_ptr<Surface> surface,
+                          std::optional<int> width, std::optional<int> height) {
     _data = std::shared_ptr<_impl::Swapchain_impl>(new _impl::Swapchain_impl);
     _data->device = device._data;
 
     std::shared_ptr<_impl::PhysicalDevice_impl> pdevice = device._data->parentDevice;
 
-    auto swapChainAdequate = false;
-    SwapChainSupportDetails swapChainSupport;
-    swapChainSupport = querySwapChainSupport(pdevice->device, surface->_data->surface);
-    swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
+    SwapChainSupportDetails swapChainSupport = querySwapChainSupport(pdevice->device, surface->_data->surface);
+    auto swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
 
     if (!swapChainAdequate)
-    throw VSL_NAMESPACE::exceptions::RuntimeException("Swapchain", "PhysicalDevices do not have requirements.");
+        throw VSL_NAMESPACE::exceptions::RuntimeException("Swapchain", "PhysicalDevices do not have requirements.");
 
     _data->surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
     _data->presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
-    _data->extent = chooseSwapExtent(swapChainSupport.capabilities, (GLFWwindow *) surface->_data->window);
+
+    if (not width.has_value() || not height.has_value())
+        glfwGetFramebufferSize((GLFWwindow *) surface->_data->window,
+                               width ? nullptr : &width.emplace(0),
+                               height ? nullptr : &height.emplace(0));
+    _data->extent = chooseSwapExtent(swapChainSupport.capabilities, width.value(), height.value());
+
     _data->imageCount = swapChainSupport.capabilities.minImageCount + 1;
     _data->preTransform = swapChainSupport.capabilities.currentTransform;
 

@@ -23,16 +23,16 @@ namespace VSL_NAMESPACE {
 		};
 
 		struct WindowData;
-		struct OnUpdateable {
+		struct OnUpdate {
 			virtual bool onUpdate(vsl::PureWindow) = 0;
 		};
 
 		struct WindowData {
 			unsigned char plugins_next_id = 0;
-			std::map<char, std::shared_ptr<Plugin>> plugins;
-			std::vector<std::shared_ptr<OnUpdateable>> updateables;
+			std::map<unsigned char, std::shared_ptr<Plugin>> plugins;
+			std::vector<std::shared_ptr<OnUpdate>> update;
 
-			void* plugdata = nullptr;
+			// void* plugdata = nullptr;
 			void* window_handle = nullptr;
 			std::string name;
 			int width, height;
@@ -54,6 +54,9 @@ namespace VSL_NAMESPACE {
 		//	requires vsl::concepts::initializer<T, VSL_NAMESPACE::PureWindow::WindowData*, Args&&...>&& std::derived_from<T, VSL_NAMESPACE::PureWindow::Plugin>
 		std::shared_ptr<T> addPlugin(Args&&... args);
 
+        virtual bool resize(int width, int height);
+        bool setTitle(const std::string& title);
+
 		std::string name();
 		bool close();
 
@@ -67,7 +70,7 @@ namespace VSL_NAMESPACE {
 	class Window : public PureWindow {
 	public:
 		Window(std::string name, int width = 800, int height = 600);
-		~Window();
+        Window(std::shared_ptr<WindowData> data);
 	};
 
 
@@ -78,10 +81,8 @@ namespace VSL_NAMESPACE {
 		auto t = std::shared_ptr<T>(new T(this, std::forward<Args>(args)...));
 		std::shared_ptr<Plugin> p = std::static_pointer_cast<Plugin>(t);
 
-		if constexpr (std::derived_from<T, vsl::PureWindow::OnUpdateable>) {
-			auto o = std::static_pointer_cast<OnUpdateable>(t);
-			_data->updateables.push_back(o);
-		}
+		if (auto o = std::dynamic_pointer_cast<OnUpdate>(p); o)
+			_data->update.push_back(o);
 
 		if (t->id == 0)
 			p->id = _data->plugins_next_id;

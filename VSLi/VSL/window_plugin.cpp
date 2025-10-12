@@ -7,6 +7,8 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include <utility>
+
 bool vsl::window_plugin::QuietClose::onUpdate(vsl::PureWindow window)
 {
 	auto data = window._data;
@@ -15,6 +17,10 @@ bool vsl::window_plugin::QuietClose::onUpdate(vsl::PureWindow window)
 		data->destroy();
 	}
 	return true;
+}
+
+vsl::window_plugin::QuietClose::QuietClose(vsl::PureWindow *) {
+    id = QUIET_CLOSE_USED_ID;
 }
 
 bool vsl::window_plugin::HookShouldClose::onUpdate(vsl::PureWindow window) {
@@ -37,7 +43,7 @@ void framebuffer_resize_callback(GLFWwindow* window, int width, int height) {
 	}
 }
 
-vsl::window_plugin::HookResize::HookResize(vsl::PureWindow* window, std::function<void(PureWindow, int, int)> callback) :  callback(callback) {
+vsl::window_plugin::HookResize::HookResize(vsl::PureWindow* window, std::function<void(PureWindow, int, int)> callback) :  callback(std::move(callback)) {
 	id = HOOK_RESIZE_USED_ID;
 	glfwSetFramebufferSizeCallback((GLFWwindow*)window->_data->window_handle, framebuffer_resize_callback);
 }

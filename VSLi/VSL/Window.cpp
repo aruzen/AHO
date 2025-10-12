@@ -6,6 +6,7 @@
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include <unistd.h>
 
 #include "window_plugin.h"
 #include "Vulkan/surface.h"
@@ -45,7 +46,7 @@ bool VSL_NAMESPACE::PureWindow::Update()
 	glfwPollEvents();
 	bool s = true;
 	for (auto p : _WINDOWS)
-		for (auto& f : p->updateables)
+		for (auto& f : p->update)
 			if (!f->onUpdate(PureWindow(p)))
 				s = false;
 	return s;
@@ -87,6 +88,16 @@ bool VSL_NAMESPACE::PureWindow::operator==(const PureWindow::WindowData* o)
 	return _data.get() == o;
 }
 
+bool vsl::PureWindow::resize(int width, int height) {
+    glfwSetWindowSize((GLFWwindow*)_data->window_handle, width, height);
+    return true;
+}
+
+bool vsl::PureWindow::setTitle(const std::string& title) {
+    glfwSetWindowTitle((GLFWwindow*)_data->window_handle, title.c_str());
+    return true;
+}
+
 void VSL_NAMESPACE::PureWindow::WindowData::destroy()
 {
 	for (auto i = _WINDOWS.begin(); i != _WINDOWS.end(); i++)
@@ -108,6 +119,7 @@ VSL_NAMESPACE::Window::Window(std::string name, int width, int height) : PureWin
 	addPlugin<vsl::window_plugin::QuietClose>();
 }
 
-VSL_NAMESPACE::Window::~Window() {
-	close();
+vsl::Window::Window(std::shared_ptr<WindowData> data) : PureWindow(data) {
+    if (not data->plugins.contains(vsl::window_plugin::QuietClose::QUIET_CLOSE_USED_ID))
+        addPlugin<vsl::window_plugin::QuietClose>();
 }

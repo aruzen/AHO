@@ -1,10 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 project(AHO VERSION 1.0 LANGUAGES CXX)
 
-# リテラルの_がないことを無視する
-add_compile_options(-Wno-user-defined-literals)
-add_compile_options(-fconcepts-diagnostics-depth=7)
-
 # 実行ファイルを作成
 add_executable(AHO
         ../AHO/Main.cpp

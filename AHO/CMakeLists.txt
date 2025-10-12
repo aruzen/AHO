@@ -1,10 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 project(AHO VERSION 1.0 LANGUAGES CXX)
 
-# C++20を使用
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 # リテラルの_がないことを無視する
 add_compile_options(-Wno-user-defined-literals)
 add_compile_options(-fconcepts-diagnostics-depth=7)
@@ -21,7 +17,12 @@ add_executable(AHO
         ../AHOLi/AHO/io/KeyBoard.cpp
         ../AHOLi/AHO/io/KeyBoard.hpp
         ../AHOLi/AHO/io/Mouse.cpp
+        ../AHOLi/AHO/resource/Image.cpp
+        ../AHOLi/AHO/resource/Buffer.cpp
         ../AHOLi/AHO/Engine.cpp
+        ../AHOLi/AHO/pipeline/base.cpp
+        ../AHOLi/AHO/Window.cpp
+        ../AHOLi/AHO/engine/StandardEngine.cpp
 )
 
 # ライブラリをリンク

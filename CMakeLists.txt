@@ -4,23 +4,45 @@
 cmake_minimum_required(VERSION 3.10...3.28)
 cmake_policy(SET CMP0167 NEW)
 
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
 project(AHO-all)
-set(CMAKE_C_COMPILER "/opt/homebrew/Cellar/gcc/15.1.0/bin/gcc-15" CACHE STRING "clang compiler" FORCE)
-set(CMAKE_CXX_COMPILER "/opt/homebrew/Cellar/gcc/15.1.0/bin/g++-15" CACHE STRING "clang++ compiler" FORCE)
+# FIXME: 何かgccを使わなくてはいけない理由があったが忘れてしまった、のちに検証して消すこと
+# set(CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING "Build type" FORCE)
+# set(CMAKE_C_COMPILER "/opt/homebrew/Cellar/gcc/15.1.0/bin/gcc-15" CACHE STRING "clang compiler" FORCE)
+# set(CMAKE_CXX_COMPILER "/opt/homebrew/Cellar/gcc/15.1.0/bin/g++-15" CACHE STRING "clang++ compiler" FORCE)
 string(REPLACE "-fcolor-diagnostics" "-fdiagnostics-color=auto" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Debug option
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -DDEBUG -fstandalone-debug -fno-omit-frame-pointer")
+    set(CMAKE_C_FLAGS_DEBUG   "-O0 -g3 -DDEBUG -fstandalone-debug -fno-omit-frame-pointer")
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -DDEBUG -gdwarf-4 -fvar-tracking-assignments -fno-omit-frame-pointer")
+    set(CMAKE_C_FLAGS_DEBUG   "-O0 -g3 -DDEBUG -gdwarf-4 -fvar-tracking-assignments -fno-omit-frame-pointer")
+endif()
+
+# Release option
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native -ftree-vectorize")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -march=native -ftree-vectorize")
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native -ftree-vectorize -fomit-frame-pointer")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -march=native -ftree-vectorize -fomit-frame-pointer")
+endif()
 
 # setting Libraries
 find_package(PkgConfig REQUIRED)
 find_package(Boost COMPONENTS system QUIET)
-if(NOT Boost_FOUND)
+if (NOT Boost_FOUND)
     message(STATUS "Boost Config mode failed. Retrying with FindBoost...")
     # add_definitions(-DBOOST_ERROR_CODE_HEADER_ONLY)
     set(Boost_NO_BOOST_CMAKE ON)
     find_package(Boost REQUIRED COMPONENTS system)
-endif()
+endif ()
 message("Boost: ${Boost_INCLUDE_DIRS}, ${Boost_LIBRARY_DIRS}, ${Boost_LIBRARIES}")
 
 find_package(Vulkan REQUIRED)
@@ -37,6 +59,6 @@ add_subdirectory(Fractal)
 include_directories(${GLFW_INCLUDE_DIRS})
 link_directories(${GLFW_LIBRARY_DIRS})
 
-if(APPLE)
+if (APPLE)
     add_definitions(-DVK_USE_PLATFORM_METAL_EXT)
-endif()
+endif ()

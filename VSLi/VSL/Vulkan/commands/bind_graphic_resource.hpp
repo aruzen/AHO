@@ -15,10 +15,10 @@
 
 namespace VSL_NAMESPACE::command {
     struct BindGraphicResource : public __Command, public __PipelineRequire {
-        BindGraphicResource(GraphicResource resource, BindingDestination dst, std::optional<PipelineAccessor> pipeline = std::nullopt);
+        BindGraphicResource(GraphicResource resource, graphic_resource::BindingDestination dst, std::optional<PipelineAccessor> pipeline = std::nullopt);
 
         GraphicResource resource;
-        BindingDestination destination;
+        graphic_resource::BindingDestination destination;
         std::optional<PipelineAccessor> pipeline;
 
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);

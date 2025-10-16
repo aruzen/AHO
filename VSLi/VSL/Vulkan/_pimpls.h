@@ -248,7 +248,7 @@ namespace VSL_NAMESPACE::_impl {
 
     struct GraphicResource_impl;
     struct GraphicResourcePool_impl {
-        std::shared_ptr<_impl::GraphicResourceManager_impl> manager;
+        void* manager;
 
         vk::DescriptorPool descriptorPool;
         std::vector<std::shared_ptr<GraphicResource_impl>> resources;

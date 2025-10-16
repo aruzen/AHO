@@ -9,7 +9,7 @@
 
 template<>
 constexpr std::string aho::input::CodeID<aho::input::KeyCode>::name() const {
-    return std::string(glfwGetKeyName((int)_code, NULL));
+    return { glfwGetKeyName((int)_code, (int)NULL) };
 }
 
 template<>

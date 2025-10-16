@@ -10,7 +10,7 @@
 #include "bind_graphic_resource.hpp"
 
 
-vsl::command::BindGraphicResource::BindGraphicResource(vsl::GraphicResource resource, vsl::BindingDestination dst,
+vsl::command::BindGraphicResource::BindGraphicResource(vsl::GraphicResource resource, vsl::graphic_resource::BindingDestination dst,
                                                        std::optional<PipelineAccessor> pipeline)
                                                        : resource(resource), destination(dst), pipeline(pipeline) {}
 

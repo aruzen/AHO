@@ -6,9 +6,9 @@
 
 namespace VSL_NAMESPACE::pipeline_layout {
 	struct ResourceBinding {
-        ResourceBinding(std::vector<ResourceBindingLayout> sets);
+        ResourceBinding(std::vector<graphic_resource::BindingLayout> sets);
 
-        std::vector<ResourceBindingLayout> resourceBindingSets;
+        std::vector<graphic_resource::BindingLayout> resourceBindingSets;
 
 		void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
 	};

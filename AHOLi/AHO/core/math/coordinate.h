@@ -431,22 +431,22 @@ struct Upper { \
             return { e1 , e2 };
         }
         namespace literals {
-		    constexpr X<double> operator"" AHO_LITERAL(x)(long double v) { return { (double)v }; };
-		    constexpr X<int> operator"" AHO_LITERAL(x)(unsigned long long v) { return { (int)v }; };
-		    constexpr X<float> operator"" AHO_LITERAL(f_x)(long double v) { return { (float)v }; };
-		    constexpr X<size_t> operator"" AHO_LITERAL(l_x)(unsigned long long v) { return { v }; };
+		    constexpr X<double> operator AHO_LITERAL(x)(long double v) { return { (double)v }; };
+		    constexpr X<int> operator AHO_LITERAL(x)(unsigned long long v) { return { (int)v }; };
+		    constexpr X<float> operator AHO_LITERAL(f_x)(long double v) { return { (float)v }; };
+		    constexpr X<size_t> operator AHO_LITERAL(l_x)(unsigned long long v) { return { v }; };
 		    constexpr X<double> x(1.0);
 
-		    constexpr Y<double> operator"" AHO_LITERAL(y)(long double v) { return { (double)v }; };
-		    constexpr Y<int> operator"" AHO_LITERAL(y)(unsigned long long v) { return { (int)v }; };
-		    constexpr Y<float> operator"" AHO_LITERAL(f_y)(long double v) { return { (float)v }; };
-		    constexpr Y<size_t> operator"" AHO_LITERAL(l_y)(unsigned long long v) { return { v }; };
+		    constexpr Y<double> operator AHO_LITERAL(y)(long double v) { return { (double)v }; };
+		    constexpr Y<int> operator AHO_LITERAL(y)(unsigned long long v) { return { (int)v }; };
+		    constexpr Y<float> operator AHO_LITERAL(f_y)(long double v) { return { (float)v }; };
+		    constexpr Y<size_t> operator AHO_LITERAL(l_y)(unsigned long long v) { return { v }; };
 		    constexpr Y<double> y(1.0);
 
-		    constexpr Z<double> operator"" AHO_LITERAL(z)(long double v) { return { (double)v }; };
-		    constexpr Z<int> operator"" AHO_LITERAL(z)(unsigned long long v) { return { (int)v }; };
-		    constexpr Z<float> operator"" AHO_LITERAL(f_z)(long double v) { return { (float)v }; };
-		    constexpr Z<size_t> operator"" AHO_LITERAL(l_z)(unsigned long long v) { return { v }; };
+		    constexpr Z<double> operator AHO_LITERAL(z)(long double v) { return { (double)v }; };
+		    constexpr Z<int> operator AHO_LITERAL(z)(unsigned long long v) { return { (int)v }; };
+		    constexpr Z<float> operator AHO_LITERAL(f_z)(long double v) { return { (float)v }; };
+		    constexpr Z<size_t> operator AHO_LITERAL(l_z)(unsigned long long v) { return { v }; };
 		    constexpr Z<double> z(1.0);
         }
 	}

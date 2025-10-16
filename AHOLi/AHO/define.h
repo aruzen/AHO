@@ -19,10 +19,10 @@
 
 #ifndef AHO_POOP_PUBLIC_SECURITY 
 
-#define AHO_LITERAL(suffix) ___AHO_JOIN(_, suffix)
+#define AHO_LITERAL(suffix) ___AHO_JOIN(""_, suffix)
 
 #else
 
-#define AHO_LITERAL(suffix) suffix
+#define AHO_LITERAL(suffix) ___AHO_JOIN("", suffix)
 
 #endif

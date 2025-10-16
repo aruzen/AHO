@@ -17,15 +17,15 @@ namespace AHO_NAMESPACE {
 		template<typename T>
 		concept is_line = requires(T t) {
             { _have_elment_dimention<T> };
-            std::convertible_to<Line<typename std::remove_cvref_t<T>::element_type, typename std::remove_cvref_t<T>::dimention, typename std::remove_cvref_t<T>::coordinate_info>,
-                                std::remove_cvref_t<T>>;
+            { std::convertible_to<Line<typename std::remove_cvref_t<T>::element_type, typename std::remove_cvref_t<T>::dimention, typename std::remove_cvref_t<T>::coordinate_info>,
+                                std::remove_cvref_t<T>> };
 		};
 
 		template<typename T>
 		concept is_triangle = requires(T t) {
             { _have_elment_dimention<T> };
-            std::convertible_to<Triangle<typename std::remove_cvref_t<T>::element_type, typename std::remove_cvref_t<T>::dimention, typename std::remove_cvref_t<T>::coordinate_info>,
-                                std::remove_cvref_t<T>>;
+            { std::convertible_to<Triangle<typename std::remove_cvref_t<T>::element_type, typename std::remove_cvref_t<T>::dimention, typename std::remove_cvref_t<T>::coordinate_info>,
+                                std::remove_cvref_t<T>>};
 		};
 
 		template<typename T>

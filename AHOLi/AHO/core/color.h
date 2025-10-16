@@ -889,10 +889,10 @@ struct Upper { \
 
 		namespace literals {
 #define LITERAL_EXPANDER(Upper, Lower) \
-		constexpr Upper<double> operator"" AHO_LITERAL(Lower)(long double v) { return { (double)v }; }; \
-		constexpr Upper<int> operator"" AHO_LITERAL(Lower)(unsigned long long v) { return { (int)v }; }; \
-		constexpr Upper<float> operator"" AHO_LITERAL(f_ ## Lower)(long double v) { return { (float)v }; }; \
-		constexpr Upper<size_t> operator"" AHO_LITERAL(l_ ## Lower)(unsigned long long v) { return { v }; }; \
+		constexpr Upper<double> operator AHO_LITERAL(Lower)(long double v) { return { (double)v }; }; \
+		constexpr Upper<int> operator AHO_LITERAL(Lower)(unsigned long long v) { return { (int)v }; }; \
+		constexpr Upper<float> operator AHO_LITERAL(f_ ## Lower)(long double v) { return { (float)v }; }; \
+		constexpr Upper<size_t> operator AHO_LITERAL(l_ ## Lower)(unsigned long long v) { return { v }; }; \
 		constexpr Upper<double> Lower(1.0);		
 
 			LITERAL_EXPANDER(R, r);

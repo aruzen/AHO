@@ -33,8 +33,9 @@ aho::window::Window::~Window() {
 }
 
 bool aho::window::Window::resize(int width, int height) {
-    VSL_NAMESPACE::PureWindow::resize(width, height);
-
+    if (not VSL_NAMESPACE::PureWindow::resize(width, height))
+        return false;
     VSL_NAMESPACE::Swapchain swapchain(engine._data->logical_device, _data2->surface);
     VSL_NAMESPACE::View<VSL_NAMESPACE::D2> image_view(swapchain);
+    return true;
 }

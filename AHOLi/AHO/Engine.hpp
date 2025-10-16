@@ -69,7 +69,7 @@ namespace AHO_NAMESPACE::engine {
         VSL_NAMESPACE::PhysicalDevice physical_device;
         VSL_NAMESPACE::LogicalDeviceAccessor logical_device;
         VSL_NAMESPACE::CommandManager command_manager;
-        VSL_NAMESPACE::GraphicResourceManager graphic_resource_manager;
+        std::shared_ptr<VSL_NAMESPACE::graphic_resource::ManagerInterface> graphic_resource_manager;
         VSL_NAMESPACE::SynchroManager synchro_manager;
     };
 

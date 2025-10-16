@@ -97,19 +97,19 @@ namespace AHO_NAMESPACE {
 		namespace literals {
 			constexpr Radian pi = { std::numbers::pi };
 
-			constexpr Radian operator"" AHO_LITERAL(rad)(long double d) {
+			constexpr Radian operator AHO_LITERAL(rad)(long double d) {
 				return { d };
 			}
 
-			constexpr Radian operator"" AHO_LITERAL(pi)(long double d) {
+			constexpr Radian operator AHO_LITERAL(pi)(long double d) {
 				return { d * std::numbers::pi };
 			}
 
-			constexpr Radian operator"" AHO_LITERAL(\u03c0)(long double d) {
+			constexpr Radian operator AHO_LITERAL(\u03c0)(long double d) {
 				return { d * std::numbers::pi };
 			}
 
-			constexpr Degree operator"" AHO_LITERAL(deg)(long double d) {
+			constexpr Degree operator AHO_LITERAL(deg)(long double d) {
 				return { d };
 			}
 		}

@@ -5,7 +5,7 @@
 #include "command.h"
 #include "image.hpp"
 
-#include "../utils/Flags.h"
+#include "../utils/flags.h"
 #include <optional>
 #include <cstring>
 

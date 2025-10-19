@@ -17,11 +17,11 @@
 
 vsl::graphic_resource::BindingLayout::BindingLayout(vsl::LogicalDeviceAccessor device,
                                                     vsl::graphic_resource::Type bindingType,
-                                                    vsl::ShaderType shaderType)
+                                                    vsl::ShaderFlag shaderType)
         : BindingLayout(device, -1, bindingType, shaderType, 1) {}
 
 vsl::graphic_resource::BindingLayout::BindingLayout(LogicalDeviceAccessor device, size_t binding,
-                                                    Type bindingType, ShaderType shaderType, size_t amount) {
+                                                    Type bindingType, ShaderFlag shaderType, size_t amount) {
     _data = std::make_shared<_impl::ResourceBindingLayout_impl>();
 
     _data->layoutBindings.resize(1);
@@ -37,8 +37,8 @@ vsl::graphic_resource::BindingLayout::BindingLayout(LogicalDeviceAccessor device
     _data->layout = device._data->device.createDescriptorSetLayout(layoutCreateInfo);
 }
 
-vsl::graphic_resource::BindingLayout::BindingLayout(LogicalDeviceAccessor device,
-                                                    std::initializer_list <BindingPoint> points) {
+vsl::graphic_resource::BindingLayout::BindingLayout(vsl::LogicalDeviceAccessor device,
+                                                    const std::vector<BindingPoint> &points) {
     _data = std::make_shared<_impl::ResourceBindingLayout_impl>();
     _data->device = device._data;
 
@@ -59,6 +59,10 @@ vsl::graphic_resource::BindingLayout::BindingLayout(LogicalDeviceAccessor device
     _data->layout = _data->device->device.createDescriptorSetLayout(layoutCreateInfo);
 }
 
+vsl::graphic_resource::BindingLayout::BindingLayout(LogicalDeviceAccessor device,
+                                                    std::initializer_list<BindingPoint> points)
+        : BindingLayout(device, std::vector<BindingPoint>(points.begin(), points.end())) {}
+
 std::vector <vsl::graphic_resource::BindingPoint> vsl::graphic_resource::BindingLayout::getBindingPoints() const {
     std::vector <BindingPoint> result;
 
@@ -67,7 +71,7 @@ std::vector <vsl::graphic_resource::BindingPoint> vsl::graphic_resource::Binding
         auto &binding = this->_data->layoutBindings[i];
         result[i].binding = binding.binding;
         result[i].bindingType = (Type) binding.descriptorType;
-        result[i].shaderType = (ShaderType)((uint32_t) binding.stageFlags);
+        result[i].shaderType = (ShaderFlag)((uint32_t) binding.stageFlags);
         result[i].amount = binding.descriptorCount;
     }
     return result;

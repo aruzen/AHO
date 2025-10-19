@@ -11,7 +11,7 @@ namespace VSL_NAMESPACE::command {
 			requires ((unsigned int)(MemType & MemoryType::IndexBuffer) != 0)
 		BindIndexBuffer(Buffer<MemType, MemProperty, SharingMode>, uint32_t offset = 0);
 
-		BufferAccessor* buffer;
+		BufferAccessor* buffer = nullptr;
         size_t offset;
 
 		void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);

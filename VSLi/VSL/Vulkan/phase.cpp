@@ -58,7 +58,9 @@ void vsl::DefaultPhase::submit() {
     presentInfo.pImageIndices = &imageIdx;
     presentInfo.pResults = nullptr;
 
-    manager._data->presentQueue.presentKHR(presentInfo);
+    auto result = manager._data->presentQueue.presentKHR(presentInfo);
+    if (vk::Result::eSuccess != result)
+        loggingln("Warning: Missing present queue!!");
 }
 
 VSL_NAMESPACE::DefaultPhase::~DefaultPhase() {

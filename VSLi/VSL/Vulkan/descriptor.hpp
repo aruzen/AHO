@@ -50,7 +50,7 @@ namespace VSL_NAMESPACE::graphic_resource {
     struct BindingPoint {
         size_t binding;
         Type bindingType;
-        ShaderType shaderType;
+        ShaderFlag shaderType;
         size_t amount = 1;
     };
 
@@ -62,12 +62,14 @@ namespace VSL_NAMESPACE::graphic_resource {
      * GPU上のメモリーに置かれたデータをShaderがどう読み取るかを指定できる
      */
     struct BindingLayout {
-        BindingLayout(LogicalDeviceAccessor device, Type bindingType, ShaderType shaderType);
+        BindingLayout(LogicalDeviceAccessor device, Type bindingType, ShaderFlag shaderType);
 
-        BindingLayout(LogicalDeviceAccessor device, size_t binding, Type bindingType, ShaderType shaderType,
+        BindingLayout(LogicalDeviceAccessor device, size_t binding, Type bindingType, ShaderFlag shaderType,
                       size_t amount = 1);
 
         BindingLayout(LogicalDeviceAccessor device, std::initializer_list<BindingPoint> points);
+
+        BindingLayout(LogicalDeviceAccessor device, const std::vector<BindingPoint>& points);
 
         [[nodiscard]] std::vector<BindingPoint> getBindingPoints() const;
 

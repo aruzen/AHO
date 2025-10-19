@@ -12,7 +12,7 @@
 #include "consteval_string.h"
 #include "test.h"
 #include "Window.h"
-#include "utils/Flags.h"
+#include "utils/flags.h"
 #include "utils/string.h"
 #include "utils/VSLArray.h"
 #include "dimention.h"

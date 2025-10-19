@@ -11,6 +11,7 @@
 #include <fstream>
 #include <memory>
 #include <source_location>
+#include <utility>
 
 template<VSL_NAMESPACE::ShaderType _Type>
 vsl::Shader<_Type>::Shader(vsl::LogicalDeviceAccessor device, std::filesystem::path path)
@@ -73,7 +74,7 @@ vsl::Shader<_Type>::Shader(vsl::LogicalDeviceAccessor device, std::filesystem::p
 
 	_data->shaderModule = _data->device->device.createShaderModule(createInfo);
 
-	_data->name = "main";
+	_data->name = std::move(name);
 
 	_data->shaderStageCreateInfo.pName = _data->name.c_str();
 	_data->shaderStageCreateInfo.module = _data->shaderModule;
@@ -101,6 +102,4 @@ template struct vsl::Shader<VSL_NAMESPACE::ShaderType::Intersection>;
 template struct vsl::Shader<VSL_NAMESPACE::ShaderType::Callable>;
 template struct vsl::Shader<VSL_NAMESPACE::ShaderType::Task>;
 template struct vsl::Shader<VSL_NAMESPACE::ShaderType::Mesh>;
-template struct vsl::Shader<VSL_NAMESPACE::ShaderType::SubpassShadingHuawei>;
-template struct vsl::Shader<VSL_NAMESPACE::ShaderType::ClusterCullingHuawei>;
-template struct vsl::Shader<VSL_NAMESPACE::ShaderType::All>;
+// template struct vsl::Shader<VSL_NAMESPACE::ShaderType::All>;

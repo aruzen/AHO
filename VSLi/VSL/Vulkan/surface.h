@@ -1,7 +1,7 @@
 #pragma once
 #include "../define.h"
 #include "pv.h"
-#include "VSL/utils/string.h"
+#include "../utils/string.h"
 
 #include "../Window.h"
 #include "Vulkan.h"

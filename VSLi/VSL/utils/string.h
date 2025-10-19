@@ -1,5 +1,5 @@
 #pragma once
-#include "VSL/define.h"
+#include "../define.h"
 
 #include <string>
 #include <iostream>

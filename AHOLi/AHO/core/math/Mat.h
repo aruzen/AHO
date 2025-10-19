@@ -48,7 +48,7 @@ namespace AHO_NAMESPACE {
             using element_type = R;
 
             using RowType = std::array<R, Column>;
-            using OriginArray = std::array<std::array<R, Column>, Row>;
+            using OriginArray = std::array<RowType, Row>;
 
             static consteval Type type() {
                 return {Row, Column};
@@ -134,6 +134,10 @@ namespace AHO_NAMESPACE {
     namespace matrix {
         template<typename R, size_t Size>
         Mat<R, Size, Size> make_identity();
+
+        template<typename R = float, typename Dim = VSL_NAMESPACE::D3>
+        requires std::same_as<Dim, VSL_NAMESPACE::D3>
+        Mat4x4<R> make_move(_Vector<R, Dim> vec);
 
         template<matrix::is_matrix R>
         requires (R::type().row == R::type().column)
@@ -223,12 +227,12 @@ namespace AHO_NAMESPACE {
         template<AHO_NAMESPACE::concepts::multiply_as<R> T, size_t TargetColumn>
         constexpr auto
         Mat<R, Row, Column>::operator*(const AHO_NAMESPACE::matrix::Mat<T, Column, TargetColumn> &p) const {
-            AHO_NAMESPACE::matrix::Mat<decltype(std::declval<T>() * std::declval<R>()), Row, TargetColumn> buf;
+            AHO_NAMESPACE::matrix::Mat<decltype(std::declval<T>() * std::declval<R>()), Row, TargetColumn> buf {};
 
             for (size_t i = 0; i < Row; i++)
                 for (size_t j = 0; j < TargetColumn; j++)
                     for (size_t k = 0; k < Column; k++)
-                        buf[i][j] = (*this)[i][k] + p[k][j];
+                        buf[i][j] += (*this)[i][k] * p[k][j];
             return std::move(buf);
         }
 
@@ -297,7 +301,6 @@ namespace AHO_NAMESPACE {
         requires (!requires {{ R::__is_mat } -> std::convertible_to<bool>; })
         constexpr Mat<R, Row, Column> operator*(const Mat<R, Row, Column> &mat, const T &m) {
             AHO_NAMESPACE::matrix::Mat<decltype(std::declval<T>() * std::declval<R>()), Row, Column> buf;
-
             for (size_t i = 0; i < Row; i++)
                 for (size_t j = 0; j < Column; j++)
                     buf[i][j] = mat[i][j] * m;
@@ -353,13 +356,13 @@ namespace AHO_NAMESPACE {
 
 
         template<typename T, size_t Row, size_t Column>
-        constexpr Mat<T, Row, Column> make_by_initializer_list(std::initializer_list<std::initializer_list<T>> init) {
+        constexpr Mat<T, Row, Column> make(std::initializer_list<std::initializer_list<T>> init) {
             std::array<std::array<T, Row>, Column> cp;
             auto itr1 = init.begin();
             for (size_t i = 0; init.end() != itr1 && i < Row; i++) {
-                auto itr2 = *itr1;
-                for (size_t j = 0; itr1 != itr1->end() && j < Row; j++) {
-                    cp[i][j] = *itr2;
+                auto itr2 = itr1->begin();
+                for (size_t j = 0; itr2 != itr1->end() && j < Row; j++) {
+                    cp[j][i] = *itr2;
                     ++itr2;
                 }
                 ++itr1;
@@ -383,6 +386,15 @@ namespace AHO_NAMESPACE {
         requires (R::type().row == R::type().column)
         Mat<typename R::element_type, R::type().row, R::type().column> make_identity() {
             return make_identity<typename R::element_type, R::type().row>();
+        }
+
+        template<typename R, typename Dim>
+        requires std::same_as<Dim, VSL_NAMESPACE::D3>
+        Mat4x4<R> make_move(_Vector<R, Dim> vec) {
+            return make<R, 4, 4>({{1, 0, 0, vec.value.x.value},
+                                  {0, 1, 0, vec.value.y.value},
+                                  {0, 0, 1, vec.value.z.value},
+                                  {0, 0, 0, 1}});
         }
 
         template<typename R>
@@ -467,5 +479,17 @@ namespace AHO_NAMESPACE {
         Mat4x4<T> make_perspective(Degree fov, T aspect, T near, T far) {
             return make_perspective((Radian) fov, aspect, near, far);
         }
+
+        template<typename R, size_t Row, size_t Column>
+        std::ostream &operator<<(std::ostream &out, const Mat<R, Row, Column> &mat) {
+            out << "{";
+            for (size_t i = 0; i < Column; i++) {
+                out << "{" << mat[i][0];
+                for (size_t j = 1; j < Row; j++)
+                    out << ", " << mat[j][i];
+                out << (i - 1 == Row ? "}}" : "}") << std::endl;
+            }
+            return out;
+        };
     }
 }

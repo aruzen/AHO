@@ -16,13 +16,13 @@ string(REPLACE "-fcolor-diagnostics" "-fdiagnostics-color=auto" CMAKE_CXX_FLAGS 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_compile_options(-fconcepts-diagnostics-depth=7)
 # Debug option
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -DDEBUG -fstandalone-debug -fno-omit-frame-pointer")
     set(CMAKE_C_FLAGS_DEBUG   "-O0 -g3 -DDEBUG -fstandalone-debug -fno-omit-frame-pointer")
     add_compile_options(-Wno-user-defined-literals)
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    add_compile_options(-fconcepts-diagnostics-depth=7)
     set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g2 -DDEBUG -gdwarf-4 -fvar-tracking-assignments -fno-omit-frame-pointer")
     set(CMAKE_C_FLAGS_DEBUG   "-O0 -g2 -DDEBUG -gdwarf-4 -fvar-tracking-assignments -fno-omit-frame-pointer")
 endif()
@@ -48,15 +48,15 @@ endif ()
 message("Boost: ${Boost_INCLUDE_DIRS}, ${Boost_LIBRARY_DIRS}, ${Boost_LIBRARIES}")
 
 find_package(Vulkan REQUIRED)
+get_filename_component(Vulkan_LIBRARY_DIRS "${Vulkan_LIBRARIES}" DIRECTORY)
 message("Vulkan: ${Vulkan_INCLUDE_DIRS}, ${Vulkan_LIBRARIES}")
 pkg_check_modules(GLFW REQUIRED glfw3)
 message("glfw3: ${GLFW_INCLUDE_DIRS}, ${GLFW_LIBRARY_DIRS}, ${GLFW_LIBRARIES}")
 
 add_subdirectory(AHO)
 add_subdirectory(AHOLi)
-add_subdirectory(Dev)
 add_subdirectory(VSLi)
-add_subdirectory(Fractal)
+add_subdirectory(Test)
 
 include_directories(${GLFW_INCLUDE_DIRS})
 link_directories(${GLFW_LIBRARY_DIRS})

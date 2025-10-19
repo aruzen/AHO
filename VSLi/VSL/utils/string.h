@@ -1,9 +1,10 @@
 #pragma once
-#include "define.h"
+#include "VSL/define.h"
 
 #include <string>
 #include <iostream>
 #include <sstream>
+#include <regex>
 
 namespace VSL_NAMESPACE {
 	constexpr bool validation = VSL_VALIDATION;
@@ -21,6 +22,8 @@ namespace VSL_NAMESPACE {
 	void logging(const Head& h,const Args&... args);
 	template<bool Validation = validation, typename Head, typename ...Args>
 	void loggingln(const Head& h, const Args&... args);
+
+    std::string expand_environments(const std::string& input);
 }
 
 inline void VSL_NAMESPACE::helper::join(std::stringstream& ss){}

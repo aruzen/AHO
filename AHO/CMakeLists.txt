@@ -16,7 +16,7 @@ add_executable(AHO
         ../AHOLi/AHO/resource/Image.cpp
         ../AHOLi/AHO/resource/Buffer.cpp
         ../AHOLi/AHO/Engine.cpp
-        ../AHOLi/AHO/pipeline/base.cpp
+        ../AHOLi/AHO/pipeline/Layouts.cpp
         ../AHOLi/AHO/Window.cpp
         ../AHOLi/AHO/engine/StandardEngine.cpp
 )

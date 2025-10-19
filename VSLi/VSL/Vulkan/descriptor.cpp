@@ -119,8 +119,7 @@ vsl::graphic_resource::ManagerInterface::make(std::map <Type, size_t> count, siz
                             Type::SampleWeightImageQcom,
                             Type::BlockMatchImageQcom,
                             Type::MutableValve,
-                            Type::PartitionedAccelerationStructureNv,
-                            Type::MaxEnum}) {
+                            Type::PartitionedAccelerationStructureNv}) {
         vk::DescriptorPoolSize poolSize;
         poolSize.type = (vk::DescriptorType) type;
         if (count.contains(type))

@@ -39,7 +39,7 @@ add_library(VSL STATIC
         ../VSLi/VSL/Vulkan/frame_buffer.cpp
         ../VSLi/VSL/Vulkan/viewport.cpp
         ../VSLi/VSL/Vulkan/Vulkan.cpp
-        ../VSLi/VSL/debug.cpp
+        VSL/utils/string.cpp
         VSL/Vulkan/stages/dynamic_state.cpp
         VSL/Vulkan/commands/bind_index_buffers.cpp
         VSL/Vulkan/commands/draw_indexed.cpp
@@ -53,10 +53,23 @@ add_library(VSL STATIC
         VSL/Vulkan/commands/dispatch.cpp
         VSL/Vulkan/image.cpp
         VSL/Vulkan/commands/pipeline_barrier.cpp
+        VSL/utils/SPIRVReflector.cpp
+        VSL/Vulkan/stages/push_contents.cpp
+        VSL/Vulkan/commands/push_contents.cpp
 )
 
 target_include_directories(VSL PRIVATE ${Vulkan_INCLUDE_DIRS})
 target_link_libraries(VSL PRIVATE ${Vulkan_LIBRARIES})
+target_link_libraries(VSL PRIVATE
+        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-core.a"
+        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-cpp.a"
+        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-glsl.a"
+        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-hlsl.a"
+        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-msl.a"
+        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-reflect.a"
+        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-util.a"
+)
+
 
 target_include_directories(VSL PRIVATE ${GLFW_INCLUDE_DIRS})
 target_link_libraries(VSL PRIVATE glfw)

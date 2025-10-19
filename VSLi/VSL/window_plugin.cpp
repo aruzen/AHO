@@ -2,7 +2,7 @@
 #include "pch.h"
 #endif
 #include "window_plugin.h"
-#include "debug.h"
+#include "utils/string.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>

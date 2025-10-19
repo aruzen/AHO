@@ -8,7 +8,7 @@
 #include "define.h"
 
 #include <VSL/concepts.h>
-#include <VSL/debug.h>
+#include "VSL/utils/string.h"
 #include <VSL/define.h>
 #include <VSL/dimention.h>
 #include <VSL/exceptions.h>

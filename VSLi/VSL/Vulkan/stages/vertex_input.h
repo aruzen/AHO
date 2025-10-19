@@ -19,7 +19,6 @@ namespace VSL_NAMESPACE::pipeline_layout {
 		enum class UpdateTiming {
 			NextVertex = 0, NextInstance = 1
 		} updateTiming = UpdateTiming::NextVertex;
-
 	};
 
 	struct VertexInput {

@@ -7,7 +7,6 @@
 #include "_pimpls.h"
 
 #include "../exceptions.h"
-#include "../debug.h"
 
 #include "surface.h"
 

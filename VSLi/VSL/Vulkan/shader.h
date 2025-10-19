@@ -1,6 +1,7 @@
 #pragma once
 #include "../define.h"
 #include "../consteval_string.h"
+#include "VSL/utils/string.h"
 #include "pv.h"
 
 #include <filesystem>
@@ -63,11 +64,11 @@ namespace vsl {
 
 	template<helper::constant_string_holder Path>
 	auto make_shader(vsl::LogicalDeviceAccessor device) {
-		return Shader<___Get_ShaderType<Path>()>(device, Path.value);
+		return Shader<___Get_ShaderType<Path>()>(device, expand_environments(Path.value));
 	}
 
 	template<helper::constant_string_holder Path>
 	auto make_shader(vsl::LogicalDeviceAccessor device, std::string name) {
-		return Shader<___Get_ShaderType<Path>()>(device, Path.value, name);
+		return Shader<___Get_ShaderType<Path>()>(device, expand_environments(Path.value), name);
 	}
 }

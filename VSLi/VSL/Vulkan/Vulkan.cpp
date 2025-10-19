@@ -7,7 +7,7 @@
 #include "_pimpls.h"
 
 #include "../exceptions.h"
-#include "../debug.h"
+#include "../utils/string.h"
 
 template<bool Validation>
 bool VSL_NAMESPACE::Vulkan<Validation>::checkValidationLayerSupport() {

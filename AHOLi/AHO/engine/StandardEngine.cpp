@@ -27,8 +27,17 @@ void aho::engine::StandardEngine::boot(std::string applicationName) {
 
     SynchroManager synchro_manager(device);
     CommandManager command_manager(device);
-    std::shared_ptr<graphic_resource::OverAllocateManager>
-            graphic_resource_manager(new graphic_resource::OverAllocateManager(device, {}, 100));
+    std::shared_ptr < graphic_resource::OverAllocateManager >
+    graphic_resource_manager(new graphic_resource::OverAllocateManager(device, {
+            {graphic_resource::Type::Sampler,              100},
+            {graphic_resource::Type::CombinedImageSampler, 100},
+            {graphic_resource::Type::SampledImage,         100},
+            {graphic_resource::Type::StorageImage,         100},
+            {graphic_resource::Type::UniformTexelBuffer,   100},
+            {graphic_resource::Type::StorageTexelBuffer,   100},
+            {graphic_resource::Type::UniformBuffer,        100},
+            {graphic_resource::Type::StorageBuffer,        100},
+    }, 0));
 
     _data = std::make_shared<EngineData>(EngineData{
             .vulkan_instance = instance,

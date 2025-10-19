@@ -14,16 +14,16 @@ VSL_NAMESPACE::pipeline_layout::VertexInput::VertexInput(std::initializer_list<V
 
 VSL_NAMESPACE::pipeline_layout::VertexInput VSL_NAMESPACE::pipeline_layout::VertexInput::add(data_format::___Format format)
 {
-	VertexInputShapeDefinition def{ .layouts = { VertexInputLayoutDefinition{.format = format } } };
+    definitions.emplace_back(VertexInputShapeDefinition{.layouts = {VertexInputLayoutDefinition{.format = format}}});
 	return *this;
 }
 
 VSL_NAMESPACE::pipeline_layout::VertexInput VSL_NAMESPACE::pipeline_layout::VertexInput::add(std::initializer_list<data_format::___Format> formats)
 {
 	this->definitions.reserve(this->definitions.size() + formats.size());
-	for (VertexInputShapeDefinition def : 
-		formats 
-			| std::views::transform([](data_format::___Format format) 
+    for (VertexInputShapeDefinition def:
+            formats
+            | std::views::transform([](data_format::___Format format)
 				{ VertexInputShapeDefinition result{ .layouts = { VertexInputLayoutDefinition{ format } } }; return result;  }))
 		this->definitions.push_back(def);
 	return *this;
@@ -54,12 +54,16 @@ VSL_NAMESPACE::pipeline_layout::VertexInput VSL_NAMESPACE::pipeline_layout::Vert
 	return *this;
 }
 
-size_t VSL_NAMESPACE::pipeline_layout::VertexInput::requirements_size()
-{
-	return std::ranges::fold_left( definitions | std::views::transform([](VertexInputShapeDefinition def) { return def.size != (std::uint32_t)-1 ? def.size
-		: std::ranges::fold_left(def.layouts | std::views::transform(
-			[](VertexInputLayoutDefinition layout) { return layout.format.size(); })
-			, 0, std::plus{}); }), 0, std::plus{});
+size_t VSL_NAMESPACE::pipeline_layout::VertexInput::requirements_size() {
+    size_t size = 0;
+    for (auto &def: definitions) {
+        if (def.size != (std::uint32_t) -1)
+            size += def.size;
+        else
+            for (auto &layout: def.layouts)
+                size += layout.format.size();
+    }
+    return size;
 }
 
 void VSL_NAMESPACE::pipeline_layout::VertexInput::injection(VSL_NAMESPACE::PipelineLayoutAccessor pl)
@@ -77,10 +81,14 @@ void VSL_NAMESPACE::pipeline_layout::VertexInput::injection(VSL_NAMESPACE::Pipel
 		vk::VertexInputBindingDescription vertexBindingDescription;
 		vertexBindingDescription.binding = def.binding != (std::uint32_t)-1 ? def.binding : nextBinding;
 		nextBinding = vertexBindingDescription.binding + 1;
-		vertexBindingDescription.stride = def.size != (std::uint32_t)-1 ? def.size 
-			: std::ranges::fold_left(def.layouts | std::views::transform(
-				[](VertexInputLayoutDefinition layout) { return layout.format.size() ; })
-				, 0, std::plus{});
+
+        if (def.size != (std::uint32_t) -1)
+            vertexBindingDescription.stride = def.size;
+        else {
+            vertexBindingDescription.stride = 0;
+            for (auto &layout: def.layouts)
+                vertexBindingDescription.stride += layout.format.size();
+        }
 		vertexBindingDescription.inputRate = (vk::VertexInputRate)def.updateTiming;
 		vertexBindingDescriptions.push_back(vertexBindingDescription);
 
@@ -97,19 +105,19 @@ void VSL_NAMESPACE::pipeline_layout::VertexInput::injection(VSL_NAMESPACE::Pipel
 			nextOffset = vertexAttributeDescription.offset + layout.format.size();
 		}
 	}
-	
 
-	/*
-	vertexBindingDescriptions.push_back(vk::VertexInputBindingDescription{
-		.binding = 0, .stride = sizeof(float) * 5, .inputRate = vk::VertexInputRate::eVertex
-		});
-	vertexAttributeDescriptions.push_back(vk::VertexInputAttributeDescription{
-		.location = 0, .binding = 0, .format = vk::Format::eR32G32Sfloat, .offset = 0
-		});
-	vertexAttributeDescriptions.push_back(vk::VertexInputAttributeDescription{
-		.location = 1, .binding = 0, .format = vk::Format::eR32G32B32Sfloat, .offset = 8
-		});
-	*/
+
+    /*
+    vertexBindingDescriptions.push_back(vk::VertexInputBindingDescription{
+        .binding = 0, .stride = sizeof(float) * 5, .inputRate = vk::VertexInputRate::eVertex
+        });
+    vertexAttributeDescriptions.push_back(vk::VertexInputAttributeDescription{
+        .location = 0, .binding = 0, .format = vk::Format::eR32G32Sfloat, .offset = 0
+        });
+    vertexAttributeDescriptions.push_back(vk::VertexInputAttributeDescription{
+        .location = 1, .binding = 0, .format = vk::Format::eR32G32B32Sfloat, .offset = 8
+        });
+    */
 
 	info.vertexInput.vertexBindingDescriptionCount = vertexBindingDescriptions.size();
 	info.vertexInput.pVertexBindingDescriptions = vertexBindingDescriptions.data();

@@ -386,6 +386,7 @@ namespace VSL_NAMESPACE::data_format {
 
 		template <size_t Length>
 		constexpr ___Format toVec()  const;
+        ___Format toVec(size_t length)  const;
 
 		constexpr auto operator <=>(const ___Format&) const = default;
 	};
@@ -1651,6 +1652,827 @@ namespace VSL_NAMESPACE::data_format {
 		}
 		return Undefined;
 	}
+
+    inline ___Format ___Format::toVec(size_t length) const
+    {
+        if (length == 1) {
+            if (___FormatTypes::UnsignedNormalized8R == _formatType)
+                return UnsignedNormalized8R;
+            if (___FormatTypes::SignedNormalized8R == _formatType)
+                return SignedNormalized8R;
+            if (___FormatTypes::UnsignedScaled8R == _formatType)
+                return UnsignedScaled8R;
+            if (___FormatTypes::SignedScaled8R == _formatType)
+                return SignedScaled8R;
+            if (___FormatTypes::UnsignedInt8R == _formatType)
+                return UnsignedInt8R;
+            if (___FormatTypes::SignedInt8R == _formatType)
+                return SignedInt8R;
+            if (___FormatTypes::Srgb8R == _formatType)
+                return Srgb8R;
+            if (___FormatTypes::UnsignedNormalized8RG == _formatType)
+                return UnsignedNormalized8R;
+            if (___FormatTypes::SignedNormalized8RG == _formatType)
+                return SignedNormalized8R;
+            if (___FormatTypes::UnsignedScaled8RG == _formatType)
+                return UnsignedScaled8R;
+            if (___FormatTypes::SignedScaled8RG == _formatType)
+                return SignedScaled8R;
+            if (___FormatTypes::UnsignedInt8RG == _formatType)
+                return UnsignedInt8R;
+            if (___FormatTypes::SignedInt8RG == _formatType)
+                return SignedInt8R;
+            if (___FormatTypes::Srgb8RG == _formatType)
+                return Srgb8R;
+            if (___FormatTypes::UnsignedNormalized8RGB == _formatType)
+                return UnsignedNormalized8R;
+            if (___FormatTypes::SignedNormalized8RGB == _formatType)
+                return SignedNormalized8R;
+            if (___FormatTypes::UnsignedScaled8RGB == _formatType)
+                return UnsignedScaled8R;
+            if (___FormatTypes::SignedScaled8RGB == _formatType)
+                return SignedScaled8R;
+            if (___FormatTypes::UnsignedInt8RGB == _formatType)
+                return UnsignedInt8R;
+            if (___FormatTypes::SignedInt8RGB == _formatType)
+                return SignedInt8R;
+            if (___FormatTypes::Srgb8RGB == _formatType)
+                return Srgb8R;
+            if (___FormatTypes::UnsignedNormalized8BGR == _formatType)
+                return UnsignedNormalized8R;
+            if (___FormatTypes::SignedNormalized8BGR == _formatType)
+                return SignedNormalized8R;
+            if (___FormatTypes::UnsignedScaled8BGR == _formatType)
+                return UnsignedScaled8R;
+            if (___FormatTypes::SignedScaled8BGR == _formatType)
+                return SignedScaled8R;
+            if (___FormatTypes::UnsignedInt8BGR == _formatType)
+                return UnsignedInt8R;
+            if (___FormatTypes::SignedInt8BGR == _formatType)
+                return SignedInt8R;
+            if (___FormatTypes::Srgb8BGR == _formatType)
+                return Srgb8R;
+            if (___FormatTypes::UnsignedNormalized8RGBA == _formatType)
+                return UnsignedNormalized8R;
+            if (___FormatTypes::SignedNormalized8RGBA == _formatType)
+                return SignedNormalized8R;
+            if (___FormatTypes::UnsignedScaled8RGBA == _formatType)
+                return UnsignedScaled8R;
+            if (___FormatTypes::SignedScaled8RGBA == _formatType)
+                return SignedScaled8R;
+            if (___FormatTypes::UnsignedInt8RGBA == _formatType)
+                return UnsignedInt8R;
+            if (___FormatTypes::SignedInt8RGBA == _formatType)
+                return SignedInt8R;
+            if (___FormatTypes::Srgb8RGBA == _formatType)
+                return Srgb8R;
+            if (___FormatTypes::UnsignedNormalized8BGRA == _formatType)
+                return UnsignedNormalized8R;
+            if (___FormatTypes::SignedNormalized8BGRA == _formatType)
+                return SignedNormalized8R;
+            if (___FormatTypes::UnsignedScaled8BGRA == _formatType)
+                return UnsignedScaled8R;
+            if (___FormatTypes::SignedScaled8BGRA == _formatType)
+                return SignedScaled8R;
+            if (___FormatTypes::UnsignedInt8BGRA == _formatType)
+                return UnsignedInt8R;
+            if (___FormatTypes::SignedInt8BGRA == _formatType)
+                return SignedInt8R;
+            if (___FormatTypes::Srgb8BGRA == _formatType)
+                return Srgb8R;
+            if (___FormatTypes::UnsignedNormalized8ABGRPACK32 == _formatType)
+                return UnsignedNormalized8R;
+            if (___FormatTypes::SignedNormalized8ABGRPACK32 == _formatType)
+                return SignedNormalized8R;
+            if (___FormatTypes::UnsignedScaled8ABGRPACK32 == _formatType)
+                return UnsignedScaled8R;
+            if (___FormatTypes::SignedScaled8ABGRPACK32 == _formatType)
+                return SignedScaled8R;
+            if (___FormatTypes::UnsignedInt8ABGRPACK32 == _formatType)
+                return UnsignedInt8R;
+            if (___FormatTypes::SignedInt8ABGRPACK32 == _formatType)
+                return SignedInt8R;
+            if (___FormatTypes::Srgb8ABGRPACK32 == _formatType)
+                return Srgb8R;
+            if (___FormatTypes::UnsignedNormalized16R == _formatType)
+                return UnsignedNormalized16R;
+            if (___FormatTypes::SignedNormalized16R == _formatType)
+                return SignedNormalized16R;
+            if (___FormatTypes::UnsignedScaled16R == _formatType)
+                return UnsignedScaled16R;
+            if (___FormatTypes::SignedScaled16R == _formatType)
+                return SignedScaled16R;
+            if (___FormatTypes::UnsignedInt16R == _formatType)
+                return UnsignedInt16R;
+            if (___FormatTypes::SignedInt16R == _formatType)
+                return SignedInt16R;
+            if (___FormatTypes::SignedFloat16R == _formatType)
+                return SignedFloat16R;
+            if (___FormatTypes::UnsignedNormalized16RG == _formatType)
+                return UnsignedNormalized16R;
+            if (___FormatTypes::SignedNormalized16RG == _formatType)
+                return SignedNormalized16R;
+            if (___FormatTypes::UnsignedScaled16RG == _formatType)
+                return UnsignedScaled16R;
+            if (___FormatTypes::SignedScaled16RG == _formatType)
+                return SignedScaled16R;
+            if (___FormatTypes::UnsignedInt16RG == _formatType)
+                return UnsignedInt16R;
+            if (___FormatTypes::SignedInt16RG == _formatType)
+                return SignedInt16R;
+            if (___FormatTypes::SignedFloat16RG == _formatType)
+                return SignedFloat16R;
+            if (___FormatTypes::UnsignedNormalized16RGB == _formatType)
+                return UnsignedNormalized16R;
+            if (___FormatTypes::SignedNormalized16RGB == _formatType)
+                return SignedNormalized16R;
+            if (___FormatTypes::UnsignedScaled16RGB == _formatType)
+                return UnsignedScaled16R;
+            if (___FormatTypes::SignedScaled16RGB == _formatType)
+                return SignedScaled16R;
+            if (___FormatTypes::UnsignedInt16RGB == _formatType)
+                return UnsignedInt16R;
+            if (___FormatTypes::SignedInt16RGB == _formatType)
+                return SignedInt16R;
+            if (___FormatTypes::SignedFloat16RGB == _formatType)
+                return SignedFloat16R;
+            if (___FormatTypes::UnsignedNormalized16RGBA == _formatType)
+                return UnsignedNormalized16R;
+            if (___FormatTypes::SignedNormalized16RGBA == _formatType)
+                return SignedNormalized16R;
+            if (___FormatTypes::UnsignedScaled16RGBA == _formatType)
+                return UnsignedScaled16R;
+            if (___FormatTypes::SignedScaled16RGBA == _formatType)
+                return SignedScaled16R;
+            if (___FormatTypes::UnsignedInt16RGBA == _formatType)
+                return UnsignedInt16R;
+            if (___FormatTypes::SignedInt16RGBA == _formatType)
+                return SignedInt16R;
+            if (___FormatTypes::SignedFloat16RGBA == _formatType)
+                return SignedFloat16R;
+            if (___FormatTypes::UnsignedInt32R == _formatType)
+                return UnsignedInt32R;
+            if (___FormatTypes::SignedInt32R == _formatType)
+                return SignedInt32R;
+            if (___FormatTypes::SignedFloat32R == _formatType)
+                return SignedFloat32R;
+            if (___FormatTypes::UnsignedInt32RG == _formatType)
+                return UnsignedInt32R;
+            if (___FormatTypes::SignedInt32RG == _formatType)
+                return SignedInt32R;
+            if (___FormatTypes::SignedFloat32RG == _formatType)
+                return SignedFloat32R;
+            if (___FormatTypes::UnsignedInt32RGB == _formatType)
+                return UnsignedInt32R;
+            if (___FormatTypes::SignedInt32RGB == _formatType)
+                return SignedInt32R;
+            if (___FormatTypes::SignedFloat32RGB == _formatType)
+                return SignedFloat32R;
+            if (___FormatTypes::UnsignedInt32RGBA == _formatType)
+                return UnsignedInt32R;
+            if (___FormatTypes::SignedInt32RGBA == _formatType)
+                return SignedInt32R;
+            if (___FormatTypes::SignedFloat32RGBA == _formatType)
+                return SignedFloat32R;
+            if (___FormatTypes::UnsignedInt64R == _formatType)
+                return UnsignedInt64R;
+            if (___FormatTypes::SignedInt64R == _formatType)
+                return SignedInt64R;
+            if (___FormatTypes::SignedFloat64R == _formatType)
+                return SignedFloat64R;
+            if (___FormatTypes::UnsignedInt64RG == _formatType)
+                return UnsignedInt64R;
+            if (___FormatTypes::SignedInt64RG == _formatType)
+                return SignedInt64R;
+            if (___FormatTypes::SignedFloat64RG == _formatType)
+                return SignedFloat64R;
+            if (___FormatTypes::UnsignedInt64RGB == _formatType)
+                return UnsignedInt64R;
+            if (___FormatTypes::SignedInt64RGB == _formatType)
+                return SignedInt64R;
+            if (___FormatTypes::SignedFloat64RGB == _formatType)
+                return SignedFloat64R;
+            if (___FormatTypes::UnsignedInt64RGBA == _formatType)
+                return UnsignedInt64R;
+            if (___FormatTypes::SignedInt64RGBA == _formatType)
+                return SignedInt64R;
+            if (___FormatTypes::SignedFloat64RGBA == _formatType)
+                return SignedFloat64R;
+        }
+        if (length == 2) {
+            if (___FormatTypes::UnsignedNormalized8R == _formatType)
+                return UnsignedNormalized8RG;
+            if (___FormatTypes::SignedNormalized8R == _formatType)
+                return SignedNormalized8RG;
+            if (___FormatTypes::UnsignedScaled8R == _formatType)
+                return UnsignedScaled8RG;
+            if (___FormatTypes::SignedScaled8R == _formatType)
+                return SignedScaled8RG;
+            if (___FormatTypes::UnsignedInt8R == _formatType)
+                return UnsignedInt8RG;
+            if (___FormatTypes::SignedInt8R == _formatType)
+                return SignedInt8RG;
+            if (___FormatTypes::Srgb8R == _formatType)
+                return Srgb8RG;
+            if (___FormatTypes::UnsignedNormalized8RG == _formatType)
+                return UnsignedNormalized8RG;
+            if (___FormatTypes::SignedNormalized8RG == _formatType)
+                return SignedNormalized8RG;
+            if (___FormatTypes::UnsignedScaled8RG == _formatType)
+                return UnsignedScaled8RG;
+            if (___FormatTypes::SignedScaled8RG == _formatType)
+                return SignedScaled8RG;
+            if (___FormatTypes::UnsignedInt8RG == _formatType)
+                return UnsignedInt8RG;
+            if (___FormatTypes::SignedInt8RG == _formatType)
+                return SignedInt8RG;
+            if (___FormatTypes::Srgb8RG == _formatType)
+                return Srgb8RG;
+            if (___FormatTypes::UnsignedNormalized8RGB == _formatType)
+                return UnsignedNormalized8RG;
+            if (___FormatTypes::SignedNormalized8RGB == _formatType)
+                return SignedNormalized8RG;
+            if (___FormatTypes::UnsignedScaled8RGB == _formatType)
+                return UnsignedScaled8RG;
+            if (___FormatTypes::SignedScaled8RGB == _formatType)
+                return SignedScaled8RG;
+            if (___FormatTypes::UnsignedInt8RGB == _formatType)
+                return UnsignedInt8RG;
+            if (___FormatTypes::SignedInt8RGB == _formatType)
+                return SignedInt8RG;
+            if (___FormatTypes::Srgb8RGB == _formatType)
+                return Srgb8RG;
+            if (___FormatTypes::UnsignedNormalized8BGR == _formatType)
+                return UnsignedNormalized8RG;
+            if (___FormatTypes::SignedNormalized8BGR == _formatType)
+                return SignedNormalized8RG;
+            if (___FormatTypes::UnsignedScaled8BGR == _formatType)
+                return UnsignedScaled8RG;
+            if (___FormatTypes::SignedScaled8BGR == _formatType)
+                return SignedScaled8RG;
+            if (___FormatTypes::UnsignedInt8BGR == _formatType)
+                return UnsignedInt8RG;
+            if (___FormatTypes::SignedInt8BGR == _formatType)
+                return SignedInt8RG;
+            if (___FormatTypes::Srgb8BGR == _formatType)
+                return Srgb8RG;
+            if (___FormatTypes::UnsignedNormalized8RGBA == _formatType)
+                return UnsignedNormalized8RG;
+            if (___FormatTypes::SignedNormalized8RGBA == _formatType)
+                return SignedNormalized8RG;
+            if (___FormatTypes::UnsignedScaled8RGBA == _formatType)
+                return UnsignedScaled8RG;
+            if (___FormatTypes::SignedScaled8RGBA == _formatType)
+                return SignedScaled8RG;
+            if (___FormatTypes::UnsignedInt8RGBA == _formatType)
+                return UnsignedInt8RG;
+            if (___FormatTypes::SignedInt8RGBA == _formatType)
+                return SignedInt8RG;
+            if (___FormatTypes::Srgb8RGBA == _formatType)
+                return Srgb8RG;
+            if (___FormatTypes::UnsignedNormalized8BGRA == _formatType)
+                return UnsignedNormalized8RG;
+            if (___FormatTypes::SignedNormalized8BGRA == _formatType)
+                return SignedNormalized8RG;
+            if (___FormatTypes::UnsignedScaled8BGRA == _formatType)
+                return UnsignedScaled8RG;
+            if (___FormatTypes::SignedScaled8BGRA == _formatType)
+                return SignedScaled8RG;
+            if (___FormatTypes::UnsignedInt8BGRA == _formatType)
+                return UnsignedInt8RG;
+            if (___FormatTypes::SignedInt8BGRA == _formatType)
+                return SignedInt8RG;
+            if (___FormatTypes::Srgb8BGRA == _formatType)
+                return Srgb8RG;
+            if (___FormatTypes::UnsignedNormalized8ABGRPACK32 == _formatType)
+                return UnsignedNormalized8RG;
+            if (___FormatTypes::SignedNormalized8ABGRPACK32 == _formatType)
+                return SignedNormalized8RG;
+            if (___FormatTypes::UnsignedScaled8ABGRPACK32 == _formatType)
+                return UnsignedScaled8RG;
+            if (___FormatTypes::SignedScaled8ABGRPACK32 == _formatType)
+                return SignedScaled8RG;
+            if (___FormatTypes::UnsignedInt8ABGRPACK32 == _formatType)
+                return UnsignedInt8RG;
+            if (___FormatTypes::SignedInt8ABGRPACK32 == _formatType)
+                return SignedInt8RG;
+            if (___FormatTypes::Srgb8ABGRPACK32 == _formatType)
+                return Srgb8RG;
+            if (___FormatTypes::UnsignedNormalized16R == _formatType)
+                return UnsignedNormalized16RG;
+            if (___FormatTypes::SignedNormalized16R == _formatType)
+                return SignedNormalized16RG;
+            if (___FormatTypes::UnsignedScaled16R == _formatType)
+                return UnsignedScaled16RG;
+            if (___FormatTypes::SignedScaled16R == _formatType)
+                return SignedScaled16RG;
+            if (___FormatTypes::UnsignedInt16R == _formatType)
+                return UnsignedInt16RG;
+            if (___FormatTypes::SignedInt16R == _formatType)
+                return SignedInt16RG;
+            if (___FormatTypes::SignedFloat16R == _formatType)
+                return SignedFloat16RG;
+            if (___FormatTypes::UnsignedNormalized16RG == _formatType)
+                return UnsignedNormalized16RG;
+            if (___FormatTypes::SignedNormalized16RG == _formatType)
+                return SignedNormalized16RG;
+            if (___FormatTypes::UnsignedScaled16RG == _formatType)
+                return UnsignedScaled16RG;
+            if (___FormatTypes::SignedScaled16RG == _formatType)
+                return SignedScaled16RG;
+            if (___FormatTypes::UnsignedInt16RG == _formatType)
+                return UnsignedInt16RG;
+            if (___FormatTypes::SignedInt16RG == _formatType)
+                return SignedInt16RG;
+            if (___FormatTypes::SignedFloat16RG == _formatType)
+                return SignedFloat16RG;
+            if (___FormatTypes::UnsignedNormalized16RGB == _formatType)
+                return UnsignedNormalized16RG;
+            if (___FormatTypes::SignedNormalized16RGB == _formatType)
+                return SignedNormalized16RG;
+            if (___FormatTypes::UnsignedScaled16RGB == _formatType)
+                return UnsignedScaled16RG;
+            if (___FormatTypes::SignedScaled16RGB == _formatType)
+                return SignedScaled16RG;
+            if (___FormatTypes::UnsignedInt16RGB == _formatType)
+                return UnsignedInt16RG;
+            if (___FormatTypes::SignedInt16RGB == _formatType)
+                return SignedInt16RG;
+            if (___FormatTypes::SignedFloat16RGB == _formatType)
+                return SignedFloat16RG;
+            if (___FormatTypes::UnsignedNormalized16RGBA == _formatType)
+                return UnsignedNormalized16RG;
+            if (___FormatTypes::SignedNormalized16RGBA == _formatType)
+                return SignedNormalized16RG;
+            if (___FormatTypes::UnsignedScaled16RGBA == _formatType)
+                return UnsignedScaled16RG;
+            if (___FormatTypes::SignedScaled16RGBA == _formatType)
+                return SignedScaled16RG;
+            if (___FormatTypes::UnsignedInt16RGBA == _formatType)
+                return UnsignedInt16RG;
+            if (___FormatTypes::SignedInt16RGBA == _formatType)
+                return SignedInt16RG;
+            if (___FormatTypes::SignedFloat16RGBA == _formatType)
+                return SignedFloat16RG;
+            if (___FormatTypes::UnsignedInt32R == _formatType)
+                return UnsignedInt32RG;
+            if (___FormatTypes::SignedInt32R == _formatType)
+                return SignedInt32RG;
+            if (___FormatTypes::SignedFloat32R == _formatType)
+                return SignedFloat32RG;
+            if (___FormatTypes::UnsignedInt32RG == _formatType)
+                return UnsignedInt32RG;
+            if (___FormatTypes::SignedInt32RG == _formatType)
+                return SignedInt32RG;
+            if (___FormatTypes::SignedFloat32RG == _formatType)
+                return SignedFloat32RG;
+            if (___FormatTypes::UnsignedInt32RGB == _formatType)
+                return UnsignedInt32RG;
+            if (___FormatTypes::SignedInt32RGB == _formatType)
+                return SignedInt32RG;
+            if (___FormatTypes::SignedFloat32RGB == _formatType)
+                return SignedFloat32RG;
+            if (___FormatTypes::UnsignedInt32RGBA == _formatType)
+                return UnsignedInt32RG;
+            if (___FormatTypes::SignedInt32RGBA == _formatType)
+                return SignedInt32RG;
+            if (___FormatTypes::SignedFloat32RGBA == _formatType)
+                return SignedFloat32RG;
+            if (___FormatTypes::UnsignedInt64R == _formatType)
+                return UnsignedInt64RG;
+            if (___FormatTypes::SignedInt64R == _formatType)
+                return SignedInt64RG;
+            if (___FormatTypes::SignedFloat64R == _formatType)
+                return SignedFloat64RG;
+            if (___FormatTypes::UnsignedInt64RG == _formatType)
+                return UnsignedInt64RG;
+            if (___FormatTypes::SignedInt64RG == _formatType)
+                return SignedInt64RG;
+            if (___FormatTypes::SignedFloat64RG == _formatType)
+                return SignedFloat64RG;
+            if (___FormatTypes::UnsignedInt64RGB == _formatType)
+                return UnsignedInt64RG;
+            if (___FormatTypes::SignedInt64RGB == _formatType)
+                return SignedInt64RG;
+            if (___FormatTypes::SignedFloat64RGB == _formatType)
+                return SignedFloat64RG;
+            if (___FormatTypes::UnsignedInt64RGBA == _formatType)
+                return UnsignedInt64RG;
+            if (___FormatTypes::SignedInt64RGBA == _formatType)
+                return SignedInt64RG;
+            if (___FormatTypes::SignedFloat64RGBA == _formatType)
+                return SignedFloat64RG;
+        }
+        if (length == 3) {
+            if (___FormatTypes::UnsignedNormalized8R == _formatType)
+                return UnsignedNormalized8RGB;
+            if (___FormatTypes::SignedNormalized8R == _formatType)
+                return SignedNormalized8RGB;
+            if (___FormatTypes::UnsignedScaled8R == _formatType)
+                return UnsignedScaled8RGB;
+            if (___FormatTypes::SignedScaled8R == _formatType)
+                return SignedScaled8RGB;
+            if (___FormatTypes::UnsignedInt8R == _formatType)
+                return UnsignedInt8RGB;
+            if (___FormatTypes::SignedInt8R == _formatType)
+                return SignedInt8RGB;
+            if (___FormatTypes::Srgb8R == _formatType)
+                return Srgb8RGB;
+            if (___FormatTypes::UnsignedNormalized8RG == _formatType)
+                return UnsignedNormalized8RGB;
+            if (___FormatTypes::SignedNormalized8RG == _formatType)
+                return SignedNormalized8RGB;
+            if (___FormatTypes::UnsignedScaled8RG == _formatType)
+                return UnsignedScaled8RGB;
+            if (___FormatTypes::SignedScaled8RG == _formatType)
+                return SignedScaled8RGB;
+            if (___FormatTypes::UnsignedInt8RG == _formatType)
+                return UnsignedInt8RGB;
+            if (___FormatTypes::SignedInt8RG == _formatType)
+                return SignedInt8RGB;
+            if (___FormatTypes::Srgb8RG == _formatType)
+                return Srgb8RGB;
+            if (___FormatTypes::UnsignedNormalized8RGB == _formatType)
+                return UnsignedNormalized8RGB;
+            if (___FormatTypes::SignedNormalized8RGB == _formatType)
+                return SignedNormalized8RGB;
+            if (___FormatTypes::UnsignedScaled8RGB == _formatType)
+                return UnsignedScaled8RGB;
+            if (___FormatTypes::SignedScaled8RGB == _formatType)
+                return SignedScaled8RGB;
+            if (___FormatTypes::UnsignedInt8RGB == _formatType)
+                return UnsignedInt8RGB;
+            if (___FormatTypes::SignedInt8RGB == _formatType)
+                return SignedInt8RGB;
+            if (___FormatTypes::Srgb8RGB == _formatType)
+                return Srgb8RGB;
+            if (___FormatTypes::UnsignedNormalized8BGR == _formatType)
+                return UnsignedNormalized8RGB;
+            if (___FormatTypes::SignedNormalized8BGR == _formatType)
+                return SignedNormalized8RGB;
+            if (___FormatTypes::UnsignedScaled8BGR == _formatType)
+                return UnsignedScaled8RGB;
+            if (___FormatTypes::SignedScaled8BGR == _formatType)
+                return SignedScaled8RGB;
+            if (___FormatTypes::UnsignedInt8BGR == _formatType)
+                return UnsignedInt8RGB;
+            if (___FormatTypes::SignedInt8BGR == _formatType)
+                return SignedInt8RGB;
+            if (___FormatTypes::Srgb8BGR == _formatType)
+                return Srgb8RGB;
+            if (___FormatTypes::UnsignedNormalized8RGBA == _formatType)
+                return UnsignedNormalized8RGB;
+            if (___FormatTypes::SignedNormalized8RGBA == _formatType)
+                return SignedNormalized8RGB;
+            if (___FormatTypes::UnsignedScaled8RGBA == _formatType)
+                return UnsignedScaled8RGB;
+            if (___FormatTypes::SignedScaled8RGBA == _formatType)
+                return SignedScaled8RGB;
+            if (___FormatTypes::UnsignedInt8RGBA == _formatType)
+                return UnsignedInt8RGB;
+            if (___FormatTypes::SignedInt8RGBA == _formatType)
+                return SignedInt8RGB;
+            if (___FormatTypes::Srgb8RGBA == _formatType)
+                return Srgb8RGB;
+            if (___FormatTypes::UnsignedNormalized8BGRA == _formatType)
+                return UnsignedNormalized8RGB;
+            if (___FormatTypes::SignedNormalized8BGRA == _formatType)
+                return SignedNormalized8RGB;
+            if (___FormatTypes::UnsignedScaled8BGRA == _formatType)
+                return UnsignedScaled8RGB;
+            if (___FormatTypes::SignedScaled8BGRA == _formatType)
+                return SignedScaled8RGB;
+            if (___FormatTypes::UnsignedInt8BGRA == _formatType)
+                return UnsignedInt8RGB;
+            if (___FormatTypes::SignedInt8BGRA == _formatType)
+                return SignedInt8RGB;
+            if (___FormatTypes::Srgb8BGRA == _formatType)
+                return Srgb8RGB;
+            if (___FormatTypes::UnsignedNormalized8ABGRPACK32 == _formatType)
+                return UnsignedNormalized8RGB;
+            if (___FormatTypes::SignedNormalized8ABGRPACK32 == _formatType)
+                return SignedNormalized8RGB;
+            if (___FormatTypes::UnsignedScaled8ABGRPACK32 == _formatType)
+                return UnsignedScaled8RGB;
+            if (___FormatTypes::SignedScaled8ABGRPACK32 == _formatType)
+                return SignedScaled8RGB;
+            if (___FormatTypes::UnsignedInt8ABGRPACK32 == _formatType)
+                return UnsignedInt8RGB;
+            if (___FormatTypes::SignedInt8ABGRPACK32 == _formatType)
+                return SignedInt8RGB;
+            if (___FormatTypes::Srgb8ABGRPACK32 == _formatType)
+                return Srgb8RGB;
+            if (___FormatTypes::UnsignedNormalized16R == _formatType)
+                return UnsignedNormalized16RGB;
+            if (___FormatTypes::SignedNormalized16R == _formatType)
+                return SignedNormalized16RGB;
+            if (___FormatTypes::UnsignedScaled16R == _formatType)
+                return UnsignedScaled16RGB;
+            if (___FormatTypes::SignedScaled16R == _formatType)
+                return SignedScaled16RGB;
+            if (___FormatTypes::UnsignedInt16R == _formatType)
+                return UnsignedInt16RGB;
+            if (___FormatTypes::SignedInt16R == _formatType)
+                return SignedInt16RGB;
+            if (___FormatTypes::SignedFloat16R == _formatType)
+                return SignedFloat16RGB;
+            if (___FormatTypes::UnsignedNormalized16RG == _formatType)
+                return UnsignedNormalized16RGB;
+            if (___FormatTypes::SignedNormalized16RG == _formatType)
+                return SignedNormalized16RGB;
+            if (___FormatTypes::UnsignedScaled16RG == _formatType)
+                return UnsignedScaled16RGB;
+            if (___FormatTypes::SignedScaled16RG == _formatType)
+                return SignedScaled16RGB;
+            if (___FormatTypes::UnsignedInt16RG == _formatType)
+                return UnsignedInt16RGB;
+            if (___FormatTypes::SignedInt16RG == _formatType)
+                return SignedInt16RGB;
+            if (___FormatTypes::SignedFloat16RG == _formatType)
+                return SignedFloat16RGB;
+            if (___FormatTypes::UnsignedNormalized16RGB == _formatType)
+                return UnsignedNormalized16RGB;
+            if (___FormatTypes::SignedNormalized16RGB == _formatType)
+                return SignedNormalized16RGB;
+            if (___FormatTypes::UnsignedScaled16RGB == _formatType)
+                return UnsignedScaled16RGB;
+            if (___FormatTypes::SignedScaled16RGB == _formatType)
+                return SignedScaled16RGB;
+            if (___FormatTypes::UnsignedInt16RGB == _formatType)
+                return UnsignedInt16RGB;
+            if (___FormatTypes::SignedInt16RGB == _formatType)
+                return SignedInt16RGB;
+            if (___FormatTypes::SignedFloat16RGB == _formatType)
+                return SignedFloat16RGB;
+            if (___FormatTypes::UnsignedNormalized16RGBA == _formatType)
+                return UnsignedNormalized16RGB;
+            if (___FormatTypes::SignedNormalized16RGBA == _formatType)
+                return SignedNormalized16RGB;
+            if (___FormatTypes::UnsignedScaled16RGBA == _formatType)
+                return UnsignedScaled16RGB;
+            if (___FormatTypes::SignedScaled16RGBA == _formatType)
+                return SignedScaled16RGB;
+            if (___FormatTypes::UnsignedInt16RGBA == _formatType)
+                return UnsignedInt16RGB;
+            if (___FormatTypes::SignedInt16RGBA == _formatType)
+                return SignedInt16RGB;
+            if (___FormatTypes::SignedFloat16RGBA == _formatType)
+                return SignedFloat16RGB;
+            if (___FormatTypes::UnsignedInt32R == _formatType)
+                return UnsignedInt32RGB;
+            if (___FormatTypes::SignedInt32R == _formatType)
+                return SignedInt32RGB;
+            if (___FormatTypes::SignedFloat32R == _formatType)
+                return SignedFloat32RGB;
+            if (___FormatTypes::UnsignedInt32RG == _formatType)
+                return UnsignedInt32RGB;
+            if (___FormatTypes::SignedInt32RG == _formatType)
+                return SignedInt32RGB;
+            if (___FormatTypes::SignedFloat32RG == _formatType)
+                return SignedFloat32RGB;
+            if (___FormatTypes::UnsignedInt32RGB == _formatType)
+                return UnsignedInt32RGB;
+            if (___FormatTypes::SignedInt32RGB == _formatType)
+                return SignedInt32RGB;
+            if (___FormatTypes::SignedFloat32RGB == _formatType)
+                return SignedFloat32RGB;
+            if (___FormatTypes::UnsignedInt32RGBA == _formatType)
+                return UnsignedInt32RGB;
+            if (___FormatTypes::SignedInt32RGBA == _formatType)
+                return SignedInt32RGB;
+            if (___FormatTypes::SignedFloat32RGBA == _formatType)
+                return SignedFloat32RGB;
+            if (___FormatTypes::UnsignedInt64R == _formatType)
+                return UnsignedInt64RGB;
+            if (___FormatTypes::SignedInt64R == _formatType)
+                return SignedInt64RGB;
+            if (___FormatTypes::SignedFloat64R == _formatType)
+                return SignedFloat64RGB;
+            if (___FormatTypes::UnsignedInt64RG == _formatType)
+                return UnsignedInt64RGB;
+            if (___FormatTypes::SignedInt64RG == _formatType)
+                return SignedInt64RGB;
+            if (___FormatTypes::SignedFloat64RG == _formatType)
+                return SignedFloat64RGB;
+            if (___FormatTypes::UnsignedInt64RGB == _formatType)
+                return UnsignedInt64RGB;
+            if (___FormatTypes::SignedInt64RGB == _formatType)
+                return SignedInt64RGB;
+            if (___FormatTypes::SignedFloat64RGB == _formatType)
+                return SignedFloat64RGB;
+            if (___FormatTypes::UnsignedInt64RGBA == _formatType)
+                return UnsignedInt64RGB;
+            if (___FormatTypes::SignedInt64RGBA == _formatType)
+                return SignedInt64RGB;
+            if (___FormatTypes::SignedFloat64RGBA == _formatType)
+                return SignedFloat64RGB;
+        }
+        if (length == 4) {
+            if (___FormatTypes::UnsignedNormalized8R == _formatType)
+                return UnsignedNormalized8RGBA;
+            if (___FormatTypes::SignedNormalized8R == _formatType)
+                return SignedNormalized8RGBA;
+            if (___FormatTypes::UnsignedScaled8R == _formatType)
+                return UnsignedScaled8RGBA;
+            if (___FormatTypes::SignedScaled8R == _formatType)
+                return SignedScaled8RGBA;
+            if (___FormatTypes::UnsignedInt8R == _formatType)
+                return UnsignedInt8RGBA;
+            if (___FormatTypes::SignedInt8R == _formatType)
+                return SignedInt8RGBA;
+            if (___FormatTypes::Srgb8R == _formatType)
+                return Srgb8RGBA;
+            if (___FormatTypes::UnsignedNormalized8RG == _formatType)
+                return UnsignedNormalized8RGBA;
+            if (___FormatTypes::SignedNormalized8RG == _formatType)
+                return SignedNormalized8RGBA;
+            if (___FormatTypes::UnsignedScaled8RG == _formatType)
+                return UnsignedScaled8RGBA;
+            if (___FormatTypes::SignedScaled8RG == _formatType)
+                return SignedScaled8RGBA;
+            if (___FormatTypes::UnsignedInt8RG == _formatType)
+                return UnsignedInt8RGBA;
+            if (___FormatTypes::SignedInt8RG == _formatType)
+                return SignedInt8RGBA;
+            if (___FormatTypes::Srgb8RG == _formatType)
+                return Srgb8RGBA;
+            if (___FormatTypes::UnsignedNormalized8RGB == _formatType)
+                return UnsignedNormalized8RGBA;
+            if (___FormatTypes::SignedNormalized8RGB == _formatType)
+                return SignedNormalized8RGBA;
+            if (___FormatTypes::UnsignedScaled8RGB == _formatType)
+                return UnsignedScaled8RGBA;
+            if (___FormatTypes::SignedScaled8RGB == _formatType)
+                return SignedScaled8RGBA;
+            if (___FormatTypes::UnsignedInt8RGB == _formatType)
+                return UnsignedInt8RGBA;
+            if (___FormatTypes::SignedInt8RGB == _formatType)
+                return SignedInt8RGBA;
+            if (___FormatTypes::Srgb8RGB == _formatType)
+                return Srgb8RGBA;
+            if (___FormatTypes::UnsignedNormalized8BGR == _formatType)
+                return UnsignedNormalized8RGBA;
+            if (___FormatTypes::SignedNormalized8BGR == _formatType)
+                return SignedNormalized8RGBA;
+            if (___FormatTypes::UnsignedScaled8BGR == _formatType)
+                return UnsignedScaled8RGBA;
+            if (___FormatTypes::SignedScaled8BGR == _formatType)
+                return SignedScaled8RGBA;
+            if (___FormatTypes::UnsignedInt8BGR == _formatType)
+                return UnsignedInt8RGBA;
+            if (___FormatTypes::SignedInt8BGR == _formatType)
+                return SignedInt8RGBA;
+            if (___FormatTypes::Srgb8BGR == _formatType)
+                return Srgb8RGBA;
+            if (___FormatTypes::UnsignedNormalized8RGBA == _formatType)
+                return UnsignedNormalized8RGBA;
+            if (___FormatTypes::SignedNormalized8RGBA == _formatType)
+                return SignedNormalized8RGBA;
+            if (___FormatTypes::UnsignedScaled8RGBA == _formatType)
+                return UnsignedScaled8RGBA;
+            if (___FormatTypes::SignedScaled8RGBA == _formatType)
+                return SignedScaled8RGBA;
+            if (___FormatTypes::UnsignedInt8RGBA == _formatType)
+                return UnsignedInt8RGBA;
+            if (___FormatTypes::SignedInt8RGBA == _formatType)
+                return SignedInt8RGBA;
+            if (___FormatTypes::Srgb8RGBA == _formatType)
+                return Srgb8RGBA;
+            if (___FormatTypes::UnsignedNormalized8BGRA == _formatType)
+                return UnsignedNormalized8RGBA;
+            if (___FormatTypes::SignedNormalized8BGRA == _formatType)
+                return SignedNormalized8RGBA;
+            if (___FormatTypes::UnsignedScaled8BGRA == _formatType)
+                return UnsignedScaled8RGBA;
+            if (___FormatTypes::SignedScaled8BGRA == _formatType)
+                return SignedScaled8RGBA;
+            if (___FormatTypes::UnsignedInt8BGRA == _formatType)
+                return UnsignedInt8RGBA;
+            if (___FormatTypes::SignedInt8BGRA == _formatType)
+                return SignedInt8RGBA;
+            if (___FormatTypes::Srgb8BGRA == _formatType)
+                return Srgb8RGBA;
+            if (___FormatTypes::UnsignedNormalized8ABGRPACK32 == _formatType)
+                return UnsignedNormalized8ABGRPACK32;
+            if (___FormatTypes::SignedNormalized8ABGRPACK32 == _formatType)
+                return SignedNormalized8ABGRPACK32;
+            if (___FormatTypes::UnsignedScaled8ABGRPACK32 == _formatType)
+                return UnsignedScaled8ABGRPACK32;
+            if (___FormatTypes::SignedScaled8ABGRPACK32 == _formatType)
+                return SignedScaled8ABGRPACK32;
+            if (___FormatTypes::UnsignedInt8ABGRPACK32 == _formatType)
+                return UnsignedInt8ABGRPACK32;
+            if (___FormatTypes::SignedInt8ABGRPACK32 == _formatType)
+                return SignedInt8ABGRPACK32;
+            if (___FormatTypes::Srgb8ABGRPACK32 == _formatType)
+                return Srgb8ABGRPACK32;
+            if (___FormatTypes::UnsignedNormalized16R == _formatType)
+                return UnsignedNormalized16RGBA;
+            if (___FormatTypes::SignedNormalized16R == _formatType)
+                return SignedNormalized16RGBA;
+            if (___FormatTypes::UnsignedScaled16R == _formatType)
+                return UnsignedScaled16RGBA;
+            if (___FormatTypes::SignedScaled16R == _formatType)
+                return SignedScaled16RGBA;
+            if (___FormatTypes::UnsignedInt16R == _formatType)
+                return UnsignedInt16RGBA;
+            if (___FormatTypes::SignedInt16R == _formatType)
+                return SignedInt16RGBA;
+            if (___FormatTypes::SignedFloat16R == _formatType)
+                return SignedFloat16RGBA;
+            if (___FormatTypes::UnsignedNormalized16RG == _formatType)
+                return UnsignedNormalized16RGBA;
+            if (___FormatTypes::SignedNormalized16RG == _formatType)
+                return SignedNormalized16RGBA;
+            if (___FormatTypes::UnsignedScaled16RG == _formatType)
+                return UnsignedScaled16RGBA;
+            if (___FormatTypes::SignedScaled16RG == _formatType)
+                return SignedScaled16RGBA;
+            if (___FormatTypes::UnsignedInt16RG == _formatType)
+                return UnsignedInt16RGBA;
+            if (___FormatTypes::SignedInt16RG == _formatType)
+                return SignedInt16RGBA;
+            if (___FormatTypes::SignedFloat16RG == _formatType)
+                return SignedFloat16RGBA;
+            if (___FormatTypes::UnsignedNormalized16RGB == _formatType)
+                return UnsignedNormalized16RGBA;
+            if (___FormatTypes::SignedNormalized16RGB == _formatType)
+                return SignedNormalized16RGBA;
+            if (___FormatTypes::UnsignedScaled16RGB == _formatType)
+                return UnsignedScaled16RGBA;
+            if (___FormatTypes::SignedScaled16RGB == _formatType)
+                return SignedScaled16RGBA;
+            if (___FormatTypes::UnsignedInt16RGB == _formatType)
+                return UnsignedInt16RGBA;
+            if (___FormatTypes::SignedInt16RGB == _formatType)
+                return SignedInt16RGBA;
+            if (___FormatTypes::SignedFloat16RGB == _formatType)
+                return SignedFloat16RGBA;
+            if (___FormatTypes::UnsignedNormalized16RGBA == _formatType)
+                return UnsignedNormalized16RGBA;
+            if (___FormatTypes::SignedNormalized16RGBA == _formatType)
+                return SignedNormalized16RGBA;
+            if (___FormatTypes::UnsignedScaled16RGBA == _formatType)
+                return UnsignedScaled16RGBA;
+            if (___FormatTypes::SignedScaled16RGBA == _formatType)
+                return SignedScaled16RGBA;
+            if (___FormatTypes::UnsignedInt16RGBA == _formatType)
+                return UnsignedInt16RGBA;
+            if (___FormatTypes::SignedInt16RGBA == _formatType)
+                return SignedInt16RGBA;
+            if (___FormatTypes::SignedFloat16RGBA == _formatType)
+                return SignedFloat16RGBA;
+            if (___FormatTypes::UnsignedInt32R == _formatType)
+                return UnsignedInt32RGBA;
+            if (___FormatTypes::SignedInt32R == _formatType)
+                return SignedInt32RGBA;
+            if (___FormatTypes::SignedFloat32R == _formatType)
+                return SignedFloat32RGBA;
+            if (___FormatTypes::UnsignedInt32RG == _formatType)
+                return UnsignedInt32RGBA;
+            if (___FormatTypes::SignedInt32RG == _formatType)
+                return SignedInt32RGBA;
+            if (___FormatTypes::SignedFloat32RG == _formatType)
+                return SignedFloat32RGBA;
+            if (___FormatTypes::UnsignedInt32RGB == _formatType)
+                return UnsignedInt32RGBA;
+            if (___FormatTypes::SignedInt32RGB == _formatType)
+                return SignedInt32RGBA;
+            if (___FormatTypes::SignedFloat32RGB == _formatType)
+                return SignedFloat32RGBA;
+            if (___FormatTypes::UnsignedInt32RGBA == _formatType)
+                return UnsignedInt32RGBA;
+            if (___FormatTypes::SignedInt32RGBA == _formatType)
+                return SignedInt32RGBA;
+            if (___FormatTypes::SignedFloat32RGBA == _formatType)
+                return SignedFloat32RGBA;
+            if (___FormatTypes::UnsignedInt64R == _formatType)
+                return UnsignedInt64RGBA;
+            if (___FormatTypes::SignedInt64R == _formatType)
+                return SignedInt64RGBA;
+            if (___FormatTypes::SignedFloat64R == _formatType)
+                return SignedFloat64RGBA;
+            if (___FormatTypes::UnsignedInt64RG == _formatType)
+                return UnsignedInt64RGBA;
+            if (___FormatTypes::SignedInt64RG == _formatType)
+                return SignedInt64RGBA;
+            if (___FormatTypes::SignedFloat64RG == _formatType)
+                return SignedFloat64RGBA;
+            if (___FormatTypes::UnsignedInt64RGB == _formatType)
+                return UnsignedInt64RGBA;
+            if (___FormatTypes::SignedInt64RGB == _formatType)
+                return SignedInt64RGBA;
+            if (___FormatTypes::SignedFloat64RGB == _formatType)
+                return SignedFloat64RGBA;
+            if (___FormatTypes::UnsignedInt64RGBA == _formatType)
+                return UnsignedInt64RGBA;
+            if (___FormatTypes::SignedInt64RGBA == _formatType)
+                return SignedInt64RGBA;
+            if (___FormatTypes::SignedFloat64RGBA == _formatType)
+                return SignedFloat64RGBA;
+        }
+        return Undefined;
+    }
 
 	inline constexpr size_t ___Format::getVecLength() const {
 		if (___FormatTypes::UnsignedNormalized8R == _formatType)

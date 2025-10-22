@@ -7,45 +7,28 @@
 #include "../define.h"
 #include "pv.h"
 
-#include "device.h"
+#include "buffer_and_image_accessor.h"
 #include "../format.h"
+#include "../utils/flags.h"
+
+#include "buffer.h"
 
 namespace VSL_NAMESPACE {
-    /*
-     * VK_IMAGE_USAGE_TRANSFER_SRC_BIT = 0x00000001,
-    VK_IMAGE_USAGE_TRANSFER_DST_BIT = 0x00000002,
-    VK_IMAGE_USAGE_SAMPLED_BIT = 0x00000004,
-    VK_IMAGE_USAGE_STORAGE_BIT = 0x00000008,
-    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT = 0x00000010,
-    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT = 0x00000020,
-    VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT = 0x00000040,
-    VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT = 0x00000080,
-    VK_IMAGE_USAGE_HOST_TRANSFER_BIT = 0x00400000,
-    VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR = 0x00000400,
-    VK_IMAGE_USAGE_VIDEO_DECODE_SRC_BIT_KHR = 0x00000800,
-    VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR = 0x00001000,
-    VK_IMAGE_USAGE_FRAGMENT_DENSITY_MAP_BIT_EXT = 0x00000200,
-    VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR = 0x00000100,
-    VK_IMAGE_USAGE_VIDEO_ENCODE_DST_BIT_KHR = 0x00002000,
-    VK_IMAGE_USAGE_VIDEO_ENCODE_SRC_BIT_KHR = 0x00004000,
-    VK_IMAGE_USAGE_VIDEO_ENCODE_DPB_BIT_KHR = 0x00008000,
-    VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT = 0x00080000,
-    VK_IMAGE_USAGE_INVOCATION_MASK_BIT_HUAWEI = 0x00040000,
-    VK_IMAGE_USAGE_SAMPLE_WEIGHT_BIT_QCOM = 0x00100000,
-    VK_IMAGE_USAGE_SAMPLE_BLOCK_MATCH_BIT_QCOM = 0x00200000,
-    VK_IMAGE_USAGE_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR = 0x02000000,
-    VK_IMAGE_USAGE_VIDEO_ENCODE_EMPHASIS_MAP_BIT_KHR = 0x04000000,
-    VK_IMAGE_USAGE_SHADING_RATE_IMAGE_BIT_NV = VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR,
-    VK_IMAGE_USAGE_HOST_TRANSFER_BIT_EXT = VK_IMAGE_USAGE_HOST_TRANSFER_BIT,
-    VK_IMAGE_USAGE_FLAG_BITS_MAX_ENUM = 0x7FFFFFFF
-     */
-
     // memory propertyとformatをtemplateにしたいかも
-    struct Image {
-        Image(LogicalDeviceAccessor device, std::uint32_t width, std::uint32_t height, data_format::___Format format = data_format::UnsignedNormalized8RGBA);
+    template<ImageType Usage, MemoryProperty MemProp = MemoryProperty::DeviceLocal, ImageLayout Layout = ImageLayout::Undefined>
+    struct Image : public ImageAccessor {
+        Image(LogicalDeviceAccessor device, std::uint32_t width, std::uint32_t height,
+              data_format::___Format format = data_format::Srgb8RGBA);
 
-        std::shared_ptr<_impl::Image_impl> _data;
+        template<MemoryType MemType, MemoryProperty MemProperty, SharingMode ShareMode>
+        bool copyByBuffer(CommandManager manager, Buffer<MemType, MemProperty, ShareMode> &buffer);
     };
+}
+
+template<vsl::ImageType Usage, vsl::MemoryProperty MemProp, vsl::ImageLayout Layout>
+vsl::Image<Usage, MemProp, Layout>::Image(vsl::LogicalDeviceAccessor device, std::uint32_t width, std::uint32_t height,
+                                          data_format::___Format format) {
+    _data = MakeImage(Usage, MemProp, Layout, device, width, height, format);
 }
 
 #endif //AHO_ALL_IMAGE_HPP

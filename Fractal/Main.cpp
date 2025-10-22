@@ -47,7 +47,7 @@
 #include <VSL/defaults.hpp>
 #include <VSL/Vulkan/descriptor.hpp>
 #include <VSL/Vulkan/image.hpp>
-#include <VSL/Vulkan/commands/pipeline_barrier.hpp>
+#include <VSL/Vulkan/commands/change_image_barrier.hpp>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "../thirdparty/stb_image_write.h"

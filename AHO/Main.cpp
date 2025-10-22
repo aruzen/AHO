@@ -70,6 +70,7 @@
 */
 
 #include <boost/bimap.hpp>
+#include "../thirdparty/stb_image.h"
 
 int main() {
     using namespace aho;
@@ -142,21 +143,63 @@ int main() {
                               scissor,
                               viewport);
 
-        RenderPass render_pass(swapchain);
+        auto [input_vertices_pool, input_vertices_resource, input_vertices_resource_layout, input_vertices] = [&]() {
+            auto vd2p_fc_umpv_reflect
+                    = utils::SPIRVReflector(device, std::filesystem::path(
+                            expand_environments(
+                                    "${AHO_HOME}/built-in-resource/shaders/vd2p_fc_umpv.vert.spv"))).generated;
+            auto input_vertices_resource_layout = vd2p_fc_umpv_reflect.makeBindingLayout();
+            return std::tuple_cat(graphic_resource_manager->allocate(
+                                          std::vector(swapchain.getSwapImageSize(), input_vertices_resource_layout[0])),
+                                  std::make_tuple(input_vertices_resource_layout, GraphicsPipeline(
+                                          layout.copy().add(
+                                                  pl::ResourceBinding(input_vertices_resource_layout),
+                                                  input_d3_shaders, vd2p_fc_umpv_reflect.vertex_input),
+                                          render_pass)));
+        }();
 
-        CommandManager manager(device);
-        manager.setDefault();
+        auto [push_triangle_layout, push_triangle] = [&]() {
+            auto d2triangle_single_color
+                    = utils::SPIRVReflector(device, std::filesystem::path(
+                            expand_environments(
+                                    "${AHO_HOME}/built-in-resource/shaders/2dtriangle_single_color.vert.spv")
+                    )).generated;
+            auto push_triangle_layout = layout.copy().add(
+                    d2triangle_single_color.push_constants,
+                    push_d2_shaders);
+            return std::make_tuple(push_triangle_layout, GraphicsPipeline(
+                    push_triangle_layout,
+                    render_pass));
+        }();
 
-        auto vert_input = pl::VertexInput().add_shape({data_format::FloatVec2}).add_shape({data_format::FloatRGB});
+        auto [texture_pool, texture_resource, texture_resource_layout, input_texture] = [&]() {
+            auto texture_vert
+                    = utils::SPIRVReflector(device, std::filesystem::path(
+                            expand_environments("../../AHO/shaders/texture.vert.spv"))).generated;
+            auto vert_resource_layout = texture_vert.makeBindingLayout()[0];
+            auto texture_frag
+                    = utils::SPIRVReflector(device, std::filesystem::path(
+                            expand_environments("../../AHO/shaders/texture.frag.spv"))).generated;
+            auto frag_resource_layout = texture_frag.makeBindingLayout()[0];
+            std::vector l(swapchain.getSwapImageSize(), vert_resource_layout);
+            l.push_back(frag_resource_layout);
+            return std::tuple_cat(graphic_resource_manager->allocate(l),
+                                  std::make_tuple(std::vector{vert_resource_layout, frag_resource_layout},
+                                                  GraphicsPipeline(
+                                                          layout.copy().add(
+                                                                  pl::ResourceBinding(
+                                                                          {vert_resource_layout, frag_resource_layout}),
+                                                                  input_texture_shaders, texture_vert.vertex_input),
+                                                          render_pass)));
+        }();
 
-        FrameBuffer frame_buffer(swapchain, view, render_pass);
 
-        auto resourceBindingLayout = std::vector(device.getSwapImageSize(), ResourceBindingLayout(device, 0, ResourceType::UniformBuffer, ShaderType::Vertex));
-        GraphicsPipeline input_vertices(layout.copy().add(pl::ResourceBinding(resourceBindingLayout), input_d3_shaders, vert_input), render_pass);
-
-        auto imageAvailable = synchro_manager.createSemaphore("imageAvailable", manager.getBuffer().getSize()),
-                renderFinished = synchro_manager.createSemaphore("renderFinished", manager.getBuffer().getSize());
-        auto inFlight = synchro_manager.createFence("inFlight", manager.getBuffer().getSize(), true);
+        auto imageAvailable = synchro_manager.createSemaphore("imageAvailable",
+                                                              command_manager.getBuffer().getSize()),
+                renderFinished = synchro_manager.createSemaphore("renderFinished",
+                                                                 command_manager.getBuffer().getSize());
+        auto inFlight = synchro_manager.createFence("inFlight",
+                                                    command_manager.getBuffer().getSize(), true);
 
         /*
         vertex center = {{0.0_f_x + 0.0_f_y}, HSV(0.0f, 0.0f, 0.1f).rgb()};
@@ -179,10 +222,17 @@ int main() {
         };
 
         std::array<d2::PointF, 4> vertices = {
-                d2::PointF{-0.5f, -0.5f},
                 d2::PointF{0.5f, -0.5f},
-                d2::PointF{0.5f, 0.5f},
-                d2::PointF{-0.5f, 0.5f}
+                d2::PointF{-0.5f, -0.5f},
+                d2::PointF{-0.5f, 0.5f},
+                d2::PointF{0.5f, 0.5f}
+        };
+
+        std::array<d2::PointF, 4> texcoords = {
+                d2::PointF{1.0f, 0.0f},
+                d2::PointF{0.0f, 0.0f},
+                d2::PointF{0.0f, 1.0f},
+                d2::PointF{1.0f, 1.0f}
         };
 
         std::array<d2::PointF, 4> vertices2 = {
@@ -255,7 +305,8 @@ int main() {
                 frame_buffer.setTargetFrame(phase.getImageIndex());
 
                 uboBuffers[phase.getImageIndex()].copy(ubo);
-                resource[phase.getImageIndex()].update(uboBuffers[phase.getImageIndex()], 0);
+                input_vertices_resource[phase.getImageIndex()].update(uboBuffers[phase.getImageIndex()], 0);
+                texture_resource[phase.getImageIndex()].update(uboBuffers[phase.getImageIndex()], 0);
 
                 if (key1->up()) {
                     target = &vertices;

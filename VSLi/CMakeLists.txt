@@ -52,10 +52,14 @@ add_library(VSL STATIC
         VSL/Vulkan/stages/resource_binding.cpp
         VSL/Vulkan/commands/dispatch.cpp
         VSL/Vulkan/image.cpp
-        VSL/Vulkan/commands/pipeline_barrier.cpp
+        VSL/Vulkan/commands/change_image_barrier.cpp
         VSL/utils/SPIRVReflector.cpp
         VSL/Vulkan/stages/push_contents.cpp
         VSL/Vulkan/commands/push_contents.cpp
+        VSL/Vulkan/sampler.cpp
+        VSL/Vulkan/commands/copy_buffer_to_image.cpp
+        VSL/Vulkan/commands/copy_image_to_buffer.cpp
+        VSL/Vulkan/post_definition.h
 )
 
 target_include_directories(VSL PRIVATE ${Vulkan_INCLUDE_DIRS})

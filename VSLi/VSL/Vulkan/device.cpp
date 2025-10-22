@@ -41,7 +41,9 @@ using namespace vsl::_impl::helper;
 const std::vector<const char*> deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     "VK_KHR_portability_subset",
-    "VK_EXT_extended_dynamic_state"
+    VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME
+    // VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME,
+    // VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
 };
 
 bool checkDeviceExtensionSupport(vk::PhysicalDevice device) {
@@ -83,6 +85,7 @@ std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> VSL_NAMESPACE::_Logica
         deviceFeatures.vertexPipelineStoresAndAtomics = true;
         deviceFeatures.fragmentStoresAndAtomics = true;
     }
+    deviceFeatures.samplerAnisotropy = true;
 
     vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT extendedDynamicStateFeatures;
     extendedDynamicStateFeatures.extendedDynamicState = true;

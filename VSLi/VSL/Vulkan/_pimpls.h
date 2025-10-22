@@ -269,6 +269,15 @@ namespace VSL_NAMESPACE::_impl {
         vk::ImageView view;
         vk::DeviceMemory memory;
         std::uint32_t width, height;
+
+        ~Image_impl();
+    };
+
+    struct Sampler_impl {
+        std::shared_ptr<LogicalDevice_impl> device;
+        vk::Sampler sampler;
+
+        ~Sampler_impl();
     };
 
 	namespace pipeline_layout {
@@ -293,6 +302,9 @@ namespace VSL_NAMESPACE::_impl {
 			bool isComplete();
 		};
 
+        std::uint32_t findMemoryType(std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> device,
+                                     std::uint32_t typeFilter,
+                                     vk::MemoryPropertyFlags properties);
 		QueueFamilyIndices findQueueFamilies(vk::PhysicalDevice device, vk::SurfaceKHR surface);
 		void DestroyDebugUtilsMessengerEXT(vk::Instance& instance, vk::DebugUtilsMessengerEXT& debugMessenger, const VkAllocationCallbacks* pAllocator);
 	}

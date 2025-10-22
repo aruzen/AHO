@@ -35,6 +35,7 @@
 #include "Vulkan/viewport.h"
 #include "Vulkan/scissor.h"
 #include "Vulkan/swapchain.h"
+#include "Vulkan/sampler.h"
 #include "Vulkan/view.h"
 #include "Vulkan/pv.h"
 #include "Vulkan/buffer.h"
@@ -54,5 +55,6 @@
 #include "format.h"
 #include "concepts.h"
 
+#include "Vulkan/post_definition.h"
 
 #endif //AHO_ALL_VSL_H

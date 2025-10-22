@@ -12,6 +12,7 @@
 #include "shader.h"
 #include "buffer.h"
 #include "image.hpp"
+#include "sampler.h"
 
 namespace VSL_NAMESPACE::graphic_resource {
     constexpr size_t MAX_POOL_SIZE = 10000000;
@@ -56,7 +57,7 @@ namespace VSL_NAMESPACE::graphic_resource {
 
     template<typename T>
     concept can_convert_graphic_resource = std::is_convertible_v<T *, vsl::BufferAccessor *> ||
-                                           std::is_convertible_v<T *, vsl::Image *>;
+            std::is_convertible_v<T *, vsl::ImageAccessor *>;
 
     /*
      * GPU上のメモリーに置かれたデータをShaderがどう読み取るかを指定できる
@@ -160,10 +161,15 @@ namespace VSL_NAMESPACE::graphic_resource {
         Pool getPool();
 
         // ここらへんのTもいつかtypename ...Argsに置き換えたいかも
-        void update(vsl::BufferAccessor *buffer, size_t binding = 0, std::optional<Type> type = std::nullopt,
+        void update(vsl::BufferAccessor* buffer, size_t binding = 0, std::optional<Type> type = std::nullopt,
                     size_t offset = 0, std::optional<size_t> size = std::nullopt);
 
-        void update(vsl::Image *image, size_t binding = 0, std::optional<Type> type = std::nullopt,
+        void update(vsl::ImageAccessor image, size_t binding = 0, std::optional<Type> type = std::nullopt,
+                    size_t offset = 0,
+                    std::optional<size_t> size = std::nullopt);
+
+        void update(vsl::ImageAccessor image, Sampler sampler, size_t binding = 0,
+                    std::optional<Type> type = std::nullopt,
                     size_t offset = 0,
                     std::optional<size_t> size = std::nullopt);
 
@@ -251,9 +257,9 @@ template<vsl::graphic_resource::can_convert_graphic_resource T>
 void
 vsl::GraphicResource::update(T t, size_t binding, std::optional<Type> type, size_t offset, std::optional<size_t> size) {
     if constexpr (std::is_convertible_v<T *, vsl::BufferAccessor *>)
-        update((vsl::BufferAccessor *) &t, binding, type, offset, size);
-    else if constexpr (std::is_convertible_v<T *, vsl::Image *>)
-        update((vsl::Image *) &t, binding, type, offset, size);
+        update((vsl::BufferAccessor*) &t, binding, type, offset, size);
+    else if constexpr (std::is_convertible_v<T *, vsl::ImageAccessor *>)
+        update((vsl::ImageAccessor) &t, binding, type, offset, size);
 }
 
 #endif //AHO_ALL_DESCRIPTOR_HPP

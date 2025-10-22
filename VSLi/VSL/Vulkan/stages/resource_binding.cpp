@@ -5,7 +5,9 @@
 #include "../_pimpls.h"
 #include "resource_binding.h"
 
-vsl::pipeline_layout::ResourceBinding::ResourceBinding(std::vector<graphic_resource::BindingLayout> sets) : resourceBindingSets(sets) {}
+#include <utility>
+
+vsl::pipeline_layout::ResourceBinding::ResourceBinding(std::vector<graphic_resource::BindingLayout> sets) : resourceBindingSets(std::move(sets)) {}
 
 void VSL_NAMESPACE::pipeline_layout::ResourceBinding::injection(VSL_NAMESPACE::PipelineLayoutAccessor pl)
 {

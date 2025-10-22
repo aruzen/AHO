@@ -5,6 +5,10 @@
 #include "_pimpls.h"
 
 #include "buffer.h"
+#include "buffer_and_image_accessor.h"
+#include "phase.hpp"
+#include "commands/copy_image_to_buffer.h"
+
 #include <source_location>
 
 VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException::MemoryNotHostVisibleException(std::string traceinfo) :
@@ -17,7 +21,7 @@ VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException::MemoryNotHostVisibleEx
                                                     "This buffer's memory is not host-visible. Mapping is not allowed.",
                                                     sourece) {}
 
-std::uint32_t findMemoryType(std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> device, std::uint32_t typeFilter,
+std::uint32_t vsl::_impl::helper::findMemoryType(std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> device, std::uint32_t typeFilter,
                              vk::MemoryPropertyFlags properties) {
     if (not device->parentDevice->memProps.has_value())
         device->parentDevice->makeMemProps();
@@ -57,40 +61,10 @@ bool VSL_NAMESPACE::BufferAccessor::copyByBuffer(CommandManager commandManager, 
     return false;
 }
 
-bool vsl::BufferAccessor::copyByImage(CommandManager commandManager, const vsl::Image& image, std::optional<vsl::FenceHolder> waitFence) {
-    vk::BufferImageCopy region;
-    region.bufferOffset = 0;
-    region.bufferRowLength = 0;  // tightly packed
-    region.bufferImageHeight = 0;
-    region.imageSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
-    region.imageSubresource.mipLevel = 0;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = 1;
-    region.imageOffset = vk::Offset3D{0, 0, 0};
-    region.imageExtent = vk::Extent3D{image._data->width, image._data->height, 1};
-
-    waitFence.value().reset(0);
-
-    auto commandBuf = commandManager.makeExclusiveBuffer();
-    auto vkCommandBuf = commandBuf._data->commandBuffers[0];
-
-    vk::CommandBufferBeginInfo beginInfo;
-    vkCommandBuf.begin(beginInfo);
-    vkCommandBuf.copyImageToBuffer(
-            image._data->image, vk::ImageLayout::eGeneral,
-            this->_data->buffer,
-            region
-    );
-    vkCommandBuf.end();
-
-    vk::SubmitInfo submitInfo;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &vkCommandBuf;
-
-    // TODO
-    commandManager._data->graphicsQueue.submit({submitInfo}, waitFence.value()._data->fences[0]);
-    waitFence.value().wait();
-    return false;
+bool vsl::BufferAccessor::copyByImage(CommandManager manager, const vsl::ImageAccessor& image) {
+    auto phase = manager.startPhase<ComputePhase>();
+    phase << command::CopyImageToBuffer(this, image);
+    return true;
 }
 
 size_t VSL_NAMESPACE::BufferAccessor::size() {
@@ -119,7 +93,7 @@ VSL_NAMESPACE::BufferAccessor::MakeBuffer(VSL_NAMESPACE::LogicalDeviceAccessor d
 
     vk::MemoryAllocateInfo allocInfo;
     allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = findMemoryType(data->device, memRequirements.memoryTypeBits,
+    allocInfo.memoryTypeIndex = vsl::_impl::helper::findMemoryType(data->device, memRequirements.memoryTypeBits,
                                                vk::MemoryPropertyFlags{(unsigned int) memProperty});
 
     data->deviceMem = data->device->device.allocateMemory(allocInfo);
@@ -168,9 +142,8 @@ GetData(VSL_NAMESPACE::BufferAccessor *data, std::optional<size_t> size, size_t 
     return holder;
 }
 
-bool vsl::BufferAccessor::LocalBufferHolder::copyByImage(vsl::CommandManager commandManager, const vsl::Image &image,
-                                      std::optional<vsl::FenceHolder> waitFence) {
-    return parent->copyByImage(std::move(commandManager), image, std::move(waitFence));
+bool vsl::BufferAccessor::LocalBufferHolder::copyByImage(vsl::CommandManager commandManager, const vsl::ImageAccessor &image) {
+    return parent->copyByImage(std::move(commandManager), image);
 }
 
 bool vsl::BufferAccessor::LocalBufferHolder::copyByBuffer(vsl::CommandManager commandManager, vsl::BufferAccessor *buf) {

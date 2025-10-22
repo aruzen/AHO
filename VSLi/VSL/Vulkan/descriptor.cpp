@@ -246,12 +246,45 @@ void vsl::graphic_resource::Resource::update(vsl::BufferAccessor *buffer, size_t
     ((ManagerInterface *) _data->pool->manager)->_data->device->device.updateDescriptorSets({descriptorWrite}, {});
 }
 
-void
-vsl::graphic_resource::Resource::update(vsl::Image *image, size_t binding, std::optional <Type> type, size_t offset,
-                                        std::optional <size_t> size) {
+void vsl::graphic_resource::Resource::update(vsl::ImageAccessor image, size_t binding,
+                                             std::optional<Type> type, size_t offset, std::optional<size_t> size) {
     vk::DescriptorImageInfo imageInfo;
-    imageInfo.imageView = image->_data->view;
+    imageInfo.imageView = image._data->view;
     imageInfo.imageLayout = vk::ImageLayout::eGeneral;
+
+    vk::WriteDescriptorSet descriptorWrite;
+    descriptorWrite.dstSet = this->_data->descriptorSet;
+    descriptorWrite.dstBinding = binding;
+    descriptorWrite.dstArrayElement = 0;
+    if (type)
+        descriptorWrite.descriptorType = (vk::DescriptorType) type.value();
+    else {
+        if (not _data->layout.expired()) {
+            auto layout = _data->layout.lock();
+            for (const auto &lb: layout->layoutBindings)
+                if (lb.binding == binding) {
+                    descriptorWrite.descriptorType = lb.descriptorType;
+                    goto found_layout;
+                }
+        }
+    }
+    throw vsl::exceptions::RuntimeException("LayoutNotFound", "Layout not found!", std::source_location::current());
+    found_layout:
+
+    descriptorWrite.descriptorCount = 1;
+    descriptorWrite.pBufferInfo = nullptr;
+    descriptorWrite.pImageInfo = &imageInfo;
+    descriptorWrite.pTexelBufferView = nullptr; // Optional
+
+    ((ManagerInterface *) _data->pool->manager)->_data->device->device.updateDescriptorSets({descriptorWrite}, {});
+}
+
+void vsl::graphic_resource::Resource::update(vsl::ImageAccessor image, Sampler sampler,size_t binding,
+                                             std::optional<Type> type, size_t offset, std::optional<size_t> size) {
+    vk::DescriptorImageInfo imageInfo;
+    imageInfo.imageView = image._data->view;
+    imageInfo.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    imageInfo.sampler = sampler._data->sampler;
 
     vk::WriteDescriptorSet descriptorWrite;
     descriptorWrite.dstSet = this->_data->descriptorSet;

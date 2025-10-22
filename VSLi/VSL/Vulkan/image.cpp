@@ -11,11 +11,18 @@
 
 #include "image.hpp"
 
-// TODO 統一する
-extern std::uint32_t findMemoryType(VSL_NAMESPACE::LogicalDeviceAccessor device, std::uint32_t typeFilter, vk::MemoryPropertyFlags properties);
+#include <utility>
+#include "phase.hpp"
+#include "commands/change_image_barrier.hpp"
+#include "commands/copy_buffer_to_image.h"
+#include "buffer_and_image_accessor.h"
 
-vsl::Image::Image(vsl::LogicalDeviceAccessor device, std::uint32_t width, std::uint32_t height, data_format::___Format format) {
-    _data = std::make_shared<_impl::Image_impl>();
+
+std::shared_ptr<vsl::_impl::Image_impl>
+vsl::ImageAccessor::MakeImage(vsl::ImageType type, vsl::MemoryProperty prop, vsl::ImageLayout layout,
+                              vsl::LogicalDeviceAccessor device, std::uint32_t width,
+                              std::uint32_t height, vsl::data_format::___Format format) {
+    auto _data = std::make_shared<_impl::Image_impl>();
     _data->device = device._data;
     _data->height = height;
     _data->width = width;
@@ -28,8 +35,8 @@ vsl::Image::Image(vsl::LogicalDeviceAccessor device, std::uint32_t width, std::u
     imageInfo.arrayLayers = 1;
     imageInfo.samples = vk::SampleCountFlagBits::e1;
     imageInfo.tiling = vk::ImageTiling::eOptimal;
-    imageInfo.usage = vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eTransferSrc;
-    imageInfo.initialLayout = vk::ImageLayout::eUndefined;
+    imageInfo.usage = (vk::ImageUsageFlagBits) type;
+    imageInfo.initialLayout = (vk::ImageLayout) layout;
 
     _data->image = device._data->device.createImage(imageInfo);
 
@@ -37,7 +44,8 @@ vsl::Image::Image(vsl::LogicalDeviceAccessor device, std::uint32_t width, std::u
 
     vk::MemoryAllocateInfo allocInfo;
     allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = findMemoryType(device, memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal);
+    allocInfo.memoryTypeIndex = vsl::_impl::helper::findMemoryType(device._data, memRequirements.memoryTypeBits,
+                                                                   (vk::MemoryPropertyFlagBits) prop);
 
     _data->memory = device._data->device.allocateMemory(allocInfo);
 
@@ -54,4 +62,23 @@ vsl::Image::Image(vsl::LogicalDeviceAccessor device, std::uint32_t width, std::u
     viewInfo.subresourceRange.layerCount = 1;
 
     _data->view = device._data->device.createImageView(viewInfo);
+    return _data;
+}
+
+void vsl::ImageAccessor::TransformLayout(vsl::CommandManager manager, std::shared_ptr<_impl::Image_impl> data,
+                                         vsl::ImageLayout oldLayout, vsl::ImageLayout newLayout) {
+    auto phase = manager.startPhase<ComputePhase>();
+    phase << command::ChangeImageBarrier(ImageAccessor{std::move(data)}, oldLayout, newLayout);
+}
+
+bool vsl::ImageAccessor::copyByBuffer(CommandManager manager, BufferAccessor *buf, vsl::ImageLayout layout) {
+    auto phase = manager.startPhase<ComputePhase>();
+    phase << command::CopyBufferToImage(*this, buf, layout);
+    return true;
+}
+
+vsl::_impl::Image_impl::~Image_impl() {
+    device->device.destroy(view);
+    device->device.destroy(image);
+    device->device.free(memory);
 }

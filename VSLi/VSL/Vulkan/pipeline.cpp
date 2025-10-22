@@ -8,7 +8,6 @@
 #include "_pimpls.h"
 
 vsl::GraphicsPipeline::GraphicsPipeline(vsl::PipelineLayoutAccessor layout, vsl::RenderPass pass) {
-
     _data = std::shared_ptr<_impl::Pipeline_impl>(new _impl::Pipeline_impl);
     _data->device = layout._data->device;
     _data->layout = layout._data;
@@ -39,7 +38,12 @@ vsl::GraphicsPipeline::GraphicsPipeline(vsl::PipelineLayoutAccessor layout, vsl:
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
     pipelineInfo.basePipelineIndex = -1; // Optional
 
-    _data->pipeline = _data->device->device.createGraphicsPipeline(cache, pipelineInfo).value;
+    const auto& result = _data->device->device.createGraphicsPipeline(cache, pipelineInfo);
+    if (result.result != vk::Result::eSuccess) {
+        // FIXME
+        loggingln(vk::to_string(result.result));
+    }
+    _data->pipeline = result.value;
 }
 
 void vsl::GraphicsPipeline::invoke(vsl::CommandPool pool, vsl::CommandBuffer buffer, vsl::CommandManager manager) {

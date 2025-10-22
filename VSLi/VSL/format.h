@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <concepts>
+#include <compare>
 
 namespace VSL_NAMESPACE::data_format {
 	enum class ___FormatTypes : std::uint32_t{

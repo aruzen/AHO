@@ -20,6 +20,7 @@
 #include "Vulkan/synchronize.h"
 #include "Vulkan/window_plugin/hook_window_resize.h"
 #include "Vulkan/device.h"
+#include "Vulkan/descriptor_set_manager.h"
 #include "Vulkan/shader.h"
 #include "Vulkan/surface.h"
 #include "Vulkan/stages/multisample.h"
@@ -45,6 +46,7 @@
 #include "Vulkan/commands/render_pass_end.h"
 #include "Vulkan/commands/draw_indexed.h"
 #include "Vulkan/commands/bind_vertex_buffers.h"
+#include "Vulkan/commands/bind_graphic_resource.hpp"
 #include "Vulkan/commands/render_pass_begin.h"
 #include "Vulkan/commands/push_contents.h"
 #include "Vulkan/commands/draw.h"
@@ -55,6 +57,9 @@
 #include "format.h"
 #include "concepts.h"
 
+#ifdef VSL_ENABLE_SPIRV_REFLECTOR
+#include "utils/SPIRVReflector.h"
+#endif
 #include "Vulkan/post_definition.h"
 
 #endif //AHO_ALL_VSL_H

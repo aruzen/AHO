@@ -1,5 +1,6 @@
 #pragma once
 #include "../define.h"
+#include "../exceptions.h"
 #include "pv.h"
 
 #include "device.h"
@@ -28,6 +29,11 @@ namespace VSL_NAMESPACE {
 		PipelineLayout add(Additions&&... a);
 
 		PipelineLayout copy();
+
+        /*
+         * 編集不可にし必要なデータだけ以外のメモリを解放する
+         */
+        PipelineLayoutAccessor freeze();
 	};
 
 
@@ -54,6 +60,10 @@ namespace VSL_NAMESPACE {
 
 	template <VSL_NAMESPACE::pipeline_layout_injecter... Additions>
 	PipelineLayout PipelineLayout::add(Additions&&... a) {
+        if (not _data){
+            throw vsl::exceptions::RuntimeException("error: Frozen Pipeline data.");
+        }
+
 		helper::expansionPipelineLayoutArgs(*this, std::forward<Additions>(a)...);
 
 		init_finish();

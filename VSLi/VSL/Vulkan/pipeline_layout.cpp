@@ -54,6 +54,11 @@ VSL_NAMESPACE::PipelineLayout VSL_NAMESPACE::PipelineLayout::copy() {
 	return PipelineLayout(data);
 }
 
+vsl::PipelineLayoutAccessor vsl::PipelineLayout::freeze() {
+    _data->info.reset();
+    return vsl::PipelineLayoutAccessor{_data};
+}
+
 VSL_NAMESPACE::_impl::PipelineLayout_impl::~PipelineLayout_impl()
 {
 	device->device.destroyPipelineLayout(pipelineLayout);

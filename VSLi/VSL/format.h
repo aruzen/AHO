@@ -369,10 +369,10 @@ namespace VSL_NAMESPACE::data_format {
 		Float = SignedFloat32Vec1,
 	};
 
-	class ___Format {
+	struct ___Format {
 		___FormatTypes _formatType = ___FormatTypes::Undefined;
 		unsigned int _size = 0;
-	public:
+
 		constexpr ___Format(___FormatTypes formatType, std::uint32_t size) : _formatType(formatType), _size(size) {}
 
 		constexpr ___FormatTypes type() const {
@@ -383,11 +383,11 @@ namespace VSL_NAMESPACE::data_format {
 			return _size;
 		}
 
-		constexpr size_t getVecLength() const;
+		constexpr std::size_t getVecLength() const;
 
-		template <size_t Length>
+		template <std::size_t Length>
 		constexpr ___Format toVec()  const;
-        ___Format toVec(size_t length)  const;
+        ___Format toVec(std::size_t length)  const;
 
 		constexpr auto operator <=>(const ___Format&) const = default;
 	};
@@ -832,7 +832,7 @@ namespace VSL_NAMESPACE::data_format {
 		return v.get_graphic_type();
 	}
 
-	template<size_t Length>
+	template<std::size_t Length>
 	inline constexpr ___Format ___Format::toVec() const
 	{
 		if constexpr (Length == 1) {
@@ -1654,7 +1654,7 @@ namespace VSL_NAMESPACE::data_format {
 		return Undefined;
 	}
 
-    inline ___Format ___Format::toVec(size_t length) const
+    inline ___Format ___Format::toVec(std::size_t length) const
     {
         if (length == 1) {
             if (___FormatTypes::UnsignedNormalized8R == _formatType)
@@ -2475,7 +2475,7 @@ namespace VSL_NAMESPACE::data_format {
         return Undefined;
     }
 
-	inline constexpr size_t ___Format::getVecLength() const {
+	inline constexpr std::size_t ___Format::getVecLength() const {
 		if (___FormatTypes::UnsignedNormalized8R == _formatType)
 			return 1;
 		if (___FormatTypes::SignedNormalized8R == _formatType)

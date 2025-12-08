@@ -9,7 +9,6 @@
 #include "../pv.h"
 #include "../command.h"
 
-#include "../descriptor.hpp"
 #include "../pipeline.h"
 
 #include "../image.hpp"

@@ -6,11 +6,16 @@ cmake_policy(SET CMP0167 NEW)
 
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
+if(NOT DEFINED AHO_HOME)
+    set(AHO_HOME $ENV{AHO_HOME})
+endif ()
+if (NOT DEFINED VSL_HOME)
+    set(VSL_HOME $ENV{VSL_HOME})
+endif ()
+message(STATUS "AHO_HOME : ${AHO_HOME}")
+message(STATUS "VSL_HOME : ${VSL_HOME}")
+
 project(AHO-all)
-# FIXME: 何かgccを使わなくてはいけない理由があったが忘れてしまった、のちに検証して消すこと
-# set(CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING "Build type" FORCE)
-# set(CMAKE_C_COMPILER "/opt/homebrew/Cellar/gcc/15.1.0/bin/gcc-15" CACHE STRING "clang compiler" FORCE)
-# set(CMAKE_CXX_COMPILER "/opt/homebrew/Cellar/gcc/15.1.0/bin/g++-15" CACHE STRING "clang++ compiler" FORCE)
 string(REPLACE "-fcolor-diagnostics" "-fdiagnostics-color=auto" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
 set(CMAKE_CXX_STANDARD 23)

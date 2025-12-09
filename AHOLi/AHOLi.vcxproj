@@ -102,7 +102,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalDependencies>"D:\apuri\_libs\glfw\lib-vc2019\glfw3.lib";"D:\sdks\VulkanSDK\1.2.176.1\Lib\vulkan-1.lib";%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>"D:\apuri\_libs\glfw\lib-vc2019\glfw3.lib";"D:\sdks\VulkanSDK\1.2.176.1\Lib\Vulkan-1.lib";%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -125,7 +125,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalDependencies>"D:\apuri\_libs\glfw\lib-vc2019\glfw3.lib";"D:\sdks\VulkanSDK\1.2.176.1\Lib\vulkan-1.lib";%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>"D:\apuri\_libs\glfw\lib-vc2019\glfw3.lib";"D:\sdks\VulkanSDK\1.2.176.1\Lib\Vulkan-1.lib";%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -145,7 +145,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalDependencies>"$(TargetDir)\VSLi.lib";"$(GLFW)\lib-vc2019\glfw3.lib";"$(VULKAN_SDK)\Lib\vulkan-1.lib";%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>"$(TargetDir)\VSLi.lib";"$(GLFW)\lib-vc2019\glfw3.lib";"$(VULKAN_SDK)\Lib\Vulkan-1.lib";%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -168,7 +168,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalDependencies>"$(TargetDir)\VSLi.lib";"$(GLFW)\lib-vc2019\glfw3.lib";"$(VULKAN_SDK)\Lib\vulkan-1.lib";%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>"$(TargetDir)\VSLi.lib";"$(GLFW)\lib-vc2019\glfw3.lib";"$(VULKAN_SDK)\Lib\Vulkan-1.lib";%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>

@@ -48,7 +48,7 @@
     <ClInclude Include="VSL\Vulkan\stages\vertex_input.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="VSL\Vulkan\_dimention.h">
+    <ClInclude Include="VSL\Vulkan\_dimension.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="VSL\Vulkan\_pimpls.h">
@@ -99,7 +99,7 @@
     <ClInclude Include="VSL\define.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="VSL\dimention.h">
+    <ClInclude Include="VSL\dimension.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="VSL\exceptions.h">

@@ -126,7 +126,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalLibraryDirectories>"$(GLFW)\lib-vc2019\glfw3.lib";"$(VULKAN_SDK)\Lib\vulkan-1.lib";%(AdditionalDependencies)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>"$(GLFW)\lib-vc2019\glfw3.lib";"$(VULKAN_SDK)\Lib\Vulkan-1.lib";%(AdditionalDependencies)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -149,7 +149,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalLibraryDirectories>"$(GLFW)\lib-vc2019\glfw3.lib";"$(VULKAN_SDK)\Lib\vulkan-1.lib";%(AdditionalDependencies)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>"$(GLFW)\lib-vc2019\glfw3.lib";"$(VULKAN_SDK)\Lib\Vulkan-1.lib";%(AdditionalDependencies)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -165,7 +165,7 @@
     <ClInclude Include="VSL\concepts.h" />
     <ClInclude Include="VSL\debug.h" />
     <ClInclude Include="VSL\define.h" />
-    <ClInclude Include="VSL\dimention.h" />
+    <ClInclude Include="VSL\dimension.h" />
     <ClInclude Include="VSL\exceptions.h" />
     <ClInclude Include="VSL\test.h" />
     <ClInclude Include="VSL\Type.h" />
@@ -196,7 +196,7 @@
     <ClInclude Include="VSL\Vulkan\viewport.h" />
     <ClInclude Include="VSL\Vulkan\Vulkan.h" />
     <ClInclude Include="VSL\Vulkan\window_plugin\hook_window_resize.h" />
-    <ClInclude Include="VSL\Vulkan\_dimention.h" />
+    <ClInclude Include="VSL\Vulkan\_dimension.h" />
     <ClInclude Include="VSL\Vulkan\_pimpls.h" />
     <ClInclude Include="VSL\Window.h" />
     <ClInclude Include="VSL\window_plugin.h" />

@@ -5,18 +5,17 @@
 #ifndef AHO_ALL_STANDARDENGINE_H
 #define AHO_ALL_STANDARDENGINE_H
 
-#include "../Engine.hpp"
-#include "../Window.h"
+#include "graphical_engine.hpp"
 
 namespace AHO_NAMESPACE::engine {
-    struct StandardEngine : public EngineAccessor {
+    struct StandardEngine : public GraphicalEngine {
         std::optional<aho::window::Window> boot_window = std::nullopt;
 
         StandardEngine(std::string applicationName, bool bootOn = true);
 
-        void boot(std::string applicationName);
+        void boot(const std::string& applicationName);
 
-        std::optional<aho::window::Window> supportWindow() override;
+        Window getWindow() override;
     };
 }
 

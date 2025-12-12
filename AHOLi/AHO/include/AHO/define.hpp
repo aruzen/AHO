@@ -9,6 +9,8 @@
 #endif
 
 // #define AHO_POOP_PUBLIC_SECURITY
+#define AHO_STB_IMAGE_ENABLE
+
 
 #define ___AHO_JOIN_S(x, y) x ## y
 #define ___AHO_JOIN(x, y) ___AHO_JOIN_S(x, y)

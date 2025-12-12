@@ -1,50 +1,6 @@
-#include <VSL/concepts.h>
-#include <VSL/debug.h>
-#include <VSL/define.h>
-#include <VSL/dimention.h>
-#include <VSL/exceptions.h>
-#include <VSL/test.h>
-#include <VSL/Type.h>
-#include <VSL/Window.h>
-#include <VSL/window_plugin.h>
-#include <VSL/utils/ShaderCompiler.h>
-#include <VSL/utils/VSLArray.h>
-#include <VSL/Vulkan/buffer.h>
-#include <VSL/Vulkan/command.h>
-#include <VSL/Vulkan/device.h>
-#include <VSL/Vulkan/frame_buffer.h>
-#include <VSL/Vulkan/pipeline.h>
-#include <VSL/Vulkan/pipeline_layout.h>
-#include <VSL/Vulkan/pv.h>
-#include <VSL/Vulkan/phase.hpp>
-#include <VSL/Vulkan/render_pass.h>
-#include <VSL/Vulkan/scissor.h>
-#include <VSL/Vulkan/shader.h>
-#include <VSL/Vulkan/surface.h>
-#include <VSL/Vulkan/swapchain.h>
-#include <VSL/Vulkan/synchronize.h>
-#include <VSL/Vulkan/view.h>
-#include <VSL/Vulkan/viewport.h>
-#include <VSL/Vulkan/Vulkan.h>
-#include <VSL/Vulkan/commands/bind_pipe_line.h>
-#include <VSL/Vulkan/commands/bind_vertex_buffers.h>
-#include <VSL/Vulkan/commands/bind_index_buffers.h>
-#include <VSL/Vulkan/commands/bind_graphic_resource.hpp>
-#include <VSL/Vulkan/commands/draw.h>
-#include <VSL/Vulkan/commands/draw_indexed.h>
-#include <VSL/Vulkan/commands/render_pass_begin.h>
-#include <VSL/Vulkan/commands/render_pass_end.h>
-#include <VSL/Vulkan/stages/color_blend.h>
-#include <VSL/Vulkan/stages/depth_stencil.h>
-#include <VSL/Vulkan/stages/dynamic_state.h>
-#include <VSL/Vulkan/stages/input_assembly.h>
-#include <VSL/Vulkan/stages/multisample.h>
-#include <VSL/Vulkan/stages/rasterization.h>
-#include <VSL/Vulkan/stages/resource_binding.h>
-#include <VSL/Vulkan/stages/shader_group.h>
-#include <VSL/Vulkan/stages/vertex_input.h>
-#include <VSL/defaults.hpp>
-#include <VSL/Vulkan/descriptor.hpp>
+#include <VSL/vsl.hpp>
+#include <VSL/utils/shader_compiler.hpp>
+#include <VSL/utils/spir_reflector.hpp>
 
 // #define AHO_POOP_PUBLIC_SECURITY
 #pragma warning( disable : 4455 )
@@ -67,6 +23,8 @@
 #include <AHO/engine/standard_engine.hpp>
 
 #include <chrono>
+#include <print>
+#include <cstdlib>
 
 /*
 * https://vulkan-tutorial.com/en/Vertex_buffers/Staging_buffer
@@ -80,38 +38,40 @@ int main() {
     using namespace aho::coordinate;
     using namespace aho::literals;
     namespace pl = vsl::pipeline_layout;
+    namespace gfx_src = vsl::graphic_resource;
 
-    try {
+#if !defined(DEBUG) && !defined(_DEBUG)
+    vsl::loggingln("Release build");
+    try
+#else
+    vsl::loggingln("Debug build");
+#endif
+    {
+        /*
+breakpoint set --name swift_willThrow
+breakpoint disable swift_willThrow
+         /opt/homebrew/bin/cmake -DCMAKE_BUILD_TYPE=Debug -G Ninja -S /Users/morimoto_hibiki/repos/AHO -B .
+         */
         using namespace vsl;
+        aho::engine::StandardEngine engine("test");
+
+        auto &[vulkan_instance, physical_device, device, command_manager, graphic_resource_manager, synchro_manager]
+                = *engine._data;
+        auto &main_window = engine.boot_window.value();
+        auto &[surface, swapchain, image_view, render_pass, frame_buffer]
+                = *engine.boot_window.value()._data2;
 #ifdef _MSC_VER
         vsl::utils::ShaderCompiler shader_compiler("glslc", "shaders/");
 #elifdef __APPLE_CC__
-        vsl::utils::ShaderCompiler shader_compiler("glslc", "../../AHO/shaders/");
+        vsl::utils::ShaderCompiler shader_compiler("glslc",
+                                                   {"../../AHO/shaders/", "${AHO_HOME}/built-in-resource/shaders/"});
 #endif
         shader_compiler.load();
         shader_compiler.compile();
 
-#ifdef _MSC_VER
-        Vulkan vk("test", { "VK_KHR_win32_surface", "VK_KHR_surface" });
-#elifdef __APPLE_CC__
-        Vulkan vk("test", {"VK_KHR_portability_enumeration", "VK_KHR_surface",
-                           "VK_EXT_metal_surface" });
-#endif
-        auto physical_device = PhysicalDevices(vk).search();
+        // Window main_window("vsl", 800, 800);
+        // auto surface = main_window.addPlugin<Surface>(vulkan_instance);
 
-        Window main_window("vsl", 800, 700);
-        auto surface = main_window.addPlugin<Surface>(vk);
-
-        LogicalDevice device(physical_device, surface);
-        for (auto device: PhysicalDevices(vk).get())
-            loggingln(physical_device.name(), "(", physical_device.apiVersion(), ")");
-        vsl::loggingln("selected : ", physical_device.name(), "(", physical_device.apiVersion(), ")");
-
-        SynchroManager synchro_manager(device);
-
-        Swapchain swapchain(device);
-
-        View view(swapchain);
 #ifdef _MSC_VER
         auto s1 = make_shader<"shaders/const_triangle.vert.spv">(device);
         auto s2 = make_shader<"shaders/red.frag.spv">(device);
@@ -119,15 +79,23 @@ int main() {
             colorfull_triangle_shaders("colorfull_triangle", { make_shader<"shaders/const_triangle2.vert.spv">(device), make_shader<"shaders/colorfull.frag.spv">(device) }),
             input_sahders("2d_input", { make_shader<"shaders/input.vert.spv">(device), make_shader<"shaders/input.frag.spv">(device) });
 #elifdef __APPLE_CC__
-        auto s1 = make_shader<"../../AHO/shaders/const_triangle.vert.spv">(device);
-        auto s2 = make_shader<"../../AHO/shaders/red.frag.spv">(device);
-        pl::ShaderGroup red_triangle_shaders("red_triangle", {s1, s2}),
-                input_d3_shaders("d3_input",
-                                           {make_shader<"../../AHO/shaders/3Dnormal.vert.spv">(device),
-                                            make_shader<"../../AHO/shaders/colorfull.frag.spv">(device)}),
-                input_d2_shaders("2d_input", {make_shader<"../../AHO/shaders/input.vert.spv">(device),
-                                           make_shader<"../../AHO/shaders/input.frag.spv">(device)});
+        pl::ShaderGroup input_d3_shaders("3d_color_input",
+                                         {make_shader<"${AHO_HOME}/built-in-resource/shaders/vd2p_fc_umpv.vert.spv">(
+                                                 device),
+                                          make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device)}),
+                input_d2_shaders("2d_color_input",
+                                 {make_shader<"${AHO_HOME}/built-in-resource/shaders/vd2p_fc.vert.spv">(device),
+                                  make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device)}),
+                push_d2_shaders("2d_color_push",
+                                {make_shader<"${AHO_HOME}/built-in-resource/shaders/2dtriangle_single_color.vert.spv">(
+                                        device),
+                                 make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device)}),
+                input_texture_shaders("input_texture",
+                                      {make_shader<"../../AHO/shaders/texture.vert.spv">(device),
+                                       make_shader<"../../AHO/shaders/texture.frag.spv">(device)});
 #endif
+
+        // utils::SPIRVReflector reflector(device, std::filesystem::path(expand_environments("${AHO_HOME}/built-in-resource/shaders/all-types.vert.spv")));
 
         Scissor scissor(swapchain);
         Viewport viewport(swapchain);
@@ -142,7 +110,8 @@ int main() {
                               pl::InputAssembly(),
                               pl::Multisample(),
                               pl::Rasterization(),
-                              // pl::DynamicState(),
+                              pl::DepthStencil(),
+                // pl::DynamicState(),
                               scissor,
                               viewport);
 
@@ -204,17 +173,10 @@ int main() {
         auto inFlight = synchro_manager.createFence("inFlight",
                                                     command_manager.getBuffer().getSize(), true);
 
-        /*
-        vertex center = {{0.0_f_x + 0.0_f_y}, HSV(0.0f, 0.0f, 0.1f).rgb()};
-        vertex top = {{0.0_f_x + -0.1_f_y}, HSV(0.0f, 1.0f, 0.5f).rgb()};
-        vertex right = {{0.1_f_x + 0.1_f_y}, HSV(120.0f, 1.0f, 0.5f).rgb()};
-        vertex left = {{-0.1_f_x + 0.1_f_y}, HSV(240.0f, 1.0f, 0.5f).rgb()};
-         */
-
-        struct ubo_t {
-            alignas(16) Mat4x4<float> model;
-            alignas(16) Mat4x4<float> view;
-            alignas(16) Mat4x4<float> proj;
+        struct alignas(16) ubo_t {
+            Mat4x4<float> model;
+            Mat4x4<float> view;
+            Mat4x4<float> proj;
         } ubo;
 
         std::array<RGB, 4> colors = {
@@ -238,119 +200,132 @@ int main() {
                 d2::PointF{1.0f, 1.0f}
         };
 
-        std::array<d2::PointF, 4> vertices2 = {
-                d2::PointF{-0.5f, -0.5f},
-                d2::PointF{0.5f, -0.5f},
-                d2::PointF{0.5f, 0.5f},
-                d2::PointF{-0.5f, 0.5f}
-        };
-
         const std::array<uint32_t, 6> indices = {
                 0, 1, 2, 2, 3, 0
         };
 
-        using UboBuffer = Buffer<vsl::MemoryType::UniformBuffer, vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>;
+        struct alignas(16) debug_t {
+            std::array<float, 4 * 3> v;
+        } *debug;
+
+        using UboBuffer = Buffer<vsl::MemoryType::UniformBuffer,
+                vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>;
         std::vector<UboBuffer> uboBuffers;
-        uboBuffers.reserve(device.getSwapImageSize());
-        std::generate_n(std::back_inserter(uboBuffers), device.getSwapImageSize(), [&]() { return UboBuffer(device, sizeof(ubo_t)); });
-        GraphicResourceManager resourceManager(device);
-        auto [pool, resource] = resourceManager.make(resourceBindingLayout, uboBuffers);
+        uboBuffers.reserve(swapchain.getSwapImageSize());
+        std::generate_n(std::back_inserter(uboBuffers), swapchain.getSwapImageSize(),
+                        [&]() { return UboBuffer(device, sizeof(ubo_t)); });
 
-        DeviceLocalBuffer<vsl::MemoryType::VertexBuffer> colorBuffer(device, sizeof(RGB)*colors.size());
-        DeviceLocalBuffer<vsl::MemoryType::VertexBuffer> vertBuffer(device, sizeof(d2::PointF)*vertices.size());
-        DeviceLocalBuffer<vsl::MemoryType::VertexBuffer> vert2Buffer(device, sizeof(d2::PointF)*vertices2.size());
-        DeviceLocalBuffer<vsl::MemoryType::IndexBuffer> indexBuffer(device, sizeof(uint32_t)*indices.size());
+        for (size_t i = 0; i < input_vertices_resource.size() && i < uboBuffers.size(); i++) {
+            input_vertices_resource[i].update(uboBuffers[i], (size_t) 0);
+            texture_resource[i].update(uboBuffers[i], (size_t) 0);
+        }
+        DeviceLocalBuffer<vsl::MemoryType::VertexBuffer> colorBuffer(device, command_manager, colors);
+        DeviceLocalBuffer<vsl::MemoryType::IndexBuffer> indexBuffer(device, command_manager, indices);
+        DeviceLocalBuffer<vsl::MemoryType::VertexBuffer> vertBuffer(device, command_manager, vertices);
+        DeviceLocalBuffer<vsl::MemoryType::VertexBuffer> texCoordBuffer(device, command_manager, texcoords);
 
-        StagingBuffer vertStagingBuffer(device, sizeof(d2::PointF)*vertices.size());
-        {
-            StagingBuffer colorStagingBuffer(device, sizeof(RGB)*colors.size());
-            colorStagingBuffer.copy(colors);
-            colorBuffer.copy(colorStagingBuffer);
+        int texWidth, texHeight, texChannels;
+        stbi_uc *pixels = stbi_load(expand_environments("${AHO_HOME}/built-in-resource/images/ahahacraft.png").c_str(),
+                                    &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
 
-
-            StagingBuffer indexStagingBuffer(device, sizeof(uint32_t)*indices.size());
-            indexStagingBuffer.copy(indices);
-            indexBuffer.copy(indexStagingBuffer);
-
-            vertStagingBuffer.copy(vertices);
-            vertBuffer.copy(vertStagingBuffer);
-            vertStagingBuffer.copy(vertices2);
-            vert2Buffer.copy(vertStagingBuffer);
+        if (!pixels) {
+            throw std::runtime_error("failed to load texture image!");
         }
 
-        InputManager input_manager(main_window);
-        auto key1 = input_manager.get<input::Key>(input::KeyCode::Num1);
-        auto key2 = input_manager.get<input::Key>(input::KeyCode::Num2);
-        auto keyUp = input_manager.get<input::Key>(input::KeyCode::Up);
-        auto keyDown = input_manager.get<input::Key>(input::KeyCode::Down);
-        auto keyLeft = input_manager.get<input::Key>(input::KeyCode::Left);
-        auto keyRight = input_manager.get<input::Key>(input::KeyCode::Right);
-
-        auto* target = &vertices;
-        auto* targetBuffer = &vertBuffer;
-
-        while (Window::Update() && main_window && input_manager) {
-            static auto startTime = std::chrono::high_resolution_clock::now();
-
-            auto currentTime = std::chrono::high_resolution_clock::now();
-            float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-            ubo.model = matrix::make_rotation(time * 5.0_rad, Vector(0.0f, 0.0f, 1.0f));
-            ubo.view = matrix::make_view(Point(2.0f, 2.0f, 2.0f), Point(0.0f, 0.0f, 0.0f), Vector(0.0f, 0.0f, 1.0f));
-            ubo.proj = matrix::make_identity<float, 4>();
-            for (auto r : ubo.proj) {
-                for (auto e: r)
-                    std::cout << e << " ";
-                std::cout << std::endl;
+        Image<ImageType::TransferDst | ImageType::Sampled> image(device, texWidth, texHeight);
+        Sampler sampler(device);
+        {
+            StagingBuffer<> imageStagingBuffer(device, texHeight * texWidth * texChannels);
+            auto data = imageStagingBuffer.data();
+            memcpy(data.data, pixels, texHeight * texWidth * texChannels);
+            {
+                auto phase = command_manager.startPhase<ComputePhase>(std::nullopt, std::nullopt, inFlight);
+                phase << command::ChangeImageBarrier(image, ImageLayout::TransferDstOptimal);
+                phase << command::CopyBufferToImage(image, &imageStagingBuffer, ImageLayout::TransferDstOptimal);
+                phase << command::ChangeImageBarrier(image, ImageLayout::TransferDstOptimal,
+                                                     ImageLayout::ShaderReadOnlyOptimal);
             }
+            inFlight.wait();
+        }
+        texture_resource[swapchain.getSwapImageSize()].update(image, sampler, 1);
+
+
+        Buffer<vsl::MemoryType::StorageBuffer,
+                vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>
+                debugBuffer(device, sizeof(debug_t));
+
+        InputManager input_manager(main_window);
+        auto [keyUp,
+                keyDown,
+                keyLeft,
+                keyRight] = input_manager.get<input::Keys>(
+                input::KeyCode::Up,
+                input::KeyCode::Down,
+                input::KeyCode::Left,
+                input::KeyCode::Right)->keys;
+        auto mouse = input_manager.get<input::Mouse>();
+
+        d3::VectorF move;
+        while (aho::Window::Update() && main_window && input_manager) {
+            static auto startTime = std::chrono::high_resolution_clock::now();
+            auto currentTime = std::chrono::high_resolution_clock::now();
+
+            if (keyUp->pressed())
+                move.value -= 0.05_f_y;
+            if (keyDown->pressed())
+                move.value += 0.05_f_y;
+            if (keyLeft->pressed())
+                move.value -= 0.05_f_x;
+            if (keyRight->pressed())
+                move.value += 0.05_f_x;
+
+            float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+            ubo.model = matrix::make_rotation(time * 5.0_rad, Vector(0.0f, 0.0f, 1.0f)) * matrix::make_move(move);
+            ubo.view = matrix::make_view(Point(2.0f, 2.0f, 2.0f), Point(0.0f, 0.0f, 0.0f), Vector(0.0f, 0.0f, 1.0f));
+            ubo.proj = matrix::make_perspective(45.0_deg, viewport.width / (float) viewport.height, 0.1f, 10.0f);
 
             {
-                auto phase = manager.startPhase(swapchain, imageAvailable, renderFinished, inFlight);
+                auto phase = command_manager.startPhase(swapchain, imageAvailable, renderFinished, inFlight);
                 frame_buffer.setTargetFrame(phase.getImageIndex());
-
                 uboBuffers[phase.getImageIndex()].copy(ubo);
                 input_vertices_resource[phase.getImageIndex()].update(uboBuffers[phase.getImageIndex()], 0);
                 texture_resource[phase.getImageIndex()].update(uboBuffers[phase.getImageIndex()], 0);
 
-                if (key1->up()) {
-                    target = &vertices;
-                    targetBuffer = &vertBuffer;
-                }
-                if (key2->up()) {
-                    target = &vertices2;
-                    targetBuffer = &vert2Buffer;
-                }
-
-                d2::VectorF move;
-                if (keyUp->pressed()) {
-                    move.value -= 0.05_f_y;
-                }
-                if (keyDown->pressed()) {
-                    move.value += 0.05_f_y;
-                }
-                if (keyLeft->pressed()) {
-                    move.value -= 0.05_f_x;
-                }
-                if (keyRight->pressed()) {
-                    move.value += 0.05_f_x;
-                }
-                if (move.length() != 0) {
-                    std::cout << vertices[0].value << ":" << vertices2[0].value << std::endl;
-                    for (auto& v : *target)
-                        v += move;
-                    vertStagingBuffer.copy(*target);
-                    targetBuffer->copy(vertStagingBuffer);
-                }
+                Triangle<float, vsl::D2> triangle{Point(-0.5f, 0.0f), Point(0.5f, 0.5f), Point(-0.5f, -0.5f)};
+                RGB rgb{1.0f, 0.0f, 0.0f};
                 phase << command::RenderPassBegin(render_pass, frame_buffer);
-                phase << command::BindGraphicResource(resource[phase.getImageIndex()], BindingDestination::Graphics, input_vertices);
-                phase << input_vertices << command::BindVertexBuffer(vert2Buffer, colorBuffer) << command::BindIndexBuffer(indexBuffer) << command::DrawIndexed(indices.size());
-                phase << input_vertices << command::BindVertexBuffer(vertBuffer, colorBuffer) << command::BindIndexBuffer(indexBuffer) << command::DrawIndexed(indices.size());
+                /*
+                phase << input_vertices
+                      << command::BindGraphicResource(input_vertices_resource[phase.getImageIndex()],
+                                                      graphic_resource::BindingDestination::Graphics, input_vertices)
+                      << command::BindVertexBuffer(vertBuffer, colorBuffer)
+                      << command::BindIndexBuffer(indexBuffer)
+                      << command::DrawIndexed(indices.size());
+                      */
+
+                phase << push_triangle
+                      << command::PushConstant(push_triangle_layout, ShaderFlag::Vertex, sizeof triangle, 0, &triangle)
+                      << command::PushConstant(push_triangle_layout, ShaderFlag::Vertex, sizeof rgb, 44 - sizeof rgb, &rgb)
+                      << command::Draw(3);
+
+                phase << input_texture
+                      << command::BindGraphicResource(
+                              {input_vertices_resource[phase.getImageIndex()], texture_resource[swapchain.getSwapImageSize()]},
+                              graphic_resource::BindingDestination::Graphics, input_texture)
+                      << command::BindVertexBuffer(vertBuffer, colorBuffer, texCoordBuffer)
+                      << command::BindIndexBuffer(indexBuffer)
+                      << command::DrawIndexed(indices.size());
+
                 phase << command::RenderPassEnd();
             }
-            manager.next();
+            // auto debugMapped = debugBuffer.data();
+            // debug = static_cast<struct debug_t *>(debugMapped.data);
+            command_manager.next();
         }
         inFlight.wait();
-        defaults::release();
+        /**/
     }
+#if !defined(DEBUG) && !defined(_DEBUG)
     catch (std::exception &e) {
         vsl::loggingln(e.what());
         return 1;
@@ -359,6 +334,7 @@ int main() {
         vsl::loggingln(e.what());
         return 1;
     }
+#endif
     /**/
 }
 /* AHO/shaders/raw/vd2p_fc_umpv.vert AHOLi/AHO/object/Object.hpp AHOLi/AHO/resource/Audio.hpp AHOLi/AHO/resource/image.hpp AHOLi/AHO/resource/ObjectHitbox.hpp AHOLi/AHO/resource/ObjectModel.hpp VSLi/VSL/Vulkan/commands/bind_graphic_resource.cpp VSLi/VSL/Vulkan/commands/bind_graphic_resource.hpp VSLi/VSL/Vulkan/descriptor.cpp VSLi/VSL/Vulkan/descriptor.hpp VSLi/VSL/Vulkan/phase.cpp VSLi/VSL/Vulkan/phase.hpp VSLi/VSL/Vulkan/stages/resource_binding.cpp VSLi/VSL/Vulkan/stages/resource_binding.h

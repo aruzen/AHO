@@ -80,11 +80,11 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>..\VSLi\;$(VULKAN_SDK)\Include;$(GLFW)\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(AHO_HOME)\include;$(VSL_HOME)\include;$(VULKAN_SDK)\Include;$(GLFW)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>..\VSLi\;$(VULKAN_SDK)\Include;$(GLFW)\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(AHO_HOME)\include;$(VSL_HOME)\include;$(VULKAN_SDK)\Include;$(GLFW)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -138,6 +138,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <BuildStlModules>false</BuildStlModules>
+      <AdditionalOptions>/FI pch.h %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -172,33 +173,67 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="AHO\concepts.h" />
-    <ClInclude Include="AHO\core\collision.h" />
-    <ClInclude Include="AHO\core\math\angle.h" />
-    <ClInclude Include="AHO\core\index.h" />
-    <ClInclude Include="AHO\core\Line.h" />
-    <ClInclude Include="AHO\core\color.h" />
-    <ClInclude Include="AHO\core\math\coordinate.h" />
-    <ClInclude Include="AHO\core\math\Mat.h" />
-    <ClInclude Include="AHO\core\ov.h" />
-    <ClInclude Include="AHO\core\Point.h" />
-    <ClInclude Include="AHO\core\Polygon.h" />
-    <ClInclude Include="AHO\core\Vector.h" />
-    <ClInclude Include="AHO\core\Triangle.h" />
-    <ClInclude Include="AHO\define.h" />
-    <ClInclude Include="AHO\utils\polygon.h" />
+    <ClInclude Include="AHO\include\AHO\aho.hpp" />
+    <ClInclude Include="AHO\include\AHO\concepts.hpp" />
+    <ClInclude Include="AHO\include\AHO\core\collision.hpp" />
+    <ClInclude Include="AHO\include\AHO\core\color.hpp" />
+    <ClInclude Include="AHO\include\AHO\core\index.hpp" />
+    <ClInclude Include="AHO\include\AHO\core\line.hpp" />
+    <ClInclude Include="AHO\include\AHO\core\math\angle.hpp" />
+    <ClInclude Include="AHO\include\AHO\core\math\coordinate.hpp" />
+    <ClInclude Include="AHO\include\AHO\core\math\mat.hpp" />
+    <ClInclude Include="AHO\include\AHO\core\ov.hpp" />
+    <ClInclude Include="AHO\include\AHO\core\point.hpp" />
+    <ClInclude Include="AHO\include\AHO\core\polygon.hpp" />
+    <ClInclude Include="AHO\include\AHO\core\triangle.hpp" />
+    <ClInclude Include="AHO\include\AHO\core\vector.hpp" />
+    <ClInclude Include="AHO\include\AHO\define.hpp" />
+    <ClInclude Include="AHO\include\AHO\drawer.hpp" />
+    <ClInclude Include="AHO\include\AHO\drawer\draw_phase.hpp" />
+    <ClInclude Include="AHO\include\AHO\drawer\standard_drawer.hpp" />
+    <ClInclude Include="AHO\include\AHO\engine.hpp" />
+    <ClInclude Include="AHO\include\AHO\engine\graphical_engine.hpp" />
+    <ClInclude Include="AHO\include\AHO\engine\standard_engine.hpp" />
+    <ClInclude Include="AHO\include\AHO\io\input.hpp" />
+    <ClInclude Include="AHO\include\AHO\io\input_manager.hpp" />
+    <ClInclude Include="AHO\include\AHO\io\key.hpp" />
+    <ClInclude Include="AHO\include\AHO\io\keyboard.hpp" />
+    <ClInclude Include="AHO\include\AHO\io\mouse.hpp" />
+    <ClInclude Include="AHO\include\AHO\object\object.hpp" />
+    <ClInclude Include="AHO\include\AHO\pipeline\layouts.hpp" />
+    <ClInclude Include="AHO\include\AHO\pipeline\pipeline.hpp" />
+    <ClInclude Include="AHO\include\AHO\resource\audio.hpp" />
+    <ClInclude Include="AHO\include\AHO\resource\buffer.hpp" />
+    <ClInclude Include="AHO\include\AHO\resource\image.hpp" />
+    <ClInclude Include="AHO\include\AHO\resource\object_hitbox.hpp" />
+    <ClInclude Include="AHO\include\AHO\resource\object_model.hpp" />
+    <ClInclude Include="AHO\include\AHO\utils\polygon.hpp" />
+    <ClInclude Include="AHO\include\AHO\window.hpp" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="pch.h" />
-    <ClInclude Include="Test\tests.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="AHO\src\drawer.cpp" />
+    <ClCompile Include="AHO\src\drawer\draw_phase.cpp" />
+    <ClCompile Include="AHO\src\engine.cpp" />
+    <ClCompile Include="AHO\src\engine\graphical_engine.cpp" />
+    <ClCompile Include="AHO\src\engine\standard_engine.cpp" />
+    <ClCompile Include="AHO\src\io\input.cpp" />
+    <ClCompile Include="AHO\src\io\input_manager.cpp" />
+    <ClCompile Include="AHO\src\io\key.cpp" />
+    <ClCompile Include="AHO\src\io\keyboard.cpp" />
+    <ClCompile Include="AHO\src\io\mouse.cpp" />
+    <ClCompile Include="AHO\src\pipeline\layouts.cpp" />
+    <ClCompile Include="AHO\src\pipeline\pipeline.cpp" />
+    <ClCompile Include="AHO\src\resource\buffer.cpp" />
+    <ClCompile Include="AHO\src\resource\image.cpp" />
+    <ClCompile Include="AHO\src\window.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="Test\tests.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

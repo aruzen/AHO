@@ -158,7 +158,7 @@ namespace AHO_NAMESPACE {
 
         template<typename R = float, typename CI = AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D3>::value>
         requires std::same_as<typename CI::dimension, VSL_NAMESPACE::D3>
-        Mat4x4<R> make_view(_Point<R, CI> eye, _Point<R, CI> target, _Vector<R, CI> up);
+        Mat4x4<R> make_view(_Point<R, typename CI::dimention, CI> eye, _Point<R, typename CI::dimention, CI> target, _Vector<R, typename CI::dimention, CI> up);
 
         template<typename T>
         Mat4x4<T> make_perspective(Radian fov, T aspect, T near, T far);
@@ -436,13 +436,12 @@ namespace AHO_NAMESPACE {
             return make_rotation(Radian(deg), axis);
         }
 
-        template<typename R, typename CI> requires (std::same_as<typename CI::dimension, VSL_NAMESPACE::D3>) || (std::same_as<CI, VSL_NAMESPACE::D3>)
-
-        Mat4x4<R> make_view(_Point<R, CI> _eye, _Point<R, CI> target, _Vector<R, CI> up) {
-            _Vector<R, CI> eye(_eye.value);
-            auto f = _Vector<R, CI>(target.value - eye.value).normalize().value; // forward
-            auto s = _Vector<R, CI>(f).cross(up).normalize().value; // right
-            auto u = _Vector<R, CI>(s).cross(_Vector<R, CI>(f)).normalize().value;             // up (recomputed)
+        template<typename R, typename D, typename CI>
+        Mat4x4<R> make_view(_Point<R, D, CI> _eye, _Point<R, D, CI> target, _Vector<R, D, CI> up) {
+            _Vector<R, D, CI> eye(_eye.value);
+            auto f = _Vector<R, D, CI>(target.value - eye.value).normalize().value; // forward
+            auto s = _Vector<R, D, CI>(f).cross(up).normalize().value; // right
+            auto u = _Vector<R, D, CI>(s).cross(_Vector<R, D, CI>(f)).normalize().value;             // up (recomputed)
 
             Mat4x4<R> result = make_identity<float, 4>();
             result[0][0] = s.x.value;
@@ -454,9 +453,9 @@ namespace AHO_NAMESPACE {
             result[0][2] = -f.x.value;
             result[1][2] = -f.y.value;
             result[2][2] = -f.z.value;
-            result[3][0] = -_Vector<R, CI>(s).dot(eye);
-            result[3][1] = -_Vector<R, CI>(u).dot(eye);
-            result[3][2] = _Vector<R, CI>(f).dot(eye);
+            result[3][0] = -_Vector<R, D, CI>(s).dot(eye);
+            result[3][1] = -_Vector<R, D, CI>(u).dot(eye);
+            result[3][2] = _Vector<R, D, CI>(f).dot(eye);
             return result;
         }
 

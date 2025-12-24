@@ -1,6 +1,3 @@
-#ifdef _MSC_VER
-#include <VSL/Vulkan/pch.hpp>
-#endif
 #include <VSL/define.hpp>
 
 #include <VSL/vulkan/view.hpp>

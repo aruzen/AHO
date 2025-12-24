@@ -14,9 +14,9 @@ aho::engine::StandardEngine::StandardEngine(std::string applicationName, bool bo
 void aho::engine::StandardEngine::boot(const std::string& applicationName) {
     using namespace VSL_NAMESPACE;
 #ifdef _MSC_VER
-    Vulkan<> instance(applicationName.c_str(), { "VK_KHR_win32_surface", "VK_KHR_surface" });
-#elifdef __APPLE_CC__
-    loggingln("daizyobu");
+    Vulkan<> instance(applicationName.c_str(), { "VK_KHR_win32_surface", "VK_KHR_surface",
+                                                 "VK_KHR_portability_enumeration", "VK_KHR_get_physical_device_properties2" });
+#elif defined(__APPLE_CC__)
     Vulkan<> instance(applicationName.c_str(), {"VK_KHR_portability_enumeration", "VK_KHR_surface",
                                                 "VK_EXT_metal_surface", "VK_KHR_get_physical_device_properties2"});
 #endif

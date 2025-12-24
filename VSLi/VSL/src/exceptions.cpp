@@ -1,6 +1,3 @@
-#ifdef _MSC_VER
-#include "pch.h"
-#endif
 #include <VSL/define.hpp>
 #include <VSL/exceptions.hpp>
 

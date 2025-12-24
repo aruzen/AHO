@@ -1,8 +1,21 @@
-#ifdef _MSC_VER
-#include "pch.h"
-#endif
 #include <VSL/define.hpp>
 #include <VSL/utils/string.hpp>
+
+#ifdef _MSC_VER
+#include <cstdlib>
+std::string fixed_get_env(const std::string& name) {
+    char* value = nullptr;
+    size_t len = 0;
+
+    if (_dupenv_s(&value, &len, name.c_str()) == 0 && value != nullptr) {
+        std::string result(value);
+        free(value);   // ← 必須
+        return result;
+    }
+
+    return "";
+}
+#endif
 
 void default_logger(const char* str) {
 		std::cout << str;
@@ -23,9 +36,15 @@ std::string VSL_NAMESPACE::expand_environments(const std::string& input) {
     for (; itr != end; ++itr) {
         const auto& match = *itr;
         result.append(input, last_pos, match.position() - last_pos);
+#ifndef _MSC_VER
         if (const char* value = std::getenv(match[1].str().c_str())) {
             result += value;
         }
+#else
+        if (auto value = fixed_get_env(match[1].str()); value != "") {
+            result += value;
+        }
+#endif
         last_pos = match.position() + match.length();
     }
     result.append(input, last_pos, std::string::npos);

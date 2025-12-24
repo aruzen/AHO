@@ -1,7 +1,3 @@
-#ifdef _MSC_VER
-#include <VSL/Vulkan/pch.hpp>
-#endif
-
 #include <VSL/vulkan/pipeline.hpp>
 #include <VSL/vulkan/render_pass.hpp>
 

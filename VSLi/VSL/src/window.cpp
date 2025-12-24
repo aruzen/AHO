@@ -1,12 +1,13 @@
-#ifdef _MSC_VER
-#include "pch.h"
-#endif
 #include <VSL/define.hpp>
 #include <VSL/window.hpp>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+
+#ifndef _MSC_VER
 #include <unistd.h>
+#else
+#endif
 
 #include <VSL/window_plugin.hpp>
 #include <VSL/vulkan/surface.hpp>

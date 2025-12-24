@@ -1,6 +1,3 @@
-#ifdef _MSC_VER
-#include <VSL/Vulkan/pch.hpp>
-#endif
 #include <VSL/vulkan/stages/color_blend.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/vulkan/stages/resource_binding.hpp>

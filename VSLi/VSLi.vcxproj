@@ -71,10 +71,10 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(VULKAN_SDK)\include;$(GLFW)\include;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Users\user\source\repos\aruzen\AHO\thirdparty;$(VULKAN_SDK)\include;$(GLFW)\include;$(VSL_HOME)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(VULKAN_SDK)\include;$(GLFW)\include;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Users\user\source\repos\aruzen\AHO\thirdparty;$(VULKAN_SDK)\include;$(GLFW)\include;$(VSL_HOME)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -119,6 +119,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpplatest</LanguageStandard>
+      <AdditionalOptions>/FI pch.h %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -126,7 +127,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalLibraryDirectories>"$(GLFW)\lib-vc2019\glfw3.lib";"$(VULKAN_SDK)\Lib\Vulkan-1.lib";%(AdditionalDependencies)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(GLFW)\lib-vc2019\glfw3.lib;$(VULKAN_SDK)\Lib\;$(VULKAN_SDK)\Lib\Vulkan-1.lib;%(AdditionalDependencies)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -137,9 +138,10 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpplatest</LanguageStandard>
+      <AdditionalOptions>/FI pch.h %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -149,97 +151,136 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalLibraryDirectories>"$(GLFW)\lib-vc2019\glfw3.lib";"$(VULKAN_SDK)\Lib\Vulkan-1.lib";%(AdditionalDependencies)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(GLFW)\lib-vc2019\glfw3.lib;$(VULKAN_SDK)\Lib\;$(VULKAN_SDK)\Lib\Vulkan-1.lib;%(AdditionalDependencies)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="VSL\consteval_string.h" />
-    <ClInclude Include="VSL\utils\Flags.h" />
-    <ClInclude Include="VSL\Vulkan\buffer.h" />
-    <ClInclude Include="VSL\Vulkan\commands\bind_pipe_line.h" />
+    <ClInclude Include="VSL\include\VSL\concepts.hpp" />
+    <ClInclude Include="VSL\include\VSL\consteval_string.hpp" />
+    <ClInclude Include="VSL\include\VSL\define.hpp" />
+    <ClInclude Include="VSL\include\VSL\dimension.hpp" />
+    <ClInclude Include="VSL\include\VSL\exceptions.hpp" />
+    <ClInclude Include="VSL\include\VSL\format.hpp" />
+    <ClInclude Include="VSL\include\VSL\test.hpp" />
+    <ClInclude Include="VSL\include\VSL\type.hpp" />
+    <ClInclude Include="VSL\include\VSL\utils\flags.hpp" />
+    <ClInclude Include="VSL\include\VSL\utils\shader_compiler.hpp" />
+    <ClInclude Include="VSL\include\VSL\utils\spir_reflector.hpp" />
+    <ClInclude Include="VSL\include\VSL\utils\string.hpp" />
+    <ClInclude Include="VSL\include\VSL\utils\typed_safe_resource.hpp" />
+    <ClInclude Include="VSL\include\VSL\utils\vsl_array.hpp" />
+    <ClInclude Include="VSL\include\VSL\vsl.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\buffer.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\buffer_and_image_accessor.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\command.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\bind_graphic_resource.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\bind_index_buffers.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\bind_pipe_line.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\bind_vertex_buffers.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\change_image_barrier.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\copy_buffer_to_image.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\copy_image_to_buffer.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\dispatch.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\draw.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\draw_indexed.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\push_content.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\render_pass_begin.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\render_pass_end.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\descriptor.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\descriptor_set_manager.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\device.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\frame_buffer.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\image.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\phase.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\pipeline.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\pipeline_layout.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\post_definition.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\pv.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\render_pass.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\sampler.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\scissor.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\shader.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\color_blend.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\depth_stencil.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\dynamic_state.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\input_assembly.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\multisample.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\push_contents.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\rasterization.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\resource_binding.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\shader_group.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\vertex_input.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\surface.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\swapchain.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\synchronize.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\view.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\viewport.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\vulkan.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\window_plugin\hook_window_resize.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\_dimension.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\_pimpls.hpp" />
+    <ClInclude Include="VSL\include\VSL\window.hpp" />
+    <ClInclude Include="VSL\include\VSL\window_plugin.hpp" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="pch.h" />
-    <ClInclude Include="VSL\Vulkan\commands\bind_vertex_buffers.h" />
-    <ClInclude Include="VSL\Vulkan\commands\draw.h" />
-    <ClInclude Include="VSL\Vulkan\commands\render_pass_end.h" />
-    <ClInclude Include="VSL\concepts.h" />
-    <ClInclude Include="VSL\debug.h" />
-    <ClInclude Include="VSL\define.h" />
-    <ClInclude Include="VSL\dimension.h" />
-    <ClInclude Include="VSL\exceptions.h" />
-    <ClInclude Include="VSL\test.h" />
-    <ClInclude Include="VSL\Type.h" />
-    <ClInclude Include="VSL\utils\ShaderCompiler.h" />
-    <ClInclude Include="VSL\utils\VSLArray.h" />
-    <ClInclude Include="VSL\Vulkan\command.h" />
-    <ClInclude Include="VSL\Vulkan\commands\render_pass_begin.h" />
-    <ClInclude Include="VSL\Vulkan\device.h" />
-    <ClInclude Include="VSL\format.h" />
-    <ClInclude Include="VSL\Vulkan\frame_buffer.h" />
-    <ClInclude Include="VSL\Vulkan\pipeline.h" />
-    <ClInclude Include="VSL\Vulkan\pipeline_layout.h" />
-    <ClInclude Include="VSL\Vulkan\pv.h" />
-    <ClInclude Include="VSL\Vulkan\render_pass.h" />
-    <ClInclude Include="VSL\Vulkan\scissor.h" />
-    <ClInclude Include="VSL\Vulkan\synchronize.h" />
-    <ClInclude Include="VSL\Vulkan\shader.h" />
-    <ClInclude Include="VSL\Vulkan\stages\color_blend.h" />
-    <ClInclude Include="VSL\Vulkan\stages\depth_stencil.h" />
-    <ClInclude Include="VSL\Vulkan\stages\input_assembly.h" />
-    <ClInclude Include="VSL\Vulkan\stages\multisample.h" />
-    <ClInclude Include="VSL\Vulkan\stages\rasterization.h" />
-    <ClInclude Include="VSL\Vulkan\stages\shader_group.h" />
-    <ClInclude Include="VSL\Vulkan\stages\vertex_input.h" />
-    <ClInclude Include="VSL\Vulkan\surface.h" />
-    <ClInclude Include="VSL\Vulkan\swapchain.h" />
-    <ClInclude Include="VSL\Vulkan\view.h" />
-    <ClInclude Include="VSL\Vulkan\viewport.h" />
-    <ClInclude Include="VSL\Vulkan\Vulkan.h" />
-    <ClInclude Include="VSL\Vulkan\window_plugin\hook_window_resize.h" />
-    <ClInclude Include="VSL\Vulkan\_dimension.h" />
-    <ClInclude Include="VSL\Vulkan\_pimpls.h" />
-    <ClInclude Include="VSL\Window.h" />
-    <ClInclude Include="VSL\window_plugin.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="VSL\Vulkan\buffer.cpp" />
-    <ClCompile Include="VSL\Vulkan\commands\bind_pipe_line.cpp" />
+    <ClCompile Include="VSL\src\exceptions.cpp" />
+    <ClCompile Include="VSL\src\utils\shader_compiler.cpp" />
+    <ClCompile Include="VSL\src\utils\spir_reflector.cpp" />
+    <ClCompile Include="VSL\src\utils\string.cpp" />
+    <ClCompile Include="VSL\src\vulkan\buffer.cpp" />
+    <ClCompile Include="VSL\src\vulkan\command.cpp" />
+    <ClCompile Include="VSL\src\vulkan\commands\bind_graphic_resource.cpp" />
+    <ClCompile Include="VSL\src\vulkan\commands\bind_index_buffers.cpp" />
+    <ClCompile Include="VSL\src\vulkan\commands\bind_pipe_line.cpp" />
+    <ClCompile Include="VSL\src\vulkan\commands\bind_vertex_buffers.cpp" />
+    <ClCompile Include="VSL\src\vulkan\commands\change_image_barrier.cpp" />
+    <ClCompile Include="VSL\src\vulkan\commands\copy_buffer_to_image.cpp" />
+    <ClCompile Include="VSL\src\vulkan\commands\copy_image_to_buffer.cpp" />
+    <ClCompile Include="VSL\src\vulkan\commands\dispatch.cpp" />
+    <ClCompile Include="VSL\src\vulkan\commands\draw.cpp" />
+    <ClCompile Include="VSL\src\vulkan\commands\draw_indexed.cpp" />
+    <ClCompile Include="VSL\src\vulkan\commands\push_content.cpp" />
+    <ClCompile Include="VSL\src\vulkan\commands\render_pass_begin.cpp" />
+    <ClCompile Include="VSL\src\vulkan\commands\render_pass_end.cpp" />
+    <ClCompile Include="VSL\src\vulkan\descriptor.cpp" />
+    <ClCompile Include="VSL\src\vulkan\descriptor_set_manager.cpp" />
+    <ClCompile Include="VSL\src\vulkan\device.cpp" />
+    <ClCompile Include="VSL\src\vulkan\frame_buffer.cpp" />
+    <ClCompile Include="VSL\src\vulkan\image.cpp" />
+    <ClCompile Include="VSL\src\vulkan\phase.cpp" />
+    <ClCompile Include="VSL\src\vulkan\pipeline.cpp" />
+    <ClCompile Include="VSL\src\vulkan\pipeline_layout.cpp" />
+    <ClCompile Include="VSL\src\vulkan\render_pass.cpp" />
+    <ClCompile Include="VSL\src\vulkan\sampler.cpp" />
+    <ClCompile Include="VSL\src\vulkan\scissor.cpp" />
+    <ClCompile Include="VSL\src\vulkan\shader.cpp" />
+    <ClCompile Include="VSL\src\vulkan\stages\color_blend.cpp" />
+    <ClCompile Include="VSL\src\vulkan\stages\depth_stencil.cpp" />
+    <ClCompile Include="VSL\src\vulkan\stages\dynamic_state.cpp" />
+    <ClCompile Include="VSL\src\vulkan\stages\input_assembly.cpp" />
+    <ClCompile Include="VSL\src\vulkan\stages\multisample.cpp" />
+    <ClCompile Include="VSL\src\vulkan\stages\push_contents.cpp" />
+    <ClCompile Include="VSL\src\vulkan\stages\rasterization.cpp" />
+    <ClCompile Include="VSL\src\vulkan\stages\resource_binding.cpp" />
+    <ClCompile Include="VSL\src\vulkan\stages\shader_group.cpp" />
+    <ClCompile Include="VSL\src\vulkan\stages\vertex_input.cpp" />
+    <ClCompile Include="VSL\src\vulkan\surface.cpp" />
+    <ClCompile Include="VSL\src\vulkan\swapchain.cpp" />
+    <ClCompile Include="VSL\src\vulkan\synchronize.cpp" />
+    <ClCompile Include="VSL\src\vulkan\view.cpp" />
+    <ClCompile Include="VSL\src\vulkan\viewport.cpp" />
+    <ClCompile Include="VSL\src\vulkan\vulkan.cpp" />
+    <ClCompile Include="VSL\src\window.cpp" />
+    <ClCompile Include="VSL\src\window_plugin.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\commands\bind_vertex_buffers.cpp" />
-    <ClCompile Include="VSL\Vulkan\commands\draw.cpp" />
-    <ClCompile Include="VSL\Vulkan\commands\render_pass_end.cpp" />
-    <ClCompile Include="VSL\debug.cpp" />
-    <ClCompile Include="VSL\exceptions.cpp" />
-    <ClCompile Include="VSL\utils\ShaderCompiler.cpp" />
-    <ClCompile Include="VSL\Vulkan\command.cpp" />
-    <ClCompile Include="VSL\Vulkan\commands\render_pass_begin.cpp" />
-    <ClCompile Include="VSL\Vulkan\device.cpp" />
-    <ClCompile Include="VSL\Vulkan\frame_buffer.cpp" />
-    <ClCompile Include="VSL\Vulkan\pipeline.cpp" />
-    <ClCompile Include="VSL\Vulkan\pipeline_layout.cpp" />
-    <ClCompile Include="VSL\Vulkan\render_pass.cpp" />
-    <ClCompile Include="VSL\Vulkan\scissor.cpp" />
-    <ClCompile Include="VSL\Vulkan\shader.cpp" />
-    <ClCompile Include="VSL\Vulkan\stages\color_blend.cpp" />
-    <ClCompile Include="VSL\Vulkan\stages\depth_stencil.cpp" />
-    <ClCompile Include="VSL\Vulkan\stages\input_assembly.cpp" />
-    <ClCompile Include="VSL\Vulkan\stages\multisample.cpp" />
-    <ClCompile Include="VSL\Vulkan\stages\rasterization.cpp" />
-    <ClCompile Include="VSL\Vulkan\stages\shader_group.cpp" />
-    <ClCompile Include="VSL\Vulkan\stages\vertex_input.cpp" />
-    <ClCompile Include="VSL\Vulkan\surface.cpp" />
-    <ClCompile Include="VSL\Vulkan\swapchain.cpp" />
-    <ClCompile Include="VSL\Vulkan\synchronize.cpp" />
-    <ClCompile Include="VSL\Vulkan\view.cpp" />
-    <ClCompile Include="VSL\Vulkan\viewport.cpp" />
-    <ClCompile Include="VSL\Vulkan\Vulkan.cpp" />
-    <ClCompile Include="VSL\Window.cpp" />
-    <ClCompile Include="VSL\window_plugin.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

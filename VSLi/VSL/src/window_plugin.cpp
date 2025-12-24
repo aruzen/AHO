@@ -1,6 +1,3 @@
-#ifdef _MSC_VER
-#include "pch.h"
-#endif
 #include <VSL/window_plugin.hpp>
 #include <VSL/utils/string.hpp>
 

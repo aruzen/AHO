@@ -12,9 +12,9 @@
 #include <map>
 #include <set>
 #include <initializer_list>
-#include <boost/bimap.hpp>
 #include <numeric>
 
+/*
 namespace AHO_NAMESPACE {
 	// TODO
 	template<typename R,
@@ -138,4 +138,4 @@ namespace AHO_NAMESPACE {
     static_assert(concepts::is_triangles_object<Polygon<double, VSL_NAMESPACE::D2>>);
     static_assert(concepts::is_lines_object<Polygon<double, VSL_NAMESPACE::D2>>);
     static_assert(concepts::is_points_object<Polygon<double, VSL_NAMESPACE::D2>>);
-}
+}*/

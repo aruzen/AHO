@@ -18,10 +18,10 @@ aho::resource::Image::Image() : _data(nullptr) {}
 #ifdef AHO_STB_IMAGE_ENABLE
 aho::resource::Image::Image(std::filesystem::path path) {
     _data = std::make_shared<ImageData>();
-    if (not stbi_info(path.c_str(), &_data->width, &_data->height, &_data->channel))
+    if (not stbi_info(path.string().c_str(), &_data->width, &_data->height, &_data->channel))
         _data = nullptr;
 
-    _data->buffer = stbi_load(path.c_str(), &_data->width, &_data->height, &_data->channel, STBI_rgb_alpha);
+    _data->buffer = stbi_load(path.string().c_str(), &_data->width, &_data->height, &_data->channel, STBI_rgb_alpha);
 
     /*
     VkDeviceSize imageSize = texWidth * texHeight * 4;

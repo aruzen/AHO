@@ -15,7 +15,6 @@
 * https://vulkan-tutorial.com/en/Vertex_buffers/Staging_buffer
 */
 
-#include <boost/bimap.hpp>
 #include "../thirdparty/stb_image.h"
 
 int main() {
@@ -49,8 +48,8 @@ breakpoint disable swift_willThrow
         if (!image_available._data)
             loggingln("image not available ; ;");
 #ifdef _MSC_VER
-        vsl::utils::ShaderCompiler shader_compiler("glslc", "shaders/");
-#elifdef __APPLE_CC__
+        vsl::utils::ShaderCompiler shader_compiler("glslc", { "shaders/", "${AHO_HOME}/built-in-resource/shaders/" });
+#elif defined(__APPLE_CC__)
         vsl::utils::ShaderCompiler shader_compiler("glslc",
                                                    {"../../AHO/shaders/", "${AHO_HOME}/built-in-resource/shaders/"});
 #endif
@@ -59,31 +58,31 @@ breakpoint disable swift_willThrow
 
         // Window main_window("vsl", 800, 800);
         // auto surface = main_window.addPlugin<Surface>(vulkan_instance);
-
-#ifdef _MSC_VER
-        auto s1 = make_shader<"shaders/const_triangle.vert.spv">(device);
-        auto s2 = make_shader<"shaders/red.frag.spv">(device);
-        pl::ShaderGroup red_triangle_shaders("red_triangle", { s1, s2 }),
-            colorfull_triangle_shaders("colorfull_triangle", { make_shader<"shaders/const_triangle2.vert.spv">(device), make_shader<"shaders/colorfull.frag.spv">(device) }),
-            input_sahders("2d_input", { make_shader<"shaders/input.vert.spv">(device), make_shader<"shaders/input.frag.spv">(device) });
-#elifdef __APPLE_CC__
         pl::ShaderGroup input_d3_shaders("3d_color_input",
-                                         {make_shader<"${AHO_HOME}/built-in-resource/shaders/vd2p_fc_umpv.vert.spv">(
-                                                 device),
-                                          make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device)}),
-                input_d2_shaders("2d_color_input",
-                                 {make_shader<"${AHO_HOME}/built-in-resource/shaders/vd2p_fc.vert.spv">(device),
-                                  make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device)}),
-                push_d2_shaders("2d_color_push",
-                                {make_shader<"${AHO_HOME}/built-in-resource/shaders/2dtriangle_single_color.vert.spv">(
-                                        device),
-                                 make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device)}),
-                input_texture_shaders("input_texture",
+            { make_shader<"${AHO_HOME}/built-in-resource/shaders/vd2p_fc_umpv.vert.spv">(
+                    device),
+             make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device) }),
+            input_d2_shaders("2d_color_input",
+                { make_shader<"${AHO_HOME}/built-in-resource/shaders/vd2p_fc.vert.spv">(device),
+                 make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device) }),
+            push_d2_shaders("2d_color_push",
+                { make_shader<"${AHO_HOME}/built-in-resource/shaders/2dtriangle_single_color.vert.spv">(
+                        device),
+                 make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device) });
+#ifdef _MSC_VER
+        pl::ShaderGroup input_texture_shaders("input_texture",
+            { make_shader<"shaders/texture.vert.spv">(device),
+             make_shader<"shaders/texture.frag.spv">(device) }),
+            push_texture_shaders("push_texture",
+                { make_shader<"shaders/push_texture.vert.spv">(device),
+                 make_shader<"shaders/push_texture.frag.spv">(device) });
+#elif defined(__APPLE_CC__)
+        pl::ShaderGroup input_texture_shaders("input_texture",
                                       {make_shader<"../../AHO/shaders/texture.vert.spv">(device),
                                        make_shader<"../../AHO/shaders/texture.frag.spv">(device)}),
                 push_texture_shaders("push_texture",
                                      {make_shader<"../../AHO/shaders/push_texture.vert.spv">(device),
-                                      make_shader<"../../AHO/shaders/push_texture.frag.spv">(device)});;
+                                      make_shader<"../../AHO/shaders/push_texture.frag.spv">(device)});
 #endif
 
         // utils::SPIRVReflector reflector(device, std::filesystem::path(expand_environments("${AHO_HOME}/built-in-resource/shaders/all-types.vert.spv")));
@@ -302,7 +301,7 @@ breakpoint disable swift_willThrow
 
             float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
             ubo.model = matrix::make_rotation(time * 5.0_rad, Vector(0.0f, 0.0f, 1.0f)) * matrix::make_move(move);
-            ubo.view = matrix::make_view(Point(2.0f, 2.0f, 2.0f), Point(0.0f, 0.0f, 0.0f), Vector(0.0f, 0.0f, 1.0f));
+            ubo.view = matrix::make_view(d3::PointF(2.0f, 2.0f, 2.0f), d3::PointF(0.0f, 0.0f, 0.0f), d3::VectorF(0.0f, 0.0f, 1.0f));
             ubo.proj = matrix::make_perspective(45.0_deg, viewport.width / (float) viewport.height, 0.1f, 10.0f);
 
             if (FullScreenKey->down()) {

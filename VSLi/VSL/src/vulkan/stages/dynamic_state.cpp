@@ -1,6 +1,3 @@
-#ifdef _MSC_VER
-#include <VSL/Vulkan/pch.hpp>
-#endif
 #include <VSL/vulkan/stages/dynamic_state.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 

@@ -136,8 +136,8 @@ void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
                 generated.push_constants.emplace();
             generated.push_constants->definitions.emplace_back(pipeline_layout::PushContentDefinition{
                     .targetShader = shaderType, // TODO
-                    .offset = static_cast<uint32_t>(comp.type_struct_member_offset(type, i)),
-                    .size = static_cast<uint32_t>(comp.get_declared_struct_member_size(type, i)),
+                    .offset = static_cast<uint32_t>(comp.type_struct_member_offset(type, (uint32_t)i)),
+                    .size = static_cast<uint32_t>(comp.get_declared_struct_member_size(type, (uint32_t)i)),
             });
         }
     }

@@ -21,139 +21,205 @@
     <ClInclude Include="pch.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="VSL\utils\ShaderCompiler.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\utils\VSLArray.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\stages\color_blend.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\stages\depth_stencil.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\stages\input_assembly.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\stages\multisample.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\stages\rasterization.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\stages\shader_group.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\stages\vertex_input.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\_dimension.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\_pimpls.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\command.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\device.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\pipeline.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\pipeline_layout.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\pv.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\render_pass.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\shader.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\surface.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\swapchain.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\view.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\viewport.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\Vulkan.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\concepts.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\debug.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\define.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\dimension.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\exceptions.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\test.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Type.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Window.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\window_plugin.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\frame_buffer.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\scissor.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\commands\render_pass_begin.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\commands\render_pass_end.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\commands\bind_pipe_line.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\commands\draw.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\synchronize.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="VSL\Vulkan\window_plugin\hook_window_resize.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="VSL\consteval_string.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="VSL\format.h">
+    <ClInclude Include="VSL\include\VSL\utils\flags.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="VSL\utils\Flags.h">
+    <ClInclude Include="VSL\include\VSL\utils\shader_compiler.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="VSL\Vulkan\buffer.h">
+    <ClInclude Include="VSL\include\VSL\utils\spir_reflector.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="VSL\Vulkan\commands\bind_vertex_buffers.h">
+    <ClInclude Include="VSL\include\VSL\utils\string.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\utils\typed_safe_resource.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\utils\vsl_array.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\bind_graphic_resource.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\bind_index_buffers.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\bind_pipe_line.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\bind_vertex_buffers.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\change_image_barrier.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\copy_buffer_to_image.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\copy_image_to_buffer.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\dispatch.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\draw.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\draw_indexed.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\push_content.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\render_pass_begin.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\render_pass_end.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\color_blend.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\depth_stencil.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\dynamic_state.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\input_assembly.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\multisample.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\push_contents.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\rasterization.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\resource_binding.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\shader_group.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\vertex_input.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\window_plugin\hook_window_resize.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\_dimension.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\_pimpls.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\buffer.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\buffer_and_image_accessor.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\command.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\descriptor.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\descriptor_set_manager.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\device.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\frame_buffer.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\image.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\phase.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\pipeline.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\pipeline_layout.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\post_definition.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\pv.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\render_pass.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\sampler.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\scissor.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\shader.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\surface.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\swapchain.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\synchronize.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\view.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\viewport.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\vulkan.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\concepts.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\consteval_string.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\define.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\dimension.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\exceptions.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\format.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\test.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\type.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vsl.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\window.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VSL\include\VSL\window_plugin.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>
@@ -161,100 +227,151 @@
     <ClCompile Include="pch.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\utils\ShaderCompiler.cpp">
+    <ClCompile Include="VSL\src\utils\shader_compiler.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\stages\color_blend.cpp">
+    <ClCompile Include="VSL\src\utils\spir_reflector.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\stages\depth_stencil.cpp">
+    <ClCompile Include="VSL\src\utils\string.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\stages\input_assembly.cpp">
+    <ClCompile Include="VSL\src\vulkan\commands\bind_graphic_resource.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\stages\multisample.cpp">
+    <ClCompile Include="VSL\src\vulkan\commands\bind_index_buffers.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\stages\rasterization.cpp">
+    <ClCompile Include="VSL\src\vulkan\commands\bind_pipe_line.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\stages\shader_group.cpp">
+    <ClCompile Include="VSL\src\vulkan\commands\bind_vertex_buffers.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\stages\vertex_input.cpp">
+    <ClCompile Include="VSL\src\vulkan\commands\change_image_barrier.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\command.cpp">
+    <ClCompile Include="VSL\src\vulkan\commands\copy_buffer_to_image.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\device.cpp">
+    <ClCompile Include="VSL\src\vulkan\commands\copy_image_to_buffer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\pipeline.cpp">
+    <ClCompile Include="VSL\src\vulkan\commands\dispatch.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\pipeline_layout.cpp">
+    <ClCompile Include="VSL\src\vulkan\commands\draw.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\render_pass.cpp">
+    <ClCompile Include="VSL\src\vulkan\commands\draw_indexed.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\shader.cpp">
+    <ClCompile Include="VSL\src\vulkan\commands\push_content.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\surface.cpp">
+    <ClCompile Include="VSL\src\vulkan\commands\render_pass_begin.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\swapchain.cpp">
+    <ClCompile Include="VSL\src\vulkan\commands\render_pass_end.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\view.cpp">
+    <ClCompile Include="VSL\src\vulkan\stages\color_blend.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\viewport.cpp">
+    <ClCompile Include="VSL\src\vulkan\stages\depth_stencil.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\Vulkan.cpp">
+    <ClCompile Include="VSL\src\vulkan\stages\dynamic_state.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\debug.cpp">
+    <ClCompile Include="VSL\src\vulkan\stages\input_assembly.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\exceptions.cpp">
+    <ClCompile Include="VSL\src\vulkan\stages\multisample.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Window.cpp">
+    <ClCompile Include="VSL\src\vulkan\stages\push_contents.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\window_plugin.cpp">
+    <ClCompile Include="VSL\src\vulkan\stages\rasterization.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\frame_buffer.cpp">
+    <ClCompile Include="VSL\src\vulkan\stages\resource_binding.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\scissor.cpp">
+    <ClCompile Include="VSL\src\vulkan\stages\shader_group.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\commands\render_pass_begin.cpp">
+    <ClCompile Include="VSL\src\vulkan\stages\vertex_input.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\commands\render_pass_end.cpp">
+    <ClCompile Include="VSL\src\vulkan\buffer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\commands\bind_pipe_line.cpp">
+    <ClCompile Include="VSL\src\vulkan\command.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\commands\draw.cpp">
+    <ClCompile Include="VSL\src\vulkan\descriptor.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\synchronize.cpp">
+    <ClCompile Include="VSL\src\vulkan\descriptor_set_manager.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\buffer.cpp">
+    <ClCompile Include="VSL\src\vulkan\device.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\Vulkan\commands\bind_vertex_buffers.cpp">
+    <ClCompile Include="VSL\src\vulkan\frame_buffer.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\src\vulkan\image.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\src\vulkan\phase.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\src\vulkan\pipeline.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\src\vulkan\pipeline_layout.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\src\vulkan\render_pass.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\src\vulkan\sampler.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\src\vulkan\scissor.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\src\vulkan\shader.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\src\vulkan\surface.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\src\vulkan\swapchain.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\src\vulkan\synchronize.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\src\vulkan\view.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\src\vulkan\viewport.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\src\vulkan\vulkan.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\src\exceptions.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\src\window.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VSL\src\window_plugin.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>

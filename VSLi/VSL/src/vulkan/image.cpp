@@ -1,9 +1,6 @@
 //
 // Created by morimoto_hibiki on 2025/07/31.
 //
-#ifdef _MSC_VER
-#include <VSL/Vulkan/pch.hpp>
-#endif
 #include <VSL/define.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>

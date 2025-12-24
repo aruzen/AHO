@@ -1,6 +1,3 @@
-#ifdef _MSC_VER
-#include <VSL/vulkan/pch.hpp>
-#endif
 #include <VSL/vulkan/stages/shader_group.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/vulkan/pipeline_layout.hpp>

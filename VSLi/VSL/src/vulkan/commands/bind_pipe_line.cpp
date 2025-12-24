@@ -1,6 +1,3 @@
-#ifdef _MSC_VER
-#include <VSL/Vulkan/pch.hpp>
-#endif
 #include <VSL/vulkan/commands/bind_pipe_line.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 

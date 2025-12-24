@@ -21,22 +21,17 @@ namespace VSL_NAMESPACE::pipeline_layout {
     };
 
     struct PushConstants {
+        PushConstants() = default;
+
+        constexpr PushConstants(VSL_NAMESPACE::ShaderFlag shader, std::initializer_list<PushContentDefinition> definitions) : definitions(definitions) {};
+
+        void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
+    
         std::vector<PushContentDefinition> definitions;
 
         template<VSL_NAMESPACE::ShaderFlag ShaderFlag, typename ...Types>
         constexpr static std::array<PushContentDefinition, sizeof...(Types)> MakeDefinitions(const Types &...);
 
-        constexpr PushConstants() = default;
-
-        constexpr PushConstants(VSL_NAMESPACE::ShaderFlag shader, std::initializer_list<PushContentDefinition> definitions) : definitions(definitions) {};
-
-        template<VSL_NAMESPACE::ShaderFlag ShaderFlag, typename ...Types>
-        constexpr PushConstants();
-
-        template<VSL_NAMESPACE::ShaderFlag ShaderFlag, typename ...Types>
-        constexpr PushConstants(const Types &...);
-
-        void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
     };
 
     template<vsl::ShaderFlag ShaderFlag, typename... Types>
@@ -44,18 +39,6 @@ namespace VSL_NAMESPACE::pipeline_layout {
         return std::array{
                 PushContentDefinition{ShaderFlag, 0, sizeof(Types)}...
         };
-    }
-
-    template<VSL_NAMESPACE::ShaderFlag ShaderFlag, typename... Types>
-    constexpr PushConstants::PushConstants() {
-        constexpr std::array<PushContentDefinition, sizeof...(Types)> defs = MakeDefinitions<ShaderFlag, Types...>();
-        definitions = std::vector(defs.begin(), defs.end());
-    }
-
-    template<VSL_NAMESPACE::ShaderFlag ShaderFlag, typename... Types>
-    constexpr PushConstants::PushConstants(const Types &...) {
-        constexpr std::array<PushContentDefinition, sizeof...(Types)> defs = MakeDefinitions<ShaderFlag, Types...>();
-        definitions = std::vector(defs.begin(), defs.end());
     }
 }
 

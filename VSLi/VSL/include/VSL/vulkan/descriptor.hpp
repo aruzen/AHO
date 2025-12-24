@@ -126,13 +126,13 @@ namespace VSL_NAMESPACE {
 
 template<vsl::graphic_resource::can_convert_graphic_resource T>
 void vsl::GraphicResource::update(T t, vsl::BufferAccessor::LocalBufferHolder holder,
-                                  size_t binding, std::optional<Type> type) {
+                                  size_t binding, std::optional<vsl::graphic_resource::Type> type) {
     update(t, *holder.parent, binding, type, holder.offset, holder.size);
 }
 
 template<vsl::graphic_resource::can_convert_graphic_resource T>
 void
-vsl::GraphicResource::update(T t, size_t binding, std::optional<Type> type, size_t offset, std::optional<size_t> size) {
+vsl::GraphicResource::update(T t, size_t binding, std::optional<vsl::graphic_resource::Type> type, size_t offset, std::optional<size_t> size) {
     if constexpr (std::is_convertible_v<T *, vsl::BufferAccessor *>)
         update((vsl::BufferAccessor*) &t, binding, type, offset, size);
     else if constexpr (std::is_convertible_v<T *, vsl::ImageAccessor *>)

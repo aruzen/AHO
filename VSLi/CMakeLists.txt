@@ -45,7 +45,7 @@ add_library(VSL STATIC
         VSL/src/vulkan/commands/copy_buffer_to_image.cpp
         VSL/src/vulkan/commands/bind_pipe_line.cpp
         VSL/src/vulkan/commands/bind_graphic_resource.cpp
-        VSL/src/vulkan/commands/push_contents.cpp
+        VSL/src/vulkan/commands/push_content.cpp
         VSL/src/vulkan/commands/bind_vertex_buffers.cpp
         VSL/src/vulkan/commands/draw.cpp
         VSL/src/vulkan/commands/dispatch.cpp
@@ -99,7 +99,7 @@ add_library(VSL STATIC
         VSL/include/VSL/vulkan/shader.hpp
         VSL/include/VSL/vulkan/render_pass.hpp
         VSL/include/VSL/vulkan/commands/dispatch.hpp
-        VSL/include/VSL/vulkan/commands/push_contents.hpp
+        VSL/include/VSL/vulkan/commands/push_content.hpp
         VSL/include/VSL/vulkan/commands/bind_vertex_buffers.hpp
         VSL/include/VSL/vulkan/commands/draw.hpp
         VSL/include/VSL/vulkan/commands/copy_buffer_to_image.hpp

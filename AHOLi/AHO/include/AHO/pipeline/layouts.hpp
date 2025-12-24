@@ -48,9 +48,9 @@ namespace AHO_NAMESPACE::pipeline {
 
 	template<ResourceName Name>
 	constexpr auto getBindingPoint() {
-		if constexpr (ResourceName::MVPMatrixUBO)
+		if constexpr (ResourceName::MVPMatrixUBO == Name)
 			return standard_resources::MVPMatrixUBO;
-		if constexpr (ResourceName::Texture)
+		if constexpr (ResourceName::Texture == Name)
 			return standard_resources::Texture;
 	}
 

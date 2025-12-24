@@ -18,8 +18,9 @@ namespace VSL_NAMESPACE {
 	template<typename S = VSL_NAMESPACE::_PhysicalDevicesSercher>
 	struct PhysicalDevices;
 
-	static std::vector<const char*> validationExtensions = {
-			"VK_EXT_debug_utils"
+    static std::vector<const char*> validationExtensions = {
+			"VK_EXT_debug_utils",
+            // "VK_EXT_layer_settings"
 	};
 
 	static std::vector<const char*> validationLayers = {
@@ -35,8 +36,7 @@ namespace VSL_NAMESPACE {
 	public: 
 		bool checkValidationLayerSupport();
 
-		Vulkan(const char* app_name);
-		Vulkan(const char* app_name, const std::vector<const char*>& requireExtensions);
+		Vulkan(const char* app_name, const std::vector<const char*>& requireExtensions = {});
 		~Vulkan();
 
 		template<typename S = VSL_NAMESPACE::_PhysicalDevicesSercher>

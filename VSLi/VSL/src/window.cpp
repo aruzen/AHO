@@ -32,7 +32,7 @@ VSL_NAMESPACE::PureWindow::PureWindow(std::string _name, int _width, int _height
 	_WINDOWS.push_back(_data);
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 	_data->height = _height;
 	_data->width = _width;
 	_data->name = _name;
@@ -90,11 +90,6 @@ bool VSL_NAMESPACE::PureWindow::operator==(const PureWindow::WindowData* o)
 
 bool vsl::PureWindow::resize(int width, int height) {
     glfwSetWindowSize((GLFWwindow*)_data->window_handle, width, height);
-    return true;
-}
-
-bool vsl::PureWindow::setTitle(const std::string& title) {
-    glfwSetWindowTitle((GLFWwindow*)_data->window_handle, title.c_str());
     return true;
 }
 

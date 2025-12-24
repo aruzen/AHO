@@ -5,22 +5,7 @@
 // #define AHO_POOP_PUBLIC_SECURITY
 #pragma warning( disable : 4455 )
 
-#include <AHO/define.hpp>
-#include <AHO/core/math/mat.hpp>
-#include <AHO/core/math/coordinate.hpp>
-#include <AHO/core/math/angle.hpp>
-
-#include <AHO/core/vector.hpp>
-#include <AHO/core/point.hpp>
-#include <AHO/core/triangle.hpp>
-#include <AHO/core/polygon.hpp>
-#include <AHO/core/color.hpp>
-
-#include <AHO/io/key.hpp>
-#include <AHO/io/keyBoard.hpp>
-#include <AHO/io/mouse.hpp>
-#include <AHO/engine.hpp>
-#include <AHO/engine/standard_engine.hpp>
+#include <AHO/aho.hpp>
 
 #include <chrono>
 #include <print>
@@ -58,8 +43,11 @@ breakpoint disable swift_willThrow
         auto &[vulkan_instance, physical_device, device, command_manager, graphic_resource_manager, synchro_manager]
                 = *engine._data;
         auto &main_window = engine.boot_window.value();
-        auto &[surface, swapchain, image_view, render_pass, frame_buffer]
+        auto &[surface, swapchain, image_view, render_pass,
+                frame_buffer, image_available, render_finish, in_flight]
                 = *engine.boot_window.value()._data2;
+        if (!image_available._data)
+            loggingln("image not available ; ;");
 #ifdef _MSC_VER
         vsl::utils::ShaderCompiler shader_compiler("glslc", "shaders/");
 #elifdef __APPLE_CC__
@@ -92,18 +80,16 @@ breakpoint disable swift_willThrow
                                  make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device)}),
                 input_texture_shaders("input_texture",
                                       {make_shader<"../../AHO/shaders/texture.vert.spv">(device),
-                                       make_shader<"../../AHO/shaders/texture.frag.spv">(device)});
+                                       make_shader<"../../AHO/shaders/texture.frag.spv">(device)}),
+                push_texture_shaders("push_texture",
+                                     {make_shader<"../../AHO/shaders/push_texture.vert.spv">(device),
+                                      make_shader<"../../AHO/shaders/push_texture.frag.spv">(device)});;
 #endif
 
         // utils::SPIRVReflector reflector(device, std::filesystem::path(expand_environments("${AHO_HOME}/built-in-resource/shaders/all-types.vert.spv")));
 
         Scissor scissor(swapchain);
         Viewport viewport(swapchain);
-        Viewport left_viewport(viewport), right_viewport(viewport);
-        left_viewport.width /= 2;
-        right_viewport.width /= 2;
-        right_viewport.x = left_viewport.width;
-
 
         PipelineLayout layout(device,
                               pl::ColorBlend(),
@@ -111,67 +97,85 @@ breakpoint disable swift_willThrow
                               pl::Multisample(),
                               pl::Rasterization(),
                               pl::DepthStencil(),
-                // pl::DynamicState(),
+                              pl::DynamicState(),
                               scissor,
                               viewport);
 
-        auto [input_vertices_pool, input_vertices_resource, input_vertices_resource_layout, input_vertices] = [&]() {
+
+        vsl::graphic_resource::BindingLayout ubo_binding_layout(device, {
+                aho::pipeline::getBindingPoint(aho::pipeline::ResourceName::MVPMatrixUBO)
+        });
+        auto [ubo_pool, ubo_resource] = graphic_resource_manager->allocate(
+                std::vector(swapchain.getSwapImageSize(), ubo_binding_layout));
+
+        vsl::graphic_resource::BindingLayout texture_binding_layout(device, {
+                aho::pipeline::getBindingPoint(aho::pipeline::ResourceName::Texture)
+        });
+        auto texture_pool = graphic_resource_manager->make(
+                std::map < vsl::graphic_resource::Type, size_t > {
+                        {vsl::graphic_resource::Type::CombinedImageSampler, 100}
+                });
+
+        auto [input_vertices_resource_layout, input_vertices] = [&]() {
             auto vd2p_fc_umpv_reflect
-                    = utils::SPIRVReflector(device, std::filesystem::path(
+                    = vsl::utils::SPIRVReflector(device, std::filesystem::path(
                             expand_environments(
                                     "${AHO_HOME}/built-in-resource/shaders/vd2p_fc_umpv.vert.spv"))).generated;
-            auto input_vertices_resource_layout = vd2p_fc_umpv_reflect.makeBindingLayout();
-            return std::tuple_cat(graphic_resource_manager->allocate(
-                                          std::vector(swapchain.getSwapImageSize(), input_vertices_resource_layout[0])),
-                                  std::make_tuple(input_vertices_resource_layout, GraphicsPipeline(
-                                          layout.copy().add(
-                                                  pl::ResourceBinding(input_vertices_resource_layout),
-                                                  input_d3_shaders, vd2p_fc_umpv_reflect.vertex_input),
-                                          render_pass)));
+            auto input_vertices_resource_layout = layout.copy().add(
+                    pl::ResourceBinding(vd2p_fc_umpv_reflect.makeBindingLayout()),
+                    input_d3_shaders, *vd2p_fc_umpv_reflect.vertex_input);
+            return std::make_tuple(input_vertices_resource_layout,
+                                   GraphicsPipeline(
+                                           input_vertices_resource_layout,
+                                           render_pass));
         }();
 
         auto [push_triangle_layout, push_triangle] = [&]() {
             auto d2triangle_single_color
-                    = utils::SPIRVReflector(device, std::filesystem::path(
+                    = vsl::utils::SPIRVReflector(device, std::filesystem::path(
                             expand_environments(
                                     "${AHO_HOME}/built-in-resource/shaders/2dtriangle_single_color.vert.spv")
                     )).generated;
             auto push_triangle_layout = layout.copy().add(
-                    d2triangle_single_color.push_constants,
+                    *d2triangle_single_color.push_constants,
                     push_d2_shaders);
-            return std::make_tuple(push_triangle_layout, GraphicsPipeline(
-                    push_triangle_layout,
-                    render_pass));
+            return std::make_tuple(push_triangle_layout,
+                                   GraphicsPipeline(push_triangle_layout, render_pass));
         }();
 
-        auto [texture_pool, texture_resource, texture_resource_layout, input_texture] = [&]() {
+        auto [push_texture_layout, push_texture] = [&]() {
+            auto push_texture_vert
+                    = vsl::utils::SPIRVReflector(device, std::filesystem::path(
+                            expand_environments("../../AHO/shaders/push_texture.vert.spv"))).generated;
+            auto push_texture_frag
+                    = vsl::utils::SPIRVReflector(device, std::filesystem::path(
+                            expand_environments("../../AHO/shaders/push_texture.frag.spv"))).generated;
+            const auto push_texture_layout = layout.copy().add(
+                    *push_texture_vert.push_constants,
+                    pl::ResourceBinding(push_texture_frag.makeBindingLayout()),
+                    push_texture_shaders);
+            return std::make_tuple(push_texture_layout,
+                                   GraphicsPipeline(push_texture_layout, render_pass));
+        }();
+
+        auto [texture_resource_layout, input_texture] = [&]() {
             auto texture_vert
-                    = utils::SPIRVReflector(device, std::filesystem::path(
+                    = vsl::utils::SPIRVReflector(device, std::filesystem::path(
                             expand_environments("../../AHO/shaders/texture.vert.spv"))).generated;
-            auto vert_resource_layout = texture_vert.makeBindingLayout()[0];
             auto texture_frag
-                    = utils::SPIRVReflector(device, std::filesystem::path(
+                    = vsl::utils::SPIRVReflector(device, std::filesystem::path(
                             expand_environments("../../AHO/shaders/texture.frag.spv"))).generated;
-            auto frag_resource_layout = texture_frag.makeBindingLayout()[0];
-            std::vector l(swapchain.getSwapImageSize(), vert_resource_layout);
-            l.push_back(frag_resource_layout);
-            return std::tuple_cat(graphic_resource_manager->allocate(l),
-                                  std::make_tuple(std::vector{vert_resource_layout, frag_resource_layout},
-                                                  GraphicsPipeline(
-                                                          layout.copy().add(
-                                                                  pl::ResourceBinding(
-                                                                          {vert_resource_layout, frag_resource_layout}),
-                                                                  input_texture_shaders, texture_vert.vertex_input),
-                                                          render_pass)));
+            const auto vert_layout = texture_vert.makeBindingLayout()[0];
+            const auto frag_layout = texture_frag.makeBindingLayout()[0];
+            std::vector layouts = {vert_layout,
+                                   frag_layout};
+            return std::make_tuple(layouts,
+                                   GraphicsPipeline(
+                                           layout.copy().add(
+                                                   pl::ResourceBinding(layouts),
+                                                   input_texture_shaders, *texture_vert.vertex_input),
+                                           render_pass));
         }();
-
-
-        auto imageAvailable = synchro_manager.createSemaphore("imageAvailable",
-                                                              command_manager.getBuffer().getSize()),
-                renderFinished = synchro_manager.createSemaphore("renderFinished",
-                                                                 command_manager.getBuffer().getSize());
-        auto inFlight = synchro_manager.createFence("inFlight",
-                                                    command_manager.getBuffer().getSize(), true);
 
         struct alignas(16) ubo_t {
             Mat4x4<float> model;
@@ -211,13 +215,16 @@ breakpoint disable swift_willThrow
         using UboBuffer = Buffer<vsl::MemoryType::UniformBuffer,
                 vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>;
         std::vector<UboBuffer> uboBuffers;
-        uboBuffers.reserve(swapchain.getSwapImageSize());
-        std::generate_n(std::back_inserter(uboBuffers), swapchain.getSwapImageSize(),
-                        [&]() { return UboBuffer(device, sizeof(ubo_t)); });
+        {
+            auto size = swapchain.getSwapImageSize();
+            uboBuffers.reserve(size);
+            for (size_t i = 0; i < size; i++)
+                uboBuffers.emplace_back(device, sizeof(ubo_t));
+        }
 
-        for (size_t i = 0; i < input_vertices_resource.size() && i < uboBuffers.size(); i++) {
-            input_vertices_resource[i].update(uboBuffers[i], (size_t) 0);
-            texture_resource[i].update(uboBuffers[i], (size_t) 0);
+        for (size_t i = 0; i < ubo_resource.size() && i < uboBuffers.size(); i++) {
+            ubo_resource[i].update(uboBuffers[i], (size_t)
+                    0, vsl::graphic_resource::Type::UniformBuffer);
         }
         DeviceLocalBuffer<vsl::MemoryType::VertexBuffer> colorBuffer(device, command_manager, colors);
         DeviceLocalBuffer<vsl::MemoryType::IndexBuffer> indexBuffer(device, command_manager, indices);
@@ -239,16 +246,18 @@ breakpoint disable swift_willThrow
             auto data = imageStagingBuffer.data();
             memcpy(data.data, pixels, texHeight * texWidth * texChannels);
             {
-                auto phase = command_manager.startPhase<ComputePhase>(std::nullopt, std::nullopt, inFlight);
+                auto phase = command_manager.startPhase<ComputePhase>(std::nullopt, std::nullopt, in_flight);
                 phase << command::ChangeImageBarrier(image, ImageLayout::TransferDstOptimal);
                 phase << command::CopyBufferToImage(image, &imageStagingBuffer, ImageLayout::TransferDstOptimal);
                 phase << command::ChangeImageBarrier(image, ImageLayout::TransferDstOptimal,
                                                      ImageLayout::ShaderReadOnlyOptimal);
             }
-            inFlight.wait();
+            in_flight.wait();
         }
-        texture_resource[swapchain.getSwapImageSize()].update(image, sampler, 1);
-
+        auto [ok, ahaha_image] = texture_pool.bind(texture_binding_layout);
+        if (!ok)
+            loggingln("texture_pool.bind(texture_binding_layout) failed.");
+        ahaha_image.update(image, sampler, 0, vsl::graphic_resource::Type::CombinedImageSampler);
 
         Buffer<vsl::MemoryType::StorageBuffer,
                 vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>
@@ -258,12 +267,24 @@ breakpoint disable swift_willThrow
         auto [keyUp,
                 keyDown,
                 keyLeft,
-                keyRight] = input_manager.get<input::Keys>(
+                keyRight,
+                FullScreenKey] = input_manager.get<input::Keys>(
                 input::KeyCode::Up,
                 input::KeyCode::Down,
                 input::KeyCode::Left,
-                input::KeyCode::Right)->keys;
+                input::KeyCode::Right,
+                input::KeyCode::I)->keys;
         auto mouse = input_manager.get<input::Mouse>();
+
+        main_window.addPlugin<window::WindowResizeHookPlugin>([&ubo, &scissor, &viewport, &swapchain](auto w) {
+            auto size = w->frame_size();
+            ubo.proj = matrix::make_perspective(45.0_deg,
+                                                (float)size.value.x.value / size.value.y.value,
+                                                0.1f,
+                                                10.0f);
+            viewport = Viewport(swapchain);
+            scissor = Scissor(swapchain);
+        });
 
         d3::VectorF move;
         while (aho::Window::Update() && main_window && input_manager) {
@@ -284,37 +305,58 @@ breakpoint disable swift_willThrow
             ubo.view = matrix::make_view(Point(2.0f, 2.0f, 2.0f), Point(0.0f, 0.0f, 0.0f), Vector(0.0f, 0.0f, 1.0f));
             ubo.proj = matrix::make_perspective(45.0_deg, viewport.width / (float) viewport.height, 0.1f, 10.0f);
 
+            if (FullScreenKey->down()) {
+            }
+
             {
-                auto phase = command_manager.startPhase(swapchain, imageAvailable, renderFinished, inFlight);
+                auto phase = DrawPhase(&engine);
                 frame_buffer.setTargetFrame(phase.getImageIndex());
                 uboBuffers[phase.getImageIndex()].copy(ubo);
-                input_vertices_resource[phase.getImageIndex()].update(uboBuffers[phase.getImageIndex()], 0);
-                texture_resource[phase.getImageIndex()].update(uboBuffers[phase.getImageIndex()], 0);
+                // ubo_resource[phase.getImageIndex()].update(uboBuffers[phase.getImageIndex()], 0);
 
-                Triangle<float, vsl::D2> triangle{Point(-0.5f, 0.0f), Point(0.5f, 0.5f), Point(-0.5f, -0.5f)};
-                RGB rgb{1.0f, 0.0f, 0.0f};
                 phase << command::RenderPassBegin(render_pass, frame_buffer);
-                /*
-                phase << input_vertices
-                      << command::BindGraphicResource(input_vertices_resource[phase.getImageIndex()],
+                phase << input_vertices << scissor << viewport
+                      << command::BindGraphicResource(ubo_resource[phase.getImageIndex()],
                                                       graphic_resource::BindingDestination::Graphics, input_vertices)
                       << command::BindVertexBuffer(vertBuffer, colorBuffer)
                       << command::BindIndexBuffer(indexBuffer)
                       << command::DrawIndexed(indices.size());
-                      */
 
-                phase << push_triangle
-                      << command::PushConstant(push_triangle_layout, ShaderFlag::Vertex, sizeof triangle, 0, &triangle)
-                      << command::PushConstant(push_triangle_layout, ShaderFlag::Vertex, sizeof rgb, 44 - sizeof rgb, &rgb)
-                      << command::Draw(3);
-
-                phase << input_texture
-                      << command::BindGraphicResource(
-                              {input_vertices_resource[phase.getImageIndex()], texture_resource[swapchain.getSwapImageSize()]},
-                              graphic_resource::BindingDestination::Graphics, input_texture)
-                      << command::BindVertexBuffer(vertBuffer, colorBuffer, texCoordBuffer)
+                struct alignas(16) {
+                    std::array<d2::PointF, 4> vertices;
+                    std::array<d2::PointF, 4> texcoords;
+                } pos_with_tc{
+                        {d2::PointF{0.5f, -0.5f},
+                         d2::PointF{-0.5f, -0.5f},
+                         d2::PointF{-0.5f, 0.5f},
+                         d2::PointF{0.5f, 0.5f}},
+                        texcoords
+                };
+                static_assert(vsl::command::is_pipeline_require<vsl::command::BindGraphicResource>, "aa");
+                phase << push_texture << scissor << viewport
+                      << command::PushConstant(push_texture_layout, ShaderFlag::Vertex,
+                                               sizeof pos_with_tc, 0, &pos_with_tc)
+                      << command::BindGraphicResource(ahaha_image,
+                                                      graphic_resource::BindingDestination::Graphics)
                       << command::BindIndexBuffer(indexBuffer)
                       << command::DrawIndexed(indices.size());
+
+                /*
+                                Triangle<float, vsl::D2> triangle{Point(-0.5f, 0.0f), Point(0.5f, 0.5f), Point(-0.5f, -0.5f)};
+                                RGB rgb{1.0f, 0.0f, 0.0f};
+                                phase << push_triangle
+                                      << command::PushConstant(push_triangle_layout, ShaderFlag::Vertex, sizeof triangle, 0, &triangle)
+                                      << command::PushConstant(push_triangle_layout, ShaderFlag::Vertex, sizeof rgb, 44 - sizeof rgb, &rgb)
+                                      << command::Draw(3);
+
+                                phase << input_texture
+                                      << command::BindGraphicResource(
+                                              {input_vertices_resource[phase.getImageIndex()], texture_resource[0]},
+                                              graphic_resource::BindingDestination::Graphics, input_texture)
+                                      << command::BindVertexBuffer(vertBuffer, colorBuffer, texCoordBuffer)
+                                      << command::BindIndexBuffer(indexBuffer)
+                                      << command::DrawIndexed(indices.size());
+                                      */
 
                 phase << command::RenderPassEnd();
             }
@@ -322,15 +364,15 @@ breakpoint disable swift_willThrow
             // debug = static_cast<struct debug_t *>(debugMapped.data);
             command_manager.next();
         }
-        inFlight.wait();
+        in_flight.wait();
         /**/
     }
 #if !defined(DEBUG) && !defined(_DEBUG)
-    catch (std::exception &e) {
+    catch (vsl::exceptions::VSLException &e) {
         vsl::loggingln(e.what());
         return 1;
     }
-    catch (vsl::exceptions::VSLException &e) {
+    catch (std::exception &e) {
         vsl::loggingln(e.what());
         return 1;
     }

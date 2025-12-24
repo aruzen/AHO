@@ -22,8 +22,9 @@ namespace VSL_NAMESPACE::utils {
             LogicalDeviceAccessor logical_device;
 
             std::map<size_t, std::vector<vsl::graphic_resource::BindingPoint>> binding_points;
-            vsl::pipeline_layout::PushConstants push_constants;
-            vsl::pipeline_layout::VertexInput vertex_input;
+
+            std::optional<vsl::pipeline_layout::PushConstants> push_constants = std::nullopt;
+            std::optional<vsl::pipeline_layout::VertexInput> vertex_input = std::nullopt;
 
             std::vector<vsl::graphic_resource::BindingLayout> makeBindingLayout(size_t repeat = 0);
         } generated;

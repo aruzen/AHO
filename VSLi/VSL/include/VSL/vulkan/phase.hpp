@@ -12,6 +12,12 @@
 #include "pipeline.hpp"
 
 namespace VSL_NAMESPACE {
+    template<typename PhaseStream, typename T>
+    concept is_phase_stream = requires(PhaseStream pst) {
+        { pst << std::declval<std::shared_ptr<T>>() } -> std::convertible_to<PhaseStream&>;
+        { pst << std::declval<T>() } -> std::convertible_to<PhaseStream&>;
+    };
+
     struct DefaultPhaseStream;
 
     struct ComputePhase {
@@ -32,17 +38,27 @@ namespace VSL_NAMESPACE {
             FinishSubmit
         } state = State::BeforeSetup;
 
+        enum class SubmitResult {
+            Success,
+            Failed,
+            WantRecreateSwapchain,
+        };
+
         std::uint32_t imageIndex;
 
         DefaultPhaseStream operator<<(std::shared_ptr<command::__Command> cmd);
 
         DefaultPhaseStream operator<<(command::is_command auto cmd);
 
+        DefaultPhaseStream operator<<(std::shared_ptr<command::__DelegateCommand> cmd);
+
+        DefaultPhaseStream operator<<(command::is_delegate_command auto cmd);
+
         std::uint32_t getImageIndex();
 
         virtual void setup();
 
-        virtual void submit();
+        virtual SubmitResult submit();
 
         // virtualはつけていないsubmitに委任
         ~ComputePhase();
@@ -59,7 +75,7 @@ namespace VSL_NAMESPACE {
 
         void setup() override;
 
-        void submit() override;
+        SubmitResult submit() override;
 
         ~DefaultPhase();
     };
@@ -74,6 +90,9 @@ namespace VSL_NAMESPACE {
 
         DefaultPhaseStream &operator<<(command::is_command auto cmd);
 
+        DefaultPhaseStream &operator<<(std::shared_ptr<command::__DelegateCommand> cmd);
+
+        DefaultPhaseStream &operator<<(command::is_delegate_command auto cmd);
     private:
         template<typename T>
         void resolveHolderRequire(T &t);
@@ -90,9 +109,21 @@ namespace VSL_NAMESPACE {
         return op;
     }
 
+    DefaultPhaseStream ComputePhase::operator<<(command::is_delegate_command auto cmd) {
+        DefaultPhaseStream op{this->manager};
+        op << cmd;
+        return op;
+    }
+
     DefaultPhaseStream &DefaultPhaseStream::operator<<(command::is_command auto cmd) {
         resolveHolderRequire(cmd);
         (&cmd)->invoke(manager.getPool(), manager.getBuffer(), manager);
+        return *this;
+    }
+
+    DefaultPhaseStream &DefaultPhaseStream::operator<<(command::is_delegate_command auto cmd) {
+        resolveHolderRequire(cmd);
+        (&cmd)->invoke(*this, manager.getPool(), manager.getBuffer(), manager);
         return *this;
     }
 }
@@ -107,7 +138,7 @@ void vsl::DefaultPhaseStream::resolveHolderRequire(T &t) {
         this->pipeline = t;
 
     if constexpr (command::is_vertex_size_holder<T>)
-        (&t)->setPipeline(this->vertexSize);
+        (&t)->setVertexSize(this->vertexSize);
     if constexpr (command::is_pipeline_require<T>)
         (&t)->setPipeline(this->pipeline);
 }

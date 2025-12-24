@@ -8,6 +8,6 @@ void VSL_NAMESPACE::pipeline_layout::DynamicState::injection(VSL_NAMESPACE::Pipe
 {
 	auto& info = *pl._data->info;
     info.enabledDynamicStates.assign(
-            {vk::DynamicState::eViewportWithCount,
-             vk::DynamicState::eScissorWithCount});
+            {vk::DynamicState::eScissor,
+             vk::DynamicState::eViewport});
 }

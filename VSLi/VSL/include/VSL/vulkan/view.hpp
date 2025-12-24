@@ -8,7 +8,7 @@
 namespace vsl {
 	template<typename D = VSL_NAMESPACE::VSL_DEFAULT_dimension_STRUCT>
 	struct View {
-		View(vsl::Swapchain device);
+		View(vsl::SwapchainAccessor device);
 
 		size_t size();
 

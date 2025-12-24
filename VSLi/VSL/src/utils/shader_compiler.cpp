@@ -1,7 +1,7 @@
 #ifdef _MSC_VER
 #include "pch.h"
 #endif
-#include <VSL/utils/ShaderCompiler.hpp>
+#include <VSL/utils/shader_compiler.hpp>
 #include <VSL/utils/string.hpp>
 
 #include <map>

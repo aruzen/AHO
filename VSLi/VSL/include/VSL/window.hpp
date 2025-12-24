@@ -55,7 +55,6 @@ namespace VSL_NAMESPACE {
 		std::shared_ptr<T> addPlugin(Args&&... args);
 
         virtual bool resize(int width, int height);
-        bool setTitle(const std::string& title);
 
 		std::string name();
 		bool close();

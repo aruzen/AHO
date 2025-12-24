@@ -110,7 +110,7 @@ namespace VSL_NAMESPACE {
 
     template<typename... Args>
     bool VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::copy(const Args&... args) {
-        size_t offset = 0;
+        size_t offset = this->offset;
         return helper::copy_with_shift_offset(this->data, parent->size(), offset, args...);
     }
 
@@ -123,7 +123,7 @@ namespace VSL_NAMESPACE {
 
     template<typename... Args>
     void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::uncheck_copy(const Args&... args) {
-        size_t offset = 0;
+        size_t offset = this->offset;
         (helper::uncheck_copy_with_shift_offset(this->data, offset, args), ...);
     }
 

@@ -102,6 +102,34 @@ vsl::graphic_resource::Pool::bind(vsl::graphic_resource::BindingLayout layout) {
     return {true, {result}};
 }
 
+
+std::tuple<bool, std::vector<vsl::graphic_resource::Resource>>
+vsl::graphic_resource::Pool::bind(size_t n, vsl::graphic_resource::BindingLayout layout) {
+    std::tuple<bool, std::vector<vsl::graphic_resource::Resource>> result{true, {}};
+    auto &[check, resources] = result;
+    resources.resize(n);
+
+    auto vkLayouts = std::vector(n, layout._data->layout);
+
+    vk::DescriptorSetAllocateInfo allocInfo;
+    allocInfo.descriptorPool = _data->descriptorPool;
+    allocInfo.descriptorSetCount = vkLayouts.size();
+    allocInfo.pSetLayouts = vkLayouts.data();
+
+    std::vector<vk::DescriptorSet> descriptorSets;
+    descriptorSets.resize(vkLayouts.size());
+    if (((ManagerInterface *) _data->manager)->_data->device->device.
+            allocateDescriptorSets(&allocInfo, descriptorSets.data()) != vk::Result::eSuccess)
+        return {false, {}};
+    for (size_t i = 0; i < descriptorSets.size(); i++) {
+        resources[i] = Resource{std::make_shared<_impl::GraphicResource_impl>()};
+        resources[i]._data->pool = _data;
+        resources[i]._data->descriptorSet = descriptorSets[i];
+        _data->resources.push_back(resources[i]._data);
+    }
+    return result;
+}
+
 std::tuple<bool, std::vector<vsl::graphic_resource::Resource>>
 vsl::graphic_resource::Pool::bind(std::vector <vsl::graphic_resource::BindingLayout> layouts) {
     std::tuple<bool, std::vector<vsl::graphic_resource::Resource>> result{true, {}};
@@ -177,8 +205,7 @@ void vsl::graphic_resource::Resource::update(vsl::BufferAccessor *buffer, size_t
     ((ManagerInterface *) _data->pool->manager)->_data->device->device.updateDescriptorSets({descriptorWrite}, {});
 }
 
-void vsl::graphic_resource::Resource::update(vsl::ImageAccessor image, size_t binding,
-                                             std::optional<Type> type, size_t offset, std::optional<size_t> size) {
+void vsl::graphic_resource::Resource::update(vsl::ImageAccessor image, size_t binding, std::optional<Type> type) {
     vk::DescriptorImageInfo imageInfo;
     imageInfo.imageView = image._data->view;
     imageInfo.imageLayout = vk::ImageLayout::eGeneral;
@@ -187,20 +214,21 @@ void vsl::graphic_resource::Resource::update(vsl::ImageAccessor image, size_t bi
     descriptorWrite.dstSet = this->_data->descriptorSet;
     descriptorWrite.dstBinding = binding;
     descriptorWrite.dstArrayElement = 0;
-    if (type)
+    if (type) {
         descriptorWrite.descriptorType = (vk::DescriptorType) type.value();
-    else {
+        goto found_type;
+    } else {
         if (not _data->layout.expired()) {
             auto layout = _data->layout.lock();
             for (const auto &lb: layout->layoutBindings)
                 if (lb.binding == binding) {
                     descriptorWrite.descriptorType = lb.descriptorType;
-                    goto found_layout;
+                    goto found_type;
                 }
         }
     }
     throw vsl::exceptions::RuntimeException("LayoutNotFound", "Layout not found!", std::source_location::current());
-    found_layout:
+    found_type:
 
     descriptorWrite.descriptorCount = 1;
     descriptorWrite.pBufferInfo = nullptr;
@@ -210,8 +238,8 @@ void vsl::graphic_resource::Resource::update(vsl::ImageAccessor image, size_t bi
     ((ManagerInterface *) _data->pool->manager)->_data->device->device.updateDescriptorSets({descriptorWrite}, {});
 }
 
-void vsl::graphic_resource::Resource::update(vsl::ImageAccessor image, Sampler sampler,size_t binding,
-                                             std::optional<Type> type, size_t offset, std::optional<size_t> size) {
+void vsl::graphic_resource::Resource::update(vsl::ImageAccessor image, SamplerAccessor sampler,
+                                             size_t binding, std::optional<Type> type) {
     vk::DescriptorImageInfo imageInfo;
     imageInfo.imageView = image._data->view;
     imageInfo.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
@@ -221,20 +249,21 @@ void vsl::graphic_resource::Resource::update(vsl::ImageAccessor image, Sampler s
     descriptorWrite.dstSet = this->_data->descriptorSet;
     descriptorWrite.dstBinding = binding;
     descriptorWrite.dstArrayElement = 0;
-    if (type)
+    if (type) {
         descriptorWrite.descriptorType = (vk::DescriptorType) type.value();
-    else {
+        goto found_type;
+    } else {
         if (not _data->layout.expired()) {
             auto layout = _data->layout.lock();
             for (const auto &lb: layout->layoutBindings)
                 if (lb.binding == binding) {
                     descriptorWrite.descriptorType = lb.descriptorType;
-                    goto found_layout;
+                    goto found_type;
                 }
         }
     }
     throw vsl::exceptions::RuntimeException("LayoutNotFound", "Layout not found!", std::source_location::current());
-    found_layout:
+    found_type:
 
     descriptorWrite.descriptorCount = 1;
     descriptorWrite.pBufferInfo = nullptr;

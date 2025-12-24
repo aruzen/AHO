@@ -30,13 +30,18 @@ void VSL_NAMESPACE::PipelineLayoutAccessor::init_finish() {
 	auto& enabledDynamicStates = _data->info->enabledDynamicStates;
 	if (_data->info->_viewport.viewportCount != 0)
 		_data->info->_viewport.pViewports = _data->info->viewports.data();
-	else if (std::find(enabledDynamicStates.begin(), enabledDynamicStates.end(), vk::DynamicState::eViewportWithCount) == enabledDynamicStates.end())
+
+    /*
+    else if (std::find(enabledDynamicStates.begin(), enabledDynamicStates.end(), vk::DynamicState::eViewportWithCount) == enabledDynamicStates.end())
 		enabledDynamicStates.push_back(vk::DynamicState::eViewportWithCount);
+     */
 
 	if (_data->info->_viewport.scissorCount != 0)
 		_data->info->_viewport.pScissors = _data->info->scissors.data();
+    /*
 	else if (std::find(enabledDynamicStates.begin(), enabledDynamicStates.end(), vk::DynamicState::eScissorWithCount) == enabledDynamicStates.end())
 		enabledDynamicStates.push_back(vk::DynamicState::eScissorWithCount);
+     */
 
 	_data->info->dynamicState.dynamicStateCount = static_cast<uint32_t>(enabledDynamicStates.size());
 	_data->info->dynamicState.pDynamicStates = enabledDynamicStates.data();
@@ -47,11 +52,12 @@ void VSL_NAMESPACE::PipelineLayoutAccessor::init_finish() {
 VSL_NAMESPACE::PipelineLayout::PipelineLayout(std::shared_ptr<_impl::PipelineLayout_impl> _data)
 	: PipelineLayoutAccessor{ _data } {}
 
-VSL_NAMESPACE::PipelineLayout VSL_NAMESPACE::PipelineLayout::copy() {
-	auto data = std::shared_ptr<VSL_NAMESPACE::_impl::PipelineLayout_impl>(new VSL_NAMESPACE::_impl::PipelineLayout_impl(*_data));
-	data->info = std::shared_ptr<VSL_NAMESPACE::_impl::CreateInfo>(new VSL_NAMESPACE::_impl::CreateInfo(*_data->info));
-	init_finish();
-	return PipelineLayout(data);
+VSL_NAMESPACE::PipelineLayout VSL_NAMESPACE::PipelineLayout::copy() const {
+	auto data = std::make_shared<VSL_NAMESPACE::_impl::PipelineLayout_impl>(*_data);
+	data->info = std::make_shared<VSL_NAMESPACE::_impl::CreateInfo>(*_data->info);
+    PipelineLayout c(data);
+    c.init_finish();
+    return c;
 }
 
 vsl::PipelineLayoutAccessor vsl::PipelineLayout::freeze() {

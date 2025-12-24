@@ -24,8 +24,7 @@ vsl::Shader<_Type>::Shader(vsl::LogicalDeviceAccessor device, std::filesystem::p
 		std::ifstream file(path, std::ios::ate | std::ios::binary);
 
 		if (!file.is_open()) {
-            std::println("failed to open file! {}", std::source_location::current().function_name());
-			throw vsl::exceptions::RuntimeException("file", "failed to open file!", std::source_location::current());
+            throw vsl::exceptions::RuntimeException("file", "failed to open file! : " +  path.string() + " : ", std::source_location::current());
 		}
 
 		size_t fileSize = (size_t)file.tellg();
@@ -59,7 +58,7 @@ vsl::Shader<_Type>::Shader(vsl::LogicalDeviceAccessor device, std::filesystem::p
 		std::ifstream file(path, std::ios::ate | std::ios::binary);
 
 		if (!file.is_open()) {
-			throw vsl::exceptions::RuntimeException("file", "failed to open file!", std::source_location::current());
+			throw vsl::exceptions::RuntimeException("file", "failed to open file! : " +  path.string() + " : ", std::source_location::current());
 		}
 
 		size_t fileSize = (size_t)file.tellg();
@@ -80,6 +79,11 @@ vsl::Shader<_Type>::Shader(vsl::LogicalDeviceAccessor device, std::filesystem::p
 	_data->shaderStageCreateInfo.pName = _data->name.c_str();
 	_data->shaderStageCreateInfo.module = _data->shaderModule;
     _data->shaderStageCreateInfo.stage = (vk::ShaderStageFlagBits)_Type;
+}
+
+template<VSL_NAMESPACE::ShaderType _Type>
+std::string VSL_NAMESPACE::Shader<_Type>::name() {
+    return _data->name;
 }
 
 VSL_NAMESPACE::_impl::Shader_impl::~Shader_impl()

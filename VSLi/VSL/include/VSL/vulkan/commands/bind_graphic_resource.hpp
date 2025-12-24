@@ -22,9 +22,9 @@ namespace VSL_NAMESPACE::command {
         graphic_resource::BindingDestination destination;
         std::optional<PipelineAccessor> pipeline;
 
-        void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
+        void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
 
-        virtual void setPipeline(std::optional<PipelineAccessor> pipeline);
+        void setPipeline(std::optional<PipelineAccessor> pipeline) override;
     };
 }
 

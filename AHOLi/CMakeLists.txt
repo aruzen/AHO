@@ -54,6 +54,7 @@ add_library(AHOLi
         AHO/include/aho/engine/graphical_engine.hpp
         AHO/include/aho/engine/standard_engine.hpp
         AHO/include/aho/define.hpp
+        AHO/src/drawer/draw_phase.cpp
 )
 
 target_include_directories(AHOLi

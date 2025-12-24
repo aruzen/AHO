@@ -2,7 +2,7 @@
 // Created by morimoto_hibiki on 2025/10/17.
 //
 
-#include <VSL/utils/SPIRVReflector.hpp>
+#include <VSL/utils/spir_reflector.hpp>
 
 #include <spirv_cross/spirv_cross.hpp>
 #include <fstream>
@@ -132,7 +132,9 @@ void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
                       << ", size = " << comp.get_declared_struct_member_size(type, i)
                       << std::endl;
                       */
-            generated.push_constants.definitions.emplace_back(pipeline_layout::PushContentDefinition{
+            if (not generated.push_constants)
+                generated.push_constants.emplace();
+            generated.push_constants->definitions.emplace_back(pipeline_layout::PushContentDefinition{
                     .targetShader = shaderType, // TODO
                     .offset = static_cast<uint32_t>(comp.type_struct_member_offset(type, i)),
                     .size = static_cast<uint32_t>(comp.get_declared_struct_member_size(type, i)),
@@ -161,8 +163,10 @@ void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
                 loggingln("Warning: Unknown format");
         }
         format = format.toVec(type.vecsize);
+        if (not generated.vertex_input)
+            generated.vertex_input.emplace();
         for (size_t i = 0; i < type.columns; i++)
-            generated.vertex_input.add(format);
+            generated.vertex_input->add(format);
     }
 }
 

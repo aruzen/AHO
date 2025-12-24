@@ -86,6 +86,8 @@ namespace VSL_NAMESPACE::graphic_resource {
 
         std::tuple<bool, Resource> bind(BindingLayout layout);
 
+        std::tuple<bool, std::vector<Resource>> bind(size_t n, BindingLayout layout);
+
         std::tuple<bool, std::vector<Resource>> bind(std::vector<BindingLayout> layout);
 
         ManagerInterface *getManager();
@@ -100,14 +102,10 @@ namespace VSL_NAMESPACE::graphic_resource {
         void update(vsl::BufferAccessor* buffer, size_t binding = 0, std::optional<Type> type = std::nullopt,
                     size_t offset = 0, std::optional<size_t> size = std::nullopt);
 
-        void update(vsl::ImageAccessor image, size_t binding = 0, std::optional<Type> type = std::nullopt,
-                    size_t offset = 0,
-                    std::optional<size_t> size = std::nullopt);
+        void update(vsl::ImageAccessor image, size_t binding = 0, std::optional<Type> type = std::nullopt);
 
-        void update(vsl::ImageAccessor image, Sampler sampler, size_t binding = 0,
-                    std::optional<Type> type = std::nullopt,
-                    size_t offset = 0,
-                    std::optional<size_t> size = std::nullopt);
+        void update(vsl::ImageAccessor image, SamplerAccessor sampler, size_t binding = 0,
+                    std::optional<Type> type = std::nullopt);
 
         template<can_convert_graphic_resource T>
         void update(T t, size_t binding = 0, std::optional<Type> type = std::nullopt, size_t offset = 0,
@@ -138,7 +136,7 @@ vsl::GraphicResource::update(T t, size_t binding, std::optional<Type> type, size
     if constexpr (std::is_convertible_v<T *, vsl::BufferAccessor *>)
         update((vsl::BufferAccessor*) &t, binding, type, offset, size);
     else if constexpr (std::is_convertible_v<T *, vsl::ImageAccessor *>)
-        update((vsl::ImageAccessor) &t, binding, type, offset, size);
+        update((vsl::ImageAccessor) &t, binding, type);
 }
 
 #endif //AHO_ALL_DESCRIPTOR_HPP

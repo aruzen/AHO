@@ -9,7 +9,7 @@
 #include <VSL/vulkan/frame_buffer.hpp>
 
 template<typename D>
-VSL_NAMESPACE::FrameBuffer<D>::FrameBuffer(Swapchain swapchain, View<D> view, RenderPass render_pass)
+VSL_NAMESPACE::FrameBuffer<D>::FrameBuffer(SwapchainAccessor swapchain, View<D> view, RenderPass render_pass)
 {
     _data = std::shared_ptr<VSL_NAMESPACE::_impl::FrameBuffer_impl>(new VSL_NAMESPACE::_impl::FrameBuffer_impl);
     _data->device = swapchain._data->device;

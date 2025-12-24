@@ -77,12 +77,8 @@ namespace vsl {
 
 		Shader(vsl::LogicalDeviceAccessor device, std::filesystem::path path);
 		Shader(vsl::LogicalDeviceAccessor device, std::filesystem::path path, std::string name);
-		
-		template<helper::constant_string_holder Path>
-		Shader(vsl::LogicalDeviceAccessor device);
 
-		template<helper::constant_string_holder Path>
-		Shader(vsl::LogicalDeviceAccessor device, std::string name);
+        std::string name();
 	};
 
 	template<helper::constant_string_holder Txt>

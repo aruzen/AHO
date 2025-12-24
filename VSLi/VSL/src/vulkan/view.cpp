@@ -9,7 +9,7 @@
 #include <VSL/vulkan/_dimension.hpp>
 
 template<typename D>
-VSL_NAMESPACE::View<D>::View(vsl::Swapchain swapchain)
+VSL_NAMESPACE::View<D>::View(vsl::SwapchainAccessor swapchain)
 {
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::View_impl>(new VSL_NAMESPACE::_impl::View_impl);
 	_data->swapChainImageViews.resize(swapchain._data->swapChainImages.size());

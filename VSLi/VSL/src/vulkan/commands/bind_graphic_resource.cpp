@@ -10,19 +10,21 @@
 #include <VSL/vulkan/commands/bind_graphic_resource.hpp>
 
 #include <ranges>
+#include <utility>
+#include <utility>
 
 
-vsl::command::BindGraphicResource::BindGraphicResource(vsl::GraphicResource resource, vsl::graphic_resource::BindingDestination dst,
+vsl::command::BindGraphicResource::BindGraphicResource(vsl::GraphicResource resource,
+                                                       vsl::graphic_resource::BindingDestination dst,
                                                        std::optional<PipelineAccessor> pipeline)
-        : resources{resource}, destination(dst), pipeline(pipeline) {}
+        : resources{resource}, destination(dst), pipeline(std::move(pipeline)) {}
 
 vsl::command::BindGraphicResource::BindGraphicResource(const std::vector<GraphicResource> &resources,
                                                        vsl::graphic_resource::BindingDestination dst,
                                                        std::optional<PipelineAccessor> pipeline)
-        : resources(resources), destination(dst), pipeline(pipeline) {}
-void VSL_NAMESPACE::command::BindGraphicResource::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager)
+        : resources(resources), destination(dst), pipeline(std::move(pipeline)) {}
 
-{
+void VSL_NAMESPACE::command::BindGraphicResource::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
     if (pipeline)
         buffer._data->commandBuffers[buffer.getCurrentBufferIdx()]
             .bindDescriptorSets((vk::PipelineBindPoint)destination,

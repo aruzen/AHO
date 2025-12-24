@@ -38,10 +38,12 @@ void vsl::DefaultPhase::setup() {
     ComputePhase::setup();
 }
 
-void vsl::DefaultPhase::submit() {
+vsl::DefaultPhase::SubmitResult vsl::DefaultPhase::submit() {
     if (state != State::WaitSubmit)
-        return;
-    ComputePhase::submit();
+        return vsl::DefaultPhase::SubmitResult::Failed;
+    auto r = ComputePhase::submit();
+    if (r != vsl::DefaultPhase::SubmitResult::Success)
+        return r;
 
     std::uint32_t imageIdx = getImageIndex();
     std::vector<vk::Semaphore> signalSemaphores;
@@ -59,8 +61,11 @@ void vsl::DefaultPhase::submit() {
     presentInfo.pResults = nullptr;
 
     auto result = manager._data->presentQueue.presentKHR(presentInfo);
-    if (vk::Result::eSuccess != result)
-        loggingln("Warning: Missing present queue!!");
+    if (vk::Result::eSuccess != result) {
+        loggingln("Warning: Missing present queue!! : ", to_string(result));
+        return vsl::DefaultPhase::SubmitResult::WantRecreateSwapchain;
+    }
+    return vsl::DefaultPhase::SubmitResult::Success;
 }
 
 VSL_NAMESPACE::DefaultPhase::~DefaultPhase() {
@@ -106,9 +111,9 @@ void vsl::ComputePhase::setup() {
     state = State::WaitSubmit;
 }
 
-void vsl::ComputePhase::submit() {
+vsl::DefaultPhase::SubmitResult vsl::ComputePhase::submit() {
     if (state != State::WaitSubmit)
-        return;
+        return vsl::DefaultPhase::SubmitResult::Failed;
 
     auto manager = this->manager._data;
     auto currentFrame = manager->commandBuffer->currentBufferIdx;
@@ -138,6 +143,7 @@ void vsl::ComputePhase::submit() {
         manager->graphicsQueue.submit({ submitInfo });
 
     state = State::FinishSubmit;
+    return vsl::DefaultPhase::SubmitResult::Success;
 }
 
 VSL_NAMESPACE::DefaultPhaseStream VSL_NAMESPACE::ComputePhase::operator<<(std::shared_ptr<command::__Command> cmd)
@@ -147,10 +153,23 @@ VSL_NAMESPACE::DefaultPhaseStream VSL_NAMESPACE::ComputePhase::operator<<(std::s
     return op;
 }
 
+vsl::DefaultPhaseStream vsl::ComputePhase::operator<<(std::shared_ptr<command::__DelegateCommand> cmd) {
+    DefaultPhaseStream op{ this->manager };
+    op << cmd;
+    return op;
+}
+
 VSL_NAMESPACE::DefaultPhaseStream& VSL_NAMESPACE::DefaultPhaseStream::operator<<(std::shared_ptr<command::__Command> cmd)
 {
     resolveHolderRequirePtr(cmd);
     cmd->invoke(manager.getPool(), manager.getBuffer(), manager);
+    return *this;
+}
+
+VSL_NAMESPACE::DefaultPhaseStream& VSL_NAMESPACE::DefaultPhaseStream::operator<<(std::shared_ptr<command::__DelegateCommand> cmd)
+{
+    resolveHolderRequirePtr(cmd);
+    cmd->invoke(*this, manager.getPool(), manager.getBuffer(), manager);
     return *this;
 }
 

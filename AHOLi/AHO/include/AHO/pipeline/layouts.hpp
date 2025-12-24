@@ -16,31 +16,45 @@
 
 namespace AHO_NAMESPACE::pipeline {
     enum class ResourceName {
-        MPVMatrixUBO,
+        MVPMatrixUBO,
+        Texture,
     };
 
     namespace  standard_resources {
-        constexpr vsl::graphic_resource::BindingPoint MPVMatrixUBO{
+        constexpr vsl::graphic_resource::BindingPoint MVPMatrixUBO{
                     .binding = (std::uint32_t) -1,
                     .bindingType = vsl::graphic_resource::Type::UniformBuffer,
                     .shaderType = vsl::ShaderFlag::Vertex,
                     .amount = 1
             };
+
+        constexpr vsl::graphic_resource::BindingPoint Texture{
+                .binding = (std::uint32_t) -1,
+                .bindingType = vsl::graphic_resource::Type::CombinedImageSampler,
+                .shaderType = vsl::ShaderFlag::Fragment,
+                .amount = 1
+        };
     };
 
     constexpr auto getBindingPoint(ResourceName name) {
-        if (ResourceName::MPVMatrixUBO == name) {
-            return standard_resources::MPVMatrixUBO;
+        switch (name) {
+            case ResourceName::MVPMatrixUBO:
+                return standard_resources::MVPMatrixUBO;
+            case ResourceName::Texture:
+                return standard_resources::Texture;
         }
         throw std::runtime_error("error: unknown resource.");
     }
 
     template<ResourceName Name>
     constexpr auto getBindingPoint() {
-        if constexpr (ResourceName::MPVMatrixUBO == Name) {
-            return standard_resources::MPVMatrixUBO;
-        } else {
-            static_assert(false, "error: unknown resource.");
+        switch (Name) {
+            case ResourceName::MVPMatrixUBO:
+                return standard_resources::MVPMatrixUBO;
+            case ResourceName::Texture:
+                return standard_resources::Texture;
+            default:
+                static_assert(false, "error: unknown resource.");
         }
     }
 

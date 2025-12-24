@@ -37,5 +37,5 @@ void VSL_NAMESPACE::Viewport::invoke(CommandPool pool, CommandBuffer buffer, Com
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
 
-	buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].setViewportWithCount({ viewport });
+	buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].setViewport(0, viewport);
 }

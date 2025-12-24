@@ -88,87 +88,8 @@ void setupDebugMessenger(std::shared_ptr<VSL_NAMESPACE::_impl::Vulkan_impl<V>> d
 template<bool Validation>
 VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vector<const char*>& requireExtensions)
 {
-	_data = std::shared_ptr<VSL_NAMESPACE::_impl::Vulkan_impl<Validation>>(new VSL_NAMESPACE::_impl::Vulkan_impl<Validation>);
-	_accessor = std::dynamic_pointer_cast<_impl::Vulkan_impl_accessor>(_data);
-
-	if constexpr (Validation) {
-		checkValidationLayerSupport();
-
-        std::vector<vk::ExtensionProperties> extensions = vk::enumerateInstanceExtensionProperties();
-        VSL_NAMESPACE::loggingln("available extensions:");
-        for (const auto &extension: extensions)
-            VSL_NAMESPACE::loggingln(extension.extensionName);
-        std::vector<vk::LayerProperties> layers = vk::enumerateInstanceLayerProperties();
-        VSL_NAMESPACE::loggingln("available layers:");
-        for (const auto& layer : layers)
-            VSL_NAMESPACE::loggingln(layer.layerName);
-    }
-
-
-	/* 使っているAPIのバージョン検索
-	auto apiVersion = vk::enumerateInstanceVersion();
-	std::cout << "Available Vulkan API Version: "
-		<< VK_VERSION_MAJOR(apiVersion) << "."
-		<< VK_VERSION_MINOR(apiVersion) << "."
-		<< VK_VERSION_PATCH(apiVersion) << std::endl;
-	*/
-
-	vk::ApplicationInfo appInfo;
-	appInfo.pApplicationName = app_name;
-	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-	appInfo.pEngineName = "VSL_Engine";
-	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-	appInfo.apiVersion = VK_MAKE_API_VERSION(0, 1, 3, 277);
-	uint32_t glfwExtensionCount = 0;
-	const char** glfwExtensions;
-
-	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-	vk::InstanceCreateInfo createInfo;
-	createInfo.pApplicationInfo = &appInfo;
-
-	std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
-
-	vk::DebugUtilsMessengerCreateInfoEXT debugCreateInfo;
-	if constexpr (Validation) {
-		for (const auto& e : validationExtensions)
-			extensions.push_back(e);
-		populateDebugMessengerCreateInfo(debugCreateInfo);
-		createInfo.pNext = &debugCreateInfo;
-		// validation layer
-		createInfo.enabledLayerCount = 1;
-		createInfo.ppEnabledLayerNames = validationLayers.data();
-	}
-
-	for (auto e : requireExtensions)
-		extensions.push_back(e);
-
-	createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
-	createInfo.ppEnabledExtensionNames = extensions.data();
-    // TODO
-    createInfo.setFlags(vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR);
-
-	if (!(_data->instance = vk::createInstance(createInfo))) {
-		throw VSL_NAMESPACE::exceptions::RuntimeException("VulkanInstance", "create failed.");
-	}
-
-	if constexpr (Validation) {
-        setupDebugMessenger(_data);
-    } else {
-		fclose(stdin);
-		fclose(stdout);
-		fclose(stderr);
-#ifdef _MSC_VER
-		FreeConsole();
-#endif
-	}
-}
-
-template<bool Validation>
-VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name)
-{
-	_data = std::shared_ptr<VSL_NAMESPACE::_impl::Vulkan_impl<Validation>>(new VSL_NAMESPACE::_impl::Vulkan_impl<Validation>);
-	_accessor = std::dynamic_pointer_cast<_impl::Vulkan_impl_accessor>(_data);
+    _data = std::shared_ptr<VSL_NAMESPACE::_impl::Vulkan_impl<Validation>>(new VSL_NAMESPACE::_impl::Vulkan_impl<Validation>);
+    _accessor = std::dynamic_pointer_cast<_impl::Vulkan_impl_accessor>(_data);
 
     if constexpr (Validation) {
         checkValidationLayerSupport();
@@ -183,51 +104,71 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name)
             VSL_NAMESPACE::loggingln(layer.layerName);
     }
 
-	vk::ApplicationInfo appInfo;
-	appInfo.pApplicationName = app_name;
-	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-	appInfo.pEngineName = "VSL_NAMESPACE Engine";
-	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-	appInfo.apiVersion = VK_API_VERSION_1_0;
+    vk::ApplicationInfo appInfo;
+    appInfo.pApplicationName = app_name;
+    appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+    appInfo.pEngineName = "VSLEngine";
+    appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+    appInfo.apiVersion = VK_API_VERSION_1_3;
 
-	uint32_t glfwExtensionCount = 0;
-	const char** glfwExtensions;
+    uint32_t glfwExtensionCount = 0;
+    const char** glfwExtensions;
 
-	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+    glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
-	vk::InstanceCreateInfo createInfo;
-	createInfo.pApplicationInfo = &appInfo;
+    vk::InstanceCreateInfo createInfo;
+    createInfo.pApplicationInfo = &appInfo;
 
-	std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+    std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+    for (auto e : requireExtensions)
+        extensions.push_back(e);
 
-	vk::DebugUtilsMessengerCreateInfoEXT debugCreateInfo;
-	if constexpr (Validation) {
-		for (const auto& e : validationExtensions)
-			extensions.push_back(e);
-		populateDebugMessengerCreateInfo(debugCreateInfo);
-		createInfo.pNext = &debugCreateInfo;
-		// validation layer
-		createInfo.enabledLayerCount = 1;
-		createInfo.ppEnabledLayerNames = validationLayers.data();
-	}
+    vk::DebugUtilsMessengerCreateInfoEXT debugCreateInfo;
+    vk::ValidationFeaturesEXT validation_features;
+    std::vector<vk::ValidationFeatureEnableEXT>  validation_feature_enables = {
+            vk::ValidationFeatureEnableEXT::eDebugPrintf
+    };
+    if constexpr (Validation) {
+        for (const auto& e : validationExtensions)
+            extensions.push_back(e);
 
-	createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
-	createInfo.ppEnabledExtensionNames = extensions.data();
+        createInfo.flags |= vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
 
-	if (!(_data->instance = vk::createInstance(createInfo))) {
-		throw VSL_NAMESPACE::exceptions::RuntimeException("VulkanInstance", "create failed.");
-	}
+        populateDebugMessengerCreateInfo(debugCreateInfo);
+        createInfo.pNext = &debugCreateInfo;
+        validation_features.enabledValidationFeatureCount = 1;
+        validation_features.pEnabledValidationFeatures    = validation_feature_enables.data();
 
-	if constexpr (Validation) {
-		setupDebugMessenger(_data);
-	} else {
-		fclose(stdin);
-		fclose(stdout);
-		fclose(stderr);
+        debugCreateInfo.pNext = &validation_features;
+
+        // validation layer
+        createInfo.enabledLayerCount = 1;
+        createInfo.ppEnabledLayerNames = validationLayers.data();
+    }
+
+    createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+    createInfo.ppEnabledExtensionNames = extensions.data();
+
+    if constexpr (Validation) {
+        loggingln("enabled extensions:");
+        for (const auto& e : extensions)
+            VSL_NAMESPACE::loggingln(e);
+    }
+
+    if (!(_data->instance = vk::createInstance(createInfo))) {
+        throw VSL_NAMESPACE::exceptions::RuntimeException("VulkanInstance", "create failed.");
+    }
+
+    if constexpr (Validation) {
+        setupDebugMessenger(_data);
+    } else {
+        fclose(stdin);
+        fclose(stdout);
+        fclose(stderr);
 #ifdef _MSC_VER
         FreeConsole();
 #endif
-	}
+    }
 }
 
 void vsl::_impl::helper::DestroyDebugUtilsMessengerEXT(vk::Instance& instance, vk::DebugUtilsMessengerEXT& debugMessenger, const VkAllocationCallbacks* pAllocator) {

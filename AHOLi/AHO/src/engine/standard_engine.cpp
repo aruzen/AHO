@@ -16,8 +16,9 @@ void aho::engine::StandardEngine::boot(const std::string& applicationName) {
 #ifdef _MSC_VER
     Vulkan<> instance(applicationName.c_str(), { "VK_KHR_win32_surface", "VK_KHR_surface" });
 #elifdef __APPLE_CC__
+    loggingln("daizyobu");
     Vulkan<> instance(applicationName.c_str(), {"VK_KHR_portability_enumeration", "VK_KHR_surface",
-                                                "VK_EXT_metal_surface"});
+                                                "VK_EXT_metal_surface", "VK_KHR_get_physical_device_properties2"});
 #endif
     auto physical_device = PhysicalDevices(instance).search();
 
@@ -63,7 +64,16 @@ void aho::engine::StandardEngine::boot(const std::string& applicationName) {
                                 .render_pass = render_pass,
                                 .frame_buffer = VSL_NAMESPACE::FrameBuffer<VSL_NAMESPACE::D2>(swapchain,
                                                                                               image_view,
-                                                                                              render_pass)
+                                                                                              render_pass),
+                                .image_available = synchro_manager
+                                        .createSemaphore(applicationName + "ImageAvailable",
+                                                         command_manager.getBuffer().getSize()),
+                                .render_finished = synchro_manager
+                                        .createSemaphore(applicationName + "RenderFinished",
+                                                         command_manager.getBuffer().getSize()),
+                                .in_flight = synchro_manager
+                                        .createFence(applicationName + "InFlight",
+                                                     command_manager.getBuffer().getSize(), true)
                         }));
 }
 

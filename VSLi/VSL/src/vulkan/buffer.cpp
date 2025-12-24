@@ -128,14 +128,13 @@ GetData(VSL_NAMESPACE::BufferAccessor *data, std::optional<size_t> size, size_t 
 
     VSL_NAMESPACE::BufferAccessor::LocalBufferHolder holder = {data, size ? size.value() : data->_data->allocatedSize,
                                                                offset};
-    holder.data =
-            data->_data->device->device.mapMemory(data->_data->deviceMem, offset,
+    holder.data = data->_data->device->device.mapMemory(data->_data->deviceMem, offset,
                                                   size ? size.value() : data->_data->allocatedSize);
 
     vk::MappedMemoryRange mappedRange;
     mappedRange.memory = data->_data->deviceMem;
-    mappedRange.offset = 0;
-    mappedRange.size = VK_WHOLE_SIZE;  // またはコピー範囲のサイズ
+    mappedRange.offset = offset;
+    mappedRange.size = size ? size.value() : data->_data->allocatedSize;  // またはコピー範囲のサイズ
 
     data->_data->device->device.invalidateMappedMemoryRanges({mappedRange});
 

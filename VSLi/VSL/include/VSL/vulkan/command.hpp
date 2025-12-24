@@ -7,6 +7,7 @@
 namespace VSL_NAMESPACE {
     struct CommandManager;
     struct DefaultPhase;
+    struct DefaultPhaseStream;
 
     static std::uint32_t DEFAULT_BUFFER_SIZE = 2;
 
@@ -42,9 +43,18 @@ namespace VSL_NAMESPACE {
             virtual void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) = 0;
         };
 
+        struct __DelegateCommand {
+            virtual void invoke(DefaultPhaseStream& pst, CommandPool pool, CommandBuffer buffer, CommandManager manager) = 0;
+        };
+
         template<typename T>
         concept is_command = requires(T t) {
             t.invoke(std::declval<CommandPool>(), std::declval<CommandBuffer>(), std::declval<CommandManager>());
+        };
+
+        template<typename T>
+        concept is_delegate_command = requires(T t) {
+            t.invoke(std::declval<DefaultPhaseStream&>(), std::declval<CommandPool>(), std::declval<CommandBuffer>(), std::declval<CommandManager>());
         };
 
         struct __PipelineHolder {
@@ -56,12 +66,12 @@ namespace VSL_NAMESPACE {
         };
 
         template<typename T>
-        concept is_pipeline_holder = requires(const T &t) {
+        concept is_pipeline_holder = requires(T t) {
             { t.getPipeline() } -> std::convertible_to<PipelineAccessor>;
         };
 
         template<typename T>
-        concept is_pipeline_require = requires(const T &t) {
+        concept is_pipeline_require = requires(T t) {
             { t.setPipeline(std::declval<std::optional<PipelineAccessor>>()) };
         };
 
@@ -74,13 +84,13 @@ namespace VSL_NAMESPACE {
         };
 
         template<typename T>
-        concept is_vertex_size_holder = requires(const T &t) {
+        concept is_vertex_size_holder = requires(T t) {
             { t.getVertexSize() } -> std::convertible_to<size_t>;
         };
 
         template<typename T>
-        concept is_vert_size_require = requires(const T &t) {
-            { t.setPipeline(std::declval<std::optional<size_t>>()) };
+        concept is_vert_size_require = requires(T t) {
+            { t.setVertexSize(std::declval<std::optional<size_t>>()) };
         };
     }
 

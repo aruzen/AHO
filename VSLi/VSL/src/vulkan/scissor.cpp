@@ -29,7 +29,6 @@ void VSL_NAMESPACE::Scissor::invoke(CommandPool pool, CommandBuffer buffer, Comm
 	scissor.offset = vk::Offset2D{ x, y };
 	scissor.extent = vk::Extent2D{ width, height };
 
-    vkCmdSetScissorWithCount((VkCommandBuffer)buffer._data->commandBuffers[buffer.getCurrentBufferIdx()],
-                             1, &(VkRect2D&)scissor);
+    buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].setScissor(0, scissor);
     // buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].setScissorWithCount({ scissor });
 }

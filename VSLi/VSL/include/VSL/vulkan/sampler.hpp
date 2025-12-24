@@ -21,10 +21,12 @@ namespace VSL_NAMESPACE {
         MirrorClampToEdge = 4,
     };
 
-    struct Sampler {
-        Sampler(LogicalDeviceAccessor device, SamplingMode sampling = SamplingMode::Linear, EdgeMode edge = EdgeMode::ClampToBorder);
-
+    struct SamplerAccessor {
         std::shared_ptr<_impl::Sampler_impl> _data;
+    };
+
+    struct Sampler : public SamplerAccessor {
+        Sampler(LogicalDeviceAccessor device, SamplingMode sampling = SamplingMode::Linear, EdgeMode edge = EdgeMode::ClampToBorder);
     };
 }
 

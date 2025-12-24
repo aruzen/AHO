@@ -18,3 +18,5 @@ target_link_libraries(AHO PRIVATE ${GLFW_LIBRARIES})
 
 find_package(glm CONFIG REQUIRED)
 target_link_libraries(AHO PRIVATE glm::glm)
+
+target_include_directories(AHO PRIVATE ../thirdparty/)

@@ -41,8 +41,8 @@ using namespace vsl::_impl::helper;
 const std::vector<const char*> deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     "VK_KHR_portability_subset",
-    VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME
-    // VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME,
+    "VK_KHR_shader_non_semantic_info"
+    // VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
     // VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
 };
 
@@ -66,7 +66,7 @@ std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> VSL_NAMESPACE::_Logica
 	QueueFamilyIndices indices = findQueueFamilies(device._data->device, surface._data->surface);
 
     if (not checkDeviceExtensionSupport(device._data->device) || not indices.isComplete())
-        throw VSL_NAMESPACE::exceptions::RuntimeException("CommandManager", "PhysicalDevices do not have requirements.", "VSL_NAMESPACE::CommandManager<V, C>::CommandManager");
+        throw VSL_NAMESPACE::exceptions::RuntimeException("PhysicalDevices", "PhysicalDevices do not have requirements.");
 
     std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
 	std::set<uint32_t> uniqueQueueFamilies = { indices.graphicsFamily.value(), indices.presentFamily.value() };
@@ -87,8 +87,10 @@ std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> VSL_NAMESPACE::_Logica
     }
     deviceFeatures.samplerAnisotropy = true;
 
+    /* MoltenVK未対応
     vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT extendedDynamicStateFeatures;
     extendedDynamicStateFeatures.extendedDynamicState = true;
+     */
 
     vk::DeviceCreateInfo createInfo;
 	createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
@@ -96,7 +98,7 @@ std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> VSL_NAMESPACE::_Logica
 	createInfo.pEnabledFeatures = &deviceFeatures;
 	createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
 	createInfo.ppEnabledExtensionNames = deviceExtensions.data();
-    createInfo.pNext = &extendedDynamicStateFeatures;
+    //createInfo.pNext = &extendedDynamicStateFeatures;
 
 	/*
 	if constexpr (V) {

@@ -16,6 +16,6 @@ namespace VSL_NAMESPACE {
 
 	template<typename D = VSL_NAMESPACE::VSL_DEFAULT_dimension_STRUCT>
 	struct FrameBuffer : public FrameBufferAccessor {
-		FrameBuffer(Swapchain swapchain, View<D> view, RenderPass render_pass);
+		FrameBuffer(SwapchainAccessor swapchain, View<D> view, RenderPass render_pass);
 	};
 }

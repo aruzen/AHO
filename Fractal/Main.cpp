@@ -118,11 +118,11 @@ int main() {
         GraphicResourceManager resourceManager(device);
 
         auto resourceBindingLayout = ResourceBindingLayout(device, {
-                ResourceBindingPoint(0, ResourceType::StorageBuffer, ShaderType::Compute),
-                ResourceBindingPoint(1, ResourceType::StorageBuffer, ShaderType::Compute),
-                ResourceBindingPoint(2, ResourceType::UniformBuffer, ShaderType::Compute),
-                ResourceBindingPoint(3, ResourceType::StorageImage, ShaderType::Compute),
-                ResourceBindingPoint(4, ResourceType::StorageBuffer, ShaderType::Compute),
+                ResourceBindingPoint(0, ResourceType::StorageBuffer, ShaderFlag::Compute),
+                ResourceBindingPoint(1, ResourceType::StorageBuffer, ShaderFlag::Compute),
+                ResourceBindingPoint(2, ResourceType::UniformBuffer, ShaderFlag::Compute),
+                ResourceBindingPoint(3, ResourceType::StorageImage, ShaderFlag::Compute),
+                ResourceBindingPoint(4, ResourceType::StorageBuffer, ShaderFlag::Compute),
         });
         auto [pool, resource] = resourceManager.make({resourceBindingLayout});
 
@@ -178,7 +178,7 @@ int main() {
                 resource[0].update(currRow, 0);
             }
             {
-                auto phase = manager.startPhase(std::nullopt, std::nullopt, inFlight);
+                auto phase = manager.startPhase<ComputePhase>(std::nullopt, std::nullopt, inFlight);
                 phase << fractal_compute
                       << command::PipelineBarrierChange(fractalImage)
                       << command::BindGraphicResource(resource[0], BindingDestination::Compute, fractal_compute)

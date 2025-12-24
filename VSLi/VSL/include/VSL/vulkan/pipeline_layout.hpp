@@ -28,7 +28,7 @@ namespace VSL_NAMESPACE {
 		template <VSL_NAMESPACE::pipeline_layout_injecter... Additions>
 		PipelineLayout add(Additions&&... a);
 
-		PipelineLayout copy();
+		PipelineLayout copy() const;
 
         /*
          * 編集不可にし必要なデータだけ以外のメモリを解放する

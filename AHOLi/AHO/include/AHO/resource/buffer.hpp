@@ -66,28 +66,28 @@ namespace AHO_NAMESPACE::resource {
 
     // ===========================================
 
-    Buffer<BufferType::General>::Buffer(size_t size) {
+    inline Buffer<BufferType::General>::Buffer(size_t size) {
         m_buffer = new char[size];
     }
 
-    void *Buffer<BufferType::General>::data() {
+    inline void *Buffer<BufferType::General>::data() {
         return m_buffer;
     }
 
-    size_t Buffer<BufferType::General>::size() {
+    inline size_t Buffer<BufferType::General>::size() {
         return m_size;
     }
 
     // ===========================================
 
-    Buffer<BufferType::GPUFriendly>::Buffer(size_t size) {
+    inline Buffer<BufferType::GPUFriendly>::Buffer(size_t size) {
         //buffer = decltype(buffer)();
     }
 
-    void *Buffer<BufferType::GPUFriendly>::data() {
+    inline void *Buffer<BufferType::GPUFriendly>::data() {
     }
 
-    size_t Buffer<BufferType::GPUFriendly>::size() {
+    inline size_t Buffer<BufferType::GPUFriendly>::size() {
     }
 }
 

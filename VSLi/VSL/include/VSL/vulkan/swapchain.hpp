@@ -16,5 +16,8 @@ namespace VSL_NAMESPACE {
     struct Swapchain : public SwapchainAccessor {
         Swapchain(LogicalDeviceAccessor device, std::shared_ptr<Surface> surface,
                   std::optional<int> width = std::nullopt, std::optional<int> height = std::nullopt);
+
+        Swapchain(LogicalDeviceAccessor device, std::shared_ptr<Surface> surface, SwapchainAccessor old,
+                  std::optional<int> width = std::nullopt, std::optional<int> height = std::nullopt);
     };
 }

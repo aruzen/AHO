@@ -13,12 +13,16 @@
 #include "engine.hpp"
 
 namespace AHO_NAMESPACE::window {
+    d2::VectorI GetMonitorSize();
+
     struct WindowData {
         std::shared_ptr<VSL_NAMESPACE::Surface> surface;
         VSL_NAMESPACE::SwapchainAccessor swapchain;
         VSL_NAMESPACE::View<VSL_NAMESPACE::D2> image_view;
         VSL_NAMESPACE::RenderPass render_pass;
         VSL_NAMESPACE::FrameBuffer<VSL_NAMESPACE::D2> frame_buffer;
+        VSL_NAMESPACE::SemaphoreHolder image_available, render_finished;
+        VSL_NAMESPACE::FenceHolder in_flight;
     };
 
     struct Window : public VSL_NAMESPACE::Window {
@@ -36,7 +40,23 @@ namespace AHO_NAMESPACE::window {
 
         bool resize(int width, int height) override;
 
-        virtual ~Window();
+        d2::VectorI window_size();
+
+        d2::VectorI frame_size();
+
+        bool set_title(const std::string& title);
+
+        void maximize();
+
+        void restore();
+    };
+
+    struct WindowResizeHookPlugin : public vsl::PureWindow::Plugin {
+        constexpr static unsigned char WINDOW_RESIZE_HOOK_PLUGIN = 101;
+
+        std::function<void(aho::window::Window*)> hook;
+
+        WindowResizeHookPlugin(vsl::PureWindow*, std::function<void(aho::window::Window*)> hook);
     };
 }
 

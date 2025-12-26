@@ -50,7 +50,8 @@ static VkBool32 VKAPI_PTR debugCallback(
 }
 
 void populateDebugMessengerCreateInfo(vk::DebugUtilsMessengerCreateInfoEXT& createInfo) {
-	createInfo.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
+	createInfo.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo |
+        vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
 		vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
 		vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
 	createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
@@ -132,11 +133,11 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vecto
         createInfo.flags |= vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
 
         populateDebugMessengerCreateInfo(debugCreateInfo);
-        createInfo.pNext = &debugCreateInfo;
+        validation_features.pNext = &debugCreateInfo;
+
         validation_features.enabledValidationFeatureCount = 1;
         validation_features.pEnabledValidationFeatures    = validation_feature_enables.data();
-
-        debugCreateInfo.pNext = &validation_features;
+        createInfo.pNext = &validation_features;
 
         // validation layer
         createInfo.enabledLayerCount = 1;

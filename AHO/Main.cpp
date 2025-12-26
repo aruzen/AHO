@@ -143,12 +143,21 @@ breakpoint disable swift_willThrow
         }();
 
         auto [push_texture_layout, push_texture] = [&]() {
+#ifndef _MSC_VER
             auto push_texture_vert
                     = vsl::utils::SPIRVReflector(device, std::filesystem::path(
                             expand_environments("../../AHO/shaders/push_texture.vert.spv"))).generated;
             auto push_texture_frag
                     = vsl::utils::SPIRVReflector(device, std::filesystem::path(
                             expand_environments("../../AHO/shaders/push_texture.frag.spv"))).generated;
+#else
+            auto push_texture_vert
+                = vsl::utils::SPIRVReflector(device, std::filesystem::path(
+                    expand_environments("shaders/push_texture.vert.spv"))).generated;
+            auto push_texture_frag
+                = vsl::utils::SPIRVReflector(device, std::filesystem::path(
+                    expand_environments("shaders/push_texture.frag.spv"))).generated;
+#endif
             const auto push_texture_layout = layout.copy().add(
                     *push_texture_vert.push_constants,
                     pl::ResourceBinding(push_texture_frag.makeBindingLayout()),
@@ -158,12 +167,21 @@ breakpoint disable swift_willThrow
         }();
 
         auto [texture_resource_layout, input_texture] = [&]() {
+#ifndef _MSC_VER
             auto texture_vert
                     = vsl::utils::SPIRVReflector(device, std::filesystem::path(
                             expand_environments("../../AHO/shaders/texture.vert.spv"))).generated;
             auto texture_frag
                     = vsl::utils::SPIRVReflector(device, std::filesystem::path(
                             expand_environments("../../AHO/shaders/texture.frag.spv"))).generated;
+#else
+            auto texture_vert
+                = vsl::utils::SPIRVReflector(device, std::filesystem::path(
+                    expand_environments("shaders/texture.vert.spv"))).generated;
+            auto texture_frag
+                = vsl::utils::SPIRVReflector(device, std::filesystem::path(
+                    expand_environments("shaders/texture.frag.spv"))).generated;
+#endif
             const auto vert_layout = texture_vert.makeBindingLayout()[0];
             const auto frag_layout = texture_frag.makeBindingLayout()[0];
             std::vector layouts = {vert_layout,
@@ -267,12 +285,16 @@ breakpoint disable swift_willThrow
                 keyDown,
                 keyLeft,
                 keyRight,
+                keyR, 
+                keyF,
                 FullScreenKey] = input_manager.get<input::Keys>(
                 input::KeyCode::Up,
                 input::KeyCode::Down,
                 input::KeyCode::Left,
                 input::KeyCode::Right,
-                input::KeyCode::I)->keys;
+                    input::KeyCode::R,
+                    input::KeyCode::F,
+                    input::KeyCode::I)->keys;
         auto mouse = input_manager.get<input::Mouse>();
 
         main_window.addPlugin<window::WindowResizeHookPlugin>([&ubo, &scissor, &viewport, &swapchain](auto w) {
@@ -291,19 +313,25 @@ breakpoint disable swift_willThrow
             auto currentTime = std::chrono::high_resolution_clock::now();
 
             if (keyUp->pressed())
-                move.value -= 0.05_f_y;
+                move.value -= 0.005_f_y;
             if (keyDown->pressed())
-                move.value += 0.05_f_y;
+                move.value += 0.005_f_y;
             if (keyLeft->pressed())
-                move.value -= 0.05_f_x;
+                move.value -= 0.005_f_x;
             if (keyRight->pressed())
-                move.value += 0.05_f_x;
+                move.value += 0.005_f_x;
+            if (keyF->pressed())
+                move.value -= 0.005_f_z;
+            if (keyR->pressed())
+                move.value += 0.005_f_z;
+
+            
 
             float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-            ubo.model = matrix::make_rotation(time * 5.0_rad, Vector(0.0f, 0.0f, 1.0f)) * matrix::make_move(move);
-            ubo.view = matrix::make_view(d3::PointF(2.0f, 2.0f, 2.0f), d3::PointF(0.0f, 0.0f, 0.0f), d3::VectorF(0.0f, 0.0f, 1.0f));
+            ubo.model = matrix::make_identity<Mat4x4F>();
+            ubo.view = matrix::make_view(d3::PointF(0.0f, 2.0f, 2.0f) + move, d3::PointF(0.0f, 0.0f, 0.0f) + move, d3::VectorF(0.0f, 0.0f, 1.0f));
             ubo.proj = matrix::make_perspective(45.0_deg, viewport.width / (float) viewport.height, 0.1f, 10.0f);
-
+            
             if (FullScreenKey->down()) {
             }
 
@@ -321,6 +349,7 @@ breakpoint disable swift_willThrow
                       << command::BindIndexBuffer(indexBuffer)
                       << command::DrawIndexed(indices.size());
 
+                /*
                 struct alignas(16) {
                     std::array<d2::PointF, 4> vertices;
                     std::array<d2::PointF, 4> texcoords;

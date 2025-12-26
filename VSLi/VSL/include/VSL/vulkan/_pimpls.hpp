@@ -223,7 +223,7 @@ namespace VSL_NAMESPACE::_impl {
 
 		vk::Buffer buffer;
 		vk::DeviceMemory deviceMem;
-		size_t allocatedSize = 0;
+		size_t requirementSize, allocatedSize = 0;
 
 		~Buffer_impl();
 	};

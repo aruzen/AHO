@@ -15,7 +15,7 @@
 #include "sampler.hpp"
 
 namespace VSL_NAMESPACE::graphic_resource {
-    constexpr size_t MAX_POOL_SIZE = 10000000;
+    constexpr size_t MAX_POOL_SIZE = 200;
 
     enum class Type : unsigned int {
         Sampler = 0,

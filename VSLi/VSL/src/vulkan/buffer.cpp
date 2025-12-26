@@ -39,7 +39,7 @@ bool VSL_NAMESPACE::BufferAccessor::copyByBuffer(CommandManager commandManager, 
     vkCommandBuf.begin(beginInfo);
 
     vk::BufferCopy copyRegion;
-    copyRegion.size = buf->size();
+    copyRegion.size = buf->_data->requirementSize;
     /* TODO offset
     copyRegion.srcOffset = buf->
     */
@@ -83,6 +83,7 @@ VSL_NAMESPACE::BufferAccessor::MakeBuffer(VSL_NAMESPACE::LogicalDeviceAccessor d
     bufferInfo.usage = vk::BufferUsageFlags{(unsigned int) memType};
     bufferInfo.sharingMode = (vk::SharingMode) sharingMode;
 
+    data->requirementSize = size;
     data->buffer = data->device->device.createBuffer(bufferInfo);
 
     vk::MemoryRequirements memRequirements = data->device->device.getBufferMemoryRequirements(data->buffer);
@@ -122,7 +123,7 @@ GetData(VSL_NAMESPACE::BufferAccessor *data, std::optional<size_t> size, size_t 
         throw VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException(std::source_location::current());
     }
 
-    VSL_NAMESPACE::BufferAccessor::LocalBufferHolder holder = {data, size ? size.value() : data->_data->allocatedSize,
+    VSL_NAMESPACE::BufferAccessor::LocalBufferHolder holder = {data, size ? size.value() : data->_data->requirementSize,
                                                                offset};
     holder.data = data->_data->device->device.mapMemory(data->_data->deviceMem, offset,
                                                   size ? size.value() : data->_data->allocatedSize);

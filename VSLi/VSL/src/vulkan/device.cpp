@@ -37,9 +37,9 @@ using namespace vsl::_impl::helper;
 
 const std::vector<const char*> deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+	"VK_KHR_shader_non_semantic_info"
 #ifndef _MSC_VER
 	"VK_KHR_portability_subset",
-	"VK_KHR_shader_non_semantic_info"
 #endif // _MSC_VER
 
     // VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
@@ -98,16 +98,16 @@ std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> VSL_NAMESPACE::_Logica
 	createInfo.pEnabledFeatures = &deviceFeatures;
 	createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
 	createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+	// createInfo.pNext = &nonSemanticFeatures;
     //createInfo.pNext = &extendedDynamicStateFeatures;
 
-	/*
 	if constexpr (V) {
 		createInfo.enabledLayerCount = static_cast<uint32_t>(VSL_NAMESPACE::validationLayers.size());
 		createInfo.ppEnabledLayerNames = VSL_NAMESPACE::validationLayers.data();
 	}
 	else {
 		createInfo.enabledLayerCount = 0;
-	}*/
+	}
 
 	_data->device = device._data->device.createDevice(createInfo);
 	_data->graphicsFamily = indices.graphicsFamily.value();

@@ -16,7 +16,7 @@ aho::d2::VectorI aho::window::GetMonitorSize() {
 aho::window::Window::Window(std::string name, int width, int height, aho::engine::EngineAccessor _engine)
         : VSL_NAMESPACE::Window(std::move(name), width, height) {
     engine = _engine;
-    auto surface = this->addPlugin<VSL_NAMESPACE::Surface>(_engine._data->vulkan_instance);
+    auto surface = this->add_plugin<VSL_NAMESPACE::Surface>(_engine._data->vulkan_instance);
     VSL_NAMESPACE::Swapchain swapchain(_engine._data->logical_device, surface);
     VSL_NAMESPACE::View<VSL_NAMESPACE::D2> image_view(swapchain);
     VSL_NAMESPACE::RenderPass pass(swapchain);
@@ -49,11 +49,10 @@ bool aho::window::Window::resize(int width, int height) {
     _data2->image_view = VSL_NAMESPACE::View<VSL_NAMESPACE::D2>(_data2->swapchain);
     _data2->frame_buffer = VSL_NAMESPACE::FrameBuffer<VSL_NAMESPACE::D2>(_data2->swapchain, _data2->image_view,
                                                                          _data2->render_pass);
-    if (_data->plugins.contains(WindowResizeHookPlugin::WINDOW_RESIZE_HOOK_PLUGIN)) {
-        auto p = _data->plugins[WindowResizeHookPlugin::WINDOW_RESIZE_HOOK_PLUGIN];
+    for (const auto&[_, p] : _data->plugins) {
         auto hook = std::dynamic_pointer_cast<WindowResizeHookPlugin>(p);
         if (not hook)
-            return true;
+            continue;
         hook->hook(this);
     }
     return true;
@@ -87,5 +86,4 @@ aho::d2::VectorI aho::window::Window::frame_size() {
 aho::window::WindowResizeHookPlugin::WindowResizeHookPlugin(vsl::PureWindow *w,
                                                             std::function<void(aho::window::Window *)> hook)
         : hook(std::move(hook)) {
-    id = WINDOW_RESIZE_HOOK_PLUGIN;
 }

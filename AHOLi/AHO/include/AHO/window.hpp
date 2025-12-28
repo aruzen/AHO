@@ -52,8 +52,6 @@ namespace AHO_NAMESPACE::window {
     };
 
     struct WindowResizeHookPlugin : public vsl::PureWindow::Plugin {
-        constexpr static unsigned char WINDOW_RESIZE_HOOK_PLUGIN = 101;
-
         std::function<void(aho::window::Window*)> hook;
 
         WindowResizeHookPlugin(vsl::PureWindow*, std::function<void(aho::window::Window*)> hook);

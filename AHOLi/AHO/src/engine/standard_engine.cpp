@@ -22,8 +22,11 @@ void aho::engine::StandardEngine::boot(const std::string& applicationName) {
 #endif
     auto physical_device = PhysicalDevices(instance).search();
 
-    VSL_NAMESPACE::Window window(applicationName, 400, 600);
-    auto surface = window.addPlugin<Surface>(instance);
+    /*
+     * エンジンロゴを出す予定なので最初に400, 400で取っている
+     */
+    VSL_NAMESPACE::Window window(applicationName, 400, 400);
+    auto surface = window.add_plugin<Surface>(instance);
 
     LogicalDevice device(physical_device, surface);
     vsl::loggingln("selected : ", physical_device.name(), "(", physical_device.apiVersion(), ")");

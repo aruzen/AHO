@@ -112,10 +112,10 @@ void VSL_NAMESPACE::PureWindow::WindowData::destroy()
 }
 
 VSL_NAMESPACE::Window::Window(std::string name, int width, int height) : PureWindow(name, width, height) {
-	addPlugin<vsl::window_plugin::QuietClose>();
+	add_plugin<vsl::window_plugin::QuietClose>();
 }
 
 vsl::Window::Window(std::shared_ptr<WindowData> data) : PureWindow(data) {
     if (not data->plugins.contains(vsl::window_plugin::QuietClose::QUIET_CLOSE_USED_ID))
-        addPlugin<vsl::window_plugin::QuietClose>();
+        add_plugin<vsl::window_plugin::QuietClose>();
 }

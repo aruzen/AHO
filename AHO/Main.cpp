@@ -57,7 +57,7 @@ breakpoint disable swift_willThrow
         shader_compiler.compile();
 
         // Window main_window("vsl", 800, 800);
-        // auto surface = main_window.addPlugin<Surface>(vulkan_instance);
+        // auto surface = main_window.add_plugin<Surface>(vulkan_instance);
         pl::ShaderGroup input_d3_shaders("3d_color_input",
             { make_shader<"${AHO_HOME}/built-in-resource/shaders/vd2p_fc_umpv.vert.spv">(
                     device),
@@ -208,17 +208,17 @@ breakpoint disable swift_willThrow
         };
 
         std::array<d2::PointF, 4> vertices = {
-                d2::PointF{0.5f, -0.5f},
                 d2::PointF{-0.5f, -0.5f},
                 d2::PointF{-0.5f, 0.5f},
-                d2::PointF{0.5f, 0.5f}
+                d2::PointF{0.5f, 0.5f},
+                d2::PointF{0.5f, -0.5f},
         };
 
         std::array<d2::PointF, 4> texcoords = {
-                d2::PointF{1.0f, 0.0f},
                 d2::PointF{0.0f, 0.0f},
                 d2::PointF{0.0f, 1.0f},
-                d2::PointF{1.0f, 1.0f}
+                d2::PointF{1.0f, 1.0f},
+                d2::PointF{1.0f, 0.0f},
         };
 
         const std::array<uint32_t, 6> indices = {
@@ -285,19 +285,22 @@ breakpoint disable swift_willThrow
                 keyDown,
                 keyLeft,
                 keyRight,
-                keyR, 
+                keyR,
                 keyF,
-                FullScreenKey] = input_manager.get<input::Keys>(
+                keyMode,
+                keyRestart] = input_manager.get<input::Keys>(
                 input::KeyCode::Up,
                 input::KeyCode::Down,
                 input::KeyCode::Left,
                 input::KeyCode::Right,
-                    input::KeyCode::R,
-                    input::KeyCode::F,
-                    input::KeyCode::I)->keys;
+                input::KeyCode::R,
+                input::KeyCode::F,
+                input::KeyCode::I,
+                input::KeyCode::Enter)->keys;
         auto mouse = input_manager.get<input::Mouse>();
 
-        main_window.addPlugin<window::WindowResizeHookPlugin>([&ubo, &scissor, &viewport, &swapchain](auto w) {
+        main_window.add_plugin<window::WindowResizeHookPlugin>([&ubo, &scissor, &viewport, &swapchain](auto w) {
+            loggingln("aaa");
             auto size = w->frame_size();
             ubo.proj = matrix::make_perspective(45.0_deg,
                                                 (float)size.value.x.value / size.value.y.value,
@@ -308,6 +311,7 @@ breakpoint disable swift_willThrow
         });
 
         d3::VectorF move;
+        int mode = 0;
         while (aho::Window::Update() && main_window && input_manager) {
             float delta = 0;
             {
@@ -318,6 +322,12 @@ breakpoint disable swift_willThrow
                 loggingln(delta);
             }
 
+            if (keyRestart->down())
+                move = d3::VectorF();
+            if (keyMode->down()) {
+                mode++;
+                mode %= 2;
+            }
             if (keyUp->pressed())
                 move.value -= 0.3_f_y * Y(delta);
             if (keyDown->pressed())
@@ -331,13 +341,10 @@ breakpoint disable swift_willThrow
             if (keyR->pressed())
                 move.value += 0.3_f_z * Z(delta);
 
-            
+
             ubo.model = matrix::make_identity<Mat4x4F>();
             ubo.view = matrix::make_view(d3::PointF(0.0f, 2.0f, 2.0f) + move, d3::PointF(0.0f, 0.0f, 0.0f) + move, d3::VectorF(0.0f, 0.0f, 1.0f));
             ubo.proj = matrix::make_perspective(45.0_deg, viewport.width / (float) viewport.height, 0.1f, 10.0f);
-            
-            if (FullScreenKey->down()) {
-            }
 
             {
                 auto phase = DrawPhase(&engine);
@@ -358,10 +365,12 @@ breakpoint disable swift_willThrow
                     std::array<d2::PointF, 4> vertices;
                     std::array<d2::PointF, 4> texcoords;
                 } pos_with_tc{
-                        {d2::PointF{0.5f, -0.5f},
-                         d2::PointF{-0.5f, -0.5f},
-                         d2::PointF{-0.5f, 0.5f},
-                         d2::PointF{0.5f, 0.5f}},
+                        {
+                                d2::PointF{-0.5f, -0.5f},
+                                d2::PointF{-0.5f, 0.5f},
+                                d2::PointF{0.5f, 0.5f},
+                                d2::PointF{0.5f, -0.5f},
+                        },
                         texcoords
                 };
                 static_assert(vsl::command::is_pipeline_require<vsl::command::BindGraphicResource>, "aa");

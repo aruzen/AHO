@@ -52,7 +52,10 @@ namespace VSL_NAMESPACE {
 
 		template<typename T, typename... Args>
 		//	requires vsl::concepts::initializer<T, VSL_NAMESPACE::PureWindow::WindowData*, Args&&...>&& std::derived_from<T, VSL_NAMESPACE::PureWindow::Plugin>
-		std::shared_ptr<T> addPlugin(Args&&... args);
+		std::shared_ptr<T> add_plugin(Args&&... args);
+
+        template<typename T, typename... Args>
+        bool remove_plugin(std::shared_ptr<T> t);
 
         virtual bool resize(int width, int height);
 
@@ -75,7 +78,7 @@ namespace VSL_NAMESPACE {
 
 	template<typename T, typename ...Args>
 	// requires vsl::concepts::initializer<T, VSL_NAMESPACE::PureWindow::WindowData*, Args&&...>&& std::derived_from<T, VSL_NAMESPACE::PureWindow::Plugin>
-	inline std::shared_ptr<T> VSL_NAMESPACE::PureWindow::addPlugin(Args && ...args)
+	inline std::shared_ptr<T> VSL_NAMESPACE::PureWindow::add_plugin(Args && ...args)
 	{
 		auto t = std::shared_ptr<T>(new T(this, std::forward<Args>(args)...));
 		std::shared_ptr<Plugin> p = std::static_pointer_cast<Plugin>(t);
@@ -90,4 +93,13 @@ namespace VSL_NAMESPACE {
 
 		return t;
 	}
+
+    template<typename T, typename... Args>
+    inline bool VSL_NAMESPACE::PureWindow::remove_plugin(std::shared_ptr<T> t) {
+        std::shared_ptr<Plugin> p = std::static_pointer_cast<Plugin>(t);
+        if (not this->_data->plugins.contains(p->id))
+            return false;
+        this->_data->plugins.erase(p->id);
+        return true;
+    }
 }

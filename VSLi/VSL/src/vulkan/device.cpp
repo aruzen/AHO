@@ -37,9 +37,10 @@ using namespace vsl::_impl::helper;
 
 const std::vector<const char*> deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-	"VK_KHR_shader_non_semantic_info"
 #ifndef _MSC_VER
 	"VK_KHR_portability_subset",
+#else
+    "VK_KHR_shader_non_semantic_info"
 #endif // _MSC_VER
 
     // VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,

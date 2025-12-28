@@ -97,7 +97,7 @@ int main() {
         auto physical_device = PhysicalDevices(vk).search();
 
         Window main_window("vsl", 800, 700);
-        auto surface = main_window.addPlugin<Surface>(vk);
+        auto surface = main_window.add_plugin<Surface>(vk);
 
         LogicalDevice device(physical_device, surface);
         for (auto device: PhysicalDevices(vk).get())

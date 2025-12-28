@@ -471,7 +471,6 @@ namespace AHO_NAMESPACE {
                                 std::array<R, 4>{0.0f, 0.0f, (far + near) * nf, -1.0f},
                                 std::array<R, 4>{0.0f, 0.0f, (2 * far * near) * nf, 0.0f}
                         });
-
         }
 
         template<typename T>

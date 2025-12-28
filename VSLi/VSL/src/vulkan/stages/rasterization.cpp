@@ -9,7 +9,7 @@ void VSL_NAMESPACE::pipeline_layout::Rasterization::injection(VSL_NAMESPACE::Pip
 	info.rasterization.rasterizerDiscardEnable = false;
 	info.rasterization.polygonMode = vk::PolygonMode::eFill;
 	info.rasterization.lineWidth = 1.0f;
-	info.rasterization.cullMode = vk::CullModeFlagBits::eBack;
+	info.rasterization.cullMode = vk::CullModeFlagBits::eNone;
 	info.rasterization.frontFace = vk::FrontFace::eCounterClockwise;
     // info.rasterization.frontFace = vk::FrontFace::eCounterClockwise;
 	info.rasterization.depthBiasEnable = false;

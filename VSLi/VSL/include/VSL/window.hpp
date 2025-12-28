@@ -40,7 +40,7 @@ namespace VSL_NAMESPACE {
 			void destroy();
 		};
 
-		static std::vector<std::shared_ptr<WindowData>> _WINDOWS;
+		static std::vector<std::shared_ptr<WindowData>> WINDOWS;
 	private:
 		static bool inited;
 	public:

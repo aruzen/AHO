@@ -29,7 +29,7 @@ bool vsl::window_plugin::HookShouldClose::onUpdate(vsl::PureWindow window) {
 }
 
 void framebuffer_resize_callback(GLFWwindow* window, int width, int height) {
-	for (auto& wd : VSL_NAMESPACE::PureWindow::_WINDOWS) {
+	for (auto& wd : VSL_NAMESPACE::PureWindow::WINDOWS) {
 		if ((GLFWwindow*)wd->window_handle != window)
 			continue;
 		if (!wd->plugins.contains(vsl::window_plugin::HookResize::HOOK_RESIZE_USED_ID))

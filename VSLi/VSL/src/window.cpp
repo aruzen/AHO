@@ -12,7 +12,7 @@
 #include <VSL/window_plugin.hpp>
 #include <VSL/vulkan/surface.hpp>
 
-std::vector<std::shared_ptr<VSL_NAMESPACE::PureWindow::WindowData>> VSL_NAMESPACE::PureWindow::_WINDOWS;
+std::vector<std::shared_ptr<VSL_NAMESPACE::PureWindow::WindowData>> VSL_NAMESPACE::PureWindow::WINDOWS;
 bool VSL_NAMESPACE::PureWindow::inited = false;
 
 VSL_NAMESPACE::PureWindow::PureWindow(std::string _name, int _width, int _height)
@@ -30,7 +30,7 @@ VSL_NAMESPACE::PureWindow::PureWindow(std::string _name, int _width, int _height
             return; // TODO throw error
         }
 	}
-	_WINDOWS.push_back(_data);
+	WINDOWS.push_back(_data);
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
@@ -46,7 +46,7 @@ bool VSL_NAMESPACE::PureWindow::Update()
 {
 	glfwPollEvents();
 	bool s = true;
-	for (auto p : _WINDOWS)
+	for (auto p : WINDOWS)
 		for (auto& f : p->update)
 			if (!f->onUpdate(PureWindow(p)))
 				s = false;
@@ -96,16 +96,16 @@ bool vsl::PureWindow::resize(int width, int height) {
 
 void VSL_NAMESPACE::PureWindow::WindowData::destroy()
 {
-	for (auto i = _WINDOWS.begin(); i != _WINDOWS.end(); i++)
+	for (auto i = WINDOWS.begin(); i != WINDOWS.end(); i++)
 		if (i->get() == this) {
-			_WINDOWS.erase(i);
+			WINDOWS.erase(i);
 			break;
 		}
 	glfwDestroyWindow((GLFWwindow*)window_handle);
 
 	window_handle = nullptr;
 
-	if (_WINDOWS.size() == 0) {
+	if (WINDOWS.size() == 0) {
 		glfwTerminate();
 		inited = false;
 	}

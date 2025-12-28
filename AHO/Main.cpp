@@ -309,25 +309,29 @@ breakpoint disable swift_willThrow
 
         d3::VectorF move;
         while (aho::Window::Update() && main_window && input_manager) {
-            static auto startTime = std::chrono::high_resolution_clock::now();
-            auto currentTime = std::chrono::high_resolution_clock::now();
+            float delta = 0;
+            {
+                static auto prev = std::chrono::steady_clock::now();
+                auto current = std::chrono::steady_clock::now();
+                delta = std::chrono::duration<float>(current - prev).count();
+                prev = current;
+                loggingln(delta);
+            }
 
             if (keyUp->pressed())
-                move.value -= 0.005_f_y;
+                move.value -= 0.3_f_y * Y(delta);
             if (keyDown->pressed())
-                move.value += 0.005_f_y;
+                move.value += 0.3_f_y * Y(delta);
             if (keyLeft->pressed())
-                move.value -= 0.005_f_x;
+                move.value -= 0.3_f_x * X(delta);
             if (keyRight->pressed())
-                move.value += 0.005_f_x;
+                move.value += 0.3_f_x * X(delta);
             if (keyF->pressed())
-                move.value -= 0.005_f_z;
+                move.value -= 0.3_f_z * Z(delta);
             if (keyR->pressed())
-                move.value += 0.005_f_z;
+                move.value += 0.3_f_z * Z(delta);
 
             
-
-            float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
             ubo.model = matrix::make_identity<Mat4x4F>();
             ubo.view = matrix::make_view(d3::PointF(0.0f, 2.0f, 2.0f) + move, d3::PointF(0.0f, 0.0f, 0.0f) + move, d3::VectorF(0.0f, 0.0f, 1.0f));
             ubo.proj = matrix::make_perspective(45.0_deg, viewport.width / (float) viewport.height, 0.1f, 10.0f);

@@ -116,6 +116,9 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vecto
 
     vk::InstanceCreateInfo createInfo;
     createInfo.pApplicationInfo = &appInfo;
+    for (auto e : requireExtensions)
+        if (std::string(e) == "VK_KHR_portability_enumeration")
+            createInfo.flags |= vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
 
     std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
     for (auto e : requireExtensions)
@@ -124,14 +127,12 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vecto
     vk::DebugUtilsMessengerCreateInfoEXT debugCreateInfo;
     vk::ValidationFeaturesEXT validation_features;
     std::vector<vk::ValidationFeatureEnableEXT>  validation_feature_enables = {
-            vk::ValidationFeatureEnableEXT::eDebugPrintf
+            vk::ValidationFeatureEnableEXT::eDebugPrintf,
+            vk::ValidationFeatureEnableEXT::eBestPractices,
     };
     if constexpr (Validation) {
         for (const auto& e : validationExtensions)
             extensions.push_back(e);
-
-        createInfo.flags |= vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
-
         populateDebugMessengerCreateInfo(debugCreateInfo);
         validation_features.pNext = &debugCreateInfo;
 

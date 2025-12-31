@@ -33,6 +33,7 @@ vsl::graphic_resource::ManagerInterface::make(std::map <Type, size_t> count, siz
     GraphicResourcePool pool;
     pool._data = std::make_shared<_impl::GraphicResourcePool_impl>();
     pool._data->manager = this;
+    pool._data->device = _data->device;
 
     std::vector <vk::DescriptorPoolSize> poolSizes;
     // size_t size;
@@ -77,8 +78,9 @@ vsl::graphic_resource::ManagerInterface::make(std::map <Type, size_t> count, siz
 }
 
 vsl::_impl::GraphicResourceManager_impl::~GraphicResourceManager_impl() {
-    for (const auto &pool: pools)
-        device->device.destroy(pool->descriptorPool);
+    for (auto &pool: pools) {
+        pool.reset();
+    }
 }
 
 

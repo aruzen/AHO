@@ -159,8 +159,7 @@ vsl::graphic_resource::Pool::bind(std::vector <vsl::graphic_resource::BindingLay
 }
 
 vsl::_impl::GraphicResourcePool_impl::~GraphicResourcePool_impl() {
-    ((vsl::graphic_resource::ManagerInterface *) manager)->destroy(
-            GraphicResourcePool{std::shared_ptr<GraphicResourcePool_impl>(this, [](auto d) {})});
+    device->device.destroyDescriptorPool(descriptorPool);
 }
 
 vsl::graphic_resource::Pool vsl::graphic_resource::Resource::getPool() {

@@ -23,6 +23,8 @@ namespace AHO_NAMESPACE::window {
         VSL_NAMESPACE::FrameBuffer<VSL_NAMESPACE::D2> frame_buffer;
         VSL_NAMESPACE::SemaphoreHolder image_available, render_finished;
         VSL_NAMESPACE::FenceHolder in_flight;
+
+        ~WindowData();
     };
 
     struct Window : public VSL_NAMESPACE::Window {
@@ -49,6 +51,8 @@ namespace AHO_NAMESPACE::window {
         void maximize();
 
         void restore();
+
+        bool close() override;
     };
 
     struct WindowResizeHookPlugin : public vsl::PureWindow::Plugin {

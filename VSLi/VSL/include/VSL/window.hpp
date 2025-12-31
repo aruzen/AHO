@@ -60,7 +60,7 @@ namespace VSL_NAMESPACE {
         virtual bool resize(int width, int height);
 
 		std::string name();
-		bool close();
+		virtual bool close();
 
 		operator bool();
 		bool operator ==(const PureWindow& o);

@@ -87,3 +87,12 @@ aho::window::WindowResizeHookPlugin::WindowResizeHookPlugin(vsl::PureWindow *w,
                                                             std::function<void(aho::window::Window *)> hook)
         : hook(std::move(hook)) {
 }
+
+bool aho::window::Window::close() {
+    _data2.reset();
+    vsl::PureWindow::close();
+}
+
+aho::window::WindowData::~WindowData() {
+    // vsl::loggingln("window destroy");
+}

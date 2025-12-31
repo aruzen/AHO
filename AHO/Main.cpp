@@ -59,16 +59,16 @@ breakpoint disable swift_willThrow
         // Window main_window("vsl", 800, 800);
         // auto surface = main_window.add_plugin<Surface>(vulkan_instance);
         pl::ShaderGroup input_d3_shaders("3d_color_input",
-            { make_shader<"${AHO_HOME}/built-in-resource/shaders/vd2p_fc_umpv.vert.spv">(
-                    device),
-             make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device) }),
-            input_d2_shaders("2d_color_input",
-                { make_shader<"${AHO_HOME}/built-in-resource/shaders/vd2p_fc.vert.spv">(device),
-                 make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device) }),
-            push_d2_shaders("2d_color_push",
-                { make_shader<"${AHO_HOME}/built-in-resource/shaders/2dtriangle_single_color.vert.spv">(
-                        device),
-                 make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device) });
+                                         {make_shader<"${AHO_HOME}/built-in-resource/shaders/vd2p_fc_umpv.vert.spv">(
+                                                 device),
+                                          make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device)}),
+                input_d2_shaders("2d_color_input",
+                                 {make_shader<"${AHO_HOME}/built-in-resource/shaders/vd2p_fc.vert.spv">(device),
+                                  make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device)}),
+                push_d2_shaders("2d_color_push",
+                                {make_shader<"${AHO_HOME}/built-in-resource/shaders/2dtriangle_single_color.vert.spv">(
+                                        device),
+                                 make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device)});
 #ifdef _MSC_VER
         pl::ShaderGroup input_texture_shaders("input_texture",
             { make_shader<"shaders/texture.vert.spv">(device),
@@ -78,8 +78,8 @@ breakpoint disable swift_willThrow
                  make_shader<"shaders/push_texture.frag.spv">(device) });
 #elif defined(__APPLE_CC__)
         pl::ShaderGroup input_texture_shaders("input_texture",
-                                      {make_shader<"../../AHO/shaders/texture.vert.spv">(device),
-                                       make_shader<"../../AHO/shaders/texture.frag.spv">(device)}),
+                                              {make_shader<"../../AHO/shaders/texture.vert.spv">(device),
+                                               make_shader<"../../AHO/shaders/texture.frag.spv">(device)}),
                 push_texture_shaders("push_texture",
                                      {make_shader<"../../AHO/shaders/push_texture.vert.spv">(device),
                                       make_shader<"../../AHO/shaders/push_texture.frag.spv">(device)});
@@ -352,7 +352,6 @@ breakpoint disable swift_willThrow
                 uboBuffers[phase.getImageIndex()].copy(ubo);
                 // ubo_resource[phase.getImageIndex()].update(uboBuffers[phase.getImageIndex()], 0);
 
-                phase << command::RenderPassBegin(render_pass, frame_buffer);
                 phase << input_vertices << scissor << viewport
                       << command::BindGraphicResource(ubo_resource[phase.getImageIndex()],
                                                       graphic_resource::BindingDestination::Graphics, input_vertices)
@@ -398,14 +397,12 @@ breakpoint disable swift_willThrow
                                       << command::BindIndexBuffer(indexBuffer)
                                       << command::DrawIndexed(indices.size());
                                       */
-
-                phase << command::RenderPassEnd();
             }
             // auto debugMapped = debugBuffer.data();
             // debug = static_cast<struct debug_t *>(debugMapped.data);
-            command_manager.next();
         }
         in_flight.wait();
+        main_window.close();
         /**/
     }
 #if !defined(DEBUG) && !defined(_DEBUG)
@@ -422,3 +419,4 @@ breakpoint disable swift_willThrow
 }
 /* AHO/shaders/raw/vd2p_fc_umpv.vert AHOLi/AHO/object/Object.hpp AHOLi/AHO/resource/Audio.hpp AHOLi/AHO/resource/image.hpp AHOLi/AHO/resource/ObjectHitbox.hpp AHOLi/AHO/resource/ObjectModel.hpp VSLi/VSL/Vulkan/commands/bind_graphic_resource.cpp VSLi/VSL/Vulkan/commands/bind_graphic_resource.hpp VSLi/VSL/Vulkan/descriptor.cpp VSLi/VSL/Vulkan/descriptor.hpp VSLi/VSL/Vulkan/phase.cpp VSLi/VSL/Vulkan/phase.hpp VSLi/VSL/Vulkan/stages/resource_binding.cpp VSLi/VSL/Vulkan/stages/resource_binding.h
  */
+// #endif

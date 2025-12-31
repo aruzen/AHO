@@ -11,13 +11,7 @@
 #include "AHO/core/triangle.hpp"
 
 namespace AHO_NAMESPACE {
-    template<>
-    struct Drawer<Triangle<float, vsl::D2>, RGBA> {
-        template<typename PhaseStream>
-        void draw(DrawStream<PhaseStream>& ds, const Triangle<float, vsl::D2>& triangle, const RGBA& rgba) {
-            // TODO ds.phase_stream <<
-        }
-    };
+    void draw(const Triangle<float, vsl::D2> &triangle, const RGBA &rgba);
 }
 
 #endif //AHO_ALL_STANDARDDRAWER_H

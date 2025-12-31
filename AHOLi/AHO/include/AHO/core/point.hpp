@@ -26,7 +26,7 @@ namespace AHO_NAMESPACE {
 
 	template<typename R = int, typename... Args>
 		requires concepts::sames_as<R, Args...>
-	struct Point : public _Point<R, 
+    struct Point : public _Point<R,
 								 typename VSL_NAMESPACE::dimension<sizeof...(Args) + 1>::value,
 								 typename AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<
 								     typename VSL_NAMESPACE::dimension<sizeof...(Args) + 1>::value
@@ -245,6 +245,10 @@ namespace AHO_NAMESPACE {
 
 		constexpr auto length() const;
 	};
+
+    template<typename R, typename CI>
+    _Point(coordinate::_CoordinateSet<R, CI>)
+    -> _Point<R, typename CI::dimension, CI>;
 
 	// ---------------------------------------------------------------------------------------------------------------------
 

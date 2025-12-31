@@ -292,6 +292,10 @@ namespace AHO_NAMESPACE {
         constexpr auto operator *(_Vector<R1, Dim, CI> v1, _Vector<R2, Dim, CI> v2);
     }
 
+    template<typename R, typename CI>
+    _Vector(coordinate::_CoordinateSet<R, CI>)
+    -> _Vector<R, typename CI::dimension, CI>;
+
     // ---------------------------------------------------------------------------------------------------------------------
 
     template<typename L, typename R, typename Dim, typename CI>

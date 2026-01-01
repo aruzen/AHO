@@ -12,7 +12,7 @@ void VSL_NAMESPACE::pipeline_layout::ColorBlend::injection(VSL_NAMESPACE::Pipeli
 		| vk::ColorComponentFlagBits::eG
 		| vk::ColorComponentFlagBits::eB
 		| vk::ColorComponentFlagBits::eA;
-	colorBlendAttachment.blendEnable = false;
+	colorBlendAttachment.blendEnable = true;
 	colorBlendAttachment.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha; // Optional
 	colorBlendAttachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha; // Optional
 	colorBlendAttachment.colorBlendOp = vk::BlendOp::eAdd; // Optional

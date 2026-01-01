@@ -90,7 +90,7 @@ aho::window::WindowResizeHookPlugin::WindowResizeHookPlugin(vsl::PureWindow *w,
 
 bool aho::window::Window::close() {
     _data2.reset();
-    vsl::PureWindow::close();
+    return vsl::PureWindow::close();
 }
 
 aho::window::WindowData::~WindowData() {

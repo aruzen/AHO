@@ -327,13 +327,13 @@ namespace AHO_NAMESPACE {
         constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _SumCoordinateInfo<CI1, CI2>::value> operator -(const _CoordinateSet<T1, CI1>& e1, const _CoordinateSet<T2, CI2>& e2) {
             _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _SumCoordinateInfo<CI1, CI2>::value> result;
             if constexpr (CI1::EnabledX) {
-                result -= e1.x;
+                result += e1.x;
             }
             if constexpr (CI1::EnabledY) {
-                result -= e1.y;
+                result += e1.y;
             }
             if constexpr (CI1::EnabledZ) {
-                result -= e1.z;
+                result += e1.z;
             }
 
             if constexpr (CI2::EnabledX) {
@@ -353,13 +353,13 @@ namespace AHO_NAMESPACE {
         constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _SumCoordinateInfo<CI1, _MakeCoordinateInfo<true, false, false>::value>::value> operator -(const _CoordinateSet<T1, CI1>& e1, const X<T2>& e2) {
             _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _SumCoordinateInfo<CI1, _MakeCoordinateInfo<true, false, false>::value>::value> result;
             if constexpr (CI1::EnabledX) {
-                result -= e1.x;
+                result += e1.x;
             }
             if constexpr (CI1::EnabledY) {
-                result -= e1.y;
+                result += e1.y;
             }
             if constexpr (CI1::EnabledZ) {
-                result -= e1.z;
+                result += e1.z;
             }
 
             result -= e2;
@@ -371,13 +371,13 @@ namespace AHO_NAMESPACE {
         constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _SumCoordinateInfo<CI1, _MakeCoordinateInfo<false, true, false>::value>::value> operator -(const _CoordinateSet<T1, CI1>& e1, const Y<T2>& e2) {
             _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _SumCoordinateInfo<CI1, _MakeCoordinateInfo<false, true, false>::value>::value> result;
             if constexpr (CI1::EnabledX) {
-                result -= e1.x;
+                result += e1.x;
             }
             if constexpr (CI1::EnabledY) {
-                result -= e1.y;
+                result += e1.y;
             }
             if constexpr (CI1::EnabledZ) {
-                result -= e1.z;
+                result += e1.z;
             }
 
             result -= e2;
@@ -389,13 +389,13 @@ namespace AHO_NAMESPACE {
         constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _SumCoordinateInfo<CI1, _MakeCoordinateInfo<false, false, true>::value>::value> operator -(const _CoordinateSet<T1, CI1>& e1, const Z<T2>& e2) {
             _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _SumCoordinateInfo<CI1, _MakeCoordinateInfo<false, false, true>::value>::value> result;
             if constexpr (CI1::EnabledX) {
-                result -= e1.x;
+                result += e1.x;
             }
             if constexpr (CI1::EnabledY) {
-                result -= e1.y;
+                result += e1.y;
             }
             if constexpr (CI1::EnabledZ) {
-                result -= e1.z;
+                result += e1.z;
             }
 
             result -= e2;

@@ -27,8 +27,7 @@ namespace AHO_NAMESPACE {
 
         PhaseStream phase_stream;
 
-        template<typename ...Args>
-        this_type &operator<<(std::tuple<Args...>&&);
+        this_type &operator<<(aho::concepts::is_std_tuple auto&& args);
 
         this_type &operator<<(std::shared_ptr<vsl::command::__Command> cmd);
 

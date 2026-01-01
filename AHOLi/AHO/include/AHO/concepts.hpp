@@ -7,6 +7,11 @@
 
 namespace AHO_NAMESPACE::concepts {
     namespace helper {
+        template<class T>
+        struct is_std_tuple : std::false_type {};
+
+        template<class... Ts>
+        struct is_std_tuple<std::tuple<Ts...>> : std::true_type {};
 
         template<size_t Index, typename... Args>
         struct GetType {};
@@ -26,6 +31,9 @@ namespace AHO_NAMESPACE::concepts {
         template<size_t Index, typename T, typename... Args>
         using get_type_v = GetType<Index, T, Args...>::value;
     }
+
+    template<class T>
+    concept is_std_tuple = helper::is_std_tuple<std::remove_cvref_t<T>>::value;
 
 	template<typename T>
 	concept plusable = requires(T t) {

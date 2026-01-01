@@ -22,8 +22,7 @@ namespace AHO_NAMESPACE {
 
         ~DrawPhase();
 
-        template<typename ...Args>
-        DrawStream<vsl::DefaultPhaseStream> operator<<(std::tuple<Args...> &&);
+        DrawStream<vsl::DefaultPhaseStream> operator<<(aho::concepts::is_std_tuple auto&&);
 
         DrawStream<vsl::DefaultPhaseStream> operator<<(std::shared_ptr<vsl::command::__Command> cmd);
 
@@ -34,12 +33,11 @@ namespace AHO_NAMESPACE {
         DrawStream<vsl::DefaultPhaseStream> operator<<(vsl::command::is_delegate_command auto cmd);
     };
 
-    template<typename... Args>
-    aho::DrawStream<vsl::DefaultPhaseStream> aho::DrawPhase::operator<<(std::tuple<Args...> &&t) {
+    aho::DrawStream<vsl::DefaultPhaseStream> aho::DrawPhase::operator<<(aho::concepts::is_std_tuple auto&& t) {
         aho::DrawStream<vsl::DefaultPhaseStream> phase{
                 .phase_stream = vsl::DefaultPhaseStream{this->manager}
         };
-        phase << std::move(t);
+        phase << std::forward<decltype(t)>(t);
         return phase;
     }
 
@@ -56,8 +54,7 @@ namespace AHO_NAMESPACE {
     }
 
     template<typename PhaseStream>
-    template<typename... Args>
-    DrawStream<PhaseStream> &DrawStream<PhaseStream>::operator<<(std::tuple<Args...>&& args) {
+    DrawStream<PhaseStream> &DrawStream<PhaseStream>::operator<<(aho::concepts::is_std_tuple auto&& args) {
         std::apply(
             [](auto&&... xs){ draw(std::forward<decltype(xs)>(xs)...); },
             std::tuple_cat(std::forward<decltype(args)>(args), std::tie(THREAD_LOCAL_DRAW_PHASE))

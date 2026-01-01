@@ -135,6 +135,10 @@ namespace AHO_NAMESPACE {
         [[deprecated("cross() is undefined in 1D. Consider checking vector dimension.")]]
         constexpr auto cross(const T& m) const;
 
+        template<typename T>
+        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D1>, T>
+        constexpr auto hadamard(const T& m) const;
+
 		constexpr auto length() const;
 
         constexpr _Vector<R, VSL_NAMESPACE::D1, CI>& normalize();
@@ -201,6 +205,10 @@ namespace AHO_NAMESPACE {
         template<typename T>
         requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2>, T>
         constexpr auto cross(const T& m) const;
+
+        template<typename T>
+        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2>, T>
+        constexpr auto hadamard(const T& m) const;
 
 		constexpr auto length() const;
 
@@ -271,7 +279,11 @@ namespace AHO_NAMESPACE {
         requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>, T>
         constexpr auto cross(const T& m) const;
 
-		constexpr auto length() const;
+        template<typename T>
+        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>, T>
+        constexpr auto hadamard(const T& m) const;
+
+        constexpr auto length() const;
 
         constexpr _Vector<R, VSL_NAMESPACE::D3, CI>& normalize();
 
@@ -288,6 +300,11 @@ namespace AHO_NAMESPACE {
     }
 
     namespace product::cross {
+        template<typename Dim, typename CI, typename R1, typename R2>
+        constexpr auto operator *(_Vector<R1, Dim, CI> v1, _Vector<R2, Dim, CI> v2);
+    }
+
+    namespace product::hadamard {
         template<typename Dim, typename CI, typename R1, typename R2>
         constexpr auto operator *(_Vector<R1, Dim, CI> v1, _Vector<R2, Dim, CI> v2);
     }
@@ -393,6 +410,14 @@ namespace AHO_NAMESPACE {
     inline constexpr auto _Vector<R, VSL_NAMESPACE::D1, CI>::cross(const T& m) const
     {
         return (decltype(std::declval<R>() * std::declval<T>()))0;
+    }
+
+    template<typename R, typename CI>
+    template<typename T>
+    requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D1>, T>
+    inline constexpr auto _Vector<R, VSL_NAMESPACE::D1, CI>::hadamard(const T &m) const
+    {
+        return _Vector<decltype(std::declval<R>() * std::declval<T>()), VSL_NAMESPACE::D1, CI>(value.___AN1 * m.value.___AN1);
     }
 
     template<typename R, typename CI>
@@ -517,6 +542,16 @@ namespace AHO_NAMESPACE {
                 VSL_NAMESPACE::D1,
                 typename coordinate::_MakeCoordinateInfo<(!CI::EnabledX), (!CI::EnabledY), (!CI::EnabledZ)>::value>
                 (value.___AN1 * m.value.___AN2 - value.___AN2 * m.value.___AN1);
+    }
+
+    template<typename R, typename CI>
+    template<typename T>
+    requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2>, T>
+    constexpr auto _Vector<R, VSL_NAMESPACE::D2, CI>::hadamard(const T &m) const {
+        _Vector<decltype(value.___AN1 * m.value.___AN1), VSL_NAMESPACE::D2, CI> result;
+        result.value.___AN1 = value.___AN1 * m.value.___AN1;
+        result.value.___AN2 = value.___AN2 * m.value.___AN2;
+        return result;
     }
 
 	template<typename R, typename CI>
@@ -658,6 +693,17 @@ namespace AHO_NAMESPACE {
         };
     }
 
+    template<typename R, typename CI>
+    template<typename T>
+    requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>, T>
+    constexpr auto _Vector<R, VSL_NAMESPACE::D3, CI>::hadamard(const T &m)  const {
+        _Vector<decltype(value.___AN1 * m.value.___AN1), VSL_NAMESPACE::D3, CI> result;
+        result.value.___AN1 = value.___AN1 * m.value.___AN1;
+        result.value.___AN2 = value.___AN2 * m.value.___AN2;
+        result.value.___AN3 = value.___AN3 * m.value.___AN3;
+        return result;
+    }
+
 	template<typename R, typename CI>
 	constexpr auto _Vector<R, VSL_NAMESPACE::D3, CI>::length() const
 	{
@@ -702,6 +748,13 @@ namespace AHO_NAMESPACE {
         template<typename Dim, typename CI, typename R1, typename R2>
         constexpr auto operator *(_Vector<R1, Dim, CI> v1, _Vector<R2, Dim, CI> v2) {
             return v1.cross(v2);
+        }
+    }
+
+    namespace product::hadamard {
+        template<typename Dim, typename CI, typename R1, typename R2>
+        constexpr auto operator *(_Vector<R1, Dim, CI> v1, _Vector<R2, Dim, CI> v2) {
+            return v1.hadamard(v2);
         }
     }
 

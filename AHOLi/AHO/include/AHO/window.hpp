@@ -18,9 +18,8 @@ namespace AHO_NAMESPACE::window {
     struct WindowData {
         std::shared_ptr<VSL_NAMESPACE::Surface> surface;
         VSL_NAMESPACE::SwapchainAccessor swapchain;
-        VSL_NAMESPACE::View<VSL_NAMESPACE::D2> image_view;
         VSL_NAMESPACE::RenderPass render_pass;
-        VSL_NAMESPACE::FrameBuffer<VSL_NAMESPACE::D2> frame_buffer;
+        VSL_NAMESPACE::FrameBuffer frame_buffer;
         VSL_NAMESPACE::SemaphoreHolder image_available, render_finished;
         VSL_NAMESPACE::FenceHolder in_flight;
 

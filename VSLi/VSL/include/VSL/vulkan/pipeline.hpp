@@ -12,7 +12,7 @@ namespace VSL_NAMESPACE {
     };
 
     struct GraphicsPipeline : public PipelineAccessor {
-        GraphicsPipeline(PipelineLayoutAccessor layout, RenderPass pass);
+        GraphicsPipeline(PipelineLayoutAccessor layout, RenderPassAccessor pass);
 
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
     };

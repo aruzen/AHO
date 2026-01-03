@@ -439,7 +439,7 @@ namespace AHO_NAMESPACE {
         template<typename R, typename D, typename CI>
         Mat4x4<R> make_view(_Point<R, D, CI> _eye, _Point<R, D, CI> target, _Vector<R, D, CI> up) {
             _Vector<R, D, CI> eye(_eye.value);
-            auto f = _Vector<R, D, CI>((-target).value - eye.value).normalize().value; // forward
+            auto f = _Vector<R, D, CI>(target.value - eye.value).normalize().value; // forward
             auto s = _Vector<R, D, CI>(f).cross(-up).normalize().value; // right
             auto u = _Vector<R, D, CI>(s).cross(_Vector<R, D, CI>(f)).normalize().value;             // up (recomputed)
 

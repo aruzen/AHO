@@ -403,20 +403,26 @@ namespace AHO_NAMESPACE {
             return result;
         }
 
-        template<typename T1, typename T2>
-        constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _MakeCoordinateInfo<true, true, false>::value> operator -(const X<T1>& e1, const Y<T2>& e2) {
-            return { e1 , e2 };
+#define AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_THAN(U1, U2) \
+        template<typename T1, typename T2> \
+        constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _MakeCoordinateInfo<true, true, false>::value> operator -(const U1<T1>& e1, const U2<T2>& e2) { \
+            return { e1 , -e2 }; \
         }
 
-        template<typename T1, typename T2>
-        constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _MakeCoordinateInfo<true, false, true>::value> operator -(const X<T1>& e1, const Z<T2>& e2) {
-            return { e1 , e2 };
+#define AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_LESS(U1, U2) \
+        template<typename T1, typename T2> \
+        constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _MakeCoordinateInfo<true, true, false>::value> operator -(const U1<T1>& e1, const U2<T2>& e2) { \
+            return { -e2, e1 }; \
         }
 
-        template<typename T1, typename T2>
-        constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _MakeCoordinateInfo<false, true, true>::value> operator -(const Y<T1>& e1, const Y<T2>& e2) {
-            return { e1 , e2 };
-        }
+        AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_THAN(X, Y)
+        AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_THAN(X, Z)
+        AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_THAN(Y, Z)
+
+        AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_LESS(Z, X)
+        AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_LESS(Y, X)
+        AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_LESS(Z, Y)
+
         namespace literals {
 		    constexpr X<double> operator AHO_LITERAL(x)(long double v) { return { (double)v }; };
 		    constexpr X<int> operator AHO_LITERAL(x)(unsigned long long v) { return { (int)v }; };

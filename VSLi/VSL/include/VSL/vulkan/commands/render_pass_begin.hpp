@@ -16,11 +16,23 @@ namespace VSL_NAMESPACE::command {
 		RenderPassBegin(RenderPass renderPass, FrameBufferAccessor frameBuffer, std::optional<__VSLDRGBColorAccessor<float>> color = std::nullopt);
 		RenderPassBegin(RenderPass renderPass, FrameBufferAccessor frameBuffer, size_t imageIdx, std::optional<__VSLDRGBColorAccessor<float>> color = std::nullopt);
 
-		RenderPass renderPass;
+        RenderPass renderPass;
 		FrameBufferAccessor frameBuffer;
 		size_t target_idx;
 		std::optional<__VSLDRGBColorAccessor<float>> clear_color;
 
 		void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
 	};
+
+    struct IDPickingRenderPassBegin : public __Command {
+        IDPickingRenderPassBegin(IDPickingRenderPass renderPass, FrameBufferAccessor frameBuffer, std::optional<__VSLDRGBColorAccessor<float>> color = std::nullopt);
+        IDPickingRenderPassBegin(IDPickingRenderPass renderPass, FrameBufferAccessor frameBuffer, size_t imageIdx, std::optional<__VSLDRGBColorAccessor<float>> color = std::nullopt);
+
+        IDPickingRenderPass renderPass;
+        FrameBufferAccessor frameBuffer;
+        size_t target_idx;
+        std::optional<__VSLDRGBColorAccessor<float>> clear_color;
+
+        void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
+    };
 }

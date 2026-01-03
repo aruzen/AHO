@@ -7,6 +7,7 @@
 #include <spirv_cross/spirv_cross.hpp>
 #include <fstream>
 #include <utility>
+#include <ranges>
 
 vsl::graphic_resource::Type spir_type_to_graphic_type(const spirv_cross::SPIRType &type) {
     namespace gfx_src = vsl::graphic_resource;
@@ -165,8 +166,11 @@ void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
         format = format.toVec(type.vecsize);
         if (not generated.vertex_input)
             generated.vertex_input.emplace();
-        for (size_t i = 0; i < type.columns; i++)
-            generated.vertex_input->add(format);
+        generated.vertex_input->definitions.push_back({
+            .layouts = {type.columns, vsl::pipeline_layout::VertexInputLayoutDefinition{
+                .format = format
+            }}
+        });
     }
 }
 

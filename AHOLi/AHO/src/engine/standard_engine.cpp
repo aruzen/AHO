@@ -29,7 +29,6 @@ void aho::engine::StandardEngine::boot(const std::string& applicationName) {
     auto surface = window.add_plugin<Surface>(instance);
 
     LogicalDevice device(physical_device, surface);
-    vsl::loggingln("selected : ", physical_device.name(), "(", physical_device.apiVersion(), ")");
 
     SynchroManager synchro_manager(device);
     CommandManager command_manager(device);
@@ -56,18 +55,15 @@ void aho::engine::StandardEngine::boot(const std::string& applicationName) {
 
 
     VSL_NAMESPACE::Swapchain swapchain(device, surface);
-    VSL_NAMESPACE::View<VSL_NAMESPACE::D2> image_view(swapchain);
     VSL_NAMESPACE::RenderPass render_pass(swapchain);
 
     boot_window.emplace(*this, window._data,
                         std::make_shared<AHO_NAMESPACE::window::WindowData>(AHO_NAMESPACE::window::WindowData{
                                 .surface = surface,
                                 .swapchain = swapchain,
-                                .image_view = image_view,
                                 .render_pass = render_pass,
-                                .frame_buffer = VSL_NAMESPACE::FrameBuffer<VSL_NAMESPACE::D2>(swapchain,
-                                                                                              image_view,
-                                                                                              render_pass),
+                                .frame_buffer = VSL_NAMESPACE::FrameBuffer(swapchain,
+                                                                           render_pass),
                                 .image_available = synchro_manager
                                         .createSemaphore(applicationName + "ImageAvailable",
                                                          command_manager.getBuffer().getSize()),

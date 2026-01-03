@@ -91,6 +91,11 @@ void VSL_NAMESPACE::pipeline_layout::VertexInput::injection(VSL_NAMESPACE::Pipel
 
         std::uint32_t nextOffset = 0;
 		for (auto& layout : def.layouts) {
+            /*
+            loggingln("size     :", layout.format.size());
+            loggingln("location :", layout.location);
+            loggingln("binding  :", def.binding);*/
+
 			vk::VertexInputAttributeDescription vertexAttributeDescription;
 			vertexAttributeDescription.location = layout.location != (std::uint32_t)-1 ? layout.location : nextLocation;
 			nextLocation = vertexAttributeDescription.location + 1;
@@ -98,9 +103,13 @@ void VSL_NAMESPACE::pipeline_layout::VertexInput::injection(VSL_NAMESPACE::Pipel
 			vertexAttributeDescription.offset = layout.offset != (std::uint32_t)-1 ? layout.offset : nextOffset;
 			vertexAttributeDescription.format = (vk::Format)layout.format.type();
 			vertexAttributeDescriptions.push_back(vertexAttributeDescription);
-
-			nextOffset = vertexAttributeDescription.offset + layout.format.size();
+            /*
+            loggingln("offset   :", vertexAttributeDescription.offset);
+            loggingln("location :", vertexAttributeDescription.location);
+            loggingln("binding  :", vertexAttributeDescription.binding); */
+            nextOffset = vertexAttributeDescription.offset + layout.format.size();
 		}
+        // loggingln("");
 	}
 
 

@@ -5,8 +5,13 @@ void VSL_NAMESPACE::pipeline_layout::ColorBlend::injection(VSL_NAMESPACE::Pipeli
 {
 	auto& info = *pl._data->info;
 
-	auto& colorBlendAttachment = std::any_cast<vk::PipelineColorBlendAttachmentState&>
-		(info.pool["colorBlendAttachment"] = vk::PipelineColorBlendAttachmentState());
+    if (not info.pool.contains("colorBlendAttachments")) {
+        info.pool["colorBlendAttachments"] = std::vector<vk::PipelineColorBlendAttachmentState>();
+    }
+    auto& colorBlendAttachments = std::any_cast<std::vector<vk::PipelineColorBlendAttachmentState>&>
+            (info.pool["colorBlendAttachments"]);
+    colorBlendAttachments.emplace_back();
+    auto& colorBlendAttachment = colorBlendAttachments.back();
 
 	colorBlendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR
 		| vk::ColorComponentFlagBits::eG
@@ -22,8 +27,8 @@ void VSL_NAMESPACE::pipeline_layout::ColorBlend::injection(VSL_NAMESPACE::Pipeli
 
 	info.colorBlend.logicOpEnable = false;
 	info.colorBlend.logicOp = vk::LogicOp::eCopy; // Optional
-	info.colorBlend.attachmentCount = 1;
-	info.colorBlend.pAttachments = &colorBlendAttachment;
+    info.colorBlend.attachmentCount = colorBlendAttachments.size();
+    info.colorBlend.pAttachments = colorBlendAttachments.data();
 	info.colorBlend.blendConstants[0] = 0.0f; // Optional
 	info.colorBlend.blendConstants[1] = 0.0f; // Optional
 	info.colorBlend.blendConstants[2] = 0.0f; // Optional

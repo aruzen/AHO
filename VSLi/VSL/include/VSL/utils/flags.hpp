@@ -1,6 +1,7 @@
 #pragma once
 #include "../define.hpp"
 
+#include <type_traits>
 #include <concepts>
 
 namespace VSL_NAMESPACE {

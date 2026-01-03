@@ -14,10 +14,15 @@ namespace AHO_NAMESPACE {
     extern thread_local DrawPhase* THREAD_LOCAL_DRAW_PHASE;
 
     struct DrawPhase : public VSL_NAMESPACE::DefaultPhase {
-        explicit DrawPhase(aho::engine::GraphicalEngine &engine);
+        explicit DrawPhase(aho::engine::GraphicalEngine &engine,
+                           std::function<void(DrawStream<vsl::DefaultPhaseStream>&)> initialize = nullptr,
+                           std::function<void(DrawStream<vsl::DefaultPhaseStream>&)> finit = nullptr);
 
-        explicit DrawPhase(aho::engine::GraphicalEngine *engine);
+        explicit DrawPhase(aho::engine::GraphicalEngine *engine,
+                           std::function<void(DrawStream<vsl::DefaultPhaseStream>&)> initialize = nullptr,
+                           std::function<void(DrawStream<vsl::DefaultPhaseStream>&)> finit = nullptr);
 
+        std::function<void(DrawStream<vsl::DefaultPhaseStream>&)> initialize, finish;
         aho::engine::GraphicalEngine * engine;
 
         ~DrawPhase();

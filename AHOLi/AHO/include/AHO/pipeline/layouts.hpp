@@ -16,12 +16,12 @@
 
 namespace AHO_NAMESPACE::pipeline {
 	enum class ResourceName {
-		MVPMatrixUBO,
+		VPMatrixUBO,
 		Texture,
 	};
 
 	namespace  standard_resources {
-		constexpr vsl::graphic_resource::BindingPoint MVPMatrixUBO{
+		constexpr vsl::graphic_resource::BindingPoint VPMatrixUBO{
 					.binding = (std::uint32_t)-1,
 					.bindingType = vsl::graphic_resource::Type::UniformBuffer,
 					.shaderType = vsl::ShaderFlag::Vertex,
@@ -38,8 +38,8 @@ namespace AHO_NAMESPACE::pipeline {
 
 	constexpr auto getBindingPoint(ResourceName name) {
 		switch (name) {
-		case ResourceName::MVPMatrixUBO:
-			return standard_resources::MVPMatrixUBO;
+		case ResourceName::VPMatrixUBO:
+			return standard_resources::VPMatrixUBO;
 		case ResourceName::Texture:
 			return standard_resources::Texture;
 		}
@@ -48,8 +48,8 @@ namespace AHO_NAMESPACE::pipeline {
 
 	template<ResourceName Name>
 	constexpr auto getBindingPoint() {
-		if constexpr (ResourceName::MVPMatrixUBO == Name)
-			return standard_resources::MVPMatrixUBO;
+		if constexpr (ResourceName::VPMatrixUBO == Name)
+			return standard_resources::VPMatrixUBO;
 		if constexpr (ResourceName::Texture == Name)
 			return standard_resources::Texture;
 	}

@@ -116,14 +116,17 @@ namespace VSL_NAMESPACE::_impl {
 		~Swapchain_impl();
 	};
 
+    // FIXME Imageの責務が色々なところに分散している
+    /*
 	struct View_impl {
 		std::shared_ptr<LogicalDevice_impl> device;
-		std::vector<vk::ImageView> swapChainImageViews;
+        std::vector<vk::Image> swapChainImages;
+		std::vector<vk::ImageView> views;
 
 		~View_impl();
 	};
 
-	/* struct Viewport_impl {
+    struct Viewport_impl {
 		std::shared_ptr<Swapchain_impl> swapchain;
 	}; */
 
@@ -269,7 +272,7 @@ namespace VSL_NAMESPACE::_impl {
         vk::Image image;
         vk::ImageView view;
         vk::DeviceMemory memory;
-        std::uint32_t width, height;
+        std::uint32_t width, height, count;
 
         ~Image_impl();
     };

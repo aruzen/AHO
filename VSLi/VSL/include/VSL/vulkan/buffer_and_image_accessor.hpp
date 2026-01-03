@@ -11,9 +11,13 @@
 #include "../format.hpp"
 #include "../utils/flags.hpp"
 
-#include "command.hpp"
+#include "device.hpp"
+#include <memory>
+#include <optional>
 
 namespace VSL_NAMESPACE {
+    struct CommandManager;
+
     enum class MemoryType : unsigned int {
         None = 0,
         // データ転送の「送信元」バッファ。他のバッファや画像へデータをコピーするために使用。
@@ -209,7 +213,7 @@ namespace VSL_NAMESPACE {
     struct BufferAccessor {
         struct LocalBufferHolder {
             BufferAccessor *parent;
-            size_t size, offset;
+            std::size_t size, offset;
             void *data;
 
             ~LocalBufferHolder();
@@ -218,6 +222,9 @@ namespace VSL_NAMESPACE {
 
             template<typename... Args>
             bool copy(const Args &... args);
+
+            template<typename T>
+            bool copy(T* t, std::size_t size);
 
             template<typename... Args>
             void uncheck_copy(const Args &... args);
@@ -236,6 +243,9 @@ namespace VSL_NAMESPACE {
 
         template<typename... Args>
         bool copy(const Args &... args);
+
+        template<typename T>
+        bool copy(T* t, size_t size);
 
         template<typename... Args>
         void uncheck_copy(const Args &... args);
@@ -261,7 +271,7 @@ namespace VSL_NAMESPACE {
     struct ImageAccessor {
         std::shared_ptr<_impl::Image_impl> _data;
 
-        bool copyByBuffer(CommandManager commandManager, BufferAccessor * buf, vsl::ImageLayout layout);
+        bool copyByBuffer(CommandManager commandManager, BufferAccessor * buf, vsl::ImageLayout layout, std::uint32_t target_idx);
 
 //        bool copyByImage(CommandManager commandManager, const ImageAccessor& image, std::optional<vsl::FenceHolder> waitFence = std::nullopt);
 
@@ -272,12 +282,14 @@ namespace VSL_NAMESPACE {
                                                             vsl::ImageLayout layout,
                                                             vsl::LogicalDeviceAccessor device,
                                                             std::uint32_t width,
-                                                            std::uint32_t height, data_format::___Format format);
+                                                            std::uint32_t height,
+                                                            data_format::___Format format,
+                                                            std::uint32_t count);
 
         static void TransformLayout(CommandManager manager,
                                     std::shared_ptr<_impl::Image_impl> data,
                                     vsl::ImageLayout oldLayout,
-                                    vsl::ImageLayout newLayout);
+                                    vsl::ImageLayout newLayouts);
     };
 }
 #endif //AHO_ALL_BUFFER_AND_IMAGE_ACCESSOR_H

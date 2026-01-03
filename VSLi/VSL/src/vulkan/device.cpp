@@ -86,6 +86,7 @@ std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> VSL_NAMESPACE::_Logica
         deviceFeatures.vertexPipelineStoresAndAtomics = true;
         deviceFeatures.fragmentStoresAndAtomics = true;
     }
+    deviceFeatures.independentBlend = true;
     deviceFeatures.samplerAnisotropy = true;
 
     /* MoltenVK未対応

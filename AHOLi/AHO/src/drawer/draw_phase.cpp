@@ -7,24 +7,40 @@
 
 thread_local aho::DrawPhase* aho::THREAD_LOCAL_DRAW_PHASE;
 
-aho::DrawPhase::DrawPhase(aho::engine::GraphicalEngine &engine)
-        : aho::DrawPhase::DrawPhase(&engine) {}
+aho::DrawPhase::DrawPhase(aho::engine::GraphicalEngine &engine,
+                          std::function<void(DrawStream<vsl::DefaultPhaseStream> &)> initialize,
+                          std::function<void(DrawStream<vsl::DefaultPhaseStream> &)> finit)
+        : aho::DrawPhase::DrawPhase(&engine, initialize, finit) {}
 
-aho::DrawPhase::DrawPhase(aho::engine::GraphicalEngine *engine)
+aho::DrawPhase::DrawPhase(aho::engine::GraphicalEngine *engine,
+                          std::function<void(DrawStream<vsl::DefaultPhaseStream> &)> initialize,
+                          std::function<void(DrawStream<vsl::DefaultPhaseStream> &)> finit)
         : VSL_NAMESPACE::DefaultPhase(engine->_data->command_manager,
                             engine->getWindow()._data2->swapchain,
                             engine->getWindow()._data2->image_available,
                             engine->getWindow()._data2->render_finished,
                             engine->getWindow()._data2->in_flight),
-          engine(engine) {
+          engine(engine),
+          initialize(initialize),
+          finish(finit) {
     THREAD_LOCAL_DRAW_PHASE = this;
     engine->getWindow()._data2->frame_buffer.setTargetFrame(this->getImageIndex());
-    *this << vsl::command::RenderPassBegin(engine->getWindow()._data2->render_pass,
-                                           engine->getWindow()._data2->frame_buffer);
+
+    if (initialize) {
+        DrawStream<vsl::DefaultPhaseStream> stream{vsl::DefaultPhaseStream{this->manager}};
+        initialize(stream);
+    } else
+        *this << vsl::command::RenderPassBegin(engine->getWindow()._data2->render_pass,
+                                               engine->getWindow()._data2->frame_buffer);
 }
 
 aho::DrawPhase::~DrawPhase() {
-    *this << vsl::command::RenderPassEnd();
+    if (finish) {
+        DrawStream<vsl::DefaultPhaseStream> stream{vsl::DefaultPhaseStream{this->manager}};
+        finish(stream);
+    } else
+        *this << vsl::command::RenderPassEnd();
+
     auto result = vsl::DefaultPhase::submit();
     engine->getWindow()._data2->in_flight.wait();
     if (result == vsl::DefaultPhase::SubmitResult::WantRecreateSwapchain)

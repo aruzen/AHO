@@ -61,7 +61,7 @@ message("glfw3: ${GLFW_INCLUDE_DIRS}, ${GLFW_LIBRARY_DIRS}, ${GLFW_LIBRARIES}")
 add_subdirectory(AHO)
 add_subdirectory(AHOLi)
 add_subdirectory(VSLi)
-add_subdirectory(Test)
+# add_subdirectory()
 
 include_directories(${GLFW_INCLUDE_DIRS})
 link_directories(${GLFW_LIBRARY_DIRS})

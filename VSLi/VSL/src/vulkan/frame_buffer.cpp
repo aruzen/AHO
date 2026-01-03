@@ -4,18 +4,18 @@
 #include <VSL/exceptions.hpp>
 
 #include <VSL/vulkan/frame_buffer.hpp>
+#include <memory>
 
-template<typename D>
-VSL_NAMESPACE::FrameBuffer<D>::FrameBuffer(SwapchainAccessor swapchain, View<D> view, RenderPass render_pass)
+VSL_NAMESPACE::FrameBuffer::FrameBuffer(SwapchainAccessor swapchain, RenderPass render_pass)
 {
-    _data = std::shared_ptr<VSL_NAMESPACE::_impl::FrameBuffer_impl>(new VSL_NAMESPACE::_impl::FrameBuffer_impl);
+    _data = std::make_shared<VSL_NAMESPACE::_impl::FrameBuffer_impl>();
     _data->device = swapchain._data->device;
     _data->swapchain = swapchain._data;
 
-    _data->swapChainFramebuffers.resize(swapchain._data->swapChainImages.size());
-    for (size_t i = 0; i < swapchain._data->swapChainImages.size(); i++) {
+    _data->swapChainFramebuffers.resize(swapchain.images.size());
+    for (size_t i = 0; i < swapchain.images.size(); i++) {
         vk::ImageView attachments[] = {
-            view._data->swapChainImageViews[i]
+            swapchain.images[i]._data->view
         };
         vk::FramebufferCreateInfo framebufferInfo{};
         framebufferInfo.renderPass = render_pass._data->renderPass;
@@ -29,7 +29,33 @@ VSL_NAMESPACE::FrameBuffer<D>::FrameBuffer(SwapchainAccessor swapchain, View<D> 
     }
 }
 
+
+VSL_NAMESPACE::FrameBuffer::FrameBuffer(SwapchainAccessor swapchain, IDPickingRenderPass render_pass)
+{
+    _data = std::make_shared<VSL_NAMESPACE::_impl::FrameBuffer_impl>();
+    _data->device = swapchain._data->device;
+    _data->swapchain = swapchain._data;
+
+    _data->swapChainFramebuffers.resize(swapchain.images.size());
+    for (size_t i = 0; i < swapchain.images.size(); i++) {
+        vk::ImageView attachments[] = {
+                swapchain.images[i]._data->view, render_pass.picking_buffer[i]._data->view
+        };
+        vk::FramebufferCreateInfo framebufferInfo{};
+        framebufferInfo.renderPass = render_pass._data->renderPass;
+        framebufferInfo.attachmentCount = std::size(attachments);
+        framebufferInfo.pAttachments = attachments;
+        framebufferInfo.width = swapchain._data->swapChainExtent.width;
+        framebufferInfo.height = swapchain._data->swapChainExtent.height;
+        framebufferInfo.layers = 1;
+
+        _data->swapChainFramebuffers[i] = _data->device->device.createFramebuffer(framebufferInfo);
+
+    }
+}
+
 void VSL_NAMESPACE::FrameBufferAccessor::setTargetFrame(std::uint32_t frameIdx) {
+
     _data->currentIndex = frameIdx;
 }
 
@@ -39,5 +65,3 @@ VSL_NAMESPACE::_impl::FrameBuffer_impl::~FrameBuffer_impl()
         device->device.destroyFramebuffer(framebuffer);
     }
 }
-
-template struct vsl::FrameBuffer<>;

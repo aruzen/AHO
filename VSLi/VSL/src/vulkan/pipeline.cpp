@@ -3,7 +3,7 @@
 
 #include <VSL/vulkan/_pimpls.hpp>
 
-vsl::GraphicsPipeline::GraphicsPipeline(vsl::PipelineLayoutAccessor layout, vsl::RenderPass pass) {
+vsl::GraphicsPipeline::GraphicsPipeline(vsl::PipelineLayoutAccessor layout, vsl::RenderPassAccessor pass) {
     _data = std::shared_ptr<_impl::Pipeline_impl>(new _impl::Pipeline_impl);
     _data->device = layout._data->device;
     _data->layout = layout._data;

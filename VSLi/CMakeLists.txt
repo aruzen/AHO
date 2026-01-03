@@ -32,7 +32,6 @@ add_library(VSL STATIC
         VSL/src/vulkan/sampler.cpp
         VSL/src/vulkan/pipeline.cpp
         VSL/src/vulkan/synchronize.cpp
-        VSL/src/vulkan/view.cpp
         VSL/src/vulkan/shader.cpp
         VSL/src/vulkan/buffer.cpp
         VSL/src/vulkan/swapchain.cpp
@@ -93,7 +92,6 @@ add_library(VSL STATIC
         VSL/include/VSL/vulkan/device.hpp
         VSL/include/VSL/vulkan/sampler.hpp
         VSL/include/VSL/vulkan/pipeline.hpp
-        VSL/include/VSL/vulkan/view.hpp
         VSL/include/VSL/vulkan/synchronize.hpp
         VSL/include/VSL/vulkan/buffer.hpp
         VSL/include/VSL/vulkan/shader.hpp
@@ -121,6 +119,8 @@ add_library(VSL STATIC
         VSL/include/VSL/format.hpp
         VSL/include/VSL/vsl.hpp
         VSL/include/VSL/define.hpp
+        VSL/src/vulkan/commands/draw_indexed_instance.cpp
+        VSL/src/vulkan/stages/id_picking.cpp
 )
 
 target_include_directories(VSL PRIVATE ${Vulkan_INCLUDE_DIRS})

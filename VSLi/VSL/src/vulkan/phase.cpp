@@ -32,6 +32,8 @@ void vsl::DefaultPhase::setup() {
     else
         imageIndex = manager._data->device->device.acquireNextImageKHR(swapchain._data->swapChain, UINT64_MAX, nullptr, nullptr).value;
 
+
+
     ComputePhase::setup();
 }
 
@@ -47,6 +49,7 @@ vsl::DefaultPhase::SubmitResult vsl::DefaultPhase::submit() {
     if (calculationFinish.has_value())
         signalSemaphores.push_back(calculationFinish.value()._data->semaphores[manager.getCurrentBufferIdx()]);
 
+
     vk::PresentInfoKHR presentInfo;
     vk::SwapchainKHR swapchains[] = { swapchain._data->swapChain };
 
@@ -56,7 +59,7 @@ vsl::DefaultPhase::SubmitResult vsl::DefaultPhase::submit() {
     presentInfo.pSwapchains = swapchains;
     presentInfo.pImageIndices = &imageIdx;
     presentInfo.pResults = nullptr;
-
+    inFlightFence->wait();
     auto result = manager._data->presentQueue.presentKHR(presentInfo);
     if (vk::Result::eSuccess != result) {
         loggingln("Warning: Missing present queue!! : ", to_string(result));
@@ -126,7 +129,7 @@ vsl::DefaultPhase::SubmitResult vsl::ComputePhase::submit() {
     vk::PipelineStageFlags waitStages[] = { vk::PipelineStageFlagBits::eColorAttachmentOutput };
 
     vk::SubmitInfo submitInfo;
-    submitInfo.waitSemaphoreCount = (std::uint32_t)waitSemaphores.size();
+    submitInfo.waitSemaphoreCount = waitSemaphores.size();
     submitInfo.pWaitSemaphores = waitSemaphores.data();
     submitInfo.pWaitDstStageMask = waitStages;
     submitInfo.commandBufferCount = 1;

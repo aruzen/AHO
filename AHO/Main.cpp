@@ -42,11 +42,12 @@ breakpoint disable swift_willThrow
         auto &[vulkan_instance, physical_device, device, command_manager, graphic_resource_manager, synchro_manager]
                 = *engine._data;
         auto &main_window = engine.boot_window.value();
-        auto &[surface, swapchain, image_view, render_pass,
+        auto &[surface, swapchain, render_pass,
                 frame_buffer, image_available, render_finish, in_flight]
                 = *engine.boot_window.value()._data2;
         if (!image_available._data)
             loggingln("image not available ; ;");
+        main_window.resize(500, 500);
 #ifdef _MSC_VER
         vsl::utils::ShaderCompiler shader_compiler("glslc", { "shaders/", "${AHO_HOME}/built-in-resource/shaders/" });
 #elif defined(__APPLE_CC__)
@@ -102,7 +103,7 @@ breakpoint disable swift_willThrow
 
 
         vsl::graphic_resource::BindingLayout ubo_binding_layout(device, {
-                aho::pipeline::getBindingPoint(aho::pipeline::ResourceName::MVPMatrixUBO)
+                aho::pipeline::getBindingPoint(aho::pipeline::ResourceName::VPMatrixUBO)
         });
         auto [ubo_pool, ubo_resource] = graphic_resource_manager->allocate(
                 std::vector(swapchain.getSwapImageSize(), ubo_binding_layout));
@@ -300,7 +301,6 @@ breakpoint disable swift_willThrow
         auto mouse = input_manager.get<input::Mouse>();
 
         main_window.add_plugin<window::WindowResizeHookPlugin>([&ubo, &scissor, &viewport, &swapchain](auto w) {
-            loggingln("aaa");
             auto size = w->frame_size();
             ubo.proj = matrix::make_perspective(45.0_deg,
                                                 (float)size.value.x.value / size.value.y.value,
@@ -309,6 +309,9 @@ breakpoint disable swift_willThrow
             viewport = Viewport(swapchain);
             scissor = Scissor(swapchain);
         });
+
+        vsl::IDPickingRenderPass picking_render_pass(swapchain);
+        vsl::FrameBuffer picking_frame_buffer(swapchain, picking_render_pass);
 
         d3::VectorF move;
         int mode = 0;
@@ -347,18 +350,20 @@ breakpoint disable swift_willThrow
             ubo.proj = matrix::make_perspective(45.0_deg, viewport.width / (float) viewport.height, 0.1f, 10.0f);
 
             {
-                auto phase = DrawPhase(&engine);
-                frame_buffer.setTargetFrame(phase.getImageIndex());
+                auto phase = DrawPhase(&engine,[&](auto& s){
+                    s << command::IDPickingRenderPassBegin(picking_render_pass, picking_frame_buffer);
+                });
                 uboBuffers[phase.getImageIndex()].copy(ubo);
-                // ubo_resource[phase.getImageIndex()].update(uboBuffers[phase.getImageIndex()], 0);
 
+                // ubo_resource[phase.getImageIndex()].update(uboBuffers[phase.getImageIndex()], 0);
+                /*
                 phase << input_vertices << scissor << viewport
                       << command::BindGraphicResource(ubo_resource[phase.getImageIndex()],
                                                       graphic_resource::BindingDestination::Graphics, input_vertices)
                       << command::BindVertexBuffer(vertBuffer, colorBuffer)
                       << command::BindIndexBuffer(indexBuffer)
                       << command::DrawIndexed(indices.size());
-
+                      */
                 /*
                 struct alignas(16) {
                     std::array<d2::PointF, 4> vertices;

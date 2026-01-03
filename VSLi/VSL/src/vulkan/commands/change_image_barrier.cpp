@@ -20,7 +20,7 @@ void vsl::command::ChangeImageBarrier::invoke(vsl::CommandPool pool, vsl::Comman
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount = 1;
     barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
+    barrier.subresourceRange.layerCount = image._data->count;
 
     vk::PipelineStageFlags sourceStage, destinationStage;
     if (oldLayout == ImageLayout::Undefined && newLayout == ImageLayout::TransferDstOptimal) {

@@ -18,15 +18,13 @@ aho::window::Window::Window(std::string name, int width, int height, aho::engine
     engine = _engine;
     auto surface = this->add_plugin<VSL_NAMESPACE::Surface>(_engine._data->vulkan_instance);
     VSL_NAMESPACE::Swapchain swapchain(_engine._data->logical_device, surface);
-    VSL_NAMESPACE::View<VSL_NAMESPACE::D2> image_view(swapchain);
     VSL_NAMESPACE::RenderPass pass(swapchain);
 
     _data2 = std::make_shared<AHO_NAMESPACE::window::WindowData>(AHO_NAMESPACE::window::WindowData{
             .surface = surface,
             .swapchain = swapchain,
-            .image_view = image_view,
             .render_pass = pass,
-            .frame_buffer = VSL_NAMESPACE::FrameBuffer<VSL_NAMESPACE::D2>(swapchain, image_view, pass),
+            .frame_buffer = VSL_NAMESPACE::FrameBuffer(swapchain, pass),
             .image_available = _engine._data->synchro_manager
                     .createSemaphore(name + "ImageAvailable", _engine._data->command_manager.getBuffer().getSize()),
             .render_finished = _engine._data->synchro_manager
@@ -46,9 +44,7 @@ bool aho::window::Window::resize(int width, int height) {
     if (not VSL_NAMESPACE::PureWindow::resize(width, height))
         return false;
     _data2->swapchain = VSL_NAMESPACE::Swapchain(engine._data->logical_device, _data2->surface, _data2->swapchain);
-    _data2->image_view = VSL_NAMESPACE::View<VSL_NAMESPACE::D2>(_data2->swapchain);
-    _data2->frame_buffer = VSL_NAMESPACE::FrameBuffer<VSL_NAMESPACE::D2>(_data2->swapchain, _data2->image_view,
-                                                                         _data2->render_pass);
+    _data2->frame_buffer = VSL_NAMESPACE::FrameBuffer(_data2->swapchain, _data2->render_pass);
     for (const auto&[_, p] : _data->plugins) {
         auto hook = std::dynamic_pointer_cast<WindowResizeHookPlugin>(p);
         if (not hook)

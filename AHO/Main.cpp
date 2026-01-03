@@ -325,6 +325,11 @@ breakpoint disable swift_willThrow
                 loggingln(delta);
             }
 
+            if (mouse->leftClick()->up()) {
+                auto id = picking_render_pass.read(command_manager, in_flight, 500, 500);
+                loggingln("clicked : ", id);
+            }
+
             if (keyRestart->down())
                 move = d3::VectorF();
             if (keyMode->down()) {

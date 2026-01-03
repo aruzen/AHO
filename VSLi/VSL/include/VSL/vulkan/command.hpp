@@ -9,7 +9,7 @@ namespace VSL_NAMESPACE {
     struct DefaultPhase;
     struct DefaultPhaseStream;
 
-    static std::uint32_t DEFAULT_BUFFER_SIZE = 2;
+    static std::uint32_t DEFAULT_BUFFER_SIZE = 3;
 
     struct CommandPool {
         CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor device);

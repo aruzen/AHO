@@ -2,6 +2,9 @@
 
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/vulkan/image.hpp>
+#include <VSL/vulkan/phase.hpp>
+#include <VSL/vulkan/commands/change_image_barrier.hpp>
+#include <VSL/vulkan/commands/copy_image_to_buffer.hpp>
 
 VSL_NAMESPACE::RenderPass::RenderPass(SwapchainAccessor swapchain)
 {
@@ -115,10 +118,62 @@ VSL_NAMESPACE::IDPickingRenderPass::IDPickingRenderPass(SwapchainAccessor swapch
                                                                          swapchain._data->extent.width,
                                                                          swapchain._data->extent.height,
                                                                          data_format::UnsignedInt);
-
-
         picking_buffer.push_back(image);
     }
+}
+
+void vsl::IDPickingRenderPass::recreate_buffer(std::uint32_t width, std::uint32_t height) {
+    for (size_t i = 0; i < picking_buffer.size(); i++) {
+        Image<ImageType::ColorAttachment | ImageType::TransferSrc> image(LogicalDeviceAccessor{_data->device},
+                                                                         width,
+                                                                         height,
+                                                                         data_format::UnsignedInt);
+        picking_buffer[i] = image;
+    }
+}
+
+std::uint32_t vsl::IDPickingRenderPass::read(vsl::CommandManager manager, FenceHolder inFlight, std::uint32_t x, std::uint32_t y) {
+    auto current = manager.getCurrentBufferIdx();
+    auto &image = picking_buffer[current];
+    uint32_t pickedId = 0;
+    StagingBuffer<vsl::MemoryType::TransferDestination> staging_buffer(LogicalDeviceAccessor{_data->device},
+                                                                       4,
+                                                                       manager);
+    {
+        auto phase = manager.startPhase<ComputePhase>(std::nullopt, std::nullopt, inFlight);
+
+        phase << command::ChangeImageBarrier(image,
+                                             vsl::ImageLayout::ColorAttachmentOptimal,
+                                             vsl::ImageLayout::TransferSrcOptimal);
+
+        vk::BufferImageCopy region{};
+        region.bufferOffset = 0;
+        region.bufferRowLength = 0;
+        region.bufferImageHeight = 0;
+        region.imageSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+        region.imageSubresource.mipLevel = 0;
+        region.imageSubresource.baseArrayLayer = 0;
+        region.imageSubresource.layerCount = 1;
+        region.imageOffset = vk::Offset3D{int32_t(x), int32_t(y), 0};
+        region.imageExtent = vk::Extent3D{1, 1, 1};
+
+        manager.getBuffer()._data->commandBuffers[current].copyImageToBuffer(
+                image._data->image,
+                vk::ImageLayout::eTransferSrcOptimal,
+                staging_buffer._data->buffer,
+                region
+        );
+
+        {
+            auto data = staging_buffer.data();
+            std::memcpy(&pickedId, data.data, 4);
+        }
+        phase << command::ChangeImageBarrier(image,
+                                             vsl::ImageLayout::TransferSrcOptimal,
+                                             vsl::ImageLayout::ColorAttachmentOptimal);
+    }
+    inFlight.wait();
+    return pickedId;
 }
 
 VSL_NAMESPACE::_impl::RenderPass_impl::~RenderPass_impl() {

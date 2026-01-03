@@ -6,6 +6,7 @@
 
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/vulkan/buffer_and_image_accessor.hpp>
+#include <VSL/vulkan/command.hpp>
 
 using namespace vsl::_impl::helper;
 
@@ -82,7 +83,7 @@ vsl::Swapchain::Swapchain(vsl::LogicalDeviceAccessor device, std::shared_ptr<Sur
                                height ? nullptr : &height.emplace(0));
     _data->extent = chooseSwapExtent(swapChainSupport.capabilities, width.value(), height.value());
 
-    _data->imageCount = swapChainSupport.capabilities.minImageCount;
+    _data->imageCount = std::max(swapChainSupport.capabilities.minImageCount, DEFAULT_BUFFER_SIZE);
     _data->preTransform = swapChainSupport.capabilities.currentTransform;
 
     if (swapChainSupport.capabilities.maxImageCount > 0 &&

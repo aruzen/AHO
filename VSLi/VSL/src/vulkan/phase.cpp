@@ -23,16 +23,13 @@ void vsl::DefaultPhase::setup() {
     if (state != State::BeforeSetup)
         return;
 
-    auto currentFrame = manager._data->commandBuffer->currentBufferIdx;
+    manager._data->commandBuffer->currentBufferIdx = (manager._data->commandBuffer->currentBufferIdx + 1) % manager._data->commandBuffer->commandBuffers.size();
     // FIXME: Result check
     if (nextImageAvailable.has_value())
         imageIndex = manager._data->device->device.acquireNextImageKHR(swapchain._data->swapChain, UINT64_MAX
-                , nextImageAvailable.value()._data->
-                        semaphores[currentFrame],nullptr).value;
+                , nextImageAvailable.value()._data->semaphores[getCurrentIndex()],nullptr).value;
     else
         imageIndex = manager._data->device->device.acquireNextImageKHR(swapchain._data->swapChain, UINT64_MAX, nullptr, nullptr).value;
-
-
 
     ComputePhase::setup();
 }
@@ -44,11 +41,9 @@ vsl::DefaultPhase::SubmitResult vsl::DefaultPhase::submit() {
     if (r != vsl::DefaultPhase::SubmitResult::Success)
         return r;
 
-    std::uint32_t imageIdx = getImageIndex();
     std::vector<vk::Semaphore> signalSemaphores;
     if (calculationFinish.has_value())
         signalSemaphores.push_back(calculationFinish.value()._data->semaphores[manager.getCurrentBufferIdx()]);
-
 
     vk::PresentInfoKHR presentInfo;
     vk::SwapchainKHR swapchains[] = { swapchain._data->swapChain };
@@ -57,7 +52,7 @@ vsl::DefaultPhase::SubmitResult vsl::DefaultPhase::submit() {
     presentInfo.pWaitSemaphores = signalSemaphores.data();
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapchains;
-    presentInfo.pImageIndices = &imageIdx;
+    presentInfo.pImageIndices = &imageIndex;
     presentInfo.pResults = nullptr;
     inFlightFence->wait();
     auto result = manager._data->presentQueue.presentKHR(presentInfo);
@@ -70,6 +65,10 @@ vsl::DefaultPhase::SubmitResult vsl::DefaultPhase::submit() {
 
 VSL_NAMESPACE::DefaultPhase::~DefaultPhase() {
     submit();
+}
+
+std::uint32_t vsl::DefaultPhase::getCurrentIndex() {
+    return this->manager.getCurrentBufferIdx();
 }
 
 VSL_NAMESPACE::ComputePhase::ComputePhase(CommandManager _manager,

@@ -75,6 +75,8 @@ namespace VSL_NAMESPACE {
 
         void setup() override;
 
+        std::uint32_t getCurrentIndex();
+
         SubmitResult submit() override;
 
         ~DefaultPhase();

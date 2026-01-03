@@ -2,17 +2,13 @@
 #include <VSL/vulkan/_pimpls.hpp>
 
 VSL_NAMESPACE::command::RenderPassBegin::RenderPassBegin(RenderPass renderPass, FrameBufferAccessor frameBuffer, std::optional<__VSLDRGBColorAccessor<float>> color)
-	: renderPass(renderPass), frameBuffer(frameBuffer), target_idx(frameBuffer._data->currentIndex), clear_color(color) {}
-
-VSL_NAMESPACE::command::RenderPassBegin::RenderPassBegin(RenderPass renderPass, FrameBufferAccessor frameBuffer, size_t imageIdx, std::optional<__VSLDRGBColorAccessor<float>> color)
-	: renderPass(renderPass), frameBuffer(frameBuffer), target_idx(imageIdx), clear_color(color) {}
-
+	: renderPass(renderPass), frameBuffer(frameBuffer), clear_color(color) {}
 
 void VSL_NAMESPACE::command::RenderPassBegin::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager)
 {
 	vk::RenderPassBeginInfo renderPassInfo;
 	renderPassInfo.renderPass = renderPass._data->renderPass;
-	renderPassInfo.framebuffer = frameBuffer._data->swapChainFramebuffers[target_idx];
+	renderPassInfo.framebuffer = frameBuffer._data->swapChainFramebuffers[buffer.getCurrentBufferIdx()];
 
 	renderPassInfo.renderArea.offset = vk::Offset2D{ 0, 0 };
 	renderPassInfo.renderArea.extent = frameBuffer._data->swapchain->swapChainExtent;
@@ -30,21 +26,13 @@ void VSL_NAMESPACE::command::RenderPassBegin::invoke(CommandPool pool, CommandBu
 VSL_NAMESPACE::command::IDPickingRenderPassBegin::IDPickingRenderPassBegin(IDPickingRenderPass renderPass,
                                                                            FrameBufferAccessor frameBuffer,
                                                                            std::optional<__VSLDRGBColorAccessor<float>> color)
-        : renderPass(renderPass), frameBuffer(frameBuffer), target_idx(frameBuffer._data->currentIndex),
-          clear_color(color) {}
-
-VSL_NAMESPACE::command::IDPickingRenderPassBegin::IDPickingRenderPassBegin(IDPickingRenderPass renderPass,
-                                                                           FrameBufferAccessor frameBuffer,
-                                                                           size_t imageIdx,
-                                                                           std::optional<__VSLDRGBColorAccessor<float>> color)
-        : renderPass(renderPass), frameBuffer(frameBuffer), target_idx(imageIdx), clear_color(color) {}
-
+        : renderPass(renderPass), frameBuffer(frameBuffer), clear_color(color) {}
 
 void VSL_NAMESPACE::command::IDPickingRenderPassBegin::invoke(CommandPool pool, CommandBuffer buffer,
                                                               CommandManager manager) {
     vk::RenderPassBeginInfo renderPassInfo;
     renderPassInfo.renderPass = renderPass._data->renderPass;
-    renderPassInfo.framebuffer = frameBuffer._data->swapChainFramebuffers[target_idx];
+    renderPassInfo.framebuffer = frameBuffer._data->swapChainFramebuffers[buffer.getCurrentBufferIdx()];
 
     renderPassInfo.renderArea.offset = vk::Offset2D{0, 0};
     renderPassInfo.renderArea.extent = frameBuffer._data->swapchain->swapChainExtent;
@@ -60,5 +48,4 @@ void VSL_NAMESPACE::command::IDPickingRenderPassBegin::invoke(CommandPool pool, 
 
     buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].beginRenderPass(renderPassInfo,
                                                                                vk::SubpassContents::eInline);
-    loggingln("IDPickingRenderPassBegin write command buffer index : ", buffer.getCurrentBufferIdx());
 }

@@ -9,8 +9,6 @@
 namespace VSL_NAMESPACE {
 	struct FrameBufferAccessor {
 		std::shared_ptr<_impl::FrameBuffer_impl> _data;
-
-		void setTargetFrame(std::uint32_t frameIdx);
 	};
 
 	struct FrameBuffer : public FrameBufferAccessor {

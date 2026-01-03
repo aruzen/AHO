@@ -54,11 +54,6 @@ VSL_NAMESPACE::FrameBuffer::FrameBuffer(SwapchainAccessor swapchain, IDPickingRe
     }
 }
 
-void VSL_NAMESPACE::FrameBufferAccessor::setTargetFrame(std::uint32_t frameIdx) {
-
-    _data->currentIndex = frameIdx;
-}
-
 VSL_NAMESPACE::_impl::FrameBuffer_impl::~FrameBuffer_impl()
 {
     for (auto framebuffer : swapChainFramebuffers) {

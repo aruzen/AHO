@@ -192,7 +192,6 @@ namespace VSL_NAMESPACE::_impl {
 	struct FrameBuffer_impl {
 		std::shared_ptr<LogicalDevice_impl> device;
 		std::shared_ptr<Swapchain_impl> swapchain;
-		size_t currentIndex = 0;
 
 		std::vector<vk::Framebuffer> swapChainFramebuffers;
 

@@ -47,11 +47,6 @@ size_t VSL_NAMESPACE::CommandBuffer::getSize() {
 	return _data->commandBuffers.size();
 }
 
-void VSL_NAMESPACE::CommandBuffer::next()
-{
-	_data->currentBufferIdx = (_data->currentBufferIdx + 1) % getSize();
-}
-
 void VSL_NAMESPACE::CommandBuffer::reset()
 {
 	for (auto& buff : _data->commandBuffers)
@@ -101,8 +96,4 @@ std::uint32_t VSL_NAMESPACE::CommandManager::getCurrentBufferIdx()
 VSL_NAMESPACE::CommandBuffer VSL_NAMESPACE::CommandManager::makeExclusiveBuffer(size_t size)
 {
 	return CommandBuffer(CommandPool{ _data->commandPool }, size);
-}
-
-void VSL_NAMESPACE::CommandManager::next() {
-	CommandBuffer{ _data->commandBuffer }.next();
 }

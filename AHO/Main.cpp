@@ -353,9 +353,9 @@ breakpoint disable swift_willThrow
                 auto phase = DrawPhase(&engine,[&](auto& s){
                     s << command::IDPickingRenderPassBegin(picking_render_pass, picking_frame_buffer);
                 });
-                uboBuffers[phase.getImageIndex()].copy(ubo);
+                uboBuffers[phase.getCurrentIndex()].copy(ubo);
 
-                // ubo_resource[phase.getImageIndex()].update(uboBuffers[phase.getImageIndex()], 0);
+                // ubo_resource[phase.getCurrentIndex()].update(uboBuffers[phase.getCurrentIndex()], 0);
                 /*
                 phase << input_vertices << scissor << viewport
                       << command::BindGraphicResource(ubo_resource[phase.getImageIndex()],

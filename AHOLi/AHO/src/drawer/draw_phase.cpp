@@ -24,7 +24,6 @@ aho::DrawPhase::DrawPhase(aho::engine::GraphicalEngine *engine,
           initialize(initialize),
           finish(finit) {
     THREAD_LOCAL_DRAW_PHASE = this;
-    engine->getWindow()._data2->frame_buffer.setTargetFrame(this->getImageIndex());
 
     if (initialize) {
         DrawStream<vsl::DefaultPhaseStream> stream{vsl::DefaultPhaseStream{this->manager}};
@@ -46,7 +45,6 @@ aho::DrawPhase::~DrawPhase() {
     if (result == vsl::DefaultPhase::SubmitResult::WantRecreateSwapchain)
         engine->getWindow().resize(engine->getWindow().window_size());
     THREAD_LOCAL_DRAW_PHASE = nullptr;
-    engine->_data->command_manager.next();
 }
 
 aho::DrawStream<vsl::DefaultPhaseStream> aho::DrawPhase::operator<<(std::shared_ptr<vsl::command::__Command> cmd) {

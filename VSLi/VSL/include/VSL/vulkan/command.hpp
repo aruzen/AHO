@@ -111,8 +111,6 @@ namespace VSL_NAMESPACE {
         std::uint32_t getCurrentBufferIdx();
 
         CommandBuffer makeExclusiveBuffer(size_t size = 1);
-
-        void next();
     };
 }
 

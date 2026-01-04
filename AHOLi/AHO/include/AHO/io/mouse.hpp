@@ -50,13 +50,15 @@ namespace AHO_NAMESPACE::input {
         void update() override;
     };
 
-    class MouseWheel : public abstract::Input<d2::VectorD> {
+    class MouseWheel : public abstract::Input<d2::VectorD>, public abstract::Updatable {
         friend aho::InputManager;
 
         void *context = nullptr;
+        size_t gen, read;
 
         static size_t subscribed;
     public:
+        static size_t _generation;
         static d2::VectorD _state;
     private:
         MouseWheel(void *context);
@@ -64,6 +66,8 @@ namespace AHO_NAMESPACE::input {
         ~MouseWheel();
 
         d2::VectorD state() override;
+
+        void update() override;
     };
 
     class Mouse : public abstract::Adaptable {

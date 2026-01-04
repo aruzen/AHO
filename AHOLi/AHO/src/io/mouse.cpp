@@ -66,13 +66,18 @@ aho::input::MouseButton::MouseButton(void *context, aho::input::MouseID code) : 
 
 size_t aho::input::MouseWheel::subscribed = 0;
 
+size_t aho::input::MouseWheel::_generation = 0;
+
 aho::d2::VectorD aho::input::MouseWheel::_state = aho::d2::VectorD(0.0, 0.0);
 
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
     aho::input::MouseWheel::_state = aho::d2::VectorD(xoffset, yoffset);
+    aho::input::MouseWheel::_generation++;
 }
 
 aho::input::MouseWheel::MouseWheel(void *context) : context(context) {
+    gen = _generation;
+    read = _generation;
     if (subscribed == 0)
         glfwSetScrollCallback((GLFWwindow *) context, scroll_callback);
     subscribed++;
@@ -84,8 +89,19 @@ aho::input::MouseWheel::~MouseWheel() {
         glfwSetScrollCallback((GLFWwindow *) context, NULL);
 }
 
+void aho::input::MouseWheel::update() {
+    if (gen < read)
+        gen = read;
+    if (gen + 60 < _generation)
+        gen = _generation - 60;
+}
+
 aho::d2::VectorD aho::input::MouseWheel::state() {
-    return _state;
+    if (gen < _generation) {
+        read = _generation;
+        return _state;
+    } else
+        return {};
 }
 
 aho::input::Mouse::Mouse(void *, aho::InputManager &manager) {

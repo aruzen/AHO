@@ -348,6 +348,7 @@ breakpoint disable swift_willThrow
                 move.value -= 0.3_f_z * Z(delta);
             if (keyR->pressed())
                 move.value += 0.3_f_z * Z(delta);
+     
 
 
             ubo.model = matrix::make_identity<Mat4x4F>();
@@ -355,20 +356,18 @@ breakpoint disable swift_willThrow
             ubo.proj = matrix::make_perspective(45.0_deg, viewport.width / (float) viewport.height, 0.1f, 10.0f);
 
             {
-                auto phase = DrawPhase(&engine,[&](auto& s){
-                    s << command::IDPickingRenderPassBegin(picking_render_pass, picking_frame_buffer);
-                });
+                auto phase = DrawPhase(&engine);
                 uboBuffers[phase.getCurrentIndex()].copy(ubo);
 
-                // ubo_resource[phase.getCurrentIndex()].update(uboBuffers[phase.getCurrentIndex()], 0);
-                /*
+                //ubo_resource[phase.getCurrentIndex()].update(uboBuffers[phase.getCurrentIndex()], 0);
+                
                 phase << input_vertices << scissor << viewport
                       << command::BindGraphicResource(ubo_resource[phase.getImageIndex()],
                                                       graphic_resource::BindingDestination::Graphics, input_vertices)
                       << command::BindVertexBuffer(vertBuffer, colorBuffer)
                       << command::BindIndexBuffer(indexBuffer)
                       << command::DrawIndexed(indices.size());
-                      */
+                      
                 /*
                 struct alignas(16) {
                     std::array<d2::PointF, 4> vertices;

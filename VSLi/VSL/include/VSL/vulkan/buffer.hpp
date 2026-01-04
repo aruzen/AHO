@@ -127,11 +127,13 @@ namespace VSL_NAMESPACE {
     bool BufferAccessor::copy(T* t, size_t size) {
         auto buff = this->data();
         memcpy(buff.data, t, sizeof(T) * size);
+        return true;
     }
 
     template<typename T>
     bool BufferAccessor::LocalBufferHolder::copy(T* t, size_t size) {
         memcpy(data, t, sizeof(T) * size);
+        return true;
     }
 
 	template<typename... Args>

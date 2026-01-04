@@ -184,6 +184,7 @@
     <ClInclude Include="VSL\include\VSL\vulkan\commands\dispatch.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\commands\draw.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\commands\draw_indexed.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\draw_indexed_instance.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\commands\push_content.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\commands\render_pass_begin.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\commands\render_pass_end.hpp" />
@@ -204,6 +205,7 @@
     <ClInclude Include="VSL\include\VSL\vulkan\stages\color_blend.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\stages\depth_stencil.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\stages\dynamic_state.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\stages\id_picking.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\stages\input_assembly.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\stages\multisample.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\stages\push_contents.hpp" />
@@ -214,7 +216,6 @@
     <ClInclude Include="VSL\include\VSL\vulkan\surface.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\swapchain.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\synchronize.hpp" />
-    <ClInclude Include="VSL\include\VSL\vulkan\view.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\viewport.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\vulkan.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\window_plugin\hook_window_resize.hpp" />
@@ -242,6 +243,7 @@
     <ClCompile Include="VSL\src\vulkan\commands\dispatch.cpp" />
     <ClCompile Include="VSL\src\vulkan\commands\draw.cpp" />
     <ClCompile Include="VSL\src\vulkan\commands\draw_indexed.cpp" />
+    <ClCompile Include="VSL\src\vulkan\commands\draw_indexed_instance.cpp" />
     <ClCompile Include="VSL\src\vulkan\commands\push_content.cpp" />
     <ClCompile Include="VSL\src\vulkan\commands\render_pass_begin.cpp" />
     <ClCompile Include="VSL\src\vulkan\commands\render_pass_end.cpp" />
@@ -260,6 +262,7 @@
     <ClCompile Include="VSL\src\vulkan\stages\color_blend.cpp" />
     <ClCompile Include="VSL\src\vulkan\stages\depth_stencil.cpp" />
     <ClCompile Include="VSL\src\vulkan\stages\dynamic_state.cpp" />
+    <ClCompile Include="VSL\src\vulkan\stages\id_picking.cpp" />
     <ClCompile Include="VSL\src\vulkan\stages\input_assembly.cpp" />
     <ClCompile Include="VSL\src\vulkan\stages\multisample.cpp" />
     <ClCompile Include="VSL\src\vulkan\stages\push_contents.cpp" />
@@ -270,7 +273,6 @@
     <ClCompile Include="VSL\src\vulkan\surface.cpp" />
     <ClCompile Include="VSL\src\vulkan\swapchain.cpp" />
     <ClCompile Include="VSL\src\vulkan\synchronize.cpp" />
-    <ClCompile Include="VSL\src\vulkan\view.cpp" />
     <ClCompile Include="VSL\src\vulkan\viewport.cpp" />
     <ClCompile Include="VSL\src\vulkan\vulkan.cpp" />
     <ClCompile Include="VSL\src\window.cpp" />

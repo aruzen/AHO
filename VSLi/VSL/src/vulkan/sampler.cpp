@@ -18,6 +18,8 @@ vsl::Sampler::Sampler(LogicalDeviceAccessor device, vsl::SamplingMode sampling, 
     samplerInfo.addressModeW = (vk::SamplerAddressMode) edge;
 
     samplerInfo.anisotropyEnable = sampling != SamplingMode::Nearest;
+    if (not device._data->parentDevice->props)
+        device._data->parentDevice->makeProps();
     samplerInfo.maxAnisotropy = device._data->parentDevice->props->limits.maxSamplerAnisotropy;
 
     // FIXME: Formatで変えないと

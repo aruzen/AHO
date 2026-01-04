@@ -272,6 +272,7 @@ namespace VSL_NAMESPACE::_impl {
         vk::ImageView view;
         vk::DeviceMemory memory;
         std::uint32_t width, height, count;
+		vk::Format format;
 
         ~Image_impl();
     };

@@ -41,7 +41,7 @@ void VSL_NAMESPACE::command::IDPickingRenderPassBegin::invoke(CommandPool pool, 
             clear_color.has_value()
             ? vk::ClearValue(vk::ClearColorValue(std::array<float, 4>{clear_color->r, clear_color->g, clear_color->b, 0.0f}))
             : vk::ClearValue(vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f})),
-            vk::ClearColorValue(std::array<uint32_t,4>{0,0,0,0})
+            vk::ClearColorValue(std::array<uint32_t,4>{0, 0, 0, 0})
     };
     renderPassInfo.clearValueCount = clearColors.size();
     renderPassInfo.pClearValues = clearColors.data();

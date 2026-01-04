@@ -55,9 +55,15 @@ vsl::DefaultPhase::SubmitResult vsl::DefaultPhase::submit() {
     presentInfo.pImageIndices = &imageIndex;
     presentInfo.pResults = nullptr;
     inFlightFence->wait();
-    auto result = manager._data->presentQueue.presentKHR(presentInfo);
-    if (vk::Result::eSuccess != result) {
-        loggingln("Warning: Missing present queue!! : ", to_string(result));
+    try {
+        auto result = manager._data->presentQueue.presentKHR(presentInfo);
+        if (vk::Result::eSuccess != result) {
+            loggingln("Warning: Missing present queue!! : ", to_string(result));
+            return vsl::DefaultPhase::SubmitResult::WantRecreateSwapchain;
+        }
+    }
+    catch (vk::OutOfDateKHRError& e) {
+        loggingln("Warning: Missing present queue!! : OutOfDateKHRError");
         return vsl::DefaultPhase::SubmitResult::WantRecreateSwapchain;
     }
     return vsl::DefaultPhase::SubmitResult::Success;

@@ -8,6 +8,8 @@
 #include <VSL/vulkan/buffer_and_image_accessor.hpp>
 #include <VSL/vulkan/command.hpp>
 
+#undef max
+
 using namespace vsl::_impl::helper;
 
 struct SwapChainSupportDetails {

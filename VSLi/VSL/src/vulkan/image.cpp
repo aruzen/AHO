@@ -16,6 +16,10 @@
 #include <VSL/vulkan/buffer_and_image_accessor.hpp>
 
 
+size_t vsl::ImageAccessor::size() {
+    return _data->width * _data->height * convert((data_format::___FormatTypes)_data->format).size();
+}
+
 std::shared_ptr<vsl::_impl::Image_impl>
 vsl::ImageAccessor::MakeImage(vsl::ImageType type,
                               vsl::MemoryProperty prop,
@@ -30,10 +34,11 @@ vsl::ImageAccessor::MakeImage(vsl::ImageType type,
     _data->height = height;
     _data->width = width;
     _data->count = count;
+    _data->format = (vk::Format)format.type();
 
     vk::ImageCreateInfo imageInfo;
     imageInfo.imageType = vk::ImageType::e2D;
-    imageInfo.format = (vk::Format)format.type();
+    imageInfo.format = _data->format;
     imageInfo.extent = vk::Extent3D{ width, height, 1 };
     imageInfo.mipLevels = 1;
     imageInfo.arrayLayers = count;

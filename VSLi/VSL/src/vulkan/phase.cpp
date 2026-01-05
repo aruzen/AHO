@@ -48,6 +48,8 @@ vsl::DefaultPhase::SubmitResult vsl::DefaultPhase::submit() {
     vk::PresentInfoKHR presentInfo;
     vk::SwapchainKHR swapchains[] = { swapchain._data->swapChain };
 
+    // FIXME なぜかacquireNextImageKHRで
+    auto imageIndex = manager.getCurrentBufferIdx();
     presentInfo.waitSemaphoreCount = signalSemaphores.size();
     presentInfo.pWaitSemaphores = signalSemaphores.data();
     presentInfo.swapchainCount = 1;

@@ -62,6 +62,7 @@ target_include_directories(AHOLi
         ${Boost_INCLUDE_DIRS}
         "${VSL_HOME}/include" # ~/repos/AHO/VSLi
         "${AHO_HOME}/include"
+        ${Vulkan_INCLUDE_DIRS}
         ${GLFW_INCLUDE_DIRS}
 )
 

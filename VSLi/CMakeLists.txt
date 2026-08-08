@@ -125,19 +125,38 @@ add_library(VSL STATIC
 
 target_include_directories(VSL PRIVATE ${Vulkan_INCLUDE_DIRS})
 target_link_libraries(VSL PRIVATE ${Vulkan_LIBRARIES})
-target_link_libraries(VSL PRIVATE
-        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-core.a"
-        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-cpp.a"
-        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-glsl.a"
-        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-hlsl.a"
-        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-msl.a"
-        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-reflect.a"
-        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-util.a"
-)
+if(WIN32)
+        target_link_libraries(VSL PRIVATE
+                "$<$<CONFIG:Debug>:${Vulkan_LIBRARY_DIRS}/spirv-cross-cored.lib>"
+                "$<$<NOT:$<CONFIG:Debug>>:${Vulkan_LIBRARY_DIRS}/spirv-cross-core.lib>"
+                "$<$<CONFIG:Debug>:${Vulkan_LIBRARY_DIRS}/spirv-cross-cppd.lib>"
+                "$<$<NOT:$<CONFIG:Debug>>:${Vulkan_LIBRARY_DIRS}/spirv-cross-cpp.lib>"
+                "$<$<CONFIG:Debug>:${Vulkan_LIBRARY_DIRS}/spirv-cross-glsld.lib>"
+                "$<$<NOT:$<CONFIG:Debug>>:${Vulkan_LIBRARY_DIRS}/spirv-cross-glsl.lib>"
+                "$<$<CONFIG:Debug>:${Vulkan_LIBRARY_DIRS}/spirv-cross-hlsld.lib>"
+                "$<$<NOT:$<CONFIG:Debug>>:${Vulkan_LIBRARY_DIRS}/spirv-cross-hlsl.lib>"
+                "$<$<CONFIG:Debug>:${Vulkan_LIBRARY_DIRS}/spirv-cross-msld.lib>"
+                "$<$<NOT:$<CONFIG:Debug>>:${Vulkan_LIBRARY_DIRS}/spirv-cross-msl.lib>"
+                "$<$<CONFIG:Debug>:${Vulkan_LIBRARY_DIRS}/spirv-cross-reflectd.lib>"
+                "$<$<NOT:$<CONFIG:Debug>>:${Vulkan_LIBRARY_DIRS}/spirv-cross-reflect.lib>"
+                "$<$<CONFIG:Debug>:${Vulkan_LIBRARY_DIRS}/spirv-cross-utild.lib>"
+                "$<$<NOT:$<CONFIG:Debug>>:${Vulkan_LIBRARY_DIRS}/spirv-cross-util.lib>"
+        )
+else()
+        target_link_libraries(VSL PRIVATE
+                "${Vulkan_LIBRARY_DIRS}/libspirv-cross-core.a"
+                "${Vulkan_LIBRARY_DIRS}/libspirv-cross-cpp.a"
+                "${Vulkan_LIBRARY_DIRS}/libspirv-cross-glsl.a"
+                "${Vulkan_LIBRARY_DIRS}/libspirv-cross-hlsl.a"
+                "${Vulkan_LIBRARY_DIRS}/libspirv-cross-msl.a"
+                "${Vulkan_LIBRARY_DIRS}/libspirv-cross-reflect.a"
+                "${Vulkan_LIBRARY_DIRS}/libspirv-cross-util.a"
+        )
+endif()
 
 
 target_include_directories(VSL PRIVATE ${GLFW_INCLUDE_DIRS} ${VSL_HOME}/include/)
-target_link_libraries(VSL PRIVATE glfw)
+target_link_libraries(VSL PRIVATE ${GLFW_LIBRARIES})
 
 if(APPLE)
     target_link_libraries(VSL PRIVATE "-framework Cocoa" "-framework OpenGL" "-framework IOKit")

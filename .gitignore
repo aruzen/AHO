@@ -20,6 +20,7 @@ thirdparty/
 mono_crash.*
 
 # Build results
+[Cc][Mm]ake-build-*/
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
@@ -30,11 +31,15 @@ x86/
 [Aa][Rr][Mm]/
 [Aa][Rr][Mm]64/
 bld/
+[Bb]uild/
 [Bb]in/
 [Oo]bj/
 [Oo]ut/
 [Ll]og/
 [Ll]ogs/
+
+# CMake local user configuration
+CMakeUserPresets.json
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/

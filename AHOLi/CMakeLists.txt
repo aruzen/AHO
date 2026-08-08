@@ -119,3 +119,7 @@ install(
         ${CMAKE_BINARY_DIR}/share/AHO/cmake/AHOConfigVersion.cmake
         DESTINATION share/AHO/cmake
 )
+
+if(BUILD_TESTING AND AHO_TESTING_HAS_GTEST AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/AHO/test/CMakeLists.txt")
+        add_subdirectory(AHO/test)
+endif()

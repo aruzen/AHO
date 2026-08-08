@@ -199,3 +199,7 @@ install(
         ${CMAKE_BINARY_DIR}/share/VSL/cmake/VSLConfigVersion.cmake
         DESTINATION share/VSL/cmake
 )
+
+if(BUILD_TESTING AND AHO_TESTING_HAS_GTEST AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/VSL/test/CMakeLists.txt")
+        add_subdirectory(VSL/test)
+endif()

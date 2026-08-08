@@ -7,5 +7,7 @@
 
 
 template class AHO_NAMESPACE::resource::Buffer<AHO_NAMESPACE::resource::BufferType::General>;
+/* 未実装
 template class AHO_NAMESPACE::resource::Buffer<AHO_NAMESPACE::resource::BufferType::GPUFriendly>;
 template class AHO_NAMESPACE::resource::Buffer<AHO_NAMESPACE::resource::BufferType::OnGPU>;
+*/

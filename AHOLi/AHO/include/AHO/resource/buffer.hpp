@@ -10,6 +10,9 @@
 #include "VSL/vulkan/buffer.hpp"
 
 #include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <utility>
 
 namespace AHO_NAMESPACE::resource {
     enum class BufferType {
@@ -27,10 +30,14 @@ namespace AHO_NAMESPACE::resource {
 
     template<>
     class Buffer<BufferType::General> {
-        size_t m_size;
-        char * m_buffer;
+        size_t m_size = 0;
+        std::unique_ptr<char[]> m_buffer;
     public:
         Buffer(size_t size);
+        Buffer(const Buffer&) = delete;
+        Buffer& operator=(const Buffer&) = delete;
+        Buffer(Buffer&&) noexcept = default;
+        Buffer& operator=(Buffer&&) noexcept = default;
 
         // ------
 
@@ -67,11 +74,12 @@ namespace AHO_NAMESPACE::resource {
     // ===========================================
 
     inline Buffer<BufferType::General>::Buffer(size_t size) {
-        m_buffer = new char[size];
+        m_size = size;
+        m_buffer = std::make_unique<char[]>(size);
     }
 
     inline void *Buffer<BufferType::General>::data() {
-        return m_buffer;
+        return m_buffer.get();
     }
 
     inline size_t Buffer<BufferType::General>::size() {

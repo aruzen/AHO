@@ -9,12 +9,13 @@ aho::InputManager::InputManager(void *context) : context(context){}
 aho::InputManager::InputManager(vsl::PureWindow window) : context(window._data->window_handle) {}
 
 void aho::InputManager::update() {
-    for (auto itr = update_targets.begin(); itr != update_targets.end(); itr++){
+    for (auto itr = update_targets.begin(); itr != update_targets.end(); ){
         if (itr->expired()) {
             itr = update_targets.erase(itr);
             continue;
         }
         itr->lock()->update();
+        ++itr;
     }
 }
 

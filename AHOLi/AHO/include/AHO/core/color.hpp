@@ -6,6 +6,10 @@
 #include <iostream>
 #include <cstdint>
 #include <algorithm>
+#include <cmath>
+#include <limits>
+
+#include <VSL/format.hpp>
 
 
 namespace AHO_NAMESPACE {
@@ -201,12 +205,13 @@ struct Upper { \
 
 			constexpr RGB() = default;
 			constexpr RGB(const ElementType& r, const ElementType& g, const ElementType& b) : r(r), g(g), b(b) {}
+			constexpr RGB(const R<ElementType>& r, const G<ElementType>& g, const B<ElementType>& b) : r(r), g(g), b(b) {}
 
 			constexpr RGB<ElementType> operator * (const ElementType& m) const {
-				return { this->r * m, this->g * m, this->b * m };
+				return { this->r.value * m, this->g.value * m, this->b.value * m };
 			}
 			constexpr RGB<ElementType> operator / (const ElementType& m) const {
-				return { this->r / m, this->g / m, this->b / m };
+				return { this->r.value / m, this->g.value / m, this->b.value / m };
 			}
 			constexpr RGB<ElementType>& operator *= (const ElementType& m) {
 				this->r *= m;
@@ -349,18 +354,20 @@ struct Upper { \
 			constexpr RGBA() = default;
 			constexpr RGBA(const ElementType& r, const ElementType& g, const ElementType& b, const ElementType& a) 
 				: RGB<ElementType>(r, g, b), a(a) {}
+			constexpr RGBA(const R<ElementType>& r, const G<ElementType>& g, const B<ElementType>& b, const A<ElementType>& a)
+				: RGB<ElementType>(r, g, b), a(a) {}
 
 			/*
 			* alpha値に影響を与えません
 			*/
 			constexpr RGBA<ElementType> operator * (const ElementType& m) const {
-				return { this->r * m, this->g * m, this->b * m, this->a };
+				return { this->r.value * m, this->g.value * m, this->b.value * m, this->a.value };
 			}
 			/*
 			* alpha値に影響を与えません
 			*/
 			constexpr RGBA<ElementType> operator / (const ElementType& m) const {
-				return { this->r / m, this->g / m, this->b / m, this->a };
+				return { this->r.value / m, this->g.value / m, this->b.value / m, this->a.value };
 			}
 			/*
 			* alpha値に影響を与えません
@@ -503,6 +510,8 @@ struct Upper { \
 
 			constexpr HSV() = default;
 			constexpr HSV(const HueType& h, const SaturationAndValueType& s, const SaturationAndValueType& v) : h(h), s(s), v(v){}
+			constexpr HSV(const H<HueType>& h, const S<SaturationAndValueType>& s, const V<SaturationAndValueType>& v)
+				: h(h), s(s), v(v) {}
 
 			constexpr HSV<HueType, SaturationAndValueType> operator + (const HSV<HueType, SaturationAndValueType>& o) const {
 				return { this->h + o.h, this->s + o.s, this->v + o.v };
@@ -641,6 +650,8 @@ struct Upper { \
 
 			constexpr HSVA() = default;
 			constexpr HSVA(const HueType& h, const SaturationAndValueType& s, const SaturationAndValueType& v, const SaturationAndValueType& a) 
+				: HSV<HueType, SaturationAndValueType>(h, s, v), a(a) {}
+			constexpr HSVA(const H<HueType>& h, const S<SaturationAndValueType>& s, const V<SaturationAndValueType>& v, const A<SaturationAndValueType>& a)
 				: HSV<HueType, SaturationAndValueType>(h, s, v), a(a) {}
 
 			constexpr HSVA<HueType, SaturationAndValueType> operator + (const HSV<HueType, SaturationAndValueType>& o) const {

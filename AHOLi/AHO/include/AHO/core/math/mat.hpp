@@ -175,8 +175,9 @@ namespace AHO_NAMESPACE {
 
         template<typename R, size_t Row, size_t Column>
         constexpr Mat<R, Row, Column>::Mat(const std::initializer_list<std::initializer_list<R>> &init) {
-            int i = 0, j = 0;
+            int i = 0;
             for (auto itr1: init) {
+                int j = 0;
                 for (auto itr2: itr1) {
                     (*this)[i][j] = itr2;
                     j++;

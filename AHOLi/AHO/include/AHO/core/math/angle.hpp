@@ -1,6 +1,7 @@
 #pragma once
 #include "../../define.hpp"
 
+#include <compare>
 #include <numbers>
 
 namespace AHO_NAMESPACE {

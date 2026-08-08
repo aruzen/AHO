@@ -27,6 +27,25 @@
       "name": "windows-vs2026-release",
       "configurePreset": "windows-vs2026-debug",
       "configuration": "Release"
+    },
+    {
+      "name": "windows-vs2026-tests",
+      "configurePreset": "windows-vs2026-debug",
+      "configuration": "Debug",
+      "targets": [
+        "vsl-test",
+        "aho-test"
+      ]
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "windows-vs2026-debug",
+      "configurePreset": "windows-vs2026-debug",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
     }
   ]
 }

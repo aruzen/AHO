@@ -9,7 +9,7 @@ namespace VSL_NAMESPACE::exceptions {
 	struct VSLException : public std::exception {
 		std::string reason;
 
-        virtual const char* what();
+        const char* what() const noexcept override;
 	};
 
 	struct RuntimeException : public VSLException{

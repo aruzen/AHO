@@ -33,6 +33,7 @@ namespace VSL_NAMESPACE {
     struct ReadableRenderPass : public RenderPassAccessor {
         std::vector<ReadableAttachmentDefinition> readable_attachments;
         std::vector<std::vector<ImageAccessor>> readable_buffers;
+        std::shared_ptr<std::vector<bool>> readable_frame_ready;
 
         ReadableRenderPass(SwapchainAccessor swapchain, std::vector<ReadableAttachmentDefinition> attachments);
 
@@ -45,5 +46,7 @@ namespace VSL_NAMESPACE {
                            std::uint32_t y);
 
         ImageAccessor readable_image(std::size_t attachment, std::size_t frame);
+
+        void mark_frame_ready(std::size_t frame);
     };
 }

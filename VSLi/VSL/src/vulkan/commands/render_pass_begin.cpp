@@ -30,6 +30,8 @@ VSL_NAMESPACE::command::ReadableRenderPassBegin::ReadableRenderPassBegin(Readabl
 
 void VSL_NAMESPACE::command::ReadableRenderPassBegin::invoke(CommandPool pool, CommandBuffer buffer,
                                                             CommandManager manager) {
+    renderPass.mark_frame_ready(buffer.getCurrentBufferIdx());
+
     vk::RenderPassBeginInfo renderPassInfo;
     renderPassInfo.renderPass = renderPass._data->renderPass;
     renderPassInfo.framebuffer = frameBuffer._data->swapChainFramebuffers[buffer.getCurrentBufferIdx()];

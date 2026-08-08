@@ -131,6 +131,7 @@ VSL_NAMESPACE::ReadableRenderPass::ReadableRenderPass(
     _data->renderPass = _data->device->device.createRenderPass(renderPassInfo);
 
     readable_buffers.resize(readable_attachments.size());
+    readable_frame_ready = std::make_shared<std::vector<bool>>(swapchain.getSwapImageSize(), false);
     for (size_t attachment = 0; attachment < readable_attachments.size(); attachment++) {
         auto &buffers = readable_buffers[attachment];
         buffers.reserve(swapchain.getSwapImageSize());
@@ -164,6 +165,8 @@ void vsl::ReadableRenderPass::recreate_buffer(std::uint32_t width, std::uint32_t
             buffers[i] = image;
         }
     }
+    if (readable_frame_ready != nullptr)
+        std::fill(readable_frame_ready->begin(), readable_frame_ready->end(), false);
 }
 
 std::uint32_t vsl::ReadableRenderPass::read(std::size_t attachment,
@@ -179,15 +182,30 @@ std::uint32_t vsl::ReadableRenderPass::read(std::size_t attachment,
                 std::source_location::current());
     }
 
-    auto current = manager.getCurrentBufferIdx();
-    if (current >= readable_buffers[attachment].size()) {
+    const auto frameCount = readable_buffers[attachment].size();
+    if (frameCount == 0) {
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "ReadableRenderPass",
+                "Readable attachment has no frame buffers.",
+                std::source_location::current());
+    }
+
+    const auto current = manager.getCurrentBufferIdx();
+    if (current >= frameCount) {
         throw VSL_NAMESPACE::exceptions::RuntimeException(
                 "ReadableRenderPass",
                 "Readable frame index is out of range.",
                 std::source_location::current());
     }
 
-    auto &image = readable_buffers[attachment][current];
+    const auto readFrame = (current + frameCount - 1) % frameCount;
+    if (readable_frame_ready == nullptr ||
+        readFrame >= readable_frame_ready->size() ||
+        !(*readable_frame_ready)[readFrame]) {
+        return 0;
+    }
+
+    auto &image = readable_buffers[attachment][readFrame];
     if (x >= image._data->width || y >= image._data->height) {
         throw VSL_NAMESPACE::exceptions::RuntimeException(
                 "ReadableRenderPass",
@@ -245,6 +263,13 @@ vsl::ImageAccessor vsl::ReadableRenderPass::readable_image(std::size_t attachmen
                 std::source_location::current());
     }
     return readable_buffers[attachment][frame];
+}
+
+void vsl::ReadableRenderPass::mark_frame_ready(std::size_t frame)
+{
+    if (readable_frame_ready == nullptr || frame >= readable_frame_ready->size())
+        return;
+    (*readable_frame_ready)[frame] = true;
 }
 
 VSL_NAMESPACE::_impl::RenderPass_impl::~RenderPass_impl()

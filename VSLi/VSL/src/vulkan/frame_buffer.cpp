@@ -37,7 +37,7 @@ VSL_NAMESPACE::FrameBuffer::FrameBuffer(SwapchainAccessor swapchain, RenderPass 
 }
 
 
-VSL_NAMESPACE::FrameBuffer::FrameBuffer(SwapchainAccessor swapchain, IDPickingRenderPass render_pass)
+VSL_NAMESPACE::FrameBuffer::FrameBuffer(SwapchainAccessor swapchain, ReadableRenderPass render_pass)
 {
     if (swapchain._data == nullptr || swapchain._data->device == nullptr || render_pass._data == nullptr || !render_pass._data->renderPass) {
         throw VSL_NAMESPACE::exceptions::RuntimeException(
@@ -51,13 +51,15 @@ VSL_NAMESPACE::FrameBuffer::FrameBuffer(SwapchainAccessor swapchain, IDPickingRe
 
     _data->swapChainFramebuffers.resize(swapchain.images.size());
     for (size_t i = 0; i < swapchain.images.size(); i++) {
-        vk::ImageView attachments[] = {
-                swapchain.images[i]._data->view, render_pass.picking_buffer[i]._data->view
-        };
+        std::vector<vk::ImageView> attachments;
+        attachments.push_back(swapchain.images[i]._data->view);
+        for (size_t attachment = 0; attachment < render_pass.readable_buffers.size(); attachment++) {
+            attachments.push_back(render_pass.readable_image(attachment, i)._data->view);
+        }
         vk::FramebufferCreateInfo framebufferInfo{};
         framebufferInfo.renderPass = render_pass._data->renderPass;
-        framebufferInfo.attachmentCount = std::size(attachments);
-        framebufferInfo.pAttachments = attachments;
+        framebufferInfo.attachmentCount = attachments.size();
+        framebufferInfo.pAttachments = attachments.data();
         framebufferInfo.width = swapchain._data->swapChainExtent.width;
         framebufferInfo.height = swapchain._data->swapChainExtent.height;
         framebufferInfo.layers = 1;

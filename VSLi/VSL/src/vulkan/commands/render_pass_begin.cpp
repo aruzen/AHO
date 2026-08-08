@@ -23,13 +23,13 @@ void VSL_NAMESPACE::command::RenderPassBegin::invoke(CommandPool pool, CommandBu
 }
 
 
-VSL_NAMESPACE::command::IDPickingRenderPassBegin::IDPickingRenderPassBegin(IDPickingRenderPass renderPass,
-                                                                           FrameBufferAccessor frameBuffer,
-                                                                           std::optional<__VSLDRGBColorAccessor<float>> color)
+VSL_NAMESPACE::command::ReadableRenderPassBegin::ReadableRenderPassBegin(ReadableRenderPass renderPass,
+                                                                         FrameBufferAccessor frameBuffer,
+                                                                         std::optional<__VSLDRGBColorAccessor<float>> color)
         : renderPass(renderPass), frameBuffer(frameBuffer), clear_color(color) {}
 
-void VSL_NAMESPACE::command::IDPickingRenderPassBegin::invoke(CommandPool pool, CommandBuffer buffer,
-                                                              CommandManager manager) {
+void VSL_NAMESPACE::command::ReadableRenderPassBegin::invoke(CommandPool pool, CommandBuffer buffer,
+                                                            CommandManager manager) {
     vk::RenderPassBeginInfo renderPassInfo;
     renderPassInfo.renderPass = renderPass._data->renderPass;
     renderPassInfo.framebuffer = frameBuffer._data->swapChainFramebuffers[buffer.getCurrentBufferIdx()];
@@ -37,12 +37,13 @@ void VSL_NAMESPACE::command::IDPickingRenderPassBegin::invoke(CommandPool pool, 
     renderPassInfo.renderArea.offset = vk::Offset2D{0, 0};
     renderPassInfo.renderArea.extent = frameBuffer._data->swapchain->swapChainExtent;
 
-    std::array<vk::ClearValue, 2> clearColors{
+    std::vector<vk::ClearValue> clearColors{
             clear_color.has_value()
             ? vk::ClearValue(vk::ClearColorValue(std::array<float, 4>{clear_color->r, clear_color->g, clear_color->b, 0.0f}))
-            : vk::ClearValue(vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f})),
-            vk::ClearColorValue(std::array<uint32_t,4>{0, 0, 0, 0})
+            : vk::ClearValue(vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f}))
     };
+    for (const auto &attachment: renderPass.readable_attachments)
+        clearColors.push_back(vk::ClearColorValue(attachment.clear));
     renderPassInfo.clearValueCount = clearColors.size();
     renderPassInfo.pClearValues = clearColors.data();
 

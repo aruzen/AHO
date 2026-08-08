@@ -2,7 +2,7 @@
 // Created by morimoto_hibiki on 2026/01/03.
 //
 
-#include <VSL/vulkan/stages/id_picking.hpp>
+#include <VSL/extend/id_picking/stage.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 
 void VSL_NAMESPACE::pipeline_layout::IDPicking::injection(VSL_NAMESPACE::PipelineLayoutAccessor pl)

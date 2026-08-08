@@ -13,6 +13,6 @@ namespace VSL_NAMESPACE {
 
 	struct FrameBuffer : public FrameBufferAccessor {
 		FrameBuffer(SwapchainAccessor swapchain, RenderPass render_pass);
-        FrameBuffer(SwapchainAccessor swapchain, IDPickingRenderPass render_pass);
+        FrameBuffer(SwapchainAccessor swapchain, ReadableRenderPass render_pass);
 	};
 }

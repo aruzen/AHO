@@ -84,6 +84,8 @@ add_library(VSL STATIC
         VSL/include/VSL/vulkan/stages/depth_stencil.hpp
         VSL/include/VSL/vulkan/stages/shader_group.hpp
         VSL/include/VSL/vulkan/stages/rasterization.hpp
+        VSL/include/VSL/extend/id_picking/id_picking.hpp
+        VSL/include/VSL/extend/id_picking/stage.hpp
         VSL/include/VSL/vulkan/swapchain.hpp
         VSL/include/VSL/vulkan/buffer_and_image_accessor.hpp
         VSL/include/VSL/vulkan/pipeline_layout.hpp

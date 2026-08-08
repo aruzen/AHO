@@ -161,6 +161,8 @@
     <ClInclude Include="VSL\include\VSL\define.hpp" />
     <ClInclude Include="VSL\include\VSL\dimension.hpp" />
     <ClInclude Include="VSL\include\VSL\exceptions.hpp" />
+    <ClInclude Include="VSL\include\VSL\extend\id_picking\id_picking.hpp" />
+    <ClInclude Include="VSL\include\VSL\extend\id_picking\stage.hpp" />
     <ClInclude Include="VSL\include\VSL\format.hpp" />
     <ClInclude Include="VSL\include\VSL\test.hpp" />
     <ClInclude Include="VSL\include\VSL\type.hpp" />

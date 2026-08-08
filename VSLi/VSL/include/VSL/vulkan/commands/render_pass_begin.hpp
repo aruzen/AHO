@@ -22,10 +22,10 @@ namespace VSL_NAMESPACE::command {
 		void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
 	};
 
-    struct IDPickingRenderPassBegin : public __Command {
-        IDPickingRenderPassBegin(IDPickingRenderPass renderPass, FrameBufferAccessor frameBuffer, std::optional<__VSLDRGBColorAccessor<float>> color = std::nullopt);
+    struct ReadableRenderPassBegin : public __Command {
+        ReadableRenderPassBegin(ReadableRenderPass renderPass, FrameBufferAccessor frameBuffer, std::optional<__VSLDRGBColorAccessor<float>> color = std::nullopt);
 
-        IDPickingRenderPass renderPass;
+        ReadableRenderPass renderPass;
         FrameBufferAccessor frameBuffer;
         std::optional<__VSLDRGBColorAccessor<float>> clear_color;
 

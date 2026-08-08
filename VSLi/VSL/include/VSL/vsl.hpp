@@ -33,7 +33,7 @@
 #include "vulkan/stages/shader_group.hpp"
 #include "vulkan/stages/resource_binding.hpp"
 #include "vulkan/stages/push_contents.hpp"
-#include "vulkan/stages/id_picking.hpp"
+#include "extend/id_picking/id_picking.hpp"
 #include "vulkan/viewport.hpp"
 #include "vulkan/scissor.hpp"
 #include "vulkan/swapchain.hpp"

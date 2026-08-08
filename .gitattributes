@@ -61,3 +61,44 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+###############################################################################
+# Project line endings
+###############################################################################
+# Keep source-like cross-platform files in LF. Windows toolchains used here
+# (MSVC, Visual Studio, CLion) can read LF cleanly, and this avoids editor churn.
+*.c      text eol=lf
+*.cc     text eol=lf
+*.cpp    text eol=lf
+*.cxx    text eol=lf
+*.h      text eol=lf
+*.hh     text eol=lf
+*.hpp    text eol=lf
+*.hxx    text eol=lf
+*.inl    text eol=lf
+*.ipp    text eol=lf
+
+*.cmake  text eol=lf
+CMakeLists.txt text eol=lf
+
+*.md     text eol=lf
+*.txt    text eol=lf
+.gitattributes text eol=lf
+
+*.vert   text eol=lf
+*.frag   text eol=lf
+*.comp   text eol=lf
+*.geom   text eol=lf
+*.tesc   text eol=lf
+*.tese   text eol=lf
+*.glsl   text eol=lf
+
+# Visual Studio project files are normally edited by Visual Studio on Windows.
+*.sln     text eol=crlf
+*.vcxproj text eol=crlf
+*.filters text eol=crlf
+*.props   text eol=crlf
+*.targets text eol=crlf
+
+# Binary shader artifacts.
+*.spv binary

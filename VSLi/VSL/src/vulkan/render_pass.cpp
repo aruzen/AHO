@@ -180,5 +180,6 @@ std::uint32_t vsl::IDPickingRenderPass::read(vsl::CommandManager manager, FenceH
 }
 
 VSL_NAMESPACE::_impl::RenderPass_impl::~RenderPass_impl() {
-	device->device.destroyRenderPass(renderPass);
+	if (device != nullptr && renderPass)
+		device->device.destroyRenderPass(renderPass);
 }

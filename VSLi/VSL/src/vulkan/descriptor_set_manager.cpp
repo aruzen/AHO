@@ -9,6 +9,8 @@
 
 #include <VSL/vulkan/descriptor_set_manager.hpp>
 
+#include <source_location>
+
 std::tuple <vsl::graphic_resource::Pool, std::vector<vsl::graphic_resource::Resource>>
 vsl::graphic_resource::ManagerInterface::make(std::vector<BindingLayout> layouts,
                                               std::map<Type, size_t> size,
@@ -30,6 +32,12 @@ vsl::graphic_resource::ManagerInterface::make(std::vector<BindingLayout> layouts
 
 vsl::graphic_resource::Pool
 vsl::graphic_resource::ManagerInterface::make(std::map <Type, size_t> count, size_t other) {
+    if (_data == nullptr || _data->device == nullptr) {
+        throw vsl::exceptions::RuntimeException(
+                "DescriptorManager",
+                "Descriptor pool creation requires a valid logical device.",
+                std::source_location::current());
+    }
     GraphicResourcePool pool;
     pool._data = std::make_shared<_impl::GraphicResourcePool_impl>();
     pool._data->manager = this;
@@ -85,6 +93,12 @@ vsl::_impl::GraphicResourceManager_impl::~GraphicResourceManager_impl() {
 
 
 vsl::graphic_resource::ExactAllocateManager::ExactAllocateManager(LogicalDeviceAccessor device) {
+    if (device._data == nullptr) {
+        throw vsl::exceptions::RuntimeException(
+                "DescriptorManager",
+                "ExactAllocateManager creation requires a valid logical device.",
+                std::source_location::current());
+    }
     _data = std::make_shared<_impl::GraphicResourceManager_impl>();
     _data->device = device._data;
 }
@@ -98,12 +112,21 @@ vsl::graphic_resource::ExactAllocateManager::allocate(std::vector <BindingLayout
 
 void vsl::graphic_resource::ExactAllocateManager::destroy(const vsl::GraphicResourcePool &pool) {
     _data->pools.erase(std::remove(_data->pools.begin(), _data->pools.end(), pool._data), _data->pools.end());
-    _data->device->device.destroy(pool._data->descriptorPool);
+    if (_data->device != nullptr && pool._data != nullptr && pool._data->descriptorPool) {
+        _data->device->device.destroy(pool._data->descriptorPool);
+        pool._data->descriptorPool = nullptr;
+    }
 }
 
 vsl::graphic_resource::OverAllocateManager::OverAllocateManager(vsl::LogicalDeviceAccessor device,
                                                                 std::map <Type, size_t> count, size_t other)
         : size(count), other(other) {
+    if (device._data == nullptr) {
+        throw vsl::exceptions::RuntimeException(
+                "DescriptorManager",
+                "OverAllocateManager creation requires a valid logical device.",
+                std::source_location::current());
+    }
     _data = std::make_shared<_impl::GraphicResourceManager_impl>();
     _data->device = device._data;
     pools.push_back(make(count, other));
@@ -111,6 +134,12 @@ vsl::graphic_resource::OverAllocateManager::OverAllocateManager(vsl::LogicalDevi
 
 
 vsl::graphic_resource::OverAllocateManager::OverAllocateManager(vsl::LogicalDeviceAccessor device) {
+    if (device._data == nullptr) {
+        throw vsl::exceptions::RuntimeException(
+                "DescriptorManager",
+                "OverAllocateManager creation requires a valid logical device.",
+                std::source_location::current());
+    }
     _data = std::make_shared<_impl::GraphicResourceManager_impl>();
     _data->device = device._data;
 }

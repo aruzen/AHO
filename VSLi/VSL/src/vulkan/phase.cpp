@@ -8,6 +8,8 @@
 
 #include <VSL/vulkan/phase.hpp>
 
+#include <source_location>
+
 VSL_NAMESPACE::DefaultPhase::DefaultPhase(CommandManager _manager, SwapchainAccessor swapchain,
                                           std::optional<SemaphoreHolder> nextImageAvailable,
                                           std::optional<SemaphoreHolder> calculationFinish,
@@ -22,14 +24,46 @@ VSL_NAMESPACE::DefaultPhase::DefaultPhase(CommandManager _manager, SwapchainAcce
 void vsl::DefaultPhase::setup() {
     if (state != State::BeforeSetup)
         return;
+    if (manager._data == nullptr || manager._data->device == nullptr ||
+        manager._data->commandBuffer == nullptr || manager._data->commandBuffer->commandBuffers.empty() ||
+        swapchain._data == nullptr || !swapchain._data->swapChain) {
+        state = State::Error;
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "DefaultPhase",
+                "setup requires a valid command manager and swapchain.",
+                std::source_location::current());
+    }
 
     manager._data->commandBuffer->currentBufferIdx = (manager._data->commandBuffer->currentBufferIdx + 1) % manager._data->commandBuffer->commandBuffers.size();
-    // FIXME: Result check
-    if (nextImageAvailable.has_value())
-        imageIndex = manager._data->device->device.acquireNextImageKHR(swapchain._data->swapChain, UINT64_MAX
-                , nextImageAvailable.value()._data->semaphores[getCurrentIndex()],nullptr).value;
-    else
-        imageIndex = manager._data->device->device.acquireNextImageKHR(swapchain._data->swapChain, UINT64_MAX, nullptr, nullptr).value;
+    vk::Result acquireResult = vk::Result::eErrorUnknown;
+    if (nextImageAvailable.has_value()) {
+        const auto currentIndex = getCurrentIndex();
+        if (nextImageAvailable.value()._data == nullptr || currentIndex >= nextImageAvailable.value()._data->semaphores.size()) {
+            state = State::Error;
+            throw VSL_NAMESPACE::exceptions::RuntimeException(
+                    "DefaultPhase",
+                    "nextImageAvailable semaphore is invalid for the current frame.",
+                    std::source_location::current());
+        }
+        auto acquired = manager._data->device->device.acquireNextImageKHR(
+                swapchain._data->swapChain,
+                UINT64_MAX,
+                nextImageAvailable.value()._data->semaphores[currentIndex],
+                nullptr);
+        acquireResult = acquired.result;
+        imageIndex = acquired.value;
+    } else {
+        auto acquired = manager._data->device->device.acquireNextImageKHR(swapchain._data->swapChain, UINT64_MAX, nullptr, nullptr);
+        acquireResult = acquired.result;
+        imageIndex = acquired.value;
+    }
+    if (acquireResult != vk::Result::eSuccess && acquireResult != vk::Result::eSuboptimalKHR) {
+        state = State::Error;
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "DefaultPhase",
+                "Failed to acquire next swapchain image: " + vk::to_string(acquireResult),
+                std::source_location::current());
+    }
 
     ComputePhase::setup();
 }
@@ -40,10 +74,26 @@ vsl::DefaultPhase::SubmitResult vsl::DefaultPhase::submit() {
     auto r = ComputePhase::submit();
     if (r != vsl::DefaultPhase::SubmitResult::Success)
         return r;
+    if (manager._data == nullptr || !manager._data->presentQueue || swapchain._data == nullptr || !swapchain._data->swapChain) {
+        state = State::Error;
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "DefaultPhase",
+                "submit requires a valid present queue and swapchain.",
+                std::source_location::current());
+    }
 
     std::vector<vk::Semaphore> signalSemaphores;
-    if (calculationFinish.has_value())
+    if (calculationFinish.has_value()) {
+        const auto currentFrame = manager.getCurrentBufferIdx();
+        if (calculationFinish.value()._data == nullptr || currentFrame >= calculationFinish.value()._data->semaphores.size()) {
+            state = State::Error;
+            throw VSL_NAMESPACE::exceptions::RuntimeException(
+                    "DefaultPhase",
+                    "calculationFinish semaphore is invalid for the current frame.",
+                    std::source_location::current());
+        }
         signalSemaphores.push_back(calculationFinish.value()._data->semaphores[manager.getCurrentBufferIdx()]);
+    }
 
     vk::PresentInfoKHR presentInfo;
     vk::SwapchainKHR swapchains[] = { swapchain._data->swapChain };
@@ -56,7 +106,8 @@ vsl::DefaultPhase::SubmitResult vsl::DefaultPhase::submit() {
     presentInfo.pSwapchains = swapchains;
     presentInfo.pImageIndices = &imageIndex;
     presentInfo.pResults = nullptr;
-    inFlightFence->wait();
+    if (inFlightFence.has_value())
+        inFlightFence->wait();
     try {
         auto result = manager._data->presentQueue.presentKHR(presentInfo);
         if (vk::Result::eSuccess != result) {
@@ -72,7 +123,11 @@ vsl::DefaultPhase::SubmitResult vsl::DefaultPhase::submit() {
 }
 
 VSL_NAMESPACE::DefaultPhase::~DefaultPhase() {
-    submit();
+    try {
+        submit();
+    } catch (...) {
+        state = State::Error;
+    }
 }
 
 std::uint32_t vsl::DefaultPhase::getCurrentIndex() {
@@ -93,7 +148,11 @@ VSL_NAMESPACE::ComputePhase::ComputePhase(CommandManager _manager,
 }
 
 vsl::ComputePhase::~ComputePhase() {
-    submit();
+    try {
+        submit();
+    } catch (...) {
+        state = State::Error;
+    }
 }
 
 void vsl::ComputePhase::setup() {
@@ -101,7 +160,21 @@ void vsl::ComputePhase::setup() {
         return;
 
     auto manager = this->manager._data;
+    if (manager == nullptr || manager->commandBuffer == nullptr || manager->commandBuffer->commandBuffers.empty()) {
+        state = State::Error;
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "ComputePhase",
+                "setup requires a valid command manager.",
+                std::source_location::current());
+    }
     auto currentFrame = manager->commandBuffer->currentBufferIdx;
+    if (currentFrame >= manager->commandBuffer->commandBuffers.size()) {
+        state = State::Error;
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "ComputePhase",
+                "current command buffer index is out of range.",
+                std::source_location::current());
+    }
 
     if (inFlightFence.has_value()) {
         inFlightFence.value().wait(currentFrame);
@@ -123,15 +196,45 @@ vsl::DefaultPhase::SubmitResult vsl::ComputePhase::submit() {
         return vsl::DefaultPhase::SubmitResult::Failed;
 
     auto manager = this->manager._data;
+    if (manager == nullptr || manager->commandBuffer == nullptr || manager->commandBuffer->commandBuffers.empty()) {
+        state = State::Error;
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "ComputePhase",
+                "submit requires a valid command manager.",
+                std::source_location::current());
+    }
     auto currentFrame = manager->commandBuffer->currentBufferIdx;
+    if (currentFrame >= manager->commandBuffer->commandBuffers.size()) {
+        state = State::Error;
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "ComputePhase",
+                "current command buffer index is out of range.",
+                std::source_location::current());
+    }
 
     manager->commandBuffer->commandBuffers[currentFrame].end();
 
     std::vector<vk::Semaphore> waitSemaphores, signalSemaphores;
-    if (nextImageAvailable.has_value())
+    if (nextImageAvailable.has_value()) {
+        if (nextImageAvailable.value()._data == nullptr || currentFrame >= nextImageAvailable.value()._data->semaphores.size()) {
+            state = State::Error;
+            throw VSL_NAMESPACE::exceptions::RuntimeException(
+                    "ComputePhase",
+                    "nextImageAvailable semaphore is invalid for the current frame.",
+                    std::source_location::current());
+        }
         waitSemaphores.push_back(nextImageAvailable.value()._data->semaphores[currentFrame]);
-    if (calculationFinish.has_value())
+    }
+    if (calculationFinish.has_value()) {
+        if (calculationFinish.value()._data == nullptr || currentFrame >= calculationFinish.value()._data->semaphores.size()) {
+            state = State::Error;
+            throw VSL_NAMESPACE::exceptions::RuntimeException(
+                    "ComputePhase",
+                    "calculationFinish semaphore is invalid for the current frame.",
+                    std::source_location::current());
+        }
         signalSemaphores.push_back(calculationFinish.value()._data->semaphores[currentFrame]);
+    }
 
     vk::PipelineStageFlags waitStages[] = { vk::PipelineStageFlagBits::eColorAttachmentOutput };
 
@@ -144,10 +247,18 @@ vsl::DefaultPhase::SubmitResult vsl::ComputePhase::submit() {
     submitInfo.signalSemaphoreCount = signalSemaphores.size();
     submitInfo.pSignalSemaphores = signalSemaphores.data();
 
-    if (inFlightFence.has_value())
+    if (inFlightFence.has_value()) {
+        if (inFlightFence.value()._data == nullptr || currentFrame >= inFlightFence.value()._data->fences.size()) {
+            state = State::Error;
+            throw VSL_NAMESPACE::exceptions::RuntimeException(
+                    "ComputePhase",
+                    "inFlightFence is invalid for the current frame.",
+                    std::source_location::current());
+        }
         manager->graphicsQueue.submit({ submitInfo }, inFlightFence.value()._data->fences[currentFrame]);
-    else
+    } else {
         manager->graphicsQueue.submit({ submitInfo });
+    }
 
     state = State::FinishSubmit;
     return vsl::DefaultPhase::SubmitResult::Success;

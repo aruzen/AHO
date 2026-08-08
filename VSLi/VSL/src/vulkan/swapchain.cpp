@@ -10,6 +10,8 @@
 
 #undef max
 
+#include <source_location>
+
 using namespace vsl::_impl::helper;
 
 struct SwapChainSupportDetails {
@@ -65,6 +67,12 @@ vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities, in
 
 vsl::Swapchain::Swapchain(vsl::LogicalDeviceAccessor device, std::shared_ptr<Surface> surface, std::optional<vsl::SwapchainAccessor> old,
                           std::optional<int> width, std::optional<int> height) {
+    if (device._data == nullptr || surface == nullptr || surface->_data == nullptr || !surface->_data->surface) {
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "Swapchain",
+                "Swapchain creation requires a valid logical device and surface.",
+                std::source_location::current());
+    }
     _data = std::shared_ptr<_impl::Swapchain_impl>(new _impl::Swapchain_impl);
     _data->device = device._data;
 
@@ -121,8 +129,12 @@ vsl::Swapchain::Swapchain(vsl::LogicalDeviceAccessor device, std::shared_ptr<Sur
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = old.has_value() ? old->_data->swapChain : VK_NULL_HANDLE;
 
-    if (auto result = device._data->device.createSwapchainKHR(&createInfo, nullptr, &_data->swapChain); result != vk::Result::eSuccess)
-        loggingln(vk::to_string(result));
+    if (auto result = device._data->device.createSwapchainKHR(&createInfo, nullptr, &_data->swapChain); result != vk::Result::eSuccess) {
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "Swapchain",
+                "Failed to create swapchain: " + vk::to_string(result),
+                std::source_location::current());
+    }
 
     // swapchain image
     _data->swapChainImages = device._data->device.getSwapchainImagesKHR(_data->swapChain);
@@ -162,5 +174,6 @@ size_t VSL_NAMESPACE::SwapchainAccessor::getSwapImageSize() {
 }
 
 VSL_NAMESPACE::_impl::Swapchain_impl::~Swapchain_impl() {
-    device->device.destroySwapchainKHR(swapChain);
+    if (device != nullptr && swapChain)
+        device->device.destroySwapchainKHR(swapChain);
 }

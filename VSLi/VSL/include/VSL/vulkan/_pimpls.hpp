@@ -78,6 +78,8 @@ namespace VSL_NAMESPACE::_impl {
 		std::shared_ptr<LogicalDevice_impl> device;
 
 		vk::CommandPool commandPool;
+
+        ~CommandPool_impl();
 	};
 
 	struct CommandBuffer_impl {
@@ -271,6 +273,8 @@ namespace VSL_NAMESPACE::_impl {
         vk::Image image;
         vk::ImageView view;
         vk::DeviceMemory memory;
+        bool ownsImage = false;
+        bool ownsMemory = false;
         std::uint32_t width, height, count;
 		vk::Format format;
 

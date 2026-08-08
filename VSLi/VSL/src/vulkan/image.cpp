@@ -9,6 +9,7 @@
 #include <VSL/vulkan/image.hpp>
 
 #include <utility>
+#include <source_location>
 #include <VSL/vulkan/phase.hpp>
 #include <VSL/vulkan/command.hpp>
 #include <VSL/vulkan/commands/change_image_barrier.hpp>
@@ -29,6 +30,12 @@ vsl::ImageAccessor::MakeImage(vsl::ImageType type,
                               std::uint32_t height,
                               vsl::data_format::___Format format,
                               std::uint32_t count) {
+    if (device._data == nullptr) {
+        throw vsl::exceptions::RuntimeException(
+                "Image",
+                "Image creation requires a valid logical device.",
+                std::source_location::current());
+    }
     auto _data = std::make_shared<_impl::Image_impl>();
     _data->device = device._data;
     _data->height = height;
@@ -48,6 +55,7 @@ vsl::ImageAccessor::MakeImage(vsl::ImageType type,
     imageInfo.initialLayout = (vk::ImageLayout) layout;
 
     _data->image = device._data->device.createImage(imageInfo);
+    _data->ownsImage = true;
 
     vk::MemoryRequirements memRequirements = device._data->device.getImageMemoryRequirements(_data->image);
 
@@ -57,6 +65,7 @@ vsl::ImageAccessor::MakeImage(vsl::ImageType type,
                                                                    (vk::MemoryPropertyFlagBits) prop);
 
     _data->memory = device._data->device.allocateMemory(allocInfo);
+    _data->ownsMemory = true;
 
     device._data->device.bindImageMemory(_data->image, _data->memory, 0);
 
@@ -90,9 +99,12 @@ bool vsl::ImageAccessor::copyByBuffer(CommandManager manager, BufferAccessor *bu
 }
 
 vsl::_impl::Image_impl::~Image_impl() {
-    if (memory == VK_NULL_HANDLE)
+    if (device == nullptr)
         return;
-    device->device.destroy(view);
-    device->device.destroy(image);
-    device->device.free(memory);
+    if (view)
+        device->device.destroy(view);
+    if (ownsImage && image)
+        device->device.destroy(image);
+    if (ownsMemory && memory)
+        device->device.free(memory);
 }

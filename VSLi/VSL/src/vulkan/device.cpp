@@ -10,6 +10,7 @@
 #include <set>
 #include <cstdint> // Necessary for UINT32_MAX
 #include <algorithm> // Necessary for std::clamp
+#include <source_location>
 
 
 bool vsl::_impl::helper::QueueFamilyIndices::isComplete() {
@@ -62,6 +63,12 @@ bool checkDeviceExtensionSupport(vk::PhysicalDevice device) {
 template<bool V>
 std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> VSL_NAMESPACE::_LogicalDeviceGraphicCreator<V>::create(VSL_NAMESPACE::PhysicalDevice device, VSL_NAMESPACE::Surface surface)
 {
+    if (device._data == nullptr || !device._data->device || surface._data == nullptr || !surface._data->surface) {
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "LogicalDevice",
+                "LogicalDevice creation requires a valid physical device and surface.",
+                std::source_location::current());
+    }
 	std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> _data = std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl>(new VSL_NAMESPACE::_impl::LogicalDevice_impl);
 
 	QueueFamilyIndices indices = findQueueFamilies(device._data->device, surface._data->surface);
@@ -172,6 +179,12 @@ std::string VSL_NAMESPACE::PhysicalDevice::name() {
 template<typename S>
 VSL_NAMESPACE::PhysicalDevices<S>::PhysicalDevices(VSL_NAMESPACE::VulkanAccessor vulkan)
 {
+    if (vulkan._accessor == nullptr || !vulkan._accessor->instance) {
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "PhysicalDevices",
+                "PhysicalDevices enumeration requires a valid Vulkan instance.",
+                std::source_location::current());
+    }
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::PhysicalDevices_impl>(new VSL_NAMESPACE::_impl::PhysicalDevices_impl);
 	_data->devices = vulkan._accessor->instance.enumeratePhysicalDevices();
 	_data->vulkan = vulkan._accessor;
@@ -201,9 +214,10 @@ VSL_NAMESPACE::PhysicalDevice VSL_NAMESPACE::PhysicalDevices<S>::search()
 	std::shared_ptr<VSL_NAMESPACE::_impl::PhysicalDevice_impl> ret = nullptr;
 	for (auto d : get()) {
 		int score = s.benchmark(d);
-		if (max_score < score)
+		if (max_score < score) {
 			max_score = score;
 			ret = d._data;
+        }
 	}
 	if (!ret)
 		throw VSL_NAMESPACE::exceptions::RuntimeException("PhysicalDevices", "PhysicalDevices is not suitable.", "VSL_NAMESPACE::_PhysicalDevicesSercher::search");
@@ -269,6 +283,12 @@ int VSL_NAMESPACE::_PhysicalDevicesSercher::benchmark(VSL_NAMESPACE::PhysicalDev
 template<typename C>
 VSL_NAMESPACE::LogicalDevice<C>::LogicalDevice(VSL_NAMESPACE::PhysicalDevice _device, vsl::Surface _surface)
 {
+    if (_device._data == nullptr || _surface._data == nullptr) {
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "LogicalDevice",
+                "LogicalDevice creation requires a valid physical device and surface.",
+                std::source_location::current());
+    }
 	C c;
 	_data = c.create(_device, _surface);
 	_data->parentDevice = _device._data;
@@ -276,13 +296,20 @@ VSL_NAMESPACE::LogicalDevice<C>::LogicalDevice(VSL_NAMESPACE::PhysicalDevice _de
 
 template<typename C>
 VSL_NAMESPACE::LogicalDevice<C>::LogicalDevice(VSL_NAMESPACE::PhysicalDevice _device, std::shared_ptr<vsl::Surface> _surface) {
+    if (_device._data == nullptr || _surface == nullptr || _surface->_data == nullptr) {
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "LogicalDevice",
+                "LogicalDevice creation requires a valid physical device and surface.",
+                std::source_location::current());
+    }
 	C c;
 	_data = c.create(_device, (vsl::Surface)(*_surface));
 	_data->parentDevice = _device._data;
 }
 
 VSL_NAMESPACE::_impl::LogicalDevice_impl::~LogicalDevice_impl() {
-	device.destroy();
+	if (device)
+		device.destroy();
 }
 
 template struct VSL_NAMESPACE::PhysicalDevices<VSL_NAMESPACE::_PhysicalDevicesSercher>;

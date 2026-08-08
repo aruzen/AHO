@@ -5,22 +5,21 @@
 
 TEST(VSLOrderRegression, DISABLED_DefaultPhaseSubmitBeforeSetupShouldNotTouchNullFence)
 {
-    // This documents an order-sensitive lifecycle bug:
-    // DefaultPhase::submit() assumes several Vulkan-backed fields are valid.
-    // A future regression test should build a minimal fake/real phase and assert
-    // that submit-before-setup fails cleanly instead of dereferencing invalid state.
+    // DefaultPhase::submit() now fails cleanly when called before setup.
+    // A future Vulkan integration test should verify this against real phase
+    // objects and invalid semaphore/fence combinations.
 }
 
 TEST(VSLOrderRegression, DISABLED_PureWindowCloseShouldBeIdempotent)
 {
-    // PureWindow::close() currently calls WindowData::destroy() and destroy()
-    // calls glfwDestroyWindow(window_handle) without an explicit null guard.
-    // A real GLFW integration test should verify that close-close is safe.
+    // PureWindow::close() and WindowData::destroy() now guard null handles.
+    // A real GLFW integration test should verify that close-close is safe
+    // against an actual created window.
 }
 
 TEST(VSLOrderRegression, DISABLED_SurfaceCreationFailureShouldNotLeavePartiallyConstructedSurface)
 {
-    // Surface construction logs and returns on glfwCreateWindowSurface failure.
-    // A future test should force surface creation failure and assert that the
-    // object cannot later destroy or expose an invalid VkSurfaceKHR.
+    // Surface construction now throws on invalid inputs and failed
+    // glfwCreateWindowSurface calls. A future test should force surface
+    // creation failure and assert that no invalid VkSurfaceKHR is exposed.
 }

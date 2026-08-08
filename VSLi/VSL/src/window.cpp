@@ -10,7 +10,10 @@
 #endif
 
 #include <VSL/window_plugin.hpp>
+#include <VSL/exceptions.hpp>
 #include <VSL/vulkan/surface.hpp>
+
+#include <source_location>
 
 std::vector<std::shared_ptr<VSL_NAMESPACE::PureWindow::WindowData>> VSL_NAMESPACE::PureWindow::WINDOWS;
 bool VSL_NAMESPACE::PureWindow::inited = false;
@@ -25,12 +28,13 @@ VSL_NAMESPACE::PureWindow::PureWindow(std::string _name, int _width, int _height
         } else {
             const char *error_txt = nullptr;
             int error = glfwGetError(&error_txt);
-            std::cerr << "Failed to initialize GLFW: " << (error == GLFW_NO_ERROR ? "Unknown error" : error_txt)
-                      << std::endl;
-            return; // TODO throw error
+            throw VSL_NAMESPACE::exceptions::RuntimeException(
+                    "GLFW",
+                    std::string("Failed to initialize GLFW: ") +
+                    (error == GLFW_NO_ERROR || error_txt == nullptr ? "Unknown error" : error_txt),
+                    std::source_location::current());
         }
 	}
-	WINDOWS.push_back(_data);
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
@@ -38,6 +42,21 @@ VSL_NAMESPACE::PureWindow::PureWindow(std::string _name, int _width, int _height
 	_data->width = _width;
 	_data->name = _name;
 	_data->window_handle = (void*)glfwCreateWindow(_width, _height, _name.c_str(), nullptr, nullptr);
+    if (_data->window_handle == nullptr) {
+        const char *error_txt = nullptr;
+        int error = glfwGetError(&error_txt);
+        if (WINDOWS.empty()) {
+            glfwTerminate();
+            inited = false;
+        }
+        _data.reset();
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "GLFW",
+                std::string("Failed to create GLFW window: ") +
+                (error == GLFW_NO_ERROR || error_txt == nullptr ? "Unknown error" : error_txt),
+                std::source_location::current());
+    }
+	WINDOWS.push_back(_data);
 }
 
 VSL_NAMESPACE::PureWindow::PureWindow(std::shared_ptr<WindowData> _data) : _data(_data) {}
@@ -76,7 +95,7 @@ std::string VSL_NAMESPACE::PureWindow::name()
 
 VSL_NAMESPACE::PureWindow::operator bool()
 {
-	return _data->window_handle != nullptr;
+	return _data != nullptr && _data->window_handle != nullptr;
 }
 
 bool VSL_NAMESPACE::PureWindow::operator==(const PureWindow& o)
@@ -90,12 +109,20 @@ bool VSL_NAMESPACE::PureWindow::operator==(const PureWindow::WindowData* o)
 }
 
 bool vsl::PureWindow::resize(int width, int height) {
+    if (_data == nullptr || _data->window_handle == nullptr) {
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "Window",
+                "resize called on an invalid window.",
+                std::source_location::current());
+    }
     glfwSetWindowSize((GLFWwindow*)_data->window_handle, width, height);
     return true;
 }
 
 void VSL_NAMESPACE::PureWindow::WindowData::destroy()
 {
+    if (window_handle == nullptr)
+        return;
 	for (auto i = WINDOWS.begin(); i != WINDOWS.end(); i++)
 		if (i->get() == this) {
 			WINDOWS.erase(i);

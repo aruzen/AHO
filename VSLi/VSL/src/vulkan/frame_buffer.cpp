@@ -5,9 +5,16 @@
 
 #include <VSL/vulkan/frame_buffer.hpp>
 #include <memory>
+#include <source_location>
 
 VSL_NAMESPACE::FrameBuffer::FrameBuffer(SwapchainAccessor swapchain, RenderPass render_pass)
 {
+    if (swapchain._data == nullptr || swapchain._data->device == nullptr || render_pass._data == nullptr || !render_pass._data->renderPass) {
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "FrameBuffer",
+                "FrameBuffer creation requires a valid swapchain and render pass.",
+                std::source_location::current());
+    }
     _data = std::make_shared<VSL_NAMESPACE::_impl::FrameBuffer_impl>();
     _data->device = swapchain._data->device;
     _data->swapchain = swapchain._data;
@@ -32,6 +39,12 @@ VSL_NAMESPACE::FrameBuffer::FrameBuffer(SwapchainAccessor swapchain, RenderPass 
 
 VSL_NAMESPACE::FrameBuffer::FrameBuffer(SwapchainAccessor swapchain, IDPickingRenderPass render_pass)
 {
+    if (swapchain._data == nullptr || swapchain._data->device == nullptr || render_pass._data == nullptr || !render_pass._data->renderPass) {
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "FrameBuffer",
+                "FrameBuffer creation requires a valid swapchain and render pass.",
+                std::source_location::current());
+    }
     _data = std::make_shared<VSL_NAMESPACE::_impl::FrameBuffer_impl>();
     _data->device = swapchain._data->device;
     _data->swapchain = swapchain._data;
@@ -56,7 +69,10 @@ VSL_NAMESPACE::FrameBuffer::FrameBuffer(SwapchainAccessor swapchain, IDPickingRe
 
 VSL_NAMESPACE::_impl::FrameBuffer_impl::~FrameBuffer_impl()
 {
+    if (device == nullptr)
+        return;
     for (auto framebuffer : swapChainFramebuffers) {
-        device->device.destroyFramebuffer(framebuffer);
+        if (framebuffer)
+            device->device.destroyFramebuffer(framebuffer);
     }
 }

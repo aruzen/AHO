@@ -19,6 +19,12 @@ VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException::MemoryNotHostVisibleEx
 
 std::uint32_t vsl::_impl::helper::findMemoryType(std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> device, std::uint32_t typeFilter,
                              vk::MemoryPropertyFlags properties) {
+    if (device == nullptr || device->parentDevice == nullptr) {
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "MemoryType",
+                "Memory type search requires a valid logical device.",
+                std::source_location::current());
+    }
     if (not device->parentDevice->memProps.has_value())
         device->parentDevice->makeMemProps();
     auto &memProperties = device->parentDevice->memProps.value();
@@ -27,7 +33,10 @@ std::uint32_t vsl::_impl::helper::findMemoryType(std::shared_ptr<VSL_NAMESPACE::
             return i;
         }
     }
-    return 0;
+    throw VSL_NAMESPACE::exceptions::RuntimeException(
+            "MemoryType",
+            "Suitable memory type was not found.",
+            std::source_location::current());
 }
 
 bool VSL_NAMESPACE::BufferAccessor::copyByBuffer(CommandManager commandManager, BufferAccessor *buf) {
@@ -75,6 +84,12 @@ void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::flush() {
 std::shared_ptr<VSL_NAMESPACE::_impl::Buffer_impl>
 VSL_NAMESPACE::BufferAccessor::MakeBuffer(VSL_NAMESPACE::LogicalDeviceAccessor device, size_t size, MemoryType memType,
                                           MemoryProperty memProperty, SharingMode sharingMode) {
+    if (device._data == nullptr) {
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "Buffer",
+                "Buffer creation requires a valid logical device.",
+                std::source_location::current());
+    }
     auto data = std::make_shared<_impl::Buffer_impl>();
     data->device = device._data;
 
@@ -148,12 +163,17 @@ bool vsl::BufferAccessor::LocalBufferHolder::copyByBuffer(vsl::CommandManager co
 
 
 VSL_NAMESPACE::_impl::Buffer_impl::~Buffer_impl() {
-    device->device.destroyBuffer(buffer);
-    device->device.freeMemory(deviceMem);
+    if (device == nullptr)
+        return;
+    if (buffer)
+        device->device.destroyBuffer(buffer);
+    if (deviceMem)
+        device->device.freeMemory(deviceMem);
 }
 
 VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::~LocalBufferHolder() {
-    parent->_data->device->device.unmapMemory(parent->_data->deviceMem);
+    if (parent != nullptr && parent->_data != nullptr && parent->_data->device != nullptr && parent->_data->deviceMem)
+        parent->_data->device->device.unmapMemory(parent->_data->deviceMem);
 }
 
 bool VSL_NAMESPACE::helper::copy_with_shift_offset(void *data, size_t maxSize, size_t &offset) {

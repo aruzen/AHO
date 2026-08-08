@@ -5,8 +5,17 @@
 #include <VSL/vulkan/sampler.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>
+#include <VSL/exceptions.hpp>
+
+#include <source_location>
 
 vsl::Sampler::Sampler(LogicalDeviceAccessor device, vsl::SamplingMode sampling, vsl::EdgeMode edge) {
+    if (device._data == nullptr) {
+        throw vsl::exceptions::RuntimeException(
+                "Sampler",
+                "Sampler creation requires a valid logical device.",
+                std::source_location::current());
+    }
     _data = std::shared_ptr<_impl::Sampler_impl>(new _impl::Sampler_impl);
     _data->device = device._data;
 
@@ -38,5 +47,6 @@ vsl::Sampler::Sampler(LogicalDeviceAccessor device, vsl::SamplingMode sampling, 
 }
 
 vsl::_impl::Sampler_impl::~Sampler_impl() {
-    device->device.destroy(sampler);
+    if (device != nullptr && sampler)
+        device->device.destroy(sampler);
 }

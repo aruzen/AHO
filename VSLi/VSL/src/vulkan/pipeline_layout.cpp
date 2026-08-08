@@ -2,10 +2,18 @@
 #include <VSL/vulkan/pipeline_layout.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>
+#include <VSL/exceptions.hpp>
 
 #include <string>
+#include <source_location>
 
 void VSL_NAMESPACE::PipelineLayoutAccessor::init_start(LogicalDeviceAccessor device) {
+    if (device._data == nullptr) {
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "PipelineLayout",
+                "PipelineLayout creation requires a valid logical device.",
+                std::source_location::current());
+    }
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::PipelineLayout_impl>(new VSL_NAMESPACE::_impl::PipelineLayout_impl);
 	_data->info = std::shared_ptr<VSL_NAMESPACE::_impl::CreateInfo>(new VSL_NAMESPACE::_impl::CreateInfo);
 	_data->device = device._data;
@@ -21,6 +29,12 @@ namespace VSL_NAMESPACE::helper {
 }
 
 void VSL_NAMESPACE::PipelineLayoutAccessor::init_finish() {
+    if (_data == nullptr || _data->device == nullptr || _data->info == nullptr) {
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "PipelineLayout",
+                "PipelineLayout finish requires a valid initialized layout.",
+                std::source_location::current());
+    }
 	_data->info->_viewport.viewportCount = (uint32_t)_data->info->viewports.size();
 	_data->info->_viewport.scissorCount = (uint32_t)_data->info->scissors.size();
 
@@ -64,5 +78,6 @@ vsl::PipelineLayoutAccessor vsl::PipelineLayout::freeze() {
 
 VSL_NAMESPACE::_impl::PipelineLayout_impl::~PipelineLayout_impl()
 {
-	device->device.destroyPipelineLayout(pipelineLayout);
+	if (device != nullptr && pipelineLayout)
+		device->device.destroyPipelineLayout(pipelineLayout);
 }

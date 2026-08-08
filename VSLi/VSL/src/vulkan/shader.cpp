@@ -13,6 +13,12 @@
 template<VSL_NAMESPACE::ShaderType _Type>
 vsl::Shader<_Type>::Shader(vsl::LogicalDeviceAccessor device, std::filesystem::path path)
 {
+    if (device._data == nullptr) {
+        throw vsl::exceptions::RuntimeException(
+                "Shader",
+                "Shader creation requires a valid logical device.",
+                std::source_location::current());
+    }
 	_data = std::make_shared<_impl::Shader_impl>();
 	_data->device = device._data;
 	std::vector<char> code;
@@ -47,6 +53,12 @@ vsl::Shader<_Type>::Shader(vsl::LogicalDeviceAccessor device, std::filesystem::p
 template<VSL_NAMESPACE::ShaderType _Type>
 vsl::Shader<_Type>::Shader(vsl::LogicalDeviceAccessor device, std::filesystem::path path, std::string name)
 {
+    if (device._data == nullptr) {
+        throw vsl::exceptions::RuntimeException(
+                "Shader",
+                "Shader creation requires a valid logical device.",
+                std::source_location::current());
+    }
 	_data = std::make_shared<_impl::Shader_impl>();
 	_data->device = device._data;
 	std::vector<char> code;
@@ -85,7 +97,8 @@ std::string VSL_NAMESPACE::Shader<_Type>::name() {
 
 VSL_NAMESPACE::_impl::Shader_impl::~Shader_impl()
 {
-	device->device.destroyShaderModule(shaderModule);
+	if (device != nullptr && shaderModule)
+		device->device.destroyShaderModule(shaderModule);
 }
 
 template struct vsl::Shader<VSL_NAMESPACE::ShaderType::Error>;

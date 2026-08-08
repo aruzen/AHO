@@ -7,9 +7,16 @@
 #include <VSL/vulkan/command.hpp>
 #include <VSL/vulkan/surface.hpp>
 
+#include <source_location>
 
 VSL_NAMESPACE::CommandPool::CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor device)
 {
+    if (device._data == nullptr) {
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "CommandPool",
+                "CommandPool creation requires a valid logical device.",
+                std::source_location::current());
+    }
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::CommandPool_impl>(new VSL_NAMESPACE::_impl::CommandPool_impl);
 	_data->device = device._data;
 
@@ -24,6 +31,12 @@ VSL_NAMESPACE::CommandPool::CommandPool(std::shared_ptr<VSL_NAMESPACE::_impl::Co
 
 VSL_NAMESPACE::CommandBuffer::CommandBuffer(VSL_NAMESPACE::CommandPool pool, std::uint32_t size)
 {
+    if (pool._data == nullptr || pool._data->device == nullptr || !pool._data->commandPool) {
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "CommandBuffer",
+                "CommandBuffer creation requires a valid command pool.",
+                std::source_location::current());
+    }
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::CommandBuffer_impl>(new VSL_NAMESPACE::_impl::CommandBuffer_impl);
 	_data->commandPool = pool._data;
 
@@ -40,32 +53,52 @@ VSL_NAMESPACE::CommandBuffer::CommandBuffer(VSL_NAMESPACE::CommandPool pool, std
 VSL_NAMESPACE::CommandBuffer::CommandBuffer(std::shared_ptr<VSL_NAMESPACE::_impl::CommandBuffer_impl> data) : _data(data) {}
 
 std::uint32_t VSL_NAMESPACE::CommandBuffer::getCurrentBufferIdx() {
+    if (_data == nullptr)
+        throw VSL_NAMESPACE::exceptions::RuntimeException("CommandBuffer", "Invalid command buffer.", std::source_location::current());
 	return _data->currentBufferIdx;
 }
 
 size_t VSL_NAMESPACE::CommandBuffer::getSize() {
+    if (_data == nullptr)
+        throw VSL_NAMESPACE::exceptions::RuntimeException("CommandBuffer", "Invalid command buffer.", std::source_location::current());
 	return _data->commandBuffers.size();
 }
 
 void VSL_NAMESPACE::CommandBuffer::reset()
 {
+    if (_data == nullptr)
+        throw VSL_NAMESPACE::exceptions::RuntimeException("CommandBuffer", "Invalid command buffer.", std::source_location::current());
 	for (auto& buff : _data->commandBuffers)
 		buff.reset();
 }
 
 void VSL_NAMESPACE::CommandBuffer::reset(std::uint32_t idx)
 {
+    if (_data == nullptr || idx >= _data->commandBuffers.size())
+        throw VSL_NAMESPACE::exceptions::RuntimeException("CommandBuffer", "Invalid command buffer index.", std::source_location::current());
 	_data->commandBuffers[idx].reset();
 }
 
 VSL_NAMESPACE::_impl::CommandBuffer_impl::~CommandBuffer_impl() {
-	commandPool->device->device.freeCommandBuffers(commandPool->commandPool, this->commandBuffers);
+    if (commandPool != nullptr && commandPool->device != nullptr && commandPool->commandPool && !commandBuffers.empty())
+	    commandPool->device->device.freeCommandBuffers(commandPool->commandPool, this->commandBuffers);
+}
+
+VSL_NAMESPACE::_impl::CommandPool_impl::~CommandPool_impl() {
+    if (device != nullptr && commandPool)
+        device->device.destroyCommandPool(commandPool);
 }
 
 VSL_NAMESPACE::CommandManager::CommandManager(std::shared_ptr<VSL_NAMESPACE::_impl::CommandManager_impl> data) : _data(data) {}
 
 VSL_NAMESPACE::CommandManager::CommandManager(VSL_NAMESPACE::LogicalDeviceAccessor device)
 {
+    if (device._data == nullptr) {
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+                "CommandManager",
+                "CommandManager creation requires a valid logical device.",
+                std::source_location::current());
+    }
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::CommandManager_impl>(new VSL_NAMESPACE::_impl::CommandManager_impl);
 	_data->device = device._data;
 	vk::Device de = device._data->device;
@@ -80,20 +113,28 @@ VSL_NAMESPACE::CommandManager::CommandManager(VSL_NAMESPACE::LogicalDeviceAccess
 
 VSL_NAMESPACE::CommandPool VSL_NAMESPACE::CommandManager::getPool()
 {
+    if (_data == nullptr || _data->commandPool == nullptr)
+        throw VSL_NAMESPACE::exceptions::RuntimeException("CommandManager", "Invalid command pool.", std::source_location::current());
 	return CommandPool{ _data->commandPool };
 }
 
 VSL_NAMESPACE::CommandBuffer VSL_NAMESPACE::CommandManager::getBuffer()
 {
+    if (_data == nullptr || _data->commandBuffer == nullptr)
+        throw VSL_NAMESPACE::exceptions::RuntimeException("CommandManager", "Invalid command buffer.", std::source_location::current());
 	return CommandBuffer{ _data->commandBuffer };
 }
 
 std::uint32_t VSL_NAMESPACE::CommandManager::getCurrentBufferIdx()
 {
+    if (_data == nullptr || _data->commandBuffer == nullptr)
+        throw VSL_NAMESPACE::exceptions::RuntimeException("CommandManager", "Invalid command buffer.", std::source_location::current());
 	return _data->commandBuffer->currentBufferIdx;
 }
 
 VSL_NAMESPACE::CommandBuffer VSL_NAMESPACE::CommandManager::makeExclusiveBuffer(size_t size)
 {
+    if (_data == nullptr || _data->commandPool == nullptr)
+        throw VSL_NAMESPACE::exceptions::RuntimeException("CommandManager", "Invalid command pool.", std::source_location::current());
 	return CommandBuffer(CommandPool{ _data->commandPool }, size);
 }

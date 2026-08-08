@@ -11,6 +11,7 @@
 
 #include <utility>
 #include <ranges>
+#include <source_location>
 
 vsl::graphic_resource::BindingLayout::BindingLayout(vsl::LogicalDeviceAccessor device,
                                                     vsl::graphic_resource::Type bindingType,
@@ -19,7 +20,14 @@ vsl::graphic_resource::BindingLayout::BindingLayout(vsl::LogicalDeviceAccessor d
 
 vsl::graphic_resource::BindingLayout::BindingLayout(LogicalDeviceAccessor device, size_t binding,
                                                     Type bindingType, ShaderFlag shaderType, size_t amount) {
+    if (device._data == nullptr) {
+        throw vsl::exceptions::RuntimeException(
+                "BindingLayout",
+                "BindingLayout creation requires a valid logical device.",
+                std::source_location::current());
+    }
     _data = std::make_shared<_impl::ResourceBindingLayout_impl>();
+    _data->device = device._data;
 
     _data->layoutBindings.resize(1);
     _data->layoutBindings[0].binding = binding;
@@ -31,11 +39,17 @@ vsl::graphic_resource::BindingLayout::BindingLayout(LogicalDeviceAccessor device
     layoutCreateInfo.bindingCount = 1;
     layoutCreateInfo.pBindings = _data->layoutBindings.data();
 
-    _data->layout = device._data->device.createDescriptorSetLayout(layoutCreateInfo);
+    _data->layout = _data->device->device.createDescriptorSetLayout(layoutCreateInfo);
 }
 
 vsl::graphic_resource::BindingLayout::BindingLayout(vsl::LogicalDeviceAccessor device,
                                                     const std::vector<BindingPoint> &points) {
+    if (device._data == nullptr) {
+        throw vsl::exceptions::RuntimeException(
+                "BindingLayout",
+                "BindingLayout creation requires a valid logical device.",
+                std::source_location::current());
+    }
     _data = std::make_shared<_impl::ResourceBindingLayout_impl>();
     _data->device = device._data;
 
@@ -74,7 +88,8 @@ std::vector <vsl::graphic_resource::BindingPoint> vsl::graphic_resource::Binding
 }
 
 vsl::_impl::ResourceBindingLayout_impl::~ResourceBindingLayout_impl() {
-    device->device.destroyDescriptorSetLayout(layout);
+    if (device != nullptr && layout)
+        device->device.destroyDescriptorSetLayout(layout);
 }
 
 vsl::graphic_resource::ManagerInterface *vsl::graphic_resource::Pool::getManager() {
@@ -83,6 +98,12 @@ vsl::graphic_resource::ManagerInterface *vsl::graphic_resource::Pool::getManager
 
 std::tuple<bool, vsl::graphic_resource::Resource>
 vsl::graphic_resource::Pool::bind(vsl::graphic_resource::BindingLayout layout) {
+    if (_data == nullptr || _data->manager == nullptr || !_data->descriptorPool || layout._data == nullptr || !layout._data->layout) {
+        throw vsl::exceptions::RuntimeException(
+                "DescriptorPool",
+                "Descriptor binding requires a valid pool and layout.",
+                std::source_location::current());
+    }
     auto result = std::make_shared<_impl::GraphicResource_impl>();
     result->pool = _data;
     vk::DescriptorSetAllocateInfo allocInfo;
@@ -101,6 +122,12 @@ vsl::graphic_resource::Pool::bind(vsl::graphic_resource::BindingLayout layout) {
 
 std::tuple<bool, std::vector<vsl::graphic_resource::Resource>>
 vsl::graphic_resource::Pool::bind(size_t n, vsl::graphic_resource::BindingLayout layout) {
+    if (_data == nullptr || _data->manager == nullptr || !_data->descriptorPool || layout._data == nullptr || !layout._data->layout) {
+        throw vsl::exceptions::RuntimeException(
+                "DescriptorPool",
+                "Descriptor binding requires a valid pool and layout.",
+                std::source_location::current());
+    }
     std::tuple<bool, std::vector<vsl::graphic_resource::Resource>> result{true, {}};
     auto &[check, resources] = result;
     resources.resize(n);
@@ -128,6 +155,20 @@ vsl::graphic_resource::Pool::bind(size_t n, vsl::graphic_resource::BindingLayout
 
 std::tuple<bool, std::vector<vsl::graphic_resource::Resource>>
 vsl::graphic_resource::Pool::bind(std::vector <vsl::graphic_resource::BindingLayout> layouts) {
+    if (_data == nullptr || _data->manager == nullptr || !_data->descriptorPool) {
+        throw vsl::exceptions::RuntimeException(
+                "DescriptorPool",
+                "Descriptor binding requires a valid pool.",
+                std::source_location::current());
+    }
+    for (const auto &layout: layouts) {
+        if (layout._data == nullptr || !layout._data->layout) {
+            throw vsl::exceptions::RuntimeException(
+                    "DescriptorPool",
+                    "Descriptor binding requires valid layouts.",
+                    std::source_location::current());
+        }
+    }
     std::tuple<bool, std::vector<vsl::graphic_resource::Resource>> result{true, {}};
     auto &[check, resources] = result;
     resources.resize(layouts.size());
@@ -159,7 +200,8 @@ vsl::graphic_resource::Pool::bind(std::vector <vsl::graphic_resource::BindingLay
 }
 
 vsl::_impl::GraphicResourcePool_impl::~GraphicResourcePool_impl() {
-    device->device.destroyDescriptorPool(descriptorPool);
+    if (device != nullptr && descriptorPool)
+        device->device.destroyDescriptorPool(descriptorPool);
 }
 
 vsl::graphic_resource::Pool vsl::graphic_resource::Resource::getPool() {

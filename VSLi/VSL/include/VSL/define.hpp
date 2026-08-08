@@ -1,6 +1,8 @@
 #pragma once
 #include "define.hpp"
 
+#include <cinttypes>
+
 // 
 #define ___VSL_JOIN_S(x, y) x ## y
 #define ___VSL_JOIN(x, y)___VSL_JOIN_S(x, y)

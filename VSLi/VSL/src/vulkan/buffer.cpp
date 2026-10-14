@@ -101,7 +101,7 @@ VSL_NAMESPACE::BufferAccessor::MakeBuffer(VSL_NAMESPACE::LogicalDeviceAccessor d
 }
 
 void
-VSL_NAMESPACE::BufferAccessor::FlushBuffer(LocalBufferHolder holder, MemoryType memType, MemoryProperty memProperty,
+VSL_NAMESPACE::BufferAccessor::FlushBuffer(LocalBufferHolder &holder, MemoryType memType, MemoryProperty memProperty,
                                            SharingMode sharingMode) {
     if (not contain(memProperty, MemoryProperty::HostVisible)) {
         throw VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException(std::source_location::current());
@@ -123,19 +123,22 @@ GetData(VSL_NAMESPACE::BufferAccessor *data, std::optional<size_t> size, size_t 
         throw VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException(std::source_location::current());
     }
 
-    VSL_NAMESPACE::BufferAccessor::LocalBufferHolder holder = {data, size ? size.value() : data->_data->requirementSize,
-                                                               offset};
-    holder.data = data->_data->device->device.mapMemory(data->_data->deviceMem, offset,
-                                                  size ? size.value() : data->_data->allocatedSize);
+
+    VSL_NAMESPACE::BufferAccessor::LocalBufferHolder holder(data,
+                                                            size ? size.value() : data->_data->requirementSize,
+                                                            offset);
+    holder.data = data->_data->device->device.mapMemory(data->_data->deviceMem,
+                                                        offset,
+                                                        holder.size);
 
     vk::MappedMemoryRange mappedRange;
     mappedRange.memory = data->_data->deviceMem;
     mappedRange.offset = offset;
-    mappedRange.size = size ? size.value() : data->_data->allocatedSize;  // またはコピー範囲のサイズ
+    mappedRange.size = holder.size;  // またはコピー範囲のサイズ
 
     data->_data->device->device.invalidateMappedMemoryRanges({mappedRange});
 
-    return holder;
+    return std::move(holder);
 }
 
 bool vsl::BufferAccessor::LocalBufferHolder::copyByImage(vsl::CommandManager commandManager, const vsl::ImageAccessor &image) {
@@ -153,8 +156,25 @@ VSL_NAMESPACE::_impl::Buffer_impl::~Buffer_impl() {
 }
 
 VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::~LocalBufferHolder() {
-    parent->_data->device->device.unmapMemory(parent->_data->deviceMem);
+    if (parent)
+        parent->_data->device->device.unmapMemory(parent->_data->deviceMem);
 }
+
+vsl::BufferAccessor::LocalBufferHolder::LocalBufferHolder(vsl::BufferAccessor::LocalBufferHolder &&other) {
+    this->parent = other.parent;
+    this->data = other.data;
+    this->size = other.size;
+    this->offset = other.offset;
+
+    other.parent = VK_NULL_HANDLE;
+    other.data = VK_NULL_HANDLE;
+    other.size = 0;
+    other.offset = 0;
+}
+
+vsl::BufferAccessor::LocalBufferHolder::LocalBufferHolder(vsl::BufferAccessor *parent, std::size_t size,
+                                                          std::size_t offset, void *data)
+        : parent(parent), size(size), offset(offset), data(data) {}
 
 bool VSL_NAMESPACE::helper::copy_with_shift_offset(void *data, size_t maxSize, size_t &offset) {
     return true;

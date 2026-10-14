@@ -216,6 +216,14 @@ namespace VSL_NAMESPACE {
             std::size_t size, offset;
             void *data;
 
+            LocalBufferHolder(const LocalBufferHolder &) = delete;
+
+            LocalBufferHolder &operator=(const LocalBufferHolder &) = delete;
+
+            LocalBufferHolder(LocalBufferHolder &&other);
+
+            LocalBufferHolder(BufferAccessor *parent, std::size_t size, std::size_t offset, void *data = nullptr);
+
             ~LocalBufferHolder();
 
             void flush();
@@ -239,7 +247,7 @@ namespace VSL_NAMESPACE {
 
         virtual LocalBufferHolder data(std::optional<size_t> size = std::nullopt, size_t offset = 0) = 0;
 
-        virtual void flush(LocalBufferHolder holder) = 0;
+        virtual void flush(LocalBufferHolder& holder) = 0;
 
         template<typename... Args>
         bool copy(const Args &... args);
@@ -261,7 +269,7 @@ namespace VSL_NAMESPACE {
                    MemoryProperty memProperty, SharingMode sharingMode);
 
         static void
-        FlushBuffer(LocalBufferHolder holder, MemoryType memType, MemoryProperty memProperty, SharingMode sharingMode);
+        FlushBuffer(LocalBufferHolder& holder, MemoryType memType, MemoryProperty memProperty, SharingMode sharingMode);
 
         static LocalBufferHolder
         GetData(VSL_NAMESPACE::BufferAccessor *data, std::optional<size_t> size, size_t offset, MemoryType memType,

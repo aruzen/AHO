@@ -43,7 +43,7 @@ namespace VSL_NAMESPACE {
         Buffer(LogicalDeviceAccessor device, CommandManager manager, T* t, size_t size = 1);
 
         virtual LocalBufferHolder data(std::optional<size_t> size = std::nullopt, size_t offset = 0);
-		virtual void flush(LocalBufferHolder holder);
+		virtual void flush(LocalBufferHolder& holder);
 	};
 
     template <MemoryType MemType = MemoryType::None,
@@ -212,7 +212,7 @@ namespace VSL_NAMESPACE {
 	}
 
 	template<MemoryType MemType, MemoryProperty MemProperty, SharingMode SharingMode>
-	inline void Buffer<MemType, MemProperty, SharingMode>::flush(LocalBufferHolder holder)
+	inline void Buffer<MemType, MemProperty, SharingMode>::flush(LocalBufferHolder& holder)
 	{
 		if constexpr (not contain<MemProperty, MemoryProperty::HostVisible>()) {
 			static_assert("Not host-visible memory!");

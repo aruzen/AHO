@@ -986,6 +986,7 @@ namespace VSL_NAMESPACE::data_format {
                 return SignedInt64RGBA;
             case ___FormatTypes::SignedFloat64RGBA:
                 return SignedFloat64RGBA;
+            default:
         }
         return Undefined;
     }

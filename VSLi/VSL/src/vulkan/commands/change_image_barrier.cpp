@@ -25,6 +25,12 @@ void vsl::command::ChangeImageBarrier::invoke(vsl::CommandPool pool, vsl::Comman
     vk::PipelineStageFlags sourceStage, destinationStage;
     if (oldLayout == ImageLayout::Undefined && newLayout == ImageLayout::TransferDstOptimal) {
         barrier.srcAccessMask = {};
+        barrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+
+        sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
+        destinationStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    } else if (oldLayout == ImageLayout::Undefined && newLayout == ImageLayout::ColorAttachmentOptimal) {
+        barrier.srcAccessMask = {};
         barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
 
         sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;

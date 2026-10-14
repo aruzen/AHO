@@ -5,6 +5,9 @@
 #include <array>
 #include <algorithm>
 #include <optional>
+#include <expected>
+#include <limits>
+#include <type_traits>
 #include <cmath>
 
 #include "../../concepts.hpp"
@@ -21,6 +24,12 @@ namespace AHO_NAMESPACE {
 
         struct Type {
             size_t row, column;
+        };
+
+        enum class FailedCause {
+            NotSquare,
+            Singular,
+            NonAffine
         };
 
         template<typename T>
@@ -165,6 +174,12 @@ namespace AHO_NAMESPACE {
 
         template<typename T>
         Mat4x4<T> make_perspective(Degree fov, T aspect, T near, T far);
+
+        template<typename R, size_t Row, size_t Column>
+        std::expected<Mat<R, Row, Column>, FailedCause> inverse_gauss_jordan(const Mat<R, Row, Column> &mat);
+
+        template<typename R>
+        std::expected<Mat<R, 4, 4>, FailedCause> inverse_affine(const Mat<R, 4, 4> &mat);
     }
     //------------------------------------------------------------------------------------------
 
@@ -476,6 +491,142 @@ namespace AHO_NAMESPACE {
         template<typename T>
         Mat4x4<T> make_perspective(Degree fov, T aspect, T near, T far) {
             return make_perspective((Radian) fov, aspect, near, far);
+        }
+
+        template<typename R, size_t Row, size_t Column>
+        std::expected<Mat<R, Row, Column>, FailedCause> inverse_gauss_jordan(const Mat<R, Row, Column> &mat) {
+            if constexpr (Row != Column) {
+                return std::unexpected(FailedCause::NotSquare);
+            } else {
+                constexpr size_t Size = Row;
+                auto abs_value = [](const R &v) {
+                    using std::abs;
+                    return abs(v);
+                };
+                auto is_near_zero = [&](const R &v) {
+                    if constexpr (std::is_floating_point_v<R>) {
+                        return abs_value(v) <= std::numeric_limits<R>::epsilon() * static_cast<R>(32);
+                    } else {
+                        return v == R{};
+                    }
+                };
+
+                std::array<std::array<R, Size * 2>, Size> aug {};
+                for (size_t i = 0; i < Size; ++i) {
+                    for (size_t j = 0; j < Size; ++j) {
+                        aug[i][j] = mat[i][j];
+                        aug[i][j + Size] = (i == j) ? static_cast<R>(1) : static_cast<R>(0);
+                    }
+                }
+
+                for (size_t i = 0; i < Size; ++i) {
+                    size_t pivot = i;
+                    auto max_abs = abs_value(aug[i][i]);
+                    for (size_t r = i + 1; r < Size; ++r) {
+                        auto v = abs_value(aug[r][i]);
+                        if (v > max_abs) {
+                            max_abs = v;
+                            pivot = r;
+                        }
+                    }
+                    if (is_near_zero(max_abs)) {
+                        return std::unexpected(FailedCause::Singular);
+                    }
+                    if (pivot != i) {
+                        std::swap(aug[i], aug[pivot]);
+                    }
+
+                    const R pivot_value = aug[i][i];
+                    for (size_t j = 0; j < Size * 2; ++j)
+                        aug[i][j] /= pivot_value;
+
+                    for (size_t r = 0; r < Size; ++r) {
+                        if (r == i)
+                            continue;
+                        const R factor = aug[r][i];
+                        if (is_near_zero(factor))
+                            continue;
+                        for (size_t j = 0; j < Size * 2; ++j)
+                            aug[r][j] -= factor * aug[i][j];
+                    }
+                }
+
+                Mat<R, Size, Size> inverse {};
+                for (size_t i = 0; i < Size; ++i)
+                    for (size_t j = 0; j < Size; ++j)
+                        inverse[i][j] = aug[i][j + Size];
+
+                return inverse;
+            }
+        }
+
+        template<typename R>
+        std::expected<Mat<R, 4, 4>, FailedCause> inverse_affine(const Mat<R, 4, 4> &mat) {
+            auto abs_value = [](const R &v) {
+                using std::abs;
+                return abs(v);
+            };
+            auto is_near_zero = [&](const R &v) {
+                if constexpr (std::is_floating_point_v<R>) {
+                    return abs_value(v) <= std::numeric_limits<R>::epsilon() * static_cast<R>(32);
+                } else {
+                    return v == R{};
+                }
+            };
+            auto is_near_one = [&](const R &v) {
+                return is_near_zero(v - static_cast<R>(1));
+            };
+
+            if (!is_near_zero(mat[3][0]) || !is_near_zero(mat[3][1]) || !is_near_zero(mat[3][2]) ||
+                !is_near_one(mat[3][3])) {
+                return std::unexpected(FailedCause::NonAffine);
+            }
+
+            const R a00 = mat[0][0];
+            const R a01 = mat[0][1];
+            const R a02 = mat[0][2];
+            const R a10 = mat[1][0];
+            const R a11 = mat[1][1];
+            const R a12 = mat[1][2];
+            const R a20 = mat[2][0];
+            const R a21 = mat[2][1];
+            const R a22 = mat[2][2];
+
+            const R det = a00 * (a11 * a22 - a12 * a21)
+                        - a01 * (a10 * a22 - a12 * a20)
+                        + a02 * (a10 * a21 - a11 * a20);
+
+            if (is_near_zero(det)) {
+                return std::unexpected(FailedCause::Singular);
+            }
+
+            const R inv_det = static_cast<R>(1) / det;
+
+            Mat<R, 4, 4> inverse {};
+            inverse[0][0] = (a11 * a22 - a12 * a21) * inv_det;
+            inverse[0][1] = (a02 * a21 - a01 * a22) * inv_det;
+            inverse[0][2] = (a01 * a12 - a02 * a11) * inv_det;
+            inverse[1][0] = (a12 * a20 - a10 * a22) * inv_det;
+            inverse[1][1] = (a00 * a22 - a02 * a20) * inv_det;
+            inverse[1][2] = (a02 * a10 - a00 * a12) * inv_det;
+            inverse[2][0] = (a10 * a21 - a11 * a20) * inv_det;
+            inverse[2][1] = (a01 * a20 - a00 * a21) * inv_det;
+            inverse[2][2] = (a00 * a11 - a01 * a10) * inv_det;
+
+            const R t0 = mat[0][3];
+            const R t1 = mat[1][3];
+            const R t2 = mat[2][3];
+
+            inverse[0][3] = -(inverse[0][0] * t0 + inverse[0][1] * t1 + inverse[0][2] * t2);
+            inverse[1][3] = -(inverse[1][0] * t0 + inverse[1][1] * t1 + inverse[1][2] * t2);
+            inverse[2][3] = -(inverse[2][0] * t0 + inverse[2][1] * t1 + inverse[2][2] * t2);
+
+            inverse[3][0] = static_cast<R>(0);
+            inverse[3][1] = static_cast<R>(0);
+            inverse[3][2] = static_cast<R>(0);
+            inverse[3][3] = static_cast<R>(1);
+
+            return inverse;
         }
 
         template<typename R, size_t Row, size_t Column>

@@ -82,9 +82,9 @@ namespace AHO_NAMESPACE {
 			constexpr static bool IndexY = _CountTruesFunc<EnableX, EnableY>();
 			constexpr static bool IndexZ = _CountTruesFunc<EnableX, EnableY, EnableZ>();
 
-			consteval static typename _MakeCoordinateInfo<true, EnableY, EnableZ>::value EnablingX() {};
-			consteval static typename _MakeCoordinateInfo<EnableX, true, EnableZ>::value EnablingY() {};
-			consteval static typename _MakeCoordinateInfo<EnableX, EnableY, true>::value EnablingZ() {};
+			consteval static typename _MakeCoordinateInfo<true, EnableY, EnableZ>::value EnablingX() { return {}; };
+			consteval static typename _MakeCoordinateInfo<EnableX, true, EnableZ>::value EnablingY() { return {}; };
+			consteval static typename _MakeCoordinateInfo<EnableX, EnableY, true>::value EnablingZ() { return {}; };
 
 			/*
 			consteval static typename _MakeCoordinateInfo<false, EnableY, EnableZ>::value DisablingX() {};

@@ -25,7 +25,7 @@ namespace AHO_NAMESPACE::concepts {
         template<size_t Index, typename T, typename... Args>
             requires (Index != 0)
         struct GetType<Index, T, Args...> {
-            using value = GetType<Index-1, Args...>;
+            using value = typename GetType<Index-1, Args...>::value;
         };
 
         template<size_t Index, typename T, typename... Args>

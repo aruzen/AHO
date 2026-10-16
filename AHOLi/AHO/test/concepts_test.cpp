@@ -19,6 +19,13 @@ static_assert(aho::concepts::sames_as<int> && aho::concepts::sames_as<int, int>)
 static_assert(aho::concepts::sames_as<int, int, int> && !aho::concepts::sames_as<int, double>);
 static_assert(aho::concepts::is_standard_object<Shape> && !aho::concepts::is_standard_object<Empty>);
 static_assert(aho::concepts::is_intersect_object<Intersecting, Shape>);
+using aho::concepts::helper::get_type_v;
+static_assert(std::same_as<get_type_v<0, int, float, double>, int>);
+static_assert(std::same_as<get_type_v<1, int, float, double>, float>);
+static_assert(std::same_as<get_type_v<2, int, float, double>, double>);
+static_assert(std::same_as<get_type_v<3, int, float, double, Empty>, Empty>);
+static_assert(std::same_as<get_type_v<1, int, const Shape&>, const Shape&>);
+static_assert(std::same_as<get_type_v<2, int, double, Shape&&>, Shape&&>);
 TEST(AhoConceptsTest, AcceptedShapeCanBeUsedThroughItsPublicContract) {
     EXPECT_DOUBLE_EQ(Shape{}.area(), 2);
     EXPECT_TRUE(Intersecting{}.intersect(Shape{}));

@@ -100,6 +100,50 @@ TEST(MatTest, AssignmentMultiplicationMatchesProductAndHandlesSelfAliasing) {
     b *= b;
     expect_matrix(b, std::array<std::array<int, 2>, 2>{{{7, 10}, {15, 22}}});
 }
+TEST(MatCompoundAssignmentTest, SubtractionSupportsRectangularMatricesAndSelfAliasing) {
+    using Matrix = aho::Mat<int, 2, 3>;
+    const std::array<std::array<int, 3>, 2> left{{{1, 2, 3}, {4, 5, 6}}};
+    const std::array<std::array<int, 3>, 2> right{{{6, 5, 4}, {3, 2, 1}}};
+    Matrix matrix(left);
+    EXPECT_EQ(&(matrix -= Matrix(right)), &matrix);
+    expect_matrix(matrix, std::array<std::array<int, 3>, 2>{{{-5, -3, -1}, {1, 3, 5}}});
+    EXPECT_EQ(&(matrix -= matrix), &matrix);
+    expect_matrix(matrix, std::array<std::array<int, 3>, 2>{});
+}
+TEST(MatCompoundAssignmentTest, MultiplicationPreservesOperandsAndMatchesKnownProducts) {
+    Matrix2 matrix(values);
+    const Matrix2 right(others);
+    EXPECT_EQ(&(matrix *= right), &matrix);
+    expect_matrix(matrix, std::array<std::array<int, 2>, 2>{{{19, 22}, {43, 50}}});
+    expect_matrix(right, others);
+    const Matrix2 identity(std::array<std::array<int, 2>, 2>{{{1, 0}, {0, 1}}});
+    matrix *= identity;
+    expect_matrix(matrix, std::array<std::array<int, 2>, 2>{{{19, 22}, {43, 50}}});
+    matrix *= Matrix2{};
+    expect_matrix(matrix, std::array<std::array<int, 2>, 2>{});
+}
+TEST(MatCompoundAssignmentTest, MixedElementMultiplicationConvertsAfterAccumulatingEachDotProduct) {
+    Matrix2 matrix(values);
+    const aho::Mat<double, 2, 2> right(std::array<std::array<double, 2>, 2>{{{0.5, 0}, {0.5, 0}}});
+    matrix *= right;
+    expect_matrix(matrix, std::array<std::array<int, 2>, 2>{{{1, 0}, {3, 0}}});
+}
+TEST(MatCompoundAssignmentTest, IntegerOperationsRemainConstantEvaluable) {
+    constexpr auto product = [] {
+        Matrix2 matrix(std::array<std::array<int, 2>, 2>{{{1, 2}, {3, 4}}});
+        matrix *= matrix;
+        return matrix;
+    }();
+    static_assert(product[0][0] == 7 && product[0][1] == 10 && product[1][0] == 15 && product[1][1] == 22);
+    constexpr auto difference = [] {
+        Matrix2 matrix(std::array<std::array<int, 2>, 2>{{{1, 2}, {3, 4}}});
+        matrix -= matrix;
+        return matrix;
+    }();
+    static_assert(difference[0][0] == 0 && difference[0][1] == 0 && difference[1][0] == 0 && difference[1][1] == 0);
+    expect_matrix(product, std::array<std::array<int, 2>, 2>{{{7, 10}, {15, 22}}});
+    expect_matrix(difference, std::array<std::array<int, 2>, 2>{});
+}
 TEST(MatTest, RectangularProductHasExpectedShapeAndValues) {
     const aho::Mat<int, 2, 3> a(std::array<std::array<int, 3>, 2>{{{1, 2, 3}, {4, 5, 6}}});
     const aho::Mat<int, 3, 1> b(std::array<std::array<int, 1>, 3>{{{2}, {3}, {4}}});

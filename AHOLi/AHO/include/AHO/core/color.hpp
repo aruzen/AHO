@@ -203,61 +203,84 @@ struct Upper { \
 			constexpr RGB(const ElementType& r, const ElementType& g, const ElementType& b) : r(r), g(g), b(b) {}
 
 			constexpr RGB<ElementType> operator * (const ElementType& m) const {
-				return { this->r * m, this->g * m, this->b * m };
+				return {
+					static_cast<ElementType>(this->r.value * m),
+					static_cast<ElementType>(this->g.value * m),
+					static_cast<ElementType>(this->b.value * m)
+				};
 			}
 			constexpr RGB<ElementType> operator / (const ElementType& m) const {
-				return { this->r / m, this->g / m, this->b / m };
+				return {
+					static_cast<ElementType>(this->r.value / m),
+					static_cast<ElementType>(this->g.value / m),
+					static_cast<ElementType>(this->b.value / m)
+				};
 			}
 			constexpr RGB<ElementType>& operator *= (const ElementType& m) {
-				this->r *= m;
-				this->g *= m;
-				this->b *= m;
+				this->r.value *= m;
+				this->g.value *= m;
+				this->b.value *= m;
 				return *this;
 			}
 			constexpr RGB<ElementType>& operator /= (const ElementType& m) {
-				this->r /= m;
-				this->g /= m;
-				this->b /= m;
+				this->r.value /= m;
+				this->g.value /= m;
+				this->b.value /= m;
 				return *this;
 			}
 
 			constexpr RGB<ElementType> operator + (const RGB<ElementType>& o) const {
-				return { this->r + o.r, this->g + o.g, this->b + o.b };
+				return {
+					static_cast<ElementType>(this->r.value + o.r.value),
+					static_cast<ElementType>(this->g.value + o.g.value),
+					static_cast<ElementType>(this->b.value + o.b.value)
+				};
 			}
 			constexpr RGBA<ElementType> operator + (const RGBA<ElementType>& o) const {
-				return { this->r + o.r, this->g + o.g, this->b + o.b, o.a };
+				return {
+					static_cast<ElementType>(this->r.value + o.r.value),
+					static_cast<ElementType>(this->g.value + o.g.value),
+					static_cast<ElementType>(this->b.value + o.b.value),
+					o.a.value
+				};
 			}
 			constexpr RGB<ElementType> operator + (const R<ElementType>& r) const {
-				return { this->r + r, this->g, this->b };
+				return { static_cast<ElementType>(this->r.value + r.value), this->g.value, this->b.value };
 			}
 			constexpr RGB<ElementType> operator + (const G<ElementType>& g) const {
-				return { this->r, this->g + g, this->b };
+				return { this->r.value, static_cast<ElementType>(this->g.value + g.value), this->b.value };
 			}
 			constexpr RGB<ElementType> operator + (const B<ElementType>& b) const {
-				return { this->r, this->g, this->b + b };
+				return { this->r.value, this->g.value, static_cast<ElementType>(this->b.value + b.value) };
 			}
 			constexpr RGBA<ElementType> operator + (const A<ElementType>& a) const {
-				return { this->r, this->g, this->b, a };
+				return { this->r.value, this->g.value, this->b.value, a.value };
 			}
 
 			constexpr RGB<ElementType> operator - (const RGB<ElementType>& o) const {
-				return { this->r - o.r, this->g - o.g, this->b - o.b };
+				return {
+					static_cast<ElementType>(this->r.value - o.r.value),
+					static_cast<ElementType>(this->g.value - o.g.value),
+					static_cast<ElementType>(this->b.value - o.b.value)
+				};
 			}
 			constexpr RGB<ElementType> operator - (const R<ElementType>& r) const {
-				return { this->r - r, this->g, this->b };
+				return { static_cast<ElementType>(this->r.value - r.value), this->g.value, this->b.value };
 			}
 			constexpr RGB<ElementType> operator - (const G<ElementType>& g) const {
-				return { this->r, this->g - g, this->b };
+				return { this->r.value, static_cast<ElementType>(this->g.value - g.value), this->b.value };
 			}
 			constexpr RGB<ElementType> operator - (const B<ElementType>& b) const {
-				return { this->r, this->g, this->b - b };
+				return { this->r.value, this->g.value, static_cast<ElementType>(this->b.value - b.value) };
 			}
 			constexpr RGBA<ElementType> operator - (const A<ElementType>& a) const {
-				return { this->r, this->g, this->b, a };
+				return { this->r.value, this->g.value, this->b.value, static_cast<ElementType>(-a.value) };
 			}
 
 			constexpr RGB<ElementType>& operator += (const RGB<ElementType>& o) {
-				*this = RGB<ElementType>{ r + o.r, g + o.g, b + o.b };
+				r += o.r;
+				g += o.g;
+				b += o.b;
 				return *this;
 			}
 			constexpr RGB<ElementType>& operator += (const R<ElementType>& r) {
@@ -273,7 +296,9 @@ struct Upper { \
 				return *this;
 			}
 			constexpr RGB<ElementType>& operator -= (const RGB<ElementType>& o) {
-				*this = RGB<ElementType>{ r - o.r, g - o.g, b - o.b };
+				r -= o.r;
+				g -= o.g;
+				b -= o.b;
 				return *this;
 			}
 			constexpr RGB<ElementType>& operator -= (const R<ElementType>& r) {

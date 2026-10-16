@@ -5,6 +5,7 @@
 #include "../core/ov.hpp"
 #include <ranges>
 #include <concepts>
+#include <utility>
 
 namespace AHO_NAMESPACE {
 	namespace concepts {
@@ -75,17 +76,18 @@ namespace AHO_NAMESPACE {
 		template<typename InnerView>
 		struct wrap_view : std::ranges::view_interface<wrap_view<InnerView>> {
 			using inner_view_t = InnerView;
-			using iterator = decltype(std::declval<InnerView>().begin());
+			using iterator = std::ranges::iterator_t<InnerView>;
+			using sentinel = std::ranges::sentinel_t<InnerView>;
 
 			inner_view_t view;
 
-			wrap_view(inner_view_t f) : view(f) {};
+			wrap_view(inner_view_t f) : view(std::move(f)) {};
 
 			iterator begin() {
 				return view.begin();
 			}
 
-			iterator end() {
+			sentinel end() {
 				return view.end();
 			}
 		};

@@ -1,6 +1,13 @@
 #include "input_backend.hpp"
 
 extern "C" {
+const char* glfwGetKeyName(int key, int) {
+    switch (key) {
+        case GLFW_KEY_A: return "test-layout-a";
+        case GLFW_KEY_B: return "test-layout-b";
+        default: return nullptr;
+    }
+}
 int glfwGetKey(GLFWwindow* handle, int key) {
     auto* window = aho_test::InputWindow::find(handle);
     return window ? window->keys.at(key) : GLFW_RELEASE;

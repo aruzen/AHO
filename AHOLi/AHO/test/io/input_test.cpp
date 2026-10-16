@@ -33,6 +33,23 @@ TEST(InputCodeTest, IntegerMouseConstructorPreservesEveryButtonCode) {
         EXPECT_EQ(static_cast<int>(id.code()), code);
     }
 }
+TEST(InputCodeNameTest, KeyboardUsesBackendNamesAndHandlesMissingNames) {
+    using namespace aho::input;
+    EXPECT_EQ(KeyID(KeyCode::A).name(), "test-layout-a");
+    EXPECT_EQ(KeyID(KeyCode::B).name(), "test-layout-b");
+    EXPECT_TRUE(KeyID(KeyCode::Enter).name().empty());
+}
+TEST(InputCodeNameTest, MouseNamesCoverEveryButtonAndUnknownCodes) {
+    using namespace aho::input;
+    constexpr const char* names[] = {
+        "LeftClick", "RightClick", "MiddleButton", "Button4",
+        "Button5", "Button6", "Button7", "Button8"
+    };
+    for (int code = 0; code < 8; ++code) {
+        EXPECT_EQ(MouseID(code).name(), names[code]) << code;
+    }
+    EXPECT_TRUE(MouseID(255).name().empty());
+}
 TEST(InputCodeTest, EnumeratedKeysAndMouseButtonsAreUniqueAndComplete) {
     using namespace aho::input;
     const std::set<KeyCode> keys(KeyCodes.begin(), KeyCodes.end());

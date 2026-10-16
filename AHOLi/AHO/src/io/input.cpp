@@ -8,12 +8,13 @@
 #include <GLFW/glfw3.h>
 
 template<>
-constexpr std::string aho::input::CodeID<aho::input::KeyCode>::name() const {
-    return { glfwGetKeyName((int)_code, (int)NULL) };
+std::string aho::input::CodeID<aho::input::KeyCode>::name() const {
+    const char* name = glfwGetKeyName(static_cast<int>(_code), 0);
+    return name ? name : "";
 }
 
 template<>
-constexpr std::string aho::input::CodeID<aho::input::MouseCode>::name() const {
+std::string aho::input::CodeID<aho::input::MouseCode>::name() const {
     switch (_code) {
         case MouseCode::LeftClick:
             return "LeftClick";
@@ -32,4 +33,5 @@ constexpr std::string aho::input::CodeID<aho::input::MouseCode>::name() const {
         case MouseCode::Button8:
             return "Button8";
     }
+    return {};
 }

@@ -184,16 +184,16 @@ namespace AHO_NAMESPACE {
 		constexpr auto operator /(const T& m) const;
 
 		template<concepts::add_as<R> T>
-		constexpr _Vector<T, VSL_NAMESPACE::D2, CI>& operator +=(const _Vector<T, VSL_NAMESPACE::D2, CI>& p);
+		constexpr _Vector<R, VSL_NAMESPACE::D2, CI>& operator +=(const _Vector<T, VSL_NAMESPACE::D2, CI>& p);
 
 		template<concepts::subtract_as<R> T>
-		constexpr _Vector<T, VSL_NAMESPACE::D2, CI>& operator -=(const _Vector<T, VSL_NAMESPACE::D2, CI>& p);
+		constexpr _Vector<R, VSL_NAMESPACE::D2, CI>& operator -=(const _Vector<T, VSL_NAMESPACE::D2, CI>& p);
 
 		template<concepts::multiply_as<R> T>
-		constexpr _Vector<T, VSL_NAMESPACE::D2, CI>& operator *=(const T& m);
+		constexpr _Vector<R, VSL_NAMESPACE::D2, CI>& operator *=(const T& m);
 
 		template<concepts::division_as<R> T>
-		constexpr _Vector<T, VSL_NAMESPACE::D2, CI>& operator /=(const T& m);
+		constexpr _Vector<R, VSL_NAMESPACE::D2, CI>& operator /=(const T& m);
 
 		template<concepts::cast_as<R> T>
 		constexpr _Vector<T, VSL_NAMESPACE::D2, CI> cast() const;
@@ -257,16 +257,16 @@ namespace AHO_NAMESPACE {
 		constexpr auto operator /(const T& m) const;
 
 		template<concepts::add_as<R> T>
-		constexpr _Vector<T, VSL_NAMESPACE::D3, CI>& operator +=(const _Vector<T, VSL_NAMESPACE::D3, CI>& p);
+		constexpr _Vector<R, VSL_NAMESPACE::D3, CI>& operator +=(const _Vector<T, VSL_NAMESPACE::D3, CI>& p);
 
 		template<concepts::subtract_as<R> T>
-		constexpr _Vector<T, VSL_NAMESPACE::D3, CI>& operator -=(const _Vector<T, VSL_NAMESPACE::D3, CI>& p);
+		constexpr _Vector<R, VSL_NAMESPACE::D3, CI>& operator -=(const _Vector<T, VSL_NAMESPACE::D3, CI>& p);
 
 		template<concepts::multiply_as<R> T>
-		constexpr _Vector<T, VSL_NAMESPACE::D3, CI>& operator *=(const T& m);
+		constexpr _Vector<R, VSL_NAMESPACE::D3, CI>& operator *=(const T& m);
 
 		template<concepts::division_as<R> T>
-		constexpr _Vector<T, VSL_NAMESPACE::D3, CI>& operator /=(const T& m);
+		constexpr _Vector<R, VSL_NAMESPACE::D3, CI>& operator /=(const T& m);
 
 		template<concepts::cast_as<R> T>
 		constexpr _Vector<T, VSL_NAMESPACE::D3, CI> cast() const;
@@ -490,7 +490,7 @@ namespace AHO_NAMESPACE {
 
 	template<typename R, typename CI>
 	template<concepts::add_as<R> T>
-	constexpr _Vector<T, VSL_NAMESPACE::D2, CI>& _Vector<R, VSL_NAMESPACE::D2, CI>::operator +=(const _Vector<T, VSL_NAMESPACE::D2, CI>& p) {
+	constexpr _Vector<R, VSL_NAMESPACE::D2, CI>& _Vector<R, VSL_NAMESPACE::D2, CI>::operator +=(const _Vector<T, VSL_NAMESPACE::D2, CI>& p) {
 		this->value.___AN1 += p.value.___AN1;
 		this->value.___AN2 += p.value.___AN2;
 		return *this;
@@ -498,7 +498,7 @@ namespace AHO_NAMESPACE {
 
 	template<typename R, typename CI>
 	template<concepts::subtract_as<R> T>
-	constexpr _Vector<T, VSL_NAMESPACE::D2, CI>& _Vector<R, VSL_NAMESPACE::D2, CI>::operator -=(const _Vector<T, VSL_NAMESPACE::D2, CI>& p) {
+	constexpr _Vector<R, VSL_NAMESPACE::D2, CI>& _Vector<R, VSL_NAMESPACE::D2, CI>::operator -=(const _Vector<T, VSL_NAMESPACE::D2, CI>& p) {
 		this->value.___AN1 -= p.value.___AN1;
 		this->value.___AN2 -= p.value.___AN2;
 		return *this;
@@ -506,7 +506,7 @@ namespace AHO_NAMESPACE {
 
 	template<typename R, typename CI>
 	template<concepts::multiply_as<R> T>
-	constexpr _Vector<T, VSL_NAMESPACE::D2, CI>& _Vector<R, VSL_NAMESPACE::D2, CI>::operator *=(const T& p) {
+	constexpr _Vector<R, VSL_NAMESPACE::D2, CI>& _Vector<R, VSL_NAMESPACE::D2, CI>::operator *=(const T& p) {
 		this->value.___AN1 *= p;
 		this->value.___AN2 *= p;
 		return *this;
@@ -514,7 +514,7 @@ namespace AHO_NAMESPACE {
 
 	template<typename R, typename CI>
 	template<concepts::division_as<R> T>
-	constexpr _Vector<T, VSL_NAMESPACE::D2, CI>& _Vector<R, VSL_NAMESPACE::D2, CI>::operator /=(const T& p) {
+	constexpr _Vector<R, VSL_NAMESPACE::D2, CI>& _Vector<R, VSL_NAMESPACE::D2, CI>::operator /=(const T& p) {
 		this->value.___AN1 /= p;
 		this->value.___AN2 /= p;
 		return *this;
@@ -632,7 +632,7 @@ namespace AHO_NAMESPACE {
 
 	template<typename R, typename CI>
 	template<concepts::add_as<R> T>
-	constexpr _Vector<T, VSL_NAMESPACE::D3, CI>& _Vector<R, VSL_NAMESPACE::D3, CI>::operator +=(const _Vector<T, VSL_NAMESPACE::D3, CI>& p) {
+	constexpr _Vector<R, VSL_NAMESPACE::D3, CI>& _Vector<R, VSL_NAMESPACE::D3, CI>::operator +=(const _Vector<T, VSL_NAMESPACE::D3, CI>& p) {
 		this->value.___AN1 += p.value.___AN1;
 		this->value.___AN2 += p.value.___AN2;
 		this->value.___AN3 += p.value.___AN3;
@@ -641,7 +641,7 @@ namespace AHO_NAMESPACE {
 
 	template<typename R, typename CI>
 	template<concepts::subtract_as<R> T>
-	constexpr _Vector<T, VSL_NAMESPACE::D3, CI>& _Vector<R, VSL_NAMESPACE::D3, CI>::operator -=(const _Vector<T, VSL_NAMESPACE::D3, CI>& p) {
+	constexpr _Vector<R, VSL_NAMESPACE::D3, CI>& _Vector<R, VSL_NAMESPACE::D3, CI>::operator -=(const _Vector<T, VSL_NAMESPACE::D3, CI>& p) {
 		this->value.___AN1 -= p.value.___AN1;
 		this->value.___AN2 -= p.value.___AN2;
 		this->value.___AN3 -= p.value.___AN3;
@@ -650,7 +650,7 @@ namespace AHO_NAMESPACE {
 
 	template<typename R, typename CI>
 	template<concepts::multiply_as<R> T>
-	constexpr _Vector<T, VSL_NAMESPACE::D3, CI>& _Vector<R, VSL_NAMESPACE::D3, CI>::operator *=(const T& p) {
+	constexpr _Vector<R, VSL_NAMESPACE::D3, CI>& _Vector<R, VSL_NAMESPACE::D3, CI>::operator *=(const T& p) {
 		this->value.___AN1 *= p;
 		this->value.___AN2 *= p;
 		this->value.___AN3 *= p;
@@ -659,7 +659,7 @@ namespace AHO_NAMESPACE {
 
 	template<typename R, typename CI>
 	template<concepts::division_as<R> T>
-	constexpr _Vector<T, VSL_NAMESPACE::D3, CI>& _Vector<R, VSL_NAMESPACE::D3, CI>::operator /=(const T& p) {
+	constexpr _Vector<R, VSL_NAMESPACE::D3, CI>& _Vector<R, VSL_NAMESPACE::D3, CI>::operator /=(const T& p) {
 		this->value.___AN1 /= p;
 		this->value.___AN2 /= p;
 		this->value.___AN3 /= p;

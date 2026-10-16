@@ -174,5 +174,21 @@ TEST(VectorConceptTest, UnrelatedTypesWithAliasesAreNotVectors) {
     EXPECT_FALSE(aho::concepts::is_vector<PretendVector>);
     EXPECT_TRUE(aho::concepts::is_vector<aho::d2::VectorD>);
 }
+TYPED_TEST(VectorTest, MixedCompoundAssignmentsKeepTheLeftHandTypeAndReturnItsReference) {
+    using V = typename TypeParam::Vector;
+    using Mixed = aho::_Vector<long double, typename TypeParam::dimension>;
+    auto value = aho_test::geometry<V>(2, 4, 6);
+    const auto delta = aho_test::geometry<Mixed>(1, 2, 3);
+    static_assert(std::same_as<decltype(value += delta), V&>);
+    static_assert(std::same_as<decltype(value -= delta), V&>);
+    static_assert(std::same_as<decltype(value *= 2.0L), V&>);
+    static_assert(std::same_as<decltype(value /= 2.0L), V&>);
+    EXPECT_EQ(&(value += delta), &value); aho_test::expect_coordinates(value, 3, 6, 9);
+    EXPECT_EQ(&(value -= delta), &value); aho_test::expect_coordinates(value, 2, 4, 6);
+    EXPECT_EQ(&(value *= 2.0L), &value); aho_test::expect_coordinates(value, 4, 8, 12);
+    EXPECT_EQ(&(value /= 2.0L), &value); aho_test::expect_coordinates(value, 2, 4, 6);
+    aho_test::expect_coordinates(delta, 1, 2, 3);
+}
+
 }
 #endif

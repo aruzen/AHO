@@ -85,6 +85,37 @@ TYPED_TEST(VectorTest, LengthAndLessThanUseMagnitude) {
     EXPECT_DOUBLE_EQ(value.length(), expected);
     EXPECT_TRUE(aho_test::geometry<V>(1) < value);
 }
+template<class T> class VectorOneDimensionalProductTest : public testing::Test {};
+using ProductScalars = testing::Types<int, float, double>;
+TYPED_TEST_SUITE(VectorOneDimensionalProductTest, ProductScalars);
+TYPED_TEST(VectorOneDimensionalProductTest, DotAndHadamardUseScalarProductsAndPreserveInputs) {
+    using V = aho::_Vector<TypeParam, vsl::D1>;
+    const V left(-2), right(3), zero(0);
+    const auto dot = left.dot(right);
+    const auto hadamard = left.hadamard(right);
+    static_assert(std::same_as<std::remove_cv_t<decltype(dot)>, TypeParam>);
+    static_assert(std::same_as<std::remove_cv_t<decltype(hadamard)>, V>);
+    EXPECT_EQ(dot, -6);
+    aho_test::expect_coordinates(hadamard, -6);
+    EXPECT_EQ(left.dot(left), 4);
+    EXPECT_EQ(left.dot(zero), 0);
+    aho_test::expect_coordinates(left.hadamard(zero), 0);
+    { using namespace aho::product::dot; EXPECT_EQ(left * right, -6); }
+    { using namespace aho::product::hadamard; aho_test::expect_coordinates(left * right, -6); }
+    aho_test::expect_coordinates(left, -2); aho_test::expect_coordinates(right, 3);
+}
+TEST(VectorOneDimensionalProductTest, MixedScalarsPromoteTheResultElementType) {
+    const aho::d1::VectorI integer(-2);
+    const aho::d1::VectorF fractional(1.25f);
+    const auto product = integer.hadamard(fractional);
+    static_assert(std::same_as<std::remove_cv_t<decltype(product)>, aho::d1::VectorF>);
+    static_assert(std::same_as<decltype(integer.dot(fractional)), float>);
+    static_assert(std::same_as<decltype(fractional.dot(integer)), float>);
+    EXPECT_FLOAT_EQ(integer.dot(fractional), -2.5f);
+    EXPECT_FLOAT_EQ(fractional.dot(integer), -2.5f);
+    aho_test::expect_coordinates(product, -2.5);
+    aho_test::expect_coordinates(fractional.hadamard(integer), -2.5);
+}
 TEST(VectorProductsTest, TwoAndThreeDimensionalProductsMatchKnownValues) {
     const aho::d2::VectorD a(2, 3), b(4, 5);
     EXPECT_DOUBLE_EQ(a.dot(b), 23);
@@ -174,5 +205,6 @@ TEST(VectorConceptTest, UnrelatedTypesWithAliasesAreNotVectors) {
     EXPECT_FALSE(aho::concepts::is_vector<PretendVector>);
     EXPECT_TRUE(aho::concepts::is_vector<aho::d2::VectorD>);
 }
+
 }
 #endif

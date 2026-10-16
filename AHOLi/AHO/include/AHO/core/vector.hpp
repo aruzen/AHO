@@ -401,7 +401,7 @@ namespace AHO_NAMESPACE {
         requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D1>, T>
     inline constexpr auto _Vector<R, VSL_NAMESPACE::D1, CI>::dot(const T& m) const
     {
-        return (decltype(std::declval<R>() * std::declval<T>()))value.___AN1 * m.value.___AN1;
+        return value.___AN1 * m.value.___AN1;
     }
 
     template<typename R, typename CI>
@@ -417,7 +417,7 @@ namespace AHO_NAMESPACE {
     requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D1>, T>
     inline constexpr auto _Vector<R, VSL_NAMESPACE::D1, CI>::hadamard(const T &m) const
     {
-        return _Vector<decltype(std::declval<R>() * std::declval<T>()), VSL_NAMESPACE::D1, CI>(value.___AN1 * m.value.___AN1);
+        return _Vector<decltype(value.___AN1 * m.value.___AN1), VSL_NAMESPACE::D1, CI>(value.___AN1 * m.value.___AN1);
     }
 
     template<typename R, typename CI>

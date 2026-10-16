@@ -46,5 +46,24 @@ TEST(LineTest, AddingPointCreatesTriangleInEndpointOrder) {
     const auto pointer_triangle = line.adress() + aho::d2::PointD(0, 4);
     EXPECT_DOUBLE_EQ(pointer_triangle.area(), 6);
 }
+template<class T> class LinePointViewTest : public testing::Test {};
+TYPED_TEST_SUITE(LinePointViewTest, aho_test::GeometryCases);
+TYPED_TEST(LinePointViewTest, OwningAndBorrowedViewsExposeOriginalEndpointsInOrder) {
+    using P = typename TypeParam::Point;
+    using L = aho::Line<typename TypeParam::element_type, typename TypeParam::dimension>;
+    L line(aho_test::geometry<P>(1, 2, 3), aho_test::geometry<P>(4, 5, 6));
+    const auto direct = line.ptrpoints();
+    const auto borrowed_line = line.adress();
+    const auto borrowed = borrowed_line.ptrpoints();
+    EXPECT_EQ(direct[0], &line.pos1); EXPECT_EQ(direct[1], &line.pos2);
+    EXPECT_EQ(borrowed[0], &line.pos1); EXPECT_EQ(borrowed[1], &line.pos2);
+    *direct[0] = aho_test::geometry<P>(7, 8, 9);
+    aho_test::expect_coordinates(line.pos1, 7, 8, 9);
+    aho_test::expect_coordinates(*borrowed[0], 7, 8, 9);
+    *borrowed[1] = aho_test::geometry<P>(-1, -2, -3);
+    aho_test::expect_coordinates(line.pos2, -1, -2, -3);
+    aho_test::expect_coordinates(*direct[1], -1, -2, -3);
+}
+
 }
 #endif

@@ -112,7 +112,7 @@ namespace AHO_NAMESPACE {
 	template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
 	inline constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 2> Line<R, D, CI>::ptrpoints()
 	{
-		return std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 2>(&pos1, &pos2);
+		return { &pos1, &pos2 };
 	}
 
 	template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
@@ -169,7 +169,7 @@ namespace AHO_NAMESPACE {
 	template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
 	inline constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 2> PtrLine<R, D, CI>::ptrpoints() const
 	{
-		return std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 2>(pos1, pos2);
+		return { pos1, pos2 };
 	}
 
 	template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>

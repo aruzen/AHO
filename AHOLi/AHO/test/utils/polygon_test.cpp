@@ -44,6 +44,33 @@ TEST(PolygonViewsTest, SinglePointLineAndTriangleProduceSingleElementViews) {
     auto triangles = aho::views::triangles(triangle);
     EXPECT_EQ(std::ranges::distance(triangles), 1); EXPECT_DOUBLE_EQ(triangles.begin()->area(), 6);
 }
+template<bool X, bool Y, bool Z> struct PointViewCase {
+    using Info = aho::coordinate::_MakeCoordinateInfo<X, Y, Z>::value;
+    using Point = aho::_Point<double, typename Info::dimension, Info>;
+};
+using PointViewMasks = testing::Types<PointViewCase<true, false, false>, PointViewCase<false, true, false>,
+    PointViewCase<false, false, true>, PointViewCase<true, true, false>, PointViewCase<true, false, true>,
+    PointViewCase<false, true, true>, PointViewCase<true, true, true>>;
+template<class T> class PointViewCoordinateTest : public testing::Test {};
+TYPED_TEST_SUITE(PointViewCoordinateTest, PointViewMasks);
+TYPED_TEST(PointViewCoordinateTest, CompositePointSnapshotsKeepTheOriginalCoordinateAxes) {
+    using CI = typename TypeParam::Info;
+    using P = typename TypeParam::Point;
+    aho::Line<double, typename CI::dimension, CI> line(aho_test::geometry<P>(1, 2, 3), aho_test::geometry<P>(4, 5, 6));
+    const auto& source = line;
+    const auto points = aho::views::points(source);
+    static_assert(std::same_as<std::ranges::range_value_t<decltype(points)>, P>);
+    ASSERT_EQ(points.size(), 2u);
+    auto check = [](const P& point, double first) {
+        if constexpr (CI::EnabledX) EXPECT_EQ(point.value.x.value, first);
+        if constexpr (CI::EnabledY) EXPECT_EQ(point.value.y.value, first + CI::EnabledX);
+        if constexpr (CI::EnabledZ) EXPECT_EQ(point.value.z.value, first + CI::EnabledX + CI::EnabledY);
+    };
+    check(points[0], 1); check(points[1], 4);
+    line.pos1 = aho_test::geometry<P>(7, 8, 9);
+    check(points[0], 1);
+    check(aho::views::points(line)[0], 7);
+}
 TEST(PolygonViewsTest, CompositePointViewCopiesEveryVertex) {
     aho::Line<double, vsl::D2> line(aho::d2::PointD(1, 2), aho::d2::PointD(3, 4));
     const auto points = aho::views::points(line);

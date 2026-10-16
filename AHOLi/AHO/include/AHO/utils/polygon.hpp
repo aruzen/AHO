@@ -116,7 +116,9 @@ namespace AHO_NAMESPACE {
 				return std::views::single(t);
 			}
 			else if constexpr (concepts::is_points_object<std::remove_reference_t<T>>) {
-				return cast<_Point<typename std::remove_reference_t<T>::element_type, typename std::remove_reference_t<T>::dimension>>(t.points());
+				return cast<_Point<typename std::remove_reference_t<T>::element_type,
+                                  typename std::remove_reference_t<T>::dimension,
+                                  typename std::remove_reference_t<T>::coordinate_info>>(t.points());
 			}
 		}
 

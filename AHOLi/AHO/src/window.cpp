@@ -14,7 +14,7 @@ aho::d2::VectorI aho::window::GetMonitorSize() {
 }
 
 aho::window::Window::Window(std::string name, int width, int height, aho::engine::EngineAccessor _engine)
-        : VSL_NAMESPACE::Window(std::move(name), width, height) {
+        : VSL_NAMESPACE::Window(name, width, height) {
     engine = _engine;
     auto surface = this->add_plugin<VSL_NAMESPACE::Surface>(_engine._data->vulkan_instance);
     VSL_NAMESPACE::Swapchain swapchain(_engine._data->logical_device, surface);

@@ -43,5 +43,24 @@ TEST(ImageTest, MalformedFileReportsAbsentDataWithoutCrashing) {
     aho::resource::Image image(path);
     EXPECT_FALSE(image.data().has_value());
 }
+TEST(ImageTest, ValidHeaderWithMissingPixelDataReportsAbsentData) {
+    aho_test::TempDirectory directory;
+    const auto path = directory.path / "truncated.png";
+    // PNG signature and 1x1 RGB IHDR with a valid CRC, but no IDAT or IEND.
+    constexpr unsigned char header[]{
+        137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
+        0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0, 0, 0, 144, 119, 83, 222
+    };
+    {
+        std::ofstream stream(path, std::ios::binary);
+        stream.write(reinterpret_cast<const char*>(header), sizeof header);
+        ASSERT_TRUE(stream.good());
+    }
+    aho::resource::Image image(path);
+    EXPECT_FALSE(image.data().has_value());
+    const auto copy = image;
+    auto retained = copy;
+    EXPECT_FALSE(retained.data().has_value());
+}
 #endif
 }

@@ -272,15 +272,15 @@ namespace AHO_NAMESPACE {
 		constexpr _Vector<T, VSL_NAMESPACE::D3, CI> cast() const;
 
         template<typename T>
-        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>, T>
+        requires concepts::is_vector<T>&& std::convertible_to<T, _Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>>
         constexpr auto dot(const T& m) const;
 
         template<typename T>
-        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>, T>
+        requires concepts::is_vector<T>&& std::convertible_to<T, _Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>>
         constexpr auto cross(const T& m) const;
 
         template<typename T>
-        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>, T>
+        requires concepts::is_vector<T>&& std::convertible_to<T, _Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>>
         constexpr auto hadamard(const T& m) const;
 
         constexpr auto length() const;
@@ -675,7 +675,7 @@ namespace AHO_NAMESPACE {
 
     template<typename R, typename CI>
     template<typename T>
-    requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>, T>
+    requires concepts::is_vector<T>&& std::convertible_to<T, _Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>>
     inline constexpr auto _Vector<R, VSL_NAMESPACE::D3, CI>::dot(const T& m) const
     {
         return value.___AN1 * m.value.___AN1 + value.___AN2 * m.value.___AN2 + value.___AN3 * m.value.___AN3;
@@ -683,10 +683,11 @@ namespace AHO_NAMESPACE {
 
     template<typename R, typename CI>
     template<typename T>
-    requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>, T>
+    requires concepts::is_vector<T>&& std::convertible_to<T, _Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>>
     inline constexpr auto _Vector<R, VSL_NAMESPACE::D3, CI>::cross(const T& m) const
     {
-        return _Vector<R, VSL_NAMESPACE::D3, CI>{
+        using Result = decltype(value.y.value * m.value.z.value - value.z.value * m.value.y.value);
+        return _Vector<Result, VSL_NAMESPACE::D3, CI>{
                 value.y.value * m.value.z.value - value.z.value * m.value.y.value,
                 value.z.value * m.value.x.value - value.x.value * m.value.z.value,
                 value.x.value * m.value.y.value - value.y.value * m.value.x.value
@@ -695,7 +696,7 @@ namespace AHO_NAMESPACE {
 
     template<typename R, typename CI>
     template<typename T>
-    requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>, T>
+    requires concepts::is_vector<T>&& std::convertible_to<T, _Vector<typename T::element_type, VSL_NAMESPACE::D3, CI>>
     constexpr auto _Vector<R, VSL_NAMESPACE::D3, CI>::hadamard(const T &m)  const {
         _Vector<decltype(value.___AN1 * m.value.___AN1), VSL_NAMESPACE::D3, CI> result;
         result.value.___AN1 = value.___AN1 * m.value.___AN1;

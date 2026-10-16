@@ -159,11 +159,12 @@ namespace AHO_NAMESPACE {
         Mat2x2<R> make_rotation(angle::Degree deg);
 
         template<typename R = float, typename CI = AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D3>::value>
-        Mat4x4<R> make_rotation(angle::Radian rad, _Vector<R, CI> axis);
+        requires std::same_as<typename CI::dimension, VSL_NAMESPACE::D3>
+        Mat4x4<R> make_rotation(angle::Radian rad, _Vector<R, VSL_NAMESPACE::D3, CI> axis);
 
         template<typename R = float, typename CI = AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D3>::value>
         requires std::same_as<typename CI::dimension, VSL_NAMESPACE::D3>
-        Mat4x4<R> make_rotation(angle::Degree deg, _Vector<R, CI> axis);
+        Mat4x4<R> make_rotation(angle::Degree deg, _Vector<R, VSL_NAMESPACE::D3, CI> axis);
 
         template<typename R = float, typename CI = AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D3>::value>
         requires std::same_as<typename CI::dimension, VSL_NAMESPACE::D3>
@@ -426,8 +427,8 @@ namespace AHO_NAMESPACE {
         }
 
         template<typename R, typename CI>
-        Mat4x4<R> make_rotation(angle::Radian rad, _Vector<R, CI> axis) {
-            static_assert(std::same_as<CI, VSL_NAMESPACE::D3>); // oto requires
+        requires std::same_as<typename CI::dimension, VSL_NAMESPACE::D3>
+        Mat4x4<R> make_rotation(angle::Radian rad, _Vector<R, VSL_NAMESPACE::D3, CI> axis) {
             axis.normalize(); // 安全のため正規化
             R c = cos(rad.value);
             R s = sin(rad.value);
@@ -447,7 +448,7 @@ namespace AHO_NAMESPACE {
 
         template<typename R, typename CI>
         requires std::same_as<typename CI::dimension, VSL_NAMESPACE::D3>
-        Mat4x4<R> make_rotation(angle::Degree deg, _Vector<R, CI> axis) {
+        Mat4x4<R> make_rotation(angle::Degree deg, _Vector<R, VSL_NAMESPACE::D3, CI> axis) {
             return make_rotation(Radian(deg), axis);
         }
 

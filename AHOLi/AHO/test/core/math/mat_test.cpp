@@ -154,6 +154,31 @@ TEST(MatFactoryTest, AxisRotationNormalizesAxisAndPreservesHomogeneousCoordinate
     const auto matrix = aho::matrix::make_rotation<double>(aho::Radian{std::numbers::pi / 2}, aho::d3::VectorD(0, 0, 2));
     expect_matrix(matrix, std::array<std::array<double, 4>, 4>{{{0, -1, 0, 0}, {1, 0, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}}});
 }
+template<class T> class MatAxisRotationTest : public testing::Test {};
+using RotationScalars = testing::Types<float, double>;
+TYPED_TEST_SUITE(MatAxisRotationTest, RotationScalars);
+TYPED_TEST(MatAxisRotationTest, DegreeOverloadHasTheDeclaredSignatureAndMatchesRadians) {
+    using T = TypeParam;
+    using V = aho::_Vector<T, vsl::D3>;
+    using DegreeRotation = aho::Mat4x4<T>(*)(aho::Degree, V);
+    constexpr DegreeRotation rotation = &aho::matrix::make_rotation<T>;
+    const V axis(0, 0, 2);
+    const auto degrees = rotation(aho::Degree{90}, axis);
+    const auto radians = aho::matrix::make_rotation<T>(aho::Radian{std::numbers::pi / 2}, axis);
+    const std::array<std::array<double, 4>, 4> expected{{{0, -1, 0, 0}, {1, 0, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}}};
+    expect_matrix(degrees, expected); expect_matrix(radians, expected);
+    EXPECT_EQ(axis.value.z.value, 2);
+}
+TYPED_TEST(MatAxisRotationTest, AxisRotationsHaveKnownOrientationAndAreOrthogonal) {
+    using T = TypeParam;
+    using V = aho::_Vector<T, vsl::D3>;
+    const auto x = aho::matrix::make_rotation<T>(aho::Degree{90}, V(2, 0, 0));
+    const auto y = aho::matrix::make_rotation<T>(aho::Degree{90}, V(0, 3, 0));
+    expect_matrix(x, std::array<std::array<double, 4>, 4>{{{1, 0, 0, 0}, {0, 0, -1, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}}});
+    expect_matrix(y, std::array<std::array<double, 4>, 4>{{{0, 0, 1, 0}, {0, 1, 0, 0}, {-1, 0, 0, 0}, {0, 0, 0, 1}}});
+    expect_identity(x * aho::matrix::make_rotation<T>(aho::Degree{-90}, V(2, 0, 0)));
+    expect_identity(y * aho::matrix::make_rotation<T>(aho::Degree{-90}, V(0, 3, 0)));
+}
 TEST(MatFactoryTest, PerspectiveOverloadsProduceKnownProjectionAndInvertibleMatrix) {
     const auto radians = aho::matrix::make_perspective(aho::Radian{std::numbers::pi / 2}, 2.0, 1.0, 11.0);
     const auto degrees = aho::matrix::make_perspective(aho::Degree{90}, 2.0, 1.0, 11.0);

@@ -521,7 +521,7 @@ namespace AHO_NAMESPACE {
 	template<concepts::cast_as<R> T>
 	constexpr _Point<T, VSL_NAMESPACE::D3, CI> _Point<R, VSL_NAMESPACE::D3, CI>::cast() const
 	{
-		return _Point<T, VSL_NAMESPACE::D3, CI>((T)value.___AN1, (T)value.___AN2);
+		return _Point<T, VSL_NAMESPACE::D3, CI>((T)value.___AN1, (T)value.___AN2, (T)value.___AN3);
 	}
 
 

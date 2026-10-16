@@ -1,6 +1,8 @@
 #include <AHO/io/input.hpp>
 #if defined(AHO_CONTRACT_INPUT_MOUSE_INTEGER)
-void verify() { aho::input::MouseID id(0); }
+constexpr aho::input::MouseID first_button(0), last_button(7);
+static_assert(first_button.code() == aho::input::MouseCode::LeftClick);
+static_assert(last_button.code() == aho::input::MouseCode::Button8);
 #elif defined(AHO_LINK_INPUT_KEY_NAME)
 int main() { return aho::input::KeyID(aho::input::KeyCode::A).name().empty(); }
 #elif defined(AHO_LINK_INPUT_MOUSE_NAME)
@@ -23,6 +25,13 @@ TEST(InputCodeTest, TypedAndIntegerKeyConstructorsPreserveCodes) {
     EXPECT_EQ(integer.code(), aho::input::KeyCode::A);
     EXPECT_EQ(static_cast<int>(aho::input::KeyID(-1).code()), -1);
     EXPECT_EQ(aho::input::MouseID(aho::input::MouseCode::RightClick).code(), aho::input::MouseCode::Button2);
+}
+TEST(InputCodeTest, IntegerMouseConstructorPreservesEveryButtonCode) {
+    for (int code = 0; code < 8; ++code) {
+        const aho::input::MouseID id(code);
+        EXPECT_EQ(id.code(), aho::input::MouseCodes[code]);
+        EXPECT_EQ(static_cast<int>(id.code()), code);
+    }
 }
 TEST(InputCodeTest, EnumeratedKeysAndMouseButtonsAreUniqueAndComplete) {
     using namespace aho::input;

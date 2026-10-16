@@ -7,6 +7,7 @@ AHO/shaders/**/*.spv
 
 cmake-build*/
 build/
+worktrees/
 
 document
 AGENT.md

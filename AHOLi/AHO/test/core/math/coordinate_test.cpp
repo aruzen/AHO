@@ -6,6 +6,29 @@
 constexpr auto x = aho::coordinate::_MakeCoordinateInfo<false, true, false>::value::EnablingX();
 constexpr auto y = aho::coordinate::_MakeCoordinateInfo<true, false, false>::value::EnablingY();
 constexpr auto z = aho::coordinate::_MakeCoordinateInfo<true, false, false>::value::EnablingZ();
+
+template<bool X, bool Y, bool Z>
+consteval bool enabling_preserves_other_axes() {
+    using Info = aho::coordinate::_MakeCoordinateInfo<X, Y, Z>::value;
+    constexpr auto with_x = Info::EnablingX();
+    constexpr auto with_y = Info::EnablingY();
+    constexpr auto with_z = Info::EnablingZ();
+    static_assert(with_x.EnabledX && with_x.EnabledY == Y && with_x.EnabledZ == Z);
+    static_assert(with_y.EnabledX == X && with_y.EnabledY && with_y.EnabledZ == Z);
+    static_assert(with_z.EnabledX == X && with_z.EnabledY == Y && with_z.EnabledZ);
+    static_assert(decltype(with_x)::dimension::dimension == 1 + Y + Z);
+    static_assert(decltype(with_y)::dimension::dimension == X + 1 + Z);
+    static_assert(decltype(with_z)::dimension::dimension == X + Y + 1);
+    return true;
+}
+static_assert(enabling_preserves_other_axes<true, false, false>());
+static_assert(enabling_preserves_other_axes<false, true, false>());
+static_assert(enabling_preserves_other_axes<false, false, true>());
+static_assert(enabling_preserves_other_axes<true, true, false>());
+static_assert(enabling_preserves_other_axes<true, false, true>());
+static_assert(enabling_preserves_other_axes<false, true, true>());
+static_assert(enabling_preserves_other_axes<true, true, true>());
+
 #elif defined(AHO_CONTRACT_COORDINATE_YZ_ADD)
 const auto coordinates = aho::Y<int>(2) + aho::Z<int>(3);
 #elif defined(AHO_CONTRACT_COORDINATE_XZ_SUBTRACT)

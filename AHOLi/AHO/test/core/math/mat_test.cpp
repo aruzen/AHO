@@ -164,6 +164,34 @@ TEST(MatFactoryTest, PerspectiveOverloadsProduceKnownProjectionAndInvertibleMatr
     expect_identity(radians * *inverse);
 }
 
+template<class T> class MatViewTest : public testing::Test {};
+using ViewScalars = testing::Types<float, double>;
+TYPED_TEST_SUITE(MatViewTest, ViewScalars);
+TYPED_TEST(MatViewTest, ExplicitCoordinateTypePreservesPrecisionAndCameraBasis) {
+    using T = TypeParam;
+    using CI = aho::coordinate::_DefaultCoordinateInfo<vsl::D3>::value;
+    using P = aho::_Point<T, vsl::D3, CI>;
+    using V = aho::_Vector<T, vsl::D3, CI>;
+    const P eye(1, 2, 3), target(1, 2, 2);
+    const V up(0, 2, 0);
+    const auto view = aho::matrix::make_view<T, CI>(eye, target, up);
+    static_assert(std::same_as<std::remove_cv_t<decltype(view)>, aho::Mat4x4<T>>);
+    expect_matrix(view, std::array<std::array<double, 4>, 4>{{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {-1, -2, -3, 1}}});
+    EXPECT_EQ(eye.value.x.value, 1); EXPECT_EQ(eye.value.y.value, 2); EXPECT_EQ(eye.value.z.value, 3);
+    EXPECT_EQ(up.value.y.value, 2);
+}
+TYPED_TEST(MatViewTest, RotatedCameraMovesEyeToOriginAndTargetToNegativeZ) {
+    using T = TypeParam;
+    using P = aho::_Point<T, vsl::D3>;
+    using V = aho::_Vector<T, vsl::D3>;
+    const auto view = aho::matrix::make_view(P(2, 0, 0), P(0, 0, 0), V(0, 1, 0));
+    const aho::Mat<T, 1, 4> eye(std::array<std::array<T, 4>, 1>{{{2, 0, 0, 1}}});
+    const aho::Mat<T, 1, 4> target(std::array<std::array<T, 4>, 1>{{{0, 0, 0, 1}}});
+    expect_matrix(eye * view, std::array<std::array<double, 4>, 1>{{{0, 0, 0, 1}}});
+    expect_matrix(target * view, std::array<std::array<double, 4>, 1>{{{0, 0, -2, 1}}});
+    expect_matrix(view, std::array<std::array<double, 4>, 4>{{{0, 0, 1, 0}, {0, 1, 0, 0}, {-1, 0, 0, 0}, {0, 0, -2, 1}}});
+}
+
 template<class T> class MatInverseTest : public testing::Test {};
 using NumericTypes = testing::Types<float, double>;
 TYPED_TEST_SUITE(MatInverseTest, NumericTypes);

@@ -167,7 +167,7 @@ namespace AHO_NAMESPACE {
 
         template<typename R = float, typename CI = AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D3>::value>
         requires std::same_as<typename CI::dimension, VSL_NAMESPACE::D3>
-        Mat4x4<R> make_view(_Point<R, typename CI::dimention, CI> eye, _Point<R, typename CI::dimention, CI> target, _Vector<R, typename CI::dimention, CI> up);
+        Mat4x4<R> make_view(_Point<R, typename CI::dimension, CI> eye, _Point<R, typename CI::dimension, CI> target, _Vector<R, typename CI::dimension, CI> up);
 
         template<typename T>
         Mat4x4<T> make_perspective(Radian fov, T aspect, T near, T far);
@@ -451,14 +451,16 @@ namespace AHO_NAMESPACE {
             return make_rotation(Radian(deg), axis);
         }
 
-        template<typename R, typename D, typename CI>
-        Mat4x4<R> make_view(_Point<R, D, CI> _eye, _Point<R, D, CI> target, _Vector<R, D, CI> up) {
+        template<typename R, typename CI>
+        requires std::same_as<typename CI::dimension, VSL_NAMESPACE::D3>
+        Mat4x4<R> make_view(_Point<R, typename CI::dimension, CI> _eye, _Point<R, typename CI::dimension, CI> target, _Vector<R, typename CI::dimension, CI> up) {
+            using D = typename CI::dimension;
             _Vector<R, D, CI> eye(_eye.value);
             auto f = _Vector<R, D, CI>(target.value - eye.value).normalize().value; // forward
-            auto s = _Vector<R, D, CI>(f).cross(-up).normalize().value; // right
+            auto s = _Vector<R, D, CI>(f).cross(up).normalize().value; // right
             auto u = _Vector<R, D, CI>(s).cross(_Vector<R, D, CI>(f)).normalize().value;             // up (recomputed)
 
-            Mat4x4<R> result = make_identity<float, 4>();
+            Mat4x4<R> result = make_identity<R, 4>();
             result[0][0] = s.x.value;
             result[1][0] = s.y.value;
             result[2][0] = s.z.value;

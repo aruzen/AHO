@@ -313,7 +313,7 @@ namespace AHO_NAMESPACE {
         }
 
         template<typename R, size_t Row, size_t Column, AHO_NAMESPACE::concepts::multiply_as<R> T>
-        requires (!requires {{ R::__is_mat } -> std::convertible_to<bool>; })
+        requires (!requires {{ T::__is_mat } -> std::convertible_to<bool>; })
         constexpr Mat<R, Row, Column> operator*(const Mat<R, Row, Column> &mat, const T &m) {
             AHO_NAMESPACE::matrix::Mat<decltype(std::declval<T>() * std::declval<R>()), Row, Column> buf;
             for (size_t i = 0; i < Row; i++)
@@ -323,7 +323,7 @@ namespace AHO_NAMESPACE {
         }
 
         template<typename R, size_t Row, size_t Column, AHO_NAMESPACE::concepts::division_as<R> T>
-        requires (!requires {{ R::__is_mat } -> std::convertible_to<bool>; })
+        requires (!requires {{ T::__is_mat } -> std::convertible_to<bool>; })
         constexpr Mat<R, Row, Column> operator/(const Mat<R, Row, Column> &mat, const T &m) {
             AHO_NAMESPACE::matrix::Mat<decltype(std::declval<T>() / std::declval<R>()), Row, Column> buf;
 
@@ -334,24 +334,24 @@ namespace AHO_NAMESPACE {
         }
 
         template<typename R, size_t Row, size_t Column, AHO_NAMESPACE::concepts::multiply_as<R> T>
-        requires (!requires {{ R::__is_mat } -> std::convertible_to<bool>; })
+        requires (!requires {{ T::__is_mat } -> std::convertible_to<bool>; })
         constexpr Mat<R, Row, Column> operator*(const T &m, const Mat<R, Row, Column> &mat) {
             AHO_NAMESPACE::matrix::Mat<decltype(std::declval<T>() * std::declval<R>()), Row, Column> buf;
 
             for (size_t i = 0; i < Row; i++)
                 for (size_t j = 0; j < Column; j++)
-                    buf[i][j] = mat[i][j] * m;
+                    buf[i][j] = m * mat[i][j];
             return std::move(buf);
         }
 
         template<typename R, size_t Row, size_t Column, AHO_NAMESPACE::concepts::division_as<R> T>
-        requires (!requires {{ R::__is_mat } -> std::convertible_to<bool>; })
+        requires (!requires {{ T::__is_mat } -> std::convertible_to<bool>; })
         constexpr Mat<R, Row, Column> operator/(const T &m, const Mat<R, Row, Column> &mat) {
             AHO_NAMESPACE::matrix::Mat<decltype(std::declval<T>() / std::declval<R>()), Row, Column> buf;
 
             for (size_t i = 0; i < Row; i++)
                 for (size_t j = 0; j < Column; j++)
-                    buf[i][j] = mat[i][j] / m;
+                    buf[i][j] = m / mat[i][j];
             return std::move(buf);
         }
 

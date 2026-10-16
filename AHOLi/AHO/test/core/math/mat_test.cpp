@@ -114,6 +114,23 @@ TEST(MatTest, ScalarAssignmentsAreElementwise) {
     expect_matrix(mutable_matrix /= 2, values);
     expect_matrix(mutable_matrix, values);
 }
+template<class T> class MatScalarOperatorTest : public testing::Test {};
+using ScalarTypes = testing::Types<int, float, double>;
+TYPED_TEST_SUITE(MatScalarOperatorTest, ScalarTypes);
+TYPED_TEST(MatScalarOperatorTest, LeftAndRightOperatorsUseOperandOrderAndKeepSourceUnchanged) {
+    using T = TypeParam;
+    constexpr std::array<std::array<T, 3>, 2> values{{{2, -4, 6}, {8, -12, 24}}};
+    const aho::Mat<T, 2, 3> matrix(values);
+    const std::array<std::array<T, 3>, 2> doubled{{{4, -8, 12}, {16, -24, 48}}};
+    const std::array<std::array<T, 3>, 2> halved{{{1, -2, 3}, {4, -6, 12}}};
+    const std::array<std::array<T, 3>, 2> reciprocal{{{12, -6, 4}, {3, -2, 1}}};
+    expect_matrix(matrix * T{2}, doubled);
+    expect_matrix(T{2} * matrix, doubled);
+    expect_matrix(matrix / T{2}, halved);
+    expect_matrix(T{24} / matrix, reciprocal);
+    expect_matrix(matrix * T{0}, std::array<std::array<T, 3>, 2>{});
+    expect_matrix(matrix, values);
+}
 TEST(MatTest, CastConvertsEachElement) {
     Matrix2 matrix(values);
     expect_matrix(matrix.cast<double>(), std::array<std::array<double, 2>, 2>{{{1, 2}, {3, 4}}});

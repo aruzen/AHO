@@ -173,6 +173,22 @@ TEST(VectorConceptTest, UnrelatedTypesWithAliasesAreNotVectors) {
     struct PretendVector { using element_type = double; using dimension = vsl::D2; };
     EXPECT_FALSE(aho::concepts::is_vector<PretendVector>);
     EXPECT_TRUE(aho::concepts::is_vector<aho::d2::VectorD>);
+    struct PretendWithCoordinates {
+        using element_type = double; using dimension = vsl::D2;
+        using coordinate_info = aho::coordinate::_DefaultCoordinateInfo<dimension>::value;
+    };
+    static_assert(!aho::concepts::is_vector<PretendVector>);
+    static_assert(!aho::concepts::is_vector<PretendWithCoordinates>);
+    static_assert(!aho::concepts::is_vector<int>);
+    static_assert(!aho::concepts::is_vector<aho::d2::PointD>);
+    static_assert(aho::concepts::is_vector<aho::d1::VectorI>);
+    static_assert(aho::concepts::is_vector<aho::d2::VectorF>);
+    static_assert(aho::concepts::is_vector<aho::d3::VectorD>);
+    static_assert(aho::concepts::is_vector<aho::d2::Vector<double, aho::coordinate::_DefaultCoordinateInfo<vsl::D2>::value>>);
+    static_assert(aho::concepts::is_vector<aho::d2::VectorD&>);
+    static_assert(aho::concepts::is_vector<const aho::d2::VectorD&>);
+    using XZ = aho::coordinate::_MakeCoordinateInfo<true, false, true>::value;
+    static_assert(aho::concepts::is_vector<aho::_Vector<float, vsl::D2, XZ>>);
 }
 }
 #endif

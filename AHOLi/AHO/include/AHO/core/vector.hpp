@@ -33,10 +33,14 @@ namespace AHO_NAMESPACE {
 
 	namespace concepts {
 		template<typename T>
-		concept is_vector = requires{
-			typename T::dimension;
-			typename T::element_type;
-            { std::convertible_to<T, _Vector<typename T::element_type, typename T::dimension>> };
+        concept is_vector = requires {
+            typename std::remove_cvref_t<T>::dimension;
+            typename std::remove_cvref_t<T>::element_type;
+            typename std::remove_cvref_t<T>::coordinate_info;
+            requires std::convertible_to<std::remove_cvref_t<T>,
+                _Vector<typename std::remove_cvref_t<T>::element_type,
+                        typename std::remove_cvref_t<T>::dimension,
+                        typename std::remove_cvref_t<T>::coordinate_info>>;
 		};
 	}
 

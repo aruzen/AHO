@@ -319,7 +319,7 @@ namespace AHO_NAMESPACE {
 		}
 
 		template<typename T1, typename T2>
-		constexpr _CoordinateSet<decltype(std::declval<T1>() + std::declval<T2>()), typename _MakeCoordinateInfo<false, true, true>::value> operator +(const Y<T1>& e1, const Y<T2>& e2) {
+		constexpr _CoordinateSet<decltype(std::declval<T1>() + std::declval<T2>()), typename _MakeCoordinateInfo<false, true, true>::value> operator +(const Y<T1>& e1, const Z<T2>& e2) {
 			return { e1 , e2 };
 		}
 
@@ -403,25 +403,25 @@ namespace AHO_NAMESPACE {
             return result;
         }
 
-#define AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_THAN(U1, U2) \
+#define AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_THAN(U1, U2, EnableX, EnableY, EnableZ) \
         template<typename T1, typename T2> \
-        constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _MakeCoordinateInfo<true, true, false>::value> operator -(const U1<T1>& e1, const U2<T2>& e2) { \
+        constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _MakeCoordinateInfo<EnableX, EnableY, EnableZ>::value> operator -(const U1<T1>& e1, const U2<T2>& e2) { \
             return { e1 , -e2 }; \
         }
 
-#define AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_LESS(U1, U2) \
+#define AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_LESS(U1, U2, EnableX, EnableY, EnableZ) \
         template<typename T1, typename T2> \
-        constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _MakeCoordinateInfo<true, true, false>::value> operator -(const U1<T1>& e1, const U2<T2>& e2) { \
+        constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _MakeCoordinateInfo<EnableX, EnableY, EnableZ>::value> operator -(const U1<T1>& e1, const U2<T2>& e2) { \
             return { -e2, e1 }; \
         }
 
-        AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_THAN(X, Y)
-        AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_THAN(X, Z)
-        AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_THAN(Y, Z)
+        AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_THAN(X, Y, true, true, false)
+        AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_THAN(X, Z, true, false, true)
+        AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_THAN(Y, Z, false, true, true)
 
-        AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_LESS(Z, X)
-        AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_LESS(Y, X)
-        AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_LESS(Z, Y)
+        AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_LESS(Z, X, true, false, true)
+        AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_LESS(Y, X, true, true, false)
+        AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_LESS(Z, Y, false, true, true)
 
         namespace literals {
 		    constexpr X<double> operator AHO_LITERAL(x)(long double v) { return { (double)v }; };

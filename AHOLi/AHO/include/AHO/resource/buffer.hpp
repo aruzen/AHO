@@ -66,7 +66,7 @@ namespace AHO_NAMESPACE::resource {
 
     // ===========================================
 
-    inline Buffer<BufferType::General>::Buffer(size_t size) {
+    inline Buffer<BufferType::General>::Buffer(size_t size) : m_size(size) {
         m_buffer = new char[size];
     }
 

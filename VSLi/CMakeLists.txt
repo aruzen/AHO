@@ -180,3 +180,7 @@ install(
         ${CMAKE_BINARY_DIR}/share/VSL/cmake/VSLConfigVersion.cmake
         DESTINATION share/VSL/cmake
 )
+
+if (BUILD_TESTING)
+    add_subdirectory(VSL/test)
+endif ()

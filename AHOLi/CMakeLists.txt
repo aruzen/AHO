@@ -118,3 +118,7 @@ install(
         ${CMAKE_BINARY_DIR}/share/AHO/cmake/AHOConfigVersion.cmake
         DESTINATION share/AHO/cmake
 )
+
+if (BUILD_TESTING)
+    add_subdirectory(AHO/test)
+endif ()

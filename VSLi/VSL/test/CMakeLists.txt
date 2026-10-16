@@ -1,0 +1,33 @@
+add_custom_target(vsl-tests)
+
+file(GLOB_RECURSE VSL_TEST_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
+if (VSL_TEST_SOURCES)
+    find_program(VSL_TEST_GLSLC NAMES glslc HINTS "$ENV{VULKAN_SDK}/bin" REQUIRED)
+    set(VSL_TEST_PUBLIC_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/../include")
+    configure_file(support/config.hpp.in "${CMAKE_CURRENT_BINARY_DIR}/vsl_test_config.hpp" @ONLY)
+    set(VSL_TEST_SHADER_OUTPUTS)
+    foreach(VSL_TEST_SHADER triangle.vert triangle.frag vertices.vert fill.comp images.comp reflection.vert)
+        set(VSL_TEST_SHADER_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/shaders/${VSL_TEST_SHADER}.spv")
+        add_custom_command(OUTPUT "${VSL_TEST_SHADER_OUTPUT}"
+                COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/shaders"
+                COMMAND "${VSL_TEST_GLSLC}" "${CMAKE_CURRENT_SOURCE_DIR}/fixtures/${VSL_TEST_SHADER}" -o "${VSL_TEST_SHADER_OUTPUT}"
+                DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/fixtures/${VSL_TEST_SHADER}"
+                VERBATIM)
+        list(APPEND VSL_TEST_SHADER_OUTPUTS "${VSL_TEST_SHADER_OUTPUT}")
+    endforeach()
+    add_custom_target(vsl-test-shaders DEPENDS ${VSL_TEST_SHADER_OUTPUTS})
+    add_executable(vsl-test ${VSL_TEST_SOURCES})
+    add_dependencies(vsl-test vsl-test-shaders)
+    target_compile_definitions(vsl-test PRIVATE
+            VSL_TEST_SHADER_DIR="${CMAKE_CURRENT_BINARY_DIR}/shaders")
+    target_include_directories(vsl-test PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/../include"
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_BINARY_DIR}"
+            "$<TARGET_PROPERTY:VSL,INCLUDE_DIRECTORIES>"
+    )
+    target_link_directories(vsl-test PRIVATE ${GLFW_LIBRARY_DIRS})
+    target_link_libraries(vsl-test PRIVATE VSL GTest::gtest_main)
+    add_dependencies(vsl-tests vsl-test)
+    gtest_discover_tests(vsl-test TEST_PREFIX "VSL." DISCOVERY_MODE PRE_TEST NO_PRETTY_VALUES PROPERTIES TIMEOUT 60)
+endif ()

@@ -21,6 +21,12 @@ string(REPLACE "-fcolor-diagnostics" "-fdiagnostics-color=auto" CMAKE_CXX_FLAGS 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+include(CTest)
+if (BUILD_TESTING)
+    find_package(GTest REQUIRED)
+    include(GoogleTest)
+endif ()
+
 # Debug option
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -DDEBUG -fstandalone-debug -fno-omit-frame-pointer")
@@ -61,6 +67,17 @@ message("glfw3: ${GLFW_INCLUDE_DIRS}, ${GLFW_LIBRARY_DIRS}, ${GLFW_LIBRARIES}")
 add_subdirectory(AHO)
 add_subdirectory(AHOLi)
 add_subdirectory(VSLi)
+
+if (BUILD_TESTING)
+    add_custom_target(build-tests DEPENDS aho-tests vsl-tests)
+    add_custom_target(check
+            COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -C "$<CONFIG>"
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+            DEPENDS build-tests
+            USES_TERMINAL
+            VERBATIM
+    )
+endif ()
 # add_subdirectory()
 
 include_directories(${GLFW_INCLUDE_DIRS})

@@ -1,0 +1,6 @@
+#pragma once
+#define VSL_TEST_CXX R"vsl(@CMAKE_CXX_COMPILER@)vsl"
+#define VSL_TEST_INCLUDE R"vsl(@VSL_TEST_PUBLIC_INCLUDE@)vsl"
+#define VSL_TEST_VULKAN_INCLUDE R"vsl(@Vulkan_INCLUDE_DIRS@)vsl"
+#define VSL_TEST_GLFW_INCLUDE R"vsl(@GLFW_INCLUDE_DIRS@)vsl"
+#define VSL_TEST_GLSLC R"vsl(@VSL_TEST_GLSLC@)vsl"

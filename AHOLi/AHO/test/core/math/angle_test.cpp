@@ -1,5 +1,5 @@
-#include <gtest/gtest.h>
 #include <AHO/core/math/angle.hpp>
+#include <gtest/gtest.h>
 #include <numbers>
 
 namespace {

@@ -1,5 +1,8 @@
 #pragma once
 #include "../../define.hpp"
+#include <compare>
+#include <cstddef>
+#include <ostream>
 
 #include <numbers>
 

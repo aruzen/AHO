@@ -4,12 +4,28 @@
 #if defined(AHO_CONTRACT_MAT_INITIALIZER)
 constexpr aho::Mat<int, 2, 2> initialized({{1, 2}, {3, 4}});
 static_assert(initialized[0][0] == 1 && initialized[0][1] == 2 && initialized[1][0] == 3 && initialized[1][1] == 4);
+constexpr aho::Mat<int, 2, 3> partial({{1}, {2, 3}});
+static_assert(partial[0][0] == 1 && partial[0][1] == 0 && partial[0][2] == 0);
+static_assert(partial[1][0] == 2 && partial[1][1] == 3 && partial[1][2] == 0);
+constexpr aho::Mat<int, 2, 2> empty_rows({{}, {}});
+static_assert(empty_rows[0][0] == 0 && empty_rows[1][1] == 0);
+constexpr aho::Mat<int, 1, 2> truncated({{1, 2, 3}, {4, 5, 6}});
+static_assert(truncated[0][0] == 1 && truncated[0][1] == 2);
+constexpr aho::Mat<int, 0, 2> no_rows({{1, 2}});
+constexpr aho::Mat<int, 2, 0> no_columns({{1}, {2}});
+static_assert(no_rows.size() == 0 && no_columns.size() == 2);
+
 #elif defined(AHO_CONTRACT_MAT_RECTANGULAR_FACTORY)
 void check_factory() {
     constexpr std::array<int, 3> rows[2]{{1, 2, 3}, {4, 5, 6}};
     constexpr auto result = aho::matrix::make(rows);
     static_assert(std::same_as<decltype(result), const aho::Mat<int, 2, 3>>);
     static_assert(result[0][0] == 1 && result[0][1] == 2 && result[0][2] == 3 && result[1][0] == 4 && result[1][1] == 5 && result[1][2] == 6);
+    constexpr std::array<int, 2> tall_rows[3]{{7, 8}, {9, 10}, {11, 12}};
+    constexpr auto tall = aho::matrix::make(tall_rows);
+    static_assert(std::same_as<decltype(tall), const aho::Mat<int, 3, 2>>);
+    static_assert(tall[0][0] == 7 && tall[0][1] == 8 && tall[1][0] == 9 && tall[1][1] == 10 && tall[2][0] == 11 && tall[2][1] == 12);
+
 }
 #elif defined(AHO_CONTRACT_MAT_AXIS_ROTATION)
 void check_rotation() {
@@ -69,6 +85,30 @@ TEST(MatTest, ArrayConstructorAndValueInitializationPreserveShapeAndValues) {
     const Matrix2 matrix(values);
     expect_matrix(matrix, values);
     expect_matrix(Matrix2{}, std::array<std::array<int, 2>, 2>{});
+}
+TEST(MatInitializationTest, InitializerListsPreserveRowsAndZeroFillMissingElements) {
+    const aho::Mat<int, 2, 3> partial({{1}, {2, 3}});
+    expect_matrix(partial, std::array<std::array<int, 3>, 2>{{{1, 0, 0}, {2, 3, 0}}});
+    const aho::Mat<int, 3, 2> tall({{4, 5}, {}, {6}});
+    expect_matrix(tall, std::array<std::array<int, 2>, 3>{{{4, 5}, {0, 0}, {6, 0}}});
+    const aho::Mat<int, 2, 2> square({{1, 2}, {3, 4}});
+    expect_matrix(square, values);
+}
+TEST(MatInitializationTest, ExcessElementsAreTruncatedAndZeroExtentsAreSafe) {
+    const aho::Mat<int, 1, 2> truncated({{1, 2, 3}, {4, 5, 6}});
+    expect_matrix(truncated, std::array<std::array<int, 2>, 1>{{{1, 2}}});
+    const aho::Mat<int, 0, 2> no_rows({{1, 2}});
+    const aho::Mat<int, 2, 0> no_columns({{1}, {2}});
+    EXPECT_TRUE(no_rows.empty());
+    ASSERT_EQ(no_columns.size(), 2u);
+    EXPECT_TRUE(no_columns[0].empty());
+    EXPECT_TRUE(no_columns[1].empty());
+}
+TEST(MatInitializationTest, ArrayFactoryPreservesWideAndTallMatrixShapes) {
+    const std::array<int, 3> wide[2]{{1, 2, 3}, {4, 5, 6}};
+    const std::array<int, 2> tall[3]{{7, 8}, {9, 10}, {11, 12}};
+    expect_matrix(aho::matrix::make(wide), std::array<std::array<int, 3>, 2>{{{1, 2, 3}, {4, 5, 6}}});
+    expect_matrix(aho::matrix::make(tall), std::array<std::array<int, 2>, 3>{{{7, 8}, {9, 10}, {11, 12}}});
 }
 TEST(MatTest, UnaryAndBinaryAdditionAndSubtractionAreElementwise) {
     const Matrix2 a(values), b(others);

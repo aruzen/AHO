@@ -189,18 +189,19 @@ namespace AHO_NAMESPACE {
                 : std::array<std::array<R, Column>, Row>{init} {}
 
         template<typename R, size_t Row, size_t Column>
-        constexpr Mat<R, Row, Column>::Mat(const std::initializer_list<std::initializer_list<R>> &init) {
-            int i = 0, j = 0;
-            for (auto itr1: init) {
-                for (auto itr2: itr1) {
-                    (*this)[i][j] = itr2;
-                    j++;
-                    if (Column <= j)
-                        break;
-                }
-                i++;
-                if (Row <= i)
+        constexpr Mat<R, Row, Column>::Mat(const std::initializer_list<std::initializer_list<R>> &init)
+                : OriginArray{} {
+            size_t row = 0;
+            for (const auto &source_row : init) {
+                if (row == Row)
                     break;
+                size_t column = 0;
+                for (const auto &value : source_row) {
+                    if (column == Column)
+                        break;
+                    (*this)[row][column++] = value;
+                }
+                ++row;
             }
         }
 
@@ -364,7 +365,7 @@ namespace AHO_NAMESPACE {
 
         template<typename T, size_t Row, size_t Column>
         constexpr Mat<T, Row, Column> make(const std::array<T, Column> (&arr)[Row]) {
-            std::array<std::array<T, Row>, Column> cp;
+            std::array<std::array<T, Column>, Row> cp;
             std::copy(std::begin(arr), std::end(arr), cp.begin());
             return {cp};
         }

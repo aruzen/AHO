@@ -21,7 +21,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     }
 }
 
-aho::input::KeyBoard::KeyBoard(void *context) {
+aho::input::KeyBoard::KeyBoard(void *context) : context(context) {
     if (KEYBOARD_TRACKED == 0)
         glfwSetKeyCallback((GLFWwindow*)context, key_callback);
     KEYBOARD_TRACKED++;

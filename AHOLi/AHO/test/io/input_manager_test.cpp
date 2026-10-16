@@ -61,4 +61,39 @@ TEST_F(InputManagerTest, RemovingExpiredInputDoesNotSkipFollowingLiveInput) {
     EXPECT_EQ(manager.update_targets.size(), 1u);
     EXPECT_EQ(live->state(), 1);
 }
+TEST_F(InputManagerTest, ConsecutiveExpiredInputsDoNotSkipSurvivorsOrLeaveSubscriptions) {
+    aho::InputManager manager(window.handle());
+    auto first_expired = manager.get<Counter>();
+    auto second_expired = manager.get<Counter>();
+    const auto first_live = manager.get<Counter>(10);
+    auto middle_expired = manager.get<Counter>();
+    const auto second_live = manager.get<Counter>(20);
+    auto last_expired = manager.get<Counter>();
+    first_expired.reset();
+    second_expired.reset();
+    middle_expired.reset();
+    last_expired.reset();
+
+    manager.update();
+    ASSERT_EQ(manager.update_targets.size(), 2u);
+    EXPECT_EQ(first_live->state(), 11);
+    EXPECT_EQ(second_live->state(), 21);
+    EXPECT_EQ(manager.update_targets[0].lock().get(), first_live.get());
+    EXPECT_EQ(manager.update_targets[1].lock().get(), second_live.get());
+    manager.update();
+    EXPECT_EQ(first_live->state(), 12);
+    EXPECT_EQ(second_live->state(), 22);
+}
+TEST_F(InputManagerTest, EmptyAndEntirelyExpiredListsCanBeUpdatedRepeatedly) {
+    aho::InputManager manager(window.handle());
+    manager.update();
+    auto first = manager.get<Counter>();
+    auto second = manager.get<Counter>();
+    first.reset();
+    second.reset();
+    manager.update();
+    EXPECT_TRUE(manager.update_targets.empty());
+    manager.update();
+    EXPECT_TRUE(manager.update_targets.empty());
+}
 }

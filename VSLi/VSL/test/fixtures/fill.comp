@@ -1,0 +1,5 @@
+#version 450
+layout(local_size_x = 1) in;
+layout(set = 0, binding = 0, std430) buffer Output { uint values[]; } output_data;
+layout(push_constant) uniform Push { uint base; } push_data;
+void main() { output_data.values[gl_GlobalInvocationID.x] = push_data.base + gl_GlobalInvocationID.x; }

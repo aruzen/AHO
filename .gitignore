@@ -8,6 +8,9 @@ AHO/shaders/**/*.spv
 cmake-build*/
 build/
 
+document
+AGENT.md
+
 .idea/
 thirdparty/
 

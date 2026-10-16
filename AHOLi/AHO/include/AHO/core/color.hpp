@@ -837,7 +837,7 @@ struct Upper { \
 			requires (!std::convertible_to<L, R>) && std::same_as<typename L::element_type, typename R::element_type>
 		RGB<typename L::element_type> operator -(const L& l, const R& r) {
 			RGB<typename L::element_type> rgb;
-			rgb -= l;
+			rgb += l;
 			rgb -= r;
 			return rgb;
 		}
@@ -846,7 +846,7 @@ struct Upper { \
 			requires (!std::convertible_to<L, R>) && std::same_as<typename L::element_type, typename R::element_type>
 		HSV<typename L::element_type> operator -(const L& l, const R& r) {
 			HSV<typename L::element_type> hsv;
-			hsv -= l;
+			hsv += l;
 			hsv -= r;
 			return hsv;
 		}
@@ -855,7 +855,7 @@ struct Upper { \
 			requires std::same_as<typename L::element_type, ElementType>
 		RGBA<typename L::element_type> operator -(const L& l, const A<ElementType>& a) {
 			RGBA<typename L::element_type> rgb;
-			rgb -= l;
+			rgb += l;
 			rgb -= a;
 			return rgb;
 		}
@@ -864,7 +864,7 @@ struct Upper { \
 			requires std::same_as<typename L::element_type, ElementType>
 		HSVA<typename L::element_type> operator -(const L& l, const A<ElementType>& a) {
 			HSVA<typename L::element_type> hsv;
-			hsv -= l;
+			hsv += l;
 			hsv -= a;
 			return hsv;
 		}
@@ -874,7 +874,7 @@ struct Upper { \
 		RGBA<typename R::element_type> operator -(const A<ElementType>& a, const R& r) {
 			RGBA<typename R::element_type> rgb;
 			rgb -= r;
-			rgb -= a;
+			rgb += a;
 			return rgb;
 		}
 
@@ -883,7 +883,7 @@ struct Upper { \
 		HSVA<typename R::element_type> operator -(const A<ElementType>& a, const R& r) {
 			HSVA<typename R::element_type> rgb;
 			rgb -= r;
-			rgb -= a;
+			rgb += a;
 			return rgb;
 		}
 

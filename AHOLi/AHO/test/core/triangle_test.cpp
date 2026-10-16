@@ -22,6 +22,26 @@ void verify() { aho::Triangle<double, vsl::D2> triangle; const auto result = tri
 #else
 #include "../support/geometry.hpp"
 namespace {
+template<class T> class PointerTriangleMetadataTest : public testing::Test {};
+TYPED_TEST_SUITE(PointerTriangleMetadataTest, aho_test::GeometryCases);
+TYPED_TEST(PointerTriangleMetadataTest, CoordinateMetadataEnablesPointViewsWithoutLosingVertexValues) {
+    using P = typename TypeParam::Point;
+    using CI = typename P::coordinate_info;
+    using Triangle = aho::Triangle<typename TypeParam::element_type, typename TypeParam::dimension, CI>;
+    using Borrowed = aho::PtrTriangle<typename TypeParam::element_type, typename TypeParam::dimension, CI>;
+    static_assert(std::same_as<typename Borrowed::coordinate_info, CI>);
+    static_assert(aho::concepts::is_points_object<Borrowed>);
+    Triangle owner(aho_test::geometry<P>(1, 2, 3), aho_test::geometry<P>(4, 5, 6), aho_test::geometry<P>(7, 8, 9));
+    const auto borrowed = owner.adress();
+    const auto points = aho::views::points(borrowed);
+    ASSERT_EQ(points.size(), 3u);
+    aho_test::expect_coordinates(points[0], 1, 2, 3);
+    aho_test::expect_coordinates(points[1], 4, 5, 6);
+    aho_test::expect_coordinates(points[2], 7, 8, 9);
+    owner.pos3 = aho_test::geometry<P>(-1, -2, -3);
+    aho_test::expect_coordinates(points[2], 7, 8, 9);
+    aho_test::expect_coordinates(aho::views::points(borrowed)[2], -1, -2, -3);
+}
 TEST(TriangleTest, TwoAndThreeDimensionalAreaHandlesWindingAndDegenerateTriangles) {
     const aho::Triangle<double, vsl::D2> a(aho::d2::PointD(0, 0), aho::d2::PointD(3, 0), aho::d2::PointD(0, 4));
     EXPECT_DOUBLE_EQ(a.area(), 6);

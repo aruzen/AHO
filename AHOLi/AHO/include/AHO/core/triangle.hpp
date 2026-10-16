@@ -50,6 +50,7 @@ namespace AHO_NAMESPACE {
 	struct PtrTriangle {
 		using dimension = D;
 		using element_type = R;
+		using coordinate_info = CI;
 
 		AHO_NAMESPACE::_Point<R, D, CI>* pos1,* pos2,* pos3;
 

@@ -24,4 +24,24 @@ TEST_F(KeyboardTest, CallbackUpdatesPressedKeysAndReleasesCallbackOnDestruction)
     }
     EXPECT_EQ(window.key_callback, nullptr);
 }
+TEST_F(KeyboardTest, CallbackRemainsUntilLastKeyboardForWindowIsDestroyed) {
+    using namespace aho::input;
+    const auto previous = PRESSED_KEYS;
+    struct Restore {
+        std::unordered_set<KeyCode> value;
+        ~Restore() { PRESSED_KEYS = value; }
+    } restore{previous};
+    aho::InputManager manager(window.handle());
+    auto first = manager.get<KeyBoard>();
+    auto second = manager.get<KeyBoard>();
+    const auto callback = window.key_callback;
+    ASSERT_NE(callback, nullptr);
+    first.reset();
+    EXPECT_EQ(window.key_callback, callback);
+    callback(window.handle(), GLFW_KEY_B, 0, GLFW_PRESS, 0);
+    EXPECT_TRUE(second->pressed(KeyCode::B));
+    second.reset();
+    EXPECT_EQ(window.key_callback, nullptr);
+    EXPECT_TRUE(PRESSED_KEYS.empty());
+}
 }

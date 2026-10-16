@@ -20,11 +20,12 @@ TEST(PointContractTest, ThreeWayComparisonOrdersAllDimensionsAndRecognizesEquali
 constexpr auto sum = aho::d2::PointI(1, 2) + aho::d2::VectorI(3, 4);
 static_assert(sum.value.x.value == 4 && sum.value.y.value == 6);
 #elif defined(AHO_CONTRACT_POINT_DEFAULT_COORDINATES)
-void verify() {
-    const aho::d1::Point<int> single(1);
-    const aho::d2::Point<int> pair(1, 2);
-    const aho::d3::Point<int> triple(1, 2, 3);
-}
+constexpr aho::d1::Point<int> single(-1);
+constexpr aho::d2::Point<int> pair(-1, 2);
+constexpr aho::d3::Point<int> triple(-1, 2, -3);
+static_assert(single.value.x.value == -1);
+static_assert(pair.value.x.value == -1 && pair.value.y.value == 2);
+static_assert(triple.value.x.value == -1 && triple.value.y.value == 2 && triple.value.z.value == -3);
 #else
 #include "../support/geometry.hpp"
 
@@ -68,6 +69,20 @@ TEST(PointDeductionTest, DeductionAndExplicitCoordinateWrappersPreserveValues) {
     aho_test::expect_coordinates(aho::d1::Point<int, CI1>{}, 0);
     aho_test::expect_coordinates(aho::d2::Point<int, CI2>{}, 0, 0);
     aho_test::expect_coordinates(aho::d3::Point<int, CI3>{}, 0, 0, 0);
+}
+TEST(PointDefaultCoordinatesTest, NamedDimensionsUseTheirDefaultAxes) {
+    using P1 = aho::d1::Point<int>;
+    using P2 = aho::d2::Point<int>;
+    using P3 = aho::d3::Point<int>;
+    static_assert(std::same_as<P1::coordinate_info, aho::d1::PointI::coordinate_info>);
+    static_assert(std::same_as<P2::coordinate_info, aho::d2::PointI::coordinate_info>);
+    static_assert(std::same_as<P3::coordinate_info, aho::d3::PointI::coordinate_info>);
+    aho_test::expect_coordinates(P1{}, 0);
+    aho_test::expect_coordinates(P2{}, 0, 0);
+    aho_test::expect_coordinates(P3{}, 0, 0, 0);
+    aho_test::expect_coordinates(P1(-1), -1);
+    aho_test::expect_coordinates(P2(-1, 2), -1, 2);
+    aho_test::expect_coordinates(P3(-1, 2, -3), -1, 2, -3);
 }
 TYPED_TEST(PointTest, PointDifferenceProducesVectorAndTranslationProducesPoint) {
     using P = typename TypeParam::Point;

@@ -245,5 +245,33 @@ TEST(MatOutputTest, RectangularOutputContainsEveryElement) {
     EXPECT_NE(stream.str().find("11"), std::string::npos);
     EXPECT_NE(stream.str().find("22"), std::string::npos);
 }
+TEST(MatOutputTest, WideAndTallMatricesPrintRowsInOrderWithBalancedBraces) {
+    const aho::Mat<int, 2, 3> wide(std::array<std::array<int, 3>, 2>{{{1, 2, 3}, {4, 5, 6}}});
+    const aho::Mat<int, 3, 2> tall(std::array<std::array<int, 2>, 3>{{{1, 2}, {3, 4}, {5, 6}}});
+    std::ostringstream wide_output, tall_output;
+    EXPECT_EQ(&(wide_output << wide), &wide_output);
+    tall_output << tall;
+    EXPECT_EQ(wide_output.str(), "{{1, 2, 3}\n{4, 5, 6}}\n");
+    EXPECT_EQ(tall_output.str(), "{{1, 2}\n{3, 4}\n{5, 6}}\n");
+}
+TEST(MatOutputTest, SquareOutputDoesNotTransposeOffDiagonalElements) {
+    const aho::Mat<int, 2, 2> matrix(std::array<std::array<int, 2>, 2>{{{1, 2}, {3, 4}}});
+    std::ostringstream output;
+    output << matrix;
+    EXPECT_EQ(output.str(), "{{1, 2}\n{3, 4}}\n");
+}
+TEST(MatOutputTest, ZeroRowsAndZeroColumnsDoNotAccessElements) {
+    const aho::Mat<int, 0, 3> no_rows{};
+    const aho::Mat<int, 2, 0> no_columns{};
+    const aho::Mat<int, 0, 0> empty{};
+    std::ostringstream rows_output, columns_output, empty_output;
+    rows_output << no_rows;
+    columns_output << no_columns;
+    empty_output << empty;
+    EXPECT_EQ(rows_output.str(), "{}");
+    EXPECT_EQ(columns_output.str(), "{{}\n{}}\n");
+    EXPECT_EQ(empty_output.str(), "{}");
+}
+
 }
 #endif

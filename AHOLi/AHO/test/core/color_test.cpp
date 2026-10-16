@@ -171,6 +171,47 @@ TEST(ColorConstructionTest, DefaultColorsInitializeEveryChannelToZero) {
     EXPECT_FLOAT_EQ(hsv.h.value, 0); EXPECT_FLOAT_EQ(hsv.s.value, 0); EXPECT_FLOAT_EQ(hsv.v.value, 0);
     EXPECT_FLOAT_EQ(hsva.h.value, 0); EXPECT_FLOAT_EQ(hsva.s.value, 0); EXPECT_FLOAT_EQ(hsva.v.value, 0); EXPECT_FLOAT_EQ(hsva.a.value, 0);
 }
+template<class T> class RgbaArithmeticTest : public testing::Test {};
+using RgbaArithmeticScalars = testing::Types<std::int8_t, int, float, double>;
+TYPED_TEST_SUITE(RgbaArithmeticTest, RgbaArithmeticScalars);
+TYPED_TEST(RgbaArithmeticTest, ColorAndScalarArithmeticCombinesOrPreservesAlpha) {
+    using T = TypeParam;
+    using C = aho::color::RGBA<T>;
+    const C source(12, 24, 36, 8), delta(1, 2, 3, 4);
+    const aho::color::RGB<T> rgb(1, 2, 3);
+    static_assert(std::same_as<decltype(source + delta), C>);
+    aho_test::expect_rgba(source + delta, 13, 26, 39, 12);
+    aho_test::expect_rgba(source - delta, 11, 22, 33, 4);
+    aho_test::expect_rgba(source + rgb, 13, 26, 39, 8);
+    aho_test::expect_rgba(source - rgb, 11, 22, 33, 8);
+    aho_test::expect_rgba(source * T{2}, 24, 48, 72, 8);
+    aho_test::expect_rgba(source / T{2}, 6, 12, 18, 8);
+    auto changed = source;
+    EXPECT_EQ(&(changed += delta), &changed); aho_test::expect_rgba(changed, 13, 26, 39, 12);
+    EXPECT_EQ(&(changed -= delta), &changed); aho_test::expect_rgba(changed, 12, 24, 36, 8);
+    EXPECT_EQ(&(changed += rgb), &changed); aho_test::expect_rgba(changed, 13, 26, 39, 8);
+    EXPECT_EQ(&(changed -= rgb), &changed); aho_test::expect_rgba(changed, 12, 24, 36, 8);
+    EXPECT_EQ(&(changed *= T{2}), &changed); aho_test::expect_rgba(changed, 24, 48, 72, 8);
+    EXPECT_EQ(&(changed /= T{2}), &changed); aho_test::expect_rgba(changed, 12, 24, 36, 8);
+    changed += changed; aho_test::expect_rgba(changed, 24, 48, 72, 16);
+    changed -= changed; aho_test::expect_rgba(changed, 0, 0, 0, 0);
+    aho_test::expect_rgba(source, 12, 24, 36, 8);
+}
+TYPED_TEST(RgbaArithmeticTest, SingleChannelChangesLeaveOtherChannelsUnchanged) {
+    using namespace aho::color;
+    using T = TypeParam;
+    const RGBA<T> source(12, 24, 36, 8);
+    aho_test::expect_rgba(source + R<T>(1), 13, 24, 36, 8);
+    aho_test::expect_rgba(source - R<T>(1), 11, 24, 36, 8);
+    aho_test::expect_rgba(source + G<T>(2), 12, 26, 36, 8);
+    aho_test::expect_rgba(source - G<T>(2), 12, 22, 36, 8);
+    aho_test::expect_rgba(source + B<T>(3), 12, 24, 39, 8);
+    aho_test::expect_rgba(source - B<T>(3), 12, 24, 33, 8);
+    aho_test::expect_rgba(source + A<T>(4), 12, 24, 36, 12);
+    aho_test::expect_rgba(source - A<T>(4), 12, 24, 36, 4);
+}
+constexpr auto constexpr_rgba_sum = aho::color::RGBA<int>(1, 2, 3, 4) + aho::color::RGBA<int>(3, 2, 1, 0);
+static_assert(constexpr_rgba_sum.r.value == 4 && constexpr_rgba_sum.g.value == 4 && constexpr_rgba_sum.b.value == 4 && constexpr_rgba_sum.a.value == 4);
 TEST(ColorConstructionTest, ComponentAssignmentsModifyOnlyTheRequestedChannel) {
     using namespace aho::color;
     RGB<int> rgb(1, 2, 3);

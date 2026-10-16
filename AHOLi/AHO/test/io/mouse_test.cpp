@@ -31,6 +31,24 @@ TEST_F(MouseTest, CursorSamplesPositionAndReportsNewMinusPreviousDelta) {
     aho_test::expect_coordinates(cursor->delta(), 3, -4);
     cursor->update(); aho_test::expect_coordinates(cursor->delta(), 0, 0);
 }
+TEST_F(MouseTest, CursorDeltaPreservesFractionalMovementInBothDirections) {
+    aho::InputManager manager(window.handle());
+    window.cursor_x = -2.5;
+    window.cursor_y = 4.75;
+    const auto cursor = manager.get<aho::input::Cursor>();
+    aho_test::expect_coordinates(cursor->delta(), 0, 0);
+    window.cursor_x = -6.25;
+    window.cursor_y = 10.5;
+    cursor->update();
+    aho_test::expect_coordinates(cursor->state(), -6.25, 10.5);
+    aho_test::expect_coordinates(cursor->delta(), -3.75, 5.75);
+    window.cursor_x = -2.5;
+    window.cursor_y = 4.75;
+    cursor->update();
+    aho_test::expect_coordinates(cursor->delta(), 3.75, -5.75);
+    cursor->update();
+    aho_test::expect_coordinates(cursor->delta(), 0, 0);
+}
 TEST_F(MouseTest, WheelPublishesScrollThenResetsAfterAnUpdate) {
     using aho::input::MouseWheel;
     const auto previous_generation = MouseWheel::_generation;

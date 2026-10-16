@@ -300,7 +300,7 @@ namespace AHO_NAMESPACE::input {
     class CodeID {
         CodeType _code;
     public:
-        constexpr explicit CodeID(int code) : _code((KeyCode) code) {}
+        constexpr explicit CodeID(int code) : _code(static_cast<CodeType>(code)) {}
 
         constexpr explicit CodeID(CodeType code) : _code(code) {}
 

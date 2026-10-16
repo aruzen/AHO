@@ -23,8 +23,8 @@ aho::d2::VectorD aho::input::Cursor::delta() {
 void aho::input::Cursor::update() {
     _delta.value = _state.value;
     glfwGetCursorPos((GLFWwindow *) context, &_state.value.x.value, &_state.value.y.value);
-    _delta.value.x -= _state.value.x;
-    _delta.value.y -= _state.value.y;
+    _delta.value.x = _state.value.x - _delta.value.x;
+    _delta.value.y = _state.value.y - _delta.value.y;
 }
 
 aho::input::ButtonState aho::input::MouseButton::state() {

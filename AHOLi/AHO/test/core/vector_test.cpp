@@ -205,6 +205,5 @@ TEST(VectorConceptTest, UnrelatedTypesWithAliasesAreNotVectors) {
     EXPECT_FALSE(aho::concepts::is_vector<PretendVector>);
     EXPECT_TRUE(aho::concepts::is_vector<aho::d2::VectorD>);
 }
-
 }
 #endif

@@ -4,9 +4,9 @@
 #include "../../define.hpp"
 #include "../../concepts.hpp"
 
-#include <iostream>
 #include <compare>
 #include <tuple>
+#include <iostream>
 
 namespace AHO_NAMESPACE {
 	namespace coordinate {

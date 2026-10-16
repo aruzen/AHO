@@ -200,6 +200,41 @@ TEST(VectorCastTest, FloatingPointToIntegerCastTruncatesTowardZeroInEveryDimensi
     aho_test::expect_coordinates(aho::d2::VectorD(-2.75, 3.75).cast<int>(), -2, 3);
     aho_test::expect_coordinates(aho::d3::VectorD(-2.75, 3.75, 4.5).cast<int>(), -2, 3, 4);
 }
+template<bool X, bool Y, bool Z> struct OneDimensionalInputCase {
+    using Info = aho::coordinate::_MakeCoordinateInfo<X, Y, Z>::value;
+};
+using OneDimensionalInputAxes = testing::Types<OneDimensionalInputCase<true, false, false>,
+    OneDimensionalInputCase<false, true, false>, OneDimensionalInputCase<false, false, true>>;
+template<class T> class VectorOneDimensionalInputTest : public testing::Test {};
+TYPED_TEST_SUITE(VectorOneDimensionalInputTest, OneDimensionalInputAxes);
+TYPED_TEST(VectorOneDimensionalInputTest, ProductsAcceptBaseAndDerivedInputsOnTheSameAxis) {
+    using CI = typename TypeParam::Info;
+    using Left = aho::_Vector<double, vsl::D1, CI>;
+    using Right = aho::_Vector<float, vsl::D1, CI>;
+    const Left left(1), negative(-2);
+    const Right base(4);
+    const aho::d1::Vector<float, CI> derived(4);
+    static_assert(std::same_as<decltype(left.dot(derived)), double>);
+    static_assert(std::same_as<decltype(left.hadamard(derived)), Left>);
+    auto coordinate = [](const auto& value) {
+        if constexpr (CI::EnabledX) return value.value.x.value;
+        else if constexpr (CI::EnabledY) return value.value.y.value;
+        else return value.value.z.value;
+    };
+    EXPECT_EQ(left.dot(base), 4); EXPECT_EQ(left.dot(derived), 4);
+    EXPECT_EQ(coordinate(left.hadamard(base)), 4); EXPECT_EQ(coordinate(left.hadamard(derived)), 4);
+    EXPECT_EQ(negative.dot(derived), -8);
+    EXPECT_EQ(coordinate(negative.hadamard(derived)), -8);
+    EXPECT_EQ(coordinate(left), 1); EXPECT_EQ(coordinate(base), 4); EXPECT_EQ(coordinate(derived), 4);
+}
+template<class L, class R> concept HasOneDimensionalProducts = requires(const L& left, const R& right) {
+    left.dot(right); left.hadamard(right);
+};
+using ProductAxisX = aho::coordinate::_MakeCoordinateInfo<true, false, false>::value;
+using ProductAxisY = aho::coordinate::_MakeCoordinateInfo<false, true, false>::value;
+static_assert(!HasOneDimensionalProducts<aho::_Vector<double, vsl::D1, ProductAxisX>, aho::_Vector<float, vsl::D1, ProductAxisY>>);
+static_assert(!HasOneDimensionalProducts<aho::d1::VectorD, aho::d2::VectorD>);
+static_assert(!HasOneDimensionalProducts<aho::d1::VectorD, aho::d1::PointD>);
 TEST(VectorConceptTest, UnrelatedTypesWithAliasesAreNotVectors) {
     struct PretendVector { using element_type = double; using dimension = vsl::D2; };
     EXPECT_FALSE(aho::concepts::is_vector<PretendVector>);

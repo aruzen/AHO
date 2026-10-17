@@ -1,9 +1,40 @@
 #include <AHO/io/keyboard.hpp>
 #include "../support/input_backend.hpp"
+#include <concepts>
 
 extern std::unordered_set<aho::input::KeyCode> PRESSED_KEYS;
 namespace {
 using KeyboardTest = aho_test::InputBackendTest;
+static_assert(std::derived_from<aho::input::KeyBoard, aho::input::abstract::Characters>);
+static_assert(std::derived_from<aho::input::KeyBoard,
+    aho::input::abstract::Input<std::unordered_set<aho::input::KeyCode>>>);
+TEST_F(KeyboardTest, PublicCharacterAndInputInterfacesReportKeyboardState) {
+    using namespace aho::input;
+    const auto previous = PRESSED_KEYS;
+    struct Restore {
+        std::unordered_set<KeyCode> value;
+        ~Restore() { PRESSED_KEYS = value; }
+    } restore{previous};
+    PRESSED_KEYS.clear();
+    aho::InputManager manager(window.handle());
+    {
+        const auto keyboard = manager.get<KeyBoard>();
+        const std::shared_ptr<abstract::Characters> characters = keyboard;
+        const std::shared_ptr<abstract::Input<std::unordered_set<KeyCode>>> input = keyboard;
+        ASSERT_NE(window.key_callback, nullptr);
+        EXPECT_TRUE(characters->state().empty());
+        window.key_callback(window.handle(), GLFW_KEY_A, 0, GLFW_PRESS, 0);
+        window.key_callback(window.handle(), GLFW_KEY_B, 0, GLFW_PRESS, 0);
+        const std::unordered_set<KeyCode> both{KeyCode::A, KeyCode::B};
+        EXPECT_EQ(characters->state(), both);
+        EXPECT_EQ(input->state(), both);
+        window.key_callback(window.handle(), GLFW_KEY_A, 0, GLFW_RELEASE, 0);
+        EXPECT_EQ(characters->state(), (std::unordered_set<KeyCode>{KeyCode::B}));
+        EXPECT_EQ(input->state(), keyboard->state());
+    }
+    EXPECT_EQ(window.key_callback, nullptr);
+}
+
 TEST_F(KeyboardTest, CallbackUpdatesPressedKeysAndReleasesCallbackOnDestruction) {
     using namespace aho::input;
     const auto previous = PRESSED_KEYS;

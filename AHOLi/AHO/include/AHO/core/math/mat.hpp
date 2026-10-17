@@ -269,7 +269,7 @@ namespace AHO_NAMESPACE {
         Mat<R, Row, Column>::operator-=(const AHO_NAMESPACE::matrix::Mat<T, Row, Column> &p) {
             for (size_t i = 0; i < Row; i++)
                 for (size_t j = 0; j < Column; j++)
-                    (*this)[i][j] + -p[i][j];
+                    (*this)[i][j] -= p[i][j];
             return *this;
         }
 
@@ -277,12 +277,11 @@ namespace AHO_NAMESPACE {
         template<AHO_NAMESPACE::concepts::multiply_as<R> T>
         constexpr Mat<R, Row, Column> &
         Mat<R, Row, Column>::operator*=(const AHO_NAMESPACE::matrix::Mat<T, Row, Column> &p) {
-            // static_assert(Row == Column, "different type  (*= -> *)");
-
+            static_assert(Row == Column, "Matrix compound multiplication requires square matrices.");
+            const auto product = *this * p;
             for (size_t i = 0; i < Row; i++)
                 for (size_t j = 0; j < Column; j++)
-                    for (size_t k = 0; k < Column; k++)
-                        (*this)[i][k] += p[k][j];
+                    (*this)[i][j] = product[i][j];
             return *this;
         }
 

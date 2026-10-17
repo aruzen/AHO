@@ -310,17 +310,20 @@ namespace AHO_NAMESPACE {
 
 		template<typename T1, typename T2>
 		constexpr _CoordinateSet<decltype(std::declval<T1>() + std::declval<T2>()), typename _MakeCoordinateInfo<true, true, false>::value> operator +(const X<T1>& e1, const Y<T2>& e2) {
-			return { e1 , e2 };
+			using Result = decltype(std::declval<T1>() + std::declval<T2>());
+			return { static_cast<Result>(e1.value), static_cast<Result>(e2.value) };
 		}
 
 		template<typename T1, typename T2>
 		constexpr _CoordinateSet<decltype(std::declval<T1>() + std::declval<T2>()), typename _MakeCoordinateInfo<true, false, true>::value> operator +(const X<T1>& e1, const Z<T2>& e2) {
-			return { e1 , e2 };
+			using Result = decltype(std::declval<T1>() + std::declval<T2>());
+			return { static_cast<Result>(e1.value), static_cast<Result>(e2.value) };
 		}
 
 		template<typename T1, typename T2>
 		constexpr _CoordinateSet<decltype(std::declval<T1>() + std::declval<T2>()), typename _MakeCoordinateInfo<false, true, true>::value> operator +(const Y<T1>& e1, const Z<T2>& e2) {
-			return { e1 , e2 };
+			using Result = decltype(std::declval<T1>() + std::declval<T2>());
+			return { static_cast<Result>(e1.value), static_cast<Result>(e2.value) };
 		}
 
         template<typename T1, typename CI1, typename T2, typename CI2>
@@ -406,13 +409,15 @@ namespace AHO_NAMESPACE {
 #define AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_THAN(U1, U2, EnableX, EnableY, EnableZ) \
         template<typename T1, typename T2> \
         constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _MakeCoordinateInfo<EnableX, EnableY, EnableZ>::value> operator -(const U1<T1>& e1, const U2<T2>& e2) { \
-            return { e1 , -e2 }; \
+            using Result = decltype(std::declval<T1>() - std::declval<T2>()); \
+            return { static_cast<Result>(e1.value), -static_cast<Result>(e2.value) }; \
         }
 
 #define AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_LESS(U1, U2, EnableX, EnableY, EnableZ) \
         template<typename T1, typename T2> \
         constexpr _CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename _MakeCoordinateInfo<EnableX, EnableY, EnableZ>::value> operator -(const U1<T1>& e1, const U2<T2>& e2) { \
-            return { -e2, e1 }; \
+            using Result = decltype(std::declval<T1>() - std::declval<T2>()); \
+            return { -static_cast<Result>(e2.value), static_cast<Result>(e1.value) }; \
         }
 
         AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_THAN(X, Y, true, true, false)

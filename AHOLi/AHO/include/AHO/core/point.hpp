@@ -37,7 +37,7 @@ namespace AHO_NAMESPACE {
 	};
 
 	namespace d1 {
-		template<typename R, typename CI = AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D1>>
+		template<typename R, typename CI = typename AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D1>::value>
 		struct Point : public AHO_NAMESPACE::_Point<R, VSL_NAMESPACE::D1, CI> {
 			constexpr Point() {};
 			
@@ -49,7 +49,7 @@ namespace AHO_NAMESPACE {
 	}
 
 	namespace d2 {
-		template<typename R, typename CI = AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D2>>
+		template<typename R, typename CI = typename AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D2>::value>
 		struct Point : public AHO_NAMESPACE::_Point<R, VSL_NAMESPACE::D2, CI> {
 			constexpr Point() {};
 			
@@ -61,7 +61,7 @@ namespace AHO_NAMESPACE {
 	}
 
 	namespace d3 {
-		template<typename R, typename CI = AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D3>>
+		template<typename R, typename CI = typename AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D3>::value>
 		struct Point : public AHO_NAMESPACE::_Point<R, VSL_NAMESPACE::D3, CI> {
 			constexpr Point() {};
 			

@@ -9,6 +9,9 @@
 
 #include "vector.hpp"
 
+#include <cmath>
+#include <type_traits>
+
 namespace AHO_NAMESPACE {
 	template<typename R, VSL_NAMESPACE::is_dimension D, typename CoordinateInfo>
 	struct _Point {
@@ -336,7 +339,20 @@ namespace AHO_NAMESPACE {
 	template<typename R, typename CI>
 	constexpr auto _Point<R, VSL_NAMESPACE::D1, CI>::length() const
 	{
-		return value.___AN1;
+        const R component = [&]() {
+            if constexpr (CI::EnabledX)
+                return value.x.value;
+            else if constexpr (CI::EnabledY)
+                return value.y.value;
+            else
+                return value.z.value;
+        }();
+        if constexpr (std::is_integral_v<R>) {
+            const double magnitude = component;
+            return magnitude < 0 ? -magnitude : magnitude;
+        } else {
+            return std::abs(component);
+        }
 	}
 
 	// ---------------------------------------------------------------------------------------------------------------------

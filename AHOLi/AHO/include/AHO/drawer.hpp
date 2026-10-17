@@ -49,6 +49,18 @@ namespace AHO_NAMESPACE {
         phase_stream << std::forward<decltype(cmd)>(cmd);
         return *this;
     }
+
+    template<typename PhaseStream>
+    DrawStream<PhaseStream> &DrawStream<PhaseStream>::operator<<(std::shared_ptr<vsl::command::__Command> cmd) {
+        phase_stream << cmd;
+        return *this;
+    }
+
+    template<typename PhaseStream>
+    DrawStream<PhaseStream> &DrawStream<PhaseStream>::operator<<(std::shared_ptr<vsl::command::__DelegateCommand> cmd) {
+        phase_stream << cmd;
+        return *this;
+    }
 }
 
 #endif //AHO_ALL_DRAWER_H

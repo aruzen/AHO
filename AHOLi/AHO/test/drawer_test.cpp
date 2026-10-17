@@ -1,20 +1,46 @@
 #include <AHO/drawer/draw_phase.hpp>
 #include "support/commands.hpp"
 
+#include <gtest/gtest.h>
+
+#if defined(AHO_LINK_DRAWER_COMMAND) || defined(AHO_LINK_DRAWER_DELEGATE)
+namespace {
 #if defined(AHO_LINK_DRAWER_COMMAND)
-int main() {
-    aho::DrawStream<aho_test::RecordingStream> stream;
-    std::shared_ptr<vsl::command::__Command> command;
-    stream << command;
+#define SharedSuite DrawStreamSharedCommandTest
+using SharedCommand = std::shared_ptr<vsl::command::__Command>;
+using RecordingCommand = aho_test::RecordingCommand;
+#else
+#define SharedSuite DrawStreamSharedDelegateTest
+using SharedCommand = std::shared_ptr<vsl::command::__DelegateCommand>;
+using RecordingCommand = aho_test::RecordingDelegate;
+#endif
+struct SharedRecordingStream {
+    SharedCommand received;
+    int calls = 0;
+    SharedRecordingStream& operator<<(SharedCommand command) {
+        received = std::move(command);
+        ++calls;
+        return *this;
+    }
+};
+TEST(SharedSuite, ForwardsOwnershipAndReturnsOriginalStreamWithoutInvoking) {
+    aho::DrawStream<SharedRecordingStream> stream;
+    int calls = 0;
+    SharedCommand command = std::make_shared<RecordingCommand>(&calls);
+    EXPECT_EQ(&(stream << command), &stream);
+    EXPECT_EQ(stream.phase_stream.received, command);
+    EXPECT_EQ(stream.phase_stream.calls, 1);
+    EXPECT_EQ(calls, 0);
+    EXPECT_EQ(command.use_count(), 2);
 }
-#elif defined(AHO_LINK_DRAWER_DELEGATE)
-int main() {
-    aho::DrawStream<aho_test::RecordingStream> stream;
-    std::shared_ptr<vsl::command::__DelegateCommand> command;
-    stream << command;
+TEST(SharedSuite, ForwardsEmptyPointersWithoutDereferencing) {
+    aho::DrawStream<SharedRecordingStream> stream;
+    EXPECT_EQ(&(stream << SharedCommand{}), &stream);
+    EXPECT_FALSE(stream.phase_stream.received);
+    EXPECT_EQ(stream.phase_stream.calls, 1);
+}
 }
 #else
-#include <gtest/gtest.h>
 namespace drawer_payload {
 struct Value { int* calls; aho::DrawPhase** received; };
 void draw(Value value, aho::DrawPhase* phase) { ++*value.calls; *value.received = phase; }

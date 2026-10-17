@@ -347,9 +347,10 @@ namespace AHO_NAMESPACE {
             else
                 return value.z.value;
         }();
-        if constexpr (std::is_integral_v<R>) {
-            const double magnitude = component;
-            return magnitude < 0 ? -magnitude : magnitude;
+        if constexpr (std::is_integral_v<R> && !std::is_same_v<R, bool>) {
+            using Magnitude = std::make_unsigned_t<R>;
+            const auto magnitude = static_cast<Magnitude>(component);
+            return component < 0 ? static_cast<Magnitude>(Magnitude{} - magnitude) : magnitude;
         } else {
             return std::abs(component);
         }

@@ -112,12 +112,19 @@ TYPED_TEST(PointOneDimensionalLengthTest, EachAxisHasNonnegativeLengthForEitherC
 TEST(PointOneDimensionalLengthTest, MinimumSignedCoordinateHasRepresentablePositiveLength) {
     constexpr aho::d1::PointI negative(-3);
     static_assert(negative.length() == 3);
-    static_assert(std::same_as<decltype(negative.length()), double>);
+    static_assert(std::same_as<decltype(negative.length()), unsigned>);
     static_assert(std::same_as<decltype(aho::d1::PointF(-3).length()), float>);
     static_assert(std::same_as<decltype(aho::d1::PointD(-3).length()), double>);
     const aho::d1::PointI minimum(std::numeric_limits<int>::min());
     EXPECT_EQ(minimum.length(), -static_cast<double>(std::numeric_limits<int>::min()));
     EXPECT_EQ(minimum.value.x.value, std::numeric_limits<int>::min());
+}
+TEST(PointOneDimensionalLengthTest, LargeIntegerMagnitudesKeepTheirExactValues) {
+    const aho::_Point<long long, vsl::D1> large(9007199254740993LL);
+    static_assert(std::same_as<decltype(large.length()), unsigned long long>);
+    EXPECT_EQ(large.length(), 9007199254740993ULL);
+    const aho::_Point<unsigned long long, vsl::D1> maximum(std::numeric_limits<unsigned long long>::max());
+    EXPECT_EQ(maximum.length(), std::numeric_limits<unsigned long long>::max());
 }
 TEST(PointOneDimensionalLengthTest, UnsignedCoordinatesRemainPositiveAndNegativeZeroBecomesPositiveZero) {
     const aho::_Point<unsigned, vsl::D1> maximum(std::numeric_limits<unsigned>::max());

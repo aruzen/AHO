@@ -1,12 +1,11 @@
 #include <AHO/io/keyboard.hpp>
-#include "../support/input_backend.hpp"
 #include <optional>
 #include <type_traits>
+#include "../support/input_backend.hpp"
 
 extern std::unordered_set<aho::input::KeyCode> PRESSED_KEYS;
 namespace {
 using KeyboardTest = aho_test::InputBackendTest;
-static_assert(std::is_nothrow_copy_constructible_v<aho::input::KeyBoard>);
 TEST_F(KeyboardTest, CallbackUpdatesPressedKeysAndReleasesCallbackOnDestruction) {
     using namespace aho::input;
     const auto previous = PRESSED_KEYS;
@@ -48,6 +47,7 @@ TEST_F(KeyboardTest, CallbackRemainsUntilLastKeyboardForWindowIsDestroyed) {
     EXPECT_TRUE(PRESSED_KEYS.empty());
 }
 TEST_F(KeyboardTest, CopiedKeyboardKeepsCallbackUntilBothObjectsAreDestroyed) {
+    static_assert(std::is_nothrow_copy_constructible_v<aho::input::KeyBoard>);
     using namespace aho::input;
     const auto previous = PRESSED_KEYS;
     struct Restore {

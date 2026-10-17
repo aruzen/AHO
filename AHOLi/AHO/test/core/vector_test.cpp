@@ -163,6 +163,50 @@ TEST(VectorNormalizationTest, FloatingPointVectorsNormalizeWithinFloatRoundingTo
     EXPECT_EQ(&b.normalize(), &b);
     aho_test::expect_coordinates(b, 1.0 / 3, 2.0 / 3, 2.0 / 3);
 }
+template<class T> class VectorOneDimensionalLengthTest : public testing::Test {};
+using VectorLengthScalars = testing::Types<int, float, double>;
+TYPED_TEST_SUITE(VectorOneDimensionalLengthTest, VectorLengthScalars);
+TYPED_TEST(VectorOneDimensionalLengthTest, LengthUsesTheEnabledAxisAndPreservesInputs) {
+    using T = TypeParam;
+    using X = aho::coordinate::_MakeCoordinateInfo<true, false, false>::value;
+    using Y = aho::coordinate::_MakeCoordinateInfo<false, true, false>::value;
+    using Z = aho::coordinate::_MakeCoordinateInfo<false, false, true>::value;
+    []<class... Axes>(std::tuple<Axes...>) {
+        ([]<class Axis>() {
+            using V = aho::_Vector<T, vsl::D1, Axis>;
+            const V negative(T{-3});
+            EXPECT_EQ(negative.length(), 3);
+            EXPECT_EQ(V(T{3}).length(), 3);
+            EXPECT_EQ(V(T{}).length(), 0);
+            if constexpr (Axis::EnabledX) EXPECT_EQ(negative.value.x.value, -3);
+            else if constexpr (Axis::EnabledY) EXPECT_EQ(negative.value.y.value, -3);
+            else EXPECT_EQ(negative.value.z.value, -3);
+        }.template operator()<Axes>(), ...);
+    }(std::tuple<X, Y, Z>{});
+}
+TEST(VectorOneDimensionalLengthTest, MinimumIntegerCoordinateHasRepresentablePositiveLength) {
+    constexpr aho::d1::VectorI negative(-3);
+    static_assert(negative.length() == 3);
+    static_assert(std::same_as<decltype(negative.length()), unsigned>);
+    static_assert(std::same_as<decltype(aho::d1::VectorF(-3).length()), float>);
+    const aho::d1::VectorI minimum(std::numeric_limits<int>::min());
+    EXPECT_EQ(minimum.length(), -static_cast<double>(std::numeric_limits<int>::min()));
+}
+TEST(VectorOneDimensionalLengthTest, UnsignedCoordinatesAreAcceptedAndNegativeZeroHasPositiveLengthZero) {
+    const aho::_Vector<unsigned, vsl::D1> maximum(std::numeric_limits<unsigned>::max());
+    EXPECT_EQ(maximum.length(), static_cast<double>(std::numeric_limits<unsigned>::max()));
+    const aho::d1::VectorD zero(-0.0);
+    EXPECT_EQ(zero.length(), 0);
+    EXPECT_FALSE(std::signbit(zero.length()));
+}
+TEST(VectorOneDimensionalLengthTest, LargeIntegralMagnitudesRetainAdjacentValuesAndOrdering) {
+    using V = aho::_Vector<long long, vsl::D1>;
+    const V smaller(9007199254740992LL), larger(9007199254740993LL);
+    EXPECT_EQ(smaller.length(), 9007199254740992ULL);
+    EXPECT_EQ(larger.length(), 9007199254740993ULL);
+    EXPECT_TRUE(smaller < larger);
+    EXPECT_EQ(V(std::numeric_limits<long long>::min()).length(), 9223372036854775808ULL);
+}
 TEST(VectorMatrixTest, RowMatrixConversionsPreserveCoordinatesAndHomogeneousZero) {
     aho_test::expect_matrix(static_cast<aho::Mat<double, 1, 1>>(aho::d1::VectorD(4)), std::array<std::array<double, 1>, 1>{{{4}}});
     aho_test::expect_matrix(static_cast<aho::Mat<double, 1, 2>>(aho::d2::VectorD(2, 3)), std::array<std::array<double, 2>, 1>{{{2, 3}}});

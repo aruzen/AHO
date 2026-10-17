@@ -6,6 +6,7 @@
 
 #include <compare>
 #include <cmath>
+#include <type_traits>
 #include "ov.hpp"
 #include "math/coordinate.hpp"
 #include "math/mat.hpp"
@@ -423,7 +424,21 @@ namespace AHO_NAMESPACE {
     template<typename R, typename CI>
 	constexpr auto _Vector<R, VSL_NAMESPACE::D1, CI>::length() const
 	{
-		return std::abs(value.___AN1);
+        const R component = [&]() {
+            if constexpr (CI::EnabledX)
+                return value.x.value;
+            else if constexpr (CI::EnabledY)
+                return value.y.value;
+            else
+                return value.z.value;
+        }();
+        if constexpr (std::is_integral_v<R> && !std::is_same_v<R, bool>) {
+            using Magnitude = std::make_unsigned_t<R>;
+            const auto magnitude = static_cast<Magnitude>(component);
+            return component < 0 ? static_cast<Magnitude>(Magnitude{} - magnitude) : magnitude;
+        } else {
+            return std::abs(component);
+        }
 	}
 
     template<typename R, typename CI>

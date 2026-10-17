@@ -128,6 +128,23 @@ TYPED_TEST(CoordinateMaskTest, EqualityAndThreeWayComparisonUseEveryEnabledAxis)
     check_axis(TypeParam::make(1, 3, 3), TypeParam::y);
     check_axis(TypeParam::make(1, 2, 4), TypeParam::z);
 }
+TYPED_TEST(CoordinateMaskTest, LessThanIsConstantEvaluableAndUsesLexicographicAxisOrder) {
+    constexpr auto original = TypeParam::make();
+    constexpr auto larger = TypeParam::make(2, 3, 4);
+    static_assert(original < larger);
+    static_assert(!(larger < original));
+    static_assert(!(original < original));
+    static_assert((original < TypeParam::make(2, 2, 3)) == TypeParam::x);
+    static_assert((original < TypeParam::make(1, 3, 3)) == TypeParam::y);
+    static_assert((original < TypeParam::make(1, 2, 4)) == TypeParam::z);
+    if constexpr (TypeParam::x && (TypeParam::y || TypeParam::z)) {
+        static_assert(TypeParam::make(0, 100, 100) < TypeParam::make(1, -100, -100));
+    } else if constexpr (TypeParam::y && TypeParam::z) {
+        static_assert(TypeParam::make(0, 0, 100) < TypeParam::make(0, 1, -100));
+    }
+    EXPECT_EQ(original < larger, std::is_lt(original <=> larger));
+    EXPECT_EQ(larger < original, std::is_lt(larger <=> original));
+}
 TEST(CoordinateComparisonTest, FloatingPointNaNsRemainUnorderedInEveryDimension) {
     using namespace aho::coordinate;
     constexpr double nan = std::numeric_limits<double>::quiet_NaN();
@@ -136,6 +153,9 @@ TEST(CoordinateComparisonTest, FloatingPointNaNsRemainUnorderedInEveryDimension)
         EXPECT_EQ(unordered <=> ordinary, std::partial_ordering::unordered);
         EXPECT_EQ(ordinary <=> unordered, std::partial_ordering::unordered);
         EXPECT_FALSE(unordered == unordered);
+        EXPECT_FALSE(unordered < ordinary);
+        EXPECT_FALSE(ordinary < unordered);
+        EXPECT_FALSE(unordered < unordered);
         EXPECT_TRUE(ordinary == ordinary);
     };
     using C1 = _CoordinateSet<double, _DefaultCoordinateInfo<vsl::D1>::value>;

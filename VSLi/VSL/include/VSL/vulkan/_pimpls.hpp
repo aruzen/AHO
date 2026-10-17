@@ -297,6 +297,7 @@ namespace VSL_NAMESPACE::_impl {
         std::shared_ptr<Image_impl> source;
         std::shared_ptr<Buffer_impl> buffer;
         vk::CommandPool pool;
+        std::shared_ptr<CommandBuffer_impl> commandBuffer;
         vk::Fence fence;
         bool submitted = false, coherent = false;
         ImagePixels pixels;

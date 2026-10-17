@@ -5,6 +5,7 @@
 #include <ostream>
 
 #include <numbers>
+#include <type_traits>
 
 namespace AHO_NAMESPACE {
 	namespace angle {
@@ -23,6 +24,12 @@ namespace AHO_NAMESPACE {
 			constexpr Radian& operator *=(size_t m) { value *= m; return *this; }
 			constexpr Radian& operator /=(double m) { value /= m; return *this; }
 			constexpr Radian& operator /=(size_t m) { value /= m; return *this; }
+
+            template<typename Scalar> requires std::is_arithmetic_v<Scalar>
+            constexpr Radian& operator *=(const Scalar& m) { value *= m; return *this; }
+
+            template<typename Scalar> requires std::is_arithmetic_v<Scalar>
+            constexpr Radian& operator /=(const Scalar& m) { value /= m; return *this; }
 
 			constexpr operator double() const { return (double)value; }
 			constexpr operator long double() const { return value; }
@@ -47,6 +54,12 @@ namespace AHO_NAMESPACE {
 			constexpr Degree& operator *=(size_t m) { value *= m; return *this; }
 			constexpr Degree& operator /=(double m) { value /= m; return *this; }
 			constexpr Degree& operator /=(size_t m) { value /= m; return *this; }
+
+            template<typename Scalar> requires std::is_arithmetic_v<Scalar>
+            constexpr Degree& operator *=(const Scalar& m) { value *= m; return *this; }
+
+            template<typename Scalar> requires std::is_arithmetic_v<Scalar>
+            constexpr Degree& operator /=(const Scalar& m) { value /= m; return *this; }
 
 			constexpr operator double() const { return (double)value; }
 			constexpr operator long double() const { return value; }
@@ -87,6 +100,25 @@ namespace AHO_NAMESPACE {
         constexpr Degree operator /(const double& m, const Degree& o) { return {  m / o.value }; }
         constexpr Degree operator /(const size_t& m, const Degree& o) { return {  m / o.value }; }
         constexpr Degree operator /(const  float& m, const Degree& o) { return {  m / o.value }; }
+
+
+        template<typename Scalar> requires std::is_arithmetic_v<Scalar>
+        constexpr Radian operator *(const Radian& o, const Scalar& m) { return { o.value * m }; }
+        template<typename Scalar> requires std::is_arithmetic_v<Scalar>
+        constexpr Radian operator *(const Scalar& m, const Radian& o) { return { m * o.value }; }
+        template<typename Scalar> requires std::is_arithmetic_v<Scalar>
+        constexpr Radian operator /(const Radian& o, const Scalar& m) { return { o.value / m }; }
+        template<typename Scalar> requires std::is_arithmetic_v<Scalar>
+        constexpr Radian operator /(const Scalar& m, const Radian& o) { return { m / o.value }; }
+
+        template<typename Scalar> requires std::is_arithmetic_v<Scalar>
+        constexpr Degree operator *(const Degree& o, const Scalar& m) { return { o.value * m }; }
+        template<typename Scalar> requires std::is_arithmetic_v<Scalar>
+        constexpr Degree operator *(const Scalar& m, const Degree& o) { return { m * o.value }; }
+        template<typename Scalar> requires std::is_arithmetic_v<Scalar>
+        constexpr Degree operator /(const Degree& o, const Scalar& m) { return { o.value / m }; }
+        template<typename Scalar> requires std::is_arithmetic_v<Scalar>
+        constexpr Degree operator /(const Scalar& m, const Degree& o) { return { m / o.value }; }
 
 
         constexpr Radian::operator Degree() const {

@@ -1,6 +1,7 @@
 #include <AHO/core/math/angle.hpp>
 #include <gtest/gtest.h>
 #include <numbers>
+#include <limits>
 
 namespace {
 template<class T> class AngleTest : public testing::Test {};
@@ -24,6 +25,7 @@ TYPED_TEST(AngleTest, ScalarOperatorsSupportBothOperandOrdersAndTypes) {
         EXPECT_NEAR(static_cast<double>((scalar / value).value), 1.0 / 6.0, 1e-15);
     };
     verify(2.0); verify(2.0f); verify(std::size_t{2});
+    verify(2); verify(2u); verify(2ll); verify(2.0L);
 }
 TYPED_TEST(AngleTest, AssignmentOperatorsMutateAndReturnOriginalObject) {
     TypeParam value{12};
@@ -33,6 +35,10 @@ TYPED_TEST(AngleTest, AssignmentOperatorsMutateAndReturnOriginalObject) {
     EXPECT_EQ(&(value /= 2.0), &value); EXPECT_EQ(value.value, 12);
     EXPECT_EQ(&(value *= std::size_t{2}), &value); EXPECT_EQ(value.value, 24);
     EXPECT_EQ(&(value /= std::size_t{2}), &value); EXPECT_EQ(value.value, 12);
+    EXPECT_EQ(&(value *= 2), &value); EXPECT_EQ(value.value, 24);
+    EXPECT_EQ(&(value /= 2), &value); EXPECT_EQ(value.value, 12);
+    EXPECT_EQ(&(value *= 2.0L), &value); EXPECT_EQ(value.value, 24);
+    EXPECT_EQ(&(value /= 2.0L), &value); EXPECT_EQ(value.value, 12);
 }
 TYPED_TEST(AngleTest, NumericConversionsReturnUnderlyingValue) {
     const TypeParam value{12.5};
@@ -41,6 +47,20 @@ TYPED_TEST(AngleTest, NumericConversionsReturnUnderlyingValue) {
     EXPECT_EQ(static_cast<float>(value), 12.5f);
     EXPECT_EQ(static_cast<int>(value), 12);
     EXPECT_EQ(static_cast<std::size_t>(value), 12u);
+}
+TYPED_TEST(AngleTest, LongDoubleScalarsRetainTheAvailablePrecisionAndSignedFractions) {
+    constexpr long double factor = 1 + std::numeric_limits<long double>::epsilon() * 8;
+    const TypeParam unit{1};
+    EXPECT_EQ((unit * factor).value, factor);
+    EXPECT_EQ((factor * unit).value, factor);
+    EXPECT_EQ((factor / unit).value, factor);
+    auto changed = unit;
+    EXPECT_EQ(&(changed *= factor), &changed);
+    EXPECT_EQ(changed.value, factor);
+    EXPECT_EQ(&(changed /= factor), &changed);
+    EXPECT_EQ(changed.value, 1);
+    EXPECT_EQ((TypeParam{-3} * 2).value, -6);
+    EXPECT_EQ((TypeParam{3} / -2).value, -1.5);
 }
 TEST(AngleConversionTest, DegreesAndRadiansRoundTripSignedAngles) {
     for (const auto degrees : {0.0L, 90.0L, 180.0L, -90.0L, 720.0L}) {
@@ -60,4 +80,12 @@ TEST(AngleLiteralTest, LiteralsPreserveUnitsAndPiMultiples) {
 }
 static_assert((aho::Degree{3} + aho::Degree{4}).value == 7);
 static_assert((aho::Radian{3} * std::size_t{2}).value == 6);
+static_assert((aho::Degree{1.5} * 2).value == 3);
+static_assert((aho::Radian{3} / 2).value == 1.5);
+static_assert((2.0L * aho::Degree{1.5}).value == 3);
+constexpr auto constexpr_angle_assignments = [] {
+    aho::Radian value{1.5}; value *= 2; value /= 2.0L; return value;
+}();
+static_assert(constexpr_angle_assignments.value == 1.5);
+
 }

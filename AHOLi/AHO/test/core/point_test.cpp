@@ -146,6 +146,47 @@ TYPED_TEST(PointTest, ScalarOperatorsAndCompoundOperatorsMutateCoordinates) {
     EXPECT_EQ(&(value *= T{2}), &value); aho_test::expect_coordinates(value, 4, 8, 12);
     EXPECT_EQ(&(value /= T{2}), &value); aho_test::expect_coordinates(value, 2, 4, 6);
 }
+template<class Scalar> class PointOneDimensionalLengthTest : public testing::Test {};
+using PointLengthScalars = testing::Types<int, float, double>;
+TYPED_TEST_SUITE(PointOneDimensionalLengthTest, PointLengthScalars);
+TYPED_TEST(PointOneDimensionalLengthTest, EachAxisHasNonnegativeLengthForEitherCoordinateSign) {
+    using T = TypeParam;
+    using X = aho::coordinate::_MakeCoordinateInfo<true, false, false>::value;
+    using Y = aho::coordinate::_MakeCoordinateInfo<false, true, false>::value;
+    using Z = aho::coordinate::_MakeCoordinateInfo<false, false, true>::value;
+    []<class... Axes>(std::tuple<Axes...>) {
+        ([]<class Axis>() {
+            using P = aho::_Point<T, vsl::D1, Axis>;
+            EXPECT_EQ(P(T{-3}).length(), 3);
+            EXPECT_EQ(P(T{3}).length(), 3);
+            EXPECT_EQ(P(T{}).length(), 0);
+        }.template operator()<Axes>(), ...);
+    }(std::tuple<X, Y, Z>{});
+}
+TEST(PointOneDimensionalLengthTest, MinimumSignedCoordinateHasRepresentablePositiveLength) {
+    constexpr aho::d1::PointI negative(-3);
+    static_assert(negative.length() == 3);
+    static_assert(std::same_as<decltype(negative.length()), unsigned>);
+    static_assert(std::same_as<decltype(aho::d1::PointF(-3).length()), float>);
+    static_assert(std::same_as<decltype(aho::d1::PointD(-3).length()), double>);
+    const aho::d1::PointI minimum(std::numeric_limits<int>::min());
+    EXPECT_EQ(minimum.length(), -static_cast<double>(std::numeric_limits<int>::min()));
+    EXPECT_EQ(minimum.value.x.value, std::numeric_limits<int>::min());
+}
+TEST(PointOneDimensionalLengthTest, LargeIntegerMagnitudesKeepTheirExactValues) {
+    const aho::_Point<long long, vsl::D1> large(9007199254740993LL);
+    static_assert(std::same_as<decltype(large.length()), unsigned long long>);
+    EXPECT_EQ(large.length(), 9007199254740993ULL);
+    const aho::_Point<unsigned long long, vsl::D1> maximum(std::numeric_limits<unsigned long long>::max());
+    EXPECT_EQ(maximum.length(), std::numeric_limits<unsigned long long>::max());
+}
+TEST(PointOneDimensionalLengthTest, UnsignedCoordinatesRemainPositiveAndNegativeZeroBecomesPositiveZero) {
+    const aho::_Point<unsigned, vsl::D1> maximum(std::numeric_limits<unsigned>::max());
+    EXPECT_EQ(maximum.length(), static_cast<double>(std::numeric_limits<unsigned>::max()));
+    const aho::d1::PointD zero(-0.0);
+    EXPECT_EQ(zero.length(), 0);
+    EXPECT_FALSE(std::signbit(zero.length()));
+}
 TYPED_TEST(PointTest, LengthAndOrderingHandleKnownCoordinates) {
     using P = typename TypeParam::Point;
     const auto value = aho_test::geometry<P>(3, 4, 12);

@@ -244,6 +244,45 @@ TEST(VectorDeductionTest, DeductionAndDimensionWrappersConstructExpectedVectors)
     aho_test::expect_coordinates(aho::d2::Vector<int, CI2>{}, 0, 0);
     aho_test::expect_coordinates(aho::d3::Vector<int, CI3>{}, 0, 0, 0);
 }
+template<class CI> class VectorTwoDimensionalInputTest : public testing::Test {};
+using ProductPlanes = testing::Types<
+    aho::coordinate::_MakeCoordinateInfo<true, true, false>::value,
+    aho::coordinate::_MakeCoordinateInfo<true, false, true>::value,
+    aho::coordinate::_MakeCoordinateInfo<false, true, true>::value>;
+TYPED_TEST_SUITE(VectorTwoDimensionalInputTest, ProductPlanes);
+TYPED_TEST(VectorTwoDimensionalInputTest, DerivedInputsPreservePlaneAndPromoteMixedProducts) {
+    using CI = TypeParam;
+    using Result = aho::_Vector<double, vsl::D2, CI>;
+    using CrossCI = aho::coordinate::_MakeCoordinateInfo<!CI::EnabledX, !CI::EnabledY, !CI::EnabledZ>::value;
+    using CrossResult = aho::_Vector<double, vsl::D1, CrossCI>;
+    const aho::_Vector<int, vsl::D2, CI> left(2, 3);
+    const aho::d2::Vector<double, CI> right(0.5, 1.5);
+    const auto product = left.hadamard(right);
+    const auto cross = left.cross(right);
+    static_assert(std::same_as<std::remove_cv_t<decltype(product)>, Result>);
+    static_assert(std::same_as<std::remove_cv_t<decltype(cross)>, CrossResult>);
+    static_assert(std::same_as<decltype(left.dot(right)), double>);
+    EXPECT_DOUBLE_EQ(left.dot(right), 5.5);
+    EXPECT_DOUBLE_EQ(right.dot(left), 5.5);
+    const auto check_components = [](const auto& value, double first, double second) {
+        if constexpr (CI::EnabledX) EXPECT_DOUBLE_EQ(value.value.x.value, first);
+        else EXPECT_DOUBLE_EQ(value.value.y.value, first);
+        if constexpr (CI::EnabledZ) EXPECT_DOUBLE_EQ(value.value.z.value, second);
+        else EXPECT_DOUBLE_EQ(value.value.y.value, second);
+    };
+    check_components(product, 1, 4.5);
+    check_components(right.hadamard(left), 1, 4.5);
+    const auto component = [](const auto& value) {
+        if constexpr (CrossCI::EnabledX) return value.value.x.value;
+        else if constexpr (CrossCI::EnabledY) return value.value.y.value;
+        else return value.value.z.value;
+    };
+    constexpr double sign = CI::EnabledX && CI::EnabledZ ? -1 : 1;
+    EXPECT_DOUBLE_EQ(component(cross), sign * 1.5);
+    EXPECT_DOUBLE_EQ(component(right.cross(left)), -sign * 1.5);
+    check_components(left, 2, 3);
+    check_components(right, 0.5, 1.5);
+}
 TEST(VectorCastTest, FloatingPointToIntegerCastTruncatesTowardZeroInEveryDimension) {
     aho_test::expect_coordinates(aho::d1::VectorD(-2.75).cast<int>(), -2);
     aho_test::expect_coordinates(aho::d2::VectorD(-2.75, 3.75).cast<int>(), -2, 3);

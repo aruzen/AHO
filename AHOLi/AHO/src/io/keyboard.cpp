@@ -27,6 +27,8 @@ aho::input::KeyBoard::KeyBoard(void *context) : context(context) {
     KEYBOARD_TRACKED++;
 }
 
+aho::input::KeyBoard::KeyBoard(const KeyBoard& other) noexcept : KeyBoard(other.context) {}
+
 std::unordered_set<aho::input::KeyCode> aho::input::KeyBoard::state() {
     return PRESSED_KEYS;
 }

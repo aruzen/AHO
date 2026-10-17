@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <AHO/core/math/coordinate.hpp>
 #include <sstream>
+#include <limits>
 
 #if defined(AHO_CONTRACT_COORDINATE_ENABLE_AXES)
 constexpr auto x = aho::coordinate::_MakeCoordinateInfo<false, true, false>::value::EnablingX();
@@ -48,14 +49,14 @@ template<bool X, bool Y, bool Z> struct CoordinateMask {
     static constexpr bool x = X, y = Y, z = Z;
     using Info = aho::coordinate::_MakeCoordinateInfo<X, Y, Z>::value;
     using Set = aho::coordinate::_CoordinateSet<int, Info>;
-    static Set make() {
-        if constexpr (X && Y && Z) return Set(aho::X<int>(1), aho::Y<int>(2), aho::Z<int>(3));
-        else if constexpr (X && Y) return Set(aho::X<int>(1), aho::Y<int>(2));
-        else if constexpr (X && Z) return Set(aho::X<int>(1), aho::Z<int>(3));
-        else if constexpr (Y && Z) return Set(aho::Y<int>(2), aho::Z<int>(3));
-        else if constexpr (X) return Set(aho::X<int>(1));
-        else if constexpr (Y) return Set(aho::Y<int>(2));
-        else return Set(aho::Z<int>(3));
+    static constexpr Set make(int x = 1, int y = 2, int z = 3) {
+        if constexpr (X && Y && Z) return Set(aho::X<int>(x), aho::Y<int>(y), aho::Z<int>(z));
+        else if constexpr (X && Y) return Set(aho::X<int>(x), aho::Y<int>(y));
+        else if constexpr (X && Z) return Set(aho::X<int>(x), aho::Z<int>(z));
+        else if constexpr (Y && Z) return Set(aho::Y<int>(y), aho::Z<int>(z));
+        else if constexpr (X) return Set(aho::X<int>(x));
+        else if constexpr (Y) return Set(aho::Y<int>(y));
+        else return Set(aho::Z<int>(z));
     }
 };
 using CoordinateMasks = testing::Types<CoordinateMask<true, false, false>, CoordinateMask<false, true, false>,
@@ -100,6 +101,49 @@ TYPED_TEST(CoordinateMaskTest, AxisAssignmentOperatorsReturnAndMutateOriginalSet
         EXPECT_EQ(&(value += aho::Z<int>(2)), &value); EXPECT_EQ(value.z.value, 5);
         EXPECT_EQ(&(value -= aho::Z<int>(1)), &value); EXPECT_EQ(value.z.value, 4);
     }
+}
+TYPED_TEST(CoordinateMaskTest, EqualityAndThreeWayComparisonUseEveryEnabledAxis) {
+    constexpr auto original = TypeParam::make();
+    constexpr auto larger = TypeParam::make(2, 3, 4);
+    static_assert(std::same_as<decltype(original <=> larger), std::strong_ordering>);
+    static_assert(std::is_lt(original <=> larger));
+    static_assert(original == TypeParam::make());
+    if constexpr (TypeParam::x && (TypeParam::y || TypeParam::z)) {
+        static_assert(std::is_lt(TypeParam::make(0, 100, 100) <=> TypeParam::make(1, -100, -100)));
+    } else if constexpr (TypeParam::y && TypeParam::z) {
+        static_assert(std::is_lt(TypeParam::make(0, 0, 100) <=> TypeParam::make(0, 1, -100)));
+    }
+    EXPECT_EQ(original, TypeParam::make());
+    auto check_axis = [&](const auto& changed, bool enabled) {
+        EXPECT_EQ(original == changed, !enabled);
+        EXPECT_EQ(original != changed, enabled);
+        if (enabled) {
+            EXPECT_TRUE(std::is_lt(original <=> changed));
+            EXPECT_TRUE(std::is_gt(changed <=> original));
+        } else {
+            EXPECT_TRUE(std::is_eq(original <=> changed));
+        }
+    };
+    check_axis(TypeParam::make(2, 2, 3), TypeParam::x);
+    check_axis(TypeParam::make(1, 3, 3), TypeParam::y);
+    check_axis(TypeParam::make(1, 2, 4), TypeParam::z);
+}
+TEST(CoordinateComparisonTest, FloatingPointNaNsRemainUnorderedInEveryDimension) {
+    using namespace aho::coordinate;
+    constexpr double nan = std::numeric_limits<double>::quiet_NaN();
+    auto check = []<class Set>(const Set& unordered, const Set& ordinary) {
+        static_assert(std::same_as<decltype(unordered <=> ordinary), std::partial_ordering>);
+        EXPECT_EQ(unordered <=> ordinary, std::partial_ordering::unordered);
+        EXPECT_EQ(ordinary <=> unordered, std::partial_ordering::unordered);
+        EXPECT_FALSE(unordered == unordered);
+        EXPECT_TRUE(ordinary == ordinary);
+    };
+    using C1 = _CoordinateSet<double, _DefaultCoordinateInfo<vsl::D1>::value>;
+    using C2 = _CoordinateSet<double, _DefaultCoordinateInfo<vsl::D2>::value>;
+    using C3 = _CoordinateSet<double, _DefaultCoordinateInfo<vsl::D3>::value>;
+    check(C1(nan), C1(0));
+    check(C2(0, nan), C2(0, 0));
+    check(C3(0, 0, nan), C3(0, 0, 0));
 }
 TYPED_TEST(CoordinateMaskTest, StreamOutputIncludesAllEnabledAxesAndCoordinates) {
     std::ostringstream stream;

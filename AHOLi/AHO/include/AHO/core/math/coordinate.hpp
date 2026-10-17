@@ -4,6 +4,8 @@
 #include "../../define.hpp"
 #include "../../concepts.hpp"
 
+#include <compare>
+#include <tuple>
 #include <iostream>
 #include <cstddef>
 
@@ -162,7 +164,8 @@ namespace AHO_NAMESPACE {
                 constexpr bool operator<(const _CoordinateSet<element_type, coordinate_info>& o) const { \
                     return this->_cnmn1 < o._cnmn1; \
                 } \
-			    constexpr auto operator<=>(const _CoordinateSet<element_type, coordinate_info>&) const = default; \
+			    constexpr bool operator==(const _CoordinateSet<element_type, coordinate_info>& o) const { return Lower == o.Lower; } \
+                constexpr auto operator<=>(const _CoordinateSet<element_type, coordinate_info>& o) const { return Lower <=> o.Lower; } \
 				AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper, Lower); \
 			};
 
@@ -187,7 +190,8 @@ namespace AHO_NAMESPACE {
                 constexpr bool operator<(const _CoordinateSet<element_type, coordinate_info>& o) const { \
                     return (this->_cnmn1 != o._cnmn1 ? this->_cnmn1 < o._cnmn1 : this->_cnmn2 < o._cnmn2); \
                 } \
-                constexpr auto operator<=>(const _CoordinateSet<element_type, coordinate_info>&) const = default;   \
+                constexpr bool operator==(const _CoordinateSet<element_type, coordinate_info>& o) const { return std::tie(Lower1, Lower2) == std::tie(o.Lower1, o.Lower2); } \
+                constexpr auto operator<=>(const _CoordinateSet<element_type, coordinate_info>& o) const { return std::tie(Lower1, Lower2) <=> std::tie(o.Lower1, o.Lower2); }   \
                 AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper1, Lower1); \
 				AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper2, Lower2); \
 			};
@@ -217,7 +221,8 @@ namespace AHO_NAMESPACE {
                         (this->_cnmn2 != o._cnmn2 ? this->_cnmn2 < o._cnmn2 :
                          this->_cnmn3 < o._cnmn3));
             }
-            constexpr auto operator<=>(const _CoordinateSet<element_type, coordinate_info>&) const = default;
+            constexpr bool operator==(const _CoordinateSet<element_type, coordinate_info>& o) const { return std::tie(x, y, z) == std::tie(o.x, o.y, o.z); }
+            constexpr auto operator<=>(const _CoordinateSet<element_type, coordinate_info>& o) const { return std::tie(x, y, z) <=> std::tie(o.x, o.y, o.z); }
 
 			AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(X, x);
 			AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Y, y);

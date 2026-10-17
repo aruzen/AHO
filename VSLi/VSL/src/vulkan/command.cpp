@@ -47,6 +47,11 @@ size_t VSL_NAMESPACE::CommandBuffer::getSize() {
 	return _data->commandBuffers.size();
 }
 
+void VSL_NAMESPACE::CommandBuffer::next()
+{
+	_data->currentBufferIdx = (_data->currentBufferIdx + 1) % _data->commandBuffers.size();
+}
+
 void VSL_NAMESPACE::CommandBuffer::reset()
 {
 	for (auto& buff : _data->commandBuffers)

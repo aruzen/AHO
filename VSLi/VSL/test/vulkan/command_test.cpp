@@ -16,6 +16,28 @@ TEST_F(CommandVulkanIntegrationTest, PoolAndBuffersShareExpectedOwnerAndCanReset
     buffers.reset();
     EXPECT_EQ(shared.getCurrentBufferIdx(), 0u);
 }
+TEST_F(CommandVulkanIntegrationTest, NextCyclesThroughEveryBufferAndSharedViewsObserveTheSameIndex) {
+    auto pool = make_pool();
+    vsl::CommandBuffer buffers(pool, 3);
+    vsl::CommandBuffer shared(buffers._data);
+    for (const auto expected : {1u, 2u, 0u, 1u}) {
+        buffers.next();
+        EXPECT_EQ(buffers.getCurrentBufferIdx(), expected);
+        EXPECT_EQ(shared.getCurrentBufferIdx(), expected);
+        EXPECT_EQ(buffers.getSize(), 3u);
+    }
+}
+TEST_F(CommandVulkanIntegrationTest, NextOnASingleBufferAndManagerViewsPreservesOwnership) {
+    auto manager = make_manager();
+    auto single = manager.makeExclusiveBuffer();
+    single.next();
+    single.next();
+    EXPECT_EQ(single.getCurrentBufferIdx(), 0u);
+    auto current = manager.getBuffer();
+    current.next();
+    EXPECT_EQ(manager.getCurrentBufferIdx(), 1u);
+    EXPECT_EQ(manager.getBuffer()._data, current._data);
+}
 TEST_F(CommandVulkanIntegrationTest, ManagerAccessorsAndExclusiveBuffersPreserveOwnership) {
     auto manager = make_manager();
     vsl::CommandManager shared(manager._data);

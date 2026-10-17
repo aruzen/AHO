@@ -9,7 +9,7 @@
 #include "input_manager.hpp"
 
 namespace AHO_NAMESPACE::input {
-    class KeyBoard : abstract::Characters {
+    class KeyBoard : public abstract::Characters {
         friend aho::InputManager;
 
         void* context = nullptr;

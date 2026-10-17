@@ -40,3 +40,36 @@ static_assert(!vsl::command::is_command<DelegateShape>);
 static_assert(vsl::command::is_delegate_command<DelegateShape>);
 static_assert(!vsl::command::is_delegate_command<int>);
 } // namespace
+
+namespace {
+struct DestructionProbe : vsl::command::__Command, vsl::command::__DelegateCommand,
+    vsl::command::__PipelineHolder, vsl::command::__PipelineRequire,
+    vsl::command::__VertexSizeHolder, vsl::command::__VertexSizeRequire {
+    int &destroyed;
+    explicit DestructionProbe(int &destroyed) : destroyed(destroyed) {}
+    ~DestructionProbe() { ++destroyed; }
+    void invoke(vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) override {}
+    void invoke(vsl::DefaultPhaseStream &, vsl::CommandPool, vsl::CommandBuffer,
+                vsl::CommandManager) override {}
+    vsl::PipelineAccessor getPipeline() override { return {}; }
+    void setPipeline(std::optional<vsl::PipelineAccessor>) override {}
+    std::size_t getVertexSize() override { return 0; }
+    void setVertexSize(std::optional<std::size_t>) override {}
+};
+template<class T> class CommandInterfaceLifetimeTest : public testing::Test {};
+using CommandInterfaces = testing::Types<vsl::command::__Command, vsl::command::__DelegateCommand,
+    vsl::command::__PipelineHolder, vsl::command::__PipelineRequire,
+    vsl::command::__VertexSizeHolder, vsl::command::__VertexSizeRequire>;
+TYPED_TEST_SUITE(CommandInterfaceLifetimeTest, CommandInterfaces);
+TYPED_TEST(CommandInterfaceLifetimeTest, UniqueOwnershipThroughTheBaseDestroysTheCompleteCommandOnce) {
+    static_assert(std::has_virtual_destructor_v<TypeParam>);
+    static_assert(std::is_copy_constructible_v<DestructionProbe>);
+    static_assert(std::is_move_constructible_v<DestructionProbe>);
+    int destroyed = 0;
+    {
+        std::unique_ptr<TypeParam> base = std::make_unique<DestructionProbe>(destroyed);
+        EXPECT_EQ(destroyed, 0);
+    }
+    EXPECT_EQ(destroyed, 1);
+}
+} // namespace

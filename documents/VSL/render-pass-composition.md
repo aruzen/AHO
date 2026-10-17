@@ -124,6 +124,9 @@ Apple M1 / MoltenVK、Apple Clang 17、Vulkan SDK 1.4.309.0、Debugで実行。
 - VSL通常実行: 184件成功、失敗0、環境skip 0。既存の未修正不具合26件はDISABLEDのまま。
 - うち共通描画・読み戻し9件と実Swapchain読み戻し1件はValidation Layerを有効化し、errorをテスト失敗へ反映。10件とも成功。
 - 既存の4件の回帰テストは変更前に失敗を確認し、変更後に通常テストとして成功。
+- AHO側の変更を取り込んだbase `0cfeb8a` 上で `build-tests` が成功。
+- 全体CTestは645登録中76件失敗で、失敗はすべてAHO側（CPU、compile/link契約、描画フェーズ3件のtimeout）。VSL側の失敗は0。未修正のAHO契約や描画フェーズの問題まで解消したという結果ではない。
+- 描画フェーズの代表1件は元の `cmake-build-tests` でも45秒timeoutと `VUID-VkPresentInfoKHR-pImageIndices-01430` を再現。取得画像とpresent画像番号の不一致は今回の抽象化とは別の残課題として扱う。
 - 画像エンコード、UI操作、Windows/Linux、深度画像自体の読み戻し、別queue間転送、自動layout追跡は今回の対象外。
 
 ```sh

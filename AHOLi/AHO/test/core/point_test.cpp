@@ -79,19 +79,6 @@ TYPED_TEST(PointTest, PointDifferenceProducesVectorAndTranslationProducesPoint) 
     aho_test::expect_coordinates(a + delta, 3, 5, 7);
     aho_test::expect_coordinates(a - delta, 1, 1, 1);
 }
-TYPED_TEST(PointTest, ScalarOperatorsAndCompoundOperatorsMutateCoordinates) {
-    using P = typename TypeParam::Point;
-    using V = typename TypeParam::Vector;
-    using T = typename TypeParam::element_type;
-    auto value = aho_test::geometry<P>(2, 4, 6);
-    aho_test::expect_coordinates(value * T{2}, 4, 8, 12);
-    aho_test::expect_coordinates(value / T{2}, 1, 2, 3);
-    const auto delta = aho_test::geometry<V>(1, 2, 3);
-    EXPECT_EQ(&(value += delta), &value); aho_test::expect_coordinates(value, 3, 6, 9);
-    EXPECT_EQ(&(value -= delta), &value); aho_test::expect_coordinates(value, 2, 4, 6);
-    EXPECT_EQ(&(value *= T{2}), &value); aho_test::expect_coordinates(value, 4, 8, 12);
-    EXPECT_EQ(&(value /= T{2}), &value); aho_test::expect_coordinates(value, 2, 4, 6);
-}
 TEST(PointLengthRangeTest, LargeIntegerCoordinatesHaveFiniteKnownLengths) {
     const aho::d2::PointI plane(60000, -80000);
     const aho::d3::PointI space(20000, -30000, 60000);
@@ -117,6 +104,19 @@ TYPED_TEST(PointFloatingLengthRangeTest, LargeAndSmallCoordinatesAvoidIntermedia
         EXPECT_NEAR(plane.length() / scale, 5, tolerance);
         EXPECT_NEAR(space.length() / scale, 7, tolerance);
     }
+}
+TYPED_TEST(PointTest, ScalarOperatorsAndCompoundOperatorsMutateCoordinates) {
+    using P = typename TypeParam::Point;
+    using V = typename TypeParam::Vector;
+    using T = typename TypeParam::element_type;
+    auto value = aho_test::geometry<P>(2, 4, 6);
+    aho_test::expect_coordinates(value * T{2}, 4, 8, 12);
+    aho_test::expect_coordinates(value / T{2}, 1, 2, 3);
+    const auto delta = aho_test::geometry<V>(1, 2, 3);
+    EXPECT_EQ(&(value += delta), &value); aho_test::expect_coordinates(value, 3, 6, 9);
+    EXPECT_EQ(&(value -= delta), &value); aho_test::expect_coordinates(value, 2, 4, 6);
+    EXPECT_EQ(&(value *= T{2}), &value); aho_test::expect_coordinates(value, 4, 8, 12);
+    EXPECT_EQ(&(value /= T{2}), &value); aho_test::expect_coordinates(value, 2, 4, 6);
 }
 TYPED_TEST(PointTest, LengthAndOrderingHandleKnownCoordinates) {
     using P = typename TypeParam::Point;

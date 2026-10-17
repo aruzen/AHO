@@ -308,11 +308,18 @@ namespace AHO_NAMESPACE::input {
             return _code;
         }
 
-        [[nodiscard]] constexpr std::string name() const;
+        // Returns an empty string when no display name is available.
+        [[nodiscard]] std::string name() const;
     };
 
     using KeyID = CodeID<KeyCode>;
     using MouseID = CodeID<MouseCode>;
+
+    template<>
+    std::string CodeID<KeyCode>::name() const;
+
+    template<>
+    std::string CodeID<MouseCode>::name() const;
 
     namespace abstract {
         template<typename T>

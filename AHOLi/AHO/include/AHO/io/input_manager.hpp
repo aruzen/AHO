@@ -40,10 +40,9 @@ namespace AHO_NAMESPACE {
             input = std::shared_ptr<T>(new T(context, *this, std::forward<Args>(args)...));
         } else {
             input = std::shared_ptr<T>(new T(context, std::forward<Args>(args)...));
-
-            if constexpr (std::derived_from<T, input::abstract::Updatable>) {
-                update_targets.push_back(input);
-            }
+        }
+        if constexpr (std::derived_from<T, input::abstract::Updatable>) {
+            update_targets.push_back(input);
         }
         return input;
     }
@@ -56,10 +55,9 @@ namespace AHO_NAMESPACE {
             input = std::shared_ptr<Type>(new Type(context, *this, std::forward<Args>(args)...));
         } else {
             input = std::shared_ptr<Type>(new Type(context, std::forward<Args>(args)...));
-
-            if constexpr (std::derived_from<Type, input::abstract::Updatable>) {
-                update_targets.push_back(input);
-            }
+        }
+        if constexpr (std::derived_from<Type, input::abstract::Updatable>) {
+            update_targets.push_back(input);
         }
 
         return input;

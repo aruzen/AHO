@@ -142,6 +142,50 @@ TEST(VectorNormalizationTest, PositiveAndNegativeOneDimensionalNormalizationPres
     negative.normalize();
     aho_test::expect_coordinates(negative, -1);
 }
+template<class T> class VectorNormalization1DTest : public testing::Test {};
+using Normalization1DTypes = testing::Types<int, float, double>;
+TYPED_TEST_SUITE(VectorNormalization1DTest, Normalization1DTypes);
+TYPED_TEST(VectorNormalization1DTest, CopyAndInPlaceNormalizationPreserveDirectionIncludingExtremeValues) {
+    using V = aho::_Vector<TypeParam, vsl::D1>;
+    const std::array<TypeParam, 4> values{TypeParam(1), TypeParam(-1),
+        std::numeric_limits<TypeParam>::max(), std::numeric_limits<TypeParam>::lowest()};
+    for (const auto value : values) {
+        const V source(value);
+        const auto normalized = source.get_normalized();
+        const auto expected = value < TypeParam{} ? -1 : 1;
+        EXPECT_EQ(normalized.value.x.value, expected);
+        EXPECT_EQ(source.value.x.value, value);
+        auto mutable_value = source;
+        EXPECT_EQ(&mutable_value.normalize(), &mutable_value);
+        EXPECT_EQ(mutable_value.value.x.value, expected);
+    }
+}
+TEST(VectorNormalizationTest, OneDimensionalFractionalValuesPreserveDirectionAndMagnitudeIsOne) {
+    const aho::d1::VectorD negative(-0.125), positive(0.25);
+    aho_test::expect_coordinates(negative.get_normalized(), -1);
+    aho_test::expect_coordinates(positive.get_normalized(), 1);
+}
+TEST(VectorNormalizationTest, OneDimensionalNormalizationSupportsEachAxisInConstantEvaluation) {
+    auto verify = []<bool X, bool Y, bool Z>() {
+        using CI = aho::coordinate::_MakeCoordinateInfo<X, Y, Z>::value;
+        using V = aho::_Vector<int, vsl::D1, CI>;
+        constexpr V source(-4);
+        constexpr auto result = source.get_normalized();
+        if constexpr (X) {
+            static_assert(result.value.x.value == -1 && source.value.x.value == -4);
+            EXPECT_EQ(result.value.x.value, -1);
+        } else if constexpr (Y) {
+            static_assert(result.value.y.value == -1 && source.value.y.value == -4);
+            EXPECT_EQ(result.value.y.value, -1);
+        } else {
+            static_assert(result.value.z.value == -1 && source.value.z.value == -4);
+            EXPECT_EQ(result.value.z.value, -1);
+        }
+    };
+    verify.template operator()<true, false, false>();
+    verify.template operator()<false, true, false>();
+    verify.template operator()<false, false, true>();
+}
 TEST(VectorNormalizationTest, TwoAndThreeDimensionalNormalizationHasUnitLength) {
     aho::d2::VectorD a(3, 4);
     EXPECT_DOUBLE_EQ(a.get_normalized().length(), 1);

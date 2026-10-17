@@ -444,14 +444,24 @@ namespace AHO_NAMESPACE {
     template<typename R, typename CI>
     constexpr _Vector<R, VSL_NAMESPACE::D1, CI>& _Vector<R, VSL_NAMESPACE::D1, CI>::normalize()
     {
-        this->value.___AN1 = 1;
+        auto &component = [&]() -> R& {
+            if constexpr (CI::EnabledX)
+                return value.x.value;
+            else if constexpr (CI::EnabledY)
+                return value.y.value;
+            else
+                return value.z.value;
+        }();
+        component = component < R{} ? R(-1) : R(1);
         return *this;
     }
 
     template<typename R, typename CI>
     constexpr auto _Vector<R, VSL_NAMESPACE::D1, CI>::get_normalized() const
     {
-        return _Vector<R, VSL_NAMESPACE::D1, CI>{ 1 };
+        auto result = *this;
+        result.normalize();
+        return result;
     }
 
     template<typename R, typename CI>

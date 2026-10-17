@@ -113,25 +113,25 @@ namespace AHO_NAMESPACE {
 	template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
 	inline constexpr std::array<Triangle<R, D, CI>, 1> Triangle<R, D, CI>::triangles() const
 	{
-		return std::array<Triangle<R, D, CI>, 1>( *this );
+		return { *this };
 	}
 
 	template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
 	inline constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 3> Triangle<R, D, CI>::ptrpoints()
 	{
-		return std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 3>(&pos1, &pos2, &pos3);
+		return { &pos1, &pos2, &pos3 };
 	}
 
 	template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
 	inline constexpr std::array<AHO_NAMESPACE::PtrLine<R, D, CI>, 3> Triangle<R, D, CI>::ptrlines()
 	{
-		return std::array<AHO_NAMESPACE::PtrLine<R, D, CI>, 3>({ &pos1, &pos2 }, { &pos2, &pos3 }, { &pos3, &pos1 });
+		return {{ { &pos1, &pos2 }, { &pos2, &pos3 }, { &pos3, &pos1 } }};
 	}
 
 	template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
 	inline constexpr std::array<PtrTriangle<R, D, CI>, 1> Triangle<R, D, CI>::ptrtriangles()
 	{
-		return std::array<PtrTriangle<R, D, CI>, 1>(PtrTriangle(&pos1, &pos2, &pos3));
+		return { adress() };
 	}
 
 	template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
@@ -169,25 +169,25 @@ namespace AHO_NAMESPACE {
 	template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
 	inline constexpr std::array<AHO_NAMESPACE::Line<R, D, CI>, 3> PtrTriangle<R, D, CI>::lines() const
 	{
-		return std::array<AHO_NAMESPACE::Line<R, D, CI>, 3>({ *pos1, *pos2 }, { *pos2, pos3 }, { *pos3, *pos1 });
+		return {{ { *pos1, *pos2 }, { *pos2, *pos3 }, { *pos3, *pos1 } }};
 	}
 
 	template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
 	inline constexpr std::array<Triangle<R, D, CI>, 1> PtrTriangle<R, D, CI>::triangles() const
 	{
-		return std::array<Triangle<R, D, CI>, 1>({ *pos1, *pos2, *pos3 });
+		return { inderect() };
 	}
 
 	template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
 	inline constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 3> PtrTriangle<R, D, CI>::ptrpoints() const
 	{
-		return std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 3>(pos1, pos2, pos3);
+		return { pos1, pos2, pos3 };
 	}
 
 	template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
 	inline constexpr std::array<AHO_NAMESPACE::PtrLine<R, D, CI>, 3> PtrTriangle<R, D, CI>::ptrlines() const
 	{
-		return std::array<AHO_NAMESPACE::PtrLine<R, D, CI>, 3>({ pos1, pos2 }, { pos2, pos3 }, { pos3, pos1 });
+		return {{ { pos1, pos2 }, { pos2, pos3 }, { pos3, pos1 } }};
 	}
 
 	template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>

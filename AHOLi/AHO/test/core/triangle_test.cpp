@@ -54,5 +54,55 @@ TEST(TriangleTest, PointerTriangleBorrowsVerticesAndReflectsChanges) {
     triangle.pos3 = aho::d2::PointD(0, 8);
     EXPECT_DOUBLE_EQ(pointer.area(), 12);
 }
+template<class T> class TriangleArrayViewTest : public testing::Test {};
+TYPED_TEST_SUITE(TriangleArrayViewTest, aho_test::GeometryCases);
+TYPED_TEST(TriangleArrayViewTest, PointerViewsPreserveVertexOrderAndCloseTheOutline) {
+    using P = typename TypeParam::Point;
+    using Triangle = aho::Triangle<typename TypeParam::element_type, typename TypeParam::dimension>;
+    Triangle triangle(aho_test::geometry<P>(1, 2, 3), aho_test::geometry<P>(4, 5, 6), aho_test::geometry<P>(7, 8, 9));
+    const auto pointer = triangle.adress();
+    const auto direct_points = triangle.ptrpoints();
+    const auto borrowed_points = pointer.ptrpoints();
+    const auto direct_edges = triangle.ptrlines();
+    const auto borrowed_edges = pointer.ptrlines();
+    const auto direct_triangles = triangle.ptrtriangles();
+    const auto borrowed_triangles = pointer.ptrtriangles();
+    const std::array<P*, 3> vertices{&triangle.pos1, &triangle.pos2, &triangle.pos3};
+    for (std::size_t i = 0; i < vertices.size(); ++i) {
+        EXPECT_EQ(direct_points[i], vertices[i]); EXPECT_EQ(borrowed_points[i], vertices[i]);
+        EXPECT_EQ(direct_edges[i].pos1, vertices[i]); EXPECT_EQ(borrowed_edges[i].pos1, vertices[i]);
+        EXPECT_EQ(direct_edges[i].pos2, vertices[(i + 1) % 3]); EXPECT_EQ(borrowed_edges[i].pos2, vertices[(i + 1) % 3]);
+    }
+    EXPECT_EQ(direct_triangles[0].pos1, vertices[0]); EXPECT_EQ(borrowed_triangles[0].pos1, vertices[0]);
+    EXPECT_EQ(direct_triangles[0].pos2, vertices[1]); EXPECT_EQ(borrowed_triangles[0].pos2, vertices[1]);
+    EXPECT_EQ(direct_triangles[0].pos3, vertices[2]); EXPECT_EQ(borrowed_triangles[0].pos3, vertices[2]);
+    *borrowed_edges[1].pos2 = aho_test::geometry<P>(-1, -2, -3);
+    aho_test::expect_coordinates(triangle.pos3, -1, -2, -3);
+    aho_test::expect_coordinates(*direct_points[2], -1, -2, -3);
+    aho_test::expect_coordinates(*direct_triangles[0].pos3, -1, -2, -3);
+}
+TYPED_TEST(TriangleArrayViewTest, ValueViewsCopyVerticesAndKeepTheirSnapshotAfterSourceChanges) {
+    using P = typename TypeParam::Point;
+    using Triangle = aho::Triangle<typename TypeParam::element_type, typename TypeParam::dimension>;
+    Triangle triangle(aho_test::geometry<P>(1, 2, 3), aho_test::geometry<P>(4, 5, 6), aho_test::geometry<P>(7, 8, 9));
+    const auto pointer = triangle.adress();
+    const auto direct = triangle.triangles();
+    const auto borrowed = pointer.triangles();
+    const auto edges = pointer.lines();
+    for (const auto* snapshot : {&direct[0], &borrowed[0]}) {
+        aho_test::expect_coordinates(snapshot->pos1, 1, 2, 3);
+        aho_test::expect_coordinates(snapshot->pos2, 4, 5, 6);
+        aho_test::expect_coordinates(snapshot->pos3, 7, 8, 9);
+    }
+    aho_test::expect_coordinates(edges[0].pos1, 1, 2, 3); aho_test::expect_coordinates(edges[0].pos2, 4, 5, 6);
+    aho_test::expect_coordinates(edges[1].pos1, 4, 5, 6); aho_test::expect_coordinates(edges[1].pos2, 7, 8, 9);
+    aho_test::expect_coordinates(edges[2].pos1, 7, 8, 9); aho_test::expect_coordinates(edges[2].pos2, 1, 2, 3);
+    triangle.pos1 = aho_test::geometry<P>(-1, -2, -3);
+    aho_test::expect_coordinates(direct[0].pos1, 1, 2, 3);
+    aho_test::expect_coordinates(borrowed[0].pos1, 1, 2, 3);
+    aho_test::expect_coordinates(edges[0].pos1, 1, 2, 3);
+    aho_test::expect_coordinates(pointer.triangles()[0].pos1, -1, -2, -3);
+}
+
 }
 #endif

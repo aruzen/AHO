@@ -15,9 +15,58 @@ TEST_F(RenderPassVulkanIntegrationTest, CreatesPublicRenderPassAndPickingImagesA
     EXPECT_EQ(picking.picking_buffer.front()._data->height, 6u);
     EXPECT_EQ(picking.picking_buffer.front().size(), 12u * 6u * 4u);
 }
-TEST_F(RenderPassVulkanIntegrationTest, DISABLED_PickingPassProvidesInitializedBaseAccessor) {
+TEST_F(RenderPassVulkanIntegrationTest, PickingPassProvidesInitializedBaseAccessor) {
     vsl::IDPickingRenderPass picking(description);
     const vsl::RenderPassAccessor base = picking;
     EXPECT_EQ(base._data, picking._data); // I04: derived _data shadows base.
+}
+} // namespace
+
+namespace {
+TEST(RenderPassDescriptionTest, CompositionPreservesAttachmentIdentityAndSubpassOrder) {
+    vsl::RenderPassDescription desc;
+    auto color = desc.addColor({.format = vsl::data_format::UnsignedNormalized8RGBA});
+    auto id = desc.addColor({.format = vsl::data_format::UnsignedInt});
+    auto depth = desc.setDepthStencil({.format = vsl::data_format::Depth32Float,
+                                       .finalLayout = vsl::ImageLayout::DepthStencilAttachmentOptimal});
+    EXPECT_EQ(color, 0u);
+    EXPECT_EQ(id, 1u);
+    EXPECT_EQ(depth, 2u);
+    ASSERT_EQ(desc.subpasses.front().colors.size(), 2u);
+    EXPECT_EQ(desc.subpasses.front().colors[1].attachment, id);
+    EXPECT_EQ(desc.subpasses.front().depthStencil->attachment, depth);
+    EXPECT_NO_THROW(desc.validate());
+    EXPECT_THROW(desc.setDepthStencil({.format = vsl::data_format::Depth32Float}), std::invalid_argument);
+}
+TEST(RenderPassDescriptionTest, RejectsInvalidReferencesFormatsAndLoadContracts) {
+    vsl::RenderPassDescription desc;
+    desc.addColor({.format = vsl::data_format::UnsignedNormalized8RGBA});
+    auto valid = desc;
+    desc.subpasses[0].colors[0].attachment = 99;
+    EXPECT_THROW(desc.validate(), std::out_of_range);
+    desc = valid;
+    desc.attachments[0].load = vsl::LoadOp::Load;
+    EXPECT_THROW(desc.validate(), std::invalid_argument);
+    desc = valid;
+    desc.attachments[0].finalLayout = vsl::ImageLayout::Undefined;
+    EXPECT_THROW(desc.validate(), std::invalid_argument);
+    desc = valid;
+    desc.attachments[0].format = vsl::data_format::Depth32Float;
+    EXPECT_THROW(desc.validate(), std::invalid_argument);
+    desc = valid;
+    desc.subpasses[0].resolves = {{0}, {0}};
+    EXPECT_THROW(desc.validate(), std::invalid_argument);
+    desc = valid;
+    desc.dependencies[0].destination = 99;
+    EXPECT_THROW(desc.validate(), std::invalid_argument);
+    desc = valid;
+    desc.subpasses[0].preserve = {0};
+    EXPECT_THROW(desc.validate(), std::invalid_argument);
+    desc = valid;
+    desc.dependencies[0].destinationStage = vsl::PipelineStage::AllCommands;
+    EXPECT_THROW(desc.validate(), std::invalid_argument);
+    desc = valid;
+    desc.subpasses.clear();
+    EXPECT_THROW(desc.validate(), std::invalid_argument);
 }
 } // namespace

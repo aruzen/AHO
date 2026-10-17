@@ -1,22 +1,12 @@
 #include "support/window_fixture.hpp"
 namespace {
 using SwapchainWindowIntegrationTest = vsl_test::WindowIntegrationTest;
-struct BorrowedImageViews {
-    vsl::SwapchainAccessor chain;
-    ~BorrowedImageViews() {
-        for (auto &image : chain.images) {
-            chain._data->device->device.destroyImageView(image._data->view);
-            image._data->view = nullptr;
-        }
-    }
-};
 TEST_F(SwapchainWindowIntegrationTest, CreatesImagesAndRecreatesUsingOldSwapchain) {
     make_surface();
     ASSERT_FALSE(HasFatalFailure());
     if (!physical._data->device.getSurfaceSupportKHR(queue_family, surface->_data->surface))
         GTEST_SKIP() << "Selected graphics queue cannot present to this surface";
     vsl::Swapchain first(device, surface, std::nullopt, 64, 48);
-    BorrowedImageViews first_views{first}; // I23: production destructor omits borrowed views.
     ASSERT_GT(first.getSwapImageSize(), 0u);
     EXPECT_EQ(first.getSwapImageSize(), first.images.size());
     int framebuffer_width = 0, framebuffer_height = 0;
@@ -28,8 +18,53 @@ TEST_F(SwapchainWindowIntegrationTest, CreatesImagesAndRecreatesUsingOldSwapchai
         EXPECT_TRUE(static_cast<bool>(image._data->view));
     device._data->device.waitIdle();
     vsl::Swapchain recreated(device, surface, first, 64, 48);
-    BorrowedImageViews recreated_views{recreated};
     EXPECT_TRUE(static_cast<bool>(recreated._data->swapChain));
     EXPECT_EQ(recreated.getSwapImageSize(), recreated.images.size());
 }
 } // namespace
+
+namespace {
+class SwapchainReadbackWindowIntegrationTest : public vsl_test::WindowIntegrationTest {
+    bool validate_vulkan() const override { return true; }
+};
+TEST_F(SwapchainReadbackWindowIntegrationTest, ReadsAcquiredSwapchainImageAndRetainsBorrowedImageOwner) {
+    make_surface();
+    ASSERT_FALSE(HasFatalFailure());
+    const auto caps=physical._data->device.getSurfaceCapabilitiesKHR(surface->_data->surface);
+    if (!(caps.supportedUsageFlags & vk::ImageUsageFlagBits::eTransferSrc) ||
+        !physical._data->device.getSurfaceSupportKHR(queue_family,surface->_data->surface))
+        GTEST_SKIP() << "Surface cannot provide presentable transfer-source images on selected queue";
+    auto chain=std::make_optional<vsl::Swapchain>(device,surface,std::nullopt,64,48,
+        vsl::ImageType::ColorAttachment | vsl::ImageType::TransferSrc);
+    EXPECT_EQ(chain->getFormat(),chain->images.front().getFormat());
+    auto acquired=device._data->device.createFenceUnique({});
+    const auto index=device._data->device.acquireNextImageKHR(chain->_data->swapChain,UINT64_MAX,nullptr,*acquired).value;
+    ASSERT_EQ(device._data->device.waitForFences(*acquired,true,UINT64_MAX),vk::Result::eSuccess);
+    auto image=chain->images[index];
+    const auto extent=chain->_data->extent;
+    std::weak_ptr<vsl::_impl::Swapchain_impl> owner=chain->_data;
+    {
+        vsl::RenderPassDescription desc;
+        desc.addColor({.format=chain->getFormat(),.finalLayout=vsl::ImageLayout::General});
+        vsl::RenderPass pass(device,desc);
+        vsl::FrameBuffer target(pass,extent.width,extent.height,{image});
+        auto manager=make_manager();
+        {
+            auto phase=manager.startPhase<vsl::ComputePhase>();
+            phase << vsl::command::RenderPassBegin(target,{vsl::ClearColor{1,0,0,1}}) << vsl::command::RenderPassEnd{};
+        }
+        auto pixels=vsl::ImageReadback(manager,image,vsl::ImageLayout::General).read();
+        ASSERT_EQ(pixels.bytes.size(),std::size_t(extent.width)*extent.height*4);
+        EXPECT_EQ(pixels.format,chain->getFormat());
+        const bool bgra=pixels.format.type()==vsl::data_format::___FormatTypes::Srgb8BGRA ||
+                         pixels.format.type()==vsl::data_format::___FormatTypes::UnsignedNormalized8BGRA;
+        EXPECT_EQ(pixels.bytes[bgra ? 2 : 0],std::byte{255});
+        EXPECT_EQ(pixels.bytes[1],std::byte{0});
+        chain.reset();
+        EXPECT_FALSE(owner.expired());
+    }
+    EXPECT_FALSE(owner.expired());
+    image._data.reset();
+    EXPECT_TRUE(owner.expired());
+}
+}

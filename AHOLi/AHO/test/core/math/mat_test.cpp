@@ -293,6 +293,41 @@ TEST(MatFactoryTest, ArrayFactoryCopiesSquareRowsWithoutTransposition) {
     const std::array<int, 2> rows[2]{{1, 2}, {3, 4}};
     expect_matrix(aho::matrix::make(rows), values);
 }
+template<class T> class MatListFactoryTest : public testing::Test {};
+using ListFactoryScalars = testing::Types<int, float, double>;
+TYPED_TEST_SUITE(MatListFactoryTest, ListFactoryScalars);
+TYPED_TEST(MatListFactoryTest, RectangularInputsPreserveColumnOrdering) {
+    using T = TypeParam;
+    constexpr auto wide = aho::matrix::make<T, 2, 3>({{1, 4}, {2, 5}, {3, 6}});
+    constexpr auto tall = aho::matrix::make<T, 3, 2>({{1, 3, 5}, {2, 4, 6}});
+    static_assert(std::same_as<std::remove_cv_t<decltype(wide)>, aho::Mat<T, 2, 3>>);
+    static_assert(std::same_as<std::remove_cv_t<decltype(tall)>, aho::Mat<T, 3, 2>>);
+    static_assert(wide[0][2] == T{3} && wide[1][2] == T{6});
+    static_assert(tall[2][0] == T{5} && tall[2][1] == T{6});
+    expect_matrix(wide, std::array<std::array<int, 3>, 2>{{{1, 2, 3}, {4, 5, 6}}});
+    expect_matrix(tall, std::array<std::array<int, 2>, 3>{{{1, 2}, {3, 4}, {5, 6}}});
+}
+TYPED_TEST(MatListFactoryTest, MissingRowsAndColumnsAreZeroInitialized) {
+    using T = TypeParam;
+    const auto partial = aho::matrix::make<T, 2, 3>({{1}, {}, {3, 6}});
+    expect_matrix(partial, std::array<std::array<int, 3>, 2>{{{1, 0, 3}, {0, 0, 6}}});
+    expect_matrix(aho::matrix::make<T, 3, 2>({{1}}),
+                  std::array<std::array<int, 2>, 3>{{{1, 0}, {0, 0}, {0, 0}}});
+    expect_matrix(aho::matrix::make<T, 2, 2>({}), std::array<std::array<int, 2>, 2>{});
+}
+TYPED_TEST(MatListFactoryTest, ExcessRowsAndColumnsAreIgnored) {
+    using T = TypeParam;
+    const auto matrix = aho::matrix::make<T, 2, 3>({{1, 4, 7}, {2, 5, 8}, {3, 6, 9}, {10}});
+    expect_matrix(matrix, std::array<std::array<int, 3>, 2>{{{1, 2, 3}, {4, 5, 6}}});
+}
+TEST(MatListFactoryTest, ZeroDimensionsDoNotReadOrWriteElements) {
+    const auto no_rows = aho::matrix::make<int, 0, 2>({{1}, {2}, {3}});
+    const auto no_columns = aho::matrix::make<int, 2, 0>({{1}, {2}});
+    EXPECT_TRUE(no_rows.empty());
+    EXPECT_TRUE(no_columns[0].empty());
+    EXPECT_TRUE(no_columns[1].empty());
+}
+
 TEST(MatFactoryTest, TranslationFactoryUsesHomogeneousRowVectorCoordinates) {
     const auto matrix = aho::matrix::make_move(aho::d3::VectorD(2, 3, 4));
     expect_matrix(matrix, std::array<std::array<double, 4>, 4>{{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {2, 3, 4, 1}}});

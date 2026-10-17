@@ -36,6 +36,12 @@ namespace AHO_NAMESPACE::engine {
         static EngineAccessor *instance();
 
         EngineAccessor();
+        ~EngineAccessor();
+
+        EngineAccessor(const EngineAccessor&) = default;
+        EngineAccessor& operator=(const EngineAccessor&) = default;
+        EngineAccessor(EngineAccessor&&) noexcept = default;
+        EngineAccessor& operator=(EngineAccessor&&) noexcept = default;
 
         std::shared_ptr<EngineData> _data;
     };

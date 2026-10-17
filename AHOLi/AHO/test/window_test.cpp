@@ -69,7 +69,7 @@ TEST_F(AhoWindowVulkanIntegration, ExplicitEngineConstructorCreatesIndependentWi
 #include <AHO/window.hpp>
 namespace {
 TEST(AhoWindowTest, SharedDataConstructorKeepsNativeOwnershipAndEmptyDrawingData) {
-    static aho::engine::EngineAccessor engine;
+    aho::engine::EngineAccessor engine;
     auto native = std::make_shared<vsl::Window::WindowData>();
     std::shared_ptr<aho::window::WindowData> drawing;
     aho::Window window(engine, native, drawing);

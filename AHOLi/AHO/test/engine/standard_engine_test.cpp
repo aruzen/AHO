@@ -31,11 +31,14 @@ TEST_F(StandardEngineVulkanIntegration, ExplicitBootInitializesPreviouslyDeferre
 #include <AHO/engine/standard_engine.hpp>
 namespace {
 TEST(StandardEngineTest, DeferredBootAllocatesNoGpuOrWindowAndGetWindowReportsAbsence) {
-    // Static lifetime keeps EngineAccessor's singleton pointer valid until process exit.
-    static aho::StandardEngine engine("deferred test", false);
-    EXPECT_EQ(engine._data, nullptr);
-    EXPECT_FALSE(engine.boot_window.has_value());
-    EXPECT_THROW(engine.getWindow(), std::bad_optional_access);
+    const auto previous = aho::engine::EngineAccessor::instance();
+    {
+        aho::StandardEngine engine("deferred test", false);
+        EXPECT_EQ(engine._data, nullptr);
+        EXPECT_FALSE(engine.boot_window.has_value());
+        EXPECT_THROW(engine.getWindow(), std::bad_optional_access);
+    }
+    EXPECT_EQ(aho::engine::EngineAccessor::instance(), previous);
 }
 }
 #endif

@@ -17,3 +17,8 @@ aho::engine::EngineAccessor::EngineAccessor() {
     if (_instance == nullptr)
         _instance = this;
 }
+
+aho::engine::EngineAccessor::~EngineAccessor() {
+    if (_instance == this)
+        _instance = nullptr;
+}

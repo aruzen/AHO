@@ -67,7 +67,7 @@ namespace VSL_NAMESPACE::graphic_resource {
      */
     struct OverAllocateManager : public ManagerInterface {
         std::map<Type, size_t> size;
-        size_t other;
+        size_t other = 0;
         std::vector<Pool> pools;
 
         OverAllocateManager(LogicalDeviceAccessor device);

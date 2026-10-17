@@ -85,6 +85,7 @@ std::tuple<bool, vsl::graphic_resource::Resource>
 vsl::graphic_resource::Pool::bind(vsl::graphic_resource::BindingLayout layout) {
     auto result = std::make_shared<_impl::GraphicResource_impl>();
     result->pool = _data;
+    result->layout = layout._data;
     vk::DescriptorSetAllocateInfo allocInfo;
     allocInfo.descriptorPool = _data->descriptorPool;
     allocInfo.descriptorSetCount = 1;
@@ -120,6 +121,7 @@ vsl::graphic_resource::Pool::bind(size_t n, vsl::graphic_resource::BindingLayout
     for (size_t i = 0; i < descriptorSets.size(); i++) {
         resources[i] = Resource{std::make_shared<_impl::GraphicResource_impl>()};
         resources[i]._data->pool = _data;
+        resources[i]._data->layout = layout._data;
         resources[i]._data->descriptorSet = descriptorSets[i];
         _data->resources.push_back(resources[i]._data);
     }

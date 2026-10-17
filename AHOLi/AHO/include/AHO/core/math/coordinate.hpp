@@ -162,7 +162,7 @@ namespace AHO_NAMESPACE {
 				constexpr _CoordinateSet() : Lower(Upper<ElementType>()) {}; \
 				constexpr _CoordinateSet(const Upper<ElementType>& Lower) : Lower(Lower) {}; \
                 constexpr bool operator<(const _CoordinateSet<element_type, coordinate_info>& o) const { \
-                    return this->_cnmn1 < o._cnmn1; \
+                    return Lower < o.Lower; \
                 } \
 			    constexpr bool operator==(const _CoordinateSet<element_type, coordinate_info>& o) const { return Lower == o.Lower; } \
                 constexpr auto operator<=>(const _CoordinateSet<element_type, coordinate_info>& o) const { return Lower <=> o.Lower; } \
@@ -188,7 +188,7 @@ namespace AHO_NAMESPACE {
 				constexpr _CoordinateSet() : Lower1(Upper1<ElementType>()), Lower2(Upper2<ElementType>()) {}; \
 				constexpr _CoordinateSet(const Upper1<ElementType>& Lower1, const Upper2<ElementType>& Lower2) : Lower1(Lower1), Lower2(Lower2) {}; \
                 constexpr bool operator<(const _CoordinateSet<element_type, coordinate_info>& o) const { \
-                    return (this->_cnmn1 != o._cnmn1 ? this->_cnmn1 < o._cnmn1 : this->_cnmn2 < o._cnmn2); \
+                    return (Lower1 != o.Lower1 ? Lower1 < o.Lower1 : Lower2 < o.Lower2); \
                 } \
                 constexpr bool operator==(const _CoordinateSet<element_type, coordinate_info>& o) const { return std::tie(Lower1, Lower2) == std::tie(o.Lower1, o.Lower2); } \
                 constexpr auto operator<=>(const _CoordinateSet<element_type, coordinate_info>& o) const { return std::tie(Lower1, Lower2) <=> std::tie(o.Lower1, o.Lower2); }   \
@@ -217,9 +217,8 @@ namespace AHO_NAMESPACE {
 			constexpr _CoordinateSet() : x(X<ElementType>()), y(Y<ElementType>()), z(Z<ElementType>()) {}
 			constexpr _CoordinateSet(const X<ElementType>& x, const Y<ElementType>& y, const Z<ElementType>& z) : x(x), y(y), z(z) {}
             constexpr bool operator<(const _CoordinateSet<element_type, coordinate_info>& o) const {
-                return (this->_cnmn1 != o._cnmn1 ? this->_cnmn1 < o._cnmn1 :
-                        (this->_cnmn2 != o._cnmn2 ? this->_cnmn2 < o._cnmn2 :
-                         this->_cnmn3 < o._cnmn3));
+                return (x != o.x ? x < o.x :
+                        (y != o.y ? y < o.y : z < o.z));
             }
             constexpr bool operator==(const _CoordinateSet<element_type, coordinate_info>& o) const { return std::tie(x, y, z) == std::tie(o.x, o.y, o.z); }
             constexpr auto operator<=>(const _CoordinateSet<element_type, coordinate_info>& o) const { return std::tie(x, y, z) <=> std::tie(o.x, o.y, o.z); }

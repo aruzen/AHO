@@ -121,7 +121,10 @@ namespace VSL_NAMESPACE {
         MicromapStorage = 0x01000000,
     };
 
+    enum class SampleCount : std::uint32_t { One = 1, Two = 2, Four = 4, Eight = 8, Sixteen = 16, ThirtyTwo = 32, SixtyFour = 64 };
+
     enum class ImageType {
+        None = 0,
         TransferSrc = 0x00000001,
         TransferDst = 0x00000002,
         Sampled = 0x00000004,
@@ -193,6 +196,7 @@ namespace VSL_NAMESPACE {
         TransferSrcOptimal = 6,
         TransferDstOptimal = 7,
         Preinitialized = 8,
+        Present = 1000001002,
     };
 
     enum class SharingMode {
@@ -285,6 +289,7 @@ namespace VSL_NAMESPACE {
 
     struct ImageAccessor {
         std::shared_ptr<_impl::Image_impl> _data;
+        data_format::___Format getFormat() const;
 
         bool copyByBuffer(CommandManager commandManager, BufferAccessor * buf, vsl::ImageLayout layout, std::uint32_t target_idx);
 
@@ -299,7 +304,7 @@ namespace VSL_NAMESPACE {
                                                             std::uint32_t width,
                                                             std::uint32_t height,
                                                             data_format::___Format format,
-                                                            std::uint32_t count);
+                                                            std::uint32_t count, SampleCount samples = SampleCount::One);
 
         static void TransformLayout(CommandManager manager,
                                     std::shared_ptr<_impl::Image_impl> data,

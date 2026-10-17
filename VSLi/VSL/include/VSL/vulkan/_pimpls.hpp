@@ -1,5 +1,6 @@
 #pragma once
 #include "../define.hpp"
+#include "buffer_and_image_accessor.hpp"
 
 #include <compare>
 
@@ -23,6 +24,8 @@
 #include <map>
 #include <any>
 #include <set>
+
+namespace VSL_NAMESPACE { struct RenderPassDescription; }
 
 namespace VSL_NAMESPACE::_impl {
 	struct Vulkan_impl_accessor {
@@ -101,6 +104,7 @@ namespace VSL_NAMESPACE::_impl {
 
 	struct Swapchain_impl {
 		std::shared_ptr<LogicalDevice_impl> device;
+        std::shared_ptr<Surface_impl> surface;
 
         vk::SurfaceFormatKHR surfaceFormat;
         vk::PresentModeKHR presentMode;
@@ -176,6 +180,7 @@ namespace VSL_NAMESPACE::_impl {
 	struct RenderPass_impl {
 		std::shared_ptr<LogicalDevice_impl> device;
 		vk::RenderPass renderPass;
+        std::shared_ptr<const RenderPassDescription> description;
 
 		~RenderPass_impl();
 	};
@@ -189,11 +194,17 @@ namespace VSL_NAMESPACE::_impl {
 		~Pipeline_impl();
 	};
 
-	struct FrameBuffer_impl {
+	struct Image_impl;
+
+    struct FrameBuffer_impl {
 		std::shared_ptr<LogicalDevice_impl> device;
 		std::shared_ptr<Swapchain_impl> swapchain;
 
 		std::vector<vk::Framebuffer> swapChainFramebuffers;
+        std::shared_ptr<RenderPass_impl> renderPass;
+        std::vector<std::vector<std::shared_ptr<Image_impl>>> attachments;
+        vk::Extent2D extent;
+        std::uint32_t layers = 1;
 
 		~FrameBuffer_impl();
 	};
@@ -269,6 +280,9 @@ namespace VSL_NAMESPACE::_impl {
     struct Image_impl {
         std::shared_ptr<LogicalDevice_impl> device;
         vk::Image image;
+        std::shared_ptr<Swapchain_impl> swapchain;
+        ImageType usage = ImageType::None;
+        SampleCount samples = SampleCount::One;
         vk::ImageView view;
         vk::DeviceMemory memory;
         std::uint32_t width, height, count;

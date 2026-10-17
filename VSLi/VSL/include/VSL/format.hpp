@@ -8,6 +8,10 @@
 namespace VSL_NAMESPACE::data_format {
 	enum class ___FormatTypes : std::uint32_t{
 		Undefined = 0,
+        Depth16Unorm = 124,
+        Depth32Float = 126,
+        Depth24Stencil8 = 129,
+        Depth32FloatStencil8 = 130,
 		UnsignedNormalized8R = 9,
 		SignedNormalized8R = 10,
 		UnsignedScaled8R = 11,
@@ -393,6 +397,10 @@ namespace VSL_NAMESPACE::data_format {
 	};
 
 	constexpr ___Format Undefined(___FormatTypes::Undefined, 0);
+    constexpr ___Format Depth16Unorm(___FormatTypes::Depth16Unorm, 2);
+    constexpr ___Format Depth32Float(___FormatTypes::Depth32Float, 4);
+    constexpr ___Format Depth24Stencil8(___FormatTypes::Depth24Stencil8, 4);
+    constexpr ___Format Depth32FloatStencil8(___FormatTypes::Depth32FloatStencil8, 8);
 
 	constexpr ___Format UnsignedNormalized8R(___FormatTypes::UnsignedNormalized8R, 1 * 1);
 	constexpr ___Format SignedNormalized8R(___FormatTypes::SignedNormalized8R, 1 * 1);
@@ -784,6 +792,10 @@ namespace VSL_NAMESPACE::concepts {
 namespace VSL_NAMESPACE::data_format {
     constexpr ___Format convert(___FormatTypes t) {
         switch (t) {
+            case ___FormatTypes::Depth16Unorm: return Depth16Unorm;
+            case ___FormatTypes::Depth32Float: return Depth32Float;
+            case ___FormatTypes::Depth24Stencil8: return Depth24Stencil8;
+            case ___FormatTypes::Depth32FloatStencil8: return Depth32FloatStencil8;
             case ___FormatTypes::UnsignedNormalized8R:
                 return UnsignedNormalized8R;
             case ___FormatTypes::SignedNormalized8R:

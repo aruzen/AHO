@@ -471,7 +471,7 @@ struct Upper { \
 			}
 
 			template<typename H = float, typename SV = H>
-			constexpr HSV<H, SV> hsva() {
+			constexpr HSVA<H, SV> hsva() {
 				using FloatType = std::conditional_t<
 					std::is_floating_point_v<ElementType>, ElementType, double>; // 浮動小数点型を確保
 				using ChannelType = ElementType;
@@ -484,7 +484,8 @@ struct Upper { \
 				if constexpr (std::is_integral_v<SV>)
 					a = std::round(a * std::numeric_limits<SV>::max());
 
-				return this->hsv() + A<SV>(static_cast<SV>(a));
+				const auto hsv = this->template hsv<H, SV>();
+				return { hsv.h.value, hsv.s.value, hsv.v.value, static_cast<SV>(a) };
 			}
 		};
 
@@ -742,12 +743,10 @@ struct Upper { \
 					a /= std::numeric_limits<SaturationAndValueType>::max();
 				}
 
-				if constexpr (std::is_integral_v<T>) {
-					return this->rgb() + A<ChannelType>(static_cast<ChannelType>(a * std::numeric_limits<ChannelType>::max()));
-				}
-				else {
-					return this->rgb() + A<ChannelType>(static_cast<ChannelType>(a));
-				}
+				const auto rgb = this->template rgb<T>();
+				if constexpr (std::is_integral_v<T>)
+					a = std::round(a * std::numeric_limits<ChannelType>::max());
+				return { rgb.r.value, rgb.g.value, rgb.b.value, static_cast<ChannelType>(a) };
 			}
 		};
 

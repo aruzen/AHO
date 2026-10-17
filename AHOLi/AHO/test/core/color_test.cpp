@@ -3,6 +3,7 @@
 #include <AHO/core/color.hpp>
 #include <cstdint>
 #include <sstream>
+#include <utility>
 #include "../support/color.hpp"
 
 #if defined(AHO_CONTRACT_COLOR_RGB_ARITHMETIC)
@@ -231,6 +232,48 @@ TEST(ColorCompositionTest, IndependentChannelsComposeWithoutChangingOtherChannel
     EXPECT_EQ(hsva.h.value, 120); EXPECT_EQ(hsva.a.value, 0.5);
     aho_test::expect_rgba(R<double>(2) + A<double>(0.5), 2, 0, 0, 0.5);
     aho_test::expect_hsva(H<double>(120) + A<double>(0.5), 120, 0, 0, 0.5);
+}
+TEST(ColorAlphaConversionTest, ExplicitIntegerTypesRoundTripAllChannels) {
+    aho::color::RGBA<std::uint8_t> rgba(255, 0, 0, 128);
+    auto hsva = rgba.hsva<short, std::uint8_t>();
+    static_assert(std::same_as<decltype(hsva), aho::color::HSVA<short, std::uint8_t>>);
+    aho_test::expect_hsva(hsva, 0, 255, 255, 128);
+    const auto restored = hsva.rgba<std::uint8_t>();
+    static_assert(std::same_as<std::remove_cv_t<decltype(restored)>, aho::color::RGBA<std::uint8_t>>);
+    aho_test::expect_rgba(restored, 255, 0, 0, 128);
+}
+TEST(ColorAlphaConversionTest, ExplicitDoubleTypesKeepAlphaPrecision) {
+    constexpr double alpha = 0.123456789012345;
+    aho::color::RGBA<double> source(0, 1, 0, alpha);
+    auto hsva = source.hsva<double, double>();
+    static_assert(std::same_as<decltype(hsva), aho::color::HSVA<double, double>>);
+    aho_test::expect_hsva(hsva, 120, 1, 1, alpha);
+    const auto restored = hsva.rgba<double>();
+    aho_test::expect_rgba(restored, 0, 1, 0, alpha);
+    EXPECT_DOUBLE_EQ(source.a.value, alpha);
+}
+TEST(ColorAlphaConversionTest, TransparentAndOpaqueEndpointsSurviveBothDirections) {
+    for (float alpha : {0.0f, 1.0f}) {
+        aho::color::RGBA<float> rgba(1, 0, 0, alpha);
+        auto hsva = rgba.hsva();
+        aho_test::expect_hsva(hsva, 0, 1, 1, alpha);
+        aho_test::expect_rgba(hsva.rgba(), 1, 0, 0, alpha);
+    }
+}
+TEST(ColorAlphaConversionTest, FloatAlphaRoundsToTheNearestIntegerChannel) {
+    for (const auto [alpha, expected] : {std::pair{0.25, 64}, {0.5, 128}, {0.75, 191}}) {
+        aho::color::HSVA<double, double> hsva(120, 1, 1, alpha);
+        aho::color::RGBA<double> rgba(0, 1, 0, alpha);
+        aho_test::expect_rgba(hsva.rgba<std::uint8_t>(), 0, 255, 0, expected);
+        aho_test::expect_hsva(rgba.hsva<short, std::uint8_t>(), 120, 255, 255, expected);
+    }
+}
+TEST(ColorAlphaConversionTest, IntegerAlphaIsNormalizedForFloatingPointOutput) {
+    aho::color::RGBA<std::uint8_t> rgba(255, 0, 0, 128);
+    const auto hsva = rgba.hsva<double, double>();
+    aho_test::expect_hsva(hsva, 0, 1, 1, 128.0 / 255);
+    aho::color::HSVA<short, std::uint8_t> source(0, 255, 255, 128);
+    aho_test::expect_rgba(source.rgba<double>(), 1, 0, 0, 128.0 / 255);
 }
 TEST(ColorCompositionTest, ChannelSubtractionPreservesLeftOperandSign) {
     using namespace aho::color;

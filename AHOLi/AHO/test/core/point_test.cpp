@@ -92,6 +92,32 @@ TYPED_TEST(PointTest, ScalarOperatorsAndCompoundOperatorsMutateCoordinates) {
     EXPECT_EQ(&(value *= T{2}), &value); aho_test::expect_coordinates(value, 4, 8, 12);
     EXPECT_EQ(&(value /= T{2}), &value); aho_test::expect_coordinates(value, 2, 4, 6);
 }
+TEST(PointLengthRangeTest, LargeIntegerCoordinatesHaveFiniteKnownLengths) {
+    const aho::d2::PointI plane(60000, -80000);
+    const aho::d3::PointI space(20000, -30000, 60000);
+    EXPECT_DOUBLE_EQ(plane.length(), 100000);
+    EXPECT_DOUBLE_EQ(space.length(), 70000);
+}
+template<class T> class PointFloatingLengthRangeTest : public testing::Test {};
+using PointFloatingLengthScalars = testing::Types<float, double>;
+TYPED_TEST_SUITE(PointFloatingLengthRangeTest, PointFloatingLengthScalars);
+TYPED_TEST(PointFloatingLengthRangeTest, LargeAndSmallCoordinatesAvoidIntermediateOverflowAndUnderflow) {
+    using T = TypeParam;
+    // Scaled 3-4-5 and 2-3-6-7 triples need only a few rounded operations.
+    constexpr T tolerance = 32 * std::numeric_limits<T>::epsilon();
+    constexpr T large = static_cast<T>(std::is_same_v<T, float> ? 1e30 : 1e200);
+    constexpr T small = static_cast<T>(std::is_same_v<T, float> ? 1e-30 : 1e-200);
+    for (const T scale : {large, small}) {
+        const aho::_Point<T, vsl::D2> plane(-T{3} * scale, T{4} * scale);
+        const aho::_Point<T, vsl::D3> space(T{2} * scale, -T{3} * scale, T{6} * scale);
+        EXPECT_TRUE(std::isfinite(plane.length()));
+        EXPECT_TRUE(std::isfinite(space.length()));
+        EXPECT_GT(plane.length(), 0);
+        EXPECT_GT(space.length(), 0);
+        EXPECT_NEAR(plane.length() / scale, 5, tolerance);
+        EXPECT_NEAR(space.length() / scale, 7, tolerance);
+    }
+}
 TYPED_TEST(PointTest, LengthAndOrderingHandleKnownCoordinates) {
     using P = typename TypeParam::Point;
     const auto value = aho_test::geometry<P>(3, 4, 12);

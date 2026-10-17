@@ -1,6 +1,7 @@
 #include <AHO/core/triangle.hpp>
 #include <AHO/utils/polygon.hpp>
 #include <gtest/gtest.h>
+#include <utility>
 #if defined(AHO_CONTRACT_POLYGON_LINES_VIEW)
 struct LinesObject {
     using element_type = double; using dimension = vsl::D2;
@@ -80,6 +81,32 @@ TEST(PolygonViewsTest, CompositePointViewCopiesEveryVertex) {
     const auto points = aho::views::points(line);
     ASSERT_EQ(points.size(), 2u);
     aho_test::expect_coordinates(points[0], 1, 2); aho_test::expect_coordinates(points[1], 3, 4);
+}
+TEST(WrapViewTest, NonCommonRangesKeepTheirSentinelAndElementReferences) {
+    std::array<int, 5> source{1, 2, 3, 0, 4};
+    auto inner = std::views::take_while(source, [](int value) { return value > 0; });
+    aho::views::wrap_view wrapped(inner);
+    static_assert(!std::ranges::common_range<decltype(inner)>);
+    static_assert(std::same_as<std::ranges::sentinel_t<decltype(wrapped)>, std::ranges::sentinel_t<decltype(inner)>>);
+    std::vector<int> values;
+    for (int value : wrapped) values.push_back(value);
+    EXPECT_EQ(values, (std::vector<int>{1, 2, 3}));
+    *wrapped.begin() = 9;
+    EXPECT_EQ(source[0], 9);
+}
+TEST(WrapViewTest, NonCommonRangesMayBeEmptyAtTheirFirstElement) {
+    std::array<int, 2> source{0, 1};
+    aho::views::wrap_view wrapped(std::views::take_while(source, [](int value) { return value > 0; }));
+    EXPECT_EQ(wrapped.begin(), wrapped.end());
+    EXPECT_TRUE(std::ranges::empty(wrapped));
+}
+TEST(WrapViewTest, MoveOnlyOwningViewsRetainTheirElementsAcrossMoves) {
+    auto wrapped = aho::views::wrap_view(std::views::all(std::vector<int>{1, 2, 3}));
+    static_assert(std::ranges::view<decltype(wrapped)>);
+    static_assert(!std::copy_constructible<decltype(wrapped)>);
+    auto moved = std::move(wrapped);
+    EXPECT_EQ(std::ranges::distance(moved), 3);
+    EXPECT_EQ((std::vector<int>(moved.begin(), moved.end())), (std::vector<int>{1, 2, 3}));
 }
 TEST(PolygonViewsTest, CastAndWrapViewsPreserveOrderAndEmptyRanges) {
     std::array<double, 3> values{1.5, 2.5, 3.5};

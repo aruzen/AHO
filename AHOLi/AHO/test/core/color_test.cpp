@@ -243,6 +243,41 @@ TEST(ColorCompositionTest, ChannelSubtractionPreservesLeftOperandSign) {
     aho_test::expect_hsva(H<double>(120) - A<double>(0.5), 120, 0, 0, -0.5);
     aho_test::expect_hsva(A<double>(0.5) - H<double>(120), -120, 0, 0, 0.5);
 }
+template<class T> class ColorChannelSubtractionTest : public testing::Test {};
+using SignedChannelTypes = testing::Types<int, float, double>;
+TYPED_TEST_SUITE(ColorChannelSubtractionTest, SignedChannelTypes);
+TYPED_TEST(ColorChannelSubtractionTest, RgbAndHsvPairsPreserveTheLeftChannelAndNegateTheRight) {
+    using namespace aho::color;
+    using T = TypeParam;
+    aho_test::expect_rgb(R<T>(2) - G<T>(3), 2, -3, 0);
+    aho_test::expect_rgb(G<T>(3) - R<T>(2), -2, 3, 0);
+    aho_test::expect_rgb(R<T>(2) - B<T>(4), 2, 0, -4);
+    aho_test::expect_rgb(B<T>(4) - R<T>(2), -2, 0, 4);
+    aho_test::expect_rgb(G<T>(3) - B<T>(4), 0, 3, -4);
+    aho_test::expect_rgb(B<T>(4) - G<T>(3), 0, -3, 4);
+    aho_test::expect_hsv(H<T>(2) - S<T>(3), 2, -3, 0);
+    aho_test::expect_hsv(S<T>(3) - H<T>(2), -2, 3, 0);
+    aho_test::expect_hsv(H<T>(2) - V<T>(4), 2, 0, -4);
+    aho_test::expect_hsv(V<T>(4) - H<T>(2), -2, 0, 4);
+    aho_test::expect_hsv(S<T>(3) - V<T>(4), 0, 3, -4);
+    aho_test::expect_hsv(V<T>(4) - S<T>(3), 0, -3, 4);
+}
+TYPED_TEST(ColorChannelSubtractionTest, AlphaPairsKeepOperandSignsInBothOrders) {
+    using namespace aho::color;
+    using T = TypeParam;
+    aho_test::expect_rgba(R<T>(2) - A<T>(5), 2, 0, 0, -5);
+    aho_test::expect_rgba(A<T>(5) - R<T>(2), -2, 0, 0, 5);
+    aho_test::expect_rgba(G<T>(3) - A<T>(5), 0, 3, 0, -5);
+    aho_test::expect_rgba(A<T>(5) - G<T>(3), 0, -3, 0, 5);
+    aho_test::expect_rgba(B<T>(4) - A<T>(5), 0, 0, 4, -5);
+    aho_test::expect_rgba(A<T>(5) - B<T>(4), 0, 0, -4, 5);
+    aho_test::expect_hsva(H<T>(2) - A<T>(5), 2, 0, 0, -5);
+    aho_test::expect_hsva(A<T>(5) - H<T>(2), -2, 0, 0, 5);
+    aho_test::expect_hsva(S<T>(3) - A<T>(5), 0, 3, 0, -5);
+    aho_test::expect_hsva(A<T>(5) - S<T>(3), 0, -3, 0, 5);
+    aho_test::expect_hsva(V<T>(4) - A<T>(5), 0, 0, 4, -5);
+    aho_test::expect_hsva(A<T>(5) - V<T>(4), 0, 0, -4, 5);
+}
 TEST(ColorOutputTest, AllColorSpaceOutputsNameAndPreserveEveryChannel) {
     auto output = [](const auto& color) { std::ostringstream stream; stream << color; return stream.str(); };
     EXPECT_EQ(output(aho::color::RGB<int>(1, 2, 3)), "(r, g, b)=(1, 2, 3)");

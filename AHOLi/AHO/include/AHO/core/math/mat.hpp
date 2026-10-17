@@ -373,9 +373,10 @@ namespace AHO_NAMESPACE {
 
         template<typename T, size_t Row, size_t Column>
         constexpr Mat<T, Row, Column> make(std::initializer_list<std::initializer_list<T>> init) {
-            std::array<std::array<T, Row>, Column> cp;
+            std::array<std::array<T, Column>, Row> cp{};
             auto itr1 = init.begin();
-            for (size_t i = 0; init.end() != itr1 && i < Row; i++) {
+            // Each inner initializer list supplies a column, as in the existing square factory.
+            for (size_t i = 0; init.end() != itr1 && i < Column; i++) {
                 auto itr2 = itr1->begin();
                 for (size_t j = 0; itr2 != itr1->end() && j < Row; j++) {
                     cp[j][i] = *itr2;

@@ -115,6 +115,62 @@ TEST(MatTest, ScalarAssignmentsAreElementwise) {
     expect_matrix(mutable_matrix /= 2, values);
     expect_matrix(mutable_matrix, values);
 }
+template<class T> class MatScalarOperatorTest : public testing::Test {};
+using ScalarTypes = testing::Types<int, float, double>;
+TYPED_TEST_SUITE(MatScalarOperatorTest, ScalarTypes);
+TYPED_TEST(MatScalarOperatorTest, LeftAndRightOperatorsUseOperandOrderAndKeepSourceUnchanged) {
+    using T = TypeParam;
+    constexpr std::array<std::array<T, 3>, 2> values{{{2, -4, 6}, {8, -12, 24}}};
+    const aho::Mat<T, 2, 3> matrix(values);
+    const std::array<std::array<T, 3>, 2> doubled{{{4, -8, 12}, {16, -24, 48}}};
+    const std::array<std::array<T, 3>, 2> halved{{{1, -2, 3}, {4, -6, 12}}};
+    const std::array<std::array<T, 3>, 2> reciprocal{{{12, -6, 4}, {3, -2, 1}}};
+    expect_matrix(matrix * T{2}, doubled);
+    expect_matrix(T{2} * matrix, doubled);
+    expect_matrix(matrix / T{2}, halved);
+    expect_matrix(T{24} / matrix, reciprocal);
+    expect_matrix(matrix * T{0}, std::array<std::array<T, 3>, 2>{});
+    expect_matrix(matrix, values);
+}
+template<class Element, class Scalar, class Result> struct MixedMatrixScalarCase {
+    using element_type = Element;
+    using scalar_type = Scalar;
+    using result_type = Result;
+};
+using MixedMatrixScalars = testing::Types<
+    MixedMatrixScalarCase<int, float, float>,
+    MixedMatrixScalarCase<float, double, double>,
+    MixedMatrixScalarCase<double, int, double>>;
+template<class T> class MatMixedScalarOperatorTest : public testing::Test {};
+TYPED_TEST_SUITE(MatMixedScalarOperatorTest, MixedMatrixScalars);
+TYPED_TEST(MatMixedScalarOperatorTest, BothOperandOrdersPromoteResultTypesAndPreserveFractions) {
+    using E = typename TypeParam::element_type;
+    using S = typename TypeParam::scalar_type;
+    using Result = aho::Mat<typename TypeParam::result_type, 1, 2>;
+    const aho::Mat<E, 1, 2> matrix(std::array<std::array<E, 2>, 1>{{{-3, 6}}});
+    static_assert(std::same_as<decltype(matrix * S{2}), Result>);
+    static_assert(std::same_as<decltype(S{2} * matrix), Result>);
+    static_assert(std::same_as<decltype(matrix / S{2}), Result>);
+    static_assert(std::same_as<decltype(S{3} / matrix), Result>);
+    const std::array<std::array<double, 2>, 1> doubled{{{-6, 12}}};
+    const std::array<std::array<double, 2>, 1> halved{{{-1.5, 3}}};
+    const std::array<std::array<double, 2>, 1> reciprocal{{{-1, 0.5}}};
+    expect_matrix(matrix * S{2}, doubled);
+    expect_matrix(S{2} * matrix, doubled);
+    expect_matrix(matrix / S{2}, halved);
+    expect_matrix(S{3} / matrix, reciprocal);
+    expect_matrix(matrix, std::array<std::array<double, 2>, 1>{{{-3, 6}}});
+}
+TEST(MatMixedScalarOperatorTest, NarrowIntegerMultiplicationUsesIntegerPromotion) {
+    constexpr aho::Mat<short, 1, 1> matrix(std::array<std::array<short, 1>, 1>{{{30000}}});
+    constexpr auto right = matrix * short{2};
+    constexpr auto left = short{2} * matrix;
+    static_assert(std::same_as<std::remove_cv_t<decltype(right)>, aho::Mat<int, 1, 1>>);
+    static_assert(std::same_as<std::remove_cv_t<decltype(left)>, aho::Mat<int, 1, 1>>);
+    static_assert(right[0][0] == 60000 && left[0][0] == 60000);
+    EXPECT_EQ(right[0][0], 60000);
+    EXPECT_EQ(left[0][0], 60000);
+}
 TEST(MatTest, CastConvertsEachElement) {
     Matrix2 matrix(values);
     expect_matrix(matrix.cast<double>(), std::array<std::array<double, 2>, 2>{{{1, 2}, {3, 4}}});

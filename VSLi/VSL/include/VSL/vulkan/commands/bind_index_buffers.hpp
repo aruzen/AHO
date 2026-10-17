@@ -9,7 +9,7 @@ namespace VSL_NAMESPACE::command {
 	struct BindIndexBuffer : __Command {
 		template <MemoryType MemType, MemoryProperty MemProperty, SharingMode SharingMode = SharingMode::Exclusive>
 			requires ((unsigned int)(MemType & MemoryType::IndexBuffer) != 0)
-		BindIndexBuffer(Buffer<MemType, MemProperty, SharingMode>, uint32_t offset = 0);
+		BindIndexBuffer(Buffer<MemType, MemProperty, SharingMode>&, uint32_t offset = 0);
 
 		BufferAccessor* buffer = nullptr;
         size_t offset;
@@ -21,5 +21,5 @@ namespace VSL_NAMESPACE::command {
 
 	template<MemoryType MemType, MemoryProperty MemProperty, SharingMode SharingMode>
 		requires ((unsigned int)(MemType& MemoryType::IndexBuffer) != 0)
-	VSL_NAMESPACE::command::BindIndexBuffer::BindIndexBuffer(Buffer<MemType, MemProperty, SharingMode> buffer, uint32_t offset) : buffer(&buffer), offset(offset) {}
+	VSL_NAMESPACE::command::BindIndexBuffer::BindIndexBuffer(Buffer<MemType, MemProperty, SharingMode>& buffer, uint32_t offset) : buffer(&buffer), offset(offset) {}
 }

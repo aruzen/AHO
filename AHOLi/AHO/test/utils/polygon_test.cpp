@@ -2,6 +2,8 @@
 #include <AHO/utils/polygon.hpp>
 #include <gtest/gtest.h>
 #include <utility>
+#include <forward_list>
+#include <sstream>
 #if defined(AHO_CONTRACT_POLYGON_LINES_VIEW)
 struct LinesObject {
     using element_type = double; using dimension = vsl::D2;
@@ -118,6 +120,71 @@ TEST(PolygonViewsTest, CastAndWrapViewsPreserveOrderAndEmptyRanges) {
     *view.begin() = 9;
     EXPECT_DOUBLE_EQ(values[0], 9);
 }
+TEST(PolygonCastTest, UnsizedForwardRangesPreserveOrderAndEmptyInputs) {
+    const std::forward_list<double> values{1.5, -2.5, 3.5};
+    static_assert(!std::ranges::sized_range<decltype(values)>);
+    EXPECT_EQ(aho::views::cast<int>(values), (std::vector<int>{1, -2, 3}));
+    EXPECT_TRUE(aho::views::cast<int>(std::forward_list<double>{}).empty());
+}
+TEST(PolygonCastTest, NonCommonRangesStopAtTheirSentinel) {
+    std::array<double, 4> values{1.5, 2.5, 0.0, 9.5};
+    auto prefix = values | std::views::take_while([](double value) { return value > 0; });
+    static_assert(!std::ranges::common_range<decltype(prefix)>);
+    EXPECT_EQ(aho::views::cast<int>(prefix), (std::vector<int>{1, 2}));
+}
+TEST(PolygonCastTest, SinglePassInputRangesAreConsumedOnce) {
+    std::istringstream stream("1.5 -2.5 3.5");
+    auto values = std::ranges::istream_view<double>(stream);
+    static_assert(std::ranges::input_range<decltype(values)>);
+    static_assert(!std::ranges::forward_range<decltype(values)>);
+    EXPECT_EQ(aho::views::cast<int>(values), (std::vector<int>{1, -2, 3}));
+    EXPECT_TRUE(stream.eof());
+}
+TEST(PolygonCastTest, ConvertedElementsDoNotRequireDefaultConstruction) {
+    struct Converted {
+        int value;
+        Converted() = delete;
+        explicit Converted(int value) : value(value) {}
+    };
+    const std::array<int, 2> source{3, 7};
+    const auto converted = aho::views::cast<Converted>(source);
+    ASSERT_EQ(converted.size(), 2u);
+    EXPECT_EQ(converted[0].value, 3);
+    EXPECT_EQ(converted[1].value, 7);
+}
+TEST(PolygonViewsTest, CompositeViewsAcceptUnsizedCollections) {
+    using P = aho::d2::PointD;
+    using L = aho::Line<double, vsl::D2>;
+    using Triangle = aho::Triangle<double, vsl::D2>;
+    struct Shape {
+        using dimension = vsl::D2;
+        using element_type = double;
+        using coordinate_info = aho::coordinate::_DefaultCoordinateInfo<dimension>::value;
+        std::forward_list<P> vertices{P(0, 0), P(3, 4)};
+        std::forward_list<L> edges{L(P(0, 0), P(3, 4))};
+        std::forward_list<Triangle> faces{Triangle(P(0, 0), P(3, 0), P(0, 4))};
+        const auto& points() const { return vertices; }
+        const auto& lines() const { return edges; }
+        const auto& triangles() const { return faces; }
+    };
+    static_assert(aho::concepts::is_points_object<Shape>);
+    static_assert(aho::concepts::is_lines_object<Shape>);
+    static_assert(aho::concepts::is_triangles_object<Shape>);
+    Shape shape;
+    const auto points = aho::views::points(shape);
+    const auto lines = aho::views::lines(shape);
+    const auto triangles = aho::views::triangles(shape);
+    ASSERT_EQ(points.size(), 2u);
+    ASSERT_EQ(lines.size(), 1u);
+    ASSERT_EQ(triangles.size(), 1u);
+    aho_test::expect_coordinates(points[0], 0, 0);
+    aho_test::expect_coordinates(points[1], 3, 4);
+    EXPECT_DOUBLE_EQ(lines[0].length(), 5);
+    EXPECT_DOUBLE_EQ(triangles[0].area(), 6);
+    shape.vertices.front() = P(9, 9);
+    aho_test::expect_coordinates(points[0], 0, 0);
+}
+
 TEST(PolygonConceptsTest, UnrelatedTypesWithMatchingAliasesAreNotGeometricObjects) {
     struct PretendShape {
         using dimension = vsl::D2; using element_type = double;

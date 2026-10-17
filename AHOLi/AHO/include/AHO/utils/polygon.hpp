@@ -6,6 +6,7 @@
 #include <ranges>
 #include <concepts>
 #include <utility>
+#include <vector>
 
 namespace AHO_NAMESPACE {
 	namespace concepts {
@@ -101,13 +102,11 @@ namespace AHO_NAMESPACE {
 
 		template<typename To, typename F>
 		auto cast(F&& f) {
-			std::vector<To> result(f.size());
-			auto view = std::ranges::transform_view(std::views::common(std::forward<F>(f)), _Castor<To>());
-			int idx = 0;
-			for (auto e : view) {
-				result[idx] = e;
-				idx++;
-			};
+			std::vector<To> result;
+			if constexpr (std::ranges::sized_range<F>)
+				result.reserve(std::ranges::size(f));
+			for (auto&& element : f)
+				result.push_back(_Castor<To>{}(element));
 			return result;
 		}
 

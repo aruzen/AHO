@@ -23,7 +23,8 @@ TEST(MatContractTest, ViewMatrixMovesEyeToOriginForFloatAndDouble) {
         using P = aho::_Point<T, vsl::D3>;
         using V = aho::_Vector<T, vsl::D3>;
         const auto view = aho::matrix::make_view(P(0, 0, 1), P(0, 0, 0), V(0, 1, 0));
-        aho_test::expect_matrix(view, std::array<std::array<double, 4>, 4>{{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, -1, 1}}});
+        // AHO retains a 180-degree camera roll relative to the conventional right-handed lookAt.
+        aho_test::expect_matrix(view, std::array<std::array<double, 4>, 4>{{{-1, 0, 0, 0}, {0, -1, 0, 0}, {0, 0, 1, 0}, {0, 0, -1, 1}}});
     };
     verify.template operator()<float>();
     verify.template operator()<double>();
@@ -187,6 +188,61 @@ TEST(MatFactoryTest, PerspectiveOverloadsProduceKnownProjectionAndInvertibleMatr
     const auto inverse = aho::matrix::inverse_gauss_jordan(radians);
     ASSERT_TRUE(inverse);
     expect_identity(radians * *inverse);
+}
+
+template<class T> class MatViewTest : public testing::Test {};
+using ViewScalars = testing::Types<float, double>;
+TYPED_TEST_SUITE(MatViewTest, ViewScalars);
+TYPED_TEST(MatViewTest, ExplicitCoordinateTypePreservesPrecisionAndExistingCameraBasis) {
+    using T = TypeParam;
+    using CI = aho::coordinate::_DefaultCoordinateInfo<vsl::D3>::value;
+    using P = aho::_Point<T, vsl::D3, CI>;
+    using V = aho::_Vector<T, vsl::D3, CI>;
+    const P eye(1, 2, 3), target(1, 2, 2);
+    const V up(0, 2, 0);
+    using ViewFactory = aho::Mat4x4<T>(*)(P, P, V);
+    constexpr ViewFactory factory = &aho::matrix::make_view<T, CI>;
+    const auto view = factory(eye, target, up);
+    static_assert(std::same_as<std::remove_cv_t<decltype(view)>, aho::Mat4x4<T>>);
+    expect_matrix(view, std::array<std::array<double, 4>, 4>{{{-1, 0, 0, 0}, {0, -1, 0, 0}, {0, 0, 1, 0}, {1, 2, -3, 1}}});
+    EXPECT_EQ(eye.value.x.value, 1); EXPECT_EQ(eye.value.y.value, 2); EXPECT_EQ(eye.value.z.value, 3);
+    EXPECT_EQ(up.value.y.value, 2);
+}
+TYPED_TEST(MatViewTest, RotatedCameraMovesEyeToOriginAndTargetToNegativeZ) {
+    using T = TypeParam;
+    using P = aho::_Point<T, vsl::D3>;
+    using V = aho::_Vector<T, vsl::D3>;
+    const auto view = aho::matrix::make_view(P(2, 0, 0), P(0, 0, 0), V(0, 1, 0));
+    const aho::Mat<T, 1, 4> eye(std::array<std::array<T, 4>, 1>{{{2, 0, 0, 1}}});
+    const aho::Mat<T, 1, 4> target(std::array<std::array<T, 4>, 1>{{{0, 0, 0, 1}}});
+    expect_matrix(eye * view, std::array<std::array<double, 4>, 1>{{{0, 0, 0, 1}}});
+    expect_matrix(target * view, std::array<std::array<double, 4>, 1>{{{0, 0, -2, 1}}});
+    expect_matrix(view, std::array<std::array<double, 4>, 4>{{{0, 0, 1, 0}, {0, -1, 0, 0}, {1, 0, 0, 0}, {0, 0, -2, 1}}});
+}
+
+// Preserve the established sample orientation; positive viewport height maps NDC +Y downward.
+TYPED_TEST(MatViewTest, SampleCameraKeepsPositiveXRightAndPositiveZUp) {
+    using T = TypeParam;
+    using P = aho::_Point<T, vsl::D3>;
+    using V = aho::_Vector<T, vsl::D3>;
+    const auto view = aho::matrix::make_view(P(0, 2, 2), P(0, 0, 0), V(0, 0, 1));
+    const auto projection = aho::matrix::make_perspective(aho::Degree{45}, T{1}, T{0.1}, T{10});
+    const auto screen_position = [&](T x, T y, T z) {
+        const aho::Mat<T, 1, 4> point(std::array<std::array<T, 4>, 1>{{{x, y, z, 1}}});
+        const auto clip = point * view * projection;
+        EXPECT_GT(clip[0][3], T{0});
+        return std::array<T, 2>{(clip[0][0] / clip[0][3] + T{1}) / T{2},
+                                (clip[0][1] / clip[0][3] + T{1}) / T{2}};
+    };
+    const auto origin = screen_position(0, 0, 0);
+    const auto positive_x = screen_position(1, 0, 0);
+    const auto positive_z = screen_position(0, 0, 1);
+    EXPECT_EQ(origin[0], T{0.5});
+    EXPECT_EQ(origin[1], T{0.5});
+    EXPECT_GT(positive_x[0], origin[0]);
+    EXPECT_EQ(positive_x[1], origin[1]);
+    EXPECT_EQ(positive_z[0], origin[0]);
+    EXPECT_LT(positive_z[1], origin[1]);
 }
 
 template<class T> class MatInverseTest : public testing::Test {};

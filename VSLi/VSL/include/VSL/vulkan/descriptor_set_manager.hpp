@@ -18,6 +18,12 @@ namespace VSL_NAMESPACE::graphic_resource {
      */
 
     struct ManagerInterface {
+        ManagerInterface() = default;
+        ManagerInterface(const ManagerInterface &) = default;
+        ManagerInterface &operator=(const ManagerInterface &) = default;
+        ManagerInterface(ManagerInterface &&) = default;
+        ManagerInterface &operator=(ManagerInterface &&) = default;
+        virtual ~ManagerInterface() = default;
         // 戻り値のvectorのサイズが同じになることを保証します
         virtual std::tuple<std::vector<Pool>, std::vector<Resource>>
         allocate(std::vector<BindingLayout> layouts) = 0;

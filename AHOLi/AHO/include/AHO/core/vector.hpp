@@ -589,7 +589,7 @@ namespace AHO_NAMESPACE {
 	template<typename R, typename CI>
 	constexpr auto _Vector<R, VSL_NAMESPACE::D2, CI>::length() const
 	{
-		return std::sqrt(std::abs(value.___AN1 * value.___AN1 + value.___AN2 * value.___AN2));
+		return std::hypot(value.___AN1, value.___AN2);
 	}
 
     template<typename R, typename CI>
@@ -739,7 +739,7 @@ namespace AHO_NAMESPACE {
 	template<typename R, typename CI>
 	constexpr auto _Vector<R, VSL_NAMESPACE::D3, CI>::length() const
 	{
-		return std::sqrt(std::abs(value.___AN1 * value.___AN1 + value.___AN2 * value.___AN2 + value.___AN3 * value.___AN3));
+		return std::hypot(value.___AN1, value.___AN2, value.___AN3);
 	}
 
     template<typename R, typename CI>

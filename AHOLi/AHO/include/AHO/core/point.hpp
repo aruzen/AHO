@@ -430,7 +430,7 @@ namespace AHO_NAMESPACE {
 	template<typename R, typename CI>
 	constexpr auto _Point<R, VSL_NAMESPACE::D2, CI>::length() const
 	{
-		return std::sqrt(value.___AN1 * value.___AN1 + value.___AN2 * value.___AN2);
+		return std::hypot(value.___AN1, value.___AN2);
 	}
 
 	// ---------------------------------------------------------------------------------------------------------------------
@@ -528,6 +528,6 @@ namespace AHO_NAMESPACE {
 	template<typename R, typename CI>
 	constexpr auto _Point<R, VSL_NAMESPACE::D3, CI>::length() const
 	{
-		return std::sqrt(value.___AN1 * value.___AN1 + value.___AN2 * value.___AN2 + value.___AN3 * value.___AN3);
+		return std::hypot(value.___AN1, value.___AN2, value.___AN3);
 	}
 }

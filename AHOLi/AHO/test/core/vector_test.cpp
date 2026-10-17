@@ -78,6 +78,34 @@ TYPED_TEST(VectorTest, CompoundOperatorsReturnAndMutateOriginalObject) {
     EXPECT_EQ(&(value *= T{2}), &value); aho_test::expect_coordinates(value, 4, 8, 12);
     EXPECT_EQ(&(value /= T{2}), &value); aho_test::expect_coordinates(value, 2, 4, 6);
 }
+TEST(VectorLengthRangeTest, LargeIntegerCoordinatesHaveFiniteKnownLengths) {
+    const aho::d2::VectorI plane(60000, -80000);
+    const aho::d3::VectorI space(20000, -30000, 60000);
+    EXPECT_DOUBLE_EQ(plane.length(), 100000);
+    EXPECT_DOUBLE_EQ(space.length(), 70000);
+}
+template<class T> class VectorFloatingLengthRangeTest : public testing::Test {};
+using VectorFloatingLengthScalars = testing::Types<float, double>;
+TYPED_TEST_SUITE(VectorFloatingLengthRangeTest, VectorFloatingLengthScalars);
+TYPED_TEST(VectorFloatingLengthRangeTest, LargeAndSmallCoordinatesAvoidIntermediateOverflowAndUnderflow) {
+    using T = TypeParam;
+    // Scaled 3-4-5 and 2-3-6-7 triples need only a few rounded operations.
+    constexpr T tolerance = 32 * std::numeric_limits<T>::epsilon();
+    constexpr T large = static_cast<T>(std::is_same_v<T, float> ? 1e30 : 1e200);
+    constexpr T small = static_cast<T>(std::is_same_v<T, float> ? 1e-30 : 1e-200);
+    for (const T scale : {large, small}) {
+        const aho::_Vector<T, vsl::D2> plane(-T{3} * scale, T{4} * scale);
+        const aho::_Vector<T, vsl::D3> space(T{2} * scale, -T{3} * scale, T{6} * scale);
+        EXPECT_TRUE(std::isfinite(plane.length()));
+        EXPECT_TRUE(std::isfinite(space.length()));
+        EXPECT_GT(plane.length(), 0);
+        EXPECT_GT(space.length(), 0);
+        EXPECT_NEAR(plane.length() / scale, 5, tolerance);
+        EXPECT_NEAR(space.length() / scale, 7, tolerance);
+        EXPECT_NEAR(plane.get_normalized().length(), 1, tolerance);
+        EXPECT_NEAR(space.get_normalized().length(), 1, tolerance);
+    }
+}
 TYPED_TEST(VectorTest, LengthAndLessThanUseMagnitude) {
     using V = typename TypeParam::Vector;
     const auto value = aho_test::geometry<V>(-3, 4, 12);

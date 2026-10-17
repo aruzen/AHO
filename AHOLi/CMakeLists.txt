@@ -14,12 +14,14 @@ add_library(AHOLi
         AHO/src/io/keyboard.cpp
         AHO/src/io/key.cpp
         AHO/src/drawer.cpp
+        AHO/src/image_readback.cpp
         AHO/src/engine.cpp
         AHO/src/resource/image.cpp
         AHO/src/resource/buffer.cpp
         AHO/src/engine/standard_engine.cpp
         AHO/src/engine/graphical_engine.cpp
 
+        AHO/include/AHO/image_readback.hpp
         AHO/include/aho/engine.hpp
         AHO/include/aho/concepts.hpp
         AHO/include/aho/pipeline/layouts.hpp
@@ -59,6 +61,7 @@ add_library(AHOLi
 
 target_include_directories(AHOLi
         PRIVATE
+        ${Vulkan_INCLUDE_DIRS}
         ${Boost_INCLUDE_DIRS}
         "${VSL_HOME}/include" # ~/repos/AHO/VSLi
         "${AHO_HOME}/include"

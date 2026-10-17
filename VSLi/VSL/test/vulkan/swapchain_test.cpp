@@ -1,4 +1,5 @@
 #include "support/window_fixture.hpp"
+#include "support/read_image.hpp"
 namespace {
 using SwapchainWindowIntegrationTest = vsl_test::WindowIntegrationTest;
 TEST_F(SwapchainWindowIntegrationTest, CreatesImagesAndRecreatesUsingOldSwapchain) {
@@ -53,13 +54,13 @@ TEST_F(SwapchainReadbackWindowIntegrationTest, ReadsAcquiredSwapchainImageAndRet
             auto phase=manager.startPhase<vsl::ComputePhase>();
             phase << vsl::command::RenderPassBegin(target,{vsl::ClearColor{1,0,0,1}}) << vsl::command::RenderPassEnd{};
         }
-        auto pixels=vsl::ImageReadback(manager,image,vsl::ImageLayout::General).read();
-        ASSERT_EQ(pixels.bytes.size(),std::size_t(extent.width)*extent.height*4);
-        EXPECT_EQ(pixels.format,chain->getFormat());
-        const bool bgra=pixels.format.type()==vsl::data_format::___FormatTypes::Srgb8BGRA ||
-                         pixels.format.type()==vsl::data_format::___FormatTypes::UnsignedNormalized8BGRA;
-        EXPECT_EQ(pixels.bytes[bgra ? 2 : 0],std::byte{255});
-        EXPECT_EQ(pixels.bytes[1],std::byte{0});
+        auto pixels=vsl_test::read_image(manager,image,vsl::ImageLayout::General);
+        ASSERT_EQ(pixels.size(),std::size_t(extent.width)*extent.height*4);
+        EXPECT_EQ(image.getFormat(),chain->getFormat());
+        const bool bgra=image.getFormat().type()==vsl::data_format::___FormatTypes::Srgb8BGRA ||
+                         image.getFormat().type()==vsl::data_format::___FormatTypes::UnsignedNormalized8BGRA;
+        EXPECT_EQ(pixels[bgra ? 2 : 0],std::byte{255});
+        EXPECT_EQ(pixels[1],std::byte{0});
         chain.reset();
         EXPECT_FALSE(owner.expired());
     }

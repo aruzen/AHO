@@ -2,7 +2,7 @@
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/vulkan/swapchain.hpp>
 #include <VSL/vulkan/image.hpp>
-#include <VSL/vulkan/image_readback.hpp>
+#include <VSL/vulkan/commands/image_readback.hpp>
 #include "image_format.hpp"
 #include <algorithm>
 #include <cstring>
@@ -225,11 +225,23 @@ std::uint32_t IDPickingRenderPass::read(CommandManager manager, FenceHolder inFl
                                         std::uint32_t y) {
     if (!inFlight.wait())
         throw std::runtime_error("Picking render did not complete");
-    auto result = ImageReadback(manager, picking_buffer.at(manager.getCurrentBufferIdx()),
-                                ImageLayout::ColorAttachmentOptimal, {x, y, 1, 1})
-                      .read();
+    auto image = picking_buffer.at(manager.getCurrentBufferIdx());
+    (void)command::ImageReadback::describe(image, ImageLayout::ColorAttachmentOptimal, {x, y, 1, 1});
+    StagingBuffer<MemoryType::TransferDestination> destination(LogicalDeviceAccessor{_data->device}, sizeof(std::uint32_t));
+    auto buffer = manager.makeExclusiveBuffer(1);
+    auto native = buffer._data->commandBuffers.front();
+    auto device = _data->device->device;
+    auto fence = device.createFenceUnique({});
+    native.begin(vk::CommandBufferBeginInfo{});
+    command::ImageReadback(&destination, image, ImageLayout::ColorAttachmentOptimal, {x, y, 1, 1})
+        .invoke(manager.getPool(), buffer, manager);
+    native.end();
+    manager._data->graphicsQueue.submit(vk::SubmitInfo{.commandBufferCount = 1, .pCommandBuffers = &native}, *fence);
+    if (device.waitForFences(*fence, true, UINT64_MAX) != vk::Result::eSuccess)
+        throw std::runtime_error("Picking transfer did not complete");
+    auto mapped = destination.data(sizeof(std::uint32_t));
     std::uint32_t id;
-    std::memcpy(&id, result.bytes.data(), sizeof(id));
+    std::memcpy(&id, mapped.data, sizeof(id));
     return id;
 }
 _impl::RenderPass_impl::~RenderPass_impl() {

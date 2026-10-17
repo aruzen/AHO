@@ -35,8 +35,12 @@ if (AHO_TEST_SOURCES)
             window_test.cpp
             pipeline/layouts_test.cpp
             drawer/draw_phase_test.cpp
+            image_readback_test.cpp
     )
-    target_compile_definitions(aho-gpu-test PRIVATE AHO_GPU_TESTS=1)
+    target_compile_definitions(aho-gpu-test PRIVATE AHO_GPU_TESTS=1
+            VSL_TEST_SHADER_DIR="${CMAKE_BINARY_DIR}/VSLi/VSL/test/shaders")
+    target_include_directories(aho-gpu-test PRIVATE "${VSL_HOME}/test")
+    add_dependencies(aho-gpu-test vsl-test-shaders)
     target_include_directories(aho-gpu-test PRIVATE "$<TARGET_PROPERTY:aho-test,INCLUDE_DIRECTORIES>")
     target_link_libraries(aho-gpu-test PRIVATE AHOLi VSL GTest::gtest_main)
     target_link_directories(aho-gpu-test PRIVATE ${GLFW_LIBRARY_DIRS})

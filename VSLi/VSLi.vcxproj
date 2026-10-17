@@ -193,7 +193,7 @@
     <ClInclude Include="VSL\include\VSL\vulkan\device.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\frame_buffer.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\image.hpp" />
-    <ClInclude Include="VSL\include\VSL\vulkan\image_readback.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\image_readback.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\phase.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\pipeline.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\pipeline_layout.hpp" />
@@ -253,7 +253,7 @@
     <ClCompile Include="VSL\src\vulkan\device.cpp" />
     <ClCompile Include="VSL\src\vulkan\frame_buffer.cpp" />
     <ClCompile Include="VSL\src\vulkan\image.cpp" />
-    <ClCompile Include="VSL\src\vulkan\image_readback.cpp" />
+    <ClCompile Include="VSL\src\vulkan\commands\image_readback.cpp" />
     <ClCompile Include="VSL\src\vulkan\phase.cpp" />
     <ClCompile Include="VSL\src\vulkan\pipeline.cpp" />
     <ClCompile Include="VSL\src\vulkan\pipeline_layout.cpp" />

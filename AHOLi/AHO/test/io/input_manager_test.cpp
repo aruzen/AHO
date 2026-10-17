@@ -30,6 +30,19 @@ template<class T> struct TypedPassiveInput {
     TypedPassiveInput(void* context, T value) : context(context), value(value) {}
     T state() const { return value; }
 };
+struct UpdatingGroup : aho::input::abstract::Adaptable, aho::input::abstract::Updatable {
+    void* context;
+    aho::InputManager* manager;
+    std::shared_ptr<Counter> child;
+    int updates = 0;
+    UpdatingGroup(void* context, aho::InputManager& manager, int initial)
+        : context(context), manager(&manager), child(manager.get<Counter>(initial)) {}
+    void update() override { ++updates; }
+};
+template<class T> struct TypedUpdatingGroup : UpdatingGroup {
+    TypedUpdatingGroup(void* context, aho::InputManager& manager, T initial)
+        : UpdatingGroup(context, manager, initial) {}
+};
 using InputManagerTest = aho_test::InputBackendTest;
 TEST_F(InputManagerTest, ConstructorsPreserveRawAndVslWindowHandles) {
     aho::InputManager raw(window.handle());
@@ -127,4 +140,38 @@ TEST_F(InputManagerTest, TemplatePassiveInputsForwardTheirArgumentsWithoutUpdate
     manager.update();
     EXPECT_DOUBLE_EQ(input->state(), 2.5);
 }
+TEST_F(InputManagerTest, AdaptableUpdatableInputsRegisterBothGroupAndChildrenExactlyOnce) {
+    aho::InputManager manager(window.handle());
+    auto group = manager.get<UpdatingGroup>(7);
+    EXPECT_EQ(group->context, window.handle());
+    EXPECT_EQ(group->manager, &manager);
+    EXPECT_EQ(manager.update_targets.size(), 2u);
+    manager.update();
+    EXPECT_EQ(group->updates, 1);
+    EXPECT_EQ(group->child->state(), 8);
+    EXPECT_TRUE(static_cast<bool>(manager));
+    EXPECT_EQ(group->updates, 2);
+    EXPECT_EQ(group->child->state(), 9);
+    group.reset();
+    manager.update();
+    EXPECT_TRUE(manager.update_targets.empty());
+}
+TEST_F(InputManagerTest, TemplateAdaptableUpdatableInputsKeepIndependentChildLifetimes) {
+    aho::InputManager manager(window.handle());
+    auto group = manager.get<TypedUpdatingGroup>(3);
+    static_assert(std::same_as<decltype(group), std::shared_ptr<TypedUpdatingGroup<int>>>);
+    EXPECT_EQ(group->context, window.handle());
+    EXPECT_EQ(group->manager, &manager);
+    EXPECT_EQ(manager.update_targets.size(), 2u);
+    const auto child = group->child;
+    manager.update();
+    EXPECT_EQ(group->updates, 1);
+    EXPECT_EQ(child->state(), 4);
+    group.reset();
+    manager.update();
+    ASSERT_EQ(manager.update_targets.size(), 1u);
+    EXPECT_EQ(manager.update_targets[0].lock().get(), child.get());
+    EXPECT_EQ(child->state(), 5);
+}
+
 }

@@ -44,6 +44,7 @@ class VulkanIntegrationTest : public testing::Test {
 
   protected:
     virtual bool validate_vulkan() const { return false; }
+    virtual bool require_timeline_semaphore() const { return false; }
     std::shared_ptr<vsl::_impl::Vulkan_impl<false>> instance;
     vsl::PhysicalDevice physical{std::shared_ptr<vsl::_impl::PhysicalDevice_impl>{}};
     vsl::LogicalDeviceAccessor device;
@@ -146,6 +147,23 @@ class VulkanIntegrationTest : public testing::Test {
             for (const auto *name : {"VK_KHR_portability_subset", "VK_KHR_swapchain"})
                 if (std::strcmp(extension.extensionName, name) == 0)
                     device_extensions.push_back(name);
+        VkPhysicalDeviceTimelineSemaphoreFeatures timeline{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES};
+        if (require_timeline_semaphore()) {
+            const auto available = selected.enumerateDeviceExtensionProperties();
+            if (!std::ranges::any_of(available, [](const auto &extension) {
+                    return std::strcmp(extension.extensionName, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME) == 0;
+                }))
+                GTEST_SKIP() << "Timeline semaphore extension unavailable";
+            auto get_features = reinterpret_cast<PFN_vkGetPhysicalDeviceFeatures2KHR>(
+                vkGetInstanceProcAddr(raw_instance, "vkGetPhysicalDeviceFeatures2KHR"));
+            ASSERT_NE(get_features, nullptr);
+            VkPhysicalDeviceFeatures2 query{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+            query.pNext = &timeline;
+            get_features(selected, &query);
+            if (!timeline.timelineSemaphore)
+                GTEST_SKIP() << "Timeline semaphore feature unavailable";
+            device_extensions.push_back(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
+        }
         const float priority = 1.0f;
         vk::DeviceQueueCreateInfo queue_info{};
         queue_info.queueFamilyIndex = queue_family;
@@ -155,6 +173,8 @@ class VulkanIntegrationTest : public testing::Test {
         features.samplerAnisotropy = physical._data->features->samplerAnisotropy;
         features.independentBlend = physical._data->features->independentBlend;
         vk::DeviceCreateInfo device_info{};
+        if (require_timeline_semaphore())
+            device_info.pNext = &timeline;
         device_info.queueCreateInfoCount = 1;
         device_info.pQueueCreateInfos = &queue_info;
         device_info.enabledExtensionCount = static_cast<std::uint32_t>(device_extensions.size());

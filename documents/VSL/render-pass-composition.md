@@ -13,7 +13,8 @@
 | FrameBuffer | Attachmentに実画像と幅・高さ・レイヤー数を結び付け、画像とRenderPassを共有保持する。 |
 | RenderPassBegin | 今回の対象index、描画領域、Attachmentごとの型別clearを指定する。 |
 | GraphicsPipeline | subpass番号、カラー出力ごとのblend/write mask、深度・stencil、sample数を指定する。 |
-| ImageReadback | 指定領域・レイヤーを非同期転送し、完了待ちとCPUデータ取得を提供する。 |
+| vsl::command::ImageReadback | 指定領域・レイヤーの転送、host可視性、layout復帰を記録する。送信・CPU待機・リソース確保は行わない。 |
+| aho::ImageReadback | VSLコマンドを送信し、転送リソースを再利用する便利クラス。完了待ち・CPUデータ取得も担当。 |
 
 IDの割当、画像の確保・リサイズ、PNG等への保存、UI操作は利用側の責任とする。
 
@@ -70,37 +71,71 @@ clear値はClearColor/ClearInt/ClearUint/ClearDepthStencilのvariant。省略時
 - dependenciesでstage/accessとsubpass番号を明示できる。既定はexternal→0と0→externalの保守的な依存関係。複数subpassでは間の依存関係と、最後のsubpass→externalを追加する。
 - 構造上の整合は検証するが、Vulkanのすべてのvalid usage、formatやfeatureのGPU対応確認を代替しない。
 
-## スクショとIDの共通読み戻し
+## AHOの再利用可能な読み戻し
 
-producerを同じmanagerのgraphics queueへ送信してから、実際の現在layoutを渡す。
+`aho::ImageReadback` を描画ループの外で1つ作り、producerを同じmanagerのgraphics queueへ送信してからcaptureする。captureには実際の現在layoutを渡す。
 
 ```cpp
-ImageReadback screenshot(manager, color, ImageLayout::General);
-// コンストラクターは専用の転送処理を送信し、CPUの完了待ちはしない。
-if (screenshot.ready()) {
-    ImagePixels pixels = screenshot.read();
+#include <AHO/image_readback.hpp>
+
+aho::ImageReadback reader(manager); // CommandPool/CommandBuffer/Fenceはここで一度作る。
+aho::ImagePixels pixels;
+// 描画ループ内。以前の結果を先に回収してから、今回のコピーを要求する。
+if (reader.ready()) {
+    reader.read(pixels); // CPU側vectorの容量も再利用する。
 }
-// 必要な時点で完了を待ち、CPU所有のbyte列を取得する。
-ImagePixels pixels = screenshot.read();
+if (!reader.capture(color, ImageLayout::General)) {
+    // 前の転送が進行中。このフレームの要求は受理されていない。
+}
+// 必要なタイミングで、最新の受理済み転送の完了を待って読むこともできる。
+pixels = reader.read();
 // pixels.width / height / format / rowStride / bytes
 
-ImageReadback picking(manager, ids, ImageLayout::General, {x, y, 1, 1});
-auto pixel = picking.read();
-std::uint32_t id;
-std::memcpy(&id, pixel.bytes.data(), sizeof(id));
+// 同じworkerを部分領域や整数ID画像にも使える。
+if (reader.capture(ids, ImageLayout::General, {x, y, 1, 1})) {
+    reader.read(pixels);
+    std::uint32_t id;
+    std::memcpy(&id, pixels.bytes.data(), sizeof(id));
+}
 ```
 
 - 元画像にはTransferSrc usageが必要。非圧縮カラーformatのmip 0、指定した1レイヤー、sample数1が対象。深度、サイズを解決できないformat、MSAA画像そのものは拒否する。
 - `ImageRegion{x,y,width,height,layer}` を指定する。領域省略は全画面、layer省略は0。範囲外や片方だけ0の寸法は拒否する。
-- 要求は専用CommandPool/CommandBuffer/Fence/host-visible bufferと元画像を保持する。描画記録中のCommandBufferをresetしない。ハンドルのコピーは同じ要求を共有し、完了後は繰り返しreadできる。
-- 元layout→TransferSrc→元layoutの遷移と転送→hostの可視性を設定する。non-coherentメモリーでは割当全体をmapしてinvalidateする。
-- wait(timeout_ns)はタイムアウトでfalse、read(timeout_ns)は例外。最後の要求を完了前に破棄すると、安全な解放のため待機する。
-- bytesはnative formatの順序・色空間のまま行間paddingなし。rowStrideはバイト単位。BGRA→RGBA、上下反転、色空間変換、画像エンコードは利用側で行う。
-- 別queueとのSemaphore/所有権移譲、queueへの並行CPUアクセス、同じ要求への並行read/mapは利用側で同期する。未送信のproducerの結果は取得できない。
+- 同時に進行できる転送は1件。captureは進行中ならfalseを返し、待機や結果の上書きを行わない。完了済みの結果は次のcapture受理まで繰り返しreadできる。コピーしたworkerハンドルも同じ状態を共有する。
+- CommandPool/CommandBuffer/Fenceを再利用する。host-visible bufferは必要容量が増えたときだけ再確保する。constructorのinitialCapacityで先に容量を用意でき、capacity()で現在の容量を取得できる。
+- mapはbuffer確保時に行い、再確保か破棄まで維持する。non-coherentメモリーは完了後に必要範囲をatom境界へ切り上げてinvalidateする。read(destination)はCPU側vectorの容量も再利用する。
+- source画像は転送完了まで保持する。描画記録中のmanagerのCommandBufferをresetしない。最後のworkerハンドルを破棄するときは、進行中の自分の転送完了を待って解放する。
+- captureはCPUのGPU完了待ちを行わない。wait(timeout_ns)はタイムアウトでfalse、read(timeout_ns)は例外。未captureのreadyはfalse、wait/readは例外。
+- bytesはnative formatの順序・色空間のまま行間paddingなし。BGRA→RGBA、上下反転、色空間変換、画像エンコードは利用側で行う。
+- queueへの並行CPUアクセス、別queueとのSemaphore/所有権移譲、同じworkerへの並行アクセスは利用側で同期する。未送信producerの結果は取得できない。
+
+## VSLの読み戻しコマンド
+
+描画と同じPhaseへ記録する場合は `vsl::command::ImageReadback` を使う。既存の `ChangeImageBarrier` と `CopyImageToBuffer` をまとめ、layout遷移・領域転送・host可視性・元layoutへの復帰だけを記録する。リソース確保・queueへの送信・CPU待機は行わない。必要なら既存2コマンドを個別に使える。
+
+```cpp
+#include <VSL/vulkan/commands/image_readback.hpp>
+
+// completionFenceはmanagerの各bufferに対応し、初回はsignal済みで用意する。
+StagingBuffer<MemoryType::TransferDestination> destination(
+    device, std::size_t(width) * height * color.getFormat().size());
+{
+    auto phase = manager.startPhase<ComputePhase>(
+        std::nullopt, std::nullopt, completionFence);
+    // colorへの描画とRenderPassEndまでを、このPhase内で記録する。
+    phase << command::ImageReadback(&destination, color, ImageLayout::General);
+}
+if (!completionFence.wait(manager.getCurrentBufferIdx(), UINT64_MAX))
+    throw std::runtime_error("Image transfer did not complete");
+auto mapped = destination.data();
+// mappedの寿命中はmapを維持する。画像・bufferもGPU完了まで保持する。
+```
+
+`ImageReadback::describe(image, layout, region)` は正規化済み領域・format・rowStride・byteSizeを返す。CopyImageToBufferにもdescribeがあり、転送先を確保する前に必要容量を取得できる。AHOもこの情報とVSLコマンドを使用する。VSLはAHOへ依存しない。
 
 ## 既存commandによる読み戻し
 
-描画と同じPhaseで転送を記録する場合は、既存の `ChangeImageBarrier` と `CopyImageToBuffer` を組み合わせる。専用のコマンド型は追加しない。`ImageReadback` も内部ではこの組合せを使い、バッファ確保・専用CommandBuffer・送信・完了待ち・non-coherent invalidateをまとめて引き受ける。
+下位の転送・バリア制御が必要な場合は、既存の `ChangeImageBarrier` と `CopyImageToBuffer` を個別に組み合わせられる。
 
 ```cpp
 #include <VSL/vulkan/commands/change_image_barrier.hpp>
@@ -143,7 +178,7 @@ Swapchain末尾のusage引数に `ImageType::ColorAttachment | ImageType::Transf
 - IDPickingRenderPass/IDPickingRenderPassBegin/pl::IDPickingは共通実装へ委譲する互換ラッパー。新しい用途では追加不要。
 - 新FrameBufferは1対象でBeginのindexは既定0。旧一括FrameBufferでも新BeginのtargetIndexで取得画像を明示できる。旧Beginの自動選択は従来のフレーム番号を維持する。既知のフレーム/取得画像番号の全面整理は今回の範囲外。
 - FrameBufferは画像とRenderPassを保持する。借用Swapchain画像はSwapchainとSurfaceを保持する。描画送信後のFrameBuffer/Pipeline等は利用側がGPU完了まで保持する。
-- ImageReadbackが保持するのは転送に必要なリソースであり、描画リソース全体のGPU寿命管理を代替しない。
+- aho::ImageReadbackが保持するのは転送に必要なリソースであり、描画リソース全体のGPU寿命管理を代替しない。
 - リサイズは利用側で新画像とFrameBufferを作る。同じformat/sample構成ならRenderPassを再利用できる。旧リソースはGPU利用完了後に解放する。
 
 ## 検証対象
@@ -171,9 +206,29 @@ build-vsl-abstraction/VSLi/VSL/test/vsl-test
 ctest --test-dir build-vsl-abstraction --output-on-failure -R '^VSL\.'
 ```
 
-## 2026-10-18 既存commandへの委譲後の検証
+## 2026-10-18 既存commandへの委譲時の検証（AHO移行前）
 
 - `vsl-tests` の再ビルドが成功。VSL全体189件成功、失敗0、skip 0。既知不具合26件はDISABLEDを維持。
 - `ChangeImageBarrier` / `CopyImageToBuffer` / `ImageReadback` / 実Swapchain読み戻しの関連18件で、Validation Layerのerrorを捕捉して成功。
 - 描画と同じPhase内での領域読み戻し、異なる内容を持つ配列レイヤーの選択、他レイヤーのlayout維持、転送先容量と範囲外の拒否を追加検証。
 - 関連4ヘッダーの単独includeコンパイルが成功。読み戻しの専用CommandBufferもGPU完了後に解放してから専用poolを破棄する。
+
+## 2026-10-18 AHOへの移動とリソース再利用の検証
+
+- `build-tests` が成功。VSL 182件とAHO読み戻し13件、新AHOヘッダーの単独include 1件の計196件が成功。失敗0、環境skip 0。既存のVSL不具合26件はDISABLEDを維持する。
+- 読み戻しの10件をVSLからAHOへ移し、再利用・容量拡張・busy拒否の3件と、VSLコマンド専用の3件を追加した。AHOの13件とVSLコマンド3件はValidation Layerのerrorを捕捉する。
+- 24フレームと部分領域1回の取得を通して、Vulkan呼出しを一時的に計数。転送先buffer作成1回、Fence作成1回、map 1回。CommandPool作成・CommandBuffer割当は各2回で、描画managerの初期化1回とreadbackの初期化1回に対応する。各captureでの作り直しはない。
+- busy拒否はTimeline Semaphoreで前の転送を確実に進行中へ保ち、capture=false、wait(0)=false、元の結果が保持されることを実GPUで確認した。
+- AHOとVSLでVulkan SDK 1.4.309.0のヘッダーを統一した。AHOがHomebrew側の別バージョンを先に参照する設定では、Vulkan-Hppのheader version assertionが発生していた。
+- 新AHO/VSLヘッダー4件の単独includeと、CMake/Visual Studioプロジェクトの参照先を確認した。AHO全体の既知の描画フェーズ問題の解消は、この結果に含めない。
+
+### 毎回作成と再利用の時間比較
+
+Apple M1 / MoltenVK、ライブラリーはDebug、計測コードは-O2。30回warmup後、1pxは各2000回、1080p RGBA8は各200回を計測。前後の順を交互に変えた5組の中央値。両方でCPU側ImagePixelsのvector容量を再利用し、GPU側リソースの使い方を比較した。
+
+| 対象 | 毎回作成: 準備〜submit | 再利用: 準備〜submit | 毎回作成: 読取り完了まで | 再利用: 読取り完了まで |
+| --- | ---: | ---: | ---: | ---: |
+| 1px | 23.0 µs | 14.4 µs | 192 µs | 165 µs |
+| 1920×1080 | 34.6 µs | 17.3 µs | 1.58 ms | 0.76 ms |
+
+GPU timestampによる純粋な転送時間ではなく、待機・CPUコピー・毎回作成側の後始末も含む。Releaseや他GPUで同じ比率になるという保証ではない。AHOのcaptureは追加submitを1回行う。既存Phaseへ送信を統合する用途ではVSLコマンドを直接使う。

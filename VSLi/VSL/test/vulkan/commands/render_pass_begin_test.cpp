@@ -1,4 +1,5 @@
 #include "support/render_fixture.hpp"
+#include "support/read_image.hpp"
 namespace {
 using RenderPassBeginVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
 TEST_F(RenderPassBeginVulkanIntegrationTest, RetainsPassAndFramebufferAndClearsBlack) {
@@ -23,10 +24,10 @@ TEST_F(RenderPassBeginVulkanIntegrationTest, ChecksClearTypesCountsRenderAreaAnd
         phase << vsl::command::RenderPassBegin(*framebuffer, {vsl::ClearColor{1, 0, 0, 1}})
               << vsl::command::RenderPassEnd{};
     }
-    auto pixels = vsl::ImageReadback(manager, *color, vsl::ImageLayout::General).read();
-    ASSERT_EQ(pixels.bytes.size(), 8u * 8u * 4u);
-    EXPECT_EQ(pixels.bytes[0], std::byte{255});
-    EXPECT_EQ(pixels.bytes[1], std::byte{0});
-    EXPECT_EQ(pixels.bytes[3], std::byte{255});
+    auto pixels = vsl_test::read_image(manager, *color, vsl::ImageLayout::General);
+    ASSERT_EQ(pixels.size(), 8u * 8u * 4u);
+    EXPECT_EQ(pixels[0], std::byte{255});
+    EXPECT_EQ(pixels[1], std::byte{0});
+    EXPECT_EQ(pixels[3], std::byte{255});
 }
 } // namespace

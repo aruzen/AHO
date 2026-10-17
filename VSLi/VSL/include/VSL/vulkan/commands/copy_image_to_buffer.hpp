@@ -16,6 +16,12 @@
 #include "../buffer.hpp"
 
 namespace VSL_NAMESPACE::command {
+    struct ImageCopyInfo {
+        ImageRegion region;
+        data_format::___Format format = data_format::Undefined;
+        std::size_t rowStride = 0, byteSize = 0;
+    };
+
     struct CopyImageToBuffer : public __Command {
         CopyImageToBuffer(BufferAccessor *buffer, ImageAccessor image);
         // Records a tightly packed mip-0 copy at buffer offset zero. No submit or CPU wait.
@@ -37,6 +43,8 @@ namespace VSL_NAMESPACE::command {
         ImageRegion region;
         bool hostRead = false;
 
+        static ImageCopyInfo describe(ImageAccessor image, ImageRegion region = {});
+        ImageCopyInfo description() const;
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
 
     private:

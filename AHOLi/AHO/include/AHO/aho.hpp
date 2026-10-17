@@ -6,6 +6,7 @@
 #define AHO_ALL_AHO_HPP
 
 #include "define.hpp"
+#include "image_readback.hpp"
 #include "concepts.hpp"
 #include "core/collision.hpp"
 #include "core/index.hpp"

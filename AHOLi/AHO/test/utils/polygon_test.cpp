@@ -5,8 +5,9 @@
 struct LinesObject {
     using element_type = double; using dimension = vsl::D2;
     using coordinate_info = aho::coordinate::_DefaultCoordinateInfo<dimension>::value;
-    auto lines() { return std::array<aho::Line<double, vsl::D2>, 1>{aho::Line<double, vsl::D2>(aho::d2::PointD(0, 0), aho::d2::PointD(3, 4))}; }
-    auto points() { return std::array<aho::d2::PointD, 2>{}; }
+    int points_calls = 0, lines_calls = 0;
+    auto lines() { ++lines_calls; return std::array<aho::Line<double, vsl::D2>, 1>{aho::Line<double, vsl::D2>(aho::d2::PointD(0, 0), aho::d2::PointD(3, 4))}; }
+    auto points() { ++points_calls; return std::array<aho::d2::PointD, 2>{}; }
 };
 TEST(PolygonContractTest, CompositeLineViewUsesLinesRatherThanPoints) {
     LinesObject value;
@@ -14,13 +15,15 @@ TEST(PolygonContractTest, CompositeLineViewUsesLinesRatherThanPoints) {
     static_assert(std::same_as<std::ranges::range_value_t<decltype(result)>, aho::Line<double, vsl::D2>>);
     ASSERT_EQ(std::ranges::distance(result), 1);
     EXPECT_DOUBLE_EQ(result.begin()->length(), 5);
+    EXPECT_EQ(value.lines_calls, 1); EXPECT_EQ(value.points_calls, 0);
 }
 #elif defined(AHO_CONTRACT_POLYGON_TRIANGLES_VIEW)
 struct TrianglesObject {
     using element_type = double; using dimension = vsl::D2;
     using coordinate_info = aho::coordinate::_DefaultCoordinateInfo<dimension>::value;
-    auto triangles() { return std::array<aho::Triangle<double, vsl::D2>, 1>{aho::Triangle<double, vsl::D2>(aho::d2::PointD(0, 0), aho::d2::PointD(3, 0), aho::d2::PointD(0, 4))}; }
-    auto points() { return std::array<aho::d2::PointD, 3>{}; }
+    int points_calls = 0, triangles_calls = 0;
+    auto triangles() { ++triangles_calls; return std::array<aho::Triangle<double, vsl::D2>, 1>{aho::Triangle<double, vsl::D2>(aho::d2::PointD(0, 0), aho::d2::PointD(3, 0), aho::d2::PointD(0, 4))}; }
+    auto points() { ++points_calls; return std::array<aho::d2::PointD, 3>{}; }
 };
 TEST(PolygonContractTest, CompositeTriangleViewUsesTrianglesRatherThanPoints) {
     TrianglesObject value;
@@ -28,6 +31,7 @@ TEST(PolygonContractTest, CompositeTriangleViewUsesTrianglesRatherThanPoints) {
     static_assert(std::same_as<std::ranges::range_value_t<decltype(result)>, aho::Triangle<double, vsl::D2>>);
     ASSERT_EQ(std::ranges::distance(result), 1);
     EXPECT_DOUBLE_EQ(result.begin()->area(), 6);
+    EXPECT_EQ(value.triangles_calls, 1); EXPECT_EQ(value.points_calls, 0);
 }
 #else
 #include "../support/geometry.hpp"
@@ -69,5 +73,20 @@ TEST(PolygonConceptsTest, UnrelatedTypesWithMatchingAliasesAreNotGeometricObject
     EXPECT_FALSE(aho::concepts::is_triangle<PretendShape>);
     EXPECT_FALSE(aho::concepts::points_view_able<PretendShape>);
 }
+TEST(PolygonViewsTest, CompositeViewsSupportEmptyCollectionsWithoutPointViews) {
+    struct LinesOnly {
+        using element_type = double; using dimension = vsl::D2;
+        using coordinate_info = aho::coordinate::_DefaultCoordinateInfo<dimension>::value;
+        auto lines() { return std::array<aho::Line<double, vsl::D2>, 0>{}; }
+    } lines;
+    struct TrianglesOnly {
+        using element_type = double; using dimension = vsl::D2;
+        using coordinate_info = aho::coordinate::_DefaultCoordinateInfo<dimension>::value;
+        auto triangles() { return std::array<aho::Triangle<double, vsl::D2>, 0>{}; }
+    } triangles;
+    EXPECT_TRUE(aho::views::lines(lines).empty());
+    EXPECT_TRUE(aho::views::triangles(triangles).empty());
+}
+
 }
 #endif

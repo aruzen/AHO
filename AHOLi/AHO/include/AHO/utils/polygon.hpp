@@ -16,16 +16,16 @@ namespace AHO_NAMESPACE {
 
 		template<typename T>
 		concept is_line = requires(T t) {
-            { _have_elment_dimension<T> };
-            { std::convertible_to<Line<typename std::remove_cvref_t<T>::element_type, typename std::remove_cvref_t<T>::dimension, typename std::remove_cvref_t<T>::coordinate_info>,
-                                std::remove_cvref_t<T>> };
+            requires _have_elment_dimension<std::remove_cvref_t<T>>;
+            requires std::convertible_to<Line<typename std::remove_cvref_t<T>::element_type, typename std::remove_cvref_t<T>::dimension, typename std::remove_cvref_t<T>::coordinate_info>,
+                                std::remove_cvref_t<T>>;
 		};
 
 		template<typename T>
 		concept is_triangle = requires(T t) {
-            { _have_elment_dimension<T> };
-            { std::convertible_to<Triangle<typename std::remove_cvref_t<T>::element_type, typename std::remove_cvref_t<T>::dimension, typename std::remove_cvref_t<T>::coordinate_info>,
-                                std::remove_cvref_t<T>>};
+            requires _have_elment_dimension<std::remove_cvref_t<T>>;
+            requires std::convertible_to<Triangle<typename std::remove_cvref_t<T>::element_type, typename std::remove_cvref_t<T>::dimension, typename std::remove_cvref_t<T>::coordinate_info>,
+                                std::remove_cvref_t<T>>;
 		};
 
 		template<typename T>
@@ -130,7 +130,7 @@ namespace AHO_NAMESPACE {
             else if constexpr (concepts::is_lines_object<PureT>) {
                 return cast<Line<typename PureT::element_type,
                         typename PureT::dimension,
-                        typename PureT::coordinate_info>>(t.points());
+                        typename PureT::coordinate_info>>(t.lines());
             }
         }
 
@@ -144,7 +144,7 @@ namespace AHO_NAMESPACE {
             else if constexpr (concepts::is_triangles_object<PureT>) {
                 return cast<Triangle<typename PureT::element_type,
                         typename PureT::dimension,
-                        typename PureT::coordinate_info>>(t.points());
+                        typename PureT::coordinate_info>>(t.triangles());
             }
         }
 	}

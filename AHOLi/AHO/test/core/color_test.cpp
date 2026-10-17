@@ -152,6 +152,46 @@ TEST(ColorConversionTest, IntegerChannelsUseFullRangeAndRoundBackToBytes) {
     const auto result = source.rgb<std::uint8_t>();
     EXPECT_EQ(result.r.value, 0); EXPECT_EQ(result.g.value, 255); EXPECT_EQ(result.b.value, 0);
 }
+template<class H, class SV> struct HsvaArithmeticCase { using Color = aho::color::HSVA<H, SV>; using Hue = H; using Channel = SV; };
+using HsvaArithmeticTypes = testing::Types<HsvaArithmeticCase<short, std::int8_t>, HsvaArithmeticCase<int, int>,
+    HsvaArithmeticCase<float, float>, HsvaArithmeticCase<double, double>, HsvaArithmeticCase<short, float>>;
+template<class T> class HsvaArithmeticTest : public testing::Test {};
+TYPED_TEST_SUITE(HsvaArithmeticTest, HsvaArithmeticTypes);
+TYPED_TEST(HsvaArithmeticTest, AlphaCombinesWithHsvaAndStaysUnchangedWithHsv) {
+    using C = typename TypeParam::Color;
+    using Base = aho::color::HSV<typename TypeParam::Hue, typename TypeParam::Channel>;
+    const C source(120, 12, 24, 8), delta(30, 1, 2, 3);
+    const Base base(30, 1, 2);
+    static_assert(std::same_as<decltype(source + delta), C>);
+    aho_test::expect_hsva(source + delta, 150, 13, 26, 11);
+    aho_test::expect_hsva(source - delta, 90, 11, 22, 5);
+    aho_test::expect_hsva(source + base, 150, 13, 26, 8);
+    aho_test::expect_hsva(source - base, 90, 11, 22, 8);
+    auto changed = source;
+    EXPECT_EQ(&(changed += delta), &changed); aho_test::expect_hsva(changed, 150, 13, 26, 11);
+    EXPECT_EQ(&(changed -= delta), &changed); aho_test::expect_hsva(changed, 120, 12, 24, 8);
+    EXPECT_EQ(&(changed += base), &changed); aho_test::expect_hsva(changed, 150, 13, 26, 8);
+    EXPECT_EQ(&(changed -= base), &changed); aho_test::expect_hsva(changed, 120, 12, 24, 8);
+    changed += changed; aho_test::expect_hsva(changed, 240, 24, 48, 16);
+    changed -= changed; aho_test::expect_hsva(changed, 0, 0, 0, 0);
+    aho_test::expect_hsva(source, 120, 12, 24, 8);
+}
+TYPED_TEST(HsvaArithmeticTest, IndividualChannelArithmeticKeepsTheOtherComponents) {
+    using namespace aho::color;
+    using H = typename TypeParam::Hue;
+    using SV = typename TypeParam::Channel;
+    const typename TypeParam::Color source(120, 12, 24, 8);
+    aho_test::expect_hsva(source + aho::color::H<H>(10), 130, 12, 24, 8);
+    aho_test::expect_hsva(source - aho::color::H<H>(10), 110, 12, 24, 8);
+    aho_test::expect_hsva(source + S<SV>(2), 120, 14, 24, 8);
+    aho_test::expect_hsva(source - S<SV>(2), 120, 10, 24, 8);
+    aho_test::expect_hsva(source + V<SV>(3), 120, 12, 27, 8);
+    aho_test::expect_hsva(source - V<SV>(3), 120, 12, 21, 8);
+    aho_test::expect_hsva(source + A<SV>(3), 120, 12, 24, 11);
+    aho_test::expect_hsva(source - A<SV>(3), 120, 12, 24, 5);
+}
+constexpr auto constexpr_hsva_sum = aho::color::HSVA<int>(1, 2, 3, 4) + aho::color::HSVA<int>(3, 2, 1, 0);
+static_assert(constexpr_hsva_sum.h.value == 4 && constexpr_hsva_sum.s.value == 4 && constexpr_hsva_sum.v.value == 4 && constexpr_hsva_sum.a.value == 4);
 TEST(ColorConstructionTest, AllColorSpacesPreserveChannelsIncludingAlpha) {
     const aho::color::RGB<int> rgb(1, 2, 3);
     EXPECT_EQ(rgb.r.value, 1); EXPECT_EQ(rgb.g.value, 2); EXPECT_EQ(rgb.b.value, 3);

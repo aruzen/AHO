@@ -1,6 +1,7 @@
 #pragma once
 #include "../define.hpp"
 #include "buffer_and_image_accessor.hpp"
+#include "image_readback.hpp"
 
 #include <compare>
 
@@ -289,6 +290,18 @@ namespace VSL_NAMESPACE::_impl {
 		vk::Format format;
 
         ~Image_impl();
+    };
+
+    struct ImageReadback_impl {
+        std::shared_ptr<LogicalDevice_impl> device;
+        std::shared_ptr<Image_impl> source;
+        std::shared_ptr<Buffer_impl> buffer;
+        vk::CommandPool pool;
+        vk::Fence fence;
+        bool submitted = false, coherent = false;
+        ImagePixels pixels;
+
+        ~ImageReadback_impl();
     };
 
     struct Sampler_impl {

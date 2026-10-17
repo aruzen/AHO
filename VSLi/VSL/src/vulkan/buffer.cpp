@@ -54,7 +54,7 @@ bool VSL_NAMESPACE::BufferAccessor::copyByBuffer(CommandManager commandManager, 
     commandManager._data->graphicsQueue.submit({submitInfo});
     commandManager._data->graphicsQueue.waitIdle();
 
-    return false;
+    return true;
 }
 
 bool vsl::BufferAccessor::copyByImage(CommandManager manager, const vsl::ImageAccessor& image) {

@@ -125,14 +125,25 @@ TEST_F(BufferVulkanIntegrationTest, UncheckedSingleValueAndMappedHolderCopiesRet
         buffer.flush(mapped);
     }
 }
-TEST_F(BufferVulkanIntegrationTest, DISABLED_SuccessfulBufferTransferReturnsTrue) {
+TEST_F(BufferVulkanIntegrationTest, SuccessfulBufferTransferReturnsTrue) {
     std::array<std::uint32_t, 2> expected{47, 53};
     HostBuffer source(device, expected), destination(device, sizeof(expected));
     auto manager = make_manager();
     EXPECT_TRUE(destination.copyByBuffer(manager, &source));
+    {
+        auto phase = manager.startPhase<vsl::ComputePhase>();
+        vk::MemoryBarrier host_visibility{};
+        host_visibility.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+        host_visibility.dstAccessMask = vk::AccessFlagBits::eHostRead;
+        auto commands = manager.getBuffer();
+        commands._data->commandBuffers[commands.getCurrentBufferIdx()].pipelineBarrier(
+            vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, host_visibility, {}, {});
+    }
+    device._data->device.waitIdle();
     auto mapped = destination.data(sizeof(expected));
     EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
     EXPECT_TRUE(mapped.copyByBuffer(manager, &source));
+    EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
 }
 TEST(BufferCompilationTest, DISABLED_DeviceLocalFactoryUsesThePublicConstructorArgumentOrder) {
     const auto result = vsl_test::compile_probe(R"cpp(

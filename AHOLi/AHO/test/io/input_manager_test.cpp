@@ -18,6 +18,18 @@ struct Group : aho::input::abstract::Adaptable {
 template<class T> struct TypedCounter : Counter {
     TypedCounter(void* context, T value) : Counter(context, value) {}
 };
+struct PassiveInput {
+    void* context;
+    int value;
+    PassiveInput(void* context, int value) : context(context), value(value) {}
+    int state() const { return value; }
+};
+template<class T> struct TypedPassiveInput {
+    void* context;
+    T value;
+    TypedPassiveInput(void* context, T value) : context(context), value(value) {}
+    T state() const { return value; }
+};
 using InputManagerTest = aho_test::InputBackendTest;
 TEST_F(InputManagerTest, ConstructorsPreserveRawAndVslWindowHandles) {
     aho::InputManager raw(window.handle());
@@ -95,5 +107,24 @@ TEST_F(InputManagerTest, EmptyAndEntirelyExpiredListsCanBeUpdatedRepeatedly) {
     EXPECT_TRUE(manager.update_targets.empty());
     manager.update();
     EXPECT_TRUE(manager.update_targets.empty());
+}
+TEST_F(InputManagerTest, PassiveInputsWithoutVirtualFunctionsDoNotRequireUpdateRegistration) {
+    aho::InputManager manager(window.handle());
+    const auto input = manager.get<PassiveInput>(7);
+    EXPECT_EQ(input->context, window.handle());
+    EXPECT_EQ(input->state(), 7);
+    EXPECT_TRUE(manager.update_targets.empty());
+    manager.update();
+    EXPECT_EQ(input->state(), 7);
+}
+TEST_F(InputManagerTest, TemplatePassiveInputsForwardTheirArgumentsWithoutUpdateRegistration) {
+    aho::InputManager manager(window.handle());
+    const auto input = manager.get<TypedPassiveInput>(2.5);
+    static_assert(std::same_as<std::remove_cv_t<decltype(input)>, std::shared_ptr<TypedPassiveInput<double>>>);
+    EXPECT_EQ(input->context, window.handle());
+    EXPECT_DOUBLE_EQ(input->state(), 2.5);
+    EXPECT_TRUE(manager.update_targets.empty());
+    manager.update();
+    EXPECT_DOUBLE_EQ(input->state(), 2.5);
 }
 }

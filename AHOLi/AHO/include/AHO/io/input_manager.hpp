@@ -41,9 +41,8 @@ namespace AHO_NAMESPACE {
         } else {
             input = std::shared_ptr<T>(new T(context, std::forward<Args>(args)...));
 
-            if (auto u = std::dynamic_pointer_cast<input::abstract::Updatable>(input); u) {
-                std::weak_ptr<input::abstract::Updatable> wptr = u;
-                update_targets.push_back(wptr);
+            if constexpr (std::derived_from<T, input::abstract::Updatable>) {
+                update_targets.push_back(input);
             }
         }
         return input;
@@ -58,9 +57,8 @@ namespace AHO_NAMESPACE {
         } else {
             input = std::shared_ptr<Type>(new Type(context, std::forward<Args>(args)...));
 
-            if (auto u = std::dynamic_pointer_cast<input::abstract::Updatable>(input); u) {
-                std::weak_ptr<input::abstract::Updatable> wptr = u;
-                update_targets.push_back(wptr);
+            if constexpr (std::derived_from<Type, input::abstract::Updatable>) {
+                update_targets.push_back(input);
             }
         }
 

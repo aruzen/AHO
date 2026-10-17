@@ -10,6 +10,14 @@
 
 namespace AHO_NAMESPACE::engine {
     struct GraphicalEngine : public EngineAccessor {
+        GraphicalEngine() = default;
+        virtual ~GraphicalEngine() = default;
+
+        GraphicalEngine(const GraphicalEngine&) = default;
+        GraphicalEngine& operator=(const GraphicalEngine&) = default;
+        GraphicalEngine(GraphicalEngine&&) noexcept = default;
+        GraphicalEngine& operator=(GraphicalEngine&&) noexcept = default;
+
         virtual aho::Window getWindow() = 0;
     };
 }

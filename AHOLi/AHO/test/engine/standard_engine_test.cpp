@@ -17,6 +17,20 @@ TEST_F(StandardEngineVulkanIntegration, ConstructorCreatesDeviceWindowAndFrameRe
     EXPECT_GT(window.frame_size().value.y.value, 0);
     EXPECT_NE(window._data2->surface, nullptr);
 }
+TEST_F(StandardEngineVulkanIntegration, BasePointerDestructionReleasesClosedWindowAndEngineResources) {
+    ASSERT_NO_THROW(start_engine());
+    ASSERT_TRUE(engine->boot_window.has_value());
+    const std::weak_ptr<aho::engine::EngineData> engine_data = engine->_data;
+    const std::weak_ptr<vsl::PureWindow::WindowData> window_data = engine->boot_window->_data;
+    engine->_data->logical_device._data->device.waitIdle();
+    ASSERT_TRUE(engine->boot_window->close());
+    std::unique_ptr<aho::engine::GraphicalEngine> base = std::move(engine);
+    EXPECT_FALSE(engine_data.expired());
+    EXPECT_FALSE(window_data.expired());
+    base.reset();
+    EXPECT_TRUE(engine_data.expired());
+    EXPECT_TRUE(window_data.expired());
+}
 TEST_F(StandardEngineVulkanIntegration, ExplicitBootInitializesPreviouslyDeferredEngine) {
     ASSERT_NO_THROW(start_engine(false));
     EXPECT_EQ(engine->_data, nullptr);

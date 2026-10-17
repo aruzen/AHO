@@ -506,42 +506,57 @@ struct Upper { \
 			constexpr HSV(const HueType& h, const SaturationAndValueType& s, const SaturationAndValueType& v) : h(h), s(s), v(v){}
 
 			constexpr HSV<HueType, SaturationAndValueType> operator + (const HSV<HueType, SaturationAndValueType>& o) const {
-				return { this->h + o.h, this->s + o.s, this->v + o.v };
+				return {
+					static_cast<HueType>(this->h.value + o.h.value),
+					static_cast<SaturationAndValueType>(this->s.value + o.s.value),
+					static_cast<SaturationAndValueType>(this->v.value + o.v.value)
+				};
 			}
 			constexpr HSVA<HueType, SaturationAndValueType> operator + (const HSVA<HueType, SaturationAndValueType>& o) const {
-				return { this->h + o.h, this->s + o.s, this->v + o.v, o.a };
+				return {
+					static_cast<HueType>(this->h.value + o.h.value),
+					static_cast<SaturationAndValueType>(this->s.value + o.s.value),
+					static_cast<SaturationAndValueType>(this->v.value + o.v.value),
+					o.a.value
+				};
 			}
 			constexpr HSV<HueType, SaturationAndValueType> operator + (const H<HueType>& h) const {
-				return { this->h + h, this->s, this->v };
+				return { static_cast<HueType>(this->h.value + h.value), this->s.value, this->v.value };
 			}
 			constexpr HSV<HueType, SaturationAndValueType> operator + (const S<saturation_type>& s) const {
-				return { this->h, this->s + s, this->v };
+				return { this->h.value, static_cast<SaturationAndValueType>(this->s.value + s.value), this->v.value };
 			}
 			constexpr HSV<HueType, SaturationAndValueType> operator + (const V<value_type>& v) const {
-				return { this->h, this->s, this->v + v };
+				return { this->h.value, this->s.value, static_cast<SaturationAndValueType>(this->v.value + v.value) };
 			}
 			constexpr HSVA<HueType, SaturationAndValueType> operator + (const A<SaturationAndValueType>& a) const {
-				return { this->h, this->s, this->v, a };
+				return { this->h.value, this->s.value, this->v.value, a.value };
 			}
 
 			constexpr HSV<HueType, SaturationAndValueType> operator - (const HSV<HueType, SaturationAndValueType>& o) const {
-				return { this->h - o.h, this->s - o.s, this->v - o.v };
+				return {
+					static_cast<HueType>(this->h.value - o.h.value),
+					static_cast<SaturationAndValueType>(this->s.value - o.s.value),
+					static_cast<SaturationAndValueType>(this->v.value - o.v.value)
+				};
 			}
 			constexpr HSV<HueType, SaturationAndValueType> operator - (const H<HueType>& h) const {
-				return { this->h - h, this->s, this->v };
+				return { static_cast<HueType>(this->h.value - h.value), this->s.value, this->v.value };
 			}
 			constexpr HSV<HueType, SaturationAndValueType> operator - (const S<saturation_type>& s) const {
-				return { this->h, this->s - s, this->v };
+				return { this->h.value, static_cast<SaturationAndValueType>(this->s.value - s.value), this->v.value };
 			}
 			constexpr HSV<HueType, SaturationAndValueType> operator - (const V<value_type>& v) const {
-				return { this->h, this->s, this->v - v };
+				return { this->h.value, this->s.value, static_cast<SaturationAndValueType>(this->v.value - v.value) };
 			}
 			constexpr HSVA<HueType, SaturationAndValueType> operator - (const A<SaturationAndValueType>& a) const {
-				return { this->h, this->s, this->v, a };
+				return { this->h.value, this->s.value, this->v.value, static_cast<SaturationAndValueType>(-a.value) };
 			}
 
 			constexpr HSV<HueType, SaturationAndValueType>& operator += (const HSV<HueType, SaturationAndValueType>& o) {
-				*this = HSV<HueType, SaturationAndValueType>{ h + o.h, s + o.s, v + o.v };
+				this->h += o.h;
+				this->s += o.s;
+				this->v += o.v;
 				return *this;
 			}
 			constexpr HSV<HueType, SaturationAndValueType>& operator += (const H<HueType>& h) {
@@ -557,7 +572,9 @@ struct Upper { \
 				return *this;
 			}
 			constexpr HSV<HueType, SaturationAndValueType>& operator -= (const HSV<HueType, SaturationAndValueType>& o) {
-				*this = HSV<HueType, SaturationAndValueType>{ h - o.h, s - o.s, v - o.v };
+				this->h -= o.h;
+				this->s -= o.s;
+				this->v -= o.v;
 				return *this;
 			}
 			constexpr HSV<HueType, SaturationAndValueType>& operator -= (const H<HueType>& h) {

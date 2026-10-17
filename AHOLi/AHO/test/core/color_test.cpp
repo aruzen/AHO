@@ -246,6 +246,41 @@ TEST(ColorConstructionTest, ComponentAssignmentsModifyOnlyTheRequestedChannel) {
     hsva += A<int>(1); aho_test::expect_hsva(hsva, 1, 2, 3, 5);
     hsva -= A<int>(1); aho_test::expect_hsva(hsva, 1, 2, 3, 4);
 }
+template<class H, class SV> struct HsvArithmeticCase { using Color = aho::color::HSV<H, SV>; using Hue = H; using Channel = SV; };
+using HsvArithmeticTypes = testing::Types<HsvArithmeticCase<short, std::int8_t>, HsvArithmeticCase<int, int>,
+    HsvArithmeticCase<float, float>, HsvArithmeticCase<double, double>, HsvArithmeticCase<short, float>>;
+template<class T> class HsvArithmeticTest : public testing::Test {};
+TYPED_TEST_SUITE(HsvArithmeticTest, HsvArithmeticTypes);
+TYPED_TEST(HsvArithmeticTest, ArithmeticPreservesSeparateChannelTypesAndOriginalValues) {
+    using C = typename TypeParam::Color;
+    const C source(120, 12, 24), delta(30, 1, 2);
+    static_assert(std::same_as<decltype(source + delta), C>);
+    aho_test::expect_hsv(source + delta, 150, 13, 26);
+    aho_test::expect_hsv(source - delta, 90, 11, 22);
+    auto changed = source;
+    EXPECT_EQ(&(changed += delta), &changed); aho_test::expect_hsv(changed, 150, 13, 26);
+    EXPECT_EQ(&(changed -= delta), &changed); aho_test::expect_hsv(changed, 120, 12, 24);
+    changed += changed; aho_test::expect_hsv(changed, 240, 24, 48);
+    changed -= changed; aho_test::expect_hsv(changed, 0, 0, 0);
+    aho_test::expect_hsv(source, 120, 12, 24);
+}
+TYPED_TEST(HsvArithmeticTest, IndividualChannelsAndAlphaKeepUnchangedComponents) {
+    using namespace aho::color;
+    using H = typename TypeParam::Hue;
+    using SV = typename TypeParam::Channel;
+    const typename TypeParam::Color source(120, 12, 24);
+    aho_test::expect_hsv(source + aho::color::H<H>(10), 130, 12, 24);
+    aho_test::expect_hsv(source - aho::color::H<H>(10), 110, 12, 24);
+    aho_test::expect_hsv(source + S<SV>(2), 120, 14, 24);
+    aho_test::expect_hsv(source - S<SV>(2), 120, 10, 24);
+    aho_test::expect_hsv(source + V<SV>(3), 120, 12, 27);
+    aho_test::expect_hsv(source - V<SV>(3), 120, 12, 21);
+    aho_test::expect_hsva(source + A<SV>(5), 120, 12, 24, 5);
+    aho_test::expect_hsva(source - A<SV>(5), 120, 12, 24, -5);
+    aho_test::expect_hsva(source + HSVA<H, SV>(30, 1, 2, 5), 150, 13, 26, 5);
+}
+constexpr auto constexpr_hsv_sum = aho::color::HSV<int>(1, 2, 3) + aho::color::HSV<int>(3, 2, 1);
+static_assert(constexpr_hsv_sum.h.value == 4 && constexpr_hsv_sum.s.value == 4 && constexpr_hsv_sum.v.value == 4);
 TEST(ColorLiteralTest, ChannelLiteralsPreserveValuesAndTypes) {
     using namespace aho::literals;
     EXPECT_EQ((2_r).value, 2); EXPECT_EQ((3_g).value, 3); EXPECT_EQ((4_b).value, 4);

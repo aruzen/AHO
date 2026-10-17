@@ -1,5 +1,6 @@
 #pragma once
 #include "../define.hpp"
+#include <cstddef>
 
 namespace AHO_NAMESPACE {
 	template<typename T>

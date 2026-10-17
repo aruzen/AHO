@@ -2,6 +2,9 @@
 #pragma once
 #include "../define.hpp"
 #include "../concepts.hpp"
+#include "VSL/format.hpp"
+#include <cmath>
+#include <limits>
 
 #include <iostream>
 #include <cstdint>

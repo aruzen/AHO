@@ -1,5 +1,5 @@
-#include <gtest/gtest.h>
 #include <AHO/core/index.hpp>
+#include <gtest/gtest.h>
 #include <limits>
 
 namespace {

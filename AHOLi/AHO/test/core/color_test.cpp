@@ -1,6 +1,5 @@
-#include <gtest/gtest.h>
-#include <VSL/format.hpp>
 #include <AHO/core/color.hpp>
+#include <gtest/gtest.h>
 #include <cstdint>
 #include <sstream>
 #include <utility>

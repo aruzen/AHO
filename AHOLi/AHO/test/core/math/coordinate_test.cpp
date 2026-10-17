@@ -30,9 +30,11 @@ static_assert(enabling_preserves_other_axes<false, true, true>());
 static_assert(enabling_preserves_other_axes<true, true, true>());
 
 #elif defined(AHO_CONTRACT_COORDINATE_YZ_ADD)
-const auto coordinates = aho::Y<int>(2) + aho::Z<int>(3);
+constexpr auto coordinates = aho::Y<int>(2) + aho::Z<int>(3);
+static_assert(coordinates.y.value == 2 && coordinates.z.value == 3);
 #elif defined(AHO_CONTRACT_COORDINATE_XZ_SUBTRACT)
-const auto coordinates = aho::X<int>(2) - aho::Z<int>(3);
+constexpr auto coordinates = aho::X<int>(2) - aho::Z<int>(3);
+static_assert(coordinates.x.value == 2 && coordinates.z.value == -3);
 #elif defined(AHO_CONTRACT_COORDINATE_COMPARISON)
 TEST(CoordinateContractTest, ThreeWayComparisonOrdersAndRecognizesEqualCoordinateSets) {
     const auto first = aho::X<int>(2) + aho::Y<int>(3);
@@ -144,6 +146,75 @@ TEST(CoordinateSetTest, AdditionAndSubtractionCombineMatchingAndDifferentAxes) {
     EXPECT_EQ(difference.x.value, 2); EXPECT_EQ(difference.y.value, 3); EXPECT_EQ(difference.z.value, 4);
     const auto moved = xyz - aho::X<int>(1);
     EXPECT_EQ(moved.x.value, 1); EXPECT_EQ(moved.y.value, 3); EXPECT_EQ(moved.z.value, 4);
+}
+template<class T> class CoordinateAxisPairTest : public testing::Test {};
+using PairScalars = testing::Types<int, float, double>;
+TYPED_TEST_SUITE(CoordinateAxisPairTest, PairScalars);
+TYPED_TEST(CoordinateAxisPairTest, AdditionUsesTheAxesOfBothOperands) {
+    using T = TypeParam;
+    constexpr auto xy = aho::X<T>(2) + aho::Y<T>(-3);
+    constexpr auto xz = aho::X<T>(2) + aho::Z<T>(-4);
+    constexpr auto yz = aho::Y<T>(-3) + aho::Z<T>(-4);
+    static_assert(xy.x.value == 2 && xy.y.value == -3);
+    static_assert(xz.x.value == 2 && xz.z.value == -4);
+    static_assert(yz.y.value == -3 && yz.z.value == -4);
+    EXPECT_EQ(xy.x.value, 2); EXPECT_EQ(xy.y.value, -3);
+    EXPECT_EQ(xz.x.value, 2); EXPECT_EQ(xz.z.value, -4);
+    EXPECT_EQ(yz.y.value, -3); EXPECT_EQ(yz.z.value, -4);
+}
+TYPED_TEST(CoordinateAxisPairTest, SubtractionPreservesLeftAxisAndNegatesRightAxisInBothOrders) {
+    using T = TypeParam;
+    constexpr auto xy = aho::X<T>(2) - aho::Y<T>(3);
+    constexpr auto yx = aho::Y<T>(3) - aho::X<T>(2);
+    constexpr auto xz = aho::X<T>(2) - aho::Z<T>(4);
+    constexpr auto zx = aho::Z<T>(4) - aho::X<T>(2);
+    constexpr auto yz = aho::Y<T>(3) - aho::Z<T>(4);
+    constexpr auto zy = aho::Z<T>(4) - aho::Y<T>(3);
+    static_assert(xy.x.value == 2 && xy.y.value == -3);
+    static_assert(yx.x.value == -2 && yx.y.value == 3);
+    static_assert(xz.x.value == 2 && xz.z.value == -4);
+    static_assert(zx.x.value == -2 && zx.z.value == 4);
+    static_assert(yz.y.value == 3 && yz.z.value == -4);
+    static_assert(zy.y.value == -3 && zy.z.value == 4);
+    EXPECT_EQ(xy.x.value, 2); EXPECT_EQ(xy.y.value, -3);
+    EXPECT_EQ(yx.x.value, -2); EXPECT_EQ(yx.y.value, 3);
+    EXPECT_EQ(xz.x.value, 2); EXPECT_EQ(xz.z.value, -4);
+    EXPECT_EQ(zx.x.value, -2); EXPECT_EQ(zx.z.value, 4);
+    EXPECT_EQ(yz.y.value, 3); EXPECT_EQ(yz.z.value, -4);
+    EXPECT_EQ(zy.y.value, -3); EXPECT_EQ(zy.z.value, 4);
+}
+TEST(CoordinateMixedAxisPairTest, AdditionPromotesBothComponentsForEveryPlane) {
+    constexpr auto xy = aho::X<int>(2) + aho::Y<double>(-3.5);
+    constexpr auto xz = aho::X<float>(2.5f) + aho::Z<int>(-4);
+    constexpr auto yz = aho::Y<unsigned>(3) + aho::Z<double>(-4.5);
+    static_assert(std::same_as<typename decltype(xy)::element_type, double>);
+    static_assert(std::same_as<typename decltype(xz)::element_type, float>);
+    static_assert(std::same_as<typename decltype(yz)::element_type, double>);
+    static_assert(xy.x.value == 2 && xy.y.value == -3.5);
+    static_assert(xz.x.value == 2.5 && xz.z.value == -4);
+    static_assert(yz.y.value == 3 && yz.z.value == -4.5);
+    EXPECT_EQ(xy.y.value, -3.5);
+    EXPECT_EQ(xz.x.value, 2.5);
+    EXPECT_EQ(yz.z.value, -4.5);
+}
+TEST(CoordinateMixedAxisPairTest, SubtractionPromotesBeforeNegatingUnsignedComponentsInEveryOrder) {
+    constexpr auto xy = aho::X<double>(2.5) - aho::Y<unsigned>(3);
+    constexpr auto yx = aho::Y<float>(3.5f) - aho::X<unsigned>(2);
+    constexpr auto xz = aho::X<int>(2) - aho::Z<double>(4.5);
+    constexpr auto zx = aho::Z<double>(4.5) - aho::X<unsigned>(2);
+    constexpr auto yz = aho::Y<double>(3.5) - aho::Z<unsigned>(4);
+    constexpr auto zy = aho::Z<float>(4.5f) - aho::Y<unsigned>(3);
+    static_assert(xy.x.value == 2.5 && xy.y.value == -3);
+    static_assert(yx.x.value == -2 && yx.y.value == 3.5);
+    static_assert(xz.x.value == 2 && xz.z.value == -4.5);
+    static_assert(zx.x.value == -2 && zx.z.value == 4.5);
+    static_assert(yz.y.value == 3.5 && yz.z.value == -4);
+    static_assert(zy.y.value == -3 && zy.z.value == 4.5);
+    static_assert(std::same_as<typename decltype(xy)::element_type, double>);
+    static_assert(std::same_as<typename decltype(yx)::element_type, float>);
+    EXPECT_EQ(xy.y.value, -3); EXPECT_EQ(yx.x.value, -2);
+    EXPECT_EQ(xz.z.value, -4.5); EXPECT_EQ(zx.x.value, -2);
+    EXPECT_EQ(yz.z.value, -4); EXPECT_EQ(zy.y.value, -3);
 }
 TEST(CoordinateLiteralTest, AllAxisLiteralTypesPreserveValues) {
     using namespace aho::literals;

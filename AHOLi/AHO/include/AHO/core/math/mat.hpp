@@ -92,10 +92,10 @@ namespace AHO_NAMESPACE {
             constexpr Mat<R, Row, Column> &operator*=(const AHO_NAMESPACE::matrix::Mat<T, Row, Column> &p);
 
             template<AHO_NAMESPACE::concepts::multiply_as<R> T>
-            constexpr Mat<R, Row, Column> operator*=(const T &m);
+            constexpr Mat<R, Row, Column>& operator*=(const T &m);
 
             template<AHO_NAMESPACE::concepts::division_as<R> T>
-            constexpr Mat<R, Row, Column> operator/=(const T &m);
+            constexpr Mat<R, Row, Column>& operator/=(const T &m);
 
             template<AHO_NAMESPACE::concepts::cast_as<R> T>
             Mat<T, Row, Column> cast();
@@ -287,7 +287,7 @@ namespace AHO_NAMESPACE {
 
         template<typename R, size_t Row, size_t Column>
         template<AHO_NAMESPACE::concepts::multiply_as<R> T>
-        constexpr Mat<R, Row, Column> Mat<R, Row, Column>::operator*=(const T &m) {
+        constexpr Mat<R, Row, Column>& Mat<R, Row, Column>::operator*=(const T &m) {
             for (size_t i = 0; i < Row; i++)
                 for (size_t j = 0; j < Column; j++)
                     (*this)[i][j] *= m;
@@ -296,7 +296,7 @@ namespace AHO_NAMESPACE {
 
         template<typename R, size_t Row, size_t Column>
         template<AHO_NAMESPACE::concepts::division_as<R> T>
-        constexpr Mat<R, Row, Column> Mat<R, Row, Column>::operator/=(const T &m) {
+        constexpr Mat<R, Row, Column>& Mat<R, Row, Column>::operator/=(const T &m) {
             for (size_t i = 0; i < Row; i++)
                 for (size_t j = 0; j < Column; j++)
                     (*this)[i][j] /= m;

@@ -261,6 +261,20 @@ TEST(MatTest, CastConvertsEachElement) {
     aho::Mat<double, 1, 2> fractional(std::array<std::array<double, 2>, 1>{{{2.75, -3.25}}});
     expect_matrix(fractional.cast<int>(), std::array<std::array<int, 2>, 1>{{{2, -3}}});
 }
+template<class T> class MatScalarAssignmentTest : public testing::Test {};
+using AssignmentScalars = testing::Types<int, float, double>;
+TYPED_TEST_SUITE(MatScalarAssignmentTest, AssignmentScalars);
+TYPED_TEST(MatScalarAssignmentTest, ReturnsTheOriginalMatrixAndSupportsChainedUpdates) {
+    using T = TypeParam;
+    using M = aho::Mat<T, 1, 3>;
+    M matrix(std::array<std::array<T, 3>, 1>{{{6, -12, 18}}});
+    static_assert(std::same_as<decltype(matrix *= T{2}), M&>);
+    static_assert(std::same_as<decltype(matrix /= T{2}), M&>);
+    EXPECT_EQ(&((matrix *= T{2}) *= T{3}), &matrix);
+    expect_matrix(matrix, std::array<std::array<T, 3>, 1>{{{36, -72, 108}}});
+    EXPECT_EQ(&((matrix /= T{2}) /= T{3}), &matrix);
+    expect_matrix(matrix, std::array<std::array<T, 3>, 1>{{{6, -12, 18}}});
+}
 TEST(MatFactoryTest, RowCopiesOriginalArray) {
     int input[]{1, 4, 7};
     const auto result = aho::matrix::row(input);

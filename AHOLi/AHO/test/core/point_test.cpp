@@ -50,6 +50,19 @@ TEST(PointCastTest, OneAndTwoDimensionalCastsPreserveCoordinates) {
     aho_test::expect_coordinates(aho::d1::PointD(-2.75).cast<int>(), -2);
     aho_test::expect_coordinates(aho::d2::PointD(-2.75, 3.75).cast<int>(), -2, 3);
 }
+TEST(PointCastTest, ThreeDimensionalCastPreservesAllSignedCoordinatesAndSource) {
+    const aho::d3::PointI source(-2, 3, -7);
+    const auto floating = source.cast<double>();
+    static_assert(std::same_as<std::remove_cv_t<decltype(floating)>, aho::d3::PointD>);
+    aho_test::expect_coordinates(floating, -2, 3, -7);
+    aho_test::expect_coordinates(floating.cast<float>(), -2, 3, -7);
+    aho_test::expect_coordinates(source, -2, 3, -7);
+}
+TEST(PointCastTest, ThreeDimensionalIntegralCastTruncatesEveryComponentTowardZero) {
+    const aho::d3::PointD source(-2.75, 3.75, -7.5);
+    aho_test::expect_coordinates(source.cast<int>(), -2, 3, -7);
+    aho_test::expect_coordinates(source, -2.75, 3.75, -7.5);
+}
 TEST(PointDeductionTest, DeductionAndExplicitCoordinateWrappersPreserveValues) {
     const aho::Point default_value;
     aho_test::expect_coordinates(default_value, 0);

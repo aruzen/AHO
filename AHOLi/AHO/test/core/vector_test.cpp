@@ -162,6 +162,46 @@ TEST(VectorProductsTest, CrossAndHadamardOperatorNamespacesMatchMethods) {
     { using namespace aho::product::cross; aho_test::expect_coordinates(x * y, 0, 0, 1); }
     { using namespace aho::product::hadamard; aho_test::expect_coordinates(x * y, 0, 0, 0); }
 }
+template<class T> class VectorThreeDimensionalInputTest : public testing::Test {};
+TYPED_TEST_SUITE(VectorThreeDimensionalInputTest, ProductScalars);
+TYPED_TEST(VectorThreeDimensionalInputTest, ProductsAcceptDerivedVectorInputsAndPreserveValues) {
+    using V = aho::_Vector<TypeParam, vsl::D3>;
+    using Derived = aho::d3::Vector<TypeParam, typename V::coordinate_info>;
+    const V left(2, 3, 4);
+    const Derived right(4, 5, 6);
+    const auto cross = left.cross(right);
+    const auto hadamard = left.hadamard(right);
+    static_assert(std::same_as<std::remove_cv_t<decltype(cross)>, V>);
+    static_assert(std::same_as<std::remove_cv_t<decltype(hadamard)>, V>);
+    static_assert(std::same_as<decltype(left.dot(right)), TypeParam>);
+    EXPECT_EQ(left.dot(right), 47);
+    aho_test::expect_coordinates(cross, -2, 4, -2);
+    aho_test::expect_coordinates(hadamard, 8, 15, 24);
+    aho_test::expect_coordinates(right.cross(left), 2, -4, 2);
+    aho_test::expect_coordinates(left, 2, 3, 4);
+    aho_test::expect_coordinates(right, 4, 5, 6);
+}
+TEST(VectorThreeDimensionalInputTest, MixedScalarProductsPromoteFractionalResultsInBothOrders) {
+    const aho::d3::VectorI integer(1, 2, 3);
+    using CI = aho::d3::VectorF::coordinate_info;
+    const aho::d3::Vector<float, CI> fractional(0.5f, 1.5f, 2.5f);
+    const auto cross = integer.cross(fractional);
+    const auto reverse = fractional.cross(integer);
+    const auto hadamard = integer.hadamard(fractional);
+    static_assert(std::same_as<std::remove_cv_t<decltype(cross)>, aho::d3::VectorF>);
+    static_assert(std::same_as<std::remove_cv_t<decltype(reverse)>, aho::d3::VectorF>);
+    static_assert(std::same_as<std::remove_cv_t<decltype(hadamard)>, aho::d3::VectorF>);
+    static_assert(std::same_as<decltype(integer.dot(fractional)), float>);
+    static_assert(std::same_as<decltype(fractional.dot(integer)), float>);
+    EXPECT_FLOAT_EQ(integer.dot(fractional), 11.0f);
+    EXPECT_FLOAT_EQ(fractional.dot(integer), 11.0f);
+    aho_test::expect_coordinates(cross, 0.5, -1, 0.5);
+    aho_test::expect_coordinates(reverse, -0.5, 1, -0.5);
+    aho_test::expect_coordinates(hadamard, 0.5, 3, 7.5);
+    aho_test::expect_coordinates(fractional.hadamard(integer), 0.5, 3, 7.5);
+    aho_test::expect_coordinates(integer, 1, 2, 3);
+    aho_test::expect_coordinates(fractional, 0.5, 1.5, 2.5);
+}
 TEST(VectorNormalizationTest, PositiveAndNegativeOneDimensionalNormalizationPreservesDirection) {
     aho::d1::VectorD positive(4), negative(-4);
     EXPECT_EQ(&positive.normalize(), &positive);

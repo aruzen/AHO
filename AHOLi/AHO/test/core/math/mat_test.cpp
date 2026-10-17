@@ -508,6 +508,23 @@ TYPED_TEST(MatInverseTest, SmallEliminationFactorMustNotSkipSignificantContribut
     ASSERT_TRUE(result);
     expect_matrix(*result, std::array<std::array<double, 2>, 2>{{{-1.0 / 99, 1e8 / 99}, {1e-6 / 99, -1.0 / 99}}});
 }
+TYPED_TEST(MatInverseTest, NonzeroMachineEpsilonFactorsStillEliminateLargeContributions) {
+    using T = TypeParam;
+    for (const T sign : {T{1}, T{-1}}) {
+        const T factor = sign * std::numeric_limits<T>::epsilon();
+        const T coupling = T{4} / factor;
+        SCOPED_TRACE(testing::Message() << "factor=" << factor);
+        // The determinant is 1 - factor * coupling = -3, despite the small factor.
+        const aho::Mat<T, 2, 2> matrix(std::array<std::array<T, 2>, 2>{{{1, coupling}, {factor, 1}}});
+        const auto result = aho::matrix::inverse_gauss_jordan(matrix);
+        ASSERT_TRUE(result);
+        expect_matrix(*result, std::array<std::array<T, 2>, 2>{{
+            {-T{1} / T{3}, coupling / T{3}}, {factor / T{3}, -T{1} / T{3}}}});
+        EXPECT_EQ(matrix[0][1], coupling);
+        EXPECT_EQ(matrix[1][0], factor);
+    }
+}
+
 TEST(MatOutputTest, RectangularOutputContainsEveryElement) {
     const aho::Mat<int, 1, 2> matrix(std::array<std::array<int, 2>, 1>{{{11, 22}}});
     std::ostringstream stream;

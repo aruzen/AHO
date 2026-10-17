@@ -549,7 +549,8 @@ namespace AHO_NAMESPACE {
                         if (r == i)
                             continue;
                         const R factor = aug[r][i];
-                        if (is_near_zero(factor))
+                        // A small nonzero factor can still multiply a large pivot-row element.
+                        if (factor == R{})
                             continue;
                         for (size_t j = 0; j < Size * 2; ++j)
                             aug[r][j] -= factor * aug[i][j];

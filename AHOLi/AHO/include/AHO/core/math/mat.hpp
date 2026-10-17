@@ -636,12 +636,17 @@ namespace AHO_NAMESPACE {
         template<typename R, size_t Row, size_t Column>
         std::ostream &operator<<(std::ostream &out, const Mat<R, Row, Column> &mat) {
             out << "{";
-            for (size_t i = 0; i < Column; i++) {
-                out << "{" << mat[i][0];
-                for (size_t j = 1; j < Row; j++)
-                    out << ", " << mat[j][i];
-                out << (i - 1 == Row ? "}}" : "}") << std::endl;
+            for (size_t i = 0; i < Row; i++) {
+                out << "{";
+                for (size_t j = 0; j < Column; j++) {
+                    if (j != 0)
+                        out << ", ";
+                    out << mat[i][j];
+                }
+                out << (i + 1 == Row ? "}}" : "}") << std::endl;
             }
+            if constexpr (Row == 0)
+                out << "}";
             return out;
         };
     }

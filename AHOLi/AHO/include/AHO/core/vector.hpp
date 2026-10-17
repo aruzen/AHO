@@ -132,7 +132,8 @@ namespace AHO_NAMESPACE {
 		constexpr _Vector<T, VSL_NAMESPACE::D1, CI> cast() const;
 
         template<typename T>
-        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D1>, T>
+        requires concepts::is_vector<T> &&
+                 std::convertible_to<T, _Vector<typename T::element_type, VSL_NAMESPACE::D1, CI>>
         constexpr auto dot(const T& m) const;
 
         template<typename T>
@@ -141,7 +142,8 @@ namespace AHO_NAMESPACE {
         constexpr auto cross(const T& m) const;
 
         template<typename T>
-        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D1>, T>
+        requires concepts::is_vector<T> &&
+                 std::convertible_to<T, _Vector<typename T::element_type, VSL_NAMESPACE::D1, CI>>
         constexpr auto hadamard(const T& m) const;
 
 		constexpr auto length() const;
@@ -403,7 +405,8 @@ namespace AHO_NAMESPACE {
 
     template<typename R, typename CI>
     template<typename T>
-        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D1>, T>
+        requires concepts::is_vector<T> &&
+                 std::convertible_to<T, _Vector<typename T::element_type, VSL_NAMESPACE::D1, CI>>
     inline constexpr auto _Vector<R, VSL_NAMESPACE::D1, CI>::dot(const T& m) const
     {
         return value.___AN1 * m.value.___AN1;
@@ -419,7 +422,8 @@ namespace AHO_NAMESPACE {
 
     template<typename R, typename CI>
     template<typename T>
-    requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D1>, T>
+    requires concepts::is_vector<T> &&
+             std::convertible_to<T, _Vector<typename T::element_type, VSL_NAMESPACE::D1, CI>>
     inline constexpr auto _Vector<R, VSL_NAMESPACE::D1, CI>::hadamard(const T &m) const
     {
         return _Vector<decltype(value.___AN1 * m.value.___AN1), VSL_NAMESPACE::D1, CI>(value.___AN1 * m.value.___AN1);

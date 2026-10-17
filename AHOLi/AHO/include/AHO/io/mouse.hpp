@@ -63,6 +63,8 @@ namespace AHO_NAMESPACE::input {
     private:
         MouseWheel(void *context);
     public:
+        MouseWheel(const MouseWheel& other) noexcept;
+
         ~MouseWheel();
 
         d2::VectorD state() override;

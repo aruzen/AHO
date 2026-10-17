@@ -83,6 +83,11 @@ aho::input::MouseWheel::MouseWheel(void *context) : context(context) {
     subscribed++;
 }
 
+aho::input::MouseWheel::MouseWheel(const MouseWheel& other) noexcept : MouseWheel(other.context) {
+    gen = other.gen;
+    read = other.read;
+}
+
 aho::input::MouseWheel::~MouseWheel() {
     subscribed--;
     if (subscribed == 0)

@@ -8,6 +8,26 @@ void verify() { aho::Line<double, vsl::D2> line; const auto polygon = line + lin
 #elif defined(AHO_CONTRACT_PTRLINE_POLYGON_ADDITION)
 void verify() { aho::Line<double, vsl::D2> line; const auto polygon = line.adress() + line; }
 #else
+#include <gtest/gtest.h>
+#include "../support/one_way_cast.hpp"
+namespace {
+TEST(LineOneWayCastTest, ConvertsBothEndpointsAndRejectsTheReverseConversion) {
+    using P = aho::_Point<aho_test::CastSource, vsl::D2>;
+    using L = aho::Line<aho_test::CastSource, vsl::D2>;
+    static_assert(aho_test::HasCast<L, aho_test::CastTarget>);
+    L source(P(aho_test::CastSource{1}, aho_test::CastSource{2}),
+             P(aho_test::CastSource{3}, aho_test::CastSource{4}));
+    const auto converted = source.cast<aho_test::CastTarget>();
+    using Converted = std::remove_cv_t<decltype(converted)>;
+    static_assert(!aho_test::HasCast<Converted, aho_test::CastSource>);
+    EXPECT_EQ(converted.pos1.value.x.value.value, 1);
+    EXPECT_EQ(converted.pos1.value.y.value.value, 2);
+    EXPECT_EQ(converted.pos2.value.x.value.value, 3);
+    EXPECT_EQ(converted.pos2.value.y.value.value, 4);
+    EXPECT_EQ(source.pos1.value.x.value.value, 1);
+    EXPECT_EQ(source.pos2.value.y.value.value, 4);
+}
+} // namespace
 #include "../support/geometry.hpp"
 namespace {
 TEST(LineTest, ConstructorsLengthAndValueViewsPreserveEndpoints) {

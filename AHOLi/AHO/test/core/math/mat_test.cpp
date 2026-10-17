@@ -70,6 +70,27 @@ constexpr aho::Mat<int, 1, 2> matrix(std::array<std::array<int, 2>, 1>{{{2, 4}}}
 constexpr auto result = 8 / matrix;
 static_assert(result[0][0] == 4 && result[0][1] == 2);
 #else
+#include <gtest/gtest.h>
+#include "../../support/one_way_cast.hpp"
+namespace {
+TEST(MatOneWayCastTest, ConvertsEveryRectangularElementAndRejectsTheReverseConversion) {
+    using M = aho::matrix::Mat<aho_test::CastSource, 2, 3>;
+    static_assert(aho_test::HasCast<M, aho_test::CastTarget>);
+    M source;
+    source[0] = {aho_test::CastSource{1}, aho_test::CastSource{2}, aho_test::CastSource{3}};
+    source[1] = {aho_test::CastSource{-4}, aho_test::CastSource{-5}, aho_test::CastSource{-6}};
+    const auto converted = source.cast<aho_test::CastTarget>();
+    using Converted = std::remove_cv_t<decltype(converted)>;
+    static_assert(std::same_as<Converted, aho::matrix::Mat<aho_test::CastTarget, 2, 3>>);
+    static_assert(!aho_test::HasCast<Converted, aho_test::CastSource>);
+    const int expected[2][3]{{1, 2, 3}, {-4, -5, -6}};
+    for (std::size_t row = 0; row < 2; ++row)
+        for (std::size_t column = 0; column < 3; ++column) {
+            EXPECT_EQ(converted[row][column].value, expected[row][column]);
+            EXPECT_EQ(source[row][column].value, expected[row][column]);
+        }
+}
+} // namespace
 #include "../../support/matrix.hpp"
 #include <sstream>
 

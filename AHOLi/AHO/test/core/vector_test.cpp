@@ -34,6 +34,38 @@ void verify() {
 constexpr auto sum = aho::d2::VectorI(1, 2) + aho::d2::VectorI(3, 4);
 static_assert(sum.value.x.value == 4 && sum.value.y.value == 6);
 #else
+#include "../support/one_way_cast.hpp"
+namespace {
+template<class T> class VectorOneWayCastTest : public testing::Test {};
+using OneWayVectors = testing::Types<aho::_Vector<aho_test::CastSource, vsl::D1>,
+    aho::_Vector<aho_test::CastSource, vsl::D2>, aho::_Vector<aho_test::CastSource, vsl::D3>,
+    aho::_Vector<aho_test::CastSource, vsl::D2, aho::coordinate::_MakeCoordinateInfo<false, true, true>::value>>;
+TYPED_TEST_SUITE(VectorOneWayCastTest, OneWayVectors);
+TYPED_TEST(VectorOneWayCastTest, ChecksConversionFromTheStoredScalarToTheRequestedType) {
+    static_assert(aho_test::HasCast<TypeParam, aho_test::CastTarget>);
+    const TypeParam source = [] {
+        if constexpr (TypeParam::dimension::dimension == 1)
+            return TypeParam(aho_test::CastSource{2});
+        else if constexpr (TypeParam::dimension::dimension == 2)
+            return TypeParam(aho_test::CastSource{2}, aho_test::CastSource{-3});
+        else
+            return TypeParam(aho_test::CastSource{2}, aho_test::CastSource{-3}, aho_test::CastSource{5});
+    }();
+    const auto converted = source.template cast<aho_test::CastTarget>();
+    using Converted = std::remove_cv_t<decltype(converted)>;
+    static_assert(!aho_test::HasCast<Converted, aho_test::CastSource>);
+    static_assert(std::same_as<typename Converted::coordinate_info, typename TypeParam::coordinate_info>);
+    auto check = [](const auto &from, const auto &to, int expected) {
+        EXPECT_EQ(from.value.value, expected);
+        EXPECT_EQ(to.value.value, expected);
+    };
+    if constexpr (TypeParam::coordinate_info::EnabledX) check(source.value.x, converted.value.x, 2);
+    if constexpr (TypeParam::coordinate_info::EnabledY)
+        check(source.value.y, converted.value.y, TypeParam::coordinate_info::EnabledX ? -3 : 2);
+    if constexpr (TypeParam::coordinate_info::EnabledZ)
+        check(source.value.z, converted.value.z, TypeParam::dimension::dimension == 3 ? 5 : -3);
+}
+} // namespace
 #include "../support/geometry.hpp"
 #include "../support/matrix.hpp"
 namespace {

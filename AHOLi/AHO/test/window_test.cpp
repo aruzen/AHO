@@ -56,11 +56,20 @@ TEST_F(AhoWindowVulkanIntegration, ResizingRecreatesFrameResourcesAndCallsHook) 
 }
 TEST_F(AhoWindowVulkanIntegration, ExplicitEngineConstructorCreatesIndependentWindow) {
     ASSERT_NO_THROW(start_engine());
-    aho::Window second("AHO secondary", 240, 160, *engine);
+    const std::string name = "AHO secondary synchronization resources";
+    aho::Window second(name, 240, 160, *engine);
     EXPECT_NE(second._data, engine->boot_window->_data);
     EXPECT_EQ(second.engine._data, engine->_data);
     EXPECT_EQ(second.window_size().value.x.value, 240);
     EXPECT_EQ(second.window_size().value.y.value, 160);
+    EXPECT_EQ(second.name(), name);
+    auto available = engine->_data->synchro_manager.getSemaphore(name + "ImageAvailable");
+    auto finished = engine->_data->synchro_manager.getSemaphore(name + "RenderFinished");
+    auto in_flight = engine->_data->synchro_manager.getFence(name + "InFlight");
+    EXPECT_TRUE(available.has_value()); EXPECT_TRUE(finished.has_value()); EXPECT_TRUE(in_flight.has_value());
+    if (available) EXPECT_EQ(available->_data, second._data2->image_available._data);
+    if (finished) EXPECT_EQ(finished->_data, second._data2->render_finished._data);
+    if (in_flight) EXPECT_EQ(in_flight->_data, second._data2->in_flight._data);
     EXPECT_TRUE(second.close());
 }
 }

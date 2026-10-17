@@ -142,5 +142,103 @@ TEST(PolygonViewsTest, CompositeViewsSupportEmptyCollectionsWithoutPointViews) {
     EXPECT_TRUE(aho::views::triangles(triangles).empty());
 }
 
+template<class T> class DerivedShapeTest : public testing::Test {};
+TYPED_TEST_SUITE(DerivedShapeTest, aho_test::GeometryCases);
+TYPED_TEST(DerivedShapeTest, SingleShapeViewsPreserveTheDerivedTypeAndSnapshot) {
+    using P = typename TypeParam::Point;
+    using L = aho::Line<typename TypeParam::element_type, typename TypeParam::dimension>;
+    using Triangle = aho::Triangle<typename TypeParam::element_type, typename TypeParam::dimension>;
+    struct DerivedLine : L { using L::L; int marker = 17; };
+    struct DerivedTriangle : Triangle { using Triangle::Triangle; int marker = 23; };
+    static_assert(aho::concepts::is_line<DerivedLine>);
+    static_assert(aho::concepts::is_line<const DerivedLine&>);
+    static_assert(aho::concepts::is_triangle<DerivedTriangle>);
+    static_assert(aho::concepts::is_triangle<const DerivedTriangle&>);
+    DerivedLine line(aho_test::geometry<P>(1, 2, 3), aho_test::geometry<P>(4, 5, 6));
+    const DerivedTriangle triangle(line.pos1, line.pos2, aho_test::geometry<P>(7, 8, 9));
+    const auto lines = aho::views::lines(std::as_const(line));
+    const auto triangles = aho::views::triangles(triangle);
+    static_assert(std::same_as<std::ranges::range_value_t<decltype(lines)>, DerivedLine>);
+    static_assert(std::same_as<std::ranges::range_value_t<decltype(triangles)>, DerivedTriangle>);
+    EXPECT_EQ(lines.begin()->marker, 17);
+    EXPECT_EQ(triangles.begin()->marker, 23);
+    aho_test::expect_coordinates(lines.begin()->pos1, 1, 2, 3);
+    aho_test::expect_coordinates(triangles.begin()->pos3, 7, 8, 9);
+    line.pos1 = aho_test::geometry<P>(10, 11, 12);
+    aho_test::expect_coordinates(lines.begin()->pos1, 1, 2, 3);
+}
+TYPED_TEST(DerivedShapeTest, CompositeViewsAcceptCollectionsOfPubliclyDerivedShapes) {
+    using P = typename TypeParam::Point;
+    using L = aho::Line<typename TypeParam::element_type, typename TypeParam::dimension>;
+    using Triangle = aho::Triangle<typename TypeParam::element_type, typename TypeParam::dimension>;
+    struct DerivedLine : L { using L::L; };
+    struct DerivedTriangle : Triangle { using Triangle::Triangle; };
+    struct Collection {
+        using element_type = typename TypeParam::element_type;
+        using dimension = typename TypeParam::dimension;
+        using coordinate_info = typename P::coordinate_info;
+        DerivedLine edge;
+        DerivedTriangle face;
+        auto lines() const { return std::array{edge}; }
+        auto triangles() const { return std::array{face}; }
+    };
+    static_assert(aho::concepts::is_lines_object<Collection>);
+    static_assert(aho::concepts::is_triangles_object<Collection>);
+    const auto first = aho_test::geometry<P>(1, 2, 3);
+    const auto second = aho_test::geometry<P>(4, 5, 6);
+    const Collection collection{DerivedLine(first, second),
+                                DerivedTriangle(first, second, aho_test::geometry<P>(7, 8, 9))};
+    const auto lines = aho::views::lines(collection);
+    const auto triangles = aho::views::triangles(collection);
+    ASSERT_EQ(lines.size(), 1u);
+    ASSERT_EQ(triangles.size(), 1u);
+    aho_test::expect_coordinates(lines[0].pos2, 4, 5, 6);
+    aho_test::expect_coordinates(triangles[0].pos3, 7, 8, 9);
+}
+TEST(PolygonConceptsTest, ShapesKeepTheirCustomCoordinatePlane) {
+    using CI = aho::coordinate::_MakeCoordinateInfo<false, true, true>::value;
+    using P = aho::_Point<double, vsl::D2, CI>;
+    using L = aho::Line<double, vsl::D2, CI>;
+    using Triangle = aho::Triangle<double, vsl::D2, CI>;
+    struct DerivedLine : L { using L::L; };
+    struct DerivedTriangle : Triangle { using Triangle::Triangle; };
+    static_assert(aho::concepts::is_line<DerivedLine> && aho::concepts::is_triangle<DerivedTriangle>);
+    const auto lines = aho::views::lines(DerivedLine(P(1, 2), P(3, 4)));
+    const auto triangles = aho::views::triangles(DerivedTriangle(P(1, 2), P(3, 4), P(5, 6)));
+    static_assert(std::same_as<typename std::ranges::range_value_t<decltype(lines)>::coordinate_info, CI>);
+    static_assert(std::same_as<typename std::ranges::range_value_t<decltype(triangles)>::coordinate_info, CI>);
+    EXPECT_EQ(lines.begin()->pos2.value.y.value, 3);
+    EXPECT_EQ(lines.begin()->pos2.value.z.value, 4);
+    EXPECT_EQ(triangles.begin()->pos3.value.y.value, 5);
+    EXPECT_EQ(triangles.begin()->pos3.value.z.value, 6);
+}
+TEST(PolygonConceptsTest, ReverseConversionsAndPrivateInheritanceDoNotIdentifyShapes) {
+    using L = aho::Line<double, vsl::D2>;
+    using Triangle = aho::Triangle<double, vsl::D2>;
+    struct FromLine {
+        using element_type = double; using dimension = vsl::D2;
+        using coordinate_info = L::coordinate_info;
+        FromLine(L) {}
+    };
+    struct FromTriangle {
+        using element_type = double; using dimension = vsl::D2;
+        using coordinate_info = Triangle::coordinate_info;
+        FromTriangle(Triangle) {}
+    };
+    struct PrivateLine : private L {
+        using element_type = double; using dimension = vsl::D2;
+        using coordinate_info = L::coordinate_info;
+    };
+    struct PrivateTriangle : private Triangle {
+        using element_type = double; using dimension = vsl::D2;
+        using coordinate_info = Triangle::coordinate_info;
+    };
+    EXPECT_FALSE(aho::concepts::is_line<FromLine>);
+    EXPECT_FALSE(aho::concepts::is_triangle<FromTriangle>);
+    EXPECT_FALSE(aho::concepts::is_line<PrivateLine>);
+    EXPECT_FALSE(aho::concepts::is_triangle<PrivateTriangle>);
+}
+
+
 }
 #endif

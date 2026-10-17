@@ -10,7 +10,11 @@
 #endif // AHO_STB_IMAGE_ENABLE
 
 aho::resource::Image::ImageData::~ImageData() {
+#ifdef AHO_STB_IMAGE_ENABLE
+    stbi_image_free(buffer);
+#else
     delete[] buffer;
+#endif
 }
 
 aho::resource::Image::Image() : _data(nullptr) {}
@@ -18,8 +22,10 @@ aho::resource::Image::Image() : _data(nullptr) {}
 #ifdef AHO_STB_IMAGE_ENABLE
 aho::resource::Image::Image(std::filesystem::path path) {
     _data = std::make_shared<ImageData>();
-    if (not stbi_info(path.string().c_str(), &_data->width, &_data->height, &_data->channel))
+    if (not stbi_info(path.string().c_str(), &_data->width, &_data->height, &_data->channel)) {
         _data = nullptr;
+        return;
+    }
 
     _data->buffer = stbi_load(path.string().c_str(), &_data->width, &_data->height, &_data->channel, STBI_rgb_alpha);
 

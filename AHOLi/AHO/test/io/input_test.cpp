@@ -10,7 +10,37 @@ int main() { return aho::input::MouseID(aho::input::MouseCode::LeftClick).name()
 #else
 #include <gtest/gtest.h>
 #include <set>
+#include <memory>
+#include <type_traits>
 namespace {
+using namespace aho::input::abstract;
+static_assert(std::has_virtual_destructor_v<Input<int>>);
+static_assert(std::has_virtual_destructor_v<Updatable>);
+static_assert(std::has_virtual_destructor_v<Button>);
+static_assert(std::has_virtual_destructor_v<Cursor>);
+static_assert(std::has_virtual_destructor_v<Text>);
+static_assert(std::has_virtual_destructor_v<Characters>);
+struct TrackedInput : Input<int>, Updatable {
+    int& destructions;
+    std::unique_ptr<int> resource = std::make_unique<int>(7);
+    explicit TrackedInput(int& destructions) : destructions(destructions) {}
+    ~TrackedInput() { ++destructions; }
+    int state() override { return *resource; }
+};
+template<class Base> class InputDestructionTest : public testing::Test {};
+using InputBases = testing::Types<Input<int>, Updatable>;
+TYPED_TEST_SUITE(InputDestructionTest, InputBases);
+TYPED_TEST(InputDestructionTest, DeletingThroughEitherBaseDestroysTheDerivedObjectOnce) {
+    int destructions = 0;
+    {
+        std::unique_ptr<TypeParam> input = std::make_unique<TrackedInput>(destructions);
+        auto* state = dynamic_cast<Input<int>*>(input.get());
+        ASSERT_NE(state, nullptr);
+        EXPECT_EQ(state->state(), 7);
+        EXPECT_EQ(destructions, 0);
+    }
+    EXPECT_EQ(destructions, 1);
+}
 TEST(InputInterfaceTest, DefaultUpdatePreservesStateAndDoesNotThrow) {
     struct DefaultInput : aho::input::abstract::Input<int>, aho::input::abstract::Updatable {
         int value = 7;

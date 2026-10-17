@@ -16,6 +16,8 @@ namespace AHO_NAMESPACE::input {
 
         KeyBoard(void * context);
     public:
+        KeyBoard(const KeyBoard& other) noexcept;
+
         ~KeyBoard();
 
         std::unordered_set<KeyCode> state() override;

@@ -72,6 +72,20 @@ TYPED_TEST(CoordinateMaskTest, DefaultAndAxisConstructorsInitializeOnlyEnabledAx
     EXPECT_TRUE(zero < value); EXPECT_FALSE(value < value);
     EXPECT_TRUE(aho::concepts::is_coordinate_set<typename TypeParam::Set>);
 }
+TYPED_TEST(CoordinateMaskTest, AxisCountsPreserveEveryEnabledPrefix) {
+    using Info = typename TypeParam::Info;
+    static_assert(std::same_as<decltype(Info::IndexX), const std::size_t>);
+    static_assert(std::same_as<decltype(Info::IndexY), const std::size_t>);
+    static_assert(std::same_as<decltype(Info::IndexZ), const std::size_t>);
+    EXPECT_EQ(Info::IndexX, TypeParam::x ? 1u : 0u);
+    EXPECT_EQ(Info::IndexY, static_cast<unsigned>(TypeParam::x) + TypeParam::y);
+    EXPECT_EQ(Info::IndexZ, static_cast<unsigned>(TypeParam::x) + TypeParam::y + TypeParam::z);
+}
+struct UnmarkedCoordinateType {};
+struct DisabledCoordinateType { static constexpr bool is_coordinate_set = false; };
+static_assert(!aho::concepts::is_coordinate_set<int>);
+static_assert(!aho::concepts::is_coordinate_set<UnmarkedCoordinateType>);
+static_assert(!aho::concepts::is_coordinate_set<DisabledCoordinateType>);
 TYPED_TEST(CoordinateMaskTest, AxisAssignmentOperatorsReturnAndMutateOriginalSet) {
     auto value = TypeParam::make();
     if constexpr (TypeParam::x) {

@@ -5,6 +5,7 @@
 #include "../../concepts.hpp"
 
 #include <iostream>
+#include <cstddef>
 
 namespace AHO_NAMESPACE {
 	namespace coordinate {
@@ -78,9 +79,9 @@ namespace AHO_NAMESPACE {
 			constexpr static bool EnabledX = EnableX;
 			constexpr static bool EnabledY = EnableY;
 			constexpr static bool EnabledZ = EnableZ;
-			constexpr static bool IndexX = _CountTruesFunc<EnableX>();
-			constexpr static bool IndexY = _CountTruesFunc<EnableX, EnableY>();
-			constexpr static bool IndexZ = _CountTruesFunc<EnableX, EnableY, EnableZ>();
+			constexpr static std::size_t IndexX = _CountTruesFunc<EnableX>();
+			constexpr static std::size_t IndexY = _CountTruesFunc<EnableX, EnableY>();
+			constexpr static std::size_t IndexZ = _CountTruesFunc<EnableX, EnableY, EnableZ>();
 
 			consteval static typename _MakeCoordinateInfo<true, EnableY, EnableZ>::value EnablingX() { return {}; };
 			consteval static typename _MakeCoordinateInfo<EnableX, true, EnableZ>::value EnablingY() { return {}; };
@@ -452,7 +453,7 @@ namespace AHO_NAMESPACE {
 	namespace concepts {
 		template<typename R>
 		concept is_coordinate_set = requires {
-			std::enable_if<R::is_coordinate_set>::type;
+			typename std::enable_if<R::is_coordinate_set>::type;
 		};
 	}
 

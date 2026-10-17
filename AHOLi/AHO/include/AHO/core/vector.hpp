@@ -199,15 +199,15 @@ namespace AHO_NAMESPACE {
 		constexpr _Vector<T, VSL_NAMESPACE::D2, CI> cast() const;
 
         template<typename T>
-        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2>, T>
+        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2, CI>, T>
         constexpr auto dot(const T& m) const;
 
         template<typename T>
-        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2>, T>
+        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2, CI>, T>
         constexpr auto cross(const T& m) const;
 
         template<typename T>
-        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2>, T>
+        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2, CI>, T>
         constexpr auto hadamard(const T& m) const;
 
 		constexpr auto length() const;
@@ -479,13 +479,13 @@ namespace AHO_NAMESPACE {
 	template<concepts::multiply_as<R> T>
 		requires (!concepts::is_vector<T>)
 	constexpr auto _Vector<R, VSL_NAMESPACE::D2, CI>::operator *(const T& m) const {
-		return _Vector<decltype(std::declval<R>() * std::declval<T>()), VSL_NAMESPACE::D2>(value.___AN1 * m, value.___AN2 * m);
+		return _Vector<decltype(std::declval<R>() * std::declval<T>()), VSL_NAMESPACE::D2, CI>(value.___AN1 * m, value.___AN2 * m);
 	}
 
 	template<typename R, typename CI>
 	template<concepts::division_as<R> T>
 	constexpr auto _Vector<R, VSL_NAMESPACE::D2, CI>::operator /(const T& m) const {
-		return _Vector<decltype(std::declval<R>() / std::declval<T>()), VSL_NAMESPACE::D2>(value.___AN1 / m, value.___AN2 / m);
+		return _Vector<decltype(std::declval<R>() / std::declval<T>()), VSL_NAMESPACE::D2, CI>(value.___AN1 / m, value.___AN2 / m);
 	}
 
 	template<typename R, typename CI>
@@ -529,24 +529,27 @@ namespace AHO_NAMESPACE {
 
     template<typename R, typename CI>
     template<typename T>
-        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2>, T>
+        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2, CI>, T>
     constexpr auto _Vector<R, VSL_NAMESPACE::D2, CI>::dot(const T& m) const {
         return value.___AN1 * m.value.___AN1 + value.___AN2 * m.value.___AN2;
     }
 
     template<typename R, typename CI>
     template<typename T>
-        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2>, T>
+        requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2, CI>, T>
     constexpr auto _Vector<R, VSL_NAMESPACE::D2, CI>::cross(const T& m) const {
-        return _Vector<decltype(value.___AN1 * m.value.___AN2),
-                VSL_NAMESPACE::D1,
+        auto determinant = value.___AN1 * m.value.___AN2 - value.___AN2 * m.value.___AN1;
+        // In a right-handed system, X cross Z points along negative Y.
+        if constexpr (CI::EnabledX && CI::EnabledZ)
+            determinant = -determinant;
+        return _Vector<decltype(determinant), VSL_NAMESPACE::D1,
                 typename coordinate::_MakeCoordinateInfo<(!CI::EnabledX), (!CI::EnabledY), (!CI::EnabledZ)>::value>
-                (value.___AN1 * m.value.___AN2 - value.___AN2 * m.value.___AN1);
+                (determinant);
     }
 
     template<typename R, typename CI>
     template<typename T>
-    requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2>, T>
+    requires concepts::is_vector<T>&& std::convertible_to<_Vector<typename T::element_type, VSL_NAMESPACE::D2, CI>, T>
     constexpr auto _Vector<R, VSL_NAMESPACE::D2, CI>::hadamard(const T &m) const {
         _Vector<decltype(value.___AN1 * m.value.___AN1), VSL_NAMESPACE::D2, CI> result;
         result.value.___AN1 = value.___AN1 * m.value.___AN1;

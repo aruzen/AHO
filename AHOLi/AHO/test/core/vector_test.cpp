@@ -176,6 +176,55 @@ TEST(VectorMatrixTest, ThreeDimensionalSquareMatrixConversionPlacesCoordinatesOn
     const auto matrix = static_cast<aho::Mat<double, 4, 4>>(aho::d3::VectorD(2, 3, 4));
     EXPECT_DOUBLE_EQ(matrix[0][0], 2); EXPECT_DOUBLE_EQ(matrix[1][1], 3); EXPECT_DOUBLE_EQ(matrix[2][2], 4);
 }
+template<class T, bool X, bool Y, bool Z> struct VectorPlaneCase {
+    using Info = aho::coordinate::_MakeCoordinateInfo<X, Y, Z>::value;
+    using Vector = aho::_Vector<T, vsl::D2, Info>;
+};
+using VectorPlanes = testing::Types<
+    VectorPlaneCase<int, true, true, false>, VectorPlaneCase<int, true, false, true>, VectorPlaneCase<int, false, true, true>,
+    VectorPlaneCase<float, true, true, false>, VectorPlaneCase<float, true, false, true>, VectorPlaneCase<float, false, true, true>,
+    VectorPlaneCase<double, true, true, false>, VectorPlaneCase<double, true, false, true>, VectorPlaneCase<double, false, true, true>>;
+template<class T> class VectorPlaneTest : public testing::Test {};
+TYPED_TEST_SUITE(VectorPlaneTest, VectorPlanes);
+template<class V> void expect_plane(const V& value, double first, double second) {
+    using CI = typename V::coordinate_info;
+    if constexpr (CI::EnabledX) EXPECT_EQ(value.value.x.value, first);
+    if constexpr (CI::EnabledY) EXPECT_EQ(value.value.y.value, CI::EnabledX ? second : first);
+    if constexpr (CI::EnabledZ) EXPECT_EQ(value.value.z.value, second);
+}
+TYPED_TEST(VectorPlaneTest, ScalarOperatorsKeepThePlaneAndSourceCoordinates) {
+    using V = typename TypeParam::Vector;
+    const V value(2, -4);
+    static_assert(std::same_as<decltype(value * 2), V>);
+    static_assert(std::same_as<decltype(2 * value), V>);
+    static_assert(std::same_as<decltype(value / 2), V>);
+    expect_plane(value * 2, 4, -8);
+    expect_plane(2 * value, 4, -8);
+    expect_plane(value / 2, 1, -2);
+    expect_plane(value, 2, -4);
+}
+TYPED_TEST(VectorPlaneTest, DotAndHadamardAcceptVectorsOnTheSamePlane) {
+    using V = typename TypeParam::Vector;
+    const V left(2, 3), right(4, 5);
+    static_assert(std::same_as<decltype(left.hadamard(right)), V>);
+    EXPECT_EQ(left.dot(right), 23);
+    EXPECT_EQ(right.dot(left), 23);
+    expect_plane(left.hadamard(right), 8, 15);
+}
+TYPED_TEST(VectorPlaneTest, CrossUsesTheComplementaryAxisAndRightHandedOrientation) {
+    using V = typename TypeParam::Vector;
+    using CI = typename TypeParam::Info;
+    const V left(2, 3), right(4, 5);
+    const auto normal = left.cross(right), opposite = right.cross(left);
+    using Normal = typename decltype(normal)::coordinate_info;
+    static_assert(Normal::EnabledX == !CI::EnabledX);
+    static_assert(Normal::EnabledY == !CI::EnabledY);
+    static_assert(Normal::EnabledZ == !CI::EnabledZ);
+    constexpr int expected = CI::EnabledX && CI::EnabledZ ? 2 : -2;
+    if constexpr (Normal::EnabledX) { EXPECT_EQ(normal.value.x.value, expected); EXPECT_EQ(opposite.value.x.value, -expected); }
+    if constexpr (Normal::EnabledY) { EXPECT_EQ(normal.value.y.value, expected); EXPECT_EQ(opposite.value.y.value, -expected); }
+    if constexpr (Normal::EnabledZ) { EXPECT_EQ(normal.value.z.value, expected); EXPECT_EQ(opposite.value.z.value, -expected); }
+}
 TEST(VectorDeductionTest, DeductionAndDimensionWrappersConstructExpectedVectors) {
     const aho::Vector default_value;
     aho_test::expect_coordinates(default_value, 0);

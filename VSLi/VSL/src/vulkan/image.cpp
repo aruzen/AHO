@@ -9,6 +9,8 @@
 #include <VSL/vulkan/image.hpp>
 
 #include <utility>
+#include <stdexcept>
+#include "image_format.hpp"
 #include <VSL/vulkan/phase.hpp>
 #include <VSL/vulkan/command.hpp>
 #include <VSL/vulkan/commands/change_image_barrier.hpp>
@@ -17,7 +19,7 @@
 
 
 size_t vsl::ImageAccessor::size() {
-    return _data->width * _data->height * convert((data_format::___FormatTypes)_data->format).size();
+    return std::size_t(_data->width) * _data->height * _data->count * convert((data_format::___FormatTypes)_data->format).size();
 }
 
 std::shared_ptr<vsl::_impl::Image_impl>
@@ -28,12 +30,19 @@ vsl::ImageAccessor::MakeImage(vsl::ImageType type,
                               std::uint32_t width,
                               std::uint32_t height,
                               vsl::data_format::___Format format,
-                              std::uint32_t count) {
+                              std::uint32_t count, SampleCount samples) {
+    if (!device._data || !width || !height || !count || format.type() == data_format::___FormatTypes::Undefined)
+        throw std::invalid_argument("Invalid image device/extent/format");
+    const auto sampleBits = static_cast<std::uint32_t>(samples);
+    if (!sampleBits || sampleBits > 64 || (sampleBits & (sampleBits - 1)))
+        throw std::invalid_argument("Invalid image sample count");
     auto _data = std::make_shared<_impl::Image_impl>();
     _data->device = device._data;
     _data->height = height;
     _data->width = width;
     _data->count = count;
+    _data->usage = type;
+    _data->samples = samples;
     _data->format = (vk::Format)format.type();
 
     vk::ImageCreateInfo imageInfo;
@@ -42,7 +51,7 @@ vsl::ImageAccessor::MakeImage(vsl::ImageType type,
     imageInfo.extent = vk::Extent3D{ width, height, 1 };
     imageInfo.mipLevels = 1;
     imageInfo.arrayLayers = count;
-    imageInfo.samples = vk::SampleCountFlagBits::e1;
+    imageInfo.samples = static_cast<vk::SampleCountFlagBits>(samples);
     imageInfo.tiling = vk::ImageTiling::eOptimal;
     imageInfo.usage = (vk::ImageUsageFlagBits) type;
     imageInfo.initialLayout = (vk::ImageLayout) layout;
@@ -64,7 +73,7 @@ vsl::ImageAccessor::MakeImage(vsl::ImageType type,
     viewInfo.image = _data->image;
     viewInfo.viewType = count == 1 ? vk::ImageViewType::e2D : vk::ImageViewType::e2DArray;
     viewInfo.format = (vk::Format)format.type();;
-    viewInfo.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+    viewInfo.subresourceRange.aspectMask = _impl::helper::imageAspects(_data->format);
     viewInfo.subresourceRange.baseMipLevel = 0;
     viewInfo.subresourceRange.levelCount = 1;
     viewInfo.subresourceRange.baseArrayLayer = 0;
@@ -90,9 +99,15 @@ bool vsl::ImageAccessor::copyByBuffer(CommandManager manager, BufferAccessor *bu
 }
 
 vsl::_impl::Image_impl::~Image_impl() {
-    if (memory == VK_NULL_HANDLE)
-        return;
+    if (!device) return;
     device->device.destroy(view);
-    device->device.destroy(image);
-    device->device.free(memory);
+    if (memory != VK_NULL_HANDLE) {
+        device->device.destroy(image);
+        device->device.free(memory);
+    }
+}
+vsl::data_format::___Format vsl::ImageAccessor::getFormat() const {
+    const auto type = static_cast<data_format::___FormatTypes>(_data->format);
+    const auto format = data_format::convert(type);
+    return format.type() == data_format::___FormatTypes::Undefined ? data_format::___Format(type, 0) : format;
 }

@@ -13,12 +13,14 @@ namespace VSL_NAMESPACE {
         std::vector<ImageAccessor> images;
 
         size_t getSwapImageSize();
+        data_format::___Format getFormat() const;
     };
 
     struct Swapchain : public SwapchainAccessor {
         Swapchain(LogicalDeviceAccessor device, std::shared_ptr<Surface> surface,
                   std::optional<vsl::SwapchainAccessor> old = std::nullopt,
-                  std::optional<int> width = std::nullopt, std::optional<int> height = std::nullopt);
+                  std::optional<int> width = std::nullopt, std::optional<int> height = std::nullopt,
+                  ImageType usage = ImageType::ColorAttachment);
 
     };
 }

@@ -38,6 +38,7 @@
 #include "vulkan/scissor.hpp"
 #include "vulkan/swapchain.hpp"
 #include "vulkan/sampler.hpp"
+#include "vulkan/image_readback.hpp"
 #include "vulkan/pv.hpp"
 #include "vulkan/buffer.hpp"
 #include "vulkan/pipeline.hpp"

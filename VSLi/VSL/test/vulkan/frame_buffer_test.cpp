@@ -15,3 +15,18 @@ TEST_F(FrameBufferVulkanIntegrationTest, CreatesPickingFramebufferWithBothAttach
     EXPECT_TRUE(static_cast<bool>(picked._data->swapChainFramebuffers.front()));
 }
 } // namespace
+
+namespace {
+TEST_F(FrameBufferVulkanIntegrationTest, GenericTargetRetainsImagesAndPassAndRejectsMismatches) {
+    vsl::FrameBuffer target(*pass, 8, 8, {*color});
+    EXPECT_EQ(target._data->renderPass, pass->_data);
+    EXPECT_EQ(target._data->attachments[0][0], color->_data);
+    EXPECT_THROW((vsl::FrameBuffer(*pass, 8, 8, {})), std::invalid_argument);
+    EXPECT_THROW((vsl::FrameBuffer(*pass, 9, 8, {*color})), std::invalid_argument);
+    ColorImage wrong(device, 8, 8, vsl::data_format::UnsignedInt);
+    EXPECT_THROW((vsl::FrameBuffer(*pass, 8, 8, {wrong})), std::invalid_argument);
+    auto retained = color->_data;
+    color.reset();
+    EXPECT_EQ(target._data->attachments[0][0], retained);
+}
+} // namespace

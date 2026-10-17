@@ -19,7 +19,7 @@ TEST_F(ImageVulkanIntegrationTest, CreatesArrayImageWithRequestedLayerCount) {
     EXPECT_EQ(image._data->count, 3u);
     EXPECT_TRUE(image._data->view);
 }
-TEST_F(ImageVulkanIntegrationTest, DISABLED_ArraySizeIncludesAllLayers) {
+TEST_F(ImageVulkanIntegrationTest, ArraySizeIncludesAllLayers) {
     vsl::Image<vsl::ImageType::TransferDst | vsl::ImageType::Sampled> image(
         device, 4, 4, vsl::data_format::UnsignedInt8RGBA, 3);
     EXPECT_EQ(image.size(), 4u * 4u * 4u * 3u);

@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <vector>
+#include <mutex>
 
 namespace vsl_test {
 
@@ -27,8 +28,22 @@ inline std::vector<char> read_binary(const std::filesystem::path &path) {
 // Vulkan を初期化し、検証対象の public API には通常の Accessor を渡す。
 class VulkanIntegrationTest : public testing::Test {
     std::vector<std::shared_ptr<vsl::_impl::CommandPool_impl>> command_pools_;
+    VkDebugUtilsMessengerEXT validation_messenger_ = VK_NULL_HANDLE;
+    std::vector<std::string> validation_errors_;
+    std::mutex validation_mutex_;
+    static VKAPI_ATTR VkBool32 VKAPI_CALL
+    validation_callback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT,
+                        const VkDebugUtilsMessengerCallbackDataEXT *data, void *user) {
+        if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+            auto &self = *static_cast<VulkanIntegrationTest *>(user);
+            std::lock_guard lock(self.validation_mutex_);
+            self.validation_errors_.emplace_back(data->pMessage);
+        }
+        return VK_FALSE;
+    }
 
   protected:
+    virtual bool validate_vulkan() const { return false; }
     std::shared_ptr<vsl::_impl::Vulkan_impl<false>> instance;
     vsl::PhysicalDevice physical{std::shared_ptr<vsl::_impl::PhysicalDevice_impl>{}};
     vsl::LogicalDeviceAccessor device;
@@ -39,7 +54,7 @@ class VulkanIntegrationTest : public testing::Test {
         vk::InstanceCreateInfo instance_info{};
         const auto extensions = vk::enumerateInstanceExtensionProperties();
         for (const auto &extension : extensions)
-            for (const auto *name : {"VK_KHR_surface", "VK_EXT_metal_surface", "VK_KHR_xcb_surface",
+            for (const auto *name : {"VK_KHR_get_physical_device_properties2", "VK_KHR_surface", "VK_EXT_metal_surface", "VK_KHR_xcb_surface",
                                      "VK_KHR_xlib_surface", "VK_KHR_wayland_surface", "VK_KHR_win32_surface"})
                 if (std::strcmp(extension.extensionName, name) == 0)
                     instance_extensions.push_back(name);
@@ -51,6 +66,27 @@ class VulkanIntegrationTest : public testing::Test {
         }
         instance_info.enabledExtensionCount = static_cast<std::uint32_t>(instance_extensions.size());
         instance_info.ppEnabledExtensionNames = instance_extensions.data();
+        const char *validation_layer = "VK_LAYER_KHRONOS_validation";
+        VkDebugUtilsMessengerCreateInfoEXT debug_info{};
+        if (validate_vulkan()) {
+            const auto layers = vk::enumerateInstanceLayerProperties();
+            if (!std::ranges::any_of(layers, [&](const auto &layer) {
+                    return std::strcmp(layer.layerName, validation_layer) == 0;
+                }))
+                GTEST_SKIP() << "Validation layer required for composition tests";
+            instance_extensions.push_back("VK_EXT_debug_utils");
+            instance_info.enabledExtensionCount = static_cast<std::uint32_t>(instance_extensions.size());
+            instance_info.ppEnabledExtensionNames = instance_extensions.data();
+            instance_info.enabledLayerCount = 1;
+            instance_info.ppEnabledLayerNames = &validation_layer;
+            debug_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+            debug_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+            debug_info.messageType =
+                VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
+            debug_info.pfnUserCallback = validation_callback;
+            debug_info.pUserData = this;
+            instance_info.pNext = &debug_info;
+        }
         vk::Instance raw_instance;
         const auto result = vk::createInstance(&instance_info, nullptr, &raw_instance);
         if (result == vk::Result::eErrorIncompatibleDriver)
@@ -58,6 +94,12 @@ class VulkanIntegrationTest : public testing::Test {
         ASSERT_EQ(result, vk::Result::eSuccess);
         instance = std::make_shared<vsl::_impl::Vulkan_impl<false>>();
         instance->instance = raw_instance;
+        if (validate_vulkan()) {
+            auto create = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
+                vkGetInstanceProcAddr(raw_instance, "vkCreateDebugUtilsMessengerEXT"));
+            ASSERT_NE(create, nullptr);
+            ASSERT_EQ(create(raw_instance, &debug_info, nullptr, &validation_messenger_), VK_SUCCESS);
+        }
 
         vk::PhysicalDevice selected;
         for (const auto candidate : raw_instance.enumeratePhysicalDevices()) {
@@ -123,7 +165,15 @@ class VulkanIntegrationTest : public testing::Test {
         command_pools_.clear();
         device._data.reset();
         physical._data.reset();
+        if (validation_messenger_) {
+            auto destroy = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+                vkGetInstanceProcAddr(instance->instance, "vkDestroyDebugUtilsMessengerEXT"));
+            destroy(instance->instance, validation_messenger_, nullptr);
+            validation_messenger_ = VK_NULL_HANDLE;
+        }
         instance.reset();
+        for (const auto &error : validation_errors_)
+            ADD_FAILURE() << error;
     }
 
     vsl::CommandManager make_manager() {

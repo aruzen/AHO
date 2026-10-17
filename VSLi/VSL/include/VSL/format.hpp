@@ -8,6 +8,10 @@
 namespace VSL_NAMESPACE::data_format {
 	enum class ___FormatTypes : std::uint32_t{
 		Undefined = 0,
+        Depth16Unorm = 124,
+        Depth32Float = 126,
+        Depth24Stencil8 = 129,
+        Depth32FloatStencil8 = 130,
 		UnsignedNormalized8R = 9,
 		SignedNormalized8R = 10,
 		UnsignedScaled8R = 11,
@@ -393,6 +397,10 @@ namespace VSL_NAMESPACE::data_format {
 	};
 
 	constexpr ___Format Undefined(___FormatTypes::Undefined, 0);
+    constexpr ___Format Depth16Unorm(___FormatTypes::Depth16Unorm, 2);
+    constexpr ___Format Depth32Float(___FormatTypes::Depth32Float, 4);
+    constexpr ___Format Depth24Stencil8(___FormatTypes::Depth24Stencil8, 4);
+    constexpr ___Format Depth32FloatStencil8(___FormatTypes::Depth32FloatStencil8, 8);
 
 	constexpr ___Format UnsignedNormalized8R(___FormatTypes::UnsignedNormalized8R, 1 * 1);
 	constexpr ___Format SignedNormalized8R(___FormatTypes::SignedNormalized8R, 1 * 1);
@@ -409,7 +417,7 @@ namespace VSL_NAMESPACE::data_format {
 	constexpr ___Format SignedInt8RG(___FormatTypes::SignedInt8RG, 2 * 1);
 	constexpr ___Format Srgb8RG(___FormatTypes::Srgb8RG, 2 * 1);
 	constexpr ___Format UnsignedNormalized8RGB(___FormatTypes::UnsignedNormalized8RGB, 3 * 1);
-	constexpr ___Format SignedNormalized8RGB(___FormatTypes::SignedNormalized8RGB, 3 * 3 * 1);
+	constexpr ___Format SignedNormalized8RGB(___FormatTypes::SignedNormalized8RGB, 3);
 	constexpr ___Format UnsignedScaled8RGB(___FormatTypes::UnsignedScaled8RGB, 3 * 1);
 	constexpr ___Format SignedScaled8RGB(___FormatTypes::SignedScaled8RGB, 3 * 1);
 	constexpr ___Format UnsignedInt8RGB(___FormatTypes::UnsignedInt8RGB, 3 * 1);
@@ -436,13 +444,13 @@ namespace VSL_NAMESPACE::data_format {
 	constexpr ___Format UnsignedInt8BGRA(___FormatTypes::UnsignedInt8BGRA, 4 * 1);
 	constexpr ___Format SignedInt8BGRA(___FormatTypes::SignedInt8BGRA, 4 * 1);
 	constexpr ___Format Srgb8BGRA(___FormatTypes::Srgb8BGRA, 4 * 1);
-	constexpr ___Format UnsignedNormalized8ABGRPACK32(___FormatTypes::UnsignedNormalized8ABGRPACK32, 8);
+	constexpr ___Format UnsignedNormalized8ABGRPACK32(___FormatTypes::UnsignedNormalized8ABGRPACK32, 4);
 	constexpr ___Format SignedNormalized8ABGRPACK32(___FormatTypes::SignedNormalized8ABGRPACK32, 4 * 1);
 	constexpr ___Format UnsignedScaled8ABGRPACK32(___FormatTypes::UnsignedScaled8ABGRPACK32, 4 * 1);
 	constexpr ___Format SignedScaled8ABGRPACK32(___FormatTypes::SignedScaled8ABGRPACK32, 4 * 1);
 	constexpr ___Format UnsignedInt8ABGRPACK32(___FormatTypes::UnsignedInt8ABGRPACK32, 4 * 1);
 	constexpr ___Format SignedInt8ABGRPACK32(___FormatTypes::SignedInt8ABGRPACK32, 4 * 1);
-	constexpr ___Format Srgb8ABGRPACK32(___FormatTypes::Srgb8ABGRPACK32, 8);
+	constexpr ___Format Srgb8ABGRPACK32(___FormatTypes::Srgb8ABGRPACK32, 4);
 	constexpr ___Format UnsignedNormalized16R(___FormatTypes::UnsignedNormalized16R, 1 * 2);
 	constexpr ___Format SignedNormalized16R(___FormatTypes::SignedNormalized16R, 1 * 2);
 	constexpr ___Format UnsignedScaled16R(___FormatTypes::UnsignedScaled16R, 1 * 2);
@@ -784,6 +792,10 @@ namespace VSL_NAMESPACE::concepts {
 namespace VSL_NAMESPACE::data_format {
     constexpr ___Format convert(___FormatTypes t) {
         switch (t) {
+            case ___FormatTypes::Depth16Unorm: return Depth16Unorm;
+            case ___FormatTypes::Depth32Float: return Depth32Float;
+            case ___FormatTypes::Depth24Stencil8: return Depth24Stencil8;
+            case ___FormatTypes::Depth32FloatStencil8: return Depth32FloatStencil8;
             case ___FormatTypes::UnsignedNormalized8R:
                 return UnsignedNormalized8R;
             case ___FormatTypes::SignedNormalized8R:

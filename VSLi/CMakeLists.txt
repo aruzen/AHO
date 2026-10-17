@@ -16,6 +16,7 @@ add_library(VSL STATIC
         VSL/src/vulkan/descriptor_set_manager.cpp
         VSL/src/vulkan/descriptor.cpp
         VSL/src/vulkan/image.cpp
+        VSL/src/vulkan/image_readback.cpp
         VSL/src/vulkan/stages/depth_stencil.cpp
         VSL/src/vulkan/stages/shader_group.cpp
         VSL/src/vulkan/stages/rasterization.cpp
@@ -114,6 +115,7 @@ add_library(VSL STATIC
         VSL/include/VSL/vulkan/descriptor.hpp
         VSL/include/VSL/vulkan/_dimension.hpp
         VSL/include/VSL/vulkan/image.hpp
+        VSL/include/VSL/vulkan/image_readback.hpp
         VSL/include/VSL/dimension.hpp
         VSL/include/VSL/exceptions.hpp
         VSL/include/VSL/format.hpp

@@ -1,36 +1,24 @@
 #include <VSL/vulkan/stages/color_blend.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
-
-void VSL_NAMESPACE::pipeline_layout::ColorBlend::injection(VSL_NAMESPACE::PipelineLayoutAccessor pl)
-{
-	auto& info = *pl._data->info;
-
-    if (not info.pool.contains("colorBlendAttachments")) {
-        info.pool["colorBlendAttachments"] = std::vector<vk::PipelineColorBlendAttachmentState>();
-    }
-    auto& colorBlendAttachments = std::any_cast<std::vector<vk::PipelineColorBlendAttachmentState>&>
-            (info.pool["colorBlendAttachments"]);
-    colorBlendAttachments.emplace_back();
-    auto& colorBlendAttachment = colorBlendAttachments.back();
-
-	colorBlendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR
-		| vk::ColorComponentFlagBits::eG
-		| vk::ColorComponentFlagBits::eB
-		| vk::ColorComponentFlagBits::eA;
-	colorBlendAttachment.blendEnable = true;
-	colorBlendAttachment.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha; // Optional
-	colorBlendAttachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha; // Optional
-	colorBlendAttachment.colorBlendOp = vk::BlendOp::eAdd; // Optional
-	colorBlendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eOne; // Optional
-	colorBlendAttachment.dstAlphaBlendFactor = vk::BlendFactor::eZero; // Optional
-	colorBlendAttachment.alphaBlendOp = vk::BlendOp::eAdd; // Optional
-
-	info.colorBlend.logicOpEnable = false;
-	info.colorBlend.logicOp = vk::LogicOp::eCopy; // Optional
-    info.colorBlend.attachmentCount = colorBlendAttachments.size();
-    info.colorBlend.pAttachments = colorBlendAttachments.data();
-	info.colorBlend.blendConstants[0] = 0.0f; // Optional
-	info.colorBlend.blendConstants[1] = 0.0f; // Optional
-	info.colorBlend.blendConstants[2] = 0.0f; // Optional
-	info.colorBlend.blendConstants[3] = 0.0f; // Optional
+namespace vsl::pipeline_layout {
+void ColorBlend::injection(PipelineLayoutAccessor pl) {
+    auto &info = *pl._data->info;
+    if (!info.pool.contains("colorBlendAttachments"))
+        info.pool["colorBlendAttachments"] = std::vector<vk::PipelineColorBlendAttachmentState>{};
+    auto &states = std::any_cast<std::vector<vk::PipelineColorBlendAttachmentState> &>(
+        info.pool["colorBlendAttachments"]);
+    for (const auto &a : attachments)
+        states.push_back(
+            {.blendEnable = a.enabled,
+             .srcColorBlendFactor = static_cast<vk::BlendFactor>(a.sourceColor),
+             .dstColorBlendFactor = static_cast<vk::BlendFactor>(a.destinationColor),
+             .colorBlendOp = static_cast<vk::BlendOp>(a.colorOp),
+             .srcAlphaBlendFactor = static_cast<vk::BlendFactor>(a.sourceAlpha),
+             .dstAlphaBlendFactor = static_cast<vk::BlendFactor>(a.destinationAlpha),
+             .alphaBlendOp = static_cast<vk::BlendOp>(a.alphaOp),
+             .colorWriteMask = vk::ColorComponentFlags(static_cast<std::uint32_t>(a.writeMask))});
+    info.colorBlend.logicOpEnable = false;
+    info.colorBlend.attachmentCount = static_cast<std::uint32_t>(states.size());
+    info.colorBlend.pAttachments = states.data();
 }
+} // namespace vsl::pipeline_layout

@@ -33,43 +33,11 @@ class RenderVulkanIntegrationTest : public VulkanIntegrationTest {
         description._data->imageCount = 1;
         description._data->swapChainImageFormat = vk::Format::eR8G8B8A8Unorm;
         description.images = {*color};
-        pass.emplace(description);
-
-        // 公開 RenderPass は Present 固定。表示画像を使わずコマンドを検証するため、
-        // fixture のみで offscreen 用 render pass を用意する（製品実装は変更しない）。
-        device._data->device.destroyRenderPass(pass->_data->renderPass);
-        pass->_data->renderPass = nullptr;
-        vk::AttachmentDescription attachment{};
-        attachment.format = vk::Format::eR8G8B8A8Unorm;
-        attachment.samples = vk::SampleCountFlagBits::e1;
-        attachment.loadOp = vk::AttachmentLoadOp::eClear;
-        attachment.storeOp = vk::AttachmentStoreOp::eStore;
-        attachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
-        attachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
-        attachment.initialLayout = vk::ImageLayout::eUndefined;
-        attachment.finalLayout = vk::ImageLayout::eGeneral;
-        vk::AttachmentReference reference{.attachment = 0,
-                                          .layout = vk::ImageLayout::eColorAttachmentOptimal};
-        vk::SubpassDescription subpass{};
-        subpass.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
-        subpass.colorAttachmentCount = 1;
-        subpass.pColorAttachments = &reference;
-        vk::RenderPassCreateInfo info{};
-        info.attachmentCount = 1;
-        info.pAttachments = &attachment;
-        info.subpassCount = 1;
-        info.pSubpasses = &subpass;
-        vk::SubpassDependency dependency{};
-        dependency.srcSubpass = 0;
-        dependency.dstSubpass = VK_SUBPASS_EXTERNAL;
-        dependency.srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-        dependency.srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
-        dependency.dstStageMask = vk::PipelineStageFlagBits::eTransfer;
-        dependency.dstAccessMask = vk::AccessFlagBits::eTransferRead;
-        info.dependencyCount = 1;
-        info.pDependencies = &dependency;
-        pass->_data->renderPass = device._data->device.createRenderPass(info);
-        framebuffer.emplace(description, *pass);
+        vsl::RenderPassDescription passDescription;
+        passDescription.addColor({.format = vsl::data_format::UnsignedNormalized8RGBA,
+                                   .finalLayout = vsl::ImageLayout::General});
+        pass.emplace(device, passDescription);
+        framebuffer.emplace(*pass, width, height, std::vector<vsl::ImageAccessor>{*color});
         configure_pipeline(false);
     }
 

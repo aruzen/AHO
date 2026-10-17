@@ -5,6 +5,7 @@
 
 #include "pipeline_layout.hpp"
 #include "render_pass.hpp"
+#include "command.hpp"
 
 namespace VSL_NAMESPACE {
     struct PipelineAccessor {
@@ -12,7 +13,7 @@ namespace VSL_NAMESPACE {
     };
 
     struct GraphicsPipeline : public PipelineAccessor {
-        GraphicsPipeline(PipelineLayoutAccessor layout, RenderPassAccessor pass);
+        GraphicsPipeline(PipelineLayoutAccessor layout, RenderPassAccessor pass, std::uint32_t subpass = 0);
 
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
     };

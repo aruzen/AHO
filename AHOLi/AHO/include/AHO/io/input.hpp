@@ -317,10 +317,14 @@ namespace AHO_NAMESPACE::input {
     namespace abstract {
         template<typename T>
         struct Input {
+            virtual ~Input() = default;
+
             virtual T state() = 0;
         };
 
         struct Updatable {
+            virtual ~Updatable() = default;
+
             virtual void update() {};
         };
 

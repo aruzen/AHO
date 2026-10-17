@@ -14,6 +14,13 @@
 #include "buffer.hpp"
 
 namespace VSL_NAMESPACE {
+    struct ImageRegion {
+        std::uint32_t x = 0, y = 0;
+        // Both zero means the full image. Coordinates then must also be zero.
+        std::uint32_t width = 0, height = 0;
+        std::uint32_t layer = 0;
+    };
+
     // memory propertyとformatをtemplateにしたいかも
     template<ImageType Usage, MemoryProperty MemProp = MemoryProperty::DeviceLocal, ImageLayout Layout = ImageLayout::Undefined>
     struct Image : public ImageAccessor {

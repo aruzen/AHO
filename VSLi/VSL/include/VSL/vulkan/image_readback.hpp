@@ -6,12 +6,6 @@
 #include <vector>
 
 namespace VSL_NAMESPACE {
-    struct ImageRegion {
-        std::uint32_t x = 0, y = 0;
-        // Both zero means the full image. Coordinates then must also be zero.
-        std::uint32_t width = 0, height = 0;
-        std::uint32_t layer = 0;
-    };
     struct ImagePixels {
         std::uint32_t width = 0, height = 0;
         std::size_t rowStride = 0;

@@ -1,6 +1,6 @@
 # RenderPass構成と画像読み戻し
 
-更新日: 2026-10-17。
+更新日: 2026-10-18。
 
 ## 責務
 
@@ -98,6 +98,41 @@ std::memcpy(&id, pixel.bytes.data(), sizeof(id));
 - bytesはnative formatの順序・色空間のまま行間paddingなし。rowStrideはバイト単位。BGRA→RGBA、上下反転、色空間変換、画像エンコードは利用側で行う。
 - 別queueとのSemaphore/所有権移譲、queueへの並行CPUアクセス、同じ要求への並行read/mapは利用側で同期する。未送信のproducerの結果は取得できない。
 
+## 既存commandによる読み戻し
+
+描画と同じPhaseで転送を記録する場合は、既存の `ChangeImageBarrier` と `CopyImageToBuffer` を組み合わせる。専用のコマンド型は追加しない。`ImageReadback` も内部ではこの組合せを使い、バッファ確保・専用CommandBuffer・送信・完了待ち・non-coherent invalidateをまとめて引き受ける。
+
+```cpp
+#include <VSL/vulkan/commands/change_image_barrier.hpp>
+#include <VSL/vulkan/commands/copy_image_to_buffer.hpp>
+
+// completionFenceはmanagerの各bufferに対応し、初回はsignal済みで用意する。
+StagingBuffer<MemoryType::TransferDestination> destination(
+    device, std::size_t(width) * height * color.getFormat().size());
+{
+    auto phase = manager.startPhase<ComputePhase>(
+        std::nullopt, std::nullopt, completionFence);
+    // このPhase内でcolorへ描画し、RenderPassEndまで記録する。
+    phase << command::ChangeImageBarrier(
+                 color, ImageLayout::General, ImageLayout::TransferSrcOptimal)
+          << command::CopyImageToBuffer(
+                 &destination, color, ImageLayout::TransferSrcOptimal, {}, true)
+          << command::ChangeImageBarrier(
+                 color, ImageLayout::TransferSrcOptimal, ImageLayout::General);
+}
+if (!completionFence.wait(manager.getCurrentBufferIdx(), UINT64_MAX))
+    throw std::runtime_error("Image transfer did not complete");
+auto mapped = destination.data();
+// mapped.dataから画素を読む。mappedの寿命中はmapを維持する。
+```
+
+- `ChangeImageBarrier(image, oldLayout, newLayout, baseLayer, layerCount)` で対象レイヤーを限定できる。従来の3引数版は全レイヤー。layerCountが0ならbaseLayer以降の残り全部。mipは0を対象とする。
+- General/ShaderReadOnlyOptimal/TransferDstOptimal/Present/ColorAttachmentOptimalとTransferSrcOptimal間の遷移に対応する。queue familyの所有権移譲は行わない。
+- `CopyImageToBuffer(buffer, image, layout, region, hostRead)` は、GeneralまたはTransferSrcOptimalから指定領域・1レイヤーをbuffer offset 0へ密にコピーする。`ImageRegion` は `image.hpp` に配置する。
+- hostRead=trueは転送書込み→CPU読取りのメモリー依存を記録する。送信やCPU待機は行わない。Fence等で転送完了を待ってからmapし、non-coherentメモリーではinvalidateも行う。例のStagingBufferはHostCoherentを要求する。
+- 画像・転送先buffer・記録したCommandBufferはGPU完了まで利用側が保持する。記録中のRenderPassの外で呼び出す。領域・レイヤー・転送先容量・deviceの不一致は記録前に拒否する。
+- 既存の2引数版と型付きの呼出しは、Generalからmip 0・layer 0の全画面をコピーする従来の動作を維持する。
+
 ## Swapchain、互換性、寿命
 
 Swapchain末尾のusage引数に `ImageType::ColorAttachment | ImageType::TransferSrc` を渡すと、Surfaceの対応usageを確認して作成する。非対応なら例外にし、暗黙に用途を落とさない。その環境では転送可能なオフスクリーン画像へ描画する。
@@ -135,3 +170,10 @@ build-vsl-abstraction/VSLi/VSL/test/vsl-test
 # CTestでも同じケースを実行できる。
 ctest --test-dir build-vsl-abstraction --output-on-failure -R '^VSL\.'
 ```
+
+## 2026-10-18 既存commandへの委譲後の検証
+
+- `vsl-tests` の再ビルドが成功。VSL全体189件成功、失敗0、skip 0。既知不具合26件はDISABLEDを維持。
+- `ChangeImageBarrier` / `CopyImageToBuffer` / `ImageReadback` / 実Swapchain読み戻しの関連18件で、Validation Layerのerrorを捕捉して成功。
+- 描画と同じPhase内での領域読み戻し、異なる内容を持つ配列レイヤーの選択、他レイヤーのlayout維持、転送先容量と範囲外の拒否を追加検証。
+- 関連4ヘッダーの単独includeコンパイルが成功。読み戻しの専用CommandBufferもGPU完了後に解放してから専用poolを破棄する。

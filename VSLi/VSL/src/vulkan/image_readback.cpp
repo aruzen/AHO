@@ -1,5 +1,7 @@
 #include <VSL/vulkan/image_readback.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
+#include <VSL/vulkan/commands/change_image_barrier.hpp>
+#include <VSL/vulkan/commands/copy_image_to_buffer.hpp>
 #include "image_format.hpp"
 #include <cstring>
 #include <limits>
@@ -10,6 +12,7 @@ VSL_NAMESPACE::_impl::ImageReadback_impl::~ImageReadback_impl() {
         return;
     if (submitted)
         (void)device->device.waitForFences(1, &fence, true, UINT64_MAX);
+    commandBuffer.reset();
     device->device.destroyFence(fence);
     device->device.destroyCommandPool(pool);
 }
@@ -77,43 +80,21 @@ namespace vsl {
             device.allocateMemory({.allocationSize = requirements.size, .memoryTypeIndex = *memoryType});
         device.bindBufferMemory(data->buffer->buffer, data->buffer->deviceMem, 0);
         data->pool = device.createCommandPool({.queueFamilyIndex = data->device->graphicsFamily});
-        auto command = device
-                           .allocateCommandBuffers({.commandPool = data->pool,
-                                                    .level = vk::CommandBufferLevel::ePrimary,
-                                                    .commandBufferCount = 1})
-                           .front();
+        auto poolData = std::make_shared<_impl::CommandPool_impl>();
+        poolData->device = data->device;
+        poolData->commandPool = data->pool;
+        CommandPool pool(poolData);
+        CommandBuffer commandBuffer(pool, 1);
+        data->commandBuffer = commandBuffer._data;
+        auto command = commandBuffer._data->commandBuffers.front();
         data->fence = device.createFence({});
         command.begin({.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-        vk::ImageMemoryBarrier barrier{
-            .srcAccessMask = vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite,
-            .dstAccessMask = vk::AccessFlagBits::eTransferRead,
-            .oldLayout = static_cast<vk::ImageLayout>(layout),
-            .newLayout = vk::ImageLayout::eTransferSrcOptimal,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = src.image,
-            .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, region.layer, 1}};
-        command.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eTransfer, {},
-                                {}, {}, barrier);
-        vk::BufferImageCopy copy{
-            .imageSubresource = {vk::ImageAspectFlagBits::eColor, 0, region.layer, 1},
-            .imageOffset = {static_cast<std::int32_t>(region.x), static_cast<std::int32_t>(region.y), 0},
-            .imageExtent = {region.width, region.height, 1}};
-        command.copyImageToBuffer(src.image, vk::ImageLayout::eTransferSrcOptimal, data->buffer->buffer, copy);
-        barrier.srcAccessMask = vk::AccessFlagBits::eTransferRead;
-        barrier.dstAccessMask = vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite;
-        barrier.oldLayout = vk::ImageLayout::eTransferSrcOptimal;
-        barrier.newLayout = static_cast<vk::ImageLayout>(layout);
-        vk::BufferMemoryBarrier host{.srcAccessMask = vk::AccessFlagBits::eTransferWrite,
-                                     .dstAccessMask = vk::AccessFlagBits::eHostRead,
-                                     .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                                     .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                                     .buffer = data->buffer->buffer,
-                                     .offset = 0,
-                                     .size = VK_WHOLE_SIZE};
-        command.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-                                vk::PipelineStageFlagBits::eAllCommands | vk::PipelineStageFlagBits::eHost, {},
-                                {}, host, barrier);
+        command::ChangeImageBarrier(image, layout, ImageLayout::TransferSrcOptimal, region.layer, 1)
+            .invoke(pool, commandBuffer, manager);
+        command::CopyImageToBuffer(data->buffer, image, ImageLayout::TransferSrcOptimal, region, true)
+            .invoke(pool, commandBuffer, manager);
+        command::ChangeImageBarrier(image, ImageLayout::TransferSrcOptimal, layout, region.layer, 1)
+            .invoke(pool, commandBuffer, manager);
         command.end();
         vk::SubmitInfo submit{.commandBufferCount = 1, .pCommandBuffers = &command};
         manager._data->graphicsQueue.submit(submit, data->fence);

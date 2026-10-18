@@ -76,3 +76,40 @@ TEST_F(DeviceVulkanIntegrationTest, SearchReturnsAnEnumeratedDeviceAndBenchmarkM
     // Maximum-score selection requires a multi-device fixture; single-device enumeration cannot prove it.
 }
 } // namespace
+
+namespace {
+struct SuppliedLogicalDeviceCreator {
+    static inline std::shared_ptr<vsl::_impl::LogicalDevice_impl> supplied;
+    static inline std::shared_ptr<vsl::_impl::PhysicalDevice_impl> received_physical;
+    static inline std::shared_ptr<vsl::_impl::Surface_impl> received_surface;
+    std::shared_ptr<vsl::_impl::LogicalDevice_impl> create(vsl::PhysicalDevice physical, vsl::Surface surface) {
+        received_physical = physical._data;
+        received_surface = surface._data;
+        return supplied;
+    }
+};
+TEST_F(LogicalDeviceWindowIntegrationTest, CustomCreatorLinksForBothSurfaceOverloadsAndPinsThePhysicalOwner) {
+    make_surface();
+    ASSERT_FALSE(HasFatalFailure());
+    struct ResetCreator {
+        ~ResetCreator() {
+            SuppliedLogicalDeviceCreator::supplied.reset();
+            SuppliedLogicalDeviceCreator::received_physical.reset();
+            SuppliedLogicalDeviceCreator::received_surface.reset();
+        }
+    } cleanup;
+    SuppliedLogicalDeviceCreator::supplied = device._data;
+    device._data->parentDevice.reset();
+    using Device = vsl::LogicalDevice<SuppliedLogicalDeviceCreator>;
+    Device by_value(physical, *surface);
+    EXPECT_EQ(by_value._data, device._data);
+    EXPECT_EQ(by_value._data->parentDevice, physical._data);
+    EXPECT_EQ(SuppliedLogicalDeviceCreator::received_physical, physical._data);
+    EXPECT_EQ(SuppliedLogicalDeviceCreator::received_surface, surface->_data);
+    device._data->parentDevice.reset();
+    Device by_pointer(physical, surface);
+    EXPECT_EQ(by_pointer._data, device._data);
+    EXPECT_EQ(by_pointer._data->parentDevice, physical._data);
+    EXPECT_TRUE(static_cast<bool>(by_pointer._data->device.getQueue(queue_family, 0)));
+}
+} // namespace

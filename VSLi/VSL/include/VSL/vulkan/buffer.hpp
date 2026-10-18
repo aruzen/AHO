@@ -131,18 +131,23 @@ namespace VSL_NAMESPACE {
         return helper::copy_with_shift_offset(this->data, this->size, offset, args...);
     }
 
-    template<typename T, std::integral Count>
-    requires (!std::same_as<Count, std::size_t>)
+    template<typename T, typename Count>
+    requires (!std::same_as<Count, std::size_t> &&
+              (std::integral<Count> || (std::is_enum_v<Count> && std::is_convertible_v<Count, std::size_t>)))
     bool BufferAccessor::copy(T* t, Count size) {
-        if constexpr (std::is_signed_v<Count>) {
-            if (size < 0)
-                return false;
+        if constexpr (std::is_enum_v<Count>) {
+            return copy(t, static_cast<std::underlying_type_t<Count>>(size));
+        } else {
+            if constexpr (std::is_signed_v<Count>) {
+                if (size < 0)
+                    return false;
+            }
+            if constexpr (sizeof(Count) > sizeof(std::size_t)) {
+                if (size > std::numeric_limits<std::size_t>::max())
+                    return false;
+            }
+            return copy(t, static_cast<std::size_t>(size));
         }
-        if constexpr (sizeof(Count) > sizeof(std::size_t)) {
-            if (size > std::numeric_limits<std::size_t>::max())
-                return false;
-        }
-        return copy(t, static_cast<std::size_t>(size));
     }
 
     template<typename T>
@@ -157,18 +162,23 @@ namespace VSL_NAMESPACE {
         return true;
     }
 
-    template<typename T, std::integral Count>
-    requires (!std::same_as<Count, std::size_t>)
+    template<typename T, typename Count>
+    requires (!std::same_as<Count, std::size_t> &&
+              (std::integral<Count> || (std::is_enum_v<Count> && std::is_convertible_v<Count, std::size_t>)))
     bool BufferAccessor::LocalBufferHolder::copy(T* t, Count size) {
-        if constexpr (std::is_signed_v<Count>) {
-            if (size < 0)
-                return false;
+        if constexpr (std::is_enum_v<Count>) {
+            return copy(t, static_cast<std::underlying_type_t<Count>>(size));
+        } else {
+            if constexpr (std::is_signed_v<Count>) {
+                if (size < 0)
+                    return false;
+            }
+            if constexpr (sizeof(Count) > sizeof(std::size_t)) {
+                if (size > std::numeric_limits<std::size_t>::max())
+                    return false;
+            }
+            return copy(t, static_cast<std::size_t>(size));
         }
-        if constexpr (sizeof(Count) > sizeof(std::size_t)) {
-            if (size > std::numeric_limits<std::size_t>::max())
-                return false;
-        }
-        return copy(t, static_cast<std::size_t>(size));
     }
 
     template<typename T>

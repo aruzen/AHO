@@ -13,7 +13,7 @@
 
 namespace VSL_NAMESPACE::command {
     struct Dispatch : public __Command {
-        Dispatch(std::uint32_t x, std::uint32_t y, std::uint32_t z);
+        Dispatch(std::uint32_t x, std::uint32_t y = 1, std::uint32_t z = 1);
 
         std::uint32_t x, y, z;
 

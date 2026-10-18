@@ -262,7 +262,7 @@ namespace VSL_NAMESPACE {
         StagingBuffer<> stagingBuffer(device, sizeof(T) * size);
         {
             auto data = stagingBuffer.data();
-            bcopy(t, data.data, sizeof(T) * size);
+            std::memcpy(data.data, t, sizeof(T) * size);
         }
         this->copyByBuffer(manager, &stagingBuffer);
     }

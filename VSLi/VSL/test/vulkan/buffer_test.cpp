@@ -563,3 +563,16 @@ TEST_F(BufferVulkanIntegrationTest, NegativeAndEmptyEnumCountsKeepExistingStorag
     EXPECT_EQ(std::memcmp(mapped.data, initial.data(), sizeof(initial)), 0);
 }
 } // namespace
+
+namespace {
+TEST(BufferCompilationTest, DeviceLocalPointerUploadCompilesWithStrictPosixHeaders) {
+    const auto result = vsl_test::compile_probe(R"cpp(
+#define _POSIX_C_SOURCE 200809L
+#include <VSL/vulkan/buffer.hpp>
+void upload(vsl::LogicalDeviceAccessor device, vsl::CommandManager manager, const unsigned *values) {
+    vsl::DeviceLocalBuffer<> buffer(device, manager, values, std::size_t{3});
+}
+)cpp");
+    EXPECT_EQ(result.status, 0) << result.diagnostics;
+}
+} // namespace

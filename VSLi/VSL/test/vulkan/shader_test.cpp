@@ -1,4 +1,5 @@
 #include "support/vulkan_fixture.hpp"
+#include "support/temporary_directory.hpp"
 
 namespace {
 using ShaderVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
@@ -41,5 +42,17 @@ TEST_F(ShaderVulkanIntegrationTest, FactoriesInferStageAndHonorExplicitEntryName
     EXPECT_EQ(fragment.name(), "main");
     EXPECT_TRUE(static_cast<bool>(vertex._data->shaderModule));
     EXPECT_TRUE(static_cast<bool>(fragment._data->shaderModule));
+}
+} // namespace
+
+namespace {
+TEST_F(ShaderVulkanIntegrationTest, RejectsEmptyAndPartialWordsBeforeCreatingAModule) {
+    vsl_test::TemporaryDirectory temporary;
+    for (const auto byte_count : {0u, 3u, 7u}) {
+        const auto path = temporary.path() / (std::to_string(byte_count) + ".vert.spv");
+        { std::ofstream output(path, std::ios::binary); output << std::string(byte_count, '\0'); }
+        EXPECT_THROW((vsl::Shader<vsl::ShaderType::Vertex>(device, path)), vsl::exceptions::RuntimeException);
+        EXPECT_THROW((vsl::Shader<vsl::ShaderType::Vertex>(device, path, "main")), vsl::exceptions::RuntimeException);
+    }
 }
 } // namespace

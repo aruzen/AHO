@@ -189,3 +189,50 @@ TEST_F(DescriptorVulkanIntegrationTest, HolderValueUpdateUsesItsOffsetAndSizeFor
     for (std::size_t i = 0; i < count; ++i) EXPECT_EQ(actual[offset / sizeof(std::uint32_t) + i], base + i);
 }
 } // namespace
+
+namespace {
+TEST_F(DescriptorVulkanIntegrationTest, BufferUpdatesRejectEmptyAndOutOfBoundsRangesBeforeCallingVulkan) {
+    const auto bytes = count * sizeof(std::uint32_t);
+    EXPECT_THROW(resource.update(&*output, 0, std::nullopt, bytes), vsl::exceptions::RuntimeException);
+    EXPECT_THROW(resource.update(&*output, 0, std::nullopt, bytes + 1), vsl::exceptions::RuntimeException);
+    EXPECT_THROW(resource.update(&*output, 0, std::nullopt, 0, 0), vsl::exceptions::RuntimeException);
+    EXPECT_THROW(resource.update(&*output, 0, std::nullopt, 0, bytes + 1), vsl::exceptions::RuntimeException);
+}
+TEST_F(DescriptorVulkanIntegrationTest, DefaultBufferRangeAtAnOffsetDoesNotExceedTheRequestedStorage) {
+    const auto offset = std::max<std::size_t>(16, physical._data->props->limits.minStorageBufferOffsetAlignment);
+    StorageBuffer buffer(device, std::size_t{offset + count * sizeof(std::uint32_t)});
+    resource.update(&buffer, 0, std::nullopt, offset);
+}
+TEST_F(DescriptorVulkanIntegrationTest, DefaultExplicitAndWholeBufferRangesWriteOnlyTheSelectedTailOnGpu) {
+    const auto offset = std::max<std::size_t>(16, physical._data->props->limits.minStorageBufferOffsetAlignment);
+    const std::vector<std::uint32_t> initial(offset / sizeof(std::uint32_t) + count, 0xa5a5a5a5u);
+    StorageBuffer buffer(device, initial.data(), initial.size());
+    std::vector<std::optional<std::size_t>> ranges{std::nullopt, count * sizeof(std::uint32_t)};
+    if constexpr (sizeof(std::size_t) >= sizeof(vk::DeviceSize))
+        ranges.emplace_back(static_cast<std::size_t>(VK_WHOLE_SIZE));
+    for (auto range : ranges) {
+        ASSERT_TRUE(buffer.copy(initial.data(), initial.size()));
+        resource.update(&buffer, 0, std::nullopt, offset, range);
+        const std::uint32_t base = 137;
+        auto manager = make_manager();
+        {
+            auto phase = manager.startPhase<vsl::ComputePhase>();
+            auto stream = phase << *pipeline;
+            stream << vsl::command::BindGraphicResource(resource, vsl::graphic_resource::BindingDestination::Compute)
+                   << vsl::command::PushConstant(*layout, vsl::ShaderFlag::Compute, base)
+                   << vsl::command::Dispatch(count, 1, 1);
+            vk::MemoryBarrier barrier{};
+            barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
+            barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
+            auto commands = manager.getBuffer();
+            commands._data->commandBuffers[commands.getCurrentBufferIdx()].pipelineBarrier(
+                vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+        }
+        device._data->device.waitIdle();
+        auto mapped = buffer.data(initial.size() * sizeof(std::uint32_t));
+        const auto *actual = static_cast<const std::uint32_t *>(mapped.data);
+        for (std::size_t i = 0; i < offset / sizeof(std::uint32_t); ++i) EXPECT_EQ(actual[i], initial[i]);
+        for (std::size_t i = 0; i < count; ++i) EXPECT_EQ(actual[offset / sizeof(std::uint32_t) + i], base + i);
+    }
+}
+} // namespace

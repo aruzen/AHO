@@ -386,3 +386,16 @@ TEST_F(BufferVulkanIntegrationTest, MappedHolderCopiesKeepExplicitFlushControl) 
     EXPECT_EQ(buffer.flush_calls, 1);
 }
 } // namespace
+
+namespace {
+TEST(BufferCompilationTest, DeviceLocalPointerUploadCompilesWithStrictPosixHeaders) {
+    const auto result = vsl_test::compile_probe(R"cpp(
+#define _POSIX_C_SOURCE 200809L
+#include <VSL/vulkan/buffer.hpp>
+void upload(vsl::LogicalDeviceAccessor device, vsl::CommandManager manager, const unsigned *values) {
+    vsl::DeviceLocalBuffer<> buffer(device, manager, values, std::size_t{3});
+}
+)cpp");
+    EXPECT_EQ(result.status, 0) << result.diagnostics;
+}
+} // namespace

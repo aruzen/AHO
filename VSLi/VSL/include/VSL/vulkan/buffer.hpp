@@ -106,6 +106,16 @@ namespace VSL_NAMESPACE {
     }
 
     namespace helper {
+
+        template<typename T>
+        constexpr std::size_t checked_buffer_array_size(std::size_t count) {
+            if (count == 0)
+                throw exceptions::RuntimeException("BufferSize", "Buffer arrays must contain at least one element");
+            if (count > std::numeric_limits<std::size_t>::max() / sizeof(T))
+                throw exceptions::RuntimeException("BufferSize", "Buffer array byte size overflow");
+            return sizeof(T) * count;
+        }
+
         bool copy_with_shift_offset(void* data, size_t maxSize, size_t& offset);
 
         template<typename T, typename... Args>
@@ -245,7 +255,8 @@ namespace VSL_NAMESPACE {
     template<typename T>
     requires(VSL_NAMESPACE::contain<MemProperty, MemoryProperty::HostVisible>())
     Buffer<MemType, MemProperty, SharingMode>::Buffer(LogicalDeviceAccessor device, T* t, size_t size) {
-        _data = this->MakeBuffer(device, sizeof(T) * size, MemType, MemProperty, SharingMode);
+        const auto bytes = helper::checked_buffer_array_size<T>(size);
+        _data = this->MakeBuffer(device, bytes, MemType, MemProperty, SharingMode);
         {
             auto data = this->data();
             data.copy(t, size);
@@ -258,11 +269,12 @@ namespace VSL_NAMESPACE {
     template<typename T>
     requires(!VSL_NAMESPACE::contain<MemProperty, MemoryProperty::HostVisible>())
     Buffer<MemType, MemProperty, SharingMode>::Buffer(LogicalDeviceAccessor device, CommandManager manager, T* t, size_t size) {
-        _data = this->MakeBuffer(device, sizeof(T) * size, MemType, MemProperty, SharingMode);
-        StagingBuffer<> stagingBuffer(device, sizeof(T) * size);
+        const auto bytes = helper::checked_buffer_array_size<T>(size);
+        _data = this->MakeBuffer(device, bytes, MemType, MemProperty, SharingMode);
+        StagingBuffer<> stagingBuffer(device, bytes);
         {
             auto data = stagingBuffer.data();
-            std::memcpy(data.data, t, sizeof(T) * size);
+            std::memcpy(data.data, t, bytes);
         }
         this->copyByBuffer(manager, &stagingBuffer);
     }

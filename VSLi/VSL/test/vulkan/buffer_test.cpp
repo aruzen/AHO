@@ -576,3 +576,26 @@ void upload(vsl::LogicalDeviceAccessor device, vsl::CommandManager manager, cons
     EXPECT_EQ(result.status, 0) << result.diagnostics;
 }
 } // namespace
+
+namespace {
+TEST_F(BufferVulkanIntegrationTest, HostVisibleArrayConstructionRejectsByteCountOverflowInsteadOfWrapping) {
+    const std::uint32_t source = 17;
+    const auto overflowing_count = std::numeric_limits<std::size_t>::max() / sizeof(source) + 2;
+    // The old multiplication wraps to one element, keeping the reproduction's native allocation valid.
+    EXPECT_THROW((HostBuffer(device, &source, overflowing_count)), vsl::exceptions::RuntimeException);
+}
+TEST_F(BufferVulkanIntegrationTest, DeviceLocalArrayConstructionRejectsByteCountOverflowInsteadOfWrapping) {
+    const std::uint32_t source = 23;
+    const auto overflowing_count = std::numeric_limits<std::size_t>::max() / sizeof(source) + 2;
+    auto manager = make_manager();
+    using Buffer = vsl::DeviceLocalBuffer<vsl::MemoryType::TransferSource>;
+    EXPECT_THROW((Buffer(device, manager, &source, overflowing_count)), vsl::exceptions::RuntimeException);
+}
+TEST_F(BufferVulkanIntegrationTest, ArrayConstructionRejectsZeroElementsBeforeCreatingNativeBuffers) {
+    const std::uint32_t source = 29;
+    EXPECT_THROW((HostBuffer(device, &source, std::size_t{0})), vsl::exceptions::RuntimeException);
+    auto manager = make_manager();
+    using Buffer = vsl::DeviceLocalBuffer<vsl::MemoryType::TransferSource>;
+    EXPECT_THROW((Buffer(device, manager, &source, std::size_t{0})), vsl::exceptions::RuntimeException);
+}
+} // namespace

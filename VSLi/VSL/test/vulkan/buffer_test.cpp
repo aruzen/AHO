@@ -156,3 +156,43 @@ TEST_F(BufferVulkanIntegrationTest, DeviceLocalFactoryUploadsThePayloadWithThePu
 }
 
 } // namespace
+
+namespace {
+TEST_F(BufferVulkanIntegrationTest, OptionalManagerFactoryUploadsDeviceLocalValues) {
+    const std::array<std::uint32_t, 4> expected{3, 17, 65537, 0xffffffffu};
+    auto payload = expected;
+    auto manager = make_manager();
+    using Buffer = vsl::DeviceLocalBuffer<vsl::MemoryType::TransferSource>;
+    auto generated = vsl::make_buffer<Buffer>(device, payload, std::optional{manager});
+    HostBuffer readback(device, sizeof(expected));
+    readback.copyByBuffer(manager, &generated);
+    {
+        auto phase = manager.startPhase<vsl::ComputePhase>();
+        vk::MemoryBarrier visible{};
+        visible.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+        visible.dstAccessMask = vk::AccessFlagBits::eHostRead;
+        auto commands = manager.getBuffer();
+        commands._data->commandBuffers[commands.getCurrentBufferIdx()].pipelineBarrier(
+            vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, visible, {}, {});
+    }
+    device._data->device.waitIdle();
+    auto mapped = readback.data(sizeof(expected));
+    EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
+}
+TEST_F(BufferVulkanIntegrationTest, OptionalManagerFactoryReportsMissingManagerBeforeDeviceLocalMapping) {
+    std::array<std::uint32_t, 2> payload{7, 11};
+    try {
+        auto buffer = vsl::make_buffer<vsl::DeviceLocalBuffer<vsl::MemoryType::TransferSource>>(device, payload);
+        FAIL() << "DeviceLocal initialization without a manager must fail";
+    } catch (const vsl::exceptions::RuntimeException &error) {
+        EXPECT_NE(error.reason.find("command manager"), std::string::npos);
+    }
+}
+TEST_F(BufferVulkanIntegrationTest, OptionalManagerFactoryKeepsTheHostVisiblePathUsable) {
+    std::array<std::uint32_t, 2> payload{19, 23};
+    auto manager = make_manager();
+    auto buffer = vsl::make_buffer<HostBuffer>(device, payload, manager);
+    auto mapped = buffer.data(sizeof(payload));
+    EXPECT_EQ(std::memcmp(mapped.data, payload.data(), sizeof(payload)), 0);
+}
+} // namespace

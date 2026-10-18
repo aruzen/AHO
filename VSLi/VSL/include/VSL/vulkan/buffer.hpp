@@ -86,7 +86,7 @@ namespace VSL_NAMESPACE {
 
     template<typename Buffer, typename T>
     Buffer make_buffer(LogicalDeviceAccessor device, CommandManager manager, T& t) {
-        Buffer buffer(device, manager, sizeof (T));
+        Buffer buffer(device, sizeof (T), manager);
         StagingBuffer<> stagingBuffer(device, sizeof (T));
         stagingBuffer.copy(t);
         buffer.copyByBuffer(manager, &stagingBuffer);

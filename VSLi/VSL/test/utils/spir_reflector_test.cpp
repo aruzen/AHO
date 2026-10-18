@@ -74,7 +74,6 @@ TEST(SpirvReflectorTest, MultidimensionalDescriptorArrayCountsMultiplyAllExtents
 TEST(SpirvReflectorTest, UnresolvedAndOverflowingDescriptorCountsReportTheirCause) {
     for (const auto &[file, reason] : {
              std::pair{"descriptor_runtime.comp.spv", "runtime"},
-             std::pair{"descriptor_specialization.comp.spv", "specialization"},
              std::pair{"descriptor_count_overflow.comp.spv", "overflow"}}) {
         try {
             vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path(file));
@@ -91,5 +90,18 @@ TEST_F(SpirvReflectorVulkanIntegrationTest, FixedArrayCountsSurviveGeneratedNati
     const auto points = layouts.front().getBindingPoints();
     ASSERT_EQ(points.size(), 4u);
     for (const auto &point : points) EXPECT_EQ(point.amount, point.binding + 2u);
+}
+} // namespace
+
+namespace {
+TEST(SpirvReflectorTest, SpecializationDescriptorCountsUseDefaultsAndEvaluateDefaultExpressions) {
+    for (const auto &[file, amount] : {std::pair{"descriptor_specialization.comp.spv", 3u},
+                                     std::pair{"descriptor_specialization_expression.comp.spv", 7u}}) {
+        vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path(file));
+        const auto &points = reflector.generated.binding_points.at(0);
+        const auto found = std::ranges::find(points, 0u, &vsl::graphic_resource::BindingPoint::binding);
+        ASSERT_NE(found, points.end());
+        EXPECT_EQ(found->amount, amount);
+    }
 }
 } // namespace

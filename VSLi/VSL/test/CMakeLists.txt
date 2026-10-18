@@ -8,7 +8,7 @@ if (VSL_TEST_SOURCES)
     set(VSL_TEST_SHADER_OUTPUTS)
     foreach(VSL_TEST_SHADER triangle.vert triangle.frag vertices.vert fill.comp images.comp reflection.vert
             descriptor_arrays.comp descriptor_multidimensional.comp descriptor_runtime.comp
-            descriptor_specialization.comp descriptor_count_overflow.comp)
+            descriptor_specialization.comp descriptor_specialization_expression.comp descriptor_count_overflow.comp)
         set(VSL_TEST_SHADER_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/shaders/${VSL_TEST_SHADER}.spv")
         add_custom_command(OUTPUT "${VSL_TEST_SHADER_OUTPUT}"
                 COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/shaders"

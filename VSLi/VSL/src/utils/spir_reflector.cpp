@@ -11,12 +11,16 @@
 #include <limits>
 
 namespace {
-std::uint32_t descriptor_count(const spirv_cross::SPIRType &type) {
+struct ReflectionCompiler : spirv_cross::Compiler {
+    using Compiler::Compiler;
+    using Compiler::evaluate_constant_u32;
+};
+
+std::uint32_t descriptor_count(const ReflectionCompiler &compiler, const spirv_cross::SPIRType &type) {
     std::uint32_t count = 1;
     for (std::size_t i = 0; i < type.array.size(); ++i) {
-        if (!type.array_size_literal[i])
-            throw vsl::exceptions::RuntimeException("SPIRVReflector", "Descriptor array specialization sizes require explicit resolution");
-        const auto extent = type.array[i];
+        // No specialization overrides are supplied to this API; reflect the shader defaults.
+        const auto extent = type.array_size_literal[i] ? type.array[i] : compiler.evaluate_constant_u32(type.array[i]);
         if (extent == 0)
             throw vsl::exceptions::RuntimeException("SPIRVReflector", "Descriptor runtime arrays require an explicit descriptor count");
         if (extent > std::numeric_limits<std::uint32_t>::max() / count)
@@ -73,7 +77,7 @@ vsl::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device,
 
 void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
     using namespace graphic_resource;
-    spirv_cross::Compiler comp(bp, size);
+    ReflectionCompiler comp(bp, size);
 
     ShaderFlag shaderType = ShaderFlag::Error;
     switch (comp.get_execution_model()) {
@@ -120,7 +124,7 @@ void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
                 .binding = binding,
                 .bindingType = gfx_type,
                 .shaderType = shaderType, // TODO
-                .amount = descriptor_count(type),
+                .amount = descriptor_count(comp, type),
         });
     }
 
@@ -133,7 +137,7 @@ void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
                     .binding = binding,
                     .bindingType = gfx_type,
                     .shaderType = shaderType,  // TODO
-                    .amount = descriptor_count(type),
+                    .amount = descriptor_count(comp, type),
             });
         }
 

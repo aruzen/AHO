@@ -46,7 +46,7 @@ namespace AHO_NAMESPACE {
 	}
 
 	namespace d1 {
-		template<typename R, typename CI>
+		template<typename R, typename CI = typename AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D1>::value>
 		struct Vector : public AHO_NAMESPACE::_Vector<R, VSL_NAMESPACE::D1, CI> {
 			constexpr Vector() {};
 
@@ -58,7 +58,7 @@ namespace AHO_NAMESPACE {
 	}
 
 	namespace d2 {
-		template<typename R, typename CI>
+		template<typename R, typename CI = typename AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D2>::value>
 		struct Vector : public AHO_NAMESPACE::_Vector<R, VSL_NAMESPACE::D2, CI> {
 			constexpr Vector() {};
 
@@ -70,7 +70,7 @@ namespace AHO_NAMESPACE {
 	}
 
 	namespace d3 {
-		template<typename R, typename CI>
+		template<typename R, typename CI = typename AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D3>::value>
 		struct Vector : public AHO_NAMESPACE::_Vector<R, VSL_NAMESPACE::D3, CI> {
 			constexpr Vector() {};
 

@@ -1,6 +1,7 @@
 #include <VSL/vulkan/stages/shader_group.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/vulkan/pipeline_layout.hpp>
+#include <vector>
 
 VSL_NAMESPACE::pipeline_layout::ShaderGroup::ShaderGroup(std::string name, std::initializer_list<ShaderAccessor> shaders) {
 	_data = std::shared_ptr<VSL_NAMESPACE::_impl::pipeline_layout::ShaderGroup_impl>(new VSL_NAMESPACE::_impl::pipeline_layout::ShaderGroup_impl);
@@ -15,17 +16,11 @@ void VSL_NAMESPACE::pipeline_layout::ShaderGroup::addShader(ShaderAccessor shade
 }
 
 void VSL_NAMESPACE::pipeline_layout::ShaderGroup::removeShader(std::string name) {
-	for (auto itr = _data->shaders.begin(); itr == _data->shaders.end(); itr++) {
-		if ((*itr)->name == name)
-			_data->shaders.erase(itr);
-	}
+	std::erase_if(_data->shaders, [&name](const auto& shader) { return shader->name == name; });
 }
 
 void VSL_NAMESPACE::pipeline_layout::ShaderGroup::removeShader(ShaderAccessor shader) {
-	for (auto itr = _data->shaders.begin(); itr == _data->shaders.end(); itr++) {
-		if ((*itr).get() == shader._data.get())
-			_data->shaders.erase(itr);
-	}
+	std::erase_if(_data->shaders, [&shader](const auto& candidate) { return candidate.get() == shader._data.get(); });
 }
 
 void VSL_NAMESPACE::pipeline_layout::ShaderGroup::injection(VSL_NAMESPACE::PipelineLayoutAccessor pl)

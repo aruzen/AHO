@@ -4,10 +4,13 @@
 #include "../command.hpp"
 
 #include "../buffer.hpp"
+#include <concepts>
 
 namespace VSL_NAMESPACE::command {
 	struct BindVertexBuffer : __Command {
 		template <typename ...Args>
+            requires ((std::convertible_to<Args*, BufferAccessor*> &&
+                       ((unsigned int)(Args::Type & MemoryType::VertexBuffer) != 0)) && ...)
         BindVertexBuffer(Args&... args);
 
 		std::vector<BufferAccessor*> buffers;
@@ -22,6 +25,8 @@ namespace VSL_NAMESPACE::command {
 	// ===============================================================================================
 
     template<typename... Args>
+        requires ((std::convertible_to<Args*, BufferAccessor*> &&
+                   ((unsigned int)(Args::Type & MemoryType::VertexBuffer) != 0)) && ...)
     vsl::command::BindVertexBuffer::BindVertexBuffer(Args&... args) {
         (..., this->add(args));
     }

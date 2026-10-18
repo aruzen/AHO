@@ -15,14 +15,15 @@
 vsl::graphic_resource::BindingLayout::BindingLayout(vsl::LogicalDeviceAccessor device,
                                                     vsl::graphic_resource::Type bindingType,
                                                     vsl::ShaderFlag shaderType)
-        : BindingLayout(device, -1, bindingType, shaderType, 1) {}
+        : BindingLayout(device, 0, bindingType, shaderType, 1) {}
 
 vsl::graphic_resource::BindingLayout::BindingLayout(LogicalDeviceAccessor device, size_t binding,
                                                     Type bindingType, ShaderFlag shaderType, size_t amount) {
     _data = std::make_shared<_impl::ResourceBindingLayout_impl>();
+    _data->device = device._data;
 
     _data->layoutBindings.resize(1);
-    _data->layoutBindings[0].binding = binding;
+    _data->layoutBindings[0].binding = binding == size_t(-1) || binding == UINT32_MAX ? 0 : binding;
     _data->layoutBindings[0].descriptorType = (vk::DescriptorType) bindingType;
     _data->layoutBindings[0].stageFlags = (vk::ShaderStageFlagBits) shaderType;
     _data->layoutBindings[0].descriptorCount = amount;

@@ -10,6 +10,7 @@
 #include "VSL/vulkan/buffer.hpp"
 
 #include <algorithm>
+#include <memory>
 
 namespace AHO_NAMESPACE::resource {
     enum class BufferType {
@@ -28,7 +29,7 @@ namespace AHO_NAMESPACE::resource {
     template<>
     class Buffer<BufferType::General> {
         size_t m_size;
-        char * m_buffer;
+        std::shared_ptr<char[]> m_buffer;
     public:
         Buffer(size_t size);
 
@@ -66,16 +67,14 @@ namespace AHO_NAMESPACE::resource {
 
     // ===========================================
 
-    inline Buffer<BufferType::General>::Buffer(size_t size) : m_size(size) {
-        m_buffer = new char[size];
-    }
+    inline Buffer<BufferType::General>::Buffer(size_t size) : m_size(size), m_buffer(new char[size]) {}
 
     inline void *Buffer<BufferType::General>::data() {
-        return m_buffer;
+        return m_buffer.get();
     }
 
     inline size_t Buffer<BufferType::General>::size() {
-        return m_size;
+        return m_buffer ? m_size : 0;
     }
 
     // ===========================================

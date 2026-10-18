@@ -1,7 +1,7 @@
 #include <VSL/define.hpp>
 #include <VSL/exceptions.hpp>
 
-const char* VSL_NAMESPACE::exceptions::VSLException::what() {
+const char* VSL_NAMESPACE::exceptions::VSLException::what() const noexcept {
 	return reason.c_str();
 }
 

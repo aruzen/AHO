@@ -47,7 +47,7 @@ TEST_F(DescriptorVulkanIntegrationTest, ValueUpdatePreservesBufferDataAndRange) 
     resource.update(*output, 0, vsl::graphic_resource::Type::StorageBuffer, 0, count * sizeof(std::uint32_t));
     expect_sequence(execute(31), 31);
 }
-TEST_F(DescriptorVulkanIntegrationTest, DISABLED_SingleBindingConstructorsRetainDeviceOwner) {
+TEST_F(DescriptorVulkanIntegrationTest, SingleBindingConstructorsRetainDeviceOwner) {
     using namespace vsl::graphic_resource;
     BindingLayout explicit_binding(device, 2, Type::UniformBuffer, vsl::ShaderFlag::Vertex, 1);
     const bool had_owner = static_cast<bool>(explicit_binding._data->device);
@@ -60,6 +60,20 @@ TEST_F(DescriptorVulkanIntegrationTest, DISABLED_SingleBindingConstructorsRetain
     automatic._data->device = device._data;
     EXPECT_TRUE(automatic_owner);
     EXPECT_EQ(automatic.getBindingPoints().front().binding, 0u);
+    EXPECT_EQ(automatic._data->layoutBindings.front().binding, 0u);
+}
+TEST_F(DescriptorVulkanIntegrationTest, ExplicitSentinelsUseTheSameAutomaticBindingAsTheVectorConstructor) {
+    using namespace vsl::graphic_resource;
+    for (const auto sentinel : {std::size_t{UINT32_MAX}, std::size_t(-1)}) {
+        BindingLayout automatic(device, sentinel, Type::StorageBuffer, vsl::ShaderFlag::Compute, 3);
+        const auto original_owner = automatic._data->device;
+        if (!original_owner) automatic._data->device = device._data;
+        EXPECT_EQ(original_owner, device._data);
+        ASSERT_EQ(automatic._data->layoutBindings.size(), 1u);
+        EXPECT_EQ(automatic._data->layoutBindings[0].binding, 0u);
+        EXPECT_EQ(automatic.getBindingPoints(),
+                  (std::vector<BindingPoint>{{0, Type::StorageBuffer, vsl::ShaderFlag::Compute, 3}}));
+    }
 }
 } // namespace
 #include "support/compile_probe.hpp"

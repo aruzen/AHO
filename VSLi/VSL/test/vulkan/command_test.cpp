@@ -16,6 +16,28 @@ TEST_F(CommandVulkanIntegrationTest, PoolAndBuffersShareExpectedOwnerAndCanReset
     buffers.reset();
     EXPECT_EQ(shared.getCurrentBufferIdx(), 0u);
 }
+TEST_F(CommandVulkanIntegrationTest, NextCyclesThroughEveryBufferAndSharedViewsObserveTheSameIndex) {
+    auto pool = make_pool();
+    vsl::CommandBuffer buffers(pool, 3);
+    vsl::CommandBuffer shared(buffers._data);
+    for (const auto expected : {1u, 2u, 0u, 1u}) {
+        buffers.next();
+        EXPECT_EQ(buffers.getCurrentBufferIdx(), expected);
+        EXPECT_EQ(shared.getCurrentBufferIdx(), expected);
+        EXPECT_EQ(buffers.getSize(), 3u);
+    }
+}
+TEST_F(CommandVulkanIntegrationTest, NextOnASingleBufferAndManagerViewsPreservesOwnership) {
+    auto manager = make_manager();
+    auto single = manager.makeExclusiveBuffer();
+    single.next();
+    single.next();
+    EXPECT_EQ(single.getCurrentBufferIdx(), 0u);
+    auto current = manager.getBuffer();
+    current.next();
+    EXPECT_EQ(manager.getCurrentBufferIdx(), 1u);
+    EXPECT_EQ(manager.getBuffer()._data, current._data);
+}
 TEST_F(CommandVulkanIntegrationTest, ManagerAccessorsAndExclusiveBuffersPreserveOwnership) {
     auto manager = make_manager();
     vsl::CommandManager shared(manager._data);
@@ -39,4 +61,37 @@ static_assert(vsl::command::is_command<CommandShape>);
 static_assert(!vsl::command::is_command<DelegateShape>);
 static_assert(vsl::command::is_delegate_command<DelegateShape>);
 static_assert(!vsl::command::is_delegate_command<int>);
+} // namespace
+
+namespace {
+struct DestructionProbe : vsl::command::__Command, vsl::command::__DelegateCommand,
+    vsl::command::__PipelineHolder, vsl::command::__PipelineRequire,
+    vsl::command::__VertexSizeHolder, vsl::command::__VertexSizeRequire {
+    int &destroyed;
+    explicit DestructionProbe(int &destroyed) : destroyed(destroyed) {}
+    ~DestructionProbe() { ++destroyed; }
+    void invoke(vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) override {}
+    void invoke(vsl::DefaultPhaseStream &, vsl::CommandPool, vsl::CommandBuffer,
+                vsl::CommandManager) override {}
+    vsl::PipelineAccessor getPipeline() override { return {}; }
+    void setPipeline(std::optional<vsl::PipelineAccessor>) override {}
+    std::size_t getVertexSize() override { return 0; }
+    void setVertexSize(std::optional<std::size_t>) override {}
+};
+template<class T> class CommandInterfaceLifetimeTest : public testing::Test {};
+using CommandInterfaces = testing::Types<vsl::command::__Command, vsl::command::__DelegateCommand,
+    vsl::command::__PipelineHolder, vsl::command::__PipelineRequire,
+    vsl::command::__VertexSizeHolder, vsl::command::__VertexSizeRequire>;
+TYPED_TEST_SUITE(CommandInterfaceLifetimeTest, CommandInterfaces);
+TYPED_TEST(CommandInterfaceLifetimeTest, UniqueOwnershipThroughTheBaseDestroysTheCompleteCommandOnce) {
+    static_assert(std::has_virtual_destructor_v<TypeParam>);
+    static_assert(std::is_copy_constructible_v<DestructionProbe>);
+    static_assert(std::is_move_constructible_v<DestructionProbe>);
+    int destroyed = 0;
+    {
+        std::unique_ptr<TypeParam> base = std::make_unique<DestructionProbe>(destroyed);
+        EXPECT_EQ(destroyed, 0);
+    }
+    EXPECT_EQ(destroyed, 1);
+}
 } // namespace

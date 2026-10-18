@@ -40,10 +40,12 @@ namespace VSL_NAMESPACE {
     struct PipelineAccessor;
     namespace command {
         struct __Command {
+            virtual ~__Command() = default;
             virtual void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) = 0;
         };
 
         struct __DelegateCommand {
+            virtual ~__DelegateCommand() = default;
             virtual void invoke(DefaultPhaseStream& pst, CommandPool pool, CommandBuffer buffer, CommandManager manager) = 0;
         };
 
@@ -58,10 +60,12 @@ namespace VSL_NAMESPACE {
         };
 
         struct __PipelineHolder {
+            virtual ~__PipelineHolder() = default;
             virtual PipelineAccessor getPipeline() = 0;
         };
 
         struct __PipelineRequire {
+            virtual ~__PipelineRequire() = default;
             virtual void setPipeline(std::optional<PipelineAccessor> pipeline) = 0;
         };
 
@@ -76,10 +80,12 @@ namespace VSL_NAMESPACE {
         };
 
         struct __VertexSizeHolder {
+            virtual ~__VertexSizeHolder() = default;
             virtual size_t getVertexSize() = 0;
         };
 
         struct __VertexSizeRequire {
+            virtual ~__VertexSizeRequire() = default;
             virtual void setVertexSize(std::optional<size_t> vertexSize) = 0;
         };
 

@@ -4,6 +4,7 @@
 #include "vsl_test_config.hpp"
 #include <fstream>
 #include <array>
+#include <algorithm>
 namespace {
 namespace fs = std::filesystem;
 void write_shader(const fs::path &path) {
@@ -50,7 +51,7 @@ TEST(ShaderCompilerTest, StringConstructorSkipsMissingDirectoriesAndNewerCompile
     EXPECT_TRUE(compiler.target.empty());
     EXPECT_EQ(compiler.compiled, (std::vector<fs::path>{output}));
 }
-TEST(ShaderCompilerTest, DISABLED_ReloadDoesNotDuplicateTargets) {
+TEST(ShaderCompilerTest, ReloadDoesNotDuplicateTargets) {
     vsl_test::TemporaryDirectory temporary;
     fs::create_directory(temporary.path() / "raw");
     write_shader(temporary.path() / "raw" / "point.vert");
@@ -58,5 +59,42 @@ TEST(ShaderCompilerTest, DISABLED_ReloadDoesNotDuplicateTargets) {
     compiler.load();
     compiler.load();
     EXPECT_EQ(compiler.target.size(), 1u);
+}
+} // namespace
+
+namespace {
+TEST(ShaderCompilerTest, ReloadRefreshesCompiledFilesAndChangedSourceLists) {
+    vsl_test::TemporaryDirectory temporary;
+    const auto raw = temporary.path() / "raw";
+    fs::create_directory(raw);
+    const auto cached = raw / "cached.vert";
+    const auto pending = raw / "pending.frag";
+    const auto binary = temporary.path() / "cached.vert.spv";
+    write_shader(cached);
+    write_shader(pending);
+    { std::ofstream output(binary); output << "cached"; }
+    const auto now = fs::file_time_type::clock::now();
+    fs::last_write_time(cached, now - std::chrono::hours(2));
+    fs::last_write_time(binary, now - std::chrono::hours(1));
+    vsl::utils::ShaderCompiler compiler(fs::path(VSL_TEST_GLSLC), std::vector<fs::path>{temporary.path()});
+    compiler.load();
+    compiler.load();
+    EXPECT_EQ(compiler.compiled, (std::vector<fs::path>{binary}));
+    EXPECT_EQ(compiler.target, (std::vector<fs::path>{pending}));
+    fs::remove(pending);
+    fs::remove(binary);
+    const auto added = raw / "added.comp";
+    write_shader(added);
+    compiler.load();
+    EXPECT_TRUE(compiler.compiled.empty());
+    auto actual = compiler.target;
+    auto expected = std::vector<fs::path>{cached, added};
+    std::ranges::sort(actual);
+    std::ranges::sort(expected);
+    EXPECT_EQ(actual, expected);
+    fs::remove_all(raw);
+    compiler.load();
+    EXPECT_TRUE(compiler.compiled.empty());
+    EXPECT_TRUE(compiler.target.empty());
 }
 } // namespace

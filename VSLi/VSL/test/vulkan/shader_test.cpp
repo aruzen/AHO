@@ -7,8 +7,8 @@ static_assert(vsl::___Get_ShaderType<"fixture.frag.spv">() == vsl::ShaderType::F
 static_assert(vsl::___Get_ShaderType<"fixture.comp.spv">() == vsl::ShaderType::Compute);
 static_assert(vsl::___Get_ShaderType<"fixture.unknown">() == vsl::ShaderType::Error);
 TEST_F(ShaderVulkanIntegrationTest, LoadsVertexAndFragmentModulesWithEntryPointNames) {
-    vsl::Shader<vsl::ShaderType::Vertex> vertex(device, vsl_test::shader_path("triangle.vert.spv"));
-    vsl::Shader<vsl::ShaderType::Fragment> fragment(device, vsl_test::shader_path("triangle.frag.spv"),
+    const vsl::Shader<vsl::ShaderType::Vertex> vertex(device, vsl_test::shader_path("triangle.vert.spv"));
+    const vsl::Shader<vsl::ShaderType::Fragment> fragment(device, vsl_test::shader_path("triangle.frag.spv"),
                                                     "main");
     EXPECT_EQ(vertex.name(), "main");
     EXPECT_EQ(fragment.name(), "main");
@@ -33,8 +33,8 @@ TEST(ShaderFlagsTest, BitwiseStageCombinationsPreserveMembership) {
 } // namespace
 namespace {
 TEST_F(ShaderVulkanIntegrationTest, FactoriesInferStageAndHonorExplicitEntryName) {
-    auto vertex = vsl::make_shader<VSL_TEST_SHADER_DIR "/triangle.vert.spv">(device);
-    auto fragment = vsl::make_shader<VSL_TEST_SHADER_DIR "/triangle.frag.spv">(device, "main");
+    const auto vertex = vsl::make_shader<VSL_TEST_SHADER_DIR "/triangle.vert.spv">(device);
+    const auto fragment = vsl::make_shader<VSL_TEST_SHADER_DIR "/triangle.frag.spv">(device, "main");
     static_assert(decltype(vertex)::Type == vsl::ShaderType::Vertex);
     static_assert(decltype(fragment)::Type == vsl::ShaderType::Fragment);
     EXPECT_EQ(vertex.name(), "main");

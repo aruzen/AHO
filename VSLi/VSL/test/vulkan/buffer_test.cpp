@@ -243,22 +243,23 @@ TEST(BufferCopyHelperTest, CheckedFailureKeepsTheSuccessfullyWrittenPrefix) {
 namespace {
 TEST_F(BufferVulkanIntegrationTest, RequestedHostVisibleSubrangesFlushAndSurviveGpuCopy) {
     using Buffer = vsl::Buffer<vsl::MemoryType::TransferSource, vsl::MemoryProperty::HostVisible>;
-    constexpr std::size_t bytes = 36;
+    const auto atom = std::max<std::size_t>(4, physical._data->props->limits.nonCoherentAtomSize);
+    const std::size_t bytes = 2 * atom + 4;
     Buffer buffer(device, bytes);
-    std::array<unsigned char, bytes> expected{};
-    expected.fill(0xa5);
+    std::vector<unsigned char> expected(bytes, 0xa5);
     {
         auto all = buffer.data();
         std::memcpy(all.data, expected.data(), expected.size());
         all.flush();
     }
-    {
-        auto part = buffer.data(5, 3);
-        EXPECT_EQ(part.offset, 3u);
-        EXPECT_EQ(part.size, 5u);
-        for (std::size_t i = 0; i < 5; ++i) {
-            expected[3 + i] = 11 + i;
-            static_cast<unsigned char *>(part.data)[i] = expected[3 + i];
+    for (const auto [offset, length] : {
+             std::pair<std::size_t, std::size_t>{3, 5}, {atom - 2, 8}, {atom + 3, 5}, {atom, atom}}) {
+        auto part = buffer.data(length, offset);
+        EXPECT_EQ(part.offset, offset);
+        EXPECT_EQ(part.size, length);
+        for (std::size_t i = 0; i < length; ++i) {
+            expected[offset + i] = static_cast<unsigned char>(11 + offset + i);
+            static_cast<unsigned char *>(part.data)[i] = expected[offset + i];
         }
         part.flush();
     }

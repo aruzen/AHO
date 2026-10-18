@@ -216,17 +216,15 @@ void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::BufferAcce
     if (type)
         descriptorWrite.descriptorType = (vk::DescriptorType)type.value();
     else {
-        if (!_data->layout)
+        const auto layout = _data->layout;
+        if (!layout)
             throw VSL_NAMESPACE::exceptions::RuntimeException("LayoutNotFound", "Layout not found!",
-                                                              std::source_location::current());
-        else {
-            auto layout = _data->layout;
-            for (const auto& lb : layout->layoutBindings)
-                if (lb.binding == binding) {
-                    descriptorWrite.descriptorType = lb.descriptorType;
-                    break;
-                }
-        }
+                                                    std::source_location::current());
+        const auto found = std::ranges::find(layout->layoutBindings, binding,
+                                             &vk::DescriptorSetLayoutBinding::binding);
+        if (found == layout->layoutBindings.end())
+            throw VSL_NAMESPACE::exceptions::RuntimeException("BindingNotFound", "Descriptor binding not found!");
+        descriptorWrite.descriptorType = found->descriptorType;
     }
     descriptorWrite.descriptorCount = 1;
     descriptorWrite.pBufferInfo = &bufferInfo;

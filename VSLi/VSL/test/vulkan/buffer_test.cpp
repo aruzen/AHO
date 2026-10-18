@@ -239,3 +239,63 @@ TEST(BufferCopyHelperTest, CheckedFailureKeepsTheSuccessfullyWrittenPrefix) {
     EXPECT_EQ(storage[5], 0);
 }
 } // namespace
+
+namespace {
+TEST_F(BufferVulkanIntegrationTest, RequestedHostVisibleSubrangesFlushAndSurviveGpuCopy) {
+    using Buffer = vsl::Buffer<vsl::MemoryType::TransferSource, vsl::MemoryProperty::HostVisible>;
+    constexpr std::size_t bytes = 36;
+    Buffer buffer(device, bytes);
+    std::array<unsigned char, bytes> expected{};
+    expected.fill(0xa5);
+    {
+        auto all = buffer.data();
+        std::memcpy(all.data, expected.data(), expected.size());
+        all.flush();
+    }
+    {
+        auto part = buffer.data(5, 3);
+        EXPECT_EQ(part.offset, 3u);
+        EXPECT_EQ(part.size, 5u);
+        for (std::size_t i = 0; i < 5; ++i) {
+            expected[3 + i] = 11 + i;
+            static_cast<unsigned char *>(part.data)[i] = expected[3 + i];
+        }
+        part.flush();
+    }
+    {
+        auto tail = buffer.data(1, bytes - 1);
+        expected.back() = 0x3f;
+        *static_cast<unsigned char *>(tail.data) = expected.back();
+        buffer.flush(tail);
+    }
+    auto manager = make_manager();
+    HostBuffer readback(device, bytes);
+    readback.copyByBuffer(manager, &buffer);
+    {
+        auto phase = manager.startPhase<vsl::ComputePhase>();
+        vk::MemoryBarrier visible{};
+        visible.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+        visible.dstAccessMask = vk::AccessFlagBits::eHostRead;
+        auto commands = manager.getBuffer();
+        commands._data->commandBuffers[commands.getCurrentBufferIdx()].pipelineBarrier(
+            vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, visible, {}, {});
+    }
+    device._data->device.waitIdle();
+    auto mapped = readback.data();
+    EXPECT_EQ(std::memcmp(mapped.data, expected.data(), expected.size()), 0);
+}
+TEST_F(BufferVulkanIntegrationTest, MappingRejectsRangesOutsideRequestedStorage) {
+    HostBuffer buffer(device, std::size_t{19});
+    EXPECT_EQ(buffer.size(), 19u);
+    { auto mapped = buffer.data(buffer.size()); EXPECT_EQ(mapped.size, 19u); }
+    EXPECT_THROW(buffer.data(20), vsl::exceptions::RuntimeException);
+    EXPECT_THROW(buffer.data(1, 19), vsl::exceptions::RuntimeException);
+}
+TEST_F(BufferVulkanIntegrationTest, DefaultMappingSizeExcludesTheRequestedOffset) {
+    const auto offset = physical._data->props->limits.minMemoryMapAlignment;
+    HostBuffer buffer(device, std::size_t{offset * 2 + 1});
+    auto mapped = buffer.data(std::nullopt, offset);
+    EXPECT_EQ(mapped.offset, offset);
+    EXPECT_EQ(mapped.size, offset + 1);
+}
+} // namespace

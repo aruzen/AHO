@@ -533,3 +533,33 @@ TEST_F(BufferVulkanIntegrationTest, NegativeAndOversizedCountsLeaveStorageUntouc
     EXPECT_EQ(std::memcmp(mapped.data, initial.data(), sizeof(initial)), 0);
 }
 } // namespace
+
+namespace {
+enum ElementCount : short { NoElements = 0, ThreeElements = 3, NegativeElements = -1 };
+TEST_F(BufferVulkanIntegrationTest, UnscopedEnumCountsCopyPointerAndCArrayElementsWithoutSerializingTheCount) {
+    const std::array<std::uint32_t, 4> initial{0xa5a5a5a5u, 0xa5a5a5a5u, 0xa5a5a5a5u, 0xa5a5a5a5u};
+    const std::array<std::uint32_t, 3> source{17, 23, 29};
+    const std::array<std::uint32_t, 4> expected{17, 23, 29, 0xa5a5a5a5u};
+    HostBuffer buffer(device, initial);
+    EXPECT_TRUE(buffer.copy(source.data(), ThreeElements));
+    {
+        auto mapped = buffer.data();
+        EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
+    }
+    ASSERT_TRUE(buffer.copy(initial));
+    const std::uint32_t raw[]{17, 23, 29};
+    auto mapped = buffer.data();
+    EXPECT_TRUE(mapped.copy(raw, ThreeElements));
+    EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
+}
+TEST_F(BufferVulkanIntegrationTest, NegativeAndEmptyEnumCountsKeepExistingStorageIntact) {
+    const std::array<std::uint32_t, 4> initial{17, 23, 29, 31};
+    HostBuffer buffer(device, initial);
+    EXPECT_FALSE(buffer.copy(initial.data(), NegativeElements));
+    EXPECT_TRUE(buffer.copy(static_cast<const std::uint32_t *>(nullptr), NoElements));
+    auto mapped = buffer.data();
+    EXPECT_FALSE(mapped.copy(initial.data(), NegativeElements));
+    EXPECT_TRUE(mapped.copy(static_cast<const std::uint32_t *>(nullptr), NoElements));
+    EXPECT_EQ(std::memcmp(mapped.data, initial.data(), sizeof(initial)), 0);
+}
+} // namespace

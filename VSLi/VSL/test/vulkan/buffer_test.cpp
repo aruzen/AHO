@@ -300,3 +300,29 @@ TEST_F(BufferVulkanIntegrationTest, DefaultMappingSizeExcludesTheRequestedOffset
     EXPECT_EQ(mapped.size, offset + 1);
 }
 } // namespace
+
+namespace {
+TEST_F(BufferVulkanIntegrationTest, UnavailableMemoryPropertiesReportTheMissingTypeInsteadOfUsingIndexZero) {
+    const auto requested = vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eLazilyAllocated;
+    const auto &properties = *physical._data->memProps;
+    for (std::uint32_t i = 0; i < properties.memoryTypeCount; ++i)
+        ASSERT_NE(properties.memoryTypes[i].propertyFlags & requested, requested);
+    using Buffer = vsl::Buffer<vsl::MemoryType::TransferSource,
+                               vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::LazilyAllocated>;
+    try {
+        Buffer buffer(device, std::size_t{16});
+        FAIL() << "No memory type satisfies the requested property combination";
+    } catch (const vsl::exceptions::RuntimeException &error) {
+        EXPECT_NE(error.reason.find("memory type"), std::string::npos) << error.reason;
+    }
+}
+TEST_F(BufferVulkanIntegrationTest, FailedMemorySelectionDoesNotPreventLaterValidAllocations) {
+    using Unsupported = vsl::Buffer<vsl::MemoryType::TransferSource,
+                                    vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::LazilyAllocated>;
+    EXPECT_THROW((Unsupported(device, std::size_t{16})), vsl::exceptions::RuntimeException);
+    const std::array<std::uint32_t, 2> payload{17, 23};
+    HostBuffer buffer(device, payload);
+    auto mapped = buffer.data(sizeof(payload));
+    EXPECT_EQ(std::memcmp(mapped.data, payload.data(), sizeof(payload)), 0);
+}
+} // namespace

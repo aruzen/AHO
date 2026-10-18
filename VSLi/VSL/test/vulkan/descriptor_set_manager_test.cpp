@@ -65,3 +65,42 @@ TEST_F(DescriptorManagerVulkanIntegrationTest, DISABLED_OverAllocatorDestroyRele
     EXPECT_TRUE(manager._data->pools.empty());
 }
 } // namespace
+
+#include <type_traits>
+namespace {
+using ResourceManagerInterface = vsl::graphic_resource::ManagerInterface;
+static_assert(std::has_virtual_destructor_v<ResourceManagerInterface>);
+struct StubResourceManager : ResourceManagerInterface {
+    std::tuple<std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>>
+    allocate(std::vector<vsl::graphic_resource::BindingLayout>) override { return {}; }
+    void destroy(const vsl::graphic_resource::Pool &) override {}
+};
+TEST(ResourceManagerLifetimeTest, BaseOwnerRunsTheDerivedDestructor) {
+    struct TrackedManager : StubResourceManager {
+        bool &destroyed;
+        explicit TrackedManager(bool &destroyed) : destroyed(destroyed) {}
+        ~TrackedManager() { destroyed = true; }
+    };
+    bool destroyed = false;
+    std::unique_ptr<ResourceManagerInterface> manager = std::make_unique<TrackedManager>(destroyed);
+    EXPECT_FALSE(destroyed);
+    manager.reset();
+    EXPECT_TRUE(destroyed);
+}
+TEST(ResourceManagerLifetimeTest, MovesTransferOwnershipAndCopiesShareIt) {
+    StubResourceManager original;
+    original._data = std::make_shared<vsl::_impl::GraphicResourceManager_impl>();
+    const auto data = original._data;
+    StubResourceManager copied = original;
+    EXPECT_EQ(copied._data, data);
+    StubResourceManager moved = std::move(original);
+    EXPECT_FALSE(original._data);
+    EXPECT_EQ(moved._data, data);
+    StubResourceManager assigned;
+    assigned = std::move(moved);
+    EXPECT_FALSE(moved._data);
+    EXPECT_EQ(assigned._data, data);
+    original = copied;
+    EXPECT_EQ(original._data, data);
+}
+} // namespace

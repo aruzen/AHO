@@ -67,6 +67,7 @@ namespace VSL_NAMESPACE {
 
 	struct LogicalDeviceAccessor {
 		std::shared_ptr<_impl::LogicalDevice_impl> _data = nullptr;
+        bool operator==(const LogicalDeviceAccessor &) const = default;
 	};
 
 	namespace helper {

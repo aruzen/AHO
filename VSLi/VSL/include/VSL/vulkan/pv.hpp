@@ -26,6 +26,7 @@ namespace VSL_NAMESPACE::_impl {
 	struct Fence_impl;
 	struct SynchroManager_impl;
 	struct Buffer_impl;
+    struct MappedBuffer_impl;
     struct ResourceBindingLayout_impl;
     struct GraphicResourcePool_impl;
     struct GraphicResourceManager_impl;

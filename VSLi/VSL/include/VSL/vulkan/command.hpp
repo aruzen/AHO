@@ -121,6 +121,9 @@ namespace VSL_NAMESPACE {
         template<class P = DefaultPhase, typename... Args>
         P startPhase(Args &&... args);
 
+        LogicalDeviceAccessor getDevice() const;
+        // Own pool and command buffers, same device and graphics queue.
+        CommandManager independent(std::uint32_t bufferCount = 1) const;
         void waitIdle();
 
         CommandPool getPool();

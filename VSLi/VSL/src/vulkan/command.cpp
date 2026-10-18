@@ -111,3 +111,21 @@ void vsl::CommandManager::waitIdle() { _data->device->device.waitIdle(); }
 vsl::_impl::CommandPool_impl::~CommandPool_impl() {
     if (commandPool) device->device.destroyCommandPool(commandPool);
 }
+
+vsl::LogicalDeviceAccessor vsl::CommandManager::getDevice() const {
+    if (!_data || !_data->device || !_data->device->device)
+        throw std::invalid_argument("Command manager is empty");
+    return {_data->device};
+}
+vsl::CommandManager vsl::CommandManager::independent(std::uint32_t count) const {
+    if (!count) throw std::invalid_argument("Command buffer count must be positive");
+    CommandPool pool(getDevice());
+    CommandBuffer buffers(pool, count);
+    auto next = std::make_shared<_impl::CommandManager_impl>();
+    next->device = _data->device;
+    next->commandPool = pool._data;
+    next->commandBuffer = buffers._data;
+    next->graphicsQueue = _data->graphicsQueue;
+    next->presentQueue = _data->presentQueue;
+    return CommandManager(next);
+}

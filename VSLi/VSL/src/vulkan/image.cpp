@@ -108,3 +108,8 @@ vsl::data_format::___Format vsl::ImageAccessor::getFormat() const {
     const auto format = data_format::convert(type);
     return format.type() == data_format::___FormatTypes::Undefined ? data_format::___Format(type, 0) : format;
 }
+
+vsl::LogicalDeviceAccessor vsl::ImageAccessor::getDevice() const {
+    if (!_data) throw std::invalid_argument("Image is empty");
+    return {_data->device};
+}

@@ -188,17 +188,15 @@ void vsl::graphic_resource::Resource::update(vsl::BufferAccessor *buffer, size_t
     if (type)
         descriptorWrite.descriptorType = (vk::DescriptorType) type.value();
     else {
-        if (_data->layout.expired())
+        const auto layout = _data->layout.lock();
+        if (!layout)
             throw vsl::exceptions::RuntimeException("LayoutNotFound", "Layout not found!",
                                                     std::source_location::current());
-        else {
-            auto layout = _data->layout.lock();
-            for (const auto &lb: layout->layoutBindings)
-                if (lb.binding == binding) {
-                    descriptorWrite.descriptorType = lb.descriptorType;
-                    break;
-                }
-        }
+        const auto found = std::ranges::find(layout->layoutBindings, binding,
+                                             &vk::DescriptorSetLayoutBinding::binding);
+        if (found == layout->layoutBindings.end())
+            throw vsl::exceptions::RuntimeException("BindingNotFound", "Descriptor binding not found!");
+        descriptorWrite.descriptorType = found->descriptorType;
     }
     descriptorWrite.descriptorCount = 1;
     descriptorWrite.pBufferInfo = &bufferInfo;

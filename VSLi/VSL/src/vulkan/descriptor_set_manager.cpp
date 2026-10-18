@@ -9,6 +9,16 @@
 
 #include <VSL/vulkan/descriptor_set_manager.hpp>
 
+namespace {
+void release_descriptor_pool(const std::shared_ptr<vsl::_impl::GraphicResourcePool_impl> &data) {
+    if (data->descriptorPool) {
+        data->device->device.destroyDescriptorPool(data->descriptorPool);
+        data->descriptorPool = nullptr;
+    }
+    data->resources.clear();
+}
+} // namespace
+
 std::tuple <vsl::graphic_resource::Pool, std::vector<vsl::graphic_resource::Resource>>
 vsl::graphic_resource::ManagerInterface::make(std::vector<BindingLayout> layouts,
                                               std::map<Type, size_t> size,
@@ -97,8 +107,11 @@ vsl::graphic_resource::ExactAllocateManager::allocate(std::vector <BindingLayout
 
 
 void vsl::graphic_resource::ExactAllocateManager::destroy(const vsl::GraphicResourcePool &pool) {
-    _data->pools.erase(std::remove(_data->pools.begin(), _data->pools.end(), pool._data), _data->pools.end());
-    _data->device->device.destroy(pool._data->descriptorPool);
+    if (!pool._data)
+        return;
+    const auto data = pool._data;
+    if (std::erase(_data->pools, data) != 0)
+        release_descriptor_pool(data);
 }
 
 vsl::graphic_resource::OverAllocateManager::OverAllocateManager(vsl::LogicalDeviceAccessor device,
@@ -141,5 +154,11 @@ vsl::graphic_resource::OverAllocateManager::allocate(std::vector <BindingLayout>
 }
 
 void vsl::graphic_resource::OverAllocateManager::destroy(const vsl::graphic_resource::Pool &pool) {
-
+    if (!pool._data)
+        return;
+    const auto data = pool._data;
+    if (std::erase(_data->pools, data) == 0)
+        return;
+    std::erase_if(pools, [&](const auto &owned) { return owned._data == data; });
+    release_descriptor_pool(data);
 }

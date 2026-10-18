@@ -261,3 +261,32 @@ TEST_F(DescriptorVulkanIntegrationTest, ExplicitBufferTypeWorksWithoutLayoutMeta
     EXPECT_NO_THROW(resource.update(&*output, 0, vsl::graphic_resource::Type::StorageBuffer));
 }
 } // namespace
+
+namespace {
+TEST_F(DescriptorVulkanIntegrationTest, EmptyLayoutVectorBindsWithoutConsumingPoolCapacity) {
+    const auto previous = pool._data->resources.size();
+    const auto [success, empty] = pool.bind(std::vector<vsl::graphic_resource::BindingLayout>{});
+    EXPECT_TRUE(success);
+    EXPECT_TRUE(empty.empty());
+    EXPECT_EQ(pool._data->resources.size(), previous);
+    auto [bound, allocated] = pool.bind(std::vector{*binding});
+    ASSERT_TRUE(bound);
+    ASSERT_EQ(allocated.size(), 1u);
+    allocated.front().update(&*output);
+    resource = allocated.front();
+    expect_sequence(execute(157), 157);
+}
+TEST_F(DescriptorVulkanIntegrationTest, ZeroRepeatedBindingsLeaveThePoolReusable) {
+    const auto previous = pool._data->resources.size();
+    const auto [success, empty] = pool.bind(std::size_t{0}, *binding);
+    EXPECT_TRUE(success);
+    EXPECT_TRUE(empty.empty());
+    EXPECT_EQ(pool._data->resources.size(), previous);
+    auto [bound, allocated] = pool.bind(std::vector{*binding});
+    ASSERT_TRUE(bound);
+    ASSERT_EQ(allocated.size(), 1u);
+    allocated.front().update(&*output);
+    resource = allocated.front();
+    expect_sequence(execute(163), 163);
+}
+} // namespace

@@ -326,3 +326,63 @@ TEST_F(BufferVulkanIntegrationTest, HostVisibleValuePointerAndFactoryPayloadsRea
     }
 }
 } // namespace
+
+namespace {
+struct FlushTrackingBuffer : vsl::Buffer<vsl::MemoryType::TransferSource, vsl::MemoryProperty::HostVisible> {
+    using Base = vsl::Buffer<vsl::MemoryType::TransferSource, vsl::MemoryProperty::HostVisible>;
+    using Base::Base;
+    int flush_calls = 0;
+    void flush(LocalBufferHolder &holder) override {
+        EXPECT_EQ(holder.parent, this);
+        ++flush_calls;
+        Base::flush(holder);
+    }
+};
+TEST_F(BufferVulkanIntegrationTest, ScopedCopiesFlushWhileTheMappingIsAlive) {
+    FlushTrackingBuffer buffer(device, std::size_t{16});
+    const std::uint32_t first = 17, second = 29;
+    EXPECT_TRUE(buffer.copy(first));
+    EXPECT_EQ(buffer.flush_calls, 1);
+    std::array<std::uint32_t, 2> values{first, second};
+    EXPECT_TRUE(buffer.copy(values.data(), values.size()));
+    EXPECT_EQ(buffer.flush_calls, 2);
+    buffer.uncheck_copy(second, first);
+    EXPECT_EQ(buffer.flush_calls, 3);
+    auto mapped = buffer.data(sizeof(values));
+    EXPECT_EQ(std::memcmp(mapped.data, (std::array<std::uint32_t, 2>{second, first}).data(), sizeof(values)), 0);
+}
+TEST_F(BufferVulkanIntegrationTest, FailedCopiesFlushWrittenPrefixesButRejectedAndEmptyCopiesDoNotFlush) {
+    FlushTrackingBuffer buffer(device, std::size_t{6});
+    {
+        auto mapped = buffer.data();
+        std::memset(mapped.data, 0xa5, mapped.size);
+        mapped.flush();
+    }
+    buffer.flush_calls = 0;
+    const std::uint32_t first = 17, second = 29;
+    EXPECT_FALSE(buffer.copy(first, second));
+    EXPECT_EQ(buffer.flush_calls, 1);
+    {
+        auto mapped = buffer.data();
+        EXPECT_EQ(std::memcmp(mapped.data, &first, sizeof(first)), 0);
+        EXPECT_EQ(static_cast<const unsigned char *>(mapped.data)[4], 0xa5);
+        EXPECT_EQ(static_cast<const unsigned char *>(mapped.data)[5], 0xa5);
+    }
+    std::array<std::uint32_t, 2> too_large{3, 5};
+    EXPECT_FALSE(buffer.copy(too_large));
+    EXPECT_FALSE(buffer.copy(too_large.data(), too_large.size()));
+    EXPECT_TRUE(buffer.copy(static_cast<const std::uint32_t *>(nullptr), std::size_t{0}));
+    EXPECT_TRUE(buffer.copy());
+    buffer.uncheck_copy();
+    EXPECT_EQ(buffer.flush_calls, 1);
+}
+TEST_F(BufferVulkanIntegrationTest, MappedHolderCopiesKeepExplicitFlushControl) {
+    FlushTrackingBuffer buffer(device, std::size_t{16});
+    auto mapped = buffer.data();
+    EXPECT_TRUE(mapped.copy(std::uint32_t{17}));
+    mapped.uncheck_copy(std::uint32_t{29});
+    EXPECT_EQ(buffer.flush_calls, 0);
+    mapped.flush();
+    EXPECT_EQ(buffer.flush_calls, 1);
+}
+} // namespace

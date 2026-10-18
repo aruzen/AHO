@@ -118,7 +118,10 @@ namespace VSL_NAMESPACE {
 	bool VSL_NAMESPACE::BufferAccessor::copy(const Args&... args) {
 		auto buff = this->data();
 		size_t offset = 0;
-		return helper::copy_with_shift_offset(buff.data, buff.size, offset, args...);
+		const bool copied = helper::copy_with_shift_offset(buff.data, buff.size, offset, args...);
+		if (offset != 0)
+			buff.flush();
+		return copied;
 	}
 
     template<typename... Args>
@@ -135,6 +138,7 @@ namespace VSL_NAMESPACE {
         if (size == 0)
             return true;
         memcpy(buff.data, t, sizeof(T) * size);
+        buff.flush();
         return true;
     }
 
@@ -153,6 +157,8 @@ namespace VSL_NAMESPACE {
 		auto buff = data();
 		size_t offset = 0;
 		(helper::uncheck_copy_with_shift_offset(buff.data, offset, args), ...);
+		if (offset != 0)
+			buff.flush();
 	}
 
     template<typename... Args>

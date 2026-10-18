@@ -37,6 +37,48 @@ static_assert(sum.value.x.value == 4 && sum.value.y.value == 6);
 #include "../support/geometry.hpp"
 #include "../support/matrix.hpp"
 namespace {
+template<class T> class VectorDefaultCoordinatesTest : public testing::Test {};
+using DefaultVectorScalars = testing::Types<int, float, double>;
+TYPED_TEST_SUITE(VectorDefaultCoordinatesTest, DefaultVectorScalars);
+TYPED_TEST(VectorDefaultCoordinatesTest, DimensionWrappersUseMatchingDefaultCoordinatesAndDeduceScalarTypes) {
+    using T = TypeParam;
+    constexpr aho::d1::Vector<T> single(T{2});
+    constexpr aho::d2::Vector<T> plane(T{3}, T{4});
+    constexpr aho::d3::Vector<T> space(T{2}, T{3}, T{6});
+    static_assert(std::same_as<typename decltype(single)::coordinate_info,
+                  aho::coordinate::_DefaultCoordinateInfo<vsl::D1>::value>);
+    static_assert(std::same_as<typename decltype(plane)::coordinate_info,
+                  aho::coordinate::_DefaultCoordinateInfo<vsl::D2>::value>);
+    static_assert(std::same_as<typename decltype(space)::coordinate_info,
+                  aho::coordinate::_DefaultCoordinateInfo<vsl::D3>::value>);
+    static_assert(single.value.x.value == T{2});
+    static_assert(plane.value.x.value == T{3} && plane.value.y.value == T{4});
+    static_assert(space.value.x.value == T{2} && space.value.y.value == T{3} && space.value.z.value == T{6});
+    const aho::d1::Vector inferred_single(T{2});
+    const aho::d2::Vector inferred_plane(T{3}, T{4});
+    const aho::d3::Vector inferred_space(T{2}, T{3}, T{6});
+    static_assert(std::same_as<std::remove_cv_t<decltype(inferred_single)>, aho::d1::Vector<T>>);
+    static_assert(std::same_as<std::remove_cv_t<decltype(inferred_plane)>, aho::d2::Vector<T>>);
+    static_assert(std::same_as<std::remove_cv_t<decltype(inferred_space)>, aho::d3::Vector<T>>);
+    aho_test::expect_coordinates(inferred_single, 2);
+    aho_test::expect_coordinates(inferred_plane, 3, 4);
+    aho_test::expect_coordinates(inferred_space, 2, 3, 6);
+    aho_test::expect_coordinates(aho::d1::Vector<T>{}, 0);
+    aho_test::expect_coordinates(aho::d2::Vector<T>{}, 0, 0);
+    aho_test::expect_coordinates(aho::d3::Vector<T>{}, 0, 0, 0);
+}
+TEST(VectorDefaultCoordinatesTest, ExplicitCoordinateInformationStillSelectsCustomAxes) {
+    using Y = aho::coordinate::_MakeCoordinateInfo<false, true, false>::value;
+    using YZ = aho::coordinate::_MakeCoordinateInfo<false, true, true>::value;
+    const aho::d1::Vector<int, Y> y(7);
+    const aho::d2::Vector<double, YZ> yz(3, 4);
+    static_assert(std::same_as<typename decltype(y)::coordinate_info, Y>);
+    static_assert(std::same_as<typename decltype(yz)::coordinate_info, YZ>);
+    EXPECT_EQ(y.value.y.value, 7);
+    EXPECT_EQ(yz.value.y.value, 3);
+    EXPECT_EQ(yz.value.z.value, 4);
+}
+
 template<class T> class VectorTest : public testing::Test {};
 TYPED_TEST_SUITE(VectorTest, aho_test::GeometryCases);
 TYPED_TEST(VectorTest, DefaultScalarAndCoordinateConstructorsPreserveValues) {

@@ -18,6 +18,7 @@ bool vsl::Image<Usage, MemProp, Layout>::copyByBuffer(CommandManager manager,
     if (Layout != ImageLayout::TransferDstOptimal)
         phase << command::ChangeImageBarrier(*this, ImageLayout::TransferDstOptimal);
     phase << command::CopyBufferToImage(*this, &buffer, ImageLayout::TransferDstOptimal);
+    return true;
 }
 
 #endif //AHO_ALL_POST_DEFINITION_H

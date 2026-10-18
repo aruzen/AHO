@@ -16,18 +16,45 @@ TEST_F(CopyBufferToImageVulkanIntegrationTest, TypedConstructorRetainsImageBuffe
     // Undefined is not a valid transfer layout; invocation of this specialization is excluded.
 }
 } // namespace
-#include "support/compile_probe.hpp"
+
 namespace {
-TEST(ImageTransferCompilationTest, DISABLED_TypedArrayCopyDelegatesToItsOwnConstructor) {
-    const auto result = vsl_test::compile_probe(R"cpp(
-#include <VSL/vulkan/_pimpls.hpp>
-#include <VSL/vsl.hpp>
-#include <VSL/vulkan/commands/copy_buffer_to_image.hpp>
-void probe(vsl::Image<vsl::ImageType::TransferDst>& image,
-           vsl::StagingBuffer<vsl::MemoryType::TransferSource>& buffer){
-    vsl::command::CopyBufferToArrayImage command(image,buffer,1);
+TEST_F(CopyBufferToImageVulkanIntegrationTest, TypedArrayCopyDelegatesToItsOwnConstructor) {
+    const std::array<std::uint32_t, 4> expected{5, 13, 29, 0xffffffffu};
+    TransferImage image(device, 2, 2, vsl::data_format::UnsignedInt, 2);
+    vsl::StagingBuffer<vsl::MemoryType::TransferSource> source(device, expected);
+    vsl::StagingBuffer<vsl::MemoryType::TransferDestination> readback(device, sizeof(expected));
+    vsl::command::CopyBufferToArrayImage command(image, source, 1);
+    EXPECT_EQ(command.image._data, image._data);
+    EXPECT_EQ(command.buffer, &source);
+    EXPECT_EQ(command.layout, vsl::ImageLayout::Undefined);
+    EXPECT_EQ(command.target_idx, 1u);
+    auto manager = make_manager();
+    {
+        auto phase = manager.startPhase<vsl::ComputePhase>();
+        transition(manager, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, {},
+                   vk::AccessFlagBits::eTransferWrite);
+        // The template records the initial layout; use the transitioned layout for the command.
+        command.layout = vsl::ImageLayout::General;
+        phase << command;
+        transition(manager, image, vk::ImageLayout::eGeneral, vk::ImageLayout::eGeneral,
+                   vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eTransferRead);
+        vk::BufferImageCopy region{};
+        region.imageSubresource = {vk::ImageAspectFlagBits::eColor, 0, 1, 1};
+        region.imageExtent = {2, 2, 1};
+        auto buffer = manager.getBuffer();
+        buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].copyImageToBuffer(
+            image._data->image, vk::ImageLayout::eGeneral, readback._data->buffer, region);
+        vk::MemoryBarrier host_visibility{};
+        host_visibility.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+        host_visibility.dstAccessMask = vk::AccessFlagBits::eHostRead;
+        auto commands = manager.getBuffer();
+        commands._data->commandBuffers[commands.getCurrentBufferIdx()].pipelineBarrier(
+            vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, host_visibility, {}, {});
+
+    }
+    device._data->device.waitIdle();
+    auto mapped = readback.data(sizeof(expected));
+    EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
 }
-)cpp");
-    EXPECT_EQ(result.status, 0) << result.diagnostics;
-}
+
 } // namespace

@@ -46,14 +46,34 @@ TEST_F(VertexInputVulkanIntegrationTest, InjectsExplicitAndAutomaticLocationsStr
     EXPECT_EQ(info.pVertexAttributeDescriptions[1].format, vk::Format::eR32G32B32Sfloat);
 }
 } // namespace
-#include "support/compile_probe.hpp"
 namespace {
-TEST(VertexInputCompilationTest, DISABLED_SingleTypeAdditionSelectsAnUnambiguousOverload) {
-    const auto result = vsl_test::compile_probe(R"cpp(
-#include <VSL/vulkan/_pimpls.hpp>
-#include <VSL/vsl.hpp>
-void probe(){vsl::pipeline_layout::VertexInput input;input.add<float>();}
-)cpp");
-    EXPECT_EQ(result.status, 0) << result.diagnostics;
+TEST(VertexInputTest, SingleTypeAdditionSelectsAnUnambiguousOverload) {
+    pl::VertexInput input;
+    const auto result = input.add<float>();
+    ASSERT_EQ(input.definitions.size(), 1u);
+    ASSERT_EQ(result.definitions.size(), 1u);
+    EXPECT_EQ(input.definitions[0].layouts[0].format, vsl::data_format::Float);
+    EXPECT_EQ(result.definitions[0].layouts[0].format, vsl::data_format::Float);
+    EXPECT_EQ(input.requirements_size(), 4u);
+}
+TEST(VertexInputTest, TypePacksPreserveArgumentOrderAndPreviouslyAddedShapes) {
+    pl::VertexInput input;
+    input.add(vsl::data_format::FloatRG);
+    input.add<float, std::uint32_t>();
+    ASSERT_EQ(input.definitions.size(), 3u);
+    EXPECT_EQ(input.definitions[0].layouts[0].format, vsl::data_format::FloatRG);
+    EXPECT_EQ(input.definitions[1].layouts[0].format, vsl::data_format::Float);
+    EXPECT_EQ(input.definitions[2].layouts[0].format, vsl::data_format::UnsignedInt);
+    EXPECT_EQ(input.requirements_size(), 16u);
 }
 } // namespace
+
+TEST(VertexInputTest, EmptyTypePacksLeaveExistingShapesUnchanged) {
+    pl::VertexInput input;
+    input.add(vsl::data_format::FloatRG);
+    const auto result = input.add<>();
+    ASSERT_EQ(input.definitions.size(), 1u);
+    ASSERT_EQ(result.definitions.size(), 1u);
+    EXPECT_EQ(input.definitions[0].layouts[0].format, vsl::data_format::FloatRG);
+    EXPECT_EQ(input.requirements_size(), 8u);
+}

@@ -1,4 +1,5 @@
 #include <AHO/io/input_manager.hpp>
+#include <functional>
 #include "../support/input_backend.hpp"
 
 namespace {
@@ -175,3 +176,49 @@ TEST_F(InputManagerTest, TemplateAdaptableUpdatableInputsKeepIndependentChildLif
 }
 
 }
+
+namespace {
+struct UpdateCallback : aho::input::abstract::Updatable {
+    std::function<void()> callback;
+    UpdateCallback(void *, std::function<void()> callback) : callback(std::move(callback)) {}
+    void update() override { callback(); }
+};
+TEST_F(InputManagerTest, InputsRegisteredDuringUpdateStartOnTheNextUpdate) {
+    aho::InputManager manager(window.handle());
+    std::vector<std::shared_ptr<Counter>> children;
+    bool spawned = false;
+    auto creator = manager.get<UpdateCallback>([&] {
+        if (spawned) return;
+        spawned = true;
+        const auto capacity = manager.update_targets.capacity();
+        for (std::size_t i = 0; i <= capacity; ++i)
+            children.push_back(manager.get<Counter>());
+    });
+    auto existing = manager.get<Counter>();
+    manager.update();
+    ASSERT_FALSE(children.empty());
+    EXPECT_EQ(existing->state(), 1);
+    for (const auto &child : children) EXPECT_EQ(child->state(), 0);
+    manager.update();
+    EXPECT_EQ(existing->state(), 2);
+    for (const auto &child : children) EXPECT_EQ(child->state(), 1);
+}
+TEST_F(InputManagerTest, InputsDestroyedBeforeTheirTurnAreNotKeptAliveByTheUpdateSnapshot) {
+    aho::InputManager manager(window.handle());
+    std::shared_ptr<UpdateCallback> later;
+    int calls = 0;
+    auto first = manager.get<UpdateCallback>([&] { later.reset(); });
+    later = manager.get<UpdateCallback>([&] { ++calls; });
+    manager.update();
+    EXPECT_EQ(calls, 0);
+    ASSERT_EQ(manager.update_targets.size(), 1u);
+    EXPECT_EQ(manager.update_targets.front().lock(), first);
+}
+TEST_F(InputManagerTest, ExpiredInputsRegisteredByACallbackAreRemovedAfterTheUpdate) {
+    aho::InputManager manager(window.handle());
+    auto creator = manager.get<UpdateCallback>([&] { (void)manager.get<Counter>(); });
+    manager.update();
+    ASSERT_EQ(manager.update_targets.size(), 1u);
+    EXPECT_EQ(manager.update_targets.front().lock(), creator);
+}
+} // namespace

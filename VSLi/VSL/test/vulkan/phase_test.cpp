@@ -60,3 +60,71 @@ TEST_F(PhaseVulkanIntegrationTest, PostponedDefaultPhaseCanBeInspectedWithoutAcq
     // getImageIndex is excluded before acquire: it reads an uninitialized member.
 }
 } // namespace
+
+namespace {
+struct VertexCountSource {
+    std::size_t count;
+    std::size_t getVertexSize() { return count; }
+    void invoke(vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) {}
+};
+struct VertexCountConsumer {
+    std::shared_ptr<std::optional<std::size_t>> received;
+    void setVertexSize(std::optional<std::size_t> value) { *received = value; }
+    void invoke(vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) {}
+};
+struct VertexCountDelegate : vsl::command::__DelegateCommand, vsl::command::__VertexSizeRequire {
+    std::optional<std::size_t> received;
+    void setVertexSize(std::optional<std::size_t> value) override { received = value; }
+    void invoke(vsl::DefaultPhaseStream &, vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) override {}
+};
+TEST_F(PhaseVulkanIntegrationTest, ValueCommandsExportAndReceiveVertexCountsThroughTheirOwnRoles) {
+    auto manager = make_manager();
+    auto received = std::make_shared<std::optional<std::size_t>>(99);
+    vsl::DefaultPhaseStream stream{manager};
+    stream << VertexCountConsumer{received};
+    EXPECT_FALSE(*received);
+    stream << VertexCountSource{17} << VertexCountConsumer{received};
+    EXPECT_EQ(stream.vertexSize, 17u);
+    EXPECT_EQ(*received, 17u);
+    stream << VertexCountSource{0} << VertexCountConsumer{received};
+    EXPECT_EQ(*received, 0u);
+}
+TEST_F(PhaseVulkanIntegrationTest, ValueAndSharedDelegatesReceiveTheSameVertexCount) {
+    auto manager = make_manager();
+    vsl::DefaultPhaseStream stream{manager, 23};
+    struct ValueDelegate {
+        std::shared_ptr<std::optional<std::size_t>> received;
+        void setVertexSize(std::optional<std::size_t> value) { *received = value; }
+        void invoke(vsl::DefaultPhaseStream &, vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) {}
+    };
+    auto received = std::make_shared<std::optional<std::size_t>>();
+    stream << ValueDelegate{received};
+    EXPECT_EQ(*received, 23u);
+    auto shared = std::make_shared<VertexCountDelegate>();
+    stream << std::shared_ptr<vsl::command::__DelegateCommand>(shared);
+    EXPECT_EQ(shared->received, *received);
+}
+} // namespace
+
+namespace {
+struct IncrementVertexCount : vsl::command::__Command,
+                              vsl::command::__VertexSizeRequire,
+                              vsl::command::__VertexSizeHolder {
+    std::optional<std::size_t> input;
+    void setVertexSize(std::optional<std::size_t> count) override { input = count; }
+    std::size_t getVertexSize() override { return input.value_or(0) + 1; }
+    void invoke(vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) override {}
+};
+TEST_F(PhaseVulkanIntegrationTest, CommandsConsumeThePreviousCountBeforeExportingTheirOwnCount) {
+    auto manager = make_manager();
+    vsl::DefaultPhaseStream value_stream{manager, 17};
+    value_stream << IncrementVertexCount{};
+    EXPECT_EQ(value_stream.vertexSize, 18u);
+    auto command = std::make_shared<IncrementVertexCount>();
+    vsl::DefaultPhaseStream shared_stream{manager, 17};
+    shared_stream << std::shared_ptr<vsl::command::__Command>(command);
+    EXPECT_EQ(command->input, 17u);
+    EXPECT_EQ(shared_stream.vertexSize, 18u);
+    EXPECT_EQ(value_stream.vertexSize, shared_stream.vertexSize);
+}
+} // namespace

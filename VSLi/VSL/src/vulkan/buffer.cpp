@@ -26,7 +26,7 @@ std::uint32_t VSL_NAMESPACE::_impl::helper::findMemoryType(std::shared_ptr<VSL_N
             return i;
         }
     }
-    return 0;
+    throw VSL_NAMESPACE::exceptions::RuntimeException("MemoryTypeNotFound", "No compatible memory type satisfies the requested properties");
 }
 
 bool VSL_NAMESPACE::BufferAccessor::copyByBuffer(CommandManager commandManager, BufferAccessor* buf) {

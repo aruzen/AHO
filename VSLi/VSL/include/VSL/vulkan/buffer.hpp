@@ -77,9 +77,11 @@ namespace VSL_NAMESPACE {
     template<typename Buffer, typename T>
     Buffer make_buffer(LogicalDeviceAccessor device, T& t, std::optional<CommandManager> manager = std::nullopt) {
         Buffer buffer(device, sizeof (T));
-        buffer.copy(t);
-        if constexpr (not contain<Buffer::Property, MemoryProperty::HostCoherent>()) {
-            buffer.flush();
+        {
+            auto mapped = buffer.data();
+            mapped.copy(t);
+            if constexpr (not contain<Buffer::Property, MemoryProperty::HostCoherent>())
+                mapped.flush();
         }
         return buffer;
     }
@@ -169,10 +171,10 @@ namespace VSL_NAMESPACE {
     requires (!std::is_integral_v<T>) && (VSL_NAMESPACE::contain<MemProperty, MemoryProperty::HostVisible>())
     Buffer<MemType, MemProperty, SharingMode>::Buffer(LogicalDeviceAccessor device, T t) {
         _data = this->MakeBuffer(device, sizeof(T), MemType, MemProperty, SharingMode);
-        this->copy(t);
-        if constexpr (not contain<Buffer::Property, MemoryProperty::HostCoherent>()) {
-            this->flush();
-        }
+        auto mapped = this->data();
+        mapped.copy(t);
+        if constexpr (not contain<Buffer::Property, MemoryProperty::HostCoherent>())
+            mapped.flush();
     }
 
     template<MemoryType MemType, MemoryProperty MemProperty, SharingMode SharingMode>
@@ -192,10 +194,9 @@ namespace VSL_NAMESPACE {
         _data = this->MakeBuffer(device, sizeof(T) * size, MemType, MemProperty, SharingMode);
         {
             auto data = this->data();
-            bcopy(t, data.data, sizeof(T) * size);
-        }
-        if constexpr (not contain<Buffer::Property, MemoryProperty::HostCoherent>()) {
-            this->flush();
+            data.copy(t, size);
+            if constexpr (not contain<Buffer::Property, MemoryProperty::HostCoherent>())
+                data.flush();
         }
     }
 

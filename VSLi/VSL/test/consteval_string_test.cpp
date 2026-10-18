@@ -1,5 +1,7 @@
-#include <gtest/gtest.h>
 #include <VSL/consteval_string.hpp>
+// The public stream alias must be complete before any other headers are included.
+static_assert(sizeof(vsl::default_using::stringstream) > 0);
+#include <gtest/gtest.h>
 
 namespace {
 static_assert(vsl::is_supported_charsets<char> && vsl::is_supported_charsets<char8_t>);
@@ -34,6 +36,12 @@ TEST(ConstantStringTest, CharacterContainerReturnsEachEncoding) {
     EXPECT_EQ(value.get<wchar_t>(), L'z');
     EXPECT_EQ(value.get<char16_t>(), u'z');
     EXPECT_EQ(value.get<char32_t>(), U'z');
+}
+TEST(ConstantStringTest, DefaultStringStreamSupportsFormattedOutput) {
+    vsl::default_using::stringstream stream;
+    stream << "value=" << 7 << '/' << 2.5;
+    EXPECT_EQ(stream.str(), "value=7/2.5");
+    static_assert(std::same_as<decltype(stream.str()), vsl::default_using::string>);
 }
 TEST(ConstantStringTest, DefaultCharacterMacrosUseSelectedCharacterType) {
     using character = char16_t;

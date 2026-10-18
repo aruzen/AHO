@@ -382,5 +382,238 @@ namespace {
         EXPECT_EQ(pixels.bytes.size(), 256u);
         EXPECT_EQ(pixels.bytes[0], std::byte{255});
     }
+    TEST_F(ImageReadbackVulkanIntegrationTest, RecordsColorAndIdWithAttachmentKeysInOneSubmission) {
+        auto manager = make_manager();
+        ColorImage ids(device, width, height, vsl::data_format::UnsignedInt);
+        vsl::RenderPassDescription description;
+        auto objectId = description.addColor({.format = ids.getFormat(), .finalLayout = vsl::ImageLayout::General});
+        auto colorId = description.addColor({.format = color->getFormat(), .finalLayout = vsl::ImageLayout::General});
+        vsl::RenderPass pass(device, description);
+        auto target = vsl::FrameBuffer::fromAttachments(pass, width, height, {{colorId, *color}, {objectId, ids}});
+        aho::ImageReadback reader(manager, 0, 2);
+        vsl::ComputePhase phase(manager);
+        phase << vsl::command::RenderPassBegin::withClears(target, {
+                                                                       {colorId, vsl::ClearColor{1, 0, 0, 1}},
+                                                                       {objectId, vsl::ClearUint{77}},
+                                                                   })
+              << vsl::command::RenderPassEnd{};
+        auto idTicket = reader.record(phase, ids, vsl::ImageLayout::General, {1, 2, 1, 1}, 123);
+        auto colorTicket = reader.record(phase, *color, vsl::ImageLayout::General, {}, 123);
+        ASSERT_TRUE(idTicket);
+        ASSERT_TRUE(colorTicket);
+        EXPECT_EQ(idTicket->status(), vsl::Completion::Status::Pending);
+        EXPECT_FALSE(idTicket->wait(0));
+        EXPECT_THROW(idTicket->read(0), std::logic_error);
+        EXPECT_EQ(idTicket->info().frameId, 123u);
+        EXPECT_EQ(idTicket->info().region.x, 1u);
+        EXPECT_EQ(idTicket->info().region.y, 2u);
+        EXPECT_EQ(idTicket->info().rowStride, 4u);
+        EXPECT_EQ(idTicket->info().byteSize, 4u);
+        EXPECT_EQ(colorTicket->info().region.width, width);
+        EXPECT_GT(colorTicket->info().requestId, idTicket->info().requestId);
+        EXPECT_EQ(reader.capacity(), width * height * 4u + 4u);
+        ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::Success);
+        auto selected = idTicket->read();
+        std::uint32_t id = 0;
+        std::memcpy(&id, selected.bytes.data(), sizeof(id));
+        EXPECT_EQ(id, 77u);
+        EXPECT_EQ(colorTicket->read().bytes[0], std::byte{255});
+        EXPECT_THROW(reader.record(phase, ids, vsl::ImageLayout::General), std::logic_error);
+    }
+    TEST_F(ImageReadbackVulkanIntegrationTest, CompletedTicketsRetainIndependentResultsAndOccupyTheirSlots) {
+        auto manager = make_manager();
+        aho::ImageReadback reader(manager, 0, 2);
+        {
+            vsl::ComputePhase phase(manager);
+            phase << vsl::command::RenderPassBegin(*framebuffer, {vsl::ClearColor{1, 0, 0, 1}}) << vsl::command::RenderPassEnd{};
+        }
+        auto red = reader.captureTicket(*color, vsl::ImageLayout::General, {}, 7);
+        ASSERT_TRUE(red);
+        ASSERT_TRUE(red->wait());
+        const auto firstId = red->info().requestId;
+        {
+            vsl::ComputePhase phase(manager);
+            phase << vsl::command::RenderPassBegin(*framebuffer, {vsl::ClearColor{0, 0, 1, 1}}) << vsl::command::RenderPassEnd{};
+        }
+        auto blue = reader.captureTicket(*color, vsl::ImageLayout::General, {}, 8);
+        ASSERT_TRUE(blue);
+        ASSERT_TRUE(blue->wait());
+        EXPECT_FALSE(reader.captureTicket(*color, vsl::ImageLayout::General));
+        EXPECT_EQ(red->read().bytes[0], std::byte{255});
+        EXPECT_EQ(red->read().bytes[2], std::byte{0});
+        EXPECT_EQ(blue->read().bytes[0], std::byte{0});
+        EXPECT_EQ(blue->read().bytes[2], std::byte{255});
+        EXPECT_EQ(red->info().frameId, 7u);
+        EXPECT_EQ(blue->info().frameId, 8u);
+        red.reset();
+        auto next = reader.captureTicket(*color, vsl::ImageLayout::General, {0, 0, 1, 1}, 9);
+        ASSERT_TRUE(next);
+        EXPECT_GT(next->info().requestId, firstId);
+        EXPECT_EQ(next->read().bytes[2], std::byte{255});
+        EXPECT_EQ(blue->info().frameId, 8u);
+    }
+    TEST_F(ImageReadbackVulkanIntegrationTest, TicketRemainsReadableAfterWorkerAndProducerAreReleased) {
+        std::optional<aho::ImageReadbackTicket> ticket;
+        {
+            auto manager = make_manager();
+            aho::ImageReadback reader(manager);
+            vsl::ComputePhase phase(manager);
+            phase << vsl::command::RenderPassBegin(*framebuffer, {vsl::ClearColor{0, 1, 0, 1}}) << vsl::command::RenderPassEnd{};
+            ticket = reader.record(phase, *color, vsl::ImageLayout::General, {}, 42);
+            ASSERT_TRUE(ticket);
+            phase.submit();
+        }
+        ASSERT_TRUE(ticket->wait());
+        EXPECT_EQ(ticket->info().frameId, 42u);
+        EXPECT_EQ(ticket->read().bytes[1], std::byte{255});
+    }
+    TEST_F(ImageReadbackVulkanIntegrationTest, CancelledAndUnwoundRecordingsCanReleaseAndReuseTheirSlot) {
+        auto manager = make_manager();
+        aho::ImageReadback reader(manager);
+        std::optional<aho::ImageReadbackTicket> ticket;
+        for (unsigned attempt = 0; attempt < 2; ++attempt) {
+            try {
+                vsl::ComputePhase phase(manager);
+                phase << vsl::command::RenderPassBegin(*framebuffer) << vsl::command::RenderPassEnd{};
+                ticket = reader.record(phase, *color, vsl::ImageLayout::General);
+                ASSERT_TRUE(ticket);
+                if (attempt == 0)
+                    phase.cancel();
+                else
+                    throw std::runtime_error("cancel recording");
+            } catch (const std::runtime_error &) {
+            }
+            EXPECT_EQ(ticket->status(), vsl::Completion::Status::Cancelled);
+            EXPECT_FALSE(ticket->wait(0));
+            EXPECT_THROW(ticket->read(0), std::logic_error);
+            ticket.reset();
+        }
+        vsl::ComputePhase phase(manager);
+        phase << vsl::command::RenderPassBegin(*framebuffer, {vsl::ClearColor{0, 0, 1, 1}}) << vsl::command::RenderPassEnd{};
+        ticket = reader.record(phase, *color, vsl::ImageLayout::General);
+        ASSERT_TRUE(ticket);
+        phase.submit();
+        EXPECT_EQ(ticket->read().bytes[2], std::byte{255});
+    }
+    TEST_F(ImageReadbackVulkanIntegrationTest, ReusesReleasedTicketSlotAcrossRecordedFrames) {
+        auto manager = make_manager();
+        aho::ImageReadback reader(manager);
+        aho::ImagePixels pixels;
+        const std::byte *storage = nullptr;
+        for (unsigned frame = 0; frame < 24; ++frame) {
+            vsl::ComputePhase phase(manager);
+            phase << vsl::command::RenderPassBegin(*framebuffer, {vsl::ClearColor{1, 0, 0, 1}}) << vsl::command::RenderPassEnd{};
+            auto ticket = reader.record(phase, *color, vsl::ImageLayout::General, {}, frame);
+            ASSERT_TRUE(ticket);
+            phase.submit();
+            ticket->read(pixels);
+            EXPECT_EQ(ticket->info().frameId, frame);
+            EXPECT_EQ(pixels.bytes[0], std::byte{255});
+            EXPECT_EQ(reader.capacity(), width * height * 4u);
+            if (storage)
+                EXPECT_EQ(pixels.bytes.data(), storage);
+            storage = pixels.bytes.data();
+        }
+        EXPECT_THROW((aho::ImageReadback(manager, 0, 0)), std::invalid_argument);
+    }
+    TEST_F(ImageReadbackBusyVulkanIntegrationTest, MultipleTicketSlotsSubmitWithoutWaitingAndRejectExcessRequests) {
+        auto manager = make_manager();
+        {
+            auto phase = manager.startPhase<vsl::ComputePhase>();
+            phase << vsl::command::RenderPassBegin(*framebuffer, {vsl::ClearColor{1, 0, 0, 1}})
+                  << vsl::command::RenderPassEnd{};
+        }
+        device._data->device.waitIdle();
+        aho::ImageReadback reader(manager, 256, 2);
+        vk::SemaphoreTypeCreateInfo type{.semaphoreType = vk::SemaphoreType::eTimeline};
+        auto semaphore = device._data->device.createSemaphoreUnique({.pNext = &type});
+        const auto signal = reinterpret_cast<PFN_vkSignalSemaphoreKHR>(
+            vkGetDeviceProcAddr(device._data->device, "vkSignalSemaphoreKHR"));
+        ASSERT_NE(signal, nullptr);
+        struct Unblock {
+            vk::Device device;
+            vk::Semaphore semaphore;
+            PFN_vkSignalSemaphoreKHR signal;
+            bool released = false;
+            void release() {
+                if (released)
+                    return;
+                VkSemaphoreSignalInfo info{VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO};
+                info.semaphore = semaphore;
+                info.value = 1;
+                (void)signal(device, &info);
+                released = true;
+            }
+            ~Unblock() {
+                release();
+                device.waitIdle();
+            }
+        } unblock{device._data->device, *semaphore, signal};
+        const std::uint64_t value = 1;
+        vk::TimelineSemaphoreSubmitInfo timeline{.waitSemaphoreValueCount = 1, .pWaitSemaphoreValues = &value};
+        const vk::PipelineStageFlags stage = vk::PipelineStageFlagBits::eAllCommands;
+        manager._data->graphicsQueue.submit(vk::SubmitInfo{
+            .pNext = &timeline, .waitSemaphoreCount = 1, .pWaitSemaphores = &*semaphore, .pWaitDstStageMask = &stage});
+        auto first = reader.captureTicket(*color, vsl::ImageLayout::General, {}, 10);
+        auto second = reader.captureTicket(*color, vsl::ImageLayout::General, {0, 0, 1, 1}, 11);
+        ASSERT_TRUE(first);
+        ASSERT_TRUE(second);
+        EXPECT_FALSE(first->ready());
+        EXPECT_FALSE(second->ready());
+        EXPECT_FALSE(first->wait(0));
+        EXPECT_FALSE(second->wait(0));
+        EXPECT_FALSE(reader.captureTicket(*color, vsl::ImageLayout::General, {}, 12));
+        EXPECT_EQ(first->info().frameId, 10u);
+        EXPECT_EQ(second->info().frameId, 11u);
+        unblock.release();
+        auto pixels = first->read();
+        EXPECT_EQ(pixels.width, 8u);
+        EXPECT_EQ(pixels.height, 8u);
+        EXPECT_EQ(pixels.bytes.size(), 256u);
+        EXPECT_EQ(pixels.bytes[0], std::byte{255});
+        EXPECT_EQ(second->read().bytes.size(), 4u);
+        EXPECT_EQ(second->info().frameId, 11u);
+    }
+    TEST_F(ImageReadbackVulkanIntegrationTest, DiscardLatestSwitchesFromConvenienceCaptureToTicketWithoutRebuildingWorker) {
+        auto manager = make_manager();
+        {
+            vsl::ComputePhase phase(manager);
+            phase << vsl::command::RenderPassBegin(*framebuffer, {vsl::ClearColor{1, 0, 0, 1}}) << vsl::command::RenderPassEnd{};
+        }
+        aho::ImageReadback reader(manager);
+        ASSERT_TRUE(reader.capture(*color, vsl::ImageLayout::General));
+        ASSERT_TRUE(reader.wait());
+        EXPECT_FALSE(reader.captureTicket(*color, vsl::ImageLayout::General));
+        reader.discardLatest();
+        EXPECT_FALSE(reader.ready());
+        EXPECT_THROW(reader.read(), std::logic_error);
+        auto ticket = reader.captureTicket(*color, vsl::ImageLayout::General);
+        ASSERT_TRUE(ticket);
+        EXPECT_EQ(ticket->read().bytes[0], std::byte{255});
+        EXPECT_EQ(reader.capacity(), width * height * 4u);
+    }
+
+    TEST_F(ImageReadbackVulkanIntegrationTest, UsesAnAvailableLargeSlotBeforeGrowingAnotherSlot) {
+        auto manager = make_manager();
+        {
+            vsl::ComputePhase phase(manager);
+            phase << vsl::command::RenderPassBegin(*framebuffer) << vsl::command::RenderPassEnd{};
+        }
+        aho::ImageReadback reader(manager, 4, 2);
+        auto small = reader.captureTicket(*color, vsl::ImageLayout::General, {0, 0, 1, 1});
+        ASSERT_TRUE(small);
+        ASSERT_TRUE(small->wait());
+        auto large = reader.captureTicket(*color, vsl::ImageLayout::General);
+        ASSERT_TRUE(large);
+        ASSERT_TRUE(large->wait());
+        EXPECT_EQ(reader.capacity(), 4u + width * height * 4u);
+        small.reset();
+        large.reset();
+        auto next = reader.captureTicket(*color, vsl::ImageLayout::General);
+        ASSERT_TRUE(next);
+        EXPECT_TRUE(next->wait());
+        EXPECT_EQ(reader.capacity(), 4u + width * height * 4u);
+    }
+
 }
 #endif

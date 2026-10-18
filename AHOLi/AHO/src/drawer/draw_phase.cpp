@@ -1,5 +1,6 @@
 #include <AHO/drawer/draw_phase.hpp>
 #include <utility>
+#include <exception>
 
 thread_local aho::DrawPhase *aho::THREAD_LOCAL_DRAW_PHASE;
 
@@ -19,30 +20,51 @@ aho::DrawPhase::DrawPhase(aho::engine::GraphicalEngine *engine,
       engine(engine),
       initialize(initialize),
       finish(finit) {
+    auto *previous = THREAD_LOCAL_DRAW_PHASE;
     THREAD_LOCAL_DRAW_PHASE = this;
-
-    if (state != State::WaitSubmit)
-        return;
-
-    if (initialize) {
-        DrawStream<vsl::DefaultPhaseStream> stream{vsl::DefaultPhaseStream{this->manager}};
-        initialize(stream);
-    } else
-        *this << vsl::command::RenderPassBegin(engine->getWindow()._data2->render_pass,
-                                               engine->getWindow()._data2->frame_buffer);
+    try {
+        if (state != State::WaitSubmit)
+            return;
+        if (initialize) {
+            DrawStream<vsl::DefaultPhaseStream> stream{vsl::DefaultPhaseStream{this->manager}};
+            initialize(stream);
+        } else {
+            *this << vsl::command::RenderPassBegin(engine->getWindow()._data2->render_pass,
+                                                   engine->getWindow()._data2->frame_buffer);
+        }
+    } catch (...) {
+        THREAD_LOCAL_DRAW_PHASE = previous;
+        throw; // The base destructor returns the acquired image through cancel().
+    }
 }
 
 aho::DrawPhase::~DrawPhase() {
-    if (state == State::WaitSubmit) {
-        if (finish) {
-            DrawStream<vsl::DefaultPhaseStream> stream{vsl::DefaultPhaseStream{this->manager}};
-            finish(stream);
-        } else
-            *this << vsl::command::RenderPassEnd();
+    try {
+        if (std::uncaught_exceptions() > initialExceptions) {
+            vsl::DefaultPhase::cancel();
+        } else {
+            if (state == State::WaitSubmit) {
+                if (finish) {
+                    DrawStream<vsl::DefaultPhaseStream> stream{vsl::DefaultPhaseStream{this->manager}};
+                    finish(stream);
+                } else {
+                    *this << vsl::command::RenderPassEnd();
+                }
+            }
+            auto result = vsl::DefaultPhase::submit();
+            if (result == vsl::DefaultPhase::SubmitResult::WantRecreateSwapchain)
+                engine->getWindow().resize(engine->getWindow().window_size());
+        }
+    } catch (...) {
+        try {
+            vsl::DefaultPhase::cancel();
+        } catch (...) {
+        }
+        try {
+            vsl::loggingln("DrawPhase completion failed; recording cancelled");
+        } catch (...) {
+        }
     }
-    auto result = vsl::DefaultPhase::submit();
-    if (result == vsl::DefaultPhase::SubmitResult::WantRecreateSwapchain)
-        engine->getWindow().resize(engine->getWindow().window_size());
     THREAD_LOCAL_DRAW_PHASE = nullptr;
 }
 

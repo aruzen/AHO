@@ -1,0 +1,6 @@
+#version 450
+layout(local_size_x=1) in;
+layout(constant_id=0) const int amount=3;
+layout(set=0,binding=0) uniform sampler2D textures[amount];
+layout(set=0,binding=1) buffer Data { vec4 value; } data;
+void main() { data.value = texture(textures[0], vec2(0)); }

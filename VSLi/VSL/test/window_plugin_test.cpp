@@ -1,5 +1,5 @@
 #include "support/window_fixture.hpp"
-#include "support/compile_probe.hpp"
+
 namespace {
 using WindowPluginWindowIntegrationTest = vsl_test::WindowIntegrationTest;
 TEST_F(WindowPluginWindowIntegrationTest, QuietCloseHonorsNativeShouldCloseFlag) {
@@ -41,13 +41,33 @@ TEST_F(WindowPluginWindowIntegrationTest, ResizeHookRoutesFramebufferDimensionsT
     EXPECT_EQ(width, 128);
     EXPECT_EQ(height, 96);
 }
-TEST(WindowPluginTest, DISABLED_CloseHookCanBeAddedWithPublicPluginHelper) {
-    const auto result = vsl_test::compile_probe(R"cpp(
-#include <VSL/window_plugin.hpp>
-void probe(vsl::PureWindow& window) {
-    window.add_plugin<vsl::window_plugin::HookShouldClose>([](vsl::PureWindow){});
+TEST_F(WindowPluginWindowIntegrationTest, CloseHookCanBeAddedWithPublicPluginHelper) {
+    int called = 0;
+    auto hook = window->add_plugin<vsl::window_plugin::HookShouldClose>([&](vsl::PureWindow copy) {
+        EXPECT_EQ(copy._data, window->_data);
+        ++called;
+    });
+    EXPECT_EQ(window->_data->plugins.at(hook->id), hook);
+    ASSERT_EQ(window->_data->update.size(), 1u);
+    EXPECT_TRUE(vsl::PureWindow::Update());
+    EXPECT_EQ(called, 0);
+    glfwSetWindowShouldClose(static_cast<GLFWwindow *>(window->_data->window_handle), GLFW_TRUE);
+    EXPECT_TRUE(vsl::PureWindow::Update());
+    EXPECT_EQ(called, 1);
 }
-)cpp");
-    EXPECT_EQ(result.status, 0) << result.diagnostics;
-}
+
 } // namespace
+
+TEST(WindowPluginTest, KeepsWindowDataAndNullPointerConstructionAvailable) {
+    using Hook = vsl::window_plugin::HookShouldClose;
+    using Callback = std::function<void(vsl::PureWindow)>;
+    static_assert(std::is_constructible_v<Hook, vsl::PureWindow *, Callback>);
+    static_assert(std::is_constructible_v<Hook, vsl::PureWindow::WindowData *, Callback>);
+    static_assert(std::is_constructible_v<Hook, std::nullptr_t, Callback>);
+    static_assert(!std::is_constructible_v<Hook, int *, Callback>);
+    int called = 0;
+    Hook hook(nullptr, [&](vsl::PureWindow) { ++called; });
+    EXPECT_EQ(called, 0);
+    hook.callback(vsl::PureWindow(std::make_shared<vsl::PureWindow::WindowData>()));
+    EXPECT_EQ(called, 1);
+}

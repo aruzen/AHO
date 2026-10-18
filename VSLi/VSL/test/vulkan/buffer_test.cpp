@@ -386,3 +386,43 @@ TEST_F(BufferVulkanIntegrationTest, MappedHolderCopiesKeepExplicitFlushControl) 
     EXPECT_EQ(buffer.flush_calls, 1);
 }
 } // namespace
+
+namespace {
+TEST_F(BufferVulkanIntegrationTest, PointerCopiesUseSignedAndNarrowIntegralCountsRatherThanPackingArguments) {
+    const std::array<std::uint32_t, 3> expected{17, 23, 0xffffffffu};
+    HostBuffer buffer(device, std::size_t{32});
+    auto verify = [&]<typename Count>(Count count) {
+        ASSERT_TRUE(buffer.copy(expected.data(), count));
+        {
+            auto mapped = buffer.data(sizeof(expected));
+            EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
+        }
+        auto mapped = buffer.data(sizeof(expected));
+        std::memset(mapped.data, 0, mapped.size);
+        ASSERT_TRUE(mapped.copy(expected.data(), count));
+        EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
+    };
+    verify(3);
+    verify(short{3});
+    verify(3u);
+    verify(3L);
+    verify(std::size_t{3});
+    const std::uint32_t raw[]{17, 23, 0xffffffffu};
+    ASSERT_TRUE(buffer.copy(raw, 3));
+    auto mapped = buffer.data(sizeof(raw));
+    EXPECT_EQ(std::memcmp(mapped.data, raw, sizeof(raw)), 0);
+}
+TEST_F(BufferVulkanIntegrationTest, NegativeAndOversizedCountsLeaveStorageUntouchedAndNullEmptyCopiesSucceed) {
+    const std::array<std::uint32_t, 4> initial{17, 23, 29, 31};
+    HostBuffer buffer(device, initial);
+    EXPECT_FALSE(buffer.copy(initial.data(), -1));
+    EXPECT_FALSE(buffer.copy(initial.data(), std::numeric_limits<long>::min()));
+    EXPECT_FALSE(buffer.copy(initial.data(), 5u));
+    EXPECT_TRUE(buffer.copy(static_cast<const std::uint32_t *>(nullptr), 0));
+    auto mapped = buffer.data();
+    EXPECT_FALSE(mapped.copy(initial.data(), short{-1}));
+    EXPECT_FALSE(mapped.copy(initial.data(), 5));
+    EXPECT_TRUE(mapped.copy(static_cast<const std::uint32_t *>(nullptr), 0));
+    EXPECT_EQ(std::memcmp(mapped.data, initial.data(), sizeof(initial)), 0);
+}
+} // namespace

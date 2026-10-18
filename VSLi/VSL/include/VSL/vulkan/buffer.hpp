@@ -6,6 +6,7 @@
 #include "../utils/flags.hpp"
 #include <optional>
 #include <cstring>
+#include <limits>
 
 #include "command.hpp"
 #include "../exceptions.hpp"
@@ -130,6 +131,20 @@ namespace VSL_NAMESPACE {
         return helper::copy_with_shift_offset(this->data, this->size, offset, args...);
     }
 
+    template<typename T, std::integral Count>
+    requires (!std::same_as<Count, std::size_t>)
+    bool BufferAccessor::copy(T* t, Count size) {
+        if constexpr (std::is_signed_v<Count>) {
+            if (size < 0)
+                return false;
+        }
+        if constexpr (sizeof(Count) > sizeof(std::size_t)) {
+            if (size > std::numeric_limits<std::size_t>::max())
+                return false;
+        }
+        return copy(t, static_cast<std::size_t>(size));
+    }
+
     template<typename T>
     bool BufferAccessor::copy(T* t, size_t size) {
         auto buff = this->data();
@@ -140,6 +155,20 @@ namespace VSL_NAMESPACE {
         memcpy(buff.data, t, sizeof(T) * size);
         buff.flush();
         return true;
+    }
+
+    template<typename T, std::integral Count>
+    requires (!std::same_as<Count, std::size_t>)
+    bool BufferAccessor::LocalBufferHolder::copy(T* t, Count size) {
+        if constexpr (std::is_signed_v<Count>) {
+            if (size < 0)
+                return false;
+        }
+        if constexpr (sizeof(Count) > sizeof(std::size_t)) {
+            if (size > std::numeric_limits<std::size_t>::max())
+                return false;
+        }
+        return copy(t, static_cast<std::size_t>(size));
     }
 
     template<typename T>

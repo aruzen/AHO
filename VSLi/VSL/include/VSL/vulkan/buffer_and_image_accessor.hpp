@@ -13,6 +13,7 @@
 
 #include "device.hpp"
 #include <memory>
+#include <concepts>
 #include <optional>
 
 namespace VSL_NAMESPACE {
@@ -234,6 +235,10 @@ namespace VSL_NAMESPACE {
             template<typename T>
             bool copy(T* t, std::size_t size);
 
+            template<typename T, std::integral Count>
+            requires (!std::same_as<Count, std::size_t>)
+            bool copy(T* t, Count size);
+
             template<typename... Args>
             void uncheck_copy(const Args &... args);
 
@@ -254,6 +259,10 @@ namespace VSL_NAMESPACE {
 
         template<typename T>
         bool copy(T* t, size_t size);
+
+        template<typename T, std::integral Count>
+        requires (!std::same_as<Count, std::size_t>)
+        bool copy(T* t, Count size);
 
         template<typename... Args>
         void uncheck_copy(const Args &... args);

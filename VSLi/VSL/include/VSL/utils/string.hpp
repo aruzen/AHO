@@ -42,24 +42,28 @@ inline void VSL_NAMESPACE::helper::join(std::stringstream& ss, const Head& h, co
 template<bool Validation, typename Head, typename ...Args>
 inline void VSL_NAMESPACE::logging(const Head& h, const Args & ...args)
 {
-	if (logger == nullptr)
-		return;
+	if constexpr (Validation) {
+		if (logger == nullptr)
+			return;
 
-	std::stringstream ss;
-	VSL_NAMESPACE::helper::join(ss, h, args...);
+		std::stringstream ss;
+		VSL_NAMESPACE::helper::join(ss, h, args...);
 
-	VSL_NAMESPACE::logger(ss.str().c_str());
+		VSL_NAMESPACE::logger(ss.str().c_str());
+	}
 }
 
 template<bool Validation, typename Head, typename ...Args>
 inline void VSL_NAMESPACE::loggingln(const Head& h, const Args & ...args)
 {
-	if (logger == nullptr)
-		return;
+	if constexpr (Validation) {
+		if (logger == nullptr)
+			return;
 
-	std::stringstream ss;
-	VSL_NAMESPACE::helper::join(ss, h, args...);
-	ss << std::endl;
+		std::stringstream ss;
+		VSL_NAMESPACE::helper::join(ss, h, args...);
+		ss << std::endl;
 
-	VSL_NAMESPACE::logger(ss.str().c_str());
+		VSL_NAMESPACE::logger(ss.str().c_str());
+	}
 }

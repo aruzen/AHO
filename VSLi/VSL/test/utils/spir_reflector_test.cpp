@@ -47,3 +47,49 @@ TEST_F(SpirvReflectorVulkanIntegrationTest, GeneratedBindingLayoutsRetainDefinit
     }
 }
 } // namespace
+
+namespace {
+TEST(SpirvReflectorTest, DescriptorArraysUseTheirElementCountsForEverySupportedResourceCategory) {
+    vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("descriptor_arrays.comp.spv"));
+    const auto &points = reflector.generated.binding_points.at(0);
+    ASSERT_EQ(points.size(), 4u);
+    for (const auto &[binding, type, amount] : {
+             std::tuple{0u, vsl::graphic_resource::Type::UniformBuffer, 2u},
+             std::tuple{1u, vsl::graphic_resource::Type::StorageBuffer, 3u},
+             std::tuple{2u, vsl::graphic_resource::Type::StorageImage, 4u},
+             std::tuple{3u, vsl::graphic_resource::Type::CombinedImageSampler, 5u}}) {
+        const auto found = std::ranges::find(points, binding, &vsl::graphic_resource::BindingPoint::binding);
+        ASSERT_NE(found, points.end());
+        EXPECT_EQ(found->bindingType, type);
+        EXPECT_EQ(found->amount, amount);
+    }
+}
+TEST(SpirvReflectorTest, MultidimensionalDescriptorArrayCountsMultiplyAllExtents) {
+    vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("descriptor_multidimensional.comp.spv"));
+    const auto &points = reflector.generated.binding_points.at(0);
+    const auto found = std::ranges::find(points, 0u, &vsl::graphic_resource::BindingPoint::binding);
+    ASSERT_NE(found, points.end());
+    EXPECT_EQ(found->amount, 6u);
+}
+TEST(SpirvReflectorTest, UnresolvedAndOverflowingDescriptorCountsReportTheirCause) {
+    for (const auto &[file, reason] : {
+             std::pair{"descriptor_runtime.comp.spv", "runtime"},
+             std::pair{"descriptor_specialization.comp.spv", "specialization"},
+             std::pair{"descriptor_count_overflow.comp.spv", "overflow"}}) {
+        try {
+            vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path(file));
+            FAIL() << file << " cannot be represented as a fixed uint32 descriptor count";
+        } catch (const vsl::exceptions::RuntimeException &error) {
+            EXPECT_NE(error.reason.find(reason), std::string::npos) << error.reason;
+        }
+    }
+}
+TEST_F(SpirvReflectorVulkanIntegrationTest, FixedArrayCountsSurviveGeneratedNativeBindingLayouts) {
+    vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("descriptor_arrays.comp.spv"));
+    auto layouts = reflector.generated.makeBindingLayout();
+    ASSERT_EQ(layouts.size(), 1u);
+    const auto points = layouts.front().getBindingPoints();
+    ASSERT_EQ(points.size(), 4u);
+    for (const auto &point : points) EXPECT_EQ(point.amount, point.binding + 2u);
+}
+} // namespace

@@ -8,6 +8,24 @@
 #include <fstream>
 #include <utility>
 #include <ranges>
+#include <limits>
+
+namespace {
+std::uint32_t descriptor_count(const spirv_cross::SPIRType &type) {
+    std::uint32_t count = 1;
+    for (std::size_t i = 0; i < type.array.size(); ++i) {
+        if (!type.array_size_literal[i])
+            throw vsl::exceptions::RuntimeException("SPIRVReflector", "Descriptor array specialization sizes require explicit resolution");
+        const auto extent = type.array[i];
+        if (extent == 0)
+            throw vsl::exceptions::RuntimeException("SPIRVReflector", "Descriptor runtime arrays require an explicit descriptor count");
+        if (extent > std::numeric_limits<std::uint32_t>::max() / count)
+            throw vsl::exceptions::RuntimeException("SPIRVReflector", "Descriptor array count overflow");
+        count *= extent;
+    }
+    return count;
+}
+} // namespace
 
 vsl::graphic_resource::Type spir_type_to_graphic_type(const spirv_cross::SPIRType &type) {
     namespace gfx_src = vsl::graphic_resource;
@@ -102,7 +120,7 @@ void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
                 .binding = binding,
                 .bindingType = gfx_type,
                 .shaderType = shaderType, // TODO
-                .amount = type.array.empty() ? 1 : (std::uint32_t)type.array.size(),
+                .amount = descriptor_count(type),
         });
     }
 
@@ -115,7 +133,7 @@ void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
                     .binding = binding,
                     .bindingType = gfx_type,
                     .shaderType = shaderType,  // TODO
-                    .amount = type.array.empty() ? 1 : (std::uint32_t)type.array.size(),
+                    .amount = descriptor_count(type),
             });
         }
 

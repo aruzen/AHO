@@ -64,7 +64,7 @@ vk::Result CreateDebugUtilsMessengerEXT(vk::Instance instance, const vk::DebugUt
 	auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
 	if (func != nullptr) {
 		VkDebugUtilsMessengerEXT tmpDebugMessenger;
-		auto result = (vk::Result)func(instance, &((const VkDebugUtilsMessengerCreateInfoEXT&)pCreateInfo), &((const VkAllocationCallbacks&)*pAllocator) , &tmpDebugMessenger);
+		auto result = (vk::Result)func(instance, &((const VkDebugUtilsMessengerCreateInfoEXT&)pCreateInfo), reinterpret_cast<const VkAllocationCallbacks *>(pAllocator) , &tmpDebugMessenger);
 		pDebugMessenger = tmpDebugMessenger;
 		return result;
 	}

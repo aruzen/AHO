@@ -36,9 +36,13 @@ namespace VSL_NAMESPACE::pipeline_layout {
 
     template<vsl::ShaderFlag ShaderFlag, typename... Types>
     constexpr std::array<PushContentDefinition, sizeof...(Types)> PushConstants::MakeDefinitions(const Types &...) {
-        return std::array{
-                PushContentDefinition{ShaderFlag, 0, sizeof(Types)}...
+        std::uint32_t offset = 0;
+        const auto next_definition = [&offset](std::uint32_t size) {
+            const auto current = offset;
+            offset += size;
+            return PushContentDefinition{ShaderFlag, current, size};
         };
+        return {{next_definition(sizeof(Types))...}};
     }
 }
 

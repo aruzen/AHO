@@ -41,3 +41,60 @@ TEST_F(WindowIntegrationTest, WindowConstructorsInstallQuietCloseOnce) {
     EXPECT_TRUE(separate.close());
 }
 } // namespace
+
+namespace {
+struct CountingUpdatePlugin : vsl::PureWindow::Plugin, vsl::PureWindow::OnUpdate {
+    int &calls;
+    CountingUpdatePlugin(vsl::PureWindow *, int &calls) : calls(calls) {}
+    bool onUpdate(vsl::PureWindow) override { ++calls; return true; }
+};
+TEST(WindowPluginRemovalTest, RemovesTheUpdateSubscriptionAndReleasesItsOwnership) {
+    vsl::PureWindow window(std::make_shared<vsl::PureWindow::WindowData>());
+    int removed_calls = 0, remaining_calls = 0;
+    auto removed = window.add_plugin<CountingUpdatePlugin>(removed_calls);
+    auto remaining = window.add_plugin<CountingUpdatePlugin>(remaining_calls);
+    std::weak_ptr<CountingUpdatePlugin> weak = removed;
+    ASSERT_EQ(window._data->update.size(), 2u);
+    ASSERT_TRUE(window.remove_plugin(removed));
+    EXPECT_FALSE(window.remove_plugin(removed));
+    ASSERT_EQ(window._data->update.size(), 1u);
+    EXPECT_EQ(window._data->update.front(), remaining);
+    for (const auto &subscriber : window._data->update)
+        EXPECT_TRUE(subscriber->onUpdate(window));
+    EXPECT_EQ(removed_calls, 0);
+    EXPECT_EQ(remaining_calls, 1);
+    removed.reset();
+    EXPECT_TRUE(weak.expired());
+    ASSERT_TRUE(window.remove_plugin(remaining));
+    EXPECT_TRUE(window._data->update.empty());
+    EXPECT_TRUE(window._data->plugins.empty());
+}
+TEST(WindowPluginRemovalTest, RejectsADifferentObjectWithTheSameId) {
+    vsl::PureWindow window(std::make_shared<vsl::PureWindow::WindowData>());
+    int actual_calls = 0, impostor_calls = 0;
+    auto actual = window.add_plugin<CountingUpdatePlugin>(actual_calls);
+    auto impostor = std::make_shared<CountingUpdatePlugin>(&window, impostor_calls);
+    impostor->id = actual->id;
+    EXPECT_FALSE(window.remove_plugin(impostor));
+    ASSERT_EQ(window._data->plugins.size(), 1u);
+    EXPECT_EQ(window._data->plugins.at(actual->id), actual);
+    ASSERT_EQ(window._data->update.size(), 1u);
+    EXPECT_EQ(window._data->update.front(), actual);
+}
+TEST(WindowPluginRemovalTest, RemovesPluginsWithoutAnUpdateSubscription) {
+    vsl::PureWindow window(std::make_shared<vsl::PureWindow::WindowData>());
+    auto plugin = window.add_plugin<TestPlugin>(23);
+    EXPECT_TRUE(window._data->update.empty());
+    EXPECT_TRUE(window.remove_plugin(plugin));
+    EXPECT_TRUE(window._data->plugins.empty());
+    EXPECT_FALSE(window.remove_plugin(plugin));
+}
+} // namespace
+
+TEST(WindowPluginRemovalTest, NullPluginDoesNotChangeRegistrations) {
+    vsl::PureWindow window(std::make_shared<vsl::PureWindow::WindowData>());
+    auto plugin = window.add_plugin<TestPlugin>(23);
+    EXPECT_FALSE(window.remove_plugin(std::shared_ptr<TestPlugin>{}));
+    ASSERT_EQ(window._data->plugins.size(), 1u);
+    EXPECT_EQ(window._data->plugins.at(plugin->id), plugin);
+}

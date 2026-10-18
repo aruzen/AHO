@@ -1,6 +1,8 @@
 #pragma once
 #include "define.hpp"
 #include <string>
+#include <sstream>
+#include <type_traits>
 
 namespace VSL_NAMESPACE::default_using {
     using character = char;

@@ -97,9 +97,14 @@ namespace VSL_NAMESPACE {
     template<typename T, typename... Args>
     inline bool VSL_NAMESPACE::PureWindow::remove_plugin(std::shared_ptr<T> t) {
         std::shared_ptr<Plugin> p = std::static_pointer_cast<Plugin>(t);
-        if (not this->_data->plugins.contains(p->id))
+        if (!p)
             return false;
-        this->_data->plugins.erase(p->id);
+        const auto entry = this->_data->plugins.find(p->id);
+        if (entry == this->_data->plugins.end() || entry->second != p)
+            return false;
+        if (auto listener = std::dynamic_pointer_cast<OnUpdate>(p))
+            std::erase(this->_data->update, listener);
+        this->_data->plugins.erase(entry);
         return true;
     }
 }

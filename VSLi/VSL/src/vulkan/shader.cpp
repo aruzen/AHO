@@ -79,7 +79,7 @@ vsl::Shader<_Type>::Shader(vsl::LogicalDeviceAccessor device, std::filesystem::p
 }
 
 template<VSL_NAMESPACE::ShaderType _Type>
-std::string VSL_NAMESPACE::Shader<_Type>::name() {
+std::string VSL_NAMESPACE::Shader<_Type>::name() const {
     return _data->name;
 }
 

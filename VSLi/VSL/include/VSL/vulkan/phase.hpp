@@ -132,17 +132,17 @@ namespace VSL_NAMESPACE {
 
 template<typename T>
 void vsl::DefaultPhaseStream::resolveHolderRequire(T &t) {
+    if constexpr (command::is_vert_size_require<T>)
+        (&t)->setVertexSize(this->vertexSize);
+    if constexpr (command::is_pipeline_require<T>)
+        (&t)->setPipeline(this->pipeline);
+
     if constexpr (command::is_vertex_size_holder<T>)
         this->vertexSize = (&t)->getVertexSize();
     if constexpr (command::is_pipeline_holder<T>)
         this->pipeline = (&t)->getPipeline();
     if constexpr (std::convertible_to<T, PipelineAccessor>)
         this->pipeline = t;
-
-    if constexpr (command::is_vertex_size_holder<T>)
-        (&t)->setVertexSize(this->vertexSize);
-    if constexpr (command::is_pipeline_require<T>)
-        (&t)->setPipeline(this->pipeline);
 }
 
 

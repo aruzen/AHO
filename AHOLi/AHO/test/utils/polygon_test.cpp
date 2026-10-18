@@ -309,3 +309,38 @@ TEST(PolygonConceptsTest, ReverseConversionsAndPrivateInheritanceDoNotIdentifySh
 
 }
 #endif
+
+namespace {
+template<typename Dimension>
+struct DimensionMetadataShapes {
+    using element_type = double;
+    using dimension = Dimension;
+    using P = aho::d2::PointD;
+    using coordinate_info = P::coordinate_info;
+    auto points() const { return std::array{P(1, 2), P(3, 4)}; }
+    auto lines() const { return std::array{aho::Line<double, vsl::D2>(P(1, 2), P(3, 4))}; }
+    auto triangles() const { return std::array{aho::Triangle<double, vsl::D2>(P(0, 0), P(3, 0), P(0, 4))}; }
+};
+static_assert(aho::concepts::is_points_object<DimensionMetadataShapes<vsl::D2>>);
+static_assert(aho::concepts::is_lines_object<DimensionMetadataShapes<vsl::D2>>);
+static_assert(aho::concepts::is_triangles_object<DimensionMetadataShapes<vsl::D2>>);
+static_assert(!aho::concepts::is_points_object<DimensionMetadataShapes<int>>);
+static_assert(!aho::concepts::is_lines_object<DimensionMetadataShapes<int>>);
+static_assert(!aho::concepts::is_triangles_object<DimensionMetadataShapes<int>>);
+static_assert(!aho::concepts::is_points_object<DimensionMetadataShapes<void>>);
+static_assert(!aho::concepts::is_lines_object<DimensionMetadataShapes<void>>);
+static_assert(!aho::concepts::is_triangles_object<DimensionMetadataShapes<void>>);
+TEST(PolygonDimensionRequirementTest, ValidCompositeShapesKeepTheirViewsAndCoordinates) {
+    const DimensionMetadataShapes<vsl::D2> shapes;
+    const auto points = aho::views::points(shapes);
+    const auto lines = aho::views::lines(shapes);
+    const auto triangles = aho::views::triangles(shapes);
+    ASSERT_EQ(points.size(), 2u);
+    ASSERT_EQ(lines.size(), 1u);
+    ASSERT_EQ(triangles.size(), 1u);
+    EXPECT_DOUBLE_EQ(points[1].value.x.value, 3);
+    EXPECT_DOUBLE_EQ(points[1].value.y.value, 4);
+    EXPECT_DOUBLE_EQ(lines[0].pos2.value.x.value, 3);
+    EXPECT_DOUBLE_EQ(triangles[0].area(), 6);
+}
+} // namespace

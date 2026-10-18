@@ -95,7 +95,10 @@ IDPickingRenderPassBegin::IDPickingRenderPassBegin(IDPickingRenderPass pass, Fra
         clearValues.front() = ClearColor{color->r, color->g, color->b, 0.f};
 }
 void RenderPassBegin::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
-    const auto index = targetIndex.value_or(buffer.getCurrentBufferIdx());
+    const auto index = targetIndex.value_or(buffer._data->acquiredImageIndex.value_or(buffer.getCurrentBufferIdx()));
+    if (buffer._data->recordingSubmission) {
+        buffer._data->recordingSubmission->resources.push_back(frameBuffer._data);
+    }
     std::vector<vk::ClearValue> values;
     for (const auto &clear : clearValues)
         values.push_back(convert(clear));

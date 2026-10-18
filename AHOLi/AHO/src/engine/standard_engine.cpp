@@ -69,7 +69,7 @@ void aho::engine::StandardEngine::boot(const std::string& applicationName) {
                                                          command_manager.getBuffer().getSize()),
                                 .render_finished = synchro_manager
                                         .createSemaphore(applicationName + "RenderFinished",
-                                                         command_manager.getBuffer().getSize()),
+                                                         swapchain.getSwapImageSize()),
                                 .in_flight = synchro_manager
                                         .createFence(applicationName + "InFlight",
                                                      command_manager.getBuffer().getSize(), true)

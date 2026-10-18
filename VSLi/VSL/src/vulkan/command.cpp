@@ -5,6 +5,7 @@
 
 #include <VSL/vulkan/vulkan.hpp>
 #include <VSL/vulkan/command.hpp>
+#include <VSL/vulkan/phase.hpp>
 #include <VSL/vulkan/surface.hpp>
 
 
@@ -64,6 +65,9 @@ void VSL_NAMESPACE::CommandBuffer::reset(std::uint32_t idx)
 }
 
 VSL_NAMESPACE::_impl::CommandBuffer_impl::~CommandBuffer_impl() {
+    for (const auto &submission : submissions)
+        if (submission && submission->status == Completion::Status::Submitted)
+            Completion{submission}.wait();
 	commandPool->device->device.freeCommandBuffers(commandPool->commandPool, this->commandBuffers);
 }
 
@@ -101,4 +105,9 @@ std::uint32_t VSL_NAMESPACE::CommandManager::getCurrentBufferIdx()
 VSL_NAMESPACE::CommandBuffer VSL_NAMESPACE::CommandManager::makeExclusiveBuffer(size_t size)
 {
 	return CommandBuffer(CommandPool{ _data->commandPool }, size);
+}
+void vsl::CommandManager::waitIdle() { _data->device->device.waitIdle(); }
+
+vsl::_impl::CommandPool_impl::~CommandPool_impl() {
+    if (commandPool) device->device.destroyCommandPool(commandPool);
 }

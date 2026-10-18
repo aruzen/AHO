@@ -1,6 +1,7 @@
 #pragma once
 #include "../define.hpp"
 #include "buffer_and_image_accessor.hpp"
+#include "command.hpp"
 
 #include <compare>
 
@@ -81,7 +82,18 @@ namespace VSL_NAMESPACE::_impl {
 		std::shared_ptr<LogicalDevice_impl> device;
 
 		vk::CommandPool commandPool;
+        ~CommandPool_impl();
 	};
+
+    struct Submission_impl {
+        std::shared_ptr<LogicalDevice_impl> device;
+        std::shared_ptr<vk::UniqueFence> ownedFence;
+        std::shared_ptr<Fence_impl> externalFence;
+        vk::Fence fence;
+        Completion::Status status = Completion::Status::Pending;
+        std::vector<std::shared_ptr<void>> resources;
+        ~Submission_impl();
+    };
 
 	struct CommandBuffer_impl {
 		std::shared_ptr<CommandPool_impl> commandPool;
@@ -89,6 +101,11 @@ namespace VSL_NAMESPACE::_impl {
 		std::uint32_t currentBufferIdx;
 
 		std::vector<vk::CommandBuffer> commandBuffers;
+        std::vector<std::shared_ptr<Submission_impl>> submissions;
+        std::shared_ptr<Submission_impl> recordingSubmission;
+        std::optional<std::uint32_t> acquiredImageIndex;
+        std::weak_ptr<Swapchain_impl> acquiredSwapchain;
+        bool recording = false;
 
 		~CommandBuffer_impl();
 	};
@@ -116,6 +133,7 @@ namespace VSL_NAMESPACE::_impl {
 		std::vector<vk::Image> swapChainImages;
 		vk::Format swapChainImageFormat;
 		vk::Extent2D swapChainExtent;
+        std::vector<vk::UniqueSemaphore> presentationSemaphores;
 
 		~Swapchain_impl();
 	};
@@ -193,15 +211,19 @@ namespace VSL_NAMESPACE::_impl {
 
 	struct SynchroManager_impl;
 	struct Semaphore_impl {
-		std::shared_ptr<SynchroManager_impl> _manager;
+		std::weak_ptr<SynchroManager_impl> _manager;
+        std::shared_ptr<LogicalDevice_impl> device;
 
 		std::vector<vk::Semaphore> semaphores;
+        ~Semaphore_impl();
 	};
 
 	struct Fence_impl {
-		std::shared_ptr<SynchroManager_impl> _manager;
+		std::weak_ptr<SynchroManager_impl> _manager;
+        std::shared_ptr<LogicalDevice_impl> device;
 
 		std::vector<vk::Fence> fences;
+        ~Fence_impl();
 	};
 
 	struct SynchroManager_impl {

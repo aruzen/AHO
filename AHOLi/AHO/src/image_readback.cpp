@@ -26,8 +26,6 @@ namespace AHO_NAMESPACE {
             if (mapped)
                 device.unmapMemory(buffer->deviceMem);
             commandBuffer.reset();
-            if (pool)
-                device.destroyCommandPool(pool->_data->commandPool);
         }
 
         void reserve(std::size_t bytes) {

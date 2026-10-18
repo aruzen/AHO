@@ -12,6 +12,7 @@ namespace VSL_NAMESPACE::_impl {
 	struct CommandBuffer_impl;
 	struct Command_impl;
 	struct CommandManager_impl;
+    struct Submission_impl;
 	struct Surface_impl;
 	struct Swapchain_impl;
 	struct View_impl;

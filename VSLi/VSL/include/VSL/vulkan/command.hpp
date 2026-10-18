@@ -37,6 +37,17 @@ namespace VSL_NAMESPACE {
         std::shared_ptr<VSL_NAMESPACE::_impl::CommandBuffer_impl> _data;
     };
 
+    // A completion identifies one submission, even after its fence is reused.
+    struct Completion {
+        enum class Status { Pending, Submitted, Complete, Cancelled };
+        std::shared_ptr<_impl::Submission_impl> _data;
+        Status status() const;
+        bool ready() const;
+        bool wait(std::uint64_t timeout_ns = UINT64_MAX) const;
+        void retain(std::shared_ptr<void> resource) const;
+        explicit operator bool() const { return bool(_data); }
+    };
+
     struct PipelineAccessor;
     namespace command {
         struct __Command {
@@ -109,6 +120,8 @@ namespace VSL_NAMESPACE {
 
         template<class P = DefaultPhase, typename... Args>
         P startPhase(Args &&... args);
+
+        void waitIdle();
 
         CommandPool getPool();
 

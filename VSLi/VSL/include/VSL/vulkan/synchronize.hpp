@@ -12,6 +12,7 @@ namespace VSL_NAMESPACE {
 	struct SemaphoreHolder {
 		std::shared_ptr<_impl::Semaphore_impl> _data;
 
+        std::size_t size() const;
 		void destroy();
 	};
 

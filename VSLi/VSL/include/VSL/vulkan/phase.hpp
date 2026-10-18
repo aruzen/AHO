@@ -25,7 +25,8 @@ namespace VSL_NAMESPACE {
                      std::optional<SemaphoreHolder> nextImageAvailable = std::nullopt,
                      std::optional<SemaphoreHolder> calculationFinish = std::nullopt,
                      std::optional<FenceHolder> inFlightFence = std::nullopt,
-                     bool postponeSetup = false);
+                     bool postponeSetup = false,
+                     PipelineStage waitStage = PipelineStage::AllCommands);
 
         CommandManager manager;
         std::optional<SemaphoreHolder> nextImageAvailable = std::nullopt, calculationFinish = std::nullopt;
@@ -44,7 +45,15 @@ namespace VSL_NAMESPACE {
             WantRecreateSwapchain,
         };
 
-        std::uint32_t imageIndex;
+        std::uint32_t imageIndex = UINT32_MAX;
+        std::uint32_t frameSlot = 0;
+        PipelineStage waitStage;
+        Completion completion() const { return _completion; }
+        virtual void cancel();
+        ComputePhase(const ComputePhase &) = delete;
+        ComputePhase &operator=(const ComputePhase &) = delete;
+        ComputePhase(ComputePhase &&) = delete;
+        ComputePhase &operator=(ComputePhase &&) = delete;
 
         DefaultPhaseStream operator<<(std::shared_ptr<command::__Command> cmd);
 
@@ -60,8 +69,15 @@ namespace VSL_NAMESPACE {
 
         virtual SubmitResult submit();
 
-        // virtualはつけていないsubmitに委任
-        ~ComputePhase();
+        virtual ~ComputePhase();
+    protected:
+        Completion _completion;
+        std::uint32_t signalIndex = 0;
+        bool recreate = false;
+        int initialExceptions = 0;
+        void prepare();
+        void begin();
+        void finishNoexcept() noexcept;
     };
 
     struct DefaultPhase : public ComputePhase {
@@ -78,6 +94,15 @@ namespace VSL_NAMESPACE {
         std::uint32_t getCurrentIndex();
 
         SubmitResult submit() override;
+        // Submit drawing first; record readback before this, then present explicitly.
+        SubmitResult submitCommands();
+        SubmitResult present();
+        void cancel() override;
+    private:
+        bool presented = false;
+        struct Presentation;
+        std::shared_ptr<Presentation> presentation;
+    public:
 
         ~DefaultPhase();
     };

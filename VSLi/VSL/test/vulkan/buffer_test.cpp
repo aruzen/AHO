@@ -1,6 +1,7 @@
 #include "support/vulkan_fixture.hpp"
 #include <array>
 #include <limits>
+#include "support/compile_probe.hpp"
 
 namespace {
 using BufferVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
@@ -118,19 +119,6 @@ TEST(BufferExceptionTest, MappingExceptionIncludesItsCause) {
     const auto location = std::source_location::current();
     vsl::exceptions::MemoryNotHostVisibleException located(location);
     EXPECT_NE(located.reason.find(std::to_string(location.line())), std::string::npos);
-}
-} // namespace
-#include "support/compile_probe.hpp"
-namespace {
-TEST(BufferCompilationTest, DISABLED_HostVisibleNonCoherentValueConstructorCanFlush) {
-    const auto result = vsl_test::compile_probe(R"cpp(
-#include <VSL/vulkan/_pimpls.hpp>
-#include <VSL/vsl.hpp>
-void probe(vsl::LogicalDeviceAccessor device){
-    vsl::Buffer<vsl::MemoryType::UniformBuffer,vsl::MemoryProperty::HostVisible> buffer(device,1.0f);
-}
-)cpp");
-    EXPECT_EQ(result.status, 0) << result.diagnostics;
 }
 } // namespace
 namespace {
@@ -297,5 +285,43 @@ TEST_F(BufferVulkanIntegrationTest, DefaultMappingSizeExcludesTheRequestedOffset
     auto mapped = buffer.data(std::nullopt, offset);
     EXPECT_EQ(mapped.offset, offset);
     EXPECT_EQ(mapped.size, offset + 1);
+}
+} // namespace
+
+namespace {
+TEST_F(BufferVulkanIntegrationTest, HostVisibleScalarConstructorFlushesBeforeUnmapping) {
+    using Buffer = vsl::Buffer<vsl::MemoryType::UniformBuffer, vsl::MemoryProperty::HostVisible>;
+    const float expected = 1.25f;
+    Buffer buffer(device, expected);
+    EXPECT_EQ(buffer.size(), sizeof(expected));
+    auto mapped = buffer.data();
+    float actual = 0;
+    std::memcpy(&actual, mapped.data, sizeof(actual));
+    EXPECT_FLOAT_EQ(actual, expected);
+}
+TEST_F(BufferVulkanIntegrationTest, HostVisibleValuePointerAndFactoryPayloadsReachGpuTransfers) {
+    using Buffer = vsl::Buffer<vsl::MemoryType::TransferSource, vsl::MemoryProperty::HostVisible>;
+    const std::array<std::uint32_t, 4> expected{17, 23, 0xffffffffu, 0};
+    Buffer value(device, expected);
+    auto payload = expected;
+    Buffer pointer(device, payload.data(), payload.size());
+    auto generated = vsl::make_buffer<Buffer>(device, payload);
+    auto manager = make_manager();
+    HostBuffer readback(device, sizeof(expected));
+    for (auto *source : {&value, &pointer, &generated}) {
+        readback.copyByBuffer(manager, source);
+        {
+            auto phase = manager.startPhase<vsl::ComputePhase>();
+            vk::MemoryBarrier visible{};
+            visible.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+            visible.dstAccessMask = vk::AccessFlagBits::eHostRead;
+            auto commands = manager.getBuffer();
+            commands._data->commandBuffers[commands.getCurrentBufferIdx()].pipelineBarrier(
+                vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, visible, {}, {});
+        }
+        device._data->device.waitIdle();
+        auto mapped = readback.data();
+        EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
+    }
 }
 } // namespace

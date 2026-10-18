@@ -20,7 +20,8 @@ std::vector<std::uint32_t> read_shader_code(const std::filesystem::path &path) {
     if (!file.is_open())
         throw vsl::exceptions::RuntimeException("file", "failed to open file: " + path.string());
     const auto byte_count = static_cast<std::streamoff>(file.tellg());
-    if (byte_count <= 0 || byte_count % sizeof(std::uint32_t) != 0 ||
+    constexpr std::size_t header_bytes = 5 * sizeof(std::uint32_t);
+    if (byte_count < static_cast<std::streamoff>(header_bytes) || byte_count % sizeof(std::uint32_t) != 0 ||
         static_cast<std::uintmax_t>(byte_count) > std::numeric_limits<std::size_t>::max() ||
         static_cast<std::uintmax_t>(byte_count) > std::numeric_limits<std::streamsize>::max())
         throw vsl::exceptions::RuntimeException("file", "invalid shader byte size: " + path.string());

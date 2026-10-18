@@ -46,9 +46,9 @@ TEST_F(ShaderVulkanIntegrationTest, FactoriesInferStageAndHonorExplicitEntryName
 } // namespace
 
 namespace {
-TEST_F(ShaderVulkanIntegrationTest, RejectsEmptyAndPartialWordsBeforeCreatingAModule) {
+TEST_F(ShaderVulkanIntegrationTest, RejectsIncompleteHeadersAndPartialWordsBeforeCreatingAModule) {
     vsl_test::TemporaryDirectory temporary;
-    for (const auto byte_count : {0u, 3u, 7u}) {
+    for (const auto byte_count : {0u, 3u, 7u, 4u, 16u, 21u}) {
         const auto path = temporary.path() / (std::to_string(byte_count) + ".vert.spv");
         { std::ofstream output(path, std::ios::binary); output << std::string(byte_count, '\0'); }
         EXPECT_THROW((vsl::Shader<vsl::ShaderType::Vertex>(device, path)), vsl::exceptions::RuntimeException);

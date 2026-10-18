@@ -76,27 +76,6 @@ TEST_F(DescriptorVulkanIntegrationTest, ExplicitSentinelsUseTheSameAutomaticBind
     }
 }
 } // namespace
-#include "support/compile_probe.hpp"
-namespace {
-TEST(ResourceCompilationTest, DISABLED_ImageValueUpdateResolvesToImageAccessor) {
-    const auto result = vsl_test::compile_probe(R"cpp(
-#include <VSL/vulkan/_pimpls.hpp>
-#include <VSL/vsl.hpp>
-void probe(vsl::GraphicResource resource,vsl::Image<vsl::ImageType::Sampled> image){resource.update(image);}
-)cpp");
-    EXPECT_EQ(result.status, 0) << result.diagnostics;
-}
-TEST(ResourceCompilationTest, DISABLED_HolderUpdateResolvesToBufferRange) {
-    const auto result = vsl_test::compile_probe(R"cpp(
-#include <VSL/vulkan/_pimpls.hpp>
-#include <VSL/vsl.hpp>
-void probe(vsl::GraphicResource resource,vsl::StagingBuffer<vsl::MemoryType::UniformBuffer>& buffer){
-    resource.update(buffer,buffer.data());
-}
-)cpp");
-    EXPECT_EQ(result.status, 0) << result.diagnostics;
-}
-} // namespace
 #include "support/image_transfer_fixture.hpp"
 namespace {
 TEST_F(DescriptorVulkanIntegrationTest, ImageAndCombinedSamplerUpdatesReachComputeShader) {
@@ -128,7 +107,7 @@ TEST_F(DescriptorVulkanIntegrationTest, ImageAndCombinedSamplerUpdatesReachCompu
                    vsl::pipeline_layout::ResourceBinding{{*binding}});
     pipeline.emplace(*layout);
     resource.update(&*output);
-    resource.update(vsl::ImageAccessor{storage}, 1);
+    resource.update(storage, 1);
     resource.update(vsl::ImageAccessor{sampled}, sampler, 2, Type::CombinedImageSampler);
     auto manager = make_manager();
     {
@@ -176,5 +155,37 @@ TEST_F(DescriptorVulkanIntegrationTest, ImageAndCombinedSamplerUpdatesReachCompu
     std::array<std::uint32_t, 2> actual{};
     std::memcpy(actual.data(), mapped.data, sizeof(actual));
     EXPECT_EQ(actual, (std::array<std::uint32_t, 2>{37, 83}));
+}
+} // namespace
+
+namespace {
+TEST_F(DescriptorVulkanIntegrationTest, HolderValueUpdateUsesItsOffsetAndSizeForTheComputeOutput) {
+    const std::size_t offset = std::max<std::size_t>(16, physical._data->props->limits.minStorageBufferOffsetAlignment);
+    std::vector<std::uint32_t> initial(offset / sizeof(std::uint32_t) + count, 0xa5a5a5a5u);
+    StorageBuffer buffer(device, initial.data(), initial.size());
+    {
+        auto mapped = buffer.data(count * sizeof(std::uint32_t), offset);
+        resource.update(buffer, std::move(mapped), 0, vsl::graphic_resource::Type::StorageBuffer);
+    }
+    std::uint32_t base = 113;
+    auto manager = make_manager();
+    {
+        auto phase = manager.startPhase<vsl::ComputePhase>();
+        auto stream = phase << *pipeline;
+        stream << vsl::command::BindGraphicResource(resource, vsl::graphic_resource::BindingDestination::Compute)
+               << vsl::command::PushConstant(*layout, vsl::ShaderFlag::Compute, base)
+               << vsl::command::Dispatch(count, 1, 1);
+        vk::MemoryBarrier barrier{};
+        barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
+        barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
+        auto commands = manager.getBuffer();
+        commands._data->commandBuffers[commands.getCurrentBufferIdx()].pipelineBarrier(
+            vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+    }
+    device._data->device.waitIdle();
+    auto mapped = buffer.data(initial.size() * sizeof(std::uint32_t));
+    const auto *actual = static_cast<const std::uint32_t *>(mapped.data);
+    for (std::size_t i = 0; i < offset / sizeof(std::uint32_t); ++i) EXPECT_EQ(actual[i], 0xa5a5a5a5u);
+    for (std::size_t i = 0; i < count; ++i) EXPECT_EQ(actual[offset / sizeof(std::uint32_t) + i], base + i);
 }
 } // namespace

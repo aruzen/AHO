@@ -385,3 +385,28 @@ namespace {
         EXPECT_TRUE(weak_sampler.expired());
     }
 } // namespace
+
+namespace {
+TEST_F(DescriptorVulkanIntegrationTest, MissingBufferBindingReportsItsCauseAndKeepsValidBindingsUsable) {
+    bool rejected = false;
+    try {
+        resource.update(&*output, 99);
+    } catch (const vsl::exceptions::RuntimeException &error) {
+        rejected = true;
+        EXPECT_NE(error.reason.find("binding"), std::string::npos) << error.reason;
+    }
+    ASSERT_TRUE(rejected) << "An unknown binding must not reach Vulkan with an unset descriptor type";
+    resource.update(&*output);
+    expect_sequence(execute(149), 149);
+}
+TEST_F(DescriptorVulkanIntegrationTest, ExplicitBufferTypeWorksWithoutLayoutMetadataWhileInferenceReportsTheMissingLayout) {
+    resource._data->layout.reset();
+    try {
+        resource.update(&*output);
+        FAIL() << "Inferring the descriptor type requires layout metadata";
+    } catch (const vsl::exceptions::RuntimeException &error) {
+        EXPECT_NE(error.reason.find("Layout"), std::string::npos);
+    }
+    EXPECT_NO_THROW(resource.update(&*output, 0, vsl::graphic_resource::Type::StorageBuffer));
+}
+} // namespace

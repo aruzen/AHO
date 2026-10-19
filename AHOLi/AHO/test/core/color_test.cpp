@@ -85,6 +85,24 @@ TEST(ColorContractTest, AlphaPreservingConversionsReturnCorrectSpaceAndChannels)
     aho_test::expect_rgba(rgba, 1, 0, 0, 0.5);
 }
 #else
+#include "../support/one_way_cast.hpp"
+namespace {
+template<class T> class ColorOneWayCastTest : public testing::Test {};
+using OneWayChannels = testing::Types<aho::color::R<aho_test::CastSource>,
+    aho::color::G<aho_test::CastSource>, aho::color::B<aho_test::CastSource>,
+    aho::color::H<aho_test::CastSource>, aho::color::S<aho_test::CastSource>,
+    aho::color::V<aho_test::CastSource>, aho::color::A<aho_test::CastSource>>;
+TYPED_TEST_SUITE(ColorOneWayCastTest, OneWayChannels);
+TYPED_TEST(ColorOneWayCastTest, ChecksConversionFromTheStoredScalarToTheRequestedType) {
+    static_assert(aho_test::HasCast<TypeParam, aho_test::CastTarget>);
+    const TypeParam source(aho_test::CastSource{23});
+    const auto converted = source.template cast<aho_test::CastTarget>();
+    using Converted = std::remove_cv_t<decltype(converted)>;
+    static_assert(!aho_test::HasCast<Converted, aho_test::CastSource>);
+    EXPECT_EQ(converted.value.value, 23);
+    EXPECT_EQ(source.value.value, 23);
+}
+} // namespace
 namespace {
 template<class T> class ColorElementTest : public testing::Test {};
 using ColorElements = testing::Types<aho::color::R<double>, aho::color::G<double>, aho::color::B<double>,

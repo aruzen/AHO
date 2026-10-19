@@ -46,7 +46,7 @@ namespace AHO_NAMESPACE {
 	}
 
 	namespace d1 {
-		template<typename R, typename CI>
+		template<typename R, typename CI = typename AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D1>::value>
 		struct Vector : public AHO_NAMESPACE::_Vector<R, VSL_NAMESPACE::D1, CI> {
 			constexpr Vector() {};
 
@@ -58,7 +58,7 @@ namespace AHO_NAMESPACE {
 	}
 
 	namespace d2 {
-		template<typename R, typename CI>
+		template<typename R, typename CI = typename AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D2>::value>
 		struct Vector : public AHO_NAMESPACE::_Vector<R, VSL_NAMESPACE::D2, CI> {
 			constexpr Vector() {};
 
@@ -70,7 +70,7 @@ namespace AHO_NAMESPACE {
 	}
 
 	namespace d3 {
-		template<typename R, typename CI>
+		template<typename R, typename CI = typename AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D3>::value>
 		struct Vector : public AHO_NAMESPACE::_Vector<R, VSL_NAMESPACE::D3, CI> {
 			constexpr Vector() {};
 
@@ -128,7 +128,7 @@ namespace AHO_NAMESPACE {
 		template<concepts::division_as<R> T>
 		constexpr _Vector<R, VSL_NAMESPACE::D1, CI>& operator /=(const T& m);
 
-		template<concepts::cast_as<R> T>
+		template<typename T> requires concepts::cast_as<R, T>
 		constexpr _Vector<T, VSL_NAMESPACE::D1, CI> cast() const;
 
         template<typename T>
@@ -202,7 +202,7 @@ namespace AHO_NAMESPACE {
 		template<concepts::division_as<R> T>
 		constexpr _Vector<R, VSL_NAMESPACE::D2, CI>& operator /=(const T& m);
 
-		template<concepts::cast_as<R> T>
+		template<typename T> requires concepts::cast_as<R, T>
 		constexpr _Vector<T, VSL_NAMESPACE::D2, CI> cast() const;
 
         template<typename T>
@@ -275,7 +275,7 @@ namespace AHO_NAMESPACE {
 		template<concepts::division_as<R> T>
 		constexpr _Vector<R, VSL_NAMESPACE::D3, CI>& operator /=(const T& m);
 
-		template<concepts::cast_as<R> T>
+		template<typename T> requires concepts::cast_as<R, T>
 		constexpr _Vector<T, VSL_NAMESPACE::D3, CI> cast() const;
 
         template<typename T>
@@ -397,7 +397,7 @@ namespace AHO_NAMESPACE {
 	}
 
 	template<typename R, typename CI>
-	template<concepts::cast_as<R> T>
+	template<typename T> requires concepts::cast_as<R, T>
 	constexpr _Vector<T, VSL_NAMESPACE::D1, CI> _Vector<R, VSL_NAMESPACE::D1, CI>::cast() const
 	{
 		return _Vector<T, VSL_NAMESPACE::D1, CI>((T)value.___AN1);
@@ -554,7 +554,7 @@ namespace AHO_NAMESPACE {
 	}
 
 	template<typename R, typename CI>
-	template<concepts::cast_as<R> T>
+	template<typename T> requires concepts::cast_as<R, T>
 	constexpr _Vector<T, VSL_NAMESPACE::D2, CI> _Vector<R, VSL_NAMESPACE::D2, CI>::cast() const
 	{
 		return _Vector<T, VSL_NAMESPACE::D2, CI>((T)value.___AN1, (T)value.___AN2);
@@ -703,7 +703,7 @@ namespace AHO_NAMESPACE {
 	}
 
 	template<typename R, typename CI>
-	template<concepts::cast_as<R> T>
+	template<typename T> requires concepts::cast_as<R, T>
 	constexpr _Vector<T, VSL_NAMESPACE::D3, CI> _Vector<R, VSL_NAMESPACE::D3, CI>::cast() const
 	{
 		return _Vector<T, VSL_NAMESPACE::D3, CI>((T)value.___AN1, (T)value.___AN2, (T)value.___AN3);

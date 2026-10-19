@@ -6,34 +6,43 @@
 #include <VSL/vulkan/shader.hpp>
 
 #include <fstream>
+#include <cstdint>
+#include <limits>
+#include <vector>
 #include <memory>
 #include <source_location>
 #include <utility>
+
+
+namespace {
+std::vector<std::uint32_t> read_shader_code(const std::filesystem::path &path) {
+    std::ifstream file(path, std::ios::ate | std::ios::binary);
+    if (!file.is_open())
+        throw vsl::exceptions::RuntimeException("file", "failed to open file: " + path.string());
+    const auto byte_count = static_cast<std::streamoff>(file.tellg());
+    constexpr std::size_t header_bytes = 5 * sizeof(std::uint32_t);
+    if (byte_count < static_cast<std::streamoff>(header_bytes) || byte_count % sizeof(std::uint32_t) != 0 ||
+        static_cast<std::uintmax_t>(byte_count) > std::numeric_limits<std::size_t>::max() ||
+        static_cast<std::uintmax_t>(byte_count) > std::numeric_limits<std::streamsize>::max())
+        throw vsl::exceptions::RuntimeException("file", "invalid shader byte size: " + path.string());
+    std::vector<std::uint32_t> code(static_cast<std::size_t>(byte_count) / sizeof(std::uint32_t));
+    file.seekg(0);
+    if (!file.read(reinterpret_cast<char *>(code.data()), static_cast<std::streamsize>(byte_count)))
+        throw vsl::exceptions::RuntimeException("file", "failed to read shader file: " + path.string());
+    return code;
+}
+} // namespace
 
 template<VSL_NAMESPACE::ShaderType _Type>
 vsl::Shader<_Type>::Shader(vsl::LogicalDeviceAccessor device, std::filesystem::path path)
 {
 	_data = std::make_shared<_impl::Shader_impl>();
 	_data->device = device._data;
-	std::vector<char> code;
-
-	{
-		std::ifstream file(path, std::ios::ate | std::ios::binary);
-
-		if (!file.is_open()) {
-            throw vsl::exceptions::RuntimeException("file", "failed to open file! : " +  path.string() + " : ", std::source_location::current());
-		}
-
-		size_t fileSize = (size_t)file.tellg();
-		code.resize(fileSize);
-		file.seekg(0);
-		file.read(code.data(), fileSize);
-		file.close();
-	}
+	const auto code = read_shader_code(path);
 
 	vk::ShaderModuleCreateInfo createInfo;
-	createInfo.codeSize = code.size();
-	createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+	createInfo.codeSize = code.size() * sizeof(std::uint32_t);
+	createInfo.pCode = code.data();
 
 	_data->shaderModule = _data->device->device.createShaderModule(createInfo);
 
@@ -49,25 +58,11 @@ vsl::Shader<_Type>::Shader(vsl::LogicalDeviceAccessor device, std::filesystem::p
 {
 	_data = std::make_shared<_impl::Shader_impl>();
 	_data->device = device._data;
-	std::vector<char> code;
-
-	{
-		std::ifstream file(path, std::ios::ate | std::ios::binary);
-
-		if (!file.is_open()) {
-			throw vsl::exceptions::RuntimeException("file", "failed to open file! : " +  path.string() + " : ", std::source_location::current());
-		}
-
-		size_t fileSize = (size_t)file.tellg();
-		code.resize(fileSize);
-		file.seekg(0);
-		file.read(code.data(), fileSize);
-		file.close();
-	}
+	const auto code = read_shader_code(path);
 
 	vk::ShaderModuleCreateInfo createInfo;
-	createInfo.codeSize = code.size();
-	createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+	createInfo.codeSize = code.size() * sizeof(std::uint32_t);
+	createInfo.pCode = code.data();
 
 	_data->shaderModule = _data->device->device.createShaderModule(createInfo);
 
@@ -79,7 +74,7 @@ vsl::Shader<_Type>::Shader(vsl::LogicalDeviceAccessor device, std::filesystem::p
 }
 
 template<VSL_NAMESPACE::ShaderType _Type>
-std::string VSL_NAMESPACE::Shader<_Type>::name() {
+std::string VSL_NAMESPACE::Shader<_Type>::name() const {
     return _data->name;
 }
 

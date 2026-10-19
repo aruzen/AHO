@@ -32,13 +32,12 @@ namespace VSL_NAMESPACE::pipeline_layout {
 		VertexInput add(data_format::___Format format);
 		VertexInput add(std::initializer_list<data_format::___Format> format);
 		VertexInput add_shape(std::initializer_list<data_format::___Format> format);
-		template<concepts::is_static_convertible_graphic_type T>
-		VertexInput add();
 		template<concepts::is_convertible_graphic_type T>
 		VertexInput add(T t);
 		template<concepts::is_static_convertible_graphic_type... Args>
 		VertexInput add();
 		template<concepts::is_convertible_graphic_type... Args>
+		    requires (sizeof...(Args) > 0)
 		VertexInput add(Args... args);
 
 		VertexInput add(VertexInputShapeDefinition definition);
@@ -61,13 +60,6 @@ namespace VSL_NAMESPACE::pipeline_layout {
 		add(args...);
 	}
 
-	template<concepts::is_static_convertible_graphic_type T>
-	VertexInput VSL_NAMESPACE::pipeline_layout::VertexInput::add()
-	{
-		add(data_format::convert_graphic_type<T>());
-		return *this;
-	}
-
 	template<concepts::is_convertible_graphic_type T>
 	VertexInput VSL_NAMESPACE::pipeline_layout::VertexInput::add(T t)
 	{
@@ -78,11 +70,12 @@ namespace VSL_NAMESPACE::pipeline_layout {
 	template<concepts::is_static_convertible_graphic_type... Arg>
 	VertexInput VSL_NAMESPACE::pipeline_layout::VertexInput::add()
 	{
-		add({ data_format::convert_graphic_type<Arg>()... });
+		add(std::initializer_list<data_format::___Format>{ data_format::convert_graphic_type<Arg>()... });
 		return *this;
 	}
 
 	template<concepts::is_convertible_graphic_type ...Args>
+	    requires (sizeof...(Args) > 0)
 	VertexInput VertexInput::add(Args ...args)
 	{
 		add({ data_format::convert_graphic_type(args)... });

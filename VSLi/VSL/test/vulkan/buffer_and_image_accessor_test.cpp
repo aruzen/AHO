@@ -62,3 +62,40 @@ TEST_F(ImageAccessorVulkanIntegrationTest, AccessorTransfersAndMappedHolderReadB
     }
 }
 } // namespace
+
+namespace {
+static_assert(std::has_virtual_destructor_v<vsl::BufferAccessor>);
+TEST(BufferAccessorLifetimeTest, BaseOwnerRunsTheDerivedDestructor) {
+    struct TrackedBuffer : vsl::BufferAccessor {
+        bool &destroyed;
+        explicit TrackedBuffer(bool &destroyed) : destroyed(destroyed) {}
+        ~TrackedBuffer() { destroyed = true; }
+        LocalBufferHolder data(std::optional<std::size_t>, std::size_t) override {
+            return {nullptr, 0, 0};
+        }
+        void flush(LocalBufferHolder &) override {}
+    };
+    bool destroyed = false;
+    std::unique_ptr<vsl::BufferAccessor> buffer = std::make_unique<TrackedBuffer>(destroyed);
+    buffer.reset();
+    EXPECT_TRUE(destroyed);
+}
+using BufferAccessorVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+TEST_F(BufferAccessorVulkanIntegrationTest, MovesTransferTheBufferAndCopiesShareItsContents) {
+    using Buffer = vsl::StagingBuffer<vsl::MemoryType::StorageBuffer>;
+    const std::array<std::uint32_t, 4> values{3, 7, 11, 19};
+    Buffer original(device, values);
+    const auto storage = original._data;
+    Buffer copied = original;
+    EXPECT_EQ(copied._data, storage);
+    Buffer moved = std::move(original);
+    EXPECT_FALSE(original._data);
+    EXPECT_EQ(moved._data, storage);
+    original = std::move(moved);
+    EXPECT_FALSE(moved._data);
+    EXPECT_EQ(original._data, storage);
+    copied = original;
+    auto mapped = copied.data(sizeof(values));
+    EXPECT_EQ(std::memcmp(mapped.data, values.data(), sizeof(values)), 0);
+}
+} // namespace

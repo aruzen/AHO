@@ -53,8 +53,6 @@ TEST_P(FormatFamilyTest, ConvertsBetweenScalarAndVectorTypes) {
 TEST_P(FormatFamilyTest, ByteSizeMatchesComponentCountAndWidth) {
     const auto &family = GetParam();
     for (std::size_t i = 0; i < 4; ++i) {
-        if (family.vectors[i].type() == format::___FormatTypes::SignedNormalized8RGB)
-            continue; // I25 は下の DISABLED_ 回帰ケースで正しい期待値を保持する。
         EXPECT_EQ(family.vectors[i].size(), family.component_bytes * (i + 1));
     }
 }
@@ -111,20 +109,37 @@ TEST(FormatTest, BuiltinTypesMapToStorageOfTheirWidth) {
     EXPECT_EQ(format::convert_graphic_type<double>(), format::Float64);
     EXPECT_EQ(format::convert_graphic_type<void *>(), format::Undefined);
 }
-TEST(FormatTest, DISABLED_NormalizedRgbAndPacked32FormatsHaveExpectedByteSizes) {
+TEST(FormatTest, NormalizedRgbAndPacked32FormatsHaveExpectedByteSizes) {
     EXPECT_EQ(format::SignedNormalized8RGB.size(), 3u);
     EXPECT_EQ(format::UnsignedNormalized8ABGRPACK32.size(), 4u);
     EXPECT_EQ(format::Srgb8ABGRPACK32.size(), 4u);
 }
 } // namespace
-#include "support/compile_probe.hpp"
+
 namespace {
-TEST(FormatTest, DISABLED_ValueConversionAcceptsBuiltinFloat) {
-    const auto result = vsl_test::compile_probe(R"cpp(
-#include <VSL/format.hpp>
-constexpr auto format=vsl::data_format::convert_graphic_type(1.0f);
-static_assert(format==vsl::data_format::Float);
-)cpp");
-    EXPECT_EQ(result.status, 0) << result.diagnostics;
+template<typename T>
+consteval bool value_conversion_matches_type() {
+    return format::convert_graphic_type(T{}) == format::convert_graphic_type<T>();
+}
+static_assert(value_conversion_matches_type<char>());
+static_assert(value_conversion_matches_type<unsigned char>());
+static_assert(value_conversion_matches_type<short>());
+static_assert(value_conversion_matches_type<unsigned short>());
+static_assert(value_conversion_matches_type<int>());
+static_assert(value_conversion_matches_type<unsigned int>());
+static_assert(value_conversion_matches_type<long>());
+static_assert(value_conversion_matches_type<unsigned long>());
+static_assert(value_conversion_matches_type<long long>());
+static_assert(value_conversion_matches_type<unsigned long long>());
+static_assert(value_conversion_matches_type<float>());
+static_assert(value_conversion_matches_type<double>());
+static_assert(value_conversion_matches_type<StaticFormat>());
+static_assert(value_conversion_matches_type<void *>());
+static_assert(format::convert_graphic_type(DynamicFormat{}) == format::UnsignedInt);
+TEST(FormatTest, ValueConversionsPreserveBuiltinAndCustomFormats) {
+    EXPECT_EQ(format::convert_graphic_type(1.0f), format::Float);
+    EXPECT_EQ(format::convert_graphic_type(StaticFormat{}), format::FloatRG);
+    EXPECT_EQ(format::convert_graphic_type(DynamicFormat{}), format::UnsignedInt);
+    EXPECT_EQ(format::convert_graphic_type(nullptr), format::Undefined);
 }
 } // namespace

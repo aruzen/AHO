@@ -409,7 +409,7 @@ namespace VSL_NAMESPACE::data_format {
 	constexpr ___Format SignedInt8RG(___FormatTypes::SignedInt8RG, 2 * 1);
 	constexpr ___Format Srgb8RG(___FormatTypes::Srgb8RG, 2 * 1);
 	constexpr ___Format UnsignedNormalized8RGB(___FormatTypes::UnsignedNormalized8RGB, 3 * 1);
-	constexpr ___Format SignedNormalized8RGB(___FormatTypes::SignedNormalized8RGB, 3 * 3 * 1);
+	constexpr ___Format SignedNormalized8RGB(___FormatTypes::SignedNormalized8RGB, 3 * 1);
 	constexpr ___Format UnsignedScaled8RGB(___FormatTypes::UnsignedScaled8RGB, 3 * 1);
 	constexpr ___Format SignedScaled8RGB(___FormatTypes::SignedScaled8RGB, 3 * 1);
 	constexpr ___Format UnsignedInt8RGB(___FormatTypes::UnsignedInt8RGB, 3 * 1);
@@ -436,13 +436,13 @@ namespace VSL_NAMESPACE::data_format {
 	constexpr ___Format UnsignedInt8BGRA(___FormatTypes::UnsignedInt8BGRA, 4 * 1);
 	constexpr ___Format SignedInt8BGRA(___FormatTypes::SignedInt8BGRA, 4 * 1);
 	constexpr ___Format Srgb8BGRA(___FormatTypes::Srgb8BGRA, 4 * 1);
-	constexpr ___Format UnsignedNormalized8ABGRPACK32(___FormatTypes::UnsignedNormalized8ABGRPACK32, 8);
+	constexpr ___Format UnsignedNormalized8ABGRPACK32(___FormatTypes::UnsignedNormalized8ABGRPACK32, 4 * 1);
 	constexpr ___Format SignedNormalized8ABGRPACK32(___FormatTypes::SignedNormalized8ABGRPACK32, 4 * 1);
 	constexpr ___Format UnsignedScaled8ABGRPACK32(___FormatTypes::UnsignedScaled8ABGRPACK32, 4 * 1);
 	constexpr ___Format SignedScaled8ABGRPACK32(___FormatTypes::SignedScaled8ABGRPACK32, 4 * 1);
 	constexpr ___Format UnsignedInt8ABGRPACK32(___FormatTypes::UnsignedInt8ABGRPACK32, 4 * 1);
 	constexpr ___Format SignedInt8ABGRPACK32(___FormatTypes::SignedInt8ABGRPACK32, 4 * 1);
-	constexpr ___Format Srgb8ABGRPACK32(___FormatTypes::Srgb8ABGRPACK32, 8);
+	constexpr ___Format Srgb8ABGRPACK32(___FormatTypes::Srgb8ABGRPACK32, 4 * 1);
 	constexpr ___Format UnsignedNormalized16R(___FormatTypes::UnsignedNormalized16R, 1 * 2);
 	constexpr ___Format SignedNormalized16R(___FormatTypes::SignedNormalized16R, 1 * 2);
 	constexpr ___Format UnsignedScaled16R(___FormatTypes::UnsignedScaled16R, 1 * 2);
@@ -1036,9 +1036,10 @@ namespace VSL_NAMESPACE::data_format {
 	consteval ___Format convert_graphic_type(T v) {
 		if constexpr (not concepts::is_convertible_graphic_type<T>)
 			return Undefined;
-		if constexpr (concepts::is_static_convertible_graphic_type<T>)
+		else if constexpr (concepts::is_static_convertible_graphic_type<T>)
 			return convert_graphic_type<T>();
-		return v.get_graphic_type();
+		else
+			return v.get_graphic_type();
 	}
 
 	template<std::size_t Length>

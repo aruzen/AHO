@@ -23,10 +23,10 @@ namespace VSL_NAMESPACE::command {
         vsl::ShaderFlag targetType;
         std::uint32_t size;
         std::uint32_t offset;
-        void *value;
+        const void *value;
 
         PushConstant(PipelineLayoutAccessor layout, vsl::ShaderFlag targetType, std::uint32_t size,
-                     std::uint32_t offset, void *value)
+                     std::uint32_t offset, const void *value)
                 : layout(std::move(layout)), targetType(targetType), size(size), offset(offset), value(value) {};
 
         template<typename T>

@@ -60,7 +60,7 @@ class ComputeVulkanIntegrationTest : public VulkanIntegrationTest {
                                                      &base);
             else
                 stream << vsl::command::PushConstant(*layout, vsl::ShaderFlag::Compute, base);
-            stream << vsl::command::Dispatch(count, 1, 1);
+            stream << vsl::command::Dispatch(count);
             // Make shader writes visible to the host before observing the payload.
             vk::MemoryBarrier barrier{};
             barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;

@@ -245,19 +245,11 @@ int VSL_NAMESPACE::_PhysicalDevicesSercher::benchmark(VSL_NAMESPACE::PhysicalDev
 	return rateDeviceSuitability(device._data->device);
 }
 
-template<typename C>
-VSL_NAMESPACE::LogicalDevice<C>::LogicalDevice(VSL_NAMESPACE::PhysicalDevice _device, vsl::Surface _surface)
+void VSL_NAMESPACE::helper::retainPhysicalDeviceOwner(
+	const std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl>& logical,
+	const VSL_NAMESPACE::PhysicalDevice& physical)
 {
-	C c;
-	_data = c.create(_device, _surface);
-	_data->parentDevice = _device._data;
-}
-
-template<typename C>
-VSL_NAMESPACE::LogicalDevice<C>::LogicalDevice(VSL_NAMESPACE::PhysicalDevice _device, std::shared_ptr<vsl::Surface> _surface) {
-	C c;
-	_data = c.create(_device, (vsl::Surface)(*_surface));
-	_data->parentDevice = _device._data;
+	logical->parentDevice = physical._data;
 }
 
 VSL_NAMESPACE::_impl::LogicalDevice_impl::~LogicalDevice_impl() {

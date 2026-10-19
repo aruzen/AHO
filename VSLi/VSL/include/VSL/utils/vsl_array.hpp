@@ -1,5 +1,11 @@
 #pragma once
 #include "../define.hpp"
+#include "string.hpp"
+#include <array>
+#include <concepts>
+#include <cstddef>
+#include <type_traits>
+#include <typeinfo>
 
 namespace VSL_NAMESPACE {
 	template<typename T>
@@ -9,22 +15,25 @@ namespace VSL_NAMESPACE {
 
 	template<convert_to_vsl_array T>
 	constexpr size_t vsl_array_size() {
-		return sizeof(T) / sizeof(T::element_type);
+		return sizeof(T) / sizeof(typename T::element_type);
 	}
 
 	template<typename T>
 	concept has_point_index = requires {
-		{ T::point_index } -> std::same_as<size_t>;
+		{ T::point_index } -> std::convertible_to<size_t>;
+		requires (!std::is_member_object_pointer_v<decltype(&T::point_index)>);
 	};
 
 	template<typename T>
 	concept has_size_index = requires {
-		{ T::size_index } -> std::same_as<size_t>;
+		{ T::size_index } -> std::convertible_to<size_t>;
+		requires (!std::is_member_object_pointer_v<decltype(&T::size_index)>);
 	};
 
 	template<typename T>
 	concept has_rgb_color_index = requires {
-		{ T::color_index } -> std::same_as<size_t>;
+		{ T::color_index } -> std::convertible_to<size_t>;
+		requires (!std::is_member_object_pointer_v<decltype(&T::color_index)>);
 	};
 
 	template<typename T, size_t Size>
@@ -68,8 +77,8 @@ namespace VSL_NAMESPACE {
 	template<typename T>
 	concept is_point = requires (T t) {
 		typename T::element_type;
-		{ t.x } -> std::convertible_to<typename T::element_type>;
-		{ t.y } -> std::convertible_to<typename T::element_type>;
+		{ t.x } -> std::convertible_to<typename T::element_type&>;
+		{ t.y } -> std::convertible_to<typename T::element_type&>;
 	};
 
 	template <typename T>
@@ -133,8 +142,8 @@ namespace VSL_NAMESPACE {
 	template<typename T>
 	concept is_size = requires (T t) {
 		typename T::element_type;
-		{ t.height } -> std::same_as<typename T::element_type>;
-		{ t.width } -> std::same_as<typename T::element_type>;
+		{ t.height } -> std::convertible_to<typename T::element_type&>;
+		{ t.width } -> std::convertible_to<typename T::element_type&>;
 	};
 
 	template<typename T>
@@ -148,7 +157,7 @@ namespace VSL_NAMESPACE {
 
 	template <typename T>
 		requires convert_to_vsl_at_least_array<T, 2> && (!has_size_index<T>) && (!is_size<T>)
-	struct __VSLD2Size<T> : public __VSLD2SizeAccessor<typename T::element_type>, public __VSLArray<T, typename T::element_type, vsl_array_size<T>()> {
+	struct __VSLD2Size<T> : public __VSLArray<T, typename T::element_type, vsl_array_size<T>()>, public __VSLD2SizeAccessor<typename T::element_type> {
 		static constexpr int SPECIALIZED_ID = 2;
 
 		using element_type = T::element_type;
@@ -163,7 +172,7 @@ namespace VSL_NAMESPACE {
 
 	template <typename T>
 		requires convert_to_vsl_at_least_array<T, 2>&& has_size_index<T> && (!is_size<T>)
-	struct __VSLD2Size<T> : public __VSLD2SizeAccessor<typename T::element_type>, public __VSLArray<T, typename T::element_type, vsl_array_size<T>()> {
+	struct __VSLD2Size<T> : public __VSLArray<T, typename T::element_type, vsl_array_size<T>()>, public __VSLD2SizeAccessor<typename T::element_type> {
 		static constexpr int SPECIALIZED_ID = 3;
 
 		using element_type = T::element_type;
@@ -201,16 +210,25 @@ namespace VSL_NAMESPACE {
 	};
 
 	template <typename T>
-		requires convert_to_vsl_at_least_array<T, 4>
-	struct __VSLD2Rectangle<T> : public __VSLD2RectangleAccessor<typename T::element_type>, public __VSLArray<T, typename T::element_type, vsl_array_size<T>()> {
+		requires convert_to_vsl_at_least_array<T, 4> && (!is_rectangle<T>)
+	struct __VSLD2Rectangle<T> : public __VSLArray<T, typename T::element_type, vsl_array_size<T>()>, public __VSLD2RectangleAccessor<typename T::element_type> {
 		using element_type = T::element_type;
+
+        static constexpr size_t point_offset() {
+            if constexpr (has_point_index<T>) return T::point_index;
+            else return 0;
+        }
+        static constexpr size_t size_offset() {
+            if constexpr (has_size_index<T>) return T::size_index;
+            else return 2;
+        }
 
 		__VSLD2Rectangle(T* t) : __VSLArray<T, element_type, vsl_array_size<T>()>(t),
 			__VSLD2RectangleAccessor<typename T::element_type>{
-				has_point_index<T> ? (*this)[T::point_index] : (*this)[0],
-				has_point_index<T> ? (*this)[T::point_index + 1] : (*this)[1],
-				has_size_index<T> ? (*this)[T::size_index] : (*this)[2],
-				has_size_index<T> ? (*this)[T::size_index + 1] : (*this)[3] } {}
+				(*this)[point_offset()],
+				(*this)[point_offset() + 1],
+				(*this)[size_offset()],
+				(*this)[size_offset() + 1] } {}
 	};
 
 	template<typename ElementType>
@@ -233,9 +251,9 @@ namespace VSL_NAMESPACE {
 	template<typename T>
 	concept is_rgb = requires (T t) {
 		typename T::element_type;
-		{ t.r } -> std::same_as<typename T::element_type>;
-		{ t.g } -> std::same_as<typename T::element_type>;
-		{ t.b } -> std::same_as<typename T::element_type>;
+		{ t.r } -> std::convertible_to<typename T::element_type&>;
+		{ t.g } -> std::convertible_to<typename T::element_type&>;
+		{ t.b } -> std::convertible_to<typename T::element_type&>;
 	};
 
 	template<typename T>
@@ -249,8 +267,8 @@ namespace VSL_NAMESPACE {
 	template <typename T>
 		requires convert_to_vsl_at_least_array<T, 3> && (!has_rgb_color_index<T>) && (!is_rgb<T>)
 	struct __VSLDRGBColor<T>
-		: public __VSLDRGBColorAccessor<typename T::element_type>
-		, public __VSLArray<T, typename T::element_type, vsl_array_size<T>()> {
+		: public __VSLArray<T, typename T::element_type, vsl_array_size<T>()>
+		, public __VSLDRGBColorAccessor<typename T::element_type> {
 
 		using element_type = T::element_type;
 
@@ -261,8 +279,8 @@ namespace VSL_NAMESPACE {
 	template <typename T>
 		requires convert_to_vsl_at_least_array<T, 3>&& has_rgb_color_index<T> && (!is_rgb<T>)
 	struct __VSLDRGBColor<T>
-		: public __VSLDRGBColorAccessor<typename T::element_type>
-		, public __VSLArray<T, typename T::element_type, vsl_array_size<T>()> {
+		: public __VSLArray<T, typename T::element_type, vsl_array_size<T>()>
+		, public __VSLDRGBColorAccessor<typename T::element_type> {
 
 		using element_type = T::element_type;
 

@@ -97,8 +97,8 @@ namespace AHO_NAMESPACE {
             template<AHO_NAMESPACE::concepts::division_as<R> T>
             constexpr Mat<R, Row, Column>& operator/=(const T &m);
 
-            template<AHO_NAMESPACE::concepts::cast_as<R> T>
-            Mat<T, Row, Column> cast();
+            template<typename T> requires AHO_NAMESPACE::concepts::cast_as<R, T>
+            Mat<T, Row, Column> cast() const;
         };
 
         template<typename T, size_t N1>
@@ -304,8 +304,8 @@ namespace AHO_NAMESPACE {
         }
 
         template<typename R, size_t Row, size_t Column>
-        template<AHO_NAMESPACE::concepts::cast_as<R> T>
-        Mat<T, Row, Column> Mat<R, Row, Column>::cast() {
+        template<typename T> requires AHO_NAMESPACE::concepts::cast_as<R, T>
+        Mat<T, Row, Column> Mat<R, Row, Column>::cast() const {
             AHO_NAMESPACE::matrix::Mat<T, Row, Column> buf;
             for (size_t i = 0; i < Row; i++)
                 for (size_t j = 0; j < Column; j++)

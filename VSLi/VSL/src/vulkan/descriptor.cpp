@@ -15,14 +15,15 @@
 vsl::graphic_resource::BindingLayout::BindingLayout(vsl::LogicalDeviceAccessor device,
                                                     vsl::graphic_resource::Type bindingType,
                                                     vsl::ShaderFlag shaderType)
-        : BindingLayout(device, -1, bindingType, shaderType, 1) {}
+        : BindingLayout(device, 0, bindingType, shaderType, 1) {}
 
 vsl::graphic_resource::BindingLayout::BindingLayout(LogicalDeviceAccessor device, size_t binding,
                                                     Type bindingType, ShaderFlag shaderType, size_t amount) {
     _data = std::make_shared<_impl::ResourceBindingLayout_impl>();
+    _data->device = device._data;
 
     _data->layoutBindings.resize(1);
-    _data->layoutBindings[0].binding = binding;
+    _data->layoutBindings[0].binding = binding == size_t(-1) || binding == UINT32_MAX ? 0 : binding;
     _data->layoutBindings[0].descriptorType = (vk::DescriptorType) bindingType;
     _data->layoutBindings[0].stageFlags = (vk::ShaderStageFlagBits) shaderType;
     _data->layoutBindings[0].descriptorCount = amount;
@@ -85,6 +86,7 @@ std::tuple<bool, vsl::graphic_resource::Resource>
 vsl::graphic_resource::Pool::bind(vsl::graphic_resource::BindingLayout layout) {
     auto result = std::make_shared<_impl::GraphicResource_impl>();
     result->pool = _data;
+    result->layout = layout._data;
     vk::DescriptorSetAllocateInfo allocInfo;
     allocInfo.descriptorPool = _data->descriptorPool;
     allocInfo.descriptorSetCount = 1;
@@ -120,6 +122,7 @@ vsl::graphic_resource::Pool::bind(size_t n, vsl::graphic_resource::BindingLayout
     for (size_t i = 0; i < descriptorSets.size(); i++) {
         resources[i] = Resource{std::make_shared<_impl::GraphicResource_impl>()};
         resources[i]._data->pool = _data;
+        resources[i]._data->layout = layout._data;
         resources[i]._data->descriptorSet = descriptorSets[i];
         _data->resources.push_back(resources[i]._data);
     }
@@ -168,10 +171,17 @@ vsl::graphic_resource::Pool vsl::graphic_resource::Resource::getPool() {
 
 void vsl::graphic_resource::Resource::update(vsl::BufferAccessor *buffer, size_t binding, std::optional <Type> type,
                                              size_t offset, std::optional <size_t> size) {
+    const auto buffer_size = buffer->_data->requirementSize;
+    if (offset >= buffer_size)
+        throw vsl::exceptions::RuntimeException("BufferRange", "Buffer descriptor range starts outside the buffer");
+    const vk::DeviceSize range = size ? *size : buffer_size - offset;
+    if (range == 0 || (range != VK_WHOLE_SIZE && range > buffer_size - offset))
+        throw vsl::exceptions::RuntimeException("BufferRange", "Buffer descriptor range is empty or exceeds the buffer");
+
     vk::DescriptorBufferInfo bufferInfo;
     bufferInfo.buffer = buffer->_data->buffer;
     bufferInfo.offset = offset;
-    bufferInfo.range = size ? size.value() : buffer->size();
+    bufferInfo.range = range;
 
     vk::WriteDescriptorSet descriptorWrite;
     descriptorWrite.dstSet = this->_data->descriptorSet;

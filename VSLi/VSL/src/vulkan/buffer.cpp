@@ -54,7 +54,7 @@ bool VSL_NAMESPACE::BufferAccessor::copyByBuffer(CommandManager commandManager, 
     commandManager._data->graphicsQueue.submit({submitInfo});
     commandManager._data->graphicsQueue.waitIdle();
 
-    return false;
+    return true;
 }
 
 bool vsl::BufferAccessor::copyByImage(CommandManager manager, const vsl::ImageAccessor& image) {
@@ -106,6 +106,8 @@ VSL_NAMESPACE::BufferAccessor::FlushBuffer(LocalBufferHolder &holder, MemoryType
     if (not contain(memProperty, MemoryProperty::HostVisible)) {
         throw VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException(std::source_location::current());
     }
+    if (contain(memProperty, MemoryProperty::HostCoherent))
+        return;
 
     vk::MappedMemoryRange range;
     range.memory = holder.parent->_data->deviceMem;
@@ -136,7 +138,8 @@ GetData(VSL_NAMESPACE::BufferAccessor *data, std::optional<size_t> size, size_t 
     mappedRange.offset = offset;
     mappedRange.size = holder.size;  // またはコピー範囲のサイズ
 
-    data->_data->device->device.invalidateMappedMemoryRanges({mappedRange});
+    if (not contain(memProperty, MemoryProperty::HostCoherent))
+        data->_data->device->device.invalidateMappedMemoryRanges({mappedRange});
 
     return std::move(holder);
 }

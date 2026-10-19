@@ -2,6 +2,24 @@
 #include <VSL/vulkan/_pimpls.hpp>
 
 #include <ranges>
+#include <algorithm>
+#include <limits>
+#include <utility>
+#include <VSL/exceptions.hpp>
+
+namespace {
+std::uint32_t shape_stride(const vsl::pipeline_layout::VertexInputShapeDefinition& definition) {
+    std::uint32_t next_offset = 0, extent = 0;
+    for (const auto& layout : definition.layouts) {
+        const auto offset = layout.offset == std::uint32_t(-1) ? next_offset : layout.offset;
+        if (layout.format.size() > std::numeric_limits<std::uint32_t>::max() - offset)
+            throw vsl::exceptions::RuntimeException("VertexInput", "Vertex attribute extent exceeds uint32 range");
+        next_offset = offset + layout.format.size();
+        extent = std::max(extent, next_offset);
+    }
+    return definition.size == std::uint32_t(-1) ? extent : definition.size;
+}
+} // namespace
 
 VSL_NAMESPACE::pipeline_layout::VertexInput::VertexInput() {}
 
@@ -54,11 +72,10 @@ VSL_NAMESPACE::pipeline_layout::VertexInput VSL_NAMESPACE::pipeline_layout::Vert
 size_t VSL_NAMESPACE::pipeline_layout::VertexInput::requirements_size() {
     size_t size = 0;
     for (auto &def: definitions) {
-        if (def.size != (std::uint32_t) -1)
-            size += def.size;
-        else
-            for (auto &layout: def.layouts)
-                size += layout.format.size();
+        const auto stride = shape_stride(def);
+        if (stride > std::numeric_limits<size_t>::max() - size)
+            throw vsl::exceptions::RuntimeException("VertexInput", "Vertex input requirements overflow");
+        size += stride;
     }
     return size;
 }
@@ -70,8 +87,8 @@ void VSL_NAMESPACE::pipeline_layout::VertexInput::injection(VSL_NAMESPACE::Pipel
 	using VIBDs = std::vector<vk::VertexInputBindingDescription>;
 	using VIADs = std::vector<vk::VertexInputAttributeDescription>;
 
-	auto& vertexBindingDescriptions = std::any_cast<VIBDs&>(info.pool["vertexBindingDescriptions"] = VIBDs());
-	auto& vertexAttributeDescriptions = std::any_cast<VIADs&>(info.pool["vertexAttributeDescriptions"] = VIADs());
+	VIBDs vertexBindingDescriptions;
+	VIADs vertexAttributeDescriptions;
 
 	std::uint32_t nextBinding = 0, nextLocation = 0;
 	for (auto& def : this->definitions) {
@@ -79,13 +96,7 @@ void VSL_NAMESPACE::pipeline_layout::VertexInput::injection(VSL_NAMESPACE::Pipel
 		vertexBindingDescription.binding = def.binding != (std::uint32_t)-1 ? def.binding : nextBinding;
 		nextBinding = vertexBindingDescription.binding + 1;
 
-        if (def.size != (std::uint32_t) -1)
-            vertexBindingDescription.stride = def.size;
-        else {
-            vertexBindingDescription.stride = 0;
-            for (auto &layout: def.layouts)
-                vertexBindingDescription.stride += layout.format.size();
-        }
+        vertexBindingDescription.stride = shape_stride(def);
 		vertexBindingDescription.inputRate = (vk::VertexInputRate)def.updateTiming;
 		vertexBindingDescriptions.push_back(vertexBindingDescription);
 
@@ -125,8 +136,16 @@ void VSL_NAMESPACE::pipeline_layout::VertexInput::injection(VSL_NAMESPACE::Pipel
         });
     */
 
-	info.vertexInput.vertexBindingDescriptionCount = vertexBindingDescriptions.size();
-	info.vertexInput.pVertexBindingDescriptions = vertexBindingDescriptions.data();
-	info.vertexInput.vertexAttributeDescriptionCount = vertexAttributeDescriptions.size();
-	info.vertexInput.pVertexAttributeDescriptions = vertexAttributeDescriptions.data();
+	std::any nextBindings = std::move(vertexBindingDescriptions);
+	std::any nextAttributes = std::move(vertexAttributeDescriptions);
+	auto& bindingStorage = info.pool["vertexBindingDescriptions"];
+	auto& attributeStorage = info.pool["vertexAttributeDescriptions"];
+	bindingStorage.swap(nextBindings);
+	attributeStorage.swap(nextAttributes);
+	const auto& bindings = std::any_cast<const VIBDs&>(bindingStorage);
+	const auto& attributes = std::any_cast<const VIADs&>(attributeStorage);
+	info.vertexInput.vertexBindingDescriptionCount = bindings.size();
+	info.vertexInput.pVertexBindingDescriptions = bindings.data();
+	info.vertexInput.vertexAttributeDescriptionCount = attributes.size();
+	info.vertexInput.pVertexAttributeDescriptions = attributes.data();
 }

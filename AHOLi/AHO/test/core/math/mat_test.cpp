@@ -70,6 +70,27 @@ constexpr aho::Mat<int, 1, 2> matrix(std::array<std::array<int, 2>, 1>{{{2, 4}}}
 constexpr auto result = 8 / matrix;
 static_assert(result[0][0] == 4 && result[0][1] == 2);
 #else
+#include <gtest/gtest.h>
+#include "../../support/one_way_cast.hpp"
+namespace {
+TEST(MatOneWayCastTest, ConvertsEveryRectangularElementAndRejectsTheReverseConversion) {
+    using M = aho::matrix::Mat<aho_test::CastSource, 2, 3>;
+    static_assert(aho_test::HasCast<M, aho_test::CastTarget>);
+    M source;
+    source[0] = {aho_test::CastSource{1}, aho_test::CastSource{2}, aho_test::CastSource{3}};
+    source[1] = {aho_test::CastSource{-4}, aho_test::CastSource{-5}, aho_test::CastSource{-6}};
+    const auto converted = source.cast<aho_test::CastTarget>();
+    using Converted = std::remove_cv_t<decltype(converted)>;
+    static_assert(std::same_as<Converted, aho::matrix::Mat<aho_test::CastTarget, 2, 3>>);
+    static_assert(!aho_test::HasCast<Converted, aho_test::CastSource>);
+    const int expected[2][3]{{1, 2, 3}, {-4, -5, -6}};
+    for (std::size_t row = 0; row < 2; ++row)
+        for (std::size_t column = 0; column < 3; ++column) {
+            EXPECT_EQ(converted[row][column].value, expected[row][column]);
+            EXPECT_EQ(source[row][column].value, expected[row][column]);
+        }
+}
+} // namespace
 #include "../../support/matrix.hpp"
 #include <sstream>
 
@@ -199,6 +220,35 @@ TEST(MatTest, ScalarAssignmentsAreElementwise) {
     expect_matrix(mutable_matrix /= 2, values);
     expect_matrix(mutable_matrix, values);
 }
+template<class T> class MatConstCastTest : public testing::Test {};
+using ConstCastScalars = testing::Types<float, double, long double>;
+TYPED_TEST_SUITE(MatConstCastTest, ConstCastScalars);
+TYPED_TEST(MatConstCastTest, ConstRectangularMatricesConvertEveryElementWithoutChangingTheirSource) {
+    using T = TypeParam;
+    const std::array<std::array<T, 3>, 2> values{{{T{-2.75}, T{4.5}, 0}, {T{1.125}, T{-3.25}, 6}}};
+    const aho::Mat<T, 2, 3> source(values);
+    auto integers = source.template cast<int>();
+    const auto doubles = source.template cast<double>();
+    static_assert(std::same_as<decltype(integers), aho::Mat<int, 2, 3>>);
+    static_assert(std::same_as<std::remove_cv_t<decltype(doubles)>, aho::Mat<double, 2, 3>>);
+    expect_matrix(integers, std::array<std::array<int, 3>, 2>{{{-2, 4, 0}, {1, -3, 6}}});
+    expect_matrix(doubles, std::array<std::array<double, 3>, 2>{{{-2.75, 4.5, 0}, {1.125, -3.25, 6}}});
+    integers[0][0] = 99;
+    expect_matrix(source, values);
+}
+TEST(MatConstCastTest, ConstMatricesWithZeroDimensionsKeepTheirShape) {
+    const aho::Mat<int, 0, 3> no_rows{};
+    const aho::Mat<int, 2, 0> no_columns{};
+    const auto converted_rows = no_rows.cast<double>();
+    const auto converted_columns = no_columns.cast<double>();
+    static_assert(std::same_as<std::remove_cv_t<decltype(converted_rows)>, aho::Mat<double, 0, 3>>);
+    static_assert(std::same_as<std::remove_cv_t<decltype(converted_columns)>, aho::Mat<double, 2, 0>>);
+    EXPECT_TRUE(converted_rows.empty());
+    EXPECT_EQ(converted_columns.size(), 2u);
+    EXPECT_TRUE(converted_columns[0].empty());
+    EXPECT_TRUE(converted_columns[1].empty());
+}
+
 template<class T> class MatScalarOperatorTest : public testing::Test {};
 using ScalarTypes = testing::Types<int, float, double>;
 TYPED_TEST_SUITE(MatScalarOperatorTest, ScalarTypes);

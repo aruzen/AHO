@@ -90,6 +90,41 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
         case spv::ExecutionModelVertex:
             shaderType = ShaderFlag::Vertex;
             break;
+        case spv::ExecutionModelTessellationControl:
+            shaderType = ShaderFlag::TessellationControl;
+            break;
+        case spv::ExecutionModelTessellationEvaluation:
+            shaderType = ShaderFlag::TessellationEvaluation;
+            break;
+        case spv::ExecutionModelGeometry:
+            shaderType = ShaderFlag::Geometry;
+            break;
+        case spv::ExecutionModelRayGenerationKHR:
+            shaderType = ShaderFlag::Raygen;
+            break;
+        case spv::ExecutionModelIntersectionKHR:
+            shaderType = ShaderFlag::Intersection;
+            break;
+        case spv::ExecutionModelAnyHitKHR:
+            shaderType = ShaderFlag::AnyHit;
+            break;
+        case spv::ExecutionModelClosestHitKHR:
+            shaderType = ShaderFlag::ClosestHit;
+            break;
+        case spv::ExecutionModelMissKHR:
+            shaderType = ShaderFlag::Miss;
+            break;
+        case spv::ExecutionModelCallableKHR:
+            shaderType = ShaderFlag::Callable;
+            break;
+        case spv::ExecutionModelTaskNV:
+        case spv::ExecutionModelTaskEXT:
+            shaderType = ShaderFlag::Task;
+            break;
+        case spv::ExecutionModelMeshNV:
+        case spv::ExecutionModelMeshEXT:
+            shaderType = ShaderFlag::Mesh;
+            break;
         case spv::ExecutionModelFragment:
             shaderType = ShaderFlag::Fragment;
             break;

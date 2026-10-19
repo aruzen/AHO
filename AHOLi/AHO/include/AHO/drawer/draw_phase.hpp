@@ -2,6 +2,7 @@
 #define AHO_ALL_DRAW_PHASE_H
 
 #include <VSL/vsl.hpp>
+#include <concepts>
 #include "../engine/graphical_engine.hpp"
 #include "../drawer.hpp"
 
@@ -39,6 +40,8 @@ namespace AHO_NAMESPACE {
         bool finishStarted = false;
         DrawPhase* previousPhase = nullptr;
         void restorePreviousPhase() noexcept;
+        static DrawPhase* currentForManager(const VSL_NAMESPACE::CommandManager& manager) noexcept;
+        template<typename> friend struct DrawStream;
     };
 
     AHO_NAMESPACE::DrawStream<VSL_NAMESPACE::DefaultPhaseStream> AHO_NAMESPACE::DrawPhase::operator<<(AHO_NAMESPACE::concepts::is_std_tuple auto&& t) {
@@ -60,9 +63,12 @@ namespace AHO_NAMESPACE {
 
     template<typename PhaseStream>
     DrawStream<PhaseStream>& DrawStream<PhaseStream>::operator<<(AHO_NAMESPACE::concepts::is_std_tuple auto&& args) {
+        auto* phase = THREAD_LOCAL_DRAW_PHASE;
+        if constexpr (requires { { phase_stream.manager } -> std::convertible_to<VSL_NAMESPACE::CommandManager>; })
+            phase = DrawPhase::currentForManager(phase_stream.manager);
         std::apply(
             [](auto&&... xs) { draw(std::forward<decltype(xs)>(xs)...); },
-            std::tuple_cat(std::forward<decltype(args)>(args), std::tie(THREAD_LOCAL_DRAW_PHASE)));
+            std::tuple_cat(std::forward<decltype(args)>(args), std::tie(phase)));
         return *this;
     }
 } // namespace AHO_NAMESPACE

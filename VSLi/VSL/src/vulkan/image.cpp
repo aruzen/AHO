@@ -115,3 +115,9 @@ VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::ImageAccessor::getDevice() c
         throw std::invalid_argument("Image is empty");
     return {_data->device};
 }
+
+VSL_NAMESPACE::ImageType VSL_NAMESPACE::ImageAccessor::getUsage() const {
+    if (!_data)
+        throw std::invalid_argument("Image is empty");
+    return _data->usage;
+}

@@ -110,7 +110,7 @@ std::string VSL_NAMESPACE::PureWindow::name()
 
 VSL_NAMESPACE::PureWindow::operator bool()
 {
-	return _data->window_handle != nullptr;
+	return _data && _data->window_handle != nullptr;
 }
 
 bool VSL_NAMESPACE::PureWindow::operator==(const PureWindow& o)

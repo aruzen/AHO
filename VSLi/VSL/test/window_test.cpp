@@ -208,6 +208,31 @@ TEST_F(WindowIntegrationTest, AListenerAddedToALaterWindowRunsWhenThatWindowBegi
 }
 } // namespace
 
+namespace {
+TEST(WindowValidityTest, NullSharedDataIsInvalidAndCanBeClosed) {
+    vsl::PureWindow window(std::shared_ptr<vsl::PureWindow::WindowData>{});
+    EXPECT_FALSE(static_cast<bool>(window));
+    EXPECT_FALSE(window.close());
+}
+TEST(WindowValidityTest, MovedFromWrappersRemainInvalidAndReusable) {
+    auto data = std::make_shared<vsl::PureWindow::WindowData>();
+    vsl::PureWindow source(data);
+    vsl::PureWindow destination(std::move(source));
+    ASSERT_FALSE(source._data);
+    EXPECT_FALSE(static_cast<bool>(source));
+    EXPECT_FALSE(source.close());
+    EXPECT_EQ(destination._data, data);
+    source = destination;
+    EXPECT_EQ(source._data, data);
+    EXPECT_FALSE(static_cast<bool>(source)); // The shared data has no native window.
+    vsl::PureWindow assigned(std::shared_ptr<vsl::PureWindow::WindowData>{});
+    assigned = std::move(source);
+    ASSERT_FALSE(source._data);
+    EXPECT_FALSE(static_cast<bool>(source));
+    EXPECT_EQ(assigned._data, data);
+}
+} // namespace
+
 #include <VSL/exceptions.hpp>
 namespace {
 TEST_F(WindowIntegrationTest, FailedCreationLeavesExistingWindowUsable) {

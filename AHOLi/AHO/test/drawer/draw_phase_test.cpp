@@ -132,6 +132,109 @@ namespace {
         inner.reset();
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
     }
+    TEST_F(DrawPhaseVulkanIntegration, ExplicitOuterTupleUsesOuterManagerWhileInnerRemainsCurrent) {
+        ASSERT_NO_THROW(start_engine());
+        NestedDrawEngine other;
+        aho::DrawPhase outer(*engine);
+        aho::DrawPhase inner(other);
+        expect_tuple_phase(outer);
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &inner);
+        expect_tuple_phase(inner);
+    }
+    TEST_F(DrawPhaseVulkanIntegration, ContinuingAnOuterTupleStreamKeepsItsPhaseDuringInnerRecording) {
+        ASSERT_NO_THROW(start_engine());
+        NestedDrawEngine other;
+        aho::DrawPhase outer(*engine);
+        int calls = 0;
+        aho::DrawPhase* received = nullptr;
+        phase_payload::Value payload{&calls, &received};
+        auto stream = outer << aho::pack(payload);
+        EXPECT_EQ(received, &outer);
+        aho::DrawPhase inner(other);
+        stream << aho::pack(payload);
+        EXPECT_EQ(calls, 2);
+        EXPECT_EQ(received, &outer);
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &inner);
+    }
+    TEST_F(DrawPhaseVulkanIntegration, AllOuterCommandStreamsKeepTheirManagerForFollowingTuples) {
+        ASSERT_NO_THROW(start_engine());
+        NestedDrawEngine other;
+        aho::DrawPhase outer(*engine);
+        aho::DrawPhase inner(other);
+        int commands = 0, tuples = 0;
+        aho::DrawPhase* received = nullptr;
+        auto check = [&](auto stream) {
+            EXPECT_EQ(stream.phase_stream.manager._data, outer.manager._data);
+            stream << aho::pack(phase_payload::Value{&tuples, &received});
+            EXPECT_EQ(received, &outer);
+            EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &inner);
+        };
+        check(outer << aho_test::RecordingCommand(&commands));
+        check(outer << aho_test::RecordingDelegate(&commands));
+        std::shared_ptr<vsl::command::__Command> command = std::make_shared<aho_test::RecordingCommand>(&commands);
+        std::shared_ptr<vsl::command::__DelegateCommand> delegate = std::make_shared<aho_test::RecordingDelegate>(&commands);
+        check(outer << command);
+        check(outer << delegate);
+        EXPECT_EQ(commands, 4);
+        EXPECT_EQ(tuples, 4);
+    }
+    TEST_F(DrawPhaseVulkanIntegration, SavedInitializerStreamFindsItsOuterPhaseDuringInnerRecording) {
+        ASSERT_NO_THROW(start_engine());
+        NestedDrawEngine other;
+        std::optional<aho::DrawStream<vsl::DefaultPhaseStream>> saved;
+        aho::DrawPhase outer(*engine, [&](auto& stream) {
+            saved = stream;
+            auto window = engine->getWindow();
+            stream << vsl::command::RenderPassBegin(window._data2->render_pass, window._data2->frame_buffer);
+        });
+        aho::DrawPhase inner(other);
+        ASSERT_TRUE(saved);
+        int calls = 0;
+        aho::DrawPhase* received = nullptr;
+        *saved << aho::pack(phase_payload::Value{&calls, &received});
+        EXPECT_EQ(calls, 1);
+        EXPECT_EQ(received, &outer);
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &inner);
+    }
+    TEST_F(DrawPhaseVulkanIntegration, OuterFinishTupleUsesOuterPhaseWhileInnerIsStillAlive) {
+        ASSERT_NO_THROW(start_engine());
+        NestedDrawEngine other;
+        int calls = 0;
+        aho::DrawPhase* expected = nullptr;
+        auto outer = std::make_unique<aho::DrawPhase>(*engine, nullptr, [&](auto& stream) {
+            aho::DrawPhase* received = nullptr;
+            stream << aho::pack(phase_payload::Value{&calls, &received});
+            EXPECT_EQ(received, expected);
+            stream << vsl::command::RenderPassEnd{};
+        });
+        expected = outer.get();
+        aho::DrawPhase inner(other);
+        outer.reset();
+        EXPECT_EQ(calls, 1);
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &inner);
+    }
+    TEST_F(DrawPhaseVulkanIntegration, StreamWithoutAMatchingDrawPhaseDoesNotBorrowAnotherManagersContext) {
+        ASSERT_NO_THROW(start_engine());
+        NestedDrawEngine other;
+        aho::DrawPhase outer(*engine);
+        aho::DrawStream<vsl::DefaultPhaseStream> unrelated{vsl::DefaultPhaseStream{other._data->command_manager}};
+        int calls = 0;
+        aho::DrawPhase* received = &outer;
+        unrelated << aho::pack(phase_payload::Value{&calls, &received});
+        EXPECT_EQ(calls, 1);
+        EXPECT_EQ(received, nullptr);
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &outer);
+    }
+    TEST_F(DrawPhaseVulkanIntegration, GenericStreamsWithoutManagersKeepTheCurrentPhaseFallback) {
+        ASSERT_NO_THROW(start_engine());
+        aho::DrawPhase outer(*engine);
+        aho::DrawStream<aho_test::RecordingStream> stream;
+        int calls = 0;
+        aho::DrawPhase* received = nullptr;
+        stream << aho::pack(phase_payload::Value{&calls, &received});
+        EXPECT_EQ(calls, 1);
+        EXPECT_EQ(received, &outer);
+    }
     TEST_F(DrawPhaseVulkanIntegration, PointerAndReferenceConstructorsSubmitFramesAndResetThreadLocal) {
         ASSERT_NO_THROW(start_engine());
         EXPECT_EQ(AHO_NAMESPACE::THREAD_LOCAL_DRAW_PHASE, nullptr);

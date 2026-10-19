@@ -15,6 +15,123 @@ namespace phase_payload {
 } // namespace phase_payload
 namespace {
     using DrawPhaseVulkanIntegration = aho_test::LiveGpuTest;
+    struct NestedDrawEngine : aho::StandardEngine {
+        NestedDrawEngine() : aho::StandardEngine("AHO nested phase test") {}
+        ~NestedDrawEngine() override {
+            if (_data)
+                _data->command_manager.waitIdle();
+            if (boot_window && static_cast<bool>(*boot_window))
+                boot_window->close();
+        }
+    };
+    void expect_tuple_phase(aho::DrawPhase& phase) {
+        int calls = 0;
+        aho::DrawPhase* received = nullptr;
+        phase << aho::pack(phase_payload::Value{&calls, &received});
+        EXPECT_EQ(calls, 1);
+        EXPECT_EQ(received, &phase);
+    }
+    TEST_F(DrawPhaseVulkanIntegration, NestedPhasesRestoreOuterTupleDispatchAfterNormalDestruction) {
+        ASSERT_NO_THROW(start_engine());
+        NestedDrawEngine other;
+        {
+            aho::DrawPhase outer(*engine);
+            {
+                aho::DrawPhase inner(other);
+                EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &inner);
+                expect_tuple_phase(inner);
+            }
+            EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &outer);
+            expect_tuple_phase(outer);
+        }
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
+    }
+    TEST_F(DrawPhaseVulkanIntegration, NestedStackUnwindingRestoresOuterPhaseWithoutFinishingInner) {
+        ASSERT_NO_THROW(start_engine());
+        NestedDrawEngine other;
+        unsigned finished = 0;
+        {
+            aho::DrawPhase outer(*engine);
+            try {
+                aho::DrawPhase inner(other, nullptr, [&](auto&) { ++finished; });
+                throw std::runtime_error("nested body failed");
+            } catch (const std::runtime_error&) {
+            }
+            EXPECT_EQ(finished, 0u);
+            EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &outer);
+            expect_tuple_phase(outer);
+        }
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
+    }
+    TEST_F(DrawPhaseVulkanIntegration, NestedFinishFailureRestoresOuterPhaseAndAllowsAnotherInnerFrame) {
+        ASSERT_NO_THROW(start_engine());
+        NestedDrawEngine other;
+        unsigned finished = 0;
+        {
+            aho::DrawPhase outer(*engine);
+            {
+                aho::DrawPhase inner(other, nullptr, [&](auto&) {
+                    ++finished;
+                    throw std::runtime_error("nested finish failed");
+                });
+            }
+            EXPECT_EQ(finished, 1u);
+            EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &outer);
+            expect_tuple_phase(outer);
+            { aho::DrawPhase next(other); }
+            EXPECT_EQ(finished, 1u);
+            EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &outer);
+        }
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
+    }
+    TEST_F(DrawPhaseVulkanIntegration, NestedInitializerFailureRestoresOuterPhaseAndAllowsAnotherInnerFrame) {
+        ASSERT_NO_THROW(start_engine());
+        NestedDrawEngine other;
+        {
+            aho::DrawPhase outer(*engine);
+            EXPECT_THROW((aho::DrawPhase(other, [&](auto&) { throw std::runtime_error("nested initialization failed"); })), std::runtime_error);
+            EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &outer);
+            expect_tuple_phase(outer);
+            { aho::DrawPhase next(other); }
+            EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &outer);
+        }
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
+    }
+    TEST_F(DrawPhaseVulkanIntegration, RejectedSameManagerNestingLeavesOuterRecordingAndContextIntact) {
+        ASSERT_NO_THROW(start_engine());
+        {
+            aho::DrawPhase outer(*engine);
+            EXPECT_THROW((aho::DrawPhase(*engine)), std::logic_error);
+            EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &outer);
+            expect_tuple_phase(outer);
+        }
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
+    }
+    TEST_F(DrawPhaseVulkanIntegration, DestroyingOuterFirstKeepsInnerCurrentAndNeverRestoresDestroyedOuter) {
+        ASSERT_NO_THROW(start_engine());
+        NestedDrawEngine other;
+        auto outer = std::make_unique<aho::DrawPhase>(*engine);
+        auto inner = std::make_unique<aho::DrawPhase>(other);
+        outer.reset();
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, inner.get());
+        expect_tuple_phase(*inner);
+        inner.reset();
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
+    }
+    TEST_F(DrawPhaseVulkanIntegration, FailingInitializerPreservesASurvivingInnerPhaseWithoutKeepingTheFailedOuter) {
+        ASSERT_NO_THROW(start_engine());
+        NestedDrawEngine other;
+        std::unique_ptr<aho::DrawPhase> inner;
+        EXPECT_THROW((aho::DrawPhase(*engine, [&](auto&) {
+            inner = std::make_unique<aho::DrawPhase>(other);
+            throw std::runtime_error("outer initialization failed");
+        })), std::runtime_error);
+        ASSERT_TRUE(inner);
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, inner.get());
+        expect_tuple_phase(*inner);
+        inner.reset();
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
+    }
     TEST_F(DrawPhaseVulkanIntegration, PointerAndReferenceConstructorsSubmitFramesAndResetThreadLocal) {
         ASSERT_NO_THROW(start_engine());
         EXPECT_EQ(AHO_NAMESPACE::THREAD_LOCAL_DRAW_PHASE, nullptr);

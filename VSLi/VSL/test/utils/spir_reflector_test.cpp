@@ -1,5 +1,6 @@
 #include "support/vulkan_fixture.hpp"
 #include <VSL/utils/spir_reflector.hpp>
+#include <span>
 
 namespace {
     TEST(SpirvReflectorTest, ReflectsBindingsVertexInputsAndPushConstantMembersFromFile) {
@@ -197,5 +198,104 @@ namespace {
         } catch (const vsl::exceptions::RuntimeException& error) {
             EXPECT_NE(error.reason.find(path.string()), std::string::npos);
         }
+    }
+} // namespace
+
+namespace {
+    TEST(SpirvReflectorTest, DenseVertexInputsRetainExplicitShaderLocations) {
+        vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection.vert.spv"));
+        ASSERT_TRUE(reflector.generated.vertex_input);
+        const auto& definitions = reflector.generated.vertex_input->definitions;
+        ASSERT_EQ(definitions.size(), 2u);
+        EXPECT_EQ(definitions[0].layouts.at(0).location, 0u);
+        EXPECT_EQ(definitions[1].layouts.at(0).location, 1u);
+    }
+    TEST(SpirvReflectorTest, SparseVertexInputsRetainLocationsWithoutRenumbering) {
+        vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection_sparse.vert.spv"));
+        ASSERT_TRUE(reflector.generated.vertex_input);
+        const auto& definitions = reflector.generated.vertex_input->definitions;
+        ASSERT_EQ(definitions.size(), 2u);
+        ASSERT_EQ(definitions[0].layouts.size(), 1u);
+        ASSERT_EQ(definitions[1].layouts.size(), 1u);
+        EXPECT_EQ(definitions[0].layouts[0].location, 3u);
+        EXPECT_EQ(definitions[0].layouts[0].format, vsl::data_format::FloatRG);
+        EXPECT_EQ(definitions[1].layouts[0].location, 7u);
+        EXPECT_EQ(definitions[1].layouts[0].format, vsl::data_format::FloatRGB);
+    }
+    TEST(SpirvReflectorTest, MatrixColumnsStartAtTheDeclaredLocation) {
+        vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection_matrix.vert.spv"));
+        ASSERT_TRUE(reflector.generated.vertex_input);
+        const auto& definitions = reflector.generated.vertex_input->definitions;
+        ASSERT_EQ(definitions.size(), 2u);
+        const auto matrix = std::ranges::find_if(definitions, [](const auto& def) { return def.layouts.size() == 3; });
+        ASSERT_NE(matrix, definitions.end());
+        for (std::size_t column = 0; column < 3; ++column) {
+            EXPECT_EQ(matrix->layouts[column].location, 4u + column);
+            EXPECT_EQ(matrix->layouts[column].format, vsl::data_format::FloatRGB);
+        }
+        const auto position = std::ranges::find_if(definitions, [](const auto& def) { return def.layouts.size() == 1; });
+        ASSERT_NE(position, definitions.end());
+        EXPECT_EQ(position->layouts[0].location, 1u);
+        EXPECT_EQ(position->layouts[0].format, vsl::data_format::FloatRG);
+    }
+    class ReflectedLocationsVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+    TEST_F(ReflectedLocationsVulkanIntegrationTest, InjectionPreservesSparseLocationsAndMatrixColumnOffsets) {
+        for (const auto& [file, expected_locations] : {
+                 std::pair{"reflection_sparse.vert.spv", std::vector<std::uint32_t>{3, 7}},
+                 std::pair{"reflection_matrix.vert.spv", std::vector<std::uint32_t>{1, 4, 5, 6}}}) {
+            SCOPED_TRACE(file);
+            vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path(file));
+            ASSERT_TRUE(reflector.generated.vertex_input);
+            auto layout = make_layout_state();
+            reflector.generated.vertex_input->injection(layout);
+            const auto& native = layout._data->info->vertexInput;
+            ASSERT_EQ(native.vertexAttributeDescriptionCount, expected_locations.size());
+            std::vector<std::uint32_t> locations;
+            for (std::uint32_t i = 0; i < native.vertexAttributeDescriptionCount; ++i) {
+                const auto& attribute = native.pVertexAttributeDescriptions[i];
+                locations.push_back(attribute.location);
+                if (attribute.format == vk::Format::eR32G32B32Sfloat && expected_locations.size() == 4) {
+                    EXPECT_EQ(attribute.offset, (attribute.location - 4) * 12);
+                    const auto bindings = std::span(native.pVertexBindingDescriptions, native.vertexBindingDescriptionCount);
+                    const auto binding = std::ranges::find(bindings, attribute.binding, &vk::VertexInputBindingDescription::binding);
+                    ASSERT_NE(binding, bindings.end());
+                    EXPECT_EQ(binding->stride, 36u);
+                }
+            }
+            std::ranges::sort(locations);
+            EXPECT_EQ(locations, expected_locations);
+        }
+    }
+} // namespace
+
+#include "support/render_fixture.hpp"
+namespace {
+    class ReflectedLocationsRenderVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+    TEST_F(ReflectedLocationsRenderVulkanIntegrationTest, ReflectedSparseVertexLocationsProduceExpectedGpuColor) {
+        vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_sparse.vert.spv"));
+        ASSERT_TRUE(reflector.generated.vertex_input);
+        const auto& definitions = reflector.generated.vertex_input->definitions;
+        ASSERT_EQ(definitions.size(), 2u);
+        // Reject incorrect metadata before constructing a native pipeline with mismatched shader inputs.
+        ASSERT_EQ(definitions[0].layouts.at(0).location, 3u);
+        ASSERT_EQ(definitions[1].layouts.at(0).location, 7u);
+        const std::array<std::array<float, 2>, 3> positions{{{-0.75f, -0.75f}, {0.75f, -0.75f}, {0, 0.75f}}};
+        const std::array<std::array<float, 3>, 3> colors{{{0.25f, 0.5f, 0.75f}, {0.25f, 0.5f, 0.75f}, {0.25f, 0.5f, 0.75f}}};
+        vsl::StagingBuffer<vsl::MemoryType::VertexBuffer> position_buffer(device, positions), color_buffer(device, colors);
+        pipeline.reset();
+        layout.reset();
+        vertex.emplace(device, vsl_test::shader_path("reflection_sparse.vert.spv"));
+        namespace pl = vsl::pipeline_layout;
+        layout.emplace(device, pl::ShaderGroup("reflected sparse inputs", {*vertex, *fragment}), *reflector.generated.vertex_input,
+                       pl::ColorBlend{}, pl::InputAssembly{}, pl::Rasterization{pl::CullingMode::None}, pl::Multisample{},
+                       pl::DynamicState{}, vsl::Viewport(description), vsl::Scissor(description));
+        pipeline.emplace(*layout, *pass);
+        expect_triangle_color(render([&](vsl::DefaultPhaseStream& stream) {
+            stream << vsl::command::BindVertexBuffer(position_buffer, color_buffer) << vsl::command::Draw(3);
+        }));
     }
 } // namespace

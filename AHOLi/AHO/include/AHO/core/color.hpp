@@ -56,7 +56,7 @@ struct Upper { \
 	template <concepts::division_as<T> RV> \
 	constexpr Upper<T>& operator /=(const Upper<RV>& t) { value /= t.value; return *this; }; \
  \
-	template <concepts::cast_as<T> RV> \
+	template <typename RV> requires concepts::cast_as<T, RV> \
 	Upper<RV> cast() const { return { (RV)value }; } \
 };
 
@@ -94,7 +94,7 @@ struct Upper { \
 	template <concepts::division_as<T> RV> \
 	constexpr Upper<T>& operator /=(const Upper<RV>& t) { value /= t.value; return *this; }; \
  \
-	template <concepts::cast_as<T> RV> \
+	template <typename RV> requires concepts::cast_as<T, RV> \
 	Upper<RV> cast() const { return { (RV)value }; } \
 };
 
@@ -130,7 +130,7 @@ struct Upper { \
 			template <concepts::division_as<T> R>
 			constexpr A<T>& operator /=(A<R> t) { value /= t.value; return *this; };
 
-			template <concepts::cast_as<T> R>
+			template <typename R> requires concepts::cast_as<T, R>
 			A<R> cast() const { return { (R)value }; }
 		};
 

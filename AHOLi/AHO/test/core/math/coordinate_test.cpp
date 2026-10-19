@@ -44,6 +44,25 @@ TEST(CoordinateContractTest, ThreeWayComparisonOrdersAndRecognizesEqualCoordinat
     EXPECT_TRUE(first == first);
 }
 #else
+#include "../../support/one_way_cast.hpp"
+namespace {
+template<class T> class CoordinateOneWayCastTest : public testing::Test {};
+using OneWayAxes = testing::Types<aho::coordinate::X<aho_test::CastSource>,
+                                 aho::coordinate::Y<aho_test::CastSource>,
+                                 aho::coordinate::Z<aho_test::CastSource>>;
+TYPED_TEST_SUITE(CoordinateOneWayCastTest, OneWayAxes);
+TYPED_TEST(CoordinateOneWayCastTest, ChecksConversionFromTheStoredScalarToTheRequestedType) {
+    static_assert(aho::concepts::cast_as<aho_test::CastSource, aho_test::CastTarget>);
+    static_assert(!aho::concepts::cast_as<aho_test::CastTarget, aho_test::CastSource>);
+    static_assert(aho_test::HasCast<TypeParam, aho_test::CastTarget>);
+    const TypeParam source(aho_test::CastSource{-17});
+    const auto converted = source.template cast<aho_test::CastTarget>();
+    using Converted = std::remove_cv_t<decltype(converted)>;
+    static_assert(!aho_test::HasCast<Converted, aho_test::CastSource>);
+    EXPECT_EQ(converted.value.value, -17);
+    EXPECT_EQ(source.value.value, -17);
+}
+} // namespace
 namespace {
 template<bool X, bool Y, bool Z> struct CoordinateMask {
     static constexpr bool x = X, y = Y, z = Z;

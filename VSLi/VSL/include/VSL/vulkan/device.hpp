@@ -1,6 +1,7 @@
 #pragma once
 #include "../define.hpp"
 #include "vulkan.hpp"
+#include "surface.hpp"
 
 #include "../type.hpp"
 #include "../concepts.hpp"
@@ -66,10 +67,19 @@ namespace VSL_NAMESPACE {
 		std::shared_ptr<_impl::LogicalDevice_impl> _data = nullptr;
 	};
 
+	namespace helper {
+		void retainPhysicalDeviceOwner(const std::shared_ptr<_impl::LogicalDevice_impl>& logical, const PhysicalDevice& physical);
+	}
+
 	template<typename C = _LogicalDeviceGraphicCreator<validation>>
 	struct LogicalDevice : public LogicalDeviceAccessor {
-		LogicalDevice(PhysicalDevice device, vsl::Surface surface);
-		LogicalDevice(PhysicalDevice device, std::shared_ptr<vsl::Surface> surface);
+		LogicalDevice(PhysicalDevice device, vsl::Surface surface) {
+			C creator;
+			_data = creator.create(device, surface);
+			helper::retainPhysicalDeviceOwner(_data, device);
+		}
+		LogicalDevice(PhysicalDevice device, std::shared_ptr<vsl::Surface> surface)
+			: LogicalDevice(device, *surface) {}
 
 #ifdef VSL_NAMESPACE_TEST
 		// void test();

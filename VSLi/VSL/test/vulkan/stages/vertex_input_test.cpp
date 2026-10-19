@@ -77,3 +77,65 @@ TEST(VertexInputTest, EmptyTypePacksLeaveExistingShapesUnchanged) {
     EXPECT_EQ(input.definitions[0].layouts[0].format, vsl::data_format::FloatRG);
     EXPECT_EQ(input.requirements_size(), 8u);
 }
+
+#include <limits>
+namespace {
+TEST(VertexInputTest, InferredRequirementsIncludeExplicitGapsAndTheLargestAttributeEnd) {
+    pl::VertexInput input({{.layouts = {{vsl::data_format::FloatRG, 0, 24},
+                                      {vsl::data_format::Float, 1, 0},
+                                      {vsl::data_format::Float, 2}}}});
+    EXPECT_EQ(input.requirements_size(), 32u);
+    input.add(pl::VertexInputShapeDefinition{.layouts = {{vsl::data_format::Float, 3, 12}}});
+    EXPECT_EQ(input.requirements_size(), 48u);
+}
+using VertexStrideVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+TEST_F(VertexStrideVulkanIntegrationTest, NativeStridesUseTheLargestEndAndPreserveExplicitSize) {
+    pl::VertexInput input({{.layouts = {{vsl::data_format::FloatRG, 0, 24},
+                                      {vsl::data_format::Float, 1, 0}, {vsl::data_format::Float, 2}}},
+                           {.layouts = {{vsl::data_format::Float, 3, 4}}, .size = 20}});
+    auto layout = make_layout_state();
+    input.injection(layout);
+    const auto &info = layout._data->info->vertexInput;
+    ASSERT_EQ(info.vertexBindingDescriptionCount, 2u);
+    EXPECT_EQ(info.pVertexBindingDescriptions[0].stride, 32u);
+    EXPECT_EQ(info.pVertexBindingDescriptions[1].stride, 20u);
+    EXPECT_EQ(input.requirements_size(), 52u);
+    ASSERT_EQ(info.vertexAttributeDescriptionCount, 4u);
+    EXPECT_EQ(info.pVertexAttributeDescriptions[0].offset, 24u);
+    EXPECT_EQ(info.pVertexAttributeDescriptions[1].offset, 0u);
+    EXPECT_EQ(info.pVertexAttributeDescriptions[2].offset, 4u);
+    EXPECT_EQ(info.pVertexAttributeDescriptions[3].offset, 4u);
+}
+TEST_F(VertexStrideVulkanIntegrationTest, AttributeExtentOverflowIsRejectedInsteadOfWrapping) {
+    pl::VertexInput input({{.layouts = {{vsl::data_format::FloatRG, 0,
+                                       std::numeric_limits<std::uint32_t>::max() - 2}}}});
+    EXPECT_THROW(input.requirements_size(), vsl::exceptions::RuntimeException);
+    auto layout = make_layout_state();
+    EXPECT_THROW(input.injection(layout), vsl::exceptions::RuntimeException);
+}
+} // namespace
+#include "support/render_fixture.hpp"
+namespace {
+using VertexStrideRenderVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
+TEST_F(VertexStrideRenderVulkanIntegrationTest, PaddedInterleavedVerticesProduceTheExpectedGpuColor) {
+    struct Vertex { float padding; float position[2]; float color[3]; };
+    const std::array<Vertex, 3> vertices{{{0, {-0.75f, -0.75f}, {0.25f, 0.5f, 0.75f}},
+                                         {0, {0.75f, -0.75f}, {0.25f, 0.5f, 0.75f}},
+                                         {0, {0, 0.75f}, {0.25f, 0.5f, 0.75f}}}};
+    static_assert(sizeof(Vertex) == 24);
+    vsl::StagingBuffer<vsl::MemoryType::VertexBuffer> buffer(device, vertices);
+    pipeline.reset();
+    layout.reset();
+    vertex.emplace(device, vsl_test::shader_path("vertices.vert.spv"));
+    pl::VertexInput input({{.layouts = {{vsl::data_format::FloatRG, 0, 4},
+                                      {vsl::data_format::FloatRGB, 1}}}});
+    EXPECT_EQ(input.requirements_size(), sizeof(Vertex));
+    layout.emplace(device, pl::ShaderGroup("padded vertices", {*vertex, *fragment}), input, pl::ColorBlend{},
+                   pl::InputAssembly{}, pl::Rasterization{pl::CullingMode::None}, pl::Multisample{},
+                   pl::DynamicState{}, vsl::Viewport(description), vsl::Scissor(description));
+    pipeline.emplace(*layout, *pass);
+    expect_triangle_color(render([&](vsl::DefaultPhaseStream &stream) {
+        stream << vsl::command::BindVertexBuffer(buffer) << vsl::command::Draw(3);
+    }));
+}
+} // namespace

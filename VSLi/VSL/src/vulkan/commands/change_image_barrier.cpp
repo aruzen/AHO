@@ -86,5 +86,6 @@ void VSL_NAMESPACE::command::ChangeImageBarrier::invoke(VSL_NAMESPACE::CommandPo
         throw std::invalid_argument("unsupported layout transition!");
     }
 
+    buffer.retain(image._data);
     buffer._data->commandBuffers.at(buffer.getCurrentBufferIdx()).pipelineBarrier(sourceStage, destinationStage, {}, nullptr, nullptr, barrier);
 }

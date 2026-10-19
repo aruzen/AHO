@@ -64,3 +64,32 @@ TEST(BindVertexBufferTest, VariadicConstructionAcceptsOnlyMutableVertexBuffers) 
     EXPECT_TRUE(std::is_copy_constructible_v<Command>);
     EXPECT_TRUE(std::is_move_constructible_v<Command>);
 }
+
+namespace {
+    class DrawResourceLifetimeVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+    TEST_F(DrawResourceLifetimeVulkanIntegrationTest, DrawSurvivesDroppingBuffersAndPipelineBeforeSubmission) {
+        configure_pipeline(true);
+        std::weak_ptr<vsl::_impl::Buffer_impl> weak_vertex, weak_color, weak_index;
+        std::weak_ptr<vsl::_impl::Pipeline_impl> weak_pipeline = pipeline->_data;
+        expect_triangle_color(render([&](auto& stream) {
+            const std::array<float, 6> positions{-1, -1, 3, -1, -1, 3};
+            const std::array<float, 9> colors{.25f, .5f, .75f, .25f, .5f, .75f, .25f, .5f, .75f};
+            const std::array<std::uint32_t, 3> indices{0, 1, 2};
+            vsl::StagingBuffer<vsl::MemoryType::VertexBuffer> position(device, positions), color(device, colors);
+            vsl::StagingBuffer<vsl::MemoryType::IndexBuffer> index(device, indices);
+            weak_vertex = position._data;
+            weak_color = color._data;
+            weak_index = index._data;
+            stream << vsl::command::BindVertexBuffer(position, color) << vsl::command::BindIndexBuffer(index)
+                   << vsl::command::DrawIndexed{3};
+            pipeline.reset();
+            layout.reset();
+        }));
+        EXPECT_TRUE(weak_vertex.expired());
+        EXPECT_TRUE(weak_color.expired());
+        EXPECT_TRUE(weak_index.expired());
+        EXPECT_TRUE(weak_pipeline.expired());
+    }
+} // namespace

@@ -14,6 +14,8 @@ VSL_NAMESPACE::command::CopyBufferToImage::CopyBufferToImage(VSL_NAMESPACE::Imag
 
 void VSL_NAMESPACE::command::CopyBufferToImage::invoke(
     VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
+    buffer.retain(image._data);
+    buffer.retain(this->buffer->_data);
     vk::BufferImageCopy region;
     region.bufferOffset = 0;
     region.bufferRowLength = 0; // tightly packed
@@ -38,6 +40,8 @@ VSL_NAMESPACE::command::CopyBufferToArrayImage::CopyBufferToArrayImage(VSL_NAMES
 
 void VSL_NAMESPACE::command::CopyBufferToArrayImage::invoke(
     VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
+    buffer.retain(image._data);
+    buffer.retain(this->buffer->_data);
     vk::BufferImageCopy region;
     region.bufferOffset = 0;
     region.bufferRowLength = 0; // tightly packed

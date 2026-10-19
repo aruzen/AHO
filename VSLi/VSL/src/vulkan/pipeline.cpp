@@ -56,6 +56,7 @@ VSL_NAMESPACE::GraphicsPipeline::GraphicsPipeline(VSL_NAMESPACE::PipelineLayoutA
 }
 
 void VSL_NAMESPACE::GraphicsPipeline::invoke(VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
+    buffer.retain(_data);
     buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].bindPipeline(vk::PipelineBindPoint::eGraphics,
                                                                             _data->pipeline);
 }
@@ -80,6 +81,7 @@ VSL_NAMESPACE::ComputePipeline::ComputePipeline(VSL_NAMESPACE::PipelineLayoutAcc
 }
 
 void VSL_NAMESPACE::ComputePipeline::invoke(VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
+    buffer.retain(_data);
     buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].bindPipeline(vk::PipelineBindPoint::eCompute,
                                                                             _data->pipeline);
 }

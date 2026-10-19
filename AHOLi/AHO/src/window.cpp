@@ -39,7 +39,9 @@ bool AHO_NAMESPACE::window::Window::resize(int width, int height) {
     if (not VSL_NAMESPACE::PureWindow::resize(width, height))
         return false;
     engine._data->command_manager.waitIdle();
-    _data2->swapchain = VSL_NAMESPACE::Swapchain(engine._data->logical_device, _data2->surface, _data2->swapchain);
+    const auto usage = _data2->swapchain.images.at(0).getUsage();
+    _data2->swapchain = VSL_NAMESPACE::Swapchain(engine._data->logical_device, _data2->surface, _data2->swapchain,
+                                                 std::nullopt, std::nullopt, usage);
     _data2->frame_buffer = VSL_NAMESPACE::FrameBuffer(_data2->swapchain, _data2->render_pass);
     if (_data2->render_finished.size() != _data2->swapchain.getSwapImageSize())
         _data2->render_finished = engine._data->synchro_manager.createSemaphore(

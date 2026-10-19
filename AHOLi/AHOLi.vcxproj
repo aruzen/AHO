@@ -192,6 +192,7 @@
     <ClInclude Include="AHO\include\AHO\drawer\draw_phase.hpp" />
     <ClInclude Include="AHO\include\AHO\drawer\standard_drawer.hpp" />
     <ClInclude Include="AHO\include\AHO\image_readback.hpp" />
+    <ClInclude Include="AHO\include\AHO\x\screenshot.hpp" />
     <ClInclude Include="AHO\include\AHO\engine.hpp" />
     <ClInclude Include="AHO\include\AHO\engine\graphical_engine.hpp" />
     <ClInclude Include="AHO\include\AHO\engine\standard_engine.hpp" />
@@ -217,6 +218,7 @@
     <ClCompile Include="AHO\src\drawer.cpp" />
     <ClCompile Include="AHO\src\drawer\draw_phase.cpp" />
     <ClCompile Include="AHO\src\image_readback.cpp" />
+    <ClCompile Include="AHO\src\x\screenshot.cpp" />
     <ClCompile Include="AHO\src\engine.cpp" />
     <ClCompile Include="AHO\src\engine\graphical_engine.cpp" />
     <ClCompile Include="AHO\src\engine\standard_engine.cpp" />

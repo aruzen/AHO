@@ -782,3 +782,92 @@ namespace {
         EXPECT_EQ(actual, 54u);
     }
 } // namespace
+
+namespace {
+    TEST(SpirvReflectorTest, InputAttachmentsRetainDescriptorBindingsAndArrayCounts) {
+        using namespace vsl::graphic_resource;
+        for (const auto& [file, set, binding, count] : {
+                 std::tuple{"reflection_input_attachment.frag.spv", 0u, 4u, 1u},
+                 std::tuple{"reflection_input_arrays.frag.spv", 1u, 7u, 2u}}) {
+            SCOPED_TRACE(file);
+            vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path(file));
+            ASSERT_EQ(reflector.generated.binding_points.size(), 1u);
+            const auto& points = reflector.generated.binding_points.at(set);
+            ASSERT_EQ(points.size(), 1u);
+            EXPECT_EQ(points[0].binding, binding);
+            EXPECT_EQ(points[0].bindingType, Type::InputAttachment);
+            EXPECT_EQ(points[0].amount, count);
+            EXPECT_EQ(points[0].shaderType, vsl::ShaderFlag::Fragment);
+            EXPECT_FALSE(reflector.generated.vertex_input);
+        }
+    }
+    class ReflectedInputAttachmentVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+    TEST_F(ReflectedInputAttachmentVulkanIntegrationTest, GeneratedLayoutReadsTheClearedInputAttachmentOnGpu) {
+        using namespace vsl::graphic_resource;
+        vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_input_attachment.frag.spv"));
+        const auto sets = reflector.generated.makeBindingLayout();
+        ASSERT_EQ(sets.size(), 1u) << "Do not create a pipeline with a missing input attachment binding";
+        const auto points = sets[0].getBindingPoints();
+        ASSERT_EQ(points.size(), 1u);
+        ASSERT_EQ(points[0].bindingType, Type::InputAttachment);
+        vsl::GraphicResourceManager resources(device);
+        auto [pool, allocated] = resources.make(sets);
+        struct ReclaimCycle {
+            vsl::GraphicResourcePool pool;
+            ~ReclaimCycle() { pool._data->resources.clear(); }
+        } reclaim{pool};
+        ASSERT_EQ(allocated.size(), 1u);
+        vsl::Image<vsl::ImageType::ColorAttachment | vsl::ImageType::InputAttachment> source(
+            device, width, height, vsl::data_format::UnsignedNormalized8RGBA);
+        allocated[0].update(source, 4);
+        pipeline.reset();
+        layout.reset();
+        framebuffer.reset();
+        pass.reset();
+        vsl::RenderPassDescription render_description;
+        render_description.attachments = {
+            {.format = vsl::data_format::UnsignedNormalized8RGBA, .finalLayout = vsl::ImageLayout::General},
+            {.format = vsl::data_format::UnsignedNormalized8RGBA, .finalLayout = vsl::ImageLayout::General}};
+        // Clear the source as a color attachment before reading it in the next subpass.
+        render_description.subpasses.resize(2);
+        render_description.subpasses[0].colors = {{0, vsl::ImageLayout::General}};
+        render_description.subpasses[1].inputs = {{0, vsl::ImageLayout::General}};
+        render_description.subpasses[1].colors = {{1, vsl::ImageLayout::General}};
+        render_description.dependencies = {
+            {},
+            {.source = 0, .destination = 1, .sourceStage = vsl::PipelineStage::ColorAttachmentOutput, .destinationStage = vsl::PipelineStage::FragmentShader, .sourceAccess = vsl::AccessMask::ColorWrite, .destinationAccess = vsl::AccessMask::MemoryRead, .byRegion = true},
+            {.source = 1, .destination = vsl::ExternalSubpass, .sourceStage = vsl::PipelineStage::ColorAttachmentOutput, .destinationStage = vsl::PipelineStage::Transfer, .sourceAccess = vsl::AccessMask::ColorWrite, .destinationAccess = vsl::AccessMask::TransferRead}};
+        pass.emplace(device, render_description);
+        framebuffer.emplace(*pass, width, height, std::vector<vsl::ImageAccessor>{source, *color});
+        fragment.emplace(device, vsl_test::shader_path("reflection_input_attachment.frag.spv"));
+        namespace pl = vsl::pipeline_layout;
+        layout.emplace(device, pl::ShaderGroup("reflected input attachment", {*vertex, *fragment}), pl::ResourceBinding(sets),
+                       pl::ColorBlend{}, pl::InputAssembly{}, pl::Rasterization{pl::CullingMode::None}, pl::Multisample{},
+                       pl::DynamicState{}, vsl::Viewport(description), vsl::Scissor(description));
+        pipeline.emplace(*layout, *pass, 1);
+        vsl::StagingBuffer<vsl::MemoryType::TransferDestination> readback(device, width * height * 4);
+        auto manager = make_manager();
+        {
+            auto phase = manager.startPhase<vsl::ComputePhase>();
+            phase << vsl::command::RenderPassBegin(*framebuffer, std::vector<vsl::ClearValue>{
+                                                                     vsl::ClearColor{37.f / 255.f, 83.f / 255.f, 131.f / 255.f, 1}, vsl::ClearColor{}})
+                  << vsl::command::NextSubpass{} << *pipeline << vsl::Viewport(description) << vsl::Scissor(description) << vsl::command::BindGraphicResource(allocated[0], BindingDestination::Graphics) << vsl::command::Draw(3) << vsl::command::RenderPassEnd{};
+            vk::MemoryBarrier barrier{};
+            barrier.srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+            barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+            auto commands = manager.getBuffer();
+            commands._data->commandBuffers[commands.getCurrentBufferIdx()].pipelineBarrier(
+                vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eTransfer, {}, barrier, {}, {});
+            phase << vsl::command::CopyImageToBuffer(&readback, *color);
+        }
+        device._data->device.waitIdle();
+        auto mapped = readback.data(width * height * 4);
+        std::array<std::uint8_t, 4> pixel{};
+        std::memcpy(pixel.data(), static_cast<const std::uint8_t*>(mapped.data) + ((height / 2) * width + width / 2) * 4, 4);
+        for (std::size_t i = 0; i < 3; ++i)
+            EXPECT_NEAR(static_cast<int>(pixel[i]), (std::array{37, 83, 131})[i], 1) << "UNORM8 round-trip permits one rounding step";
+        EXPECT_EQ(pixel[3], 255);
+    }
+} // namespace

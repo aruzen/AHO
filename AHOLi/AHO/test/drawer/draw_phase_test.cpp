@@ -66,6 +66,62 @@ namespace {
         }
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
     }
+    TEST_F(DrawPhaseVulkanIntegration, ExplicitSubmissionRunsFinishOnceThroughBaseReferences) {
+        ASSERT_NO_THROW(start_engine());
+        for (unsigned split = 0; split < 2; ++split) {
+            unsigned finished = 0;
+            {
+                // End the pass in initialize so the pre-fix skipped callback can be tested safely.
+                aho::DrawPhase phase(*engine, [&](auto& stream) { stream << vsl::command::RenderPassBegin(engine->getWindow()._data2->render_pass,
+                                                                                                          engine->getWindow()._data2->frame_buffer)
+                                                                         << vsl::command::RenderPassEnd{}; }, [&](auto&) { ++finished; });
+                if (split) {
+                    vsl::DefaultPhase& base = phase;
+                    EXPECT_EQ(base.submitCommands(), vsl::ComputePhase::SubmitResult::Success);
+                    EXPECT_EQ(finished, 1u);
+                    EXPECT_EQ(base.present(), vsl::ComputePhase::SubmitResult::Success);
+                } else {
+                    vsl::ComputePhase& base = phase;
+                    EXPECT_EQ(base.submit(), vsl::ComputePhase::SubmitResult::Success);
+                    EXPECT_EQ(finished, 1u);
+                }
+                EXPECT_TRUE(phase.completion().wait());
+            }
+            EXPECT_EQ(finished, 1u);
+        }
+        engine->_data->command_manager.waitIdle();
+    }
+    TEST_F(DrawPhaseVulkanIntegration, ExplicitSubmissionClosesTheDefaultRenderPass) {
+        ASSERT_NO_THROW(start_engine());
+        for (unsigned split = 0; split < 2; ++split) {
+            aho::DrawPhase phase(*engine);
+            if (split) {
+                EXPECT_EQ(phase.submitCommands(), vsl::ComputePhase::SubmitResult::Success);
+                EXPECT_EQ(phase.present(), vsl::ComputePhase::SubmitResult::Success);
+            } else {
+                EXPECT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::Success);
+            }
+            EXPECT_TRUE(phase.completion().wait());
+        }
+        engine->_data->command_manager.waitIdle();
+    }
+    TEST_F(DrawPhaseVulkanIntegration, ExplicitThrowingFinishCancelsAndDoesNotRetryDuringDestruction) {
+        ASSERT_NO_THROW(start_engine());
+        unsigned calls = 0;
+        {
+            aho::DrawPhase phase(*engine, nullptr, [&](auto&) {
+                ++calls;
+                throw std::runtime_error("explicit finish failed");
+            });
+            EXPECT_THROW(phase.submit(), std::runtime_error);
+            EXPECT_EQ(calls, 1u);
+        }
+        EXPECT_EQ(calls, 1u);
+        {
+            aho::DrawPhase next(*engine);
+        }
+        engine->_data->command_manager.waitIdle();
+    }
     TEST_F(DrawPhaseVulkanIntegration, FinishCallbackRecordsReadbackBeforeSubmitAndPresent) {
         ASSERT_NO_THROW(start_engine());
         auto window = engine->getWindow();

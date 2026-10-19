@@ -82,7 +82,9 @@ std::optional<aho::ImageReadbackTicket> pending;
 
 この経路も既存のDrawPhaseを使った実GPUテストで検証している。画像エンコード、上下反転、色空間変換は今回のAPIに含めない。
 
-finish callbackから例外が出た場合はデストラクター外へ投げず、記録をcancelして取得画像を返し、ログへ通知する。初期化callbackの例外はthread-local状態を復元して伝播する。フレーム本体の例外巻き戻しではfinish callbackを実行せずcancelする。通常のネスト時のthread-local復元を再設計した変更ではない。
+finish callbackは自動送信だけでなく明示的なsubmit / submitCommandsでも、送信前に一度だけ実行する。基底Phaseの参照経由でも同じ動作とする。callbackを指定しなければ既定RenderPassを終了する。
+
+finish callbackから例外が出た場合は記録をcancelして取得画像を返す。明示送信では例外を呼び出し元へ伝播し、デストラクターでは外へ投げずログへ通知する。初期化callbackの例外はthread-local状態を復元して伝播する。フレーム本体の例外巻き戻しではfinish callbackを実行せずcancelする。通常のネスト時のthread-local復元を再設計した変更ではない。
 
 ## 2026-10-19 検証結果
 
@@ -105,3 +107,11 @@ submitの追加や毎フレームのGPUリソース作成へ戻っていない�
 ctest --test-dir build-vsl-tickets --output-on-failure \
   -R '^(VSL\.|AHO\.(ImageReadback(Busy)?VulkanIntegrationTest|DrawPhaseVulkanIntegration)\.|AHO\.Compile\.(Header\.image_readback\.hpp|ImageReadback\.PublicVslOnly)$)'
 ```
+
+## 2026-10-20 セルフレビュー
+
+DrawPhaseで明示送信するとfinish callbackを通らず、RenderPassEndやその後のReadback記録を飛ばす問題を修正した。DefaultPhase::submitCommandsを仮想化し、DrawPhaseの送信前処理へ統一した。キャンセル用の空送信はこの前処理を通さず、捨てるフレームにfinish callbackを実行しない。
+
+修正前に基底参照経由の明示submit / submitCommandsでcallbackが呼ばれないことを再現した。既定RenderPassの明示送信と、明示送信中のcallback例外を一度だけ通知して次フレームへ進むケースも追加した。VSL / AHO / 利用側は仮想関数の追加を含めて再ビルドする。
+
+親の#105で修正したSemaphore保持と外部Fence再利用を取り込んだ構成で、関連232件成功、失敗・環境skip 0。既存26件DISABLEDは維持。DrawPhaseの10件はValidation Layer付きで成功した。Windows / Linux実行、物理的なnon-coherent heapと全AHO CPU suiteはこの検証に含めていない。

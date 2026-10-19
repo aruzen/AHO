@@ -279,7 +279,7 @@ namespace vsl {
             buffers->commandBuffers.at(frameSlot).pipelineBarrier(
                 vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eBottomOfPipe,
                 {}, {}, {}, barrier);
-            submitCommands();
+            DefaultPhase::submitCommands(); // Discarded frames must bypass derived finish callbacks.
         }
         if (state == State::FinishSubmit)
             present();

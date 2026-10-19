@@ -1,6 +1,7 @@
 #include <AHO/drawer/draw_phase.hpp>
 #include <utility>
 #include <exception>
+#include <stdexcept>
 
 thread_local aho::DrawPhase *aho::THREAD_LOCAL_DRAW_PHASE;
 
@@ -43,14 +44,6 @@ aho::DrawPhase::~DrawPhase() {
         if (std::uncaught_exceptions() > initialExceptions) {
             vsl::DefaultPhase::cancel();
         } else {
-            if (state == State::WaitSubmit) {
-                if (finish) {
-                    DrawStream<vsl::DefaultPhaseStream> stream{vsl::DefaultPhaseStream{this->manager}};
-                    finish(stream);
-                } else {
-                    *this << vsl::command::RenderPassEnd();
-                }
-            }
             auto result = vsl::DefaultPhase::submit();
             if (result == vsl::DefaultPhase::SubmitResult::WantRecreateSwapchain)
                 engine->getWindow().resize(engine->getWindow().window_size());
@@ -66,6 +59,29 @@ aho::DrawPhase::~DrawPhase() {
         }
     }
     THREAD_LOCAL_DRAW_PHASE = nullptr;
+}
+
+aho::DrawPhase::SubmitResult aho::DrawPhase::submitCommands() {
+    if (state == State::WaitSubmit) {
+        if (finishStarted)
+            throw std::logic_error("DrawPhase completion is already in progress");
+        finishStarted = true;
+        try {
+            if (finish) {
+                DrawStream<vsl::DefaultPhaseStream> stream{vsl::DefaultPhaseStream{this->manager}};
+                finish(stream);
+            } else {
+                *this << vsl::command::RenderPassEnd();
+            }
+        } catch (...) {
+            try {
+                vsl::DefaultPhase::cancel();
+            } catch (...) {
+            }
+            throw;
+        }
+    }
+    return vsl::DefaultPhase::submitCommands();
 }
 
 aho::DrawStream<vsl::DefaultPhaseStream> aho::DrawPhase::operator<<(std::shared_ptr<vsl::command::__Command> cmd) {

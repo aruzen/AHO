@@ -91,7 +91,7 @@ namespace VSL_NAMESPACE {
 
         SubmitResult submit() override;
         // 読み戻しも記録してから送信する。画面表示は続けてpresent()で行う。
-        SubmitResult submitCommands();
+        virtual SubmitResult submitCommands();
         SubmitResult present();
         void cancel() override;
     private:

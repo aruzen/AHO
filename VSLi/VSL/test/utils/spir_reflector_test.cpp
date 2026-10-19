@@ -325,3 +325,107 @@ namespace {
         EXPECT_TRUE(data.binding_points.empty());
     }
 } // namespace
+
+namespace {
+    TEST(SpirvReflectorTest, SparseSetMetadataPreservesTheShaderDecoration) {
+        vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection_sparse_sets.comp.spv"));
+        ASSERT_EQ(reflector.generated.binding_points.size(), 1u);
+        ASSERT_TRUE(reflector.generated.binding_points.contains(2));
+        const auto& points = reflector.generated.binding_points.at(2);
+        ASSERT_EQ(points.size(), 1u);
+        EXPECT_EQ(points[0].binding, 0u);
+        EXPECT_EQ(points[0].bindingType, vsl::graphic_resource::Type::StorageBuffer);
+        EXPECT_EQ(points[0].shaderType, vsl::ShaderFlag::Compute);
+    }
+    class ReflectedSetSlotsVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+    TEST_F(ReflectedSetSlotsVulkanIntegrationTest, MissingSetsProduceEmptyLayoutsAtTheirOriginalIndices) {
+        vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_sparse_sets.comp.spv"));
+        const auto before = reflector.generated.binding_points;
+        const auto layouts = reflector.generated.makeBindingLayout();
+        ASSERT_EQ(layouts.size(), 3u);
+        EXPECT_TRUE(layouts[0].getBindingPoints().empty());
+        EXPECT_TRUE(layouts[1].getBindingPoints().empty());
+        EXPECT_EQ(layouts[2].getBindingPoints(), before.at(2));
+        EXPECT_EQ(reflector.generated.binding_points, before);
+        auto layout = make_layout_state();
+        vsl::pipeline_layout::ResourceBinding(layouts).injection(layout);
+        ASSERT_EQ(layout._data->info->pipelineLayout.setLayoutCount, 3u);
+        for (std::size_t set = 0; set < layouts.size(); ++set)
+            EXPECT_EQ(layout._data->info->pipelineLayout.pSetLayouts[set], layouts[set]._data->layout);
+    }
+    TEST_F(ReflectedSetSlotsVulkanIntegrationTest, RepeatedSparseSetsKeepTheFullSequenceAndIndependentOwners) {
+        vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_sparse_sets.comp.spv"));
+        const auto layouts = reflector.generated.makeBindingLayout(2);
+        ASSERT_EQ(layouts.size(), 9u);
+        for (std::size_t block = 0; block < 3; ++block) {
+            EXPECT_TRUE(layouts[block * 3].getBindingPoints().empty());
+            EXPECT_TRUE(layouts[block * 3 + 1].getBindingPoints().empty());
+            EXPECT_EQ(layouts[block * 3 + 2].getBindingPoints(), reflector.generated.binding_points.at(2));
+            if (block)
+                EXPECT_NE(layouts[block * 3 + 2]._data, layouts[2]._data);
+        }
+    }
+    TEST_F(ReflectedSetSlotsVulkanIntegrationTest, MultipleSparseSetsKeepTheirSetNumbers) {
+        vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_sparse_sets.comp.spv"));
+        reflector.generated.binding_points[0] = reflector.generated.binding_points.at(2);
+        const auto layouts = reflector.generated.makeBindingLayout();
+        ASSERT_EQ(layouts.size(), 3u);
+        EXPECT_EQ(layouts[0].getBindingPoints(), reflector.generated.binding_points.at(0));
+        EXPECT_TRUE(layouts[1].getBindingPoints().empty());
+        EXPECT_EQ(layouts[2].getBindingPoints(), reflector.generated.binding_points.at(2));
+    }
+    TEST_F(ReflectedSetSlotsVulkanIntegrationTest, InvalidSetNumbersAreRejectedBeforeAllocatingNativeLayouts) {
+        const auto limit = physical._data->props->limits.maxBoundDescriptorSets;
+        for (const auto set : {std::numeric_limits<std::size_t>::max(), std::size_t{limit}}) {
+            SCOPED_TRACE(set);
+            vsl::utils::SPIRVReflector::GenerateData data{.logical_device = device};
+            data.binding_points[set] = {{0, vsl::graphic_resource::Type::StorageBuffer, vsl::ShaderFlag::Compute, 1}};
+            const auto before = data.binding_points;
+            try {
+                (void)data.makeBindingLayout();
+                ADD_FAILURE() << "An unusable set number was accepted";
+            } catch (const vsl::exceptions::RuntimeException& error) {
+                EXPECT_NE(error.reason.find("set"), std::string::npos);
+            }
+            EXPECT_EQ(data.binding_points, before);
+        }
+    }
+} // namespace
+
+#include "support/compute_fixture.hpp"
+namespace {
+    class ReflectedSetComputeVulkanIntegrationTest : public vsl_test::ComputeVulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+    TEST_F(ReflectedSetComputeVulkanIntegrationTest, GeneratedSparseLayoutsSupportShaderWritesAtSetTwo) {
+        vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_sparse_sets.comp.spv"));
+        const auto sets = reflector.generated.makeBindingLayout();
+        ASSERT_EQ(sets.size(), 3u) << "Do not create a pipeline with incorrectly numbered reflected sets";
+        auto [success, allocated] = pool.bind(sets);
+        ASSERT_TRUE(success);
+        ASSERT_EQ(allocated.size(), 3u);
+        allocated[2].update(&*output);
+        vsl::Shader<vsl::ShaderType::Compute> reflected_shader(device, vsl_test::shader_path("reflection_sparse_sets.comp.spv"));
+        vsl::PipelineLayout reflected_layout(device, vsl::pipeline_layout::ShaderGroup("reflected set two", {reflected_shader}),
+                                             vsl::pipeline_layout::ResourceBinding(sets));
+        vsl::ComputePipeline reflected_pipeline(reflected_layout);
+        auto manager = make_manager();
+        {
+            auto phase = manager.startPhase<vsl::ComputePhase>();
+            phase << reflected_pipeline << vsl::command::BindGraphicResource(allocated, vsl::graphic_resource::BindingDestination::Compute, reflected_pipeline) << vsl::command::Dispatch(count);
+            vk::MemoryBarrier barrier{};
+            barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
+            barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
+            auto commands = manager.getBuffer();
+            commands._data->commandBuffers[commands.getCurrentBufferIdx()].pipelineBarrier(
+                vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+        }
+        device._data->device.waitIdle();
+        auto mapped = output->data(count * sizeof(std::uint32_t));
+        std::array<std::uint32_t, count> actual{};
+        std::memcpy(actual.data(), mapped.data, sizeof(actual));
+        expect_sequence(actual, 37);
+    }
+} // namespace

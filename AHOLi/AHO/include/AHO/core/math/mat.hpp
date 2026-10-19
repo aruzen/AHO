@@ -520,6 +520,45 @@ namespace AHO_NAMESPACE {
                     }
                 }
 
+                std::array<int, Size> row_exponents{}, column_exponents{};
+                if constexpr (std::is_floating_point_v<R>) {
+                    auto equilibrate = [&](bool rows, auto& exponents) {
+                        bool exact = true;
+                        for (size_t i = 0; i < Size; ++i) {
+                            R largest{};
+                            for (size_t j = 0; j < Size; ++j)
+                                largest = std::max(largest, abs_value(rows ? aug[i][j] : aug[j][i]));
+                            if (largest == R{} || !std::isfinite(largest))
+                                continue;
+                            exponents[i] = std::ilogb(largest);
+                            if (exponents[i] == 0)
+                                continue;
+                            for (size_t j = 0; j < Size; ++j) {
+                                auto& value = rows ? aug[i][j] : aug[j][i];
+                                const R scaled = std::scalbn(value, -exponents[i]);
+                                if (std::scalbn(scaled, exponents[i]) != value)
+                                    exact = false;
+                                value = scaled;
+                            }
+                        }
+                        return exact;
+                    };
+                    auto restore = [&] {
+                        for (size_t i = 0; i < Size; ++i)
+                            for (size_t j = 0; j < Size; ++j)
+                                aug[i][j] = mat[i][j];
+                        row_exponents.fill(0);
+                        column_exponents.fill(0);
+                    };
+                    // B = D^-1 A C^-1。2の冪で入力の精度を保ち、単位に依存する小ピボットを避ける。
+                    // epsilon判定はこの行列に適用するため、ほぼ従属する入力の受理条件も変わる。
+                    if (!equilibrate(true, row_exponents) || !equilibrate(false, column_exponents)) {
+                        restore();
+                        if (!equilibrate(false, column_exponents) || !equilibrate(true, row_exponents))
+                            restore();
+                    }
+                }
+
                 for (size_t i = 0; i < Size; ++i) {
                     size_t pivot = i;
                     auto max_abs = abs_value(aug[i][i]);
@@ -555,8 +594,14 @@ namespace AHO_NAMESPACE {
 
                 Mat<R, Size, Size> inverse{};
                 for (size_t i = 0; i < Size; ++i)
-                    for (size_t j = 0; j < Size; ++j)
+                    for (size_t j = 0; j < Size; ++j) {
                         inverse[i][j] = aug[i][j + Size];
+                        if constexpr (std::is_floating_point_v<R>) {
+                            const int exponent = -column_exponents[i] - row_exponents[j];
+                            if (exponent != 0)
+                                inverse[i][j] = std::scalbn(inverse[i][j], exponent);
+                        }
+                    }
 
                 return inverse;
             }

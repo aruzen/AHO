@@ -201,4 +201,64 @@ TYPED_TEST(OneDimensionalTriangleAreaTest, ValueAndPointerTrianglesHaveZeroAreaA
     EXPECT_DOUBLE_EQ(borrowed.area(), 0);
 }
 } // namespace
+
+#include <cmath>
+#include <cstdint>
+#include <limits>
+namespace {
+    template<class T, bool X, bool Y, bool Z>
+    struct TriangleAreaRangeCase {
+        using Scalar = T;
+        using CI = typename aho::coordinate::_MakeCoordinateInfo<X, Y, Z>::value;
+        using Point = aho::_Point<T, typename CI::dimension, CI>;
+        using Triangle = aho::Triangle<T, typename CI::dimension, CI>;
+        static Point point(T first, T second) {
+            if constexpr (CI::dimension::dimension == 2)
+                return Point(first, second);
+            else
+                return Point(first, second, T{});
+        }
+    };
+    template<class T> class TriangleAreaRangeTest : public testing::Test {};
+    using TriangleAreaRanges = testing::Types<
+        TriangleAreaRangeCase<float, true, true, false>,
+        TriangleAreaRangeCase<float, true, false, true>,
+        TriangleAreaRangeCase<float, false, true, true>,
+        TriangleAreaRangeCase<float, true, true, true>,
+        TriangleAreaRangeCase<double, true, true, false>,
+        TriangleAreaRangeCase<double, true, false, true>,
+        TriangleAreaRangeCase<double, false, true, true>,
+        TriangleAreaRangeCase<double, true, true, true>>;
+    TYPED_TEST_SUITE(TriangleAreaRangeTest, TriangleAreaRanges);
+    TYPED_TEST(TriangleAreaRangeTest, ValueAndPointerAreasUseAWiderRangeForFloatingIntermediates) {
+        using C = TypeParam;
+        using T = typename C::Scalar;
+        auto check = [](const char* name, typename C::Point first, typename C::Point second,
+                        typename C::Point third, double expected) {
+            SCOPED_TRACE(name);
+            typename C::Triangle triangle(first, second, third);
+            EXPECT_DOUBLE_EQ(triangle.area(), expected);
+            EXPECT_DOUBLE_EQ(triangle.adress().area(), expected);
+        };
+        const auto zero = C::point(0, 0);
+        const T large = std::ldexp(T{1}, 80);
+        const T tiny = std::ldexp(T{1}, -80);
+        check("cross product overflow", zero, C::point(large, 0), C::point(0, large), std::ldexp(1.0, 159));
+        check("cross product underflow", zero, C::point(tiny, 0), C::point(0, tiny), std::ldexp(1.0, -161));
+        const T endpoint = std::ldexp(T{1}, 127);
+        check("subtraction overflow", C::point(-endpoint, 0), C::point(endpoint, 0), C::point(-endpoint, 1),
+              std::ldexp(1.0, 127));
+        check("mixed exponents", zero, C::point(large, 0), C::point(0, tiny), 0.5);
+        const T subnormal = std::ldexp(T{1}, -149);
+        check("area below float minimum", zero, C::point(subnormal, 0), C::point(0, 1), std::ldexp(1.0, -150));
+    }
+    TEST(TriangleAreaRangeTest, LargeUnsignedCoordinatesRetainTheUnitDeterminant) {
+        using T = std::uint64_t;
+        using P = aho::d2::Point<T>;
+        const auto maximum = std::numeric_limits<T>::max();
+        aho::Triangle<T, vsl::D2> triangle(P(0, 0), P(maximum - 1, maximum - 2), P(maximum, maximum - 1));
+        EXPECT_DOUBLE_EQ(triangle.area(), 0.5);
+        EXPECT_DOUBLE_EQ(triangle.adress().area(), 0.5);
+    }
+} // namespace
 #endif

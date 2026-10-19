@@ -2,7 +2,18 @@
 #include <VSL/utils/string.hpp>
 #include <VSL/exceptions.hpp>
 
-#include <cstdlib>
+#include <cerrno>
+#ifdef _WIN32
+#include <process.h>
+#else
+#include <spawn.h>
+#include <sys/wait.h>
+#ifdef __APPLE__
+#include <crt_externs.h>
+#else
+extern char** environ;
+#endif
+#endif
 #include <map>
 
 VSL_NAMESPACE::utils::ShaderCompiler::ShaderCompiler(std::filesystem::path glslc_path, std::vector<std::filesystem::path> shader_dirs) : glslc_path(glslc_path), shader_dirs(shader_dirs) {}
@@ -15,6 +26,69 @@ vsl::utils::ShaderCompiler::ShaderCompiler(std::string glslc_str, std::initializ
 }
 
 namespace fs = std::filesystem;
+
+namespace {
+#ifdef _WIN32
+std::wstring quote_process_argument(const std::wstring& argument)
+{
+    std::wstring result(1, L'"');
+    std::size_t backslashes = 0;
+    for (const wchar_t character : argument) {
+        if (character == L'\\') {
+            ++backslashes;
+            continue;
+        }
+        result.append(backslashes * (character == L'"' ? 2 : 1), L'\\');
+        backslashes = 0;
+        if (character == L'"')
+            result += L'\\';
+        result += character;
+    }
+    result.append(backslashes * 2, L'\\');
+    result += L'"';
+    return result;
+}
+#endif
+
+int run_compiler(const fs::path& executable, const fs::path& source, const fs::path& destination)
+{
+#ifdef _WIN32
+    const auto program = quote_process_argument(executable.native());
+    const auto input = quote_process_argument(source.native());
+    const auto output = quote_process_argument(destination.native());
+    const wchar_t* arguments[] = {program.c_str(), input.c_str(), L"-o", output.c_str(), nullptr};
+    const auto status = _wspawnvp(_P_WAIT, executable.c_str(), arguments);
+    return status == -1 ? (errno ? -errno : -1) : static_cast<int>(status);
+#else
+    auto program = executable.native();
+    auto input = source.native();
+    auto output = destination.native();
+    char option[] = "-o";
+    char* arguments[] = {program.data(), input.data(), option, output.data(), nullptr};
+    pid_t child;
+#ifdef __APPLE__
+    char** environment = *_NSGetEnviron();
+#else
+    char** environment = environ;
+#endif
+    const int error = posix_spawnp(&child, program.c_str(), nullptr, nullptr, arguments, environment);
+    if (error != 0)
+        return -error;
+    int status = 0;
+    while (waitpid(child, &status, 0) == -1)
+        if (errno != EINTR)
+            return -errno;
+    return status;
+#endif
+}
+
+std::string path_text(const fs::path& path)
+{
+    const auto utf8 = path.u8string();
+    return {utf8.begin(), utf8.end()};
+}
+} // namespace
+
 
 void VSL_NAMESPACE::utils::ShaderCompiler::load()
 {
@@ -49,15 +123,13 @@ void VSL_NAMESPACE::utils::ShaderCompiler::load()
 
 void VSL_NAMESPACE::utils::ShaderCompiler::compile()
 {
-	// if (!fs::exists(glslc_path) || !glslc_path.has_filename())
-	//	return;
-	for (auto p : target) {
-		auto src_file = fs::absolute(p);
-		auto&& src = src_file.string();
-		auto&& dst = (src_file.parent_path().parent_path() / (src_file.filename().string() + ".spv")).string();
-		const int status = std::system((glslc_path.string() + " \"" + src + "\" -o \"" + dst + "\"").c_str());
-		if (status != 0)
-			throw exceptions::RuntimeException("ShaderCompiler", "Failed to compile " + src +
-				" using " + glslc_path.string() + " (status " + std::to_string(status) + ")");
-	}
+    for (const auto& path : target) {
+        const auto source = fs::absolute(path);
+        auto destination = source.parent_path().parent_path() / source.filename();
+        destination += ".spv";
+        const int status = run_compiler(glslc_path, source, destination);
+        if (status != 0)
+            throw exceptions::RuntimeException("ShaderCompiler", "Failed to compile " + path_text(source) +
+                " using " + path_text(glslc_path) + " (status " + std::to_string(status) + ")");
+    }
 }

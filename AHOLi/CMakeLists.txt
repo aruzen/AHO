@@ -82,6 +82,10 @@ target_link_libraries(AHOLi
         VSL
 )
 
+if(APPLE)
+    target_link_libraries(AHOLi PRIVATE "-framework CoreGraphics")
+endif()
+
 set_target_properties(AHOLi
         PROPERTIES
         ARCHIVE_OUTPUT_DIRECTORY

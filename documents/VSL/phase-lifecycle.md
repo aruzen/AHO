@@ -57,3 +57,13 @@ ctest --test-dir build-vsl-phase --output-on-failure \
 ```
 
 Completion追加と内部所有構造の変更により、VSL / AHO / 利用側を同じヘッダーで再ビルドする必要がある。
+
+## 2026-10-20 セルフレビュー
+
+送信のwait / signalに使ったSemaphoreがPhaseの寿命しか持たず、SynchroManagerとHolderを先に破棄するとGPU参照中にも破棄され得た。送信Completionへ両方の所有者を保持するよう修正した。明示destroyについては従来どおりGPU完了の確認が必要。
+
+外部FenceをFenceHolder経由でwait / resetすると、まだ照会していない古いCompletionが再利用後のFenceを見て未完了に戻る問題も修正した。Fenceから送信へのweak参照で対応を記録し、wait成功時とreset / destroy前に完了結果を保存する。所有循環は追加しない。
+
+修正前にSemaphore保持不足と外部Fence再利用の回帰テストが失敗することを確認した。回帰ケースでは全Fence / 添字指定のwait・reset、別APIで完了待機した後のreset、完了したFenceの明示destroy後も古いCompletionを照会する経路を扱う。
+
+同じM1 / MoltenVK環境でVSL全体・AHO Readback / DrawPhase・公開ヘッダーcompileの関連210件成功、失敗・環境skip 0。既存26件DISABLEDは維持。GPUリソース作成・submit・待機の追加はなく、CPU側の所有参照とFence完了結果の追跡を補った。

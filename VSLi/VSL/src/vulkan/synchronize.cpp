@@ -12,6 +12,16 @@ namespace vsl {
             if (!data || data->fences.empty())
                 throw std::logic_error("Fence has been destroyed");
         }
+        void rememberCompletion(const std::shared_ptr<_impl::Fence_impl> &data, std::size_t index) {
+            if (index < data->submissions.size())
+                if (auto submission = data->submissions[index].lock())
+                    (void)Completion{submission}.status();
+        }
+        void rememberCompletions(const std::shared_ptr<_impl::Fence_impl> &data) {
+            // Cache the old submission's result before a public reset/destroy reuses its fence.
+            for (std::size_t i = 0; i < data->submissions.size(); ++i)
+                rememberCompletion(data, i);
+        }
     }
     _impl::Semaphore_impl::~Semaphore_impl() {
         for (auto handle : semaphores)
@@ -36,29 +46,39 @@ namespace vsl {
     }
     bool FenceHolder::wait(std::uint64_t timeout) {
         requireFence(_data);
-        return _data->device->device.waitForFences(_data->fences, true, timeout) == vk::Result::eSuccess;
+        const bool ready = _data->device->device.waitForFences(_data->fences, true, timeout) == vk::Result::eSuccess;
+        if (ready)
+            rememberCompletions(_data);
+        return ready;
     }
     bool FenceHolder::wait(std::uint32_t index, std::uint64_t timeout) {
         requireFence(_data);
-        return _data->device->device.waitForFences(_data->fences.at(index), true, timeout) == vk::Result::eSuccess;
+        const bool ready = _data->device->device.waitForFences(_data->fences.at(index), true, timeout) == vk::Result::eSuccess;
+        if (ready)
+            rememberCompletion(_data, index);
+        return ready;
     }
     void FenceHolder::reset() {
         requireFence(_data);
+        rememberCompletions(_data);
         _data->device->device.resetFences(_data->fences);
     }
     void FenceHolder::reset(std::uint32_t index) {
         requireFence(_data);
+        rememberCompletion(_data, index);
         _data->device->device.resetFences(_data->fences.at(index));
     }
     void FenceHolder::destroy() {
         if (!_data)
             return;
         auto data = _data;
+        rememberCompletions(data);
         if (auto manager = data->_manager.lock())
             eraseHandle(manager->fences, data);
         for (auto handle : data->fences)
             data->device->device.destroyFence(handle);
         data->fences.clear();
+        data->submissions.clear();
     }
     SynchroManager::SynchroManager(LogicalDeviceAccessor device)
         : _data(std::make_shared<_impl::SynchroManager_impl>()) { _data->device = device._data; }

@@ -72,8 +72,13 @@ namespace vsl {
             throw std::invalid_argument("Fence count must cover frame slots");
         auto next = std::make_shared<_impl::Submission_impl>();
         next->device = manager._data->device;
+        if (nextImageAvailable)
+            next->resources.push_back(nextImageAvailable->_data);
+        if (calculationFinish)
+            next->resources.push_back(calculationFinish->_data);
         if (inFlightFence) {
             next->externalFence = inFlightFence->_data;
+            next->externalFence->submissions.resize(next->externalFence->fences.size());
             next->fence = inFlightFence->_data->fences.at(frameSlot);
             if (!inFlightFence->wait(frameSlot, UINT64_MAX))
                 throw std::runtime_error("Frame completion wait failed");
@@ -134,6 +139,8 @@ namespace vsl {
             throw;
         }
         _completion._data->status = Completion::Status::Submitted;
+        if (auto& external = _completion._data->externalFence)
+            external->submissions.at(frameSlot) = _completion._data;
         buffers->submissions.at(frameSlot) = _completion._data;
         buffers->recording = false;
         buffers->recordingSubmission.reset();

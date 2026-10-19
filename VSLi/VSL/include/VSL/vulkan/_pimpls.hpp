@@ -223,6 +223,7 @@ namespace VSL_NAMESPACE::_impl {
         std::shared_ptr<LogicalDevice_impl> device;
 
 		std::vector<vk::Fence> fences;
+        std::vector<std::weak_ptr<Submission_impl>> submissions;
         ~Fence_impl();
 	};
 

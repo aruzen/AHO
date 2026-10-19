@@ -105,6 +105,59 @@ namespace {
         EXPECT_TRUE(original.wait(0));
         EXPECT_TRUE(second.completion().wait());
     }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, SubmittedWorkRetainsItsWaitAndSignalSemaphores) {
+        auto manager = make_manager();
+        // Keep fallback owners so a failing lifetime assertion never destroys an in-use handle.
+        std::shared_ptr<vsl::_impl::Semaphore_impl> availableOwner, finishedOwner;
+        vsl::Completion completion;
+        {
+            vsl::SynchroManager synchronization(device);
+            auto available = synchronization.createSemaphore("available", manager.getBuffer().getSize());
+            auto finished = synchronization.createSemaphore("finished", manager.getBuffer().getSize());
+            availableOwner = available._data;
+            finishedOwner = finished._data;
+            auto signal = available._data->semaphores.at(manager.getCurrentBufferIdx());
+            manager._data->graphicsQueue.submit(vk::SubmitInfo{
+                .signalSemaphoreCount = 1, .pSignalSemaphores = &signal});
+            vsl::ComputePhase phase(manager, available, finished);
+            completion = phase.completion();
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::Success);
+        }
+        EXPECT_GT(availableOwner.use_count(), 1);
+        EXPECT_GT(finishedOwner.use_count(), 1);
+        ASSERT_TRUE(completion.wait());
+        manager.waitIdle();
+    }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, ExternalFenceWaitAndResetPreserveTheOriginalCompletion) {
+        for (unsigned mode = 0; mode < 3; ++mode) {
+            SCOPED_TRACE(mode);
+            auto manager = make_manager();
+            vsl::SynchroManager synchronization(device);
+            auto fence = synchronization.createFence("frames", manager.getBuffer().getSize(), true);
+            vsl::ComputePhase first(manager, std::nullopt, std::nullopt, fence);
+            auto original = first.completion();
+            ASSERT_EQ(first.submit(), vsl::ComputePhase::SubmitResult::Success);
+            if (mode == 0) {
+                ASSERT_TRUE(fence.wait(first.frameSlot, UINT64_MAX));
+                fence.reset(first.frameSlot);
+            } else if (mode == 1) {
+                ASSERT_TRUE(fence.wait());
+                fence.reset();
+            } else {
+                // A caller may wait through another API before invoking the public reset.
+                ASSERT_EQ(device._data->device.waitForFences(fence._data->fences, true, UINT64_MAX), vk::Result::eSuccess);
+                fence.reset(first.frameSlot);
+            }
+            EXPECT_TRUE(original.ready());
+            EXPECT_TRUE(original.wait(0));
+            // Restore a signal for the pre-fix submission destructor, which still watches this fence.
+            manager._data->graphicsQueue.submit(vk::SubmitInfo{}, fence._data->fences.at(first.frameSlot));
+            ASSERT_TRUE(fence.wait(first.frameSlot, UINT64_MAX));
+            fence.destroy();
+            EXPECT_TRUE(original.ready());
+        }
+    }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, RetainedResourcesSurviveUntilCompletionTokenIsReleased) {
         auto manager = make_manager();
         std::weak_ptr<int> resource;

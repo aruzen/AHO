@@ -43,6 +43,10 @@ namespace vsl_test {
         }
 
     protected:
+        bool has_validation_errors() {
+            std::lock_guard lock(validation_mutex_);
+            return !validation_errors_.empty();
+        }
         virtual bool validate_vulkan() const { return false; }
         virtual bool require_timeline_semaphore() const { return false; }
         std::shared_ptr<vsl::_impl::Vulkan_impl<false>> instance;

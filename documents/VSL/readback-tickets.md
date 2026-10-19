@@ -115,3 +115,16 @@ DrawPhaseで明示送信するとfinish callbackを通らず、RenderPassEndや�
 修正前に基底参照経由の明示submit / submitCommandsでcallbackが呼ばれないことを再現した。既定RenderPassの明示送信と、明示送信中のcallback例外を一度だけ通知して次フレームへ進むケースも追加した。VSL / AHO / 利用側は仮想関数の追加を含めて再ビルドする。
 
 親の#105で修正したSemaphore保持と外部Fence再利用を取り込んだ構成で、関連232件成功、失敗・環境skip 0。既存26件DISABLEDは維持。DrawPhaseの10件はValidation Layer付きで成功した。Windows / Linux実行、物理的なnon-coherent heapと全AHO CPU suiteはこの検証に含めていない。
+
+## origin/master追従後の検証（2026-10-20）
+
+`18c481a23005c2d2a09b328b5d414dfb30c50181`を基点に、#56 → #105 → #109 → #114の依存順を保ってrebaseした。format定数、CommandBuffer、同期処理、既存テスト、shader fixture一覧の競合を解消し、master側の回帰テストを保持した。Vulkan fixtureのValidation Layer初期化も両方の指定方法を扱う形へ統合した。
+
+| PR | 検証範囲 | 成功件数 |
+| --- | --- | ---: |
+| #56 | VSL全体、AHO読み戻し、公開ヘッダーcompile | 354 |
+| #105 | AHO GPU全体、公開ヘッダーcompile | 25 |
+| #109 | AHO GPU全体、公開ヘッダーと公開VSL依存境界compile | 26 |
+| #114 | VSL全体、AHO GPU全体、公開ヘッダーと公開VSL依存境界compile | 398 |
+
+いずれもM1 / MoltenVK・SDK 1.4.309.0・Debugで失敗・環境skip 0。最新masterに残るVSLのDISABLED 2件は維持した。AHO GPUはEngine / Window / pipeline / DrawPhase / Readbackを含み、#114で39件成功。Windows / Linux、物理的なnon-coherent heap、全AHO CPU suiteの検証結果ではない。master側のWindow仮想デストラクター追加を含め、各ライブラリと実行ファイルを同じヘッダーで再ビルドした。

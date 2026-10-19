@@ -12,6 +12,23 @@
 #include <utility>
 #include <ranges>
 
+namespace {
+    void validate_pool(const std::shared_ptr<VSL_NAMESPACE::_impl::GraphicResourcePool_impl>& pool) {
+        if (!pool || !pool->descriptorPool)
+            throw std::logic_error("Descriptor pool has been destroyed");
+        std::erase_if(pool->resources, [](const auto& resource) { return resource.expired(); });
+    }
+    void validate_layout(const std::shared_ptr<VSL_NAMESPACE::_impl::GraphicResourcePool_impl>& pool,
+                         const VSL_NAMESPACE::graphic_resource::BindingLayout& layout) {
+        if (!layout._data || layout._data->device != pool->device)
+            throw std::invalid_argument("Descriptor layout device mismatch");
+    }
+    void validate_resource(const std::shared_ptr<VSL_NAMESPACE::_impl::GraphicResource_impl>& resource) {
+        if (!resource || !resource->pool || !resource->pool->descriptorPool || !resource->descriptorSet)
+            throw std::logic_error("Descriptor resource has been destroyed");
+    }
+} // namespace
+
 VSL_NAMESPACE::graphic_resource::BindingLayout::BindingLayout(VSL_NAMESPACE::LogicalDeviceAccessor device,
                                                               VSL_NAMESPACE::graphic_resource::Type bindingType,
                                                               VSL_NAMESPACE::ShaderFlag shaderType)
@@ -79,11 +96,14 @@ VSL_NAMESPACE::_impl::ResourceBindingLayout_impl::~ResourceBindingLayout_impl() 
 }
 
 VSL_NAMESPACE::graphic_resource::ManagerInterface* VSL_NAMESPACE::graphic_resource::Pool::getManager() {
-    return (VSL_NAMESPACE::graphic_resource::ManagerInterface*)this->_data->manager;
+    auto identity = _data ? _data->manager.lock() : nullptr;
+    return identity ? identity->manager : nullptr;
 }
 
 std::tuple<bool, VSL_NAMESPACE::graphic_resource::Resource>
 VSL_NAMESPACE::graphic_resource::Pool::bind(VSL_NAMESPACE::graphic_resource::BindingLayout layout) {
+    validate_pool(_data);
+    validate_layout(_data, layout);
     auto result = std::make_shared<_impl::GraphicResource_impl>();
     result->pool = _data;
     result->layout = layout._data;
@@ -92,7 +112,7 @@ VSL_NAMESPACE::graphic_resource::Pool::bind(VSL_NAMESPACE::graphic_resource::Bin
     allocInfo.descriptorSetCount = 1;
     allocInfo.pSetLayouts = &layout._data->layout;
 
-    if (((ManagerInterface*)_data->manager)->_data->device->device.allocateDescriptorSets(&allocInfo, &result->descriptorSet) != vk::Result::eSuccess) {
+    if (_data->device->device.allocateDescriptorSets(&allocInfo, &result->descriptorSet) != vk::Result::eSuccess) {
         return {false, {}};
     }
     _data->resources.push_back(result);
@@ -101,6 +121,10 @@ VSL_NAMESPACE::graphic_resource::Pool::bind(VSL_NAMESPACE::graphic_resource::Bin
 
 std::tuple<bool, std::vector<VSL_NAMESPACE::graphic_resource::Resource>>
 VSL_NAMESPACE::graphic_resource::Pool::bind(size_t n, VSL_NAMESPACE::graphic_resource::BindingLayout layout) {
+    validate_pool(_data);
+    validate_layout(_data, layout);
+    if (n == 0)
+        return {true, {}};
     std::tuple<bool, std::vector<VSL_NAMESPACE::graphic_resource::Resource>> result{true, {}};
     auto& [check, resources] = result;
     resources.resize(n);
@@ -114,7 +138,7 @@ VSL_NAMESPACE::graphic_resource::Pool::bind(size_t n, VSL_NAMESPACE::graphic_res
 
     std::vector<vk::DescriptorSet> descriptorSets;
     descriptorSets.resize(vkLayouts.size());
-    if (((ManagerInterface*)_data->manager)->_data->device->device.allocateDescriptorSets(&allocInfo, descriptorSets.data()) != vk::Result::eSuccess)
+    if (_data->device->device.allocateDescriptorSets(&allocInfo, descriptorSets.data()) != vk::Result::eSuccess)
         return {false, {}};
     for (size_t i = 0; i < descriptorSets.size(); i++) {
         resources[i] = Resource{std::make_shared<_impl::GraphicResource_impl>()};
@@ -128,6 +152,11 @@ VSL_NAMESPACE::graphic_resource::Pool::bind(size_t n, VSL_NAMESPACE::graphic_res
 
 std::tuple<bool, std::vector<VSL_NAMESPACE::graphic_resource::Resource>>
 VSL_NAMESPACE::graphic_resource::Pool::bind(std::vector<VSL_NAMESPACE::graphic_resource::BindingLayout> layouts) {
+    validate_pool(_data);
+    for (const auto& layout : layouts)
+        validate_layout(_data, layout);
+    if (layouts.empty())
+        return {true, {}};
     std::tuple<bool, std::vector<VSL_NAMESPACE::graphic_resource::Resource>> result{true, {}};
     auto& [check, resources] = result;
     resources.resize(layouts.size());
@@ -146,7 +175,7 @@ VSL_NAMESPACE::graphic_resource::Pool::bind(std::vector<VSL_NAMESPACE::graphic_r
     allocInfo.pSetLayouts = vkLayouts.data();
 
     std::vector<vk::DescriptorSet> descriptorSets(vkLayouts.size());
-    if (((ManagerInterface*)_data->manager)->_data->device->device.allocateDescriptorSets(&allocInfo, descriptorSets.data()) != vk::Result::eSuccess)
+    if (_data->device->device.allocateDescriptorSets(&allocInfo, descriptorSets.data()) != vk::Result::eSuccess)
         return {false, {}};
     for (size_t i = 0; i < descriptorSets.size(); i++) {
         resources[i]._data->descriptorSet = descriptorSets[i];
@@ -165,6 +194,9 @@ VSL_NAMESPACE::graphic_resource::Pool VSL_NAMESPACE::graphic_resource::Resource:
 
 void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::BufferAccessor* buffer, size_t binding, std::optional<Type> type,
                                                        size_t offset, std::optional<size_t> size) {
+    validate_resource(_data);
+    if (!buffer || !buffer->_data || buffer->_data->device != _data->pool->device)
+        throw std::invalid_argument("Descriptor buffer device mismatch");
     const auto buffer_size = buffer->_data->requirementSize;
     if (offset >= buffer_size)
         throw VSL_NAMESPACE::exceptions::RuntimeException("BufferRange", "Buffer descriptor range starts outside the buffer");
@@ -184,11 +216,11 @@ void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::BufferAcce
     if (type)
         descriptorWrite.descriptorType = (vk::DescriptorType)type.value();
     else {
-        if (_data->layout.expired())
+        if (!_data->layout)
             throw VSL_NAMESPACE::exceptions::RuntimeException("LayoutNotFound", "Layout not found!",
                                                               std::source_location::current());
         else {
-            auto layout = _data->layout.lock();
+            auto layout = _data->layout;
             for (const auto& lb : layout->layoutBindings)
                 if (lb.binding == binding) {
                     descriptorWrite.descriptorType = lb.descriptorType;
@@ -201,10 +233,15 @@ void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::BufferAcce
     descriptorWrite.pImageInfo = nullptr;       // Optional
     descriptorWrite.pTexelBufferView = nullptr; // Optional
 
-    ((ManagerInterface*)_data->pool->manager)->_data->device->device.updateDescriptorSets({descriptorWrite}, {});
+    auto owners = std::vector<std::shared_ptr<void>>{buffer->_data};
+    _data->bindings[static_cast<std::uint32_t>(binding)] = std::move(owners);
+    _data->pool->device->device.updateDescriptorSets({descriptorWrite}, {});
 }
 
 void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::ImageAccessor image, size_t binding, std::optional<Type> type) {
+    validate_resource(_data);
+    if (!image._data || image._data->device != _data->pool->device)
+        throw std::invalid_argument("Descriptor image device mismatch");
     vk::DescriptorImageInfo imageInfo;
     imageInfo.imageView = image._data->view;
     imageInfo.imageLayout = vk::ImageLayout::eGeneral;
@@ -217,8 +254,8 @@ void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::ImageAcces
         descriptorWrite.descriptorType = (vk::DescriptorType)type.value();
         goto found_type;
     } else {
-        if (not _data->layout.expired()) {
-            auto layout = _data->layout.lock();
+        if (_data->layout) {
+            auto layout = _data->layout;
             for (const auto& lb : layout->layoutBindings)
                 if (lb.binding == binding) {
                     descriptorWrite.descriptorType = lb.descriptorType;
@@ -234,14 +271,20 @@ found_type:
     descriptorWrite.pImageInfo = &imageInfo;
     descriptorWrite.pTexelBufferView = nullptr; // Optional
 
-    ((ManagerInterface*)_data->pool->manager)->_data->device->device.updateDescriptorSets({descriptorWrite}, {});
+    _data->bindings[static_cast<std::uint32_t>(binding)] = {image._data};
+    _data->pool->device->device.updateDescriptorSets({descriptorWrite}, {});
 }
 
 void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::ImageAccessor image, SamplerAccessor sampler,
                                                        size_t binding, std::optional<Type> type) {
+    validate_resource(_data);
+    if (!image._data || image._data->device != _data->pool->device)
+        throw std::invalid_argument("Descriptor image device mismatch");
     vk::DescriptorImageInfo imageInfo;
     imageInfo.imageView = image._data->view;
     imageInfo.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    if (!sampler._data || sampler._data->device != _data->pool->device)
+        throw std::invalid_argument("Descriptor sampler device mismatch");
     imageInfo.sampler = sampler._data->sampler;
 
     vk::WriteDescriptorSet descriptorWrite;
@@ -252,8 +295,8 @@ void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::ImageAcces
         descriptorWrite.descriptorType = (vk::DescriptorType)type.value();
         goto found_type;
     } else {
-        if (not _data->layout.expired()) {
-            auto layout = _data->layout.lock();
+        if (_data->layout) {
+            auto layout = _data->layout;
             for (const auto& lb : layout->layoutBindings)
                 if (lb.binding == binding) {
                     descriptorWrite.descriptorType = lb.descriptorType;
@@ -269,5 +312,11 @@ found_type:
     descriptorWrite.pImageInfo = &imageInfo;
     descriptorWrite.pTexelBufferView = nullptr; // Optional
 
-    ((ManagerInterface*)_data->pool->manager)->_data->device->device.updateDescriptorSets({descriptorWrite}, {});
+    _data->bindings[static_cast<std::uint32_t>(binding)] = {image._data, sampler._data};
+    _data->pool->device->device.updateDescriptorSets({descriptorWrite}, {});
+}
+
+VSL_NAMESPACE::_impl::GraphicResource_impl::~GraphicResource_impl() {
+    if (pool && pool->descriptorPool && descriptorSet)
+        (void)pool->device->device.freeDescriptorSets(pool->descriptorPool, 1, &descriptorSet);
 }

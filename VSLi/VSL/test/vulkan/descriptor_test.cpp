@@ -1,6 +1,36 @@
 #include "support/compute_fixture.hpp"
 namespace {
     using DescriptorVulkanIntegrationTest = vsl_test::ComputeVulkanIntegrationTest;
+    class DescriptorOwnershipVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+    TEST_F(DescriptorOwnershipVulkanIntegrationTest, OrdinaryScopeExitReleasesPoolAndResourceWithoutDestroy) {
+        std::weak_ptr<vsl::_impl::GraphicResourcePool_impl> weak_pool;
+        std::weak_ptr<vsl::_impl::GraphicResource_impl> weak_resource;
+        {
+            vsl::GraphicResourceManager manager(device);
+            vsl::graphic_resource::BindingLayout layout(device, vsl::graphic_resource::Type::StorageBuffer, vsl::ShaderFlag::Compute);
+            auto [pool, allocated] = manager.make(std::vector{layout});
+            weak_pool = pool._data;
+            weak_resource = allocated.front()._data;
+        }
+        EXPECT_TRUE(weak_resource.expired());
+        EXPECT_TRUE(weak_pool.expired());
+    }
+    TEST_F(DescriptorOwnershipVulkanIntegrationTest, ResourceKeepsItsLayoutUntilTheLastAliasIsReleased) {
+        vsl::GraphicResourceManager manager(device);
+        vsl::GraphicResource retained;
+        std::weak_ptr<vsl::_impl::ResourceBindingLayout_impl> weak_layout;
+        {
+            vsl::graphic_resource::BindingLayout layout(device, vsl::graphic_resource::Type::StorageBuffer, vsl::ShaderFlag::Compute);
+            weak_layout = layout._data;
+            auto [pool, allocated] = manager.make(std::vector{layout});
+            retained = allocated.front();
+        }
+        EXPECT_FALSE(weak_layout.expired());
+        retained = {};
+        EXPECT_TRUE(weak_layout.expired());
+    }
     TEST(BindingPointTest, ComparisonIncludesBindingTypeStageAndAmount) {
         using namespace vsl::graphic_resource;
         BindingPoint first{2, Type::StorageBuffer, vsl::ShaderFlag::Compute, 1};
@@ -38,10 +68,10 @@ namespace {
         ASSERT_EQ(many.size(), 2u);
         EXPECT_NE(many[0]._data->descriptorSet, many[1]._data->descriptorSet);
         EXPECT_EQ(many[0].getPool()._data, pool._data);
-        EXPECT_EQ(single._data->layout.lock(), binding->_data);
+        EXPECT_EQ(single._data->layout, binding->_data);
         EXPECT_NO_THROW(single.update(&*output));
         for (auto& entry : many) {
-            EXPECT_EQ(entry._data->layout.lock(), binding->_data);
+            EXPECT_EQ(entry._data->layout, binding->_data);
             EXPECT_NO_THROW(entry.update(&*output));
         }
         resource = single;
@@ -243,5 +273,115 @@ namespace {
             for (std::size_t i = 0; i < count; ++i)
                 EXPECT_EQ(actual[offset / sizeof(std::uint32_t) + i], base + i);
         }
+    }
+} // namespace
+
+namespace {
+    TEST_F(DescriptorOwnershipVulkanIntegrationTest, PoolAndResourceRemainUsableAfterManagerMoveAndDestruction) {
+        using namespace vsl::graphic_resource;
+        BindingLayout layout(device, Type::StorageBuffer, vsl::ShaderFlag::Compute);
+        vsl::StagingBuffer<vsl::MemoryType::StorageBuffer> buffer(device, 16);
+        Pool pool;
+        Resource retained;
+        {
+            vsl::GraphicResourceManager manager(device);
+            auto [created, allocated] = manager.make(std::vector{layout}, std::map<Type, std::size_t>{{Type::StorageBuffer, 3}});
+            pool = created;
+            retained = allocated.front();
+            auto moved = std::move(manager);
+            EXPECT_EQ(pool.getManager(), &moved);
+            retained.update(&buffer);
+            auto [success, extra] = pool.bind(layout);
+            ASSERT_TRUE(success);
+            extra.update(&buffer);
+        }
+        EXPECT_EQ(pool.getManager(), nullptr);
+        EXPECT_NO_THROW(retained.update(&buffer));
+        auto [success, extra] = pool.bind(2, layout);
+        ASSERT_TRUE(success);
+        ASSERT_EQ(extra.size(), 2u);
+        EXPECT_NO_THROW(extra.front().update(&buffer));
+    }
+    TEST_F(DescriptorOwnershipVulkanIntegrationTest, ManagerCopyAndAssignmentDoNotLeaveDanglingPoolObservers) {
+        using namespace vsl::graphic_resource;
+        vsl::GraphicResourceManager manager(device);
+        auto pool = manager.make(std::map<Type, std::size_t>{{Type::StorageBuffer, 1}});
+        auto copied = manager;
+        BindingLayout layout(device, Type::StorageBuffer, vsl::ShaderFlag::Compute);
+        auto [success, resource] = pool.bind(layout);
+        ASSERT_TRUE(success);
+        manager = vsl::GraphicResourceManager(device);
+        EXPECT_EQ(pool.getManager(), nullptr);
+        vsl::StagingBuffer<vsl::MemoryType::StorageBuffer> buffer(device, 16);
+        EXPECT_NO_THROW(resource.update(&buffer));
+        copied.destroy(pool);
+        EXPECT_THROW(resource.update(&buffer), std::logic_error);
+        EXPECT_THROW(pool.bind(layout), std::logic_error);
+        EXPECT_THROW(pool.bind(1, layout), std::logic_error);
+        EXPECT_THROW(pool.bind(std::vector{layout}), std::logic_error);
+    }
+    TEST_F(DescriptorOwnershipVulkanIntegrationTest, UpdatedBuffersAreOwnedPerBindingAndReplacementReleasesTheOldBuffer) {
+        using namespace vsl::graphic_resource;
+        vsl::GraphicResourceManager manager(device);
+        BindingLayout layout(device, Type::StorageBuffer, vsl::ShaderFlag::Compute);
+        auto [pool, allocated] = manager.make(std::vector{layout});
+        auto resource = allocated.front();
+        std::weak_ptr<vsl::_impl::Buffer_impl> weak;
+        {
+            vsl::StagingBuffer<vsl::MemoryType::StorageBuffer> buffer(device, 16);
+            weak = buffer._data;
+            resource.update(&buffer);
+        }
+        EXPECT_FALSE(weak.expired());
+        vsl::StagingBuffer<vsl::MemoryType::StorageBuffer> replacement(device, 16);
+        resource.update(&replacement);
+        EXPECT_TRUE(weak.expired());
+    }
+    TEST_F(DescriptorOwnershipVulkanIntegrationTest, DroppingTheLastResourceAliasReleasesItsNativeSetAndOwners) {
+        using namespace vsl::graphic_resource;
+        vsl::GraphicResourceManager manager(device);
+        BindingLayout layout(device, Type::StorageBuffer, vsl::ShaderFlag::Compute);
+        auto pool = manager.make(std::map<Type, std::size_t>{{Type::StorageBuffer, 1}});
+        std::weak_ptr<vsl::_impl::GraphicResource_impl> weak;
+        {
+            auto [success, resource] = pool.bind(layout);
+            ASSERT_TRUE(success);
+            weak = resource._data;
+        }
+        EXPECT_TRUE(weak.expired());
+        auto [success, replacement] = pool.bind(layout);
+        EXPECT_TRUE(success);
+        EXPECT_EQ(pool._data->resources.size(), 1u);
+        auto [empty_ok, empty] = pool.bind(0, layout);
+        EXPECT_TRUE(empty_ok);
+        EXPECT_TRUE(empty.empty());
+        auto [vector_ok, vector] = pool.bind(std::vector<BindingLayout>{});
+        EXPECT_TRUE(vector_ok);
+        EXPECT_TRUE(vector.empty());
+    }
+} // namespace
+
+namespace {
+    TEST_F(DescriptorOwnershipVulkanIntegrationTest, ImageAndSamplerOwnersSurviveTheirWrappers) {
+        using namespace vsl::graphic_resource;
+        vsl::GraphicResourceManager manager(device);
+        BindingLayout layout(device, {{0, Type::StorageImage, vsl::ShaderFlag::Compute, 1},
+                                      {1, Type::CombinedImageSampler, vsl::ShaderFlag::Compute, 1}});
+        auto [pool, allocated] = manager.make(std::vector{layout});
+        std::weak_ptr<vsl::_impl::Image_impl> weak_image;
+        std::weak_ptr<vsl::_impl::Sampler_impl> weak_sampler;
+        {
+            vsl::Image<vsl::ImageType::Storage | vsl::ImageType::Sampled> image(device, 1, 1, vsl::data_format::UnsignedNormalized8RGBA);
+            vsl::Sampler sampler(device, vsl::SamplingMode::Nearest, vsl::EdgeMode::ClampToEdge);
+            weak_image = image._data;
+            weak_sampler = sampler._data;
+            allocated.front().update(image, 0);
+            allocated.front().update(image, sampler, 1);
+        }
+        EXPECT_FALSE(weak_image.expired());
+        EXPECT_FALSE(weak_sampler.expired());
+        allocated.clear();
+        EXPECT_TRUE(weak_image.expired());
+        EXPECT_TRUE(weak_sampler.expired());
     }
 } // namespace

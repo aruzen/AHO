@@ -11,6 +11,7 @@
 #include "line.hpp"
 
 #include <array>
+#include <type_traits>
 
 namespace AHO_NAMESPACE {
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
@@ -93,8 +94,10 @@ namespace AHO_NAMESPACE {
         if constexpr (std::same_as<D, VSL_NAMESPACE::D1>) {
             return 0;
         } else {
-            auto v1 = pos2 - pos1;
-            auto v2 = pos3 - pos1;
+            using CalculationType = std::conditional_t<std::is_floating_point_v<R>, long double, R>;
+            const auto origin = pos1.template cast<CalculationType>();
+            auto v1 = pos2.template cast<CalculationType>() - origin;
+            auto v2 = pos3.template cast<CalculationType>() - origin;
             return 0.5 * (v1 * v2).length();
         }
     }
@@ -148,8 +151,10 @@ namespace AHO_NAMESPACE {
         if constexpr (std::same_as<D, VSL_NAMESPACE::D1>) {
             return 0;
         } else {
-            auto v1 = *pos2 - *pos1;
-            auto v2 = *pos3 - *pos1;
+            using CalculationType = std::conditional_t<std::is_floating_point_v<R>, long double, R>;
+            const auto origin = pos1->template cast<CalculationType>();
+            auto v1 = pos2->template cast<CalculationType>() - origin;
+            auto v2 = pos3->template cast<CalculationType>() - origin;
             return 0.5 * (v1 * v2).length();
         }
     }

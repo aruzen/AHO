@@ -146,15 +146,16 @@ vsl::graphic_resource::OverAllocateManager::allocate(std::vector <BindingLayout>
     for (auto &layout: layouts) {
         for (auto &pool: pools) {
             const auto &[err, resource] = pool.bind(layout);
-            if (err)
+            if (not err)
                 continue;
-            pools.push_back(pool);
+            use_pools.push_back(pool);
             resources.push_back(resource);
             goto found_pool;
         }
         {
             const auto &[pool, resource] = make({layout}, size, other);
             pools.push_back(pool);
+            use_pools.push_back(pool);
             resources.push_back(resource[0]);
         }
         found_pool:

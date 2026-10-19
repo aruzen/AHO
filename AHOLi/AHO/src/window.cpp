@@ -1,12 +1,36 @@
 #include <AHO/window.hpp>
 #include <GLFW/glfw3.h>
+#include <VSL/exceptions.hpp>
+#ifdef __APPLE__
+#define GLFW_EXPOSE_NATIVE_COCOA
+#include <GLFW/glfw3native.h>
+#endif
 
 #include <utility>
 #include <vector>
 
 AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::GetMonitorSize() {
     GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+    if (!monitor)
+        throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "Primary monitor is not available");
+#ifdef __APPLE__
+#if defined(GLFW_PLATFORM_COCOA)
+    if (glfwGetPlatform() == GLFW_PLATFORM_COCOA) {
+#endif
+        auto mode = CGDisplayCopyDisplayMode(glfwGetCocoaMonitor(monitor));
+        if (!mode)
+            throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "Primary monitor video mode is not available");
+        const auto width = static_cast<int>(CGDisplayModeGetWidth(mode));
+        const auto height = static_cast<int>(CGDisplayModeGetHeight(mode));
+        CGDisplayModeRelease(mode);
+        return {width, height};
+#if defined(GLFW_PLATFORM_COCOA)
+    }
+#endif
+#endif
     const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+    if (!mode)
+        throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "Primary monitor video mode is not available");
     return {mode->width, mode->height};
 }
 

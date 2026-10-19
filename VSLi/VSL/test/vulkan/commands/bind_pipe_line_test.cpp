@@ -52,6 +52,40 @@ namespace {
             }
             ComputeVulkanIntegrationTest::TearDown();
         }
+        void check_pipeline_holder(bool shared_command) {
+            auto manager = make_manager();
+            const std::uint32_t base = shared_command ? 197 : 173;
+            {
+                auto phase = manager.startPhase<vsl::ComputePhase>();
+                vsl::DefaultPhaseStream stream(manager);
+                if (shared_command) {
+                    auto command = std::make_shared<vsl::command::BindPipeline>(*pipeline);
+                    stream << std::static_pointer_cast<vsl::command::__Command>(command);
+                } else {
+                    stream << vsl::command::BindPipeline(*pipeline);
+                }
+                if (!stream.pipeline) {
+                    phase.cancel();
+                    FAIL() << "BindPipeline did not expose its pipeline to the stream";
+                }
+                ASSERT_EQ(stream.pipeline->_data, pipeline->_data);
+                stream << vsl::command::BindGraphicResource(resource, vsl::graphic_resource::BindingDestination::Compute)
+                       << vsl::command::PushConstant(*layout, vsl::ShaderFlag::Compute, base)
+                       << vsl::command::Dispatch(count, 1, 1);
+                vk::MemoryBarrier barrier{};
+                barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
+                barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
+                auto commands = manager.getBuffer();
+                commands._data->commandBuffers[commands.getCurrentBufferIdx()].pipelineBarrier(
+                    vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+            }
+            device._data->device.waitIdle();
+            auto mapped = output->data(count * sizeof(std::uint32_t));
+            std::array<std::uint32_t, count> actual{};
+            std::memcpy(actual.data(), mapped.data, sizeof(actual));
+            expect_sequence(actual, base);
+            EXPECT_EQ(aborted_errors_, 0u);
+        }
         void check_bind(bool erase_type) {
             vsl::PipelineAccessor accessor = *pipeline;
             auto binding = erase_type ? vsl::command::BindPipeline(accessor) : vsl::command::BindPipeline(*pipeline);
@@ -90,6 +124,12 @@ namespace {
     }
     TEST_F(BindComputePipelineVulkanIntegrationTest, ErasedAccessorKeepsTheComputeBindPoint) {
         check_bind(true);
+    }
+    TEST_F(BindComputePipelineVulkanIntegrationTest, ValueCommandExposesThePipelineForImplicitDescriptorBinding) {
+        check_pipeline_holder(false);
+    }
+    TEST_F(BindComputePipelineVulkanIntegrationTest, SharedCommandExposesThePipelineForImplicitDescriptorBinding) {
+        check_pipeline_holder(true);
     }
     TEST_F(BindPipelineVulkanIntegrationTest, ErasedAccessorKeepsTheGraphicsBindPoint) {
         vsl::PipelineAccessor accessor = *pipeline;

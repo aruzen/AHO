@@ -7,6 +7,8 @@
 #include "../concepts.hpp"
 
 #include <any>
+#include <utility>
+#include "../exceptions.hpp"
 
 namespace VSL_NAMESPACE {
 	struct Surface;
@@ -92,4 +94,37 @@ template<typename S>
 VSL_NAMESPACE::PhysicalDevices<S> VSL_NAMESPACE::Vulkan<Validation>::devices()
 {
 	return VSL_NAMESPACE::PhysicalDevices<S>(*this);
+}
+namespace VSL_NAMESPACE::helper {
+    std::shared_ptr<_impl::PhysicalDevices_impl> enumeratePhysicalDevices(VulkanAccessor vulkan);
+    std::vector<PhysicalDevice> physicalDevices(const std::shared_ptr<_impl::PhysicalDevices_impl> &data);
+}
+
+template<typename S>
+VSL_NAMESPACE::PhysicalDevices<S>::PhysicalDevices(VulkanAccessor vulkan)
+    : _data(helper::enumeratePhysicalDevices(std::move(vulkan))) {}
+
+template<typename S>
+VSL_NAMESPACE::PhysicalDevices<S>::~PhysicalDevices() = default;
+
+template<typename S>
+std::vector<VSL_NAMESPACE::PhysicalDevice> VSL_NAMESPACE::PhysicalDevices<S>::get() {
+    return helper::physicalDevices(_data);
+}
+
+template<typename S>
+VSL_NAMESPACE::PhysicalDevice VSL_NAMESPACE::PhysicalDevices<S>::search() {
+    S searcher;
+    int max_score = -1;
+    std::shared_ptr<_impl::PhysicalDevice_impl> selected;
+    for (auto device : get()) {
+        const int score = searcher.benchmark(device);
+        if (max_score < score) {
+            max_score = score;
+            selected = device._data;
+        }
+    }
+    if (!selected)
+        throw exceptions::RuntimeException("PhysicalDevices", "PhysicalDevices is not suitable.");
+    return PhysicalDevice(selected);
 }

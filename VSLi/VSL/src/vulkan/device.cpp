@@ -169,46 +169,25 @@ std::string VSL_NAMESPACE::PhysicalDevice::name() {
 	return _data->props.value().deviceName;
 }
 
-template<typename S>
-VSL_NAMESPACE::PhysicalDevices<S>::PhysicalDevices(VSL_NAMESPACE::VulkanAccessor vulkan)
-{
-	_data = std::shared_ptr<VSL_NAMESPACE::_impl::PhysicalDevices_impl>(new VSL_NAMESPACE::_impl::PhysicalDevices_impl);
-	_data->devices = vulkan._accessor->instance.enumeratePhysicalDevices();
-	_data->vulkan = vulkan._accessor;
+std::shared_ptr<VSL_NAMESPACE::_impl::PhysicalDevices_impl>
+VSL_NAMESPACE::helper::enumeratePhysicalDevices(VulkanAccessor vulkan) {
+    auto data = std::make_shared<_impl::PhysicalDevices_impl>();
+    data->devices = vulkan._accessor->instance.enumeratePhysicalDevices();
+    data->vulkan = vulkan._accessor;
+    return data;
 }
 
-template<typename S>
-VSL_NAMESPACE::PhysicalDevices<S>::~PhysicalDevices() {}
-
-template<typename S>
-std::vector<VSL_NAMESPACE::PhysicalDevice> VSL_NAMESPACE::PhysicalDevices<S>::get()
-{
-	std::vector<VSL_NAMESPACE::PhysicalDevice> devices;
-	for (auto& d : _data->devices) {
-		std::shared_ptr<VSL_NAMESPACE::_impl::PhysicalDevice_impl> nd(new VSL_NAMESPACE::_impl::PhysicalDevice_impl);
-		nd->device = d;
-		nd->vulkan = _data->vulkan;
-		devices.push_back(VSL_NAMESPACE::PhysicalDevice(nd));
-	}
-	return devices;
-}
-
-template<typename S>
-VSL_NAMESPACE::PhysicalDevice VSL_NAMESPACE::PhysicalDevices<S>::search()
-{
-	S s;
-	int max_score = -1;
-	std::shared_ptr<VSL_NAMESPACE::_impl::PhysicalDevice_impl> ret = nullptr;
-	for (auto d : get()) {
-		int score = s.benchmark(d);
-		if (max_score < score)
-			max_score = score;
-			ret = d._data;
-	}
-	if (!ret)
-		throw VSL_NAMESPACE::exceptions::RuntimeException("PhysicalDevices", "PhysicalDevices is not suitable.", "VSL_NAMESPACE::_PhysicalDevicesSercher::search");
-
-	return VSL_NAMESPACE::PhysicalDevice(ret);
+std::vector<VSL_NAMESPACE::PhysicalDevice>
+VSL_NAMESPACE::helper::physicalDevices(const std::shared_ptr<_impl::PhysicalDevices_impl> &data) {
+    std::vector<PhysicalDevice> devices;
+    devices.reserve(data->devices.size());
+    for (auto handle : data->devices) {
+        auto device = std::make_shared<_impl::PhysicalDevice_impl>();
+        device->device = handle;
+        device->vulkan = data->vulkan;
+        devices.emplace_back(std::move(device));
+    }
+    return devices;
 }
 
 #ifdef VSL_NAMESPACE_TEST

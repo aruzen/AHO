@@ -113,3 +113,51 @@ TEST_F(LogicalDeviceWindowIntegrationTest, CustomCreatorLinksForBothSurfaceOverl
     EXPECT_TRUE(static_cast<bool>(by_pointer._data->device.getQueue(queue_family, 0)));
 }
 } // namespace
+
+#include <functional>
+namespace {
+struct ConfiguredDeviceBenchmark {
+    static inline std::function<int(vsl::PhysicalDevice)> evaluate;
+    int benchmark(vsl::PhysicalDevice device) { return evaluate(std::move(device)); }
+};
+struct ClearDeviceBenchmark {
+    ~ClearDeviceBenchmark() { ConfiguredDeviceBenchmark::evaluate = {}; }
+};
+TEST_F(DeviceVulkanIntegrationTest, CustomSearcherKeepsTheHighestNonnegativeScoreAndFirstTie) {
+    ClearDeviceBenchmark cleanup;
+    vsl::PhysicalDevices<ConfiguredDeviceBenchmark> devices(vsl::VulkanAccessor{instance});
+    for (const auto &[scores, expected] : {
+             std::pair{std::array{90, 10, 2}, 0u}, std::pair{std::array{0, 12, 1}, 1u},
+             std::pair{std::array{1, 2, 99}, 2u}, std::pair{std::array{7, 7, 1}, 0u},
+             std::pair{std::array{0, 0, 0}, 0u}}) {
+        devices._data->devices.assign(scores.size(), physical._data->device);
+        const auto listed = devices.get();
+        ASSERT_EQ(listed.size(), scores.size());
+        std::vector<std::shared_ptr<vsl::_impl::PhysicalDevice_impl>> visited;
+        ConfiguredDeviceBenchmark::evaluate = [&](vsl::PhysicalDevice candidate) {
+            EXPECT_EQ(candidate._data->device, physical._data->device);
+            const auto index = visited.size();
+            visited.push_back(candidate._data);
+            if (index >= scores.size()) { ADD_FAILURE() << "Unexpected extra candidate"; return -1; }
+            return scores[index];
+        };
+        const auto selected = devices.search();
+        ASSERT_EQ(visited.size(), scores.size());
+        EXPECT_EQ(selected._data, visited[expected]);
+    }
+}
+TEST_F(DeviceVulkanIntegrationTest, CustomSearcherRejectsNegativeScoresAndEmptyEnumerations) {
+    ClearDeviceBenchmark cleanup;
+    vsl::PhysicalDevices<ConfiguredDeviceBenchmark> devices(vsl::VulkanAccessor{instance});
+    devices._data->devices.assign(2, physical._data->device);
+    ConfiguredDeviceBenchmark::evaluate = [](vsl::PhysicalDevice) { return -1; };
+    EXPECT_THROW(devices.search(), vsl::exceptions::RuntimeException);
+    devices._data->devices.clear();
+    ConfiguredDeviceBenchmark::evaluate = [](vsl::PhysicalDevice) {
+        ADD_FAILURE() << "An empty device list must not be benchmarked";
+        return 1;
+    };
+    EXPECT_TRUE(devices.get().empty());
+    EXPECT_THROW(devices.search(), vsl::exceptions::RuntimeException);
+}
+} // namespace

@@ -204,6 +204,11 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
 
 std::vector<VSL_NAMESPACE::graphic_resource::BindingLayout> VSL_NAMESPACE::utils::SPIRVReflector::GenerateData::makeBindingLayout(size_t repeat) {
     std::vector<VSL_NAMESPACE::graphic_resource::BindingLayout> result;
+    if (binding_points.empty())
+        return result;
+    if (repeat >= result.max_size() / binding_points.size())
+        throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "Binding layout repeat count exceeds vector capacity");
+    result.reserve((repeat + 1) * binding_points.size());
     for (size_t i = 0; i < repeat + 1; i++)
         for (auto& [_, points] : binding_points)
             result.emplace_back(logical_device, points);

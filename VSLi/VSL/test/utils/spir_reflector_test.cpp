@@ -299,3 +299,29 @@ namespace {
         }));
     }
 } // namespace
+
+#include <limits>
+namespace {
+    TEST(SpirvReflectorTest, RepeatedLayoutCountOverflowIsRejectedBeforeNativeAllocation) {
+        for (const auto set_count : {1u, 2u}) {
+            SCOPED_TRACE(set_count);
+            vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("fill.comp.spv"));
+            if (set_count == 2)
+                reflector.generated.binding_points[1] = reflector.generated.binding_points.at(0);
+            const auto before = reflector.generated.binding_points;
+            try {
+                (void)reflector.generated.makeBindingLayout(std::numeric_limits<std::size_t>::max());
+                ADD_FAILURE() << "An overflowing repeat count silently returned an empty layout list";
+            } catch (const vsl::exceptions::RuntimeException& error) {
+                EXPECT_NE(error.reason.find("repeat"), std::string::npos);
+            }
+            EXPECT_EQ(reflector.generated.binding_points, before);
+        }
+    }
+    TEST(SpirvReflectorTest, EmptyBindingDefinitionsNeedNoNativeAllocationRegardlessOfRepeatCount) {
+        vsl::utils::SPIRVReflector::GenerateData data{};
+        EXPECT_TRUE(data.makeBindingLayout().empty());
+        EXPECT_TRUE(data.makeBindingLayout(std::numeric_limits<std::size_t>::max()).empty());
+        EXPECT_TRUE(data.binding_points.empty());
+    }
+} // namespace

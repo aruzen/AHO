@@ -127,7 +127,7 @@ namespace AHO_NAMESPACE {
 		template<concepts::division_as<R> T>
 		constexpr _Point<R, VSL_NAMESPACE::D1, CI>& /*Point*/ operator /=(const T& m);
 
-		template<concepts::cast_as<R> T>
+		template<typename T> requires concepts::cast_as<R, T>
 		constexpr _Point<T, VSL_NAMESPACE::D1, CI> cast() const;
 
 		constexpr auto length() const;
@@ -185,7 +185,7 @@ namespace AHO_NAMESPACE {
 		template<concepts::division_as<R> T>
 		constexpr _Point<R, VSL_NAMESPACE::D2, CI>& /*Point*/ operator /=(const T& m);
 
-		template<concepts::cast_as<R> T>
+		template<typename T> requires concepts::cast_as<R, T>
 		constexpr _Point<T, VSL_NAMESPACE::D2, CI> cast() const;
 
 		constexpr auto length() const;
@@ -243,7 +243,7 @@ namespace AHO_NAMESPACE {
 		template<concepts::division_as<R> T>
 		constexpr _Point<R, VSL_NAMESPACE::D3, CI>& /*Point*/ operator /=(const T& m);
 
-		template<concepts::cast_as<R> T>
+		template<typename T> requires concepts::cast_as<R, T>
 		constexpr _Point<T, VSL_NAMESPACE::D3, CI> cast() const;
 
 		constexpr auto length() const;
@@ -330,7 +330,7 @@ namespace AHO_NAMESPACE {
 	}
 
 	template<typename R, typename CI>
-	template<concepts::cast_as<R> T>
+	template<typename T> requires concepts::cast_as<R, T>
 	constexpr _Point<T, VSL_NAMESPACE::D1, CI> _Point<R, VSL_NAMESPACE::D1, CI>::cast() const
 	{
 		return _Point<T, VSL_NAMESPACE::D1, CI>((T)value.___AN1);
@@ -437,7 +437,7 @@ namespace AHO_NAMESPACE {
 	}
 
 	template<typename R, typename CI>
-	template<concepts::cast_as<R> T>
+	template<typename T> requires concepts::cast_as<R, T>
 	constexpr _Point<T, VSL_NAMESPACE::D2, CI> _Point<R, VSL_NAMESPACE::D2, CI>::cast() const
 	{
 		return _Point<T, VSL_NAMESPACE::D2, CI>((T)value.___AN1, (T)value.___AN2);
@@ -535,7 +535,7 @@ namespace AHO_NAMESPACE {
 	}
 
 	template<typename R, typename CI>
-	template<concepts::cast_as<R> T>
+	template<typename T> requires concepts::cast_as<R, T>
 	constexpr _Point<T, VSL_NAMESPACE::D3, CI> _Point<R, VSL_NAMESPACE::D3, CI>::cast() const
 	{
 		return _Point<T, VSL_NAMESPACE::D3, CI>((T)value.___AN1, (T)value.___AN2, (T)value.___AN3);

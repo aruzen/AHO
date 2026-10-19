@@ -2,6 +2,9 @@
 #include <VSL/window.hpp>
 #include <algorithm>
 
+#include <VSL/exceptions.hpp>
+#include <utility>
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -16,29 +19,47 @@
 std::vector<std::shared_ptr<VSL_NAMESPACE::PureWindow::WindowData>> VSL_NAMESPACE::PureWindow::WINDOWS;
 bool VSL_NAMESPACE::PureWindow::inited = false;
 
+namespace {
+[[noreturn]] void throw_glfw_error(const char* operation)
+{
+    const char* description = nullptr;
+    const int error = glfwGetError(&description);
+    throw VSL_NAMESPACE::exceptions::RuntimeException("GLFW",
+        std::string(operation) + ": " + (description ? description : "Unknown error") +
+        " (error " + std::to_string(error) + ")");
+}
+} // namespace
+
 VSL_NAMESPACE::PureWindow::PureWindow(std::string _name, int _width, int _height)
 {
-	_data = std::shared_ptr<WindowData>(new WindowData);
+    _data = std::make_shared<WindowData>();
+    _data->height = _height;
+    _data->width = _width;
+    _data->name = std::move(_name);
 
-	if (!inited) {
-        if (glfwInit() == GLFW_TRUE) {
-            inited = true;
-        } else {
-            const char *error_txt = nullptr;
-            int error = glfwGetError(&error_txt);
-            std::cerr << "Failed to initialize GLFW: " << (error == GLFW_NO_ERROR ? "Unknown error" : error_txt)
-                      << std::endl;
-            return; // TODO throw error
+    if (!inited) {
+        if (glfwInit() != GLFW_TRUE)
+            throw_glfw_error("Failed to initialize GLFW");
+        inited = true;
+    }
+    try {
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+        _data->window_handle = glfwCreateWindow(_width, _height, _data->name.c_str(), nullptr, nullptr);
+        if (!_data->window_handle)
+            throw_glfw_error("Failed to create GLFW window");
+        WINDOWS.push_back(_data);
+    } catch (...) {
+        if (_data->window_handle) {
+            glfwDestroyWindow(static_cast<GLFWwindow*>(_data->window_handle));
+            _data->window_handle = nullptr;
         }
-	}
-	WINDOWS.push_back(_data);
-
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-	_data->height = _height;
-	_data->width = _width;
-	_data->name = _name;
-	_data->window_handle = (void*)glfwCreateWindow(_width, _height, _name.c_str(), nullptr, nullptr);
+        if (WINDOWS.empty()) {
+            glfwTerminate();
+            inited = false;
+        }
+        throw;
+    }
 }
 
 VSL_NAMESPACE::PureWindow::PureWindow(std::shared_ptr<WindowData> _data) : _data(_data) {}

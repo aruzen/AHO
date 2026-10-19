@@ -158,13 +158,6 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vecto
 
     if constexpr (Validation) {
         setupDebugMessenger(_data);
-    } else {
-        fclose(stdin);
-        fclose(stdout);
-        fclose(stderr);
-#ifdef _MSC_VER
-        FreeConsole();
-#endif
     }
 }
 

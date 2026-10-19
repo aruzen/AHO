@@ -29,7 +29,7 @@ AttachmentIdはdescription.attachmentsの添字。shader出力locationはsubpass
 ## 既存Phaseへ読み戻しを記録する
 
 ```cpp
-aho::ImageReadback reader(manager, 0, 2); // helperは保持し、結果slotを最大2件使う。
+aho::ImageReadback reader(manager, 0, 2); // 読み戻し用クラスを保持し、結果用スロットを最大2件使う。
 std::optional<aho::ImageReadbackTicket> picking, screenshot;
 {
     auto phase = manager.startPhase<vsl::ComputePhase>();
@@ -37,12 +37,12 @@ std::optional<aho::ImageReadbackTicket> picking, screenshot;
     picking = reader.record(phase, ids, vsl::ImageLayout::General,
                             {x, y, 1, 1}, frameId);
     screenshot = reader.record(phase, color, vsl::ImageLayout::General, {}, frameId);
-    // 両方を描画と同じsubmitで送る。record内にはsubmit・CPU完了待機がない。
+    // 2件の読み戻しを描画と同時に送信する。record内では送信やCPUでの完了待ちを行わない。
 }
 if (picking && picking->ready()) {
     picking->read(pixels);
     const auto frame = picking->info().frameId;
-    picking.reset(); // 結果を回収したらslotを返す。
+    picking.reset(); // 結果を回収したらスロットを返す。
 }
 ```
 
@@ -76,7 +76,7 @@ std::optional<aho::ImageReadbackTicket> pending;
         pending = reader.record(phase, chain.images.at(phase.getImageIndex()),
                                 vsl::ImageLayout::Present, {x, y, 1, 1}, frameId);
     });
-    // 描画する。finish callback後に同じPhaseをsubmitしてpresentする。
+    // 描画する。終了コールバックの後に、同じPhaseを送信して画面表示する。
 }
 ```
 

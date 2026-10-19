@@ -1,7 +1,3 @@
-//
-// Created by morimoto_hibiki on 2025/12/21.
-//
-
 #ifndef AHO_ALL_DRAW_PHASE_H
 #define AHO_ALL_DRAW_PHASE_H
 
@@ -69,4 +65,4 @@ namespace AHO_NAMESPACE {
     }
 }
 
-#endif //AHO_ALL_DRAW_PHASE_H
+#endif

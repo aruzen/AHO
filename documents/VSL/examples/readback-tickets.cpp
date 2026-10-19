@@ -12,7 +12,7 @@ struct ReadbackExampleResult {
     aho::ImagePixels screenshot;
 };
 
-// vertex: gl_VertexIndexで三角形を生成。fragment: location 0にvec4、1にuint。
+// 頂点シェーダーはgl_VertexIndexで三角形を生成し、フラグメントシェーダーはlocation 0にvec4、1にuintを出力する。
 // テスト用triangle.vert / picking.fragと同じ入出力を想定する。
 ReadbackExampleResult renderReadbackExample(vsl::LogicalDeviceAccessor device,
                                             vsl::CommandManager manager,
@@ -44,9 +44,9 @@ ReadbackExampleResult renderReadbackExample(vsl::LogicalDeviceAccessor device,
                           pl::DynamicState{}, viewport, scissor);
     GraphicsPipeline pipeline(layout, pass);
 
-    // 2 frame分のCommandBufferを交互に再利用する。各Phaseはそのbufferの前回完了を確認する。
+    // 2フレーム分のコマンドバッファを交互に再利用する。各Phaseで前回の送信完了を確認する。
     std::array<CommandManager, 2> frames{manager.independent(), manager.independent()};
-    aho::ImageReadback readback(manager, 0, 2); // helperは1つ、同時に保持できる結果は2件。
+    aho::ImageReadback readback(manager, 0, 2); // 読み戻し用クラスは1つ、同時に保持できる結果は2件。
     std::optional<aho::ImageReadbackTicket> picking, screenshot;
     aho::ImagePixels selectedPixel;
     ReadbackExampleResult result;
@@ -54,7 +54,7 @@ ReadbackExampleResult renderReadbackExample(vsl::LogicalDeviceAccessor device,
         if (picking && picking->ready()) {
             picking->read(selectedPixel);
             result.pickedFrame = picking->info().frameId;
-            picking.reset(); // 回収後にslotを返す。
+            picking.reset(); // 回収後にスロットを返す。
         }
         if (screenshot && screenshot->ready()) {
             screenshot->read(result.screenshot);
@@ -76,8 +76,8 @@ ReadbackExampleResult renderReadbackExample(vsl::LogicalDeviceAccessor device,
             screenshot = readback.record(phase, color, ImageLayout::General, {}, frame);
         if (phase.submit() != ComputePhase::SubmitResult::Success)
             throw std::runtime_error("Frame submission failed");
-        // 描画と両方のReadbackをこの1回のsubmitで送る。
-        // slot不足ならrecordはnulloptを返す。その要求は受理されていない。
+        // 描画と2件の読み戻しを1回の送信で行う。
+        // スロット不足ならrecordはnulloptを返し、その要求は受理されない。
     }
     // 例の終了時だけ未回収の結果を待つ。通常のループではcollectでreadyを確認する。
     if (picking) {

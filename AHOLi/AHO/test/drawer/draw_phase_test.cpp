@@ -71,7 +71,7 @@ namespace {
         for (unsigned split = 0; split < 2; ++split) {
             unsigned finished = 0;
             {
-                // End the pass in initialize so the pre-fix skipped callback can be tested safely.
+                // 終了コールバックが呼ばれない場合も安全に検証できるよう、初期化時にパスを閉じる。
                 aho::DrawPhase phase(*engine, [&](auto& stream) { stream << vsl::command::RenderPassBegin(engine->getWindow()._data2->render_pass,
                                                                                                           engine->getWindow()._data2->frame_buffer)
                                                                          << vsl::command::RenderPassEnd{}; }, [&](auto&) { ++finished; });

@@ -35,7 +35,7 @@ aho::DrawPhase::DrawPhase(aho::engine::GraphicalEngine *engine,
         }
     } catch (...) {
         THREAD_LOCAL_DRAW_PHASE = previous;
-        throw; // The base destructor returns the acquired image through cancel().
+        throw; // 基底クラスのデストラクタがcancel()で取得済み画像を返す。
     }
 }
 

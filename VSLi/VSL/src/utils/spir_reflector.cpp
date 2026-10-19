@@ -179,6 +179,24 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
          */
         data_format::___Format format = data_format::Undefined;
         switch (type.basetype) {
+            case spirv_cross::SPIRType::Short:
+                format = data_format::SignedInt16R;
+                break;
+            case spirv_cross::SPIRType::UShort:
+                format = data_format::UnsignedInt16R;
+                break;
+            case spirv_cross::SPIRType::Int64:
+                format = data_format::SignedInt64R;
+                break;
+            case spirv_cross::SPIRType::UInt64:
+                format = data_format::UnsignedInt64R;
+                break;
+            case spirv_cross::SPIRType::Half:
+                format = data_format::SignedFloat16R;
+                break;
+            case spirv_cross::SPIRType::Double:
+                format = data_format::SignedFloat64R;
+                break;
             case spirv_cross::SPIRType::Int:
                 format = data_format::Int;
                 break;
@@ -197,8 +215,9 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
         VSL_NAMESPACE::pipeline_layout::VertexInputShapeDefinition definition{
             .layouts = {type.columns, VSL_NAMESPACE::pipeline_layout::VertexInputLayoutDefinition{.format = format}}};
         const auto location = comp.get_decoration(resource.id, spv::DecorationLocation);
+        const auto locations_per_column = type.width == 64 && type.vecsize >= 3 ? 2u : 1u;
         for (std::uint32_t column = 0; column < type.columns; ++column)
-            definition.layouts[column].location = location + column;
+            definition.layouts[column].location = location + column * locations_per_column;
         generated.vertex_input->definitions.push_back(std::move(definition));
     }
 }

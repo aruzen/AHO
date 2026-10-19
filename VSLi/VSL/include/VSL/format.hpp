@@ -1036,9 +1036,10 @@ namespace VSL_NAMESPACE::data_format {
 	consteval ___Format convert_graphic_type(T v) {
 		if constexpr (not concepts::is_convertible_graphic_type<T>)
 			return Undefined;
-		if constexpr (concepts::is_static_convertible_graphic_type<T>)
+		else if constexpr (concepts::is_static_convertible_graphic_type<T>)
 			return convert_graphic_type<T>();
-		return v.get_graphic_type();
+		else
+			return v.get_graphic_type();
 	}
 
 	template<std::size_t Length>

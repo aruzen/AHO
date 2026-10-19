@@ -148,3 +148,67 @@ TEST_F(WindowIntegrationTest, DeletingADerivedWrapperRetainsTheSharedNativeWindo
     EXPECT_TRUE(static_cast<bool>(*window));
 }
 } // namespace
+
+#include <VSL/exceptions.hpp>
+namespace {
+TEST_F(WindowIntegrationTest, FailedCreationLeavesExistingWindowUsable) {
+    const auto before = vsl::PureWindow::WINDOWS;
+    std::optional<vsl::PureWindow> failed;
+    try {
+        failed.emplace("invalid width", 0, 24);
+        ADD_FAILURE() << "Window creation failure was silently accepted";
+    } catch (const vsl::exceptions::RuntimeException &error) {
+        EXPECT_NE(std::string(error.what()).find("GLFW"), std::string::npos);
+    }
+    EXPECT_EQ(vsl::PureWindow::WINDOWS, before);
+    // Clean up the failed object left by the old implementation, too.
+    if (failed)
+        failed->close();
+    EXPECT_TRUE(static_cast<bool>(*window));
+    EXPECT_TRUE(window->resize(80, 60));
+    int width = 0, height = 0;
+    glfwGetWindowSize(static_cast<GLFWwindow *>(window->_data->window_handle), &width, &height);
+    EXPECT_EQ(width, 80);
+    EXPECT_EQ(height, 60);
+    EXPECT_TRUE(vsl::PureWindow::NoCheckUpdate());
+}
+TEST_F(WindowIntegrationTest, FailedFirstCreationLeavesNoRegistrationAndAllowsRetry) {
+    ASSERT_TRUE(window->close());
+    ASSERT_TRUE(vsl::PureWindow::WINDOWS.empty());
+    std::optional<vsl::PureWindow> failed;
+    EXPECT_THROW(failed.emplace("invalid first window", 32, 0), vsl::exceptions::RuntimeException);
+    EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
+    if (failed)
+        failed->close();
+    ASSERT_TRUE(glfwInit());
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+    vsl::PureWindow retry("valid retry", 32, 24);
+    EXPECT_TRUE(static_cast<bool>(retry));
+    EXPECT_EQ(vsl::PureWindow::WINDOWS.size(), 1u);
+    EXPECT_TRUE(retry.close());
+    EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
+}
+} // namespace
+
+#if defined(GLFW_PLATFORM)
+TEST(WindowInitializationTest, FailedGlfwInitializationThrowsWithoutRegisteringAWindow) {
+    struct RestorePlatform {
+        ~RestorePlatform() {
+            glfwTerminate();
+            glfwInitHint(GLFW_PLATFORM, GLFW_ANY_PLATFORM);
+        }
+    } restore;
+    ASSERT_TRUE(vsl::PureWindow::WINDOWS.empty());
+    glfwInitHint(GLFW_PLATFORM, -1); // GLFW rejects an unsupported platform ID during initialization.
+    std::optional<vsl::PureWindow> failed;
+    try {
+        failed.emplace("cannot initialize GLFW", 32, 24);
+        ADD_FAILURE() << "GLFW initialization failure was silently accepted";
+    } catch (const vsl::exceptions::RuntimeException &error) {
+        EXPECT_NE(std::string(error.what()).find("GLFW"), std::string::npos);
+    }
+    EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
+    if (failed)
+        failed->close();
+}
+#endif

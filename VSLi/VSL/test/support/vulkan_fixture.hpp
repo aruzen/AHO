@@ -33,6 +33,7 @@ class VulkanIntegrationTest : public testing::Test {
     vsl::PhysicalDevice physical{std::shared_ptr<vsl::_impl::PhysicalDevice_impl>{}};
     vsl::LogicalDeviceAccessor device;
     std::uint32_t queue_family = 0;
+    bool require_validation = false;
 
     void SetUp() override {
         std::vector<const char *> instance_extensions;
@@ -48,6 +49,21 @@ class VulkanIntegrationTest : public testing::Test {
             })) {
             instance_extensions.push_back("VK_KHR_portability_enumeration");
             instance_info.flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
+        }
+        const char* validation_layer = "VK_LAYER_KHRONOS_validation";
+        if (require_validation) {
+            const auto layers = vk::enumerateInstanceLayerProperties();
+            if (!std::ranges::any_of(layers, [&](const auto& layer) {
+                    return std::strcmp(layer.layerName, validation_layer) == 0;
+                }))
+                GTEST_SKIP() << "VK_LAYER_KHRONOS_validation is required";
+            if (!std::ranges::any_of(extensions, [](const auto& extension) {
+                    return std::strcmp(extension.extensionName, "VK_EXT_debug_utils") == 0;
+                }))
+                GTEST_SKIP() << "VK_EXT_debug_utils is required";
+            instance_extensions.push_back("VK_EXT_debug_utils");
+            instance_info.enabledLayerCount = 1;
+            instance_info.ppEnabledLayerNames = &validation_layer;
         }
         instance_info.enabledExtensionCount = static_cast<std::uint32_t>(instance_extensions.size());
         instance_info.ppEnabledExtensionNames = instance_extensions.data();

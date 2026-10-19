@@ -691,3 +691,94 @@ namespace {
         EXPECT_EQ(actual, (std::array<std::uint32_t, 2>{37, 83}));
     }
 } // namespace
+
+namespace {
+    TEST(SpirvReflectorTest, CombinedAndStorageBufferImagesUseTexelDescriptorsAndKeepArrayCounts) {
+        using namespace vsl::graphic_resource;
+        for (const auto& [file, source_count, destination_count] : {
+                 std::tuple{"reflection_texel_buffers.comp.spv", 1u, 1u},
+                 std::tuple{"reflection_texel_arrays.comp.spv", 2u, 3u}}) {
+            SCOPED_TRACE(file);
+            vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path(file));
+            const auto& points = reflector.generated.binding_points.at(0);
+            ASSERT_EQ(points.size(), 2u);
+            for (const auto& [binding, type, count] : {std::tuple{0u, Type::UniformTexelBuffer, source_count},
+                                                       std::tuple{1u, Type::StorageTexelBuffer, destination_count}}) {
+                const auto found = std::ranges::find(points, binding, &BindingPoint::binding);
+                ASSERT_NE(found, points.end());
+                EXPECT_EQ(found->bindingType, type);
+                EXPECT_EQ(found->amount, count);
+                EXPECT_EQ(found->shaderType, vsl::ShaderFlag::Compute);
+            }
+        }
+    }
+    class ReflectedTexelBufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+    TEST_F(ReflectedTexelBufferVulkanIntegrationTest, GeneratedLayoutSupportsReadingAndWritingNativeBufferViews) {
+        using namespace vsl::graphic_resource;
+        if (!host_coherent_available())
+            GTEST_SKIP() << "Host coherent memory unavailable";
+        const auto properties = physical._data->device.getFormatProperties(vk::Format::eR32Uint);
+        const auto required = vk::FormatFeatureFlagBits::eUniformTexelBuffer | vk::FormatFeatureFlagBits::eStorageTexelBuffer;
+        if ((properties.bufferFeatures & required) != required)
+            GTEST_SKIP() << "R32Uint uniform/storage texel buffer support unavailable";
+        vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_texel_buffers.comp.spv"));
+        const auto& points = reflector.generated.binding_points.at(0);
+        ASSERT_EQ(points.size(), 2u);
+        for (const auto& [binding, type] : {std::pair{0u, Type::UniformTexelBuffer}, std::pair{1u, Type::StorageTexelBuffer}}) {
+            const auto found = std::ranges::find(points, binding, &BindingPoint::binding);
+            ASSERT_NE(found, points.end());
+            ASSERT_EQ(found->bindingType, type) << "Do not create a native pipeline with an incorrect descriptor type";
+        }
+        const auto sets = reflector.generated.makeBindingLayout();
+        vsl::GraphicResourceManager resources(device);
+        auto [pool, allocated] = resources.make(sets);
+        struct ReclaimCycle {
+            vsl::GraphicResourcePool pool;
+            ~ReclaimCycle() { pool._data->resources.clear(); }
+        } reclaim{pool};
+        ASSERT_EQ(allocated.size(), 1u);
+        vsl::StagingBuffer<vsl::MemoryType::UniformTexelBuffer> source(device, std::array<std::uint32_t, 1>{37});
+        vsl::StagingBuffer<vsl::MemoryType::StorageTexelBuffer> destination(device, std::array<std::uint32_t, 1>{0});
+        vk::BufferViewCreateInfo view_info{};
+        view_info.format = vk::Format::eR32Uint;
+        view_info.range = sizeof(std::uint32_t);
+        view_info.buffer = source._data->buffer;
+        auto source_view = device._data->device.createBufferViewUnique(view_info);
+        view_info.buffer = destination._data->buffer;
+        auto destination_view = device._data->device.createBufferViewUnique(view_info);
+        // Resource::update has no BufferView overload. Bind native views to the reflected layout.
+        std::array<vk::WriteDescriptorSet, 2> writes{};
+        for (std::uint32_t i = 0; i < writes.size(); ++i) {
+            writes[i].dstSet = allocated[0]._data->descriptorSet;
+            writes[i].dstBinding = i;
+            writes[i].descriptorCount = 1;
+            writes[i].descriptorType = i == 0 ? vk::DescriptorType::eUniformTexelBuffer : vk::DescriptorType::eStorageTexelBuffer;
+        }
+        writes[0].pTexelBufferView = &*source_view;
+        writes[1].pTexelBufferView = &*destination_view;
+        device._data->device.updateDescriptorSets(writes, {});
+        vsl::Shader<vsl::ShaderType::Compute> shader(device, vsl_test::shader_path("reflection_texel_buffers.comp.spv"));
+        vsl::PipelineLayout layout(device, vsl::pipeline_layout::ShaderGroup("reflected texel buffers", {shader}),
+                                   vsl::pipeline_layout::ResourceBinding(sets));
+        vsl::ComputePipeline pipeline(layout);
+        auto manager = make_manager();
+        {
+            auto phase = manager.startPhase<vsl::ComputePhase>();
+            phase << pipeline << vsl::command::BindGraphicResource(allocated[0], BindingDestination::Compute)
+                  << vsl::command::Dispatch(1, 1, 1);
+            vk::MemoryBarrier barrier{};
+            barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
+            barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
+            auto commands = manager.getBuffer();
+            commands._data->commandBuffers[commands.getCurrentBufferIdx()].pipelineBarrier(
+                vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+        }
+        device._data->device.waitIdle();
+        auto mapped = destination.data(sizeof(std::uint32_t));
+        std::uint32_t actual = 0;
+        std::memcpy(&actual, mapped.data, sizeof(actual));
+        EXPECT_EQ(actual, 54u);
+    }
+} // namespace

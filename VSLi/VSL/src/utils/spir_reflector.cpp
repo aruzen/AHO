@@ -59,7 +59,7 @@ VSL_NAMESPACE::graphic_resource::Type spir_type_to_graphic_type(const spirv_cros
         case spirv_cross::SPIRType::Image:
             return gfx_src::Type::SampledImage;
         case spirv_cross::SPIRType::SampledImage:
-            return gfx_src::Type::CombinedImageSampler;
+            return type.image.dim == spv::DimBuffer ? gfx_src::Type::UniformTexelBuffer : gfx_src::Type::CombinedImageSampler;
         case spirv_cross::SPIRType::Sampler:
             return gfx_src::Type::Sampler;
         default:
@@ -175,11 +175,12 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
             uint32_t set = comp.get_decoration(resource.id, spv::DecorationDescriptorSet);
             uint32_t binding = comp.get_decoration(resource.id, spv::DecorationBinding);
             const auto& type = comp.get_type(resource.type_id);
+            auto descriptor_type = gfx_type;
+            if ((gfx_type == Type::SampledImage || gfx_type == Type::StorageImage) && type.image.dim == spv::DimBuffer)
+                descriptor_type = gfx_type == Type::SampledImage ? Type::UniformTexelBuffer : Type::StorageTexelBuffer;
             generated.binding_points[set].emplace_back(BindingPoint{
                 .binding = binding,
-                .bindingType = gfx_type == Type::SampledImage && type.image.dim == spv::DimBuffer
-                                   ? Type::UniformTexelBuffer
-                                   : gfx_type,
+                .bindingType = descriptor_type,
                 .shaderType = shaderType, // TODO
                 .amount = descriptor_count(comp, type),
             });

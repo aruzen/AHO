@@ -784,4 +784,88 @@ namespace {
         expect_identity(*inverse * matrix);
     }
 } // namespace
+
+namespace {
+    template<class T> class MatAffineScaleTest : public testing::Test {};
+    using AffineScaleScalars = testing::Types<float, double, long double>;
+    TYPED_TEST_SUITE(MatAffineScaleTest, AffineScaleScalars);
+    TYPED_TEST(MatAffineScaleTest, UniformSmallAndLargeScalesPreserveReflectionAndTranslation) {
+        using T = TypeParam;
+        const int limit = std::numeric_limits<T>::max_exponent;
+        for (const int exponent : {-limit / 2, -limit / 4, 0, limit / 4, limit / 2}) {
+            SCOPED_TRACE(testing::Message() << "exponent=" << exponent);
+            const T scale = std::ldexp(T{1}, exponent);
+            auto matrix = aho::matrix::make_identity<T, 4>();
+            auto knownInverse = aho::matrix::make_identity<T, 4>();
+            const std::array<T, 3> diagonal{scale, 2 * scale, -scale};
+            const std::array<T, 3> offset{1, -2, T{0.5}};
+            for (std::size_t i = 0; i < 3; ++i) {
+                matrix[i][i] = diagonal[i];
+                matrix[i][3] = diagonal[i] * offset[i];
+                knownInverse[i][i] = T{1} / diagonal[i];
+                knownInverse[i][3] = -offset[i];
+            }
+            const auto original = matrix;
+            const auto inverse = aho::matrix::inverse_affine(matrix);
+            EXPECT_TRUE(inverse);
+            if (!inverse)
+                continue;
+            EXPECT_EQ(*inverse, knownInverse);
+            expect_identity(matrix * *inverse);
+            expect_identity(*inverse * matrix);
+            EXPECT_EQ(matrix, original);
+        }
+    }
+    TYPED_TEST(MatAffineScaleTest, IndependentUnitsPreserveShearAndTranslatedKnownInverse) {
+        using T = TypeParam;
+        const int exponent = std::numeric_limits<T>::max_exponent / 6;
+        const std::array<std::array<T, 3>, 3> base{{{1, 2, 3}, {0, 1, 4}, {0, 0, 1}}};
+        const std::array<std::array<T, 3>, 3> knownInverse{{{1, -2, 5}, {0, 1, -4}, {0, 0, 1}}};
+        for (const int rowSign : {-1, 1})
+            for (const int columnSign : {-1, 1}) {
+                SCOPED_TRACE(testing::Message() << "rowSign=" << rowSign << " columnSign=" << columnSign);
+                const std::array<int, 3> rows{-rowSign * exponent, 0, rowSign * exponent};
+                const std::array<int, 3> columns{columnSign * exponent, -columnSign * exponent, 0};
+                auto matrix = aho::matrix::make_identity<T, 4>();
+                auto expected = aho::matrix::make_identity<T, 4>();
+                for (std::size_t i = 0; i < 3; ++i) {
+                    for (std::size_t j = 0; j < 3; ++j) {
+                        matrix[i][j] = std::ldexp(base[i][j], rows[i] + columns[j]);
+                        expected[i][j] = std::ldexp(knownInverse[i][j], -columns[i] - rows[j]);
+                    }
+                    // t = A * e_zなので、逆変換の平行移動は-e_zと分かる。
+                    matrix[i][3] = matrix[i][2];
+                    expected[i][3] = i == 2 ? T{-1} : T{0};
+                }
+                const auto inverse = aho::matrix::inverse_affine(matrix);
+                ASSERT_TRUE(inverse);
+                EXPECT_EQ(*inverse, expected);
+                expect_identity(matrix * *inverse);
+                expect_identity(*inverse * matrix);
+            }
+    }
+    TYPED_TEST(MatAffineScaleTest, DependentLinearRowsRemainSingularAcrossUnits) {
+        using T = TypeParam;
+        const int exponent = std::numeric_limits<T>::max_exponent / 4;
+        const std::array<std::array<T, 3>, 3> base{{{1, 2, 3}, {2, 4, 6}, {0, 1, 1}}};
+        for (const int power : {-exponent, 0, exponent}) {
+            auto matrix = aho::matrix::make_identity<T, 4>();
+            for (std::size_t i = 0; i < 3; ++i)
+                for (std::size_t j = 0; j < 3; ++j)
+                    matrix[i][j] = std::ldexp(base[i][j], power);
+            const auto inverse = aho::matrix::inverse_affine(matrix);
+            ASSERT_FALSE(inverse);
+            EXPECT_EQ(inverse.error(), aho::matrix::FailedCause::Singular);
+        }
+    }
+    TEST(MatAffineScaleTest, IntegerUnitDeterminantsKeepExactShearAndTranslation) {
+        const aho::Mat<int, 4, 4> matrix(std::array<std::array<int, 4>, 4>{{{1, 2, 3, 2}, {0, 1, 4, -3}, {0, 0, 1, 5}, {0, 0, 0, 1}}});
+        const aho::Mat<int, 4, 4> expected(std::array<std::array<int, 4>, 4>{{{1, -2, 5, -33}, {0, 1, -4, 23}, {0, 0, 1, -5}, {0, 0, 0, 1}}});
+        const auto inverse = aho::matrix::inverse_affine(matrix);
+        ASSERT_TRUE(inverse);
+        EXPECT_EQ(*inverse, expected);
+        expect_identity(matrix * *inverse);
+        expect_identity(*inverse * matrix);
+    }
+} // namespace
 #endif

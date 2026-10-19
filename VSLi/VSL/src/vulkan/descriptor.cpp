@@ -171,10 +171,17 @@ vsl::graphic_resource::Pool vsl::graphic_resource::Resource::getPool() {
 
 void vsl::graphic_resource::Resource::update(vsl::BufferAccessor *buffer, size_t binding, std::optional <Type> type,
                                              size_t offset, std::optional <size_t> size) {
+    const auto buffer_size = buffer->_data->requirementSize;
+    if (offset >= buffer_size)
+        throw vsl::exceptions::RuntimeException("BufferRange", "Buffer descriptor range starts outside the buffer");
+    const vk::DeviceSize range = size ? *size : buffer_size - offset;
+    if (range == 0 || (range != VK_WHOLE_SIZE && range > buffer_size - offset))
+        throw vsl::exceptions::RuntimeException("BufferRange", "Buffer descriptor range is empty or exceeds the buffer");
+
     vk::DescriptorBufferInfo bufferInfo;
     bufferInfo.buffer = buffer->_data->buffer;
     bufferInfo.offset = offset;
-    bufferInfo.range = size ? size.value() : buffer->size();
+    bufferInfo.range = range;
 
     vk::WriteDescriptorSet descriptorWrite;
     descriptorWrite.dstSet = this->_data->descriptorSet;

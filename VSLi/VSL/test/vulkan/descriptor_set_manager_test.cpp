@@ -21,15 +21,30 @@ TEST_F(DescriptorManagerVulkanIntegrationTest, DefaultOverAllocatorStartsWithout
     vsl::graphic_resource::OverAllocateManager manager(device);
     EXPECT_EQ(manager._data->device, device._data);
     EXPECT_TRUE(manager.pools.empty());
+    EXPECT_EQ(manager.other, 0u);
 }
 TEST_F(DescriptorManagerVulkanIntegrationTest,
-       DISABLED_OverAllocateReturnsOnePoolPerResourceAndReusesCapacity) {
+       OverAllocateReturnsOnePoolPerResourceAndReusesCapacity) {
     using namespace vsl::graphic_resource;
     OverAllocateManager manager(device, {{Type::StorageBuffer, 4}}, 0);
+    struct ClearCycles {
+        std::shared_ptr<vsl::_impl::GraphicResourceManager_impl> data;
+        ~ClearCycles() { for (auto &owned : data->pools) owned->resources.clear(); }
+    } cleanup{manager._data};
     auto [pools, allocated] = manager.allocate(std::vector{*binding});
-    EXPECT_EQ(pools.size(), allocated.size()); // I12: result pool vector remains empty.
+    EXPECT_EQ(pools.size(), allocated.size());
     ASSERT_EQ(allocated.size(), 1u);
+    ASSERT_EQ(pools.size(), 1u);
+    EXPECT_EQ(pools.front()._data, manager.pools.front()._data);
+    EXPECT_EQ(allocated.front().getPool()._data, pools.front()._data);
+    resource = allocated.front();
     allocated.front().update(&*output);
+    expect_sequence(execute(89), 89);
+    auto [again_pools, again] = manager.allocate(std::vector{*binding});
+    ASSERT_EQ(again_pools.size(), 1u);
+    ASSERT_EQ(again.size(), 1u);
+    EXPECT_EQ(again_pools.front()._data, pools.front()._data);
+    EXPECT_EQ(manager.pools.size(), 1u);
     for (auto &entry : manager._data->pools)
         entry->resources.clear();
 }
@@ -154,5 +169,29 @@ TEST(ResourceManagerLifetimeTest, MovesTransferOwnershipAndCopiesShareIt) {
     EXPECT_EQ(assigned._data, data);
     original = copied;
     EXPECT_EQ(original._data, data);
+}
+} // namespace
+
+namespace {
+TEST_F(DescriptorManagerVulkanIntegrationTest, LazyOverAllocatorReturnsItsNewPoolAndCachesItForReuse) {
+    using namespace vsl::graphic_resource;
+    OverAllocateManager manager(device);
+    struct ClearCycles {
+        std::shared_ptr<vsl::_impl::GraphicResourceManager_impl> data;
+        ~ClearCycles() { for (auto &owned : data->pools) owned->resources.clear(); }
+    } cleanup{manager._data};
+    auto [pools, allocated] = manager.allocate(std::vector{*binding});
+    ASSERT_EQ(pools.size(), 1u);
+    ASSERT_EQ(allocated.size(), 1u);
+    ASSERT_EQ(manager.pools.size(), 1u);
+    EXPECT_EQ(pools.front()._data, manager.pools.front()._data);
+    EXPECT_EQ(allocated.front().getPool()._data, pools.front()._data);
+    allocated.front().update(&*output);
+    resource = allocated.front();
+    expect_sequence(execute(97), 97);
+    auto [empty_pools, empty_resources] = manager.allocate(std::vector<BindingLayout>{});
+    EXPECT_TRUE(empty_pools.empty());
+    EXPECT_TRUE(empty_resources.empty());
+    EXPECT_EQ(manager.pools.size(), 1u);
 }
 } // namespace

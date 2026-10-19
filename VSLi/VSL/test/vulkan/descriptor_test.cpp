@@ -38,8 +38,12 @@ TEST_F(DescriptorVulkanIntegrationTest, BindsSingleAndRepeatedLayoutsWithExplici
     ASSERT_EQ(many.size(), 2u);
     EXPECT_NE(many[0]._data->descriptorSet, many[1]._data->descriptorSet);
     EXPECT_EQ(many[0].getPool()._data, pool._data);
-    // These overloads omit the layout owner (I13); explicit type remains usable.
-    EXPECT_THROW(single.update(&*output), vsl::exceptions::RuntimeException);
+    EXPECT_EQ(single._data->layout.lock(), binding->_data);
+    EXPECT_NO_THROW(single.update(&*output));
+    for (auto &entry : many) {
+        EXPECT_EQ(entry._data->layout.lock(), binding->_data);
+        EXPECT_NO_THROW(entry.update(&*output));
+    }
     resource = single;
     expect_sequence(execute(23), 23);
 }

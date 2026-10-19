@@ -79,6 +79,15 @@ VSL_NAMESPACE::BufferAccessor::MakeBuffer(VSL_NAMESPACE::LogicalDeviceAccessor d
     bufferInfo.size = size;
     bufferInfo.usage = vk::BufferUsageFlags{(unsigned int)memType};
     bufferInfo.sharingMode = (vk::SharingMode)sharingMode;
+    const std::uint32_t queueFamilies[] = {device._data->graphicsFamily, device._data->presentFamily};
+    if (sharingMode == SharingMode::Concurrent) {
+        if (queueFamilies[0] == queueFamilies[1]) {
+            bufferInfo.sharingMode = vk::SharingMode::eExclusive;
+        } else {
+            bufferInfo.queueFamilyIndexCount = 2;
+            bufferInfo.pQueueFamilyIndices = queueFamilies;
+        }
+    }
 
     data->requirementSize = size;
     data->buffer = data->device->device.createBuffer(bufferInfo);

@@ -871,3 +871,88 @@ namespace {
         EXPECT_EQ(pixel[3], 255);
     }
 } // namespace
+
+namespace {
+    TEST(SpirvReflectorTest, VectorVertexInputArraysExpandEveryElementAtItsDeclaredLocation) {
+        vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection_vertex_arrays.vert.spv"));
+        ASSERT_TRUE(reflector.generated.vertex_input);
+        const auto& definitions = reflector.generated.vertex_input->definitions;
+        ASSERT_EQ(definitions.size(), 2u);
+        const auto found = std::ranges::find_if(definitions, [](const auto& definition) {
+            return definition.layouts.at(0).location == 3;
+        });
+        ASSERT_NE(found, definitions.end());
+        ASSERT_EQ(found->layouts.size(), 2u);
+        EXPECT_EQ(found->layouts[0].location, 3u);
+        EXPECT_EQ(found->layouts[1].location, 4u);
+        for (const auto& attribute : found->layouts)
+            EXPECT_EQ(attribute.format, vsl::data_format::FloatRGB);
+    }
+    TEST(SpirvReflectorTest, MatrixAndMultidimensionalArraysExpandAllColumnsIncludingWideLocations) {
+        vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection_vertex_array_shapes.vert.spv"));
+        ASSERT_TRUE(reflector.generated.vertex_input);
+        const auto& definitions = reflector.generated.vertex_input->definitions;
+        ASSERT_EQ(definitions.size(), 3u);
+        for (const auto& [first, step, format] : {
+                 std::tuple{2u, 1u, vsl::data_format::FloatRGB},
+                 std::tuple{7u, 2u, vsl::data_format::SignedFloat64RGB},
+                 std::tuple{20u, 1u, vsl::data_format::FloatRG}}) {
+            const auto found = std::ranges::find_if(definitions, [&](const auto& definition) {
+                return definition.layouts.at(0).location == first;
+            });
+            ASSERT_NE(found, definitions.end());
+            ASSERT_EQ(found->layouts.size(), 4u) << "location=" << first;
+            for (std::uint32_t column = 0; column < 4; ++column) {
+                EXPECT_EQ(found->layouts[column].location, first + column * step);
+                EXPECT_EQ(found->layouts[column].format, format);
+            }
+        }
+    }
+    TEST_F(ReflectedLocationsVulkanIntegrationTest, VertexArrayInjectionUsesFullStrideAndElementOffsets) {
+        vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_vertex_array_shapes.vert.spv"));
+        ASSERT_TRUE(reflector.generated.vertex_input);
+        auto layout = make_layout_state();
+        reflector.generated.vertex_input->injection(layout);
+        const auto& native = layout._data->info->vertexInput;
+        ASSERT_EQ(native.vertexAttributeDescriptionCount, 12u);
+        const auto attributes = std::span(native.pVertexAttributeDescriptions, native.vertexAttributeDescriptionCount);
+        const auto bindings = std::span(native.pVertexBindingDescriptions, native.vertexBindingDescriptionCount);
+        for (const auto& [first, step, bytes] : {std::tuple{2u, 1u, 12u}, std::tuple{7u, 2u, 24u}, std::tuple{20u, 1u, 8u}}) {
+            for (std::uint32_t column = 0; column < 4; ++column) {
+                const auto attribute = std::ranges::find(attributes, first + column * step, &vk::VertexInputAttributeDescription::location);
+                ASSERT_NE(attribute, attributes.end());
+                EXPECT_EQ(attribute->offset, column * bytes);
+                const auto binding = std::ranges::find(bindings, attribute->binding, &vk::VertexInputBindingDescription::binding);
+                ASSERT_NE(binding, bindings.end());
+                EXPECT_EQ(binding->stride, 4 * bytes);
+            }
+        }
+    }
+    TEST_F(ReflectedLocationsRenderVulkanIntegrationTest, ReflectedVertexArraysCombineBothElementsIntoTheGpuColor) {
+        vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_vertex_arrays.vert.spv"));
+        ASSERT_TRUE(reflector.generated.vertex_input);
+        const auto& definitions = reflector.generated.vertex_input->definitions;
+        ASSERT_EQ(definitions.size(), 2u);
+        ASSERT_EQ(definitions[0].layouts.size(), 1u);
+        ASSERT_EQ(definitions[0].layouts[0].location, 1u);
+        ASSERT_EQ(definitions[1].layouts.size(), 2u) << "Do not create a native pipeline with missing vertex attributes";
+        ASSERT_EQ(definitions[1].layouts[0].location, 3u);
+        ASSERT_EQ(definitions[1].layouts[1].location, 4u);
+        const std::array<std::array<float, 2>, 3> positions{{{-0.75f, -0.75f}, {0.75f, -0.75f}, {0, 0.75f}}};
+        const std::array<std::array<float, 6>, 3> colors{{{0.125f, 0.25f, 0.375f, 0.125f, 0.25f, 0.375f},
+                                                          {0.125f, 0.25f, 0.375f, 0.125f, 0.25f, 0.375f},
+                                                          {0.125f, 0.25f, 0.375f, 0.125f, 0.25f, 0.375f}}};
+        vsl::StagingBuffer<vsl::MemoryType::VertexBuffer> position_buffer(device, positions), color_buffer(device, colors);
+        pipeline.reset();
+        layout.reset();
+        vertex.emplace(device, vsl_test::shader_path("reflection_vertex_arrays.vert.spv"));
+        namespace pl = vsl::pipeline_layout;
+        layout.emplace(device, pl::ShaderGroup("reflected vertex arrays", {*vertex, *fragment}), *reflector.generated.vertex_input,
+                       pl::ColorBlend{}, pl::InputAssembly{}, pl::Rasterization{pl::CullingMode::None}, pl::Multisample{},
+                       pl::DynamicState{}, vsl::Viewport(description), vsl::Scissor(description));
+        pipeline.emplace(*layout, *pass);
+        expect_triangle_color(render([&](vsl::DefaultPhaseStream& stream) {
+            stream << vsl::command::BindVertexBuffer(position_buffer, color_buffer) << vsl::command::Draw(3);
+        }));
+    }
+} // namespace

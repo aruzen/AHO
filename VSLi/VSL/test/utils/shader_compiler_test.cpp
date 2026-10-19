@@ -60,3 +60,55 @@ TEST(ShaderCompilerTest, DISABLED_ReloadDoesNotDuplicateTargets) {
     EXPECT_EQ(compiler.target.size(), 1u);
 }
 } // namespace
+
+#include <VSL/exceptions.hpp>
+namespace {
+TEST(ShaderCompilerTest, InvalidShaderReportsTheSourceAndStopsCompilation) {
+    vsl_test::TemporaryDirectory temporary;
+    fs::create_directory(temporary.path() / "raw");
+    const auto invalid = temporary.path() / "raw" / "broken.vert";
+    const auto valid = temporary.path() / "raw" / "later.vert";
+    { std::ofstream output(invalid); output << "this is not valid GLSL"; }
+    write_shader(valid);
+    vsl::utils::ShaderCompiler compiler(fs::path(VSL_TEST_GLSLC), std::vector<fs::path>{});
+    compiler.target = {invalid, valid};
+    try {
+        compiler.compile();
+        FAIL() << "Compilation failure was silently ignored";
+    } catch (const vsl::exceptions::RuntimeException &error) {
+        EXPECT_NE(std::string(error.what()).find(invalid.string()), std::string::npos);
+    }
+    EXPECT_FALSE(fs::exists(temporary.path() / "later.vert.spv"));
+    // A failed batch must not prevent a later, explicitly requested retry.
+    compiler.target = {valid};
+    EXPECT_NO_THROW(compiler.compile());
+    std::ifstream stream(temporary.path() / "later.vert.spv", std::ios::binary);
+    ASSERT_TRUE(stream.good());
+    std::uint32_t magic = 0;
+    stream.read(reinterpret_cast<char *>(&magic), sizeof(magic));
+    EXPECT_EQ(magic, 0x07230203u);
+}
+TEST(ShaderCompilerTest, MissingExecutableReportsCompilationFailure) {
+    vsl_test::TemporaryDirectory temporary;
+    fs::create_directory(temporary.path() / "raw");
+    const auto source = temporary.path() / "raw" / "point.vert";
+    write_shader(source);
+    const auto missing = temporary.path() / "missing-glslc";
+    vsl::utils::ShaderCompiler compiler(missing, std::vector<fs::path>{});
+    compiler.target = {source};
+    try {
+        compiler.compile();
+        FAIL() << "Missing executable was silently ignored";
+    } catch (const vsl::exceptions::RuntimeException &error) {
+        const std::string message(error.what());
+        EXPECT_NE(message.find(source.string()), std::string::npos);
+        EXPECT_NE(message.find(missing.string()), std::string::npos);
+    }
+}
+} // namespace
+
+TEST(ShaderCompilerTest, EmptyBatchDoesNotInvokeAMissingExecutable) {
+    vsl_test::TemporaryDirectory temporary;
+    vsl::utils::ShaderCompiler compiler(temporary.path() / "missing-glslc", std::vector<fs::path>{});
+    EXPECT_NO_THROW(compiler.compile());
+}

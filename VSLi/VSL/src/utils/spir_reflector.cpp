@@ -9,8 +9,29 @@
 #include <utility>
 #include <ranges>
 #include <limits>
+#include <cstring>
 
 namespace {
+    void validate_spirv_size(std::size_t size) {
+        if (size < 5 * sizeof(std::uint32_t) || size % sizeof(std::uint32_t) != 0)
+            throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "Invalid SPIR-V binary size: expected at least five complete 32-bit words");
+    }
+
+    std::vector<std::uint32_t> read_spirv_words(const std::filesystem::path& path) {
+        std::ifstream file(path, std::ios::ate | std::ios::binary);
+        if (!file)
+            throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "Failed to open SPIR-V file: " + path.string());
+        const std::streamoff size = file.tellg();
+        if (!std::in_range<std::size_t>(size) || !std::in_range<std::streamsize>(size))
+            throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "Invalid SPIR-V file size: " + path.string());
+        validate_spirv_size(static_cast<std::size_t>(size));
+        std::vector<std::uint32_t> words(static_cast<std::size_t>(size) / sizeof(std::uint32_t));
+        file.seekg(0);
+        if (!file.read(reinterpret_cast<char*>(words.data()), static_cast<std::streamsize>(size)))
+            throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "Failed to read SPIR-V file: " + path.string());
+        return words;
+    }
+
     struct ReflectionCompiler : spirv_cross::Compiler {
         using Compiler::Compiler;
         using Compiler::evaluate_constant_u32;
@@ -48,35 +69,20 @@ VSL_NAMESPACE::graphic_resource::Type spir_type_to_graphic_type(const spirv_cros
 
 VSL_NAMESPACE::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device, std::filesystem::path path)
     : generated{std::move(logical_device)} {
-    std::vector<char> binary;
-    {
-        std::ifstream file(path, std::ios::ate | std::ios::binary);
-
-        if (!file.is_open()) {
-            throw VSL_NAMESPACE::exceptions::RuntimeException("file", "failed to open file!", std::source_location::current());
-        }
-
-        size_t fileSize = (size_t)file.tellg();
-        binary.resize(fileSize);
-        file.seekg(0);
-        file.read(binary.data(), fileSize);
-        file.close();
-    }
-    if (binary.size() % 4 != 0)
-        loggingln("warning: SPIRVReflector: SPIR-V file size (not multiple of 4 bytes) by ", path);
-    init((const std::uint32_t*)binary.data(), binary.size() / sizeof(std::uint32_t));
+    init(read_spirv_words(path));
 }
 
 VSL_NAMESPACE::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device, const std::vector<char>& binary)
     : generated{std::move(logical_device)} {
-    if (binary.size() % 4 != 0)
-        loggingln("warning: SPIRVReflector: SPIR-V file size (not multiple of 4 bytes)");
-    init((const std::uint32_t*)binary.data(), binary.size() / sizeof(std::uint32_t));
+    validate_spirv_size(binary.size());
+    std::vector<std::uint32_t> words(binary.size() / sizeof(std::uint32_t));
+    std::memcpy(words.data(), binary.data(), binary.size());
+    init(std::move(words));
 }
 
-void VSL_NAMESPACE::utils::SPIRVReflector::init(const std::uint32_t* bp, size_t size) {
+void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words) {
     using namespace graphic_resource;
-    ReflectionCompiler comp(bp, size);
+    ReflectionCompiler comp(std::move(words));
 
     ShaderFlag shaderType = ShaderFlag::Error;
     switch (comp.get_execution_model()) {

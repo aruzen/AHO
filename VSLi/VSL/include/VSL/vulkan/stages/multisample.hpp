@@ -7,6 +7,6 @@
 namespace VSL_NAMESPACE::pipeline_layout {
     struct Multisample {
         SampleCount samples = SampleCount::One;
-        void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
+        void injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl);
     };
 } // namespace VSL_NAMESPACE::pipeline_layout

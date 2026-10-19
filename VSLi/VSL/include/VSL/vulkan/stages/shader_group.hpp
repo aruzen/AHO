@@ -18,6 +18,6 @@ namespace VSL_NAMESPACE::pipeline_layout {
         void removeShader(std::string name);
         void removeShader(ShaderAccessor shader);
 
-        void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
+        void injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl);
     };
 } // namespace VSL_NAMESPACE::pipeline_layout

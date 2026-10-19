@@ -2,14 +2,15 @@
 #include "../define.hpp"
 #include "../exceptions.hpp"
 #include "pv.hpp"
-
 #include "device.hpp"
 #include "shader.hpp"
 
 namespace VSL_NAMESPACE {
     struct PipelineLayoutAccessor {
         std::shared_ptr<_impl::PipelineLayout_impl> _data;
+    };
 
+    struct PipelineLayoutEditAccessor : PipelineLayoutAccessor {
     protected:
         void init_start(LogicalDeviceAccessor device);
         void init_finish();
@@ -17,57 +18,54 @@ namespace VSL_NAMESPACE {
 
     template<typename T>
     concept pipeline_layout_injecter = requires(T&& t) {
-        std::forward<T>(t).injection(std::declval<VSL_NAMESPACE::PipelineLayoutAccessor>());
+        std::forward<T>(t).injection(std::declval<PipelineLayoutEditAccessor>());
     };
 
-    struct PipelineLayout : public PipelineLayoutAccessor {
+    class FrozenPipelineLayout : public PipelineLayoutAccessor {
+        friend struct PipelineLayout;
+        explicit FrozenPipelineLayout(std::shared_ptr<_impl::PipelineLayout_impl> data)
+            : PipelineLayoutAccessor{std::move(data)} {}
+    };
+
+    struct PipelineLayout : PipelineLayoutEditAccessor {
         template<pipeline_layout_injecter... Args>
         PipelineLayout(LogicalDeviceAccessor device, Args&&... args);
 
-        PipelineLayout(std::shared_ptr<_impl::PipelineLayout_impl> _data);
-
-        template<VSL_NAMESPACE::pipeline_layout_injecter... Additions>
-        PipelineLayout add(Additions&&... a);
+        template<pipeline_layout_injecter... Additions>
+        PipelineLayout add(Additions&&... additions);
 
         PipelineLayout copy() const;
+        // 編集用の値を消費し、以降はPipeline生成とコマンドからの参照に使う。
+        FrozenPipelineLayout freeze() &&;
 
-        /*
-         * 編集不可にし必要なデータだけ以外のメモリを解放する
-         */
-        PipelineLayoutAccessor freeze();
+    private:
+        explicit PipelineLayout(std::shared_ptr<_impl::PipelineLayout_impl> data);
+        PipelineLayout clone_state() const;
     };
 
-    // ----------------------------------------------------------------------------------------------------------------------
-
     namespace helper {
-        extern void expansionPipelineLayoutArgs(PipelineLayoutAccessor& pl);
+        inline void expansionPipelineLayoutArgs(PipelineLayoutEditAccessor&) {}
 
-        template<VSL_NAMESPACE::pipeline_layout_injecter T, typename... Args>
-        void expansionPipelineLayoutArgs(PipelineLayoutAccessor& pl, T&& t, Args&&... args) {
-            std::forward<T>(t).injection(pl);
-            expansionPipelineLayoutArgs(pl, std::forward<Args>(args)...);
+        template<pipeline_layout_injecter T, typename... Args>
+        void expansionPipelineLayoutArgs(PipelineLayoutEditAccessor& layout, T&& stage, Args&&... args) {
+            std::forward<T>(stage).injection(layout);
+            expansionPipelineLayoutArgs(layout, std::forward<Args>(args)...);
         }
     } // namespace helper
 
     template<pipeline_layout_injecter... Args>
-    PipelineLayout::PipelineLayout(VSL_NAMESPACE::LogicalDeviceAccessor device, Args&&... args) {
+    PipelineLayout::PipelineLayout(LogicalDeviceAccessor device, Args&&... args) {
         init_start(device);
-
         helper::expansionPipelineLayoutArgs(*this, std::forward<Args>(args)...);
-
         init_finish();
-    } /**/
+    }
 
-    template<VSL_NAMESPACE::pipeline_layout_injecter... Additions>
-    PipelineLayout PipelineLayout::add(Additions&&... a) {
-        if (not _data) {
-            throw VSL_NAMESPACE::exceptions::RuntimeException("error: Frozen Pipeline data.");
-        }
-
-        helper::expansionPipelineLayoutArgs(*this, std::forward<Additions>(a)...);
-
-        init_finish();
-
+    template<pipeline_layout_injecter... Additions>
+    PipelineLayout PipelineLayout::add(Additions&&... additions) {
+        auto next = clone_state();
+        helper::expansionPipelineLayoutArgs(next, std::forward<Additions>(additions)...);
+        next.init_finish();
+        _data = std::move(next._data);
         return *this;
     }
 } // namespace VSL_NAMESPACE

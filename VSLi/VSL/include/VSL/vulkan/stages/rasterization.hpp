@@ -21,7 +21,7 @@ namespace VSL_NAMESPACE::pipeline_layout {
             CullingMode culling_mode = CullingMode::Back,
             FrontFace front_face = FrontFace::CounterClockwise);
 
-        void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
+        void injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl);
 
         CullingMode culling_mode;
         FrontFace front_face;

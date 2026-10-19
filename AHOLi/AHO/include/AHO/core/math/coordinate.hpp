@@ -78,12 +78,7 @@ namespace AHO_NAMESPACE {
 
         template<bool... Booleans>
         constexpr size_t _CountTruesFunc() {
-            size_t n = 0;
-            bool bools[] = {Booleans...};
-            for (bool f : bools)
-                if (f)
-                    n++;
-            return n;
+            return (size_t{0} + ... + Booleans);
         }
 
         template<bool... Booleans>

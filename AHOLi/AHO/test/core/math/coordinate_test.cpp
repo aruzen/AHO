@@ -1,3 +1,8 @@
+#if defined(__clang__)
+#pragma clang diagnostic push
+// Empty-pack support must not depend on the zero-length-array extension.
+#pragma clang diagnostic error "-Wzero-length-array"
+#endif
 #include <gtest/gtest.h>
 #include <AHO/core/math/coordinate.hpp>
 #include <sstream>
@@ -263,6 +268,12 @@ namespace {
         stream << TypeParam(12);
         EXPECT_EQ(stream.str(), std::string(1, TypeParam::LowerChar) + " : 12");
     }
+    static_assert(aho::coordinate::_CountTruesFunc<>() == 0);
+    static_assert(aho::coordinate::_CountTrues<>::value == 0);
+    TEST(CoordinateInfoTest, EmptyBooleanPackHasNoEnabledAxes) {
+        EXPECT_EQ(aho::coordinate::_CountTruesFunc<>(), 0u);
+        EXPECT_EQ(aho::coordinate::_CountTrues<>::value, 0u);
+    }
     TEST(CoordinateInfoTest, EnabledFlagsDimensionAndAxisCountsMatchConfiguration) {
         using Info = aho::coordinate::_MakeCoordinateInfo<true, true, true>::value;
         static_assert(std::same_as<Info::dimension, vsl::D3>);
@@ -513,4 +524,8 @@ namespace {
         EXPECT_TRUE(check_point_vector_arithmetic<TypeParam>());
     }
 } // namespace
+#endif
+
+#if defined(__clang__)
+#pragma clang diagnostic pop
 #endif

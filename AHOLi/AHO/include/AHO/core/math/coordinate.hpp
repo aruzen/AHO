@@ -44,7 +44,7 @@ namespace AHO_NAMESPACE {
             template <concepts::division_as<T> R> \
             constexpr Upper<T>& operator /=(const Upper<R>& t) { value /= t.value; return *this; }; \
          \
-            template <concepts::cast_as<T> R> \
+            template <typename R> requires concepts::cast_as<T, R> \
             Upper<R> cast() const { return { (R)value }; } \
         }; \
         template<typename T> \

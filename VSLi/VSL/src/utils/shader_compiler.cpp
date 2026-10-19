@@ -1,6 +1,8 @@
 #include <VSL/utils/shader_compiler.hpp>
 #include <VSL/utils/string.hpp>
+#include <VSL/exceptions.hpp>
 
+#include <cstdlib>
 #include <map>
 
 VSL_NAMESPACE::utils::ShaderCompiler::ShaderCompiler(std::filesystem::path glslc_path, std::vector<std::filesystem::path> shader_dirs) : glslc_path(glslc_path), shader_dirs(shader_dirs) {}
@@ -53,6 +55,9 @@ void VSL_NAMESPACE::utils::ShaderCompiler::compile()
 		auto src_file = fs::absolute(p);
 		auto&& src = src_file.string();
 		auto&& dst = (src_file.parent_path().parent_path() / (src_file.filename().string() + ".spv")).string();
-		system((glslc_path.string() + " \"" + src + "\" -o \"" + dst + "\"").c_str());
+		const int status = std::system((glslc_path.string() + " \"" + src + "\" -o \"" + dst + "\"").c_str());
+		if (status != 0)
+			throw exceptions::RuntimeException("ShaderCompiler", "Failed to compile " + src +
+				" using " + glslc_path.string() + " (status " + std::to_string(status) + ")");
 	}
 }

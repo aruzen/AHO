@@ -524,3 +524,36 @@ namespace {
         // this test does not create a pipeline with unsupported shader features.
     }
 } // namespace
+
+namespace {
+    TEST(SpirvReflectorTest, FragmentStageVaryingsDoNotBecomeVertexAttributes) {
+        const auto binary = vsl_test::read_binary(vsl_test::shader_path("triangle.frag.spv"));
+        vsl::utils::SPIRVReflector reflector({}, binary);
+        EXPECT_FALSE(reflector.generated.vertex_input);
+    }
+    TEST(SpirvReflectorTest, FragmentDescriptorsAndPushConstantsRemainAvailableWithoutVertexInputs) {
+        vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection_fragment_inputs.frag.spv"));
+        EXPECT_FALSE(reflector.generated.vertex_input);
+        ASSERT_EQ(reflector.generated.binding_points.size(), 1u);
+        const auto& points = reflector.generated.binding_points.at(0);
+        ASSERT_EQ(points.size(), 1u);
+        EXPECT_EQ(points[0].binding, 1u);
+        EXPECT_EQ(points[0].bindingType, vsl::graphic_resource::Type::UniformBuffer);
+        EXPECT_EQ(points[0].shaderType, vsl::ShaderFlag::Fragment);
+        ASSERT_TRUE(reflector.generated.push_constants);
+        const auto& constants = reflector.generated.push_constants->definitions;
+        ASSERT_EQ(constants.size(), 1u);
+        EXPECT_EQ(constants[0].targetShader, vsl::ShaderFlag::Fragment);
+        EXPECT_EQ(constants[0].offset, 0u);
+        EXPECT_EQ(constants[0].size, 16u);
+    }
+    TEST(SpirvReflectorTest, ComputeReflectionKeepsResourcesWithoutProducingVertexInputs) {
+        vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("fill.comp.spv"));
+        EXPECT_FALSE(reflector.generated.vertex_input);
+        const auto& binding = reflector.generated.binding_points.at(0).at(0);
+        EXPECT_EQ(binding.bindingType, vsl::graphic_resource::Type::StorageBuffer);
+        EXPECT_EQ(binding.shaderType, vsl::ShaderFlag::Compute);
+        ASSERT_TRUE(reflector.generated.push_constants);
+        EXPECT_EQ(reflector.generated.push_constants->definitions.at(0).size, 4u);
+    }
+} // namespace

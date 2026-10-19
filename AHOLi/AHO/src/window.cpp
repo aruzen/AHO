@@ -34,24 +34,50 @@ AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::GetMonitorSize() {
     return {mode->width, mode->height};
 }
 
-AHO_NAMESPACE::window::Window::Window(std::string name, int width, int height, AHO_NAMESPACE::engine::EngineAccessor _engine)
-    : VSL_NAMESPACE::Window(name, width, height) {
-    engine = _engine;
-    auto surface = this->add_plugin<VSL_NAMESPACE::Surface>(_engine._data->vulkan_instance);
-    VSL_NAMESPACE::Swapchain swapchain(_engine._data->logical_device, surface);
-    VSL_NAMESPACE::RenderPass pass(swapchain);
+namespace {
+    const std::string& checked_window_name(const std::string& name, const AHO_NAMESPACE::engine::EngineAccessor& engine) {
+        const auto& data = engine._data;
+        if (!data || !data->vulkan_instance._accessor || !data->logical_device._data ||
+            !data->command_manager._data || !data->synchro_manager._data)
+            throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "A booted engine is required");
+        auto buffers = data->command_manager.getBuffer();
+        if (!buffers._data || buffers.getSize() == 0)
+            throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "A booted engine is required");
+        return name;
+    }
+} // namespace
 
-    _data2 = std::make_shared<AHO_NAMESPACE::window::WindowData>(AHO_NAMESPACE::window::WindowData{
-        .surface = surface,
-        .swapchain = swapchain,
-        .render_pass = pass,
-        .frame_buffer = VSL_NAMESPACE::FrameBuffer(swapchain, pass),
-        .image_available = _engine._data->synchro_manager
-                               .createSemaphore(name + "ImageAvailable", _engine._data->command_manager.getBuffer().getSize()),
-        .render_finished = _engine._data->synchro_manager
-                               .createSemaphore(name + "RenderFinished", swapchain.getSwapImageSize()),
-        .in_flight = _engine._data->synchro_manager
-                         .createFence(name + "InFlight", _engine._data->command_manager.getBuffer().getSize(), true)});
+AHO_NAMESPACE::engine::EngineAccessor AHO_NAMESPACE::window::Window::default_engine() {
+    auto* current = AHO_NAMESPACE::engine::EngineAccessor::instance();
+    if (!current)
+        throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "A booted engine is required");
+    return *current;
+}
+
+AHO_NAMESPACE::window::Window::Window(std::string name, int width, int height, AHO_NAMESPACE::engine::EngineAccessor _engine)
+    : VSL_NAMESPACE::Window(checked_window_name(name, _engine), width, height) {
+    try {
+        engine = _engine;
+        auto surface = this->add_plugin<VSL_NAMESPACE::Surface>(_engine._data->vulkan_instance);
+        VSL_NAMESPACE::Swapchain swapchain(_engine._data->logical_device, surface);
+        VSL_NAMESPACE::RenderPass pass(swapchain);
+
+        _data2 = std::make_shared<AHO_NAMESPACE::window::WindowData>(AHO_NAMESPACE::window::WindowData{
+            .surface = surface,
+            .swapchain = swapchain,
+            .render_pass = pass,
+            .frame_buffer = VSL_NAMESPACE::FrameBuffer(swapchain, pass),
+            .image_available = _engine._data->synchro_manager
+                                   .createSemaphore(name + "ImageAvailable", _engine._data->command_manager.getBuffer().getSize()),
+            .render_finished = _engine._data->synchro_manager
+                                   .createSemaphore(name + "RenderFinished", swapchain.getSwapImageSize()),
+            .in_flight = _engine._data->synchro_manager
+                             .createFence(name + "InFlight", _engine._data->command_manager.getBuffer().getSize(), true)});
+    } catch (...) {
+        _data->plugins.clear();
+        VSL_NAMESPACE::PureWindow::close();
+        throw;
+    }
 }
 
 AHO_NAMESPACE::window::Window::Window(engine::EngineAccessor engine, std::shared_ptr<VSL_NAMESPACE::Window::WindowData> vsl_data,

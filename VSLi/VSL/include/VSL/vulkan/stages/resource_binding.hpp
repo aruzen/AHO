@@ -10,6 +10,6 @@ namespace VSL_NAMESPACE::pipeline_layout {
 
         std::vector<graphic_resource::BindingLayout> resourceBindingSets;
 
-        void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
+        void injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl);
     };
 } // namespace VSL_NAMESPACE::pipeline_layout

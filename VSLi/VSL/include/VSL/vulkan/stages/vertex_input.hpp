@@ -48,7 +48,7 @@ namespace VSL_NAMESPACE::pipeline_layout {
 
         std::vector<VertexInputShapeDefinition> definitions;
 
-        void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
+        void injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl);
     };
 
     template<concepts::is_static_convertible_graphic_type... Args>

@@ -110,7 +110,7 @@ VSL_NAMESPACE::Swapchain::Swapchain(VSL_NAMESPACE::LogicalDeviceAccessor device,
 
     configureSwapchainSharing(createInfo, queueFamilyIndices, _data->preTransform);
 
-    createInfo.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
+    createInfo.compositeAlpha = chooseSwapchainCompositeAlpha(swapChainSupport.capabilities.supportedCompositeAlpha);
     createInfo.presentMode = _data->presentMode;
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = old.has_value() ? old->_data->swapChain : VK_NULL_HANDLE;

@@ -102,6 +102,8 @@ vsl::graphic_resource::Pool::bind(vsl::graphic_resource::BindingLayout layout) {
 
 std::tuple<bool, std::vector<vsl::graphic_resource::Resource>>
 vsl::graphic_resource::Pool::bind(size_t n, vsl::graphic_resource::BindingLayout layout) {
+    if (n == 0)
+        return {true, {}};
     std::tuple<bool, std::vector<vsl::graphic_resource::Resource>> result{true, {}};
     auto &[check, resources] = result;
     resources.resize(n);
@@ -129,6 +131,8 @@ vsl::graphic_resource::Pool::bind(size_t n, vsl::graphic_resource::BindingLayout
 
 std::tuple<bool, std::vector<vsl::graphic_resource::Resource>>
 vsl::graphic_resource::Pool::bind(std::vector <vsl::graphic_resource::BindingLayout> layouts) {
+    if (layouts.empty())
+        return {true, {}};
     std::tuple<bool, std::vector<vsl::graphic_resource::Resource>> result{true, {}};
     auto &[check, resources] = result;
     resources.resize(layouts.size());

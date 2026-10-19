@@ -429,3 +429,98 @@ namespace {
         expect_sequence(actual, 37);
     }
 } // namespace
+
+namespace {
+    TEST(SpirvReflectorTest, NumericVertexFormatsKeepTheirSignednessAnd16Or64BitWidth) {
+        vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection_numeric_widths.vert.spv"));
+        ASSERT_TRUE(reflector.generated.vertex_input);
+        const auto& definitions = reflector.generated.vertex_input->definitions;
+        ASSERT_EQ(definitions.size(), 9u);
+        for (const auto& [location, format, bytes] : {
+                 std::tuple{0u, vsl::data_format::SignedFloat16RG, 4u},
+                 std::tuple{1u, vsl::data_format::SignedInt16RGB, 6u},
+                 std::tuple{2u, vsl::data_format::UnsignedInt16RGBA, 8u},
+                 std::tuple{3u, vsl::data_format::SignedFloat64RGB, 24u},
+                 std::tuple{11u, vsl::data_format::SignedInt64RG, 16u},
+                 std::tuple{12u, vsl::data_format::UnsignedInt64RG, 16u},
+                 std::tuple{15u, vsl::data_format::SignedFloat64RGBA, 32u}}) {
+            SCOPED_TRACE(location);
+            const auto found = std::ranges::find_if(definitions, [&](const auto& def) {
+                return def.layouts.size() == 1 && def.layouts[0].location == location;
+            });
+            ASSERT_NE(found, definitions.end());
+            EXPECT_EQ(found->layouts[0].format, format);
+            EXPECT_EQ(found->layouts[0].format.size(), bytes);
+        }
+    }
+    TEST(SpirvReflectorTest, DoubleMatrixColumnsUseTheLocationsRequiredByTheirVectorWidth) {
+        vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection_numeric_widths.vert.spv"));
+        ASSERT_TRUE(reflector.generated.vertex_input);
+        const auto& definitions = reflector.generated.vertex_input->definitions;
+        const auto matrix = std::ranges::find_if(definitions, [](const auto& def) { return def.layouts.size() == 3; });
+        ASSERT_NE(matrix, definitions.end());
+        for (std::uint32_t column = 0; column < 3; ++column) {
+            EXPECT_EQ(matrix->layouts[column].location, 5u + column * 2);
+            EXPECT_EQ(matrix->layouts[column].format, vsl::data_format::SignedFloat64RGB);
+            EXPECT_EQ(matrix->layouts[column].format.size(), 24u);
+        }
+        const auto compact = std::ranges::find_if(definitions, [](const auto& def) { return def.layouts.size() == 2; });
+        ASSERT_NE(compact, definitions.end());
+        for (std::uint32_t column = 0; column < 2; ++column) {
+            EXPECT_EQ(compact->layouts[column].location, 13u + column);
+            EXPECT_EQ(compact->layouts[column].format, vsl::data_format::SignedFloat64RG);
+        }
+    }
+    TEST(SpirvReflectorTest, ReflectedNumericWidthRequirementsIncludeEveryMatrixColumn) {
+        vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection_numeric_widths.vert.spv"));
+        ASSERT_TRUE(reflector.generated.vertex_input);
+        // Separate bindings: half/short vectors, dvec3/4, dmat3/2 and signed/unsigned int64 vectors.
+        EXPECT_EQ(reflector.generated.vertex_input->requirements_size(), 4u + 6u + 8u + 24u + 72u + 16u + 16u + 32u + 32u);
+    }
+    class ReflectedNumericFormatsVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+    TEST_F(ReflectedNumericFormatsVulkanIntegrationTest, NativeInputMetadataKeepsFormatsWidthsAndMatrixColumnOffsets) {
+        vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_numeric_widths.vert.spv"));
+        ASSERT_TRUE(reflector.generated.vertex_input);
+        auto layout = make_layout_state();
+        reflector.generated.vertex_input->injection(layout);
+        const auto& native = layout._data->info->vertexInput;
+        ASSERT_EQ(native.vertexBindingDescriptionCount, 9u);
+        ASSERT_EQ(native.vertexAttributeDescriptionCount, 12u);
+        const auto attributes = std::span(native.pVertexAttributeDescriptions, native.vertexAttributeDescriptionCount);
+        for (const auto& [location, format] : {
+                 std::pair{0u, vk::Format::eR16G16Sfloat},
+                 std::pair{1u, vk::Format::eR16G16B16Sint},
+                 std::pair{2u, vk::Format::eR16G16B16A16Uint},
+                 std::pair{3u, vk::Format::eR64G64B64Sfloat},
+                 std::pair{5u, vk::Format::eR64G64B64Sfloat},
+                 std::pair{7u, vk::Format::eR64G64B64Sfloat},
+                 std::pair{9u, vk::Format::eR64G64B64Sfloat},
+                 std::pair{11u, vk::Format::eR64G64Sint},
+                 std::pair{12u, vk::Format::eR64G64Uint},
+                 std::pair{13u, vk::Format::eR64G64Sfloat},
+                 std::pair{14u, vk::Format::eR64G64Sfloat},
+                 std::pair{15u, vk::Format::eR64G64B64A64Sfloat}}) {
+            SCOPED_TRACE(location);
+            const auto attribute = std::ranges::find(attributes, location, &vk::VertexInputAttributeDescription::location);
+            ASSERT_NE(attribute, attributes.end());
+            EXPECT_EQ(attribute->format, format);
+            if (location == 5 || location == 7 || location == 9) {
+                EXPECT_EQ(attribute->offset, (location - 5) / 2 * 24);
+                const auto bindings = std::span(native.pVertexBindingDescriptions, native.vertexBindingDescriptionCount);
+                const auto binding = std::ranges::find(bindings, attribute->binding, &vk::VertexInputBindingDescription::binding);
+                ASSERT_NE(binding, bindings.end());
+                EXPECT_EQ(binding->stride, 72u);
+            } else if (location == 13 || location == 14) {
+                EXPECT_EQ(attribute->offset, (location - 13) * 16);
+                const auto bindings = std::span(native.pVertexBindingDescriptions, native.vertexBindingDescriptionCount);
+                const auto binding = std::ranges::find(bindings, attribute->binding, &vk::VertexInputBindingDescription::binding);
+                ASSERT_NE(binding, bindings.end());
+                EXPECT_EQ(binding->stride, 32u);
+            }
+        }
+        // The metadata is independent of device shaderFloat64 / storageInputOutput16 support;
+        // this test does not create a pipeline with unsupported shader features.
+    }
+} // namespace

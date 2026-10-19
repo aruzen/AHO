@@ -28,7 +28,7 @@ namespace AHO_NAMESPACE::window {
 
     struct Window : public VSL_NAMESPACE::Window {
         Window(std::string name, int width = 800, int height = 600,
-               engine::EngineAccessor engine = *engine::EngineAccessor::instance());
+               engine::EngineAccessor engine = default_engine());
 
         Window(engine::EngineAccessor engine,
                std::shared_ptr<VSL_NAMESPACE::Window::WindowData> vsl_data,
@@ -52,6 +52,9 @@ namespace AHO_NAMESPACE::window {
         void restore();
 
         bool close() override;
+
+    private:
+        static AHO_NAMESPACE::engine::EngineAccessor default_engine();
     };
 
     struct WindowResizeHookPlugin : public VSL_NAMESPACE::PureWindow::Plugin {

@@ -6,6 +6,43 @@
 #endif
 namespace {
     using AhoWindowVulkanIntegration = aho_test::LiveGpuTest;
+    TEST_F(AhoWindowVulkanIntegration, GraphicsInitializationFailureUnregistersTheNewNativeWindow) {
+        ASSERT_NO_THROW(start_engine());
+        aho::engine::EngineAccessor failing = *engine;
+        failing._data = std::make_shared<aho::engine::EngineData>(*engine->_data);
+        std::vector<const char*> extensions{VK_KHR_SURFACE_EXTENSION_NAME};
+#ifdef __APPLE__
+        extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+#endif
+        auto unsupported = std::make_shared<vsl::_impl::Vulkan_impl<false>>();
+        vk::InstanceCreateInfo info{};
+#ifdef __APPLE__
+        info.flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
+#endif
+        info.enabledExtensionCount = static_cast<std::uint32_t>(extensions.size());
+        info.ppEnabledExtensionNames = extensions.data();
+        unsupported->instance = vk::createInstance(info);
+        failing._data->vulkan_instance._accessor = unsupported;
+        const auto previous = vsl::PureWindow::WINDOWS;
+        const auto singleton = aho::engine::EngineAccessor::instance();
+        EXPECT_THROW((aho::Window("cannot create graphics", 48, 32, failing)), vsl::exceptions::RuntimeException);
+        EXPECT_EQ(vsl::PureWindow::WINDOWS, previous);
+        EXPECT_EQ(aho::engine::EngineAccessor::instance(), singleton);
+        EXPECT_TRUE(static_cast<bool>(*engine->boot_window));
+        aho::Window retry("valid construction after failure", 48, 32, *engine);
+        EXPECT_TRUE(static_cast<bool>(retry));
+        EXPECT_EQ(vsl::PureWindow::WINDOWS.size(), previous.size() + 1);
+        EXPECT_TRUE(retry.close());
+    }
+    TEST_F(AhoWindowVulkanIntegration, BootedDefaultEngineCreatesAndClosesAnIndependentWindow) {
+        ASSERT_NO_THROW(start_engine());
+        const auto previous = vsl::PureWindow::WINDOWS.size();
+        aho::Window second("default engine construction", 48, 32);
+        EXPECT_EQ(second.engine._data, engine->_data);
+        EXPECT_EQ(vsl::PureWindow::WINDOWS.size(), previous + 1);
+        EXPECT_TRUE(second.close());
+        EXPECT_EQ(vsl::PureWindow::WINDOWS.size(), previous);
+    }
     TEST_F(AhoWindowVulkanIntegration, ExistingWindowSupportsSizeTitleAndClose) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
@@ -85,7 +122,29 @@ namespace {
 #else
 #include <gtest/gtest.h>
 #include <AHO/window.hpp>
+#include <AHO/engine/standard_engine.hpp>
 namespace {
+    TEST(AhoWindowConstructionTest, MissingDefaultEngineThrowsBeforeWindowRegistration) {
+        ASSERT_EQ(aho::engine::EngineAccessor::instance(), nullptr);
+        ASSERT_TRUE(vsl::PureWindow::WINDOWS.empty());
+        EXPECT_THROW((aho::Window("no default engine")), vsl::exceptions::RuntimeException);
+        EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
+        EXPECT_EQ(aho::engine::EngineAccessor::instance(), nullptr);
+    }
+    TEST(AhoWindowConstructionTest, UnbootedDefaultEngineThrowsBeforeWindowRegistration) {
+        aho::StandardEngine engine("not booted", false);
+        ASSERT_FALSE(engine._data);
+        EXPECT_THROW((aho::Window("unbooted default engine")), vsl::exceptions::RuntimeException);
+        EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
+        EXPECT_EQ(aho::engine::EngineAccessor::instance(), &engine);
+    }
+    TEST(AhoWindowConstructionTest, UnbootedExplicitEngineThrowsBeforeWindowRegistration) {
+        aho::StandardEngine engine("not booted", false);
+        ASSERT_FALSE(engine._data);
+        EXPECT_THROW((aho::Window("unbooted explicit engine", 48, 32, engine)), vsl::exceptions::RuntimeException);
+        EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
+        EXPECT_EQ(aho::engine::EngineAccessor::instance(), &engine);
+    }
     TEST(AhoWindowTest, SharedDataConstructorKeepsNativeOwnershipAndEmptyDrawingData) {
         aho::engine::EngineAccessor engine;
         auto native = std::make_shared<vsl::Window::WindowData>();

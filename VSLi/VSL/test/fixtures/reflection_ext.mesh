@@ -1,0 +1,12 @@
+#version 460
+#extension GL_EXT_mesh_shader : require
+layout(local_size_x = 1) in;
+layout(triangles, max_vertices = 3, max_primitives = 1) out;
+layout(set = 0, binding = 0, std430) buffer Output { vec4 value; }
+result;
+layout(push_constant) uniform Push { vec4 bias; }
+pushed;
+void main() {
+    SetMeshOutputsEXT(0, 0);
+    result.value = pushed.bias;
+}

@@ -1,0 +1,5 @@
+#version 450
+layout(local_size_x = 1) in;
+layout(set = 0, binding = 0) uniform usamplerBuffer source_texels[2];
+layout(set = 0, binding = 1, r32ui) writeonly uniform uimageBuffer destination_texels[3];
+void main() { imageStore(destination_texels[2], 0, texelFetch(source_texels[1], 0)); }

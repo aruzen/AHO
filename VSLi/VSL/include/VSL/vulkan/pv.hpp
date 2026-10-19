@@ -12,6 +12,7 @@ namespace VSL_NAMESPACE::_impl {
     struct CommandBuffer_impl;
     struct Command_impl;
     struct CommandManager_impl;
+    struct Submission_impl;
     struct Surface_impl;
     struct Swapchain_impl;
     struct View_impl;
@@ -25,6 +26,7 @@ namespace VSL_NAMESPACE::_impl {
     struct Fence_impl;
     struct SynchroManager_impl;
     struct Buffer_impl;
+    struct MappedBuffer_impl;
     struct ResourceBindingLayout_impl;
     struct GraphicResourcePool_impl;
     struct GraphicResourceManager_impl;

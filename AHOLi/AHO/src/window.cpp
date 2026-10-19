@@ -1,7 +1,3 @@
-//
-// Created by morimoto_hibiki on 2025/10/10.
-//
-
 #include <AHO/window.hpp>
 #include <GLFW/glfw3.h>
 
@@ -28,7 +24,7 @@ AHO_NAMESPACE::window::Window::Window(std::string name, int width, int height, A
         .image_available = _engine._data->synchro_manager
                                .createSemaphore(name + "ImageAvailable", _engine._data->command_manager.getBuffer().getSize()),
         .render_finished = _engine._data->synchro_manager
-                               .createSemaphore(name + "RenderFinished", _engine._data->command_manager.getBuffer().getSize()),
+                               .createSemaphore(name + "RenderFinished", swapchain.getSwapImageSize()),
         .in_flight = _engine._data->synchro_manager
                          .createFence(name + "InFlight", _engine._data->command_manager.getBuffer().getSize(), true)});
 }
@@ -42,8 +38,12 @@ AHO_NAMESPACE::window::Window::Window(engine::EngineAccessor engine, std::shared
 bool AHO_NAMESPACE::window::Window::resize(int width, int height) {
     if (not VSL_NAMESPACE::PureWindow::resize(width, height))
         return false;
+    engine._data->command_manager.waitIdle();
     _data2->swapchain = VSL_NAMESPACE::Swapchain(engine._data->logical_device, _data2->surface, _data2->swapchain);
     _data2->frame_buffer = VSL_NAMESPACE::FrameBuffer(_data2->swapchain, _data2->render_pass);
+    if (_data2->render_finished.size() != _data2->swapchain.getSwapImageSize())
+        _data2->render_finished = engine._data->synchro_manager.createSemaphore(
+            name() + "RenderFinished", _data2->swapchain.getSwapImageSize());
     for (const auto& [_, p] : _data->plugins) {
         auto hook = std::dynamic_pointer_cast<WindowResizeHookPlugin>(p);
         if (not hook)
@@ -84,10 +84,11 @@ AHO_NAMESPACE::window::WindowResizeHookPlugin::WindowResizeHookPlugin(VSL_NAMESP
 }
 
 bool AHO_NAMESPACE::window::Window::close() {
+    if (_data2)
+        engine._data->command_manager.waitIdle();
     _data2.reset();
     return VSL_NAMESPACE::PureWindow::close();
 }
 
 AHO_NAMESPACE::window::WindowData::~WindowData() {
-    // vsl::loggingln("window destroy");
 }

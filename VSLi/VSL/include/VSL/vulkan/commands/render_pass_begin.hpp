@@ -14,6 +14,9 @@ namespace VSL_NAMESPACE::command {
                         RenderArea area = {}, std::uint32_t targetIndex = 0);
         RenderPassBegin(RenderPass pass, FrameBufferAccessor target,
                         std::optional<__VSLDRGBColorAccessor<float>> color = std::nullopt);
+        // 未指定のアタッチメントには、形式に応じた既定のクリア値を使う。
+        static RenderPassBegin withClears(FrameBufferAccessor target, std::vector<AttachmentClear> values,
+                                          RenderArea area = {}, std::uint32_t targetIndex = 0);
         // 既存コードとの互換性のために保持する。
         RenderPassAccessor renderPass;
         FrameBufferAccessor frameBuffer;

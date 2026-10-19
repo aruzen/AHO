@@ -35,7 +35,9 @@ namespace {
         EXPECT_THROW(vsl::utils::SPIRVReflector({}, vsl_test::shader_path("absent.spv")),
                      vsl::exceptions::RuntimeException);
     }
-    using SpirvReflectorVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+    class SpirvReflectorVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
     TEST_F(SpirvReflectorVulkanIntegrationTest, GeneratedBindingLayoutsRetainDefinitionsAndRepeatCount) {
         vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("fill.comp.spv"));
         const auto layouts = reflector.generated.makeBindingLayout(2);
@@ -103,6 +105,97 @@ namespace {
             const auto found = std::ranges::find(points, 0u, &vsl::graphic_resource::BindingPoint::binding);
             ASSERT_NE(found, points.end());
             EXPECT_EQ(found->amount, amount);
+        }
+    }
+} // namespace
+
+#include "support/temporary_directory.hpp"
+#include <fstream>
+namespace {
+    TEST(SpirvReflectorTest, BinaryRejectsTrailingPartialWordsInsteadOfSilentlyIgnoringThem) {
+        const auto valid = vsl_test::read_binary(vsl_test::shader_path("fill.comp.spv"));
+        for (std::size_t trailing = 1; trailing <= 3; ++trailing) {
+            SCOPED_TRACE(trailing);
+            auto bytes = valid;
+            bytes.insert(bytes.end(), trailing, '\0');
+            try {
+                vsl::utils::SPIRVReflector reflector({}, bytes);
+                ADD_FAILURE() << "A partial SPIR-V word was accepted";
+            } catch (const vsl::exceptions::RuntimeException& error) {
+                EXPECT_NE(error.reason.find("size"), std::string::npos);
+            }
+        }
+    }
+    TEST(SpirvReflectorTest, BinaryRejectsEmptyOrTruncatedHeadersWithVslRuntimeException) {
+        const auto valid = vsl_test::read_binary(vsl_test::shader_path("fill.comp.spv"));
+        for (std::size_t length = 0; length < 20; length += 4) {
+            SCOPED_TRACE(length);
+            const std::vector<char> bytes(valid.begin(), valid.begin() + length);
+            EXPECT_THROW(vsl::utils::SPIRVReflector({}, bytes), vsl::exceptions::RuntimeException);
+        }
+    }
+    TEST(SpirvReflectorTest, FileRejectsTrailingPartialWordsInsteadOfSilentlyIgnoringThem) {
+        vsl_test::TemporaryDirectory directory;
+        const auto path = directory.path() / "partial.spv";
+        const auto valid = vsl_test::read_binary(vsl_test::shader_path("fill.comp.spv"));
+        for (std::size_t trailing = 1; trailing <= 3; ++trailing) {
+            SCOPED_TRACE(trailing);
+            auto bytes = valid;
+            bytes.insert(bytes.end(), trailing, '\0');
+            {
+                std::ofstream output(path, std::ios::binary);
+                ASSERT_TRUE(output.write(bytes.data(), static_cast<std::streamsize>(bytes.size())));
+            }
+            EXPECT_THROW(vsl::utils::SPIRVReflector({}, path), vsl::exceptions::RuntimeException);
+        }
+    }
+    TEST(SpirvReflectorTest, FileRejectsEmptyOrTruncatedHeadersWithVslRuntimeException) {
+        vsl_test::TemporaryDirectory directory;
+        const auto path = directory.path() / "short.spv";
+        const auto valid = vsl_test::read_binary(vsl_test::shader_path("fill.comp.spv"));
+        for (std::size_t length = 0; length < 20; length += 4) {
+            SCOPED_TRACE(length);
+            {
+                std::ofstream output(path, std::ios::binary);
+                ASSERT_TRUE(output.write(valid.data(), static_cast<std::streamsize>(length)));
+            }
+            EXPECT_THROW(vsl::utils::SPIRVReflector({}, path), vsl::exceptions::RuntimeException);
+        }
+    }
+    TEST(SpirvReflectorTest, FileAndBinaryConstructorsPreserveValidReflectionFromTemporaryPath) {
+        vsl_test::TemporaryDirectory directory;
+        const auto path = directory.path() / "反射 shader.spv";
+        const auto bytes = vsl_test::read_binary(vsl_test::shader_path("fill.comp.spv"));
+        {
+            std::ofstream output(path, std::ios::binary);
+            ASSERT_TRUE(output.write(bytes.data(), static_cast<std::streamsize>(bytes.size())));
+        }
+        vsl::utils::SPIRVReflector from_file({}, path), from_binary({}, bytes);
+        EXPECT_EQ(from_file.generated.binding_points, from_binary.generated.binding_points);
+        ASSERT_TRUE(from_file.generated.push_constants);
+        EXPECT_EQ(from_file.generated.push_constants->definitions.at(0).size, 4u);
+        EXPECT_EQ(from_file.generated.push_constants->definitions.at(0).targetShader, vsl::ShaderFlag::Compute);
+    }
+    TEST(SpirvReflectorTest, BinaryPreservesSupportForSwappedWordByteOrder) {
+        auto bytes = vsl_test::read_binary(vsl_test::shader_path("fill.comp.spv"));
+        ASSERT_EQ(bytes.size() % 4, 0u);
+        for (std::size_t i = 0; i < bytes.size(); i += 4)
+            std::reverse(bytes.begin() + i, bytes.begin() + i + 4);
+        vsl::utils::SPIRVReflector reflector({}, bytes);
+        const auto& binding = reflector.generated.binding_points.at(0).at(0);
+        EXPECT_EQ(binding.bindingType, vsl::graphic_resource::Type::StorageBuffer);
+        EXPECT_EQ(binding.shaderType, vsl::ShaderFlag::Compute);
+        ASSERT_TRUE(reflector.generated.push_constants);
+        EXPECT_EQ(reflector.generated.push_constants->definitions.at(0).size, 4u);
+    }
+    TEST(SpirvReflectorTest, MissingFileFailureIncludesTheRequestedPath) {
+        vsl_test::TemporaryDirectory directory;
+        const auto path = directory.path() / "missing shader.spv";
+        try {
+            vsl::utils::SPIRVReflector reflector({}, path);
+            ADD_FAILURE() << "Missing SPIR-V file was accepted";
+        } catch (const vsl::exceptions::RuntimeException& error) {
+            EXPECT_NE(error.reason.find(path.string()), std::string::npos);
         }
     }
 } // namespace

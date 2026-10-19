@@ -10,7 +10,8 @@ if (VSL_TEST_SOURCES)
             descriptor_arrays.comp descriptor_multidimensional.comp descriptor_runtime.comp
             descriptor_specialization.comp descriptor_specialization_expression.comp descriptor_count_overflow.comp
             reflection_stage.geom reflection_stage.tesc reflection_stage.tese reflection_ext.task reflection_ext.mesh reflection_nv.task reflection_nv.mesh reflection_stage.rgen reflection_stage.rmiss reflection_stage.rint reflection_stage.rahit reflection_stage.rchit reflection_stage.rcall
-            reflection_separate_images.comp reflection_separate_arrays.comp reflection_separate_texel.comp)
+            reflection_separate_images.comp reflection_separate_arrays.comp reflection_separate_texel.comp
+            reflection_texel_buffers.comp reflection_texel_arrays.comp)
         set(VSL_TEST_SHADER_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/shaders/${VSL_TEST_SHADER}.spv")
         set(VSL_TEST_SHADER_OPTIONS)
         if (VSL_TEST_SHADER MATCHES "\\.(rgen|rmiss|rint|rahit|rchit|rcall|task|mesh)$")

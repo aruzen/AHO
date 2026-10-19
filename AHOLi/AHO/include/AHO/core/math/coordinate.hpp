@@ -128,15 +128,30 @@ namespace AHO_NAMESPACE {
 #define AHO_COORDINATE_NUMBERD_MEMBER_2 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 2)
 #define AHO_COORDINATE_NUMBERD_MEMBER_3 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 3)
 
-#ifdef _MSC_VER
-#define ___AN1 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_1, .value)
-#define ___AN2 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_2, .value)
-#define ___AN3 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_3, .value)
-#elif __APPLE__
-#define ___AN1 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_1, ).value
-#define ___AN2 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_2, ).value
-#define ___AN3 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_3, ).value
-#endif
+		namespace detail {
+			template<std::size_t Index, typename Set>
+			constexpr decltype(auto) coordinate_component(Set& set) {
+				using CI = typename Set::coordinate_info;
+				static_assert(Index < CI::dimension::dimension);
+				if constexpr (Index == 0 && CI::EnabledX)
+					return (set.x.value);
+				else if constexpr ((Index == 0 && !CI::EnabledX && CI::EnabledY) ||
+								   (Index == 1 && CI::EnabledX && CI::EnabledY))
+					return (set.y.value);
+				else
+					return (set.z.value);
+			}
+		}
+
+#define ___AN1 template component<0>()
+#define ___AN2 template component<1>()
+#define ___AN3 template component<2>()
+
+#define AHO_COORDINATE_COMPONENT_ACCESSORS \
+				template<std::size_t Index> \
+				constexpr decltype(auto) component() { return detail::coordinate_component<Index>(*this); } \
+				template<std::size_t Index> \
+				constexpr decltype(auto) component() const { return detail::coordinate_component<Index>(*this); }
 
 #define AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper, Lower) \
 				template <typename T> \
@@ -158,6 +173,7 @@ namespace AHO_NAMESPACE {
 								  std::same_as<Z<ElementType>, Upper<ElementType>>  \
 							  >::value; \
 				static constexpr bool is_coordinate_set = true; \
+				AHO_COORDINATE_COMPONENT_ACCESSORS \
 				union { Upper<ElementType> Lower, AHO_COORDINATE_NUMBERD_MEMBER_1; }; \
 				constexpr _CoordinateSet() : Lower(Upper<ElementType>()) {}; \
 				constexpr _CoordinateSet(const Upper<ElementType>& Lower) : Lower(Lower) {}; \
@@ -183,6 +199,7 @@ namespace AHO_NAMESPACE {
 							      (std::same_as<Z<ElementType>, Upper1<ElementType>> || std::same_as<Z<ElementType>, Upper2<ElementType>>)  \
 							  >::value; \
 				static constexpr bool is_coordinate_set = true; \
+				AHO_COORDINATE_COMPONENT_ACCESSORS \
 				union { Upper1<ElementType> Lower1, AHO_COORDINATE_NUMBERD_MEMBER_1; }; \
 				union { Upper2<ElementType> Lower2, AHO_COORDINATE_NUMBERD_MEMBER_2; }; \
 				constexpr _CoordinateSet() : Lower1(Upper1<ElementType>()), Lower2(Upper2<ElementType>()) {}; \
@@ -210,6 +227,7 @@ namespace AHO_NAMESPACE {
 			using coordinate_info = _MakeCoordinateInfo<true, true, true>::value;
 
 			static constexpr bool is_coordinate_set = true;
+			AHO_COORDINATE_COMPONENT_ACCESSORS
 			union { X<ElementType> x, AHO_COORDINATE_NUMBERD_MEMBER_1; };
 			union { Y<ElementType> y, AHO_COORDINATE_NUMBERD_MEMBER_2; };
 			union { Z<ElementType> z, AHO_COORDINATE_NUMBERD_MEMBER_3; };

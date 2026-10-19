@@ -3,7 +3,9 @@
 #include <limits>
 
 namespace {
-    using BufferVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+    class BufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
     using HostBuffer = vsl::StagingBuffer<vsl::MemoryType::TransferDestination>;
     TEST_F(BufferVulkanIntegrationTest, MapsCopiesAndReadsBackSingleValues) {
         if (!host_coherent_available())
@@ -300,5 +302,47 @@ namespace {
         auto buffer = vsl::make_buffer<HostBuffer>(device, payload, manager);
         auto mapped = buffer.data(sizeof(payload));
         EXPECT_EQ(std::memcmp(mapped.data, payload.data(), sizeof(payload)), 0);
+    }
+} // namespace
+
+namespace {
+    class BufferSharingVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+    using ConcurrentHostBuffer = vsl::StagingBuffer<vsl::MemoryType::TransferDestination, vsl::MemoryProperty::None, vsl::SharingMode::Concurrent>;
+    TEST_F(BufferSharingVulkanIntegrationTest, ConcurrentRequestWorksWithOneQueueFamilyAndPreservesMappedPayload) {
+        if (!host_coherent_available())
+            GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
+        ASSERT_EQ(device._data->graphicsFamily, queue_family);
+        ASSERT_EQ(device._data->presentFamily, queue_family);
+        const std::array<std::uint32_t, 4> expected{0, 17, 0xffffffffu, 101};
+        ConcurrentHostBuffer buffer(device, expected);
+        ASSERT_FALSE(has_validation_errors()) << "Buffer creation must pass validation before mapping";
+        EXPECT_GE(buffer.size(), sizeof(expected));
+        auto mapped = buffer.data(sizeof(expected));
+        EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
+    }
+    TEST_F(BufferSharingVulkanIntegrationTest, ConcurrentDeviceLocalBufferTransfersPayloadUsingTheCreatedGraphicsQueue) {
+        if (!host_coherent_available())
+            GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
+        const std::array<std::uint32_t, 4> expected{13, 0, 0xffffffffu, 29};
+        ConcurrentHostBuffer upload(device, expected), readback(device, sizeof(expected));
+        vsl::DeviceLocalBuffer<vsl::MemoryType::TransferSource, vsl::MemoryProperty::None, vsl::SharingMode::Concurrent> gpu(device, sizeof(expected));
+        ASSERT_FALSE(has_validation_errors()) << "Do not submit buffers whose creation failed validation";
+        auto manager = make_manager();
+        EXPECT_TRUE(gpu.copyByBuffer(manager, &upload));
+        EXPECT_TRUE(readback.copyByBuffer(manager, &gpu));
+        {
+            auto phase = manager.startPhase<vsl::ComputePhase>();
+            vk::MemoryBarrier host_visibility{};
+            host_visibility.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+            host_visibility.dstAccessMask = vk::AccessFlagBits::eHostRead;
+            auto commands = manager.getBuffer();
+            commands._data->commandBuffers[commands.getCurrentBufferIdx()].pipelineBarrier(
+                vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, host_visibility, {}, {});
+        }
+        device._data->device.waitIdle();
+        auto mapped = readback.data(sizeof(expected));
+        EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
     }
 } // namespace

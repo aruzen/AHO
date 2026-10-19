@@ -601,3 +601,93 @@ namespace {
             expect_reflected_stage(file, stage);
     }
 } // namespace
+
+namespace {
+    TEST(SpirvReflectorTest, SeparateImagesAndSamplersRetainTheirBindingTypesAndArrayCounts) {
+        using namespace vsl::graphic_resource;
+        for (const auto& [file, image_count, sampler_count] : {
+                 std::tuple{"reflection_separate_images.comp.spv", 1u, 1u},
+                 std::tuple{"reflection_separate_arrays.comp.spv", 2u, 3u}}) {
+            SCOPED_TRACE(file);
+            vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path(file));
+            const auto& points = reflector.generated.binding_points.at(0);
+            ASSERT_EQ(points.size(), 3u);
+            for (const auto& [binding, type, count] : {std::tuple{0u, Type::StorageBuffer, 1u},
+                                                       std::tuple{1u, Type::SampledImage, image_count},
+                                                       std::tuple{2u, Type::Sampler, sampler_count}}) {
+                const auto found = std::ranges::find(points, binding, &BindingPoint::binding);
+                ASSERT_NE(found, points.end());
+                EXPECT_EQ(found->bindingType, type);
+                EXPECT_EQ(found->amount, count);
+                EXPECT_EQ(found->shaderType, vsl::ShaderFlag::Compute);
+            }
+        }
+    }
+    TEST(SpirvReflectorTest, SeparateBufferImagesUseUniformTexelBufferDescriptors) {
+        using namespace vsl::graphic_resource;
+        vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection_separate_texel.comp.spv"));
+        const auto& points = reflector.generated.binding_points.at(0);
+        ASSERT_EQ(points.size(), 2u);
+        const auto found = std::ranges::find(points, 1u, &BindingPoint::binding);
+        ASSERT_NE(found, points.end());
+        EXPECT_EQ(found->bindingType, Type::UniformTexelBuffer);
+        EXPECT_EQ(found->amount, 1u);
+        EXPECT_EQ(found->shaderType, vsl::ShaderFlag::Compute);
+    }
+} // namespace
+
+#include "support/image_transfer_fixture.hpp"
+namespace {
+    class ReflectedSeparateImageVulkanIntegrationTest : public vsl_test::ImageTransferVulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+    TEST_F(ReflectedSeparateImageVulkanIntegrationTest, GeneratedLayoutSamplesTheUploadedTexelWithASeparateSampler) {
+        using namespace vsl::graphic_resource;
+        if (!host_coherent_available())
+            GTEST_SKIP() << "Host coherent memory unavailable";
+        vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_separate_images.comp.spv"));
+        const auto sets = reflector.generated.makeBindingLayout();
+        ASSERT_EQ(sets.size(), 1u);
+        ASSERT_EQ(sets[0].getBindingPoints().size(), 3u) << "Do not use a pipeline with an incomplete reflected layout";
+        vsl::GraphicResourceManager resources(device);
+        auto [pool, allocated] = resources.make(sets);
+        struct ReclaimCycle {
+            vsl::GraphicResourcePool pool;
+            ~ReclaimCycle() { pool._data->resources.clear(); }
+        } reclaim{pool};
+        ASSERT_EQ(allocated.size(), 1u);
+        vsl::StagingBuffer<vsl::MemoryType::StorageBuffer> output(device, std::array<std::uint32_t, 2>{0, 0});
+        TransferImage image(device, 1, 1, vsl::data_format::UnsignedNormalized8RGBA);
+        vsl::Sampler sampler(device, vsl::SamplingMode::Nearest, vsl::EdgeMode::ClampToEdge);
+        const std::array<std::uint8_t, 4> texel{37, 83, 131, 255};
+        vsl::StagingBuffer<vsl::MemoryType::TransferSource> upload(device, texel);
+        allocated[0].update(&output, 0);
+        allocated[0].update(image, 1);
+        allocated[0].update(image, sampler, 2);
+        vsl::Shader<vsl::ShaderType::Compute> shader(device, vsl_test::shader_path("reflection_separate_images.comp.spv"));
+        vsl::PipelineLayout layout(device, vsl::pipeline_layout::ShaderGroup("separate image", {shader}),
+                                   vsl::pipeline_layout::ResourceBinding(sets));
+        vsl::ComputePipeline pipeline(layout);
+        auto manager = make_manager();
+        {
+            auto phase = manager.startPhase<vsl::ComputePhase>();
+            transition(manager, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, {}, vk::AccessFlagBits::eTransferWrite);
+            phase << vsl::command::CopyBufferToImage(image, &upload, vsl::ImageLayout::General);
+            transition(manager, image, vk::ImageLayout::eGeneral, vk::ImageLayout::eGeneral,
+                       vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eShaderRead);
+            phase << pipeline << vsl::command::BindGraphicResource(allocated[0], BindingDestination::Compute)
+                  << vsl::command::Dispatch(1, 1, 1);
+            vk::MemoryBarrier barrier{};
+            barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
+            barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
+            auto commands = manager.getBuffer();
+            commands._data->commandBuffers[commands.getCurrentBufferIdx()].pipelineBarrier(
+                vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+        }
+        device._data->device.waitIdle();
+        auto mapped = output.data(2 * sizeof(std::uint32_t));
+        std::array<std::uint32_t, 2> actual{};
+        std::memcpy(actual.data(), mapped.data, sizeof(actual));
+        EXPECT_EQ(actual, (std::array<std::uint32_t, 2>{37, 83}));
+    }
+} // namespace

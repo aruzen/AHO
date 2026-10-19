@@ -353,3 +353,68 @@ namespace {
         EXPECT_TRUE(static_cast<bool>(*window));
     }
 } // namespace
+
+namespace {
+    struct WindowCloseErrorCapture {
+        inline static unsigned calls = 0;
+        GLFWerrorfun previous;
+        WindowCloseErrorCapture() : previous(glfwSetErrorCallback([](int, const char*) { ++calls; })) { calls = 0; }
+        ~WindowCloseErrorCapture() { glfwSetErrorCallback(previous); glfwGetError(nullptr); }
+    };
+    TEST(WindowValidityTest, EmptyNativeDataCloseAndDestroyDoNotCallUninitializedGlfw) {
+        ASSERT_TRUE(vsl::PureWindow::WINDOWS.empty());
+        glfwTerminate();
+        WindowCloseErrorCapture errors;
+        auto data = std::make_shared<vsl::PureWindow::WindowData>();
+        vsl::PureWindow window(data);
+        EXPECT_FALSE(window.close());
+        data->destroy();
+        data->destroy();
+        EXPECT_EQ(WindowCloseErrorCapture::calls, 0u);
+        EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
+    }
+    TEST_F(WindowIntegrationTest, RepeatedCloseThroughAliasesAndDataDoesNotReenterTerminatedGlfw) {
+        auto data = window->_data;
+        vsl::PureWindow alias(data);
+        WindowCloseErrorCapture errors;
+        ASSERT_TRUE(window->close());
+        EXPECT_FALSE(static_cast<bool>(alias));
+        EXPECT_EQ(data->window_handle, nullptr);
+        EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
+        EXPECT_FALSE(alias.close());
+        EXPECT_FALSE(window->close());
+        data->destroy();
+        EXPECT_EQ(WindowCloseErrorCapture::calls, 0u);
+    }
+    TEST_F(WindowIntegrationTest, RepeatedCloseLeavesAnotherRegisteredWindowUsable) {
+        ScopedUpdateWindow other;
+        int calls = 0;
+        other.window.add_plugin<CountingUpdatePlugin>(calls);
+        WindowCloseErrorCapture errors;
+        ASSERT_TRUE(window->close());
+        EXPECT_FALSE(window->close());
+        window->_data->destroy();
+        EXPECT_TRUE(static_cast<bool>(other.window));
+        ASSERT_EQ(vsl::PureWindow::WINDOWS.size(), 1u);
+        EXPECT_EQ(vsl::PureWindow::WINDOWS.front(), other.window._data);
+        EXPECT_TRUE(other.window.resize(48, 24));
+        EXPECT_TRUE(vsl::PureWindow::Update());
+        EXPECT_EQ(calls, 1);
+        EXPECT_EQ(WindowCloseErrorCapture::calls, 0u);
+    }
+    TEST_F(WindowIntegrationTest, ClosingAnOldAliasAfterRestartKeepsTheNewWindowRegistered) {
+        vsl::PureWindow old(window->_data);
+        ASSERT_TRUE(window->close());
+        ASSERT_TRUE(glfwInit());
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+        ScopedUpdateWindow next;
+        WindowCloseErrorCapture errors;
+        EXPECT_FALSE(old.close());
+        old._data->destroy();
+        EXPECT_TRUE(static_cast<bool>(next.window));
+        ASSERT_EQ(vsl::PureWindow::WINDOWS.size(), 1u);
+        EXPECT_EQ(vsl::PureWindow::WINDOWS.front(), next.window._data);
+        EXPECT_TRUE(next.window.resize(48, 24));
+        EXPECT_EQ(WindowCloseErrorCapture::calls, 0u);
+    }
+} // namespace

@@ -141,6 +141,7 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
         {shader_resources.uniform_buffers, graphic_resource::Type::UniformBuffer},
         {shader_resources.storage_buffers, graphic_resource::Type::StorageBuffer},
         {shader_resources.storage_images, graphic_resource::Type::StorageImage},
+        {shader_resources.subpass_inputs, graphic_resource::Type::InputAttachment},
         {shader_resources.acceleration_structures, graphic_resource::Type::AccelerationStructureNv}, // 例: NV拡張
         {shader_resources.separate_images, graphic_resource::Type::SampledImage},
         {shader_resources.separate_samplers, graphic_resource::Type::Sampler},

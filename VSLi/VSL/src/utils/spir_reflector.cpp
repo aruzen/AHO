@@ -193,8 +193,12 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
         format = format.toVec(type.vecsize);
         if (not generated.vertex_input)
             generated.vertex_input.emplace();
-        generated.vertex_input->definitions.push_back({.layouts = {type.columns, VSL_NAMESPACE::pipeline_layout::VertexInputLayoutDefinition{
-                                                                                     .format = format}}});
+        VSL_NAMESPACE::pipeline_layout::VertexInputShapeDefinition definition{
+            .layouts = {type.columns, VSL_NAMESPACE::pipeline_layout::VertexInputLayoutDefinition{.format = format}}};
+        const auto location = comp.get_decoration(resource.id, spv::DecorationLocation);
+        for (std::uint32_t column = 0; column < type.columns; ++column)
+            definition.layouts[column].location = location + column;
+        generated.vertex_input->definitions.push_back(std::move(definition));
     }
 }
 

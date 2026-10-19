@@ -33,4 +33,4 @@ struct DepthStencil {
     StencilFace front, back;
     void injection(PipelineLayoutAccessor pl);
 };
-} // namespace VSL_NAMESPACE::pipeline_layout
+}

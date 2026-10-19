@@ -21,4 +21,4 @@ void ColorBlend::injection(PipelineLayoutAccessor pl) {
     info.colorBlend.attachmentCount = static_cast<std::uint32_t>(states.size());
     info.colorBlend.pAttachments = states.data();
 }
-} // namespace vsl::pipeline_layout
+}

@@ -115,8 +115,8 @@ vsl::Swapchain::Swapchain(vsl::LogicalDeviceAccessor device, std::shared_ptr<Sur
         createInfo.pQueueFamilyIndices = queueFamilyIndices;
     } else {
         createInfo.imageSharingMode = vk::SharingMode::eExclusive;
-        createInfo.queueFamilyIndexCount = 0; // Optional
-        createInfo.pQueueFamilyIndices = nullptr; // Optional
+        createInfo.queueFamilyIndexCount = 0;
+        createInfo.pQueueFamilyIndices = nullptr;
         createInfo.preTransform = _data->preTransform;
     }
 
@@ -128,7 +128,6 @@ vsl::Swapchain::Swapchain(vsl::LogicalDeviceAccessor device, std::shared_ptr<Sur
     if (auto result = device._data->device.createSwapchainKHR(&createInfo, nullptr, &_data->swapChain); result != vk::Result::eSuccess)
         loggingln(vk::to_string(result));
 
-    // swapchain image
     _data->swapChainImages = device._data->device.getSwapchainImagesKHR(_data->swapChain);
     _data->swapChainImageFormat = _data->surfaceFormat.format;
     _data->swapChainExtent = _data->extent;
@@ -149,7 +148,6 @@ vsl::Swapchain::Swapchain(vsl::LogicalDeviceAccessor device, std::shared_ptr<Sur
         createInfo.subresourceRange.baseArrayLayer = 0;
         createInfo.subresourceRange.layerCount = 1;
 
-        // swapchain image
         auto imageData = std::make_shared<_impl::Image_impl>();
         imageData->device = device._data;
         imageData->swapchain = _data;

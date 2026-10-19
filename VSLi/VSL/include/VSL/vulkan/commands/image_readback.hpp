@@ -2,8 +2,8 @@
 #include "copy_image_to_buffer.hpp"
 
 namespace VSL_NAMESPACE::command {
-    // Records layout transition, image-to-buffer copy, host visibility, and layout restoration.
-    // Invoke outside a render pass. Submission, completion, and resource lifetime belong to the caller.
+    // レイアウト遷移、バッファへのコピー、CPUへの可視性確保、レイアウト復元を記録する。
+    // レンダーパスの外で使う。送信、完了待ち、リソースの寿命管理は呼び出し側で行う。
     struct ImageReadback : public __Command {
         ImageReadback(BufferAccessor *destination, ImageAccessor image, ImageLayout currentLayout,
                       ImageRegion region = {});

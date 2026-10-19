@@ -1,7 +1,3 @@
-//
-// Created by morimoto_hibiki on 2025/10/08.
-//
-
 #ifndef AHO_ALL_VSL_H
 #define AHO_ALL_VSL_H
 
@@ -64,4 +60,4 @@
 #endif
 #include "vulkan/post_definition.hpp"
 
-#endif //AHO_ALL_VSL_H
+#endif

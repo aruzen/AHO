@@ -205,7 +205,7 @@ RenderPassDescription present_description(SwapchainAccessor swapchain, bool pick
         desc.addColor({.format = data_format::UnsignedInt});
     return desc;
 }
-} // namespace
+}
 RenderPass::RenderPass(SwapchainAccessor swapchain)
     : RenderPass(LogicalDeviceAccessor{swapchain._data ? swapchain._data->device : nullptr},
                  present_description(swapchain, false)) {}
@@ -248,4 +248,4 @@ _impl::RenderPass_impl::~RenderPass_impl() {
     if (device)
         device->device.destroyRenderPass(renderPass);
 }
-} // namespace vsl
+}

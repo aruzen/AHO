@@ -1,7 +1,3 @@
-//
-// Created by morimoto_hibiki on 2025/10/22.
-//
-
 #include <VSL/vulkan/commands/copy_image_to_buffer.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>

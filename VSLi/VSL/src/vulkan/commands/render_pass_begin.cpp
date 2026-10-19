@@ -43,7 +43,7 @@ vk::ClearValue convert(const ClearValue &value) {
         value);
     return result;
 }
-} // namespace
+}
 RenderPassBegin::RenderPassBegin(FrameBufferAccessor target, std::vector<ClearValue> clears,
                                  RenderArea renderArea, std::uint32_t index)
     : frameBuffer(std::move(target)), clearValues(std::move(clears)), area(renderArea), targetIndex(index) {
@@ -111,4 +111,4 @@ void RenderPassBegin::invoke(CommandPool, CommandBuffer buffer, CommandManager) 
 void NextSubpass::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
     buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].nextSubpass(vk::SubpassContents::eInline);
 }
-} // namespace vsl::command
+}

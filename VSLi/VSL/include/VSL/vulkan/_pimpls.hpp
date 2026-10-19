@@ -120,19 +120,6 @@ namespace VSL_NAMESPACE::_impl {
 		~Swapchain_impl();
 	};
 
-    // FIXME Imageの責務が色々なところに分散している
-    /*
-	struct View_impl {
-		std::shared_ptr<LogicalDevice_impl> device;
-        std::vector<vk::Image> swapChainImages;
-		std::vector<vk::ImageView> views;
-
-		~View_impl();
-	};
-
-    struct Viewport_impl {
-		std::shared_ptr<Swapchain_impl> swapchain;
-	}; */
 
 	struct CreateInfo {
 		std::vector<vk::PipelineShaderStageCreateInfo> shaderStages;
@@ -162,11 +149,6 @@ namespace VSL_NAMESPACE::_impl {
 		~PipelineLayout_impl();
 	};
 
-	/*
-	struct ShaderStage_impl {
-		vk::PipelineShaderStageCreateInfo stage;
-	};
-	*/
 
 	struct Shader_impl {
 		std::string name;
@@ -304,12 +286,6 @@ namespace VSL_NAMESPACE::_impl {
 			std::vector<std::shared_ptr<Shader_impl>> shaders;
 		};
 
-		/*
-		struct VertexInput_impl {
-			std::shared_ptr<std::vector<vk::VertexInputBindingDescription>> vertexBindingDescriptions;
-			std::shared_ptr<std::vector<vk::VertexInputAttributeDescription>> vertexAttributeDescriptions;
-		};
-		*/
 	}
 
 	namespace helper {

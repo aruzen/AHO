@@ -27,7 +27,7 @@ namespace VSL_NAMESPACE::command {
 
     void ImageReadback::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
         const auto info = describe(copy.image, currentLayout, copy.region);
-        (void)copy.description(); // Reject invalid destinations before recording any transition.
+        (void)copy.description(); // 遷移の記録前にコピー先を検証する。
         if (copy.layout != ImageLayout::TransferSrcOptimal || !copy.hostRead)
             throw std::invalid_argument("Readback copy must use TransferSrcOptimal and host visibility");
         ChangeImageBarrier(copy.image, currentLayout, ImageLayout::TransferSrcOptimal, info.region.layer, 1)

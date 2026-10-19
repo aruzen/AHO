@@ -6,7 +6,7 @@
 namespace VSL_NAMESPACE::command {
 struct RenderArea {
     std::int32_t x = 0, y = 0;
-    // Both zero means the full framebuffer.
+    // 幅と高さがともに0ならフレームバッファ全体を対象にする。
     std::uint32_t width = 0, height = 0;
 };
 struct RenderPassBegin : __Command {
@@ -14,7 +14,7 @@ struct RenderPassBegin : __Command {
                     RenderArea area = {}, std::uint32_t targetIndex = 0);
     RenderPassBegin(RenderPass pass, FrameBufferAccessor target,
                     std::optional<__VSLDRGBColorAccessor<float>> color = std::nullopt);
-    // Kept for source compatibility with existing command users.
+    // 既存コードとの互換性のために保持する。
     RenderPassAccessor renderPass;
     FrameBufferAccessor frameBuffer;
     std::optional<__VSLDRGBColorAccessor<float>> clear_color;
@@ -30,4 +30,4 @@ struct IDPickingRenderPassBegin : RenderPassBegin {
 struct NextSubpass : __Command {
     void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
 };
-} // namespace VSL_NAMESPACE::command
+}

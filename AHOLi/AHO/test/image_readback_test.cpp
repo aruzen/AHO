@@ -50,7 +50,7 @@ namespace {
             EXPECT_NEAR(std::to_integer<int>(pixels.bytes[i + 2]), 191, 1);
             EXPECT_EQ(pixels.bytes[i + 3], std::byte{255});
         }
-        // A second copy from General verifies restoration after the first request.
+        // 再度Generalから読み戻し、最初の要求でレイアウトが復元されたことを確かめる。
         auto region = aho::ImageReadback(manager, *color, vsl::ImageLayout::General, {1, 2, 3, 2}).read();
         EXPECT_EQ(region.rowStride, 12u);
         ASSERT_EQ(region.bytes.size(), 24u);
@@ -169,7 +169,7 @@ namespace {
             phase << vsl::command::RenderPassBegin(*framebuffer, {vsl::ClearColor{0, 1, 0, 1}})
                   << vsl::command::RenderPassEnd{};
         }
-        // Drawing owns the framebuffer until its submission completes. Readback owns its own transfer resources.
+        // 描画側の参照を解放する前に完了を待ち、読み戻し側だけで画像の寿命を維持できるか確かめる。
         device._data->device.waitIdle();
         std::weak_ptr<vsl::_impl::Image_impl> source = color->_data;
         auto request = aho::ImageReadback(manager, *color, vsl::ImageLayout::General);
@@ -202,7 +202,7 @@ namespace {
         EXPECT_EQ(a.bytes, b.bytes);
         EXPECT_NEAR(std::to_integer<int>(b.bytes[0]), 64, 1);
     }
-} // namespace
+}
 
 namespace {
     TEST_F(ImageReadbackVulkanIntegrationTest, MultisampleResolveIsConfiguredByAttachmentReferences) {
@@ -248,7 +248,7 @@ namespace {
             phase << vsl::command::RenderPassBegin(target, {vsl::ClearColor{0, 0, 1, 1}})
                   << vsl::command::RenderPassEnd{};
         }
-        // ComputePhase reuses the manager command buffer; complete the previous submission first.
+        // 同じコマンドバッファを再利用するため、前の送信の完了を待つ。
         device._data->device.waitIdle();
         desc.attachments[0].load = vsl::LoadOp::Load;
         desc.attachments[0].initialLayout = vsl::ImageLayout::General;
@@ -268,7 +268,7 @@ namespace {
             EXPECT_EQ(pixels.bytes[i + 3], std::byte{255});
         }
     }
-} // namespace
+}
 
 namespace {
     TEST_F(ImageReadbackVulkanIntegrationTest, ReusesGpuCapacityAndCallerCpuStorageAcrossFrames) {

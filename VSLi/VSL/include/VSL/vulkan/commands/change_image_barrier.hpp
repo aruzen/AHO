@@ -1,7 +1,3 @@
-//
-// Created by morimoto_hibiki on 2025/07/30.
-//
-
 #ifndef AHO_ALL_CHANGE_IMAGE_BARRIER_HPP
 #define AHO_ALL_CHANGE_IMAGE_BARRIER_HPP
 
@@ -17,7 +13,7 @@
 namespace VSL_NAMESPACE::command {
     struct ChangeImageBarrier : public __Command {
         ChangeImageBarrier(ImageAccessor image, ImageLayout oldLayout, ImageLayout newLayout);
-        // layerCount == 0 selects all layers from baseLayer onward. Only mip 0 is used.
+        // layerCountが0ならbaseLayer以降の全レイヤーを対象にする。ミップレベルは0のみ。
         ChangeImageBarrier(ImageAccessor image, ImageLayout oldLayout, ImageLayout newLayout,
                            std::uint32_t baseLayer, std::uint32_t layerCount);
 
@@ -33,4 +29,4 @@ namespace VSL_NAMESPACE::command {
     };
 }
 
-#endif //AHO_ALL_CHANGE_IMAGE_BARRIER_HPP
+#endif

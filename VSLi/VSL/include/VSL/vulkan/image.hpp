@@ -1,7 +1,3 @@
-//
-// Created by morimoto_hibiki on 2025/07/31.
-//
-
 #ifndef AHO_ALL_IMAGE_HPP
 #define AHO_ALL_IMAGE_HPP
 #include "../define.hpp"
@@ -16,12 +12,11 @@
 namespace VSL_NAMESPACE {
     struct ImageRegion {
         std::uint32_t x = 0, y = 0;
-        // Both zero means the full image. Coordinates then must also be zero.
+        // 幅と高さがともに0なら画像全体を対象にする。その場合は座標も0にする。
         std::uint32_t width = 0, height = 0;
         std::uint32_t layer = 0;
     };
 
-    // memory propertyとformatをtemplateにしたいかも
     template<ImageType Usage, MemoryProperty MemProp = MemoryProperty::DeviceLocal, ImageLayout Layout = ImageLayout::Undefined>
     struct Image : public ImageAccessor {
         Image(LogicalDeviceAccessor device, std::uint32_t width, std::uint32_t height,
@@ -38,4 +33,4 @@ vsl::Image<Usage, MemProp, Layout>::Image(vsl::LogicalDeviceAccessor device, std
     _data = MakeImage(Usage, MemProp, Layout, device, width, height, format, count, samples);
 }
 
-#endif //AHO_ALL_IMAGE_HPP
+#endif

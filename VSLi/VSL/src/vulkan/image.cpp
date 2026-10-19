@@ -1,6 +1,3 @@
-//
-// Created by morimoto_hibiki on 2025/07/31.
-//
 #include <VSL/define.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>

@@ -84,4 +84,4 @@ namespace {
         EXPECT_THROW(invoke(vsl::ImageLayout::General, {1, 0, 0, 0}), std::invalid_argument);
         EXPECT_THROW(invoke(vsl::ImageLayout::ColorAttachmentOptimal, {0, 0, 1, 1}), std::invalid_argument);
     }
-} // namespace
+}

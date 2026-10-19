@@ -2,13 +2,12 @@
 
 namespace {
 using DepthStencilVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
-// Previously disabled for U01; the common depth/stencil state is now implemented.
 TEST_F(DepthStencilVulkanIntegrationTest, ProvidesDepthStencilStateWhenInjected) {
     auto layout = make_layout_state();
     vsl::pipeline_layout::DepthStencil{}.injection(layout);
     EXPECT_TRUE(layout._data->info->depthStencil.has_value());
 }
-} // namespace
+}
 
 namespace {
 TEST_F(DepthStencilVulkanIntegrationTest, PreservesDepthAndFrontBackStencilSettings) {

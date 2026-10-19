@@ -23,7 +23,6 @@ vsl::GraphicsPipeline::GraphicsPipeline(vsl::PipelineLayoutAccessor layout, vsl:
     _data->layout = layout._data;
 
     vk::PipelineCacheCreateInfo pipelineInfoCache;
-    // pipelineInfoCache.flags = vk::PipelineCacheCreateFlagBits::
     auto cache = _data->device->device.createPipelineCacheUnique(pipelineInfoCache);
 
     vk::GraphicsPipelineCreateInfo pipelineInfo;
@@ -45,12 +44,11 @@ vsl::GraphicsPipeline::GraphicsPipeline(vsl::PipelineLayoutAccessor layout, vsl:
     pipelineInfo.renderPass = pass._data->renderPass;
     pipelineInfo.subpass = subpass;
 
-    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
-    pipelineInfo.basePipelineIndex = -1; // Optional
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+    pipelineInfo.basePipelineIndex = -1;
 
     const auto& result = _data->device->device.createGraphicsPipeline(*cache, pipelineInfo);
     if (result.result != vk::Result::eSuccess) {
-        // FIXME
         loggingln(vk::to_string(result.result));
     }
     _data->pipeline = result.value;
@@ -68,7 +66,6 @@ vsl::ComputePipeline::ComputePipeline(vsl::PipelineLayoutAccessor layout) {
     _data->layout = layout._data;
 
     vk::PipelineCacheCreateInfo pipelineInfoCache;
-    // pipelineInfoCache.flags = vk::PipelineCacheCreateFlagBits::
     auto cache = _data->device->device.createPipelineCacheUnique(pipelineInfoCache);
 
     vk::ComputePipelineCreateInfo pipelineInfo;

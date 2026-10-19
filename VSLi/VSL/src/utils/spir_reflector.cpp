@@ -171,6 +171,9 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
         }
     }
 
+    if (shaderType != ShaderFlag::Vertex)
+        return;
+
     for (auto& resource : shader_resources.stage_inputs) {
         const auto& type = comp.get_type(resource.type_id);
         /*

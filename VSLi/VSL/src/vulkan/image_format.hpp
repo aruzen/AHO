@@ -18,7 +18,7 @@ inline vk::ImageAspectFlags imageAspects(vk::Format format) {
         return vk::ImageAspectFlagBits::eColor;
     }
 }
-// ClearValue variant indices: float, signed integer, unsigned integer, depth/stencil.
+// ClearValueの型の並びは、浮動小数点色、符号付き整数色、符号なし整数色、深度・ステンシル。
 inline std::size_t clearKind(vk::Format format) {
     if (imageAspects(format) != vk::ImageAspectFlagBits::eColor)
         return 3;
@@ -67,4 +67,4 @@ inline std::size_t clearKind(vk::Format format) {
         return 0;
     }
 }
-} // namespace vsl::_impl::helper
+}

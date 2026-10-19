@@ -67,7 +67,7 @@ struct AttachmentReference {
     ImageLayout layout = ImageLayout::ColorAttachmentOptimal;
 };
 struct SubpassDescription {
-    // Vector position is the fragment output location / input attachment index.
+    // 配列内の位置がフラグメント出力のlocation、入力アタッチメントのインデックスに対応する。
     std::vector<AttachmentReference> colors;
     std::vector<AttachmentReference> inputs;
     std::vector<AttachmentReference> resolves;
@@ -86,7 +86,7 @@ struct SubpassDependency {
 struct RenderPassDescription {
     std::vector<AttachmentDescription> attachments;
     std::vector<SubpassDescription> subpasses{1};
-    // Explicit defaults cover prior/subsequent work on the same queue.
+    // 既定の依存関係は、同じキューの前後の処理を同期する。
     std::vector<SubpassDependency> dependencies{
         SubpassDependency{.sourceStage = PipelineStage::AllCommands}, SubpassDependency{.source = 0, .destination = ExternalSubpass, .destinationStage = PipelineStage::AllCommands}};
     AttachmentId addAttachment(AttachmentDescription attachment);
@@ -116,15 +116,15 @@ struct RenderPassAccessor {
 };
 struct RenderPass : RenderPassAccessor {
     RenderPass(LogicalDeviceAccessor device, RenderPassDescription description);
-    // Compatibility convenience for the original single present attachment.
+    // 従来の画面表示用アタッチメント1つを持つ構成との互換性を保つ。
     RenderPass(SwapchainAccessor swapchain);
 };
 
-// Compatibility facade. New effects compose RenderPass + Image + FrameBuffer.
+// 互換性のためのクラス。新しい用途ではRenderPass、Image、FrameBufferを組み合わせる。
 struct IDPickingRenderPass : RenderPassAccessor {
     std::vector<ImageAccessor> picking_buffer;
     IDPickingRenderPass(SwapchainAccessor swapchain);
     void recreate_buffer(std::uint32_t width, std::uint32_t height);
     std::uint32_t read(CommandManager manager, FenceHolder inFlight, std::uint32_t x, std::uint32_t y);
 };
-} // namespace VSL_NAMESPACE
+}

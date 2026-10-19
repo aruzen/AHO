@@ -18,9 +18,9 @@ TEST_F(RenderPassVulkanIntegrationTest, CreatesPublicRenderPassAndPickingImagesA
 TEST_F(RenderPassVulkanIntegrationTest, PickingPassProvidesInitializedBaseAccessor) {
     vsl::IDPickingRenderPass picking(description);
     const vsl::RenderPassAccessor base = picking;
-    EXPECT_EQ(base._data, picking._data); // I04: derived _data shadows base.
+    EXPECT_EQ(base._data, picking._data);
 }
-} // namespace
+}
 
 namespace {
 TEST(RenderPassDescriptionTest, CompositionPreservesAttachmentIdentityAndSubpassOrder) {
@@ -69,4 +69,4 @@ TEST(RenderPassDescriptionTest, RejectsInvalidReferencesFormatsAndLoadContracts)
     desc.subpasses.clear();
     EXPECT_THROW(desc.validate(), std::invalid_argument);
 }
-} // namespace
+}

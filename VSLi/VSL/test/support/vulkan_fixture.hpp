@@ -181,8 +181,7 @@ class VulkanIntegrationTest : public testing::Test {
     void TearDown() override {
         if (device._data && device._data->device) {
             device._data->device.waitIdle();
-            // CommandPool_impl に破棄処理がない既知の不具合 I23 のため、
-            // テストが作成した pool は GPU 完了・buffer 解放後に明示的に回収する。
+            // GPUの完了後に、テストで保持していたコマンドプールを回収する。
             for (auto &pool : command_pools_) {
                 device._data->device.destroyCommandPool(pool->commandPool);
                 pool->commandPool = nullptr;
@@ -232,4 +231,4 @@ class VulkanIntegrationTest : public testing::Test {
     }
 };
 
-} // namespace vsl_test
+}

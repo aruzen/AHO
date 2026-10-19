@@ -89,9 +89,8 @@ if (!reader.capture(color, ImageLayout::General)) {
 }
 // 必要なタイミングで、最新の受理済み転送の完了を待って読むこともできる。
 pixels = reader.read();
-// pixels.width / height / format / rowStride / bytes
 
-// 同じworkerを部分領域や整数ID画像にも使える。
+// 同じ読み戻しオブジェクトを部分領域や整数ID画像にも使える。
 if (reader.capture(ids, ImageLayout::General, {x, y, 1, 1})) {
     reader.read(pixels);
     std::uint32_t id;

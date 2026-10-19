@@ -15,10 +15,8 @@ namespace VSL_NAMESPACE::_impl {
 	struct Surface_impl;
 	struct Swapchain_impl;
 	struct View_impl;
-	// struct Viewport_impl;
 	struct CreateInfo;
 	struct PipelineLayout_impl;
-	// struct ShaderStage_impl;
 	struct Shader_impl; 
 	struct RenderPass_impl;
 	struct Pipeline_impl;
@@ -35,6 +33,5 @@ namespace VSL_NAMESPACE::_impl {
     struct Sampler_impl;
 	namespace pipeline_layout {
 		struct ShaderGroup_impl;
-		// struct VertexInput_impl;
 	}
 }

@@ -104,4 +104,4 @@ class RenderVulkanIntegrationTest : public VulkanIntegrationTest {
     }
 };
 
-} // namespace vsl_test
+}

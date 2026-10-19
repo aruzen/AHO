@@ -1,7 +1,3 @@
-//
-// Created by morimoto_hibiki on 2025/12/21.
-//
-
 #ifndef AHO_ALL_AHO_HPP
 #define AHO_ALL_AHO_HPP
 
@@ -42,4 +38,4 @@
 #include "engine/graphical_engine.hpp"
 #include "engine/standard_engine.hpp"
 
-#endif //AHO_ALL_AHO_HPP
+#endif

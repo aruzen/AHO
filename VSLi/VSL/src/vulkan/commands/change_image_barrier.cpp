@@ -1,6 +1,3 @@
-//
-// Created by morimoto_hibiki on 2025/07/30.
-//
 #include <VSL/vulkan/_pimpls.hpp>
 
 #include <VSL/vulkan/commands/change_image_barrier.hpp>

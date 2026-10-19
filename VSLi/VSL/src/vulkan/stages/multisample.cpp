@@ -7,8 +7,8 @@ void VSL_NAMESPACE::pipeline_layout::Multisample::injection(VSL_NAMESPACE::Pipel
 
 	info.multisample.sampleShadingEnable = false;
 	info.multisample.rasterizationSamples = static_cast<vk::SampleCountFlagBits>(samples);
-	info.multisample.minSampleShading = 1.0f; // Optional
-	info.multisample.pSampleMask = nullptr; // Optional
-	info.multisample.alphaToCoverageEnable = false; // Optional
-	info.multisample.alphaToOneEnable = false; // Optional
+	info.multisample.minSampleShading = 1.0f;
+	info.multisample.pSampleMask = nullptr;
+	info.multisample.alphaToCoverageEnable = false;
+	info.multisample.alphaToOneEnable = false;
 }

@@ -40,4 +40,4 @@ namespace {
         EXPECT_THROW(invoke(1, 2), std::out_of_range);
         EXPECT_THROW(invoke(UINT32_MAX, UINT32_MAX), std::out_of_range);
     }
-} // namespace
+}

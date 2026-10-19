@@ -1,6 +1,6 @@
 BasedOnStyle: Microsoft
 
-# Match the existing AHO/VSL namespace and brace layout.
+# 既存のAHO/VSLに合わせ、名前空間内もインデントする。
 IndentWidth: 4
 TabWidth: 4
 UseTab: Never
@@ -9,7 +9,6 @@ BreakBeforeBraces: Attach
 AccessModifierOffset: -4
 IndentCaseLabels: true
 
-# Preserve compact helpers and the prevailing pointer style in each file.
 AllowShortFunctionsOnASingleLine: All
 SpaceAfterTemplateKeyword: false
 BreakTemplateDeclarations: Yes
@@ -18,7 +17,7 @@ DerivePointerAlignment: true
 PointerAlignment: Left
 ReferenceAlignment: Pointer
 
-# Keep intentional line breaks, include order, and comments.
+# 手動の改行、インクルード順、コメントの折り返しを維持する。
 ColumnLimit: 0
 SortIncludes: Never
 SortUsingDeclarations: Never

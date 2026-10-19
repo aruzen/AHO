@@ -4,7 +4,7 @@
 #include <cstring>
 
 namespace vsl_test {
-    // Test-only synchronous reader. Product resource reuse belongs to AHO::ImageReadback.
+    // テスト用の同期読み戻し。製品側のリソース再利用にはAHO::ImageReadbackを使う。
     inline std::vector<std::byte> read_image(vsl::CommandManager manager, vsl::ImageAccessor image,
                                              vsl::ImageLayout layout, vsl::ImageRegion region = {}) {
         const auto info = vsl::command::ImageReadback::describe(image, layout, region);

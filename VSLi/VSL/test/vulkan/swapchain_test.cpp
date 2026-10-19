@@ -22,7 +22,7 @@ TEST_F(SwapchainWindowIntegrationTest, CreatesImagesAndRecreatesUsingOldSwapchai
     EXPECT_TRUE(static_cast<bool>(recreated._data->swapChain));
     EXPECT_EQ(recreated.getSwapImageSize(), recreated.images.size());
 }
-} // namespace
+}
 
 namespace {
 class SwapchainReadbackWindowIntegrationTest : public vsl_test::WindowIntegrationTest {

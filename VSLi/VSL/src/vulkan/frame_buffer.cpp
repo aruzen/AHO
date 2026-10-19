@@ -59,7 +59,7 @@ void append(_impl::FrameBuffer_impl &target, const std::vector<ImageAccessor> &i
     target.swapChainFramebuffers.push_back(target.device->device.createFramebuffer(info));
     target.attachments.push_back(std::move(retained));
 }
-} // namespace
+}
 FrameBuffer::FrameBuffer(RenderPassAccessor pass, std::uint32_t width, std::uint32_t height,
                          std::vector<ImageAccessor> images, std::uint32_t layers) {
     _data = make_data(pass, width, height, layers);
@@ -88,4 +88,4 @@ _impl::FrameBuffer_impl::~FrameBuffer_impl() {
         for (auto fb : swapChainFramebuffers)
             device->device.destroyFramebuffer(fb);
 }
-} // namespace vsl
+}

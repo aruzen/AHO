@@ -6,7 +6,7 @@ TEST_F(FrameBufferVulkanIntegrationTest, CreatesFramebufferForEveryImageAndRende
     EXPECT_TRUE(static_cast<bool>(framebuffer->_data->swapChainFramebuffers.front()));
     expect_triangle_color(render([](auto &stream) { stream << vsl::command::Draw{3}; }));
 }
-} // namespace
+}
 namespace {
 TEST_F(FrameBufferVulkanIntegrationTest, CreatesPickingFramebufferWithBothAttachments) {
     vsl::IDPickingRenderPass picking(description);
@@ -14,7 +14,7 @@ TEST_F(FrameBufferVulkanIntegrationTest, CreatesPickingFramebufferWithBothAttach
     ASSERT_EQ(picked._data->swapChainFramebuffers.size(), 1u);
     EXPECT_TRUE(static_cast<bool>(picked._data->swapChainFramebuffers.front()));
 }
-} // namespace
+}
 
 namespace {
 TEST_F(FrameBufferVulkanIntegrationTest, GenericTargetRetainsImagesAndPassAndRejectsMismatches) {
@@ -29,4 +29,4 @@ TEST_F(FrameBufferVulkanIntegrationTest, GenericTargetRetainsImagesAndPassAndRej
     color.reset();
     EXPECT_EQ(target._data->attachments[0][0], retained);
 }
-} // namespace
+}

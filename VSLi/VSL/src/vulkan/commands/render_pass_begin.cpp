@@ -26,6 +26,18 @@ namespace VSL_NAMESPACE::command {
             }
             return values;
         }
+        std::vector<ClearValue> legacy_clears(FrameBufferAccessor target,
+                                              std::optional<__VSLDRGBColorAccessor<float>> color) {
+            if (!color)
+                return {};
+            if (!target._data || !target._data->renderPass)
+                throw std::invalid_argument("Framebuffer required");
+            auto values = defaults(RenderPassAccessor{target._data->renderPass}.description());
+            if (values.empty())
+                throw std::invalid_argument("Legacy clear color requires an attachment");
+            values.front() = ClearColor{color->r, color->g, color->b, 0.f};
+            return values;
+        }
         vk::ClearValue convert(const ClearValue& value) {
             vk::ClearValue result{};
             std::visit(
@@ -90,25 +102,21 @@ namespace VSL_NAMESPACE::command {
     }
     RenderPassBegin::RenderPassBegin(RenderPass pass, FrameBufferAccessor target,
                                      std::optional<__VSLDRGBColorAccessor<float>> color)
-        : RenderPassBegin(target) {
+        : RenderPassBegin(target, legacy_clears(target, color)) {
         if (pass._data != renderPass._data)
             throw std::invalid_argument("RenderPass/Framebuffer mismatch");
         if (color)
             clear_color.emplace(*color);
         targetIndex.reset();
-        if (color)
-            clearValues.front() = ClearColor{color->r, color->g, color->b, 0.f};
     }
     IDPickingRenderPassBegin::IDPickingRenderPassBegin(IDPickingRenderPass pass, FrameBufferAccessor target,
                                                        std::optional<__VSLDRGBColorAccessor<float>> color)
-        : RenderPassBegin(target) {
+        : RenderPassBegin(target, legacy_clears(target, color)) {
         if (pass._data != renderPass._data)
             throw std::invalid_argument("RenderPass/Framebuffer mismatch");
         if (color)
             clear_color.emplace(*color);
         targetIndex.reset();
-        if (color)
-            clearValues.front() = ClearColor{color->r, color->g, color->b, 0.f};
     }
     void RenderPassBegin::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
         const auto index = targetIndex.value_or(buffer._data->acquiredImageIndex.value_or(buffer.getCurrentBufferIdx()));

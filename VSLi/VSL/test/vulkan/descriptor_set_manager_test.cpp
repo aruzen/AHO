@@ -12,8 +12,14 @@ TEST_F(DescriptorManagerVulkanIntegrationTest, MakeAndExactAllocateReturnUsableR
     auto [pools, exact] = resources->allocate(std::vector{*binding, *binding});
     ASSERT_EQ(pools.size(), 2u);
     ASSERT_EQ(exact.size(), 2u);
+    EXPECT_NE(pools[0]._data, pools[1]._data);
     EXPECT_EQ(exact[0].getPool()._data, pools[0]._data);
     EXPECT_EQ(exact[1].getPool()._data, pools[1]._data);
+    for (std::size_t i = 0; i < exact.size(); ++i) {
+        exact[i].update(&*output);
+        resource = exact[i];
+        expect_sequence(execute(43 + static_cast<std::uint32_t>(i)), 43 + static_cast<std::uint32_t>(i));
+    }
     for (auto &entry : pools)
         entry._data->resources.clear();
 }
@@ -193,5 +199,15 @@ TEST_F(DescriptorManagerVulkanIntegrationTest, LazyOverAllocatorReturnsItsNewPoo
     EXPECT_TRUE(empty_pools.empty());
     EXPECT_TRUE(empty_resources.empty());
     EXPECT_EQ(manager.pools.size(), 1u);
+}
+} // namespace
+
+namespace {
+TEST_F(DescriptorManagerVulkanIntegrationTest, EmptyExactAllocationCreatesNoPoolOrResource) {
+    const auto previous = resources->_data->pools.size();
+    auto [pools, allocated] = resources->allocate(std::vector<vsl::graphic_resource::BindingLayout>{});
+    EXPECT_TRUE(pools.empty());
+    EXPECT_TRUE(allocated.empty());
+    EXPECT_EQ(resources->_data->pools.size(), previous);
 }
 } // namespace

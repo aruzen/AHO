@@ -94,3 +94,67 @@ namespace {
         EXPECT_EQ(destroyed, 1);
     }
 } // namespace
+
+namespace {
+    using CommandResourceVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+    TEST_F(CommandResourceVulkanIntegrationTest, VertexBindingAddsAnOwnerToTheRecordingSubmission) {
+        auto manager = make_manager();
+        vsl::StagingBuffer<vsl::MemoryType::VertexBuffer> vertex(device, 32);
+        const auto owners = vertex._data.use_count();
+        auto phase = manager.startPhase<vsl::ComputePhase>();
+        phase << vsl::command::BindVertexBuffer(vertex);
+        EXPECT_GT(vertex._data.use_count(), owners);
+        phase.cancel();
+    }
+    TEST_F(CommandResourceVulkanIntegrationTest, IndexBindingAddsAnOwnerToTheRecordingSubmission) {
+        auto manager = make_manager();
+        vsl::StagingBuffer<vsl::MemoryType::IndexBuffer> indices(device, 12);
+        const auto owners = indices._data.use_count();
+        auto phase = manager.startPhase<vsl::ComputePhase>();
+        phase << vsl::command::BindIndexBuffer(indices);
+        EXPECT_GT(indices._data.use_count(), owners);
+        phase.cancel();
+    }
+} // namespace
+
+namespace {
+    TEST_F(CommandResourceVulkanIntegrationTest, CancellationReleasesRetainedBuffersWhenTheTokenIsDropped) {
+        auto manager = make_manager();
+        std::weak_ptr<vsl::_impl::Buffer_impl> weak;
+        vsl::Completion cancelled;
+        {
+            auto phase = manager.startPhase<vsl::ComputePhase>();
+            cancelled = phase.completion();
+            {
+                vsl::StagingBuffer<vsl::MemoryType::VertexBuffer> vertex(device, 32);
+                weak = vertex._data;
+                phase << vsl::command::BindVertexBuffer(vertex);
+            }
+            EXPECT_FALSE(weak.expired());
+            phase.cancel();
+        }
+        EXPECT_EQ(cancelled.status(), vsl::Completion::Status::Cancelled);
+        EXPECT_FALSE(weak.expired());
+        cancelled = {};
+        EXPECT_TRUE(weak.expired());
+    }
+    TEST_F(CommandResourceVulkanIntegrationTest, CustomCommandsCanRetainOwnersUntilFrameSlotReuse) {
+        auto manager = make_manager();
+        std::weak_ptr<int> weak;
+        {
+            auto phase = manager.startPhase<vsl::ComputePhase>();
+            auto owner = std::make_shared<int>(42);
+            weak = owner;
+            manager.getBuffer().retain(owner);
+            EXPECT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::Success);
+            ASSERT_TRUE(phase.completion().wait());
+        }
+        EXPECT_FALSE(weak.expired());
+        {
+            auto phase = manager.startPhase<vsl::ComputePhase>();
+            EXPECT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::Success);
+            ASSERT_TRUE(phase.completion().wait());
+        }
+        EXPECT_TRUE(weak.expired());
+    }
+} // namespace

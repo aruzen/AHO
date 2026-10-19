@@ -99,53 +99,137 @@ TEST(WindowPluginRemovalTest, NullPluginDoesNotChangeRegistrations) {
     EXPECT_EQ(window._data->plugins.at(plugin->id), plugin);
 }
 
-#include <type_traits>
 namespace {
-static_assert(std::has_virtual_destructor_v<vsl::PureWindow>);
-static_assert(std::has_virtual_destructor_v<vsl::PureWindow::OnUpdate>);
-struct TrackedWindow : vsl::PureWindow {
-    bool &destroyed;
-    TrackedWindow(std::shared_ptr<WindowData> data, bool &flag) : PureWindow(std::move(data)), destroyed(flag) {}
-    ~TrackedWindow() { destroyed = true; }
+struct UpdateActionPlugin : vsl::PureWindow::Plugin, vsl::PureWindow::OnUpdate {
+    std::function<bool(vsl::PureWindow)> action;
+    UpdateActionPlugin(vsl::PureWindow *, std::function<bool(vsl::PureWindow)> action)
+        : action(std::move(action)) {}
+    bool onUpdate(vsl::PureWindow window) override { return action(std::move(window)); }
 };
-struct TrackedUpdate : vsl::PureWindow::OnUpdate {
-    bool &destroyed;
-    explicit TrackedUpdate(bool &flag) : destroyed(flag) {}
-    ~TrackedUpdate() { destroyed = true; }
-    bool onUpdate(vsl::PureWindow) override { return true; }
+struct ScopedUpdateWindow {
+    vsl::PureWindow window{"VSL update mutation test", 32, 24};
+    ~ScopedUpdateWindow() { if (window._data && window._data->window_handle) window.close(); }
 };
-TEST(WindowInterfaceLifetimeTest, BaseOwnersRunBothDerivedDestructors) {
-    bool window_destroyed = false, update_destroyed = false;
-    std::unique_ptr<vsl::PureWindow> window =
-        std::make_unique<TrackedWindow>(std::make_shared<vsl::PureWindow::WindowData>(), window_destroyed);
-    std::unique_ptr<vsl::PureWindow::OnUpdate> update = std::make_unique<TrackedUpdate>(update_destroyed);
-    window.reset();
-    update.reset();
-    EXPECT_TRUE(window_destroyed);
-    EXPECT_TRUE(update_destroyed);
+TEST_F(WindowIntegrationTest, UpdateSkipsRemovedListenersAndDefersNewListenersOnTheCurrentWindow) {
+    int first_calls = 0, removed_calls = 0, added_calls = 0;
+    bool changed = false;
+    std::shared_ptr<CountingUpdatePlugin> removed, added;
+    window->add_plugin<UpdateActionPlugin>([&](vsl::PureWindow current) {
+        ++first_calls;
+        if (!changed) {
+            changed = true;
+            EXPECT_TRUE(current.remove_plugin(removed));
+            added = current.add_plugin<CountingUpdatePlugin>(added_calls);
+        }
+        return false;
+    });
+    removed = window->add_plugin<CountingUpdatePlugin>(removed_calls);
+    EXPECT_FALSE(vsl::PureWindow::Update());
+    EXPECT_EQ(first_calls, 1);
+    EXPECT_EQ(removed_calls, 0);
+    EXPECT_EQ(added_calls, 0);
+    EXPECT_FALSE(vsl::PureWindow::Update());
+    EXPECT_EQ(first_calls, 2);
+    EXPECT_EQ(removed_calls, 0);
+    EXPECT_EQ(added_calls, 1);
 }
-TEST(WindowInterfaceLifetimeTest, CopiesShareDataAndMovesTransferIt) {
-    static_assert(std::is_nothrow_move_constructible_v<vsl::PureWindow>);
-    static_assert(std::is_nothrow_move_assignable_v<vsl::PureWindow>);
+TEST_F(WindowIntegrationTest, UpdatingListenerStaysAliveUntilItsSelfRemovalCallbackReturns) {
+    int follower_calls = 0;
+    bool alive_during_callback = false;
+    std::weak_ptr<UpdateActionPlugin> weak;
+    std::shared_ptr<UpdateActionPlugin> self;
+    self = window->add_plugin<UpdateActionPlugin>([&](vsl::PureWindow current) {
+        EXPECT_TRUE(current.remove_plugin(self));
+        self.reset();
+        alive_during_callback = !weak.expired();
+        return true;
+    });
+    weak = self;
+    window->add_plugin<CountingUpdatePlugin>(follower_calls);
+    EXPECT_TRUE(vsl::PureWindow::Update());
+    EXPECT_TRUE(alive_during_callback);
+    EXPECT_TRUE(weak.expired());
+    EXPECT_EQ(follower_calls, 1);
+}
+TEST_F(WindowIntegrationTest, ClosingTheCurrentWindowSkipsItsOtherCallbacksAndStillUpdatesAnotherWindow) {
+    int stale_calls = 0, other_calls = 0;
+    ScopedUpdateWindow other;
+    ASSERT_TRUE(static_cast<bool>(other.window));
+    window->add_plugin<UpdateActionPlugin>([](vsl::PureWindow current) { return current.close(); });
+    window->add_plugin<CountingUpdatePlugin>(stale_calls);
+    other.window.add_plugin<CountingUpdatePlugin>(other_calls);
+    EXPECT_TRUE(vsl::PureWindow::Update());
+    EXPECT_EQ(stale_calls, 0);
+    EXPECT_EQ(other_calls, 1);
+    EXPECT_FALSE(static_cast<bool>(*window));
+}
+TEST_F(WindowIntegrationTest, WindowsAddedDuringUpdateStartReceivingCallbacksOnTheNextTick) {
+    int first_calls = 0, other_calls = 0, created_calls = 0;
+    ScopedUpdateWindow other;
+    std::vector<std::unique_ptr<ScopedUpdateWindow>> created;
+    window->add_plugin<UpdateActionPlugin>([&](vsl::PureWindow) {
+        ++first_calls;
+        if (created.empty()) {
+            const auto previous_capacity = vsl::PureWindow::WINDOWS.capacity();
+            do {
+                created.push_back(std::make_unique<ScopedUpdateWindow>());
+                EXPECT_TRUE(static_cast<bool>(created.back()->window));
+                created.back()->window.add_plugin<CountingUpdatePlugin>(created_calls);
+            } while (vsl::PureWindow::WINDOWS.capacity() == previous_capacity);
+        }
+        return true;
+    });
+    other.window.add_plugin<CountingUpdatePlugin>(other_calls);
+    EXPECT_TRUE(vsl::PureWindow::Update());
+    EXPECT_EQ(first_calls, 1);
+    EXPECT_EQ(other_calls, 1);
+    EXPECT_EQ(created_calls, 0);
+    ASSERT_FALSE(created.empty());
+    EXPECT_TRUE(vsl::PureWindow::Update());
+    EXPECT_EQ(first_calls, 2);
+    EXPECT_EQ(other_calls, 2);
+    EXPECT_EQ(created_calls, static_cast<int>(created.size()));
+}
+} // namespace
+
+namespace {
+TEST_F(WindowIntegrationTest, AListenerAddedToALaterWindowRunsWhenThatWindowBeginsUpdating) {
+    int calls = 0;
+    ScopedUpdateWindow other;
+    std::shared_ptr<CountingUpdatePlugin> added;
+    window->add_plugin<UpdateActionPlugin>([&](vsl::PureWindow) {
+        if (!added) added = other.window.add_plugin<CountingUpdatePlugin>(calls);
+        return true;
+    });
+    EXPECT_TRUE(vsl::PureWindow::Update());
+    EXPECT_EQ(calls, 1);
+    EXPECT_TRUE(vsl::PureWindow::Update());
+    EXPECT_EQ(calls, 2);
+}
+} // namespace
+
+namespace {
+TEST(WindowValidityTest, NullSharedDataIsInvalidAndCanBeClosed) {
+    vsl::PureWindow window(std::shared_ptr<vsl::PureWindow::WindowData>{});
+    EXPECT_FALSE(static_cast<bool>(window));
+    EXPECT_FALSE(window.close());
+}
+TEST(WindowValidityTest, MovedFromWrappersRemainInvalidAndReusable) {
     auto data = std::make_shared<vsl::PureWindow::WindowData>();
-    vsl::PureWindow original(data), copied(original);
-    EXPECT_EQ(copied._data, data);
-    vsl::PureWindow moved(std::move(original));
-    EXPECT_FALSE(original._data);
-    EXPECT_EQ(moved._data, data);
-    original = copied;
-    vsl::PureWindow assigned(std::make_shared<vsl::PureWindow::WindowData>());
-    assigned = std::move(moved);
-    EXPECT_FALSE(moved._data);
+    vsl::PureWindow source(data);
+    vsl::PureWindow destination(std::move(source));
+    ASSERT_FALSE(source._data);
+    EXPECT_FALSE(static_cast<bool>(source));
+    EXPECT_FALSE(source.close());
+    EXPECT_EQ(destination._data, data);
+    source = destination;
+    EXPECT_EQ(source._data, data);
+    EXPECT_FALSE(static_cast<bool>(source)); // The shared data has no native window.
+    vsl::PureWindow assigned(std::shared_ptr<vsl::PureWindow::WindowData>{});
+    assigned = std::move(source);
+    ASSERT_FALSE(source._data);
+    EXPECT_FALSE(static_cast<bool>(source));
     EXPECT_EQ(assigned._data, data);
-    EXPECT_EQ(original._data, data);
-}
-TEST_F(WindowIntegrationTest, DeletingADerivedWrapperRetainsTheSharedNativeWindow) {
-    bool destroyed = false;
-    std::unique_ptr<vsl::PureWindow> owner = std::make_unique<TrackedWindow>(window->_data, destroyed);
-    owner.reset();
-    EXPECT_TRUE(destroyed);
-    EXPECT_TRUE(static_cast<bool>(*window));
 }
 } // namespace
 
@@ -212,3 +296,53 @@ TEST(WindowInitializationTest, FailedGlfwInitializationThrowsWithoutRegisteringA
         failed->close();
 }
 #endif
+
+#include <type_traits>
+namespace {
+static_assert(std::has_virtual_destructor_v<vsl::PureWindow>);
+static_assert(std::has_virtual_destructor_v<vsl::PureWindow::OnUpdate>);
+struct TrackedWindow : vsl::PureWindow {
+    bool &destroyed;
+    TrackedWindow(std::shared_ptr<WindowData> data, bool &flag) : PureWindow(std::move(data)), destroyed(flag) {}
+    ~TrackedWindow() { destroyed = true; }
+};
+struct TrackedUpdate : vsl::PureWindow::OnUpdate {
+    bool &destroyed;
+    explicit TrackedUpdate(bool &flag) : destroyed(flag) {}
+    ~TrackedUpdate() { destroyed = true; }
+    bool onUpdate(vsl::PureWindow) override { return true; }
+};
+TEST(WindowInterfaceLifetimeTest, BaseOwnersRunBothDerivedDestructors) {
+    bool window_destroyed = false, update_destroyed = false;
+    std::unique_ptr<vsl::PureWindow> window =
+        std::make_unique<TrackedWindow>(std::make_shared<vsl::PureWindow::WindowData>(), window_destroyed);
+    std::unique_ptr<vsl::PureWindow::OnUpdate> update = std::make_unique<TrackedUpdate>(update_destroyed);
+    window.reset();
+    update.reset();
+    EXPECT_TRUE(window_destroyed);
+    EXPECT_TRUE(update_destroyed);
+}
+TEST(WindowInterfaceLifetimeTest, CopiesShareDataAndMovesTransferIt) {
+    static_assert(std::is_nothrow_move_constructible_v<vsl::PureWindow>);
+    static_assert(std::is_nothrow_move_assignable_v<vsl::PureWindow>);
+    auto data = std::make_shared<vsl::PureWindow::WindowData>();
+    vsl::PureWindow original(data), copied(original);
+    EXPECT_EQ(copied._data, data);
+    vsl::PureWindow moved(std::move(original));
+    EXPECT_FALSE(original._data);
+    EXPECT_EQ(moved._data, data);
+    original = copied;
+    vsl::PureWindow assigned(std::make_shared<vsl::PureWindow::WindowData>());
+    assigned = std::move(moved);
+    EXPECT_FALSE(moved._data);
+    EXPECT_EQ(assigned._data, data);
+    EXPECT_EQ(original._data, data);
+}
+TEST_F(WindowIntegrationTest, DeletingADerivedWrapperRetainsTheSharedNativeWindow) {
+    bool destroyed = false;
+    std::unique_ptr<vsl::PureWindow> owner = std::make_unique<TrackedWindow>(window->_data, destroyed);
+    owner.reset();
+    EXPECT_TRUE(destroyed);
+    EXPECT_TRUE(static_cast<bool>(*window));
+}
+} // namespace

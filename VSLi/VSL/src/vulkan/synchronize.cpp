@@ -14,11 +14,12 @@
 #include <future>
 
 void VSL_NAMESPACE::SemaphoreHolder::destroy() {
-	for (auto semaphore : _data->semaphores)
-		_data->_manager->device->device.destroySemaphore(semaphore);
-	for (const auto& [name, s] : _data->_manager->semaphores)
-		if (s == _data)
-			_data->_manager->semaphores.erase(name);
+    if (!_data)
+        return;
+    for (auto handle : _data->semaphores)
+        _data->_manager->device->device.destroySemaphore(handle);
+    _data->semaphores.clear();
+    std::erase_if(_data->_manager->semaphores, [&](const auto &entry) { return entry.second == _data; });
 }
 
 
@@ -51,11 +52,12 @@ void VSL_NAMESPACE::FenceHolder::reset(std::uint32_t target_idx)
 }
 
 void VSL_NAMESPACE::FenceHolder::destroy() {
-	for (auto fence : _data->fences)
-		_data->_manager->device->device.destroyFence(fence);
-	for (const auto& [name, f] : _data->_manager->fences)
-		if (f == _data)
-			_data->_manager->fences.erase(name);
+    if (!_data)
+        return;
+    for (auto handle : _data->fences)
+        _data->_manager->device->device.destroyFence(handle);
+    _data->fences.clear();
+    std::erase_if(_data->_manager->fences, [&](const auto &entry) { return entry.second == _data; });
 }
 
 VSL_NAMESPACE::SynchroManager::SynchroManager(LogicalDeviceAccessor device) {

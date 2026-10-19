@@ -61,7 +61,6 @@ add_library(AHOLi
 
 target_include_directories(AHOLi
         PRIVATE
-        ${Vulkan_INCLUDE_DIRS}
         ${Boost_INCLUDE_DIRS}
         "${VSL_HOME}/include" # ~/repos/AHO/VSLi
         "${AHO_HOME}/include"

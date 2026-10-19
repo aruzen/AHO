@@ -47,7 +47,7 @@ namespace VSL_NAMESPACE {
         PhysicalDevice search();
 #ifdef VSL_NAMESPACE_TEST
         void test();
-#endif // VSL_NAMESPACE_TEST
+#endif
         std::shared_ptr<_impl::PhysicalDevices_impl> _data = nullptr;
     };
 
@@ -66,6 +66,7 @@ namespace VSL_NAMESPACE {
 
     struct LogicalDeviceAccessor {
         std::shared_ptr<_impl::LogicalDevice_impl> _data = nullptr;
+        bool operator==(const LogicalDeviceAccessor&) const = default;
     };
 
     namespace helper {
@@ -83,8 +84,7 @@ namespace VSL_NAMESPACE {
             : LogicalDevice(device, *surface) {}
 
 #ifdef VSL_NAMESPACE_TEST
-        // void test();
-#endif // VSL_NAMESPACE_TEST
+#endif
     };
 } // namespace VSL_NAMESPACE
 

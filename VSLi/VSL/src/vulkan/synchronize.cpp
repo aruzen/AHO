@@ -1,165 +1,141 @@
 #include <VSL/vulkan/synchronize.hpp>
-
 #include <VSL/vulkan/_pimpls.hpp>
-#include <VSL/exceptions.hpp>
+#include <stdexcept>
 
-/*
- * FIXME
- * おそらくValidationLayer側のバグであるがで1回目のreset時のみエラーが出る
- *  frame #0: 0x0000000181ba4158 libc++abi.dylib`__cxa_throw
- *  frame #1: 0x0000000181b14a4c libc++.1.dylib`std::exception_ptr std::make_exception_ptr[abi:ue170006]<std::__1::future_error>(std::__1::future_error) + 104
- *  frame #2: 0x0000000181b14978 libc++.1.dylib`std::__1::promise<void>::~promise() + 112
- *  frame #3: 0x0000000108843cc4 libVkLayer_khronos_validation.dylib`vvl::Fence::Reset() + 124
- */
-#include <future>
-
-void VSL_NAMESPACE::SemaphoreHolder::destroy() {
-    if (!_data)
-        return;
-    for (auto handle : _data->semaphores)
-        _data->_manager->device->device.destroySemaphore(handle);
-    _data->semaphores.clear();
-    std::erase_if(_data->_manager->semaphores, [&](const auto& entry) { return entry.second == _data; });
-}
-
-bool VSL_NAMESPACE::FenceHolder::wait(std::uint64_t timeout_ns) {
-    if (vk::Result::eSuccess == _data->_manager->device->device.waitForFences(_data->fences, true, timeout_ns))
-        return true;
-    return false;
-}
-
-bool VSL_NAMESPACE::FenceHolder::wait(std::uint32_t target_idx, std::uint64_t timeout_ns) {
-    if (vk::Result::eSuccess == _data->_manager->device->device.waitForFences({_data->fences[target_idx]}, true, timeout_ns))
-        return true;
-    return false;
-}
-
-void VSL_NAMESPACE::FenceHolder::reset() {
-    _data->_manager->device->device.resetFences(_data->fences);
-}
-
-void VSL_NAMESPACE::FenceHolder::reset(std::uint32_t target_idx) {
-    try {
-        auto result = _data->_manager->device->device.resetFences(1, &_data->fences[target_idx]);
-        if (result != vk::Result::eSuccess)
-            loggingln("resetFence failed.");
-    } catch (...) {
-        loggingln("Exception caught in resetFences");
+namespace VSL_NAMESPACE {
+    namespace {
+        template<class Map, class T>
+        void eraseHandle(Map& map, const std::shared_ptr<T>& target) {
+            std::erase_if(map, [&](const auto& entry) { return entry.second == target; });
+        }
+        void requireFence(const std::shared_ptr<_impl::Fence_impl>& data) {
+            if (!data || data->fences.empty())
+                throw std::logic_error("Fence has been destroyed");
+        }
+        void rememberCompletion(const std::shared_ptr<_impl::Fence_impl>& data, std::size_t index) {
+            if (index < data->submissions.size())
+                if (auto submission = data->submissions[index].lock())
+                    (void)Completion{submission}.status();
+        }
+        void rememberCompletions(const std::shared_ptr<_impl::Fence_impl>& data) {
+            // 公開APIでフェンスをリセット・破棄する前に、以前の送信結果を保存する。
+            for (std::size_t i = 0; i < data->submissions.size(); ++i)
+                rememberCompletion(data, i);
+        }
+    } // namespace
+    _impl::Semaphore_impl::~Semaphore_impl() {
+        for (auto handle : semaphores)
+            device->device.destroySemaphore(handle);
     }
-}
+    _impl::Fence_impl::~Fence_impl() {
+        for (auto handle : fences)
+            device->device.destroyFence(handle);
+    }
+    _impl::SynchroManager_impl::~SynchroManager_impl() = default;
 
-void VSL_NAMESPACE::FenceHolder::destroy() {
-    if (!_data)
-        return;
-    for (auto handle : _data->fences)
-        _data->_manager->device->device.destroyFence(handle);
-    _data->fences.clear();
-    std::erase_if(_data->_manager->fences, [&](const auto& entry) { return entry.second == _data; });
-}
-
-VSL_NAMESPACE::SynchroManager::SynchroManager(LogicalDeviceAccessor device) {
-    _data = std::make_shared<_impl::SynchroManager_impl>();
-    _data->device = device._data;
-}
-
-VSL_NAMESPACE::SemaphoreHolder VSL_NAMESPACE::SynchroManager::createSemaphore(std::string name) {
-    std::shared_ptr<_impl::Semaphore_impl> data = std::make_shared<_impl::Semaphore_impl>();
-    data->_manager = _data;
-
-    vk::SemaphoreCreateInfo info;
-    data->semaphores = {_data->device->device.createSemaphore(info)};
-    data->semaphores.shrink_to_fit();
-
-    _data->semaphores[name] = data;
-
-    return SemaphoreHolder{data};
-}
-
-VSL_NAMESPACE::SemaphoreHolder VSL_NAMESPACE::SynchroManager::createSemaphore(std::string name, size_t amount) {
-    std::shared_ptr<_impl::Semaphore_impl> data = std::make_shared<_impl::Semaphore_impl>();
-    data->_manager = _data;
-
-    vk::SemaphoreCreateInfo info;
-    data->semaphores.resize(amount);
-    for (size_t i = 0; i < amount; i++)
-        data->semaphores[i] = _data->device->device.createSemaphore(info);
-    data->semaphores.shrink_to_fit();
-
-    _data->semaphores[name] = data;
-
-    return SemaphoreHolder{data};
-}
-
-VSL_NAMESPACE::FenceHolder VSL_NAMESPACE::SynchroManager::createFence(std::string name, bool signal) {
-    std::shared_ptr<_impl::Fence_impl> data = std::make_shared<_impl::Fence_impl>();
-    ;
-    data->_manager = _data;
-
-    vk::FenceCreateInfo info;
-    if (signal)
-        info.flags = vk::FenceCreateFlagBits::eSignaled;
-    data->fences = {_data->device->device.createFence(info)};
-    data->fences.shrink_to_fit();
-
-    _data->fences[name] = data;
-
-    return FenceHolder{data};
-}
-
-VSL_NAMESPACE::FenceHolder VSL_NAMESPACE::SynchroManager::createFence(std::string name, size_t amount, bool signal) {
-    std::shared_ptr<_impl::Fence_impl> data = std::make_shared<_impl::Fence_impl>();
-    ;
-    data->_manager = _data;
-
-    vk::FenceCreateInfo info;
-    if (signal)
-        info.flags = vk::FenceCreateFlagBits::eSignaled;
-
-    data->fences.resize(amount);
-    for (size_t i = 0; i < amount; i++)
-        data->fences[i] = _data->device->device.createFence(info);
-    data->fences.shrink_to_fit();
-
-    _data->fences[name] = data;
-
-    return FenceHolder{data};
-}
-
-std::optional<VSL_NAMESPACE::SemaphoreHolder> VSL_NAMESPACE::SynchroManager::getSemaphore(std::string name) {
-    if (not _data->semaphores.contains(name))
-        return std::nullopt;
-    return {SemaphoreHolder{_data->semaphores[name]}};
-}
-
-std::optional<VSL_NAMESPACE::FenceHolder> VSL_NAMESPACE::SynchroManager::getFence(std::string name) {
-    if (not _data->fences.contains(name))
-        return std::nullopt;
-    return {FenceHolder{_data->fences[name]}};
-}
-
-bool VSL_NAMESPACE::SynchroManager::destroySemaphore(std::string name) {
-    if (not _data->semaphores.contains(name))
-        return false;
-    SemaphoreHolder{_data->semaphores[name]}.destroy();
-    _data->semaphores.erase(name);
-    return true;
-}
-
-bool VSL_NAMESPACE::SynchroManager::destroyFence(std::string name) {
-    if (not _data->fences.contains(name))
-        return false;
-    FenceHolder{_data->fences[name]}.destroy();
-    _data->fences.erase(name);
-    return true;
-}
-
-std::optional<VSL_NAMESPACE::FenceHolder> VSL_NAMESPACE::SynchroManager::operator[](std::string name) {
-    return this->getFence(name);
-}
-
-VSL_NAMESPACE::_impl::SynchroManager_impl::~SynchroManager_impl() {
-    for (const auto& [_, s] : semaphores)
-        SemaphoreHolder{s}.destroy();
-    for (const auto& [_, f] : fences)
-        FenceHolder{f}.destroy();
-}
+    std::size_t SemaphoreHolder::size() const { return _data ? _data->semaphores.size() : 0; }
+    void SemaphoreHolder::destroy() {
+        if (!_data)
+            return;
+        auto data = _data; // マップから削除しても参照が無効にならないよう、共有ポインタをコピーする。
+        if (auto manager = data->_manager.lock())
+            eraseHandle(manager->semaphores, data);
+        for (auto handle : data->semaphores)
+            data->device->device.destroySemaphore(handle);
+        data->semaphores.clear();
+    }
+    bool FenceHolder::wait(std::uint64_t timeout) {
+        requireFence(_data);
+        const bool ready = _data->device->device.waitForFences(_data->fences, true, timeout) == vk::Result::eSuccess;
+        if (ready)
+            rememberCompletions(_data);
+        return ready;
+    }
+    bool FenceHolder::wait(std::uint32_t index, std::uint64_t timeout) {
+        requireFence(_data);
+        const bool ready = _data->device->device.waitForFences(_data->fences.at(index), true, timeout) == vk::Result::eSuccess;
+        if (ready)
+            rememberCompletion(_data, index);
+        return ready;
+    }
+    void FenceHolder::reset() {
+        requireFence(_data);
+        rememberCompletions(_data);
+        _data->device->device.resetFences(_data->fences);
+    }
+    void FenceHolder::reset(std::uint32_t index) {
+        requireFence(_data);
+        rememberCompletion(_data, index);
+        _data->device->device.resetFences(_data->fences.at(index));
+    }
+    void FenceHolder::destroy() {
+        if (!_data)
+            return;
+        auto data = _data;
+        rememberCompletions(data);
+        if (auto manager = data->_manager.lock())
+            eraseHandle(manager->fences, data);
+        for (auto handle : data->fences)
+            data->device->device.destroyFence(handle);
+        data->fences.clear();
+        data->submissions.clear();
+    }
+    SynchroManager::SynchroManager(LogicalDeviceAccessor device)
+        : _data(std::make_shared<_impl::SynchroManager_impl>()) { _data->device = device._data; }
+    SemaphoreHolder SynchroManager::createSemaphore(std::string name) { return createSemaphore(std::move(name), 1); }
+    SemaphoreHolder SynchroManager::createSemaphore(std::string name, std::size_t amount) {
+        if (!amount)
+            throw std::invalid_argument("Semaphore count must be positive");
+        auto data = std::make_shared<_impl::Semaphore_impl>();
+        data->_manager = _data;
+        data->device = _data->device;
+        for (std::size_t i = 0; i < amount; ++i)
+            data->semaphores.push_back(_data->device->device.createSemaphore({}));
+        _data->semaphores[std::move(name)] = data;
+        return {data};
+    }
+    FenceHolder SynchroManager::createFence(std::string name, bool signal) {
+        return createFence(std::move(name), std::size_t{1}, signal);
+    }
+    FenceHolder SynchroManager::createFence(std::string name, std::size_t amount, bool signal) {
+        if (!amount)
+            throw std::invalid_argument("Fence count must be positive");
+        auto data = std::make_shared<_impl::Fence_impl>();
+        data->_manager = _data;
+        data->device = _data->device;
+        vk::FenceCreateInfo info{};
+        if (signal)
+            info.flags = vk::FenceCreateFlagBits::eSignaled;
+        for (std::size_t i = 0; i < amount; ++i)
+            data->fences.push_back(_data->device->device.createFence(info));
+        _data->fences[std::move(name)] = data;
+        return {data};
+    }
+    std::optional<SemaphoreHolder> SynchroManager::getSemaphore(std::string name) {
+        auto found = _data->semaphores.find(name);
+        if (found == _data->semaphores.end())
+            return std::nullopt;
+        return SemaphoreHolder{found->second};
+    }
+    std::optional<FenceHolder> SynchroManager::getFence(std::string name) {
+        auto found = _data->fences.find(name);
+        if (found == _data->fences.end())
+            return std::nullopt;
+        return FenceHolder{found->second};
+    }
+    bool SynchroManager::destroySemaphore(std::string name) {
+        auto holder = getSemaphore(name);
+        if (!holder)
+            return false;
+        holder->destroy();
+        return true;
+    }
+    bool SynchroManager::destroyFence(std::string name) {
+        auto holder = getFence(name);
+        if (!holder)
+            return false;
+        holder->destroy();
+        return true;
+    }
+    std::optional<FenceHolder> SynchroManager::operator[](std::string name) { return getFence(std::move(name)); }
+} // namespace VSL_NAMESPACE

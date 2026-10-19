@@ -1,7 +1,3 @@
-//
-// Created by morimoto_hibiki on 2025/12/21.
-//
-
 #ifndef AHO_ALL_DRAW_PHASE_H
 #define AHO_ALL_DRAW_PHASE_H
 
@@ -27,6 +23,8 @@ namespace AHO_NAMESPACE {
 
         ~DrawPhase();
 
+        SubmitResult submitCommands() override;
+
         DrawStream<VSL_NAMESPACE::DefaultPhaseStream> operator<<(AHO_NAMESPACE::concepts::is_std_tuple auto&&);
 
         DrawStream<VSL_NAMESPACE::DefaultPhaseStream> operator<<(std::shared_ptr<VSL_NAMESPACE::command::__Command> cmd);
@@ -36,6 +34,9 @@ namespace AHO_NAMESPACE {
         DrawStream<VSL_NAMESPACE::DefaultPhaseStream> operator<<(std::shared_ptr<VSL_NAMESPACE::command::__DelegateCommand> cmd);
 
         DrawStream<VSL_NAMESPACE::DefaultPhaseStream> operator<<(VSL_NAMESPACE::command::is_delegate_command auto cmd);
+
+    private:
+        bool finishStarted = false;
     };
 
     AHO_NAMESPACE::DrawStream<VSL_NAMESPACE::DefaultPhaseStream> AHO_NAMESPACE::DrawPhase::operator<<(AHO_NAMESPACE::concepts::is_std_tuple auto&& t) {
@@ -64,4 +65,4 @@ namespace AHO_NAMESPACE {
     }
 } // namespace AHO_NAMESPACE
 
-#endif //AHO_ALL_DRAW_PHASE_H
+#endif

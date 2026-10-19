@@ -35,6 +35,7 @@ add_library(VSL STATIC
         VSL/src/vulkan/synchronize.cpp
         VSL/src/vulkan/shader.cpp
         VSL/src/vulkan/buffer.cpp
+        VSL/src/vulkan/mapped_buffer.cpp
         VSL/src/vulkan/swapchain.cpp
         VSL/src/vulkan/commands/copy_image_to_buffer.cpp
         VSL/src/vulkan/commands/render_pass_end.cpp
@@ -95,6 +96,7 @@ add_library(VSL STATIC
         VSL/include/VSL/vulkan/pipeline.hpp
         VSL/include/VSL/vulkan/synchronize.hpp
         VSL/include/VSL/vulkan/buffer.hpp
+        VSL/include/VSL/vulkan/mapped_buffer.hpp
         VSL/include/VSL/vulkan/shader.hpp
         VSL/include/VSL/vulkan/render_pass.hpp
         VSL/include/VSL/vulkan/commands/dispatch.hpp

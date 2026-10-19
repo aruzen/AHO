@@ -65,6 +65,23 @@ namespace VSL_NAMESPACE {
         _data = make_data(pass, width, height, layers);
         append(*_data, images);
     }
+    FrameBuffer FrameBuffer::fromAttachments(RenderPassAccessor pass, std::uint32_t width, std::uint32_t height,
+                                             std::vector<AttachmentImage> bindings, std::uint32_t layers) {
+        const auto count = pass.description().attachments.size();
+        if (bindings.size() != count)
+            throw std::invalid_argument("Every framebuffer attachment must be bound");
+        std::vector<ImageAccessor> images(count);
+        std::vector<bool> bound(count);
+        for (auto& binding : bindings) {
+            if (binding.attachment >= count)
+                throw std::out_of_range("Framebuffer attachment id");
+            if (bound[binding.attachment])
+                throw std::invalid_argument("Duplicate framebuffer attachment id");
+            bound[binding.attachment] = true;
+            images[binding.attachment] = std::move(binding.image);
+        }
+        return FrameBuffer(pass, width, height, std::move(images), layers);
+    }
     FrameBuffer::FrameBuffer(SwapchainAccessor swapchain, RenderPass pass) {
         if (!swapchain._data)
             throw std::invalid_argument("Swapchain required");

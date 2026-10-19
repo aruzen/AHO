@@ -7,6 +7,7 @@
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/vulkan/buffer_and_image_accessor.hpp>
 #include <VSL/vulkan/command.hpp>
+#include "swapchain_sharing.hpp"
 
 #undef max
 
@@ -107,16 +108,7 @@ VSL_NAMESPACE::Swapchain::Swapchain(VSL_NAMESPACE::LogicalDeviceAccessor device,
     QueueFamilyIndices indices = findQueueFamilies(pdevice->device, surface->_data->surface);
     uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
 
-    if (indices.graphicsFamily != indices.presentFamily) {
-        createInfo.imageSharingMode = vk::SharingMode::eConcurrent;
-        createInfo.queueFamilyIndexCount = 2;
-        createInfo.pQueueFamilyIndices = queueFamilyIndices;
-    } else {
-        createInfo.imageSharingMode = vk::SharingMode::eExclusive;
-        createInfo.queueFamilyIndexCount = 0;
-        createInfo.pQueueFamilyIndices = nullptr;
-        createInfo.preTransform = _data->preTransform;
-    }
+    configureSwapchainSharing(createInfo, queueFamilyIndices, _data->preTransform);
 
     createInfo.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
     createInfo.presentMode = _data->presentMode;

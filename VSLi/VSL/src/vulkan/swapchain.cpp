@@ -115,8 +115,10 @@ VSL_NAMESPACE::Swapchain::Swapchain(VSL_NAMESPACE::LogicalDeviceAccessor device,
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = old.has_value() ? old->_data->swapChain : VK_NULL_HANDLE;
 
-    if (auto result = device._data->device.createSwapchainKHR(&createInfo, nullptr, &_data->swapChain); result != vk::Result::eSuccess)
-        loggingln(vk::to_string(result));
+    vk::SwapchainKHR created;
+    if (auto result = device._data->device.createSwapchainKHR(&createInfo, nullptr, &created); result != vk::Result::eSuccess)
+        throw VSL_NAMESPACE::exceptions::RuntimeException("Swapchain", "vkCreateSwapchainKHR failed: " + vk::to_string(result));
+    _data->swapChain = created;
 
     _data->swapChainImages = device._data->device.getSwapchainImagesKHR(_data->swapChain);
     _data->swapChainImageFormat = _data->surfaceFormat.format;

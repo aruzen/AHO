@@ -90,7 +90,7 @@ bool VSL_NAMESPACE::PureWindow::NoCheckUpdate() {
 }
 
 bool VSL_NAMESPACE::PureWindow::close() {
-    if (_data == nullptr)
+    if (!_data || !_data->window_handle)
         return false;
 
     _data->destroy();
@@ -120,6 +120,8 @@ bool VSL_NAMESPACE::PureWindow::resize(int width, int height) {
 }
 
 void VSL_NAMESPACE::PureWindow::WindowData::destroy() {
+    if (!window_handle)
+        return;
     for (auto i = WINDOWS.begin(); i != WINDOWS.end(); i++)
         if (i->get() == this) {
             WINDOWS.erase(i);

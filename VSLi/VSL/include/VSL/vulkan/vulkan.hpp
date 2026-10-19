@@ -12,39 +12,38 @@
 #include <concepts>
 
 namespace VSL_NAMESPACE {
-	struct PhysicalDevice;
-	struct _PhysicalDevicesSercher;
+    struct PhysicalDevice;
+    struct _PhysicalDevicesSercher;
 
-	template<typename S = VSL_NAMESPACE::_PhysicalDevicesSercher>
-	struct PhysicalDevices;
+    template<typename S = VSL_NAMESPACE::_PhysicalDevicesSercher>
+    struct PhysicalDevices;
 
     static std::vector<const char*> validationExtensions = {
-			"VK_EXT_debug_utils",
-            // "VK_EXT_layer_settings"
-	};
+        "VK_EXT_debug_utils",
+        // "VK_EXT_layer_settings"
+    };
 
-	static std::vector<const char*> validationLayers = {
-			"VK_LAYER_KHRONOS_validation"
-	};
+    static std::vector<const char*> validationLayers = {
+        "VK_LAYER_KHRONOS_validation"};
 
-	struct VulkanAccessor {
-		std::shared_ptr<_impl::Vulkan_impl_accessor> _accessor;
-	};
+    struct VulkanAccessor {
+        std::shared_ptr<_impl::Vulkan_impl_accessor> _accessor;
+    };
 
-	template<bool Validation = VSL_NAMESPACE::validation>
-	struct Vulkan : VulkanAccessor {
-	public: 
-		bool checkValidationLayerSupport();
+    template<bool Validation = VSL_NAMESPACE::validation>
+    struct Vulkan : VulkanAccessor {
+    public:
+        bool checkValidationLayerSupport();
 
-		Vulkan(const char* app_name, const std::vector<const char*>& requireExtensions = {});
-		~Vulkan();
+        Vulkan(const char* app_name, const std::vector<const char*>& requireExtensions = {});
+        ~Vulkan();
 
-		template<typename S = VSL_NAMESPACE::_PhysicalDevicesSercher>
-		PhysicalDevices<S> devices();
+        template<typename S = VSL_NAMESPACE::_PhysicalDevicesSercher>
+        PhysicalDevices<S> devices();
 
-#ifdef VSL_NAMESPACE_TEST 
-		void test();
-#endif // VSL_NAMESPACE_TEST 
-		std::shared_ptr<_impl::Vulkan_impl<Validation>> _data;
-	};
+#ifdef VSL_NAMESPACE_TEST
+        void test();
+#endif // VSL_NAMESPACE_TEST
+        std::shared_ptr<_impl::Vulkan_impl<Validation>> _data;
+    };
 }

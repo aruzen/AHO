@@ -5,7 +5,6 @@
 #ifndef AHO_ALL_BUFFER_HPP
 #define AHO_ALL_BUFFER_HPP
 
-
 #include "AHO/define.hpp"
 #include "VSL/vulkan/buffer.hpp"
 
@@ -30,6 +29,7 @@ namespace AHO_NAMESPACE::resource {
     class Buffer<BufferType::General> {
         size_t m_size;
         std::shared_ptr<char[]> m_buffer;
+
     public:
         Buffer(size_t size);
 
@@ -62,14 +62,13 @@ namespace AHO_NAMESPACE::resource {
     template<>
     class Buffer<BufferType::OnGPU> {
         Buffer(size_t size);
-
     };
 
     // ===========================================
 
     inline Buffer<BufferType::General>::Buffer(size_t size) : m_size(size), m_buffer(new char[size]) {}
 
-    inline void *Buffer<BufferType::General>::data() {
+    inline void* Buffer<BufferType::General>::data() {
         return m_buffer.get();
     }
 
@@ -83,12 +82,11 @@ namespace AHO_NAMESPACE::resource {
         //buffer = decltype(buffer)();
     }
 
-    inline void *Buffer<BufferType::GPUFriendly>::data() {
+    inline void* Buffer<BufferType::GPUFriendly>::data() {
     }
 
     inline size_t Buffer<BufferType::GPUFriendly>::size() {
     }
 }
-
 
 #endif //AHO_ALL_BUFFER_HPP

@@ -108,7 +108,7 @@ namespace VSL_NAMESPACE {
         std::shared_ptr<VSL_NAMESPACE::_impl::CommandManager_impl> _data;
 
         template<class P = DefaultPhase, typename... Args>
-        P startPhase(Args &&... args);
+        P startPhase(Args&&... args);
 
         CommandPool getPool();
 
@@ -123,7 +123,6 @@ namespace VSL_NAMESPACE {
 // ============================================================================
 
 template<class P, typename... Args>
-P VSL_NAMESPACE::CommandManager::startPhase(Args&&... args)
-{
+P VSL_NAMESPACE::CommandManager::startPhase(Args&&... args) {
     return P(*this, std::forward<Args>(args)...);
 }

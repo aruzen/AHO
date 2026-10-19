@@ -6,11 +6,11 @@
 #include "../pipeline.hpp"
 
 namespace VSL_NAMESPACE::command {
-	struct BindPipeline : __Command {
-		BindPipeline(PipelineAccessor pipeline);
+    struct BindPipeline : __Command {
+        BindPipeline(PipelineAccessor pipeline);
 
         PipelineAccessor pipeline;
 
-		void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
-	};
+        void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
+    };
 }

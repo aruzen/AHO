@@ -11,22 +11,22 @@
 #include <VSL/vulkan/descriptor_set_manager.hpp>
 
 namespace {
-void release_descriptor_pool(const std::shared_ptr<vsl::_impl::GraphicResourcePool_impl> &data) {
-    if (data->descriptorPool) {
-        data->device->device.destroyDescriptorPool(data->descriptorPool);
-        data->descriptorPool = nullptr;
+    void release_descriptor_pool(const std::shared_ptr<vsl::_impl::GraphicResourcePool_impl> &data) {
+        if (data->descriptorPool) {
+            data->device->device.destroyDescriptorPool(data->descriptorPool);
+            data->descriptorPool = nullptr;
+        }
+        data->resources.clear();
     }
-    data->resources.clear();
-}
 } // namespace
 
-std::tuple <vsl::graphic_resource::Pool, std::vector<vsl::graphic_resource::Resource>>
+std::tuple<vsl::graphic_resource::Pool, std::vector<vsl::graphic_resource::Resource>>
 vsl::graphic_resource::ManagerInterface::make(std::vector<BindingLayout> layouts,
                                               std::map<Type, size_t> size,
                                               size_t other) {
-    for (const auto &layout: layouts)
-        for (const auto &bp: layout.getBindingPoints()) {
-            auto& count = size[bp.bindingType];
+    for (const auto &layout : layouts)
+        for (const auto &bp : layout.getBindingPoints()) {
+            auto &count = size[bp.bindingType];
             constexpr auto maximum = std::numeric_limits<std::uint32_t>::max();
             if (count > maximum || bp.amount > maximum - count)
                 throw vsl::exceptions::RuntimeException("DescriptorPool", "Descriptor count exceeds uint32_t");
@@ -42,11 +42,11 @@ vsl::graphic_resource::ManagerInterface::make(std::vector<BindingLayout> layouts
 }
 
 vsl::graphic_resource::Pool
-vsl::graphic_resource::ManagerInterface::make(std::map <Type, size_t> count, size_t other) {
+vsl::graphic_resource::ManagerInterface::make(std::map<Type, size_t> count, size_t other) {
     constexpr auto maximum = std::numeric_limits<std::uint32_t>::max();
     if (other > maximum)
         throw vsl::exceptions::RuntimeException("DescriptorPool", "Fallback descriptor count exceeds uint32_t");
-    for (const auto& [type, amount] : count)
+    for (const auto &[type, amount] : count)
         if (amount > maximum)
             throw vsl::exceptions::RuntimeException("DescriptorPool", "Descriptor count exceeds uint32_t");
 
@@ -55,28 +55,28 @@ vsl::graphic_resource::ManagerInterface::make(std::map <Type, size_t> count, siz
     pool._data->manager = this;
     pool._data->device = _data->device;
 
-    std::vector <vk::DescriptorPoolSize> poolSizes;
+    std::vector<vk::DescriptorPoolSize> poolSizes;
     // size_t size;
-    for (const auto &type: {Type::Sampler,
-                            Type::CombinedImageSampler,
-                            Type::SampledImage,
-                            Type::StorageImage,
-                            Type::UniformTexelBuffer,
-                            Type::StorageTexelBuffer,
-                            Type::UniformBuffer,
-                            Type::StorageBuffer,
-                            Type::UniformBufferDynamic,
-                            Type::StorageBufferDynamic,
-                            Type::InputAttachment,
-                            Type::InlineUniformBlock,
-                            Type::AccelerationStructure,
-                            Type::AccelerationStructureNv,
-                            Type::SampleWeightImageQcom,
-                            Type::BlockMatchImageQcom,
-                            Type::MutableValve,
-                            Type::PartitionedAccelerationStructureNv}) {
+    for (const auto &type : {Type::Sampler,
+                             Type::CombinedImageSampler,
+                             Type::SampledImage,
+                             Type::StorageImage,
+                             Type::UniformTexelBuffer,
+                             Type::StorageTexelBuffer,
+                             Type::UniformBuffer,
+                             Type::StorageBuffer,
+                             Type::UniformBufferDynamic,
+                             Type::StorageBufferDynamic,
+                             Type::InputAttachment,
+                             Type::InlineUniformBlock,
+                             Type::AccelerationStructure,
+                             Type::AccelerationStructureNv,
+                             Type::SampleWeightImageQcom,
+                             Type::BlockMatchImageQcom,
+                             Type::MutableValve,
+                             Type::PartitionedAccelerationStructureNv}) {
         vk::DescriptorPoolSize poolSize;
-        poolSize.type = (vk::DescriptorType) type;
+        poolSize.type = (vk::DescriptorType)type;
         if (count.contains(type))
             poolSize.descriptorCount = static_cast<uint32_t>(count[type]);
         else
@@ -98,19 +98,18 @@ vsl::graphic_resource::ManagerInterface::make(std::map <Type, size_t> count, siz
 }
 
 vsl::_impl::GraphicResourceManager_impl::~GraphicResourceManager_impl() {
-    for (auto &pool: pools) {
+    for (auto &pool : pools) {
         pool.reset();
     }
 }
-
 
 vsl::graphic_resource::ExactAllocateManager::ExactAllocateManager(LogicalDeviceAccessor device) {
     _data = std::make_shared<_impl::GraphicResourceManager_impl>();
     _data->device = device._data;
 }
 
-std::tuple <std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>>
-vsl::graphic_resource::ExactAllocateManager::allocate(std::vector <BindingLayout> layouts) {
+std::tuple<std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>>
+vsl::graphic_resource::ExactAllocateManager::allocate(std::vector<BindingLayout> layouts) {
     std::vector<Pool> pools;
     std::vector<Resource> resources;
     pools.reserve(layouts.size());
@@ -123,7 +122,6 @@ vsl::graphic_resource::ExactAllocateManager::allocate(std::vector <BindingLayout
     return {std::move(pools), std::move(resources)};
 }
 
-
 void vsl::graphic_resource::ExactAllocateManager::destroy(const vsl::GraphicResourcePool &pool) {
     if (!pool._data)
         return;
@@ -133,26 +131,24 @@ void vsl::graphic_resource::ExactAllocateManager::destroy(const vsl::GraphicReso
 }
 
 vsl::graphic_resource::OverAllocateManager::OverAllocateManager(vsl::LogicalDeviceAccessor device,
-                                                                std::map <Type, size_t> count, size_t other)
-        : size(count), other(other) {
+                                                                std::map<Type, size_t> count, size_t other)
+    : size(count), other(other) {
     _data = std::make_shared<_impl::GraphicResourceManager_impl>();
     _data->device = device._data;
     pools.push_back(make(count, other));
 }
-
 
 vsl::graphic_resource::OverAllocateManager::OverAllocateManager(vsl::LogicalDeviceAccessor device) {
     _data = std::make_shared<_impl::GraphicResourceManager_impl>();
     _data->device = device._data;
 }
 
-
-std::tuple <std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>>
-vsl::graphic_resource::OverAllocateManager::allocate(std::vector <BindingLayout> layouts) {
-    std::tuple <std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>> result;
+std::tuple<std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>>
+vsl::graphic_resource::OverAllocateManager::allocate(std::vector<BindingLayout> layouts) {
+    std::tuple<std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>> result;
     auto &[use_pools, resources] = result;
-    for (auto &layout: layouts) {
-        for (auto &pool: pools) {
+    for (auto &layout : layouts) {
+        for (auto &pool : pools) {
             const auto &[err, resource] = pool.bind(layout);
             if (not err)
                 continue;
@@ -166,7 +162,7 @@ vsl::graphic_resource::OverAllocateManager::allocate(std::vector <BindingLayout>
             use_pools.push_back(pool);
             resources.push_back(resource[0]);
         }
-        found_pool:
+    found_pool:
         continue;
     }
     return result;

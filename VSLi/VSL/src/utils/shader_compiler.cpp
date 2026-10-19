@@ -29,69 +29,64 @@ namespace fs = std::filesystem;
 
 namespace {
 #ifdef _WIN32
-std::wstring quote_process_argument(const std::wstring& argument)
-{
-    std::wstring result(1, L'"');
-    std::size_t backslashes = 0;
-    for (const wchar_t character : argument) {
-        if (character == L'\\') {
-            ++backslashes;
-            continue;
+    std::wstring quote_process_argument(const std::wstring& argument) {
+        std::wstring result(1, L'"');
+        std::size_t backslashes = 0;
+        for (const wchar_t character : argument) {
+            if (character == L'\\') {
+                ++backslashes;
+                continue;
+            }
+            result.append(backslashes * (character == L'"' ? 2 : 1), L'\\');
+            backslashes = 0;
+            if (character == L'"')
+                result += L'\\';
+            result += character;
         }
-        result.append(backslashes * (character == L'"' ? 2 : 1), L'\\');
-        backslashes = 0;
-        if (character == L'"')
-            result += L'\\';
-        result += character;
+        result.append(backslashes * 2, L'\\');
+        result += L'"';
+        return result;
     }
-    result.append(backslashes * 2, L'\\');
-    result += L'"';
-    return result;
-}
 #endif
 
-int run_compiler(const fs::path& executable, const fs::path& source, const fs::path& destination)
-{
+    int run_compiler(const fs::path& executable, const fs::path& source, const fs::path& destination) {
 #ifdef _WIN32
-    const auto program = quote_process_argument(executable.native());
-    const auto input = quote_process_argument(source.native());
-    const auto output = quote_process_argument(destination.native());
-    const wchar_t* arguments[] = {program.c_str(), input.c_str(), L"-o", output.c_str(), nullptr};
-    const auto status = _wspawnvp(_P_WAIT, executable.c_str(), arguments);
-    return status == -1 ? (errno ? -errno : -1) : static_cast<int>(status);
+        const auto program = quote_process_argument(executable.native());
+        const auto input = quote_process_argument(source.native());
+        const auto output = quote_process_argument(destination.native());
+        const wchar_t* arguments[] = {program.c_str(), input.c_str(), L"-o", output.c_str(), nullptr};
+        const auto status = _wspawnvp(_P_WAIT, executable.c_str(), arguments);
+        return status == -1 ? (errno ? -errno : -1) : static_cast<int>(status);
 #else
-    auto program = executable.native();
-    auto input = source.native();
-    auto output = destination.native();
-    char option[] = "-o";
-    char* arguments[] = {program.data(), input.data(), option, output.data(), nullptr};
-    pid_t child;
+        auto program = executable.native();
+        auto input = source.native();
+        auto output = destination.native();
+        char option[] = "-o";
+        char* arguments[] = {program.data(), input.data(), option, output.data(), nullptr};
+        pid_t child;
 #ifdef __APPLE__
-    char** environment = *_NSGetEnviron();
+        char** environment = *_NSGetEnviron();
 #else
-    char** environment = environ;
+        char** environment = environ;
 #endif
-    const int error = posix_spawnp(&child, program.c_str(), nullptr, nullptr, arguments, environment);
-    if (error != 0)
-        return -error;
-    int status = 0;
-    while (waitpid(child, &status, 0) == -1)
-        if (errno != EINTR)
-            return -errno;
-    return status;
+        const int error = posix_spawnp(&child, program.c_str(), nullptr, nullptr, arguments, environment);
+        if (error != 0)
+            return -error;
+        int status = 0;
+        while (waitpid(child, &status, 0) == -1)
+            if (errno != EINTR)
+                return -errno;
+        return status;
 #endif
-}
+    }
 
-std::string path_text(const fs::path& path)
-{
-    const auto utf8 = path.u8string();
-    return {utf8.begin(), utf8.end()};
-}
+    std::string path_text(const fs::path& path) {
+        const auto utf8 = path.u8string();
+        return {utf8.begin(), utf8.end()};
+    }
 } // namespace
 
-
-void VSL_NAMESPACE::utils::ShaderCompiler::load()
-{
+void VSL_NAMESPACE::utils::ShaderCompiler::load() {
     compiled.clear();
     target.clear();
     std::map<std::string, fs::file_time_type> dates;
@@ -100,7 +95,7 @@ void VSL_NAMESPACE::utils::ShaderCompiler::load()
         if (!fs::exists(shaders_path) || !fs::exists(shaders_path / "raw") || !fs::is_directory(shaders_path / "raw"))
             continue;
 
-        for (const fs::directory_entry &x: fs::directory_iterator(shaders_path)) {
+        for (const fs::directory_entry& x : fs::directory_iterator(shaders_path)) {
             auto path = x.path();
             if (!path.has_extension() || path.extension() != ".spv")
                 continue;
@@ -109,7 +104,7 @@ void VSL_NAMESPACE::utils::ShaderCompiler::load()
             compiled.push_back(path);
         }
 
-        for (const fs::directory_entry &x: fs::directory_iterator(shaders_path / "raw")) {
+        for (const fs::directory_entry& x : fs::directory_iterator(shaders_path / "raw")) {
             auto path = x.path();
             if (!path.has_extension() ||
                 !(path.extension() == ".vert" || path.extension() == ".frag" || path.extension() == ".comp"))
@@ -121,8 +116,7 @@ void VSL_NAMESPACE::utils::ShaderCompiler::load()
     }
 }
 
-void VSL_NAMESPACE::utils::ShaderCompiler::compile()
-{
+void VSL_NAMESPACE::utils::ShaderCompiler::compile() {
     for (const auto& path : target) {
         const auto source = fs::absolute(path);
         auto destination = source.parent_path().parent_path() / source.filename();
@@ -130,6 +124,6 @@ void VSL_NAMESPACE::utils::ShaderCompiler::compile()
         const int status = run_compiler(glslc_path, source, destination);
         if (status != 0)
             throw exceptions::RuntimeException("ShaderCompiler", "Failed to compile " + path_text(source) +
-                " using " + path_text(glslc_path) + " (status " + std::to_string(status) + ")");
+                                                                     " using " + path_text(glslc_path) + " (status " + std::to_string(status) + ")");
     }
 }

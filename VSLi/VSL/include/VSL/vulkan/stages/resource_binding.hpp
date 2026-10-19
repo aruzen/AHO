@@ -5,11 +5,11 @@
 #include "../descriptor.hpp"
 
 namespace VSL_NAMESPACE::pipeline_layout {
-	struct ResourceBinding {
+    struct ResourceBinding {
         ResourceBinding(std::vector<graphic_resource::BindingLayout> sets);
 
         std::vector<graphic_resource::BindingLayout> resourceBindingSets;
 
-		void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
-	};
+        void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
+    };
 }

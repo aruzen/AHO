@@ -9,7 +9,7 @@
 
 aho::engine::EngineAccessor* aho::engine::EngineAccessor::_instance = nullptr;
 
-aho::engine::EngineAccessor *aho::engine::EngineAccessor::instance() {
+aho::engine::EngineAccessor* aho::engine::EngineAccessor::instance() {
     return _instance;
 }
 

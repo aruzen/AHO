@@ -12,12 +12,12 @@
 #define GLFW_INCLUDE_VULKAN
 
 #include <GLFW/glfw3.h>
-#pragma warning( push )
+#pragma warning(push)
 #include <compare>
 #define VULKAN_HPP_HAS_SPACESHIP_OPERATOR
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <vulkan/vulkan.hpp>
-#pragma warning( pop )
+#pragma warning(pop)
 
 #include <optional>
 #include <memory>
@@ -25,85 +25,86 @@
 #include <any>
 #include <set>
 
-namespace VSL_NAMESPACE { struct RenderPassDescription; }
+namespace VSL_NAMESPACE {
+    struct RenderPassDescription;
+}
 
 namespace VSL_NAMESPACE::_impl {
-	struct Vulkan_impl_accessor {
-		vk::Instance instance;
-		vk::DebugUtilsMessengerEXT debugMessenger;
+    struct Vulkan_impl_accessor {
+        vk::Instance instance;
+        vk::DebugUtilsMessengerEXT debugMessenger;
 
-		virtual ~Vulkan_impl_accessor() {};
-	};
+        virtual ~Vulkan_impl_accessor() {};
+    };
 
-	template<bool V>
-	struct Vulkan_impl : public Vulkan_impl_accessor {
-		virtual ~Vulkan_impl() override;
-	};
+    template<bool V>
+    struct Vulkan_impl : public Vulkan_impl_accessor {
+        virtual ~Vulkan_impl() override;
+    };
 
-	struct PhysicalDevice_impl {
-		std::shared_ptr<Vulkan_impl_accessor> vulkan;
+    struct PhysicalDevice_impl {
+        std::shared_ptr<Vulkan_impl_accessor> vulkan;
 
+        vk::PhysicalDevice device;
+        std::optional<vk::PhysicalDeviceProperties> props;
+        std::optional<vk::PhysicalDeviceFeatures> features;
+        std::optional<vk::PhysicalDeviceMemoryProperties> memProps;
 
-		vk::PhysicalDevice device;
-		std::optional<vk::PhysicalDeviceProperties> props;
-		std::optional<vk::PhysicalDeviceFeatures> features;
-		std::optional<vk::PhysicalDeviceMemoryProperties> memProps;
+        void makeProps();
+        void makeMemProps();
+    };
 
-		void makeProps();
-		void makeMemProps();
-	};
+    struct PhysicalDevices_impl {
+        std::shared_ptr<Vulkan_impl_accessor> vulkan;
 
-	struct PhysicalDevices_impl {
-		std::shared_ptr<Vulkan_impl_accessor> vulkan;
+        std::vector<vk::PhysicalDevice> devices = {};
+    };
 
-		std::vector<vk::PhysicalDevice> devices = {};
-	};
+    struct Surface_impl {
+        std::shared_ptr<Vulkan_impl_accessor> vulkan;
 
-	struct Surface_impl {
-		std::shared_ptr<Vulkan_impl_accessor> vulkan;
+        vk::SurfaceKHR surface;
+        void* window;
 
-		vk::SurfaceKHR surface;
-		void* window;
+        ~Surface_impl();
+    };
 
-		~Surface_impl();
-	};
-
-	struct LogicalDevice_impl {
-		std::shared_ptr<PhysicalDevice_impl> parentDevice;
+    struct LogicalDevice_impl {
+        std::shared_ptr<PhysicalDevice_impl> parentDevice;
 
         uint32_t graphicsFamily = 0, presentFamily = 0;
-		vk::Device device;
+        vk::Device device;
 
-		~LogicalDevice_impl();
-	};
+        ~LogicalDevice_impl();
+    };
 
-	struct CommandPool_impl {
-		std::shared_ptr<LogicalDevice_impl> device;
+    struct CommandPool_impl {
+        std::shared_ptr<LogicalDevice_impl> device;
 
-		vk::CommandPool commandPool;
-	};
+        vk::CommandPool commandPool;
+    };
 
-	struct CommandBuffer_impl {
-		std::shared_ptr<CommandPool_impl> commandPool;
+    struct CommandBuffer_impl {
+        std::shared_ptr<CommandPool_impl> commandPool;
 
-		std::uint32_t currentBufferIdx;
+        std::uint32_t currentBufferIdx;
 
-		std::vector<vk::CommandBuffer> commandBuffers;
+        std::vector<vk::CommandBuffer> commandBuffers;
 
-		~CommandBuffer_impl();
-	};
+        ~CommandBuffer_impl();
+    };
 
-	struct CommandManager_impl {
-		std::shared_ptr<LogicalDevice_impl> device;
+    struct CommandManager_impl {
+        std::shared_ptr<LogicalDevice_impl> device;
 
-		std::shared_ptr<CommandPool_impl> commandPool;
-		std::shared_ptr<CommandBuffer_impl> commandBuffer;
+        std::shared_ptr<CommandPool_impl> commandPool;
+        std::shared_ptr<CommandBuffer_impl> commandBuffer;
 
-		vk::Queue graphicsQueue, presentQueue;
-	};
+        vk::Queue graphicsQueue, presentQueue;
+    };
 
-	struct Swapchain_impl {
-		std::shared_ptr<LogicalDevice_impl> device;
+    struct Swapchain_impl {
+        std::shared_ptr<LogicalDevice_impl> device;
         std::shared_ptr<Surface_impl> surface;
 
         vk::SurfaceFormatKHR surfaceFormat;
@@ -112,116 +113,114 @@ namespace VSL_NAMESPACE::_impl {
         uint32_t imageCount;
         vk::SurfaceTransformFlagBitsKHR preTransform;
 
-		vk::SwapchainKHR swapChain;
-		std::vector<vk::Image> swapChainImages;
-		vk::Format swapChainImageFormat;
-		vk::Extent2D swapChainExtent;
+        vk::SwapchainKHR swapChain;
+        std::vector<vk::Image> swapChainImages;
+        vk::Format swapChainImageFormat;
+        vk::Extent2D swapChainExtent;
 
-		~Swapchain_impl();
-	};
+        ~Swapchain_impl();
+    };
 
+    struct CreateInfo {
+        std::vector<vk::PipelineShaderStageCreateInfo> shaderStages;
+        vk::PipelineDynamicStateCreateInfo dynamicState;
+        vk::PipelineLayoutCreateInfo pipelineLayout;
+        vk::PipelineVertexInputStateCreateInfo vertexInput;
+        vk::PipelineInputAssemblyStateCreateInfo inputAssembly;
+        std::vector<vk::Viewport> viewports;
+        std::vector<vk::Rect2D> scissors;
+        vk::PipelineRasterizationStateCreateInfo rasterization;
+        vk::PipelineMultisampleStateCreateInfo multisample;
+        vk::PipelineColorBlendStateCreateInfo colorBlend;
 
-	struct CreateInfo {
-		std::vector<vk::PipelineShaderStageCreateInfo> shaderStages;
-		vk::PipelineDynamicStateCreateInfo dynamicState;
-		vk::PipelineLayoutCreateInfo pipelineLayout;
-		vk::PipelineVertexInputStateCreateInfo vertexInput;
-		vk::PipelineInputAssemblyStateCreateInfo inputAssembly;
-		std::vector<vk::Viewport> viewports;
-		std::vector<vk::Rect2D> scissors;
-		vk::PipelineRasterizationStateCreateInfo rasterization;
-		vk::PipelineMultisampleStateCreateInfo multisample;
-		vk::PipelineColorBlendStateCreateInfo colorBlend;
-		
-		std::optional<vk::PipelineDepthStencilStateCreateInfo> depthStencil;
+        std::optional<vk::PipelineDepthStencilStateCreateInfo> depthStencil;
 
-		vk::PipelineViewportStateCreateInfo _viewport;
+        vk::PipelineViewportStateCreateInfo _viewport;
 
-		std::vector<vk::DynamicState> enabledDynamicStates;
-		std::map<std::string, std::any> pool;
-	};
+        std::vector<vk::DynamicState> enabledDynamicStates;
+        std::map<std::string, std::any> pool;
+    };
 
-	struct PipelineLayout_impl {
-		vk::PipelineLayout pipelineLayout;
-		std::shared_ptr<CreateInfo> info;
-		std::shared_ptr<LogicalDevice_impl> device;
+    struct PipelineLayout_impl {
+        vk::PipelineLayout pipelineLayout;
+        std::shared_ptr<CreateInfo> info;
+        std::shared_ptr<LogicalDevice_impl> device;
 
-		~PipelineLayout_impl();
-	};
+        ~PipelineLayout_impl();
+    };
 
+    struct Shader_impl {
+        std::string name;
+        std::shared_ptr<LogicalDevice_impl> device;
+        vk::ShaderModule shaderModule;
+        vk::PipelineShaderStageCreateInfo shaderStageCreateInfo;
 
-	struct Shader_impl {
-		std::string name;
-		std::shared_ptr<LogicalDevice_impl> device;
-		vk::ShaderModule shaderModule;
-		vk::PipelineShaderStageCreateInfo shaderStageCreateInfo;
+        ~Shader_impl();
+    };
 
-		~Shader_impl();
-	};
-
-	struct RenderPass_impl {
-		std::shared_ptr<LogicalDevice_impl> device;
-		vk::RenderPass renderPass;
+    struct RenderPass_impl {
+        std::shared_ptr<LogicalDevice_impl> device;
+        vk::RenderPass renderPass;
         std::shared_ptr<const RenderPassDescription> description;
 
-		~RenderPass_impl();
-	};
+        ~RenderPass_impl();
+    };
 
-	struct Pipeline_impl {
-		std::shared_ptr<LogicalDevice_impl> device;
-		std::shared_ptr<PipelineLayout_impl> layout;
+    struct Pipeline_impl {
+        std::shared_ptr<LogicalDevice_impl> device;
+        std::shared_ptr<PipelineLayout_impl> layout;
 
-		vk::Pipeline pipeline;
+        vk::Pipeline pipeline;
 
-		~Pipeline_impl();
-	};
+        ~Pipeline_impl();
+    };
 
-	struct Image_impl;
+    struct Image_impl;
 
     struct FrameBuffer_impl {
-		std::shared_ptr<LogicalDevice_impl> device;
-		std::shared_ptr<Swapchain_impl> swapchain;
+        std::shared_ptr<LogicalDevice_impl> device;
+        std::shared_ptr<Swapchain_impl> swapchain;
 
-		std::vector<vk::Framebuffer> swapChainFramebuffers;
+        std::vector<vk::Framebuffer> swapChainFramebuffers;
         std::shared_ptr<RenderPass_impl> renderPass;
         std::vector<std::vector<std::shared_ptr<Image_impl>>> attachments;
         vk::Extent2D extent;
         std::uint32_t layers = 1;
 
-		~FrameBuffer_impl();
-	};
+        ~FrameBuffer_impl();
+    };
 
-	struct SynchroManager_impl;
-	struct Semaphore_impl {
-		std::shared_ptr<SynchroManager_impl> _manager;
+    struct SynchroManager_impl;
+    struct Semaphore_impl {
+        std::shared_ptr<SynchroManager_impl> _manager;
 
-		std::vector<vk::Semaphore> semaphores;
-	};
+        std::vector<vk::Semaphore> semaphores;
+    };
 
-	struct Fence_impl {
-		std::shared_ptr<SynchroManager_impl> _manager;
+    struct Fence_impl {
+        std::shared_ptr<SynchroManager_impl> _manager;
 
-		std::vector<vk::Fence> fences;
-	};
+        std::vector<vk::Fence> fences;
+    };
 
-	struct SynchroManager_impl {
-		std::shared_ptr<LogicalDevice_impl> device;
+    struct SynchroManager_impl {
+        std::shared_ptr<LogicalDevice_impl> device;
 
-		std::map<std::string, std::shared_ptr<Semaphore_impl>> semaphores;
-		std::map<std::string, std::shared_ptr<Fence_impl>> fences;
+        std::map<std::string, std::shared_ptr<Semaphore_impl>> semaphores;
+        std::map<std::string, std::shared_ptr<Fence_impl>> fences;
 
-		~SynchroManager_impl();
-	};
+        ~SynchroManager_impl();
+    };
 
-	struct Buffer_impl {
-		std::shared_ptr<LogicalDevice_impl> device;
+    struct Buffer_impl {
+        std::shared_ptr<LogicalDevice_impl> device;
 
-		vk::Buffer buffer;
-		vk::DeviceMemory deviceMem;
-		size_t requirementSize, allocatedSize = 0;
+        vk::Buffer buffer;
+        vk::DeviceMemory deviceMem;
+        size_t requirementSize, allocatedSize = 0;
 
-		~Buffer_impl();
-	};
+        ~Buffer_impl();
+    };
 
     struct ResourceBindingLayout_impl {
         std::shared_ptr<LogicalDevice_impl> device;
@@ -268,7 +267,7 @@ namespace VSL_NAMESPACE::_impl {
         vk::ImageView view;
         vk::DeviceMemory memory;
         std::uint32_t width, height, count;
-		vk::Format format;
+        vk::Format format;
 
         ~Image_impl();
     };
@@ -280,26 +279,26 @@ namespace VSL_NAMESPACE::_impl {
         ~Sampler_impl();
     };
 
-	namespace pipeline_layout {
-		struct ShaderGroup_impl {
-			std::string name;
-			std::vector<std::shared_ptr<Shader_impl>> shaders;
-		};
+    namespace pipeline_layout {
+        struct ShaderGroup_impl {
+            std::string name;
+            std::vector<std::shared_ptr<Shader_impl>> shaders;
+        };
 
-	}
+    }
 
-	namespace helper {
-		struct QueueFamilyIndices {
-			std::optional<uint32_t> graphicsFamily;
-			std::optional<uint32_t> presentFamily;
+    namespace helper {
+        struct QueueFamilyIndices {
+            std::optional<uint32_t> graphicsFamily;
+            std::optional<uint32_t> presentFamily;
 
-			bool isComplete();
-		};
+            bool isComplete();
+        };
 
         std::uint32_t findMemoryType(std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> device,
                                      std::uint32_t typeFilter,
                                      vk::MemoryPropertyFlags properties);
-		QueueFamilyIndices findQueueFamilies(vk::PhysicalDevice device, vk::SurfaceKHR surface);
-		void DestroyDebugUtilsMessengerEXT(vk::Instance& instance, vk::DebugUtilsMessengerEXT& debugMessenger, const VkAllocationCallbacks* pAllocator);
-	}
+        QueueFamilyIndices findQueueFamilies(vk::PhysicalDevice device, vk::SurfaceKHR surface);
+        void DestroyDebugUtilsMessengerEXT(vk::Instance& instance, vk::DebugUtilsMessengerEXT& debugMessenger, const VkAllocationCallbacks* pAllocator);
+    }
 }

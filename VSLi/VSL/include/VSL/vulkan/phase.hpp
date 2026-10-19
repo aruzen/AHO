@@ -14,8 +14,8 @@
 namespace VSL_NAMESPACE {
     template<typename PhaseStream, typename T>
     concept is_phase_stream = requires(PhaseStream pst) {
-        { pst << std::declval<std::shared_ptr<T>>() } -> std::convertible_to<PhaseStream&>;
-        { pst << std::declval<T>() } -> std::convertible_to<PhaseStream&>;
+        { pst << std::declval<std::shared_ptr<T>>() } -> std::convertible_to<PhaseStream &>;
+        { pst << std::declval<T>() } -> std::convertible_to<PhaseStream &>;
     };
 
     struct DefaultPhaseStream;
@@ -95,6 +95,7 @@ namespace VSL_NAMESPACE {
         DefaultPhaseStream &operator<<(std::shared_ptr<command::__DelegateCommand> cmd);
 
         DefaultPhaseStream &operator<<(command::is_delegate_command auto cmd);
+
     private:
         template<typename T>
         void resolveHolderRequire(T &t);
@@ -144,7 +145,6 @@ void vsl::DefaultPhaseStream::resolveHolderRequire(T &t) {
     if constexpr (std::convertible_to<T, PipelineAccessor>)
         this->pipeline = t;
 }
-
 
 template<typename T>
 void vsl::DefaultPhaseStream::resolveHolderRequirePtr(std::shared_ptr<T> cmd) {

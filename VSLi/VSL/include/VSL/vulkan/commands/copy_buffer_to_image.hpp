@@ -19,9 +19,9 @@ namespace VSL_NAMESPACE::command {
         CopyBufferToImage(ImageAccessor image, BufferAccessor *buffer, vsl::ImageLayout layout);
 
         template<vsl::ImageType ImgType, vsl::MemoryProperty ImgMemProp, vsl::ImageLayout Layout,
-                MemoryType MemType, MemoryProperty BufMemProp, SharingMode ShareMode>
+                 MemoryType MemType, MemoryProperty BufMemProp, SharingMode ShareMode>
         CopyBufferToImage(Image<ImgType, ImgMemProp, Layout> &image, Buffer<MemType, BufMemProp, ShareMode> &buffer)
-                : CopyBufferToImage(image, &buffer, Layout) {};
+            : CopyBufferToImage(image, &buffer, Layout){};
 
         vsl::ImageLayout layout;
         ImageAccessor image;
@@ -34,9 +34,9 @@ namespace VSL_NAMESPACE::command {
         CopyBufferToArrayImage(ImageAccessor image, BufferAccessor *buffer, vsl::ImageLayout layout, std::uint32_t target_idx);
 
         template<vsl::ImageType ImgType, vsl::MemoryProperty ImgMemProp, vsl::ImageLayout Layout,
-                MemoryType MemType, MemoryProperty BufMemProp, SharingMode ShareMode>
+                 MemoryType MemType, MemoryProperty BufMemProp, SharingMode ShareMode>
         CopyBufferToArrayImage(Image<ImgType, ImgMemProp, Layout> &image, Buffer<MemType, BufMemProp, ShareMode> &buffer, std::uint32_t target_idx)
-                : CopyBufferToArrayImage(image, &buffer, Layout, target_idx) {};
+            : CopyBufferToArrayImage(image, &buffer, Layout, target_idx){};
 
         vsl::ImageLayout layout;
         ImageAccessor image;

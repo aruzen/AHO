@@ -14,7 +14,6 @@
 #include <VSL/vulkan/commands/copy_buffer_to_image.hpp>
 #include <VSL/vulkan/buffer_and_image_accessor.hpp>
 
-
 size_t vsl::ImageAccessor::size() {
     return std::size_t(_data->width) * _data->height * _data->count * convert((data_format::___FormatTypes)_data->format).size();
 }
@@ -45,13 +44,13 @@ vsl::ImageAccessor::MakeImage(vsl::ImageType type,
     vk::ImageCreateInfo imageInfo;
     imageInfo.imageType = vk::ImageType::e2D;
     imageInfo.format = _data->format;
-    imageInfo.extent = vk::Extent3D{ width, height, 1 };
+    imageInfo.extent = vk::Extent3D{width, height, 1};
     imageInfo.mipLevels = 1;
     imageInfo.arrayLayers = count;
     imageInfo.samples = static_cast<vk::SampleCountFlagBits>(samples);
     imageInfo.tiling = vk::ImageTiling::eOptimal;
-    imageInfo.usage = (vk::ImageUsageFlagBits) type;
-    imageInfo.initialLayout = (vk::ImageLayout) layout;
+    imageInfo.usage = (vk::ImageUsageFlagBits)type;
+    imageInfo.initialLayout = (vk::ImageLayout)layout;
 
     _data->image = device._data->device.createImage(imageInfo);
 
@@ -60,7 +59,7 @@ vsl::ImageAccessor::MakeImage(vsl::ImageType type,
     vk::MemoryAllocateInfo allocInfo;
     allocInfo.allocationSize = memRequirements.size;
     allocInfo.memoryTypeIndex = vsl::_impl::helper::findMemoryType(device._data, memRequirements.memoryTypeBits,
-                                                                   (vk::MemoryPropertyFlagBits) prop);
+                                                                   (vk::MemoryPropertyFlagBits)prop);
 
     _data->memory = device._data->device.allocateMemory(allocInfo);
 
@@ -69,7 +68,8 @@ vsl::ImageAccessor::MakeImage(vsl::ImageType type,
     vk::ImageViewCreateInfo viewInfo;
     viewInfo.image = _data->image;
     viewInfo.viewType = count == 1 ? vk::ImageViewType::e2D : vk::ImageViewType::e2DArray;
-    viewInfo.format = (vk::Format)format.type();;
+    viewInfo.format = (vk::Format)format.type();
+    ;
     viewInfo.subresourceRange.aspectMask = _impl::helper::imageAspects(_data->format);
     viewInfo.subresourceRange.baseMipLevel = 0;
     viewInfo.subresourceRange.levelCount = 1;
@@ -96,7 +96,8 @@ bool vsl::ImageAccessor::copyByBuffer(CommandManager manager, BufferAccessor *bu
 }
 
 vsl::_impl::Image_impl::~Image_impl() {
-    if (!device) return;
+    if (!device)
+        return;
     device->device.destroy(view);
     if (memory != VK_NULL_HANDLE) {
         device->device.destroy(image);

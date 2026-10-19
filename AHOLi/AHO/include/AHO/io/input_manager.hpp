@@ -26,15 +26,15 @@ namespace AHO_NAMESPACE {
 
         operator bool();
 
-        template<typename T, typename ...Args>
-        std::shared_ptr<T> get(Args&& ...args);
+        template<typename T, typename... Args>
+        std::shared_ptr<T> get(Args&&... args);
 
-        template<template<typename ...> typename T, typename ...Args>
-        std::shared_ptr<T<Args...>> get(Args&& ...args);
+        template<template<typename...> typename T, typename... Args>
+        std::shared_ptr<T<Args...>> get(Args&&... args);
     };
 
     template<typename T, typename... Args>
-    std::shared_ptr<T> InputManager::get(Args && ...args) {
+    std::shared_ptr<T> InputManager::get(Args&&... args) {
         std::shared_ptr<T> input;
         if constexpr (std::derived_from<T, input::abstract::Adaptable>) {
             input = std::shared_ptr<T>(new T(context, *this, std::forward<Args>(args)...));
@@ -48,7 +48,7 @@ namespace AHO_NAMESPACE {
     }
 
     template<template<typename...> typename T, typename... Args>
-    std::shared_ptr<T<Args...>> InputManager::get(Args && ...args) {
+    std::shared_ptr<T<Args...>> InputManager::get(Args&&... args) {
         using Type = T<Args...>;
         std::shared_ptr<Type> input;
         if constexpr (std::derived_from<Type, input::abstract::Adaptable>) {

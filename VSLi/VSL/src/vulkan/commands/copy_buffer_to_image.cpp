@@ -10,13 +10,13 @@
 
 vsl::command::CopyBufferToImage::CopyBufferToImage(vsl::ImageAccessor image, vsl::BufferAccessor *buffer,
                                                    vsl::ImageLayout layout)
-        : image(std::move(image)), buffer(buffer), layout(layout) {}
+    : image(std::move(image)), buffer(buffer), layout(layout) {}
 
 void vsl::command::CopyBufferToImage::invoke(
-        vsl::CommandPool pool, vsl::CommandBuffer buffer, vsl::CommandManager manager) {
+    vsl::CommandPool pool, vsl::CommandBuffer buffer, vsl::CommandManager manager) {
     vk::BufferImageCopy region;
     region.bufferOffset = 0;
-    region.bufferRowLength = 0;  // tightly packed
+    region.bufferRowLength = 0; // tightly packed
     region.bufferImageHeight = 0;
     region.imageSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
     region.imageSubresource.mipLevel = 0;
@@ -26,23 +26,21 @@ void vsl::command::CopyBufferToImage::invoke(
     region.imageExtent = vk::Extent3D{image._data->width, image._data->height, 1};
 
     buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].copyBufferToImage(
-            this->buffer->_data->buffer,
-            this->image._data->image,
-            (vk::ImageLayout) layout,
-            region
-    );
+        this->buffer->_data->buffer,
+        this->image._data->image,
+        (vk::ImageLayout)layout,
+        region);
 }
 
-
 vsl::command::CopyBufferToArrayImage::CopyBufferToArrayImage(vsl::ImageAccessor image, vsl::BufferAccessor *buffer,
-                                                   vsl::ImageLayout layout, std::uint32_t target_idx)
-        : image(std::move(image)), buffer(buffer), layout(layout), target_idx(target_idx) {}
+                                                             vsl::ImageLayout layout, std::uint32_t target_idx)
+    : image(std::move(image)), buffer(buffer), layout(layout), target_idx(target_idx) {}
 
 void vsl::command::CopyBufferToArrayImage::invoke(
-        vsl::CommandPool pool, vsl::CommandBuffer buffer, vsl::CommandManager manager) {
+    vsl::CommandPool pool, vsl::CommandBuffer buffer, vsl::CommandManager manager) {
     vk::BufferImageCopy region;
     region.bufferOffset = 0;
-    region.bufferRowLength = 0;  // tightly packed
+    region.bufferRowLength = 0; // tightly packed
     region.bufferImageHeight = 0;
     region.imageSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
     region.imageSubresource.mipLevel = 0;
@@ -52,9 +50,8 @@ void vsl::command::CopyBufferToArrayImage::invoke(
     region.imageExtent = vk::Extent3D{image._data->width, image._data->height, 1};
 
     buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].copyBufferToImage(
-            this->buffer->_data->buffer,
-            this->image._data->image,
-            (vk::ImageLayout) layout,
-            region
-    );
+        this->buffer->_data->buffer,
+        this->image._data->image,
+        (vk::ImageLayout)layout,
+        region);
 }

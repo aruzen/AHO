@@ -7,7 +7,6 @@
 
 // TODO
 namespace AHO_NAMESPACE::collision {
-	struct CollisionJudger {
-
-	};
+    struct CollisionJudger {
+    };
 }

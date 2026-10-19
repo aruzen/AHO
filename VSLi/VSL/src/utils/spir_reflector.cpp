@@ -11,24 +11,24 @@
 #include <limits>
 
 namespace {
-struct ReflectionCompiler : spirv_cross::Compiler {
-    using Compiler::Compiler;
-    using Compiler::evaluate_constant_u32;
-};
+    struct ReflectionCompiler : spirv_cross::Compiler {
+        using Compiler::Compiler;
+        using Compiler::evaluate_constant_u32;
+    };
 
-std::uint32_t descriptor_count(const ReflectionCompiler &compiler, const spirv_cross::SPIRType &type) {
-    std::uint32_t count = 1;
-    for (std::size_t i = 0; i < type.array.size(); ++i) {
-        // No specialization overrides are supplied to this API; reflect the shader defaults.
-        const auto extent = type.array_size_literal[i] ? type.array[i] : compiler.evaluate_constant_u32(type.array[i]);
-        if (extent == 0)
-            throw vsl::exceptions::RuntimeException("SPIRVReflector", "Descriptor runtime arrays require an explicit descriptor count");
-        if (extent > std::numeric_limits<std::uint32_t>::max() / count)
-            throw vsl::exceptions::RuntimeException("SPIRVReflector", "Descriptor array count overflow");
-        count *= extent;
+    std::uint32_t descriptor_count(const ReflectionCompiler &compiler, const spirv_cross::SPIRType &type) {
+        std::uint32_t count = 1;
+        for (std::size_t i = 0; i < type.array.size(); ++i) {
+            // No specialization overrides are supplied to this API; reflect the shader defaults.
+            const auto extent = type.array_size_literal[i] ? type.array[i] : compiler.evaluate_constant_u32(type.array[i]);
+            if (extent == 0)
+                throw vsl::exceptions::RuntimeException("SPIRVReflector", "Descriptor runtime arrays require an explicit descriptor count");
+            if (extent > std::numeric_limits<std::uint32_t>::max() / count)
+                throw vsl::exceptions::RuntimeException("SPIRVReflector", "Descriptor array count overflow");
+            count *= extent;
+        }
+        return count;
     }
-    return count;
-}
 } // namespace
 
 vsl::graphic_resource::Type spir_type_to_graphic_type(const spirv_cross::SPIRType &type) {
@@ -47,7 +47,7 @@ vsl::graphic_resource::Type spir_type_to_graphic_type(const spirv_cross::SPIRTyp
 }
 
 vsl::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device, std::filesystem::path path)
-        : generated{ std::move(logical_device) } {
+    : generated{std::move(logical_device)} {
     std::vector<char> binary;
     {
         std::ifstream file(path, std::ios::ate | std::ios::binary);
@@ -56,7 +56,7 @@ vsl::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device,
             throw vsl::exceptions::RuntimeException("file", "failed to open file!", std::source_location::current());
         }
 
-        size_t fileSize = (size_t) file.tellg();
+        size_t fileSize = (size_t)file.tellg();
         binary.resize(fileSize);
         file.seekg(0);
         file.read(binary.data(), fileSize);
@@ -64,15 +64,14 @@ vsl::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device,
     }
     if (binary.size() % 4 != 0)
         loggingln("warning: SPIRVReflector: SPIR-V file size (not multiple of 4 bytes) by ", path);
-    init((const std::uint32_t *) binary.data(), binary.size() / sizeof(std::uint32_t));
+    init((const std::uint32_t *)binary.data(), binary.size() / sizeof(std::uint32_t));
 }
 
-
 vsl::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device, const std::vector<char> &binary)
-        : generated{ std::move(logical_device) } {
+    : generated{std::move(logical_device)} {
     if (binary.size() % 4 != 0)
         loggingln("warning: SPIRVReflector: SPIR-V file size (not multiple of 4 bytes)");
-    init((const std::uint32_t *) binary.data(), binary.size() / sizeof(std::uint32_t));
+    init((const std::uint32_t *)binary.data(), binary.size() / sizeof(std::uint32_t));
 }
 
 void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
@@ -97,12 +96,12 @@ void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
 
     spirv_cross::ShaderResources shader_resources = comp.get_shader_resources();
     std::vector<std::tuple<spirv_cross::SmallVector<spirv_cross::Resource>, graphic_resource::Type>> mapped_resources = {
-            {shader_resources.uniform_buffers,         graphic_resource::Type::UniformBuffer},
-            {shader_resources.storage_buffers,         graphic_resource::Type::StorageBuffer},
-            {shader_resources.storage_images,          graphic_resource::Type::StorageImage},
-            {shader_resources.acceleration_structures, graphic_resource::Type::AccelerationStructureNv}, // 例: NV拡張
-            {shader_resources.separate_samplers,       graphic_resource::Type::Sampler},
-            /*
+        {shader_resources.uniform_buffers, graphic_resource::Type::UniformBuffer},
+        {shader_resources.storage_buffers, graphic_resource::Type::StorageBuffer},
+        {shader_resources.storage_images, graphic_resource::Type::StorageImage},
+        {shader_resources.acceleration_structures, graphic_resource::Type::AccelerationStructureNv}, // 例: NV拡張
+        {shader_resources.separate_samplers, graphic_resource::Type::Sampler},
+        /*
             { resources.uniform_texel_buffers, graphic_resource::type::UniformTexelBuffer },
             { resources.storage_texel_buffers, graphic_resource::type::StorageTexelBuffer },
             { resources., graphic_resource::type::Sampler },
@@ -113,7 +112,7 @@ void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
              */
     };
 
-    for (const auto &resource: shader_resources.sampled_images) {
+    for (const auto &resource : shader_resources.sampled_images) {
         uint32_t set = comp.get_decoration(resource.id, spv::DecorationDescriptorSet);
         uint32_t binding = comp.get_decoration(resource.id, spv::DecorationBinding);
         const auto &type = comp.get_type(resource.type_id);
@@ -121,27 +120,27 @@ void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
         if (gfx_type == graphic_resource::Type::MaxEnum)
             vsl::loggingln("hint: name: ", resource.name);
         generated.binding_points[set].emplace_back(BindingPoint{
-                .binding = binding,
-                .bindingType = gfx_type,
-                .shaderType = shaderType, // TODO
-                .amount = descriptor_count(comp, type),
+            .binding = binding,
+            .bindingType = gfx_type,
+            .shaderType = shaderType, // TODO
+            .amount = descriptor_count(comp, type),
         });
     }
 
-    for (auto &[resources, gfx_type]: mapped_resources)
-        for (const auto &resource: resources) {
+    for (auto &[resources, gfx_type] : mapped_resources)
+        for (const auto &resource : resources) {
             uint32_t set = comp.get_decoration(resource.id, spv::DecorationDescriptorSet);
             uint32_t binding = comp.get_decoration(resource.id, spv::DecorationBinding);
             const auto &type = comp.get_type(resource.type_id);
             generated.binding_points[set].emplace_back(BindingPoint{
-                    .binding = binding,
-                    .bindingType = gfx_type,
-                    .shaderType = shaderType,  // TODO
-                    .amount = descriptor_count(comp, type),
+                .binding = binding,
+                .bindingType = gfx_type,
+                .shaderType = shaderType, // TODO
+                .amount = descriptor_count(comp, type),
             });
         }
 
-    for (const auto &resource: shader_resources.push_constant_buffers) {
+    for (const auto &resource : shader_resources.push_constant_buffers) {
         const auto &type = comp.get_type(resource.type_id);
         /*
         std::cout << "PushConstant name: " << resource.name << std::endl;
@@ -158,14 +157,14 @@ void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
             if (not generated.push_constants)
                 generated.push_constants.emplace();
             generated.push_constants->definitions.emplace_back(pipeline_layout::PushContentDefinition{
-                    .targetShader = shaderType, // TODO
-                    .offset = static_cast<uint32_t>(comp.type_struct_member_offset(type, (uint32_t)i)),
-                    .size = static_cast<uint32_t>(comp.get_declared_struct_member_size(type, (uint32_t)i)),
+                .targetShader = shaderType, // TODO
+                .offset = static_cast<uint32_t>(comp.type_struct_member_offset(type, (uint32_t)i)),
+                .size = static_cast<uint32_t>(comp.get_declared_struct_member_size(type, (uint32_t)i)),
             });
         }
     }
 
-    for (auto &resource: shader_resources.stage_inputs) {
+    for (auto &resource : shader_resources.stage_inputs) {
         const auto &type = comp.get_type(resource.type_id);
         /*
         std::cout << "vertex input name: " << resource.name
@@ -188,18 +187,15 @@ void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
         format = format.toVec(type.vecsize);
         if (not generated.vertex_input)
             generated.vertex_input.emplace();
-        generated.vertex_input->definitions.push_back({
-            .layouts = {type.columns, vsl::pipeline_layout::VertexInputLayoutDefinition{
-                .format = format
-            }}
-        });
+        generated.vertex_input->definitions.push_back({.layouts = {type.columns, vsl::pipeline_layout::VertexInputLayoutDefinition{
+                                                                                     .format = format}}});
     }
 }
 
 std::vector<vsl::graphic_resource::BindingLayout> vsl::utils::SPIRVReflector::GenerateData::makeBindingLayout(size_t repeat) {
     std::vector<vsl::graphic_resource::BindingLayout> result;
     for (size_t i = 0; i < repeat + 1; i++)
-        for (auto &[_, points]: binding_points)
+        for (auto &[_, points] : binding_points)
             result.emplace_back(logical_device, points);
     return result;
 }

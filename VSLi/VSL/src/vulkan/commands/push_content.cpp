@@ -7,5 +7,5 @@
 
 void vsl::command::PushConstant::invoke(vsl::CommandPool pool, vsl::CommandBuffer buffer, vsl::CommandManager manager) {
     buffer._data->commandBuffers[buffer.getCurrentBufferIdx()]
-            .pushConstants(layout._data->pipelineLayout, (vk::ShaderStageFlagBits) targetType, offset, size, value);
+        .pushConstants(layout._data->pipelineLayout, (vk::ShaderStageFlagBits)targetType, offset, size, value);
 }

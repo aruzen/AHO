@@ -8,17 +8,17 @@
 #include "command.hpp"
 
 namespace VSL_NAMESPACE {
-	struct Viewport {
-		float x = 0, y = 0, width = 1, height = 1;
+    struct Viewport {
+        float x = 0, y = 0, width = 1, height = 1;
 
-		// std::shared_ptr<_impl::Viewport_impl> _data;
+        // std::shared_ptr<_impl::Viewport_impl> _data;
 
-		Viewport();
-		Viewport(float x, float y, float width , float height);
-		Viewport(__VSLD2RectangleAccessor<float> rect);
-		Viewport(SwapchainAccessor swapchain);
+        Viewport();
+        Viewport(float x, float y, float width, float height);
+        Viewport(__VSLD2RectangleAccessor<float> rect);
+        Viewport(SwapchainAccessor swapchain);
 
-		void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
-		void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
-	};
+        void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
+        void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
+    };
 }

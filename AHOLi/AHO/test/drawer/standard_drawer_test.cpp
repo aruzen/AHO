@@ -13,5 +13,5 @@ void verify() {
     stream << aho::pack(triangle, color);
 }
 #else
-static_assert(std::same_as<decltype(&aho::draw), void(*)(const aho::Triangle<float, vsl::D2>&, const aho::RGBA&)>);
+static_assert(std::same_as<decltype(&aho::draw), void (*)(const aho::Triangle<float, vsl::D2>&, const aho::RGBA&)>);
 #endif

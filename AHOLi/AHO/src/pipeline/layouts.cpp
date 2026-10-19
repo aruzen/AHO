@@ -8,7 +8,6 @@
 #include <VSL/vulkan/pipeline_layout.hpp>
 #include <VSL/vulkan/pipeline.hpp>
 
-
 namespace pl = VSL_NAMESPACE::pipeline_layout;
 using namespace VSL_NAMESPACE;
 

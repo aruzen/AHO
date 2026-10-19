@@ -3,7 +3,7 @@
 #include <VSL/utils/spir_reflector.hpp>
 
 // #define AHO_POOP_PUBLIC_SECURITY
-#pragma warning( disable : 4455 )
+#pragma warning(disable : 4455)
 
 #include <AHO/aho.hpp>
 
@@ -39,17 +39,15 @@ breakpoint disable swift_willThrow
         using namespace vsl;
         aho::engine::StandardEngine engine("test");
 
-        auto &[vulkan_instance, physical_device, device, command_manager, graphic_resource_manager, synchro_manager]
-                = *engine._data;
+        auto &[vulkan_instance, physical_device, device, command_manager, graphic_resource_manager, synchro_manager] = *engine._data;
         auto &main_window = engine.boot_window.value();
         auto &[surface, swapchain, render_pass,
-                frame_buffer, image_available, render_finish, in_flight]
-                = *engine.boot_window.value()._data2;
+               frame_buffer, image_available, render_finish, in_flight] = *engine.boot_window.value()._data2;
         if (!image_available._data)
             loggingln("image not available ; ;");
         main_window.resize(500, 500);
 #ifdef _MSC_VER
-        vsl::utils::ShaderCompiler shader_compiler("glslc", { "shaders/", "${AHO_HOME}/built-in-resource/shaders/" });
+        vsl::utils::ShaderCompiler shader_compiler("glslc", {"shaders/", "${AHO_HOME}/built-in-resource/shaders/"});
 #elif defined(__APPLE_CC__)
         vsl::utils::ShaderCompiler shader_compiler("glslc",
                                                    {"../../AHO/shaders/", "${AHO_HOME}/built-in-resource/shaders/"});
@@ -61,29 +59,29 @@ breakpoint disable swift_willThrow
         // auto surface = main_window.add_plugin<Surface>(vulkan_instance);
         pl::ShaderGroup input_d3_shaders("3d_color_input",
                                          {make_shader<"${AHO_HOME}/built-in-resource/shaders/vd2p_fc_umpv.vert.spv">(
-                                                 device),
+                                              device),
                                           make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device)}),
-                input_d2_shaders("2d_color_input",
-                                 {make_shader<"${AHO_HOME}/built-in-resource/shaders/vd2p_fc.vert.spv">(device),
-                                  make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device)}),
-                push_d2_shaders("2d_color_push",
-                                {make_shader<"${AHO_HOME}/built-in-resource/shaders/2dtriangle_single_color.vert.spv">(
-                                        device),
-                                 make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device)});
+            input_d2_shaders("2d_color_input",
+                             {make_shader<"${AHO_HOME}/built-in-resource/shaders/vd2p_fc.vert.spv">(device),
+                              make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device)}),
+            push_d2_shaders("2d_color_push",
+                            {make_shader<"${AHO_HOME}/built-in-resource/shaders/2dtriangle_single_color.vert.spv">(
+                                 device),
+                             make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device)});
 #ifdef _MSC_VER
         pl::ShaderGroup input_texture_shaders("input_texture",
-            { make_shader<"shaders/texture.vert.spv">(device),
-             make_shader<"shaders/texture.frag.spv">(device) }),
+                                              {make_shader<"shaders/texture.vert.spv">(device),
+                                               make_shader<"shaders/texture.frag.spv">(device)}),
             push_texture_shaders("push_texture",
-                { make_shader<"shaders/push_texture.vert.spv">(device),
-                 make_shader<"shaders/push_texture.frag.spv">(device) });
+                                 {make_shader<"shaders/push_texture.vert.spv">(device),
+                                  make_shader<"shaders/push_texture.frag.spv">(device)});
 #elif defined(__APPLE_CC__)
         pl::ShaderGroup input_texture_shaders("input_texture",
                                               {make_shader<"../../AHO/shaders/texture.vert.spv">(device),
                                                make_shader<"../../AHO/shaders/texture.frag.spv">(device)}),
-                push_texture_shaders("push_texture",
-                                     {make_shader<"../../AHO/shaders/push_texture.vert.spv">(device),
-                                      make_shader<"../../AHO/shaders/push_texture.frag.spv">(device)});
+            push_texture_shaders("push_texture",
+                                 {make_shader<"../../AHO/shaders/push_texture.vert.spv">(device),
+                                  make_shader<"../../AHO/shaders/push_texture.frag.spv">(device)});
 #endif
 
         // utils::SPIRVReflector reflector(device, std::filesystem::path(expand_environments("${AHO_HOME}/built-in-resource/shaders/all-types.vert.spv")));
@@ -101,87 +99,80 @@ breakpoint disable swift_willThrow
                               scissor,
                               viewport);
 
-
-        vsl::graphic_resource::BindingLayout ubo_binding_layout(device, {
-                aho::pipeline::getBindingPoint(aho::pipeline::ResourceName::VPMatrixUBO)
-        });
+        vsl::graphic_resource::BindingLayout ubo_binding_layout(device, {aho::pipeline::getBindingPoint(aho::pipeline::ResourceName::VPMatrixUBO)});
         auto [ubo_pool, ubo_resource] = graphic_resource_manager->allocate(
-                std::vector(swapchain.getSwapImageSize(), ubo_binding_layout));
+            std::vector(swapchain.getSwapImageSize(), ubo_binding_layout));
 
-        vsl::graphic_resource::BindingLayout texture_binding_layout(device, {
-                aho::pipeline::getBindingPoint(aho::pipeline::ResourceName::Texture)
-        });
+        vsl::graphic_resource::BindingLayout texture_binding_layout(device, {aho::pipeline::getBindingPoint(aho::pipeline::ResourceName::Texture)});
         auto texture_pool = graphic_resource_manager->make(
-                std::map < vsl::graphic_resource::Type, size_t > {
-                        {vsl::graphic_resource::Type::CombinedImageSampler, 100}
-                });
+            std::map<vsl::graphic_resource::Type, size_t>{
+                {vsl::graphic_resource::Type::CombinedImageSampler, 100}});
 
         auto [input_vertices_resource_layout, input_vertices] = [&]() {
-            auto vd2p_fc_umpv_reflect
-                    = vsl::utils::SPIRVReflector(device, std::filesystem::path(
-                            expand_environments(
-                                    "${AHO_HOME}/built-in-resource/shaders/vd2p_fc_umpv.vert.spv"))).generated;
+            auto vd2p_fc_umpv_reflect = vsl::utils::SPIRVReflector(device, std::filesystem::path(
+                                                                               expand_environments(
+                                                                                   "${AHO_HOME}/built-in-resource/shaders/vd2p_fc_umpv.vert.spv")))
+                                            .generated;
             auto input_vertices_resource_layout = layout.copy().add(
-                    pl::ResourceBinding(vd2p_fc_umpv_reflect.makeBindingLayout()),
-                    input_d3_shaders, *vd2p_fc_umpv_reflect.vertex_input);
+                pl::ResourceBinding(vd2p_fc_umpv_reflect.makeBindingLayout()),
+                input_d3_shaders, *vd2p_fc_umpv_reflect.vertex_input);
             return std::make_tuple(input_vertices_resource_layout,
                                    GraphicsPipeline(
-                                           input_vertices_resource_layout,
-                                           render_pass));
+                                       input_vertices_resource_layout,
+                                       render_pass));
         }();
 
         auto [push_triangle_layout, push_triangle] = [&]() {
-            auto d2triangle_single_color
-                    = vsl::utils::SPIRVReflector(device, std::filesystem::path(
-                            expand_environments(
-                                    "${AHO_HOME}/built-in-resource/shaders/2dtriangle_single_color.vert.spv")
-                    )).generated;
+            auto d2triangle_single_color = vsl::utils::SPIRVReflector(device, std::filesystem::path(
+                                                                                  expand_environments(
+                                                                                      "${AHO_HOME}/built-in-resource/shaders/2dtriangle_single_color.vert.spv")))
+                                               .generated;
             auto push_triangle_layout = layout.copy().add(
-                    *d2triangle_single_color.push_constants,
-                    push_d2_shaders);
+                *d2triangle_single_color.push_constants,
+                push_d2_shaders);
             return std::make_tuple(push_triangle_layout,
                                    GraphicsPipeline(push_triangle_layout, render_pass));
         }();
 
         auto [push_texture_layout, push_texture] = [&]() {
 #ifndef _MSC_VER
-            auto push_texture_vert
-                    = vsl::utils::SPIRVReflector(device, std::filesystem::path(
-                            expand_environments("../../AHO/shaders/push_texture.vert.spv"))).generated;
-            auto push_texture_frag
-                    = vsl::utils::SPIRVReflector(device, std::filesystem::path(
-                            expand_environments("../../AHO/shaders/push_texture.frag.spv"))).generated;
+            auto push_texture_vert = vsl::utils::SPIRVReflector(device, std::filesystem::path(
+                                                                            expand_environments("../../AHO/shaders/push_texture.vert.spv")))
+                                         .generated;
+            auto push_texture_frag = vsl::utils::SPIRVReflector(device, std::filesystem::path(
+                                                                            expand_environments("../../AHO/shaders/push_texture.frag.spv")))
+                                         .generated;
 #else
-            auto push_texture_vert
-                = vsl::utils::SPIRVReflector(device, std::filesystem::path(
-                    expand_environments("shaders/push_texture.vert.spv"))).generated;
-            auto push_texture_frag
-                = vsl::utils::SPIRVReflector(device, std::filesystem::path(
-                    expand_environments("shaders/push_texture.frag.spv"))).generated;
+            auto push_texture_vert = vsl::utils::SPIRVReflector(device, std::filesystem::path(
+                                                                            expand_environments("shaders/push_texture.vert.spv")))
+                                         .generated;
+            auto push_texture_frag = vsl::utils::SPIRVReflector(device, std::filesystem::path(
+                                                                            expand_environments("shaders/push_texture.frag.spv")))
+                                         .generated;
 #endif
             const auto push_texture_layout = layout.copy().add(
-                    *push_texture_vert.push_constants,
-                    pl::ResourceBinding(push_texture_frag.makeBindingLayout()),
-                    push_texture_shaders);
+                *push_texture_vert.push_constants,
+                pl::ResourceBinding(push_texture_frag.makeBindingLayout()),
+                push_texture_shaders);
             return std::make_tuple(push_texture_layout,
                                    GraphicsPipeline(push_texture_layout, render_pass));
         }();
 
         auto [texture_resource_layout, input_texture] = [&]() {
 #ifndef _MSC_VER
-            auto texture_vert
-                    = vsl::utils::SPIRVReflector(device, std::filesystem::path(
-                            expand_environments("../../AHO/shaders/texture.vert.spv"))).generated;
-            auto texture_frag
-                    = vsl::utils::SPIRVReflector(device, std::filesystem::path(
-                            expand_environments("../../AHO/shaders/texture.frag.spv"))).generated;
+            auto texture_vert = vsl::utils::SPIRVReflector(device, std::filesystem::path(
+                                                                       expand_environments("../../AHO/shaders/texture.vert.spv")))
+                                    .generated;
+            auto texture_frag = vsl::utils::SPIRVReflector(device, std::filesystem::path(
+                                                                       expand_environments("../../AHO/shaders/texture.frag.spv")))
+                                    .generated;
 #else
-            auto texture_vert
-                = vsl::utils::SPIRVReflector(device, std::filesystem::path(
-                    expand_environments("shaders/texture.vert.spv"))).generated;
-            auto texture_frag
-                = vsl::utils::SPIRVReflector(device, std::filesystem::path(
-                    expand_environments("shaders/texture.frag.spv"))).generated;
+            auto texture_vert = vsl::utils::SPIRVReflector(device, std::filesystem::path(
+                                                                       expand_environments("shaders/texture.vert.spv")))
+                                    .generated;
+            auto texture_frag = vsl::utils::SPIRVReflector(device, std::filesystem::path(
+                                                                       expand_environments("shaders/texture.frag.spv")))
+                                    .generated;
 #endif
             const auto vert_layout = texture_vert.makeBindingLayout()[0];
             const auto frag_layout = texture_frag.makeBindingLayout()[0];
@@ -189,10 +180,10 @@ breakpoint disable swift_willThrow
                                    frag_layout};
             return std::make_tuple(layouts,
                                    GraphicsPipeline(
-                                           layout.copy().add(
-                                                   pl::ResourceBinding(layouts),
-                                                   input_texture_shaders, *texture_vert.vertex_input),
-                                           render_pass));
+                                       layout.copy().add(
+                                           pl::ResourceBinding(layouts),
+                                           input_texture_shaders, *texture_vert.vertex_input),
+                                       render_pass));
         }();
 
         struct alignas(16) ubo_t {
@@ -202,36 +193,34 @@ breakpoint disable swift_willThrow
         } ubo;
 
         std::array<RGB, 4> colors = {
-                RGB{1.0f, 0.0f, 0.0f},
-                RGB{0.0f, 1.0f, 0.0f},
-                RGB{0.0f, 0.0f, 1.0f},
-                RGB{1.0f, 1.0f, 1.0f}
-        };
+            RGB{1.0f, 0.0f, 0.0f},
+            RGB{0.0f, 1.0f, 0.0f},
+            RGB{0.0f, 0.0f, 1.0f},
+            RGB{1.0f, 1.0f, 1.0f}};
 
         std::array<d2::PointF, 4> vertices = {
-                d2::PointF{-0.5f, -0.5f},
-                d2::PointF{-0.5f, 0.5f},
-                d2::PointF{0.5f, 0.5f},
-                d2::PointF{0.5f, -0.5f},
+            d2::PointF{-0.5f, -0.5f},
+            d2::PointF{-0.5f, 0.5f},
+            d2::PointF{0.5f, 0.5f},
+            d2::PointF{0.5f, -0.5f},
         };
 
         std::array<d2::PointF, 4> texcoords = {
-                d2::PointF{0.0f, 0.0f},
-                d2::PointF{0.0f, 1.0f},
-                d2::PointF{1.0f, 1.0f},
-                d2::PointF{1.0f, 0.0f},
+            d2::PointF{0.0f, 0.0f},
+            d2::PointF{0.0f, 1.0f},
+            d2::PointF{1.0f, 1.0f},
+            d2::PointF{1.0f, 0.0f},
         };
 
         const std::array<uint32_t, 6> indices = {
-                0, 1, 2, 2, 3, 0
-        };
+            0, 1, 2, 2, 3, 0};
 
         struct alignas(16) debug_t {
             std::array<float, 4 * 3> v;
         } *debug;
 
         using UboBuffer = Buffer<vsl::MemoryType::UniformBuffer,
-                vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>;
+                                 vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>;
         std::vector<UboBuffer> uboBuffers;
         {
             auto size = swapchain.getSwapImageSize();
@@ -241,8 +230,7 @@ breakpoint disable swift_willThrow
         }
 
         for (size_t i = 0; i < ubo_resource.size() && i < uboBuffers.size(); i++) {
-            ubo_resource[i].update(uboBuffers[i], (size_t)
-                    0, vsl::graphic_resource::Type::UniformBuffer);
+            ubo_resource[i].update(uboBuffers[i], (size_t)0, vsl::graphic_resource::Type::UniformBuffer);
         }
         DeviceLocalBuffer<vsl::MemoryType::VertexBuffer> colorBuffer(device, command_manager, colors);
         DeviceLocalBuffer<vsl::MemoryType::IndexBuffer> indexBuffer(device, command_manager, indices);
@@ -278,26 +266,26 @@ breakpoint disable swift_willThrow
         ahaha_image.update(image, sampler, 0, vsl::graphic_resource::Type::CombinedImageSampler);
 
         Buffer<vsl::MemoryType::StorageBuffer,
-                vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>
-                debugBuffer(device, sizeof(debug_t));
+               vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>
+            debugBuffer(device, sizeof(debug_t));
 
         InputManager input_manager(main_window);
         auto [keyUp,
-                keyDown,
-                keyLeft,
-                keyRight,
-                keyR,
-                keyF,
-                keyMode,
-                keyRestart] = input_manager.get<input::Keys>(
-                input::KeyCode::Up,
-                input::KeyCode::Down,
-                input::KeyCode::Left,
-                input::KeyCode::Right,
-                input::KeyCode::R,
-                input::KeyCode::F,
-                input::KeyCode::I,
-                input::KeyCode::Enter)->keys;
+              keyDown,
+              keyLeft,
+              keyRight,
+              keyR,
+              keyF,
+              keyMode,
+              keyRestart] = input_manager.get<input::Keys>(input::KeyCode::Up,
+                                                           input::KeyCode::Down,
+                                                           input::KeyCode::Left,
+                                                           input::KeyCode::Right,
+                                                           input::KeyCode::R,
+                                                           input::KeyCode::F,
+                                                           input::KeyCode::I,
+                                                           input::KeyCode::Enter)
+                                ->keys;
         auto mouse = input_manager.get<input::Mouse>();
 
         main_window.add_plugin<window::WindowResizeHookPlugin>([&ubo, &scissor, &viewport, &swapchain](auto w) {
@@ -348,26 +336,24 @@ breakpoint disable swift_willThrow
                 move.value -= 0.3_f_z * Z(delta);
             if (keyR->pressed())
                 move.value += 0.3_f_z * Z(delta);
-     
-
 
             ubo.model = matrix::make_identity<Mat4x4F>();
             ubo.view = matrix::make_view(d3::PointF(0.0f, 2.0f, 2.0f) + move, d3::PointF(0.0f, 0.0f, 0.0f) + move, d3::VectorF(0.0f, 0.0f, 1.0f));
-            ubo.proj = matrix::make_perspective(45.0_deg, viewport.width / (float) viewport.height, 0.1f, 10.0f);
+            ubo.proj = matrix::make_perspective(45.0_deg, viewport.width / (float)viewport.height, 0.1f, 10.0f);
 
             {
                 auto phase = DrawPhase(&engine);
                 uboBuffers[phase.getCurrentIndex()].copy(ubo);
 
                 //ubo_resource[phase.getCurrentIndex()].update(uboBuffers[phase.getCurrentIndex()], 0);
-                
+
                 phase << input_vertices << scissor << viewport
                       << command::BindGraphicResource(ubo_resource[phase.getImageIndex()],
                                                       graphic_resource::BindingDestination::Graphics, input_vertices)
                       << command::BindVertexBuffer(vertBuffer, colorBuffer)
                       << command::BindIndexBuffer(indexBuffer)
                       << command::DrawIndexed(indices.size());
-                      
+
                 /*
                 struct alignas(16) {
                     std::array<d2::PointF, 4> vertices;
@@ -418,8 +404,7 @@ breakpoint disable swift_willThrow
     catch (vsl::exceptions::VSLException &e) {
         vsl::loggingln(e.what());
         return 1;
-    }
-    catch (std::exception &e) {
+    } catch (std::exception &e) {
         vsl::loggingln(e.what());
         return 1;
     }

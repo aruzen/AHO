@@ -1,6 +1,7 @@
 #version 450
 // Reflection-only: array-of-arrays SPIR-V is never submitted to a Vulkan device.
-layout(local_size_x=1) in;
-layout(set=0,binding=0) uniform sampler2D textures[2][3];
-layout(set=0,binding=1) buffer Data { vec4 value; } data;
+layout(local_size_x = 1) in;
+layout(set = 0, binding = 0) uniform sampler2D textures[2][3];
+layout(set = 0, binding = 1) buffer Data { vec4 value; }
+data;
 void main() { data.value = texture(textures[1][2], vec2(0)); }

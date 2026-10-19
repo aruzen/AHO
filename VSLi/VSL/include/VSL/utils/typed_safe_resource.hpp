@@ -29,12 +29,12 @@ namespace VSL_NAMESPACE::typed {
         }
     };
 
-    template<data_format::___Format FormatType, std::uint32_t Location = (std::uint32_t) -1, std::uint32_t Offset = (std::uint32_t) -1>
+    template<data_format::___Format FormatType, std::uint32_t Location = (std::uint32_t)-1, std::uint32_t Offset = (std::uint32_t)-1>
     struct VertexInputDefinition {
         static constexpr pipeline_layout::VertexInputLayoutDefinition value = {FormatType, Location, Offset};
     };
 
-    template<std::uint32_t Binding, std::uint32_t Size, pipeline_layout::VertexInputShapeDefinition::UpdateTiming Timing, typename...Definitions>
+    template<std::uint32_t Binding, std::uint32_t Size, pipeline_layout::VertexInputShapeDefinition::UpdateTiming Timing, typename... Definitions>
     struct VertexShapeDefinition {
         static constexpr size_t size() { return sizeof...(Definitions); }
 
@@ -44,17 +44,17 @@ namespace VSL_NAMESPACE::typed {
         }
     };
 
-    template<typename...Definitions>
+    template<typename... Definitions>
     struct TypedVertexInput {
         void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
     };
 
-    template<VSL_NAMESPACE::ShaderFlag Target, std::uint32_t Size = (std::uint32_t) -1, std::uint32_t Offset = (std::uint32_t) -1>
+    template<VSL_NAMESPACE::ShaderFlag Target, std::uint32_t Size = (std::uint32_t)-1, std::uint32_t Offset = (std::uint32_t)-1>
     struct PushContentDefinitionTag {
         static constexpr pipeline_layout::PushContentDefinition value = {Target, Offset, Size};
     };
 
-    template<typename...Definitions>
+    template<typename... Definitions>
     struct PushContentDefinitions {
         static constexpr size_t size() { return sizeof...(Definitions); }
 
@@ -68,7 +68,6 @@ namespace VSL_NAMESPACE::typed {
 
     template<typename... Definitions>
     void TypedVertexInput<Definitions...>::injection(vsl::PipelineLayoutAccessor pl) {
-        
     }
 }
 

@@ -13,7 +13,8 @@ layout(std430, binding = 1) buffer CurrRow {
 layout(std140, binding = 2) uniform UniformBufferObject {
     uint baseNumber;
     uint rowIndex;
-} ubo;
+}
+ubo;
 
 layout(binding = 3, rgba8) uniform writeonly image2D img;
 
@@ -27,12 +28,18 @@ vec4 hue2rgb(float h) {
     float c = 1.0;
     float x = 1.0 - abs(mod(h, 2.0) - 1.0);
 
-    if (h < 1.0) return vec4(c, x, 0.0, 1.0);
-    else if (h < 2.0) return vec4(x, c, 0.0, 1.0);
-    else if (h < 3.0) return vec4(0.0, c, x, 1.0);
-    else if (h < 4.0) return vec4(0.0, x, c, 1.0);
-    else if (h < 5.0) return vec4(x, 0.0, c, 1.0);
-    else return vec4(c, 0.0, x, 1.0);
+    if (h < 1.0)
+        return vec4(c, x, 0.0, 1.0);
+    else if (h < 2.0)
+        return vec4(x, c, 0.0, 1.0);
+    else if (h < 3.0)
+        return vec4(0.0, c, x, 1.0);
+    else if (h < 4.0)
+        return vec4(0.0, x, c, 1.0);
+    else if (h < 5.0)
+        return vec4(x, 0.0, c, 1.0);
+    else
+        return vec4(c, 0.0, x, 1.0);
 }
 
 void main() {
@@ -48,5 +55,5 @@ void main() {
 
     currRow[x] = val;
 
-    imageStore(img, ivec2(x, y), hue2rgb(float(val)/float(ubo.baseNumber)));
+    imageStore(img, ivec2(x, y), hue2rgb(float(val) / float(ubo.baseNumber)));
 }

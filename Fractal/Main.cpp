@@ -52,7 +52,7 @@
 #include "../thirdparty/stb_image_write.h"
 
 // #define AHO_POOP_PUBLIC_SECURITY
-#pragma warning( disable : 4455 )
+#pragma warning(disable : 4455)
 
 #include <AHO/define.hpp>
 #include <AHO/core/math/Mat.hpp>
@@ -89,7 +89,7 @@ int main() {
         shader_compiler.compile();
 
 #ifdef _MSC_VER
-        Vulkan vk("test", { "VK_KHR_win32_surface", "VK_KHR_surface" });
+        Vulkan vk("test", {"VK_KHR_win32_surface", "VK_KHR_surface"});
 #elifdef __APPLE_CC__
         Vulkan vk("test", {"VK_KHR_portability_enumeration", "VK_KHR_surface",
                            "VK_EXT_metal_surface"});
@@ -100,7 +100,7 @@ int main() {
         auto surface = main_window.add_plugin<Surface>(vk);
 
         LogicalDevice device(physical_device, surface);
-        for (auto device: PhysicalDevices(vk).get())
+        for (auto device : PhysicalDevices(vk).get())
             loggingln(physical_device.name(), "(", physical_device.apiVersion(), ")");
         vsl::loggingln("selected : ", physical_device.name(), "(", physical_device.apiVersion(), ")");
 
@@ -118,12 +118,12 @@ int main() {
         GraphicResourceManager resourceManager(device);
 
         auto resourceBindingLayout = ResourceBindingLayout(device, {
-                ResourceBindingPoint(0, ResourceType::StorageBuffer, ShaderFlag::Compute),
-                ResourceBindingPoint(1, ResourceType::StorageBuffer, ShaderFlag::Compute),
-                ResourceBindingPoint(2, ResourceType::UniformBuffer, ShaderFlag::Compute),
-                ResourceBindingPoint(3, ResourceType::StorageImage, ShaderFlag::Compute),
-                ResourceBindingPoint(4, ResourceType::StorageBuffer, ShaderFlag::Compute),
-        });
+                                                                       ResourceBindingPoint(0, ResourceType::StorageBuffer, ShaderFlag::Compute),
+                                                                       ResourceBindingPoint(1, ResourceType::StorageBuffer, ShaderFlag::Compute),
+                                                                       ResourceBindingPoint(2, ResourceType::UniformBuffer, ShaderFlag::Compute),
+                                                                       ResourceBindingPoint(3, ResourceType::StorageImage, ShaderFlag::Compute),
+                                                                       ResourceBindingPoint(4, ResourceType::StorageBuffer, ShaderFlag::Compute),
+                                                                   });
         auto [pool, resource] = resourceManager.make({resourceBindingLayout});
 
         struct alignas(16) ubo_t {
@@ -138,9 +138,9 @@ int main() {
 
         using StorageBuffer = Buffer<vsl::MemoryType::StorageBuffer, vsl::MemoryProperty::DeviceLocal>;
         using UboBuffer = Buffer<vsl::MemoryType::UniformBuffer,
-                vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>;
+                                 vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>;
         using DebugBuffer = Buffer<vsl::MemoryType::StorageBuffer,
-                vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>;
+                                   vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>;
         StorageBuffer prevRow(device, sizeof(std::uint32_t) * 1024);
         StorageBuffer currRow(device, sizeof(std::uint32_t) * 1024);
         UboBuffer uboBuffer(device, sizeof(ubo_t));
@@ -154,12 +154,11 @@ int main() {
         resource[0].update(debugBuffer, 4);
 
         Buffer<vsl::MemoryType::TransferDestination,
-                vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent >
-                                                   imageStagingBuffer(device, 1024 * 1024 * 4);
+               vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>
+            imageStagingBuffer(device, 1024 * 1024 * 4);
 
         PipelineLayout fractal_compute_layout(device, pl::ResourceBinding({resourceBindingLayout}), fractal_shaders);
         ComputePipeline fractal_compute(fractal_compute_layout);
-
 
         auto inFlight = synchro_manager.createFence("inFlight", manager.getBuffer().getSize(), true),
              inCopy = synchro_manager.createFence("inCopy", 1, true);
@@ -189,7 +188,7 @@ int main() {
         imageStagingBuffer.copyByImage(fractalImage, inCopy);
         inCopy.wait();
 
-        auto data = (std::uint32_t*)imageStagingBuffer.data().data;
+        auto data = (std::uint32_t *)imageStagingBuffer.data().data;
 
         int result = stbi_write_png("output.png",
                                     1024,
@@ -201,12 +200,10 @@ int main() {
             throw std::runtime_error("Failed to write PNG file!");
         }
         defaults::release();
-    }
-    catch (std::exception &e) {
+    } catch (std::exception &e) {
         vsl::loggingln(e.what());
         return 1;
-    }
-    catch (vsl::exceptions::VSLException &e) {
+    } catch (vsl::exceptions::VSLException &e) {
         vsl::loggingln(e.what());
         return 1;
     }

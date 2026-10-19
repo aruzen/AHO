@@ -11,11 +11,11 @@ vsl::Sampler::Sampler(LogicalDeviceAccessor device, vsl::SamplingMode sampling, 
     _data->device = device._data;
 
     vk::SamplerCreateInfo samplerInfo;
-    samplerInfo.magFilter = (vk::Filter) sampling;
-    samplerInfo.minFilter = (vk::Filter) sampling;
-    samplerInfo.addressModeU = (vk::SamplerAddressMode) edge;
-    samplerInfo.addressModeV = (vk::SamplerAddressMode) edge;
-    samplerInfo.addressModeW = (vk::SamplerAddressMode) edge;
+    samplerInfo.magFilter = (vk::Filter)sampling;
+    samplerInfo.minFilter = (vk::Filter)sampling;
+    samplerInfo.addressModeU = (vk::SamplerAddressMode)edge;
+    samplerInfo.addressModeV = (vk::SamplerAddressMode)edge;
+    samplerInfo.addressModeW = (vk::SamplerAddressMode)edge;
 
     samplerInfo.anisotropyEnable = sampling != SamplingMode::Nearest;
     if (not device._data->parentDevice->props)

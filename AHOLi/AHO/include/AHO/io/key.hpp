@@ -35,9 +35,9 @@ namespace AHO_NAMESPACE::input {
         bool pressed() override;
     };
 
-    template<typename ...KeyCodes>
+    template<typename... KeyCodes>
     class Keys : public abstract::Adaptable {
-        template<template<typename ...> typename T, typename... Args>
+        template<template<typename...> typename T, typename... Args>
         friend std::shared_ptr<T<Args...>> InputManager::get(Args &&...args);
 
         Keys(void *context, aho::InputManager &manager, KeyCodes... codes);

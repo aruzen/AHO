@@ -8,84 +8,82 @@
 
 template<bool Validation>
 bool VSL_NAMESPACE::Vulkan<Validation>::checkValidationLayerSupport() {
-	uint32_t layerCount;
-	vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+    uint32_t layerCount;
+    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 
-	std::vector<VkLayerProperties> availableLayers(layerCount);
-	vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+    std::vector<VkLayerProperties> availableLayers(layerCount);
+    vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
 
-	for (const char* layerName : validationLayers) {
-		bool layerFound = false;
+    for (const char* layerName : validationLayers) {
+        bool layerFound = false;
 
-		for (const auto& layerProperties : availableLayers) {
-			if (strcmp(layerName, layerProperties.layerName) == 0) {
-				layerFound = true;
-				break;
-			}
-		}
+        for (const auto& layerProperties : availableLayers) {
+            if (strcmp(layerName, layerProperties.layerName) == 0) {
+                layerFound = true;
+                break;
+            }
+        }
 
-		if (!layerFound) {
-			return false;
-		}
-	}
+        if (!layerFound) {
+            return false;
+        }
+    }
 
-	return true;
+    return true;
 }
 
 static VkBool32 VKAPI_PTR debugCallback(
-	VkDebugUtilsMessageSeverityFlagBitsEXT           messageSeverity,
-	VkDebugUtilsMessageTypeFlagsEXT                  messageTypes,
-	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-	void* pUserData) {
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData) {
 
-	using namespace std;
+    using namespace std;
 
-	string message(pCallbackData->pMessage);
-	if (message.substr(0, 20).contains("Error"))
-		VSL_NAMESPACE::loggingln("\033[31mvalidation\033[0m : "s + pCallbackData->pMessage);
-	else
-		VSL_NAMESPACE::loggingln("\033[32mvalidation\033[0m : "s + pCallbackData->pMessage);
+    string message(pCallbackData->pMessage);
+    if (message.substr(0, 20).contains("Error"))
+        VSL_NAMESPACE::loggingln("\033[31mvalidation\033[0m : "s + pCallbackData->pMessage);
+    else
+        VSL_NAMESPACE::loggingln("\033[32mvalidation\033[0m : "s + pCallbackData->pMessage);
 
-	return VK_FALSE;
+    return VK_FALSE;
 }
 
 void populateDebugMessengerCreateInfo(vk::DebugUtilsMessengerCreateInfoEXT& createInfo) {
-	createInfo.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo |
-        vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
-		vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
-		vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
-	createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
-		vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
-		vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
+    createInfo.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo |
+                                 vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
+                                 vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
+                                 vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
+    createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
+                             vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
+                             vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
     createInfo.pfnUserCallback = (vk::PFN_DebugUtilsMessengerCallbackEXT)debugCallback;
 }
 
 vk::Result CreateDebugUtilsMessengerEXT(vk::Instance instance, const vk::DebugUtilsMessengerCreateInfoEXT& pCreateInfo, const vk::AllocationCallbacks* pAllocator, vk::DebugUtilsMessengerEXT& pDebugMessenger) {
-	auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
-	if (func != nullptr) {
-		VkDebugUtilsMessengerEXT tmpDebugMessenger;
-		auto result = (vk::Result)func(instance, &((const VkDebugUtilsMessengerCreateInfoEXT&)pCreateInfo), reinterpret_cast<const VkAllocationCallbacks *>(pAllocator) , &tmpDebugMessenger);
-		pDebugMessenger = tmpDebugMessenger;
-		return result;
-	}
-	else {
-		return vk::Result::eErrorExtensionNotPresent;
-	}
+    auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+    if (func != nullptr) {
+        VkDebugUtilsMessengerEXT tmpDebugMessenger;
+        auto result = (vk::Result)func(instance, &((const VkDebugUtilsMessengerCreateInfoEXT&)pCreateInfo), reinterpret_cast<const VkAllocationCallbacks*>(pAllocator), &tmpDebugMessenger);
+        pDebugMessenger = tmpDebugMessenger;
+        return result;
+    } else {
+        return vk::Result::eErrorExtensionNotPresent;
+    }
 }
 
 template<bool V>
 void setupDebugMessenger(std::shared_ptr<VSL_NAMESPACE::_impl::Vulkan_impl<V>> data) {
-	vk::DebugUtilsMessengerCreateInfoEXT createInfo;
-	populateDebugMessengerCreateInfo(createInfo);
+    vk::DebugUtilsMessengerCreateInfoEXT createInfo;
+    populateDebugMessengerCreateInfo(createInfo);
 
-	if (CreateDebugUtilsMessengerEXT(data->instance, createInfo, nullptr, data->debugMessenger) != vk::Result::eSuccess) {
-		throw VSL_NAMESPACE::exceptions::RuntimeException("failed to set up debug messenger!");
-	}
+    if (CreateDebugUtilsMessengerEXT(data->instance, createInfo, nullptr, data->debugMessenger) != vk::Result::eSuccess) {
+        throw VSL_NAMESPACE::exceptions::RuntimeException("failed to set up debug messenger!");
+    }
 }
 
 template<bool Validation>
-VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vector<const char*>& requireExtensions)
-{
+VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vector<const char*>& requireExtensions) {
     _data = std::shared_ptr<VSL_NAMESPACE::_impl::Vulkan_impl<Validation>>(new VSL_NAMESPACE::_impl::Vulkan_impl<Validation>);
     _accessor = std::dynamic_pointer_cast<_impl::Vulkan_impl_accessor>(_data);
 
@@ -94,7 +92,7 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vecto
 
         std::vector<vk::ExtensionProperties> extensions = vk::enumerateInstanceExtensionProperties();
         VSL_NAMESPACE::loggingln("available extensions:");
-        for (const auto &extension: extensions)
+        for (const auto& extension : extensions)
             VSL_NAMESPACE::loggingln(extension.extensionName);
         std::vector<vk::LayerProperties> layers = vk::enumerateInstanceLayerProperties();
         VSL_NAMESPACE::loggingln("available layers:");
@@ -126,9 +124,9 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vecto
 
     vk::DebugUtilsMessengerCreateInfoEXT debugCreateInfo;
     vk::ValidationFeaturesEXT validation_features;
-    std::vector<vk::ValidationFeatureEnableEXT>  validation_feature_enables = {
-            vk::ValidationFeatureEnableEXT::eDebugPrintf,
-            vk::ValidationFeatureEnableEXT::eBestPractices,
+    std::vector<vk::ValidationFeatureEnableEXT> validation_feature_enables = {
+        vk::ValidationFeatureEnableEXT::eDebugPrintf,
+        vk::ValidationFeatureEnableEXT::eBestPractices,
     };
     if constexpr (Validation) {
         for (const auto& e : validationExtensions)
@@ -137,7 +135,7 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vecto
         validation_features.pNext = &debugCreateInfo;
 
         validation_features.enabledValidationFeatureCount = 1;
-        validation_features.pEnabledValidationFeatures    = validation_feature_enables.data();
+        validation_features.pEnabledValidationFeatures = validation_feature_enables.data();
         createInfo.pNext = &validation_features;
 
         // validation layer
@@ -171,37 +169,33 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vecto
 }
 
 void vsl::_impl::helper::DestroyDebugUtilsMessengerEXT(vk::Instance& instance, vk::DebugUtilsMessengerEXT& debugMessenger, const VkAllocationCallbacks* pAllocator) {
-	auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
-	if (func != nullptr) {
-		func(instance, debugMessenger, pAllocator);
-	}
+    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+    if (func != nullptr) {
+        func(instance, debugMessenger, pAllocator);
+    }
 }
 
 template<bool Validation>
-VSL_NAMESPACE::Vulkan<Validation>::~Vulkan()
-{
-
+VSL_NAMESPACE::Vulkan<Validation>::~Vulkan() {
 }
 
 #ifdef VSL_NAMESPACE_TEST
 template<bool Validation>
-void VSL_NAMESPACE::Vulkan<Validation>::test()
-{
- 	auto devices = _data->instance.enumeratePhysicalDevices();
-	for (auto d : devices) {
-		auto props = d.getProperties();
-		VSL_NAMESPACE::logging(props.deviceName);
-	}
+void VSL_NAMESPACE::Vulkan<Validation>::test() {
+    auto devices = _data->instance.enumeratePhysicalDevices();
+    for (auto d : devices) {
+        auto props = d.getProperties();
+        VSL_NAMESPACE::logging(props.deviceName);
+    }
 }
 #endif // VSL_NAMESPACE_TEST
 
 template<bool V>
-VSL_NAMESPACE::_impl::Vulkan_impl<V>::~Vulkan_impl()
-{
-	if constexpr (V) {
-		helper::DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
-	}
-	instance.destroy();
+VSL_NAMESPACE::_impl::Vulkan_impl<V>::~Vulkan_impl() {
+    if constexpr (V) {
+        helper::DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+    }
+    instance.destroy();
 }
 
 template struct VSL_NAMESPACE::_impl::Vulkan_impl<true>;

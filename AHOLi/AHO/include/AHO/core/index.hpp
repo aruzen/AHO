@@ -3,24 +3,24 @@
 #include <cstddef>
 
 namespace AHO_NAMESPACE {
-	template<typename T>
-	struct Index {
-		T index;
-	};
-
-	template<typename T>
-	struct IndexedLine {
-		Index<T> idx1, idx2;
-
-        Index<T>& operator[] (size_t t);
-	};
+    template<typename T>
+    struct Index {
+        T index;
+    };
 
     template<typename T>
-	struct IndexedTriangle {
-		Index<T> idx1, idx2, idx3;
+    struct IndexedLine {
+        Index<T> idx1, idx2;
 
-        Index<T>& operator[] (size_t t);
-	};
+        Index<T>& operator[](size_t t);
+    };
+
+    template<typename T>
+    struct IndexedTriangle {
+        Index<T> idx1, idx2, idx3;
+
+        Index<T>& operator[](size_t t);
+    };
 
     template<typename T>
     Index<T>& IndexedLine<T>::operator[](size_t t) {

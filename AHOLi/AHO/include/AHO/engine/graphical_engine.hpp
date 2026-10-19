@@ -22,5 +22,4 @@ namespace AHO_NAMESPACE::engine {
     };
 }
 
-
 #endif //AHO_ALL_GRAPHITICALENGINE_H

@@ -10,18 +10,17 @@
 #include <utility>
 #include <utility>
 
-
 vsl::command::BindGraphicResource::BindGraphicResource(vsl::GraphicResource resource,
                                                        vsl::graphic_resource::BindingDestination dst,
                                                        std::optional<PipelineAccessor> pipeline,
                                                        std::uint32_t first_binding)
-        : resources{resource}, destination(dst), pipeline(std::move(pipeline)), first_binding(first_binding) {}
+    : resources{resource}, destination(dst), pipeline(std::move(pipeline)), first_binding(first_binding) {}
 
 vsl::command::BindGraphicResource::BindGraphicResource(const std::vector<GraphicResource> &resources,
                                                        vsl::graphic_resource::BindingDestination dst,
                                                        std::optional<PipelineAccessor> pipeline,
                                                        std::uint32_t first_binding)
-        : resources(resources), destination(dst), pipeline(std::move(pipeline)), first_binding(first_binding) {}
+    : resources(resources), destination(dst), pipeline(std::move(pipeline)), first_binding(first_binding) {}
 
 void VSL_NAMESPACE::command::BindGraphicResource::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
     if (pipeline)
@@ -29,10 +28,8 @@ void VSL_NAMESPACE::command::BindGraphicResource::invoke(CommandPool pool, Comma
             .bindDescriptorSets((vk::PipelineBindPoint)destination,
                                 pipeline.value()._data->layout->pipelineLayout,
                                 first_binding,
-                                resources
-                                | std::views::transform([](auto &r) { return r._data->descriptorSet; })
-                                | std::ranges::to<std::vector<vk::DescriptorSet>>(),
-                                { });
+                                resources | std::views::transform([](auto &r) { return r._data->descriptorSet; }) | std::ranges::to<std::vector<vk::DescriptorSet>>(),
+                                {});
 }
 
 void vsl::command::BindGraphicResource::setPipeline(std::optional<PipelineAccessor> pipeline) {

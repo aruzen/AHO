@@ -1,7 +1,9 @@
 #version 450
-layout(local_size_x=1) in;
-layout(set=0,binding=0) uniform Params { uint value; } params[2];
-layout(set=0,binding=1) buffer Data { uint value; } data[3];
-layout(set=0,binding=2,rgba8) uniform image2D images[4];
-layout(set=0,binding=3) uniform sampler2D textures[5];
+layout(local_size_x = 1) in;
+layout(set = 0, binding = 0) uniform Params { uint value; }
+params[2];
+layout(set = 0, binding = 1) buffer Data { uint value; }
+data[3];
+layout(set = 0, binding = 2, rgba8) uniform image2D images[4];
+layout(set = 0, binding = 3) uniform sampler2D textures[5];
 void main() { data[2].value = params[1].value + uint(imageLoad(images[3], ivec2(0)).x) + uint(texture(textures[4], vec2(0)).x); }

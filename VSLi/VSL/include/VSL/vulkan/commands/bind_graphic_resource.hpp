@@ -5,7 +5,6 @@
 #ifndef AHO_ALL_BIND_GRAPHIC_RESOURCE_HPP
 #define AHO_ALL_BIND_GRAPHIC_RESOURCE_HPP
 
-
 #include "../../define.hpp"
 #include "../pv.hpp"
 #include "../command.hpp"
@@ -28,6 +27,5 @@ namespace VSL_NAMESPACE::command {
         void setPipeline(std::optional<PipelineAccessor> pipeline) override;
     };
 }
-
 
 #endif //AHO_ALL_BIND_GRAPHIC_RESOURCE_HPP

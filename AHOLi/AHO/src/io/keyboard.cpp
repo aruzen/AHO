@@ -4,7 +4,6 @@
 
 #include <AHO/io/keyboard.hpp>
 
-
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <unordered_set>
@@ -21,7 +20,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     }
 }
 
-aho::input::KeyBoard::KeyBoard(void *context) : context(context) {
+aho::input::KeyBoard::KeyBoard(void* context) : context(context) {
     if (KEYBOARD_TRACKED == 0)
         glfwSetKeyCallback((GLFWwindow*)context, key_callback);
     KEYBOARD_TRACKED++;
@@ -36,7 +35,7 @@ std::unordered_set<aho::input::KeyCode> aho::input::KeyBoard::state() {
 aho::input::KeyBoard::~KeyBoard() {
     KEYBOARD_TRACKED--;
     if (KEYBOARD_TRACKED == 0) {
-        glfwSetKeyCallback((GLFWwindow *) context, nullptr);
+        glfwSetKeyCallback((GLFWwindow*)context, nullptr);
         PRESSED_KEYS.clear();
     }
 }

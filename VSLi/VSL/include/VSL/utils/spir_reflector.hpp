@@ -32,6 +32,7 @@ namespace VSL_NAMESPACE::utils {
         SPIRVReflector(LogicalDeviceAccessor logical_device, std::filesystem::path path);
 
         SPIRVReflector(LogicalDeviceAccessor logical_device, const std::vector<char> &binary);
+
     private:
         void init(const std::uint32_t *bp, size_t size);
     };

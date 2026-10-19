@@ -54,12 +54,12 @@ namespace VSL_NAMESPACE::graphic_resource {
         ShaderFlag shaderType;
         std::uint32_t amount = 1;
 
-        constexpr auto operator<=>(const BindingPoint&) const = default;
+        constexpr auto operator<=>(const BindingPoint &) const = default;
     };
 
     template<typename T>
     concept can_convert_graphic_resource = std::is_convertible_v<T *, vsl::BufferAccessor *> ||
-            std::is_convertible_v<T *, vsl::ImageAccessor *>;
+                                           std::is_convertible_v<T *, vsl::ImageAccessor *>;
 
     /*
      * GPU上のメモリーに置かれたデータをShaderがどう読み取るかを指定できる
@@ -72,7 +72,7 @@ namespace VSL_NAMESPACE::graphic_resource {
 
         BindingLayout(LogicalDeviceAccessor device, std::initializer_list<BindingPoint> points);
 
-        BindingLayout(LogicalDeviceAccessor device, const std::vector<BindingPoint>& points);
+        BindingLayout(LogicalDeviceAccessor device, const std::vector<BindingPoint> &points);
 
         [[nodiscard]] std::vector<BindingPoint> getBindingPoints() const;
 
@@ -99,7 +99,7 @@ namespace VSL_NAMESPACE::graphic_resource {
         Pool getPool();
 
         // ここらへんのTもいつかtypename ...Argsに置き換えたいかも
-        void update(vsl::BufferAccessor* buffer, size_t binding = 0, std::optional<Type> type = std::nullopt,
+        void update(vsl::BufferAccessor *buffer, size_t binding = 0, std::optional<Type> type = std::nullopt,
                     size_t offset = 0, std::optional<size_t> size = std::nullopt);
 
         void update(vsl::ImageAccessor image, size_t binding = 0, std::optional<Type> type = std::nullopt);
@@ -131,10 +131,9 @@ void vsl::GraphicResource::update(T t, vsl::BufferAccessor::LocalBufferHolder ho
 }
 
 template<vsl::graphic_resource::can_convert_graphic_resource T>
-void
-vsl::GraphicResource::update(T t, size_t binding, std::optional<vsl::graphic_resource::Type> type, size_t offset, std::optional<size_t> size) {
+void vsl::GraphicResource::update(T t, size_t binding, std::optional<vsl::graphic_resource::Type> type, size_t offset, std::optional<size_t> size) {
     if constexpr (std::is_convertible_v<T *, vsl::BufferAccessor *>)
-        update((vsl::BufferAccessor*) &t, binding, type, offset, size);
+        update((vsl::BufferAccessor *)&t, binding, type, offset, size);
     else if constexpr (std::is_convertible_v<T *, vsl::ImageAccessor *>)
         update(static_cast<vsl::ImageAccessor>(t), binding, type);
 }

@@ -6,15 +6,15 @@
 #include <optional>
 
 namespace VSL_NAMESPACE::command {
-	struct Draw : public __Command {
-		Draw(size_t size = 0);
+    struct Draw : public __Command {
+        Draw(size_t size = 0);
 
-		size_t size;
+        size_t size;
 
-		void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
-	};
+        void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
+    };
 
-	struct DrawManip : public __Command, __VertexSizeRequire {
+    struct DrawManip : public __Command, __VertexSizeRequire {
         std::optional<size_t> size;
 
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
@@ -22,5 +22,5 @@ namespace VSL_NAMESPACE::command {
         void setVertexSize(std::optional<size_t> vertexSize) override;
     };
 
-	extern DrawManip draw;
+    extern DrawManip draw;
 }

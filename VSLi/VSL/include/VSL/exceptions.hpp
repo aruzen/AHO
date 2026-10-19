@@ -6,14 +6,14 @@
 #include <exception>
 
 namespace VSL_NAMESPACE::exceptions {
-	struct VSLException : public std::exception {
-		std::string reason;
+    struct VSLException : public std::exception {
+        std::string reason;
 
         const char* what() const noexcept override;
-	};
+    };
 
-	struct RuntimeException : public VSLException{
-		RuntimeException(std::string type, std::string message = "", std::string traceinfo = "");
-		RuntimeException(std::string type, std::string message, std::source_location sourece);
-	};
+    struct RuntimeException : public VSLException {
+        RuntimeException(std::string type, std::string message = "", std::string traceinfo = "");
+        RuntimeException(std::string type, std::string message, std::source_location sourece);
+    };
 }

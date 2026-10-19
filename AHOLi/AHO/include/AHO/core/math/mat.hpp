@@ -92,17 +92,18 @@ namespace AHO_NAMESPACE {
             constexpr Mat<R, Row, Column> &operator*=(const AHO_NAMESPACE::matrix::Mat<T, Row, Column> &p);
 
             template<AHO_NAMESPACE::concepts::multiply_as<R> T>
-            constexpr Mat<R, Row, Column>& operator*=(const T &m);
+            constexpr Mat<R, Row, Column> &operator*=(const T &m);
 
             template<AHO_NAMESPACE::concepts::division_as<R> T>
-            constexpr Mat<R, Row, Column>& operator/=(const T &m);
+            constexpr Mat<R, Row, Column> &operator/=(const T &m);
 
-            template<typename T> requires AHO_NAMESPACE::concepts::cast_as<R, T>
+            template<typename T>
+            requires AHO_NAMESPACE::concepts::cast_as<R, T>
             Mat<T, Row, Column> cast() const;
         };
 
         template<typename T, size_t N1>
-        std::array<T, N1> row(const T(&arr)[N1]);
+        std::array<T, N1> row(const T (&arr)[N1]);
 
         template<typename T, size_t Row, size_t Column>
         constexpr Mat<T, Row, Column> make(const std::array<T, Column> (&arr)[Row]);
@@ -111,19 +112,19 @@ namespace AHO_NAMESPACE {
         constexpr Mat<T, Row, Column> make(std::initializer_list<std::initializer_list<T>>);
 
         template<typename L, size_t Row, size_t Column, AHO_NAMESPACE::concepts::multiply_as<L> R>
-        requires (!requires {{ R::__is_mat } -> std::convertible_to<bool>; })
+        requires(!requires {{ R::__is_mat } -> std::convertible_to<bool>; })
         constexpr auto operator*(const matrix::Mat<L, Row, Column> &mat, const R &m);
 
         template<typename L, size_t Row, size_t Column, AHO_NAMESPACE::concepts::division_as<L> R>
-        requires (!requires {{ R::__is_mat } -> std::convertible_to<bool>; })
+        requires(!requires {{ R::__is_mat } -> std::convertible_to<bool>; })
         constexpr auto operator/(const matrix::Mat<L, Row, Column> &mat, const R &m);
 
         template<typename L, size_t Row, size_t Column, AHO_NAMESPACE::concepts::multiply_as<L> R>
-        requires (!requires {{ R::__is_mat } -> std::convertible_to<bool>; })
+        requires(!requires {{ R::__is_mat } -> std::convertible_to<bool>; })
         constexpr auto operator*(const R &m, const matrix::Mat<L, Row, Column> &mat);
 
         template<typename L, size_t Row, size_t Column, AHO_NAMESPACE::concepts::division_as<L> R>
-        requires (!requires {{ R::__is_mat } -> std::convertible_to<bool>; })
+        requires(!requires {{ R::__is_mat } -> std::convertible_to<bool>; })
         constexpr auto operator/(const R &m, const matrix::Mat<L, Row, Column> &mat);
     }
 
@@ -149,7 +150,7 @@ namespace AHO_NAMESPACE {
         Mat4x4<R> make_move(_Vector<R, Dim> vec);
 
         template<matrix::is_matrix R>
-        requires (R::type().row == R::type().column)
+        requires(R::type().row == R::type().column)
         Mat<typename R::element_type, R::type().row, R::type().column> make_identity();
 
         template<typename R = float>
@@ -187,11 +188,11 @@ namespace AHO_NAMESPACE {
     namespace matrix {
         template<typename R, size_t Row, size_t Column>
         constexpr Mat<R, Row, Column>::Mat(const std::array<std::array<R, Column>, Row> &init)
-                : std::array<std::array<R, Column>, Row>{init} {}
+            : std::array<std::array<R, Column>, Row>{init} {}
 
         template<typename R, size_t Row, size_t Column>
         constexpr Mat<R, Row, Column>::Mat(const std::initializer_list<std::initializer_list<R>> &init)
-                : OriginArray{} {
+            : OriginArray{} {
             size_t row = 0;
             for (const auto &source_row : init) {
                 if (row == Row)
@@ -244,7 +245,7 @@ namespace AHO_NAMESPACE {
         template<AHO_NAMESPACE::concepts::multiply_as<R> T, size_t TargetColumn>
         constexpr auto
         Mat<R, Row, Column>::operator*(const AHO_NAMESPACE::matrix::Mat<T, Column, TargetColumn> &p) const {
-            AHO_NAMESPACE::matrix::Mat<decltype(std::declval<T>() * std::declval<R>()), Row, TargetColumn> buf {};
+            AHO_NAMESPACE::matrix::Mat<decltype(std::declval<T>() * std::declval<R>()), Row, TargetColumn> buf{};
 
             for (size_t i = 0; i < Row; i++)
                 for (size_t j = 0; j < TargetColumn; j++)
@@ -287,7 +288,7 @@ namespace AHO_NAMESPACE {
 
         template<typename R, size_t Row, size_t Column>
         template<AHO_NAMESPACE::concepts::multiply_as<R> T>
-        constexpr Mat<R, Row, Column>& Mat<R, Row, Column>::operator*=(const T &m) {
+        constexpr Mat<R, Row, Column> &Mat<R, Row, Column>::operator*=(const T &m) {
             for (size_t i = 0; i < Row; i++)
                 for (size_t j = 0; j < Column; j++)
                     (*this)[i][j] *= m;
@@ -296,7 +297,7 @@ namespace AHO_NAMESPACE {
 
         template<typename R, size_t Row, size_t Column>
         template<AHO_NAMESPACE::concepts::division_as<R> T>
-        constexpr Mat<R, Row, Column>& Mat<R, Row, Column>::operator/=(const T &m) {
+        constexpr Mat<R, Row, Column> &Mat<R, Row, Column>::operator/=(const T &m) {
             for (size_t i = 0; i < Row; i++)
                 for (size_t j = 0; j < Column; j++)
                     (*this)[i][j] /= m;
@@ -304,7 +305,8 @@ namespace AHO_NAMESPACE {
         }
 
         template<typename R, size_t Row, size_t Column>
-        template<typename T> requires AHO_NAMESPACE::concepts::cast_as<R, T>
+        template<typename T>
+        requires AHO_NAMESPACE::concepts::cast_as<R, T>
         Mat<T, Row, Column> Mat<R, Row, Column>::cast() const {
             AHO_NAMESPACE::matrix::Mat<T, Row, Column> buf;
             for (size_t i = 0; i < Row; i++)
@@ -314,7 +316,7 @@ namespace AHO_NAMESPACE {
         }
 
         template<typename R, size_t Row, size_t Column, AHO_NAMESPACE::concepts::multiply_as<R> T>
-        requires (!requires {{ T::__is_mat } -> std::convertible_to<bool>; })
+        requires(!requires {{ T::__is_mat } -> std::convertible_to<bool>; })
         constexpr auto operator*(const Mat<R, Row, Column> &mat, const T &m) {
             AHO_NAMESPACE::matrix::Mat<decltype(std::declval<R>() * std::declval<T>()), Row, Column> buf;
             for (size_t i = 0; i < Row; i++)
@@ -324,7 +326,7 @@ namespace AHO_NAMESPACE {
         }
 
         template<typename R, size_t Row, size_t Column, AHO_NAMESPACE::concepts::division_as<R> T>
-        requires (!requires {{ T::__is_mat } -> std::convertible_to<bool>; })
+        requires(!requires {{ T::__is_mat } -> std::convertible_to<bool>; })
         constexpr auto operator/(const Mat<R, Row, Column> &mat, const T &m) {
             AHO_NAMESPACE::matrix::Mat<decltype(std::declval<R>() / std::declval<T>()), Row, Column> buf;
 
@@ -335,7 +337,7 @@ namespace AHO_NAMESPACE {
         }
 
         template<typename R, size_t Row, size_t Column, AHO_NAMESPACE::concepts::multiply_as<R> T>
-        requires (!requires {{ T::__is_mat } -> std::convertible_to<bool>; })
+        requires(!requires {{ T::__is_mat } -> std::convertible_to<bool>; })
         constexpr auto operator*(const T &m, const Mat<R, Row, Column> &mat) {
             AHO_NAMESPACE::matrix::Mat<decltype(std::declval<T>() * std::declval<R>()), Row, Column> buf;
 
@@ -346,7 +348,7 @@ namespace AHO_NAMESPACE {
         }
 
         template<typename R, size_t Row, size_t Column, AHO_NAMESPACE::concepts::division_as<R> T>
-        requires (!requires {{ T::__is_mat } -> std::convertible_to<bool>; })
+        requires(!requires {{ T::__is_mat } -> std::convertible_to<bool>; })
         constexpr auto operator/(const T &m, const Mat<R, Row, Column> &mat) {
             AHO_NAMESPACE::matrix::Mat<decltype(std::declval<T>() / std::declval<R>()), Row, Column> buf;
 
@@ -357,7 +359,7 @@ namespace AHO_NAMESPACE {
         }
 
         template<typename T, size_t N1>
-        std::array<T, N1> row(const T(&arr)[N1]) {
+        std::array<T, N1> row(const T (&arr)[N1]) {
             std::array<T, N1> cp;
             std::copy(std::begin(arr), std::end(arr), cp.begin());
             return cp;
@@ -369,7 +371,6 @@ namespace AHO_NAMESPACE {
             std::copy(std::begin(arr), std::end(arr), cp.begin());
             return {cp};
         }
-
 
         template<typename T, size_t Row, size_t Column>
         constexpr Mat<T, Row, Column> make(std::initializer_list<std::initializer_list<T>> init) {
@@ -400,7 +401,7 @@ namespace AHO_NAMESPACE {
         }
 
         template<matrix::is_matrix R>
-        requires (R::type().row == R::type().column)
+        requires(R::type().row == R::type().column)
         Mat<typename R::element_type, R::type().row, R::type().column> make_identity() {
             return make_identity<typename R::element_type, R::type().row>();
         }
@@ -439,12 +440,10 @@ namespace AHO_NAMESPACE {
             R y = axis.value.y.value;
             R z = axis.value.z.value;
 
-            return make({
-                                std::array<R, 4>{c + x * x * one_c, x * y * one_c - z * s, x * z * one_c + y * s, 0.0f},
-                                std::array<R, 4>{y * x * one_c + z * s, c + y * y * one_c, y * z * one_c - x * s, 0.0f},
-                                std::array<R, 4>{z * x * one_c - y * s, z * y * one_c + x * s, c + z * z * one_c, 0.0f},
-                                std::array<R, 4>{0.0f, 0.0f, 0.0f, 1.0f}
-                        });
+            return make({std::array<R, 4>{c + x * x * one_c, x * y * one_c - z * s, x * z * one_c + y * s, 0.0f},
+                         std::array<R, 4>{y * x * one_c + z * s, c + y * y * one_c, y * z * one_c - x * s, 0.0f},
+                         std::array<R, 4>{z * x * one_c - y * s, z * y * one_c + x * s, c + z * z * one_c, 0.0f},
+                         std::array<R, 4>{0.0f, 0.0f, 0.0f, 1.0f}});
         }
 
         template<typename R, typename CI>
@@ -460,8 +459,8 @@ namespace AHO_NAMESPACE {
             _Vector<R, D, CI> eye(_eye.value);
             auto f = _Vector<R, D, CI>(target.value - eye.value).normalize().value; // forward
             // Preserve AHO's existing camera roll; changing to cross(up) reverses both screen axes.
-            auto s = _Vector<R, D, CI>(f).cross(-up).normalize().value; // right
-            auto u = _Vector<R, D, CI>(s).cross(_Vector<R, D, CI>(f)).normalize().value;             // up (recomputed)
+            auto s = _Vector<R, D, CI>(f).cross(-up).normalize().value;                  // right
+            auto u = _Vector<R, D, CI>(s).cross(_Vector<R, D, CI>(f)).normalize().value; // up (recomputed)
 
             Mat4x4<R> result = make_identity<R, 4>();
             result[0][0] = s.x.value;
@@ -479,23 +478,20 @@ namespace AHO_NAMESPACE {
             return result;
         }
 
-
         template<typename R>
         Mat4x4<R> make_perspective(Radian fov, R aspect, R near, R far) {
             R f = static_cast<R>(1.0) / std::tan((fov * static_cast<R>(0.5)).value);
             R nf = static_cast<R>(1.0) / (near - far);
 
-            return make({
-                                std::array<R, 4>{f / aspect, 0.0f, 0.0f, 0.0f},
-                                std::array<R, 4>{0.0f, f, 0.0f, 0.0f},
-                                std::array<R, 4>{0.0f, 0.0f, (far + near) * nf, -1.0f},
-                                std::array<R, 4>{0.0f, 0.0f, (2 * far * near) * nf, 0.0f}
-                        });
+            return make({std::array<R, 4>{f / aspect, 0.0f, 0.0f, 0.0f},
+                         std::array<R, 4>{0.0f, f, 0.0f, 0.0f},
+                         std::array<R, 4>{0.0f, 0.0f, (far + near) * nf, -1.0f},
+                         std::array<R, 4>{0.0f, 0.0f, (2 * far * near) * nf, 0.0f}});
         }
 
         template<typename T>
         Mat4x4<T> make_perspective(Degree fov, T aspect, T near, T far) {
-            return make_perspective((Radian) fov, aspect, near, far);
+            return make_perspective((Radian)fov, aspect, near, far);
         }
 
         template<typename R, size_t Row, size_t Column>
@@ -516,7 +512,7 @@ namespace AHO_NAMESPACE {
                     }
                 };
 
-                std::array<std::array<R, Size * 2>, Size> aug {};
+                std::array<std::array<R, Size * 2>, Size> aug{};
                 for (size_t i = 0; i < Size; ++i) {
                     for (size_t j = 0; j < Size; ++j) {
                         aug[i][j] = mat[i][j];
@@ -557,7 +553,7 @@ namespace AHO_NAMESPACE {
                     }
                 }
 
-                Mat<R, Size, Size> inverse {};
+                Mat<R, Size, Size> inverse{};
                 for (size_t i = 0; i < Size; ++i)
                     for (size_t j = 0; j < Size; ++j)
                         inverse[i][j] = aug[i][j + Size];
@@ -598,9 +594,7 @@ namespace AHO_NAMESPACE {
             const R a21 = mat[2][1];
             const R a22 = mat[2][2];
 
-            const R det = a00 * (a11 * a22 - a12 * a21)
-                        - a01 * (a10 * a22 - a12 * a20)
-                        + a02 * (a10 * a21 - a11 * a20);
+            const R det = a00 * (a11 * a22 - a12 * a21) - a01 * (a10 * a22 - a12 * a20) + a02 * (a10 * a21 - a11 * a20);
 
             if (is_near_zero(det)) {
                 return std::unexpected(FailedCause::Singular);
@@ -608,7 +602,7 @@ namespace AHO_NAMESPACE {
 
             const R inv_det = static_cast<R>(1) / det;
 
-            Mat<R, 4, 4> inverse {};
+            Mat<R, 4, 4> inverse{};
             inverse[0][0] = (a11 * a22 - a12 * a21) * inv_det;
             inverse[0][1] = (a02 * a21 - a01 * a22) * inv_det;
             inverse[0][2] = (a01 * a12 - a02 * a11) * inv_det;

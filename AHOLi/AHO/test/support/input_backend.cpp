@@ -3,9 +3,12 @@
 extern "C" {
 const char* glfwGetKeyName(int key, int) {
     switch (key) {
-        case GLFW_KEY_A: return "test-layout-a";
-        case GLFW_KEY_B: return "test-layout-b";
-        default: return nullptr;
+        case GLFW_KEY_A:
+            return "test-layout-a";
+        case GLFW_KEY_B:
+            return "test-layout-b";
+        default:
+            return nullptr;
     }
 }
 int glfwGetKey(GLFWwindow* handle, int key) {
@@ -18,16 +21,21 @@ int glfwGetMouseButton(GLFWwindow* handle, int button) {
 }
 void glfwGetCursorPos(GLFWwindow* handle, double* x, double* y) {
     auto* window = aho_test::InputWindow::find(handle);
-    if (window) { *x = window->cursor_x; *y = window->cursor_y; }
+    if (window) {
+        *x = window->cursor_x;
+        *y = window->cursor_y;
+    }
 }
 GLFWkeyfun glfwSetKeyCallback(GLFWwindow* handle, GLFWkeyfun callback) {
     auto* window = aho_test::InputWindow::find(handle);
-    if (!window) return nullptr;
+    if (!window)
+        return nullptr;
     return std::exchange(window->key_callback, callback);
 }
 GLFWscrollfun glfwSetScrollCallback(GLFWwindow* handle, GLFWscrollfun callback) {
     auto* window = aho_test::InputWindow::find(handle);
-    if (!window) return nullptr;
+    if (!window)
+        return nullptr;
     return std::exchange(window->scroll_callback, callback);
 }
 }

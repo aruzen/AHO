@@ -15,7 +15,7 @@
 vsl::graphic_resource::BindingLayout::BindingLayout(vsl::LogicalDeviceAccessor device,
                                                     vsl::graphic_resource::Type bindingType,
                                                     vsl::ShaderFlag shaderType)
-        : BindingLayout(device, 0, bindingType, shaderType, 1) {}
+    : BindingLayout(device, 0, bindingType, shaderType, 1) {}
 
 vsl::graphic_resource::BindingLayout::BindingLayout(LogicalDeviceAccessor device, size_t binding,
                                                     Type bindingType, ShaderFlag shaderType, size_t amount) {
@@ -24,8 +24,8 @@ vsl::graphic_resource::BindingLayout::BindingLayout(LogicalDeviceAccessor device
 
     _data->layoutBindings.resize(1);
     _data->layoutBindings[0].binding = binding == size_t(-1) || binding == UINT32_MAX ? 0 : binding;
-    _data->layoutBindings[0].descriptorType = (vk::DescriptorType) bindingType;
-    _data->layoutBindings[0].stageFlags = (vk::ShaderStageFlagBits) shaderType;
+    _data->layoutBindings[0].descriptorType = (vk::DescriptorType)bindingType;
+    _data->layoutBindings[0].stageFlags = (vk::ShaderStageFlagBits)shaderType;
     _data->layoutBindings[0].descriptorCount = amount;
 
     vk::DescriptorSetLayoutCreateInfo layoutCreateInfo;
@@ -43,9 +43,9 @@ vsl::graphic_resource::BindingLayout::BindingLayout(vsl::LogicalDeviceAccessor d
     _data->layoutBindings.resize(points.size());
     for (size_t i = 0; i < points.size(); i++) {
         auto &point = points[i];
-        _data->layoutBindings[i].binding = point.binding == (std::uint32_t) -1 ? (std::uint32_t) i : point.binding;
-        _data->layoutBindings[i].descriptorType = (vk::DescriptorType) point.bindingType;
-        _data->layoutBindings[i].stageFlags = (vk::ShaderStageFlagBits) point.shaderType;
+        _data->layoutBindings[i].binding = point.binding == (std::uint32_t)-1 ? (std::uint32_t)i : point.binding;
+        _data->layoutBindings[i].descriptorType = (vk::DescriptorType)point.bindingType;
+        _data->layoutBindings[i].stageFlags = (vk::ShaderStageFlagBits)point.shaderType;
         _data->layoutBindings[i].descriptorCount = point.amount;
     }
 
@@ -58,17 +58,17 @@ vsl::graphic_resource::BindingLayout::BindingLayout(vsl::LogicalDeviceAccessor d
 
 vsl::graphic_resource::BindingLayout::BindingLayout(LogicalDeviceAccessor device,
                                                     std::initializer_list<BindingPoint> points)
-        : BindingLayout(device, std::vector<BindingPoint>(points.begin(), points.end())) {}
+    : BindingLayout(device, std::vector<BindingPoint>(points.begin(), points.end())) {}
 
-std::vector <vsl::graphic_resource::BindingPoint> vsl::graphic_resource::BindingLayout::getBindingPoints() const {
-    std::vector <BindingPoint> result;
+std::vector<vsl::graphic_resource::BindingPoint> vsl::graphic_resource::BindingLayout::getBindingPoints() const {
+    std::vector<BindingPoint> result;
 
     result.resize(this->_data->layoutBindings.size());
     for (size_t i = 0; i < result.size(); i++) {
         auto &binding = this->_data->layoutBindings[i];
-        result[i].binding = binding.binding == (std::uint32_t) -1 ? (std::uint32_t) i : binding.binding;
-        result[i].bindingType = (Type) binding.descriptorType;
-        result[i].shaderType = (ShaderFlag)((uint32_t) binding.stageFlags);
+        result[i].binding = binding.binding == (std::uint32_t)-1 ? (std::uint32_t)i : binding.binding;
+        result[i].bindingType = (Type)binding.descriptorType;
+        result[i].shaderType = (ShaderFlag)((uint32_t)binding.stageFlags);
         result[i].amount = binding.descriptorCount;
     }
     return result;
@@ -79,7 +79,7 @@ vsl::_impl::ResourceBindingLayout_impl::~ResourceBindingLayout_impl() {
 }
 
 vsl::graphic_resource::ManagerInterface *vsl::graphic_resource::Pool::getManager() {
-    return (vsl::graphic_resource::ManagerInterface *) this->_data->manager;
+    return (vsl::graphic_resource::ManagerInterface *)this->_data->manager;
 }
 
 std::tuple<bool, vsl::graphic_resource::Resource>
@@ -92,14 +92,12 @@ vsl::graphic_resource::Pool::bind(vsl::graphic_resource::BindingLayout layout) {
     allocInfo.descriptorSetCount = 1;
     allocInfo.pSetLayouts = &layout._data->layout;
 
-    if (((ManagerInterface *) _data->manager)->_data->device->device
-                .allocateDescriptorSets(&allocInfo, &result->descriptorSet) != vk::Result::eSuccess) {
+    if (((ManagerInterface *)_data->manager)->_data->device->device.allocateDescriptorSets(&allocInfo, &result->descriptorSet) != vk::Result::eSuccess) {
         return {false, {}};
     }
     _data->resources.push_back(result);
     return {true, {result}};
 }
-
 
 std::tuple<bool, std::vector<vsl::graphic_resource::Resource>>
 vsl::graphic_resource::Pool::bind(size_t n, vsl::graphic_resource::BindingLayout layout) {
@@ -116,8 +114,7 @@ vsl::graphic_resource::Pool::bind(size_t n, vsl::graphic_resource::BindingLayout
 
     std::vector<vk::DescriptorSet> descriptorSets;
     descriptorSets.resize(vkLayouts.size());
-    if (((ManagerInterface *) _data->manager)->_data->device->device.
-            allocateDescriptorSets(&allocInfo, descriptorSets.data()) != vk::Result::eSuccess)
+    if (((ManagerInterface *)_data->manager)->_data->device->device.allocateDescriptorSets(&allocInfo, descriptorSets.data()) != vk::Result::eSuccess)
         return {false, {}};
     for (size_t i = 0; i < descriptorSets.size(); i++) {
         resources[i] = Resource{std::make_shared<_impl::GraphicResource_impl>()};
@@ -130,7 +127,7 @@ vsl::graphic_resource::Pool::bind(size_t n, vsl::graphic_resource::BindingLayout
 }
 
 std::tuple<bool, std::vector<vsl::graphic_resource::Resource>>
-vsl::graphic_resource::Pool::bind(std::vector <vsl::graphic_resource::BindingLayout> layouts) {
+vsl::graphic_resource::Pool::bind(std::vector<vsl::graphic_resource::BindingLayout> layouts) {
     std::tuple<bool, std::vector<vsl::graphic_resource::Resource>> result{true, {}};
     auto &[check, resources] = result;
     resources.resize(layouts.size());
@@ -142,17 +139,14 @@ vsl::graphic_resource::Pool::bind(std::vector <vsl::graphic_resource::BindingLay
         r._data->layout = layouts[i]._data;
     }
 
-    auto vkLayouts = layouts
-                     | std::views::transform([](const BindingLayout &layout) { return layout._data->layout; })
-                     | std::ranges::to<std::vector>();
+    auto vkLayouts = layouts | std::views::transform([](const BindingLayout &layout) { return layout._data->layout; }) | std::ranges::to<std::vector>();
     vk::DescriptorSetAllocateInfo allocInfo;
     allocInfo.descriptorPool = _data->descriptorPool;
     allocInfo.descriptorSetCount = vkLayouts.size();
     allocInfo.pSetLayouts = vkLayouts.data();
 
-    std::vector <vk::DescriptorSet> descriptorSets(vkLayouts.size());
-    if (((ManagerInterface *) _data->manager)->_data->device->device.
-            allocateDescriptorSets(&allocInfo, descriptorSets.data()) != vk::Result::eSuccess)
+    std::vector<vk::DescriptorSet> descriptorSets(vkLayouts.size());
+    if (((ManagerInterface *)_data->manager)->_data->device->device.allocateDescriptorSets(&allocInfo, descriptorSets.data()) != vk::Result::eSuccess)
         return {false, {}};
     for (size_t i = 0; i < descriptorSets.size(); i++) {
         resources[i]._data->descriptorSet = descriptorSets[i];
@@ -169,8 +163,8 @@ vsl::graphic_resource::Pool vsl::graphic_resource::Resource::getPool() {
     return {_data->pool};
 }
 
-void vsl::graphic_resource::Resource::update(vsl::BufferAccessor *buffer, size_t binding, std::optional <Type> type,
-                                             size_t offset, std::optional <size_t> size) {
+void vsl::graphic_resource::Resource::update(vsl::BufferAccessor *buffer, size_t binding, std::optional<Type> type,
+                                             size_t offset, std::optional<size_t> size) {
     const auto buffer_size = buffer->_data->requirementSize;
     if (offset >= buffer_size)
         throw vsl::exceptions::RuntimeException("BufferRange", "Buffer descriptor range starts outside the buffer");
@@ -188,14 +182,14 @@ void vsl::graphic_resource::Resource::update(vsl::BufferAccessor *buffer, size_t
     descriptorWrite.dstBinding = binding;
     descriptorWrite.dstArrayElement = 0;
     if (type)
-        descriptorWrite.descriptorType = (vk::DescriptorType) type.value();
+        descriptorWrite.descriptorType = (vk::DescriptorType)type.value();
     else {
         if (_data->layout.expired())
             throw vsl::exceptions::RuntimeException("LayoutNotFound", "Layout not found!",
                                                     std::source_location::current());
         else {
             auto layout = _data->layout.lock();
-            for (const auto &lb: layout->layoutBindings)
+            for (const auto &lb : layout->layoutBindings)
                 if (lb.binding == binding) {
                     descriptorWrite.descriptorType = lb.descriptorType;
                     break;
@@ -204,10 +198,10 @@ void vsl::graphic_resource::Resource::update(vsl::BufferAccessor *buffer, size_t
     }
     descriptorWrite.descriptorCount = 1;
     descriptorWrite.pBufferInfo = &bufferInfo;
-    descriptorWrite.pImageInfo = nullptr; // Optional
+    descriptorWrite.pImageInfo = nullptr;       // Optional
     descriptorWrite.pTexelBufferView = nullptr; // Optional
 
-    ((ManagerInterface *) _data->pool->manager)->_data->device->device.updateDescriptorSets({descriptorWrite}, {});
+    ((ManagerInterface *)_data->pool->manager)->_data->device->device.updateDescriptorSets({descriptorWrite}, {});
 }
 
 void vsl::graphic_resource::Resource::update(vsl::ImageAccessor image, size_t binding, std::optional<Type> type) {
@@ -220,12 +214,12 @@ void vsl::graphic_resource::Resource::update(vsl::ImageAccessor image, size_t bi
     descriptorWrite.dstBinding = binding;
     descriptorWrite.dstArrayElement = 0;
     if (type) {
-        descriptorWrite.descriptorType = (vk::DescriptorType) type.value();
+        descriptorWrite.descriptorType = (vk::DescriptorType)type.value();
         goto found_type;
     } else {
         if (not _data->layout.expired()) {
             auto layout = _data->layout.lock();
-            for (const auto &lb: layout->layoutBindings)
+            for (const auto &lb : layout->layoutBindings)
                 if (lb.binding == binding) {
                     descriptorWrite.descriptorType = lb.descriptorType;
                     goto found_type;
@@ -233,14 +227,14 @@ void vsl::graphic_resource::Resource::update(vsl::ImageAccessor image, size_t bi
         }
     }
     throw vsl::exceptions::RuntimeException("LayoutNotFound", "Layout not found!", std::source_location::current());
-    found_type:
+found_type:
 
     descriptorWrite.descriptorCount = 1;
     descriptorWrite.pBufferInfo = nullptr;
     descriptorWrite.pImageInfo = &imageInfo;
     descriptorWrite.pTexelBufferView = nullptr; // Optional
 
-    ((ManagerInterface *) _data->pool->manager)->_data->device->device.updateDescriptorSets({descriptorWrite}, {});
+    ((ManagerInterface *)_data->pool->manager)->_data->device->device.updateDescriptorSets({descriptorWrite}, {});
 }
 
 void vsl::graphic_resource::Resource::update(vsl::ImageAccessor image, SamplerAccessor sampler,
@@ -255,12 +249,12 @@ void vsl::graphic_resource::Resource::update(vsl::ImageAccessor image, SamplerAc
     descriptorWrite.dstBinding = binding;
     descriptorWrite.dstArrayElement = 0;
     if (type) {
-        descriptorWrite.descriptorType = (vk::DescriptorType) type.value();
+        descriptorWrite.descriptorType = (vk::DescriptorType)type.value();
         goto found_type;
     } else {
         if (not _data->layout.expired()) {
             auto layout = _data->layout.lock();
-            for (const auto &lb: layout->layoutBindings)
+            for (const auto &lb : layout->layoutBindings)
                 if (lb.binding == binding) {
                     descriptorWrite.descriptorType = lb.descriptorType;
                     goto found_type;
@@ -268,12 +262,12 @@ void vsl::graphic_resource::Resource::update(vsl::ImageAccessor image, SamplerAc
         }
     }
     throw vsl::exceptions::RuntimeException("LayoutNotFound", "Layout not found!", std::source_location::current());
-    found_type:
+found_type:
 
     descriptorWrite.descriptorCount = 1;
     descriptorWrite.pBufferInfo = nullptr;
     descriptorWrite.pImageInfo = &imageInfo;
     descriptorWrite.pTexelBufferView = nullptr; // Optional
 
-    ((ManagerInterface *) _data->pool->manager)->_data->device->device.updateDescriptorSets({descriptorWrite}, {});
+    ((ManagerInterface *)_data->pool->manager)->_data->device->device.updateDescriptorSets({descriptorWrite}, {});
 }

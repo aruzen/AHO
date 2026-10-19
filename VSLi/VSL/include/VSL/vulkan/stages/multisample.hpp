@@ -5,8 +5,8 @@
 #include "../buffer_and_image_accessor.hpp"
 
 namespace VSL_NAMESPACE::pipeline_layout {
-	struct Multisample {
+    struct Multisample {
         SampleCount samples = SampleCount::One;
-		void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
-	};
+        void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
+    };
 }

@@ -14,5 +14,4 @@ namespace VSL_NAMESPACE::pipeline_layout {
     };
 }
 
-
 #endif //AHO_ALL_ID_PICKING_HPP

@@ -20,13 +20,14 @@ namespace AHO_NAMESPACE::resource {
         };
 
         std::shared_ptr<ImageData> _data;
+
     public:
         Image();
 #ifdef AHO_STB_IMAGE_ENABLE
         Image(std::filesystem::path path);
 #endif // AHO_STB_IMAGE_ENABLE
 
-        std::optional<unsigned char**> data();
+        std::optional<unsigned char **> data();
     };
 }
 

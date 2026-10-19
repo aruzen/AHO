@@ -9,7 +9,7 @@
 #include <GLFW/glfw3.h>
 
 aho::input::Cursor::Cursor(void *context) : context(context) {
-    glfwGetCursorPos((GLFWwindow *) context, &_state.value.x.value, &_state.value.y.value);
+    glfwGetCursorPos((GLFWwindow *)context, &_state.value.x.value, &_state.value.y.value);
 }
 
 aho::d2::PointD aho::input::Cursor::state() {
@@ -22,7 +22,7 @@ aho::d2::VectorD aho::input::Cursor::delta() {
 
 void aho::input::Cursor::update() {
     _delta.value = _state.value;
-    glfwGetCursorPos((GLFWwindow *) context, &_state.value.x.value, &_state.value.y.value);
+    glfwGetCursorPos((GLFWwindow *)context, &_state.value.x.value, &_state.value.y.value);
     _delta.value.x = _state.value.x - _delta.value.x;
     _delta.value.y = _state.value.y - _delta.value.y;
 }
@@ -44,7 +44,7 @@ bool aho::input::MouseButton::pressed() {
 }
 
 void aho::input::MouseButton::update() {
-    switch (glfwGetMouseButton((GLFWwindow *) context, (int) code.code())) {
+    switch (glfwGetMouseButton((GLFWwindow *)context, (int)code.code())) {
         default:
         case GLFW_RELEASE:
             if (pressed())
@@ -79,11 +79,11 @@ aho::input::MouseWheel::MouseWheel(void *context) : context(context) {
     gen = _generation;
     read = _generation;
     if (subscribed == 0)
-        glfwSetScrollCallback((GLFWwindow *) context, scroll_callback);
+        glfwSetScrollCallback((GLFWwindow *)context, scroll_callback);
     subscribed++;
 }
 
-aho::input::MouseWheel::MouseWheel(const MouseWheel& other) noexcept : MouseWheel(other.context) {
+aho::input::MouseWheel::MouseWheel(const MouseWheel &other) noexcept : MouseWheel(other.context) {
     gen = other.gen;
     read = other.read;
 }
@@ -91,7 +91,7 @@ aho::input::MouseWheel::MouseWheel(const MouseWheel& other) noexcept : MouseWhee
 aho::input::MouseWheel::~MouseWheel() {
     subscribed--;
     if (subscribed == 0)
-        glfwSetScrollCallback((GLFWwindow *) context, NULL);
+        glfwSetScrollCallback((GLFWwindow *)context, NULL);
 }
 
 void aho::input::MouseWheel::update() {
@@ -136,4 +136,3 @@ std::shared_ptr<aho::input::MouseButton> aho::input::Mouse::leftClick() {
 std::shared_ptr<aho::input::MouseWheel> aho::input::Mouse::wheel() {
     return _wheel;
 }
-

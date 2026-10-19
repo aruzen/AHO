@@ -55,5 +55,4 @@ namespace AHO_NAMESPACE {
     };
 }
 
-
 #endif //AHO_ALL_PIPELINE_H

@@ -97,11 +97,10 @@ vsl::graphic_resource::ManagerInterface::allocate(std::vector<BindingLayout> lay
     auto [pools, resources] = allocate(std::move(layouts));
 
     for (size_t i = 0; i < resources.size() && i < buffers.size(); i++) {
-        resources[i].update(buffers[i], (size_t) 0);
+        resources[i].update(buffers[i], (size_t)0);
     }
     return {pools, resources};
 }
-
 
 template<vsl::graphic_resource::can_convert_graphic_resource T>
 std::tuple<std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>>
@@ -125,7 +124,7 @@ vsl::graphic_resource::ManagerInterface::make(std::vector<BindingLayout> layouts
     auto [pool, resources] = make(layouts);
 
     for (size_t i = 0; i < resources.size() && i < buffers.size(); i++) {
-        resources[i].update(buffers[i], (size_t) 0);
+        resources[i].update(buffers[i], (size_t)0);
     }
     return {pool, resources};
 }

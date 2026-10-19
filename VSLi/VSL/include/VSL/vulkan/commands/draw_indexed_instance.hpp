@@ -6,14 +6,14 @@
 #include <optional>
 
 namespace VSL_NAMESPACE::command {
-	struct DrawInstance : public __Command {
+    struct DrawInstance : public __Command {
         DrawInstance(size_t index_size, size_t instance_size);
         DrawInstance(size_t instance_size);
 
         size_t index_size = 0, instance_size;
 
-		void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
-	};
+        void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
+    };
 
     /* FIXME
 	struct DrawInstanceManip : public DrawInstance, public __VertexSizeRequire{

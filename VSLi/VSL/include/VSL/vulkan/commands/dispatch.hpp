@@ -21,5 +21,4 @@ namespace VSL_NAMESPACE::command {
     };
 }
 
-
 #endif //AHO_ALL_DISPATCH_HPP

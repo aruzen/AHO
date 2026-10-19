@@ -6,7 +6,7 @@
 #include <VSL/vulkan/commands/dispatch.hpp>
 
 vsl::command::Dispatch::Dispatch(std::uint32_t x, std::uint32_t y, std::uint32_t z)
-        : x(x), y(y), z(z) {}
+    : x(x), y(y), z(z) {}
 
 void vsl::command::Dispatch::invoke(vsl::CommandPool pool, vsl::CommandBuffer buffer, vsl::CommandManager manager) {
     buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].dispatch(x, y, z);

@@ -21,6 +21,5 @@ namespace VSL_NAMESPACE {
                   std::optional<vsl::SwapchainAccessor> old = std::nullopt,
                   std::optional<int> width = std::nullopt, std::optional<int> height = std::nullopt,
                   ImageType usage = ImageType::ColorAttachment);
-
     };
 }

@@ -4,19 +4,20 @@
 #include <VSL/vulkan/_pimpls.hpp>
 
 vsl::GraphicsPipeline::GraphicsPipeline(vsl::PipelineLayoutAccessor layout, vsl::RenderPassAccessor pass, std::uint32_t subpass) {
-    if (!pass._data || subpass >= pass.description().subpasses.size()) throw std::out_of_range("Pipeline subpass index");
+    if (!pass._data || subpass >= pass.description().subpasses.size())
+        throw std::out_of_range("Pipeline subpass index");
     if (!layout._data || !layout._data->info || layout._data->device != pass._data->device)
         throw std::invalid_argument("Pipeline requires editable layout and pass on the same device");
-    const auto &outputs = pass.description().subpasses[subpass];
+    const auto& outputs = pass.description().subpasses[subpass];
     if (layout._data->info->colorBlend.attachmentCount != outputs.colors.size())
         throw std::invalid_argument("Pipeline color blend count does not match subpass outputs");
     for (auto ref : outputs.colors)
         if (ref.attachment != UnusedAttachment && layout._data->info->multisample.rasterizationSamples !=
-            static_cast<vk::SampleCountFlagBits>(pass.description().attachments[ref.attachment].samples))
+                                                      static_cast<vk::SampleCountFlagBits>(pass.description().attachments[ref.attachment].samples))
             throw std::invalid_argument("Pipeline sample count does not match subpass");
     if (outputs.depthStencil && outputs.depthStencil->attachment != UnusedAttachment &&
         layout._data->info->multisample.rasterizationSamples != static_cast<vk::SampleCountFlagBits>(
-            pass.description().attachments[outputs.depthStencil->attachment].samples))
+                                                                    pass.description().attachments[outputs.depthStencil->attachment].samples))
         throw std::invalid_argument("Pipeline depth sample count does not match subpass");
     _data = std::shared_ptr<_impl::Pipeline_impl>(new _impl::Pipeline_impl);
     _data->device = layout._data->device;
@@ -26,7 +27,7 @@ vsl::GraphicsPipeline::GraphicsPipeline(vsl::PipelineLayoutAccessor layout, vsl:
     auto cache = _data->device->device.createPipelineCacheUnique(pipelineInfoCache);
 
     vk::GraphicsPipelineCreateInfo pipelineInfo;
-    pipelineInfo.stageCount = (uint32_t) layout._data->info->shaderStages.size();
+    pipelineInfo.stageCount = (uint32_t)layout._data->info->shaderStages.size();
     pipelineInfo.pStages = layout._data->info->shaderStages.data();
     pipelineInfo.pVertexInputState = &layout._data->info->vertexInput;
     pipelineInfo.pInputAssemblyState = &layout._data->info->inputAssembly;

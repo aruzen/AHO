@@ -1,24 +1,25 @@
 #version 450
 
 layout(push_constant) uniform PushConstants {
-    mat4 modelMatrix;    // vertex shaderで使う
-    vec4 color;          // fragment shaderで使う
-} pc;
+    mat4 modelMatrix; // vertex shaderで使う
+    vec4 color;       // fragment shaderで使う
+}
+pc;
 
 // ----------------------
 // 1. スカラー入力
 // ----------------------
 layout(location = 0) in float inScalarF;
-layout(location = 1) in int   inScalarI;
-layout(location = 2) in uint  inScalarU;
+layout(location = 1) in int inScalarI;
+layout(location = 2) in uint inScalarU;
 // layout(location = 3) in bool  inScalarB;
 
 // ----------------------
 // 2. ベクトル入力
 // ----------------------
-layout(location = 4) in vec2  inVec2;
-layout(location = 5) in vec3  inVec3;
-layout(location = 6) in vec4  inVec4;
+layout(location = 4) in vec2 inVec2;
+layout(location = 5) in vec3 inVec3;
+layout(location = 6) in vec4 inVec4;
 
 layout(location = 7) in ivec2 inIVec2;
 layout(location = 8) in ivec3 inIVec3;
@@ -91,6 +92,6 @@ void main() {
     col += imageLoad(u_image1D, 0);
     col += imageLoad(u_image2D, ivec2(0));
     col += imageLoad(u_image3D, ivec3(0));
-//     col += subpassLoad(u_subpassInput0);
+    //     col += subpassLoad(u_subpassInput0);
     fragColor = col;
 }

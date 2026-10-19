@@ -92,7 +92,15 @@ namespace VSL_NAMESPACE {
         MicromapStorage = 0x01000000,
     };
 
-    enum class SampleCount : std::uint32_t { One = 1, Two = 2, Four = 4, Eight = 8, Sixteen = 16, ThirtyTwo = 32, SixtyFour = 64 };
+    enum class SampleCount : std::uint32_t {
+        One = 1,
+        Two = 2,
+        Four = 4,
+        Eight = 8,
+        Sixteen = 16,
+        ThirtyTwo = 32,
+        SixtyFour = 64
+    };
 
     enum class ImageType {
         None = 0,
@@ -202,13 +210,13 @@ namespace VSL_NAMESPACE {
             void flush();
 
             template<typename... Args>
-            bool copy(const Args &... args);
+            bool copy(const Args &...args);
 
             template<typename T>
-            bool copy(T* t, std::size_t size);
+            bool copy(T *t, std::size_t size);
 
             template<typename... Args>
-            void uncheck_copy(const Args &... args);
+            void uncheck_copy(const Args &...args);
 
             bool copyByBuffer(CommandManager commandManager, BufferAccessor *buf);
 
@@ -217,19 +225,18 @@ namespace VSL_NAMESPACE {
 
         std::shared_ptr<_impl::Buffer_impl> _data;
 
-
         virtual LocalBufferHolder data(std::optional<size_t> size = std::nullopt, size_t offset = 0) = 0;
 
-        virtual void flush(LocalBufferHolder& holder) = 0;
+        virtual void flush(LocalBufferHolder &holder) = 0;
 
         template<typename... Args>
-        bool copy(const Args &... args);
+        bool copy(const Args &...args);
 
         template<typename T>
-        bool copy(T* t, size_t size);
+        bool copy(T *t, size_t size);
 
         template<typename... Args>
-        void uncheck_copy(const Args &... args);
+        void uncheck_copy(const Args &...args);
 
         bool copyByBuffer(CommandManager commandManager, BufferAccessor *buf);
 
@@ -242,7 +249,7 @@ namespace VSL_NAMESPACE {
                    MemoryProperty memProperty, SharingMode sharingMode);
 
         static void
-        FlushBuffer(LocalBufferHolder& holder, MemoryType memType, MemoryProperty memProperty, SharingMode sharingMode);
+        FlushBuffer(LocalBufferHolder &holder, MemoryType memType, MemoryProperty memProperty, SharingMode sharingMode);
 
         static LocalBufferHolder
         GetData(VSL_NAMESPACE::BufferAccessor *data, std::optional<size_t> size, size_t offset, MemoryType memType,
@@ -253,8 +260,7 @@ namespace VSL_NAMESPACE {
         std::shared_ptr<_impl::Image_impl> _data;
         data_format::___Format getFormat() const;
 
-        bool copyByBuffer(CommandManager commandManager, BufferAccessor * buf, vsl::ImageLayout layout, std::uint32_t target_idx);
-
+        bool copyByBuffer(CommandManager commandManager, BufferAccessor *buf, vsl::ImageLayout layout, std::uint32_t target_idx);
 
         size_t size();
 

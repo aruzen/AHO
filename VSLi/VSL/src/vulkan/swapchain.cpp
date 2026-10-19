@@ -27,9 +27,8 @@ SwapChainSupportDetails querySwapChainSupport(vk::PhysicalDevice device, vk::Sur
 }
 
 vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats) {
-    for (const auto &availableFormat: availableFormats) {
-        if (availableFormat.format == vk::Format::eB8G8R8A8Srgb
-            && availableFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
+    for (const auto &availableFormat : availableFormats) {
+        if (availableFormat.format == vk::Format::eB8G8R8A8Srgb && availableFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
             return availableFormat;
         }
     }
@@ -37,7 +36,7 @@ vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormat
 }
 
 vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR> &availablePresentModes) {
-    for (const auto &availablePresentMode: availablePresentModes) {
+    for (const auto &availablePresentMode : availablePresentModes) {
         if (availablePresentMode == vk::PresentModeKHR::eMailbox) {
             return availablePresentMode;
         }
@@ -50,9 +49,8 @@ vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities, in
         return capabilities.currentExtent;
     } else {
         vk::Extent2D actualExtent = {
-                static_cast<uint32_t>(width),
-                static_cast<uint32_t>(height)
-        };
+            static_cast<uint32_t>(width),
+            static_cast<uint32_t>(height)};
 
         actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width,
                                         capabilities.maxImageExtent.width);
@@ -81,7 +79,7 @@ vsl::Swapchain::Swapchain(vsl::LogicalDeviceAccessor device, std::shared_ptr<Sur
     _data->presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
 
     if (not width.has_value() || not height.has_value())
-        glfwGetFramebufferSize((GLFWwindow *) surface->_data->window,
+        glfwGetFramebufferSize((GLFWwindow *)surface->_data->window,
                                width ? nullptr : &width.emplace(0),
                                height ? nullptr : &height.emplace(0));
     _data->extent = chooseSwapExtent(swapChainSupport.capabilities, width.value(), height.value());

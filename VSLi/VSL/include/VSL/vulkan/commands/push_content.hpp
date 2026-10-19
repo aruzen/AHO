@@ -27,7 +27,7 @@ namespace VSL_NAMESPACE::command {
 
         PushConstant(PipelineLayoutAccessor layout, vsl::ShaderFlag targetType, std::uint32_t size,
                      std::uint32_t offset, const void *value)
-                : layout(std::move(layout)), targetType(targetType), size(size), offset(offset), value(value) {};
+            : layout(std::move(layout)), targetType(targetType), size(size), offset(offset), value(value) {};
 
         template<typename T>
         PushConstant(PipelineLayoutAccessor layout, vsl::ShaderFlag targetType, T &t, std::uint32_t offset = 0);
@@ -37,8 +37,7 @@ namespace VSL_NAMESPACE::command {
 
     template<typename T>
     PushConstant::PushConstant(PipelineLayoutAccessor layout, vsl::ShaderFlag targetType, T &t, std::uint32_t offset)
-            : PushConstant(layout, targetType, sizeof(T), offset, &t) {}
+        : PushConstant(layout, targetType, sizeof(T), offset, &t) {}
 }
-
 
 #endif //AHO_ALL_COMMAND_PUSH_CONTENTS_H

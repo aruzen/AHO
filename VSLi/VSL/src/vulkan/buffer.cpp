@@ -7,18 +7,16 @@
 
 #include <source_location>
 
-VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException::MemoryNotHostVisibleException(std::string traceinfo) :
-        VSL_NAMESPACE::exceptions::RuntimeException("MemoryNotHostVisibleException",
-                                                    "This buffer's memory is not host-visible. Mapping is not allowed.",
-                                                    traceinfo) {}
+VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException::MemoryNotHostVisibleException(std::string traceinfo) : VSL_NAMESPACE::exceptions::RuntimeException("MemoryNotHostVisibleException",
+                                                                                                                                                             "This buffer's memory is not host-visible. Mapping is not allowed.",
+                                                                                                                                                             traceinfo) {}
 
-VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException::MemoryNotHostVisibleException(std::source_location sourece) :
-        VSL_NAMESPACE::exceptions::RuntimeException("MemoryNotHostVisibleException",
-                                                    "This buffer's memory is not host-visible. Mapping is not allowed.",
-                                                    sourece) {}
+VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException::MemoryNotHostVisibleException(std::source_location sourece) : VSL_NAMESPACE::exceptions::RuntimeException("MemoryNotHostVisibleException",
+                                                                                                                                                                    "This buffer's memory is not host-visible. Mapping is not allowed.",
+                                                                                                                                                                    sourece) {}
 
 std::uint32_t vsl::_impl::helper::findMemoryType(std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> device, std::uint32_t typeFilter,
-                             vk::MemoryPropertyFlags properties) {
+                                                 vk::MemoryPropertyFlags properties) {
     if (not device->parentDevice->memProps.has_value())
         device->parentDevice->makeMemProps();
     auto &memProperties = device->parentDevice->memProps.value();
@@ -57,7 +55,7 @@ bool VSL_NAMESPACE::BufferAccessor::copyByBuffer(CommandManager commandManager, 
     return true;
 }
 
-bool vsl::BufferAccessor::copyByImage(CommandManager manager, const vsl::ImageAccessor& image) {
+bool vsl::BufferAccessor::copyByImage(CommandManager manager, const vsl::ImageAccessor &image) {
     auto phase = manager.startPhase<ComputePhase>();
     phase << command::CopyImageToBuffer(this, image);
     return true;
@@ -66,7 +64,6 @@ bool vsl::BufferAccessor::copyByImage(CommandManager manager, const vsl::ImageAc
 size_t VSL_NAMESPACE::BufferAccessor::size() {
     return _data->allocatedSize;
 }
-
 
 void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::flush() {
     parent->flush(*this);
@@ -80,8 +77,8 @@ VSL_NAMESPACE::BufferAccessor::MakeBuffer(VSL_NAMESPACE::LogicalDeviceAccessor d
 
     vk::BufferCreateInfo bufferInfo;
     bufferInfo.size = size;
-    bufferInfo.usage = vk::BufferUsageFlags{(unsigned int) memType};
-    bufferInfo.sharingMode = (vk::SharingMode) sharingMode;
+    bufferInfo.usage = vk::BufferUsageFlags{(unsigned int)memType};
+    bufferInfo.sharingMode = (vk::SharingMode)sharingMode;
 
     data->requirementSize = size;
     data->buffer = data->device->device.createBuffer(bufferInfo);
@@ -91,7 +88,7 @@ VSL_NAMESPACE::BufferAccessor::MakeBuffer(VSL_NAMESPACE::LogicalDeviceAccessor d
     vk::MemoryAllocateInfo allocInfo;
     allocInfo.allocationSize = memRequirements.size;
     allocInfo.memoryTypeIndex = vsl::_impl::helper::findMemoryType(data->device, memRequirements.memoryTypeBits,
-                                               vk::MemoryPropertyFlags{(unsigned int) memProperty});
+                                                                   vk::MemoryPropertyFlags{(unsigned int)memProperty});
 
     data->deviceMem = data->device->device.allocateMemory(allocInfo);
     data->allocatedSize = allocInfo.allocationSize;
@@ -100,9 +97,8 @@ VSL_NAMESPACE::BufferAccessor::MakeBuffer(VSL_NAMESPACE::LogicalDeviceAccessor d
     return data;
 }
 
-void
-VSL_NAMESPACE::BufferAccessor::FlushBuffer(LocalBufferHolder &holder, MemoryType memType, MemoryProperty memProperty,
-                                           SharingMode sharingMode) {
+void VSL_NAMESPACE::BufferAccessor::FlushBuffer(LocalBufferHolder &holder, MemoryType memType, MemoryProperty memProperty,
+                                                SharingMode sharingMode) {
     if (not contain(memProperty, MemoryProperty::HostVisible)) {
         throw VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException(std::source_location::current());
     }
@@ -117,14 +113,12 @@ VSL_NAMESPACE::BufferAccessor::FlushBuffer(LocalBufferHolder &holder, MemoryType
     holder.parent->_data->device->device.flushMappedMemoryRanges(range);
 }
 
-
 VSL_NAMESPACE::BufferAccessor::LocalBufferHolder VSL_NAMESPACE::BufferAccessor::
-GetData(VSL_NAMESPACE::BufferAccessor *data, std::optional<size_t> size, size_t offset, MemoryType memType,
-        MemoryProperty memProperty, SharingMode sharingMode) {
+    GetData(VSL_NAMESPACE::BufferAccessor *data, std::optional<size_t> size, size_t offset, MemoryType memType,
+            MemoryProperty memProperty, SharingMode sharingMode) {
     if (not contain(memProperty, MemoryProperty::HostVisible)) {
         throw VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException(std::source_location::current());
     }
-
 
     VSL_NAMESPACE::BufferAccessor::LocalBufferHolder holder(data,
                                                             size ? size.value() : data->_data->requirementSize,
@@ -136,7 +130,7 @@ GetData(VSL_NAMESPACE::BufferAccessor *data, std::optional<size_t> size, size_t 
     vk::MappedMemoryRange mappedRange;
     mappedRange.memory = data->_data->deviceMem;
     mappedRange.offset = offset;
-    mappedRange.size = holder.size;  // またはコピー範囲のサイズ
+    mappedRange.size = holder.size; // またはコピー範囲のサイズ
 
     if (not contain(memProperty, MemoryProperty::HostCoherent))
         data->_data->device->device.invalidateMappedMemoryRanges({mappedRange});
@@ -149,9 +143,9 @@ bool vsl::BufferAccessor::LocalBufferHolder::copyByImage(vsl::CommandManager com
 }
 
 bool vsl::BufferAccessor::LocalBufferHolder::copyByBuffer(vsl::CommandManager commandManager, vsl::BufferAccessor *buf) {
-    return parent->copyByBuffer(std::move(commandManager), buf);;
+    return parent->copyByBuffer(std::move(commandManager), buf);
+    ;
 }
-
 
 VSL_NAMESPACE::_impl::Buffer_impl::~Buffer_impl() {
     device->device.destroyBuffer(buffer);
@@ -177,7 +171,7 @@ vsl::BufferAccessor::LocalBufferHolder::LocalBufferHolder(vsl::BufferAccessor::L
 
 vsl::BufferAccessor::LocalBufferHolder::LocalBufferHolder(vsl::BufferAccessor *parent, std::size_t size,
                                                           std::size_t offset, void *data)
-        : parent(parent), size(size), offset(offset), data(data) {}
+    : parent(parent), size(size), offset(offset), data(data) {}
 
 bool VSL_NAMESPACE::helper::copy_with_shift_offset(void *data, size_t maxSize, size_t &offset) {
     return true;

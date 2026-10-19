@@ -1,11 +1,11 @@
-﻿template<typename ...parameter>
+﻿template<typename... parameter>
 struct ParameterPack {
-//	using Parameters = parameter;
+    //	using Parameters = parameter;
 };
 
-template<typename Indispensable, typename T, typename ...Args>
-concept initializer = requires(Indispensable i, Args ...args) {
-	T(i, args...);
+template<typename Indispensable, typename T, typename... Args>
+concept initializer = requires(Indispensable i, Args... args) {
+    T(i, args...);
 };
 
 #include <iostream>
@@ -13,53 +13,52 @@ concept initializer = requires(Indispensable i, Args ...args) {
 #include <tuple>
 
 struct A {
-	A(void*, int, int) {}
+    A(void*, int, int) {}
 };
 
 template<typename T = A>
 struct B {
-	template<typename... Args>
-	requires initializer<void*, T, Args...>
-	B(Args ...args);
+    template<typename... Args>
+    requires initializer<void*, T, Args...>
+    B(Args... args);
 };
 
 template<typename T>
 template<typename... Args>
 requires initializer<void*, T, Args...>
-inline B<T>::B(Args ...args) {
-	int i = 1;
-	T(&i, args...);
+inline B<T>::B(Args... args) {
+    int i = 1;
+    T(&i, args...);
 }
 
 template<typename T>
 consteval bool __sames_as() {
-	return true;
+    return true;
 }
 
 template<typename T, typename R, typename... Args>
 consteval bool __sames_as() {
-	if constexpr (std::same_as<T, R>) {
-		return __sames_as<T, Args...>();
-	}
-	return false;
+    if constexpr (std::same_as<T, R>) {
+        return __sames_as<T, Args...>();
+    }
+    return false;
 }
 
 template<typename T, typename... Args>
 concept sames_as = (0 == sizeof...(Args) && true) ||
-				   (1 == sizeof...(Args) && std::same_as<T, Args...>) ||
-				   (2 <= sizeof...(Args) && __sames_as<T, Args...>());
+                   (1 == sizeof...(Args) && std::same_as<T, Args...>) ||
+                   (2 <= sizeof...(Args) && __sames_as<T, Args...>());
 
-int main()
-{
-	B b(1, 1);
+int main() {
+    B b(1, 1);
     std::cout << "Hello World!\n";
 }
 
 // プログラムの実行: Ctrl + F5 または [デバッグ] > [デバッグなしで開始] メニュー
 // プログラムのデバッグ: F5 または [デバッグ] > [デバッグの開始] メニュー
 
-// 作業を開始するためのヒント: 
-//    1. ソリューション エクスプローラー ウィンドウを使用してファイルを追加/管理します 
+// 作業を開始するためのヒント:
+//    1. ソリューション エクスプローラー ウィンドウを使用してファイルを追加/管理します
 //   2. チーム エクスプローラー ウィンドウを使用してソース管理に接続します
 //   3. 出力ウィンドウを使用して、ビルド出力とその他のメッセージを表示します
 //   4. エラー一覧ウィンドウを使用してエラーを表示します

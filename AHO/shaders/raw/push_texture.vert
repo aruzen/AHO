@@ -9,7 +9,8 @@ layout(push_constant) uniform Push {
     vec2 uv1;
     vec2 uv2;
     vec2 uv3;
-} pushData;
+}
+pushData;
 
 layout(location = 0) out vec2 fragTexCoord;
 

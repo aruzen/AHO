@@ -9,7 +9,7 @@ std::string fixed_get_env(const std::string& name) {
 
     if (_dupenv_s(&value, &len, name.c_str()) == 0 && value != nullptr) {
         std::string result(value);
-        free(value);   // ← 必須
+        free(value); // ← 必須
         return result;
     }
 
@@ -18,12 +18,12 @@ std::string fixed_get_env(const std::string& name) {
 #endif
 
 void default_logger(const char* str) {
-		std::cout << str;
+    std::cout << str;
 }
 
 template<bool V>
 consteval VSL_NAMESPACE::logger_t get_default_logger() {
-	return V ? default_logger : nullptr;
+    return V ? default_logger : nullptr;
 }
 
 std::string VSL_NAMESPACE::expand_environments(const std::string& input) {

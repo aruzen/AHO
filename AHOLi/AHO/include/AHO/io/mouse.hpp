@@ -10,7 +10,7 @@
 
 namespace AHO_NAMESPACE::input {
     class Cursor : public abstract::Cursor, public abstract::Updatable {
-        template<typename T, typename ...Args>
+        template<typename T, typename... Args>
         friend std::shared_ptr<T> aho::InputManager::get(Args &&...args);
 
         void *context = nullptr;
@@ -57,13 +57,16 @@ namespace AHO_NAMESPACE::input {
         size_t gen, read;
 
         static size_t subscribed;
+
     public:
         static size_t _generation;
         static d2::VectorD _state;
+
     private:
         MouseWheel(void *context);
+
     public:
-        MouseWheel(const MouseWheel& other) noexcept;
+        MouseWheel(const MouseWheel &other) noexcept;
 
         ~MouseWheel();
 
@@ -75,14 +78,15 @@ namespace AHO_NAMESPACE::input {
     class Mouse : public abstract::Adaptable {
         friend aho::InputManager;
 
-        Mouse(void*, InputManager &manager);
-    private:
+        Mouse(void *, InputManager &manager);
 
+    private:
         std::shared_ptr<Cursor> _cursor;
         std::shared_ptr<MouseButton> _rightClick;
         std::shared_ptr<MouseButton> _middleButton;
         std::shared_ptr<MouseButton> _leftClick;
         std::shared_ptr<MouseWheel> _wheel;
+
     public:
         std::shared_ptr<Cursor> cursor();
 
@@ -95,6 +99,5 @@ namespace AHO_NAMESPACE::input {
         std::shared_ptr<MouseWheel> wheel();
     };
 }
-
 
 #endif //AHO_ALL_MOUSE_HPP

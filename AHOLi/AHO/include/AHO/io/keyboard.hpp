@@ -14,7 +14,8 @@ namespace AHO_NAMESPACE::input {
 
         void* context = nullptr;
 
-        KeyBoard(void * context);
+        KeyBoard(void* context);
+
     public:
         KeyBoard(const KeyBoard& other) noexcept;
 

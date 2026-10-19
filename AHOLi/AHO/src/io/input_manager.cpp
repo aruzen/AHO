@@ -4,7 +4,7 @@
 
 #include <AHO/io/input_manager.hpp>
 
-aho::InputManager::InputManager(void *context) : context(context){}
+aho::InputManager::InputManager(void *context) : context(context) {}
 
 aho::InputManager::InputManager(vsl::PureWindow window) : context(window._data->window_handle) {}
 

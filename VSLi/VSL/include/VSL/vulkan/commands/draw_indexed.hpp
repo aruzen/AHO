@@ -6,17 +6,17 @@
 #include <optional>
 
 namespace VSL_NAMESPACE::command {
-	struct DrawIndexed : public __Command {
+    struct DrawIndexed : public __Command {
         DrawIndexed(size_t size = 0);
 
-		size_t size;
+        size_t size;
 
-		void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
-	};
+        void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
+    };
 
-	struct DrawIndexedManip : public DrawIndexed, public __VertexSizeRequire{
+    struct DrawIndexedManip : public DrawIndexed, public __VertexSizeRequire {
         void setVertexSize(std::optional<size_t> vertexSize) override;
     };
 
-	extern DrawIndexedManip drawIndexed;
+    extern DrawIndexedManip drawIndexed;
 }

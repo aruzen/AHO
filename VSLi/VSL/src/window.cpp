@@ -20,18 +20,16 @@ std::vector<std::shared_ptr<VSL_NAMESPACE::PureWindow::WindowData>> VSL_NAMESPAC
 bool VSL_NAMESPACE::PureWindow::inited = false;
 
 namespace {
-[[noreturn]] void throw_glfw_error(const char* operation)
-{
-    const char* description = nullptr;
-    const int error = glfwGetError(&description);
-    throw VSL_NAMESPACE::exceptions::RuntimeException("GLFW",
-        std::string(operation) + ": " + (description ? description : "Unknown error") +
-        " (error " + std::to_string(error) + ")");
-}
+    [[noreturn]] void throw_glfw_error(const char* operation) {
+        const char* description = nullptr;
+        const int error = glfwGetError(&description);
+        throw VSL_NAMESPACE::exceptions::RuntimeException("GLFW",
+                                                          std::string(operation) + ": " + (description ? description : "Unknown error") +
+                                                              " (error " + std::to_string(error) + ")");
+    }
 } // namespace
 
-VSL_NAMESPACE::PureWindow::PureWindow(std::string _name, int _width, int _height)
-{
+VSL_NAMESPACE::PureWindow::PureWindow(std::string _name, int _width, int _height) {
     _data = std::make_shared<WindowData>();
     _data->height = _height;
     _data->width = _width;
@@ -64,63 +62,56 @@ VSL_NAMESPACE::PureWindow::PureWindow(std::string _name, int _width, int _height
 
 VSL_NAMESPACE::PureWindow::PureWindow(std::shared_ptr<WindowData> _data) : _data(_data) {}
 
-bool VSL_NAMESPACE::PureWindow::Update()
-{
-	glfwPollEvents();
-	bool s = true;
-	const std::vector<std::weak_ptr<WindowData>> windows(WINDOWS.begin(), WINDOWS.end());
-	for (const auto& candidate : windows) {
-		auto p = candidate.lock();
-		if (!p || std::ranges::find(WINDOWS, p) == WINDOWS.end())
-			continue;
-		const std::vector<std::weak_ptr<OnUpdate>> callbacks(p->update.begin(), p->update.end());
-		for (const auto& callback : callbacks) {
-			if (std::ranges::find(WINDOWS, p) == WINDOWS.end())
-				break;
-			auto listener = callback.lock();
-			if (!listener || std::ranges::find(p->update, listener) == p->update.end())
-				continue;
-			if (!listener->onUpdate(PureWindow(p)))
-				s = false;
-		}
-	}
-	return s;
+bool VSL_NAMESPACE::PureWindow::Update() {
+    glfwPollEvents();
+    bool s = true;
+    const std::vector<std::weak_ptr<WindowData>> windows(WINDOWS.begin(), WINDOWS.end());
+    for (const auto& candidate : windows) {
+        auto p = candidate.lock();
+        if (!p || std::ranges::find(WINDOWS, p) == WINDOWS.end())
+            continue;
+        const std::vector<std::weak_ptr<OnUpdate>> callbacks(p->update.begin(), p->update.end());
+        for (const auto& callback : callbacks) {
+            if (std::ranges::find(WINDOWS, p) == WINDOWS.end())
+                break;
+            auto listener = callback.lock();
+            if (!listener || std::ranges::find(p->update, listener) == p->update.end())
+                continue;
+            if (!listener->onUpdate(PureWindow(p)))
+                s = false;
+        }
+    }
+    return s;
 }
 
-bool VSL_NAMESPACE::PureWindow::NoCheckUpdate()
-{
-	glfwPollEvents();
-	return true;
+bool VSL_NAMESPACE::PureWindow::NoCheckUpdate() {
+    glfwPollEvents();
+    return true;
 }
 
-bool VSL_NAMESPACE::PureWindow::close()
-{
-	if (_data == nullptr)
-		return false;
+bool VSL_NAMESPACE::PureWindow::close() {
+    if (_data == nullptr)
+        return false;
 
-	_data->destroy();
+    _data->destroy();
 
-	return true;
+    return true;
 }
 
-std::string VSL_NAMESPACE::PureWindow::name()
-{
-	return _data->name;
+std::string VSL_NAMESPACE::PureWindow::name() {
+    return _data->name;
 }
 
-VSL_NAMESPACE::PureWindow::operator bool()
-{
-	return _data && _data->window_handle != nullptr;
+VSL_NAMESPACE::PureWindow::operator bool() {
+    return _data && _data->window_handle != nullptr;
 }
 
-bool VSL_NAMESPACE::PureWindow::operator==(const PureWindow& o)
-{
-	return _data == o._data;
+bool VSL_NAMESPACE::PureWindow::operator==(const PureWindow& o) {
+    return _data == o._data;
 }
 
-bool VSL_NAMESPACE::PureWindow::operator==(const PureWindow::WindowData* o)
-{
-	return _data.get() == o;
+bool VSL_NAMESPACE::PureWindow::operator==(const PureWindow::WindowData* o) {
+    return _data.get() == o;
 }
 
 bool vsl::PureWindow::resize(int width, int height) {
@@ -128,25 +119,24 @@ bool vsl::PureWindow::resize(int width, int height) {
     return true;
 }
 
-void VSL_NAMESPACE::PureWindow::WindowData::destroy()
-{
-	for (auto i = WINDOWS.begin(); i != WINDOWS.end(); i++)
-		if (i->get() == this) {
-			WINDOWS.erase(i);
-			break;
-		}
-	glfwDestroyWindow((GLFWwindow*)window_handle);
+void VSL_NAMESPACE::PureWindow::WindowData::destroy() {
+    for (auto i = WINDOWS.begin(); i != WINDOWS.end(); i++)
+        if (i->get() == this) {
+            WINDOWS.erase(i);
+            break;
+        }
+    glfwDestroyWindow((GLFWwindow*)window_handle);
 
-	window_handle = nullptr;
+    window_handle = nullptr;
 
-	if (WINDOWS.size() == 0) {
-		glfwTerminate();
-		inited = false;
-	}
+    if (WINDOWS.size() == 0) {
+        glfwTerminate();
+        inited = false;
+    }
 }
 
 VSL_NAMESPACE::Window::Window(std::string name, int width, int height) : PureWindow(name, width, height) {
-	add_plugin<vsl::window_plugin::QuietClose>();
+    add_plugin<vsl::window_plugin::QuietClose>();
 }
 
 vsl::Window::Window(std::shared_ptr<WindowData> data) : PureWindow(data) {

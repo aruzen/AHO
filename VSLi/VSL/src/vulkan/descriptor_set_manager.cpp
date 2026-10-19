@@ -111,8 +111,16 @@ vsl::graphic_resource::ExactAllocateManager::ExactAllocateManager(LogicalDeviceA
 
 std::tuple <std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>>
 vsl::graphic_resource::ExactAllocateManager::allocate(std::vector <BindingLayout> layouts) {
-    auto [pool, resources] = make(layouts);
-    return {std::vector(resources.size(), pool), resources};
+    std::vector<Pool> pools;
+    std::vector<Resource> resources;
+    pools.reserve(layouts.size());
+    resources.reserve(layouts.size());
+    for (auto &layout : layouts) {
+        auto [pool, allocated] = make(std::vector{layout});
+        pools.push_back(std::move(pool));
+        resources.push_back(std::move(allocated.front()));
+    }
+    return {std::move(pools), std::move(resources)};
 }
 
 

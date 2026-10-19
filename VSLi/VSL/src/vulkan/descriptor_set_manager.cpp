@@ -6,6 +6,7 @@
 
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/exceptions.hpp>
+#include <limits>
 
 #include <VSL/vulkan/descriptor_set_manager.hpp>
 
@@ -25,9 +26,11 @@ vsl::graphic_resource::ManagerInterface::make(std::vector<BindingLayout> layouts
                                               size_t other) {
     for (const auto &layout: layouts)
         for (const auto &bp: layout.getBindingPoints()) {
-            if (not size.contains(bp.bindingType))
-                size[bp.bindingType] = 0;
-            size[bp.bindingType]++;
+            auto& count = size[bp.bindingType];
+            constexpr auto maximum = std::numeric_limits<std::uint32_t>::max();
+            if (count > maximum || bp.amount > maximum - count)
+                throw vsl::exceptions::RuntimeException("DescriptorPool", "Descriptor count exceeds uint32_t");
+            count += bp.amount;
         }
     auto pool = this->make(size, other);
     const auto &[err, resources] = pool.bind(layouts);
@@ -40,6 +43,13 @@ vsl::graphic_resource::ManagerInterface::make(std::vector<BindingLayout> layouts
 
 vsl::graphic_resource::Pool
 vsl::graphic_resource::ManagerInterface::make(std::map <Type, size_t> count, size_t other) {
+    constexpr auto maximum = std::numeric_limits<std::uint32_t>::max();
+    if (other > maximum)
+        throw vsl::exceptions::RuntimeException("DescriptorPool", "Fallback descriptor count exceeds uint32_t");
+    for (const auto& [type, amount] : count)
+        if (amount > maximum)
+            throw vsl::exceptions::RuntimeException("DescriptorPool", "Descriptor count exceeds uint32_t");
+
     GraphicResourcePool pool;
     pool._data = std::make_shared<_impl::GraphicResourcePool_impl>();
     pool._data->manager = this;
@@ -101,8 +111,16 @@ vsl::graphic_resource::ExactAllocateManager::ExactAllocateManager(LogicalDeviceA
 
 std::tuple <std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>>
 vsl::graphic_resource::ExactAllocateManager::allocate(std::vector <BindingLayout> layouts) {
-    auto [pool, resources] = make(layouts);
-    return {std::vector(resources.size(), pool), resources};
+    std::vector<Pool> pools;
+    std::vector<Resource> resources;
+    pools.reserve(layouts.size());
+    resources.reserve(layouts.size());
+    for (auto &layout : layouts) {
+        auto [pool, allocated] = make(std::vector{layout});
+        pools.push_back(std::move(pool));
+        resources.push_back(std::move(allocated.front()));
+    }
+    return {std::move(pools), std::move(resources)};
 }
 
 
@@ -136,15 +154,16 @@ vsl::graphic_resource::OverAllocateManager::allocate(std::vector <BindingLayout>
     for (auto &layout: layouts) {
         for (auto &pool: pools) {
             const auto &[err, resource] = pool.bind(layout);
-            if (err)
+            if (not err)
                 continue;
-            pools.push_back(pool);
+            use_pools.push_back(pool);
             resources.push_back(resource);
             goto found_pool;
         }
         {
             const auto &[pool, resource] = make({layout}, size, other);
             pools.push_back(pool);
+            use_pools.push_back(pool);
             resources.push_back(resource[0]);
         }
         found_pool:

@@ -122,7 +122,7 @@ namespace VSL_NAMESPACE {
         P startPhase(Args &&... args);
 
         LogicalDeviceAccessor getDevice() const;
-        // Own pool and command buffers, same device and graphics queue.
+        // 同じデバイスとグラフィックスキューで、プールとコマンドバッファを独立させる。
         CommandManager independent(std::uint32_t bufferCount = 1) const;
         void waitIdle();
 

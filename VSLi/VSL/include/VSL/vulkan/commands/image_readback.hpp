@@ -4,7 +4,8 @@
 
 namespace VSL_NAMESPACE::command {
     // レイアウト遷移、バッファへのコピー、CPUへの可視性確保、レイアウト復元を記録する。
-    // レンダーパスの外で使う。送信、完了待ち、リソースの寿命管理は呼び出し側で行う。
+    // レンダーパスの外で使う。送信と完了待ちは呼び出し側で行う。
+    // Phaseに記録すると画像と転送先を送信側が保持する。直接記録する場合は呼び出し側で保持する。
     struct ImageReadback : public __Command {
         ImageReadback(BufferAccessor *destination, ImageAccessor image, ImageLayout currentLayout,
                       ImageRegion region = {});

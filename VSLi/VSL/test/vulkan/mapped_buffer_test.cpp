@@ -45,8 +45,8 @@ namespace {
             phase.submit();
             ASSERT_TRUE(phase.completion().wait());
         }
-        // Exercise invalidate alignment even on devices exposing only coherent host memory.
-        // This does not claim to emulate a physically non-coherent heap.
+        // コヒーレントメモリしかない環境でも、キャッシュ無効化範囲のアラインメントを確かめる。
+        // 実際の非コヒーレントメモリの動作を再現する検証ではない。
         destination._data->coherent = false;
         destination._data->atomSize = physical._data->device.getProperties().limits.nonCoherentAtomSize;
         auto partial = destination.read(3, 1);

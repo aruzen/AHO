@@ -98,3 +98,47 @@ TEST(ShaderCompilerTest, ReloadRefreshesCompiledFilesAndChangedSourceLists) {
     EXPECT_TRUE(compiler.target.empty());
 }
 } // namespace
+
+namespace {
+TEST(ShaderCompilerTest, IgnoresDirectoriesWithSourceOrCompiledExtensions) {
+    vsl_test::TemporaryDirectory temporary;
+    const auto raw = temporary.path() / "raw";
+    fs::create_directories(raw / "nested.vert");
+    fs::create_directory(temporary.path() / "cached.vert.spv");
+    const auto source = raw / "cached.vert";
+    write_shader(source);
+    const auto now = fs::file_time_type::clock::now();
+    fs::last_write_time(source, now - std::chrono::hours(2));
+    fs::last_write_time(temporary.path() / "cached.vert.spv", now - std::chrono::hours(1));
+    vsl::utils::ShaderCompiler compiler(fs::path(VSL_TEST_GLSLC), std::vector<fs::path>{temporary.path()});
+    compiler.load();
+    EXPECT_TRUE(compiler.compiled.empty());
+    EXPECT_EQ(compiler.target, (std::vector<fs::path>{source}));
+}
+TEST(ShaderCompilerTest, PreservesRegularFilesAndSymlinksToShaderFiles) {
+    vsl_test::TemporaryDirectory temporary;
+    fs::create_directory(temporary.path() / "raw");
+    const auto source = temporary.path() / "raw" / "point.vert";
+    const auto output = temporary.path() / "point.vert.spv";
+    write_shader(source);
+    { std::ofstream stream(output); stream << "cached"; }
+    const auto now = fs::file_time_type::clock::now();
+    fs::last_write_time(source, now - std::chrono::hours(2));
+    fs::last_write_time(output, now - std::chrono::hours(1));
+    vsl::utils::ShaderCompiler compiler(fs::path(VSL_TEST_GLSLC), std::vector<fs::path>{temporary.path()});
+    compiler.load();
+    EXPECT_EQ(compiler.compiled, (std::vector<fs::path>{output}));
+    EXPECT_TRUE(compiler.target.empty());
+    fs::remove(source);
+    const auto real = temporary.path() / "real.vert";
+    write_shader(real);
+    std::error_code error;
+    fs::create_symlink(real, source, error);
+    if (error)
+        GTEST_SKIP() << "Symlink creation unavailable: " << error.message();
+    fs::remove(output);
+    compiler.load();
+    EXPECT_EQ(compiler.target, (std::vector<fs::path>{source}));
+    EXPECT_TRUE(compiler.compiled.empty());
+}
+} // namespace

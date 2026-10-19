@@ -21,8 +21,7 @@ AHO_NAMESPACE::DrawPhase::DrawPhase(AHO_NAMESPACE::engine::GraphicalEngine* engi
       engine(engine),
       initialize(initialize),
       finish(finit) {
-    auto* previous = THREAD_LOCAL_DRAW_PHASE;
-    THREAD_LOCAL_DRAW_PHASE = this;
+    previousPhase = std::exchange(THREAD_LOCAL_DRAW_PHASE, this);
     try {
         if (state != State::WaitSubmit)
             return;
@@ -34,7 +33,7 @@ AHO_NAMESPACE::DrawPhase::DrawPhase(AHO_NAMESPACE::engine::GraphicalEngine* engi
                                                              engine->getWindow()._data2->frame_buffer);
         }
     } catch (...) {
-        THREAD_LOCAL_DRAW_PHASE = previous;
+        restorePreviousPhase();
         throw; // 基底クラスのデストラクタがcancel()で取得済み画像を返す。
     }
 }
@@ -58,7 +57,16 @@ AHO_NAMESPACE::DrawPhase::~DrawPhase() {
         } catch (...) {
         }
     }
-    THREAD_LOCAL_DRAW_PHASE = nullptr;
+    restorePreviousPhase();
+}
+
+void AHO_NAMESPACE::DrawPhase::restorePreviousPhase() noexcept {
+    auto** current = &THREAD_LOCAL_DRAW_PHASE;
+    // 外側が先に破棄された場合も、内側から破棄済みのPhaseへ戻らないようにつなぎ直す。
+    while (*current && *current != this)
+        current = &(*current)->previousPhase;
+    if (*current == this)
+        *current = previousPhase;
 }
 
 AHO_NAMESPACE::DrawPhase::SubmitResult AHO_NAMESPACE::DrawPhase::submitCommands() {

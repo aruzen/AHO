@@ -98,3 +98,53 @@ TEST(WindowPluginRemovalTest, NullPluginDoesNotChangeRegistrations) {
     ASSERT_EQ(window._data->plugins.size(), 1u);
     EXPECT_EQ(window._data->plugins.at(plugin->id), plugin);
 }
+
+#include <type_traits>
+namespace {
+static_assert(std::has_virtual_destructor_v<vsl::PureWindow>);
+static_assert(std::has_virtual_destructor_v<vsl::PureWindow::OnUpdate>);
+struct TrackedWindow : vsl::PureWindow {
+    bool &destroyed;
+    TrackedWindow(std::shared_ptr<WindowData> data, bool &flag) : PureWindow(std::move(data)), destroyed(flag) {}
+    ~TrackedWindow() { destroyed = true; }
+};
+struct TrackedUpdate : vsl::PureWindow::OnUpdate {
+    bool &destroyed;
+    explicit TrackedUpdate(bool &flag) : destroyed(flag) {}
+    ~TrackedUpdate() { destroyed = true; }
+    bool onUpdate(vsl::PureWindow) override { return true; }
+};
+TEST(WindowInterfaceLifetimeTest, BaseOwnersRunBothDerivedDestructors) {
+    bool window_destroyed = false, update_destroyed = false;
+    std::unique_ptr<vsl::PureWindow> window =
+        std::make_unique<TrackedWindow>(std::make_shared<vsl::PureWindow::WindowData>(), window_destroyed);
+    std::unique_ptr<vsl::PureWindow::OnUpdate> update = std::make_unique<TrackedUpdate>(update_destroyed);
+    window.reset();
+    update.reset();
+    EXPECT_TRUE(window_destroyed);
+    EXPECT_TRUE(update_destroyed);
+}
+TEST(WindowInterfaceLifetimeTest, CopiesShareDataAndMovesTransferIt) {
+    static_assert(std::is_nothrow_move_constructible_v<vsl::PureWindow>);
+    static_assert(std::is_nothrow_move_assignable_v<vsl::PureWindow>);
+    auto data = std::make_shared<vsl::PureWindow::WindowData>();
+    vsl::PureWindow original(data), copied(original);
+    EXPECT_EQ(copied._data, data);
+    vsl::PureWindow moved(std::move(original));
+    EXPECT_FALSE(original._data);
+    EXPECT_EQ(moved._data, data);
+    original = copied;
+    vsl::PureWindow assigned(std::make_shared<vsl::PureWindow::WindowData>());
+    assigned = std::move(moved);
+    EXPECT_FALSE(moved._data);
+    EXPECT_EQ(assigned._data, data);
+    EXPECT_EQ(original._data, data);
+}
+TEST_F(WindowIntegrationTest, DeletingADerivedWrapperRetainsTheSharedNativeWindow) {
+    bool destroyed = false;
+    std::unique_ptr<vsl::PureWindow> owner = std::make_unique<TrackedWindow>(window->_data, destroyed);
+    owner.reset();
+    EXPECT_TRUE(destroyed);
+    EXPECT_TRUE(static_cast<bool>(*window));
+}
+} // namespace

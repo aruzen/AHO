@@ -24,6 +24,7 @@ namespace VSL_NAMESPACE {
 
 		struct WindowData;
 		struct OnUpdate {
+			virtual ~OnUpdate() = default;
 			virtual bool onUpdate(vsl::PureWindow) = 0;
 		};
 
@@ -46,6 +47,11 @@ namespace VSL_NAMESPACE {
 	public:
 		PureWindow(std::string name, int width = 800, int height = 600);
 		PureWindow(std::shared_ptr<WindowData> _data);
+		PureWindow(const PureWindow&) = default;
+		PureWindow& operator=(const PureWindow&) = default;
+		PureWindow(PureWindow&&) = default;
+		PureWindow& operator=(PureWindow&&) = default;
+		virtual ~PureWindow() = default;
 
 		static bool Update();
 		static bool NoCheckUpdate();

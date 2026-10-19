@@ -204,8 +204,8 @@ namespace AHO_NAMESPACE {
             constexpr Degree operator AHO_LITERAL(deg)(long double d) {
                 return {d};
             }
-        }
-    }
+        } // namespace literals
+    } // namespace angle
 
     using angle::Radian;
     using angle::Degree;
@@ -213,4 +213,4 @@ namespace AHO_NAMESPACE {
     namespace literals {
         using namespace angle::literals;
     }
-}
+} // namespace AHO_NAMESPACE

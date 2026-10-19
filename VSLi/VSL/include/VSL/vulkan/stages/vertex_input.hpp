@@ -79,4 +79,4 @@ namespace VSL_NAMESPACE::pipeline_layout {
         add({data_format::convert_graphic_type(args)...});
         return *this;
     }
-}
+} // namespace VSL_NAMESPACE::pipeline_layout

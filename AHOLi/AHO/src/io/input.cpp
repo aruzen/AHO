@@ -8,13 +8,13 @@
 #include <GLFW/glfw3.h>
 
 template<>
-std::string aho::input::CodeID<aho::input::KeyCode>::name() const {
+std::string AHO_NAMESPACE::input::CodeID<AHO_NAMESPACE::input::KeyCode>::name() const {
     const char* name = glfwGetKeyName(static_cast<int>(_code), 0);
     return name ? name : "";
 }
 
 template<>
-std::string aho::input::CodeID<aho::input::MouseCode>::name() const {
+std::string AHO_NAMESPACE::input::CodeID<AHO_NAMESPACE::input::MouseCode>::name() const {
     switch (_code) {
         case MouseCode::LeftClick:
             return "LeftClick";

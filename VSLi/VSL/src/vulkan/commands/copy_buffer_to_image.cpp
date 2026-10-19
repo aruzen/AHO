@@ -8,12 +8,12 @@
 
 #include <utility>
 
-vsl::command::CopyBufferToImage::CopyBufferToImage(vsl::ImageAccessor image, vsl::BufferAccessor *buffer,
-                                                   vsl::ImageLayout layout)
+VSL_NAMESPACE::command::CopyBufferToImage::CopyBufferToImage(VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::BufferAccessor* buffer,
+                                                             VSL_NAMESPACE::ImageLayout layout)
     : image(std::move(image)), buffer(buffer), layout(layout) {}
 
-void vsl::command::CopyBufferToImage::invoke(
-    vsl::CommandPool pool, vsl::CommandBuffer buffer, vsl::CommandManager manager) {
+void VSL_NAMESPACE::command::CopyBufferToImage::invoke(
+    VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
     vk::BufferImageCopy region;
     region.bufferOffset = 0;
     region.bufferRowLength = 0; // tightly packed
@@ -32,12 +32,12 @@ void vsl::command::CopyBufferToImage::invoke(
         region);
 }
 
-vsl::command::CopyBufferToArrayImage::CopyBufferToArrayImage(vsl::ImageAccessor image, vsl::BufferAccessor *buffer,
-                                                             vsl::ImageLayout layout, std::uint32_t target_idx)
+VSL_NAMESPACE::command::CopyBufferToArrayImage::CopyBufferToArrayImage(VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::BufferAccessor* buffer,
+                                                                       VSL_NAMESPACE::ImageLayout layout, std::uint32_t target_idx)
     : image(std::move(image)), buffer(buffer), layout(layout), target_idx(target_idx) {}
 
-void vsl::command::CopyBufferToArrayImage::invoke(
-    vsl::CommandPool pool, vsl::CommandBuffer buffer, vsl::CommandManager manager) {
+void VSL_NAMESPACE::command::CopyBufferToArrayImage::invoke(
+    VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
     vk::BufferImageCopy region;
     region.bufferOffset = 0;
     region.bufferRowLength = 0; // tightly packed

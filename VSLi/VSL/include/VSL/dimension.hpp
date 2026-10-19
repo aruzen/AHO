@@ -44,4 +44,4 @@ namespace VSL_NAMESPACE {
                                std::same_as<D, VSL_NAMESPACE::D1> ||
                            std::same_as<D, VSL_NAMESPACE::D2> ||
                            std::same_as<D, VSL_NAMESPACE::D3>;
-}
+} // namespace VSL_NAMESPACE

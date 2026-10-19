@@ -17,7 +17,7 @@ namespace VSL_NAMESPACE::command {
         ChangeImageBarrier(ImageAccessor image, ImageLayout oldLayout, ImageLayout newLayout,
                            std::uint32_t baseLayer, std::uint32_t layerCount);
 
-        template<vsl::ImageType Usage, vsl::MemoryProperty MemProp, vsl::ImageLayout Layout>
+        template<VSL_NAMESPACE::ImageType Usage, VSL_NAMESPACE::MemoryProperty MemProp, VSL_NAMESPACE::ImageLayout Layout>
         ChangeImageBarrier(Image<Usage, MemProp, Layout> image, ImageLayout newLayout)
             : ChangeImageBarrier(image, Layout, newLayout){};
 
@@ -27,6 +27,6 @@ namespace VSL_NAMESPACE::command {
 
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
     };
-}
+} // namespace VSL_NAMESPACE::command
 
 #endif

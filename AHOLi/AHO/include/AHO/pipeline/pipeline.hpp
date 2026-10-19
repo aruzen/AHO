@@ -14,10 +14,10 @@ namespace AHO_NAMESPACE {
      */
 
     struct PipelineData {
-        vsl::graphic_resource::BindingLayout binding_layout;
-        vsl::PipelineLayoutAccessor pipeline_layout;
-        vsl::PipelineAccessor pipeline;
-        vsl::pipeline_layout::ShaderGroup shader_group;
+        VSL_NAMESPACE::graphic_resource::BindingLayout binding_layout;
+        VSL_NAMESPACE::PipelineLayoutAccessor pipeline_layout;
+        VSL_NAMESPACE::PipelineAccessor pipeline;
+        VSL_NAMESPACE::pipeline_layout::ShaderGroup shader_group;
     };
 
     // FIXME: Implement me
@@ -53,6 +53,6 @@ namespace AHO_NAMESPACE {
         ModelPushConstants,
         VertexColorInput,
     };
-}
+} // namespace AHO_NAMESPACE
 
 #endif //AHO_ALL_PIPELINE_H

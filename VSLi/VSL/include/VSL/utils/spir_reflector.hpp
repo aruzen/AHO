@@ -21,21 +21,21 @@ namespace VSL_NAMESPACE::utils {
         struct GenerateData {
             LogicalDeviceAccessor logical_device;
 
-            std::map<size_t, std::vector<vsl::graphic_resource::BindingPoint>> binding_points;
+            std::map<size_t, std::vector<VSL_NAMESPACE::graphic_resource::BindingPoint>> binding_points;
 
-            std::optional<vsl::pipeline_layout::PushConstants> push_constants = std::nullopt;
-            std::optional<vsl::pipeline_layout::VertexInput> vertex_input = std::nullopt;
+            std::optional<VSL_NAMESPACE::pipeline_layout::PushConstants> push_constants = std::nullopt;
+            std::optional<VSL_NAMESPACE::pipeline_layout::VertexInput> vertex_input = std::nullopt;
 
-            std::vector<vsl::graphic_resource::BindingLayout> makeBindingLayout(size_t repeat = 0);
+            std::vector<VSL_NAMESPACE::graphic_resource::BindingLayout> makeBindingLayout(size_t repeat = 0);
         } generated;
 
         SPIRVReflector(LogicalDeviceAccessor logical_device, std::filesystem::path path);
 
-        SPIRVReflector(LogicalDeviceAccessor logical_device, const std::vector<char> &binary);
+        SPIRVReflector(LogicalDeviceAccessor logical_device, const std::vector<char>& binary);
 
     private:
-        void init(const std::uint32_t *bp, size_t size);
+        void init(const std::uint32_t* bp, size_t size);
     };
-}
+} // namespace VSL_NAMESPACE::utils
 
 #endif //VSL_SPIRV_REFLECTOR_UTIL

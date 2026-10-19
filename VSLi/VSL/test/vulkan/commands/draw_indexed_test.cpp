@@ -13,7 +13,7 @@ namespace {
     TEST_F(DrawIndexedVulkanIntegrationTest, DrawsIndexedTriangle) {
         std::array<std::uint32_t, 3> indices{0, 1, 2};
         vsl::StagingBuffer<vsl::MemoryType::IndexBuffer> index(device, indices);
-        expect_triangle_color(render([&](auto &stream) {
+        expect_triangle_color(render([&](auto& stream) {
             // BindIndexBuffer has a dangling pointer (I05); isolate DrawIndexed with a raw binding.
             auto buffer = stream.manager.getBuffer();
             buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].bindIndexBuffer(index._data->buffer, 0,

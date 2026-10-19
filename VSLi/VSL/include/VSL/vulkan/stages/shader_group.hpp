@@ -20,4 +20,4 @@ namespace VSL_NAMESPACE::pipeline_layout {
 
         void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
     };
-}
+} // namespace VSL_NAMESPACE::pipeline_layout

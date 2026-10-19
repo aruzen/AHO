@@ -41,7 +41,7 @@ namespace AHO_NAMESPACE {
                                                  typename std::remove_cvref_t<T>::dimension,
                                                  typename std::remove_cvref_t<T>::coordinate_info>>;
         };
-    }
+    } // namespace concepts
 
     namespace d1 {
         template<typename R, typename CI = typename AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D1>::value>
@@ -53,7 +53,7 @@ namespace AHO_NAMESPACE {
         using VectorI = AHO_NAMESPACE::_Vector<int, VSL_NAMESPACE::D1>;
         using VectorF = AHO_NAMESPACE::_Vector<float, VSL_NAMESPACE::D1>;
         using VectorD = AHO_NAMESPACE::_Vector<double, VSL_NAMESPACE::D1>;
-    }
+    } // namespace d1
 
     namespace d2 {
         template<typename R, typename CI = typename AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D2>::value>
@@ -65,7 +65,7 @@ namespace AHO_NAMESPACE {
         using VectorI = AHO_NAMESPACE::_Vector<int, VSL_NAMESPACE::D2>;
         using VectorF = AHO_NAMESPACE::_Vector<float, VSL_NAMESPACE::D2>;
         using VectorD = AHO_NAMESPACE::_Vector<double, VSL_NAMESPACE::D2>;
-    }
+    } // namespace d2
 
     namespace d3 {
         template<typename R, typename CI = typename AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D3>::value>
@@ -77,7 +77,7 @@ namespace AHO_NAMESPACE {
         using VectorI = AHO_NAMESPACE::_Vector<int, VSL_NAMESPACE::D3>;
         using VectorF = AHO_NAMESPACE::_Vector<float, VSL_NAMESPACE::D3>;
         using VectorD = AHO_NAMESPACE::_Vector<double, VSL_NAMESPACE::D3>;
-    }
+    } // namespace d3
 
     template<typename R, typename CI>
     struct _Vector<R, VSL_NAMESPACE::D1, CI> {
@@ -755,21 +755,21 @@ namespace AHO_NAMESPACE {
         constexpr auto operator*(_Vector<R1, Dim, CI> v1, _Vector<R2, Dim, CI> v2) {
             return v1.dot(v2);
         }
-    }
+    } // namespace product::dot
 
     namespace product::cross {
         template<typename Dim, typename CI, typename R1, typename R2>
         constexpr auto operator*(_Vector<R1, Dim, CI> v1, _Vector<R2, Dim, CI> v2) {
             return v1.cross(v2);
         }
-    }
+    } // namespace product::cross
 
     namespace product::hadamard {
         template<typename Dim, typename CI, typename R1, typename R2>
         constexpr auto operator*(_Vector<R1, Dim, CI> v1, _Vector<R2, Dim, CI> v2) {
             return v1.hadamard(v2);
         }
-    }
+    } // namespace product::hadamard
 
     // ---------------------------------------------------------------------------------------------------------------------
 
@@ -777,4 +777,4 @@ namespace AHO_NAMESPACE {
     constexpr auto operator*(const L& l, _Vector<R, Dim, CI> v1) {
         return v1 * l;
     }
-}
+} // namespace AHO_NAMESPACE

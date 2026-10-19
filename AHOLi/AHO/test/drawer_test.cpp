@@ -39,7 +39,7 @@ namespace {
         EXPECT_FALSE(stream.phase_stream.received);
         EXPECT_EQ(stream.phase_stream.calls, 1);
     }
-}
+} // namespace
 #else
 namespace drawer_payload {
     struct Value {
@@ -50,7 +50,7 @@ namespace drawer_payload {
         ++*value.calls;
         *value.received = phase;
     }
-}
+} // namespace drawer_payload
 namespace {
     TEST(DrawPackTest, PackKeepsLvalueReferencesAndForwardsRvalueTypes) {
         int number = 3;
@@ -86,5 +86,5 @@ namespace {
         EXPECT_EQ(calls, 1);
         EXPECT_EQ(received, nullptr);
     }
-}
+} // namespace
 #endif

@@ -1,13 +1,13 @@
 #include <VSL/vulkan/stages/color_blend.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
-namespace vsl::pipeline_layout {
+namespace VSL_NAMESPACE::pipeline_layout {
     void ColorBlend::injection(PipelineLayoutAccessor pl) {
-        auto &info = *pl._data->info;
+        auto& info = *pl._data->info;
         if (!info.pool.contains("colorBlendAttachments"))
             info.pool["colorBlendAttachments"] = std::vector<vk::PipelineColorBlendAttachmentState>{};
-        auto &states = std::any_cast<std::vector<vk::PipelineColorBlendAttachmentState> &>(
+        auto& states = std::any_cast<std::vector<vk::PipelineColorBlendAttachmentState>&>(
             info.pool["colorBlendAttachments"]);
-        for (const auto &a : attachments)
+        for (const auto& a : attachments)
             states.push_back(
                 {.blendEnable = a.enabled,
                  .srcColorBlendFactor = static_cast<vk::BlendFactor>(a.sourceColor),
@@ -21,4 +21,4 @@ namespace vsl::pipeline_layout {
         info.colorBlend.attachmentCount = static_cast<std::uint32_t>(states.size());
         info.colorBlend.pAttachments = states.data();
     }
-}
+} // namespace VSL_NAMESPACE::pipeline_layout

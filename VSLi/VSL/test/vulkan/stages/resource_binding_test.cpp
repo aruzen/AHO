@@ -11,7 +11,7 @@ namespace {
         ASSERT_EQ(binding.resourceBindingSets.size(), 2u);
         auto layout = make_layout_state();
         binding.injection(layout);
-        const auto &info = layout._data->info->pipelineLayout;
+        const auto& info = layout._data->info->pipelineLayout;
         ASSERT_EQ(info.setLayoutCount, 2u);
         EXPECT_EQ(info.pSetLayouts[0], first._data->layout);
         EXPECT_EQ(info.pSetLayouts[1], second._data->layout);

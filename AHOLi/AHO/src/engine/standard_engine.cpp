@@ -6,12 +6,12 @@
 
 #include <utility>
 
-aho::engine::StandardEngine::StandardEngine(std::string applicationName, bool bootOn) {
+AHO_NAMESPACE::engine::StandardEngine::StandardEngine(std::string applicationName, bool bootOn) {
     if (bootOn)
         boot(std::move(applicationName));
 }
 
-void aho::engine::StandardEngine::boot(const std::string& applicationName) {
+void AHO_NAMESPACE::engine::StandardEngine::boot(const std::string& applicationName) {
     using namespace VSL_NAMESPACE;
 #ifdef _MSC_VER
     Vulkan<> instance(applicationName.c_str(), {"VK_KHR_win32_surface", "VK_KHR_surface",
@@ -74,6 +74,6 @@ void aho::engine::StandardEngine::boot(const std::string& applicationName) {
                                                           command_manager.getBuffer().getSize(), true)}));
 }
 
-aho::Window aho::engine::StandardEngine::getWindow() {
+AHO_NAMESPACE::Window AHO_NAMESPACE::engine::StandardEngine::getWindow() {
     return boot_window.value();
 }

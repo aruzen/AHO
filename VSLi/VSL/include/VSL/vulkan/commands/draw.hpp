@@ -23,4 +23,4 @@ namespace VSL_NAMESPACE::command {
     };
 
     extern DrawManip draw;
-}
+} // namespace VSL_NAMESPACE::command

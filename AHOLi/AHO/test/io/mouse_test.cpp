@@ -141,4 +141,4 @@ namespace {
         EXPECT_NE(mouse->leftClick(), mouse->rightClick());
         EXPECT_EQ(manager.update_targets.size(), 5u);
     }
-}
+} // namespace

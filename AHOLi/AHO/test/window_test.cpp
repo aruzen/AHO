@@ -81,7 +81,7 @@ namespace {
             EXPECT_EQ(in_flight->_data, second._data2->in_flight._data);
         EXPECT_TRUE(second.close());
     }
-}
+} // namespace
 #else
 #include <gtest/gtest.h>
 #include <AHO/window.hpp>
@@ -102,5 +102,5 @@ namespace {
         plugin.hook(nullptr);
         EXPECT_EQ(received, nullptr);
     }
-}
+} // namespace
 #endif

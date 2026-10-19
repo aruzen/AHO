@@ -36,4 +36,4 @@ namespace VSL_NAMESPACE {
     inline constexpr auto type<C, T>::operator<=>(const C& t) const {
         return t.index_ <=> index_;
     }
-}
+} // namespace VSL_NAMESPACE

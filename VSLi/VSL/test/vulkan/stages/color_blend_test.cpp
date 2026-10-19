@@ -7,10 +7,10 @@ namespace {
         auto layout = make_layout_state();
 
         pl::ColorBlend{}.injection(layout);
-        const auto &state = layout._data->info->colorBlend;
+        const auto& state = layout._data->info->colorBlend;
         ASSERT_EQ(state.attachmentCount, 1u);
         ASSERT_NE(state.pAttachments, nullptr);
-        const auto &attachment = state.pAttachments[0];
+        const auto& attachment = state.pAttachments[0];
         EXPECT_TRUE(attachment.blendEnable);
         EXPECT_EQ(attachment.colorWriteMask, vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
                                                  vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);

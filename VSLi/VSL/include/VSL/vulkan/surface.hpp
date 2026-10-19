@@ -7,9 +7,9 @@
 #include "vulkan.hpp"
 
 namespace VSL_NAMESPACE {
-    struct Surface : public vsl::PureWindow::Plugin {
-        Surface(vsl::PureWindow* data, VSL_NAMESPACE::VulkanAccessor instance);
+    struct Surface : public VSL_NAMESPACE::PureWindow::Plugin {
+        Surface(VSL_NAMESPACE::PureWindow* data, VSL_NAMESPACE::VulkanAccessor instance);
 
-        std::shared_ptr<vsl::_impl::Surface_impl> _data;
+        std::shared_ptr<VSL_NAMESPACE::_impl::Surface_impl> _data;
     };
-}
+} // namespace VSL_NAMESPACE

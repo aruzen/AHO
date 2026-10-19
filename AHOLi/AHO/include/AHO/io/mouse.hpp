@@ -11,13 +11,13 @@
 namespace AHO_NAMESPACE::input {
     class Cursor : public abstract::Cursor, public abstract::Updatable {
         template<typename T, typename... Args>
-        friend std::shared_ptr<T> aho::InputManager::get(Args &&...args);
+        friend std::shared_ptr<T> AHO_NAMESPACE::InputManager::get(Args&&... args);
 
-        void *context = nullptr;
+        void* context = nullptr;
         d2::PointD _state;
         d2::VectorD _delta;
 
-        explicit Cursor(void *context);
+        explicit Cursor(void* context);
 
     public:
         d2::PointD state() override;
@@ -28,15 +28,15 @@ namespace AHO_NAMESPACE::input {
     };
 
     class MouseButton : public abstract::Button, public abstract::Updatable {
-        friend aho::InputManager;
+        friend AHO_NAMESPACE::InputManager;
 
-        void *context = nullptr;
+        void* context = nullptr;
         MouseID code;
         ButtonState _state = ButtonState::Idle;
 
-        MouseButton(void *context, MouseCode code);
+        MouseButton(void* context, MouseCode code);
 
-        MouseButton(void *context, MouseID code);
+        MouseButton(void* context, MouseID code);
 
     public:
         ButtonState state() override;
@@ -51,9 +51,9 @@ namespace AHO_NAMESPACE::input {
     };
 
     class MouseWheel : public abstract::Input<d2::VectorD>, public abstract::Updatable {
-        friend aho::InputManager;
+        friend AHO_NAMESPACE::InputManager;
 
-        void *context = nullptr;
+        void* context = nullptr;
         size_t gen, read;
 
         static size_t subscribed;
@@ -63,10 +63,10 @@ namespace AHO_NAMESPACE::input {
         static d2::VectorD _state;
 
     private:
-        MouseWheel(void *context);
+        MouseWheel(void* context);
 
     public:
-        MouseWheel(const MouseWheel &other) noexcept;
+        MouseWheel(const MouseWheel& other) noexcept;
 
         ~MouseWheel();
 
@@ -76,9 +76,9 @@ namespace AHO_NAMESPACE::input {
     };
 
     class Mouse : public abstract::Adaptable {
-        friend aho::InputManager;
+        friend AHO_NAMESPACE::InputManager;
 
-        Mouse(void *, InputManager &manager);
+        Mouse(void*, InputManager& manager);
 
     private:
         std::shared_ptr<Cursor> _cursor;
@@ -98,6 +98,6 @@ namespace AHO_NAMESPACE::input {
 
         std::shared_ptr<MouseWheel> wheel();
     };
-}
+} // namespace AHO_NAMESPACE::input
 
 #endif //AHO_ALL_MOUSE_HPP

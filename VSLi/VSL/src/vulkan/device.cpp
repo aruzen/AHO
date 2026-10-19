@@ -11,11 +11,11 @@
 #include <cstdint>   // Necessary for UINT32_MAX
 #include <algorithm> // Necessary for std::clamp
 
-bool vsl::_impl::helper::QueueFamilyIndices::isComplete() {
+bool VSL_NAMESPACE::_impl::helper::QueueFamilyIndices::isComplete() {
     return graphicsFamily.has_value() && presentFamily.has_value();
 }
 
-vsl::_impl::helper::QueueFamilyIndices vsl::_impl::helper::findQueueFamilies(vk::PhysicalDevice device, vk::SurfaceKHR surface) {
+VSL_NAMESPACE::_impl::helper::QueueFamilyIndices VSL_NAMESPACE::_impl::helper::findQueueFamilies(vk::PhysicalDevice device, vk::SurfaceKHR surface) {
     QueueFamilyIndices indices;
     std::vector<vk::QueueFamilyProperties> queueFamilies = device.getQueueFamilyProperties();
     int i = 0;
@@ -32,7 +32,7 @@ vsl::_impl::helper::QueueFamilyIndices vsl::_impl::helper::findQueueFamilies(vk:
     return indices;
 }
 
-using namespace vsl::_impl::helper;
+using namespace VSL_NAMESPACE::_impl::helper;
 
 const std::vector<const char*> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
@@ -193,7 +193,7 @@ void VSL_NAMESPACE::PhysicalDevices<S>::test() {
         auto p = d.getProperties();
     }
     for (auto d : get()) {
-        vsl::loggingln(d.name());
+        VSL_NAMESPACE::loggingln(d.name());
     }
 }
 #endif // VSL_NAMESPACE_TEST

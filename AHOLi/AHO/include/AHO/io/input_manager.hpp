@@ -62,6 +62,6 @@ namespace AHO_NAMESPACE {
 
         return input;
     }
-}
+} // namespace AHO_NAMESPACE
 
 #endif //AHO_ALL_INPUTMANAGER_HPP

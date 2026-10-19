@@ -20,7 +20,7 @@ namespace {
             resource = exact[i];
             expect_sequence(execute(43 + static_cast<std::uint32_t>(i)), 43 + static_cast<std::uint32_t>(i));
         }
-        for (auto &entry : pools)
+        for (auto& entry : pools)
             entry._data->resources.clear();
     }
     TEST_F(DescriptorManagerVulkanIntegrationTest, DefaultOverAllocatorStartsWithoutPools) {
@@ -36,7 +36,7 @@ namespace {
         struct ClearCycles {
             std::shared_ptr<vsl::_impl::GraphicResourceManager_impl> data;
             ~ClearCycles() {
-                for (auto &owned : data->pools)
+                for (auto& owned : data->pools)
                     owned->resources.clear();
             }
         } cleanup{manager._data};
@@ -54,13 +54,13 @@ namespace {
         ASSERT_EQ(again.size(), 1u);
         EXPECT_EQ(again_pools.front()._data, pools.front()._data);
         EXPECT_EQ(manager.pools.size(), 1u);
-        for (auto &entry : manager._data->pools)
+        for (auto& entry : manager._data->pools)
             entry->resources.clear();
     }
 } // namespace
 namespace {
     TEST_F(DescriptorManagerVulkanIntegrationTest, TemplateMakeAndAllocateOverloadsUpdateTheirBuffers) {
-        auto &manager = static_cast<vsl::graphic_resource::ManagerInterface &>(*resources);
+        auto& manager = static_cast<vsl::graphic_resource::ManagerInterface&>(*resources);
         auto use = [&](auto allocated, std::uint32_t base) {
             ASSERT_EQ(allocated.size(), 1u);
             resource = allocated.front();
@@ -133,7 +133,7 @@ namespace {
         struct ClearCycles {
             std::shared_ptr<vsl::_impl::GraphicResourceManager_impl> data;
             ~ClearCycles() {
-                for (auto &owned : data->pools)
+                for (auto& owned : data->pools)
                     owned->resources.clear();
             }
         } cleanup{manager._data};
@@ -152,12 +152,12 @@ namespace {
     struct StubResourceManager : ResourceManagerInterface {
         std::tuple<std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>>
         allocate(std::vector<vsl::graphic_resource::BindingLayout>) override { return {}; }
-        void destroy(const vsl::graphic_resource::Pool &) override {}
+        void destroy(const vsl::graphic_resource::Pool&) override {}
     };
     TEST(ResourceManagerLifetimeTest, BaseOwnerRunsTheDerivedDestructor) {
         struct TrackedManager : StubResourceManager {
-            bool &destroyed;
-            explicit TrackedManager(bool &destroyed) : destroyed(destroyed) {}
+            bool& destroyed;
+            explicit TrackedManager(bool& destroyed) : destroyed(destroyed) {}
             ~TrackedManager() { destroyed = true; }
         };
         bool destroyed = false;
@@ -191,7 +191,7 @@ namespace {
         struct ClearCycles {
             std::shared_ptr<vsl::_impl::GraphicResourceManager_impl> data;
             ~ClearCycles() {
-                for (auto &owned : data->pools)
+                for (auto& owned : data->pools)
                     owned->resources.clear();
             }
         } cleanup{manager._data};
@@ -220,9 +220,9 @@ namespace {
         PFN_vkDestroyDebugUtilsMessengerEXT destroy_messenger = nullptr;
         std::atomic<unsigned> validation_errors{0};
         static VKAPI_ATTR VkBool32 VKAPI_CALL record_error(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
-                                                           VkDebugUtilsMessageTypeFlagsEXT, const VkDebugUtilsMessengerCallbackDataEXT *message, void *user) {
+                                                           VkDebugUtilsMessageTypeFlagsEXT, const VkDebugUtilsMessengerCallbackDataEXT* message, void* user) {
             if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-                ++*static_cast<std::atomic<unsigned> *>(user);
+                ++*static_cast<std::atomic<unsigned>*>(user);
                 std::cerr << message->pMessageIdName << ": " << message->pMessage << '\n';
                 return VK_TRUE; // Abort an invalid Vulkan call before it reaches the driver.
             }
@@ -289,7 +289,7 @@ namespace {
                                   std::map<Type, std::size_t>{{Type::StorageBuffer, UINT32_MAX}}),
                      vsl::exceptions::RuntimeException);
         EXPECT_TRUE(manager._data->pools.empty());
-        for (auto &pool : manager._data->pools)
+        for (auto& pool : manager._data->pools)
             pool->resources.clear(); // Clean up a pool created by the old implementation, too.
     }
 #if SIZE_MAX > UINT32_MAX

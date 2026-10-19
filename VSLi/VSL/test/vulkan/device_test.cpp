@@ -28,7 +28,7 @@ namespace {
         const auto found = devices.get();
         ASSERT_FALSE(found.empty());
         EXPECT_TRUE(std::ranges::any_of(
-            found, [&](const auto &item) { return item._data->device == physical._data->device; }));
+            found, [&](const auto& item) { return item._data->device == physical._data->device; }));
         for (auto item : found)
             EXPECT_FALSE(item.name().empty());
     }
@@ -45,7 +45,7 @@ namespace {
             GTEST_SKIP() << "Public logical-device constructor requires unsupported fixed features";
 #ifndef _MSC_VER
         const auto extensions = physical._data->device.enumerateDeviceExtensionProperties();
-        if (!std::ranges::any_of(extensions, [](const auto &extension) {
+        if (!std::ranges::any_of(extensions, [](const auto& extension) {
                 return std::strcmp(extension.extensionName, "VK_KHR_portability_subset") == 0;
             }))
             GTEST_SKIP()
@@ -65,7 +65,7 @@ namespace {
         auto selected = candidates.search();
         const auto found = candidates.get();
         EXPECT_TRUE(std::ranges::any_of(
-            found, [&](const auto &candidate) { return candidate._data->device == selected._data->device; }));
+            found, [&](const auto& candidate) { return candidate._data->device == selected._data->device; }));
         const auto properties = physical._data->device.getProperties();
         const auto features = physical._data->device.getFeatures();
         const int expected = features.geometryShader
@@ -126,7 +126,7 @@ namespace {
     TEST_F(DeviceVulkanIntegrationTest, CustomSearcherKeepsTheHighestNonnegativeScoreAndFirstTie) {
         ClearDeviceBenchmark cleanup;
         vsl::PhysicalDevices<ConfiguredDeviceBenchmark> devices(vsl::VulkanAccessor{instance});
-        for (const auto &[scores, expected] : {
+        for (const auto& [scores, expected] : {
                  std::pair{std::array{90, 10, 2}, 0u}, std::pair{std::array{0, 12, 1}, 1u},
                  std::pair{std::array{1, 2, 99}, 2u}, std::pair{std::array{7, 7, 1}, 0u},
                  std::pair{std::array{0, 0, 0}, 0u}}) {

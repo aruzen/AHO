@@ -9,4 +9,4 @@
 namespace AHO_NAMESPACE::collision {
     struct CollisionJudger {
     };
-}
+} // namespace AHO_NAMESPACE::collision

@@ -54,12 +54,12 @@ namespace VSL_NAMESPACE::graphic_resource {
         ShaderFlag shaderType;
         std::uint32_t amount = 1;
 
-        constexpr auto operator<=>(const BindingPoint &) const = default;
+        constexpr auto operator<=>(const BindingPoint&) const = default;
     };
 
     template<typename T>
-    concept can_convert_graphic_resource = std::is_convertible_v<T *, vsl::BufferAccessor *> ||
-                                           std::is_convertible_v<T *, vsl::ImageAccessor *>;
+    concept can_convert_graphic_resource = std::is_convertible_v<T*, VSL_NAMESPACE::BufferAccessor*> ||
+                                           std::is_convertible_v<T*, VSL_NAMESPACE::ImageAccessor*>;
 
     /*
      * GPU上のメモリーに置かれたデータをShaderがどう読み取るかを指定できる
@@ -72,7 +72,7 @@ namespace VSL_NAMESPACE::graphic_resource {
 
         BindingLayout(LogicalDeviceAccessor device, std::initializer_list<BindingPoint> points);
 
-        BindingLayout(LogicalDeviceAccessor device, const std::vector<BindingPoint> &points);
+        BindingLayout(LogicalDeviceAccessor device, const std::vector<BindingPoint>& points);
 
         [[nodiscard]] std::vector<BindingPoint> getBindingPoints() const;
 
@@ -90,7 +90,7 @@ namespace VSL_NAMESPACE::graphic_resource {
 
         std::tuple<bool, std::vector<Resource>> bind(std::vector<BindingLayout> layout);
 
-        ManagerInterface *getManager();
+        ManagerInterface* getManager();
     };
 
     struct Resource {
@@ -99,12 +99,12 @@ namespace VSL_NAMESPACE::graphic_resource {
         Pool getPool();
 
         // ここらへんのTもいつかtypename ...Argsに置き換えたいかも
-        void update(vsl::BufferAccessor *buffer, size_t binding = 0, std::optional<Type> type = std::nullopt,
+        void update(VSL_NAMESPACE::BufferAccessor* buffer, size_t binding = 0, std::optional<Type> type = std::nullopt,
                     size_t offset = 0, std::optional<size_t> size = std::nullopt);
 
-        void update(vsl::ImageAccessor image, size_t binding = 0, std::optional<Type> type = std::nullopt);
+        void update(VSL_NAMESPACE::ImageAccessor image, size_t binding = 0, std::optional<Type> type = std::nullopt);
 
-        void update(vsl::ImageAccessor image, SamplerAccessor sampler, size_t binding = 0,
+        void update(VSL_NAMESPACE::ImageAccessor image, SamplerAccessor sampler, size_t binding = 0,
                     std::optional<Type> type = std::nullopt);
 
         template<can_convert_graphic_resource T>
@@ -115,27 +115,27 @@ namespace VSL_NAMESPACE::graphic_resource {
         void update(T t, BufferAccessor::LocalBufferHolder holder, size_t binding = 0,
                     std::optional<Type> type = std::nullopt);
     };
-}
+} // namespace VSL_NAMESPACE::graphic_resource
 
 namespace VSL_NAMESPACE {
     using GraphicResourcePool = graphic_resource::Pool;
     using GraphicResource = graphic_resource::Resource;
-}
+} // namespace VSL_NAMESPACE
 
 // ==================================================================================
 
-template<vsl::graphic_resource::can_convert_graphic_resource T>
-void vsl::GraphicResource::update(T t, vsl::BufferAccessor::LocalBufferHolder holder,
-                                  size_t binding, std::optional<vsl::graphic_resource::Type> type) {
+template<VSL_NAMESPACE::graphic_resource::can_convert_graphic_resource T>
+void VSL_NAMESPACE::GraphicResource::update(T t, VSL_NAMESPACE::BufferAccessor::LocalBufferHolder holder,
+                                            size_t binding, std::optional<VSL_NAMESPACE::graphic_resource::Type> type) {
     update(t, binding, type, holder.offset, holder.size);
 }
 
-template<vsl::graphic_resource::can_convert_graphic_resource T>
-void vsl::GraphicResource::update(T t, size_t binding, std::optional<vsl::graphic_resource::Type> type, size_t offset, std::optional<size_t> size) {
-    if constexpr (std::is_convertible_v<T *, vsl::BufferAccessor *>)
-        update((vsl::BufferAccessor *)&t, binding, type, offset, size);
-    else if constexpr (std::is_convertible_v<T *, vsl::ImageAccessor *>)
-        update(static_cast<vsl::ImageAccessor>(t), binding, type);
+template<VSL_NAMESPACE::graphic_resource::can_convert_graphic_resource T>
+void VSL_NAMESPACE::GraphicResource::update(T t, size_t binding, std::optional<VSL_NAMESPACE::graphic_resource::Type> type, size_t offset, std::optional<size_t> size) {
+    if constexpr (std::is_convertible_v<T*, VSL_NAMESPACE::BufferAccessor*>)
+        update((VSL_NAMESPACE::BufferAccessor*)&t, binding, type, offset, size);
+    else if constexpr (std::is_convertible_v<T*, VSL_NAMESPACE::ImageAccessor*>)
+        update(static_cast<VSL_NAMESPACE::ImageAccessor>(t), binding, type);
 }
 
 #endif //AHO_ALL_DESCRIPTOR_HPP

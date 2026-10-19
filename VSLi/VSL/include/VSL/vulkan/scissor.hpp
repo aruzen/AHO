@@ -22,4 +22,4 @@ namespace VSL_NAMESPACE {
         void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
     };
-}
+} // namespace VSL_NAMESPACE

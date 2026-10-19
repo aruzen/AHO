@@ -71,7 +71,7 @@ namespace AHO_NAMESPACE {
 
         template<typename T>
         concept triangles_view_able = is_triangles_object<T> || is_triangle<T>;
-    }
+    } // namespace concepts
 
     namespace views {
         template<typename InnerView>
@@ -147,5 +147,5 @@ namespace AHO_NAMESPACE {
                                      typename PureT::coordinate_info>>(t.triangles());
             }
         }
-    }
-}
+    } // namespace views
+} // namespace AHO_NAMESPACE

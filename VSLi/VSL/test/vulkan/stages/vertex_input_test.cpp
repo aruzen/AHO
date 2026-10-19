@@ -33,7 +33,7 @@ namespace {
                                 .updateTiming = pl::VertexInputShapeDefinition::UpdateTiming::NextInstance}});
         auto layout = make_layout_state();
         input.injection(layout);
-        const auto &info = layout._data->info->vertexInput;
+        const auto& info = layout._data->info->vertexInput;
         ASSERT_EQ(info.vertexBindingDescriptionCount, 1u);
         ASSERT_EQ(info.vertexAttributeDescriptionCount, 2u);
         EXPECT_EQ(info.pVertexBindingDescriptions[0].binding, 2u);
@@ -96,7 +96,7 @@ namespace {
                                {.layouts = {{vsl::data_format::Float, 3, 4}}, .size = 20}});
         auto layout = make_layout_state();
         input.injection(layout);
-        const auto &info = layout._data->info->vertexInput;
+        const auto& info = layout._data->info->vertexInput;
         ASSERT_EQ(info.vertexBindingDescriptionCount, 2u);
         EXPECT_EQ(info.pVertexBindingDescriptions[0].stride, 32u);
         EXPECT_EQ(info.pVertexBindingDescriptions[1].stride, 20u);
@@ -139,7 +139,7 @@ namespace {
                        pl::InputAssembly{}, pl::Rasterization{pl::CullingMode::None}, pl::Multisample{},
                        pl::DynamicState{}, vsl::Viewport(description), vsl::Scissor(description));
         pipeline.emplace(*layout, *pass);
-        expect_triangle_color(render([&](vsl::DefaultPhaseStream &stream) {
+        expect_triangle_color(render([&](vsl::DefaultPhaseStream& stream) {
             stream << vsl::command::BindVertexBuffer(buffer) << vsl::command::Draw(3);
         }));
     }
@@ -153,13 +153,13 @@ namespace {
         pl::VertexInput invalid({{.layouts = {{vsl::data_format::FloatRG, 0,
                                                std::numeric_limits<std::uint32_t>::max() - 2}}}});
         EXPECT_THROW(invalid.injection(layout), vsl::exceptions::RuntimeException);
-        const auto &bindings = std::any_cast<const std::vector<vk::VertexInputBindingDescription> &>(
+        const auto& bindings = std::any_cast<const std::vector<vk::VertexInputBindingDescription>&>(
             layout._data->info->pool.at("vertexBindingDescriptions"));
-        const auto &attributes = std::any_cast<const std::vector<vk::VertexInputAttributeDescription> &>(
+        const auto& attributes = std::any_cast<const std::vector<vk::VertexInputAttributeDescription>&>(
             layout._data->info->pool.at("vertexAttributeDescriptions"));
         ASSERT_EQ(bindings.size(), 1u);
         ASSERT_EQ(attributes.size(), 1u);
-        const auto &native = layout._data->info->vertexInput;
+        const auto& native = layout._data->info->vertexInput;
         ASSERT_EQ(native.vertexBindingDescriptionCount, 1u);
         ASSERT_EQ(native.vertexAttributeDescriptionCount, 1u);
         EXPECT_EQ(native.pVertexBindingDescriptions, bindings.data());

@@ -34,4 +34,4 @@ namespace VSL_NAMESPACE::_impl {
     namespace pipeline_layout {
         struct ShaderGroup_impl;
     }
-}
+} // namespace VSL_NAMESPACE::_impl

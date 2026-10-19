@@ -14,7 +14,7 @@ namespace {
         EXPECT_EQ(layout._data->info->rasterization.cullMode, vk::CullModeFlags(vk::CullModeFlagBits::eBack));
         EXPECT_EQ(layout._data->info->inputAssembly.topology, vk::PrimitiveTopology::eTriangleList);
     }
-}
+} // namespace
 #else
 #include <gtest/gtest.h>
 #include <AHO/pipeline/layouts.hpp>
@@ -39,5 +39,5 @@ namespace {
         EXPECT_EQ(texture.binding, static_texture.binding);
         EXPECT_THROW(getBindingPoint(static_cast<ResourceName>(999)), std::runtime_error);
     }
-}
+} // namespace
 #endif

@@ -23,13 +23,13 @@ namespace VSL_NAMESPACE {
               data_format::___Format format = data_format::Srgb8RGBA, std::uint32_t count = 1, SampleCount samples = SampleCount::One);
 
         template<MemoryType MemType, MemoryProperty MemProperty, SharingMode ShareMode>
-        bool copyByBuffer(CommandManager manager, Buffer<MemType, MemProperty, ShareMode> &buffer);
+        bool copyByBuffer(CommandManager manager, Buffer<MemType, MemProperty, ShareMode>& buffer);
     };
-}
+} // namespace VSL_NAMESPACE
 
-template<vsl::ImageType Usage, vsl::MemoryProperty MemProp, vsl::ImageLayout Layout>
-vsl::Image<Usage, MemProp, Layout>::Image(vsl::LogicalDeviceAccessor device, std::uint32_t width, std::uint32_t height,
-                                          data_format::___Format format, std::uint32_t count, SampleCount samples) {
+template<VSL_NAMESPACE::ImageType Usage, VSL_NAMESPACE::MemoryProperty MemProp, VSL_NAMESPACE::ImageLayout Layout>
+VSL_NAMESPACE::Image<Usage, MemProp, Layout>::Image(VSL_NAMESPACE::LogicalDeviceAccessor device, std::uint32_t width, std::uint32_t height,
+                                                    data_format::___Format format, std::uint32_t count, SampleCount samples) {
     _data = MakeImage(Usage, MemProp, Layout, device, width, height, format, count, samples);
 }
 

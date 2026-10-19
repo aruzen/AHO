@@ -5,7 +5,7 @@
 #include <fstream>
 #include <string>
 namespace vsl_test {
-    inline std::string shell_quote(const std::string &value) {
+    inline std::string shell_quote(const std::string& value) {
 #ifdef _WIN32
         std::string result = "\"";
         for (char c : value) {
@@ -25,7 +25,7 @@ namespace vsl_test {
         int status;
         std::string diagnostics;
     };
-    inline CompileResult compile_probe(const std::string &source) {
+    inline CompileResult compile_probe(const std::string& source) {
         TemporaryDirectory temporary;
         auto input = temporary.path() / "probe.cpp", output = temporary.path() / "diagnostics.txt";
         {
@@ -33,7 +33,7 @@ namespace vsl_test {
             stream << source;
         }
         std::string command = shell_quote(VSL_TEST_CXX) + " -std=c++23 -fsyntax-only -Werror=return-type";
-        for (const auto *include : {VSL_TEST_INCLUDE, VSL_TEST_VULKAN_INCLUDE, VSL_TEST_GLFW_INCLUDE})
+        for (const auto* include : {VSL_TEST_INCLUDE, VSL_TEST_VULKAN_INCLUDE, VSL_TEST_GLFW_INCLUDE})
             command += " -I" + shell_quote(include);
         command += " " + shell_quote(input.string()) + " >" + shell_quote(output.string()) + " 2>&1";
         const int status = std::system(command.c_str());

@@ -14,4 +14,4 @@ namespace VSL_NAMESPACE {
         FrameBuffer(SwapchainAccessor swapchain, RenderPass render_pass);
         FrameBuffer(SwapchainAccessor swapchain, IDPickingRenderPass render_pass);
     };
-}
+} // namespace VSL_NAMESPACE

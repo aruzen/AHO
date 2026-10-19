@@ -39,7 +39,7 @@ namespace {
         EXPECT_EQ(engine->getWindow().name(), "AHO deferred boot");
         EXPECT_EQ(engine->getWindow().engine._data, engine->_data);
     }
-}
+} // namespace
 #else
 #include <gtest/gtest.h>
 #include <AHO/engine/standard_engine.hpp>
@@ -54,5 +54,5 @@ namespace {
         }
         EXPECT_EQ(aho::engine::EngineAccessor::instance(), previous);
     }
-}
+} // namespace
 #endif

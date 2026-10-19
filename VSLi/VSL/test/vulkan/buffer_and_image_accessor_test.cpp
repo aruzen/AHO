@@ -42,8 +42,8 @@ namespace {
                        vk::AccessFlagBits::eTransferWrite);
         }
         device._data->device.waitIdle();
-        EXPECT_TRUE(static_cast<vsl::ImageAccessor &>(image).copyByBuffer(manager, &upload,
-                                                                          vsl::ImageLayout::General, 0));
+        EXPECT_TRUE(static_cast<vsl::ImageAccessor&>(image).copyByBuffer(manager, &upload,
+                                                                         vsl::ImageLayout::General, 0));
         device._data->device.waitIdle();
         {
             auto phase = manager.startPhase<vsl::ComputePhase>();
@@ -67,13 +67,13 @@ namespace {
     static_assert(std::has_virtual_destructor_v<vsl::BufferAccessor>);
     TEST(BufferAccessorLifetimeTest, BaseOwnerRunsTheDerivedDestructor) {
         struct TrackedBuffer : vsl::BufferAccessor {
-            bool &destroyed;
-            explicit TrackedBuffer(bool &destroyed) : destroyed(destroyed) {}
+            bool& destroyed;
+            explicit TrackedBuffer(bool& destroyed) : destroyed(destroyed) {}
             ~TrackedBuffer() { destroyed = true; }
             LocalBufferHolder data(std::optional<std::size_t>, std::size_t) override {
                 return {nullptr, 0, 0};
             }
-            void flush(LocalBufferHolder &) override {}
+            void flush(LocalBufferHolder&) override {}
         };
         bool destroyed = false;
         std::unique_ptr<vsl::BufferAccessor> buffer = std::make_unique<TrackedBuffer>(destroyed);

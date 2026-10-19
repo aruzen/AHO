@@ -9,4 +9,4 @@ namespace VSL_NAMESPACE::pipeline_layout {
         SampleCount samples = SampleCount::One;
         void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
     };
-}
+} // namespace VSL_NAMESPACE::pipeline_layout

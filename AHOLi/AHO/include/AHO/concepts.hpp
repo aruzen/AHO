@@ -30,7 +30,7 @@ namespace AHO_NAMESPACE::concepts {
 
         template<size_t Index, typename T, typename... Args>
         using get_type_v = GetType<Index, T, Args...>::value;
-    }
+    } // namespace helper
 
     template<class T>
     concept is_std_tuple = helper::is_std_tuple<std::remove_cvref_t<T>>::value;
@@ -98,4 +98,4 @@ namespace AHO_NAMESPACE::concepts {
         { t.intersect(r) } -> std::convertible_to<bool>;
         { t.cotains(r) } -> std::convertible_to<bool>;
     };
-}
+} // namespace AHO_NAMESPACE::concepts

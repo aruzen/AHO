@@ -41,4 +41,4 @@ namespace VSL_NAMESPACE {
     constexpr bool contain(T original, T want) {                                                                      \
         return (original & want) == want;                                                                             \
     }
-}
+} // namespace VSL_NAMESPACE

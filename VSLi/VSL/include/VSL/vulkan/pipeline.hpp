@@ -23,4 +23,4 @@ namespace VSL_NAMESPACE {
 
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
     };
-}
+} // namespace VSL_NAMESPACE

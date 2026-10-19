@@ -3,18 +3,18 @@
 #include <VSL/vulkan/commands/change_image_barrier.hpp>
 #include "../image_format.hpp"
 
-vsl::command::ChangeImageBarrier::ChangeImageBarrier(vsl::ImageAccessor image,
-                                                     ImageLayout oldLayout,
-                                                     ImageLayout newLayout)
+VSL_NAMESPACE::command::ChangeImageBarrier::ChangeImageBarrier(VSL_NAMESPACE::ImageAccessor image,
+                                                               ImageLayout oldLayout,
+                                                               ImageLayout newLayout)
     : image(image), oldLayout(oldLayout), newLayout(newLayout) {}
 
-vsl::command::ChangeImageBarrier::ChangeImageBarrier(vsl::ImageAccessor image, ImageLayout oldLayout,
-                                                     ImageLayout newLayout, std::uint32_t baseLayer,
-                                                     std::uint32_t layerCount)
+VSL_NAMESPACE::command::ChangeImageBarrier::ChangeImageBarrier(VSL_NAMESPACE::ImageAccessor image, ImageLayout oldLayout,
+                                                               ImageLayout newLayout, std::uint32_t baseLayer,
+                                                               std::uint32_t layerCount)
     : image(image), oldLayout(oldLayout), newLayout(newLayout), baseLayer(baseLayer), layerCount(layerCount) {}
 
-void vsl::command::ChangeImageBarrier::invoke(vsl::CommandPool pool, vsl::CommandBuffer buffer,
-                                              vsl::CommandManager manager) {
+void VSL_NAMESPACE::command::ChangeImageBarrier::invoke(VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer,
+                                                        VSL_NAMESPACE::CommandManager manager) {
     if (!image._data || !image._data->image || !buffer._data || !buffer._data->commandPool || !manager._data ||
         image._data->device != manager._data->device ||
         buffer._data->commandPool->device != image._data->device)

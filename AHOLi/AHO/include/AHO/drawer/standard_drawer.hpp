@@ -11,7 +11,7 @@
 #include "AHO/core/triangle.hpp"
 
 namespace AHO_NAMESPACE {
-    void draw(const Triangle<float, vsl::D2> &triangle, const RGBA &rgba);
+    void draw(const Triangle<float, VSL_NAMESPACE::D2>& triangle, const RGBA& rgba);
 }
 
 #endif //AHO_ALL_STANDARDDRAWER_H

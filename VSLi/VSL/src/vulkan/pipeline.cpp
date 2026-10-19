@@ -3,7 +3,7 @@
 
 #include <VSL/vulkan/_pimpls.hpp>
 
-vsl::GraphicsPipeline::GraphicsPipeline(vsl::PipelineLayoutAccessor layout, vsl::RenderPassAccessor pass, std::uint32_t subpass) {
+VSL_NAMESPACE::GraphicsPipeline::GraphicsPipeline(VSL_NAMESPACE::PipelineLayoutAccessor layout, VSL_NAMESPACE::RenderPassAccessor pass, std::uint32_t subpass) {
     if (!pass._data || subpass >= pass.description().subpasses.size())
         throw std::out_of_range("Pipeline subpass index");
     if (!layout._data || !layout._data->info || layout._data->device != pass._data->device)
@@ -55,12 +55,12 @@ vsl::GraphicsPipeline::GraphicsPipeline(vsl::PipelineLayoutAccessor layout, vsl:
     _data->pipeline = result.value;
 }
 
-void vsl::GraphicsPipeline::invoke(vsl::CommandPool pool, vsl::CommandBuffer buffer, vsl::CommandManager manager) {
+void VSL_NAMESPACE::GraphicsPipeline::invoke(VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
     buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].bindPipeline(vk::PipelineBindPoint::eGraphics,
                                                                             _data->pipeline);
 }
 
-vsl::ComputePipeline::ComputePipeline(vsl::PipelineLayoutAccessor layout) {
+VSL_NAMESPACE::ComputePipeline::ComputePipeline(VSL_NAMESPACE::PipelineLayoutAccessor layout) {
 
     _data = std::shared_ptr<_impl::Pipeline_impl>(new _impl::Pipeline_impl);
     _data->device = layout._data->device;
@@ -76,7 +76,7 @@ vsl::ComputePipeline::ComputePipeline(vsl::PipelineLayoutAccessor layout) {
     _data->pipeline = _data->device->device.createComputePipeline(*cache, pipelineInfo).value;
 }
 
-void vsl::ComputePipeline::invoke(vsl::CommandPool pool, vsl::CommandBuffer buffer, vsl::CommandManager manager) {
+void VSL_NAMESPACE::ComputePipeline::invoke(VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
     buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].bindPipeline(vk::PipelineBindPoint::eCompute,
                                                                             _data->pipeline);
 }

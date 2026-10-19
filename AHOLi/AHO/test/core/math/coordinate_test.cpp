@@ -411,7 +411,7 @@ namespace {
         EXPECT_EQ((3_l_y).value, 3u);
         EXPECT_EQ((4_l_z).value, 4u);
     }
-}
+} // namespace
 
 namespace {
     template<class Value>

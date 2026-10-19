@@ -756,7 +756,7 @@ namespace VSL_NAMESPACE::data_format {
     constexpr ___Format SignedFloat(___FormatTypes::SignedFloat, SignedFloat32R.size());
     constexpr ___Format Int(___FormatTypes::Int, SignedInt32Vec1.size());
     constexpr ___Format Float(___FormatTypes::Float, SignedFloat32Vec1.size());
-}
+} // namespace VSL_NAMESPACE::data_format
 
 namespace VSL_NAMESPACE::concepts {
     template<typename T>
@@ -786,7 +786,7 @@ namespace VSL_NAMESPACE::concepts {
 
     template<typename T>
     concept is_convertible_graphic_type = is_static_convertible_graphic_type<T> || ___is_convertible_graphic_type_by_dynamic_method<T>;
-}
+} // namespace VSL_NAMESPACE::concepts
 
 namespace VSL_NAMESPACE::data_format {
     constexpr ___Format convert(___FormatTypes t) {
@@ -2902,4 +2902,4 @@ namespace VSL_NAMESPACE::data_format {
             return 4;
         return 0;
     }
-}
+} // namespace VSL_NAMESPACE::data_format

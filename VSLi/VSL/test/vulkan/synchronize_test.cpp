@@ -12,10 +12,10 @@ namespace {
             // Manager and holders retain each other. Reclaim fixture-owned handles before breaking the cycle.
             if (manager) {
                 device._data->device.waitIdle();
-                for (auto &[name, holder] : manager->_data->fences)
+                for (auto& [name, holder] : manager->_data->fences)
                     for (auto fence : holder->fences)
                         device._data->device.destroyFence(fence);
-                for (auto &[name, holder] : manager->_data->semaphores)
+                for (auto& [name, holder] : manager->_data->semaphores)
                     for (auto semaphore : holder->semaphores)
                         device._data->device.destroySemaphore(semaphore);
                 manager->_data->fences.clear();

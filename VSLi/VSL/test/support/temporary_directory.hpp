@@ -19,13 +19,13 @@ namespace vsl_test {
             }
             throw std::runtime_error("Cannot create unique test directory");
         }
-        TemporaryDirectory(const TemporaryDirectory &) = delete;
-        TemporaryDirectory &operator=(const TemporaryDirectory &) = delete;
+        TemporaryDirectory(const TemporaryDirectory&) = delete;
+        TemporaryDirectory& operator=(const TemporaryDirectory&) = delete;
         ~TemporaryDirectory() {
             std::error_code ignored;
             std::filesystem::remove_all(path_, ignored);
         }
-        const std::filesystem::path &path() const {
+        const std::filesystem::path& path() const {
             return path_;
         }
     };

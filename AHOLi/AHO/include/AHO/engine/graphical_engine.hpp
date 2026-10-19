@@ -18,8 +18,8 @@ namespace AHO_NAMESPACE::engine {
         GraphicalEngine(GraphicalEngine&&) noexcept = default;
         GraphicalEngine& operator=(GraphicalEngine&&) noexcept = default;
 
-        virtual aho::Window getWindow() = 0;
+        virtual AHO_NAMESPACE::Window getWindow() = 0;
     };
-}
+} // namespace AHO_NAMESPACE::engine
 
 #endif //AHO_ALL_GRAPHITICALENGINE_H

@@ -33,4 +33,4 @@ namespace VSL_NAMESPACE::pipeline_layout {
         StencilFace front, back;
         void injection(PipelineLayoutAccessor pl);
     };
-}
+} // namespace VSL_NAMESPACE::pipeline_layout

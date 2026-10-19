@@ -39,4 +39,4 @@ namespace aho_test {
         TempDirectory(const TempDirectory&) = delete;
         TempDirectory& operator=(const TempDirectory&) = delete;
     };
-}
+} // namespace aho_test

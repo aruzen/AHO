@@ -285,7 +285,7 @@ namespace VSL_NAMESPACE::_impl {
             std::vector<std::shared_ptr<Shader_impl>> shaders;
         };
 
-    }
+    } // namespace pipeline_layout
 
     namespace helper {
         struct QueueFamilyIndices {
@@ -300,5 +300,5 @@ namespace VSL_NAMESPACE::_impl {
                                      vk::MemoryPropertyFlags properties);
         QueueFamilyIndices findQueueFamilies(vk::PhysicalDevice device, vk::SurfaceKHR surface);
         void DestroyDebugUtilsMessengerEXT(vk::Instance& instance, vk::DebugUtilsMessengerEXT& debugMessenger, const VkAllocationCallbacks* pAllocator);
-    }
-}
+    } // namespace helper
+} // namespace VSL_NAMESPACE::_impl

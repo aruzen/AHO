@@ -173,4 +173,4 @@ namespace AHO_NAMESPACE {
 
     static_assert(concepts::is_line<Line<double, VSL_NAMESPACE::D2, coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D2>::value>>);
     static_assert(concepts::is_points_object<Line<double, VSL_NAMESPACE::D2, coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D2>::value>>);
-}
+} // namespace AHO_NAMESPACE

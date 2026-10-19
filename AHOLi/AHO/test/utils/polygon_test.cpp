@@ -354,7 +354,7 @@ namespace {
         EXPECT_FALSE(aho::concepts::is_triangle<PrivateTriangle>);
     }
 
-}
+} // namespace
 #endif
 
 namespace {

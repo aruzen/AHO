@@ -11,7 +11,7 @@
 #include <VSL/vulkan/descriptor_set_manager.hpp>
 
 namespace {
-    void release_descriptor_pool(const std::shared_ptr<vsl::_impl::GraphicResourcePool_impl> &data) {
+    void release_descriptor_pool(const std::shared_ptr<VSL_NAMESPACE::_impl::GraphicResourcePool_impl>& data) {
         if (data->descriptorPool) {
             data->device->device.destroyDescriptorPool(data->descriptorPool);
             data->descriptorPool = nullptr;
@@ -20,35 +20,35 @@ namespace {
     }
 } // namespace
 
-std::tuple<vsl::graphic_resource::Pool, std::vector<vsl::graphic_resource::Resource>>
-vsl::graphic_resource::ManagerInterface::make(std::vector<BindingLayout> layouts,
-                                              std::map<Type, size_t> size,
-                                              size_t other) {
-    for (const auto &layout : layouts)
-        for (const auto &bp : layout.getBindingPoints()) {
-            auto &count = size[bp.bindingType];
+std::tuple<VSL_NAMESPACE::graphic_resource::Pool, std::vector<VSL_NAMESPACE::graphic_resource::Resource>>
+VSL_NAMESPACE::graphic_resource::ManagerInterface::make(std::vector<BindingLayout> layouts,
+                                                        std::map<Type, size_t> size,
+                                                        size_t other) {
+    for (const auto& layout : layouts)
+        for (const auto& bp : layout.getBindingPoints()) {
+            auto& count = size[bp.bindingType];
             constexpr auto maximum = std::numeric_limits<std::uint32_t>::max();
             if (count > maximum || bp.amount > maximum - count)
-                throw vsl::exceptions::RuntimeException("DescriptorPool", "Descriptor count exceeds uint32_t");
+                throw VSL_NAMESPACE::exceptions::RuntimeException("DescriptorPool", "Descriptor count exceeds uint32_t");
             count += bp.amount;
         }
     auto pool = this->make(size, other);
-    const auto &[err, resources] = pool.bind(layouts);
+    const auto& [err, resources] = pool.bind(layouts);
     if (not err) {
         // FIXME: message
-        throw vsl::exceptions::RuntimeException("error: layout can't bind to pool.");
+        throw VSL_NAMESPACE::exceptions::RuntimeException("error: layout can't bind to pool.");
     }
     return {pool, resources};
 }
 
-vsl::graphic_resource::Pool
-vsl::graphic_resource::ManagerInterface::make(std::map<Type, size_t> count, size_t other) {
+VSL_NAMESPACE::graphic_resource::Pool
+VSL_NAMESPACE::graphic_resource::ManagerInterface::make(std::map<Type, size_t> count, size_t other) {
     constexpr auto maximum = std::numeric_limits<std::uint32_t>::max();
     if (other > maximum)
-        throw vsl::exceptions::RuntimeException("DescriptorPool", "Fallback descriptor count exceeds uint32_t");
-    for (const auto &[type, amount] : count)
+        throw VSL_NAMESPACE::exceptions::RuntimeException("DescriptorPool", "Fallback descriptor count exceeds uint32_t");
+    for (const auto& [type, amount] : count)
         if (amount > maximum)
-            throw vsl::exceptions::RuntimeException("DescriptorPool", "Descriptor count exceeds uint32_t");
+            throw VSL_NAMESPACE::exceptions::RuntimeException("DescriptorPool", "Descriptor count exceeds uint32_t");
 
     GraphicResourcePool pool;
     pool._data = std::make_shared<_impl::GraphicResourcePool_impl>();
@@ -57,7 +57,7 @@ vsl::graphic_resource::ManagerInterface::make(std::map<Type, size_t> count, size
 
     std::vector<vk::DescriptorPoolSize> poolSizes;
     // size_t size;
-    for (const auto &type : {Type::Sampler,
+    for (const auto& type : {Type::Sampler,
                              Type::CombinedImageSampler,
                              Type::SampledImage,
                              Type::StorageImage,
@@ -97,24 +97,24 @@ vsl::graphic_resource::ManagerInterface::make(std::map<Type, size_t> count, size
     return pool;
 }
 
-vsl::_impl::GraphicResourceManager_impl::~GraphicResourceManager_impl() {
-    for (auto &pool : pools) {
+VSL_NAMESPACE::_impl::GraphicResourceManager_impl::~GraphicResourceManager_impl() {
+    for (auto& pool : pools) {
         pool.reset();
     }
 }
 
-vsl::graphic_resource::ExactAllocateManager::ExactAllocateManager(LogicalDeviceAccessor device) {
+VSL_NAMESPACE::graphic_resource::ExactAllocateManager::ExactAllocateManager(LogicalDeviceAccessor device) {
     _data = std::make_shared<_impl::GraphicResourceManager_impl>();
     _data->device = device._data;
 }
 
-std::tuple<std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>>
-vsl::graphic_resource::ExactAllocateManager::allocate(std::vector<BindingLayout> layouts) {
+std::tuple<std::vector<VSL_NAMESPACE::graphic_resource::Pool>, std::vector<VSL_NAMESPACE::graphic_resource::Resource>>
+VSL_NAMESPACE::graphic_resource::ExactAllocateManager::allocate(std::vector<BindingLayout> layouts) {
     std::vector<Pool> pools;
     std::vector<Resource> resources;
     pools.reserve(layouts.size());
     resources.reserve(layouts.size());
-    for (auto &layout : layouts) {
+    for (auto& layout : layouts) {
         auto [pool, allocated] = make(std::vector{layout});
         pools.push_back(std::move(pool));
         resources.push_back(std::move(allocated.front()));
@@ -122,7 +122,7 @@ vsl::graphic_resource::ExactAllocateManager::allocate(std::vector<BindingLayout>
     return {std::move(pools), std::move(resources)};
 }
 
-void vsl::graphic_resource::ExactAllocateManager::destroy(const vsl::GraphicResourcePool &pool) {
+void VSL_NAMESPACE::graphic_resource::ExactAllocateManager::destroy(const VSL_NAMESPACE::GraphicResourcePool& pool) {
     if (!pool._data)
         return;
     const auto data = pool._data;
@@ -130,26 +130,26 @@ void vsl::graphic_resource::ExactAllocateManager::destroy(const vsl::GraphicReso
         release_descriptor_pool(data);
 }
 
-vsl::graphic_resource::OverAllocateManager::OverAllocateManager(vsl::LogicalDeviceAccessor device,
-                                                                std::map<Type, size_t> count, size_t other)
+VSL_NAMESPACE::graphic_resource::OverAllocateManager::OverAllocateManager(VSL_NAMESPACE::LogicalDeviceAccessor device,
+                                                                          std::map<Type, size_t> count, size_t other)
     : size(count), other(other) {
     _data = std::make_shared<_impl::GraphicResourceManager_impl>();
     _data->device = device._data;
     pools.push_back(make(count, other));
 }
 
-vsl::graphic_resource::OverAllocateManager::OverAllocateManager(vsl::LogicalDeviceAccessor device) {
+VSL_NAMESPACE::graphic_resource::OverAllocateManager::OverAllocateManager(VSL_NAMESPACE::LogicalDeviceAccessor device) {
     _data = std::make_shared<_impl::GraphicResourceManager_impl>();
     _data->device = device._data;
 }
 
-std::tuple<std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>>
-vsl::graphic_resource::OverAllocateManager::allocate(std::vector<BindingLayout> layouts) {
-    std::tuple<std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>> result;
-    auto &[use_pools, resources] = result;
-    for (auto &layout : layouts) {
-        for (auto &pool : pools) {
-            const auto &[err, resource] = pool.bind(layout);
+std::tuple<std::vector<VSL_NAMESPACE::graphic_resource::Pool>, std::vector<VSL_NAMESPACE::graphic_resource::Resource>>
+VSL_NAMESPACE::graphic_resource::OverAllocateManager::allocate(std::vector<BindingLayout> layouts) {
+    std::tuple<std::vector<VSL_NAMESPACE::graphic_resource::Pool>, std::vector<VSL_NAMESPACE::graphic_resource::Resource>> result;
+    auto& [use_pools, resources] = result;
+    for (auto& layout : layouts) {
+        for (auto& pool : pools) {
+            const auto& [err, resource] = pool.bind(layout);
             if (not err)
                 continue;
             use_pools.push_back(pool);
@@ -157,7 +157,7 @@ vsl::graphic_resource::OverAllocateManager::allocate(std::vector<BindingLayout> 
             goto found_pool;
         }
         {
-            const auto &[pool, resource] = make({layout}, size, other);
+            const auto& [pool, resource] = make({layout}, size, other);
             pools.push_back(pool);
             use_pools.push_back(pool);
             resources.push_back(resource[0]);
@@ -168,12 +168,12 @@ vsl::graphic_resource::OverAllocateManager::allocate(std::vector<BindingLayout> 
     return result;
 }
 
-void vsl::graphic_resource::OverAllocateManager::destroy(const vsl::graphic_resource::Pool &pool) {
+void VSL_NAMESPACE::graphic_resource::OverAllocateManager::destroy(const VSL_NAMESPACE::graphic_resource::Pool& pool) {
     if (!pool._data)
         return;
     const auto data = pool._data;
     if (std::erase(_data->pools, data) == 0)
         return;
-    std::erase_if(pools, [&](const auto &owned) { return owned._data == data; });
+    std::erase_if(pools, [&](const auto& owned) { return owned._data == data; });
     release_descriptor_pool(data);
 }

@@ -76,4 +76,4 @@ namespace {
         EXPECT_THROW(invoke(vsl::ImageLayout::General), std::out_of_range);
         EXPECT_THROW(invoke(vsl::ImageLayout::General, {2, 0, 1, 1}), std::out_of_range);
     }
-}
+} // namespace

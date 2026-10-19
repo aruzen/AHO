@@ -28,7 +28,7 @@ namespace {
         vsl::Scissor all(description);
         EXPECT_EQ(all.width, 8u);
         EXPECT_EQ(all.height, 8u);
-        EXPECT_EQ(render([&](auto &stream) { stream << scissor << vsl::command::Draw{3}; }),
+        EXPECT_EQ(render([&](auto& stream) { stream << scissor << vsl::command::Draw{3}; }),
                   (std::array<std::uint8_t, 4>{0, 0, 0, 0}));
     }
 } // namespace

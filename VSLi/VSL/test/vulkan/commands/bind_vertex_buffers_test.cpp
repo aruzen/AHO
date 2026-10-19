@@ -12,7 +12,7 @@ namespace {
         ASSERT_EQ(binding.buffers.size(), 2u);
         EXPECT_EQ(binding.buffers[0], &position);
         EXPECT_EQ(binding.buffers[1], &color_buffer);
-        expect_triangle_color(render([&](auto &stream) {
+        expect_triangle_color(render([&](auto& stream) {
             stream << binding << vsl::command::Draw{3};
         }));
     }
@@ -43,7 +43,7 @@ namespace {
         vsl::command::BindVertexBuffer assigned;
         assigned = copied;
         auto moved = std::move(assigned);
-        expect_triangle_color(render([&](auto &stream) {
+        expect_triangle_color(render([&](auto& stream) {
             stream << moved << vsl::command::Draw{3};
         }));
     }
@@ -53,14 +53,14 @@ TEST(BindVertexBufferTest, VariadicConstructionAcceptsOnlyMutableVertexBuffers) 
     using Command = vsl::command::BindVertexBuffer;
     using Vertex = vsl::StagingBuffer<vsl::MemoryType::VertexBuffer>;
     using Index = vsl::StagingBuffer<vsl::MemoryType::IndexBuffer>;
-    static_assert(std::is_constructible_v<Command, Vertex &>);
-    static_assert(std::is_constructible_v<Command, Vertex &, Vertex &>);
-    static_assert(!std::is_constructible_v<Command, const Vertex &>);
-    static_assert(!std::is_constructible_v<Command, volatile Vertex &>);
-    static_assert(!std::is_constructible_v<Command, Vertex &&>);
-    static_assert(!std::is_constructible_v<Command, Index &>);
-    static_assert(!std::is_constructible_v<Command, int &>);
-    static_assert(!std::is_constructible_v<Command, vsl::BufferAccessor &>);
+    static_assert(std::is_constructible_v<Command, Vertex&>);
+    static_assert(std::is_constructible_v<Command, Vertex&, Vertex&>);
+    static_assert(!std::is_constructible_v<Command, const Vertex&>);
+    static_assert(!std::is_constructible_v<Command, volatile Vertex&>);
+    static_assert(!std::is_constructible_v<Command, Vertex&&>);
+    static_assert(!std::is_constructible_v<Command, Index&>);
+    static_assert(!std::is_constructible_v<Command, int&>);
+    static_assert(!std::is_constructible_v<Command, vsl::BufferAccessor&>);
     EXPECT_TRUE(std::is_copy_constructible_v<Command>);
     EXPECT_TRUE(std::is_move_constructible_v<Command>);
 }

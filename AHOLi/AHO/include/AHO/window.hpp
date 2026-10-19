@@ -54,18 +54,18 @@ namespace AHO_NAMESPACE::window {
         bool close() override;
     };
 
-    struct WindowResizeHookPlugin : public vsl::PureWindow::Plugin {
-        std::function<void(aho::window::Window*)> hook;
+    struct WindowResizeHookPlugin : public VSL_NAMESPACE::PureWindow::Plugin {
+        std::function<void(AHO_NAMESPACE::window::Window*)> hook;
 
-        WindowResizeHookPlugin(vsl::PureWindow*, std::function<void(aho::window::Window*)> hook);
+        WindowResizeHookPlugin(VSL_NAMESPACE::PureWindow*, std::function<void(AHO_NAMESPACE::window::Window*)> hook);
     };
-}
+} // namespace AHO_NAMESPACE::window
 
 namespace AHO_NAMESPACE {
     using window::Window;
 }
 
-inline bool aho::window::Window::resize(aho::d2::VectorI size) {
+inline bool AHO_NAMESPACE::window::Window::resize(AHO_NAMESPACE::d2::VectorI size) {
     return resize(size.value.x.value, size.value.y.value);
 }
 

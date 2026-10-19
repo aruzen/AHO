@@ -12,7 +12,7 @@ namespace {
         GeneralBuffer buffer(size);
         EXPECT_EQ(buffer.size(), size);
         if (size > 0) {
-            auto *data = static_cast<unsigned char *>(buffer.data());
+            auto* data = static_cast<unsigned char*>(buffer.data());
             ASSERT_NE(data, nullptr);
             std::memset(data, 0x5a, size);
             EXPECT_EQ(data[0], 0x5a);
@@ -24,12 +24,12 @@ namespace {
     TEST(GeneralBufferOwnershipTest, OwningAllocationRequiresNontrivialDestruction) {
         EXPECT_FALSE(std::is_trivially_destructible_v<GeneralBuffer>);
     }
-}
+} // namespace
 
 namespace {
     TEST(GeneralBufferOwnershipTest, CopiesKeepTheExistingSharedStorageSemantics) {
         GeneralBuffer source(8);
-        auto *storage = static_cast<unsigned char *>(source.data());
+        auto* storage = static_cast<unsigned char*>(source.data());
         storage[0] = 17;
         GeneralBuffer copy(source);
         GeneralBuffer assigned(3);
@@ -38,9 +38,9 @@ namespace {
         EXPECT_EQ(assigned.data(), source.data());
         EXPECT_EQ(copy.size(), 8u);
         EXPECT_EQ(assigned.size(), 8u);
-        static_cast<unsigned char *>(copy.data())[0] = 29;
+        static_cast<unsigned char*>(copy.data())[0] = 29;
         EXPECT_EQ(storage[0], 29);
-        EXPECT_EQ(static_cast<unsigned char *>(assigned.data())[0], 29);
+        EXPECT_EQ(static_cast<unsigned char*>(assigned.data())[0], 29);
     }
     TEST(GeneralBufferOwnershipTest, SharedStorageOutlivesTheOriginalBuffer) {
         std::optional<GeneralBuffer> copy;
@@ -51,11 +51,11 @@ namespace {
         }
         ASSERT_EQ(copy->size(), 4u);
         for (std::size_t i = 0; i < copy->size(); ++i)
-            EXPECT_EQ(static_cast<unsigned char *>(copy->data())[i], 0x5a);
+            EXPECT_EQ(static_cast<unsigned char*>(copy->data())[i], 0x5a);
     }
     TEST(GeneralBufferOwnershipTest, MovesKeepTheStorageInTheDestination) {
         GeneralBuffer source(8);
-        auto *storage = source.data();
+        auto* storage = source.data();
         std::memset(storage, 0x6b, 8);
         GeneralBuffer moved(std::move(source));
         EXPECT_EQ(moved.data(), storage);
@@ -68,7 +68,7 @@ namespace {
         EXPECT_EQ(moved.size(), 0u);
         EXPECT_EQ(moved.data(), nullptr);
         EXPECT_EQ(assigned.size(), 8u);
-        EXPECT_EQ(static_cast<unsigned char *>(assigned.data())[7], 0x6b);
+        EXPECT_EQ(static_cast<unsigned char*>(assigned.data())[7], 0x6b);
     }
 } // namespace
 #if defined(__has_feature)
@@ -81,7 +81,7 @@ namespace {
 #ifdef AHO_BUFFER_TEST_ASAN
 #include <sanitizer/asan_interface.h>
 TEST(GeneralBufferOwnershipTest, LastOwnerDestructionReleasesTheArray) {
-    void *storage = nullptr;
+    void* storage = nullptr;
     {
         GeneralBuffer source(8);
         storage = source.data();

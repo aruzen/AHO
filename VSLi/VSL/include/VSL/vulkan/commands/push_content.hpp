@@ -19,25 +19,25 @@ namespace VSL_NAMESPACE::command {
      * PushConstantsはset=1のように指定できず、offsetで管理するしかないので今後改良の余地あり
      */
     struct PushConstant : public __Command {
-        vsl::PipelineLayoutAccessor layout;
-        vsl::ShaderFlag targetType;
+        VSL_NAMESPACE::PipelineLayoutAccessor layout;
+        VSL_NAMESPACE::ShaderFlag targetType;
         std::uint32_t size;
         std::uint32_t offset;
-        const void *value;
+        const void* value;
 
-        PushConstant(PipelineLayoutAccessor layout, vsl::ShaderFlag targetType, std::uint32_t size,
-                     std::uint32_t offset, const void *value)
+        PushConstant(PipelineLayoutAccessor layout, VSL_NAMESPACE::ShaderFlag targetType, std::uint32_t size,
+                     std::uint32_t offset, const void* value)
             : layout(std::move(layout)), targetType(targetType), size(size), offset(offset), value(value) {};
 
         template<typename T>
-        PushConstant(PipelineLayoutAccessor layout, vsl::ShaderFlag targetType, T &t, std::uint32_t offset = 0);
+        PushConstant(PipelineLayoutAccessor layout, VSL_NAMESPACE::ShaderFlag targetType, T& t, std::uint32_t offset = 0);
 
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
     };
 
     template<typename T>
-    PushConstant::PushConstant(PipelineLayoutAccessor layout, vsl::ShaderFlag targetType, T &t, std::uint32_t offset)
+    PushConstant::PushConstant(PipelineLayoutAccessor layout, VSL_NAMESPACE::ShaderFlag targetType, T& t, std::uint32_t offset)
         : PushConstant(layout, targetType, sizeof(T), offset, &t) {}
-}
+} // namespace VSL_NAMESPACE::command
 
 #endif //AHO_ALL_COMMAND_PUSH_CONTENTS_H

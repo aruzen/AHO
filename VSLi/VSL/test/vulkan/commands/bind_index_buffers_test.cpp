@@ -16,10 +16,10 @@ namespace {
     TEST(BindIndexBufferTest, BorrowsAnLvalueAndRejectsTemporaryBuffers) {
         using Buffer = vsl::StagingBuffer<vsl::MemoryType::IndexBuffer>;
         using Command = vsl::command::BindIndexBuffer;
-        static_assert(std::is_constructible_v<Command, Buffer &>);
-        static_assert(std::is_constructible_v<Command, Buffer &, std::uint32_t>);
-        static_assert(!std::is_constructible_v<Command, Buffer &&>);
-        static_assert(!std::is_constructible_v<Command, const Buffer &>);
+        static_assert(std::is_constructible_v<Command, Buffer&>);
+        static_assert(std::is_constructible_v<Command, Buffer&, std::uint32_t>);
+        static_assert(!std::is_constructible_v<Command, Buffer&&>);
+        static_assert(!std::is_constructible_v<Command, const Buffer&>);
         SUCCEED();
     }
     using BindIndexRenderVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
@@ -28,7 +28,7 @@ namespace {
         vsl::StagingBuffer<vsl::MemoryType::IndexBuffer> buffer(device, indices);
         vsl::command::BindIndexBuffer command(buffer);
         EXPECT_EQ(command.offset, 0u);
-        expect_triangle_color(render([&](auto &stream) {
+        expect_triangle_color(render([&](auto& stream) {
             stream << command << vsl::command::DrawIndexed{3};
         }));
     }
@@ -38,7 +38,7 @@ namespace {
         vsl::StagingBuffer<vsl::MemoryType::IndexBuffer> buffer(device, indices);
         vsl::command::BindIndexBuffer command(buffer, sizeof(std::uint32_t));
         const auto copied_command = command;
-        expect_triangle_color(render([&](auto &stream) {
+        expect_triangle_color(render([&](auto& stream) {
             stream << copied_command << vsl::command::DrawIndexed{3};
         }));
     }

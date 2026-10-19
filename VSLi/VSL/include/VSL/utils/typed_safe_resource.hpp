@@ -67,8 +67,8 @@ namespace VSL_NAMESPACE::typed {
     // ===========================================================
 
     template<typename... Definitions>
-    void TypedVertexInput<Definitions...>::injection(vsl::PipelineLayoutAccessor pl) {
+    void TypedVertexInput<Definitions...>::injection(VSL_NAMESPACE::PipelineLayoutAccessor pl) {
     }
-}
+} // namespace VSL_NAMESPACE::typed
 
 #endif //AHO_ALL_TYPED_SAFE_RESOURCE_H

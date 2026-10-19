@@ -120,7 +120,7 @@ namespace VSL_NAMESPACE {
 
     struct RenderPassAccessor {
         std::shared_ptr<_impl::RenderPass_impl> _data;
-        const RenderPassDescription &description() const;
+        const RenderPassDescription& description() const;
     };
     struct RenderPass : RenderPassAccessor {
         RenderPass(LogicalDeviceAccessor device, RenderPassDescription description);
@@ -135,4 +135,4 @@ namespace VSL_NAMESPACE {
         void recreate_buffer(std::uint32_t width, std::uint32_t height);
         std::uint32_t read(CommandManager manager, FenceHolder inFlight, std::uint32_t x, std::uint32_t y);
     };
-}
+} // namespace VSL_NAMESPACE

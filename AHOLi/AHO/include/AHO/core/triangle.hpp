@@ -187,6 +187,6 @@ namespace AHO_NAMESPACE {
     }
 
     static_assert(concepts::is_triangle<Triangle<double, VSL_NAMESPACE::D2, coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D2>::value>>);
-    static_assert(concepts::is_lines_object<Triangle<double, VSL_NAMESPACE::D2, aho::coordinate::_CoordinateInfo<vsl::D2, true, true>>>);
+    static_assert(concepts::is_lines_object<Triangle<double, VSL_NAMESPACE::D2, AHO_NAMESPACE::coordinate::_CoordinateInfo<VSL_NAMESPACE::D2, true, true>>>);
     static_assert(concepts::is_points_object<Triangle<double, VSL_NAMESPACE::D2, coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D2>::value>>);
-}
+} // namespace AHO_NAMESPACE

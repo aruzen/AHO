@@ -133,5 +133,5 @@ namespace {
         aho_test::expect_coordinates(*direct[1], -1, -2, -3);
     }
 
-}
+} // namespace
 #endif

@@ -3,7 +3,7 @@
 #include <stdexcept>
 
 namespace VSL_NAMESPACE::command {
-    ImageReadback::ImageReadback(BufferAccessor *destination, ImageAccessor image, ImageLayout currentLayout,
+    ImageReadback::ImageReadback(BufferAccessor* destination, ImageAccessor image, ImageLayout currentLayout,
                                  ImageRegion region)
         : copy(destination, image, ImageLayout::TransferSrcOptimal, region, true), currentLayout(currentLayout) {}
 
@@ -36,4 +36,4 @@ namespace VSL_NAMESPACE::command {
         ChangeImageBarrier(copy.image, ImageLayout::TransferSrcOptimal, currentLayout, info.region.layer, 1)
             .invoke(pool, buffer, manager);
     }
-}
+} // namespace VSL_NAMESPACE::command

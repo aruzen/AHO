@@ -46,6 +46,6 @@ namespace AHO_NAMESPACE::engine {
 
         std::shared_ptr<EngineData> _data;
     };
-}
+} // namespace AHO_NAMESPACE::engine
 
 #endif //AHO_ALL_ENGINE_HPP

@@ -10,7 +10,7 @@
 
 namespace AHO_NAMESPACE::input {
     class KeyBoard : public abstract::Characters {
-        friend aho::InputManager;
+        friend AHO_NAMESPACE::InputManager;
 
         void* context = nullptr;
 
@@ -25,6 +25,6 @@ namespace AHO_NAMESPACE::input {
 
         bool pressed(KeyCode code) const;
     };
-}
+} // namespace AHO_NAMESPACE::input
 
 #endif //AHO_ALL_KEYBOARD_HPP

@@ -7,7 +7,7 @@
 #include <algorithm>
 namespace {
     namespace fs = std::filesystem;
-    void write_shader(const fs::path &path) {
+    void write_shader(const fs::path& path) {
         std::ofstream stream(path);
         stream << "#version 450\nvoid main(){gl_Position=vec4(0,0,0,1);}\n";
     }
@@ -29,7 +29,7 @@ namespace {
         std::ifstream stream(directory / "point.vert.spv", std::ios::binary);
         ASSERT_TRUE(stream.good());
         std::uint32_t magic = 0;
-        stream.read(reinterpret_cast<char *>(&magic), sizeof(magic));
+        stream.read(reinterpret_cast<char*>(&magic), sizeof(magic));
         EXPECT_EQ(magic, 0x07230203u);
     }
     TEST(ShaderCompilerTest, StringConstructorSkipsMissingDirectoriesAndNewerCompiledOutputs) {
@@ -79,7 +79,7 @@ namespace {
         try {
             compiler.compile();
             FAIL() << "Compilation failure was silently ignored";
-        } catch (const vsl::exceptions::RuntimeException &error) {
+        } catch (const vsl::exceptions::RuntimeException& error) {
             EXPECT_NE(std::string(error.what()).find(invalid.string()), std::string::npos);
         }
         EXPECT_FALSE(fs::exists(temporary.path() / "later.vert.spv"));
@@ -89,7 +89,7 @@ namespace {
         std::ifstream stream(temporary.path() / "later.vert.spv", std::ios::binary);
         ASSERT_TRUE(stream.good());
         std::uint32_t magic = 0;
-        stream.read(reinterpret_cast<char *>(&magic), sizeof(magic));
+        stream.read(reinterpret_cast<char*>(&magic), sizeof(magic));
         EXPECT_EQ(magic, 0x07230203u);
     }
     TEST(ShaderCompilerTest, MissingExecutableReportsCompilationFailure) {
@@ -103,7 +103,7 @@ namespace {
         try {
             compiler.compile();
             FAIL() << "Missing executable was silently ignored";
-        } catch (const vsl::exceptions::RuntimeException &error) {
+        } catch (const vsl::exceptions::RuntimeException& error) {
             const std::string message(error.what());
             EXPECT_NE(message.find(source.string()), std::string::npos);
             EXPECT_NE(message.find(missing.string()), std::string::npos);
@@ -118,11 +118,11 @@ TEST(ShaderCompilerTest, EmptyBatchDoesNotInvokeAMissingExecutable) {
 }
 
 namespace {
-    void expect_spirv(const fs::path &path) {
+    void expect_spirv(const fs::path& path) {
         std::ifstream stream(path, std::ios::binary);
         ASSERT_TRUE(stream.good()) << path;
         std::uint32_t magic = 0;
-        stream.read(reinterpret_cast<char *>(&magic), sizeof(magic));
+        stream.read(reinterpret_cast<char*>(&magic), sizeof(magic));
         EXPECT_EQ(magic, 0x07230203u);
     }
     TEST(ShaderCompilerTest, RunsCompilerExecutableWhosePathContainsSpaces) {
@@ -164,7 +164,7 @@ TEST(ShaderCompilerTest, FindsCompilerOnPathWithoutShellExpansion) {
 #else
     const char separator = ':';
 #endif
-    const auto *previous = std::getenv("PATH");
+    const auto* previous = std::getenv("PATH");
     const auto search_path = binary_directory.string() + separator + (previous ? previous : "");
     vsl_test::ScopedEnvironment environment("PATH", search_path.c_str());
     fs::create_directory(temporary.path() / "raw");

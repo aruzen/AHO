@@ -289,4 +289,4 @@ namespace VSL_NAMESPACE {
         __VSLDRGBColor(T* t) : __VSLArray<T, element_type, vsl_array_size<T>()>(t),
                                __VSLDRGBColorAccessor<typename T::element_type>{(*this)[T::color_index + 0], (*this)[T::color_index + 1], (*this)[T::color_index + 2]} {}
     };
-}
+} // namespace VSL_NAMESPACE

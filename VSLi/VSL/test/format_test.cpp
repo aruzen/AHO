@@ -7,7 +7,7 @@ namespace {
     struct Family {
         std::array<format::___Format, 4> vectors;
         std::uint32_t component_bytes;
-        const char *name;
+        const char* name;
     };
 #define FAMILY(name, bytes)                                                                      \
     Family {                                                                                     \
@@ -36,7 +36,7 @@ namespace {
 #undef FAMILY
     class FormatFamilyTest : public testing::TestWithParam<Family> {};
     TEST_P(FormatFamilyTest, ConvertsBetweenScalarAndVectorTypes) {
-        const auto &family = GetParam();
+        const auto& family = GetParam();
         for (std::size_t source = 0; source < 4; ++source) {
             const auto value = family.vectors[source];
             SCOPED_TRACE(source);
@@ -51,13 +51,13 @@ namespace {
         }
     }
     TEST_P(FormatFamilyTest, ByteSizeMatchesComponentCountAndWidth) {
-        const auto &family = GetParam();
+        const auto& family = GetParam();
         for (std::size_t i = 0; i < 4; ++i) {
             EXPECT_EQ(family.vectors[i].size(), family.component_bytes * (i + 1));
         }
     }
     INSTANTIATE_TEST_SUITE_P(StandardFormats, FormatFamilyTest, testing::ValuesIn(families),
-                             [](const testing::TestParamInfo<Family> &info) { return info.param.name; });
+                             [](const testing::TestParamInfo<Family>& info) { return info.param.name; });
     TEST(FormatTest, UndefinedAndUnsupportedLengthsHaveNoStorage) {
         EXPECT_EQ(format::Undefined.size(), 0u);
         EXPECT_EQ(format::Undefined.getVecLength(), 0u);
@@ -91,7 +91,7 @@ namespace {
     static_assert(vsl::concepts::is_static_convertible_graphic_type<StaticFormat>);
     static_assert(!vsl::concepts::is_static_convertible_graphic_type<DynamicFormat>);
     static_assert(vsl::concepts::is_convertible_graphic_type<DynamicFormat>);
-    static_assert(!vsl::concepts::is_convertible_graphic_type<void *>);
+    static_assert(!vsl::concepts::is_convertible_graphic_type<void*>);
     static_assert(format::convert_graphic_type<StaticFormat>() == format::FloatRG);
     static_assert(format::convert_graphic_type(DynamicFormat{}) == format::UnsignedInt);
     TEST(FormatTest, BuiltinTypesMapToStorageOfTheirWidth) {
@@ -107,7 +107,7 @@ namespace {
         EXPECT_EQ(format::convert_graphic_type<unsigned long long>(), format::UnsignedInt64);
         EXPECT_EQ(format::convert_graphic_type<float>(), format::Float);
         EXPECT_EQ(format::convert_graphic_type<double>(), format::Float64);
-        EXPECT_EQ(format::convert_graphic_type<void *>(), format::Undefined);
+        EXPECT_EQ(format::convert_graphic_type<void*>(), format::Undefined);
     }
     TEST(FormatTest, NormalizedRgbAndPacked32FormatsHaveExpectedByteSizes) {
         EXPECT_EQ(format::SignedNormalized8RGB.size(), 3u);
@@ -134,7 +134,7 @@ namespace {
     static_assert(value_conversion_matches_type<float>());
     static_assert(value_conversion_matches_type<double>());
     static_assert(value_conversion_matches_type<StaticFormat>());
-    static_assert(value_conversion_matches_type<void *>());
+    static_assert(value_conversion_matches_type<void*>());
     static_assert(format::convert_graphic_type(DynamicFormat{}) == format::UnsignedInt);
     TEST(FormatTest, ValueConversionsPreserveBuiltinAndCustomFormats) {
         EXPECT_EQ(format::convert_graphic_type(1.0f), format::Float);

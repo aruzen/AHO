@@ -14,7 +14,7 @@
 
 namespace AHO_NAMESPACE {
     template<class... Ts>
-    constexpr auto pack(Ts &&...xs) noexcept {
+    constexpr auto pack(Ts&&... xs) noexcept {
         return std::forward_as_tuple(std::forward<Ts>(xs)...);
     }
 
@@ -27,40 +27,40 @@ namespace AHO_NAMESPACE {
 
         PhaseStream phase_stream;
 
-        this_type &operator<<(aho::concepts::is_std_tuple auto &&args);
+        this_type& operator<<(AHO_NAMESPACE::concepts::is_std_tuple auto&& args);
 
-        this_type &operator<<(std::shared_ptr<vsl::command::__Command> cmd);
+        this_type& operator<<(std::shared_ptr<VSL_NAMESPACE::command::__Command> cmd);
 
-        this_type &operator<<(vsl::command::is_command auto &&cmd);
+        this_type& operator<<(VSL_NAMESPACE::command::is_command auto&& cmd);
 
-        this_type &operator<<(std::shared_ptr<vsl::command::__DelegateCommand> cmd);
+        this_type& operator<<(std::shared_ptr<VSL_NAMESPACE::command::__DelegateCommand> cmd);
 
-        this_type &operator<<(vsl::command::is_delegate_command auto &&cmd);
+        this_type& operator<<(VSL_NAMESPACE::command::is_delegate_command auto&& cmd);
     };
 
     template<typename PhaseStream>
-    DrawStream<PhaseStream> &DrawStream<PhaseStream>::operator<<(vsl::command::is_command auto &&cmd) {
+    DrawStream<PhaseStream>& DrawStream<PhaseStream>::operator<<(VSL_NAMESPACE::command::is_command auto&& cmd) {
         phase_stream << std::forward<decltype(cmd)>(cmd);
         return *this;
     }
 
     template<typename PhaseStream>
-    DrawStream<PhaseStream> &DrawStream<PhaseStream>::operator<<(vsl::command::is_delegate_command auto &&cmd) {
+    DrawStream<PhaseStream>& DrawStream<PhaseStream>::operator<<(VSL_NAMESPACE::command::is_delegate_command auto&& cmd) {
         phase_stream << std::forward<decltype(cmd)>(cmd);
         return *this;
     }
 
     template<typename PhaseStream>
-    DrawStream<PhaseStream> &DrawStream<PhaseStream>::operator<<(std::shared_ptr<vsl::command::__Command> cmd) {
+    DrawStream<PhaseStream>& DrawStream<PhaseStream>::operator<<(std::shared_ptr<VSL_NAMESPACE::command::__Command> cmd) {
         phase_stream << cmd;
         return *this;
     }
 
     template<typename PhaseStream>
-    DrawStream<PhaseStream> &DrawStream<PhaseStream>::operator<<(std::shared_ptr<vsl::command::__DelegateCommand> cmd) {
+    DrawStream<PhaseStream>& DrawStream<PhaseStream>::operator<<(std::shared_ptr<VSL_NAMESPACE::command::__DelegateCommand> cmd) {
         phase_stream << cmd;
         return *this;
     }
-}
+} // namespace AHO_NAMESPACE
 
 #endif //AHO_ALL_DRAWER_H

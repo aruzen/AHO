@@ -9,7 +9,7 @@
 
 namespace AHO_NAMESPACE::engine {
     struct StandardEngine : public GraphicalEngine {
-        std::optional<aho::window::Window> boot_window = std::nullopt;
+        std::optional<AHO_NAMESPACE::window::Window> boot_window = std::nullopt;
 
         StandardEngine(std::string applicationName, bool bootOn = true);
 
@@ -17,7 +17,7 @@ namespace AHO_NAMESPACE::engine {
 
         Window getWindow() override;
     };
-}
+} // namespace AHO_NAMESPACE::engine
 
 namespace AHO_NAMESPACE {
     using engine::StandardEngine;

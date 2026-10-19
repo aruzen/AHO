@@ -3,7 +3,7 @@ namespace {
     using WindowIntegrationTest = vsl_test::WindowIntegrationTest;
     struct TestPlugin : vsl::PureWindow::Plugin {
         int value;
-        TestPlugin(vsl::PureWindow *, int value) : value(value) {}
+        TestPlugin(vsl::PureWindow*, int value) : value(value) {}
     };
     TEST_F(WindowIntegrationTest, NamesSharedConstructorsComparisonsResizeAndClose) {
         EXPECT_EQ(window->name(), "VSL hidden integration test");
@@ -13,7 +13,7 @@ namespace {
         EXPECT_TRUE(shared == window->_data.get());
         EXPECT_TRUE(window->resize(96, 72));
         int width = 0, height = 0;
-        glfwGetWindowSize(static_cast<GLFWwindow *>(window->_data->window_handle), &width, &height);
+        glfwGetWindowSize(static_cast<GLFWwindow*>(window->_data->window_handle), &width, &height);
         EXPECT_EQ(width, 96);
         EXPECT_EQ(height, 72);
         EXPECT_TRUE(vsl::PureWindow::NoCheckUpdate());
@@ -44,8 +44,8 @@ namespace {
 
 namespace {
     struct CountingUpdatePlugin : vsl::PureWindow::Plugin, vsl::PureWindow::OnUpdate {
-        int &calls;
-        CountingUpdatePlugin(vsl::PureWindow *, int &calls) : calls(calls) {}
+        int& calls;
+        CountingUpdatePlugin(vsl::PureWindow*, int& calls) : calls(calls) {}
         bool onUpdate(vsl::PureWindow) override {
             ++calls;
             return true;
@@ -62,7 +62,7 @@ namespace {
         EXPECT_FALSE(window.remove_plugin(removed));
         ASSERT_EQ(window._data->update.size(), 1u);
         EXPECT_EQ(window._data->update.front(), remaining);
-        for (const auto &subscriber : window._data->update)
+        for (const auto& subscriber : window._data->update)
             EXPECT_TRUE(subscriber->onUpdate(window));
         EXPECT_EQ(removed_calls, 0);
         EXPECT_EQ(remaining_calls, 1);
@@ -105,7 +105,7 @@ TEST(WindowPluginRemovalTest, NullPluginDoesNotChangeRegistrations) {
 namespace {
     struct UpdateActionPlugin : vsl::PureWindow::Plugin, vsl::PureWindow::OnUpdate {
         std::function<bool(vsl::PureWindow)> action;
-        UpdateActionPlugin(vsl::PureWindow *, std::function<bool(vsl::PureWindow)> action)
+        UpdateActionPlugin(vsl::PureWindow*, std::function<bool(vsl::PureWindow)> action)
             : action(std::move(action)) {}
         bool onUpdate(vsl::PureWindow window) override { return action(std::move(window)); }
     };
@@ -248,7 +248,7 @@ namespace {
         try {
             failed.emplace("invalid width", 0, 24);
             ADD_FAILURE() << "Window creation failure was silently accepted";
-        } catch (const vsl::exceptions::RuntimeException &error) {
+        } catch (const vsl::exceptions::RuntimeException& error) {
             EXPECT_NE(std::string(error.what()).find("GLFW"), std::string::npos);
         }
         EXPECT_EQ(vsl::PureWindow::WINDOWS, before);
@@ -258,7 +258,7 @@ namespace {
         EXPECT_TRUE(static_cast<bool>(*window));
         EXPECT_TRUE(window->resize(80, 60));
         int width = 0, height = 0;
-        glfwGetWindowSize(static_cast<GLFWwindow *>(window->_data->window_handle), &width, &height);
+        glfwGetWindowSize(static_cast<GLFWwindow*>(window->_data->window_handle), &width, &height);
         EXPECT_EQ(width, 80);
         EXPECT_EQ(height, 60);
         EXPECT_TRUE(vsl::PureWindow::NoCheckUpdate());
@@ -295,7 +295,7 @@ TEST(WindowInitializationTest, FailedGlfwInitializationThrowsWithoutRegisteringA
     try {
         failed.emplace("cannot initialize GLFW", 32, 24);
         ADD_FAILURE() << "GLFW initialization failure was silently accepted";
-    } catch (const vsl::exceptions::RuntimeException &error) {
+    } catch (const vsl::exceptions::RuntimeException& error) {
         EXPECT_NE(std::string(error.what()).find("GLFW"), std::string::npos);
     }
     EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
@@ -309,13 +309,13 @@ namespace {
     static_assert(std::has_virtual_destructor_v<vsl::PureWindow>);
     static_assert(std::has_virtual_destructor_v<vsl::PureWindow::OnUpdate>);
     struct TrackedWindow : vsl::PureWindow {
-        bool &destroyed;
-        TrackedWindow(std::shared_ptr<WindowData> data, bool &flag) : PureWindow(std::move(data)), destroyed(flag) {}
+        bool& destroyed;
+        TrackedWindow(std::shared_ptr<WindowData> data, bool& flag) : PureWindow(std::move(data)), destroyed(flag) {}
         ~TrackedWindow() { destroyed = true; }
     };
     struct TrackedUpdate : vsl::PureWindow::OnUpdate {
-        bool &destroyed;
-        explicit TrackedUpdate(bool &flag) : destroyed(flag) {}
+        bool& destroyed;
+        explicit TrackedUpdate(bool& flag) : destroyed(flag) {}
         ~TrackedUpdate() { destroyed = true; }
         bool onUpdate(vsl::PureWindow) override { return true; }
     };

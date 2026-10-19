@@ -46,4 +46,4 @@ namespace VSL_NAMESPACE::pipeline_layout {
         explicit ColorBlend(std::vector<ColorBlendAttachment> values) : attachments(std::move(values)) {}
         void injection(PipelineLayoutAccessor pl);
     };
-}
+} // namespace VSL_NAMESPACE::pipeline_layout

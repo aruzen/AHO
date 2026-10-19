@@ -9,7 +9,7 @@
 #include "../../../thirdparty/stb_image.h"
 #endif // AHO_STB_IMAGE_ENABLE
 
-aho::resource::Image::ImageData::~ImageData() {
+AHO_NAMESPACE::resource::Image::ImageData::~ImageData() {
 #ifdef AHO_STB_IMAGE_ENABLE
     stbi_image_free(buffer);
 #else
@@ -17,10 +17,10 @@ aho::resource::Image::ImageData::~ImageData() {
 #endif
 }
 
-aho::resource::Image::Image() : _data(nullptr) {}
+AHO_NAMESPACE::resource::Image::Image() : _data(nullptr) {}
 
 #ifdef AHO_STB_IMAGE_ENABLE
-aho::resource::Image::Image(std::filesystem::path path) {
+AHO_NAMESPACE::resource::Image::Image(std::filesystem::path path) {
     _data = std::make_shared<ImageData>();
     if (not stbi_info(path.string().c_str(), &_data->width, &_data->height, &_data->channel)) {
         _data = nullptr;
@@ -39,7 +39,7 @@ aho::resource::Image::Image(std::filesystem::path path) {
 }
 #endif // AHO_STB_IMAGE_ENABLE
 
-std::optional<unsigned char**> aho::resource::Image::data() {
+std::optional<unsigned char**> AHO_NAMESPACE::resource::Image::data() {
     if (not _data)
         return std::nullopt;
     if (_data->buffer == nullptr)

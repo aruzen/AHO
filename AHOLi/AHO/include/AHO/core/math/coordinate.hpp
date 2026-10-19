@@ -160,7 +160,7 @@ namespace AHO_NAMESPACE {
                 else
                     return (set.z.value);
             }
-        }
+        } // namespace detail
 
 #define ___AN1 template component<0>()
 #define ___AN2 template component<1>()
@@ -501,15 +501,15 @@ namespace AHO_NAMESPACE {
             constexpr Z<float> operator AHO_LITERAL(f_z)(long double v) { return {(float)v}; };
             constexpr Z<size_t> operator AHO_LITERAL(l_z)(unsigned long long v) { return {v}; };
             constexpr Z<double> z(1.0);
-        }
-    }
+        } // namespace literals
+    } // namespace coordinate
 
     namespace concepts {
         template<typename R>
         concept is_coordinate_set = requires {
             typename std::enable_if<R::is_coordinate_set>::type;
         };
-    }
+    } // namespace concepts
 
     namespace literals {
         using namespace coordinate::literals;
@@ -544,4 +544,4 @@ namespace AHO_NAMESPACE {
     using coordinate::X;
     using coordinate::Y;
     using coordinate::Z;
-}
+} // namespace AHO_NAMESPACE

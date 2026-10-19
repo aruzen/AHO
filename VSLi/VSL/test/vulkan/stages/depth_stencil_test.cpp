@@ -7,7 +7,7 @@ namespace {
         vsl::pipeline_layout::DepthStencil{}.injection(layout);
         EXPECT_TRUE(layout._data->info->depthStencil.has_value());
     }
-}
+} // namespace
 
 namespace {
     TEST_F(DepthStencilVulkanIntegrationTest, PreservesDepthAndFrontBackStencilSettings) {
@@ -15,7 +15,7 @@ namespace {
         auto layout = make_layout_state();
         pl::DepthStencil settings{.depthTest = false, .depthWrite = false, .depthCompare = pl::CompareOp::Greater, .stencilTest = true, .front = {.pass = pl::StencilOp::Replace, .reference = 7}, .back = {.fail = pl::StencilOp::Zero, .writeMask = 15}};
         settings.injection(layout);
-        const auto &state = layout._data->info->depthStencil.value();
+        const auto& state = layout._data->info->depthStencil.value();
         EXPECT_FALSE(state.depthTestEnable);
         EXPECT_FALSE(state.depthWriteEnable);
         EXPECT_EQ(state.depthCompareOp, vk::CompareOp::eGreater);
@@ -25,4 +25,4 @@ namespace {
         EXPECT_EQ(state.back.failOp, vk::StencilOp::eZero);
         EXPECT_EQ(state.back.writeMask, 15u);
     }
-}
+} // namespace

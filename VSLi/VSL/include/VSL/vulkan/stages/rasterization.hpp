@@ -26,4 +26,4 @@ namespace VSL_NAMESPACE::pipeline_layout {
         CullingMode culling_mode;
         FrontFace front_face;
     };
-}
+} // namespace VSL_NAMESPACE::pipeline_layout

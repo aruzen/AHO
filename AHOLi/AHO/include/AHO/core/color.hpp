@@ -204,7 +204,7 @@ namespace AHO_NAMESPACE {
 
             template<typename T>
             concept is_hsv_elemenet = T::is_hsv_elemenet;
-        }
+        } // namespace concepts
 
         template<typename T>
         std::ostream& operator<<(std::ostream& out, const R<T>& r) {
@@ -1055,8 +1055,8 @@ namespace AHO_NAMESPACE {
             LITERAL_EXPANDER(S, s);
             LITERAL_EXPANDER(V, v);
             LITERAL_EXPANDER(A, a);
-        }
-    }
+        } // namespace literals
+    } // namespace color
 
     using RGB = color::RGB<float>;
     using RGBA = color::RGBA<float>;
@@ -1073,7 +1073,7 @@ namespace AHO_NAMESPACE {
         using IntHSVA = color::HSVA<short, int8_t>;
         using FloatHSV = color::HSV<float, float>;
         using FloatHSVA = color::HSVA<float, float>;
-    }
+    } // namespace color
 
     namespace concepts {
         using namespace color::concepts;
@@ -1082,7 +1082,7 @@ namespace AHO_NAMESPACE {
     namespace literals {
         using namespace color::literals;
     }
-}
+} // namespace AHO_NAMESPACE
 
 #undef RGB_ELEMENT_TYPE_DEFINITION_EXPANDER
 #undef HSV_ELEMENT_TYPE_DEFINITION_EXPANDER

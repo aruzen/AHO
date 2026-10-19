@@ -183,7 +183,7 @@ namespace {
         EXPECT_EQ(child->state(), 5);
     }
 
-}
+} // namespace
 
 namespace {
     struct UpdateCallback : aho::input::abstract::Updatable {

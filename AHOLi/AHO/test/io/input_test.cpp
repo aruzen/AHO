@@ -93,5 +93,5 @@ namespace {
         EXPECT_EQ(MouseCode::RightClick, MouseCode::Button2);
         EXPECT_EQ(MouseCode::LastButton, MouseCode::Button8);
     }
-}
+} // namespace
 #endif

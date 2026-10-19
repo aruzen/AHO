@@ -7,4 +7,4 @@ namespace VSL_NAMESPACE::pipeline_layout {
     struct DynamicState {
         void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
     };
-}
+} // namespace VSL_NAMESPACE::pipeline_layout

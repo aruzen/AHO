@@ -39,9 +39,9 @@ breakpoint disable swift_willThrow
         using namespace vsl;
         aho::engine::StandardEngine engine("test");
 
-        auto &[vulkan_instance, physical_device, device, command_manager, graphic_resource_manager, synchro_manager] = *engine._data;
-        auto &main_window = engine.boot_window.value();
-        auto &[surface, swapchain, render_pass,
+        auto& [vulkan_instance, physical_device, device, command_manager, graphic_resource_manager, synchro_manager] = *engine._data;
+        auto& main_window = engine.boot_window.value();
+        auto& [surface, swapchain, render_pass,
                frame_buffer, image_available, render_finish, in_flight] = *engine.boot_window.value()._data2;
         if (!image_available._data)
             loggingln("image not available ; ;");
@@ -217,7 +217,7 @@ breakpoint disable swift_willThrow
 
         struct alignas(16) debug_t {
             std::array<float, 4 * 3> v;
-        } *debug;
+        }* debug;
 
         using UboBuffer = Buffer<vsl::MemoryType::UniformBuffer,
                                  vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>;
@@ -238,7 +238,7 @@ breakpoint disable swift_willThrow
         DeviceLocalBuffer<vsl::MemoryType::VertexBuffer> texCoordBuffer(device, command_manager, texcoords);
 
         int texWidth, texHeight, texChannels;
-        stbi_uc *pixels = stbi_load(expand_environments("${AHO_HOME}/built-in-resource/images/ahahacraft.png").c_str(),
+        stbi_uc* pixels = stbi_load(expand_environments("${AHO_HOME}/built-in-resource/images/ahahacraft.png").c_str(),
                                     &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
 
         if (!pixels) {
@@ -401,10 +401,10 @@ breakpoint disable swift_willThrow
         /**/
     }
 #if !defined(DEBUG) && !defined(_DEBUG)
-    catch (vsl::exceptions::VSLException &e) {
+    catch (vsl::exceptions::VSLException& e) {
         vsl::loggingln(e.what());
         return 1;
-    } catch (std::exception &e) {
+    } catch (std::exception& e) {
         vsl::loggingln(e.what());
         return 1;
     }

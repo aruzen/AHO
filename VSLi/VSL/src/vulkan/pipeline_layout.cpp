@@ -18,7 +18,7 @@ void VSL_NAMESPACE::PipelineLayoutAccessor::init_start(LogicalDeviceAccessor dev
 
 namespace VSL_NAMESPACE::helper {
     void expansionPipelineLayoutArgs(VSL_NAMESPACE::PipelineLayoutAccessor& pl) {}
-}
+} // namespace VSL_NAMESPACE::helper
 
 void VSL_NAMESPACE::PipelineLayoutAccessor::init_finish() {
     _data->info->_viewport.viewportCount = (uint32_t)_data->info->viewports.size();
@@ -57,9 +57,9 @@ VSL_NAMESPACE::PipelineLayout VSL_NAMESPACE::PipelineLayout::copy() const {
     return c;
 }
 
-vsl::PipelineLayoutAccessor vsl::PipelineLayout::freeze() {
+VSL_NAMESPACE::PipelineLayoutAccessor VSL_NAMESPACE::PipelineLayout::freeze() {
     _data->info.reset();
-    return vsl::PipelineLayoutAccessor{_data};
+    return VSL_NAMESPACE::PipelineLayoutAccessor{_data};
 }
 
 VSL_NAMESPACE::_impl::PipelineLayout_impl::~PipelineLayout_impl() {

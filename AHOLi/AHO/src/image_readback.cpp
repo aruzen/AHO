@@ -7,18 +7,18 @@
 
 namespace AHO_NAMESPACE {
     struct ImageReadback::Data {
-        vsl::CommandManager manager;
-        std::optional<vsl::CommandPool> pool;
-        std::optional<vsl::CommandBuffer> commandBuffer;
+        VSL_NAMESPACE::CommandManager manager;
+        std::optional<VSL_NAMESPACE::CommandPool> pool;
+        std::optional<VSL_NAMESPACE::CommandBuffer> commandBuffer;
         vk::UniqueFence fence;
-        std::shared_ptr<vsl::_impl::Buffer_impl> buffer;
-        vsl::ImageAccessor source;
-        vsl::command::ImageCopyInfo info;
+        std::shared_ptr<VSL_NAMESPACE::_impl::Buffer_impl> buffer;
+        VSL_NAMESPACE::ImageAccessor source;
+        VSL_NAMESPACE::command::ImageCopyInfo info;
         vk::DeviceSize atomSize = 1;
-        void *mapped = nullptr;
+        void* mapped = nullptr;
         bool submitted = false, coherent = false;
 
-        explicit Data(vsl::CommandManager manager) : manager(std::move(manager)) {}
+        explicit Data(VSL_NAMESPACE::CommandManager manager) : manager(std::move(manager)) {}
         ~Data() {
             auto device = manager._data->device->device;
             if (submitted)
@@ -35,7 +35,7 @@ namespace AHO_NAMESPACE {
                 return;
             auto owner = manager._data->device;
             auto device = owner->device;
-            auto next = std::make_shared<vsl::_impl::Buffer_impl>();
+            auto next = std::make_shared<VSL_NAMESPACE::_impl::Buffer_impl>();
             next->device = owner;
             next->requirementSize = bytes;
             next->buffer = device.createBuffer({.size = bytes,
@@ -59,7 +59,7 @@ namespace AHO_NAMESPACE {
             next->allocatedSize = requirements.size;
             next->deviceMem = device.allocateMemory({.allocationSize = requirements.size, .memoryTypeIndex = *memoryType});
             device.bindBufferMemory(next->buffer, next->deviceMem, 0);
-            void *nextMapped = device.mapMemory(next->deviceMem, 0, VK_WHOLE_SIZE);
+            void* nextMapped = device.mapMemory(next->deviceMem, 0, VK_WHOLE_SIZE);
             if (mapped)
                 device.unmapMemory(buffer->deviceMem);
             buffer = std::move(next);
@@ -70,28 +70,28 @@ namespace AHO_NAMESPACE {
         }
     };
 
-    ImageReadback::ImageReadback(vsl::CommandManager manager, std::size_t initialCapacity) {
+    ImageReadback::ImageReadback(VSL_NAMESPACE::CommandManager manager, std::size_t initialCapacity) {
         if (!manager._data || !manager._data->device || !manager._data->device->device)
             throw std::invalid_argument("Readback requires a valid command manager");
         auto data = std::make_shared<Data>(std::move(manager));
-        data->pool.emplace(vsl::LogicalDeviceAccessor{data->manager._data->device});
+        data->pool.emplace(VSL_NAMESPACE::LogicalDeviceAccessor{data->manager._data->device});
         data->commandBuffer.emplace(*data->pool, 1);
         data->fence = data->manager._data->device->device.createFenceUnique({});
         data->reserve(initialCapacity);
         _data = std::move(data);
     }
 
-    ImageReadback::ImageReadback(vsl::CommandManager manager, vsl::ImageAccessor image,
-                                 vsl::ImageLayout layout, vsl::ImageRegion region)
+    ImageReadback::ImageReadback(VSL_NAMESPACE::CommandManager manager, VSL_NAMESPACE::ImageAccessor image,
+                                 VSL_NAMESPACE::ImageLayout layout, VSL_NAMESPACE::ImageRegion region)
         : ImageReadback(std::move(manager)) {
         capture(std::move(image), layout, region);
     }
 
-    bool ImageReadback::capture(vsl::ImageAccessor image, vsl::ImageLayout layout, vsl::ImageRegion region) {
+    bool ImageReadback::capture(VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::ImageLayout layout, VSL_NAMESPACE::ImageRegion region) {
         if (!_data)
             throw std::logic_error("Readback handle is empty");
-        const auto info = vsl::command::ImageReadback::describe(image, layout, region);
-        auto &data = *_data;
+        const auto info = VSL_NAMESPACE::command::ImageReadback::describe(image, layout, region);
+        auto& data = *_data;
         if (image._data->device != data.manager._data->device)
             throw std::invalid_argument("Readback requires an image on the manager's device");
         if (data.submitted && !ready())
@@ -103,7 +103,7 @@ namespace AHO_NAMESPACE {
         auto command = data.commandBuffer->_data->commandBuffers.front();
         command.reset();
         command.begin({.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-        vsl::command::ImageReadback(data.buffer, data.source, layout, info.region)
+        VSL_NAMESPACE::command::ImageReadback(data.buffer, data.source, layout, info.region)
             .invoke(*data.pool, *data.commandBuffer, data.manager);
         command.end();
         auto device = data.manager._data->device->device;
@@ -131,10 +131,10 @@ namespace AHO_NAMESPACE {
         return result;
     }
 
-    void ImageReadback::read(ImagePixels &destination, std::uint64_t timeout) const {
+    void ImageReadback::read(ImagePixels& destination, std::uint64_t timeout) const {
         if (!wait(timeout))
             throw std::runtime_error("Readback timed out");
-        const auto &data = *_data;
+        const auto& data = *_data;
         destination.bytes.resize(data.info.byteSize);
         if (!data.coherent) {
             const vk::DeviceSize bytes = data.info.byteSize;
@@ -153,4 +153,4 @@ namespace AHO_NAMESPACE {
     std::size_t ImageReadback::capacity() const {
         return _data && _data->buffer ? _data->buffer->requirementSize : 0;
     }
-}
+} // namespace AHO_NAMESPACE

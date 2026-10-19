@@ -56,7 +56,7 @@ namespace vsl_test {
             pipeline.emplace(*layout, *pass);
         }
 
-        std::array<std::uint8_t, 4> render(const std::function<void(vsl::DefaultPhaseStream &)> &commands) {
+        std::array<std::uint8_t, 4> render(const std::function<void(vsl::DefaultPhaseStream&)>& commands) {
             auto manager = make_manager();
             {
                 auto phase = manager.startPhase<vsl::ComputePhase>();
@@ -76,11 +76,11 @@ namespace vsl_test {
             std::array<std::uint8_t, 4> result{};
             // 中央ピクセルを読み、端のラスタライズ規則から独立した検証にする。
             std::memcpy(result.data(),
-                        static_cast<const char *>(mapped.data) + ((height / 2) * width + width / 2) * 4, 4);
+                        static_cast<const char*>(mapped.data) + ((height / 2) * width + width / 2) * 4, 4);
             return result;
         }
 
-        static void expect_triangle_color(const std::array<std::uint8_t, 4> &pixel) {
+        static void expect_triangle_color(const std::array<std::uint8_t, 4>& pixel) {
             // UNORM8 変換の丸め差を1段階だけ許容する。
             EXPECT_NEAR(static_cast<int>(pixel[0]), 64, 1);
             EXPECT_NEAR(static_cast<int>(pixel[1]), 128, 1);
@@ -104,4 +104,4 @@ namespace vsl_test {
         }
     };
 
-}
+} // namespace vsl_test

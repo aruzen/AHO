@@ -16,7 +16,7 @@ namespace VSL_NAMESPACE {
             MemoryNotHostVisibleException(std::string traceinfo = "");
             MemoryNotHostVisibleException(std::source_location sourece);
         };
-    }
+    } // namespace exceptions
 
     template<MemoryType MemType, MemoryProperty MemProperty, SharingMode ShareMode = SharingMode::Exclusive>
     struct Buffer : public BufferAccessor {
@@ -119,7 +119,7 @@ namespace VSL_NAMESPACE {
             memcpy(static_cast<char*>(data) + offset, &t, sizeof(T));
             offset += sizeof(T);
         }
-    }
+    } // namespace helper
 
     template<typename... Args>
     bool VSL_NAMESPACE::BufferAccessor::copy(const Args&... args) {
@@ -238,4 +238,4 @@ namespace VSL_NAMESPACE {
 
         this->FlushBuffer(holder, MemType, MemProperty, SharingMode);
     }
-}
+} // namespace VSL_NAMESPACE

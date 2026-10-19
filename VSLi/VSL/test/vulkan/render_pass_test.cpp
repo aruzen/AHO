@@ -20,7 +20,7 @@ namespace {
         const vsl::RenderPassAccessor base = picking;
         EXPECT_EQ(base._data, picking._data);
     }
-}
+} // namespace
 
 namespace {
     TEST(RenderPassDescriptionTest, CompositionPreservesAttachmentIdentityAndSubpassOrder) {
@@ -69,4 +69,4 @@ namespace {
         desc.subpasses.clear();
         EXPECT_THROW(desc.validate(), std::invalid_argument);
     }
-}
+} // namespace

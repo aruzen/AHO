@@ -26,11 +26,11 @@ namespace {
         auto state = make_layout_state();
         viewport.injection(state);
         ASSERT_EQ(state._data->info->viewports.size(), 1u);
-        const auto &actual = state._data->info->viewports[0];
+        const auto& actual = state._data->info->viewports[0];
         EXPECT_EQ(actual.width, 8);
         EXPECT_EQ(actual.height, 8);
         EXPECT_EQ(actual.minDepth, 0);
         EXPECT_EQ(actual.maxDepth, 1);
-        expect_triangle_color(render([&](auto &stream) { stream << viewport << vsl::command::Draw{3}; }));
+        expect_triangle_color(render([&](auto& stream) { stream << viewport << vsl::command::Draw{3}; }));
     }
 } // namespace

@@ -27,4 +27,4 @@ namespace VSL_NAMESPACE::concepts {
     concept initializer = requires(Args... args) {
         T(std::forward<Args>(args)...);
     };
-}
+} // namespace VSL_NAMESPACE::concepts

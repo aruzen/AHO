@@ -7,7 +7,7 @@
 
 namespace {
     struct Kind : vsl::type<Kind> {
-        consteval Kind(const char *name, char index) : type(name, index) {}
+        consteval Kind(const char* name, char index) : type(name, index) {}
     };
     TEST(TypeTest, ConstTagsExposeTheirNameAndIndex) {
         constexpr Kind kind("vertex", 7);

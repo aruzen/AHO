@@ -13,7 +13,7 @@ namespace vsl_test {
             if (HasFatalFailure() || IsSkipped())
                 return;
             if (!glfwInit()) {
-                const char *description = nullptr;
+                const char* description = nullptr;
                 const int error = glfwGetError(&description);
                 const std::string reason = description ? description : "unknown GLFW error";
                 if (error == GLFW_PLATFORM_UNAVAILABLE || reason.find("DISPLAY") != std::string::npos ||

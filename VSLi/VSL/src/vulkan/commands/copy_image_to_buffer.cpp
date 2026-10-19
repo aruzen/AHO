@@ -7,23 +7,23 @@
 #include <stdexcept>
 #include <utility>
 
-vsl::command::CopyImageToBuffer::CopyImageToBuffer(vsl::BufferAccessor *buffer, vsl::ImageAccessor image)
+VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(VSL_NAMESPACE::BufferAccessor* buffer, VSL_NAMESPACE::ImageAccessor image)
     : CopyImageToBuffer(buffer, std::move(image), ImageLayout::General) {}
 
-vsl::command::CopyImageToBuffer::CopyImageToBuffer(vsl::BufferAccessor *buffer, vsl::ImageAccessor image,
-                                                   ImageLayout layout, ImageRegion region, bool hostRead)
+VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(VSL_NAMESPACE::BufferAccessor* buffer, VSL_NAMESPACE::ImageAccessor image,
+                                                             ImageLayout layout, ImageRegion region, bool hostRead)
     : image(std::move(image)), buffer(buffer), layout(layout), region(region), hostRead(hostRead) {}
 
-vsl::command::CopyImageToBuffer::CopyImageToBuffer(std::shared_ptr<_impl::Buffer_impl> buffer,
-                                                   vsl::ImageAccessor image, ImageLayout layout,
-                                                   ImageRegion region, bool hostRead)
+VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(std::shared_ptr<_impl::Buffer_impl> buffer,
+                                                             VSL_NAMESPACE::ImageAccessor image, ImageLayout layout,
+                                                             ImageRegion region, bool hostRead)
     : image(std::move(image)), buffer(nullptr), layout(layout), region(region), hostRead(hostRead),
       destination_(std::move(buffer)) {}
 
-vsl::command::ImageCopyInfo vsl::command::CopyImageToBuffer::describe(ImageAccessor image, ImageRegion region) {
+VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer::describe(ImageAccessor image, ImageRegion region) {
     if (!image._data || !image._data->image || !image._data->device)
         throw std::invalid_argument("Image copy requires a valid image");
-    const auto &source = *image._data;
+    const auto& source = *image._data;
     if (!contain(source.usage, ImageType::TransferSrc) || source.samples != SampleCount::One ||
         _impl::helper::imageAspects(source.format) != vk::ImageAspectFlagBits::eColor)
         throw std::invalid_argument("Image copy requires a single-sample color TransferSrc image");
@@ -47,7 +47,7 @@ vsl::command::ImageCopyInfo vsl::command::CopyImageToBuffer::describe(ImageAcces
     return {area, image.getFormat(), static_cast<std::size_t>(row), static_cast<std::size_t>(bytes)};
 }
 
-vsl::command::ImageCopyInfo vsl::command::CopyImageToBuffer::description() const {
+VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer::description() const {
     const auto info = describe(image, region);
     const auto destination = buffer ? buffer->_data : destination_;
     if (!destination || !destination->buffer || destination->device != image._data->device)
@@ -59,14 +59,14 @@ vsl::command::ImageCopyInfo vsl::command::CopyImageToBuffer::description() const
     return info;
 }
 
-void vsl::command::CopyImageToBuffer::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
+void VSL_NAMESPACE::command::CopyImageToBuffer::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
     const auto info = description();
     const auto destination = this->buffer ? this->buffer->_data : destination_;
     if (!buffer._data || !buffer._data->commandPool || !manager._data ||
         manager._data->device != image._data->device ||
         buffer._data->commandPool->device != image._data->device)
         throw std::invalid_argument("Image copy requires a command buffer on the same device");
-    const auto &area = info.region;
+    const auto& area = info.region;
     vk::BufferImageCopy copy{
         .imageSubresource = {vk::ImageAspectFlagBits::eColor, 0, area.layer, 1},
         .imageOffset = {static_cast<std::int32_t>(area.x), static_cast<std::int32_t>(area.y), 0},

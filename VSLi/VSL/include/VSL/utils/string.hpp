@@ -16,7 +16,7 @@ namespace VSL_NAMESPACE {
         void join(std::stringstream& ss);
         template<typename Head, typename... Args>
         void join(std::stringstream& ss, const Head& h, const Args&... args);
-    }
+    } // namespace helper
 
     template<bool Validation = validation, typename Head, typename... Args>
     void logging(const Head& h, const Args&... args);
@@ -24,7 +24,7 @@ namespace VSL_NAMESPACE {
     void loggingln(const Head& h, const Args&... args);
 
     std::string expand_environments(const std::string& input);
-}
+} // namespace VSL_NAMESPACE
 
 inline void VSL_NAMESPACE::helper::join(std::stringstream& ss) {}
 

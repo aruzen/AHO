@@ -10,15 +10,15 @@ namespace vsl_test {
         std::optional<std::string> previous_;
 
     public:
-        ScopedEnvironment(std::string name, const char *value) : name_(std::move(name)) {
-            if (const auto *previous = std::getenv(name_.c_str()))
+        ScopedEnvironment(std::string name, const char* value) : name_(std::move(name)) {
+            if (const auto* previous = std::getenv(name_.c_str()))
                 previous_ = previous;
             set(value);
         }
         ~ScopedEnvironment() {
             set(previous_ ? previous_->c_str() : nullptr);
         }
-        void set(const char *value) const {
+        void set(const char* value) const {
 #ifdef _WIN32
             _putenv_s(name_.c_str(), value ? value : "");
 #else

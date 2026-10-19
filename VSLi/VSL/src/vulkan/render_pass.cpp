@@ -8,7 +8,7 @@
 #include <cstring>
 #include <stdexcept>
 
-namespace vsl {
+namespace VSL_NAMESPACE {
     AttachmentId RenderPassDescription::addAttachment(AttachmentDescription attachment) {
         if (attachments.size() >= UnusedAttachment)
             throw std::length_error("Too many attachments");
@@ -34,7 +34,7 @@ namespace vsl {
     void RenderPassDescription::validate() const {
         if (subpasses.empty())
             throw std::invalid_argument("RenderPass needs at least one subpass");
-        for (const auto &a : attachments) {
+        for (const auto& a : attachments) {
             const auto samples = static_cast<std::uint32_t>(a.samples);
             if (a.format.type() == data_format::___FormatTypes::Undefined || !samples || samples > 64 ||
                 (samples & (samples - 1)))
@@ -45,7 +45,7 @@ namespace vsl {
                 a.initialLayout == ImageLayout::Undefined)
                 throw std::invalid_argument("Cannot load undefined attachment contents");
         }
-        for (const auto &s : subpasses) {
+        for (const auto& s : subpasses) {
             if (!s.resolves.empty() && s.resolves.size() != s.colors.size())
                 throw std::invalid_argument("Resolve attachment count must match color output count");
             auto check = [&](AttachmentReference ref, bool depth) {
@@ -110,7 +110,7 @@ namespace vsl {
                     throw std::invalid_argument("Cannot preserve an attachment used by the same subpass");
             }
         }
-        for (const auto &d : dependencies) {
+        for (const auto& d : dependencies) {
             const auto nonGraphics = PipelineStage::ComputeShader | PipelineStage::Transfer | PipelineStage::Host | PipelineStage::AllCommands;
             if ((d.source != ExternalSubpass && static_cast<std::uint32_t>(d.sourceStage & nonGraphics)) ||
                 (d.destination != ExternalSubpass && static_cast<std::uint32_t>(d.destinationStage & nonGraphics)))
@@ -123,7 +123,7 @@ namespace vsl {
                 throw std::invalid_argument("Invalid subpass dependency");
         }
     }
-    const RenderPassDescription &RenderPassAccessor::description() const {
+    const RenderPassDescription& RenderPassAccessor::description() const {
         if (!_data || !_data->description)
             throw std::logic_error("RenderPass has no description");
         return *_data->description;
@@ -136,7 +136,7 @@ namespace vsl {
         data->device = device._data;
         data->description = std::make_shared<const RenderPassDescription>(std::move(desc));
         std::vector<vk::AttachmentDescription> attachments;
-        for (const auto &a : data->description->attachments)
+        for (const auto& a : data->description->attachments)
             attachments.push_back({.format = static_cast<vk::Format>(a.format.type()),
                                    .samples = static_cast<vk::SampleCountFlagBits>(a.samples),
                                    .loadOp = static_cast<vk::AttachmentLoadOp>(a.load),
@@ -152,9 +152,9 @@ namespace vsl {
         std::vector<References> refs(data->description->subpasses.size());
         std::vector<vk::SubpassDescription> subpasses;
         for (std::size_t i = 0; i < refs.size(); ++i) {
-            const auto &s = data->description->subpasses[i];
-            auto &r = refs[i];
-            auto convert = [](const auto &src, auto &dst) {
+            const auto& s = data->description->subpasses[i];
+            auto& r = refs[i];
+            auto convert = [](const auto& src, auto& dst) {
                 for (auto ref : src)
                     dst.push_back(vk::AttachmentReference{.attachment = ref.attachment,
                                                           .layout = static_cast<vk::ImageLayout>(ref.layout)});
@@ -176,7 +176,7 @@ namespace vsl {
                                  .pPreserveAttachments = s.preserve.data()});
         }
         std::vector<vk::SubpassDependency> dependencies;
-        for (const auto &d : data->description->dependencies)
+        for (const auto& d : data->description->dependencies)
             dependencies.push_back(
                 {.srcSubpass = d.source,
                  .dstSubpass = d.destination,
@@ -205,7 +205,7 @@ namespace vsl {
                 desc.addColor({.format = data_format::UnsignedInt});
             return desc;
         }
-    }
+    } // namespace
     RenderPass::RenderPass(SwapchainAccessor swapchain)
         : RenderPass(LogicalDeviceAccessor{swapchain._data ? swapchain._data->device : nullptr},
                      present_description(swapchain, false)) {}
@@ -217,7 +217,7 @@ namespace vsl {
         recreate_buffer(swapchain._data->extent.width, swapchain._data->extent.height);
     }
     void IDPickingRenderPass::recreate_buffer(std::uint32_t width, std::uint32_t height) {
-        for (auto &image : picking_buffer)
+        for (auto& image : picking_buffer)
             image = Image<ImageType::ColorAttachment | ImageType::TransferSrc>(
                 LogicalDeviceAccessor{_data->device}, width, height, data_format::UnsignedInt);
     }
@@ -248,4 +248,4 @@ namespace vsl {
         if (device)
             device->device.destroyRenderPass(renderPass);
     }
-}
+} // namespace VSL_NAMESPACE

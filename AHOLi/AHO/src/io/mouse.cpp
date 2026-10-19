@@ -8,43 +8,43 @@
 
 #include <GLFW/glfw3.h>
 
-aho::input::Cursor::Cursor(void *context) : context(context) {
-    glfwGetCursorPos((GLFWwindow *)context, &_state.value.x.value, &_state.value.y.value);
+AHO_NAMESPACE::input::Cursor::Cursor(void* context) : context(context) {
+    glfwGetCursorPos((GLFWwindow*)context, &_state.value.x.value, &_state.value.y.value);
 }
 
-aho::d2::PointD aho::input::Cursor::state() {
+AHO_NAMESPACE::d2::PointD AHO_NAMESPACE::input::Cursor::state() {
     return _state;
 }
 
-aho::d2::VectorD aho::input::Cursor::delta() {
+AHO_NAMESPACE::d2::VectorD AHO_NAMESPACE::input::Cursor::delta() {
     return _delta;
 }
 
-void aho::input::Cursor::update() {
+void AHO_NAMESPACE::input::Cursor::update() {
     _delta.value = _state.value;
-    glfwGetCursorPos((GLFWwindow *)context, &_state.value.x.value, &_state.value.y.value);
+    glfwGetCursorPos((GLFWwindow*)context, &_state.value.x.value, &_state.value.y.value);
     _delta.value.x = _state.value.x - _delta.value.x;
     _delta.value.y = _state.value.y - _delta.value.y;
 }
 
-aho::input::ButtonState aho::input::MouseButton::state() {
+AHO_NAMESPACE::input::ButtonState AHO_NAMESPACE::input::MouseButton::state() {
     return _state;
 }
 
-bool aho::input::MouseButton::down() {
+bool AHO_NAMESPACE::input::MouseButton::down() {
     return _state == ButtonState::Down;
 }
 
-bool aho::input::MouseButton::up() {
+bool AHO_NAMESPACE::input::MouseButton::up() {
     return _state == ButtonState::Up;
 }
 
-bool aho::input::MouseButton::pressed() {
+bool AHO_NAMESPACE::input::MouseButton::pressed() {
     return _state == ButtonState::Down || _state == ButtonState::Pressed;
 }
 
-void aho::input::MouseButton::update() {
-    switch (glfwGetMouseButton((GLFWwindow *)context, (int)code.code())) {
+void AHO_NAMESPACE::input::MouseButton::update() {
+    switch (glfwGetMouseButton((GLFWwindow*)context, (int)code.code())) {
         default:
         case GLFW_RELEASE:
             if (pressed())
@@ -60,48 +60,48 @@ void aho::input::MouseButton::update() {
     }
 }
 
-aho::input::MouseButton::MouseButton(void *context, aho::input::MouseCode code) : context(context), code(code) {}
+AHO_NAMESPACE::input::MouseButton::MouseButton(void* context, AHO_NAMESPACE::input::MouseCode code) : context(context), code(code) {}
 
-aho::input::MouseButton::MouseButton(void *context, aho::input::MouseID code) : context(context), code(code) {}
+AHO_NAMESPACE::input::MouseButton::MouseButton(void* context, AHO_NAMESPACE::input::MouseID code) : context(context), code(code) {}
 
-size_t aho::input::MouseWheel::subscribed = 0;
+size_t AHO_NAMESPACE::input::MouseWheel::subscribed = 0;
 
-size_t aho::input::MouseWheel::_generation = 0;
+size_t AHO_NAMESPACE::input::MouseWheel::_generation = 0;
 
-aho::d2::VectorD aho::input::MouseWheel::_state = aho::d2::VectorD(0.0, 0.0);
+AHO_NAMESPACE::d2::VectorD AHO_NAMESPACE::input::MouseWheel::_state = AHO_NAMESPACE::d2::VectorD(0.0, 0.0);
 
-void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
-    aho::input::MouseWheel::_state = aho::d2::VectorD(xoffset, yoffset);
-    aho::input::MouseWheel::_generation++;
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    AHO_NAMESPACE::input::MouseWheel::_state = AHO_NAMESPACE::d2::VectorD(xoffset, yoffset);
+    AHO_NAMESPACE::input::MouseWheel::_generation++;
 }
 
-aho::input::MouseWheel::MouseWheel(void *context) : context(context) {
+AHO_NAMESPACE::input::MouseWheel::MouseWheel(void* context) : context(context) {
     gen = _generation;
     read = _generation;
     if (subscribed == 0)
-        glfwSetScrollCallback((GLFWwindow *)context, scroll_callback);
+        glfwSetScrollCallback((GLFWwindow*)context, scroll_callback);
     subscribed++;
 }
 
-aho::input::MouseWheel::MouseWheel(const MouseWheel &other) noexcept : MouseWheel(other.context) {
+AHO_NAMESPACE::input::MouseWheel::MouseWheel(const MouseWheel& other) noexcept : MouseWheel(other.context) {
     gen = other.gen;
     read = other.read;
 }
 
-aho::input::MouseWheel::~MouseWheel() {
+AHO_NAMESPACE::input::MouseWheel::~MouseWheel() {
     subscribed--;
     if (subscribed == 0)
-        glfwSetScrollCallback((GLFWwindow *)context, NULL);
+        glfwSetScrollCallback((GLFWwindow*)context, NULL);
 }
 
-void aho::input::MouseWheel::update() {
+void AHO_NAMESPACE::input::MouseWheel::update() {
     if (gen < read)
         gen = read;
     if (gen + 60 < _generation)
         gen = _generation - 60;
 }
 
-aho::d2::VectorD aho::input::MouseWheel::state() {
+AHO_NAMESPACE::d2::VectorD AHO_NAMESPACE::input::MouseWheel::state() {
     if (gen < _generation) {
         read = _generation;
         return _state;
@@ -109,7 +109,7 @@ aho::d2::VectorD aho::input::MouseWheel::state() {
         return {};
 }
 
-aho::input::Mouse::Mouse(void *, aho::InputManager &manager) {
+AHO_NAMESPACE::input::Mouse::Mouse(void*, AHO_NAMESPACE::InputManager& manager) {
     _cursor = manager.get<Cursor>();
     _rightClick = manager.get<MouseButton>(MouseCode::RightClick);
     _middleButton = manager.get<MouseButton>(MouseCode::MiddleButton);
@@ -117,22 +117,22 @@ aho::input::Mouse::Mouse(void *, aho::InputManager &manager) {
     _wheel = manager.get<MouseWheel>();
 }
 
-std::shared_ptr<aho::input::Cursor> aho::input::Mouse::cursor() {
+std::shared_ptr<AHO_NAMESPACE::input::Cursor> AHO_NAMESPACE::input::Mouse::cursor() {
     return _cursor;
 }
 
-std::shared_ptr<aho::input::MouseButton> aho::input::Mouse::rightClick() {
+std::shared_ptr<AHO_NAMESPACE::input::MouseButton> AHO_NAMESPACE::input::Mouse::rightClick() {
     return _rightClick;
 }
 
-std::shared_ptr<aho::input::MouseButton> aho::input::Mouse::middleButton() {
+std::shared_ptr<AHO_NAMESPACE::input::MouseButton> AHO_NAMESPACE::input::Mouse::middleButton() {
     return _middleButton;
 }
 
-std::shared_ptr<aho::input::MouseButton> aho::input::Mouse::leftClick() {
+std::shared_ptr<AHO_NAMESPACE::input::MouseButton> AHO_NAMESPACE::input::Mouse::leftClick() {
     return _leftClick;
 }
 
-std::shared_ptr<aho::input::MouseWheel> aho::input::Mouse::wheel() {
+std::shared_ptr<AHO_NAMESPACE::input::MouseWheel> AHO_NAMESPACE::input::Mouse::wheel() {
     return _wheel;
 }

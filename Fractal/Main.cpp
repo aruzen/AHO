@@ -188,7 +188,7 @@ int main() {
         imageStagingBuffer.copyByImage(fractalImage, inCopy);
         inCopy.wait();
 
-        auto data = (std::uint32_t *)imageStagingBuffer.data().data;
+        auto data = (std::uint32_t*)imageStagingBuffer.data().data;
 
         int result = stbi_write_png("output.png",
                                     1024,
@@ -200,10 +200,10 @@ int main() {
             throw std::runtime_error("Failed to write PNG file!");
         }
         defaults::release();
-    } catch (std::exception &e) {
+    } catch (std::exception& e) {
         vsl::loggingln(e.what());
         return 1;
-    } catch (vsl::exceptions::VSLException &e) {
+    } catch (vsl::exceptions::VSLException& e) {
         vsl::loggingln(e.what());
         return 1;
     }

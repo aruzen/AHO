@@ -13,7 +13,8 @@ AllowShortFunctionsOnASingleLine: All
 SpaceAfterTemplateKeyword: false
 BreakTemplateDeclarations: Yes
 IndentRequiresClause: false
-DerivePointerAlignment: true
+# ファイルごとの推測をせず、ポインターと参照を型側に揃える。
+DerivePointerAlignment: false
 PointerAlignment: Left
 ReferenceAlignment: Pointer
 
@@ -22,4 +23,6 @@ ColumnLimit: 0
 SortIncludes: Never
 SortUsingDeclarations: Never
 ReflowComments: Never
-FixNamespaceComments: false
+# 名前空間の終了コメントとファイル末尾を統一する。
+FixNamespaceComments: true
+InsertNewlineAtEOF: true

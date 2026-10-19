@@ -29,11 +29,11 @@ namespace VSL_NAMESPACE::pipeline_layout {
         std::vector<PushContentDefinition> definitions;
 
         template<VSL_NAMESPACE::ShaderFlag ShaderFlag, typename... Types>
-        constexpr static std::array<PushContentDefinition, sizeof...(Types)> MakeDefinitions(const Types &...);
+        constexpr static std::array<PushContentDefinition, sizeof...(Types)> MakeDefinitions(const Types&...);
     };
 
-    template<vsl::ShaderFlag ShaderFlag, typename... Types>
-    constexpr std::array<PushContentDefinition, sizeof...(Types)> PushConstants::MakeDefinitions(const Types &...) {
+    template<VSL_NAMESPACE::ShaderFlag ShaderFlag, typename... Types>
+    constexpr std::array<PushContentDefinition, sizeof...(Types)> PushConstants::MakeDefinitions(const Types&...) {
         std::uint32_t offset = 0;
         const auto next_definition = [&offset](std::uint32_t size) {
             const auto current = offset;
@@ -42,6 +42,6 @@ namespace VSL_NAMESPACE::pipeline_layout {
         };
         return {{next_definition(sizeof(Types))...}};
     }
-}
+} // namespace VSL_NAMESPACE::pipeline_layout
 
 #endif //AHO_ALL_PUSH_CONTENTS_H

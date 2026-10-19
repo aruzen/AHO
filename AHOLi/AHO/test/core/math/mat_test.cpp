@@ -621,5 +621,5 @@ namespace {
         EXPECT_EQ(empty_output.str(), "{}");
     }
 
-}
+} // namespace
 #endif

@@ -11,7 +11,7 @@ namespace {
     TEST_F(DrawInstanceVulkanIntegrationTest, DrawsTwoIndexedInstances) {
         std::array<std::uint32_t, 3> indices{0, 1, 2};
         vsl::StagingBuffer<vsl::MemoryType::IndexBuffer> index(device, indices);
-        expect_triangle_color(render([&](auto &stream) {
+        expect_triangle_color(render([&](auto& stream) {
             auto buffer = stream.manager.getBuffer();
             buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].bindIndexBuffer(index._data->buffer, 0,
                                                                                        vk::IndexType::eUint32);

@@ -16,4 +16,4 @@ namespace VSL_NAMESPACE::exceptions {
         RuntimeException(std::string type, std::string message = "", std::string traceinfo = "");
         RuntimeException(std::string type, std::string message, std::source_location sourece);
     };
-}
+} // namespace VSL_NAMESPACE::exceptions

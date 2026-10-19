@@ -1,7 +1,8 @@
 #pragma once
+#include <VSL/define.hpp>
 #include <vulkan/vulkan.hpp>
 #include <cstddef>
-namespace vsl::_impl::helper {
+namespace VSL_NAMESPACE::_impl::helper {
     inline vk::ImageAspectFlags imageAspects(vk::Format format) {
         switch (format) {
             case vk::Format::eD16Unorm:
@@ -67,4 +68,4 @@ namespace vsl::_impl::helper {
                 return 0;
         }
     }
-}
+} // namespace VSL_NAMESPACE::_impl::helper

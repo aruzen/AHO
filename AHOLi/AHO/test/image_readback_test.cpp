@@ -202,7 +202,7 @@ namespace {
         EXPECT_EQ(a.bytes, b.bytes);
         EXPECT_NEAR(std::to_integer<int>(b.bytes[0]), 64, 1);
     }
-}
+} // namespace
 
 namespace {
     TEST_F(ImageReadbackVulkanIntegrationTest, MultisampleResolveIsConfiguredByAttachmentReferences) {
@@ -268,7 +268,7 @@ namespace {
             EXPECT_EQ(pixels.bytes[i + 3], std::byte{255});
         }
     }
-}
+} // namespace
 
 namespace {
     TEST_F(ImageReadbackVulkanIntegrationTest, ReusesGpuCapacityAndCallerCpuStorageAcrossFrames) {
@@ -382,5 +382,5 @@ namespace {
         EXPECT_EQ(pixels.bytes.size(), 256u);
         EXPECT_EQ(pixels.bytes[0], std::byte{255});
     }
-}
+} // namespace
 #endif

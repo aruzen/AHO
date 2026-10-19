@@ -39,4 +39,4 @@ namespace aho_test {
         if constexpr (V::dimension::dimension >= 3)
             EXPECT_NEAR(value.value.z.value, z, epsilon * std::max(1.0, std::abs(z)));
     }
-}
+} // namespace aho_test

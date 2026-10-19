@@ -25,4 +25,4 @@ namespace aho_test {
         expect_hsv(color, h, s, v);
         EXPECT_DOUBLE_EQ(color.a.value, a);
     }
-}
+} // namespace aho_test

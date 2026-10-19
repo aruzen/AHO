@@ -27,4 +27,4 @@ namespace vsl_test {
         std::memcpy(result.data(), mapped.data, result.size());
         return result;
     }
-}
+} // namespace vsl_test

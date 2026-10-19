@@ -11,7 +11,7 @@
 namespace pl = VSL_NAMESPACE::pipeline_layout;
 using namespace VSL_NAMESPACE;
 
-PipelineLayout getBaseLayout(AHO_NAMESPACE::engine::EngineAccessor *engine) {
+PipelineLayout getBaseLayout(AHO_NAMESPACE::engine::EngineAccessor* engine) {
     return {engine->_data->logical_device,
             pl::ColorBlend(),
             pl::InputAssembly(),

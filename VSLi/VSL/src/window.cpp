@@ -114,7 +114,7 @@ bool VSL_NAMESPACE::PureWindow::operator==(const PureWindow::WindowData* o) {
     return _data.get() == o;
 }
 
-bool vsl::PureWindow::resize(int width, int height) {
+bool VSL_NAMESPACE::PureWindow::resize(int width, int height) {
     glfwSetWindowSize((GLFWwindow*)_data->window_handle, width, height);
     return true;
 }
@@ -136,10 +136,10 @@ void VSL_NAMESPACE::PureWindow::WindowData::destroy() {
 }
 
 VSL_NAMESPACE::Window::Window(std::string name, int width, int height) : PureWindow(name, width, height) {
-    add_plugin<vsl::window_plugin::QuietClose>();
+    add_plugin<VSL_NAMESPACE::window_plugin::QuietClose>();
 }
 
-vsl::Window::Window(std::shared_ptr<WindowData> data) : PureWindow(data) {
-    if (not data->plugins.contains(vsl::window_plugin::QuietClose::QUIET_CLOSE_USED_ID))
-        add_plugin<vsl::window_plugin::QuietClose>();
+VSL_NAMESPACE::Window::Window(std::shared_ptr<WindowData> data) : PureWindow(data) {
+    if (not data->plugins.contains(VSL_NAMESPACE::window_plugin::QuietClose::QUIET_CLOSE_USED_ID))
+        add_plugin<VSL_NAMESPACE::window_plugin::QuietClose>();
 }

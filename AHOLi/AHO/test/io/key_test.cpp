@@ -50,4 +50,4 @@ namespace {
         EXPECT_EQ(keys->keys[0]->state(), ButtonState::Idle);
         EXPECT_EQ(keys->keys[1]->state(), ButtonState::Down);
     }
-}
+} // namespace

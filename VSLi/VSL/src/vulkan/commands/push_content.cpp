@@ -5,7 +5,7 @@
 #include <VSL/vulkan/commands/push_content.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 
-void vsl::command::PushConstant::invoke(vsl::CommandPool pool, vsl::CommandBuffer buffer, vsl::CommandManager manager) {
+void VSL_NAMESPACE::command::PushConstant::invoke(VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
     buffer._data->commandBuffers[buffer.getCurrentBufferIdx()]
         .pushConstants(layout._data->pipelineLayout, (vk::ShaderStageFlagBits)targetType, offset, size, value);
 }

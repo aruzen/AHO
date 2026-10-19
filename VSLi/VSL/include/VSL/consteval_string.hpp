@@ -9,7 +9,7 @@ namespace VSL_NAMESPACE::default_using {
     using string = std::string;
     using string_view = std::string_view;
     using stringstream = std::stringstream;
-}
+} // namespace VSL_NAMESPACE::default_using
 
 namespace VSL_NAMESPACE {
     template<typename T>
@@ -136,7 +136,7 @@ namespace VSL_NAMESPACE::helper {
             }
         }
     };
-}
+} // namespace VSL_NAMESPACE::helper
 
 #define VSL_PREFIX(str) VSL_NAMESPACE::helper::AdjustString<character,               \
                                                             str,                     \

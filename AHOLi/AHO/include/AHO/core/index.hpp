@@ -45,4 +45,4 @@ namespace AHO_NAMESPACE {
                 return idx1;
         }
     }
-}
+} // namespace AHO_NAMESPACE

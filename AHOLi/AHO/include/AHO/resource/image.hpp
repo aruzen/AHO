@@ -13,7 +13,7 @@
 namespace AHO_NAMESPACE::resource {
     class Image {
         struct ImageData {
-            unsigned char *buffer = nullptr;
+            unsigned char* buffer = nullptr;
             int channel = 0, width = 0, height = 0;
 
             ~ImageData();
@@ -27,8 +27,8 @@ namespace AHO_NAMESPACE::resource {
         Image(std::filesystem::path path);
 #endif // AHO_STB_IMAGE_ENABLE
 
-        std::optional<unsigned char **> data();
+        std::optional<unsigned char**> data();
     };
-}
+} // namespace AHO_NAMESPACE::resource
 
 #endif //AHO_ALL_IMAGE_HPP

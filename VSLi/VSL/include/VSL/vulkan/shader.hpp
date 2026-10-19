@@ -10,7 +10,7 @@
 #include "device.hpp"
 #include "../utils/flags.hpp"
 
-namespace vsl {
+namespace VSL_NAMESPACE {
     enum class ShaderType : int {
         Error,
         Vertex = 0x00000001,
@@ -65,18 +65,18 @@ namespace vsl {
         return static_cast<ShaderFlag>(static_cast<std::underlying_type_t<ShaderType>>(l) ^ static_cast<std::underlying_type_t<ShaderType>>(r));
     }
 
-    constexpr ShaderFlag convert(const ShaderType &t) { return (ShaderFlag)t; };
+    constexpr ShaderFlag convert(const ShaderType& t) { return (ShaderFlag)t; };
 
     struct ShaderAccessor {
-        std::shared_ptr<vsl::_impl::Shader_impl> _data;
+        std::shared_ptr<VSL_NAMESPACE::_impl::Shader_impl> _data;
     };
 
     template<VSL_NAMESPACE::ShaderType _Type = ShaderType::Vertex>
     struct Shader : public ShaderAccessor {
         constexpr static ShaderType Type = _Type;
 
-        Shader(vsl::LogicalDeviceAccessor device, std::filesystem::path path);
-        Shader(vsl::LogicalDeviceAccessor device, std::filesystem::path path, std::string name);
+        Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path);
+        Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path, std::string name);
 
         std::string name() const;
     };
@@ -94,12 +94,12 @@ namespace vsl {
     }
 
     template<helper::constant_string_holder Path>
-    auto make_shader(vsl::LogicalDeviceAccessor device) {
+    auto make_shader(VSL_NAMESPACE::LogicalDeviceAccessor device) {
         return Shader<___Get_ShaderType<Path>()>(device, expand_environments(Path.value));
     }
 
     template<helper::constant_string_holder Path>
-    auto make_shader(vsl::LogicalDeviceAccessor device, std::string name) {
+    auto make_shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::string name) {
         return Shader<___Get_ShaderType<Path>()>(device, expand_environments(Path.value), name);
     }
-}
+} // namespace VSL_NAMESPACE

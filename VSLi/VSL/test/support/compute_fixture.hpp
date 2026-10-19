@@ -76,7 +76,7 @@ namespace vsl_test {
             std::memcpy(actual.data(), mapped.data, sizeof(actual));
             return actual;
         }
-        static void expect_sequence(const std::array<std::uint32_t, count> &actual, std::uint32_t base) {
+        static void expect_sequence(const std::array<std::uint32_t, count>& actual, std::uint32_t base) {
             for (std::size_t i = 0; i < count; ++i)
                 EXPECT_EQ(actual[i], base + i) << "index=" << i;
         }
@@ -89,7 +89,7 @@ namespace vsl_test {
             resource._data.reset();
             // Pool and Resource hold each other strongly (I23). Break fixture-owned cycles.
             if (resources)
-                for (auto &owned_pool : resources->_data->pools)
+                for (auto& owned_pool : resources->_data->pools)
                     owned_pool->resources.clear();
             pool._data.reset();
             resources.reset();

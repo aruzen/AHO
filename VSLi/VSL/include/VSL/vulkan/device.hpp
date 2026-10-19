@@ -25,7 +25,7 @@ namespace VSL_NAMESPACE {
         constexpr _PhysicalDeviceType CPU = _PhysicalDeviceType("CPU", 4);
 
         _PhysicalDeviceType getType(int a);
-    };
+    }; // namespace PhysicalDeviceType
 
     struct _PhysicalDevicesSercher {
         int benchmark(PhysicalDevice device);
@@ -74,19 +74,19 @@ namespace VSL_NAMESPACE {
 
     template<typename C = _LogicalDeviceGraphicCreator<validation>>
     struct LogicalDevice : public LogicalDeviceAccessor {
-        LogicalDevice(PhysicalDevice device, vsl::Surface surface) {
+        LogicalDevice(PhysicalDevice device, VSL_NAMESPACE::Surface surface) {
             C creator;
             _data = creator.create(device, surface);
             helper::retainPhysicalDeviceOwner(_data, device);
         }
-        LogicalDevice(PhysicalDevice device, std::shared_ptr<vsl::Surface> surface)
+        LogicalDevice(PhysicalDevice device, std::shared_ptr<VSL_NAMESPACE::Surface> surface)
             : LogicalDevice(device, *surface) {}
 
 #ifdef VSL_NAMESPACE_TEST
         // void test();
 #endif // VSL_NAMESPACE_TEST
     };
-}
+} // namespace VSL_NAMESPACE
 
 template<bool Validation>
 template<typename S>
@@ -96,7 +96,7 @@ VSL_NAMESPACE::PhysicalDevices<S> VSL_NAMESPACE::Vulkan<Validation>::devices() {
 namespace VSL_NAMESPACE::helper {
     std::shared_ptr<_impl::PhysicalDevices_impl> enumeratePhysicalDevices(VulkanAccessor vulkan);
     std::vector<PhysicalDevice> physicalDevices(const std::shared_ptr<_impl::PhysicalDevices_impl>& data);
-}
+} // namespace VSL_NAMESPACE::helper
 
 template<typename S>
 VSL_NAMESPACE::PhysicalDevices<S>::PhysicalDevices(VulkanAccessor vulkan)

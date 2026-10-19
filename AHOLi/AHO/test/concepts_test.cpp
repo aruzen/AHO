@@ -36,4 +36,4 @@ namespace {
         EXPECT_TRUE(Intersecting{}.intersect(Shape{}));
         EXPECT_FALSE(Intersecting{}.cotains(Shape{}));
     }
-}
+} // namespace

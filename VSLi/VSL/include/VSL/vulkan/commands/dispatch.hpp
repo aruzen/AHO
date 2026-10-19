@@ -19,6 +19,6 @@ namespace VSL_NAMESPACE::command {
 
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
     };
-}
+} // namespace VSL_NAMESPACE::command
 
 #endif //AHO_ALL_DISPATCH_HPP

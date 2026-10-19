@@ -4,11 +4,11 @@
 #include <stdexcept>
 #include <type_traits>
 
-namespace vsl::command {
+namespace VSL_NAMESPACE::command {
     namespace {
-        std::vector<ClearValue> defaults(const RenderPassDescription &desc) {
+        std::vector<ClearValue> defaults(const RenderPassDescription& desc) {
             std::vector<ClearValue> values;
-            for (const auto &a : desc.attachments) {
+            for (const auto& a : desc.attachments) {
                 switch (_impl::helper::clearKind(static_cast<vk::Format>(a.format.type()))) {
                     case 1:
                         values.emplace_back(ClearInt{});
@@ -26,7 +26,7 @@ namespace vsl::command {
             }
             return values;
         }
-        vk::ClearValue convert(const ClearValue &value) {
+        vk::ClearValue convert(const ClearValue& value) {
             vk::ClearValue result{};
             std::visit(
                 [&](auto v) {
@@ -43,7 +43,7 @@ namespace vsl::command {
                 value);
             return result;
         }
-    }
+    } // namespace
     RenderPassBegin::RenderPassBegin(FrameBufferAccessor target, std::vector<ClearValue> clears,
                                      RenderArea renderArea, std::uint32_t index)
         : frameBuffer(std::move(target)), clearValues(std::move(clears)), area(renderArea), targetIndex(index) {
@@ -57,7 +57,7 @@ namespace vsl::command {
         if (clearValues.size() != renderPass.description().attachments.size())
             throw std::invalid_argument("Clear count must match attachments");
         for (std::size_t i = 0; i < clearValues.size(); ++i) {
-            const auto &a = renderPass.description().attachments[i];
+            const auto& a = renderPass.description().attachments[i];
             if ((a.load == LoadOp::Clear || a.stencilLoad == LoadOp::Clear) &&
                 clearValues[i].index() != _impl::helper::clearKind(static_cast<vk::Format>(a.format.type())))
                 throw std::invalid_argument("Clear type does not match attachment format");
@@ -97,7 +97,7 @@ namespace vsl::command {
     void RenderPassBegin::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
         const auto index = targetIndex.value_or(buffer.getCurrentBufferIdx());
         std::vector<vk::ClearValue> values;
-        for (const auto &clear : clearValues)
+        for (const auto& clear : clearValues)
             values.push_back(convert(clear));
         vk::RenderPassBeginInfo info{
             .renderPass = renderPass._data->renderPass,
@@ -111,4 +111,4 @@ namespace vsl::command {
     void NextSubpass::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
         buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].nextSubpass(vk::SubpassContents::eInline);
     }
-}
+} // namespace VSL_NAMESPACE::command

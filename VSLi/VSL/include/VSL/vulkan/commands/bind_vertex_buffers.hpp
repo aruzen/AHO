@@ -29,13 +29,13 @@ namespace VSL_NAMESPACE::command {
     requires((std::convertible_to<Args*, BufferAccessor*> &&
               ((unsigned int)(Args::Type & MemoryType::VertexBuffer) != 0)) &&
              ...)
-    vsl::command::BindVertexBuffer::BindVertexBuffer(Args&... args) {
+    VSL_NAMESPACE::command::BindVertexBuffer::BindVertexBuffer(Args&... args) {
         (..., this->add(args));
     }
 
-    template<vsl::MemoryType MemType, vsl::MemoryProperty MemProperty, SharingMode SharingMode>
+    template<VSL_NAMESPACE::MemoryType MemType, VSL_NAMESPACE::MemoryProperty MemProperty, SharingMode SharingMode>
     requires((unsigned int)(MemType & MemoryType::VertexBuffer) != 0)
-    void vsl::command::BindVertexBuffer::add(vsl::Buffer<MemType, MemProperty, SharingMode>& buffer) {
+    void VSL_NAMESPACE::command::BindVertexBuffer::add(VSL_NAMESPACE::Buffer<MemType, MemProperty, SharingMode>& buffer) {
         buffers.push_back(&buffer);
     }
-}
+} // namespace VSL_NAMESPACE::command

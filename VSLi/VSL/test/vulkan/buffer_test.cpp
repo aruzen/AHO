@@ -144,7 +144,7 @@ namespace {
         vsl::DeviceLocalBuffer<vsl::MemoryType::TransferSource> pointer(device, manager, payload.data(),
                                                                         payload.size());
         HostBuffer readback(device, sizeof(expected));
-        for (auto *buffer : {&value, &pointer}) {
+        for (auto* buffer : {&value, &pointer}) {
             readback.copyByBuffer(manager, buffer);
             auto mapped = readback.data(sizeof(expected));
             EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
@@ -237,7 +237,7 @@ namespace {
             EXPECT_FALSE(mapped.copy(initial.data(), std::size_t{9}));
             EXPECT_FALSE(mapped.copy(initial));
             EXPECT_FALSE(mapped.copy(initial.data(), std::numeric_limits<std::size_t>::max()));
-            EXPECT_TRUE(mapped.copy(static_cast<const std::uint32_t *>(nullptr), std::size_t{0}));
+            EXPECT_TRUE(mapped.copy(static_cast<const std::uint32_t*>(nullptr), std::size_t{0}));
             const std::array<std::uint32_t, 2> expected{first, second};
             EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
             mapped.uncheck_copy(second, first);
@@ -249,7 +249,7 @@ namespace {
         auto all = buffer.data(initial.size());
         for (std::size_t i = 0; i < initial.size(); ++i)
             if (i < map_offset || i >= map_offset + 8)
-                EXPECT_EQ(static_cast<const unsigned char *>(all.data)[i], 0xa5) << i;
+                EXPECT_EQ(static_cast<const unsigned char*>(all.data)[i], 0xa5) << i;
     }
     TEST(BufferCopyHelperTest, CheckedFailureKeepsTheSuccessfullyWrittenPrefix) {
         std::array<unsigned char, 6> storage{};
@@ -290,7 +290,7 @@ namespace {
         try {
             auto buffer = vsl::make_buffer<vsl::DeviceLocalBuffer<vsl::MemoryType::TransferSource>>(device, payload);
             FAIL() << "DeviceLocal initialization without a manager must fail";
-        } catch (const vsl::exceptions::RuntimeException &error) {
+        } catch (const vsl::exceptions::RuntimeException& error) {
             EXPECT_NE(error.reason.find("command manager"), std::string::npos);
         }
     }

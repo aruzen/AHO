@@ -53,7 +53,7 @@ namespace {
         using Converted = std::remove_cv_t<decltype(converted)>;
         static_assert(!aho_test::HasCast<Converted, aho_test::CastSource>);
         static_assert(std::same_as<typename Converted::coordinate_info, typename TypeParam::coordinate_info>);
-        auto check = [](const auto &from, const auto &to, int expected) {
+        auto check = [](const auto& from, const auto& to, int expected) {
             EXPECT_EQ(from.value.value, expected);
             EXPECT_EQ(to.value.value, expected);
         };
@@ -241,5 +241,5 @@ namespace {
         EXPECT_DOUBLE_EQ(value.length(), expected);
         EXPECT_TRUE(aho_test::geometry<P>(1) < value);
     }
-}
+} // namespace
 #endif

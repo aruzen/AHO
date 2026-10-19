@@ -7,9 +7,9 @@ namespace {
         EXPECT_EQ(begin.renderPass._data, pass->_data);
         EXPECT_EQ(begin.frameBuffer._data, framebuffer->_data);
         EXPECT_FALSE(begin.clear_color.has_value());
-        EXPECT_EQ(render([](auto &) {}), (std::array<std::uint8_t, 4>{0, 0, 0, 0}));
+        EXPECT_EQ(render([](auto&) {}), (std::array<std::uint8_t, 4>{0, 0, 0, 0}));
     }
-}
+} // namespace
 
 namespace {
     TEST_F(RenderPassBeginVulkanIntegrationTest, ChecksClearTypesCountsRenderAreaAndTargetIndex) {
@@ -30,4 +30,4 @@ namespace {
         EXPECT_EQ(pixels[1], std::byte{0});
         EXPECT_EQ(pixels[3], std::byte{255});
     }
-}
+} // namespace

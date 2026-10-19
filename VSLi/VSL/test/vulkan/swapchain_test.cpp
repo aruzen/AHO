@@ -11,18 +11,18 @@ namespace {
         ASSERT_GT(first.getSwapImageSize(), 0u);
         EXPECT_EQ(first.getSwapImageSize(), first.images.size());
         int framebuffer_width = 0, framebuffer_height = 0;
-        glfwGetFramebufferSize(static_cast<GLFWwindow *>(window->_data->window_handle), &framebuffer_width,
+        glfwGetFramebufferSize(static_cast<GLFWwindow*>(window->_data->window_handle), &framebuffer_width,
                                &framebuffer_height);
         EXPECT_EQ(first._data->swapChainExtent.width, static_cast<unsigned>(framebuffer_width));
         EXPECT_EQ(first._data->swapChainExtent.height, static_cast<unsigned>(framebuffer_height));
-        for (const auto &image : first.images)
+        for (const auto& image : first.images)
             EXPECT_TRUE(static_cast<bool>(image._data->view));
         device._data->device.waitIdle();
         vsl::Swapchain recreated(device, surface, first, 64, 48);
         EXPECT_TRUE(static_cast<bool>(recreated._data->swapChain));
         EXPECT_EQ(recreated.getSwapImageSize(), recreated.images.size());
     }
-}
+} // namespace
 
 namespace {
     class SwapchainReadbackWindowIntegrationTest : public vsl_test::WindowIntegrationTest {
@@ -68,4 +68,4 @@ namespace {
         image._data.reset();
         EXPECT_TRUE(owner.expired());
     }
-}
+} // namespace

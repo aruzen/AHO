@@ -30,4 +30,4 @@ namespace VSL_NAMESPACE::command {
     struct NextSubpass : __Command {
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
     };
-}
+} // namespace VSL_NAMESPACE::command

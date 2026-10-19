@@ -7,7 +7,7 @@ namespace {
         EXPECT_EQ(plugin.id, vsl::window_plugin::QuietClose::QUIET_CLOSE_USED_ID);
         EXPECT_TRUE(plugin.onUpdate(*window));
         EXPECT_TRUE(static_cast<bool>(*window));
-        glfwSetWindowShouldClose(static_cast<GLFWwindow *>(window->_data->window_handle), GLFW_TRUE);
+        glfwSetWindowShouldClose(static_cast<GLFWwindow*>(window->_data->window_handle), GLFW_TRUE);
         EXPECT_TRUE(plugin.onUpdate(*window));
         EXPECT_FALSE(static_cast<bool>(*window));
     }
@@ -19,7 +19,7 @@ namespace {
         });
         EXPECT_TRUE(hook.onUpdate(*window));
         EXPECT_EQ(called, 0);
-        glfwSetWindowShouldClose(static_cast<GLFWwindow *>(window->_data->window_handle), GLFW_TRUE);
+        glfwSetWindowShouldClose(static_cast<GLFWwindow*>(window->_data->window_handle), GLFW_TRUE);
         EXPECT_TRUE(hook.onUpdate(*window));
         EXPECT_EQ(called, 1);
     }
@@ -32,7 +32,7 @@ namespace {
             height = h;
         });
         EXPECT_EQ(plugin->id, vsl::window_plugin::HookResize::HOOK_RESIZE_USED_ID);
-        auto handle = static_cast<GLFWwindow *>(window->_data->window_handle);
+        auto handle = static_cast<GLFWwindow*>(window->_data->window_handle);
         const auto callback = glfwSetFramebufferSizeCallback(handle, nullptr);
         ASSERT_NE(callback, nullptr);
         glfwSetFramebufferSizeCallback(handle, callback);
@@ -51,7 +51,7 @@ namespace {
         ASSERT_EQ(window->_data->update.size(), 1u);
         EXPECT_TRUE(vsl::PureWindow::Update());
         EXPECT_EQ(called, 0);
-        glfwSetWindowShouldClose(static_cast<GLFWwindow *>(window->_data->window_handle), GLFW_TRUE);
+        glfwSetWindowShouldClose(static_cast<GLFWwindow*>(window->_data->window_handle), GLFW_TRUE);
         EXPECT_TRUE(vsl::PureWindow::Update());
         EXPECT_EQ(called, 1);
     }
@@ -61,10 +61,10 @@ namespace {
 TEST(WindowPluginTest, KeepsWindowDataAndNullPointerConstructionAvailable) {
     using Hook = vsl::window_plugin::HookShouldClose;
     using Callback = std::function<void(vsl::PureWindow)>;
-    static_assert(std::is_constructible_v<Hook, vsl::PureWindow *, Callback>);
-    static_assert(std::is_constructible_v<Hook, vsl::PureWindow::WindowData *, Callback>);
+    static_assert(std::is_constructible_v<Hook, vsl::PureWindow*, Callback>);
+    static_assert(std::is_constructible_v<Hook, vsl::PureWindow::WindowData*, Callback>);
     static_assert(std::is_constructible_v<Hook, std::nullptr_t, Callback>);
-    static_assert(!std::is_constructible_v<Hook, int *, Callback>);
+    static_assert(!std::is_constructible_v<Hook, int*, Callback>);
     int called = 0;
     Hook hook(nullptr, [&](vsl::PureWindow) { ++called; });
     EXPECT_EQ(called, 0);

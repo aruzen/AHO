@@ -32,4 +32,4 @@ namespace aho_test {
             expected[i][i] = T{1};
         expect_matrix(matrix, expected);
     }
-}
+} // namespace aho_test

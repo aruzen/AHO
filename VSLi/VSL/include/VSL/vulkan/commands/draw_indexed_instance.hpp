@@ -22,4 +22,4 @@ namespace VSL_NAMESPACE::command {
 
 	extern DrawInstanceManip drawInstance;
      */
-}
+} // namespace VSL_NAMESPACE::command

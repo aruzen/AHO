@@ -19,4 +19,4 @@ namespace VSL_NAMESPACE::command {
     };
 
     extern DrawIndexedManip drawIndexed;
-}
+} // namespace VSL_NAMESPACE::command

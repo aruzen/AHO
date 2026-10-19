@@ -7,18 +7,18 @@
 
 #include <memory>
 
-aho::engine::EngineAccessor* aho::engine::EngineAccessor::_instance = nullptr;
+AHO_NAMESPACE::engine::EngineAccessor* AHO_NAMESPACE::engine::EngineAccessor::_instance = nullptr;
 
-aho::engine::EngineAccessor* aho::engine::EngineAccessor::instance() {
+AHO_NAMESPACE::engine::EngineAccessor* AHO_NAMESPACE::engine::EngineAccessor::instance() {
     return _instance;
 }
 
-aho::engine::EngineAccessor::EngineAccessor() {
+AHO_NAMESPACE::engine::EngineAccessor::EngineAccessor() {
     if (_instance == nullptr)
         _instance = this;
 }
 
-aho::engine::EngineAccessor::~EngineAccessor() {
+AHO_NAMESPACE::engine::EngineAccessor::~EngineAccessor() {
     if (_instance == this)
         _instance = nullptr;
 }

@@ -21,18 +21,18 @@ namespace AHO_NAMESPACE::pipeline {
     };
 
     namespace standard_resources {
-        constexpr vsl::graphic_resource::BindingPoint VPMatrixUBO{
+        constexpr VSL_NAMESPACE::graphic_resource::BindingPoint VPMatrixUBO{
             .binding = (std::uint32_t)-1,
-            .bindingType = vsl::graphic_resource::Type::UniformBuffer,
-            .shaderType = vsl::ShaderFlag::Vertex,
+            .bindingType = VSL_NAMESPACE::graphic_resource::Type::UniformBuffer,
+            .shaderType = VSL_NAMESPACE::ShaderFlag::Vertex,
             .amount = 1};
 
-        constexpr vsl::graphic_resource::BindingPoint Texture{
+        constexpr VSL_NAMESPACE::graphic_resource::BindingPoint Texture{
             .binding = (std::uint32_t)-1,
-            .bindingType = vsl::graphic_resource::Type::CombinedImageSampler,
-            .shaderType = vsl::ShaderFlag::Fragment,
+            .bindingType = VSL_NAMESPACE::graphic_resource::Type::CombinedImageSampler,
+            .shaderType = VSL_NAMESPACE::ShaderFlag::Fragment,
             .amount = 1};
-    };
+    }; // namespace standard_resources
 
     constexpr auto getBindingPoint(ResourceName name) {
         switch (name) {
@@ -55,6 +55,6 @@ namespace AHO_NAMESPACE::pipeline {
     typedef VSL_NAMESPACE::PipelineLayout (*GET_BASE_LAYOUT_func)(engine::EngineAccessor* engine);
 
     extern GET_BASE_LAYOUT_func GET_BASE_LAYOUT;
-}
+} // namespace AHO_NAMESPACE::pipeline
 
 #endif //AHO_ALL_LAYOUTS_H

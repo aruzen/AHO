@@ -10,7 +10,7 @@ namespace {
     struct RecordDelegate : vsl::command::__DelegateCommand {
         std::shared_ptr<int> calls;
         explicit RecordDelegate(std::shared_ptr<int> calls) : calls(std::move(calls)) {}
-        void invoke(vsl::DefaultPhaseStream &stream, vsl::CommandPool, vsl::CommandBuffer,
+        void invoke(vsl::DefaultPhaseStream& stream, vsl::CommandPool, vsl::CommandBuffer,
                     vsl::CommandManager manager) override {
             EXPECT_EQ(stream.manager._data, manager._data);
             ++*calls;
@@ -75,7 +75,7 @@ namespace {
     struct VertexCountDelegate : vsl::command::__DelegateCommand, vsl::command::__VertexSizeRequire {
         std::optional<std::size_t> received;
         void setVertexSize(std::optional<std::size_t> value) override { received = value; }
-        void invoke(vsl::DefaultPhaseStream &, vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) override {}
+        void invoke(vsl::DefaultPhaseStream&, vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) override {}
     };
     TEST_F(PhaseVulkanIntegrationTest, ValueCommandsExportAndReceiveVertexCountsThroughTheirOwnRoles) {
         auto manager = make_manager();
@@ -95,7 +95,7 @@ namespace {
         struct ValueDelegate {
             std::shared_ptr<std::optional<std::size_t>> received;
             void setVertexSize(std::optional<std::size_t> value) { *received = value; }
-            void invoke(vsl::DefaultPhaseStream &, vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) {}
+            void invoke(vsl::DefaultPhaseStream&, vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) {}
         };
         auto received = std::make_shared<std::optional<std::size_t>>();
         stream << ValueDelegate{received};

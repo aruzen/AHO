@@ -83,4 +83,4 @@ namespace aho_test {
                 ADD_FAILURE() << error;
         }
     };
-}
+} // namespace aho_test

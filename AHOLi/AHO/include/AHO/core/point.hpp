@@ -25,7 +25,7 @@ namespace AHO_NAMESPACE {
             { std::convertible_to<std::remove_reference_t<T>, _Point<typename std::remove_reference_t<T>::element_type, typename std::remove_reference_t<T>::dimension, typename std::remove_reference_t<T>::coordinate_info>> };
             (_Point<typename std::remove_reference_t<T>::element_type, typename std::remove_reference_t<T>::dimension, typename std::remove_reference_t<T>::coordinate_info>)t;
         };
-    }
+    } // namespace concepts
 
     template<typename R = int, typename... Args>
     requires concepts::sames_as<R, Args...>
@@ -48,7 +48,7 @@ namespace AHO_NAMESPACE {
         using PointI = AHO_NAMESPACE::_Point<int, VSL_NAMESPACE::D1>;
         using PointF = AHO_NAMESPACE::_Point<float, VSL_NAMESPACE::D1>;
         using PointD = AHO_NAMESPACE::_Point<double, VSL_NAMESPACE::D1>;
-    }
+    } // namespace d1
 
     namespace d2 {
         template<typename R, typename CI = typename AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D2>::value>
@@ -60,7 +60,7 @@ namespace AHO_NAMESPACE {
         using PointI = AHO_NAMESPACE::_Point<int, VSL_NAMESPACE::D2>;
         using PointF = AHO_NAMESPACE::_Point<float, VSL_NAMESPACE::D2>;
         using PointD = AHO_NAMESPACE::_Point<double, VSL_NAMESPACE::D2>;
-    }
+    } // namespace d2
 
     namespace d3 {
         template<typename R, typename CI = typename AHO_NAMESPACE::coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D3>::value>
@@ -72,7 +72,7 @@ namespace AHO_NAMESPACE {
         using PointI = AHO_NAMESPACE::_Point<int, VSL_NAMESPACE::D3>;
         using PointF = AHO_NAMESPACE::_Point<float, VSL_NAMESPACE::D3>;
         using PointD = AHO_NAMESPACE::_Point<double, VSL_NAMESPACE::D3>;
-    }
+    } // namespace d3
 
     template<typename R, typename CI>
     struct _Point<R, VSL_NAMESPACE::D1, CI> {
@@ -539,4 +539,4 @@ namespace AHO_NAMESPACE {
     constexpr auto _Point<R, VSL_NAMESPACE::D3, CI>::length() const {
         return std::hypot(value.___AN1, value.___AN2, value.___AN3);
     }
-}
+} // namespace AHO_NAMESPACE

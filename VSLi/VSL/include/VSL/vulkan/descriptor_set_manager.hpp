@@ -19,10 +19,10 @@ namespace VSL_NAMESPACE::graphic_resource {
 
     struct ManagerInterface {
         ManagerInterface() = default;
-        ManagerInterface(const ManagerInterface &) = default;
-        ManagerInterface &operator=(const ManagerInterface &) = default;
-        ManagerInterface(ManagerInterface &&) = default;
-        ManagerInterface &operator=(ManagerInterface &&) = default;
+        ManagerInterface(const ManagerInterface&) = default;
+        ManagerInterface& operator=(const ManagerInterface&) = default;
+        ManagerInterface(ManagerInterface&&) = default;
+        ManagerInterface& operator=(ManagerInterface&&) = default;
         virtual ~ManagerInterface() = default;
         // 戻り値のvectorのサイズが同じになることを保証します
         virtual std::tuple<std::vector<Pool>, std::vector<Resource>>
@@ -51,7 +51,7 @@ namespace VSL_NAMESPACE::graphic_resource {
 
         std::shared_ptr<_impl::GraphicResourceManager_impl> _data;
 
-        virtual void destroy(const Pool &pool) = 0;
+        virtual void destroy(const Pool& pool) = 0;
     };
 
     /*
@@ -64,7 +64,7 @@ namespace VSL_NAMESPACE::graphic_resource {
 
         std::tuple<std::vector<Pool>, std::vector<Resource>> allocate(std::vector<BindingLayout> layouts) override;
 
-        void destroy(const Pool &pool) override;
+        void destroy(const Pool& pool) override;
     };
 
     /*
@@ -81,9 +81,9 @@ namespace VSL_NAMESPACE::graphic_resource {
 
         std::tuple<std::vector<Pool>, std::vector<Resource>> allocate(std::vector<BindingLayout> layouts) override;
 
-        void destroy(const Pool &pool) override;
+        void destroy(const Pool& pool) override;
     };
-}
+} // namespace VSL_NAMESPACE::graphic_resource
 
 namespace VSL_NAMESPACE {
     using GraphicResourceManager = graphic_resource::ExactAllocateManager;
@@ -91,9 +91,9 @@ namespace VSL_NAMESPACE {
 
 // ==================================================================================
 
-template<vsl::graphic_resource::can_convert_graphic_resource T>
-std::tuple<std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>>
-vsl::graphic_resource::ManagerInterface::allocate(std::vector<BindingLayout> layouts, std::vector<T> buffers) {
+template<VSL_NAMESPACE::graphic_resource::can_convert_graphic_resource T>
+std::tuple<std::vector<VSL_NAMESPACE::graphic_resource::Pool>, std::vector<VSL_NAMESPACE::graphic_resource::Resource>>
+VSL_NAMESPACE::graphic_resource::ManagerInterface::allocate(std::vector<BindingLayout> layouts, std::vector<T> buffers) {
     auto [pools, resources] = allocate(std::move(layouts));
 
     for (size_t i = 0; i < resources.size() && i < buffers.size(); i++) {
@@ -102,10 +102,10 @@ vsl::graphic_resource::ManagerInterface::allocate(std::vector<BindingLayout> lay
     return {pools, resources};
 }
 
-template<vsl::graphic_resource::can_convert_graphic_resource T>
-std::tuple<std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>>
-vsl::graphic_resource::ManagerInterface::allocate(std::vector<BindingLayout> layouts, std::vector<T> buffers,
-                                                  std::vector<size_t> bindings) {
+template<VSL_NAMESPACE::graphic_resource::can_convert_graphic_resource T>
+std::tuple<std::vector<VSL_NAMESPACE::graphic_resource::Pool>, std::vector<VSL_NAMESPACE::graphic_resource::Resource>>
+VSL_NAMESPACE::graphic_resource::ManagerInterface::allocate(std::vector<BindingLayout> layouts, std::vector<T> buffers,
+                                                            std::vector<size_t> bindings) {
     auto [pools, resources] = allocate(std::move(layouts));
 
     for (size_t i = 0; i < resources.size() && i < buffers.size(); i++) {
@@ -118,9 +118,9 @@ vsl::graphic_resource::ManagerInterface::allocate(std::vector<BindingLayout> lay
     return {pools, resources};
 }
 
-template<vsl::graphic_resource::can_convert_graphic_resource T>
-std::tuple<vsl::graphic_resource::Pool, std::vector<vsl::graphic_resource::Resource>>
-vsl::graphic_resource::ManagerInterface::make(std::vector<BindingLayout> layouts, std::vector<T> buffers) {
+template<VSL_NAMESPACE::graphic_resource::can_convert_graphic_resource T>
+std::tuple<VSL_NAMESPACE::graphic_resource::Pool, std::vector<VSL_NAMESPACE::graphic_resource::Resource>>
+VSL_NAMESPACE::graphic_resource::ManagerInterface::make(std::vector<BindingLayout> layouts, std::vector<T> buffers) {
     auto [pool, resources] = make(layouts);
 
     for (size_t i = 0; i < resources.size() && i < buffers.size(); i++) {
@@ -129,10 +129,10 @@ vsl::graphic_resource::ManagerInterface::make(std::vector<BindingLayout> layouts
     return {pool, resources};
 }
 
-template<vsl::graphic_resource::can_convert_graphic_resource T>
-std::tuple<vsl::GraphicResourcePool, std::vector<vsl::GraphicResource>>
-vsl::graphic_resource::ManagerInterface::make(std::vector<BindingLayout> layouts, std::vector<T> buffers,
-                                              std::vector<size_t> bindings) {
+template<VSL_NAMESPACE::graphic_resource::can_convert_graphic_resource T>
+std::tuple<VSL_NAMESPACE::GraphicResourcePool, std::vector<VSL_NAMESPACE::GraphicResource>>
+VSL_NAMESPACE::graphic_resource::ManagerInterface::make(std::vector<BindingLayout> layouts, std::vector<T> buffers,
+                                                        std::vector<size_t> bindings) {
     auto [pool, resources] = make(layouts);
 
     for (size_t i = 0; i < resources.size() && i < buffers.size(); i++) {

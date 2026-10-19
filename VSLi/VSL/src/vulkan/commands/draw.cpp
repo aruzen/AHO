@@ -10,10 +10,10 @@ void VSL_NAMESPACE::command::Draw::invoke(CommandPool pool, CommandBuffer buffer
     buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].draw(size, 1, 0, 0);
 }
 
-void vsl::command::DrawManip::invoke(vsl::CommandPool pool, vsl::CommandBuffer buffer, vsl::CommandManager manager) {
+void VSL_NAMESPACE::command::DrawManip::invoke(VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
     buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].draw(size.value(), 1, 0, 0);
 }
 
-void vsl::command::DrawManip::setVertexSize(std::optional<size_t> vertexSize) {
+void VSL_NAMESPACE::command::DrawManip::setVertexSize(std::optional<size_t> vertexSize) {
     size = vertexSize;
 }

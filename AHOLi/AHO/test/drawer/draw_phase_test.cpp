@@ -11,7 +11,7 @@ namespace phase_payload {
         ++*value.calls;
         *value.received = phase;
     }
-}
+} // namespace phase_payload
 namespace {
     using DrawPhaseVulkanIntegration = aho_test::LiveGpuTest;
     TEST_F(DrawPhaseVulkanIntegration, PointerAndReferenceConstructorsSubmitFramesAndResetThreadLocal) {
@@ -65,12 +65,12 @@ namespace {
         }
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
     }
-}
+} // namespace
 #else
 #include <gtest/gtest.h>
 namespace {
     TEST(DrawPhaseTest, CurrentPhasePointerIsInitiallyEmpty) {
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
     }
-}
+} // namespace
 #endif

@@ -7,31 +7,31 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-aho::input::Key::Key(void *context, aho::input::KeyCode code) : context(context), _code(code) {}
+AHO_NAMESPACE::input::Key::Key(void* context, AHO_NAMESPACE::input::KeyCode code) : context(context), _code(code) {}
 
-aho::input::Key::Key(void *context, aho::input::KeyID code) : context(context), _code(code) {}
+AHO_NAMESPACE::input::Key::Key(void* context, AHO_NAMESPACE::input::KeyID code) : context(context), _code(code) {}
 
-aho::input::ButtonState aho::input::Key::state() {
+AHO_NAMESPACE::input::ButtonState AHO_NAMESPACE::input::Key::state() {
     return _state;
 }
 
-bool aho::input::Key::down() {
+bool AHO_NAMESPACE::input::Key::down() {
     return _state == ButtonState::Down;
 }
 
-bool aho::input::Key::up() {
+bool AHO_NAMESPACE::input::Key::up() {
     return _state == ButtonState::Up;
 }
 
 /*
  * 押されている状態ならtrue(ButtonState::Down or ButtonState::Pressed)
  */
-bool aho::input::Key::pressed() {
+bool AHO_NAMESPACE::input::Key::pressed() {
     return _state == ButtonState::Down || _state == ButtonState::Pressed;
 }
 
-void aho::input::Key::update() {
-    switch (glfwGetKey((GLFWwindow *)context, (int)_code.code())) {
+void AHO_NAMESPACE::input::Key::update() {
+    switch (glfwGetKey((GLFWwindow*)context, (int)_code.code())) {
         default:
         case GLFW_RELEASE:
             if (pressed())
@@ -47,6 +47,6 @@ void aho::input::Key::update() {
     }
 }
 
-aho::input::KeyID aho::input::Key::code() {
+AHO_NAMESPACE::input::KeyID AHO_NAMESPACE::input::Key::code() {
     return _code;
 }

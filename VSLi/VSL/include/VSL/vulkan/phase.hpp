@@ -14,8 +14,8 @@
 namespace VSL_NAMESPACE {
     template<typename PhaseStream, typename T>
     concept is_phase_stream = requires(PhaseStream pst) {
-        { pst << std::declval<std::shared_ptr<T>>() } -> std::convertible_to<PhaseStream &>;
-        { pst << std::declval<T>() } -> std::convertible_to<PhaseStream &>;
+        { pst << std::declval<std::shared_ptr<T>>() } -> std::convertible_to<PhaseStream&>;
+        { pst << std::declval<T>() } -> std::convertible_to<PhaseStream&>;
     };
 
     struct DefaultPhaseStream;
@@ -88,17 +88,17 @@ namespace VSL_NAMESPACE {
         std::optional<size_t> vertexSize;
         std::optional<PipelineAccessor> pipeline;
 
-        DefaultPhaseStream &operator<<(std::shared_ptr<command::__Command> cmd);
+        DefaultPhaseStream& operator<<(std::shared_ptr<command::__Command> cmd);
 
-        DefaultPhaseStream &operator<<(command::is_command auto cmd);
+        DefaultPhaseStream& operator<<(command::is_command auto cmd);
 
-        DefaultPhaseStream &operator<<(std::shared_ptr<command::__DelegateCommand> cmd);
+        DefaultPhaseStream& operator<<(std::shared_ptr<command::__DelegateCommand> cmd);
 
-        DefaultPhaseStream &operator<<(command::is_delegate_command auto cmd);
+        DefaultPhaseStream& operator<<(command::is_delegate_command auto cmd);
 
     private:
         template<typename T>
-        void resolveHolderRequire(T &t);
+        void resolveHolderRequire(T& t);
 
         template<typename T>
         void resolveHolderRequirePtr(std::shared_ptr<T> cmd);
@@ -118,21 +118,21 @@ namespace VSL_NAMESPACE {
         return op;
     }
 
-    DefaultPhaseStream &DefaultPhaseStream::operator<<(command::is_command auto cmd) {
+    DefaultPhaseStream& DefaultPhaseStream::operator<<(command::is_command auto cmd) {
         resolveHolderRequire(cmd);
         (&cmd)->invoke(manager.getPool(), manager.getBuffer(), manager);
         return *this;
     }
 
-    DefaultPhaseStream &DefaultPhaseStream::operator<<(command::is_delegate_command auto cmd) {
+    DefaultPhaseStream& DefaultPhaseStream::operator<<(command::is_delegate_command auto cmd) {
         resolveHolderRequire(cmd);
         (&cmd)->invoke(*this, manager.getPool(), manager.getBuffer(), manager);
         return *this;
     }
-}
+} // namespace VSL_NAMESPACE
 
 template<typename T>
-void vsl::DefaultPhaseStream::resolveHolderRequire(T &t) {
+void VSL_NAMESPACE::DefaultPhaseStream::resolveHolderRequire(T& t) {
     if constexpr (command::is_vert_size_require<T>)
         (&t)->setVertexSize(this->vertexSize);
     if constexpr (command::is_pipeline_require<T>)
@@ -147,7 +147,7 @@ void vsl::DefaultPhaseStream::resolveHolderRequire(T &t) {
 }
 
 template<typename T>
-void vsl::DefaultPhaseStream::resolveHolderRequirePtr(std::shared_ptr<T> cmd) {
+void VSL_NAMESPACE::DefaultPhaseStream::resolveHolderRequirePtr(std::shared_ptr<T> cmd) {
     if (auto holder = std::dynamic_pointer_cast<command::__VertexSizeRequire>(cmd); holder)
         holder->setVertexSize(this->vertexSize);
     if (auto holder = std::dynamic_pointer_cast<command::__PipelineRequire>(cmd); holder)

@@ -47,7 +47,7 @@ namespace VSL_NAMESPACE {
             std::forward<T>(t).injection(pl);
             expansionPipelineLayoutArgs(pl, std::forward<Args>(args)...);
         }
-    }
+    } // namespace helper
 
     template<pipeline_layout_injecter... Args>
     PipelineLayout::PipelineLayout(VSL_NAMESPACE::LogicalDeviceAccessor device, Args&&... args) {
@@ -61,7 +61,7 @@ namespace VSL_NAMESPACE {
     template<VSL_NAMESPACE::pipeline_layout_injecter... Additions>
     PipelineLayout PipelineLayout::add(Additions&&... a) {
         if (not _data) {
-            throw vsl::exceptions::RuntimeException("error: Frozen Pipeline data.");
+            throw VSL_NAMESPACE::exceptions::RuntimeException("error: Frozen Pipeline data.");
         }
 
         helper::expansionPipelineLayoutArgs(*this, std::forward<Additions>(a)...);
@@ -70,4 +70,4 @@ namespace VSL_NAMESPACE {
 
         return *this;
     }
-}
+} // namespace VSL_NAMESPACE

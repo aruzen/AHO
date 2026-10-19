@@ -98,7 +98,7 @@ namespace VSL_NAMESPACE {
         concept is_vert_size_require = requires(T t) {
             { t.setVertexSize(std::declval<std::optional<size_t>>()) };
         };
-    }
+    } // namespace command
 
     struct CommandManager {
         CommandManager(std::shared_ptr<VSL_NAMESPACE::_impl::CommandManager_impl> data);
@@ -118,7 +118,7 @@ namespace VSL_NAMESPACE {
 
         CommandBuffer makeExclusiveBuffer(size_t size = 1);
     };
-}
+} // namespace VSL_NAMESPACE
 
 // ============================================================================
 

@@ -18,4 +18,4 @@ namespace VSL_NAMESPACE::utils {
 
         std::vector<std::filesystem::path> compiled, target;
     };
-}
+} // namespace VSL_NAMESPACE::utils

@@ -14,26 +14,26 @@
 #include <utility>
 
 namespace {
-    std::vector<std::uint32_t> read_shader_code(const std::filesystem::path &path) {
+    std::vector<std::uint32_t> read_shader_code(const std::filesystem::path& path) {
         std::ifstream file(path, std::ios::ate | std::ios::binary);
         if (!file.is_open())
-            throw vsl::exceptions::RuntimeException("file", "failed to open file: " + path.string());
+            throw VSL_NAMESPACE::exceptions::RuntimeException("file", "failed to open file: " + path.string());
         const auto byte_count = static_cast<std::streamoff>(file.tellg());
         constexpr std::size_t header_bytes = 5 * sizeof(std::uint32_t);
         if (byte_count < static_cast<std::streamoff>(header_bytes) || byte_count % sizeof(std::uint32_t) != 0 ||
             static_cast<std::uintmax_t>(byte_count) > std::numeric_limits<std::size_t>::max() ||
             static_cast<std::uintmax_t>(byte_count) > std::numeric_limits<std::streamsize>::max())
-            throw vsl::exceptions::RuntimeException("file", "invalid shader byte size: " + path.string());
+            throw VSL_NAMESPACE::exceptions::RuntimeException("file", "invalid shader byte size: " + path.string());
         std::vector<std::uint32_t> code(static_cast<std::size_t>(byte_count) / sizeof(std::uint32_t));
         file.seekg(0);
-        if (!file.read(reinterpret_cast<char *>(code.data()), static_cast<std::streamsize>(byte_count)))
-            throw vsl::exceptions::RuntimeException("file", "failed to read shader file: " + path.string());
+        if (!file.read(reinterpret_cast<char*>(code.data()), static_cast<std::streamsize>(byte_count)))
+            throw VSL_NAMESPACE::exceptions::RuntimeException("file", "failed to read shader file: " + path.string());
         return code;
     }
 } // namespace
 
 template<VSL_NAMESPACE::ShaderType _Type>
-vsl::Shader<_Type>::Shader(vsl::LogicalDeviceAccessor device, std::filesystem::path path) {
+VSL_NAMESPACE::Shader<_Type>::Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path) {
     _data = std::make_shared<_impl::Shader_impl>();
     _data->device = device._data;
     const auto code = read_shader_code(path);
@@ -52,7 +52,7 @@ vsl::Shader<_Type>::Shader(vsl::LogicalDeviceAccessor device, std::filesystem::p
 }
 
 template<VSL_NAMESPACE::ShaderType _Type>
-vsl::Shader<_Type>::Shader(vsl::LogicalDeviceAccessor device, std::filesystem::path path, std::string name) {
+VSL_NAMESPACE::Shader<_Type>::Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path, std::string name) {
     _data = std::make_shared<_impl::Shader_impl>();
     _data->device = device._data;
     const auto code = read_shader_code(path);
@@ -79,20 +79,20 @@ VSL_NAMESPACE::_impl::Shader_impl::~Shader_impl() {
     device->device.destroyShaderModule(shaderModule);
 }
 
-template struct vsl::Shader<VSL_NAMESPACE::ShaderType::Error>;
-template struct vsl::Shader<VSL_NAMESPACE::ShaderType::Vertex>;
-template struct vsl::Shader<VSL_NAMESPACE::ShaderType::TessellationControl>;
-template struct vsl::Shader<VSL_NAMESPACE::ShaderType::TessellationEvaluation>;
-template struct vsl::Shader<VSL_NAMESPACE::ShaderType::Geometry>;
-template struct vsl::Shader<VSL_NAMESPACE::ShaderType::Fragment>;
-template struct vsl::Shader<VSL_NAMESPACE::ShaderType::Compute>;
-template struct vsl::Shader<VSL_NAMESPACE::ShaderType::AllGraphics>;
-template struct vsl::Shader<VSL_NAMESPACE::ShaderType::Raygen>;
-template struct vsl::Shader<VSL_NAMESPACE::ShaderType::AnyHit>;
-template struct vsl::Shader<VSL_NAMESPACE::ShaderType::ClosestHit>;
-template struct vsl::Shader<VSL_NAMESPACE::ShaderType::Miss>;
-template struct vsl::Shader<VSL_NAMESPACE::ShaderType::Intersection>;
-template struct vsl::Shader<VSL_NAMESPACE::ShaderType::Callable>;
-template struct vsl::Shader<VSL_NAMESPACE::ShaderType::Task>;
-template struct vsl::Shader<VSL_NAMESPACE::ShaderType::Mesh>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Error>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Vertex>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::TessellationControl>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::TessellationEvaluation>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Geometry>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Fragment>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Compute>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::AllGraphics>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Raygen>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::AnyHit>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::ClosestHit>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Miss>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Intersection>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Callable>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Task>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Mesh>;
 // template struct vsl::Shader<VSL_NAMESPACE::ShaderType::All>;

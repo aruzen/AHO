@@ -24,7 +24,7 @@ namespace VSL_NAMESPACE {
         struct WindowData;
         struct OnUpdate {
             virtual ~OnUpdate() = default;
-            virtual bool onUpdate(vsl::PureWindow) = 0;
+            virtual bool onUpdate(VSL_NAMESPACE::PureWindow) = 0;
         };
 
         struct WindowData {
@@ -112,4 +112,4 @@ namespace VSL_NAMESPACE {
         this->_data->plugins.erase(entry);
         return true;
     }
-}
+} // namespace VSL_NAMESPACE

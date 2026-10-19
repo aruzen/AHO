@@ -687,5 +687,5 @@ namespace {
         EXPECT_EQ(output(aho::color::HSV<int, int>(1, 2, 3)), "(h, s, v)=(1, 2, 3)");
         EXPECT_EQ(output(aho::color::HSVA<int, int>(1, 2, 3, 4)), "(h, s, v, a)=(1, 2, 3, 4)");
     }
-}
+} // namespace
 #endif

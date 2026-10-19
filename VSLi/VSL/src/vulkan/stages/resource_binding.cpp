@@ -4,7 +4,7 @@
 
 #include <utility>
 
-vsl::pipeline_layout::ResourceBinding::ResourceBinding(std::vector<graphic_resource::BindingLayout> sets) : resourceBindingSets(std::move(sets)) {}
+VSL_NAMESPACE::pipeline_layout::ResourceBinding::ResourceBinding(std::vector<graphic_resource::BindingLayout> sets) : resourceBindingSets(std::move(sets)) {}
 
 void VSL_NAMESPACE::pipeline_layout::ResourceBinding::injection(VSL_NAMESPACE::PipelineLayoutAccessor pl) {
     std::vector<vk::DescriptorSetLayout>& layouts = std::any_cast<std::vector<vk::DescriptorSetLayout>&>(pl._data->info->pool["DescriptorSetLayouts"] = std::vector<vk::DescriptorSetLayout>());

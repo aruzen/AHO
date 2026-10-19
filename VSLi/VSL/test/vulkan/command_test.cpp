@@ -55,7 +55,7 @@ namespace {
         void invoke(vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager);
     };
     struct DelegateShape {
-        void invoke(vsl::DefaultPhaseStream &, vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager);
+        void invoke(vsl::DefaultPhaseStream&, vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager);
     };
     static_assert(vsl::command::is_command<CommandShape>);
     static_assert(!vsl::command::is_command<DelegateShape>);
@@ -65,11 +65,11 @@ namespace {
 
 namespace {
     struct DestructionProbe : vsl::command::__Command, vsl::command::__DelegateCommand, vsl::command::__PipelineHolder, vsl::command::__PipelineRequire, vsl::command::__VertexSizeHolder, vsl::command::__VertexSizeRequire {
-        int &destroyed;
-        explicit DestructionProbe(int &destroyed) : destroyed(destroyed) {}
+        int& destroyed;
+        explicit DestructionProbe(int& destroyed) : destroyed(destroyed) {}
         ~DestructionProbe() { ++destroyed; }
         void invoke(vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) override {}
-        void invoke(vsl::DefaultPhaseStream &, vsl::CommandPool, vsl::CommandBuffer,
+        void invoke(vsl::DefaultPhaseStream&, vsl::CommandPool, vsl::CommandBuffer,
                     vsl::CommandManager) override {}
         vsl::PipelineAccessor getPipeline() override { return {}; }
         void setPipeline(std::optional<vsl::PipelineAccessor>) override {}

@@ -16,23 +16,23 @@ namespace {
         using Compiler::evaluate_constant_u32;
     };
 
-    std::uint32_t descriptor_count(const ReflectionCompiler &compiler, const spirv_cross::SPIRType &type) {
+    std::uint32_t descriptor_count(const ReflectionCompiler& compiler, const spirv_cross::SPIRType& type) {
         std::uint32_t count = 1;
         for (std::size_t i = 0; i < type.array.size(); ++i) {
             // No specialization overrides are supplied to this API; reflect the shader defaults.
             const auto extent = type.array_size_literal[i] ? type.array[i] : compiler.evaluate_constant_u32(type.array[i]);
             if (extent == 0)
-                throw vsl::exceptions::RuntimeException("SPIRVReflector", "Descriptor runtime arrays require an explicit descriptor count");
+                throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "Descriptor runtime arrays require an explicit descriptor count");
             if (extent > std::numeric_limits<std::uint32_t>::max() / count)
-                throw vsl::exceptions::RuntimeException("SPIRVReflector", "Descriptor array count overflow");
+                throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "Descriptor array count overflow");
             count *= extent;
         }
         return count;
     }
 } // namespace
 
-vsl::graphic_resource::Type spir_type_to_graphic_type(const spirv_cross::SPIRType &type) {
-    namespace gfx_src = vsl::graphic_resource;
+VSL_NAMESPACE::graphic_resource::Type spir_type_to_graphic_type(const spirv_cross::SPIRType& type) {
+    namespace gfx_src = VSL_NAMESPACE::graphic_resource;
     switch (type.basetype) {
         case spirv_cross::SPIRType::Image:
             return gfx_src::Type::SampledImage;
@@ -41,19 +41,19 @@ vsl::graphic_resource::Type spir_type_to_graphic_type(const spirv_cross::SPIRTyp
         case spirv_cross::SPIRType::Sampler:
             return gfx_src::Type::Sampler;
         default:
-            vsl::loggingln("error: Unknown spir-v type. (spir_type_to_graphic_type)");
+            VSL_NAMESPACE::loggingln("error: Unknown spir-v type. (spir_type_to_graphic_type)");
     }
     return gfx_src::Type::MaxEnum;
 }
 
-vsl::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device, std::filesystem::path path)
+VSL_NAMESPACE::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device, std::filesystem::path path)
     : generated{std::move(logical_device)} {
     std::vector<char> binary;
     {
         std::ifstream file(path, std::ios::ate | std::ios::binary);
 
         if (!file.is_open()) {
-            throw vsl::exceptions::RuntimeException("file", "failed to open file!", std::source_location::current());
+            throw VSL_NAMESPACE::exceptions::RuntimeException("file", "failed to open file!", std::source_location::current());
         }
 
         size_t fileSize = (size_t)file.tellg();
@@ -64,17 +64,17 @@ vsl::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device,
     }
     if (binary.size() % 4 != 0)
         loggingln("warning: SPIRVReflector: SPIR-V file size (not multiple of 4 bytes) by ", path);
-    init((const std::uint32_t *)binary.data(), binary.size() / sizeof(std::uint32_t));
+    init((const std::uint32_t*)binary.data(), binary.size() / sizeof(std::uint32_t));
 }
 
-vsl::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device, const std::vector<char> &binary)
+VSL_NAMESPACE::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device, const std::vector<char>& binary)
     : generated{std::move(logical_device)} {
     if (binary.size() % 4 != 0)
         loggingln("warning: SPIRVReflector: SPIR-V file size (not multiple of 4 bytes)");
-    init((const std::uint32_t *)binary.data(), binary.size() / sizeof(std::uint32_t));
+    init((const std::uint32_t*)binary.data(), binary.size() / sizeof(std::uint32_t));
 }
 
-void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
+void VSL_NAMESPACE::utils::SPIRVReflector::init(const std::uint32_t* bp, size_t size) {
     using namespace graphic_resource;
     ReflectionCompiler comp(bp, size);
 
@@ -112,13 +112,13 @@ void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
              */
     };
 
-    for (const auto &resource : shader_resources.sampled_images) {
+    for (const auto& resource : shader_resources.sampled_images) {
         uint32_t set = comp.get_decoration(resource.id, spv::DecorationDescriptorSet);
         uint32_t binding = comp.get_decoration(resource.id, spv::DecorationBinding);
-        const auto &type = comp.get_type(resource.type_id);
+        const auto& type = comp.get_type(resource.type_id);
         graphic_resource::Type gfx_type = spir_type_to_graphic_type(type);
         if (gfx_type == graphic_resource::Type::MaxEnum)
-            vsl::loggingln("hint: name: ", resource.name);
+            VSL_NAMESPACE::loggingln("hint: name: ", resource.name);
         generated.binding_points[set].emplace_back(BindingPoint{
             .binding = binding,
             .bindingType = gfx_type,
@@ -127,11 +127,11 @@ void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
         });
     }
 
-    for (auto &[resources, gfx_type] : mapped_resources)
-        for (const auto &resource : resources) {
+    for (auto& [resources, gfx_type] : mapped_resources)
+        for (const auto& resource : resources) {
             uint32_t set = comp.get_decoration(resource.id, spv::DecorationDescriptorSet);
             uint32_t binding = comp.get_decoration(resource.id, spv::DecorationBinding);
-            const auto &type = comp.get_type(resource.type_id);
+            const auto& type = comp.get_type(resource.type_id);
             generated.binding_points[set].emplace_back(BindingPoint{
                 .binding = binding,
                 .bindingType = gfx_type,
@@ -140,8 +140,8 @@ void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
             });
         }
 
-    for (const auto &resource : shader_resources.push_constant_buffers) {
-        const auto &type = comp.get_type(resource.type_id);
+    for (const auto& resource : shader_resources.push_constant_buffers) {
+        const auto& type = comp.get_type(resource.type_id);
         /*
         std::cout << "PushConstant name: " << resource.name << std::endl;
         std::cout << "id: " << resource.id << ", type_id: " << resource.type_id << std::endl;
@@ -164,8 +164,8 @@ void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
         }
     }
 
-    for (auto &resource : shader_resources.stage_inputs) {
-        const auto &type = comp.get_type(resource.type_id);
+    for (auto& resource : shader_resources.stage_inputs) {
+        const auto& type = comp.get_type(resource.type_id);
         /*
         std::cout << "vertex input name: " << resource.name
         << " width: " << type.width << " vecsize: " << type.vecsize << " columns: " << type.columns << std::endl;
@@ -187,15 +187,15 @@ void vsl::utils::SPIRVReflector::init(const std::uint32_t *bp, size_t size) {
         format = format.toVec(type.vecsize);
         if (not generated.vertex_input)
             generated.vertex_input.emplace();
-        generated.vertex_input->definitions.push_back({.layouts = {type.columns, vsl::pipeline_layout::VertexInputLayoutDefinition{
+        generated.vertex_input->definitions.push_back({.layouts = {type.columns, VSL_NAMESPACE::pipeline_layout::VertexInputLayoutDefinition{
                                                                                      .format = format}}});
     }
 }
 
-std::vector<vsl::graphic_resource::BindingLayout> vsl::utils::SPIRVReflector::GenerateData::makeBindingLayout(size_t repeat) {
-    std::vector<vsl::graphic_resource::BindingLayout> result;
+std::vector<VSL_NAMESPACE::graphic_resource::BindingLayout> VSL_NAMESPACE::utils::SPIRVReflector::GenerateData::makeBindingLayout(size_t repeat) {
+    std::vector<VSL_NAMESPACE::graphic_resource::BindingLayout> result;
     for (size_t i = 0; i < repeat + 1; i++)
-        for (auto &[_, points] : binding_points)
+        for (auto& [_, points] : binding_points)
             result.emplace_back(logical_device, points);
     return result;
 }

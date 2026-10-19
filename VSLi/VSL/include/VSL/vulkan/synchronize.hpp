@@ -43,4 +43,4 @@ namespace VSL_NAMESPACE {
 
         std::optional<FenceHolder> operator[](std::string name);
     };
-}
+} // namespace VSL_NAMESPACE

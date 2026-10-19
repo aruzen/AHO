@@ -51,4 +51,4 @@ namespace {
         copy_assigned = copy;
         EXPECT_EQ(backing.use_count(), 4);
     }
-}
+} // namespace

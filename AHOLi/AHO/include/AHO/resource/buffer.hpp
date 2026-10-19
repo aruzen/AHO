@@ -87,6 +87,6 @@ namespace AHO_NAMESPACE::resource {
 
     inline size_t Buffer<BufferType::GPUFriendly>::size() {
     }
-}
+} // namespace AHO_NAMESPACE::resource
 
 #endif //AHO_ALL_BUFFER_HPP

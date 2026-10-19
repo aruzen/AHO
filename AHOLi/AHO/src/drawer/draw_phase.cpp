@@ -5,16 +5,16 @@
 #include <AHO/drawer/draw_phase.hpp>
 #include <utility>
 
-thread_local aho::DrawPhase *aho::THREAD_LOCAL_DRAW_PHASE;
+thread_local AHO_NAMESPACE::DrawPhase* AHO_NAMESPACE::THREAD_LOCAL_DRAW_PHASE;
 
-aho::DrawPhase::DrawPhase(aho::engine::GraphicalEngine &engine,
-                          std::function<void(DrawStream<vsl::DefaultPhaseStream> &)> initialize,
-                          std::function<void(DrawStream<vsl::DefaultPhaseStream> &)> finit)
-    : aho::DrawPhase::DrawPhase(&engine, initialize, finit) {}
+AHO_NAMESPACE::DrawPhase::DrawPhase(AHO_NAMESPACE::engine::GraphicalEngine& engine,
+                                    std::function<void(DrawStream<VSL_NAMESPACE::DefaultPhaseStream>&)> initialize,
+                                    std::function<void(DrawStream<VSL_NAMESPACE::DefaultPhaseStream>&)> finit)
+    : AHO_NAMESPACE::DrawPhase::DrawPhase(&engine, initialize, finit) {}
 
-aho::DrawPhase::DrawPhase(aho::engine::GraphicalEngine *engine,
-                          std::function<void(DrawStream<vsl::DefaultPhaseStream> &)> initialize,
-                          std::function<void(DrawStream<vsl::DefaultPhaseStream> &)> finit)
+AHO_NAMESPACE::DrawPhase::DrawPhase(AHO_NAMESPACE::engine::GraphicalEngine* engine,
+                                    std::function<void(DrawStream<VSL_NAMESPACE::DefaultPhaseStream>&)> initialize,
+                                    std::function<void(DrawStream<VSL_NAMESPACE::DefaultPhaseStream>&)> finit)
     : VSL_NAMESPACE::DefaultPhase(engine->_data->command_manager,
                                   engine->getWindow()._data2->swapchain,
                                   engine->getWindow()._data2->image_available,
@@ -26,33 +26,33 @@ aho::DrawPhase::DrawPhase(aho::engine::GraphicalEngine *engine,
     THREAD_LOCAL_DRAW_PHASE = this;
 
     if (initialize) {
-        DrawStream<vsl::DefaultPhaseStream> stream{vsl::DefaultPhaseStream{this->manager}};
+        DrawStream<VSL_NAMESPACE::DefaultPhaseStream> stream{VSL_NAMESPACE::DefaultPhaseStream{this->manager}};
         initialize(stream);
     } else
-        *this << vsl::command::RenderPassBegin(engine->getWindow()._data2->render_pass,
-                                               engine->getWindow()._data2->frame_buffer);
+        *this << VSL_NAMESPACE::command::RenderPassBegin(engine->getWindow()._data2->render_pass,
+                                                         engine->getWindow()._data2->frame_buffer);
 }
 
-aho::DrawPhase::~DrawPhase() {
+AHO_NAMESPACE::DrawPhase::~DrawPhase() {
     if (finish) {
-        DrawStream<vsl::DefaultPhaseStream> stream{vsl::DefaultPhaseStream{this->manager}};
+        DrawStream<VSL_NAMESPACE::DefaultPhaseStream> stream{VSL_NAMESPACE::DefaultPhaseStream{this->manager}};
         finish(stream);
     } else
-        *this << vsl::command::RenderPassEnd();
+        *this << VSL_NAMESPACE::command::RenderPassEnd();
 
-    auto result = vsl::DefaultPhase::submit();
+    auto result = VSL_NAMESPACE::DefaultPhase::submit();
     engine->getWindow()._data2->in_flight.wait();
-    if (result == vsl::DefaultPhase::SubmitResult::WantRecreateSwapchain)
+    if (result == VSL_NAMESPACE::DefaultPhase::SubmitResult::WantRecreateSwapchain)
         engine->getWindow().resize(engine->getWindow().window_size());
     THREAD_LOCAL_DRAW_PHASE = nullptr;
 }
 
-aho::DrawStream<vsl::DefaultPhaseStream> aho::DrawPhase::operator<<(std::shared_ptr<vsl::command::__Command> cmd) {
+AHO_NAMESPACE::DrawStream<VSL_NAMESPACE::DefaultPhaseStream> AHO_NAMESPACE::DrawPhase::operator<<(std::shared_ptr<VSL_NAMESPACE::command::__Command> cmd) {
     return {
-        .phase_stream = (vsl::DefaultPhaseStream{this->manager} << std::move(cmd))};
+        .phase_stream = (VSL_NAMESPACE::DefaultPhaseStream{this->manager} << std::move(cmd))};
 }
 
-aho::DrawStream<vsl::DefaultPhaseStream> aho::DrawPhase::operator<<(std::shared_ptr<vsl::command::__DelegateCommand> cmd) {
+AHO_NAMESPACE::DrawStream<VSL_NAMESPACE::DefaultPhaseStream> AHO_NAMESPACE::DrawPhase::operator<<(std::shared_ptr<VSL_NAMESPACE::command::__DelegateCommand> cmd) {
     return {
-        .phase_stream = (vsl::DefaultPhaseStream{this->manager} << std::move(cmd))};
+        .phase_stream = (VSL_NAMESPACE::DefaultPhaseStream{this->manager} << std::move(cmd))};
 }

@@ -22,7 +22,7 @@ namespace {
         pl::PushConstants constants;
         constants.definitions = {{vsl::ShaderFlag::Vertex, 0, 16}, {vsl::ShaderFlag::Vertex, 16, 4}};
         constants.injection(layout);
-        const auto &info = layout._data->info->pipelineLayout;
+        const auto& info = layout._data->info->pipelineLayout;
         ASSERT_EQ(info.pushConstantRangeCount, 1u);
         EXPECT_EQ(info.pPushConstantRanges[0].stageFlags, vk::ShaderStageFlagBits::eVertex);
         EXPECT_EQ(info.pPushConstantRanges[0].offset, 0u);
@@ -35,7 +35,7 @@ namespace {
         EXPECT_EQ(definitions[0].offset, 0u);
         EXPECT_EQ(definitions[1].offset, sizeof(first));
         EXPECT_EQ(definitions[1].size, sizeof(second));
-        for (const auto &definition : definitions)
+        for (const auto& definition : definitions)
             EXPECT_EQ(definition.targetShader, vsl::ShaderFlag::Compute);
     }
     TEST(PushContentsTest, MixedSizesAccumulateOffsetsInArgumentOrder) {
@@ -51,7 +51,7 @@ namespace {
         EXPECT_EQ(definitions[0].size, 12u);
         EXPECT_EQ(definitions[1].size, 4u);
         EXPECT_EQ(definitions[2].size, 8u);
-        for (const auto &definition : definitions)
+        for (const auto& definition : definitions)
             EXPECT_EQ(definition.targetShader, stage);
         EXPECT_EQ(first, (std::array<std::uint32_t, 3>{1, 2, 3}));
         EXPECT_FLOAT_EQ(second, 4.0f);

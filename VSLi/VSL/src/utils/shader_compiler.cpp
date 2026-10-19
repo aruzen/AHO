@@ -18,11 +18,11 @@ extern char** environ;
 
 VSL_NAMESPACE::utils::ShaderCompiler::ShaderCompiler(std::filesystem::path glslc_path, std::vector<std::filesystem::path> shader_dirs) : glslc_path(glslc_path), shader_dirs(shader_dirs) {}
 
-vsl::utils::ShaderCompiler::ShaderCompiler(std::string glslc_str, std::initializer_list<std::string> shader_str) {
-    glslc_path = std::filesystem::path(vsl::expand_environments(glslc_str));
+VSL_NAMESPACE::utils::ShaderCompiler::ShaderCompiler(std::string glslc_str, std::initializer_list<std::string> shader_str) {
+    glslc_path = std::filesystem::path(VSL_NAMESPACE::expand_environments(glslc_str));
     shader_dirs.reserve(shader_str.size());
     for (auto shader_dir : shader_str)
-        shader_dirs.push_back(std::filesystem::path(vsl::expand_environments(shader_dir)));
+        shader_dirs.push_back(std::filesystem::path(VSL_NAMESPACE::expand_environments(shader_dir)));
 }
 
 namespace fs = std::filesystem;

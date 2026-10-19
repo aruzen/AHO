@@ -18,7 +18,7 @@ VSL_NAMESPACE::DefaultPhase::DefaultPhase(CommandManager _manager, SwapchainAcce
         setup();
 }
 
-void vsl::DefaultPhase::setup() {
+void VSL_NAMESPACE::DefaultPhase::setup() {
     if (state != State::BeforeSetup)
         return;
 
@@ -32,11 +32,11 @@ void vsl::DefaultPhase::setup() {
     ComputePhase::setup();
 }
 
-vsl::DefaultPhase::SubmitResult vsl::DefaultPhase::submit() {
+VSL_NAMESPACE::DefaultPhase::SubmitResult VSL_NAMESPACE::DefaultPhase::submit() {
     if (state != State::WaitSubmit)
-        return vsl::DefaultPhase::SubmitResult::Failed;
+        return VSL_NAMESPACE::DefaultPhase::SubmitResult::Failed;
     auto r = ComputePhase::submit();
-    if (r != vsl::DefaultPhase::SubmitResult::Success)
+    if (r != VSL_NAMESPACE::DefaultPhase::SubmitResult::Success)
         return r;
 
     std::vector<vk::Semaphore> signalSemaphores;
@@ -59,20 +59,20 @@ vsl::DefaultPhase::SubmitResult vsl::DefaultPhase::submit() {
         auto result = manager._data->presentQueue.presentKHR(presentInfo);
         if (vk::Result::eSuccess != result) {
             loggingln("Warning: Missing present queue!! : ", to_string(result));
-            return vsl::DefaultPhase::SubmitResult::WantRecreateSwapchain;
+            return VSL_NAMESPACE::DefaultPhase::SubmitResult::WantRecreateSwapchain;
         }
     } catch (vk::OutOfDateKHRError& e) {
         loggingln("Warning: Missing present queue!! : OutOfDateKHRError");
-        return vsl::DefaultPhase::SubmitResult::WantRecreateSwapchain;
+        return VSL_NAMESPACE::DefaultPhase::SubmitResult::WantRecreateSwapchain;
     }
-    return vsl::DefaultPhase::SubmitResult::Success;
+    return VSL_NAMESPACE::DefaultPhase::SubmitResult::Success;
 }
 
 VSL_NAMESPACE::DefaultPhase::~DefaultPhase() {
     submit();
 }
 
-std::uint32_t vsl::DefaultPhase::getCurrentIndex() {
+std::uint32_t VSL_NAMESPACE::DefaultPhase::getCurrentIndex() {
     return this->manager.getCurrentBufferIdx();
 }
 
@@ -86,11 +86,11 @@ VSL_NAMESPACE::ComputePhase::ComputePhase(CommandManager _manager,
         setup();
 }
 
-vsl::ComputePhase::~ComputePhase() {
+VSL_NAMESPACE::ComputePhase::~ComputePhase() {
     submit();
 }
 
-void vsl::ComputePhase::setup() {
+void VSL_NAMESPACE::ComputePhase::setup() {
     if (state != State::BeforeSetup)
         return;
 
@@ -112,9 +112,9 @@ void vsl::ComputePhase::setup() {
     state = State::WaitSubmit;
 }
 
-vsl::DefaultPhase::SubmitResult vsl::ComputePhase::submit() {
+VSL_NAMESPACE::DefaultPhase::SubmitResult VSL_NAMESPACE::ComputePhase::submit() {
     if (state != State::WaitSubmit)
-        return vsl::DefaultPhase::SubmitResult::Failed;
+        return VSL_NAMESPACE::DefaultPhase::SubmitResult::Failed;
 
     auto manager = this->manager._data;
     auto currentFrame = manager->commandBuffer->currentBufferIdx;
@@ -144,7 +144,7 @@ vsl::DefaultPhase::SubmitResult vsl::ComputePhase::submit() {
         manager->graphicsQueue.submit({submitInfo});
 
     state = State::FinishSubmit;
-    return vsl::DefaultPhase::SubmitResult::Success;
+    return VSL_NAMESPACE::DefaultPhase::SubmitResult::Success;
 }
 
 VSL_NAMESPACE::DefaultPhaseStream VSL_NAMESPACE::ComputePhase::operator<<(std::shared_ptr<command::__Command> cmd) {
@@ -153,7 +153,7 @@ VSL_NAMESPACE::DefaultPhaseStream VSL_NAMESPACE::ComputePhase::operator<<(std::s
     return op;
 }
 
-vsl::DefaultPhaseStream vsl::ComputePhase::operator<<(std::shared_ptr<command::__DelegateCommand> cmd) {
+VSL_NAMESPACE::DefaultPhaseStream VSL_NAMESPACE::ComputePhase::operator<<(std::shared_ptr<command::__DelegateCommand> cmd) {
     DefaultPhaseStream op{this->manager};
     op << cmd;
     return op;

@@ -3,7 +3,7 @@
 #include "image_format.hpp"
 #include <stdexcept>
 
-namespace vsl {
+namespace VSL_NAMESPACE {
     namespace {
         std::shared_ptr<_impl::FrameBuffer_impl> make_data(RenderPassAccessor pass, std::uint32_t width,
                                                            std::uint32_t height, std::uint32_t layers) {
@@ -16,15 +16,15 @@ namespace vsl {
             data->layers = layers;
             return data;
         }
-        void append(_impl::FrameBuffer_impl &target, const std::vector<ImageAccessor> &images) {
-            const auto &desc = *target.renderPass->description;
+        void append(_impl::FrameBuffer_impl& target, const std::vector<ImageAccessor>& images) {
+            const auto& desc = *target.renderPass->description;
             if (images.size() != desc.attachments.size())
                 throw std::invalid_argument("Framebuffer attachment count mismatch");
             std::vector<vk::ImageView> views;
             std::vector<std::shared_ptr<_impl::Image_impl>> retained;
             for (std::size_t i = 0; i < images.size(); ++i) {
-                const auto &image = images[i]._data;
-                const auto &a = desc.attachments[i];
+                const auto& image = images[i]._data;
+                const auto& a = desc.attachments[i];
                 if (!image || !image->view || image->device != target.device ||
                     image->format != static_cast<vk::Format>(a.format.type()) || image->samples != a.samples ||
                     image->width < target.extent.width || image->height < target.extent.height ||
@@ -34,7 +34,7 @@ namespace vsl {
                     if (!contain(image->usage, usage))
                         throw std::invalid_argument("Framebuffer image missing required usage");
                 };
-                for (const auto &s : desc.subpasses) {
+                for (const auto& s : desc.subpasses) {
                     for (auto r : s.colors)
                         if (r.attachment == i)
                             require(ImageType::ColorAttachment);
@@ -59,7 +59,7 @@ namespace vsl {
             target.swapChainFramebuffers.push_back(target.device->device.createFramebuffer(info));
             target.attachments.push_back(std::move(retained));
         }
-    }
+    } // namespace
     FrameBuffer::FrameBuffer(RenderPassAccessor pass, std::uint32_t width, std::uint32_t height,
                              std::vector<ImageAccessor> images, std::uint32_t layers) {
         _data = make_data(pass, width, height, layers);
@@ -88,4 +88,4 @@ namespace vsl {
             for (auto fb : swapChainFramebuffers)
                 device->device.destroyFramebuffer(fb);
     }
-}
+} // namespace VSL_NAMESPACE

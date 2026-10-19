@@ -15,7 +15,7 @@
 #include "../core/point.hpp"
 #include "../core/vector.hpp"
 
-namespace aho {
+namespace AHO_NAMESPACE {
     struct InputManager;
 }
 namespace AHO_NAMESPACE::input {
@@ -358,7 +358,7 @@ namespace AHO_NAMESPACE::input {
 
         struct Characters : public Input<std::unordered_set<KeyCode>> {
         };
-    }
-}
+    } // namespace abstract
+} // namespace AHO_NAMESPACE::input
 
 #endif //AHO_ALL_INPUT_HPP

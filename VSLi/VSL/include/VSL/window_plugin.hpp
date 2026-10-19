@@ -4,30 +4,30 @@
 
 #include "window.hpp"
 
-namespace vsl::window_plugin {
-    struct QuietClose : public vsl::PureWindow::Plugin, public vsl::PureWindow::OnUpdate {
+namespace VSL_NAMESPACE::window_plugin {
+    struct QuietClose : public VSL_NAMESPACE::PureWindow::Plugin, public VSL_NAMESPACE::PureWindow::OnUpdate {
         constexpr static unsigned char QUIET_CLOSE_USED_ID = -1;
 
-        QuietClose(vsl::PureWindow*);
+        QuietClose(VSL_NAMESPACE::PureWindow*);
         // OnUpdate
-        bool onUpdate(vsl::PureWindow data) override;
+        bool onUpdate(VSL_NAMESPACE::PureWindow data) override;
     };
 
-    struct HookShouldClose : public vsl::PureWindow::Plugin, public vsl::PureWindow::OnUpdate {
-        HookShouldClose(vsl::PureWindow::WindowData*, std::function<void(PureWindow)> callback) : callback(std::move(callback)) {};
+    struct HookShouldClose : public VSL_NAMESPACE::PureWindow::Plugin, public VSL_NAMESPACE::PureWindow::OnUpdate {
+        HookShouldClose(VSL_NAMESPACE::PureWindow::WindowData*, std::function<void(PureWindow)> callback) : callback(std::move(callback)) {};
         template<std::same_as<PureWindow> WindowType>
         HookShouldClose(WindowType*, std::function<void(PureWindow)> callback) : callback(std::move(callback)){};
         // OnUpdate
-        bool onUpdate(vsl::PureWindow data) override;
+        bool onUpdate(VSL_NAMESPACE::PureWindow data) override;
 
         std::function<void(PureWindow)> callback;
     };
 
-    struct HookResize : public vsl::PureWindow::Plugin {
+    struct HookResize : public VSL_NAMESPACE::PureWindow::Plugin {
         constexpr static unsigned char HOOK_RESIZE_USED_ID = -2;
 
-        HookResize(vsl::PureWindow*, std::function<void(PureWindow, int, int)> callback);
+        HookResize(VSL_NAMESPACE::PureWindow*, std::function<void(PureWindow, int, int)> callback);
 
         std::function<void(PureWindow, int, int)> callback;
     };
-}
+} // namespace VSL_NAMESPACE::window_plugin

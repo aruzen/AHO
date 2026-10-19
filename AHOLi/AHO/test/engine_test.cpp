@@ -59,4 +59,4 @@ namespace {
         GTEST_FLAG_SET(death_test_style, previous_style);
     }
 
-}
+} // namespace

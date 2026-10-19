@@ -71,4 +71,4 @@ namespace {
         EXPECT_FALSE(retained.data().has_value());
     }
 #endif
-}
+} // namespace

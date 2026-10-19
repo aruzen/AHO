@@ -120,4 +120,4 @@ namespace {
         EXPECT_EQ(window.key_callback, nullptr);
     }
 
-}
+} // namespace

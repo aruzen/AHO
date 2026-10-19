@@ -23,4 +23,4 @@ namespace {
         triangle[8].index = 12;
         EXPECT_EQ(triangle.idx3.index, 12);
     }
-}
+} // namespace

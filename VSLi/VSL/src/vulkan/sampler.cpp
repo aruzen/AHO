@@ -6,7 +6,7 @@
 
 #include <VSL/vulkan/_pimpls.hpp>
 
-vsl::Sampler::Sampler(LogicalDeviceAccessor device, vsl::SamplingMode sampling, vsl::EdgeMode edge) {
+VSL_NAMESPACE::Sampler::Sampler(LogicalDeviceAccessor device, VSL_NAMESPACE::SamplingMode sampling, VSL_NAMESPACE::EdgeMode edge) {
     _data = std::shared_ptr<_impl::Sampler_impl>(new _impl::Sampler_impl);
     _data->device = device._data;
 
@@ -37,6 +37,6 @@ vsl::Sampler::Sampler(LogicalDeviceAccessor device, vsl::SamplingMode sampling, 
     _data->sampler = device._data->device.createSampler(samplerInfo);
 }
 
-vsl::_impl::Sampler_impl::~Sampler_impl() {
+VSL_NAMESPACE::_impl::Sampler_impl::~Sampler_impl() {
     device->device.destroy(sampler);
 }

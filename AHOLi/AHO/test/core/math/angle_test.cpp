@@ -107,4 +107,4 @@ namespace {
     }();
     static_assert(constexpr_angle_assignments.value == 1.5);
 
-}
+} // namespace

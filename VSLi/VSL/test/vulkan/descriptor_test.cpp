@@ -40,7 +40,7 @@ namespace {
         EXPECT_EQ(many[0].getPool()._data, pool._data);
         EXPECT_EQ(single._data->layout.lock(), binding->_data);
         EXPECT_NO_THROW(single.update(&*output));
-        for (auto &entry : many) {
+        for (auto& entry : many) {
             EXPECT_EQ(entry._data->layout.lock(), binding->_data);
             EXPECT_NO_THROW(entry.update(&*output));
         }
@@ -189,7 +189,7 @@ namespace {
         }
         device._data->device.waitIdle();
         auto mapped = buffer.data(initial.size() * sizeof(std::uint32_t));
-        const auto *actual = static_cast<const std::uint32_t *>(mapped.data);
+        const auto* actual = static_cast<const std::uint32_t*>(mapped.data);
         for (std::size_t i = 0; i < offset / sizeof(std::uint32_t); ++i)
             EXPECT_EQ(actual[i], 0xa5a5a5a5u);
         for (std::size_t i = 0; i < count; ++i)
@@ -237,7 +237,7 @@ namespace {
             }
             device._data->device.waitIdle();
             auto mapped = buffer.data(initial.size() * sizeof(std::uint32_t));
-            const auto *actual = static_cast<const std::uint32_t *>(mapped.data);
+            const auto* actual = static_cast<const std::uint32_t*>(mapped.data);
             for (std::size_t i = 0; i < offset / sizeof(std::uint32_t); ++i)
                 EXPECT_EQ(actual[i], initial[i]);
             for (std::size_t i = 0; i < count; ++i)

@@ -20,4 +20,4 @@ namespace aho_test {
             return *this;
         }
     };
-}
+} // namespace aho_test

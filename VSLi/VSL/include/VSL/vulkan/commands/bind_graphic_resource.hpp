@@ -26,6 +26,6 @@ namespace VSL_NAMESPACE::command {
 
         void setPipeline(std::optional<PipelineAccessor> pipeline) override;
     };
-}
+} // namespace VSL_NAMESPACE::command
 
 #endif //AHO_ALL_BIND_GRAPHIC_RESOURCE_HPP

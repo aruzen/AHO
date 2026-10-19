@@ -46,4 +46,4 @@ namespace VSL_NAMESPACE {
 #endif // VSL_NAMESPACE_TEST
         std::shared_ptr<_impl::Vulkan_impl<Validation>> _data;
     };
-}
+} // namespace VSL_NAMESPACE

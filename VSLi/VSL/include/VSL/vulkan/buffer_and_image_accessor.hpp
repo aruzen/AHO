@@ -186,61 +186,61 @@ namespace VSL_NAMESPACE {
 
     struct BufferAccessor {
         BufferAccessor() = default;
-        BufferAccessor(const BufferAccessor &) = default;
-        BufferAccessor &operator=(const BufferAccessor &) = default;
-        BufferAccessor(BufferAccessor &&) = default;
-        BufferAccessor &operator=(BufferAccessor &&) = default;
+        BufferAccessor(const BufferAccessor&) = default;
+        BufferAccessor& operator=(const BufferAccessor&) = default;
+        BufferAccessor(BufferAccessor&&) = default;
+        BufferAccessor& operator=(BufferAccessor&&) = default;
         virtual ~BufferAccessor() = default;
 
         struct LocalBufferHolder {
-            BufferAccessor *parent;
+            BufferAccessor* parent;
             std::size_t size, offset;
-            void *data;
+            void* data;
 
-            LocalBufferHolder(const LocalBufferHolder &) = delete;
+            LocalBufferHolder(const LocalBufferHolder&) = delete;
 
-            LocalBufferHolder &operator=(const LocalBufferHolder &) = delete;
+            LocalBufferHolder& operator=(const LocalBufferHolder&) = delete;
 
-            LocalBufferHolder(LocalBufferHolder &&other);
+            LocalBufferHolder(LocalBufferHolder&& other);
 
-            LocalBufferHolder(BufferAccessor *parent, std::size_t size, std::size_t offset, void *data = nullptr);
+            LocalBufferHolder(BufferAccessor* parent, std::size_t size, std::size_t offset, void* data = nullptr);
 
             ~LocalBufferHolder();
 
             void flush();
 
             template<typename... Args>
-            bool copy(const Args &...args);
+            bool copy(const Args&... args);
 
             template<typename T>
-            bool copy(T *t, std::size_t size);
+            bool copy(T* t, std::size_t size);
 
             template<typename... Args>
-            void uncheck_copy(const Args &...args);
+            void uncheck_copy(const Args&... args);
 
-            bool copyByBuffer(CommandManager commandManager, BufferAccessor *buf);
+            bool copyByBuffer(CommandManager commandManager, BufferAccessor* buf);
 
-            bool copyByImage(CommandManager commandManager, const ImageAccessor &image);
+            bool copyByImage(CommandManager commandManager, const ImageAccessor& image);
         };
 
         std::shared_ptr<_impl::Buffer_impl> _data;
 
         virtual LocalBufferHolder data(std::optional<size_t> size = std::nullopt, size_t offset = 0) = 0;
 
-        virtual void flush(LocalBufferHolder &holder) = 0;
+        virtual void flush(LocalBufferHolder& holder) = 0;
 
         template<typename... Args>
-        bool copy(const Args &...args);
+        bool copy(const Args&... args);
 
         template<typename T>
-        bool copy(T *t, size_t size);
+        bool copy(T* t, size_t size);
 
         template<typename... Args>
-        void uncheck_copy(const Args &...args);
+        void uncheck_copy(const Args&... args);
 
-        bool copyByBuffer(CommandManager commandManager, BufferAccessor *buf);
+        bool copyByBuffer(CommandManager commandManager, BufferAccessor* buf);
 
-        bool copyByImage(CommandManager commandManager, const ImageAccessor &image);
+        bool copyByImage(CommandManager commandManager, const ImageAccessor& image);
 
         size_t size();
 
@@ -249,10 +249,10 @@ namespace VSL_NAMESPACE {
                    MemoryProperty memProperty, SharingMode sharingMode);
 
         static void
-        FlushBuffer(LocalBufferHolder &holder, MemoryType memType, MemoryProperty memProperty, SharingMode sharingMode);
+        FlushBuffer(LocalBufferHolder& holder, MemoryType memType, MemoryProperty memProperty, SharingMode sharingMode);
 
         static LocalBufferHolder
-        GetData(VSL_NAMESPACE::BufferAccessor *data, std::optional<size_t> size, size_t offset, MemoryType memType,
+        GetData(VSL_NAMESPACE::BufferAccessor* data, std::optional<size_t> size, size_t offset, MemoryType memType,
                 MemoryProperty memProperty, SharingMode sharingMode);
     };
 
@@ -260,14 +260,14 @@ namespace VSL_NAMESPACE {
         std::shared_ptr<_impl::Image_impl> _data;
         data_format::___Format getFormat() const;
 
-        bool copyByBuffer(CommandManager commandManager, BufferAccessor *buf, vsl::ImageLayout layout, std::uint32_t target_idx);
+        bool copyByBuffer(CommandManager commandManager, BufferAccessor* buf, VSL_NAMESPACE::ImageLayout layout, std::uint32_t target_idx);
 
         size_t size();
 
-        static std::shared_ptr<_impl::Image_impl> MakeImage(vsl::ImageType type,
-                                                            vsl::MemoryProperty prop,
-                                                            vsl::ImageLayout layout,
-                                                            vsl::LogicalDeviceAccessor device,
+        static std::shared_ptr<_impl::Image_impl> MakeImage(VSL_NAMESPACE::ImageType type,
+                                                            VSL_NAMESPACE::MemoryProperty prop,
+                                                            VSL_NAMESPACE::ImageLayout layout,
+                                                            VSL_NAMESPACE::LogicalDeviceAccessor device,
                                                             std::uint32_t width,
                                                             std::uint32_t height,
                                                             data_format::___Format format,
@@ -275,8 +275,8 @@ namespace VSL_NAMESPACE {
 
         static void TransformLayout(CommandManager manager,
                                     std::shared_ptr<_impl::Image_impl> data,
-                                    vsl::ImageLayout oldLayout,
-                                    vsl::ImageLayout newLayouts);
+                                    VSL_NAMESPACE::ImageLayout oldLayout,
+                                    VSL_NAMESPACE::ImageLayout newLayouts);
     };
-}
+} // namespace VSL_NAMESPACE
 #endif

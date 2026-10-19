@@ -37,4 +37,4 @@ namespace aho_test {
                 << "Input objects must keep the window handle through callback unregistration.";
         }
     };
-}
+} // namespace aho_test

@@ -168,5 +168,5 @@ namespace {
         aho_test::expect_coordinates(pointer.triangles()[0].pos1, -1, -2, -3);
     }
 
-}
+} // namespace
 #endif

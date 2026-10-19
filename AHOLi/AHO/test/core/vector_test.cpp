@@ -676,5 +676,5 @@ namespace {
         aho_test::expect_coordinates(delta, 1, 2, 3);
     }
 
-}
+} // namespace
 #endif

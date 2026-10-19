@@ -28,6 +28,6 @@ namespace VSL_NAMESPACE {
     struct Sampler : public SamplerAccessor {
         Sampler(LogicalDeviceAccessor device, SamplingMode sampling = SamplingMode::Linear, EdgeMode edge = EdgeMode::ClampToBorder);
     };
-}
+} // namespace VSL_NAMESPACE
 
 #endif //AHO_ALL_SAMPLER_H

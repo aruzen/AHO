@@ -41,4 +41,4 @@ namespace AHO_NAMESPACE {
              typename Size = size_t,
              typename Alloc = std::vector<IndexedTriangle<Size>>::allocator_type>
     struct Polygon;
-}
+} // namespace AHO_NAMESPACE

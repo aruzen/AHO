@@ -14,19 +14,19 @@
 #include <VSL/vulkan/commands/copy_buffer_to_image.hpp>
 #include <VSL/vulkan/buffer_and_image_accessor.hpp>
 
-size_t vsl::ImageAccessor::size() {
+size_t VSL_NAMESPACE::ImageAccessor::size() {
     return std::size_t(_data->width) * _data->height * _data->count * convert((data_format::___FormatTypes)_data->format).size();
 }
 
-std::shared_ptr<vsl::_impl::Image_impl>
-vsl::ImageAccessor::MakeImage(vsl::ImageType type,
-                              vsl::MemoryProperty prop,
-                              vsl::ImageLayout layout,
-                              vsl::LogicalDeviceAccessor device,
-                              std::uint32_t width,
-                              std::uint32_t height,
-                              vsl::data_format::___Format format,
-                              std::uint32_t count, SampleCount samples) {
+std::shared_ptr<VSL_NAMESPACE::_impl::Image_impl>
+VSL_NAMESPACE::ImageAccessor::MakeImage(VSL_NAMESPACE::ImageType type,
+                                        VSL_NAMESPACE::MemoryProperty prop,
+                                        VSL_NAMESPACE::ImageLayout layout,
+                                        VSL_NAMESPACE::LogicalDeviceAccessor device,
+                                        std::uint32_t width,
+                                        std::uint32_t height,
+                                        VSL_NAMESPACE::data_format::___Format format,
+                                        std::uint32_t count, SampleCount samples) {
     if (!device._data || !width || !height || !count || format.type() == data_format::___FormatTypes::Undefined)
         throw std::invalid_argument("Invalid image device/extent/format");
     const auto sampleBits = static_cast<std::uint32_t>(samples);
@@ -58,8 +58,8 @@ vsl::ImageAccessor::MakeImage(vsl::ImageType type,
 
     vk::MemoryAllocateInfo allocInfo;
     allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = vsl::_impl::helper::findMemoryType(device._data, memRequirements.memoryTypeBits,
-                                                                   (vk::MemoryPropertyFlagBits)prop);
+    allocInfo.memoryTypeIndex = VSL_NAMESPACE::_impl::helper::findMemoryType(device._data, memRequirements.memoryTypeBits,
+                                                                             (vk::MemoryPropertyFlagBits)prop);
 
     _data->memory = device._data->device.allocateMemory(allocInfo);
 
@@ -80,13 +80,13 @@ vsl::ImageAccessor::MakeImage(vsl::ImageType type,
     return _data;
 }
 
-void vsl::ImageAccessor::TransformLayout(vsl::CommandManager manager, std::shared_ptr<_impl::Image_impl> data,
-                                         vsl::ImageLayout oldLayout, vsl::ImageLayout newLayout) {
+void VSL_NAMESPACE::ImageAccessor::TransformLayout(VSL_NAMESPACE::CommandManager manager, std::shared_ptr<_impl::Image_impl> data,
+                                                   VSL_NAMESPACE::ImageLayout oldLayout, VSL_NAMESPACE::ImageLayout newLayout) {
     auto phase = manager.startPhase<ComputePhase>();
     phase << command::ChangeImageBarrier(ImageAccessor{std::move(data)}, oldLayout, newLayout);
 }
 
-bool vsl::ImageAccessor::copyByBuffer(CommandManager manager, BufferAccessor *buf, vsl::ImageLayout layout, std::uint32_t target_idx) {
+bool VSL_NAMESPACE::ImageAccessor::copyByBuffer(CommandManager manager, BufferAccessor* buf, VSL_NAMESPACE::ImageLayout layout, std::uint32_t target_idx) {
     auto phase = manager.startPhase<ComputePhase>();
     if (this->_data->count == 1)
         phase << command::CopyBufferToImage(*this, buf, layout);
@@ -95,7 +95,7 @@ bool vsl::ImageAccessor::copyByBuffer(CommandManager manager, BufferAccessor *bu
     return true;
 }
 
-vsl::_impl::Image_impl::~Image_impl() {
+VSL_NAMESPACE::_impl::Image_impl::~Image_impl() {
     if (!device)
         return;
     device->device.destroy(view);
@@ -104,7 +104,7 @@ vsl::_impl::Image_impl::~Image_impl() {
         device->device.free(memory);
     }
 }
-vsl::data_format::___Format vsl::ImageAccessor::getFormat() const {
+VSL_NAMESPACE::data_format::___Format VSL_NAMESPACE::ImageAccessor::getFormat() const {
     const auto type = static_cast<data_format::___FormatTypes>(_data->format);
     const auto format = data_format::convert(type);
     return format.type() == data_format::___FormatTypes::Undefined ? data_format::___Format(type, 0) : format;

@@ -8,12 +8,12 @@
 #include <VSL/exceptions.hpp>
 
 namespace {
-    std::uint32_t shape_stride(const vsl::pipeline_layout::VertexInputShapeDefinition& definition) {
+    std::uint32_t shape_stride(const VSL_NAMESPACE::pipeline_layout::VertexInputShapeDefinition& definition) {
         std::uint32_t next_offset = 0, extent = 0;
         for (const auto& layout : definition.layouts) {
             const auto offset = layout.offset == std::uint32_t(-1) ? next_offset : layout.offset;
             if (layout.format.size() > std::numeric_limits<std::uint32_t>::max() - offset)
-                throw vsl::exceptions::RuntimeException("VertexInput", "Vertex attribute extent exceeds uint32 range");
+                throw VSL_NAMESPACE::exceptions::RuntimeException("VertexInput", "Vertex attribute extent exceeds uint32 range");
             next_offset = offset + layout.format.size();
             extent = std::max(extent, next_offset);
         }
@@ -67,7 +67,7 @@ size_t VSL_NAMESPACE::pipeline_layout::VertexInput::requirements_size() {
     for (auto& def : definitions) {
         const auto stride = shape_stride(def);
         if (stride > std::numeric_limits<size_t>::max() - size)
-            throw vsl::exceptions::RuntimeException("VertexInput", "Vertex input requirements overflow");
+            throw VSL_NAMESPACE::exceptions::RuntimeException("VertexInput", "Vertex input requirements overflow");
         size += stride;
     }
     return size;

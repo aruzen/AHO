@@ -24,13 +24,17 @@ namespace {
     }
     TEST_F(AhoWindowVulkanIntegration, MonitorSizeRequiresAvailablePrimaryDisplayMode) {
         auto* monitor = glfwGetPrimaryMonitor();
-        if (!monitor)
-            GTEST_SKIP() << "The current display session exposes no primary monitor.";
+        if (!monitor) {
+            EXPECT_THROW(aho::window::GetMonitorSize(), vsl::exceptions::RuntimeException);
+            return;
+        }
 #ifdef __APPLE__
         const auto display = glfwGetCocoaMonitor(monitor);
         auto mode = CGDisplayCopyDisplayMode(display);
-        if (!mode)
-            GTEST_SKIP() << "macOS exposes no video mode for the primary display; GLFW 3.4 cannot query it safely.";
+        if (!mode) {
+            EXPECT_THROW(aho::window::GetMonitorSize(), vsl::exceptions::RuntimeException);
+            return;
+        }
         CGDisplayModeRelease(mode);
 #endif
         const auto* mode_info = glfwGetVideoMode(monitor);
@@ -104,3 +108,42 @@ namespace {
     }
 } // namespace
 #endif
+
+#ifndef AHO_GPU_TESTS
+#include <gtest/gtest.h>
+#include <AHO/window.hpp>
+#include <GLFW/glfw3.h>
+namespace {
+    TEST(MonitorSizeTest, UninitializedGlfwThrowsInsteadOfDereferencingANullMode) {
+        ASSERT_TRUE(vsl::PureWindow::WINDOWS.empty());
+        glfwTerminate();
+        try {
+            (void)aho::window::GetMonitorSize();
+            ADD_FAILURE() << "Missing primary monitor was accepted";
+        } catch (const vsl::exceptions::RuntimeException& error) {
+            EXPECT_NE(std::string(error.what()).find("monitor"), std::string::npos);
+        }
+        glfwGetError(nullptr);
+    }
+#if defined(GLFW_PLATFORM_NULL)
+    TEST(MonitorSizeTest, InitializedNullPlatformReturnsItsVirtualMonitorSize) {
+        ASSERT_TRUE(vsl::PureWindow::WINDOWS.empty());
+        struct RestorePlatform {
+            ~RestorePlatform() {
+                glfwTerminate();
+                glfwInitHint(GLFW_PLATFORM, GLFW_ANY_PLATFORM);
+            }
+        } restore;
+        glfwTerminate();
+        glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_NULL);
+        ASSERT_TRUE(glfwInit());
+        ASSERT_NE(glfwGetPrimaryMonitor(), nullptr);
+        const auto size = aho::window::GetMonitorSize();
+        EXPECT_EQ(size.value.x.value, 1920);
+        EXPECT_EQ(size.value.y.value, 1080);
+        EXPECT_EQ(glfwGetError(nullptr), GLFW_NO_ERROR);
+    }
+#endif
+} // namespace
+
+#endif // AHO_GPU_TESTS

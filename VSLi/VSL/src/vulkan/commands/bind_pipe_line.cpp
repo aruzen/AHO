@@ -4,5 +4,6 @@
 VSL_NAMESPACE::command::BindPipeline::BindPipeline(PipelineAccessor pipeline) : pipeline(pipeline) {}
 
 void VSL_NAMESPACE::command::BindPipeline::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
+    buffer.retain(pipeline._data);
     buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline._data->pipeline);
 }

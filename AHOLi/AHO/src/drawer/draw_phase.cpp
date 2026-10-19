@@ -69,6 +69,13 @@ void AHO_NAMESPACE::DrawPhase::restorePreviousPhase() noexcept {
         *current = previousPhase;
 }
 
+AHO_NAMESPACE::DrawPhase* AHO_NAMESPACE::DrawPhase::currentForManager(const VSL_NAMESPACE::CommandManager& manager) noexcept {
+    auto* phase = THREAD_LOCAL_DRAW_PHASE;
+    while (phase && phase->manager._data != manager._data)
+        phase = phase->previousPhase;
+    return phase;
+}
+
 AHO_NAMESPACE::DrawPhase::SubmitResult AHO_NAMESPACE::DrawPhase::submitCommands() {
     if (state == State::WaitSubmit) {
         if (finishStarted)

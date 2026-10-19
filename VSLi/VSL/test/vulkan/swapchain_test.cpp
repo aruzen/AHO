@@ -1,7 +1,9 @@
 #include "support/window_fixture.hpp"
 #include "support/read_image.hpp"
 namespace {
-    using SwapchainWindowIntegrationTest = vsl_test::WindowIntegrationTest;
+    class SwapchainWindowIntegrationTest : public vsl_test::WindowIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
     TEST_F(SwapchainWindowIntegrationTest, CreatesImagesAndRecreatesUsingOldSwapchain) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
@@ -67,5 +69,53 @@ namespace {
         EXPECT_FALSE(owner.expired());
         image._data.reset();
         EXPECT_TRUE(owner.expired());
+    }
+} // namespace
+
+#include "../../src/vulkan/swapchain_sharing.hpp"
+namespace {
+    TEST(SwapchainSharingTest, ConcurrentImagesKeepEverySelectedSurfaceTransform) {
+        const std::uint32_t families[]{2, 7};
+        for (const auto transform : {vk::SurfaceTransformFlagBitsKHR::eIdentity, vk::SurfaceTransformFlagBitsKHR::eRotate90,
+                                     vk::SurfaceTransformFlagBitsKHR::eRotate180, vk::SurfaceTransformFlagBitsKHR::eHorizontalMirror}) {
+            SCOPED_TRACE(vk::to_string(transform));
+            vk::SwapchainCreateInfoKHR info{};
+            vsl::_impl::helper::configureSwapchainSharing(info, families, transform);
+            EXPECT_EQ(info.preTransform, transform);
+            EXPECT_EQ(info.imageSharingMode, vk::SharingMode::eConcurrent);
+            ASSERT_EQ(info.queueFamilyIndexCount, 2u);
+            ASSERT_EQ(info.pQueueFamilyIndices, families);
+            EXPECT_EQ(info.pQueueFamilyIndices[0], 2u);
+            EXPECT_EQ(info.pQueueFamilyIndices[1], 7u);
+        }
+    }
+    TEST(SwapchainSharingTest, ExclusiveImagesKeepTransformAndNeedNoFamilyList) {
+        const std::uint32_t families[]{4, 4};
+        vk::SwapchainCreateInfoKHR info{};
+        vsl::_impl::helper::configureSwapchainSharing(info, families, vk::SurfaceTransformFlagBitsKHR::eRotate270);
+        EXPECT_EQ(info.preTransform, vk::SurfaceTransformFlagBitsKHR::eRotate270);
+        EXPECT_EQ(info.imageSharingMode, vk::SharingMode::eExclusive);
+        EXPECT_EQ(info.queueFamilyIndexCount, 0u);
+        EXPECT_EQ(info.pQueueFamilyIndices, nullptr);
+    }
+    TEST(SwapchainSharingTest, ReconfiguringForOneFamilyClearsThePreviousFamilyList) {
+        const std::uint32_t different[]{1, 3}, same[]{1, 1};
+        vk::SwapchainCreateInfoKHR info{};
+        vsl::_impl::helper::configureSwapchainSharing(info, different, vk::SurfaceTransformFlagBitsKHR::eIdentity);
+        vsl::_impl::helper::configureSwapchainSharing(info, same, vk::SurfaceTransformFlagBitsKHR::eRotate90);
+        EXPECT_EQ(info.preTransform, vk::SurfaceTransformFlagBitsKHR::eRotate90);
+        EXPECT_EQ(info.imageSharingMode, vk::SharingMode::eExclusive);
+        EXPECT_EQ(info.queueFamilyIndexCount, 0u);
+        EXPECT_EQ(info.pQueueFamilyIndices, nullptr);
+    }
+    TEST(SwapchainSharingTest, ReconfiguringForTwoFamiliesUpdatesTransformAndFamilyList) {
+        const std::uint32_t same[]{1, 1}, different[]{1, 3};
+        vk::SwapchainCreateInfoKHR info{};
+        vsl::_impl::helper::configureSwapchainSharing(info, same, vk::SurfaceTransformFlagBitsKHR::eRotate90);
+        vsl::_impl::helper::configureSwapchainSharing(info, different, vk::SurfaceTransformFlagBitsKHR::eHorizontalMirror);
+        EXPECT_EQ(info.preTransform, vk::SurfaceTransformFlagBitsKHR::eHorizontalMirror);
+        EXPECT_EQ(info.imageSharingMode, vk::SharingMode::eConcurrent);
+        EXPECT_EQ(info.queueFamilyIndexCount, 2u);
+        EXPECT_EQ(info.pQueueFamilyIndices, different);
     }
 } // namespace

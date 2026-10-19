@@ -1,5 +1,7 @@
 #include <VSL/define.hpp>
 #include <VSL/window.hpp>
+#include <algorithm>
+
 #include <VSL/exceptions.hpp>
 #include <utility>
 
@@ -66,10 +68,22 @@ bool VSL_NAMESPACE::PureWindow::Update()
 {
 	glfwPollEvents();
 	bool s = true;
-	for (auto p : WINDOWS)
-		for (auto& f : p->update)
-			if (!f->onUpdate(PureWindow(p)))
+	const std::vector<std::weak_ptr<WindowData>> windows(WINDOWS.begin(), WINDOWS.end());
+	for (const auto& candidate : windows) {
+		auto p = candidate.lock();
+		if (!p || std::ranges::find(WINDOWS, p) == WINDOWS.end())
+			continue;
+		const std::vector<std::weak_ptr<OnUpdate>> callbacks(p->update.begin(), p->update.end());
+		for (const auto& callback : callbacks) {
+			if (std::ranges::find(WINDOWS, p) == WINDOWS.end())
+				break;
+			auto listener = callback.lock();
+			if (!listener || std::ranges::find(p->update, listener) == p->update.end())
+				continue;
+			if (!listener->onUpdate(PureWindow(p)))
 				s = false;
+		}
+	}
 	return s;
 }
 

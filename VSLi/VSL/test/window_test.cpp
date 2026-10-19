@@ -100,6 +100,115 @@ TEST(WindowPluginRemovalTest, NullPluginDoesNotChangeRegistrations) {
 }
 
 namespace {
+struct UpdateActionPlugin : vsl::PureWindow::Plugin, vsl::PureWindow::OnUpdate {
+    std::function<bool(vsl::PureWindow)> action;
+    UpdateActionPlugin(vsl::PureWindow *, std::function<bool(vsl::PureWindow)> action)
+        : action(std::move(action)) {}
+    bool onUpdate(vsl::PureWindow window) override { return action(std::move(window)); }
+};
+struct ScopedUpdateWindow {
+    vsl::PureWindow window{"VSL update mutation test", 32, 24};
+    ~ScopedUpdateWindow() { if (window._data && window._data->window_handle) window.close(); }
+};
+TEST_F(WindowIntegrationTest, UpdateSkipsRemovedListenersAndDefersNewListenersOnTheCurrentWindow) {
+    int first_calls = 0, removed_calls = 0, added_calls = 0;
+    bool changed = false;
+    std::shared_ptr<CountingUpdatePlugin> removed, added;
+    window->add_plugin<UpdateActionPlugin>([&](vsl::PureWindow current) {
+        ++first_calls;
+        if (!changed) {
+            changed = true;
+            EXPECT_TRUE(current.remove_plugin(removed));
+            added = current.add_plugin<CountingUpdatePlugin>(added_calls);
+        }
+        return false;
+    });
+    removed = window->add_plugin<CountingUpdatePlugin>(removed_calls);
+    EXPECT_FALSE(vsl::PureWindow::Update());
+    EXPECT_EQ(first_calls, 1);
+    EXPECT_EQ(removed_calls, 0);
+    EXPECT_EQ(added_calls, 0);
+    EXPECT_FALSE(vsl::PureWindow::Update());
+    EXPECT_EQ(first_calls, 2);
+    EXPECT_EQ(removed_calls, 0);
+    EXPECT_EQ(added_calls, 1);
+}
+TEST_F(WindowIntegrationTest, UpdatingListenerStaysAliveUntilItsSelfRemovalCallbackReturns) {
+    int follower_calls = 0;
+    bool alive_during_callback = false;
+    std::weak_ptr<UpdateActionPlugin> weak;
+    std::shared_ptr<UpdateActionPlugin> self;
+    self = window->add_plugin<UpdateActionPlugin>([&](vsl::PureWindow current) {
+        EXPECT_TRUE(current.remove_plugin(self));
+        self.reset();
+        alive_during_callback = !weak.expired();
+        return true;
+    });
+    weak = self;
+    window->add_plugin<CountingUpdatePlugin>(follower_calls);
+    EXPECT_TRUE(vsl::PureWindow::Update());
+    EXPECT_TRUE(alive_during_callback);
+    EXPECT_TRUE(weak.expired());
+    EXPECT_EQ(follower_calls, 1);
+}
+TEST_F(WindowIntegrationTest, ClosingTheCurrentWindowSkipsItsOtherCallbacksAndStillUpdatesAnotherWindow) {
+    int stale_calls = 0, other_calls = 0;
+    ScopedUpdateWindow other;
+    ASSERT_TRUE(static_cast<bool>(other.window));
+    window->add_plugin<UpdateActionPlugin>([](vsl::PureWindow current) { return current.close(); });
+    window->add_plugin<CountingUpdatePlugin>(stale_calls);
+    other.window.add_plugin<CountingUpdatePlugin>(other_calls);
+    EXPECT_TRUE(vsl::PureWindow::Update());
+    EXPECT_EQ(stale_calls, 0);
+    EXPECT_EQ(other_calls, 1);
+    EXPECT_FALSE(static_cast<bool>(*window));
+}
+TEST_F(WindowIntegrationTest, WindowsAddedDuringUpdateStartReceivingCallbacksOnTheNextTick) {
+    int first_calls = 0, other_calls = 0, created_calls = 0;
+    ScopedUpdateWindow other;
+    std::vector<std::unique_ptr<ScopedUpdateWindow>> created;
+    window->add_plugin<UpdateActionPlugin>([&](vsl::PureWindow) {
+        ++first_calls;
+        if (created.empty()) {
+            const auto previous_capacity = vsl::PureWindow::WINDOWS.capacity();
+            do {
+                created.push_back(std::make_unique<ScopedUpdateWindow>());
+                EXPECT_TRUE(static_cast<bool>(created.back()->window));
+                created.back()->window.add_plugin<CountingUpdatePlugin>(created_calls);
+            } while (vsl::PureWindow::WINDOWS.capacity() == previous_capacity);
+        }
+        return true;
+    });
+    other.window.add_plugin<CountingUpdatePlugin>(other_calls);
+    EXPECT_TRUE(vsl::PureWindow::Update());
+    EXPECT_EQ(first_calls, 1);
+    EXPECT_EQ(other_calls, 1);
+    EXPECT_EQ(created_calls, 0);
+    ASSERT_FALSE(created.empty());
+    EXPECT_TRUE(vsl::PureWindow::Update());
+    EXPECT_EQ(first_calls, 2);
+    EXPECT_EQ(other_calls, 2);
+    EXPECT_EQ(created_calls, static_cast<int>(created.size()));
+}
+} // namespace
+
+namespace {
+TEST_F(WindowIntegrationTest, AListenerAddedToALaterWindowRunsWhenThatWindowBeginsUpdating) {
+    int calls = 0;
+    ScopedUpdateWindow other;
+    std::shared_ptr<CountingUpdatePlugin> added;
+    window->add_plugin<UpdateActionPlugin>([&](vsl::PureWindow) {
+        if (!added) added = other.window.add_plugin<CountingUpdatePlugin>(calls);
+        return true;
+    });
+    EXPECT_TRUE(vsl::PureWindow::Update());
+    EXPECT_EQ(calls, 1);
+    EXPECT_TRUE(vsl::PureWindow::Update());
+    EXPECT_EQ(calls, 2);
+}
+} // namespace
+
+namespace {
 TEST(WindowValidityTest, NullSharedDataIsInvalidAndCanBeClosed) {
     vsl::PureWindow window(std::shared_ptr<vsl::PureWindow::WindowData>{});
     EXPECT_FALSE(static_cast<bool>(window));

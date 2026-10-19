@@ -36,6 +36,10 @@ namespace VSL_NAMESPACE::typed {
 
     template<std::uint32_t Binding, std::uint32_t Size, pipeline_layout::VertexInputShapeDefinition::UpdateTiming Timing, typename... Definitions>
     struct VertexShapeDefinition {
+        static pipeline_layout::VertexInputShapeDefinition make() {
+            return {.layouts = {Definitions::value...}, .binding = Binding, .size = Size, .updateTiming = Timing};
+        }
+
         static constexpr size_t size() { return sizeof...(Definitions); }
 
         template<size_t Index>
@@ -68,6 +72,10 @@ namespace VSL_NAMESPACE::typed {
 
     template<typename... Definitions>
     void TypedVertexInput<Definitions...>::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
+        pipeline_layout::VertexInput input;
+        input.definitions.reserve(sizeof...(Definitions));
+        (input.definitions.push_back(Definitions::make()), ...);
+        input.injection(pl);
     }
 } // namespace VSL_NAMESPACE::typed
 

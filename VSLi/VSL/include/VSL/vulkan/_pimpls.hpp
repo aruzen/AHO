@@ -27,8 +27,11 @@
 #include <set>
 
 namespace VSL_NAMESPACE {
+    namespace graphic_resource {
+        struct ManagerInterface;
+    }
     struct RenderPassDescription;
-}
+} // namespace VSL_NAMESPACE
 
 namespace VSL_NAMESPACE::_impl {
     struct Vulkan_impl_accessor {
@@ -265,6 +268,10 @@ namespace VSL_NAMESPACE::_impl {
         ~ResourceBindingLayout_impl();
     };
 
+    struct GraphicResourceManagerIdentity {
+        graphic_resource::ManagerInterface* manager = nullptr;
+    };
+
     struct GraphicResourcePool_impl;
     struct GraphicResourceManager_impl {
         std::shared_ptr<LogicalDevice_impl> device;
@@ -276,20 +283,23 @@ namespace VSL_NAMESPACE::_impl {
 
     struct GraphicResource_impl;
     struct GraphicResourcePool_impl {
-        void* manager;
+        std::weak_ptr<GraphicResourceManagerIdentity> manager;
         std::shared_ptr<LogicalDevice_impl> device;
 
         vk::DescriptorPool descriptorPool;
-        std::vector<std::shared_ptr<GraphicResource_impl>> resources;
+        std::vector<std::weak_ptr<GraphicResource_impl>> resources;
 
         ~GraphicResourcePool_impl();
     };
 
     struct GraphicResource_impl {
         std::shared_ptr<_impl::GraphicResourcePool_impl> pool;
-        std::weak_ptr<_impl::ResourceBindingLayout_impl> layout;
+        std::shared_ptr<_impl::ResourceBindingLayout_impl> layout;
 
         vk::DescriptorSet descriptorSet;
+        std::map<std::uint32_t, std::vector<std::shared_ptr<void>>> bindings;
+
+        ~GraphicResource_impl();
     };
 
     struct Image_impl {

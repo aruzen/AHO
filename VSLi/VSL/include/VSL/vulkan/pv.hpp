@@ -30,6 +30,7 @@ namespace VSL_NAMESPACE::_impl {
     struct ResourceBindingLayout_impl;
     struct GraphicResourcePool_impl;
     struct GraphicResourceManager_impl;
+    struct GraphicResourceManagerIdentity;
     struct GraphicResource_impl;
     struct Image_impl;
     struct Sampler_impl;

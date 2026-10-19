@@ -255,11 +255,18 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
         format = format.toVec(type.vecsize);
         if (not generated.vertex_input)
             generated.vertex_input.emplace();
-        VSL_NAMESPACE::pipeline_layout::VertexInputShapeDefinition definition{
-            .layouts = {type.columns, VSL_NAMESPACE::pipeline_layout::VertexInputLayoutDefinition{.format = format}}};
+        const auto array_elements = descriptor_count(comp, type);
+        constexpr auto max_location = std::numeric_limits<std::uint32_t>::max();
+        if (type.columns > max_location / array_elements)
+            throw exceptions::RuntimeException("SPIRVReflector", "Vertex input array column count overflow");
+        const auto columns = type.columns * array_elements;
         const auto location = comp.get_decoration(resource.id, spv::DecorationLocation);
         const auto locations_per_column = type.width == 64 && type.vecsize >= 3 ? 2u : 1u;
-        for (std::uint32_t column = 0; column < type.columns; ++column)
+        if (columns - 1 > (max_location - location) / locations_per_column)
+            throw exceptions::RuntimeException("SPIRVReflector", "Vertex input location range overflow");
+        VSL_NAMESPACE::pipeline_layout::VertexInputShapeDefinition definition{
+            .layouts = {columns, VSL_NAMESPACE::pipeline_layout::VertexInputLayoutDefinition{.format = format}}};
+        for (std::uint32_t column = 0; column < columns; ++column)
             definition.layouts[column].location = location + column * locations_per_column;
         generated.vertex_input->definitions.push_back(std::move(definition));
     }

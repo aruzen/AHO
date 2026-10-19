@@ -35,7 +35,7 @@ namespace AHO_NAMESPACE {
 			typename T::element_type;
 			typename T::dimension;
             typename T::coordinate_info;
-            { VSL_NAMESPACE::is_dimension<typename T::dimension> };
+            requires VSL_NAMESPACE::is_dimension<typename T::dimension>;
 			{t.points()} -> std::ranges::range;
 			{*std::begin(t.points())} -> is_point;
 			std::views::common(t.points());
@@ -46,7 +46,7 @@ namespace AHO_NAMESPACE {
 			typename T::element_type;
 			typename T::dimension;
             typename T::coordinate_info;
-            { VSL_NAMESPACE::is_dimension<typename T::dimension> };
+            requires VSL_NAMESPACE::is_dimension<typename T::dimension>;
 			{t.lines()} -> std::ranges::range;
 			{*std::begin(t.lines())} -> is_line;
 			std::views::common(t.lines());
@@ -57,7 +57,7 @@ namespace AHO_NAMESPACE {
 			typename T::element_type;
 			typename T::dimension;
             typename T::coordinate_info;
-            { VSL_NAMESPACE::is_dimension<typename T::dimension> };
+            requires VSL_NAMESPACE::is_dimension<typename T::dimension>;
 			{t.triangles()} -> std::ranges::range;
 			{*std::begin(t.triangles())} -> is_triangle;
 			std::views::common(t.triangles());

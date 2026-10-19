@@ -96,6 +96,6 @@ namespace AHO_NAMESPACE::concepts {
     template<typename T, typename R>
     concept is_intersect_object = requires(T t, R r) {
         { t.intersect(r) } -> std::convertible_to<bool>;
-        { t.cotains(r) } -> std::convertible_to<bool>;
+        { t.contains(r) } -> std::convertible_to<bool>;
     };
 } // namespace AHO_NAMESPACE::concepts

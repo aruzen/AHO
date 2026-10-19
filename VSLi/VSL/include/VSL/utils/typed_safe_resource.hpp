@@ -46,7 +46,7 @@ namespace VSL_NAMESPACE::typed {
 
     template<typename... Definitions>
     struct TypedVertexInput {
-        void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
+        void injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl);
     };
 
     template<VSL_NAMESPACE::ShaderFlag Target, std::uint32_t Size = (std::uint32_t)-1, std::uint32_t Offset = (std::uint32_t)-1>
@@ -67,7 +67,7 @@ namespace VSL_NAMESPACE::typed {
     // ===========================================================
 
     template<typename... Definitions>
-    void TypedVertexInput<Definitions...>::injection(VSL_NAMESPACE::PipelineLayoutAccessor pl) {
+    void TypedVertexInput<Definitions...>::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
     }
 } // namespace VSL_NAMESPACE::typed
 

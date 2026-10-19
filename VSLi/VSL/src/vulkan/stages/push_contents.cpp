@@ -6,7 +6,7 @@
 #include <VSL/vulkan/stages/color_blend.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 
-void VSL_NAMESPACE::pipeline_layout::PushConstants::injection(VSL_NAMESPACE::PipelineLayoutAccessor pl) {
+void VSL_NAMESPACE::pipeline_layout::PushConstants::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
     auto& info = *pl._data->info;
 
     auto& push_contents = std::any_cast<std::vector<vk::PushConstantRange>&>(info.pool["colorBlendAttachment"] = std::vector<vk::PushConstantRange>());

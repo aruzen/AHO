@@ -2,6 +2,7 @@
 #include <GLFW/glfw3.h>
 
 #include <utility>
+#include <vector>
 
 AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::GetMonitorSize() {
     GLFWmonitor* monitor = glfwGetPrimaryMonitor();
@@ -44,9 +45,18 @@ bool AHO_NAMESPACE::window::Window::resize(int width, int height) {
     if (_data2->render_finished.size() != _data2->swapchain.getSwapImageSize())
         _data2->render_finished = engine._data->synchro_manager.createSemaphore(
             name() + "RenderFinished", _data2->swapchain.getSwapImageSize());
-    for (const auto& [_, p] : _data->plugins) {
-        auto hook = std::dynamic_pointer_cast<WindowResizeHookPlugin>(p);
-        if (not hook)
+    const auto data = _data;
+    std::vector<std::pair<unsigned char, std::weak_ptr<WindowResizeHookPlugin>>> hooks;
+    hooks.reserve(data->plugins.size());
+    for (const auto& [id, plugin] : data->plugins)
+        if (auto hook = std::dynamic_pointer_cast<WindowResizeHookPlugin>(plugin))
+            hooks.emplace_back(id, hook);
+    for (const auto& [id, candidate] : hooks) {
+        if (_data != data || !_data2 || !data->window_handle)
+            break;
+        auto hook = candidate.lock();
+        const auto current = data->plugins.find(id);
+        if (!hook || current == data->plugins.end() || current->second != hook)
             continue;
         hook->hook(this);
     }

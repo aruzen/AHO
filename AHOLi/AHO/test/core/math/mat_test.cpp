@@ -622,4 +622,166 @@ namespace {
     }
 
 } // namespace
+
+namespace {
+    template<class T> class MatScaledInverseTest : public testing::Test {};
+    using ScaledInverseScalars = testing::Types<float, double, long double>;
+    TYPED_TEST_SUITE(MatScaledInverseTest, ScaledInverseScalars);
+    TYPED_TEST(MatScaledInverseTest, OneElementMatricesHaveRepresentableReciprocalsAtSmallAndLargeScales) {
+        using T = TypeParam;
+        const int limit = std::numeric_limits<T>::max_exponent;
+        for (const int exponent : {-limit + 1, -limit / 2, 0, limit / 2, limit - 2})
+            for (const T sign : {T{1}, T{-1}}) {
+                SCOPED_TRACE(testing::Message() << "exponent=" << exponent << " sign=" << sign);
+                const aho::Mat<T, 1, 1> matrix(std::array<std::array<T, 1>, 1>{{{std::ldexp(sign, exponent)}}});
+                const auto inverse = aho::matrix::inverse_gauss_jordan(matrix);
+                ASSERT_TRUE(inverse);
+                EXPECT_EQ((*inverse)[0][0], std::ldexp(sign, -exponent));
+                expect_identity(matrix * *inverse);
+            }
+    }
+    TYPED_TEST(MatScaledInverseTest, IndependentRowAndColumnUnitsPreserveTheKnownInverseAndBothProducts) {
+        using T = TypeParam;
+        const int exponent = std::numeric_limits<T>::max_exponent / 4;
+        const std::array<std::array<T, 2>, 2> base{{{2, 1}, {1, 1}}};
+        const std::array<std::array<T, 2>, 2> knownInverse{{{1, -1}, {-1, 2}}};
+        for (const int rowSign : {-1, 1})
+            for (const int columnSign : {-1, 1}) {
+                SCOPED_TRACE(testing::Message() << "rowSign=" << rowSign << " columnSign=" << columnSign);
+                const std::array<int, 2> rows{rowSign * exponent, -rowSign * exponent};
+                const std::array<int, 2> columns{columnSign * exponent, -columnSign * exponent};
+                aho::Mat<T, 2, 2> matrix;
+                for (std::size_t i = 0; i < 2; ++i)
+                    for (std::size_t j = 0; j < 2; ++j)
+                        matrix[i][j] = std::ldexp(base[i][j], rows[i] + columns[j]);
+                const auto original = matrix;
+                const auto inverse = aho::matrix::inverse_gauss_jordan(matrix);
+                ASSERT_TRUE(inverse);
+                for (std::size_t i = 0; i < 2; ++i)
+                    for (std::size_t j = 0; j < 2; ++j)
+                        EXPECT_EQ((*inverse)[i][j], std::ldexp(knownInverse[i][j], -columns[i] - rows[j]));
+                expect_identity(matrix * *inverse);
+                expect_identity(*inverse * matrix);
+                EXPECT_EQ(matrix, original);
+            }
+    }
+    TYPED_TEST(MatScaledInverseTest, ExtremeRowOrColumnUnitsKeepEveryInputAndFiniteInverseEntry) {
+        using T = TypeParam;
+        const int exponent = std::numeric_limits<T>::max_exponent - 2;
+        const std::array<std::array<T, 2>, 2> base{{{1, 1}, {1, -1}}};
+        const std::array<std::array<T, 2>, 2> knownInverse{{{T{0.5}, T{0.5}}, {T{0.5}, T{-0.5}}}};
+        for (const bool scaleRows : {false, true}) {
+            SCOPED_TRACE(testing::Message() << "scaleRows=" << scaleRows);
+            const std::array<int, 2> rows = scaleRows ? std::array<int, 2>{exponent, -exponent} : std::array<int, 2>{};
+            const std::array<int, 2> columns = scaleRows ? std::array<int, 2>{} : std::array<int, 2>{exponent, -exponent};
+            aho::Mat<T, 2, 2> matrix;
+            for (std::size_t i = 0; i < 2; ++i)
+                for (std::size_t j = 0; j < 2; ++j)
+                    matrix[i][j] = std::ldexp(base[i][j], rows[i] + columns[j]);
+            const auto inverse = aho::matrix::inverse_gauss_jordan(matrix);
+            ASSERT_TRUE(inverse);
+            aho::Mat<T, 2, 2> normalizedInverse;
+            for (std::size_t i = 0; i < 2; ++i)
+                for (std::size_t j = 0; j < 2; ++j) {
+                    EXPECT_TRUE(std::isfinite((*inverse)[i][j]));
+                    EXPECT_EQ((*inverse)[i][j], std::ldexp(knownInverse[i][j], -columns[i] - rows[j]));
+                    normalizedInverse[i][j] = std::ldexp((*inverse)[i][j], columns[i] + rows[j]);
+                }
+            // 元の単位の行列積自体がoverflowするため、既知の単位へ戻して両側の積を確認する。
+            const aho::Mat<T, 2, 2> normalized(base);
+            expect_identity(normalized * normalizedInverse);
+            expect_identity(normalizedInverse * normalized);
+        }
+    }
+    TYPED_TEST(MatScaledInverseTest, ExactlyDependentIntegerRowsRemainSingularAfterRescaling) {
+        using T = TypeParam;
+        for (const bool rescale : {false, true}) {
+            std::uint32_t seed = 311;
+            std::size_t accepted = 0;
+            for (unsigned sample = 0; sample < 1000; ++sample) {
+                aho::Mat<T, 3, 3> matrix;
+                for (std::size_t i = 0; i < 2; ++i)
+                    for (std::size_t j = 0; j < 3; ++j) {
+                        seed = seed * 1664525u + 1013904223u;
+                        matrix[i][j] = static_cast<T>(int((seed >> 16) % 19) - 9);
+                    }
+                for (std::size_t j = 0; j < 3; ++j)
+                    matrix[2][j] = matrix[0][j] + matrix[1][j];
+                if (rescale)
+                    for (std::size_t i = 0; i < 3; ++i)
+                        for (std::size_t j = 0; j < 3; ++j)
+                            matrix[i][j] = std::ldexp(matrix[i][j], (int(i) - int(j)) * 20);
+                const auto inverse = aho::matrix::inverse_gauss_jordan(matrix);
+                if (inverse)
+                    ++accepted;
+                else
+                    EXPECT_EQ(inverse.error(), aho::matrix::FailedCause::Singular);
+            }
+            EXPECT_EQ(accepted, 0u) << "rescale=" << rescale;
+        }
+    }
+    TYPED_TEST(MatScaledInverseTest, LossyRowAndColumnScalingDoesNotEraseNonzeroInputs) {
+        using T = TypeParam;
+        const int exponent = std::numeric_limits<T>::max_exponent - 2;
+        const T large = std::ldexp(T{1}, exponent), tiny = std::ldexp(T{1}, -exponent);
+        const aho::Mat<T, 2, 2> matrix(std::array<std::array<T, 2>, 2>{{{large, tiny}, {tiny, large}}});
+        const auto inverse = aho::matrix::inverse_gauss_jordan(matrix);
+        ASSERT_TRUE(inverse);
+        EXPECT_EQ((*inverse)[0][0], tiny);
+        EXPECT_EQ((*inverse)[1][1], tiny);
+        EXPECT_EQ((*inverse)[0][1], T{0});
+        EXPECT_EQ((*inverse)[1][0], T{0});
+        expect_identity(matrix * *inverse);
+        expect_identity(*inverse * matrix);
+        EXPECT_EQ(matrix[0][1], tiny);
+        EXPECT_EQ(matrix[1][0], tiny);
+    }
+    TYPED_TEST(MatScaledInverseTest, UniformUnitsPreserveNearDependentRowRejection) {
+        using T = TypeParam;
+        // 可逆でもepsilonに近い相対pivotを持つ入力は、単位によらず数値的に特異と扱う。
+        const T adjacent = std::nextafter(T{1}, T{2});
+        for (const int exponent : {-30, 0, 30}) {
+            SCOPED_TRACE(testing::Message() << "exponent=" << exponent);
+            const T scale = std::ldexp(T{1}, exponent);
+            const aho::Mat<T, 2, 2> matrix(std::array<std::array<T, 2>, 2>{{{scale, scale}, {scale, adjacent * scale}}});
+            const auto inverse = aho::matrix::inverse_gauss_jordan(matrix);
+            ASSERT_FALSE(inverse);
+            EXPECT_EQ(inverse.error(), aho::matrix::FailedCause::Singular);
+        }
+    }
+    TEST(MatScaledInverseTest, IntegerPermutationMatricesKeepTheirExactInverse) {
+        const std::array<std::array<int, 2>, 2> values{{{0, 1}, {1, 0}}};
+        const aho::Mat<int, 2, 2> matrix(values);
+        const auto inverse = aho::matrix::inverse_gauss_jordan(matrix);
+        ASSERT_TRUE(inverse);
+        expect_matrix(*inverse, values);
+        expect_identity(matrix * *inverse);
+    }
+    TEST(MatScaledInverseTest, EmptyMatricesRemainInvertibleAndZeroRowsRemainSingular) {
+        const auto empty = aho::matrix::inverse_gauss_jordan(aho::Mat<double, 0, 0>{});
+        ASSERT_TRUE(empty);
+        EXPECT_TRUE(empty->empty());
+        const auto zero = aho::matrix::inverse_gauss_jordan(aho::Mat<double, 2, 2>{});
+        ASSERT_FALSE(zero);
+        EXPECT_EQ(zero.error(), aho::matrix::FailedCause::Singular);
+    }
+    TYPED_TEST(MatScaledInverseTest, ScaledThreeByThreeMatricesPreserveTheirKnownInverse) {
+        using T = TypeParam;
+        const int exponent = std::numeric_limits<T>::max_exponent / 6;
+        const std::array<int, 3> rows{-exponent, 0, exponent}, columns{exponent, -exponent, 0};
+        const std::array<std::array<T, 3>, 3> base{{{1, 2, 3}, {0, 1, 4}, {0, 0, 1}}};
+        const std::array<std::array<T, 3>, 3> knownInverse{{{1, -2, 5}, {0, 1, -4}, {0, 0, 1}}};
+        aho::Mat<T, 3, 3> matrix;
+        for (std::size_t i = 0; i < 3; ++i)
+            for (std::size_t j = 0; j < 3; ++j)
+                matrix[i][j] = std::ldexp(base[i][j], rows[i] + columns[j]);
+        const auto inverse = aho::matrix::inverse_gauss_jordan(matrix);
+        ASSERT_TRUE(inverse);
+        for (std::size_t i = 0; i < 3; ++i)
+            for (std::size_t j = 0; j < 3; ++j)
+                EXPECT_EQ((*inverse)[i][j], std::ldexp(knownInverse[i][j], -columns[i] - rows[j]));
+        expect_identity(matrix * *inverse);
+        expect_identity(*inverse * matrix);
+    }
+} // namespace
 #endif

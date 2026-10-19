@@ -37,6 +37,8 @@ namespace AHO_NAMESPACE {
 
     private:
         bool finishStarted = false;
+        DrawPhase* previousPhase = nullptr;
+        void restorePreviousPhase() noexcept;
     };
 
     AHO_NAMESPACE::DrawStream<VSL_NAMESPACE::DefaultPhaseStream> AHO_NAMESPACE::DrawPhase::operator<<(AHO_NAMESPACE::concepts::is_std_tuple auto&& t) {

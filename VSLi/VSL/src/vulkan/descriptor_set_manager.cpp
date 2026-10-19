@@ -10,12 +10,47 @@
 
 #include <VSL/vulkan/descriptor_set_manager.hpp>
 
+namespace VSL_NAMESPACE::graphic_resource {
+    ManagerInterface::ManagerInterface()
+        : identity_(std::make_shared<_impl::GraphicResourceManagerIdentity>()) { identity_->manager = this; }
+    ManagerInterface::~ManagerInterface() = default;
+    ManagerInterface::ManagerInterface(const ManagerInterface& other) : ManagerInterface() { _data = other._data; }
+    ManagerInterface& ManagerInterface::operator=(const ManagerInterface& other) {
+        if (this != &other) {
+            auto identity = std::make_shared<_impl::GraphicResourceManagerIdentity>();
+            identity->manager = this;
+            _data = other._data;
+            identity_ = std::move(identity);
+        }
+        return *this;
+    }
+    ManagerInterface::ManagerInterface(ManagerInterface&& other) noexcept
+        : _data(std::move(other._data)), identity_(std::move(other.identity_)) {
+        if (identity_)
+            identity_->manager = this;
+    }
+    ManagerInterface& ManagerInterface::operator=(ManagerInterface&& other) noexcept {
+        if (this != &other) {
+            _data = std::move(other._data);
+            identity_ = std::move(other.identity_);
+            if (identity_)
+                identity_->manager = this;
+        }
+        return *this;
+    }
+} // namespace VSL_NAMESPACE::graphic_resource
+
 namespace {
     void release_descriptor_pool(const std::shared_ptr<VSL_NAMESPACE::_impl::GraphicResourcePool_impl>& data) {
         if (data->descriptorPool) {
             data->device->device.destroyDescriptorPool(data->descriptorPool);
             data->descriptorPool = nullptr;
         }
+        for (auto& entry : data->resources)
+            if (auto resource = entry.lock()) {
+                resource->descriptorSet = nullptr;
+                resource->bindings.clear();
+            }
         data->resources.clear();
     }
 } // namespace
@@ -52,7 +87,7 @@ VSL_NAMESPACE::graphic_resource::ManagerInterface::make(std::map<Type, size_t> c
 
     GraphicResourcePool pool;
     pool._data = std::make_shared<_impl::GraphicResourcePool_impl>();
-    pool._data->manager = this;
+    pool._data->manager = identity_;
     pool._data->device = _data->device;
 
     std::vector<vk::DescriptorPoolSize> poolSizes;

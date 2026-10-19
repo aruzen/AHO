@@ -18,12 +18,12 @@ namespace VSL_NAMESPACE::graphic_resource {
      */
 
     struct ManagerInterface {
-        ManagerInterface() = default;
-        ManagerInterface(const ManagerInterface&) = default;
-        ManagerInterface& operator=(const ManagerInterface&) = default;
-        ManagerInterface(ManagerInterface&&) = default;
-        ManagerInterface& operator=(ManagerInterface&&) = default;
-        virtual ~ManagerInterface() = default;
+        ManagerInterface();
+        ManagerInterface(const ManagerInterface& other);
+        ManagerInterface& operator=(const ManagerInterface& other);
+        ManagerInterface(ManagerInterface&& other) noexcept;
+        ManagerInterface& operator=(ManagerInterface&& other) noexcept;
+        virtual ~ManagerInterface();
         // 戻り値のvectorのサイズが同じになることを保証します
         virtual std::tuple<std::vector<Pool>, std::vector<Resource>>
         allocate(std::vector<BindingLayout> layouts) = 0;
@@ -52,6 +52,9 @@ namespace VSL_NAMESPACE::graphic_resource {
         std::shared_ptr<_impl::GraphicResourceManager_impl> _data;
 
         virtual void destroy(const Pool& pool) = 0;
+
+    private:
+        std::shared_ptr<_impl::GraphicResourceManagerIdentity> identity_;
     };
 
     /*

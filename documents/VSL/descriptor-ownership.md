@@ -1,0 +1,9 @@
+# Descriptorの所有権
+
+ManagerはPoolを保持し、ResourceはPool・BindingLayout・更新したbuffer/image/samplerを保持します。Poolが追跡するResourceは弱参照です。最後のResourceが解放されるとdescriptor setも解放され、通常のスコープ終了だけで循環参照なく回収されます。
+
+PoolとResourceは、生成したManagerが先に破棄されても利用できます。native操作にはPoolが保持するdeviceを使います。`getManager()`は生成元のオブジェクトが存在する間の観測用です。生成元のmoveには追従し、生成元の破棄や代入後は`nullptr`を返します。Managerのコピーが同じ内部状態を保持していても、生成元とは別の観測先になります。返された生ポインターを長期間保存しないでください。
+
+`Resource::update`はbindingごとに渡された所有者を保持し、同じbindingを更新すると以前の所有者を解放します。他のbindingには影響しません。現在の単一要素更新APIの範囲で保持し、descriptor配列の任意要素更新APIは追加していません。
+
+`Manager::destroy(pool)`は明示的な破棄です。そのPoolのResourceも無効になり、以降のbind/updateは例外になります。GPUで使用中のdestroyは禁止です。descriptorを記録した後のupdateも、使用する送信の完了を呼び出し側で待ってください。並行したallocate/update/destroyにはVulkanと同様に呼び出し側の同期が必要です。所有権の保持はGPUとの読み書きの同期を代替しません。

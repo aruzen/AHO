@@ -75,13 +75,22 @@ namespace VSL_NAMESPACE {
 	// ==========================================================================================================
 
     template<typename Buffer, typename T>
+    Buffer make_buffer(LogicalDeviceAccessor device, CommandManager manager, T& t);
+
+    template<typename Buffer, typename T>
     Buffer make_buffer(LogicalDeviceAccessor device, T& t, std::optional<CommandManager> manager = std::nullopt) {
-        Buffer buffer(device, sizeof (T));
-        buffer.copy(t);
-        if constexpr (not contain<Buffer::Property, MemoryProperty::HostCoherent>()) {
-            buffer.flush();
+        if constexpr (not contain<Buffer::Property, MemoryProperty::HostVisible>()) {
+            if (not manager)
+                throw exceptions::RuntimeException("buffer", "Device-local initialization requires a command manager");
+            return make_buffer<Buffer>(device, *manager, t);
+        } else {
+            Buffer buffer(device, sizeof (T));
+            buffer.copy(t);
+            if constexpr (not contain<Buffer::Property, MemoryProperty::HostCoherent>()) {
+                buffer.flush();
+            }
+            return buffer;
         }
-        return buffer;
     }
 
     template<typename Buffer, typename T>

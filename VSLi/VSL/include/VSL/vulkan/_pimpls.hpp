@@ -141,6 +141,8 @@ namespace VSL_NAMESPACE::_impl {
 
     struct CreateInfo {
         std::vector<vk::PipelineShaderStageCreateInfo> shaderStages;
+        std::vector<std::shared_ptr<Shader_impl>> shaders;
+        std::vector<std::shared_ptr<ResourceBindingLayout_impl>> bindingLayouts;
         vk::PipelineDynamicStateCreateInfo dynamicState;
         vk::PipelineLayoutCreateInfo pipelineLayout;
         vk::PipelineVertexInputStateCreateInfo vertexInput;

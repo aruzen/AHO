@@ -92,6 +92,8 @@ std::string path_text(const fs::path& path)
 
 void VSL_NAMESPACE::utils::ShaderCompiler::load()
 {
+    compiled.clear();
+    target.clear();
     std::map<std::string, fs::file_time_type> dates;
     for (auto shaders_path : shader_dirs) {
         dates.clear();

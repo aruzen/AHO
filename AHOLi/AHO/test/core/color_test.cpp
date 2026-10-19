@@ -128,7 +128,183 @@ TEST(ColorContractTest, AlphaPreservingConversionsReturnCorrectSpaceAndChannels)
 }
 #else
 #include "../support/one_way_cast.hpp"
+#include "../support/asymmetric_arithmetic.hpp"
 namespace {
+    using namespace aho_test::arithmetic;
+    template<class T>
+    class ColorChannelArithmeticConstraintTest : public testing::Test {};
+    using ColorChannelArithmeticFamilies = testing::Types<Family<aho::color::R>, Family<aho::color::G>, Family<aho::color::B>, Family<aho::color::H>, Family<aho::color::S>, Family<aho::color::V>, Family<aho::color::A>>;
+    TYPED_TEST_SUITE(ColorChannelArithmeticConstraintTest, ColorChannelArithmeticFamilies);
+    TYPED_TEST(ColorChannelArithmeticConstraintTest, BinaryOperationsUseTheStoredScalarOnTheLeft) {
+        using Left = typename TypeParam::template Of<LeftOperand>;
+        using Right = typename TypeParam::template Of<Operand>;
+        using Expected = typename TypeParam::template Of<int>;
+        constexpr Left lhs(LeftOperand{24});
+        constexpr Right rhs(Operand{4});
+        static_assert(CanAdd<Left, Right>);
+        static_assert(!CanAdd<Right, Left>);
+        static_assert(std::same_as<decltype(lhs + rhs), Expected>);
+        static_assert((lhs + rhs).value == 28);
+        EXPECT_EQ((lhs + rhs).value, 28);
+        static_assert(CanSubtract<Left, Right>);
+        static_assert(!CanSubtract<Right, Left>);
+        static_assert(std::same_as<decltype(lhs - rhs), Expected>);
+        static_assert((lhs - rhs).value == 20);
+        EXPECT_EQ((lhs - rhs).value, 20);
+        static_assert(CanMultiply<Left, Right>);
+        static_assert(!CanMultiply<Right, Left>);
+        static_assert(std::same_as<decltype(lhs * rhs), Expected>);
+        static_assert((lhs * rhs).value == 96);
+        EXPECT_EQ((lhs * rhs).value, 96);
+        static_assert(CanDivide<Left, Right>);
+        static_assert(!CanDivide<Right, Left>);
+        static_assert(std::same_as<decltype(lhs / rhs), Expected>);
+        static_assert((lhs / rhs).value == 6);
+        EXPECT_EQ((lhs / rhs).value, 6);
+    }
+    TYPED_TEST(ColorChannelArithmeticConstraintTest, CompoundOperationsKeepOperandOrderAndReturnTheSameWrapper) {
+        using Left = typename TypeParam::template Of<LeftOperand>;
+        using Right = typename TypeParam::template Of<Operand>;
+        Left lhs(LeftOperand{24});
+        const Right rhs(Operand{4});
+        static_assert(CanAddAssign<Left, Right>);
+        static_assert(!CanAddAssign<Right, Left>);
+        EXPECT_EQ(&(lhs += rhs), &lhs);
+        EXPECT_EQ(lhs.value.value, 28);
+        static_assert(CanSubtractAssign<Left, Right>);
+        static_assert(!CanSubtractAssign<Right, Left>);
+        EXPECT_EQ(&(lhs -= rhs), &lhs);
+        EXPECT_EQ(lhs.value.value, 24);
+        static_assert(CanMultiplyAssign<Left, Right>);
+        static_assert(!CanMultiplyAssign<Right, Left>);
+        EXPECT_EQ(&(lhs *= rhs), &lhs);
+        EXPECT_EQ(lhs.value.value, 96);
+        static_assert(CanDivideAssign<Left, Right>);
+        static_assert(!CanDivideAssign<Right, Left>);
+        EXPECT_EQ(&(lhs /= rhs), &lhs);
+        EXPECT_EQ(lhs.value.value, 24);
+    }
+    TYPED_TEST(ColorChannelArithmeticConstraintTest, CompoundOperationsDoNotRequireBinaryOperators) {
+        using Left = typename TypeParam::template Of<AssignmentOnly>;
+        using Right = typename TypeParam::template Of<Operand>;
+        Left lhs(AssignmentOnly{24});
+        const Right rhs(Operand{4});
+        static_assert(CanAddAssign<Left, Right>);
+        static_assert(!CanAddAssign<Right, Left>);
+        static_assert(!CanAdd<Left, Right>);
+        EXPECT_EQ(&(lhs += rhs), &lhs);
+        EXPECT_EQ(lhs.value.value, 28);
+        static_assert(CanSubtractAssign<Left, Right>);
+        static_assert(!CanSubtractAssign<Right, Left>);
+        static_assert(!CanSubtract<Left, Right>);
+        EXPECT_EQ(&(lhs -= rhs), &lhs);
+        EXPECT_EQ(lhs.value.value, 24);
+        static_assert(CanMultiplyAssign<Left, Right>);
+        static_assert(!CanMultiplyAssign<Right, Left>);
+        static_assert(!CanMultiply<Left, Right>);
+        EXPECT_EQ(&(lhs *= rhs), &lhs);
+        EXPECT_EQ(lhs.value.value, 96);
+        static_assert(CanDivideAssign<Left, Right>);
+        static_assert(!CanDivideAssign<Right, Left>);
+        static_assert(!CanDivide<Left, Right>);
+        EXPECT_EQ(&(lhs /= rhs), &lhs);
+        EXPECT_EQ(lhs.value.value, 24);
+    }
+    TYPED_TEST(ColorChannelArithmeticConstraintTest, ResultTypesMatchTheActualConstOperands) {
+        using Wrapper = typename TypeParam::template Of<CategoryResult>;
+        using Expected = typename TypeParam::template Of<int>;
+        constexpr Wrapper lhs(CategoryResult{24}), rhs(CategoryResult{4});
+        static_assert(std::same_as<decltype(lhs + rhs), Expected>);
+        static_assert((lhs + rhs).value == 28);
+        EXPECT_EQ((lhs + rhs).value, 28);
+        static_assert(std::same_as<decltype(lhs - rhs), Expected>);
+        static_assert((lhs - rhs).value == 20);
+        EXPECT_EQ((lhs - rhs).value, 20);
+        static_assert(std::same_as<decltype(lhs * rhs), Expected>);
+        static_assert((lhs * rhs).value == 96);
+        EXPECT_EQ((lhs * rhs).value, 96);
+        static_assert(std::same_as<decltype(lhs / rhs), Expected>);
+        static_assert((lhs / rhs).value == 6);
+        EXPECT_EQ((lhs / rhs).value, 6);
+    }
+    TYPED_TEST(ColorChannelArithmeticConstraintTest, RejectsMutableOnlyBinaryAndMissingCompoundOperations) {
+        using Mutable = typename TypeParam::template Of<MutableOnly>;
+        using BinaryOnly = typename TypeParam::template Of<CategoryResult>;
+        EXPECT_FALSE((CanAdd<Mutable, Mutable>));
+        EXPECT_FALSE((CanAddAssign<BinaryOnly, BinaryOnly>));
+        EXPECT_FALSE((CanSubtract<Mutable, Mutable>));
+        EXPECT_FALSE((CanSubtractAssign<BinaryOnly, BinaryOnly>));
+        EXPECT_FALSE((CanMultiply<Mutable, Mutable>));
+        EXPECT_FALSE((CanMultiplyAssign<BinaryOnly, BinaryOnly>));
+        EXPECT_FALSE((CanDivide<Mutable, Mutable>));
+        EXPECT_FALSE((CanDivideAssign<BinaryOnly, BinaryOnly>));
+    }
+    struct MutableAlphaRight {
+        int value{};
+        auto operator<=>(const MutableAlphaRight&) const = default;
+    };
+    struct AlphaLeft {
+        int value{};
+        auto operator<=>(const AlphaLeft&) const = default;
+        constexpr AlphaLeft& operator+=(MutableAlphaRight& rhs) {
+            value += rhs.value;
+            return *this;
+        }
+        constexpr AlphaLeft& operator-=(MutableAlphaRight& rhs) {
+            value -= rhs.value;
+            return *this;
+        }
+        constexpr AlphaLeft& operator*=(MutableAlphaRight& rhs) {
+            value *= rhs.value;
+            return *this;
+        }
+        constexpr AlphaLeft& operator/=(MutableAlphaRight& rhs) {
+            value /= rhs.value;
+            return *this;
+        }
+    };
+    constexpr int operator+(const AlphaLeft& lhs, MutableAlphaRight& rhs) { return lhs.value + rhs.value; }
+    constexpr int operator-(const AlphaLeft& lhs, MutableAlphaRight& rhs) { return lhs.value - rhs.value; }
+    constexpr int operator*(const AlphaLeft& lhs, MutableAlphaRight& rhs) { return lhs.value * rhs.value; }
+    constexpr int operator/(const AlphaLeft& lhs, MutableAlphaRight& rhs) { return lhs.value / rhs.value; }
+    TEST(ColorAlphaArithmeticConstraintTest, BinaryOperationsUseTheMutableCopyOfTheRightOperand) {
+        const aho::color::A<AlphaLeft> lhs(AlphaLeft{24});
+        const aho::color::A<MutableAlphaRight> rhs(MutableAlphaRight{4});
+        static_assert(CanAdd<aho::color::A<AlphaLeft>, aho::color::A<MutableAlphaRight>>);
+        static_assert(!CanAdd<aho::color::R<AlphaLeft>, aho::color::R<MutableAlphaRight>>);
+        EXPECT_EQ((lhs + rhs).value, 28);
+        static_assert(CanSubtract<aho::color::A<AlphaLeft>, aho::color::A<MutableAlphaRight>>);
+        static_assert(!CanSubtract<aho::color::R<AlphaLeft>, aho::color::R<MutableAlphaRight>>);
+        EXPECT_EQ((lhs - rhs).value, 20);
+        static_assert(CanMultiply<aho::color::A<AlphaLeft>, aho::color::A<MutableAlphaRight>>);
+        static_assert(!CanMultiply<aho::color::R<AlphaLeft>, aho::color::R<MutableAlphaRight>>);
+        EXPECT_EQ((lhs * rhs).value, 96);
+        static_assert(CanDivide<aho::color::A<AlphaLeft>, aho::color::A<MutableAlphaRight>>);
+        static_assert(!CanDivide<aho::color::R<AlphaLeft>, aho::color::R<MutableAlphaRight>>);
+        EXPECT_EQ((lhs / rhs).value, 6);
+        EXPECT_EQ(rhs.value.value, 4);
+    }
+    TEST(ColorAlphaArithmeticConstraintTest, CompoundOperationsUseTheMutableCopyOfTheRightOperand) {
+        aho::color::A<AlphaLeft> lhs(AlphaLeft{24});
+        const aho::color::A<MutableAlphaRight> rhs(MutableAlphaRight{4});
+        static_assert(CanAddAssign<aho::color::A<AlphaLeft>, aho::color::A<MutableAlphaRight>>);
+        static_assert(!CanAddAssign<aho::color::R<AlphaLeft>, aho::color::R<MutableAlphaRight>>);
+        EXPECT_EQ(&(lhs += rhs), &lhs);
+        EXPECT_EQ(lhs.value.value, 28);
+        static_assert(CanSubtractAssign<aho::color::A<AlphaLeft>, aho::color::A<MutableAlphaRight>>);
+        static_assert(!CanSubtractAssign<aho::color::R<AlphaLeft>, aho::color::R<MutableAlphaRight>>);
+        EXPECT_EQ(&(lhs -= rhs), &lhs);
+        EXPECT_EQ(lhs.value.value, 24);
+        static_assert(CanMultiplyAssign<aho::color::A<AlphaLeft>, aho::color::A<MutableAlphaRight>>);
+        static_assert(!CanMultiplyAssign<aho::color::R<AlphaLeft>, aho::color::R<MutableAlphaRight>>);
+        EXPECT_EQ(&(lhs *= rhs), &lhs);
+        EXPECT_EQ(lhs.value.value, 96);
+        static_assert(CanDivideAssign<aho::color::A<AlphaLeft>, aho::color::A<MutableAlphaRight>>);
+        static_assert(!CanDivideAssign<aho::color::R<AlphaLeft>, aho::color::R<MutableAlphaRight>>);
+        EXPECT_EQ(&(lhs /= rhs), &lhs);
+        EXPECT_EQ(lhs.value.value, 24);
+        EXPECT_EQ(rhs.value.value, 4);
+    }
     template<class T>
     class ColorOneWayCastTest : public testing::Test {};
     using OneWayChannels = testing::Types<aho::color::R<aho_test::CastSource>,

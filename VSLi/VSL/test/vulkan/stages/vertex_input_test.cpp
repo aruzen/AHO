@@ -139,3 +139,27 @@ TEST_F(VertexStrideRenderVulkanIntegrationTest, PaddedInterleavedVerticesProduce
     }));
 }
 } // namespace
+
+namespace {
+TEST_F(VertexStrideVulkanIntegrationTest, RejectedAttributesPreservePreviouslyInjectedDescriptions) {
+    auto layout = make_layout_state();
+    pl::VertexInput valid({{.layouts = {{vsl::data_format::FloatRG, 0, 4}}}});
+    valid.injection(layout);
+    pl::VertexInput invalid({{.layouts = {{vsl::data_format::FloatRG, 0,
+                                         std::numeric_limits<std::uint32_t>::max() - 2}}}});
+    EXPECT_THROW(invalid.injection(layout), vsl::exceptions::RuntimeException);
+    const auto &bindings = std::any_cast<const std::vector<vk::VertexInputBindingDescription>&>(
+        layout._data->info->pool.at("vertexBindingDescriptions"));
+    const auto &attributes = std::any_cast<const std::vector<vk::VertexInputAttributeDescription>&>(
+        layout._data->info->pool.at("vertexAttributeDescriptions"));
+    ASSERT_EQ(bindings.size(), 1u);
+    ASSERT_EQ(attributes.size(), 1u);
+    const auto &native = layout._data->info->vertexInput;
+    ASSERT_EQ(native.vertexBindingDescriptionCount, 1u);
+    ASSERT_EQ(native.vertexAttributeDescriptionCount, 1u);
+    EXPECT_EQ(native.pVertexBindingDescriptions, bindings.data());
+    EXPECT_EQ(native.pVertexAttributeDescriptions, attributes.data());
+    EXPECT_EQ(native.pVertexBindingDescriptions[0].stride, 12u);
+    EXPECT_EQ(native.pVertexAttributeDescriptions[0].offset, 4u);
+}
+} // namespace

@@ -4,6 +4,7 @@
 #include <ranges>
 #include <algorithm>
 #include <limits>
+#include <utility>
 #include <VSL/exceptions.hpp>
 
 namespace {
@@ -86,8 +87,8 @@ void VSL_NAMESPACE::pipeline_layout::VertexInput::injection(VSL_NAMESPACE::Pipel
 	using VIBDs = std::vector<vk::VertexInputBindingDescription>;
 	using VIADs = std::vector<vk::VertexInputAttributeDescription>;
 
-	auto& vertexBindingDescriptions = std::any_cast<VIBDs&>(info.pool["vertexBindingDescriptions"] = VIBDs());
-	auto& vertexAttributeDescriptions = std::any_cast<VIADs&>(info.pool["vertexAttributeDescriptions"] = VIADs());
+	VIBDs vertexBindingDescriptions;
+	VIADs vertexAttributeDescriptions;
 
 	std::uint32_t nextBinding = 0, nextLocation = 0;
 	for (auto& def : this->definitions) {
@@ -135,8 +136,16 @@ void VSL_NAMESPACE::pipeline_layout::VertexInput::injection(VSL_NAMESPACE::Pipel
         });
     */
 
-	info.vertexInput.vertexBindingDescriptionCount = vertexBindingDescriptions.size();
-	info.vertexInput.pVertexBindingDescriptions = vertexBindingDescriptions.data();
-	info.vertexInput.vertexAttributeDescriptionCount = vertexAttributeDescriptions.size();
-	info.vertexInput.pVertexAttributeDescriptions = vertexAttributeDescriptions.data();
+	std::any nextBindings = std::move(vertexBindingDescriptions);
+	std::any nextAttributes = std::move(vertexAttributeDescriptions);
+	auto& bindingStorage = info.pool["vertexBindingDescriptions"];
+	auto& attributeStorage = info.pool["vertexAttributeDescriptions"];
+	bindingStorage.swap(nextBindings);
+	attributeStorage.swap(nextAttributes);
+	const auto& bindings = std::any_cast<const VIBDs&>(bindingStorage);
+	const auto& attributes = std::any_cast<const VIADs&>(attributeStorage);
+	info.vertexInput.vertexBindingDescriptionCount = bindings.size();
+	info.vertexInput.pVertexBindingDescriptions = bindings.data();
+	info.vertexInput.vertexAttributeDescriptionCount = attributes.size();
+	info.vertexInput.pVertexAttributeDescriptions = attributes.data();
 }

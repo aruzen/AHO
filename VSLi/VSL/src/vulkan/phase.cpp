@@ -126,7 +126,7 @@ namespace vsl {
         auto command = buffers->commandBuffers.at(frameSlot);
         command.end();
         auto device = manager._data->device->device;
-        device.resetFences(_completion._data->fence); // Never reset before successful acquire.
+        device.resetFences(_completion._data->fence); // 画像の取得に成功するまでフェンスをリセットしない。
         vk::SubmitInfo info{
             .waitSemaphoreCount = static_cast<std::uint32_t>(waits.size()), .pWaitSemaphores = waits.data(), .pWaitDstStageMask = &stages, .commandBufferCount = 1, .pCommandBuffers = &command, .signalSemaphoreCount = static_cast<std::uint32_t>(signals.size()), .pSignalSemaphores = signals.data()};
         try {
@@ -264,8 +264,8 @@ namespace vsl {
             return;
         }
         if (state == State::WaitSubmit) {
-            // Discard partial recording, consume acquire, and return the image to presentation.
-            // Tickets attached to the discarded recording remain cancelled.
+            // 途中の記録を破棄し、取得時のセマフォを消費して画像を画面表示に戻す。
+            // 破棄した記録の完了状態はキャンセルのまま維持する。
             ComputePhase::cancel();
             prepare();
             signalIndex = imageIndex;

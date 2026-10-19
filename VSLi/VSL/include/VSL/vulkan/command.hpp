@@ -37,7 +37,7 @@ namespace VSL_NAMESPACE {
         std::shared_ptr<VSL_NAMESPACE::_impl::CommandBuffer_impl> _data;
     };
 
-    // A completion identifies one submission, even after its fence is reused.
+    // フェンスが再利用されても、個々の送信の完了状態を維持する。
     struct Completion {
         enum class Status { Pending, Submitted, Complete, Cancelled };
         std::shared_ptr<_impl::Submission_impl> _data;
@@ -133,7 +133,6 @@ namespace VSL_NAMESPACE {
     };
 }
 
-// ============================================================================
 
 template<class P, typename... Args>
 P VSL_NAMESPACE::CommandManager::startPhase(Args&&... args)

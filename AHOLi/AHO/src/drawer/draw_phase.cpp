@@ -1,7 +1,3 @@
-//
-// Created by morimoto_hibiki on 2025/12/21.
-//
-
 #include <AHO/drawer/draw_phase.hpp>
 #include <utility>
 

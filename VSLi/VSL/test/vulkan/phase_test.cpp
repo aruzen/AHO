@@ -59,7 +59,7 @@ namespace {
         EXPECT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::Failed);
         EXPECT_EQ(phase.getImageIndex(), UINT32_MAX);
     }
-} // namespace
+}
 
 namespace {
     class PhaseCompletionVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
@@ -107,7 +107,7 @@ namespace {
     }
     TEST_F(PhaseCompletionVulkanIntegrationTest, SubmittedWorkRetainsItsWaitAndSignalSemaphores) {
         auto manager = make_manager();
-        // Keep fallback owners so a failing lifetime assertion never destroys an in-use handle.
+        // 寿命の検証に失敗しても使用中のハンドルを破棄しないよう、別の参照を保持する。
         std::shared_ptr<vsl::_impl::Semaphore_impl> availableOwner, finishedOwner;
         vsl::Completion completion;
         {
@@ -144,13 +144,13 @@ namespace {
                 ASSERT_TRUE(fence.wait());
                 fence.reset();
             } else {
-                // A caller may wait through another API before invoking the public reset.
+                // 別のAPIで完了を待ってから公開APIでリセットする場合も確かめる。
                 ASSERT_EQ(device._data->device.waitForFences(fence._data->fences, true, UINT64_MAX), vk::Result::eSuccess);
                 fence.reset(first.frameSlot);
             }
             EXPECT_TRUE(original.ready());
             EXPECT_TRUE(original.wait(0));
-            // Restore a signal for the pre-fix submission destructor, which still watches this fence.
+            // 回帰時にも破棄時のフェンス待ちが停止しないよう、再度シグナルを送る。
             manager._data->graphicsQueue.submit(vk::SubmitInfo{}, fence._data->fences.at(first.frameSlot));
             ASSERT_TRUE(fence.wait(first.frameSlot, UINT64_MAX));
             fence.destroy();
@@ -175,7 +175,7 @@ namespace {
             vsl::ComputePhase next(manager);
             next.cancel();
         }
-        // The old slot still owns its last submission until a new submission replaces it.
+        // 同じスロットへ再送信するまで、最後の送信がリソースを保持する。
         {
             vsl::ComputePhase next(manager);
             next.submit();
@@ -207,7 +207,7 @@ namespace {
         vsl::StagingBuffer<vsl::MemoryType::TransferDestination> destination(device, bytes);
         bool differentIndex = false;
         for (unsigned frame = 0; frame < 12; ++frame) {
-            vsl::DefaultPhase phase(manager, chain); // no user-supplied semaphores or fence
+            vsl::DefaultPhase phase(manager, chain); // セマフォやフェンスを外から渡さない。
             auto index = phase.getImageIndex();
             differentIndex |= index != phase.getCurrentIndex();
             auto begin = vsl::command::RenderPassBegin(pass, target);
@@ -226,7 +226,7 @@ namespace {
             EXPECT_EQ(pixel[3], 255);
             EXPECT_EQ(phase.present(), vsl::ComputePhase::SubmitResult::Failed);
         }
-        // Implementations may acquire in frame-slot order; correctness does not rely on that order.
+        // 画像の取得順がフレームのスロット順と一致する実装でも動作する。
         (void)differentIndex;
         device._data->device.waitIdle();
     }
@@ -242,7 +242,7 @@ namespace {
         {
             vsl::DefaultPhase phase(manager, chain);
             auto discarded = phase.completion();
-            phase << vsl::command::RenderPassBegin(pass, target); // intentionally no End
+            phase << vsl::command::RenderPassBegin(pass, target); // 終了コマンドを省略し、記録途中のキャンセルを確かめる。
             phase.cancel();
             EXPECT_EQ(discarded.status(), vsl::Completion::Status::Cancelled);
             EXPECT_TRUE(phase.completion().wait());
@@ -323,7 +323,7 @@ TEST_F(PhaseVulkanIntegrationTest, ValueAndSharedDelegatesReceiveTheSameVertexCo
     stream << std::shared_ptr<vsl::command::__DelegateCommand>(shared);
     EXPECT_EQ(shared->received, *received);
 }
-} // namespace
+}
 
 namespace {
 struct IncrementVertexCount : vsl::command::__Command,
@@ -346,4 +346,4 @@ TEST_F(PhaseVulkanIntegrationTest, CommandsConsumeThePreviousCountBeforeExportin
     EXPECT_EQ(shared_stream.vertexSize, 18u);
     EXPECT_EQ(value_stream.vertexSize, shared_stream.vertexSize);
 }
-} // namespace
+}

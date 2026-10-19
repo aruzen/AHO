@@ -8,7 +8,7 @@ struct FrameBufferAccessor {
 };
 struct FrameBuffer : FrameBufferAccessor {
     // 画像はRenderPassDescription::attachmentsと同じ順序で指定する。
-    // パスと画像を保持する。呼び出し側はGPUの完了までこのオブジェクトを保持する。
+    // パスと画像を保持する。Phaseを介さず記録する場合は、GPUの完了まで呼び出し側で保持する。
     FrameBuffer(RenderPassAccessor pass, std::uint32_t width, std::uint32_t height,
                 std::vector<ImageAccessor> images, std::uint32_t layers = 1);
     FrameBuffer(SwapchainAccessor swapchain, RenderPass render_pass);

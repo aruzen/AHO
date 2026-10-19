@@ -1,7 +1,3 @@
-//
-// Created by morimoto_hibiki on 2025/10/10.
-//
-
 #include <AHO/window.hpp>
 #include <GLFW/glfw3.h>
 
@@ -95,5 +91,4 @@ bool aho::window::Window::close() {
 }
 
 aho::window::WindowData::~WindowData() {
-    // vsl::loggingln("window destroy");
 }

@@ -49,7 +49,7 @@ namespace {
         EXPECT_TRUE(single.wait());
         EXPECT_TRUE(many.wait(std::uint64_t{UINT64_MAX}));
     }
-} // namespace
+}
 
 namespace {
     TEST_F(SynchronizeVulkanIntegrationTest, DestroyIsIdempotentAndDoesNotEraseReplacement) {
@@ -93,7 +93,7 @@ TEST_F(SynchronizeVulkanIntegrationTest, SemaphoreDestroyRemovesOnlyItsNameAndDi
     EXPECT_FALSE(manager->getSemaphore("a"));
     ASSERT_TRUE(manager->getSemaphore("b"));
     EXPECT_EQ(manager->getSemaphore("b")->_data, retained._data);
-    // The old implementation leaves destroyed handles in the retained alias.
+    // 検証に失敗しても、後続の確認でハンドルを二重破棄しないようにする。
     alias._data->semaphores.clear();
     alias.destroy();
     vsl::SemaphoreHolder{}.destroy();
@@ -134,4 +134,4 @@ TEST_F(SynchronizeVulkanIntegrationTest, DestroyingReplacedHoldersKeepsTheCurren
     EXPECT_EQ(manager->getFence("same")->_data, current_fence._data);
     EXPECT_TRUE(current_fence.wait(std::uint64_t{0}));
 }
-} // namespace
+}

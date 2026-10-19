@@ -1,7 +1,3 @@
-//
-// Created by morimoto_hibiki on 2025/07/30.
-//
-
 #ifndef AHO_ALL_PHASE_HPP
 #define AHO_ALL_PHASE_HPP
 
@@ -94,7 +90,7 @@ namespace VSL_NAMESPACE {
         std::uint32_t getCurrentIndex();
 
         SubmitResult submit() override;
-        // Submit drawing first; record readback before this, then present explicitly.
+        // 読み戻しも記録してから送信する。画面表示は続けてpresent()で行う。
         SubmitResult submitCommands();
         SubmitResult present();
         void cancel() override;
@@ -128,7 +124,6 @@ namespace VSL_NAMESPACE {
         void resolveHolderRequirePtr(std::shared_ptr<T> cmd);
     };
 
-    // ============================================================================
 
     DefaultPhaseStream ComputePhase::operator<<(command::is_command auto cmd) {
         DefaultPhaseStream op{this->manager};
@@ -184,4 +179,4 @@ void vsl::DefaultPhaseStream::resolveHolderRequirePtr(std::shared_ptr<T> cmd) {
         this->pipeline = holder->getPipeline();
 }
 
-#endif //AHO_ALL_PHASE_HPP
+#endif

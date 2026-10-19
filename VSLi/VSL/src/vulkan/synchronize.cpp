@@ -18,7 +18,7 @@ namespace vsl {
                     (void)Completion{submission}.status();
         }
         void rememberCompletions(const std::shared_ptr<_impl::Fence_impl> &data) {
-            // Cache the old submission's result before a public reset/destroy reuses its fence.
+            // 公開APIでフェンスをリセット・破棄する前に、以前の送信結果を保存する。
             for (std::size_t i = 0; i < data->submissions.size(); ++i)
                 rememberCompletion(data, i);
         }
@@ -37,7 +37,7 @@ namespace vsl {
     void SemaphoreHolder::destroy() {
         if (!_data)
             return;
-        auto data = _data; // map.erase must not invalidate our shared_ptr reference.
+        auto data = _data; // マップから削除しても参照が無効にならないよう、共有ポインタをコピーする。
         if (auto manager = data->_manager.lock())
             eraseHandle(manager->semaphores, data);
         for (auto handle : data->semaphores)

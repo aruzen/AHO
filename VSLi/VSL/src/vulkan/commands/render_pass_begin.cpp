@@ -112,9 +112,7 @@ namespace VSL_NAMESPACE::command {
     }
     void RenderPassBegin::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
         const auto index = targetIndex.value_or(buffer._data->acquiredImageIndex.value_or(buffer.getCurrentBufferIdx()));
-        if (buffer._data->recordingSubmission) {
-            buffer._data->recordingSubmission->resources.push_back(frameBuffer._data);
-        }
+        buffer.retain(frameBuffer._data);
         std::vector<vk::ClearValue> values;
         for (const auto& clear : clearValues)
             values.push_back(convert(clear));

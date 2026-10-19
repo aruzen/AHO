@@ -34,6 +34,9 @@ namespace VSL_NAMESPACE {
 
         void reset(std::uint32_t idx);
 
+        // Phaseの記録中は、送信完了まで使用する所有者を保持する。
+        void retain(std::shared_ptr<void> resource) const;
+
         std::shared_ptr<VSL_NAMESPACE::_impl::CommandBuffer_impl> _data;
     };
 

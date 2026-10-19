@@ -66,6 +66,8 @@ void VSL_NAMESPACE::command::CopyImageToBuffer::invoke(CommandPool pool, Command
         manager._data->device != image._data->device ||
         buffer._data->commandPool->device != image._data->device)
         throw std::invalid_argument("Image copy requires a command buffer on the same device");
+    buffer.retain(image._data);
+    buffer.retain(destination);
     const auto& area = info.region;
     vk::BufferImageCopy copy{
         .imageSubresource = {vk::ImageAspectFlagBits::eColor, 0, area.layer, 1},

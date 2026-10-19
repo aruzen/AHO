@@ -9,7 +9,7 @@ class SynchronizeVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest 
             manager.emplace(device);
     }
     void TearDown() override {
-        // Holder::destroy erases while iterating (I23). Reclaim fixture-owned handles safely.
+        // Manager and holders retain each other. Reclaim fixture-owned handles before breaking the cycle.
         if (manager) {
             device._data->device.waitIdle();
             for (auto &[name, holder] : manager->_data->fences)
@@ -56,5 +56,58 @@ TEST_F(SynchronizeVulkanIntegrationTest, FenceWaitResetAndQueueSignalHaveObserva
     queue.submit(vk::SubmitInfo{}, many._data->fences[1]);
     EXPECT_TRUE(single.wait());
     EXPECT_TRUE(many.wait(std::uint64_t{UINT64_MAX}));
+}
+} // namespace
+
+namespace {
+TEST_F(SynchronizeVulkanIntegrationTest, SemaphoreDestroyRemovesOnlyItsNameAndDisarmsAllAliases) {
+    auto value = manager->createSemaphore("a", 2);
+    auto alias = value;
+    auto retained = manager->createSemaphore("b");
+    value.destroy();
+    EXPECT_TRUE(alias._data->semaphores.empty());
+    EXPECT_FALSE(manager->getSemaphore("a"));
+    ASSERT_TRUE(manager->getSemaphore("b"));
+    EXPECT_EQ(manager->getSemaphore("b")->_data, retained._data);
+    // The old implementation leaves destroyed handles in the retained alias.
+    alias._data->semaphores.clear();
+    alias.destroy();
+    vsl::SemaphoreHolder{}.destroy();
+    EXPECT_TRUE(manager->destroySemaphore("b"));
+    EXPECT_TRUE(retained._data->semaphores.empty());
+    retained._data->semaphores.clear();
+    EXPECT_FALSE(manager->destroySemaphore("b"));
+}
+TEST_F(SynchronizeVulkanIntegrationTest, FenceDestroyRemovesOnlyItsNameAndDisarmsAllAliases) {
+    auto value = manager->createFence("a", std::size_t{2}, true);
+    auto alias = value;
+    auto retained = manager->createFence("b", true);
+    value.destroy();
+    EXPECT_TRUE(alias._data->fences.empty());
+    EXPECT_FALSE(manager->getFence("a"));
+    ASSERT_TRUE(manager->getFence("b"));
+    EXPECT_TRUE(retained.wait(std::uint64_t{0}));
+    alias._data->fences.clear();
+    alias.destroy();
+    vsl::FenceHolder{}.destroy();
+    EXPECT_TRUE(manager->destroyFence("b"));
+    EXPECT_TRUE(retained._data->fences.empty());
+    retained._data->fences.clear();
+    EXPECT_FALSE(manager->destroyFence("b"));
+}
+TEST_F(SynchronizeVulkanIntegrationTest, DestroyingReplacedHoldersKeepsTheCurrentNamedObjectsAlive) {
+    auto old_semaphore = manager->createSemaphore("same");
+    auto old_fence = manager->createFence("same", true);
+    auto current_semaphore = manager->createSemaphore("same");
+    auto current_fence = manager->createFence("same", true);
+    old_semaphore.destroy();
+    old_fence.destroy();
+    EXPECT_TRUE(old_semaphore._data->semaphores.empty());
+    EXPECT_TRUE(old_fence._data->fences.empty());
+    ASSERT_TRUE(manager->getSemaphore("same"));
+    ASSERT_TRUE(manager->getFence("same"));
+    EXPECT_EQ(manager->getSemaphore("same")->_data, current_semaphore._data);
+    EXPECT_EQ(manager->getFence("same")->_data, current_fence._data);
+    EXPECT_TRUE(current_fence.wait(std::uint64_t{0}));
 }
 } // namespace

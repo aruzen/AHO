@@ -40,7 +40,7 @@ namespace AHO_NAMESPACE {
 
 		constexpr std::array<PtrLine<R, D, CI>, 1> ptrlines();
 
-		template<concepts::cast_as<R> T>
+		template<typename T> requires concepts::cast_as<R, T>
 		constexpr Line<T, D, CI> cast() const;
 
 		constexpr PtrLine<R, D, CI> adress();
@@ -122,7 +122,7 @@ namespace AHO_NAMESPACE {
 	}
 
 	template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
-	template<concepts::cast_as<R> T>
+	template<typename T> requires concepts::cast_as<R, T>
 	inline constexpr Line<T, D, CI> Line<R, D, CI>::cast() const
 	{
 		return Line<T, D, CI>(pos1.template cast<T>(), pos2.template cast<T>());

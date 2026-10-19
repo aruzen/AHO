@@ -1,5 +1,6 @@
 #include "support/vulkan_fixture.hpp"
 #include <array>
+#include <limits>
 
 namespace {
 using BufferVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
@@ -60,7 +61,7 @@ TEST_F(BufferVulkanIntegrationTest, ValueConstructorAndFactoryPreservePayload) {
     EXPECT_EQ(std::memcmp(first.data, expected.data(), sizeof(expected)), 0);
     EXPECT_EQ(std::memcmp(second.data, expected.data(), sizeof(expected)), 0);
 }
-TEST_F(BufferVulkanIntegrationTest, DISABLED_VariadicCopyStoresValuesConsecutively) {
+TEST_F(BufferVulkanIntegrationTest, VariadicCopyStoresValuesConsecutively) {
     HostBuffer buffer(device, std::size_t{8});
     const std::uint32_t first = 17, second = 29;
     ASSERT_TRUE(buffer.copy(first, second));
@@ -68,6 +69,47 @@ TEST_F(BufferVulkanIntegrationTest, DISABLED_VariadicCopyStoresValuesConsecutive
     std::array<std::uint32_t, 2> actual{};
     std::memcpy(actual.data(), mapped.data, sizeof(actual));
     EXPECT_EQ(actual, (std::array<std::uint32_t, 2>{first, second}));
+}
+TEST(BufferCopyHelperTest, CheckedCopyAdvancesFromTheGivenOffsetAndStopsAtCapacity) {
+    std::array<unsigned char, 12> storage{};
+    storage.fill(0xa5);
+    const std::uint32_t first = 0x10203040, second = 0x50607080;
+    std::size_t offset = 4;
+    ASSERT_TRUE(vsl::helper::copy_with_shift_offset(storage.data(), storage.size(), offset, first, second));
+    EXPECT_EQ(offset, 12u);
+    EXPECT_EQ(std::memcmp(storage.data() + 4, &first, sizeof(first)), 0);
+    EXPECT_EQ(std::memcmp(storage.data() + 8, &second, sizeof(second)), 0);
+    for (std::size_t i = 0; i < 4; ++i) EXPECT_EQ(storage[i], 0xa5);
+    EXPECT_FALSE(vsl::helper::copy_with_shift_offset(storage.data(), storage.size(), offset, first));
+    EXPECT_EQ(offset, 12u);
+}
+TEST(BufferCopyHelperTest, CheckedCapacityTestDoesNotWrapAtTheSizeLimit) {
+    std::array<unsigned char, 4> storage{};
+    const auto before = storage;
+    std::size_t offset = std::numeric_limits<std::size_t>::max() - 1;
+    EXPECT_FALSE(vsl::helper::copy_with_shift_offset(storage.data(),
+        std::numeric_limits<std::size_t>::max(), offset, std::uint32_t{7}));
+    EXPECT_EQ(offset, std::numeric_limits<std::size_t>::max() - 1);
+    EXPECT_EQ(storage, before);
+}
+TEST(BufferCopyHelperTest, UncheckedCopyAppendsAndAdvancesItsOffset) {
+    std::array<unsigned char, 12> storage{};
+    const std::uint32_t first = 17, second = 29;
+    std::size_t offset = 4;
+    vsl::helper::uncheck_copy_with_shift_offset(storage.data(), offset, first);
+    vsl::helper::uncheck_copy_with_shift_offset(storage.data(), offset, second);
+    EXPECT_EQ(offset, 12u);
+    EXPECT_EQ(std::memcmp(storage.data() + 4, &first, sizeof(first)), 0);
+    EXPECT_EQ(std::memcmp(storage.data() + 8, &second, sizeof(second)), 0);
+    for (std::size_t i = 0; i < 4; ++i) EXPECT_EQ(storage[i], 0);
+}
+TEST_F(BufferVulkanIntegrationTest, UncheckedVariadicCopyStoresValuesConsecutively) {
+    HostBuffer buffer(device, std::size_t{8});
+    const std::uint32_t first = 37, second = 41;
+    buffer.uncheck_copy(first, second);
+    auto mapped = buffer.data(8);
+    const std::array<std::uint32_t, 2> expected{first, second};
+    EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
 }
 TEST(BufferExceptionTest, MappingExceptionIncludesItsCause) {
     vsl::exceptions::MemoryNotHostVisibleException error("test trace");
@@ -166,6 +208,57 @@ TEST_F(BufferVulkanIntegrationTest, DeviceLocalFactoryUploadsThePayloadWithThePu
     EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
 }
 
+} // namespace
+
+namespace {
+TEST_F(BufferVulkanIntegrationTest, CheckedCopiesRespectTheMappedSizeRatherThanAllocationPadding) {
+    const std::array<std::uint32_t, 2> initial{71, 73};
+    HostBuffer buffer(device, initial);
+    const std::array<std::uint32_t, 3> too_large{1, 2, 3};
+    EXPECT_FALSE(buffer.copy(too_large.data(), too_large.size()));
+    EXPECT_FALSE(buffer.copy(too_large));
+    auto mapped = buffer.data(sizeof(initial));
+    EXPECT_EQ(std::memcmp(mapped.data, initial.data(), sizeof(initial)), 0);
+}
+TEST_F(BufferVulkanIntegrationTest, MappedHolderCopiesStartAtItsPointerAndStayWithinItsRange) {
+    std::array<unsigned char, 256> initial{};
+    initial.fill(0xa5);
+    HostBuffer buffer(device, initial);
+    const auto alignment = physical._data->props->limits.minMemoryMapAlignment;
+    const auto map_offset = static_cast<std::size_t>(alignment);
+    ASSERT_GT(map_offset, 0u);
+    ASSERT_LE(map_offset + 8, initial.size());
+    const std::uint32_t first = 17, second = 29;
+    {
+        auto mapped = buffer.data(8, map_offset);
+        EXPECT_TRUE(mapped.copy(first, second));
+        EXPECT_FALSE(mapped.copy(initial.data(), std::size_t{9}));
+        EXPECT_FALSE(mapped.copy(initial));
+        EXPECT_FALSE(mapped.copy(initial.data(), std::numeric_limits<std::size_t>::max()));
+        EXPECT_TRUE(mapped.copy(static_cast<const std::uint32_t *>(nullptr), std::size_t{0}));
+        const std::array<std::uint32_t, 2> expected{first, second};
+        EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
+        mapped.uncheck_copy(second, first);
+        const std::array<std::uint32_t, 2> reversed{second, first};
+        EXPECT_EQ(std::memcmp(mapped.data, reversed.data(), sizeof(reversed)), 0);
+        EXPECT_EQ(mapped.offset, map_offset);
+        EXPECT_EQ(mapped.size, 8u);
+    }
+    auto all = buffer.data(initial.size());
+    for (std::size_t i = 0; i < initial.size(); ++i)
+        if (i < map_offset || i >= map_offset + 8)
+            EXPECT_EQ(static_cast<const unsigned char *>(all.data)[i], 0xa5) << i;
+}
+TEST(BufferCopyHelperTest, CheckedFailureKeepsTheSuccessfullyWrittenPrefix) {
+    std::array<unsigned char, 6> storage{};
+    const std::uint32_t first = 17, second = 29;
+    std::size_t offset = 0;
+    EXPECT_FALSE(vsl::helper::copy_with_shift_offset(storage.data(), storage.size(), offset, first, second));
+    EXPECT_EQ(offset, 4u);
+    EXPECT_EQ(std::memcmp(storage.data(), &first, sizeof(first)), 0);
+    EXPECT_EQ(storage[4], 0);
+    EXPECT_EQ(storage[5], 0);
+}
 } // namespace
 
 namespace {

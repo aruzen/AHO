@@ -211,6 +211,13 @@ namespace VSL_NAMESPACE {
     struct ImageAccessor;
 
     struct BufferAccessor {
+        BufferAccessor() = default;
+        BufferAccessor(const BufferAccessor &) = default;
+        BufferAccessor &operator=(const BufferAccessor &) = default;
+        BufferAccessor(BufferAccessor &&) = default;
+        BufferAccessor &operator=(BufferAccessor &&) = default;
+        virtual ~BufferAccessor() = default;
+
         struct LocalBufferHolder {
             BufferAccessor *parent;
             std::size_t size, offset;

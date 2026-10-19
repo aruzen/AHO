@@ -44,6 +44,27 @@ TEST(CoordinateContractTest, ThreeWayComparisonOrdersAndRecognizesEqualCoordinat
     EXPECT_TRUE(first == first);
 }
 #else
+#include <AHO/core/point.hpp>
+#include <array>
+#include "../../support/one_way_cast.hpp"
+namespace {
+template<class T> class CoordinateOneWayCastTest : public testing::Test {};
+using OneWayAxes = testing::Types<aho::coordinate::X<aho_test::CastSource>,
+                                 aho::coordinate::Y<aho_test::CastSource>,
+                                 aho::coordinate::Z<aho_test::CastSource>>;
+TYPED_TEST_SUITE(CoordinateOneWayCastTest, OneWayAxes);
+TYPED_TEST(CoordinateOneWayCastTest, ChecksConversionFromTheStoredScalarToTheRequestedType) {
+    static_assert(aho::concepts::cast_as<aho_test::CastSource, aho_test::CastTarget>);
+    static_assert(!aho::concepts::cast_as<aho_test::CastTarget, aho_test::CastSource>);
+    static_assert(aho_test::HasCast<TypeParam, aho_test::CastTarget>);
+    const TypeParam source(aho_test::CastSource{-17});
+    const auto converted = source.template cast<aho_test::CastTarget>();
+    using Converted = std::remove_cv_t<decltype(converted)>;
+    static_assert(!aho_test::HasCast<Converted, aho_test::CastSource>);
+    EXPECT_EQ(converted.value.value, -17);
+    EXPECT_EQ(source.value.value, -17);
+}
+} // namespace
 namespace {
 template<bool X, bool Y, bool Z> struct CoordinateMask {
     static constexpr bool x = X, y = Y, z = Z;
@@ -302,4 +323,75 @@ TEST(CoordinateLiteralTest, AllAxisLiteralTypesPreserveValues) {
     EXPECT_EQ((2_l_x).value, 2u); EXPECT_EQ((3_l_y).value, 3u); EXPECT_EQ((4_l_z).value, 4u);
 }
 }
+
+namespace {
+template<class Value> constexpr Value make_arithmetic_value(int first) {
+    if constexpr (Value::dimension::dimension == 1)
+        return Value(first);
+    else if constexpr (Value::dimension::dimension == 2)
+        return Value(first, first * 2);
+    else
+        return Value(first, first * 2, first * 3);
+}
+template<class Set> constexpr bool matches_active_axes(const Set& value, std::array<int, 3> expected) {
+    using CI = typename Set::coordinate_info;
+    std::size_t index = 0;
+    if constexpr (CI::EnabledX) if (value.x.value != expected[index++]) return false;
+    if constexpr (CI::EnabledY) if (value.y.value != expected[index++]) return false;
+    if constexpr (CI::EnabledZ) if (value.z.value != expected[index++]) return false;
+    return true;
+}
+template<class CI> constexpr bool check_point_vector_arithmetic() {
+    using P = aho::_Point<int, typename CI::dimension, CI>;
+    using V = aho::_Vector<int, typename CI::dimension, CI>;
+    auto point = make_arithmetic_value<P>(6);
+    auto vector = make_arithmetic_value<V>(2);
+    const auto other = make_arithmetic_value<V>(1);
+    if (!matches_active_axes((point + vector).value, {8, 16, 24})) return false;
+    if (!matches_active_axes((point - vector).value, {4, 8, 12})) return false;
+    if (!matches_active_axes((point - make_arithmetic_value<P>(2)).value, {4, 8, 12})) return false;
+    if (!matches_active_axes((-point).value, {-6, -12, -18})) return false;
+    if (!matches_active_axes((point * 2).value, {12, 24, 36})) return false;
+    if (!matches_active_axes((point / 2).value, {3, 6, 9})) return false;
+    if (!matches_active_axes((vector + other).value, {3, 6, 9})) return false;
+    if (!matches_active_axes((vector - other).value, {1, 2, 3})) return false;
+    if (!matches_active_axes((-vector).value, {-2, -4, -6})) return false;
+    if (!matches_active_axes((vector * 3).value, {6, 12, 18})) return false;
+    if (!matches_active_axes((vector / 2).value, {1, 2, 3})) return false;
+    if (!matches_active_axes(point.template cast<double>().value, {6, 12, 18})) return false;
+    if (!matches_active_axes(vector.template cast<double>().value, {2, 4, 6})) return false;
+    point += vector;
+    if (!matches_active_axes(point.value, {8, 16, 24})) return false;
+    point -= vector;
+    if (!matches_active_axes(point.value, {6, 12, 18})) return false;
+    point *= 2;
+    if (!matches_active_axes(point.value, {12, 24, 36})) return false;
+    point /= 2;
+    if (!matches_active_axes(point.value, {6, 12, 18})) return false;
+    vector += other;
+    if (!matches_active_axes(vector.value, {3, 6, 9})) return false;
+    vector -= other;
+    if (!matches_active_axes(vector.value, {2, 4, 6})) return false;
+    vector *= 3;
+    if (!matches_active_axes(vector.value, {6, 12, 18})) return false;
+    vector /= 2;
+    return matches_active_axes(vector.value, {3, 6, 9});
+}
+template<class T> class CoordinateArithmeticConstexprTest : public testing::Test {};
+using ArithmeticCoordinates = testing::Types<
+    aho::coordinate::_MakeCoordinateInfo<true, false, false>::value,
+    aho::coordinate::_MakeCoordinateInfo<false, true, false>::value,
+    aho::coordinate::_MakeCoordinateInfo<false, false, true>::value,
+    aho::coordinate::_MakeCoordinateInfo<true, true, false>::value,
+    aho::coordinate::_MakeCoordinateInfo<true, false, true>::value,
+    aho::coordinate::_MakeCoordinateInfo<false, true, true>::value,
+    aho::coordinate::_MakeCoordinateInfo<true, true, true>::value>;
+TYPED_TEST_SUITE(CoordinateArithmeticConstexprTest, ArithmeticCoordinates);
+TYPED_TEST(CoordinateArithmeticConstexprTest, PointAndVectorOperationsKeepActiveAxisValuesAtCompileTime) {
+    static_assert(check_point_vector_arithmetic<TypeParam>());
+    static_assert(sizeof(aho::coordinate::_CoordinateSet<int, TypeParam>) ==
+        TypeParam::dimension::dimension * sizeof(int));
+    EXPECT_TRUE(check_point_vector_arithmetic<TypeParam>());
+}
+} // namespace
 #endif

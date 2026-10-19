@@ -107,15 +107,17 @@ namespace VSL_NAMESPACE {
 
 		template<typename T, typename... Args>
 		bool copy_with_shift_offset(void* data, size_t maxSize, size_t& offset, const T& t, const Args&... args) {
-			if (maxSize < offset + sizeof(T))
+			if (offset > maxSize || sizeof(T) > maxSize - offset)
 				return false;
-			memcpy(data, &t, sizeof(T));
+			memcpy(static_cast<char*>(data) + offset, &t, sizeof(T));
+			offset += sizeof(T);
 			return helper::copy_with_shift_offset(data, maxSize, offset, args...);
 		}
 
 		template<typename T>
 		void uncheck_copy_with_shift_offset(void* data, size_t& offset, const T& t) {
-			memcpy(data, &t, sizeof(T));
+			memcpy(static_cast<char*>(data) + offset, &t, sizeof(T));
+			offset += sizeof(T);
 		}
 	}
 
@@ -123,24 +125,32 @@ namespace VSL_NAMESPACE {
 	bool VSL_NAMESPACE::BufferAccessor::copy(const Args&... args) {
 		auto buff = this->data();
 		size_t offset = 0;
-		return helper::copy_with_shift_offset(buff.data, size(), offset, args...);
+		return helper::copy_with_shift_offset(buff.data, buff.size, offset, args...);
 	}
 
     template<typename... Args>
     bool VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::copy(const Args&... args) {
-        size_t offset = this->offset;
-        return helper::copy_with_shift_offset(this->data, parent->size(), offset, args...);
+        size_t offset = 0;
+        return helper::copy_with_shift_offset(this->data, this->size, offset, args...);
     }
 
     template<typename T>
     bool BufferAccessor::copy(T* t, size_t size) {
         auto buff = this->data();
+        if (size > buff.size / sizeof(T))
+            return false;
+        if (size == 0)
+            return true;
         memcpy(buff.data, t, sizeof(T) * size);
         return true;
     }
 
     template<typename T>
     bool BufferAccessor::LocalBufferHolder::copy(T* t, size_t size) {
+        if (size > this->size / sizeof(T))
+            return false;
+        if (size == 0)
+            return true;
         memcpy(data, t, sizeof(T) * size);
         return true;
     }
@@ -154,7 +164,7 @@ namespace VSL_NAMESPACE {
 
     template<typename... Args>
     void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::uncheck_copy(const Args&... args) {
-        size_t offset = this->offset;
+        size_t offset = 0;
         (helper::uncheck_copy_with_shift_offset(this->data, offset, args), ...);
     }
 

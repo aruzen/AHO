@@ -3,6 +3,7 @@
 //
 
 #include <VSL/utils/spir_reflector.hpp>
+#include <VSL/vulkan/_pimpls.hpp>
 
 #include <spirv_cross/spirv_cross.hpp>
 #include <fstream>
@@ -206,11 +207,25 @@ std::vector<VSL_NAMESPACE::graphic_resource::BindingLayout> VSL_NAMESPACE::utils
     std::vector<VSL_NAMESPACE::graphic_resource::BindingLayout> result;
     if (binding_points.empty())
         return result;
-    if (repeat >= result.max_size() / binding_points.size())
+    const auto last_set = binding_points.rbegin()->first;
+    if (last_set >= result.max_size())
+        throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "Descriptor set index exceeds vector capacity");
+    const auto slots = last_set + 1;
+    if (repeat >= result.max_size() / slots)
         throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "Binding layout repeat count exceeds vector capacity");
-    result.reserve((repeat + 1) * binding_points.size());
+    if (!logical_device._data || !logical_device._data->device || !logical_device._data->parentDevice)
+        throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "A valid logical device is required for binding layouts");
+    const auto& physical = logical_device._data->parentDevice;
+    const auto max_sets = physical->props ? physical->props->limits.maxBoundDescriptorSets
+                                          : physical->device.getProperties().limits.maxBoundDescriptorSets;
+    if (slots > max_sets)
+        throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "Descriptor set index exceeds device limit");
+    result.reserve((repeat + 1) * slots);
+    const std::vector<graphic_resource::BindingPoint> empty;
     for (size_t i = 0; i < repeat + 1; i++)
-        for (auto& [_, points] : binding_points)
-            result.emplace_back(logical_device, points);
+        for (size_t set = 0; set < slots; ++set) {
+            const auto found = binding_points.find(set);
+            result.emplace_back(logical_device, found == binding_points.end() ? empty : found->second);
+        }
     return result;
 }

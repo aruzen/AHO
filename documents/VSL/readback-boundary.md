@@ -50,3 +50,7 @@ Apple M1 / MoltenVK、Vulkan SDK 1.4.309.0、Debugで関連targetのビルド成
 ctest --test-dir build-vsl-boundary --output-on-failure \
   -R '^(VSL\.|AHO\.(ImageReadback(Busy)?VulkanIntegrationTest|DrawPhaseVulkanIntegration)\.|AHO\.Compile\.(Header\.image_readback\.hpp|ImageReadback\.PublicVslOnly)$)'
 ```
+
+## 2026-10-20 セルフレビュー
+
+MappedBufferの確保失敗時の解放、論理サイズの範囲検証、invalidateのatom境界と割当末尾、map所有者の保持、独立managerの非干渉、AHO側の公開API境界を確認した。このPR固有の追加修正が必要な問題は見つからなかった。親の#105で修正したSemaphore保持と外部Fence再利用時のCompletion保存を取り込んだ。

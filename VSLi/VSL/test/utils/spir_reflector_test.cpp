@@ -557,3 +557,47 @@ namespace {
         EXPECT_EQ(reflector.generated.push_constants->definitions.at(0).size, 4u);
     }
 } // namespace
+
+namespace {
+    void expect_reflected_stage(const char* file, vsl::ShaderFlag expected) {
+        SCOPED_TRACE(file);
+        vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path(file));
+        const auto& points = reflector.generated.binding_points.at(0);
+        ASSERT_EQ(points.size(), 1u);
+        EXPECT_EQ(points[0].bindingType, vsl::graphic_resource::Type::StorageBuffer);
+        EXPECT_EQ(points[0].shaderType, expected);
+        EXPECT_EQ(points[0].amount, 1u);
+        ASSERT_TRUE(reflector.generated.push_constants);
+        const auto& definitions = reflector.generated.push_constants->definitions;
+        ASSERT_EQ(definitions.size(), 1u);
+        EXPECT_EQ(definitions[0].targetShader, expected);
+        EXPECT_EQ(definitions[0].offset, 0u);
+        EXPECT_EQ(definitions[0].size, 16u);
+        EXPECT_FALSE(reflector.generated.vertex_input);
+    }
+    TEST(SpirvReflectorTest, GeometryAndTessellationKeepTheirDeclaredStageFlags) {
+        for (const auto& [file, stage] : {
+                 std::pair{"reflection_stage.geom.spv", vsl::ShaderFlag::Geometry},
+                 std::pair{"reflection_stage.tesc.spv", vsl::ShaderFlag::TessellationControl},
+                 std::pair{"reflection_stage.tese.spv", vsl::ShaderFlag::TessellationEvaluation}})
+            expect_reflected_stage(file, stage);
+    }
+    TEST(SpirvReflectorTest, RayTracingExecutionModelsKeepTheirDeclaredStageFlags) {
+        for (const auto& [file, stage] : {
+                 std::pair{"reflection_stage.rgen.spv", vsl::ShaderFlag::Raygen},
+                 std::pair{"reflection_stage.rmiss.spv", vsl::ShaderFlag::Miss},
+                 std::pair{"reflection_stage.rint.spv", vsl::ShaderFlag::Intersection},
+                 std::pair{"reflection_stage.rahit.spv", vsl::ShaderFlag::AnyHit},
+                 std::pair{"reflection_stage.rchit.spv", vsl::ShaderFlag::ClosestHit},
+                 std::pair{"reflection_stage.rcall.spv", vsl::ShaderFlag::Callable}})
+            expect_reflected_stage(file, stage);
+    }
+    TEST(SpirvReflectorTest, ExtAndNvTaskMeshExecutionModelsUseTheMatchingStageBits) {
+        for (const auto& [file, stage] : {
+                 std::pair{"reflection_ext.task.spv", vsl::ShaderFlag::Task},
+                 std::pair{"reflection_ext.mesh.spv", vsl::ShaderFlag::Mesh},
+                 std::pair{"reflection_nv.task.spv", vsl::ShaderFlag::Task},
+                 std::pair{"reflection_nv.mesh.spv", vsl::ShaderFlag::Mesh}})
+            expect_reflected_stage(file, stage);
+    }
+} // namespace

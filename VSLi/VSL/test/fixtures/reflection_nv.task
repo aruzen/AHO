@@ -1,0 +1,11 @@
+#version 460
+#extension GL_NV_mesh_shader : require
+layout(local_size_x = 1) in;
+layout(set = 0, binding = 0, std430) buffer Output { vec4 value; }
+result;
+layout(push_constant) uniform Push { vec4 bias; }
+pushed;
+void main() {
+    result.value = pushed.bias;
+    gl_TaskCountNV = 1;
+}

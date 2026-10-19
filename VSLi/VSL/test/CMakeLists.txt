@@ -8,11 +8,16 @@ if (VSL_TEST_SOURCES)
     set(VSL_TEST_SHADER_OUTPUTS)
     foreach(VSL_TEST_SHADER triangle.vert triangle.frag vertices.vert fill.comp images.comp reflection.vert reflection_sparse.vert reflection_matrix.vert reflection_sparse_sets.comp reflection_numeric_widths.vert reflection_fragment_inputs.frag picking.frag
             descriptor_arrays.comp descriptor_multidimensional.comp descriptor_runtime.comp
-            descriptor_specialization.comp descriptor_specialization_expression.comp descriptor_count_overflow.comp)
+            descriptor_specialization.comp descriptor_specialization_expression.comp descriptor_count_overflow.comp
+            reflection_stage.geom reflection_stage.tesc reflection_stage.tese reflection_ext.task reflection_ext.mesh reflection_nv.task reflection_nv.mesh reflection_stage.rgen reflection_stage.rmiss reflection_stage.rint reflection_stage.rahit reflection_stage.rchit reflection_stage.rcall)
         set(VSL_TEST_SHADER_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/shaders/${VSL_TEST_SHADER}.spv")
+        set(VSL_TEST_SHADER_OPTIONS)
+        if (VSL_TEST_SHADER MATCHES "\\.(rgen|rmiss|rint|rahit|rchit|rcall|task|mesh)$")
+            list(APPEND VSL_TEST_SHADER_OPTIONS --target-env=vulkan1.2)
+        endif()
         add_custom_command(OUTPUT "${VSL_TEST_SHADER_OUTPUT}"
                 COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/shaders"
-                COMMAND "${VSL_TEST_GLSLC}" "${CMAKE_CURRENT_SOURCE_DIR}/fixtures/${VSL_TEST_SHADER}" -o "${VSL_TEST_SHADER_OUTPUT}"
+                COMMAND "${VSL_TEST_GLSLC}" ${VSL_TEST_SHADER_OPTIONS} "${CMAKE_CURRENT_SOURCE_DIR}/fixtures/${VSL_TEST_SHADER}" -o "${VSL_TEST_SHADER_OUTPUT}"
                 DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/fixtures/${VSL_TEST_SHADER}"
                 VERBATIM)
         list(APPEND VSL_TEST_SHADER_OUTPUTS "${VSL_TEST_SHADER_OUTPUT}")

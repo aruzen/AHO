@@ -6,6 +6,7 @@
 
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/exceptions.hpp>
+#include <limits>
 
 #include <VSL/vulkan/descriptor_set_manager.hpp>
 
@@ -25,9 +26,11 @@ vsl::graphic_resource::ManagerInterface::make(std::vector<BindingLayout> layouts
                                               size_t other) {
     for (const auto &layout: layouts)
         for (const auto &bp: layout.getBindingPoints()) {
-            if (not size.contains(bp.bindingType))
-                size[bp.bindingType] = 0;
-            size[bp.bindingType]++;
+            auto& count = size[bp.bindingType];
+            constexpr auto maximum = std::numeric_limits<std::uint32_t>::max();
+            if (count > maximum || bp.amount > maximum - count)
+                throw vsl::exceptions::RuntimeException("DescriptorPool", "Descriptor count exceeds uint32_t");
+            count += bp.amount;
         }
     auto pool = this->make(size, other);
     const auto &[err, resources] = pool.bind(layouts);
@@ -40,6 +43,13 @@ vsl::graphic_resource::ManagerInterface::make(std::vector<BindingLayout> layouts
 
 vsl::graphic_resource::Pool
 vsl::graphic_resource::ManagerInterface::make(std::map <Type, size_t> count, size_t other) {
+    constexpr auto maximum = std::numeric_limits<std::uint32_t>::max();
+    if (other > maximum)
+        throw vsl::exceptions::RuntimeException("DescriptorPool", "Fallback descriptor count exceeds uint32_t");
+    for (const auto& [type, amount] : count)
+        if (amount > maximum)
+            throw vsl::exceptions::RuntimeException("DescriptorPool", "Descriptor count exceeds uint32_t");
+
     GraphicResourcePool pool;
     pool._data = std::make_shared<_impl::GraphicResourcePool_impl>();
     pool._data->manager = this;

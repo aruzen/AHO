@@ -156,3 +156,96 @@ TEST(ResourceManagerLifetimeTest, MovesTransferOwnershipAndCopiesShareIt) {
     EXPECT_EQ(original._data, data);
 }
 } // namespace
+
+#include <atomic>
+#include <iostream>
+#include <limits>
+namespace {
+class DescriptorPoolValidationVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+    VkDebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
+    PFN_vkDestroyDebugUtilsMessengerEXT destroy_messenger = nullptr;
+    std::atomic<unsigned> validation_errors{0};
+    static VKAPI_ATTR VkBool32 VKAPI_CALL record_error(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+        VkDebugUtilsMessageTypeFlagsEXT, const VkDebugUtilsMessengerCallbackDataEXT* message, void* user) {
+        if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+            ++*static_cast<std::atomic<unsigned>*>(user);
+            std::cerr << message->pMessageIdName << ": " << message->pMessage << '\n';
+            return VK_TRUE; // Abort an invalid Vulkan call before it reaches the driver.
+        }
+        return VK_FALSE;
+    }
+    void SetUp() override {
+        require_validation = true;
+        VulkanIntegrationTest::SetUp();
+        if (HasFatalFailure() || IsSkipped())
+            return;
+        const auto create = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
+            instance->instance.getProcAddr("vkCreateDebugUtilsMessengerEXT"));
+        destroy_messenger = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+            instance->instance.getProcAddr("vkDestroyDebugUtilsMessengerEXT"));
+        ASSERT_NE(create, nullptr);
+        ASSERT_NE(destroy_messenger, nullptr);
+        VkDebugUtilsMessengerCreateInfoEXT info{};
+        info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+        info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+            VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+        info.pfnUserCallback = record_error;
+        info.pUserData = &validation_errors;
+        ASSERT_EQ(create(instance->instance, &info, nullptr, &messenger), VK_SUCCESS);
+    }
+    void TearDown() override {
+        EXPECT_EQ(validation_errors.load(), 0u) << "Descriptor pool operations emitted validation errors";
+        if (messenger)
+            destroy_messenger(instance->instance, messenger, nullptr);
+        VulkanIntegrationTest::TearDown();
+    }
+};
+TEST_F(DescriptorPoolValidationVulkanIntegrationTest, MakeAllocatesAllArrayElementsAcrossLayoutsAndBindings) {
+    using namespace vsl::graphic_resource;
+    ExactAllocateManager manager(device);
+    BindingLayout first(device, {{0, Type::StorageBuffer, vsl::ShaderFlag::Compute, 4},
+                                 {3, Type::UniformBuffer, vsl::ShaderFlag::Compute, 2}});
+    BindingLayout second(device, {{1, Type::StorageBuffer, vsl::ShaderFlag::Compute, 3}});
+    auto [array_pool, allocated] = manager.make(std::vector{first, second},
+        std::map<Type, std::size_t>{{Type::StorageBuffer, 2}, {Type::UniformBuffer, 1}});
+    struct ClearResources {
+        vsl::GraphicResourcePool pool;
+        ~ClearResources() { pool._data->resources.clear(); }
+    } cleanup{array_pool};
+    ASSERT_EQ(allocated.size(), 2u);
+    EXPECT_EQ(allocated[0].getPool()._data, array_pool._data);
+    EXPECT_EQ(allocated[1].getPool()._data, array_pool._data);
+    EXPECT_TRUE(static_cast<bool>(allocated[0]._data->descriptorSet));
+    EXPECT_TRUE(static_cast<bool>(allocated[1]._data->descriptorSet));
+    BindingLayout spare(device, {{0, Type::StorageBuffer, vsl::ShaderFlag::Compute, 2},
+                                 {1, Type::UniformBuffer, vsl::ShaderFlag::Compute, 1}});
+    auto [success, additional] = array_pool.bind(spare);
+    ASSERT_TRUE(success); // The explicit counts are extra capacity beyond the layouts.
+    EXPECT_EQ(additional.getPool()._data, array_pool._data);
+}
+} // namespace
+
+namespace {
+TEST_F(DescriptorPoolValidationVulkanIntegrationTest, RejectsLayoutTotalsBeyondNativeCapacityBeforeCreatingAPool) {
+    using namespace vsl::graphic_resource;
+    ExactAllocateManager manager(device);
+    BindingLayout array(device, 0, Type::StorageBuffer, vsl::ShaderFlag::Compute, 4);
+    EXPECT_THROW(manager.make(std::vector{array},
+        std::map<Type, std::size_t>{{Type::StorageBuffer, UINT32_MAX}}), vsl::exceptions::RuntimeException);
+    EXPECT_TRUE(manager._data->pools.empty());
+    for (auto& pool : manager._data->pools)
+        pool->resources.clear(); // Clean up a pool created by the old implementation, too.
+}
+#if SIZE_MAX > UINT32_MAX
+TEST_F(DescriptorPoolValidationVulkanIntegrationTest, RejectsOversizedExplicitAndFallbackCountsBeforeCreatingAPool) {
+    using namespace vsl::graphic_resource;
+    ExactAllocateManager manager(device);
+    const auto overflow = std::size_t{UINT32_MAX} + 1;
+    EXPECT_THROW(manager.make(std::map<Type, std::size_t>{{Type::StorageBuffer, overflow}}),
+                 vsl::exceptions::RuntimeException);
+    EXPECT_THROW(manager.make(std::map<Type, std::size_t>{}, overflow), vsl::exceptions::RuntimeException);
+    EXPECT_TRUE(manager._data->pools.empty());
+}
+#endif
+} // namespace

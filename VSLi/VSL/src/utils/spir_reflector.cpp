@@ -142,6 +142,7 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
         {shader_resources.storage_buffers, graphic_resource::Type::StorageBuffer},
         {shader_resources.storage_images, graphic_resource::Type::StorageImage},
         {shader_resources.acceleration_structures, graphic_resource::Type::AccelerationStructureNv}, // 例: NV拡張
+        {shader_resources.separate_images, graphic_resource::Type::SampledImage},
         {shader_resources.separate_samplers, graphic_resource::Type::Sampler},
         /*
             { resources.uniform_texel_buffers, graphic_resource::type::UniformTexelBuffer },
@@ -176,7 +177,9 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
             const auto& type = comp.get_type(resource.type_id);
             generated.binding_points[set].emplace_back(BindingPoint{
                 .binding = binding,
-                .bindingType = gfx_type,
+                .bindingType = gfx_type == Type::SampledImage && type.image.dim == spv::DimBuffer
+                                   ? Type::UniformTexelBuffer
+                                   : gfx_type,
                 .shaderType = shaderType, // TODO
                 .amount = descriptor_count(comp, type),
             });

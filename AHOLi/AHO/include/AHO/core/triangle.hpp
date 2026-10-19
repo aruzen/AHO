@@ -90,11 +90,13 @@ namespace AHO_NAMESPACE {
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
     inline constexpr double Triangle<R, D, CI>::area() const {
         using namespace product::cross;
-        if constexpr (std::same_as<D, VSL_NAMESPACE::D1>)
+        if constexpr (std::same_as<D, VSL_NAMESPACE::D1>) {
             return 0;
-        auto v1 = pos2 - pos1;
-        auto v2 = pos3 - pos1;
-        return 0.5 * (v1 * v2).length();
+        } else {
+            auto v1 = pos2 - pos1;
+            auto v2 = pos3 - pos1;
+            return 0.5 * (v1 * v2).length();
+        }
     }
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
@@ -143,12 +145,13 @@ namespace AHO_NAMESPACE {
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
     inline constexpr double PtrTriangle<R, D, CI>::area() const {
         using namespace product::cross;
-        if constexpr (std::same_as<D, VSL_NAMESPACE::D1>)
+        if constexpr (std::same_as<D, VSL_NAMESPACE::D1>) {
             return 0;
-        auto v1 = *pos2 - *pos1;
-        auto v2 = *pos3 - *pos1;
-        return 0.5 * (v1 * v2).length();
-        ;
+        } else {
+            auto v1 = *pos2 - *pos1;
+            auto v2 = *pos3 - *pos1;
+            return 0.5 * (v1 * v2).length();
+        }
     }
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>

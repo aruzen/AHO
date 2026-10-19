@@ -9,8 +9,26 @@ namespace {
     };
     struct Intersecting {
         bool intersect(Shape) { return true; }
-        bool cotains(Shape) { return false; }
+        bool contains(Shape) { return false; }
     };
+    struct OnlyIntersects {
+        bool intersect(Shape) { return true; }
+    };
+    struct OnlyContains {
+        bool contains(Shape) { return true; }
+    };
+    struct NonBooleanContains {
+        bool intersect(Shape) { return true; }
+        void contains(Shape) {}
+    };
+    struct NonBooleanIntersection {
+        void intersect(Shape) {}
+        bool contains(Shape) { return true; }
+    };
+    static_assert(!aho::concepts::is_intersect_object<OnlyIntersects, Shape>);
+    static_assert(!aho::concepts::is_intersect_object<OnlyContains, Shape>);
+    static_assert(!aho::concepts::is_intersect_object<NonBooleanContains, Shape>);
+    static_assert(!aho::concepts::is_intersect_object<NonBooleanIntersection, Shape>);
     static_assert(aho::concepts::is_std_tuple<std::tuple<int>&>);
     static_assert(!aho::concepts::is_std_tuple<int>);
     static_assert(aho::concepts::plusable<int> && aho::concepts::minusable<int>);
@@ -31,9 +49,16 @@ namespace {
     static_assert(std::same_as<get_type_v<3, int, float, double, Empty>, Empty>);
     static_assert(std::same_as<get_type_v<1, int, const Shape&>, const Shape&>);
     static_assert(std::same_as<get_type_v<2, int, double, Shape&&>, Shape&&>);
+    TEST(AhoConceptsTest, IntersectionConstraintRequiresBothBooleanOperations) {
+        EXPECT_TRUE((aho::concepts::is_intersect_object<Intersecting, Shape>));
+        EXPECT_FALSE((aho::concepts::is_intersect_object<OnlyIntersects, Shape>));
+        EXPECT_FALSE((aho::concepts::is_intersect_object<OnlyContains, Shape>));
+        EXPECT_FALSE((aho::concepts::is_intersect_object<NonBooleanContains, Shape>));
+        EXPECT_FALSE((aho::concepts::is_intersect_object<NonBooleanIntersection, Shape>));
+    }
     TEST(AhoConceptsTest, AcceptedShapeCanBeUsedThroughItsPublicContract) {
         EXPECT_DOUBLE_EQ(Shape{}.area(), 2);
         EXPECT_TRUE(Intersecting{}.intersect(Shape{}));
-        EXPECT_FALSE(Intersecting{}.cotains(Shape{}));
+        EXPECT_FALSE(Intersecting{}.contains(Shape{}));
     }
 } // namespace

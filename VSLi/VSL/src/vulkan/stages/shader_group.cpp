@@ -23,9 +23,11 @@ void VSL_NAMESPACE::pipeline_layout::ShaderGroup::removeShader(ShaderAccessor sh
     std::erase_if(_data->shaders, [&shader](const auto& candidate) { return candidate.get() == shader._data.get(); });
 }
 
-void VSL_NAMESPACE::pipeline_layout::ShaderGroup::injection(VSL_NAMESPACE::PipelineLayoutAccessor pl) {
+void VSL_NAMESPACE::pipeline_layout::ShaderGroup::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
     auto& info = *pl._data->info;
 
-    for (auto& itr : _data->shaders)
+    for (auto& itr : _data->shaders) {
         info.shaderStages.push_back(itr->shaderStageCreateInfo);
+        info.shaders.push_back(itr);
+    }
 }

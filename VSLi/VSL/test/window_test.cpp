@@ -353,3 +353,187 @@ namespace {
         EXPECT_TRUE(static_cast<bool>(*window));
     }
 } // namespace
+
+namespace {
+    struct WindowCloseErrorCapture {
+        inline static unsigned calls = 0;
+        GLFWerrorfun previous;
+        WindowCloseErrorCapture() : previous(glfwSetErrorCallback([](int, const char*) { ++calls; })) { calls = 0; }
+        ~WindowCloseErrorCapture() { glfwSetErrorCallback(previous); glfwGetError(nullptr); }
+    };
+    TEST(WindowValidityTest, EmptyNativeDataCloseAndDestroyDoNotCallUninitializedGlfw) {
+        ASSERT_TRUE(vsl::PureWindow::WINDOWS.empty());
+        glfwTerminate();
+        WindowCloseErrorCapture errors;
+        auto data = std::make_shared<vsl::PureWindow::WindowData>();
+        vsl::PureWindow window(data);
+        EXPECT_FALSE(window.close());
+        data->destroy();
+        data->destroy();
+        EXPECT_EQ(WindowCloseErrorCapture::calls, 0u);
+        EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
+    }
+    TEST_F(WindowIntegrationTest, RepeatedCloseThroughAliasesAndDataDoesNotReenterTerminatedGlfw) {
+        auto data = window->_data;
+        vsl::PureWindow alias(data);
+        WindowCloseErrorCapture errors;
+        ASSERT_TRUE(window->close());
+        EXPECT_FALSE(static_cast<bool>(alias));
+        EXPECT_EQ(data->window_handle, nullptr);
+        EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
+        EXPECT_FALSE(alias.close());
+        EXPECT_FALSE(window->close());
+        data->destroy();
+        EXPECT_EQ(WindowCloseErrorCapture::calls, 0u);
+    }
+    TEST_F(WindowIntegrationTest, RepeatedCloseLeavesAnotherRegisteredWindowUsable) {
+        ScopedUpdateWindow other;
+        int calls = 0;
+        other.window.add_plugin<CountingUpdatePlugin>(calls);
+        WindowCloseErrorCapture errors;
+        ASSERT_TRUE(window->close());
+        EXPECT_FALSE(window->close());
+        window->_data->destroy();
+        EXPECT_TRUE(static_cast<bool>(other.window));
+        ASSERT_EQ(vsl::PureWindow::WINDOWS.size(), 1u);
+        EXPECT_EQ(vsl::PureWindow::WINDOWS.front(), other.window._data);
+        EXPECT_TRUE(other.window.resize(48, 24));
+        EXPECT_TRUE(vsl::PureWindow::Update());
+        EXPECT_EQ(calls, 1);
+        EXPECT_EQ(WindowCloseErrorCapture::calls, 0u);
+    }
+    TEST_F(WindowIntegrationTest, ClosingAnOldAliasAfterRestartKeepsTheNewWindowRegistered) {
+        vsl::PureWindow old(window->_data);
+        ASSERT_TRUE(window->close());
+        ASSERT_TRUE(glfwInit());
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+        ScopedUpdateWindow next;
+        WindowCloseErrorCapture errors;
+        EXPECT_FALSE(old.close());
+        old._data->destroy();
+        EXPECT_TRUE(static_cast<bool>(next.window));
+        ASSERT_EQ(vsl::PureWindow::WINDOWS.size(), 1u);
+        EXPECT_EQ(vsl::PureWindow::WINDOWS.front(), next.window._data);
+        EXPECT_TRUE(next.window.resize(48, 24));
+        EXPECT_EQ(WindowCloseErrorCapture::calls, 0u);
+    }
+} // namespace
+
+#include <limits>
+namespace {
+    struct RegistrationListener : vsl::PureWindow::Plugin, vsl::PureWindow::OnUpdate {
+        int& calls;
+        RegistrationListener(vsl::PureWindow*, int& calls, unsigned char fixed_id = 0) : calls(calls) {
+            id = fixed_id;
+        }
+        bool onUpdate(vsl::PureWindow) override { ++calls; return true; }
+    };
+    struct RegistrationPlugin : vsl::PureWindow::Plugin {
+        explicit RegistrationPlugin(vsl::PureWindow*, unsigned char fixed_id = 0) { id = fixed_id; }
+    };
+    TEST(WindowPluginRegistrationTest, AutomaticIdsSkipRegisteredFixedIds) {
+        vsl::PureWindow window(std::make_shared<vsl::PureWindow::WindowData>());
+        int fixed_calls = 0, automatic_calls = 0;
+        auto fixed = window.add_plugin<RegistrationListener>(fixed_calls, 1);
+        auto automatic = window.add_plugin<RegistrationListener>(automatic_calls);
+        auto next = window.add_plugin<RegistrationListener>(automatic_calls);
+        EXPECT_NE(automatic->id, fixed->id);
+        EXPECT_NE(next->id, fixed->id);
+        EXPECT_NE(next->id, automatic->id);
+        ASSERT_EQ(window._data->plugins.size(), 3u);
+        EXPECT_EQ(window._data->plugins.at(fixed->id), fixed);
+        EXPECT_EQ(window._data->plugins.at(automatic->id), automatic);
+        EXPECT_EQ(window._data->plugins.at(next->id), next);
+        for (const auto& listener : window._data->update)
+            EXPECT_TRUE(listener->onUpdate(window));
+        EXPECT_EQ(fixed_calls, 1);
+        EXPECT_EQ(automatic_calls, 2);
+    }
+    TEST(WindowPluginRegistrationTest, WrappingAutomaticIdsReuseTheVacantSlotWithoutReplacingSurvivors) {
+        vsl::PureWindow window(std::make_shared<vsl::PureWindow::WindowData>());
+        const auto capacity = static_cast<unsigned int>(std::numeric_limits<unsigned char>::max()) + 1u;
+        std::vector<std::shared_ptr<RegistrationPlugin>> plugins;
+        for (unsigned int i = 0; i < capacity; ++i)
+            plugins.push_back(window.add_plugin<RegistrationPlugin>());
+        const auto vacant_id = plugins[37]->id;
+        ASSERT_TRUE(window.remove_plugin(plugins[37]));
+        auto replacement = window.add_plugin<RegistrationPlugin>();
+        EXPECT_EQ(replacement->id, vacant_id);
+        ASSERT_EQ(window._data->plugins.size(), capacity);
+        for (const auto& plugin : plugins)
+            if (plugin->id != vacant_id)
+                EXPECT_EQ(window._data->plugins.at(plugin->id), plugin);
+        EXPECT_EQ(window._data->plugins.at(vacant_id), replacement);
+    }
+    TEST(WindowPluginRegistrationTest, ExhaustionReportsAnErrorAndPreservesRegistrationsAndSubscriptions) {
+        vsl::PureWindow window(std::make_shared<vsl::PureWindow::WindowData>());
+        int calls = 0;
+        const auto capacity = static_cast<unsigned int>(std::numeric_limits<unsigned char>::max()) + 1u;
+        for (unsigned int i = 0; i < capacity; ++i)
+            window.add_plugin<RegistrationListener>(calls);
+        const auto registrations = window._data->plugins;
+        const auto subscriptions = window._data->update;
+        const auto next_id = window._data->plugins_next_id;
+        try {
+            window.add_plugin<RegistrationListener>(calls);
+            FAIL() << "Exhausted plugin IDs must not replace an existing registration";
+        } catch (const vsl::exceptions::RuntimeException& error) {
+            EXPECT_NE(error.reason.find("plugin ID"), std::string::npos);
+        }
+        EXPECT_EQ(window._data->plugins, registrations);
+        EXPECT_EQ(window._data->update, subscriptions);
+        EXPECT_EQ(window._data->plugins_next_id, next_id);
+    }
+    TEST(WindowPluginRegistrationTest, ReplacingAFixedIdAlsoReplacesItsUpdateSubscription) {
+        vsl::PureWindow window(std::make_shared<vsl::PureWindow::WindowData>());
+        int previous_calls = 0, replacement_calls = 0;
+        auto previous = window.add_plugin<RegistrationListener>(previous_calls, 11);
+        auto replacement = window.add_plugin<RegistrationListener>(replacement_calls, 11);
+        ASSERT_EQ(window._data->plugins.size(), 1u);
+        EXPECT_EQ(window._data->plugins.at(11), replacement);
+        ASSERT_EQ(window._data->update.size(), 1u);
+        EXPECT_TRUE(window._data->update.front()->onUpdate(window));
+        EXPECT_EQ(previous_calls, 0);
+        EXPECT_EQ(replacement_calls, 1);
+        EXPECT_FALSE(window.remove_plugin(previous));
+        EXPECT_TRUE(window.remove_plugin(replacement));
+        EXPECT_TRUE(window._data->plugins.empty());
+        EXPECT_TRUE(window._data->update.empty());
+    }
+} // namespace
+
+namespace {
+    TEST(WindowPluginRegistrationTest, FixedIdReplacementCanRemoveAndRestoreAnUpdateSubscription) {
+        vsl::PureWindow window(std::make_shared<vsl::PureWindow::WindowData>());
+        int calls = 0;
+        auto previous = window.add_plugin<RegistrationListener>(calls, 11);
+        std::weak_ptr<RegistrationListener> weak = previous;
+        auto passive = window.add_plugin<RegistrationPlugin>(11);
+        EXPECT_EQ(window._data->plugins.at(11), passive);
+        EXPECT_TRUE(window._data->update.empty());
+        previous.reset();
+        EXPECT_TRUE(weak.expired());
+        auto replacement = window.add_plugin<RegistrationListener>(calls, 11);
+        ASSERT_EQ(window._data->plugins.size(), 1u);
+        ASSERT_EQ(window._data->update.size(), 1u);
+        EXPECT_TRUE(window._data->update.front()->onUpdate(window));
+        EXPECT_EQ(calls, 1);
+        EXPECT_TRUE(window.remove_plugin(replacement));
+        EXPECT_TRUE(window._data->update.empty());
+    }
+    TEST(WindowPluginRegistrationTest, AFullRegistryStillAllowsExplicitFixedIdReplacement) {
+        vsl::PureWindow window(std::make_shared<vsl::PureWindow::WindowData>());
+        int calls = 0;
+        const auto capacity = static_cast<unsigned int>(std::numeric_limits<unsigned char>::max()) + 1u;
+        for (unsigned int i = 0; i < capacity; ++i)
+            window.add_plugin<RegistrationListener>(calls);
+        const auto previous = window._data->plugins.at(11);
+        auto replacement = window.add_plugin<RegistrationListener>(calls, 11);
+        EXPECT_NE(previous, replacement);
+        EXPECT_EQ(window._data->plugins.at(11), replacement);
+        EXPECT_EQ(window._data->plugins.size(), capacity);
+        EXPECT_EQ(window._data->update.size(), capacity);
+        const auto retired = std::dynamic_pointer_cast<vsl::PureWindow::OnUpdate>(previous);
+        EXPECT_EQ(std::ranges::count(window._data->update, retired), 0);
+    }
+} // namespace

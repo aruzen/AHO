@@ -7,7 +7,7 @@ VSL_NAMESPACE::GraphicsPipeline::GraphicsPipeline(VSL_NAMESPACE::PipelineLayoutA
     if (!pass._data || subpass >= pass.description().subpasses.size())
         throw std::out_of_range("Pipeline subpass index");
     if (!layout._data || !layout._data->info || layout._data->device != pass._data->device)
-        throw std::invalid_argument("Pipeline requires editable layout and pass on the same device");
+        throw std::invalid_argument("Pipeline requires initialized layout and pass on the same device");
     const auto& outputs = pass.description().subpasses[subpass];
     if (layout._data->info->colorBlend.attachmentCount != outputs.colors.size())
         throw std::invalid_argument("Pipeline color blend count does not match subpass outputs");
@@ -61,6 +61,9 @@ void VSL_NAMESPACE::GraphicsPipeline::invoke(VSL_NAMESPACE::CommandPool pool, VS
 }
 
 VSL_NAMESPACE::ComputePipeline::ComputePipeline(VSL_NAMESPACE::PipelineLayoutAccessor layout) {
+    if (!layout._data || !layout._data->info || layout._data->info->shaderStages.size() != 1 ||
+        layout._data->info->shaderStages.front().stage != vk::ShaderStageFlagBits::eCompute)
+        throw std::invalid_argument("ComputePipeline requires exactly one compute shader");
 
     _data = std::shared_ptr<_impl::Pipeline_impl>(new _impl::Pipeline_impl);
     _data->device = layout._data->device;

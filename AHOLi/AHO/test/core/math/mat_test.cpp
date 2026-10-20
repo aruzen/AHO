@@ -624,7 +624,8 @@ namespace {
 } // namespace
 
 namespace {
-    template<class T> class MatScaledInverseTest : public testing::Test {};
+    template<class T>
+    class MatScaledInverseTest : public testing::Test {};
     using ScaledInverseScalars = testing::Types<float, double, long double>;
     TYPED_TEST_SUITE(MatScaledInverseTest, ScaledInverseScalars);
     TYPED_TEST(MatScaledInverseTest, OneElementMatricesHaveRepresentableReciprocalsAtSmallAndLargeScales) {
@@ -786,7 +787,8 @@ namespace {
 } // namespace
 
 namespace {
-    template<class T> class MatAffineScaleTest : public testing::Test {};
+    template<class T>
+    class MatAffineScaleTest : public testing::Test {};
     using AffineScaleScalars = testing::Types<float, double, long double>;
     TYPED_TEST_SUITE(MatAffineScaleTest, AffineScaleScalars);
     TYPED_TEST(MatAffineScaleTest, UniformSmallAndLargeScalesPreserveReflectionAndTranslation) {

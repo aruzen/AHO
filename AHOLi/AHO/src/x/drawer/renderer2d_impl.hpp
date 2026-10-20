@@ -2,6 +2,8 @@
 #include <AHO/x/drawer/renderer2d.hpp>
 #include <AHO/x/command/draw2d.hpp>
 #include <VSL/vulkan/buffer.hpp>
+#include <VSL/vulkan/descriptor_set_manager.hpp>
+#include <map>
 
 namespace AHO_NAMESPACE::x {
     namespace detail {
@@ -23,9 +25,13 @@ namespace AHO_NAMESPACE::x {
             VSL_NAMESPACE::LogicalDeviceAccessor device;
             VSL_NAMESPACE::PipelineLayout layout;
             VSL_NAMESPACE::GraphicsPipeline pipeline;
+            VSL_NAMESPACE::graphic_resource::BindingLayout texture_binding;
+            VSL_NAMESPACE::PipelineLayout texture_layout;
+            VSL_NAMESPACE::GraphicsPipeline texture_pipeline;
             Pipeline(VSL_NAMESPACE::LogicalDeviceAccessor device, VSL_NAMESPACE::RenderPassAccessor pass,
                      const std::filesystem::path& directory, std::uint32_t subpass);
-            static VSL_NAMESPACE::PipelineLayout MakeLayout(VSL_NAMESPACE::LogicalDeviceAccessor device, const std::filesystem::path& directory);
+            static VSL_NAMESPACE::PipelineLayout MakeLayout(VSL_NAMESPACE::LogicalDeviceAccessor device, const std::filesystem::path& directory,
+                                                            std::optional<VSL_NAMESPACE::graphic_resource::BindingLayout> texture_binding = std::nullopt);
         };
     } // namespace detail
 
@@ -33,12 +39,15 @@ namespace AHO_NAMESPACE::x {
         std::shared_ptr<detail::Pipeline> pipeline;
         std::vector<std::shared_ptr<detail::Slot>> slots;
         std::size_t limit;
+        std::unique_ptr<VSL_NAMESPACE::GraphicResourceManager> resources;
+        std::map<std::uint32_t, VSL_NAMESPACE::GraphicResource> textures;
     };
 
     struct command::Draw2DCommand::Data {
         std::shared_ptr<detail::Pipeline> pipeline;
         std::shared_ptr<detail::Slot> slot;
         std::vector<DrawBatch> batches;
+        std::vector<VSL_NAMESPACE::GraphicResource> textures;
         std::uint32_t width, height;
         std::weak_ptr<VSL_NAMESPACE::_impl::Submission_impl> submission;
         std::weak_ptr<VSL_NAMESPACE::_impl::CommandManager_impl> manager;

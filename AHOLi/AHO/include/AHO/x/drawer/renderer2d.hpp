@@ -2,6 +2,7 @@
 #include "draw_list.hpp"
 #include <VSL/vulkan/phase.hpp>
 #include <VSL/vulkan/pipeline.hpp>
+#include <VSL/vulkan/sampler.hpp>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -21,6 +22,9 @@ namespace AHO_NAMESPACE::x {
         // 空きスナップショットがなければnullopt。待機や追加のGPU送信はしない。
         [[nodiscard]] std::optional<command::Draw2DCommand> draw(VSL_NAMESPACE::ComputePhase& phase, const DrawList& list, std::uint32_t width, std::uint32_t height);
         [[nodiscard]] bool record(VSL_NAMESPACE::ComputePhase& phase, const DrawList& list, std::uint32_t width, std::uint32_t height);
+        // 画像は描画時にShaderReadOnlyOptimalの2D単層画像として利用できる状態にする。
+        void set_texture(TextureId id, VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::SamplerAccessor sampler);
+        [[nodiscard]] bool erase_texture(TextureId id);
         [[nodiscard]] std::size_t capacity() const noexcept;
     };
 } // namespace AHO_NAMESPACE::x

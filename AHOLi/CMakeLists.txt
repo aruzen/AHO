@@ -24,6 +24,7 @@ add_library(AHOLi
 
         AHO/include/AHO/image_readback.hpp
         AHO/include/AHO/x/screenshot.hpp
+        AHO/include/AHO/x/drawer/draw_list.hpp
         AHO/include/aho/engine.hpp
         AHO/include/aho/concepts.hpp
         AHO/include/aho/pipeline/layouts.hpp

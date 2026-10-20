@@ -173,6 +173,7 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="AHO\include\AHO\x\drawer\draw_list.hpp" />
     <ClInclude Include="AHO\include\AHO\aho.hpp" />
     <ClInclude Include="AHO\include\AHO\concepts.hpp" />
     <ClInclude Include="AHO\include\AHO\core\collision.hpp" />

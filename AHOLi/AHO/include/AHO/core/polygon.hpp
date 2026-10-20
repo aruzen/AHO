@@ -1,141 +1,81 @@
 #pragma once
-#include "../define.hpp"
-
-#include "VSL/dimension.hpp"
-
-#include "vector.hpp"
-#include "point.hpp"
 #include "triangle.hpp"
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <ranges>
+#include <span>
+#include <stdexcept>
+#include <type_traits>
+#include <vector>
 
-#include "../utils/polygon.hpp"
-
-#include <map>
-#include <set>
-#include <initializer_list>
-#include <numeric>
-
-/*
 namespace AHO_NAMESPACE {
-	// TODO
-	template<typename R,
-			 VSL_NAMESPACE::is_dimension D,
-			 typename CoordinateInfo,
-			 typename Size,
-			 typename Alloc>
-	struct Polygon : public std::vector<IndexedTriangle<Size>, Alloc> {
+    // 頂点と三角形を所有するメッシュ。参照ビューから形状を変更できない。
+    template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
+    struct Polygon {
         using dimension = D;
         using element_type = R;
-        using coordinate_info = CoordinateInfo;
+        using coordinate_info = CI;
+        using point_type = _Point<R, D, CI>;
+        using index_type = Size;
+        using triangle_type = IndexedTriangle<Size>;
+        static_assert(std::is_integral_v<Size> && std::is_unsigned_v<Size> && !std::same_as<Size, bool>);
 
-		boost::bimap<AHO_NAMESPACE::_Point<R, D, CoordinateInfo>, Size> _points;
-
-		constexpr Polygon() : std::vector<IndexedTriangle<Size>, Alloc>() {};
-		constexpr Polygon(std::initializer_list<AHO_NAMESPACE::Triangle<R, D, CoordinateInfo>> init);
-
-		template<typename T>
-            requires AHO_NAMESPACE::concepts::points_view_able<T> || AHO_NAMESPACE::concepts::triangles_view_able<T>
-		constexpr Polygon<R, D, CoordinateInfo, Size, Alloc> operator +(T t) const;
-
-        template<typename T>
-            requires AHO_NAMESPACE::concepts::points_view_able<T> || AHO_NAMESPACE::concepts::triangles_view_able<T>
-        constexpr Polygon<R, D, CoordinateInfo, Size, Alloc>& operator +=(T t);
-
-		constexpr double area();
-
-		constexpr auto points();
-
-        // 重めの処理
-        constexpr auto lines();
-
-        constexpr auto triangles();
-	};
-
-    // ===========================================================================================
-
-    template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
-    inline constexpr AHO_NAMESPACE::Polygon<R, D, CI, Size, Alloc>::Polygon(std::initializer_list<AHO_NAMESPACE::Triangle<R, D, CI>> init)
-            : std::vector<IndexedTriangle<Size>, Alloc>() {
-        for (auto i : init) {
-            (*this) += i;
+        Polygon() = default;
+        Polygon(std::span<const point_type> points, std::span<const triangle_type> triangles) {
+            if (points.size() && points.size() - 1 > std::numeric_limits<Size>::max())
+                throw std::length_error("Polygon vertex index exceeds index type");
+            for (const auto& triangle : triangles)
+                for (const auto index : {triangle.idx1.index, triangle.idx2.index, triangle.idx3.index})
+                    if (index >= points.size())
+                        throw std::out_of_range("Polygon triangle index exceeds vertex count");
+            points_.assign(points.begin(), points.end());
+            triangles_.assign(triangles.begin(), triangles.end());
         }
-    }
 
-    template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
-    template<typename T>
-        requires AHO_NAMESPACE::concepts::points_view_able<T> || AHO_NAMESPACE::concepts::triangles_view_able<T>
-    inline constexpr Polygon<R, D, CI, Size, Alloc> AHO_NAMESPACE::Polygon<R, D, CI, Size, Alloc>::operator+(T t) const
-	{
-        auto copy = Polygon<R, D, CI, Size, Alloc>(*this);
-        copy += t;
-        return copy;
-	}
+        [[nodiscard]] std::span<const point_type> points() const noexcept { return points_; }
+        [[nodiscard]] std::span<const triangle_type> indices() const noexcept { return triangles_; }
+        [[nodiscard]] std::size_t size() const noexcept { return triangles_.size(); }
+        [[nodiscard]] bool empty() const noexcept { return triangles_.empty(); }
 
-    template<typename R, vsl::is_dimension D, typename CI, typename Size, typename Alloc>
-    template<typename T>
-    requires AHO_NAMESPACE::concepts::points_view_able<T> || AHO_NAMESPACE::concepts::triangles_view_able<T>
-    constexpr Polygon<R, D, CI, Size, Alloc>& Polygon<R, D, CI, Size, Alloc>::operator+=(T t) {
-        if constexpr (AHO_NAMESPACE::concepts::triangles_view_able<T>) {
-            for (Triangle<R, D, CI> triangle : views::triangles(t)) {
-                // 新しいのを見つけた場合
-                IndexedTriangle<Size> indexed_tri;
-                size_t i = 0;
-                for (const auto& point : t.points()) {
-                    // TODO ランダムアクセス可能でない場合アクセスできないのであとで直す
-                    auto point_itr = this->_points.left.find(point);
-                    if (point_itr == this->_points.left.end()) {
-                        indexed_tri[i] = Index<Size>(this->_points.size());
-                        using vt = typename decltype(_points)::value_type;
-                        this->_points.insert(vt(point, this->_points.size()));
-                    } else {
-                        indexed_tri[i] = Index<Size>(point_itr->second);
-                    }
-                    i++;
+        [[nodiscard]] auto triangles() const {
+            return std::views::all(triangles_) | std::views::transform([this](const triangle_type& t) {
+                       return Triangle<R, D, CI>{points_[t.idx1.index], points_[t.idx2.index], points_[t.idx3.index]};
+                   });
+        }
+        // 各三角形の3辺を返す。共有辺も含むため、輪郭線とは区別する。
+        [[nodiscard]] auto lines() const {
+            return std::views::iota(std::size_t{0}, triangles_.size() * 3) | std::views::transform([this](std::size_t i) {
+                       const auto& t = triangles_[i / 3];
+                       const Size vertices[]{t.idx1.index, t.idx2.index, t.idx3.index};
+                       return Line<R, D, CI>{points_[vertices[i % 3]], points_[vertices[(i + 1) % 3]]};
+                   });
+        }
+        [[nodiscard]] double area() const {
+            long double result = 0;
+            for (const auto triangle : triangles()) {
+                const auto a = triangle.pos1.value;
+                const auto b = triangle.pos2.value;
+                const auto c = triangle.pos3.value;
+                const long double ux = static_cast<long double>(b.___AN1) - static_cast<long double>(a.___AN1);
+                const long double vx = static_cast<long double>(c.___AN1) - static_cast<long double>(a.___AN1);
+                if constexpr (D::dimension == 2) {
+                    const long double uy = static_cast<long double>(b.___AN2) - static_cast<long double>(a.___AN2);
+                    const long double vy = static_cast<long double>(c.___AN2) - static_cast<long double>(a.___AN2);
+                    result += std::abs(ux * vy - uy * vx) / 2;
+                } else if constexpr (D::dimension == 3) {
+                    const long double uy = static_cast<long double>(b.___AN2) - static_cast<long double>(a.___AN2);
+                    const long double vy = static_cast<long double>(c.___AN2) - static_cast<long double>(a.___AN2);
+                    const long double uz = static_cast<long double>(b.___AN3) - static_cast<long double>(a.___AN3);
+                    const long double vz = static_cast<long double>(c.___AN3) - static_cast<long double>(a.___AN3);
+                    result += std::hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) / 2;
                 }
-                this->push_back(indexed_tri);
             }
-        } else if constexpr (AHO_NAMESPACE::concepts::points_view_able<T>) {
-            // TODO
+            return static_cast<double>(result);
         }
-        return *this;
-    }
 
-	template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
-	inline constexpr auto AHO_NAMESPACE::Polygon<R, D, CI, Size, Alloc>::points()
-	{
-		return _points.left | std::views::transform([](const auto& pair) {
-            return pair.first;
-        });
-	}
-
-    template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
-    inline constexpr auto AHO_NAMESPACE::Polygon<R, D, CI, Size, Alloc>::lines()
-    {
-        auto max = (3*this->size());
-        return std::views::iota((decltype(max))0, max) |
-        std::views::transform([this](decltype(max) i){
-            IndexedTriangle<Size> t = (*this)[i/3];
-            return Line<R, D, CI>(_points.right.at(t[i%3].index), _points.right.at(t[(i+1)%3].index));
-        });
-    }
-
-    template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
-    inline constexpr auto AHO_NAMESPACE::Polygon<R, D, CI, Size, Alloc>::triangles()
-    {
-        return *this | std::views::transform([this](IndexedTriangle<Size> t) {
-            return Triangle<R, D, CI>(_points.right.at(t.idx1.index),
-                                     _points.right.at(t.idx2.index),
-                                     _points.right.at(t.idx3.index));
-        });
-    }
-
-    template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
-    inline constexpr double AHO_NAMESPACE::Polygon<R, D, CI, Size, Alloc>::area()
-    {
-        auto triangles = this->triangles();
-        return std::accumulate(triangles.begin(), triangles.end(), 0.0);
-    }
-
-    static_assert(concepts::is_triangles_object<Polygon<double, VSL_NAMESPACE::D2>>);
-    static_assert(concepts::is_lines_object<Polygon<double, VSL_NAMESPACE::D2>>);
-    static_assert(concepts::is_points_object<Polygon<double, VSL_NAMESPACE::D2>>);
-}*/
+    private:
+        std::vector<point_type> points_;
+        std::vector<triangle_type, Alloc> triangles_;
+    };
+} // namespace AHO_NAMESPACE

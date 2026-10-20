@@ -69,10 +69,15 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Label="UserMacros">
+    <AHOTinyGltfRoot Condition="'$(AHOTinyGltfRoot)'==''">$(ProjectDir)..\thirdparty\tinygltf</AHOTinyGltfRoot>
+  </PropertyGroup>
   <PropertyGroup>
     <IncludePath Condition="'$(SAITEKIKUUKAN_HOME)' != ''">$(SAITEKIKUUKAN_HOME)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile><AdditionalIncludeDirectories>$(AHOTinyGltfRoot);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories></ClCompile>
+  </ItemDefinitionGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>C:\Users\aruze\source\repos\AHO\AHOLi;D:\sdks\VulkanSDK\1.2.176.1\Include;D:\apuri\_libs\glfw\include;D:\apuri\_libs\glm;$(IncludePath)</IncludePath>
@@ -211,6 +216,8 @@
     <ClInclude Include="AHO\include\AHO\drawer\draw_phase.hpp" />
     <ClInclude Include="AHO\include\AHO\drawer\standard_drawer.hpp" />
     <ClInclude Include="AHO\include\AHO\image_readback.hpp" />
+    <ClInclude Include="AHO\include\AHO\x\resource\gltf.hpp" />
+    <ClInclude Include="AHO\include\AHO\x\resource\shader.hpp" />
     <ClInclude Include="AHO\include\AHO\x\screenshot.hpp" />
     <ClInclude Include="AHO\include\AHO\x\core\mesh.hpp" />
     <ClInclude Include="AHO\include\AHO\x\core\mesh_attributes.hpp" />
@@ -240,6 +247,8 @@
     <ClCompile Include="AHO\src\drawer.cpp" />
     <ClCompile Include="AHO\src\drawer\draw_phase.cpp" />
     <ClCompile Include="AHO\src\image_readback.cpp" />
+    <ClCompile Include="AHO\src\x\resource\gltf.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="AHO\src\x\resource\shader.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
     <ClCompile Include="AHO\src\x\screenshot.cpp" />
     <ClCompile Include="AHO\src\engine.cpp" />
     <ClCompile Include="AHO\src\engine\graphical_engine.cpp" />

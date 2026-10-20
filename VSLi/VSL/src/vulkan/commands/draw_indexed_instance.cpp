@@ -4,15 +4,21 @@
 #include "draw_count.hpp"
 
 VSL_NAMESPACE::command::DrawInstance::DrawInstance(size_t index_size, size_t instance_size)
-    : index_size(index_size), instance_size(instance_size) {}
+    : index_size_(_impl::helper::checkedDrawCount(index_size)), instance_size_(_impl::helper::checkedDrawCount(instance_size)) {}
 
 VSL_NAMESPACE::command::DrawInstance::DrawInstance(size_t instance_size)
-    : instance_size(instance_size) {}
+    : DrawInstance(0, instance_size) {}
+
+void VSL_NAMESPACE::command::DrawInstance::setIndexSize(size_t size) {
+    index_size_ = _impl::helper::checkedDrawCount(size);
+}
+
+void VSL_NAMESPACE::command::DrawInstance::setInstanceSize(size_t size) {
+    instance_size_ = _impl::helper::checkedDrawCount(size);
+}
 
 void VSL_NAMESPACE::command::DrawInstance::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
-    const auto index_count = _impl::helper::checkedDrawCount(index_size);
-    const auto instance_count = _impl::helper::checkedDrawCount(instance_size);
-    buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].drawIndexed(index_count, instance_count, 0, 0, 0);
+    buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].drawIndexed(index_size_, instance_size_, 0, 0, 0);
 }
 
 /*

@@ -47,49 +47,20 @@ static_assert(sum.value.x.value == 4 && sum.value.y.value == 6);
 #else
 
 #include "../support/asymmetric_arithmetic.hpp"
+#include "../support/arithmetic_geometry.hpp"
 namespace {
     using namespace aho_test::arithmetic;
-    template<bool X, bool Y, bool Z>
-    using ArithmeticCoordinates = typename aho::coordinate::_MakeCoordinateInfo<X, Y, Z>::value;
     template<class CI, class T>
     using ArithmeticVector = aho::_Vector<T, typename CI::dimension, CI>;
-    template<class CI, class T>
-    constexpr auto arithmetic_vector(int first = 12, int second = 20, int third = 28) {
-        if constexpr (CI::dimension::dimension == 1)
-            return ArithmeticVector<CI, T>(T{first});
-        else if constexpr (CI::dimension::dimension == 2)
-            return ArithmeticVector<CI, T>(T{first}, T{second});
-        else
-            return ArithmeticVector<CI, T>(T{first}, T{second}, T{third});
-    }
-    template<class V>
-    constexpr bool arithmetic_values_are(const V& v, int first, int second, int third) {
-        auto scalar = [](const auto& value) {
-            if constexpr (std::integral<std::remove_cvref_t<decltype(value)>>)
-                return value;
-            else
-                return value.value;
-        };
-        bool result = scalar(v.value.template component<0>()) == first;
-        if constexpr (V::dimension::dimension >= 2)
-            result = result && scalar(v.value.template component<1>()) == second;
-        if constexpr (V::dimension::dimension == 3)
-            result = result && scalar(v.value.template component<2>()) == third;
-        return result;
-    }
     template<class CI>
     class VectorArithmeticConstraintTest : public testing::Test {};
-    using ArithmeticVectorCoordinates = testing::Types<
-        ArithmeticCoordinates<true, false, false>, ArithmeticCoordinates<false, true, false>,
-        ArithmeticCoordinates<false, false, true>, ArithmeticCoordinates<true, true, false>,
-        ArithmeticCoordinates<true, false, true>, ArithmeticCoordinates<false, true, true>,
-        ArithmeticCoordinates<true, true, true>>;
+    using ArithmeticVectorCoordinates = ArithmeticGeometryCoordinates;
     TYPED_TEST_SUITE(VectorArithmeticConstraintTest, ArithmeticVectorCoordinates);
     TYPED_TEST(VectorArithmeticConstraintTest, BinaryOperatorsUseTheStoredScalarOnTheLeft) {
         using CI = TypeParam;
         using Result = ArithmeticVector<CI, int>;
-        constexpr auto lhs = arithmetic_vector<CI, LeftOperand>();
-        constexpr auto rhs = arithmetic_vector<CI, Operand>(4, 5, 7);
+        constexpr auto lhs = arithmetic_geometry<ArithmeticVector<CI, LeftOperand>>();
+        constexpr auto rhs = arithmetic_geometry<ArithmeticVector<CI, Operand>>(4, 5, 7);
         constexpr Operand factor{4};
         static_assert(std::same_as<decltype(lhs + rhs), Result>);
         static_assert(std::same_as<decltype(lhs - rhs), Result>);
@@ -111,8 +82,8 @@ namespace {
     TYPED_TEST(VectorArithmeticConstraintTest, CompoundOperatorsMutateEveryComponentAndReturnTheSameVector) {
         using CI = TypeParam;
         using Vector = ArithmeticVector<CI, LeftOperand>;
-        auto lhs = arithmetic_vector<CI, LeftOperand>();
-        constexpr auto rhs = arithmetic_vector<CI, Operand>(4, 5, 7);
+        auto lhs = arithmetic_geometry<ArithmeticVector<CI, LeftOperand>>();
+        constexpr auto rhs = arithmetic_geometry<ArithmeticVector<CI, Operand>>(4, 5, 7);
         constexpr Operand factor{4};
         static_assert(std::same_as<decltype(lhs += rhs), Vector&>);
         static_assert(std::same_as<decltype(lhs -= rhs), Vector&>);
@@ -135,8 +106,8 @@ namespace {
         using Right = ArithmeticVector<CI, Operand>;
         static_assert(!CanAdd<Vector, Right> && !CanSubtract<Vector, Right>);
         static_assert(!CanMultiply<Vector, Operand> && !CanDivide<Vector, Operand>);
-        auto lhs = arithmetic_vector<CI, AssignmentOnly>();
-        constexpr auto rhs = arithmetic_vector<CI, Operand>(4, 5, 7);
+        auto lhs = arithmetic_geometry<ArithmeticVector<CI, AssignmentOnly>>();
+        constexpr auto rhs = arithmetic_geometry<ArithmeticVector<CI, Operand>>(4, 5, 7);
         EXPECT_EQ(&(lhs += rhs), &lhs);
         EXPECT_TRUE(arithmetic_values_are(lhs, 16, 25, 35));
         EXPECT_EQ(&(lhs -= rhs), &lhs);
@@ -149,8 +120,8 @@ namespace {
     TYPED_TEST(VectorArithmeticConstraintTest, ResultsUseConstComponentOverloadsRatherThanRvalueOverloads) {
         using CI = TypeParam;
         using Result = ArithmeticVector<CI, int>;
-        constexpr auto lhs = arithmetic_vector<CI, CategoryResult>();
-        constexpr auto rhs = arithmetic_vector<CI, CategoryResult>(4, 5, 7);
+        constexpr auto lhs = arithmetic_geometry<ArithmeticVector<CI, CategoryResult>>();
+        constexpr auto rhs = arithmetic_geometry<ArithmeticVector<CI, CategoryResult>>(4, 5, 7);
         constexpr CategoryResult factor{4};
         static_assert(std::same_as<decltype(lhs + rhs), Result>);
         static_assert(std::same_as<decltype(lhs - rhs), Result>);

@@ -38,9 +38,11 @@ if (AHO_TEST_SOURCES)
             drawer/draw_phase_test.cpp
             image_readback_test.cpp
             x/screenshot_test.cpp
+            x/drawer/renderer2d_test.cpp
     )
     target_compile_definitions(aho-gpu-test PRIVATE AHO_GPU_TESTS=1
-            VSL_TEST_SHADER_DIR="${CMAKE_BINARY_DIR}/VSLi/VSL/test/shaders")
+            VSL_TEST_SHADER_DIR="${CMAKE_BINARY_DIR}/VSLi/VSL/test/shaders"
+            AHO_DRAW_SHADER_DIR="${CMAKE_BINARY_DIR}/AHOLi/shaders/drawer")
     target_include_directories(aho-gpu-test PRIVATE "${VSL_HOME}/test")
     add_dependencies(aho-gpu-test vsl-test-shaders)
     target_include_directories(aho-gpu-test PRIVATE "$<TARGET_PROPERTY:aho-test,INCLUDE_DIRECTORIES>")
@@ -60,6 +62,9 @@ if (AHO_TEST_SOURCES)
     aho_add_compile_test(Screenshot.PublicVslOnly
             "${CMAKE_CURRENT_SOURCE_DIR}/contracts/screenshot_public_vsl.cpp"
             AHO_CONTRACT_SCREENSHOT_PUBLIC_VSL)
+    aho_add_compile_test(Renderer2D.PublicVslOnly
+            "${CMAKE_CURRENT_SOURCE_DIR}/contracts/renderer2d_public_vsl.cpp"
+            AHO_CONTRACT_RENDERER2D_PUBLIC_VSL)
     aho_add_compile_test(Mat.InitializerConstructor "${CMAKE_CURRENT_SOURCE_DIR}/core/math/mat_test.cpp" AHO_CONTRACT_MAT_INITIALIZER)
     aho_add_compile_test(Mat.RectangularFactory "${CMAKE_CURRENT_SOURCE_DIR}/core/math/mat_test.cpp" AHO_CONTRACT_MAT_RECTANGULAR_FACTORY)
     aho_add_compile_test(Mat.AxisRotation "${CMAKE_CURRENT_SOURCE_DIR}/core/math/mat_test.cpp" AHO_CONTRACT_MAT_AXIS_ROTATION)

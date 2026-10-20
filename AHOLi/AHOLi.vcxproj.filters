@@ -1,10 +1,16 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <ClInclude Include="AHO\include\AHO\x\drawer\renderer2d.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClInclude Include="AHO\include\AHO\x\drawer\draw_list.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="AHO\include\AHO\x\screenshot.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClCompile Include="AHO\src\x\drawer\renderer2d.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="AHO\src\x\screenshot.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="AHO\include\AHO\image_readback.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClCompile Include="AHO\src\image_readback.cpp"><Filter>ソース ファイル</Filter></ClCompile>
@@ -189,5 +195,9 @@
     <ClCompile Include="AHO\src\window.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="AHO\shaders\drawer\draw2d.vert" />
+    <CustomBuild Include="AHO\shaders\drawer\draw2d.frag" />
   </ItemGroup>
 </Project>

@@ -24,7 +24,7 @@ namespace aho_test::arithmetic {
     template<class V>
     constexpr bool arithmetic_values_are(const V& v, int first, int second, int third) {
         auto scalar = [](const auto& value) {
-            if constexpr (std::integral<std::remove_cvref_t<decltype(value)>>)
+            if constexpr (std::is_arithmetic_v<std::remove_cvref_t<decltype(value)>>)
                 return value;
             else
                 return value.value;

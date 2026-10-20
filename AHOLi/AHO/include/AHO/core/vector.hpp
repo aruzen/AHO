@@ -345,6 +345,7 @@ namespace AHO_NAMESPACE {
     // ---------------------------------------------------------------------------------------------------------------------
 
     template<typename L, typename R, typename Dim, typename CI>
+    requires(!concepts::is_vector<L>) && requires(const L& lhs, const R& rhs) { lhs * rhs; }
     constexpr auto operator*(const L& l, _Vector<R, Dim, CI> v1);
 
     // ---------------------------------------------------------------------------------------------------------------------
@@ -815,7 +816,15 @@ namespace AHO_NAMESPACE {
     // ---------------------------------------------------------------------------------------------------------------------
 
     template<typename L, typename R, typename Dim, typename CI>
+    requires(!concepts::is_vector<L>) && requires(const L& lhs, const R& rhs) { lhs * rhs; }
     constexpr auto operator*(const L& l, _Vector<R, Dim, CI> v1) {
-        return v1 * l;
+        const auto& components = v1.value;
+        using Result = _Vector<decltype(l * components.___AN1), Dim, CI>;
+        if constexpr (Dim::dimension == 1)
+            return Result(l * components.___AN1);
+        else if constexpr (Dim::dimension == 2)
+            return Result(l * components.___AN1, l * components.___AN2);
+        else
+            return Result(l * components.___AN1, l * components.___AN2, l * components.___AN3);
     }
 } // namespace AHO_NAMESPACE

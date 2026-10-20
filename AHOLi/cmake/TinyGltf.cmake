@@ -1,0 +1,25 @@
+# C++版を固定する。公開ヘッダーにはtinygltfへの依存を持ち込まない。
+set(AHO_TINYGLTF_INCLUDE_DIR "" CACHE PATH "tinygltf 2.9.7 directory (tiny_gltf.h, json.hpp, stb_image.h)")
+if(NOT AHO_TINYGLTF_INCLUDE_DIR)
+    include(FetchContent)
+    if(POLICY CMP0135)
+        cmake_policy(SET CMP0135 NEW)
+    endif()
+    set(TINYGLTF_BUILD_LOADER_EXAMPLE OFF CACHE BOOL "" FORCE)
+    set(TINYGLTF_BUILD_GL_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(TINYGLTF_BUILD_VALIDATOR_EXAMPLE OFF CACHE BOOL "" FORCE)
+    set(TINYGLTF_BUILD_BUILDER_EXAMPLE OFF CACHE BOOL "" FORCE)
+    set(TINYGLTF_HEADER_ONLY ON CACHE BOOL "" FORCE)
+    set(TINYGLTF_INSTALL OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(aho_tinygltf
+            URL https://codeload.github.com/syoyo/tinygltf/tar.gz/488a70a3df62a4df1a736e9e56fb8836580c4888
+            URL_HASH SHA256=16093ac815dc216d9a43abc9a4eabff8df1a7472da2abc79e97ca65d4b7f2565
+    )
+    FetchContent_MakeAvailable(aho_tinygltf)
+    set(AHO_TINYGLTF_INCLUDE_DIR "${aho_tinygltf_SOURCE_DIR}")
+endif()
+foreach(header tiny_gltf.h json.hpp stb_image.h)
+    if(NOT EXISTS "${AHO_TINYGLTF_INCLUDE_DIR}/${header}")
+        message(FATAL_ERROR "Missing ${header} in AHO_TINYGLTF_INCLUDE_DIR=${AHO_TINYGLTF_INCLUDE_DIR}")
+    endif()
+endforeach()

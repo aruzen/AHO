@@ -4,6 +4,8 @@ project(AHOLi VERSION 1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+include(cmake/TinyGltf.cmake)
+
 add_library(AHOLi
         AHO/src/pipeline/layouts.cpp
         AHO/src/pipeline/pipeline.cpp
@@ -15,6 +17,8 @@ add_library(AHOLi
         AHO/src/io/key.cpp
         AHO/src/drawer.cpp
         AHO/src/image_readback.cpp
+        AHO/src/x/resource/gltf.cpp
+        AHO/src/x/resource/shader.cpp
         AHO/src/x/screenshot.cpp
         AHO/src/engine.cpp
         AHO/src/resource/image.cpp
@@ -23,6 +27,8 @@ add_library(AHOLi
         AHO/src/engine/graphical_engine.cpp
 
         AHO/include/AHO/image_readback.hpp
+        AHO/include/AHO/x/resource/gltf.hpp
+        AHO/include/AHO/x/resource/shader.hpp
         AHO/include/AHO/x/screenshot.hpp
         AHO/include/aho/engine.hpp
         AHO/include/aho/concepts.hpp
@@ -60,6 +66,8 @@ add_library(AHOLi
         AHO/include/aho/define.hpp
         AHO/src/drawer/draw_phase.cpp
 )
+
+target_include_directories(AHOLi SYSTEM PRIVATE "${AHO_TINYGLTF_INCLUDE_DIR}")
 
 target_include_directories(AHOLi
         PRIVATE
@@ -130,3 +138,11 @@ install(
 if (BUILD_TESTING)
     add_subdirectory(AHO/test)
 endif ()
+
+option(AHO_BUILD_GLTF_EXAMPLE "Build the CPU glTF/GLB inspection example" OFF)
+if(AHO_BUILD_GLTF_EXAMPLE)
+    add_executable(aho-gltf-inspect "${CMAKE_CURRENT_SOURCE_DIR}/../examples/gltf_inspect.cpp")
+    target_include_directories(aho-gltf-inspect PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/AHO/include")
+    target_link_directories(aho-gltf-inspect PRIVATE ${GLFW_LIBRARY_DIRS})
+    target_link_libraries(aho-gltf-inspect PRIVATE AHOLi)
+endif()

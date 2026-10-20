@@ -150,6 +150,86 @@ namespace {
         EXPECT_FALSE((CanDivideAssign<BinaryOnly, CategoryResult>));
     }
 } // namespace
+
+#include "../support/integer_matrix2.hpp"
+namespace {
+    template<class CI>
+    class VectorLeftProductTest : public testing::Test {};
+    TYPED_TEST_SUITE(VectorLeftProductTest, ArithmeticGeometryCoordinates);
+    TYPED_TEST(VectorLeftProductTest, SupportsOnlyTheWrittenScalarToComponentDirection) {
+        using CI = TypeParam;
+        constexpr LeftOperand lhs{4};
+        constexpr auto rhs = arithmetic_geometry<ArithmeticVector<CI, Operand>>();
+        constexpr auto result = lhs * rhs;
+        static_assert(std::same_as<std::remove_cv_t<decltype(result)>, ArithmeticVector<CI, int>>);
+        static_assert(arithmetic_values_are(result, 48, 80, 112));
+        EXPECT_TRUE(arithmetic_values_are(result, 48, 80, 112));
+        EXPECT_TRUE(arithmetic_values_are(rhs, 12, 20, 28));
+        EXPECT_FALSE((CanMultiply<Operand, ArithmeticVector<CI, LeftOperand>>));
+        EXPECT_FALSE((CanMultiply<ArithmeticVector<CI, Operand>, LeftOperand>));
+    }
+    TYPED_TEST(VectorLeftProductTest, NonCommutingIntegerMatricesMultiplyOnTheWrittenSide) {
+        using CI = TypeParam;
+        using M = aho_test::IntegerMatrix2;
+        using V = ArithmeticVector<CI, M>;
+        constexpr M lhs{1, 2, 0, 1};
+        constexpr M first{1, 0, 3, 1}, second{2, 0, 0, 3}, third{0, 1, 1, 0};
+        constexpr V rhs = [=] {
+            if constexpr (CI::dimension::dimension == 1)
+                return V(first);
+            else if constexpr (CI::dimension::dimension == 2)
+                return V(first, second);
+            else
+                return V(first, second, third);
+        }();
+        constexpr auto result = lhs * rhs;
+        static_assert(std::same_as<std::remove_cv_t<decltype(result)>, V>);
+        static_assert(result.value.template component<0>() == M{7, 2, 3, 1});
+        EXPECT_EQ(result.value.template component<0>(), (M{7, 2, 3, 1}));
+        EXPECT_EQ(rhs.value.template component<0>(), first);
+        if constexpr (CI::dimension::dimension >= 2) {
+            static_assert(result.value.template component<1>() == M{2, 6, 0, 3});
+            EXPECT_EQ(result.value.template component<1>(), (M{2, 6, 0, 3}));
+            EXPECT_EQ(rhs.value.template component<1>(), second);
+        }
+        if constexpr (CI::dimension::dimension == 3) {
+            static_assert(result.value.template component<2>() == M{2, 1, 1, 0});
+            EXPECT_EQ(result.value.template component<2>(), (M{2, 1, 1, 0}));
+            EXPECT_EQ(rhs.value.template component<2>(), third);
+        }
+        const auto rightProduct = rhs * lhs;
+        EXPECT_EQ(rightProduct.value.template component<0>(), (M{1, 2, 3, 7}));
+        if constexpr (CI::dimension::dimension >= 2)
+            EXPECT_EQ(rightProduct.value.template component<1>(), (M{2, 4, 0, 3}));
+        if constexpr (CI::dimension::dimension == 3)
+            EXPECT_EQ(rightProduct.value.template component<2>(), (M{0, 1, 1, 2}));
+    }
+    TYPED_TEST(VectorLeftProductTest, UsesConstOperandsEvenThoughTheVectorIsPassedByValue) {
+        using CI = TypeParam;
+        constexpr CategoryResult lhs{4};
+        constexpr auto rhs = arithmetic_geometry<ArithmeticVector<CI, CategoryResult>>();
+        constexpr auto result = lhs * rhs;
+        static_assert(std::same_as<std::remove_cv_t<decltype(result)>, ArithmeticVector<CI, int>>);
+        static_assert(arithmetic_values_are(result, 48, 80, 112));
+        EXPECT_TRUE(arithmetic_values_are(result, 48, 80, 112));
+        EXPECT_TRUE(arithmetic_values_are(rhs, 12, 20, 28));
+    }
+    TYPED_TEST(VectorLeftProductTest, MixedBuiltinScalarsKeepTheCoordinateInfoAndResultType) {
+        using CI = TypeParam;
+        constexpr auto rhs = arithmetic_geometry<ArithmeticVector<CI, int>>();
+        constexpr auto result = 2.5 * rhs;
+        static_assert(std::same_as<std::remove_cv_t<decltype(result)>, ArithmeticVector<CI, double>>);
+        static_assert(arithmetic_values_are(result, 30, 50, 70));
+        EXPECT_TRUE(arithmetic_values_are(result, 30, 50, 70));
+        EXPECT_TRUE(arithmetic_values_are(rhs, 12, 20, 28));
+    }
+    TYPED_TEST(VectorLeftProductTest, RejectsMissingConstProductsAndVectorLeftOperands) {
+        using CI = TypeParam;
+        EXPECT_FALSE((CanMultiply<Operand, ArithmeticVector<CI, Operand>>));
+        EXPECT_FALSE((CanMultiply<MutableOnly, ArithmeticVector<CI, MutableOnly>>));
+        EXPECT_FALSE((CanMultiply<ArithmeticVector<CI, int>, ArithmeticVector<CI, int>>));
+    }
+} // namespace
 #include "../support/one_way_cast.hpp"
 namespace {
     template<class T>

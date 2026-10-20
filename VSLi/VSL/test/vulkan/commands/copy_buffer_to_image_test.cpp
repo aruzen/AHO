@@ -56,4 +56,38 @@ namespace {
         EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
     }
 
+    TEST_F(CopyBufferToImageVulkanIntegrationTest, CommandsCaptureStorageBeforeSourceHandleIsDestroyed) {
+        const std::array<std::uint32_t, 4> expected{17, 29, 43, 71};
+        TransferImage image(device, 2, 2, vsl::data_format::UnsignedInt, 2);
+        std::optional<vsl::command::CopyBufferToImage> single;
+        std::optional<vsl::command::CopyBufferToArrayImage> array;
+        std::weak_ptr<vsl::_impl::Buffer_impl> sourceStorage;
+        {
+            vsl::StagingBuffer<> source(device, expected);
+            sourceStorage = source._data;
+            single.emplace(image, &source, vsl::ImageLayout::General);
+            array.emplace(image, &source, vsl::ImageLayout::General, 1);
+        }
+        ASSERT_FALSE(sourceStorage.expired());
+        auto manager = make_manager();
+        vsl::StagingBuffer<vsl::MemoryType::TransferDestination> first(device, sizeof(expected)), second(device, sizeof(expected));
+        {
+            vsl::ComputePhase phase(manager);
+            transition(manager, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, {}, vk::AccessFlagBits::eTransferWrite);
+            phase << *single << *array;
+            single.reset();
+            array.reset();
+            transition(manager, image, vk::ImageLayout::eGeneral, vk::ImageLayout::eGeneral,
+                       vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eTransferRead);
+            phase << vsl::command::CopyImageToBuffer(&first, image, vsl::ImageLayout::General, {0, 0, 2, 2, 0}, true)
+                  << vsl::command::CopyImageToBuffer(&second, image, vsl::ImageLayout::General, {0, 0, 2, 2, 1}, true);
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::Success);
+            ASSERT_TRUE(phase.completion().wait());
+        }
+        auto firstMapping = first.data();
+        auto secondMapping = second.data();
+        EXPECT_EQ(std::memcmp(firstMapping.read(sizeof(expected)).data(), expected.data(), sizeof(expected)), 0);
+        EXPECT_EQ(std::memcmp(secondMapping.read(sizeof(expected)).data(), expected.data(), sizeof(expected)), 0);
+    }
+
 } // namespace

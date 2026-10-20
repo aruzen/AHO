@@ -12,6 +12,8 @@
 #include <concepts>
 #include <type_traits>
 #include <optional>
+#include <span>
+#include <cstddef>
 
 namespace VSL_NAMESPACE {
     struct CommandManager;
@@ -194,7 +196,9 @@ namespace VSL_NAMESPACE {
         BufferAccessor& operator=(BufferAccessor&&) = default;
         virtual ~BufferAccessor() = default;
 
+        // マップはストレージと共有する。holderの破棄ではunmapしない。
         struct LocalBufferHolder {
+            // 元のハンドルを指す互換用の非所有参照。内部の寿命管理には使用しない。
             BufferAccessor* parent;
             std::size_t size, offset;
             void* data;
@@ -210,6 +214,11 @@ namespace VSL_NAMESPACE {
             ~LocalBufferHolder();
 
             void flush();
+            void flush(std::size_t bytes, std::size_t offset = 0) const;
+            void invalidate(std::size_t bytes, std::size_t offset = 0) const;
+            // GPUの使用完了後に呼ぶ。範囲はこのholderの先頭から指定する。
+            std::span<const std::byte> read(std::size_t bytes, std::size_t offset = 0) const;
+            void write(std::span<const std::byte> bytes, std::size_t offset = 0) const;
 
             template<typename... Args>
             bool copy(const Args&... args);
@@ -228,6 +237,10 @@ namespace VSL_NAMESPACE {
             bool copyByBuffer(CommandManager commandManager, BufferAccessor* buf);
 
             bool copyByImage(CommandManager commandManager, const ImageAccessor& image);
+
+        private:
+            std::shared_ptr<_impl::Buffer_impl> owner_;
+            void synchronize(std::size_t bytes, std::size_t offset, bool flush) const;
         };
 
         std::shared_ptr<_impl::Buffer_impl> _data;
@@ -255,6 +268,8 @@ namespace VSL_NAMESPACE {
         bool copyByImage(CommandManager commandManager, const ImageAccessor& image);
 
         size_t size();
+        // size()の割当サイズと区別し、要求したバイト数を返す。
+        std::size_t requestedSize() const;
 
         static std::shared_ptr<_impl::Buffer_impl>
         MakeBuffer(VSL_NAMESPACE::LogicalDeviceAccessor device, size_t size, MemoryType memType,

@@ -28,6 +28,9 @@ namespace VSL_NAMESPACE::command {
         BufferAccessor* buffer;
 
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
+
+    private:
+        std::shared_ptr<_impl::Buffer_impl> source_;
     };
 
     struct CopyBufferToArrayImage : public __Command {
@@ -44,6 +47,9 @@ namespace VSL_NAMESPACE::command {
         std::uint32_t target_idx{};
 
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
+
+    private:
+        std::shared_ptr<_impl::Buffer_impl> source_;
     };
 } // namespace VSL_NAMESPACE::command
 

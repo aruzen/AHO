@@ -172,7 +172,6 @@
     <ClInclude Include="VSL\include\VSL\utils\vsl_array.hpp" />
     <ClInclude Include="VSL\include\VSL\vsl.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\buffer.hpp" />
-    <ClInclude Include="VSL\include\VSL\vulkan\mapped_buffer.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\buffer_and_image_accessor.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\command.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\commands\bind_graphic_resource.hpp" />
@@ -234,7 +233,6 @@
     <ClCompile Include="VSL\src\utils\spir_reflector.cpp" />
     <ClCompile Include="VSL\src\utils\string.cpp" />
     <ClCompile Include="VSL\src\vulkan\buffer.cpp" />
-    <ClCompile Include="VSL\src\vulkan\mapped_buffer.cpp" />
     <ClCompile Include="VSL\src\vulkan\command.cpp" />
     <ClCompile Include="VSL\src\vulkan\commands\bind_graphic_resource.cpp" />
     <ClCompile Include="VSL\src\vulkan\commands\bind_index_buffers.cpp" />

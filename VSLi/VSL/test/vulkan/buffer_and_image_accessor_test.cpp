@@ -98,4 +98,21 @@ namespace {
         auto mapped = copied.data(sizeof(values));
         EXPECT_EQ(std::memcmp(mapped.data, values.data(), sizeof(values)), 0);
     }
+    TEST_F(BufferAccessorVulkanIntegrationTest, MappingKeepsStorageAliveAfterOriginalBufferIsDestroyed) {
+        std::optional<Holder> mapping;
+        std::weak_ptr<vsl::_impl::Buffer_impl> storage;
+        const std::array<std::uint32_t, 2> expected{17, 43};
+        {
+            vsl::StagingBuffer<> buffer(device, expected);
+            storage = buffer._data;
+            mapping.emplace(buffer.data());
+        }
+        if (storage.expired())
+            mapping->parent = nullptr;
+        ASSERT_FALSE(storage.expired());
+        EXPECT_EQ(std::memcmp(mapping->data, expected.data(), sizeof(expected)), 0);
+        mapping->flush();
+        mapping.reset();
+        EXPECT_TRUE(storage.expired());
+    }
 } // namespace

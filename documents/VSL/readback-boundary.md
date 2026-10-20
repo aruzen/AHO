@@ -4,22 +4,26 @@ RenderPass構成のPR #56、PhaseのPR #105に続く変更。AHOのImageReadback
 
 ## 公開VSL API
 
-- `MappedBuffer(device, bytes, usage)`: host-visible Bufferを確保して一度mapする。コピーは同じbufferとmapを共有する。HostCoherentを優先し、非coherentでも利用できる。
-- `MappedBuffer::read(bytes, offset)`: 要求範囲を検証し、非coherent時はatom境界に合わせてinvalidateしてから読み取り専用spanを返す。submitやGPU待機は行わない。呼び出し側がGPU writerの完了を待ち、span使用中はMappedBufferを保持する。
+- `Buffer<usage, MemoryProperty::HostVisible>(device, bytes)`: 既存Bufferを使う。HostCoherentを優先し、非coherentでも利用できる。
+- `Buffer::data()`: 割当全体を初回だけmapし、Bufferの共有ストレージが破棄されるまで維持する。複数のholderやBufferのコピーはmapを共有する。holder自身もストレージを保持する。
+- `LocalBufferHolder::read(bytes, offset)` / `write(bytes, offset)`: holder内の相対範囲を検証し、readはinvalidate、writeはコピー後flushを行う。非coherentの範囲はatom境界へ拡張する。GPU完了待ちは呼び出し側の責務。spanの利用中はholderまたはBufferを保持する。
+- `LocalBufferHolder::flush()` / `flush(bytes, offset)` / `invalidate(bytes, offset)`: dataポインタへ直接アクセスした場合のキャッシュ操作。長寿命holderではGPUによる更新後にもreadまたはinvalidateを呼ぶ。
+- `BufferAccessor::requestedSize()`: 要求した論理サイズ。従来の`size()`は割当サイズを返す契約を維持する。
 - `CommandManager::independent(count)`: 同じdevice / queueを使う独立したpoolとCommandBuffer群を作る。元managerで記録中のCommandBufferをresetしない。
 - `CommandManager::getDevice()` / `ImageAccessor::getDevice()`: 公開Accessor同士でdeviceの整合性を確認できる。
-- `command::ImageReadback(mappedBuffer, image, layout, region)`: 永続mapした転送先を利用する。TransferDestination usageを確認する。Phase内で記録すると、転送先のmapを含む所有者と元画像を、その送信のCompletionに保持する。
+- `command::ImageReadback(&buffer, image, layout, region)`: 永続mapした転送先を利用する。TransferDestination usageを確認する。Phase内で記録すると、転送先Bufferと元画像を、その送信のCompletionに保持する。
 
 ```cpp
-vsl::MappedBuffer destination(device, byteSize);
+vsl::Buffer<vsl::MemoryType::TransferDestination, vsl::MemoryProperty::HostVisible> destination(device, byteSize);
+auto mapped = destination.data();
 auto transfer = producer.independent();
 auto phase = transfer.startPhase<vsl::ComputePhase>();
-phase << vsl::command::ImageReadback(destination, image, layout, region);
+phase << vsl::command::ImageReadback(&destination, image, layout, region);
 auto completed = phase.completion();
 phase.submit();
 if (completed.wait()) {
-    auto bytes = destination.read(byteSize);
-    // bytesを利用する。destinationの寿命を維持する。
+    auto bytes = mapped.read(byteSize);
+    // bytesの利用中はmappedまたはdestinationを保持する。
 }
 ```
 
@@ -27,7 +31,7 @@ if (completed.wait()) {
 
 AHO ImageReadbackは上記を組み合わせ、必要容量の判断、オブジェクトの保持と再利用、busy判定、CPU側ImagePixelsへのコピーを担当する。capture / ready / wait / read / capacityの既存契約を維持する。
 
-同時進行の転送は1件。受理済みcaptureごとに追加submitを1回行い、完了前のcaptureはfalseを返して結果を維持する。Bufferは必要容量が増えたときだけ交換し、構築に失敗した場合は以前のBufferを保持する。read(destination)はCPU vectorの容量も再利用する。
+同時要求数はmaxRequestsで指定する（既定1）。チケット保持中またはGPU使用中のスロットは再利用しない。従来captureは完了前ならfalseを返して最新結果を維持する。captureTicketは専用Phaseを送信し、recordは呼び出し側のPhaseへ記録する。Bufferは必要容量が増えたときだけ交換し、構築に失敗した場合は以前のBufferを保持する。read(destination)はCPU vectorの容量も再利用する。
 
 AHOLiの製品targetからVulkan SDKの直接include設定を削除した。Vulkanのfixtureを使うGPUテストには、SDKヘッダーの順序をテストtargetで明示する。
 
@@ -38,7 +42,7 @@ AHOLiの製品targetからVulkan SDKの直接include設定を削除した。Vulk
 - non-coherentのinvalidate範囲はValidation Layer付きで検証する。coherent memory上で明示的にinvalidate経路を通すケースは、物理的なnon-coherent heapの動作を再現したという意味ではない。
 - 既存のAHO Readback 13ケースによる画像内容・region/layer・再利用・容量拡張・busyを回帰検証する。
 
-既存Bufferの局所修正PR #78〜#80やBufferAccessorの多態破棄PR #103の差分は取り込まない。新しいMappedBufferはBufferAccessorを継承しないため、未修正のLocalBufferHolderのmap / unmap処理には依存しない。
+MappedBufferは既存BufferとLocalBufferHolderへ統合した。旧MappedBufferの利用者は、用途を指定したHostVisible Bufferを保持し、data()で取得したholderのread/writeへ移行する。転送コマンドは構築時のBufferストレージを保持するため、元のBufferオブジェクトの破棄や差し替えに影響されない。同じBufferへのCPU/GPUアクセスは呼び出し側で同期する。
 
 ## 2026-10-18 検証結果
 

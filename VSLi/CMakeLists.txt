@@ -17,6 +17,8 @@ add_library(VSL STATIC
         VSL/src/vulkan/descriptor.cpp
         VSL/src/vulkan/image.cpp
         VSL/src/vulkan/commands/image_readback.cpp
+        VSL/src/vulkan/commands/image_upload.cpp
+        VSL/include/VSL/vulkan/commands/image_upload.hpp
         VSL/src/vulkan/stages/depth_stencil.cpp
         VSL/src/vulkan/stages/shader_group.cpp
         VSL/src/vulkan/stages/rasterization.cpp

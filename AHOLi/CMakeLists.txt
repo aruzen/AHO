@@ -16,6 +16,10 @@ add_library(AHOLi
         AHO/src/drawer.cpp
         AHO/src/image_readback.cpp
         AHO/src/x/screenshot.cpp
+        AHO/src/x/resource/buffer.cpp
+        AHO/src/x/resource/texture.cpp
+        AHO/include/AHO/x/resource/buffer.hpp
+        AHO/include/AHO/x/resource/texture.hpp
         AHO/src/engine.cpp
         AHO/src/resource/image.cpp
         AHO/src/resource/buffer.cpp

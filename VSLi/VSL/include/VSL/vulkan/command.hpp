@@ -6,6 +6,7 @@
 
 namespace VSL_NAMESPACE {
     struct CommandManager;
+    struct Completion;
     struct DefaultPhase;
     struct DefaultPhaseStream;
 
@@ -27,6 +28,9 @@ namespace VSL_NAMESPACE {
         std::uint32_t getCurrentBufferIdx();
 
         size_t getSize();
+
+        // Phaseの記録中だけ、その送信の完了状態を返す。
+        Completion completion() const;
 
         void next();
 
@@ -54,6 +58,7 @@ namespace VSL_NAMESPACE {
         bool wait(std::uint64_t timeout_ns = UINT64_MAX) const;
         void retain(std::shared_ptr<void> resource) const;
         explicit operator bool() const;
+        bool operator==(const Completion&) const = default;
     };
 
     struct PipelineAccessor;

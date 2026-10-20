@@ -850,3 +850,27 @@ namespace {
         EXPECT_THROW((ProtectedBuffer(device, std::size_t{4})), vsl::exceptions::RuntimeException);
     }
 } // namespace
+
+namespace {
+    TEST_F(PersistentBufferVulkanIntegrationTest, WritesBoundedRangesAndFlushesWithoutReplacingTheMapping) {
+        vsl::Buffer<vsl::MemoryType::TransferSource, vsl::MemoryProperty::HostVisible> source(device, std::size_t{32});
+        auto mapping = source.data();
+        std::array<std::byte, 4> payload{std::byte{17}, std::byte{29}, std::byte{43}, std::byte{71}};
+        mapping.write(payload, 4);
+        auto bytes = mapping.read(4, 4);
+        EXPECT_EQ(bytes[0], payload[0]);
+        EXPECT_EQ(bytes[3], payload[3]);
+        const auto* address = bytes.data();
+        auto alias = source;
+        auto aliasMapping = alias.data();
+        aliasMapping.write(std::span(payload).first(2), 4);
+        EXPECT_EQ(aliasMapping.read(4, 4).data(), address);
+        EXPECT_THROW(mapping.write(payload, 30), std::out_of_range);
+        EXPECT_THROW(mapping.write({}, SIZE_MAX), std::out_of_range);
+        EXPECT_NO_THROW(mapping.write({}, 32));
+        source._data->properties = vsl::MemoryProperty::HostVisible;
+        source._data->atomSize = physical._data->device.getProperties().limits.nonCoherentAtomSize;
+        mapping.write(std::span(payload).first(1), 31);
+        EXPECT_EQ(mapping.read(1, 31)[0], payload[0]);
+    }
+} // namespace

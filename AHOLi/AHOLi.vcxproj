@@ -173,10 +173,7 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="AHO\include\AHO\x\resource\buffer.hpp" />
     <ClInclude Include="AHO\include\AHO\x\resource\texture.hpp" />
-    <ClInclude Include="AHO\src\x\resource\buffer_impl.hpp" />
-    <ClCompile Include="AHO\src\x\resource\buffer.cpp" />
     <ClCompile Include="AHO\src\x\resource\texture.cpp" />
     <ClInclude Include="AHO\include\AHO\aho.hpp" />
     <ClInclude Include="AHO\include\AHO\concepts.hpp" />

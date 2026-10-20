@@ -25,7 +25,7 @@ namespace {
     TEST_F(ExperimentalTextureVulkanIntegrationTest, InitialPatchClearsUntouchedPixelsAndReportsMetadata) {
         auto manager = make_manager();
         resource::Texture texture(device, 4, 3);
-        resource::UploadBuffer upload(device, 64);
+        aho::resource::Buffer<aho::resource::BufferType::GPUFriendly> upload(device, 64);
         const std::array<std::uint8_t, 8> patch{255, 0, 0, 255, 0, 255, 0, 255};
         upload.assign(std::as_bytes(std::span(patch)));
         EXPECT_EQ(texture.width(), 4u);
@@ -53,7 +53,7 @@ namespace {
     TEST_F(ExperimentalTextureVulkanIntegrationTest, RepeatedUpdatesPreserveOtherPixelsAndReuseCapacity) {
         auto manager = make_manager();
         resource::Texture texture(device, 2, 2);
-        resource::UploadBuffer upload(device, 64);
+        aho::resource::Buffer<aho::resource::BufferType::GPUFriendly> upload(device, 64);
         const std::array<std::uint8_t, 16> initial{0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255};
         upload.assign(std::as_bytes(std::span(initial)));
         {
@@ -88,7 +88,7 @@ namespace {
     TEST_F(ExperimentalTextureVulkanIntegrationTest, SamePhaseCanCopySeveralRegionsFromOneImmutableUpload) {
         auto manager = make_manager();
         resource::Texture texture(device, 2, 2);
-        resource::UploadBuffer upload(device);
+        aho::resource::Buffer<aho::resource::BufferType::GPUFriendly> upload(device);
         const std::array<std::uint8_t, 8> payload{255, 0, 0, 255, 0, 255, 0, 255};
         upload.assign(std::as_bytes(std::span(payload)));
         {
@@ -107,7 +107,7 @@ namespace {
     TEST_F(ExperimentalTextureVulkanIntegrationTest, CancelledFirstUpdateCanBeRetriedWithoutAssumingAnImageLayout) {
         auto manager = make_manager();
         resource::Texture texture(device, 2, 2);
-        resource::UploadBuffer upload(device);
+        aho::resource::Buffer<aho::resource::BufferType::GPUFriendly> upload(device);
         const std::array<std::byte, 4> red{std::byte{255}, {}, {}, std::byte{255}};
         upload.assign(red);
         {
@@ -129,7 +129,7 @@ namespace {
     TEST_F(ExperimentalTextureVulkanIntegrationTest, InvalidRequestsDoNotClaimTheBufferOrChangeTheTextureState) {
         auto manager = make_manager();
         resource::Texture texture(device, 2, 2);
-        resource::UploadBuffer upload(device);
+        aho::resource::Buffer<aho::resource::BufferType::GPUFriendly> upload(device);
         std::array<std::byte, 4> pixel{};
         upload.assign(pixel);
         {
@@ -149,6 +149,40 @@ namespace {
         EXPECT_THROW(command.invoke(manager.getPool(), manager.getBuffer(), manager), std::logic_error);
         EXPECT_THROW((resource::Texture(device, 0, 1)), std::invalid_argument);
         EXPECT_THROW((resource::Texture(device, 1, 1, vsl::data_format::Srgb8RGBA)), std::invalid_argument);
+    }
+} // namespace
+#endif
+#ifdef AHO_GPU_TESTS
+namespace {
+    TEST_F(ExperimentalTextureVulkanIntegrationTest, CpuToOnGpuUploadFeedsTextureUpdateInTheSamePhase) {
+        const std::array<std::byte, 4> pixel{std::byte{11}, std::byte{37}, std::byte{73}, std::byte{255}};
+        aho::resource::Buffer<aho::resource::BufferType::General> cpu;
+        cpu.assign(pixel);
+        aho::resource::Buffer<aho::resource::BufferType::OnGPU> gpu(device, 4);
+        resource::Texture texture(device, 1, 1);
+        auto manager = make_manager();
+        {
+            auto phase = manager.startPhase<vsl::ComputePhase>();
+            phase << gpu.upload(cpu) << texture.update(gpu);
+            submit(phase);
+        }
+        EXPECT_EQ(read(manager, texture).bytes, (std::vector<std::byte>(pixel.begin(), pixel.end())));
+    }
+    TEST_F(ExperimentalTextureVulkanIntegrationTest, CustomVslBufferUsesTheSameTextureUpdateAndBusyTracking) {
+        using Native = vsl::Buffer<vsl::MemoryType::TransferSource, vsl::MemoryProperty::HostVisible>;
+        auto source = aho::resource::make_custom_buffer(Native(device, 4));
+        const std::array<std::byte, 4> pixel{std::byte{17}, std::byte{37}, std::byte{73}, std::byte{255}};
+        source.write(pixel);
+        resource::Texture texture(device, 1, 1);
+        auto manager = make_manager();
+        {
+            auto phase = manager.startPhase<vsl::ComputePhase>();
+            phase << texture.update(source);
+            EXPECT_TRUE(source.busy());
+            EXPECT_THROW(source.write(pixel), std::logic_error);
+            submit(phase);
+        }
+        EXPECT_EQ(read(manager, texture).bytes, (std::vector<std::byte>(pixel.begin(), pixel.end())));
     }
 } // namespace
 #endif

@@ -35,6 +35,7 @@
 #include "vulkan/swapchain.hpp"
 #include "vulkan/sampler.hpp"
 #include "vulkan/commands/image_readback.hpp"
+#include "vulkan/commands/copy_buffer.hpp"
 #include "vulkan/pv.hpp"
 #include "vulkan/buffer.hpp"
 #include "vulkan/pipeline.hpp"

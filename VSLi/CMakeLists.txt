@@ -17,6 +17,8 @@ add_library(VSL STATIC
         VSL/src/vulkan/descriptor.cpp
         VSL/src/vulkan/image.cpp
         VSL/src/vulkan/commands/image_readback.cpp
+        VSL/src/vulkan/commands/copy_buffer.cpp
+        VSL/include/VSL/vulkan/commands/copy_buffer.hpp
         VSL/src/vulkan/commands/image_upload.cpp
         VSL/include/VSL/vulkan/commands/image_upload.hpp
         VSL/src/vulkan/stages/depth_stencil.cpp

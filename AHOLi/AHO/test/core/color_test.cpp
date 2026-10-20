@@ -129,6 +129,7 @@ TEST(ColorContractTest, AlphaPreservingConversionsReturnCorrectSpaceAndChannels)
 #else
 #include "../support/one_way_cast.hpp"
 #include "../support/asymmetric_arithmetic.hpp"
+#include "../support/unary_scalar.hpp"
 namespace {
     using namespace aho_test::arithmetic;
     template<class T>
@@ -304,6 +305,38 @@ namespace {
         EXPECT_EQ(&(lhs /= rhs), &lhs);
         EXPECT_EQ(lhs.value.value, 24);
         EXPECT_EQ(rhs.value.value, 4);
+    }
+    template<class T>
+    class ColorNarrowNegationTest : public testing::Test {};
+    using ColorNarrowNegationTestTypes = testing::Types<aho::color::R<std::int8_t>, aho::color::R<std::int16_t>,
+                                                        aho::color::G<std::int8_t>, aho::color::G<std::int16_t>,
+                                                        aho::color::B<std::int8_t>, aho::color::B<std::int16_t>,
+                                                        aho::color::H<std::int8_t>, aho::color::H<std::int16_t>,
+                                                        aho::color::S<std::int8_t>, aho::color::S<std::int16_t>,
+                                                        aho::color::V<std::int8_t>, aho::color::V<std::int16_t>,
+                                                        aho::color::A<std::int8_t>, aho::color::A<std::int16_t>>;
+    TYPED_TEST_SUITE(ColorNarrowNegationTest, ColorNarrowNegationTestTypes);
+    TYPED_TEST(ColorNarrowNegationTest, PromotedNegationReturnsTheDeclaredNarrowScalarType) {
+        using Scalar = std::remove_cvref_t<decltype(std::declval<TypeParam>().value)>;
+        constexpr TypeParam positive(Scalar{7}), negative(Scalar{-7}), zero(Scalar{0});
+        static_assert(std::same_as<decltype(-positive), TypeParam>);
+        static_assert((-positive).value == Scalar{-7});
+        static_assert((-negative).value == Scalar{7});
+        static_assert((-zero).value == Scalar{0});
+        EXPECT_EQ(static_cast<int>((-positive).value), -7);
+        EXPECT_EQ(static_cast<int>((-negative).value), 7);
+        EXPECT_EQ(static_cast<int>((-zero).value), 0);
+        EXPECT_EQ(static_cast<int>((-(-positive)).value), 7);
+    }
+    template<class T>
+    class ColorUnaryConversionTest : public testing::Test {};
+    using ColorUnaryConversionTypes = testing::Types<aho::color::R<aho_test::UnaryScalar>, aho::color::H<aho_test::UnaryScalar>, aho::color::A<aho_test::UnaryScalar>>;
+    TYPED_TEST_SUITE(ColorUnaryConversionTest, ColorUnaryConversionTypes);
+    TYPED_TEST(ColorUnaryConversionTest, NegationKeepsTheImplicitScalarArgumentConversion) {
+        constexpr TypeParam source(aho_test::UnaryScalar{7});
+        static_assert(static_cast<aho_test::UnaryScalar>(-source.value).value == 93);
+        static_assert((-source).value.value == -7);
+        EXPECT_EQ((-source).value.value, -7);
     }
     template<class T>
     class ColorOneWayCastTest : public testing::Test {};

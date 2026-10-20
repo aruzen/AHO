@@ -41,7 +41,7 @@ namespace AHO_NAMESPACE {
         };                                                                                                                    \
         constexpr Upper<T> operator-() const {                                                                                \
             static_assert(concepts::minusable<T>);                                                                            \
-            return {-value};                                                                                                  \
+            return Upper<T>(-value);                                                                                          \
         };                                                                                                                    \
         template<typename RV>                                                                                                 \
         requires requires(const T& lhs, const RV& rhs) { lhs + rhs; }                                                         \
@@ -106,7 +106,7 @@ namespace AHO_NAMESPACE {
         };                                                                                                                    \
         constexpr Upper<T> operator-() const {                                                                                \
             static_assert(concepts::minusable<T>);                                                                            \
-            return {-value};                                                                                                  \
+            return Upper<T>(-value);                                                                                          \
         };                                                                                                                    \
         template<typename RV>                                                                                                 \
         requires requires(const T& lhs, const RV& rhs) { lhs + rhs; }                                                         \
@@ -169,7 +169,7 @@ namespace AHO_NAMESPACE {
             };
             constexpr A<T> operator-() const {
                 static_assert(concepts::minusable<T>);
-                return {-value};
+                return A<T>(-value);
             };
             template<typename R>
             requires requires(const T& lhs, R& rhs) { lhs + rhs; }

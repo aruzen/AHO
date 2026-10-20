@@ -31,6 +31,8 @@ namespace VSL_NAMESPACE::_impl::helper {
             case vk::Format::eR8G8B8A8Sint:
             case vk::Format::eB8G8R8A8Sint:
             case vk::Format::eA8B8G8R8SintPack32:
+            case vk::Format::eA2R10G10B10SintPack32:
+            case vk::Format::eA2B10G10R10SintPack32:
             case vk::Format::eR16Sint:
             case vk::Format::eR16G16Sint:
             case vk::Format::eR16G16B16Sint:
@@ -51,6 +53,8 @@ namespace VSL_NAMESPACE::_impl::helper {
             case vk::Format::eR8G8B8A8Uint:
             case vk::Format::eB8G8R8A8Uint:
             case vk::Format::eA8B8G8R8UintPack32:
+            case vk::Format::eA2R10G10B10UintPack32:
+            case vk::Format::eA2B10G10R10UintPack32:
             case vk::Format::eR16Uint:
             case vk::Format::eR16G16Uint:
             case vk::Format::eR16G16B16Uint:

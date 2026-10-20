@@ -24,7 +24,7 @@ namespace VSL_NAMESPACE::pipeline_layout {
 
         constexpr PushConstants(VSL_NAMESPACE::ShaderFlag shader, std::initializer_list<PushContentDefinition> definitions) : definitions(definitions) {};
 
-        void injection(VSL_NAMESPACE::PipelineLayoutAccessor pl);
+        void injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl);
 
         std::vector<PushContentDefinition> definitions;
 

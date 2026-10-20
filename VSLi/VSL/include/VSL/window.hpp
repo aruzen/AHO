@@ -2,6 +2,7 @@
 #include "define.hpp"
 
 #include "concepts.hpp"
+#include "exceptions.hpp"
 
 #include <memory>
 #include <vector>
@@ -88,13 +89,24 @@ namespace VSL_NAMESPACE {
         auto t = std::shared_ptr<T>(new T(this, std::forward<Args>(args)...));
         std::shared_ptr<Plugin> p = std::static_pointer_cast<Plugin>(t);
 
-        if (auto o = std::dynamic_pointer_cast<OnUpdate>(p); o)
-            _data->update.push_back(o);
+        if (t->id == 0) {
+            auto candidate = _data->plugins_next_id;
+            while (_data->plugins.contains(candidate)) {
+                candidate = static_cast<unsigned char>(candidate + 1);
+                if (candidate == _data->plugins_next_id)
+                    throw exceptions::RuntimeException("window", "No free window plugin IDs available");
+            }
+            p->id = candidate;
+            _data->plugins_next_id = static_cast<unsigned char>(candidate + 1);
+        }
 
-        if (t->id == 0)
-            p->id = _data->plugins_next_id;
+        if (const auto previous = _data->plugins.find(p->id); previous != _data->plugins.end())
+            if (auto listener = std::dynamic_pointer_cast<OnUpdate>(previous->second))
+                std::erase(_data->update, listener);
+
         _data->plugins[t->id] = p;
-        _data->plugins_next_id++;
+        if (auto listener = std::dynamic_pointer_cast<OnUpdate>(p))
+            _data->update.push_back(listener);
 
         return t;
     }

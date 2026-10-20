@@ -10,7 +10,7 @@ VSL_NAMESPACE::Scissor::Scissor(__VSLD2RectangleAccessor<float> rect) : x(rect.x
 
 VSL_NAMESPACE::Scissor::Scissor(SwapchainAccessor swapchain) : x(0), y(0), height(swapchain._data->swapChainExtent.height), width(swapchain._data->swapChainExtent.width) {}
 
-void VSL_NAMESPACE::Scissor::injection(VSL_NAMESPACE::PipelineLayoutAccessor pl) {
+void VSL_NAMESPACE::Scissor::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
     auto& info = *pl._data->info;
 
     vk::Rect2D scissor;

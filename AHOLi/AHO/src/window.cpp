@@ -1,11 +1,36 @@
 #include <AHO/window.hpp>
 #include <GLFW/glfw3.h>
+#include <VSL/exceptions.hpp>
+#ifdef __APPLE__
+#define GLFW_EXPOSE_NATIVE_COCOA
+#include <GLFW/glfw3native.h>
+#endif
 
 #include <utility>
+#include <vector>
 
 AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::GetMonitorSize() {
     GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+    if (!monitor)
+        throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "Primary monitor is not available");
+#ifdef __APPLE__
+#if defined(GLFW_PLATFORM_COCOA)
+    if (glfwGetPlatform() == GLFW_PLATFORM_COCOA) {
+#endif
+        auto mode = CGDisplayCopyDisplayMode(glfwGetCocoaMonitor(monitor));
+        if (!mode)
+            throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "Primary monitor video mode is not available");
+        const auto width = static_cast<int>(CGDisplayModeGetWidth(mode));
+        const auto height = static_cast<int>(CGDisplayModeGetHeight(mode));
+        CGDisplayModeRelease(mode);
+        return {width, height};
+#if defined(GLFW_PLATFORM_COCOA)
+    }
+#endif
+#endif
     const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+    if (!mode)
+        throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "Primary monitor video mode is not available");
     return {mode->width, mode->height};
 }
 
@@ -39,14 +64,25 @@ bool AHO_NAMESPACE::window::Window::resize(int width, int height) {
     if (not VSL_NAMESPACE::PureWindow::resize(width, height))
         return false;
     engine._data->command_manager.waitIdle();
-    _data2->swapchain = VSL_NAMESPACE::Swapchain(engine._data->logical_device, _data2->surface, _data2->swapchain);
+    const auto usage = _data2->swapchain.images.at(0).getUsage();
+    _data2->swapchain = VSL_NAMESPACE::Swapchain(engine._data->logical_device, _data2->surface, _data2->swapchain,
+                                                 std::nullopt, std::nullopt, usage);
     _data2->frame_buffer = VSL_NAMESPACE::FrameBuffer(_data2->swapchain, _data2->render_pass);
     if (_data2->render_finished.size() != _data2->swapchain.getSwapImageSize())
         _data2->render_finished = engine._data->synchro_manager.createSemaphore(
             name() + "RenderFinished", _data2->swapchain.getSwapImageSize());
-    for (const auto& [_, p] : _data->plugins) {
-        auto hook = std::dynamic_pointer_cast<WindowResizeHookPlugin>(p);
-        if (not hook)
+    const auto data = _data;
+    std::vector<std::pair<unsigned char, std::weak_ptr<WindowResizeHookPlugin>>> hooks;
+    hooks.reserve(data->plugins.size());
+    for (const auto& [id, plugin] : data->plugins)
+        if (auto hook = std::dynamic_pointer_cast<WindowResizeHookPlugin>(plugin))
+            hooks.emplace_back(id, hook);
+    for (const auto& [id, candidate] : hooks) {
+        if (_data != data || !_data2 || !data->window_handle)
+            break;
+        auto hook = candidate.lock();
+        const auto current = data->plugins.find(id);
+        if (!hook || current == data->plugins.end() || current->second != hook)
             continue;
         hook->hook(this);
     }

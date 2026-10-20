@@ -1,7 +1,7 @@
 #include <VSL/vulkan/stages/multisample.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 
-void VSL_NAMESPACE::pipeline_layout::Multisample::injection(VSL_NAMESPACE::PipelineLayoutAccessor pl) {
+void VSL_NAMESPACE::pipeline_layout::Multisample::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
     auto& info = *pl._data->info;
 
     info.multisample.sampleShadingEnable = false;

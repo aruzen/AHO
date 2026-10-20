@@ -1,6 +1,6 @@
 #include <VSL/vulkan/stages/depth_stencil.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
-void VSL_NAMESPACE::pipeline_layout::DepthStencil::injection(PipelineLayoutAccessor pl) {
+void VSL_NAMESPACE::pipeline_layout::DepthStencil::injection(PipelineLayoutEditAccessor pl) {
     auto convert = [](const StencilFace& face) {
         return vk::StencilOpState{.failOp = static_cast<vk::StencilOp>(face.fail),
                                   .passOp = static_cast<vk::StencilOp>(face.pass),

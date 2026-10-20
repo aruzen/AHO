@@ -73,7 +73,7 @@ size_t VSL_NAMESPACE::pipeline_layout::VertexInput::requirements_size() {
     return size;
 }
 
-void VSL_NAMESPACE::pipeline_layout::VertexInput::injection(VSL_NAMESPACE::PipelineLayoutAccessor pl) {
+void VSL_NAMESPACE::pipeline_layout::VertexInput::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
     auto& info = *pl._data->info;
 
     using VIBDs = std::vector<vk::VertexInputBindingDescription>;

@@ -7,6 +7,7 @@
 #include <AHO/core/math/coordinate.hpp>
 #include <sstream>
 #include <limits>
+#include <cstdint>
 
 #if defined(AHO_CONTRACT_COORDINATE_ENABLE_AXES)
 constexpr auto x = aho::coordinate::_MakeCoordinateInfo<false, true, false>::value::EnablingX();
@@ -53,6 +54,7 @@ TEST(CoordinateContractTest, ThreeWayComparisonOrdersAndRecognizesEqualCoordinat
 #include <array>
 #include "../../support/one_way_cast.hpp"
 #include "../../support/asymmetric_arithmetic.hpp"
+#include "../../support/unary_scalar.hpp"
 namespace {
     using namespace aho_test::arithmetic;
     template<class T>
@@ -162,6 +164,30 @@ namespace {
         EXPECT_FALSE((CanMultiplyAssign<BinaryOnly, BinaryOnly>));
         EXPECT_FALSE((CanDivide<Mutable, Mutable>));
         EXPECT_FALSE((CanDivideAssign<BinaryOnly, BinaryOnly>));
+    }
+    template<class T>
+    class CoordinateNarrowNegationTest : public testing::Test {};
+    using CoordinateNarrowNegationTestTypes = testing::Types<aho::coordinate::X<std::int8_t>, aho::coordinate::X<std::int16_t>,
+                                                             aho::coordinate::Y<std::int8_t>, aho::coordinate::Y<std::int16_t>,
+                                                             aho::coordinate::Z<std::int8_t>, aho::coordinate::Z<std::int16_t>>;
+    TYPED_TEST_SUITE(CoordinateNarrowNegationTest, CoordinateNarrowNegationTestTypes);
+    TYPED_TEST(CoordinateNarrowNegationTest, PromotedNegationReturnsTheDeclaredNarrowScalarType) {
+        using Scalar = std::remove_cvref_t<decltype(std::declval<TypeParam>().value)>;
+        constexpr TypeParam positive(Scalar{7}), negative(Scalar{-7}), zero(Scalar{0});
+        static_assert(std::same_as<decltype(-positive), TypeParam>);
+        static_assert((-positive).value == Scalar{-7});
+        static_assert((-negative).value == Scalar{7});
+        static_assert((-zero).value == Scalar{0});
+        EXPECT_EQ(static_cast<int>((-positive).value), -7);
+        EXPECT_EQ(static_cast<int>((-negative).value), 7);
+        EXPECT_EQ(static_cast<int>((-zero).value), 0);
+        EXPECT_EQ(static_cast<int>((-(-positive)).value), 7);
+    }
+    TEST(CoordinateUnaryConversionTest, NegationKeepsTheImplicitScalarArgumentConversion) {
+        constexpr aho::coordinate::X<aho_test::UnaryScalar> source(aho_test::UnaryScalar{7});
+        static_assert(static_cast<aho_test::UnaryScalar>(-source.value).value == 93);
+        static_assert((-source).value.value == -7);
+        EXPECT_EQ((-source).value.value, -7);
     }
     template<class T>
     class CoordinateOneWayCastTest : public testing::Test {};

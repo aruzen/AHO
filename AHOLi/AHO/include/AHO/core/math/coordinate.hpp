@@ -30,7 +30,7 @@ namespace AHO_NAMESPACE {
         };                                                                                                                   \
         constexpr Upper<T> operator-() const {                                                                               \
             static_assert(concepts::minusable<T>);                                                                           \
-            return {-value};                                                                                                 \
+            return Upper<T>(-value);                                                                                         \
         };                                                                                                                   \
         template<typename R>                                                                                                 \
         requires requires(const T& lhs, const R& rhs) { lhs + rhs; }                                                         \

@@ -213,11 +213,11 @@ namespace vsl_test {
             return pool;
         }
 
-        vsl::PipelineLayoutAccessor make_layout_state() {
+        vsl::PipelineLayoutEditAccessor make_layout_state() {
             auto data = std::make_shared<vsl::_impl::PipelineLayout_impl>();
             data->device = device._data;
             data->info = std::make_shared<vsl::_impl::CreateInfo>();
-            return {std::move(data)};
+            return {{std::move(data)}};
         }
 
         bool host_coherent_available() const {

@@ -16,18 +16,25 @@
 #include <memory>
 
 #include <VSL/window_plugin.hpp>
+#include <VSL/exceptions.hpp>
 
 VSL_NAMESPACE::Surface::Surface(VSL_NAMESPACE::PureWindow* window, VSL_NAMESPACE::VulkanAccessor instance) {
+    if (!window || !window->_data || !window->_data->window_handle)
+        throw VSL_NAMESPACE::exceptions::RuntimeException("Surface", "A live window is required");
+    if (!instance._accessor || !instance._accessor->instance)
+        throw VSL_NAMESPACE::exceptions::RuntimeException("Surface", "A Vulkan instance is required");
     _data = std::make_shared<VSL_NAMESPACE::_impl::Surface_impl>();
     _data->vulkan = instance._accessor;
     _data->window = window->_data->window_handle;
 
-    VkSurfaceKHR surface;
-    if (glfwCreateWindowSurface(_data->vulkan->instance, (GLFWwindow*)_data->window, nullptr, &surface) != VK_SUCCESS) {
-        const char* error_txt = nullptr;
-        int error = glfwGetError(&error_txt);
-        std::cerr << "Failed to create Window surface: " << (error == GLFW_NO_ERROR ? "Unknown error" : error_txt) << std::endl;
-        return; // TODO throw error
+    VkSurfaceKHR surface = VK_NULL_HANDLE;
+    const auto result = glfwCreateWindowSurface(_data->vulkan->instance, (GLFWwindow*)_data->window, nullptr, &surface);
+    if (result != VK_SUCCESS) {
+        const char* description = nullptr;
+        const int error = glfwGetError(&description);
+        throw VSL_NAMESPACE::exceptions::RuntimeException(
+            "Surface", "Failed to create GLFW window surface: " + std::string(description ? description : "Unknown GLFW error") +
+                           " (VkResult " + std::to_string(result) + ", GLFW " + std::to_string(error) + ")");
     }
     _data->surface = vk::SurfaceKHR(surface);
     /*
@@ -40,5 +47,6 @@ VSL_NAMESPACE::Surface::Surface(VSL_NAMESPACE::PureWindow* window, VSL_NAMESPACE
 }
 
 VSL_NAMESPACE::_impl::Surface_impl::~Surface_impl() {
-    vulkan->instance.destroySurfaceKHR(surface);
+    if (vulkan && surface)
+        vulkan->instance.destroySurfaceKHR(surface);
 }

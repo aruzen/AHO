@@ -6,6 +6,116 @@
 #endif
 namespace {
     using AhoWindowVulkanIntegration = aho_test::LiveGpuTest;
+    TEST_F(AhoWindowVulkanIntegration, ResizeHookCanRemoveItselfAndIsReleasedBeforeTheNextHook) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        int selfCalls = 0, followerCalls = 0;
+        std::shared_ptr<aho::window::WindowResizeHookPlugin> self;
+        std::weak_ptr<aho::window::WindowResizeHookPlugin> weak;
+        self = window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
+            ++selfCalls;
+            EXPECT_TRUE(current->remove_plugin(self));
+            self.reset();
+            EXPECT_FALSE(weak.expired());
+        });
+        weak = self;
+        window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) {
+            ++followerCalls;
+            EXPECT_TRUE(weak.expired());
+        });
+        EXPECT_TRUE(window.resize(420, 300));
+        EXPECT_EQ(selfCalls, 1);
+        EXPECT_EQ(followerCalls, 1);
+        EXPECT_TRUE(weak.expired());
+        EXPECT_TRUE(window.resize(400, 400));
+        EXPECT_EQ(selfCalls, 1);
+        EXPECT_EQ(followerCalls, 2);
+    }
+    TEST_F(AhoWindowVulkanIntegration, HooksAddedDuringResizeWaitUntilTheNextNotification) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        int firstCalls = 0, addedCalls = 0;
+        std::shared_ptr<aho::window::WindowResizeHookPlugin> added;
+        window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
+            ++firstCalls;
+            if (!added)
+                added = current->add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) { ++addedCalls; });
+        });
+        EXPECT_TRUE(window.resize(420, 300));
+        EXPECT_EQ(firstCalls, 1);
+        EXPECT_EQ(addedCalls, 0);
+        EXPECT_TRUE(window.resize(400, 400));
+        EXPECT_EQ(firstCalls, 2);
+        EXPECT_EQ(addedCalls, 1);
+    }
+    TEST_F(AhoWindowVulkanIntegration, RemovedHooksAreSkippedEvenIfTheCallerStillOwnsThem) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        int removedCalls = 0, remainingCalls = 0;
+        std::shared_ptr<aho::window::WindowResizeHookPlugin> removed;
+        window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
+            if (removed)
+                current->remove_plugin(removed);
+        });
+        removed = window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) { ++removedCalls; });
+        window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) { ++remainingCalls; });
+        EXPECT_TRUE(window.resize(420, 300));
+        EXPECT_EQ(removedCalls, 0);
+        EXPECT_EQ(remainingCalls, 1);
+        EXPECT_TRUE(static_cast<bool>(removed));
+    }
+    TEST_F(AhoWindowVulkanIntegration, ClosingTheWindowDuringAResizeStopsItsRemainingHooks) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        int staleCalls = 0;
+        window.add_plugin<aho::window::WindowResizeHookPlugin>([](aho::Window* current) { EXPECT_TRUE(current->close()); });
+        window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) { ++staleCalls; });
+        EXPECT_TRUE(window.resize(420, 300));
+        EXPECT_EQ(staleCalls, 0);
+        EXPECT_FALSE(static_cast<bool>(window));
+        EXPECT_FALSE(window._data2);
+    }
+    TEST_F(AhoWindowVulkanIntegration, ClearingAllPluginsDuringAResizeKeepsTheRunningHookAlive) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        int staleCalls = 0;
+        std::weak_ptr<aho::window::WindowResizeHookPlugin> weak;
+        auto currentHook = window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
+            current->_data->plugins.clear();
+            EXPECT_FALSE(weak.expired());
+        });
+        weak = currentHook;
+        currentHook.reset();
+        window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) { ++staleCalls; });
+        EXPECT_TRUE(window.resize(420, 300));
+        EXPECT_TRUE(weak.expired());
+        EXPECT_EQ(staleCalls, 0);
+        EXPECT_TRUE(window._data->plugins.empty());
+        EXPECT_TRUE(window.resize(400, 400));
+    }
+    struct FixedIdResizeHook : aho::window::WindowResizeHookPlugin {
+        FixedIdResizeHook(vsl::PureWindow* window, unsigned char id, std::function<void(aho::Window*)> callback)
+            : WindowResizeHookPlugin(window, std::move(callback)) { this->id = id; }
+    };
+    TEST_F(AhoWindowVulkanIntegration, ReplacementAtTheSameIdWaitsUntilTheNextResize) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        int oldCalls = 0, replacementCalls = 0;
+        std::shared_ptr<aho::window::WindowResizeHookPlugin> old;
+        std::shared_ptr<FixedIdResizeHook> replacement;
+        window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
+            if (!replacement)
+                replacement = current->add_plugin<FixedIdResizeHook>(old->id, [&](aho::Window*) { ++replacementCalls; });
+        });
+        old = window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) { ++oldCalls; });
+        ASSERT_NE(old->id, 0u);
+        EXPECT_TRUE(window.resize(420, 300));
+        EXPECT_EQ(oldCalls, 0);
+        EXPECT_EQ(replacementCalls, 0);
+        EXPECT_TRUE(window.resize(400, 400));
+        EXPECT_EQ(oldCalls, 0);
+        EXPECT_EQ(replacementCalls, 1);
+    }
     TEST_F(AhoWindowVulkanIntegration, ExistingWindowSupportsSizeTitleAndClose) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
@@ -24,13 +134,17 @@ namespace {
     }
     TEST_F(AhoWindowVulkanIntegration, MonitorSizeRequiresAvailablePrimaryDisplayMode) {
         auto* monitor = glfwGetPrimaryMonitor();
-        if (!monitor)
-            GTEST_SKIP() << "The current display session exposes no primary monitor.";
+        if (!monitor) {
+            EXPECT_THROW(aho::window::GetMonitorSize(), vsl::exceptions::RuntimeException);
+            return;
+        }
 #ifdef __APPLE__
         const auto display = glfwGetCocoaMonitor(monitor);
         auto mode = CGDisplayCopyDisplayMode(display);
-        if (!mode)
-            GTEST_SKIP() << "macOS exposes no video mode for the primary display; GLFW 3.4 cannot query it safely.";
+        if (!mode) {
+            EXPECT_THROW(aho::window::GetMonitorSize(), vsl::exceptions::RuntimeException);
+            return;
+        }
         CGDisplayModeRelease(mode);
 #endif
         const auto* mode_info = glfwGetVideoMode(monitor);
@@ -104,3 +218,42 @@ namespace {
     }
 } // namespace
 #endif
+
+#ifndef AHO_GPU_TESTS
+#include <gtest/gtest.h>
+#include <AHO/window.hpp>
+#include <GLFW/glfw3.h>
+namespace {
+    TEST(MonitorSizeTest, UninitializedGlfwThrowsInsteadOfDereferencingANullMode) {
+        ASSERT_TRUE(vsl::PureWindow::WINDOWS.empty());
+        glfwTerminate();
+        try {
+            (void)aho::window::GetMonitorSize();
+            ADD_FAILURE() << "Missing primary monitor was accepted";
+        } catch (const vsl::exceptions::RuntimeException& error) {
+            EXPECT_NE(std::string(error.what()).find("monitor"), std::string::npos);
+        }
+        glfwGetError(nullptr);
+    }
+#if defined(GLFW_PLATFORM_NULL)
+    TEST(MonitorSizeTest, InitializedNullPlatformReturnsItsVirtualMonitorSize) {
+        ASSERT_TRUE(vsl::PureWindow::WINDOWS.empty());
+        struct RestorePlatform {
+            ~RestorePlatform() {
+                glfwTerminate();
+                glfwInitHint(GLFW_PLATFORM, GLFW_ANY_PLATFORM);
+            }
+        } restore;
+        glfwTerminate();
+        glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_NULL);
+        ASSERT_TRUE(glfwInit());
+        ASSERT_NE(glfwGetPrimaryMonitor(), nullptr);
+        const auto size = aho::window::GetMonitorSize();
+        EXPECT_EQ(size.value.x.value, 1920);
+        EXPECT_EQ(size.value.y.value, 1080);
+        EXPECT_EQ(glfwGetError(nullptr), GLFW_NO_ERROR);
+    }
+#endif
+} // namespace
+
+#endif // AHO_GPU_TESTS

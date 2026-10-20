@@ -43,6 +43,10 @@ namespace VSL_NAMESPACE::command {
         (void)copy.description(); // 遷移の記録前にコピー先を検証する。
         if (copy.layout != ImageLayout::TransferSrcOptimal || !copy.hostRead)
             throw std::invalid_argument("Readback copy must use TransferSrcOptimal and host visibility");
+        if (!buffer._data || !buffer._data->commandPool || !manager._data ||
+            manager._data->device != copy.image._data->device ||
+            buffer._data->commandPool->device != copy.image._data->device)
+            throw std::invalid_argument("Readback requires a command buffer and manager on the image device");
         if (auto submission = buffer._data->recordingSubmission) {
             submission->resources.reserve(submission->resources.size() + 2);
             submission->resources.push_back(destinationOwner_);

@@ -9,11 +9,11 @@ namespace AHO_NAMESPACE::collision {
         template<typename T>
         concept Shape2D = AHO_NAMESPACE::concepts::is_triangles_object<T> &&
                           std::same_as<typename T::dimension, VSL_NAMESPACE::D2> &&
-                          std::is_arithmetic_v<typename T::element_type>;
+                          std::is_arithmetic_v<typename T::element_type> && requires(const T& shape) { shape.triangles(); };
         namespace g = AHO_NAMESPACE::detail::geometry2d;
         template<Shape2D Shape>
         void append(const Shape& shape, std::vector<g::Point>& points) {
-            for (const auto triangle : shape.triangles())
+            for (const Triangle<typename Shape::element_type, VSL_NAMESPACE::D2, typename Shape::coordinate_info> triangle : shape.triangles())
                 for (const auto p : triangle.points()) {
                     const auto value = g::convert(p);
                     if (!std::isfinite(value.x) || !std::isfinite(value.y))

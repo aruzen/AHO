@@ -120,6 +120,19 @@ namespace {
             EXPECT_NEAR(result->area(), expected, 1e-12);
         }
     }
+    TEST(TriangulationTest, AcceptsPointObjectsConvertibleToTheExistingPointType) {
+        struct PointObject {
+            using element_type = double;
+            using dimension = vsl::D2;
+            using coordinate_info = P::coordinate_info;
+            P point;
+            operator P() const { return point; }
+        };
+        const std::array points{PointObject{P(0, 0)}, PointObject{P(3, 0)}, PointObject{P(0, 4)}};
+        auto result = aho::triangulate(points);
+        ASSERT_TRUE(result);
+        EXPECT_DOUBLE_EQ(result->area(), 6);
+    }
     TEST(TriangulationTest, RejectsIndexOverflowBeforeConversion) {
         std::vector<P> points;
         for (int i = 0; i < 257; ++i)

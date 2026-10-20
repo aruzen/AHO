@@ -37,6 +37,8 @@ if (AHO_TEST_SOURCES)
             pipeline/layouts_test.cpp
             drawer/draw_phase_test.cpp
             image_readback_test.cpp
+            x/resource/buffer_test.cpp
+            x/resource/texture_test.cpp
             x/screenshot_test.cpp
     )
     target_compile_definitions(aho-gpu-test PRIVATE AHO_GPU_TESTS=1
@@ -60,6 +62,9 @@ if (AHO_TEST_SOURCES)
     aho_add_compile_test(Screenshot.PublicVslOnly
             "${CMAKE_CURRENT_SOURCE_DIR}/contracts/screenshot_public_vsl.cpp"
             AHO_CONTRACT_SCREENSHOT_PUBLIC_VSL)
+    aho_add_compile_test(ResourceUpload.PublicVslOnly
+            "${CMAKE_CURRENT_SOURCE_DIR}/contracts/resource_upload_public_vsl.cpp"
+            AHO_CONTRACT_RESOURCE_UPLOAD_PUBLIC_VSL)
     aho_add_compile_test(Mat.InitializerConstructor "${CMAKE_CURRENT_SOURCE_DIR}/core/math/mat_test.cpp" AHO_CONTRACT_MAT_INITIALIZER)
     aho_add_compile_test(Mat.RectangularFactory "${CMAKE_CURRENT_SOURCE_DIR}/core/math/mat_test.cpp" AHO_CONTRACT_MAT_RECTANGULAR_FACTORY)
     aho_add_compile_test(Mat.AxisRotation "${CMAKE_CURRENT_SOURCE_DIR}/core/math/mat_test.cpp" AHO_CONTRACT_MAT_AXIS_ROTATION)

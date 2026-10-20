@@ -43,6 +43,11 @@ void VSL_NAMESPACE::command::ChangeImageBarrier::invoke(VSL_NAMESPACE::CommandPo
 
         sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
         destinationStage = vk::PipelineStageFlagBits::eTransfer;
+    } else if (oldLayout == ImageLayout::ShaderReadOnlyOptimal && newLayout == ImageLayout::TransferDstOptimal) {
+        barrier.srcAccessMask = vk::AccessFlagBits::eShaderRead;
+        barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+        sourceStage = vk::PipelineStageFlagBits::eAllCommands;
+        destinationStage = vk::PipelineStageFlagBits::eTransfer;
     } else if (oldLayout == ImageLayout::Undefined && newLayout == ImageLayout::ColorAttachmentOptimal) {
         barrier.srcAccessMask = {};
         barrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
@@ -54,7 +59,7 @@ void VSL_NAMESPACE::command::ChangeImageBarrier::invoke(VSL_NAMESPACE::CommandPo
         barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
 
         sourceStage = vk::PipelineStageFlagBits::eTransfer;
-        destinationStage = vk::PipelineStageFlagBits::eFragmentShader;
+        destinationStage = vk::PipelineStageFlagBits::eAllCommands;
     } else if (oldLayout == ImageLayout::ColorAttachmentOptimal && newLayout == ImageLayout::TransferSrcOptimal) {
         barrier.srcAccessMask = vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite;
         barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;

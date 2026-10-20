@@ -127,3 +127,7 @@ void VSL_NAMESPACE::CommandBuffer::retain(std::shared_ptr<void> resource) const 
     if (resource && _data->recordingSubmission)
         Completion{_data->recordingSubmission}.retain(std::move(resource));
 }
+
+VSL_NAMESPACE::Completion VSL_NAMESPACE::CommandBuffer::completion() const {
+    return {_data ? _data->recordingSubmission : nullptr};
+}

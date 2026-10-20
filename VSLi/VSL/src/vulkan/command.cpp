@@ -5,6 +5,7 @@
 
 #include <VSL/vulkan/vulkan.hpp>
 #include <VSL/vulkan/command.hpp>
+#include <VSL/vulkan/phase.hpp>
 #include <VSL/vulkan/surface.hpp>
 
 VSL_NAMESPACE::CommandPool::CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor device) {
@@ -58,6 +59,9 @@ void VSL_NAMESPACE::CommandBuffer::reset(std::uint32_t idx) {
 }
 
 VSL_NAMESPACE::_impl::CommandBuffer_impl::~CommandBuffer_impl() {
+    for (const auto& submission : submissions)
+        if (submission && submission->status == Completion::Status::Submitted)
+            Completion{submission}.wait();
     commandPool->device->device.freeCommandBuffers(commandPool->commandPool, this->commandBuffers);
 }
 
@@ -90,4 +94,29 @@ std::uint32_t VSL_NAMESPACE::CommandManager::getCurrentBufferIdx() {
 
 VSL_NAMESPACE::CommandBuffer VSL_NAMESPACE::CommandManager::makeExclusiveBuffer(size_t size) {
     return CommandBuffer(CommandPool{_data->commandPool}, size);
+}
+void VSL_NAMESPACE::CommandManager::waitIdle() { _data->device->device.waitIdle(); }
+
+VSL_NAMESPACE::_impl::CommandPool_impl::~CommandPool_impl() {
+    if (commandPool)
+        device->device.destroyCommandPool(commandPool);
+}
+
+VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::CommandManager::getDevice() const {
+    if (!_data || !_data->device || !_data->device->device)
+        throw std::invalid_argument("Command manager is empty");
+    return {_data->device};
+}
+VSL_NAMESPACE::CommandManager VSL_NAMESPACE::CommandManager::independent(std::uint32_t count) const {
+    if (!count)
+        throw std::invalid_argument("Command buffer count must be positive");
+    CommandPool pool(getDevice());
+    CommandBuffer buffers(pool, count);
+    auto next = std::make_shared<_impl::CommandManager_impl>();
+    next->device = _data->device;
+    next->commandPool = pool._data;
+    next->commandBuffer = buffers._data;
+    next->graphicsQueue = _data->graphicsQueue;
+    next->presentQueue = _data->presentQueue;
+    return CommandManager(next);
 }

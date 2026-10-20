@@ -9,6 +9,7 @@ file(GLOB_RECURSE AHO_INPUT_TEST_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOUR
 if (AHO_TEST_SOURCES)
     add_executable(aho-test ${AHO_TEST_SOURCES})
     target_include_directories(aho-test PRIVATE
+            ${Vulkan_INCLUDE_DIRS}
             "${CMAKE_CURRENT_SOURCE_DIR}/../include"
             "$<TARGET_PROPERTY:AHOLi,INCLUDE_DIRECTORIES>"
             "$<TARGET_PROPERTY:VSL,INCLUDE_DIRECTORIES>"
@@ -36,6 +37,7 @@ if (AHO_TEST_SOURCES)
             pipeline/layouts_test.cpp
             drawer/draw_phase_test.cpp
             image_readback_test.cpp
+            x/screenshot_test.cpp
     )
     target_compile_definitions(aho-gpu-test PRIVATE AHO_GPU_TESTS=1
             VSL_TEST_SHADER_DIR="${CMAKE_BINARY_DIR}/VSLi/VSL/test/shaders")
@@ -52,6 +54,12 @@ if (AHO_TEST_SOURCES)
             PROPERTIES LABELS gpu RESOURCE_LOCK aho_graphics TIMEOUT 45)
     include(cmake/CompileContracts.cmake)
     aho_register_header_tests()
+    aho_add_compile_test(ImageReadback.PublicVslOnly
+            "${CMAKE_CURRENT_SOURCE_DIR}/contracts/image_readback_public_vsl.cpp"
+            AHO_CONTRACT_READBACK_PUBLIC_VSL)
+    aho_add_compile_test(Screenshot.PublicVslOnly
+            "${CMAKE_CURRENT_SOURCE_DIR}/contracts/screenshot_public_vsl.cpp"
+            AHO_CONTRACT_SCREENSHOT_PUBLIC_VSL)
     aho_add_compile_test(Mat.InitializerConstructor "${CMAKE_CURRENT_SOURCE_DIR}/core/math/mat_test.cpp" AHO_CONTRACT_MAT_INITIALIZER)
     aho_add_compile_test(Mat.RectangularFactory "${CMAKE_CURRENT_SOURCE_DIR}/core/math/mat_test.cpp" AHO_CONTRACT_MAT_RECTANGULAR_FACTORY)
     aho_add_compile_test(Mat.AxisRotation "${CMAKE_CURRENT_SOURCE_DIR}/core/math/mat_test.cpp" AHO_CONTRACT_MAT_AXIS_ROTATION)

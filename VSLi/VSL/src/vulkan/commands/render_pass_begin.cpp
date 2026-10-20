@@ -72,6 +72,22 @@ namespace VSL_NAMESPACE::command {
             static_cast<std::uint64_t>(area.y) + area.height > extent.height)
             throw std::out_of_range("Render area exceeds framebuffer");
     }
+    RenderPassBegin RenderPassBegin::withClears(FrameBufferAccessor target, std::vector<AttachmentClear> bindings,
+                                                RenderArea area, std::uint32_t index) {
+        if (!target._data || !target._data->renderPass)
+            throw std::invalid_argument("Framebuffer required");
+        auto values = defaults(*target._data->renderPass->description);
+        std::vector<bool> bound(values.size());
+        for (auto& binding : bindings) {
+            if (binding.attachment >= values.size())
+                throw std::out_of_range("Clear attachment id");
+            if (bound[binding.attachment])
+                throw std::invalid_argument("Duplicate clear attachment id");
+            bound[binding.attachment] = true;
+            values[binding.attachment] = std::move(binding.value);
+        }
+        return RenderPassBegin(std::move(target), std::move(values), area, index);
+    }
     RenderPassBegin::RenderPassBegin(RenderPass pass, FrameBufferAccessor target,
                                      std::optional<__VSLDRGBColorAccessor<float>> color)
         : RenderPassBegin(target) {
@@ -95,7 +111,10 @@ namespace VSL_NAMESPACE::command {
             clearValues.front() = ClearColor{color->r, color->g, color->b, 0.f};
     }
     void RenderPassBegin::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
-        const auto index = targetIndex.value_or(buffer.getCurrentBufferIdx());
+        const auto index = targetIndex.value_or(buffer._data->acquiredImageIndex.value_or(buffer.getCurrentBufferIdx()));
+        if (buffer._data->recordingSubmission) {
+            buffer._data->recordingSubmission->resources.push_back(frameBuffer._data);
+        }
         std::vector<vk::ClearValue> values;
         for (const auto& clear : clearValues)
             values.push_back(convert(clear));

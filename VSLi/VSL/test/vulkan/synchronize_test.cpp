@@ -2,24 +2,16 @@
 namespace {
     class SynchronizeVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
     protected:
-        std::optional<vsl::SynchroManager> manager;
+        bool validate_vulkan() const override { return true; }
+        std::optional<VSL_NAMESPACE::SynchroManager> manager;
         void SetUp() override {
             VulkanIntegrationTest::SetUp();
             if (!HasFatalFailure() && !IsSkipped())
                 manager.emplace(device);
         }
         void TearDown() override {
-            // Manager and holders retain each other. Reclaim fixture-owned handles before breaking the cycle.
             if (manager) {
                 device._data->device.waitIdle();
-                for (auto& [name, holder] : manager->_data->fences)
-                    for (auto fence : holder->fences)
-                        device._data->device.destroyFence(fence);
-                for (auto& [name, holder] : manager->_data->semaphores)
-                    for (auto semaphore : holder->semaphores)
-                        device._data->device.destroySemaphore(semaphore);
-                manager->_data->fences.clear();
-                manager->_data->semaphores.clear();
                 manager.reset();
             }
             VulkanIntegrationTest::TearDown();
@@ -60,6 +52,38 @@ namespace {
 } // namespace
 
 namespace {
+    TEST_F(SynchronizeVulkanIntegrationTest, DestroyIsIdempotentAndDoesNotEraseReplacement) {
+        auto old = manager->createFence("same", true);
+        auto replacement = manager->createFence("same", true);
+        old.destroy();
+        old.destroy();
+        EXPECT_TRUE(old._data->fences.empty());
+        ASSERT_TRUE(manager->getFence("same"));
+        EXPECT_EQ(manager->getFence("same")->_data, replacement._data);
+        EXPECT_TRUE(replacement.wait(std::uint64_t{0}));
+        EXPECT_TRUE(manager->destroyFence("same"));
+        EXPECT_FALSE(manager->destroyFence("same"));
+        EXPECT_THROW(replacement.wait(std::uint64_t{0}), std::logic_error);
+        auto semaphore = manager->createSemaphore("signal", 2);
+        auto alias = semaphore;
+        semaphore.destroy();
+        alias.destroy();
+        EXPECT_EQ(alias.size(), 0u);
+        EXPECT_FALSE(manager->getSemaphore("signal"));
+    }
+    TEST_F(SynchronizeVulkanIntegrationTest, HoldersOutliveManagerWithoutOwningIt) {
+        auto fence = manager->createFence("survivor", true);
+        auto semaphore = manager->createSemaphore("survivor");
+        std::weak_ptr<VSL_NAMESPACE::_impl::SynchroManager_impl> weak = manager->_data;
+        manager.reset();
+        EXPECT_TRUE(weak.expired());
+        EXPECT_TRUE(fence.wait(std::uint64_t{0}));
+        semaphore.destroy();
+        fence.destroy();
+    }
+} // namespace
+
+namespace {
     TEST_F(SynchronizeVulkanIntegrationTest, SemaphoreDestroyRemovesOnlyItsNameAndDisarmsAllAliases) {
         auto value = manager->createSemaphore("a", 2);
         auto alias = value;
@@ -69,10 +93,10 @@ namespace {
         EXPECT_FALSE(manager->getSemaphore("a"));
         ASSERT_TRUE(manager->getSemaphore("b"));
         EXPECT_EQ(manager->getSemaphore("b")->_data, retained._data);
-        // The old implementation leaves destroyed handles in the retained alias.
+        // 検証に失敗しても、後続の確認でハンドルを二重破棄しないようにする。
         alias._data->semaphores.clear();
         alias.destroy();
-        vsl::SemaphoreHolder{}.destroy();
+        VSL_NAMESPACE::SemaphoreHolder{}.destroy();
         EXPECT_TRUE(manager->destroySemaphore("b"));
         EXPECT_TRUE(retained._data->semaphores.empty());
         retained._data->semaphores.clear();
@@ -89,7 +113,7 @@ namespace {
         EXPECT_TRUE(retained.wait(std::uint64_t{0}));
         alias._data->fences.clear();
         alias.destroy();
-        vsl::FenceHolder{}.destroy();
+        VSL_NAMESPACE::FenceHolder{}.destroy();
         EXPECT_TRUE(manager->destroyFence("b"));
         EXPECT_TRUE(retained._data->fences.empty());
         retained._data->fences.clear();

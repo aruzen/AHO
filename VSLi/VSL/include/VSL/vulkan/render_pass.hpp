@@ -117,6 +117,10 @@ namespace VSL_NAMESPACE {
         std::uint32_t stencil = 0;
     };
     using ClearValue = std::variant<ClearColor, ClearInt, ClearUint, ClearDepthStencil>;
+    struct AttachmentClear {
+        AttachmentId attachment;
+        ClearValue value;
+    };
 
     struct RenderPassAccessor {
         std::shared_ptr<_impl::RenderPass_impl> _data;

@@ -259,6 +259,8 @@ namespace VSL_NAMESPACE {
     struct ImageAccessor {
         std::shared_ptr<_impl::Image_impl> _data;
         data_format::___Format getFormat() const;
+        ImageType getUsage() const;
+        LogicalDeviceAccessor getDevice() const;
 
         bool copyByBuffer(CommandManager commandManager, BufferAccessor* buf, VSL_NAMESPACE::ImageLayout layout, std::uint32_t target_idx);
 

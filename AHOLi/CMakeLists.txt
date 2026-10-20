@@ -15,6 +15,7 @@ add_library(AHOLi
         AHO/src/io/key.cpp
         AHO/src/drawer.cpp
         AHO/src/image_readback.cpp
+        AHO/src/x/screenshot.cpp
         AHO/src/engine.cpp
         AHO/src/resource/image.cpp
         AHO/src/resource/buffer.cpp
@@ -22,6 +23,7 @@ add_library(AHOLi
         AHO/src/engine/graphical_engine.cpp
 
         AHO/include/AHO/image_readback.hpp
+        AHO/include/AHO/x/screenshot.hpp
         AHO/include/aho/engine.hpp
         AHO/include/aho/concepts.hpp
         AHO/include/aho/pipeline/layouts.hpp
@@ -61,7 +63,6 @@ add_library(AHOLi
 
 target_include_directories(AHOLi
         PRIVATE
-        ${Vulkan_INCLUDE_DIRS}
         ${Boost_INCLUDE_DIRS}
         "${VSL_HOME}/include" # ~/repos/AHO/VSLi
         "${AHO_HOME}/include"
@@ -80,6 +81,10 @@ target_link_libraries(AHOLi
         ${GLFW_LIBRARIES}
         VSL
 )
+
+if(APPLE)
+    target_link_libraries(AHOLi PRIVATE "-framework CoreGraphics")
+endif()
 
 set_target_properties(AHOLi
         PROPERTIES

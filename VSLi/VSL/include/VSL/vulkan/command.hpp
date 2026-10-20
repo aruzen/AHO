@@ -37,6 +37,22 @@ namespace VSL_NAMESPACE {
         std::shared_ptr<VSL_NAMESPACE::_impl::CommandBuffer_impl> _data;
     };
 
+    // フェンスが再利用されても、個々の送信の完了状態を維持する。
+    struct Completion {
+        enum class Status {
+            Pending,
+            Submitted,
+            Complete,
+            Cancelled
+        };
+        std::shared_ptr<_impl::Submission_impl> _data;
+        Status status() const;
+        bool ready() const;
+        bool wait(std::uint64_t timeout_ns = UINT64_MAX) const;
+        void retain(std::shared_ptr<void> resource) const;
+        explicit operator bool() const { return bool(_data); }
+    };
+
     struct PipelineAccessor;
     namespace command {
         struct __Command {
@@ -110,6 +126,11 @@ namespace VSL_NAMESPACE {
         template<class P = DefaultPhase, typename... Args>
         P startPhase(Args&&... args);
 
+        LogicalDeviceAccessor getDevice() const;
+        // 同じデバイスとグラフィックスキューで、プールとコマンドバッファを独立させる。
+        CommandManager independent(std::uint32_t bufferCount = 1) const;
+        void waitIdle();
+
         CommandPool getPool();
 
         CommandBuffer getBuffer();
@@ -119,8 +140,6 @@ namespace VSL_NAMESPACE {
         CommandBuffer makeExclusiveBuffer(size_t size = 1);
     };
 } // namespace VSL_NAMESPACE
-
-// ============================================================================
 
 template<class P, typename... Args>
 P VSL_NAMESPACE::CommandManager::startPhase(Args&&... args) {

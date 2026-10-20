@@ -109,3 +109,15 @@ VSL_NAMESPACE::data_format::___Format VSL_NAMESPACE::ImageAccessor::getFormat() 
     const auto format = data_format::convert(type);
     return format.type() == data_format::___FormatTypes::Undefined ? data_format::___Format(type, 0) : format;
 }
+
+VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::ImageAccessor::getDevice() const {
+    if (!_data)
+        throw std::invalid_argument("Image is empty");
+    return {_data->device};
+}
+
+VSL_NAMESPACE::ImageType VSL_NAMESPACE::ImageAccessor::getUsage() const {
+    if (!_data)
+        throw std::invalid_argument("Image is empty");
+    return _data->usage;
+}

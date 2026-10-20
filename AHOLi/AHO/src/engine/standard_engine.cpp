@@ -1,7 +1,3 @@
-//
-// Created by morimoto_hibiki on 2025/10/10.
-//
-
 #include <AHO/engine/standard_engine.hpp>
 
 #include <utility>
@@ -22,9 +18,7 @@ void AHO_NAMESPACE::engine::StandardEngine::boot(const std::string& applicationN
 #endif
     auto physical_device = PhysicalDevices(instance).search();
 
-    /*
-     * エンジンロゴを出す予定なので最初に400, 400で取っている
-     */
+    // ロゴ表示を想定し、初期ウィンドウを400×400で作成する。
     VSL_NAMESPACE::Window window(applicationName, 400, 400);
     auto surface = window.add_plugin<Surface>(instance);
 
@@ -68,7 +62,7 @@ void AHO_NAMESPACE::engine::StandardEngine::boot(const std::string& applicationN
                                                                     command_manager.getBuffer().getSize()),
                             .render_finished = synchro_manager
                                                    .createSemaphore(applicationName + "RenderFinished",
-                                                                    command_manager.getBuffer().getSize()),
+                                                                    swapchain.getSwapImageSize()),
                             .in_flight = synchro_manager
                                              .createFence(applicationName + "InFlight",
                                                           command_manager.getBuffer().getSize(), true)}));

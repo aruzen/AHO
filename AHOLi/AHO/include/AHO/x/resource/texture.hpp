@@ -1,5 +1,5 @@
 #pragma once
-#include "buffer.hpp"
+#include <AHO/resource/buffer.hpp>
 #include <VSL/vulkan/image.hpp>
 #include <VSL/vulkan/phase.hpp>
 
@@ -18,7 +18,9 @@ namespace AHO_NAMESPACE::x::resource {
         VSL_NAMESPACE::data_format::___Format format() const;
         VSL_NAMESPACE::ImageAccessor image() const;
         // レンダーパス外で記録する。初回は未更新の画素もゼロになる。
-        TextureUpdate update(const UploadBuffer& source, VSL_NAMESPACE::ImageRegion region = {}, std::size_t offset = 0) const;
+        TextureUpdate update(AHO_NAMESPACE::resource::BufferBinding source, VSL_NAMESPACE::ImageRegion region = {}, std::size_t offset = 0) const;
+        template<AHO_NAMESPACE::resource::GpuBuffer Source>
+        TextureUpdate update(const Source& source, VSL_NAMESPACE::ImageRegion region = {}, std::size_t offset = 0) const;
     };
 
     // 描画streamと同じ<<で記録する。生成時には転送せず、invoke時のデータを使う。
@@ -27,10 +29,14 @@ namespace AHO_NAMESPACE::x::resource {
 
     private:
         friend class Texture;
-        TextureUpdate(Texture texture, UploadBuffer source, VSL_NAMESPACE::ImageRegion region, std::size_t offset);
+        TextureUpdate(Texture texture, AHO_NAMESPACE::resource::BufferBinding source, VSL_NAMESPACE::ImageRegion region, std::size_t offset);
         Texture texture_;
-        UploadBuffer source_;
+        AHO_NAMESPACE::resource::BufferBinding source_;
         VSL_NAMESPACE::ImageRegion region_;
         std::size_t offset_;
     };
+    template<AHO_NAMESPACE::resource::GpuBuffer Source>
+    TextureUpdate Texture::update(const Source& source, VSL_NAMESPACE::ImageRegion region, std::size_t offset) const {
+        return update(source.binding(), region, offset);
+    }
 } // namespace AHO_NAMESPACE::x::resource

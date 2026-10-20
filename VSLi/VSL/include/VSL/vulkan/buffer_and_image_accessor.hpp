@@ -270,6 +270,9 @@ namespace VSL_NAMESPACE {
         size_t size();
         // 要求したバイト数を返す。
         std::size_t requestedSize() const;
+        LogicalDeviceAccessor getDevice() const;
+        MemoryType getUsage() const;
+        MemoryProperty getMemoryProperties() const;
 
         static std::shared_ptr<_impl::Buffer_impl>
         MakeBuffer(VSL_NAMESPACE::LogicalDeviceAccessor device, size_t size, MemoryType memType,

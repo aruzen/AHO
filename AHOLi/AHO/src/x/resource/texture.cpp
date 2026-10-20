@@ -1,5 +1,4 @@
 #include <AHO/x/resource/texture.hpp>
-#include "buffer_impl.hpp"
 #include <VSL/vulkan/commands/image_upload.hpp>
 #include <stdexcept>
 
@@ -38,33 +37,33 @@ namespace AHO_NAMESPACE::x::resource {
             throw std::logic_error("Texture is empty");
         return _data->image;
     }
-    TextureUpdate Texture::update(const UploadBuffer& source, VSL_NAMESPACE::ImageRegion region, std::size_t offset) const {
-        if (!_data || !source._data)
+    TextureUpdate Texture::update(AHO_NAMESPACE::resource::BufferBinding source, VSL_NAMESPACE::ImageRegion region, std::size_t offset) const {
+        if (!_data)
             throw std::logic_error("Texture or upload source is empty");
         return TextureUpdate(*this, source, region, offset);
     }
-    TextureUpdate::TextureUpdate(Texture texture, UploadBuffer source, VSL_NAMESPACE::ImageRegion region, std::size_t offset)
+    TextureUpdate::TextureUpdate(Texture texture, AHO_NAMESPACE::resource::BufferBinding source, VSL_NAMESPACE::ImageRegion region, std::size_t offset)
         : texture_(std::move(texture)), source_(std::move(source)), region_(region), offset_(offset) {}
     void TextureUpdate::invoke(VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
         auto& texture = *texture_._data;
-        auto& source = *source_._data;
+        const auto& source = source_;
         auto completion = buffer.completion();
         if (!completion || completion.status() != VSL_NAMESPACE::Completion::Status::Pending)
             throw std::logic_error("Texture update requires a recording phase");
         texture.settle();
-        if ((texture.update && texture.update != completion) || (source.busy() && source.use != completion))
+        source.checkAvailable(completion);
+        if (texture.update && texture.update != completion)
             throw std::logic_error("Texture or upload source is still in use by another phase");
-        if (!source.buffer)
-            throw std::invalid_argument("Texture update requires upload data");
         auto layout = texture.initialized || texture.update ? VSL_NAMESPACE::ImageLayout::ShaderReadOnlyOptimal : VSL_NAMESPACE::ImageLayout::Undefined;
-        VSL_NAMESPACE::command::ImageUpload command(&*source.buffer, texture.image, layout, region_, offset_);
+        VSL_NAMESPACE::command::ImageUpload command(&source.native(), texture.image, layout, region_, offset_);
         const auto info = command.copy.description();
-        if (offset_ > source.size || info.byteSize > source.size - offset_)
+        if (offset_ > source.size() || info.byteSize > source.size() - offset_)
             throw std::out_of_range("Texture update exceeds initialized upload data");
-        if (manager.getDevice() != source.device || texture.image.getDevice() != source.device)
+        if (manager.getDevice() != source.device() || texture.image.getDevice() != source.device())
             throw std::invalid_argument("Texture update device mismatch");
+        buffer.retain(source.owner());
         command.invoke(pool, buffer, manager);
         texture.update = completion;
-        source.use = std::move(completion);
+        source.markUsed(std::move(completion));
     }
 } // namespace AHO_NAMESPACE::x::resource

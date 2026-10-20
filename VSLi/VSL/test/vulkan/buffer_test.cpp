@@ -17,6 +17,9 @@ namespace {
             GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
         HostBuffer buffer(device, std::size_t{64});
         EXPECT_GE(buffer.size(), 64u);
+        EXPECT_EQ(buffer.getDevice(), device);
+        EXPECT_EQ(buffer.getUsage(), HostBuffer::Type);
+        EXPECT_TRUE(vsl::contain(buffer.getMemoryProperties(), HostBuffer::Property));
         const std::uint32_t expected = 0x10203040;
         EXPECT_TRUE(buffer.copy(expected));
         auto mapped = buffer.data(sizeof(expected));

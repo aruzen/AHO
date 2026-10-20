@@ -83,6 +83,18 @@ void VSL_NAMESPACE::BufferAccessor::flushCopied(LocalBufferHolder& holder, std::
     flush(holder);
 }
 
+VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::BufferAccessor::getDevice() const {
+    if (!_data || !_data->device)
+        throw std::logic_error("Buffer is empty");
+    return LogicalDeviceAccessor{_data->device};
+}
+VSL_NAMESPACE::MemoryType VSL_NAMESPACE::BufferAccessor::getUsage() const {
+    return _data ? _data->usage : MemoryType::None;
+}
+VSL_NAMESPACE::MemoryProperty VSL_NAMESPACE::BufferAccessor::getMemoryProperties() const {
+    return _data ? _data->properties : MemoryProperty::None;
+}
+
 void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::flush() {
     flush(size);
 }

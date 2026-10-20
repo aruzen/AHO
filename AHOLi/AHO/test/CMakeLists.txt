@@ -37,7 +37,7 @@ if (AHO_TEST_SOURCES)
             pipeline/layouts_test.cpp
             drawer/draw_phase_test.cpp
             image_readback_test.cpp
-            x/resource/buffer_test.cpp
+            resource/buffer_test.cpp
             x/resource/texture_test.cpp
             x/screenshot_test.cpp
     )

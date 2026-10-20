@@ -34,6 +34,8 @@ add_library(AHOLi
         AHO/include/aho/core/vector.hpp
         AHO/include/aho/core/triangle.hpp
         AHO/include/aho/core/point.hpp
+        AHO/include/AHO/core/triangulation.hpp
+        AHO/include/AHO/core/detail/geometry2d.hpp
         AHO/include/aho/core/polygon.hpp
         AHO/include/aho/core/math/angle.hpp
         AHO/include/aho/core/math/mat.hpp

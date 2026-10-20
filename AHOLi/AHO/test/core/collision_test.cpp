@@ -70,6 +70,26 @@ namespace {
             EXPECT_TRUE(aho::collision::intersects(shape, rectangle(s / 2, s / 2, s, s)));
         }
     }
+    TEST(CollisionTest, TriangleViewsMayExposeConvertibleTriangleObjects) {
+        struct TriangleObject {
+            using element_type = double;
+            using dimension = vsl::D2;
+            using coordinate_info = T::coordinate_info;
+            T value;
+            operator T() const { return value; }
+        };
+        struct Shape {
+            using element_type = double;
+            using dimension = vsl::D2;
+            using coordinate_info = T::coordinate_info;
+            std::array<TriangleObject, 1> values;
+            auto triangles() const { return values; }
+        };
+        static_assert(aho::concepts::is_triangles_object<Shape>);
+        const Shape shape{{TriangleObject{T{P(0, 0), P(4, 0), P(0, 4)}}}};
+        EXPECT_TRUE(aho::collision::contains(shape, P(1, 1)));
+        EXPECT_TRUE(aho::collision::intersects(shape, rectangle(0, 0, 1, 1)));
+    }
     TEST(CollisionTest, NonFiniteInputsAreRejectedRatherThanReportedAsMisses) {
         const auto shape = rectangle(0, 0, 1, 1);
         const T invalid{P(0, 0), P(INFINITY, 0), P(0, 1)};

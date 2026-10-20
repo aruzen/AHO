@@ -37,7 +37,8 @@ namespace AHO_NAMESPACE {
         namespace g = detail::geometry2d;
         std::vector<P> points;
         std::vector<g::Point> normalized;
-        for (const auto& point : contour) {
+        for (const auto& source : contour) {
+            const P point = source;
             if (!points.empty() && points.size() - 1 > std::numeric_limits<Size>::max())
                 return Result(std::unexpected(Error::INDEX_OVERFLOW));
             const auto p = g::convert(point);

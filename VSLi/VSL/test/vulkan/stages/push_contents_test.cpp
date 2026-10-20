@@ -66,14 +66,20 @@ namespace {
 
 namespace {
     class PushRangeVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
-        void SetUp() override { require_validation = true; VulkanIntegrationTest::SetUp(); }
+        void SetUp() override {
+            require_validation = true;
+            VulkanIntegrationTest::SetUp();
+        }
     };
     vk::PushConstantRange range_for(vsl::PipelineLayoutEditAccessor layout, vk::ShaderStageFlagBits stage) {
         const auto& info = layout._data->info->pipelineLayout;
         unsigned found = 0;
         vk::PushConstantRange result{};
         for (unsigned i = 0; i < info.pushConstantRangeCount; ++i)
-            if (info.pPushConstantRanges[i].stageFlags & stage) { result = info.pPushConstantRanges[i]; ++found; }
+            if (info.pPushConstantRanges[i].stageFlags & stage) {
+                result = info.pPushConstantRanges[i];
+                ++found;
+            }
         EXPECT_EQ(found, 1u);
         return result;
     }
@@ -91,8 +97,7 @@ namespace {
     TEST_F(PushRangeVulkanIntegrationTest, OverlappingAndUnorderedDefinitionsCoverTheirUnionOnlyOnce) {
         auto layout = make_layout_state();
         pl::PushConstants constants;
-        constants.definitions = {{vsl::ShaderFlag::Vertex, 16, 8}, {vsl::ShaderFlag::Vertex, 8, 16},
-                                 {vsl::ShaderFlag::Vertex, 12, 4}, {vsl::ShaderFlag::Vertex, 32, 4}};
+        constants.definitions = {{vsl::ShaderFlag::Vertex, 16, 8}, {vsl::ShaderFlag::Vertex, 8, 16}, {vsl::ShaderFlag::Vertex, 12, 4}, {vsl::ShaderFlag::Vertex, 32, 4}};
         constants.injection(layout);
         const auto range = range_for(layout, vk::ShaderStageFlagBits::eVertex);
         EXPECT_EQ(range.offset, 8u);
@@ -125,10 +130,12 @@ namespace {
         const auto old = layout._data->info->pipelineLayout;
         const auto limit = physical._data->device.getProperties().limits.maxPushConstantsSize;
         for (const pl::PushContentDefinition definition : {
-                pl::PushContentDefinition{vsl::ShaderFlag::Compute, 2, 4},
-                {vsl::ShaderFlag::Compute, 0, 0}, {vsl::ShaderFlag::Compute, 0, 6},
-                {vsl::ShaderFlag::Compute, UINT32_MAX - 3, 8},
-                {vsl::ShaderFlag::Compute, 0, limit + 4}, {vsl::ShaderFlag::Error, 0, 4}}) {
+                 pl::PushContentDefinition{vsl::ShaderFlag::Compute, 2, 4},
+                 {vsl::ShaderFlag::Compute, 0, 0},
+                 {vsl::ShaderFlag::Compute, 0, 6},
+                 {vsl::ShaderFlag::Compute, UINT32_MAX - 3, 8},
+                 {vsl::ShaderFlag::Compute, 0, limit + 4},
+                 {vsl::ShaderFlag::Error, 0, 4}}) {
             pl::PushConstants invalid;
             invalid.definitions = {definition};
             EXPECT_THROW(invalid.injection(layout), std::invalid_argument);

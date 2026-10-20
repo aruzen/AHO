@@ -37,7 +37,6 @@
 #include "vulkan/commands/image_readback.hpp"
 #include "vulkan/pv.hpp"
 #include "vulkan/buffer.hpp"
-#include "vulkan/mapped_buffer.hpp"
 #include "vulkan/pipeline.hpp"
 #include "vulkan/commands/bind_index_buffers.hpp"
 #include "vulkan/commands/bind_pipe_line.hpp"

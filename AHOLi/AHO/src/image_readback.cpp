@@ -1,6 +1,7 @@
 #include <AHO/image_readback.hpp>
 #include <VSL/vulkan/commands/image_readback.hpp>
 #include <VSL/vulkan/phase.hpp>
+#include <VSL/vulkan/buffer.hpp>
 #include <cstring>
 #include <stdexcept>
 #include <utility>
@@ -9,7 +10,9 @@ namespace AHO_NAMESPACE {
     namespace {
         struct ReadbackSlot {
             std::optional<VSL_NAMESPACE::CommandManager> transfer;
-            std::optional<VSL_NAMESPACE::MappedBuffer> buffer;
+            using Buffer = VSL_NAMESPACE::Buffer<VSL_NAMESPACE::MemoryType::TransferDestination, VSL_NAMESPACE::MemoryProperty::HostVisible>;
+            std::optional<Buffer> buffer;
+            std::optional<VSL_NAMESPACE::BufferAccessor::LocalBufferHolder> mapping;
             VSL_NAMESPACE::Completion completion;
             std::weak_ptr<void> request;
         };
@@ -72,7 +75,7 @@ namespace AHO_NAMESPACE {
             throw std::runtime_error("Readback timed out");
         const auto& meta = _data->info;
         destination.bytes.resize(meta.byteSize);
-        auto mapped = _data->slot->buffer->read(meta.byteSize);
+        auto mapped = _data->slot->mapping->read(meta.byteSize);
         std::memcpy(destination.bytes.data(), mapped.data(), mapped.size());
         destination.width = meta.region.width;
         destination.height = meta.region.height;
@@ -89,9 +92,11 @@ namespace AHO_NAMESPACE {
     }
 
     void ImageReadback::Data::reserve(ReadbackSlot& slot, std::size_t bytes) {
-        if (bytes && (!slot.buffer || slot.buffer->size() < bytes)) {
-            auto next = VSL_NAMESPACE::MappedBuffer(producer.getDevice(), bytes);
+        if (bytes && (!slot.buffer || slot.buffer->requestedSize() < bytes)) {
+            ReadbackSlot::Buffer next(producer.getDevice(), bytes);
+            auto mapping = next.data();
             slot.buffer = std::move(next);
+            slot.mapping.emplace(std::move(mapping));
         }
     }
 
@@ -111,9 +116,9 @@ namespace AHO_NAMESPACE {
             auto status = slot->completion.status();
             if (status == VSL_NAMESPACE::Completion::Status::Pending || status == VSL_NAMESPACE::Completion::Status::Submitted)
                 continue;
-            if (slot->buffer && slot->buffer->size() >= bytes)
+            if (slot->buffer && slot->buffer->requestedSize() >= bytes)
                 return slot;
-            if (!candidate || (slot->buffer && (!candidate->buffer || slot->buffer->size() > candidate->buffer->size())))
+            if (!candidate || (slot->buffer && (!candidate->buffer || slot->buffer->requestedSize() > candidate->buffer->requestedSize())))
                 candidate = slot;
         }
         if (candidate) {
@@ -137,7 +142,7 @@ namespace AHO_NAMESPACE {
         request->slot = slot;
         request->completion = phase.completion();
         request->info = {nextRequestId++, frameId, info.region, info.format, info.rowStride, info.byteSize};
-        phase << VSL_NAMESPACE::command::ImageReadback(*slot->buffer, image, layout, info.region);
+        phase << VSL_NAMESPACE::command::ImageReadback(&*slot->buffer, image, layout, info.region);
         slot->completion = request->completion;
         slot->request = request;
         return ImageReadbackTicket(std::move(request));
@@ -235,7 +240,7 @@ namespace AHO_NAMESPACE {
         if (_data)
             for (const auto& slot : _data->slots)
                 if (slot->buffer)
-                    total += slot->buffer->size();
+                    total += slot->buffer->requestedSize();
         return total;
     }
 } // namespace AHO_NAMESPACE

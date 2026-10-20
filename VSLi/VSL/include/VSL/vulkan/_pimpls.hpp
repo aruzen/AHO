@@ -246,18 +246,13 @@ namespace VSL_NAMESPACE::_impl {
 
         vk::Buffer buffer;
         vk::DeviceMemory deviceMem;
-        size_t requirementSize, allocatedSize = 0;
+        size_t requirementSize = 0, allocatedSize = 0;
+        MemoryType usage = MemoryType::None;
+        MemoryProperty properties = MemoryProperty::None;
+        void* mapped = nullptr;
+        vk::DeviceSize atomSize = 1;
 
         ~Buffer_impl();
-    };
-
-    struct MappedBuffer_impl {
-        std::shared_ptr<Buffer_impl> buffer;
-        MemoryType usage = MemoryType::None;
-        void* mapped = nullptr;
-        bool coherent = false;
-        vk::DeviceSize atomSize = 1;
-        ~MappedBuffer_impl();
     };
 
     struct ResourceBindingLayout_impl {

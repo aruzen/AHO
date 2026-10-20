@@ -86,12 +86,7 @@ namespace VSL_NAMESPACE {
             return make_buffer<Buffer>(device, *manager, t);
         } else {
             Buffer buffer(device, sizeof(T));
-            {
-                auto mapped = buffer.data();
-                mapped.copy(t);
-                if constexpr (not contain<Buffer::Property, MemoryProperty::HostCoherent>())
-                    mapped.flush();
-            }
+            buffer.copy(t);
             return buffer;
         }
     }
@@ -139,8 +134,7 @@ namespace VSL_NAMESPACE {
         auto buff = this->data();
         size_t offset = 0;
         const bool copied = helper::copy_with_shift_offset(buff.data, buff.size, offset, args...);
-        if (offset != 0)
-            buff.flush();
+        buff.flush(offset);
         return copied;
     }
 
@@ -176,8 +170,7 @@ namespace VSL_NAMESPACE {
             return false;
         if (size == 0)
             return true;
-        memcpy(buff.data, t, sizeof(T) * size);
-        buff.flush();
+        buff.write(std::as_bytes(std::span(t, size)));
         return true;
     }
 
@@ -215,8 +208,7 @@ namespace VSL_NAMESPACE {
         auto buff = data();
         size_t offset = 0;
         (helper::uncheck_copy_with_shift_offset(buff.data, offset, args), ...);
-        if (offset != 0)
-            buff.flush();
+        buff.flush(offset);
     }
 
     template<typename... Args>
@@ -236,9 +228,7 @@ namespace VSL_NAMESPACE {
     Buffer<MemType, MemProperty, SharingMode>::Buffer(LogicalDeviceAccessor device, T t) {
         _data = this->MakeBuffer(device, sizeof(T), MemType, MemProperty, SharingMode);
         auto mapped = this->data();
-        mapped.copy(t);
-        if constexpr (not contain<Buffer::Property, MemoryProperty::HostCoherent>())
-            mapped.flush();
+        mapped.write(std::as_bytes(std::span(&t, 1)));
     }
 
     template<MemoryType MemType, MemoryProperty MemProperty, SharingMode SharingMode>
@@ -257,12 +247,8 @@ namespace VSL_NAMESPACE {
     Buffer<MemType, MemProperty, SharingMode>::Buffer(LogicalDeviceAccessor device, T* t, size_t size) {
         const auto bytes = helper::checked_buffer_array_size<T>(size);
         _data = this->MakeBuffer(device, bytes, MemType, MemProperty, SharingMode);
-        {
-            auto data = this->data();
-            data.copy(t, size);
-            if constexpr (not contain<Buffer::Property, MemoryProperty::HostCoherent>())
-                data.flush();
-        }
+        auto mapped = this->data();
+        mapped.write(std::as_bytes(std::span(t, size)));
     }
 
     template<MemoryType MemType, MemoryProperty MemProperty, SharingMode SharingMode>

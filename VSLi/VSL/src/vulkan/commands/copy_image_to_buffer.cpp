@@ -12,7 +12,8 @@ VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(VSL_NAMESPACE::Buff
 
 VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(VSL_NAMESPACE::BufferAccessor* buffer, VSL_NAMESPACE::ImageAccessor image,
                                                              ImageLayout layout, ImageRegion region, bool hostRead)
-    : image(std::move(image)), buffer(buffer), layout(layout), region(region), hostRead(hostRead) {}
+    : image(std::move(image)), buffer(buffer), layout(layout), region(region), hostRead(hostRead),
+      destination_(buffer ? buffer->_data : nullptr) {}
 
 VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(std::shared_ptr<_impl::Buffer_impl> buffer,
                                                              VSL_NAMESPACE::ImageAccessor image, ImageLayout layout,
@@ -49,9 +50,13 @@ VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer:
 
 VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer::description() const {
     const auto info = describe(image, region);
-    const auto destination = buffer ? buffer->_data : destination_;
+    const auto& destination = destination_;
     if (!destination || !destination->buffer || destination->device != image._data->device)
         throw std::invalid_argument("Image copy requires a destination on the same device");
+    if (!contain(destination->usage, MemoryType::TransferDestination))
+        throw std::invalid_argument("Image copy requires TransferDestination buffer usage");
+    if (hostRead && !contain(destination->properties, MemoryProperty::HostVisible))
+        throw std::invalid_argument("Host read requires host-visible buffer memory");
     if (layout != ImageLayout::General && layout != ImageLayout::TransferSrcOptimal)
         throw std::invalid_argument("Image copy requires General or TransferSrcOptimal layout");
     if (info.byteSize > destination->requirementSize)
@@ -61,7 +66,7 @@ VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer:
 
 void VSL_NAMESPACE::command::CopyImageToBuffer::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
     const auto info = description();
-    const auto destination = this->buffer ? this->buffer->_data : destination_;
+    const auto& destination = destination_;
     if (!buffer._data || !buffer._data->commandPool || !manager._data ||
         manager._data->device != image._data->device ||
         buffer._data->commandPool->device != image._data->device)

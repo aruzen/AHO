@@ -1,6 +1,5 @@
 #pragma once
 #include "copy_image_to_buffer.hpp"
-#include "../mapped_buffer.hpp"
 
 namespace VSL_NAMESPACE::command {
     // レイアウト遷移、バッファへのコピー、CPUへの可視性確保、レイアウト復元を記録する。
@@ -12,16 +11,10 @@ namespace VSL_NAMESPACE::command {
         ImageReadback(std::shared_ptr<_impl::Buffer_impl> destination, ImageAccessor image,
                       ImageLayout currentLayout, ImageRegion region = {});
 
-        ImageReadback(MappedBuffer destination, ImageAccessor image,
-                      ImageLayout currentLayout, ImageRegion region = {});
-
         CopyImageToBuffer copy;
         ImageLayout currentLayout;
 
         static ImageCopyInfo describe(ImageAccessor image, ImageLayout currentLayout, ImageRegion region = {});
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
-
-    private:
-        std::shared_ptr<void> destinationOwner_;
     };
 } // namespace VSL_NAMESPACE::command

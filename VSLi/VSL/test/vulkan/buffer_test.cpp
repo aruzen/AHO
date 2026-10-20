@@ -634,3 +634,189 @@ namespace {
         EXPECT_EQ(std::memcmp(mapped.data, payload.data(), sizeof(payload)), 0);
     }
 } // namespace
+
+namespace {
+    TEST(BufferCompilationTest, HostVisibleNonCoherentValueConstructorCanFlush) {
+        const auto result = vsl_test::compile_probe(R"cpp(
+#include <VSL/vulkan/_pimpls.hpp>
+#include <VSL/vsl.hpp>
+void probe(vsl::LogicalDeviceAccessor device){
+    vsl::Buffer<vsl::MemoryType::UniformBuffer,vsl::MemoryProperty::HostVisible> buffer(device,1.0f);
+}
+)cpp");
+        EXPECT_EQ(result.status, 0) << result.diagnostics;
+    }
+} // namespace
+
+#include "support/render_fixture.hpp"
+#include <VSL/vulkan/buffer.hpp>
+#include <VSL/vulkan/commands/image_readback.hpp>
+namespace {
+    using ReadbackBuffer = vsl::Buffer<vsl::MemoryType::TransferDestination, vsl::MemoryProperty::HostVisible>;
+    class PersistentBufferVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+    TEST_F(PersistentBufferVulkanIntegrationTest, ReusesMappingAndReadsBoundedRangesAfterGpuCompletion) {
+        auto manager = make_manager();
+        ReadbackBuffer destination(device, width * height * 4);
+        auto mapping = destination.data();
+        const std::byte* address = nullptr;
+        for (unsigned frame = 0; frame < 8; ++frame) {
+            VSL_NAMESPACE::ComputePhase phase(manager);
+            phase << VSL_NAMESPACE::command::RenderPassBegin(*framebuffer, {VSL_NAMESPACE::ClearColor{frame % 2 ? 0.0f : 1.0f, frame % 2 ? 1.0f : 0.0f, 0, 1}})
+                  << VSL_NAMESPACE::command::RenderPassEnd{}
+                  << VSL_NAMESPACE::command::ImageReadback(&destination, *color, VSL_NAMESPACE::ImageLayout::General);
+            ASSERT_EQ(phase.submit(), VSL_NAMESPACE::ComputePhase::SubmitResult::Success);
+            ASSERT_TRUE(phase.completion().wait());
+            auto pixels = mapping.read(4);
+            EXPECT_EQ(pixels[0], frame % 2 ? std::byte{0} : std::byte{255});
+            EXPECT_EQ(pixels[1], frame % 2 ? std::byte{255} : std::byte{0});
+            EXPECT_EQ(pixels[3], std::byte{255});
+            if (address)
+                EXPECT_EQ(pixels.data(), address);
+            address = pixels.data();
+        }
+        auto alias = destination;
+        auto aliasMapping = alias.data();
+        EXPECT_EQ(aliasMapping.read(4).data(), address);
+        EXPECT_EQ(aliasMapping.read(3, 1)[2], std::byte{255});
+        EXPECT_TRUE(aliasMapping.read(0, alias.requestedSize()).empty());
+        EXPECT_THROW(mapping.read(1, destination.requestedSize()), std::out_of_range);
+        EXPECT_THROW(mapping.read(SIZE_MAX, 1), std::out_of_range);
+        EXPECT_THROW((ReadbackBuffer(device, std::size_t{0})), std::invalid_argument);
+        vsl::Buffer<vsl::MemoryType::StorageBuffer, vsl::MemoryProperty::HostVisible> storage(device, width * height * 4);
+        EXPECT_THROW((VSL_NAMESPACE::command::ImageReadback(&storage, *color, VSL_NAMESPACE::ImageLayout::General).copy.description()), std::invalid_argument);
+    }
+    TEST_F(PersistentBufferVulkanIntegrationTest, InvalidationPathAlignsPartialRangesAndKeepsMapping) {
+        auto manager = make_manager();
+        ReadbackBuffer destination(device, width * height * 4);
+        auto mapping = destination.data();
+        {
+            VSL_NAMESPACE::ComputePhase phase(manager);
+            phase << VSL_NAMESPACE::command::RenderPassBegin(*framebuffer, {VSL_NAMESPACE::ClearColor{1, 0, 0, 1}})
+                  << VSL_NAMESPACE::command::RenderPassEnd{}
+                  << VSL_NAMESPACE::command::ImageReadback(&destination, *color, VSL_NAMESPACE::ImageLayout::General);
+            phase.submit();
+            ASSERT_TRUE(phase.completion().wait());
+        }
+        // コヒーレントメモリしかない環境でも、キャッシュ無効化範囲のアラインメントを確かめる。
+        // 実際の非コヒーレントメモリの動作を再現する検証ではない。
+        destination._data->properties = vsl::MemoryProperty::HostVisible;
+        destination._data->atomSize = physical._data->device.getProperties().limits.nonCoherentAtomSize;
+        auto partial = mapping.read(3, 1);
+        EXPECT_EQ(partial[0], std::byte{0});
+        EXPECT_EQ(partial[2], std::byte{255});
+        EXPECT_EQ(mapping.read(1, destination.requestedSize() - 1)[0], std::byte{255});
+    }
+    TEST_F(PersistentBufferVulkanIntegrationTest, RecordedCommandKeepsBufferAliveUntilCompletionOwnerReleasesIt) {
+        auto manager = make_manager();
+        std::weak_ptr<VSL_NAMESPACE::_impl::Buffer_impl> weak;
+        {
+            VSL_NAMESPACE::ComputePhase phase(manager);
+            {
+                ReadbackBuffer destination(device, width * height * 4);
+                auto mapping = destination.data();
+                weak = destination._data;
+                phase << VSL_NAMESPACE::command::RenderPassBegin(*framebuffer) << VSL_NAMESPACE::command::RenderPassEnd{}
+                      << VSL_NAMESPACE::command::ImageReadback(&destination, *color, VSL_NAMESPACE::ImageLayout::General);
+            }
+            EXPECT_FALSE(weak.expired());
+            phase.submit();
+            EXPECT_TRUE(phase.completion().wait());
+        }
+        {
+            VSL_NAMESPACE::ComputePhase next(manager);
+            next.submit();
+            EXPECT_TRUE(next.completion().wait());
+        }
+        EXPECT_TRUE(weak.expired());
+    }
+    TEST_F(PersistentBufferVulkanIntegrationTest, IndependentManagerHasOwnBuffersOnSameDeviceAndQueue) {
+        auto producer = make_manager();
+        auto transfer = producer.independent();
+        EXPECT_EQ(transfer.getDevice(), producer.getDevice());
+        EXPECT_NE(transfer.getPool()._data, producer.getPool()._data);
+        EXPECT_EQ(transfer.getBuffer().getSize(), 1u);
+        EXPECT_EQ(transfer._data->graphicsQueue, producer._data->graphicsQueue);
+        auto producerPhase = producer.startPhase<VSL_NAMESPACE::ComputePhase>();
+        {
+            auto transferPhase = transfer.startPhase<VSL_NAMESPACE::ComputePhase>();
+            transferPhase.submit();
+            EXPECT_TRUE(transferPhase.completion().wait());
+        }
+        EXPECT_EQ(producerPhase.state, VSL_NAMESPACE::ComputePhase::State::WaitSubmit);
+        producerPhase.cancel();
+        EXPECT_THROW(producer.independent(0), std::invalid_argument);
+    }
+} // namespace
+
+namespace {
+    TEST_F(BufferVulkanIntegrationTest, SharedMappingsSupportUnalignedViewsWithoutRemapping) {
+        using Buffer = vsl::Buffer<vsl::MemoryType::TransferSource, vsl::MemoryProperty::HostVisible>;
+        Buffer buffer(device, std::size_t{33});
+        EXPECT_EQ(buffer.requestedSize(), 33u);
+        EXPECT_FALSE(buffer._data->mapped);
+        auto first = buffer.data();
+        auto alias = buffer;
+        auto partial = alias.data(7, 1);
+        EXPECT_EQ(partial.data, static_cast<std::byte*>(first.data) + 1);
+        const std::array payload{std::byte{17}, std::byte{29}, std::byte{43}};
+        partial.write(payload, 2);
+        EXPECT_EQ(first.read(1, 3)[0], payload[0]);
+        EXPECT_EQ(first.read(1, 5)[0], payload[2]);
+        auto remaining = buffer.data(std::nullopt, 3);
+        EXPECT_EQ(remaining.size, 30u);
+        EXPECT_EQ(remaining.data, static_cast<std::byte*>(first.data) + 3);
+        EXPECT_TRUE(buffer.data(0, 33).read(0).empty());
+        EXPECT_THROW(buffer.data(1, 33), std::out_of_range);
+        EXPECT_THROW(buffer.data(std::nullopt, SIZE_MAX), std::out_of_range);
+        EXPECT_THROW(partial.read(1, 7), std::out_of_range);
+        EXPECT_THROW(partial.write(payload, 6), std::out_of_range);
+        EXPECT_THROW(partial.flush(SIZE_MAX, 1), std::out_of_range);
+        EXPECT_THROW(partial.invalidate(1, SIZE_MAX), std::out_of_range);
+        auto moved = std::move(partial);
+        EXPECT_THROW(partial.read(0), std::logic_error);
+        EXPECT_THROW(partial.write({}), std::logic_error);
+        EXPECT_EQ(moved.read(1, 2)[0], payload[0]);
+    }
+    TEST_F(BufferVulkanIntegrationTest, FlushAndInvalidateAlignPartialViewsAndAllocationTail) {
+        using Buffer = vsl::Buffer<vsl::MemoryType::TransferSource, vsl::MemoryProperty::HostVisible>;
+        Buffer buffer(device, std::size_t{33});
+        auto mapped = buffer.data();
+        // 実際の非コヒーレントheapの可視性ではなく、範囲の整列を検証する。
+        buffer._data->properties = vsl::MemoryProperty::HostVisible;
+        auto partial = buffer.data(31, 1);
+        const std::array payload{std::byte{71}, std::byte{73}};
+        partial.write(payload, 29);
+        partial.flush(1, 30);
+        partial.invalidate(1, 30);
+        mapped.write(std::span(payload).first(1), 32);
+        EXPECT_EQ(mapped.read(1, 30)[0], payload[0]);
+        EXPECT_EQ(mapped.read(1, 31)[0], payload[1]);
+        EXPECT_EQ(mapped.read(1, 32)[0], payload[0]);
+        EXPECT_NO_THROW(mapped.write({}, 33));
+        EXPECT_NO_THROW(mapped.flush(0, 33));
+    }
+    TEST_F(BufferVulkanIntegrationTest, MappingKeepsItsOriginalStorageWhenBufferIsReassigned) {
+        using Buffer = vsl::Buffer<vsl::MemoryType::TransferSource, vsl::MemoryProperty::HostVisible>;
+        Buffer buffer(device, std::size_t{4});
+        auto mapping = buffer.data();
+        const auto original = buffer._data;
+        buffer = Buffer(device, std::size_t{8});
+        EXPECT_NE(buffer._data, original);
+        const std::array payload{std::byte{101}};
+        mapping.write(payload);
+        EXPECT_EQ(mapping.read(1)[0], payload[0]);
+        EXPECT_EQ(mapping.data, original->mapped);
+    }
+    TEST_F(BufferVulkanIntegrationTest, RejectsUnavailableRequiredMemoryInsteadOfSelectingAnUnrelatedType) {
+        const auto properties = physical._data->device.getMemoryProperties();
+        auto selected = vk::MemoryPropertyFlags{};
+        for (std::uint32_t i = 0; i < properties.memoryTypeCount; ++i)
+            selected |= properties.memoryTypes[i].propertyFlags;
+        if (selected & vk::MemoryPropertyFlagBits::eProtected)
+            GTEST_SKIP() << "This device has protected memory";
+        using ProtectedBuffer = vsl::Buffer<vsl::MemoryType::TransferSource, vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::Protected>;
+        EXPECT_THROW((ProtectedBuffer(device, std::size_t{4})), std::runtime_error);
+    }
+} // namespace

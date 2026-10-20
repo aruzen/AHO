@@ -120,4 +120,30 @@ namespace {
         EXPECT_EQ(buffer._data->recordingSubmission->resources, retained);
         phase.cancel();
     }
+    TEST_F(ImageReadbackCommandVulkanIntegrationTest, CommandKeepsDestinationWhenOriginalHandleIsDestroyedBeforeRecording) {
+        auto manager = make_manager();
+        auto image = initialized_image(manager);
+        std::optional<vsl::command::ImageReadback> command;
+        std::optional<vsl::BufferAccessor::LocalBufferHolder> mapped;
+        std::weak_ptr<vsl::_impl::Buffer_impl> storage;
+        {
+            vsl::Buffer<vsl::MemoryType::TransferDestination, vsl::MemoryProperty::HostVisible> destination(device, std::size_t{16});
+            storage = destination._data;
+            mapped.emplace(destination.data());
+            command.emplace(&destination, image, vsl::ImageLayout::TransferDstOptimal);
+        }
+        ASSERT_FALSE(storage.expired());
+        {
+            vsl::ComputePhase phase(manager);
+            phase << *command;
+            command.reset();
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::Success);
+            ASSERT_TRUE(phase.completion().wait());
+        }
+        std::array<std::uint32_t, 4> pixels{};
+        auto bytes = mapped->read(sizeof(pixels));
+        std::memcpy(pixels.data(), bytes.data(), bytes.size());
+        EXPECT_EQ(pixels, (std::array<std::uint32_t, 4>{11, 22, 33, 44}));
+    }
+
 } // namespace

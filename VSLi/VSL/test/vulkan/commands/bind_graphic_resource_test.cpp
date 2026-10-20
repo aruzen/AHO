@@ -59,10 +59,12 @@ namespace {
         ASSERT_TRUE(completion.wait());
         auto output_owner = weak_output.lock();
         ASSERT_TRUE(output_owner);
-        const auto* values = static_cast<const std::uint32_t*>(device._data->device.mapMemory(output_owner->deviceMem, 0, count * sizeof(std::uint32_t)));
+        // holderで寿命を延ばさず、Completionが保持する既存のマップから結果を読む。
+        ASSERT_TRUE(vsl::contain(output_owner->properties, vsl::MemoryProperty::HostCoherent));
+        const auto* values = static_cast<const std::uint32_t*>(output_owner->mapped);
+        ASSERT_NE(values, nullptr);
         for (std::size_t i = 0; i < count; ++i)
             EXPECT_EQ(values[i], 307u + i);
-        device._data->device.unmapMemory(output_owner->deviceMem);
         output_owner.reset();
         completion = {};
         {

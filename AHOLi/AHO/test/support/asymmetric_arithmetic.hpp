@@ -64,6 +64,9 @@ namespace aho_test::arithmetic {
     constexpr int operator/(const CategoryResult& lhs, const CategoryResult& rhs) { return lhs.value / rhs.value; }
     constexpr long operator/(CategoryResult&& lhs, CategoryResult&& rhs) { return static_cast<long>(lhs.value / rhs.value); }
 
+    constexpr long operator*(CategoryResult&& lhs, const CategoryResult& rhs) { return static_cast<long>(lhs.value * rhs.value); }
+    constexpr long operator/(CategoryResult&& lhs, const CategoryResult& rhs) { return static_cast<long>(lhs.value / rhs.value); }
+
     struct MutableOnly {
         int value{};
         auto operator<=>(const MutableOnly&) const = default;

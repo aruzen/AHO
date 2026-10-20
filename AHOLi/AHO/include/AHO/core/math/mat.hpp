@@ -50,6 +50,17 @@ namespace AHO_NAMESPACE {
             t *= std::declval<Mat<typename T::element_type, T::type().row, T::type().column>>();
         };
 
+        namespace detail {
+            template<typename L, typename R>
+            using product_type = decltype(std::declval<const L&>() * std::declval<const R&>());
+
+            template<typename L, typename R, size_t Rows, size_t Columns>
+            concept matrix_product = requires(const L& lhs, const R& rhs) { lhs * rhs; } &&
+                                     std::is_object_v<product_type<L, R>> &&
+                                     requires(const L& lhs, const R& rhs, product_type<L, R>& total) { total += lhs * rhs; } &&
+                                     (Rows == 0 || Columns == 0 || std::default_initializable<product_type<L, R>>);
+        } // namespace detail
+
         template<typename R, size_t Row, size_t Column>
         struct Mat : public std::array<std::array<R, Column>, Row> {
             static constexpr bool __is_mat = true;
@@ -81,7 +92,8 @@ namespace AHO_NAMESPACE {
             requires requires(const R& lhs, const T& rhs) { lhs - rhs; }
             constexpr auto operator-(const AHO_NAMESPACE::matrix::Mat<T, Row, Column>& p) const;
 
-            template<AHO_NAMESPACE::concepts::multiply_as<R> T, size_t TargetColumn>
+            template<typename T, size_t TargetColumn>
+            requires detail::matrix_product<R, T, Row, TargetColumn>
             constexpr auto operator*(const AHO_NAMESPACE::matrix::Mat<T, Column, TargetColumn>& p) const;
 
             template<typename T>
@@ -92,7 +104,9 @@ namespace AHO_NAMESPACE {
             requires requires(R& lhs, const T& rhs) { lhs -= rhs; }
             constexpr Mat<R, Row, Column>& operator-=(const AHO_NAMESPACE::matrix::Mat<T, Row, Column>& p);
 
-            template<AHO_NAMESPACE::concepts::multiply_as<R> T>
+            template<typename T>
+            requires(Row == Column) && detail::matrix_product<R, T, Row, Column> &&
+                    requires(R& target, const detail::product_type<R, T>& value) { target = value; }
             constexpr Mat<R, Row, Column>& operator*=(const AHO_NAMESPACE::matrix::Mat<T, Row, Column>& p);
 
             template<typename T>
@@ -250,10 +264,11 @@ namespace AHO_NAMESPACE {
         }
 
         template<typename R, size_t Row, size_t Column>
-        template<AHO_NAMESPACE::concepts::multiply_as<R> T, size_t TargetColumn>
+        template<typename T, size_t TargetColumn>
+        requires detail::matrix_product<R, T, Row, TargetColumn>
         constexpr auto
         Mat<R, Row, Column>::operator*(const AHO_NAMESPACE::matrix::Mat<T, Column, TargetColumn>& p) const {
-            AHO_NAMESPACE::matrix::Mat<decltype(std::declval<T>() * std::declval<R>()), Row, TargetColumn> buf{};
+            AHO_NAMESPACE::matrix::Mat<decltype((*this)[0][0] * p[0][0]), Row, TargetColumn> buf{};
 
             for (size_t i = 0; i < Row; i++)
                 for (size_t j = 0; j < TargetColumn; j++)
@@ -285,10 +300,11 @@ namespace AHO_NAMESPACE {
         }
 
         template<typename R, size_t Row, size_t Column>
-        template<AHO_NAMESPACE::concepts::multiply_as<R> T>
+        template<typename T>
+        requires(Row == Column) && detail::matrix_product<R, T, Row, Column> &&
+                requires(R& target, const detail::product_type<R, T>& value) { target = value; }
         constexpr Mat<R, Row, Column>&
         Mat<R, Row, Column>::operator*=(const AHO_NAMESPACE::matrix::Mat<T, Row, Column>& p) {
-            static_assert(Row == Column, "Matrix compound multiplication requires square matrices.");
             const auto product = *this * p;
             for (size_t i = 0; i < Row; i++)
                 for (size_t j = 0; j < Column; j++)

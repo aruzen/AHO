@@ -96,6 +96,8 @@ void VSL_NAMESPACE::utils::ShaderCompiler::load() {
             continue;
 
         for (const fs::directory_entry& x : fs::directory_iterator(shaders_path)) {
+            if (!x.is_regular_file())
+                continue;
             auto path = x.path();
             if (!path.has_extension() || path.extension() != ".spv")
                 continue;
@@ -105,6 +107,8 @@ void VSL_NAMESPACE::utils::ShaderCompiler::load() {
         }
 
         for (const fs::directory_entry& x : fs::directory_iterator(shaders_path / "raw")) {
+            if (!x.is_regular_file())
+                continue;
             auto path = x.path();
             if (!path.has_extension() ||
                 !(path.extension() == ".vert" || path.extension() == ".frag" || path.extension() == ".comp"))

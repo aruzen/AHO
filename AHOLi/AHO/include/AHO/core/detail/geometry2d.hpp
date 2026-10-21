@@ -35,8 +35,10 @@ namespace AHO_NAMESPACE::detail::geometry2d {
     }
 
     inline int orientation(Point a, Point b, Point c) {
-        const auto u = (b.value.___AN1 - a.value.___AN1) * (c.value.___AN2 - a.value.___AN2);
-        const auto v = (b.value.___AN2 - a.value.___AN2) * (c.value.___AN1 - a.value.___AN1);
+        const auto ab = b - a;
+        const auto ac = c - a;
+        const auto u = ab.value.___AN1 * ac.value.___AN2;
+        const auto v = ab.value.___AN2 * ac.value.___AN1;
         const auto error = 16 * std::numeric_limits<long double>::epsilon() * (std::abs(u) + std::abs(v));
         return u - v > error ? 1 : (u - v < -error ? -1 : 0);
     }

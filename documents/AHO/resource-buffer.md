@@ -39,7 +39,7 @@ uploadはコマンドを作り、invoke時の内容を記録する。自動submi
 
 Generalからの転送は、転送先が保持するGPUFriendlyのstagingを使う。容量不足時だけ再確保し、後続の転送でも再利用する。同一stagingの書き換えを防ぐため、同じ転送先へのGeneral uploadが未完了なら次のGeneral uploadは拒否する。同じPhase内で複数の範囲を転送するときは、先にGPUFriendlyへ全データを書き、uploadのsourceOffset/bytesを指定する。
 
-GPU Bufferからは`destination.upload(source, destinationOffset, sourceOffset, optionalByteCount)`でGPU転送する。sourceを読み直してCPUへコピーする処理は挟まない。sourceにはGpuBuffer conceptを満たす標準型・Customを渡せる。
+GPU Bufferからは`destination.upload(source, destinationOffset, sourceOffset, optionalByteCount)`でGPU転送する。sourceを読み直してCPUへコピーする処理は挟まない。sourceにはGPUBuffer conceptを満たす標準型・Customを渡せる。
 
 使用中はassign/write/read/map/reserve/resizeを拒否する。busyはPending/Submittedでtrue、waitは未送信ならfalse、送信済みなら指定timeoutで待機する。同じPhaseでの複数転送は許可するが、その間にCPUから内容を変更してはならない。キャンセル後は再利用できる。
 
@@ -80,4 +80,4 @@ custom.reserve(128);
 - mapだけの型、カスタマイズなしの型、move-onlyなCustomizationも利用できる。固定容量の型のassignは、既存容量内でのみ利用できる。
 - native()は保持するVSL Bufferを元の型で返す。基礎となるVSLハンドル自体の差し替えは、AHOのマップと状態を無効にするため行わない。
 
-BufferBindingは転送に必要な参照と使用状態を共有する。AHOの各処理はGpuBuffer conceptとこのbindingを利用し、Custom専用の転送実装を追加しない。SubmissionはStorage・Customization・マップを含むResourceを保持する。Completionを持つ管理状態はSubmissionへ保持せず、循環を避ける。
+BufferBindingは転送に必要な参照と使用状態を共有する。AHOの各処理はGPUBuffer conceptとこのbindingを利用し、Custom専用の転送実装を追加しない。SubmissionはStorage・Customization・マップを含むResourceを保持する。Completionを持つ管理状態はSubmissionへ保持せず、循環を避ける。

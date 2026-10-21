@@ -1,13 +1,58 @@
-#ifndef AHO_GPU_TESTS
-#include <gtest/gtest.h>
 #include <AHO/resource/buffer.hpp>
+#include <gtest/gtest.h>
+#include <array>
 #include <cstring>
 #include <optional>
 #include <utility>
 
+#ifdef AHO_GPU_TESTS
+#include <VSL/vulkan/commands/copy_buffer.hpp>
+#include "support/vulkan_fixture.hpp"
+#else
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define AHO_BUFFER_TEST_ASAN 1
+#endif
+#elif defined(__SANITIZE_ADDRESS__)
+#define AHO_BUFFER_TEST_ASAN 1
+#endif
+#ifdef AHO_BUFFER_TEST_ASAN
+#include <sanitizer/asan_interface.h>
+#endif
+#endif
+
+namespace {
+    template<typename T>
+    concept CompleteBuffer = requires { sizeof(T); };
+
+    template<typename T>
+    concept HasCPUWrite = requires(T& b, std::span<const std::byte> bytes) { b.write(bytes); };
+
+    template<typename T>
+    concept HasCPUMap = requires(T& b) { b.map(); };
+
+    template<typename T>
+    concept HasReserve = requires(T& b) { b.reserve(std::size_t{}); };
+
+    using General = aho::resource::Buffer<aho::resource::BufferType::General>;
+    using Host = aho::resource::Buffer<aho::resource::BufferType::GPUFriendly>;
+    using Device = aho::resource::Buffer<aho::resource::BufferType::OnGPU>;
+    using CustomHost = decltype(aho::resource::make_custom_buffer(std::declval<vsl::StagingBuffer<>>()));
+    using CustomDevice = decltype(aho::resource::make_custom_buffer(std::declval<vsl::DeviceLocalBuffer<>>()));
+    static_assert(!CompleteBuffer<aho::resource::Buffer<aho::resource::BufferType::Custom>>);
+    static_assert(aho::resource::GPUBuffer<Host> && aho::resource::GPUBuffer<Device> && aho::resource::GPUBuffer<CustomHost>);
+    static_assert(!aho::resource::GPUBuffer<General>);
+    static_assert(HasCPUWrite<Host> && HasCPUMap<Host> && HasReserve<Host>);
+    static_assert(!HasCPUWrite<Device> && !HasCPUMap<Device> && !HasReserve<Device>);
+    static_assert(HasCPUWrite<CustomHost> && !HasReserve<CustomHost>);
+    static_assert(!HasCPUWrite<CustomDevice> && !HasCPUMap<CustomDevice>);
+} // namespace
+
+#ifndef AHO_GPU_TESTS
 namespace {
     using GeneralBuffer = aho::resource::Buffer<aho::resource::BufferType::General>;
     class GeneralBufferTest : public testing::TestWithParam<std::size_t> {};
+
     TEST_P(GeneralBufferTest, ConstructorReportsRequestedSizeAndWritableStorage) {
         const auto size = GetParam();
         GeneralBuffer buffer(size);
@@ -21,6 +66,7 @@ namespace {
             EXPECT_EQ(buffer.data(), data);
         }
     }
+
     INSTANTIATE_TEST_SUITE_P(AllocationBoundaries, GeneralBufferTest, testing::Values(std::size_t{0}, std::size_t{1}, std::size_t{7}, std::size_t{257}));
     TEST(GeneralBufferOwnershipTest, OwningAllocationRequiresNontrivialDestruction) {
         EXPECT_FALSE(std::is_trivially_destructible_v<GeneralBuffer>);
@@ -43,6 +89,7 @@ namespace {
         EXPECT_EQ(storage[0], 29);
         EXPECT_EQ(static_cast<unsigned char*>(assigned.data())[0], 29);
     }
+
     TEST(GeneralBufferOwnershipTest, SharedStorageOutlivesTheOriginalBuffer) {
         std::optional<GeneralBuffer> copy;
         {
@@ -54,6 +101,7 @@ namespace {
         for (std::size_t i = 0; i < copy->size(); ++i)
             EXPECT_EQ(static_cast<unsigned char*>(copy->data())[i], 0x5a);
     }
+
     TEST(GeneralBufferOwnershipTest, MovesKeepTheStorageInTheDestination) {
         GeneralBuffer source(8);
         auto* storage = source.data();
@@ -72,39 +120,6 @@ namespace {
         EXPECT_EQ(static_cast<unsigned char*>(assigned.data())[7], 0x6b);
     }
 } // namespace
-#if defined(__has_feature)
-#if __has_feature(address_sanitizer)
-#define AHO_BUFFER_TEST_ASAN 1
-#endif
-#elif defined(__SANITIZE_ADDRESS__)
-#define AHO_BUFFER_TEST_ASAN 1
-#endif
-#ifdef AHO_BUFFER_TEST_ASAN
-#include <sanitizer/asan_interface.h>
-TEST(GeneralBufferOwnershipTest, LastOwnerDestructionReleasesTheArray) {
-    void* storage = nullptr;
-    {
-        GeneralBuffer source(8);
-        storage = source.data();
-        {
-            GeneralBuffer copy(source);
-            EXPECT_EQ(__asan_address_is_poisoned(storage), 0);
-        }
-        EXPECT_EQ(__asan_address_is_poisoned(storage), 0);
-    }
-    EXPECT_NE(__asan_address_is_poisoned(storage), 0);
-}
-#undef AHO_BUFFER_TEST_ASAN
-#endif
-
-#endif
-
-#include <AHO/resource/buffer.hpp>
-#include <gtest/gtest.h>
-#include <array>
-#include <utility>
-
-#ifndef AHO_GPU_TESTS
 namespace {
     namespace resource = aho::resource;
     TEST(GeneralBufferCapacityTest, ReserveResizeAndAliasesShareStorageWithoutGrowingWithinCapacity) {
@@ -118,6 +133,7 @@ namespace {
         EXPECT_EQ(alias.size(), 8u);
         EXPECT_GE(alias.capacity(), 32u);
         const std::array<std::byte, 2> bytes{std::byte{17}, std::byte{29}};
+
         alias.write(bytes, 2);
         EXPECT_EQ(buffer.bytes()[2], bytes[0]);
         const auto& view = buffer;
@@ -128,9 +144,11 @@ namespace {
         EXPECT_TRUE(buffer.bytes().empty());
         EXPECT_EQ(moved.bytes().data(), storage);
     }
+
     TEST(GeneralBufferCapacityTest, BoundsAndOverlappingWritesPreserveThePayload) {
         resource::Buffer<resource::BufferType::General> buffer(4);
         const std::array<std::byte, 4> initial{std::byte{1}, std::byte{2}, std::byte{3}, std::byte{4}};
+
         buffer.write(initial);
         buffer.write(buffer.bytes().first(3), 1);
         EXPECT_EQ(buffer.bytes()[0], std::byte{1});
@@ -145,75 +163,11 @@ namespace {
         EXPECT_GE(buffer.capacity(), 4u);
     }
 } // namespace
-#else
-#include "support/vulkan_fixture.hpp"
-namespace {
-    class GpuFriendlyBufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
-    };
-    TEST_F(GpuFriendlyBufferVulkanIntegrationTest, LogicalLengthAndReservedCapacityAreIndependent) {
-        aho::resource::Buffer<aho::resource::BufferType::GPUFriendly> buffer(device);
-        EXPECT_EQ(buffer.size(), 0u);
-        EXPECT_EQ(buffer.capacity(), 0u);
-        EXPECT_FALSE(buffer.busy());
-        EXPECT_TRUE(buffer.wait(0));
-        buffer.reserve(64);
-        const std::array<std::byte, 8> payload{};
-        buffer.assign(payload);
-        EXPECT_EQ(buffer.size(), 8u);
-        EXPECT_EQ(buffer.capacity(), 64u);
-        auto alias = buffer;
-        alias.assign(std::span(payload).first(4));
-        EXPECT_EQ(buffer.size(), 4u);
-        EXPECT_EQ(buffer.capacity(), 64u);
-        buffer.reserve(128);
-        EXPECT_EQ(alias.capacity(), 128u);
-        EXPECT_EQ(alias.size(), 4u);
-        buffer.write({});
-    }
-    TEST_F(GpuFriendlyBufferVulkanIntegrationTest, InvalidWritesDoNotChangeSizeAndEmptyAssignmentKeepsCapacity) {
-        aho::resource::Buffer<aho::resource::BufferType::GPUFriendly> buffer(device, 16);
-        std::array<std::byte, 4> payload{};
-        buffer.assign(payload);
-        EXPECT_THROW(buffer.write(payload, 1), std::out_of_range);
-        EXPECT_THROW(buffer.write({}, SIZE_MAX), std::out_of_range);
-        EXPECT_NO_THROW(buffer.write({}, 4));
-        EXPECT_EQ(buffer.size(), 4u);
-        buffer.assign({});
-        EXPECT_EQ(buffer.size(), 0u);
-        EXPECT_EQ(buffer.capacity(), 16u);
-        EXPECT_THROW((aho::resource::Buffer<aho::resource::BufferType::GPUFriendly>(vsl::LogicalDeviceAccessor{})), std::invalid_argument);
-    }
-} // namespace
-#endif
-
-namespace {
-    template<typename T>
-    concept CompleteBuffer = requires { sizeof(T); };
-    template<typename T>
-    concept HasCpuWrite = requires(T& b, std::span<const std::byte> bytes) { b.write(bytes); };
-    template<typename T>
-    concept HasCpuMap = requires(T& b) { b.map(); };
-    template<typename T>
-    concept HasReserve = requires(T& b) { b.reserve(std::size_t{}); };
-    using General = aho::resource::Buffer<aho::resource::BufferType::General>;
-    using Host = aho::resource::Buffer<aho::resource::BufferType::GPUFriendly>;
-    using Device = aho::resource::Buffer<aho::resource::BufferType::OnGPU>;
-    using CustomHost = decltype(aho::resource::make_custom_buffer(std::declval<vsl::StagingBuffer<>>()));
-    using CustomDevice = decltype(aho::resource::make_custom_buffer(std::declval<vsl::DeviceLocalBuffer<>>()));
-    static_assert(!CompleteBuffer<aho::resource::Buffer<aho::resource::BufferType::Custom>>);
-    static_assert(aho::resource::GpuBuffer<Host> && aho::resource::GpuBuffer<Device> && aho::resource::GpuBuffer<CustomHost>);
-    static_assert(!aho::resource::GpuBuffer<General>);
-    static_assert(HasCpuWrite<Host> && HasCpuMap<Host> && HasReserve<Host>);
-    static_assert(!HasCpuWrite<Device> && !HasCpuMap<Device> && !HasReserve<Device>);
-    static_assert(HasCpuWrite<CustomHost> && !HasReserve<CustomHost>);
-    static_assert(!HasCpuWrite<CustomDevice> && !HasCpuMap<CustomDevice>);
-} // namespace
-#ifndef AHO_GPU_TESTS
 namespace {
     TEST(GeneralBufferCapacityTest, AssignmentFromOwnSubrangeAndConstAccessKeepSharedMetadata) {
         General buffer(8);
         const std::array<std::byte, 4> payload{std::byte{11}, std::byte{22}, std::byte{33}, std::byte{44}};
+
         buffer.assign(payload);
         auto alias = buffer;
         buffer.assign(buffer.bytes().subspan(1, 2));
@@ -230,12 +184,71 @@ namespace {
         EXPECT_THROW(buffer.write(payload), std::logic_error);
     }
 } // namespace
+#ifdef AHO_BUFFER_TEST_ASAN
+TEST(GeneralBufferOwnershipTest, LastOwnerDestructionReleasesTheArray) {
+    void* storage = nullptr;
+    {
+        GeneralBuffer source(8);
+        storage = source.data();
+        {
+            GeneralBuffer copy(source);
+            EXPECT_EQ(__asan_address_is_poisoned(storage), 0);
+        }
+        EXPECT_EQ(__asan_address_is_poisoned(storage), 0);
+    }
+    EXPECT_NE(__asan_address_is_poisoned(storage), 0);
+}
+#undef AHO_BUFFER_TEST_ASAN
+#endif
+
 #else
-#include <VSL/vulkan/commands/copy_buffer.hpp>
+namespace {
+    class GPUFriendlyBufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+
+    TEST_F(GPUFriendlyBufferVulkanIntegrationTest, LogicalLengthAndReservedCapacityAreIndependent) {
+        aho::resource::Buffer<aho::resource::BufferType::GPUFriendly> buffer(device);
+        EXPECT_EQ(buffer.size(), 0u);
+        EXPECT_EQ(buffer.capacity(), 0u);
+        EXPECT_FALSE(buffer.busy());
+        EXPECT_TRUE(buffer.wait(0));
+        buffer.reserve(64);
+        const std::array<std::byte, 8> payload{};
+
+        buffer.assign(payload);
+        EXPECT_EQ(buffer.size(), 8u);
+        EXPECT_EQ(buffer.capacity(), 64u);
+        auto alias = buffer;
+        alias.assign(std::span(payload).first(4));
+        EXPECT_EQ(buffer.size(), 4u);
+        EXPECT_EQ(buffer.capacity(), 64u);
+        buffer.reserve(128);
+        EXPECT_EQ(alias.capacity(), 128u);
+        EXPECT_EQ(alias.size(), 4u);
+        buffer.write({});
+    }
+
+    TEST_F(GPUFriendlyBufferVulkanIntegrationTest, InvalidWritesDoNotChangeSizeAndEmptyAssignmentKeepsCapacity) {
+        aho::resource::Buffer<aho::resource::BufferType::GPUFriendly> buffer(device, 16);
+        std::array<std::byte, 4> payload{};
+
+        buffer.assign(payload);
+        EXPECT_THROW(buffer.write(payload, 1), std::out_of_range);
+        EXPECT_THROW(buffer.write({}, SIZE_MAX), std::out_of_range);
+        EXPECT_NO_THROW(buffer.write({}, 4));
+        EXPECT_EQ(buffer.size(), 4u);
+        buffer.assign({});
+        EXPECT_EQ(buffer.size(), 0u);
+        EXPECT_EQ(buffer.capacity(), 16u);
+        EXPECT_THROW((aho::resource::Buffer<aho::resource::BufferType::GPUFriendly>(vsl::LogicalDeviceAccessor{})), std::invalid_argument);
+    }
+} // namespace
 namespace {
     struct CustomCounters {
         unsigned maps = 0, allocations = 0;
     };
+
     using NativeHost = vsl::Buffer<vsl::MemoryType::TransferSource | vsl::MemoryType::TransferDestination, vsl::MemoryProperty::HostVisible>;
     struct CountingCustomization {
         vsl::LogicalDeviceAccessor device;
@@ -244,18 +257,21 @@ namespace {
             ++counters->maps;
             return storage.data();
         }
+
         NativeHost reallocate(const NativeHost&, std::size_t size) {
             ++counters->allocations;
             return NativeHost(device, size);
         }
     };
+
     struct MoveOnlyCustomization {
         std::unique_ptr<int> value = std::make_unique<int>(7);
         MoveOnlyCustomization() = default;
         MoveOnlyCustomization(MoveOnlyCustomization&&) = default;
         MoveOnlyCustomization(const MoveOnlyCustomization&) = delete;
     };
-    TEST_F(GpuFriendlyBufferVulkanIntegrationTest, ConstructorsExposeStandardUsageAndReuseTheirMapping) {
+
+    TEST_F(GPUFriendlyBufferVulkanIntegrationTest, ConstructorsExposeStandardUsageAndReuseTheirMapping) {
         Host source(device, 8);
         EXPECT_EQ(source.size(), 8u);
         EXPECT_EQ(source.capacity(), 8u);
@@ -264,6 +280,7 @@ namespace {
         EXPECT_TRUE(vsl::contain(source.native().getMemoryProperties(), vsl::MemoryProperty::HostVisible));
         std::array<std::byte, 8> expected{};
         expected[3] = std::byte{71};
+
         source.write(expected);
         const auto* address = source.read(8).data();
         auto alias = source;
@@ -285,7 +302,8 @@ namespace {
         EXPECT_THROW(moved.read(1, 4), std::out_of_range);
         EXPECT_TRUE(moved.read(0, 4).empty());
     }
-    TEST_F(GpuFriendlyBufferVulkanIntegrationTest, CpuUploadAndGpuCopiesShareTheSameCommandsAndRetainContents) {
+
+    TEST_F(GPUFriendlyBufferVulkanIntegrationTest, CPUUploadAndGPUCopiesShareTheSameCommandsAndRetainContents) {
         std::array<std::byte, 8> expected{std::byte{11}, std::byte{22}, std::byte{33}, std::byte{44}, std::byte{55}, std::byte{66}, std::byte{77}, std::byte{88}};
         General cpu;
         cpu.assign(expected);
@@ -295,6 +313,7 @@ namespace {
         auto manager = make_manager();
         for (unsigned frame = 0; frame < 3; ++frame) {
             expected[0] = std::byte{static_cast<unsigned char>(11 + frame)};
+
             cpu.assign(expected);
             auto phase = manager.startPhase<vsl::ComputePhase>();
             phase << destination.upload(cpu) << readback.upload(destination);
@@ -313,9 +332,11 @@ namespace {
             EXPECT_EQ(std::memcmp(pixels.data(), expected.data(), 8), 0);
         }
     }
-    TEST_F(GpuFriendlyBufferVulkanIntegrationTest, FixedCustomBuffersAndOverlappingRangesUseCapabilityChecks) {
+
+    TEST_F(GPUFriendlyBufferVulkanIntegrationTest, FixedCustomBuffersAndOverlappingRangesUseCapabilityChecks) {
         auto custom = aho::resource::make_custom_buffer(NativeHost(device, 8));
         const std::array<std::byte, 4> expected{std::byte{17}, std::byte{29}, std::byte{43}, std::byte{71}};
+
         custom.assign(expected);
         EXPECT_EQ(custom.size(), 4u);
         EXPECT_EQ(custom.capacity(), 8u);
@@ -334,10 +355,12 @@ namespace {
         ASSERT_TRUE(phase.completion().wait());
         EXPECT_EQ(std::memcmp(target.read(4, 4).data(), expected.data(), 4), 0);
     }
-    TEST_F(GpuFriendlyBufferVulkanIntegrationTest, CustomMappingAndReallocationHooksPreserveDataAndSharedState) {
+
+    TEST_F(GPUFriendlyBufferVulkanIntegrationTest, CustomMappingAndReallocationHooksPreserveDataAndSharedState) {
         auto counters = std::make_shared<CustomCounters>();
         auto custom = aho::resource::make_custom_buffer(NativeHost(device, 4), CountingCustomization{device, counters});
         const std::array<std::byte, 4> expected{std::byte{5}, std::byte{13}, std::byte{29}, std::byte{71}};
+
         custom.write(expected);
         auto alias = custom;
         custom.reserve(16);
@@ -352,13 +375,16 @@ namespace {
         moveOnly.assign(expected);
         EXPECT_EQ(moveOnly.read(1)[0], expected[0]);
     }
-    TEST_F(GpuFriendlyBufferVulkanIntegrationTest, InvalidCustomReallocationLeavesTheOriginalStorageIntact) {
+
+    TEST_F(GPUFriendlyBufferVulkanIntegrationTest, InvalidCustomReallocationLeavesTheOriginalStorageIntact) {
         struct TooSmallAllocation {
             vsl::LogicalDeviceAccessor device;
             NativeHost reallocate(const NativeHost&, std::size_t) { return NativeHost(device, 1); }
         };
+
         auto custom = aho::resource::make_custom_buffer(NativeHost(device, 4), TooSmallAllocation{device});
         const std::array<std::byte, 4> payload{std::byte{11}, std::byte{22}, std::byte{33}, std::byte{44}};
+
         custom.write(payload);
         const auto owner = custom.binding().owner();
         EXPECT_THROW(custom.reserve(8), std::invalid_argument);
@@ -366,12 +392,14 @@ namespace {
         EXPECT_EQ(custom.capacity(), 4u);
         EXPECT_EQ(std::memcmp(custom.read(4).data(), payload.data(), 4), 0);
     }
-    TEST_F(GpuFriendlyBufferVulkanIntegrationTest, PendingTransfersRejectOtherPhasesAndCancellationAllowsReuse) {
+
+    TEST_F(GPUFriendlyBufferVulkanIntegrationTest, PendingTransfersRejectOtherPhasesAndCancellationAllowsReuse) {
         auto manager = make_manager();
         auto other = manager.independent();
         Host source(device, 4);
         Device destination(device, 4);
         const std::array<std::byte, 4> bytes{};
+
         source.write(bytes);
         {
             auto phase = manager.startPhase<vsl::ComputePhase>();
@@ -389,7 +417,8 @@ namespace {
         phase.submit();
         ASSERT_TRUE(phase.completion().wait());
     }
-    TEST_F(GpuFriendlyBufferVulkanIntegrationTest, CancelledCpuUploadReusesStagingWithTheNewPayload) {
+
+    TEST_F(GPUFriendlyBufferVulkanIntegrationTest, CancelledCPUUploadReusesStagingWithTheNewPayload) {
         auto manager = make_manager();
         General cpu(4);
         Device destination(device, 4);
@@ -400,6 +429,7 @@ namespace {
             phase.cancel();
         }
         const std::array<std::byte, 4> expected{std::byte{17}, std::byte{37}, std::byte{73}, std::byte{255}};
+
         cpu.assign(expected);
         auto phase = manager.startPhase<vsl::ComputePhase>();
         phase << destination.upload(cpu) << result.upload(destination);
@@ -407,7 +437,8 @@ namespace {
         ASSERT_TRUE(phase.completion().wait());
         EXPECT_EQ(std::memcmp(result.read(4).data(), expected.data(), 4), 0);
     }
-    TEST_F(GpuFriendlyBufferVulkanIntegrationTest, SubmissionOwnsCustomizationWithoutKeepingCompletionInACycle) {
+
+    TEST_F(GPUFriendlyBufferVulkanIntegrationTest, SubmissionOwnsCustomizationWithoutKeepingCompletionInACycle) {
         auto manager = make_manager();
         std::weak_ptr<CustomCounters> weak;
         {
@@ -431,7 +462,8 @@ namespace {
         }
         EXPECT_TRUE(weak.expired());
     }
-    TEST_F(GpuFriendlyBufferVulkanIntegrationTest, CustomizationContextOutlivesTheWrappedStorageDestructor) {
+
+    TEST_F(GPUFriendlyBufferVulkanIntegrationTest, CustomizationContextOutlivesTheWrappedStorageDestructor) {
         struct ContextStorage : NativeHost {
             std::weak_ptr<int> context;
             std::shared_ptr<bool> destroyedWithoutContext;
@@ -444,9 +476,11 @@ namespace {
                     *destroyedWithoutContext = true;
             }
         };
+
         struct ContextCustomization {
             std::shared_ptr<int> context;
         };
+
         auto result = std::make_shared<bool>(false);
         {
             auto context = std::make_shared<int>(7);
@@ -455,7 +489,8 @@ namespace {
         }
         EXPECT_FALSE(*result);
     }
-    TEST_F(GpuFriendlyBufferVulkanIntegrationTest, EmptyUploadsAndInvalidRecordingDoNotSubmitOrClaimResources) {
+
+    TEST_F(GPUFriendlyBufferVulkanIntegrationTest, EmptyUploadsAndInvalidRecordingDoNotSubmitOrClaimResources) {
         auto manager = make_manager();
         Host source(device);
         Device destination(device, 0);

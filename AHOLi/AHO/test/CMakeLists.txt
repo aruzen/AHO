@@ -62,7 +62,7 @@ if (AHO_TEST_SOURCES)
     aho_add_compile_test(Screenshot.PublicVslOnly
             "${CMAKE_CURRENT_SOURCE_DIR}/contracts/screenshot_public_vsl.cpp"
             AHO_CONTRACT_SCREENSHOT_PUBLIC_VSL)
-    aho_add_compile_test(ResourceUpload.PublicVslOnly
+    aho_add_compile_test(ResourceUpload.PublicVSLOnly
             "${CMAKE_CURRENT_SOURCE_DIR}/contracts/resource_upload_public_vsl.cpp"
             AHO_CONTRACT_RESOURCE_UPLOAD_PUBLIC_VSL)
     aho_add_compile_test(Mat.InitializerConstructor "${CMAKE_CURRENT_SOURCE_DIR}/core/math/mat_test.cpp" AHO_CONTRACT_MAT_INITIALIZER)

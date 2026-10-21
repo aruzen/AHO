@@ -5,6 +5,7 @@ namespace {
     class CopyBufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     using Native = vsl::Buffer<vsl::MemoryType::TransferSource | vsl::MemoryType::TransferDestination, vsl::MemoryProperty::HostVisible>;
     TEST_F(CopyBufferVulkanIntegrationTest, UnalignedRangesAndDeferredCommandsRetainTheOriginalBuffers) {
         auto manager = make_manager();
@@ -32,6 +33,7 @@ namespace {
         EXPECT_EQ(bytes[4], std::byte{44});
         EXPECT_EQ(bytes[5], std::byte{});
     }
+
     TEST_F(CopyBufferVulkanIntegrationTest, InvalidContractsAreRejectedBeforeRecording) {
         Native a(device, 8), b(device, 8);
         vsl::Buffer<vsl::MemoryType::UniformBuffer, vsl::MemoryProperty::HostVisible> wrong(device, 8);

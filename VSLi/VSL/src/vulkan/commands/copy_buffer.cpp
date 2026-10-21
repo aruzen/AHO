@@ -5,43 +5,78 @@
 namespace VSL_NAMESPACE::command {
     CopyBuffer::CopyBuffer(BufferAccessor* source, BufferAccessor* destination, std::size_t bytes,
                            std::size_t sourceOffset, std::size_t destinationOffset, bool hostRead)
-        : source_(source ? source->_data : nullptr), destination_(destination ? destination->_data : nullptr),
-          bytes_(bytes), sourceOffset_(sourceOffset), destinationOffset_(destinationOffset), hostRead_(hostRead) {}
+        : _source(source ? source->_data : nullptr),
+          _destination(destination ? destination->_data : nullptr),
+          _bytes(bytes), _sourceOffset(sourceOffset), _destinationOffset(destinationOffset), _hostRead(hostRead) {
+    }
+
     void CopyBuffer::validate() const {
-        if (!source_ || !destination_ || !source_->buffer || !destination_->buffer || source_->device != destination_->device)
+        if (!_source || !_destination || !_source->buffer || !_destination->buffer ||
+            _source->device != _destination->device)
             throw std::invalid_argument("Buffer copy requires buffers on the same device");
-        if (!contain(source_->usage, MemoryType::TransferSource) || !contain(destination_->usage, MemoryType::TransferDestination))
+        if (!contain(_source->usage, MemoryType::TransferSource) || !contain(_destination->usage, MemoryType::TransferDestination))
             throw std::invalid_argument("Buffer copy requires transfer usage");
-        if (!bytes_ || sourceOffset_ > source_->requirementSize || bytes_ > source_->requirementSize - sourceOffset_ ||
-            destinationOffset_ > destination_->requirementSize || bytes_ > destination_->requirementSize - destinationOffset_)
+        if (!_bytes || _sourceOffset > _source->requirementSize || _bytes > _source->requirementSize - _sourceOffset ||
+            _destinationOffset > _destination->requirementSize || _bytes > _destination->requirementSize - _destinationOffset)
             throw std::out_of_range("Buffer copy range");
-        if (source_->deviceMem == destination_->deviceMem && sourceOffset_ < destinationOffset_ + bytes_ && destinationOffset_ < sourceOffset_ + bytes_)
+        if (_source->deviceMem == _destination->deviceMem &&
+            _sourceOffset < _destinationOffset + _bytes && _destinationOffset < _sourceOffset + _bytes)
             throw std::invalid_argument("Buffer copy ranges must not overlap");
-        if (hostRead_ && !contain(destination_->properties, MemoryProperty::HostVisible))
+        if (_hostRead && !contain(_destination->properties, MemoryProperty::HostVisible))
             throw std::invalid_argument("Host read requires host-visible buffer memory");
     }
+
     void CopyBuffer::invoke(CommandPool, CommandBuffer buffer, CommandManager manager) {
         validate();
         if (!buffer._data || !buffer._data->commandPool || !manager._data ||
-            buffer._data->commandPool->device != source_->device || manager.getDevice()._data != source_->device)
+            buffer._data->commandPool->device != _source->device || manager.getDevice()._data != _source->device)
             throw std::invalid_argument("Buffer copy command device mismatch");
         if (auto submission = buffer._data->recordingSubmission)
             submission->resources.reserve(submission->resources.size() + 2);
-        buffer.retain(source_);
-        buffer.retain(destination_);
+
+        buffer.retain(_source);
+        buffer.retain(_destination);
+
         auto command = buffer._data->commandBuffers.at(buffer.getCurrentBufferIdx());
         const vk::BufferMemoryBarrier before[] = {
-            {.srcAccessMask = vk::AccessFlagBits::eMemoryWrite, .dstAccessMask = vk::AccessFlagBits::eTransferRead, .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .buffer = source_->buffer, .offset = sourceOffset_, .size = bytes_},
-            {.srcAccessMask = vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite, .dstAccessMask = vk::AccessFlagBits::eTransferWrite, .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .buffer = destination_->buffer, .offset = destinationOffset_, .size = bytes_}};
+            {
+                .srcAccessMask = vk::AccessFlagBits::eMemoryWrite,
+                .dstAccessMask = vk::AccessFlagBits::eTransferRead,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .buffer = _source->buffer,
+                .offset = _sourceOffset,
+                .size = _bytes,
+            },
+            {
+                .srcAccessMask = vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite,
+                .dstAccessMask = vk::AccessFlagBits::eTransferWrite,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .buffer = _destination->buffer,
+                .offset = _destinationOffset,
+                .size = _bytes,
+            },
+        };
         command.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eTransfer, {}, {}, before, {});
-        command.copyBuffer(source_->buffer, destination_->buffer, vk::BufferCopy{sourceOffset_, destinationOffset_, bytes_});
+        command.copyBuffer(_source->buffer, _destination->buffer, vk::BufferCopy{_sourceOffset, _destinationOffset, _bytes});
+
         vk::PipelineStageFlags stages = vk::PipelineStageFlagBits::eAllCommands;
         vk::AccessFlags access = vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite;
-        if (hostRead_) {
+        if (_hostRead) {
             stages |= vk::PipelineStageFlagBits::eHost;
             access |= vk::AccessFlagBits::eHostRead;
         }
-        const vk::BufferMemoryBarrier after{.srcAccessMask = vk::AccessFlagBits::eTransferWrite, .dstAccessMask = access, .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .buffer = destination_->buffer, .offset = destinationOffset_, .size = bytes_};
+        const vk::BufferMemoryBarrier after{
+            .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
+            .dstAccessMask = access,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .buffer = _destination->buffer,
+            .offset = _destinationOffset,
+            .size = _bytes,
+        };
+
         command.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, stages, {}, {}, after, {});
     }
 } // namespace VSL_NAMESPACE::command

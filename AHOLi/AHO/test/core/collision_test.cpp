@@ -6,6 +6,30 @@
 namespace {
     using P = aho::d2::PointD;
     using T = aho::Triangle<double, vsl::D2>;
+
+    template<typename T>
+    class CollisionCoordinateTest : public testing::Test {};
+
+    using CalculationPoints = testing::Types<
+        aho::d2::Point<long double>,
+        aho::d2::Point<long double, aho::coordinate::_MakeCoordinateInfo<true, false, true>::value>,
+        aho::d2::Point<long double, aho::coordinate::_MakeCoordinateInfo<false, true, true>::value>>;
+    TYPED_TEST_SUITE(CollisionCoordinateTest, CalculationPoints);
+
+    TYPED_TEST(CollisionCoordinateTest, LongDoubleCoordinatesPreserveContainmentAndBoundaryContactAcrossEnabledAxes) {
+        using Triangle = aho::Triangle<long double, vsl::D2, typename TypeParam::coordinate_info>;
+        const auto shape = aho::triangulate(std::array{TypeParam(0, 0), TypeParam(4, 0), TypeParam(4, 2), TypeParam(0, 2)}).value();
+        EXPECT_TRUE(aho::collision::contains(shape, TypeParam(2, 1)));
+        EXPECT_TRUE(aho::collision::contains(shape, TypeParam(4, 1)));
+        EXPECT_FALSE(aho::collision::contains(shape, TypeParam(5, 1)));
+        const Triangle touching{TypeParam(4, 0), TypeParam(6, 0), TypeParam(4, 2)};
+        const Triangle separated{TypeParam(5, 0), TypeParam(6, 0), TypeParam(5, 2)};
+        EXPECT_TRUE(aho::collision::intersects(shape, touching));
+        EXPECT_TRUE(aho::collision::intersects(touching, shape));
+        EXPECT_FALSE(aho::collision::intersects(shape, separated));
+        EXPECT_FALSE(aho::collision::intersects(separated, shape));
+    }
+
     auto rectangle(double x, double y, double w, double h) {
         return aho::triangulate(std::array{P(x, y), P(x + w, y), P(x + w, y + h), P(x, y + h)}).value();
     }

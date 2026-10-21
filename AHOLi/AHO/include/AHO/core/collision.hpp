@@ -41,7 +41,7 @@ namespace AHO_NAMESPACE::collision {
             for (const Triangle<typename Shape::element_type, VSL_NAMESPACE::D2, typename Shape::coordinate_info> triangle : shape.triangles())
                 for (const auto p : triangle.points()) {
                     const auto value = g::convert(p);
-                    if (!std::isfinite(value.x) || !std::isfinite(value.y))
+                    if (!std::isfinite(value.value.___AN1) || !std::isfinite(value.value.___AN2))
                         throw std::invalid_argument("Collision requires finite coordinates");
                     points.push_back(value);
                 }
@@ -58,7 +58,7 @@ namespace AHO_NAMESPACE::collision {
                 const auto [bMin, bMax] = std::minmax({component(b[0]), component(b[1]), component(b[2])});
                 return aMax < bMin || bMax < aMin;
             };
-            if (separated([](g::Point p) { return p.x; }) || separated([](g::Point p) { return p.y; }))
+            if (separated([](g::Point p) { return p.value.___AN1; }) || separated([](g::Point p) { return p.value.___AN2; }))
                 return false;
             for (std::size_t i = 0; i < 3; ++i)
                 for (std::size_t j = 0; j < 3; ++j)
@@ -76,7 +76,7 @@ namespace AHO_NAMESPACE::collision {
         std::vector<detail::g::Point> points;
         detail::append(shape, points);
         const auto p = detail::g::convert(point);
-        if (!std::isfinite(p.x) || !std::isfinite(p.y))
+        if (!std::isfinite(p.value.___AN1) || !std::isfinite(p.value.___AN2))
             throw std::invalid_argument("Collision requires a finite point");
         points.push_back(p);
         detail::g::normalize(points);

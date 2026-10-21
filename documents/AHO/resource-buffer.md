@@ -21,7 +21,7 @@ Generalの従来data()はvoid*として維持し、const版とbytes()によるsp
 ## Upload
 
 ```cpp
-#include <AHO/resource/buffer.hpp>
+#include <AHO/command/buffer_upload.hpp>
 #include <VSL/vulkan/phase.hpp>
 
 using namespace aho::resource;
@@ -34,6 +34,8 @@ auto completed = phase.completion();
 phase.submit();
 completed.wait();
 ```
+
+`BufferUpload`は`aho::command`に置き、`<AHO/command/buffer_upload.hpp>`で公開する。Resourceヘッダーはコマンドを前方宣言するだけなので、`upload()`でコマンドを作る際もコマンドヘッダーをincludeする。
 
 uploadはコマンドを作り、invoke時の内容を記録する。自動submitやCPU待機は行わない。RenderPassの外で使う。転送先の論理サイズを超える書き込みは例外となり、転送先のサイズは変えない。
 

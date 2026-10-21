@@ -38,6 +38,8 @@ if (AHO_TEST_SOURCES)
             drawer/draw_phase_test.cpp
             image_readback_test.cpp
             resource/buffer_test.cpp
+            command/buffer_upload_test.cpp
+            x/command/texture_update_test.cpp
             x/resource/texture_test.cpp
             x/screenshot_test.cpp
     )

@@ -12,6 +12,10 @@
 #include <utility>
 #include <variant>
 
+namespace AHO_NAMESPACE::command {
+    class BufferUpload;
+}
+
 namespace AHO_NAMESPACE::resource {
     enum class BufferType {
         General,
@@ -67,8 +71,6 @@ namespace AHO_NAMESPACE::resource {
         class GPUBufferBase;
     } // namespace detail
 
-    class BufferUpload;
-
     // 型を消すのは転送に必要な参照だけ。CustomのStorage/Customizationは元の型で保持する。
     class BufferBinding {
         std::shared_ptr<detail::BufferState> _state;
@@ -77,7 +79,7 @@ namespace AHO_NAMESPACE::resource {
 
         template<typename, typename>
         friend class detail::GPUBufferBase;
-        friend class BufferUpload;
+        friend class AHO_NAMESPACE::command::BufferUpload;
 
     public:
         std::size_t size() const;
@@ -322,10 +324,10 @@ namespace AHO_NAMESPACE::resource {
                 _state->size = bytes.size();
             }
 
-            BufferUpload upload(const Buffer<BufferType::General>& source, std::size_t destinationOffset = 0) const;
+            AHO_NAMESPACE::command::BufferUpload upload(const Buffer<BufferType::General>& source, std::size_t destinationOffset = 0) const;
             template<AHO_NAMESPACE::resource::GPUBuffer Source>
-            BufferUpload upload(const Source& source, std::size_t destinationOffset = 0, std::size_t sourceOffset = 0,
-                                std::optional<std::size_t> bytes = std::nullopt) const;
+            AHO_NAMESPACE::command::BufferUpload upload(const Source& source, std::size_t destinationOffset = 0, std::size_t sourceOffset = 0,
+                                                        std::optional<std::size_t> bytes = std::nullopt) const;
         };
 
         inline constexpr auto StandardBufferUsage =
@@ -350,7 +352,7 @@ namespace AHO_NAMESPACE::resource {
         using Base = detail::GPUBufferBase<detail::HostBuffer, detail::HostBufferCustomization>;
 
         explicit Buffer(std::shared_ptr<detail::BufferState> state) : Base(std::move(state)) {}
-        friend class BufferUpload;
+        friend class AHO_NAMESPACE::command::BufferUpload;
 
     public:
         explicit Buffer(VSL_NAMESPACE::LogicalDeviceAccessor device, std::size_t size = 0)
@@ -382,30 +384,4 @@ namespace AHO_NAMESPACE::resource {
         return Buffer<BufferType::Custom, Storage, Customization>(std::move(storage), std::move(customization));
     }
 
-    // RenderPass外で記録する。送信・完了待ちは呼び出し側で行う。
-    class BufferUpload : public VSL_NAMESPACE::command::__Command {
-        BufferBinding _destination;
-        std::variant<Buffer<BufferType::General>, BufferBinding> _source;
-        std::size_t _destinationOffset;
-        std::size_t _sourceOffset;
-        std::optional<std::size_t> _bytes;
-
-    public:
-        BufferUpload(BufferBinding destination, Buffer<BufferType::General> source, std::size_t destinationOffset);
-        BufferUpload(BufferBinding destination, BufferBinding source, std::size_t destinationOffset, std::size_t sourceOffset,
-                     std::optional<std::size_t> bytes);
-        void invoke(VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) override;
-    };
-
-    template<typename Storage, typename Customization>
-    BufferUpload detail::GPUBufferBase<Storage, Customization>::upload(const Buffer<BufferType::General>& source, std::size_t offset) const {
-        return BufferUpload(binding(), source, offset);
-    }
-
-    template<typename Storage, typename Customization>
-    template<AHO_NAMESPACE::resource::GPUBuffer Source>
-    BufferUpload detail::GPUBufferBase<Storage, Customization>::upload(const Source& source, std::size_t destinationOffset,
-                                                                       std::size_t sourceOffset, std::optional<std::size_t> bytes) const {
-        return BufferUpload(binding(), source.binding(), destinationOffset, sourceOffset, bytes);
-    }
 } // namespace AHO_NAMESPACE::resource

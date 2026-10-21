@@ -3,7 +3,8 @@
 Textureは`AHO/x/resource`のexperimental APIです。Bufferは[既存のAHO Resourceへ統合](resource-buffer.md)しました。msdfgen・atlas allocator・文字描画はまだ追加していません。外部ライブラリの依存追加はありません。
 
 ```cpp
-#include <AHO/x/resource/texture.hpp>
+#include <AHO/x/command/texture_update.hpp>
+#include <VSL/vulkan/phase.hpp>
 
 namespace resource = aho::x::resource;
 
@@ -28,6 +29,15 @@ upload.wait();
 - `Texture::update()`はGPUBuffer conceptを受け、GPUFriendly・OnGPU・VSL Bufferを包んだCustomを同じ経路で利用できます。必要なTransferSource usageはVSL側で検証します。
 - コピーしたResourceは容量・内容・使用状態を共有します。独立した内容が必要なら別のResourceを構築してください。CPUのspanはresize/reserveで無効になる場合があります。
 - `Texture`は線形RGBA8、1レイヤー・1ミップのGPUテクスチャです。MSDFの3チャンネルはRGBへ、余ったAは呼び出し側で設定してください。色空間変換は行いません。初回更新時はページ全体をゼロで埋め、その後の更新では他の画素を維持します。
+
+## コマンドの配置
+
+Resourceは`AHO/resource/`、コマンドは`AHO/command/`へ置く。experimental側も同じ構造で`AHO/x/resource/`と`AHO/x/command/`に分ける。実装とテストのディレクトリもこの構造に揃える。
+
+- `aho::command::BufferUpload`：`<AHO/command/buffer_upload.hpp>`
+- `aho::x::command::TextureUpdate`：`<AHO/x/command/texture_update.hpp>`
+
+`buffer.upload()`と`texture.update()`の呼び方は維持する。これらを使う側は対応するコマンドヘッダーをincludeする。Resourceヘッダーからコマンドヘッダーを読み戻す循環includeは設けない。
 
 ## 記録と同期
 

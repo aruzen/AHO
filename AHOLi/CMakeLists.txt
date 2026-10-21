@@ -3,6 +3,7 @@ project(AHOLi VERSION 1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+include(cmake/Stb.cmake)
 
 include(cmake/TinyGltf.cmake)
 
@@ -20,6 +21,7 @@ add_library(AHOLi
         AHO/src/x/resource/gltf.cpp
         AHO/src/x/resource/shader.cpp
         AHO/src/x/screenshot.cpp
+        AHO/src/x/scene/mesh_renderer.cpp
         AHO/src/engine.cpp
         AHO/src/resource/image.cpp
         AHO/src/resource/buffer.cpp
@@ -76,6 +78,7 @@ target_include_directories(AHOLi
         "${AHO_HOME}/include"
         ${GLFW_INCLUDE_DIRS}
 )
+target_include_directories(AHOLi SYSTEM PRIVATE "${AHO_STB_INCLUDE_DIR}")
 
 target_link_directories(AHOLi
         PRIVATE
@@ -89,6 +92,8 @@ target_link_libraries(AHOLi
         ${GLFW_LIBRARIES}
         VSL
 )
+find_package(glm CONFIG REQUIRED)
+target_link_libraries(AHOLi PUBLIC glm::glm)
 
 if(APPLE)
     target_link_libraries(AHOLi PRIVATE "-framework CoreGraphics")

@@ -2,7 +2,8 @@
 
 namespace AHO_NAMESPACE::x {
     std::array<float, 2> Transform2D::apply(float px, float py) const {
-        return {xx * px + xy * py + x, yx * px + yy * py + y};
+        const d2::VectorF point{px, py};
+        return {d2::VectorF{xx, xy}.dot(point) + x, d2::VectorF{yx, yy}.dot(point) + y};
     }
 
     void DrawList::reserve(std::size_t vertices, std::size_t batches) {

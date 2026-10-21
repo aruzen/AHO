@@ -6,7 +6,7 @@
 
 #ifdef AHO_STB_IMAGE_ENABLE
 #define STB_IMAGE_IMPLEMENTATION
-#include "../../../thirdparty/stb_image.h"
+#include <stb_image.h>
 #endif // AHO_STB_IMAGE_ENABLE
 
 AHO_NAMESPACE::resource::Image::ImageData::~ImageData() {

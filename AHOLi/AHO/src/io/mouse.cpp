@@ -10,6 +10,7 @@
 
 AHO_NAMESPACE::input::Cursor::Cursor(void* context) : context(context) {
     glfwGetCursorPos((GLFWwindow*)context, &_state.value.x.value, &_state.value.y.value);
+    previousFocus = focused();
 }
 
 AHO_NAMESPACE::d2::PointD AHO_NAMESPACE::input::Cursor::state() {
@@ -25,6 +26,28 @@ void AHO_NAMESPACE::input::Cursor::update() {
     glfwGetCursorPos((GLFWwindow*)context, &_state.value.x.value, &_state.value.y.value);
     _delta.value.x = _state.value.x - _delta.value.x;
     _delta.value.y = _state.value.y - _delta.value.y;
+    const bool focus = focused();
+    if (!focus || !previousFocus || skipDelta)
+        _delta = d2::VectorD(0.0, 0.0);
+    previousFocus = focus;
+    skipDelta = false;
+}
+
+void AHO_NAMESPACE::input::Cursor::setCaptured(bool capture) {
+    auto* window = static_cast<GLFWwindow*>(context);
+    glfwSetInputMode(window, GLFW_CURSOR, capture ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+    if (glfwRawMouseMotionSupported())
+        glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, capture ? GLFW_TRUE : GLFW_FALSE);
+    skipDelta = true;
+    _delta = d2::VectorD(0.0, 0.0);
+}
+
+bool AHO_NAMESPACE::input::Cursor::captured() const {
+    return glfwGetInputMode(static_cast<GLFWwindow*>(context), GLFW_CURSOR) == GLFW_CURSOR_DISABLED;
+}
+
+bool AHO_NAMESPACE::input::Cursor::focused() const {
+    return glfwGetWindowAttrib(static_cast<GLFWwindow*>(context), GLFW_FOCUSED) == GLFW_TRUE;
 }
 
 AHO_NAMESPACE::input::ButtonState AHO_NAMESPACE::input::MouseButton::state() {

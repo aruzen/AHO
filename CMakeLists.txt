@@ -68,6 +68,11 @@ add_subdirectory(AHO)
 add_subdirectory(AHOLi)
 add_subdirectory(VSLi)
 
+option(AHO_BUILD_SAMPLE_GAME "Build the walkable low-poly sample world" OFF)
+if (AHO_BUILD_SAMPLE_GAME)
+    add_subdirectory(sample-game)
+endif ()
+
 if (BUILD_TESTING)
     add_custom_target(build-tests DEPENDS aho-tests vsl-tests)
     add_custom_target(check

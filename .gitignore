@@ -8,6 +8,7 @@ AHO/shaders/**/*.spv
 cmake-build*/
 build/
 worktrees/
+wander-captures/
 
 document
 AGENT.md

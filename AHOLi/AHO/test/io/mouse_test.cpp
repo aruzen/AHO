@@ -69,6 +69,52 @@ namespace {
         cursor->update();
         aho_test::expect_coordinates(cursor->delta(), 0, 0);
     }
+    TEST_F(MouseTest, CaptureResetsWarpDeltaAndReleaseRestoresPointerMode) {
+        aho::InputManager manager(window.handle());
+        const auto cursor = manager.get<aho::input::Cursor>();
+        EXPECT_FALSE(cursor->captured());
+        cursor->setCaptured(true);
+        EXPECT_TRUE(cursor->captured());
+        EXPECT_EQ(window.raw_motion, GLFW_TRUE);
+        window.cursor_x = 400;
+        window.cursor_y = 300;
+        cursor->update();
+        aho_test::expect_coordinates(cursor->delta(), 0, 0);
+        window.cursor_x += 3;
+        cursor->update();
+        aho_test::expect_coordinates(cursor->delta(), 3, 0);
+        cursor->setCaptured(false);
+        EXPECT_FALSE(cursor->captured());
+        EXPECT_EQ(window.raw_motion, GLFW_FALSE);
+        aho_test::expect_coordinates(cursor->delta(), 0, 0);
+    }
+    TEST_F(MouseTest, FocusLossAndRegainSuppressCameraJump) {
+        aho::InputManager manager(window.handle());
+        const auto cursor = manager.get<aho::input::Cursor>();
+        window.focused = GLFW_FALSE;
+        window.cursor_x = 100;
+        cursor->update();
+        EXPECT_FALSE(cursor->focused());
+        aho_test::expect_coordinates(cursor->delta(), 0, 0);
+        window.focused = GLFW_TRUE;
+        window.cursor_x = 900;
+        cursor->update();
+        EXPECT_TRUE(cursor->focused());
+        aho_test::expect_coordinates(cursor->delta(), 0, 0);
+        window.cursor_x += .5;
+        cursor->update();
+        aho_test::expect_coordinates(cursor->delta(), .5, 0);
+    }
+    TEST_F(MouseTest, CaptureWorksWithoutRawMouseSupport) {
+        aho::InputManager manager(window.handle());
+        const auto cursor = manager.get<aho::input::Cursor>();
+        aho_test::InputWindow::raw_supported = false;
+        cursor->setCaptured(true);
+        EXPECT_TRUE(cursor->captured());
+        EXPECT_EQ(window.raw_motion, GLFW_FALSE);
+        cursor->setCaptured(false);
+        aho_test::InputWindow::raw_supported = true;
+    }
     TEST_F(MouseTest, WheelPublishesScrollThenResetsAfterAnUpdate) {
         using aho::input::MouseWheel;
         RestoreWheelState restore;

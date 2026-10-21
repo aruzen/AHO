@@ -11,7 +11,7 @@
 #define STB_IMAGE_WRITE_STATIC
 #define STBI_WRITE_NO_STDIO
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "../../../../thirdparty/stb_image_write.h"
+#include <stb_image_write.h>
 
 namespace AHO_NAMESPACE::x {
     namespace {

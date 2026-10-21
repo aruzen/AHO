@@ -16,6 +16,8 @@ namespace AHO_NAMESPACE::input {
         void* context = nullptr;
         d2::PointD _state;
         d2::VectorD _delta;
+        bool previousFocus = true;
+        bool skipDelta = false;
 
         explicit Cursor(void* context);
 
@@ -25,6 +27,11 @@ namespace AHO_NAMESPACE::input {
         d2::VectorD delta() override;
 
         void update() override;
+
+        // Capture the pointer for relative camera input. Resets the next delta.
+        void setCaptured(bool captured);
+        bool captured() const;
+        bool focused() const;
     };
 
     class MouseButton : public abstract::Button, public abstract::Updatable {

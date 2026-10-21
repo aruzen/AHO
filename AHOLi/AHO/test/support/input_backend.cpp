@@ -1,6 +1,22 @@
 #include "input_backend.hpp"
 
 extern "C" {
+int glfwRawMouseMotionSupported() { return aho_test::InputWindow::raw_supported ? GLFW_TRUE : GLFW_FALSE; }
+int glfwGetWindowAttrib(GLFWwindow* handle, int attribute) {
+    auto* window = aho_test::InputWindow::find(handle);
+    return window && attribute == GLFW_FOCUSED ? window->focused : 0;
+}
+int glfwGetInputMode(GLFWwindow* handle, int mode) {
+    auto* window = aho_test::InputWindow::find(handle);
+    if (!window) return 0;
+    return mode == GLFW_CURSOR ? window->cursor_mode : window->raw_motion;
+}
+void glfwSetInputMode(GLFWwindow* handle, int mode, int value) {
+    auto* window = aho_test::InputWindow::find(handle);
+    if (!window) return;
+    if (mode == GLFW_CURSOR) window->cursor_mode = value;
+    if (mode == GLFW_RAW_MOUSE_MOTION) window->raw_motion = value;
+}
 const char* glfwGetKeyName(int key, int) {
     switch (key) {
         case GLFW_KEY_A:

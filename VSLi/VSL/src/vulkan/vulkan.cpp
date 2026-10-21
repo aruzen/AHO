@@ -159,6 +159,8 @@ VSL_NAMESPACE::Vulkan<Validation>::Vulkan(const char* app_name, const std::vecto
     if constexpr (Validation) {
         setupDebugMessenger(_data);
     } else {
+        // Release等で検証を無効にする運用では、一般ユーザーに不要なコンソール画面（黒いウィンドウ）を残さない意図の処理。
+        // 標準入出力を閉じ、MSVCではFreeConsole()でコンソールから切り離す。
         fclose(stdin);
         fclose(stdout);
         fclose(stderr);

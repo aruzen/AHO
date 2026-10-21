@@ -31,13 +31,21 @@ namespace vsl_test {
         VkDebugUtilsMessengerEXT validation_messenger_ = VK_NULL_HANDLE;
         std::vector<std::string> validation_errors_;
         std::mutex validation_mutex_;
+        bool abort_validation_errors_ = false;
+        std::string expected_abort_vuid_;
+        std::size_t expected_abort_count_ = 0;
         static VKAPI_ATTR VkBool32 VKAPI_CALL
         validation_callback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT,
                             const VkDebugUtilsMessengerCallbackDataEXT* data, void* user) {
             if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
                 auto& self = *static_cast<VulkanIntegrationTest*>(user);
                 std::lock_guard lock(self.validation_mutex_);
-                self.validation_errors_.emplace_back(data->pMessage);
+                if (!self.expected_abort_vuid_.empty() && data->pMessageIdName &&
+                    self.expected_abort_vuid_ == data->pMessageIdName)
+                    ++self.expected_abort_count_;
+                else
+                    self.validation_errors_.emplace_back(data->pMessage);
+                return self.abort_validation_errors_ ? VK_TRUE : VK_FALSE;
             }
             return VK_FALSE;
         }
@@ -46,6 +54,17 @@ namespace vsl_test {
         bool has_validation_errors() {
             std::lock_guard lock(validation_mutex_);
             return !validation_errors_.empty();
+        }
+        // Test-only validation-layer failure injection; application callbacks keep returning VK_FALSE.
+        void expect_validation_abort(const char* vuid) {
+            std::lock_guard lock(validation_mutex_);
+            expected_abort_vuid_ = vuid;
+            expected_abort_count_ = 0;
+            abort_validation_errors_ = true;
+        }
+        std::size_t validation_abort_count() {
+            std::lock_guard lock(validation_mutex_);
+            return expected_abort_count_;
         }
         virtual bool validate_vulkan() const { return false; }
         virtual bool require_timeline_semaphore() const { return false; }
@@ -203,6 +222,8 @@ namespace vsl_test {
             instance.reset();
             for (const auto& error : validation_errors_)
                 ADD_FAILURE() << error;
+            if (!expected_abort_vuid_.empty())
+                EXPECT_EQ(expected_abort_count_, 1u) << "Expected exactly one injected validation abort: " << expected_abort_vuid_;
         }
 
         vsl::CommandManager make_manager() {

@@ -22,6 +22,7 @@ VSL_NAMESPACE::GraphicsPipeline::GraphicsPipeline(VSL_NAMESPACE::PipelineLayoutA
     _data = std::shared_ptr<_impl::Pipeline_impl>(new _impl::Pipeline_impl);
     _data->device = layout._data->device;
     _data->layout = layout._data;
+    _data->bindPoint = vk::PipelineBindPoint::eGraphics;
 
     vk::PipelineCacheCreateInfo pipelineInfoCache;
     auto cache = _data->device->device.createPipelineCacheUnique(pipelineInfoCache);
@@ -69,6 +70,7 @@ VSL_NAMESPACE::ComputePipeline::ComputePipeline(VSL_NAMESPACE::PipelineLayoutAcc
     _data = std::shared_ptr<_impl::Pipeline_impl>(new _impl::Pipeline_impl);
     _data->device = layout._data->device;
     _data->layout = layout._data;
+    _data->bindPoint = vk::PipelineBindPoint::eCompute;
 
     vk::PipelineCacheCreateInfo pipelineInfoCache;
     auto cache = _data->device->device.createPipelineCacheUnique(pipelineInfoCache);

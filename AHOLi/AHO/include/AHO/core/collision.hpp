@@ -11,6 +11,31 @@ namespace AHO_NAMESPACE::collision {
                           std::same_as<typename T::dimension, VSL_NAMESPACE::D2> &&
                           std::is_arithmetic_v<typename T::element_type> && requires(const T& shape) { shape.triangles(); };
         namespace g = AHO_NAMESPACE::detail::geometry2d;
+
+        template<Shape2D Shape>
+        void append(const Shape& shape, std::vector<g::Point>& points);
+        inline bool contains(std::span<const g::Point, 3> t, g::Point p);
+        inline bool intersects(std::span<const g::Point, 3> a, std::span<const g::Point, 3> b);
+    } // namespace detail
+
+    // 境界を含む閉集合として判定する。退化した三角形も線分・点として扱う。
+    template<detail::Shape2D Shape, AHO_NAMESPACE::concepts::is_point P>
+    requires std::same_as<typename P::dimension, VSL_NAMESPACE::D2> &&
+             std::same_as<typename Shape::coordinate_info, typename P::coordinate_info> &&
+             std::is_arithmetic_v<typename P::element_type>
+    [[nodiscard]] bool contains(const Shape& shape, const P& point);
+
+    template<detail::Shape2D Left, detail::Shape2D Right>
+    requires std::same_as<typename Left::coordinate_info, typename Right::coordinate_info>
+    [[nodiscard]] bool intersects(const Left& left, const Right& right);
+
+    struct CollisionJudger {
+        template<detail::Shape2D Left, detail::Shape2D Right>
+        requires std::same_as<typename Left::coordinate_info, typename Right::coordinate_info>
+        [[nodiscard]] bool operator()(const Left& left, const Right& right) const;
+    };
+
+    namespace detail {
         template<Shape2D Shape>
         void append(const Shape& shape, std::vector<g::Point>& points) {
             for (const Triangle<typename Shape::element_type, VSL_NAMESPACE::D2, typename Shape::coordinate_info> triangle : shape.triangles())
@@ -21,10 +46,12 @@ namespace AHO_NAMESPACE::collision {
                     points.push_back(value);
                 }
         }
+
         inline bool contains(std::span<const g::Point, 3> t, g::Point p) {
             return g::inTriangle(t[0], t[1], t[2], p) || g::onSegment(t[0], t[1], p) ||
                    g::onSegment(t[1], t[2], p) || g::onSegment(t[2], t[0], p);
         }
+
         inline bool intersects(std::span<const g::Point, 3> a, std::span<const g::Point, 3> b) {
             auto separated = [&](auto component) {
                 const auto [aMin, aMax] = std::minmax({component(a[0]), component(a[1]), component(a[2])});
@@ -41,7 +68,6 @@ namespace AHO_NAMESPACE::collision {
         }
     } // namespace detail
 
-    // 境界を含む閉集合として判定する。退化した三角形も線分・点として扱う。
     template<detail::Shape2D Shape, AHO_NAMESPACE::concepts::is_point P>
     requires std::same_as<typename P::dimension, VSL_NAMESPACE::D2> &&
              std::same_as<typename Shape::coordinate_info, typename P::coordinate_info> &&
@@ -75,9 +101,10 @@ namespace AHO_NAMESPACE::collision {
                     return true;
         return false;
     }
-    struct CollisionJudger {
-        template<detail::Shape2D Left, detail::Shape2D Right>
-        requires std::same_as<typename Left::coordinate_info, typename Right::coordinate_info>
-        [[nodiscard]] bool operator()(const Left& left, const Right& right) const { return intersects(left, right); }
-    };
+
+    template<detail::Shape2D Left, detail::Shape2D Right>
+    requires std::same_as<typename Left::coordinate_info, typename Right::coordinate_info>
+    bool CollisionJudger::operator()(const Left& left, const Right& right) const {
+        return intersects(left, right);
+    }
 } // namespace AHO_NAMESPACE::collision

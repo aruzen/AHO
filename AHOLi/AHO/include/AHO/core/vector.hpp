@@ -102,35 +102,35 @@ namespace AHO_NAMESPACE {
         constexpr _Vector<R, VSL_NAMESPACE::D1, CI> operator-() const;
 
         template<typename T>
-        requires requires(const R& lhs, const T& rhs) { lhs + rhs; }
+        requires concepts::add_as<const R&, const T&>
         constexpr auto operator+(const _Vector<T, VSL_NAMESPACE::D1, CI>& p) const;
 
         template<typename T>
-        requires requires(const R& lhs, const T& rhs) { lhs - rhs; }
+        requires concepts::subtract_as<const R&, const T&>
         constexpr auto operator-(const _Vector<T, VSL_NAMESPACE::D1, CI>& p) const;
 
         template<typename T>
-        requires(!concepts::is_vector<T>) && requires(const R& lhs, const T& rhs) { lhs * rhs; }
+        requires(!concepts::is_vector<T>) && concepts::multiply_as<const R&, const T&>
         constexpr auto operator*(const T& m) const;
 
         template<typename T>
-        requires requires(const R& lhs, const T& rhs) { lhs / rhs; }
+        requires concepts::division_as<const R&, const T&>
         constexpr auto operator/(const T& m) const;
 
         template<typename T>
-        requires requires(R& lhs, const T& rhs) { lhs += rhs; }
+        requires concepts::add_assign_as<R&, const T&>
         constexpr _Vector<R, VSL_NAMESPACE::D1, CI>& operator+=(const _Vector<T, VSL_NAMESPACE::D1, CI>& p);
 
         template<typename T>
-        requires requires(R& lhs, const T& rhs) { lhs -= rhs; }
+        requires concepts::subtract_assign_as<R&, const T&>
         constexpr _Vector<R, VSL_NAMESPACE::D1, CI>& operator-=(const _Vector<T, VSL_NAMESPACE::D1, CI>& p);
 
         template<typename T>
-        requires requires(R& lhs, const T& rhs) { lhs *= rhs; }
+        requires concepts::multiply_assign_as<R&, const T&>
         constexpr _Vector<R, VSL_NAMESPACE::D1, CI>& operator*=(const T& m);
 
         template<typename T>
-        requires requires(R& lhs, const T& rhs) { lhs /= rhs; }
+        requires concepts::division_assign_as<R&, const T&>
         constexpr _Vector<R, VSL_NAMESPACE::D1, CI>& operator/=(const T& m);
 
         template<typename T>
@@ -184,35 +184,35 @@ namespace AHO_NAMESPACE {
         constexpr _Vector<R, VSL_NAMESPACE::D2, CI> operator-() const;
 
         template<typename T>
-        requires requires(const R& lhs, const T& rhs) { lhs + rhs; }
+        requires concepts::add_as<const R&, const T&>
         constexpr auto operator+(const _Vector<T, VSL_NAMESPACE::D2, CI>& p) const;
 
         template<typename T>
-        requires requires(const R& lhs, const T& rhs) { lhs - rhs; }
+        requires concepts::subtract_as<const R&, const T&>
         constexpr auto operator-(const _Vector<T, VSL_NAMESPACE::D2, CI>& p) const;
 
         template<typename T>
-        requires(!concepts::is_vector<T>) && requires(const R& lhs, const T& rhs) { lhs * rhs; }
+        requires(!concepts::is_vector<T>) && concepts::multiply_as<const R&, const T&>
         constexpr auto operator*(const T& m) const;
 
         template<typename T>
-        requires requires(const R& lhs, const T& rhs) { lhs / rhs; }
+        requires concepts::division_as<const R&, const T&>
         constexpr auto operator/(const T& m) const;
 
         template<typename T>
-        requires requires(R& lhs, const T& rhs) { lhs += rhs; }
+        requires concepts::add_assign_as<R&, const T&>
         constexpr _Vector<R, VSL_NAMESPACE::D2, CI>& operator+=(const _Vector<T, VSL_NAMESPACE::D2, CI>& p);
 
         template<typename T>
-        requires requires(R& lhs, const T& rhs) { lhs -= rhs; }
+        requires concepts::subtract_assign_as<R&, const T&>
         constexpr _Vector<R, VSL_NAMESPACE::D2, CI>& operator-=(const _Vector<T, VSL_NAMESPACE::D2, CI>& p);
 
         template<typename T>
-        requires requires(R& lhs, const T& rhs) { lhs *= rhs; }
+        requires concepts::multiply_assign_as<R&, const T&>
         constexpr _Vector<R, VSL_NAMESPACE::D2, CI>& operator*=(const T& m);
 
         template<typename T>
-        requires requires(R& lhs, const T& rhs) { lhs /= rhs; }
+        requires concepts::division_assign_as<R&, const T&>
         constexpr _Vector<R, VSL_NAMESPACE::D2, CI>& operator/=(const T& m);
 
         template<typename T>
@@ -265,35 +265,35 @@ namespace AHO_NAMESPACE {
         constexpr _Vector<R, VSL_NAMESPACE::D3, CI> operator-() const;
 
         template<typename T>
-        requires requires(const R& lhs, const T& rhs) { lhs + rhs; }
+        requires concepts::add_as<const R&, const T&>
         constexpr auto operator+(const _Vector<T, VSL_NAMESPACE::D3, CI>& p) const;
 
         template<typename T>
-        requires requires(const R& lhs, const T& rhs) { lhs - rhs; }
+        requires concepts::subtract_as<const R&, const T&>
         constexpr auto operator-(const _Vector<T, VSL_NAMESPACE::D3, CI>& p) const;
 
         template<typename T>
-        requires(!concepts::is_vector<T>) && requires(const R& lhs, const T& rhs) { lhs * rhs; }
+        requires(!concepts::is_vector<T>) && concepts::multiply_as<const R&, const T&>
         constexpr auto operator*(const T& m) const;
 
         template<typename T>
-        requires requires(const R& lhs, const T& rhs) { lhs / rhs; }
+        requires concepts::division_as<const R&, const T&>
         constexpr auto operator/(const T& m) const;
 
         template<typename T>
-        requires requires(R& lhs, const T& rhs) { lhs += rhs; }
+        requires concepts::add_assign_as<R&, const T&>
         constexpr _Vector<R, VSL_NAMESPACE::D3, CI>& operator+=(const _Vector<T, VSL_NAMESPACE::D3, CI>& p);
 
         template<typename T>
-        requires requires(R& lhs, const T& rhs) { lhs -= rhs; }
+        requires concepts::subtract_assign_as<R&, const T&>
         constexpr _Vector<R, VSL_NAMESPACE::D3, CI>& operator-=(const _Vector<T, VSL_NAMESPACE::D3, CI>& p);
 
         template<typename T>
-        requires requires(R& lhs, const T& rhs) { lhs *= rhs; }
+        requires concepts::multiply_assign_as<R&, const T&>
         constexpr _Vector<R, VSL_NAMESPACE::D3, CI>& operator*=(const T& m);
 
         template<typename T>
-        requires requires(R& lhs, const T& rhs) { lhs /= rhs; }
+        requires concepts::division_assign_as<R&, const T&>
         constexpr _Vector<R, VSL_NAMESPACE::D3, CI>& operator/=(const T& m);
 
         template<typename T>
@@ -345,7 +345,7 @@ namespace AHO_NAMESPACE {
     // ---------------------------------------------------------------------------------------------------------------------
 
     template<typename L, typename R, typename Dim, typename CI>
-    requires(!concepts::is_vector<L>) && requires(const L& lhs, const R& rhs) { lhs * rhs; }
+    requires(!concepts::is_vector<L>) && concepts::multiply_as<const L&, const R&>
     constexpr auto operator*(const L& l, _Vector<R, Dim, CI> v1);
 
     // ---------------------------------------------------------------------------------------------------------------------
@@ -367,35 +367,35 @@ namespace AHO_NAMESPACE {
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(const R& lhs, const T& rhs) { lhs + rhs; }
+    requires concepts::add_as<const R&, const T&>
     constexpr auto _Vector<R, VSL_NAMESPACE::D1, CI>::operator+(const _Vector<T, VSL_NAMESPACE::D1, CI>& p) const {
         return _Vector<decltype(value.___AN1 + p.value.___AN1), VSL_NAMESPACE::D1, CI>(value.___AN1 + p.value.___AN1);
     }
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(const R& lhs, const T& rhs) { lhs - rhs; }
+    requires concepts::subtract_as<const R&, const T&>
     constexpr auto _Vector<R, VSL_NAMESPACE::D1, CI>::operator-(const _Vector<T, VSL_NAMESPACE::D1, CI>& p) const {
         return _Vector<decltype(value.___AN1 - p.value.___AN1), VSL_NAMESPACE::D1, CI>(value.___AN1 - p.value.___AN1);
     }
 
     template<typename R, typename CI>
     template<typename T>
-    requires(!concepts::is_vector<T>) && requires(const R& lhs, const T& rhs) { lhs * rhs; }
+    requires(!concepts::is_vector<T>) && concepts::multiply_as<const R&, const T&>
     constexpr auto _Vector<R, VSL_NAMESPACE::D1, CI>::operator*(const T& m) const {
         return _Vector<decltype(value.___AN1 * m), VSL_NAMESPACE::D1, CI>(value.___AN1 * m);
     }
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(const R& lhs, const T& rhs) { lhs / rhs; }
+    requires concepts::division_as<const R&, const T&>
     constexpr auto _Vector<R, VSL_NAMESPACE::D1, CI>::operator/(const T& m) const {
         return _Vector<decltype(value.___AN1 / m), VSL_NAMESPACE::D1, CI>(value.___AN1 / m);
     }
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(R& lhs, const T& rhs) { lhs += rhs; }
+    requires concepts::add_assign_as<R&, const T&>
     constexpr _Vector<R, VSL_NAMESPACE::D1, CI>& _Vector<R, VSL_NAMESPACE::D1, CI>::operator+=(const _Vector<T, VSL_NAMESPACE::D1, CI>& p) {
         this->value.___AN1 += p.value.___AN1;
         return *this;
@@ -403,7 +403,7 @@ namespace AHO_NAMESPACE {
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(R& lhs, const T& rhs) { lhs -= rhs; }
+    requires concepts::subtract_assign_as<R&, const T&>
     constexpr _Vector<R, VSL_NAMESPACE::D1, CI>& _Vector<R, VSL_NAMESPACE::D1, CI>::operator-=(const _Vector<T, VSL_NAMESPACE::D1, CI>& p) {
         this->value.___AN1 -= p.value.___AN1;
         return *this;
@@ -411,7 +411,7 @@ namespace AHO_NAMESPACE {
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(R& lhs, const T& rhs) { lhs *= rhs; }
+    requires concepts::multiply_assign_as<R&, const T&>
     constexpr _Vector<R, VSL_NAMESPACE::D1, CI>& _Vector<R, VSL_NAMESPACE::D1, CI>::operator*=(const T& p) {
         this->value.___AN1 *= p;
         return *this;
@@ -419,7 +419,7 @@ namespace AHO_NAMESPACE {
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(R& lhs, const T& rhs) { lhs /= rhs; }
+    requires concepts::division_assign_as<R&, const T&>
     constexpr _Vector<R, VSL_NAMESPACE::D1, CI>& _Vector<R, VSL_NAMESPACE::D1, CI>::operator/=(const T& p) {
         this->value.___AN1 /= p;
         return *this;
@@ -519,35 +519,35 @@ namespace AHO_NAMESPACE {
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(const R& lhs, const T& rhs) { lhs + rhs; }
+    requires concepts::add_as<const R&, const T&>
     constexpr auto _Vector<R, VSL_NAMESPACE::D2, CI>::operator+(const _Vector<T, VSL_NAMESPACE::D2, CI>& p) const {
         return _Vector<decltype(value.___AN1 + p.value.___AN1), VSL_NAMESPACE::D2, CI>(value.___AN1 + p.value.___AN1, value.___AN2 + p.value.___AN2);
     }
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(const R& lhs, const T& rhs) { lhs - rhs; }
+    requires concepts::subtract_as<const R&, const T&>
     constexpr auto _Vector<R, VSL_NAMESPACE::D2, CI>::operator-(const _Vector<T, VSL_NAMESPACE::D2, CI>& p) const {
         return _Vector<decltype(value.___AN1 - p.value.___AN1), VSL_NAMESPACE::D2, CI>(value.___AN1 - p.value.___AN1, value.___AN2 - p.value.___AN2);
     }
 
     template<typename R, typename CI>
     template<typename T>
-    requires(!concepts::is_vector<T>) && requires(const R& lhs, const T& rhs) { lhs * rhs; }
+    requires(!concepts::is_vector<T>) && concepts::multiply_as<const R&, const T&>
     constexpr auto _Vector<R, VSL_NAMESPACE::D2, CI>::operator*(const T& m) const {
         return _Vector<decltype(value.___AN1 * m), VSL_NAMESPACE::D2, CI>(value.___AN1 * m, value.___AN2 * m);
     }
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(const R& lhs, const T& rhs) { lhs / rhs; }
+    requires concepts::division_as<const R&, const T&>
     constexpr auto _Vector<R, VSL_NAMESPACE::D2, CI>::operator/(const T& m) const {
         return _Vector<decltype(value.___AN1 / m), VSL_NAMESPACE::D2, CI>(value.___AN1 / m, value.___AN2 / m);
     }
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(R& lhs, const T& rhs) { lhs += rhs; }
+    requires concepts::add_assign_as<R&, const T&>
     constexpr _Vector<R, VSL_NAMESPACE::D2, CI>& _Vector<R, VSL_NAMESPACE::D2, CI>::operator+=(const _Vector<T, VSL_NAMESPACE::D2, CI>& p) {
         this->value.___AN1 += p.value.___AN1;
         this->value.___AN2 += p.value.___AN2;
@@ -556,7 +556,7 @@ namespace AHO_NAMESPACE {
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(R& lhs, const T& rhs) { lhs -= rhs; }
+    requires concepts::subtract_assign_as<R&, const T&>
     constexpr _Vector<R, VSL_NAMESPACE::D2, CI>& _Vector<R, VSL_NAMESPACE::D2, CI>::operator-=(const _Vector<T, VSL_NAMESPACE::D2, CI>& p) {
         this->value.___AN1 -= p.value.___AN1;
         this->value.___AN2 -= p.value.___AN2;
@@ -565,7 +565,7 @@ namespace AHO_NAMESPACE {
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(R& lhs, const T& rhs) { lhs *= rhs; }
+    requires concepts::multiply_assign_as<R&, const T&>
     constexpr _Vector<R, VSL_NAMESPACE::D2, CI>& _Vector<R, VSL_NAMESPACE::D2, CI>::operator*=(const T& p) {
         this->value.___AN1 *= p;
         this->value.___AN2 *= p;
@@ -574,7 +574,7 @@ namespace AHO_NAMESPACE {
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(R& lhs, const T& rhs) { lhs /= rhs; }
+    requires concepts::division_assign_as<R&, const T&>
     constexpr _Vector<R, VSL_NAMESPACE::D2, CI>& _Vector<R, VSL_NAMESPACE::D2, CI>::operator/=(const T& p) {
         this->value.___AN1 /= p;
         this->value.___AN2 /= p;
@@ -662,35 +662,35 @@ namespace AHO_NAMESPACE {
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(const R& lhs, const T& rhs) { lhs + rhs; }
+    requires concepts::add_as<const R&, const T&>
     constexpr auto _Vector<R, VSL_NAMESPACE::D3, CI>::operator+(const _Vector<T, VSL_NAMESPACE::D3, CI>& p) const {
         return _Vector<decltype(value.___AN1 + p.value.___AN1), VSL_NAMESPACE::D3, CI>(value.___AN1 + p.value.___AN1, value.___AN2 + p.value.___AN2, value.___AN3 + p.value.___AN3);
     }
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(const R& lhs, const T& rhs) { lhs - rhs; }
+    requires concepts::subtract_as<const R&, const T&>
     constexpr auto _Vector<R, VSL_NAMESPACE::D3, CI>::operator-(const _Vector<T, VSL_NAMESPACE::D3, CI>& p) const {
         return _Vector<decltype(value.___AN1 - p.value.___AN1), VSL_NAMESPACE::D3, CI>(value.___AN1 - p.value.___AN1, value.___AN2 - p.value.___AN2, value.___AN3 - p.value.___AN3);
     }
 
     template<typename R, typename CI>
     template<typename T>
-    requires(!concepts::is_vector<T>) && requires(const R& lhs, const T& rhs) { lhs * rhs; }
+    requires(!concepts::is_vector<T>) && concepts::multiply_as<const R&, const T&>
     constexpr auto _Vector<R, VSL_NAMESPACE::D3, CI>::operator*(const T& m) const {
         return _Vector<decltype(value.___AN1 * m), VSL_NAMESPACE::D3, CI>(value.___AN1 * m, value.___AN2 * m, value.___AN3 * m);
     }
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(const R& lhs, const T& rhs) { lhs / rhs; }
+    requires concepts::division_as<const R&, const T&>
     constexpr auto _Vector<R, VSL_NAMESPACE::D3, CI>::operator/(const T& m) const {
         return _Vector<decltype(value.___AN1 / m), VSL_NAMESPACE::D3>(value.___AN1 / m, value.___AN2 / m, value.___AN3 / m);
     }
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(R& lhs, const T& rhs) { lhs += rhs; }
+    requires concepts::add_assign_as<R&, const T&>
     constexpr _Vector<R, VSL_NAMESPACE::D3, CI>& _Vector<R, VSL_NAMESPACE::D3, CI>::operator+=(const _Vector<T, VSL_NAMESPACE::D3, CI>& p) {
         this->value.___AN1 += p.value.___AN1;
         this->value.___AN2 += p.value.___AN2;
@@ -700,7 +700,7 @@ namespace AHO_NAMESPACE {
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(R& lhs, const T& rhs) { lhs -= rhs; }
+    requires concepts::subtract_assign_as<R&, const T&>
     constexpr _Vector<R, VSL_NAMESPACE::D3, CI>& _Vector<R, VSL_NAMESPACE::D3, CI>::operator-=(const _Vector<T, VSL_NAMESPACE::D3, CI>& p) {
         this->value.___AN1 -= p.value.___AN1;
         this->value.___AN2 -= p.value.___AN2;
@@ -710,7 +710,7 @@ namespace AHO_NAMESPACE {
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(R& lhs, const T& rhs) { lhs *= rhs; }
+    requires concepts::multiply_assign_as<R&, const T&>
     constexpr _Vector<R, VSL_NAMESPACE::D3, CI>& _Vector<R, VSL_NAMESPACE::D3, CI>::operator*=(const T& p) {
         this->value.___AN1 *= p;
         this->value.___AN2 *= p;
@@ -720,7 +720,7 @@ namespace AHO_NAMESPACE {
 
     template<typename R, typename CI>
     template<typename T>
-    requires requires(R& lhs, const T& rhs) { lhs /= rhs; }
+    requires concepts::division_assign_as<R&, const T&>
     constexpr _Vector<R, VSL_NAMESPACE::D3, CI>& _Vector<R, VSL_NAMESPACE::D3, CI>::operator/=(const T& p) {
         this->value.___AN1 /= p;
         this->value.___AN2 /= p;
@@ -816,7 +816,7 @@ namespace AHO_NAMESPACE {
     // ---------------------------------------------------------------------------------------------------------------------
 
     template<typename L, typename R, typename Dim, typename CI>
-    requires(!concepts::is_vector<L>) && requires(const L& lhs, const R& rhs) { lhs * rhs; }
+    requires(!concepts::is_vector<L>) && concepts::multiply_as<const L&, const R&>
     constexpr auto operator*(const L& l, _Vector<R, Dim, CI> v1) {
         const auto& components = v1.value;
         using Result = _Vector<decltype(l * components.___AN1), Dim, CI>;

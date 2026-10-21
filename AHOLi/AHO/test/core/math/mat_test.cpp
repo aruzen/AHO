@@ -70,6 +70,149 @@ constexpr auto result = 8 / matrix;
 static_assert(result[0][0] == 4 && result[0][1] == 2);
 #else
 #include <gtest/gtest.h>
+
+#include "../../support/asymmetric_arithmetic.hpp"
+namespace {
+    using namespace aho_test::arithmetic;
+    template<std::size_t Rows, std::size_t Columns>
+    struct ElementMatrixShape {
+        template<class T>
+        using Of = aho::Mat<T, Rows, Columns>;
+        template<class T>
+        static constexpr Of<T> values(bool right = false) {
+            Of<T> result{};
+            for (std::size_t i = 0; i < Rows; ++i)
+                for (std::size_t j = 0; j < Columns; ++j) {
+                    const int index = static_cast<int>(i * Columns + j);
+                    result[i][j] = T{right ? 4 + index : 12 + 4 * index};
+                }
+            return result;
+        }
+        template<class T>
+        static constexpr bool equal(const Of<T>& actual, const std::array<int, 6>& expected) {
+            for (std::size_t i = 0; i < Rows; ++i)
+                for (std::size_t j = 0; j < Columns; ++j) {
+                    const auto& value = actual[i][j];
+                    const int integer = [&] {
+                        if constexpr (std::integral<T>)
+                            return value;
+                        else
+                            return value.value;
+                    }();
+                    if (integer != expected[i * Columns + j])
+                        return false;
+                }
+            return true;
+        }
+    };
+    template<class T>
+    class MatElementConstraintTest : public testing::Test {};
+    using ElementMatrixShapes = testing::Types<ElementMatrixShape<1, 1>, ElementMatrixShape<1, 3>, ElementMatrixShape<2, 3>>;
+    TYPED_TEST_SUITE(MatElementConstraintTest, ElementMatrixShapes);
+    TYPED_TEST(MatElementConstraintTest, BinaryAndScalarOperatorsUseTheWrittenOperandOrder) {
+        using S = TypeParam;
+        using Result = typename S::template Of<int>;
+        constexpr auto lhs = S::template values<LeftOperand>();
+        constexpr auto rhs = S::template values<Operand>(true);
+        constexpr Operand divisor{4};
+        constexpr LeftOperand scalar{48};
+        static_assert(std::same_as<decltype(lhs + rhs), Result>);
+        static_assert(std::same_as<decltype(lhs - rhs), Result>);
+        static_assert(std::same_as<decltype(lhs * divisor), Result>);
+        static_assert(std::same_as<decltype(lhs / divisor), Result>);
+        static_assert(std::same_as<decltype(scalar * rhs), Result>);
+        static_assert(std::same_as<decltype(scalar / rhs), Result>);
+        static_assert(S::equal(lhs + rhs, {16, 21, 26, 31, 36, 41}));
+        static_assert(S::equal(lhs - rhs, {8, 11, 14, 17, 20, 23}));
+        static_assert(S::equal(lhs * divisor, {48, 64, 80, 96, 112, 128}));
+        static_assert(S::equal(lhs / divisor, {3, 4, 5, 6, 7, 8}));
+        static_assert(S::equal(scalar * rhs, {192, 240, 288, 336, 384, 432}));
+        static_assert(S::equal(scalar / rhs, {12, 9, 8, 6, 6, 5}));
+        EXPECT_TRUE(S::equal(lhs + rhs, {16, 21, 26, 31, 36, 41}));
+        EXPECT_TRUE(S::equal(lhs - rhs, {8, 11, 14, 17, 20, 23}));
+        EXPECT_TRUE(S::equal(lhs * divisor, {48, 64, 80, 96, 112, 128}));
+        EXPECT_TRUE(S::equal(lhs / divisor, {3, 4, 5, 6, 7, 8}));
+        EXPECT_TRUE(S::equal(scalar * rhs, {192, 240, 288, 336, 384, 432}));
+        EXPECT_TRUE(S::equal(scalar / rhs, {12, 9, 8, 6, 6, 5}));
+        EXPECT_FALSE((CanAdd<decltype(rhs), decltype(lhs)>));
+        EXPECT_FALSE((CanSubtract<decltype(rhs), decltype(lhs)>));
+        EXPECT_FALSE((CanMultiply<decltype(rhs), LeftOperand>));
+        EXPECT_FALSE((CanDivide<decltype(rhs), LeftOperand>));
+        EXPECT_FALSE((CanMultiply<Operand, decltype(lhs)>));
+        EXPECT_FALSE((CanDivide<Operand, decltype(lhs)>));
+    }
+    TYPED_TEST(MatElementConstraintTest, CompoundOperatorsModifyEveryElementAndReturnTheSameMatrix) {
+        using S = TypeParam;
+        using M = typename S::template Of<LeftOperand>;
+        auto lhs = S::template values<LeftOperand>();
+        constexpr auto rhs = S::template values<Operand>(true);
+        constexpr Operand factor{4};
+        static_assert(std::same_as<decltype(lhs += rhs), M&>);
+        static_assert(std::same_as<decltype(lhs -= rhs), M&>);
+        static_assert(std::same_as<decltype(lhs *= factor), M&>);
+        static_assert(std::same_as<decltype(lhs /= factor), M&>);
+        EXPECT_EQ(&(lhs += rhs), &lhs);
+        EXPECT_TRUE(S::equal(lhs, {16, 21, 26, 31, 36, 41}));
+        EXPECT_EQ(&(lhs -= rhs), &lhs);
+        EXPECT_TRUE(S::equal(lhs, {12, 16, 20, 24, 28, 32}));
+        EXPECT_EQ(&(lhs *= factor), &lhs);
+        EXPECT_TRUE(S::equal(lhs, {48, 64, 80, 96, 112, 128}));
+        EXPECT_EQ(&(lhs /= factor), &lhs);
+        EXPECT_TRUE(S::equal(lhs, {12, 16, 20, 24, 28, 32}));
+        EXPECT_TRUE(S::equal(rhs, {4, 5, 6, 7, 8, 9}));
+    }
+    TYPED_TEST(MatElementConstraintTest, AssignmentOnlyElementsDoNotNeedBinaryOperators) {
+        using S = TypeParam;
+        using M = typename S::template Of<AssignmentOnly>;
+        using Right = typename S::template Of<Operand>;
+        static_assert(!CanAdd<M, Right> && !CanSubtract<M, Right>);
+        static_assert(!CanMultiply<M, Operand> && !CanDivide<M, Operand>);
+        auto lhs = S::template values<AssignmentOnly>();
+        constexpr auto rhs = S::template values<Operand>(true);
+        EXPECT_EQ(&(lhs += rhs), &lhs);
+        EXPECT_TRUE(S::equal(lhs, {16, 21, 26, 31, 36, 41}));
+        EXPECT_EQ(&(lhs -= rhs), &lhs);
+        EXPECT_TRUE(S::equal(lhs, {12, 16, 20, 24, 28, 32}));
+        EXPECT_EQ(&(lhs *= Operand{4}), &lhs);
+        EXPECT_TRUE(S::equal(lhs, {48, 64, 80, 96, 112, 128}));
+        EXPECT_EQ(&(lhs /= Operand{4}), &lhs);
+        EXPECT_TRUE(S::equal(lhs, {12, 16, 20, 24, 28, 32}));
+    }
+    TYPED_TEST(MatElementConstraintTest, ResultTypesComeFromConstReferencesRatherThanRvalues) {
+        using S = TypeParam;
+        using Result = typename S::template Of<int>;
+        constexpr auto lhs = S::template values<CategoryResult>();
+        constexpr auto rhs = S::template values<CategoryResult>(true);
+        constexpr CategoryResult factor{4};
+        static_assert(std::same_as<decltype(lhs + rhs), Result>);
+        static_assert(std::same_as<decltype(lhs - rhs), Result>);
+        static_assert(std::same_as<decltype(lhs * factor), Result>);
+        static_assert(std::same_as<decltype(lhs / factor), Result>);
+        static_assert(std::same_as<decltype(factor * rhs), Result>);
+        static_assert(std::same_as<decltype(factor / rhs), Result>);
+        EXPECT_TRUE(S::equal(lhs + rhs, {16, 21, 26, 31, 36, 41}));
+        EXPECT_TRUE(S::equal(lhs - rhs, {8, 11, 14, 17, 20, 23}));
+        EXPECT_TRUE(S::equal(lhs * factor, {48, 64, 80, 96, 112, 128}));
+        EXPECT_TRUE(S::equal(lhs / factor, {3, 4, 5, 6, 7, 8}));
+        EXPECT_TRUE(S::equal(factor * rhs, {16, 20, 24, 28, 32, 36}));
+        EXPECT_TRUE(S::equal(factor / rhs, {1, 0, 0, 0, 0, 0}));
+    }
+    TYPED_TEST(MatElementConstraintTest, RejectsMutableOnlyBinaryOperationsAndAbsentCompoundAssignments) {
+        using S = TypeParam;
+        using Mutable = typename S::template Of<MutableOnly>;
+        using Binary = typename S::template Of<CategoryResult>;
+        EXPECT_FALSE((CanAdd<Mutable, Mutable>));
+        EXPECT_FALSE((CanSubtract<Mutable, Mutable>));
+        EXPECT_FALSE((CanMultiply<Mutable, MutableOnly>));
+        EXPECT_FALSE((CanDivide<Mutable, MutableOnly>));
+        EXPECT_FALSE((CanMultiply<MutableOnly, Mutable>));
+        EXPECT_FALSE((CanDivide<MutableOnly, Mutable>));
+        EXPECT_FALSE((CanAddAssign<Binary, Binary>));
+        EXPECT_FALSE((CanSubtractAssign<Binary, Binary>));
+        EXPECT_FALSE((CanMultiplyAssign<Binary, CategoryResult>));
+        EXPECT_FALSE((CanDivideAssign<Binary, CategoryResult>));
+    }
+} // namespace
 #include "../../support/one_way_cast.hpp"
 namespace {
     TEST(MatOneWayCastTest, ConvertsEveryRectangularElementAndRejectsTheReverseConversion) {

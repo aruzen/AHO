@@ -213,6 +213,140 @@ namespace {
         EXPECT_FALSE((CanDivideAssign<Binary, CategoryResult>));
     }
 } // namespace
+
+namespace {
+    struct MatrixWritebackElement {
+        int value{};
+        constexpr MatrixWritebackElement& operator=(int result) {
+            value = result;
+            return *this;
+        }
+    };
+    constexpr int operator*(const MatrixWritebackElement& lhs, const Operand& rhs) { return lhs.value * rhs.value; }
+    struct RvalueMatrixSum {
+        int value{};
+        constexpr RvalueMatrixSum& operator+=(RvalueMatrixSum&& rhs) {
+            value += rhs.value;
+            return *this;
+        }
+        RvalueMatrixSum& operator+=(const RvalueMatrixSum&) = delete;
+    };
+    struct RvalueMatrixFactor {
+        int value{};
+    };
+    constexpr RvalueMatrixSum operator*(const RvalueMatrixFactor& lhs, const RvalueMatrixFactor& rhs) { return {lhs.value * rhs.value}; }
+    struct MissingMatrixSum {
+        int value{};
+    };
+    struct MissingMatrixSumFactor {
+        int value{};
+    };
+    constexpr MissingMatrixSum operator*(const MissingMatrixSumFactor& lhs, const MissingMatrixSumFactor& rhs) { return {lhs.value * rhs.value}; }
+    struct NonDefaultMatrixSum {
+        int value;
+        NonDefaultMatrixSum() = delete;
+        constexpr explicit NonDefaultMatrixSum(int v) : value(v) {}
+        constexpr NonDefaultMatrixSum& operator+=(NonDefaultMatrixSum&& rhs) {
+            value += rhs.value;
+            return *this;
+        }
+    };
+    struct NonDefaultMatrixFactor {
+        int value{};
+    };
+    constexpr NonDefaultMatrixSum operator*(const NonDefaultMatrixFactor& lhs, const NonDefaultMatrixFactor& rhs) { return NonDefaultMatrixSum(lhs.value * rhs.value); }
+
+    TEST(MatProductConstraintTest, OneDirectionalRectangularProductsKeepOperandOrderAndOutputShape) {
+        constexpr aho::Mat<LeftOperand, 2, 3> lhs{{LeftOperand{1}, LeftOperand{2}, LeftOperand{3}}, {LeftOperand{4}, LeftOperand{5}, LeftOperand{6}}};
+        constexpr aho::Mat<Operand, 3, 2> rhs{{Operand{7}, Operand{8}}, {Operand{9}, Operand{10}}, {Operand{11}, Operand{12}}};
+        constexpr auto product = lhs * rhs;
+        static_assert(std::same_as<std::remove_cv_t<decltype(product)>, aho::Mat<int, 2, 2>>);
+        static_assert(product[0][0] == 58 && product[0][1] == 64 && product[1][0] == 139 && product[1][1] == 154);
+        EXPECT_EQ(product[0], (std::array<int, 2>{58, 64}));
+        EXPECT_EQ(product[1], (std::array<int, 2>{139, 154}));
+        EXPECT_FALSE((CanMultiply<decltype(rhs), decltype(lhs)>));
+        EXPECT_FALSE((CanMultiply<decltype(lhs), aho::Mat<Operand, 2, 2>>));
+    }
+    TEST(MatProductConstraintTest, ColumnAndSingleElementProductsReturnKnownValues) {
+        constexpr aho::Mat<LeftOperand, 1, 3> row{{LeftOperand{1}, LeftOperand{2}, LeftOperand{3}}};
+        constexpr aho::Mat<Operand, 3, 1> column{{Operand{4}}, {Operand{5}}, {Operand{6}}};
+        constexpr auto dot = row * column;
+        static_assert(std::same_as<std::remove_cv_t<decltype(dot)>, aho::Mat<int, 1, 1>>);
+        static_assert(dot[0][0] == 32);
+        EXPECT_EQ(dot[0][0], 32);
+        constexpr aho::Mat<LeftOperand, 1, 1> single{{LeftOperand{12}}};
+        constexpr aho::Mat<Operand, 1, 1> multiplier{{Operand{4}}};
+        static_assert((single * multiplier)[0][0] == 48);
+        EXPECT_EQ((single * multiplier)[0][0], 48);
+    }
+    TEST(MatProductConstraintTest, ProductsUseConstOperandsAndAccumulateTheActualPrvalue) {
+        constexpr aho::Mat<CategoryResult, 1, 2> lhs{{CategoryResult{2}, CategoryResult{3}}};
+        constexpr aho::Mat<CategoryResult, 2, 1> rhs{{CategoryResult{4}}, {CategoryResult{5}}};
+        constexpr auto product = lhs * rhs;
+        static_assert(std::same_as<std::remove_cv_t<decltype(product)>, aho::Mat<int, 1, 1>>);
+        static_assert(product[0][0] == 23);
+        EXPECT_EQ(product[0][0], 23);
+        constexpr aho::Mat<RvalueMatrixFactor, 1, 2> left{{RvalueMatrixFactor{2}, RvalueMatrixFactor{3}}};
+        constexpr aho::Mat<RvalueMatrixFactor, 2, 1> right{{RvalueMatrixFactor{4}}, {RvalueMatrixFactor{5}}};
+        constexpr auto actualPrvalue = left * right;
+        static_assert(actualPrvalue[0][0].value == 23);
+        EXPECT_EQ(actualPrvalue[0][0].value, 23);
+    }
+    TEST(MatProductConstraintTest, CompoundProductsUseAssignmentInsteadOfScalarMultiplyAssign) {
+        using L = aho::Mat<MatrixWritebackElement, 2, 2>;
+        L lhs{{MatrixWritebackElement{1}, MatrixWritebackElement{2}}, {MatrixWritebackElement{3}, MatrixWritebackElement{4}}};
+        constexpr aho::Mat<Operand, 2, 2> rhs{{Operand{5}, Operand{6}}, {Operand{7}, Operand{8}}};
+        static_assert(!CanMultiplyAssign<MatrixWritebackElement, Operand>);
+        static_assert(std::same_as<decltype(lhs *= rhs), L&>);
+        EXPECT_EQ(&(lhs *= rhs), &lhs);
+        EXPECT_EQ(lhs[0][0].value, 19);
+        EXPECT_EQ(lhs[0][1].value, 22);
+        EXPECT_EQ(lhs[1][0].value, 43);
+        EXPECT_EQ(lhs[1][1].value, 50);
+        EXPECT_EQ(rhs[0][0].value, 5);
+        EXPECT_EQ(rhs[1][1].value, 8);
+    }
+    TEST(MatProductConstraintTest, RejectsMissingAccumulationConstProductsAndWriteback) {
+        using Missing = aho::Mat<MissingMatrixSumFactor, 2, 2>;
+        using Mutable = aho::Mat<MutableOnly, 2, 2>;
+        EXPECT_FALSE((CanMultiply<Missing, Missing>));
+        EXPECT_FALSE((CanMultiply<Mutable, Mutable>));
+        EXPECT_FALSE((CanMultiplyAssign<aho::Mat<LeftOperand, 2, 2>, aho::Mat<Operand, 2, 2>>));
+        EXPECT_FALSE((CanMultiplyAssign<aho::Mat<CategoryResult, 2, 2>, aho::Mat<CategoryResult, 2, 2>>));
+        EXPECT_FALSE((CanMultiplyAssign<aho::Mat<int, 2, 3>, aho::Mat<int, 2, 3>>));
+    }
+    TEST(MatProductConstraintTest, NonDefaultAccumulatorsRemainValidForEmptyOutputStorage) {
+        constexpr aho::Mat<NonDefaultMatrixFactor, 0, 1> lhs{};
+        constexpr aho::Mat<NonDefaultMatrixFactor, 1, 2> rhs{{NonDefaultMatrixFactor{2}, NonDefaultMatrixFactor{3}}};
+        constexpr auto result = lhs * rhs;
+        static_assert(std::same_as<std::remove_cv_t<decltype(result)>, aho::Mat<NonDefaultMatrixSum, 0, 2>>);
+        static_assert(result.empty());
+        EXPECT_TRUE(result.empty());
+        using NonEmpty = aho::Mat<NonDefaultMatrixFactor, 1, 1>;
+        EXPECT_FALSE((CanMultiply<NonEmpty, NonEmpty>));
+    }
+    TEST(MatProductConstraintTest, ZeroExtentsRetainOutputShapeAndValueInitialization) {
+        constexpr aho::Mat<int, 2, 0> lhs{};
+        constexpr aho::Mat<double, 0, 3> rhs{};
+        constexpr auto result = lhs * rhs;
+        static_assert(std::same_as<std::remove_cv_t<decltype(result)>, aho::Mat<double, 2, 3>>);
+        static_assert(result[0][0] == 0 && result[1][2] == 0);
+        for (const auto& row : result)
+            for (const auto value : row)
+                EXPECT_DOUBLE_EQ(value, 0);
+        constexpr aho::Mat<int, 0, 2> noRows{};
+        constexpr aho::Mat<int, 2, 3> regular{};
+        constexpr auto noRowResult = noRows * regular;
+        static_assert(noRowResult.empty());
+        EXPECT_TRUE(noRowResult.empty());
+        constexpr aho::Mat<int, 3, 0> noColumns{};
+        constexpr auto noColumnResult = regular * noColumns;
+        static_assert(noColumnResult.size() == 2 && noColumnResult[0].empty());
+        EXPECT_EQ(noColumnResult.size(), 2u);
+        EXPECT_TRUE(noColumnResult[0].empty());
+        EXPECT_TRUE(noColumnResult[1].empty());
+    }
+} // namespace
 #include "../../support/one_way_cast.hpp"
 namespace {
     TEST(MatOneWayCastTest, ConvertsEveryRectangularElementAndRejectsTheReverseConversion) {

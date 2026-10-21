@@ -149,3 +149,44 @@ namespace {
         EXPECT_FALSE(retry.images.empty());
     }
 } // namespace
+
+namespace {
+    TEST(SwapchainCompositeAlphaTest, OpaqueRemainsPreferredWhenSupported) {
+        const auto supported = vk::CompositeAlphaFlagBitsKHR::eOpaque | vk::CompositeAlphaFlagBitsKHR::ePreMultiplied |
+                               vk::CompositeAlphaFlagBitsKHR::ePostMultiplied | vk::CompositeAlphaFlagBitsKHR::eInherit;
+        EXPECT_EQ(vsl::_impl::helper::chooseSwapchainCompositeAlpha(supported), vk::CompositeAlphaFlagBitsKHR::eOpaque);
+    }
+    TEST(SwapchainCompositeAlphaTest, EverySingleSupportedModeIsSelected) {
+        for (const auto mode : {vk::CompositeAlphaFlagBitsKHR::eOpaque, vk::CompositeAlphaFlagBitsKHR::ePreMultiplied,
+                                vk::CompositeAlphaFlagBitsKHR::ePostMultiplied, vk::CompositeAlphaFlagBitsKHR::eInherit}) {
+            SCOPED_TRACE(vk::to_string(mode));
+            EXPECT_EQ(vsl::_impl::helper::chooseSwapchainCompositeAlpha(mode), mode);
+        }
+    }
+    TEST(SwapchainCompositeAlphaTest, CombinedFallbackModesNeverSelectAnUnsupportedFlag) {
+        for (const auto supported : {
+                 vk::CompositeAlphaFlagBitsKHR::ePreMultiplied | vk::CompositeAlphaFlagBitsKHR::ePostMultiplied,
+                 vk::CompositeAlphaFlagBitsKHR::ePostMultiplied | vk::CompositeAlphaFlagBitsKHR::eInherit,
+                 vk::CompositeAlphaFlagBitsKHR::ePreMultiplied | vk::CompositeAlphaFlagBitsKHR::eInherit}) {
+            SCOPED_TRACE(vk::to_string(supported));
+            const auto selected = vsl::_impl::helper::chooseSwapchainCompositeAlpha(supported);
+            EXPECT_TRUE(static_cast<bool>(supported & selected));
+            EXPECT_NE(selected, vk::CompositeAlphaFlagBitsKHR::eOpaque);
+        }
+    }
+    TEST(SwapchainCompositeAlphaTest, EmptySupportIsRejectedBeforeNativeCreation) {
+        EXPECT_THROW(vsl::_impl::helper::chooseSwapchainCompositeAlpha({}), vsl::exceptions::RuntimeException);
+    }
+    TEST_F(SwapchainWindowIntegrationTest, NativeSurfaceSupportsTheSelectedCompositeAlpha) {
+        make_surface();
+        ASSERT_FALSE(HasFatalFailure());
+        const auto caps = physical._data->device.getSurfaceCapabilitiesKHR(surface->_data->surface);
+        const auto selected = vsl::_impl::helper::chooseSwapchainCompositeAlpha(caps.supportedCompositeAlpha);
+        ASSERT_TRUE(static_cast<bool>(caps.supportedCompositeAlpha & selected));
+        if (!physical._data->device.getSurfaceSupportKHR(queue_family, surface->_data->surface))
+            GTEST_SKIP() << "Selected graphics queue cannot present to this surface";
+        vsl::Swapchain chain(device, surface, std::nullopt, 64, 48);
+        EXPECT_TRUE(static_cast<bool>(chain._data->swapChain));
+        EXPECT_FALSE(chain.images.empty());
+    }
+} // namespace

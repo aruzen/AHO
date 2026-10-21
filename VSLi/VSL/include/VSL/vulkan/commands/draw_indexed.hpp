@@ -4,14 +4,20 @@
 #include "../command.hpp"
 
 #include <optional>
+#include <cstdint>
 
 namespace VSL_NAMESPACE::command {
     struct DrawIndexed : public __Command {
         DrawIndexed(size_t size = 0);
 
-        size_t size;
+        [[nodiscard]] std::uint32_t getSize() const noexcept { return size_; }
+
+        void setSize(size_t size);
 
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
+
+    private:
+        std::uint32_t size_;
     };
 
     struct DrawIndexedManip : public DrawIndexed, public __VertexSizeRequire {

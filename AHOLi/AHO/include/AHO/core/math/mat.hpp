@@ -55,7 +55,7 @@ namespace AHO_NAMESPACE {
             using product_type = decltype(std::declval<const L&>() * std::declval<const R&>());
 
             template<typename L, typename R, size_t Rows, size_t Columns>
-            concept matrix_product = requires(const L& lhs, const R& rhs) { lhs * rhs; } &&
+            concept matrix_product = concepts::multiply_as<const L&, const R&> &&
                                      std::is_object_v<product_type<L, R>> &&
                                      requires(const L& lhs, const R& rhs, product_type<L, R>& total) { total += lhs * rhs; } &&
                                      (Rows == 0 || Columns == 0 || std::default_initializable<product_type<L, R>>);
@@ -85,11 +85,11 @@ namespace AHO_NAMESPACE {
             constexpr AHO_NAMESPACE::matrix::Mat<R, Row, Column> operator-() const;
 
             template<typename T>
-            requires requires(const R& lhs, const T& rhs) { lhs + rhs; }
+            requires concepts::add_as<const R&, const T&>
             constexpr auto operator+(const AHO_NAMESPACE::matrix::Mat<T, Row, Column>& p) const;
 
             template<typename T>
-            requires requires(const R& lhs, const T& rhs) { lhs - rhs; }
+            requires concepts::subtract_as<const R&, const T&>
             constexpr auto operator-(const AHO_NAMESPACE::matrix::Mat<T, Row, Column>& p) const;
 
             template<typename T, size_t TargetColumn>
@@ -97,11 +97,11 @@ namespace AHO_NAMESPACE {
             constexpr auto operator*(const AHO_NAMESPACE::matrix::Mat<T, Column, TargetColumn>& p) const;
 
             template<typename T>
-            requires requires(R& lhs, const T& rhs) { lhs += rhs; }
+            requires concepts::add_assign_as<R&, const T&>
             constexpr Mat<R, Row, Column>& operator+=(const AHO_NAMESPACE::matrix::Mat<T, Row, Column>& p);
 
             template<typename T>
-            requires requires(R& lhs, const T& rhs) { lhs -= rhs; }
+            requires concepts::subtract_assign_as<R&, const T&>
             constexpr Mat<R, Row, Column>& operator-=(const AHO_NAMESPACE::matrix::Mat<T, Row, Column>& p);
 
             template<typename T>
@@ -110,11 +110,11 @@ namespace AHO_NAMESPACE {
             constexpr Mat<R, Row, Column>& operator*=(const AHO_NAMESPACE::matrix::Mat<T, Row, Column>& p);
 
             template<typename T>
-            requires requires(R& lhs, const T& rhs) { lhs *= rhs; }
+            requires concepts::multiply_assign_as<R&, const T&>
             constexpr Mat<R, Row, Column>& operator*=(const T& m);
 
             template<typename T>
-            requires requires(R& lhs, const T& rhs) { lhs /= rhs; }
+            requires concepts::division_assign_as<R&, const T&>
             constexpr Mat<R, Row, Column>& operator/=(const T& m);
 
             template<typename T>
@@ -132,19 +132,19 @@ namespace AHO_NAMESPACE {
         constexpr Mat<T, Row, Column> make(std::initializer_list<std::initializer_list<T>>);
 
         template<typename L, size_t Row, size_t Column, typename R>
-        requires(!requires {{ R::__is_mat } -> std::convertible_to<bool>; }) && requires(const L& lhs, const R& rhs) { lhs * rhs; }
+        requires(!requires {{ R::__is_mat } -> std::convertible_to<bool>; }) && concepts::multiply_as<const L&, const R&>
         constexpr auto operator*(const matrix::Mat<L, Row, Column>& mat, const R& m);
 
         template<typename L, size_t Row, size_t Column, typename R>
-        requires(!requires {{ R::__is_mat } -> std::convertible_to<bool>; }) && requires(const L& lhs, const R& rhs) { lhs / rhs; }
+        requires(!requires {{ R::__is_mat } -> std::convertible_to<bool>; }) && concepts::division_as<const L&, const R&>
         constexpr auto operator/(const matrix::Mat<L, Row, Column>& mat, const R& m);
 
         template<typename L, size_t Row, size_t Column, typename R>
-        requires(!requires {{ R::__is_mat } -> std::convertible_to<bool>; }) && requires(const R& lhs, const L& rhs) { lhs * rhs; }
+        requires(!requires {{ R::__is_mat } -> std::convertible_to<bool>; }) && concepts::multiply_as<const R&, const L&>
         constexpr auto operator*(const R& m, const matrix::Mat<L, Row, Column>& mat);
 
         template<typename L, size_t Row, size_t Column, typename R>
-        requires(!requires {{ R::__is_mat } -> std::convertible_to<bool>; }) && requires(const R& lhs, const L& rhs) { lhs / rhs; }
+        requires(!requires {{ R::__is_mat } -> std::convertible_to<bool>; }) && concepts::division_as<const R&, const L&>
         constexpr auto operator/(const R& m, const matrix::Mat<L, Row, Column>& mat);
     } // namespace matrix
 
@@ -243,7 +243,7 @@ namespace AHO_NAMESPACE {
 
         template<typename R, size_t Row, size_t Column>
         template<typename T>
-        requires requires(const R& lhs, const T& rhs) { lhs + rhs; }
+        requires concepts::add_as<const R&, const T&>
         constexpr auto Mat<R, Row, Column>::operator+(const Mat<T, Row, Column>& p) const {
             Mat<decltype((*this)[0][0] + p[0][0]), Row, Column> buf;
             for (size_t i = 0; i < Row; i++)
@@ -254,7 +254,7 @@ namespace AHO_NAMESPACE {
 
         template<typename R, size_t Row, size_t Column>
         template<typename T>
-        requires requires(const R& lhs, const T& rhs) { lhs - rhs; }
+        requires concepts::subtract_as<const R&, const T&>
         constexpr auto Mat<R, Row, Column>::operator-(const Mat<T, Row, Column>& p) const {
             Mat<decltype((*this)[0][0] - p[0][0]), Row, Column> buf;
             for (size_t i = 0; i < Row; i++)
@@ -279,7 +279,7 @@ namespace AHO_NAMESPACE {
 
         template<typename R, size_t Row, size_t Column>
         template<typename T>
-        requires requires(R& lhs, const T& rhs) { lhs += rhs; }
+        requires concepts::add_assign_as<R&, const T&>
         constexpr Mat<R, Row, Column>&
         Mat<R, Row, Column>::operator+=(const AHO_NAMESPACE::matrix::Mat<T, Row, Column>& p) {
             for (size_t i = 0; i < Row; i++)
@@ -290,7 +290,7 @@ namespace AHO_NAMESPACE {
 
         template<typename R, size_t Row, size_t Column>
         template<typename T>
-        requires requires(R& lhs, const T& rhs) { lhs -= rhs; }
+        requires concepts::subtract_assign_as<R&, const T&>
         constexpr Mat<R, Row, Column>&
         Mat<R, Row, Column>::operator-=(const AHO_NAMESPACE::matrix::Mat<T, Row, Column>& p) {
             for (size_t i = 0; i < Row; i++)
@@ -314,7 +314,7 @@ namespace AHO_NAMESPACE {
 
         template<typename R, size_t Row, size_t Column>
         template<typename T>
-        requires requires(R& lhs, const T& rhs) { lhs *= rhs; }
+        requires concepts::multiply_assign_as<R&, const T&>
         constexpr Mat<R, Row, Column>& Mat<R, Row, Column>::operator*=(const T& m) {
             for (size_t i = 0; i < Row; i++)
                 for (size_t j = 0; j < Column; j++)
@@ -324,7 +324,7 @@ namespace AHO_NAMESPACE {
 
         template<typename R, size_t Row, size_t Column>
         template<typename T>
-        requires requires(R& lhs, const T& rhs) { lhs /= rhs; }
+        requires concepts::division_assign_as<R&, const T&>
         constexpr Mat<R, Row, Column>& Mat<R, Row, Column>::operator/=(const T& m) {
             for (size_t i = 0; i < Row; i++)
                 for (size_t j = 0; j < Column; j++)
@@ -344,7 +344,7 @@ namespace AHO_NAMESPACE {
         }
 
         template<typename R, size_t Row, size_t Column, typename T>
-        requires(!requires {{ T::__is_mat } -> std::convertible_to<bool>; }) && requires(const R& lhs, const T& rhs) { lhs * rhs; }
+        requires(!requires {{ T::__is_mat } -> std::convertible_to<bool>; }) && concepts::multiply_as<const R&, const T&>
         constexpr auto operator*(const Mat<R, Row, Column>& mat, const T& m) {
             AHO_NAMESPACE::matrix::Mat<decltype(mat[0][0] * m), Row, Column> buf;
             for (size_t i = 0; i < Row; i++)
@@ -354,7 +354,7 @@ namespace AHO_NAMESPACE {
         }
 
         template<typename R, size_t Row, size_t Column, typename T>
-        requires(!requires {{ T::__is_mat } -> std::convertible_to<bool>; }) && requires(const R& lhs, const T& rhs) { lhs / rhs; }
+        requires(!requires {{ T::__is_mat } -> std::convertible_to<bool>; }) && concepts::division_as<const R&, const T&>
         constexpr auto operator/(const Mat<R, Row, Column>& mat, const T& m) {
             AHO_NAMESPACE::matrix::Mat<decltype(mat[0][0] / m), Row, Column> buf;
 
@@ -365,7 +365,7 @@ namespace AHO_NAMESPACE {
         }
 
         template<typename R, size_t Row, size_t Column, typename T>
-        requires(!requires {{ T::__is_mat } -> std::convertible_to<bool>; }) && requires(const T& lhs, const R& rhs) { lhs * rhs; }
+        requires(!requires {{ T::__is_mat } -> std::convertible_to<bool>; }) && concepts::multiply_as<const T&, const R&>
         constexpr auto operator*(const T& m, const Mat<R, Row, Column>& mat) {
             AHO_NAMESPACE::matrix::Mat<decltype(m * mat[0][0]), Row, Column> buf;
 
@@ -376,7 +376,7 @@ namespace AHO_NAMESPACE {
         }
 
         template<typename R, size_t Row, size_t Column, typename T>
-        requires(!requires {{ T::__is_mat } -> std::convertible_to<bool>; }) && requires(const T& lhs, const R& rhs) { lhs / rhs; }
+        requires(!requires {{ T::__is_mat } -> std::convertible_to<bool>; }) && concepts::division_as<const T&, const R&>
         constexpr auto operator/(const T& m, const Mat<R, Row, Column>& mat) {
             AHO_NAMESPACE::matrix::Mat<decltype(m / mat[0][0]), Row, Column> buf;
 

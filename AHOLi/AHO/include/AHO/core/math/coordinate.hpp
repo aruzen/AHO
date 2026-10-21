@@ -11,65 +11,73 @@
 
 namespace AHO_NAMESPACE {
     namespace coordinate {
-#define COORDINATE_ELEMENT_TYPE_DEFINITION_EXPANDER(Upper, Lower)                                                                          \
-    template<typename T>                                                                                                                   \
-    struct Upper {                                                                                                                         \
-        T value;                                                                                                                           \
-                                                                                                                                           \
-        constexpr static char UpperChar = #Upper[0];                                                                                       \
-        constexpr static char LowerChar = #Lower[0];                                                                                       \
-                                                                                                                                           \
-        constexpr Upper(const T& t) : value(t) {};                                                                                         \
-        constexpr Upper() : value{} {};                                                                                                    \
-                                                                                                                                           \
-        constexpr auto operator<=>(const Upper<T>&) const = default;                                                                       \
-                                                                                                                                           \
-        constexpr Upper<T> operator+() const {                                                                                             \
-            static_assert(concepts::plusable<T>);                                                                                          \
-            return {value};                                                                                                                \
-        };                                                                                                                                 \
-        constexpr Upper<T> operator-() const {                                                                                             \
-            static_assert(concepts::minusable<T>);                                                                                         \
-            return {-value};                                                                                                               \
-        };                                                                                                                                 \
-        template<concepts::add_as<T> R>                                                                                                    \
-        constexpr Upper<decltype(std::declval<T>() + std::declval<R>())> operator+(const Upper<R>& t) const { return {value + t.value}; }; \
-        template<concepts::subtract_as<T> R>                                                                                               \
-        constexpr Upper<decltype(std::declval<T>() - std::declval<R>())> operator-(const Upper<R>& t) const { return {value - t.value}; }; \
-        template<concepts::multiply_as<T> R>                                                                                               \
-        constexpr Upper<decltype(std::declval<T>() * std::declval<R>())> operator*(const Upper<R>& t) const { return {value * t.value}; }; \
-        template<concepts::division_as<T> R>                                                                                               \
-        constexpr Upper<decltype(std::declval<T>() / std::declval<R>())> operator/(const Upper<R>& t) const { return {value / t.value}; }; \
-                                                                                                                                           \
-        template<concepts::add_as<T> R>                                                                                                    \
-        constexpr Upper<T>& operator+=(const Upper<R>& t) {                                                                                \
-            value += t.value;                                                                                                              \
-            return *this;                                                                                                                  \
-        };                                                                                                                                 \
-        template<concepts::subtract_as<T> R>                                                                                               \
-        constexpr Upper<T>& operator-=(const Upper<R>& t) {                                                                                \
-            value -= t.value;                                                                                                              \
-            return *this;                                                                                                                  \
-        };                                                                                                                                 \
-        template<concepts::multiply_as<T> R>                                                                                               \
-        constexpr Upper<T>& operator*=(const Upper<R>& t) {                                                                                \
-            value *= t.value;                                                                                                              \
-            return *this;                                                                                                                  \
-        };                                                                                                                                 \
-        template<concepts::division_as<T> R>                                                                                               \
-        constexpr Upper<T>& operator/=(const Upper<R>& t) {                                                                                \
-            value /= t.value;                                                                                                              \
-            return *this;                                                                                                                  \
-        };                                                                                                                                 \
-                                                                                                                                           \
-        template<typename R>                                                                                                               \
-        requires concepts::cast_as<T, R>                                                                                                   \
-        Upper<R> cast() const { return {(R)value}; }                                                                                       \
-    };                                                                                                                                     \
-    template<typename T>                                                                                                                   \
-    std::ostream& operator<<(std::ostream& out, const Upper<T>& Lower) {                                                                   \
-        out << #Lower << " : " << Lower.value;                                                                                             \
-        return out;                                                                                                                        \
+#define COORDINATE_ELEMENT_TYPE_DEFINITION_EXPANDER(Upper, Lower)                                                            \
+    template<typename T>                                                                                                     \
+    struct Upper {                                                                                                           \
+        T value;                                                                                                             \
+                                                                                                                             \
+        constexpr static char UpperChar = #Upper[0];                                                                         \
+        constexpr static char LowerChar = #Lower[0];                                                                         \
+                                                                                                                             \
+        constexpr Upper(const T& t) : value(t) {};                                                                           \
+        constexpr Upper() : value{} {};                                                                                      \
+                                                                                                                             \
+        constexpr auto operator<=>(const Upper<T>&) const = default;                                                         \
+                                                                                                                             \
+        constexpr Upper<T> operator+() const {                                                                               \
+            static_assert(concepts::plusable<T>);                                                                            \
+            return {value};                                                                                                  \
+        };                                                                                                                   \
+        constexpr Upper<T> operator-() const {                                                                               \
+            static_assert(concepts::minusable<T>);                                                                           \
+            return Upper<T>(-value);                                                                                         \
+        };                                                                                                                   \
+        template<typename R>                                                                                                 \
+        requires concepts::add_as<const T&, const R&>                                                                        \
+        constexpr auto operator+(const Upper<R>& t) const -> Upper<decltype(value + t.value)> { return {value + t.value}; }; \
+        template<typename R>                                                                                                 \
+        requires concepts::subtract_as<const T&, const R&>                                                                   \
+        constexpr auto operator-(const Upper<R>& t) const -> Upper<decltype(value - t.value)> { return {value - t.value}; }; \
+        template<typename R>                                                                                                 \
+        requires concepts::multiply_as<const T&, const R&>                                                                   \
+        constexpr auto operator*(const Upper<R>& t) const -> Upper<decltype(value * t.value)> { return {value * t.value}; }; \
+        template<typename R>                                                                                                 \
+        requires concepts::division_as<const T&, const R&>                                                                   \
+        constexpr auto operator/(const Upper<R>& t) const -> Upper<decltype(value / t.value)> { return {value / t.value}; }; \
+                                                                                                                             \
+        template<typename R>                                                                                                 \
+        requires concepts::add_assign_as<T&, const R&>                                                                       \
+        constexpr Upper<T>& operator+=(const Upper<R>& t) {                                                                  \
+            value += t.value;                                                                                                \
+            return *this;                                                                                                    \
+        };                                                                                                                   \
+        template<typename R>                                                                                                 \
+        requires concepts::subtract_assign_as<T&, const R&>                                                                  \
+        constexpr Upper<T>& operator-=(const Upper<R>& t) {                                                                  \
+            value -= t.value;                                                                                                \
+            return *this;                                                                                                    \
+        };                                                                                                                   \
+        template<typename R>                                                                                                 \
+        requires concepts::multiply_assign_as<T&, const R&>                                                                  \
+        constexpr Upper<T>& operator*=(const Upper<R>& t) {                                                                  \
+            value *= t.value;                                                                                                \
+            return *this;                                                                                                    \
+        };                                                                                                                   \
+        template<typename R>                                                                                                 \
+        requires concepts::division_assign_as<T&, const R&>                                                                  \
+        constexpr Upper<T>& operator/=(const Upper<R>& t) {                                                                  \
+            value /= t.value;                                                                                                \
+            return *this;                                                                                                    \
+        };                                                                                                                   \
+                                                                                                                             \
+        template<typename R>                                                                                                 \
+        requires concepts::cast_as<T, R>                                                                                     \
+        Upper<R> cast() const { return {(R)value}; }                                                                         \
+    };                                                                                                                       \
+    template<typename T>                                                                                                     \
+    std::ostream& operator<<(std::ostream& out, const Upper<T>& Lower) {                                                     \
+        out << #Lower << " : " << Lower.value;                                                                               \
+        return out;                                                                                                          \
     };
 
         COORDINATE_ELEMENT_TYPE_DEFINITION_EXPANDER(X, x);

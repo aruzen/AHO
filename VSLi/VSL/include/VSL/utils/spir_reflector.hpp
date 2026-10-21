@@ -26,6 +26,8 @@ namespace VSL_NAMESPACE::utils {
             std::optional<VSL_NAMESPACE::pipeline_layout::PushConstants> push_constants = std::nullopt;
             std::optional<VSL_NAMESPACE::pipeline_layout::VertexInput> vertex_input = std::nullopt;
 
+            // レイアウトの添字はディスクリプターセット番号に対応し、欠番には空のレイアウトを配置する。
+            // repeatで指定した回数だけ、セット全体の並びを追加で複製する。
             std::vector<VSL_NAMESPACE::graphic_resource::BindingLayout> makeBindingLayout(size_t repeat = 0);
         } generated;
 

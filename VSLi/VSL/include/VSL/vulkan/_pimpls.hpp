@@ -194,6 +194,7 @@ namespace VSL_NAMESPACE::_impl {
         std::shared_ptr<PipelineLayout_impl> layout;
 
         vk::Pipeline pipeline;
+        vk::PipelineBindPoint bindPoint = vk::PipelineBindPoint::eGraphics;
 
         ~Pipeline_impl();
     };

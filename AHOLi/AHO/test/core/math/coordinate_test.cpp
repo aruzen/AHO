@@ -7,6 +7,7 @@
 #include <AHO/core/math/coordinate.hpp>
 #include <sstream>
 #include <limits>
+#include <cstdint>
 
 #if defined(AHO_CONTRACT_COORDINATE_ENABLE_AXES)
 constexpr auto x = aho::coordinate::_MakeCoordinateInfo<false, true, false>::value::EnablingX();
@@ -52,7 +53,142 @@ TEST(CoordinateContractTest, ThreeWayComparisonOrdersAndRecognizesEqualCoordinat
 #include <AHO/core/point.hpp>
 #include <array>
 #include "../../support/one_way_cast.hpp"
+#include "../../support/asymmetric_arithmetic.hpp"
+#include "../../support/unary_scalar.hpp"
 namespace {
+    using namespace aho_test::arithmetic;
+    template<class T>
+    class CoordinateArithmeticConstraintTest : public testing::Test {};
+    using CoordinateArithmeticFamilies = testing::Types<Family<aho::coordinate::X>, Family<aho::coordinate::Y>, Family<aho::coordinate::Z>>;
+    TYPED_TEST_SUITE(CoordinateArithmeticConstraintTest, CoordinateArithmeticFamilies);
+    TYPED_TEST(CoordinateArithmeticConstraintTest, BinaryOperationsUseTheStoredScalarOnTheLeft) {
+        using Left = typename TypeParam::template Of<LeftOperand>;
+        using Right = typename TypeParam::template Of<Operand>;
+        using Expected = typename TypeParam::template Of<int>;
+        constexpr Left lhs(LeftOperand{24});
+        constexpr Right rhs(Operand{4});
+        static_assert(CanAdd<Left, Right>);
+        static_assert(!CanAdd<Right, Left>);
+        static_assert(std::same_as<decltype(lhs + rhs), Expected>);
+        static_assert((lhs + rhs).value == 28);
+        EXPECT_EQ((lhs + rhs).value, 28);
+        static_assert(CanSubtract<Left, Right>);
+        static_assert(!CanSubtract<Right, Left>);
+        static_assert(std::same_as<decltype(lhs - rhs), Expected>);
+        static_assert((lhs - rhs).value == 20);
+        EXPECT_EQ((lhs - rhs).value, 20);
+        static_assert(CanMultiply<Left, Right>);
+        static_assert(!CanMultiply<Right, Left>);
+        static_assert(std::same_as<decltype(lhs * rhs), Expected>);
+        static_assert((lhs * rhs).value == 96);
+        EXPECT_EQ((lhs * rhs).value, 96);
+        static_assert(CanDivide<Left, Right>);
+        static_assert(!CanDivide<Right, Left>);
+        static_assert(std::same_as<decltype(lhs / rhs), Expected>);
+        static_assert((lhs / rhs).value == 6);
+        EXPECT_EQ((lhs / rhs).value, 6);
+    }
+    TYPED_TEST(CoordinateArithmeticConstraintTest, CompoundOperationsKeepOperandOrderAndReturnTheSameWrapper) {
+        using Left = typename TypeParam::template Of<LeftOperand>;
+        using Right = typename TypeParam::template Of<Operand>;
+        Left lhs(LeftOperand{24});
+        const Right rhs(Operand{4});
+        static_assert(CanAddAssign<Left, Right>);
+        static_assert(!CanAddAssign<Right, Left>);
+        EXPECT_EQ(&(lhs += rhs), &lhs);
+        EXPECT_EQ(lhs.value.value, 28);
+        static_assert(CanSubtractAssign<Left, Right>);
+        static_assert(!CanSubtractAssign<Right, Left>);
+        EXPECT_EQ(&(lhs -= rhs), &lhs);
+        EXPECT_EQ(lhs.value.value, 24);
+        static_assert(CanMultiplyAssign<Left, Right>);
+        static_assert(!CanMultiplyAssign<Right, Left>);
+        EXPECT_EQ(&(lhs *= rhs), &lhs);
+        EXPECT_EQ(lhs.value.value, 96);
+        static_assert(CanDivideAssign<Left, Right>);
+        static_assert(!CanDivideAssign<Right, Left>);
+        EXPECT_EQ(&(lhs /= rhs), &lhs);
+        EXPECT_EQ(lhs.value.value, 24);
+    }
+    TYPED_TEST(CoordinateArithmeticConstraintTest, CompoundOperationsDoNotRequireBinaryOperators) {
+        using Left = typename TypeParam::template Of<AssignmentOnly>;
+        using Right = typename TypeParam::template Of<Operand>;
+        Left lhs(AssignmentOnly{24});
+        const Right rhs(Operand{4});
+        static_assert(CanAddAssign<Left, Right>);
+        static_assert(!CanAddAssign<Right, Left>);
+        static_assert(!CanAdd<Left, Right>);
+        EXPECT_EQ(&(lhs += rhs), &lhs);
+        EXPECT_EQ(lhs.value.value, 28);
+        static_assert(CanSubtractAssign<Left, Right>);
+        static_assert(!CanSubtractAssign<Right, Left>);
+        static_assert(!CanSubtract<Left, Right>);
+        EXPECT_EQ(&(lhs -= rhs), &lhs);
+        EXPECT_EQ(lhs.value.value, 24);
+        static_assert(CanMultiplyAssign<Left, Right>);
+        static_assert(!CanMultiplyAssign<Right, Left>);
+        static_assert(!CanMultiply<Left, Right>);
+        EXPECT_EQ(&(lhs *= rhs), &lhs);
+        EXPECT_EQ(lhs.value.value, 96);
+        static_assert(CanDivideAssign<Left, Right>);
+        static_assert(!CanDivideAssign<Right, Left>);
+        static_assert(!CanDivide<Left, Right>);
+        EXPECT_EQ(&(lhs /= rhs), &lhs);
+        EXPECT_EQ(lhs.value.value, 24);
+    }
+    TYPED_TEST(CoordinateArithmeticConstraintTest, ResultTypesMatchTheActualConstOperands) {
+        using Wrapper = typename TypeParam::template Of<CategoryResult>;
+        using Expected = typename TypeParam::template Of<int>;
+        constexpr Wrapper lhs(CategoryResult{24}), rhs(CategoryResult{4});
+        static_assert(std::same_as<decltype(lhs + rhs), Expected>);
+        static_assert((lhs + rhs).value == 28);
+        EXPECT_EQ((lhs + rhs).value, 28);
+        static_assert(std::same_as<decltype(lhs - rhs), Expected>);
+        static_assert((lhs - rhs).value == 20);
+        EXPECT_EQ((lhs - rhs).value, 20);
+        static_assert(std::same_as<decltype(lhs * rhs), Expected>);
+        static_assert((lhs * rhs).value == 96);
+        EXPECT_EQ((lhs * rhs).value, 96);
+        static_assert(std::same_as<decltype(lhs / rhs), Expected>);
+        static_assert((lhs / rhs).value == 6);
+        EXPECT_EQ((lhs / rhs).value, 6);
+    }
+    TYPED_TEST(CoordinateArithmeticConstraintTest, RejectsMutableOnlyBinaryAndMissingCompoundOperations) {
+        using Mutable = typename TypeParam::template Of<MutableOnly>;
+        using BinaryOnly = typename TypeParam::template Of<CategoryResult>;
+        EXPECT_FALSE((CanAdd<Mutable, Mutable>));
+        EXPECT_FALSE((CanAddAssign<BinaryOnly, BinaryOnly>));
+        EXPECT_FALSE((CanSubtract<Mutable, Mutable>));
+        EXPECT_FALSE((CanSubtractAssign<BinaryOnly, BinaryOnly>));
+        EXPECT_FALSE((CanMultiply<Mutable, Mutable>));
+        EXPECT_FALSE((CanMultiplyAssign<BinaryOnly, BinaryOnly>));
+        EXPECT_FALSE((CanDivide<Mutable, Mutable>));
+        EXPECT_FALSE((CanDivideAssign<BinaryOnly, BinaryOnly>));
+    }
+    template<class T>
+    class CoordinateNarrowNegationTest : public testing::Test {};
+    using CoordinateNarrowNegationTestTypes = testing::Types<aho::coordinate::X<std::int8_t>, aho::coordinate::X<std::int16_t>,
+                                                             aho::coordinate::Y<std::int8_t>, aho::coordinate::Y<std::int16_t>,
+                                                             aho::coordinate::Z<std::int8_t>, aho::coordinate::Z<std::int16_t>>;
+    TYPED_TEST_SUITE(CoordinateNarrowNegationTest, CoordinateNarrowNegationTestTypes);
+    TYPED_TEST(CoordinateNarrowNegationTest, PromotedNegationReturnsTheDeclaredNarrowScalarType) {
+        using Scalar = std::remove_cvref_t<decltype(std::declval<TypeParam>().value)>;
+        constexpr TypeParam positive(Scalar{7}), negative(Scalar{-7}), zero(Scalar{0});
+        static_assert(std::same_as<decltype(-positive), TypeParam>);
+        static_assert((-positive).value == Scalar{-7});
+        static_assert((-negative).value == Scalar{7});
+        static_assert((-zero).value == Scalar{0});
+        EXPECT_EQ(static_cast<int>((-positive).value), -7);
+        EXPECT_EQ(static_cast<int>((-negative).value), 7);
+        EXPECT_EQ(static_cast<int>((-zero).value), 0);
+        EXPECT_EQ(static_cast<int>((-(-positive)).value), 7);
+    }
+    TEST(CoordinateUnaryConversionTest, NegationKeepsTheImplicitScalarArgumentConversion) {
+        constexpr aho::coordinate::X<aho_test::UnaryScalar> source(aho_test::UnaryScalar{7});
+        static_assert(static_cast<aho_test::UnaryScalar>(-source.value).value == 93);
+        static_assert((-source).value.value == -7);
+        EXPECT_EQ((-source).value.value, -7);
+    }
     template<class T>
     class CoordinateOneWayCastTest : public testing::Test {};
     using OneWayAxes = testing::Types<aho::coordinate::X<aho_test::CastSource>,

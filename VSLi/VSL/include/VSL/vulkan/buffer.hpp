@@ -6,6 +6,7 @@
 #include "../utils/flags.hpp"
 #include <optional>
 #include <cstring>
+#include <limits>
 
 #include "command.hpp"
 #include "../exceptions.hpp"
@@ -85,9 +86,11 @@ namespace VSL_NAMESPACE {
             return make_buffer<Buffer>(device, *manager, t);
         } else {
             Buffer buffer(device, sizeof(T));
-            buffer.copy(t);
-            if constexpr (not contain<Buffer::Property, MemoryProperty::HostCoherent>()) {
-                buffer.flush();
+            {
+                auto mapped = buffer.data();
+                mapped.copy(t);
+                if constexpr (not contain<Buffer::Property, MemoryProperty::HostCoherent>())
+                    mapped.flush();
             }
             return buffer;
         }
@@ -103,6 +106,16 @@ namespace VSL_NAMESPACE {
     }
 
     namespace helper {
+
+        template<typename T>
+        constexpr std::size_t checked_buffer_array_size(std::size_t count) {
+            if (count == 0)
+                throw exceptions::RuntimeException("BufferSize", "Buffer arrays must contain at least one element");
+            if (count > std::numeric_limits<std::size_t>::max() / sizeof(T))
+                throw exceptions::RuntimeException("BufferSize", "Buffer array byte size overflow");
+            return sizeof(T) * count;
+        }
+
         bool copy_with_shift_offset(void* data, size_t maxSize, size_t& offset);
 
         template<typename T, typename... Args>
@@ -125,13 +138,35 @@ namespace VSL_NAMESPACE {
     bool VSL_NAMESPACE::BufferAccessor::copy(const Args&... args) {
         auto buff = this->data();
         size_t offset = 0;
-        return helper::copy_with_shift_offset(buff.data, buff.size, offset, args...);
+        const bool copied = helper::copy_with_shift_offset(buff.data, buff.size, offset, args...);
+        if (offset != 0)
+            buff.flush();
+        return copied;
     }
 
     template<typename... Args>
     bool VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::copy(const Args&... args) {
         size_t offset = 0;
         return helper::copy_with_shift_offset(this->data, this->size, offset, args...);
+    }
+
+    template<typename T, typename Count>
+    requires(!std::same_as<Count, std::size_t> &&
+             (std::integral<Count> || (std::is_enum_v<Count> && std::is_convertible_v<Count, std::size_t>)))
+    bool BufferAccessor::copy(T* t, Count size) {
+        if constexpr (std::is_enum_v<Count>) {
+            return copy(t, static_cast<std::underlying_type_t<Count>>(size));
+        } else {
+            if constexpr (std::is_signed_v<Count>) {
+                if (size < 0)
+                    return false;
+            }
+            if constexpr (sizeof(Count) > sizeof(std::size_t)) {
+                if (size > std::numeric_limits<std::size_t>::max())
+                    return false;
+            }
+            return copy(t, static_cast<std::size_t>(size));
+        }
     }
 
     template<typename T>
@@ -142,7 +177,27 @@ namespace VSL_NAMESPACE {
         if (size == 0)
             return true;
         memcpy(buff.data, t, sizeof(T) * size);
+        buff.flush();
         return true;
+    }
+
+    template<typename T, typename Count>
+    requires(!std::same_as<Count, std::size_t> &&
+             (std::integral<Count> || (std::is_enum_v<Count> && std::is_convertible_v<Count, std::size_t>)))
+    bool BufferAccessor::LocalBufferHolder::copy(T* t, Count size) {
+        if constexpr (std::is_enum_v<Count>) {
+            return copy(t, static_cast<std::underlying_type_t<Count>>(size));
+        } else {
+            if constexpr (std::is_signed_v<Count>) {
+                if (size < 0)
+                    return false;
+            }
+            if constexpr (sizeof(Count) > sizeof(std::size_t)) {
+                if (size > std::numeric_limits<std::size_t>::max())
+                    return false;
+            }
+            return copy(t, static_cast<std::size_t>(size));
+        }
     }
 
     template<typename T>
@@ -160,6 +215,8 @@ namespace VSL_NAMESPACE {
         auto buff = data();
         size_t offset = 0;
         (helper::uncheck_copy_with_shift_offset(buff.data, offset, args), ...);
+        if (offset != 0)
+            buff.flush();
     }
 
     template<typename... Args>
@@ -178,10 +235,10 @@ namespace VSL_NAMESPACE {
     requires(!std::is_integral_v<T>) && (VSL_NAMESPACE::contain<MemProperty, MemoryProperty::HostVisible>())
     Buffer<MemType, MemProperty, SharingMode>::Buffer(LogicalDeviceAccessor device, T t) {
         _data = this->MakeBuffer(device, sizeof(T), MemType, MemProperty, SharingMode);
-        this->copy(t);
-        if constexpr (not contain<Buffer::Property, MemoryProperty::HostCoherent>()) {
-            this->flush();
-        }
+        auto mapped = this->data();
+        mapped.copy(t);
+        if constexpr (not contain<Buffer::Property, MemoryProperty::HostCoherent>())
+            mapped.flush();
     }
 
     template<MemoryType MemType, MemoryProperty MemProperty, SharingMode SharingMode>
@@ -198,13 +255,13 @@ namespace VSL_NAMESPACE {
     template<typename T>
     requires(VSL_NAMESPACE::contain<MemProperty, MemoryProperty::HostVisible>())
     Buffer<MemType, MemProperty, SharingMode>::Buffer(LogicalDeviceAccessor device, T* t, size_t size) {
-        _data = this->MakeBuffer(device, sizeof(T) * size, MemType, MemProperty, SharingMode);
+        const auto bytes = helper::checked_buffer_array_size<T>(size);
+        _data = this->MakeBuffer(device, bytes, MemType, MemProperty, SharingMode);
         {
             auto data = this->data();
-            bcopy(t, data.data, sizeof(T) * size);
-        }
-        if constexpr (not contain<Buffer::Property, MemoryProperty::HostCoherent>()) {
-            this->flush();
+            data.copy(t, size);
+            if constexpr (not contain<Buffer::Property, MemoryProperty::HostCoherent>())
+                data.flush();
         }
     }
 
@@ -212,11 +269,12 @@ namespace VSL_NAMESPACE {
     template<typename T>
     requires(!VSL_NAMESPACE::contain<MemProperty, MemoryProperty::HostVisible>())
     Buffer<MemType, MemProperty, SharingMode>::Buffer(LogicalDeviceAccessor device, CommandManager manager, T* t, size_t size) {
-        _data = this->MakeBuffer(device, sizeof(T) * size, MemType, MemProperty, SharingMode);
-        StagingBuffer<> stagingBuffer(device, sizeof(T) * size);
+        const auto bytes = helper::checked_buffer_array_size<T>(size);
+        _data = this->MakeBuffer(device, bytes, MemType, MemProperty, SharingMode);
+        StagingBuffer<> stagingBuffer(device, bytes);
         {
             auto data = stagingBuffer.data();
-            bcopy(t, data.data, sizeof(T) * size);
+            std::memcpy(data.data, t, bytes);
         }
         this->copyByBuffer(manager, &stagingBuffer);
     }

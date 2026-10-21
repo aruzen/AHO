@@ -2,21 +2,31 @@
 namespace {
     struct RecordCommand : VSL_NAMESPACE::command::__Command {
         std::shared_ptr<int> calls;
-        explicit RecordCommand(std::shared_ptr<int> calls) : calls(std::move(calls)) {}
-        void invoke(VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) override {
-            ++*calls;
-        }
+        explicit RecordCommand(std::shared_ptr<int> calls);
+        void invoke(VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) override;
     };
     struct RecordDelegate : VSL_NAMESPACE::command::__DelegateCommand {
         std::shared_ptr<int> calls;
-        explicit RecordDelegate(std::shared_ptr<int> calls) : calls(std::move(calls)) {}
+        explicit RecordDelegate(std::shared_ptr<int> calls);
         void invoke(VSL_NAMESPACE::DefaultPhaseStream& stream, VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer,
-                    VSL_NAMESPACE::CommandManager manager) override {
-            EXPECT_EQ(stream.manager._data, manager._data);
-            ++*calls;
-        }
+                    VSL_NAMESPACE::CommandManager manager) override;
     };
     using PhaseVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
+    RecordCommand::RecordCommand(std::shared_ptr<int> calls) : calls(std::move(calls)) {}
+
+    void RecordCommand::invoke(VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) {
+        ++*calls;
+    }
+
+    RecordDelegate::RecordDelegate(std::shared_ptr<int> calls) : calls(std::move(calls)) {}
+
+    void RecordDelegate::invoke(VSL_NAMESPACE::DefaultPhaseStream& stream, VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer,
+                                VSL_NAMESPACE::CommandManager manager) {
+        EXPECT_EQ(stream.manager._data, manager._data);
+        ++*calls;
+    }
+
     TEST_F(PhaseVulkanIntegrationTest, PostponedSetupAndSubmissionFollowStateTransitions) {
         auto manager = make_manager();
         VSL_NAMESPACE::ComputePhase phase(manager, std::nullopt, std::nullopt, std::nullopt, true);
@@ -63,8 +73,13 @@ namespace {
 
 namespace {
     class PhaseCompletionVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
+        bool validate_vulkan() const override;
     };
+
+    bool PhaseCompletionVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, RepeatedSubmissionsReuseBuffersWithoutExternalFenceOrIdle) {
         auto manager = make_manager();
         VSL_NAMESPACE::Completion previous;
@@ -189,8 +204,13 @@ namespace {
 #include <VSL/vulkan/commands/image_readback.hpp>
 namespace {
     class PresentPhaseWindowIntegrationTest : public vsl_test::WindowIntegrationTest {
-        bool validate_vulkan() const override { return true; }
+        bool validate_vulkan() const override;
     };
+
+    bool PresentPhaseWindowIntegrationTest::validate_vulkan() const {
+        return true;
+    }
+
     TEST_F(PresentPhaseWindowIntegrationTest, UsesAcquiredImageForFramebufferReadbackAndPresentAcrossFrames) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());

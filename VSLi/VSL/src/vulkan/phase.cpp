@@ -4,6 +4,10 @@
 #include <stdexcept>
 
 namespace VSL_NAMESPACE {
+    struct DefaultPhase::Presentation {
+        vk::UniqueFence acquireFence;
+    };
+
     Completion::Status Completion::status() const {
         if (!_data)
             return Status::Cancelled;
@@ -12,7 +16,9 @@ namespace VSL_NAMESPACE {
             _data->status = Status::Complete;
         return _data->status;
     }
-    bool Completion::ready() const { return status() == Status::Complete; }
+    bool Completion::ready() const {
+        return status() == Status::Complete;
+    }
     bool Completion::wait(std::uint64_t timeout) const {
         auto current = status();
         if (current == Status::Complete)
@@ -170,12 +176,13 @@ namespace VSL_NAMESPACE {
             loggingln("Phase submission failed during destruction");
         }
     }
-    ComputePhase::~ComputePhase() { finishNoexcept(); }
-    std::uint32_t ComputePhase::getImageIndex() { return imageIndex; }
+    ComputePhase::~ComputePhase() {
+        finishNoexcept();
+    }
+    std::uint32_t ComputePhase::getImageIndex() {
+        return imageIndex;
+    }
 
-    struct DefaultPhase::Presentation {
-        vk::UniqueFence acquireFence;
-    };
     DefaultPhase::DefaultPhase(CommandManager manager, SwapchainAccessor chain,
                                std::optional<SemaphoreHolder> available,
                                std::optional<SemaphoreHolder> finished,
@@ -230,7 +237,9 @@ namespace VSL_NAMESPACE {
         buffers->acquiredSwapchain = swapchain._data;
         _completion.retain(swapchain._data);
     }
-    std::uint32_t DefaultPhase::getCurrentIndex() { return manager.getCurrentBufferIdx(); }
+    std::uint32_t DefaultPhase::getCurrentIndex() {
+        return manager.getCurrentBufferIdx();
+    }
     DefaultPhase::SubmitResult DefaultPhase::submitCommands() {
         if (state == State::Error && recreate)
             return SubmitResult::WantRecreateSwapchain;
@@ -284,7 +293,9 @@ namespace VSL_NAMESPACE {
         if (state == State::FinishSubmit)
             present();
     }
-    DefaultPhase::~DefaultPhase() { finishNoexcept(); }
+    DefaultPhase::~DefaultPhase() {
+        finishNoexcept();
+    }
 } // namespace VSL_NAMESPACE
 
 VSL_NAMESPACE::DefaultPhaseStream VSL_NAMESPACE::ComputePhase::operator<<(std::shared_ptr<command::__Command> cmd) {

@@ -52,9 +52,9 @@ VSL_NAMESPACE::ImageAccessor::MakeImage(VSL_NAMESPACE::ImageType type,
     imageInfo.usage = (vk::ImageUsageFlagBits)type;
     imageInfo.initialLayout = (vk::ImageLayout)layout;
 
-    _data->image = device._data->device.createImage(imageInfo);
+    auto image = device._data->device.createImageUnique(imageInfo);
 
-    vk::MemoryRequirements memRequirements = device._data->device.getImageMemoryRequirements(_data->image);
+    vk::MemoryRequirements memRequirements = device._data->device.getImageMemoryRequirements(*image);
 
     vk::MemoryAllocateInfo allocInfo;
     allocInfo.allocationSize = memRequirements.size;
@@ -63,7 +63,8 @@ VSL_NAMESPACE::ImageAccessor::MakeImage(VSL_NAMESPACE::ImageType type,
 
     _data->memory = device._data->device.allocateMemory(allocInfo);
 
-    device._data->device.bindImageMemory(_data->image, _data->memory, 0);
+    device._data->device.bindImageMemory(*image, _data->memory, 0);
+    _data->image = image.release();
 
     vk::ImageViewCreateInfo viewInfo;
     viewInfo.image = _data->image;

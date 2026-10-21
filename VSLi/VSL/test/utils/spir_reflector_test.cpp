@@ -557,3 +557,408 @@ namespace {
         EXPECT_EQ(reflector.generated.push_constants->definitions.at(0).size, 4u);
     }
 } // namespace
+
+namespace {
+    void expect_reflected_stage(const char* file, vsl::ShaderFlag expected) {
+        SCOPED_TRACE(file);
+        vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path(file));
+        const auto& points = reflector.generated.binding_points.at(0);
+        ASSERT_EQ(points.size(), 1u);
+        EXPECT_EQ(points[0].bindingType, vsl::graphic_resource::Type::StorageBuffer);
+        EXPECT_EQ(points[0].shaderType, expected);
+        EXPECT_EQ(points[0].amount, 1u);
+        ASSERT_TRUE(reflector.generated.push_constants);
+        const auto& definitions = reflector.generated.push_constants->definitions;
+        ASSERT_EQ(definitions.size(), 1u);
+        EXPECT_EQ(definitions[0].targetShader, expected);
+        EXPECT_EQ(definitions[0].offset, 0u);
+        EXPECT_EQ(definitions[0].size, 16u);
+        EXPECT_FALSE(reflector.generated.vertex_input);
+    }
+    TEST(SpirvReflectorTest, GeometryAndTessellationKeepTheirDeclaredStageFlags) {
+        for (const auto& [file, stage] : {
+                 std::pair{"reflection_stage.geom.spv", vsl::ShaderFlag::Geometry},
+                 std::pair{"reflection_stage.tesc.spv", vsl::ShaderFlag::TessellationControl},
+                 std::pair{"reflection_stage.tese.spv", vsl::ShaderFlag::TessellationEvaluation}})
+            expect_reflected_stage(file, stage);
+    }
+    TEST(SpirvReflectorTest, RayTracingExecutionModelsKeepTheirDeclaredStageFlags) {
+        for (const auto& [file, stage] : {
+                 std::pair{"reflection_stage.rgen.spv", vsl::ShaderFlag::Raygen},
+                 std::pair{"reflection_stage.rmiss.spv", vsl::ShaderFlag::Miss},
+                 std::pair{"reflection_stage.rint.spv", vsl::ShaderFlag::Intersection},
+                 std::pair{"reflection_stage.rahit.spv", vsl::ShaderFlag::AnyHit},
+                 std::pair{"reflection_stage.rchit.spv", vsl::ShaderFlag::ClosestHit},
+                 std::pair{"reflection_stage.rcall.spv", vsl::ShaderFlag::Callable}})
+            expect_reflected_stage(file, stage);
+    }
+    TEST(SpirvReflectorTest, ExtAndNvTaskMeshExecutionModelsUseTheMatchingStageBits) {
+        for (const auto& [file, stage] : {
+                 std::pair{"reflection_ext.task.spv", vsl::ShaderFlag::Task},
+                 std::pair{"reflection_ext.mesh.spv", vsl::ShaderFlag::Mesh},
+                 std::pair{"reflection_nv.task.spv", vsl::ShaderFlag::Task},
+                 std::pair{"reflection_nv.mesh.spv", vsl::ShaderFlag::Mesh}})
+            expect_reflected_stage(file, stage);
+    }
+} // namespace
+
+namespace {
+    TEST(SpirvReflectorTest, SeparateImagesAndSamplersRetainTheirBindingTypesAndArrayCounts) {
+        using namespace vsl::graphic_resource;
+        for (const auto& [file, image_count, sampler_count] : {
+                 std::tuple{"reflection_separate_images.comp.spv", 1u, 1u},
+                 std::tuple{"reflection_separate_arrays.comp.spv", 2u, 3u}}) {
+            SCOPED_TRACE(file);
+            vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path(file));
+            const auto& points = reflector.generated.binding_points.at(0);
+            ASSERT_EQ(points.size(), 3u);
+            for (const auto& [binding, type, count] : {std::tuple{0u, Type::StorageBuffer, 1u},
+                                                       std::tuple{1u, Type::SampledImage, image_count},
+                                                       std::tuple{2u, Type::Sampler, sampler_count}}) {
+                const auto found = std::ranges::find(points, binding, &BindingPoint::binding);
+                ASSERT_NE(found, points.end());
+                EXPECT_EQ(found->bindingType, type);
+                EXPECT_EQ(found->amount, count);
+                EXPECT_EQ(found->shaderType, vsl::ShaderFlag::Compute);
+            }
+        }
+    }
+    TEST(SpirvReflectorTest, SeparateBufferImagesUseUniformTexelBufferDescriptors) {
+        using namespace vsl::graphic_resource;
+        vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection_separate_texel.comp.spv"));
+        const auto& points = reflector.generated.binding_points.at(0);
+        ASSERT_EQ(points.size(), 2u);
+        const auto found = std::ranges::find(points, 1u, &BindingPoint::binding);
+        ASSERT_NE(found, points.end());
+        EXPECT_EQ(found->bindingType, Type::UniformTexelBuffer);
+        EXPECT_EQ(found->amount, 1u);
+        EXPECT_EQ(found->shaderType, vsl::ShaderFlag::Compute);
+    }
+} // namespace
+
+#include "support/image_transfer_fixture.hpp"
+namespace {
+    class ReflectedSeparateImageVulkanIntegrationTest : public vsl_test::ImageTransferVulkanIntegrationTest {
+        bool validate_vulkan() const override;
+    };
+
+    bool ReflectedSeparateImageVulkanIntegrationTest::validate_vulkan() const { return true; }
+    TEST_F(ReflectedSeparateImageVulkanIntegrationTest, GeneratedLayoutSamplesTheUploadedTexelWithASeparateSampler) {
+        using namespace vsl::graphic_resource;
+        if (!host_coherent_available())
+            GTEST_SKIP() << "Host coherent memory unavailable";
+        vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_separate_images.comp.spv"));
+        const auto sets = reflector.generated.makeBindingLayout();
+        ASSERT_EQ(sets.size(), 1u);
+        ASSERT_EQ(sets[0].getBindingPoints().size(), 3u) << "Do not use a pipeline with an incomplete reflected layout";
+        vsl::GraphicResourceManager resources(device);
+        auto [pool, allocated] = resources.make(sets);
+        struct ReclaimCycle {
+            vsl::GraphicResourcePool pool;
+            ~ReclaimCycle() { pool._data->resources.clear(); }
+        } reclaim{pool};
+        ASSERT_EQ(allocated.size(), 1u);
+        vsl::StagingBuffer<vsl::MemoryType::StorageBuffer> output(device, std::array<std::uint32_t, 2>{0, 0});
+        TransferImage image(device, 1, 1, vsl::data_format::UnsignedNormalized8RGBA);
+        vsl::Sampler sampler(device, vsl::SamplingMode::Nearest, vsl::EdgeMode::ClampToEdge);
+        const std::array<std::uint8_t, 4> texel{37, 83, 131, 255};
+        vsl::StagingBuffer<vsl::MemoryType::TransferSource> upload(device, texel);
+        allocated[0].update(&output, 0);
+        allocated[0].update(image, 1);
+        allocated[0].update(image, sampler, 2);
+        vsl::Shader<vsl::ShaderType::Compute> shader(device, vsl_test::shader_path("reflection_separate_images.comp.spv"));
+        vsl::PipelineLayout layout(device, vsl::pipeline_layout::ShaderGroup("separate image", {shader}),
+                                   vsl::pipeline_layout::ResourceBinding(sets));
+        vsl::ComputePipeline pipeline(layout);
+        auto manager = make_manager();
+        {
+            auto phase = manager.startPhase<vsl::ComputePhase>();
+            transition(manager, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, {}, vk::AccessFlagBits::eTransferWrite);
+            phase << vsl::command::CopyBufferToImage(image, &upload, vsl::ImageLayout::General);
+            transition(manager, image, vk::ImageLayout::eGeneral, vk::ImageLayout::eGeneral,
+                       vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eShaderRead);
+            phase << pipeline << vsl::command::BindGraphicResource(allocated[0], BindingDestination::Compute)
+                  << vsl::command::Dispatch(1, 1, 1);
+            vk::MemoryBarrier barrier{};
+            barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
+            barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
+            auto commands = manager.getBuffer();
+            commands._data->commandBuffers[commands.getCurrentBufferIdx()].pipelineBarrier(
+                vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+        }
+        device._data->device.waitIdle();
+        auto mapped = output.data(2 * sizeof(std::uint32_t));
+        std::array<std::uint32_t, 2> actual{};
+        std::memcpy(actual.data(), mapped.data, sizeof(actual));
+        EXPECT_EQ(actual, (std::array<std::uint32_t, 2>{37, 83}));
+    }
+} // namespace
+
+namespace {
+    TEST(SpirvReflectorTest, CombinedAndStorageBufferImagesUseTexelDescriptorsAndKeepArrayCounts) {
+        using namespace vsl::graphic_resource;
+        for (const auto& [file, source_count, destination_count] : {
+                 std::tuple{"reflection_texel_buffers.comp.spv", 1u, 1u},
+                 std::tuple{"reflection_texel_arrays.comp.spv", 2u, 3u}}) {
+            SCOPED_TRACE(file);
+            vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path(file));
+            const auto& points = reflector.generated.binding_points.at(0);
+            ASSERT_EQ(points.size(), 2u);
+            for (const auto& [binding, type, count] : {std::tuple{0u, Type::UniformTexelBuffer, source_count},
+                                                       std::tuple{1u, Type::StorageTexelBuffer, destination_count}}) {
+                const auto found = std::ranges::find(points, binding, &BindingPoint::binding);
+                ASSERT_NE(found, points.end());
+                EXPECT_EQ(found->bindingType, type);
+                EXPECT_EQ(found->amount, count);
+                EXPECT_EQ(found->shaderType, vsl::ShaderFlag::Compute);
+            }
+        }
+    }
+    class ReflectedTexelBufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override;
+    };
+
+    bool ReflectedTexelBufferVulkanIntegrationTest::validate_vulkan() const { return true; }
+    TEST_F(ReflectedTexelBufferVulkanIntegrationTest, GeneratedLayoutSupportsReadingAndWritingNativeBufferViews) {
+        using namespace vsl::graphic_resource;
+        if (!host_coherent_available())
+            GTEST_SKIP() << "Host coherent memory unavailable";
+        const auto properties = physical._data->device.getFormatProperties(vk::Format::eR32Uint);
+        const auto required = vk::FormatFeatureFlagBits::eUniformTexelBuffer | vk::FormatFeatureFlagBits::eStorageTexelBuffer;
+        if ((properties.bufferFeatures & required) != required)
+            GTEST_SKIP() << "R32Uint uniform/storage texel buffer support unavailable";
+        vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_texel_buffers.comp.spv"));
+        const auto& points = reflector.generated.binding_points.at(0);
+        ASSERT_EQ(points.size(), 2u);
+        for (const auto& [binding, type] : {std::pair{0u, Type::UniformTexelBuffer}, std::pair{1u, Type::StorageTexelBuffer}}) {
+            const auto found = std::ranges::find(points, binding, &BindingPoint::binding);
+            ASSERT_NE(found, points.end());
+            ASSERT_EQ(found->bindingType, type) << "Do not create a native pipeline with an incorrect descriptor type";
+        }
+        const auto sets = reflector.generated.makeBindingLayout();
+        vsl::GraphicResourceManager resources(device);
+        auto [pool, allocated] = resources.make(sets);
+        struct ReclaimCycle {
+            vsl::GraphicResourcePool pool;
+            ~ReclaimCycle() { pool._data->resources.clear(); }
+        } reclaim{pool};
+        ASSERT_EQ(allocated.size(), 1u);
+        vsl::StagingBuffer<vsl::MemoryType::UniformTexelBuffer> source(device, std::array<std::uint32_t, 1>{37});
+        vsl::StagingBuffer<vsl::MemoryType::StorageTexelBuffer> destination(device, std::array<std::uint32_t, 1>{0});
+        vk::BufferViewCreateInfo view_info{};
+        view_info.format = vk::Format::eR32Uint;
+        view_info.range = sizeof(std::uint32_t);
+        view_info.buffer = source._data->buffer;
+        auto source_view = device._data->device.createBufferViewUnique(view_info);
+        view_info.buffer = destination._data->buffer;
+        auto destination_view = device._data->device.createBufferViewUnique(view_info);
+        // BufferView用の公開updateはないため、テスト内で反射したlayoutへnative viewを設定する。
+        std::array<vk::WriteDescriptorSet, 2> writes{};
+        for (std::uint32_t i = 0; i < writes.size(); ++i) {
+            writes[i].dstSet = allocated[0]._data->descriptorSet;
+            writes[i].dstBinding = i;
+            writes[i].descriptorCount = 1;
+            writes[i].descriptorType = i == 0 ? vk::DescriptorType::eUniformTexelBuffer : vk::DescriptorType::eStorageTexelBuffer;
+        }
+        writes[0].pTexelBufferView = &*source_view;
+        writes[1].pTexelBufferView = &*destination_view;
+        device._data->device.updateDescriptorSets(writes, {});
+        vsl::Shader<vsl::ShaderType::Compute> shader(device, vsl_test::shader_path("reflection_texel_buffers.comp.spv"));
+        vsl::PipelineLayout layout(device, vsl::pipeline_layout::ShaderGroup("reflected texel buffers", {shader}),
+                                   vsl::pipeline_layout::ResourceBinding(sets));
+        vsl::ComputePipeline pipeline(layout);
+        auto manager = make_manager();
+        {
+            auto phase = manager.startPhase<vsl::ComputePhase>();
+            phase << pipeline << vsl::command::BindGraphicResource(allocated[0], BindingDestination::Compute)
+                  << vsl::command::Dispatch(1, 1, 1);
+            vk::MemoryBarrier barrier{};
+            barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
+            barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
+            auto commands = manager.getBuffer();
+            commands._data->commandBuffers[commands.getCurrentBufferIdx()].pipelineBarrier(
+                vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+        }
+        device._data->device.waitIdle();
+        auto mapped = destination.data(sizeof(std::uint32_t));
+        std::uint32_t actual = 0;
+        std::memcpy(&actual, mapped.data, sizeof(actual));
+        EXPECT_EQ(actual, 54u);
+    }
+} // namespace
+
+namespace {
+    TEST(SpirvReflectorTest, InputAttachmentsRetainDescriptorBindingsAndArrayCounts) {
+        using namespace vsl::graphic_resource;
+        for (const auto& [file, set, binding, count] : {
+                 std::tuple{"reflection_input_attachment.frag.spv", 0u, 4u, 1u},
+                 std::tuple{"reflection_input_arrays.frag.spv", 1u, 7u, 2u}}) {
+            SCOPED_TRACE(file);
+            vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path(file));
+            ASSERT_EQ(reflector.generated.binding_points.size(), 1u);
+            const auto& points = reflector.generated.binding_points.at(set);
+            ASSERT_EQ(points.size(), 1u);
+            EXPECT_EQ(points[0].binding, binding);
+            EXPECT_EQ(points[0].bindingType, Type::InputAttachment);
+            EXPECT_EQ(points[0].amount, count);
+            EXPECT_EQ(points[0].shaderType, vsl::ShaderFlag::Fragment);
+            EXPECT_FALSE(reflector.generated.vertex_input);
+        }
+    }
+    class ReflectedInputAttachmentVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
+        bool validate_vulkan() const override;
+    };
+
+    bool ReflectedInputAttachmentVulkanIntegrationTest::validate_vulkan() const { return true; }
+    TEST_F(ReflectedInputAttachmentVulkanIntegrationTest, GeneratedLayoutReadsTheClearedInputAttachmentOnGpu) {
+        using namespace vsl::graphic_resource;
+        vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_input_attachment.frag.spv"));
+        const auto sets = reflector.generated.makeBindingLayout();
+        ASSERT_EQ(sets.size(), 1u) << "Do not create a pipeline with a missing input attachment binding";
+        const auto points = sets[0].getBindingPoints();
+        ASSERT_EQ(points.size(), 1u);
+        ASSERT_EQ(points[0].bindingType, Type::InputAttachment);
+        vsl::GraphicResourceManager resources(device);
+        auto [pool, allocated] = resources.make(sets);
+        struct ReclaimCycle {
+            vsl::GraphicResourcePool pool;
+            ~ReclaimCycle() { pool._data->resources.clear(); }
+        } reclaim{pool};
+        ASSERT_EQ(allocated.size(), 1u);
+        vsl::Image<vsl::ImageType::ColorAttachment | vsl::ImageType::InputAttachment> source(
+            device, width, height, vsl::data_format::UnsignedNormalized8RGBA);
+        allocated[0].update(source, 4);
+        pipeline.reset();
+        layout.reset();
+        framebuffer.reset();
+        pass.reset();
+        vsl::RenderPassDescription render_description;
+        render_description.attachments = {
+            {.format = vsl::data_format::UnsignedNormalized8RGBA, .finalLayout = vsl::ImageLayout::General},
+            {.format = vsl::data_format::UnsignedNormalized8RGBA, .finalLayout = vsl::ImageLayout::General}};
+        // 次のsubpassで読む前に、入力元をcolor attachmentとしてclearする。
+        render_description.subpasses.resize(2);
+        render_description.subpasses[0].colors = {{0, vsl::ImageLayout::General}};
+        render_description.subpasses[1].inputs = {{0, vsl::ImageLayout::General}};
+        render_description.subpasses[1].colors = {{1, vsl::ImageLayout::General}};
+        render_description.dependencies = {
+            {},
+            {.source = 0, .destination = 1, .sourceStage = vsl::PipelineStage::ColorAttachmentOutput, .destinationStage = vsl::PipelineStage::FragmentShader, .sourceAccess = vsl::AccessMask::ColorWrite, .destinationAccess = vsl::AccessMask::MemoryRead, .byRegion = true},
+            {.source = 1, .destination = vsl::ExternalSubpass, .sourceStage = vsl::PipelineStage::ColorAttachmentOutput, .destinationStage = vsl::PipelineStage::Transfer, .sourceAccess = vsl::AccessMask::ColorWrite, .destinationAccess = vsl::AccessMask::TransferRead}};
+        pass.emplace(device, render_description);
+        framebuffer.emplace(*pass, width, height, std::vector<vsl::ImageAccessor>{source, *color});
+        fragment.emplace(device, vsl_test::shader_path("reflection_input_attachment.frag.spv"));
+        namespace pl = vsl::pipeline_layout;
+        layout.emplace(device, pl::ShaderGroup("reflected input attachment", {*vertex, *fragment}), pl::ResourceBinding(sets),
+                       pl::ColorBlend{}, pl::InputAssembly{}, pl::Rasterization{pl::CullingMode::None}, pl::Multisample{},
+                       pl::DynamicState{}, vsl::Viewport(description), vsl::Scissor(description));
+        pipeline.emplace(*layout, *pass, 1);
+        vsl::StagingBuffer<vsl::MemoryType::TransferDestination> readback(device, width * height * 4);
+        auto manager = make_manager();
+        {
+            auto phase = manager.startPhase<vsl::ComputePhase>();
+            phase << vsl::command::RenderPassBegin(*framebuffer, std::vector<vsl::ClearValue>{
+                                                                     vsl::ClearColor{37.f / 255.f, 83.f / 255.f, 131.f / 255.f, 1}, vsl::ClearColor{}})
+                  << vsl::command::NextSubpass{} << *pipeline << vsl::Viewport(description) << vsl::Scissor(description) << vsl::command::BindGraphicResource(allocated[0], BindingDestination::Graphics) << vsl::command::Draw(3) << vsl::command::RenderPassEnd{};
+            vk::MemoryBarrier barrier{};
+            barrier.srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+            barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+            auto commands = manager.getBuffer();
+            commands._data->commandBuffers[commands.getCurrentBufferIdx()].pipelineBarrier(
+                vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eTransfer, {}, barrier, {}, {});
+            phase << vsl::command::CopyImageToBuffer(&readback, *color);
+        }
+        device._data->device.waitIdle();
+        auto mapped = readback.data(width * height * 4);
+        std::array<std::uint8_t, 4> pixel{};
+        std::memcpy(pixel.data(), static_cast<const std::uint8_t*>(mapped.data) + ((height / 2) * width + width / 2) * 4, 4);
+        for (std::size_t i = 0; i < 3; ++i)
+            EXPECT_NEAR(static_cast<int>(pixel[i]), (std::array{37, 83, 131})[i], 1) << "UNORM8 round-trip permits one rounding step";
+        EXPECT_EQ(pixel[3], 255);
+    }
+} // namespace
+
+namespace {
+    TEST(SpirvReflectorTest, VectorVertexInputArraysExpandEveryElementAtItsDeclaredLocation) {
+        vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection_vertex_arrays.vert.spv"));
+        ASSERT_TRUE(reflector.generated.vertex_input);
+        const auto& definitions = reflector.generated.vertex_input->definitions;
+        ASSERT_EQ(definitions.size(), 2u);
+        const auto found = std::ranges::find_if(definitions, [](const auto& definition) {
+            return definition.layouts.at(0).location == 3;
+        });
+        ASSERT_NE(found, definitions.end());
+        ASSERT_EQ(found->layouts.size(), 2u);
+        EXPECT_EQ(found->layouts[0].location, 3u);
+        EXPECT_EQ(found->layouts[1].location, 4u);
+        for (const auto& attribute : found->layouts)
+            EXPECT_EQ(attribute.format, vsl::data_format::FloatRGB);
+    }
+    TEST(SpirvReflectorTest, MatrixAndMultidimensionalArraysExpandAllColumnsIncludingWideLocations) {
+        vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection_vertex_array_shapes.vert.spv"));
+        ASSERT_TRUE(reflector.generated.vertex_input);
+        const auto& definitions = reflector.generated.vertex_input->definitions;
+        ASSERT_EQ(definitions.size(), 3u);
+        for (const auto& [first, step, format] : {
+                 std::tuple{2u, 1u, vsl::data_format::FloatRGB},
+                 std::tuple{7u, 2u, vsl::data_format::SignedFloat64RGB},
+                 std::tuple{20u, 1u, vsl::data_format::FloatRG}}) {
+            const auto found = std::ranges::find_if(definitions, [&](const auto& definition) {
+                return definition.layouts.at(0).location == first;
+            });
+            ASSERT_NE(found, definitions.end());
+            ASSERT_EQ(found->layouts.size(), 4u) << "location=" << first;
+            for (std::uint32_t column = 0; column < 4; ++column) {
+                EXPECT_EQ(found->layouts[column].location, first + column * step);
+                EXPECT_EQ(found->layouts[column].format, format);
+            }
+        }
+    }
+    TEST_F(ReflectedLocationsVulkanIntegrationTest, VertexArrayInjectionUsesFullStrideAndElementOffsets) {
+        vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_vertex_array_shapes.vert.spv"));
+        ASSERT_TRUE(reflector.generated.vertex_input);
+        auto layout = make_layout_state();
+        reflector.generated.vertex_input->injection(layout);
+        const auto& native = layout._data->info->vertexInput;
+        ASSERT_EQ(native.vertexAttributeDescriptionCount, 12u);
+        const auto attributes = std::span(native.pVertexAttributeDescriptions, native.vertexAttributeDescriptionCount);
+        const auto bindings = std::span(native.pVertexBindingDescriptions, native.vertexBindingDescriptionCount);
+        for (const auto& [first, step, bytes] : {std::tuple{2u, 1u, 12u}, std::tuple{7u, 2u, 24u}, std::tuple{20u, 1u, 8u}}) {
+            for (std::uint32_t column = 0; column < 4; ++column) {
+                const auto attribute = std::ranges::find(attributes, first + column * step, &vk::VertexInputAttributeDescription::location);
+                ASSERT_NE(attribute, attributes.end());
+                EXPECT_EQ(attribute->offset, column * bytes);
+                const auto binding = std::ranges::find(bindings, attribute->binding, &vk::VertexInputBindingDescription::binding);
+                ASSERT_NE(binding, bindings.end());
+                EXPECT_EQ(binding->stride, 4 * bytes);
+            }
+        }
+    }
+    TEST_F(ReflectedLocationsRenderVulkanIntegrationTest, ReflectedVertexArraysCombineBothElementsIntoTheGpuColor) {
+        vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_vertex_arrays.vert.spv"));
+        ASSERT_TRUE(reflector.generated.vertex_input);
+        const auto& definitions = reflector.generated.vertex_input->definitions;
+        ASSERT_EQ(definitions.size(), 2u);
+        ASSERT_EQ(definitions[0].layouts.size(), 1u);
+        ASSERT_EQ(definitions[0].layouts[0].location, 1u);
+        ASSERT_EQ(definitions[1].layouts.size(), 2u) << "Do not create a native pipeline with missing vertex attributes";
+        ASSERT_EQ(definitions[1].layouts[0].location, 3u);
+        ASSERT_EQ(definitions[1].layouts[1].location, 4u);
+        const std::array<std::array<float, 2>, 3> positions{{{-0.75f, -0.75f}, {0.75f, -0.75f}, {0, 0.75f}}};
+        const std::array<std::array<float, 6>, 3> colors{{{0.125f, 0.25f, 0.375f, 0.125f, 0.25f, 0.375f},
+                                                          {0.125f, 0.25f, 0.375f, 0.125f, 0.25f, 0.375f},
+                                                          {0.125f, 0.25f, 0.375f, 0.125f, 0.25f, 0.375f}}};
+        vsl::StagingBuffer<vsl::MemoryType::VertexBuffer> position_buffer(device, positions), color_buffer(device, colors);
+        pipeline.reset();
+        layout.reset();
+        vertex.emplace(device, vsl_test::shader_path("reflection_vertex_arrays.vert.spv"));
+        namespace pl = vsl::pipeline_layout;
+        layout.emplace(device, pl::ShaderGroup("reflected vertex arrays", {*vertex, *fragment}), *reflector.generated.vertex_input,
+                       pl::ColorBlend{}, pl::InputAssembly{}, pl::Rasterization{pl::CullingMode::None}, pl::Multisample{},
+                       pl::DynamicState{}, vsl::Viewport(description), vsl::Scissor(description));
+        pipeline.emplace(*layout, *pass);
+        expect_triangle_color(render([&](vsl::DefaultPhaseStream& stream) {
+            stream << vsl::command::BindVertexBuffer(position_buffer, color_buffer) << vsl::command::Draw(3);
+        }));
+    }
+} // namespace

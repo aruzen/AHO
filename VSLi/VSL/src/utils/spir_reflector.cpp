@@ -59,7 +59,7 @@ VSL_NAMESPACE::graphic_resource::Type spir_type_to_graphic_type(const spirv_cros
         case spirv_cross::SPIRType::Image:
             return gfx_src::Type::SampledImage;
         case spirv_cross::SPIRType::SampledImage:
-            return gfx_src::Type::CombinedImageSampler;
+            return type.image.dim == spv::DimBuffer ? gfx_src::Type::UniformTexelBuffer : gfx_src::Type::CombinedImageSampler;
         case spirv_cross::SPIRType::Sampler:
             return gfx_src::Type::Sampler;
         default:
@@ -90,6 +90,41 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
         case spv::ExecutionModelVertex:
             shaderType = ShaderFlag::Vertex;
             break;
+        case spv::ExecutionModelTessellationControl:
+            shaderType = ShaderFlag::TessellationControl;
+            break;
+        case spv::ExecutionModelTessellationEvaluation:
+            shaderType = ShaderFlag::TessellationEvaluation;
+            break;
+        case spv::ExecutionModelGeometry:
+            shaderType = ShaderFlag::Geometry;
+            break;
+        case spv::ExecutionModelRayGenerationKHR:
+            shaderType = ShaderFlag::Raygen;
+            break;
+        case spv::ExecutionModelIntersectionKHR:
+            shaderType = ShaderFlag::Intersection;
+            break;
+        case spv::ExecutionModelAnyHitKHR:
+            shaderType = ShaderFlag::AnyHit;
+            break;
+        case spv::ExecutionModelClosestHitKHR:
+            shaderType = ShaderFlag::ClosestHit;
+            break;
+        case spv::ExecutionModelMissKHR:
+            shaderType = ShaderFlag::Miss;
+            break;
+        case spv::ExecutionModelCallableKHR:
+            shaderType = ShaderFlag::Callable;
+            break;
+        case spv::ExecutionModelTaskNV:
+        case spv::ExecutionModelTaskEXT:
+            shaderType = ShaderFlag::Task;
+            break;
+        case spv::ExecutionModelMeshNV:
+        case spv::ExecutionModelMeshEXT:
+            shaderType = ShaderFlag::Mesh;
+            break;
         case spv::ExecutionModelFragment:
             shaderType = ShaderFlag::Fragment;
             break;
@@ -106,7 +141,9 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
         {shader_resources.uniform_buffers, graphic_resource::Type::UniformBuffer},
         {shader_resources.storage_buffers, graphic_resource::Type::StorageBuffer},
         {shader_resources.storage_images, graphic_resource::Type::StorageImage},
+        {shader_resources.subpass_inputs, graphic_resource::Type::InputAttachment},
         {shader_resources.acceleration_structures, graphic_resource::Type::AccelerationStructureNv}, // 例: NV拡張
+        {shader_resources.separate_images, graphic_resource::Type::SampledImage},
         {shader_resources.separate_samplers, graphic_resource::Type::Sampler},
         /*
             { resources.uniform_texel_buffers, graphic_resource::type::UniformTexelBuffer },
@@ -139,9 +176,12 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
             uint32_t set = comp.get_decoration(resource.id, spv::DecorationDescriptorSet);
             uint32_t binding = comp.get_decoration(resource.id, spv::DecorationBinding);
             const auto& type = comp.get_type(resource.type_id);
+            auto descriptor_type = gfx_type;
+            if ((gfx_type == Type::SampledImage || gfx_type == Type::StorageImage) && type.image.dim == spv::DimBuffer)
+                descriptor_type = gfx_type == Type::SampledImage ? Type::UniformTexelBuffer : Type::StorageTexelBuffer;
             generated.binding_points[set].emplace_back(BindingPoint{
                 .binding = binding,
-                .bindingType = gfx_type,
+                .bindingType = descriptor_type,
                 .shaderType = shaderType, // TODO
                 .amount = descriptor_count(comp, type),
             });
@@ -215,11 +255,18 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
         format = format.toVec(type.vecsize);
         if (not generated.vertex_input)
             generated.vertex_input.emplace();
-        VSL_NAMESPACE::pipeline_layout::VertexInputShapeDefinition definition{
-            .layouts = {type.columns, VSL_NAMESPACE::pipeline_layout::VertexInputLayoutDefinition{.format = format}}};
+        const auto array_elements = descriptor_count(comp, type);
+        constexpr auto max_location = std::numeric_limits<std::uint32_t>::max();
+        if (type.columns > max_location / array_elements)
+            throw exceptions::RuntimeException("SPIRVReflector", "Vertex input array column count overflow");
+        const auto columns = type.columns * array_elements;
         const auto location = comp.get_decoration(resource.id, spv::DecorationLocation);
         const auto locations_per_column = type.width == 64 && type.vecsize >= 3 ? 2u : 1u;
-        for (std::uint32_t column = 0; column < type.columns; ++column)
+        if (columns - 1 > (max_location - location) / locations_per_column)
+            throw exceptions::RuntimeException("SPIRVReflector", "Vertex input location range overflow");
+        VSL_NAMESPACE::pipeline_layout::VertexInputShapeDefinition definition{
+            .layouts = {columns, VSL_NAMESPACE::pipeline_layout::VertexInputLayoutDefinition{.format = format}}};
+        for (std::uint32_t column = 0; column < columns; ++column)
             definition.layouts[column].location = location + column * locations_per_column;
         generated.vertex_input->definitions.push_back(std::move(definition));
     }

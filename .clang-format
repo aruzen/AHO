@@ -9,7 +9,7 @@ BreakBeforeBraces: Attach
 AccessModifierOffset: -4
 IndentCaseLabels: true
 
-AllowShortFunctionsOnASingleLine: All
+AllowShortFunctionsOnASingleLine: Inline
 SpaceAfterTemplateKeyword: false
 BreakTemplateDeclarations: Yes
 IndentRequiresClause: false

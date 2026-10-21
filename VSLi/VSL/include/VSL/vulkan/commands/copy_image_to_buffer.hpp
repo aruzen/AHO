@@ -30,8 +30,7 @@ namespace VSL_NAMESPACE::command {
         template<MemoryType MemType, MemoryProperty BufMemProp, SharingMode ShareMode,
                  VSL_NAMESPACE::ImageType ImgType, VSL_NAMESPACE::MemoryProperty ImgMemProp, VSL_NAMESPACE::ImageLayout Layout>
         CopyImageToBuffer(Buffer<MemType, BufMemProp, ShareMode>& buffer, Image<ImgType, ImgMemProp, Layout>& image,
-                          ImageLayout layout = ImageLayout::General, ImageRegion region = {}, bool hostRead = false)
-            : CopyImageToBuffer(&buffer, image, layout, region, hostRead){};
+                          ImageLayout layout = ImageLayout::General, ImageRegion region = {}, bool hostRead = false);
 
         ImageAccessor image;
         BufferAccessor* buffer;
@@ -46,6 +45,12 @@ namespace VSL_NAMESPACE::command {
     private:
         std::shared_ptr<_impl::Buffer_impl> destination_;
     };
+
+    template<MemoryType MemType, MemoryProperty BufMemProp, SharingMode ShareMode,
+             VSL_NAMESPACE::ImageType ImgType, VSL_NAMESPACE::MemoryProperty ImgMemProp, VSL_NAMESPACE::ImageLayout Layout>
+    CopyImageToBuffer::CopyImageToBuffer(Buffer<MemType, BufMemProp, ShareMode>& buffer, Image<ImgType, ImgMemProp, Layout>& image,
+                                         ImageLayout layout, ImageRegion region, bool hostRead)
+        : CopyImageToBuffer(&buffer, image, layout, region, hostRead) {}
 } // namespace VSL_NAMESPACE::command
 
 #endif

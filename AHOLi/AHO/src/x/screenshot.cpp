@@ -14,6 +14,22 @@
 #include "../../../../thirdparty/stb_image_write.h"
 
 namespace AHO_NAMESPACE::x {
+    struct Screenshot::Data {
+        std::weak_ptr<window::WindowData> window;
+        ImageReadback reader;
+        std::optional<ImageReadbackTicket> ticket;
+        VSL_NAMESPACE::Completion completion;
+
+        Data(std::shared_ptr<window::WindowData> window, VSL_NAMESPACE::CommandManager manager);
+    };
+
+    namespace {
+        bool isBgra(VSL_NAMESPACE::data_format::___Format format);
+    } // namespace
+
+    Screenshot::Data::Data(std::shared_ptr<window::WindowData> window, VSL_NAMESPACE::CommandManager manager)
+        : window(std::move(window)), reader(std::move(manager)) {}
+
     namespace {
         bool isBgra(VSL_NAMESPACE::data_format::___Format format) {
             using enum VSL_NAMESPACE::data_format::___FormatTypes;
@@ -75,16 +91,6 @@ namespace AHO_NAMESPACE::x {
             throw std::runtime_error("Could not write screenshot: " + path.string());
     }
 
-    struct Screenshot::Data {
-        std::weak_ptr<window::WindowData> window;
-        ImageReadback reader;
-        std::optional<ImageReadbackTicket> ticket;
-        VSL_NAMESPACE::Completion completion;
-
-        Data(std::shared_ptr<window::WindowData> window, VSL_NAMESPACE::CommandManager manager)
-            : window(std::move(window)), reader(std::move(manager)) {}
-    };
-
     Screenshot::Screenshot(window::Window window) {
         if (!window || !window._data2 || !window.engine._data)
             throw std::invalid_argument("Screenshot requires a live AHO window");
@@ -137,7 +143,9 @@ namespace AHO_NAMESPACE::x {
         return true;
     }
 
-    bool Screenshot::ready() const { return _data && _data->ticket && _data->ticket->ready(); }
+    bool Screenshot::ready() const {
+        return _data && _data->ticket && _data->ticket->ready();
+    }
 
     ImagePixels Screenshot::read(std::uint64_t timeout) const {
         if (!_data || !_data->ticket)

@@ -18,6 +18,8 @@ add_library(AHOLi
         AHO/src/image_readback.cpp
         AHO/src/x/screenshot.cpp
         AHO/src/x/drawer/renderer2d.cpp
+        AHO/src/x/command/draw2d.cpp
+        AHO/src/x/drawer/renderer2d_impl.hpp
         AHO/src/engine.cpp
         AHO/src/resource/image.cpp
         AHO/src/resource/buffer.cpp
@@ -28,6 +30,7 @@ add_library(AHOLi
         AHO/include/AHO/x/screenshot.hpp
         AHO/include/AHO/x/drawer/draw_list.hpp
         AHO/include/AHO/x/drawer/renderer2d.hpp
+        AHO/include/AHO/x/command/draw2d.hpp
         AHO/include/aho/engine.hpp
         AHO/include/aho/concepts.hpp
         AHO/include/aho/pipeline/layouts.hpp

@@ -174,6 +174,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="AHO\include\AHO\x\drawer\renderer2d.hpp" />
+    <ClInclude Include="AHO\include\AHO\x\command\draw2d.hpp" />
+    <ClInclude Include="AHO\src\x\drawer\renderer2d_impl.hpp" />
     <ClInclude Include="AHO\include\AHO\x\drawer\draw_list.hpp" />
     <ClInclude Include="AHO\include\AHO\aho.hpp" />
     <ClInclude Include="AHO\include\AHO\concepts.hpp" />
@@ -218,6 +220,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AHO\src\x\drawer\renderer2d.cpp" />
+    <ClCompile Include="AHO\src\x\command\draw2d.cpp" />
     <ClCompile Include="AHO\src\drawer.cpp" />
     <ClCompile Include="AHO\src\x\drawer\draw_list.cpp" />
     <ClCompile Include="AHO\src\drawer\draw_phase.cpp" />

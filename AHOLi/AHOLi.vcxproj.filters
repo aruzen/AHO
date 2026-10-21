@@ -1,6 +1,12 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <ClInclude Include="AHO\include\AHO\x\command\draw2d.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="AHO\src\x\drawer\renderer2d_impl.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClInclude Include="AHO\include\AHO\x\drawer\renderer2d.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -9,6 +15,9 @@
     </ClInclude>
     <ClInclude Include="AHO\include\AHO\x\screenshot.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClCompile Include="AHO\src\x\drawer\renderer2d.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="AHO\src\x\command\draw2d.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="AHO\src\x\screenshot.cpp"><Filter>ソース ファイル</Filter></ClCompile>

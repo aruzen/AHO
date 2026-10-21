@@ -30,7 +30,7 @@ if (auto command = renderer.draw(phase, list, width, height))
     phase << *command;
 ```
 
-record()は記録を行ってbool、draw()は未記録のスナップショットをoptional<Draw2DCommand>で返します。draw()の時点で頂点をGPUバッファへコピーするので、元のDrawListは直後に変更・破棄できます。コマンドは作成したPhase内だけで記録できます。Phaseは記録中で、Rendererと同じdeviceでなければなりません。RenderPass/subpass/deviceの互換性はRenderer作成時と描画時で一致させてください。対象subpassはRGBA8/BGRA8のUNORMまたはsRGB、sample数1のcolor attachmentが1つ、depth/stencilなしに限定し、それ以外は構築時に拒否します。
+record()は記録を行ってbool、draw()は未記録のスナップショットをoptional<aho::x::command::Draw2DCommand>で返します。draw()の戻り値を使う場合は`<AHO/x/command/draw2d.hpp>`もincludeしてください。draw()の時点で頂点をGPUバッファへコピーするので、元のDrawListは直後に変更・破棄できます。コマンドは作成したPhase内だけで記録できます。Phaseは記録中で、Rendererと同じdeviceでなければなりません。RenderPass/subpass/deviceの互換性はRenderer作成時と描画時で一致させてください。対象subpassはRGBA8/BGRA8のUNORMまたはsRGB、sample数1のcolor attachmentが1つ、depth/stencilなしに限定し、それ以外は構築時に拒否します。
 
 座標は左上原点、右向きX・下向きYのピクセル座標です。シェーダーで描画先の幅・高さからNDCへ変換します。幅・高さは1〜2²⁴で、実デバイスのviewport/imageの上限も守る必要があります。Rendererは指定サイズのviewport/scissor、カリングなし・深度なし・通常の非乗算済みalpha blendingを設定します。後続の独自コマンドは必要な状態を再設定してください。
 

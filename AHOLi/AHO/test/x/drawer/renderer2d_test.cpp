@@ -1,30 +1,12 @@
 #include <AHO/x/drawer/renderer2d.hpp>
+#include <AHO/x/command/draw2d.hpp>
 #ifdef AHO_GPU_TESTS
-#include "support/render_fixture.hpp"
+#include "../../support/drawing2d_fixture.hpp"
 #include <AHO/image_readback.hpp>
 #include <AHO/drawer.hpp>
 namespace {
-    class Renderer2DVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
+    using Renderer2DVulkanIntegrationTest = aho_test::Drawing2DVulkanIntegrationTest;
 
-    protected:
-        using Renderer = aho::x::Renderer2D;
-        using List = aho::x::DrawList;
-        static aho::RGBA red() { return {1, 0, 0, 1}; }
-        static aho::RGBA green() { return {0, 1, 0, 1}; }
-        aho::ImagePixels pixels(vsl::CommandManager manager) {
-            aho::ImageReadback readback(manager);
-            auto ticket = readback.captureTicket(*color, vsl::ImageLayout::General);
-            if (!ticket)
-                throw std::runtime_error("No readback slot");
-            return ticket->read();
-        }
-        static std::array<unsigned, 4> pixel(const aho::ImagePixels& image, std::size_t x, std::size_t y) {
-            const auto i = y * image.rowStride + x * 4;
-            return {std::to_integer<unsigned>(image.bytes[i]), std::to_integer<unsigned>(image.bytes[i + 1]),
-                    std::to_integer<unsigned>(image.bytes[i + 2]), std::to_integer<unsigned>(image.bytes[i + 3])};
-        }
-    };
     TEST_F(Renderer2DVulkanIntegrationTest, SolidShapesTransformAndSnapshotRemainIndependentOfSourceList) {
         auto manager = make_manager();
         Renderer renderer(device, *pass, AHO_DRAW_SHADER_DIR);
@@ -86,24 +68,7 @@ namespace {
         textured.rectangle({0, 0, 1, 1}, red(), {1});
         EXPECT_THROW(renderer.draw(phase, textured, 8, 8), std::invalid_argument);
     }
-    TEST_F(Renderer2DVulkanIntegrationTest, DrawStreamRetainsSnapshotUntilSubmissionCompletes) {
-        auto manager = make_manager();
-        {
-            Renderer renderer(device, *pass, AHO_DRAW_SHADER_DIR, 1);
-            List list;
-            list.rectangle({0, 0, 8, 8}, green());
-            auto phase = manager.startPhase<vsl::ComputePhase>();
-            auto cmd = renderer.draw(phase, list, 8, 8);
-            ASSERT_TRUE(cmd);
-            auto native = phase << vsl::command::RenderPassBegin(*framebuffer);
-            aho::DrawStream<vsl::DefaultPhaseStream> stream{native};
-            stream << *cmd;
-            EXPECT_EQ(stream.phase_stream.pipeline->_data, cmd->getPipeline()._data);
-            stream << vsl::command::RenderPassEnd{};
-        }
-        const auto image = pixels(manager);
-        EXPECT_EQ(pixel(image, 4, 4), (std::array<unsigned, 4>{0, 255, 0, 255}));
-    }
+
     TEST_F(Renderer2DVulkanIntegrationTest, CancelledAndCompletedSubmissionsMakeSlotsReusable) {
         auto manager = make_manager();
         Renderer renderer(device, *pass, AHO_DRAW_SHADER_DIR, 1);
@@ -132,24 +97,7 @@ namespace {
         next.cancel();
         EXPECT_EQ(pixel(pixels(manager), 4, 4), (std::array<unsigned, 4>{0, 255, 0, 255}));
     }
-    TEST_F(Renderer2DVulkanIntegrationTest, CommandsRejectOtherManagersAndCancelledPhases) {
-        Renderer renderer(device, *pass, AHO_DRAW_SHADER_DIR);
-        auto manager = make_manager();
-        auto other = make_manager();
-        List list;
-        list.rectangle({0, 0, 8, 8}, red());
-        auto phase = manager.startPhase<vsl::ComputePhase>();
-        auto command = renderer.draw(phase, list, 8, 8);
-        ASSERT_TRUE(command);
-        {
-            auto otherPhase = other.startPhase<vsl::ComputePhase>();
-            EXPECT_THROW(command->invoke(other.getPool(), other.getBuffer(), other), std::logic_error);
-            otherPhase.cancel();
-        }
-        phase.cancel();
-        EXPECT_THROW(command->invoke(manager.getPool(), manager.getBuffer(), manager), std::logic_error);
-        EXPECT_THROW(renderer.draw(phase, list, 8, 8), std::invalid_argument);
-    }
+
     TEST_F(Renderer2DVulkanIntegrationTest, UnsupportedPassIsRejectedBeforePipelineCreation) {
         EXPECT_THROW((Renderer(device, *pass, AHO_DRAW_SHADER_DIR, 1, 1)), std::out_of_range);
         vsl::RenderPassDescription info;
@@ -171,7 +119,6 @@ namespace {
 } // namespace
 #else
 #include <gtest/gtest.h>
-static_assert(vsl::command::is_command<aho::x::Draw2DCommand>);
 TEST(Renderer2DTest, InvalidConstructionFailsBeforeNativeDeviceAccess) {
     EXPECT_THROW((aho::x::Renderer2D({}, {}, "", 0)), std::invalid_argument);
 }

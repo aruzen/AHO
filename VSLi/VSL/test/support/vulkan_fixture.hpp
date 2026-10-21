@@ -55,6 +55,17 @@ namespace vsl_test {
             std::lock_guard lock(validation_mutex_);
             return !validation_errors_.empty();
         }
+        // Test-only validation-layer failure injection; application callbacks keep returning VK_FALSE.
+        void expect_validation_abort(const char* vuid) {
+            std::lock_guard lock(validation_mutex_);
+            expected_abort_vuid_ = vuid;
+            expected_abort_count_ = 0;
+            abort_validation_errors_ = true;
+        }
+        std::size_t validation_abort_count() {
+            std::lock_guard lock(validation_mutex_);
+            return expected_abort_count_;
+        }
         virtual bool validate_vulkan() const { return false; }
         virtual bool require_timeline_semaphore() const { return false; }
         std::shared_ptr<vsl::_impl::Vulkan_impl<false>> instance;

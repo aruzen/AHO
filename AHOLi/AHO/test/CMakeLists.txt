@@ -39,6 +39,7 @@ if (AHO_TEST_SOURCES)
             image_readback_test.cpp
             x/screenshot_test.cpp
             x/drawer/renderer2d_test.cpp
+            x/command/draw2d_test.cpp
     )
     target_compile_definitions(aho-gpu-test PRIVATE AHO_GPU_TESTS=1
             VSL_TEST_SHADER_DIR="${CMAKE_BINARY_DIR}/VSLi/VSL/test/shaders"

@@ -44,7 +44,7 @@ namespace VSL_NAMESPACE {
         std::uint32_t imageIndex = UINT32_MAX;
         std::uint32_t frameSlot = 0;
         PipelineStage waitStage;
-        Completion completion() const { return _completion; }
+        Completion completion() const;
         virtual void cancel();
         ComputePhase(const ComputePhase&) = delete;
         ComputePhase& operator=(const ComputePhase&) = delete;
@@ -126,6 +126,10 @@ namespace VSL_NAMESPACE {
         template<typename T>
         void resolveHolderRequirePtr(std::shared_ptr<T> cmd);
     };
+
+    inline Completion ComputePhase::completion() const {
+        return _completion;
+    }
 
     DefaultPhaseStream ComputePhase::operator<<(command::is_command auto cmd) {
         DefaultPhaseStream op{this->manager};

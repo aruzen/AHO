@@ -2,8 +2,12 @@
 namespace {
     using DescriptorVulkanIntegrationTest = vsl_test::ComputeVulkanIntegrationTest;
     class DescriptorOwnershipVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
+        bool validate_vulkan() const override;
     };
+
+    bool DescriptorOwnershipVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
     TEST_F(DescriptorOwnershipVulkanIntegrationTest, OrdinaryScopeExitReleasesPoolAndResourceWithoutDestroy) {
         std::weak_ptr<vsl::_impl::GraphicResourcePool_impl> weak_pool;
         std::weak_ptr<vsl::_impl::GraphicResource_impl> weak_resource;

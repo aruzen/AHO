@@ -4,20 +4,27 @@
 
 namespace {
     class ImageReadbackCommandVulkanIntegrationTest : public vsl_test::ImageTransferVulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
+        bool validate_vulkan() const override;
+
     protected:
-        TransferImage initialized_image(vsl::CommandManager manager) {
-            const std::array<std::uint32_t, 4> values{11, 22, 33, 44};
-            TransferImage image(device, 2, 2, vsl::data_format::UnsignedInt);
-            vsl::StagingBuffer<> source(device, values);
-            vsl::ComputePhase phase(manager);
-            phase << vsl::command::ChangeImageBarrier(image, vsl::ImageLayout::TransferDstOptimal)
-                  << vsl::command::CopyBufferToImage(image, &source, vsl::ImageLayout::TransferDstOptimal);
-            if (phase.submit() != vsl::ComputePhase::SubmitResult::Success || !phase.completion().wait())
-                throw std::runtime_error("Image setup submission failed");
-            return image;
-        }
+        TransferImage initialized_image(vsl::CommandManager manager);
     };
+
+    bool ImageReadbackCommandVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
+
+    ImageReadbackCommandVulkanIntegrationTest::TransferImage ImageReadbackCommandVulkanIntegrationTest::initialized_image(vsl::CommandManager manager) {
+        const std::array<std::uint32_t, 4> values{11, 22, 33, 44};
+        TransferImage image(device, 2, 2, vsl::data_format::UnsignedInt);
+        vsl::StagingBuffer<> source(device, values);
+        vsl::ComputePhase phase(manager);
+        phase << vsl::command::ChangeImageBarrier(image, vsl::ImageLayout::TransferDstOptimal)
+              << vsl::command::CopyBufferToImage(image, &source, vsl::ImageLayout::TransferDstOptimal);
+        if (phase.submit() != vsl::ComputePhase::SubmitResult::Success || !phase.completion().wait())
+            throw std::runtime_error("Image setup submission failed");
+        return image;
+    }
 
     TEST_F(ImageReadbackCommandVulkanIntegrationTest, RecordsCopyAndRestoresLayoutWithoutSubmitting) {
         const std::array<std::uint32_t, 4> first{11, 22, 33, 44}, second{55, 66, 77, 88};
@@ -113,4 +120,4 @@ namespace {
         EXPECT_EQ(buffer._data->recordingSubmission->resources, retained);
         phase.cancel();
     }
-}
+} // namespace

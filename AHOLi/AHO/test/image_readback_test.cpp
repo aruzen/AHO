@@ -5,8 +5,12 @@
 #include <cstring>
 namespace {
     class ImageReadbackVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
+        bool validate_vulkan() const override;
     };
+
+    bool ImageReadbackVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
     namespace pl = VSL_NAMESPACE::pipeline_layout;
 
     TEST_F(ImageReadbackVulkanIntegrationTest, ExistingCommandsReadPixelsWithinTheDrawingPhase) {
@@ -271,7 +275,7 @@ namespace {
 } // namespace
 
 namespace {
-    TEST_F(ImageReadbackVulkanIntegrationTest, ReusesGpuCapacityAndCallerCpuStorageAcrossFrames) {
+    TEST_F(ImageReadbackVulkanIntegrationTest, ReusesGPUCapacityAndCallerCPUStorageAcrossFrames) {
         auto manager = make_manager();
         AHO_NAMESPACE::ImageReadback reader(manager, 8 * 8 * 4);
         EXPECT_FALSE(reader.ready());
@@ -330,8 +334,12 @@ namespace {
     }
 
     class ImageReadbackBusyVulkanIntegrationTest : public ImageReadbackVulkanIntegrationTest {
-        bool require_timeline_semaphore() const override { return true; }
+        bool require_timeline_semaphore() const override;
     };
+
+    bool ImageReadbackBusyVulkanIntegrationTest::require_timeline_semaphore() const {
+        return true;
+    }
 
     TEST_F(ImageReadbackBusyVulkanIntegrationTest, BusyCaptureDoesNotWaitOrOverwriteAnOutstandingTransfer) {
         auto manager = make_manager();

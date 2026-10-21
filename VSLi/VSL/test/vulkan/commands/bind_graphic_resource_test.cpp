@@ -18,8 +18,12 @@ namespace {
 
 namespace {
     class DescriptorResourceLifetimeVulkanIntegrationTest : public vsl_test::ComputeVulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
+        bool validate_vulkan() const override;
     };
+
+    bool DescriptorResourceLifetimeVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
     TEST_F(DescriptorResourceLifetimeVulkanIntegrationTest, DispatchKeepsDescriptorBufferAndPipelineAliveUntilCompletion) {
         auto manager = make_manager();
         vsl::Completion completion;

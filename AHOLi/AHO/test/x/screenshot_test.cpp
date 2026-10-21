@@ -109,23 +109,26 @@ namespace {
 #else
     class ScreenshotWindowIntegration : public aho_test::LiveGpuTest {
     protected:
-        void requireReadback() {
-            start_engine();
-            const auto window = engine->getWindow();
-            const auto device = engine->_data->logical_device._data;
-            const auto caps = device->parentDevice->device.getSurfaceCapabilitiesKHR(window._data2->surface->_data->surface);
-            if (!(caps.supportedUsageFlags & vk::ImageUsageFlagBits::eTransferSrc))
-                GTEST_SKIP() << "Surface does not support TransferSrc";
-        }
-        auto clear(float red, float green, float blue) {
-            return [=, this](auto& stream) {
-                auto window = engine->getWindow();
-                auto begin = vsl::command::RenderPassBegin(window._data2->render_pass, window._data2->frame_buffer);
-                begin.clearValues[0] = vsl::ClearColor{red, green, blue, 1};
-                stream << begin;
-            };
-        }
+        void requireReadback();
+        auto clear(float red, float green, float blue);
     };
+
+    void ScreenshotWindowIntegration::requireReadback() {
+        start_engine();
+        const auto window = engine->getWindow();
+        const auto device = engine->_data->logical_device._data;
+        const auto caps = device->parentDevice->device.getSurfaceCapabilitiesKHR(window._data2->surface->_data->surface);
+        if (!(caps.supportedUsageFlags & vk::ImageUsageFlagBits::eTransferSrc))
+            GTEST_SKIP() << "Surface does not support TransferSrc";
+    }
+    auto ScreenshotWindowIntegration::clear(float red, float green, float blue) {
+        return [=, this](auto& stream) {
+            auto window = engine->getWindow();
+            auto begin = vsl::command::RenderPassBegin(window._data2->render_pass, window._data2->frame_buffer);
+            begin.clearValues[0] = vsl::ClearColor{red, green, blue, 1};
+            stream << begin;
+        };
+    }
 
     TEST_F(ScreenshotWindowIntegration, CapturesTheRequestedFrameAndSavesPngWithSharedBusyState) {
         ASSERT_NO_FATAL_FAILURE(requireReadback());

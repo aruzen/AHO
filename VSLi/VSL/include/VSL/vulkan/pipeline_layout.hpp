@@ -23,8 +23,7 @@ namespace VSL_NAMESPACE {
 
     class FrozenPipelineLayout : public PipelineLayoutAccessor {
         friend struct PipelineLayout;
-        explicit FrozenPipelineLayout(std::shared_ptr<_impl::PipelineLayout_impl> data)
-            : PipelineLayoutAccessor{std::move(data)} {}
+        explicit FrozenPipelineLayout(std::shared_ptr<_impl::PipelineLayout_impl> data);
     };
 
     struct PipelineLayout : PipelineLayoutEditAccessor {
@@ -42,6 +41,16 @@ namespace VSL_NAMESPACE {
         explicit PipelineLayout(std::shared_ptr<_impl::PipelineLayout_impl> data);
         PipelineLayout clone_state() const;
     };
+
+    namespace helper {
+        void expansionPipelineLayoutArgs(PipelineLayoutEditAccessor&);
+
+        template<pipeline_layout_injecter T, typename... Args>
+        void expansionPipelineLayoutArgs(PipelineLayoutEditAccessor& layout, T&& stage, Args&&... args);
+    } // namespace helper
+
+    inline FrozenPipelineLayout::FrozenPipelineLayout(std::shared_ptr<_impl::PipelineLayout_impl> data)
+        : PipelineLayoutAccessor{std::move(data)} {}
 
     namespace helper {
         inline void expansionPipelineLayoutArgs(PipelineLayoutEditAccessor&) {}

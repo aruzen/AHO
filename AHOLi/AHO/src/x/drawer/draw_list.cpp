@@ -27,7 +27,7 @@ namespace AHO_NAMESPACE::x {
 
     const Transform2D& DrawList::transform() const noexcept { return _transform; }
 
-    void DrawList::setTransform(Transform2D value) {
+    void DrawList::set_transform(Transform2D value) {
         for (const auto f : {value.xx, value.xy, value.yx, value.yy, value.x, value.y})
             if (!std::isfinite(f))
                 throw std::invalid_argument("Draw transform requires finite values");
@@ -73,7 +73,7 @@ namespace AHO_NAMESPACE::x {
             _batches.reserve(std::min(_batches.max_size(), std::max(std::size_t{1}, _batches.capacity() * 2)));
         _vertices.insert(_vertices.end(), vertices.begin(), vertices.end());
         if (merge)
-            _batches.back().vertexCount += count;
+            _batches.back().vertex_count += count;
         else
             _batches.push_back({texture, first, count});
     }

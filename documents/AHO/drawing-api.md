@@ -6,7 +6,7 @@
 aho::x::DrawList list;
 list.reserve(1024);
 list.rectangle({10, 20, 100, 50}, aho::RGBA(1, 0, 0, 1));
-list.setTransform({.xx = 2, .yy = 2, .x = 10, .y = 20});
+list.set_transform({.xx = 2, .yy = 2, .x = 10, .y = 20});
 list.triangle(triangle, aho::RGBA(0, 1, 0, 1));
 // list.geometry(mesh, color)は同じ座標情報を持つfloat/2Dのtriangles()を受け付ける。
 ```

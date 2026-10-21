@@ -36,7 +36,7 @@ namespace AHO_NAMESPACE::x {
 
     struct DrawBatch {
         TextureId texture;
-        std::uint32_t firstVertex, vertexCount;
+        std::uint32_t first_vertex, vertex_count;
     };
 
     // CPUで再利用する描画リスト。追加順を保ち、隣り合う同一materialだけをまとめる。
@@ -48,7 +48,7 @@ namespace AHO_NAMESPACE::x {
         [[nodiscard]] std::span<const DrawVertex> vertices() const noexcept;
         [[nodiscard]] std::span<const DrawBatch> batches() const noexcept;
         [[nodiscard]] const Transform2D& transform() const noexcept;
-        void setTransform(Transform2D value);
+        void set_transform(Transform2D value);
         void triangle(const Triangle<float, VSL_NAMESPACE::D2>& shape, const RGBA& color);
         void rectangle(DrawRect rect, const RGBA& color, TextureId texture = {}, DrawRect uv = {0, 0, 1, 1});
         // Polygonなどの既存の三角形ビューを、実装型に依存せず追加できる。

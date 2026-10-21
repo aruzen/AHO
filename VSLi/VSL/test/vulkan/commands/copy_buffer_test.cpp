@@ -3,10 +3,15 @@
 
 namespace {
     class CopyBufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
+        bool validate_vulkan() const override;
     };
 
     using Native = vsl::Buffer<vsl::MemoryType::TransferSource | vsl::MemoryType::TransferDestination, vsl::MemoryProperty::HostVisible>;
+
+    bool CopyBufferVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
+
     TEST_F(CopyBufferVulkanIntegrationTest, UnalignedRangesAndDeferredCommandsRetainTheOriginalBuffers) {
         auto manager = make_manager();
         Native destination(device, 8);

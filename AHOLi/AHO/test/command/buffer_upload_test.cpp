@@ -15,8 +15,12 @@ namespace {
     using aho_test::CountingCustomization;
 
     class BufferUploadVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
+        bool validate_vulkan() const override;
     };
+
+    bool BufferUploadVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
 
     TEST_F(BufferUploadVulkanIntegrationTest, CPUUploadAndGPUCopiesShareTheSameCommandsAndRetainContents) {
         std::array<std::byte, 8> expected{std::byte{11}, std::byte{22}, std::byte{33}, std::byte{44}, std::byte{55}, std::byte{66}, std::byte{77}, std::byte{88}};

@@ -10,21 +10,28 @@
 namespace {
     namespace resource = aho::x::resource;
     class TextureUpdateVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
+        bool validate_vulkan() const override;
 
     protected:
-        aho::ImagePixels read(vsl::CommandManager manager, const resource::Texture& texture) {
-            aho::ImageReadback reader(manager);
-            if (!reader.capture(texture.image(), vsl::ImageLayout::ShaderReadOnlyOptimal))
-                throw std::runtime_error("Readback unavailable");
-            return reader.read();
-        }
-
-        void submit(vsl::ComputePhase& phase) {
-            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::Success);
-            ASSERT_TRUE(phase.completion().wait());
-        }
+        aho::ImagePixels read(vsl::CommandManager manager, const resource::Texture& texture);
+        void submit(vsl::ComputePhase& phase);
     };
+
+    bool TextureUpdateVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
+
+    aho::ImagePixels TextureUpdateVulkanIntegrationTest::read(vsl::CommandManager manager, const resource::Texture& texture) {
+        aho::ImageReadback reader(manager);
+        if (!reader.capture(texture.image(), vsl::ImageLayout::ShaderReadOnlyOptimal))
+            throw std::runtime_error("Readback unavailable");
+        return reader.read();
+    }
+
+    void TextureUpdateVulkanIntegrationTest::submit(vsl::ComputePhase& phase) {
+        ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::Success);
+        ASSERT_TRUE(phase.completion().wait());
+    }
 
     TEST_F(TextureUpdateVulkanIntegrationTest, InitialPatchClearsUntouchedPixelsAndReportsMetadata) {
         auto manager = make_manager();
@@ -162,6 +169,7 @@ namespace {
         auto command = texture.update(upload, {.width = 1, .height = 1});
         EXPECT_THROW(command.invoke(manager.getPool(), manager.getBuffer(), manager), std::logic_error);
     }
+
     TEST_F(TextureUpdateVulkanIntegrationTest, CPUToOnGPUUploadFeedsTextureUpdateInTheSamePhase) {
         const std::array<std::byte, 4> pixel{std::byte{11}, std::byte{37}, std::byte{73}, std::byte{255}};
         aho::resource::Buffer<aho::resource::BufferType::General> cpu;

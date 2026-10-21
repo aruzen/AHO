@@ -204,8 +204,12 @@ TEST(GeneralBufferOwnershipTest, LastOwnerDestructionReleasesTheArray) {
 #else
 namespace {
     class GPUFriendlyBufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
+        bool validate_vulkan() const override;
     };
+
+    bool GPUFriendlyBufferVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
 
     TEST_F(GPUFriendlyBufferVulkanIntegrationTest, LogicalLengthAndReservedCapacityAreIndependent) {
         aho::resource::Buffer<aho::resource::BufferType::GPUFriendly> buffer(device);

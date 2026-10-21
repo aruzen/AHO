@@ -66,11 +66,18 @@ StorageとCustomizationの型を保った`Buffer<Custom, Storage, Customization>
 ```cpp
 struct Customization {
     vsl::LogicalDeviceAccessor device;
-    auto map(Native& storage) { return storage.data(); }
-    Native reallocate(const Native&, std::size_t capacity) {
-        return Native(device, capacity);
-    }
+    auto map(Native& storage);
+    Native reallocate(const Native&, std::size_t capacity);
 };
+
+auto Customization::map(Native& storage) {
+    return storage.data();
+}
+
+Native Customization::reallocate(const Native&, std::size_t capacity) {
+    return Native(device, capacity);
+}
+
 auto custom = aho::resource::make_custom_buffer(
     Native(device, 64), Customization{device});
 custom.reserve(128);

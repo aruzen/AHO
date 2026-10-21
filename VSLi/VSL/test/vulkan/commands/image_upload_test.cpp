@@ -6,8 +6,12 @@
 
 namespace {
     class ImageUploadVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
+        bool validate_vulkan() const override;
     };
+
+    bool ImageUploadVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
 
     TEST_F(ImageUploadVulkanIntegrationTest, OwnsMappedSourceAfterTheCallerDropsItAndCopiesAnOffsetRegion) {
         using Image = vsl::Image<vsl::ImageType::Sampled | vsl::ImageType::TransferDst | vsl::ImageType::TransferSrc>;

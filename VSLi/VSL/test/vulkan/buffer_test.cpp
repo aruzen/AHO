@@ -45,6 +45,20 @@ namespace {
         EXPECT_TRUE(mapped.copy(replacement.data(), replacement.size()));
         EXPECT_EQ(std::memcmp(mapped.data, replacement.data(), sizeof(replacement)), 0);
     }
+    TEST_F(BufferVulkanIntegrationTest, PointerCopyPreservesOverlappingSourceAndRejectsInvalidCounts) {
+        if (!host_coherent_available())
+            GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
+        const std::array<std::uint32_t, 4> initial{3, 5, 7, 11};
+        HostBuffer buffer(device, initial);
+        auto mapped = buffer.data();
+        auto* source = static_cast<std::uint32_t*>(mapped.data) + 1;
+        ASSERT_TRUE(buffer.copy(source, std::size_t{3}));
+        const std::array<std::uint32_t, 4> expected{5, 7, 11, 11};
+        EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
+        EXPECT_TRUE(buffer.copy(static_cast<std::uint32_t*>(nullptr), std::size_t{0}));
+        EXPECT_FALSE(buffer.copy(source, std::numeric_limits<std::size_t>::max()));
+        EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
+    }
     TEST_F(BufferVulkanIntegrationTest, CopiesThroughDeviceLocalBufferOnGPU) {
         if (!host_coherent_available())
             GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";

@@ -31,6 +31,132 @@ static_assert(single.value.x.value == -1);
 static_assert(pair.value.x.value == -1 && pair.value.y.value == 2);
 static_assert(triple.value.x.value == -1 && triple.value.y.value == 2 && triple.value.z.value == -3);
 #else
+
+#include "../support/asymmetric_arithmetic.hpp"
+#include "../support/arithmetic_geometry.hpp"
+namespace {
+    using namespace aho_test::arithmetic;
+    template<class CI, class T>
+    using ArithmeticPoint = aho::_Point<T, typename CI::dimension, CI>;
+    template<class CI, class T>
+    using ArithmeticPointVector = aho::_Vector<T, typename CI::dimension, CI>;
+    template<class CI>
+    class PointArithmeticConstraintTest : public testing::Test {};
+    TYPED_TEST_SUITE(PointArithmeticConstraintTest, ArithmeticGeometryCoordinates);
+    TYPED_TEST(PointArithmeticConstraintTest, BinaryOperatorsUseThePointScalarOnTheLeft) {
+        using CI = TypeParam;
+        using PointResult = ArithmeticPoint<CI, int>;
+        using VectorResult = ArithmeticPointVector<CI, int>;
+        constexpr auto lhs = arithmetic_geometry<ArithmeticPoint<CI, LeftOperand>>();
+        constexpr auto point = arithmetic_geometry<ArithmeticPoint<CI, Operand>>(4, 5, 7);
+        constexpr auto vector = arithmetic_geometry<ArithmeticPointVector<CI, Operand>>(4, 5, 7);
+        constexpr Operand factor{4};
+        static_assert(std::same_as<decltype(lhs - point), VectorResult>);
+        static_assert(std::same_as<decltype(lhs + vector), PointResult>);
+        static_assert(std::same_as<decltype(lhs - vector), PointResult>);
+        static_assert(std::same_as<decltype(lhs * factor), PointResult>);
+        static_assert(std::same_as<decltype(lhs / factor), PointResult>);
+        static_assert(arithmetic_values_are(lhs - point, 8, 15, 21));
+        static_assert(arithmetic_values_are(lhs + vector, 16, 25, 35));
+        static_assert(arithmetic_values_are(lhs - vector, 8, 15, 21));
+        static_assert(arithmetic_values_are(lhs * factor, 48, 80, 112));
+        static_assert(arithmetic_values_are(lhs / factor, 3, 5, 7));
+        EXPECT_TRUE(arithmetic_values_are(lhs - point, 8, 15, 21));
+        EXPECT_TRUE(arithmetic_values_are(lhs + vector, 16, 25, 35));
+        EXPECT_TRUE(arithmetic_values_are(lhs - vector, 8, 15, 21));
+        EXPECT_TRUE(arithmetic_values_are(lhs * factor, 48, 80, 112));
+        EXPECT_TRUE(arithmetic_values_are(lhs / factor, 3, 5, 7));
+        using ReversePoint = ArithmeticPoint<CI, Operand>;
+        using ReverseVector = ArithmeticPointVector<CI, LeftOperand>;
+        EXPECT_FALSE((CanSubtract<ReversePoint, decltype(lhs)>));
+        EXPECT_FALSE((CanAdd<ReversePoint, ReverseVector>));
+        EXPECT_FALSE((CanSubtract<ReversePoint, ReverseVector>));
+        EXPECT_FALSE((CanMultiply<ReversePoint, LeftOperand>));
+        EXPECT_FALSE((CanDivide<ReversePoint, LeftOperand>));
+    }
+    TYPED_TEST(PointArithmeticConstraintTest, CompoundOperatorsMutateEveryComponentAndReturnTheSamePoint) {
+        using CI = TypeParam;
+        using Point = ArithmeticPoint<CI, LeftOperand>;
+        auto lhs = arithmetic_geometry<Point>();
+        constexpr auto rhs = arithmetic_geometry<ArithmeticPointVector<CI, Operand>>(4, 5, 7);
+        constexpr Operand factor{4};
+        static_assert(std::same_as<decltype(lhs += rhs), Point&>);
+        static_assert(std::same_as<decltype(lhs -= rhs), Point&>);
+        static_assert(std::same_as<decltype(lhs *= factor), Point&>);
+        static_assert(std::same_as<decltype(lhs /= factor), Point&>);
+        EXPECT_EQ(&(lhs += rhs), &lhs);
+        EXPECT_TRUE(arithmetic_values_are(lhs, 16, 25, 35));
+        EXPECT_EQ(&(lhs -= rhs), &lhs);
+        EXPECT_TRUE(arithmetic_values_are(lhs, 12, 20, 28));
+        EXPECT_EQ(&(lhs *= factor), &lhs);
+        EXPECT_TRUE(arithmetic_values_are(lhs, 48, 80, 112));
+        EXPECT_EQ(&(lhs /= factor), &lhs);
+        EXPECT_TRUE(arithmetic_values_are(lhs, 12, 20, 28));
+        EXPECT_TRUE(arithmetic_values_are(rhs, 4, 5, 7));
+        EXPECT_EQ(factor.value, 4);
+    }
+    TYPED_TEST(PointArithmeticConstraintTest, AssignmentOnlyScalarsDoNotNeedBinaryOperators) {
+        using CI = TypeParam;
+        using Point = ArithmeticPoint<CI, AssignmentOnly>;
+        using RightPoint = ArithmeticPoint<CI, Operand>;
+        using RightVector = ArithmeticPointVector<CI, Operand>;
+        static_assert(!CanSubtract<Point, RightPoint>);
+        static_assert(!CanAdd<Point, RightVector> && !CanSubtract<Point, RightVector>);
+        static_assert(!CanMultiply<Point, Operand> && !CanDivide<Point, Operand>);
+        auto lhs = arithmetic_geometry<Point>();
+        constexpr auto rhs = arithmetic_geometry<RightVector>(4, 5, 7);
+        EXPECT_EQ(&(lhs += rhs), &lhs);
+        EXPECT_TRUE(arithmetic_values_are(lhs, 16, 25, 35));
+        EXPECT_EQ(&(lhs -= rhs), &lhs);
+        EXPECT_TRUE(arithmetic_values_are(lhs, 12, 20, 28));
+        EXPECT_EQ(&(lhs *= Operand{4}), &lhs);
+        EXPECT_TRUE(arithmetic_values_are(lhs, 48, 80, 112));
+        EXPECT_EQ(&(lhs /= Operand{4}), &lhs);
+        EXPECT_TRUE(arithmetic_values_are(lhs, 12, 20, 28));
+    }
+    TYPED_TEST(PointArithmeticConstraintTest, ResultsUseConstComponentOverloadsRatherThanRvalueOverloads) {
+        using CI = TypeParam;
+        using PointResult = ArithmeticPoint<CI, int>;
+        using VectorResult = ArithmeticPointVector<CI, int>;
+        constexpr auto lhs = arithmetic_geometry<ArithmeticPoint<CI, CategoryResult>>();
+        constexpr auto point = arithmetic_geometry<ArithmeticPoint<CI, CategoryResult>>(4, 5, 7);
+        constexpr auto vector = arithmetic_geometry<ArithmeticPointVector<CI, CategoryResult>>(4, 5, 7);
+        constexpr CategoryResult factor{4};
+        static_assert(std::same_as<decltype(lhs - point), VectorResult>);
+        static_assert(std::same_as<decltype(lhs + vector), PointResult>);
+        static_assert(std::same_as<decltype(lhs - vector), PointResult>);
+        static_assert(std::same_as<decltype(lhs * factor), PointResult>);
+        static_assert(std::same_as<decltype(lhs / factor), PointResult>);
+        static_assert(std::same_as<decltype(std::declval<CategoryResult>() * factor), long>);
+        static_assert(std::same_as<decltype(std::declval<CategoryResult>() / factor), long>);
+        static_assert(arithmetic_values_are(lhs - point, 8, 15, 21));
+        static_assert(arithmetic_values_are(lhs + vector, 16, 25, 35));
+        static_assert(arithmetic_values_are(lhs - vector, 8, 15, 21));
+        static_assert(arithmetic_values_are(lhs * factor, 48, 80, 112));
+        static_assert(arithmetic_values_are(lhs / factor, 3, 5, 7));
+        EXPECT_TRUE(arithmetic_values_are(lhs - point, 8, 15, 21));
+        EXPECT_TRUE(arithmetic_values_are(lhs + vector, 16, 25, 35));
+        EXPECT_TRUE(arithmetic_values_are(lhs - vector, 8, 15, 21));
+        EXPECT_TRUE(arithmetic_values_are(lhs * factor, 48, 80, 112));
+        EXPECT_TRUE(arithmetic_values_are(lhs / factor, 3, 5, 7));
+    }
+    TYPED_TEST(PointArithmeticConstraintTest, RejectsMutableOnlyBinaryOperationsAndMissingCompoundAssignments) {
+        using CI = TypeParam;
+        using Mutable = ArithmeticPoint<CI, MutableOnly>;
+        using MutableVector = ArithmeticPointVector<CI, MutableOnly>;
+        using BinaryOnly = ArithmeticPoint<CI, CategoryResult>;
+        using BinaryOnlyVector = ArithmeticPointVector<CI, CategoryResult>;
+        EXPECT_FALSE((CanSubtract<Mutable, Mutable>));
+        EXPECT_FALSE((CanAdd<Mutable, MutableVector>));
+        EXPECT_FALSE((CanSubtract<Mutable, MutableVector>));
+        EXPECT_FALSE((CanMultiply<Mutable, MutableOnly>));
+        EXPECT_FALSE((CanDivide<Mutable, MutableOnly>));
+        EXPECT_FALSE((CanAddAssign<BinaryOnly, BinaryOnlyVector>));
+        EXPECT_FALSE((CanSubtractAssign<BinaryOnly, BinaryOnlyVector>));
+        EXPECT_FALSE((CanMultiplyAssign<BinaryOnly, CategoryResult>));
+        EXPECT_FALSE((CanDivideAssign<BinaryOnly, CategoryResult>));
+    }
+} // namespace
 #include "../support/one_way_cast.hpp"
 namespace {
     template<class T>

@@ -29,11 +29,11 @@ namespace aho_test::arithmetic {
             else
                 return value.value;
         };
-        bool result = scalar(v.value.template component<0>()) == first;
+        bool result = scalar(v.value.___AN1) == first;
         if constexpr (V::dimension::dimension >= 2)
-            result = result && scalar(v.value.template component<1>()) == second;
+            result = result && scalar(v.value.___AN2) == second;
         if constexpr (V::dimension::dimension == 3)
-            result = result && scalar(v.value.template component<2>()) == third;
+            result = result && scalar(v.value.___AN3) == third;
         return result;
     }
 } // namespace aho_test::arithmetic

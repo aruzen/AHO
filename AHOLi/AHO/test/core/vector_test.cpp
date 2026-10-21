@@ -184,25 +184,25 @@ namespace {
         }();
         constexpr auto result = lhs * rhs;
         static_assert(std::same_as<std::remove_cv_t<decltype(result)>, V>);
-        static_assert(result.value.template component<0>() == M{7, 2, 3, 1});
-        EXPECT_EQ(result.value.template component<0>(), (M{7, 2, 3, 1}));
-        EXPECT_EQ(rhs.value.template component<0>(), first);
+        static_assert(result.value.___AN1 == M{7, 2, 3, 1});
+        EXPECT_EQ(result.value.___AN1, (M{7, 2, 3, 1}));
+        EXPECT_EQ(rhs.value.___AN1, first);
         if constexpr (CI::dimension::dimension >= 2) {
-            static_assert(result.value.template component<1>() == M{2, 6, 0, 3});
-            EXPECT_EQ(result.value.template component<1>(), (M{2, 6, 0, 3}));
-            EXPECT_EQ(rhs.value.template component<1>(), second);
+            static_assert(result.value.___AN2 == M{2, 6, 0, 3});
+            EXPECT_EQ(result.value.___AN2, (M{2, 6, 0, 3}));
+            EXPECT_EQ(rhs.value.___AN2, second);
         }
         if constexpr (CI::dimension::dimension == 3) {
-            static_assert(result.value.template component<2>() == M{2, 1, 1, 0});
-            EXPECT_EQ(result.value.template component<2>(), (M{2, 1, 1, 0}));
-            EXPECT_EQ(rhs.value.template component<2>(), third);
+            static_assert(result.value.___AN3 == M{2, 1, 1, 0});
+            EXPECT_EQ(result.value.___AN3, (M{2, 1, 1, 0}));
+            EXPECT_EQ(rhs.value.___AN3, third);
         }
         const auto rightProduct = rhs * lhs;
-        EXPECT_EQ(rightProduct.value.template component<0>(), (M{1, 2, 3, 7}));
+        EXPECT_EQ(rightProduct.value.___AN1, (M{1, 2, 3, 7}));
         if constexpr (CI::dimension::dimension >= 2)
-            EXPECT_EQ(rightProduct.value.template component<1>(), (M{2, 4, 0, 3}));
+            EXPECT_EQ(rightProduct.value.___AN2, (M{2, 4, 0, 3}));
         if constexpr (CI::dimension::dimension == 3)
-            EXPECT_EQ(rightProduct.value.template component<2>(), (M{0, 1, 1, 2}));
+            EXPECT_EQ(rightProduct.value.___AN3, (M{0, 1, 1, 2}));
     }
     TYPED_TEST(VectorLeftProductTest, UsesConstOperandsEvenThoughTheVectorIsPassedByValue) {
         using CI = TypeParam;

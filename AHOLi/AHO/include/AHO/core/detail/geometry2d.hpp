@@ -31,8 +31,7 @@ namespace AHO_NAMESPACE::detail::geometry2d {
     inline void normalize(std::span<Point> points);
 
     inline long double cross(Point a, Point b, Point c) {
-        return (b.value.___AN1 - a.value.___AN1) * (c.value.___AN2 - a.value.___AN2) -
-               (b.value.___AN2 - a.value.___AN2) * (c.value.___AN1 - a.value.___AN1);
+        return (b - a).cross(c - a).value.___AN1;
     }
 
     inline int orientation(Point a, Point b, Point c) {

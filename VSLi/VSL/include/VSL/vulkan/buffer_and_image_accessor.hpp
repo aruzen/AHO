@@ -218,8 +218,8 @@ namespace VSL_NAMESPACE {
             bool copy(T* t, std::size_t size);
 
             template<typename T, typename Count>
-            requires (!std::same_as<Count, std::size_t> &&
-                      (std::integral<Count> || (std::is_enum_v<Count> && std::is_convertible_v<Count, std::size_t>)))
+            requires(!std::same_as<Count, std::size_t> &&
+                     (std::integral<Count> || (std::is_enum_v<Count> && std::is_convertible_v<Count, std::size_t>)))
             bool copy(T* t, Count size);
 
             template<typename... Args>
@@ -243,8 +243,8 @@ namespace VSL_NAMESPACE {
         bool copy(T* t, size_t size);
 
         template<typename T, typename Count>
-        requires (!std::same_as<Count, std::size_t> &&
-                  (std::integral<Count> || (std::is_enum_v<Count> && std::is_convertible_v<Count, std::size_t>)))
+        requires(!std::same_as<Count, std::size_t> &&
+                 (std::integral<Count> || (std::is_enum_v<Count> && std::is_convertible_v<Count, std::size_t>)))
         bool copy(T* t, Count size);
 
         template<typename... Args>

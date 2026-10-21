@@ -108,29 +108,28 @@ VSL_NAMESPACE::BufferAccessor::MakeBuffer(VSL_NAMESPACE::LogicalDeviceAccessor d
 }
 
 namespace {
-vk::MappedMemoryRange atom_aligned_range(const vsl::BufferAccessor::LocalBufferHolder &holder) {
-    const auto &data = holder.parent->_data;
-    if (holder.offset > data->requirementSize || holder.size == 0 ||
-        holder.size > data->requirementSize - holder.offset)
-        throw vsl::exceptions::RuntimeException("buffer", "mapped range is outside requested storage");
-    const auto &physical = data->device->parentDevice;
-    if (!physical->props)
-        physical->makeProps();
-    const auto atom = physical->props->limits.nonCoherentAtomSize;
-    const vk::DeviceSize start = holder.offset - holder.offset % atom;
-    vk::DeviceSize end = holder.offset + holder.size;
-    if (const auto remainder = end % atom; remainder != 0)
-        end += std::min<vk::DeviceSize>(atom - remainder, data->allocatedSize - end);
-    vk::MappedMemoryRange range{};
-    range.memory = data->deviceMem;
-    range.offset = start;
-    range.size = end - start;
-    return range;
-}
+    vk::MappedMemoryRange atom_aligned_range(const VSL_NAMESPACE::BufferAccessor::LocalBufferHolder& holder) {
+        const auto& data = holder.parent->_data;
+        if (holder.offset > data->requirementSize || holder.size == 0 ||
+            holder.size > data->requirementSize - holder.offset)
+            throw VSL_NAMESPACE::exceptions::RuntimeException("buffer", "mapped range is outside requested storage");
+        const auto& physical = data->device->parentDevice;
+        if (!physical->props)
+            physical->makeProps();
+        const auto atom = physical->props->limits.nonCoherentAtomSize;
+        const vk::DeviceSize start = holder.offset - holder.offset % atom;
+        vk::DeviceSize end = holder.offset + holder.size;
+        if (const auto remainder = end % atom; remainder != 0)
+            end += std::min<vk::DeviceSize>(atom - remainder, data->allocatedSize - end);
+        vk::MappedMemoryRange range{};
+        range.memory = data->deviceMem;
+        range.offset = start;
+        range.size = end - start;
+        return range;
+    }
 } // namespace
 
-void
-VSL_NAMESPACE::BufferAccessor::FlushBuffer(LocalBufferHolder &holder, MemoryType memType, MemoryProperty memProperty,
+void VSL_NAMESPACE::BufferAccessor::FlushBuffer(LocalBufferHolder& holder, MemoryType memType, MemoryProperty memProperty,
                                                 SharingMode sharingMode) {
     if (not contain(memProperty, MemoryProperty::HostVisible)) {
         throw VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException(std::source_location::current());
@@ -149,20 +148,19 @@ VSL_NAMESPACE::BufferAccessor::LocalBufferHolder VSL_NAMESPACE::BufferAccessor::
         throw VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException(std::source_location::current());
     }
 
-
     const auto requested = data->_data->requirementSize;
     if (offset > requested)
-        throw vsl::exceptions::RuntimeException("buffer", "mapped offset is outside requested storage");
+        throw VSL_NAMESPACE::exceptions::RuntimeException("buffer", "mapped offset is outside requested storage");
     const auto bytes = size.value_or(requested - offset);
     if (bytes == 0 || bytes > requested - offset)
-        throw vsl::exceptions::RuntimeException("buffer", "mapped range is outside requested storage");
+        throw VSL_NAMESPACE::exceptions::RuntimeException("buffer", "mapped range is outside requested storage");
     VSL_NAMESPACE::BufferAccessor::LocalBufferHolder holder(nullptr, bytes, offset);
     if (contain(memProperty, MemoryProperty::HostCoherent)) {
         holder.data = data->_data->device->device.mapMemory(data->_data->deviceMem, offset, bytes);
         holder.parent = data;
     } else {
-        auto *mapped = data->_data->device->device.mapMemory(data->_data->deviceMem, 0, VK_WHOLE_SIZE);
-        holder.data = static_cast<unsigned char *>(mapped) + offset;
+        auto* mapped = data->_data->device->device.mapMemory(data->_data->deviceMem, 0, VK_WHOLE_SIZE);
+        holder.data = static_cast<unsigned char*>(mapped) + offset;
         holder.parent = data;
         data->_data->device->device.invalidateMappedMemoryRanges(atom_aligned_range(holder));
     }

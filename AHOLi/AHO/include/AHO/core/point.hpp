@@ -99,31 +99,40 @@ namespace AHO_NAMESPACE {
 
         constexpr _Point<R, VSL_NAMESPACE::D1, CI> operator-() const;
 
-        template<concepts::subtract_as<R> T>
+        template<typename T>
+        requires concepts::subtract_as<const R&, const T&>
         constexpr auto /*Vector*/ operator-(const _Point<T, VSL_NAMESPACE::D1, CI>& p) const;
 
-        template<concepts::add_as<R> T>
+        template<typename T>
+        requires concepts::add_as<const R&, const T&>
         constexpr auto /*Point*/ operator+(const _Vector<T, VSL_NAMESPACE::D1, CI>& p) const;
 
-        template<concepts::subtract_as<R> T>
+        template<typename T>
+        requires concepts::subtract_as<const R&, const T&>
         constexpr auto /*Point*/ operator-(const _Vector<T, VSL_NAMESPACE::D1, CI>& p) const;
 
-        template<concepts::multiply_as<R> T>
+        template<typename T>
+        requires concepts::multiply_as<const R&, const T&>
         constexpr auto /*Point*/ operator*(const T& m) const;
 
-        template<concepts::division_as<R> T>
+        template<typename T>
+        requires concepts::division_as<const R&, const T&>
         constexpr auto /*Point*/ operator/(const T& m) const;
 
-        template<concepts::add_as<R> T>
+        template<typename T>
+        requires concepts::add_assign_as<R&, const T&>
         constexpr _Point<R, VSL_NAMESPACE::D1, CI>& /*Point*/ operator+=(const _Vector<T, VSL_NAMESPACE::D1, CI>& p);
 
-        template<concepts::subtract_as<R> T>
+        template<typename T>
+        requires concepts::subtract_assign_as<R&, const T&>
         constexpr _Point<R, VSL_NAMESPACE::D1, CI>& /*Point*/ operator-=(const _Vector<T, VSL_NAMESPACE::D1, CI>& p);
 
-        template<concepts::multiply_as<R> T>
+        template<typename T>
+        requires concepts::multiply_assign_as<R&, const T&>
         constexpr _Point<R, VSL_NAMESPACE::D1, CI>& /*Point*/ operator*=(const T& m);
 
-        template<concepts::division_as<R> T>
+        template<typename T>
+        requires concepts::division_assign_as<R&, const T&>
         constexpr _Point<R, VSL_NAMESPACE::D1, CI>& /*Point*/ operator/=(const T& m);
 
         template<typename T>
@@ -157,31 +166,40 @@ namespace AHO_NAMESPACE {
 
         constexpr _Point<R, VSL_NAMESPACE::D2, CI> operator-() const;
 
-        template<concepts::subtract_as<R> T>
+        template<typename T>
+        requires concepts::subtract_as<const R&, const T&>
         constexpr auto /*Vector*/ operator-(const _Point<T, VSL_NAMESPACE::D2, CI>& p) const;
 
-        template<concepts::add_as<R> T>
+        template<typename T>
+        requires concepts::add_as<const R&, const T&>
         constexpr auto /*Point*/ operator+(const _Vector<T, VSL_NAMESPACE::D2, CI>& p) const;
 
-        template<concepts::subtract_as<R> T>
+        template<typename T>
+        requires concepts::subtract_as<const R&, const T&>
         constexpr auto /*Point*/ operator-(const _Vector<T, VSL_NAMESPACE::D2, CI>& p) const;
 
-        template<concepts::multiply_as<R> T>
+        template<typename T>
+        requires concepts::multiply_as<const R&, const T&>
         constexpr auto /*Point*/ operator*(const T& m) const;
 
-        template<concepts::division_as<R> T>
+        template<typename T>
+        requires concepts::division_as<const R&, const T&>
         constexpr auto /*Point*/ operator/(const T& m) const;
 
-        template<concepts::add_as<R> T>
+        template<typename T>
+        requires concepts::add_assign_as<R&, const T&>
         constexpr _Point<R, VSL_NAMESPACE::D2, CI>& /*Point*/ operator+=(const _Vector<T, VSL_NAMESPACE::D2, CI>& p);
 
-        template<concepts::subtract_as<R> T>
+        template<typename T>
+        requires concepts::subtract_assign_as<R&, const T&>
         constexpr _Point<R, VSL_NAMESPACE::D2, CI>& /*Point*/ operator-=(const _Vector<T, VSL_NAMESPACE::D2, CI>& p);
 
-        template<concepts::multiply_as<R> T>
+        template<typename T>
+        requires concepts::multiply_assign_as<R&, const T&>
         constexpr _Point<R, VSL_NAMESPACE::D2, CI>& /*Point*/ operator*=(const T& m);
 
-        template<concepts::division_as<R> T>
+        template<typename T>
+        requires concepts::division_assign_as<R&, const T&>
         constexpr _Point<R, VSL_NAMESPACE::D2, CI>& /*Point*/ operator/=(const T& m);
 
         template<typename T>
@@ -215,31 +233,40 @@ namespace AHO_NAMESPACE {
 
         constexpr _Point<R, VSL_NAMESPACE::D3, CI> operator-() const;
 
-        template<concepts::subtract_as<R> T>
+        template<typename T>
+        requires concepts::subtract_as<const R&, const T&>
         constexpr auto /*Vector*/ operator-(const _Point<T, VSL_NAMESPACE::D3, CI>& p) const;
 
-        template<concepts::add_as<R> T>
+        template<typename T>
+        requires concepts::add_as<const R&, const T&>
         constexpr auto /*Point*/ operator+(const _Vector<T, VSL_NAMESPACE::D3, CI>& p) const;
 
-        template<concepts::subtract_as<R> T>
+        template<typename T>
+        requires concepts::subtract_as<const R&, const T&>
         constexpr auto /*Point*/ operator-(const _Vector<T, VSL_NAMESPACE::D3, CI>& p) const;
 
-        template<concepts::multiply_as<R> T>
+        template<typename T>
+        requires concepts::multiply_as<const R&, const T&>
         constexpr auto /*Point*/ operator*(const T& m) const;
 
-        template<concepts::division_as<R> T>
+        template<typename T>
+        requires concepts::division_as<const R&, const T&>
         constexpr auto /*Point*/ operator/(const T& m) const;
 
-        template<concepts::add_as<R> T>
+        template<typename T>
+        requires concepts::add_assign_as<R&, const T&>
         constexpr _Point<R, VSL_NAMESPACE::D3, CI>& /*Point*/ operator+=(const _Vector<T, VSL_NAMESPACE::D3, CI>& p);
 
-        template<concepts::subtract_as<R> T>
+        template<typename T>
+        requires concepts::subtract_assign_as<R&, const T&>
         constexpr _Point<R, VSL_NAMESPACE::D3, CI>& /*Point*/ operator-=(const _Vector<T, VSL_NAMESPACE::D3, CI>& p);
 
-        template<concepts::multiply_as<R> T>
+        template<typename T>
+        requires concepts::multiply_assign_as<R&, const T&>
         constexpr _Point<R, VSL_NAMESPACE::D3, CI>& /*Point*/ operator*=(const T& m);
 
-        template<concepts::division_as<R> T>
+        template<typename T>
+        requires concepts::division_assign_as<R&, const T&>
         constexpr _Point<R, VSL_NAMESPACE::D3, CI>& /*Point*/ operator/=(const T& m);
 
         template<typename T>
@@ -271,58 +298,67 @@ namespace AHO_NAMESPACE {
     }
 
     template<typename R, typename CI>
-    template<concepts::subtract_as<R> T>
+    template<typename T>
+    requires concepts::subtract_as<const R&, const T&>
     constexpr auto _Point<R, VSL_NAMESPACE::D1, CI>::operator-(const _Point<T, VSL_NAMESPACE::D1, CI>& p) const {
-        return _Vector<decltype(std::declval<R>() - std::declval<T>()), VSL_NAMESPACE::D1, CI>(value.___AN1 - p.value.___AN1);
+        return _Vector<decltype(value.___AN1 - p.value.___AN1), VSL_NAMESPACE::D1, CI>(value.___AN1 - p.value.___AN1);
     }
 
     template<typename R, typename CI>
-    template<concepts::add_as<R> T>
+    template<typename T>
+    requires concepts::add_as<const R&, const T&>
     constexpr auto _Point<R, VSL_NAMESPACE::D1, CI>::operator+(const _Vector<T, VSL_NAMESPACE::D1, CI>& p) const {
-        return _Point<decltype(std::declval<R>() + std::declval<T>()), VSL_NAMESPACE::D1, CI>(value.___AN1 + p.value.___AN1);
+        return _Point<decltype(value.___AN1 + p.value.___AN1), VSL_NAMESPACE::D1, CI>(value.___AN1 + p.value.___AN1);
     }
 
     template<typename R, typename CI>
-    template<concepts::subtract_as<R> T>
+    template<typename T>
+    requires concepts::subtract_as<const R&, const T&>
     constexpr auto _Point<R, VSL_NAMESPACE::D1, CI>::operator-(const _Vector<T, VSL_NAMESPACE::D1, CI>& p) const {
-        return _Point<decltype(std::declval<R>() - std::declval<T>()), VSL_NAMESPACE::D1, CI>(value.___AN1 - p.value.___AN1);
+        return _Point<decltype(value.___AN1 - p.value.___AN1), VSL_NAMESPACE::D1, CI>(value.___AN1 - p.value.___AN1);
     }
 
     template<typename R, typename CI>
-    template<concepts::multiply_as<R> T>
+    template<typename T>
+    requires concepts::multiply_as<const R&, const T&>
     constexpr auto _Point<R, VSL_NAMESPACE::D1, CI>::operator*(const T& m) const {
-        return _Point<decltype(std::declval<R>() * m), VSL_NAMESPACE::D1, CI>(value.___AN1 * m);
+        return _Point<decltype(value.___AN1 * m), VSL_NAMESPACE::D1, CI>(value.___AN1 * m);
     }
 
     template<typename R, typename CI>
-    template<concepts::division_as<R> T>
+    template<typename T>
+    requires concepts::division_as<const R&, const T&>
     constexpr auto _Point<R, VSL_NAMESPACE::D1, CI>::operator/(const T& m) const {
-        return _Point<decltype(std::declval<R>() / m), VSL_NAMESPACE::D1, CI>(value.___AN1 / m);
+        return _Point<decltype(value.___AN1 / m), VSL_NAMESPACE::D1, CI>(value.___AN1 / m);
     }
 
     template<typename R, typename CI>
-    template<concepts::add_as<R> T>
+    template<typename T>
+    requires concepts::add_assign_as<R&, const T&>
     constexpr _Point<R, VSL_NAMESPACE::D1, CI>& _Point<R, VSL_NAMESPACE::D1, CI>::operator+=(const _Vector<T, VSL_NAMESPACE::D1, CI>& p) {
         this->value.___AN1 += p.value.___AN1;
         return *this;
     }
 
     template<typename R, typename CI>
-    template<concepts::subtract_as<R> T>
+    template<typename T>
+    requires concepts::subtract_assign_as<R&, const T&>
     constexpr _Point<R, VSL_NAMESPACE::D1, CI>& _Point<R, VSL_NAMESPACE::D1, CI>::operator-=(const _Vector<T, VSL_NAMESPACE::D1, CI>& p) {
         this->value.___AN1 -= p.value.___AN1;
         return *this;
     }
 
     template<typename R, typename CI>
-    template<concepts::multiply_as<R> T>
+    template<typename T>
+    requires concepts::multiply_assign_as<R&, const T&>
     constexpr _Point<R, VSL_NAMESPACE::D1, CI>& _Point<R, VSL_NAMESPACE::D1, CI>::operator*=(const T& m) {
         this->value.___AN1 *= m;
         return *this;
     }
 
     template<typename R, typename CI>
-    template<concepts::division_as<R> T>
+    template<typename T>
+    requires concepts::division_assign_as<R&, const T&>
     constexpr _Point<R, VSL_NAMESPACE::D1, CI>& _Point<R, VSL_NAMESPACE::D1, CI>::operator/=(const T& m) {
         this->value.___AN1 /= m;
         return *this;
@@ -372,37 +408,43 @@ namespace AHO_NAMESPACE {
     }
 
     template<typename R, typename CI>
-    template<concepts::subtract_as<R> T>
+    template<typename T>
+    requires concepts::subtract_as<const R&, const T&>
     constexpr auto _Point<R, VSL_NAMESPACE::D2, CI>::operator-(const _Point<T, VSL_NAMESPACE::D2, CI>& p) const {
-        return _Vector<decltype(std::declval<R>() - std::declval<T>()), VSL_NAMESPACE::D2, CI>(value.___AN1 - p.value.___AN1, value.___AN2 - p.value.___AN2);
+        return _Vector<decltype(value.___AN1 - p.value.___AN1), VSL_NAMESPACE::D2, CI>(value.___AN1 - p.value.___AN1, value.___AN2 - p.value.___AN2);
     }
 
     template<typename R, typename CI>
-    template<concepts::add_as<R> T>
+    template<typename T>
+    requires concepts::add_as<const R&, const T&>
     constexpr auto _Point<R, VSL_NAMESPACE::D2, CI>::operator+(const _Vector<T, VSL_NAMESPACE::D2, CI>& p) const {
-        return _Point<decltype(std::declval<R>() + std::declval<T>()), VSL_NAMESPACE::D2, CI>(value.___AN1 + p.value.___AN1, value.___AN2 + p.value.___AN2);
+        return _Point<decltype(value.___AN1 + p.value.___AN1), VSL_NAMESPACE::D2, CI>(value.___AN1 + p.value.___AN1, value.___AN2 + p.value.___AN2);
     }
 
     template<typename R, typename CI>
-    template<concepts::subtract_as<R> T>
+    template<typename T>
+    requires concepts::subtract_as<const R&, const T&>
     constexpr auto _Point<R, VSL_NAMESPACE::D2, CI>::operator-(const _Vector<T, VSL_NAMESPACE::D2, CI>& p) const {
-        return _Point<decltype(std::declval<R>() - std::declval<T>()), VSL_NAMESPACE::D2, CI>(value.___AN1 - p.value.___AN1, value.___AN2 - p.value.___AN2);
+        return _Point<decltype(value.___AN1 - p.value.___AN1), VSL_NAMESPACE::D2, CI>(value.___AN1 - p.value.___AN1, value.___AN2 - p.value.___AN2);
     }
 
     template<typename R, typename CI>
-    template<concepts::multiply_as<R> T>
+    template<typename T>
+    requires concepts::multiply_as<const R&, const T&>
     constexpr auto _Point<R, VSL_NAMESPACE::D2, CI>::operator*(const T& m) const {
-        return _Point<decltype(std::declval<R>() * m), VSL_NAMESPACE::D2, CI>(value.___AN1 * m, value.___AN2 * m);
+        return _Point<decltype(value.___AN1 * m), VSL_NAMESPACE::D2, CI>(value.___AN1 * m, value.___AN2 * m);
     }
 
     template<typename R, typename CI>
-    template<concepts::division_as<R> T>
+    template<typename T>
+    requires concepts::division_as<const R&, const T&>
     constexpr auto _Point<R, VSL_NAMESPACE::D2, CI>::operator/(const T& m) const {
-        return _Point<decltype(std::declval<R>() / m), VSL_NAMESPACE::D2, CI>(value.___AN1 / m, value.___AN2 / m);
+        return _Point<decltype(value.___AN1 / m), VSL_NAMESPACE::D2, CI>(value.___AN1 / m, value.___AN2 / m);
     }
 
     template<typename R, typename CI>
-    template<concepts::add_as<R> T>
+    template<typename T>
+    requires concepts::add_assign_as<R&, const T&>
     constexpr _Point<R, VSL_NAMESPACE::D2, CI>& _Point<R, VSL_NAMESPACE::D2, CI>::operator+=(const _Vector<T, VSL_NAMESPACE::D2, CI>& p) {
         this->value.___AN1 += p.value.___AN1;
         this->value.___AN2 += p.value.___AN2;
@@ -410,7 +452,8 @@ namespace AHO_NAMESPACE {
     }
 
     template<typename R, typename CI>
-    template<concepts::subtract_as<R> T>
+    template<typename T>
+    requires concepts::subtract_assign_as<R&, const T&>
     constexpr _Point<R, VSL_NAMESPACE::D2, CI>& _Point<R, VSL_NAMESPACE::D2, CI>::operator-=(const _Vector<T, VSL_NAMESPACE::D2, CI>& p) {
         this->value.___AN1 -= p.value.___AN1;
         this->value.___AN2 -= p.value.___AN2;
@@ -418,7 +461,8 @@ namespace AHO_NAMESPACE {
     }
 
     template<typename R, typename CI>
-    template<concepts::multiply_as<R> T>
+    template<typename T>
+    requires concepts::multiply_assign_as<R&, const T&>
     constexpr _Point<R, VSL_NAMESPACE::D2, CI>& _Point<R, VSL_NAMESPACE::D2, CI>::operator*=(const T& m) {
         this->value.___AN1 *= m;
         this->value.___AN2 *= m;
@@ -426,7 +470,8 @@ namespace AHO_NAMESPACE {
     }
 
     template<typename R, typename CI>
-    template<concepts::division_as<R> T>
+    template<typename T>
+    requires concepts::division_assign_as<R&, const T&>
     constexpr _Point<R, VSL_NAMESPACE::D2, CI>& _Point<R, VSL_NAMESPACE::D2, CI>::operator/=(const T& m) {
         this->value.___AN1 /= m;
         this->value.___AN2 /= m;
@@ -463,37 +508,43 @@ namespace AHO_NAMESPACE {
     }
 
     template<typename R, typename CI>
-    template<concepts::subtract_as<R> T>
+    template<typename T>
+    requires concepts::subtract_as<const R&, const T&>
     constexpr auto _Point<R, VSL_NAMESPACE::D3, CI>::operator-(const _Point<T, VSL_NAMESPACE::D3, CI>& p) const {
-        return _Vector<decltype(std::declval<R>() - std::declval<T>()), VSL_NAMESPACE::D3, CI>(value.___AN1 - p.value.___AN1, value.___AN2 - p.value.___AN2, value.___AN3 - p.value.___AN3);
+        return _Vector<decltype(value.___AN1 - p.value.___AN1), VSL_NAMESPACE::D3, CI>(value.___AN1 - p.value.___AN1, value.___AN2 - p.value.___AN2, value.___AN3 - p.value.___AN3);
     }
 
     template<typename R, typename CI>
-    template<concepts::add_as<R> T>
+    template<typename T>
+    requires concepts::add_as<const R&, const T&>
     constexpr auto _Point<R, VSL_NAMESPACE::D3, CI>::operator+(const _Vector<T, VSL_NAMESPACE::D3, CI>& p) const {
-        return _Point<decltype(std::declval<R>() + std::declval<T>()), VSL_NAMESPACE::D3, CI>(value.___AN1 + p.value.___AN1, value.___AN2 + p.value.___AN2, value.___AN3 + p.value.___AN3);
+        return _Point<decltype(value.___AN1 + p.value.___AN1), VSL_NAMESPACE::D3, CI>(value.___AN1 + p.value.___AN1, value.___AN2 + p.value.___AN2, value.___AN3 + p.value.___AN3);
     }
 
     template<typename R, typename CI>
-    template<concepts::subtract_as<R> T>
+    template<typename T>
+    requires concepts::subtract_as<const R&, const T&>
     constexpr auto _Point<R, VSL_NAMESPACE::D3, CI>::operator-(const _Vector<T, VSL_NAMESPACE::D3, CI>& p) const {
-        return _Point<decltype(std::declval<R>() - std::declval<T>()), VSL_NAMESPACE::D3, CI>(value.___AN1 - p.value.___AN1, value.___AN2 - p.value.___AN2, value.___AN3 - p.value.___AN3);
+        return _Point<decltype(value.___AN1 - p.value.___AN1), VSL_NAMESPACE::D3, CI>(value.___AN1 - p.value.___AN1, value.___AN2 - p.value.___AN2, value.___AN3 - p.value.___AN3);
     }
 
     template<typename R, typename CI>
-    template<concepts::multiply_as<R> T>
+    template<typename T>
+    requires concepts::multiply_as<const R&, const T&>
     constexpr auto _Point<R, VSL_NAMESPACE::D3, CI>::operator*(const T& m) const {
-        return _Point<decltype(std::declval<R>() * m), VSL_NAMESPACE::D3, CI>(value.___AN1 * m, value.___AN2 * m, value.___AN3 * m);
+        return _Point<decltype(value.___AN1 * m), VSL_NAMESPACE::D3, CI>(value.___AN1 * m, value.___AN2 * m, value.___AN3 * m);
     }
 
     template<typename R, typename CI>
-    template<concepts::division_as<R> T>
+    template<typename T>
+    requires concepts::division_as<const R&, const T&>
     constexpr auto _Point<R, VSL_NAMESPACE::D3, CI>::operator/(const T& m) const {
-        return _Point<decltype(std::declval<R>() / m), VSL_NAMESPACE::D3, CI>(value.___AN1 / m, value.___AN2 / m, value.___AN3 / m);
+        return _Point<decltype(value.___AN1 / m), VSL_NAMESPACE::D3, CI>(value.___AN1 / m, value.___AN2 / m, value.___AN3 / m);
     }
 
     template<typename R, typename CI>
-    template<concepts::add_as<R> T>
+    template<typename T>
+    requires concepts::add_assign_as<R&, const T&>
     constexpr _Point<R, VSL_NAMESPACE::D3, CI>& _Point<R, VSL_NAMESPACE::D3, CI>::operator+=(const _Vector<T, VSL_NAMESPACE::D3, CI>& p) {
         this->value.___AN1 += p.value.___AN1;
         this->value.___AN2 += p.value.___AN2;
@@ -502,7 +553,8 @@ namespace AHO_NAMESPACE {
     }
 
     template<typename R, typename CI>
-    template<concepts::subtract_as<R> T>
+    template<typename T>
+    requires concepts::subtract_assign_as<R&, const T&>
     constexpr _Point<R, VSL_NAMESPACE::D3, CI>& _Point<R, VSL_NAMESPACE::D3, CI>::operator-=(const _Vector<T, VSL_NAMESPACE::D3, CI>& p) {
         this->value.___AN1 -= p.value.___AN1;
         this->value.___AN2 -= p.value.___AN2;
@@ -511,7 +563,8 @@ namespace AHO_NAMESPACE {
     }
 
     template<typename R, typename CI>
-    template<concepts::multiply_as<R> T>
+    template<typename T>
+    requires concepts::multiply_assign_as<R&, const T&>
     constexpr _Point<R, VSL_NAMESPACE::D3, CI>& _Point<R, VSL_NAMESPACE::D3, CI>::operator*=(const T& m) {
         this->value.___AN1 *= m;
         this->value.___AN2 *= m;
@@ -520,7 +573,8 @@ namespace AHO_NAMESPACE {
     }
 
     template<typename R, typename CI>
-    template<concepts::division_as<R> T>
+    template<typename T>
+    requires concepts::division_assign_as<R&, const T&>
     constexpr _Point<R, VSL_NAMESPACE::D3, CI>& _Point<R, VSL_NAMESPACE::D3, CI>::operator/=(const T& m) {
         this->value.___AN1 /= m;
         this->value.___AN2 /= m;

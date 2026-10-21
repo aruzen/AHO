@@ -33,38 +33,38 @@ namespace AHO_NAMESPACE {
             return Upper<T>(-value);                                                                                         \
         };                                                                                                                   \
         template<typename R>                                                                                                 \
-        requires requires(const T& lhs, const R& rhs) { lhs + rhs; }                                                         \
+        requires concepts::add_as<const T&, const R&>                                                                        \
         constexpr auto operator+(const Upper<R>& t) const -> Upper<decltype(value + t.value)> { return {value + t.value}; }; \
         template<typename R>                                                                                                 \
-        requires requires(const T& lhs, const R& rhs) { lhs - rhs; }                                                         \
+        requires concepts::subtract_as<const T&, const R&>                                                                   \
         constexpr auto operator-(const Upper<R>& t) const -> Upper<decltype(value - t.value)> { return {value - t.value}; }; \
         template<typename R>                                                                                                 \
-        requires requires(const T& lhs, const R& rhs) { lhs * rhs; }                                                         \
+        requires concepts::multiply_as<const T&, const R&>                                                                   \
         constexpr auto operator*(const Upper<R>& t) const -> Upper<decltype(value * t.value)> { return {value * t.value}; }; \
         template<typename R>                                                                                                 \
-        requires requires(const T& lhs, const R& rhs) { lhs / rhs; }                                                         \
+        requires concepts::division_as<const T&, const R&>                                                                   \
         constexpr auto operator/(const Upper<R>& t) const -> Upper<decltype(value / t.value)> { return {value / t.value}; }; \
                                                                                                                              \
         template<typename R>                                                                                                 \
-        requires requires(T& lhs, const R& rhs) { lhs += rhs; }                                                              \
+        requires concepts::add_assign_as<T&, const R&>                                                                       \
         constexpr Upper<T>& operator+=(const Upper<R>& t) {                                                                  \
             value += t.value;                                                                                                \
             return *this;                                                                                                    \
         };                                                                                                                   \
         template<typename R>                                                                                                 \
-        requires requires(T& lhs, const R& rhs) { lhs -= rhs; }                                                              \
+        requires concepts::subtract_assign_as<T&, const R&>                                                                  \
         constexpr Upper<T>& operator-=(const Upper<R>& t) {                                                                  \
             value -= t.value;                                                                                                \
             return *this;                                                                                                    \
         };                                                                                                                   \
         template<typename R>                                                                                                 \
-        requires requires(T& lhs, const R& rhs) { lhs *= rhs; }                                                              \
+        requires concepts::multiply_assign_as<T&, const R&>                                                                  \
         constexpr Upper<T>& operator*=(const Upper<R>& t) {                                                                  \
             value *= t.value;                                                                                                \
             return *this;                                                                                                    \
         };                                                                                                                   \
         template<typename R>                                                                                                 \
-        requires requires(T& lhs, const R& rhs) { lhs /= rhs; }                                                              \
+        requires concepts::division_assign_as<T&, const R&>                                                                  \
         constexpr Upper<T>& operator/=(const Upper<R>& t) {                                                                  \
             value /= t.value;                                                                                                \
             return *this;                                                                                                    \

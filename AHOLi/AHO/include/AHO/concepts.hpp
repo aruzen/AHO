@@ -66,6 +66,26 @@ namespace AHO_NAMESPACE::concepts {
     };
 
     template<typename T, typename R>
+    concept add_assign_as = requires(T t, R r) {
+        t += r;
+    };
+
+    template<typename T, typename R>
+    concept subtract_assign_as = requires(T t, R r) {
+        t -= r;
+    };
+
+    template<typename T, typename R>
+    concept multiply_assign_as = requires(T t, R r) {
+        t *= r;
+    };
+
+    template<typename T, typename R>
+    concept division_assign_as = requires(T t, R r) {
+        t /= r;
+    };
+
+    template<typename T, typename R>
     concept cast_as = requires(T t) {
         (R) t;
     };

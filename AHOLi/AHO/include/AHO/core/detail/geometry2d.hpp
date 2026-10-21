@@ -1,6 +1,5 @@
 #pragma once
-#include "../../define.hpp"
-#include "../math/coordinate.hpp"
+#include "../point.hpp"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -8,9 +7,7 @@
 #include <vector>
 
 namespace AHO_NAMESPACE::detail::geometry2d {
-    struct Point {
-        long double x, y;
-    };
+    using Point = AHO_NAMESPACE::d2::Point<long double>;
 
     inline long double cross(Point a, Point b, Point c);
     inline int orientation(Point a, Point b, Point c);
@@ -25,19 +22,21 @@ namespace AHO_NAMESPACE::detail::geometry2d {
     inline void normalize(std::span<Point> points);
 
     inline long double cross(Point a, Point b, Point c) {
-        return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+        return (b.value.___AN1 - a.value.___AN1) * (c.value.___AN2 - a.value.___AN2) -
+               (b.value.___AN2 - a.value.___AN2) * (c.value.___AN1 - a.value.___AN1);
     }
 
     inline int orientation(Point a, Point b, Point c) {
-        const auto u = (b.x - a.x) * (c.y - a.y);
-        const auto v = (b.y - a.y) * (c.x - a.x);
+        const auto u = (b.value.___AN1 - a.value.___AN1) * (c.value.___AN2 - a.value.___AN2);
+        const auto v = (b.value.___AN2 - a.value.___AN2) * (c.value.___AN1 - a.value.___AN1);
         const auto error = 16 * std::numeric_limits<long double>::epsilon() * (std::abs(u) + std::abs(v));
         return u - v > error ? 1 : (u - v < -error ? -1 : 0);
     }
 
     inline bool onSegment(Point a, Point b, Point p) {
-        return orientation(a, b, p) == 0 && p.x >= std::min(a.x, b.x) && p.x <= std::max(a.x, b.x) &&
-               p.y >= std::min(a.y, b.y) && p.y <= std::max(a.y, b.y);
+        return orientation(a, b, p) == 0 &&
+               p.value.___AN1 >= std::min(a.value.___AN1, b.value.___AN1) && p.value.___AN1 <= std::max(a.value.___AN1, b.value.___AN1) &&
+               p.value.___AN2 >= std::min(a.value.___AN2, b.value.___AN2) && p.value.___AN2 <= std::max(a.value.___AN2, b.value.___AN2);
     }
 
     inline bool intersects(Point a, Point b, Point c, Point d) {
@@ -61,11 +60,9 @@ namespace AHO_NAMESPACE::detail::geometry2d {
     inline void normalize(std::span<Point> points) {
         long double scale = 0;
         for (const auto p : points)
-            scale = std::max({scale, std::abs(p.x), std::abs(p.y)});
+            scale = std::max({scale, std::abs(p.value.___AN1), std::abs(p.value.___AN2)});
         if (scale > 0)
-            for (auto& p : points) {
-                p.x /= scale;
-                p.y /= scale;
-            }
+            for (auto& p : points)
+                p /= scale;
     }
 } // namespace AHO_NAMESPACE::detail::geometry2d

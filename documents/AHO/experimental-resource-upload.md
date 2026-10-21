@@ -25,7 +25,7 @@ upload.wait();
 ## Resourceの契約
 
 - CPUデータは`aho::resource::Buffer<General>`、転送元は`Buffer<GPUFriendly>`を使います。詳細は[Bufferの契約](resource-buffer.md)を参照してください。
-- `Texture::update()`はGpuBuffer conceptを受け、GPUFriendly・OnGPU・VSL Bufferを包んだCustomを同じ経路で利用できます。必要なTransferSource usageはVSL側で検証します。
+- `Texture::update()`はGPUBuffer conceptを受け、GPUFriendly・OnGPU・VSL Bufferを包んだCustomを同じ経路で利用できます。必要なTransferSource usageはVSL側で検証します。
 - コピーしたResourceは容量・内容・使用状態を共有します。独立した内容が必要なら別のResourceを構築してください。CPUのspanはresize/reserveで無効になる場合があります。
 - `Texture`は線形RGBA8、1レイヤー・1ミップのGPUテクスチャです。MSDFの3チャンネルはRGBへ、余ったAは呼び出し側で設定してください。色空間変換は行いません。初回更新時はページ全体をゼロで埋め、その後の更新では他の画素を維持します。
 

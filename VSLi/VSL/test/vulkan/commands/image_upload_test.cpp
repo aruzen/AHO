@@ -8,6 +8,7 @@ namespace {
     class ImageUploadVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     TEST_F(ImageUploadVulkanIntegrationTest, OwnsMappedSourceAfterTheCallerDropsItAndCopiesAnOffsetRegion) {
         using Image = vsl::Image<vsl::ImageType::Sampled | vsl::ImageType::TransferDst | vsl::ImageType::TransferSrc>;
         auto manager = make_manager();
@@ -21,6 +22,7 @@ namespace {
             {
                 vsl::Buffer<vsl::MemoryType::TransferSource, vsl::MemoryProperty::HostVisible> source(device, std::size_t{8});
                 const std::array<std::uint8_t, 8> data{0, 0, 0, 0, 19, 37, 73, 255};
+
                 source.data().write(std::as_bytes(std::span(data)));
                 weak_source = source._data;
                 phase << vsl::command::ImageUpload(&source, *image, vsl::ImageLayout::Undefined,
@@ -33,6 +35,7 @@ namespace {
             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::Success);
             ASSERT_TRUE(phase.completion().wait());
         }
+
         const auto bytes = destinationMapping.read(16);
         for (std::size_t i = 0; i < 12; ++i)
             EXPECT_EQ(bytes[i], std::byte{});
@@ -48,6 +51,7 @@ namespace {
         EXPECT_TRUE(weak_source.expired());
         EXPECT_TRUE(weak_image.expired());
     }
+
     TEST_F(ImageUploadVulkanIntegrationTest, RejectsInvalidUsageLayoutAndRangesBeforeRecording) {
         using Image = vsl::Image<vsl::ImageType::Sampled | vsl::ImageType::TransferDst>;
         Image image(device, 2, 2, vsl::data_format::UnsignedNormalized8RGBA);

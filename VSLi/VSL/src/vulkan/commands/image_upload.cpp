@@ -5,7 +5,9 @@
 
 namespace VSL_NAMESPACE::command {
     ImageUpload::ImageUpload(BufferAccessor* source, ImageAccessor image, ImageLayout layout, ImageRegion region, std::size_t offset)
-        : copy(image, source, ImageLayout::TransferDstOptimal, region, offset), currentLayout(layout) {}
+        : copy(image, source, ImageLayout::TransferDstOptimal, region, offset), currentLayout(layout) {
+    }
+
     void ImageUpload::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
         (void)copy.description();
         if (currentLayout != ImageLayout::Undefined && currentLayout != ImageLayout::ShaderReadOnlyOptimal)
@@ -23,11 +25,14 @@ namespace VSL_NAMESPACE::command {
         ChangeImageBarrier(copy.image, currentLayout, ImageLayout::TransferDstOptimal).invoke(pool, buffer, manager);
         if (currentLayout == ImageLayout::Undefined) {
             const vk::ImageSubresourceRange range{vk::ImageAspectFlagBits::eColor, 0, 1, 0, copy.image._data->count};
+
             auto command = buffer._data->commandBuffers.at(buffer.getCurrentBufferIdx());
             command.clearColorImage(copy.image._data->image, vk::ImageLayout::eTransferDstOptimal, vk::ClearColorValue{}, range);
             const vk::MemoryBarrier visible{.srcAccessMask = vk::AccessFlagBits::eTransferWrite, .dstAccessMask = vk::AccessFlagBits::eTransferWrite};
+
             command.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, {}, visible, {}, {});
         }
+
         copy.invoke(pool, buffer, manager);
         ChangeImageBarrier(copy.image, ImageLayout::TransferDstOptimal, ImageLayout::ShaderReadOnlyOptimal).invoke(pool, buffer, manager);
     }

@@ -7,12 +7,16 @@ namespace VSL_NAMESPACE::command {
     struct CopyBuffer : __Command {
         CopyBuffer(BufferAccessor* source, BufferAccessor* destination, std::size_t bytes,
                    std::size_t sourceOffset = 0, std::size_t destinationOffset = 0, bool hostRead = false);
+
         void validate() const;
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
 
     private:
-        std::shared_ptr<_impl::Buffer_impl> source_, destination_;
-        std::size_t bytes_, sourceOffset_, destinationOffset_;
-        bool hostRead_;
+        std::shared_ptr<_impl::Buffer_impl> _source;
+        std::shared_ptr<_impl::Buffer_impl> _destination;
+        std::size_t _bytes;
+        std::size_t _sourceOffset;
+        std::size_t _destinationOffset;
+        bool _hostRead;
     };
 } // namespace VSL_NAMESPACE::command

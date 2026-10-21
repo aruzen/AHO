@@ -2,8 +2,12 @@
 
 namespace {
     class PipelineLayoutVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
+        bool validate_vulkan() const override;
     };
+
+    bool PipelineLayoutVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
     TEST_F(PipelineLayoutVulkanIntegrationTest, CopyOwnsItsVertexAndBlendStorage) {
         vsl::pipeline_layout::VertexInput input;
         input.add(vsl::data_format::FloatRG);

@@ -53,7 +53,7 @@ namespace VSL_NAMESPACE {
         bool ready() const;
         bool wait(std::uint64_t timeout_ns = UINT64_MAX) const;
         void retain(std::shared_ptr<void> resource) const;
-        explicit operator bool() const { return bool(_data); }
+        explicit operator bool() const;
     };
 
     struct PipelineAccessor;
@@ -142,6 +142,10 @@ namespace VSL_NAMESPACE {
 
         CommandBuffer makeExclusiveBuffer(size_t size = 1);
     };
+
+    inline Completion::operator bool() const {
+        return bool(_data);
+    }
 } // namespace VSL_NAMESPACE
 
 template<class P, typename... Args>

@@ -29,12 +29,12 @@ namespace AHO_NAMESPACE {
     class ImageReadbackTicket {
         struct Data;
         std::shared_ptr<Data> _data;
-        explicit ImageReadbackTicket(std::shared_ptr<Data> data) : _data(std::move(data)) {}
+        explicit ImageReadbackTicket(std::shared_ptr<Data> data);
         friend class ImageReadback;
 
     public:
         ImageReadbackTicket() = default;
-        explicit operator bool() const { return bool(_data); }
+        explicit operator bool() const;
         const ImageReadbackInfo& info() const;
         VSL_NAMESPACE::Completion::Status status() const;
         bool ready() const;
@@ -74,4 +74,10 @@ namespace AHO_NAMESPACE {
         // 確保済みの全スロットのGPUバッファ容量を合計する。
         std::size_t capacity() const;
     };
+
+    inline ImageReadbackTicket::ImageReadbackTicket(std::shared_ptr<Data> data) : _data(std::move(data)) {}
+
+    inline ImageReadbackTicket::operator bool() const {
+        return bool(_data);
+    }
 } // namespace AHO_NAMESPACE

@@ -22,7 +22,7 @@ DrawListとそのspanはスレッド間で共有しながら変更できませ�
 `<AHO/x/drawer/renderer2d.hpp>`のRenderer2Dは、device・RenderPass・SPIR-Vのディレクトリから作成します。パスやデバイスにグローバルな既定値を設けません。CMakeのAHOLiビルドでglslcを使って`build/AHOLi/shaders/drawer/`へシェーダーを生成し、installでは`share/AHO/shaders/drawer/`へ配置します。MSBuildはVULKAN_SDKのglslc.exeで`$(OutDir)shaders/drawer/`へ生成します。
 
 ```cpp
-aho::x::Renderer2D renderer(device, renderPass, shaderDirectory); // ループ外で再利用
+aho::x::Renderer2D renderer(device, render_pass, shader_directory); // ループ外で再利用
 // DrawPhaseなら既定のRenderPassが開始済み。ComputePhaseではBegin/Endを明示する。
 if (!renderer.record(phase, list, width, height)) { /* 空きスロット不足 */ }
 // 描画ストリームへ明示的に渡す場合:
@@ -34,6 +34,8 @@ record()は記録を行ってbool、draw()は未記録のスナップショッ�
 
 座標は左上原点、右向きX・下向きYのピクセル座標です。シェーダーで描画先の幅・高さからNDCへ変換します。幅・高さは1〜2²⁴で、実デバイスのviewport/imageの上限も守る必要があります。Rendererは指定サイズのviewport/scissor、カリングなし・深度なし・通常の非乗算済みalpha blendingを設定します。後続の独自コマンドは必要な状態を再設定してください。
 
-GPU使用中の領域は上書きせず、Completionを弱参照で追跡します。コマンド自体のコピーが残るスロットも再利用しません。空きスロットがない場合はrecord=false / draw=nulloptで、暗黙waitや追加のsubmitはしません。maxSnapshotsは既定3で、未使用のコマンドを保持する場合も上限に含みます。完了・cancel後は再利用します。バッチごとに頂点バッファを持ち、容量不足のときだけ作り直します。capacity()は確保済みバッファの合計バイト数です。Rendererのコピーはスロット管理を共有し、同時変更には外部同期が必要です。
+GPU使用中の領域は上書きせず、Completionを弱参照で追跡します。コマンド自体のコピーが残るスロットも再利用しません。空きスロットがない場合はrecord=false / draw=nulloptで、暗黙waitや追加のsubmitはしません。max_snapshotsは既定3で、未使用のコマンドを保持する場合も上限に含みます。完了・cancel後は再利用します。バッチごとに頂点バッファを持ち、容量不足のときだけ作り直します。capacity()は確保済みバッファの合計バイト数です。Rendererのコピーはスロット管理を共有し、同時変更には外部同期が必要です。
+
+Draw2DCommandの`getPipeline()`はVSLのコマンドconceptが要求する名前を維持します。
 
 GPU完了までのネイティブ資源保持はVSLの公開コマンドに委ねます。AHO製品コードはVulkanヘッダー・_pimpls.hpp・vk型に依存せず、コンパイル契約でも禁止します。現段階のRendererは単色バッチだけを受け付け、TextureId≠0をエラーにします。

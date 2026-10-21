@@ -13,7 +13,7 @@ namespace {
         {
             Renderer renderer(device, *pass, AHO_DRAW_SHADER_DIR, 1);
             List list;
-            list.rectangle({0, 0, 8, 8}, green());
+            list.rectangle({0, 0, 8, 8}, Green());
             auto phase = manager.startPhase<vsl::ComputePhase>();
             auto cmd = renderer.draw(phase, list, 8, 8);
             ASSERT_TRUE(cmd);
@@ -24,7 +24,7 @@ namespace {
             stream << vsl::command::RenderPassEnd{};
         }
         const auto image = pixels(manager);
-        EXPECT_EQ(pixel(image, 4, 4), (std::array<unsigned, 4>{0, 255, 0, 255}));
+        EXPECT_EQ(Pixel(image, 4, 4), (std::array<unsigned, 4>{0, 255, 0, 255}));
     }
 
     TEST_F(Renderer2DVulkanIntegrationTest, CommandsRejectOtherManagersAndCancelledPhases) {
@@ -32,14 +32,14 @@ namespace {
         auto manager = make_manager();
         auto other = make_manager();
         List list;
-        list.rectangle({0, 0, 8, 8}, red());
+        list.rectangle({0, 0, 8, 8}, Red());
         auto phase = manager.startPhase<vsl::ComputePhase>();
         auto command = renderer.draw(phase, list, 8, 8);
         ASSERT_TRUE(command);
         {
-            auto otherPhase = other.startPhase<vsl::ComputePhase>();
+            auto other_phase = other.startPhase<vsl::ComputePhase>();
             EXPECT_THROW(command->invoke(other.getPool(), other.getBuffer(), other), std::logic_error);
-            otherPhase.cancel();
+            other_phase.cancel();
         }
         phase.cancel();
         EXPECT_THROW(command->invoke(manager.getPool(), manager.getBuffer(), manager), std::logic_error);

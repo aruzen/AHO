@@ -4,7 +4,7 @@
 #include <VSL/vulkan/buffer.hpp>
 
 namespace AHO_NAMESPACE::x {
-    namespace _impl {
+    namespace detail {
         using VertexBuffer = VSL_NAMESPACE::Buffer<VSL_NAMESPACE::MemoryType::VertexBuffer,
                                                    VSL_NAMESPACE::MemoryProperty::HostVisible | VSL_NAMESPACE::MemoryProperty::HostCoherent>;
         struct Upload {
@@ -25,19 +25,19 @@ namespace AHO_NAMESPACE::x {
             VSL_NAMESPACE::GraphicsPipeline pipeline;
             Pipeline(VSL_NAMESPACE::LogicalDeviceAccessor device, VSL_NAMESPACE::RenderPassAccessor pass,
                      const std::filesystem::path& directory, std::uint32_t subpass);
-            static VSL_NAMESPACE::PipelineLayout makeLayout(VSL_NAMESPACE::LogicalDeviceAccessor device, const std::filesystem::path& directory);
+            static VSL_NAMESPACE::PipelineLayout MakeLayout(VSL_NAMESPACE::LogicalDeviceAccessor device, const std::filesystem::path& directory);
         };
-    } // namespace _impl
+    } // namespace detail
 
     struct Renderer2D::Data {
-        std::shared_ptr<_impl::Pipeline> pipeline;
-        std::vector<std::shared_ptr<_impl::Slot>> slots;
+        std::shared_ptr<detail::Pipeline> pipeline;
+        std::vector<std::shared_ptr<detail::Slot>> slots;
         std::size_t limit;
     };
 
     struct command::Draw2DCommand::Data {
-        std::shared_ptr<_impl::Pipeline> pipeline;
-        std::shared_ptr<_impl::Slot> slot;
+        std::shared_ptr<detail::Pipeline> pipeline;
+        std::shared_ptr<detail::Slot> slot;
         std::vector<DrawBatch> batches;
         std::uint32_t width, height;
         std::weak_ptr<VSL_NAMESPACE::_impl::Submission_impl> submission;

@@ -31,7 +31,7 @@ namespace AHO_NAMESPACE::x::command {
         VSL_NAMESPACE::command::PushConstant(pipeline.layout, VSL_NAMESPACE::ShaderFlag::Vertex, 16, 0, transform.data()).invoke(pool, buffer, manager);
         for (std::size_t i = 0; i < _data->batches.size(); ++i) {
             VSL_NAMESPACE::command::BindVertexBuffer(_data->slot->uploads[i]->buffer).invoke(pool, buffer, manager);
-            VSL_NAMESPACE::command::Draw(_data->batches[i].vertexCount).invoke(pool, buffer, manager);
+            VSL_NAMESPACE::command::Draw(_data->batches[i].vertex_count).invoke(pool, buffer, manager);
         }
     }
 } // namespace AHO_NAMESPACE::x::command

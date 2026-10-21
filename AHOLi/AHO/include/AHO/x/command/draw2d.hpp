@@ -18,6 +18,7 @@ namespace AHO_NAMESPACE::x::command {
 
     public:
         void invoke(VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) const;
+        // VSLのPipelineHolderコマンド契約で要求される名前を維持する。
         [[nodiscard]] VSL_NAMESPACE::PipelineAccessor getPipeline() const;
     };
 } // namespace AHO_NAMESPACE::x::command

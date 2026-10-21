@@ -11,9 +11,9 @@ namespace {
         auto manager = make_manager();
         Renderer renderer(device, *pass, AHO_DRAW_SHADER_DIR);
         List list;
-        list.rectangle({0, 0, 8, 8}, red());
-        list.setTransform({.x = 2, .y = 2});
-        list.rectangle({0, 0, 4, 4}, green());
+        list.rectangle({0, 0, 8, 8}, Red());
+        list.set_transform({.x = 2, .y = 2});
+        list.rectangle({0, 0, 4, 4}, Green());
         auto phase = manager.startPhase<vsl::ComputePhase>();
         auto cmd = renderer.draw(phase, list, 8, 8);
         ASSERT_TRUE(cmd);
@@ -22,9 +22,9 @@ namespace {
         phase << vsl::command::RenderPassBegin(*framebuffer) << *cmd << vsl::command::RenderPassEnd{};
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::Success);
         const auto image = pixels(manager);
-        EXPECT_EQ(pixel(image, 0, 0), (std::array<unsigned, 4>{255, 0, 0, 255}));
-        EXPECT_EQ(pixel(image, 4, 4), (std::array<unsigned, 4>{0, 255, 0, 255}));
-        EXPECT_EQ(pixel(image, 7, 7), (std::array<unsigned, 4>{255, 0, 0, 255}));
+        EXPECT_EQ(Pixel(image, 0, 0), (std::array<unsigned, 4>{255, 0, 0, 255}));
+        EXPECT_EQ(Pixel(image, 4, 4), (std::array<unsigned, 4>{0, 255, 0, 255}));
+        EXPECT_EQ(Pixel(image, 7, 7), (std::array<unsigned, 4>{255, 0, 0, 255}));
     }
     TEST_F(Renderer2DVulkanIntegrationTest, RecordPreservesAlphaCompositingOrder) {
         auto manager = make_manager();
@@ -38,7 +38,7 @@ namespace {
             ASSERT_TRUE(renderer.record(phase, list, 8, 8));
             phase << vsl::command::RenderPassEnd{};
         }
-        const auto center = pixel(pixels(manager), 4, 4);
+        const auto center = Pixel(pixels(manager), 4, 4);
         EXPECT_NEAR(center[0], 128, 1);
         EXPECT_EQ(center[1], 0u);
         EXPECT_NEAR(center[2], 128, 1);
@@ -49,7 +49,7 @@ namespace {
         auto manager = make_manager();
         auto phase = manager.startPhase<vsl::ComputePhase>();
         List list;
-        list.rectangle({0, 0, 8, 8}, red());
+        list.rectangle({0, 0, 8, 8}, Red());
         auto first = renderer.draw(phase, list, 8, 8);
         ASSERT_TRUE(first);
         const auto capacity = renderer.capacity();
@@ -65,7 +65,7 @@ namespace {
         EXPECT_THROW(renderer.draw(phase, list, 0, 8), std::invalid_argument);
         EXPECT_THROW(renderer.draw(phase, list, 8, UINT32_MAX), std::invalid_argument);
         List textured;
-        textured.rectangle({0, 0, 1, 1}, red(), {1});
+        textured.rectangle({0, 0, 1, 1}, Red(), {1});
         EXPECT_THROW(renderer.draw(phase, textured, 8, 8), std::invalid_argument);
     }
 
@@ -73,7 +73,7 @@ namespace {
         auto manager = make_manager();
         Renderer renderer(device, *pass, AHO_DRAW_SHADER_DIR, 1);
         List list;
-        list.rectangle({0, 0, 8, 8}, red());
+        list.rectangle({0, 0, 8, 8}, Red());
         {
             auto phase = manager.startPhase<vsl::ComputePhase>();
             auto cmd = renderer.draw(phase, list, 8, 8);
@@ -82,7 +82,7 @@ namespace {
             phase.cancel();
         }
         list.clear();
-        list.rectangle({0, 0, 8, 8}, green());
+        list.rectangle({0, 0, 8, 8}, Green());
         {
             auto phase = manager.startPhase<vsl::ComputePhase>();
             auto cmd = renderer.draw(phase, list, 8, 8);
@@ -95,15 +95,15 @@ namespace {
         auto next = manager.startPhase<vsl::ComputePhase>();
         EXPECT_TRUE(renderer.draw(next, list, 8, 8));
         next.cancel();
-        EXPECT_EQ(pixel(pixels(manager), 4, 4), (std::array<unsigned, 4>{0, 255, 0, 255}));
+        EXPECT_EQ(Pixel(pixels(manager), 4, 4), (std::array<unsigned, 4>{0, 255, 0, 255}));
     }
 
     TEST_F(Renderer2DVulkanIntegrationTest, UnsupportedPassIsRejectedBeforePipelineCreation) {
         EXPECT_THROW((Renderer(device, *pass, AHO_DRAW_SHADER_DIR, 1, 1)), std::out_of_range);
         vsl::RenderPassDescription info;
         info.addColor({.format = vsl::data_format::UnsignedInt32R, .finalLayout = vsl::ImageLayout::General});
-        vsl::RenderPass integerPass(device, info);
-        EXPECT_THROW((Renderer(device, integerPass, AHO_DRAW_SHADER_DIR)), std::invalid_argument);
+        vsl::RenderPass integer_pass(device, info);
+        EXPECT_THROW((Renderer(device, integer_pass, AHO_DRAW_SHADER_DIR)), std::invalid_argument);
     }
     TEST_F(Renderer2DVulkanIntegrationTest, EmptyListsDoNotConsumeSnapshotSlots) {
         Renderer renderer(device, *pass, AHO_DRAW_SHADER_DIR, 1);
@@ -113,7 +113,7 @@ namespace {
         ASSERT_TRUE(empty);
         EXPECT_EQ(renderer.capacity(), 0u);
         List list;
-        list.rectangle({0, 0, 1, 1}, red());
+        list.rectangle({0, 0, 1, 1}, Red());
         EXPECT_TRUE(renderer.draw(phase, list, 8, 8));
     }
 } // namespace

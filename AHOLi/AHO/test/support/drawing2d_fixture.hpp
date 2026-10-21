@@ -10,17 +10,17 @@ namespace aho_test {
     protected:
         using Renderer = aho::x::Renderer2D;
         using List = aho::x::DrawList;
-        static aho::RGBA red();
-        static aho::RGBA green();
+        static aho::RGBA Red();
+        static aho::RGBA Green();
         aho::ImagePixels pixels(vsl::CommandManager manager);
-        static std::array<unsigned, 4> pixel(const aho::ImagePixels& image, std::size_t x, std::size_t y);
+        static std::array<unsigned, 4> Pixel(const aho::ImagePixels& image, std::size_t x, std::size_t y);
     };
 
     inline bool Drawing2DVulkanIntegrationTest::validate_vulkan() const { return true; }
 
-    inline aho::RGBA Drawing2DVulkanIntegrationTest::red() { return {1, 0, 0, 1}; }
+    inline aho::RGBA Drawing2DVulkanIntegrationTest::Red() { return {1, 0, 0, 1}; }
 
-    inline aho::RGBA Drawing2DVulkanIntegrationTest::green() { return {0, 1, 0, 1}; }
+    inline aho::RGBA Drawing2DVulkanIntegrationTest::Green() { return {0, 1, 0, 1}; }
 
     inline aho::ImagePixels Drawing2DVulkanIntegrationTest::pixels(vsl::CommandManager manager) {
         aho::ImageReadback readback(manager);
@@ -30,7 +30,7 @@ namespace aho_test {
         return ticket->read();
     }
 
-    inline std::array<unsigned, 4> Drawing2DVulkanIntegrationTest::pixel(const aho::ImagePixels& image, std::size_t x, std::size_t y) {
+    inline std::array<unsigned, 4> Drawing2DVulkanIntegrationTest::Pixel(const aho::ImagePixels& image, std::size_t x, std::size_t y) {
         const auto i = y * image.rowStride + x * 4;
         return {std::to_integer<unsigned>(image.bytes[i]), std::to_integer<unsigned>(image.bytes[i + 1]),
                 std::to_integer<unsigned>(image.bytes[i + 2]), std::to_integer<unsigned>(image.bytes[i + 3])};

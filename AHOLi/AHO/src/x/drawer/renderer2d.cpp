@@ -13,7 +13,7 @@
 #include <algorithm>
 
 namespace AHO_NAMESPACE::x {
-    namespace _impl {
+    namespace detail {
         Upload::Upload(VSL_NAMESPACE::LogicalDeviceAccessor device, std::size_t bytes) : buffer(device, bytes), capacity(bytes) {}
 
         bool Slot::available() {
@@ -29,9 +29,9 @@ namespace AHO_NAMESPACE::x {
 
         Pipeline::Pipeline(VSL_NAMESPACE::LogicalDeviceAccessor device, VSL_NAMESPACE::RenderPassAccessor pass,
                            const std::filesystem::path& directory, std::uint32_t subpass)
-            : device(device), layout(makeLayout(device, directory)), pipeline(layout, pass, subpass) {}
+            : device(device), layout(MakeLayout(device, directory)), pipeline(layout, pass, subpass) {}
 
-        VSL_NAMESPACE::PipelineLayout Pipeline::makeLayout(VSL_NAMESPACE::LogicalDeviceAccessor device, const std::filesystem::path& directory) {
+        VSL_NAMESPACE::PipelineLayout Pipeline::MakeLayout(VSL_NAMESPACE::LogicalDeviceAccessor device, const std::filesystem::path& directory) {
             namespace pl = VSL_NAMESPACE::pipeline_layout;
             VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Vertex> vertex(device, directory / "draw2d.vert.spv");
             VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Fragment> fragment(device, directory / "draw2d.frag.spv");
@@ -48,11 +48,11 @@ namespace AHO_NAMESPACE::x {
                     pl::Multisample{}, pl::DynamicState{},
                     VSL_NAMESPACE::Viewport(0, 0, 1, 1), VSL_NAMESPACE::Scissor(0, 0, 1, 1)};
         }
-    } // namespace _impl
+    } // namespace detail
 
     Renderer2D::Renderer2D(VSL_NAMESPACE::LogicalDeviceAccessor device, VSL_NAMESPACE::RenderPassAccessor pass,
-                           const std::filesystem::path& shaders, std::size_t maxSnapshots, std::uint32_t subpass) {
-        if (!device._data || !pass._data || !maxSnapshots)
+                           const std::filesystem::path& shaders, std::size_t max_snapshots, std::uint32_t subpass) {
+        if (!device._data || !pass._data || !max_snapshots)
             throw std::invalid_argument("Renderer2D requires device, pass and a nonzero snapshot limit");
         const auto& description = pass.description();
         if (subpass >= description.subpasses.size())
@@ -67,8 +67,8 @@ namespace AHO_NAMESPACE::x {
              attachment.format != Srgb8RGBA && attachment.format != Srgb8BGRA))
             throw std::invalid_argument("Renderer2D requires a single-sample RGBA8/BGRA8 UNORM or sRGB target");
         _data = std::make_shared<Data>();
-        _data->pipeline = std::make_shared<_impl::Pipeline>(device, pass, shaders, subpass);
-        _data->limit = maxSnapshots;
+        _data->pipeline = std::make_shared<detail::Pipeline>(device, pass, shaders, subpass);
+        _data->limit = max_snapshots;
     }
 
     std::optional<command::Draw2DCommand> Renderer2D::draw(VSL_NAMESPACE::ComputePhase& phase, const DrawList& list, std::uint32_t width, std::uint32_t height) {
@@ -89,7 +89,7 @@ namespace AHO_NAMESPACE::x {
         snapshot->batches.assign(list.batches().begin(), list.batches().end());
         if (list.empty())
             return command::Draw2DCommand(std::move(snapshot));
-        std::shared_ptr<_impl::Slot> slot;
+        std::shared_ptr<detail::Slot> slot;
         for (const auto& candidate : _data->slots)
             if (candidate.use_count() == 1 && candidate->available()) {
                 slot = candidate;
@@ -98,20 +98,20 @@ namespace AHO_NAMESPACE::x {
         if (!slot) {
             if (_data->slots.size() >= _data->limit)
                 return std::nullopt;
-            slot = std::make_shared<_impl::Slot>();
+            slot = std::make_shared<detail::Slot>();
             _data->slots.push_back(slot);
         }
         for (std::size_t i = 0; i < snapshot->batches.size(); ++i) {
             const auto& batch = snapshot->batches[i];
-            if (static_cast<std::uintmax_t>(batch.vertexCount) * sizeof(DrawVertex) > std::numeric_limits<std::size_t>::max())
+            if (static_cast<std::uintmax_t>(batch.vertex_count) * sizeof(DrawVertex) > std::numeric_limits<std::size_t>::max())
                 throw std::length_error("Draw upload byte count overflow");
-            const auto bytes = static_cast<std::size_t>(batch.vertexCount) * sizeof(DrawVertex);
+            const auto bytes = static_cast<std::size_t>(batch.vertex_count) * sizeof(DrawVertex);
             if (slot->uploads.size() <= i)
-                slot->uploads.push_back(std::make_unique<_impl::Upload>(_data->pipeline->device, bytes));
+                slot->uploads.push_back(std::make_unique<detail::Upload>(_data->pipeline->device, bytes));
             else if (slot->uploads[i]->capacity < bytes)
-                slot->uploads[i] = std::make_unique<_impl::Upload>(_data->pipeline->device, bytes);
+                slot->uploads[i] = std::make_unique<detail::Upload>(_data->pipeline->device, bytes);
             auto mapped = slot->uploads[i]->buffer.data(bytes);
-            std::memcpy(mapped.data, list.vertices().data() + batch.firstVertex, bytes);
+            std::memcpy(mapped.data, list.vertices().data() + batch.first_vertex, bytes);
         }
         snapshot->slot = std::move(slot);
         return command::Draw2DCommand(std::move(snapshot));

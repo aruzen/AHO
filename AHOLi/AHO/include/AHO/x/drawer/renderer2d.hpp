@@ -17,7 +17,7 @@ namespace AHO_NAMESPACE::x {
 
     public:
         Renderer2D(VSL_NAMESPACE::LogicalDeviceAccessor device, VSL_NAMESPACE::RenderPassAccessor pass,
-                   const std::filesystem::path& shaderDirectory, std::size_t maxSnapshots = 3, std::uint32_t subpass = 0);
+                   const std::filesystem::path& shader_directory, std::size_t max_snapshots = 3, std::uint32_t subpass = 0);
         // 空きスナップショットがなければnullopt。待機や追加のGPU送信はしない。
         [[nodiscard]] std::optional<command::Draw2DCommand> draw(VSL_NAMESPACE::ComputePhase& phase, const DrawList& list, std::uint32_t width, std::uint32_t height);
         [[nodiscard]] bool record(VSL_NAMESPACE::ComputePhase& phase, const DrawList& list, std::uint32_t width, std::uint32_t height);

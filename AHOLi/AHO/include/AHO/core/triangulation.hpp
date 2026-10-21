@@ -41,13 +41,12 @@ namespace AHO_NAMESPACE {
             if (!points.empty() && points.size() - 1 > std::numeric_limits<Size>::max())
                 return Result(std::unexpected(Error::IndexOverflow));
             const auto p = g::convert(point);
-            if (!std::isfinite(p.x) || !std::isfinite(p.y))
+            if (!std::isfinite(p.value.___AN1) || !std::isfinite(p.value.___AN2))
                 return Result(std::unexpected(Error::NonFiniteCoordinate));
             points.push_back(point);
             normalized.push_back(p);
         }
-        auto same = [](g::Point a, g::Point b) { return a.x == b.x && a.y == b.y; };
-        if (points.size() > 1 && same(normalized.front(), normalized.back())) {
+        if (points.size() > 1 && normalized.front() == normalized.back()) {
             points.pop_back();
             normalized.pop_back();
         }
@@ -57,7 +56,7 @@ namespace AHO_NAMESPACE {
             return Result(std::unexpected(Error::TooFewVertices));
         for (std::size_t i = 0; i < points.size(); ++i)
             for (std::size_t j = 0; j < i; ++j)
-                if (same(normalized[i], normalized[j]))
+                if (normalized[i] == normalized[j])
                     return Result(std::unexpected(Error::DuplicateVertex));
         g::normalize(normalized);
         const auto n = points.size();

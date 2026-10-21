@@ -7,6 +7,31 @@
 namespace {
     using P = aho::d2::PointD;
     using E = aho::TriangulationFailedCause;
+
+    template<typename T>
+    class TriangulationCoordinateTest : public testing::Test {};
+
+    using CalculationPoints = testing::Types<
+        aho::d2::Point<long double>,
+        aho::d2::Point<long double, aho::coordinate::_MakeCoordinateInfo<true, false, true>::value>,
+        aho::d2::Point<long double, aho::coordinate::_MakeCoordinateInfo<false, true, true>::value>>;
+    TYPED_TEST_SUITE(TriangulationCoordinateTest, CalculationPoints);
+
+    TYPED_TEST(TriangulationCoordinateTest, PreservesLongDoubleCoordinatesAndTheirEnabledAxes) {
+        const std::array points{TypeParam(0, 0), TypeParam(4, 0), TypeParam(4, 2), TypeParam(0, 2), TypeParam(0, 0)};
+        const auto result = aho::triangulate(points);
+        ASSERT_TRUE(result);
+        static_assert(std::same_as<typename decltype(result)::value_type::coordinate_info, typename TypeParam::coordinate_info>);
+        static_assert(std::same_as<typename decltype(result)::value_type::element_type, long double>);
+        EXPECT_EQ(result->size(), 2u);
+        EXPECT_DOUBLE_EQ(result->area(), 8);
+        ASSERT_EQ(result->points().size(), 4u);
+        for (std::size_t i = 0; i < result->points().size(); ++i) {
+            EXPECT_EQ(result->points()[i].value.___AN1, points[i].value.___AN1);
+            EXPECT_EQ(result->points()[i].value.___AN2, points[i].value.___AN2);
+        }
+    }
+
     TEST(TriangulationTest, TriangleAndSquareKeepInputVerticesAndWinding) {
         for (const bool reverse : {false, true}) {
             std::vector<P> points{P(0, 0), P(2, 0), P(2, 3), P(0, 3)};

@@ -639,8 +639,10 @@ namespace {
 #include "support/image_transfer_fixture.hpp"
 namespace {
     class ReflectedSeparateImageVulkanIntegrationTest : public vsl_test::ImageTransferVulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
+        bool validate_vulkan() const override;
     };
+
+    bool ReflectedSeparateImageVulkanIntegrationTest::validate_vulkan() const { return true; }
     TEST_F(ReflectedSeparateImageVulkanIntegrationTest, GeneratedLayoutSamplesTheUploadedTexelWithASeparateSampler) {
         using namespace vsl::graphic_resource;
         if (!host_coherent_available())
@@ -713,8 +715,10 @@ namespace {
         }
     }
     class ReflectedTexelBufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
+        bool validate_vulkan() const override;
     };
+
+    bool ReflectedTexelBufferVulkanIntegrationTest::validate_vulkan() const { return true; }
     TEST_F(ReflectedTexelBufferVulkanIntegrationTest, GeneratedLayoutSupportsReadingAndWritingNativeBufferViews) {
         using namespace vsl::graphic_resource;
         if (!host_coherent_available())
@@ -748,7 +752,7 @@ namespace {
         auto source_view = device._data->device.createBufferViewUnique(view_info);
         view_info.buffer = destination._data->buffer;
         auto destination_view = device._data->device.createBufferViewUnique(view_info);
-        // Resource::update has no BufferView overload. Bind native views to the reflected layout.
+        // BufferView用の公開updateはないため、テスト内で反射したlayoutへnative viewを設定する。
         std::array<vk::WriteDescriptorSet, 2> writes{};
         for (std::uint32_t i = 0; i < writes.size(); ++i) {
             writes[i].dstSet = allocated[0]._data->descriptorSet;
@@ -802,8 +806,10 @@ namespace {
         }
     }
     class ReflectedInputAttachmentVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
+        bool validate_vulkan() const override;
     };
+
+    bool ReflectedInputAttachmentVulkanIntegrationTest::validate_vulkan() const { return true; }
     TEST_F(ReflectedInputAttachmentVulkanIntegrationTest, GeneratedLayoutReadsTheClearedInputAttachmentOnGpu) {
         using namespace vsl::graphic_resource;
         vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_input_attachment.frag.spv"));
@@ -830,7 +836,7 @@ namespace {
         render_description.attachments = {
             {.format = vsl::data_format::UnsignedNormalized8RGBA, .finalLayout = vsl::ImageLayout::General},
             {.format = vsl::data_format::UnsignedNormalized8RGBA, .finalLayout = vsl::ImageLayout::General}};
-        // Clear the source as a color attachment before reading it in the next subpass.
+        // 次のsubpassで読む前に、入力元をcolor attachmentとしてclearする。
         render_description.subpasses.resize(2);
         render_description.subpasses[0].colors = {{0, vsl::ImageLayout::General}};
         render_description.subpasses[1].inputs = {{0, vsl::ImageLayout::General}};

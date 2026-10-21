@@ -6,13 +6,13 @@
 
 namespace AHO_NAMESPACE {
     enum class TriangulationFailedCause {
-        TooFewVertices,
-        NonFiniteCoordinate,
-        DuplicateVertex,
-        DegenerateContour,
-        SelfIntersection,
-        IndexOverflow,
-        NoEar
+        TOO_FEW_VERTICES,
+        NON_FINITE_COORDINATE,
+        DUPLICATE_VERTEX,
+        DEGENERATE_CONTOUR,
+        SELF_INTERSECTION,
+        INDEX_OVERFLOW,
+        NO_EAR
     };
 
     // 点列は輪郭順。終点に始点を繰り返す形式も受け付ける。穴は扱わない。
@@ -31,7 +31,7 @@ namespace AHO_NAMESPACE {
     auto triangulate(Range&& contour) {
         using Input = std::ranges::range_value_t<Range>;
         using Mesh = Polygon<typename Input::element_type, VSL_NAMESPACE::D2, typename Input::coordinate_info, Size>;
-        using P = typename Mesh::point_type;
+        using P = typename Mesh::PointType;
         using Error = TriangulationFailedCause;
         using Result = std::expected<Mesh, Error>;
         namespace g = detail::geometry2d;
@@ -39,10 +39,10 @@ namespace AHO_NAMESPACE {
         std::vector<g::Point> normalized;
         for (const auto& point : contour) {
             if (!points.empty() && points.size() - 1 > std::numeric_limits<Size>::max())
-                return Result(std::unexpected(Error::IndexOverflow));
+                return Result(std::unexpected(Error::INDEX_OVERFLOW));
             const auto p = g::convert(point);
             if (!std::isfinite(p.value.___AN1) || !std::isfinite(p.value.___AN2))
-                return Result(std::unexpected(Error::NonFiniteCoordinate));
+                return Result(std::unexpected(Error::NON_FINITE_COORDINATE));
             points.push_back(point);
             normalized.push_back(p);
         }
@@ -51,13 +51,13 @@ namespace AHO_NAMESPACE {
             normalized.pop_back();
         }
         if (!points.empty() && points.size() - 1 > std::numeric_limits<Size>::max())
-            return Result(std::unexpected(Error::IndexOverflow));
+            return Result(std::unexpected(Error::INDEX_OVERFLOW));
         if (points.size() < 3)
-            return Result(std::unexpected(Error::TooFewVertices));
+            return Result(std::unexpected(Error::TOO_FEW_VERTICES));
         for (std::size_t i = 0; i < points.size(); ++i)
             for (std::size_t j = 0; j < i; ++j)
                 if (normalized[i] == normalized[j])
-                    return Result(std::unexpected(Error::DuplicateVertex));
+                    return Result(std::unexpected(Error::DUPLICATE_VERTEX));
         g::normalize(normalized);
         const auto n = points.size();
         for (std::size_t i = 0; i < n; ++i)
@@ -65,7 +65,7 @@ namespace AHO_NAMESPACE {
                 if (j == i + 1 || (i == 0 && j == n - 1))
                     continue;
                 if (g::intersects(normalized[i], normalized[(i + 1) % n], normalized[j], normalized[(j + 1) % n]))
-                    return Result(std::unexpected(Error::SelfIntersection));
+                    return Result(std::unexpected(Error::SELF_INTERSECTION));
             }
         std::vector<std::size_t> remaining(n);
         std::iota(remaining.begin(), remaining.end(), 0);
@@ -77,21 +77,21 @@ namespace AHO_NAMESPACE {
                 const auto a = normalized[remaining[(i + remaining.size() - 1) % remaining.size()]];
                 const auto b = normalized[remaining[i]];
                 const auto c = normalized[remaining[(i + 1) % remaining.size()]];
-                if (g::onSegment(a, c, b)) {
+                if (g::on_segment(a, c, b)) {
                     remaining.erase(remaining.begin() + i);
                     simplified = true;
                     break;
                 }
                 if (g::orientation(a, b, c) == 0)
-                    return Result(std::unexpected(Error::DegenerateContour));
+                    return Result(std::unexpected(Error::DEGENERATE_CONTOUR));
             }
         }
-        long double twiceArea = 0;
+        long double twice_area = 0;
         for (std::size_t i = 1; i + 1 < remaining.size(); ++i)
-            twiceArea += g::cross(normalized[remaining[0]], normalized[remaining[i]], normalized[remaining[i + 1]]);
-        if (twiceArea == 0 || g::orientation(normalized[remaining[0]], normalized[remaining[1]], normalized[remaining[2]]) == 0)
-            return Result(std::unexpected(Error::DegenerateContour));
-        const int winding = twiceArea > 0 ? 1 : -1;
+            twice_area += g::cross(normalized[remaining[0]], normalized[remaining[i]], normalized[remaining[i + 1]]);
+        if (twice_area == 0 || g::orientation(normalized[remaining[0]], normalized[remaining[1]], normalized[remaining[2]]) == 0)
+            return Result(std::unexpected(Error::DEGENERATE_CONTOUR));
+        const int winding = twice_area > 0 ? 1 : -1;
         std::vector<IndexedTriangle<Size>> triangles;
         triangles.reserve(remaining.size() - 2);
         while (remaining.size() > 3) {
@@ -103,7 +103,7 @@ namespace AHO_NAMESPACE {
                     continue;
                 bool occupied = false;
                 for (const auto p : remaining)
-                    if (p != a && p != b && p != c && g::inTriangle(normalized[a], normalized[b], normalized[c], normalized[p])) {
+                    if (p != a && p != b && p != c && g::in_triangle(normalized[a], normalized[b], normalized[c], normalized[p])) {
                         occupied = true;
                         break;
                     }
@@ -115,7 +115,7 @@ namespace AHO_NAMESPACE {
                 break;
             }
             if (!clipped)
-                return Result(std::unexpected(Error::NoEar));
+                return Result(std::unexpected(Error::NO_EAR));
         }
         triangles.push_back({{static_cast<Size>(remaining[0])}, {static_cast<Size>(remaining[1])}, {static_cast<Size>(remaining[2])}});
         return Result(Mesh(points, triangles));

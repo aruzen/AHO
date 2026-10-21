@@ -2,6 +2,8 @@
 
 `AHO/core/polygon.hpp` の `Polygon<R, D, CI, Size, Alloc>` は頂点と三角形インデックスを所有する値型です。既存の前方宣言のテンプレート引数を維持します。座標次元・座標情報を保持し、2D/3Dで利用できます。
 
+固有の型エイリアスは`PointType`・`IndexType`・`TriangleType`です。既存のAHO conceptが要求する`dimension`・`element_type`・`coordinate_info`は、その契約に従う名前を維持します。
+
 ```cpp
 using P = aho::d2::PointF;
 const std::array points{P(0, 0), P(1, 0), P(0, 1)};
@@ -27,5 +29,7 @@ if (!result) { /* result.error()で原因を判別 */ }
 ```
 
 穴のない単純な凹多角形をear clippingで分割します。点不足・非有限値・重複頂点・自己交差・退化・インデックス範囲超過をエラーとして返します。メモリ確保の失敗はstd::bad_allocです。自己交差検査はO(n²)、ear clippingの最悪時間はO(n³)で、大量頂点用の高速化は含みません。
+
+エラー要素は`TOO_FEW_VERTICES`・`NON_FINITE_COORDINATE`・`DUPLICATE_VERTEX`・`SELF_INTERSECTION`・`DEGENERATE_CONTOUR`・`INDEX_OVERFLOW`・`NO_EAR`です。
 
 判定はlong doubleへ変換し、座標を共通係数で縮小してから外積を計算します。方向判定の許容値は演算項の大きさ×long doubleのepsilon×16です。厳密述語ではなく、極端な縦横比・ほぼ共線な点・long doubleの精度を超える整数について厳密な判定は保証しません。

@@ -16,16 +16,16 @@ namespace AHO_NAMESPACE {
         using dimension = D;
         using element_type = R;
         using coordinate_info = CI;
-        using point_type = _Point<R, D, CI>;
-        using index_type = Size;
-        using triangle_type = IndexedTriangle<Size>;
+        using PointType = _Point<R, D, CI>;
+        using IndexType = Size;
+        using TriangleType = IndexedTriangle<Size>;
         static_assert(std::is_integral_v<Size> && std::is_unsigned_v<Size> && !std::same_as<Size, bool>);
 
         Polygon() = default;
-        Polygon(std::span<const point_type> points, std::span<const triangle_type> triangles);
+        Polygon(std::span<const PointType> points, std::span<const TriangleType> triangles);
 
-        [[nodiscard]] std::span<const point_type> points() const noexcept;
-        [[nodiscard]] std::span<const triangle_type> indices() const noexcept;
+        [[nodiscard]] std::span<const PointType> points() const noexcept;
+        [[nodiscard]] std::span<const TriangleType> indices() const noexcept;
         [[nodiscard]] std::size_t size() const noexcept;
         [[nodiscard]] bool empty() const noexcept;
 
@@ -35,13 +35,13 @@ namespace AHO_NAMESPACE {
         [[nodiscard]] double area() const;
 
     private:
-        std::vector<point_type> _points;
-        std::vector<triangle_type, Alloc> _triangles;
+        std::vector<PointType> _points;
+        std::vector<TriangleType, Alloc> _triangles;
     };
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
-    Polygon<R, D, CI, Size, Alloc>::Polygon(std::span<const point_type> points,
-                                            std::span<const triangle_type> triangles) {
+    Polygon<R, D, CI, Size, Alloc>::Polygon(std::span<const PointType> points,
+                                            std::span<const TriangleType> triangles) {
         if (points.size() && points.size() - 1 > std::numeric_limits<Size>::max())
             throw std::length_error("Polygon vertex index exceeds index type");
         for (const auto& triangle : triangles)
@@ -53,12 +53,12 @@ namespace AHO_NAMESPACE {
     }
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
-    std::span<const typename Polygon<R, D, CI, Size, Alloc>::point_type> Polygon<R, D, CI, Size, Alloc>::points() const noexcept {
+    std::span<const typename Polygon<R, D, CI, Size, Alloc>::PointType> Polygon<R, D, CI, Size, Alloc>::points() const noexcept {
         return _points;
     }
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
-    std::span<const typename Polygon<R, D, CI, Size, Alloc>::triangle_type> Polygon<R, D, CI, Size, Alloc>::indices() const noexcept {
+    std::span<const typename Polygon<R, D, CI, Size, Alloc>::TriangleType> Polygon<R, D, CI, Size, Alloc>::indices() const noexcept {
         return _triangles;
     }
 
@@ -74,7 +74,7 @@ namespace AHO_NAMESPACE {
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
     auto Polygon<R, D, CI, Size, Alloc>::triangles() const {
-        return std::views::all(_triangles) | std::views::transform([this](const triangle_type& t) {
+        return std::views::all(_triangles) | std::views::transform([this](const TriangleType& t) {
                    return Triangle<R, D, CI>{_points[t.idx1.index], _points[t.idx2.index], _points[t.idx3.index]};
                });
     }

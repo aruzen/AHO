@@ -16,13 +16,13 @@ namespace AHO_NAMESPACE::detail::geometry2d {
     inline int orientation(Point a, Point b, Point c);
 
     // 点pが線分ab上にあるか。両端点を含み、共線性はorientationで判定する。
-    inline bool onSegment(Point a, Point b, Point p);
+    inline bool on_segment(Point a, Point b, Point p);
 
     // 線分abとcdの交差判定。端点の接触と、共線な線分の重なりも含む。
     inline bool intersects(Point a, Point b, Point c, Point d);
 
     // 点pが三角形abcの内部・辺上・頂点にあるか。orientationで共線とみなす退化三角形はfalse。
-    inline bool inTriangle(Point a, Point b, Point c, Point p);
+    inline bool in_triangle(Point a, Point b, Point c, Point p);
 
     template<typename P>
     Point convert(const P& p);
@@ -43,20 +43,20 @@ namespace AHO_NAMESPACE::detail::geometry2d {
         return u - v > error ? 1 : (u - v < -error ? -1 : 0);
     }
 
-    inline bool onSegment(Point a, Point b, Point p) {
+    inline bool on_segment(Point a, Point b, Point p) {
         return orientation(a, b, p) == 0 &&
                p.value.___AN1 >= std::min(a.value.___AN1, b.value.___AN1) && p.value.___AN1 <= std::max(a.value.___AN1, b.value.___AN1) &&
                p.value.___AN2 >= std::min(a.value.___AN2, b.value.___AN2) && p.value.___AN2 <= std::max(a.value.___AN2, b.value.___AN2);
     }
 
     inline bool intersects(Point a, Point b, Point c, Point d) {
-        const int abC = orientation(a, b, c), abD = orientation(a, b, d);
-        const int cdA = orientation(c, d, a), cdB = orientation(c, d, b);
-        return (abC * abD < 0 && cdA * cdB < 0) || onSegment(a, b, c) || onSegment(a, b, d) ||
-               onSegment(c, d, a) || onSegment(c, d, b);
+        const int ab_c = orientation(a, b, c), ab_d = orientation(a, b, d);
+        const int cd_a = orientation(c, d, a), cd_b = orientation(c, d, b);
+        return (ab_c * ab_d < 0 && cd_a * cd_b < 0) || on_segment(a, b, c) || on_segment(a, b, d) ||
+               on_segment(c, d, a) || on_segment(c, d, b);
     }
 
-    inline bool inTriangle(Point a, Point b, Point c, Point p) {
+    inline bool in_triangle(Point a, Point b, Point c, Point p) {
         const int winding = orientation(a, b, c);
         return winding != 0 && orientation(a, b, p) * winding >= 0 && orientation(b, c, p) * winding >= 0 &&
                orientation(c, a, p) * winding >= 0;

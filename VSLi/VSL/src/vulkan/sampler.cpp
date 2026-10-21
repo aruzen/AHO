@@ -7,36 +7,36 @@
 #include <VSL/vulkan/_pimpls.hpp>
 
 VSL_NAMESPACE::Sampler::Sampler(LogicalDeviceAccessor device, VSL_NAMESPACE::SamplingMode sampling, VSL_NAMESPACE::EdgeMode edge) {
-    _data = std::shared_ptr<_impl::Sampler_impl>(new _impl::Sampler_impl);
-    _data->device = device._data;
+    data_ = std::shared_ptr<impl::SamplerImpl>(new impl::SamplerImpl);
+    data_->device = device.data_;
 
-    vk::SamplerCreateInfo samplerInfo;
-    samplerInfo.magFilter = (vk::Filter)sampling;
-    samplerInfo.minFilter = (vk::Filter)sampling;
-    samplerInfo.addressModeU = (vk::SamplerAddressMode)edge;
-    samplerInfo.addressModeV = (vk::SamplerAddressMode)edge;
-    samplerInfo.addressModeW = (vk::SamplerAddressMode)edge;
+    vk::SamplerCreateInfo sampler_info;
+    sampler_info.magFilter = (vk::Filter)sampling;
+    sampler_info.minFilter = (vk::Filter)sampling;
+    sampler_info.addressModeU = (vk::SamplerAddressMode)edge;
+    sampler_info.addressModeV = (vk::SamplerAddressMode)edge;
+    sampler_info.addressModeW = (vk::SamplerAddressMode)edge;
 
-    samplerInfo.anisotropyEnable = sampling != SamplingMode::Nearest;
-    if (not device._data->parentDevice->props)
-        device._data->parentDevice->makeProps();
-    samplerInfo.maxAnisotropy = device._data->parentDevice->props->limits.maxSamplerAnisotropy;
+    sampler_info.anisotropyEnable = sampling != SamplingMode::NEAREST;
+    if (not device.data_->parent_device->props)
+        device.data_->parent_device->make_props();
+    sampler_info.maxAnisotropy = device.data_->parent_device->props->limits.maxSamplerAnisotropy;
 
     // FIXME: Formatで変えないと
-    samplerInfo.borderColor = vk::BorderColor::eFloatTransparentBlack;
-    samplerInfo.unnormalizedCoordinates = false;
+    sampler_info.borderColor = vk::BorderColor::eFloatTransparentBlack;
+    sampler_info.unnormalizedCoordinates = false;
 
-    samplerInfo.compareEnable = false;
-    samplerInfo.compareOp = vk::CompareOp::eAlways;
+    sampler_info.compareEnable = false;
+    sampler_info.compareOp = vk::CompareOp::eAlways;
 
-    samplerInfo.mipmapMode = vk::SamplerMipmapMode::eLinear;
-    samplerInfo.mipLodBias = 0.0f;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f;
+    sampler_info.mipmapMode = vk::SamplerMipmapMode::eLinear;
+    sampler_info.mipLodBias = 0.0f;
+    sampler_info.minLod = 0.0f;
+    sampler_info.maxLod = 0.0f;
 
-    _data->sampler = device._data->device.createSampler(samplerInfo);
+    data_->sampler = device.data_->device.createSampler(sampler_info);
 }
 
-VSL_NAMESPACE::_impl::Sampler_impl::~Sampler_impl() {
+VSL_NAMESPACE::impl::SamplerImpl::~SamplerImpl() {
     device->device.destroy(sampler);
 }

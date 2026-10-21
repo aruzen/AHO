@@ -10,7 +10,7 @@ namespace VSL_NAMESPACE::window_plugin {
 
         QuietClose(VSL_NAMESPACE::PureWindow*);
         // OnUpdate
-        bool onUpdate(VSL_NAMESPACE::PureWindow data) override;
+        bool on_update(VSL_NAMESPACE::PureWindow data) override;
     };
 
     struct HookShouldClose : public VSL_NAMESPACE::PureWindow::Plugin, public VSL_NAMESPACE::PureWindow::OnUpdate {
@@ -18,7 +18,7 @@ namespace VSL_NAMESPACE::window_plugin {
         template<std::same_as<PureWindow> WindowType>
         HookShouldClose(WindowType*, std::function<void(PureWindow)> callback) : callback(std::move(callback)){};
         // OnUpdate
-        bool onUpdate(VSL_NAMESPACE::PureWindow data) override;
+        bool on_update(VSL_NAMESPACE::PureWindow data) override;
 
         std::function<void(PureWindow)> callback;
     };

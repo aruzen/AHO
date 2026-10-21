@@ -6,7 +6,7 @@
 #include <AHO/x/screenshot.hpp>
 #include <AHO/drawer/draw_phase.hpp>
 
-aho::x::Screenshot screenshot(engine.getWindow());
+aho::x::Screenshot screenshot(engine.get_window());
 {
     aho::DrawPhase phase(engine);
     // 通常の描画コマンドを記録する。
@@ -21,7 +21,7 @@ screenshot.save("screenshot.png");
 
 前の撮影が記録待ち・転送中なら`capture()`は`false`を返し、進行中の要求を維持する。`true`を返すと以前の結果を手放し、新しいフレームを撮影する。コピーした`Screenshot`は撮影状態と結果を共有する。
 
-`capture()`の呼び出し後は`phase.finish`を置き換えない。独自の終了コールバックを使う場合は、通常のDrawPhaseと同じく、そのコールバックでRenderPassEndまで記録する。明示的な`submit()`や`submitCommands()`にも対応する。
+`capture()`の呼び出し後は`phase.finish`を置き換えない。独自の終了コールバックを使う場合は、通常のDrawPhaseと同じく、そのコールバックでRenderPassEndまで記録する。明示的な`submit()`や`submit_commands()`にも対応する。
 
 `save(path)`と`read()`はPhaseの送信後に呼ぶ。GPUの完了待ちはここで行う。記録待ちやキャンセル済みのフレーム、撮影前の読み取りは例外で通知する。描画スレッドで使用し、同じオブジェクトへの並行呼び出しは行わない。
 
@@ -38,7 +38,7 @@ PNGのエンコードとファイル書き込みは同期処理。HDR・整数ID
 取得済みの`aho::ImagePixels`も、同じPNG保存処理へ渡せる。
 
 ```cpp
-aho::x::saveScreenshot(pixels, "offscreen.png");
+aho::x::save_screenshot(pixels, "offscreen.png");
 ```
 
 保存先の親ディレクトリは事前に用意する。既存ファイルは上書きする。非対応形式・サイズ・データ不足は`std::invalid_argument`、エンコード・ファイル保存の失敗は`std::runtime_error`で通知する。

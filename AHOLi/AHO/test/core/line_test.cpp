@@ -24,7 +24,7 @@ void verify() {
 #include "../support/one_way_cast.hpp"
 namespace {
     TEST(LineOneWayCastTest, ConvertsBothEndpointsAndRejectsTheReverseConversion) {
-        using P = aho::_Point<aho_test::CastSource, vsl::D2>;
+        using P = aho::Point_<aho_test::CastSource, vsl::D2>;
         using L = aho::Line<aho_test::CastSource, vsl::D2>;
         static_assert(aho_test::HasCast<L, aho_test::CastTarget>);
         L source(P(aho_test::CastSource{1}, aho_test::CastSource{2}),
@@ -85,8 +85,8 @@ namespace {
     TYPED_TEST_SUITE(LineConstCastTest, aho_test::GeometryCases);
     TYPED_TEST(LineConstCastTest, ConstLinesConvertBothEndpointsAndKeepIndependentValues) {
         using P = typename TypeParam::Point;
-        using L = aho::Line<typename TypeParam::element_type, typename TypeParam::dimension>;
-        using Converted = aho::Line<int, typename TypeParam::dimension>;
+        using L = aho::Line<typename TypeParam::ElementType, typename TypeParam::Dimension>;
+        using Converted = aho::Line<int, typename TypeParam::Dimension>;
         const L source(aho_test::geometry<P>(1.5, -2.5, 3.5), aho_test::geometry<P>(4.75, -5.75, 6.75));
         const auto original = source;
         auto converted = source.template cast<int>();
@@ -98,8 +98,8 @@ namespace {
         EXPECT_EQ(source.pos2, original.pos2);
     }
     TEST(LineConstCastTest, ConstLinesKeepTheirCustomCoordinatePlane) {
-        using CI = aho::coordinate::_MakeCoordinateInfo<false, true, true>::value;
-        using P = aho::_Point<double, vsl::D2, CI>;
+        using CI = aho::coordinate::MakeCoordinateInfo<false, true, true>::Value;
+        using P = aho::Point_<double, vsl::D2, CI>;
         const aho::Line<double, vsl::D2, CI> source(P(1.5, 2.75), P(3.5, 4.25));
         const auto converted = source.cast<int>();
         static_assert(std::same_as<std::remove_cv_t<decltype(converted)>, aho::Line<int, vsl::D2, CI>>);
@@ -116,7 +116,7 @@ namespace {
     TYPED_TEST_SUITE(LinePointViewTest, aho_test::GeometryCases);
     TYPED_TEST(LinePointViewTest, OwningAndBorrowedViewsExposeOriginalEndpointsInOrder) {
         using P = typename TypeParam::Point;
-        using L = aho::Line<typename TypeParam::element_type, typename TypeParam::dimension>;
+        using L = aho::Line<typename TypeParam::ElementType, typename TypeParam::Dimension>;
         L line(aho_test::geometry<P>(1, 2, 3), aho_test::geometry<P>(4, 5, 6));
         const auto direct = line.ptrpoints();
         const auto borrowed_line = line.adress();

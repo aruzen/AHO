@@ -21,7 +21,7 @@ namespace {
         const std::exception& base = error;
         EXPECT_STREQ(base.what(), error.reason.c_str());
     }
-    TEST(ExceptionTest, ConstVslExceptionReferenceProvidesTheReasonWithoutThrowing) {
+    TEST(ExceptionTest, ConstVSLExceptionReferenceProvidesTheReasonWithoutThrowing) {
         const vsl::exceptions::RuntimeException error("Buffer", "allocation failed", "trace");
         const vsl::exceptions::VSLException& base = error;
         static_assert(noexcept(base.what()));

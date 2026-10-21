@@ -3,9 +3,9 @@ namespace {
     using VulkanInstanceVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
     TEST_F(VulkanInstanceVulkanIntegrationTest, AccessorSharesInstanceAndEnumeratesPhysicalDevices) {
         vsl::VulkanAccessor first{instance}, second = first;
-        EXPECT_EQ(first._accessor, second._accessor);
-        EXPECT_TRUE(static_cast<bool>(first._accessor->instance));
-        EXPECT_FALSE(first._accessor->instance.enumeratePhysicalDevices().empty());
+        EXPECT_EQ(first.accessor, second.accessor);
+        EXPECT_TRUE(static_cast<bool>(first.accessor->instance));
+        EXPECT_FALSE(first.accessor->instance.enumeratePhysicalDevices().empty());
         // Public Vulkan<false> still closes stdio; validation-enabled construction is tested below.
     }
 } // namespace
@@ -32,9 +32,9 @@ namespace {
             if (has_extension(name))
                 required.push_back(name);
         vsl::Vulkan<true> vulkan("debug messenger default allocator test", required);
-        EXPECT_TRUE(vulkan.checkValidationLayerSupport());
-        EXPECT_TRUE(static_cast<bool>(vulkan._data->debugMessenger));
-        EXPECT_EQ(vulkan._accessor, vulkan._data);
+        EXPECT_TRUE(vulkan.check_validation_layer_support());
+        EXPECT_TRUE(static_cast<bool>(vulkan.data_->debug_messenger));
+        EXPECT_EQ(vulkan.accessor, vulkan.data_);
         EXPECT_FALSE(vulkan.devices().get().empty());
     }
 } // namespace

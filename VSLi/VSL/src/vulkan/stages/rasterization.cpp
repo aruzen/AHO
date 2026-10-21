@@ -6,7 +6,7 @@ VSL_NAMESPACE::pipeline_layout::Rasterization::Rasterization(
     FrontFace front_face) : culling_mode(culling_mode), front_face(front_face) {}
 
 void VSL_NAMESPACE::pipeline_layout::Rasterization::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
-    auto& info = *pl._data->info;
+    auto& info = *pl.data_->info;
 
     info.rasterization.depthClampEnable = false;
     info.rasterization.rasterizerDiscardEnable = false;

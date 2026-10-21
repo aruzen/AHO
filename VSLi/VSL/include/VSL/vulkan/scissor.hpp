@@ -12,11 +12,11 @@ namespace VSL_NAMESPACE {
         int32_t x = 0, y = 0;
         uint32_t width = 1, height = 1;
 
-        // std::shared_ptr<_impl::Scissor_impl> _data;
+        // std::shared_ptr<impl::ScissorImpl> data_;
 
         Scissor();
         Scissor(float x, float y, float width, float height);
-        Scissor(__VSLD2RectangleAccessor<float> rect);
+        Scissor(VSLD2RectangleAccessor<float> rect);
         Scissor(SwapchainAccessor swapchain);
 
         void injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl);

@@ -4,9 +4,9 @@
 
 ```cpp
 const auto mesh = aho::triangulate(contour).value();
-const bool hitPoint = aho::collision::contains(mesh, aho::d2::PointF(0.5f, 0.5f));
-const bool hitShape = aho::collision::intersects(mesh, otherMesh);
-const bool same = aho::collision::CollisionJudger{}(mesh, otherMesh);
+const bool hit_point = aho::collision::contains(mesh, aho::d2::PointF(0.5f, 0.5f));
+const bool hit_shape = aho::collision::intersects(mesh, other_mesh);
+const bool same = aho::collision::CollisionJudger{}(mesh, other_mesh);
 ```
 
 - 頂点・辺への接触もtrueになる閉集合として判定します。退化した三角形は線分や点として扱います。

@@ -6,8 +6,8 @@
 
 namespace VSL_NAMESPACE::utils {
     class ShaderCompiler {
-        std::filesystem::path glslc_path;
-        std::vector<std::filesystem::path> shader_dirs;
+        std::filesystem::path _glslc_path;
+        std::vector<std::filesystem::path> _shader_dirs;
 
     public:
         ShaderCompiler(std::filesystem::path glslc_path, std::vector<std::filesystem::path> shader_dirs);

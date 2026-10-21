@@ -13,16 +13,16 @@ namespace {
 
     using CalculationPoints = testing::Types<
         aho::d2::Point<long double>,
-        aho::d2::Point<long double, aho::coordinate::_MakeCoordinateInfo<true, false, true>::value>,
-        aho::d2::Point<long double, aho::coordinate::_MakeCoordinateInfo<false, true, true>::value>>;
+        aho::d2::Point<long double, aho::coordinate::MakeCoordinateInfo<true, false, true>::Value>,
+        aho::d2::Point<long double, aho::coordinate::MakeCoordinateInfo<false, true, true>::Value>>;
     TYPED_TEST_SUITE(TriangulationCoordinateTest, CalculationPoints);
 
     TYPED_TEST(TriangulationCoordinateTest, PreservesLongDoubleCoordinatesAndTheirEnabledAxes) {
         const std::array points{TypeParam(0, 0), TypeParam(4, 0), TypeParam(4, 2), TypeParam(0, 2), TypeParam(0, 0)};
         const auto result = aho::triangulate(points);
         ASSERT_TRUE(result);
-        static_assert(std::same_as<typename decltype(result)::value_type::coordinate_info, typename TypeParam::coordinate_info>);
-        static_assert(std::same_as<typename decltype(result)::value_type::element_type, long double>);
+        static_assert(std::same_as<typename decltype(result)::value_type::CoordinateInfo, typename TypeParam::CoordinateInfo>);
+        static_assert(std::same_as<typename decltype(result)::value_type::ElementType, long double>);
         EXPECT_EQ(result->size(), 2u);
         EXPECT_DOUBLE_EQ(result->area(), 8);
         ASSERT_EQ(result->points().size(), 4u);
@@ -122,9 +122,9 @@ namespace {
     }
     TEST(TriangulationTest, AcceptsPointObjectsConvertibleToTheExistingPointType) {
         struct PointObject {
-            using element_type = double;
-            using dimension = vsl::D2;
-            using coordinate_info = P::coordinate_info;
+            using ElementType = double;
+            using Dimension = vsl::D2;
+            using CoordinateInfo = P::CoordinateInfo;
             P point;
             operator P() const { return point; }
         };

@@ -6,8 +6,8 @@
 
 #include <utility>
 
-bool VSL_NAMESPACE::window_plugin::QuietClose::onUpdate(VSL_NAMESPACE::PureWindow window) {
-    auto data = window._data;
+bool VSL_NAMESPACE::window_plugin::QuietClose::on_update(VSL_NAMESPACE::PureWindow window) {
+    auto data = window.data_;
     if (glfwWindowShouldClose((GLFWwindow*)data->window_handle)) {
         VSL_NAMESPACE::logging("destroy " + data->name + " by QuietClosePlugin");
         data->destroy();
@@ -19,8 +19,8 @@ VSL_NAMESPACE::window_plugin::QuietClose::QuietClose(VSL_NAMESPACE::PureWindow*)
     id = QUIET_CLOSE_USED_ID;
 }
 
-bool VSL_NAMESPACE::window_plugin::HookShouldClose::onUpdate(VSL_NAMESPACE::PureWindow window) {
-    auto&& data = window._data;
+bool VSL_NAMESPACE::window_plugin::HookShouldClose::on_update(VSL_NAMESPACE::PureWindow window) {
+    auto&& data = window.data_;
     if (glfwWindowShouldClose((GLFWwindow*)data->window_handle)) {
         callback(window);
     }
@@ -41,5 +41,5 @@ void framebuffer_resize_callback(GLFWwindow* window, int width, int height) {
 
 VSL_NAMESPACE::window_plugin::HookResize::HookResize(VSL_NAMESPACE::PureWindow* window, std::function<void(PureWindow, int, int)> callback) : callback(std::move(callback)) {
     id = HOOK_RESIZE_USED_ID;
-    glfwSetFramebufferSizeCallback((GLFWwindow*)window->_data->window_handle, framebuffer_resize_callback);
+    glfwSetFramebufferSizeCallback((GLFWwindow*)window->data_->window_handle, framebuffer_resize_callback);
 }

@@ -7,11 +7,11 @@
 namespace {
 #if defined(AHO_LINK_DRAWER_COMMAND)
 #define SharedSuite DrawStreamSharedCommandTest
-    using SharedCommand = std::shared_ptr<vsl::command::__Command>;
+    using SharedCommand = std::shared_ptr<vsl::command::Command>;
     using RecordingCommand = aho_test::RecordingCommand;
 #else
 #define SharedSuite DrawStreamSharedDelegateTest
-    using SharedCommand = std::shared_ptr<vsl::command::__DelegateCommand>;
+    using SharedCommand = std::shared_ptr<vsl::command::DelegateCommand>;
     using RecordingCommand = aho_test::RecordingDelegate;
 #endif
     struct SharedRecordingStream {

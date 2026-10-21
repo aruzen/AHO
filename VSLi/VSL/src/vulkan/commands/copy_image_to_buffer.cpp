@@ -8,25 +8,25 @@
 #include <utility>
 
 VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(VSL_NAMESPACE::BufferAccessor* buffer, VSL_NAMESPACE::ImageAccessor image)
-    : CopyImageToBuffer(buffer, std::move(image), ImageLayout::General) {}
+    : CopyImageToBuffer(buffer, std::move(image), ImageLayout::GENERAL) {}
 
 VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(VSL_NAMESPACE::BufferAccessor* buffer, VSL_NAMESPACE::ImageAccessor image,
-                                                             ImageLayout layout, ImageRegion region, bool hostRead)
-    : image(std::move(image)), buffer(buffer), layout(layout), region(region), hostRead(hostRead),
-      destination_(buffer ? buffer->_data : nullptr) {}
+                                                             ImageLayout layout, ImageRegion region, bool host_read)
+    : image(std::move(image)), buffer(buffer), layout(layout), region(region), host_read(host_read),
+      _destination(buffer ? buffer->data_ : nullptr) {}
 
-VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(std::shared_ptr<_impl::Buffer_impl> buffer,
+VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(std::shared_ptr<impl::BufferImpl> buffer,
                                                              VSL_NAMESPACE::ImageAccessor image, ImageLayout layout,
-                                                             ImageRegion region, bool hostRead)
-    : image(std::move(image)), buffer(nullptr), layout(layout), region(region), hostRead(hostRead),
-      destination_(std::move(buffer)) {}
+                                                             ImageRegion region, bool host_read)
+    : image(std::move(image)), buffer(nullptr), layout(layout), region(region), host_read(host_read),
+      _destination(std::move(buffer)) {}
 
-VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer::describe(ImageAccessor image, ImageRegion region) {
-    if (!image._data || !image._data->image || !image._data->device)
+VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer::Describe(ImageAccessor image, ImageRegion region) {
+    if (!image.data_ || !image.data_->image || !image.data_->device)
         throw std::invalid_argument("Image copy requires a valid image");
-    const auto& source = *image._data;
-    if (!contain(source.usage, ImageType::TransferSrc) || source.samples != SampleCount::One ||
-        _impl::helper::imageAspects(source.format) != vk::ImageAspectFlagBits::eColor)
+    const auto& source = *image.data_;
+    if (!contain(source.usage, ImageType::TRANSFER_SRC) || source.samples != SampleCount::ONE ||
+        impl::helper::image_aspects(source.format) != vk::ImageAspectFlagBits::eColor)
         throw std::invalid_argument("Image copy requires a single-sample color TransferSrc image");
     auto area = region;
     if (!area.width && !area.height) {
@@ -38,49 +38,49 @@ VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer:
     if (!area.width || !area.height || area.x >= source.width || area.y >= source.height ||
         area.width > source.width - area.x || area.height > source.height - area.y || area.layer >= source.count)
         throw std::out_of_range("Image copy region exceeds image");
-    const auto texelSize = data_format::convert(static_cast<data_format::___FormatTypes>(source.format)).size();
-    if (!texelSize)
+    const auto texel_size = data_format::convert(static_cast<data_format::FormatTypes>(source.format)).size();
+    if (!texel_size)
         throw std::invalid_argument("Image copy format has no supported texel size");
-    const std::uint64_t row = std::uint64_t(area.width) * texelSize;
+    const std::uint64_t row = std::uint64_t(area.width) * texel_size;
     if (row > std::numeric_limits<std::size_t>::max() / area.height)
         throw std::length_error("Image copy byte count overflow");
     const auto bytes = row * area.height;
-    return {area, image.getFormat(), static_cast<std::size_t>(row), static_cast<std::size_t>(bytes)};
+    return {area, image.get_format(), static_cast<std::size_t>(row), static_cast<std::size_t>(bytes)};
 }
 
 VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer::description() const {
-    const auto info = describe(image, region);
-    const auto& destination = destination_;
-    if (!destination || !destination->buffer || destination->device != image._data->device)
+    const auto info = Describe(image, region);
+    const auto& destination = _destination;
+    if (!destination || !destination->buffer || destination->device != image.data_->device)
         throw std::invalid_argument("Image copy requires a destination on the same device");
-    if (!contain(destination->usage, MemoryType::TransferDestination))
+    if (!contain(destination->usage, MemoryType::TRANSFER_DESTINATION))
         throw std::invalid_argument("Image copy requires TransferDestination buffer usage");
-    if (hostRead && !contain(destination->properties, MemoryProperty::HostVisible))
+    if (host_read && !contain(destination->properties, MemoryProperty::HOST_VISIBLE))
         throw std::invalid_argument("Host read requires host-visible buffer memory");
-    if (layout != ImageLayout::General && layout != ImageLayout::TransferSrcOptimal)
+    if (layout != ImageLayout::GENERAL && layout != ImageLayout::TRANSFER_SRC_OPTIMAL)
         throw std::invalid_argument("Image copy requires General or TransferSrcOptimal layout");
-    if (info.byteSize > destination->requirementSize)
+    if (info.byte_size > destination->requirement_size)
         throw std::out_of_range("Image copy exceeds destination buffer");
     return info;
 }
 
 void VSL_NAMESPACE::command::CopyImageToBuffer::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
     const auto info = description();
-    const auto& destination = destination_;
-    if (!buffer._data || !buffer._data->commandPool || !manager._data ||
-        manager._data->device != image._data->device ||
-        buffer._data->commandPool->device != image._data->device)
+    const auto& destination = _destination;
+    if (!buffer.data_ || !buffer.data_->command_pool || !manager.data_ ||
+        manager.data_->device != image.data_->device ||
+        buffer.data_->command_pool->device != image.data_->device)
         throw std::invalid_argument("Image copy requires a command buffer on the same device");
-    buffer.retain(image._data);
+    buffer.retain(image.data_);
     buffer.retain(destination);
     const auto& area = info.region;
     vk::BufferImageCopy copy{
         .imageSubresource = {vk::ImageAspectFlagBits::eColor, 0, area.layer, 1},
         .imageOffset = {static_cast<std::int32_t>(area.x), static_cast<std::int32_t>(area.y), 0},
         .imageExtent = {area.width, area.height, 1}};
-    auto command = buffer._data->commandBuffers.at(buffer.getCurrentBufferIdx());
-    command.copyImageToBuffer(image._data->image, static_cast<vk::ImageLayout>(layout), destination->buffer, copy);
-    if (hostRead) {
+    auto command = buffer.data_->command_buffers.at(buffer.get_current_buffer_idx());
+    command.copyImageToBuffer(image.data_->image, static_cast<vk::ImageLayout>(layout), destination->buffer, copy);
+    if (host_read) {
         vk::BufferMemoryBarrier barrier{
             .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
             .dstAccessMask = vk::AccessFlagBits::eHostRead,
@@ -88,7 +88,7 @@ void VSL_NAMESPACE::command::CopyImageToBuffer::invoke(CommandPool pool, Command
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .buffer = destination->buffer,
             .offset = 0,
-            .size = info.byteSize};
+            .size = info.byte_size};
         command.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost,
                                 {}, {}, barrier, {});
     }

@@ -16,15 +16,15 @@
 namespace AHO_NAMESPACE {
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
     struct Triangle {
-        using dimension = D;
-        using element_type = R;
-        using coordinate_info = CI;
+        using Dimension = D;
+        using ElementType = R;
+        using CoordinateInfo = CI;
 
-        AHO_NAMESPACE::_Point<R, D, CI> pos1, pos2, pos3;
+        AHO_NAMESPACE::Point_<R, D, CI> pos1, pos2, pos3;
 
         constexpr Triangle() {}
 
-        constexpr Triangle(AHO_NAMESPACE::_Point<R, D, CI> pos1, AHO_NAMESPACE::_Point<R, D, CI> pos2, AHO_NAMESPACE::_Point<R, D, CI> pos3)
+        constexpr Triangle(AHO_NAMESPACE::Point_<R, D, CI> pos1, AHO_NAMESPACE::Point_<R, D, CI> pos2, AHO_NAMESPACE::Point_<R, D, CI> pos3)
             : pos1(pos1), pos2(pos2), pos3(pos3) {}
 
         template<AHO_NAMESPACE::concepts::points_view_able T>
@@ -32,13 +32,13 @@ namespace AHO_NAMESPACE {
 
         constexpr double area() const;
 
-        constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>, 3> points() const;
+        constexpr std::array<AHO_NAMESPACE::Point_<R, D, CI>, 3> points() const;
 
         constexpr std::array<AHO_NAMESPACE::Line<R, D, CI>, 3> lines() const;
 
         constexpr std::array<Triangle<R, D, CI>, 1> triangles() const;
 
-        constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 3> ptrpoints();
+        constexpr std::array<AHO_NAMESPACE::Point_<R, D, CI>*, 3> ptrpoints();
 
         constexpr std::array<AHO_NAMESPACE::PtrLine<R, D, CI>, 3> ptrlines();
 
@@ -49,15 +49,15 @@ namespace AHO_NAMESPACE {
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
     struct PtrTriangle {
-        using dimension = D;
-        using element_type = R;
-        using coordinate_info = CI;
+        using Dimension = D;
+        using ElementType = R;
+        using CoordinateInfo = CI;
 
-        AHO_NAMESPACE::_Point<R, D, CI>*pos1, *pos2, *pos3;
+        AHO_NAMESPACE::Point_<R, D, CI>*pos1, *pos2, *pos3;
 
         constexpr PtrTriangle() {}
 
-        constexpr PtrTriangle(AHO_NAMESPACE::_Point<R, D, CI>* pos1, AHO_NAMESPACE::_Point<R, D, CI>* pos2, AHO_NAMESPACE::_Point<R, D, CI>* pos3)
+        constexpr PtrTriangle(AHO_NAMESPACE::Point_<R, D, CI>* pos1, AHO_NAMESPACE::Point_<R, D, CI>* pos2, AHO_NAMESPACE::Point_<R, D, CI>* pos3)
             : pos1(pos1), pos2(pos2), pos3(pos3) {}
 
         template<AHO_NAMESPACE::concepts::points_view_able T>
@@ -65,13 +65,13 @@ namespace AHO_NAMESPACE {
 
         constexpr double area() const;
 
-        constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>, 3> points() const;
+        constexpr std::array<AHO_NAMESPACE::Point_<R, D, CI>, 3> points() const;
 
         constexpr std::array<AHO_NAMESPACE::Line<R, D, CI>, 3> lines() const;
 
         constexpr std::array<Triangle<R, D, CI>, 1> triangles() const;
 
-        constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 3> ptrpoints() const;
+        constexpr std::array<AHO_NAMESPACE::Point_<R, D, CI>*, 3> ptrpoints() const;
 
         constexpr std::array<AHO_NAMESPACE::PtrLine<R, D, CI>, 3> ptrlines() const;
 
@@ -103,7 +103,7 @@ namespace AHO_NAMESPACE {
     }
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
-    inline constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>, 3> Triangle<R, D, CI>::points() const {
+    inline constexpr std::array<AHO_NAMESPACE::Point_<R, D, CI>, 3> Triangle<R, D, CI>::points() const {
         return {pos1, pos2, pos3};
     }
 
@@ -118,7 +118,7 @@ namespace AHO_NAMESPACE {
     }
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
-    inline constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 3> Triangle<R, D, CI>::ptrpoints() {
+    inline constexpr std::array<AHO_NAMESPACE::Point_<R, D, CI>*, 3> Triangle<R, D, CI>::ptrpoints() {
         return {&pos1, &pos2, &pos3};
     }
 
@@ -160,7 +160,7 @@ namespace AHO_NAMESPACE {
     }
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
-    inline constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>, 3> PtrTriangle<R, D, CI>::points() const {
+    inline constexpr std::array<AHO_NAMESPACE::Point_<R, D, CI>, 3> PtrTriangle<R, D, CI>::points() const {
         return {*pos1, *pos2, *pos3};
     }
 
@@ -175,7 +175,7 @@ namespace AHO_NAMESPACE {
     }
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
-    inline constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 3> PtrTriangle<R, D, CI>::ptrpoints() const {
+    inline constexpr std::array<AHO_NAMESPACE::Point_<R, D, CI>*, 3> PtrTriangle<R, D, CI>::ptrpoints() const {
         return {pos1, pos2, pos3};
     }
 
@@ -194,7 +194,7 @@ namespace AHO_NAMESPACE {
         return Triangle<R, D, CI>(*pos1, *pos2, *pos3);
     }
 
-    static_assert(concepts::is_triangle<Triangle<double, VSL_NAMESPACE::D2, coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D2>::value>>);
-    static_assert(concepts::is_lines_object<Triangle<double, VSL_NAMESPACE::D2, AHO_NAMESPACE::coordinate::_CoordinateInfo<VSL_NAMESPACE::D2, true, true>>>);
-    static_assert(concepts::is_points_object<Triangle<double, VSL_NAMESPACE::D2, coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D2>::value>>);
+    static_assert(concepts::is_triangle<Triangle<double, VSL_NAMESPACE::D2, coordinate::DefaultCoordinateInfo<VSL_NAMESPACE::D2>::Value>>);
+    static_assert(concepts::is_lines_object<Triangle<double, VSL_NAMESPACE::D2, AHO_NAMESPACE::coordinate::CoordinateInfo<VSL_NAMESPACE::D2, true, true>>>);
+    static_assert(concepts::is_points_object<Triangle<double, VSL_NAMESPACE::D2, coordinate::DefaultCoordinateInfo<VSL_NAMESPACE::D2>::Value>>);
 } // namespace AHO_NAMESPACE

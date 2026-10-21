@@ -12,30 +12,30 @@ namespace AHO_NAMESPACE {
     namespace concepts {
         template<typename T>
         concept _have_elment_dimension = requires {
-            typename T::dimension;
-            typename T::element_type;
+            typename T::Dimension;
+            typename T::ElementType;
         };
 
         template<typename T>
         concept is_line = requires(T t) {
             requires _have_elment_dimension<std::remove_cvref_t<T>>;
             requires std::convertible_to<std::remove_cvref_t<T>,
-                                         Line<typename std::remove_cvref_t<T>::element_type, typename std::remove_cvref_t<T>::dimension, typename std::remove_cvref_t<T>::coordinate_info>>;
+                                         Line<typename std::remove_cvref_t<T>::ElementType, typename std::remove_cvref_t<T>::Dimension, typename std::remove_cvref_t<T>::CoordinateInfo>>;
         };
 
         template<typename T>
         concept is_triangle = requires(T t) {
             requires _have_elment_dimension<std::remove_cvref_t<T>>;
             requires std::convertible_to<std::remove_cvref_t<T>,
-                                         Triangle<typename std::remove_cvref_t<T>::element_type, typename std::remove_cvref_t<T>::dimension, typename std::remove_cvref_t<T>::coordinate_info>>;
+                                         Triangle<typename std::remove_cvref_t<T>::ElementType, typename std::remove_cvref_t<T>::Dimension, typename std::remove_cvref_t<T>::CoordinateInfo>>;
         };
 
         template<typename T>
         concept is_points_object = requires(T t) {
-            typename T::element_type;
-            typename T::dimension;
-            typename T::coordinate_info;
-            requires VSL_NAMESPACE::is_dimension<typename T::dimension>;
+            typename T::ElementType;
+            typename T::Dimension;
+            typename T::CoordinateInfo;
+            requires VSL_NAMESPACE::is_dimension<typename T::Dimension>;
             { t.points() } -> std::ranges::range;
             { *std::begin(t.points()) } -> is_point;
             std::views::common(t.points());
@@ -43,10 +43,10 @@ namespace AHO_NAMESPACE {
 
         template<typename T>
         concept is_lines_object = requires(T t) {
-            typename T::element_type;
-            typename T::dimension;
-            typename T::coordinate_info;
-            requires VSL_NAMESPACE::is_dimension<typename T::dimension>;
+            typename T::ElementType;
+            typename T::Dimension;
+            typename T::CoordinateInfo;
+            requires VSL_NAMESPACE::is_dimension<typename T::Dimension>;
             { t.lines() } -> std::ranges::range;
             { *std::begin(t.lines()) } -> is_line;
             std::views::common(t.lines());
@@ -54,10 +54,10 @@ namespace AHO_NAMESPACE {
 
         template<typename T>
         concept is_triangles_object = requires(T t) {
-            typename T::element_type;
-            typename T::dimension;
-            typename T::coordinate_info;
-            requires VSL_NAMESPACE::is_dimension<typename T::dimension>;
+            typename T::ElementType;
+            typename T::Dimension;
+            typename T::CoordinateInfo;
+            requires VSL_NAMESPACE::is_dimension<typename T::Dimension>;
             { t.triangles() } -> std::ranges::range;
             { *std::begin(t.triangles()) } -> is_triangle;
             std::views::common(t.triangles());
@@ -75,26 +75,26 @@ namespace AHO_NAMESPACE {
 
     namespace views {
         template<typename InnerView>
-        struct wrap_view : std::ranges::view_interface<wrap_view<InnerView>> {
-            using inner_view_t = InnerView;
-            using iterator = std::ranges::iterator_t<InnerView>;
-            using sentinel = std::ranges::sentinel_t<InnerView>;
+        struct WrapView : std::ranges::view_interface<WrapView<InnerView>> {
+            using InnerViewT = InnerView;
+            using Iterator = std::ranges::iterator_t<InnerView>;
+            using Sentinel = std::ranges::sentinel_t<InnerView>;
 
-            inner_view_t view;
+            InnerViewT view;
 
-            wrap_view(inner_view_t f) : view(std::move(f)) {};
+            WrapView(InnerViewT f) : view(std::move(f)) {};
 
-            iterator begin() {
+            Iterator begin() {
                 return view.begin();
             }
 
-            sentinel end() {
+            Sentinel end() {
                 return view.end();
             }
         };
 
         template<typename To>
-        struct _Castor {
+        struct Castor {
             constexpr To operator()(auto a) const {
                 return (To)a;
             }
@@ -106,7 +106,7 @@ namespace AHO_NAMESPACE {
             if constexpr (std::ranges::sized_range<F>)
                 result.reserve(std::ranges::size(f));
             for (auto&& element : f)
-                result.push_back(_Castor<To>{}(element));
+                result.push_back(Castor<To>{}(element));
             return result;
         }
 
@@ -116,9 +116,9 @@ namespace AHO_NAMESPACE {
             if constexpr (concepts::is_point<std::remove_reference_t<T>>) {
                 return std::views::single(t);
             } else if constexpr (concepts::is_points_object<std::remove_reference_t<T>>) {
-                return cast<_Point<typename std::remove_reference_t<T>::element_type,
-                                   typename std::remove_reference_t<T>::dimension,
-                                   typename std::remove_reference_t<T>::coordinate_info>>(t.points());
+                return cast<Point_<typename std::remove_reference_t<T>::ElementType,
+                                   typename std::remove_reference_t<T>::Dimension,
+                                   typename std::remove_reference_t<T>::CoordinateInfo>>(t.points());
             }
         }
 
@@ -129,9 +129,9 @@ namespace AHO_NAMESPACE {
             if constexpr (concepts::is_line<PureT>) {
                 return std::views::single(t);
             } else if constexpr (concepts::is_lines_object<PureT>) {
-                return cast<Line<typename PureT::element_type,
-                                 typename PureT::dimension,
-                                 typename PureT::coordinate_info>>(t.lines());
+                return cast<Line<typename PureT::ElementType,
+                                 typename PureT::Dimension,
+                                 typename PureT::CoordinateInfo>>(t.lines());
             }
         }
 
@@ -142,9 +142,9 @@ namespace AHO_NAMESPACE {
             if constexpr (concepts::is_triangle<PureT>) {
                 return std::views::single(t);
             } else if constexpr (concepts::is_triangles_object<PureT>) {
-                return cast<Triangle<typename PureT::element_type,
-                                     typename PureT::dimension,
-                                     typename PureT::coordinate_info>>(t.triangles());
+                return cast<Triangle<typename PureT::ElementType,
+                                     typename PureT::Dimension,
+                                     typename PureT::CoordinateInfo>>(t.triangles());
             }
         }
     } // namespace views

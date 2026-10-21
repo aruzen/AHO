@@ -52,7 +52,7 @@ namespace {
         }
     }
     TEST(PolygonTest, SupportsThreeDimensionsAndNarrowIndices) {
-        using Mesh3 = aho::Polygon<double, vsl::D3, aho::coordinate::_DefaultCoordinateInfo<vsl::D3>::value, std::uint16_t>;
+        using Mesh3 = aho::Polygon<double, vsl::D3, aho::coordinate::DefaultCoordinateInfo<vsl::D3>::Value, std::uint16_t>;
         const std::array<aho::d3::PointD, 3> points{aho::d3::PointD(0, 0, 0), aho::d3::PointD(0, 3, 0), aho::d3::PointD(0, 0, 4)};
         const std::array indices{aho::IndexedTriangle<std::uint16_t>{{0}, {1}, {2}}};
         const Mesh3 mesh(points, indices);
@@ -66,7 +66,7 @@ namespace {
         const aho::Polygon<int, vsl::D2> mesh(points, indices);
         EXPECT_DOUBLE_EQ(mesh.area(), 20000000000.0);
 
-        using IntPoint = aho::_Point<std::int32_t, vsl::D2>;
+        using IntPoint = aho::Point_<std::int32_t, vsl::D2>;
         constexpr auto lowest = std::numeric_limits<std::int32_t>::min();
         constexpr auto highest = std::numeric_limits<std::int32_t>::max();
         const std::array extreme_points{IntPoint(lowest, lowest), IntPoint(highest, lowest), IntPoint(lowest, highest)};
@@ -83,7 +83,7 @@ namespace {
         }
     }
     TEST(PolygonTest, RejectsVertexCountsThatCannotBeIndexed) {
-        using Small = aho::Polygon<double, vsl::D2, aho::coordinate::_DefaultCoordinateInfo<vsl::D2>::value, std::uint8_t>;
+        using Small = aho::Polygon<double, vsl::D2, aho::coordinate::DefaultCoordinateInfo<vsl::D2>::Value, std::uint8_t>;
         const std::vector<P> points(257);
         EXPECT_THROW(Small(points, {}), std::length_error);
         const std::vector<P> maximum(256);

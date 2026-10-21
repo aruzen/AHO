@@ -7,7 +7,7 @@ namespace {
         auto layout = make_layout_state();
 
         pl::ColorBlend{}.injection(layout);
-        const auto& state = layout._data->info->colorBlend;
+        const auto& state = layout.data_->info->color_blend;
         ASSERT_EQ(state.attachmentCount, 1u);
         ASSERT_NE(state.pAttachments, nullptr);
         const auto& attachment = state.pAttachments[0];
@@ -19,6 +19,6 @@ namespace {
         EXPECT_EQ(attachment.colorBlendOp, vk::BlendOp::eAdd);
         EXPECT_FALSE(state.logicOpEnable);
         pl::ColorBlend{}.injection(layout);
-        EXPECT_EQ(layout._data->info->colorBlend.attachmentCount, 2u);
+        EXPECT_EQ(layout.data_->info->color_blend.attachmentCount, 2u);
     }
 } // namespace

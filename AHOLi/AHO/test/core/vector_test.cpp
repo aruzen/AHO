@@ -33,8 +33,8 @@ TEST(VectorContractTest, ThreeWayComparisonOrdersAllDimensionsAndRecognizesEqual
 }
 #elif defined(AHO_CONTRACT_VECTOR_CUSTOM_COORDINATES)
 void verify() {
-    using CI = aho::coordinate::_MakeCoordinateInfo<true, false, true>::value;
-    using V = aho::_Vector<double, vsl::D2, CI>;
+    using CI = aho::coordinate::MakeCoordinateInfo<true, false, true>::Value;
+    using V = aho::Vector_<double, vsl::D2, CI>;
     const V value(2, 3);
     static_assert(std::same_as<decltype(value * 2.0), V>);
     static_assert(std::same_as<decltype(value / 2.0), V>);
@@ -51,7 +51,7 @@ static_assert(sum.value.x.value == 4 && sum.value.y.value == 6);
 namespace {
     using namespace aho_test::arithmetic;
     template<class CI, class T>
-    using ArithmeticVector = aho::_Vector<T, typename CI::dimension, CI>;
+    using ArithmeticVector = aho::Vector_<T, typename CI::Dimension, CI>;
     template<class CI>
     class VectorArithmeticConstraintTest : public testing::Test {};
     using ArithmeticVectorCoordinates = ArithmeticGeometryCoordinates;
@@ -175,9 +175,9 @@ namespace {
         constexpr M lhs{1, 2, 0, 1};
         constexpr M first{1, 0, 3, 1}, second{2, 0, 0, 3}, third{0, 1, 1, 0};
         constexpr V rhs = [=] {
-            if constexpr (CI::dimension::dimension == 1)
+            if constexpr (CI::Dimension::DIMENSION == 1)
                 return V(first);
-            else if constexpr (CI::dimension::dimension == 2)
+            else if constexpr (CI::Dimension::DIMENSION == 2)
                 return V(first, second);
             else
                 return V(first, second, third);
@@ -187,22 +187,22 @@ namespace {
         static_assert(result.value.___AN1 == M{7, 2, 3, 1});
         EXPECT_EQ(result.value.___AN1, (M{7, 2, 3, 1}));
         EXPECT_EQ(rhs.value.___AN1, first);
-        if constexpr (CI::dimension::dimension >= 2) {
+        if constexpr (CI::Dimension::DIMENSION >= 2) {
             static_assert(result.value.___AN2 == M{2, 6, 0, 3});
             EXPECT_EQ(result.value.___AN2, (M{2, 6, 0, 3}));
             EXPECT_EQ(rhs.value.___AN2, second);
         }
-        if constexpr (CI::dimension::dimension == 3) {
+        if constexpr (CI::Dimension::DIMENSION == 3) {
             static_assert(result.value.___AN3 == M{2, 1, 1, 0});
             EXPECT_EQ(result.value.___AN3, (M{2, 1, 1, 0}));
             EXPECT_EQ(rhs.value.___AN3, third);
         }
-        const auto rightProduct = rhs * lhs;
-        EXPECT_EQ(rightProduct.value.___AN1, (M{1, 2, 3, 7}));
-        if constexpr (CI::dimension::dimension >= 2)
-            EXPECT_EQ(rightProduct.value.___AN2, (M{2, 4, 0, 3}));
-        if constexpr (CI::dimension::dimension == 3)
-            EXPECT_EQ(rightProduct.value.___AN3, (M{0, 1, 1, 2}));
+        const auto right_product = rhs * lhs;
+        EXPECT_EQ(right_product.value.___AN1, (M{1, 2, 3, 7}));
+        if constexpr (CI::Dimension::DIMENSION >= 2)
+            EXPECT_EQ(right_product.value.___AN2, (M{2, 4, 0, 3}));
+        if constexpr (CI::Dimension::DIMENSION == 3)
+            EXPECT_EQ(right_product.value.___AN3, (M{0, 1, 1, 2}));
     }
     TYPED_TEST(VectorLeftProductTest, UsesConstOperandsEvenThoughTheVectorIsPassedByValue) {
         using CI = TypeParam;
@@ -234,16 +234,16 @@ namespace {
 namespace {
     template<class T>
     class VectorOneWayCastTest : public testing::Test {};
-    using OneWayVectors = testing::Types<aho::_Vector<aho_test::CastSource, vsl::D1>,
-                                         aho::_Vector<aho_test::CastSource, vsl::D2>, aho::_Vector<aho_test::CastSource, vsl::D3>,
-                                         aho::_Vector<aho_test::CastSource, vsl::D2, aho::coordinate::_MakeCoordinateInfo<false, true, true>::value>>;
+    using OneWayVectors = testing::Types<aho::Vector_<aho_test::CastSource, vsl::D1>,
+                                         aho::Vector_<aho_test::CastSource, vsl::D2>, aho::Vector_<aho_test::CastSource, vsl::D3>,
+                                         aho::Vector_<aho_test::CastSource, vsl::D2, aho::coordinate::MakeCoordinateInfo<false, true, true>::Value>>;
     TYPED_TEST_SUITE(VectorOneWayCastTest, OneWayVectors);
     TYPED_TEST(VectorOneWayCastTest, ChecksConversionFromTheStoredScalarToTheRequestedType) {
         static_assert(aho_test::HasCast<TypeParam, aho_test::CastTarget>);
         const TypeParam source = [] {
-            if constexpr (TypeParam::dimension::dimension == 1)
+            if constexpr (TypeParam::Dimension::DIMENSION == 1)
                 return TypeParam(aho_test::CastSource{2});
-            else if constexpr (TypeParam::dimension::dimension == 2)
+            else if constexpr (TypeParam::Dimension::DIMENSION == 2)
                 return TypeParam(aho_test::CastSource{2}, aho_test::CastSource{-3});
             else
                 return TypeParam(aho_test::CastSource{2}, aho_test::CastSource{-3}, aho_test::CastSource{5});
@@ -251,17 +251,17 @@ namespace {
         const auto converted = source.template cast<aho_test::CastTarget>();
         using Converted = std::remove_cv_t<decltype(converted)>;
         static_assert(!aho_test::HasCast<Converted, aho_test::CastSource>);
-        static_assert(std::same_as<typename Converted::coordinate_info, typename TypeParam::coordinate_info>);
+        static_assert(std::same_as<typename Converted::CoordinateInfo, typename TypeParam::CoordinateInfo>);
         auto check = [](const auto& from, const auto& to, int expected) {
             EXPECT_EQ(from.value.value, expected);
             EXPECT_EQ(to.value.value, expected);
         };
-        if constexpr (TypeParam::coordinate_info::EnabledX)
+        if constexpr (TypeParam::CoordinateInfo::ENABLED_X)
             check(source.value.x, converted.value.x, 2);
-        if constexpr (TypeParam::coordinate_info::EnabledY)
-            check(source.value.y, converted.value.y, TypeParam::coordinate_info::EnabledX ? -3 : 2);
-        if constexpr (TypeParam::coordinate_info::EnabledZ)
-            check(source.value.z, converted.value.z, TypeParam::dimension::dimension == 3 ? 5 : -3);
+        if constexpr (TypeParam::CoordinateInfo::ENABLED_Y)
+            check(source.value.y, converted.value.y, TypeParam::CoordinateInfo::ENABLED_X ? -3 : 2);
+        if constexpr (TypeParam::CoordinateInfo::ENABLED_Z)
+            check(source.value.z, converted.value.z, TypeParam::Dimension::DIMENSION == 3 ? 5 : -3);
     }
 } // namespace
 #include "../support/geometry.hpp"
@@ -276,12 +276,12 @@ namespace {
         constexpr aho::d1::Vector<T> single(T{2});
         constexpr aho::d2::Vector<T> plane(T{3}, T{4});
         constexpr aho::d3::Vector<T> space(T{2}, T{3}, T{6});
-        static_assert(std::same_as<typename decltype(single)::coordinate_info,
-                                   aho::coordinate::_DefaultCoordinateInfo<vsl::D1>::value>);
-        static_assert(std::same_as<typename decltype(plane)::coordinate_info,
-                                   aho::coordinate::_DefaultCoordinateInfo<vsl::D2>::value>);
-        static_assert(std::same_as<typename decltype(space)::coordinate_info,
-                                   aho::coordinate::_DefaultCoordinateInfo<vsl::D3>::value>);
+        static_assert(std::same_as<typename decltype(single)::CoordinateInfo,
+                                   aho::coordinate::DefaultCoordinateInfo<vsl::D1>::Value>);
+        static_assert(std::same_as<typename decltype(plane)::CoordinateInfo,
+                                   aho::coordinate::DefaultCoordinateInfo<vsl::D2>::Value>);
+        static_assert(std::same_as<typename decltype(space)::CoordinateInfo,
+                                   aho::coordinate::DefaultCoordinateInfo<vsl::D3>::Value>);
         static_assert(single.value.x.value == T{2});
         static_assert(plane.value.x.value == T{3} && plane.value.y.value == T{4});
         static_assert(space.value.x.value == T{2} && space.value.y.value == T{3} && space.value.z.value == T{6});
@@ -299,12 +299,12 @@ namespace {
         aho_test::expect_coordinates(aho::d3::Vector<T>{}, 0, 0, 0);
     }
     TEST(VectorDefaultCoordinatesTest, ExplicitCoordinateInformationStillSelectsCustomAxes) {
-        using Y = aho::coordinate::_MakeCoordinateInfo<false, true, false>::value;
-        using YZ = aho::coordinate::_MakeCoordinateInfo<false, true, true>::value;
+        using Y = aho::coordinate::MakeCoordinateInfo<false, true, false>::Value;
+        using YZ = aho::coordinate::MakeCoordinateInfo<false, true, true>::Value;
         const aho::d1::Vector<int, Y> y(7);
         const aho::d2::Vector<double, YZ> yz(3, 4);
-        static_assert(std::same_as<typename decltype(y)::coordinate_info, Y>);
-        static_assert(std::same_as<typename decltype(yz)::coordinate_info, YZ>);
+        static_assert(std::same_as<typename decltype(y)::CoordinateInfo, Y>);
+        static_assert(std::same_as<typename decltype(yz)::CoordinateInfo, YZ>);
         EXPECT_EQ(y.value.y.value, 7);
         EXPECT_EQ(yz.value.y.value, 3);
         EXPECT_EQ(yz.value.z.value, 4);
@@ -336,7 +336,7 @@ namespace {
     }
     TYPED_TEST(VectorTest, ScalarMultiplicationAndDivisionSupportBothMultiplicationOrders) {
         using V = typename TypeParam::Vector;
-        using T = typename TypeParam::element_type;
+        using T = typename TypeParam::ElementType;
         const auto value = aho_test::geometry<V>(2, 4, 6);
         aho_test::expect_coordinates(value * T{2}, 4, 8, 12);
         aho_test::expect_coordinates(T{2} * value, 4, 8, 12);
@@ -344,7 +344,7 @@ namespace {
     }
     TYPED_TEST(VectorTest, CompoundOperatorsReturnAndMutateOriginalObject) {
         using V = typename TypeParam::Vector;
-        using T = typename TypeParam::element_type;
+        using T = typename TypeParam::ElementType;
         auto value = aho_test::geometry<V>(2, 4, 6);
         const auto delta = aho_test::geometry<V>(1, 2, 3);
         EXPECT_EQ(&(value += delta), &value);
@@ -373,8 +373,8 @@ namespace {
         constexpr T large = static_cast<T>(std::is_same_v<T, float> ? 1e30 : 1e200);
         constexpr T small = static_cast<T>(std::is_same_v<T, float> ? 1e-30 : 1e-200);
         for (const T scale : {large, small}) {
-            const aho::_Vector<T, vsl::D2> plane(-T{3} * scale, T{4} * scale);
-            const aho::_Vector<T, vsl::D3> space(T{2} * scale, -T{3} * scale, T{6} * scale);
+            const aho::Vector_<T, vsl::D2> plane(-T{3} * scale, T{4} * scale);
+            const aho::Vector_<T, vsl::D3> space(T{2} * scale, -T{3} * scale, T{6} * scale);
             EXPECT_TRUE(std::isfinite(plane.length()));
             EXPECT_TRUE(std::isfinite(space.length()));
             EXPECT_GT(plane.length(), 0);
@@ -388,7 +388,7 @@ namespace {
     TYPED_TEST(VectorTest, LengthAndLessThanUseMagnitude) {
         using V = typename TypeParam::Vector;
         const auto value = aho_test::geometry<V>(-3, 4, 12);
-        const double expected = TypeParam::dimension::dimension == 1 ? 3 : TypeParam::dimension::dimension == 2 ? 5
+        const double expected = TypeParam::Dimension::DIMENSION == 1 ? 3 : TypeParam::Dimension::DIMENSION == 2 ? 5
                                                                                                                 : 13;
         EXPECT_DOUBLE_EQ(value.length(), expected);
         EXPECT_TRUE(aho_test::geometry<V>(1) < value);
@@ -398,7 +398,7 @@ namespace {
     using ProductScalars = testing::Types<int, float, double>;
     TYPED_TEST_SUITE(VectorOneDimensionalProductTest, ProductScalars);
     TYPED_TEST(VectorOneDimensionalProductTest, DotAndHadamardUseScalarProductsAndPreserveInputs) {
-        using V = aho::_Vector<TypeParam, vsl::D1>;
+        using V = aho::Vector_<TypeParam, vsl::D1>;
         const V left(-2), right(3), zero(0);
         const auto dot = left.dot(right);
         const auto hadamard = left.hadamard(right);
@@ -460,8 +460,8 @@ namespace {
     class VectorThreeDimensionalInputTest : public testing::Test {};
     TYPED_TEST_SUITE(VectorThreeDimensionalInputTest, ProductScalars);
     TYPED_TEST(VectorThreeDimensionalInputTest, ProductsAcceptDerivedVectorInputsAndPreserveValues) {
-        using V = aho::_Vector<TypeParam, vsl::D3>;
-        using Derived = aho::d3::Vector<TypeParam, typename V::coordinate_info>;
+        using V = aho::Vector_<TypeParam, vsl::D3>;
+        using Derived = aho::d3::Vector<TypeParam, typename V::CoordinateInfo>;
         const V left(2, 3, 4);
         const Derived right(4, 5, 6);
         const auto cross = left.cross(right);
@@ -478,7 +478,7 @@ namespace {
     }
     TEST(VectorThreeDimensionalInputTest, MixedScalarProductsPromoteFractionalResultsInBothOrders) {
         const aho::d3::VectorI integer(1, 2, 3);
-        using CI = aho::d3::VectorF::coordinate_info;
+        using CI = aho::d3::VectorF::CoordinateInfo;
         const aho::d3::Vector<float, CI> fractional(0.5f, 1.5f, 2.5f);
         const auto cross = integer.cross(fractional);
         const auto reverse = fractional.cross(integer);
@@ -510,7 +510,7 @@ namespace {
     using Normalization1DTypes = testing::Types<int, float, double>;
     TYPED_TEST_SUITE(VectorNormalization1DTest, Normalization1DTypes);
     TYPED_TEST(VectorNormalization1DTest, CopyAndInPlaceNormalizationPreserveDirectionIncludingExtremeValues) {
-        using V = aho::_Vector<TypeParam, vsl::D1>;
+        using V = aho::Vector_<TypeParam, vsl::D1>;
         const std::array<TypeParam, 4> values{TypeParam(1), TypeParam(-1),
                                               std::numeric_limits<TypeParam>::max(), std::numeric_limits<TypeParam>::lowest()};
         for (const auto value : values) {
@@ -530,15 +530,15 @@ namespace {
         aho_test::expect_coordinates(positive.get_normalized(), 1);
     }
     TEST(VectorNormalizationTest, OneDimensionalNormalizationSupportsEachAxisInConstantEvaluation) {
-        auto verify = []<bool X, bool Y, bool Z>() {
-            using CI = aho::coordinate::_MakeCoordinateInfo<X, Y, Z>::value;
-            using V = aho::_Vector<int, vsl::D1, CI>;
+        auto verify = []<bool x, bool y, bool z>() {
+            using CI = aho::coordinate::MakeCoordinateInfo<x, y, z>::Value;
+            using V = aho::Vector_<int, vsl::D1, CI>;
             constexpr V source(-4);
             constexpr auto result = source.get_normalized();
-            if constexpr (X) {
+            if constexpr (x) {
                 static_assert(result.value.x.value == -1 && source.value.x.value == -4);
                 EXPECT_EQ(result.value.x.value, -1);
-            } else if constexpr (Y) {
+            } else if constexpr (y) {
                 static_assert(result.value.y.value == -1 && source.value.y.value == -4);
                 EXPECT_EQ(result.value.y.value, -1);
             } else {
@@ -577,19 +577,19 @@ namespace {
     TYPED_TEST_SUITE(VectorOneDimensionalLengthTest, VectorLengthScalars);
     TYPED_TEST(VectorOneDimensionalLengthTest, LengthUsesTheEnabledAxisAndPreservesInputs) {
         using T = TypeParam;
-        using X = aho::coordinate::_MakeCoordinateInfo<true, false, false>::value;
-        using Y = aho::coordinate::_MakeCoordinateInfo<false, true, false>::value;
-        using Z = aho::coordinate::_MakeCoordinateInfo<false, false, true>::value;
+        using X = aho::coordinate::MakeCoordinateInfo<true, false, false>::Value;
+        using Y = aho::coordinate::MakeCoordinateInfo<false, true, false>::Value;
+        using Z = aho::coordinate::MakeCoordinateInfo<false, false, true>::Value;
         []<class... Axes>(std::tuple<Axes...>) {
             ([]<class Axis>() {
-                using V = aho::_Vector<T, vsl::D1, Axis>;
+                using V = aho::Vector_<T, vsl::D1, Axis>;
                 const V negative(T{-3});
                 EXPECT_EQ(negative.length(), 3);
                 EXPECT_EQ(V(T{3}).length(), 3);
                 EXPECT_EQ(V(T{}).length(), 0);
-                if constexpr (Axis::EnabledX)
+                if constexpr (Axis::ENABLED_X)
                     EXPECT_EQ(negative.value.x.value, -3);
-                else if constexpr (Axis::EnabledY)
+                else if constexpr (Axis::ENABLED_Y)
                     EXPECT_EQ(negative.value.y.value, -3);
                 else
                     EXPECT_EQ(negative.value.z.value, -3);
@@ -606,14 +606,14 @@ namespace {
         EXPECT_EQ(minimum.length(), -static_cast<double>(std::numeric_limits<int>::min()));
     }
     TEST(VectorOneDimensionalLengthTest, UnsignedCoordinatesAreAcceptedAndNegativeZeroHasPositiveLengthZero) {
-        const aho::_Vector<unsigned, vsl::D1> maximum(std::numeric_limits<unsigned>::max());
+        const aho::Vector_<unsigned, vsl::D1> maximum(std::numeric_limits<unsigned>::max());
         EXPECT_EQ(maximum.length(), static_cast<double>(std::numeric_limits<unsigned>::max()));
         const aho::d1::VectorD zero(-0.0);
         EXPECT_EQ(zero.length(), 0);
         EXPECT_FALSE(std::signbit(zero.length()));
     }
     TEST(VectorOneDimensionalLengthTest, LargeIntegralMagnitudesRetainAdjacentValuesAndOrdering) {
-        using V = aho::_Vector<long long, vsl::D1>;
+        using V = aho::Vector_<long long, vsl::D1>;
         const V smaller(9007199254740992LL), larger(9007199254740993LL);
         EXPECT_EQ(smaller.length(), 9007199254740992ULL);
         EXPECT_EQ(larger.length(), 9007199254740993ULL);
@@ -635,10 +635,10 @@ namespace {
         EXPECT_DOUBLE_EQ(matrix[1][1], 3);
         EXPECT_DOUBLE_EQ(matrix[2][2], 4);
     }
-    template<class T, bool X, bool Y, bool Z>
+    template<class T, bool x, bool y, bool z>
     struct VectorPlaneCase {
-        using Info = aho::coordinate::_MakeCoordinateInfo<X, Y, Z>::value;
-        using Vector = aho::_Vector<T, vsl::D2, Info>;
+        using Info = aho::coordinate::MakeCoordinateInfo<x, y, z>::Value;
+        using Vector = aho::Vector_<T, vsl::D2, Info>;
     };
     using VectorPlanes = testing::Types<
         VectorPlaneCase<int, true, true, false>, VectorPlaneCase<int, true, false, true>, VectorPlaneCase<int, false, true, true>,
@@ -649,12 +649,12 @@ namespace {
     TYPED_TEST_SUITE(VectorPlaneTest, VectorPlanes);
     template<class V>
     void expect_plane(const V& value, double first, double second) {
-        using CI = typename V::coordinate_info;
-        if constexpr (CI::EnabledX)
+        using CI = typename V::CoordinateInfo;
+        if constexpr (CI::ENABLED_X)
             EXPECT_EQ(value.value.x.value, first);
-        if constexpr (CI::EnabledY)
-            EXPECT_EQ(value.value.y.value, CI::EnabledX ? second : first);
-        if constexpr (CI::EnabledZ)
+        if constexpr (CI::ENABLED_Y)
+            EXPECT_EQ(value.value.y.value, CI::ENABLED_X ? second : first);
+        if constexpr (CI::ENABLED_Z)
             EXPECT_EQ(value.value.z.value, second);
     }
     TYPED_TEST(VectorPlaneTest, ScalarOperatorsKeepThePlaneAndSourceCoordinates) {
@@ -681,20 +681,20 @@ namespace {
         using CI = typename TypeParam::Info;
         const V left(2, 3), right(4, 5);
         const auto normal = left.cross(right), opposite = right.cross(left);
-        using Normal = typename decltype(normal)::coordinate_info;
-        static_assert(Normal::EnabledX == !CI::EnabledX);
-        static_assert(Normal::EnabledY == !CI::EnabledY);
-        static_assert(Normal::EnabledZ == !CI::EnabledZ);
-        constexpr int expected = CI::EnabledX && CI::EnabledZ ? 2 : -2;
-        if constexpr (Normal::EnabledX) {
+        using Normal = typename decltype(normal)::CoordinateInfo;
+        static_assert(Normal::ENABLED_X == !CI::ENABLED_X);
+        static_assert(Normal::ENABLED_Y == !CI::ENABLED_Y);
+        static_assert(Normal::ENABLED_Z == !CI::ENABLED_Z);
+        constexpr int expected = CI::ENABLED_X && CI::ENABLED_Z ? 2 : -2;
+        if constexpr (Normal::ENABLED_X) {
             EXPECT_EQ(normal.value.x.value, expected);
             EXPECT_EQ(opposite.value.x.value, -expected);
         }
-        if constexpr (Normal::EnabledY) {
+        if constexpr (Normal::ENABLED_Y) {
             EXPECT_EQ(normal.value.y.value, expected);
             EXPECT_EQ(opposite.value.y.value, -expected);
         }
-        if constexpr (Normal::EnabledZ) {
+        if constexpr (Normal::ENABLED_Z) {
             EXPECT_EQ(normal.value.z.value, expected);
             EXPECT_EQ(opposite.value.z.value, -expected);
         }
@@ -708,9 +708,9 @@ namespace {
         aho_test::expect_coordinates(single, 2);
         aho_test::expect_coordinates(pair, 2, 3);
         aho_test::expect_coordinates(triple, 2, 3, 4);
-        using CI1 = aho::coordinate::_DefaultCoordinateInfo<vsl::D1>::value;
-        using CI2 = aho::coordinate::_DefaultCoordinateInfo<vsl::D2>::value;
-        using CI3 = aho::coordinate::_DefaultCoordinateInfo<vsl::D3>::value;
+        using CI1 = aho::coordinate::DefaultCoordinateInfo<vsl::D1>::Value;
+        using CI2 = aho::coordinate::DefaultCoordinateInfo<vsl::D2>::Value;
+        using CI3 = aho::coordinate::DefaultCoordinateInfo<vsl::D3>::Value;
         aho_test::expect_coordinates(aho::d1::Vector<int, CI1>(2), 2);
         aho_test::expect_coordinates(aho::d2::Vector<int, CI2>(2, 3), 2, 3);
         aho_test::expect_coordinates(aho::d3::Vector<int, CI3>(2, 3, 4), 2, 3, 4);
@@ -721,16 +721,16 @@ namespace {
     template<class CI>
     class VectorTwoDimensionalInputTest : public testing::Test {};
     using ProductPlanes = testing::Types<
-        aho::coordinate::_MakeCoordinateInfo<true, true, false>::value,
-        aho::coordinate::_MakeCoordinateInfo<true, false, true>::value,
-        aho::coordinate::_MakeCoordinateInfo<false, true, true>::value>;
+        aho::coordinate::MakeCoordinateInfo<true, true, false>::Value,
+        aho::coordinate::MakeCoordinateInfo<true, false, true>::Value,
+        aho::coordinate::MakeCoordinateInfo<false, true, true>::Value>;
     TYPED_TEST_SUITE(VectorTwoDimensionalInputTest, ProductPlanes);
     TYPED_TEST(VectorTwoDimensionalInputTest, DerivedInputsPreservePlaneAndPromoteMixedProducts) {
         using CI = TypeParam;
-        using Result = aho::_Vector<double, vsl::D2, CI>;
-        using CrossCI = aho::coordinate::_MakeCoordinateInfo<!CI::EnabledX, !CI::EnabledY, !CI::EnabledZ>::value;
-        using CrossResult = aho::_Vector<double, vsl::D1, CrossCI>;
-        const aho::_Vector<int, vsl::D2, CI> left(2, 3);
+        using Result = aho::Vector_<double, vsl::D2, CI>;
+        using CrossCI = aho::coordinate::MakeCoordinateInfo<!CI::ENABLED_X, !CI::ENABLED_Y, !CI::ENABLED_Z>::Value;
+        using CrossResult = aho::Vector_<double, vsl::D1, CrossCI>;
+        const aho::Vector_<int, vsl::D2, CI> left(2, 3);
         const aho::d2::Vector<double, CI> right(0.5, 1.5);
         const auto product = left.hadamard(right);
         const auto cross = left.cross(right);
@@ -740,11 +740,11 @@ namespace {
         EXPECT_DOUBLE_EQ(left.dot(right), 5.5);
         EXPECT_DOUBLE_EQ(right.dot(left), 5.5);
         const auto check_components = [](const auto& value, double first, double second) {
-            if constexpr (CI::EnabledX)
+            if constexpr (CI::ENABLED_X)
                 EXPECT_DOUBLE_EQ(value.value.x.value, first);
             else
                 EXPECT_DOUBLE_EQ(value.value.y.value, first);
-            if constexpr (CI::EnabledZ)
+            if constexpr (CI::ENABLED_Z)
                 EXPECT_DOUBLE_EQ(value.value.z.value, second);
             else
                 EXPECT_DOUBLE_EQ(value.value.y.value, second);
@@ -752,14 +752,14 @@ namespace {
         check_components(product, 1, 4.5);
         check_components(right.hadamard(left), 1, 4.5);
         const auto component = [](const auto& value) {
-            if constexpr (CrossCI::EnabledX)
+            if constexpr (CrossCI::ENABLED_X)
                 return value.value.x.value;
-            else if constexpr (CrossCI::EnabledY)
+            else if constexpr (CrossCI::ENABLED_Y)
                 return value.value.y.value;
             else
                 return value.value.z.value;
         };
-        constexpr double sign = CI::EnabledX && CI::EnabledZ ? -1 : 1;
+        constexpr double sign = CI::ENABLED_X && CI::ENABLED_Z ? -1 : 1;
         EXPECT_DOUBLE_EQ(component(cross), sign * 1.5);
         EXPECT_DOUBLE_EQ(component(right.cross(left)), -sign * 1.5);
         check_components(left, 2, 3);
@@ -770,9 +770,9 @@ namespace {
         aho_test::expect_coordinates(aho::d2::VectorD(-2.75, 3.75).cast<int>(), -2, 3);
         aho_test::expect_coordinates(aho::d3::VectorD(-2.75, 3.75, 4.5).cast<int>(), -2, 3, 4);
     }
-    template<bool X, bool Y, bool Z>
+    template<bool x, bool y, bool z>
     struct OneDimensionalInputCase {
-        using Info = aho::coordinate::_MakeCoordinateInfo<X, Y, Z>::value;
+        using Info = aho::coordinate::MakeCoordinateInfo<x, y, z>::Value;
     };
     using OneDimensionalInputAxes = testing::Types<OneDimensionalInputCase<true, false, false>,
                                                    OneDimensionalInputCase<false, true, false>, OneDimensionalInputCase<false, false, true>>;
@@ -781,17 +781,17 @@ namespace {
     TYPED_TEST_SUITE(VectorOneDimensionalInputTest, OneDimensionalInputAxes);
     TYPED_TEST(VectorOneDimensionalInputTest, ProductsAcceptBaseAndDerivedInputsOnTheSameAxis) {
         using CI = typename TypeParam::Info;
-        using Left = aho::_Vector<double, vsl::D1, CI>;
-        using Right = aho::_Vector<float, vsl::D1, CI>;
+        using Left = aho::Vector_<double, vsl::D1, CI>;
+        using Right = aho::Vector_<float, vsl::D1, CI>;
         const Left left(1), negative(-2);
         const Right base(4);
         const aho::d1::Vector<float, CI> derived(4);
         static_assert(std::same_as<decltype(left.dot(derived)), double>);
         static_assert(std::same_as<decltype(left.hadamard(derived)), Left>);
         auto coordinate = [](const auto& value) {
-            if constexpr (CI::EnabledX)
+            if constexpr (CI::ENABLED_X)
                 return value.value.x.value;
-            else if constexpr (CI::EnabledY)
+            else if constexpr (CI::ENABLED_Y)
                 return value.value.y.value;
             else
                 return value.value.z.value;
@@ -811,22 +811,22 @@ namespace {
         left.dot(right);
         left.hadamard(right);
     };
-    using ProductAxisX = aho::coordinate::_MakeCoordinateInfo<true, false, false>::value;
-    using ProductAxisY = aho::coordinate::_MakeCoordinateInfo<false, true, false>::value;
-    static_assert(!HasOneDimensionalProducts<aho::_Vector<double, vsl::D1, ProductAxisX>, aho::_Vector<float, vsl::D1, ProductAxisY>>);
+    using ProductAxisX = aho::coordinate::MakeCoordinateInfo<true, false, false>::Value;
+    using ProductAxisY = aho::coordinate::MakeCoordinateInfo<false, true, false>::Value;
+    static_assert(!HasOneDimensionalProducts<aho::Vector_<double, vsl::D1, ProductAxisX>, aho::Vector_<float, vsl::D1, ProductAxisY>>);
     static_assert(!HasOneDimensionalProducts<aho::d1::VectorD, aho::d2::VectorD>);
     static_assert(!HasOneDimensionalProducts<aho::d1::VectorD, aho::d1::PointD>);
     TEST(VectorConceptTest, UnrelatedTypesWithAliasesAreNotVectors) {
         struct PretendVector {
-            using element_type = double;
-            using dimension = vsl::D2;
+            using ElementType = double;
+            using Dimension = vsl::D2;
         };
         EXPECT_FALSE(aho::concepts::is_vector<PretendVector>);
         EXPECT_TRUE(aho::concepts::is_vector<aho::d2::VectorD>);
         struct PretendWithCoordinates {
-            using element_type = double;
-            using dimension = vsl::D2;
-            using coordinate_info = aho::coordinate::_DefaultCoordinateInfo<dimension>::value;
+            using ElementType = double;
+            using Dimension = vsl::D2;
+            using CoordinateInfo = aho::coordinate::DefaultCoordinateInfo<Dimension>::Value;
         };
         static_assert(!aho::concepts::is_vector<PretendVector>);
         static_assert(!aho::concepts::is_vector<PretendWithCoordinates>);
@@ -835,15 +835,15 @@ namespace {
         static_assert(aho::concepts::is_vector<aho::d1::VectorI>);
         static_assert(aho::concepts::is_vector<aho::d2::VectorF>);
         static_assert(aho::concepts::is_vector<aho::d3::VectorD>);
-        static_assert(aho::concepts::is_vector<aho::d2::Vector<double, aho::coordinate::_DefaultCoordinateInfo<vsl::D2>::value>>);
+        static_assert(aho::concepts::is_vector<aho::d2::Vector<double, aho::coordinate::DefaultCoordinateInfo<vsl::D2>::Value>>);
         static_assert(aho::concepts::is_vector<aho::d2::VectorD&>);
         static_assert(aho::concepts::is_vector<const aho::d2::VectorD&>);
-        using XZ = aho::coordinate::_MakeCoordinateInfo<true, false, true>::value;
-        static_assert(aho::concepts::is_vector<aho::_Vector<float, vsl::D2, XZ>>);
+        using XZ = aho::coordinate::MakeCoordinateInfo<true, false, true>::Value;
+        static_assert(aho::concepts::is_vector<aho::Vector_<float, vsl::D2, XZ>>);
     }
     TYPED_TEST(VectorTest, MixedCompoundAssignmentsKeepTheLeftHandTypeAndReturnItsReference) {
         using V = typename TypeParam::Vector;
-        using Mixed = aho::_Vector<long double, typename TypeParam::dimension>;
+        using Mixed = aho::Vector_<long double, typename TypeParam::Dimension>;
         auto value = aho_test::geometry<V>(2, 4, 6);
         const auto delta = aho_test::geometry<Mixed>(1, 2, 3);
         static_assert(std::same_as<decltype(value += delta), V&>);

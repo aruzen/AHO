@@ -5,21 +5,21 @@
 
 namespace VSL_NAMESPACE::pipeline_layout {
     enum class CullingMode {
-        None = 0,
-        Front = 1,
-        Back = 2,
-        FrontAndBack = 3,
+        NONE = 0,
+        FRONT = 1,
+        BACK = 2,
+        FRONT_AND_BACK = 3,
     };
 
     enum class FrontFace {
-        CounterClockwise = 0,
-        Clockwise = 1
+        COUNTER_CLOCKWISE = 0,
+        CLOCKWISE = 1
     };
 
     struct Rasterization {
         explicit Rasterization(
-            CullingMode culling_mode = CullingMode::Back,
-            FrontFace front_face = FrontFace::CounterClockwise);
+            CullingMode culling_mode = CullingMode::BACK,
+            FrontFace front_face = FrontFace::COUNTER_CLOCKWISE);
 
         void injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl);
 

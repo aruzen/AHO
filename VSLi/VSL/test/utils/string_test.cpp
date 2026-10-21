@@ -6,20 +6,20 @@
 namespace {
     using vsl_test::ScopedEnvironment;
     class LoggingTest : public testing::Test {
-        vsl::logger_t previous_ = nullptr;
+        vsl::LoggerT _previous = nullptr;
 
     protected:
-        inline static std::string messages;
-        static void capture(const char* text) {
-            messages += text;
+        inline static std::string MESSAGES;
+        static void Capture(const char* text) {
+            MESSAGES += text;
         }
         void SetUp() override {
-            previous_ = vsl::logger;
-            messages.clear();
-            vsl::logger = capture;
+            _previous = vsl::LOGGER;
+            MESSAGES.clear();
+            vsl::LOGGER = Capture;
         }
         void TearDown() override {
-            vsl::logger = previous_;
+            vsl::LOGGER = _previous;
         }
     };
     TEST(EnvironmentExpansionTest, PreservesPlainEmptyAndInvalidPlaceholders) {
@@ -48,15 +48,15 @@ namespace {
     }
     TEST_F(LoggingTest, LoggingAndLogginglnSendExpectedText) {
         vsl::logging<true>("value=", 42);
-        EXPECT_EQ(messages, "value=42");
+        EXPECT_EQ(MESSAGES, "value=42");
         vsl::loggingln<true>("ok=", true);
-        EXPECT_EQ(messages, "value=42ok=true\n");
+        EXPECT_EQ(MESSAGES, "value=42ok=true\n");
     }
     TEST_F(LoggingTest, NullLoggerIsSafe) {
-        vsl::logger = nullptr;
+        vsl::LOGGER = nullptr;
         vsl::logging<true>("ignored");
         vsl::loggingln<true>("ignored");
-        EXPECT_TRUE(messages.empty());
+        EXPECT_TRUE(MESSAGES.empty());
     }
     struct CountedFormatting {
         int* calls;
@@ -71,20 +71,20 @@ namespace {
         vsl::logging<false>(value);
         vsl::loggingln<false>(value);
         EXPECT_EQ(calls, 0);
-        EXPECT_TRUE(messages.empty());
+        EXPECT_TRUE(MESSAGES.empty());
         vsl::logging<true>(value);
         EXPECT_EQ(calls, 1);
-        EXPECT_EQ(messages, "formatted");
+        EXPECT_EQ(MESSAGES, "formatted");
     }
     TEST_F(LoggingTest, DisabledValidationDoesNotRequireStreamInsertion) {
         struct Unprintable {};
         vsl::logging<false>(Unprintable{});
         vsl::loggingln<false>(Unprintable{});
-        EXPECT_TRUE(messages.empty());
+        EXPECT_TRUE(MESSAGES.empty());
     }
     TEST_F(LoggingTest, DisabledValidationDoesNotInvokeLogger) {
         vsl::logging<false>("ignored");
         vsl::loggingln<false>("ignored");
-        EXPECT_TRUE(messages.empty());
+        EXPECT_TRUE(MESSAGES.empty());
     }
 } // namespace

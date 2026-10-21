@@ -7,7 +7,7 @@ namespace {
         EXPECT_EQ(defaults.width, 1u);
         EXPECT_EQ(defaults.height, 1u);
         float x = 2, y = 3, width = 4, height = 5;
-        vsl::__VSLD2RectangleAccessor<float> rect{{x, y}, {width, height}};
+        vsl::VSLD2RectangleAccessor<float> rect{{x, y}, {width, height}};
         vsl::Scissor direct(x, y, width, height), adapted(rect);
         EXPECT_EQ(direct.x, 2);
         EXPECT_EQ(direct.y, 3);
@@ -23,8 +23,8 @@ namespace {
         vsl::Scissor scissor(0, 0, 1, 1);
         auto state = make_layout_state();
         scissor.injection(state);
-        ASSERT_EQ(state._data->info->scissors.size(), 1u);
-        EXPECT_EQ(state._data->info->scissors[0].extent, (vk::Extent2D{1, 1}));
+        ASSERT_EQ(state.data_->info->scissors.size(), 1u);
+        EXPECT_EQ(state.data_->info->scissors[0].extent, (vk::Extent2D{1, 1}));
         vsl::Scissor all(description);
         EXPECT_EQ(all.width, 8u);
         EXPECT_EQ(all.height, 8u);

@@ -57,15 +57,15 @@ VSL_NAMESPACE::graphic_resource::Type spir_type_to_graphic_type(const spirv_cros
     namespace gfx_src = VSL_NAMESPACE::graphic_resource;
     switch (type.basetype) {
         case spirv_cross::SPIRType::Image:
-            return gfx_src::Type::SampledImage;
+            return gfx_src::Type::SAMPLED_IMAGE;
         case spirv_cross::SPIRType::SampledImage:
-            return type.image.dim == spv::DimBuffer ? gfx_src::Type::UniformTexelBuffer : gfx_src::Type::CombinedImageSampler;
+            return type.image.dim == spv::DimBuffer ? gfx_src::Type::UNIFORM_TEXEL_BUFFER : gfx_src::Type::COMBINED_IMAGE_SAMPLER;
         case spirv_cross::SPIRType::Sampler:
-            return gfx_src::Type::Sampler;
+            return gfx_src::Type::SAMPLER;
         default:
             VSL_NAMESPACE::loggingln("error: Unknown spir-v type. (spir_type_to_graphic_type)");
     }
-    return gfx_src::Type::MaxEnum;
+    return gfx_src::Type::MAX_ENUM;
 }
 
 VSL_NAMESPACE::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device, std::filesystem::path path)
@@ -85,51 +85,51 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
     using namespace graphic_resource;
     ReflectionCompiler comp(std::move(words));
 
-    ShaderFlag shaderType = ShaderFlag::Error;
+    ShaderFlag shader_type = ShaderFlag::ERROR_;
     switch (comp.get_execution_model()) {
         case spv::ExecutionModelVertex:
-            shaderType = ShaderFlag::Vertex;
+            shader_type = ShaderFlag::VERTEX;
             break;
         case spv::ExecutionModelTessellationControl:
-            shaderType = ShaderFlag::TessellationControl;
+            shader_type = ShaderFlag::TESSELLATION_CONTROL;
             break;
         case spv::ExecutionModelTessellationEvaluation:
-            shaderType = ShaderFlag::TessellationEvaluation;
+            shader_type = ShaderFlag::TESSELLATION_EVALUATION;
             break;
         case spv::ExecutionModelGeometry:
-            shaderType = ShaderFlag::Geometry;
+            shader_type = ShaderFlag::GEOMETRY;
             break;
         case spv::ExecutionModelRayGenerationKHR:
-            shaderType = ShaderFlag::Raygen;
+            shader_type = ShaderFlag::RAYGEN;
             break;
         case spv::ExecutionModelIntersectionKHR:
-            shaderType = ShaderFlag::Intersection;
+            shader_type = ShaderFlag::INTERSECTION;
             break;
         case spv::ExecutionModelAnyHitKHR:
-            shaderType = ShaderFlag::AnyHit;
+            shader_type = ShaderFlag::ANY_HIT;
             break;
         case spv::ExecutionModelClosestHitKHR:
-            shaderType = ShaderFlag::ClosestHit;
+            shader_type = ShaderFlag::CLOSEST_HIT;
             break;
         case spv::ExecutionModelMissKHR:
-            shaderType = ShaderFlag::Miss;
+            shader_type = ShaderFlag::MISS;
             break;
         case spv::ExecutionModelCallableKHR:
-            shaderType = ShaderFlag::Callable;
+            shader_type = ShaderFlag::CALLABLE;
             break;
         case spv::ExecutionModelTaskNV:
         case spv::ExecutionModelTaskEXT:
-            shaderType = ShaderFlag::Task;
+            shader_type = ShaderFlag::TASK;
             break;
         case spv::ExecutionModelMeshNV:
         case spv::ExecutionModelMeshEXT:
-            shaderType = ShaderFlag::Mesh;
+            shader_type = ShaderFlag::MESH;
             break;
         case spv::ExecutionModelFragment:
-            shaderType = ShaderFlag::Fragment;
+            shader_type = ShaderFlag::FRAGMENT;
             break;
         case spv::ExecutionModelGLCompute:
-            shaderType = ShaderFlag::Compute;
+            shader_type = ShaderFlag::COMPUTE;
             break;
         default:
             std::cout << "Other shader stage" << std::endl;
@@ -138,13 +138,13 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
 
     spirv_cross::ShaderResources shader_resources = comp.get_shader_resources();
     std::vector<std::tuple<spirv_cross::SmallVector<spirv_cross::Resource>, graphic_resource::Type>> mapped_resources = {
-        {shader_resources.uniform_buffers, graphic_resource::Type::UniformBuffer},
-        {shader_resources.storage_buffers, graphic_resource::Type::StorageBuffer},
-        {shader_resources.storage_images, graphic_resource::Type::StorageImage},
-        {shader_resources.subpass_inputs, graphic_resource::Type::InputAttachment},
-        {shader_resources.acceleration_structures, graphic_resource::Type::AccelerationStructureNv}, // 例: NV拡張
-        {shader_resources.separate_images, graphic_resource::Type::SampledImage},
-        {shader_resources.separate_samplers, graphic_resource::Type::Sampler},
+        {shader_resources.uniform_buffers, graphic_resource::Type::UNIFORM_BUFFER},
+        {shader_resources.storage_buffers, graphic_resource::Type::STORAGE_BUFFER},
+        {shader_resources.storage_images, graphic_resource::Type::STORAGE_IMAGE},
+        {shader_resources.subpass_inputs, graphic_resource::Type::INPUT_ATTACHMENT},
+        {shader_resources.acceleration_structures, graphic_resource::Type::ACCELERATION_STRUCTURE_NV}, // 例: NV拡張
+        {shader_resources.separate_images, graphic_resource::Type::SAMPLED_IMAGE},
+        {shader_resources.separate_samplers, graphic_resource::Type::SAMPLER},
         /*
             { resources.uniform_texel_buffers, graphic_resource::type::UniformTexelBuffer },
             { resources.storage_texel_buffers, graphic_resource::type::StorageTexelBuffer },
@@ -161,12 +161,12 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
         uint32_t binding = comp.get_decoration(resource.id, spv::DecorationBinding);
         const auto& type = comp.get_type(resource.type_id);
         graphic_resource::Type gfx_type = spir_type_to_graphic_type(type);
-        if (gfx_type == graphic_resource::Type::MaxEnum)
+        if (gfx_type == graphic_resource::Type::MAX_ENUM)
             VSL_NAMESPACE::loggingln("hint: name: ", resource.name);
         generated.binding_points[set].emplace_back(BindingPoint{
             .binding = binding,
-            .bindingType = gfx_type,
-            .shaderType = shaderType, // TODO
+            .binding_type = gfx_type,
+            .shader_type = shader_type, // TODO
             .amount = descriptor_count(comp, type),
         });
     }
@@ -177,12 +177,12 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
             uint32_t binding = comp.get_decoration(resource.id, spv::DecorationBinding);
             const auto& type = comp.get_type(resource.type_id);
             auto descriptor_type = gfx_type;
-            if ((gfx_type == Type::SampledImage || gfx_type == Type::StorageImage) && type.image.dim == spv::DimBuffer)
-                descriptor_type = gfx_type == Type::SampledImage ? Type::UniformTexelBuffer : Type::StorageTexelBuffer;
+            if ((gfx_type == Type::SAMPLED_IMAGE || gfx_type == Type::STORAGE_IMAGE) && type.image.dim == spv::DimBuffer)
+                descriptor_type = gfx_type == Type::SAMPLED_IMAGE ? Type::UNIFORM_TEXEL_BUFFER : Type::STORAGE_TEXEL_BUFFER;
             generated.binding_points[set].emplace_back(BindingPoint{
                 .binding = binding,
-                .bindingType = descriptor_type,
-                .shaderType = shaderType, // TODO
+                .binding_type = descriptor_type,
+                .shader_type = shader_type, // TODO
                 .amount = descriptor_count(comp, type),
             });
         }
@@ -204,14 +204,14 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
             if (not generated.push_constants)
                 generated.push_constants.emplace();
             generated.push_constants->definitions.emplace_back(pipeline_layout::PushContentDefinition{
-                .targetShader = shaderType, // TODO
+                .target_shader = shader_type, // TODO
                 .offset = static_cast<uint32_t>(comp.type_struct_member_offset(type, (uint32_t)i)),
                 .size = static_cast<uint32_t>(comp.get_declared_struct_member_size(type, (uint32_t)i)),
             });
         }
     }
 
-    if (shaderType != ShaderFlag::Vertex)
+    if (shader_type != ShaderFlag::VERTEX)
         return;
 
     for (auto& resource : shader_resources.stage_inputs) {
@@ -220,39 +220,39 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
         std::cout << "vertex input name: " << resource.name
         << " width: " << type.width << " vecsize: " << type.vecsize << " columns: " << type.columns << std::endl;
          */
-        data_format::___Format format = data_format::Undefined;
+        data_format::Format format = data_format::UNDEFINED;
         switch (type.basetype) {
             case spirv_cross::SPIRType::Short:
-                format = data_format::SignedInt16R;
+                format = data_format::SIGNED_INT16_R;
                 break;
             case spirv_cross::SPIRType::UShort:
-                format = data_format::UnsignedInt16R;
+                format = data_format::UNSIGNED_INT16_R;
                 break;
             case spirv_cross::SPIRType::Int64:
-                format = data_format::SignedInt64R;
+                format = data_format::SIGNED_INT64_R;
                 break;
             case spirv_cross::SPIRType::UInt64:
-                format = data_format::UnsignedInt64R;
+                format = data_format::UNSIGNED_INT64_R;
                 break;
             case spirv_cross::SPIRType::Half:
-                format = data_format::SignedFloat16R;
+                format = data_format::SIGNED_FLOAT16_R;
                 break;
             case spirv_cross::SPIRType::Double:
-                format = data_format::SignedFloat64R;
+                format = data_format::SIGNED_FLOAT64_R;
                 break;
             case spirv_cross::SPIRType::Int:
-                format = data_format::Int;
+                format = data_format::INT;
                 break;
             case spirv_cross::SPIRType::UInt:
-                format = data_format::UnsignedInt;
+                format = data_format::UNSIGNED_INT;
                 break;
             case spirv_cross::SPIRType::Float:
-                format = data_format::Float;
+                format = data_format::FLOAT;
                 break;
             default:
                 loggingln("Warning: Unknown format");
         }
-        format = format.toVec(type.vecsize);
+        format = format.to_vec(type.vecsize);
         if (not generated.vertex_input)
             generated.vertex_input.emplace();
         const auto array_elements = descriptor_count(comp, type);
@@ -272,7 +272,7 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
     }
 }
 
-std::vector<VSL_NAMESPACE::graphic_resource::BindingLayout> VSL_NAMESPACE::utils::SPIRVReflector::GenerateData::makeBindingLayout(size_t repeat) {
+std::vector<VSL_NAMESPACE::graphic_resource::BindingLayout> VSL_NAMESPACE::utils::SPIRVReflector::GenerateData::make_binding_layout(size_t repeat) {
     std::vector<VSL_NAMESPACE::graphic_resource::BindingLayout> result;
     if (binding_points.empty())
         return result;
@@ -282,9 +282,9 @@ std::vector<VSL_NAMESPACE::graphic_resource::BindingLayout> VSL_NAMESPACE::utils
     const auto slots = last_set + 1;
     if (repeat >= result.max_size() / slots)
         throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "Binding layout repeat count exceeds vector capacity");
-    if (!logical_device._data || !logical_device._data->device || !logical_device._data->parentDevice)
+    if (!logical_device.data_ || !logical_device.data_->device || !logical_device.data_->parent_device)
         throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "A valid logical device is required for binding layouts");
-    const auto& physical = logical_device._data->parentDevice;
+    const auto& physical = logical_device.data_->parent_device;
     const auto max_sets = physical->props ? physical->props->limits.maxBoundDescriptorSets
                                           : physical->device.getProperties().limits.maxBoundDescriptorSets;
     if (slots > max_sets)

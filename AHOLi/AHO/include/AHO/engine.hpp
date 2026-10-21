@@ -31,10 +31,10 @@ namespace AHO_NAMESPACE::engine {
 
     struct EngineAccessor {
     private:
-        static EngineAccessor* _instance;
+        static EngineAccessor* INSTANCE;
 
     public:
-        static EngineAccessor* instance();
+        static EngineAccessor* Instance();
 
         EngineAccessor();
         ~EngineAccessor();
@@ -44,7 +44,7 @@ namespace AHO_NAMESPACE::engine {
         EngineAccessor(EngineAccessor&&) noexcept = default;
         EngineAccessor& operator=(EngineAccessor&&) noexcept = default;
 
-        std::shared_ptr<EngineData> _data;
+        std::shared_ptr<EngineData> data_;
     };
 } // namespace AHO_NAMESPACE::engine
 

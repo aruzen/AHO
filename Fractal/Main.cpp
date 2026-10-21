@@ -101,8 +101,8 @@ int main() {
 
         LogicalDevice device(physical_device, surface);
         for (auto device : PhysicalDevices(vk).get())
-            loggingln(physical_device.name(), "(", physical_device.apiVersion(), ")");
-        vsl::loggingln("selected : ", physical_device.name(), "(", physical_device.apiVersion(), ")");
+            loggingln(physical_device.name(), "(", physical_device.api_version(), ")");
+        vsl::loggingln("selected : ", physical_device.name(), "(", physical_device.api_version(), ")");
 
         SynchroManager synchro_manager(device);
 #ifdef _MSC_VER
@@ -113,82 +113,82 @@ int main() {
                                         {make_shader<"../../Fractal/shaders/fractal.comp.spv">(device)});
 #endif
         CommandManager manager(device);
-        manager.setDefault();
+        manager.set_default();
 
-        GraphicResourceManager resourceManager(device);
+        GraphicResourceManager resource_manager(device);
 
-        auto resourceBindingLayout = ResourceBindingLayout(device, {
-                                                                       ResourceBindingPoint(0, ResourceType::StorageBuffer, ShaderFlag::Compute),
-                                                                       ResourceBindingPoint(1, ResourceType::StorageBuffer, ShaderFlag::Compute),
-                                                                       ResourceBindingPoint(2, ResourceType::UniformBuffer, ShaderFlag::Compute),
-                                                                       ResourceBindingPoint(3, ResourceType::StorageImage, ShaderFlag::Compute),
-                                                                       ResourceBindingPoint(4, ResourceType::StorageBuffer, ShaderFlag::Compute),
+        auto resource_binding_layout = ResourceBindingLayout(device, {
+                                                                       ResourceBindingPoint(0, ResourceType::STORAGE_BUFFER, ShaderFlag::COMPUTE),
+                                                                       ResourceBindingPoint(1, ResourceType::STORAGE_BUFFER, ShaderFlag::COMPUTE),
+                                                                       ResourceBindingPoint(2, ResourceType::UNIFORM_BUFFER, ShaderFlag::COMPUTE),
+                                                                       ResourceBindingPoint(3, ResourceType::STORAGE_IMAGE, ShaderFlag::COMPUTE),
+                                                                       ResourceBindingPoint(4, ResourceType::STORAGE_BUFFER, ShaderFlag::COMPUTE),
                                                                    });
-        auto [pool, resource] = resourceManager.make({resourceBindingLayout});
+        auto [pool, resource] = resource_manager.make({resource_binding_layout});
 
-        struct alignas(16) ubo_t {
-            std::uint32_t baseNumber;
-            std::uint32_t rowIndex;
+        struct alignas(16) UniformData {
+            std::uint32_t base_number;
+            std::uint32_t row_index;
         } ubo;
 
-        struct alignas(16) debug_t {
-            float firstColumn;
-            float secondColumn;
+        struct alignas(16) DebugData {
+            float first_column;
+            float second_column;
         };
 
-        using StorageBuffer = Buffer<vsl::MemoryType::StorageBuffer, vsl::MemoryProperty::DeviceLocal>;
-        using UboBuffer = Buffer<vsl::MemoryType::UniformBuffer,
-                                 vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>;
-        using DebugBuffer = Buffer<vsl::MemoryType::StorageBuffer,
-                                   vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>;
-        StorageBuffer prevRow(device, sizeof(std::uint32_t) * 1024);
-        StorageBuffer currRow(device, sizeof(std::uint32_t) * 1024);
-        UboBuffer uboBuffer(device, sizeof(ubo_t));
-        Image fractalImage(device, 1024, 1024);
-        DebugBuffer debugBuffer(device, sizeof(debug_t));
+        using StorageBuffer = Buffer<vsl::MemoryType::STORAGE_BUFFER, vsl::MemoryProperty::DEVICE_LOCAL>;
+        using UniformBuffer = Buffer<vsl::MemoryType::UNIFORM_BUFFER,
+                                 vsl::MemoryProperty::HOST_VISIBLE | vsl::MemoryProperty::HOST_COHERENT>;
+        using DebugBuffer = Buffer<vsl::MemoryType::STORAGE_BUFFER,
+                                   vsl::MemoryProperty::HOST_VISIBLE | vsl::MemoryProperty::HOST_COHERENT>;
+        StorageBuffer prev_row(device, sizeof(std::uint32_t) * 1024);
+        StorageBuffer curr_row(device, sizeof(std::uint32_t) * 1024);
+        UniformBuffer ubo_buffer(device, sizeof(UniformData));
+        Image fractal_image(device, 1024, 1024);
+        DebugBuffer debug_buffer(device, sizeof(DebugData));
 
-        resource[0].update(prevRow, 0);
-        resource[0].update(currRow, 1);
-        resource[0].update(uboBuffer, 2);
-        resource[0].update(fractalImage, 3);
-        resource[0].update(debugBuffer, 4);
+        resource[0].update(prev_row, 0);
+        resource[0].update(curr_row, 1);
+        resource[0].update(ubo_buffer, 2);
+        resource[0].update(fractal_image, 3);
+        resource[0].update(debug_buffer, 4);
 
-        Buffer<vsl::MemoryType::TransferDestination,
-               vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>
-            imageStagingBuffer(device, 1024 * 1024 * 4);
+        Buffer<vsl::MemoryType::TRANSFER_DESTINATION,
+               vsl::MemoryProperty::HOST_VISIBLE | vsl::MemoryProperty::HOST_COHERENT>
+            image_staging_buffer(device, 1024 * 1024 * 4);
 
-        PipelineLayout fractal_compute_layout(device, pl::ResourceBinding({resourceBindingLayout}), fractal_shaders);
+        PipelineLayout fractal_compute_layout(device, pl::ResourceBinding({resource_binding_layout}), fractal_shaders);
         ComputePipeline fractal_compute(fractal_compute_layout);
 
-        auto inFlight = synchro_manager.createFence("inFlight", manager.getBuffer().getSize(), true),
-             inCopy = synchro_manager.createFence("inCopy", 1, true);
+        auto in_flight = synchro_manager.create_fence("inFlight", manager.get_buffer().get_size(), true),
+             in_copy = synchro_manager.create_fence("inCopy", 1, true);
 
-        ubo.baseNumber = 4;
+        ubo.base_number = 4;
         for (size_t i = 0; i < 1024; i++) {
-            ubo.rowIndex = i;
-            uboBuffer.copy(ubo);
-            resource[0].update(uboBuffer, 2);
+            ubo.row_index = i;
+            ubo_buffer.copy(ubo);
+            resource[0].update(ubo_buffer, 2);
 
             if (i % 2 == 0) {
-                resource[0].update(prevRow, 0);
-                resource[0].update(currRow, 1);
+                resource[0].update(prev_row, 0);
+                resource[0].update(curr_row, 1);
             } else {
-                resource[0].update(prevRow, 1);
-                resource[0].update(currRow, 0);
+                resource[0].update(prev_row, 1);
+                resource[0].update(curr_row, 0);
             }
             {
-                auto phase = manager.startPhase<ComputePhase>(std::nullopt, std::nullopt, inFlight);
+                auto phase = manager.start_phase<ComputePhase>(std::nullopt, std::nullopt, in_flight);
                 phase << fractal_compute
-                      << command::PipelineBarrierChange(fractalImage)
-                      << command::BindGraphicResource(resource[0], BindingDestination::Compute, fractal_compute)
+                      << command::PipelineBarrierChange(fractal_image)
+                      << command::BindGraphicResource(resource[0], BindingDestination::COMPUTE, fractal_compute)
                       << command::Dispatch(1 + i, 1, 1);
             }
-            inFlight.wait();
+            in_flight.wait();
         }
-        imageStagingBuffer.copyByImage(fractalImage, inCopy);
-        inCopy.wait();
+        image_staging_buffer.copy_by_image(fractal_image, in_copy);
+        in_copy.wait();
 
-        auto data = (std::uint32_t*)imageStagingBuffer.data().data;
+        auto data = (std::uint32_t*)image_staging_buffer.data().data;
 
         int result = stbi_write_png("output.png",
                                     1024,

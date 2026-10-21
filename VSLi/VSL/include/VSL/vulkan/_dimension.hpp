@@ -7,7 +7,7 @@
 
 namespace VSL_NAMESPACE::helper::dimension {
     template<typename D>
-    consteval vk::ImageViewType toImageViewType() {
+    consteval vk::ImageViewType to_image_view_type() {
         if constexpr (std::same_as<VSL_NAMESPACE::D1, D>) {
             return vk::ImageViewType::e1D;
         } else if constexpr (std::same_as<VSL_NAMESPACE::D2, D>) {

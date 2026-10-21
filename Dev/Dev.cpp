@@ -1,6 +1,6 @@
-﻿template<typename... parameter>
+﻿template<typename... Parameter>
 struct ParameterPack {
-    //	using Parameters = parameter;
+    //	using Parameters = Parameter;
 };
 
 template<typename Indispensable, typename T, typename... Args>
@@ -32,14 +32,14 @@ inline B<T>::B(Args... args) {
 }
 
 template<typename T>
-consteval bool __sames_as() {
+consteval bool sames_as_() {
     return true;
 }
 
 template<typename T, typename R, typename... Args>
-consteval bool __sames_as() {
+consteval bool sames_as_() {
     if constexpr (std::same_as<T, R>) {
-        return __sames_as<T, Args...>();
+        return sames_as_<T, Args...>();
     }
     return false;
 }
@@ -47,7 +47,7 @@ consteval bool __sames_as() {
 template<typename T, typename... Args>
 concept sames_as = (0 == sizeof...(Args) && true) ||
                    (1 == sizeof...(Args) && std::same_as<T, Args...>) ||
-                   (2 <= sizeof...(Args) && __sames_as<T, Args...>());
+                   (2 <= sizeof...(Args) && sames_as_<T, Args...>());
 
 int main() {
     B b(1, 1);

@@ -6,12 +6,12 @@ VSL_NAMESPACE::Viewport::Viewport() {}
 
 VSL_NAMESPACE::Viewport::Viewport(float x, float y, float width, float height) : x(x), y(y), width(width), height(height) {}
 
-VSL_NAMESPACE::Viewport::Viewport(__VSLD2RectangleAccessor<float> rect) : x(rect.x), y(rect.y), width(rect.width), height(rect.height) {}
+VSL_NAMESPACE::Viewport::Viewport(VSLD2RectangleAccessor<float> rect) : x(rect.x), y(rect.y), width(rect.width), height(rect.height) {}
 
-VSL_NAMESPACE::Viewport::Viewport(SwapchainAccessor swapchain) : x(0), y(0), height(swapchain._data->swapChainExtent.height), width(swapchain._data->swapChainExtent.width) {}
+VSL_NAMESPACE::Viewport::Viewport(SwapchainAccessor swapchain) : x(0), y(0), height(swapchain.data_->swap_chain_extent.height), width(swapchain.data_->swap_chain_extent.width) {}
 
 void VSL_NAMESPACE::Viewport::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
-    auto& info = *pl._data->info;
+    auto& info = *pl.data_->info;
 
     vk::Viewport viewport;
     viewport.x = x;
@@ -32,5 +32,5 @@ void VSL_NAMESPACE::Viewport::invoke(CommandPool pool, CommandBuffer buffer, Com
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
-    buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].setViewport(0, viewport);
+    buffer.data_->command_buffers[buffer.get_current_buffer_idx()].setViewport(0, viewport);
 }

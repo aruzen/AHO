@@ -25,17 +25,17 @@ IDの割当、画像の確保・リサイズ、PNG等への保存、UI操作は�
 #include <cstring>
 using namespace vsl;
 
-Image<ImageType::ColorAttachment | ImageType::TransferSrc> color(
-    device, width, height, data_format::UnsignedNormalized8RGBA);
-Image<ImageType::ColorAttachment | ImageType::TransferSrc> ids(
-    device, width, height, data_format::UnsignedInt);
+Image<ImageType::COLOR_ATTACHMENT | ImageType::TRANSFER_SRC> color(
+    device, width, height, data_format::UNSIGNED_NORMALIZED8_RGBA);
+Image<ImageType::COLOR_ATTACHMENT | ImageType::TRANSFER_SRC> ids(
+    device, width, height, data_format::UNSIGNED_INT);
 
 RenderPassDescription desc;
-const auto colorId = desc.addColor({
-    .format = color.getFormat(), .finalLayout = ImageLayout::General,
+const auto color_id = desc.add_color({
+    .format = color.get_format(), .final_layout = ImageLayout::GENERAL,
 });
-const auto objectId = desc.addColor({
-    .format = ids.getFormat(), .finalLayout = ImageLayout::General,
+const auto object_id = desc.add_color({
+    .format = ids.get_format(), .final_layout = ImageLayout::GENERAL,
 });
 RenderPass pass(device, desc);
 FrameBuffer target(pass, width, height, {color, ids});
@@ -47,11 +47,11 @@ AttachmentIdは `desc.attachments` の位置。FrameBufferの画像とclear値�
 namespace pl = vsl::pipeline_layout;
 pl::ColorBlend blends(std::vector<pl::ColorBlendAttachment>{
     {},
-    {.enabled = false, .writeMask = pl::ColorWriteMask::R},
+    {.enabled = false, .write_mask = pl::ColorWriteMask::R},
 });
 // PipelineLayoutへblendsを注入する。整数出力のblendは無効にする。
 {
-    auto phase = manager.startPhase<ComputePhase>();
+    auto phase = manager.start_phase<ComputePhase>();
     phase << command::RenderPassBegin(target, {
         ClearColor{0.f, 0.f, 0.f, 1.f}, ClearUint{0, 0, 0, 0},
     });
@@ -60,14 +60,14 @@ pl::ColorBlend blends(std::vector<pl::ColorBlendAttachment>{
 } // 記録した処理を送信する。
 ```
 
-clear値はClearColor/ClearInt/ClearUint/ClearDepthStencilのvariant。省略時はformatに応じた0、深度は1を生成する。明示指定時はAttachment数と同じ個数を渡し、Clearを使うAttachmentでは型も検証する。RenderAreaで部分領域を指定でき、幅・高さが両方0なら全体を使う。
+clear値はClearColor/ClearInt/ClearUint/ClearDepthStencilのvariant。省略時はformatに応じた0、深度は1を生成する。明示指定時はAttachment数と同じ個数を渡し、CLEARを使うAttachmentでは型も検証する。RenderAreaで部分領域を指定でき、幅・高さが両方0なら全体を使う。
 
 ## 深度、MSAA、複数subpass
 
-- 深度画像は `Image<ImageType::DepthStencilAttachment>` と `data_format::Depth32Float` 等で作る。ImageViewのaspectはformatから選ぶ。`setDepthStencil` で接続し、`pl::DepthStencil` で深度テスト・書込み・比較、前面/背面stencilを設定する。
+- 深度画像は `Image<ImageType::DEPTH_STENCIL_ATTACHMENT>` と `data_format::DEPTH32_FLOAT` 等で作る。ImageViewのaspectはformatから選ぶ。`set_depth_stencil` で接続し、`pl::DepthStencil` で深度テスト・書込み・比較、前面/背面stencilを設定する。
 - Image、Attachment、`pl::Multisample` のSampleCountを一致させる。MSAAのresolve先は単一sampleのAttachmentとして追加し、`subpasses[i].resolves` にカラー出力と同じ順序で指定する。読み戻しはresolve先に対して行う。
-- `addAttachment` で役割を固定せず登録できる。subpassesのcolors/inputs/resolves/depthStencil/preserveに参照を設定する。未使用スロットはUnusedAttachment。
-- `GraphicsPipeline(layout, pass, subpassIndex)` で対象を選び、描画中に `command::NextSubpass{}` で次へ進む。
+- `add_attachment` で役割を固定せず登録できる。subpassesのcolors/inputs/resolves/depth_stencil/preserveに参照を設定する。未使用スロットはUNUSED_ATTACHMENT。
+- `GraphicsPipeline(layout, pass, subpass_index)` で対象を選び、描画中に `command::NextSubpass{}` で次へ進む。
 - dependenciesでstage/accessとsubpass番号を明示できる。既定はexternal→0と0→externalの保守的な依存関係。複数subpassでは間の依存関係と、最後のsubpass→externalを追加する。
 - 構造上の整合は検証するが、Vulkanのすべてのvalid usage、formatやfeatureのGPU対応確認を代替しない。
 
@@ -84,24 +84,24 @@ aho::ImagePixels pixels;
 if (reader.ready()) {
     reader.read(pixels); // CPU側vectorの容量も再利用する。
 }
-if (!reader.capture(color, ImageLayout::General)) {
+if (!reader.capture(color, ImageLayout::GENERAL)) {
     // 前の転送が進行中。このフレームの要求は受理されていない。
 }
 // 必要なタイミングで、最新の受理済み転送の完了を待って読むこともできる。
 pixels = reader.read();
 
 // 同じ読み戻しオブジェクトを部分領域や整数ID画像にも使える。
-if (reader.capture(ids, ImageLayout::General, {x, y, 1, 1})) {
+if (reader.capture(ids, ImageLayout::GENERAL, {x, y, 1, 1})) {
     reader.read(pixels);
     std::uint32_t id;
     std::memcpy(&id, pixels.bytes.data(), sizeof(id));
 }
 ```
 
-- 元画像にはTransferSrc usageが必要。非圧縮カラーformatのmip 0、指定した1レイヤー、sample数1が対象。深度、サイズを解決できないformat、MSAA画像そのものは拒否する。
+- 元画像にはTRANSFER_SRC usageが必要。非圧縮カラーformatのmip 0、指定した1レイヤー、sample数1が対象。深度、サイズを解決できないformat、MSAA画像そのものは拒否する。
 - `ImageRegion{x,y,width,height,layer}` を指定する。領域省略は全画面、layer省略は0。範囲外や片方だけ0の寸法は拒否する。
 - 同時に進行できる転送は1件。captureは進行中ならfalseを返し、待機や結果の上書きを行わない。完了済みの結果は次のcapture受理まで繰り返しreadできる。コピーしたworkerハンドルも同じ状態を共有する。
-- CommandPool/CommandBuffer/Fenceを再利用する。host-visible bufferは必要容量が増えたときだけ再確保する。constructorのinitialCapacityで先に容量を用意でき、capacity()で現在の容量を取得できる。
+- CommandPool/CommandBuffer/Fenceを再利用する。host-visible bufferは必要容量が増えたときだけ再確保する。constructorのinitial_capacityで先に容量を用意でき、capacity()で現在の容量を取得できる。
 - mapはbuffer確保時に行い、再確保か破棄まで維持する。non-coherentメモリーは完了後に必要範囲をatom境界へ切り上げてinvalidateする。read(destination)はCPU側vectorの容量も再利用する。
 - source画像は転送完了まで保持する。描画記録中のmanagerのCommandBufferをresetしない。最後のworkerハンドルを破棄するときは、進行中の自分の転送完了を待って解放する。
 - captureはCPUのGPU完了待ちを行わない。wait(timeout_ns)はタイムアウトでfalse、read(timeout_ns)は例外。未captureのreadyはfalse、wait/readは例外。
@@ -115,22 +115,22 @@ if (reader.capture(ids, ImageLayout::General, {x, y, 1, 1})) {
 ```cpp
 #include <VSL/vulkan/commands/image_readback.hpp>
 
-// completionFenceはmanagerの各bufferに対応し、初回はsignal済みで用意する。
-StagingBuffer<MemoryType::TransferDestination> destination(
-    device, std::size_t(width) * height * color.getFormat().size());
+// completion_fenceはmanagerの各bufferに対応し、初回はsignal済みで用意する。
+StagingBuffer<MemoryType::TRANSFER_DESTINATION> destination(
+    device, std::size_t(width) * height * color.get_format().size());
 {
-    auto phase = manager.startPhase<ComputePhase>(
-        std::nullopt, std::nullopt, completionFence);
+    auto phase = manager.start_phase<ComputePhase>(
+        std::nullopt, std::nullopt, completion_fence);
     // colorへの描画とRenderPassEndまでを、このPhase内で記録する。
-    phase << command::ImageReadback(&destination, color, ImageLayout::General);
+    phase << command::ImageReadback(&destination, color, ImageLayout::GENERAL);
 }
-if (!completionFence.wait(manager.getCurrentBufferIdx(), UINT64_MAX))
+if (!completion_fence.wait(manager.get_current_buffer_idx(), UINT64_MAX))
     throw std::runtime_error("Image transfer did not complete");
 auto mapped = destination.data();
 // mappedの寿命中はmapを維持する。画像・bufferもGPU完了まで保持する。
 ```
 
-`ImageReadback::describe(image, layout, region)` は正規化済み領域・format・rowStride・byteSizeを返す。CopyImageToBufferにもdescribeがあり、転送先を確保する前に必要容量を取得できる。AHOもこの情報とVSLコマンドを使用する。VSLはAHOへ依存しない。
+`ImageReadback::Describe(image, layout, region)` は正規化済み領域・format・row_stride・byte_sizeを返す。CopyImageToBufferにもDescribeがあり、転送先を確保する前に必要容量を取得できる。AHOもこの情報とVSLコマンドを使用する。VSLはAHOへ依存しない。
 
 ## 既存commandによる読み戻し
 
@@ -140,49 +140,49 @@ auto mapped = destination.data();
 #include <VSL/vulkan/commands/change_image_barrier.hpp>
 #include <VSL/vulkan/commands/copy_image_to_buffer.hpp>
 
-// completionFenceはmanagerの各bufferに対応し、初回はsignal済みで用意する。
-StagingBuffer<MemoryType::TransferDestination> destination(
-    device, std::size_t(width) * height * color.getFormat().size());
+// completion_fenceはmanagerの各bufferに対応し、初回はsignal済みで用意する。
+StagingBuffer<MemoryType::TRANSFER_DESTINATION> destination(
+    device, std::size_t(width) * height * color.get_format().size());
 {
-    auto phase = manager.startPhase<ComputePhase>(
-        std::nullopt, std::nullopt, completionFence);
+    auto phase = manager.start_phase<ComputePhase>(
+        std::nullopt, std::nullopt, completion_fence);
     // このPhase内でcolorへ描画し、RenderPassEndまで記録する。
     phase << command::ChangeImageBarrier(
-                 color, ImageLayout::General, ImageLayout::TransferSrcOptimal)
+                 color, ImageLayout::GENERAL, ImageLayout::TRANSFER_SRC_OPTIMAL)
           << command::CopyImageToBuffer(
-                 &destination, color, ImageLayout::TransferSrcOptimal, {}, true)
+                 &destination, color, ImageLayout::TRANSFER_SRC_OPTIMAL, {}, true)
           << command::ChangeImageBarrier(
-                 color, ImageLayout::TransferSrcOptimal, ImageLayout::General);
+                 color, ImageLayout::TRANSFER_SRC_OPTIMAL, ImageLayout::GENERAL);
 }
-if (!completionFence.wait(manager.getCurrentBufferIdx(), UINT64_MAX))
+if (!completion_fence.wait(manager.get_current_buffer_idx(), UINT64_MAX))
     throw std::runtime_error("Image transfer did not complete");
 auto mapped = destination.data();
 // mapped.dataから画素を読む。mappedの寿命中はmapを維持する。
 ```
 
-- `ChangeImageBarrier(image, oldLayout, newLayout, baseLayer, layerCount)` で対象レイヤーを限定できる。従来の3引数版は全レイヤー。layerCountが0ならbaseLayer以降の残り全部。mipは0を対象とする。
-- General/ShaderReadOnlyOptimal/TransferDstOptimal/Present/ColorAttachmentOptimalとTransferSrcOptimal間の遷移に対応する。queue familyの所有権移譲は行わない。
-- `CopyImageToBuffer(buffer, image, layout, region, hostRead)` は、GeneralまたはTransferSrcOptimalから指定領域・1レイヤーをbuffer offset 0へ密にコピーする。`ImageRegion` は `image.hpp` に配置する。
-- hostRead=trueは転送書込み→CPU読取りのメモリー依存を記録する。送信やCPU待機は行わない。Fence等で転送完了を待ってからmapし、non-coherentメモリーではinvalidateも行う。例のStagingBufferはHostCoherentを要求する。
+- `ChangeImageBarrier(image, old_layout, new_layout, base_layer, layer_count)` で対象レイヤーを限定できる。従来の3引数版は全レイヤー。layer_countが0ならbase_layer以降の残り全部。mipは0を対象とする。
+- GENERAL/SHADER_READ_ONLY_OPTIMAL/TRANSFER_DST_OPTIMAL/PRESENT/COLOR_ATTACHMENT_OPTIMALとTRANSFER_SRC_OPTIMAL間の遷移に対応する。queue familyの所有権移譲は行わない。
+- `CopyImageToBuffer(buffer, image, layout, region, host_read)` は、GENERALまたはTRANSFER_SRC_OPTIMALから指定領域・1レイヤーをbuffer offset 0へ密にコピーする。`ImageRegion` は `image.hpp` に配置する。
+- host_read=trueは転送書込み→CPU読取りのメモリー依存を記録する。送信やCPU待機は行わない。Fence等で転送完了を待ってからmapし、non-coherentメモリーではinvalidateも行う。例のStagingBufferはHOST_COHERENTを要求する。
 - 画像・転送先buffer・記録したCommandBufferはGPU完了まで利用側が保持する。記録中のRenderPassの外で呼び出す。領域・レイヤー・転送先容量・deviceの不一致は記録前に拒否する。
-- 既存の2引数版と型付きの呼出しは、Generalからmip 0・layer 0の全画面をコピーする従来の動作を維持する。
+- 既存の2引数版と型付きの呼出しは、GENERALからmip 0・layer 0の全画面をコピーする従来の動作を維持する。
 
 ## Swapchain、互換性、寿命
 
-Swapchain末尾のusage引数に `ImageType::ColorAttachment | ImageType::TransferSrc` を渡すと、Surfaceの対応usageを確認して作成する。非対応なら例外にし、暗黙に用途を落とさない。その環境では転送可能なオフスクリーン画像へ描画する。
+Swapchain末尾のusage引数に `ImageType::COLOR_ATTACHMENT | ImageType::TRANSFER_SRC` を渡すと、Surfaceの対応usageを確認して作成する。非対応なら例外にし、暗黙に用途を落とさない。その環境では転送可能なオフスクリーン画像へ描画する。
 
 直接Swapchain画像を読む場合は、取得済みの画像を選び、描画送信とpresentの間へ転送を配置する。今回の変更は既存DefaultPhaseのsubmitとpresentの分離を行わない。その経路へのスクショ機能の接続には送信・表示順序の連携が別途必要。
 
 - RenderPass(swapchain)、FrameBuffer(swapchain, pass)、旧RenderPassBegin(pass, framebuffer, color)を維持する。
 - IDPickingRenderPass/IDPickingRenderPassBegin/pl::IDPickingは共通実装へ委譲する互換ラッパー。新しい用途では追加不要。
-- 新FrameBufferは1対象でBeginのindexは既定0。旧一括FrameBufferでも新BeginのtargetIndexで取得画像を明示できる。旧Beginの自動選択は従来のフレーム番号を維持する。既知のフレーム/取得画像番号の全面整理は今回の範囲外。
+- 新FrameBufferは1対象でBeginのindexは既定0。旧一括FrameBufferでも新Beginのtarget_indexで取得画像を明示できる。旧Beginの自動選択は従来のフレーム番号を維持する。既知のフレーム/取得画像番号の全面整理は今回の範囲外。
 - FrameBufferは画像とRenderPassを保持する。借用Swapchain画像はSwapchainとSurfaceを保持する。描画送信後のFrameBuffer/Pipeline等は利用側がGPU完了まで保持する。
 - aho::ImageReadbackが保持するのは転送に必要なリソースであり、描画リソース全体のGPU寿命管理を代替しない。
 - リサイズは利用側で新画像とFrameBufferを作る。同じformat/sample構成ならRenderPassを再利用できる。旧リソースはGPU利用完了後に解放する。
 
 ## 検証対象
 
-公開APIのみで、カラー＋整数ID同時出力、signed/unsigned clear、深度によるfragment棄却、複数subpass、MSAA resolve、配列レイヤー、Loadによる保持、全画面/部分領域読み戻し、layout復帰、元画像の寿命保持を検証する。これらはValidation Layerのerrorを捕捉し、リソース破棄時も含めテスト失敗へ反映する。
+公開APIのみで、カラー＋整数ID同時出力、signed/unsigned clear、深度によるfragment棄却、複数subpass、MSAA resolve、配列レイヤー、LOADによる保持、全画面/部分領域読み戻し、layout復帰、元画像の寿命保持を検証する。これらはvalidation Layerのerrorを捕捉し、リソース破棄時も含めテスト失敗へ反映する。
 
 既存Render fixtureで行っていた内部RenderPass差し替えを撤去した。修正前に失敗したIDPickingの基底Accessor、深度state、配列画像サイズ、3定数のformatサイズの回帰テストを通常実行へ戻した。
 
@@ -191,7 +191,7 @@ Swapchain末尾のusage引数に `ImageType::ColorAttachment | ImageType::Transf
 Apple M1 / MoltenVK、Apple Clang 17、Vulkan SDK 1.4.309.0、Debugで実行。
 
 - VSL通常実行: 184件成功、失敗0、環境skip 0。既存の未修正不具合26件はDISABLEDのまま。
-- うち共通描画・読み戻し9件と実Swapchain読み戻し1件はValidation Layerを有効化し、errorをテスト失敗へ反映。10件とも成功。
+- うち共通描画・読み戻し9件と実Swapchain読み戻し1件はvalidation Layerを有効化し、errorをテスト失敗へ反映。10件とも成功。
 - 既存の4件の回帰テストは変更前に失敗を確認し、変更後に通常テストとして成功。
 - AHO側の変更を取り込んだbase `0cfeb8a` 上で `build-tests` が成功。
 - 全体CTestは645登録中76件失敗で、失敗はすべてAHO側（CPU、compile/link契約、描画フェーズ3件のtimeout）。VSL側の失敗は0。未修正のAHO契約や描画フェーズの問題まで解消したという結果ではない。
@@ -208,14 +208,14 @@ ctest --test-dir build-vsl-abstraction --output-on-failure -R '^VSL\.'
 ## 2026-10-18 既存commandへの委譲時の検証（AHO移行前）
 
 - `vsl-tests` の再ビルドが成功。VSL全体189件成功、失敗0、skip 0。既知不具合26件はDISABLEDを維持。
-- `ChangeImageBarrier` / `CopyImageToBuffer` / `ImageReadback` / 実Swapchain読み戻しの関連18件で、Validation Layerのerrorを捕捉して成功。
+- `ChangeImageBarrier` / `CopyImageToBuffer` / `ImageReadback` / 実Swapchain読み戻しの関連18件で、validation Layerのerrorを捕捉して成功。
 - 描画と同じPhase内での領域読み戻し、異なる内容を持つ配列レイヤーの選択、他レイヤーのlayout維持、転送先容量と範囲外の拒否を追加検証。
 - 関連4ヘッダーの単独includeコンパイルが成功。読み戻しの専用CommandBufferもGPU完了後に解放してから専用poolを破棄する。
 
 ## 2026-10-18 AHOへの移動とリソース再利用の検証
 
 - `build-tests` が成功。VSL 182件とAHO読み戻し13件、新AHOヘッダーの単独include 1件の計196件が成功。失敗0、環境skip 0。既存のVSL不具合26件はDISABLEDを維持する。
-- 読み戻しの10件をVSLからAHOへ移し、再利用・容量拡張・busy拒否の3件と、VSLコマンド専用の3件を追加した。AHOの13件とVSLコマンド3件はValidation Layerのerrorを捕捉する。
+- 読み戻しの10件をVSLからAHOへ移し、再利用・容量拡張・busy拒否の3件と、VSLコマンド専用の3件を追加した。AHOの13件とVSLコマンド3件はvalidation Layerのerrorを捕捉する。
 - 24フレームと部分領域1回の取得を通して、Vulkan呼出しを一時的に計数。転送先buffer作成1回、Fence作成1回、map 1回。CommandPool作成・CommandBuffer割当は各2回で、描画managerの初期化1回とreadbackの初期化1回に対応する。各captureでの作り直しはない。
 - busy拒否はTimeline Semaphoreで前の転送を確実に進行中へ保ち、capture=false、wait(0)=false、元の結果が保持されることを実GPUで確認した。
 - AHOとVSLでVulkan SDK 1.4.309.0のヘッダーを統一した。AHOがHomebrew側の別バージョンを先に参照する設定では、Vulkan-Hppのheader version assertionが発生していた。

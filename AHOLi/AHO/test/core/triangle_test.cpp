@@ -54,10 +54,10 @@ namespace {
     TYPED_TEST_SUITE(PointerTriangleMetadataTest, aho_test::GeometryCases);
     TYPED_TEST(PointerTriangleMetadataTest, CoordinateMetadataEnablesPointViewsWithoutLosingVertexValues) {
         using P = typename TypeParam::Point;
-        using CI = typename P::coordinate_info;
-        using Triangle = aho::Triangle<typename TypeParam::element_type, typename TypeParam::dimension, CI>;
-        using Borrowed = aho::PtrTriangle<typename TypeParam::element_type, typename TypeParam::dimension, CI>;
-        static_assert(std::same_as<typename Borrowed::coordinate_info, CI>);
+        using CI = typename P::CoordinateInfo;
+        using Triangle = aho::Triangle<typename TypeParam::ElementType, typename TypeParam::Dimension, CI>;
+        using Borrowed = aho::PtrTriangle<typename TypeParam::ElementType, typename TypeParam::Dimension, CI>;
+        static_assert(std::same_as<typename Borrowed::CoordinateInfo, CI>);
         static_assert(aho::concepts::is_points_object<Borrowed>);
         Triangle owner(aho_test::geometry<P>(1, 2, 3), aho_test::geometry<P>(4, 5, 6), aho_test::geometry<P>(7, 8, 9));
         const auto borrowed = owner.adress();
@@ -113,7 +113,7 @@ namespace {
     TYPED_TEST_SUITE(TriangleArrayViewTest, aho_test::GeometryCases);
     TYPED_TEST(TriangleArrayViewTest, PointerViewsPreserveVertexOrderAndCloseTheOutline) {
         using P = typename TypeParam::Point;
-        using Triangle = aho::Triangle<typename TypeParam::element_type, typename TypeParam::dimension>;
+        using Triangle = aho::Triangle<typename TypeParam::ElementType, typename TypeParam::Dimension>;
         Triangle triangle(aho_test::geometry<P>(1, 2, 3), aho_test::geometry<P>(4, 5, 6), aho_test::geometry<P>(7, 8, 9));
         const auto pointer = triangle.adress();
         const auto direct_points = triangle.ptrpoints();
@@ -144,7 +144,7 @@ namespace {
     }
     TYPED_TEST(TriangleArrayViewTest, ValueViewsCopyVerticesAndKeepTheirSnapshotAfterSourceChanges) {
         using P = typename TypeParam::Point;
-        using Triangle = aho::Triangle<typename TypeParam::element_type, typename TypeParam::dimension>;
+        using Triangle = aho::Triangle<typename TypeParam::ElementType, typename TypeParam::Dimension>;
         Triangle triangle(aho_test::geometry<P>(1, 2, 3), aho_test::geometry<P>(4, 5, 6), aho_test::geometry<P>(7, 8, 9));
         const auto pointer = triangle.adress();
         const auto direct = triangle.triangles();
@@ -171,9 +171,9 @@ namespace {
 } // namespace
 
 namespace {
-template<class R, bool X, bool Y, bool Z>
+template<class R, bool x, bool y, bool z>
 struct OneDimensionalTriangleCase {
-    using CoordinateInfo = typename aho::coordinate::_MakeCoordinateInfo<X, Y, Z>::value;
+    using CoordinateInfo = typename aho::coordinate::MakeCoordinateInfo<x, y, z>::Value;
     using Triangle = aho::Triangle<R, vsl::D1, CoordinateInfo>;
 };
 template<class T> class OneDimensionalTriangleAreaTest : public testing::Test {};
@@ -206,14 +206,14 @@ TYPED_TEST(OneDimensionalTriangleAreaTest, ValueAndPointerTrianglesHaveZeroAreaA
 #include <cstdint>
 #include <limits>
 namespace {
-    template<class T, bool X, bool Y, bool Z>
+    template<class T, bool x, bool y, bool z>
     struct TriangleAreaRangeCase {
         using Scalar = T;
-        using CI = typename aho::coordinate::_MakeCoordinateInfo<X, Y, Z>::value;
-        using Point = aho::_Point<T, typename CI::dimension, CI>;
-        using Triangle = aho::Triangle<T, typename CI::dimension, CI>;
-        static Point point(T first, T second) {
-            if constexpr (CI::dimension::dimension == 2)
+        using CI = typename aho::coordinate::MakeCoordinateInfo<x, y, z>::Value;
+        using Point = aho::Point_<T, typename CI::Dimension, CI>;
+        using Triangle = aho::Triangle<T, typename CI::Dimension, CI>;
+        static Point Point_(T first, T second) {
+            if constexpr (CI::Dimension::DIMENSION == 2)
                 return Point(first, second);
             else
                 return Point(first, second, T{});
@@ -240,17 +240,17 @@ namespace {
             EXPECT_DOUBLE_EQ(triangle.area(), expected);
             EXPECT_DOUBLE_EQ(triangle.adress().area(), expected);
         };
-        const auto zero = C::point(0, 0);
+        const auto zero = C::Point_(0, 0);
         const T large = std::ldexp(T{1}, 80);
         const T tiny = std::ldexp(T{1}, -80);
-        check("cross product overflow", zero, C::point(large, 0), C::point(0, large), std::ldexp(1.0, 159));
-        check("cross product underflow", zero, C::point(tiny, 0), C::point(0, tiny), std::ldexp(1.0, -161));
+        check("cross product overflow", zero, C::Point_(large, 0), C::Point_(0, large), std::ldexp(1.0, 159));
+        check("cross product underflow", zero, C::Point_(tiny, 0), C::Point_(0, tiny), std::ldexp(1.0, -161));
         const T endpoint = std::ldexp(T{1}, 127);
-        check("subtraction overflow", C::point(-endpoint, 0), C::point(endpoint, 0), C::point(-endpoint, 1),
+        check("subtraction overflow", C::Point_(-endpoint, 0), C::Point_(endpoint, 0), C::Point_(-endpoint, 1),
               std::ldexp(1.0, 127));
-        check("mixed exponents", zero, C::point(large, 0), C::point(0, tiny), 0.5);
+        check("mixed exponents", zero, C::Point_(large, 0), C::Point_(0, tiny), 0.5);
         const T subnormal = std::ldexp(T{1}, -149);
-        check("area below float minimum", zero, C::point(subnormal, 0), C::point(0, 1), std::ldexp(1.0, -150));
+        check("area below float minimum", zero, C::Point_(subnormal, 0), C::Point_(0, 1), std::ldexp(1.0, -150));
     }
     TEST(TriangleAreaRangeTest, LargeUnsignedCoordinatesRetainTheUnitDeterminant) {
         using T = std::uint64_t;

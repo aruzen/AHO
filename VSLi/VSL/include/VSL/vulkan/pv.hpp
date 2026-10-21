@@ -1,39 +1,39 @@
 #pragma once
 #include "../define.hpp"
 
-namespace VSL_NAMESPACE::_impl {
-    struct Vulkan_impl_accessor;
-    template<bool V>
-    struct Vulkan_impl;
-    struct PhysicalDevice_impl;
-    struct PhysicalDevices_impl;
-    struct LogicalDevice_impl;
-    struct CommandPool_impl;
-    struct CommandBuffer_impl;
-    struct Command_impl;
-    struct CommandManager_impl;
-    struct Submission_impl;
-    struct Surface_impl;
-    struct Swapchain_impl;
-    struct View_impl;
+namespace VSL_NAMESPACE::impl {
+    struct VulkanImplAccessor;
+    template<bool v>
+    struct VulkanImpl;
+    struct PhysicalDeviceImpl;
+    struct PhysicalDevicesImpl;
+    struct LogicalDeviceImpl;
+    struct CommandPoolImpl;
+    struct CommandBufferImpl;
+    struct CommandImpl;
+    struct CommandManagerImpl;
+    struct SubmissionImpl;
+    struct SurfaceImpl;
+    struct SwapchainImpl;
+    struct ViewImpl;
     struct CreateInfo;
-    struct PipelineLayout_impl;
-    struct Shader_impl;
-    struct RenderPass_impl;
-    struct Pipeline_impl;
-    struct FrameBuffer_impl;
-    struct Semaphore_impl;
-    struct Fence_impl;
-    struct SynchroManager_impl;
-    struct Buffer_impl;
-    struct ResourceBindingLayout_impl;
-    struct GraphicResourcePool_impl;
-    struct GraphicResourceManager_impl;
+    struct PipelineLayoutImpl;
+    struct ShaderImpl;
+    struct RenderPassImpl;
+    struct PipelineImpl;
+    struct FrameBufferImpl;
+    struct SemaphoreImpl;
+    struct FenceImpl;
+    struct SynchroManagerImpl;
+    struct BufferImpl;
+    struct ResourceBindingLayoutImpl;
+    struct GraphicResourcePoolImpl;
+    struct GraphicResourceManagerImpl;
     struct GraphicResourceManagerIdentity;
-    struct GraphicResource_impl;
-    struct Image_impl;
-    struct Sampler_impl;
+    struct GraphicResourceImpl;
+    struct ImageImpl;
+    struct SamplerImpl;
     namespace pipeline_layout {
-        struct ShaderGroup_impl;
+        struct ShaderGroupImpl;
     }
-} // namespace VSL_NAMESPACE::_impl
+} // namespace VSL_NAMESPACE::impl

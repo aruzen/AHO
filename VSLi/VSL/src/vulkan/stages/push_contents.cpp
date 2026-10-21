@@ -10,11 +10,11 @@
 #include <stdexcept>
 
 void VSL_NAMESPACE::pipeline_layout::PushConstants::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
-    auto& info = *pl._data->info;
-    const auto limit = pl._data->device->parentDevice->device.getProperties().limits.maxPushConstantsSize;
+    auto& info = *pl.data_->info;
+    const auto limit = pl.data_->device->parent_device->device.getProperties().limits.maxPushConstantsSize;
     std::map<std::uint32_t, std::pair<std::uint32_t, std::uint32_t>> per_stage;
     for (const auto& definition : definitions) {
-        auto stages = static_cast<std::uint32_t>(definition.targetShader);
+        auto stages = static_cast<std::uint32_t>(definition.target_shader);
         if (!stages || !definition.size || definition.offset >= limit || definition.size > limit - definition.offset)
             throw std::invalid_argument("Invalid push constant range");
         const auto end = definition.offset + definition.size;
@@ -38,6 +38,6 @@ void VSL_NAMESPACE::pipeline_layout::PushConstants::injection(VSL_NAMESPACE::Pip
     auto& storage = info.pool["colorBlendAttachment"];
     storage.swap(next);
     const auto& values = std::any_cast<const std::vector<vk::PushConstantRange>&>(storage);
-    info.pipelineLayout.pPushConstantRanges = values.empty() ? nullptr : values.data();
-    info.pipelineLayout.pushConstantRangeCount = static_cast<std::uint32_t>(values.size());
+    info.pipeline_layout.pPushConstantRanges = values.empty() ? nullptr : values.data();
+    info.pipeline_layout.pushConstantRangeCount = static_cast<std::uint32_t>(values.size());
 }

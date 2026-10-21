@@ -2,8 +2,8 @@
 #include <VSL/define.hpp>
 #include <vulkan/vulkan.hpp>
 #include <cstddef>
-namespace VSL_NAMESPACE::_impl::helper {
-    inline vk::ImageAspectFlags imageAspects(vk::Format format) {
+namespace VSL_NAMESPACE::impl::helper {
+    inline vk::ImageAspectFlags image_aspects(vk::Format format) {
         switch (format) {
             case vk::Format::eD16Unorm:
             case vk::Format::eX8D24UnormPack32:
@@ -20,8 +20,8 @@ namespace VSL_NAMESPACE::_impl::helper {
         }
     }
     // ClearValueの型の並びは、浮動小数点色、符号付き整数色、符号なし整数色、深度・ステンシル。
-    inline std::size_t clearKind(vk::Format format) {
-        if (imageAspects(format) != vk::ImageAspectFlagBits::eColor)
+    inline std::size_t clear_kind(vk::Format format) {
+        if (image_aspects(format) != vk::ImageAspectFlagBits::eColor)
             return 3;
         switch (format) {
             case vk::Format::eR8Sint:
@@ -72,4 +72,4 @@ namespace VSL_NAMESPACE::_impl::helper {
                 return 0;
         }
     }
-} // namespace VSL_NAMESPACE::_impl::helper
+} // namespace VSL_NAMESPACE::impl::helper

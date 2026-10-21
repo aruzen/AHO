@@ -180,18 +180,18 @@ namespace AHO_NAMESPACE {
 
         namespace literals {
             // Preserve the precision of the long double value, including on older standard libraries.
-            constexpr Radian pi = {3.141592653589793238462643383279502884L};
+            constexpr Radian PI = {3.141592653589793238462643383279502884L};
 
             constexpr Radian operator AHO_LITERAL(rad)(long double d) {
                 return {d};
             }
 
             constexpr Radian operator AHO_LITERAL(pi)(long double d) {
-                return {d * pi.value};
+                return {d * PI.value};
             }
 
             constexpr Radian operator AHO_LITERAL(\u03c0)(long double d) {
-                return {d * pi.value};
+                return {d * PI.value};
             }
 
             constexpr Degree operator AHO_LITERAL(deg)(long double d) {
@@ -200,11 +200,11 @@ namespace AHO_NAMESPACE {
         } // namespace literals
 
         constexpr Radian::operator Degree() const {
-            return {value * 180.0 / literals::pi.value};
+            return {value * 180.0 / literals::PI.value};
         }
 
         constexpr Degree::operator Radian() const {
-            return {value / 180.0 * literals::pi.value};
+            return {value / 180.0 * literals::PI.value};
         }
 
     } // namespace angle

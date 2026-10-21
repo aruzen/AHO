@@ -4,8 +4,8 @@
 #include <vulkan/vulkan.hpp>
 #include <cstdint>
 
-namespace VSL_NAMESPACE::_impl::helper {
-    inline vk::CompositeAlphaFlagBitsKHR chooseSwapchainCompositeAlpha(vk::CompositeAlphaFlagsKHR supported) {
+namespace VSL_NAMESPACE::impl::helper {
+    inline vk::CompositeAlphaFlagBitsKHR choose_swapchain_composite_alpha(vk::CompositeAlphaFlagsKHR supported) {
         for (const auto mode : {vk::CompositeAlphaFlagBitsKHR::eOpaque, vk::CompositeAlphaFlagBitsKHR::ePreMultiplied,
                                 vk::CompositeAlphaFlagBitsKHR::ePostMultiplied, vk::CompositeAlphaFlagBitsKHR::eInherit}) {
             if (supported & mode)
@@ -15,7 +15,7 @@ namespace VSL_NAMESPACE::_impl::helper {
     }
 
     // The queue-family array must remain alive until the native swapchain creation call returns.
-    inline void configureSwapchainSharing(vk::SwapchainCreateInfoKHR& info, const std::uint32_t (&families)[2],
+    inline void configure_swapchain_sharing(vk::SwapchainCreateInfoKHR& info, const std::uint32_t (&families)[2],
                                           vk::SurfaceTransformFlagBitsKHR transform) {
         info.preTransform = transform;
         if (families[0] != families[1]) {
@@ -28,4 +28,4 @@ namespace VSL_NAMESPACE::_impl::helper {
             info.pQueueFamilyIndices = nullptr;
         }
     }
-} // namespace VSL_NAMESPACE::_impl::helper
+} // namespace VSL_NAMESPACE::impl::helper

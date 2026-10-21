@@ -3,25 +3,25 @@
 #include <VSL/vulkan/phase.hpp>
 #include "draw_count.hpp"
 
-VSL_NAMESPACE::command::DrawManip VSL_NAMESPACE::command::draw;
+VSL_NAMESPACE::command::DrawManip VSL_NAMESPACE::command::DRAW;
 
-VSL_NAMESPACE::command::Draw::Draw(size_t size) : size_(_impl::helper::checkedDrawCount(size)) {}
+VSL_NAMESPACE::command::Draw::Draw(size_t size) : _size(impl::helper::checked_draw_count(size)) {}
 
-void VSL_NAMESPACE::command::Draw::setSize(size_t size) {
-    size_ = _impl::helper::checkedDrawCount(size);
+void VSL_NAMESPACE::command::Draw::set_size(size_t size) {
+    _size = impl::helper::checked_draw_count(size);
 }
 
 void VSL_NAMESPACE::command::Draw::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
-    buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].draw(size_, 1, 0, 0);
+    buffer.data_->command_buffers[buffer.get_current_buffer_idx()].draw(_size, 1, 0, 0);
 }
 
 void VSL_NAMESPACE::command::DrawManip::invoke(VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
-    buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].draw(size_.value(), 1, 0, 0);
+    buffer.data_->command_buffers[buffer.get_current_buffer_idx()].draw(_size.value(), 1, 0, 0);
 }
 
-void VSL_NAMESPACE::command::DrawManip::setVertexSize(std::optional<size_t> vertexSize) {
-    if (vertexSize)
-        size_ = _impl::helper::checkedDrawCount(*vertexSize);
+void VSL_NAMESPACE::command::DrawManip::set_vertex_size(std::optional<size_t> vertex_size) {
+    if (vertex_size)
+        _size = impl::helper::checked_draw_count(*vertex_size);
     else
-        size_.reset();
+        _size.reset();
 }

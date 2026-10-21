@@ -16,60 +16,60 @@ namespace {
 
     ImageReadbackCommandVulkanIntegrationTest::TransferImage ImageReadbackCommandVulkanIntegrationTest::initialized_image(vsl::CommandManager manager) {
         const std::array<std::uint32_t, 4> values{11, 22, 33, 44};
-        TransferImage image(device, 2, 2, vsl::data_format::UnsignedInt);
+        TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT);
         vsl::StagingBuffer<> source(device, values);
         vsl::ComputePhase phase(manager);
-        phase << vsl::command::ChangeImageBarrier(image, vsl::ImageLayout::TransferDstOptimal)
-              << vsl::command::CopyBufferToImage(image, &source, vsl::ImageLayout::TransferDstOptimal);
-        if (phase.submit() != vsl::ComputePhase::SubmitResult::Success || !phase.completion().wait())
+        phase << vsl::command::ChangeImageBarrier(image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL)
+              << vsl::command::CopyBufferToImage(image, &source, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
+        if (phase.submit() != vsl::ComputePhase::SubmitResult::SUCCESS || !phase.completion().wait())
             throw std::runtime_error("Image setup submission failed");
         return image;
     }
 
     TEST_F(ImageReadbackCommandVulkanIntegrationTest, RecordsCopyAndRestoresLayoutWithoutSubmitting) {
         const std::array<std::uint32_t, 4> first{11, 22, 33, 44}, second{55, 66, 77, 88};
-        TransferImage image(device, 2, 2, vsl::data_format::UnsignedInt);
-        vsl::StagingBuffer<> firstSource(device, first), secondSource(device, second);
-        vsl::StagingBuffer<vsl::MemoryType::TransferDestination> pixel(device, sizeof(std::uint32_t));
-        vsl::StagingBuffer<vsl::MemoryType::TransferDestination> full(device, sizeof(second));
+        TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT);
+        vsl::StagingBuffer<> first_source(device, first), second_source(device, second);
+        vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION> pixel(device, sizeof(std::uint32_t));
+        vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION> full(device, sizeof(second));
         auto manager = make_manager();
         {
-            auto phase = manager.startPhase<vsl::ComputePhase>();
-            phase << vsl::command::ChangeImageBarrier(image, vsl::ImageLayout::TransferDstOptimal)
-                  << vsl::command::CopyBufferToImage(image, &firstSource, vsl::ImageLayout::TransferDstOptimal)
-                  << vsl::command::ImageReadback(&pixel, image, vsl::ImageLayout::TransferDstOptimal, {1, 0, 1, 1})
-                  << vsl::command::CopyBufferToImage(image, &secondSource, vsl::ImageLayout::TransferDstOptimal)
-                  << vsl::command::ImageReadback(full._data, image, vsl::ImageLayout::TransferDstOptimal);
-            EXPECT_EQ(phase.state, vsl::ComputePhase::State::WaitSubmit);
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << vsl::command::ChangeImageBarrier(image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL)
+                  << vsl::command::CopyBufferToImage(image, &first_source, vsl::ImageLayout::TRANSFER_DST_OPTIMAL)
+                  << vsl::command::ImageReadback(&pixel, image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL, {1, 0, 1, 1})
+                  << vsl::command::CopyBufferToImage(image, &second_source, vsl::ImageLayout::TRANSFER_DST_OPTIMAL)
+                  << vsl::command::ImageReadback(full.data_, image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
+            EXPECT_EQ(phase.state, vsl::ComputePhase::State::WAIT_SUBMIT);
         }
-        device._data->device.waitIdle();
-        auto mappedPixel = pixel.data(sizeof(std::uint32_t));
-        std::uint32_t actualPixel;
-        std::memcpy(&actualPixel, mappedPixel.data, sizeof(actualPixel));
-        EXPECT_EQ(actualPixel, first[1]);
-        auto mappedFull = full.data(sizeof(second));
+        device.data_->device.waitIdle();
+        auto mapped_pixel = pixel.data(sizeof(std::uint32_t));
+        std::uint32_t actual_pixel;
+        std::memcpy(&actual_pixel, mapped_pixel.data, sizeof(actual_pixel));
+        EXPECT_EQ(actual_pixel, first[1]);
+        auto mapped_full = full.data(sizeof(second));
         std::array<std::uint32_t, 4> actual;
-        std::memcpy(actual.data(), mappedFull.data, sizeof(actual));
+        std::memcpy(actual.data(), mapped_full.data, sizeof(actual));
         EXPECT_EQ(actual, second);
     }
 
     TEST_F(ImageReadbackCommandVulkanIntegrationTest, SelectedLayerRestorationLeavesOtherLayersUsable) {
         const std::array<std::uint32_t, 4> expected{11, 22, 33, 44};
-        TransferImage image(device, 2, 2, vsl::data_format::UnsignedInt, 2);
+        TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT, 2);
         vsl::StagingBuffer<> source(device, expected);
-        vsl::StagingBuffer<vsl::MemoryType::TransferDestination> pixel(device, sizeof(std::uint32_t));
-        vsl::StagingBuffer<vsl::MemoryType::TransferDestination> full(device, sizeof(expected));
+        vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION> pixel(device, sizeof(std::uint32_t));
+        vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION> full(device, sizeof(expected));
         auto manager = make_manager();
         {
-            auto phase = manager.startPhase<vsl::ComputePhase>();
-            phase << vsl::command::ChangeImageBarrier(image, vsl::ImageLayout::TransferDstOptimal)
-                  << vsl::command::CopyBufferToArrayImage(image, &source, vsl::ImageLayout::TransferDstOptimal, 0)
-                  << vsl::command::CopyBufferToArrayImage(image, &source, vsl::ImageLayout::TransferDstOptimal, 1)
-                  << vsl::command::ImageReadback(&pixel, image, vsl::ImageLayout::TransferDstOptimal, {1, 1, 1, 1, 1})
-                  << vsl::command::CopyBufferToArrayImage(image, &source, vsl::ImageLayout::TransferDstOptimal, 1)
-                  << vsl::command::ImageReadback(&full, image, vsl::ImageLayout::TransferDstOptimal, {0, 0, 2, 2, 0});
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << vsl::command::ChangeImageBarrier(image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL)
+                  << vsl::command::CopyBufferToArrayImage(image, &source, vsl::ImageLayout::TRANSFER_DST_OPTIMAL, 0)
+                  << vsl::command::CopyBufferToArrayImage(image, &source, vsl::ImageLayout::TRANSFER_DST_OPTIMAL, 1)
+                  << vsl::command::ImageReadback(&pixel, image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL, {1, 1, 1, 1, 1})
+                  << vsl::command::CopyBufferToArrayImage(image, &source, vsl::ImageLayout::TRANSFER_DST_OPTIMAL, 1)
+                  << vsl::command::ImageReadback(&full, image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL, {0, 0, 2, 2, 0});
         }
-        device._data->device.waitIdle();
+        device.data_->device.waitIdle();
         auto mapped = pixel.data(sizeof(std::uint32_t));
         std::uint32_t actual;
         std::memcpy(&actual, mapped.data, sizeof(actual));
@@ -77,23 +77,23 @@ namespace {
     }
 
     TEST_F(ImageReadbackCommandVulkanIntegrationTest, DescriptionAndInvalidContractsDoNotRecordCommands) {
-        TransferImage image(device, 2, 2, vsl::data_format::UnsignedInt);
-        const auto info = vsl::command::ImageReadback::describe(image, vsl::ImageLayout::General);
+        TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT);
+        const auto info = vsl::command::ImageReadback::Describe(image, vsl::ImageLayout::GENERAL);
         EXPECT_EQ(info.region.width, 2u);
         EXPECT_EQ(info.region.height, 2u);
-        EXPECT_EQ(info.rowStride, 8u);
-        EXPECT_EQ(info.byteSize, 16u);
-        EXPECT_EQ(info.format, vsl::data_format::UnsignedInt);
-        vsl::StagingBuffer<vsl::MemoryType::TransferDestination> small(device, 4);
+        EXPECT_EQ(info.row_stride, 8u);
+        EXPECT_EQ(info.byte_size, 16u);
+        EXPECT_EQ(info.format, vsl::data_format::UNSIGNED_INT);
+        vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION> small(device, 4);
         auto manager = make_manager();
         auto invoke = [&](vsl::ImageLayout layout, vsl::ImageRegion region = {}) {
             vsl::command::ImageReadback(&small, image, layout, region)
-                .invoke(manager.getPool(), manager.getBuffer(), manager);
+                .invoke(manager.get_pool(), manager.get_buffer(), manager);
         };
-        EXPECT_THROW(invoke(vsl::ImageLayout::Undefined), std::invalid_argument);
-        EXPECT_THROW(invoke(vsl::ImageLayout::Preinitialized), std::invalid_argument);
-        EXPECT_THROW(invoke(vsl::ImageLayout::General), std::out_of_range);
-        EXPECT_THROW(invoke(vsl::ImageLayout::General, {2, 0, 1, 1}), std::out_of_range);
+        EXPECT_THROW(invoke(vsl::ImageLayout::UNDEFINED), std::invalid_argument);
+        EXPECT_THROW(invoke(vsl::ImageLayout::PREINITIALIZED), std::invalid_argument);
+        EXPECT_THROW(invoke(vsl::ImageLayout::GENERAL), std::out_of_range);
+        EXPECT_THROW(invoke(vsl::ImageLayout::GENERAL, {2, 0, 1, 1}), std::out_of_range);
     }
 } // namespace
 
@@ -101,23 +101,23 @@ namespace {
     TEST_F(ImageReadbackCommandVulkanIntegrationTest, EmptyCommandBufferIsRejectedBeforeItIsDereferenced) {
         auto manager = make_manager();
         auto image = initialized_image(manager);
-        vsl::StagingBuffer<vsl::MemoryType::TransferDestination> destination(device, std::size_t{16});
-        const vsl::CommandBuffer empty(std::shared_ptr<vsl::_impl::CommandBuffer_impl>{});
-        vsl::command::ImageReadback command(&destination, image, vsl::ImageLayout::TransferDstOptimal);
-        EXPECT_THROW(command.invoke(manager.getPool(), empty, manager), std::invalid_argument);
+        vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION> destination(device, std::size_t{16});
+        const vsl::CommandBuffer empty(std::shared_ptr<vsl::impl::CommandBufferImpl>{});
+        vsl::command::ImageReadback command(&destination, image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
+        EXPECT_THROW(command.invoke(manager.get_pool(), empty, manager), std::invalid_argument);
     }
     TEST_F(ImageReadbackCommandVulkanIntegrationTest, EmptyManagerIsRejectedBeforeRetainingResourcesOrRecordingBarriers) {
         auto manager = make_manager();
         auto image = initialized_image(manager);
-        vsl::StagingBuffer<vsl::MemoryType::TransferDestination> destination(device, std::size_t{16});
-        const vsl::CommandManager empty(std::shared_ptr<vsl::_impl::CommandManager_impl>{});
+        vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION> destination(device, std::size_t{16});
+        const vsl::CommandManager empty(std::shared_ptr<vsl::impl::CommandManagerImpl>{});
         vsl::ComputePhase phase(manager);
-        const auto buffer = manager.getBuffer();
-        ASSERT_TRUE(buffer._data->recordingSubmission);
-        const auto retained = buffer._data->recordingSubmission->resources;
-        vsl::command::ImageReadback command(&destination, image, vsl::ImageLayout::TransferDstOptimal);
-        EXPECT_THROW(command.invoke(manager.getPool(), buffer, empty), std::invalid_argument);
-        EXPECT_EQ(buffer._data->recordingSubmission->resources, retained);
+        const auto buffer = manager.get_buffer();
+        ASSERT_TRUE(buffer.data_->recording_submission);
+        const auto retained = buffer.data_->recording_submission->resources;
+        vsl::command::ImageReadback command(&destination, image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
+        EXPECT_THROW(command.invoke(manager.get_pool(), buffer, empty), std::invalid_argument);
+        EXPECT_EQ(buffer.data_->recording_submission->resources, retained);
         phase.cancel();
     }
     TEST_F(ImageReadbackCommandVulkanIntegrationTest, CommandKeepsDestinationWhenOriginalHandleIsDestroyedBeforeRecording) {
@@ -125,19 +125,19 @@ namespace {
         auto image = initialized_image(manager);
         std::optional<vsl::command::ImageReadback> command;
         std::optional<vsl::BufferAccessor::LocalBufferHolder> mapped;
-        std::weak_ptr<vsl::_impl::Buffer_impl> storage;
+        std::weak_ptr<vsl::impl::BufferImpl> storage;
         {
-            vsl::Buffer<vsl::MemoryType::TransferDestination, vsl::MemoryProperty::HostVisible> destination(device, std::size_t{16});
-            storage = destination._data;
+            vsl::Buffer<vsl::MemoryType::TRANSFER_DESTINATION, vsl::MemoryProperty::HOST_VISIBLE> destination(device, std::size_t{16});
+            storage = destination.data_;
             mapped.emplace(destination.data());
-            command.emplace(&destination, image, vsl::ImageLayout::TransferDstOptimal);
+            command.emplace(&destination, image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
         }
         ASSERT_FALSE(storage.expired());
         {
             vsl::ComputePhase phase(manager);
             phase << *command;
             command.reset();
-            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::Success);
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
             ASSERT_TRUE(phase.completion().wait());
         }
         std::array<std::uint32_t, 4> pixels{};

@@ -12,12 +12,12 @@ namespace {
 
     using CalculationPoints = testing::Types<
         aho::d2::Point<long double>,
-        aho::d2::Point<long double, aho::coordinate::_MakeCoordinateInfo<true, false, true>::value>,
-        aho::d2::Point<long double, aho::coordinate::_MakeCoordinateInfo<false, true, true>::value>>;
+        aho::d2::Point<long double, aho::coordinate::MakeCoordinateInfo<true, false, true>::Value>,
+        aho::d2::Point<long double, aho::coordinate::MakeCoordinateInfo<false, true, true>::Value>>;
     TYPED_TEST_SUITE(CollisionCoordinateTest, CalculationPoints);
 
     TYPED_TEST(CollisionCoordinateTest, LongDoubleCoordinatesPreserveContainmentAndBoundaryContactAcrossEnabledAxes) {
-        using Triangle = aho::Triangle<long double, vsl::D2, typename TypeParam::coordinate_info>;
+        using Triangle = aho::Triangle<long double, vsl::D2, typename TypeParam::CoordinateInfo>;
         const auto shape = aho::triangulate(std::array{TypeParam(0, 0), TypeParam(4, 0), TypeParam(4, 2), TypeParam(0, 2)}).value();
         EXPECT_TRUE(aho::collision::contains(shape, TypeParam(2, 1)));
         EXPECT_TRUE(aho::collision::contains(shape, TypeParam(4, 1)));
@@ -96,16 +96,16 @@ namespace {
     }
     TEST(CollisionTest, TriangleViewsMayExposeConvertibleTriangleObjects) {
         struct TriangleObject {
-            using element_type = double;
-            using dimension = vsl::D2;
-            using coordinate_info = T::coordinate_info;
+            using ElementType = double;
+            using Dimension = vsl::D2;
+            using CoordinateInfo = T::CoordinateInfo;
             T value;
             operator T() const { return value; }
         };
         struct Shape {
-            using element_type = double;
-            using dimension = vsl::D2;
-            using coordinate_info = T::coordinate_info;
+            using ElementType = double;
+            using Dimension = vsl::D2;
+            using CoordinateInfo = T::CoordinateInfo;
             std::array<TriangleObject, 1> values;
             auto triangles() const { return values; }
         };

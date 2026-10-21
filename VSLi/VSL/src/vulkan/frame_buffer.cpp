@@ -5,25 +5,25 @@
 
 namespace VSL_NAMESPACE {
     namespace {
-        std::shared_ptr<_impl::FrameBuffer_impl> make_data(RenderPassAccessor pass, std::uint32_t width,
+        std::shared_ptr<impl::FrameBufferImpl> make_data(RenderPassAccessor pass, std::uint32_t width,
                                                            std::uint32_t height, std::uint32_t layers) {
-            if (!pass._data || !width || !height || !layers)
+            if (!pass.data_ || !width || !height || !layers)
                 throw std::invalid_argument("Invalid framebuffer pass/extent/layers");
-            auto data = std::make_shared<_impl::FrameBuffer_impl>();
-            data->device = pass._data->device;
-            data->renderPass = pass._data;
+            auto data = std::make_shared<impl::FrameBufferImpl>();
+            data->device = pass.data_->device;
+            data->render_pass = pass.data_;
             data->extent = {width, height};
             data->layers = layers;
             return data;
         }
-        void append(_impl::FrameBuffer_impl& target, const std::vector<ImageAccessor>& images) {
-            const auto& desc = *target.renderPass->description;
+        void append(impl::FrameBufferImpl& target, const std::vector<ImageAccessor>& images) {
+            const auto& desc = *target.render_pass->description;
             if (images.size() != desc.attachments.size())
                 throw std::invalid_argument("Framebuffer attachment count mismatch");
             std::vector<vk::ImageView> views;
-            std::vector<std::shared_ptr<_impl::Image_impl>> retained;
+            std::vector<std::shared_ptr<impl::ImageImpl>> retained;
             for (std::size_t i = 0; i < images.size(); ++i) {
-                const auto& image = images[i]._data;
+                const auto& image = images[i].data_;
                 const auto& a = desc.attachments[i];
                 if (!image || !image->view || image->device != target.device ||
                     image->format != static_cast<vk::Format>(a.format.type()) || image->samples != a.samples ||
@@ -37,35 +37,35 @@ namespace VSL_NAMESPACE {
                 for (const auto& s : desc.subpasses) {
                     for (auto r : s.colors)
                         if (r.attachment == i)
-                            require(ImageType::ColorAttachment);
+                            require(ImageType::COLOR_ATTACHMENT);
                     for (auto r : s.resolves)
                         if (r.attachment == i)
-                            require(ImageType::ColorAttachment);
+                            require(ImageType::COLOR_ATTACHMENT);
                     for (auto r : s.inputs)
                         if (r.attachment == i)
-                            require(ImageType::InputAttachment);
-                    if (s.depthStencil && s.depthStencil->attachment == i)
-                        require(ImageType::DepthStencilAttachment);
+                            require(ImageType::INPUT_ATTACHMENT);
+                    if (s.depth_stencil && s.depth_stencil->attachment == i)
+                        require(ImageType::DEPTH_STENCIL_ATTACHMENT);
                 }
                 views.push_back(image->view);
                 retained.push_back(image);
             }
-            vk::FramebufferCreateInfo info{.renderPass = target.renderPass->renderPass,
+            vk::FramebufferCreateInfo info{.renderPass = target.render_pass->render_pass,
                                            .attachmentCount = static_cast<std::uint32_t>(views.size()),
                                            .pAttachments = views.data(),
                                            .width = target.extent.width,
                                            .height = target.extent.height,
                                            .layers = target.layers};
-            target.swapChainFramebuffers.push_back(target.device->device.createFramebuffer(info));
+            target.swap_chain_framebuffers.push_back(target.device->device.createFramebuffer(info));
             target.attachments.push_back(std::move(retained));
         }
     } // namespace
     FrameBuffer::FrameBuffer(RenderPassAccessor pass, std::uint32_t width, std::uint32_t height,
                              std::vector<ImageAccessor> images, std::uint32_t layers) {
-        _data = make_data(pass, width, height, layers);
-        append(*_data, images);
+        data_ = make_data(pass, width, height, layers);
+        append(*data_, images);
     }
-    FrameBuffer FrameBuffer::fromAttachments(RenderPassAccessor pass, std::uint32_t width, std::uint32_t height,
+    FrameBuffer FrameBuffer::FromAttachments(RenderPassAccessor pass, std::uint32_t width, std::uint32_t height,
                                              std::vector<AttachmentImage> bindings, std::uint32_t layers) {
         const auto count = pass.description().attachments.size();
         if (bindings.size() != count)
@@ -83,26 +83,26 @@ namespace VSL_NAMESPACE {
         return FrameBuffer(pass, width, height, std::move(images), layers);
     }
     FrameBuffer::FrameBuffer(SwapchainAccessor swapchain, RenderPass pass) {
-        if (!swapchain._data)
+        if (!swapchain.data_)
             throw std::invalid_argument("Swapchain required");
-        _data =
-            make_data(pass, swapchain._data->swapChainExtent.width, swapchain._data->swapChainExtent.height, 1);
-        _data->swapchain = swapchain._data;
+        data_ =
+            make_data(pass, swapchain.data_->swap_chain_extent.width, swapchain.data_->swap_chain_extent.height, 1);
+        data_->swapchain = swapchain.data_;
         for (auto image : swapchain.images)
-            append(*_data, {image});
+            append(*data_, {image});
     }
     FrameBuffer::FrameBuffer(SwapchainAccessor swapchain, IDPickingRenderPass pass) {
-        if (!swapchain._data || swapchain.images.size() != pass.picking_buffer.size())
+        if (!swapchain.data_ || swapchain.images.size() != pass.picking_buffer.size())
             throw std::invalid_argument("Picking image count must match swapchain");
-        _data =
-            make_data(pass, swapchain._data->swapChainExtent.width, swapchain._data->swapChainExtent.height, 1);
-        _data->swapchain = swapchain._data;
+        data_ =
+            make_data(pass, swapchain.data_->swap_chain_extent.width, swapchain.data_->swap_chain_extent.height, 1);
+        data_->swapchain = swapchain.data_;
         for (std::size_t i = 0; i < swapchain.images.size(); ++i)
-            append(*_data, {swapchain.images[i], pass.picking_buffer[i]});
+            append(*data_, {swapchain.images[i], pass.picking_buffer[i]});
     }
-    _impl::FrameBuffer_impl::~FrameBuffer_impl() {
+    impl::FrameBufferImpl::~FrameBufferImpl() {
         if (device)
-            for (auto fb : swapChainFramebuffers)
+            for (auto fb : swap_chain_framebuffers)
                 device->device.destroyFramebuffer(fb);
     }
 } // namespace VSL_NAMESPACE

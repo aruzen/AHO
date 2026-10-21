@@ -34,7 +34,7 @@ namespace AHO_NAMESPACE {
 #ifdef VSL_SPIRV_REFLECTOR_UTIL
     /*
     struct ShaderReflectGraphicPipeline : public GraphicPipeline {
-        template<vsl::helper::constant_string_holder String>
+        template<vsl::helper::ConstantStringHolder string>
         ShaderReflectGraphicPipeline()
     };
      */
@@ -42,16 +42,16 @@ namespace AHO_NAMESPACE {
     // TODO: typed_safe_pipelineと合わせて, make<StandardPipelineTag, DefinedUniformBufferTag>()のような形でファクトリメソッドorファクトリクラスをくむべき
     enum class StandardPipelineTag {
         // FIXME:[issue] (Triangle + RGBA) * 4 = 112 Byteなので四角形まで拡張するか考えるべき
-        PushConstantTriangle, // Triangle * 3 + RGBA * 3
-        BindBufferIndexedTriangle,
+        PUSH_CONSTANT_TRIANGLE, // Triangle * 3 + RGBA * 3
+        BIND_BUFFER_INDEXED_TRIANGLE,
     };
 
     enum class DefinedDescriptorBufferTag {
-        ModelViewPerspectiveUniformBuffer,
-        ViewPerspectiveUniformBuffer,
-        Texture2D,
-        ModelPushConstants,
-        VertexColorInput,
+        MODEL_VIEW_PERSPECTIVE_UNIFORM_BUFFER,
+        VIEW_PERSPECTIVE_UNIFORM_BUFFER,
+        TEXTURE2_D,
+        MODEL_PUSH_CONSTANTS,
+        VERTEX_COLOR_INPUT,
     };
 } // namespace AHO_NAMESPACE
 

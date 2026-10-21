@@ -4,7 +4,7 @@
 
 namespace VSL_NAMESPACE {
     struct FrameBufferAccessor {
-        std::shared_ptr<_impl::FrameBuffer_impl> _data;
+        std::shared_ptr<impl::FrameBufferImpl> data_;
     };
     struct AttachmentImage {
         AttachmentId attachment;
@@ -16,7 +16,7 @@ namespace VSL_NAMESPACE {
         FrameBuffer(RenderPassAccessor pass, std::uint32_t width, std::uint32_t height,
                     std::vector<ImageAccessor> images, std::uint32_t layers = 1);
         // AttachmentIdで対応付けるため、配列の順序は問わない。全アタッチメントの指定が必要。
-        static FrameBuffer fromAttachments(RenderPassAccessor pass, std::uint32_t width, std::uint32_t height,
+        static FrameBuffer FromAttachments(RenderPassAccessor pass, std::uint32_t width, std::uint32_t height,
                                            std::vector<AttachmentImage> images, std::uint32_t layers = 1);
         FrameBuffer(SwapchainAccessor swapchain, RenderPass render_pass);
         FrameBuffer(SwapchainAccessor swapchain, IDPickingRenderPass render_pass);

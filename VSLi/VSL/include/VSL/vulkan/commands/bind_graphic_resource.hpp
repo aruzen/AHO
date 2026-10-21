@@ -13,7 +13,7 @@
 #include "../pipeline.hpp"
 
 namespace VSL_NAMESPACE::command {
-    struct BindGraphicResource : public __Command, public __PipelineRequire {
+    struct BindGraphicResource : public Command, public PipelineRequire {
         BindGraphicResource(GraphicResource resource, graphic_resource::BindingDestination dst, std::optional<PipelineAccessor> pipeline = std::nullopt, std::uint32_t first_binding = 0);
         BindGraphicResource(const std::vector<GraphicResource>& resources, graphic_resource::BindingDestination dst, std::optional<PipelineAccessor> pipeline = std::nullopt, std::uint32_t first_binding = 0);
 
@@ -24,7 +24,7 @@ namespace VSL_NAMESPACE::command {
 
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
 
-        void setPipeline(std::optional<PipelineAccessor> pipeline) override;
+        void set_pipeline(std::optional<PipelineAccessor> pipeline) override;
     };
 } // namespace VSL_NAMESPACE::command
 

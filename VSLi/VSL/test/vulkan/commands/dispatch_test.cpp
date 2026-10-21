@@ -17,7 +17,7 @@ namespace {
         EXPECT_EQ(two_dimensions.z, 1u);
     }
     using DispatchVulkanIntegrationTest = vsl_test::ComputeVulkanIntegrationTest;
-    TEST_F(DispatchVulkanIntegrationTest, WritesEveryStorageBufferElementOnGpu) {
-        expect_sequence(execute(100), 100);
+    TEST_F(DispatchVulkanIntegrationTest, WritesEveryStorageBufferElementOnGPU) {
+        ExpectSequence(execute(100), 100);
     }
 } // namespace

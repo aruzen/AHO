@@ -13,18 +13,18 @@
 namespace AHO_NAMESPACE {
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
     struct Line {
-        using dimension = D;
-        using element_type = R;
-        using coordinate_info = CI;
+        using Dimension = D;
+        using ElementType = R;
+        using CoordinateInfo = CI;
 
-        AHO_NAMESPACE::_Point<R, D, CI> pos1, pos2;
+        AHO_NAMESPACE::Point_<R, D, CI> pos1, pos2;
 
         constexpr Line() {}
 
-        constexpr Line(AHO_NAMESPACE::_Point<R, D, CI> pos1, AHO_NAMESPACE::_Point<R, D, CI> pos2)
+        constexpr Line(AHO_NAMESPACE::Point_<R, D, CI> pos1, AHO_NAMESPACE::Point_<R, D, CI> pos2)
             : pos1(pos1), pos2(pos2) {}
 
-        constexpr Triangle<R, D, CI> operator+(AHO_NAMESPACE::_Point<R, D, CI> t) const;
+        constexpr Triangle<R, D, CI> operator+(AHO_NAMESPACE::Point_<R, D, CI> t) const;
 
         template<AHO_NAMESPACE::concepts::points_view_able T>
         requires(!AHO_NAMESPACE::concepts::is_point<T>)
@@ -32,11 +32,11 @@ namespace AHO_NAMESPACE {
 
         constexpr auto length() const;
 
-        constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>, 2> points() const;
+        constexpr std::array<AHO_NAMESPACE::Point_<R, D, CI>, 2> points() const;
 
         constexpr std::array<Line<R, D, CI>, 1> lines() const;
 
-        constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 2> ptrpoints();
+        constexpr std::array<AHO_NAMESPACE::Point_<R, D, CI>*, 2> ptrpoints();
 
         constexpr std::array<PtrLine<R, D, CI>, 1> ptrlines();
 
@@ -49,29 +49,29 @@ namespace AHO_NAMESPACE {
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
     struct PtrLine {
-        using dimension = D;
-        using element_type = R;
-        using coordinate_info = CI;
+        using Dimension = D;
+        using ElementType = R;
+        using CoordinateInfo = CI;
 
-        AHO_NAMESPACE::_Point<R, D, CI>*pos1, *pos2;
+        AHO_NAMESPACE::Point_<R, D, CI>*pos1, *pos2;
 
         constexpr PtrLine() {}
 
-        constexpr PtrLine(AHO_NAMESPACE::_Point<R, D, CI>* pos1, AHO_NAMESPACE::_Point<R, D, CI>* pos2)
+        constexpr PtrLine(AHO_NAMESPACE::Point_<R, D, CI>* pos1, AHO_NAMESPACE::Point_<R, D, CI>* pos2)
             : pos1(pos1), pos2(pos2) {}
 
-        constexpr Triangle<R, D, CI> operator+(AHO_NAMESPACE::_Point<R, D, CI> t) const;
+        constexpr Triangle<R, D, CI> operator+(AHO_NAMESPACE::Point_<R, D, CI> t) const;
 
         template<AHO_NAMESPACE::concepts::points_view_able T>
         constexpr Polygon<R, D, CI> operator+(T t) const;
 
         constexpr auto length() const;
 
-        constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>, 2> points() const;
+        constexpr std::array<AHO_NAMESPACE::Point_<R, D, CI>, 2> points() const;
 
         constexpr std::array<Line<R, D, CI>, 1> lines() const;
 
-        constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 2> ptrpoints() const;
+        constexpr std::array<AHO_NAMESPACE::Point_<R, D, CI>*, 2> ptrpoints() const;
 
         constexpr std::array<PtrLine<R, D, CI>, 1> ptrlines() const;
 
@@ -81,7 +81,7 @@ namespace AHO_NAMESPACE {
     // --------------------------------------------------------------------------------------------------------------------
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
-    inline constexpr Triangle<R, D, CI> Line<R, D, CI>::operator+(AHO_NAMESPACE::_Point<R, D, CI> t) const {
+    inline constexpr Triangle<R, D, CI> Line<R, D, CI>::operator+(AHO_NAMESPACE::Point_<R, D, CI> t) const {
         return Triangle<R, D, CI>(pos1, pos2, t);
     }
 
@@ -98,7 +98,7 @@ namespace AHO_NAMESPACE {
     };
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
-    inline constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>, 2> Line<R, D, CI>::points() const {
+    inline constexpr std::array<AHO_NAMESPACE::Point_<R, D, CI>, 2> Line<R, D, CI>::points() const {
         return {pos1, pos2};
     }
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
@@ -107,7 +107,7 @@ namespace AHO_NAMESPACE {
     }
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
-    inline constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 2> Line<R, D, CI>::ptrpoints() {
+    inline constexpr std::array<AHO_NAMESPACE::Point_<R, D, CI>*, 2> Line<R, D, CI>::ptrpoints() {
         return {&pos1, &pos2};
     }
 
@@ -131,7 +131,7 @@ namespace AHO_NAMESPACE {
     // --------------------------------------------------------------------------------------------------------------------
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
-    inline constexpr Triangle<R, D, CI> PtrLine<R, D, CI>::operator+(AHO_NAMESPACE::_Point<R, D, CI> t) const {
+    inline constexpr Triangle<R, D, CI> PtrLine<R, D, CI>::operator+(AHO_NAMESPACE::Point_<R, D, CI> t) const {
         return Triangle<R, D, CI>(*pos1, *pos2, t);
     }
 
@@ -147,7 +147,7 @@ namespace AHO_NAMESPACE {
     };
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
-    inline constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>, 2> PtrLine<R, D, CI>::points() const {
+    inline constexpr std::array<AHO_NAMESPACE::Point_<R, D, CI>, 2> PtrLine<R, D, CI>::points() const {
         return {*pos1, *pos2};
     }
 
@@ -157,7 +157,7 @@ namespace AHO_NAMESPACE {
     }
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
-    inline constexpr std::array<AHO_NAMESPACE::_Point<R, D, CI>*, 2> PtrLine<R, D, CI>::ptrpoints() const {
+    inline constexpr std::array<AHO_NAMESPACE::Point_<R, D, CI>*, 2> PtrLine<R, D, CI>::ptrpoints() const {
         return {pos1, pos2};
     }
 
@@ -171,6 +171,6 @@ namespace AHO_NAMESPACE {
         return Line<R, D, CI>(*pos1, *pos2);
     }
 
-    static_assert(concepts::is_line<Line<double, VSL_NAMESPACE::D2, coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D2>::value>>);
-    static_assert(concepts::is_points_object<Line<double, VSL_NAMESPACE::D2, coordinate::_DefaultCoordinateInfo<VSL_NAMESPACE::D2>::value>>);
+    static_assert(concepts::is_line<Line<double, VSL_NAMESPACE::D2, coordinate::DefaultCoordinateInfo<VSL_NAMESPACE::D2>::Value>>);
+    static_assert(concepts::is_points_object<Line<double, VSL_NAMESPACE::D2, coordinate::DefaultCoordinateInfo<VSL_NAMESPACE::D2>::Value>>);
 } // namespace AHO_NAMESPACE

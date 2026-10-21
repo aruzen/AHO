@@ -6,7 +6,7 @@
 
 namespace VSL_NAMESPACE::pipeline_layout {
     struct VertexInputLayoutDefinition {
-        data_format::___Format format;
+        data_format::Format format;
         std::uint32_t location = (std::uint32_t)-1, offset = (std::uint32_t)-1;
     };
 
@@ -17,9 +17,9 @@ namespace VSL_NAMESPACE::pipeline_layout {
         std::uint32_t size = (std::uint32_t)-1;
 
         enum class UpdateTiming {
-            NextVertex = 0,
-            NextInstance = 1
-        } updateTiming = UpdateTiming::NextVertex;
+            NEXT_VERTEX = 0,
+            NEXT_INSTANCE = 1
+        } update_timing = UpdateTiming::NEXT_VERTEX;
     };
 
     struct VertexInput {
@@ -30,9 +30,9 @@ namespace VSL_NAMESPACE::pipeline_layout {
         template<concepts::is_convertible_graphic_type... Args>
         VertexInput(Args... args);
 
-        VertexInput add(data_format::___Format format);
-        VertexInput add(std::initializer_list<data_format::___Format> format);
-        VertexInput add_shape(std::initializer_list<data_format::___Format> format);
+        VertexInput add(data_format::Format format);
+        VertexInput add(std::initializer_list<data_format::Format> format);
+        VertexInput add_shape(std::initializer_list<data_format::Format> format);
         template<concepts::is_convertible_graphic_type T>
         VertexInput add(T t);
         template<concepts::is_static_convertible_graphic_type... Args>
@@ -69,7 +69,7 @@ namespace VSL_NAMESPACE::pipeline_layout {
 
     template<concepts::is_static_convertible_graphic_type... Arg>
     VertexInput VSL_NAMESPACE::pipeline_layout::VertexInput::add() {
-        add(std::initializer_list<data_format::___Format>{data_format::convert_graphic_type<Arg>()...});
+        add(std::initializer_list<data_format::Format>{data_format::convert_graphic_type<Arg>()...});
         return *this;
     }
 

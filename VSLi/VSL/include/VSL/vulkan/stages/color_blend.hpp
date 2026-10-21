@@ -4,7 +4,7 @@
 #include <utility>
 namespace VSL_NAMESPACE::pipeline_layout {
     enum class ColorWriteMask : std::uint32_t {
-        None = 0,
+        NONE = 0,
         R = 1,
         G = 2,
         B = 4,
@@ -13,31 +13,31 @@ namespace VSL_NAMESPACE::pipeline_layout {
     };
     ___VSL_EXPAND_FLAGS_OPERATOR(ColorWriteMask);
     enum class BlendFactor {
-        Zero = 0,
-        One = 1,
-        SrcColor = 2,
-        OneMinusSrcColor = 3,
-        DstColor = 4,
-        OneMinusDstColor = 5,
-        SrcAlpha = 6,
-        OneMinusSrcAlpha = 7,
-        DstAlpha = 8,
-        OneMinusDstAlpha = 9
+        ZERO = 0,
+        ONE = 1,
+        SRC_COLOR = 2,
+        ONE_MINUS_SRC_COLOR = 3,
+        DST_COLOR = 4,
+        ONE_MINUS_DST_COLOR = 5,
+        SRC_ALPHA = 6,
+        ONE_MINUS_SRC_ALPHA = 7,
+        DST_ALPHA = 8,
+        ONE_MINUS_DST_ALPHA = 9
     };
     enum class BlendOp {
-        Add = 0,
-        Subtract = 1,
-        ReverseSubtract = 2,
-        Min = 3,
-        Max = 4
+        ADD = 0,
+        SUBTRACT = 1,
+        REVERSE_SUBTRACT = 2,
+        MIN_ = 3,
+        MAX_ = 4
     };
     struct ColorBlendAttachment {
         bool enabled = true;
-        ColorWriteMask writeMask = ColorWriteMask::RGBA;
-        BlendFactor sourceColor = BlendFactor::SrcAlpha, destinationColor = BlendFactor::OneMinusSrcAlpha;
-        BlendOp colorOp = BlendOp::Add;
-        BlendFactor sourceAlpha = BlendFactor::One, destinationAlpha = BlendFactor::Zero;
-        BlendOp alphaOp = BlendOp::Add;
+        ColorWriteMask write_mask = ColorWriteMask::RGBA;
+        BlendFactor source_color = BlendFactor::SRC_ALPHA, destination_color = BlendFactor::ONE_MINUS_SRC_ALPHA;
+        BlendOp color_op = BlendOp::ADD;
+        BlendFactor source_alpha = BlendFactor::ONE, destination_alpha = BlendFactor::ZERO;
+        BlendOp alpha_op = BlendOp::ADD;
     };
     struct ColorBlend {
         std::vector<ColorBlendAttachment> attachments{1};

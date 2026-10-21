@@ -8,8 +8,8 @@ namespace AHO_NAMESPACE::collision {
     namespace detail {
         template<typename T>
         concept Shape2D = AHO_NAMESPACE::concepts::is_triangles_object<T> &&
-                          std::same_as<typename T::dimension, VSL_NAMESPACE::D2> &&
-                          std::is_arithmetic_v<typename T::element_type> && requires(const T& shape) { shape.triangles(); };
+                          std::same_as<typename T::Dimension, VSL_NAMESPACE::D2> &&
+                          std::is_arithmetic_v<typename T::ElementType> && requires(const T& shape) { shape.triangles(); };
         namespace g = AHO_NAMESPACE::detail::geometry2d;
 
         template<Shape2D Shape>
@@ -20,25 +20,25 @@ namespace AHO_NAMESPACE::collision {
 
     // 境界を含む閉集合として判定する。退化した三角形も線分・点として扱う。
     template<detail::Shape2D Shape, AHO_NAMESPACE::concepts::is_point P>
-    requires std::same_as<typename P::dimension, VSL_NAMESPACE::D2> &&
-             std::same_as<typename Shape::coordinate_info, typename P::coordinate_info> &&
-             std::is_arithmetic_v<typename P::element_type>
+    requires std::same_as<typename P::Dimension, VSL_NAMESPACE::D2> &&
+             std::same_as<typename Shape::CoordinateInfo, typename P::CoordinateInfo> &&
+             std::is_arithmetic_v<typename P::ElementType>
     [[nodiscard]] bool contains(const Shape& shape, const P& point);
 
     template<detail::Shape2D Left, detail::Shape2D Right>
-    requires std::same_as<typename Left::coordinate_info, typename Right::coordinate_info>
+    requires std::same_as<typename Left::CoordinateInfo, typename Right::CoordinateInfo>
     [[nodiscard]] bool intersects(const Left& left, const Right& right);
 
     struct CollisionJudger {
         template<detail::Shape2D Left, detail::Shape2D Right>
-        requires std::same_as<typename Left::coordinate_info, typename Right::coordinate_info>
+        requires std::same_as<typename Left::CoordinateInfo, typename Right::CoordinateInfo>
         [[nodiscard]] bool operator()(const Left& left, const Right& right) const;
     };
 
     namespace detail {
         template<Shape2D Shape>
         void append(const Shape& shape, std::vector<g::Point>& points) {
-            for (const Triangle<typename Shape::element_type, VSL_NAMESPACE::D2, typename Shape::coordinate_info> triangle : shape.triangles())
+            for (const Triangle<typename Shape::ElementType, VSL_NAMESPACE::D2, typename Shape::CoordinateInfo> triangle : shape.triangles())
                 for (const auto p : triangle.points()) {
                     const auto value = g::convert(p);
                     if (!std::isfinite(value.value.___AN1) || !std::isfinite(value.value.___AN2))
@@ -69,9 +69,9 @@ namespace AHO_NAMESPACE::collision {
     } // namespace detail
 
     template<detail::Shape2D Shape, AHO_NAMESPACE::concepts::is_point P>
-    requires std::same_as<typename P::dimension, VSL_NAMESPACE::D2> &&
-             std::same_as<typename Shape::coordinate_info, typename P::coordinate_info> &&
-             std::is_arithmetic_v<typename P::element_type>
+    requires std::same_as<typename P::Dimension, VSL_NAMESPACE::D2> &&
+             std::same_as<typename Shape::CoordinateInfo, typename P::CoordinateInfo> &&
+             std::is_arithmetic_v<typename P::ElementType>
     [[nodiscard]] bool contains(const Shape& shape, const P& point) {
         std::vector<detail::g::Point> points;
         detail::append(shape, points);
@@ -87,7 +87,7 @@ namespace AHO_NAMESPACE::collision {
     }
 
     template<detail::Shape2D Left, detail::Shape2D Right>
-    requires std::same_as<typename Left::coordinate_info, typename Right::coordinate_info>
+    requires std::same_as<typename Left::CoordinateInfo, typename Right::CoordinateInfo>
     [[nodiscard]] bool intersects(const Left& left, const Right& right) {
         std::vector<detail::g::Point> points;
         detail::append(left, points);
@@ -103,7 +103,7 @@ namespace AHO_NAMESPACE::collision {
     }
 
     template<detail::Shape2D Left, detail::Shape2D Right>
-    requires std::same_as<typename Left::coordinate_info, typename Right::coordinate_info>
+    requires std::same_as<typename Left::CoordinateInfo, typename Right::CoordinateInfo>
     bool CollisionJudger::operator()(const Left& left, const Right& right) const {
         return intersects(left, right);
     }

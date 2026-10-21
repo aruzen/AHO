@@ -10,14 +10,14 @@
 
 namespace VSL_NAMESPACE {
     struct SemaphoreHolder {
-        std::shared_ptr<_impl::Semaphore_impl> _data;
+        std::shared_ptr<impl::SemaphoreImpl> data_;
 
         std::size_t size() const;
         void destroy();
     };
 
     struct FenceHolder {
-        std::shared_ptr<_impl::Fence_impl> _data;
+        std::shared_ptr<impl::FenceImpl> data_;
 
         bool wait(std::uint64_t timeout_ns = UINT64_MAX);
         bool wait(std::uint32_t target_idx, std::uint64_t timeout_ns = UINT64_MAX);
@@ -27,20 +27,20 @@ namespace VSL_NAMESPACE {
     };
 
     struct SynchroManager {
-        std::shared_ptr<_impl::SynchroManager_impl> _data;
+        std::shared_ptr<impl::SynchroManagerImpl> data_;
 
         SynchroManager(LogicalDeviceAccessor device);
 
-        SemaphoreHolder createSemaphore(std::string name);
-        SemaphoreHolder createSemaphore(std::string name, size_t amount);
-        FenceHolder createFence(std::string name, bool signal = false);
-        FenceHolder createFence(std::string name, size_t amount, bool signal = false);
+        SemaphoreHolder create_semaphore(std::string name);
+        SemaphoreHolder create_semaphore(std::string name, size_t amount);
+        FenceHolder create_fence(std::string name, bool signal = false);
+        FenceHolder create_fence(std::string name, size_t amount, bool signal = false);
 
-        std::optional<SemaphoreHolder> getSemaphore(std::string name);
-        std::optional<FenceHolder> getFence(std::string name);
+        std::optional<SemaphoreHolder> get_semaphore(std::string name);
+        std::optional<FenceHolder> get_fence(std::string name);
 
-        bool destroySemaphore(std::string name);
-        bool destroyFence(std::string name);
+        bool destroy_semaphore(std::string name);
+        bool destroy_fence(std::string name);
 
         std::optional<FenceHolder> operator[](std::string name);
     };

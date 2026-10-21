@@ -24,13 +24,13 @@ namespace AHO_NAMESPACE {
 #define RGB_ELEMENT_TYPE_DEFINITION_EXPANDER(Upper, Lower)                                                                    \
     template<typename T>                                                                                                      \
     struct Upper {                                                                                                            \
-        using element_type = T;                                                                                               \
-        constexpr static bool is_rgb_elemenet = true;                                                                         \
+        using ElementType = T;                                                                                               \
+        constexpr static bool IS_RGB_ELEMENET = true;                                                                         \
                                                                                                                               \
         T value;                                                                                                              \
                                                                                                                               \
-        constexpr static char UpperChar = #Upper[0];                                                                          \
-        constexpr static char LowerChar = #Lower[0];                                                                          \
+        constexpr static char UPPER_CHAR = #Upper[0];                                                                          \
+        constexpr static char LOWER_CHAR = #Lower[0];                                                                          \
                                                                                                                               \
         constexpr Upper(const T& t) : value(t) {};                                                                            \
         constexpr Upper() : value{} {};                                                                                       \
@@ -89,13 +89,13 @@ namespace AHO_NAMESPACE {
 #define HSV_ELEMENT_TYPE_DEFINITION_EXPANDER(Upper, Lower)                                                                    \
     template<typename T>                                                                                                      \
     struct Upper {                                                                                                            \
-        using element_type = T;                                                                                               \
-        constexpr static bool is_hsv_elemenet = true;                                                                         \
+        using ElementType = T;                                                                                               \
+        constexpr static bool IS_HSV_ELEMENET = true;                                                                         \
                                                                                                                               \
         T value;                                                                                                              \
                                                                                                                               \
-        constexpr static char UpperChar = #Upper[0];                                                                          \
-        constexpr static char LowerChar = #Lower[0];                                                                          \
+        constexpr static char UPPER_CHAR = #Upper[0];                                                                          \
+        constexpr static char LOWER_CHAR = #Lower[0];                                                                          \
                                                                                                                               \
         constexpr Upper(const T& t) : value(t) {};                                                                            \
         constexpr Upper() : value{} {};                                                                                       \
@@ -153,12 +153,12 @@ namespace AHO_NAMESPACE {
 
         template<typename T>
         struct A {
-            using element_type = T;
+            using ElementType = T;
 
             T value;
 
-            constexpr static char UpperChar = 'A';
-            constexpr static char LowerChar = 'a';
+            constexpr static char UPPER_CHAR = 'A';
+            constexpr static char LOWER_CHAR = 'a';
 
             constexpr A(const T& t) : value(t) {};
             constexpr A() : value{} {};
@@ -224,10 +224,10 @@ namespace AHO_NAMESPACE {
 
         namespace concepts {
             template<typename T>
-            concept is_rgb_elemenet = T::is_rgb_elemenet;
+            concept IS_RGB_ELEMENET = T::IS_RGB_ELEMENET;
 
             template<typename T>
-            concept is_hsv_elemenet = T::is_hsv_elemenet;
+            concept IS_HSV_ELEMENET = T::IS_HSV_ELEMENET;
         } // namespace concepts
 
         template<typename T>
@@ -272,121 +272,121 @@ namespace AHO_NAMESPACE {
             return out;
         };
 
-        template<typename ElementType>
+        template<typename ElementType_>
         struct RGB {
-            using element_type = ElementType;
-            static constexpr VSL_NAMESPACE::data_format::___Format graphic_type = VSL_NAMESPACE::data_format::convert_graphic_type<ElementType>().template toVec<3>();
+            using ElementType = ElementType_;
+            static constexpr VSL_NAMESPACE::data_format::Format GRAPHIC_TYPE = VSL_NAMESPACE::data_format::convert_graphic_type<ElementType_>().template to_vec<3>();
 
-            R<ElementType> r;
-            G<ElementType> g;
-            B<ElementType> b;
+            R<ElementType_> r;
+            G<ElementType_> g;
+            B<ElementType_> b;
 
             constexpr RGB() = default;
-            constexpr RGB(const ElementType& r, const ElementType& g, const ElementType& b) : r(r), g(g), b(b) {}
+            constexpr RGB(const ElementType_& r, const ElementType_& g, const ElementType_& b) : r(r), g(g), b(b) {}
 
-            constexpr RGB<ElementType> operator*(const ElementType& m) const {
+            constexpr RGB<ElementType_> operator*(const ElementType_& m) const {
                 return {
-                    static_cast<ElementType>(this->r.value * m),
-                    static_cast<ElementType>(this->g.value * m),
-                    static_cast<ElementType>(this->b.value * m)};
+                    static_cast<ElementType_>(this->r.value * m),
+                    static_cast<ElementType_>(this->g.value * m),
+                    static_cast<ElementType_>(this->b.value * m)};
             }
-            constexpr RGB<ElementType> operator/(const ElementType& m) const {
+            constexpr RGB<ElementType_> operator/(const ElementType_& m) const {
                 return {
-                    static_cast<ElementType>(this->r.value / m),
-                    static_cast<ElementType>(this->g.value / m),
-                    static_cast<ElementType>(this->b.value / m)};
+                    static_cast<ElementType_>(this->r.value / m),
+                    static_cast<ElementType_>(this->g.value / m),
+                    static_cast<ElementType_>(this->b.value / m)};
             }
-            constexpr RGB<ElementType>& operator*=(const ElementType& m) {
+            constexpr RGB<ElementType_>& operator*=(const ElementType_& m) {
                 this->r.value *= m;
                 this->g.value *= m;
                 this->b.value *= m;
                 return *this;
             }
-            constexpr RGB<ElementType>& operator/=(const ElementType& m) {
+            constexpr RGB<ElementType_>& operator/=(const ElementType_& m) {
                 this->r.value /= m;
                 this->g.value /= m;
                 this->b.value /= m;
                 return *this;
             }
 
-            constexpr RGB<ElementType> operator+(const RGB<ElementType>& o) const {
+            constexpr RGB<ElementType_> operator+(const RGB<ElementType_>& o) const {
                 return {
-                    static_cast<ElementType>(this->r.value + o.r.value),
-                    static_cast<ElementType>(this->g.value + o.g.value),
-                    static_cast<ElementType>(this->b.value + o.b.value)};
+                    static_cast<ElementType_>(this->r.value + o.r.value),
+                    static_cast<ElementType_>(this->g.value + o.g.value),
+                    static_cast<ElementType_>(this->b.value + o.b.value)};
             }
-            constexpr RGBA<ElementType> operator+(const RGBA<ElementType>& o) const {
+            constexpr RGBA<ElementType_> operator+(const RGBA<ElementType_>& o) const {
                 return {
-                    static_cast<ElementType>(this->r.value + o.r.value),
-                    static_cast<ElementType>(this->g.value + o.g.value),
-                    static_cast<ElementType>(this->b.value + o.b.value),
+                    static_cast<ElementType_>(this->r.value + o.r.value),
+                    static_cast<ElementType_>(this->g.value + o.g.value),
+                    static_cast<ElementType_>(this->b.value + o.b.value),
                     o.a.value};
             }
-            constexpr RGB<ElementType> operator+(const R<ElementType>& r) const {
-                return {static_cast<ElementType>(this->r.value + r.value), this->g.value, this->b.value};
+            constexpr RGB<ElementType_> operator+(const R<ElementType_>& r) const {
+                return {static_cast<ElementType_>(this->r.value + r.value), this->g.value, this->b.value};
             }
-            constexpr RGB<ElementType> operator+(const G<ElementType>& g) const {
-                return {this->r.value, static_cast<ElementType>(this->g.value + g.value), this->b.value};
+            constexpr RGB<ElementType_> operator+(const G<ElementType_>& g) const {
+                return {this->r.value, static_cast<ElementType_>(this->g.value + g.value), this->b.value};
             }
-            constexpr RGB<ElementType> operator+(const B<ElementType>& b) const {
-                return {this->r.value, this->g.value, static_cast<ElementType>(this->b.value + b.value)};
+            constexpr RGB<ElementType_> operator+(const B<ElementType_>& b) const {
+                return {this->r.value, this->g.value, static_cast<ElementType_>(this->b.value + b.value)};
             }
-            constexpr RGBA<ElementType> operator+(const A<ElementType>& a) const {
+            constexpr RGBA<ElementType_> operator+(const A<ElementType_>& a) const {
                 return {this->r.value, this->g.value, this->b.value, a.value};
             }
 
-            constexpr RGB<ElementType> operator-(const RGB<ElementType>& o) const {
+            constexpr RGB<ElementType_> operator-(const RGB<ElementType_>& o) const {
                 return {
-                    static_cast<ElementType>(this->r.value - o.r.value),
-                    static_cast<ElementType>(this->g.value - o.g.value),
-                    static_cast<ElementType>(this->b.value - o.b.value)};
+                    static_cast<ElementType_>(this->r.value - o.r.value),
+                    static_cast<ElementType_>(this->g.value - o.g.value),
+                    static_cast<ElementType_>(this->b.value - o.b.value)};
             }
-            constexpr RGB<ElementType> operator-(const R<ElementType>& r) const {
-                return {static_cast<ElementType>(this->r.value - r.value), this->g.value, this->b.value};
+            constexpr RGB<ElementType_> operator-(const R<ElementType_>& r) const {
+                return {static_cast<ElementType_>(this->r.value - r.value), this->g.value, this->b.value};
             }
-            constexpr RGB<ElementType> operator-(const G<ElementType>& g) const {
-                return {this->r.value, static_cast<ElementType>(this->g.value - g.value), this->b.value};
+            constexpr RGB<ElementType_> operator-(const G<ElementType_>& g) const {
+                return {this->r.value, static_cast<ElementType_>(this->g.value - g.value), this->b.value};
             }
-            constexpr RGB<ElementType> operator-(const B<ElementType>& b) const {
-                return {this->r.value, this->g.value, static_cast<ElementType>(this->b.value - b.value)};
+            constexpr RGB<ElementType_> operator-(const B<ElementType_>& b) const {
+                return {this->r.value, this->g.value, static_cast<ElementType_>(this->b.value - b.value)};
             }
-            constexpr RGBA<ElementType> operator-(const A<ElementType>& a) const {
-                return {this->r.value, this->g.value, this->b.value, static_cast<ElementType>(-a.value)};
+            constexpr RGBA<ElementType_> operator-(const A<ElementType_>& a) const {
+                return {this->r.value, this->g.value, this->b.value, static_cast<ElementType_>(-a.value)};
             }
 
-            constexpr RGB<ElementType>& operator+=(const RGB<ElementType>& o) {
+            constexpr RGB<ElementType_>& operator+=(const RGB<ElementType_>& o) {
                 r += o.r;
                 g += o.g;
                 b += o.b;
                 return *this;
             }
-            constexpr RGB<ElementType>& operator+=(const R<ElementType>& r) {
+            constexpr RGB<ElementType_>& operator+=(const R<ElementType_>& r) {
                 this->r += r;
                 return *this;
             }
-            constexpr RGB<ElementType>& operator+=(const G<ElementType>& g) {
+            constexpr RGB<ElementType_>& operator+=(const G<ElementType_>& g) {
                 this->g += g;
                 return *this;
             }
-            constexpr RGB<ElementType>& operator+=(const B<ElementType>& b) {
+            constexpr RGB<ElementType_>& operator+=(const B<ElementType_>& b) {
                 this->b += b;
                 return *this;
             }
-            constexpr RGB<ElementType>& operator-=(const RGB<ElementType>& o) {
+            constexpr RGB<ElementType_>& operator-=(const RGB<ElementType_>& o) {
                 r -= o.r;
                 g -= o.g;
                 b -= o.b;
                 return *this;
             }
-            constexpr RGB<ElementType>& operator-=(const R<ElementType>& r) {
+            constexpr RGB<ElementType_>& operator-=(const R<ElementType_>& r) {
                 this->r -= r;
                 return *this;
             }
-            constexpr RGB<ElementType>& operator-=(const G<ElementType>& g) {
+            constexpr RGB<ElementType_>& operator-=(const G<ElementType_>& g) {
                 this->g -= g;
                 return *this;
             }
-            constexpr RGB<ElementType>& operator-=(const B<ElementType>& b) {
+            constexpr RGB<ElementType_>& operator-=(const B<ElementType_>& b) {
                 this->b -= b;
                 return *this;
             }
@@ -394,8 +394,8 @@ namespace AHO_NAMESPACE {
             template<typename H = float, typename SV = H>
             constexpr HSV<H, SV> hsv() {
                 using FloatType = std::conditional_t<
-                    std::is_floating_point_v<ElementType>, ElementType, double>; // 浮動小数点型を確保
-                using ChannelType = ElementType;
+                    std::is_floating_point_v<ElementType_>, ElementType_, double>; // 浮動小数点型を確保
+                using ChannelType = ElementType_;
 
                 FloatType r = static_cast<FloatType>(this->r.value);
                 FloatType g = static_cast<FloatType>(this->g.value);
@@ -439,41 +439,41 @@ namespace AHO_NAMESPACE {
             }
         };
 
-        template<typename ElementType>
-        struct RGBA : public RGB<ElementType> {
-            using element_type = ElementType;
-            static constexpr VSL_NAMESPACE::data_format::___Format graphic_type = VSL_NAMESPACE::data_format::convert_graphic_type<ElementType>().template toVec<4>();
+        template<typename ElementType_>
+        struct RGBA : public RGB<ElementType_> {
+            using ElementType = ElementType_;
+            static constexpr VSL_NAMESPACE::data_format::Format GRAPHIC_TYPE = VSL_NAMESPACE::data_format::convert_graphic_type<ElementType_>().template to_vec<4>();
 
-            A<ElementType> a;
+            A<ElementType_> a;
 
             constexpr RGBA() = default;
-            constexpr RGBA(const ElementType& r, const ElementType& g, const ElementType& b, const ElementType& a)
-                : RGB<ElementType>(r, g, b), a(a) {}
+            constexpr RGBA(const ElementType_& r, const ElementType_& g, const ElementType_& b, const ElementType_& a)
+                : RGB<ElementType_>(r, g, b), a(a) {}
 
             /*
 			* alpha値に影響を与えません
 			*/
-            constexpr RGBA<ElementType> operator*(const ElementType& m) const {
+            constexpr RGBA<ElementType_> operator*(const ElementType_& m) const {
                 return {
-                    static_cast<ElementType>(this->r.value * m),
-                    static_cast<ElementType>(this->g.value * m),
-                    static_cast<ElementType>(this->b.value * m),
+                    static_cast<ElementType_>(this->r.value * m),
+                    static_cast<ElementType_>(this->g.value * m),
+                    static_cast<ElementType_>(this->b.value * m),
                     this->a.value};
             }
             /*
 			* alpha値に影響を与えません
 			*/
-            constexpr RGBA<ElementType> operator/(const ElementType& m) const {
+            constexpr RGBA<ElementType_> operator/(const ElementType_& m) const {
                 return {
-                    static_cast<ElementType>(this->r.value / m),
-                    static_cast<ElementType>(this->g.value / m),
-                    static_cast<ElementType>(this->b.value / m),
+                    static_cast<ElementType_>(this->r.value / m),
+                    static_cast<ElementType_>(this->g.value / m),
+                    static_cast<ElementType_>(this->b.value / m),
                     this->a.value};
             }
             /*
 			* alpha値に影響を与えません
 			*/
-            constexpr RGBA<ElementType>& operator*=(const ElementType& m) {
+            constexpr RGBA<ElementType_>& operator*=(const ElementType_& m) {
                 this->r.value *= m;
                 this->g.value *= m;
                 this->b.value *= m;
@@ -482,7 +482,7 @@ namespace AHO_NAMESPACE {
             /*
 			* alpha値に影響を与えません
 			*/
-            constexpr RGBA<ElementType>& operator/=(const ElementType& m) {
+            constexpr RGBA<ElementType_>& operator/=(const ElementType_& m) {
                 this->r.value /= m;
                 this->g.value /= m;
                 this->b.value /= m;
@@ -491,115 +491,115 @@ namespace AHO_NAMESPACE {
 
             // =================================================================
 
-            constexpr RGBA<ElementType> operator+(const RGB<ElementType>& o) const {
+            constexpr RGBA<ElementType_> operator+(const RGB<ElementType_>& o) const {
                 return {
-                    static_cast<ElementType>(this->r.value + o.r.value),
-                    static_cast<ElementType>(this->g.value + o.g.value),
-                    static_cast<ElementType>(this->b.value + o.b.value),
+                    static_cast<ElementType_>(this->r.value + o.r.value),
+                    static_cast<ElementType_>(this->g.value + o.g.value),
+                    static_cast<ElementType_>(this->b.value + o.b.value),
                     this->a.value};
             }
-            constexpr RGBA<ElementType> operator+(const RGBA<ElementType>& o) const {
+            constexpr RGBA<ElementType_> operator+(const RGBA<ElementType_>& o) const {
                 return {
-                    static_cast<ElementType>(this->r.value + o.r.value),
-                    static_cast<ElementType>(this->g.value + o.g.value),
-                    static_cast<ElementType>(this->b.value + o.b.value),
-                    static_cast<ElementType>(this->a.value + o.a.value)};
+                    static_cast<ElementType_>(this->r.value + o.r.value),
+                    static_cast<ElementType_>(this->g.value + o.g.value),
+                    static_cast<ElementType_>(this->b.value + o.b.value),
+                    static_cast<ElementType_>(this->a.value + o.a.value)};
             }
-            constexpr RGBA<ElementType> operator+(const R<ElementType>& r) const {
-                return {static_cast<ElementType>(this->r.value + r.value), this->g.value, this->b.value, this->a.value};
+            constexpr RGBA<ElementType_> operator+(const R<ElementType_>& r) const {
+                return {static_cast<ElementType_>(this->r.value + r.value), this->g.value, this->b.value, this->a.value};
             }
-            constexpr RGBA<ElementType> operator+(const G<ElementType>& g) const {
-                return {this->r.value, static_cast<ElementType>(this->g.value + g.value), this->b.value, this->a.value};
+            constexpr RGBA<ElementType_> operator+(const G<ElementType_>& g) const {
+                return {this->r.value, static_cast<ElementType_>(this->g.value + g.value), this->b.value, this->a.value};
             }
-            constexpr RGBA<ElementType> operator+(const B<ElementType>& b) const {
-                return {this->r.value, this->g.value, static_cast<ElementType>(this->b.value + b.value), this->a.value};
+            constexpr RGBA<ElementType_> operator+(const B<ElementType_>& b) const {
+                return {this->r.value, this->g.value, static_cast<ElementType_>(this->b.value + b.value), this->a.value};
             }
-            constexpr RGBA<ElementType> operator+(const A<ElementType>& a) const {
-                return {this->r.value, this->g.value, this->b.value, static_cast<ElementType>(this->a.value + a.value)};
+            constexpr RGBA<ElementType_> operator+(const A<ElementType_>& a) const {
+                return {this->r.value, this->g.value, this->b.value, static_cast<ElementType_>(this->a.value + a.value)};
             }
 
-            constexpr RGBA<ElementType> operator-(const RGB<ElementType>& o) const {
+            constexpr RGBA<ElementType_> operator-(const RGB<ElementType_>& o) const {
                 return {
-                    static_cast<ElementType>(this->r.value - o.r.value),
-                    static_cast<ElementType>(this->g.value - o.g.value),
-                    static_cast<ElementType>(this->b.value - o.b.value),
+                    static_cast<ElementType_>(this->r.value - o.r.value),
+                    static_cast<ElementType_>(this->g.value - o.g.value),
+                    static_cast<ElementType_>(this->b.value - o.b.value),
                     this->a.value};
             }
-            constexpr RGBA<ElementType> operator-(const RGBA<ElementType>& o) const {
+            constexpr RGBA<ElementType_> operator-(const RGBA<ElementType_>& o) const {
                 return {
-                    static_cast<ElementType>(this->r.value - o.r.value),
-                    static_cast<ElementType>(this->g.value - o.g.value),
-                    static_cast<ElementType>(this->b.value - o.b.value),
-                    static_cast<ElementType>(this->a.value - o.a.value)};
+                    static_cast<ElementType_>(this->r.value - o.r.value),
+                    static_cast<ElementType_>(this->g.value - o.g.value),
+                    static_cast<ElementType_>(this->b.value - o.b.value),
+                    static_cast<ElementType_>(this->a.value - o.a.value)};
             }
-            constexpr RGBA<ElementType> operator-(const R<ElementType>& r) const {
-                return {static_cast<ElementType>(this->r.value - r.value), this->g.value, this->b.value, this->a.value};
+            constexpr RGBA<ElementType_> operator-(const R<ElementType_>& r) const {
+                return {static_cast<ElementType_>(this->r.value - r.value), this->g.value, this->b.value, this->a.value};
             }
-            constexpr RGBA<ElementType> operator-(const G<ElementType>& g) const {
-                return {this->r.value, static_cast<ElementType>(this->g.value - g.value), this->b.value, this->a.value};
+            constexpr RGBA<ElementType_> operator-(const G<ElementType_>& g) const {
+                return {this->r.value, static_cast<ElementType_>(this->g.value - g.value), this->b.value, this->a.value};
             }
-            constexpr RGBA<ElementType> operator-(const B<ElementType>& b) const {
-                return {this->r.value, this->g.value, static_cast<ElementType>(this->b.value - b.value), this->a.value};
+            constexpr RGBA<ElementType_> operator-(const B<ElementType_>& b) const {
+                return {this->r.value, this->g.value, static_cast<ElementType_>(this->b.value - b.value), this->a.value};
             }
-            constexpr RGBA<ElementType> operator-(const A<ElementType>& a) const {
-                return {this->r.value, this->g.value, this->b.value, static_cast<ElementType>(this->a.value - a.value)};
+            constexpr RGBA<ElementType_> operator-(const A<ElementType_>& a) const {
+                return {this->r.value, this->g.value, this->b.value, static_cast<ElementType_>(this->a.value - a.value)};
             }
 
-            constexpr RGBA<ElementType>& operator+=(const RGB<ElementType>& o) {
+            constexpr RGBA<ElementType_>& operator+=(const RGB<ElementType_>& o) {
                 this->r += o.r;
                 this->g += o.g;
                 this->b += o.b;
                 return *this;
             }
-            constexpr RGBA<ElementType>& operator+=(const RGBA<ElementType>& o) {
+            constexpr RGBA<ElementType_>& operator+=(const RGBA<ElementType_>& o) {
                 this->r += o.r;
                 this->g += o.g;
                 this->b += o.b;
                 this->a += o.a;
                 return *this;
             }
-            constexpr RGBA<ElementType>& operator+=(const R<ElementType>& r) {
+            constexpr RGBA<ElementType_>& operator+=(const R<ElementType_>& r) {
                 this->r += r;
                 return *this;
             }
-            constexpr RGBA<ElementType>& operator+=(const G<ElementType>& g) {
+            constexpr RGBA<ElementType_>& operator+=(const G<ElementType_>& g) {
                 this->g += g;
                 return *this;
             }
-            constexpr RGBA<ElementType>& operator+=(const B<ElementType>& b) {
+            constexpr RGBA<ElementType_>& operator+=(const B<ElementType_>& b) {
                 this->b += b;
                 return *this;
             }
-            constexpr RGBA<ElementType>& operator+=(const A<ElementType>& a) {
+            constexpr RGBA<ElementType_>& operator+=(const A<ElementType_>& a) {
                 this->a += a;
                 return *this;
             }
-            constexpr RGBA<ElementType>& operator-=(const RGB<ElementType>& o) {
+            constexpr RGBA<ElementType_>& operator-=(const RGB<ElementType_>& o) {
                 this->r -= o.r;
                 this->g -= o.g;
                 this->b -= o.b;
                 return *this;
             }
-            constexpr RGBA<ElementType>& operator-=(const RGBA<ElementType>& o) {
+            constexpr RGBA<ElementType_>& operator-=(const RGBA<ElementType_>& o) {
                 this->r -= o.r;
                 this->g -= o.g;
                 this->b -= o.b;
                 this->a -= o.a;
                 return *this;
             }
-            constexpr RGBA<ElementType>& operator-=(const R<ElementType>& r) {
+            constexpr RGBA<ElementType_>& operator-=(const R<ElementType_>& r) {
                 this->r -= r;
                 return *this;
             }
-            constexpr RGBA<ElementType>& operator-=(const G<ElementType>& g) {
+            constexpr RGBA<ElementType_>& operator-=(const G<ElementType_>& g) {
                 this->g -= g;
                 return *this;
             }
-            constexpr RGBA<ElementType>& operator-=(const B<ElementType>& b) {
+            constexpr RGBA<ElementType_>& operator-=(const B<ElementType_>& b) {
                 this->b -= b;
                 return *this;
             }
-            constexpr RGBA<ElementType>& operator-=(const A<ElementType>& a) {
+            constexpr RGBA<ElementType_>& operator-=(const A<ElementType_>& a) {
                 this->a -= a;
                 return *this;
             }
@@ -607,13 +607,13 @@ namespace AHO_NAMESPACE {
             template<typename H = float, typename SV = H>
             constexpr HSVA<H, SV> hsva() {
                 using FloatType = std::conditional_t<
-                    std::is_floating_point_v<ElementType>, ElementType, double>; // 浮動小数点型を確保
-                using ChannelType = ElementType;
+                    std::is_floating_point_v<ElementType_>, ElementType_, double>; // 浮動小数点型を確保
+                using ChannelType = ElementType_;
 
                 FloatType a = static_cast<FloatType>(this->a.value);
 
-                if constexpr (std::is_integral_v<ElementType>)
-                    a /= std::numeric_limits<ElementType>::max();
+                if constexpr (std::is_integral_v<ElementType_>)
+                    a /= std::numeric_limits<ElementType_>::max();
 
                 if constexpr (std::is_integral_v<SV>)
                     a = std::round(a * std::numeric_limits<SV>::max());
@@ -623,99 +623,99 @@ namespace AHO_NAMESPACE {
             }
         };
 
-        template<typename HueType, typename SaturationAndValueType>
+        template<typename HueType_, typename SaturationAndValueType>
         struct HSV {
-            using element_type = HueType;
-            using hue_type = HueType;
-            using saturation_type = SaturationAndValueType;
-            using value_type = SaturationAndValueType;
-            static constexpr VSL_NAMESPACE::data_format::___Format graphic_type = VSL_NAMESPACE::data_format::convert_graphic_type<HueType>().template toVec<3>();
+            using ElementType = HueType_;
+            using HueType = HueType_;
+            using SaturationType = SaturationAndValueType;
+            using ValueType = SaturationAndValueType;
+            static constexpr VSL_NAMESPACE::data_format::Format GRAPHIC_TYPE = VSL_NAMESPACE::data_format::convert_graphic_type<HueType_>().template to_vec<3>();
 
-            H<hue_type> h;
-            S<saturation_type> s;
-            V<value_type> v;
+            H<HueType_> h;
+            S<SaturationType> s;
+            V<ValueType> v;
 
             constexpr HSV() = default;
-            constexpr HSV(const HueType& h, const SaturationAndValueType& s, const SaturationAndValueType& v) : h(h), s(s), v(v) {}
+            constexpr HSV(const HueType_& h, const SaturationAndValueType& s, const SaturationAndValueType& v) : h(h), s(s), v(v) {}
 
-            constexpr HSV<HueType, SaturationAndValueType> operator+(const HSV<HueType, SaturationAndValueType>& o) const {
+            constexpr HSV<HueType_, SaturationAndValueType> operator+(const HSV<HueType_, SaturationAndValueType>& o) const {
                 return {
-                    static_cast<HueType>(this->h.value + o.h.value),
+                    static_cast<HueType_>(this->h.value + o.h.value),
                     static_cast<SaturationAndValueType>(this->s.value + o.s.value),
                     static_cast<SaturationAndValueType>(this->v.value + o.v.value)};
             }
-            constexpr HSVA<HueType, SaturationAndValueType> operator+(const HSVA<HueType, SaturationAndValueType>& o) const {
+            constexpr HSVA<HueType_, SaturationAndValueType> operator+(const HSVA<HueType_, SaturationAndValueType>& o) const {
                 return {
-                    static_cast<HueType>(this->h.value + o.h.value),
+                    static_cast<HueType_>(this->h.value + o.h.value),
                     static_cast<SaturationAndValueType>(this->s.value + o.s.value),
                     static_cast<SaturationAndValueType>(this->v.value + o.v.value),
                     o.a.value};
             }
-            constexpr HSV<HueType, SaturationAndValueType> operator+(const H<HueType>& h) const {
-                return {static_cast<HueType>(this->h.value + h.value), this->s.value, this->v.value};
+            constexpr HSV<HueType_, SaturationAndValueType> operator+(const H<HueType_>& h) const {
+                return {static_cast<HueType_>(this->h.value + h.value), this->s.value, this->v.value};
             }
-            constexpr HSV<HueType, SaturationAndValueType> operator+(const S<saturation_type>& s) const {
+            constexpr HSV<HueType_, SaturationAndValueType> operator+(const S<SaturationType>& s) const {
                 return {this->h.value, static_cast<SaturationAndValueType>(this->s.value + s.value), this->v.value};
             }
-            constexpr HSV<HueType, SaturationAndValueType> operator+(const V<value_type>& v) const {
+            constexpr HSV<HueType_, SaturationAndValueType> operator+(const V<ValueType>& v) const {
                 return {this->h.value, this->s.value, static_cast<SaturationAndValueType>(this->v.value + v.value)};
             }
-            constexpr HSVA<HueType, SaturationAndValueType> operator+(const A<SaturationAndValueType>& a) const {
+            constexpr HSVA<HueType_, SaturationAndValueType> operator+(const A<SaturationAndValueType>& a) const {
                 return {this->h.value, this->s.value, this->v.value, a.value};
             }
 
-            constexpr HSV<HueType, SaturationAndValueType> operator-(const HSV<HueType, SaturationAndValueType>& o) const {
+            constexpr HSV<HueType_, SaturationAndValueType> operator-(const HSV<HueType_, SaturationAndValueType>& o) const {
                 return {
-                    static_cast<HueType>(this->h.value - o.h.value),
+                    static_cast<HueType_>(this->h.value - o.h.value),
                     static_cast<SaturationAndValueType>(this->s.value - o.s.value),
                     static_cast<SaturationAndValueType>(this->v.value - o.v.value)};
             }
-            constexpr HSV<HueType, SaturationAndValueType> operator-(const H<HueType>& h) const {
-                return {static_cast<HueType>(this->h.value - h.value), this->s.value, this->v.value};
+            constexpr HSV<HueType_, SaturationAndValueType> operator-(const H<HueType_>& h) const {
+                return {static_cast<HueType_>(this->h.value - h.value), this->s.value, this->v.value};
             }
-            constexpr HSV<HueType, SaturationAndValueType> operator-(const S<saturation_type>& s) const {
+            constexpr HSV<HueType_, SaturationAndValueType> operator-(const S<SaturationType>& s) const {
                 return {this->h.value, static_cast<SaturationAndValueType>(this->s.value - s.value), this->v.value};
             }
-            constexpr HSV<HueType, SaturationAndValueType> operator-(const V<value_type>& v) const {
+            constexpr HSV<HueType_, SaturationAndValueType> operator-(const V<ValueType>& v) const {
                 return {this->h.value, this->s.value, static_cast<SaturationAndValueType>(this->v.value - v.value)};
             }
-            constexpr HSVA<HueType, SaturationAndValueType> operator-(const A<SaturationAndValueType>& a) const {
+            constexpr HSVA<HueType_, SaturationAndValueType> operator-(const A<SaturationAndValueType>& a) const {
                 return {this->h.value, this->s.value, this->v.value, static_cast<SaturationAndValueType>(-a.value)};
             }
 
-            constexpr HSV<HueType, SaturationAndValueType>& operator+=(const HSV<HueType, SaturationAndValueType>& o) {
+            constexpr HSV<HueType_, SaturationAndValueType>& operator+=(const HSV<HueType_, SaturationAndValueType>& o) {
                 this->h += o.h;
                 this->s += o.s;
                 this->v += o.v;
                 return *this;
             }
-            constexpr HSV<HueType, SaturationAndValueType>& operator+=(const H<HueType>& h) {
+            constexpr HSV<HueType_, SaturationAndValueType>& operator+=(const H<HueType_>& h) {
                 this->h += h;
                 return *this;
             }
-            constexpr HSV<HueType, SaturationAndValueType>& operator+=(const S<saturation_type>& s) {
+            constexpr HSV<HueType_, SaturationAndValueType>& operator+=(const S<SaturationType>& s) {
                 this->s += s;
                 return *this;
             }
-            constexpr HSV<HueType, SaturationAndValueType>& operator+=(const V<value_type>& v) {
+            constexpr HSV<HueType_, SaturationAndValueType>& operator+=(const V<ValueType>& v) {
                 this->v += v;
                 return *this;
             }
-            constexpr HSV<HueType, SaturationAndValueType>& operator-=(const HSV<HueType, SaturationAndValueType>& o) {
+            constexpr HSV<HueType_, SaturationAndValueType>& operator-=(const HSV<HueType_, SaturationAndValueType>& o) {
                 this->h -= o.h;
                 this->s -= o.s;
                 this->v -= o.v;
                 return *this;
             }
-            constexpr HSV<HueType, SaturationAndValueType>& operator-=(const H<HueType>& h) {
+            constexpr HSV<HueType_, SaturationAndValueType>& operator-=(const H<HueType_>& h) {
                 this->h -= h;
                 return *this;
             }
-            constexpr HSV<HueType, SaturationAndValueType>& operator-=(const S<saturation_type>& s) {
+            constexpr HSV<HueType_, SaturationAndValueType>& operator-=(const S<SaturationType>& s) {
                 this->s -= s;
                 return *this;
             }
-            constexpr HSV<HueType, SaturationAndValueType>& operator-=(const V<value_type>& v) {
+            constexpr HSV<HueType_, SaturationAndValueType>& operator-=(const V<ValueType>& v) {
                 this->v -= v;
                 return *this;
             }
@@ -781,130 +781,130 @@ namespace AHO_NAMESPACE {
             }
         };
 
-        template<typename HueType, typename SaturationAndValueType>
-        struct HSVA : public HSV<HueType, SaturationAndValueType> {
-            using element_type = HueType;
-            using hue_type = HueType;
-            using saturation_type = SaturationAndValueType;
-            using value_type = SaturationAndValueType;
-            using alpha_type = SaturationAndValueType;
-            static constexpr VSL_NAMESPACE::data_format::___Format graphic_type = VSL_NAMESPACE::data_format::convert_graphic_type<HueType>().template toVec<4>();
+        template<typename HueType_, typename SaturationAndValueType>
+        struct HSVA : public HSV<HueType_, SaturationAndValueType> {
+            using ElementType = HueType_;
+            using HueType = HueType_;
+            using SaturationType = SaturationAndValueType;
+            using ValueType = SaturationAndValueType;
+            using AlphaType = SaturationAndValueType;
+            static constexpr VSL_NAMESPACE::data_format::Format GRAPHIC_TYPE = VSL_NAMESPACE::data_format::convert_graphic_type<HueType_>().template to_vec<4>();
 
-            A<alpha_type> a;
+            A<AlphaType> a;
 
             constexpr HSVA() = default;
-            constexpr HSVA(const HueType& h, const SaturationAndValueType& s, const SaturationAndValueType& v, const SaturationAndValueType& a)
-                : HSV<HueType, SaturationAndValueType>(h, s, v), a(a) {}
+            constexpr HSVA(const HueType_& h, const SaturationAndValueType& s, const SaturationAndValueType& v, const SaturationAndValueType& a)
+                : HSV<HueType_, SaturationAndValueType>(h, s, v), a(a) {}
 
-            constexpr HSVA<HueType, SaturationAndValueType> operator+(const HSV<HueType, SaturationAndValueType>& o) const {
+            constexpr HSVA<HueType_, SaturationAndValueType> operator+(const HSV<HueType_, SaturationAndValueType>& o) const {
                 return {
-                    static_cast<HueType>(this->h.value + o.h.value),
+                    static_cast<HueType_>(this->h.value + o.h.value),
                     static_cast<SaturationAndValueType>(this->s.value + o.s.value),
                     static_cast<SaturationAndValueType>(this->v.value + o.v.value),
                     a.value};
             }
-            constexpr HSVA<HueType, SaturationAndValueType> operator+(const HSVA<HueType, SaturationAndValueType>& o) const {
+            constexpr HSVA<HueType_, SaturationAndValueType> operator+(const HSVA<HueType_, SaturationAndValueType>& o) const {
                 return {
-                    static_cast<HueType>(this->h.value + o.h.value),
+                    static_cast<HueType_>(this->h.value + o.h.value),
                     static_cast<SaturationAndValueType>(this->s.value + o.s.value),
                     static_cast<SaturationAndValueType>(this->v.value + o.v.value),
                     static_cast<SaturationAndValueType>(a.value + o.a.value)};
             }
-            constexpr HSVA<HueType, SaturationAndValueType> operator+(const H<HueType>& h) const {
-                return {static_cast<HueType>(this->h.value + h.value), this->s.value, this->v.value, a.value};
+            constexpr HSVA<HueType_, SaturationAndValueType> operator+(const H<HueType_>& h) const {
+                return {static_cast<HueType_>(this->h.value + h.value), this->s.value, this->v.value, a.value};
             }
-            constexpr HSVA<HueType, SaturationAndValueType> operator+(const S<saturation_type>& s) const {
+            constexpr HSVA<HueType_, SaturationAndValueType> operator+(const S<SaturationType>& s) const {
                 return {this->h.value, static_cast<SaturationAndValueType>(this->s.value + s.value), this->v.value, a.value};
             }
-            constexpr HSVA<HueType, SaturationAndValueType> operator+(const V<value_type>& v) const {
+            constexpr HSVA<HueType_, SaturationAndValueType> operator+(const V<ValueType>& v) const {
                 return {this->h.value, this->s.value, static_cast<SaturationAndValueType>(this->v.value + v.value), a.value};
             }
-            constexpr HSVA<HueType, SaturationAndValueType> operator+(const A<alpha_type>& a) const {
+            constexpr HSVA<HueType_, SaturationAndValueType> operator+(const A<AlphaType>& a) const {
                 return {this->h.value, this->s.value, this->v.value, static_cast<SaturationAndValueType>(this->a.value + a.value)};
             }
 
-            constexpr HSVA<HueType, SaturationAndValueType> operator-(const HSV<HueType, SaturationAndValueType>& o) const {
+            constexpr HSVA<HueType_, SaturationAndValueType> operator-(const HSV<HueType_, SaturationAndValueType>& o) const {
                 return {
-                    static_cast<HueType>(this->h.value - o.h.value),
+                    static_cast<HueType_>(this->h.value - o.h.value),
                     static_cast<SaturationAndValueType>(this->s.value - o.s.value),
                     static_cast<SaturationAndValueType>(this->v.value - o.v.value),
                     a.value};
             }
-            constexpr HSVA<HueType, SaturationAndValueType> operator-(const HSVA<HueType, SaturationAndValueType>& o) const {
+            constexpr HSVA<HueType_, SaturationAndValueType> operator-(const HSVA<HueType_, SaturationAndValueType>& o) const {
                 return {
-                    static_cast<HueType>(this->h.value - o.h.value),
+                    static_cast<HueType_>(this->h.value - o.h.value),
                     static_cast<SaturationAndValueType>(this->s.value - o.s.value),
                     static_cast<SaturationAndValueType>(this->v.value - o.v.value),
                     static_cast<SaturationAndValueType>(a.value - o.a.value)};
             }
-            constexpr HSVA<HueType, SaturationAndValueType> operator-(const H<HueType>& h) const {
-                return {static_cast<HueType>(this->h.value - h.value), this->s.value, this->v.value, a.value};
+            constexpr HSVA<HueType_, SaturationAndValueType> operator-(const H<HueType_>& h) const {
+                return {static_cast<HueType_>(this->h.value - h.value), this->s.value, this->v.value, a.value};
             }
-            constexpr HSVA<HueType, SaturationAndValueType> operator-(const S<saturation_type>& s) const {
+            constexpr HSVA<HueType_, SaturationAndValueType> operator-(const S<SaturationType>& s) const {
                 return {this->h.value, static_cast<SaturationAndValueType>(this->s.value - s.value), this->v.value, a.value};
             }
-            constexpr HSVA<HueType, SaturationAndValueType> operator-(const V<value_type>& v) const {
+            constexpr HSVA<HueType_, SaturationAndValueType> operator-(const V<ValueType>& v) const {
                 return {this->h.value, this->s.value, static_cast<SaturationAndValueType>(this->v.value - v.value), a.value};
             }
-            constexpr HSVA<HueType, SaturationAndValueType> operator-(const A<alpha_type>& a) const {
+            constexpr HSVA<HueType_, SaturationAndValueType> operator-(const A<AlphaType>& a) const {
                 return {this->h.value, this->s.value, this->v.value, static_cast<SaturationAndValueType>(this->a.value - a.value)};
             }
 
-            constexpr HSVA<HueType, SaturationAndValueType>& operator+=(const HSV<HueType, SaturationAndValueType>& o) {
+            constexpr HSVA<HueType_, SaturationAndValueType>& operator+=(const HSV<HueType_, SaturationAndValueType>& o) {
                 this->h += o.h;
                 this->s += o.s;
                 this->v += o.v;
                 return *this;
             }
-            constexpr HSVA<HueType, SaturationAndValueType>& operator+=(const HSVA<HueType, SaturationAndValueType>& o) {
+            constexpr HSVA<HueType_, SaturationAndValueType>& operator+=(const HSVA<HueType_, SaturationAndValueType>& o) {
                 this->h += o.h;
                 this->s += o.s;
                 this->v += o.v;
                 this->a += o.a;
                 return *this;
             }
-            constexpr HSVA<HueType, SaturationAndValueType>& operator+=(const H<HueType>& h) {
+            constexpr HSVA<HueType_, SaturationAndValueType>& operator+=(const H<HueType_>& h) {
                 this->h += h;
                 return *this;
             }
-            constexpr HSVA<HueType, SaturationAndValueType>& operator+=(const S<saturation_type>& s) {
+            constexpr HSVA<HueType_, SaturationAndValueType>& operator+=(const S<SaturationType>& s) {
                 this->s += s;
                 return *this;
             }
-            constexpr HSVA<HueType, SaturationAndValueType>& operator+=(const V<value_type>& v) {
+            constexpr HSVA<HueType_, SaturationAndValueType>& operator+=(const V<ValueType>& v) {
                 this->v += v;
                 return *this;
             }
-            constexpr HSVA<HueType, SaturationAndValueType>& operator+=(const A<alpha_type>& a) {
+            constexpr HSVA<HueType_, SaturationAndValueType>& operator+=(const A<AlphaType>& a) {
                 this->a += a;
                 return *this;
             }
-            constexpr HSVA<HueType, SaturationAndValueType>& operator-=(const HSV<HueType, SaturationAndValueType>& o) {
+            constexpr HSVA<HueType_, SaturationAndValueType>& operator-=(const HSV<HueType_, SaturationAndValueType>& o) {
                 this->h -= o.h;
                 this->s -= o.s;
                 this->v -= o.v;
                 return *this;
             }
-            constexpr HSVA<HueType, SaturationAndValueType>& operator-=(const HSVA<HueType, SaturationAndValueType>& o) {
+            constexpr HSVA<HueType_, SaturationAndValueType>& operator-=(const HSVA<HueType_, SaturationAndValueType>& o) {
                 this->h -= o.h;
                 this->s -= o.s;
                 this->v -= o.v;
                 this->a -= o.a;
                 return *this;
             }
-            constexpr HSVA<HueType, SaturationAndValueType>& operator-=(const H<HueType>& h) {
+            constexpr HSVA<HueType_, SaturationAndValueType>& operator-=(const H<HueType_>& h) {
                 this->h -= h;
                 return *this;
             }
-            constexpr HSVA<HueType, SaturationAndValueType>& operator-=(const S<saturation_type>& s) {
+            constexpr HSVA<HueType_, SaturationAndValueType>& operator-=(const S<SaturationType>& s) {
                 this->s -= s;
                 return *this;
             }
-            constexpr HSVA<HueType, SaturationAndValueType>& operator-=(const V<value_type>& v) {
+            constexpr HSVA<HueType_, SaturationAndValueType>& operator-=(const V<ValueType>& v) {
                 this->v -= v;
                 return *this;
             }
-            constexpr HSVA<HueType, SaturationAndValueType>& operator-=(const A<alpha_type>& a) {
+            constexpr HSVA<HueType_, SaturationAndValueType>& operator-=(const A<AlphaType>& a) {
                 this->a -= a;
                 return *this;
             }
@@ -956,109 +956,109 @@ namespace AHO_NAMESPACE {
             return out;
         };
 
-        template<concepts::is_rgb_elemenet L, concepts::is_rgb_elemenet R>
-        requires(!std::convertible_to<L, R>) && std::same_as<typename L::element_type, typename R::element_type>
-        RGB<typename L::element_type> operator+(const L& l, const R& r) {
-            RGB<typename L::element_type> rgb;
+        template<concepts::IS_RGB_ELEMENET L, concepts::IS_RGB_ELEMENET R>
+        requires(!std::convertible_to<L, R>) && std::same_as<typename L::ElementType, typename R::ElementType>
+        RGB<typename L::ElementType> operator+(const L& l, const R& r) {
+            RGB<typename L::ElementType> rgb;
             rgb += l;
             rgb += r;
             return rgb;
         }
 
-        template<concepts::is_hsv_elemenet L, concepts::is_hsv_elemenet R>
-        requires(!std::convertible_to<L, R>) && std::same_as<typename L::element_type, typename R::element_type>
-        HSV<typename L::element_type> operator+(const L& l, const R& r) {
-            HSV<typename L::element_type> hsv;
+        template<concepts::IS_HSV_ELEMENET L, concepts::IS_HSV_ELEMENET R>
+        requires(!std::convertible_to<L, R>) && std::same_as<typename L::ElementType, typename R::ElementType>
+        HSV<typename L::ElementType> operator+(const L& l, const R& r) {
+            HSV<typename L::ElementType> hsv;
             hsv += l;
             hsv += r;
             return hsv;
         }
 
-        template<concepts::is_rgb_elemenet L, typename ElementType>
-        requires std::same_as<typename L::element_type, ElementType>
-        RGBA<typename L::element_type> operator+(const L& l, A<ElementType> a) {
-            RGBA<typename L::element_type> rgb;
+        template<concepts::IS_RGB_ELEMENET L, typename ElementType_>
+        requires std::same_as<typename L::ElementType, ElementType_>
+        RGBA<typename L::ElementType> operator+(const L& l, A<ElementType_> a) {
+            RGBA<typename L::ElementType> rgb;
             rgb += l;
             rgb += a;
             return rgb;
         }
 
-        template<concepts::is_hsv_elemenet L, typename ElementType>
-        requires std::same_as<typename L::element_type, ElementType>
-        HSVA<typename L::element_type> operator+(const L& l, A<ElementType> a) {
-            HSVA<typename L::element_type> hsv;
+        template<concepts::IS_HSV_ELEMENET L, typename ElementType_>
+        requires std::same_as<typename L::ElementType, ElementType_>
+        HSVA<typename L::ElementType> operator+(const L& l, A<ElementType_> a) {
+            HSVA<typename L::ElementType> hsv;
             hsv += l;
             hsv += a;
             return hsv;
         }
 
-        template<typename ElementType, concepts::is_rgb_elemenet R>
-        requires std::same_as<typename R::element_type, ElementType>
-        RGBA<typename R::element_type> operator+(A<ElementType> a, const R& r) {
-            RGBA<typename R::element_type> rgb;
+        template<typename ElementType_, concepts::IS_RGB_ELEMENET R>
+        requires std::same_as<typename R::ElementType, ElementType_>
+        RGBA<typename R::ElementType> operator+(A<ElementType_> a, const R& r) {
+            RGBA<typename R::ElementType> rgb;
             rgb += r;
             rgb += a;
             return rgb;
         }
 
-        template<typename ElementType, concepts::is_hsv_elemenet R>
-        requires std::same_as<typename R::element_type, ElementType>
-        HSVA<typename R::element_type> operator+(A<ElementType> a, const R& r) {
-            HSVA<typename R::element_type> rgb;
+        template<typename ElementType_, concepts::IS_HSV_ELEMENET R>
+        requires std::same_as<typename R::ElementType, ElementType_>
+        HSVA<typename R::ElementType> operator+(A<ElementType_> a, const R& r) {
+            HSVA<typename R::ElementType> rgb;
             rgb += r;
             rgb += a;
             return rgb;
         }
 
-        template<concepts::is_rgb_elemenet L, concepts::is_rgb_elemenet R>
-        requires(!std::convertible_to<L, R>) && std::same_as<typename L::element_type, typename R::element_type>
-        RGB<typename L::element_type> operator-(const L& l, const R& r) {
-            RGB<typename L::element_type> rgb;
+        template<concepts::IS_RGB_ELEMENET L, concepts::IS_RGB_ELEMENET R>
+        requires(!std::convertible_to<L, R>) && std::same_as<typename L::ElementType, typename R::ElementType>
+        RGB<typename L::ElementType> operator-(const L& l, const R& r) {
+            RGB<typename L::ElementType> rgb;
             rgb += l;
             rgb -= r;
             return rgb;
         }
 
-        template<concepts::is_hsv_elemenet L, concepts::is_hsv_elemenet R>
-        requires(!std::convertible_to<L, R>) && std::same_as<typename L::element_type, typename R::element_type>
-        HSV<typename L::element_type> operator-(const L& l, const R& r) {
-            HSV<typename L::element_type> hsv;
+        template<concepts::IS_HSV_ELEMENET L, concepts::IS_HSV_ELEMENET R>
+        requires(!std::convertible_to<L, R>) && std::same_as<typename L::ElementType, typename R::ElementType>
+        HSV<typename L::ElementType> operator-(const L& l, const R& r) {
+            HSV<typename L::ElementType> hsv;
             hsv += l;
             hsv -= r;
             return hsv;
         }
 
-        template<concepts::is_rgb_elemenet L, typename ElementType>
-        requires std::same_as<typename L::element_type, ElementType>
-        RGBA<typename L::element_type> operator-(const L& l, const A<ElementType>& a) {
-            RGBA<typename L::element_type> rgb;
+        template<concepts::IS_RGB_ELEMENET L, typename ElementType_>
+        requires std::same_as<typename L::ElementType, ElementType_>
+        RGBA<typename L::ElementType> operator-(const L& l, const A<ElementType_>& a) {
+            RGBA<typename L::ElementType> rgb;
             rgb += l;
             rgb -= a;
             return rgb;
         }
 
-        template<concepts::is_hsv_elemenet L, typename ElementType>
-        requires std::same_as<typename L::element_type, ElementType>
-        HSVA<typename L::element_type> operator-(const L& l, const A<ElementType>& a) {
-            HSVA<typename L::element_type> hsv;
+        template<concepts::IS_HSV_ELEMENET L, typename ElementType_>
+        requires std::same_as<typename L::ElementType, ElementType_>
+        HSVA<typename L::ElementType> operator-(const L& l, const A<ElementType_>& a) {
+            HSVA<typename L::ElementType> hsv;
             hsv += l;
             hsv -= a;
             return hsv;
         }
 
-        template<typename ElementType, concepts::is_rgb_elemenet R>
-        requires std::same_as<typename R::element_type, ElementType>
-        RGBA<typename R::element_type> operator-(const A<ElementType>& a, const R& r) {
-            RGBA<typename R::element_type> rgb;
+        template<typename ElementType_, concepts::IS_RGB_ELEMENET R>
+        requires std::same_as<typename R::ElementType, ElementType_>
+        RGBA<typename R::ElementType> operator-(const A<ElementType_>& a, const R& r) {
+            RGBA<typename R::ElementType> rgb;
             rgb -= r;
             rgb += a;
             return rgb;
         }
 
-        template<typename ElementType, concepts::is_hsv_elemenet R>
-        requires std::same_as<typename R::element_type, ElementType>
-        HSVA<typename R::element_type> operator-(const A<ElementType>& a, const R& r) {
-            HSVA<typename R::element_type> rgb;
+        template<typename ElementType_, concepts::IS_HSV_ELEMENET R>
+        requires std::same_as<typename R::ElementType, ElementType_>
+        HSVA<typename R::ElementType> operator-(const A<ElementType_>& a, const R& r) {
+            HSVA<typename R::ElementType> rgb;
             rgb -= r;
             rgb += a;
             return rgb;
@@ -1070,7 +1070,7 @@ namespace AHO_NAMESPACE {
     constexpr Upper<int> operator AHO_LITERAL(Lower)(unsigned long long v) { return {(int)v}; };   \
     constexpr Upper<float> operator AHO_LITERAL(f_##Lower)(long double v) { return {(float)v}; };  \
     constexpr Upper<size_t> operator AHO_LITERAL(l_##Lower)(unsigned long long v) { return {v}; }; \
-    constexpr Upper<double> Lower(1.0);
+    constexpr Upper<double> Upper##_(1.0);
 
             LITERAL_EXPANDER(R, r);
             LITERAL_EXPANDER(G, g);

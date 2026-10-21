@@ -4,7 +4,7 @@
 #include <limits>
 
 namespace {
-    constexpr long double precise_pi = 3.141592653589793238462643383279502884L;
+    constexpr long double PRECISE_PI = 3.141592653589793238462643383279502884L;
     template<class T>
     class AngleTest : public testing::Test {};
     using AngleTypes = testing::Types<aho::Degree, aho::Radian>;
@@ -91,37 +91,37 @@ namespace {
         using namespace aho::literals;
         EXPECT_EQ((90.0_deg).value, 90);
         EXPECT_EQ((2.0_rad).value, 2);
-        EXPECT_EQ((2.0_pi).value, 2 * precise_pi);
-        EXPECT_EQ((2.0_π).value, 2 * precise_pi);
-        EXPECT_EQ(pi.value, precise_pi);
+        EXPECT_EQ((2.0_pi).value, 2 * PRECISE_PI);
+        EXPECT_EQ((2.0_π).value, 2 * PRECISE_PI);
+        EXPECT_EQ(PI.value, PRECISE_PI);
     }
     static_assert((aho::Degree{3} + aho::Degree{4}).value == 7);
     static_assert((aho::Radian{3} * std::size_t{2}).value == 6);
     static_assert((aho::Degree{1.5} * 2).value == 3);
     static_assert((aho::Radian{3} / 2).value == 1.5);
     static_assert((2.0L * aho::Degree{1.5}).value == 3);
-    constexpr auto constexpr_angle_assignments = [] {
+    constexpr auto CONSTEXPR_ANGLE_ASSIGNMENTS = [] {
         aho::Radian value{1.5};
         value *= 2;
         value /= 2.0L;
         return value;
     }();
-    static_assert(constexpr_angle_assignments.value == 1.5);
+    static_assert(CONSTEXPR_ANGLE_ASSIGNMENTS.value == 1.5);
 
 } // namespace
 
 namespace {
 TEST(AnglePrecisionTest, PiConstantsLiteralsAndConversionsRetainLongDoublePrecision) {
     using namespace aho::literals;
-    static_assert(pi.value == precise_pi);
-    static_assert((1.0_pi).value == precise_pi);
-    static_assert((1.0_π).value == precise_pi);
-    static_assert(static_cast<aho::Radian>(aho::Degree{180}).value == precise_pi);
-    static_assert(static_cast<aho::Degree>(aho::Radian{precise_pi}).value == 180);
-    EXPECT_EQ(pi.value, precise_pi);
-    EXPECT_EQ((1.0_pi).value, precise_pi);
-    EXPECT_EQ((1.0_π).value, precise_pi);
-    EXPECT_EQ(static_cast<aho::Radian>(aho::Degree{180}).value, precise_pi);
-    EXPECT_EQ(static_cast<aho::Degree>(aho::Radian{precise_pi}).value, 180);
+    static_assert(PI.value == PRECISE_PI);
+    static_assert((1.0_pi).value == PRECISE_PI);
+    static_assert((1.0_π).value == PRECISE_PI);
+    static_assert(static_cast<aho::Radian>(aho::Degree{180}).value == PRECISE_PI);
+    static_assert(static_cast<aho::Degree>(aho::Radian{PRECISE_PI}).value == 180);
+    EXPECT_EQ(PI.value, PRECISE_PI);
+    EXPECT_EQ((1.0_pi).value, PRECISE_PI);
+    EXPECT_EQ((1.0_π).value, PRECISE_PI);
+    EXPECT_EQ(static_cast<aho::Radian>(aho::Degree{180}).value, PRECISE_PI);
+    EXPECT_EQ(static_cast<aho::Degree>(aho::Radian{PRECISE_PI}).value, 180);
 }
 } // namespace

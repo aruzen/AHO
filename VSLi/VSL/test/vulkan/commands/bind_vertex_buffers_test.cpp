@@ -5,14 +5,14 @@ namespace {
         configure_pipeline(true);
         std::array<float, 6> positions{-1, -1, 3, -1, -1, 3};
         std::array<float, 9> colors{.25f, .5f, .75f, .25f, .5f, .75f, .25f, .5f, .75f};
-        vsl::StagingBuffer<vsl::MemoryType::VertexBuffer> position(device, positions);
-        vsl::StagingBuffer<vsl::MemoryType::VertexBuffer> color_buffer(device, colors);
+        vsl::StagingBuffer<vsl::MemoryType::VERTEX_BUFFER> position(device, positions);
+        vsl::StagingBuffer<vsl::MemoryType::VERTEX_BUFFER> color_buffer(device, colors);
         vsl::command::BindVertexBuffer binding(position);
         binding.add(color_buffer);
         ASSERT_EQ(binding.buffers.size(), 2u);
         EXPECT_EQ(binding.buffers[0], &position);
         EXPECT_EQ(binding.buffers[1], &color_buffer);
-        expect_triangle_color(render([&](auto& stream) {
+        ExpectTriangleColor(render([&](auto& stream) {
             stream << binding << vsl::command::Draw{3};
         }));
     }
@@ -33,7 +33,7 @@ namespace {
         configure_pipeline(true);
         std::array<float, 6> positions{-1, -1, 3, -1, -1, 3};
         std::array<float, 9> colors{.25f, .5f, .75f, .25f, .5f, .75f, .25f, .5f, .75f};
-        vsl::StagingBuffer<vsl::MemoryType::VertexBuffer> position(device, positions), color(device, colors);
+        vsl::StagingBuffer<vsl::MemoryType::VERTEX_BUFFER> position(device, positions), color(device, colors);
         vsl::command::BindVertexBuffer original(position, color);
         vsl::command::BindVertexBuffer copied(original);
         original.buffers.clear();
@@ -43,7 +43,7 @@ namespace {
         vsl::command::BindVertexBuffer assigned;
         assigned = copied;
         auto moved = std::move(assigned);
-        expect_triangle_color(render([&](auto& stream) {
+        ExpectTriangleColor(render([&](auto& stream) {
             stream << moved << vsl::command::Draw{3};
         }));
     }
@@ -51,8 +51,8 @@ namespace {
 
 TEST(BindVertexBufferTest, VariadicConstructionAcceptsOnlyMutableVertexBuffers) {
     using Command = vsl::command::BindVertexBuffer;
-    using Vertex = vsl::StagingBuffer<vsl::MemoryType::VertexBuffer>;
-    using Index = vsl::StagingBuffer<vsl::MemoryType::IndexBuffer>;
+    using Vertex = vsl::StagingBuffer<vsl::MemoryType::VERTEX_BUFFER>;
+    using Index = vsl::StagingBuffer<vsl::MemoryType::INDEX_BUFFER>;
     static_assert(std::is_constructible_v<Command, Vertex&>);
     static_assert(std::is_constructible_v<Command, Vertex&, Vertex&>);
     static_assert(!std::is_constructible_v<Command, const Vertex&>);
@@ -71,17 +71,17 @@ namespace {
     };
     TEST_F(DrawResourceLifetimeVulkanIntegrationTest, DrawSurvivesDroppingBuffersAndPipelineBeforeSubmission) {
         configure_pipeline(true);
-        std::weak_ptr<vsl::_impl::Buffer_impl> weak_vertex, weak_color, weak_index;
-        std::weak_ptr<vsl::_impl::Pipeline_impl> weak_pipeline = pipeline->_data;
-        expect_triangle_color(render([&](auto& stream) {
+        std::weak_ptr<vsl::impl::BufferImpl> weak_vertex, weak_color, weak_index;
+        std::weak_ptr<vsl::impl::PipelineImpl> weak_pipeline = pipeline->data_;
+        ExpectTriangleColor(render([&](auto& stream) {
             const std::array<float, 6> positions{-1, -1, 3, -1, -1, 3};
             const std::array<float, 9> colors{.25f, .5f, .75f, .25f, .5f, .75f, .25f, .5f, .75f};
             const std::array<std::uint32_t, 3> indices{0, 1, 2};
-            vsl::StagingBuffer<vsl::MemoryType::VertexBuffer> position(device, positions), color(device, colors);
-            vsl::StagingBuffer<vsl::MemoryType::IndexBuffer> index(device, indices);
-            weak_vertex = position._data;
-            weak_color = color._data;
-            weak_index = index._data;
+            vsl::StagingBuffer<vsl::MemoryType::VERTEX_BUFFER> position(device, positions), color(device, colors);
+            vsl::StagingBuffer<vsl::MemoryType::INDEX_BUFFER> index(device, indices);
+            weak_vertex = position.data_;
+            weak_color = color.data_;
+            weak_index = index.data_;
             stream << vsl::command::BindVertexBuffer(position, color) << vsl::command::BindIndexBuffer(index)
                    << vsl::command::DrawIndexed{3};
             pipeline.reset();

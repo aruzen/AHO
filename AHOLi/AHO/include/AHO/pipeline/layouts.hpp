@@ -16,45 +16,45 @@
 
 namespace AHO_NAMESPACE::pipeline {
     enum class ResourceName {
-        VPMatrixUBO,
-        Texture,
+        VP_MATRIX_UBO,
+        TEXTURE,
     };
 
     namespace standard_resources {
-        constexpr VSL_NAMESPACE::graphic_resource::BindingPoint VPMatrixUBO{
+        constexpr VSL_NAMESPACE::graphic_resource::BindingPoint VP_MATRIX_UBO{
             .binding = (std::uint32_t)-1,
-            .bindingType = VSL_NAMESPACE::graphic_resource::Type::UniformBuffer,
-            .shaderType = VSL_NAMESPACE::ShaderFlag::Vertex,
+            .binding_type = VSL_NAMESPACE::graphic_resource::Type::UNIFORM_BUFFER,
+            .shader_type = VSL_NAMESPACE::ShaderFlag::VERTEX,
             .amount = 1};
 
-        constexpr VSL_NAMESPACE::graphic_resource::BindingPoint Texture{
+        constexpr VSL_NAMESPACE::graphic_resource::BindingPoint TEXTURE{
             .binding = (std::uint32_t)-1,
-            .bindingType = VSL_NAMESPACE::graphic_resource::Type::CombinedImageSampler,
-            .shaderType = VSL_NAMESPACE::ShaderFlag::Fragment,
+            .binding_type = VSL_NAMESPACE::graphic_resource::Type::COMBINED_IMAGE_SAMPLER,
+            .shader_type = VSL_NAMESPACE::ShaderFlag::FRAGMENT,
             .amount = 1};
     }; // namespace standard_resources
 
-    constexpr auto getBindingPoint(ResourceName name) {
+    constexpr auto get_binding_point(ResourceName name) {
         switch (name) {
-            case ResourceName::VPMatrixUBO:
-                return standard_resources::VPMatrixUBO;
-            case ResourceName::Texture:
-                return standard_resources::Texture;
+            case ResourceName::VP_MATRIX_UBO:
+                return standard_resources::VP_MATRIX_UBO;
+            case ResourceName::TEXTURE:
+                return standard_resources::TEXTURE;
         }
         throw std::runtime_error("error: unknown resource.");
     }
 
-    template<ResourceName Name>
-    constexpr auto getBindingPoint() {
-        if constexpr (ResourceName::VPMatrixUBO == Name)
-            return standard_resources::VPMatrixUBO;
-        if constexpr (ResourceName::Texture == Name)
-            return standard_resources::Texture;
+    template<ResourceName name>
+    constexpr auto get_binding_point() {
+        if constexpr (ResourceName::VP_MATRIX_UBO == name)
+            return standard_resources::VP_MATRIX_UBO;
+        if constexpr (ResourceName::TEXTURE == name)
+            return standard_resources::TEXTURE;
     }
 
-    typedef VSL_NAMESPACE::PipelineLayout (*GET_BASE_LAYOUT_func)(engine::EngineAccessor* engine);
+    typedef VSL_NAMESPACE::PipelineLayout (*GetBaseLayoutFunc)(engine::EngineAccessor* engine);
 
-    extern GET_BASE_LAYOUT_func GET_BASE_LAYOUT;
+    extern GetBaseLayoutFunc GET_BASE_LAYOUT;
 } // namespace AHO_NAMESPACE::pipeline
 
 #endif //AHO_ALL_LAYOUTS_H

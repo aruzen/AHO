@@ -2,24 +2,24 @@
 
 #include <utility>
 
-AHO_NAMESPACE::engine::StandardEngine::StandardEngine(std::string applicationName, bool bootOn) {
-    if (bootOn)
-        boot(std::move(applicationName));
+AHO_NAMESPACE::engine::StandardEngine::StandardEngine(std::string application_name, bool boot_on) {
+    if (boot_on)
+        boot(std::move(application_name));
 }
 
-void AHO_NAMESPACE::engine::StandardEngine::boot(const std::string& applicationName) {
+void AHO_NAMESPACE::engine::StandardEngine::boot(const std::string& application_name) {
     using namespace VSL_NAMESPACE;
 #ifdef _MSC_VER
-    Vulkan<> instance(applicationName.c_str(), {"VK_KHR_win32_surface", "VK_KHR_surface",
+    Vulkan<> instance(application_name.c_str(), {"VK_KHR_win32_surface", "VK_KHR_surface",
                                                 "VK_KHR_get_physical_device_properties2"});
 #elif defined(__APPLE_CC__)
-    Vulkan<> instance(applicationName.c_str(), {"VK_KHR_portability_enumeration", "VK_KHR_surface",
+    Vulkan<> instance(application_name.c_str(), {"VK_KHR_portability_enumeration", "VK_KHR_surface",
                                                 "VK_EXT_metal_surface", "VK_KHR_get_physical_device_properties2"});
 #endif
     auto physical_device = PhysicalDevices(instance).search();
 
     // ロゴ表示を想定し、初期ウィンドウを400×400で作成する。
-    VSL_NAMESPACE::Window window(applicationName, 400, 400);
+    VSL_NAMESPACE::Window window(application_name, 400, 400);
     auto surface = window.add_plugin<Surface>(instance);
 
     LogicalDevice device(physical_device, surface);
@@ -28,18 +28,18 @@ void AHO_NAMESPACE::engine::StandardEngine::boot(const std::string& applicationN
     CommandManager command_manager(device);
     std::shared_ptr<graphic_resource::OverAllocateManager>
         graphic_resource_manager(new graphic_resource::OverAllocateManager(device, {
-                                                                                       {graphic_resource::Type::Sampler, 100},
-                                                                                       {graphic_resource::Type::CombinedImageSampler, 100},
-                                                                                       {graphic_resource::Type::SampledImage, 100},
-                                                                                       {graphic_resource::Type::StorageImage, 100},
-                                                                                       {graphic_resource::Type::UniformTexelBuffer, 100},
-                                                                                       {graphic_resource::Type::StorageTexelBuffer, 100},
-                                                                                       {graphic_resource::Type::UniformBuffer, 100},
-                                                                                       {graphic_resource::Type::StorageBuffer, 100},
+                                                                                       {graphic_resource::Type::SAMPLER, 100},
+                                                                                       {graphic_resource::Type::COMBINED_IMAGE_SAMPLER, 100},
+                                                                                       {graphic_resource::Type::SAMPLED_IMAGE, 100},
+                                                                                       {graphic_resource::Type::STORAGE_IMAGE, 100},
+                                                                                       {graphic_resource::Type::UNIFORM_TEXEL_BUFFER, 100},
+                                                                                       {graphic_resource::Type::STORAGE_TEXEL_BUFFER, 100},
+                                                                                       {graphic_resource::Type::UNIFORM_BUFFER, 100},
+                                                                                       {graphic_resource::Type::STORAGE_BUFFER, 100},
                                                                                    },
                                                                            0));
 
-    _data = std::make_shared<EngineData>(EngineData{
+    data_ = std::make_shared<EngineData>(EngineData{
         .vulkan_instance = instance,
         .physical_device = physical_device,
         .logical_device = device,
@@ -50,7 +50,7 @@ void AHO_NAMESPACE::engine::StandardEngine::boot(const std::string& applicationN
     VSL_NAMESPACE::Swapchain swapchain(device, surface);
     VSL_NAMESPACE::RenderPass render_pass(swapchain);
 
-    boot_window.emplace(*this, window._data,
+    boot_window.emplace(*this, window.data_,
                         std::make_shared<AHO_NAMESPACE::window::WindowData>(AHO_NAMESPACE::window::WindowData{
                             .surface = surface,
                             .swapchain = swapchain,
@@ -58,16 +58,16 @@ void AHO_NAMESPACE::engine::StandardEngine::boot(const std::string& applicationN
                             .frame_buffer = VSL_NAMESPACE::FrameBuffer(swapchain,
                                                                        render_pass),
                             .image_available = synchro_manager
-                                                   .createSemaphore(applicationName + "ImageAvailable",
-                                                                    command_manager.getBuffer().getSize()),
+                                                   .create_semaphore(application_name + "ImageAvailable",
+                                                                    command_manager.get_buffer().get_size()),
                             .render_finished = synchro_manager
-                                                   .createSemaphore(applicationName + "RenderFinished",
-                                                                    swapchain.getSwapImageSize()),
+                                                   .create_semaphore(application_name + "RenderFinished",
+                                                                    swapchain.get_swap_image_size()),
                             .in_flight = synchro_manager
-                                             .createFence(applicationName + "InFlight",
-                                                          command_manager.getBuffer().getSize(), true)}));
+                                             .create_fence(application_name + "InFlight",
+                                                          command_manager.get_buffer().get_size(), true)}));
 }
 
-AHO_NAMESPACE::Window AHO_NAMESPACE::engine::StandardEngine::getWindow() {
+AHO_NAMESPACE::Window AHO_NAMESPACE::engine::StandardEngine::get_window() {
     return boot_window.value();
 }

@@ -4,7 +4,7 @@
 #include <stdexcept>
 namespace vsl_test {
     class TemporaryDirectory {
-        std::filesystem::path path_;
+        std::filesystem::path _path;
 
     public:
         TemporaryDirectory() {
@@ -13,7 +13,7 @@ namespace vsl_test {
                 auto candidate =
                     std::filesystem::temp_directory_path() / ("aho-vsl-test-" + std::to_string(random()));
                 if (std::filesystem::create_directory(candidate)) {
-                    path_ = candidate;
+                    _path = candidate;
                     return;
                 }
             }
@@ -23,10 +23,10 @@ namespace vsl_test {
         TemporaryDirectory& operator=(const TemporaryDirectory&) = delete;
         ~TemporaryDirectory() {
             std::error_code ignored;
-            std::filesystem::remove_all(path_, ignored);
+            std::filesystem::remove_all(_path, ignored);
         }
         const std::filesystem::path& path() const {
-            return path_;
+            return _path;
         }
     };
 } // namespace vsl_test

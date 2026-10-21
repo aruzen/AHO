@@ -10,14 +10,14 @@
 
 VSL_NAMESPACE::command::CopyBufferToImage::CopyBufferToImage(VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::BufferAccessor* buffer,
                                                              VSL_NAMESPACE::ImageLayout layout)
-    : image(std::move(image)), buffer(buffer), layout(layout), source_(buffer ? buffer->_data : nullptr) {}
+    : image(std::move(image)), buffer(buffer), layout(layout), _source(buffer ? buffer->data_ : nullptr) {}
 
 void VSL_NAMESPACE::command::CopyBufferToImage::invoke(
     VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
-    if (!source_ || !VSL_NAMESPACE::contain(source_->usage, VSL_NAMESPACE::MemoryType::TransferSource))
+    if (!_source || !VSL_NAMESPACE::contain(_source->usage, VSL_NAMESPACE::MemoryType::TRANSFER_SOURCE))
         throw std::invalid_argument("Image upload requires TransferSource buffer usage");
-    buffer.retain(image._data);
-    buffer.retain(source_);
+    buffer.retain(image.data_);
+    buffer.retain(_source);
     vk::BufferImageCopy region;
     region.bufferOffset = 0;
     region.bufferRowLength = 0; // tightly packed
@@ -27,25 +27,25 @@ void VSL_NAMESPACE::command::CopyBufferToImage::invoke(
     region.imageSubresource.baseArrayLayer = 0;
     region.imageSubresource.layerCount = 1;
     region.imageOffset = vk::Offset3D{0, 0, 0};
-    region.imageExtent = vk::Extent3D{image._data->width, image._data->height, 1};
+    region.imageExtent = vk::Extent3D{image.data_->width, image.data_->height, 1};
 
-    buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].copyBufferToImage(
-        source_->buffer,
-        this->image._data->image,
+    buffer.data_->command_buffers[buffer.get_current_buffer_idx()].copyBufferToImage(
+        _source->buffer,
+        this->image.data_->image,
         (vk::ImageLayout)layout,
         region);
 }
 
 VSL_NAMESPACE::command::CopyBufferToArrayImage::CopyBufferToArrayImage(VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::BufferAccessor* buffer,
                                                                        VSL_NAMESPACE::ImageLayout layout, std::uint32_t target_idx)
-    : image(std::move(image)), buffer(buffer), layout(layout), target_idx(target_idx), source_(buffer ? buffer->_data : nullptr) {}
+    : image(std::move(image)), buffer(buffer), layout(layout), target_idx(target_idx), _source(buffer ? buffer->data_ : nullptr) {}
 
 void VSL_NAMESPACE::command::CopyBufferToArrayImage::invoke(
     VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
-    if (!source_ || !VSL_NAMESPACE::contain(source_->usage, VSL_NAMESPACE::MemoryType::TransferSource))
+    if (!_source || !VSL_NAMESPACE::contain(_source->usage, VSL_NAMESPACE::MemoryType::TRANSFER_SOURCE))
         throw std::invalid_argument("Image upload requires TransferSource buffer usage");
-    buffer.retain(image._data);
-    buffer.retain(source_);
+    buffer.retain(image.data_);
+    buffer.retain(_source);
     vk::BufferImageCopy region;
     region.bufferOffset = 0;
     region.bufferRowLength = 0; // tightly packed
@@ -55,11 +55,11 @@ void VSL_NAMESPACE::command::CopyBufferToArrayImage::invoke(
     region.imageSubresource.baseArrayLayer = target_idx;
     region.imageSubresource.layerCount = 1;
     region.imageOffset = vk::Offset3D{0, 0, 0};
-    region.imageExtent = vk::Extent3D{image._data->width, image._data->height, 1};
+    region.imageExtent = vk::Extent3D{image.data_->width, image.data_->height, 1};
 
-    buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].copyBufferToImage(
-        source_->buffer,
-        this->image._data->image,
+    buffer.data_->command_buffers[buffer.get_current_buffer_idx()].copyBufferToImage(
+        _source->buffer,
+        this->image.data_->image,
         (vk::ImageLayout)layout,
         region);
 }

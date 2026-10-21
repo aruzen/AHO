@@ -18,15 +18,15 @@ namespace vsl_test {
 
     // GLFW/surfaceを必要としないGPU環境。小さいfeature集合で初期化し、公開APIを検証する。
     class VulkanIntegrationTest : public testing::Test {
-        std::vector<std::shared_ptr<vsl::_impl::CommandPool_impl>> command_pools_;
-        VkDebugUtilsMessengerEXT validation_messenger_ = VK_NULL_HANDLE;
-        std::vector<std::string> validation_errors_;
-        std::mutex validation_mutex_;
-        bool abort_validation_errors_ = false;
-        std::string expected_abort_vuid_;
-        std::size_t expected_abort_count_ = 0;
+        std::vector<std::shared_ptr<vsl::impl::CommandPoolImpl>> _command_pools;
+        VkDebugUtilsMessengerEXT _validation_messenger = VK_NULL_HANDLE;
+        std::vector<std::string> _validation_errors;
+        std::mutex _validation_mutex;
+        bool _abort_validation_errors = false;
+        std::string _expected_abort_vuid;
+        std::size_t _expected_abort_count = 0;
         static VKAPI_ATTR VkBool32 VKAPI_CALL
-        validation_callback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT,
+        ValidationCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT,
                             const VkDebugUtilsMessengerCallbackDataEXT* data, void* user);
 
     protected:
@@ -36,8 +36,8 @@ namespace vsl_test {
         std::size_t validation_abort_count();
         virtual bool validate_vulkan() const;
         virtual bool require_timeline_semaphore() const;
-        std::shared_ptr<vsl::_impl::Vulkan_impl<false>> instance;
-        vsl::PhysicalDevice physical{std::shared_ptr<vsl::_impl::PhysicalDevice_impl>{}};
+        std::shared_ptr<vsl::impl::VulkanImpl<false>> instance;
+        vsl::PhysicalDevice physical{std::shared_ptr<vsl::impl::PhysicalDeviceImpl>{}};
         vsl::LogicalDeviceAccessor device;
         std::uint32_t queue_family = 0;
         bool require_validation = false;
@@ -62,34 +62,34 @@ namespace vsl_test {
     }
 
     inline VKAPI_ATTR VkBool32 VKAPI_CALL
-    VulkanIntegrationTest::validation_callback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT,
+    VulkanIntegrationTest::ValidationCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT,
                                                const VkDebugUtilsMessengerCallbackDataEXT* data, void* user) {
         if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
             auto& self = *static_cast<VulkanIntegrationTest*>(user);
-            std::lock_guard lock(self.validation_mutex_);
-            if (!self.expected_abort_vuid_.empty() && data->pMessageIdName &&
-                self.expected_abort_vuid_ == data->pMessageIdName)
-                ++self.expected_abort_count_;
+            std::lock_guard lock(self._validation_mutex);
+            if (!self._expected_abort_vuid.empty() && data->pMessageIdName &&
+                self._expected_abort_vuid == data->pMessageIdName)
+                ++self._expected_abort_count;
             else
-                self.validation_errors_.emplace_back(data->pMessage);
-            return self.abort_validation_errors_ ? VK_TRUE : VK_FALSE;
+                self._validation_errors.emplace_back(data->pMessage);
+            return self._abort_validation_errors ? VK_TRUE : VK_FALSE;
         }
         return VK_FALSE;
     }
 
     inline bool VulkanIntegrationTest::has_validation_errors() {
-        std::lock_guard lock(validation_mutex_);
-        return !validation_errors_.empty();
+        std::lock_guard lock(_validation_mutex);
+        return !_validation_errors.empty();
     }
     inline void VulkanIntegrationTest::expect_validation_abort(const char* vuid) {
-        std::lock_guard lock(validation_mutex_);
-        expected_abort_vuid_ = vuid;
-        expected_abort_count_ = 0;
-        abort_validation_errors_ = true;
+        std::lock_guard lock(_validation_mutex);
+        _expected_abort_vuid = vuid;
+        _expected_abort_count = 0;
+        _abort_validation_errors = true;
     }
     inline std::size_t VulkanIntegrationTest::validation_abort_count() {
-        std::lock_guard lock(validation_mutex_);
-        return expected_abort_count_;
+        std::lock_guard lock(_validation_mutex);
+        return _expected_abort_count;
     }
     inline bool VulkanIntegrationTest::validate_vulkan() const {
         return false;
@@ -117,8 +117,8 @@ namespace vsl_test {
         instance_info.ppEnabledExtensionNames = instance_extensions.data();
         const char* validation_layer = "VK_LAYER_KHRONOS_validation";
         VkDebugUtilsMessengerCreateInfoEXT debug_info{};
-        const bool validationEnabled = require_validation || validate_vulkan();
-        if (validationEnabled) {
+        const bool validation_enabled = require_validation || validate_vulkan();
+        if (validation_enabled) {
             const auto layers = vk::enumerateInstanceLayerProperties();
             if (!std::ranges::any_of(layers, [&](const auto& layer) {
                     return std::strcmp(layer.layerName, validation_layer) == 0;
@@ -137,7 +137,7 @@ namespace vsl_test {
             debug_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
             debug_info.messageType =
                 VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
-            debug_info.pfnUserCallback = validation_callback;
+            debug_info.pfnUserCallback = ValidationCallback;
             debug_info.pUserData = this;
             instance_info.pNext = &debug_info;
         }
@@ -146,13 +146,13 @@ namespace vsl_test {
         if (result == vk::Result::eErrorIncompatibleDriver)
             GTEST_SKIP() << "Vulkan driver/GPU unavailable: " << vk::to_string(result);
         ASSERT_EQ(result, vk::Result::eSuccess);
-        instance = std::make_shared<vsl::_impl::Vulkan_impl<false>>();
+        instance = std::make_shared<vsl::impl::VulkanImpl<false>>();
         instance->instance = raw_instance;
-        if (validationEnabled) {
+        if (validation_enabled) {
             auto create = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
                 vkGetInstanceProcAddr(raw_instance, "vkCreateDebugUtilsMessengerEXT"));
             ASSERT_NE(create, nullptr);
-            ASSERT_EQ(create(raw_instance, &debug_info, nullptr, &validation_messenger_), VK_SUCCESS);
+            ASSERT_EQ(create(raw_instance, &debug_info, nullptr, &_validation_messenger), VK_SUCCESS);
         }
 
         vk::PhysicalDevice selected;
@@ -172,12 +172,12 @@ namespace vsl_test {
         if (!selected)
             GTEST_SKIP() << "No device has a graphics and compute queue";
 
-        physical._data = std::make_shared<vsl::_impl::PhysicalDevice_impl>();
-        physical._data->device = selected;
-        physical._data->vulkan = instance;
-        physical._data->props = selected.getProperties();
-        physical._data->features = selected.getFeatures();
-        physical._data->memProps = selected.getMemoryProperties();
+        physical.data_ = std::make_shared<vsl::impl::PhysicalDeviceImpl>();
+        physical.data_->device = selected;
+        physical.data_->vulkan = instance;
+        physical.data_->props = selected.getProperties();
+        physical.data_->features = selected.getFeatures();
+        physical.data_->mem_props = selected.getMemoryProperties();
 
         std::vector<const char*> device_extensions;
         for (const auto& extension : selected.enumerateDeviceExtensionProperties())
@@ -207,8 +207,8 @@ namespace vsl_test {
         queue_info.queueCount = 1;
         queue_info.pQueuePriorities = &priority;
         vk::PhysicalDeviceFeatures features{};
-        features.samplerAnisotropy = physical._data->features->samplerAnisotropy;
-        features.independentBlend = physical._data->features->independentBlend;
+        features.samplerAnisotropy = physical.data_->features->samplerAnisotropy;
+        features.independentBlend = physical.data_->features->independentBlend;
         vk::DeviceCreateInfo device_info{};
         if (require_timeline_semaphore())
             device_info.pNext = &timeline;
@@ -218,59 +218,59 @@ namespace vsl_test {
         device_info.ppEnabledExtensionNames = device_extensions.data();
         device_info.pEnabledFeatures = &features;
         const auto raw_device = selected.createDevice(device_info);
-        auto data = std::make_shared<vsl::_impl::LogicalDevice_impl>();
-        data->parentDevice = physical._data;
-        data->graphicsFamily = data->presentFamily = queue_family;
+        auto data = std::make_shared<vsl::impl::LogicalDeviceImpl>();
+        data->parent_device = physical.data_;
+        data->graphics_family = data->present_family = queue_family;
         data->device = raw_device;
-        device._data = std::move(data);
+        device.data_ = std::move(data);
     }
 
     inline void VulkanIntegrationTest::TearDown() {
-        if (device._data && device._data->device) {
-            device._data->device.waitIdle();
+        if (device.data_ && device.data_->device) {
+            device.data_->device.waitIdle();
             // GPUの完了後に、テストで保持していたコマンドプールを回収する。
-            for (auto& pool : command_pools_) {
-                device._data->device.destroyCommandPool(pool->commandPool);
-                pool->commandPool = nullptr;
+            for (auto& pool : _command_pools) {
+                device.data_->device.destroyCommandPool(pool->command_pool);
+                pool->command_pool = nullptr;
             }
         }
-        command_pools_.clear();
-        device._data.reset();
-        physical._data.reset();
-        if (validation_messenger_) {
+        _command_pools.clear();
+        device.data_.reset();
+        physical.data_.reset();
+        if (_validation_messenger) {
             auto destroy = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
                 vkGetInstanceProcAddr(instance->instance, "vkDestroyDebugUtilsMessengerEXT"));
-            destroy(instance->instance, validation_messenger_, nullptr);
-            validation_messenger_ = VK_NULL_HANDLE;
+            destroy(instance->instance, _validation_messenger, nullptr);
+            _validation_messenger = VK_NULL_HANDLE;
         }
         instance.reset();
-        for (const auto& error : validation_errors_)
+        for (const auto& error : _validation_errors)
             ADD_FAILURE() << error;
-        if (!expected_abort_vuid_.empty())
-            EXPECT_EQ(expected_abort_count_, 1u) << "Expected exactly one injected validation abort: " << expected_abort_vuid_;
+        if (!_expected_abort_vuid.empty())
+            EXPECT_EQ(_expected_abort_count, 1u) << "Expected exactly one injected validation abort: " << _expected_abort_vuid;
     }
 
     inline vsl::CommandManager VulkanIntegrationTest::make_manager() {
         vsl::CommandManager manager(device);
-        command_pools_.push_back(manager._data->commandPool);
+        _command_pools.push_back(manager.data_->command_pool);
         return manager;
     }
 
     inline vsl::CommandPool VulkanIntegrationTest::make_pool() {
         vsl::CommandPool pool(device);
-        command_pools_.push_back(pool._data);
+        _command_pools.push_back(pool.data_);
         return pool;
     }
 
     inline vsl::PipelineLayoutEditAccessor VulkanIntegrationTest::make_layout_state() {
-        auto data = std::make_shared<vsl::_impl::PipelineLayout_impl>();
-        data->device = device._data;
-        data->info = std::make_shared<vsl::_impl::CreateInfo>();
+        auto data = std::make_shared<vsl::impl::PipelineLayoutImpl>();
+        data->device = device.data_;
+        data->info = std::make_shared<vsl::impl::CreateInfo>();
         return {{std::move(data)}};
     }
 
     inline bool VulkanIntegrationTest::host_coherent_available() const {
-        const auto& properties = *physical._data->memProps;
+        const auto& properties = *physical.data_->mem_props;
         for (std::uint32_t i = 0; i < properties.memoryTypeCount; ++i)
             if ((properties.memoryTypes[i].propertyFlags &
                  (vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)) ==

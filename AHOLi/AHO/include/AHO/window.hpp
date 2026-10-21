@@ -13,7 +13,7 @@
 #include "engine.hpp"
 
 namespace AHO_NAMESPACE::window {
-    d2::VectorI GetMonitorSize();
+    d2::VectorI get_monitor_size();
 
     struct WindowData {
         std::shared_ptr<VSL_NAMESPACE::Surface> surface;
@@ -28,14 +28,14 @@ namespace AHO_NAMESPACE::window {
 
     struct Window : public VSL_NAMESPACE::Window {
         Window(std::string name, int width = 800, int height = 600,
-               engine::EngineAccessor engine = default_engine());
+               engine::EngineAccessor engine_ = DefaultEngine());
 
         Window(engine::EngineAccessor engine,
                std::shared_ptr<VSL_NAMESPACE::Window::WindowData> vsl_data,
                std::shared_ptr<AHO_NAMESPACE::window::WindowData> aho_data);
 
         engine::EngineAccessor engine;
-        std::shared_ptr<AHO_NAMESPACE::window::WindowData> _data2;
+        std::shared_ptr<AHO_NAMESPACE::window::WindowData> data2;
 
         bool resize(d2::VectorI size);
 
@@ -54,7 +54,7 @@ namespace AHO_NAMESPACE::window {
         bool close() override;
 
     private:
-        static AHO_NAMESPACE::engine::EngineAccessor default_engine();
+        static AHO_NAMESPACE::engine::EngineAccessor DefaultEngine();
     };
 
     struct WindowResizeHookPlugin : public VSL_NAMESPACE::PureWindow::Plugin {

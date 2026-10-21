@@ -387,7 +387,7 @@ namespace {
         std::ostringstream stream;
         stream << TypeParam(12);
         const auto name = [] {
-            switch (TypeParam::UpperChar) {
+            switch (TypeParam::UPPER_CHAR) {
                 case 'R':
                     return "red";
                 case 'G':
@@ -499,8 +499,8 @@ namespace {
         aho_test::expect_hsva(source + A<SV>(3), 120, 12, 24, 11);
         aho_test::expect_hsva(source - A<SV>(3), 120, 12, 24, 5);
     }
-    constexpr auto constexpr_hsva_sum = aho::color::HSVA<int>(1, 2, 3, 4) + aho::color::HSVA<int>(3, 2, 1, 0);
-    static_assert(constexpr_hsva_sum.h.value == 4 && constexpr_hsva_sum.s.value == 4 && constexpr_hsva_sum.v.value == 4 && constexpr_hsva_sum.a.value == 4);
+    constexpr auto CONSTEXPR_HSVA_SUM = aho::color::HSVA<int>(1, 2, 3, 4) + aho::color::HSVA<int>(3, 2, 1, 0);
+    static_assert(CONSTEXPR_HSVA_SUM.h.value == 4 && CONSTEXPR_HSVA_SUM.s.value == 4 && CONSTEXPR_HSVA_SUM.v.value == 4 && CONSTEXPR_HSVA_SUM.a.value == 4);
     TEST(ColorConstructionTest, AllColorSpacesPreserveChannelsIncludingAlpha) {
         const aho::color::RGB<int> rgb(1, 2, 3);
         EXPECT_EQ(rgb.r.value, 1);
@@ -589,8 +589,8 @@ namespace {
         aho_test::expect_rgba(source + A<T>(4), 12, 24, 36, 12);
         aho_test::expect_rgba(source - A<T>(4), 12, 24, 36, 4);
     }
-    constexpr auto constexpr_rgba_sum = aho::color::RGBA<int>(1, 2, 3, 4) + aho::color::RGBA<int>(3, 2, 1, 0);
-    static_assert(constexpr_rgba_sum.r.value == 4 && constexpr_rgba_sum.g.value == 4 && constexpr_rgba_sum.b.value == 4 && constexpr_rgba_sum.a.value == 4);
+    constexpr auto CONSTEXPR_RGBA_SUM = aho::color::RGBA<int>(1, 2, 3, 4) + aho::color::RGBA<int>(3, 2, 1, 0);
+    static_assert(CONSTEXPR_RGBA_SUM.r.value == 4 && CONSTEXPR_RGBA_SUM.g.value == 4 && CONSTEXPR_RGBA_SUM.b.value == 4 && CONSTEXPR_RGBA_SUM.a.value == 4);
     TEST(ColorConstructionTest, ComponentAssignmentsModifyOnlyTheRequestedChannel) {
         using namespace aho::color;
         RGB<int> rgb(1, 2, 3);
@@ -700,8 +700,8 @@ namespace {
         aho_test::expect_hsva(source - A<SV>(5), 120, 12, 24, -5);
         aho_test::expect_hsva(source + HSVA<H, SV>(30, 1, 2, 5), 150, 13, 26, 5);
     }
-    constexpr auto constexpr_hsv_sum = aho::color::HSV<int>(1, 2, 3) + aho::color::HSV<int>(3, 2, 1);
-    static_assert(constexpr_hsv_sum.h.value == 4 && constexpr_hsv_sum.s.value == 4 && constexpr_hsv_sum.v.value == 4);
+    constexpr auto CONSTEXPR_HSV_SUM = aho::color::HSV<int>(1, 2, 3) + aho::color::HSV<int>(3, 2, 1);
+    static_assert(CONSTEXPR_HSV_SUM.h.value == 4 && CONSTEXPR_HSV_SUM.s.value == 4 && CONSTEXPR_HSV_SUM.v.value == 4);
     TEST(ColorLiteralTest, ChannelLiteralsPreserveValuesAndTypes) {
         using namespace aho::literals;
         EXPECT_EQ((2_r).value, 2);
@@ -772,8 +772,8 @@ namespace {
         aho_test::expect_rgba(source - A<T>(5), 12, 24, 36, -5);
         aho_test::expect_rgba(source + RGBA<T>(1, 2, 3, 5), 13, 26, 39, 5);
     }
-    constexpr auto constexpr_rgb_sum = aho::color::RGB<int>(1, 2, 3) + aho::color::RGB<int>(3, 2, 1);
-    static_assert(constexpr_rgb_sum.r.value == 4 && constexpr_rgb_sum.g.value == 4 && constexpr_rgb_sum.b.value == 4);
+    constexpr auto CONSTEXPR_RGB_SUM = aho::color::RGB<int>(1, 2, 3) + aho::color::RGB<int>(3, 2, 1);
+    static_assert(CONSTEXPR_RGB_SUM.r.value == 4 && CONSTEXPR_RGB_SUM.g.value == 4 && CONSTEXPR_RGB_SUM.b.value == 4);
     TEST(ColorCompositionTest, IndependentChannelsComposeWithoutChangingOtherChannels) {
         using namespace aho::color;
         const auto rgb = R<double>(2) + G<double>(3);

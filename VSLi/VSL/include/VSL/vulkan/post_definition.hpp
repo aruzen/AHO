@@ -10,14 +10,14 @@
 #include "commands/copy_buffer_to_image.hpp"
 #include "commands/change_image_barrier.hpp"
 
-template<VSL_NAMESPACE::ImageType Usage, VSL_NAMESPACE::MemoryProperty MemProp, VSL_NAMESPACE::ImageLayout Layout>
-template<VSL_NAMESPACE::MemoryType MemType, VSL_NAMESPACE::MemoryProperty MemProperty, VSL_NAMESPACE::SharingMode ShareMode>
-bool VSL_NAMESPACE::Image<Usage, MemProp, Layout>::copyByBuffer(CommandManager manager,
-                                                                Buffer<MemType, MemProperty, ShareMode>& buffer) {
-    auto phase = manager.startPhase<ComputePhase>();
-    if (Layout != ImageLayout::TransferDstOptimal)
-        phase << command::ChangeImageBarrier(*this, ImageLayout::TransferDstOptimal);
-    phase << command::CopyBufferToImage(*this, &buffer, ImageLayout::TransferDstOptimal);
+template<VSL_NAMESPACE::ImageType usage, VSL_NAMESPACE::MemoryProperty mem_prop, VSL_NAMESPACE::ImageLayout layout>
+template<VSL_NAMESPACE::MemoryType mem_type, VSL_NAMESPACE::MemoryProperty mem_property, VSL_NAMESPACE::SharingMode share_mode>
+bool VSL_NAMESPACE::Image<usage, mem_prop, layout>::copy_by_buffer(CommandManager manager,
+                                                                Buffer<mem_type, mem_property, share_mode>& buffer) {
+    auto phase = manager.start_phase<ComputePhase>();
+    if (layout != ImageLayout::TRANSFER_DST_OPTIMAL)
+        phase << command::ChangeImageBarrier(*this, ImageLayout::TRANSFER_DST_OPTIMAL);
+    phase << command::CopyBufferToImage(*this, &buffer, ImageLayout::TRANSFER_DST_OPTIMAL);
     return true;
 }
 

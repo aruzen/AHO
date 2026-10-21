@@ -19,12 +19,12 @@ namespace {
     }
     TEST(ResourceFlagsTest, UsageAndPropertiesSupportCombinedRequirements) {
         using namespace vsl;
-        EXPECT_TRUE(contain(ImageType::TransferSrc | ImageType::Sampled, ImageType::TransferSrc));
-        EXPECT_FALSE(contain(MemoryType::UniformBuffer, MemoryType::StorageBuffer));
-        auto properties = MemoryProperty::HostVisible;
-        properties |= MemoryProperty::HostCoherent;
-        EXPECT_TRUE(contain(properties, MemoryProperty::HostVisible | MemoryProperty::HostCoherent));
-        EXPECT_EQ(properties & MemoryProperty::DeviceLocal, MemoryProperty::None);
+        EXPECT_TRUE(contain(ImageType::TRANSFER_SRC | ImageType::SAMPLED, ImageType::TRANSFER_SRC));
+        EXPECT_FALSE(contain(MemoryType::UNIFORM_BUFFER, MemoryType::STORAGE_BUFFER));
+        auto properties = MemoryProperty::HOST_VISIBLE;
+        properties |= MemoryProperty::HOST_COHERENT;
+        EXPECT_TRUE(contain(properties, MemoryProperty::HOST_VISIBLE | MemoryProperty::HOST_COHERENT));
+        EXPECT_EQ(properties & MemoryProperty::DEVICE_LOCAL, MemoryProperty::NONE);
     }
 } // namespace
 #include "support/image_transfer_fixture.hpp"
@@ -32,32 +32,32 @@ namespace {
     using ImageAccessorVulkanIntegrationTest = vsl_test::ImageTransferVulkanIntegrationTest;
     TEST_F(ImageAccessorVulkanIntegrationTest, AccessorTransfersAndMappedHolderReadBackPixels) {
         const std::array<std::uint32_t, 4> expected{127, 257, 65537, 0xffffffff};
-        TransferImage image(device, 2, 2, vsl::data_format::UnsignedInt);
-        vsl::StagingBuffer<vsl::MemoryType::TransferSource> upload(device, expected);
-        vsl::StagingBuffer<vsl::MemoryType::TransferDestination> readback(device, sizeof(expected));
+        TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT);
+        vsl::StagingBuffer<vsl::MemoryType::TRANSFER_SOURCE> upload(device, expected);
+        vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION> readback(device, sizeof(expected));
         auto manager = make_manager();
         {
-            auto phase = manager.startPhase<vsl::ComputePhase>();
+            auto phase = manager.start_phase<vsl::ComputePhase>();
             transition(manager, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, {},
                        vk::AccessFlagBits::eTransferWrite);
         }
-        device._data->device.waitIdle();
-        EXPECT_TRUE(static_cast<vsl::ImageAccessor&>(image).copyByBuffer(manager, &upload,
-                                                                         vsl::ImageLayout::General, 0));
-        device._data->device.waitIdle();
+        device.data_->device.waitIdle();
+        EXPECT_TRUE(static_cast<vsl::ImageAccessor&>(image).copy_by_buffer(manager, &upload,
+                                                                         vsl::ImageLayout::GENERAL, 0));
+        device.data_->device.waitIdle();
         {
-            auto phase = manager.startPhase<vsl::ComputePhase>();
+            auto phase = manager.start_phase<vsl::ComputePhase>();
             transition(manager, image, vk::ImageLayout::eGeneral, vk::ImageLayout::eGeneral,
                        vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eTransferRead);
         }
-        device._data->device.waitIdle();
-        EXPECT_TRUE(readback.copyByImage(manager, image));
-        device._data->device.waitIdle();
+        device.data_->device.waitIdle();
+        EXPECT_TRUE(readback.copy_by_image(manager, image));
+        device.data_->device.waitIdle();
         {
             auto mapped = readback.data(sizeof(expected));
             EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
-            EXPECT_TRUE(mapped.copyByImage(manager, image));
-            device._data->device.waitIdle();
+            EXPECT_TRUE(mapped.copy_by_image(manager, image));
+            device.data_->device.waitIdle();
             EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
         }
     }
@@ -82,29 +82,29 @@ namespace {
     }
     using BufferAccessorVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
     TEST_F(BufferAccessorVulkanIntegrationTest, MovesTransferTheBufferAndCopiesShareItsContents) {
-        using Buffer = vsl::StagingBuffer<vsl::MemoryType::StorageBuffer>;
+        using Buffer = vsl::StagingBuffer<vsl::MemoryType::STORAGE_BUFFER>;
         const std::array<std::uint32_t, 4> values{3, 7, 11, 19};
         Buffer original(device, values);
-        const auto storage = original._data;
+        const auto storage = original.data_;
         Buffer copied = original;
-        EXPECT_EQ(copied._data, storage);
+        EXPECT_EQ(copied.data_, storage);
         Buffer moved = std::move(original);
-        EXPECT_FALSE(original._data);
-        EXPECT_EQ(moved._data, storage);
+        EXPECT_FALSE(original.data_);
+        EXPECT_EQ(moved.data_, storage);
         original = std::move(moved);
-        EXPECT_FALSE(moved._data);
-        EXPECT_EQ(original._data, storage);
+        EXPECT_FALSE(moved.data_);
+        EXPECT_EQ(original.data_, storage);
         copied = original;
         auto mapped = copied.data(sizeof(values));
         EXPECT_EQ(std::memcmp(mapped.data, values.data(), sizeof(values)), 0);
     }
     TEST_F(BufferAccessorVulkanIntegrationTest, MappingKeepsStorageAliveAfterOriginalBufferIsDestroyed) {
         std::optional<Holder> mapping;
-        std::weak_ptr<vsl::_impl::Buffer_impl> storage;
+        std::weak_ptr<vsl::impl::BufferImpl> storage;
         const std::array<std::uint32_t, 2> expected{17, 43};
         {
             vsl::StagingBuffer<> buffer(device, expected);
-            storage = buffer._data;
+            storage = buffer.data_;
             mapping.emplace(buffer.data());
         }
         if (storage.expired())

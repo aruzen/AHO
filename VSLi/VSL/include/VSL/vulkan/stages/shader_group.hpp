@@ -9,14 +9,14 @@
 
 namespace VSL_NAMESPACE::pipeline_layout {
     struct ShaderGroup {
-        std::shared_ptr<_impl::pipeline_layout::ShaderGroup_impl> _data;
+        std::shared_ptr<impl::pipeline_layout::ShaderGroupImpl> data_;
 
         ShaderGroup(std::string name, std::initializer_list<ShaderAccessor> shaders);
 
-        void addShader(ShaderAccessor shader);
+        void add_shader(ShaderAccessor shader);
 
-        void removeShader(std::string name);
-        void removeShader(ShaderAccessor shader);
+        void remove_shader(std::string name);
+        void remove_shader(ShaderAccessor shader);
 
         void injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl);
     };

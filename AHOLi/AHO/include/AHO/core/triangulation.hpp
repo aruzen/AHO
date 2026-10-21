@@ -21,7 +21,14 @@ namespace AHO_NAMESPACE {
              std::same_as<typename std::ranges::range_value_t<Range>::dimension, VSL_NAMESPACE::D2> &&
              std::is_arithmetic_v<typename std::ranges::range_value_t<Range>::element_type> &&
              std::unsigned_integral<Size> && (!std::same_as<Size, bool>)
-    [[nodiscard]] auto triangulate(Range&& contour) {
+    [[nodiscard]] auto triangulate(Range&& contour);
+
+    template<typename Size, std::ranges::input_range Range>
+    requires concepts::is_point<std::ranges::range_value_t<Range>> &&
+             std::same_as<typename std::ranges::range_value_t<Range>::dimension, VSL_NAMESPACE::D2> &&
+             std::is_arithmetic_v<typename std::ranges::range_value_t<Range>::element_type> &&
+             std::unsigned_integral<Size> && (!std::same_as<Size, bool>)
+    auto triangulate(Range&& contour) {
         using Input = std::ranges::range_value_t<Range>;
         using Mesh = Polygon<typename Input::element_type, VSL_NAMESPACE::D2, typename Input::coordinate_info, Size>;
         using P = typename Mesh::point_type;

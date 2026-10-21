@@ -1,5 +1,6 @@
 #pragma once
 #include "../../define.hpp"
+#include "../math/coordinate.hpp"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -36,7 +37,7 @@ namespace AHO_NAMESPACE::detail::geometry2d {
     }
     template<typename P>
     Point convert(const P& p) {
-        return {static_cast<long double>(p.value.template component<0>()), static_cast<long double>(p.value.template component<1>())};
+        return {static_cast<long double>(p.value.___AN1), static_cast<long double>(p.value.___AN2)};
     }
     // 全座標を同じ正の係数で縮小し、差と外積のオーバーフローを避ける。
     inline void normalize(std::span<Point> points) {

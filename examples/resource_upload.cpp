@@ -1,4 +1,6 @@
-#include <AHO/x/resource/texture.hpp>
+#include <AHO/command/buffer_upload.hpp>
+#include <AHO/x/command/texture_update.hpp>
+#include <VSL/vulkan/phase.hpp>
 #include <stdexcept>
 
 // 管理するTextureとGPUFriendly Bufferを再利用し、グリフの矩形だけを追加する。

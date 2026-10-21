@@ -10,14 +10,17 @@ namespace aho_test {
     struct CountingCustomization {
         vsl::LogicalDeviceAccessor device;
         std::shared_ptr<CustomCounters> counters;
-        auto map(NativeHost& storage) {
-            ++counters->maps;
-            return storage.data();
-        }
-
-        NativeHost reallocate(const NativeHost&, std::size_t size) {
-            ++counters->allocations;
-            return NativeHost(device, size);
-        }
+        auto map(NativeHost& storage);
+        NativeHost reallocate(const NativeHost&, std::size_t size);
     };
+
+    inline auto CountingCustomization::map(NativeHost& storage) {
+        ++counters->maps;
+        return storage.data();
+    }
+
+    inline NativeHost CountingCustomization::reallocate(const NativeHost&, std::size_t size) {
+        ++counters->allocations;
+        return NativeHost(device, size);
+    }
 } // namespace aho_test

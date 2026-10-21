@@ -73,13 +73,27 @@ namespace VSL_NAMESPACE {
         using Buffer<Type, Property, Mode>::Buffer;
     };
 
-    // ==========================================================================================================
-
     template<typename Buffer, typename T>
     Buffer make_buffer(LogicalDeviceAccessor device, CommandManager manager, T& t);
 
     template<typename Buffer, typename T>
-    Buffer make_buffer(LogicalDeviceAccessor device, T& t, std::optional<CommandManager> manager = std::nullopt) {
+    Buffer make_buffer(LogicalDeviceAccessor device, T& t, std::optional<CommandManager> manager = std::nullopt);
+
+    namespace helper {
+        template<typename T>
+        constexpr std::size_t checked_buffer_array_size(std::size_t count);
+
+        bool copy_with_shift_offset(void* data, size_t maxSize, size_t& offset);
+
+        template<typename T, typename... Args>
+        bool copy_with_shift_offset(void* data, size_t maxSize, size_t& offset, const T& t, const Args&... args);
+
+        template<typename T>
+        void uncheck_copy_with_shift_offset(void* data, size_t& offset, const T& t);
+    } // namespace helper
+
+    template<typename Buffer, typename T>
+    Buffer make_buffer(LogicalDeviceAccessor device, T& t, std::optional<CommandManager> manager) {
         if constexpr (not contain<Buffer::Property, MemoryProperty::HostVisible>()) {
             if (not manager)
                 throw exceptions::RuntimeException("buffer", "Device-local initialization requires a command manager");
@@ -101,7 +115,6 @@ namespace VSL_NAMESPACE {
     }
 
     namespace helper {
-
         template<typename T>
         constexpr std::size_t checked_buffer_array_size(std::size_t count) {
             if (count == 0)
@@ -110,8 +123,6 @@ namespace VSL_NAMESPACE {
                 throw exceptions::RuntimeException("BufferSize", "Buffer array byte size overflow");
             return sizeof(T) * count;
         }
-
-        bool copy_with_shift_offset(void* data, size_t maxSize, size_t& offset);
 
         template<typename T, typename... Args>
         bool copy_with_shift_offset(void* data, size_t maxSize, size_t& offset, const T& t, const Args&... args) {

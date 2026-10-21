@@ -5,8 +5,12 @@
 
 namespace {
     class BufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
+        bool validate_vulkan() const override;
     };
+
+    bool BufferVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
     using HostBuffer = vsl::StagingBuffer<vsl::MemoryType::TransferDestination>;
     TEST_F(BufferVulkanIntegrationTest, MapsCopiesAndReadsBackSingleValues) {
         if (!host_coherent_available())
@@ -41,7 +45,7 @@ namespace {
         EXPECT_TRUE(mapped.copy(replacement.data(), replacement.size()));
         EXPECT_EQ(std::memcmp(mapped.data, replacement.data(), sizeof(replacement)), 0);
     }
-    TEST_F(BufferVulkanIntegrationTest, CopiesThroughDeviceLocalBufferOnGpu) {
+    TEST_F(BufferVulkanIntegrationTest, CopiesThroughDeviceLocalBufferOnGPU) {
         if (!host_coherent_available())
             GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
         auto manager = make_manager();
@@ -295,8 +299,12 @@ namespace {
 
 namespace {
     class BufferSharingVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
+        bool validate_vulkan() const override;
     };
+
+    bool BufferSharingVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
     using ConcurrentHostBuffer = vsl::StagingBuffer<vsl::MemoryType::TransferDestination, vsl::MemoryProperty::None, vsl::SharingMode::Concurrent>;
     TEST_F(BufferSharingVulkanIntegrationTest, ConcurrentRequestWorksWithOneQueueFamilyAndPreservesMappedPayload) {
         if (!host_coherent_available())
@@ -654,9 +662,14 @@ void probe(vsl::LogicalDeviceAccessor device){
 namespace {
     using ReadbackBuffer = vsl::Buffer<vsl::MemoryType::TransferDestination, vsl::MemoryProperty::HostVisible>;
     class PersistentBufferVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
+        bool validate_vulkan() const override;
     };
-    TEST_F(PersistentBufferVulkanIntegrationTest, ReusesMappingAndReadsBoundedRangesAfterGpuCompletion) {
+
+    bool PersistentBufferVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
+
+    TEST_F(PersistentBufferVulkanIntegrationTest, ReusesMappingAndReadsBoundedRangesAfterGPUCompletion) {
         auto manager = make_manager();
         ReadbackBuffer destination(device, width * height * 4);
         auto mapping = destination.data();

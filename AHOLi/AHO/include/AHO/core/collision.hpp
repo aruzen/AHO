@@ -48,15 +48,15 @@ namespace AHO_NAMESPACE::collision {
         }
 
         inline bool contains(std::span<const g::Point, 3> t, g::Point p) {
-            return g::inTriangle(t[0], t[1], t[2], p) || g::onSegment(t[0], t[1], p) ||
-                   g::onSegment(t[1], t[2], p) || g::onSegment(t[2], t[0], p);
+            return g::in_triangle(t[0], t[1], t[2], p) || g::on_segment(t[0], t[1], p) ||
+                   g::on_segment(t[1], t[2], p) || g::on_segment(t[2], t[0], p);
         }
 
         inline bool intersects(std::span<const g::Point, 3> a, std::span<const g::Point, 3> b) {
             auto separated = [&](auto component) {
-                const auto [aMin, aMax] = std::minmax({component(a[0]), component(a[1]), component(a[2])});
-                const auto [bMin, bMax] = std::minmax({component(b[0]), component(b[1]), component(b[2])});
-                return aMax < bMin || bMax < aMin;
+                const auto [a_min, a_max] = std::minmax({component(a[0]), component(a[1]), component(a[2])});
+                const auto [b_min, b_max] = std::minmax({component(b[0]), component(b[1]), component(b[2])});
+                return a_max < b_min || b_max < a_min;
             };
             if (separated([](g::Point p) { return p.value.___AN1; }) || separated([](g::Point p) { return p.value.___AN2; }))
                 return false;

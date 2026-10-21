@@ -179,3 +179,35 @@ if(AHO_BUILD_GLTF_EXAMPLE)
     target_link_directories(aho-gltf-inspect PRIVATE ${GLFW_LIBRARY_DIRS})
     target_link_libraries(aho-gltf-inspect PRIVATE AHOLi)
 endif()
+
+option(AHO_BUILD_GLTF_VIEWER "Build the animated glTF window example" OFF)
+if(AHO_BUILD_GLTF_VIEWER)
+    find_program(AHO_VIEWER_GLSLC NAMES glslc HINTS "$ENV{VULKAN_SDK}/bin" REQUIRED)
+    set(AHO_VIEWER_SHADER_DIR "${CMAKE_CURRENT_BINARY_DIR}/gltf-viewer-shaders")
+    set(AHO_VIEWER_SHADER_OUTPUTS)
+    foreach(stage vert frag)
+        set(source "${CMAKE_CURRENT_SOURCE_DIR}/../examples/shaders/gltf_viewer.${stage}")
+        set(output "${AHO_VIEWER_SHADER_DIR}/gltf_viewer.${stage}.spv")
+        add_custom_command(OUTPUT "${output}"
+                COMMAND "${CMAKE_COMMAND}" -E make_directory "${AHO_VIEWER_SHADER_DIR}"
+                COMMAND "${AHO_VIEWER_GLSLC}" "${source}" -o "${output}"
+                DEPENDS "${source}" VERBATIM)
+        list(APPEND AHO_VIEWER_SHADER_OUTPUTS "${output}")
+    endforeach()
+    add_custom_target(aho-gltf-viewer-shaders DEPENDS ${AHO_VIEWER_SHADER_OUTPUTS})
+    add_executable(aho-gltf-viewer "${CMAKE_CURRENT_SOURCE_DIR}/../examples/gltf_viewer.cpp")
+    add_dependencies(aho-gltf-viewer aho-gltf-viewer-shaders)
+    target_include_directories(aho-gltf-viewer PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/AHO/include" "${VSL_HOME}/include"
+            ${Vulkan_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS})
+    target_compile_definitions(aho-gltf-viewer PRIVATE
+            AHO_GLTF_VIEWER_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../examples/assets/animated_cube"
+            AHO_GLTF_VIEWER_SHADER_DIR="${AHO_VIEWER_SHADER_DIR}")
+    target_link_directories(aho-gltf-viewer PRIVATE ${GLFW_LIBRARY_DIRS})
+    target_link_libraries(aho-gltf-viewer PRIVATE AHOLi VSL)
+    if(BUILD_TESTING)
+        add_test(NAME AHO.GltfViewer.WindowIntegration
+                COMMAND aho-gltf-viewer --verify "${CMAKE_CURRENT_BINARY_DIR}/gltf-viewer-captures")
+        set_tests_properties(AHO.GltfViewer.WindowIntegration PROPERTIES LABELS gpu RESOURCE_LOCK aho_graphics TIMEOUT 90)
+    endif()
+endif()

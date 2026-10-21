@@ -9,10 +9,19 @@
 namespace AHO_NAMESPACE::detail::geometry2d {
     using Point = AHO_NAMESPACE::d2::Point<long double>;
 
+    // ベクトルabとacの2D外積。三角形abcの符号付き面積の2倍を返す。
     inline long double cross(Point a, Point b, Point c);
+
+    // 点列a→b→cの向きを外積の符号（1/-1）で返す。演算誤差の範囲内なら共線とみなして0。
     inline int orientation(Point a, Point b, Point c);
+
+    // 点pが線分ab上にあるか。両端点を含み、共線性はorientationで判定する。
     inline bool onSegment(Point a, Point b, Point p);
+
+    // 線分abとcdの交差判定。端点の接触と、共線な線分の重なりも含む。
     inline bool intersects(Point a, Point b, Point c, Point d);
+
+    // 点pが三角形abcの内部・辺上・頂点にあるか。orientationで共線とみなす退化三角形はfalse。
     inline bool inTriangle(Point a, Point b, Point c, Point p);
 
     template<typename P>

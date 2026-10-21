@@ -22,60 +22,85 @@ namespace AHO_NAMESPACE {
         static_assert(std::is_integral_v<Size> && std::is_unsigned_v<Size> && !std::same_as<Size, bool>);
 
         Polygon() = default;
-        Polygon(std::span<const point_type> points, std::span<const triangle_type> triangles) {
-            if (points.size() && points.size() - 1 > std::numeric_limits<Size>::max())
-                throw std::length_error("Polygon vertex index exceeds index type");
-            for (const auto& triangle : triangles)
-                for (const auto index : {triangle.idx1.index, triangle.idx2.index, triangle.idx3.index})
-                    if (index >= points.size())
-                        throw std::out_of_range("Polygon triangle index exceeds vertex count");
-            points_.assign(points.begin(), points.end());
-            triangles_.assign(triangles.begin(), triangles.end());
-        }
+        Polygon(std::span<const point_type> points, std::span<const triangle_type> triangles);
 
-        [[nodiscard]] std::span<const point_type> points() const noexcept { return points_; }
-        [[nodiscard]] std::span<const triangle_type> indices() const noexcept { return triangles_; }
-        [[nodiscard]] std::size_t size() const noexcept { return triangles_.size(); }
-        [[nodiscard]] bool empty() const noexcept { return triangles_.empty(); }
+        [[nodiscard]] std::span<const point_type> points() const noexcept;
+        [[nodiscard]] std::span<const triangle_type> indices() const noexcept;
+        [[nodiscard]] std::size_t size() const noexcept;
+        [[nodiscard]] bool empty() const noexcept;
 
-        [[nodiscard]] auto triangles() const {
-            return std::views::all(triangles_) | std::views::transform([this](const triangle_type& t) {
-                       return Triangle<R, D, CI>{points_[t.idx1.index], points_[t.idx2.index], points_[t.idx3.index]};
-                   });
-        }
+        [[nodiscard]] auto triangles() const;
         // 各三角形の3辺を返す。共有辺も含むため、輪郭線とは区別する。
-        [[nodiscard]] auto lines() const {
-            return std::views::iota(std::size_t{0}, triangles_.size() * 3) | std::views::transform([this](std::size_t i) {
-                       const auto& t = triangles_[i / 3];
-                       const Size vertices[]{t.idx1.index, t.idx2.index, t.idx3.index};
-                       return Line<R, D, CI>{points_[vertices[i % 3]], points_[vertices[(i + 1) % 3]]};
-                   });
-        }
-        [[nodiscard]] double area() const {
-            long double result = 0;
-            for (const auto triangle : triangles()) {
-                const auto a = triangle.pos1.value;
-                const auto b = triangle.pos2.value;
-                const auto c = triangle.pos3.value;
-                const long double ux = static_cast<long double>(b.___AN1) - static_cast<long double>(a.___AN1);
-                const long double vx = static_cast<long double>(c.___AN1) - static_cast<long double>(a.___AN1);
-                if constexpr (D::dimension == 2) {
-                    const long double uy = static_cast<long double>(b.___AN2) - static_cast<long double>(a.___AN2);
-                    const long double vy = static_cast<long double>(c.___AN2) - static_cast<long double>(a.___AN2);
-                    result += std::abs(ux * vy - uy * vx) / 2;
-                } else if constexpr (D::dimension == 3) {
-                    const long double uy = static_cast<long double>(b.___AN2) - static_cast<long double>(a.___AN2);
-                    const long double vy = static_cast<long double>(c.___AN2) - static_cast<long double>(a.___AN2);
-                    const long double uz = static_cast<long double>(b.___AN3) - static_cast<long double>(a.___AN3);
-                    const long double vz = static_cast<long double>(c.___AN3) - static_cast<long double>(a.___AN3);
-                    result += std::hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) / 2;
-                }
-            }
-            return static_cast<double>(result);
-        }
+        [[nodiscard]] auto lines() const;
+        [[nodiscard]] double area() const;
 
     private:
-        std::vector<point_type> points_;
-        std::vector<triangle_type, Alloc> triangles_;
+        std::vector<point_type> _points;
+        std::vector<triangle_type, Alloc> _triangles;
     };
+
+    template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
+    Polygon<R, D, CI, Size, Alloc>::Polygon(std::span<const point_type> points,
+                                            std::span<const triangle_type> triangles) {
+        if (points.size() && points.size() - 1 > std::numeric_limits<Size>::max())
+            throw std::length_error("Polygon vertex index exceeds index type");
+        for (const auto& triangle : triangles)
+            for (const auto index : {triangle.idx1.index, triangle.idx2.index, triangle.idx3.index})
+                if (index >= points.size())
+                    throw std::out_of_range("Polygon triangle index exceeds vertex count");
+        _points.assign(points.begin(), points.end());
+        _triangles.assign(triangles.begin(), triangles.end());
+    }
+
+    template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
+    std::span<const typename Polygon<R, D, CI, Size, Alloc>::point_type> Polygon<R, D, CI, Size, Alloc>::points() const noexcept { return _points; }
+
+    template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
+    std::span<const typename Polygon<R, D, CI, Size, Alloc>::triangle_type> Polygon<R, D, CI, Size, Alloc>::indices() const noexcept { return _triangles; }
+
+    template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
+    std::size_t Polygon<R, D, CI, Size, Alloc>::size() const noexcept { return _triangles.size(); }
+
+    template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
+    bool Polygon<R, D, CI, Size, Alloc>::empty() const noexcept { return _triangles.empty(); }
+
+    template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
+    auto Polygon<R, D, CI, Size, Alloc>::triangles() const {
+        return std::views::all(_triangles) | std::views::transform([this](const triangle_type& t) {
+                   return Triangle<R, D, CI>{_points[t.idx1.index], _points[t.idx2.index], _points[t.idx3.index]};
+               });
+    }
+
+    template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
+    auto Polygon<R, D, CI, Size, Alloc>::lines() const {
+        return std::views::iota(std::size_t{0}, _triangles.size() * 3) | std::views::transform([this](std::size_t i) {
+                   const auto& t = _triangles[i / 3];
+                   const Size vertices[]{t.idx1.index, t.idx2.index, t.idx3.index};
+                   return Line<R, D, CI>{_points[vertices[i % 3]], _points[vertices[(i + 1) % 3]]};
+               });
+    }
+
+    template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
+    double Polygon<R, D, CI, Size, Alloc>::area() const {
+        long double result = 0;
+        for (const auto triangle : triangles()) {
+            const auto a = triangle.pos1.value;
+            const auto b = triangle.pos2.value;
+            const auto c = triangle.pos3.value;
+            const long double ux = static_cast<long double>(b.___AN1) - static_cast<long double>(a.___AN1);
+            const long double vx = static_cast<long double>(c.___AN1) - static_cast<long double>(a.___AN1);
+            if constexpr (D::dimension == 2) {
+                const long double uy = static_cast<long double>(b.___AN2) - static_cast<long double>(a.___AN2);
+                const long double vy = static_cast<long double>(c.___AN2) - static_cast<long double>(a.___AN2);
+                result += std::abs(ux * vy - uy * vx) / 2;
+            } else if constexpr (D::dimension == 3) {
+                const long double uy = static_cast<long double>(b.___AN2) - static_cast<long double>(a.___AN2);
+                const long double vy = static_cast<long double>(c.___AN2) - static_cast<long double>(a.___AN2);
+                const long double uz = static_cast<long double>(b.___AN3) - static_cast<long double>(a.___AN3);
+                const long double vz = static_cast<long double>(c.___AN3) - static_cast<long double>(a.___AN3);
+                result += std::hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) / 2;
+            }
+        }
+        return static_cast<double>(result);
+    }
 } // namespace AHO_NAMESPACE

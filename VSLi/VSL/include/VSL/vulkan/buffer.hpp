@@ -138,10 +138,10 @@ namespace VSL_NAMESPACE {
     bool VSL_NAMESPACE::BufferAccessor::copy(const Args&... args) {
         auto buff = this->data();
         size_t offset = 0;
-		const bool copied = helper::copy_with_shift_offset(buff.data, buff.size, offset, args...);
-		if (offset != 0)
-			buff.flush();
-		return copied;
+        const bool copied = helper::copy_with_shift_offset(buff.data, buff.size, offset, args...);
+        if (offset != 0)
+            buff.flush();
+        return copied;
     }
 
     template<typename... Args>
@@ -151,22 +151,22 @@ namespace VSL_NAMESPACE {
     }
 
     template<typename T, typename Count>
-    requires (!std::same_as<Count, std::size_t> &&
-              (std::integral<Count> || (std::is_enum_v<Count> && std::is_convertible_v<Count, std::size_t>)))
+    requires(!std::same_as<Count, std::size_t> &&
+             (std::integral<Count> || (std::is_enum_v<Count> && std::is_convertible_v<Count, std::size_t>)))
     bool BufferAccessor::copy(T* t, Count size) {
         if constexpr (std::is_enum_v<Count>) {
             return copy(t, static_cast<std::underlying_type_t<Count>>(size));
         } else {
-        if constexpr (std::is_signed_v<Count>) {
-            if (size < 0)
-                return false;
+            if constexpr (std::is_signed_v<Count>) {
+                if (size < 0)
+                    return false;
+            }
+            if constexpr (sizeof(Count) > sizeof(std::size_t)) {
+                if (size > std::numeric_limits<std::size_t>::max())
+                    return false;
+            }
+            return copy(t, static_cast<std::size_t>(size));
         }
-        if constexpr (sizeof(Count) > sizeof(std::size_t)) {
-            if (size > std::numeric_limits<std::size_t>::max())
-                return false;
-        }
-        return copy(t, static_cast<std::size_t>(size));
-    }
     }
 
     template<typename T>
@@ -182,22 +182,22 @@ namespace VSL_NAMESPACE {
     }
 
     template<typename T, typename Count>
-    requires (!std::same_as<Count, std::size_t> &&
-              (std::integral<Count> || (std::is_enum_v<Count> && std::is_convertible_v<Count, std::size_t>)))
+    requires(!std::same_as<Count, std::size_t> &&
+             (std::integral<Count> || (std::is_enum_v<Count> && std::is_convertible_v<Count, std::size_t>)))
     bool BufferAccessor::LocalBufferHolder::copy(T* t, Count size) {
         if constexpr (std::is_enum_v<Count>) {
             return copy(t, static_cast<std::underlying_type_t<Count>>(size));
         } else {
-        if constexpr (std::is_signed_v<Count>) {
-            if (size < 0)
-                return false;
+            if constexpr (std::is_signed_v<Count>) {
+                if (size < 0)
+                    return false;
+            }
+            if constexpr (sizeof(Count) > sizeof(std::size_t)) {
+                if (size > std::numeric_limits<std::size_t>::max())
+                    return false;
+            }
+            return copy(t, static_cast<std::size_t>(size));
         }
-        if constexpr (sizeof(Count) > sizeof(std::size_t)) {
-            if (size > std::numeric_limits<std::size_t>::max())
-                return false;
-        }
-        return copy(t, static_cast<std::size_t>(size));
-    }
     }
 
     template<typename T>
@@ -215,8 +215,8 @@ namespace VSL_NAMESPACE {
         auto buff = data();
         size_t offset = 0;
         (helper::uncheck_copy_with_shift_offset(buff.data, offset, args), ...);
-		if (offset != 0)
-			buff.flush();
+        if (offset != 0)
+            buff.flush();
     }
 
     template<typename... Args>

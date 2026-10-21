@@ -219,7 +219,7 @@ void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::BufferAcce
         const auto layout = _data->layout;
         if (!layout)
             throw VSL_NAMESPACE::exceptions::RuntimeException("LayoutNotFound", "Layout not found!",
-                                                    std::source_location::current());
+                                                              std::source_location::current());
         const auto found = std::ranges::find(layout->layoutBindings, binding,
                                              &vk::DescriptorSetLayoutBinding::binding);
         if (found == layout->layoutBindings.end())

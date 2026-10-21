@@ -27,16 +27,16 @@ namespace {
 } // namespace
 
 namespace {
-TEST_F(ImageVulkanIntegrationTest, UnavailableImageMemoryPropertiesReleasePartiallyCreatedImages) {
-    using Unsupported = vsl::Image<vsl::ImageType::TransferDst | vsl::ImageType::Sampled,
-                                   vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::LazilyAllocated>;
-    for (int attempt = 0; attempt < 3; ++attempt)
-        EXPECT_THROW((Unsupported(device, 2, 2, vsl::data_format::UnsignedNormalized8RGBA)),
-                     vsl::exceptions::RuntimeException);
-    vsl::Image<vsl::ImageType::TransferDst | vsl::ImageType::Sampled> valid(
-        device, 2, 2, vsl::data_format::UnsignedNormalized8RGBA);
-    EXPECT_TRUE(valid._data->image);
-    EXPECT_TRUE(valid._data->view);
-    EXPECT_TRUE(valid._data->memory);
-}
+    TEST_F(ImageVulkanIntegrationTest, UnavailableImageMemoryPropertiesReleasePartiallyCreatedImages) {
+        using Unsupported = vsl::Image<vsl::ImageType::TransferDst | vsl::ImageType::Sampled,
+                                       vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::LazilyAllocated>;
+        for (int attempt = 0; attempt < 3; ++attempt)
+            EXPECT_THROW((Unsupported(device, 2, 2, vsl::data_format::UnsignedNormalized8RGBA)),
+                         vsl::exceptions::RuntimeException);
+        vsl::Image<vsl::ImageType::TransferDst | vsl::ImageType::Sampled> valid(
+            device, 2, 2, vsl::data_format::UnsignedNormalized8RGBA);
+        EXPECT_TRUE(valid._data->image);
+        EXPECT_TRUE(valid._data->view);
+        EXPECT_TRUE(valid._data->memory);
+    }
 } // namespace

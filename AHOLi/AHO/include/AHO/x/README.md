@@ -21,3 +21,5 @@ AHOのexperimental機能は、次のディレクトリに配置する。
 空の分類ディレクトリは`.gitkeep`でGit上に保持する。ファイルを追加した分類では`.gitkeep`を削除してよい。
 
 実装済みの機能: [glTF/GLB・画像・外部SPIR-Vの読み込み](../../../../../documents/AHO/experimental-gltf.md)、 [スクリーンショット](../../../../../documents/AHO/experimental-screenshot.md)。
+
+歩行サンプルで検証する `x/scene/` には、Vulkan座標規約の `Camera`、深度付き静的メッシュ描画の `MeshRenderer`、同じ深度パスへGPU skinning付きglTFを描く `GltfRenderer` を配置する。[利用例](../../../../../sample-game/README.md)と[不足機能・実装順序](../../../../../documants/sample-game-engine-order.md)を参照。

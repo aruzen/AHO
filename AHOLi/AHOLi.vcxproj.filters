@@ -188,4 +188,11 @@
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="AHO\include\AHO\x\scene\camera.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="AHO\include\AHO\x\scene\mesh_renderer.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="AHO\include\AHO\x\scene\gltf_renderer.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClCompile Include="AHO\src\x\scene\mesh_renderer.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClCompile Include="AHO\src\x\scene\gltf_renderer.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+  </ItemGroup>
 </Project>

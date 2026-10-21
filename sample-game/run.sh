@@ -11,7 +11,9 @@ if [[ -z "${VULKAN_SDK:-}" && -d "$HOME/VulkanSDK" ]]; then
 fi
 if [[ -n "${VULKAN_SDK:-}" ]]; then
     export PATH="$VULKAN_SDK/bin:$PATH"
-    sample_options+=("-DVulkan_INCLUDE_DIR=$VULKAN_SDK/include" "-DVulkan_LIBRARY=$VULKAN_SDK/lib/libvulkan.dylib")
+    if [[ "$(uname -s)" == Darwin ]]; then
+        sample_options+=("-DVulkan_INCLUDE_DIR=$VULKAN_SDK/include" "-DVulkan_LIBRARY=$VULKAN_SDK/lib/libvulkan.dylib")
+    fi
     if [[ -f "$VULKAN_SDK/share/vulkan/icd.d/MoltenVK_icd.json" ]]; then
         export VK_ICD_FILENAMES="${VK_ICD_FILENAMES:-$VULKAN_SDK/share/vulkan/icd.d/MoltenVK_icd.json}"
     fi

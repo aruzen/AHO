@@ -70,8 +70,16 @@ namespace wander {
             float angle = i * glm::two_pi<float>() / 54;
             glm::vec3 base(std::sin(angle) * range(370, 460), -14, std::cos(angle) * range(370, 460));
             float r = range(50, 100), h = range(95, 200), cap = range(.36f, .55f), rotation = range(0, 6);
-            cone(vertices, base, r, h, {.34f, .47f, .46f}, 5, rotation);
-            cone(vertices, base + glm::vec3(0, h * (1 - cap), 0), r * cap * 1.003f, h * cap + .1f, {.85f, .91f, .85f}, 5, rotation);
+            auto peak = base + glm::vec3(0, h, 0);
+            for (int j = 0; j < 5; ++j) {
+                float a = rotation + j * glm::two_pi<float>() / 5, b = rotation + (j + 1) * glm::two_pi<float>() / 5;
+                auto p = base + glm::vec3(std::cos(a) * r, 0, std::sin(a) * r);
+                auto q = base + glm::vec3(std::cos(b) * r, 0, std::sin(b) * r);
+                auto cp = glm::mix(peak, p, cap), cq = glm::mix(peak, q, cap);
+                triangle(vertices, p, cp, q, {.28f, .4f, .39f});
+                triangle(vertices, q, cp, cq, {.28f, .4f, .39f});
+                triangle(vertices, cp, peak, cq, {.85f, .91f, .85f});
+            }
         }
         // Continuous walkable shoreline: trunks and boulders are solid; water stays at the shore.
         for (int i = 0; i < 2100; ++i) {
@@ -167,9 +175,24 @@ namespace wander {
         return from;
     }
     void Walker::view(int index) {
-        if (index == 0) { position = {0, 87}; yaw = 0; pitch = .03f; night = 0; }
-        if (index == 1) { position = {-115, 70}; yaw = -.65f; pitch = .12f; night = .15f; }
-        if (index == 2) { position = {120, 55}; yaw = .75f; pitch = .25f; night = 1; }
+        if (index == 0) {
+            position = {0, 87};
+            yaw = 0;
+            pitch = .03f;
+            night = 0;
+        }
+        if (index == 1) {
+            position = {-115, 70};
+            yaw = -.65f;
+            pitch = .12f;
+            night = .15f;
+        }
+        if (index == 2) {
+            position = {120, 55};
+            yaw = .75f;
+            pitch = .25f;
+            night = 1;
+        }
         stride = 0;
     }
     void Walker::walk(const World& world, glm::vec2 input, float seconds, bool running) {

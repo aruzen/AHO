@@ -8,14 +8,18 @@ int glfwGetWindowAttrib(GLFWwindow* handle, int attribute) {
 }
 int glfwGetInputMode(GLFWwindow* handle, int mode) {
     auto* window = aho_test::InputWindow::find(handle);
-    if (!window) return 0;
+    if (!window)
+        return 0;
     return mode == GLFW_CURSOR ? window->cursor_mode : window->raw_motion;
 }
 void glfwSetInputMode(GLFWwindow* handle, int mode, int value) {
     auto* window = aho_test::InputWindow::find(handle);
-    if (!window) return;
-    if (mode == GLFW_CURSOR) window->cursor_mode = value;
-    if (mode == GLFW_RAW_MOUSE_MOTION) window->raw_motion = value;
+    if (!window)
+        return;
+    if (mode == GLFW_CURSOR)
+        window->cursor_mode = value;
+    if (mode == GLFW_RAW_MOUSE_MOTION)
+        window->raw_motion = value;
 }
 const char* glfwGetKeyName(int key, int) {
     switch (key) {

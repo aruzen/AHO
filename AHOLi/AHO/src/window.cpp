@@ -97,6 +97,18 @@ void AHO_NAMESPACE::window::Window::restore() {
     glfwRestoreWindow((GLFWwindow*)_data->window_handle);
 }
 
+void AHO_NAMESPACE::window::Window::show() {
+    if (!*this)
+        throw std::logic_error("Cannot show a closed window");
+    glfwShowWindow(static_cast<GLFWwindow*>(_data->window_handle));
+}
+
+void AHO_NAMESPACE::window::Window::focus() {
+    if (!*this)
+        throw std::logic_error("Cannot focus a closed window");
+    glfwFocusWindow(static_cast<GLFWwindow*>(_data->window_handle));
+}
+
 bool AHO_NAMESPACE::window::Window::set_title(const std::string& title) {
     glfwSetWindowTitle((GLFWwindow*)_data->window_handle, title.c_str());
     return true;

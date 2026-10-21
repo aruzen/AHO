@@ -1,0 +1,38 @@
+# SDK 1.4.309 ships MoltenVK 1.2.11, whose retired swapchains can turn the
+# replacement CAMetalLayer into a 1x1 drawable. Fixed upstream in 1.4.2.
+# Keep the fixed runtime inside this build; never install or replace a system SDK.
+option(AHO_WANDER_LOCAL_MOLTENVK "Use a project-local MoltenVK 1.4.2 runtime on macOS" ON)
+set(AHO_WANDER_ICD_FILE "" CACHE FILEPATH "Override the sample's MoltenVK ICD (1.4.2 or newer)")
+if(APPLE AND AHO_WANDER_LOCAL_MOLTENVK)
+    if(NOT AHO_WANDER_ICD_FILE)
+        set(sample_mvk_root "${CMAKE_BINARY_DIR}/_deps/moltenvk-1.4.2")
+        set(sample_mvk_archive "${sample_mvk_root}/MoltenVK-macos.tar")
+        set(sample_mvk_icd "${sample_mvk_root}/MoltenVK/MoltenVK/dynamic/dylib/macOS/MoltenVK_icd.json")
+        if(NOT EXISTS "${sample_mvk_icd}")
+            file(MAKE_DIRECTORY "${sample_mvk_root}")
+            set(sample_mvk_hash f95765a6229cb7b915990a2890ce12ebe36a730b021545d3d52ae69ce4c4024e)
+            if(EXISTS "${sample_mvk_archive}")
+                file(SHA256 "${sample_mvk_archive}" sample_mvk_actual)
+            endif()
+            if(NOT sample_mvk_actual STREQUAL sample_mvk_hash)
+                file(DOWNLOAD "https://github.com/KhronosGroup/MoltenVK/releases/download/v1.4.2/MoltenVK-macos.tar"
+                    "${sample_mvk_archive}" EXPECTED_HASH "SHA256=${sample_mvk_hash}" TLS_VERIFY ON TIMEOUT 180 STATUS result)
+                list(GET result 0 status)
+                if(NOT status EQUAL 0)
+                    file(REMOVE "${sample_mvk_archive}")
+                    message(FATAL_ERROR "Could not fetch MoltenVK: ${result}. Set AHO_WANDER_ICD_FILE for offline builds.")
+                endif()
+            endif()
+            execute_process(COMMAND "${CMAKE_COMMAND}" -E tar xf "${sample_mvk_archive}"
+                MoltenVK/MoltenVK/dynamic MoltenVK/LICENSE
+                WORKING_DIRECTORY "${sample_mvk_root}" RESULT_VARIABLE result)
+            if(NOT result EQUAL 0)
+                message(FATAL_ERROR "Could not extract project-local MoltenVK")
+            endif()
+        endif()
+        set(AHO_WANDER_ICD_FILE "${sample_mvk_icd}" CACHE FILEPATH "Sample MoltenVK ICD" FORCE)
+    endif()
+    if(NOT EXISTS "${AHO_WANDER_ICD_FILE}")
+        message(FATAL_ERROR "Missing MoltenVK ICD: ${AHO_WANDER_ICD_FILE}")
+    endif()
+endif()

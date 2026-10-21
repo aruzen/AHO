@@ -6,11 +6,15 @@
 #include <span>
 #include <cstddef>
 #include <array>
+#include <VSL/vulkan/render_pass.hpp>
+#include <VSL/vulkan/swapchain.hpp>
 
 namespace AHO_NAMESPACE {
     struct DrawPhase;
-    namespace engine { struct GraphicalEngine; }
-}
+    namespace engine {
+        struct GraphicalEngine;
+    }
+} // namespace AHO_NAMESPACE
 namespace AHO_NAMESPACE::x::scene {
     // Experimental descriptor-free vertex stream. Material is interpreted by the caller's shaders.
     struct MeshVertex {
@@ -20,6 +24,7 @@ namespace AHO_NAMESPACE::x::scene {
     class MeshRenderer {
         struct Data;
         std::unique_ptr<Data> data;
+
     public:
         MeshRenderer(engine::GraphicalEngine& engine, std::span<const MeshVertex> vertices,
                      const std::filesystem::path& vertexShader, const std::filesystem::path& fragmentShader,
@@ -30,6 +35,9 @@ namespace AHO_NAMESPACE::x::scene {
         // Call before acquiring DrawPhase; recreates depth/framebuffers/pipeline after a resize.
         void prepare();
         std::array<unsigned, 2> extent() const;
+        // Composition point for another AHO renderer recording into this same depth pass.
+        VSL_NAMESPACE::RenderPassAccessor renderPass() const;
+        VSL_NAMESPACE::SwapchainAccessor swapchain() const;
         // Starts a color+depth pass. DrawPhase ends and submits it, allowing Screenshot to attach.
         void record(DrawPhase& phase, std::span<const std::byte> pushConstants);
     };

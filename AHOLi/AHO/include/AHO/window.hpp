@@ -50,6 +50,8 @@ namespace AHO_NAMESPACE::window {
         void maximize();
 
         void restore();
+        void show();
+        void focus();
 
         bool close() override;
     };

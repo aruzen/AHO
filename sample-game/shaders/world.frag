@@ -173,12 +173,12 @@ void main() {
             alpha = .18;
         }
         float distance = length(world - scene.eyeTime.xyz);
-        float fog = 1. - exp(-distance * mix(.0032, .0046, night));
-        vec3 mist = sky(normalize(vec3(view.x, .035, view.z)));
+        float fog = 1. - exp(-distance * mix(.0022, .0035, night));
+        vec3 mist = mix(vec3(.65, .78, .68), vec3(.08, .19, .23), night);
         c = mix(c, mist, clamp(fog, 0., .9));
     }
     // Gentle film response, deliberately retaining the pastel palette.
     c = c / (c + vec3(.65));
-    c = pow(c, vec3(.90));
+    c = pow(c, vec3(1.32));
     outputColor = vec4(hud(c), alpha);
 }

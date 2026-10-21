@@ -3,6 +3,18 @@
 #include <VSL/vulkan/phase.hpp>
 #include <stdexcept>
 
+namespace {
+    struct BufferCustomization {
+        auto map(VSL_NAMESPACE::StagingBuffer<>& storage) const;
+    };
+} // namespace
+
+namespace {
+    auto BufferCustomization::map(VSL_NAMESPACE::StagingBuffer<>& storage) const {
+        return storage.data();
+    }
+} // namespace
+
 // 管理するTextureとGPUFriendly Bufferを再利用し、グリフの矩形だけを追加する。
 VSL_NAMESPACE::Completion uploadGlyph(
     VSL_NAMESPACE::CommandManager manager,
@@ -19,12 +31,6 @@ VSL_NAMESPACE::Completion uploadGlyph(
         throw std::runtime_error("Texture upload submission failed");
     return phase.completion();
 }
-
-namespace {
-    struct BufferCustomization {
-        auto map(VSL_NAMESPACE::StagingBuffer<>& storage) const { return storage.data(); }
-    };
-} // namespace
 
 // VSLで用意したバッファも同じAHOの転送経路で使う。
 VSL_NAMESPACE::Completion uploadCustomBuffer(

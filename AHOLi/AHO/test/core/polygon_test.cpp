@@ -2,6 +2,8 @@
 #include <gtest/gtest.h>
 #include <array>
 #include <cstdint>
+#include <cmath>
+#include <limits>
 
 namespace {
     using P = aho::d2::PointD;
@@ -63,6 +65,22 @@ namespace {
         const std::array indices{I{{0}, {1}, {2}}};
         const aho::Polygon<int, vsl::D2> mesh(points, indices);
         EXPECT_DOUBLE_EQ(mesh.area(), 20000000000.0);
+
+        using IntPoint = aho::_Point<std::int32_t, vsl::D2>;
+        constexpr auto lowest = std::numeric_limits<std::int32_t>::min();
+        constexpr auto highest = std::numeric_limits<std::int32_t>::max();
+        const std::array extreme_points{IntPoint(lowest, lowest), IntPoint(highest, lowest), IntPoint(lowest, highest)};
+        const aho::Polygon<std::int32_t, vsl::D2> extreme_mesh(extreme_points, indices);
+        EXPECT_DOUBLE_EQ(extreme_mesh.area(), 9223372032559808512.0);
+    }
+
+    TEST(PolygonTest, ThreeDimensionalAreaPreservesLargeAndSmallNonAxisAlignedTriangles) {
+        const std::array indices{I{{0}, {1}, {2}}};
+        for (const double scale : {1e-150, 1e150}) {
+            const std::array points{aho::d3::PointD(0, 0, 0), aho::d3::PointD(scale, scale, 0), aho::d3::PointD(0, scale, scale)};
+            const aho::Polygon<double, vsl::D3> mesh(points, indices);
+            EXPECT_NEAR(mesh.area() / scale / scale, std::sqrt(3.0) / 2, 1e-12);
+        }
     }
     TEST(PolygonTest, RejectsVertexCountsThatCannotBeIndexed) {
         using Small = aho::Polygon<double, vsl::D2, aho::coordinate::_DefaultCoordinateInfo<vsl::D2>::value, std::uint8_t>;

@@ -53,16 +53,24 @@ namespace AHO_NAMESPACE {
     }
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
-    std::span<const typename Polygon<R, D, CI, Size, Alloc>::point_type> Polygon<R, D, CI, Size, Alloc>::points() const noexcept { return _points; }
+    std::span<const typename Polygon<R, D, CI, Size, Alloc>::point_type> Polygon<R, D, CI, Size, Alloc>::points() const noexcept {
+        return _points;
+    }
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
-    std::span<const typename Polygon<R, D, CI, Size, Alloc>::triangle_type> Polygon<R, D, CI, Size, Alloc>::indices() const noexcept { return _triangles; }
+    std::span<const typename Polygon<R, D, CI, Size, Alloc>::triangle_type> Polygon<R, D, CI, Size, Alloc>::indices() const noexcept {
+        return _triangles;
+    }
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
-    std::size_t Polygon<R, D, CI, Size, Alloc>::size() const noexcept { return _triangles.size(); }
+    std::size_t Polygon<R, D, CI, Size, Alloc>::size() const noexcept {
+        return _triangles.size();
+    }
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
-    bool Polygon<R, D, CI, Size, Alloc>::empty() const noexcept { return _triangles.empty(); }
+    bool Polygon<R, D, CI, Size, Alloc>::empty() const noexcept {
+        return _triangles.empty();
+    }
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
     auto Polygon<R, D, CI, Size, Alloc>::triangles() const {
@@ -84,21 +92,11 @@ namespace AHO_NAMESPACE {
     double Polygon<R, D, CI, Size, Alloc>::area() const {
         long double result = 0;
         for (const auto triangle : triangles()) {
-            const auto a = triangle.pos1.value;
-            const auto b = triangle.pos2.value;
-            const auto c = triangle.pos3.value;
-            const long double ux = static_cast<long double>(b.___AN1) - static_cast<long double>(a.___AN1);
-            const long double vx = static_cast<long double>(c.___AN1) - static_cast<long double>(a.___AN1);
-            if constexpr (D::dimension == 2) {
-                const long double uy = static_cast<long double>(b.___AN2) - static_cast<long double>(a.___AN2);
-                const long double vy = static_cast<long double>(c.___AN2) - static_cast<long double>(a.___AN2);
-                result += std::abs(ux * vy - uy * vx) / 2;
-            } else if constexpr (D::dimension == 3) {
-                const long double uy = static_cast<long double>(b.___AN2) - static_cast<long double>(a.___AN2);
-                const long double vy = static_cast<long double>(c.___AN2) - static_cast<long double>(a.___AN2);
-                const long double uz = static_cast<long double>(b.___AN3) - static_cast<long double>(a.___AN3);
-                const long double vz = static_cast<long double>(c.___AN3) - static_cast<long double>(a.___AN3);
-                result += std::hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) / 2;
+            if constexpr (D::dimension == 2 || D::dimension == 3) {
+                const auto origin = triangle.pos1.template cast<long double>();
+                const auto ab = triangle.pos2.template cast<long double>() - origin;
+                const auto ac = triangle.pos3.template cast<long double>() - origin;
+                result += ab.cross(ac).length() / 2;
             }
         }
         return static_cast<double>(result);

@@ -168,7 +168,7 @@ if(AHO_BUILD_GLTF_VIEWER)
             "${CMAKE_CURRENT_SOURCE_DIR}/AHO/include" "${VSL_HOME}/include"
             ${Vulkan_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS})
     target_compile_definitions(aho-gltf-viewer PRIVATE
-            AHO_GLTF_VIEWER_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../examples/assets/animated_cube"
+            AHO_GLTF_VIEWER_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../examples/assets/fox"
             AHO_GLTF_VIEWER_SHADER_DIR="${AHO_VIEWER_SHADER_DIR}")
     target_link_directories(aho-gltf-viewer PRIVATE ${GLFW_LIBRARY_DIRS})
     target_link_libraries(aho-gltf-viewer PRIVATE AHOLi VSL)

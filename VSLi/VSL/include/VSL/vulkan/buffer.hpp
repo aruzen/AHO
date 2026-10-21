@@ -154,7 +154,7 @@ namespace VSL_NAMESPACE {
         auto buff = this->data();
         size_t offset = 0;
         const bool copied = helper::copy_with_shift_offset(buff.data, buff.size, offset, args...);
-        buff.flush(offset);
+        flushCopied(buff, offset);
         return copied;
     }
 
@@ -190,7 +190,8 @@ namespace VSL_NAMESPACE {
             return false;
         if (size == 0)
             return true;
-        buff.write(std::as_bytes(std::span(t, size)));
+        std::memmove(buff.data, t, sizeof(T) * size);
+        flushCopied(buff, sizeof(T) * size);
         return true;
     }
 
@@ -228,7 +229,7 @@ namespace VSL_NAMESPACE {
         auto buff = data();
         size_t offset = 0;
         (helper::uncheck_copy_with_shift_offset(buff.data, offset, args), ...);
-        buff.flush(offset);
+        flushCopied(buff, offset);
     }
 
     template<typename... Args>

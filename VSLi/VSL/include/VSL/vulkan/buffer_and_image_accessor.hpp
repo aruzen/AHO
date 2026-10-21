@@ -268,7 +268,7 @@ namespace VSL_NAMESPACE {
         bool copyByImage(CommandManager commandManager, const ImageAccessor& image);
 
         size_t size();
-        // size()の割当サイズと区別し、要求したバイト数を返す。
+        // 要求したバイト数を返す。
         std::size_t requestedSize() const;
 
         static std::shared_ptr<_impl::Buffer_impl>
@@ -281,6 +281,9 @@ namespace VSL_NAMESPACE {
         static LocalBufferHolder
         GetData(VSL_NAMESPACE::BufferAccessor* data, std::optional<size_t> size, size_t offset, MemoryType memType,
                 MemoryProperty memProperty, SharingMode sharingMode);
+
+    private:
+        void flushCopied(LocalBufferHolder& holder, std::size_t bytes);
     };
 
     struct ImageAccessor {

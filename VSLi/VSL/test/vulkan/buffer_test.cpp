@@ -517,7 +517,10 @@ namespace {
         mapped.uncheck_copy(std::uint32_t{29});
         EXPECT_EQ(buffer.flush_calls, 0);
         mapped.flush();
+        EXPECT_EQ(buffer.flush_calls, 0);
+        buffer.flush(mapped);
         EXPECT_EQ(buffer.flush_calls, 1);
+        EXPECT_EQ(*static_cast<const std::uint32_t*>(mapped.data), 29u);
     }
 } // namespace
 
@@ -795,8 +798,8 @@ namespace {
         EXPECT_EQ(remaining.size, 30u);
         EXPECT_EQ(remaining.data, static_cast<std::byte*>(first.data) + 3);
         EXPECT_TRUE(buffer.data(0, 33).read(0).empty());
-        EXPECT_THROW(buffer.data(1, 33), std::out_of_range);
-        EXPECT_THROW(buffer.data(std::nullopt, SIZE_MAX), std::out_of_range);
+        EXPECT_THROW(buffer.data(1, 33), vsl::exceptions::RuntimeException);
+        EXPECT_THROW(buffer.data(std::nullopt, SIZE_MAX), vsl::exceptions::RuntimeException);
         EXPECT_THROW(partial.read(1, 7), std::out_of_range);
         EXPECT_THROW(partial.write(payload, 6), std::out_of_range);
         EXPECT_THROW(partial.flush(SIZE_MAX, 1), std::out_of_range);
@@ -844,6 +847,6 @@ namespace {
         if (selected & vk::MemoryPropertyFlagBits::eProtected)
             GTEST_SKIP() << "This device has protected memory";
         using ProtectedBuffer = vsl::Buffer<vsl::MemoryType::TransferSource, vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::Protected>;
-        EXPECT_THROW((ProtectedBuffer(device, std::size_t{4})), std::runtime_error);
+        EXPECT_THROW((ProtectedBuffer(device, std::size_t{4})), vsl::exceptions::RuntimeException);
     }
 } // namespace

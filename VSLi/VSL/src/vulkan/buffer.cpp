@@ -76,6 +76,13 @@ std::size_t VSL_NAMESPACE::BufferAccessor::requestedSize() const {
     return _data ? _data->requirementSize : 0;
 }
 
+void VSL_NAMESPACE::BufferAccessor::flushCopied(LocalBufferHolder& holder, std::size_t bytes) {
+    if (!bytes)
+        return;
+    holder.size = bytes;
+    flush(holder);
+}
+
 void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::flush() {
     flush(size);
 }

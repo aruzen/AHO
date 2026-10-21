@@ -177,6 +177,9 @@
     <ClCompile Include="AHO\src\resource\image.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="AHO\src\x\drawer\draw_list.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="AHO\src\drawer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>

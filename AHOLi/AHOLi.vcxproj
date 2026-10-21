@@ -217,6 +217,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AHO\src\drawer.cpp" />
+    <ClCompile Include="AHO\src\x\drawer\draw_list.cpp" />
     <ClCompile Include="AHO\src\drawer\draw_phase.cpp" />
     <ClCompile Include="AHO\src\image_readback.cpp" />
     <ClCompile Include="AHO\src\x\screenshot.cpp" />

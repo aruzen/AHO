@@ -9,6 +9,7 @@ BreakBeforeBraces: Attach
 AccessModifierOffset: -4
 IndentCaseLabels: true
 
+# 短いインライン関数と空の関数のみ1行を許可する。
 AllowShortFunctionsOnASingleLine: Inline
 SpaceAfterTemplateKeyword: false
 BreakTemplateDeclarations: Yes

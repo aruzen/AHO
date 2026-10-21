@@ -32,67 +32,67 @@ namespace {
     }
 } // namespace
 
-template<VSL_NAMESPACE::ShaderType _Type>
-VSL_NAMESPACE::Shader<_Type>::Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path) {
-    _data = std::make_shared<_impl::Shader_impl>();
-    _data->device = device._data;
+template<VSL_NAMESPACE::ShaderType type>
+VSL_NAMESPACE::Shader<type>::Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path) {
+    data_ = std::make_shared<impl::ShaderImpl>();
+    data_->device = device.data_;
     const auto code = read_shader_code(path);
 
-    vk::ShaderModuleCreateInfo createInfo;
-    createInfo.codeSize = code.size() * sizeof(std::uint32_t);
-    createInfo.pCode = code.data();
+    vk::ShaderModuleCreateInfo create_info;
+    create_info.codeSize = code.size() * sizeof(std::uint32_t);
+    create_info.pCode = code.data();
 
-    _data->shaderModule = _data->device->device.createShaderModule(createInfo);
+    data_->shader_module = data_->device->device.createShaderModule(create_info);
 
-    _data->name = "main";
+    data_->name = "main";
 
-    _data->shaderStageCreateInfo.pName = _data->name.c_str();
-    _data->shaderStageCreateInfo.module = _data->shaderModule;
-    _data->shaderStageCreateInfo.stage = (vk::ShaderStageFlagBits)_Type;
+    data_->shader_stage_create_info.pName = data_->name.c_str();
+    data_->shader_stage_create_info.module = data_->shader_module;
+    data_->shader_stage_create_info.stage = (vk::ShaderStageFlagBits)type;
 }
 
-template<VSL_NAMESPACE::ShaderType _Type>
-VSL_NAMESPACE::Shader<_Type>::Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path, std::string name) {
-    _data = std::make_shared<_impl::Shader_impl>();
-    _data->device = device._data;
+template<VSL_NAMESPACE::ShaderType type>
+VSL_NAMESPACE::Shader<type>::Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path, std::string name) {
+    data_ = std::make_shared<impl::ShaderImpl>();
+    data_->device = device.data_;
     const auto code = read_shader_code(path);
 
-    vk::ShaderModuleCreateInfo createInfo;
-    createInfo.codeSize = code.size() * sizeof(std::uint32_t);
-    createInfo.pCode = code.data();
+    vk::ShaderModuleCreateInfo create_info;
+    create_info.codeSize = code.size() * sizeof(std::uint32_t);
+    create_info.pCode = code.data();
 
-    _data->shaderModule = _data->device->device.createShaderModule(createInfo);
+    data_->shader_module = data_->device->device.createShaderModule(create_info);
 
-    _data->name = std::move(name);
+    data_->name = std::move(name);
 
-    _data->shaderStageCreateInfo.pName = _data->name.c_str();
-    _data->shaderStageCreateInfo.module = _data->shaderModule;
-    _data->shaderStageCreateInfo.stage = (vk::ShaderStageFlagBits)_Type;
+    data_->shader_stage_create_info.pName = data_->name.c_str();
+    data_->shader_stage_create_info.module = data_->shader_module;
+    data_->shader_stage_create_info.stage = (vk::ShaderStageFlagBits)type;
 }
 
-template<VSL_NAMESPACE::ShaderType _Type>
-std::string VSL_NAMESPACE::Shader<_Type>::name() const {
-    return _data->name;
+template<VSL_NAMESPACE::ShaderType type>
+std::string VSL_NAMESPACE::Shader<type>::name() const {
+    return data_->name;
 }
 
-VSL_NAMESPACE::_impl::Shader_impl::~Shader_impl() {
-    device->device.destroyShaderModule(shaderModule);
+VSL_NAMESPACE::impl::ShaderImpl::~ShaderImpl() {
+    device->device.destroyShaderModule(shader_module);
 }
 
-template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Error>;
-template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Vertex>;
-template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::TessellationControl>;
-template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::TessellationEvaluation>;
-template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Geometry>;
-template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Fragment>;
-template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Compute>;
-template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::AllGraphics>;
-template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Raygen>;
-template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::AnyHit>;
-template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::ClosestHit>;
-template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Miss>;
-template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Intersection>;
-template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Callable>;
-template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Task>;
-template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Mesh>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::ERROR_>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::VERTEX>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::TESSELLATION_CONTROL>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::TESSELLATION_EVALUATION>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::GEOMETRY>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::FRAGMENT>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::COMPUTE>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::ALL_GRAPHICS>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::RAYGEN>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::ANY_HIT>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::CLOSEST_HIT>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::MISS>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::INTERSECTION>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::CALLABLE>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::TASK>;
+template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::MESH>;
 // template struct vsl::Shader<VSL_NAMESPACE::ShaderType::All>;

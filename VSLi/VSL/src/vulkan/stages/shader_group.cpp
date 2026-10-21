@@ -4,30 +4,30 @@
 #include <vector>
 
 VSL_NAMESPACE::pipeline_layout::ShaderGroup::ShaderGroup(std::string name, std::initializer_list<ShaderAccessor> shaders) {
-    _data = std::shared_ptr<VSL_NAMESPACE::_impl::pipeline_layout::ShaderGroup_impl>(new VSL_NAMESPACE::_impl::pipeline_layout::ShaderGroup_impl);
-    _data->name = name;
+    data_ = std::shared_ptr<VSL_NAMESPACE::impl::pipeline_layout::ShaderGroupImpl>(new VSL_NAMESPACE::impl::pipeline_layout::ShaderGroupImpl);
+    data_->name = name;
     for (auto& shader : shaders) {
-        _data->shaders.push_back(shader._data);
+        data_->shaders.push_back(shader.data_);
     }
 }
 
-void VSL_NAMESPACE::pipeline_layout::ShaderGroup::addShader(ShaderAccessor shader) {
-    _data->shaders.push_back(shader._data);
+void VSL_NAMESPACE::pipeline_layout::ShaderGroup::add_shader(ShaderAccessor shader) {
+    data_->shaders.push_back(shader.data_);
 }
 
-void VSL_NAMESPACE::pipeline_layout::ShaderGroup::removeShader(std::string name) {
-    std::erase_if(_data->shaders, [&name](const auto& shader) { return shader->name == name; });
+void VSL_NAMESPACE::pipeline_layout::ShaderGroup::remove_shader(std::string name) {
+    std::erase_if(data_->shaders, [&name](const auto& shader) { return shader->name == name; });
 }
 
-void VSL_NAMESPACE::pipeline_layout::ShaderGroup::removeShader(ShaderAccessor shader) {
-    std::erase_if(_data->shaders, [&shader](const auto& candidate) { return candidate.get() == shader._data.get(); });
+void VSL_NAMESPACE::pipeline_layout::ShaderGroup::remove_shader(ShaderAccessor shader) {
+    std::erase_if(data_->shaders, [&shader](const auto& candidate) { return candidate.get() == shader.data_.get(); });
 }
 
 void VSL_NAMESPACE::pipeline_layout::ShaderGroup::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
-    auto& info = *pl._data->info;
+    auto& info = *pl.data_->info;
 
-    for (auto& itr : _data->shaders) {
-        info.shaderStages.push_back(itr->shaderStageCreateInfo);
+    for (auto& itr : data_->shaders) {
+        info.shader_stages.push_back(itr->shader_stage_create_info);
         info.shaders.push_back(itr);
     }
 }

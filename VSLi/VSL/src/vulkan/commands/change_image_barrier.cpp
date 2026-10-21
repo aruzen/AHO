@@ -4,88 +4,88 @@
 #include "../image_format.hpp"
 
 VSL_NAMESPACE::command::ChangeImageBarrier::ChangeImageBarrier(VSL_NAMESPACE::ImageAccessor image,
-                                                               ImageLayout oldLayout,
-                                                               ImageLayout newLayout)
-    : image(image), oldLayout(oldLayout), newLayout(newLayout) {}
+                                                               ImageLayout old_layout,
+                                                               ImageLayout new_layout)
+    : image(image), old_layout(old_layout), new_layout(new_layout) {}
 
-VSL_NAMESPACE::command::ChangeImageBarrier::ChangeImageBarrier(VSL_NAMESPACE::ImageAccessor image, ImageLayout oldLayout,
-                                                               ImageLayout newLayout, std::uint32_t baseLayer,
-                                                               std::uint32_t layerCount)
-    : image(image), oldLayout(oldLayout), newLayout(newLayout), baseLayer(baseLayer), layerCount(layerCount) {}
+VSL_NAMESPACE::command::ChangeImageBarrier::ChangeImageBarrier(VSL_NAMESPACE::ImageAccessor image, ImageLayout old_layout,
+                                                               ImageLayout new_layout, std::uint32_t base_layer,
+                                                               std::uint32_t layer_count)
+    : image(image), old_layout(old_layout), new_layout(new_layout), base_layer(base_layer), layer_count(layer_count) {}
 
 void VSL_NAMESPACE::command::ChangeImageBarrier::invoke(VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer,
                                                         VSL_NAMESPACE::CommandManager manager) {
-    if (!image._data || !image._data->image || !buffer._data || !buffer._data->commandPool || !manager._data ||
-        image._data->device != manager._data->device ||
-        buffer._data->commandPool->device != image._data->device)
+    if (!image.data_ || !image.data_->image || !buffer.data_ || !buffer.data_->command_pool || !manager.data_ ||
+        image.data_->device != manager.data_->device ||
+        buffer.data_->command_pool->device != image.data_->device)
         throw std::invalid_argument("Image barrier requires an image and command buffer on the same device");
-    if (baseLayer >= image._data->count)
+    if (base_layer >= image.data_->count)
         throw std::out_of_range("Image barrier base layer exceeds image");
-    const auto layers = layerCount ? layerCount : image._data->count - baseLayer;
-    if (layers > image._data->count - baseLayer)
+    const auto layers = layer_count ? layer_count : image.data_->count - base_layer;
+    if (layers > image.data_->count - base_layer)
         throw std::out_of_range("Image barrier layer range exceeds image");
     vk::ImageMemoryBarrier barrier;
-    barrier.oldLayout = (vk::ImageLayout)oldLayout;
-    barrier.newLayout = (vk::ImageLayout)newLayout;
-    barrier.image = image._data->image;
+    barrier.oldLayout = (vk::ImageLayout)old_layout;
+    barrier.newLayout = (vk::ImageLayout)new_layout;
+    barrier.image = image.data_->image;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.subresourceRange.aspectMask = _impl::helper::imageAspects(image._data->format);
+    barrier.subresourceRange.aspectMask = impl::helper::image_aspects(image.data_->format);
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount = 1;
-    barrier.subresourceRange.baseArrayLayer = baseLayer;
+    barrier.subresourceRange.baseArrayLayer = base_layer;
     barrier.subresourceRange.layerCount = layers;
 
-    vk::PipelineStageFlags sourceStage, destinationStage;
-    if (oldLayout == ImageLayout::Undefined && newLayout == ImageLayout::TransferDstOptimal) {
+    vk::PipelineStageFlags source_stage, destination_stage;
+    if (old_layout == ImageLayout::UNDEFINED && new_layout == ImageLayout::TRANSFER_DST_OPTIMAL) {
         barrier.srcAccessMask = {};
         barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
 
-        sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
-        destinationStage = vk::PipelineStageFlagBits::eTransfer;
-    } else if (oldLayout == ImageLayout::Undefined && newLayout == ImageLayout::ColorAttachmentOptimal) {
+        source_stage = vk::PipelineStageFlagBits::eTopOfPipe;
+        destination_stage = vk::PipelineStageFlagBits::eTransfer;
+    } else if (old_layout == ImageLayout::UNDEFINED && new_layout == ImageLayout::COLOR_ATTACHMENT_OPTIMAL) {
         barrier.srcAccessMask = {};
         barrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
 
-        sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
-        destinationStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-    } else if (oldLayout == ImageLayout::TransferDstOptimal && newLayout == ImageLayout::ShaderReadOnlyOptimal) {
+        source_stage = vk::PipelineStageFlagBits::eTopOfPipe;
+        destination_stage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    } else if (old_layout == ImageLayout::TRANSFER_DST_OPTIMAL && new_layout == ImageLayout::SHADER_READ_ONLY_OPTIMAL) {
         barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
         barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
 
-        sourceStage = vk::PipelineStageFlagBits::eTransfer;
-        destinationStage = vk::PipelineStageFlagBits::eFragmentShader;
-    } else if (oldLayout == ImageLayout::ColorAttachmentOptimal && newLayout == ImageLayout::TransferSrcOptimal) {
+        source_stage = vk::PipelineStageFlagBits::eTransfer;
+        destination_stage = vk::PipelineStageFlagBits::eFragmentShader;
+    } else if (old_layout == ImageLayout::COLOR_ATTACHMENT_OPTIMAL && new_layout == ImageLayout::TRANSFER_SRC_OPTIMAL) {
         barrier.srcAccessMask = vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite;
         barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
 
-        sourceStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-        destinationStage = vk::PipelineStageFlagBits::eTransfer;
-    } else if (oldLayout == ImageLayout::TransferSrcOptimal && newLayout == ImageLayout::ColorAttachmentOptimal) {
+        source_stage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+        destination_stage = vk::PipelineStageFlagBits::eTransfer;
+    } else if (old_layout == ImageLayout::TRANSFER_SRC_OPTIMAL && new_layout == ImageLayout::COLOR_ATTACHMENT_OPTIMAL) {
         barrier.srcAccessMask = vk::AccessFlagBits::eTransferRead;
         barrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite;
 
-        sourceStage = vk::PipelineStageFlagBits::eTransfer;
-        destinationStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-    } else if (newLayout == ImageLayout::TransferSrcOptimal &&
-               (oldLayout == ImageLayout::General || oldLayout == ImageLayout::ShaderReadOnlyOptimal ||
-                oldLayout == ImageLayout::TransferDstOptimal || oldLayout == ImageLayout::Present ||
-                oldLayout == ImageLayout::TransferSrcOptimal)) {
+        source_stage = vk::PipelineStageFlagBits::eTransfer;
+        destination_stage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    } else if (new_layout == ImageLayout::TRANSFER_SRC_OPTIMAL &&
+               (old_layout == ImageLayout::GENERAL || old_layout == ImageLayout::SHADER_READ_ONLY_OPTIMAL ||
+                old_layout == ImageLayout::TRANSFER_DST_OPTIMAL || old_layout == ImageLayout::PRESENT ||
+                old_layout == ImageLayout::TRANSFER_SRC_OPTIMAL)) {
         barrier.srcAccessMask = vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite;
         barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
-        sourceStage = vk::PipelineStageFlagBits::eAllCommands;
-        destinationStage = vk::PipelineStageFlagBits::eTransfer;
-    } else if (oldLayout == ImageLayout::TransferSrcOptimal &&
-               (newLayout == ImageLayout::General || newLayout == ImageLayout::ShaderReadOnlyOptimal ||
-                newLayout == ImageLayout::TransferDstOptimal || newLayout == ImageLayout::Present)) {
+        source_stage = vk::PipelineStageFlagBits::eAllCommands;
+        destination_stage = vk::PipelineStageFlagBits::eTransfer;
+    } else if (old_layout == ImageLayout::TRANSFER_SRC_OPTIMAL &&
+               (new_layout == ImageLayout::GENERAL || new_layout == ImageLayout::SHADER_READ_ONLY_OPTIMAL ||
+                new_layout == ImageLayout::TRANSFER_DST_OPTIMAL || new_layout == ImageLayout::PRESENT)) {
         barrier.srcAccessMask = vk::AccessFlagBits::eTransferRead;
         barrier.dstAccessMask = vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite;
-        sourceStage = vk::PipelineStageFlagBits::eTransfer;
-        destinationStage = vk::PipelineStageFlagBits::eAllCommands;
+        source_stage = vk::PipelineStageFlagBits::eTransfer;
+        destination_stage = vk::PipelineStageFlagBits::eAllCommands;
     } else {
         throw std::invalid_argument("unsupported layout transition!");
     }
 
-    buffer.retain(image._data);
-    buffer._data->commandBuffers.at(buffer.getCurrentBufferIdx()).pipelineBarrier(sourceStage, destinationStage, {}, nullptr, nullptr, barrier);
+    buffer.retain(image.data_);
+    buffer.data_->command_buffers.at(buffer.get_current_buffer_idx()).pipelineBarrier(source_stage, destination_stage, {}, nullptr, nullptr, barrier);
 }

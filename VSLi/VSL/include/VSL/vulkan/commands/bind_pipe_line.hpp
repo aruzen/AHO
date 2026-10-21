@@ -6,12 +6,12 @@
 #include "../pipeline.hpp"
 
 namespace VSL_NAMESPACE::command {
-    struct BindPipeline : public __Command, public __PipelineHolder {
+    struct BindPipeline : public Command, public PipelineHolder {
         BindPipeline(PipelineAccessor pipeline);
 
         PipelineAccessor pipeline;
 
-        PipelineAccessor getPipeline() override;
+        PipelineAccessor get_pipeline() override;
 
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
     };

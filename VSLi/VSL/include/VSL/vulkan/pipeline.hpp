@@ -9,7 +9,7 @@
 
 namespace VSL_NAMESPACE {
     struct PipelineAccessor {
-        std::shared_ptr<_impl::Pipeline_impl> _data;
+        std::shared_ptr<impl::PipelineImpl> data_;
     };
 
     struct GraphicsPipeline : public PipelineAccessor {

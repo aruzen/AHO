@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::GetMonitorSize() {
+AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::get_monitor_size() {
     GLFWmonitor* monitor = glfwGetPrimaryMonitor();
     if (!monitor)
         throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "Primary monitor is not available");
@@ -36,45 +36,45 @@ AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::GetMonitorSize() {
 
 namespace {
     const std::string& checked_window_name(const std::string& name, const AHO_NAMESPACE::engine::EngineAccessor& engine) {
-        const auto& data = engine._data;
-        if (!data || !data->vulkan_instance._accessor || !data->logical_device._data ||
-            !data->command_manager._data || !data->synchro_manager._data)
+        const auto& data = engine.data_;
+        if (!data || !data->vulkan_instance.accessor || !data->logical_device.data_ ||
+            !data->command_manager.data_ || !data->synchro_manager.data_)
             throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "A booted engine is required");
-        auto buffers = data->command_manager.getBuffer();
-        if (!buffers._data || buffers.getSize() == 0)
+        auto buffers = data->command_manager.get_buffer();
+        if (!buffers.data_ || buffers.get_size() == 0)
             throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "A booted engine is required");
         return name;
     }
 } // namespace
 
-AHO_NAMESPACE::engine::EngineAccessor AHO_NAMESPACE::window::Window::default_engine() {
-    auto* current = AHO_NAMESPACE::engine::EngineAccessor::instance();
+AHO_NAMESPACE::engine::EngineAccessor AHO_NAMESPACE::window::Window::DefaultEngine() {
+    auto* current = AHO_NAMESPACE::engine::EngineAccessor::Instance();
     if (!current)
         throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "A booted engine is required");
     return *current;
 }
 
-AHO_NAMESPACE::window::Window::Window(std::string name, int width, int height, AHO_NAMESPACE::engine::EngineAccessor _engine)
-    : VSL_NAMESPACE::Window(checked_window_name(name, _engine), width, height) {
+AHO_NAMESPACE::window::Window::Window(std::string name, int width, int height, AHO_NAMESPACE::engine::EngineAccessor engine_)
+    : VSL_NAMESPACE::Window(checked_window_name(name, engine_), width, height) {
     try {
-        engine = _engine;
-        auto surface = this->add_plugin<VSL_NAMESPACE::Surface>(_engine._data->vulkan_instance);
-        VSL_NAMESPACE::Swapchain swapchain(_engine._data->logical_device, surface);
+        engine = engine_;
+        auto surface = this->add_plugin<VSL_NAMESPACE::Surface>(engine_.data_->vulkan_instance);
+        VSL_NAMESPACE::Swapchain swapchain(engine_.data_->logical_device, surface);
         VSL_NAMESPACE::RenderPass pass(swapchain);
 
-        _data2 = std::make_shared<AHO_NAMESPACE::window::WindowData>(AHO_NAMESPACE::window::WindowData{
+        data2 = std::make_shared<AHO_NAMESPACE::window::WindowData>(AHO_NAMESPACE::window::WindowData{
             .surface = surface,
             .swapchain = swapchain,
             .render_pass = pass,
             .frame_buffer = VSL_NAMESPACE::FrameBuffer(swapchain, pass),
-            .image_available = _engine._data->synchro_manager
-                                   .createSemaphore(name + "ImageAvailable", _engine._data->command_manager.getBuffer().getSize()),
-            .render_finished = _engine._data->synchro_manager
-                                   .createSemaphore(name + "RenderFinished", swapchain.getSwapImageSize()),
-            .in_flight = _engine._data->synchro_manager
-                             .createFence(name + "InFlight", _engine._data->command_manager.getBuffer().getSize(), true)});
+            .image_available = engine_.data_->synchro_manager
+                                   .create_semaphore(name + "ImageAvailable", engine_.data_->command_manager.get_buffer().get_size()),
+            .render_finished = engine_.data_->synchro_manager
+                                   .create_semaphore(name + "RenderFinished", swapchain.get_swap_image_size()),
+            .in_flight = engine_.data_->synchro_manager
+                             .create_fence(name + "InFlight", engine_.data_->command_manager.get_buffer().get_size(), true)});
     } catch (...) {
-        _data->plugins.clear();
+        data_->plugins.clear();
         VSL_NAMESPACE::PureWindow::close();
         throw;
     }
@@ -83,28 +83,28 @@ AHO_NAMESPACE::window::Window::Window(std::string name, int width, int height, A
 AHO_NAMESPACE::window::Window::Window(engine::EngineAccessor engine, std::shared_ptr<VSL_NAMESPACE::Window::WindowData> vsl_data,
                                       std::shared_ptr<AHO_NAMESPACE::window::WindowData> aho_data)
     : VSL_NAMESPACE::Window(std::move(vsl_data)), engine(std::move(engine)) {
-    _data2 = std::move(aho_data);
+    data2 = std::move(aho_data);
 }
 
 bool AHO_NAMESPACE::window::Window::resize(int width, int height) {
     if (not VSL_NAMESPACE::PureWindow::resize(width, height))
         return false;
-    engine._data->command_manager.waitIdle();
-    const auto usage = _data2->swapchain.images.at(0).getUsage();
-    _data2->swapchain = VSL_NAMESPACE::Swapchain(engine._data->logical_device, _data2->surface, _data2->swapchain,
+    engine.data_->command_manager.wait_idle();
+    const auto usage = data2->swapchain.images.at(0).get_usage();
+    data2->swapchain = VSL_NAMESPACE::Swapchain(engine.data_->logical_device, data2->surface, data2->swapchain,
                                                  std::nullopt, std::nullopt, usage);
-    _data2->frame_buffer = VSL_NAMESPACE::FrameBuffer(_data2->swapchain, _data2->render_pass);
-    if (_data2->render_finished.size() != _data2->swapchain.getSwapImageSize())
-        _data2->render_finished = engine._data->synchro_manager.createSemaphore(
-            name() + "RenderFinished", _data2->swapchain.getSwapImageSize());
-    const auto data = _data;
+    data2->frame_buffer = VSL_NAMESPACE::FrameBuffer(data2->swapchain, data2->render_pass);
+    if (data2->render_finished.size() != data2->swapchain.get_swap_image_size())
+        data2->render_finished = engine.data_->synchro_manager.create_semaphore(
+            name() + "RenderFinished", data2->swapchain.get_swap_image_size());
+    const auto data = data_;
     std::vector<std::pair<unsigned char, std::weak_ptr<WindowResizeHookPlugin>>> hooks;
     hooks.reserve(data->plugins.size());
     for (const auto& [id, plugin] : data->plugins)
         if (auto hook = std::dynamic_pointer_cast<WindowResizeHookPlugin>(plugin))
             hooks.emplace_back(id, hook);
     for (const auto& [id, candidate] : hooks) {
-        if (_data != data || !_data2 || !data->window_handle)
+        if (data_ != data || !data2 || !data->window_handle)
             break;
         auto hook = candidate.lock();
         const auto current = data->plugins.find(id);
@@ -116,27 +116,27 @@ bool AHO_NAMESPACE::window::Window::resize(int width, int height) {
 }
 
 void AHO_NAMESPACE::window::Window::maximize() {
-    glfwMaximizeWindow((GLFWwindow*)_data->window_handle);
+    glfwMaximizeWindow((GLFWwindow*)data_->window_handle);
 }
 
 void AHO_NAMESPACE::window::Window::restore() {
-    glfwRestoreWindow((GLFWwindow*)_data->window_handle);
+    glfwRestoreWindow((GLFWwindow*)data_->window_handle);
 }
 
 bool AHO_NAMESPACE::window::Window::set_title(const std::string& title) {
-    glfwSetWindowTitle((GLFWwindow*)_data->window_handle, title.c_str());
+    glfwSetWindowTitle((GLFWwindow*)data_->window_handle, title.c_str());
     return true;
 }
 
 AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::Window::window_size() {
     d2::VectorI v;
-    glfwGetWindowSize((GLFWwindow*)_data->window_handle, &v.value.x.value, &v.value.y.value);
+    glfwGetWindowSize((GLFWwindow*)data_->window_handle, &v.value.x.value, &v.value.y.value);
     return v;
 }
 
 AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::Window::frame_size() {
     d2::VectorI v;
-    glfwGetFramebufferSize((GLFWwindow*)_data->window_handle, &v.value.x.value, &v.value.y.value);
+    glfwGetFramebufferSize((GLFWwindow*)data_->window_handle, &v.value.x.value, &v.value.y.value);
     return v;
 }
 
@@ -146,9 +146,9 @@ AHO_NAMESPACE::window::WindowResizeHookPlugin::WindowResizeHookPlugin(VSL_NAMESP
 }
 
 bool AHO_NAMESPACE::window::Window::close() {
-    if (_data2)
-        engine._data->command_manager.waitIdle();
-    _data2.reset();
+    if (data2)
+        engine.data_->command_manager.wait_idle();
+    data2.reset();
     return VSL_NAMESPACE::PureWindow::close();
 }
 

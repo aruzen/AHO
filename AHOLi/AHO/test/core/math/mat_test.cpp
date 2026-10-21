@@ -2,18 +2,18 @@
 #include <AHO/core/point.hpp>
 
 #if defined(AHO_CONTRACT_MAT_INITIALIZER)
-constexpr aho::Mat<int, 2, 2> initialized({{1, 2}, {3, 4}});
-static_assert(initialized[0][0] == 1 && initialized[0][1] == 2 && initialized[1][0] == 3 && initialized[1][1] == 4);
-constexpr aho::Mat<int, 2, 3> partial({{1}, {2, 3}});
-static_assert(partial[0][0] == 1 && partial[0][1] == 0 && partial[0][2] == 0);
-static_assert(partial[1][0] == 2 && partial[1][1] == 3 && partial[1][2] == 0);
-constexpr aho::Mat<int, 2, 2> empty_rows({{}, {}});
-static_assert(empty_rows[0][0] == 0 && empty_rows[1][1] == 0);
-constexpr aho::Mat<int, 1, 2> truncated({{1, 2, 3}, {4, 5, 6}});
-static_assert(truncated[0][0] == 1 && truncated[0][1] == 2);
-constexpr aho::Mat<int, 0, 2> no_rows({{1, 2}});
-constexpr aho::Mat<int, 2, 0> no_columns({{1}, {2}});
-static_assert(no_rows.size() == 0 && no_columns.size() == 2);
+constexpr aho::Mat<int, 2, 2> INITIALIZED({{1, 2}, {3, 4}});
+static_assert(INITIALIZED[0][0] == 1 && INITIALIZED[0][1] == 2 && INITIALIZED[1][0] == 3 && INITIALIZED[1][1] == 4);
+constexpr aho::Mat<int, 2, 3> PARTIAL({{1}, {2, 3}});
+static_assert(PARTIAL[0][0] == 1 && PARTIAL[0][1] == 0 && PARTIAL[0][2] == 0);
+static_assert(PARTIAL[1][0] == 2 && PARTIAL[1][1] == 3 && PARTIAL[1][2] == 0);
+constexpr aho::Mat<int, 2, 2> EMPTY_ROWS({{}, {}});
+static_assert(EMPTY_ROWS[0][0] == 0 && EMPTY_ROWS[1][1] == 0);
+constexpr aho::Mat<int, 1, 2> TRUNCATED({{1, 2, 3}, {4, 5, 6}});
+static_assert(TRUNCATED[0][0] == 1 && TRUNCATED[0][1] == 2);
+constexpr aho::Mat<int, 0, 2> NO_ROWS({{1, 2}});
+constexpr aho::Mat<int, 2, 0> NO_COLUMNS({{1}, {2}});
+static_assert(NO_ROWS.size() == 0 && NO_COLUMNS.size() == 2);
 
 #elif defined(AHO_CONTRACT_MAT_RECTANGULAR_FACTORY)
 void check_factory() {
@@ -35,8 +35,8 @@ void check_rotation() {
 #include "../../support/matrix.hpp"
 TEST(MatContractTest, ViewMatrixMovesEyeToOriginForFloatAndDouble) {
     auto verify = []<class T>() {
-        using P = aho::_Point<T, vsl::D3>;
-        using V = aho::_Vector<T, vsl::D3>;
+        using P = aho::Point_<T, vsl::D3>;
+        using V = aho::Vector_<T, vsl::D3>;
         const auto view = aho::matrix::make_view(P(0, 0, 1), P(0, 0, 0), V(0, 1, 0));
         // AHO retains a 180-degree camera roll relative to the conventional right-handed lookAt.
         aho_test::expect_matrix(view, std::array<std::array<double, 4>, 4>{{{-1, 0, 0, 0}, {0, -1, 0, 0}, {0, 0, 1, 0}, {0, 0, -1, 1}}});
@@ -46,52 +46,52 @@ TEST(MatContractTest, ViewMatrixMovesEyeToOriginForFloatAndDouble) {
 }
 #elif defined(AHO_CONTRACT_MAT_AXIS_DEGREE_OVERLOAD)
 using Rotation = aho::Mat4x4<double> (*)(aho::Degree, aho::d3::VectorD);
-constexpr Rotation rotation = &aho::matrix::make_rotation<double>;
+constexpr Rotation ROTATION = &aho::matrix::make_rotation<double>;
 #elif defined(AHO_CONTRACT_MAT_PERSPECTIVE)
 void check_perspective() {
     const auto radians = aho::matrix::make_perspective(aho::Radian{1}, 1.0, 0.1, 100.0);
     const auto degrees = aho::matrix::make_perspective(aho::Degree{90}, 1.0, 0.1, 100.0);
 }
 #elif defined(AHO_CONTRACT_MAT_SCALAR_RIGHT_MULTIPLY)
-constexpr aho::Mat<int, 1, 2> matrix(std::array<std::array<int, 2>, 1>{{{2, 4}}});
-constexpr auto result = matrix * 2;
-static_assert(result[0][0] == 4 && result[0][1] == 8);
+constexpr aho::Mat<int, 1, 2> MATRIX(std::array<std::array<int, 2>, 1>{{{2, 4}}});
+constexpr auto RESULT = MATRIX * 2;
+static_assert(RESULT[0][0] == 4 && RESULT[0][1] == 8);
 #elif defined(AHO_CONTRACT_MAT_SCALAR_LEFT_MULTIPLY)
-constexpr aho::Mat<int, 1, 2> matrix(std::array<std::array<int, 2>, 1>{{{2, 4}}});
-constexpr auto result = 2 * matrix;
-static_assert(result[0][0] == 4 && result[0][1] == 8);
+constexpr aho::Mat<int, 1, 2> MATRIX(std::array<std::array<int, 2>, 1>{{{2, 4}}});
+constexpr auto RESULT = 2 * MATRIX;
+static_assert(RESULT[0][0] == 4 && RESULT[0][1] == 8);
 #elif defined(AHO_CONTRACT_MAT_SCALAR_RIGHT_DIVIDE)
-constexpr aho::Mat<int, 1, 2> matrix(std::array<std::array<int, 2>, 1>{{{2, 4}}});
-constexpr auto result = matrix / 2;
-static_assert(result[0][0] == 1 && result[0][1] == 2);
+constexpr aho::Mat<int, 1, 2> MATRIX(std::array<std::array<int, 2>, 1>{{{2, 4}}});
+constexpr auto RESULT = MATRIX / 2;
+static_assert(RESULT[0][0] == 1 && RESULT[0][1] == 2);
 #elif defined(AHO_CONTRACT_MAT_SCALAR_LEFT_DIVIDE)
-constexpr aho::Mat<int, 1, 2> matrix(std::array<std::array<int, 2>, 1>{{{2, 4}}});
-constexpr auto result = 8 / matrix;
-static_assert(result[0][0] == 4 && result[0][1] == 2);
+constexpr aho::Mat<int, 1, 2> MATRIX(std::array<std::array<int, 2>, 1>{{{2, 4}}});
+constexpr auto RESULT = 8 / MATRIX;
+static_assert(RESULT[0][0] == 4 && RESULT[0][1] == 2);
 #else
 #include <gtest/gtest.h>
 
 #include "../../support/asymmetric_arithmetic.hpp"
 namespace {
     using namespace aho_test::arithmetic;
-    template<std::size_t Rows, std::size_t Columns>
+    template<std::size_t rows, std::size_t columns>
     struct ElementMatrixShape {
         template<class T>
-        using Of = aho::Mat<T, Rows, Columns>;
+        using Of = aho::Mat<T, rows, columns>;
         template<class T>
-        static constexpr Of<T> values(bool right = false) {
+        static constexpr Of<T> Values(bool right = false) {
             Of<T> result{};
-            for (std::size_t i = 0; i < Rows; ++i)
-                for (std::size_t j = 0; j < Columns; ++j) {
-                    const int index = static_cast<int>(i * Columns + j);
+            for (std::size_t i = 0; i < rows; ++i)
+                for (std::size_t j = 0; j < columns; ++j) {
+                    const int index = static_cast<int>(i * columns + j);
                     result[i][j] = T{right ? 4 + index : 12 + 4 * index};
                 }
             return result;
         }
         template<class T>
-        static constexpr bool equal(const Of<T>& actual, const std::array<int, 6>& expected) {
-            for (std::size_t i = 0; i < Rows; ++i)
-                for (std::size_t j = 0; j < Columns; ++j) {
+        static constexpr bool Equal(const Of<T>& actual, const std::array<int, 6>& expected) {
+            for (std::size_t i = 0; i < rows; ++i)
+                for (std::size_t j = 0; j < columns; ++j) {
                     const auto& value = actual[i][j];
                     const int integer = [&] {
                         if constexpr (std::integral<T>)
@@ -99,7 +99,7 @@ namespace {
                         else
                             return value.value;
                     }();
-                    if (integer != expected[i * Columns + j])
+                    if (integer != expected[i * columns + j])
                         return false;
                 }
             return true;
@@ -112,8 +112,8 @@ namespace {
     TYPED_TEST(MatElementConstraintTest, BinaryAndScalarOperatorsUseTheWrittenOperandOrder) {
         using S = TypeParam;
         using Result = typename S::template Of<int>;
-        constexpr auto lhs = S::template values<LeftOperand>();
-        constexpr auto rhs = S::template values<Operand>(true);
+        constexpr auto lhs = S::template Values<LeftOperand>();
+        constexpr auto rhs = S::template Values<Operand>(true);
         constexpr Operand divisor{4};
         constexpr LeftOperand scalar{48};
         static_assert(std::same_as<decltype(lhs + rhs), Result>);
@@ -122,18 +122,18 @@ namespace {
         static_assert(std::same_as<decltype(lhs / divisor), Result>);
         static_assert(std::same_as<decltype(scalar * rhs), Result>);
         static_assert(std::same_as<decltype(scalar / rhs), Result>);
-        static_assert(S::equal(lhs + rhs, {16, 21, 26, 31, 36, 41}));
-        static_assert(S::equal(lhs - rhs, {8, 11, 14, 17, 20, 23}));
-        static_assert(S::equal(lhs * divisor, {48, 64, 80, 96, 112, 128}));
-        static_assert(S::equal(lhs / divisor, {3, 4, 5, 6, 7, 8}));
-        static_assert(S::equal(scalar * rhs, {192, 240, 288, 336, 384, 432}));
-        static_assert(S::equal(scalar / rhs, {12, 9, 8, 6, 6, 5}));
-        EXPECT_TRUE(S::equal(lhs + rhs, {16, 21, 26, 31, 36, 41}));
-        EXPECT_TRUE(S::equal(lhs - rhs, {8, 11, 14, 17, 20, 23}));
-        EXPECT_TRUE(S::equal(lhs * divisor, {48, 64, 80, 96, 112, 128}));
-        EXPECT_TRUE(S::equal(lhs / divisor, {3, 4, 5, 6, 7, 8}));
-        EXPECT_TRUE(S::equal(scalar * rhs, {192, 240, 288, 336, 384, 432}));
-        EXPECT_TRUE(S::equal(scalar / rhs, {12, 9, 8, 6, 6, 5}));
+        static_assert(S::Equal(lhs + rhs, {16, 21, 26, 31, 36, 41}));
+        static_assert(S::Equal(lhs - rhs, {8, 11, 14, 17, 20, 23}));
+        static_assert(S::Equal(lhs * divisor, {48, 64, 80, 96, 112, 128}));
+        static_assert(S::Equal(lhs / divisor, {3, 4, 5, 6, 7, 8}));
+        static_assert(S::Equal(scalar * rhs, {192, 240, 288, 336, 384, 432}));
+        static_assert(S::Equal(scalar / rhs, {12, 9, 8, 6, 6, 5}));
+        EXPECT_TRUE(S::Equal(lhs + rhs, {16, 21, 26, 31, 36, 41}));
+        EXPECT_TRUE(S::Equal(lhs - rhs, {8, 11, 14, 17, 20, 23}));
+        EXPECT_TRUE(S::Equal(lhs * divisor, {48, 64, 80, 96, 112, 128}));
+        EXPECT_TRUE(S::Equal(lhs / divisor, {3, 4, 5, 6, 7, 8}));
+        EXPECT_TRUE(S::Equal(scalar * rhs, {192, 240, 288, 336, 384, 432}));
+        EXPECT_TRUE(S::Equal(scalar / rhs, {12, 9, 8, 6, 6, 5}));
         EXPECT_FALSE((CanAdd<decltype(rhs), decltype(lhs)>));
         EXPECT_FALSE((CanSubtract<decltype(rhs), decltype(lhs)>));
         EXPECT_FALSE((CanMultiply<decltype(rhs), LeftOperand>));
@@ -144,22 +144,22 @@ namespace {
     TYPED_TEST(MatElementConstraintTest, CompoundOperatorsModifyEveryElementAndReturnTheSameMatrix) {
         using S = TypeParam;
         using M = typename S::template Of<LeftOperand>;
-        auto lhs = S::template values<LeftOperand>();
-        constexpr auto rhs = S::template values<Operand>(true);
+        auto lhs = S::template Values<LeftOperand>();
+        constexpr auto rhs = S::template Values<Operand>(true);
         constexpr Operand factor{4};
         static_assert(std::same_as<decltype(lhs += rhs), M&>);
         static_assert(std::same_as<decltype(lhs -= rhs), M&>);
         static_assert(std::same_as<decltype(lhs *= factor), M&>);
         static_assert(std::same_as<decltype(lhs /= factor), M&>);
         EXPECT_EQ(&(lhs += rhs), &lhs);
-        EXPECT_TRUE(S::equal(lhs, {16, 21, 26, 31, 36, 41}));
+        EXPECT_TRUE(S::Equal(lhs, {16, 21, 26, 31, 36, 41}));
         EXPECT_EQ(&(lhs -= rhs), &lhs);
-        EXPECT_TRUE(S::equal(lhs, {12, 16, 20, 24, 28, 32}));
+        EXPECT_TRUE(S::Equal(lhs, {12, 16, 20, 24, 28, 32}));
         EXPECT_EQ(&(lhs *= factor), &lhs);
-        EXPECT_TRUE(S::equal(lhs, {48, 64, 80, 96, 112, 128}));
+        EXPECT_TRUE(S::Equal(lhs, {48, 64, 80, 96, 112, 128}));
         EXPECT_EQ(&(lhs /= factor), &lhs);
-        EXPECT_TRUE(S::equal(lhs, {12, 16, 20, 24, 28, 32}));
-        EXPECT_TRUE(S::equal(rhs, {4, 5, 6, 7, 8, 9}));
+        EXPECT_TRUE(S::Equal(lhs, {12, 16, 20, 24, 28, 32}));
+        EXPECT_TRUE(S::Equal(rhs, {4, 5, 6, 7, 8, 9}));
     }
     TYPED_TEST(MatElementConstraintTest, AssignmentOnlyElementsDoNotNeedBinaryOperators) {
         using S = TypeParam;
@@ -167,22 +167,22 @@ namespace {
         using Right = typename S::template Of<Operand>;
         static_assert(!CanAdd<M, Right> && !CanSubtract<M, Right>);
         static_assert(!CanMultiply<M, Operand> && !CanDivide<M, Operand>);
-        auto lhs = S::template values<AssignmentOnly>();
-        constexpr auto rhs = S::template values<Operand>(true);
+        auto lhs = S::template Values<AssignmentOnly>();
+        constexpr auto rhs = S::template Values<Operand>(true);
         EXPECT_EQ(&(lhs += rhs), &lhs);
-        EXPECT_TRUE(S::equal(lhs, {16, 21, 26, 31, 36, 41}));
+        EXPECT_TRUE(S::Equal(lhs, {16, 21, 26, 31, 36, 41}));
         EXPECT_EQ(&(lhs -= rhs), &lhs);
-        EXPECT_TRUE(S::equal(lhs, {12, 16, 20, 24, 28, 32}));
+        EXPECT_TRUE(S::Equal(lhs, {12, 16, 20, 24, 28, 32}));
         EXPECT_EQ(&(lhs *= Operand{4}), &lhs);
-        EXPECT_TRUE(S::equal(lhs, {48, 64, 80, 96, 112, 128}));
+        EXPECT_TRUE(S::Equal(lhs, {48, 64, 80, 96, 112, 128}));
         EXPECT_EQ(&(lhs /= Operand{4}), &lhs);
-        EXPECT_TRUE(S::equal(lhs, {12, 16, 20, 24, 28, 32}));
+        EXPECT_TRUE(S::Equal(lhs, {12, 16, 20, 24, 28, 32}));
     }
     TYPED_TEST(MatElementConstraintTest, ResultTypesComeFromConstReferencesRatherThanRvalues) {
         using S = TypeParam;
         using Result = typename S::template Of<int>;
-        constexpr auto lhs = S::template values<CategoryResult>();
-        constexpr auto rhs = S::template values<CategoryResult>(true);
+        constexpr auto lhs = S::template Values<CategoryResult>();
+        constexpr auto rhs = S::template Values<CategoryResult>(true);
         constexpr CategoryResult factor{4};
         static_assert(std::same_as<decltype(lhs + rhs), Result>);
         static_assert(std::same_as<decltype(lhs - rhs), Result>);
@@ -190,12 +190,12 @@ namespace {
         static_assert(std::same_as<decltype(lhs / factor), Result>);
         static_assert(std::same_as<decltype(factor * rhs), Result>);
         static_assert(std::same_as<decltype(factor / rhs), Result>);
-        EXPECT_TRUE(S::equal(lhs + rhs, {16, 21, 26, 31, 36, 41}));
-        EXPECT_TRUE(S::equal(lhs - rhs, {8, 11, 14, 17, 20, 23}));
-        EXPECT_TRUE(S::equal(lhs * factor, {48, 64, 80, 96, 112, 128}));
-        EXPECT_TRUE(S::equal(lhs / factor, {3, 4, 5, 6, 7, 8}));
-        EXPECT_TRUE(S::equal(factor * rhs, {16, 20, 24, 28, 32, 36}));
-        EXPECT_TRUE(S::equal(factor / rhs, {1, 0, 0, 0, 0, 0}));
+        EXPECT_TRUE(S::Equal(lhs + rhs, {16, 21, 26, 31, 36, 41}));
+        EXPECT_TRUE(S::Equal(lhs - rhs, {8, 11, 14, 17, 20, 23}));
+        EXPECT_TRUE(S::Equal(lhs * factor, {48, 64, 80, 96, 112, 128}));
+        EXPECT_TRUE(S::Equal(lhs / factor, {3, 4, 5, 6, 7, 8}));
+        EXPECT_TRUE(S::Equal(factor * rhs, {16, 20, 24, 28, 32, 36}));
+        EXPECT_TRUE(S::Equal(factor / rhs, {1, 0, 0, 0, 0, 0}));
     }
     TYPED_TEST(MatElementConstraintTest, RejectsMutableOnlyBinaryOperationsAndAbsentCompoundAssignments) {
         using S = TypeParam;
@@ -288,9 +288,9 @@ namespace {
         EXPECT_EQ(product[0][0], 23);
         constexpr aho::Mat<RvalueMatrixFactor, 1, 2> left{{RvalueMatrixFactor{2}, RvalueMatrixFactor{3}}};
         constexpr aho::Mat<RvalueMatrixFactor, 2, 1> right{{RvalueMatrixFactor{4}}, {RvalueMatrixFactor{5}}};
-        constexpr auto actualPrvalue = left * right;
-        static_assert(actualPrvalue[0][0].value == 23);
-        EXPECT_EQ(actualPrvalue[0][0].value, 23);
+        constexpr auto actual_prvalue = left * right;
+        static_assert(actual_prvalue[0][0].value == 23);
+        EXPECT_EQ(actual_prvalue[0][0].value, 23);
     }
     TEST(MatProductConstraintTest, CompoundProductsUseAssignmentInsteadOfScalarMultiplyAssign) {
         using L = aho::Mat<MatrixWritebackElement, 2, 2>;
@@ -334,17 +334,17 @@ namespace {
         for (const auto& row : result)
             for (const auto value : row)
                 EXPECT_DOUBLE_EQ(value, 0);
-        constexpr aho::Mat<int, 0, 2> noRows{};
+        constexpr aho::Mat<int, 0, 2> no_rows{};
         constexpr aho::Mat<int, 2, 3> regular{};
-        constexpr auto noRowResult = noRows * regular;
-        static_assert(noRowResult.empty());
-        EXPECT_TRUE(noRowResult.empty());
-        constexpr aho::Mat<int, 3, 0> noColumns{};
-        constexpr auto noColumnResult = regular * noColumns;
-        static_assert(noColumnResult.size() == 2 && noColumnResult[0].empty());
-        EXPECT_EQ(noColumnResult.size(), 2u);
-        EXPECT_TRUE(noColumnResult[0].empty());
-        EXPECT_TRUE(noColumnResult[1].empty());
+        constexpr auto no_row_result = no_rows * regular;
+        static_assert(no_row_result.empty());
+        EXPECT_TRUE(no_row_result.empty());
+        constexpr aho::Mat<int, 3, 0> no_columns{};
+        constexpr auto no_column_result = regular * no_columns;
+        static_assert(no_column_result.size() == 2 && no_column_result[0].empty());
+        EXPECT_EQ(no_column_result.size(), 2u);
+        EXPECT_TRUE(no_column_result[0].empty());
+        EXPECT_TRUE(no_column_result[1].empty());
     }
 } // namespace
 #include "../../support/one_way_cast.hpp"
@@ -374,14 +374,14 @@ namespace {
     using aho_test::expect_identity;
     using aho_test::expect_matrix;
     using Matrix2 = aho::Mat<int, 2, 2>;
-    const std::array<std::array<int, 2>, 2> values{{{1, 2}, {3, 4}}};
-    const std::array<std::array<int, 2>, 2> others{{{5, 6}, {7, 8}}};
-    static_assert(Matrix2::type().row == 2 && Matrix2::type().column == 2);
+    const std::array<std::array<int, 2>, 2> VALUES{{{1, 2}, {3, 4}}};
+    const std::array<std::array<int, 2>, 2> OTHERS{{{5, 6}, {7, 8}}};
+    static_assert(Matrix2::Type_().row == 2 && Matrix2::Type_().column == 2);
     static_assert(std::same_as<decltype(aho::matrix::inverse_gauss_jordan(aho::Mat<double, 2, 2>{})),
                                std::expected<aho::Mat<double, 2, 2>, aho::matrix::FailedCause>>);
     TEST(MatTest, ArrayConstructorAndValueInitializationPreserveShapeAndValues) {
-        const Matrix2 matrix(values);
-        expect_matrix(matrix, values);
+        const Matrix2 matrix(VALUES);
+        expect_matrix(matrix, VALUES);
         expect_matrix(Matrix2{}, std::array<std::array<int, 2>, 2>{});
     }
     TEST(MatInitializationTest, InitializerListsPreserveRowsAndZeroFillMissingElements) {
@@ -390,7 +390,7 @@ namespace {
         const aho::Mat<int, 3, 2> tall({{4, 5}, {}, {6}});
         expect_matrix(tall, std::array<std::array<int, 2>, 3>{{{4, 5}, {0, 0}, {6, 0}}});
         const aho::Mat<int, 2, 2> square({{1, 2}, {3, 4}});
-        expect_matrix(square, values);
+        expect_matrix(square, VALUES);
     }
     TEST(MatInitializationTest, ExcessElementsAreTruncatedAndZeroExtentsAreSafe) {
         const aho::Mat<int, 1, 2> truncated({{1, 2, 3}, {4, 5, 6}});
@@ -409,32 +409,32 @@ namespace {
         expect_matrix(aho::matrix::make(tall), std::array<std::array<int, 2>, 3>{{{7, 8}, {9, 10}, {11, 12}}});
     }
     TEST(MatTest, UnaryAndBinaryAdditionAndSubtractionAreElementwise) {
-        const Matrix2 a(values), b(others);
-        expect_matrix(+a, values);
+        const Matrix2 a(VALUES), b(OTHERS);
+        expect_matrix(+a, VALUES);
         expect_matrix(-a, std::array<std::array<int, 2>, 2>{{{-1, -2}, {-3, -4}}});
         expect_matrix(a + b, std::array<std::array<int, 2>, 2>{{{6, 8}, {10, 12}}});
         expect_matrix(a - b, std::array<std::array<int, 2>, 2>{{{-4, -4}, {-4, -4}}});
-        expect_matrix(a, values);
+        expect_matrix(a, VALUES);
     }
     TEST(MatTest, AssignmentAdditionMutatesAndReturnsOriginalObject) {
-        Matrix2 a(values);
-        EXPECT_EQ(&(a += Matrix2(others)), &a);
+        Matrix2 a(VALUES);
+        EXPECT_EQ(&(a += Matrix2(OTHERS)), &a);
         expect_matrix(a, std::array<std::array<int, 2>, 2>{{{6, 8}, {10, 12}}});
     }
     TEST(MatTest, AssignmentSubtractionMutatesAndReturnsOriginalObject) {
-        Matrix2 a(values);
-        EXPECT_EQ(&(a -= Matrix2(others)), &a);
+        Matrix2 a(VALUES);
+        EXPECT_EQ(&(a -= Matrix2(OTHERS)), &a);
         expect_matrix(a, std::array<std::array<int, 2>, 2>{{{-4, -4}, {-4, -4}}});
     }
     TEST(MatTest, MatrixProductUsesRowColumnDotProducts) {
-        const Matrix2 a(values), b(others);
+        const Matrix2 a(VALUES), b(OTHERS);
         expect_matrix(a * b, std::array<std::array<int, 2>, 2>{{{19, 22}, {43, 50}}});
     }
     TEST(MatTest, AssignmentMultiplicationMatchesProductAndHandlesSelfAliasing) {
-        Matrix2 a(values);
-        EXPECT_EQ(&(a *= Matrix2(others)), &a);
+        Matrix2 a(VALUES);
+        EXPECT_EQ(&(a *= Matrix2(OTHERS)), &a);
         expect_matrix(a, std::array<std::array<int, 2>, 2>{{{19, 22}, {43, 50}}});
-        Matrix2 b(values);
+        Matrix2 b(VALUES);
         b *= b;
         expect_matrix(b, std::array<std::array<int, 2>, 2>{{{7, 10}, {15, 22}}});
     }
@@ -449,11 +449,11 @@ namespace {
         expect_matrix(matrix, std::array<std::array<int, 3>, 2>{});
     }
     TEST(MatCompoundAssignmentTest, MultiplicationPreservesOperandsAndMatchesKnownProducts) {
-        Matrix2 matrix(values);
-        const Matrix2 right(others);
+        Matrix2 matrix(VALUES);
+        const Matrix2 right(OTHERS);
         EXPECT_EQ(&(matrix *= right), &matrix);
         expect_matrix(matrix, std::array<std::array<int, 2>, 2>{{{19, 22}, {43, 50}}});
-        expect_matrix(right, others);
+        expect_matrix(right, OTHERS);
         const Matrix2 identity(std::array<std::array<int, 2>, 2>{{{1, 0}, {0, 1}}});
         matrix *= identity;
         expect_matrix(matrix, std::array<std::array<int, 2>, 2>{{{19, 22}, {43, 50}}});
@@ -461,7 +461,7 @@ namespace {
         expect_matrix(matrix, std::array<std::array<int, 2>, 2>{});
     }
     TEST(MatCompoundAssignmentTest, MixedElementMultiplicationConvertsAfterAccumulatingEachDotProduct) {
-        Matrix2 matrix(values);
+        Matrix2 matrix(VALUES);
         const aho::Mat<double, 2, 2> right(std::array<std::array<double, 2>, 2>{{{0.5, 0}, {0.5, 0}}});
         matrix *= right;
         expect_matrix(matrix, std::array<std::array<int, 2>, 2>{{{1, 0}, {3, 0}}});
@@ -488,13 +488,13 @@ namespace {
         expect_matrix(a * b, std::array<std::array<int, 1>, 2>{{{20}, {47}}});
     }
     TEST(MatTest, ScalarAssignmentsAreElementwise) {
-        const Matrix2 a(values);
+        const Matrix2 a(VALUES);
         const std::array<std::array<int, 2>, 2> doubled{{{2, 4}, {6, 8}}};
         auto mutable_matrix = a;
         expect_matrix(mutable_matrix *= 2, doubled);
         expect_matrix(mutable_matrix, doubled);
-        expect_matrix(mutable_matrix /= 2, values);
-        expect_matrix(mutable_matrix, values);
+        expect_matrix(mutable_matrix /= 2, VALUES);
+        expect_matrix(mutable_matrix, VALUES);
     }
     template<class T>
     class MatConstCastTest : public testing::Test {};
@@ -546,9 +546,9 @@ namespace {
     }
     template<class Element, class Scalar, class Result>
     struct MixedMatrixScalarCase {
-        using element_type = Element;
-        using scalar_type = Scalar;
-        using result_type = Result;
+        using ElementType = Element;
+        using ScalarType = Scalar;
+        using ResultType = Result;
     };
     using MixedMatrixScalars = testing::Types<
         MixedMatrixScalarCase<int, float, float>,
@@ -558,9 +558,9 @@ namespace {
     class MatMixedScalarOperatorTest : public testing::Test {};
     TYPED_TEST_SUITE(MatMixedScalarOperatorTest, MixedMatrixScalars);
     TYPED_TEST(MatMixedScalarOperatorTest, BothOperandOrdersPromoteResultTypesAndPreserveFractions) {
-        using E = typename TypeParam::element_type;
-        using S = typename TypeParam::scalar_type;
-        using Result = aho::Mat<typename TypeParam::result_type, 1, 2>;
+        using E = typename TypeParam::ElementType;
+        using S = typename TypeParam::ScalarType;
+        using Result = aho::Mat<typename TypeParam::ResultType, 1, 2>;
         const aho::Mat<E, 1, 2> matrix(std::array<std::array<E, 2>, 1>{{{-3, 6}}});
         static_assert(std::same_as<decltype(matrix * S{2}), Result>);
         static_assert(std::same_as<decltype(S{2} * matrix), Result>);
@@ -586,7 +586,7 @@ namespace {
         EXPECT_EQ(left[0][0], 60000);
     }
     TEST(MatTest, CastConvertsEachElement) {
-        Matrix2 matrix(values);
+        Matrix2 matrix(VALUES);
         expect_matrix(matrix.cast<double>(), std::array<std::array<double, 2>, 2>{{{1, 2}, {3, 4}}});
         aho::Mat<double, 1, 2> fractional(std::array<std::array<double, 2>, 1>{{{2.75, -3.25}}});
         expect_matrix(fractional.cast<int>(), std::array<std::array<int, 2>, 1>{{{2, -3}}});
@@ -622,7 +622,7 @@ namespace {
     }
     TEST(MatFactoryTest, ArrayFactoryCopiesSquareRowsWithoutTransposition) {
         const std::array<int, 2> rows[2]{{1, 2}, {3, 4}};
-        expect_matrix(aho::matrix::make(rows), values);
+        expect_matrix(aho::matrix::make(rows), VALUES);
     }
     template<class T>
     class MatListFactoryTest : public testing::Test {};
@@ -682,7 +682,7 @@ namespace {
     TYPED_TEST_SUITE(MatAxisRotationTest, RotationScalars);
     TYPED_TEST(MatAxisRotationTest, DegreeOverloadHasTheDeclaredSignatureAndMatchesRadians) {
         using T = TypeParam;
-        using V = aho::_Vector<T, vsl::D3>;
+        using V = aho::Vector_<T, vsl::D3>;
         using DegreeRotation = aho::Mat4x4<T> (*)(aho::Degree, V);
         constexpr DegreeRotation rotation = &aho::matrix::make_rotation<T>;
         const V axis(0, 0, 2);
@@ -695,7 +695,7 @@ namespace {
     }
     TYPED_TEST(MatAxisRotationTest, AxisRotationsHaveKnownOrientationAndAreOrthogonal) {
         using T = TypeParam;
-        using V = aho::_Vector<T, vsl::D3>;
+        using V = aho::Vector_<T, vsl::D3>;
         const auto x = aho::matrix::make_rotation<T>(aho::Degree{90}, V(2, 0, 0));
         const auto y = aho::matrix::make_rotation<T>(aho::Degree{90}, V(0, 3, 0));
         expect_matrix(x, std::array<std::array<double, 4>, 4>{{{1, 0, 0, 0}, {0, 0, -1, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}}});
@@ -720,9 +720,9 @@ namespace {
     TYPED_TEST_SUITE(MatViewTest, ViewScalars);
     TYPED_TEST(MatViewTest, ExplicitCoordinateTypePreservesPrecisionAndExistingCameraBasis) {
         using T = TypeParam;
-        using CI = aho::coordinate::_DefaultCoordinateInfo<vsl::D3>::value;
-        using P = aho::_Point<T, vsl::D3, CI>;
-        using V = aho::_Vector<T, vsl::D3, CI>;
+        using CI = aho::coordinate::DefaultCoordinateInfo<vsl::D3>::Value;
+        using P = aho::Point_<T, vsl::D3, CI>;
+        using V = aho::Vector_<T, vsl::D3, CI>;
         const P eye(1, 2, 3), target(1, 2, 2);
         const V up(0, 2, 0);
         using ViewFactory = aho::Mat4x4<T> (*)(P, P, V);
@@ -737,8 +737,8 @@ namespace {
     }
     TYPED_TEST(MatViewTest, RotatedCameraMovesEyeToOriginAndTargetToNegativeZ) {
         using T = TypeParam;
-        using P = aho::_Point<T, vsl::D3>;
-        using V = aho::_Vector<T, vsl::D3>;
+        using P = aho::Point_<T, vsl::D3>;
+        using V = aho::Vector_<T, vsl::D3>;
         const auto view = aho::matrix::make_view(P(2, 0, 0), P(0, 0, 0), V(0, 1, 0));
         const aho::Mat<T, 1, 4> eye(std::array<std::array<T, 4>, 1>{{{2, 0, 0, 1}}});
         const aho::Mat<T, 1, 4> target(std::array<std::array<T, 4>, 1>{{{0, 0, 0, 1}}});
@@ -750,8 +750,8 @@ namespace {
     // Preserve the established sample orientation; positive viewport height maps NDC +Y downward.
     TYPED_TEST(MatViewTest, SampleCameraKeepsPositiveXRightAndPositiveZUp) {
         using T = TypeParam;
-        using P = aho::_Point<T, vsl::D3>;
-        using V = aho::_Vector<T, vsl::D3>;
+        using P = aho::Point_<T, vsl::D3>;
+        using V = aho::Vector_<T, vsl::D3>;
         const auto view = aho::matrix::make_view(P(0, 2, 2), P(0, 0, 0), V(0, 0, 1));
         const auto projection = aho::matrix::make_perspective(aho::Degree{45}, T{1}, T{0.1}, T{10});
         const auto screen_position = [&](T x, T y, T z) {
@@ -797,10 +797,10 @@ namespace {
         const aho::Mat<TypeParam, 2, 2> matrix(std::array<std::array<TypeParam, 2>, 2>{{{1, 2}, {2, 4}}});
         const auto singular = aho::matrix::inverse_gauss_jordan(matrix);
         ASSERT_FALSE(singular);
-        EXPECT_EQ(singular.error(), aho::matrix::FailedCause::Singular);
+        EXPECT_EQ(singular.error(), aho::matrix::FailedCause::SINGULAR);
         const auto non_square = aho::matrix::inverse_gauss_jordan(aho::Mat<TypeParam, 2, 3>{});
         ASSERT_FALSE(non_square);
-        EXPECT_EQ(non_square.error(), aho::matrix::FailedCause::NotSquare);
+        EXPECT_EQ(non_square.error(), aho::matrix::FailedCause::NOT_SQUARE);
     }
     TYPED_TEST(MatInverseTest, AffineInverseSupportsScaleShearTranslationAndReflection) {
         const aho::Mat<TypeParam, 4, 4> matrix(std::array<std::array<TypeParam, 4>, 4>{{{2, 1, 0, 4}, {0, 3, 0, 6}, {0, 0, -4, 8}, {0, 0, 0, 1}}});
@@ -818,12 +818,12 @@ namespace {
         matrix[3][0] = 1;
         const auto non_affine = aho::matrix::inverse_affine(matrix);
         ASSERT_FALSE(non_affine);
-        EXPECT_EQ(non_affine.error(), aho::matrix::FailedCause::NonAffine);
+        EXPECT_EQ(non_affine.error(), aho::matrix::FailedCause::NON_AFFINE);
         matrix[3][0] = 0;
         matrix[0][0] = 0;
         const auto singular = aho::matrix::inverse_affine(matrix);
         ASSERT_FALSE(singular);
-        EXPECT_EQ(singular.error(), aho::matrix::FailedCause::Singular);
+        EXPECT_EQ(singular.error(), aho::matrix::FailedCause::SINGULAR);
     }
     TYPED_TEST(MatInverseTest, AffineSmallInvertibleScaleMustNotBeClassifiedAsSingular) {
         auto matrix = aho::matrix::make_identity<TypeParam, 4>();
@@ -922,12 +922,12 @@ namespace {
         using T = TypeParam;
         const int exponent = std::numeric_limits<T>::max_exponent / 4;
         const std::array<std::array<T, 2>, 2> base{{{2, 1}, {1, 1}}};
-        const std::array<std::array<T, 2>, 2> knownInverse{{{1, -1}, {-1, 2}}};
-        for (const int rowSign : {-1, 1})
-            for (const int columnSign : {-1, 1}) {
-                SCOPED_TRACE(testing::Message() << "rowSign=" << rowSign << " columnSign=" << columnSign);
-                const std::array<int, 2> rows{rowSign * exponent, -rowSign * exponent};
-                const std::array<int, 2> columns{columnSign * exponent, -columnSign * exponent};
+        const std::array<std::array<T, 2>, 2> known_inverse{{{1, -1}, {-1, 2}}};
+        for (const int row_sign : {-1, 1})
+            for (const int column_sign : {-1, 1}) {
+                SCOPED_TRACE(testing::Message() << "rowSign=" << row_sign << " columnSign=" << column_sign);
+                const std::array<int, 2> rows{row_sign * exponent, -row_sign * exponent};
+                const std::array<int, 2> columns{column_sign * exponent, -column_sign * exponent};
                 aho::Mat<T, 2, 2> matrix;
                 for (std::size_t i = 0; i < 2; ++i)
                     for (std::size_t j = 0; j < 2; ++j)
@@ -937,7 +937,7 @@ namespace {
                 ASSERT_TRUE(inverse);
                 for (std::size_t i = 0; i < 2; ++i)
                     for (std::size_t j = 0; j < 2; ++j)
-                        EXPECT_EQ((*inverse)[i][j], std::ldexp(knownInverse[i][j], -columns[i] - rows[j]));
+                        EXPECT_EQ((*inverse)[i][j], std::ldexp(known_inverse[i][j], -columns[i] - rows[j]));
                 expect_identity(matrix * *inverse);
                 expect_identity(*inverse * matrix);
                 EXPECT_EQ(matrix, original);
@@ -947,28 +947,28 @@ namespace {
         using T = TypeParam;
         const int exponent = std::numeric_limits<T>::max_exponent - 2;
         const std::array<std::array<T, 2>, 2> base{{{1, 1}, {1, -1}}};
-        const std::array<std::array<T, 2>, 2> knownInverse{{{T{0.5}, T{0.5}}, {T{0.5}, T{-0.5}}}};
-        for (const bool scaleRows : {false, true}) {
-            SCOPED_TRACE(testing::Message() << "scaleRows=" << scaleRows);
-            const std::array<int, 2> rows = scaleRows ? std::array<int, 2>{exponent, -exponent} : std::array<int, 2>{};
-            const std::array<int, 2> columns = scaleRows ? std::array<int, 2>{} : std::array<int, 2>{exponent, -exponent};
+        const std::array<std::array<T, 2>, 2> known_inverse{{{T{0.5}, T{0.5}}, {T{0.5}, T{-0.5}}}};
+        for (const bool scale_rows : {false, true}) {
+            SCOPED_TRACE(testing::Message() << "scaleRows=" << scale_rows);
+            const std::array<int, 2> rows = scale_rows ? std::array<int, 2>{exponent, -exponent} : std::array<int, 2>{};
+            const std::array<int, 2> columns = scale_rows ? std::array<int, 2>{} : std::array<int, 2>{exponent, -exponent};
             aho::Mat<T, 2, 2> matrix;
             for (std::size_t i = 0; i < 2; ++i)
                 for (std::size_t j = 0; j < 2; ++j)
                     matrix[i][j] = std::ldexp(base[i][j], rows[i] + columns[j]);
             const auto inverse = aho::matrix::inverse_gauss_jordan(matrix);
             ASSERT_TRUE(inverse);
-            aho::Mat<T, 2, 2> normalizedInverse;
+            aho::Mat<T, 2, 2> normalized_inverse;
             for (std::size_t i = 0; i < 2; ++i)
                 for (std::size_t j = 0; j < 2; ++j) {
                     EXPECT_TRUE(std::isfinite((*inverse)[i][j]));
-                    EXPECT_EQ((*inverse)[i][j], std::ldexp(knownInverse[i][j], -columns[i] - rows[j]));
-                    normalizedInverse[i][j] = std::ldexp((*inverse)[i][j], columns[i] + rows[j]);
+                    EXPECT_EQ((*inverse)[i][j], std::ldexp(known_inverse[i][j], -columns[i] - rows[j]));
+                    normalized_inverse[i][j] = std::ldexp((*inverse)[i][j], columns[i] + rows[j]);
                 }
             // 元の単位の行列積自体がoverflowするため、既知の単位へ戻して両側の積を確認する。
             const aho::Mat<T, 2, 2> normalized(base);
-            expect_identity(normalized * normalizedInverse);
-            expect_identity(normalizedInverse * normalized);
+            expect_identity(normalized * normalized_inverse);
+            expect_identity(normalized_inverse * normalized);
         }
     }
     TYPED_TEST(MatScaledInverseTest, ExactlyDependentIntegerRowsRemainSingularAfterRescaling) {
@@ -993,7 +993,7 @@ namespace {
                 if (inverse)
                     ++accepted;
                 else
-                    EXPECT_EQ(inverse.error(), aho::matrix::FailedCause::Singular);
+                    EXPECT_EQ(inverse.error(), aho::matrix::FailedCause::SINGULAR);
             }
             EXPECT_EQ(accepted, 0u) << "rescale=" << rescale;
         }
@@ -1024,7 +1024,7 @@ namespace {
             const aho::Mat<T, 2, 2> matrix(std::array<std::array<T, 2>, 2>{{{scale, scale}, {scale, adjacent * scale}}});
             const auto inverse = aho::matrix::inverse_gauss_jordan(matrix);
             ASSERT_FALSE(inverse);
-            EXPECT_EQ(inverse.error(), aho::matrix::FailedCause::Singular);
+            EXPECT_EQ(inverse.error(), aho::matrix::FailedCause::SINGULAR);
         }
     }
     TEST(MatScaledInverseTest, IntegerPermutationMatricesKeepTheirExactInverse) {
@@ -1041,14 +1041,14 @@ namespace {
         EXPECT_TRUE(empty->empty());
         const auto zero = aho::matrix::inverse_gauss_jordan(aho::Mat<double, 2, 2>{});
         ASSERT_FALSE(zero);
-        EXPECT_EQ(zero.error(), aho::matrix::FailedCause::Singular);
+        EXPECT_EQ(zero.error(), aho::matrix::FailedCause::SINGULAR);
     }
     TYPED_TEST(MatScaledInverseTest, ScaledThreeByThreeMatricesPreserveTheirKnownInverse) {
         using T = TypeParam;
         const int exponent = std::numeric_limits<T>::max_exponent / 6;
         const std::array<int, 3> rows{-exponent, 0, exponent}, columns{exponent, -exponent, 0};
         const std::array<std::array<T, 3>, 3> base{{{1, 2, 3}, {0, 1, 4}, {0, 0, 1}}};
-        const std::array<std::array<T, 3>, 3> knownInverse{{{1, -2, 5}, {0, 1, -4}, {0, 0, 1}}};
+        const std::array<std::array<T, 3>, 3> known_inverse{{{1, -2, 5}, {0, 1, -4}, {0, 0, 1}}};
         aho::Mat<T, 3, 3> matrix;
         for (std::size_t i = 0; i < 3; ++i)
             for (std::size_t j = 0; j < 3; ++j)
@@ -1057,7 +1057,7 @@ namespace {
         ASSERT_TRUE(inverse);
         for (std::size_t i = 0; i < 3; ++i)
             for (std::size_t j = 0; j < 3; ++j)
-                EXPECT_EQ((*inverse)[i][j], std::ldexp(knownInverse[i][j], -columns[i] - rows[j]));
+                EXPECT_EQ((*inverse)[i][j], std::ldexp(known_inverse[i][j], -columns[i] - rows[j]));
         expect_identity(matrix * *inverse);
         expect_identity(*inverse * matrix);
     }
@@ -1075,21 +1075,21 @@ namespace {
             SCOPED_TRACE(testing::Message() << "exponent=" << exponent);
             const T scale = std::ldexp(T{1}, exponent);
             auto matrix = aho::matrix::make_identity<T, 4>();
-            auto knownInverse = aho::matrix::make_identity<T, 4>();
+            auto known_inverse = aho::matrix::make_identity<T, 4>();
             const std::array<T, 3> diagonal{scale, 2 * scale, -scale};
             const std::array<T, 3> offset{1, -2, T{0.5}};
             for (std::size_t i = 0; i < 3; ++i) {
                 matrix[i][i] = diagonal[i];
                 matrix[i][3] = diagonal[i] * offset[i];
-                knownInverse[i][i] = T{1} / diagonal[i];
-                knownInverse[i][3] = -offset[i];
+                known_inverse[i][i] = T{1} / diagonal[i];
+                known_inverse[i][3] = -offset[i];
             }
             const auto original = matrix;
             const auto inverse = aho::matrix::inverse_affine(matrix);
             EXPECT_TRUE(inverse);
             if (!inverse)
                 continue;
-            EXPECT_EQ(*inverse, knownInverse);
+            EXPECT_EQ(*inverse, known_inverse);
             expect_identity(matrix * *inverse);
             expect_identity(*inverse * matrix);
             EXPECT_EQ(matrix, original);
@@ -1099,18 +1099,18 @@ namespace {
         using T = TypeParam;
         const int exponent = std::numeric_limits<T>::max_exponent / 6;
         const std::array<std::array<T, 3>, 3> base{{{1, 2, 3}, {0, 1, 4}, {0, 0, 1}}};
-        const std::array<std::array<T, 3>, 3> knownInverse{{{1, -2, 5}, {0, 1, -4}, {0, 0, 1}}};
-        for (const int rowSign : {-1, 1})
-            for (const int columnSign : {-1, 1}) {
-                SCOPED_TRACE(testing::Message() << "rowSign=" << rowSign << " columnSign=" << columnSign);
-                const std::array<int, 3> rows{-rowSign * exponent, 0, rowSign * exponent};
-                const std::array<int, 3> columns{columnSign * exponent, -columnSign * exponent, 0};
+        const std::array<std::array<T, 3>, 3> known_inverse{{{1, -2, 5}, {0, 1, -4}, {0, 0, 1}}};
+        for (const int row_sign : {-1, 1})
+            for (const int column_sign : {-1, 1}) {
+                SCOPED_TRACE(testing::Message() << "rowSign=" << row_sign << " columnSign=" << column_sign);
+                const std::array<int, 3> rows{-row_sign * exponent, 0, row_sign * exponent};
+                const std::array<int, 3> columns{column_sign * exponent, -column_sign * exponent, 0};
                 auto matrix = aho::matrix::make_identity<T, 4>();
                 auto expected = aho::matrix::make_identity<T, 4>();
                 for (std::size_t i = 0; i < 3; ++i) {
                     for (std::size_t j = 0; j < 3; ++j) {
                         matrix[i][j] = std::ldexp(base[i][j], rows[i] + columns[j]);
-                        expected[i][j] = std::ldexp(knownInverse[i][j], -columns[i] - rows[j]);
+                        expected[i][j] = std::ldexp(known_inverse[i][j], -columns[i] - rows[j]);
                     }
                     // t = A * e_zなので、逆変換の平行移動は-e_zと分かる。
                     matrix[i][3] = matrix[i][2];
@@ -1134,7 +1134,7 @@ namespace {
                     matrix[i][j] = std::ldexp(base[i][j], power);
             const auto inverse = aho::matrix::inverse_affine(matrix);
             ASSERT_FALSE(inverse);
-            EXPECT_EQ(inverse.error(), aho::matrix::FailedCause::Singular);
+            EXPECT_EQ(inverse.error(), aho::matrix::FailedCause::SINGULAR);
         }
     }
     TEST(MatAffineScaleTest, IntegerUnitDeterminantsKeepExactShearAndTranslation) {

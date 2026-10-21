@@ -9,7 +9,7 @@ namespace VSL_NAMESPACE::command {
         std::vector<ClearValue> defaults(const RenderPassDescription& desc) {
             std::vector<ClearValue> values;
             for (const auto& a : desc.attachments) {
-                switch (_impl::helper::clearKind(static_cast<vk::Format>(a.format.type()))) {
+                switch (impl::helper::clear_kind(static_cast<vk::Format>(a.format.type()))) {
                     case 1:
                         values.emplace_back(ClearInt{});
                         break;
@@ -27,12 +27,12 @@ namespace VSL_NAMESPACE::command {
             return values;
         }
         std::vector<ClearValue> legacy_clears(FrameBufferAccessor target,
-                                              std::optional<__VSLDRGBColorAccessor<float>> color) {
+                                              std::optional<VSLDRGBColorAccessor<float>> color) {
             if (!color)
                 return {};
-            if (!target._data || !target._data->renderPass)
+            if (!target.data_ || !target.data_->render_pass)
                 throw std::invalid_argument("Framebuffer required");
-            auto values = defaults(RenderPassAccessor{target._data->renderPass}.description());
+            auto values = defaults(RenderPassAccessor{target.data_->render_pass}.description());
             if (values.empty())
                 throw std::invalid_argument("Legacy clear color requires an attachment");
             values.front() = ClearColor{color->r, color->g, color->b, 0.f};
@@ -57,24 +57,24 @@ namespace VSL_NAMESPACE::command {
         }
     } // namespace
     RenderPassBegin::RenderPassBegin(FrameBufferAccessor target, std::vector<ClearValue> clears,
-                                     RenderArea renderArea, std::uint32_t index)
-        : frameBuffer(std::move(target)), clearValues(std::move(clears)), area(renderArea), targetIndex(index) {
-        if (!frameBuffer._data || !frameBuffer._data->renderPass)
+                                     RenderArea render_area, std::uint32_t index)
+        : frame_buffer(std::move(target)), clear_values(std::move(clears)), area(render_area), target_index(index) {
+        if (!frame_buffer.data_ || !frame_buffer.data_->render_pass)
             throw std::invalid_argument("Framebuffer required");
-        renderPass._data = frameBuffer._data->renderPass;
-        if (index >= frameBuffer._data->swapChainFramebuffers.size())
+        render_pass.data_ = frame_buffer.data_->render_pass;
+        if (index >= frame_buffer.data_->swap_chain_framebuffers.size())
             throw std::out_of_range("Framebuffer index");
-        if (clearValues.empty())
-            clearValues = defaults(renderPass.description());
-        if (clearValues.size() != renderPass.description().attachments.size())
+        if (clear_values.empty())
+            clear_values = defaults(render_pass.description());
+        if (clear_values.size() != render_pass.description().attachments.size())
             throw std::invalid_argument("Clear count must match attachments");
-        for (std::size_t i = 0; i < clearValues.size(); ++i) {
-            const auto& a = renderPass.description().attachments[i];
-            if ((a.load == LoadOp::Clear || a.stencilLoad == LoadOp::Clear) &&
-                clearValues[i].index() != _impl::helper::clearKind(static_cast<vk::Format>(a.format.type())))
+        for (std::size_t i = 0; i < clear_values.size(); ++i) {
+            const auto& a = render_pass.description().attachments[i];
+            if ((a.load == LoadOp::CLEAR || a.stencil_load == LoadOp::CLEAR) &&
+                clear_values[i].index() != impl::helper::clear_kind(static_cast<vk::Format>(a.format.type())))
                 throw std::invalid_argument("Clear type does not match attachment format");
         }
-        const auto extent = frameBuffer._data->extent;
+        const auto extent = frame_buffer.data_->extent;
         if (!area.width && !area.height) {
             area.width = extent.width;
             area.height = extent.height;
@@ -84,11 +84,11 @@ namespace VSL_NAMESPACE::command {
             static_cast<std::uint64_t>(area.y) + area.height > extent.height)
             throw std::out_of_range("Render area exceeds framebuffer");
     }
-    RenderPassBegin RenderPassBegin::withClears(FrameBufferAccessor target, std::vector<AttachmentClear> bindings,
+    RenderPassBegin RenderPassBegin::WithClears(FrameBufferAccessor target, std::vector<AttachmentClear> bindings,
                                                 RenderArea area, std::uint32_t index) {
-        if (!target._data || !target._data->renderPass)
+        if (!target.data_ || !target.data_->render_pass)
             throw std::invalid_argument("Framebuffer required");
-        auto values = defaults(*target._data->renderPass->description);
+        auto values = defaults(*target.data_->render_pass->description);
         std::vector<bool> bound(values.size());
         for (auto& binding : bindings) {
             if (binding.attachment >= values.size())
@@ -101,39 +101,39 @@ namespace VSL_NAMESPACE::command {
         return RenderPassBegin(std::move(target), std::move(values), area, index);
     }
     RenderPassBegin::RenderPassBegin(RenderPass pass, FrameBufferAccessor target,
-                                     std::optional<__VSLDRGBColorAccessor<float>> color)
+                                     std::optional<VSLDRGBColorAccessor<float>> color)
         : RenderPassBegin(target, legacy_clears(target, color)) {
-        if (pass._data != renderPass._data)
+        if (pass.data_ != render_pass.data_)
             throw std::invalid_argument("RenderPass/Framebuffer mismatch");
         if (color)
             clear_color.emplace(*color);
-        targetIndex.reset();
+        target_index.reset();
     }
     IDPickingRenderPassBegin::IDPickingRenderPassBegin(IDPickingRenderPass pass, FrameBufferAccessor target,
-                                                       std::optional<__VSLDRGBColorAccessor<float>> color)
+                                                       std::optional<VSLDRGBColorAccessor<float>> color)
         : RenderPassBegin(target, legacy_clears(target, color)) {
-        if (pass._data != renderPass._data)
+        if (pass.data_ != render_pass.data_)
             throw std::invalid_argument("RenderPass/Framebuffer mismatch");
         if (color)
             clear_color.emplace(*color);
-        targetIndex.reset();
+        target_index.reset();
     }
     void RenderPassBegin::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
-        const auto index = targetIndex.value_or(buffer._data->acquiredImageIndex.value_or(buffer.getCurrentBufferIdx()));
-        buffer.retain(frameBuffer._data);
+        const auto index = target_index.value_or(buffer.data_->acquired_image_index.value_or(buffer.get_current_buffer_idx()));
+        buffer.retain(frame_buffer.data_);
         std::vector<vk::ClearValue> values;
-        for (const auto& clear : clearValues)
+        for (const auto& clear : clear_values)
             values.push_back(convert(clear));
         vk::RenderPassBeginInfo info{
-            .renderPass = renderPass._data->renderPass,
-            .framebuffer = frameBuffer._data->swapChainFramebuffers.at(index),
+            .renderPass = render_pass.data_->render_pass,
+            .framebuffer = frame_buffer.data_->swap_chain_framebuffers.at(index),
             .renderArea = {.offset = {area.x, area.y}, .extent = {area.width, area.height}},
             .clearValueCount = static_cast<std::uint32_t>(values.size()),
             .pClearValues = values.data()};
-        buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].beginRenderPass(info,
+        buffer.data_->command_buffers[buffer.get_current_buffer_idx()].beginRenderPass(info,
                                                                                    vk::SubpassContents::eInline);
     }
     void NextSubpass::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
-        buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].nextSubpass(vk::SubpassContents::eInline);
+        buffer.data_->command_buffers[buffer.get_current_buffer_idx()].nextSubpass(vk::SubpassContents::eInline);
     }
 } // namespace VSL_NAMESPACE::command

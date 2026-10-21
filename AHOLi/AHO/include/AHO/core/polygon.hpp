@@ -13,10 +13,10 @@ namespace AHO_NAMESPACE {
     // 頂点と三角形を所有するメッシュ。参照ビューから形状を変更できない。
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
     struct Polygon {
-        using dimension = D;
-        using element_type = R;
-        using coordinate_info = CI;
-        using PointType = _Point<R, D, CI>;
+        using Dimension = D;
+        using ElementType = R;
+        using CoordinateInfo = CI;
+        using PointType = Point_<R, D, CI>;
         using IndexType = Size;
         using TriangleType = IndexedTriangle<Size>;
         static_assert(std::is_integral_v<Size> && std::is_unsigned_v<Size> && !std::same_as<Size, bool>);
@@ -92,7 +92,7 @@ namespace AHO_NAMESPACE {
     double Polygon<R, D, CI, Size, Alloc>::area() const {
         long double result = 0;
         for (const auto triangle : triangles()) {
-            if constexpr (D::dimension == 2 || D::dimension == 3) {
+            if constexpr (D::DIMENSION == 2 || D::DIMENSION == 3) {
                 const auto origin = triangle.pos1.template cast<long double>();
                 const auto ab = triangle.pos2.template cast<long double>() - origin;
                 const auto ac = triangle.pos3.template cast<long double>() - origin;

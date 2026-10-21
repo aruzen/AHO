@@ -6,12 +6,12 @@
 
 namespace VSL_NAMESPACE {
     template<typename C, typename T = char>
-    class type {
-        const char* name_;
-        const T index_;
+    class Type_ {
+        const char* _name;
+        const T _index;
 
     public:
-        consteval type(const char* name_, T index_);
+        consteval Type_(const char* name, T index);
 
         constexpr const char* name() const;
         constexpr const T index() const;
@@ -20,20 +20,20 @@ namespace VSL_NAMESPACE {
     };
 
     template<typename C, typename T>
-    inline consteval type<C, T>::type(const char* name_, T index_) : name_(name_), index_(index_) {}
+    inline consteval Type_<C, T>::Type_(const char* name, T index) : _name(name), _index(index) {}
 
     template<typename C, typename T>
-    inline constexpr const char* type<C, T>::name() const {
-        return name_;
+    inline constexpr const char* Type_<C, T>::name() const {
+        return _name;
     }
 
     template<typename C, typename T>
-    inline constexpr const T type<C, T>::index() const {
-        return index_;
+    inline constexpr const T Type_<C, T>::index() const {
+        return _index;
     }
 
     template<typename C, typename T>
-    inline constexpr auto type<C, T>::operator<=>(const C& t) const {
-        return t.index_ <=> index_;
+    inline constexpr auto Type_<C, T>::operator<=>(const C& t) const {
+        return t._index <=> _index;
     }
 } // namespace VSL_NAMESPACE

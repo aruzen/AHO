@@ -5,126 +5,126 @@
 #include <GLFW/glfw3native.h>
 #endif
 namespace {
-    using AhoWindowVulkanIntegration = aho_test::LiveGpuTest;
-    TEST_F(AhoWindowVulkanIntegration, ResizeHookCanRemoveItselfAndIsReleasedBeforeTheNextHook) {
+    using AHOWindowVulkanIntegration = aho_test::LiveGPUTest;
+    TEST_F(AHOWindowVulkanIntegration, ResizeHookCanRemoveItselfAndIsReleasedBeforeTheNextHook) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
-        int selfCalls = 0, followerCalls = 0;
+        int self_calls = 0, follower_calls = 0;
         std::shared_ptr<aho::window::WindowResizeHookPlugin> self;
         std::weak_ptr<aho::window::WindowResizeHookPlugin> weak;
         self = window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
-            ++selfCalls;
+            ++self_calls;
             EXPECT_TRUE(current->remove_plugin(self));
             self.reset();
             EXPECT_FALSE(weak.expired());
         });
         weak = self;
         window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) {
-            ++followerCalls;
+            ++follower_calls;
             EXPECT_TRUE(weak.expired());
         });
         EXPECT_TRUE(window.resize(420, 300));
-        EXPECT_EQ(selfCalls, 1);
-        EXPECT_EQ(followerCalls, 1);
+        EXPECT_EQ(self_calls, 1);
+        EXPECT_EQ(follower_calls, 1);
         EXPECT_TRUE(weak.expired());
         EXPECT_TRUE(window.resize(400, 400));
-        EXPECT_EQ(selfCalls, 1);
-        EXPECT_EQ(followerCalls, 2);
+        EXPECT_EQ(self_calls, 1);
+        EXPECT_EQ(follower_calls, 2);
     }
-    TEST_F(AhoWindowVulkanIntegration, HooksAddedDuringResizeWaitUntilTheNextNotification) {
+    TEST_F(AHOWindowVulkanIntegration, HooksAddedDuringResizeWaitUntilTheNextNotification) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
-        int firstCalls = 0, addedCalls = 0;
+        int first_calls = 0, added_calls = 0;
         std::shared_ptr<aho::window::WindowResizeHookPlugin> added;
         window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
-            ++firstCalls;
+            ++first_calls;
             if (!added)
-                added = current->add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) { ++addedCalls; });
+                added = current->add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) { ++added_calls; });
         });
         EXPECT_TRUE(window.resize(420, 300));
-        EXPECT_EQ(firstCalls, 1);
-        EXPECT_EQ(addedCalls, 0);
+        EXPECT_EQ(first_calls, 1);
+        EXPECT_EQ(added_calls, 0);
         EXPECT_TRUE(window.resize(400, 400));
-        EXPECT_EQ(firstCalls, 2);
-        EXPECT_EQ(addedCalls, 1);
+        EXPECT_EQ(first_calls, 2);
+        EXPECT_EQ(added_calls, 1);
     }
-    TEST_F(AhoWindowVulkanIntegration, RemovedHooksAreSkippedEvenIfTheCallerStillOwnsThem) {
+    TEST_F(AHOWindowVulkanIntegration, RemovedHooksAreSkippedEvenIfTheCallerStillOwnsThem) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
-        int removedCalls = 0, remainingCalls = 0;
+        int removed_calls = 0, remaining_calls = 0;
         std::shared_ptr<aho::window::WindowResizeHookPlugin> removed;
         window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
             if (removed)
                 current->remove_plugin(removed);
         });
-        removed = window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) { ++removedCalls; });
-        window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) { ++remainingCalls; });
+        removed = window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) { ++removed_calls; });
+        window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) { ++remaining_calls; });
         EXPECT_TRUE(window.resize(420, 300));
-        EXPECT_EQ(removedCalls, 0);
-        EXPECT_EQ(remainingCalls, 1);
+        EXPECT_EQ(removed_calls, 0);
+        EXPECT_EQ(remaining_calls, 1);
         EXPECT_TRUE(static_cast<bool>(removed));
     }
-    TEST_F(AhoWindowVulkanIntegration, ClosingTheWindowDuringAResizeStopsItsRemainingHooks) {
+    TEST_F(AHOWindowVulkanIntegration, ClosingTheWindowDuringAResizeStopsItsRemainingHooks) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
-        int staleCalls = 0;
+        int stale_calls = 0;
         window.add_plugin<aho::window::WindowResizeHookPlugin>([](aho::Window* current) { EXPECT_TRUE(current->close()); });
-        window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) { ++staleCalls; });
+        window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) { ++stale_calls; });
         EXPECT_TRUE(window.resize(420, 300));
-        EXPECT_EQ(staleCalls, 0);
+        EXPECT_EQ(stale_calls, 0);
         EXPECT_FALSE(static_cast<bool>(window));
-        EXPECT_FALSE(window._data2);
+        EXPECT_FALSE(window.data2);
     }
-    TEST_F(AhoWindowVulkanIntegration, ClearingAllPluginsDuringAResizeKeepsTheRunningHookAlive) {
+    TEST_F(AHOWindowVulkanIntegration, ClearingAllPluginsDuringAResizeKeepsTheRunningHookAlive) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
-        int staleCalls = 0;
+        int stale_calls = 0;
         std::weak_ptr<aho::window::WindowResizeHookPlugin> weak;
-        auto currentHook = window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
-            current->_data->plugins.clear();
+        auto current_hook = window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
+            current->data_->plugins.clear();
             EXPECT_FALSE(weak.expired());
         });
-        weak = currentHook;
-        currentHook.reset();
-        window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) { ++staleCalls; });
+        weak = current_hook;
+        current_hook.reset();
+        window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) { ++stale_calls; });
         EXPECT_TRUE(window.resize(420, 300));
         EXPECT_TRUE(weak.expired());
-        EXPECT_EQ(staleCalls, 0);
-        EXPECT_TRUE(window._data->plugins.empty());
+        EXPECT_EQ(stale_calls, 0);
+        EXPECT_TRUE(window.data_->plugins.empty());
         EXPECT_TRUE(window.resize(400, 400));
     }
     struct FixedIdResizeHook : aho::window::WindowResizeHookPlugin {
         FixedIdResizeHook(vsl::PureWindow* window, unsigned char id, std::function<void(aho::Window*)> callback)
             : WindowResizeHookPlugin(window, std::move(callback)) { this->id = id; }
     };
-    TEST_F(AhoWindowVulkanIntegration, ReplacementAtTheSameIdWaitsUntilTheNextResize) {
+    TEST_F(AHOWindowVulkanIntegration, ReplacementAtTheSameIdWaitsUntilTheNextResize) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
-        int oldCalls = 0, replacementCalls = 0;
+        int old_calls = 0, replacement_calls = 0;
         std::shared_ptr<aho::window::WindowResizeHookPlugin> old;
         std::shared_ptr<FixedIdResizeHook> replacement;
         window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
             if (!replacement)
-                replacement = current->add_plugin<FixedIdResizeHook>(old->id, [&](aho::Window*) { ++replacementCalls; });
+                replacement = current->add_plugin<FixedIdResizeHook>(old->id, [&](aho::Window*) { ++replacement_calls; });
         });
-        old = window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) { ++oldCalls; });
+        old = window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) { ++old_calls; });
         ASSERT_NE(old->id, 0u);
         EXPECT_TRUE(window.resize(420, 300));
-        EXPECT_EQ(oldCalls, 0);
-        EXPECT_EQ(replacementCalls, 0);
+        EXPECT_EQ(old_calls, 0);
+        EXPECT_EQ(replacement_calls, 0);
         EXPECT_TRUE(window.resize(400, 400));
-        EXPECT_EQ(oldCalls, 0);
-        EXPECT_EQ(replacementCalls, 1);
+        EXPECT_EQ(old_calls, 0);
+        EXPECT_EQ(replacement_calls, 1);
     }
-    TEST_F(AhoWindowVulkanIntegration, GraphicsInitializationFailureUnregistersTheNewNativeWindow) {
+    TEST_F(AHOWindowVulkanIntegration, GraphicsInitializationFailureUnregistersTheNewNativeWindow) {
         ASSERT_NO_THROW(start_engine());
         aho::engine::EngineAccessor failing = *engine;
-        failing._data = std::make_shared<aho::engine::EngineData>(*engine->_data);
+        failing.data_ = std::make_shared<aho::engine::EngineData>(*engine->data_);
         std::vector<const char*> extensions{VK_KHR_SURFACE_EXTENSION_NAME};
 #ifdef __APPLE__
         extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
 #endif
-        auto unsupported = std::make_shared<vsl::_impl::Vulkan_impl<false>>();
+        auto unsupported = std::make_shared<vsl::impl::VulkanImpl<false>>();
         vk::InstanceCreateInfo info{};
 #ifdef __APPLE__
         info.flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
@@ -132,32 +132,32 @@ namespace {
         info.enabledExtensionCount = static_cast<std::uint32_t>(extensions.size());
         info.ppEnabledExtensionNames = extensions.data();
         unsupported->instance = vk::createInstance(info);
-        failing._data->vulkan_instance._accessor = unsupported;
+        failing.data_->vulkan_instance.accessor = unsupported;
         const auto previous = vsl::PureWindow::WINDOWS;
-        const auto singleton = aho::engine::EngineAccessor::instance();
+        const auto singleton = aho::engine::EngineAccessor::Instance();
         EXPECT_THROW((aho::Window("cannot create graphics", 48, 32, failing)), vsl::exceptions::RuntimeException);
         EXPECT_EQ(vsl::PureWindow::WINDOWS, previous);
-        EXPECT_EQ(aho::engine::EngineAccessor::instance(), singleton);
+        EXPECT_EQ(aho::engine::EngineAccessor::Instance(), singleton);
         EXPECT_TRUE(static_cast<bool>(*engine->boot_window));
         aho::Window retry("valid construction after failure", 48, 32, *engine);
         EXPECT_TRUE(static_cast<bool>(retry));
         EXPECT_EQ(vsl::PureWindow::WINDOWS.size(), previous.size() + 1);
         EXPECT_TRUE(retry.close());
     }
-    TEST_F(AhoWindowVulkanIntegration, BootedDefaultEngineCreatesAndClosesAnIndependentWindow) {
+    TEST_F(AHOWindowVulkanIntegration, BootedDefaultEngineCreatesAndClosesAnIndependentWindow) {
         ASSERT_NO_THROW(start_engine());
         const auto previous = vsl::PureWindow::WINDOWS.size();
         aho::Window second("default engine construction", 48, 32);
-        EXPECT_EQ(second.engine._data, engine->_data);
+        EXPECT_EQ(second.engine.data_, engine->data_);
         EXPECT_EQ(vsl::PureWindow::WINDOWS.size(), previous + 1);
         EXPECT_TRUE(second.close());
         EXPECT_EQ(vsl::PureWindow::WINDOWS.size(), previous);
     }
-    TEST_F(AhoWindowVulkanIntegration, ExistingWindowSupportsSizeTitleAndClose) {
+    TEST_F(AHOWindowVulkanIntegration, ExistingWindowSupportsSizeTitleAndClose) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
         EXPECT_TRUE(window.set_title("AHO changed title"));
-        auto* native = static_cast<GLFWwindow*>(window._data->window_handle);
+        auto* native = static_cast<GLFWwindow*>(window.data_->window_handle);
         EXPECT_STREQ(glfwGetWindowTitle(native), "AHO changed title");
         window.maximize();
         glfwPollEvents();
@@ -166,33 +166,33 @@ namespace {
         glfwPollEvents();
         EXPECT_EQ(glfwGetWindowAttrib(native, GLFW_MAXIMIZED), GLFW_FALSE);
         EXPECT_TRUE(window.close());
-        EXPECT_EQ(window._data2, nullptr);
-        EXPECT_EQ(window._data->window_handle, nullptr);
+        EXPECT_EQ(window.data2, nullptr);
+        EXPECT_EQ(window.data_->window_handle, nullptr);
     }
-    TEST_F(AhoWindowVulkanIntegration, MonitorSizeRequiresAvailablePrimaryDisplayMode) {
+    TEST_F(AHOWindowVulkanIntegration, MonitorSizeRequiresAvailablePrimaryDisplayMode) {
         auto* monitor = glfwGetPrimaryMonitor();
         if (!monitor) {
-            EXPECT_THROW(aho::window::GetMonitorSize(), vsl::exceptions::RuntimeException);
+            EXPECT_THROW(aho::window::get_monitor_size(), vsl::exceptions::RuntimeException);
             return;
         }
 #ifdef __APPLE__
         const auto display = glfwGetCocoaMonitor(monitor);
         auto mode = CGDisplayCopyDisplayMode(display);
         if (!mode) {
-            EXPECT_THROW(aho::window::GetMonitorSize(), vsl::exceptions::RuntimeException);
+            EXPECT_THROW(aho::window::get_monitor_size(), vsl::exceptions::RuntimeException);
             return;
         }
         CGDisplayModeRelease(mode);
 #endif
         const auto* mode_info = glfwGetVideoMode(monitor);
         ASSERT_NE(mode_info, nullptr) << "GLFW failed to query a video mode exposed by the OS.";
-        const auto size = aho::window::GetMonitorSize();
+        const auto size = aho::window::get_monitor_size();
         EXPECT_EQ(size.value.x.value, mode_info->width);
         EXPECT_EQ(size.value.y.value, mode_info->height);
         EXPECT_GT(size.value.x.value, 0);
         EXPECT_GT(size.value.y.value, 0);
     }
-    TEST_F(AhoWindowVulkanIntegration, ResizingRecreatesFrameResourcesAndCallsHook) {
+    TEST_F(AHOWindowVulkanIntegration, ResizingRecreatesFrameResourcesAndCallsHook) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
         int callbacks = 0;
@@ -209,27 +209,27 @@ namespace {
         EXPECT_EQ(window.window_size().value.x.value, 400);
         EXPECT_EQ(window.window_size().value.y.value, 400);
     }
-    TEST_F(AhoWindowVulkanIntegration, ExplicitEngineConstructorCreatesIndependentWindow) {
+    TEST_F(AHOWindowVulkanIntegration, ExplicitEngineConstructorCreatesIndependentWindow) {
         ASSERT_NO_THROW(start_engine());
         const std::string name = "AHO secondary synchronization resources";
         aho::Window second(name, 240, 160, *engine);
-        EXPECT_NE(second._data, engine->boot_window->_data);
-        EXPECT_EQ(second.engine._data, engine->_data);
+        EXPECT_NE(second.data_, engine->boot_window->data_);
+        EXPECT_EQ(second.engine.data_, engine->data_);
         EXPECT_EQ(second.window_size().value.x.value, 240);
         EXPECT_EQ(second.window_size().value.y.value, 160);
         EXPECT_EQ(second.name(), name);
-        auto available = engine->_data->synchro_manager.getSemaphore(name + "ImageAvailable");
-        auto finished = engine->_data->synchro_manager.getSemaphore(name + "RenderFinished");
-        auto in_flight = engine->_data->synchro_manager.getFence(name + "InFlight");
+        auto available = engine->data_->synchro_manager.get_semaphore(name + "ImageAvailable");
+        auto finished = engine->data_->synchro_manager.get_semaphore(name + "RenderFinished");
+        auto in_flight = engine->data_->synchro_manager.get_fence(name + "InFlight");
         EXPECT_TRUE(available.has_value());
         EXPECT_TRUE(finished.has_value());
         EXPECT_TRUE(in_flight.has_value());
         if (available)
-            EXPECT_EQ(available->_data, second._data2->image_available._data);
+            EXPECT_EQ(available->data_, second.data2->image_available.data_);
         if (finished)
-            EXPECT_EQ(finished->_data, second._data2->render_finished._data);
+            EXPECT_EQ(finished->data_, second.data2->render_finished.data_);
         if (in_flight)
-            EXPECT_EQ(in_flight->_data, second._data2->in_flight._data);
+            EXPECT_EQ(in_flight->data_, second.data2->in_flight.data_);
         EXPECT_TRUE(second.close());
     }
 } // namespace
@@ -238,35 +238,35 @@ namespace {
 #include <AHO/window.hpp>
 #include <AHO/engine/standard_engine.hpp>
 namespace {
-    TEST(AhoWindowConstructionTest, MissingDefaultEngineThrowsBeforeWindowRegistration) {
-        ASSERT_EQ(aho::engine::EngineAccessor::instance(), nullptr);
+    TEST(AHOWindowConstructionTest, MissingDefaultEngineThrowsBeforeWindowRegistration) {
+        ASSERT_EQ(aho::engine::EngineAccessor::Instance(), nullptr);
         ASSERT_TRUE(vsl::PureWindow::WINDOWS.empty());
         EXPECT_THROW((aho::Window("no default engine")), vsl::exceptions::RuntimeException);
         EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
-        EXPECT_EQ(aho::engine::EngineAccessor::instance(), nullptr);
+        EXPECT_EQ(aho::engine::EngineAccessor::Instance(), nullptr);
     }
-    TEST(AhoWindowConstructionTest, UnbootedDefaultEngineThrowsBeforeWindowRegistration) {
+    TEST(AHOWindowConstructionTest, UnbootedDefaultEngineThrowsBeforeWindowRegistration) {
         aho::StandardEngine engine("not booted", false);
-        ASSERT_FALSE(engine._data);
+        ASSERT_FALSE(engine.data_);
         EXPECT_THROW((aho::Window("unbooted default engine")), vsl::exceptions::RuntimeException);
         EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
-        EXPECT_EQ(aho::engine::EngineAccessor::instance(), &engine);
+        EXPECT_EQ(aho::engine::EngineAccessor::Instance(), &engine);
     }
-    TEST(AhoWindowConstructionTest, UnbootedExplicitEngineThrowsBeforeWindowRegistration) {
+    TEST(AHOWindowConstructionTest, UnbootedExplicitEngineThrowsBeforeWindowRegistration) {
         aho::StandardEngine engine("not booted", false);
-        ASSERT_FALSE(engine._data);
+        ASSERT_FALSE(engine.data_);
         EXPECT_THROW((aho::Window("unbooted explicit engine", 48, 32, engine)), vsl::exceptions::RuntimeException);
         EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
-        EXPECT_EQ(aho::engine::EngineAccessor::instance(), &engine);
+        EXPECT_EQ(aho::engine::EngineAccessor::Instance(), &engine);
     }
-    TEST(AhoWindowTest, SharedDataConstructorKeepsNativeOwnershipAndEmptyDrawingData) {
+    TEST(AHOWindowTest, SharedDataConstructorKeepsNativeOwnershipAndEmptyDrawingData) {
         aho::engine::EngineAccessor engine;
         auto native = std::make_shared<vsl::Window::WindowData>();
         std::shared_ptr<aho::window::WindowData> drawing;
         aho::Window window(engine, native, drawing);
-        EXPECT_EQ(window._data, native);
-        EXPECT_EQ(window._data2, drawing);
-        EXPECT_EQ(window.engine._data, engine._data);
+        EXPECT_EQ(window.data_, native);
+        EXPECT_EQ(window.data2, drawing);
+        EXPECT_EQ(window.engine.data_, engine.data_);
     }
     TEST(WindowResizeHookTest, ConstructorStoresCallableAndPassesWindowPointer) {
         aho::Window* received = nullptr;
@@ -287,7 +287,7 @@ namespace {
         ASSERT_TRUE(vsl::PureWindow::WINDOWS.empty());
         glfwTerminate();
         try {
-            (void)aho::window::GetMonitorSize();
+            (void)aho::window::get_monitor_size();
             ADD_FAILURE() << "Missing primary monitor was accepted";
         } catch (const vsl::exceptions::RuntimeException& error) {
             EXPECT_NE(std::string(error.what()).find("monitor"), std::string::npos);
@@ -307,7 +307,7 @@ namespace {
         glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_NULL);
         ASSERT_TRUE(glfwInit());
         ASSERT_NE(glfwGetPrimaryMonitor(), nullptr);
-        const auto size = aho::window::GetMonitorSize();
+        const auto size = aho::window::get_monitor_size();
         EXPECT_EQ(size.value.x.value, 1920);
         EXPECT_EQ(size.value.y.value, 1080);
         EXPECT_EQ(glfwGetError(nullptr), GLFW_NO_ERROR);

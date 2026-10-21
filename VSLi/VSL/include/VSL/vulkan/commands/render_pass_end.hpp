@@ -4,7 +4,7 @@
 #include "../command.hpp"
 
 namespace VSL_NAMESPACE::command {
-    struct RenderPassEnd : public __Command {
+    struct RenderPassEnd : public Command {
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
     };
 } // namespace VSL_NAMESPACE::command

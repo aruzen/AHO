@@ -3,45 +3,45 @@
 
 namespace {
     using ShaderVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
-    static_assert(vsl::___Get_ShaderType<"fixture.vert.spv">() == vsl::ShaderType::Vertex);
-    static_assert(vsl::___Get_ShaderType<"fixture.frag.spv">() == vsl::ShaderType::Fragment);
-    static_assert(vsl::___Get_ShaderType<"fixture.comp.spv">() == vsl::ShaderType::Compute);
-    static_assert(vsl::___Get_ShaderType<"fixture.unknown">() == vsl::ShaderType::Error);
+    static_assert(vsl::get_shader_type<"fixture.vert.spv">() == vsl::ShaderType::VERTEX);
+    static_assert(vsl::get_shader_type<"fixture.frag.spv">() == vsl::ShaderType::FRAGMENT);
+    static_assert(vsl::get_shader_type<"fixture.comp.spv">() == vsl::ShaderType::COMPUTE);
+    static_assert(vsl::get_shader_type<"fixture.unknown">() == vsl::ShaderType::ERROR_);
     TEST_F(ShaderVulkanIntegrationTest, LoadsVertexAndFragmentModulesWithEntryPointNames) {
-        const vsl::Shader<vsl::ShaderType::Vertex> vertex(device, vsl_test::shader_path("triangle.vert.spv"));
-        const vsl::Shader<vsl::ShaderType::Fragment> fragment(device, vsl_test::shader_path("triangle.frag.spv"),
+        const vsl::Shader<vsl::ShaderType::VERTEX> vertex(device, vsl_test::shader_path("triangle.vert.spv"));
+        const vsl::Shader<vsl::ShaderType::FRAGMENT> fragment(device, vsl_test::shader_path("triangle.frag.spv"),
                                                               "main");
         EXPECT_EQ(vertex.name(), "main");
         EXPECT_EQ(fragment.name(), "main");
-        EXPECT_TRUE(vertex._data->shaderModule);
-        EXPECT_TRUE(fragment._data->shaderModule);
-        EXPECT_EQ(vertex._data->shaderStageCreateInfo.stage, vk::ShaderStageFlagBits::eVertex);
-        EXPECT_EQ(fragment._data->shaderStageCreateInfo.stage, vk::ShaderStageFlagBits::eFragment);
-        EXPECT_STREQ(vertex._data->shaderStageCreateInfo.pName, vertex.name().c_str());
+        EXPECT_TRUE(vertex.data_->shader_module);
+        EXPECT_TRUE(fragment.data_->shader_module);
+        EXPECT_EQ(vertex.data_->shader_stage_create_info.stage, vk::ShaderStageFlagBits::eVertex);
+        EXPECT_EQ(fragment.data_->shader_stage_create_info.stage, vk::ShaderStageFlagBits::eFragment);
+        EXPECT_STREQ(vertex.data_->shader_stage_create_info.pName, vertex.name().c_str());
     }
     TEST_F(ShaderVulkanIntegrationTest, RejectsMissingShaderFiles) {
-        EXPECT_THROW((vsl::Shader<vsl::ShaderType::Compute>(device, vsl_test::shader_path("missing.comp.spv"))),
+        EXPECT_THROW((vsl::Shader<vsl::ShaderType::COMPUTE>(device, vsl_test::shader_path("missing.comp.spv"))),
                      vsl::exceptions::RuntimeException);
     }
     TEST(ShaderFlagsTest, BitwiseStageCombinationsPreserveMembership) {
         using namespace vsl;
-        const auto stages = ShaderType::Vertex | ShaderType::Fragment;
-        EXPECT_EQ(stages, ShaderFlag::Vertex | ShaderFlag::Fragment);
-        EXPECT_EQ(ShaderType::Vertex & ShaderType::Fragment, ShaderFlag::Error);
-        EXPECT_EQ(ShaderType::Vertex ^ ShaderType::Fragment, stages);
-        EXPECT_EQ(convert(ShaderType::Compute), ShaderFlag::Compute);
+        const auto stages = ShaderType::VERTEX | ShaderType::FRAGMENT;
+        EXPECT_EQ(stages, ShaderFlag::VERTEX | ShaderFlag::FRAGMENT);
+        EXPECT_EQ(ShaderType::VERTEX & ShaderType::FRAGMENT, ShaderFlag::ERROR_);
+        EXPECT_EQ(ShaderType::VERTEX ^ ShaderType::FRAGMENT, stages);
+        EXPECT_EQ(convert(ShaderType::COMPUTE), ShaderFlag::COMPUTE);
     }
 } // namespace
 namespace {
     TEST_F(ShaderVulkanIntegrationTest, FactoriesInferStageAndHonorExplicitEntryName) {
         const auto vertex = vsl::make_shader<VSL_TEST_SHADER_DIR "/triangle.vert.spv">(device);
         const auto fragment = vsl::make_shader<VSL_TEST_SHADER_DIR "/triangle.frag.spv">(device, "main");
-        static_assert(decltype(vertex)::Type == vsl::ShaderType::Vertex);
-        static_assert(decltype(fragment)::Type == vsl::ShaderType::Fragment);
+        static_assert(decltype(vertex)::TYPE == vsl::ShaderType::VERTEX);
+        static_assert(decltype(fragment)::TYPE == vsl::ShaderType::FRAGMENT);
         EXPECT_EQ(vertex.name(), "main");
         EXPECT_EQ(fragment.name(), "main");
-        EXPECT_TRUE(static_cast<bool>(vertex._data->shaderModule));
-        EXPECT_TRUE(static_cast<bool>(fragment._data->shaderModule));
+        EXPECT_TRUE(static_cast<bool>(vertex.data_->shader_module));
+        EXPECT_TRUE(static_cast<bool>(fragment.data_->shader_module));
     }
 } // namespace
 
@@ -54,8 +54,8 @@ namespace {
                 std::ofstream output(path, std::ios::binary);
                 output << std::string(byte_count, '\0');
             }
-            EXPECT_THROW((vsl::Shader<vsl::ShaderType::Vertex>(device, path)), vsl::exceptions::RuntimeException);
-            EXPECT_THROW((vsl::Shader<vsl::ShaderType::Vertex>(device, path, "main")), vsl::exceptions::RuntimeException);
+            EXPECT_THROW((vsl::Shader<vsl::ShaderType::VERTEX>(device, path)), vsl::exceptions::RuntimeException);
+            EXPECT_THROW((vsl::Shader<vsl::ShaderType::VERTEX>(device, path, "main")), vsl::exceptions::RuntimeException);
         }
     }
 } // namespace

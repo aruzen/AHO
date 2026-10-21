@@ -13,7 +13,7 @@ namespace AHO_NAMESPACE::input {
         template<typename T, typename... Args>
         friend std::shared_ptr<T> AHO_NAMESPACE::InputManager::get(Args&&... args);
 
-        void* context = nullptr;
+        void* _context = nullptr;
         d2::PointD _state;
         d2::VectorD _delta;
 
@@ -30,9 +30,9 @@ namespace AHO_NAMESPACE::input {
     class MouseButton : public abstract::Button, public abstract::Updatable {
         friend AHO_NAMESPACE::InputManager;
 
-        void* context = nullptr;
-        MouseID code;
-        ButtonState _state = ButtonState::Idle;
+        void* _context = nullptr;
+        MouseID _code;
+        ButtonState _state = ButtonState::IDLE;
 
         MouseButton(void* context, MouseCode code);
 
@@ -53,14 +53,14 @@ namespace AHO_NAMESPACE::input {
     class MouseWheel : public abstract::Input<d2::VectorD>, public abstract::Updatable {
         friend AHO_NAMESPACE::InputManager;
 
-        void* context = nullptr;
-        size_t gen, read;
+        void* _context = nullptr;
+        size_t _gen, _read;
 
-        static size_t subscribed;
+        static size_t SUBSCRIBED;
 
     public:
-        static size_t _generation;
-        static d2::VectorD _state;
+        static size_t GENERATION;
+        static d2::VectorD STATE;
 
     private:
         MouseWheel(void* context);
@@ -82,19 +82,19 @@ namespace AHO_NAMESPACE::input {
 
     private:
         std::shared_ptr<Cursor> _cursor;
-        std::shared_ptr<MouseButton> _rightClick;
-        std::shared_ptr<MouseButton> _middleButton;
-        std::shared_ptr<MouseButton> _leftClick;
+        std::shared_ptr<MouseButton> _right_click;
+        std::shared_ptr<MouseButton> _middle_button;
+        std::shared_ptr<MouseButton> _left_click;
         std::shared_ptr<MouseWheel> _wheel;
 
     public:
         std::shared_ptr<Cursor> cursor();
 
-        std::shared_ptr<MouseButton> rightClick();
+        std::shared_ptr<MouseButton> right_click();
 
-        std::shared_ptr<MouseButton> middleButton();
+        std::shared_ptr<MouseButton> middle_button();
 
-        std::shared_ptr<MouseButton> leftClick();
+        std::shared_ptr<MouseButton> left_click();
 
         std::shared_ptr<MouseWheel> wheel();
     };

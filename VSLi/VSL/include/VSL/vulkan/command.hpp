@@ -14,19 +14,19 @@ namespace VSL_NAMESPACE {
     struct CommandPool {
         CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor device);
 
-        CommandPool(std::shared_ptr<VSL_NAMESPACE::_impl::CommandPool_impl> data);
+        CommandPool(std::shared_ptr<VSL_NAMESPACE::impl::CommandPoolImpl> data);
 
-        std::shared_ptr<VSL_NAMESPACE::_impl::CommandPool_impl> _data;
+        std::shared_ptr<VSL_NAMESPACE::impl::CommandPoolImpl> data_;
     };
 
     struct CommandBuffer {
         CommandBuffer(VSL_NAMESPACE::CommandPool pool, std::uint32_t size = DEFAULT_BUFFER_SIZE);
 
-        CommandBuffer(std::shared_ptr<VSL_NAMESPACE::_impl::CommandBuffer_impl> data);
+        CommandBuffer(std::shared_ptr<VSL_NAMESPACE::impl::CommandBufferImpl> data);
 
-        std::uint32_t getCurrentBufferIdx();
+        std::uint32_t get_current_buffer_idx();
 
-        size_t getSize();
+        size_t get_size();
 
         void next();
 
@@ -37,18 +37,18 @@ namespace VSL_NAMESPACE {
         // Phaseの記録中は、送信完了まで使用する所有者を保持する。
         void retain(std::shared_ptr<void> resource) const;
 
-        std::shared_ptr<VSL_NAMESPACE::_impl::CommandBuffer_impl> _data;
+        std::shared_ptr<VSL_NAMESPACE::impl::CommandBufferImpl> data_;
     };
 
     // フェンスが再利用されても、個々の送信の完了状態を維持する。
     struct Completion {
         enum class Status {
-            Pending,
-            Submitted,
-            Complete,
-            Cancelled
+            PENDING,
+            SUBMITTED,
+            COMPLETE,
+            CANCELLED
         };
-        std::shared_ptr<_impl::Submission_impl> _data;
+        std::shared_ptr<impl::SubmissionImpl> data_;
         Status status() const;
         bool ready() const;
         bool wait(std::uint64_t timeout_ns = UINT64_MAX) const;
@@ -58,13 +58,13 @@ namespace VSL_NAMESPACE {
 
     struct PipelineAccessor;
     namespace command {
-        struct __Command {
-            virtual ~__Command() = default;
+        struct Command {
+            virtual ~Command() = default;
             virtual void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) = 0;
         };
 
-        struct __DelegateCommand {
-            virtual ~__DelegateCommand() = default;
+        struct DelegateCommand {
+            virtual ~DelegateCommand() = default;
             virtual void invoke(DefaultPhaseStream& pst, CommandPool pool, CommandBuffer buffer, CommandManager manager) = 0;
         };
 
@@ -78,77 +78,77 @@ namespace VSL_NAMESPACE {
             t.invoke(std::declval<DefaultPhaseStream&>(), std::declval<CommandPool>(), std::declval<CommandBuffer>(), std::declval<CommandManager>());
         };
 
-        struct __PipelineHolder {
-            virtual ~__PipelineHolder() = default;
-            virtual PipelineAccessor getPipeline() = 0;
+        struct PipelineHolder {
+            virtual ~PipelineHolder() = default;
+            virtual PipelineAccessor get_pipeline() = 0;
         };
 
-        struct __PipelineRequire {
-            virtual ~__PipelineRequire() = default;
-            virtual void setPipeline(std::optional<PipelineAccessor> pipeline) = 0;
+        struct PipelineRequire {
+            virtual ~PipelineRequire() = default;
+            virtual void set_pipeline(std::optional<PipelineAccessor> pipeline) = 0;
         };
 
         template<typename T>
         concept is_pipeline_holder = requires(T t) {
-            { t.getPipeline() } -> std::convertible_to<PipelineAccessor>;
+            { t.get_pipeline() } -> std::convertible_to<PipelineAccessor>;
         };
 
         template<typename T>
         concept is_pipeline_require = requires(T t) {
-            { t.setPipeline(std::declval<std::optional<PipelineAccessor>>()) };
+            { t.set_pipeline(std::declval<std::optional<PipelineAccessor>>()) };
         };
 
-        struct __VertexSizeHolder {
-            virtual ~__VertexSizeHolder() = default;
-            virtual size_t getVertexSize() = 0;
+        struct VertexSizeHolder {
+            virtual ~VertexSizeHolder() = default;
+            virtual size_t get_vertex_size() = 0;
         };
 
-        struct __VertexSizeRequire {
-            virtual ~__VertexSizeRequire() = default;
-            virtual void setVertexSize(std::optional<size_t> vertexSize) = 0;
+        struct VertexSizeRequire {
+            virtual ~VertexSizeRequire() = default;
+            virtual void set_vertex_size(std::optional<size_t> vertex_size) = 0;
         };
 
         template<typename T>
         concept is_vertex_size_holder = requires(T t) {
-            { t.getVertexSize() } -> std::convertible_to<size_t>;
+            { t.get_vertex_size() } -> std::convertible_to<size_t>;
         };
 
         template<typename T>
         concept is_vert_size_require = requires(T t) {
-            { t.setVertexSize(std::declval<std::optional<size_t>>()) };
+            { t.set_vertex_size(std::declval<std::optional<size_t>>()) };
         };
     } // namespace command
 
     struct CommandManager {
-        CommandManager(std::shared_ptr<VSL_NAMESPACE::_impl::CommandManager_impl> data);
+        CommandManager(std::shared_ptr<VSL_NAMESPACE::impl::CommandManagerImpl> data);
 
         CommandManager(VSL_NAMESPACE::LogicalDeviceAccessor device);
 
-        std::shared_ptr<VSL_NAMESPACE::_impl::CommandManager_impl> _data;
+        std::shared_ptr<VSL_NAMESPACE::impl::CommandManagerImpl> data_;
 
         template<class P = DefaultPhase, typename... Args>
-        P startPhase(Args&&... args);
+        P start_phase(Args&&... args);
 
-        LogicalDeviceAccessor getDevice() const;
+        LogicalDeviceAccessor get_device() const;
         // 同じデバイスとグラフィックスキューで、プールとコマンドバッファを独立させる。
-        CommandManager independent(std::uint32_t bufferCount = 1) const;
-        void waitIdle();
+        CommandManager independent(std::uint32_t buffer_count = 1) const;
+        void wait_idle();
 
-        CommandPool getPool();
+        CommandPool get_pool();
 
-        CommandBuffer getBuffer();
+        CommandBuffer get_buffer();
 
-        std::uint32_t getCurrentBufferIdx();
+        std::uint32_t get_current_buffer_idx();
 
-        CommandBuffer makeExclusiveBuffer(size_t size = 1);
+        CommandBuffer make_exclusive_buffer(size_t size = 1);
     };
 
     inline Completion::operator bool() const {
-        return bool(_data);
+        return bool(data_);
     }
 } // namespace VSL_NAMESPACE
 
 template<class P, typename... Args>
-P VSL_NAMESPACE::CommandManager::startPhase(Args&&... args) {
+P VSL_NAMESPACE::CommandManager::start_phase(Args&&... args) {
     return P(*this, std::forward<Args>(args)...);
 }

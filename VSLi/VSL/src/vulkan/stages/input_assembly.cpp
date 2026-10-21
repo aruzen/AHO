@@ -2,8 +2,8 @@
 #include <VSL/vulkan/_pimpls.hpp>
 
 void VSL_NAMESPACE::pipeline_layout::InputAssembly::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
-    auto& info = *pl._data->info;
+    auto& info = *pl.data_->info;
 
-    info.inputAssembly.topology = vk::PrimitiveTopology::eTriangleList;
-    info.inputAssembly.primitiveRestartEnable = false;
+    info.input_assembly.topology = vk::PrimitiveTopology::eTriangleList;
+    info.input_assembly.primitiveRestartEnable = false;
 }

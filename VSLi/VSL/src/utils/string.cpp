@@ -21,15 +21,15 @@ void default_logger(const char* str) {
     std::cout << str;
 }
 
-template<bool V>
-consteval VSL_NAMESPACE::logger_t get_default_logger() {
-    return V ? default_logger : nullptr;
+template<bool v>
+consteval VSL_NAMESPACE::LoggerT get_default_logger() {
+    return v ? default_logger : nullptr;
 }
 
 std::string VSL_NAMESPACE::expand_environments(const std::string& input) {
-    static const std::regex env_pattern(R"(\$\{([A-Za-z_][A-Za-z0-9_]*)\})");
+    static const std::regex ENV_PATTERN(R"(\$\{([A-Za-z_][A-Za-z0-9_]*)\})");
     std::string result;
-    std::sregex_iterator itr(input.begin(), input.end(), env_pattern);
+    std::sregex_iterator itr(input.begin(), input.end(), ENV_PATTERN);
     std::sregex_iterator end;
     size_t last_pos = 0;
 
@@ -51,4 +51,4 @@ std::string VSL_NAMESPACE::expand_environments(const std::string& input) {
     return result;
 }
 
-VSL_NAMESPACE::logger_t VSL_NAMESPACE::logger = get_default_logger<VSL_NAMESPACE::validation>();
+VSL_NAMESPACE::LoggerT VSL_NAMESPACE::LOGGER = get_default_logger<VSL_NAMESPACE::VALIDATION>();

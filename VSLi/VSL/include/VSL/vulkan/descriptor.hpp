@@ -18,40 +18,40 @@ namespace VSL_NAMESPACE::graphic_resource {
     constexpr size_t MAX_POOL_SIZE = 200;
 
     enum class Type : unsigned int {
-        Sampler = 0,
-        CombinedImageSampler = 1,
-        SampledImage = 2,
-        StorageImage = 3,
-        UniformTexelBuffer = 4,
-        StorageTexelBuffer = 5,
-        UniformBuffer = 6,
-        StorageBuffer = 7,
-        UniformBufferDynamic = 8,
-        StorageBufferDynamic = 9,
-        InputAttachment = 10,
-        InlineUniformBlock = 1000138000,
-        AccelerationStructure = 1000150000,
-        AccelerationStructureNv = 1000165000,
-        SampleWeightImageQcom = 1000440000,
-        BlockMatchImageQcom = 1000440001,
-        MutableValve = 1000351000,
-        PartitionedAccelerationStructureNv = 1000570000,
-        MaxEnum = 0x7FFFFFFF
+        SAMPLER = 0,
+        COMBINED_IMAGE_SAMPLER = 1,
+        SAMPLED_IMAGE = 2,
+        STORAGE_IMAGE = 3,
+        UNIFORM_TEXEL_BUFFER = 4,
+        STORAGE_TEXEL_BUFFER = 5,
+        UNIFORM_BUFFER = 6,
+        STORAGE_BUFFER = 7,
+        UNIFORM_BUFFER_DYNAMIC = 8,
+        STORAGE_BUFFER_DYNAMIC = 9,
+        INPUT_ATTACHMENT = 10,
+        INLINE_UNIFORM_BLOCK = 1000138000,
+        ACCELERATION_STRUCTURE = 1000150000,
+        ACCELERATION_STRUCTURE_NV = 1000165000,
+        SAMPLE_WEIGHT_IMAGE_QCOM = 1000440000,
+        BLOCK_MATCH_IMAGE_QCOM = 1000440001,
+        MUTABLE_VALVE = 1000351000,
+        PARTITIONED_ACCELERATION_STRUCTURE_NV = 1000570000,
+        MAX_ENUM = 0x7FFFFFFF
     };
 
     enum class BindingDestination {
-        Graphics = 0,
-        Compute = 1,
+        GRAPHICS = 0,
+        COMPUTE = 1,
 #ifdef VK_ENABLE_BETA_EXTENSIONS
-        ExecutionGraphAmdx = 1000134000,
+        EXECUTION_GRAPH_AMDX = 1000134000,
 #endif
-        RayTracing = 1000165000,
+        RAY_TRACING = 1000165000,
     };
 
     struct BindingPoint {
         std::uint32_t binding;
-        Type bindingType;
-        ShaderFlag shaderType;
+        Type binding_type;
+        ShaderFlag shader_type;
         std::uint32_t amount = 1;
 
         constexpr auto operator<=>(const BindingPoint&) const = default;
@@ -65,24 +65,24 @@ namespace VSL_NAMESPACE::graphic_resource {
      * GPU上のメモリーに置かれたデータをShaderがどう読み取るかを指定できる
      */
     struct BindingLayout {
-        BindingLayout(LogicalDeviceAccessor device, Type bindingType, ShaderFlag shaderType);
+        BindingLayout(LogicalDeviceAccessor device, Type binding_type, ShaderFlag shader_type);
 
-        BindingLayout(LogicalDeviceAccessor device, size_t binding, Type bindingType, ShaderFlag shaderType,
+        BindingLayout(LogicalDeviceAccessor device, size_t binding, Type binding_type, ShaderFlag shader_type,
                       size_t amount = 1);
 
         BindingLayout(LogicalDeviceAccessor device, std::initializer_list<BindingPoint> points);
 
         BindingLayout(LogicalDeviceAccessor device, const std::vector<BindingPoint>& points);
 
-        [[nodiscard]] std::vector<BindingPoint> getBindingPoints() const;
+        [[nodiscard]] std::vector<BindingPoint> get_binding_points() const;
 
-        std::shared_ptr<_impl::ResourceBindingLayout_impl> _data;
+        std::shared_ptr<impl::ResourceBindingLayoutImpl> data_;
     };
 
     struct ManagerInterface;
     struct Resource;
     struct Pool {
-        std::shared_ptr<_impl::GraphicResourcePool_impl> _data;
+        std::shared_ptr<impl::GraphicResourcePoolImpl> data_;
 
         std::tuple<bool, Resource> bind(BindingLayout layout);
 
@@ -90,13 +90,13 @@ namespace VSL_NAMESPACE::graphic_resource {
 
         std::tuple<bool, std::vector<Resource>> bind(std::vector<BindingLayout> layout);
 
-        ManagerInterface* getManager();
+        ManagerInterface* get_manager();
     };
 
     struct Resource {
-        std::shared_ptr<_impl::GraphicResource_impl> _data;
+        std::shared_ptr<impl::GraphicResourceImpl> data_;
 
-        Pool getPool();
+        Pool get_pool();
 
         // ここらへんのTもいつかtypename ...Argsに置き換えたいかも
         void update(VSL_NAMESPACE::BufferAccessor* buffer, size_t binding = 0, std::optional<Type> type = std::nullopt,

@@ -20,13 +20,13 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     }
 }
 
-AHO_NAMESPACE::input::KeyBoard::KeyBoard(void* context) : context(context) {
+AHO_NAMESPACE::input::KeyBoard::KeyBoard(void* context) : _context(context) {
     if (KEYBOARD_TRACKED == 0)
         glfwSetKeyCallback((GLFWwindow*)context, key_callback);
     KEYBOARD_TRACKED++;
 }
 
-AHO_NAMESPACE::input::KeyBoard::KeyBoard(const KeyBoard& other) noexcept : KeyBoard(other.context) {}
+AHO_NAMESPACE::input::KeyBoard::KeyBoard(const KeyBoard& other) noexcept : KeyBoard(other._context) {}
 
 std::unordered_set<AHO_NAMESPACE::input::KeyCode> AHO_NAMESPACE::input::KeyBoard::state() {
     return PRESSED_KEYS;
@@ -35,7 +35,7 @@ std::unordered_set<AHO_NAMESPACE::input::KeyCode> AHO_NAMESPACE::input::KeyBoard
 AHO_NAMESPACE::input::KeyBoard::~KeyBoard() {
     KEYBOARD_TRACKED--;
     if (KEYBOARD_TRACKED == 0) {
-        glfwSetKeyCallback((GLFWwindow*)context, nullptr);
+        glfwSetKeyCallback((GLFWwindow*)_context, nullptr);
         PRESSED_KEYS.clear();
     }
 }

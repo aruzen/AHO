@@ -13,9 +13,9 @@ namespace AHO_NAMESPACE::input {
         template<typename T, typename... Args>
         friend std::shared_ptr<T> InputManager::get(Args&&... args);
 
-        void* context = nullptr;
+        void* _context = nullptr;
         KeyID _code;
-        ButtonState _state = ButtonState::Idle;
+        ButtonState _state = ButtonState::IDLE;
 
         Key(void* context, KeyCode code);
 
@@ -49,8 +49,8 @@ namespace AHO_NAMESPACE::input {
     template<typename... KeyCodes>
     Keys<KeyCodes...>::Keys(void* context, InputManager& manager, KeyCodes... codes) {
         std::tuple<KeyCodes...> packed_codes(codes...);
-        [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-            ((keys[Is] = manager.get<Key>(std::get<Is>(packed_codes))), ...);
+        [&]<std::size_t... is>(std::index_sequence<is...>) {
+            ((keys[is] = manager.get<Key>(std::get<is>(packed_codes))), ...);
         }(std::make_index_sequence<sizeof...(KeyCodes)>());
     }
 } // namespace AHO_NAMESPACE::input

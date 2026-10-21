@@ -11,11 +11,11 @@ namespace AHO_NAMESPACE::engine {
     struct StandardEngine : public GraphicalEngine {
         std::optional<AHO_NAMESPACE::window::Window> boot_window = std::nullopt;
 
-        StandardEngine(std::string applicationName, bool bootOn = true);
+        StandardEngine(std::string application_name, bool boot_on = true);
 
-        void boot(const std::string& applicationName);
+        void boot(const std::string& application_name);
 
-        Window getWindow() override;
+        Window get_window() override;
     };
 } // namespace AHO_NAMESPACE::engine
 

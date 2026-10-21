@@ -6,8 +6,8 @@
 #include <type_traits>
 
 namespace {
-    struct Kind : vsl::type<Kind> {
-        consteval Kind(const char* name, char index) : type(name, index) {}
+    struct Kind : vsl::Type_<Kind> {
+        consteval Kind(const char* name, char index) : Type_(name, index) {}
     };
     TEST(TypeTest, ConstTagsExposeTheirNameAndIndex) {
         constexpr Kind kind("vertex", 7);
@@ -38,8 +38,8 @@ namespace {
         EXPECT_TRUE(first >= alias);
     }
     TEST(TypeTest, SignedIndexExtremesDoNotOverflowDuringComparison) {
-        struct WideKind : vsl::type<WideKind, std::int64_t> {
-            consteval WideKind(std::int64_t value) : type("wide", value) {}
+        struct WideKind : vsl::Type_<WideKind, std::int64_t> {
+            consteval WideKind(std::int64_t value) : Type_("wide", value) {}
         };
         constexpr WideKind low(std::numeric_limits<std::int64_t>::min());
         constexpr WideKind high(std::numeric_limits<std::int64_t>::max());
@@ -47,8 +47,8 @@ namespace {
         EXPECT_EQ(high <=> low, std::strong_ordering::less);
     }
     TEST(TypeTest, FloatingPointIndicesKeepPartialOrderingAndNaNs) {
-        struct FloatingKind : vsl::type<FloatingKind, double> {
-            consteval FloatingKind(double value) : type("floating", value) {}
+        struct FloatingKind : vsl::Type_<FloatingKind, double> {
+            consteval FloatingKind(double value) : Type_("floating", value) {}
         };
         constexpr FloatingKind first(1), second(2), nan(std::numeric_limits<double>::quiet_NaN());
         static_assert(std::same_as<decltype(first <=> second), std::partial_ordering>);

@@ -2,12 +2,12 @@
 #include <VSL/vulkan/command.hpp>
 
 namespace aho_test {
-    struct RecordingCommand : vsl::command::__Command {
+    struct RecordingCommand : vsl::command::Command {
         int* calls;
         explicit RecordingCommand(int* calls);
         void invoke(vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) override;
     };
-    struct RecordingDelegate : vsl::command::__DelegateCommand {
+    struct RecordingDelegate : vsl::command::DelegateCommand {
         int* calls;
         explicit RecordingDelegate(int* calls);
         void invoke(vsl::DefaultPhaseStream&, vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) override;

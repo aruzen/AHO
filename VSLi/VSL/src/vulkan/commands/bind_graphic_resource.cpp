@@ -25,20 +25,20 @@ VSL_NAMESPACE::command::BindGraphicResource::BindGraphicResource(const std::vect
 void VSL_NAMESPACE::command::BindGraphicResource::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
     if (pipeline) {
         for (const auto& resource : resources) {
-            if (!resource._data || !resource._data->pool || !resource._data->pool->descriptorPool || !resource._data->descriptorSet)
+            if (!resource.data_ || !resource.data_->pool || !resource.data_->pool->descriptor_pool || !resource.data_->descriptor_set)
                 throw std::logic_error("Descriptor resource has been destroyed");
-            buffer.retain(resource._data);
+            buffer.retain(resource.data_);
         }
-        buffer.retain(pipeline->_data);
-        buffer._data->commandBuffers[buffer.getCurrentBufferIdx()]
+        buffer.retain(pipeline->data_);
+        buffer.data_->command_buffers[buffer.get_current_buffer_idx()]
             .bindDescriptorSets((vk::PipelineBindPoint)destination,
-                                pipeline.value()._data->layout->pipelineLayout,
+                                pipeline.value().data_->layout->pipeline_layout,
                                 first_binding,
-                                resources | std::views::transform([](auto& r) { return r._data->descriptorSet; }) | std::ranges::to<std::vector<vk::DescriptorSet>>(),
+                                resources | std::views::transform([](auto& r) { return r.data_->descriptor_set; }) | std::ranges::to<std::vector<vk::DescriptorSet>>(),
                                 {});
     }
 }
 
-void VSL_NAMESPACE::command::BindGraphicResource::setPipeline(std::optional<PipelineAccessor> pipeline) {
+void VSL_NAMESPACE::command::BindGraphicResource::set_pipeline(std::optional<PipelineAccessor> pipeline) {
     this->pipeline = pipeline;
 }

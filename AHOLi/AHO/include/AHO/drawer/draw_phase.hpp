@@ -24,23 +24,23 @@ namespace AHO_NAMESPACE {
 
         ~DrawPhase();
 
-        SubmitResult submitCommands() override;
+        SubmitResult submit_commands() override;
 
         DrawStream<VSL_NAMESPACE::DefaultPhaseStream> operator<<(AHO_NAMESPACE::concepts::is_std_tuple auto&&);
 
-        DrawStream<VSL_NAMESPACE::DefaultPhaseStream> operator<<(std::shared_ptr<VSL_NAMESPACE::command::__Command> cmd);
+        DrawStream<VSL_NAMESPACE::DefaultPhaseStream> operator<<(std::shared_ptr<VSL_NAMESPACE::command::Command> cmd);
 
         DrawStream<VSL_NAMESPACE::DefaultPhaseStream> operator<<(VSL_NAMESPACE::command::is_command auto cmd);
 
-        DrawStream<VSL_NAMESPACE::DefaultPhaseStream> operator<<(std::shared_ptr<VSL_NAMESPACE::command::__DelegateCommand> cmd);
+        DrawStream<VSL_NAMESPACE::DefaultPhaseStream> operator<<(std::shared_ptr<VSL_NAMESPACE::command::DelegateCommand> cmd);
 
         DrawStream<VSL_NAMESPACE::DefaultPhaseStream> operator<<(VSL_NAMESPACE::command::is_delegate_command auto cmd);
 
     private:
-        bool finishStarted = false;
-        DrawPhase* previousPhase = nullptr;
-        void restorePreviousPhase() noexcept;
-        static DrawPhase* currentForManager(const VSL_NAMESPACE::CommandManager& manager) noexcept;
+        bool _finish_started = false;
+        DrawPhase* _previous_phase = nullptr;
+        void restore_previous_phase() noexcept;
+        static DrawPhase* CurrentForManager(const VSL_NAMESPACE::CommandManager& manager) noexcept;
         template<typename> friend struct DrawStream;
     };
 
@@ -65,7 +65,7 @@ namespace AHO_NAMESPACE {
     DrawStream<PhaseStream>& DrawStream<PhaseStream>::operator<<(AHO_NAMESPACE::concepts::is_std_tuple auto&& args) {
         auto* phase = THREAD_LOCAL_DRAW_PHASE;
         if constexpr (requires { { phase_stream.manager } -> std::convertible_to<VSL_NAMESPACE::CommandManager>; })
-            phase = DrawPhase::currentForManager(phase_stream.manager);
+            phase = DrawPhase::CurrentForManager(phase_stream.manager);
         std::apply(
             [](auto&&... xs) { draw(std::forward<decltype(xs)>(xs)...); },
             std::tuple_cat(std::forward<decltype(args)>(args), std::tie(phase)));

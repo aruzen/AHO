@@ -49,12 +49,12 @@ namespace VSL_NAMESPACE::graphic_resource {
         std::tuple<Pool, std::vector<Resource>>
         make(std::vector<BindingLayout> layouts, std::vector<T> buffers, std::vector<size_t> bindings);
 
-        std::shared_ptr<_impl::GraphicResourceManager_impl> _data;
+        std::shared_ptr<impl::GraphicResourceManagerImpl> data_;
 
         virtual void destroy(const Pool& pool) = 0;
 
     private:
-        std::shared_ptr<_impl::GraphicResourceManagerIdentity> identity_;
+        std::shared_ptr<impl::GraphicResourceManagerIdentity> _identity;
     };
 
     /*

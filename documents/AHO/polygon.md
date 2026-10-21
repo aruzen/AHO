@@ -2,7 +2,7 @@
 
 `AHO/core/polygon.hpp` の `Polygon<R, D, CI, Size, Alloc>` は頂点と三角形インデックスを所有する値型です。既存の前方宣言のテンプレート引数を維持します。座標次元・座標情報を保持し、2D/3Dで利用できます。
 
-固有の型エイリアスは`PointType`・`IndexType`・`TriangleType`です。既存のAHO conceptが要求する`dimension`・`element_type`・`coordinate_info`は、その契約に従う名前を維持します。
+固有の型エイリアスは`PointType`・`IndexType`・`TriangleType`です。AHO conceptが要求する型エイリアスも、命名規則に合わせて`Dimension`・`ElementType`・`CoordinateInfo`に統一します。
 
 ```cpp
 using P = aho::d2::PointF;

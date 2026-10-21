@@ -5,7 +5,7 @@
 #include <utility>
 
 namespace {
-    using GeneralBuffer = aho::resource::Buffer<aho::resource::BufferType::General>;
+    using GeneralBuffer = aho::resource::Buffer<aho::resource::BufferType::GENERAL>;
     class GeneralBufferTest : public testing::TestWithParam<std::size_t> {};
     TEST_P(GeneralBufferTest, ConstructorReportsRequestedSizeAndWritableStorage) {
         const auto size = GetParam();

@@ -11,8 +11,8 @@
 namespace pl = VSL_NAMESPACE::pipeline_layout;
 using namespace VSL_NAMESPACE;
 
-PipelineLayout getBaseLayout(AHO_NAMESPACE::engine::EngineAccessor* engine) {
-    return {engine->_data->logical_device,
+PipelineLayout get_base_layout(AHO_NAMESPACE::engine::EngineAccessor* engine) {
+    return {engine->data_->logical_device,
             pl::ColorBlend(),
             pl::InputAssembly(),
             pl::Multisample(),
@@ -20,4 +20,4 @@ PipelineLayout getBaseLayout(AHO_NAMESPACE::engine::EngineAccessor* engine) {
             pl::DepthStencil()};
 }
 
-AHO_NAMESPACE::pipeline::GET_BASE_LAYOUT_func AHO_NAMESPACE::pipeline::GET_BASE_LAYOUT = getBaseLayout;
+AHO_NAMESPACE::pipeline::GetBaseLayoutFunc AHO_NAMESPACE::pipeline::GET_BASE_LAYOUT = get_base_layout;

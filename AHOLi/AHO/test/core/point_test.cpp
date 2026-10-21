@@ -21,15 +21,15 @@ TEST(PointContractTest, ThreeWayComparisonOrdersAllDimensionsAndRecognizesEquali
     EXPECT_TRUE(aho::d3::PointD(1, 2, 3) == aho::d3::PointD(1, 2, 3));
 }
 #elif defined(AHO_CONTRACT_POINT_CONSTEXPR_ARITHMETIC)
-constexpr auto sum = aho::d2::PointI(1, 2) + aho::d2::VectorI(3, 4);
-static_assert(sum.value.x.value == 4 && sum.value.y.value == 6);
+constexpr auto SUM = aho::d2::PointI(1, 2) + aho::d2::VectorI(3, 4);
+static_assert(SUM.value.x.value == 4 && SUM.value.y.value == 6);
 #elif defined(AHO_CONTRACT_POINT_DEFAULT_COORDINATES)
-constexpr aho::d1::Point<int> single(-1);
-constexpr aho::d2::Point<int> pair(-1, 2);
-constexpr aho::d3::Point<int> triple(-1, 2, -3);
-static_assert(single.value.x.value == -1);
-static_assert(pair.value.x.value == -1 && pair.value.y.value == 2);
-static_assert(triple.value.x.value == -1 && triple.value.y.value == 2 && triple.value.z.value == -3);
+constexpr aho::d1::Point<int> SINGLE(-1);
+constexpr aho::d2::Point<int> PAIR(-1, 2);
+constexpr aho::d3::Point<int> TRIPLE(-1, 2, -3);
+static_assert(SINGLE.value.x.value == -1);
+static_assert(PAIR.value.x.value == -1 && PAIR.value.y.value == 2);
+static_assert(TRIPLE.value.x.value == -1 && TRIPLE.value.y.value == 2 && TRIPLE.value.z.value == -3);
 #else
 
 #include "../support/asymmetric_arithmetic.hpp"
@@ -37,9 +37,9 @@ static_assert(triple.value.x.value == -1 && triple.value.y.value == 2 && triple.
 namespace {
     using namespace aho_test::arithmetic;
     template<class CI, class T>
-    using ArithmeticPoint = aho::_Point<T, typename CI::dimension, CI>;
+    using ArithmeticPoint = aho::Point_<T, typename CI::Dimension, CI>;
     template<class CI, class T>
-    using ArithmeticPointVector = aho::_Vector<T, typename CI::dimension, CI>;
+    using ArithmeticPointVector = aho::Vector_<T, typename CI::Dimension, CI>;
     template<class CI>
     class PointArithmeticConstraintTest : public testing::Test {};
     TYPED_TEST_SUITE(PointArithmeticConstraintTest, ArithmeticGeometryCoordinates);
@@ -161,16 +161,16 @@ namespace {
 namespace {
     template<class T>
     class PointOneWayCastTest : public testing::Test {};
-    using OneWayPoints = testing::Types<aho::_Point<aho_test::CastSource, vsl::D1>,
-                                        aho::_Point<aho_test::CastSource, vsl::D2>, aho::_Point<aho_test::CastSource, vsl::D3>,
-                                        aho::_Point<aho_test::CastSource, vsl::D2, aho::coordinate::_MakeCoordinateInfo<false, true, true>::value>>;
+    using OneWayPoints = testing::Types<aho::Point_<aho_test::CastSource, vsl::D1>,
+                                        aho::Point_<aho_test::CastSource, vsl::D2>, aho::Point_<aho_test::CastSource, vsl::D3>,
+                                        aho::Point_<aho_test::CastSource, vsl::D2, aho::coordinate::MakeCoordinateInfo<false, true, true>::Value>>;
     TYPED_TEST_SUITE(PointOneWayCastTest, OneWayPoints);
     TYPED_TEST(PointOneWayCastTest, ChecksConversionFromTheStoredScalarToTheRequestedType) {
         static_assert(aho_test::HasCast<TypeParam, aho_test::CastTarget>);
         const TypeParam source = [] {
-            if constexpr (TypeParam::dimension::dimension == 1)
+            if constexpr (TypeParam::Dimension::DIMENSION == 1)
                 return TypeParam(aho_test::CastSource{2});
-            else if constexpr (TypeParam::dimension::dimension == 2)
+            else if constexpr (TypeParam::Dimension::DIMENSION == 2)
                 return TypeParam(aho_test::CastSource{2}, aho_test::CastSource{-3});
             else
                 return TypeParam(aho_test::CastSource{2}, aho_test::CastSource{-3}, aho_test::CastSource{5});
@@ -178,17 +178,17 @@ namespace {
         const auto converted = source.template cast<aho_test::CastTarget>();
         using Converted = std::remove_cv_t<decltype(converted)>;
         static_assert(!aho_test::HasCast<Converted, aho_test::CastSource>);
-        static_assert(std::same_as<typename Converted::coordinate_info, typename TypeParam::coordinate_info>);
+        static_assert(std::same_as<typename Converted::CoordinateInfo, typename TypeParam::CoordinateInfo>);
         auto check = [](const auto& from, const auto& to, int expected) {
             EXPECT_EQ(from.value.value, expected);
             EXPECT_EQ(to.value.value, expected);
         };
-        if constexpr (TypeParam::coordinate_info::EnabledX)
+        if constexpr (TypeParam::CoordinateInfo::ENABLED_X)
             check(source.value.x, converted.value.x, 2);
-        if constexpr (TypeParam::coordinate_info::EnabledY)
-            check(source.value.y, converted.value.y, TypeParam::coordinate_info::EnabledX ? -3 : 2);
-        if constexpr (TypeParam::coordinate_info::EnabledZ)
-            check(source.value.z, converted.value.z, TypeParam::dimension::dimension == 3 ? 5 : -3);
+        if constexpr (TypeParam::CoordinateInfo::ENABLED_Y)
+            check(source.value.y, converted.value.y, TypeParam::CoordinateInfo::ENABLED_X ? -3 : 2);
+        if constexpr (TypeParam::CoordinateInfo::ENABLED_Z)
+            check(source.value.z, converted.value.z, TypeParam::Dimension::DIMENSION == 3 ? 5 : -3);
     }
 } // namespace
 #include "../support/geometry.hpp"
@@ -238,9 +238,9 @@ namespace {
         aho_test::expect_coordinates(single, 2);
         aho_test::expect_coordinates(pair, 2, 3);
         aho_test::expect_coordinates(triple, 2, 3, 4);
-        using CI1 = aho::coordinate::_DefaultCoordinateInfo<vsl::D1>::value;
-        using CI2 = aho::coordinate::_DefaultCoordinateInfo<vsl::D2>::value;
-        using CI3 = aho::coordinate::_DefaultCoordinateInfo<vsl::D3>::value;
+        using CI1 = aho::coordinate::DefaultCoordinateInfo<vsl::D1>::Value;
+        using CI2 = aho::coordinate::DefaultCoordinateInfo<vsl::D2>::Value;
+        using CI3 = aho::coordinate::DefaultCoordinateInfo<vsl::D3>::Value;
         aho_test::expect_coordinates(aho::d1::Point<int, CI1>(2), 2);
         aho_test::expect_coordinates(aho::d2::Point<int, CI2>(2, 3), 2, 3);
         aho_test::expect_coordinates(aho::d3::Point<int, CI3>(2, 3, 4), 2, 3, 4);
@@ -252,9 +252,9 @@ namespace {
         using P1 = aho::d1::Point<int>;
         using P2 = aho::d2::Point<int>;
         using P3 = aho::d3::Point<int>;
-        static_assert(std::same_as<P1::coordinate_info, aho::d1::PointI::coordinate_info>);
-        static_assert(std::same_as<P2::coordinate_info, aho::d2::PointI::coordinate_info>);
-        static_assert(std::same_as<P3::coordinate_info, aho::d3::PointI::coordinate_info>);
+        static_assert(std::same_as<P1::CoordinateInfo, aho::d1::PointI::CoordinateInfo>);
+        static_assert(std::same_as<P2::CoordinateInfo, aho::d2::PointI::CoordinateInfo>);
+        static_assert(std::same_as<P3::CoordinateInfo, aho::d3::PointI::CoordinateInfo>);
         aho_test::expect_coordinates(P1{}, 0);
         aho_test::expect_coordinates(P2{}, 0, 0);
         aho_test::expect_coordinates(P3{}, 0, 0, 0);
@@ -289,8 +289,8 @@ namespace {
         constexpr T large = static_cast<T>(std::is_same_v<T, float> ? 1e30 : 1e200);
         constexpr T small = static_cast<T>(std::is_same_v<T, float> ? 1e-30 : 1e-200);
         for (const T scale : {large, small}) {
-            const aho::_Point<T, vsl::D2> plane(-T{3} * scale, T{4} * scale);
-            const aho::_Point<T, vsl::D3> space(T{2} * scale, -T{3} * scale, T{6} * scale);
+            const aho::Point_<T, vsl::D2> plane(-T{3} * scale, T{4} * scale);
+            const aho::Point_<T, vsl::D3> space(T{2} * scale, -T{3} * scale, T{6} * scale);
             EXPECT_TRUE(std::isfinite(plane.length()));
             EXPECT_TRUE(std::isfinite(space.length()));
             EXPECT_GT(plane.length(), 0);
@@ -302,7 +302,7 @@ namespace {
     TYPED_TEST(PointTest, ScalarOperatorsAndCompoundOperatorsMutateCoordinates) {
         using P = typename TypeParam::Point;
         using V = typename TypeParam::Vector;
-        using T = typename TypeParam::element_type;
+        using T = typename TypeParam::ElementType;
         auto value = aho_test::geometry<P>(2, 4, 6);
         aho_test::expect_coordinates(value * T{2}, 4, 8, 12);
         aho_test::expect_coordinates(value / T{2}, 1, 2, 3);
@@ -322,12 +322,12 @@ namespace {
     TYPED_TEST_SUITE(PointOneDimensionalLengthTest, PointLengthScalars);
     TYPED_TEST(PointOneDimensionalLengthTest, EachAxisHasNonnegativeLengthForEitherCoordinateSign) {
         using T = TypeParam;
-        using X = aho::coordinate::_MakeCoordinateInfo<true, false, false>::value;
-        using Y = aho::coordinate::_MakeCoordinateInfo<false, true, false>::value;
-        using Z = aho::coordinate::_MakeCoordinateInfo<false, false, true>::value;
+        using X = aho::coordinate::MakeCoordinateInfo<true, false, false>::Value;
+        using Y = aho::coordinate::MakeCoordinateInfo<false, true, false>::Value;
+        using Z = aho::coordinate::MakeCoordinateInfo<false, false, true>::Value;
         []<class... Axes>(std::tuple<Axes...>) {
             ([]<class Axis>() {
-                using P = aho::_Point<T, vsl::D1, Axis>;
+                using P = aho::Point_<T, vsl::D1, Axis>;
                 EXPECT_EQ(P(T{-3}).length(), 3);
                 EXPECT_EQ(P(T{3}).length(), 3);
                 EXPECT_EQ(P(T{}).length(), 0);
@@ -346,14 +346,14 @@ namespace {
         EXPECT_EQ(minimum.value.x.value, std::numeric_limits<int>::min());
     }
     TEST(PointOneDimensionalLengthTest, LargeIntegerMagnitudesKeepTheirExactValues) {
-        const aho::_Point<long long, vsl::D1> large(9007199254740993LL);
+        const aho::Point_<long long, vsl::D1> large(9007199254740993LL);
         static_assert(std::same_as<decltype(large.length()), unsigned long long>);
         EXPECT_EQ(large.length(), 9007199254740993ULL);
-        const aho::_Point<unsigned long long, vsl::D1> maximum(std::numeric_limits<unsigned long long>::max());
+        const aho::Point_<unsigned long long, vsl::D1> maximum(std::numeric_limits<unsigned long long>::max());
         EXPECT_EQ(maximum.length(), std::numeric_limits<unsigned long long>::max());
     }
     TEST(PointOneDimensionalLengthTest, UnsignedCoordinatesRemainPositiveAndNegativeZeroBecomesPositiveZero) {
-        const aho::_Point<unsigned, vsl::D1> maximum(std::numeric_limits<unsigned>::max());
+        const aho::Point_<unsigned, vsl::D1> maximum(std::numeric_limits<unsigned>::max());
         EXPECT_EQ(maximum.length(), static_cast<double>(std::numeric_limits<unsigned>::max()));
         const aho::d1::PointD zero(-0.0);
         EXPECT_EQ(zero.length(), 0);
@@ -362,7 +362,7 @@ namespace {
     TYPED_TEST(PointTest, LengthAndOrderingHandleKnownCoordinates) {
         using P = typename TypeParam::Point;
         const auto value = aho_test::geometry<P>(3, 4, 12);
-        const double expected = TypeParam::dimension::dimension == 1 ? 3 : TypeParam::dimension::dimension == 2 ? 5
+        const double expected = TypeParam::Dimension::DIMENSION == 1 ? 3 : TypeParam::Dimension::DIMENSION == 2 ? 5
                                                                                                                 : 13;
         EXPECT_DOUBLE_EQ(value.length(), expected);
         EXPECT_TRUE(aho_test::geometry<P>(1) < value);

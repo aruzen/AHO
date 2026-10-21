@@ -14,43 +14,43 @@
 namespace VSL_NAMESPACE::command {
     struct ImageCopyInfo {
         ImageRegion region;
-        data_format::___Format format = data_format::Undefined;
-        std::size_t rowStride = 0, byteSize = 0;
+        data_format::Format format = data_format::UNDEFINED;
+        std::size_t row_stride = 0, byte_size = 0;
     };
 
-    struct CopyImageToBuffer : public __Command {
+    struct CopyImageToBuffer : public Command {
         CopyImageToBuffer(BufferAccessor* buffer, ImageAccessor image);
         // ミップレベル0の画素をバッファの先頭へ隙間なくコピーするコマンドを記録する。送信やCPU待機は行わない。
         // hostReadはCPUへの可視性を確保する。読み取り前には別途GPUの完了待ちが必要。
         CopyImageToBuffer(BufferAccessor* buffer, ImageAccessor image, ImageLayout layout,
-                          ImageRegion region = {}, bool hostRead = false);
-        CopyImageToBuffer(std::shared_ptr<_impl::Buffer_impl> buffer, ImageAccessor image, ImageLayout layout,
-                          ImageRegion region = {}, bool hostRead = false);
+                          ImageRegion region = {}, bool host_read = false);
+        CopyImageToBuffer(std::shared_ptr<impl::BufferImpl> buffer, ImageAccessor image, ImageLayout layout,
+                          ImageRegion region = {}, bool host_read = false);
 
-        template<MemoryType MemType, MemoryProperty BufMemProp, SharingMode ShareMode,
-                 VSL_NAMESPACE::ImageType ImgType, VSL_NAMESPACE::MemoryProperty ImgMemProp, VSL_NAMESPACE::ImageLayout Layout>
-        CopyImageToBuffer(Buffer<MemType, BufMemProp, ShareMode>& buffer, Image<ImgType, ImgMemProp, Layout>& image,
-                          ImageLayout layout = ImageLayout::General, ImageRegion region = {}, bool hostRead = false);
+        template<MemoryType mem_type, MemoryProperty buf_mem_prop, SharingMode share_mode,
+                 VSL_NAMESPACE::ImageType img_type, VSL_NAMESPACE::MemoryProperty img_mem_prop, VSL_NAMESPACE::ImageLayout layout_>
+        CopyImageToBuffer(Buffer<mem_type, buf_mem_prop, share_mode>& buffer, Image<img_type, img_mem_prop, layout_>& image,
+                          ImageLayout layout = ImageLayout::GENERAL, ImageRegion region = {}, bool host_read = false);
 
         ImageAccessor image;
         BufferAccessor* buffer;
-        ImageLayout layout = ImageLayout::General;
+        ImageLayout layout = ImageLayout::GENERAL;
         ImageRegion region;
-        bool hostRead = false;
+        bool host_read = false;
 
-        static ImageCopyInfo describe(ImageAccessor image, ImageRegion region = {});
+        static ImageCopyInfo Describe(ImageAccessor image, ImageRegion region = {});
         ImageCopyInfo description() const;
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
 
     private:
-        std::shared_ptr<_impl::Buffer_impl> destination_;
+        std::shared_ptr<impl::BufferImpl> _destination;
     };
 
-    template<MemoryType MemType, MemoryProperty BufMemProp, SharingMode ShareMode,
-             VSL_NAMESPACE::ImageType ImgType, VSL_NAMESPACE::MemoryProperty ImgMemProp, VSL_NAMESPACE::ImageLayout Layout>
-    CopyImageToBuffer::CopyImageToBuffer(Buffer<MemType, BufMemProp, ShareMode>& buffer, Image<ImgType, ImgMemProp, Layout>& image,
-                                         ImageLayout layout, ImageRegion region, bool hostRead)
-        : CopyImageToBuffer(&buffer, image, layout, region, hostRead) {}
+    template<MemoryType mem_type, MemoryProperty buf_mem_prop, SharingMode share_mode,
+             VSL_NAMESPACE::ImageType img_type, VSL_NAMESPACE::MemoryProperty img_mem_prop, VSL_NAMESPACE::ImageLayout layout_>
+    CopyImageToBuffer::CopyImageToBuffer(Buffer<mem_type, buf_mem_prop, share_mode>& buffer, Image<img_type, img_mem_prop, layout_>& image,
+                                         ImageLayout layout, ImageRegion region, bool host_read)
+        : CopyImageToBuffer(&buffer, image, layout, region, host_read) {}
 } // namespace VSL_NAMESPACE::command
 
 #endif

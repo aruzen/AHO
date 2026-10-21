@@ -4,37 +4,37 @@ namespace {
         bool validate_vulkan() const override { return true; }
     };
     TEST_F(ChangeImageBarrierVulkanIntegrationTest, RetainsExplicitAndTypedLayoutsAndRejectsUnsupportedPair) {
-        TransferImage image(device, 2, 2, vsl::data_format::UnsignedInt);
-        vsl::command::ChangeImageBarrier typed(image, vsl::ImageLayout::TransferDstOptimal);
-        EXPECT_EQ(typed.oldLayout, vsl::ImageLayout::Undefined);
-        EXPECT_EQ(typed.newLayout, vsl::ImageLayout::TransferDstOptimal);
-        EXPECT_EQ(typed.image._data, image._data);
-        vsl::command::ChangeImageBarrier unsupported(image, vsl::ImageLayout::General,
-                                                     vsl::ImageLayout::Undefined);
+        TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT);
+        vsl::command::ChangeImageBarrier typed(image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
+        EXPECT_EQ(typed.old_layout, vsl::ImageLayout::UNDEFINED);
+        EXPECT_EQ(typed.new_layout, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
+        EXPECT_EQ(typed.image.data_, image.data_);
+        vsl::command::ChangeImageBarrier unsupported(image, vsl::ImageLayout::GENERAL,
+                                                     vsl::ImageLayout::UNDEFINED);
         auto manager = make_manager();
-        EXPECT_THROW(unsupported.invoke(manager.getPool(), manager.getBuffer(), manager), std::invalid_argument);
+        EXPECT_THROW(unsupported.invoke(manager.get_pool(), manager.get_buffer(), manager), std::invalid_argument);
     }
     TEST_F(ChangeImageBarrierVulkanIntegrationTest, TransitionsTransferDestinationToShaderRead) {
-        TransferImage image(device, 2, 2, vsl::data_format::UnsignedInt);
+        TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT);
         auto manager = make_manager();
         {
-            auto phase = manager.startPhase<vsl::ComputePhase>();
+            auto phase = manager.start_phase<vsl::ComputePhase>();
             transition(manager, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, {},
                        vk::AccessFlagBits::eTransferWrite);
-            phase << vsl::command::ChangeImageBarrier(image, vsl::ImageLayout::TransferDstOptimal,
-                                                      vsl::ImageLayout::ShaderReadOnlyOptimal);
-            EXPECT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::Success);
+            phase << vsl::command::ChangeImageBarrier(image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL,
+                                                      vsl::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
+            EXPECT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         }
-        EXPECT_NO_THROW(device._data->device.waitIdle());
+        EXPECT_NO_THROW(device.data_->device.waitIdle());
     }
 
     TEST_F(ChangeImageBarrierVulkanIntegrationTest, RejectsLayerRangesOutsideTheImageBeforeRecording) {
-        TransferImage image(device, 2, 2, vsl::data_format::UnsignedInt, 2);
+        TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT, 2);
         auto manager = make_manager();
         auto invoke = [&](std::uint32_t base, std::uint32_t count) {
-            vsl::command::ChangeImageBarrier(image, vsl::ImageLayout::General,
-                                             vsl::ImageLayout::TransferSrcOptimal, base, count)
-                .invoke(manager.getPool(), manager.getBuffer(), manager);
+            vsl::command::ChangeImageBarrier(image, vsl::ImageLayout::GENERAL,
+                                             vsl::ImageLayout::TRANSFER_SRC_OPTIMAL, base, count)
+                .invoke(manager.get_pool(), manager.get_buffer(), manager);
         };
         EXPECT_THROW(invoke(2, 0), std::out_of_range);
         EXPECT_THROW(invoke(1, 2), std::out_of_range);

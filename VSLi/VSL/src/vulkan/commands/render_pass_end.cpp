@@ -2,5 +2,5 @@
 #include <VSL/vulkan/_pimpls.hpp>
 
 void VSL_NAMESPACE::command::RenderPassEnd::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
-    buffer._data->commandBuffers[buffer.getCurrentBufferIdx()].endRenderPass();
+    buffer.data_->command_buffers[buffer.get_current_buffer_idx()].endRenderPass();
 }

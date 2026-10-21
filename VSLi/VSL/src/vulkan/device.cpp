@@ -11,30 +11,30 @@
 #include <cstdint>   // Necessary for UINT32_MAX
 #include <algorithm> // Necessary for std::clamp
 
-bool VSL_NAMESPACE::_impl::helper::QueueFamilyIndices::isComplete() {
-    return graphicsFamily.has_value() && presentFamily.has_value();
+bool VSL_NAMESPACE::impl::helper::QueueFamilyIndices::is_complete() {
+    return graphics_family.has_value() && present_family.has_value();
 }
 
-VSL_NAMESPACE::_impl::helper::QueueFamilyIndices VSL_NAMESPACE::_impl::helper::findQueueFamilies(vk::PhysicalDevice device, vk::SurfaceKHR surface) {
+VSL_NAMESPACE::impl::helper::QueueFamilyIndices VSL_NAMESPACE::impl::helper::find_queue_families(vk::PhysicalDevice device, vk::SurfaceKHR surface) {
     QueueFamilyIndices indices;
-    std::vector<vk::QueueFamilyProperties> queueFamilies = device.getQueueFamilyProperties();
+    std::vector<vk::QueueFamilyProperties> queue_families = device.getQueueFamilyProperties();
     int i = 0;
-    for (const auto& queueFamily : queueFamilies) {
-        if (queueFamily.queueFlags & vk::QueueFlagBits::eGraphics) {
-            indices.graphicsFamily = i;
+    for (const auto& queue_family : queue_families) {
+        if (queue_family.queueFlags & vk::QueueFlagBits::eGraphics) {
+            indices.graphics_family = i;
         }
-        vk::Bool32 presentSupport = device.getSurfaceSupportKHR(i, surface);
-        if (presentSupport) {
-            indices.presentFamily = i;
+        vk::Bool32 present_support = device.getSurfaceSupportKHR(i, surface);
+        if (present_support) {
+            indices.present_family = i;
         }
         i++;
     }
     return indices;
 }
 
-using namespace VSL_NAMESPACE::_impl::helper;
+using namespace VSL_NAMESPACE::impl::helper;
 
-const std::vector<const char*> deviceExtensions = {
+const std::vector<const char*> DEVICE_EXTENSIONS = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 #ifndef _MSC_VER
     "VK_KHR_portability_subset",
@@ -46,137 +46,137 @@ const std::vector<const char*> deviceExtensions = {
     // VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
 };
 
-bool checkDeviceExtensionSupport(vk::PhysicalDevice device) {
-    std::vector<vk::ExtensionProperties> availableExtensions = device.enumerateDeviceExtensionProperties();
+bool check_device_extension_support(vk::PhysicalDevice device) {
+    std::vector<vk::ExtensionProperties> available_extensions = device.enumerateDeviceExtensionProperties();
 
-    std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
+    std::set<std::string> required_extensions(DEVICE_EXTENSIONS.begin(), DEVICE_EXTENSIONS.end());
 
-    for (const auto& extension : availableExtensions) {
-        requiredExtensions.erase(extension.extensionName);
+    for (const auto& extension : available_extensions) {
+        required_extensions.erase(extension.extensionName);
     }
 
-    return requiredExtensions.empty();
+    return required_extensions.empty();
 }
 
-template<bool V>
-std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> VSL_NAMESPACE::_LogicalDeviceGraphicCreator<V>::create(VSL_NAMESPACE::PhysicalDevice device, VSL_NAMESPACE::Surface surface) {
-    std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl> _data = std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl>(new VSL_NAMESPACE::_impl::LogicalDevice_impl);
+template<bool v>
+std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl> VSL_NAMESPACE::LogicalDeviceGraphicCreator<v>::create(VSL_NAMESPACE::PhysicalDevice device, VSL_NAMESPACE::Surface surface) {
+    std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl> data_ = std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl>(new VSL_NAMESPACE::impl::LogicalDeviceImpl);
 
-    QueueFamilyIndices indices = findQueueFamilies(device._data->device, surface._data->surface);
+    QueueFamilyIndices indices = find_queue_families(device.data_->device, surface.data_->surface);
 
-    if (not checkDeviceExtensionSupport(device._data->device) || not indices.isComplete())
+    if (not check_device_extension_support(device.data_->device) || not indices.is_complete())
         throw VSL_NAMESPACE::exceptions::RuntimeException("PhysicalDevices", "PhysicalDevices do not have requirements.");
 
-    std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
-    std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+    std::vector<vk::DeviceQueueCreateInfo> queue_create_infos;
+    std::set<uint32_t> unique_queue_families = {indices.graphics_family.value(), indices.present_family.value()};
 
-    float queuePriority = 1.0f;
-    for (uint32_t queueFamily : uniqueQueueFamilies) {
-        vk::DeviceQueueCreateInfo queueCreateInfo{};
-        queueCreateInfo.queueFamilyIndex = queueFamily;
-        queueCreateInfo.queueCount = 1;
-        queueCreateInfo.pQueuePriorities = &queuePriority;
-        queueCreateInfos.push_back(queueCreateInfo);
+    float queue_priority = 1.0f;
+    for (uint32_t queue_family : unique_queue_families) {
+        vk::DeviceQueueCreateInfo queue_create_info{};
+        queue_create_info.queueFamilyIndex = queue_family;
+        queue_create_info.queueCount = 1;
+        queue_create_info.pQueuePriorities = &queue_priority;
+        queue_create_infos.push_back(queue_create_info);
     }
 
-    vk::PhysicalDeviceFeatures deviceFeatures;
-    if constexpr (validation) {
-        deviceFeatures.vertexPipelineStoresAndAtomics = true;
-        deviceFeatures.fragmentStoresAndAtomics = true;
+    vk::PhysicalDeviceFeatures device_features;
+    if constexpr (VALIDATION) {
+        device_features.vertexPipelineStoresAndAtomics = true;
+        device_features.fragmentStoresAndAtomics = true;
     }
-    deviceFeatures.independentBlend = true;
-    deviceFeatures.samplerAnisotropy = true;
+    device_features.independentBlend = true;
+    device_features.samplerAnisotropy = true;
 
     /* MoltenVK未対応
     vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT extendedDynamicStateFeatures;
     extendedDynamicStateFeatures.extendedDynamicState = true;
      */
 
-    vk::DeviceCreateInfo createInfo;
-    createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
-    createInfo.pQueueCreateInfos = queueCreateInfos.data();
-    createInfo.pEnabledFeatures = &deviceFeatures;
-    createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
-    createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+    vk::DeviceCreateInfo create_info;
+    create_info.queueCreateInfoCount = static_cast<uint32_t>(queue_create_infos.size());
+    create_info.pQueueCreateInfos = queue_create_infos.data();
+    create_info.pEnabledFeatures = &device_features;
+    create_info.enabledExtensionCount = static_cast<uint32_t>(DEVICE_EXTENSIONS.size());
+    create_info.ppEnabledExtensionNames = DEVICE_EXTENSIONS.data();
     // createInfo.pNext = &nonSemanticFeatures;
     //createInfo.pNext = &extendedDynamicStateFeatures;
 
-    if constexpr (V) {
-        createInfo.enabledLayerCount = static_cast<uint32_t>(VSL_NAMESPACE::validationLayers.size());
-        createInfo.ppEnabledLayerNames = VSL_NAMESPACE::validationLayers.data();
+    if constexpr (v) {
+        create_info.enabledLayerCount = static_cast<uint32_t>(VSL_NAMESPACE::VALIDATION_LAYERS.size());
+        create_info.ppEnabledLayerNames = VSL_NAMESPACE::VALIDATION_LAYERS.data();
     } else {
-        createInfo.enabledLayerCount = 0;
+        create_info.enabledLayerCount = 0;
     }
 
-    _data->device = device._data->device.createDevice(createInfo);
-    _data->graphicsFamily = indices.graphicsFamily.value();
-    _data->presentFamily = indices.presentFamily.value();
+    data_->device = device.data_->device.createDevice(create_info);
+    data_->graphics_family = indices.graphics_family.value();
+    data_->present_family = indices.present_family.value();
 
-    return _data;
+    return data_;
 }
 
-void VSL_NAMESPACE::_impl::PhysicalDevice_impl::makeProps() {
+void VSL_NAMESPACE::impl::PhysicalDeviceImpl::make_props() {
     props = device.getProperties();
 }
 
-void VSL_NAMESPACE::_impl::PhysicalDevice_impl::makeMemProps() {
-    memProps = device.getMemoryProperties();
+void VSL_NAMESPACE::impl::PhysicalDeviceImpl::make_mem_props() {
+    mem_props = device.getMemoryProperties();
 }
 
-VSL_NAMESPACE::PhysicalDevice::PhysicalDevice(std::shared_ptr<_impl::PhysicalDevice_impl> _data) : _data(_data) {}
+VSL_NAMESPACE::PhysicalDevice::PhysicalDevice(std::shared_ptr<impl::PhysicalDeviceImpl> data_) : data_(data_) {}
 
 VSL_NAMESPACE::PhysicalDevice::~PhysicalDevice() {}
 
-uint32_t VSL_NAMESPACE::PhysicalDevice::apiVersion() {
-    if (!_data->props.has_value())
-        _data->makeProps();
-    return _data->props.value().apiVersion;
+uint32_t VSL_NAMESPACE::PhysicalDevice::api_version() {
+    if (!data_->props.has_value())
+        data_->make_props();
+    return data_->props.value().apiVersion;
 }
 
-uint32_t VSL_NAMESPACE::PhysicalDevice::driverVersion() {
-    if (!_data->props.has_value())
-        _data->makeProps();
-    return _data->props.value().driverVersion;
+uint32_t VSL_NAMESPACE::PhysicalDevice::driver_version() {
+    if (!data_->props.has_value())
+        data_->make_props();
+    return data_->props.value().driverVersion;
 }
 
-uint32_t VSL_NAMESPACE::PhysicalDevice::vendorID() {
-    if (!_data->props.has_value())
-        _data->makeProps();
-    return _data->props.value().vendorID;
+uint32_t VSL_NAMESPACE::PhysicalDevice::vendor_id() {
+    if (!data_->props.has_value())
+        data_->make_props();
+    return data_->props.value().vendorID;
 }
 
-uint32_t VSL_NAMESPACE::PhysicalDevice::deviceID() {
-    if (!_data->props.has_value())
-        _data->makeProps();
-    return _data->props.value().deviceID;
+uint32_t VSL_NAMESPACE::PhysicalDevice::device_id() {
+    if (!data_->props.has_value())
+        data_->make_props();
+    return data_->props.value().deviceID;
 }
 
-VSL_NAMESPACE::PhysicalDeviceType::_PhysicalDeviceType VSL_NAMESPACE::PhysicalDevice::type() {
-    if (!_data->props.has_value())
-        _data->makeProps();
-    return VSL_NAMESPACE::PhysicalDeviceType::getType((size_t)_data->props.value().deviceType);
+VSL_NAMESPACE::physical_device_type::PhysicalDeviceType VSL_NAMESPACE::PhysicalDevice::type() {
+    if (!data_->props.has_value())
+        data_->make_props();
+    return VSL_NAMESPACE::physical_device_type::get_type((size_t)data_->props.value().deviceType);
 }
 
 std::string VSL_NAMESPACE::PhysicalDevice::name() {
-    if (!_data->props.has_value())
-        _data->makeProps();
-    return _data->props.value().deviceName;
+    if (!data_->props.has_value())
+        data_->make_props();
+    return data_->props.value().deviceName;
 }
 
-std::shared_ptr<VSL_NAMESPACE::_impl::PhysicalDevices_impl>
-VSL_NAMESPACE::helper::enumeratePhysicalDevices(VulkanAccessor vulkan) {
-    auto data = std::make_shared<_impl::PhysicalDevices_impl>();
-    data->devices = vulkan._accessor->instance.enumeratePhysicalDevices();
-    data->vulkan = vulkan._accessor;
+std::shared_ptr<VSL_NAMESPACE::impl::PhysicalDevicesImpl>
+VSL_NAMESPACE::helper::enumerate_physical_devices(VulkanAccessor vulkan) {
+    auto data = std::make_shared<impl::PhysicalDevicesImpl>();
+    data->devices = vulkan.accessor->instance.enumeratePhysicalDevices();
+    data->vulkan = vulkan.accessor;
     return data;
 }
 
 std::vector<VSL_NAMESPACE::PhysicalDevice>
-VSL_NAMESPACE::helper::physicalDevices(const std::shared_ptr<_impl::PhysicalDevices_impl>& data) {
+VSL_NAMESPACE::helper::physical_devices(const std::shared_ptr<impl::PhysicalDevicesImpl>& data) {
     std::vector<PhysicalDevice> devices;
     devices.reserve(data->devices.size());
     for (auto handle : data->devices) {
-        auto device = std::make_shared<_impl::PhysicalDevice_impl>();
+        auto device = std::make_shared<impl::PhysicalDeviceImpl>();
         device->device = handle;
         device->vulkan = data->vulkan;
         devices.emplace_back(std::move(device));
@@ -188,7 +188,7 @@ VSL_NAMESPACE::helper::physicalDevices(const std::shared_ptr<_impl::PhysicalDevi
 template<typename S>
 void VSL_NAMESPACE::PhysicalDevices<S>::test() {
     std::vector<VSL_NAMESPACE::PhysicalDevice> devices;
-    for (auto& d : _data->devices) {
+    for (auto& d : data_->devices) {
         auto f = d.getFeatures();
         auto p = d.getProperties();
     }
@@ -198,53 +198,53 @@ void VSL_NAMESPACE::PhysicalDevices<S>::test() {
 }
 #endif // VSL_NAMESPACE_TEST
 
-VSL_NAMESPACE::PhysicalDeviceType::_PhysicalDeviceType VSL_NAMESPACE::PhysicalDeviceType::getType(int a) {
+VSL_NAMESPACE::physical_device_type::PhysicalDeviceType VSL_NAMESPACE::physical_device_type::get_type(int a) {
     switch (a) {
         case 1:
-            return VSL_NAMESPACE::PhysicalDeviceType::IntegratedGPU;
+            return VSL_NAMESPACE::physical_device_type::INTEGRATED_GPU;
         case 2:
-            return VSL_NAMESPACE::PhysicalDeviceType::DiscreteGPU;
+            return VSL_NAMESPACE::physical_device_type::DISCRETE_GPU;
         case 3:
-            return VSL_NAMESPACE::PhysicalDeviceType::VirtualGPU;
+            return VSL_NAMESPACE::physical_device_type::VIRTUAL_GPU;
         case 4:
-            return VSL_NAMESPACE::PhysicalDeviceType::CPU;
+            return VSL_NAMESPACE::physical_device_type::CPU;
         default:
-            return VSL_NAMESPACE::PhysicalDeviceType::Other;
+            return VSL_NAMESPACE::physical_device_type::OTHER;
     }
 }
 
-int rateDeviceSuitability(vk::PhysicalDevice device) {
-    auto deviceProperties = device.getProperties();
-    auto deviceFeatures = device.getFeatures();
+int rate_device_suitability(vk::PhysicalDevice device) {
+    auto device_properties = device.getProperties();
+    auto device_features = device.getFeatures();
 
     int score = 0;
 
-    if (deviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu) {
+    if (device_properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu) {
         score += 1000;
     }
 
-    score += deviceProperties.limits.maxImageDimension2D;
+    score += device_properties.limits.maxImageDimension2D;
 
-    if (!deviceFeatures.geometryShader) {
+    if (!device_features.geometryShader) {
         return 0;
     }
     return score;
 }
 
-int VSL_NAMESPACE::_PhysicalDevicesSercher::benchmark(VSL_NAMESPACE::PhysicalDevice device) {
-    return rateDeviceSuitability(device._data->device);
+int VSL_NAMESPACE::PhysicalDevicesSercher::benchmark(VSL_NAMESPACE::PhysicalDevice device) {
+    return rate_device_suitability(device.data_->device);
 }
 
-void VSL_NAMESPACE::helper::retainPhysicalDeviceOwner(
-    const std::shared_ptr<VSL_NAMESPACE::_impl::LogicalDevice_impl>& logical,
+void VSL_NAMESPACE::helper::retain_physical_device_owner(
+    const std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl>& logical,
     const VSL_NAMESPACE::PhysicalDevice& physical) {
-    logical->parentDevice = physical._data;
+    logical->parent_device = physical.data_;
 }
 
-VSL_NAMESPACE::_impl::LogicalDevice_impl::~LogicalDevice_impl() {
+VSL_NAMESPACE::impl::LogicalDeviceImpl::~LogicalDeviceImpl() {
     device.destroy();
 }
 
-template struct VSL_NAMESPACE::PhysicalDevices<VSL_NAMESPACE::_PhysicalDevicesSercher>;
-template struct VSL_NAMESPACE::LogicalDevice<VSL_NAMESPACE::_LogicalDeviceGraphicCreator<true>>;
-template struct VSL_NAMESPACE::LogicalDevice<VSL_NAMESPACE::_LogicalDeviceGraphicCreator<false>>;
+template struct VSL_NAMESPACE::PhysicalDevices<VSL_NAMESPACE::PhysicalDevicesSercher>;
+template struct VSL_NAMESPACE::LogicalDevice<VSL_NAMESPACE::LogicalDeviceGraphicCreator<true>>;
+template struct VSL_NAMESPACE::LogicalDevice<VSL_NAMESPACE::LogicalDeviceGraphicCreator<false>>;

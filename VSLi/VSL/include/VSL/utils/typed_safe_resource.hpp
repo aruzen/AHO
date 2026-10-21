@@ -10,37 +10,37 @@
 #include "../vulkan/stages/push_contents.hpp"
 
 namespace VSL_NAMESPACE::typed {
-    template<std::uint32_t Binding, graphic_resource::Type BindingType, ShaderFlag ShaderType, std::uint32_t Amount = 1>
+    template<std::uint32_t binding, graphic_resource::Type binding_type, ShaderFlag shader_type, std::uint32_t amount = 1>
     struct ResourceBindingPoint {
-        static constexpr graphic_resource::BindingPoint value = {Binding, BindingType, ShaderType, Amount};
+        static constexpr graphic_resource::BindingPoint VALUE = {binding, binding_type, shader_type, amount};
     };
 
     template<typename... Points>
     struct ResourceBindingPoints {
-        static constexpr size_t size() { return sizeof...(Points); }
+        static constexpr size_t Size() { return sizeof...(Points); }
 
-        template<size_t Index>
-        static constexpr auto get() {
-            return std::get<Index>(std::tuple{Points::value...});
+        template<size_t index>
+        static constexpr auto Get() {
+            return std::get<index>(std::tuple{Points::VALUE...});
         }
 
         graphic_resource::BindingLayout make(LogicalDeviceAccessor device) {
-            return {device, {Points::value...}};
+            return {device, {Points::VALUE...}};
         }
     };
 
-    template<data_format::___Format FormatType, std::uint32_t Location = (std::uint32_t)-1, std::uint32_t Offset = (std::uint32_t)-1>
+    template<data_format::Format format_type, std::uint32_t location = (std::uint32_t)-1, std::uint32_t offset = (std::uint32_t)-1>
     struct VertexInputDefinition {
-        static constexpr pipeline_layout::VertexInputLayoutDefinition value = {FormatType, Location, Offset};
+        static constexpr pipeline_layout::VertexInputLayoutDefinition VALUE = {format_type, location, offset};
     };
 
-    template<std::uint32_t Binding, std::uint32_t Size, pipeline_layout::VertexInputShapeDefinition::UpdateTiming Timing, typename... Definitions>
+    template<std::uint32_t binding, std::uint32_t size, pipeline_layout::VertexInputShapeDefinition::UpdateTiming timing, typename... Definitions>
     struct VertexShapeDefinition {
-        static constexpr size_t size() { return sizeof...(Definitions); }
+        static constexpr size_t Size() { return sizeof...(Definitions); }
 
-        template<size_t Index>
-        static constexpr auto get() {
-            return std::get<Index>(std::tuple{Definitions::value...});
+        template<size_t index>
+        static constexpr auto Get() {
+            return std::get<index>(std::tuple{Definitions::VALUE...});
         }
     };
 
@@ -49,18 +49,18 @@ namespace VSL_NAMESPACE::typed {
         void injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl);
     };
 
-    template<VSL_NAMESPACE::ShaderFlag Target, std::uint32_t Size = (std::uint32_t)-1, std::uint32_t Offset = (std::uint32_t)-1>
+    template<VSL_NAMESPACE::ShaderFlag target, std::uint32_t size = (std::uint32_t)-1, std::uint32_t offset = (std::uint32_t)-1>
     struct PushContentDefinitionTag {
-        static constexpr pipeline_layout::PushContentDefinition value = {Target, Offset, Size};
+        static constexpr pipeline_layout::PushContentDefinition VALUE = {target, offset, size};
     };
 
     template<typename... Definitions>
     struct PushContentDefinitions {
-        static constexpr size_t size() { return sizeof...(Definitions); }
+        static constexpr size_t Size() { return sizeof...(Definitions); }
 
-        template<size_t Index>
-        static constexpr auto get() {
-            return std::get<Index>(std::tuple{Definitions::value...});
+        template<size_t index>
+        static constexpr auto Get() {
+            return std::get<index>(std::tuple{Definitions::VALUE...});
         }
     };
 

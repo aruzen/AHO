@@ -9,27 +9,27 @@
 #include <string_view>
 
 namespace aho_test {
-    class LiveGpuTest : public testing::Test {
-        vsl::logger_t previous_logger = nullptr;
-        inline static std::vector<std::string> validation_errors;
-        inline static std::mutex validation_mutex;
-        static void capture_log(const char* text) {
+    class LiveGPUTest : public testing::Test {
+        vsl::LoggerT _previous_logger = nullptr;
+        inline static std::vector<std::string> VALIDATION_ERRORS;
+        inline static std::mutex VALIDATION_MUTEX;
+        static void CaptureLog(const char* text) {
             const std::string_view message(text);
             if (message.find("Validation Error") != std::string_view::npos || message.find("VUID-") != std::string_view::npos) {
-                std::lock_guard lock(validation_mutex);
-                validation_errors.emplace_back(text);
+                std::lock_guard lock(VALIDATION_MUTEX);
+                VALIDATION_ERRORS.emplace_back(text);
             }
         }
 
     protected:
         std::unique_ptr<aho::StandardEngine> engine;
         void SetUp() override {
-            previous_logger = vsl::logger;
+            _previous_logger = vsl::LOGGER;
             {
-                std::lock_guard lock(validation_mutex);
-                validation_errors.clear();
+                std::lock_guard lock(VALIDATION_MUTEX);
+                VALIDATION_ERRORS.clear();
             }
-            vsl::logger = capture_log;
+            vsl::LOGGER = CaptureLog;
             if (glfwInit() != GLFW_TRUE) {
                 const char* reason = nullptr;
                 glfwGetError(&reason);
@@ -62,9 +62,9 @@ namespace aho_test {
             engine = std::make_unique<aho::StandardEngine>("AHO integration test", boot_on);
         }
         void TearDown() override {
-            if (engine && engine->_data && engine->_data->logical_device._data)
-                engine->_data->logical_device._data->device.waitIdle();
-            if (engine && engine->boot_window && engine->boot_window->_data && engine->boot_window->_data->window_handle)
+            if (engine && engine->data_ && engine->data_->logical_device.data_)
+                engine->data_->logical_device.data_->device.waitIdle();
+            if (engine && engine->boot_window && engine->boot_window->data_ && engine->boot_window->data_->window_handle)
                 engine->boot_window->close();
             engine.reset();
             // The library closes its GLFW windows explicitly; never leave a failed case's window open.
@@ -73,11 +73,11 @@ namespace aho_test {
                 if (window->window_handle)
                     vsl::PureWindow(window).close();
             glfwTerminate();
-            vsl::logger = previous_logger;
+            vsl::LOGGER = _previous_logger;
             std::vector<std::string> errors;
             {
-                std::lock_guard lock(validation_mutex);
-                errors.swap(validation_errors);
+                std::lock_guard lock(VALIDATION_MUTEX);
+                errors.swap(VALIDATION_ERRORS);
             }
             for (const auto& error : errors)
                 ADD_FAILURE() << error;

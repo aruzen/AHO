@@ -27,13 +27,13 @@ namespace vsl_test {
         }
         void make_surface() {
             surface = window->add_plugin<vsl::Surface>(vsl::VulkanAccessor{instance});
-            ASSERT_TRUE(surface->_data->surface) << "GLFW surface creation failed";
+            ASSERT_TRUE(surface->data_->surface) << "GLFW surface creation failed";
         }
         void TearDown() override {
-            if (device._data)
-                device._data->device.waitIdle();
+            if (device.data_)
+                device.data_->device.waitIdle();
             if (window)
-                window->_data->plugins.clear();
+                window->data_->plugins.clear();
             surface.reset();
             if (window && static_cast<bool>(*window))
                 window->close();

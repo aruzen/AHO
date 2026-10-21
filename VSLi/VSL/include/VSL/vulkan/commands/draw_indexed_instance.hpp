@@ -7,27 +7,27 @@
 #include <cstdint>
 
 namespace VSL_NAMESPACE::command {
-    struct DrawInstance : public __Command {
+    struct DrawInstance : public Command {
         DrawInstance(size_t index_size, size_t instance_size);
         DrawInstance(size_t instance_size);
 
-        [[nodiscard]] std::uint32_t getIndexSize() const noexcept { return index_size_; }
+        [[nodiscard]] std::uint32_t get_index_size() const noexcept { return _index_size; }
 
-        [[nodiscard]] std::uint32_t getInstanceSize() const noexcept { return instance_size_; }
+        [[nodiscard]] std::uint32_t get_instance_size() const noexcept { return _instance_size; }
 
-        void setIndexSize(size_t size);
+        void set_index_size(size_t size);
 
-        void setInstanceSize(size_t size);
+        void set_instance_size(size_t size);
 
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
 
     private:
-        std::uint32_t index_size_, instance_size_;
+        std::uint32_t _index_size, _instance_size;
     };
 
     /* FIXME
 	struct DrawInstanceManip : public DrawInstance, public __VertexSizeRequire{
-        void setVertexSize(std::optional<size_t> vertexSize) override;
+        void set_vertex_size(std::optional<size_t> vertex_size) override;
     };
 
 	extern DrawInstanceManip drawInstance;

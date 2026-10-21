@@ -15,7 +15,7 @@
 
 namespace VSL_NAMESPACE::pipeline_layout {
     struct PushContentDefinition {
-        VSL_NAMESPACE::ShaderFlag targetShader;
+        VSL_NAMESPACE::ShaderFlag target_shader;
         std::uint32_t offset = (std::uint32_t)-1, size = (std::uint32_t)-1;
     };
 
@@ -28,17 +28,17 @@ namespace VSL_NAMESPACE::pipeline_layout {
 
         std::vector<PushContentDefinition> definitions;
 
-        template<VSL_NAMESPACE::ShaderFlag ShaderFlag, typename... Types>
+        template<VSL_NAMESPACE::ShaderFlag shader_flag, typename... Types>
         constexpr static std::array<PushContentDefinition, sizeof...(Types)> MakeDefinitions(const Types&...);
     };
 
-    template<VSL_NAMESPACE::ShaderFlag ShaderFlag, typename... Types>
+    template<VSL_NAMESPACE::ShaderFlag shader_flag, typename... Types>
     constexpr std::array<PushContentDefinition, sizeof...(Types)> PushConstants::MakeDefinitions(const Types&...) {
         std::uint32_t offset = 0;
         const auto next_definition = [&offset](std::uint32_t size) {
             const auto current = offset;
             offset += size;
-            return PushContentDefinition{ShaderFlag, current, size};
+            return PushContentDefinition{shader_flag, current, size};
         };
         return {{next_definition(sizeof(Types))...}};
     }

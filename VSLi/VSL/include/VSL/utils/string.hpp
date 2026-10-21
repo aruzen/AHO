@@ -7,10 +7,10 @@
 #include <regex>
 
 namespace VSL_NAMESPACE {
-    constexpr bool validation = VSL_VALIDATION;
+    constexpr bool VALIDATION = VSL_VALIDATION;
 
-    typedef void (*logger_t)(const char*);
-    extern logger_t logger;
+    typedef void (*LoggerT)(const char*);
+    extern LoggerT LOGGER;
 
     namespace helper {
         void join(std::stringstream& ss);
@@ -18,9 +18,9 @@ namespace VSL_NAMESPACE {
         void join(std::stringstream& ss, const Head& h, const Args&... args);
     } // namespace helper
 
-    template<bool Validation = validation, typename Head, typename... Args>
+    template<bool validation = VALIDATION, typename Head, typename... Args>
     void logging(const Head& h, const Args&... args);
-    template<bool Validation = validation, typename Head, typename... Args>
+    template<bool validation = VALIDATION, typename Head, typename... Args>
     void loggingln(const Head& h, const Args&... args);
 
     std::string expand_environments(const std::string& input);
@@ -38,29 +38,29 @@ inline void VSL_NAMESPACE::helper::join(std::stringstream& ss, const Head& h, co
     VSL_NAMESPACE::helper::join(ss, args...);
 }
 
-template<bool Validation, typename Head, typename... Args>
+template<bool validation, typename Head, typename... Args>
 inline void VSL_NAMESPACE::logging(const Head& h, const Args&... args) {
-    if constexpr (Validation) {
-        if (logger == nullptr)
+    if constexpr (validation) {
+        if (LOGGER == nullptr)
             return;
 
         std::stringstream ss;
         VSL_NAMESPACE::helper::join(ss, h, args...);
 
-        VSL_NAMESPACE::logger(ss.str().c_str());
+        VSL_NAMESPACE::LOGGER(ss.str().c_str());
     }
 }
 
-template<bool Validation, typename Head, typename... Args>
+template<bool validation, typename Head, typename... Args>
 inline void VSL_NAMESPACE::loggingln(const Head& h, const Args&... args) {
-    if constexpr (Validation) {
-        if (logger == nullptr)
+    if constexpr (validation) {
+        if (LOGGER == nullptr)
             return;
 
         std::stringstream ss;
         VSL_NAMESPACE::helper::join(ss, h, args...);
         ss << std::endl;
 
-        VSL_NAMESPACE::logger(ss.str().c_str());
+        VSL_NAMESPACE::LOGGER(ss.str().c_str());
     }
 }

@@ -4,18 +4,18 @@ namespace {
     TEST_F(SurfaceWindowIntegrationTest, CreatesSurfaceForWindowAndRetainsInstance) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        EXPECT_EQ(surface->_data->vulkan, instance);
-        EXPECT_EQ(surface->_data->window, window->_data->window_handle);
-        const auto capabilities = physical._data->device.getSurfaceCapabilitiesKHR(surface->_data->surface);
+        EXPECT_EQ(surface->data_->vulkan, instance);
+        EXPECT_EQ(surface->data_->window, window->data_->window_handle);
+        const auto capabilities = physical.data_->device.getSurfaceCapabilitiesKHR(surface->data_->surface);
         EXPECT_GE(capabilities.maxImageExtent.width, 64u);
         EXPECT_GE(capabilities.maxImageExtent.height, 48u);
-        EXPECT_FALSE(physical._data->device.getSurfaceFormatsKHR(surface->_data->surface).empty());
+        EXPECT_FALSE(physical.data_->device.getSurfaceFormatsKHR(surface->data_->surface).empty());
     }
 } // namespace
 
 namespace {
     TEST(SurfaceDataTest, EmptySurfaceDataCanBeDestroyedWithoutCallingVulkan) {
-        auto empty = std::make_shared<vsl::_impl::Surface_impl>();
+        auto empty = std::make_shared<vsl::impl::SurfaceImpl>();
         EXPECT_NO_THROW(empty.reset());
     }
     TEST_F(SurfaceWindowIntegrationTest, NullWindowIsRejectedBeforeNativeAccess) {
@@ -33,11 +33,11 @@ namespace {
         EXPECT_THROW((vsl::Surface(&*window, vsl::VulkanAccessor{})), vsl::exceptions::RuntimeException);
     }
     TEST_F(SurfaceWindowIntegrationTest, NullNativeInstanceIsRejectedBeforeGlfwAccess) {
-        auto empty = std::make_shared<vsl::_impl::Vulkan_impl<false>>();
+        auto empty = std::make_shared<vsl::impl::VulkanImpl<false>>();
         EXPECT_THROW((vsl::Surface(&*window, vsl::VulkanAccessor{empty})), vsl::exceptions::RuntimeException);
     }
     TEST_F(SurfaceWindowIntegrationTest, MissingPlatformExtensionThrowsWithReasonAndDoesNotRegisterAPlugin) {
-        auto unsupported = std::make_shared<vsl::_impl::Vulkan_impl<false>>();
+        auto unsupported = std::make_shared<vsl::impl::VulkanImpl<false>>();
         std::vector<const char*> extensions{VK_KHR_SURFACE_EXTENSION_NAME};
         vk::InstanceCreateInfo info{};
 #ifdef __APPLE__
@@ -47,8 +47,8 @@ namespace {
         info.enabledExtensionCount = static_cast<std::uint32_t>(extensions.size());
         info.ppEnabledExtensionNames = extensions.data();
         unsupported->instance = vk::createInstance(info);
-        const auto previousCount = window->_data->plugins.size();
-        const auto previousId = window->_data->plugins_next_id;
+        const auto previous_count = window->data_->plugins.size();
+        const auto previous_id = window->data_->plugins_next_id;
         try {
             window->add_plugin<vsl::Surface>(vsl::VulkanAccessor{unsupported});
             ADD_FAILURE() << "Failed surface creation returned a registered plugin";
@@ -59,10 +59,10 @@ namespace {
             EXPECT_NE(reason.find(std::to_string(VK_ERROR_EXTENSION_NOT_PRESENT)), std::string::npos);
             EXPECT_NE(reason.find("GLFW"), std::string::npos);
         }
-        EXPECT_EQ(window->_data->plugins.size(), previousCount);
-        EXPECT_EQ(window->_data->plugins_next_id, previousId);
+        EXPECT_EQ(window->data_->plugins.size(), previous_count);
+        EXPECT_EQ(window->data_->plugins_next_id, previous_id);
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        EXPECT_TRUE(static_cast<bool>(surface->_data->surface));
+        EXPECT_TRUE(static_cast<bool>(surface->data_->surface));
     }
 } // namespace

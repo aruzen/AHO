@@ -19,163 +19,163 @@ namespace VSL_NAMESPACE {
     struct CommandManager;
 
     enum class MemoryType : unsigned int {
-        None = 0,
+        NONE = 0,
         // データ転送の「送信元」バッファ。他のバッファや画像へデータをコピーするために使用。
-        TransferSource = 0x00000001,
+        TRANSFER_SOURCE = 0x00000001,
 
         // データ転送の「受信先」バッファ。他のバッファや画像からデータを受け取るために使用。
-        TransferDestination = 0x00000002,
+        TRANSFER_DESTINATION = 0x00000002,
 
         // シェーダーがテクスチャのように読み込めるが、変更されないバッファ。
-        UniformTexelBuffer = 0x00000004,
+        UNIFORM_TEXEL_BUFFER = 0x00000004,
 
         // シェーダーが自由に読み書きできるバッファ。
-        StorageTexelBuffer = 0x00000008,
+        STORAGE_TEXEL_BUFFER = 0x00000008,
 
         // シェーダーが参照する「読み取り専用」のデータバッファ。
-        UniformBuffer = 0x00000010,
+        UNIFORM_BUFFER = 0x00000010,
 
         // シェーダーが自由に読み書きできるデータバッファ。
-        StorageBuffer = 0x00000020,
+        STORAGE_BUFFER = 0x00000020,
 
         // 描画時に頂点の描画順序を指定するためのバッファ。
-        IndexBuffer = 0x00000040,
+        INDEX_BUFFER = 0x00000040,
 
         // 頂点の座標や色、テクスチャ座標などを格納するバッファ。
-        VertexBuffer = 0x00000080,
+        VERTEX_BUFFER = 0x00000080,
 
         // GPU が間接描画 (`vkCmdDrawIndirect`) を行うためのバッファ。
-        IndirectDrawBuffer = 0x00000100,
+        INDIRECT_DRAW_BUFFER = 0x00000100,
 
         // シェーダーから GPU メモリのアドレスを直接取得できるバッファ。
-        ShaderDeviceAddress = 0x00020000,
+        SHADER_DEVICE_ADDRESS = 0x00020000,
 
         // ハードウェアによる動画デコードの入力データを格納するバッファ。
-        VideoDecodeSource = 0x00002000,
+        VIDEO_DECODE_SOURCE = 0x00002000,
 
         // ハードウェアによる動画デコードの出力データを格納するバッファ。
-        VideoDecodeDestination = 0x00004000,
+        VIDEO_DECODE_DESTINATION = 0x00004000,
 
         // 頂点シェーダーの出力を保存するためのバッファ。
-        TransformFeedbackBuffer = 0x00000800,
+        TRANSFORM_FEEDBACK_BUFFER = 0x00000800,
 
         // トランスフォームフィードバック時に記録されるカウンター情報を保存するバッファ。
-        TransformFeedbackCounter = 0x00001000,
+        TRANSFORM_FEEDBACK_COUNTER = 0x00001000,
 
         // GPU が条件に応じて描画をスキップできるようにするバッファ。
-        ConditionalRendering = 0x00000200,
+        CONDITIONAL_RENDERING = 0x00000200,
 
         // レイトレーシングの衝突判定 (BVH) を構築するための入力データ。
-        AccelerationStructureBuildInput = 0x00080000,
+        ACCELERATION_STRUCTURE_BUILD_INPUT = 0x00080000,
 
         // レイトレーシング用の空間構造 (BVH) を格納するバッファ。
-        AccelerationStructureStorage = 0x00100000,
+        ACCELERATION_STRUCTURE_STORAGE = 0x00100000,
 
         // レイトレーシングシェーダーを管理するための特別なバッファ。
-        ShaderBindingTable = 0x00000400,
+        SHADER_BINDING_TABLE = 0x00000400,
 
         // ハードウェアによる動画エンコードの出力データを格納するバッファ。
-        VideoEncodeDestination = 0x00008000,
+        VIDEO_ENCODE_DESTINATION = 0x00008000,
 
         // ハードウェアによる動画エンコードの入力データを格納するバッファ。
-        VideoEncodeSource = 0x00010000,
+        VIDEO_ENCODE_SOURCE = 0x00010000,
 
         // サンプラーの情報 (テクスチャのフィルタリング設定など) を格納するバッファ。
-        SamplerDescriptorBuffer = 0x00200000,
+        SAMPLER_DESCRIPTOR_BUFFER = 0x00200000,
 
         // リソース (テクスチャやバッファ) の情報を格納するデスクリプタバッファ。
-        ResourceDescriptorBuffer = 0x00400000,
+        RESOURCE_DESCRIPTOR_BUFFER = 0x00400000,
 
         // プッシュデスクリプタの情報を格納するバッファ。
-        PushDescriptorBuffer = 0x04000000,
+        PUSH_DESCRIPTOR_BUFFER = 0x04000000,
 
         // マイクロマップ (微細なジオメトリデータ) を構築するための入力データを格納するバッファ。
-        MicromapBuildInput = 0x00800000,
+        MICROMAP_BUILD_INPUT = 0x00800000,
 
         // マイクロマップデータ (ジオメトリの詳細情報) を格納するバッファ。
-        MicromapStorage = 0x01000000,
+        MICROMAP_STORAGE = 0x01000000,
     };
 
     enum class SampleCount : std::uint32_t {
-        One = 1,
-        Two = 2,
-        Four = 4,
-        Eight = 8,
-        Sixteen = 16,
-        ThirtyTwo = 32,
-        SixtyFour = 64
+        ONE = 1,
+        TWO = 2,
+        FOUR = 4,
+        EIGHT = 8,
+        SIXTEEN = 16,
+        THIRTY_TWO = 32,
+        SIXTY_FOUR = 64
     };
 
     enum class ImageType {
-        None = 0,
-        TransferSrc = 0x00000001,
-        TransferDst = 0x00000002,
-        Sampled = 0x00000004,
-        Storage = 0x00000008,
-        ColorAttachment = 0x00000010,
-        DepthStencilAttachment = 0x00000020,
-        TransientAttachment = 0x00000040,
-        InputAttachment = 0x00000080,
-        HostTransfer = 0x00400000,
-        VideoDecodeDst = 0x00000400,
-        VideoDecodeSrc = 0x00000800,
-        VideoDecodeDpb = 0x00001000,
-        FragmentDensityMap = 0x00000200,
-        FragmentShadingRateAttachment = 0x00000100,
-        VideoEncodeDst = 0x00002000,
-        VideoEncodeSrc = 0x00004000,
-        VideoEncodeDpb = 0x00008000,
-        AttachmentFeedbackLoop = 0x00080000,
-        VideoEncodeQuantizationDeltaMap = 0x02000000,
-        VideoEncodeEmphasisMap = 0x04000000,
+        NONE = 0,
+        TRANSFER_SRC = 0x00000001,
+        TRANSFER_DST = 0x00000002,
+        SAMPLED = 0x00000004,
+        STORAGE = 0x00000008,
+        COLOR_ATTACHMENT = 0x00000010,
+        DEPTH_STENCIL_ATTACHMENT = 0x00000020,
+        TRANSIENT_ATTACHMENT = 0x00000040,
+        INPUT_ATTACHMENT = 0x00000080,
+        HOST_TRANSFER = 0x00400000,
+        VIDEO_DECODE_DST = 0x00000400,
+        VIDEO_DECODE_SRC = 0x00000800,
+        VIDEO_DECODE_DPB = 0x00001000,
+        FRAGMENT_DENSITY_MAP = 0x00000200,
+        FRAGMENT_SHADING_RATE_ATTACHMENT = 0x00000100,
+        VIDEO_ENCODE_DST = 0x00002000,
+        VIDEO_ENCODE_SRC = 0x00004000,
+        VIDEO_ENCODE_DPB = 0x00008000,
+        ATTACHMENT_FEEDBACK_LOOP = 0x00080000,
+        VIDEO_ENCODE_QUANTIZATION_DELTA_MAP = 0x02000000,
+        VIDEO_ENCODE_EMPHASIS_MAP = 0x04000000,
     };
 
     enum class MemoryProperty {
-        None = 0,
+        NONE = 0,
         // GPUからのアクセスに適したメモリ。CPUからアクセスできるかはHostVisibleによる。
-        DeviceLocal = 0x00000001,
+        DEVICE_LOCAL = 0x00000001,
 
         // CPU からアクセス可能なメモリ: CPU から直接読み書きできるメモリ。
-        HostVisible = 0x00000002,
+        HOST_VISIBLE = 0x00000002,
 
         // CPUキャッシュの明示的なフラッシュ・無効化が不要。GPUの実行完了待ちは別途必要。
-        HostCoherent = 0x00000004,
+        HOST_COHERENT = 0x00000004,
 
         // CPU 側でキャッシュされるメモリ: CPU のキャッシュが有効で、読み取り速度が速くなる。
-        HostCached = 0x00000008,
+        HOST_CACHED = 0x00000008,
 
         // 遅延割り当てメモリ: メモリが必要になるまで実際に割り当てられない。
-        LazilyAllocated = 0x00000010,
+        LAZILY_ALLOCATED = 0x00000010,
 
         // 保護されたGPU処理で使用するメモリ。CPUからはアクセスできない。
-        Protected = 0x00000020,
+        PROTECTED = 0x00000020,
 
         // AMD拡張による、デバイス側キャッシュの明示的な可視性操作が不要なメモリ。
-        DeviceCoherentAmd = 0x00000040,
+        DEVICE_COHERENT_AMD = 0x00000040,
 
         // AMD 用のデバイス非キャッシュメモリ: GPU がキャッシュしないメモリ。
-        DeviceUncachedAmd = 0x00000080,
+        DEVICE_UNCACHED_AMD = 0x00000080,
 
         // NVIDIA RDMA 対応メモリ: ネットワーク経由で直接メモリにアクセス可能なメモリ。
-        RdmaCapableNv = 0x00000100,
+        RDMA_CAPABLE_NV = 0x00000100,
     };
 
     enum class ImageLayout {
-        Undefined = 0,
-        General = 1,
-        ColorAttachmentOptimal = 2,
-        DepthStencilAttachmentOptimal = 3,
-        DepthStencilReadOnlyOptimal = 4,
-        ShaderReadOnlyOptimal = 5,
-        TransferSrcOptimal = 6,
-        TransferDstOptimal = 7,
-        Preinitialized = 8,
-        Present = 1000001002,
+        UNDEFINED = 0,
+        GENERAL = 1,
+        COLOR_ATTACHMENT_OPTIMAL = 2,
+        DEPTH_STENCIL_ATTACHMENT_OPTIMAL = 3,
+        DEPTH_STENCIL_READ_ONLY_OPTIMAL = 4,
+        SHADER_READ_ONLY_OPTIMAL = 5,
+        TRANSFER_SRC_OPTIMAL = 6,
+        TRANSFER_DST_OPTIMAL = 7,
+        PREINITIALIZED = 8,
+        PRESENT = 1000001002,
     };
 
     enum class SharingMode {
-        Exclusive = 0,
-        Concurrent = 1,
+        EXCLUSIVE = 0,
+        CONCURRENT = 1,
     };
 
     ___VSL_EXPAND_FLAGS_OPERATOR(ImageType);
@@ -234,16 +234,16 @@ namespace VSL_NAMESPACE {
             template<typename... Args>
             void uncheck_copy(const Args&... args);
 
-            bool copyByBuffer(CommandManager commandManager, BufferAccessor* buf);
+            bool copy_by_buffer(CommandManager command_manager, BufferAccessor* buf);
 
-            bool copyByImage(CommandManager commandManager, const ImageAccessor& image);
+            bool copy_by_image(CommandManager command_manager, const ImageAccessor& image);
 
         private:
-            std::shared_ptr<_impl::Buffer_impl> owner_;
+            std::shared_ptr<impl::BufferImpl> _owner;
             void synchronize(std::size_t bytes, std::size_t offset, bool flush) const;
         };
 
-        std::shared_ptr<_impl::Buffer_impl> _data;
+        std::shared_ptr<impl::BufferImpl> data_;
 
         virtual LocalBufferHolder data(std::optional<size_t> size = std::nullopt, size_t offset = 0) = 0;
 
@@ -263,52 +263,52 @@ namespace VSL_NAMESPACE {
         template<typename... Args>
         void uncheck_copy(const Args&... args);
 
-        bool copyByBuffer(CommandManager commandManager, BufferAccessor* buf);
+        bool copy_by_buffer(CommandManager command_manager, BufferAccessor* buf);
 
-        bool copyByImage(CommandManager commandManager, const ImageAccessor& image);
+        bool copy_by_image(CommandManager command_manager, const ImageAccessor& image);
 
         size_t size();
         // 要求したバイト数を返す。
-        std::size_t requestedSize() const;
+        std::size_t requested_size() const;
 
-        static std::shared_ptr<_impl::Buffer_impl>
-        MakeBuffer(VSL_NAMESPACE::LogicalDeviceAccessor device, size_t size, MemoryType memType,
-                   MemoryProperty memProperty, SharingMode sharingMode);
+        static std::shared_ptr<impl::BufferImpl>
+        MakeBuffer(VSL_NAMESPACE::LogicalDeviceAccessor device, size_t size, MemoryType mem_type,
+                   MemoryProperty mem_property, SharingMode sharing_mode);
 
         static void
-        FlushBuffer(LocalBufferHolder& holder, MemoryType memType, MemoryProperty memProperty, SharingMode sharingMode);
+        FlushBuffer(LocalBufferHolder& holder, MemoryType mem_type, MemoryProperty mem_property, SharingMode sharing_mode);
 
         static LocalBufferHolder
-        GetData(VSL_NAMESPACE::BufferAccessor* data, std::optional<size_t> size, size_t offset, MemoryType memType,
-                MemoryProperty memProperty, SharingMode sharingMode);
+        GetData(VSL_NAMESPACE::BufferAccessor* data, std::optional<size_t> size, size_t offset, MemoryType mem_type,
+                MemoryProperty mem_property, SharingMode sharing_mode);
 
     private:
-        void flushCopied(LocalBufferHolder& holder, std::size_t bytes);
+        void flush_copied(LocalBufferHolder& holder, std::size_t bytes);
     };
 
     struct ImageAccessor {
-        std::shared_ptr<_impl::Image_impl> _data;
-        data_format::___Format getFormat() const;
-        ImageType getUsage() const;
-        LogicalDeviceAccessor getDevice() const;
+        std::shared_ptr<impl::ImageImpl> data_;
+        data_format::Format get_format() const;
+        ImageType get_usage() const;
+        LogicalDeviceAccessor get_device() const;
 
-        bool copyByBuffer(CommandManager commandManager, BufferAccessor* buf, VSL_NAMESPACE::ImageLayout layout, std::uint32_t target_idx);
+        bool copy_by_buffer(CommandManager command_manager, BufferAccessor* buf, VSL_NAMESPACE::ImageLayout layout, std::uint32_t target_idx);
 
         size_t size();
 
-        static std::shared_ptr<_impl::Image_impl> MakeImage(VSL_NAMESPACE::ImageType type,
+        static std::shared_ptr<impl::ImageImpl> MakeImage(VSL_NAMESPACE::ImageType type,
                                                             VSL_NAMESPACE::MemoryProperty prop,
                                                             VSL_NAMESPACE::ImageLayout layout,
                                                             VSL_NAMESPACE::LogicalDeviceAccessor device,
                                                             std::uint32_t width,
                                                             std::uint32_t height,
-                                                            data_format::___Format format,
-                                                            std::uint32_t count, SampleCount samples = SampleCount::One);
+                                                            data_format::Format format,
+                                                            std::uint32_t count, SampleCount samples = SampleCount::ONE);
 
         static void TransformLayout(CommandManager manager,
-                                    std::shared_ptr<_impl::Image_impl> data,
-                                    VSL_NAMESPACE::ImageLayout oldLayout,
-                                    VSL_NAMESPACE::ImageLayout newLayouts);
+                                    std::shared_ptr<impl::ImageImpl> data,
+                                    VSL_NAMESPACE::ImageLayout old_layout,
+                                    VSL_NAMESPACE::ImageLayout new_layouts);
     };
 } // namespace VSL_NAMESPACE
 #endif

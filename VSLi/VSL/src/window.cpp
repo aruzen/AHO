@@ -17,7 +17,7 @@
 #include <VSL/vulkan/surface.hpp>
 
 std::vector<std::shared_ptr<VSL_NAMESPACE::PureWindow::WindowData>> VSL_NAMESPACE::PureWindow::WINDOWS;
-bool VSL_NAMESPACE::PureWindow::inited = false;
+bool VSL_NAMESPACE::PureWindow::INITED = false;
 
 namespace {
     [[noreturn]] void throw_glfw_error(const char* operation) {
@@ -29,38 +29,38 @@ namespace {
     }
 } // namespace
 
-VSL_NAMESPACE::PureWindow::PureWindow(std::string _name, int _width, int _height) {
-    _data = std::make_shared<WindowData>();
-    _data->height = _height;
-    _data->width = _width;
-    _data->name = std::move(_name);
+VSL_NAMESPACE::PureWindow::PureWindow(std::string name, int width, int height) {
+    data_ = std::make_shared<WindowData>();
+    data_->height = height;
+    data_->width = width;
+    data_->name = std::move(name);
 
-    if (!inited) {
+    if (!INITED) {
         if (glfwInit() != GLFW_TRUE)
             throw_glfw_error("Failed to initialize GLFW");
-        inited = true;
+        INITED = true;
     }
     try {
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-        _data->window_handle = glfwCreateWindow(_width, _height, _data->name.c_str(), nullptr, nullptr);
-        if (!_data->window_handle)
+        data_->window_handle = glfwCreateWindow(width, height, data_->name.c_str(), nullptr, nullptr);
+        if (!data_->window_handle)
             throw_glfw_error("Failed to create GLFW window");
-        WINDOWS.push_back(_data);
+        WINDOWS.push_back(data_);
     } catch (...) {
-        if (_data->window_handle) {
-            glfwDestroyWindow(static_cast<GLFWwindow*>(_data->window_handle));
-            _data->window_handle = nullptr;
+        if (data_->window_handle) {
+            glfwDestroyWindow(static_cast<GLFWwindow*>(data_->window_handle));
+            data_->window_handle = nullptr;
         }
         if (WINDOWS.empty()) {
             glfwTerminate();
-            inited = false;
+            INITED = false;
         }
         throw;
     }
 }
 
-VSL_NAMESPACE::PureWindow::PureWindow(std::shared_ptr<WindowData> _data) : _data(_data) {}
+VSL_NAMESPACE::PureWindow::PureWindow(std::shared_ptr<WindowData> data_) : data_(data_) {}
 
 bool VSL_NAMESPACE::PureWindow::Update() {
     glfwPollEvents();
@@ -77,7 +77,7 @@ bool VSL_NAMESPACE::PureWindow::Update() {
             auto listener = callback.lock();
             if (!listener || std::ranges::find(p->update, listener) == p->update.end())
                 continue;
-            if (!listener->onUpdate(PureWindow(p)))
+            if (!listener->on_update(PureWindow(p)))
                 s = false;
         }
     }
@@ -90,32 +90,32 @@ bool VSL_NAMESPACE::PureWindow::NoCheckUpdate() {
 }
 
 bool VSL_NAMESPACE::PureWindow::close() {
-    if (!_data || !_data->window_handle)
+    if (!data_ || !data_->window_handle)
         return false;
 
-    _data->destroy();
+    data_->destroy();
 
     return true;
 }
 
 std::string VSL_NAMESPACE::PureWindow::name() {
-    return _data->name;
+    return data_->name;
 }
 
 VSL_NAMESPACE::PureWindow::operator bool() {
-    return _data && _data->window_handle != nullptr;
+    return data_ && data_->window_handle != nullptr;
 }
 
 bool VSL_NAMESPACE::PureWindow::operator==(const PureWindow& o) {
-    return _data == o._data;
+    return data_ == o.data_;
 }
 
 bool VSL_NAMESPACE::PureWindow::operator==(const PureWindow::WindowData* o) {
-    return _data.get() == o;
+    return data_.get() == o;
 }
 
 bool VSL_NAMESPACE::PureWindow::resize(int width, int height) {
-    glfwSetWindowSize((GLFWwindow*)_data->window_handle, width, height);
+    glfwSetWindowSize((GLFWwindow*)data_->window_handle, width, height);
     return true;
 }
 
@@ -133,7 +133,7 @@ void VSL_NAMESPACE::PureWindow::WindowData::destroy() {
 
     if (WINDOWS.size() == 0) {
         glfwTerminate();
-        inited = false;
+        INITED = false;
     }
 }
 

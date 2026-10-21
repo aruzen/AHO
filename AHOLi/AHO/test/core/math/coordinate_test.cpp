@@ -10,22 +10,22 @@
 #include <cstdint>
 
 #if defined(AHO_CONTRACT_COORDINATE_ENABLE_AXES)
-constexpr auto x = aho::coordinate::_MakeCoordinateInfo<false, true, false>::value::EnablingX();
-constexpr auto y = aho::coordinate::_MakeCoordinateInfo<true, false, false>::value::EnablingY();
-constexpr auto z = aho::coordinate::_MakeCoordinateInfo<true, false, false>::value::EnablingZ();
+constexpr auto X = aho::coordinate::MakeCoordinateInfo<false, true, false>::Value::EnablingX();
+constexpr auto Y = aho::coordinate::MakeCoordinateInfo<true, false, false>::Value::EnablingY();
+constexpr auto Z = aho::coordinate::MakeCoordinateInfo<true, false, false>::Value::EnablingZ();
 
-template<bool X, bool Y, bool Z>
+template<bool x, bool y, bool z>
 consteval bool enabling_preserves_other_axes() {
-    using Info = aho::coordinate::_MakeCoordinateInfo<X, Y, Z>::value;
+    using Info = aho::coordinate::MakeCoordinateInfo<x, y, z>::Value;
     constexpr auto with_x = Info::EnablingX();
     constexpr auto with_y = Info::EnablingY();
     constexpr auto with_z = Info::EnablingZ();
-    static_assert(with_x.EnabledX && with_x.EnabledY == Y && with_x.EnabledZ == Z);
-    static_assert(with_y.EnabledX == X && with_y.EnabledY && with_y.EnabledZ == Z);
-    static_assert(with_z.EnabledX == X && with_z.EnabledY == Y && with_z.EnabledZ);
-    static_assert(decltype(with_x)::dimension::dimension == 1 + Y + Z);
-    static_assert(decltype(with_y)::dimension::dimension == X + 1 + Z);
-    static_assert(decltype(with_z)::dimension::dimension == X + Y + 1);
+    static_assert(with_x.ENABLED_X && with_x.ENABLED_Y == y && with_x.ENABLED_Z == z);
+    static_assert(with_y.ENABLED_X == x && with_y.ENABLED_Y && with_y.ENABLED_Z == z);
+    static_assert(with_z.ENABLED_X == x && with_z.ENABLED_Y == y && with_z.ENABLED_Z);
+    static_assert(decltype(with_x)::Dimension::DIMENSION == 1 + y + z);
+    static_assert(decltype(with_y)::Dimension::DIMENSION == x + 1 + z);
+    static_assert(decltype(with_z)::Dimension::DIMENSION == x + y + 1);
     return true;
 }
 static_assert(enabling_preserves_other_axes<true, false, false>());
@@ -37,11 +37,11 @@ static_assert(enabling_preserves_other_axes<false, true, true>());
 static_assert(enabling_preserves_other_axes<true, true, true>());
 
 #elif defined(AHO_CONTRACT_COORDINATE_YZ_ADD)
-constexpr auto coordinates = aho::Y<int>(2) + aho::Z<int>(3);
-static_assert(coordinates.y.value == 2 && coordinates.z.value == 3);
+constexpr auto COORDINATES = aho::Y<int>(2) + aho::Z<int>(3);
+static_assert(COORDINATES.y.value == 2 && COORDINATES.z.value == 3);
 #elif defined(AHO_CONTRACT_COORDINATE_XZ_SUBTRACT)
-constexpr auto coordinates = aho::X<int>(2) - aho::Z<int>(3);
-static_assert(coordinates.x.value == 2 && coordinates.z.value == -3);
+constexpr auto COORDINATES = aho::X<int>(2) - aho::Z<int>(3);
+static_assert(COORDINATES.x.value == 2 && COORDINATES.z.value == -3);
 #elif defined(AHO_CONTRACT_COORDINATE_COMPARISON)
 TEST(CoordinateContractTest, ThreeWayComparisonOrdersAndRecognizesEqualCoordinateSets) {
     const auto first = aho::X<int>(2) + aho::Y<int>(3);
@@ -208,23 +208,23 @@ namespace {
     }
 } // namespace
 namespace {
-    template<bool X, bool Y, bool Z>
+    template<bool x_, bool y_, bool z_>
     struct CoordinateMask {
-        static constexpr bool x = X, y = Y, z = Z;
-        using Info = aho::coordinate::_MakeCoordinateInfo<X, Y, Z>::value;
-        using Set = aho::coordinate::_CoordinateSet<int, Info>;
-        static constexpr Set make(int x = 1, int y = 2, int z = 3) {
-            if constexpr (X && Y && Z)
+        static constexpr bool X = x_, Y = y_, Z = z_;
+        using Info = aho::coordinate::MakeCoordinateInfo<x_, y_, z_>::Value;
+        using Set = aho::coordinate::CoordinateSet<int, Info>;
+        static constexpr Set Make(int x = 1, int y = 2, int z = 3) {
+            if constexpr (x_ && y_ && z_)
                 return Set(aho::X<int>(x), aho::Y<int>(y), aho::Z<int>(z));
-            else if constexpr (X && Y)
+            else if constexpr (x_ && y_)
                 return Set(aho::X<int>(x), aho::Y<int>(y));
-            else if constexpr (X && Z)
+            else if constexpr (x_ && z_)
                 return Set(aho::X<int>(x), aho::Z<int>(z));
-            else if constexpr (Y && Z)
+            else if constexpr (y_ && z_)
                 return Set(aho::Y<int>(y), aho::Z<int>(z));
-            else if constexpr (X)
+            else if constexpr (x_)
                 return Set(aho::X<int>(x));
-            else if constexpr (Y)
+            else if constexpr (y_)
                 return Set(aho::Y<int>(y));
             else
                 return Set(aho::Z<int>(z));
@@ -238,54 +238,54 @@ namespace {
     TYPED_TEST_SUITE(CoordinateMaskTest, CoordinateMasks);
     TYPED_TEST(CoordinateMaskTest, DefaultAndAxisConstructorsInitializeOnlyEnabledAxes) {
         typename TypeParam::Set zero;
-        const auto value = TypeParam::make();
-        if constexpr (TypeParam::x) {
+        const auto value = TypeParam::Make();
+        if constexpr (TypeParam::X) {
             EXPECT_EQ(zero.x.value, 0);
             EXPECT_EQ(value.x.value, 1);
         }
-        if constexpr (TypeParam::y) {
+        if constexpr (TypeParam::Y) {
             EXPECT_EQ(zero.y.value, 0);
             EXPECT_EQ(value.y.value, 2);
         }
-        if constexpr (TypeParam::z) {
+        if constexpr (TypeParam::Z) {
             EXPECT_EQ(zero.z.value, 0);
             EXPECT_EQ(value.z.value, 3);
         }
         EXPECT_TRUE(zero < value);
         EXPECT_FALSE(value < value);
-        EXPECT_TRUE(aho::concepts::is_coordinate_set<typename TypeParam::Set>);
+        EXPECT_TRUE(aho::concepts::IS_COORDINATE_SET<typename TypeParam::Set>);
     }
     TYPED_TEST(CoordinateMaskTest, AxisCountsPreserveEveryEnabledPrefix) {
         using Info = typename TypeParam::Info;
-        static_assert(std::same_as<decltype(Info::IndexX), const std::size_t>);
-        static_assert(std::same_as<decltype(Info::IndexY), const std::size_t>);
-        static_assert(std::same_as<decltype(Info::IndexZ), const std::size_t>);
-        EXPECT_EQ(Info::IndexX, TypeParam::x ? 1u : 0u);
-        EXPECT_EQ(Info::IndexY, static_cast<unsigned>(TypeParam::x) + TypeParam::y);
-        EXPECT_EQ(Info::IndexZ, static_cast<unsigned>(TypeParam::x) + TypeParam::y + TypeParam::z);
+        static_assert(std::same_as<decltype(Info::INDEX_X), const std::size_t>);
+        static_assert(std::same_as<decltype(Info::INDEX_Y), const std::size_t>);
+        static_assert(std::same_as<decltype(Info::INDEX_Z), const std::size_t>);
+        EXPECT_EQ(Info::INDEX_X, TypeParam::X ? 1u : 0u);
+        EXPECT_EQ(Info::INDEX_Y, static_cast<unsigned>(TypeParam::X) + TypeParam::Y);
+        EXPECT_EQ(Info::INDEX_Z, static_cast<unsigned>(TypeParam::X) + TypeParam::Y + TypeParam::Z);
     }
     struct UnmarkedCoordinateType {};
     struct DisabledCoordinateType {
-        static constexpr bool is_coordinate_set = false;
+        static constexpr bool IS_COORDINATE_SET = false;
     };
-    static_assert(!aho::concepts::is_coordinate_set<int>);
-    static_assert(!aho::concepts::is_coordinate_set<UnmarkedCoordinateType>);
-    static_assert(!aho::concepts::is_coordinate_set<DisabledCoordinateType>);
+    static_assert(!aho::concepts::IS_COORDINATE_SET<int>);
+    static_assert(!aho::concepts::IS_COORDINATE_SET<UnmarkedCoordinateType>);
+    static_assert(!aho::concepts::IS_COORDINATE_SET<DisabledCoordinateType>);
     TYPED_TEST(CoordinateMaskTest, AxisAssignmentOperatorsReturnAndMutateOriginalSet) {
-        auto value = TypeParam::make();
-        if constexpr (TypeParam::x) {
+        auto value = TypeParam::Make();
+        if constexpr (TypeParam::X) {
             EXPECT_EQ(&(value += aho::X<int>(2)), &value);
             EXPECT_EQ(value.x.value, 3);
             EXPECT_EQ(&(value -= aho::X<int>(1)), &value);
             EXPECT_EQ(value.x.value, 2);
         }
-        if constexpr (TypeParam::y) {
+        if constexpr (TypeParam::Y) {
             EXPECT_EQ(&(value += aho::Y<int>(2)), &value);
             EXPECT_EQ(value.y.value, 4);
             EXPECT_EQ(&(value -= aho::Y<int>(1)), &value);
             EXPECT_EQ(value.y.value, 3);
         }
-        if constexpr (TypeParam::z) {
+        if constexpr (TypeParam::Z) {
             EXPECT_EQ(&(value += aho::Z<int>(2)), &value);
             EXPECT_EQ(value.z.value, 5);
             EXPECT_EQ(&(value -= aho::Z<int>(1)), &value);
@@ -293,17 +293,17 @@ namespace {
         }
     }
     TYPED_TEST(CoordinateMaskTest, EqualityAndThreeWayComparisonUseEveryEnabledAxis) {
-        constexpr auto original = TypeParam::make();
-        constexpr auto larger = TypeParam::make(2, 3, 4);
+        constexpr auto original = TypeParam::Make();
+        constexpr auto larger = TypeParam::Make(2, 3, 4);
         static_assert(std::same_as<decltype(original <=> larger), std::strong_ordering>);
         static_assert(std::is_lt(original <=> larger));
-        static_assert(original == TypeParam::make());
-        if constexpr (TypeParam::x && (TypeParam::y || TypeParam::z)) {
-            static_assert(std::is_lt(TypeParam::make(0, 100, 100) <=> TypeParam::make(1, -100, -100)));
-        } else if constexpr (TypeParam::y && TypeParam::z) {
-            static_assert(std::is_lt(TypeParam::make(0, 0, 100) <=> TypeParam::make(0, 1, -100)));
+        static_assert(original == TypeParam::Make());
+        if constexpr (TypeParam::X && (TypeParam::Y || TypeParam::Z)) {
+            static_assert(std::is_lt(TypeParam::Make(0, 100, 100) <=> TypeParam::Make(1, -100, -100)));
+        } else if constexpr (TypeParam::Y && TypeParam::Z) {
+            static_assert(std::is_lt(TypeParam::Make(0, 0, 100) <=> TypeParam::Make(0, 1, -100)));
         }
-        EXPECT_EQ(original, TypeParam::make());
+        EXPECT_EQ(original, TypeParam::Make());
         auto check_axis = [&](const auto& changed, bool enabled) {
             EXPECT_EQ(original == changed, !enabled);
             EXPECT_EQ(original != changed, enabled);
@@ -314,23 +314,23 @@ namespace {
                 EXPECT_TRUE(std::is_eq(original <=> changed));
             }
         };
-        check_axis(TypeParam::make(2, 2, 3), TypeParam::x);
-        check_axis(TypeParam::make(1, 3, 3), TypeParam::y);
-        check_axis(TypeParam::make(1, 2, 4), TypeParam::z);
+        check_axis(TypeParam::Make(2, 2, 3), TypeParam::X);
+        check_axis(TypeParam::Make(1, 3, 3), TypeParam::Y);
+        check_axis(TypeParam::Make(1, 2, 4), TypeParam::Z);
     }
     TYPED_TEST(CoordinateMaskTest, LessThanIsConstantEvaluableAndUsesLexicographicAxisOrder) {
-        constexpr auto original = TypeParam::make();
-        constexpr auto larger = TypeParam::make(2, 3, 4);
+        constexpr auto original = TypeParam::Make();
+        constexpr auto larger = TypeParam::Make(2, 3, 4);
         static_assert(original < larger);
         static_assert(!(larger < original));
         static_assert(!(original < original));
-        static_assert((original < TypeParam::make(2, 2, 3)) == TypeParam::x);
-        static_assert((original < TypeParam::make(1, 3, 3)) == TypeParam::y);
-        static_assert((original < TypeParam::make(1, 2, 4)) == TypeParam::z);
-        if constexpr (TypeParam::x && (TypeParam::y || TypeParam::z)) {
-            static_assert(TypeParam::make(0, 100, 100) < TypeParam::make(1, -100, -100));
-        } else if constexpr (TypeParam::y && TypeParam::z) {
-            static_assert(TypeParam::make(0, 0, 100) < TypeParam::make(0, 1, -100));
+        static_assert((original < TypeParam::Make(2, 2, 3)) == TypeParam::X);
+        static_assert((original < TypeParam::Make(1, 3, 3)) == TypeParam::Y);
+        static_assert((original < TypeParam::Make(1, 2, 4)) == TypeParam::Z);
+        if constexpr (TypeParam::X && (TypeParam::Y || TypeParam::Z)) {
+            static_assert(TypeParam::Make(0, 100, 100) < TypeParam::Make(1, -100, -100));
+        } else if constexpr (TypeParam::Y && TypeParam::Z) {
+            static_assert(TypeParam::Make(0, 0, 100) < TypeParam::Make(0, 1, -100));
         }
         EXPECT_EQ(original < larger, std::is_lt(original <=> larger));
         EXPECT_EQ(larger < original, std::is_lt(larger <=> original));
@@ -348,25 +348,25 @@ namespace {
             EXPECT_FALSE(unordered < unordered);
             EXPECT_TRUE(ordinary == ordinary);
         };
-        using C1 = _CoordinateSet<double, _DefaultCoordinateInfo<vsl::D1>::value>;
-        using C2 = _CoordinateSet<double, _DefaultCoordinateInfo<vsl::D2>::value>;
-        using C3 = _CoordinateSet<double, _DefaultCoordinateInfo<vsl::D3>::value>;
+        using C1 = CoordinateSet<double, DefaultCoordinateInfo<vsl::D1>::Value>;
+        using C2 = CoordinateSet<double, DefaultCoordinateInfo<vsl::D2>::Value>;
+        using C3 = CoordinateSet<double, DefaultCoordinateInfo<vsl::D3>::Value>;
         check(C1(nan), C1(0));
         check(C2(0, nan), C2(0, 0));
         check(C3(0, 0, nan), C3(0, 0, 0));
     }
     TYPED_TEST(CoordinateMaskTest, StreamOutputIncludesAllEnabledAxesAndCoordinates) {
         std::ostringstream stream;
-        aho::operator<<(stream, TypeParam::make());
-        if constexpr (TypeParam::x) {
+        aho::operator<<(stream, TypeParam::Make());
+        if constexpr (TypeParam::X) {
             EXPECT_NE(stream.str().find('x'), std::string::npos);
             EXPECT_NE(stream.str().find('1'), std::string::npos);
         }
-        if constexpr (TypeParam::y) {
+        if constexpr (TypeParam::Y) {
             EXPECT_NE(stream.str().find('y'), std::string::npos);
             EXPECT_NE(stream.str().find('2'), std::string::npos);
         }
-        if constexpr (TypeParam::z) {
+        if constexpr (TypeParam::Z) {
             EXPECT_NE(stream.str().find('z'), std::string::npos);
             EXPECT_NE(stream.str().find('3'), std::string::npos);
         }
@@ -402,29 +402,29 @@ namespace {
     TYPED_TEST(CoordinateElementTest, OutputNamesTheAxisAndValue) {
         std::ostringstream stream;
         stream << TypeParam(12);
-        EXPECT_EQ(stream.str(), std::string(1, TypeParam::LowerChar) + " : 12");
+        EXPECT_EQ(stream.str(), std::string(1, TypeParam::LOWER_CHAR) + " : 12");
     }
-    static_assert(aho::coordinate::_CountTruesFunc<>() == 0);
-    static_assert(aho::coordinate::_CountTrues<>::value == 0);
+    static_assert(aho::coordinate::count_trues_func<>() == 0);
+    static_assert(aho::coordinate::CountTrues<>::VALUE == 0);
     TEST(CoordinateInfoTest, EmptyBooleanPackHasNoEnabledAxes) {
-        EXPECT_EQ(aho::coordinate::_CountTruesFunc<>(), 0u);
-        EXPECT_EQ(aho::coordinate::_CountTrues<>::value, 0u);
+        EXPECT_EQ(aho::coordinate::count_trues_func<>(), 0u);
+        EXPECT_EQ(aho::coordinate::CountTrues<>::VALUE, 0u);
     }
     TEST(CoordinateInfoTest, EnabledFlagsDimensionAndAxisCountsMatchConfiguration) {
-        using Info = aho::coordinate::_MakeCoordinateInfo<true, true, true>::value;
-        static_assert(std::same_as<Info::dimension, vsl::D3>);
-        EXPECT_TRUE(Info::EnabledX);
-        EXPECT_TRUE(Info::EnabledY);
-        EXPECT_TRUE(Info::EnabledZ);
-        EXPECT_EQ(Info::IndexX, 1);
-        EXPECT_EQ(Info::IndexY, 2);
-        EXPECT_EQ(Info::IndexZ, 3);
-        EXPECT_EQ((aho::coordinate::_CountTruesFunc<true, false, true>()), 2u);
-        EXPECT_EQ((aho::coordinate::_CountTrues<false, false, false>::value), 0u);
+        using Info = aho::coordinate::MakeCoordinateInfo<true, true, true>::Value;
+        static_assert(std::same_as<Info::Dimension, vsl::D3>);
+        EXPECT_TRUE(Info::ENABLED_X);
+        EXPECT_TRUE(Info::ENABLED_Y);
+        EXPECT_TRUE(Info::ENABLED_Z);
+        EXPECT_EQ(Info::INDEX_X, 1);
+        EXPECT_EQ(Info::INDEX_Y, 2);
+        EXPECT_EQ(Info::INDEX_Z, 3);
+        EXPECT_EQ((aho::coordinate::count_trues_func<true, false, true>()), 2u);
+        EXPECT_EQ((aho::coordinate::CountTrues<false, false, false>::VALUE), 0u);
     }
     TEST(CoordinateSetTest, ConstructorsAndAxisAssignmentsKeepNamedValues) {
-        using CI = aho::coordinate::_DefaultCoordinateInfo<vsl::D3>::value;
-        aho::coordinate::_CoordinateSet<int, CI> value(1, 2, 3), zero;
+        using CI = aho::coordinate::DefaultCoordinateInfo<vsl::D3>::Value;
+        aho::coordinate::CoordinateSet<int, CI> value(1, 2, 3), zero;
         EXPECT_EQ(zero.x.value, 0);
         EXPECT_EQ(zero.y.value, 0);
         EXPECT_EQ(zero.z.value, 0);
@@ -511,9 +511,9 @@ namespace {
         constexpr auto xy = aho::X<int>(2) + aho::Y<double>(-3.5);
         constexpr auto xz = aho::X<float>(2.5f) + aho::Z<int>(-4);
         constexpr auto yz = aho::Y<unsigned>(3) + aho::Z<double>(-4.5);
-        static_assert(std::same_as<typename decltype(xy)::element_type, double>);
-        static_assert(std::same_as<typename decltype(xz)::element_type, float>);
-        static_assert(std::same_as<typename decltype(yz)::element_type, double>);
+        static_assert(std::same_as<typename decltype(xy)::ElementType, double>);
+        static_assert(std::same_as<typename decltype(xz)::ElementType, float>);
+        static_assert(std::same_as<typename decltype(yz)::ElementType, double>);
         static_assert(xy.x.value == 2 && xy.y.value == -3.5);
         static_assert(xz.x.value == 2.5 && xz.z.value == -4);
         static_assert(yz.y.value == 3 && yz.z.value == -4.5);
@@ -534,8 +534,8 @@ namespace {
         static_assert(zx.x.value == -2 && zx.z.value == 4.5);
         static_assert(yz.y.value == 3.5 && yz.z.value == -4);
         static_assert(zy.y.value == -3 && zy.z.value == 4.5);
-        static_assert(std::same_as<typename decltype(xy)::element_type, double>);
-        static_assert(std::same_as<typename decltype(yx)::element_type, float>);
+        static_assert(std::same_as<typename decltype(xy)::ElementType, double>);
+        static_assert(std::same_as<typename decltype(yx)::ElementType, float>);
         EXPECT_EQ(xy.y.value, -3);
         EXPECT_EQ(yx.x.value, -2);
         EXPECT_EQ(xz.z.value, -4.5);
@@ -563,32 +563,32 @@ namespace {
 namespace {
     template<class Value>
     constexpr Value make_arithmetic_value(int first) {
-        if constexpr (Value::dimension::dimension == 1)
+        if constexpr (Value::Dimension::DIMENSION == 1)
             return Value(first);
-        else if constexpr (Value::dimension::dimension == 2)
+        else if constexpr (Value::Dimension::DIMENSION == 2)
             return Value(first, first * 2);
         else
             return Value(first, first * 2, first * 3);
     }
     template<class Set>
     constexpr bool matches_active_axes(const Set& value, std::array<int, 3> expected) {
-        using CI = typename Set::coordinate_info;
+        using CI = typename Set::CoordinateInfo;
         std::size_t index = 0;
-        if constexpr (CI::EnabledX)
+        if constexpr (CI::ENABLED_X)
             if (value.x.value != expected[index++])
                 return false;
-        if constexpr (CI::EnabledY)
+        if constexpr (CI::ENABLED_Y)
             if (value.y.value != expected[index++])
                 return false;
-        if constexpr (CI::EnabledZ)
+        if constexpr (CI::ENABLED_Z)
             if (value.z.value != expected[index++])
                 return false;
         return true;
     }
     template<class CI>
     constexpr bool check_point_vector_arithmetic() {
-        using P = aho::_Point<int, typename CI::dimension, CI>;
-        using V = aho::_Vector<int, typename CI::dimension, CI>;
+        using P = aho::Point_<int, typename CI::Dimension, CI>;
+        using V = aho::Vector_<int, typename CI::Dimension, CI>;
         auto point = make_arithmetic_value<P>(6);
         auto vector = make_arithmetic_value<V>(2);
         const auto other = make_arithmetic_value<V>(1);
@@ -645,18 +645,18 @@ namespace {
     template<class T>
     class CoordinateArithmeticConstexprTest : public testing::Test {};
     using ArithmeticCoordinates = testing::Types<
-        aho::coordinate::_MakeCoordinateInfo<true, false, false>::value,
-        aho::coordinate::_MakeCoordinateInfo<false, true, false>::value,
-        aho::coordinate::_MakeCoordinateInfo<false, false, true>::value,
-        aho::coordinate::_MakeCoordinateInfo<true, true, false>::value,
-        aho::coordinate::_MakeCoordinateInfo<true, false, true>::value,
-        aho::coordinate::_MakeCoordinateInfo<false, true, true>::value,
-        aho::coordinate::_MakeCoordinateInfo<true, true, true>::value>;
+        aho::coordinate::MakeCoordinateInfo<true, false, false>::Value,
+        aho::coordinate::MakeCoordinateInfo<false, true, false>::Value,
+        aho::coordinate::MakeCoordinateInfo<false, false, true>::Value,
+        aho::coordinate::MakeCoordinateInfo<true, true, false>::Value,
+        aho::coordinate::MakeCoordinateInfo<true, false, true>::Value,
+        aho::coordinate::MakeCoordinateInfo<false, true, true>::Value,
+        aho::coordinate::MakeCoordinateInfo<true, true, true>::Value>;
     TYPED_TEST_SUITE(CoordinateArithmeticConstexprTest, ArithmeticCoordinates);
     TYPED_TEST(CoordinateArithmeticConstexprTest, PointAndVectorOperationsKeepActiveAxisValuesAtCompileTime) {
         static_assert(check_point_vector_arithmetic<TypeParam>());
-        static_assert(sizeof(aho::coordinate::_CoordinateSet<int, TypeParam>) ==
-                      TypeParam::dimension::dimension * sizeof(int));
+        static_assert(sizeof(aho::coordinate::CoordinateSet<int, TypeParam>) ==
+                      TypeParam::Dimension::DIMENSION * sizeof(int));
         EXPECT_TRUE(check_point_vector_arithmetic<TypeParam>());
     }
 } // namespace

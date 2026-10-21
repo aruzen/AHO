@@ -7,29 +7,29 @@
 #include <cstdint>
 
 namespace VSL_NAMESPACE::command {
-    struct Draw : public __Command {
+    struct Draw : public Command {
         Draw(size_t size = 0);
 
-        [[nodiscard]] std::uint32_t getSize() const noexcept { return size_; }
+        [[nodiscard]] std::uint32_t get_size() const noexcept { return _size; }
 
-        void setSize(size_t size);
+        void set_size(size_t size);
 
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
 
     private:
-        std::uint32_t size_;
+        std::uint32_t _size;
     };
 
-    struct DrawManip : public __Command, __VertexSizeRequire {
-        [[nodiscard]] std::optional<std::uint32_t> getSize() const noexcept { return size_; }
+    struct DrawManip : public Command, VertexSizeRequire {
+        [[nodiscard]] std::optional<std::uint32_t> get_size() const noexcept { return _size; }
 
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
 
-        void setVertexSize(std::optional<size_t> vertexSize) override;
+        void set_vertex_size(std::optional<size_t> vertex_size) override;
 
     private:
-        std::optional<std::uint32_t> size_;
+        std::optional<std::uint32_t> _size;
     };
 
-    extern DrawManip draw;
+    extern DrawManip DRAW;
 } // namespace VSL_NAMESPACE::command

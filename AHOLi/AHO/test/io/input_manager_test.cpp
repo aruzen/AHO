@@ -48,7 +48,7 @@ namespace {
             : UpdatingGroup(context, manager, initial) {}
     };
     using InputManagerTest = aho_test::InputBackendTest;
-    TEST_F(InputManagerTest, ConstructorsPreserveRawAndVslWindowHandles) {
+    TEST_F(InputManagerTest, ConstructorsPreserveRawAndVSLWindowHandles) {
         aho::InputManager raw(window.handle());
         EXPECT_EQ(raw.context, window.handle());
         auto data = std::make_shared<vsl::PureWindow::WindowData>();

@@ -2,34 +2,34 @@
 #include "../pipeline_layout.hpp"
 namespace VSL_NAMESPACE::pipeline_layout {
     enum class CompareOp {
-        Never = 0,
-        Less = 1,
-        Equal = 2,
-        LessOrEqual = 3,
-        Greater = 4,
-        NotEqual = 5,
-        GreaterOrEqual = 6,
-        Always = 7
+        NEVER = 0,
+        LESS = 1,
+        EQUAL = 2,
+        LESS_OR_EQUAL = 3,
+        GREATER = 4,
+        NOT_EQUAL = 5,
+        GREATER_OR_EQUAL = 6,
+        ALWAYS = 7
     };
     enum class StencilOp {
-        Keep = 0,
-        Zero = 1,
-        Replace = 2,
-        IncrementClamp = 3,
-        DecrementClamp = 4,
-        Invert = 5,
-        IncrementWrap = 6,
-        DecrementWrap = 7
+        KEEP = 0,
+        ZERO = 1,
+        REPLACE = 2,
+        INCREMENT_CLAMP = 3,
+        DECREMENT_CLAMP = 4,
+        INVERT = 5,
+        INCREMENT_WRAP = 6,
+        DECREMENT_WRAP = 7
     };
     struct StencilFace {
-        StencilOp fail = StencilOp::Keep, pass = StencilOp::Keep, depthFail = StencilOp::Keep;
-        CompareOp compare = CompareOp::Always;
-        std::uint32_t compareMask = UINT32_MAX, writeMask = UINT32_MAX, reference = 0;
+        StencilOp fail = StencilOp::KEEP, pass = StencilOp::KEEP, depth_fail = StencilOp::KEEP;
+        CompareOp compare = CompareOp::ALWAYS;
+        std::uint32_t compare_mask = UINT32_MAX, write_mask = UINT32_MAX, reference = 0;
     };
     struct DepthStencil {
-        bool depthTest = true, depthWrite = true;
-        CompareOp depthCompare = CompareOp::Less;
-        bool stencilTest = false;
+        bool depth_test = true, depth_write = true;
+        CompareOp depth_compare = CompareOp::LESS;
+        bool stencil_test = false;
         StencilFace front, back;
         void injection(PipelineLayoutEditAccessor pl);
     };

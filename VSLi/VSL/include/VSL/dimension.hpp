@@ -5,38 +5,38 @@
 
 namespace VSL_NAMESPACE {
     struct D1 {
-        constexpr static char dimension = 1;
+        constexpr static char DIMENSION = 1;
     };
 
     struct D2 {
-        constexpr static char dimension = 2;
+        constexpr static char DIMENSION = 2;
     };
 
     struct D3 {
-        constexpr static char dimension = 3;
+        constexpr static char DIMENSION = 3;
     };
 
     template<int d>
-    struct dimension {};
+    struct Dimension {};
 
     template<>
-    struct dimension<1> : D1 {
-        using value = VSL_NAMESPACE::D1;
+    struct Dimension<1> : D1 {
+        using Value = VSL_NAMESPACE::D1;
     };
 
     template<>
-    struct dimension<2> : D2 {
-        using value = VSL_NAMESPACE::D2;
+    struct Dimension<2> : D2 {
+        using Value = VSL_NAMESPACE::D2;
     };
 
     template<>
-    struct dimension<3> : D3 {
-        using value = VSL_NAMESPACE::D3;
+    struct Dimension<3> : D3 {
+        using Value = VSL_NAMESPACE::D3;
     };
 
     template<typename D>
     concept __has_char_dimension = requires {
-        { D::dimension } -> std::convertible_to<char>;
+        { D::DIMENSION } -> std::convertible_to<char>;
     };
 
     template<typename D>

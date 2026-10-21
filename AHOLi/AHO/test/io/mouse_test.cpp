@@ -7,35 +7,35 @@
 namespace {
     using MouseTest = aho_test::InputBackendTest;
     struct RestoreWheelState {
-        std::size_t generation = aho::input::MouseWheel::_generation;
-        aho::d2::VectorD state = aho::input::MouseWheel::_state;
+        std::size_t generation = aho::input::MouseWheel::GENERATION;
+        aho::d2::VectorD state = aho::input::MouseWheel::STATE;
         ~RestoreWheelState() {
-            aho::input::MouseWheel::_generation = generation;
-            aho::input::MouseWheel::_state = state;
+            aho::input::MouseWheel::GENERATION = generation;
+            aho::input::MouseWheel::STATE = state;
         }
     };
 
     TEST_F(MouseTest, ButtonConstructorsAndTransitionsReflectBackendState) {
         using namespace aho::input;
         aho::InputManager manager(window.handle());
-        const auto button = manager.get<MouseButton>(MouseCode::LeftClick);
-        const auto typed = manager.get<MouseButton>(MouseID(MouseCode::RightClick));
-        EXPECT_EQ(button->state(), ButtonState::Idle);
-        EXPECT_EQ(typed->state(), ButtonState::Idle);
+        const auto button = manager.get<MouseButton>(MouseCode::LEFT_CLICK);
+        const auto typed = manager.get<MouseButton>(MouseID(MouseCode::RIGHT_CLICK));
+        EXPECT_EQ(button->state(), ButtonState::IDLE);
+        EXPECT_EQ(typed->state(), ButtonState::IDLE);
         window.buttons[GLFW_MOUSE_BUTTON_LEFT] = GLFW_PRESS;
         button->update();
         EXPECT_TRUE(button->down());
         EXPECT_TRUE(button->pressed());
         EXPECT_FALSE(button->up());
         button->update();
-        EXPECT_EQ(button->state(), ButtonState::Pressed);
+        EXPECT_EQ(button->state(), ButtonState::PRESSED);
         EXPECT_FALSE(button->down());
         window.buttons[GLFW_MOUSE_BUTTON_LEFT] = GLFW_RELEASE;
         button->update();
         EXPECT_TRUE(button->up());
         EXPECT_FALSE(button->pressed());
         button->update();
-        EXPECT_EQ(button->state(), ButtonState::Idle);
+        EXPECT_EQ(button->state(), ButtonState::IDLE);
     }
     TEST_F(MouseTest, CursorSamplesPositionAndReportsNewMinusPreviousDelta) {
         aho::InputManager manager(window.handle());
@@ -135,10 +135,10 @@ namespace {
         const auto mouse = manager.get<aho::input::Mouse>();
         EXPECT_NE(mouse->cursor(), nullptr);
         EXPECT_NE(mouse->wheel(), nullptr);
-        EXPECT_NE(mouse->leftClick(), nullptr);
-        EXPECT_NE(mouse->rightClick(), nullptr);
-        EXPECT_NE(mouse->middleButton(), nullptr);
-        EXPECT_NE(mouse->leftClick(), mouse->rightClick());
+        EXPECT_NE(mouse->left_click(), nullptr);
+        EXPECT_NE(mouse->right_click(), nullptr);
+        EXPECT_NE(mouse->middle_button(), nullptr);
+        EXPECT_NE(mouse->left_click(), mouse->right_click());
         EXPECT_EQ(manager.update_targets.size(), 5u);
     }
 } // namespace

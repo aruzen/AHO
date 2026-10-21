@@ -13,22 +13,22 @@
 
 namespace AHO_NAMESPACE::resource {
     enum class BufferType {
-        General,
-        GPUFriendly,
-        OnGPU,
-        Custom
+        GENERAL,
+        GPU_FRIENDLY,
+        ON_GPU,
+        CUSTOM
     };
 
-    template<BufferType Type>
+    template<BufferType type>
     class Buffer {
     };
 
     // ===========================================
 
     template<>
-    class Buffer<BufferType::General> {
-        size_t m_size;
-        std::shared_ptr<char[]> m_buffer;
+    class Buffer<BufferType::GENERAL> {
+        size_t _size;
+        std::shared_ptr<char[]> _buffer;
 
     public:
         Buffer(size_t size);
@@ -44,7 +44,7 @@ namespace AHO_NAMESPACE::resource {
     // ===========================================
 
     template<>
-    class Buffer<BufferType::GPUFriendly> {
+    class Buffer<BufferType::GPU_FRIENDLY> {
         // VSL_NAMESPACE::StagingBuffer<> buffer;
     public:
         Buffer(size_t size);
@@ -60,32 +60,32 @@ namespace AHO_NAMESPACE::resource {
     // ===========================================
 
     template<>
-    class Buffer<BufferType::OnGPU> {
+    class Buffer<BufferType::ON_GPU> {
         Buffer(size_t size);
     };
 
     // ===========================================
 
-    inline Buffer<BufferType::General>::Buffer(size_t size) : m_size(size), m_buffer(new char[size]) {}
+    inline Buffer<BufferType::GENERAL>::Buffer(size_t size) : _size(size), _buffer(new char[size]) {}
 
-    inline void* Buffer<BufferType::General>::data() {
-        return m_buffer.get();
+    inline void* Buffer<BufferType::GENERAL>::data() {
+        return _buffer.get();
     }
 
-    inline size_t Buffer<BufferType::General>::size() {
-        return m_buffer ? m_size : 0;
+    inline size_t Buffer<BufferType::GENERAL>::size() {
+        return _buffer ? _size : 0;
     }
 
     // ===========================================
 
-    inline Buffer<BufferType::GPUFriendly>::Buffer(size_t size) {
+    inline Buffer<BufferType::GPU_FRIENDLY>::Buffer(size_t size) {
         //buffer = decltype(buffer)();
     }
 
-    inline void* Buffer<BufferType::GPUFriendly>::data() {
+    inline void* Buffer<BufferType::GPU_FRIENDLY>::data() {
     }
 
-    inline size_t Buffer<BufferType::GPUFriendly>::size() {
+    inline size_t Buffer<BufferType::GPU_FRIENDLY>::size() {
     }
 } // namespace AHO_NAMESPACE::resource
 

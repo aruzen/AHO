@@ -4,17 +4,17 @@ void VSL_NAMESPACE::pipeline_layout::DepthStencil::injection(PipelineLayoutEditA
     auto convert = [](const StencilFace& face) {
         return vk::StencilOpState{.failOp = static_cast<vk::StencilOp>(face.fail),
                                   .passOp = static_cast<vk::StencilOp>(face.pass),
-                                  .depthFailOp = static_cast<vk::StencilOp>(face.depthFail),
+                                  .depthFailOp = static_cast<vk::StencilOp>(face.depth_fail),
                                   .compareOp = static_cast<vk::CompareOp>(face.compare),
-                                  .compareMask = face.compareMask,
-                                  .writeMask = face.writeMask,
+                                  .compareMask = face.compare_mask,
+                                  .writeMask = face.write_mask,
                                   .reference = face.reference};
     };
-    pl._data->info->depthStencil =
-        vk::PipelineDepthStencilStateCreateInfo{.depthTestEnable = depthTest,
-                                                .depthWriteEnable = depthWrite,
-                                                .depthCompareOp = static_cast<vk::CompareOp>(depthCompare),
-                                                .stencilTestEnable = stencilTest,
+    pl.data_->info->depth_stencil =
+        vk::PipelineDepthStencilStateCreateInfo{.depthTestEnable = depth_test,
+                                                .depthWriteEnable = depth_write,
+                                                .depthCompareOp = static_cast<vk::CompareOp>(depth_compare),
+                                                .stencilTestEnable = stencil_test,
                                                 .front = convert(front),
                                                 .back = convert(back),
                                                 .minDepthBounds = 0.f,

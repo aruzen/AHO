@@ -9,121 +9,121 @@
 #include <VSL/vulkan/surface.hpp>
 
 VSL_NAMESPACE::CommandPool::CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor device) {
-    _data = std::shared_ptr<VSL_NAMESPACE::_impl::CommandPool_impl>(new VSL_NAMESPACE::_impl::CommandPool_impl);
-    _data->device = device._data;
+    data_ = std::shared_ptr<VSL_NAMESPACE::impl::CommandPoolImpl>(new VSL_NAMESPACE::impl::CommandPoolImpl);
+    data_->device = device.data_;
 
-    vk::CommandPoolCreateInfo poolInfo;
-    poolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
-    poolInfo.queueFamilyIndex = device._data->graphicsFamily;
+    vk::CommandPoolCreateInfo pool_info;
+    pool_info.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
+    pool_info.queueFamilyIndex = device.data_->graphics_family;
 
-    _data->commandPool = device._data->device.createCommandPool(poolInfo);
+    data_->command_pool = device.data_->device.createCommandPool(pool_info);
 }
 
-VSL_NAMESPACE::CommandPool::CommandPool(std::shared_ptr<VSL_NAMESPACE::_impl::CommandPool_impl> data) : _data(data) {}
+VSL_NAMESPACE::CommandPool::CommandPool(std::shared_ptr<VSL_NAMESPACE::impl::CommandPoolImpl> data) : data_(data) {}
 
 VSL_NAMESPACE::CommandBuffer::CommandBuffer(VSL_NAMESPACE::CommandPool pool, std::uint32_t size) {
-    _data = std::shared_ptr<VSL_NAMESPACE::_impl::CommandBuffer_impl>(new VSL_NAMESPACE::_impl::CommandBuffer_impl);
-    _data->commandPool = pool._data;
+    data_ = std::shared_ptr<VSL_NAMESPACE::impl::CommandBufferImpl>(new VSL_NAMESPACE::impl::CommandBufferImpl);
+    data_->command_pool = pool.data_;
 
-    _data->commandBuffers.resize(size);
-    vk::CommandBufferAllocateInfo allocInfo;
-    allocInfo.commandPool = pool._data->commandPool;
-    allocInfo.level = vk::CommandBufferLevel::ePrimary;
-    allocInfo.commandBufferCount = size;
+    data_->command_buffers.resize(size);
+    vk::CommandBufferAllocateInfo alloc_info;
+    alloc_info.commandPool = pool.data_->command_pool;
+    alloc_info.level = vk::CommandBufferLevel::ePrimary;
+    alloc_info.commandBufferCount = size;
 
-    _data->currentBufferIdx = 0;
-    _data->commandBuffers = pool._data->device->device.allocateCommandBuffers(allocInfo);
+    data_->current_buffer_idx = 0;
+    data_->command_buffers = pool.data_->device->device.allocateCommandBuffers(alloc_info);
 }
 
-VSL_NAMESPACE::CommandBuffer::CommandBuffer(std::shared_ptr<VSL_NAMESPACE::_impl::CommandBuffer_impl> data) : _data(data) {}
+VSL_NAMESPACE::CommandBuffer::CommandBuffer(std::shared_ptr<VSL_NAMESPACE::impl::CommandBufferImpl> data) : data_(data) {}
 
-std::uint32_t VSL_NAMESPACE::CommandBuffer::getCurrentBufferIdx() {
-    return _data->currentBufferIdx;
+std::uint32_t VSL_NAMESPACE::CommandBuffer::get_current_buffer_idx() {
+    return data_->current_buffer_idx;
 }
 
-size_t VSL_NAMESPACE::CommandBuffer::getSize() {
-    return _data->commandBuffers.size();
+size_t VSL_NAMESPACE::CommandBuffer::get_size() {
+    return data_->command_buffers.size();
 }
 
 void VSL_NAMESPACE::CommandBuffer::next() {
-    _data->currentBufferIdx = (_data->currentBufferIdx + 1) % _data->commandBuffers.size();
+    data_->current_buffer_idx = (data_->current_buffer_idx + 1) % data_->command_buffers.size();
 }
 
 void VSL_NAMESPACE::CommandBuffer::reset() {
-    for (auto& buff : _data->commandBuffers)
+    for (auto& buff : data_->command_buffers)
         buff.reset();
 }
 
 void VSL_NAMESPACE::CommandBuffer::reset(std::uint32_t idx) {
-    _data->commandBuffers[idx].reset();
+    data_->command_buffers[idx].reset();
 }
 
-VSL_NAMESPACE::_impl::CommandBuffer_impl::~CommandBuffer_impl() {
+VSL_NAMESPACE::impl::CommandBufferImpl::~CommandBufferImpl() {
     for (const auto& submission : submissions)
-        if (submission && submission->status == Completion::Status::Submitted)
+        if (submission && submission->status == Completion::Status::SUBMITTED)
             Completion{submission}.wait();
-    commandPool->device->device.freeCommandBuffers(commandPool->commandPool, this->commandBuffers);
+    command_pool->device->device.freeCommandBuffers(command_pool->command_pool, this->command_buffers);
 }
 
-VSL_NAMESPACE::CommandManager::CommandManager(std::shared_ptr<VSL_NAMESPACE::_impl::CommandManager_impl> data) : _data(data) {}
+VSL_NAMESPACE::CommandManager::CommandManager(std::shared_ptr<VSL_NAMESPACE::impl::CommandManagerImpl> data) : data_(data) {}
 
 VSL_NAMESPACE::CommandManager::CommandManager(VSL_NAMESPACE::LogicalDeviceAccessor device) {
-    _data = std::shared_ptr<VSL_NAMESPACE::_impl::CommandManager_impl>(new VSL_NAMESPACE::_impl::CommandManager_impl);
-    _data->device = device._data;
-    vk::Device de = device._data->device;
+    data_ = std::shared_ptr<VSL_NAMESPACE::impl::CommandManagerImpl>(new VSL_NAMESPACE::impl::CommandManagerImpl);
+    data_->device = device.data_;
+    vk::Device de = device.data_->device;
     CommandPool pool(device);
     CommandBuffer buffer(pool);
 
-    _data->commandPool = pool._data;
-    _data->commandBuffer = buffer._data;
-    _data->graphicsQueue = de.getQueue(device._data->graphicsFamily, 0);
-    _data->presentQueue = de.getQueue(device._data->presentFamily, 0);
+    data_->command_pool = pool.data_;
+    data_->command_buffer = buffer.data_;
+    data_->graphics_queue = de.getQueue(device.data_->graphics_family, 0);
+    data_->present_queue = de.getQueue(device.data_->present_family, 0);
 }
 
-VSL_NAMESPACE::CommandPool VSL_NAMESPACE::CommandManager::getPool() {
-    return CommandPool{_data->commandPool};
+VSL_NAMESPACE::CommandPool VSL_NAMESPACE::CommandManager::get_pool() {
+    return CommandPool{data_->command_pool};
 }
 
-VSL_NAMESPACE::CommandBuffer VSL_NAMESPACE::CommandManager::getBuffer() {
-    return CommandBuffer{_data->commandBuffer};
+VSL_NAMESPACE::CommandBuffer VSL_NAMESPACE::CommandManager::get_buffer() {
+    return CommandBuffer{data_->command_buffer};
 }
 
-std::uint32_t VSL_NAMESPACE::CommandManager::getCurrentBufferIdx() {
-    return _data->commandBuffer->currentBufferIdx;
+std::uint32_t VSL_NAMESPACE::CommandManager::get_current_buffer_idx() {
+    return data_->command_buffer->current_buffer_idx;
 }
 
-VSL_NAMESPACE::CommandBuffer VSL_NAMESPACE::CommandManager::makeExclusiveBuffer(size_t size) {
-    return CommandBuffer(CommandPool{_data->commandPool}, size);
+VSL_NAMESPACE::CommandBuffer VSL_NAMESPACE::CommandManager::make_exclusive_buffer(size_t size) {
+    return CommandBuffer(CommandPool{data_->command_pool}, size);
 }
-void VSL_NAMESPACE::CommandManager::waitIdle() { _data->device->device.waitIdle(); }
+void VSL_NAMESPACE::CommandManager::wait_idle() { data_->device->device.waitIdle(); }
 
-VSL_NAMESPACE::_impl::CommandPool_impl::~CommandPool_impl() {
-    if (commandPool)
-        device->device.destroyCommandPool(commandPool);
+VSL_NAMESPACE::impl::CommandPoolImpl::~CommandPoolImpl() {
+    if (command_pool)
+        device->device.destroyCommandPool(command_pool);
 }
 
-VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::CommandManager::getDevice() const {
-    if (!_data || !_data->device || !_data->device->device)
+VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::CommandManager::get_device() const {
+    if (!data_ || !data_->device || !data_->device->device)
         throw std::invalid_argument("Command manager is empty");
-    return {_data->device};
+    return {data_->device};
 }
 VSL_NAMESPACE::CommandManager VSL_NAMESPACE::CommandManager::independent(std::uint32_t count) const {
     if (!count)
         throw std::invalid_argument("Command buffer count must be positive");
-    CommandPool pool(getDevice());
+    CommandPool pool(get_device());
     CommandBuffer buffers(pool, count);
-    auto next = std::make_shared<_impl::CommandManager_impl>();
-    next->device = _data->device;
-    next->commandPool = pool._data;
-    next->commandBuffer = buffers._data;
-    next->graphicsQueue = _data->graphicsQueue;
-    next->presentQueue = _data->presentQueue;
+    auto next = std::make_shared<impl::CommandManagerImpl>();
+    next->device = data_->device;
+    next->command_pool = pool.data_;
+    next->command_buffer = buffers.data_;
+    next->graphics_queue = data_->graphics_queue;
+    next->present_queue = data_->present_queue;
     return CommandManager(next);
 }
 
 void VSL_NAMESPACE::CommandBuffer::retain(std::shared_ptr<void> resource) const {
-    if (!_data)
+    if (!data_)
         throw std::invalid_argument("CommandBuffer is empty");
-    if (resource && _data->recordingSubmission)
-        Completion{_data->recordingSubmission}.retain(std::move(resource));
+    if (resource && data_->recording_submission)
+        Completion{data_->recording_submission}.retain(std::move(resource));
 }

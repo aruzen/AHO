@@ -5,10 +5,10 @@
 #include <type_traits>
 
 namespace VSL_NAMESPACE::default_using {
-    using character = char;
-    using string = std::string;
-    using string_view = std::string_view;
-    using stringstream = std::stringstream;
+    using Character = char;
+    using String = std::string;
+    using StringView = std::string_view;
+    using Stringstream = std::stringstream;
 } // namespace VSL_NAMESPACE::default_using
 
 namespace VSL_NAMESPACE {
@@ -17,128 +17,128 @@ namespace VSL_NAMESPACE {
 }
 
 namespace VSL_NAMESPACE::helper {
-    template<is_supported_charsets CharType, size_t Size>
-    class constant_string_holder {
+    template<is_supported_charsets CharType, size_t size>
+    class ConstantStringHolder {
     public:
-        using chcaracter = CharType;
-        static constexpr size_t size = Size;
+        using Chcaracter = CharType;
+        static constexpr size_t SIZE = size;
 
-        consteval constant_string_holder(const CharType (&str)[Size]) {
-            for (size_t i = 0; i < size; i++)
+        consteval ConstantStringHolder(const CharType (&str)[size]) {
+            for (size_t i = 0; i < SIZE; i++)
                 value[i] = str[i];
         }
 
-        CharType value[size];
+        CharType value[SIZE];
     };
 
-    template<is_supported_charsets CharType, char C, char8_t C8,
-             wchar_t WC, char16_t C16, char32_t C32>
-    consteval auto AdjustChar() {
+    template<is_supported_charsets CharType, char c, char8_t c8,
+             wchar_t wc, char16_t c16, char32_t c32>
+    consteval auto adjust_char() {
         if constexpr (std::is_same_v<CharType, char>)
-            return C;
+            return c;
         else if constexpr (std::is_same_v<CharType, char8_t>)
-            return C8;
+            return c8;
         else if constexpr (std::is_same_v<CharType, wchar_t>)
-            return WC;
+            return wc;
         else if constexpr (std::is_same_v<CharType, char16_t>)
-            return C16;
+            return c16;
         else if constexpr (std::is_same_v<CharType, char32_t>)
-            return C32;
+            return c32;
     }
 
-    template<is_supported_charsets CharType, constant_string_holder C, constant_string_holder C8,
-             constant_string_holder WC, constant_string_holder C16, constant_string_holder C32>
-    consteval auto AdjustString() {
+    template<is_supported_charsets CharType, ConstantStringHolder c, ConstantStringHolder c8,
+             ConstantStringHolder wc, ConstantStringHolder c16, ConstantStringHolder c32>
+    consteval auto adjust_string() {
         if constexpr (std::is_same_v<CharType, char>)
-            return C;
+            return c;
         else if constexpr (std::is_same_v<CharType, char8_t>)
-            return C8;
+            return c8;
         else if constexpr (std::is_same_v<CharType, wchar_t>)
-            return WC;
+            return wc;
         else if constexpr (std::is_same_v<CharType, char16_t>)
-            return C16;
+            return c16;
         else if constexpr (std::is_same_v<CharType, char32_t>)
-            return C32;
+            return c32;
     }
 
-    class character_container {
-        char char_holder;
-        char8_t char8_t_holder;
-        wchar_t wchar_t_holder;
-        char16_t char16_t_holder;
-        char32_t char32_t_holder;
+    class CharacterContainer {
+        char _char_holder;
+        char8_t _char8_t_holder;
+        wchar_t _wchar_t_holder;
+        char16_t _char16_t_holder;
+        char32_t _char32_t_holder;
 
     public:
-        character_container(char char_holder,
+        CharacterContainer(char char_holder,
                             char8_t char8_t_holder,
                             wchar_t wchar_t_holder,
                             char16_t char16_t_holder,
-                            char32_t char32_t_holder) : char_holder(char_holder),
-                                                        char8_t_holder(char8_t_holder),
-                                                        wchar_t_holder(wchar_t_holder),
-                                                        char16_t_holder(char16_t_holder),
-                                                        char32_t_holder(char32_t_holder) {}
+                            char32_t char32_t_holder) : _char_holder(char_holder),
+                                                        _char8_t_holder(char8_t_holder),
+                                                        _wchar_t_holder(wchar_t_holder),
+                                                        _char16_t_holder(char16_t_holder),
+                                                        _char32_t_holder(char32_t_holder) {}
 
         template<is_supported_charsets CharType>
         CharType get() const {
             if constexpr (std::is_same_v<CharType, char>) {
-                return char_holder;
+                return _char_holder;
             }
             if constexpr (std::is_same_v<CharType, char8_t>) {
-                return char8_t_holder;
+                return _char8_t_holder;
             }
             if constexpr (std::is_same_v<CharType, wchar_t>) {
-                return wchar_t_holder;
+                return _wchar_t_holder;
             }
             if constexpr (std::is_same_v<CharType, char16_t>) {
-                return char16_t_holder;
+                return _char16_t_holder;
             }
             if constexpr (std::is_same_v<CharType, char32_t>) {
-                return char32_t_holder;
+                return _char32_t_holder;
             }
         }
     };
 
-    class string_container {
-        std::basic_string<char> char_holder;
-        std::basic_string<char8_t> char8_t_holder;
-        std::basic_string<wchar_t> wchar_t_holder;
-        std::basic_string<char16_t> char16_t_holder;
-        std::basic_string<char32_t> char32_t_holder;
+    class StringContainer {
+        std::basic_string<char> _char_holder;
+        std::basic_string<char8_t> _char8_t_holder;
+        std::basic_string<wchar_t> _wchar_t_holder;
+        std::basic_string<char16_t> _char16_t_holder;
+        std::basic_string<char32_t> _char32_t_holder;
 
     public:
-        string_container(std::basic_string<char> char_holder,
+        StringContainer(std::basic_string<char> char_holder,
                          std::basic_string<char8_t> char8_t_holder,
                          std::basic_string<wchar_t> wchar_t_holder,
                          std::basic_string<char16_t> char16_t_holder,
-                         std::basic_string<char32_t> char32_t_holder) : char_holder(char_holder),
-                                                                        char8_t_holder(char8_t_holder),
-                                                                        wchar_t_holder(wchar_t_holder),
-                                                                        char16_t_holder(char16_t_holder),
-                                                                        char32_t_holder(char32_t_holder) {}
+                         std::basic_string<char32_t> char32_t_holder) : _char_holder(char_holder),
+                                                                        _char8_t_holder(char8_t_holder),
+                                                                        _wchar_t_holder(wchar_t_holder),
+                                                                        _char16_t_holder(char16_t_holder),
+                                                                        _char32_t_holder(char32_t_holder) {}
 
         template<is_supported_charsets CharType>
         std::basic_string<CharType> get() const {
             if constexpr (std::is_same_v<CharType, char>) {
-                return char_holder;
+                return _char_holder;
             }
             if constexpr (std::is_same_v<CharType, char8_t>) {
-                return char8_t_holder;
+                return _char8_t_holder;
             }
             if constexpr (std::is_same_v<CharType, wchar_t>) {
-                return wchar_t_holder;
+                return _wchar_t_holder;
             }
             if constexpr (std::is_same_v<CharType, char16_t>) {
-                return char16_t_holder;
+                return _char16_t_holder;
             }
             if constexpr (std::is_same_v<CharType, char32_t>) {
-                return char32_t_holder;
+                return _char32_t_holder;
             }
         }
     };
 } // namespace VSL_NAMESPACE::helper
 
-#define VSL_PREFIX(str) VSL_NAMESPACE::helper::AdjustString<character,               \
+#define VSL_PREFIX(str) VSL_NAMESPACE::helper::adjust_string<Character,               \
                                                             str,                     \
                                                             ___VSL_JOIN_2(u8, str),  \
                                                             ___VSL_JOIN_2(L, str),   \
@@ -146,14 +146,14 @@ namespace VSL_NAMESPACE::helper {
                                                             ___VSL_JOIN_2(U, str)>() \
                             .value
 
-#define VSL_CHAR_PREFIX(str) VSL_NAMESPACE::helper::AdjustChar<character,              \
+#define VSL_CHAR_PREFIX(str) VSL_NAMESPACE::helper::adjust_char<Character,              \
                                                                str,                    \
                                                                ___VSL_JOIN_2(u8, str), \
                                                                ___VSL_JOIN_2(L, str),  \
                                                                ___VSL_JOIN_2(u, str),  \
                                                                ___VSL_JOIN_2(U, str)>()
 
-#define VSL_STR_PREFIX(str) std::basic_string<character>(VSL_NAMESPACE::helper::AdjustString<character,               \
+#define VSL_STR_PREFIX(str) std::basic_string<Character>(VSL_NAMESPACE::helper::adjust_string<Character,               \
                                                                                              str,                     \
                                                                                              ___VSL_JOIN_2(u8, str),  \
                                                                                              ___VSL_JOIN_2(L, str),   \
@@ -161,7 +161,7 @@ namespace VSL_NAMESPACE::helper {
                                                                                              ___VSL_JOIN_2(U, str)>() \
                                                              .value)
 
-#define VSL_T_PREFIX(type, str) VSL_NAMESPACE::helper::AdjustString<type,                    \
+#define VSL_T_PREFIX(type, str) VSL_NAMESPACE::helper::adjust_string<type,                    \
                                                                     str,                     \
                                                                     ___VSL_JOIN_2(u8, str),  \
                                                                     ___VSL_JOIN_2(L, str),   \
@@ -169,14 +169,14 @@ namespace VSL_NAMESPACE::helper {
                                                                     ___VSL_JOIN_2(U, str)>() \
                                     .value
 
-#define VSL_T_CHAR_PREFIX(type, str) VSL_NAMESPACE::helper::AdjustChar<type,                   \
+#define VSL_T_CHAR_PREFIX(type, str) VSL_NAMESPACE::helper::adjust_char<type,                   \
                                                                        str,                    \
                                                                        ___VSL_JOIN_2(u8, str), \
                                                                        ___VSL_JOIN_2(L, str),  \
                                                                        ___VSL_JOIN_2(u, str),  \
                                                                        ___VSL_JOIN_2(U, str)>()
 
-#define VSL_T_STR_PREFIX(type, str) std::basic_string<type>(VSL_NAMESPACE::helper::AdjustString<type,                    \
+#define VSL_T_STR_PREFIX(type, str) std::basic_string<type>(VSL_NAMESPACE::helper::adjust_string<type,                    \
                                                                                                 str,                     \
                                                                                                 ___VSL_JOIN_2(u8, str),  \
                                                                                                 ___VSL_JOIN_2(L, str),   \
@@ -184,13 +184,13 @@ namespace VSL_NAMESPACE::helper {
                                                                                                 ___VSL_JOIN_2(U, str)>() \
                                                                 .value)
 
-#define VSL_STRING_CONTAINER(str) VSL_NAMESPACE::helper::string_container(str,                    \
+#define VSL_STRING_CONTAINER(str) VSL_NAMESPACE::helper::StringContainer(str,                    \
                                                                           ___VSL_JOIN_2(u8, str), \
                                                                           ___VSL_JOIN_2(L, str),  \
                                                                           ___VSL_JOIN_2(u, str),  \
                                                                           ___VSL_JOIN_2(U, str))
 
-#define VSL_CHARACTER_CONTAINER(str) VSL_NAMESPACE::helper::character_container(str,                    \
+#define VSL_CHARACTER_CONTAINER(str) VSL_NAMESPACE::helper::CharacterContainer(str,                    \
                                                                                 ___VSL_JOIN_2(u8, str), \
                                                                                 ___VSL_JOIN_2(L, str),  \
                                                                                 ___VSL_JOIN_2(u, str),  \

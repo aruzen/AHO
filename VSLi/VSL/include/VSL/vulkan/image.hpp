@@ -17,20 +17,20 @@ namespace VSL_NAMESPACE {
         std::uint32_t layer = 0;
     };
 
-    template<ImageType Usage, MemoryProperty MemProp = MemoryProperty::DeviceLocal, ImageLayout Layout = ImageLayout::Undefined>
+    template<ImageType usage, MemoryProperty mem_prop = MemoryProperty::DEVICE_LOCAL, ImageLayout layout = ImageLayout::UNDEFINED>
     struct Image : public ImageAccessor {
         Image(LogicalDeviceAccessor device, std::uint32_t width, std::uint32_t height,
-              data_format::___Format format = data_format::Srgb8RGBA, std::uint32_t count = 1, SampleCount samples = SampleCount::One);
+              data_format::Format format = data_format::SRGB8_RGBA, std::uint32_t count = 1, SampleCount samples = SampleCount::ONE);
 
-        template<MemoryType MemType, MemoryProperty MemProperty, SharingMode ShareMode>
-        bool copyByBuffer(CommandManager manager, Buffer<MemType, MemProperty, ShareMode>& buffer);
+        template<MemoryType mem_type, MemoryProperty mem_property, SharingMode share_mode>
+        bool copy_by_buffer(CommandManager manager, Buffer<mem_type, mem_property, share_mode>& buffer);
     };
 } // namespace VSL_NAMESPACE
 
-template<VSL_NAMESPACE::ImageType Usage, VSL_NAMESPACE::MemoryProperty MemProp, VSL_NAMESPACE::ImageLayout Layout>
-VSL_NAMESPACE::Image<Usage, MemProp, Layout>::Image(VSL_NAMESPACE::LogicalDeviceAccessor device, std::uint32_t width, std::uint32_t height,
-                                                    data_format::___Format format, std::uint32_t count, SampleCount samples) {
-    _data = MakeImage(Usage, MemProp, Layout, device, width, height, format, count, samples);
+template<VSL_NAMESPACE::ImageType usage, VSL_NAMESPACE::MemoryProperty mem_prop, VSL_NAMESPACE::ImageLayout layout>
+VSL_NAMESPACE::Image<usage, mem_prop, layout>::Image(VSL_NAMESPACE::LogicalDeviceAccessor device, std::uint32_t width, std::uint32_t height,
+                                                    data_format::Format format, std::uint32_t count, SampleCount samples) {
+    data_ = MakeImage(usage, mem_prop, layout, device, width, height, format, count, samples);
 }
 
 #endif

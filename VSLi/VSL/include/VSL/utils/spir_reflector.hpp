@@ -28,7 +28,7 @@ namespace VSL_NAMESPACE::utils {
 
             // レイアウトの添字はディスクリプターセット番号に対応し、欠番には空のレイアウトを配置する。
             // repeatで指定した回数だけ、セット全体の並びを追加で複製する。
-            std::vector<VSL_NAMESPACE::graphic_resource::BindingLayout> makeBindingLayout(size_t repeat = 0);
+            std::vector<VSL_NAMESPACE::graphic_resource::BindingLayout> make_binding_layout(size_t repeat = 0);
         } generated;
 
         SPIRVReflector(LogicalDeviceAccessor logical_device, std::filesystem::path path);

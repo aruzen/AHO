@@ -14,12 +14,12 @@ namespace phase_payload {
     }
 } // namespace phase_payload
 namespace {
-    using DrawPhaseVulkanIntegration = aho_test::LiveGpuTest;
+    using DrawPhaseVulkanIntegration = aho_test::LiveGPUTest;
     struct NestedDrawEngine : aho::StandardEngine {
         NestedDrawEngine() : aho::StandardEngine("AHO nested phase test") {}
         ~NestedDrawEngine() override {
-            if (_data)
-                _data->command_manager.waitIdle();
+            if (data_)
+                data_->command_manager.wait_idle();
             if (boot_window && static_cast<bool>(*boot_window))
                 boot_window->close();
         }
@@ -164,15 +164,15 @@ namespace {
         int commands = 0, tuples = 0;
         aho::DrawPhase* received = nullptr;
         auto check = [&](auto stream) {
-            EXPECT_EQ(stream.phase_stream.manager._data, outer.manager._data);
+            EXPECT_EQ(stream.phase_stream.manager.data_, outer.manager.data_);
             stream << aho::pack(phase_payload::Value{&tuples, &received});
             EXPECT_EQ(received, &outer);
             EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &inner);
         };
         check(outer << aho_test::RecordingCommand(&commands));
         check(outer << aho_test::RecordingDelegate(&commands));
-        std::shared_ptr<vsl::command::__Command> command = std::make_shared<aho_test::RecordingCommand>(&commands);
-        std::shared_ptr<vsl::command::__DelegateCommand> delegate = std::make_shared<aho_test::RecordingDelegate>(&commands);
+        std::shared_ptr<vsl::command::Command> command = std::make_shared<aho_test::RecordingCommand>(&commands);
+        std::shared_ptr<vsl::command::DelegateCommand> delegate = std::make_shared<aho_test::RecordingDelegate>(&commands);
         check(outer << command);
         check(outer << delegate);
         EXPECT_EQ(commands, 4);
@@ -184,8 +184,8 @@ namespace {
         std::optional<aho::DrawStream<vsl::DefaultPhaseStream>> saved;
         aho::DrawPhase outer(*engine, [&](auto& stream) {
             saved = stream;
-            auto window = engine->getWindow();
-            stream << vsl::command::RenderPassBegin(window._data2->render_pass, window._data2->frame_buffer);
+            auto window = engine->get_window();
+            stream << vsl::command::RenderPassBegin(window.data2->render_pass, window.data2->frame_buffer);
         });
         aho::DrawPhase inner(other);
         ASSERT_TRUE(saved);
@@ -217,7 +217,7 @@ namespace {
         ASSERT_NO_THROW(start_engine());
         NestedDrawEngine other;
         aho::DrawPhase outer(*engine);
-        aho::DrawStream<vsl::DefaultPhaseStream> unrelated{vsl::DefaultPhaseStream{other._data->command_manager}};
+        aho::DrawStream<vsl::DefaultPhaseStream> unrelated{vsl::DefaultPhaseStream{other.data_->command_manager}};
         int calls = 0;
         aho::DrawPhase* received = &outer;
         unrelated << aho::pack(phase_payload::Value{&calls, &received});
@@ -256,11 +256,11 @@ namespace {
         {
             AHO_NAMESPACE::DrawPhase phase(*engine, [&](auto& stream) {
                 ++initialized;
-                stream << VSL_NAMESPACE::command::RenderPassBegin(engine->getWindow()._data2->render_pass, engine->getWindow()._data2->frame_buffer); }, [&](auto& stream) { ++finished; stream << VSL_NAMESPACE::command::RenderPassEnd(); });
+                stream << VSL_NAMESPACE::command::RenderPassBegin(engine->get_window().data2->render_pass, engine->get_window().data2->frame_buffer); }, [&](auto& stream) { ++finished; stream << VSL_NAMESPACE::command::RenderPassEnd(); });
             phase << aho_test::RecordingCommand(&commands);
             phase << aho_test::RecordingDelegate(&delegates);
-            std::shared_ptr<VSL_NAMESPACE::command::__Command> command = std::make_shared<aho_test::RecordingCommand>(&commands);
-            std::shared_ptr<VSL_NAMESPACE::command::__DelegateCommand> delegate = std::make_shared<aho_test::RecordingDelegate>(&delegates);
+            std::shared_ptr<VSL_NAMESPACE::command::Command> command = std::make_shared<aho_test::RecordingCommand>(&commands);
+            std::shared_ptr<VSL_NAMESPACE::command::DelegateCommand> delegate = std::make_shared<aho_test::RecordingDelegate>(&delegates);
             phase << command;
             phase << delegate;
             phase_payload::Value payload{&tuple_calls, &tuple_phase};
@@ -278,7 +278,7 @@ namespace {
     }
     TEST_F(DrawPhaseVulkanIntegration, RepeatedFramesWorkAcrossCommandBufferWraparound) {
         ASSERT_NO_THROW(start_engine());
-        const auto frames = engine->_data->command_manager.getBuffer().getSize() + 2;
+        const auto frames = engine->data_->command_manager.get_buffer().get_size() + 2;
         for (std::size_t frame = 0; frame < frames; ++frame) {
             SCOPED_TRACE(frame);
             AHO_NAMESPACE::DrawPhase phase(*engine);
@@ -292,38 +292,38 @@ namespace {
             unsigned finished = 0;
             {
                 // 終了コールバックが呼ばれない場合も安全に検証できるよう、初期化時にパスを閉じる。
-                AHO_NAMESPACE::DrawPhase phase(*engine, [&](auto& stream) { stream << VSL_NAMESPACE::command::RenderPassBegin(engine->getWindow()._data2->render_pass,
-                                                                                                                              engine->getWindow()._data2->frame_buffer)
+                AHO_NAMESPACE::DrawPhase phase(*engine, [&](auto& stream) { stream << VSL_NAMESPACE::command::RenderPassBegin(engine->get_window().data2->render_pass,
+                                                                                                                              engine->get_window().data2->frame_buffer)
                                                                                    << VSL_NAMESPACE::command::RenderPassEnd{}; }, [&](auto&) { ++finished; });
                 if (split) {
                     VSL_NAMESPACE::DefaultPhase& base = phase;
-                    EXPECT_EQ(base.submitCommands(), VSL_NAMESPACE::ComputePhase::SubmitResult::Success);
+                    EXPECT_EQ(base.submit_commands(), VSL_NAMESPACE::ComputePhase::SubmitResult::SUCCESS);
                     EXPECT_EQ(finished, 1u);
-                    EXPECT_EQ(base.present(), VSL_NAMESPACE::ComputePhase::SubmitResult::Success);
+                    EXPECT_EQ(base.present(), VSL_NAMESPACE::ComputePhase::SubmitResult::SUCCESS);
                 } else {
                     VSL_NAMESPACE::ComputePhase& base = phase;
-                    EXPECT_EQ(base.submit(), VSL_NAMESPACE::ComputePhase::SubmitResult::Success);
+                    EXPECT_EQ(base.submit(), VSL_NAMESPACE::ComputePhase::SubmitResult::SUCCESS);
                     EXPECT_EQ(finished, 1u);
                 }
                 EXPECT_TRUE(phase.completion().wait());
             }
             EXPECT_EQ(finished, 1u);
         }
-        engine->_data->command_manager.waitIdle();
+        engine->data_->command_manager.wait_idle();
     }
     TEST_F(DrawPhaseVulkanIntegration, ExplicitSubmissionClosesTheDefaultRenderPass) {
         ASSERT_NO_THROW(start_engine());
         for (unsigned split = 0; split < 2; ++split) {
             AHO_NAMESPACE::DrawPhase phase(*engine);
             if (split) {
-                EXPECT_EQ(phase.submitCommands(), VSL_NAMESPACE::ComputePhase::SubmitResult::Success);
-                EXPECT_EQ(phase.present(), VSL_NAMESPACE::ComputePhase::SubmitResult::Success);
+                EXPECT_EQ(phase.submit_commands(), VSL_NAMESPACE::ComputePhase::SubmitResult::SUCCESS);
+                EXPECT_EQ(phase.present(), VSL_NAMESPACE::ComputePhase::SubmitResult::SUCCESS);
             } else {
-                EXPECT_EQ(phase.submit(), VSL_NAMESPACE::ComputePhase::SubmitResult::Success);
+                EXPECT_EQ(phase.submit(), VSL_NAMESPACE::ComputePhase::SubmitResult::SUCCESS);
             }
             EXPECT_TRUE(phase.completion().wait());
         }
-        engine->_data->command_manager.waitIdle();
+        engine->data_->command_manager.wait_idle();
     }
     TEST_F(DrawPhaseVulkanIntegration, ExplicitThrowingFinishCancelsAndDoesNotRetryDuringDestruction) {
         ASSERT_NO_THROW(start_engine());
@@ -340,56 +340,56 @@ namespace {
         {
             AHO_NAMESPACE::DrawPhase next(*engine);
         }
-        engine->_data->command_manager.waitIdle();
+        engine->data_->command_manager.wait_idle();
     }
     TEST_F(DrawPhaseVulkanIntegration, FinishCallbackRecordsReadbackBeforeSubmitAndPresent) {
         ASSERT_NO_THROW(start_engine());
-        auto window = engine->getWindow();
-        auto manager = engine->_data->command_manager;
-        auto device = engine->_data->logical_device;
-        const auto capabilities = device._data->parentDevice->device.getSurfaceCapabilitiesKHR(window._data2->surface->_data->surface);
+        auto window = engine->get_window();
+        auto manager = engine->data_->command_manager;
+        auto device = engine->data_->logical_device;
+        const auto capabilities = device.data_->parent_device->device.getSurfaceCapabilitiesKHR(window.data2->surface->data_->surface);
         if (!(capabilities.supportedUsageFlags & vk::ImageUsageFlagBits::eTransferSrc))
             GTEST_SKIP() << "Swapchain does not support TransferSrc";
-        auto chain = VSL_NAMESPACE::Swapchain(device, window._data2->surface, window._data2->swapchain,
+        auto chain = VSL_NAMESPACE::Swapchain(device, window.data2->surface, window.data2->swapchain,
                                               std::nullopt, std::nullopt,
-                                              VSL_NAMESPACE::ImageType::ColorAttachment | VSL_NAMESPACE::ImageType::TransferSrc);
-        window._data2->swapchain = chain;
-        window._data2->frame_buffer = VSL_NAMESPACE::FrameBuffer(chain, window._data2->render_pass);
-        if (window._data2->render_finished.size() != chain.getSwapImageSize())
-            window._data2->render_finished = engine->_data->synchro_manager.createSemaphore("ticket-present", chain.getSwapImageSize());
+                                              VSL_NAMESPACE::ImageType::COLOR_ATTACHMENT | VSL_NAMESPACE::ImageType::TRANSFER_SRC);
+        window.data2->swapchain = chain;
+        window.data2->frame_buffer = VSL_NAMESPACE::FrameBuffer(chain, window.data2->render_pass);
+        if (window.data2->render_finished.size() != chain.get_swap_image_size())
+            window.data2->render_finished = engine->data_->synchro_manager.create_semaphore("ticket-present", chain.get_swap_image_size());
         AHO_NAMESPACE::ImageReadback reader(manager);
         std::optional<AHO_NAMESPACE::ImageReadbackTicket> ticket;
         {
             AHO_NAMESPACE::DrawPhase phase(*engine, [&](auto& stream) {
-                auto begin = VSL_NAMESPACE::command::RenderPassBegin(window._data2->render_pass, window._data2->frame_buffer);
-                begin.clearValues[0] = VSL_NAMESPACE::ClearColor{1, 0, 0, 1};
+                auto begin = VSL_NAMESPACE::command::RenderPassBegin(window.data2->render_pass, window.data2->frame_buffer);
+                begin.clear_values[0] = VSL_NAMESPACE::ClearColor{1, 0, 0, 1};
                 stream << begin; }, [&](auto& stream) {
                 stream << VSL_NAMESPACE::command::RenderPassEnd{};
-                ticket = reader.record(phase, chain.images.at(phase.getImageIndex()), VSL_NAMESPACE::ImageLayout::Present,
+                ticket = reader.record(phase, chain.images.at(phase.get_image_index()), VSL_NAMESPACE::ImageLayout::PRESENT,
                                        {0, 0, 1, 1}, 57);
                 ASSERT_TRUE(ticket);
-                EXPECT_EQ(ticket->status(), VSL_NAMESPACE::Completion::Status::Pending); });
+                EXPECT_EQ(ticket->status(), VSL_NAMESPACE::Completion::Status::PENDING); });
         }
         ASSERT_TRUE(ticket);
-        EXPECT_EQ(ticket->info().frameId, 57u);
+        EXPECT_EQ(ticket->info().frame_id, 57u);
         auto pixels = ticket->read();
         const auto format = pixels.format.type();
-        const bool bgra = format == VSL_NAMESPACE::data_format::___FormatTypes::Srgb8BGRA ||
-                          format == VSL_NAMESPACE::data_format::___FormatTypes::UnsignedNormalized8BGRA;
+        const bool bgra = format == VSL_NAMESPACE::data_format::FormatTypes::SRGB8_BGRA ||
+                          format == VSL_NAMESPACE::data_format::FormatTypes::UNSIGNED_NORMALIZED8_BGRA;
         EXPECT_EQ(pixels.bytes[bgra ? 2 : 0], std::byte{255});
         EXPECT_EQ(pixels.bytes[1], std::byte{0});
         EXPECT_EQ(AHO_NAMESPACE::THREAD_LOCAL_DRAW_PHASE, nullptr);
-        manager.waitIdle();
+        manager.wait_idle();
     }
 
     TEST_F(DrawPhaseVulkanIntegration, ThrowingFinishCallbackCancelsTicketAndAllowsNextFrame) {
         ASSERT_NO_THROW(start_engine());
-        auto manager = engine->_data->command_manager;
-        auto device = engine->_data->logical_device;
-        VSL_NAMESPACE::Image<VSL_NAMESPACE::ImageType::ColorAttachment | VSL_NAMESPACE::ImageType::TransferSrc> image(
-            device, 8, 8, VSL_NAMESPACE::data_format::UnsignedNormalized8RGBA);
+        auto manager = engine->data_->command_manager;
+        auto device = engine->data_->logical_device;
+        VSL_NAMESPACE::Image<VSL_NAMESPACE::ImageType::COLOR_ATTACHMENT | VSL_NAMESPACE::ImageType::TRANSFER_SRC> image(
+            device, 8, 8, VSL_NAMESPACE::data_format::UNSIGNED_NORMALIZED8_RGBA);
         VSL_NAMESPACE::RenderPassDescription description;
-        description.addColor({.format = image.getFormat(), .finalLayout = VSL_NAMESPACE::ImageLayout::General});
+        description.add_color({.format = image.get_format(), .final_layout = VSL_NAMESPACE::ImageLayout::GENERAL});
         VSL_NAMESPACE::RenderPass pass(device, description);
         VSL_NAMESPACE::FrameBuffer target(pass, 8, 8, {image});
         AHO_NAMESPACE::ImageReadback reader(manager);
@@ -397,17 +397,17 @@ namespace {
         {
             AHO_NAMESPACE::DrawPhase phase(*engine, [&](auto& stream) { stream << VSL_NAMESPACE::command::RenderPassBegin(target); }, [&](auto& stream) {
                     stream << VSL_NAMESPACE::command::RenderPassEnd{};
-                    ticket = reader.record(phase, image, VSL_NAMESPACE::ImageLayout::General);
+                    ticket = reader.record(phase, image, VSL_NAMESPACE::ImageLayout::GENERAL);
                     throw std::runtime_error("finish callback failed"); });
         }
         ASSERT_TRUE(ticket);
-        EXPECT_EQ(ticket->status(), VSL_NAMESPACE::Completion::Status::Cancelled);
+        EXPECT_EQ(ticket->status(), VSL_NAMESPACE::Completion::Status::CANCELLED);
         EXPECT_THROW(ticket->read(), std::logic_error);
         EXPECT_EQ(AHO_NAMESPACE::THREAD_LOCAL_DRAW_PHASE, nullptr);
         {
             AHO_NAMESPACE::DrawPhase next(*engine);
         }
-        manager.waitIdle();
+        manager.wait_idle();
     }
     TEST_F(DrawPhaseVulkanIntegration, ThrowingInitializerRestoresCurrentPhaseAndAllowsNextFrame) {
         ASSERT_NO_THROW(start_engine());
@@ -416,7 +416,7 @@ namespace {
         {
             AHO_NAMESPACE::DrawPhase next(*engine);
         }
-        engine->_data->command_manager.waitIdle();
+        engine->data_->command_manager.wait_idle();
     }
     TEST_F(DrawPhaseVulkanIntegration, StackUnwindingCancelsFrameWithoutInvokingFinishCallback) {
         ASSERT_NO_THROW(start_engine());
@@ -431,7 +431,7 @@ namespace {
         {
             AHO_NAMESPACE::DrawPhase next(*engine);
         }
-        engine->_data->command_manager.waitIdle();
+        engine->data_->command_manager.wait_idle();
     }
 
 } // namespace

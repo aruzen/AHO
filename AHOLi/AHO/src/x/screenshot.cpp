@@ -24,21 +24,21 @@ namespace AHO_NAMESPACE::x {
     };
 
     namespace {
-        bool isBgra(VSL_NAMESPACE::data_format::___Format format);
+        bool is_bgra(VSL_NAMESPACE::data_format::Format format);
     } // namespace
 
     Screenshot::Data::Data(std::shared_ptr<window::WindowData> window, VSL_NAMESPACE::CommandManager manager)
         : window(std::move(window)), reader(std::move(manager)) {}
 
     namespace {
-        bool isBgra(VSL_NAMESPACE::data_format::___Format format) {
-            using enum VSL_NAMESPACE::data_format::___FormatTypes;
+        bool is_bgra(VSL_NAMESPACE::data_format::Format format) {
+            using enum VSL_NAMESPACE::data_format::FormatTypes;
             switch (format.type()) {
-                case Srgb8RGBA:
-                case UnsignedNormalized8RGBA:
+                case SRGB8_RGBA:
+                case UNSIGNED_NORMALIZED8_RGBA:
                     return false;
-                case Srgb8BGRA:
-                case UnsignedNormalized8BGRA:
+                case SRGB8_BGRA:
+                case UNSIGNED_NORMALIZED8_BGRA:
                     return true;
                 default:
                     throw std::invalid_argument("Screenshot requires RGBA8 or BGRA8 pixels");
@@ -46,28 +46,28 @@ namespace AHO_NAMESPACE::x {
         }
     } // namespace
 
-    void saveScreenshot(const ImagePixels& pixels, const std::filesystem::path& path) {
-        const bool bgra = isBgra(pixels.format);
+    void save_screenshot(const ImagePixels& pixels, const std::filesystem::path& path) {
+        const bool bgra = is_bgra(pixels.format);
         // エンコーダー内部の符号付き整数演算と作業領域にも余裕を確保する。
         constexpr auto limit = std::size_t(std::numeric_limits<int>::max()) / 2;
         if (!pixels.width || !pixels.height || pixels.width > (limit - 1) / 4)
             throw std::invalid_argument("Invalid screenshot dimensions");
-        const auto rowBytes = std::size_t(pixels.width) * 4;
-        if (pixels.height > limit / (rowBytes + 1))
+        const auto row_bytes = std::size_t(pixels.width) * 4;
+        if (pixels.height > limit / (row_bytes + 1))
             throw std::invalid_argument("Screenshot is too large to encode");
-        if (pixels.rowStride < rowBytes || pixels.rowStride > std::size_t(std::numeric_limits<int>::max()) ||
-            pixels.bytes.size() < rowBytes ||
-            pixels.height - 1 > (pixels.bytes.size() - rowBytes) / pixels.rowStride)
+        if (pixels.row_stride < row_bytes || pixels.row_stride > std::size_t(std::numeric_limits<int>::max()) ||
+            pixels.bytes.size() < row_bytes ||
+            pixels.height - 1 > (pixels.bytes.size() - row_bytes) / pixels.row_stride)
             throw std::invalid_argument("Screenshot pixel storage is too small");
         std::vector<std::byte> converted;
         auto* source = reinterpret_cast<const unsigned char*>(pixels.bytes.data());
-        auto stride = pixels.rowStride;
+        auto stride = pixels.row_stride;
         if (bgra) {
-            converted.resize(rowBytes * pixels.height);
+            converted.resize(row_bytes * pixels.height);
             for (std::size_t y = 0; y < pixels.height; ++y) {
-                const auto* input = pixels.bytes.data() + y * pixels.rowStride;
-                auto* output = converted.data() + y * rowBytes;
-                for (std::size_t x = 0; x < rowBytes; x += 4) {
+                const auto* input = pixels.bytes.data() + y * pixels.row_stride;
+                auto* output = converted.data() + y * row_bytes;
+                for (std::size_t x = 0; x < row_bytes; x += 4) {
                     output[x] = input[x + 2];
                     output[x + 1] = input[x + 1];
                     output[x + 2] = input[x];
@@ -75,7 +75,7 @@ namespace AHO_NAMESPACE::x {
                 }
             }
             source = reinterpret_cast<const unsigned char*>(converted.data());
-            stride = rowBytes;
+            stride = row_bytes;
         }
         int size = 0;
         std::unique_ptr<unsigned char, decltype(&std::free)> encoded(
@@ -92,23 +92,23 @@ namespace AHO_NAMESPACE::x {
     }
 
     Screenshot::Screenshot(window::Window window) {
-        if (!window || !window._data2 || !window.engine._data)
+        if (!window || !window.data2 || !window.engine.data_)
             throw std::invalid_argument("Screenshot requires a live AHO window");
         if (THREAD_LOCAL_DRAW_PHASE)
             throw std::logic_error("Create Screenshot outside a DrawPhase");
-        auto& resources = *window._data2;
-        auto manager = window.engine._data->command_manager;
-        (void)isBgra(resources.swapchain.getFormat());
-        auto data = std::make_shared<Data>(window._data2, manager);
-        const auto usage = resources.swapchain.images.at(0).getUsage();
-        if (!VSL_NAMESPACE::contain(usage, VSL_NAMESPACE::ImageType::TransferSrc)) {
-            manager.waitIdle();
-            auto swapchain = VSL_NAMESPACE::Swapchain(manager.getDevice(), resources.surface, resources.swapchain,
-                                                      std::nullopt, std::nullopt, usage | VSL_NAMESPACE::ImageType::TransferSrc);
+        auto& resources = *window.data2;
+        auto manager = window.engine.data_->command_manager;
+        (void)is_bgra(resources.swapchain.get_format());
+        auto data = std::make_shared<Data>(window.data2, manager);
+        const auto usage = resources.swapchain.images.at(0).get_usage();
+        if (!VSL_NAMESPACE::contain(usage, VSL_NAMESPACE::ImageType::TRANSFER_SRC)) {
+            manager.wait_idle();
+            auto swapchain = VSL_NAMESPACE::Swapchain(manager.get_device(), resources.surface, resources.swapchain,
+                                                      std::nullopt, std::nullopt, usage | VSL_NAMESPACE::ImageType::TRANSFER_SRC);
             auto target = VSL_NAMESPACE::FrameBuffer(swapchain, resources.render_pass);
-            if (resources.render_finished.size() != swapchain.getSwapImageSize())
-                resources.render_finished = window.engine._data->synchro_manager.createSemaphore(
-                    window.name() + "ScreenshotFinished", swapchain.getSwapImageSize());
+            if (resources.render_finished.size() != swapchain.get_swap_image_size())
+                resources.render_finished = window.engine.data_->synchro_manager.create_semaphore(
+                    window.name() + "ScreenshotFinished", swapchain.get_swap_image_size());
             resources.swapchain = std::move(swapchain);
             resources.frame_buffer = std::move(target);
         }
@@ -116,24 +116,24 @@ namespace AHO_NAMESPACE::x {
     }
 
     bool Screenshot::capture(DrawPhase& phase) {
-        if (!_data || phase.state != VSL_NAMESPACE::ComputePhase::State::WaitSubmit)
+        if (!_data || phase.state != VSL_NAMESPACE::ComputePhase::State::WAIT_SUBMIT)
             throw std::logic_error("Screenshot requires a recording DrawPhase");
         const auto window = _data->window.lock();
-        if (!window || !phase.engine || phase.engine->getWindow()._data2 != window ||
-            phase.swapchain._data != window->swapchain._data)
+        if (!window || !phase.engine || phase.engine->get_window().data2 != window ||
+            phase.swapchain.data_ != window->swapchain.data_)
             throw std::invalid_argument("DrawPhase belongs to a different or closed window");
-        const auto image = phase.swapchain.images.at(phase.getImageIndex());
-        if (!VSL_NAMESPACE::contain(image.getUsage(), VSL_NAMESPACE::ImageType::TransferSrc))
+        const auto image = phase.swapchain.images.at(phase.get_image_index());
+        if (!VSL_NAMESPACE::contain(image.get_usage(), VSL_NAMESPACE::ImageType::TRANSFER_SRC))
             throw std::logic_error("Window no longer supports screenshot readback");
         const auto status = _data->completion.status();
-        if (status == VSL_NAMESPACE::Completion::Status::Pending || status == VSL_NAMESPACE::Completion::Status::Submitted)
+        if (status == VSL_NAMESPACE::Completion::Status::PENDING || status == VSL_NAMESPACE::Completion::Status::SUBMITTED)
             return false;
         auto finish = [previous = phase.finish, state = _data, &phase, image](auto& stream) {
             if (previous)
                 previous(stream);
             else
                 stream << VSL_NAMESPACE::command::RenderPassEnd{};
-            state->ticket = state->reader.record(phase, image, VSL_NAMESPACE::ImageLayout::Present);
+            state->ticket = state->reader.record(phase, image, VSL_NAMESPACE::ImageLayout::PRESENT);
             if (!state->ticket)
                 throw std::logic_error("Screenshot readback slot is unavailable");
         };
@@ -154,6 +154,6 @@ namespace AHO_NAMESPACE::x {
     }
 
     void Screenshot::save(const std::filesystem::path& path, std::uint64_t timeout) const {
-        saveScreenshot(read(timeout), path);
+        save_screenshot(read(timeout), path);
     }
 } // namespace AHO_NAMESPACE::x

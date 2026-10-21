@@ -12,7 +12,7 @@
 
 namespace aho_test {
     class TempDirectory {
-        inline static std::atomic<unsigned> sequence{0};
+        inline static std::atomic<unsigned> SEQUENCE{0};
 
     public:
         std::filesystem::path path;
@@ -26,7 +26,7 @@ namespace aho_test {
                 const auto* configured_root = std::getenv("AHO_TEST_TMPDIR");
                 const auto root = configured_root ? std::filesystem::path(configured_root) : std::filesystem::temp_directory_path();
                 path = root /
-                       ("aho-test-" + std::to_string(process) + "-" + std::to_string(sequence++));
+                       ("aho-test-" + std::to_string(process) + "-" + std::to_string(SEQUENCE++));
                 if (std::filesystem::create_directory(path))
                     return;
             }

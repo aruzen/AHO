@@ -16,13 +16,13 @@ extern char** environ;
 #endif
 #include <map>
 
-VSL_NAMESPACE::utils::ShaderCompiler::ShaderCompiler(std::filesystem::path glslc_path, std::vector<std::filesystem::path> shader_dirs) : glslc_path(glslc_path), shader_dirs(shader_dirs) {}
+VSL_NAMESPACE::utils::ShaderCompiler::ShaderCompiler(std::filesystem::path glslc_path, std::vector<std::filesystem::path> shader_dirs) : _glslc_path(glslc_path), _shader_dirs(shader_dirs) {}
 
 VSL_NAMESPACE::utils::ShaderCompiler::ShaderCompiler(std::string glslc_str, std::initializer_list<std::string> shader_str) {
-    glslc_path = std::filesystem::path(VSL_NAMESPACE::expand_environments(glslc_str));
-    shader_dirs.reserve(shader_str.size());
+    _glslc_path = std::filesystem::path(VSL_NAMESPACE::expand_environments(glslc_str));
+    _shader_dirs.reserve(shader_str.size());
     for (auto shader_dir : shader_str)
-        shader_dirs.push_back(std::filesystem::path(VSL_NAMESPACE::expand_environments(shader_dir)));
+        _shader_dirs.push_back(std::filesystem::path(VSL_NAMESPACE::expand_environments(shader_dir)));
 }
 
 namespace fs = std::filesystem;
@@ -90,7 +90,7 @@ void VSL_NAMESPACE::utils::ShaderCompiler::load() {
     compiled.clear();
     target.clear();
     std::map<std::string, fs::file_time_type> dates;
-    for (auto shaders_path : shader_dirs) {
+    for (auto shaders_path : _shader_dirs) {
         dates.clear();
         if (!fs::exists(shaders_path) || !fs::exists(shaders_path / "raw") || !fs::is_directory(shaders_path / "raw"))
             continue;
@@ -125,9 +125,9 @@ void VSL_NAMESPACE::utils::ShaderCompiler::compile() {
         const auto source = fs::absolute(path);
         auto destination = source.parent_path().parent_path() / source.filename();
         destination += ".spv";
-        const int status = run_compiler(glslc_path, source, destination);
+        const int status = run_compiler(_glslc_path, source, destination);
         if (status != 0)
             throw exceptions::RuntimeException("ShaderCompiler", "Failed to compile " + path_text(source) +
-                                                                     " using " + path_text(glslc_path) + " (status " + std::to_string(status) + ")");
+                                                                     " using " + path_text(_glslc_path) + " (status " + std::to_string(status) + ")");
     }
 }

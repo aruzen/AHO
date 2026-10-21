@@ -6,9 +6,9 @@
 #include <sstream>
 #if defined(AHO_CONTRACT_POLYGON_LINES_VIEW)
 struct LinesObject {
-    using element_type = double;
-    using dimension = vsl::D2;
-    using coordinate_info = aho::coordinate::_DefaultCoordinateInfo<dimension>::value;
+    using ElementType = double;
+    using Dimension = vsl::D2;
+    using CoordinateInfo = aho::coordinate::DefaultCoordinateInfo<Dimension>::Value;
     int points_calls = 0, lines_calls = 0;
     auto lines() {
         ++lines_calls;
@@ -30,9 +30,9 @@ TEST(PolygonContractTest, CompositeLineViewUsesLinesRatherThanPoints) {
 }
 #elif defined(AHO_CONTRACT_POLYGON_TRIANGLES_VIEW)
 struct TrianglesObject {
-    using element_type = double;
-    using dimension = vsl::D2;
-    using coordinate_info = aho::coordinate::_DefaultCoordinateInfo<dimension>::value;
+    using ElementType = double;
+    using Dimension = vsl::D2;
+    using CoordinateInfo = aho::coordinate::DefaultCoordinateInfo<Dimension>::Value;
     int points_calls = 0, triangles_calls = 0;
     auto triangles() {
         ++triangles_calls;
@@ -69,10 +69,10 @@ namespace {
         EXPECT_EQ(std::ranges::distance(triangles), 1);
         EXPECT_DOUBLE_EQ(triangles.begin()->area(), 6);
     }
-    template<bool X, bool Y, bool Z>
+    template<bool x, bool y, bool z>
     struct PointViewCase {
-        using Info = aho::coordinate::_MakeCoordinateInfo<X, Y, Z>::value;
-        using Point = aho::_Point<double, typename Info::dimension, Info>;
+        using Info = aho::coordinate::MakeCoordinateInfo<x, y, z>::Value;
+        using Point = aho::Point_<double, typename Info::Dimension, Info>;
     };
     using PointViewMasks = testing::Types<PointViewCase<true, false, false>, PointViewCase<false, true, false>,
                                           PointViewCase<false, false, true>, PointViewCase<true, true, false>, PointViewCase<true, false, true>,
@@ -83,18 +83,18 @@ namespace {
     TYPED_TEST(PointViewCoordinateTest, CompositePointSnapshotsKeepTheOriginalCoordinateAxes) {
         using CI = typename TypeParam::Info;
         using P = typename TypeParam::Point;
-        aho::Line<double, typename CI::dimension, CI> line(aho_test::geometry<P>(1, 2, 3), aho_test::geometry<P>(4, 5, 6));
+        aho::Line<double, typename CI::Dimension, CI> line(aho_test::geometry<P>(1, 2, 3), aho_test::geometry<P>(4, 5, 6));
         const auto& source = line;
         const auto points = aho::views::points(source);
         static_assert(std::same_as<std::ranges::range_value_t<decltype(points)>, P>);
         ASSERT_EQ(points.size(), 2u);
         auto check = [](const P& point, double first) {
-            if constexpr (CI::EnabledX)
+            if constexpr (CI::ENABLED_X)
                 EXPECT_EQ(point.value.x.value, first);
-            if constexpr (CI::EnabledY)
-                EXPECT_EQ(point.value.y.value, first + CI::EnabledX);
-            if constexpr (CI::EnabledZ)
-                EXPECT_EQ(point.value.z.value, first + CI::EnabledX + CI::EnabledY);
+            if constexpr (CI::ENABLED_Y)
+                EXPECT_EQ(point.value.y.value, first + CI::ENABLED_X);
+            if constexpr (CI::ENABLED_Z)
+                EXPECT_EQ(point.value.z.value, first + CI::ENABLED_X + CI::ENABLED_Y);
         };
         check(points[0], 1);
         check(points[1], 4);
@@ -112,7 +112,7 @@ namespace {
     TEST(WrapViewTest, NonCommonRangesKeepTheirSentinelAndElementReferences) {
         std::array<int, 5> source{1, 2, 3, 0, 4};
         auto inner = std::views::take_while(source, [](int value) { return value > 0; });
-        aho::views::wrap_view wrapped(inner);
+        aho::views::WrapView wrapped(inner);
         static_assert(!std::ranges::common_range<decltype(inner)>);
         static_assert(std::same_as<std::ranges::sentinel_t<decltype(wrapped)>, std::ranges::sentinel_t<decltype(inner)>>);
         std::vector<int> values;
@@ -124,12 +124,12 @@ namespace {
     }
     TEST(WrapViewTest, NonCommonRangesMayBeEmptyAtTheirFirstElement) {
         std::array<int, 2> source{0, 1};
-        aho::views::wrap_view wrapped(std::views::take_while(source, [](int value) { return value > 0; }));
+        aho::views::WrapView wrapped(std::views::take_while(source, [](int value) { return value > 0; }));
         EXPECT_EQ(wrapped.begin(), wrapped.end());
         EXPECT_TRUE(std::ranges::empty(wrapped));
     }
     TEST(WrapViewTest, MoveOnlyOwningViewsRetainTheirElementsAcrossMoves) {
-        auto wrapped = aho::views::wrap_view(std::views::all(std::vector<int>{1, 2, 3}));
+        auto wrapped = aho::views::WrapView(std::views::all(std::vector<int>{1, 2, 3}));
         static_assert(std::ranges::view<decltype(wrapped)>);
         static_assert(!std::copy_constructible<decltype(wrapped)>);
         auto moved = std::move(wrapped);
@@ -141,7 +141,7 @@ namespace {
         EXPECT_EQ(aho::views::cast<int>(values), (std::vector<int>{1, 2, 3}));
         std::vector<double> empty;
         EXPECT_TRUE(aho::views::cast<int>(empty).empty());
-        aho::views::wrap_view view(std::views::all(values));
+        aho::views::WrapView view(std::views::all(values));
         EXPECT_EQ(std::ranges::distance(view.begin(), view.end()), 3);
         *view.begin() = 9;
         EXPECT_DOUBLE_EQ(values[0], 9);
@@ -183,9 +183,9 @@ namespace {
         using L = aho::Line<double, vsl::D2>;
         using Triangle = aho::Triangle<double, vsl::D2>;
         struct Shape {
-            using dimension = vsl::D2;
-            using element_type = double;
-            using coordinate_info = aho::coordinate::_DefaultCoordinateInfo<dimension>::value;
+            using Dimension = vsl::D2;
+            using ElementType = double;
+            using CoordinateInfo = aho::coordinate::DefaultCoordinateInfo<Dimension>::Value;
             std::forward_list<P> vertices{P(0, 0), P(3, 4)};
             std::forward_list<L> edges{L(P(0, 0), P(3, 4))};
             std::forward_list<Triangle> faces{Triangle(P(0, 0), P(3, 0), P(0, 4))};
@@ -213,9 +213,9 @@ namespace {
 
     TEST(PolygonConceptsTest, UnrelatedTypesWithMatchingAliasesAreNotGeometricObjects) {
         struct PretendShape {
-            using dimension = vsl::D2;
-            using element_type = double;
-            using coordinate_info = aho::coordinate::_DefaultCoordinateInfo<dimension>::value;
+            using Dimension = vsl::D2;
+            using ElementType = double;
+            using CoordinateInfo = aho::coordinate::DefaultCoordinateInfo<Dimension>::Value;
         };
         EXPECT_FALSE(aho::concepts::is_line<PretendShape>);
         EXPECT_FALSE(aho::concepts::is_triangle<PretendShape>);
@@ -223,15 +223,15 @@ namespace {
     }
     TEST(PolygonViewsTest, CompositeViewsSupportEmptyCollectionsWithoutPointViews) {
         struct LinesOnly {
-            using element_type = double;
-            using dimension = vsl::D2;
-            using coordinate_info = aho::coordinate::_DefaultCoordinateInfo<dimension>::value;
+            using ElementType = double;
+            using Dimension = vsl::D2;
+            using CoordinateInfo = aho::coordinate::DefaultCoordinateInfo<Dimension>::Value;
             auto lines() { return std::array<aho::Line<double, vsl::D2>, 0>{}; }
         } lines;
         struct TrianglesOnly {
-            using element_type = double;
-            using dimension = vsl::D2;
-            using coordinate_info = aho::coordinate::_DefaultCoordinateInfo<dimension>::value;
+            using ElementType = double;
+            using Dimension = vsl::D2;
+            using CoordinateInfo = aho::coordinate::DefaultCoordinateInfo<Dimension>::Value;
             auto triangles() { return std::array<aho::Triangle<double, vsl::D2>, 0>{}; }
         } triangles;
         EXPECT_TRUE(aho::views::lines(lines).empty());
@@ -243,8 +243,8 @@ namespace {
     TYPED_TEST_SUITE(DerivedShapeTest, aho_test::GeometryCases);
     TYPED_TEST(DerivedShapeTest, SingleShapeViewsPreserveTheDerivedTypeAndSnapshot) {
         using P = typename TypeParam::Point;
-        using L = aho::Line<typename TypeParam::element_type, typename TypeParam::dimension>;
-        using Triangle = aho::Triangle<typename TypeParam::element_type, typename TypeParam::dimension>;
+        using L = aho::Line<typename TypeParam::ElementType, typename TypeParam::Dimension>;
+        using Triangle = aho::Triangle<typename TypeParam::ElementType, typename TypeParam::Dimension>;
         struct DerivedLine : L {
             using L::L;
             int marker = 17;
@@ -272,8 +272,8 @@ namespace {
     }
     TYPED_TEST(DerivedShapeTest, CompositeViewsAcceptCollectionsOfPubliclyDerivedShapes) {
         using P = typename TypeParam::Point;
-        using L = aho::Line<typename TypeParam::element_type, typename TypeParam::dimension>;
-        using Triangle = aho::Triangle<typename TypeParam::element_type, typename TypeParam::dimension>;
+        using L = aho::Line<typename TypeParam::ElementType, typename TypeParam::Dimension>;
+        using Triangle = aho::Triangle<typename TypeParam::ElementType, typename TypeParam::Dimension>;
         struct DerivedLine : L {
             using L::L;
         };
@@ -281,9 +281,9 @@ namespace {
             using Triangle::Triangle;
         };
         struct Collection {
-            using element_type = typename TypeParam::element_type;
-            using dimension = typename TypeParam::dimension;
-            using coordinate_info = typename P::coordinate_info;
+            using ElementType = typename TypeParam::ElementType;
+            using Dimension = typename TypeParam::Dimension;
+            using CoordinateInfo = typename P::CoordinateInfo;
             DerivedLine edge;
             DerivedTriangle face;
             auto lines() const { return std::array{edge}; }
@@ -303,8 +303,8 @@ namespace {
         aho_test::expect_coordinates(triangles[0].pos3, 7, 8, 9);
     }
     TEST(PolygonConceptsTest, ShapesKeepTheirCustomCoordinatePlane) {
-        using CI = aho::coordinate::_MakeCoordinateInfo<false, true, true>::value;
-        using P = aho::_Point<double, vsl::D2, CI>;
+        using CI = aho::coordinate::MakeCoordinateInfo<false, true, true>::Value;
+        using P = aho::Point_<double, vsl::D2, CI>;
         using L = aho::Line<double, vsl::D2, CI>;
         using Triangle = aho::Triangle<double, vsl::D2, CI>;
         struct DerivedLine : L {
@@ -316,8 +316,8 @@ namespace {
         static_assert(aho::concepts::is_line<DerivedLine> && aho::concepts::is_triangle<DerivedTriangle>);
         const auto lines = aho::views::lines(DerivedLine(P(1, 2), P(3, 4)));
         const auto triangles = aho::views::triangles(DerivedTriangle(P(1, 2), P(3, 4), P(5, 6)));
-        static_assert(std::same_as<typename std::ranges::range_value_t<decltype(lines)>::coordinate_info, CI>);
-        static_assert(std::same_as<typename std::ranges::range_value_t<decltype(triangles)>::coordinate_info, CI>);
+        static_assert(std::same_as<typename std::ranges::range_value_t<decltype(lines)>::CoordinateInfo, CI>);
+        static_assert(std::same_as<typename std::ranges::range_value_t<decltype(triangles)>::CoordinateInfo, CI>);
         EXPECT_EQ(lines.begin()->pos2.value.y.value, 3);
         EXPECT_EQ(lines.begin()->pos2.value.z.value, 4);
         EXPECT_EQ(triangles.begin()->pos3.value.y.value, 5);
@@ -327,26 +327,26 @@ namespace {
         using L = aho::Line<double, vsl::D2>;
         using Triangle = aho::Triangle<double, vsl::D2>;
         struct FromLine {
-            using element_type = double;
-            using dimension = vsl::D2;
-            using coordinate_info = L::coordinate_info;
+            using ElementType = double;
+            using Dimension = vsl::D2;
+            using CoordinateInfo = L::CoordinateInfo;
             FromLine(L) {}
         };
         struct FromTriangle {
-            using element_type = double;
-            using dimension = vsl::D2;
-            using coordinate_info = Triangle::coordinate_info;
+            using ElementType = double;
+            using Dimension = vsl::D2;
+            using CoordinateInfo = Triangle::CoordinateInfo;
             FromTriangle(Triangle) {}
         };
         struct PrivateLine : private L {
-            using element_type = double;
-            using dimension = vsl::D2;
-            using coordinate_info = L::coordinate_info;
+            using ElementType = double;
+            using Dimension = vsl::D2;
+            using CoordinateInfo = L::CoordinateInfo;
         };
         struct PrivateTriangle : private Triangle {
-            using element_type = double;
-            using dimension = vsl::D2;
-            using coordinate_info = Triangle::coordinate_info;
+            using ElementType = double;
+            using Dimension = vsl::D2;
+            using CoordinateInfo = Triangle::CoordinateInfo;
         };
         EXPECT_FALSE(aho::concepts::is_line<FromLine>);
         EXPECT_FALSE(aho::concepts::is_triangle<FromTriangle>);
@@ -358,12 +358,12 @@ namespace {
 #endif
 
 namespace {
-    template<typename Dimension>
+    template<typename Dimension_>
     struct DimensionMetadataShapes {
-        using element_type = double;
-        using dimension = Dimension;
+        using ElementType = double;
+        using Dimension = Dimension_;
         using P = aho::d2::PointD;
-        using coordinate_info = P::coordinate_info;
+        using CoordinateInfo = P::CoordinateInfo;
         auto points() const { return std::array{P(1, 2), P(3, 4)}; }
         auto lines() const { return std::array{aho::Line<double, vsl::D2>(P(1, 2), P(3, 4))}; }
         auto triangles() const { return std::array{aho::Triangle<double, vsl::D2>(P(0, 0), P(3, 0), P(0, 4))}; }

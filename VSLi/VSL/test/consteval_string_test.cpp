@@ -1,14 +1,14 @@
 #include <VSL/consteval_string.hpp>
 // The public stream alias must be complete before any other headers are included.
-static_assert(sizeof(vsl::default_using::stringstream) > 0);
+static_assert(sizeof(vsl::default_using::Stringstream) > 0);
 #include <gtest/gtest.h>
 
 namespace {
     static_assert(vsl::is_supported_charsets<char> && vsl::is_supported_charsets<char8_t>);
     static_assert(vsl::is_supported_charsets<wchar_t> && vsl::is_supported_charsets<char16_t>);
     static_assert(vsl::is_supported_charsets<char32_t> && !vsl::is_supported_charsets<int>);
-    constexpr vsl::helper::constant_string_holder holder("AHO");
-    static_assert(holder.size == 4 && holder.value[3] == '\0');
+    constexpr vsl::helper::ConstantStringHolder HOLDER("AHO");
+    static_assert(HOLDER.SIZE == 4 && HOLDER.value[3] == '\0');
     static_assert(VSL_T_CHAR_PREFIX(char, 'a') == 'a');
     static_assert(VSL_T_CHAR_PREFIX(char8_t, 'a') == u8'a');
     static_assert(VSL_T_CHAR_PREFIX(wchar_t, 'a') == L'a');
@@ -38,13 +38,13 @@ namespace {
         EXPECT_EQ(value.get<char32_t>(), U'z');
     }
     TEST(ConstantStringTest, DefaultStringStreamSupportsFormattedOutput) {
-        vsl::default_using::stringstream stream;
+        vsl::default_using::Stringstream stream;
         stream << "value=" << 7 << '/' << 2.5;
         EXPECT_EQ(stream.str(), "value=7/2.5");
-        static_assert(std::same_as<decltype(stream.str()), vsl::default_using::string>);
+        static_assert(std::same_as<decltype(stream.str()), vsl::default_using::String>);
     }
     TEST(ConstantStringTest, DefaultCharacterMacrosUseSelectedCharacterType) {
-        using character = char16_t;
+        using Character = char16_t;
         EXPECT_EQ((VSL_CHAR_PREFIX('x')), u'x');
         EXPECT_EQ(VSL_STR_PREFIX("text"), u"text");
         EXPECT_EQ(std::u16string(VSL_PREFIX("text")), u"text");

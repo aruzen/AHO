@@ -12,7 +12,7 @@ namespace AHO_NAMESPACE::input {
     class KeyBoard : public abstract::Characters {
         friend AHO_NAMESPACE::InputManager;
 
-        void* context = nullptr;
+        void* _context = nullptr;
 
         KeyBoard(void* context);
 

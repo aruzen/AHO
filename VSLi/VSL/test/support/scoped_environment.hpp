@@ -6,26 +6,26 @@
 
 namespace vsl_test {
     class ScopedEnvironment {
-        std::string name_;
-        std::optional<std::string> previous_;
+        std::string _name;
+        std::optional<std::string> _previous;
 
     public:
-        ScopedEnvironment(std::string name, const char* value) : name_(std::move(name)) {
-            if (const auto* previous = std::getenv(name_.c_str()))
-                previous_ = previous;
+        ScopedEnvironment(std::string name, const char* value) : _name(std::move(name)) {
+            if (const auto* previous = std::getenv(_name.c_str()))
+                _previous = previous;
             set(value);
         }
         ~ScopedEnvironment() {
-            set(previous_ ? previous_->c_str() : nullptr);
+            set(_previous ? _previous->c_str() : nullptr);
         }
         void set(const char* value) const {
 #ifdef _WIN32
-            _putenv_s(name_.c_str(), value ? value : "");
+            _putenv_s(_name.c_str(), value ? value : "");
 #else
             if (value)
-                setenv(name_.c_str(), value, 1);
+                setenv(_name.c_str(), value, 1);
             else
-                unsetenv(name_.c_str());
+                unsetenv(_name.c_str());
 #endif
         }
     };

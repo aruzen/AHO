@@ -16,21 +16,21 @@ std::string AHO_NAMESPACE::input::CodeID<AHO_NAMESPACE::input::KeyCode>::name() 
 template<>
 std::string AHO_NAMESPACE::input::CodeID<AHO_NAMESPACE::input::MouseCode>::name() const {
     switch (_code) {
-        case MouseCode::LeftClick:
+        case MouseCode::LEFT_CLICK:
             return "LeftClick";
-        case MouseCode::RightClick:
+        case MouseCode::RIGHT_CLICK:
             return "RightClick";
-        case MouseCode::MiddleButton:
+        case MouseCode::MIDDLE_BUTTON:
             return "MiddleButton";
-        case MouseCode::Button4:
+        case MouseCode::BUTTON4:
             return "Button4";
-        case MouseCode::Button5:
+        case MouseCode::BUTTON5:
             return "Button5";
-        case MouseCode::Button6:
+        case MouseCode::BUTTON6:
             return "Button6";
-        case MouseCode::Button7:
+        case MouseCode::BUTTON7:
             return "Button7";
-        case MouseCode::Button8:
+        case MouseCode::BUTTON8:
             return "Button8";
     }
     return {};

@@ -25,7 +25,7 @@ namespace VSL_NAMESPACE {
         struct WindowData;
         struct OnUpdate {
             virtual ~OnUpdate() = default;
-            virtual bool onUpdate(VSL_NAMESPACE::PureWindow) = 0;
+            virtual bool on_update(VSL_NAMESPACE::PureWindow) = 0;
         };
 
         struct WindowData {
@@ -44,11 +44,11 @@ namespace VSL_NAMESPACE {
         static std::vector<std::shared_ptr<WindowData>> WINDOWS;
 
     private:
-        static bool inited;
+        static bool INITED;
 
     public:
         PureWindow(std::string name, int width = 800, int height = 600);
-        PureWindow(std::shared_ptr<WindowData> _data);
+        PureWindow(std::shared_ptr<WindowData> data_);
         PureWindow(const PureWindow&) = default;
         PureWindow& operator=(const PureWindow&) = default;
         PureWindow(PureWindow&&) = default;
@@ -74,7 +74,7 @@ namespace VSL_NAMESPACE {
         bool operator==(const PureWindow& o);
         bool operator==(const PureWindow::WindowData* o);
 
-        std::shared_ptr<WindowData> _data;
+        std::shared_ptr<WindowData> data_;
     };
 
     class Window : public PureWindow {
@@ -90,23 +90,23 @@ namespace VSL_NAMESPACE {
         std::shared_ptr<Plugin> p = std::static_pointer_cast<Plugin>(t);
 
         if (t->id == 0) {
-            auto candidate = _data->plugins_next_id;
-            while (_data->plugins.contains(candidate)) {
+            auto candidate = data_->plugins_next_id;
+            while (data_->plugins.contains(candidate)) {
                 candidate = static_cast<unsigned char>(candidate + 1);
-                if (candidate == _data->plugins_next_id)
+                if (candidate == data_->plugins_next_id)
                     throw exceptions::RuntimeException("window", "No free window plugin IDs available");
             }
             p->id = candidate;
-            _data->plugins_next_id = static_cast<unsigned char>(candidate + 1);
+            data_->plugins_next_id = static_cast<unsigned char>(candidate + 1);
         }
 
-        if (const auto previous = _data->plugins.find(p->id); previous != _data->plugins.end())
+        if (const auto previous = data_->plugins.find(p->id); previous != data_->plugins.end())
             if (auto listener = std::dynamic_pointer_cast<OnUpdate>(previous->second))
-                std::erase(_data->update, listener);
+                std::erase(data_->update, listener);
 
-        _data->plugins[t->id] = p;
+        data_->plugins[t->id] = p;
         if (auto listener = std::dynamic_pointer_cast<OnUpdate>(p))
-            _data->update.push_back(listener);
+            data_->update.push_back(listener);
 
         return t;
     }
@@ -116,12 +116,12 @@ namespace VSL_NAMESPACE {
         std::shared_ptr<Plugin> p = std::static_pointer_cast<Plugin>(t);
         if (!p)
             return false;
-        const auto entry = this->_data->plugins.find(p->id);
-        if (entry == this->_data->plugins.end() || entry->second != p)
+        const auto entry = this->data_->plugins.find(p->id);
+        if (entry == this->data_->plugins.end() || entry->second != p)
             return false;
         if (auto listener = std::dynamic_pointer_cast<OnUpdate>(p))
-            std::erase(this->_data->update, listener);
-        this->_data->plugins.erase(entry);
+            std::erase(this->data_->update, listener);
+        this->data_->plugins.erase(entry);
         return true;
     }
 } // namespace VSL_NAMESPACE

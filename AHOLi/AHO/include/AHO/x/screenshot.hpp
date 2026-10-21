@@ -12,7 +12,7 @@ namespace AHO_NAMESPACE {
 
 namespace AHO_NAMESPACE::x {
     // RGBA8またはBGRA8の画素をPNGで保存する。行の順序とアルファ値を維持する。
-    void saveScreenshot(const ImagePixels& pixels, const std::filesystem::path& path);
+    void save_screenshot(const ImagePixels& pixels, const std::filesystem::path& path);
 
     // 描画ループの外で作成し、転送用バッファを再利用する。コピーすると撮影結果を共有する。
     class Screenshot {

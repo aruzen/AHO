@@ -4,52 +4,52 @@ namespace {
     using CommandVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
     TEST_F(CommandVulkanIntegrationTest, PoolAndBuffersShareExpectedOwnerAndCanReset) {
         auto pool = make_pool();
-        vsl::CommandPool borrowed(pool._data);
-        EXPECT_EQ(borrowed._data, pool._data);
+        vsl::CommandPool borrowed(pool.data_);
+        EXPECT_EQ(borrowed.data_, pool.data_);
         vsl::CommandBuffer buffers(pool, 2);
-        EXPECT_EQ(buffers.getSize(), 2u);
-        EXPECT_EQ(buffers.getCurrentBufferIdx(), 0u);
-        EXPECT_EQ(buffers._data->commandPool, pool._data);
-        vsl::CommandBuffer shared(buffers._data);
-        EXPECT_EQ(shared._data, buffers._data);
+        EXPECT_EQ(buffers.get_size(), 2u);
+        EXPECT_EQ(buffers.get_current_buffer_idx(), 0u);
+        EXPECT_EQ(buffers.data_->command_pool, pool.data_);
+        vsl::CommandBuffer shared(buffers.data_);
+        EXPECT_EQ(shared.data_, buffers.data_);
         buffers.reset(0);
         buffers.reset();
-        EXPECT_EQ(shared.getCurrentBufferIdx(), 0u);
+        EXPECT_EQ(shared.get_current_buffer_idx(), 0u);
     }
     TEST_F(CommandVulkanIntegrationTest, NextCyclesThroughEveryBufferAndSharedViewsObserveTheSameIndex) {
         auto pool = make_pool();
         vsl::CommandBuffer buffers(pool, 3);
-        vsl::CommandBuffer shared(buffers._data);
+        vsl::CommandBuffer shared(buffers.data_);
         for (const auto expected : {1u, 2u, 0u, 1u}) {
             buffers.next();
-            EXPECT_EQ(buffers.getCurrentBufferIdx(), expected);
-            EXPECT_EQ(shared.getCurrentBufferIdx(), expected);
-            EXPECT_EQ(buffers.getSize(), 3u);
+            EXPECT_EQ(buffers.get_current_buffer_idx(), expected);
+            EXPECT_EQ(shared.get_current_buffer_idx(), expected);
+            EXPECT_EQ(buffers.get_size(), 3u);
         }
     }
     TEST_F(CommandVulkanIntegrationTest, NextOnASingleBufferAndManagerViewsPreservesOwnership) {
         auto manager = make_manager();
-        auto single = manager.makeExclusiveBuffer();
+        auto single = manager.make_exclusive_buffer();
         single.next();
         single.next();
-        EXPECT_EQ(single.getCurrentBufferIdx(), 0u);
-        auto current = manager.getBuffer();
+        EXPECT_EQ(single.get_current_buffer_idx(), 0u);
+        auto current = manager.get_buffer();
         current.next();
-        EXPECT_EQ(manager.getCurrentBufferIdx(), 1u);
-        EXPECT_EQ(manager.getBuffer()._data, current._data);
+        EXPECT_EQ(manager.get_current_buffer_idx(), 1u);
+        EXPECT_EQ(manager.get_buffer().data_, current.data_);
     }
     TEST_F(CommandVulkanIntegrationTest, ManagerAccessorsAndExclusiveBuffersPreserveOwnership) {
         auto manager = make_manager();
-        vsl::CommandManager shared(manager._data);
-        EXPECT_EQ(shared._data, manager._data);
-        EXPECT_EQ(manager.getPool()._data, manager._data->commandPool);
-        EXPECT_EQ(manager.getBuffer()._data, manager._data->commandBuffer);
-        EXPECT_EQ(manager.getCurrentBufferIdx(), manager.getBuffer().getCurrentBufferIdx());
-        auto exclusive = manager.makeExclusiveBuffer(2);
-        EXPECT_EQ(exclusive.getSize(), 2u);
-        EXPECT_NE(exclusive._data, manager.getBuffer()._data);
-        EXPECT_EQ(exclusive._data->commandPool, manager.getPool()._data);
-        EXPECT_NE(exclusive._data->commandBuffers[0], manager.getBuffer()._data->commandBuffers[0]);
+        vsl::CommandManager shared(manager.data_);
+        EXPECT_EQ(shared.data_, manager.data_);
+        EXPECT_EQ(manager.get_pool().data_, manager.data_->command_pool);
+        EXPECT_EQ(manager.get_buffer().data_, manager.data_->command_buffer);
+        EXPECT_EQ(manager.get_current_buffer_idx(), manager.get_buffer().get_current_buffer_idx());
+        auto exclusive = manager.make_exclusive_buffer(2);
+        EXPECT_EQ(exclusive.get_size(), 2u);
+        EXPECT_NE(exclusive.data_, manager.get_buffer().data_);
+        EXPECT_EQ(exclusive.data_->command_pool, manager.get_pool().data_);
+        EXPECT_NE(exclusive.data_->command_buffers[0], manager.get_buffer().data_->command_buffers[0]);
     }
     struct CommandShape {
         void invoke(vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager);
@@ -64,23 +64,23 @@ namespace {
 } // namespace
 
 namespace {
-    struct DestructionProbe : vsl::command::__Command, vsl::command::__DelegateCommand, vsl::command::__PipelineHolder, vsl::command::__PipelineRequire, vsl::command::__VertexSizeHolder, vsl::command::__VertexSizeRequire {
+    struct DestructionProbe : vsl::command::Command, vsl::command::DelegateCommand, vsl::command::PipelineHolder, vsl::command::PipelineRequire, vsl::command::VertexSizeHolder, vsl::command::VertexSizeRequire {
         int& destroyed;
         explicit DestructionProbe(int& destroyed) : destroyed(destroyed) {}
         ~DestructionProbe() { ++destroyed; }
         void invoke(vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) override {}
         void invoke(vsl::DefaultPhaseStream&, vsl::CommandPool, vsl::CommandBuffer,
                     vsl::CommandManager) override {}
-        vsl::PipelineAccessor getPipeline() override { return {}; }
-        void setPipeline(std::optional<vsl::PipelineAccessor>) override {}
-        std::size_t getVertexSize() override { return 0; }
-        void setVertexSize(std::optional<std::size_t>) override {}
+        vsl::PipelineAccessor get_pipeline() override { return {}; }
+        void set_pipeline(std::optional<vsl::PipelineAccessor>) override {}
+        std::size_t get_vertex_size() override { return 0; }
+        void set_vertex_size(std::optional<std::size_t>) override {}
     };
     template<class T>
     class CommandInterfaceLifetimeTest : public testing::Test {};
-    using CommandInterfaces = testing::Types<vsl::command::__Command, vsl::command::__DelegateCommand,
-                                             vsl::command::__PipelineHolder, vsl::command::__PipelineRequire,
-                                             vsl::command::__VertexSizeHolder, vsl::command::__VertexSizeRequire>;
+    using CommandInterfaces = testing::Types<vsl::command::Command, vsl::command::DelegateCommand,
+                                             vsl::command::PipelineHolder, vsl::command::PipelineRequire,
+                                             vsl::command::VertexSizeHolder, vsl::command::VertexSizeRequire>;
     TYPED_TEST_SUITE(CommandInterfaceLifetimeTest, CommandInterfaces);
     TYPED_TEST(CommandInterfaceLifetimeTest, UniqueOwnershipThroughTheBaseDestroysTheCompleteCommandOnce) {
         static_assert(std::has_virtual_destructor_v<TypeParam>);
@@ -99,20 +99,20 @@ namespace {
     using CommandResourceVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
     TEST_F(CommandResourceVulkanIntegrationTest, VertexBindingAddsAnOwnerToTheRecordingSubmission) {
         auto manager = make_manager();
-        vsl::StagingBuffer<vsl::MemoryType::VertexBuffer> vertex(device, 32);
-        const auto owners = vertex._data.use_count();
-        auto phase = manager.startPhase<vsl::ComputePhase>();
+        vsl::StagingBuffer<vsl::MemoryType::VERTEX_BUFFER> vertex(device, 32);
+        const auto owners = vertex.data_.use_count();
+        auto phase = manager.start_phase<vsl::ComputePhase>();
         phase << vsl::command::BindVertexBuffer(vertex);
-        EXPECT_GT(vertex._data.use_count(), owners);
+        EXPECT_GT(vertex.data_.use_count(), owners);
         phase.cancel();
     }
     TEST_F(CommandResourceVulkanIntegrationTest, IndexBindingAddsAnOwnerToTheRecordingSubmission) {
         auto manager = make_manager();
-        vsl::StagingBuffer<vsl::MemoryType::IndexBuffer> indices(device, 12);
-        const auto owners = indices._data.use_count();
-        auto phase = manager.startPhase<vsl::ComputePhase>();
+        vsl::StagingBuffer<vsl::MemoryType::INDEX_BUFFER> indices(device, 12);
+        const auto owners = indices.data_.use_count();
+        auto phase = manager.start_phase<vsl::ComputePhase>();
         phase << vsl::command::BindIndexBuffer(indices);
-        EXPECT_GT(indices._data.use_count(), owners);
+        EXPECT_GT(indices.data_.use_count(), owners);
         phase.cancel();
     }
 } // namespace
@@ -120,20 +120,20 @@ namespace {
 namespace {
     TEST_F(CommandResourceVulkanIntegrationTest, CancellationReleasesRetainedBuffersWhenTheTokenIsDropped) {
         auto manager = make_manager();
-        std::weak_ptr<vsl::_impl::Buffer_impl> weak;
+        std::weak_ptr<vsl::impl::BufferImpl> weak;
         vsl::Completion cancelled;
         {
-            auto phase = manager.startPhase<vsl::ComputePhase>();
+            auto phase = manager.start_phase<vsl::ComputePhase>();
             cancelled = phase.completion();
             {
-                vsl::StagingBuffer<vsl::MemoryType::VertexBuffer> vertex(device, 32);
-                weak = vertex._data;
+                vsl::StagingBuffer<vsl::MemoryType::VERTEX_BUFFER> vertex(device, 32);
+                weak = vertex.data_;
                 phase << vsl::command::BindVertexBuffer(vertex);
             }
             EXPECT_FALSE(weak.expired());
             phase.cancel();
         }
-        EXPECT_EQ(cancelled.status(), vsl::Completion::Status::Cancelled);
+        EXPECT_EQ(cancelled.status(), vsl::Completion::Status::CANCELLED);
         EXPECT_FALSE(weak.expired());
         cancelled = {};
         EXPECT_TRUE(weak.expired());
@@ -142,17 +142,17 @@ namespace {
         auto manager = make_manager();
         std::weak_ptr<int> weak;
         {
-            auto phase = manager.startPhase<vsl::ComputePhase>();
+            auto phase = manager.start_phase<vsl::ComputePhase>();
             auto owner = std::make_shared<int>(42);
             weak = owner;
-            manager.getBuffer().retain(owner);
-            EXPECT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::Success);
+            manager.get_buffer().retain(owner);
+            EXPECT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
             ASSERT_TRUE(phase.completion().wait());
         }
         EXPECT_FALSE(weak.expired());
         {
-            auto phase = manager.startPhase<vsl::ComputePhase>();
-            EXPECT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::Success);
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            EXPECT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
             ASSERT_TRUE(phase.completion().wait());
         }
         EXPECT_TRUE(weak.expired());

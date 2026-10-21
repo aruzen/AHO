@@ -14,17 +14,17 @@ namespace VSL_NAMESPACE {
 namespace AHO_NAMESPACE {
     struct ImagePixels {
         std::uint32_t width = 0, height = 0;
-        std::size_t rowStride = 0;
-        VSL_NAMESPACE::data_format::___Format format = VSL_NAMESPACE::data_format::Undefined;
+        std::size_t row_stride = 0;
+        VSL_NAMESPACE::data_format::Format format = VSL_NAMESPACE::data_format::UNDEFINED;
         // 画素は隙間なく格納する。エンコードや色変換は呼び出し側で行う。
         std::vector<std::byte> bytes;
     };
     struct ImageReadbackInfo {
         // requestIdは共有する読み戻しオブジェクト内で一意。frameIdは呼び出し側で指定する。
-        std::uint64_t requestId = 0, frameId = 0;
+        std::uint64_t request_id = 0, frame_id = 0;
         VSL_NAMESPACE::ImageRegion region;
-        VSL_NAMESPACE::data_format::___Format format = VSL_NAMESPACE::data_format::Undefined;
-        std::size_t rowStride = 0, byteSize = 0;
+        VSL_NAMESPACE::data_format::Format format = VSL_NAMESPACE::data_format::UNDEFINED;
+        std::size_t row_stride = 0, byte_size = 0;
     };
     class ImageReadbackTicket {
         struct Data;
@@ -49,28 +49,28 @@ namespace AHO_NAMESPACE {
         std::shared_ptr<Data> _data;
 
     public:
-        explicit ImageReadback(VSL_NAMESPACE::CommandManager manager, std::size_t initialCapacity = 0,
-                               std::size_t maxRequests = 1);
-        ImageReadback(VSL_NAMESPACE::CommandManager manager, VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::ImageLayout currentLayout,
+        explicit ImageReadback(VSL_NAMESPACE::CommandManager manager, std::size_t initial_capacity = 0,
+                               std::size_t max_requests = 1);
+        ImageReadback(VSL_NAMESPACE::CommandManager manager, VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::ImageLayout current_layout,
                       VSL_NAMESPACE::ImageRegion region = {});
 
         // 従来の最新結果を読むAPI。要求を受理すると、完了済みの結果を置き換える。
-        bool capture(VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::ImageLayout currentLayout, VSL_NAMESPACE::ImageRegion region = {});
+        bool capture(VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::ImageLayout current_layout, VSL_NAMESPACE::ImageRegion region = {});
         bool ready() const;
         bool wait(std::uint64_t timeout_ns = UINT64_MAX) const;
         ImagePixels read(std::uint64_t timeout_ns = UINT64_MAX) const;
         void read(ImagePixels& destination, std::uint64_t timeout_ns = UINT64_MAX) const;
 
         // 従来APIの最新結果を手放す。進行中のGPU処理は完了まで継続する。
-        void discardLatest();
+        void discard_latest();
 
         // 空きスロットがなければnulloptを返す。完了済みでも保持中のチケットはスロットを占有する。
-        std::optional<ImageReadbackTicket> captureTicket(VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::ImageLayout currentLayout,
-                                                         VSL_NAMESPACE::ImageRegion region = {}, std::uint64_t frameId = 0);
+        std::optional<ImageReadbackTicket> capture_ticket(VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::ImageLayout current_layout,
+                                                         VSL_NAMESPACE::ImageRegion region = {}, std::uint64_t frame_id = 0);
         // RenderPassEndの後に記録する。追加の送信やCPUでの完了待ちは行わない。
         std::optional<ImageReadbackTicket> record(VSL_NAMESPACE::ComputePhase& phase, VSL_NAMESPACE::ImageAccessor image,
-                                                  VSL_NAMESPACE::ImageLayout currentLayout, VSL_NAMESPACE::ImageRegion region = {},
-                                                  std::uint64_t frameId = 0);
+                                                  VSL_NAMESPACE::ImageLayout current_layout, VSL_NAMESPACE::ImageRegion region = {},
+                                                  std::uint64_t frame_id = 0);
         // 確保済みの全スロットのGPUバッファ容量を合計する。
         std::size_t capacity() const;
     };

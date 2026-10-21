@@ -8,32 +8,32 @@
 namespace AHO_NAMESPACE::concepts {
     namespace helper {
         template<class T>
-        struct is_std_tuple : std::false_type {};
+        struct IsStdTuple : std::false_type {};
 
         template<class... Ts>
-        struct is_std_tuple<std::tuple<Ts...>> : std::true_type {};
+        struct IsStdTuple<std::tuple<Ts...>> : std::true_type {};
 
-        template<size_t Index, typename... Args>
+        template<size_t index, typename... Args>
         struct GetType {};
 
-        template<size_t Index, typename T, typename... Args>
-        requires(Index == 0)
-        struct GetType<Index, T, Args...> {
-            using value = T;
+        template<size_t index, typename T, typename... Args>
+        requires(index == 0)
+        struct GetType<index, T, Args...> {
+            using Value = T;
         };
 
-        template<size_t Index, typename T, typename... Args>
-        requires(Index != 0)
-        struct GetType<Index, T, Args...> {
-            using value = typename GetType<Index - 1, Args...>::value;
+        template<size_t index, typename T, typename... Args>
+        requires(index != 0)
+        struct GetType<index, T, Args...> {
+            using Value = typename GetType<index - 1, Args...>::Value;
         };
 
-        template<size_t Index, typename T, typename... Args>
-        using get_type_v = GetType<Index, T, Args...>::value;
+        template<size_t index, typename T, typename... Args>
+        using GetTypeV = GetType<index, T, Args...>::Value;
     } // namespace helper
 
     template<class T>
-    concept is_std_tuple = helper::is_std_tuple<std::remove_cvref_t<T>>::value;
+    concept is_std_tuple = helper::IsStdTuple<std::remove_cvref_t<T>>::value;
 
     template<typename T>
     concept plusable = requires(T t) {
@@ -91,22 +91,22 @@ namespace AHO_NAMESPACE::concepts {
     };
 
     template<typename T>
-    consteval bool __sames_as() {
+    consteval bool sames_as_() {
         return true;
     }
 
     template<typename T, typename R, typename... Args>
-    consteval bool __sames_as() {
+    consteval bool sames_as_() {
         if constexpr (std::same_as<T, R>) {
-            return __sames_as<T, Args...>();
+            return sames_as_<T, Args...>();
         }
         return false;
     }
 
     template<typename T, typename... Args>
     concept sames_as = (0 == sizeof...(Args) && true) ||
-                       (1 == sizeof...(Args) && std::same_as<T, typename helper::GetType<0, Args...>::value>) ||
-                       (2 <= sizeof...(Args) && __sames_as<T, Args...>());
+                       (1 == sizeof...(Args) && std::same_as<T, typename helper::GetType<0, Args...>::Value>) ||
+                       (2 <= sizeof...(Args) && sames_as_<T, Args...>());
 
     template<typename T>
     concept is_standard_object = requires(T t) {

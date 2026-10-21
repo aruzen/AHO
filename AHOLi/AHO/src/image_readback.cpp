@@ -10,7 +10,7 @@ namespace AHO_NAMESPACE {
     namespace {
         struct ReadbackSlot {
             std::optional<VSL_NAMESPACE::CommandManager> transfer;
-            using Buffer = VSL_NAMESPACE::Buffer<VSL_NAMESPACE::MemoryType::TransferDestination, VSL_NAMESPACE::MemoryProperty::HostVisible>;
+            using Buffer = VSL_NAMESPACE::Buffer<VSL_NAMESPACE::MemoryType::TRANSFER_DESTINATION, VSL_NAMESPACE::MemoryProperty::HOST_VISIBLE>;
             std::optional<Buffer> buffer;
             std::optional<VSL_NAMESPACE::BufferAccessor::LocalBufferHolder> mapping;
             VSL_NAMESPACE::Completion completion;
@@ -26,19 +26,19 @@ namespace AHO_NAMESPACE {
 
     struct ImageReadback::Data {
         VSL_NAMESPACE::CommandManager producer;
-        std::size_t maxRequests;
+        std::size_t max_requests;
         std::vector<std::shared_ptr<ReadbackSlot>> slots;
         ImageReadbackTicket latest;
-        std::uint64_t nextRequestId = 1;
+        std::uint64_t next_request_id = 1;
 
-        Data(VSL_NAMESPACE::CommandManager producer, std::size_t maxRequests);
+        Data(VSL_NAMESPACE::CommandManager producer, std::size_t max_requests);
         void reserve(ReadbackSlot& slot, std::size_t bytes);
         VSL_NAMESPACE::command::ImageCopyInfo describe(VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::ImageLayout layout,
                                                        VSL_NAMESPACE::ImageRegion region) const;
         std::shared_ptr<ReadbackSlot> acquire(std::size_t bytes);
         ImageReadbackTicket record(VSL_NAMESPACE::ComputePhase& phase, std::shared_ptr<ReadbackSlot> slot,
                                    VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::ImageLayout layout,
-                                   const VSL_NAMESPACE::command::ImageCopyInfo& info, std::uint64_t frameId);
+                                   const VSL_NAMESPACE::command::ImageCopyInfo& info, std::uint64_t frame_id);
     };
 
     const ImageReadbackInfo& ImageReadbackTicket::info() const {
@@ -48,7 +48,7 @@ namespace AHO_NAMESPACE {
     }
 
     VSL_NAMESPACE::Completion::Status ImageReadbackTicket::status() const {
-        return _data ? _data->completion.status() : VSL_NAMESPACE::Completion::Status::Cancelled;
+        return _data ? _data->completion.status() : VSL_NAMESPACE::Completion::Status::CANCELLED;
     }
 
     bool ImageReadbackTicket::ready() const {
@@ -69,31 +69,31 @@ namespace AHO_NAMESPACE {
 
     void ImageReadbackTicket::read(ImagePixels& destination, std::uint64_t timeout) const {
         const auto current = status();
-        if (!_data || current == VSL_NAMESPACE::Completion::Status::Pending || current == VSL_NAMESPACE::Completion::Status::Cancelled)
+        if (!_data || current == VSL_NAMESPACE::Completion::Status::PENDING || current == VSL_NAMESPACE::Completion::Status::CANCELLED)
             throw std::logic_error("Readback was not submitted or was cancelled");
         if (!wait(timeout))
             throw std::runtime_error("Readback timed out");
         const auto& meta = _data->info;
-        destination.bytes.resize(meta.byteSize);
-        auto mapped = _data->slot->mapping->read(meta.byteSize);
+        destination.bytes.resize(meta.byte_size);
+        auto mapped = _data->slot->mapping->read(meta.byte_size);
         std::memcpy(destination.bytes.data(), mapped.data(), mapped.size());
         destination.width = meta.region.width;
         destination.height = meta.region.height;
-        destination.rowStride = meta.rowStride;
+        destination.row_stride = meta.row_stride;
         destination.format = meta.format;
     }
 
-    ImageReadback::Data::Data(VSL_NAMESPACE::CommandManager producer, std::size_t maxRequests)
-        : producer(std::move(producer)), maxRequests(maxRequests) {
-        (void)this->producer.getDevice();
-        if (!maxRequests)
+    ImageReadback::Data::Data(VSL_NAMESPACE::CommandManager producer, std::size_t max_requests)
+        : producer(std::move(producer)), max_requests(max_requests) {
+        (void)this->producer.get_device();
+        if (!max_requests)
             throw std::invalid_argument("Readback requires at least one slot");
         slots.push_back(std::make_shared<ReadbackSlot>());
     }
 
     void ImageReadback::Data::reserve(ReadbackSlot& slot, std::size_t bytes) {
-        if (bytes && (!slot.buffer || slot.buffer->requestedSize() < bytes)) {
-            ReadbackSlot::Buffer next(producer.getDevice(), bytes);
+        if (bytes && (!slot.buffer || slot.buffer->requested_size() < bytes)) {
+            ReadbackSlot::Buffer next(producer.get_device(), bytes);
             auto mapping = next.data();
             slot.buffer = std::move(next);
             slot.mapping.emplace(std::move(mapping));
@@ -102,8 +102,8 @@ namespace AHO_NAMESPACE {
 
     VSL_NAMESPACE::command::ImageCopyInfo ImageReadback::Data::describe(VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::ImageLayout layout,
                                                                         VSL_NAMESPACE::ImageRegion region) const {
-        auto info = VSL_NAMESPACE::command::ImageReadback::describe(image, layout, region);
-        if (image.getDevice() != producer.getDevice())
+        auto info = VSL_NAMESPACE::command::ImageReadback::Describe(image, layout, region);
+        if (image.get_device() != producer.get_device())
             throw std::invalid_argument("Readback requires an image on the worker's device");
         return info;
     }
@@ -114,18 +114,18 @@ namespace AHO_NAMESPACE {
             if (!slot->request.expired())
                 continue;
             auto status = slot->completion.status();
-            if (status == VSL_NAMESPACE::Completion::Status::Pending || status == VSL_NAMESPACE::Completion::Status::Submitted)
+            if (status == VSL_NAMESPACE::Completion::Status::PENDING || status == VSL_NAMESPACE::Completion::Status::SUBMITTED)
                 continue;
-            if (slot->buffer && slot->buffer->requestedSize() >= bytes)
+            if (slot->buffer && slot->buffer->requested_size() >= bytes)
                 return slot;
-            if (!candidate || (slot->buffer && (!candidate->buffer || slot->buffer->requestedSize() > candidate->buffer->requestedSize())))
+            if (!candidate || (slot->buffer && (!candidate->buffer || slot->buffer->requested_size() > candidate->buffer->requested_size())))
                 candidate = slot;
         }
         if (candidate) {
             reserve(*candidate, bytes);
             return candidate;
         }
-        if (slots.size() >= maxRequests)
+        if (slots.size() >= max_requests)
             return {};
         auto slot = std::make_shared<ReadbackSlot>();
         reserve(*slot, bytes);
@@ -135,22 +135,22 @@ namespace AHO_NAMESPACE {
 
     ImageReadbackTicket ImageReadback::Data::record(VSL_NAMESPACE::ComputePhase& phase, std::shared_ptr<ReadbackSlot> slot,
                                                     VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::ImageLayout layout,
-                                                    const VSL_NAMESPACE::command::ImageCopyInfo& info, std::uint64_t frameId) {
-        if (!nextRequestId)
+                                                    const VSL_NAMESPACE::command::ImageCopyInfo& info, std::uint64_t frame_id) {
+        if (!next_request_id)
             throw std::overflow_error("Readback request id exhausted");
         auto request = std::make_shared<ImageReadbackTicket::Data>();
         request->slot = slot;
         request->completion = phase.completion();
-        request->info = {nextRequestId++, frameId, info.region, info.format, info.rowStride, info.byteSize};
+        request->info = {next_request_id++, frame_id, info.region, info.format, info.row_stride, info.byte_size};
         phase << VSL_NAMESPACE::command::ImageReadback(&*slot->buffer, image, layout, info.region);
         slot->completion = request->completion;
         slot->request = request;
         return ImageReadbackTicket(std::move(request));
     }
 
-    ImageReadback::ImageReadback(VSL_NAMESPACE::CommandManager manager, std::size_t initialCapacity, std::size_t maxRequests) {
-        auto data = std::make_shared<Data>(std::move(manager), maxRequests);
-        data->reserve(*data->slots.front(), initialCapacity);
+    ImageReadback::ImageReadback(VSL_NAMESPACE::CommandManager manager, std::size_t initial_capacity, std::size_t max_requests) {
+        auto data = std::make_shared<Data>(std::move(manager), max_requests);
+        data->reserve(*data->slots.front(), initial_capacity);
         _data = std::move(data);
     }
 
@@ -160,38 +160,38 @@ namespace AHO_NAMESPACE {
         capture(std::move(image), layout, region);
     }
 
-    std::optional<ImageReadbackTicket> ImageReadback::captureTicket(VSL_NAMESPACE::ImageAccessor image,
+    std::optional<ImageReadbackTicket> ImageReadback::capture_ticket(VSL_NAMESPACE::ImageAccessor image,
                                                                     VSL_NAMESPACE::ImageLayout layout,
-                                                                    VSL_NAMESPACE::ImageRegion region, std::uint64_t frameId) {
+                                                                    VSL_NAMESPACE::ImageRegion region, std::uint64_t frame_id) {
         if (!_data)
             throw std::logic_error("Readback handle is empty");
         auto info = _data->describe(image, layout, region);
-        auto slot = _data->acquire(info.byteSize);
+        auto slot = _data->acquire(info.byte_size);
         if (!slot)
             return std::nullopt;
         if (!slot->transfer)
             slot->transfer = _data->producer.independent();
-        auto phase = slot->transfer->startPhase<VSL_NAMESPACE::ComputePhase>();
-        auto ticket = _data->record(phase, slot, image, layout, info, frameId);
-        if (phase.submit() != VSL_NAMESPACE::ComputePhase::SubmitResult::Success)
+        auto phase = slot->transfer->start_phase<VSL_NAMESPACE::ComputePhase>();
+        auto ticket = _data->record(phase, slot, image, layout, info, frame_id);
+        if (phase.submit() != VSL_NAMESPACE::ComputePhase::SubmitResult::SUCCESS)
             throw std::runtime_error("Readback submission failed");
         return ticket;
     }
 
     std::optional<ImageReadbackTicket> ImageReadback::record(VSL_NAMESPACE::ComputePhase& phase,
                                                              VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::ImageLayout layout,
-                                                             VSL_NAMESPACE::ImageRegion region, std::uint64_t frameId) {
+                                                             VSL_NAMESPACE::ImageRegion region, std::uint64_t frame_id) {
         if (!_data)
             throw std::logic_error("Readback handle is empty");
         auto info = _data->describe(image, layout, region);
-        if (phase.state != VSL_NAMESPACE::ComputePhase::State::WaitSubmit)
+        if (phase.state != VSL_NAMESPACE::ComputePhase::State::WAIT_SUBMIT)
             throw std::logic_error("Readback requires a recording phase");
-        if (phase.manager.getDevice() != _data->producer.getDevice())
+        if (phase.manager.get_device() != _data->producer.get_device())
             throw std::invalid_argument("Readback phase device mismatch");
-        auto slot = _data->acquire(info.byteSize);
+        auto slot = _data->acquire(info.byte_size);
         if (!slot)
             return std::nullopt;
-        return _data->record(phase, slot, image, layout, info, frameId);
+        return _data->record(phase, slot, image, layout, info, frame_id);
     }
 
     bool ImageReadback::capture(VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::ImageLayout layout, VSL_NAMESPACE::ImageRegion region) {
@@ -201,14 +201,14 @@ namespace AHO_NAMESPACE {
         if (_data->latest && !_data->latest.ready())
             return false;
         _data->latest = {};
-        auto ticket = captureTicket(image, layout, region);
+        auto ticket = capture_ticket(image, layout, region);
         if (!ticket)
             return false;
         _data->latest = std::move(*ticket);
         return true;
     }
 
-    void ImageReadback::discardLatest() {
+    void ImageReadback::discard_latest() {
         if (_data)
             _data->latest = {};
     }
@@ -240,7 +240,7 @@ namespace AHO_NAMESPACE {
         if (_data)
             for (const auto& slot : _data->slots)
                 if (slot->buffer)
-                    total += slot->buffer->requestedSize();
+                    total += slot->buffer->requested_size();
         return total;
     }
 } // namespace AHO_NAMESPACE

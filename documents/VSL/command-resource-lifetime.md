@@ -2,14 +2,14 @@
 
 ComputePhase/DefaultPhaseの記録中は、VSL標準コマンドが使用する所有者をCompletionへ登録します。記録後に呼び出し側のラッパーを解放しても、GPU処理が終わるまでnativeオブジェクトを保持します。
 
-対象は頂点・index buffer、Graphics/ComputePipeline、BindPipeline、descriptorとその更新済みリソース、PushConstantのlayout、画像barrier、画像とbufferの転送、RenderPassBeginのframebufferです。ImageReadbackの既存の保持も継続します。
+対象は頂点・index buffer、GRAPHICS/ComputePipeline、BindPipeline、descriptorとその更新済みリソース、PushConstantのlayout、画像barrier、画像とbufferの転送、RenderPassBeginのframebufferです。ImageReadbackの既存の保持も継続します。
 
 ```cpp
 vsl::Completion completion;
 {
-    auto phase = manager.startPhase<vsl::ComputePhase>();
+    auto phase = manager.start_phase<vsl::ComputePhase>();
     {
-        auto vertices = makeVertices();
+        auto vertices = make_vertices();
         phase << vsl::command::BindVertexBuffer(vertices);
         // 記録したbufferの所有権はPhase側にも残る。
     }

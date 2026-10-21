@@ -82,13 +82,13 @@ namespace {
             ASSERT_FALSE(result);
             EXPECT_EQ(result.error(), error);
         };
-        expect({}, E::TooFewVertices);
-        expect({P(0, 0), P(1, 0)}, E::TooFewVertices);
-        expect({P(0, 0), P(1, 1), P(1, 1), P(0, 1)}, E::DuplicateVertex);
-        expect({P(0, 0), P(1, 0), P(2, 0)}, E::DegenerateContour);
-        expect({P(0, 0), P(2, 2), P(0, 2), P(2, 0)}, E::SelfIntersection);
-        expect({P(0, 0), P(INFINITY, 0), P(0, 1)}, E::NonFiniteCoordinate);
-        expect({P(0, 0), P(1, NAN), P(0, 1)}, E::NonFiniteCoordinate);
+        expect({}, E::TOO_FEW_VERTICES);
+        expect({P(0, 0), P(1, 0)}, E::TOO_FEW_VERTICES);
+        expect({P(0, 0), P(1, 1), P(1, 1), P(0, 1)}, E::DUPLICATE_VERTEX);
+        expect({P(0, 0), P(1, 0), P(2, 0)}, E::DEGENERATE_CONTOUR);
+        expect({P(0, 0), P(2, 2), P(0, 2), P(2, 0)}, E::SELF_INTERSECTION);
+        expect({P(0, 0), P(INFINITY, 0), P(0, 1)}, E::NON_FINITE_COORDINATE);
+        expect({P(0, 0), P(1, NAN), P(0, 1)}, E::NON_FINITE_COORDINATE);
     }
     TEST(TriangulationTest, NormalizationPreservesVeryLargeAndVerySmallContours) {
         for (const auto scale : {1e-150, 1e150}) {
@@ -103,7 +103,7 @@ namespace {
         const std::array points{aho::d2::PointI(-2, -2), aho::d2::PointI(2, -2), aho::d2::PointI(2, 2), aho::d2::PointI(-2, 2)};
         auto result = aho::triangulate<std::uint8_t>(points);
         ASSERT_TRUE(result);
-        static_assert(std::same_as<typename decltype(result)::value_type::index_type, std::uint8_t>);
+        static_assert(std::same_as<typename decltype(result)::value_type::IndexType, std::uint8_t>);
         EXPECT_DOUBLE_EQ(result->area(), 16);
     }
     TEST(TriangulationTest, ConvexContoursPreserveAreaForDeterministicVertexCounts) {
@@ -126,6 +126,6 @@ namespace {
             points.emplace_back(i, i % 3);
         const auto result = aho::triangulate<std::uint8_t>(points);
         ASSERT_FALSE(result);
-        EXPECT_EQ(result.error(), E::IndexOverflow);
+        EXPECT_EQ(result.error(), E::INDEX_OVERFLOW);
     }
 } // namespace

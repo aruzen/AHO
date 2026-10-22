@@ -33,6 +33,7 @@ if (AHO_TEST_SOURCES)
     gtest_discover_tests(aho-input-test TEST_PREFIX "AHO." DISCOVERY_MODE PRE_TEST PROPERTIES LABELS cpu TIMEOUT 20)
     add_executable(aho-gpu-test
             engine/standard_engine_test.cpp
+            io/mouse_test.cpp
             window_test.cpp
             pipeline/layouts_test.cpp
             drawer/draw_phase_test.cpp

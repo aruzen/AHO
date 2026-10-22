@@ -7,9 +7,27 @@
 #define GLFW_INCLUDE_VULKAN
 
 #include <GLFW/glfw3.h>
+#include <unordered_map>
 
-AHO_NAMESPACE::input::Cursor::Cursor(void* context) : _context(context) {
+struct AHO_NAMESPACE::input::Cursor::CaptureState {
+    std::size_t generation = 0;
+};
+
+std::shared_ptr<AHO_NAMESPACE::input::Cursor::CaptureState> AHO_NAMESPACE::input::Cursor::GetCaptureState(void* context) {
+    static std::unordered_map<void*, std::weak_ptr<CaptureState>> STATES;
+    std::erase_if(STATES, [](const auto& entry) { return entry.second.expired(); });
+    auto state = STATES[context].lock();
+    if (!state) {
+        state = std::make_shared<CaptureState>();
+        STATES[context] = state;
+    }
+    return state;
+}
+
+AHO_NAMESPACE::input::Cursor::Cursor(void* context)
+    : _context(context), _capture_state(GetCaptureState(context)), _capture_generation(_capture_state->generation) {
     glfwGetCursorPos((GLFWwindow*)context, &_state.value.x.value, &_state.value.y.value);
+    _previous_focus = focused();
 }
 
 AHO_NAMESPACE::d2::PointD AHO_NAMESPACE::input::Cursor::state() {
@@ -17,6 +35,8 @@ AHO_NAMESPACE::d2::PointD AHO_NAMESPACE::input::Cursor::state() {
 }
 
 AHO_NAMESPACE::d2::VectorD AHO_NAMESPACE::input::Cursor::delta() {
+    if (_capture_generation != _capture_state->generation)
+        return d2::VectorD(0.0, 0.0);
     return _delta;
 }
 
@@ -25,6 +45,31 @@ void AHO_NAMESPACE::input::Cursor::update() {
     glfwGetCursorPos((GLFWwindow*)_context, &_state.value.x.value, &_state.value.y.value);
     _delta.value.x = _state.value.x - _delta.value.x;
     _delta.value.y = _state.value.y - _delta.value.y;
+    const bool focus = focused();
+    if (!focus || !_previous_focus || _capture_generation != _capture_state->generation)
+        _delta = d2::VectorD(0.0, 0.0);
+    _previous_focus = focus;
+    _capture_generation = _capture_state->generation;
+}
+
+void AHO_NAMESPACE::input::Cursor::set_captured(bool capture) {
+    auto* window = static_cast<GLFWwindow*>(_context);
+    const int mode = capture ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL;
+    if (glfwGetInputMode(window, GLFW_CURSOR) == mode)
+        return;
+    glfwSetInputMode(window, GLFW_CURSOR, mode);
+    if (glfwRawMouseMotionSupported())
+        glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, capture ? GLFW_TRUE : GLFW_FALSE);
+    ++_capture_state->generation;
+    _delta = d2::VectorD(0.0, 0.0);
+}
+
+bool AHO_NAMESPACE::input::Cursor::captured() const {
+    return glfwGetInputMode(static_cast<GLFWwindow*>(_context), GLFW_CURSOR) == GLFW_CURSOR_DISABLED;
+}
+
+bool AHO_NAMESPACE::input::Cursor::focused() const {
+    return glfwGetWindowAttrib(static_cast<GLFWwindow*>(_context), GLFW_FOCUSED) == GLFW_TRUE;
 }
 
 AHO_NAMESPACE::input::ButtonState AHO_NAMESPACE::input::MouseButton::state() {

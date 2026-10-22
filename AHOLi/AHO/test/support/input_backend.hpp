@@ -10,6 +10,8 @@ namespace aho_test {
         std::array<int, GLFW_KEY_LAST + 1> keys{};
         std::array<int, GLFW_MOUSE_BUTTON_LAST + 1> buttons{};
         double cursor_x = 0, cursor_y = 0;
+        int cursor_mode = GLFW_CURSOR_NORMAL, raw_motion = GLFW_FALSE, focused = GLFW_TRUE;
+        inline static bool RAW_SUPPORTED = true;
         GLFWkeyfun key_callback = nullptr;
         GLFWscrollfun scroll_callback = nullptr;
         inline static std::unordered_map<GLFWwindow*, InputWindow*> WINDOWS;

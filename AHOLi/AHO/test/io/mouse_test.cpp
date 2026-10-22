@@ -1,4 +1,33 @@
 #include <AHO/io/mouse.hpp>
+#ifdef AHO_GPU_TESTS
+#include "../support/live_gpu.hpp"
+namespace {
+    using CursorWindowIntegration = aho_test::LiveGPUTest;
+    TEST_F(CursorWindowIntegration, CaptureModesAreSharedAndRawInputIsOptional) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        aho::InputManager manager(window);
+        const auto first = manager.get<aho::input::Cursor>();
+        const auto second = manager.get<aho::input::Cursor>();
+        auto* native = static_cast<GLFWwindow*>(window.data_->window_handle);
+        EXPECT_FALSE(first->captured());
+        EXPECT_EQ(first->focused(), glfwGetWindowAttrib(native, GLFW_FOCUSED) == GLFW_TRUE);
+        first->set_captured(true);
+        EXPECT_TRUE(first->captured());
+        EXPECT_TRUE(second->captured());
+        EXPECT_EQ(glfwGetInputMode(native, GLFW_RAW_MOUSE_MOTION),
+                  glfwRawMouseMotionSupported() ? GLFW_TRUE : GLFW_FALSE);
+        manager.update();
+        EXPECT_DOUBLE_EQ(first->delta().value.___AN1, 0);
+        EXPECT_DOUBLE_EQ(second->delta().value.___AN1, 0);
+        second->set_captured(false);
+        EXPECT_FALSE(first->captured());
+        EXPECT_FALSE(second->captured());
+        EXPECT_EQ(glfwGetInputMode(native, GLFW_CURSOR), GLFW_CURSOR_NORMAL);
+        EXPECT_EQ(glfwGetInputMode(native, GLFW_RAW_MOUSE_MOTION), GLFW_FALSE);
+    }
+} // namespace
+#else
 #include <optional>
 #include <type_traits>
 #include "../support/input_backend.hpp"
@@ -68,6 +97,140 @@ namespace {
         aho_test::expect_coordinates(cursor->delta(), 3.75, -5.75);
         cursor->update();
         aho_test::expect_coordinates(cursor->delta(), 0, 0);
+    }
+    TEST_F(MouseTest, CaptureResetsWarpDeltaAndReleaseRestoresPointerMode) {
+        aho::InputManager manager(window.handle());
+        const auto cursor = manager.get<aho::input::Cursor>();
+        EXPECT_FALSE(cursor->captured());
+        cursor->set_captured(true);
+        EXPECT_TRUE(cursor->captured());
+        EXPECT_EQ(window.raw_motion, GLFW_TRUE);
+        window.cursor_x = 400;
+        window.cursor_y = 300;
+        manager.update();
+        aho_test::expect_coordinates(cursor->delta(), 0, 0);
+        window.cursor_x += 3;
+        manager.update();
+        aho_test::expect_coordinates(cursor->delta(), 3, 0);
+        cursor->set_captured(false);
+        EXPECT_FALSE(cursor->captured());
+        EXPECT_EQ(window.raw_motion, GLFW_FALSE);
+        aho_test::expect_coordinates(cursor->delta(), 0, 0);
+    }
+    TEST_F(MouseTest, FocusLossAndRegainSuppressCameraJump) {
+        aho::InputManager manager(window.handle());
+        const auto cursor = manager.get<aho::input::Cursor>();
+        window.focused = GLFW_FALSE;
+        window.cursor_x = 100;
+        manager.update();
+        EXPECT_FALSE(cursor->focused());
+        aho_test::expect_coordinates(cursor->delta(), 0, 0);
+        window.focused = GLFW_TRUE;
+        window.cursor_x = 900;
+        manager.update();
+        EXPECT_TRUE(cursor->focused());
+        aho_test::expect_coordinates(cursor->delta(), 0, 0);
+        window.cursor_x += .5;
+        manager.update();
+        aho_test::expect_coordinates(cursor->delta(), .5, 0);
+    }
+    TEST_F(MouseTest, CaptureWorksWithoutRawMouseSupport) {
+        aho::InputManager manager(window.handle());
+        const auto cursor = manager.get<aho::input::Cursor>();
+        const bool supported = std::exchange(aho_test::InputWindow::RAW_SUPPORTED, false);
+        cursor->set_captured(true);
+        EXPECT_TRUE(cursor->captured());
+        EXPECT_EQ(window.raw_motion, GLFW_FALSE);
+        cursor->set_captured(false);
+        aho_test::InputWindow::RAW_SUPPORTED = supported;
+    }
+    TEST_F(MouseTest, RepeatingCaptureStatePreservesCurrentAndNextMovement) {
+        aho::InputManager manager(window.handle());
+        const auto cursor = manager.get<aho::input::Cursor>();
+        cursor->set_captured(true);
+        manager.update();
+        window.cursor_x = 3;
+        manager.update();
+        cursor->set_captured(true);
+        aho_test::expect_coordinates(cursor->delta(), 3, 0);
+        window.cursor_x = 5;
+        manager.update();
+        aho_test::expect_coordinates(cursor->delta(), 2, 0);
+        cursor->set_captured(false);
+        manager.update();
+        window.cursor_x = 8;
+        manager.update();
+        cursor->set_captured(false);
+        aho_test::expect_coordinates(cursor->delta(), 3, 0);
+        window.cursor_x = 10;
+        manager.update();
+        aho_test::expect_coordinates(cursor->delta(), 2, 0);
+    }
+    TEST_F(MouseTest, CaptureChangesResetEveryCursorAcrossInputManagers) {
+        aho::InputManager manager(window.handle()), other(window.handle());
+        const auto mouse = manager.get<aho::input::Mouse>();
+        const auto first = mouse->cursor();
+        const auto second = other.get<aho::input::Cursor>();
+        first->set_captured(true);
+        EXPECT_TRUE(second->captured());
+        window.cursor_x = 400;
+        window.cursor_y = 300;
+        manager.update();
+        other.update();
+        aho_test::expect_coordinates(first->delta(), 0, 0);
+        aho_test::expect_coordinates(second->delta(), 0, 0);
+        window.cursor_x += 2;
+        manager.update();
+        other.update();
+        aho_test::expect_coordinates(first->delta(), 2, 0);
+        aho_test::expect_coordinates(second->delta(), 2, 0);
+        second->set_captured(false);
+        EXPECT_FALSE(first->captured());
+        aho_test::expect_coordinates(first->delta(), 0, 0);
+        window.cursor_x = -40;
+        other.update();
+        manager.update();
+        aho_test::expect_coordinates(first->delta(), 0, 0);
+        aho_test::expect_coordinates(second->delta(), 0, 0);
+    }
+    TEST_F(MouseTest, CaptureRoundTripBeforeAnUpdateResetsEveryCursor) {
+        aho::InputManager manager(window.handle());
+        const auto first = manager.get<aho::input::Cursor>();
+        const auto second = manager.get<aho::input::Cursor>();
+        first->set_captured(true);
+        first->set_captured(false);
+        window.cursor_x = 1000;
+        manager.update();
+        aho_test::expect_coordinates(first->delta(), 0, 0);
+        aho_test::expect_coordinates(second->delta(), 0, 0);
+        window.cursor_x += 4;
+        window.cursor_y += 5;
+        manager.update();
+        aho_test::expect_coordinates(first->delta(), 4, 5);
+        aho_test::expect_coordinates(second->delta(), 4, 5);
+    }
+    TEST_F(MouseTest, CaptureChangesDoNotDiscardMovementInAnotherWindow) {
+        aho_test::InputWindow other_window;
+        aho::InputManager manager(window.handle()), other(other_window.handle());
+        const auto first = manager.get<aho::input::Cursor>();
+        const auto second = other.get<aho::input::Cursor>();
+        first->set_captured(true);
+        other_window.cursor_x = 3;
+        other_window.cursor_y = 4;
+        other.update();
+        EXPECT_FALSE(second->captured());
+        aho_test::expect_coordinates(second->delta(), 3, 4);
+    }
+    TEST_F(MouseTest, CursorCreatedAfterCaptureKeepsItsFirstRealMovement) {
+        aho::InputManager manager(window.handle());
+        const auto first = manager.get<aho::input::Cursor>();
+        first->set_captured(true);
+        window.cursor_x = 400;
+        const auto second = manager.get<aho::input::Cursor>();
+        window.cursor_x += 3;
+        manager.update();
+        aho_test::expect_coordinates(first->delta(), 0, 0);
+        aho_test::expect_coordinates(second->delta(), 3, 0);
     }
     TEST_F(MouseTest, WheelPublishesScrollThenResetsAfterAnUpdate) {
         using aho::input::MouseWheel;
@@ -142,3 +305,4 @@ namespace {
         EXPECT_EQ(manager.update_targets.size(), 5u);
     }
 } // namespace
+#endif

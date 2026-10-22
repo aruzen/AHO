@@ -130,6 +130,34 @@ namespace {
         };
     }
 
+    TEST_F(ScreenshotWindowIntegration, AddingReadbackUsageNotifiesWindowHooksOnceAndStillCaptures) {
+        ASSERT_NO_FATAL_FAILURE(require_readback());
+        if (IsSkipped())
+            return;
+        auto window = engine->get_window();
+        ASSERT_FALSE(vsl::contain(window.data2->swapchain.images.front().get_usage(), vsl::ImageType::TRANSFER_SRC));
+        const auto previous = window.data2->frame_buffer.data_;
+        int calls = 0;
+        window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
+            ++calls;
+            EXPECT_NE(current->data2->frame_buffer.data_, previous);
+            EXPECT_TRUE(vsl::contain(current->data2->swapchain.images.front().get_usage(), vsl::ImageType::TRANSFER_SRC));
+        });
+        aho::x::Screenshot screenshot(window);
+        EXPECT_EQ(calls, 1);
+        aho::x::Screenshot second(window);
+        EXPECT_EQ(calls, 1);
+        {
+            aho::DrawPhase phase(*engine, clear(0, 1, 0));
+            ASSERT_TRUE(screenshot.capture(phase));
+        }
+        const auto pixels = screenshot.read();
+        EXPECT_EQ(pixels.width, window.frame_size().value.x.value);
+        EXPECT_EQ(pixels.height, window.frame_size().value.y.value);
+        EXPECT_EQ(pixels.bytes[1], std::byte{255});
+        EXPECT_EQ(pixels.bytes[3], std::byte{255});
+    }
+
     TEST_F(ScreenshotWindowIntegration, CapturesTheRequestedFrameAndSavesPngWithSharedBusyState) {
         ASSERT_NO_FATAL_FAILURE(require_readback());
         if (IsSkipped())

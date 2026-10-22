@@ -101,17 +101,8 @@ namespace AHO_NAMESPACE::x {
         (void)is_bgra(resources.swapchain.get_format());
         auto data = std::make_shared<Data>(window.data2, manager);
         const auto usage = resources.swapchain.images.at(0).get_usage();
-        if (!VSL_NAMESPACE::contain(usage, VSL_NAMESPACE::ImageType::TRANSFER_SRC)) {
-            manager.wait_idle();
-            auto swapchain = VSL_NAMESPACE::Swapchain(manager.get_device(), resources.surface, resources.swapchain,
-                                                      std::nullopt, std::nullopt, usage | VSL_NAMESPACE::ImageType::TRANSFER_SRC);
-            auto target = VSL_NAMESPACE::FrameBuffer(swapchain, resources.render_pass);
-            if (resources.render_finished.size() != swapchain.get_swap_image_size())
-                resources.render_finished = window.engine.data_->synchro_manager.create_semaphore(
-                    window.name() + "ScreenshotFinished", swapchain.get_swap_image_size());
-            resources.swapchain = std::move(swapchain);
-            resources.frame_buffer = std::move(target);
-        }
+        if (!VSL_NAMESPACE::contain(usage, VSL_NAMESPACE::ImageType::TRANSFER_SRC))
+            window.recreate_swapchain(VSL_NAMESPACE::ImageType::TRANSFER_SRC);
         _data = std::move(data);
     }
 

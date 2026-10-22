@@ -17,6 +17,10 @@ screenshot.save("screenshot.png");
 
 `Screenshot`は描画ループの外で1つ作成し、撮影のたびに再利用する。最初の作成時にウィンドウの画像を読み戻せる構成へ変更する。描画中の作成はエラーになる。通常のリサイズでも読み戻し用の設定を維持する。
 
+読み戻し用のusage追加は`Window::recreate_swapchain()`を通し、GPU完了と標準描画資源の更新後に`WindowResizeHookPlugin`へ通知する。読み戻しが既に有効なら再作成・通知は行わない。同じAPIでnativeウィンドウのサイズを変えずにswapchainを再作成でき、追加usageは現在のusageに加算する。
+
+`resize()`と`recreate_swapchain()`は描画スレッドで呼び出す。同じCommandManagerのDrawPhase記録中は、外側のPhaseであっても`std::logic_error`になる。`resize()`もnativeサイズ変更前に拒否する。通知中に同じウィンドウを再作成・リサイズすることはできず、コピーしたWindowもこの制約を共有する。通知が例外を投げると呼び出し元へ伝播し、更新済み資源は維持される。次の再作成は可能だが、呼ばれなかった後続pluginの通知は自動では再開しない。
+
 `capture(phase)`は、そのPhaseの終了コールバックを維持したまま、終了コールバックの後に読み戻しを追加する。既定の終了処理も自動で行う。撮影対象はそのPhaseで取得した画像であり、描画と読み戻しを1回の送信で実行する。
 
 前の撮影が記録待ち・転送中なら`capture()`は`false`を返し、進行中の要求を維持する。`true`を返すと以前の結果を手放し、新しいフレームを撮影する。コピーした`Screenshot`は撮影状態と結果を共有する。

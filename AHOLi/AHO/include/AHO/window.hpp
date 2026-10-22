@@ -41,6 +41,10 @@ namespace AHO_NAMESPACE::window {
 
         bool resize(int width, int height) override;
 
+        // GPU完了後に標準描画資源を更新し、resize pluginへ通知する。
+        // DrawPhaseの記録中と、同じwindowの再作成通知中には呼び出せない。
+        bool recreate_swapchain(VSL_NAMESPACE::ImageType additional_usage = VSL_NAMESPACE::ImageType::NONE);
+
         d2::VectorI window_size();
 
         d2::VectorI frame_size();
@@ -55,9 +59,12 @@ namespace AHO_NAMESPACE::window {
 
     private:
         static AHO_NAMESPACE::engine::EngineAccessor DefaultEngine();
+        void check_recreation_allowed();
     };
 
     struct WindowResizeHookPlugin : public VSL_NAMESPACE::PureWindow::Plugin {
+        // native resizeとusage変更の両方で、GPU完了・標準描画資源の更新後に呼ばれる。
+        // 同じwindowの再作成やGPU処理の送信は行わない。
         std::function<void(AHO_NAMESPACE::window::Window*)> hook;
 
         WindowResizeHookPlugin(VSL_NAMESPACE::PureWindow*, std::function<void(AHO_NAMESPACE::window::Window*)> hook);

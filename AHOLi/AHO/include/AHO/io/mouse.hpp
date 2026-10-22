@@ -7,15 +7,24 @@
 
 #include "input.hpp"
 #include "input_manager.hpp"
+#include <cstddef>
+#include <memory>
 
 namespace AHO_NAMESPACE::input {
     class Cursor : public abstract::Cursor, public abstract::Updatable {
         template<typename T, typename... Args>
         friend std::shared_ptr<T> AHO_NAMESPACE::InputManager::get(Args&&... args);
 
+        struct CaptureState;
+
+        static std::shared_ptr<CaptureState> GetCaptureState(void* context);
+
         void* _context = nullptr;
         d2::PointD _state;
         d2::VectorD _delta;
+        std::shared_ptr<CaptureState> _capture_state;
+        std::size_t _capture_generation;
+        bool _previous_focus = true;
 
         explicit Cursor(void* context);
 
@@ -25,6 +34,14 @@ namespace AHO_NAMESPACE::input {
         d2::VectorD delta() override;
 
         void update() override;
+
+        // 同状態の再設定では移動量を維持する。切替時は同じwindowの全Cursorで
+        // 次のupdate()までと、そのupdate()の差分を0にして位置補正を除外する。
+        void set_captured(bool capture);
+
+        bool captured() const;
+
+        bool focused() const;
     };
 
     class MouseButton : public abstract::Button, public abstract::Updatable {

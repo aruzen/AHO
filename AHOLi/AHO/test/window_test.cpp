@@ -1,11 +1,123 @@
 #ifdef AHO_GPU_TESTS
 #include "support/live_gpu.hpp"
+#include <AHO/drawer/draw_phase.hpp>
 #ifdef __APPLE__
 #define GLFW_EXPOSE_NATIVE_COCOA
 #include <GLFW/glfw3native.h>
 #endif
 namespace {
     using AHOWindowVulkanIntegration = aho_test::LiveGPUTest;
+
+    bool expect_recreation_guard(aho::Window& window) {
+        // ガードが欠けても、VSLのusage検証で止めて記録中のswapchainを破棄しない。
+        const auto unsupported = static_cast<vsl::ImageType>(std::uint32_t{1} << 31);
+        try {
+            window.recreate_swapchain(unsupported);
+            ADD_FAILURE() << "Recording or reentrant recreation was accepted";
+        } catch (const std::invalid_argument& error) {
+            ADD_FAILURE() << "Recreation reached usage validation before its guard: " << error.what();
+        } catch (const std::logic_error&) {
+            return true;
+        }
+        return false;
+    }
+
+    TEST_F(AHOWindowVulkanIntegration, RecreationNotifiesAfterReplacingResourcesWithoutResizingTheNativeWindow) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        const auto previous_swapchain = window.data2->swapchain.data_;
+        const auto previous_frames = window.data2->frame_buffer.data_;
+        const auto previous_pass = window.data2->render_pass.data_;
+        const auto previous_usage = window.data2->swapchain.images.front().get_usage();
+        const auto size = window.window_size();
+        int calls = 0;
+        window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
+            ++calls;
+            EXPECT_NE(current->data2->swapchain.data_, previous_swapchain);
+            EXPECT_NE(current->data2->frame_buffer.data_, previous_frames);
+            EXPECT_EQ(current->data2->render_pass.data_, previous_pass);
+            EXPECT_EQ(current->data2->swapchain.images.front().get_usage(), previous_usage);
+            EXPECT_EQ(current->data2->render_finished.size(), current->data2->swapchain.get_swap_image_size());
+        });
+        EXPECT_TRUE(window.recreate_swapchain());
+        EXPECT_EQ(calls, 1);
+        EXPECT_EQ(window.window_size().value.x.value, size.value.x.value);
+        EXPECT_EQ(window.window_size().value.y.value, size.value.y.value);
+    }
+
+    TEST_F(AHOWindowVulkanIntegration, RecordingGuardPrecedesNativeResize) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        const auto size = window.window_size();
+        const auto previous = window.data2->swapchain.data_;
+        aho::DrawPhase phase(*engine);
+        EXPECT_THROW(window.resize(480, 320), std::logic_error);
+        EXPECT_EQ(window.window_size().value.x.value, size.value.x.value);
+        EXPECT_EQ(window.window_size().value.y.value, size.value.y.value);
+        EXPECT_EQ(window.data2->swapchain.data_, previous);
+        expect_recreation_guard(window);
+    }
+
+    TEST_F(AHOWindowVulkanIntegration, RecordingGuardFindsTheOuterPhaseOfAnotherEngine) {
+        ASSERT_NO_THROW(start_engine());
+        auto close_engine = [](aho::StandardEngine* other) {
+            other->data_->command_manager.wait_idle();
+            other->boot_window->close();
+            delete other;
+        };
+        std::unique_ptr<aho::StandardEngine, decltype(close_engine)> other(new aho::StandardEngine("nested recreation"), close_engine);
+        auto& window = *engine->boot_window;
+        const auto previous = window.data2->swapchain.data_;
+        aho::DrawPhase outer(*engine);
+        {
+            aho::DrawPhase inner(*other);
+            expect_recreation_guard(window);
+            EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &inner);
+            EXPECT_EQ(outer.state, vsl::ComputePhase::State::WAIT_SUBMIT);
+            EXPECT_EQ(window.data2->swapchain.data_, previous);
+        }
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &outer);
+    }
+
+    TEST_F(AHOWindowVulkanIntegration, NotificationRejectsRecreationThroughACopiedWindow) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        int calls = 0;
+        window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
+            ++calls;
+            auto copy = *current;
+            if (!expect_recreation_guard(copy))
+                return;
+            const auto size = copy.window_size();
+            EXPECT_THROW(copy.resize(480, 320), std::logic_error);
+            EXPECT_EQ(copy.window_size().value.x.value, size.value.x.value);
+            EXPECT_EQ(copy.window_size().value.y.value, size.value.y.value);
+        });
+        EXPECT_TRUE(window.recreate_swapchain());
+        EXPECT_EQ(calls, 1);
+    }
+
+    TEST_F(AHOWindowVulkanIntegration, ThrowingNotificationAllowsAFollowingRecreation) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        int calls = 0;
+        window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) {
+            if (++calls == 1)
+                throw std::runtime_error("resize listener failed");
+        });
+        EXPECT_THROW(window.recreate_swapchain(), std::runtime_error);
+        EXPECT_TRUE(window.recreate_swapchain());
+        EXPECT_EQ(calls, 2);
+    }
+
+    TEST_F(AHOWindowVulkanIntegration, ClosedWindowRejectsRecreationAndResize) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        EXPECT_TRUE(window.close());
+        EXPECT_THROW(window.recreate_swapchain(), std::logic_error);
+        EXPECT_THROW(window.resize(480, 320), std::logic_error);
+    }
+
     TEST_F(AHOWindowVulkanIntegration, ResizeHookCanRemoveItselfAndIsReleasedBeforeTheNextHook) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;

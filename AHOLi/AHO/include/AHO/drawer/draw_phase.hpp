@@ -42,6 +42,7 @@ namespace AHO_NAMESPACE {
         void restore_previous_phase() noexcept;
         static DrawPhase* CurrentForManager(const VSL_NAMESPACE::CommandManager& manager) noexcept;
         template<typename> friend struct DrawStream;
+        friend struct AHO_NAMESPACE::window::Window;
     };
 
     AHO_NAMESPACE::DrawStream<VSL_NAMESPACE::DefaultPhaseStream> AHO_NAMESPACE::DrawPhase::operator<<(AHO_NAMESPACE::concepts::is_std_tuple auto&& t) {

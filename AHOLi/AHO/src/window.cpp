@@ -1,4 +1,5 @@
 #include <AHO/window.hpp>
+#include <AHO/drawer/draw_phase.hpp>
 #include <GLFW/glfw3.h>
 #include <VSL/exceptions.hpp>
 #ifdef __APPLE__
@@ -6,6 +7,7 @@
 #include <GLFW/glfw3native.h>
 #endif
 
+#include <algorithm>
 #include <utility>
 #include <vector>
 
@@ -35,6 +37,8 @@ AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::get_monitor_size() {
 }
 
 namespace {
+    thread_local std::vector<std::shared_ptr<AHO_NAMESPACE::window::WindowData>> RECREATING_WINDOWS;
+
     const std::string& checked_window_name(const std::string& name, const AHO_NAMESPACE::engine::EngineAccessor& engine) {
         const auto& data = engine.data_;
         if (!data || !data->vulkan_instance.accessor || !data->logical_device.data_ ||
@@ -87,16 +91,44 @@ AHO_NAMESPACE::window::Window::Window(engine::EngineAccessor engine, std::shared
 }
 
 bool AHO_NAMESPACE::window::Window::resize(int width, int height) {
+    check_recreation_allowed();
     if (not VSL_NAMESPACE::PureWindow::resize(width, height))
         return false;
+    return recreate_swapchain();
+}
+
+void AHO_NAMESPACE::window::Window::check_recreation_allowed() {
+    if (!*this || !data2 || !engine.data_)
+        throw std::logic_error("Swapchain recreation requires a live AHO window");
+    if (std::find(RECREATING_WINDOWS.begin(), RECREATING_WINDOWS.end(), data2) != RECREATING_WINDOWS.end())
+        throw std::logic_error("Swapchain recreation is already in progress");
+    if (auto* phase = AHO_NAMESPACE::DrawPhase::CurrentForManager(engine.data_->command_manager);
+        phase && phase->state == VSL_NAMESPACE::ComputePhase::State::WAIT_SUBMIT)
+        throw std::logic_error("Cannot recreate a swapchain while recording a DrawPhase");
+}
+
+bool AHO_NAMESPACE::window::Window::recreate_swapchain(VSL_NAMESPACE::ImageType additional_usage) {
+    check_recreation_allowed();
+    // callbackがwindowを閉じても、共有状態を生存させて確実にガードを解除する。
+    RECREATING_WINDOWS.push_back(data2);
+    struct RecreationGuard {
+        ~RecreationGuard() { RECREATING_WINDOWS.pop_back(); }
+    } guard;
     engine.data_->command_manager.wait_idle();
-    const auto usage = data2->swapchain.images.at(0).get_usage();
-    data2->swapchain = VSL_NAMESPACE::Swapchain(engine.data_->logical_device, data2->surface, data2->swapchain,
-                                                 std::nullopt, std::nullopt, usage);
-    data2->frame_buffer = VSL_NAMESPACE::FrameBuffer(data2->swapchain, data2->render_pass);
-    if (data2->render_finished.size() != data2->swapchain.get_swap_image_size())
-        data2->render_finished = engine.data_->synchro_manager.create_semaphore(
-            name() + "RenderFinished", data2->swapchain.get_swap_image_size());
+    const auto usage = data2->swapchain.images.at(0).get_usage() | additional_usage;
+    auto next = VSL_NAMESPACE::Swapchain(engine.data_->logical_device, data2->surface, data2->swapchain,
+                                         std::nullopt, std::nullopt, usage);
+    auto pass = data2->render_pass;
+    if (pass.description().attachments.front().format.type() != next.get_format().type())
+        pass = VSL_NAMESPACE::RenderPass(next);
+    auto frames = VSL_NAMESPACE::FrameBuffer(next, pass);
+    auto finished = data2->render_finished;
+    if (finished.size() != next.get_swap_image_size())
+        finished = engine.data_->synchro_manager.create_semaphore(name() + "RenderFinished", next.get_swap_image_size());
+    data2->swapchain = std::move(next);
+    data2->render_pass = std::move(pass);
+    data2->frame_buffer = std::move(frames);
+    data2->render_finished = std::move(finished);
     const auto data = data_;
     std::vector<std::pair<unsigned char, std::weak_ptr<WindowResizeHookPlugin>>> hooks;
     hooks.reserve(data->plugins.size());

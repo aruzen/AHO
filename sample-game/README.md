@@ -50,9 +50,11 @@ macOSでは、SDK同梱MoltenVK 1.2.11で再現したリサイズ後の1×1描�
 ## 使用しているエンジン機能
 
 - AHO: `StandardEngine`、`Window`、`InputManager`、`Key`、`Cursor`、`MouseButton`、`DrawPhase`、`x::Screenshot`。
-- AHO experimental: `x::scene::Camera`、`MeshRenderer`、`GltfRenderer`、`x::resource::GltfModel`。ゲーム側からGLFWや生のVulkan APIを直接呼びません。
+- AHO experimental: `x::scene::Camera`、`RenderTarget`、`MeshRenderer`、`GltfRenderer`、`x::resource::GltfModel`。ゲーム側からGLFWや生のVulkan APIを直接呼びません。
 - VSL: GPU buffer/image/sampler、descriptor、pipeline、depth attachment、render pass、framebuffer、command、GPU完了通知。glTF関節paletteはframe slot単位で更新します。
 - サンプル固有: 地形と木々の生成、簡易衝突と歩行、昼夜・霧・水面・オーロラ・操作表示shader。地形のベクトル演算にはGLMを使い、cameraの行列はAHOの型で作ります。
+
+`RenderTarget` がWindowのresize pluginへ登録され、深度画像とframebufferの再構築後に両rendererへ通知します。Screenshotのusage変更も同じ通知経路を通り、毎フレームの `prepare()` は不要です。描画は `target.begin(phase)` → `renderer.record(...)` → `foxRenderer.record(...)` の順です。RenderTargetは両rendererより先に作成し、後で破棄します。
 
 ## 素材
 

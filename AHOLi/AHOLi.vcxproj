@@ -202,6 +202,7 @@
     <ClInclude Include="AHO\include\AHO\x\screenshot.hpp" />
     <ClInclude Include="AHO\include\AHO\x\scene\camera.hpp" />
     <ClInclude Include="AHO\include\AHO\x\scene\mesh_renderer.hpp" />
+    <ClInclude Include="AHO\include\AHO\x\scene\render_target.hpp" />
     <ClInclude Include="AHO\include\AHO\x\scene\gltf_renderer.hpp" />
     <ClInclude Include="AHO\include\AHO\engine.hpp" />
     <ClInclude Include="AHO\include\AHO\engine\graphical_engine.hpp" />
@@ -232,6 +233,7 @@
     <ClCompile Include="AHO\src\x\resource\shader.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
     <ClCompile Include="AHO\src\x\screenshot.cpp" />
     <ClCompile Include="AHO\src\x\scene\mesh_renderer.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="AHO\src\x\scene\render_target.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
     <ClCompile Include="AHO\src\x\scene\gltf_renderer.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
     <ClCompile Include="AHO\src\engine.cpp" />
     <ClCompile Include="AHO\src\engine\graphical_engine.cpp" />

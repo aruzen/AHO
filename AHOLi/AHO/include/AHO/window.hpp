@@ -41,6 +41,10 @@ namespace AHO_NAMESPACE::window {
 
         bool resize(int width, int height) override;
 
+        // Recreates at the current extent, preserves usage and notifies resize plugins after GPU idle.
+        // Also used for usage changes that do not resize the native window. Call outside recording.
+        bool recreateSwapchain(VSL_NAMESPACE::ImageType additionalUsage = VSL_NAMESPACE::ImageType::None);
+
         d2::VectorI window_size();
 
         d2::VectorI frame_size();
@@ -57,6 +61,7 @@ namespace AHO_NAMESPACE::window {
     };
 
     struct WindowResizeHookPlugin : public VSL_NAMESPACE::PureWindow::Plugin {
+        // Called after resize or usage-driven swapchain recreation; the GPU is already idle.
         std::function<void(AHO_NAMESPACE::window::Window*)> hook;
 
         WindowResizeHookPlugin(VSL_NAMESPACE::PureWindow*, std::function<void(AHO_NAMESPACE::window::Window*)> hook);

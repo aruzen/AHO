@@ -59,6 +59,8 @@ SDK 1.4.309同梱のMoltenVK **1.2.11**で再現した。初期描画、歩行�
 
 以下は優先順位ではなく、今回のコードから分かった責務の分割案。
 
+shader入力の基盤は既にVSLにある。`VertexInput` / `convert_graphic_type<T>()` は複数型と独自型のgraphic type定義を受け取り、`SPIRVReflector` は頂点入力・descriptorのset/binding/type/配列数・push constantのrangeを取得する。型付き `TypedVertexInput` も用意されているが、確認したmasterではinjectionが空で、実装するPR #151が未統合。これらを汎用入力として利用し、FrameUniformは利用側が定義する構造体の一例とする。AHO側のrendererが任意型・bindingへ接続する入口と、CPU側の型レイアウトとの整合性確認を整理する。現状のreflection公開結果にはUBO/SSBOの各memberの型・offset・array/matrix strideが含まれないため、descriptor定義の取得だけで任意C++構造体との互換性が検証できるとは扱わない。
+
 | 箇所 | 現在の具体的な結合 | AHO/VSLへ追加・整理したい契約 |
 |---|---|---|
 | DrawPhaseの描画先 | 独自targetを使うため `DrawPhase(engine, [](auto&) {})` で標準passの自動開始を抑え、別途 `target.begin(phase)` を呼ぶ。 | DrawPhaseへ描画先を明示できるAPI。空callbackによる既定動作の抑制を利用側へ要求しない。 |

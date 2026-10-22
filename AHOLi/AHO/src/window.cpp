@@ -1,4 +1,5 @@
 #include <AHO/window.hpp>
+#include <AHO/drawer/draw_phase.hpp>
 #include <GLFW/glfw3.h>
 #include <VSL/exceptions.hpp>
 #ifdef __APPLE__
@@ -63,14 +64,30 @@ AHO_NAMESPACE::window::Window::Window(engine::EngineAccessor engine, std::shared
 bool AHO_NAMESPACE::window::Window::resize(int width, int height) {
     if (not VSL_NAMESPACE::PureWindow::resize(width, height))
         return false;
+    return recreateSwapchain();
+}
+
+bool AHO_NAMESPACE::window::Window::recreateSwapchain(VSL_NAMESPACE::ImageType additionalUsage) {
+    if (!*this || !_data2 || !engine._data)
+        throw std::logic_error("Swapchain recreation requires a live AHO window");
+    if (auto* phase = AHO_NAMESPACE::THREAD_LOCAL_DRAW_PHASE;
+        phase && phase->engine->_data == engine._data && phase->state == VSL_NAMESPACE::ComputePhase::State::WaitSubmit)
+        throw std::logic_error("Cannot recreate a swapchain while recording a DrawPhase");
     engine._data->command_manager.waitIdle();
-    const auto usage = _data2->swapchain.images.at(0).getUsage();
-    _data2->swapchain = VSL_NAMESPACE::Swapchain(engine._data->logical_device, _data2->surface, _data2->swapchain,
-                                                 std::nullopt, std::nullopt, usage);
-    _data2->frame_buffer = VSL_NAMESPACE::FrameBuffer(_data2->swapchain, _data2->render_pass);
-    if (_data2->render_finished.size() != _data2->swapchain.getSwapImageSize())
-        _data2->render_finished = engine._data->synchro_manager.createSemaphore(
-            name() + "RenderFinished", _data2->swapchain.getSwapImageSize());
+    const auto usage = _data2->swapchain.images.at(0).getUsage() | additionalUsage;
+    auto next = VSL_NAMESPACE::Swapchain(engine._data->logical_device, _data2->surface, _data2->swapchain,
+                                        std::nullopt, std::nullopt, usage);
+    auto pass = _data2->render_pass;
+    if (pass.description().attachments.front().format.type() != next.getFormat().type())
+        pass = VSL_NAMESPACE::RenderPass(next);
+    auto frames = VSL_NAMESPACE::FrameBuffer(next, pass);
+    auto finished = _data2->render_finished;
+    if (finished.size() != next.getSwapImageSize())
+        finished = engine._data->synchro_manager.createSemaphore(name() + "RenderFinished", next.getSwapImageSize());
+    _data2->swapchain = std::move(next);
+    _data2->render_pass = std::move(pass);
+    _data2->frame_buffer = std::move(frames);
+    _data2->render_finished = std::move(finished);
     const auto data = _data;
     std::vector<std::pair<unsigned char, std::weak_ptr<WindowResizeHookPlugin>>> hooks;
     hooks.reserve(data->plugins.size());

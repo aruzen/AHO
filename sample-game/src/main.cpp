@@ -189,8 +189,9 @@ namespace {
         window.focus();
         {
             auto shader = std::filesystem::path(AHO_WANDER_SHADER_DIR);
-            aho::x::scene::MeshRenderer renderer(engine, world.vertices, shader / "world.vert.spv", shader / "world.frag.spv");
-            aho::x::scene::GltfRenderer foxRenderer(engine, renderer, fox, shader / "model.vert.spv", shader / "model.frag.spv");
+            aho::x::scene::RenderTarget target(engine);
+            aho::x::scene::MeshRenderer renderer(engine, target, world.vertices, shader / "world.vert.spv", shader / "world.frag.spv");
+            aho::x::scene::GltfRenderer foxRenderer(engine, target, fox, shader / "model.vert.spv", shader / "model.frag.spv");
             aho::x::Screenshot screenshot(window);
             Controls input(window);
             wander::Walker walker;
@@ -200,9 +201,7 @@ namespace {
                 auto extent = window.frame_size();
                 if (extent.value.x.value <= 0 || extent.value.y.value <= 0)
                     return false;
-                renderer.prepare();
-                foxRenderer.prepare();
-                auto size = renderer.extent();
+                auto size = target.extent();
                 auto direction = walker.direction();
                 auto eye = walker.eye();
                 aho::x::scene::Camera camera;
@@ -217,6 +216,7 @@ namespace {
                 aho::DrawPhase phase(engine, [](auto&) {});
                 if (phase.state != vsl::ComputePhase::State::WaitSubmit)
                     return false;
+                target.begin(phase);
                 renderer.record(phase, std::as_bytes(std::span(&scene, 1)));
                 glm::vec2 foxPosition(4 + std::sin(time * .3f) * 3, 81 + std::cos(time * .3f) * 1.5f);
                 auto instance = glm::translate(glm::mat4(1), {foxPosition.x, wander::ground(foxPosition.x, foxPosition.y), foxPosition.y});

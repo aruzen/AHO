@@ -167,7 +167,7 @@ namespace AHO_NAMESPACE::x::scene {
     } // namespace
     struct GltfRenderer::Data {
         engine::GraphicalEngine& engine;
-        MeshRenderer& target;
+        RenderTarget& target;
         resource::GltfModel model;
         gfx::BindingLayout binding;
         std::vector<Mesh> meshes;
@@ -177,25 +177,26 @@ namespace AHO_NAMESPACE::x::scene {
         std::optional<VSL_NAMESPACE::PipelineLayout> layout;
         std::optional<VSL_NAMESPACE::GraphicsPipeline> pipeline;
         VSL_NAMESPACE::Completion lastFrame;
-        Data(engine::GraphicalEngine& e, MeshRenderer& t, resource::GltfModel m, const std::filesystem::path& vs, const std::filesystem::path& fs)
+        RenderTarget::Subscription subscription;
+        Data(engine::GraphicalEngine& e, RenderTarget& t, resource::GltfModel m, const std::filesystem::path& vs, const std::filesystem::path& fs)
             : engine(e), target(t), model(std::move(m)),
               binding(e._data->logical_device, {{0, gfx::Type::CombinedImageSampler, VSL_NAMESPACE::ShaderFlag::Fragment}, {1, gfx::Type::StorageBuffer, VSL_NAMESPACE::ShaderFlag::Vertex}}),
               vertex(e._data->logical_device, vs), fragment(e._data->logical_device, fs) {
+            if (target.window().engine._data != e._data)
+                throw std::invalid_argument("glTF renderer and target use different engines");
             for (auto node : visibleNodes(model))
                 if (model.nodes()[node].mesh >= 0)
                     for (const auto& primitive : model.meshes()[model.nodes()[node].mesh].primitives)
                         meshes.emplace_back(e, node, primitive, model, binding);
             if (meshes.empty())
                 throw std::invalid_argument("glTF scene contains no drawable meshes");
+            updatePipeline();
+            subscription = target.onRecreated([this] { updatePipeline(); });
         }
-        void prepare() {
+        void updatePipeline() {
             auto next = target.renderPass();
             if (pass && pass->_data == next._data)
                 return;
-            engine._data->command_manager.waitIdle();
-            pipeline.reset();
-            layout.reset();
-            pass = next;
             pl::VertexInput input;
             input.add(pl::VertexInputShapeDefinition{
                 .layouts = {{VSL_NAMESPACE::data_format::FloatRGB, 0, offsetof(Vertex, position)},
@@ -209,27 +210,31 @@ namespace AHO_NAMESPACE::x::scene {
             pl::PushConstants constants;
             constants.definitions = {{VSL_NAMESPACE::ShaderFlag::Vertex, 0, sizeof(Transform)}};
             auto swapchain = target.swapchain();
-            layout.emplace(engine._data->logical_device, pl::ShaderGroup("AHO experimental glTF", {vertex, fragment}), input,
+            VSL_NAMESPACE::PipelineLayout nextLayout(engine._data->logical_device, pl::ShaderGroup("AHO experimental glTF", {vertex, fragment}), input,
                            pl::ResourceBinding({binding}), constants, pl::ColorBlend{}, pl::InputAssembly{},
                            pl::Rasterization{pl::CullingMode::None}, pl::DepthStencil{}, pl::Multisample{}, pl::DynamicState{},
                            VSL_NAMESPACE::Viewport(swapchain), VSL_NAMESPACE::Scissor(swapchain));
-            pipeline.emplace(*layout, next);
+            VSL_NAMESPACE::GraphicsPipeline nextPipeline(nextLayout, next);
+            pipeline = std::move(nextPipeline);
+            layout = std::move(nextLayout);
+            pass = next;
         }
     };
-    GltfRenderer::GltfRenderer(engine::GraphicalEngine& engine, MeshRenderer& target, resource::GltfModel model,
+    GltfRenderer::GltfRenderer(engine::GraphicalEngine& engine, RenderTarget& target, resource::GltfModel model,
                                const std::filesystem::path& vertex, const std::filesystem::path& fragment)
-        : data(std::make_unique<Data>(engine, target, std::move(model), vertex, fragment)) { data->prepare(); }
+        : data(std::make_unique<Data>(engine, target, std::move(model), vertex, fragment)) {}
     GltfRenderer::~GltfRenderer() {
-        if (data)
+        if (data) {
+            data->subscription = {};
             data->engine._data->command_manager.waitIdle();
+        }
     }
-    void GltfRenderer::prepare() { data->prepare(); }
     void GltfRenderer::record(DrawPhase& phase, const resource::GltfPose& pose, const resource::GltfMatrix& instance,
                               const resource::GltfMatrix& viewProjection, std::array<float, 4> eyeNight) {
         if (phase.engine->_data != data->engine._data || phase.state != VSL_NAMESPACE::ComputePhase::State::WaitSubmit)
             throw std::invalid_argument("glTF renderer requires a recording DrawPhase on the same engine");
-        if (data->pass->_data != data->target.renderPass()._data)
-            throw std::logic_error("Prepare glTF renderer after the target's resize");
+        if (data->pass->_data != data->target.renderPass()._data || phase.swapchain._data != data->target.swapchain()._data)
+            throw std::logic_error("glTF renderer has not received its target update");
         if (data->lastFrame._data == phase.completion()._data)
             throw std::logic_error("Use a separate GltfRenderer for each animated instance in a frame");
         data->lastFrame = phase.completion();

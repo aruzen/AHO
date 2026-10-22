@@ -22,4 +22,4 @@ AHOのexperimental機能は、次のディレクトリに配置する。
 
 実装済みの機能: [glTF/GLB・画像・外部SPIR-Vの読み込み](../../../../../documents/AHO/experimental-gltf.md)、 [スクリーンショット](../../../../../documents/AHO/experimental-screenshot.md)。
 
-歩行サンプルで検証する `x/scene/` には、Vulkan座標規約の `Camera`、深度付き静的メッシュ描画の `MeshRenderer`、同じ深度パスへGPU skinning付きglTFを描く `GltfRenderer` を配置する。[利用例](../../../../../sample-game/README.md)と[不足機能・実装順序](../../../../../documants/sample-game-engine-order.md)を参照。
+歩行サンプルで検証する `x/scene/` には、Vulkan座標規約の `Camera`、Window pluginで深度画像とframebufferを更新する `RenderTarget`、静的メッシュ描画の `MeshRenderer`、同じ深度パスへGPU skinning付きglTFを描く `GltfRenderer` を配置する。RenderTargetの更新完了後に各rendererへ通知し、GPU待機はWindow側で行う。[利用例](../../../../../sample-game/README.md)と[不足機能・実装順序](../../../../../documants/sample-game-engine-order.md)を参照。

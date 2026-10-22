@@ -22,6 +22,7 @@ add_library(AHOLi
         AHO/src/x/resource/shader.cpp
         AHO/src/x/screenshot.cpp
         AHO/src/x/scene/mesh_renderer.cpp
+        AHO/src/x/scene/render_target.cpp
         AHO/src/x/scene/gltf_renderer.cpp
         AHO/src/engine.cpp
         AHO/src/resource/image.cpp

@@ -7,9 +7,9 @@
 | 順序 | 必要な機能／発見した不足 | 対応 |
 |---|---|---|
 | 0 | 新規worktreeで再現できる依存準備 | stbの相対include先が不統一でヘッダーもgit管理外だったため、CMakeでcommitとSHA256を固定して取得。glTF PRのtinygltf取得を利用。macOS runtimeも後述の固定版へ揃える。 |
-| 1 | window、GPU command、同期、color/depth、readback | 既存AHO `StandardEngine` / `Window` / `DrawPhase` / `x::Screenshot` とVSL公開APIを使用。GPU完了待ち・swapchain・標準color framebufferの再作成は既存 `Window::resize()` が行う。追加したMeshRendererは独自depth画像とcolor+depth framebufferの再構築を担当する。既存VSLのdynamic viewport/scissorを利用し、形式が変わらなければ描画器がpipelineを保持する。 |
+| 1 | window、GPU command、同期、color/depth、readback | 既存AHO `StandardEngine` / `Window` / `DrawPhase` / `x::Screenshot` とVSL公開APIを使用。GPU完了待ち・swapchain・標準color framebufferの再作成はWindowが行う。resizeとusage変更を `recreateSwapchain()` に集約し、RenderTarget plugin→依存rendererへ通知する。既存VSLのdynamic viewport/scissorを利用し、形式が変わらなければpipelineを保持する。 |
 | 2 | 座標規約が明確なcamera | AHOの既存行列型を使う `x::scene::Camera` を追加。右手系・Y-up・Vulkan depth [0,1]・射影Y反転を明示。既存 `make_view` の180度rollやOpenGL型の射影の契約は変更しない。 |
-| 3 | CPUメッシュから深度付き3D描画への入口 | `x::scene::MeshRenderer` を追加。頂点buffer、depth、render pass、framebuffer、pipelineを所有し、DrawPhaseに描画を記録する。shaderは利用側が渡す。 |
+| 3 | CPUメッシュから深度付き3D描画への入口 | `x::scene::RenderTarget` がdepth、render pass、framebufferを所有し、`MeshRenderer` が頂点bufferとpipelineを所有する。`target.begin(phase)` で共通passを開始してから各rendererが描画を記録する。shaderは利用側が渡す。 |
 | 4 | glTF asset→GPU texture/mesh→骨格アニメーション | PR #201/#206を取り込み。#201の `GltfModel::load/sample/skinMatrices` を利用し、#206のviewer内GPU実装を `x::scene::GltfRenderer` へ切り出した。地形と同じdepth passへFoxを配置。関節palette/descriptorはframe slotごとに所有し、そのslotの完了後に更新する。 |
 | 5 | 一人称入力とwindow focus | 既存 `InputManager` / `Key` / `MouseButton` / `Cursor` を使用。Cursorにcapture、focus確認、捕捉切り替え・focus復帰時のdelta抑止を追加。Windowにshow/focusを追加。サンプルからGLFWを直接呼ばない。 |
 | 6 | 地形の高さと歩行・衝突 | 描画と同じ三角形を補間する高さ取得、幹・岩・岸・外周への衝突、axis slide、移動substepをサンプルに実装。`core/collision.hpp`の空のCollisionJudgerを汎用物理完成扱いにはしない。 |
@@ -21,17 +21,17 @@
 
 ### 既存のresize機構と追加した描画器の責務
 
-AHO `Window::resize()` は既にGPU完了を待ち、swapchainとWindow所有の標準color framebufferを再作成し、resize hookへ通知する。`DrawPhase` もswapchain再作成が必要な結果を受けると、このresize経路を呼ぶ。これらは今回追加した機能ではない。
+AHO `Window::resize()` は既にGPU完了を待ち、swapchainとWindow所有の標準color framebufferを再作成し、resize hookへ通知していた。`DrawPhase` もswapchain再作成が必要な結果を受けると、このresize経路を呼ぶ。既存の標準framebuffer再作成を不足機能として数えない。
 
-今回のMeshRendererは、Windowの標準color passとは別にdepth付きpassとframebufferを所有する。そのため `prepare()` でswapchainの変更を検出し、自分のdepth画像とframebufferを再作成する。Windowが任意の外部attachmentを自動再作成する仕組みは使っていない。dynamic viewport/scissor自体も既存VSLの機能であり、pipelineを保持する判断だけが描画器側にある。
+今回の修正では、Window側に `recreateSwapchain(additionalUsage)` を設け、native windowのresizeと `Screenshot` のTransferSrc usage追加を同じ更新・通知経路へ集約した。記録中のDrawPhaseからの再作成は拒否する。既存resize hookは、寸法変更を伴わないusage変更でも呼び出される。
 
-現状の `MeshRenderer::prepare()` にもGPU完了待ちがあり、直前に `Window::resize()` が行われた経路では待機が重複する。次のRenderTarget共通化では、Windowのresize hookと独自attachmentの再構築・同期を接続する。既存の標準framebuffer再作成を不足機能として数えない。
+`x::scene::RenderTarget` の内部pluginが既存 `WindowResizeHookPlugin` を継承し、通知を受けて独自depth画像・color+depth framebufferを再構築する。その完了後にMeshRenderer/GltfRendererへ通知するので、Windowのplugin ID順に描画器の依存関係を持たせない。extentはnative windowの要求サイズではなく、実際のswapchainのviewportから取得する。dynamic viewport/scissor自体は既存VSLの機能であり、attachment形式が変わらなければrender passとpipelineを保持する。
 
-既存 `WindowResizeHookPlugin` を使えば、GPU待機・swapchain更新後にdepth画像とframebufferの再構築を連鎖させられる。このcallback内では、直前のWindow側の待機を前提に追加のGPU待機を省ける。pipelineはattachment形式が変わった場合に更新し、サイズだけの変更では保持できる。
+resize時のGPU待機はWindow側の一回に集約した。ゲームから `prepare()` を毎フレーム呼ぶ必要はない。RenderTargetのハンドル破棄時にpluginを登録解除し、pluginからnative/AHO WindowDataへの参照はweakとする。各rendererはSubscriptionの寿命で依存通知を解除する。RenderTargetは依存rendererより長く生存させる。
 
-ただし、`x::Screenshot` のコンストラクタはTransferSrc usageを追加するため、`Window::resize()` を経由せずswapchainと標準framebufferを差し替える。現在の `prepare()` によるswapchain比較はこれも検出するが、resize hookだけへ置き換えると通知を取りこぼす。共通化ではswapchain再作成と完了通知をWindow側の同じ経路に集約し、usage変更もpluginへ通知する必要がある。
+callback追加・解除中の通知はweak snapshotで処理し、追加callbackは次回から呼ぶ。すべてwindow/render threadで操作し、callback内ではGPU処理の送信やswapchain再作成を行わない。汎用のplugin依存グラフ、offscreen target、複数pass、再構築失敗後の自動復旧は今後の範囲とする。
 
-また、現状のhook呼び出しはplugin ID順であり、RenderTarget更新→依存renderer更新という依存順を保証するAPIではない。対象資源の再構築を一つのRenderTarget pluginにまとめ、その完了後に依存rendererへ通知する等の契約を決める。pluginはWindowが所有するため、renderer破棄時の登録解除と、callbackからrendererへの参照の寿命も揃える。
+検証用の `aho-gpu-test` をビルドすると、既存 `VSL/test/support/vulkan_fixture.hpp` 内の `expect_validation_abort` / `validation_abort_count` の同一クラス内二重定義でコンパイルが停止した。重複していた後半の定義のみ除去し、GPUテストをビルド可能にした。
 
 ### resize後に全画素が同じ色になる
 
@@ -57,7 +57,7 @@ SDK 1.4.309同梱のMoltenVK **1.2.11**で再現した。初期描画、歩行�
 
 | 優先順 | 機能 | このサンプルで得た根拠 |
 |---|---|---|
-| 1 | 独立したRenderTargetとScene/Transform/instance管理 | 現状はMeshRendererがtargetも所有し、GltfRendererがそれへ依存する。まずtargetを独立させ、assetと配置・変換を分離する。これはviewer、複数camera、postprocessでも共通になる。 |
+| 1 | Scene/Transform/instance管理とRenderTargetの拡張 | Window pluginに接続した独立RenderTargetと依存rendererの通知は対応済み。次はassetと配置・変換の分離、offscreen target、複数camera、複数passへ拡張する。 |
 | 2 | 3Dの地形queryとcharacter collision契約 | 高さ取得、境界、circle collider、slideがサンプルに閉じている。地形queryと動く物体の位置更新を分離し、sweep、段差、斜面、capsuleへ進む。今回の高さ追従は汎用物理・重力・ジャンプではない。 |
 | 3 | GPU mesh/textureの共有、instancing、frustum culling | 環境は149,708三角形、2,030 collider。木をすべて展開した静的bufferで約18 MBを使い、view外も送信する。glTF rendererも1 renderer/1 instanceでGPU asset共有はない。計測してこの重複を減らす。 |
 | 4 | 共通environment/material定義とshader入力契約 | 地形とglTF shaderに照明・霧・tone responseが重複する。共通のframe uniformとmaterial表現を先に作り、その後PBR、sampler各設定、mipmap、透過sortへ広げる。現在は不透明triangle、4 influence、base color textureの範囲。 |
@@ -79,4 +79,12 @@ SDK 1.4.309同梱のMoltenVK **1.2.11**で再現した。初期描画、歩行�
 - 描画PNGは `build/wander/sample-game/captures/`、起動・検証方法は `sample-game/README.md`。lake/snow/aurora/HUDの画像を目視確認した。
 - `./sample-game/run.sh --view 3 --frames 180` も正常終了。通常ループ180 frameは1.52秒（約118 fps、validation有効、2560×1512）。この環境での短い実測であり、最適化判断の初期値とする。
 
-Windows/Linux、全AHO/VSLテスト、sanitizer、PBR/汎用物理は今回の検証範囲に含めない。
+### plugin連鎖への修正後の検証
+
+同じMac環境で関連CTest **122/122成功、skipなし**。内訳はCPU 67件、実GPU 48件、公開header compile 5件、fixture 2件。
+
+- RenderTargetの新規実GPUテスト6件で、再構築後の依存通知、Screenshot初期化によるusage変更、同一形式でのrender pass保持、通知中のSubscription追加・解除、ハンドル破棄時のplugin解除、window close後の扱い、記録中の再作成拒否を確認。
+- 既存Window/Screenshot/DrawPhase、glTF viewer、カメラ・入力・glTF、PNG出力の関連テストも成功。sample-gameは `prepare()` を呼ばず、移動・昼夜・骨格アニメーション・slot再利用・resize先頭フレーム・拡大・再縮小を実画像で検証した。
+- Vulkan validation errorなし。CMakeの5ターゲットのビルド、MSBuild XML、diff checkを確認。
+
+Windows/Linux、全AHO/VSLテスト、sanitizer、異なるsurface formatへの実機切替、PBR/汎用物理は今回の検証範囲に含めない。

@@ -84,6 +84,8 @@ if (AHO_TEST_SOURCES)
             PROPERTIES LABELS gpu RESOURCE_LOCK aho_graphics TIMEOUT 45)
     include(cmake/CompileContracts.cmake)
     aho_register_header_tests()
+    aho_add_compile_test(Math.SampleGameWithoutGLM
+            "${CMAKE_CURRENT_SOURCE_DIR}/contracts/sample_game_math.cpp" "")
     aho_add_compile_test(ImageReadback.PublicVslOnly
             "${CMAKE_CURRENT_SOURCE_DIR}/contracts/image_readback_public_vsl.cpp"
             AHO_CONTRACT_READBACK_PUBLIC_VSL)

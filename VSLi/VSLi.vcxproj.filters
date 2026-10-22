@@ -41,6 +41,8 @@
     <ClInclude Include="VSL\include\VSL\utils\typed_safe_resource.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="VSL\include\VSL\utils\typed_vertex_layout.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\utils\typed_pipeline.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\utils\vsl_array.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>

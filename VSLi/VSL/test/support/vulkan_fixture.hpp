@@ -245,17 +245,6 @@ namespace vsl_test {
             return {{std::move(data)}};
         }
 
-        // Test-only validation-layer failure injection; application callbacks keep returning VK_FALSE.
-        void expect_validation_abort(const char* vuid) {
-            std::lock_guard lock(validation_mutex_);
-            expected_abort_vuid_ = vuid;
-            expected_abort_count_ = 0;
-            abort_validation_errors_ = true;
-        }
-        std::size_t validation_abort_count() {
-            std::lock_guard lock(validation_mutex_);
-            return expected_abort_count_;
-        }
         bool host_coherent_available() const {
             const auto& properties = *physical._data->memProps;
             for (std::uint32_t i = 0; i < properties.memoryTypeCount; ++i)

@@ -7,6 +7,15 @@
 #include <concepts>
 
 namespace VSL_NAMESPACE::command {
+    // Explicit binding, with ownership retained even if the C++ buffer wrapper is destroyed.
+    struct BindVertexBufferAt : Command {
+        BindVertexBufferAt(std::uint32_t binding, const BufferAccessor& source);
+        void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
+    private:
+        std::uint32_t _binding;
+        std::shared_ptr<impl::BufferImpl> _source;
+    };
+
     struct BindVertexBuffer : Command {
         template<typename... Args>
         requires((std::convertible_to<Args*, BufferAccessor*> &&

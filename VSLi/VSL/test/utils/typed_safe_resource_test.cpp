@@ -42,7 +42,7 @@ namespace {
     }
 } // namespace
 namespace {
-    TEST_F(TypedResourceVulkanIntegrationTest, DISABLED_TypedVertexInputInjectsItsDeclaredAttribute) {
+    TEST_F(TypedResourceVulkanIntegrationTest, TypedVertexInputInjectsItsDeclaredAttribute) {
         using Attribute = vsl::typed::VertexInputDefinition<vsl::data_format::FLOAT_RG, 3, 8>;
         using Shape = vsl::typed::VertexShapeDefinition<
             4, 16, vsl::pipeline_layout::VertexInputShapeDefinition::UpdateTiming::NEXT_INSTANCE, Attribute>;

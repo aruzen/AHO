@@ -27,6 +27,12 @@ AHO `Window::resize()` は既にGPU完了を待ち、swapchainとWindow所有の
 
 現状の `MeshRenderer::prepare()` にもGPU完了待ちがあり、直前に `Window::resize()` が行われた経路では待機が重複する。次のRenderTarget共通化では、Windowのresize hookと独自attachmentの再構築・同期を接続する。既存の標準framebuffer再作成を不足機能として数えない。
 
+既存 `WindowResizeHookPlugin` を使えば、GPU待機・swapchain更新後にdepth画像とframebufferの再構築を連鎖させられる。このcallback内では、直前のWindow側の待機を前提に追加のGPU待機を省ける。pipelineはattachment形式が変わった場合に更新し、サイズだけの変更では保持できる。
+
+ただし、`x::Screenshot` のコンストラクタはTransferSrc usageを追加するため、`Window::resize()` を経由せずswapchainと標準framebufferを差し替える。現在の `prepare()` によるswapchain比較はこれも検出するが、resize hookだけへ置き換えると通知を取りこぼす。共通化ではswapchain再作成と完了通知をWindow側の同じ経路に集約し、usage変更もpluginへ通知する必要がある。
+
+また、現状のhook呼び出しはplugin ID順であり、RenderTarget更新→依存renderer更新という依存順を保証するAPIではない。対象資源の再構築を一つのRenderTarget pluginにまとめ、その完了後に依存rendererへ通知する等の契約を決める。pluginはWindowが所有するため、renderer破棄時の登録解除と、callbackからrendererへの参照の寿命も揃える。
+
 ### resize後に全画素が同じ色になる
 
 SDK 1.4.309同梱のMoltenVK **1.2.11**で再現した。初期描画、歩行、異なる時刻、frame slot再利用後の同時刻画像一致までは成功し、resize後だけ画像が単色になった。

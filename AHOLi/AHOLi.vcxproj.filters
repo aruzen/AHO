@@ -35,6 +35,12 @@
     <ClInclude Include="AHO\include\AHO\core\math\mat.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="AHO\include\AHO\core\math\functions.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="AHO\include\AHO\core\math\transform.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClInclude Include="AHO\include\AHO\core\collision.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>

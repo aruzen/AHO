@@ -182,6 +182,8 @@
     <ClInclude Include="AHO\include\AHO\core\math\angle.hpp" />
     <ClInclude Include="AHO\include\AHO\core\math\coordinate.hpp" />
     <ClInclude Include="AHO\include\AHO\core\math\mat.hpp" />
+    <ClInclude Include="AHO\include\AHO\core\math\functions.hpp" />
+    <ClInclude Include="AHO\include\AHO\core\math\transform.hpp" />
     <ClInclude Include="AHO\include\AHO\core\ov.hpp" />
     <ClInclude Include="AHO\include\AHO\core\point.hpp" />
     <ClInclude Include="AHO\include\AHO\core\triangulation.hpp" />

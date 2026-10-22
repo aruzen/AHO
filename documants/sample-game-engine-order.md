@@ -7,7 +7,7 @@
 | 順序 | 必要な機能／発見した不足 | 対応 |
 |---|---|---|
 | 0 | 新規worktreeで再現できる依存準備 | stbの相対include先が不統一でヘッダーもgit管理外だったため、CMakeでcommitとSHA256を固定して取得。glTF PRのtinygltf取得を利用。macOS runtimeも後述の固定版へ揃える。 |
-| 1 | window、GPU command、同期、color/depth、readback | 既存AHO `StandardEngine` / `Window` / `DrawPhase` / `x::Screenshot` とVSL公開APIを使用。resize時はGPU完了後にattachment/framebufferを再構築し、形式が互換ならdynamic viewport/scissorのpipelineを保持する。 |
+| 1 | window、GPU command、同期、color/depth、readback | 既存AHO `StandardEngine` / `Window` / `DrawPhase` / `x::Screenshot` とVSL公開APIを使用。GPU完了待ち・swapchain・標準color framebufferの再作成は既存 `Window::resize()` が行う。追加したMeshRendererは独自depth画像とcolor+depth framebufferの再構築を担当する。既存VSLのdynamic viewport/scissorを利用し、形式が変わらなければ描画器がpipelineを保持する。 |
 | 2 | 座標規約が明確なcamera | AHOの既存行列型を使う `x::scene::Camera` を追加。右手系・Y-up・Vulkan depth [0,1]・射影Y反転を明示。既存 `make_view` の180度rollやOpenGL型の射影の契約は変更しない。 |
 | 3 | CPUメッシュから深度付き3D描画への入口 | `x::scene::MeshRenderer` を追加。頂点buffer、depth、render pass、framebuffer、pipelineを所有し、DrawPhaseに描画を記録する。shaderは利用側が渡す。 |
 | 4 | glTF asset→GPU texture/mesh→骨格アニメーション | PR #201/#206を取り込み。#201の `GltfModel::load/sample/skinMatrices` を利用し、#206のviewer内GPU実装を `x::scene::GltfRenderer` へ切り出した。地形と同じdepth passへFoxを配置。関節palette/descriptorはframe slotごとに所有し、そのslotの完了後に更新する。 |
@@ -18,6 +18,14 @@
 描画経路は `World / GltfModel → MeshRenderer / GltfRenderer → DrawPhase → VSL → swapchain`。入力は `InputManager → Walker → Camera`。GPU画像の確認には同じDrawPhaseへ `Screenshot` を接続する。ゲーム側でも描画器側でも、生のVulkanやVSLの `_pimpls.hpp` を使わない。
 
 ## 詰まった点と最終対応
+
+### 既存のresize機構と追加した描画器の責務
+
+AHO `Window::resize()` は既にGPU完了を待ち、swapchainとWindow所有の標準color framebufferを再作成し、resize hookへ通知する。`DrawPhase` もswapchain再作成が必要な結果を受けると、このresize経路を呼ぶ。これらは今回追加した機能ではない。
+
+今回のMeshRendererは、Windowの標準color passとは別にdepth付きpassとframebufferを所有する。そのため `prepare()` でswapchainの変更を検出し、自分のdepth画像とframebufferを再作成する。Windowが任意の外部attachmentを自動再作成する仕組みは使っていない。dynamic viewport/scissor自体も既存VSLの機能であり、pipelineを保持する判断だけが描画器側にある。
+
+現状の `MeshRenderer::prepare()` にもGPU完了待ちがあり、直前に `Window::resize()` が行われた経路では待機が重複する。次のRenderTarget共通化では、Windowのresize hookと独自attachmentの再構築・同期を接続する。既存の標準framebuffer再作成を不足機能として数えない。
 
 ### resize後に全画素が同じ色になる
 

@@ -32,7 +32,8 @@ namespace AHO_NAMESPACE::x::scene {
         ~MeshRenderer();
         MeshRenderer(const MeshRenderer&) = delete;
         MeshRenderer& operator=(const MeshRenderer&) = delete;
-        // Call before acquiring DrawPhase; recreates depth/framebuffers/pipeline after a resize.
+        // Call before acquiring DrawPhase; refreshes owned depth/framebuffers after Window resizes.
+        // Retains the pipeline when the attachment format is unchanged.
         void prepare();
         std::array<unsigned, 2> extent() const;
         // Composition point for another AHO renderer recording into this same depth pass.

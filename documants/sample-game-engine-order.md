@@ -53,6 +53,21 @@ SDK 1.4.309同梱のMoltenVK **1.2.11**で再現した。初期描画、歩行�
 
 雪冠と岩肌のconeを重ねる方式では遠距離の重複面にz-fightingが発生した。共有稜線で岩肌と雪の面を分割し、重複面をなくした。エンジンのdepth biasで覆い隠す対応にはしない。
 
+## masterへ切り出す機能と不足していた抽象化
+
+取り込み候補は、Windowのswapchain再作成・通知経路の共通化、Windowのshow/focus、#201のglTF読込・pose/skin計算、stb等の取得版固定。最新masterの命名・APIに合わせて切り出す前提とする。確認したmaster `635058b` にはCursor捕捉APIが既に追加されているので重複実装を持ち込まない。#206のviewerやサンプル固有shaderは利用例として扱い、次の境界を整理して汎用の描画APIへつなげる。
+
+以下は優先順位ではなく、今回のコードから分かった責務の分割案。
+
+| 箇所 | 現在の具体的な結合 | AHO/VSLへ追加・整理したい契約 |
+|---|---|---|
+| DrawPhaseの描画先 | 独自targetを使うため `DrawPhase(engine, [](auto&) {})` で標準passの自動開始を抑え、別途 `target.begin(phase)` を呼ぶ。 | DrawPhaseへ描画先を明示できるAPI。空callbackによる既定動作の抑制を利用側へ要求しない。 |
+| frame共通データとmaterial | GltfRendererの `eyeNight` と関節palette末尾のmetadataにcamera位置・昼夜を格納し、地形とモデルで霧・照明の定義も重複する。 | Camera/FrameUniform、environment、materialの入力契約を分離する。glTF描画器がゲーム固有の昼夜設定を知る構成を解消する。 |
+| GPU資産と配置・アニメーション | GltfRendererごとにmesh/textureを持ち、1 rendererが1 animated instanceに対応する。 | 共有GPU model、ModelInstance/Transform、animation state/poseを分離する。同じFoxの別配置・別poseで資産を再uploadしない。 |
+| RenderTargetの仕様 | 現状はwindowのcolor一枚とDepth32、固定clear値に限定される。 | attachment、load/store、clear、sample count、出力先を記述するtarget仕様。VSLの既存RenderPassDescription/FrameBufferを利用し、windowとoffscreenへ接続する。 |
+| 行列・座標規約 | Cameraでprojection要素やupを補正し、AHO Mat・GLM・glTF配列の間を利用側で変換する。 | view/projectionの座標規約とGPU向け行列変換を明示する。既存make_view等の契約を無条件に変えず、用途を指定したAPIを用意する。 |
+| 地形と歩行 | Walkerがサンプル固有のground/surface、World::moveへ依存する。 | 高さ・法線・移動判定を問い合わせる地形/衝突契約。地形生成、character移動、描画meshの責務を分ける。 |
+
 ## 次に実装する順序
 
 | 優先順 | 機能 | このサンプルで得た根拠 |

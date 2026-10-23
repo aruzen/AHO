@@ -86,6 +86,8 @@ if (AHO_TEST_SOURCES)
     aho_register_header_tests()
     aho_add_compile_test(Math.SampleGameWithoutGLM
             "${CMAKE_CURRENT_SOURCE_DIR}/contracts/sample_game_math.cpp" "")
+    aho_add_compile_test(Math.CommonWithoutGLM
+            "${CMAKE_CURRENT_SOURCE_DIR}/contracts/common_math.cpp" "")
     aho_add_compile_test(ImageReadback.PublicVslOnly
             "${CMAKE_CURRENT_SOURCE_DIR}/contracts/image_readback_public_vsl.cpp"
             AHO_CONTRACT_READBACK_PUBLIC_VSL)

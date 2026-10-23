@@ -44,6 +44,7 @@ add_library(AHOLi
         AHO/include/AHO/core/math/conventions.hpp
         AHO/include/AHO/core/math/matrix_functions.hpp
         AHO/include/AHO/core/math/projection.hpp
+        AHO/include/AHO/core/math/quaternion.hpp
         AHO/include/aho/core/math/coordinate.hpp
         AHO/include/aho/core/color.hpp
         AHO/include/aho/core/line.hpp

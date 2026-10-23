@@ -2,6 +2,7 @@
 #include "support/render_fixture.hpp"
 #include <cstddef>
 #include <limits>
+#include "support/temporary_directory.hpp"
 
 namespace {
     namespace typed = vsl::typed;
@@ -23,6 +24,8 @@ namespace {
     static_assert(!typed::compatible_vertex_buffers<Input, typed::TypedVertexBuffer<Position>>);
     static_assert(!typed::compatible_vertex_buffers<Input, int, int>);
     static_assert(typed::compatible_vertex_buffers<typed::TypedVertexInput<>>);
+    using RawShape = typed::VertexShapeDefinition<0, 8, Timing::NEXT_VERTEX, PositionAttribute>;
+    static_assert(!typed::compatible_vertex_buffers<typed::TypedVertexInput<RawShape>, typed::TypedVertexBuffer<Position>>);
     static_assert(std::same_as<typed::TypedGraphicsPipeline<Input>::VertexInput, Input>);
 
     const std::array<Position, 3> POSITIONS{{{{-1, -1}}, {{3, -1}}, {{-1, 3}}}};
@@ -66,6 +69,20 @@ namespace {
         static_assert(layout.attribute[0].location == 3 && layout.attribute[1].location == 4);
         static_assert(layout.attribute[1].locations == 2 && layout.binding[0].stride == sizeof(Vertex));
         EXPECT_EQ(layout.binding[0].timing, Timing::NEXT_INSTANCE);
+    }
+
+    struct GraphicVector {
+        float xy[2];
+        static constexpr auto GRAPHIC_TYPE = vsl::data_format::FLOAT_RG;
+    };
+    TEST(TypedVertexLayoutTest, SignedByteAndCustomGraphicTypesInferTheirStorageFormats) {
+        struct Vertex { std::int8_t signed_values[3]; std::array<std::uint8_t, 4> unsigned_values; GraphicVector vector; };
+        using Schema = typed::VertexRecord<Vertex, VSL_VERTEX_MEMBER(Vertex, signed_values),
+            VSL_VERTEX_MEMBER(Vertex, unsigned_values), VSL_VERTEX_MEMBER(Vertex, vector)>;
+        static_assert(Schema::ATTRIBUTES[0].format == vsl::data_format::INT8_RGB);
+        static_assert(Schema::ATTRIBUTES[1].format == vsl::data_format::UNSIGNED_INT8_RGBA);
+        static_assert(Schema::ATTRIBUTES[2].format == vsl::data_format::FLOAT_RG);
+        EXPECT_EQ(Schema::LAYOUT.binding[0].stride, sizeof(Vertex));
     }
 
     class TypedPipelineVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
@@ -186,4 +203,53 @@ namespace {
                    << vsl::command::Draw(3);
         }));
     }
+    TEST_F(TypedPipelineVulkanIntegrationTest, ShaderMismatchIsRejectedBeforeNativeGraphicsPipelineCreation) {
+        using Empty = typed::TypedVertexInput<>;
+        EXPECT_THROW(make_typed<Empty>(), std::invalid_argument);
+        struct UnsignedPosition { std::uint32_t xy[2]; };
+        using Schema = typed::VertexRecord<UnsignedPosition, VSL_VERTEX_MEMBER(UnsignedPosition, xy)>;
+        using Wrong = typed::TypedVertexInput<Schema::Binding<0>, Colors>;
+        EXPECT_THROW(make_typed<Wrong>(), std::invalid_argument);
+        EXPECT_FALSE(has_validation_errors());
+    }
+
+    TEST_F(TypedPipelineVulkanIntegrationTest, ValidationUsesLoadedModuleEvenAfterTheSourceFileIsRemoved) {
+        vsl_test::TemporaryDirectory directory;
+        const auto path = directory.path() / "loaded.vert.spv";
+        std::filesystem::copy_file(vsl_test::shader_path("vertices.vert.spv"), path);
+        vsl::Shader<vsl::ShaderType::VERTEX> shader(device, path);
+        std::filesystem::remove(path);
+        namespace pl = vsl::pipeline_layout;
+        typed::TypedGraphicsPipeline<Input> typed_pipeline(device, *pass,
+            pl::ShaderGroup("removed source", {shader, *fragment}), pl::ColorBlend{}, pl::InputAssembly{},
+            pl::Rasterization{pl::CullingMode::NONE}, pl::Multisample{}, pl::DynamicState{},
+            vsl::Viewport(description), vsl::Scissor(description));
+        typed::TypedVertexBuffer<Position> positions(device, POSITIONS);
+        typed::TypedVertexBuffer<Color> colors(device, COLORS);
+        ExpectTriangleColor(render([&](auto& stream) { stream << typed_pipeline.bind_vertices(positions, colors).draw(3); }));
+    }
+
+    TEST_F(TypedPipelineVulkanIntegrationTest, MissingAndDuplicateVertexStagesAreRejectedBeforeDriverPipelineCreation) {
+        namespace pl = vsl::pipeline_layout;
+        EXPECT_THROW((typed::TypedGraphicsPipeline<Input>(device, *pass, pl::ShaderGroup("no vertex", {*fragment}))), std::invalid_argument);
+        EXPECT_THROW((typed::TypedGraphicsPipeline<Input>(device, *pass, pl::ShaderGroup("duplicate vertex", {*vertex, *vertex, *fragment}))), std::invalid_argument);
+        EXPECT_FALSE(has_validation_errors());
+    }
+
+    TEST_F(TypedPipelineVulkanIntegrationTest, ActualNamedEntryPointIsValidatedAndUsedForDrawing) {
+        namespace pl = vsl::pipeline_layout;
+        vsl::Shader<vsl::ShaderType::VERTEX> shader(device, vsl_test::shader_path("typed_entry_points.spv"), "second");
+        auto make = [&]<typename Layout>() {
+            return typed::TypedGraphicsPipeline<Layout>(device, *pass, pl::ShaderGroup("entry second", {shader, *fragment}),
+                pl::ColorBlend{}, pl::InputAssembly{}, pl::Rasterization{pl::CullingMode::NONE}, pl::Multisample{},
+                pl::DynamicState{}, vsl::Viewport(description), vsl::Scissor(description));
+        };
+        using Wrong = typed::TypedVertexInput<PositionRecord::Binding<0>>;
+        using Correct = typed::TypedVertexInput<PositionRecord::Binding<3, Timing::NEXT_VERTEX, 7>>;
+        EXPECT_THROW(make.template operator()<Wrong>(), std::invalid_argument);
+        auto typed_pipeline = make.template operator()<Correct>();
+        typed::TypedVertexBuffer<Position> positions(device, POSITIONS);
+        ExpectTriangleColor(render([&](auto& stream) { stream << typed_pipeline.bind_vertices(positions).draw(3); }));
+    }
+
 }

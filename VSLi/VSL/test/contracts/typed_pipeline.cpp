@@ -73,5 +73,9 @@ namespace {
     struct Unsupported { void* member; };
     using Bad = t::VertexRecord<Unsupported, VSL_VERTEX_MEMBER(Unsupported, member)>;
     static_assert(Bad::LAYOUT.valid);
+#elif VSL_TYPED_CASE == 15
+    struct Matrix { float values[3][3]; };
+    using Bad = t::VertexRecord<Matrix, VSL_VERTEX_MEMBER(Matrix, values)>;
+    static_assert(Bad::LAYOUT.valid);
 #endif
 }

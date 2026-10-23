@@ -36,7 +36,8 @@ template<VSL_NAMESPACE::ShaderType type>
 VSL_NAMESPACE::Shader<type>::Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path) {
     data_ = std::make_shared<impl::ShaderImpl>();
     data_->device = device.data_;
-    const auto code = read_shader_code(path);
+    data_->code = read_shader_code(path);
+    const auto& code = data_->code;
 
     vk::ShaderModuleCreateInfo create_info;
     create_info.codeSize = code.size() * sizeof(std::uint32_t);
@@ -55,7 +56,8 @@ template<VSL_NAMESPACE::ShaderType type>
 VSL_NAMESPACE::Shader<type>::Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path, std::string name) {
     data_ = std::make_shared<impl::ShaderImpl>();
     data_->device = device.data_;
-    const auto code = read_shader_code(path);
+    data_->code = read_shader_code(path);
+    const auto& code = data_->code;
 
     vk::ShaderModuleCreateInfo create_info;
     create_info.codeSize = code.size() * sizeof(std::uint32_t);

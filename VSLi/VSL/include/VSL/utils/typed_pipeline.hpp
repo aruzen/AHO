@@ -1,5 +1,5 @@
 #pragma once
-#include "typed_vertex_layout.hpp"
+#include "typed_shader.hpp"
 #include "../vulkan/buffer.hpp"
 #include "../vulkan/pipeline.hpp"
 #include "../vulkan/commands/bind_vertex_buffers.hpp"
@@ -54,6 +54,8 @@ namespace VSL_NAMESPACE::typed {
         template<typename Input, typename... Buffers, size_t... indices>
         consteval bool VertexBuffersMatch(std::index_sequence<indices...>) {
             if constexpr (sizeof...(Buffers) != Input::BINDING_COUNT || !(IsVertexBuffer<std::remove_cvref_t<Buffers>>::value && ...))
+                return false;
+            else if constexpr (!(requires { typename Input::template Shape<indices>::Vertex; } && ...))
                 return false;
             else
                 return (std::same_as<typename std::remove_cvref_t<Buffers>::Vertex, typename Input::template Shape<indices>::Vertex> && ...);
@@ -131,6 +133,7 @@ namespace VSL_NAMESPACE::typed {
         static VSL_NAMESPACE::GraphicsPipeline MakePipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, Stages&&... stages) {
             // Input is deliberately last: earlier stages cannot replace the typed vertex layout.
             PipelineLayout layout(device, std::forward<Stages>(stages)..., Input{});
+            detail::validate_pipeline_vertex_shader(layout, Input::LAYOUT.attribute);
             return VSL_NAMESPACE::GraphicsPipeline(std::move(layout).freeze(), pass);
         }
 

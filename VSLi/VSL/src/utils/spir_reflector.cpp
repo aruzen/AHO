@@ -36,6 +36,7 @@ namespace {
     struct ReflectionCompiler : spirv_cross::Compiler {
         using Compiler::Compiler;
         using Compiler::evaluate_constant_u32;
+        using Compiler::get_entry_point;
     };
 
     std::uint32_t descriptor_count(const ReflectionCompiler& compiler, const spirv_cross::SPIRType& type) {
@@ -68,152 +69,171 @@ VSL_NAMESPACE::graphic_resource::Type spir_type_to_graphic_type(const spirv_cros
     return gfx_src::Type::MAX_ENUM;
 }
 
-VSL_NAMESPACE::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device, std::filesystem::path path)
+VSL_NAMESPACE::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device, std::filesystem::path path, std::string_view entry_point, ShaderType stage, Scope scope)
     : generated{std::move(logical_device)} {
-    init(read_spirv_words(path));
+    init(read_spirv_words(path), entry_point, stage, scope);
 }
 
-VSL_NAMESPACE::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device, const std::vector<char>& binary)
+VSL_NAMESPACE::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device, const std::vector<char>& binary, std::string_view entry_point, ShaderType stage, Scope scope)
     : generated{std::move(logical_device)} {
     validate_spirv_size(binary.size());
     std::vector<std::uint32_t> words(binary.size() / sizeof(std::uint32_t));
     std::memcpy(words.data(), binary.data(), binary.size());
-    init(std::move(words));
+    init(std::move(words), entry_point, stage, scope);
 }
 
-void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words) {
+VSL_NAMESPACE::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device, std::span<const std::uint32_t> words,
+    std::string_view entry_point, ShaderType stage, Scope scope) : generated{std::move(logical_device)} {
+    validate_spirv_size(words.size_bytes());
+    init({words.begin(), words.end()}, entry_point, stage, scope);
+}
+
+namespace {
+    VSL_NAMESPACE::ShaderFlag shader_flag(spv::ExecutionModel model) {
+        switch (model) {
+            case spv::ExecutionModelVertex:
+                return VSL_NAMESPACE::ShaderFlag::VERTEX;
+            case spv::ExecutionModelTessellationControl:
+                return VSL_NAMESPACE::ShaderFlag::TESSELLATION_CONTROL;
+            case spv::ExecutionModelTessellationEvaluation:
+                return VSL_NAMESPACE::ShaderFlag::TESSELLATION_EVALUATION;
+            case spv::ExecutionModelGeometry:
+                return VSL_NAMESPACE::ShaderFlag::GEOMETRY;
+            case spv::ExecutionModelRayGenerationKHR:
+                return VSL_NAMESPACE::ShaderFlag::RAYGEN;
+            case spv::ExecutionModelIntersectionKHR:
+                return VSL_NAMESPACE::ShaderFlag::INTERSECTION;
+            case spv::ExecutionModelAnyHitKHR:
+                return VSL_NAMESPACE::ShaderFlag::ANY_HIT;
+            case spv::ExecutionModelClosestHitKHR:
+                return VSL_NAMESPACE::ShaderFlag::CLOSEST_HIT;
+            case spv::ExecutionModelMissKHR:
+                return VSL_NAMESPACE::ShaderFlag::MISS;
+            case spv::ExecutionModelCallableKHR:
+                return VSL_NAMESPACE::ShaderFlag::CALLABLE;
+            case spv::ExecutionModelTaskNV:
+            case spv::ExecutionModelTaskEXT:
+                return VSL_NAMESPACE::ShaderFlag::TASK;
+            case spv::ExecutionModelMeshNV:
+            case spv::ExecutionModelMeshEXT:
+                return VSL_NAMESPACE::ShaderFlag::MESH;
+            case spv::ExecutionModelFragment:
+                return VSL_NAMESPACE::ShaderFlag::FRAGMENT;
+            case spv::ExecutionModelGLCompute:
+                return VSL_NAMESPACE::ShaderFlag::COMPUTE;
+            default:
+                return VSL_NAMESPACE::ShaderFlag::ERROR_;
+        }
+    }
+} // namespace
+
+void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words, std::string_view entry_point, ShaderType stage, Scope scope) try {
     using namespace graphic_resource;
     ReflectionCompiler comp(std::move(words));
 
-    ShaderFlag shader_type = ShaderFlag::ERROR_;
-    switch (comp.get_execution_model()) {
-        case spv::ExecutionModelVertex:
-            shader_type = ShaderFlag::VERTEX;
-            break;
-        case spv::ExecutionModelTessellationControl:
-            shader_type = ShaderFlag::TESSELLATION_CONTROL;
-            break;
-        case spv::ExecutionModelTessellationEvaluation:
-            shader_type = ShaderFlag::TESSELLATION_EVALUATION;
-            break;
-        case spv::ExecutionModelGeometry:
-            shader_type = ShaderFlag::GEOMETRY;
-            break;
-        case spv::ExecutionModelRayGenerationKHR:
-            shader_type = ShaderFlag::RAYGEN;
-            break;
-        case spv::ExecutionModelIntersectionKHR:
-            shader_type = ShaderFlag::INTERSECTION;
-            break;
-        case spv::ExecutionModelAnyHitKHR:
-            shader_type = ShaderFlag::ANY_HIT;
-            break;
-        case spv::ExecutionModelClosestHitKHR:
-            shader_type = ShaderFlag::CLOSEST_HIT;
-            break;
-        case spv::ExecutionModelMissKHR:
-            shader_type = ShaderFlag::MISS;
-            break;
-        case spv::ExecutionModelCallableKHR:
-            shader_type = ShaderFlag::CALLABLE;
-            break;
-        case spv::ExecutionModelTaskNV:
-        case spv::ExecutionModelTaskEXT:
-            shader_type = ShaderFlag::TASK;
-            break;
-        case spv::ExecutionModelMeshNV:
-        case spv::ExecutionModelMeshEXT:
-            shader_type = ShaderFlag::MESH;
-            break;
-        case spv::ExecutionModelFragment:
-            shader_type = ShaderFlag::FRAGMENT;
-            break;
-        case spv::ExecutionModelGLCompute:
-            shader_type = ShaderFlag::COMPUTE;
-            break;
-        default:
-            std::cout << "Other shader stage" << std::endl;
-            break;
+    const auto entry_points = comp.get_entry_points_and_stages();
+    if (entry_points.empty())
+        throw exceptions::RuntimeException("SPIRVReflector", "SPIR-V contains no shader entry point");
+    if (!entry_point.empty() || stage != ShaderType::ERROR_) {
+        std::optional<spirv_cross::EntryPoint> selected;
+        for (const auto& candidate : entry_points) {
+            if ((!entry_point.empty() && candidate.name != entry_point) ||
+                (stage != ShaderType::ERROR_ && shader_flag(candidate.execution_model) != convert(stage)))
+                continue;
+            if (selected)
+                throw exceptions::RuntimeException("SPIRVReflector", "Ambiguous shader entry point: " + std::string(entry_point));
+            selected = candidate;
+        }
+        if (!selected)
+            throw exceptions::RuntimeException("SPIRVReflector", "Shader entry point/stage not found: " + std::string(entry_point));
+        comp.set_entry_point(selected->name, selected->execution_model);
     }
+    generated.entry_point = comp.get_entry_point().name;
+    const auto shader_type = shader_flag(comp.get_execution_model());
+    generated.shader_type = shader_type;
 
     spirv_cross::ShaderResources shader_resources = comp.get_shader_resources();
-    std::vector<std::tuple<spirv_cross::SmallVector<spirv_cross::Resource>, graphic_resource::Type>> mapped_resources = {
-        {shader_resources.uniform_buffers, graphic_resource::Type::UNIFORM_BUFFER},
-        {shader_resources.storage_buffers, graphic_resource::Type::STORAGE_BUFFER},
-        {shader_resources.storage_images, graphic_resource::Type::STORAGE_IMAGE},
-        {shader_resources.subpass_inputs, graphic_resource::Type::INPUT_ATTACHMENT},
-        {shader_resources.acceleration_structures, graphic_resource::Type::ACCELERATION_STRUCTURE_NV}, // 例: NV拡張
-        {shader_resources.separate_images, graphic_resource::Type::SAMPLED_IMAGE},
-        {shader_resources.separate_samplers, graphic_resource::Type::SAMPLER},
-        /*
-            { resources.uniform_texel_buffers, graphic_resource::type::UniformTexelBuffer },
-            { resources.storage_texel_buffers, graphic_resource::type::StorageTexelBuffer },
-            { resources., graphic_resource::type::Sampler },
-            { resources.combined_image_samplers, graphic_resource::type::CombinedImageSampler },
-            { resources.input_attachments, graphic_resource::type::InputAttachment },
-            { resources.inline_uniform_blocks, graphic_resource::type::InlineUniformBlock },
-            // Qcom/Valve拡張は必要に応じて追加
-             */
-    };
+    if (scope == Scope::ALL) {
+        std::vector<std::tuple<spirv_cross::SmallVector<spirv_cross::Resource>, graphic_resource::Type>> mapped_resources = {
+            {shader_resources.uniform_buffers, graphic_resource::Type::UNIFORM_BUFFER},
+            {shader_resources.storage_buffers, graphic_resource::Type::STORAGE_BUFFER},
+            {shader_resources.storage_images, graphic_resource::Type::STORAGE_IMAGE},
+            {shader_resources.subpass_inputs, graphic_resource::Type::INPUT_ATTACHMENT},
+            {shader_resources.acceleration_structures, graphic_resource::Type::ACCELERATION_STRUCTURE_NV}, // 例: NV拡張
+            {shader_resources.separate_images, graphic_resource::Type::SAMPLED_IMAGE},
+            {shader_resources.separate_samplers, graphic_resource::Type::SAMPLER},
+            /*
+                { resources.uniform_texel_buffers, graphic_resource::type::UniformTexelBuffer },
+                { resources.storage_texel_buffers, graphic_resource::type::StorageTexelBuffer },
+                { resources., graphic_resource::type::Sampler },
+                { resources.combined_image_samplers, graphic_resource::type::CombinedImageSampler },
+                { resources.input_attachments, graphic_resource::type::InputAttachment },
+                { resources.inline_uniform_blocks, graphic_resource::type::InlineUniformBlock },
+                // Qcom/Valve拡張は必要に応じて追加
+                 */
+        };
 
-    for (const auto& resource : shader_resources.sampled_images) {
-        uint32_t set = comp.get_decoration(resource.id, spv::DecorationDescriptorSet);
-        uint32_t binding = comp.get_decoration(resource.id, spv::DecorationBinding);
-        const auto& type = comp.get_type(resource.type_id);
-        graphic_resource::Type gfx_type = spir_type_to_graphic_type(type);
-        if (gfx_type == graphic_resource::Type::MAX_ENUM)
-            VSL_NAMESPACE::loggingln("hint: name: ", resource.name);
-        generated.binding_points[set].emplace_back(BindingPoint{
-            .binding = binding,
-            .binding_type = gfx_type,
-            .shader_type = shader_type, // TODO
-            .amount = descriptor_count(comp, type),
-        });
-    }
-
-    for (auto& [resources, gfx_type] : mapped_resources)
-        for (const auto& resource : resources) {
+        for (const auto& resource : shader_resources.sampled_images) {
             uint32_t set = comp.get_decoration(resource.id, spv::DecorationDescriptorSet);
             uint32_t binding = comp.get_decoration(resource.id, spv::DecorationBinding);
             const auto& type = comp.get_type(resource.type_id);
-            auto descriptor_type = gfx_type;
-            if ((gfx_type == Type::SAMPLED_IMAGE || gfx_type == Type::STORAGE_IMAGE) && type.image.dim == spv::DimBuffer)
-                descriptor_type = gfx_type == Type::SAMPLED_IMAGE ? Type::UNIFORM_TEXEL_BUFFER : Type::STORAGE_TEXEL_BUFFER;
+            graphic_resource::Type gfx_type = spir_type_to_graphic_type(type);
+            if (gfx_type == graphic_resource::Type::MAX_ENUM)
+                VSL_NAMESPACE::loggingln("hint: name: ", resource.name);
             generated.binding_points[set].emplace_back(BindingPoint{
                 .binding = binding,
-                .binding_type = descriptor_type,
+                .binding_type = gfx_type,
                 .shader_type = shader_type, // TODO
                 .amount = descriptor_count(comp, type),
             });
         }
 
-    for (const auto& resource : shader_resources.push_constant_buffers) {
-        const auto& type = comp.get_type(resource.type_id);
-        /*
-        std::cout << "PushConstant name: " << resource.name << std::endl;
-        std::cout << "id: " << resource.id << ", type_id: " << resource.type_id << std::endl;
-        std::cout << "PushConstant has " << type.member_types.size() << " members\n";
-         */
-        for (size_t i = 0; i < type.member_types.size(); i++) {
+        for (auto& [resources, gfx_type] : mapped_resources)
+            for (const auto& resource : resources) {
+                uint32_t set = comp.get_decoration(resource.id, spv::DecorationDescriptorSet);
+                uint32_t binding = comp.get_decoration(resource.id, spv::DecorationBinding);
+                const auto& type = comp.get_type(resource.type_id);
+                auto descriptor_type = gfx_type;
+                if ((gfx_type == Type::SAMPLED_IMAGE || gfx_type == Type::STORAGE_IMAGE) && type.image.dim == spv::DimBuffer)
+                    descriptor_type = gfx_type == Type::SAMPLED_IMAGE ? Type::UNIFORM_TEXEL_BUFFER : Type::STORAGE_TEXEL_BUFFER;
+                generated.binding_points[set].emplace_back(BindingPoint{
+                    .binding = binding,
+                    .binding_type = descriptor_type,
+                    .shader_type = shader_type, // TODO
+                    .amount = descriptor_count(comp, type),
+                });
+            }
+
+        for (const auto& resource : shader_resources.push_constant_buffers) {
+            const auto& type = comp.get_type(resource.type_id);
             /*
-            std::cout << "  member[" << i << "] = " << comp.get_member_name(resource.base_type_id, i)
-                      << ", offset = " << comp.type_struct_member_offset(type, i)
-                      << ", size = " << comp.get_declared_struct_member_size(type, i)
-                      << std::endl;
-                      */
-            if (not generated.push_constants)
-                generated.push_constants.emplace();
-            generated.push_constants->definitions.emplace_back(pipeline_layout::PushContentDefinition{
-                .target_shader = shader_type, // TODO
-                .offset = static_cast<uint32_t>(comp.type_struct_member_offset(type, (uint32_t)i)),
-                .size = static_cast<uint32_t>(comp.get_declared_struct_member_size(type, (uint32_t)i)),
-            });
+            std::cout << "PushConstant name: " << resource.name << std::endl;
+            std::cout << "id: " << resource.id << ", type_id: " << resource.type_id << std::endl;
+            std::cout << "PushConstant has " << type.member_types.size() << " members\n";
+             */
+            for (size_t i = 0; i < type.member_types.size(); i++) {
+                /*
+                std::cout << "  member[" << i << "] = " << comp.get_member_name(resource.base_type_id, i)
+                          << ", offset = " << comp.type_struct_member_offset(type, i)
+                          << ", size = " << comp.get_declared_struct_member_size(type, i)
+                          << std::endl;
+                          */
+                if (not generated.push_constants)
+                    generated.push_constants.emplace();
+                generated.push_constants->definitions.emplace_back(pipeline_layout::PushContentDefinition{
+                    .target_shader = shader_type, // TODO
+                    .offset = static_cast<uint32_t>(comp.type_struct_member_offset(type, (uint32_t)i)),
+                    .size = static_cast<uint32_t>(comp.get_declared_struct_member_size(type, (uint32_t)i)),
+                });
+            }
         }
+
     }
 
     if (shader_type != ShaderFlag::VERTEX)
         return;
 
+    const auto active_variables = comp.get_active_interface_variables();
     for (auto& resource : shader_resources.stage_inputs) {
         const auto& type = comp.get_type(resource.type_id);
         /*
@@ -266,10 +286,30 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
             throw exceptions::RuntimeException("SPIRVReflector", "Vertex input location range overflow");
         VSL_NAMESPACE::pipeline_layout::VertexInputShapeDefinition definition{
             .layouts = {columns, VSL_NAMESPACE::pipeline_layout::VertexInputLayoutDefinition{.format = format}}};
-        for (std::uint32_t column = 0; column < columns; ++column)
-            definition.layouts[column].location = location + column * locations_per_column;
+        for (std::uint32_t column = 0; column < columns; ++column) {
+            const auto column_location = location + column * locations_per_column;
+            definition.layouts[column].location = column_location;
+            if (active_variables.contains(resource.id)) {
+                auto numeric = NumericType::UNSUPPORTED;
+                switch (type.basetype) {
+                    case spirv_cross::SPIRType::Half: case spirv_cross::SPIRType::Float: case spirv_cross::SPIRType::Double:
+                        numeric = NumericType::FLOATING_POINT; break;
+                    case spirv_cross::SPIRType::Short: case spirv_cross::SPIRType::Int: case spirv_cross::SPIRType::Int64:
+                        numeric = NumericType::SIGNED_INTEGER; break;
+                    case spirv_cross::SPIRType::UShort: case spirv_cross::SPIRType::UInt: case spirv_cross::SPIRType::UInt64:
+                        numeric = NumericType::UNSIGNED_INTEGER; break;
+                    default: break;
+                }
+                generated.vertex_inputs.push_back({resource.name, column_location,
+                    comp.get_decoration(resource.id, spv::DecorationComponent), type.width, type.vecsize, numeric});
+            }
+        }
         generated.vertex_input->definitions.push_back(std::move(definition));
     }
+}
+
+catch (const spirv_cross::CompilerError& error) {
+    throw exceptions::RuntimeException("SPIRVReflector", error.what());
 }
 
 std::vector<VSL_NAMESPACE::graphic_resource::BindingLayout> VSL_NAMESPACE::utils::SPIRVReflector::GenerateData::make_binding_layout(size_t repeat) {

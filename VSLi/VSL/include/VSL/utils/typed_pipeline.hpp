@@ -1,6 +1,7 @@
 #pragma once
 #include "typed_shader.hpp"
 #include "typed_resources.hpp"
+#include "typed_push_constants.hpp"
 #include "../vulkan/commands/bind_graphic_resource.hpp"
 #include "../vulkan/buffer.hpp"
 #include "../vulkan/pipeline.hpp"
@@ -70,46 +71,49 @@ namespace VSL_NAMESPACE::typed {
     template<typename Input, typename... Buffers>
     concept compatible_vertex_buffers = detail::vertex_buffers_match<Input, Buffers...>(std::index_sequence_for<Buffers...>{});
 
-    template<typename Input, typename Resources = ResourceSchema<>>
+    template<typename Input, typename Resources = ResourceSchema<>, typename Pushes = PushSchema<>>
     class TypedGraphicsPipeline;
-    template<typename Input, typename Resources = ResourceSchema<>, bool bound = Resources::EMPTY>
+    template<typename Input, typename Resources = ResourceSchema<>, typename Pushes = PushSchema<>, bool bound = Resources::EMPTY, bool pushed = Pushes::EMPTY>
     class TypedVertexBinding;
 
     // One command explicitly binds the pipeline, every input binding, and then draws.
     // Captured owners survive wrapper destruction and are retained through GPU completion.
-    template<typename Input, typename Resources = ResourceSchema<>>
+    template<typename Input, typename Resources = ResourceSchema<>, typename Pushes = PushSchema<>>
     class TypedDraw final : public command::Command, public command::PipelineHolder {
-        template<typename, typename, bool>
+        template<typename, typename, typename, bool, bool>
         friend class TypedVertexBinding;
         VSL_NAMESPACE::GraphicsPipeline _pipeline;
         LogicalDeviceAccessor _device;
         std::array<command::BindVertexBufferAt, Input::BINDING_COUNT> _buffers;
         command::Draw _draw;
         std::vector<command::BindGraphicResource> _resources;
+        std::optional<typename Pushes::Values> _pushes;
         TypedDraw(VSL_NAMESPACE::GraphicsPipeline pipeline, LogicalDeviceAccessor device,
-                  std::array<command::BindVertexBufferAt, Input::BINDING_COUNT> buffers, command::Draw draw, std::vector<command::BindGraphicResource> resources)
-            : _pipeline(std::move(pipeline)), _device(device), _buffers(std::move(buffers)), _draw(std::move(draw)), _resources(std::move(resources)) {}
+                  std::array<command::BindVertexBufferAt, Input::BINDING_COUNT> buffers, command::Draw draw, std::vector<command::BindGraphicResource> resources, std::optional<typename Pushes::Values> pushes)
+            : _pipeline(std::move(pipeline)), _device(device), _buffers(std::move(buffers)), _draw(std::move(draw)), _resources(std::move(resources)), _pushes(std::move(pushes)) {}
 
     public:
         using VertexInput = Input;
         using ResourceLayout = Resources;
+        using PushLayout = Pushes;
         PipelineAccessor get_pipeline() override { return _pipeline; }
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
     };
 
-    template<typename Input, typename Resources, bool bound>
+    template<typename Input, typename Resources, typename Pushes, bool bound, bool pushed>
     class TypedVertexBinding {
-        friend class TypedGraphicsPipeline<Input, Resources>;
-        template<typename, typename, bool>
+        friend class TypedGraphicsPipeline<Input, Resources, Pushes>;
+        template<typename, typename, typename, bool, bool>
         friend class TypedVertexBinding;
         VSL_NAMESPACE::GraphicsPipeline _pipeline;
         LogicalDeviceAccessor _device;
         std::array<command::BindVertexBufferAt, Input::BINDING_COUNT> _buffers;
         std::array<size_t, Input::BINDING_COUNT> _counts;
         std::vector<command::BindGraphicResource> _resources;
-        template<bool other_bound>
-        TypedVertexBinding(const TypedVertexBinding<Input, Resources, other_bound>& source, std::vector<command::BindGraphicResource> resources)
-            : _pipeline(source._pipeline), _device(source._device), _buffers(source._buffers), _counts(source._counts), _resources(std::move(resources)) {}
+        std::optional<typename Pushes::Values> _pushes;
+        template<bool other_bound, bool other_pushed>
+        TypedVertexBinding(const TypedVertexBinding<Input, Resources, Pushes, other_bound, other_pushed>& source, std::vector<command::BindGraphicResource> resources, std::optional<typename Pushes::Values> pushes)
+            : _pipeline(source._pipeline), _device(source._device), _buffers(source._buffers), _counts(source._counts), _resources(std::move(resources)), _pushes(std::move(pushes)) {}
         template<typename... Buffers, size_t... indices>
         TypedVertexBinding(VSL_NAMESPACE::GraphicsPipeline pipeline, LogicalDeviceAccessor device,
                            std::index_sequence<indices...>, const Buffers&... buffers)
@@ -122,29 +126,26 @@ namespace VSL_NAMESPACE::typed {
     public:
         using VertexInput = Input;
         using ResourceLayout = Resources;
+        using PushLayout = Pushes;
         template<typename... Sets>
         requires compatible_descriptor_sets<Resources, Sets...>
-        TypedVertexBinding<Input, Resources, true> bind_resources(const Sets&... sets) const;
-        TypedDraw<Input, Resources> draw(size_t vertex_count, size_t instance_count = 1, size_t first_vertex = 0, size_t first_instance = 0) const
-        requires(bound);
+        TypedVertexBinding<Input, Resources, Pushes, true, pushed> bind_resources(const Sets&... sets) const;
+        TypedDraw<Input, Resources, Pushes> draw(size_t vertex_count, size_t instance_count = 1, size_t first_vertex = 0, size_t first_instance = 0) const
+        requires(bound && pushed);
+        TypedVertexBinding<Input, Resources, Pushes, bound, true> push_constants(const typename Pushes::Values& values) const;
     };
 
-    template<typename Input, typename Resources>
+    template<typename Input, typename Resources, typename Pushes>
     class TypedGraphicsPipeline {
         LogicalDeviceAccessor _device;
         VSL_NAMESPACE::GraphicsPipeline _pipeline;
         template<pipeline_layout_injecter... Stages>
-        static VSL_NAMESPACE::GraphicsPipeline MakePipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, Stages&&... stages) {
-            // Input is deliberately last: earlier stages cannot replace the typed vertex layout.
-            PipelineLayout layout(device, std::forward<Stages>(stages)..., Input{}, Resources{});
-            detail::validate_pipeline_vertex_shader(layout, Input::LAYOUT.attribute);
-            detail::validate_resource_schema(layout, Resources::REQUIREMENTS);
-            return VSL_NAMESPACE::GraphicsPipeline(std::move(layout).freeze(), pass);
-        }
+        static VSL_NAMESPACE::GraphicsPipeline MakePipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, Stages&&... stages);
 
     public:
         using VertexInput = Input;
         using ResourceLayout = Resources;
+        using PushLayout = Pushes;
         template<pipeline_layout_injecter... Stages>
         TypedGraphicsPipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, Stages&&... stages)
             : _device(device), _pipeline(MakePipeline(device, std::move(pass), std::forward<Stages>(stages)...)) {}
@@ -153,13 +154,24 @@ namespace VSL_NAMESPACE::typed {
 
         template<typename... Buffers>
         requires compatible_vertex_buffers<Input, Buffers...>
-        TypedVertexBinding<Input, Resources> bind_vertices(const Buffers&... buffers) const {
-            return TypedVertexBinding<Input, Resources>(_pipeline, _device, std::index_sequence_for<Buffers...>{}, buffers...);
+        TypedVertexBinding<Input, Resources, Pushes> bind_vertices(const Buffers&... buffers) const {
+            return TypedVertexBinding<Input, Resources, Pushes>(_pipeline, _device, std::index_sequence_for<Buffers...>{}, buffers...);
         }
     };
 
-    template<typename Input, typename Resources>
-    void TypedDraw<Input, Resources>::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
+    template<typename Input, typename Resources, typename Pushes>
+    template<pipeline_layout_injecter... Stages>
+    VSL_NAMESPACE::GraphicsPipeline TypedGraphicsPipeline<Input, Resources, Pushes>::MakePipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, Stages&&... stages) {
+        // Input is deliberately last: earlier stages cannot replace the typed vertex layout.
+        PipelineLayout layout(device, std::forward<Stages>(stages)..., Input{}, Resources{}, Pushes{});
+        detail::validate_pipeline_vertex_shader(layout, Input::LAYOUT.attribute);
+        detail::validate_resource_schema(layout, Resources::REQUIREMENTS);
+        detail::validate_push_schema(layout, Pushes::REQUIREMENTS);
+        return VSL_NAMESPACE::GraphicsPipeline(std::move(layout).freeze(), pass);
+    }
+
+    template<typename Input, typename Resources, typename Pushes>
+    void TypedDraw<Input, Resources, Pushes>::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
         if (_device.data_ != manager.get_device().data_)
             throw std::invalid_argument("Typed pipeline and command manager use different devices");
         _pipeline.invoke(pool, buffer, manager);
@@ -167,12 +179,14 @@ namespace VSL_NAMESPACE::typed {
             binding.invoke(pool, buffer, manager);
         for (auto& resource : _resources)
             resource.invoke(pool, buffer, manager);
+        if constexpr (!Pushes::EMPTY)
+            detail::invoke_push_values(_pipeline, buffer, Pushes::REQUIREMENTS, _pushes->bytes());
         _draw.invoke(pool, buffer, manager);
     }
 
-    template<typename Input, typename Resources, bool bound>
-    TypedDraw<Input, Resources> TypedVertexBinding<Input, Resources, bound>::draw(size_t vertex_count, size_t instance_count, size_t first_vertex, size_t first_instance) const
-    requires(bound)
+    template<typename Input, typename Resources, typename Pushes, bool bound, bool pushed>
+    TypedDraw<Input, Resources, Pushes> TypedVertexBinding<Input, Resources, Pushes, bound, pushed>::draw(size_t vertex_count, size_t instance_count, size_t first_vertex, size_t first_instance) const
+    requires(bound && pushed)
     {
         command::Draw command(vertex_count, instance_count, first_vertex, first_instance);
         for (size_t i = 0; i < Input::BINDING_COUNT; ++i) {
@@ -182,13 +196,13 @@ namespace VSL_NAMESPACE::typed {
             if (first > _counts[i] || count > _counts[i] - first)
                 throw std::out_of_range("Typed draw exceeds its vertex/instance buffer");
         }
-        return TypedDraw<Input, Resources>(_pipeline, _device, _buffers, std::move(command), _resources);
+        return TypedDraw<Input, Resources, Pushes>(_pipeline, _device, _buffers, std::move(command), _resources, _pushes);
     }
 
-    template<typename Input, typename Resources, bool bound>
+    template<typename Input, typename Resources, typename Pushes, bool bound, bool pushed>
     template<typename... Sets>
     requires compatible_descriptor_sets<Resources, Sets...>
-    TypedVertexBinding<Input, Resources, true> TypedVertexBinding<Input, Resources, bound>::bind_resources(const Sets&... sets) const {
+    TypedVertexBinding<Input, Resources, Pushes, true, pushed> TypedVertexBinding<Input, Resources, Pushes, bound, pushed>::bind_resources(const Sets&... sets) const {
         if (((sets.device().data_ != _device.data_) || ...))
             throw std::invalid_argument("Typed descriptor/pipeline device mismatch");
         (sets.require_complete(), ...);
@@ -198,7 +212,12 @@ namespace VSL_NAMESPACE::typed {
         (commands.emplace_back(sets.backend(), graphic_resource::BindingDestination::GRAPHICS, _pipeline,
                                Resources::SET_NUMBERS[set_index++]),
          ...);
-        return TypedVertexBinding<Input, Resources, true>(*this, std::move(commands));
+        return TypedVertexBinding<Input, Resources, Pushes, true, pushed>(*this, std::move(commands), _pushes);
+    }
+
+    template<typename Input, typename Resources, typename Pushes, bool bound, bool pushed>
+    TypedVertexBinding<Input, Resources, Pushes, bound, true> TypedVertexBinding<Input, Resources, Pushes, bound, pushed>::push_constants(const typename Pushes::Values& values) const {
+        return TypedVertexBinding<Input, Resources, Pushes, bound, true>(*this, _resources, std::optional<typename Pushes::Values>(values));
     }
 
 } // namespace VSL_NAMESPACE::typed

@@ -1,6 +1,12 @@
 #include "support/vulkan_fixture.hpp"
 #include <VSL/utils/spir_reflector.hpp>
 #include <span>
+#include "support/temporary_directory.hpp"
+#include <fstream>
+#include "support/render_fixture.hpp"
+#include <limits>
+#include "support/compute_fixture.hpp"
+#include "support/image_transfer_fixture.hpp"
 
 namespace {
     TEST(SpirvReflectorTest, ReflectsBindingsVertexInputsAndPushConstantMembersFromFile) {
@@ -39,6 +45,39 @@ namespace {
     class SpirvReflectorVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
+    class ReflectedLocationsVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+
+    class ReflectedLocationsRenderVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+
+    class ReflectedSetSlotsVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+
+    class ReflectedSetComputeVulkanIntegrationTest : public vsl_test::ComputeVulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+
+    class ReflectedNumericFormatsVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+
+    class ReflectedSeparateImageVulkanIntegrationTest : public vsl_test::ImageTransferVulkanIntegrationTest {
+        bool validate_vulkan() const override;
+    };
+
+    class ReflectedTexelBufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override;
+    };
+
+    class ReflectedInputAttachmentVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
+        bool validate_vulkan() const override;
+    };
+
     TEST_F(SpirvReflectorVulkanIntegrationTest, GeneratedBindingLayoutsRetainDefinitionsAndRepeatCount) {
         vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("fill.comp.spv"));
         const auto layouts = reflector.generated.make_binding_layout(2);
@@ -110,8 +149,6 @@ namespace {
     }
 } // namespace
 
-#include "support/temporary_directory.hpp"
-#include <fstream>
 namespace {
     TEST(SpirvReflectorTest, BinaryRejectsTrailingPartialWordsInsteadOfSilentlyIgnoringThem) {
         const auto valid = vsl_test::read_binary(vsl_test::shader_path("fill.comp.spv"));
@@ -238,9 +275,6 @@ namespace {
         EXPECT_EQ(position->layouts[0].location, 1u);
         EXPECT_EQ(position->layouts[0].format, vsl::data_format::FLOAT_RG);
     }
-    class ReflectedLocationsVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
-    };
     TEST_F(ReflectedLocationsVulkanIntegrationTest, InjectionPreservesSparseLocationsAndMatrixColumnOffsets) {
         for (const auto& [file, expected_locations] : {
                  std::pair{"reflection_sparse.vert.spv", std::vector<std::uint32_t>{3, 7}},
@@ -270,11 +304,7 @@ namespace {
     }
 } // namespace
 
-#include "support/render_fixture.hpp"
 namespace {
-    class ReflectedLocationsRenderVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
-    };
     TEST_F(ReflectedLocationsRenderVulkanIntegrationTest, ReflectedSparseVertexLocationsProduceExpectedGPUColor) {
         vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_sparse.vert.spv"));
         ASSERT_TRUE(reflector.generated.vertex_input);
@@ -300,7 +330,6 @@ namespace {
     }
 } // namespace
 
-#include <limits>
 namespace {
     TEST(SpirvReflectorTest, RepeatedLayoutCountOverflowIsRejectedBeforeNativeAllocation) {
         for (const auto set_count : {1u, 2u}) {
@@ -337,9 +366,6 @@ namespace {
         EXPECT_EQ(points[0].binding_type, vsl::graphic_resource::Type::STORAGE_BUFFER);
         EXPECT_EQ(points[0].shader_type, vsl::ShaderFlag::COMPUTE);
     }
-    class ReflectedSetSlotsVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
-    };
     TEST_F(ReflectedSetSlotsVulkanIntegrationTest, MissingSetsProduceEmptyLayoutsAtTheirOriginalIndices) {
         vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_sparse_sets.comp.spv"));
         const auto before = reflector.generated.binding_points;
@@ -394,11 +420,7 @@ namespace {
     }
 } // namespace
 
-#include "support/compute_fixture.hpp"
 namespace {
-    class ReflectedSetComputeVulkanIntegrationTest : public vsl_test::ComputeVulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
-    };
     TEST_F(ReflectedSetComputeVulkanIntegrationTest, GeneratedSparseLayoutsSupportShaderWritesAtSetTwo) {
         vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_sparse_sets.comp.spv"));
         const auto sets = reflector.generated.make_binding_layout();
@@ -477,9 +499,6 @@ namespace {
         // Separate bindings: half/short vectors, dvec3/4, dmat3/2 and signed/unsigned int64 vectors.
         EXPECT_EQ(reflector.generated.vertex_input->requirements_size(), 4u + 6u + 8u + 24u + 72u + 16u + 16u + 32u + 32u);
     }
-    class ReflectedNumericFormatsVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
-        bool validate_vulkan() const override { return true; }
-    };
     TEST_F(ReflectedNumericFormatsVulkanIntegrationTest, NativeInputMetadataKeepsFormatsWidthsAndMatrixColumnOffsets) {
         vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_numeric_widths.vert.spv"));
         ASSERT_TRUE(reflector.generated.vertex_input);
@@ -636,13 +655,11 @@ namespace {
     }
 } // namespace
 
-#include "support/image_transfer_fixture.hpp"
 namespace {
-    class ReflectedSeparateImageVulkanIntegrationTest : public vsl_test::ImageTransferVulkanIntegrationTest {
-        bool validate_vulkan() const override;
-    };
 
-    bool ReflectedSeparateImageVulkanIntegrationTest::validate_vulkan() const { return true; }
+    bool ReflectedSeparateImageVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
     TEST_F(ReflectedSeparateImageVulkanIntegrationTest, GeneratedLayoutSamplesTheUploadedTexelWithASeparateSampler) {
         using namespace vsl::graphic_resource;
         if (!host_coherent_available())
@@ -714,11 +731,10 @@ namespace {
             }
         }
     }
-    class ReflectedTexelBufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
-        bool validate_vulkan() const override;
-    };
 
-    bool ReflectedTexelBufferVulkanIntegrationTest::validate_vulkan() const { return true; }
+    bool ReflectedTexelBufferVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
     TEST_F(ReflectedTexelBufferVulkanIntegrationTest, GeneratedLayoutSupportsReadingAndWritingNativeBufferViews) {
         using namespace vsl::graphic_resource;
         if (!host_coherent_available())
@@ -805,11 +821,10 @@ namespace {
             EXPECT_FALSE(reflector.generated.vertex_input);
         }
     }
-    class ReflectedInputAttachmentVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
-        bool validate_vulkan() const override;
-    };
 
-    bool ReflectedInputAttachmentVulkanIntegrationTest::validate_vulkan() const { return true; }
+    bool ReflectedInputAttachmentVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
     TEST_F(ReflectedInputAttachmentVulkanIntegrationTest, GeneratedLayoutReadsTheClearedInputAttachmentOnGPU) {
         using namespace vsl::graphic_resource;
         vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_input_attachment.frag.spv"));

@@ -5,6 +5,11 @@
 #include <fstream>
 #include <string>
 namespace vsl_test {
+    struct CompileResult {
+        int status;
+        std::string diagnostics;
+    };
+
     inline std::string shell_quote(const std::string& value) {
 #ifdef _WIN32
         std::string result = "\"";
@@ -21,10 +26,6 @@ namespace vsl_test {
         return result + "'";
 #endif
     }
-    struct CompileResult {
-        int status;
-        std::string diagnostics;
-    };
     inline CompileResult compile_probe(const std::string& source) {
         TemporaryDirectory temporary;
         auto input = temporary.path() / "probe.cpp", output = temporary.path() / "diagnostics.txt";

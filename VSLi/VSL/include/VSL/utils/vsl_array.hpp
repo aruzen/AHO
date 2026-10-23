@@ -14,9 +14,7 @@ namespace VSL_NAMESPACE {
     };
 
     template<convert_to_vsl_array T>
-    constexpr size_t vsl_array_size() {
-        return sizeof(T) / sizeof(typename T::ElementType);
-    }
+    constexpr size_t vsl_array_size();
 
     template<typename T>
     concept has_point_index = requires {
@@ -117,7 +115,7 @@ namespace VSL_NAMESPACE {
         using ElementType = T::ElementType;
 
         VSLD2Point(T* t) : VSLArray<T, ElementType, vsl_array_size<T>()>(t),
-                             VSLD2PointAccessor<typename T::ElementType>{(*this)[T::POINT_INDEX], (*this)[T::POINT_INDEX + 1]} {
+                           VSLD2PointAccessor<typename T::ElementType>{(*this)[T::POINT_INDEX], (*this)[T::POINT_INDEX + 1]} {
             if constexpr (VSL_NAMESPACE::VALIDATION) {
                 VSL_NAMESPACE::loggingln(typeid(*this).name(), " : ", typeid(T).name(), " (processed by vsl_array & has_index)");
             }
@@ -163,7 +161,7 @@ namespace VSL_NAMESPACE {
         using ElementType = T::ElementType;
 
         VSLD2Size(T* t) : VSLArray<T, ElementType, vsl_array_size<T>()>(t),
-                            VSLD2SizeAccessor<typename T::ElementType>{(*this)[0], (*this)[1]} {
+                          VSLD2SizeAccessor<typename T::ElementType>{(*this)[0], (*this)[1]} {
             if constexpr (VSL_NAMESPACE::VALIDATION) {
                 VSL_NAMESPACE::loggingln(typeid(*this).name(), " : ", typeid(T).name(), " (processed by vsl_array)");
             }
@@ -178,7 +176,7 @@ namespace VSL_NAMESPACE {
         using ElementType = T::ElementType;
 
         VSLD2Size(T* t) : VSLArray<T, ElementType, vsl_array_size<T>()>(t),
-                            VSLD2SizeAccessor<typename T::ElementType>{(*this)[T::SIZE_INDEX], (*this)[T::SIZE_INDEX + 1]} {
+                          VSLD2SizeAccessor<typename T::ElementType>{(*this)[T::SIZE_INDEX], (*this)[T::SIZE_INDEX + 1]} {
             if constexpr (VSL_NAMESPACE::VALIDATION) {
                 VSL_NAMESPACE::loggingln(typeid(*this).name(), " : ", typeid(T).name(), " (processed by vsl_array & has_index)");
             }
@@ -228,11 +226,11 @@ namespace VSL_NAMESPACE {
         }
 
         VSLD2Rectangle(T* t) : VSLArray<T, ElementType, vsl_array_size<T>()>(t),
-                                 VSLD2RectangleAccessor<typename T::ElementType>{
-                                     (*this)[PointOffset()],
-                                     (*this)[PointOffset() + 1],
-                                     (*this)[SizeOffset()],
-                                     (*this)[SizeOffset() + 1]} {}
+                               VSLD2RectangleAccessor<typename T::ElementType>{
+                                   (*this)[PointOffset()],
+                                   (*this)[PointOffset() + 1],
+                                   (*this)[SizeOffset()],
+                                   (*this)[SizeOffset() + 1]} {}
     };
 
     template<typename ElementType_>
@@ -276,7 +274,7 @@ namespace VSL_NAMESPACE {
         using ElementType = T::ElementType;
 
         VSLDRGBColor(T* t) : VSLArray<T, ElementType, vsl_array_size<T>()>(t),
-                               VSLDRGBColorAccessor<typename T::ElementType>{(*this)[0], (*this)[1], (*this)[2]} {}
+                             VSLDRGBColorAccessor<typename T::ElementType>{(*this)[0], (*this)[1], (*this)[2]} {}
     };
 
     template<typename T>
@@ -287,6 +285,11 @@ namespace VSL_NAMESPACE {
         using ElementType = T::ElementType;
 
         VSLDRGBColor(T* t) : VSLArray<T, ElementType, vsl_array_size<T>()>(t),
-                               VSLDRGBColorAccessor<typename T::ElementType>{(*this)[T::COLOR_INDEX + 0], (*this)[T::COLOR_INDEX + 1], (*this)[T::COLOR_INDEX + 2]} {}
+                             VSLDRGBColorAccessor<typename T::ElementType>{(*this)[T::COLOR_INDEX + 0], (*this)[T::COLOR_INDEX + 1], (*this)[T::COLOR_INDEX + 2]} {}
     };
+
+    template<convert_to_vsl_array T>
+    constexpr size_t vsl_array_size() {
+        return sizeof(T) / sizeof(typename T::ElementType);
+    }
 } // namespace VSL_NAMESPACE

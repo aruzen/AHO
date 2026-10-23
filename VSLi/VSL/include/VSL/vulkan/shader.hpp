@@ -51,6 +51,20 @@ namespace VSL_NAMESPACE {
         //        All = 0x7FFFFFFF,
     };
 
+    struct ShaderAccessor {
+        std::shared_ptr<VSL_NAMESPACE::impl::ShaderImpl> data_;
+    };
+
+    template<VSL_NAMESPACE::ShaderType type = ShaderType::VERTEX>
+    struct Shader : public ShaderAccessor {
+        constexpr static ShaderType TYPE = type;
+
+        Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path);
+        Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path, std::string name);
+
+        std::string name() const;
+    };
+
     ___VSL_EXPAND_FLAGS_OPERATOR(ShaderFlag);
 
     constexpr ShaderFlag operator|(ShaderType l, ShaderType r) {
@@ -65,20 +79,8 @@ namespace VSL_NAMESPACE {
         return static_cast<ShaderFlag>(static_cast<std::underlying_type_t<ShaderType>>(l) ^ static_cast<std::underlying_type_t<ShaderType>>(r));
     }
 
-    constexpr ShaderFlag convert(const ShaderType& t) { return (ShaderFlag)t; };
-
-    struct ShaderAccessor {
-        std::shared_ptr<VSL_NAMESPACE::impl::ShaderImpl> data_;
-    };
-
-    template<VSL_NAMESPACE::ShaderType type = ShaderType::VERTEX>
-    struct Shader : public ShaderAccessor {
-        constexpr static ShaderType TYPE = type;
-
-        Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path);
-        Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path, std::string name);
-
-        std::string name() const;
+    constexpr ShaderFlag convert(const ShaderType& t) {
+        return (ShaderFlag)t;
     };
 
     template<helper::ConstantStringHolder txt>

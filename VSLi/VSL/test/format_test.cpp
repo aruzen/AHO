@@ -9,8 +9,8 @@ namespace {
         std::uint32_t component_bytes;
         const char* name;
     };
-#define FAMILY(name, bytes)                                                                      \
-    Family {                                                                                     \
+#define FAMILY(name, bytes)                                                                          \
+    Family {                                                                                         \
         {format::name##_R, format::name##_RG, format::name##_RGB, format::name##_RGBA}, bytes, #name \
     }
     const std::array FAMILIES{FAMILY(UNSIGNED_NORMALIZED8, 1),

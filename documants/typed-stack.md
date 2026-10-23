@@ -1,6 +1,6 @@
 # Typed拡張のstack
 
-基点は最新masterから切った `typed-stack-base`。今回は以下のTyped経路を順番に実装し、各PRのbaseを直前のbranchとする。arenaによる一括確保は将来の方向として記録するが、今回のstackには追加しない。
+基点は作業開始時のmaster（`433f3e3`）から切った `typed-stack-base`。今回は以下のTyped経路を順番に実装し、各PRのbaseを直前のbranchとする。arenaによる一括確保は将来の方向として記録するが、今回のstackには追加しない。
 
 1. descriptor: schemaをpipeline/update/bind/drawへ保持する。UBO/SSBOのpayload、画像/samplerの種別、set/binding、固定配列数を照合する。
 2. push constant: payloadとstage/offset/sizeを結び、commandが値を所有する。
@@ -9,7 +9,7 @@
 5. buffer view / subpass: offset/rangeを持つviewとsubpass選択を追加する。
 6. batch: pipeline/resourceの一致を確認して連続drawの冗長bindを省く。
 
-現在はTyped pipelineが頂点入力の型だけを保持し、descriptor更新は型消去されたResourceへ委譲される。descriptorの配列更新は既存APIが先頭1要素だけに固定されているため、Typed用のbackendへ配列全体の検証・更新・所有権保持を追加する。Vulkan handleは既存VSLを使う。
+着手時点ではTyped pipelineが頂点入力の型だけを保持し、descriptor更新は型消去されたResourceへ委譲される。descriptorの配列更新は既存APIが先頭1要素だけに固定されているため、Typed用のbackendへ配列全体の検証・更新・所有権保持を追加する。Vulkan handleは既存VSLを使う。
 
 同期とdescriptorの使用中更新は利用側の責任。型検査はGPU実行中の更新を安全にする仕組みではない。特殊descriptor（texel buffer、dynamic offset、acceleration structure等）は対応するnative機能と合わせた拡張が必要で、今回の共通UBO/SSBO・画像・samplerの契約には含めない。
 
@@ -153,3 +153,30 @@ using SecondSubpass = t::TypedGraphicsPipeline<Input, Resources, Pushes, 1>;
 ### view/subpassの検証
 
 同じM1/MoltenVK環境で関連CTest **278/278成功、skipなし**。新規CPU 1件、実GPU 4件、compile contract 6件（正例1、負例5）。subviewのoffset/容量/所有権、部分頂点bufferからのdraw/indexed draw、SSBOの部分範囲だけの書き込み、uniform alignment拒否とowner保持、subpass 1の描画・存在しないsubpass拒否を確認した。unexpected validation errorなし。変更8ファイル/4TUのstyle違反0件、MSBuild XML検査成功。
+
+PR: [#244](https://github.com/aruzen/AHO/pull/244)、`feat/vsl-typed-views-subpass` → `feat/vsl-typed-indexed-draw`。
+
+## 6. Typed commandのbatch化
+
+`TypedBatch(draw1, indexed2, ...)` または `TypedBatch(dispatch1, dispatch2, ...)` が完成済みのTyped commandをtupleで所有する。異なるInput/Resource/Push schemaも同じgraphics/compute系統内なら混在できる。空batch、graphicsとcomputeの混在、生command、未完成bindingはコンパイル時に拒否する。
+
+構築時にnative実体のidentityからbind計画を作る。pipelineは実PipelineImpl、vertexはbinding番号+BufferImpl+byte offset、indexはBufferImpl+offset+要素型、descriptorはset番号+実allocationで比較する。同じC++型であっても別pipeline/buffer/setならbindする。pipeline切り替え時はdescriptorを再bindし、異なるlayoutの互換性を勝手に推測しない。vertex/index stateはVulkanの保持する実stateと照合して再利用する。push snapshotは各commandで必ず反映する。
+
+型宣言から計算した固定容量arrayにplanと比較用stateを置くため、この計画用にheap allocationは追加しない。command内の既存resource vectorやnative objectのshared ownershipは継続する。`statistics()` で計画上のpipeline/vertex/index/descriptor bind数とdraw/dispatch数を確認できる。
+
+batchの各invokeは最初から必要なstateをbindする。外側のcommand streamや前回のbatch実行のstateには依存しない。get_pipelineは最後のcommandのpipelineを返し、直後の動的APIへ正しい状態を伝える。元wrapper/batchの破棄後もsubmissionへownerをpinする。全commandは同じdeviceを要求し、異なるmanagerは記録前に拒否する。
+
+順序変更・drawの統合・GPU barrier挿入は行わない。compute dispatch間のデータ依存、descriptorの使用中更新、pipelineに対応するrender pass/subpass、CPU/GPU同期は利用側が扱う。依存するdispatchの間にbarrierが必要ならbatchを分け、既存commandでbarrierを入れる。今回のcompute GPU検証は別々の出力範囲へ書き込む2dispatchを使う。
+
+```cpp
+auto bound = pipeline.bind_vertices(vertices).bind_resources(resources);
+auto batch = t::TypedBatch(bound.draw(3), bound.draw(6, 1, 3));
+phase << batch;
+```
+
+
+### batchの検証
+
+同じM1/MoltenVK環境で関連CTest **290/290成功、skipなし**。新規実GPU 6件、compile contract 6件（正例1、負例5）。同じpipelineのbind省略とbatch再利用、同じ型の別pipelineと最後のpipelineの通知、vertex bufferのidentity/offset、index型、descriptorの切り替え・pipeline変更時の再bind、全push snapshot、wrapper/batch破棄後の所有権、computeの別範囲への出力を確認した。unexpected validation errorなし。変更5ファイル/2TUのstyle違反0件。新規SPIR-V validator、MSBuild XML、diff検査も成功。
+
+6段の機能はそれぞれのbaseから製品VSL・vsl-test・正例contractをビルドし、各段の新規テストと既存経路を実行した。最終290件はTypedの全compile contract 73件と関連CPU/GPUテストを含む。全AHO/VSLテスト、Windows/Linux、sanitizerは未実施。masterへのmergeは行わず、最後のbranchは `feat/vsl-typed-batches`、baseは `feat/vsl-typed-views-subpass`。

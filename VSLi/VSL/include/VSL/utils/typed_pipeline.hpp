@@ -16,6 +16,8 @@
 #include <utility>
 
 namespace VSL_NAMESPACE::typed {
+    template<typename...>
+    class TypedBatch;
     template<typename Vertex_, MemoryProperty memory_property>
     class TypedVertexBuffer;
     template<typename Vertex_>
@@ -113,6 +115,8 @@ namespace VSL_NAMESPACE::typed {
     // Captured owners survive wrapper destruction and are retained through GPU completion.
     template<typename Input, typename Resources = ResourceSchema<>, typename Pushes = PushSchema<>>
     class TypedDraw final : public command::Command, public command::PipelineHolder {
+        template<typename...>
+        friend class TypedBatch;
         template<typename, typename, typename, bool, bool>
         friend class TypedVertexBinding;
         VSL_NAMESPACE::GraphicsPipeline _pipeline;
@@ -135,6 +139,8 @@ namespace VSL_NAMESPACE::typed {
 
     template<typename Input, typename Resources = ResourceSchema<>, typename Pushes = PushSchema<>>
     class TypedIndexedDraw final : public command::Command, public command::PipelineHolder {
+        template<typename...>
+        friend class TypedBatch;
         template<typename, typename, typename, bool, bool>
         friend class TypedVertexBinding;
         VSL_NAMESPACE::GraphicsPipeline _pipeline;

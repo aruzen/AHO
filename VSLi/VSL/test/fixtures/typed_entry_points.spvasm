@@ -1,0 +1,49 @@
+OpCapability Shader
+OpMemoryModel Logical GLSL450
+OpEntryPoint Vertex %first "first" %input0 %position %color
+OpEntryPoint Vertex %second "second" %input7 %position %color
+OpName %input0 "position0"
+OpName %input7 "position7"
+OpDecorate %input0 Location 0
+OpDecorate %input7 Location 7
+OpDecorate %position BuiltIn Position
+OpDecorate %color Location 0
+%void = OpTypeVoid
+%function = OpTypeFunction %void
+%float = OpTypeFloat 32
+%vec2 = OpTypeVector %float 2
+%vec3 = OpTypeVector %float 3
+%vec4 = OpTypeVector %float 4
+%input_pointer = OpTypePointer Input %vec2
+%output_pointer = OpTypePointer Output %vec4
+%color_pointer = OpTypePointer Output %vec3
+%input0 = OpVariable %input_pointer Input
+%input7 = OpVariable %input_pointer Input
+%position = OpVariable %output_pointer Output
+%color = OpVariable %color_pointer Output
+%zero = OpConstant %float 0
+%one = OpConstant %float 1
+%quarter = OpConstant %float 0.25
+%half = OpConstant %float 0.5
+%three_quarters = OpConstant %float 0.75
+%tint = OpConstantComposite %vec3 %quarter %half %three_quarters
+%first = OpFunction %void None %function
+%first_label = OpLabel
+%a = OpLoad %vec2 %input0
+%ax = OpCompositeExtract %float %a 0
+%ay = OpCompositeExtract %float %a 1
+%av = OpCompositeConstruct %vec4 %ax %ay %zero %one
+OpStore %position %av
+OpStore %color %tint
+OpReturn
+OpFunctionEnd
+%second = OpFunction %void None %function
+%second_label = OpLabel
+%b = OpLoad %vec2 %input7
+%bx = OpCompositeExtract %float %b 0
+%by = OpCompositeExtract %float %b 1
+%bv = OpCompositeConstruct %vec4 %bx %by %zero %one
+OpStore %position %bv
+OpStore %color %tint
+OpReturn
+OpFunctionEnd

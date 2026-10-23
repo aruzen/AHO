@@ -132,10 +132,19 @@ namespace VSL_NAMESPACE::typed {
 
     namespace detail {
         template<typename T> struct VertexMemberFormat {
-            static constexpr auto VALUE = data_format::convert_graphic_type<std::remove_cv_t<T>>();
+            static constexpr auto VALUE = [] {
+                if constexpr (std::is_same_v<std::remove_cv_t<T>, signed char>) return data_format::INT8;
+                else return data_format::convert_graphic_type<std::remove_cv_t<T>>();
+            }();
         };
         template<typename T, size_t count> struct VertexMemberFormat<T[count]> {
-            static constexpr auto VALUE = VertexMemberFormat<T>::VALUE.template to_vec<count>();
+            static constexpr auto VALUE = [] {
+                constexpr auto scalar = VertexMemberFormat<T>::VALUE;
+                if constexpr (scalar.size() == sizeof(T) && scalar.get_vec_length() == 1)
+                    return scalar.template to_vec<count>();
+                else
+                    return data_format::UNDEFINED;
+            }();
         };
         template<typename T, size_t count> struct VertexMemberFormat<std::array<T, count>> : VertexMemberFormat<T[count]> {};
 
@@ -153,7 +162,7 @@ namespace VSL_NAMESPACE::typed {
 
     // Keep the member's actual type and offsetof together; a format override expresses e.g. UNORM storage.
     template<typename Vertex_, typename Member, std::uint32_t offset, std::uint32_t location = AUTO,
-             data_format::Format format = detail::VertexMemberFormat<Member>::VALUE>
+             data_format::Format format = detail::VertexMemberFormat<std::remove_cv_t<Member>>::VALUE>
     struct VertexMember : VertexInputDefinition<format, location, offset> {
         using Vertex = Vertex_;
         static_assert(format.size() != 0 && format.size() <= sizeof(Member), "Vertex member format exceeds its C++ storage or is undefined");

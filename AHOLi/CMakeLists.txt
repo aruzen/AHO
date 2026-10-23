@@ -14,6 +14,7 @@ add_library(AHOLi
         AHO/src/io/keyboard.cpp
         AHO/src/io/key.cpp
         AHO/src/drawer.cpp
+        AHO/src/x/drawer/draw_list.cpp
         AHO/src/image_readback.cpp
         AHO/src/x/screenshot.cpp
         AHO/src/engine.cpp
@@ -24,6 +25,7 @@ add_library(AHOLi
 
         AHO/include/AHO/image_readback.hpp
         AHO/include/AHO/x/screenshot.hpp
+        AHO/include/AHO/x/drawer/draw_list.hpp
         AHO/include/aho/engine.hpp
         AHO/include/aho/concepts.hpp
         AHO/include/aho/pipeline/layouts.hpp

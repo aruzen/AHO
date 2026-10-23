@@ -173,6 +173,7 @@
     <ClInclude Include="VSL\include\VSL\utils\typed_pipeline.hpp" />
     <ClInclude Include="VSL\include\VSL\utils\typed_index_buffer.hpp" />
     <ClInclude Include="VSL\include\VSL\utils\typed_buffer_view.hpp" />
+    <ClInclude Include="VSL\include\VSL\utils\typed_batch.hpp" />
     <ClInclude Include="VSL\include\VSL\utils\typed_shader.hpp" />
     <ClInclude Include="VSL\include\VSL\utils\typed_resources.hpp" />
     <ClInclude Include="VSL\include\VSL\utils\typed_push_constants.hpp" />

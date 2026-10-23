@@ -64,6 +64,7 @@ add_library(VSL STATIC
         VSL/include/VSL/utils/typed_safe_resource.hpp
         VSL/include/VSL/utils/typed_vertex_layout.hpp
         VSL/include/VSL/utils/typed_pipeline.hpp
+        VSL/include/VSL/utils/typed_index_buffer.hpp
         VSL/include/VSL/utils/typed_shader.hpp
         VSL/include/VSL/utils/typed_resources.hpp
         VSL/include/VSL/utils/typed_push_constants.hpp

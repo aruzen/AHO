@@ -11,73 +11,83 @@
 
 namespace AHO_NAMESPACE {
     namespace coordinate {
-#define COORDINATE_ELEMENT_TYPE_DEFINITION_EXPANDER(Upper, Lower)                                                            \
-    template<typename T>                                                                                                     \
-    struct Upper {                                                                                                           \
-        T value;                                                                                                             \
-                                                                                                                             \
-        constexpr static char UPPER_CHAR = #Upper[0];                                                                         \
-        constexpr static char LOWER_CHAR = #Lower[0];                                                                         \
-                                                                                                                             \
-        constexpr Upper(const T& t) : value(t) {};                                                                           \
-        constexpr Upper() : value{} {};                                                                                      \
-                                                                                                                             \
-        constexpr auto operator<=>(const Upper<T>&) const = default;                                                         \
-                                                                                                                             \
-        constexpr Upper<T> operator+() const {                                                                               \
-            static_assert(concepts::plusable<T>);                                                                            \
-            return {value};                                                                                                  \
-        };                                                                                                                   \
-        constexpr Upper<T> operator-() const {                                                                               \
-            static_assert(concepts::minusable<T>);                                                                           \
-            return Upper<T>(-value);                                                                                         \
-        };                                                                                                                   \
-        template<typename R>                                                                                                 \
-        requires concepts::add_as<const T&, const R&>                                                                        \
-        constexpr auto operator+(const Upper<R>& t) const -> Upper<decltype(value + t.value)> { return {value + t.value}; }; \
-        template<typename R>                                                                                                 \
-        requires concepts::subtract_as<const T&, const R&>                                                                   \
-        constexpr auto operator-(const Upper<R>& t) const -> Upper<decltype(value - t.value)> { return {value - t.value}; }; \
-        template<typename R>                                                                                                 \
-        requires concepts::multiply_as<const T&, const R&>                                                                   \
-        constexpr auto operator*(const Upper<R>& t) const -> Upper<decltype(value * t.value)> { return {value * t.value}; }; \
-        template<typename R>                                                                                                 \
-        requires concepts::division_as<const T&, const R&>                                                                   \
-        constexpr auto operator/(const Upper<R>& t) const -> Upper<decltype(value / t.value)> { return {value / t.value}; }; \
-                                                                                                                             \
-        template<typename R>                                                                                                 \
-        requires concepts::add_assign_as<T&, const R&>                                                                       \
-        constexpr Upper<T>& operator+=(const Upper<R>& t) {                                                                  \
-            value += t.value;                                                                                                \
-            return *this;                                                                                                    \
-        };                                                                                                                   \
-        template<typename R>                                                                                                 \
-        requires concepts::subtract_assign_as<T&, const R&>                                                                  \
-        constexpr Upper<T>& operator-=(const Upper<R>& t) {                                                                  \
-            value -= t.value;                                                                                                \
-            return *this;                                                                                                    \
-        };                                                                                                                   \
-        template<typename R>                                                                                                 \
-        requires concepts::multiply_assign_as<T&, const R&>                                                                  \
-        constexpr Upper<T>& operator*=(const Upper<R>& t) {                                                                  \
-            value *= t.value;                                                                                                \
-            return *this;                                                                                                    \
-        };                                                                                                                   \
-        template<typename R>                                                                                                 \
-        requires concepts::division_assign_as<T&, const R&>                                                                  \
-        constexpr Upper<T>& operator/=(const Upper<R>& t) {                                                                  \
-            value /= t.value;                                                                                                \
-            return *this;                                                                                                    \
-        };                                                                                                                   \
-                                                                                                                             \
-        template<typename R>                                                                                                 \
-        requires concepts::cast_as<T, R>                                                                                     \
-        Upper<R> cast() const { return {(R)value}; }                                                                         \
-    };                                                                                                                       \
-    template<typename T>                                                                                                     \
-    std::ostream& operator<<(std::ostream& out, const Upper<T>& Lower) {                                                     \
-        out << #Lower << " : " << Lower.value;                                                                               \
-        return out;                                                                                                          \
+#define COORDINATE_ELEMENT_TYPE_DEFINITION_EXPANDER(Upper, Lower)                               \
+    template<typename T>                                                                        \
+    struct Upper {                                                                              \
+        T value;                                                                                \
+                                                                                                \
+        constexpr static char UPPER_CHAR = #Upper[0];                                           \
+        constexpr static char LOWER_CHAR = #Lower[0];                                           \
+                                                                                                \
+        constexpr Upper(const T& t) : value(t) {};                                              \
+        constexpr Upper() : value{} {};                                                         \
+                                                                                                \
+        constexpr auto operator<=>(const Upper<T>&) const = default;                            \
+                                                                                                \
+        constexpr Upper<T> operator+() const {                                                  \
+            static_assert(concepts::plusable<T>);                                               \
+            return {value};                                                                     \
+        };                                                                                      \
+        constexpr Upper<T> operator-() const {                                                  \
+            static_assert(concepts::minusable<T>);                                              \
+            return Upper<T>(-value);                                                            \
+        };                                                                                      \
+        template<typename R>                                                                    \
+        requires concepts::add_as<const T&, const R&>                                           \
+        constexpr auto operator+(const Upper<R>& t) const -> Upper<decltype(value + t.value)> { \
+            return {value + t.value};                                                           \
+        };                                                                                      \
+        template<typename R>                                                                    \
+        requires concepts::subtract_as<const T&, const R&>                                      \
+        constexpr auto operator-(const Upper<R>& t) const -> Upper<decltype(value - t.value)> { \
+            return {value - t.value};                                                           \
+        };                                                                                      \
+        template<typename R>                                                                    \
+        requires concepts::multiply_as<const T&, const R&>                                      \
+        constexpr auto operator*(const Upper<R>& t) const -> Upper<decltype(value * t.value)> { \
+            return {value * t.value};                                                           \
+        };                                                                                      \
+        template<typename R>                                                                    \
+        requires concepts::division_as<const T&, const R&>                                      \
+        constexpr auto operator/(const Upper<R>& t) const -> Upper<decltype(value / t.value)> { \
+            return {value / t.value};                                                           \
+        };                                                                                      \
+                                                                                                \
+        template<typename R>                                                                    \
+        requires concepts::add_assign_as<T&, const R&>                                          \
+        constexpr Upper<T>& operator+=(const Upper<R>& t) {                                     \
+            value += t.value;                                                                   \
+            return *this;                                                                       \
+        };                                                                                      \
+        template<typename R>                                                                    \
+        requires concepts::subtract_assign_as<T&, const R&>                                     \
+        constexpr Upper<T>& operator-=(const Upper<R>& t) {                                     \
+            value -= t.value;                                                                   \
+            return *this;                                                                       \
+        };                                                                                      \
+        template<typename R>                                                                    \
+        requires concepts::multiply_assign_as<T&, const R&>                                     \
+        constexpr Upper<T>& operator*=(const Upper<R>& t) {                                     \
+            value *= t.value;                                                                   \
+            return *this;                                                                       \
+        };                                                                                      \
+        template<typename R>                                                                    \
+        requires concepts::division_assign_as<T&, const R&>                                     \
+        constexpr Upper<T>& operator/=(const Upper<R>& t) {                                     \
+            value /= t.value;                                                                   \
+            return *this;                                                                       \
+        };                                                                                      \
+                                                                                                \
+        template<typename R>                                                                    \
+        requires concepts::cast_as<T, R>                                                        \
+        Upper<R> cast() const {                                                                 \
+            return {(R)value};                                                                  \
+        }                                                                                       \
+    };                                                                                          \
+    template<typename T>                                                                        \
+    std::ostream& operator<<(std::ostream& out, const Upper<T>& Lower) {                        \
+        out << #Lower << " : " << Lower.value;                                                  \
+        return out;                                                                             \
     };
 
         COORDINATE_ELEMENT_TYPE_DEFINITION_EXPANDER(X, x);
@@ -185,78 +195,90 @@ namespace AHO_NAMESPACE {
 #define ___AN3 template component<2>()
 #define ___AN4 template component<3>()
 
-#define AHO_COORDINATE_COMPONENT_ACCESSORS                                                      \
-    template<std::size_t index>                                                                 \
-    constexpr decltype(auto) component() { return detail::coordinate_component<index>(*this); } \
-    template<std::size_t index>                                                                 \
-    constexpr decltype(auto) component() const { return detail::coordinate_component<index>(*this); }
-
-#define AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper, Lower)                                \
-    template<typename T>                                                                    \
-    constexpr CoordinateSet<ElementType_, CoordinateInfo>& operator+=(const Upper<T>& e) { \
-        Lower += e;                                                                         \
-        return *this;                                                                       \
-    }                                                                                       \
-    template<typename T>                                                                    \
-    constexpr CoordinateSet<ElementType_, CoordinateInfo>& operator-=(const Upper<T>& e) { \
-        Lower -= e;                                                                         \
-        return *this;                                                                       \
+#define AHO_COORDINATE_COMPONENT_ACCESSORS                 \
+    template<std::size_t index>                            \
+    constexpr decltype(auto) component() {                 \
+        return detail::coordinate_component<index>(*this); \
+    }                                                      \
+    template<std::size_t index>                            \
+    constexpr decltype(auto) component() const {           \
+        return detail::coordinate_component<index>(*this); \
     }
 
-#define AHO_DEFINE_SPECIAL_COORDINATE_SET1(Upper, Lower)                                                                       \
-    template<typename ElementType_>                                                                                             \
-    struct CoordinateSet<ElementType_, typename MakeCoordinateInfo<                                                           \
-                                           std::same_as<X<ElementType_>, Upper<ElementType_>>,                                   \
-                                           std::same_as<Y<ElementType_>, Upper<ElementType_>>,                                   \
-                                           std::same_as<Z<ElementType_>, Upper<ElementType_>>>::Value> {                         \
-        using ElementType = ElementType_;                                                                                      \
-        using CoordinateInfo = typename MakeCoordinateInfo<                                                                  \
-            std::same_as<X<ElementType_>, Upper<ElementType_>>,                                                                  \
-            std::same_as<Y<ElementType_>, Upper<ElementType_>>,                                                                  \
-            std::same_as<Z<ElementType_>, Upper<ElementType_>>>::Value;                                                          \
-        static constexpr bool IS_COORDINATE_SET = true;                                                                        \
-        AHO_COORDINATE_COMPONENT_ACCESSORS                                                                                     \
-        union {                                                                                                                \
-            Upper<ElementType_> Lower, AHO_COORDINATE_NUMBERD_MEMBER_1;                                                         \
-        };                                                                                                                     \
-        constexpr CoordinateSet() : Lower(Upper<ElementType_>()) {};                                                           \
-        constexpr CoordinateSet(const Upper<ElementType_>& Lower) : Lower(Lower) {};                                           \
-        constexpr bool operator<(const CoordinateSet<ElementType, CoordinateInfo>& o) const {                               \
-            return Lower < o.Lower;                                                                                            \
-        }                                                                                                                      \
-        constexpr bool operator==(const CoordinateSet<ElementType, CoordinateInfo>& o) const { return Lower == o.Lower; }   \
-        constexpr auto operator<=>(const CoordinateSet<ElementType, CoordinateInfo>& o) const { return Lower <=> o.Lower; } \
-        AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper, Lower);                                                                  \
+#define AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper, Lower)                               \
+    template<typename T>                                                                   \
+    constexpr CoordinateSet<ElementType_, CoordinateInfo>& operator+=(const Upper<T>& e) { \
+        Lower += e;                                                                        \
+        return *this;                                                                      \
+    }                                                                                      \
+    template<typename T>                                                                   \
+    constexpr CoordinateSet<ElementType_, CoordinateInfo>& operator-=(const Upper<T>& e) { \
+        Lower -= e;                                                                        \
+        return *this;                                                                      \
+    }
+
+#define AHO_DEFINE_SPECIAL_COORDINATE_SET1(Upper, Lower)                                                 \
+    template<typename ElementType_>                                                                      \
+    struct CoordinateSet<ElementType_, typename MakeCoordinateInfo<                                      \
+                                           std::same_as<X<ElementType_>, Upper<ElementType_>>,           \
+                                           std::same_as<Y<ElementType_>, Upper<ElementType_>>,           \
+                                           std::same_as<Z<ElementType_>, Upper<ElementType_>>>::Value> { \
+        using ElementType = ElementType_;                                                                \
+        using CoordinateInfo = typename MakeCoordinateInfo<                                              \
+            std::same_as<X<ElementType_>, Upper<ElementType_>>,                                          \
+            std::same_as<Y<ElementType_>, Upper<ElementType_>>,                                          \
+            std::same_as<Z<ElementType_>, Upper<ElementType_>>>::Value;                                  \
+        static constexpr bool IS_COORDINATE_SET = true;                                                  \
+        AHO_COORDINATE_COMPONENT_ACCESSORS                                                               \
+        union {                                                                                          \
+            Upper<ElementType_> Lower, AHO_COORDINATE_NUMBERD_MEMBER_1;                                  \
+        };                                                                                               \
+        constexpr CoordinateSet() : Lower(Upper<ElementType_>()) {};                                     \
+        constexpr CoordinateSet(const Upper<ElementType_>& Lower) : Lower(Lower) {};                     \
+        constexpr bool operator<(const CoordinateSet<ElementType, CoordinateInfo>& o) const {            \
+            return Lower < o.Lower;                                                                      \
+        }                                                                                                \
+        constexpr bool operator==(const CoordinateSet<ElementType, CoordinateInfo>& o) const {           \
+            return Lower == o.Lower;                                                                     \
+        }                                                                                                \
+        constexpr auto operator<=>(const CoordinateSet<ElementType, CoordinateInfo>& o) const {          \
+            return Lower <=> o.Lower;                                                                    \
+        }                                                                                                \
+        AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper, Lower);                                            \
     };
 
-#define AHO_DEFINE_SPECIAL_COORDINATE_SET2(Upper1, Upper2, Lower1, Lower2)                                                                                             \
-    template<typename ElementType_>                                                                                                                                     \
-    struct CoordinateSet<ElementType_, typename MakeCoordinateInfo<                                                                                                   \
-                                           (std::same_as<X<ElementType_>, Upper1<ElementType_>> || std::same_as<X<ElementType_>, Upper2<ElementType_>>),                   \
-                                           (std::same_as<Y<ElementType_>, Upper1<ElementType_>> || std::same_as<Y<ElementType_>, Upper2<ElementType_>>),                   \
-                                           (std::same_as<Z<ElementType_>, Upper1<ElementType_>> || std::same_as<Z<ElementType_>, Upper2<ElementType_>>)>::Value> {         \
-        using ElementType = ElementType_;                                                                                                                              \
-        using CoordinateInfo = typename MakeCoordinateInfo<                                                                                                          \
-            (std::same_as<X<ElementType_>, Upper1<ElementType_>> || std::same_as<X<ElementType_>, Upper2<ElementType_>>),                                                  \
-            (std::same_as<Y<ElementType_>, Upper1<ElementType_>> || std::same_as<Y<ElementType_>, Upper2<ElementType_>>),                                                  \
-            (std::same_as<Z<ElementType_>, Upper1<ElementType_>> || std::same_as<Z<ElementType_>, Upper2<ElementType_>>)>::Value;                                          \
-        static constexpr bool IS_COORDINATE_SET = true;                                                                                                                \
-        AHO_COORDINATE_COMPONENT_ACCESSORS                                                                                                                             \
-        union {                                                                                                                                                        \
-            Upper1<ElementType_> Lower1, AHO_COORDINATE_NUMBERD_MEMBER_1;                                                                                               \
-        };                                                                                                                                                             \
-        union {                                                                                                                                                        \
-            Upper2<ElementType_> Lower2, AHO_COORDINATE_NUMBERD_MEMBER_2;                                                                                               \
-        };                                                                                                                                                             \
-        constexpr CoordinateSet() : Lower1(Upper1<ElementType_>()), Lower2(Upper2<ElementType_>()) {};                                                                  \
-        constexpr CoordinateSet(const Upper1<ElementType_>& Lower1, const Upper2<ElementType_>& Lower2) : Lower1(Lower1), Lower2(Lower2) {};                            \
-        constexpr bool operator<(const CoordinateSet<ElementType, CoordinateInfo>& o) const {                                                                       \
-            return (Lower1 != o.Lower1 ? Lower1 < o.Lower1 : Lower2 < o.Lower2);                                                                                       \
-        }                                                                                                                                                              \
-        constexpr bool operator==(const CoordinateSet<ElementType, CoordinateInfo>& o) const { return std::tie(Lower1, Lower2) == std::tie(o.Lower1, o.Lower2); }   \
-        constexpr auto operator<=>(const CoordinateSet<ElementType, CoordinateInfo>& o) const { return std::tie(Lower1, Lower2) <=> std::tie(o.Lower1, o.Lower2); } \
-        AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper1, Lower1);                                                                                                        \
-        AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper2, Lower2);                                                                                                        \
+#define AHO_DEFINE_SPECIAL_COORDINATE_SET2(Upper1, Upper2, Lower1, Lower2)                                                                                         \
+    template<typename ElementType_>                                                                                                                                \
+    struct CoordinateSet<ElementType_, typename MakeCoordinateInfo<                                                                                                \
+                                           (std::same_as<X<ElementType_>, Upper1<ElementType_>> || std::same_as<X<ElementType_>, Upper2<ElementType_>>),           \
+                                           (std::same_as<Y<ElementType_>, Upper1<ElementType_>> || std::same_as<Y<ElementType_>, Upper2<ElementType_>>),           \
+                                           (std::same_as<Z<ElementType_>, Upper1<ElementType_>> || std::same_as<Z<ElementType_>, Upper2<ElementType_>>)>::Value> { \
+        using ElementType = ElementType_;                                                                                                                          \
+        using CoordinateInfo = typename MakeCoordinateInfo<                                                                                                        \
+            (std::same_as<X<ElementType_>, Upper1<ElementType_>> || std::same_as<X<ElementType_>, Upper2<ElementType_>>),                                          \
+            (std::same_as<Y<ElementType_>, Upper1<ElementType_>> || std::same_as<Y<ElementType_>, Upper2<ElementType_>>),                                          \
+            (std::same_as<Z<ElementType_>, Upper1<ElementType_>> || std::same_as<Z<ElementType_>, Upper2<ElementType_>>)>::Value;                                  \
+        static constexpr bool IS_COORDINATE_SET = true;                                                                                                            \
+        AHO_COORDINATE_COMPONENT_ACCESSORS                                                                                                                         \
+        union {                                                                                                                                                    \
+            Upper1<ElementType_> Lower1, AHO_COORDINATE_NUMBERD_MEMBER_1;                                                                                          \
+        };                                                                                                                                                         \
+        union {                                                                                                                                                    \
+            Upper2<ElementType_> Lower2, AHO_COORDINATE_NUMBERD_MEMBER_2;                                                                                          \
+        };                                                                                                                                                         \
+        constexpr CoordinateSet() : Lower1(Upper1<ElementType_>()), Lower2(Upper2<ElementType_>()) {};                                                             \
+        constexpr CoordinateSet(const Upper1<ElementType_>& Lower1, const Upper2<ElementType_>& Lower2) : Lower1(Lower1), Lower2(Lower2) {};                       \
+        constexpr bool operator<(const CoordinateSet<ElementType, CoordinateInfo>& o) const {                                                                      \
+            return (Lower1 != o.Lower1 ? Lower1 < o.Lower1 : Lower2 < o.Lower2);                                                                                   \
+        }                                                                                                                                                          \
+        constexpr bool operator==(const CoordinateSet<ElementType, CoordinateInfo>& o) const {                                                                     \
+            return std::tie(Lower1, Lower2) == std::tie(o.Lower1, o.Lower2);                                                                                       \
+        }                                                                                                                                                          \
+        constexpr auto operator<=>(const CoordinateSet<ElementType, CoordinateInfo>& o) const {                                                                    \
+            return std::tie(Lower1, Lower2) <=> std::tie(o.Lower1, o.Lower2);                                                                                      \
+        }                                                                                                                                                          \
+        AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper1, Lower1);                                                                                                    \
+        AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Upper2, Lower2);                                                                                                    \
     };
 
         AHO_DEFINE_SPECIAL_COORDINATE_SET1(X, x);
@@ -524,18 +546,18 @@ namespace AHO_NAMESPACE {
             return result;
         }
 
-#define AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_THAN(U1, U2, EnableX, EnableY, EnableZ)                                                                                                        \
-    template<typename T1, typename T2>                                                                                                                                                          \
+#define AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_THAN(U1, U2, EnableX, EnableY, EnableZ)                                                                                                      \
+    template<typename T1, typename T2>                                                                                                                                                        \
     constexpr CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename MakeCoordinateInfo<EnableX, EnableY, EnableZ>::Value> operator-(const U1<T1>& e1, const U2<T2>& e2) { \
-        using Result = decltype(std::declval<T1>() - std::declval<T2>());                                                                                                                       \
-        return {static_cast<Result>(e1.value), -static_cast<Result>(e2.value)};                                                                                                                 \
+        using Result = decltype(std::declval<T1>() - std::declval<T2>());                                                                                                                     \
+        return {static_cast<Result>(e1.value), -static_cast<Result>(e2.value)};                                                                                                               \
     }
 
-#define AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_LESS(U1, U2, EnableX, EnableY, EnableZ)                                                                                                        \
-    template<typename T1, typename T2>                                                                                                                                                          \
+#define AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_LESS(U1, U2, EnableX, EnableY, EnableZ)                                                                                                      \
+    template<typename T1, typename T2>                                                                                                                                                        \
     constexpr CoordinateSet<decltype(std::declval<T1>() - std::declval<T2>()), typename MakeCoordinateInfo<EnableX, EnableY, EnableZ>::Value> operator-(const U1<T1>& e1, const U2<T2>& e2) { \
-        using Result = decltype(std::declval<T1>() - std::declval<T2>());                                                                                                                       \
-        return {-static_cast<Result>(e2.value), static_cast<Result>(e1.value)};                                                                                                                 \
+        using Result = decltype(std::declval<T1>() - std::declval<T2>());                                                                                                                     \
+        return {-static_cast<Result>(e2.value), static_cast<Result>(e1.value)};                                                                                                               \
     }
 
         AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_THAN(X, Y, true, true, false)
@@ -547,22 +569,46 @@ namespace AHO_NAMESPACE {
         AHO_DEFINE_COORDINATE_SET_SUB_COORDINATE_LESS(Z, Y, false, true, true)
 
         namespace literals {
-            constexpr X<double> operator AHO_LITERAL(x)(long double v) { return {(double)v}; };
-            constexpr X<int> operator AHO_LITERAL(x)(unsigned long long v) { return {(int)v}; };
-            constexpr X<float> operator AHO_LITERAL(f_x)(long double v) { return {(float)v}; };
-            constexpr X<size_t> operator AHO_LITERAL(l_x)(unsigned long long v) { return {v}; };
+            constexpr X<double> operator AHO_LITERAL(x)(long double v) {
+                return {(double)v};
+            };
+            constexpr X<int> operator AHO_LITERAL(x)(unsigned long long v) {
+                return {(int)v};
+            };
+            constexpr X<float> operator AHO_LITERAL(f_x)(long double v) {
+                return {(float)v};
+            };
+            constexpr X<size_t> operator AHO_LITERAL(l_x)(unsigned long long v) {
+                return {v};
+            };
             constexpr X<double> X_(1.0);
 
-            constexpr Y<double> operator AHO_LITERAL(y)(long double v) { return {(double)v}; };
-            constexpr Y<int> operator AHO_LITERAL(y)(unsigned long long v) { return {(int)v}; };
-            constexpr Y<float> operator AHO_LITERAL(f_y)(long double v) { return {(float)v}; };
-            constexpr Y<size_t> operator AHO_LITERAL(l_y)(unsigned long long v) { return {v}; };
+            constexpr Y<double> operator AHO_LITERAL(y)(long double v) {
+                return {(double)v};
+            };
+            constexpr Y<int> operator AHO_LITERAL(y)(unsigned long long v) {
+                return {(int)v};
+            };
+            constexpr Y<float> operator AHO_LITERAL(f_y)(long double v) {
+                return {(float)v};
+            };
+            constexpr Y<size_t> operator AHO_LITERAL(l_y)(unsigned long long v) {
+                return {v};
+            };
             constexpr Y<double> Y_(1.0);
 
-            constexpr Z<double> operator AHO_LITERAL(z)(long double v) { return {(double)v}; };
-            constexpr Z<int> operator AHO_LITERAL(z)(unsigned long long v) { return {(int)v}; };
-            constexpr Z<float> operator AHO_LITERAL(f_z)(long double v) { return {(float)v}; };
-            constexpr Z<size_t> operator AHO_LITERAL(l_z)(unsigned long long v) { return {v}; };
+            constexpr Z<double> operator AHO_LITERAL(z)(long double v) {
+                return {(double)v};
+            };
+            constexpr Z<int> operator AHO_LITERAL(z)(unsigned long long v) {
+                return {(int)v};
+            };
+            constexpr Z<float> operator AHO_LITERAL(f_z)(long double v) {
+                return {(float)v};
+            };
+            constexpr Z<size_t> operator AHO_LITERAL(l_z)(unsigned long long v) {
+                return {v};
+            };
             constexpr Z<double> Z_(1.0);
         } // namespace literals
     } // namespace coordinate

@@ -10,8 +10,10 @@ namespace {
     struct Color { float rgb[3]; };
     using PositionAttribute = typed::VertexInputDefinition<vsl::data_format::FLOAT_RG, 0, offsetof(Position, xy)>;
     using ColorAttribute = typed::VertexInputDefinition<vsl::data_format::FLOAT_RGB, 1, offsetof(Color, rgb)>;
-    using Positions = typed::VertexBinding<Position, 0, Timing::NEXT_VERTEX, PositionAttribute>;
-    using Colors = typed::VertexBinding<Color, 1, Timing::NEXT_VERTEX, ColorAttribute>;
+    using PositionRecord = typed::VertexRecord<Position, VSL_VERTEX_MEMBER(Position, xy)>;
+    using ColorRecord = typed::VertexRecord<Color, VSL_VERTEX_MEMBER(Color, rgb)>;
+    using Positions = PositionRecord::Binding<0>;
+    using Colors = ColorRecord::Binding<1, Timing::NEXT_VERTEX, 1>;
     using Input = typed::TypedVertexInput<Positions, Colors>;
     static_assert(Input::LAYOUT.binding[0].stride == sizeof(Position));
     static_assert(Input::LAYOUT.binding[1].stride == sizeof(Color));
@@ -52,6 +54,20 @@ namespace {
         EXPECT_GT(sizeof(Wide), offsetof(Wide, scalar) + sizeof(float));
     }
 
+    TEST(TypedVertexLayoutTest, RecordSchemaInfersMembersAndReusesLocationsWithPadding) {
+        struct Vertex { std::uint8_t tag; float xy[2]; std::array<double, 3> normal; };
+        using Schema = typed::VertexRecord<Vertex, VSL_VERTEX_MEMBER(Vertex, xy), VSL_VERTEX_MEMBER(Vertex, normal)>;
+        using Binding = Schema::Binding<7, Timing::NEXT_INSTANCE, 3>;
+        constexpr auto layout = typed::TypedVertexInput<Binding>::LAYOUT;
+        static_assert(layout.attribute[0].format == vsl::data_format::FLOAT_RG);
+        static_assert(layout.attribute[1].format == vsl::data_format::FLOAT64_RGB);
+        static_assert(layout.attribute[0].offset == offsetof(Vertex, xy));
+        static_assert(layout.attribute[1].offset == offsetof(Vertex, normal));
+        static_assert(layout.attribute[0].location == 3 && layout.attribute[1].location == 4);
+        static_assert(layout.attribute[1].locations == 2 && layout.binding[0].stride == sizeof(Vertex));
+        EXPECT_EQ(layout.binding[0].timing, Timing::NEXT_INSTANCE);
+    }
+
     class TypedPipelineVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     protected:
@@ -76,8 +92,8 @@ namespace {
     }
 
     TEST_F(TypedPipelineVulkanIntegrationTest, SparseBindingsAreNotRenumberedDuringRecording) {
-        using SparsePositions = typed::VertexBinding<Position, 4, Timing::NEXT_VERTEX, PositionAttribute>;
-        using SparseColors = typed::VertexBinding<Color, 7, Timing::NEXT_VERTEX, ColorAttribute>;
+        using SparsePositions = PositionRecord::Binding<4>;
+        using SparseColors = ColorRecord::Binding<7, Timing::NEXT_VERTEX, 1>;
         auto typed_pipeline = make_typed<typed::TypedVertexInput<SparsePositions, SparseColors>>();
         typed::TypedVertexBuffer<Position> positions(device, POSITIONS);
         typed::TypedVertexBuffer<Color> colors(device, COLORS);
@@ -89,7 +105,7 @@ namespace {
     }
 
     TEST_F(TypedPipelineVulkanIntegrationTest, InstanceRateAndFirstVertexAndInstanceSelectTheCorrectRecords) {
-        using Instances = typed::VertexBinding<Color, 1, Timing::NEXT_INSTANCE, ColorAttribute>;
+        using Instances = ColorRecord::Binding<1, Timing::NEXT_INSTANCE, 1>;
         auto typed_pipeline = make_typed<typed::TypedVertexInput<Positions, Instances>>();
         const std::array<Position, 4> source{{{{0, 0}}, POSITIONS[0], POSITIONS[1], POSITIONS[2]}};
         const std::array<Color, 2> tints{{{{1, 0, 0}}, COLORS[0]}};
@@ -148,9 +164,9 @@ namespace {
 
     TEST_F(TypedPipelineVulkanIntegrationTest, InterleavedFloatAndNormalizedIntegerAttributesKeepPadding) {
         struct Vertex { float xy[2]; std::uint8_t rgba[4]; float padding; };
-        using Record = typed::VertexBinding<Vertex, 3, Timing::NEXT_VERTEX,
-            typed::VertexInputDefinition<vsl::data_format::FLOAT_RG, 0, offsetof(Vertex, xy)>,
-            typed::VertexInputDefinition<vsl::data_format::UNSIGNED_NORMALIZED8_RGBA, 1, offsetof(Vertex, rgba)>>;
+        using Schema = typed::VertexRecord<Vertex, VSL_VERTEX_MEMBER(Vertex, xy),
+            VSL_VERTEX_MEMBER(Vertex, rgba, typed::AUTO, vsl::data_format::UNSIGNED_NORMALIZED8_RGBA)>;
+        using Record = Schema::Binding<3>;
         using Layout = typed::TypedVertexInput<Record>;
         static_assert(Layout::LAYOUT.binding[0].stride == sizeof(Vertex));
         auto typed_pipeline = make_typed<Layout>();

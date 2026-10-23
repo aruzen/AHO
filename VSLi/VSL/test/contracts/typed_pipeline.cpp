@@ -11,7 +11,8 @@ namespace {
     struct Vertex { float xy[2]; };
     struct OtherVertex { std::uint32_t xy[2]; };
     using Attribute = t::VertexInputDefinition<vsl::data_format::FLOAT_RG, 0, offsetof(Vertex, xy)>;
-    using Binding = t::VertexBinding<Vertex, 0, Timing::NEXT_VERTEX, Attribute>;
+    using Schema = t::VertexRecord<Vertex, VSL_VERTEX_MEMBER(Vertex, xy)>;
+    using Binding = Schema::Binding<0>;
     using Input = t::TypedVertexInput<Binding>;
     using Pipeline = t::TypedGraphicsPipeline<Input>;
 
@@ -59,5 +60,18 @@ namespace {
     using Undefined = t::VertexShapeDefinition<0, t::AUTO, Timing::NEXT_VERTEX,
         t::VertexInputDefinition<vsl::data_format::UNDEFINED>>;
     static_assert(t::TypedVertexInput<Undefined>::BINDING_COUNT == 1);
+#elif VSL_TYPED_CASE == 11
+    using Bad = t::VertexRecord<Vertex, VSL_VERTEX_MEMBER(Vertex, xy, 0, vsl::data_format::FLOAT_RGBA)>;
+    static_assert(Bad::LAYOUT.valid);
+#elif VSL_TYPED_CASE == 12
+    using Bad = t::VertexRecord<Vertex, VSL_VERTEX_MEMBER(OtherVertex, xy)>;
+    static_assert(Bad::LAYOUT.valid);
+#elif VSL_TYPED_CASE == 13
+    using Bad = Schema::Binding<0, Timing::NEXT_VERTEX, UINT32_MAX>;
+    static_assert(t::TypedVertexInput<Bad>::BINDING_COUNT == 1);
+#elif VSL_TYPED_CASE == 14
+    struct Unsupported { void* member; };
+    using Bad = t::VertexRecord<Unsupported, VSL_VERTEX_MEMBER(Unsupported, member)>;
+    static_assert(Bad::LAYOUT.valid);
 #endif
 }

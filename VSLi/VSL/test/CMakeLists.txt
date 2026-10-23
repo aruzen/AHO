@@ -46,8 +46,9 @@ if (VSL_TEST_SOURCES)
     file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
         CONTENT "set(TEST_COMPILER [==[${CMAKE_CXX_COMPILER}]==])\nset(TEST_COMPILER_ID [==[${CMAKE_CXX_COMPILER_ID}]==])\nset(TEST_FRONTEND [==[${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}]==])\nset(TEST_INCLUDE_DIRS [==[$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>]==])\nset(TEST_FLAGS [==[${CMAKE_CXX_FLAGS}]==])\nset(TEST_SYSROOT [==[${CMAKE_OSX_SYSROOT}]==])\nset(TEST_ARCHITECTURES [==[${CMAKE_OSX_ARCHITECTURES}]==])\n")
     set(typed_contract_names Valid WrongVertexBinding MissingBuffer WrongRecord DuplicateBinding DuplicateLocation
-        ExtentOverflow StrideTooSmall ImplicitRecordOffset WideLocationOverlap UndefinedFormat)
-    foreach(case RANGE 0 10)
+        ExtentOverflow StrideTooSmall ImplicitRecordOffset WideLocationOverlap UndefinedFormat
+        MemberStorageOverflow WrongMemberRecord RecordLocationOverflow UnsupportedMember)
+    foreach(case RANGE 0 14)
         list(GET typed_contract_names ${case} name)
         add_test(NAME "VSL.TypedPipeline.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
             "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"

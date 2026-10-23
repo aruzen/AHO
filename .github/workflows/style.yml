@@ -23,7 +23,7 @@ jobs:
           persist-credentials: false
       - name: Install tools and headers
         run: |
-          brew install llvm@20 cmake ninja boost glfw glm googletest pkgconf vulkan-headers vulkan-loader spirv-cross shaderc
+          brew install llvm@20 cmake ninja boost glfw glm googletest pkgconf vulkan-headers vulkan-loader spirv-cross spirv-tools shaderc
           echo "$(brew --prefix llvm@20)/bin" >> "$GITHUB_PATH"
       - name: Configure
         run: |

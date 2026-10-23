@@ -4,6 +4,8 @@ project(AHOLi VERSION 1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+include(cmake/Saitekikuukan.cmake)
+
 add_library(AHOLi
         AHO/src/pipeline/layouts.cpp
         AHO/src/pipeline/pipeline.cpp
@@ -84,6 +86,7 @@ target_link_directories(AHOLi
 )
 
 target_link_libraries(AHOLi
+        PUBLIC saitekikuukan::saitekikuukan
         PRIVATE
         ${Boost_LIBRARIES}
         ${GLFW_LIBRARIES}

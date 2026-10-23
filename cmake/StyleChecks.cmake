@@ -4,6 +4,7 @@ set(AHO_STYLE_MASTER_DIRECTORY "${CMAKE_SOURCE_DIR}/tools/style/master" CACHE PA
 add_custom_target(check-format
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/style/check.py"
         --checks=format --master "${AHO_STYLE_MASTER_DIRECTORY}"
+        --in-class-min-lines "${AHO_STYLE_IN_CLASS_MIN_LINES}"
         --clang-format "${AHO_CLANG_FORMAT}" --jobs "${AHO_STYLE_JOBS}"
     WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
     USES_TERMINAL VERBATIM)

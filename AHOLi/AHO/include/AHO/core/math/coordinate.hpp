@@ -83,6 +83,14 @@ namespace AHO_NAMESPACE {
         COORDINATE_ELEMENT_TYPE_DEFINITION_EXPANDER(X, x);
         COORDINATE_ELEMENT_TYPE_DEFINITION_EXPANDER(Y, y);
         COORDINATE_ELEMENT_TYPE_DEFINITION_EXPANDER(Z, z);
+        COORDINATE_ELEMENT_TYPE_DEFINITION_EXPANDER(W, w);
+
+        // 4次元は全成分xyzwを持つ。既存の1〜3次元の軸選択とは区別する。
+        struct CoordinateInfo4 {
+            using Dimension = VSL_NAMESPACE::D4;
+            static constexpr bool ENABLED_X = true, ENABLED_Y = true, ENABLED_Z = true, ENABLED_W = true;
+            static constexpr std::size_t INDEX_X = 1, INDEX_Y = 2, INDEX_Z = 3, INDEX_W = 4;
+        };
 
         template<bool... booleans>
         constexpr size_t count_trues_func() {
@@ -141,6 +149,11 @@ namespace AHO_NAMESPACE {
             using Value = CoordinateInfo<VSL_NAMESPACE::D3, true, true, true>;
         };
 
+        template<>
+        struct DefaultCoordinateInfo<VSL_NAMESPACE::D4> {
+            using Value = CoordinateInfo4;
+        };
+
         template<typename ElementType_, typename CoordinateInfo>
         struct CoordinateSet {
             static constexpr bool IS_COORDINATE_SET = true;
@@ -160,14 +173,17 @@ namespace AHO_NAMESPACE {
                 else if constexpr ((index == 0 && !CI::ENABLED_X && CI::ENABLED_Y) ||
                                    (index == 1 && CI::ENABLED_X && CI::ENABLED_Y))
                     return (set.y.value);
-                else
+                else if constexpr (index < 3)
                     return (set.z.value);
+                else
+                    return (set.w.value);
             }
         } // namespace detail
 
 #define ___AN1 template component<0>()
 #define ___AN2 template component<1>()
 #define ___AN3 template component<2>()
+#define ___AN4 template component<3>()
 
 #define AHO_COORDINATE_COMPONENT_ACCESSORS                                                      \
     template<std::size_t index>                                                                 \
@@ -281,9 +297,33 @@ namespace AHO_NAMESPACE {
             AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Z, z);
         };
 
+        template<typename ElementType_>
+        struct CoordinateSet<ElementType_, CoordinateInfo4> {
+            using ElementType = ElementType_;
+            using CoordinateInfo = CoordinateInfo4;
+            static constexpr bool IS_COORDINATE_SET = true;
+            X<ElementType> x{};
+            Y<ElementType> y{};
+            Z<ElementType> z{};
+            W<ElementType> w{};
+            AHO_COORDINATE_COMPONENT_ACCESSORS
+
+            constexpr CoordinateSet() = default;
+            constexpr CoordinateSet(X<ElementType> x, Y<ElementType> y, Z<ElementType> z, W<ElementType> w)
+                : x(x), y(y), z(z), w(w) {}
+            constexpr bool operator==(const CoordinateSet&) const = default;
+            constexpr auto operator<=>(const CoordinateSet&) const = default;
+            AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(X, x);
+            AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Y, y);
+            AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Z, z);
+            AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(W, w);
+        };
+
         template<typename CI1, typename CI2>
         struct SumCoordinateInfo {
-            using Value = typename MakeCoordinateInfo<CI1::ENABLED_X || CI2::ENABLED_X, CI1::ENABLED_Y || CI2::ENABLED_Y, CI1::ENABLED_Z || CI2::ENABLED_Z>::Value;
+            using Value = std::conditional_t<CI1::Dimension::DIMENSION == 4 || CI2::Dimension::DIMENSION == 4,
+                                             CoordinateInfo4,
+                                             typename MakeCoordinateInfo<CI1::ENABLED_X || CI2::ENABLED_X, CI1::ENABLED_Y || CI2::ENABLED_Y, CI1::ENABLED_Z || CI2::ENABLED_Z>::Value>;
         };
 
         template<typename T1, typename CI1, typename T2, typename CI2>
@@ -298,6 +338,8 @@ namespace AHO_NAMESPACE {
             if constexpr (CI1::ENABLED_Z) {
                 result += e1.z;
             }
+            if constexpr (CI1::Dimension::DIMENSION == 4)
+                result += e1.w;
 
             if constexpr (CI2::ENABLED_X) {
                 result += e2.x;
@@ -308,6 +350,8 @@ namespace AHO_NAMESPACE {
             if constexpr (CI2::ENABLED_Z) {
                 result += e2.z;
             }
+            if constexpr (CI2::Dimension::DIMENSION == 4)
+                result += e2.w;
 
             return result;
         }
@@ -324,6 +368,8 @@ namespace AHO_NAMESPACE {
             if constexpr (CI1::ENABLED_Z) {
                 result += e1.z;
             }
+            if constexpr (CI1::Dimension::DIMENSION == 4)
+                result += e1.w;
 
             result += e2;
 
@@ -342,6 +388,8 @@ namespace AHO_NAMESPACE {
             if constexpr (CI1::ENABLED_Z) {
                 result += e1.z;
             }
+            if constexpr (CI1::Dimension::DIMENSION == 4)
+                result += e1.w;
 
             result += e2;
 
@@ -360,6 +408,8 @@ namespace AHO_NAMESPACE {
             if constexpr (CI1::ENABLED_Z) {
                 result += e1.z;
             }
+            if constexpr (CI1::Dimension::DIMENSION == 4)
+                result += e1.w;
 
             result += e2;
 
@@ -396,6 +446,8 @@ namespace AHO_NAMESPACE {
             if constexpr (CI1::ENABLED_Z) {
                 result += e1.z;
             }
+            if constexpr (CI1::Dimension::DIMENSION == 4)
+                result += e1.w;
 
             if constexpr (CI2::ENABLED_X) {
                 result -= e2.x;
@@ -406,6 +458,8 @@ namespace AHO_NAMESPACE {
             if constexpr (CI2::ENABLED_Z) {
                 result -= e2.z;
             }
+            if constexpr (CI2::Dimension::DIMENSION == 4)
+                result -= e2.w;
 
             return result;
         }
@@ -422,6 +476,8 @@ namespace AHO_NAMESPACE {
             if constexpr (CI1::ENABLED_Z) {
                 result += e1.z;
             }
+            if constexpr (CI1::Dimension::DIMENSION == 4)
+                result += e1.w;
 
             result -= e2;
 
@@ -440,6 +496,8 @@ namespace AHO_NAMESPACE {
             if constexpr (CI1::ENABLED_Z) {
                 result += e1.z;
             }
+            if constexpr (CI1::Dimension::DIMENSION == 4)
+                result += e1.w;
 
             result -= e2;
 
@@ -458,6 +516,8 @@ namespace AHO_NAMESPACE {
             if constexpr (CI1::ENABLED_Z) {
                 result += e1.z;
             }
+            if constexpr (CI1::Dimension::DIMENSION == 4)
+                result += e1.w;
 
             result -= e2;
 
@@ -541,10 +601,13 @@ namespace AHO_NAMESPACE {
                 << ", " << set.AHO_COORDINATE_NUMBERD_MEMBER_2.value
                 << ", " << set.AHO_COORDINATE_NUMBERD_MEMBER_3.value << ")";
         }
+        if constexpr (std::same_as<typename CoordinationInfo::Dimension, VSL_NAMESPACE::D4>)
+            out << "(x, y, z, w)=(" << set.___AN1 << ", " << set.___AN2 << ", " << set.___AN3 << ", " << set.___AN4 << ")";
         return out;
     };
 
     using coordinate::X;
     using coordinate::Y;
     using coordinate::Z;
+    using coordinate::W;
 } // namespace AHO_NAMESPACE

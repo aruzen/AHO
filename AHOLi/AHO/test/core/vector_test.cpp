@@ -1,4 +1,6 @@
 #include <gtest/gtest.h>
+#include <sstream>
+#include <AHO/core/math/functions.hpp>
 #include <AHO/core/vector.hpp>
 #if defined(AHO_CONTRACT_VECTOR_MIXED_ASSIGNMENT)
 void verify() {
@@ -45,6 +47,69 @@ void verify() {
 constexpr auto sum = aho::d2::VectorI(1, 2) + aho::d2::VectorI(3, 4);
 static_assert(sum.value.x.value == 4 && sum.value.y.value == 6);
 #else
+namespace {
+    template<typename T>
+    concept has_cross = requires(T a) { a.cross(a); };
+
+    TEST(Vector4Test, FourCoordinatesParticipateInArithmeticAndTypeDeduction) {
+        using V = aho::d4::Vector<int>;
+        constexpr V a{1, 2, 3, 4}, b{4, 3, 2, 1};
+        static_assert(aho::concepts::is_vector<V>);
+        static_assert(std::same_as<typename aho::Vector<int, int, int, int>::Dimension, vsl::D4>);
+        static_assert(!has_cross<V>);
+        static_assert((a + b) == V{5, 5, 5, 5});
+        static_assert((a - b) == V{-3, -1, 1, 3});
+        static_assert((-a) == V{-1, -2, -3, -4});
+        static_assert((2 * a) == V{2, 4, 6, 8});
+        static_assert((a * 2) == V{2, 4, 6, 8});
+        static_assert((a / 2) == V{0, 1, 1, 2});
+        static_assert(a.dot(b) == 20);
+        static_assert(a.hadamard(b) == V{4, 6, 6, 4});
+        constexpr auto mixed = a + aho::d4::VectorD{.5, .5, .5, .5};
+        static_assert(std::same_as<std::remove_cv_t<decltype(mixed)>, aho::d4::VectorD>);
+        EXPECT_EQ(mixed.value.___AN4, 4.5);
+        auto changed = a;
+        EXPECT_EQ(&(changed += b), &changed);
+        EXPECT_EQ(changed, (V{5, 5, 5, 5}));
+        EXPECT_EQ(&(changed -= b), &changed);
+        EXPECT_EQ(&(changed *= 2), &changed);
+        EXPECT_EQ(&(changed /= 2), &changed);
+        EXPECT_EQ(changed, a);
+        EXPECT_EQ(a.cast<double>().value.___AN4, 4.);
+        constexpr aho::Mat<int, 1, 4> row = a;
+        static_assert(row[0][3] == 4);
+    }
+
+    TEST(Vector4Test, CoordinateOperationsAndMathFunctionsKeepTheFourthComponent) {
+        const aho::d4::VectorD a{1, 2, 3, 4}, b{5, 6, 7, 8};
+        EXPECT_EQ(aho::math::to_array(a), (std::array{1., 2., 3., 4.}));
+        EXPECT_EQ(aho::math::to_array(aho::math::lerp(a, b, .5)), (std::array{3., 4., 5., 6.}));
+        EXPECT_DOUBLE_EQ(aho::math::distance(a, b), 8);
+        EXPECT_EQ((a.value + b.value).___AN4, 12);
+        EXPECT_EQ((a.value - b.value).___AN4, -4);
+        EXPECT_EQ((a.value + aho::X<double>{2}).___AN4, 4);
+        EXPECT_EQ((a.value - aho::Z<double>{2}).___AN4, 4);
+        std::ostringstream text;
+        aho::operator<<(text, a.value);
+        EXPECT_EQ(text.str(), "(x, y, z, w)=(1, 2, 3, 4)");
+    }
+
+    TEST(Vector4Test, NormalizationHandlesHugeTinyZeroAndNonFiniteValues) {
+        for (const auto scale : {1., std::numeric_limits<double>::max(), std::numeric_limits<double>::denorm_min()}) {
+            const aho::d4::VectorD a{scale, scale, scale, scale};
+            const auto normalized = aho::math::normalized(a);
+            EXPECT_EQ(aho::math::to_array(normalized), (std::array{.5, .5, .5, .5}));
+            EXPECT_DOUBLE_EQ(normalized.length(), 1);
+        }
+        aho::d4::VectorD zero;
+        EXPECT_THROW(zero.normalize(), std::invalid_argument);
+        EXPECT_THROW(aho::math::normalized(zero), std::invalid_argument);
+        aho::d4::VectorD bad{1, 2, 3, std::numeric_limits<double>::quiet_NaN()};
+        EXPECT_THROW(bad.normalize(), std::invalid_argument);
+        bad.value.___AN4 = std::numeric_limits<double>::infinity();
+        EXPECT_THROW(bad.get_normalized(), std::invalid_argument);
+    }
+} // namespace
 
 #include "../support/asymmetric_arithmetic.hpp"
 #include "../support/arithmetic_geometry.hpp"

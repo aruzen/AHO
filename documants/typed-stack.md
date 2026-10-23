@@ -133,3 +133,23 @@ phase << pipeline.bind_vertices(vertices).draw_indexed(indices, index_values.siz
 ### indexed drawの検証
 
 同じM1/MoltenVK環境で関連CTest **249/249成功、skipなし**。新規CPU 1件、実GPU 5件、compile contract 7件（正例1、負例6）。16bitのfirst index/負のbase vertex/first instance、uint16を超える32bit indexのdevice-local upload、範囲外拒否、alias更新、wrapper破棄後の所有権、descriptor/pushとの組み合わせを確認した。unexpected validation errorなし。変更8ファイル/4TUのstyle違反0件。MSBuild XML検査も成功。
+
+PR: [#243](https://github.com/aruzen/AHO/pull/243)、`feat/vsl-typed-indexed-draw` → `feat/vsl-typed-block-layouts`。
+
+## 5. buffer viewとsubpass選択
+
+TypedVertexBufferの `view(first, count)` はvertex型と元bufferの所有権を保ったままbyte offset・容量を持つ。viewからのviewも相対範囲で作れ、bind/draw/indexed drawはその容量で検証する。元wrapperの寿命には依存しない。既存BufferAccessorはabstractだったため、viewはBufferImplのownerを直接保持し、BindVertexBufferAtへ渡す所有型のoverloadを追加した。viewのbackend()はこのownerを返す。
+
+TypedUniformBuffer/TypedStorageBufferにもviewを追加し、descriptorのoffset/rangeへ接続した。payload・usageの型制約は元bufferと同じ。descriptor更新時にdeviceのminUniformBufferOffsetAlignment/minStorageBufferOffsetAlignment、範囲、最大rangeを確認する。viewの切り出し時にalignmentを丸めることはせず、不適合なら更新を拒否する。空viewは作れず、要素数による範囲超過・byte offsetのoverflowを拒否する。index bufferのviewやbyte単位の再解釈はこの段階に含めない。
+
+`TypedGraphicsPipeline<Input, Resources, Pushes, subpass>` の第4引数でsubpassを選べる。既定値0で互換性を保ち、SUBPASS定数として参照できる。実RenderPass上の存在・attachment数/形式・sample countは既存native検査へ渡す。render pass全体やphase遷移を型に持つ機能ではなく、NextSubpassと同期は既存APIで指定する。
+
+```cpp
+auto vertices = vertex_buffer.view(first_vertex, vertex_count);
+set.write<0>(uniform_buffer.view(first_uniform, 1));
+using SecondSubpass = t::TypedGraphicsPipeline<Input, Resources, Pushes, 1>;
+```
+
+### view/subpassの検証
+
+同じM1/MoltenVK環境で関連CTest **278/278成功、skipなし**。新規CPU 1件、実GPU 4件、compile contract 6件（正例1、負例5）。subviewのoffset/容量/所有権、部分頂点bufferからのdraw/indexed draw、SSBOの部分範囲だけの書き込み、uniform alignment拒否とowner保持、subpass 1の描画・存在しないsubpass拒否を確認した。unexpected validation errorなし。変更8ファイル/4TUのstyle違反0件、MSBuild XML検査成功。

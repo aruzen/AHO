@@ -1,5 +1,6 @@
 #pragma once
 #include "typed_block_layout.hpp"
+#include "typed_buffer_view.hpp"
 #include "../vulkan/descriptor_set_manager.hpp"
 #include "../vulkan/stages/resource_binding.hpp"
 #include <algorithm>
@@ -14,6 +15,7 @@ namespace VSL_NAMESPACE::typed {
             std::shared_ptr<impl::ImageImpl> image;
             std::shared_ptr<impl::SamplerImpl> sampler;
             size_t bytes = 0;
+            size_t offset = 0;
         };
         struct DescriptorRequirement {
             std::uint32_t set;
@@ -103,6 +105,25 @@ namespace VSL_NAMESPACE::typed {
         void injection(PipelineLayoutEditAccessor layout) const { detail::inject_resource_schema(layout, REQUIREMENTS, SET_COUNT); }
     };
 
+    template<typename Payload_, graphic_resource::Type kind, MemoryProperty property>
+    class TypedResourceBuffer;
+    template<typename Payload_, graphic_resource::Type kind>
+    class TypedResourceBufferView {
+        template<typename, graphic_resource::Type, MemoryProperty>
+        friend class TypedResourceBuffer;
+        detail::DescriptorValue _value;
+        size_t _count;
+        TypedResourceBufferView(detail::DescriptorValue value, size_t count) : _value(std::move(value)), _count(count) {}
+
+    public:
+        using Payload = typename PayloadLayout<Payload_>::Payload;
+        static constexpr auto KIND = kind;
+        size_t size() const { return _count; }
+        size_t byte_offset() const { return _value.offset; }
+        detail::DescriptorValue descriptor() const { return _value; }
+        TypedResourceBufferView view(size_t first, size_t count) const;
+    };
+
     template<typename Payload_, graphic_resource::Type kind, MemoryProperty property = MemoryProperty::HOST_VISIBLE | MemoryProperty::HOST_COHERENT>
     class TypedResourceBuffer {
     public:
@@ -129,6 +150,7 @@ namespace VSL_NAMESPACE::typed {
         Storage& backend() { return _buffer; }
         const Storage& backend() const { return _buffer; }
         size_t size() const { return _count; }
+        TypedResourceBufferView<Payload_, kind> view(size_t first, size_t count) const;
         void copy(std::span<const Payload> values)
         requires(contain<property, MemoryProperty::HOST_VISIBLE>());
         detail::DescriptorValue descriptor() const { return {_buffer.data_, {}, {}, _count * sizeof(Payload)}; }
@@ -207,6 +229,20 @@ namespace VSL_NAMESPACE::typed {
     template<typename Schema, typename... Sets>
     concept compatible_descriptor_sets = detail::descriptor_sets_match<Schema, Sets...>(std::index_sequence_for<Sets...>{});
 
+    template<typename Payload_, graphic_resource::Type kind>
+    TypedResourceBufferView<Payload_, kind> TypedResourceBufferView<Payload_, kind>::view(size_t first, size_t count) const {
+        auto value = _value;
+        value.offset = detail::checked_view_offset(value.offset, first, count, _count, sizeof(Payload));
+        value.bytes = count * sizeof(Payload);
+        return TypedResourceBufferView(value, count);
+    }
+    template<typename Payload_, graphic_resource::Type kind, MemoryProperty property>
+    TypedResourceBufferView<Payload_, kind> TypedResourceBuffer<Payload_, kind, property>::view(size_t first, size_t count) const {
+        auto value = descriptor();
+        value.offset = detail::checked_view_offset(0, first, count, _count, sizeof(Payload));
+        value.bytes = count * sizeof(Payload);
+        return TypedResourceBufferView<Payload_, kind>(value, count);
+    }
     template<typename... BindingTypes>
     consteval bool DescriptorLayout<BindingTypes...>::IsValid() {
         for (size_t i = 0; i < POINTS.size(); ++i)

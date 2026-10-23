@@ -1,3 +1,4 @@
+#include <VSL/utils/typed_block_validation.hpp>
 #include <VSL/utils/typed_resources.hpp>
 #include <VSL/utils/spir_reflector.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
@@ -93,6 +94,7 @@ namespace VSL_NAMESPACE::typed::detail {
                                                     std::to_string(set) + ", binding " + std::to_string(point.binding));
                 }
             }
+            validate_descriptor_blocks(reflection.generated, requirements);
         }
     }
     void validate_dispatch(LogicalDeviceAccessor device, size_t x, size_t y, size_t z) {

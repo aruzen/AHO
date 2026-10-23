@@ -113,4 +113,23 @@ SSBO末尾のruntime配列は、C++の固定capacity配列または単独の要�
 
 製品VSL・vsl-testと各正例contractをビルドし、SPIR-V validatorとMSBuild XMLの検査も成功。Windows/Linux、sanitizer、全AHO/VSLテストは未実施。
 
-変更16ファイル/10TUの命名・配置・format検査は違反0件。
+変更15ファイル/10TUの命名・配置・format検査は違反0件。
+
+PR: [#241](https://github.com/aruzen/AHO/pull/241)、`feat/vsl-typed-block-layouts` → `feat/vsl-typed-push-constants`。
+
+## 4. index bufferとindexed drawのTyped化
+
+既存のBindIndexBufferはwrapperへの生pointerとuint32固定のindex型を使い、DrawIndexedはcount以外の指定ができなかった。所有権を保持するBindIndexBufferAtと16/32bitの選択を追加し、DrawIndexedへinstance count・first index・符号付きbase vertex・first instanceを追加した。既存APIはそのまま残し、新しいTyped経路では所有する方を使う。
+
+`TypedIndexBuffer<uint16_t/uint32_t>` を `binding.draw_indexed(indices, count, instances, first_index, base_vertex, first_instance)` へ渡す。descriptor/push未設定の制約は通常drawと同じ。device、index範囲、index値+base vertexと各頂点bufferの容量、instance範囲、全native引数の整数幅を記録前に検証する。commandはpipeline・頂点/index buffer・descriptor・push snapshotを保持し、記録時にGPU完了までpinする。
+
+index値の範囲確認用にCPU snapshotを保持し、指定範囲のmin/maxをdraw作成時に調べる。Typed経由のcopyは共有aliasのsnapshotも更新する。snapshotはGPU読み戻しではなく、GPUが生成/変更したindexやbackend()経由の直接変更を追跡しない。draw構築後の内容変更・GPU同期は利用者の責任。uint8 index、primitive restart、indirect drawは別機能として残る。現在のInputAssemblyはtriangle list / restart無効。
+
+```cpp
+t::TypedIndexBuffer<std::uint16_t> indices(device, index_values);
+phase << pipeline.bind_vertices(vertices).draw_indexed(indices, index_values.size());
+```
+
+### indexed drawの検証
+
+同じM1/MoltenVK環境で関連CTest **249/249成功、skipなし**。新規CPU 1件、実GPU 5件、compile contract 7件（正例1、負例6）。16bitのfirst index/負のbase vertex/first instance、uint16を超える32bit indexのdevice-local upload、範囲外拒否、alias更新、wrapper破棄後の所有権、descriptor/pushとの組み合わせを確認した。unexpected validation errorなし。変更8ファイル/4TUのstyle違反0件。MSBuild XML検査も成功。

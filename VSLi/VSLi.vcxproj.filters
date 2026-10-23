@@ -43,6 +43,7 @@
     </ClInclude>
     <ClInclude Include="VSL\include\VSL\utils\typed_vertex_layout.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\utils\typed_pipeline.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\utils\typed_shader.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\utils\vsl_array.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -234,6 +235,7 @@
     <ClCompile Include="VSL\src\utils\shader_compiler.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="VSL\src\utils\typed_shader.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClCompile Include="VSL\src\utils\spir_reflector.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>

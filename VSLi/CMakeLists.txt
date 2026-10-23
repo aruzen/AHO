@@ -9,6 +9,7 @@ add_library(VSL STATIC
         VSL/src/window.cpp
         ./VSL/src/window_plugin.cpp
         ./VSL/src/utils/spir_reflector.cpp
+        VSL/src/utils/typed_shader.cpp
         ./VSL/src/utils/string.cpp
         ./VSL/src/utils/shader_compiler.cpp
         VSL/src/vulkan/render_pass.cpp
@@ -60,6 +61,7 @@ add_library(VSL STATIC
         VSL/include/VSL/utils/typed_safe_resource.hpp
         VSL/include/VSL/utils/typed_vertex_layout.hpp
         VSL/include/VSL/utils/typed_pipeline.hpp
+        VSL/include/VSL/utils/typed_shader.hpp
         VSL/include/VSL/utils/shader_compiler.hpp
         VSL/include/VSL/utils/spir_reflector.hpp
         VSL/include/VSL/utils/string.hpp

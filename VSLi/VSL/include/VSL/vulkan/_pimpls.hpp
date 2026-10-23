@@ -174,6 +174,7 @@ namespace VSL_NAMESPACE::impl {
 
     struct ShaderImpl {
         std::string name;
+        std::vector<std::uint32_t> code;
         std::shared_ptr<LogicalDeviceImpl> device;
         vk::ShaderModule shader_module;
         vk::PipelineShaderStageCreateInfo shader_stage_create_info;

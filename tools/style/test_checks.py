@@ -37,7 +37,7 @@ class CheckerContracts(unittest.TestCase):
         command = [str(ARGS.ast_tool), '--root=' + str(self.root)]
         if min_lines is not None:
             command.append('--in-class-min-lines=' + str(min_lines))
-        result = subprocess.run([*command, str(source), '--', '-std=c++23'], text=True, capture_output=True)
+        result = subprocess.run([*command, str(source), '--', '-std=c++2c'], text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         return [item for line in result.stdout.splitlines() if 'coverage' not in (item := json.loads(line))]
 
@@ -45,7 +45,7 @@ class CheckerContracts(unittest.TestCase):
         path = self.root / 'probe.cpp'
         path.write_text(source)
         result = subprocess.run([ARGS.clang_tidy, '--config-file=' + str(HERE.parents[1] / '.clang-tidy'),
-                                 str(path), '--', '-std=c++23'], text=True, capture_output=True)
+                                 str(path), '--', '-std=c++2c'], text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         return result.stdout + result.stderr
 
@@ -69,7 +69,7 @@ class CheckerContracts(unittest.TestCase):
         database = self.root / 'compile_commands.json'
         database.write_text(json.dumps([
             dict(directory=str(self.root), file=str(self.root / file),
-                 arguments=['clang++', '-std=c++23', '-c', str(self.root / file)])
+                 arguments=['clang++', '-std=c++2c', '-c', str(self.root / file)])
             for file in registered]))
         return [sys.executable, str(HERE / 'check.py'), '--root', str(self.root),
                 '--database', str(database), '--ast-tool', str(ARGS.ast_tool.resolve()),
@@ -272,7 +272,7 @@ struct Example {
         source.write_text(original)
         database = self.root / 'compile_commands.json'
         database.write_text(json.dumps([dict(directory=str(self.root), file=str(source),
-                                             arguments=['clang++', '-std=c++23', '-c', str(source)])]))
+                                             arguments=['clang++', '-std=c++2c', '-c', str(source)])]))
         subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
         subprocess.run(['git', 'add', '.'], cwd=self.root, check=True)
         command = [sys.executable, str(HERE / 'check.py'), '--root', str(self.root), '--checks=layout',
@@ -317,7 +317,7 @@ inline int probe() {
     def test_parse_errors_fail_instead_of_producing_a_clean_result(self):
         source = self.root / 'invalid.cpp'
         source.write_text('class Broken { missing_type value; };')
-        result = subprocess.run([str(ARGS.ast_tool), '--root=' + str(self.root), str(source), '--', '-std=c++23'],
+        result = subprocess.run([str(ARGS.ast_tool), '--root=' + str(self.root), str(source), '--', '-std=c++2c'],
                                 text=True, capture_output=True)
         self.assertNotEqual(result.returncode, 0)
 
@@ -329,7 +329,7 @@ inline int probe() {
             (directory / name).write_text('#pragma once\n')
         source = self.root / 'probe.cpp'
         source.write_text(''.join(f'#include "include/./{name}"\n' for name in headers))
-        result = subprocess.run([str(ARGS.ast_tool), '--root=' + str(self.root), str(source), '--', '-std=c++23'],
+        result = subprocess.run([str(ARGS.ast_tool), '--root=' + str(self.root), str(source), '--', '-std=c++2c'],
                                 text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         coverage = next(json.loads(line)['coverage'] for line in result.stdout.splitlines() if '"coverage"' in line)
@@ -444,14 +444,16 @@ inline int probe() {
 
     def test_cmake_targets_check_and_update_the_per_source_master(self):
         file = 'AHOLi/AHO/probe.cpp'
-        self.prepare_cli({file: 'int   VALUE=1;\n'}, [file])
+        self.prepare_cli({file: '#include <string>\nint   VALUE=1;\n'}, [file])
         path = self.write_master(file, [{**item, 'count': 1}
                                        for item in CHECK.format_check(self.root, file, ARGS.clang_format)], min_lines=0)
         shutil.copy2(HERE / 'check.py', self.root / 'tools/style/check.py')
         (self.root / 'CMakeLists.txt').write_text(f'''
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.30)
 project(StyleMasterFixture LANGUAGES CXX)
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 26)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_library(probe OBJECT {file})
 add_executable(aho-style-ast IMPORTED GLOBAL)
@@ -462,7 +464,10 @@ set(AHO_CLANG_TIDY [==[{ARGS.clang_tidy}]==])
 include([==[{HERE.parents[1] / 'cmake/StyleChecks.cmake'}]==])
 ''')
         build = self.root / 'build/cmake'
+        tidy_path = Path(ARGS.clang_tidy).resolve()
+        compiler = tidy_path.with_name('clang++' + tidy_path.suffix)
         configure = subprocess.run(['cmake', '-S', str(self.root), '-B', str(build), '-G', 'Ninja',
+                                    '-DCMAKE_CXX_COMPILER=' + str(compiler),
                                     '-DAHO_STYLE_IN_CLASS_MIN_LINES=0'],
                                    text=True, capture_output=True)
         self.assertEqual(configure.returncode, 0, configure.stdout + configure.stderr)
@@ -471,7 +476,7 @@ include([==[{HERE.parents[1] / 'cmake/StyleChecks.cmake'}]==])
                                text=True, capture_output=True)
         self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
         self.assertEqual(path.read_bytes(), before)
-        (self.root / file).write_text('int VALUE = 1;\n')
+        (self.root / file).write_text('#include <string>\nint VALUE = 1;\n')
         for target in ['update-style-master', 'check-style']:
             result = subprocess.run(['cmake', '--build', str(build), '--target', target],
                                     text=True, capture_output=True)
@@ -511,7 +516,7 @@ include([==[{HERE.parents[1] / 'cmake/StyleChecks.cmake'}]==])
         (directory / 'unregistered.cpp').write_text('int VALUE;\n')
         database = self.root / 'compile_commands.json'
         database.write_text(json.dumps([dict(directory=str(self.root), file=str(source),
-                                             arguments=['clang++', '-std=c++23', '-c', str(source)])]))
+                                             arguments=['clang++', '-std=c++2c', '-c', str(source)])]))
         subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
         subprocess.run(['git', 'add', '.'], cwd=self.root, check=True)
         command = [sys.executable, str(HERE / 'check.py'), '--root', str(self.root), '--checks=layout',

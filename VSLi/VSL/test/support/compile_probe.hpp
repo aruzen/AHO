@@ -33,9 +33,15 @@ namespace vsl_test {
             std::ofstream stream(input);
             stream << source;
         }
-        std::string command = shell_quote(VSL_TEST_CXX) + " -std=c++23 -fsyntax-only -Werror=return-type";
+#ifdef _MSC_VER
+        std::string command = shell_quote(VSL_TEST_CXX) + " /nologo /std:c++latest /Zs";
+        constexpr auto include_prefix = " /I";
+#else
+        std::string command = shell_quote(VSL_TEST_CXX) + " -std=c++2c -fsyntax-only -Werror=return-type";
+        constexpr auto include_prefix = " -I";
+#endif
         for (const auto* include : {VSL_TEST_INCLUDE, VSL_TEST_VULKAN_INCLUDE, VSL_TEST_GLFW_INCLUDE})
-            command += " -I" + shell_quote(include);
+            command += include_prefix + shell_quote(include);
         command += " " + shell_quote(input.string()) + " >" + shell_quote(output.string()) + " 2>&1";
         const int status = std::system(command.c_str());
         std::ifstream stream(output);

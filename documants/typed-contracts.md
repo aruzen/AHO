@@ -20,7 +20,7 @@ PR #221の後続。次の3点を順に解決する。
 
 `Record::Binding<binding, timing, first_location>` は共通layoutからbindingを生成する。locationはレコード内の相対値を一度解決し、first_locationを加算する。strideはsizeof(Vertex)、offsetはoffsetofを使う。異なるrecordのmember、memberのstorageを超えるformat、未対応型、location overflowはコンパイル時に拒否する。明示formatの意味上の解釈は呼び出し側が選ぶ。
 
-C++23ではmember pointerからportableにconstexpr offsetofを求められないため、マクロは型とoffsetの取得だけに限定した。layout生成と検査はテンプレートで行う。padding付き構造体、float/正規化整数の混在、std::array<double,3>の2location消費を検証する。
+コンパイラー間で使える型とoffsetofだけをマクロで取得し、layout生成と検査はテンプレートで行う。言語モードは[C++26](../documents/development/cxx-standard.md)を使用する。padding付き構造体、float/正規化整数の混在、std::array<double,3>の2location消費を検証する。
 
 自動推論の配列はscalarの1〜4要素をvectorとして扱う。配列の配列を一つのvectorへ誤変換しないよう、行列やvector配列の自動推論は拒否する。これらは低水準の属性宣言で列/要素を指定する。`std::int8_t` のsigned charにも対応し、std::arrayや `GRAPHIC_TYPE` を持つ独自型も検証する。
 

@@ -1,7 +1,7 @@
 ﻿# CMakeList.txt : CMake project for vulkan_guide, include source and define
 # project specific logic here.
 #
-cmake_minimum_required(VERSION 3.10...3.28)
+cmake_minimum_required(VERSION 3.30)
 cmake_policy(SET CMP0167 NEW)
 
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
@@ -18,8 +18,9 @@ message(STATUS "VSL_HOME : ${VSL_HOME}")
 project(AHO-all)
 string(REPLACE "-fcolor-diagnostics" "-fdiagnostics-color=auto" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 option(AHO_STYLE_CHECKS "Enable AHO/VSL format, naming and layout checks" OFF)
 if(AHO_STYLE_CHECKS)

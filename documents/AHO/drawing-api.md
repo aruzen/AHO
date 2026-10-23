@@ -38,4 +38,30 @@ GPU使用中の領域は上書きせず、Completionを弱参照で追跡しま�
 
 Draw2DCommandの`getPipeline()`はVSLのコマンドconceptが要求する名前を維持します。
 
-GPU完了までのネイティブ資源保持はVSLの公開コマンドに委ねます。AHO製品コードはVulkanヘッダー・_pimpls.hpp・vk型に依存せず、コンパイル契約でも禁止します。現段階のRendererは単色バッチだけを受け付け、TextureId≠0をエラーにします。
+GPU完了までのネイティブ資源保持はVSLの公開コマンドに委ねます。AHO製品コードはVulkanヘッダー・_pimpls.hpp・vk型に依存せず、コンパイル契約でも禁止します。未登録のTextureIdはdraw/recordの時点で例外にします。
+
+## テクスチャ
+
+```cpp
+renderer.set_texture(aho::x::TextureId{1}, image, sampler);
+list.rectangle({10, 20, 100, 50}, aho::RGBA(1, 1, 1, 1), {1});
+// UVを矩形で指定。負の幅・高さなら反転する。
+list.rectangle({120, 20, 100, 50}, aho::RGBA(.5f, 1, 1, 1), {1}, {1, 0, -1, 1});
+```
+
+IDはRendererごとの登録番号で、0は単色用に予約します。set_textureはUNORM8/sRGB8のR/RG/RGB/RGBA/BGRA、Sampled用途の画像を受け付けます。samplerとimageはRendererと同じdeviceで作成してください。画像は単層2Dで、記録・実行時にはShaderReadOnlyOptimalで参照可能にする契約です。Rendererはアップロード・画像layout遷移・他のキューとの同期を自動では行いません。
+
+登録時は新しいdescriptorを作ります。同じIDを差し替えたりerase_textureで解除しても、準備済みコマンドが保持するdescriptor・画像・samplerは変わりません。元の画像やRendererを破棄しても、記録したGPU処理に必要な資源はVSLが完了まで保持します。erase_textureは登録が存在した場合だけtrueです。
+
+テクスチャ色と頂点色を乗算し、単色と同じalpha blendingを行います。入出力のsRGB変換は画像formatに従います。UVの範囲外はSamplerのedge modeに従います。単色/テクスチャを切り替えても追加順を維持します。DrawListの各バッチを1回のdrawに対応させます。描画用バッファはHostVisible|HostCoherentが利用可能なメモリを必要とします。
+
+## 実行例
+
+```sh
+cmake -S . -B build -DAHO_BUILD_DRAWING_DEMO=ON \
+  -DAHO_HOME="$PWD/AHOLi/AHO" -DVSL_HOME="$PWD/VSLi/VSL"
+cmake --build build --target aho-drawing-demo
+./build/AHOLi/aho-drawing-demo ./build/AHOLi/shaders/drawer
+```
+
+`examples/drawing2d.cpp`は色付きの三角形と半透明の四角形を描画します。RenderPassがリサイズで置き換わったらRendererを作り直し、通常のDrawPhaseで表示します。画像を読み込む依存は追加していません。

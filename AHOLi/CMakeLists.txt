@@ -142,7 +142,7 @@ endif ()
 
 find_program(AHO_DRAW_GLSLC NAMES glslc HINTS "$ENV{VULKAN_SDK}/bin" REQUIRED)
 set(AHO_DRAW_SHADER_OUTPUTS)
-foreach(shader draw2d.vert draw2d.frag)
+foreach(shader draw2d.vert draw2d.frag draw2d-textured.frag)
     set(output "${CMAKE_CURRENT_BINARY_DIR}/shaders/drawer/${shader}.spv")
     add_custom_command(OUTPUT "${output}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/shaders/drawer"
@@ -154,3 +154,11 @@ endforeach()
 add_custom_target(aho-draw-shaders DEPENDS ${AHO_DRAW_SHADER_OUTPUTS})
 add_dependencies(AHOLi aho-draw-shaders)
 install(FILES ${AHO_DRAW_SHADER_OUTPUTS} DESTINATION share/AHO/shaders/drawer)
+
+option(AHO_BUILD_DRAWING_DEMO "Build the experimental 2D drawing example" OFF)
+if(AHO_BUILD_DRAWING_DEMO)
+    add_executable(aho-drawing-demo "${CMAKE_CURRENT_SOURCE_DIR}/../examples/drawing2d.cpp")
+    target_include_directories(aho-drawing-demo PRIVATE "${AHO_HOME}/include" "${VSL_HOME}/include")
+    target_link_directories(aho-drawing-demo PRIVATE ${GLFW_LIBRARY_DIRS})
+    target_link_libraries(aho-drawing-demo PRIVATE AHOLi VSL)
+endif()

@@ -1,5 +1,6 @@
 #include "../drawer/renderer2d_impl.hpp"
 #include <VSL/vulkan/commands/bind_vertex_buffers.hpp>
+#include <VSL/vulkan/commands/bind_graphic_resource.hpp>
 #include <VSL/vulkan/commands/draw.hpp>
 #include <VSL/vulkan/commands/push_content.hpp>
 #include <VSL/vulkan/scissor.hpp>
@@ -9,7 +10,9 @@
 namespace AHO_NAMESPACE::x::command {
     Draw2DCommand::Draw2DCommand(std::shared_ptr<Data> data) : _data(std::move(data)) {}
 
-    VSL_NAMESPACE::PipelineAccessor Draw2DCommand::getPipeline() const { return _data->pipeline->pipeline; }
+    VSL_NAMESPACE::PipelineAccessor Draw2DCommand::getPipeline() const {
+        return !_data->batches.empty() && _data->batches.back().texture.value ? _data->pipeline->texture_pipeline : _data->pipeline->pipeline;
+    }
 
     void Draw2DCommand::invoke(VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) const {
         if (!_data || !pool._data || !buffer._data || !manager._data || manager.getDevice()._data != _data->pipeline->device._data)
@@ -24,12 +27,24 @@ namespace AHO_NAMESPACE::x::command {
                 pending.push_back(submission);
         }
         auto& pipeline = *_data->pipeline;
-        pipeline.pipeline.invoke(pool, buffer, manager);
+        if (_data->batches.empty())
+            pipeline.pipeline.invoke(pool, buffer, manager);
         VSL_NAMESPACE::Viewport(0, 0, static_cast<float>(_data->width), static_cast<float>(_data->height)).invoke(pool, buffer, manager);
         VSL_NAMESPACE::Scissor(0, 0, static_cast<float>(_data->width), static_cast<float>(_data->height)).invoke(pool, buffer, manager);
         const std::array<float, 4> transform{2.f / _data->width, 2.f / _data->height, -1, -1};
-        VSL_NAMESPACE::command::PushConstant(pipeline.layout, VSL_NAMESPACE::ShaderFlag::Vertex, 16, 0, transform.data()).invoke(pool, buffer, manager);
+        VSL_NAMESPACE::PipelineAccessor previous;
         for (std::size_t i = 0; i < _data->batches.size(); ++i) {
+            const bool textured = _data->batches[i].texture.value != 0;
+            auto& selected = textured ? pipeline.texture_pipeline : pipeline.pipeline;
+            if (previous._data != selected._data) {
+                selected.invoke(pool, buffer, manager);
+                VSL_NAMESPACE::command::PushConstant(textured ? pipeline.texture_layout : pipeline.layout,
+                                                     VSL_NAMESPACE::ShaderFlag::Vertex, 16, 0, transform.data())
+                    .invoke(pool, buffer, manager);
+                previous = selected;
+            }
+            if (textured)
+                VSL_NAMESPACE::command::BindGraphicResource(_data->textures[i], VSL_NAMESPACE::graphic_resource::BindingDestination::Graphics, selected).invoke(pool, buffer, manager);
             VSL_NAMESPACE::command::BindVertexBuffer(_data->slot->uploads[i]->buffer).invoke(pool, buffer, manager);
             VSL_NAMESPACE::command::Draw(_data->batches[i].vertex_count).invoke(pool, buffer, manager);
         }

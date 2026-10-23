@@ -7,6 +7,7 @@
 #include <VSL/vulkan/stages/rasterization.hpp>
 #include <VSL/vulkan/stages/shader_group.hpp>
 #include <VSL/vulkan/stages/vertex_input.hpp>
+#include <VSL/vulkan/stages/resource_binding.hpp>
 #include <VSL/vulkan/scissor.hpp>
 #include <VSL/vulkan/viewport.hpp>
 #include <cstring>
@@ -29,19 +30,25 @@ namespace AHO_NAMESPACE::x {
 
         Pipeline::Pipeline(VSL_NAMESPACE::LogicalDeviceAccessor device, VSL_NAMESPACE::RenderPassAccessor pass,
                            const std::filesystem::path& directory, std::uint32_t subpass)
-            : device(device), layout(MakeLayout(device, directory)), pipeline(layout, pass, subpass) {}
+            : device(device), layout(MakeLayout(device, directory)), pipeline(layout, pass, subpass),
+              texture_binding(device, VSL_NAMESPACE::graphic_resource::Type::CombinedImageSampler, VSL_NAMESPACE::ShaderFlag::Fragment),
+              texture_layout(MakeLayout(device, directory, texture_binding)), texture_pipeline(texture_layout, pass, subpass) {}
 
-        VSL_NAMESPACE::PipelineLayout Pipeline::MakeLayout(VSL_NAMESPACE::LogicalDeviceAccessor device, const std::filesystem::path& directory) {
+        VSL_NAMESPACE::PipelineLayout Pipeline::MakeLayout(VSL_NAMESPACE::LogicalDeviceAccessor device, const std::filesystem::path& directory,
+                                                           std::optional<VSL_NAMESPACE::graphic_resource::BindingLayout> texture_binding) {
             namespace pl = VSL_NAMESPACE::pipeline_layout;
             VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Vertex> vertex(device, directory / "draw2d.vert.spv");
-            VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Fragment> fragment(device, directory / "draw2d.frag.spv");
+            VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::Fragment> fragment(device, directory / (texture_binding ? "draw2d-textured.frag.spv" : "draw2d.frag.spv"));
             pl::VertexInputShapeDefinition shape{
                 .layouts = {{VSL_NAMESPACE::data_format::FloatRG, 0, offsetof(DrawVertex, position)},
                             {VSL_NAMESPACE::data_format::FloatRG, 1, offsetof(DrawVertex, uv)},
                             {VSL_NAMESPACE::data_format::FloatRGBA, 2, offsetof(DrawVertex, color)}},
                 .binding = 0,
                 .size = sizeof(DrawVertex)};
-            return {device, pl::ShaderGroup("aho-draw2d", {vertex, fragment}), pl::VertexInput({shape}),
+            std::vector<VSL_NAMESPACE::graphic_resource::BindingLayout> sets;
+            if (texture_binding)
+                sets.push_back(*texture_binding);
+            return {device, pl::ResourceBinding(sets), pl::ShaderGroup("aho-draw2d", {vertex, fragment}), pl::VertexInput({shape}),
                     pl::PushConstants(VSL_NAMESPACE::ShaderFlag::Vertex, {{VSL_NAMESPACE::ShaderFlag::Vertex, 0, 16}}),
                     pl::ColorBlend(pl::ColorBlendAttachment{.destinationAlpha = pl::BlendFactor::OneMinusSrcAlpha}),
                     pl::InputAssembly{}, pl::Rasterization(pl::CullingMode::None),
@@ -69,6 +76,7 @@ namespace AHO_NAMESPACE::x {
         _data = std::make_shared<Data>();
         _data->pipeline = std::make_shared<detail::Pipeline>(device, pass, shaders, subpass);
         _data->limit = max_snapshots;
+        _data->resources = std::make_unique<VSL_NAMESPACE::GraphicResourceManager>(device);
     }
 
     std::optional<command::Draw2DCommand> Renderer2D::draw(VSL_NAMESPACE::ComputePhase& phase, const DrawList& list, std::uint32_t width, std::uint32_t height) {
@@ -78,8 +86,8 @@ namespace AHO_NAMESPACE::x {
         if (!width || !height || width > 16777216 || height > 16777216)
             throw std::invalid_argument("Draw extent must be positive and exactly representable as float");
         for (const auto& batch : list.batches())
-            if (batch.texture.value)
-                throw std::invalid_argument("Solid Renderer2D does not accept texture IDs");
+            if (batch.texture.value && !_data->textures.contains(batch.texture.value))
+                throw std::invalid_argument("Draw texture ID is not registered with this renderer");
         auto snapshot = std::make_shared<command::Draw2DCommand::Data>();
         snapshot->submission = phase.completion()._data;
         snapshot->manager = phase.manager._data;
@@ -87,6 +95,9 @@ namespace AHO_NAMESPACE::x {
         snapshot->width = width;
         snapshot->height = height;
         snapshot->batches.assign(list.batches().begin(), list.batches().end());
+        snapshot->textures.reserve(snapshot->batches.size());
+        for (const auto& batch : snapshot->batches)
+            snapshot->textures.push_back(batch.texture.value ? _data->textures.at(batch.texture.value) : VSL_NAMESPACE::GraphicResource{});
         if (list.empty())
             return command::Draw2DCommand(std::move(snapshot));
         std::shared_ptr<detail::Slot> slot;
@@ -124,6 +135,36 @@ namespace AHO_NAMESPACE::x {
         phase << *command;
         return true;
     }
+
+    void Renderer2D::set_texture(TextureId id, VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::SamplerAccessor sampler) {
+        if (!id.value || !image._data || !sampler._data || image.getDevice()._data != _data->pipeline->device._data ||
+            !(static_cast<unsigned>(image.getUsage()) & static_cast<unsigned>(VSL_NAMESPACE::ImageType::Sampled)))
+            throw std::invalid_argument("Texture registration requires a nonzero ID and a sampled image/sampler on the renderer device");
+        using F = VSL_NAMESPACE::data_format::___FormatTypes;
+        switch (image.getFormat().type()) {
+            case F::UnsignedNormalized8R:
+            case F::UnsignedNormalized8RG:
+            case F::UnsignedNormalized8RGB:
+            case F::UnsignedNormalized8RGBA:
+            case F::UnsignedNormalized8BGRA:
+            case F::Srgb8R:
+            case F::Srgb8RG:
+            case F::Srgb8RGB:
+            case F::Srgb8RGBA:
+            case F::Srgb8BGRA:
+                break;
+            default:
+                throw std::invalid_argument("Renderer2D textures require UNORM8 or sRGB8 color formats");
+        }
+        auto [pools, resources] = _data->resources->allocate({_data->pipeline->texture_binding});
+        if (resources.size() != 1)
+            throw std::runtime_error("Texture descriptor allocation failed");
+        auto resource = resources.front();
+        resource.update(image, sampler);
+        _data->textures.insert_or_assign(id.value, std::move(resource));
+    }
+
+    bool Renderer2D::erase_texture(TextureId id) { return _data->textures.erase(id.value) != 0; }
 
     std::size_t Renderer2D::capacity() const noexcept {
         std::size_t result = 0;

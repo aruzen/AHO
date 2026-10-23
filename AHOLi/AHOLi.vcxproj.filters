@@ -214,5 +214,6 @@
   <ItemGroup>
     <CustomBuild Include="AHO\shaders\drawer\draw2d.vert" />
     <CustomBuild Include="AHO\shaders\drawer\draw2d.frag" />
+    <CustomBuild Include="AHO\shaders\drawer\draw2d-textured.frag" />
   </ItemGroup>
 </Project>

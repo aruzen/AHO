@@ -260,5 +260,9 @@
       <Command>if not exist "$(OutDir)shaders\drawer" mkdir "$(OutDir)shaders\drawer"&#xD;&#xA;"$(VULKAN_SDK)\Bin\glslc.exe" "%(FullPath)" -o "$(OutDir)shaders\drawer\%(Filename)%(Extension).spv"</Command>
       <Outputs>$(OutDir)shaders\drawer\%(Filename)%(Extension).spv</Outputs>
     </CustomBuild>
+    <CustomBuild Include="AHO\shaders\drawer\draw2d-textured.frag">
+      <Command>if not exist "$(OutDir)shaders\drawer" mkdir "$(OutDir)shaders\drawer"&#xD;&#xA;"$(VULKAN_SDK)\Bin\glslc.exe" "%(FullPath)" -o "$(OutDir)shaders\drawer\%(Filename)%(Extension).spv"</Command>
+      <Outputs>$(OutDir)shaders\drawer\%(Filename)%(Extension).spv</Outputs>
+    </CustomBuild>
   </ItemGroup>
 </Project>

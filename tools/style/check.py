@@ -42,13 +42,16 @@ def tracked_files(root):
                   if path and path.decode().startswith(ROOTS) and Path(path.decode()).suffix in SUFFIXES)
 
 
-def diagnostic(root, file, line, column, rule, symbol, message, source=None):
+def diagnostic(root, file, line, column, rule, symbol, message, source=None, code_lines=None):
     if source is None:
         lines = (root / file).read_text().splitlines()
         source = lines[line - 1].strip() if 0 < line <= len(lines) else ''
     identity = [file, rule, symbol, source]
-    return dict(file=file, line=line, column=column, rule=rule, symbol=symbol, message=message,
-                source=source, key=hashlib.sha256(json.dumps(identity, ensure_ascii=False).encode()).hexdigest())
+    result = dict(file=file, line=line, column=column, rule=rule, symbol=symbol, message=message,
+                  source=source, key=hashlib.sha256(json.dumps(identity, ensure_ascii=False).encode()).hexdigest())
+    if code_lines is not None:
+        result['code_lines'] = code_lines
+    return result
 
 
 def format_check(root, file, tool):
@@ -129,7 +132,8 @@ def translation_check(job, args, selected, tidy, extra):
                 diagnostics.append(diagnostic(args.root, relative, int(match[2]), int(match[3]),
                                               'readability-identifier-naming', match[4], match[4]))
     if 'layout' in args.checks:
-        result = run([str(args.ast_tool), '--root=' + str(args.root), '-p=' + str(directory), *extra, entry['file']])
+        result = run([str(args.ast_tool), '--root=' + str(args.root), '-p=' + str(directory),
+                      '--in-class-min-lines=' + str(args.in_class_min_lines), *extra, entry['file']])
         (directory / 'layout.log').write_text(result.stderr)
         if result.returncode:
             raise RuntimeError(f'{file}: AST解析に失敗しました。{directory / "layout.log"}')
@@ -164,6 +168,7 @@ def main():
     parser.add_argument('--clang-format', default='clang-format')
     parser.add_argument('--clang-tidy', default='clang-tidy')
     parser.add_argument('--jobs', type=int, default=2)
+    parser.add_argument('--in-class-min-lines', type=int, default=5, help='クラス外定義を要求する本体の最小コード行数。既定5、0は全件')
     parser.add_argument('--output', type=Path)
     parser.add_argument('--baseline', type=Path)
     parser.add_argument('--write-baseline', action='store_true')
@@ -176,6 +181,8 @@ def main():
         parser.error('--checksはformat,naming,layoutの組み合わせです')
     if args.jobs < 1:
         parser.error('--jobsは1以上です')
+    if args.in_class_min_lines < 0:
+        parser.error('--in-class-min-linesは0以上です')
     args.output = (args.output or args.root / 'build/style-report').resolve()
     args.baseline = (args.baseline or args.root / 'tools/style/baseline.json').resolve()
     selected = set(tracked_files(args.root))
@@ -240,10 +247,12 @@ def main():
             if item['key'] not in grouped:
                 grouped[item['key']] = {**item, 'count': 0}
             grouped[item['key']]['count'] += 1
-        args.baseline.write_text(json.dumps({'version': 1, 'llvm_major': 20, 'diagnostics': list(grouped.values())}, indent=2, ensure_ascii=False) + '\n')
+        args.baseline.write_text(json.dumps({'version': 1, 'llvm_major': 20, 'in_class_min_lines': args.in_class_min_lines,
+                                            'diagnostics': list(grouped.values())}, indent=2, ensure_ascii=False) + '\n')
     baseline = json.loads(args.baseline.read_text()) if args.baseline.exists() and not args.strict else {}
     new = compare(diagnostics, baseline)
-    report = dict(files=len(selected), translation_units=len(jobs), diagnostics=diagnostics, new=new,
+    report = dict(files=len(selected), translation_units=len(jobs), in_class_min_lines=args.in_class_min_lines,
+                  diagnostics=diagnostics, new=new,
                   unmapped_sources=unmapped, unparsed_headers=unparsed if 'layout' in args.checks else [])
     (args.output / 'report.json').write_text(json.dumps(report, indent=2, ensure_ascii=False) + '\n')
     for item in new:

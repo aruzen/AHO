@@ -2,6 +2,7 @@
 #include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/FrontendActions.h>
+#include <clang/Lex/Lexer.h>
 #include <clang/Tooling/CommonOptionsParser.h>
 #include <clang/Tooling/Tooling.h>
 #include <llvm/Support/CommandLine.h>
@@ -12,6 +13,7 @@
 #include <algorithm>
 #include <map>
 #include <memory>
+#include <optional>
 #include <regex>
 #include <set>
 #include <string>
@@ -20,6 +22,7 @@
 namespace {
     llvm::cl::OptionCategory STYLE_OPTIONS("AHO style checks");
     llvm::cl::opt<std::string> ROOT("root", llvm::cl::Required, llvm::cl::cat(STYLE_OPTIONS));
+    llvm::cl::opt<unsigned> IN_CLASS_MIN_LINES("in-class-min-lines", llvm::cl::init(5), llvm::cl::cat(STYLE_OPTIONS));
 
     struct Position {
         std::string file;
@@ -38,8 +41,10 @@ namespace {
         std::set<std::pair<unsigned, std::string>> _emitted;
 
         bool position(clang::SourceLocation location, Position& result) const;
-        void report(const Position& position, llvm::StringRef rule, llvm::StringRef symbol, llvm::StringRef message);
+        void report(const Position& position, llvm::StringRef rule, llvm::StringRef symbol, llvm::StringRef message,
+                    std::optional<unsigned> code_lines = std::nullopt);
         bool exempt_record(const clang::DeclContext* context) const;
+        std::optional<unsigned> body_code_lines(const clang::FunctionDecl* declaration) const;
 
     public:
         explicit Visitor(clang::ASTContext& context);
@@ -82,13 +87,16 @@ namespace {
         return true;
     }
 
-    void Visitor::report(const Position& position, llvm::StringRef rule, llvm::StringRef symbol, llvm::StringRef message) {
+    void Visitor::report(const Position& position, llvm::StringRef rule, llvm::StringRef symbol, llvm::StringRef message,
+                         std::optional<unsigned> code_lines) {
         // ヘッダーを複数TUから読む場合の重複は実行側でも除去する。
         if (!_emitted.emplace(position.offset, position.file + rule.str()).second)
             return;
-        llvm::outs() << llvm::json::Value(llvm::json::Object{
-                            {"file", position.file}, {"line", position.line}, {"column", position.column}, {"rule", rule}, {"symbol", symbol}, {"message", message}})
-                     << '\n';
+        llvm::json::Object result{
+            {"file", position.file}, {"line", position.line}, {"column", position.column}, {"rule", rule}, {"symbol", symbol}, {"message", message}};
+        if (code_lines)
+            result["code_lines"] = *code_lines;
+        llvm::outs() << llvm::json::Value(std::move(result)) << '\n';
     }
 
     bool Visitor::exempt_record(const clang::DeclContext* context) const {
@@ -97,6 +105,44 @@ namespace {
                 if (record->isLambda() || record->isLocalClass())
                     return true;
         return false;
+    }
+
+    std::optional<unsigned> Visitor::body_code_lines(const clang::FunctionDecl* declaration) const {
+        const auto* body = declaration->getBody();
+        if (!body || !llvm::isa<clang::CompoundStmt>(body))
+            return std::nullopt;
+        const auto& source = _context.getSourceManager();
+        const auto begin = source.getExpansionLoc(body->getBeginLoc());
+        const auto end = source.getExpansionLoc(body->getEndLoc());
+        if (begin.isInvalid() || end.isInvalid() || source.getFileID(begin) != source.getFileID(end))
+            return std::nullopt;
+        const auto file = source.getFileID(begin);
+        const auto data = source.getBufferData(file);
+        const auto first = source.getFileOffset(begin);
+        const auto last = source.getFileOffset(end);
+        if (last < first)
+            return std::nullopt;
+        clang::Lexer lexer(source.getLocForStartOfFile(file), _context.getLangOpts(), data.begin(), data.begin() + first, data.end());
+        lexer.SetCommentRetentionState(false);
+        std::set<unsigned> lines;
+        clang::Token token;
+        while (true) {
+            lexer.LexFromRawLexer(token);
+            if (token.is(clang::tok::eof))
+                break;
+            const auto offset = source.getFileOffset(token.getLocation());
+            if (offset > last)
+                break;
+            // 関数本体の外側の波括弧だけを除く。内側のブロックや文字列はコードとして数える。
+            if ((offset == first && token.is(clang::tok::l_brace)) ||
+                (offset == last && token.is(clang::tok::r_brace)))
+                continue;
+            const auto first_line = source.getSpellingLineNumber(token.getLocation());
+            const auto last_line = source.getSpellingLineNumber(token.getLocation().getLocWithOffset(token.getLength() ? token.getLength() - 1 : 0));
+            for (auto line = first_line; line <= last_line; ++line)
+                lines.insert(line);
+        }
+        return static_cast<unsigned>(lines.size());
     }
 
     bool Visitor::VisitNamedDecl(clang::NamedDecl* declaration) {
@@ -139,8 +185,12 @@ namespace {
         const bool definition = declaration->doesThisDeclarationHaveABody();
         const auto symbol = declaration->getQualifiedNameAsString();
         const auto* context = declaration->getLexicalDeclContext();
-        if (definition && context->isRecord())
-            report(where, "aho-in-class-definition", symbol, "クラス内は宣言とし、関数本体を型定義の後へ移してください");
+        if (definition && context->isRecord()) {
+            const auto lines = body_code_lines(declaration);
+            // 行数を取得できない場合も診断を残し、解析不能な関数を黙って許可しない。
+            if (!lines || *lines >= IN_CLASS_MIN_LINES)
+                report(where, "aho-in-class-definition", symbol, "クラス内は宣言とし、関数本体を型定義の後へ移してください", lines);
+        }
 
         const bool header = llvm::StringRef(where.file).ends_with(".hpp") || llvm::StringRef(where.file).ends_with(".h") ||
                             llvm::StringRef(where.file).ends_with(".inl");

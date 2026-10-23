@@ -1,6 +1,7 @@
 #pragma once
 #include "typed_shader.hpp"
 #include "typed_index_buffer.hpp"
+#include "typed_buffer_view.hpp"
 #include "../vulkan/commands/draw_indexed.hpp"
 #include "typed_resources.hpp"
 #include "typed_push_constants.hpp"
@@ -15,6 +16,29 @@
 #include <utility>
 
 namespace VSL_NAMESPACE::typed {
+    template<typename Vertex_, MemoryProperty memory_property>
+    class TypedVertexBuffer;
+    template<typename Vertex_>
+    class TypedVertexBufferView {
+        template<typename, MemoryProperty>
+        friend class TypedVertexBuffer;
+        LogicalDeviceAccessor _device;
+        std::shared_ptr<impl::BufferImpl> _buffer;
+        size_t _offset, _count;
+        TypedVertexBufferView(LogicalDeviceAccessor device, std::shared_ptr<impl::BufferImpl> buffer, size_t offset, size_t count)
+            : _device(device), _buffer(std::move(buffer)), _offset(offset), _count(count) {}
+
+    public:
+        using Vertex = Vertex_;
+        size_t size() const { return _count; }
+        size_t byte_offset() const { return _offset; }
+        LogicalDeviceAccessor device() const { return _device; }
+        const std::shared_ptr<impl::BufferImpl>& backend() const { return _buffer; }
+        TypedVertexBufferView view(size_t first, size_t count) const {
+            return TypedVertexBufferView(_device, _buffer, detail::checked_view_offset(_offset, first, count, _count, sizeof(Vertex)), count);
+        }
+    };
+
     template<typename Vertex_, MemoryProperty memory_property = MemoryProperty::HOST_VISIBLE | MemoryProperty::HOST_COHERENT>
     class TypedVertexBuffer {
     public:
@@ -39,6 +63,10 @@ namespace VSL_NAMESPACE::typed {
             : _device(device), _buffer(device, manager, vertices.data(), vertices.size()), _count(vertices.size()) {}
 
         size_t size() const noexcept { return _count; }
+        size_t byte_offset() const { return 0; }
+        TypedVertexBufferView<Vertex> view(size_t first, size_t count) const {
+            return TypedVertexBufferView<Vertex>(_device, _buffer.data_, detail::checked_view_offset(0, first, count, _count, sizeof(Vertex)), count);
+        }
         LogicalDeviceAccessor device() const { return _device; }
         // Explicit escape to the existing dynamic API. Typed binding does not accept a raw BufferAccessor.
         Storage& backend() { return _buffer; }
@@ -59,6 +87,9 @@ namespace VSL_NAMESPACE::typed {
         template<typename Vertex, MemoryProperty property>
         struct IsVertexBuffer<TypedVertexBuffer<Vertex, property>> : std::true_type {};
 
+        template<typename Vertex>
+        struct IsVertexBuffer<TypedVertexBufferView<Vertex>> : std::true_type {};
+
         template<typename Input, typename... Buffers, size_t... indices>
         consteval bool vertex_buffers_match(std::index_sequence<indices...>) {
             if constexpr (sizeof...(Buffers) != Input::BINDING_COUNT || !(IsVertexBuffer<std::remove_cvref_t<Buffers>>::value && ...))
@@ -73,7 +104,7 @@ namespace VSL_NAMESPACE::typed {
     template<typename Input, typename... Buffers>
     concept compatible_vertex_buffers = detail::vertex_buffers_match<Input, Buffers...>(std::index_sequence_for<Buffers...>{});
 
-    template<typename Input, typename Resources = ResourceSchema<>, typename Pushes = PushSchema<>>
+    template<typename Input, typename Resources = ResourceSchema<>, typename Pushes = PushSchema<>, std::uint32_t subpass = 0>
     class TypedGraphicsPipeline;
     template<typename Input, typename Resources = ResourceSchema<>, typename Pushes = PushSchema<>, bool bound = Resources::EMPTY, bool pushed = Pushes::EMPTY>
     class TypedVertexBinding;
@@ -129,7 +160,8 @@ namespace VSL_NAMESPACE::typed {
 
     template<typename Input, typename Resources, typename Pushes, bool bound, bool pushed>
     class TypedVertexBinding {
-        friend class TypedGraphicsPipeline<Input, Resources, Pushes>;
+        template<typename, typename, typename, std::uint32_t>
+        friend class TypedGraphicsPipeline;
         template<typename, typename, typename, bool, bool>
         friend class TypedVertexBinding;
         VSL_NAMESPACE::GraphicsPipeline _pipeline;
@@ -145,7 +177,7 @@ namespace VSL_NAMESPACE::typed {
         TypedVertexBinding(VSL_NAMESPACE::GraphicsPipeline pipeline, LogicalDeviceAccessor device,
                            std::index_sequence<indices...>, const Buffers&... buffers)
             : _pipeline(std::move(pipeline)), _device(device),
-              _buffers{command::BindVertexBufferAt(Input::LAYOUT.binding[indices].binding, buffers.backend())...}, _counts{buffers.size()...} {
+              _buffers{command::BindVertexBufferAt(Input::LAYOUT.binding[indices].binding, buffers.backend(), buffers.byte_offset())...}, _counts{buffers.size()...} {
             if (((buffers.device().data_ != device.data_) || ...))
                 throw std::invalid_argument("Typed pipeline and vertex buffers use different devices");
         }
@@ -166,7 +198,7 @@ namespace VSL_NAMESPACE::typed {
         TypedVertexBinding<Input, Resources, Pushes, bound, true> push_constants(const typename Pushes::Values& values) const;
     };
 
-    template<typename Input, typename Resources, typename Pushes>
+    template<typename Input, typename Resources, typename Pushes, std::uint32_t subpass>
     class TypedGraphicsPipeline {
         LogicalDeviceAccessor _device;
         VSL_NAMESPACE::GraphicsPipeline _pipeline;
@@ -177,6 +209,7 @@ namespace VSL_NAMESPACE::typed {
         using VertexInput = Input;
         using ResourceLayout = Resources;
         using PushLayout = Pushes;
+        static constexpr std::uint32_t SUBPASS = subpass;
         template<pipeline_layout_injecter... Stages>
         TypedGraphicsPipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, Stages&&... stages)
             : _device(device), _pipeline(MakePipeline(device, std::move(pass), std::forward<Stages>(stages)...)) {}
@@ -190,15 +223,15 @@ namespace VSL_NAMESPACE::typed {
         }
     };
 
-    template<typename Input, typename Resources, typename Pushes>
+    template<typename Input, typename Resources, typename Pushes, std::uint32_t subpass>
     template<pipeline_layout_injecter... Stages>
-    VSL_NAMESPACE::GraphicsPipeline TypedGraphicsPipeline<Input, Resources, Pushes>::MakePipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, Stages&&... stages) {
+    VSL_NAMESPACE::GraphicsPipeline TypedGraphicsPipeline<Input, Resources, Pushes, subpass>::MakePipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, Stages&&... stages) {
         // Input is deliberately last: earlier stages cannot replace the typed vertex layout.
         PipelineLayout layout(device, std::forward<Stages>(stages)..., Input{}, Resources{}, Pushes{});
         detail::validate_pipeline_vertex_shader(layout, Input::LAYOUT.attribute);
         detail::validate_resource_schema(layout, Resources::REQUIREMENTS);
         detail::validate_push_schema(layout, Pushes::REQUIREMENTS);
-        return VSL_NAMESPACE::GraphicsPipeline(std::move(layout).freeze(), pass);
+        return VSL_NAMESPACE::GraphicsPipeline(std::move(layout).freeze(), pass, subpass);
     }
 
     template<typename Input, typename Resources, typename Pushes>

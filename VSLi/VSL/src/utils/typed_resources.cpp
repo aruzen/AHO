@@ -23,13 +23,16 @@ namespace VSL_NAMESPACE::typed::detail {
                 const auto usage = point.binding_type == UNIFORM_BUFFER ? MemoryType::UNIFORM_BUFFER : MemoryType::STORAGE_BUFFER;
                 if (!value.buffer || value.buffer->device != device || !contain(value.buffer->usage, usage))
                     throw std::invalid_argument("Typed descriptor buffer device/usage mismatch");
-                if (!value.bytes || value.bytes > value.buffer->requirement_size)
+                if (!value.bytes || value.offset > value.buffer->requirement_size || value.bytes > value.buffer->requirement_size - value.offset)
                     throw std::out_of_range("Typed descriptor buffer range mismatch");
                 const auto limits = device->parent_device->device.getProperties().limits;
                 const auto limit = point.binding_type == UNIFORM_BUFFER ? limits.maxUniformBufferRange : limits.maxStorageBufferRange;
                 if (value.bytes > limit)
                     throw std::out_of_range("Typed descriptor buffer exceeds the device range limit");
-                buffers.push_back({value.buffer->buffer, 0, value.bytes});
+                const auto alignment = point.binding_type == UNIFORM_BUFFER ? limits.minUniformBufferOffsetAlignment : limits.minStorageBufferOffsetAlignment;
+                if (alignment && value.offset % alignment)
+                    throw std::invalid_argument("Typed descriptor buffer offset violates device alignment");
+                buffers.push_back({value.buffer->buffer, value.offset, value.bytes});
                 owners.push_back(value.buffer);
             } else {
                 vk::DescriptorImageInfo info{};

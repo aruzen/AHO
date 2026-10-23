@@ -17,6 +17,9 @@ add_library(AHOLi
         AHO/src/x/drawer/draw_list.cpp
         AHO/src/image_readback.cpp
         AHO/src/x/screenshot.cpp
+        AHO/src/x/drawer/renderer2d.cpp
+        AHO/src/x/command/draw2d.cpp
+        AHO/src/x/drawer/renderer2d_impl.hpp
         AHO/src/engine.cpp
         AHO/src/resource/image.cpp
         AHO/src/resource/buffer.cpp
@@ -26,6 +29,8 @@ add_library(AHOLi
         AHO/include/AHO/image_readback.hpp
         AHO/include/AHO/x/screenshot.hpp
         AHO/include/AHO/x/drawer/draw_list.hpp
+        AHO/include/AHO/x/drawer/renderer2d.hpp
+        AHO/include/AHO/x/command/draw2d.hpp
         AHO/include/aho/engine.hpp
         AHO/include/aho/concepts.hpp
         AHO/include/aho/pipeline/layouts.hpp
@@ -134,3 +139,18 @@ install(
 if (BUILD_TESTING)
     add_subdirectory(AHO/test)
 endif ()
+
+find_program(AHO_DRAW_GLSLC NAMES glslc HINTS "$ENV{VULKAN_SDK}/bin" REQUIRED)
+set(AHO_DRAW_SHADER_OUTPUTS)
+foreach(shader draw2d.vert draw2d.frag)
+    set(output "${CMAKE_CURRENT_BINARY_DIR}/shaders/drawer/${shader}.spv")
+    add_custom_command(OUTPUT "${output}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/shaders/drawer"
+            COMMAND "${AHO_DRAW_GLSLC}" "${CMAKE_CURRENT_SOURCE_DIR}/AHO/shaders/drawer/${shader}" -o "${output}"
+            DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/AHO/shaders/drawer/${shader}"
+            VERBATIM)
+    list(APPEND AHO_DRAW_SHADER_OUTPUTS "${output}")
+endforeach()
+add_custom_target(aho-draw-shaders DEPENDS ${AHO_DRAW_SHADER_OUTPUTS})
+add_dependencies(AHOLi aho-draw-shaders)
+install(FILES ${AHO_DRAW_SHADER_OUTPUTS} DESTINATION share/AHO/shaders/drawer)

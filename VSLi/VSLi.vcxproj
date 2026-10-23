@@ -172,6 +172,8 @@
     <ClInclude Include="VSL\include\VSL\utils\typed_vertex_layout.hpp" />
     <ClInclude Include="VSL\include\VSL\utils\typed_pipeline.hpp" />
     <ClInclude Include="VSL\include\VSL\utils\typed_shader.hpp" />
+    <ClInclude Include="VSL\include\VSL\utils\typed_resources.hpp" />
+    <ClInclude Include="VSL\include\VSL\utils\typed_compute.hpp" />
     <ClInclude Include="VSL\include\VSL\utils\vsl_array.hpp" />
     <ClInclude Include="VSL\include\VSL\vsl.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\buffer.hpp" />
@@ -235,6 +237,7 @@
     <ClCompile Include="VSL\src\utils\shader_compiler.cpp" />
     <ClCompile Include="VSL\src\utils\spir_reflector.cpp" />
     <ClCompile Include="VSL\src\utils\typed_shader.cpp" />
+    <ClCompile Include="VSL\src\utils\typed_resources.cpp" />
     <ClCompile Include="VSL\src\utils\string.cpp" />
     <ClCompile Include="VSL\src\vulkan\buffer.cpp" />
     <ClCompile Include="VSL\src\vulkan\command.cpp" />

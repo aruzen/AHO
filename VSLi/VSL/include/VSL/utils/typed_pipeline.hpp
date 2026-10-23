@@ -10,15 +10,13 @@
 #include <utility>
 
 namespace VSL_NAMESPACE::typed {
-    template<typename Binding_, MemoryProperty memory_property = MemoryProperty::HOST_VISIBLE | MemoryProperty::HOST_COHERENT>
+    template<typename Vertex_, MemoryProperty memory_property = MemoryProperty::HOST_VISIBLE | MemoryProperty::HOST_COHERENT>
     class TypedVertexBuffer {
     public:
-        using Binding = Binding_;
-        using Vertex = typename Binding::Vertex;
+        using Vertex = Vertex_;
 
     private:
         static_assert(std::is_standard_layout_v<Vertex> && std::is_trivially_copyable_v<Vertex>);
-        static_assert(sizeof(Vertex) == Binding::STRIDE, "Typed buffer record size must match its binding stride");
         using Storage = VSL_NAMESPACE::Buffer<MemoryType::VERTEX_BUFFER | MemoryType::TRANSFER_DESTINATION, memory_property>;
         LogicalDeviceAccessor _device;
         Storage _buffer;
@@ -50,15 +48,15 @@ namespace VSL_NAMESPACE::typed {
 
     namespace detail {
         template<typename T> struct IsVertexBuffer : std::false_type {};
-        template<typename Binding, MemoryProperty property>
-        struct IsVertexBuffer<TypedVertexBuffer<Binding, property>> : std::true_type {};
+        template<typename Vertex, MemoryProperty property>
+        struct IsVertexBuffer<TypedVertexBuffer<Vertex, property>> : std::true_type {};
 
         template<typename Input, typename... Buffers, size_t... indices>
         consteval bool VertexBuffersMatch(std::index_sequence<indices...>) {
             if constexpr (sizeof...(Buffers) != Input::BINDING_COUNT || !(IsVertexBuffer<std::remove_cvref_t<Buffers>>::value && ...))
                 return false;
             else
-                return (std::same_as<typename std::remove_cvref_t<Buffers>::Binding, typename Input::template Shape<indices>> && ...);
+                return (std::same_as<typename std::remove_cvref_t<Buffers>::Vertex, typename Input::template Shape<indices>::Vertex> && ...);
         }
     }
 

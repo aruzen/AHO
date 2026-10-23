@@ -225,7 +225,8 @@ namespace VSL_NAMESPACE {
                                             std::uint32_t y) {
         if (!in_flight.wait())
             throw std::runtime_error("Picking render did not complete");
-        auto image = picking_buffer.at(manager.get_current_buffer_idx());
+        const auto index = manager.data_->command_buffer->acquired_image_index.value_or(manager.get_current_buffer_idx());
+        auto image = picking_buffer.at(index);
         (void)command::ImageReadback::Describe(image, ImageLayout::COLOR_ATTACHMENT_OPTIMAL, {x, y, 1, 1});
         StagingBuffer<MemoryType::TRANSFER_DESTINATION> destination(LogicalDeviceAccessor{data_->device}, sizeof(std::uint32_t));
         auto buffer = manager.make_exclusive_buffer(1);

@@ -1,6 +1,72 @@
 #include "support/image_transfer_fixture.hpp"
 namespace {
+    class ImageUploadRangeVulkanIntegrationTest : public vsl_test::ImageTransferVulkanIntegrationTest {
+        bool validate_vulkan() const override;
+    };
+
     using CopyBufferToImageVulkanIntegrationTest = vsl_test::ImageTransferVulkanIntegrationTest;
+
+    bool ImageUploadRangeVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
+    TEST_F(ImageUploadRangeVulkanIntegrationTest, RejectsSourceSmallerThanOneImageLayerBeforeRecording) {
+        TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT);
+        vsl::StagingBuffer<> source(device, std::size_t{4});
+        auto manager = make_manager();
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        transition(manager, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, {}, vk::AccessFlagBits::eTransferWrite);
+        // validationエラーはfixtureで失敗させ、不正命令をdriverへ渡さない。
+        expect_validation_abort("");
+        vsl::command::CopyBufferToImage command(image, &source, vsl::ImageLayout::GENERAL);
+        EXPECT_THROW(phase << command, std::out_of_range);
+        EXPECT_FALSE(has_validation_errors());
+    }
+    TEST_F(ImageUploadRangeVulkanIntegrationTest, RejectsArrayUploadSourceSmallerThanOneImageLayer) {
+        TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT, 2);
+        vsl::StagingBuffer<> source(device, std::size_t{4});
+        auto manager = make_manager();
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        transition(manager, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, {}, vk::AccessFlagBits::eTransferWrite);
+        expect_validation_abort("");
+        vsl::command::CopyBufferToArrayImage command(image, &source, vsl::ImageLayout::GENERAL, 1);
+        EXPECT_THROW(phase << command, std::out_of_range);
+        EXPECT_FALSE(has_validation_errors());
+    }
+    TEST_F(ImageUploadRangeVulkanIntegrationTest, RejectsArrayLayerEqualToTheLayerCountBeforeRecording) {
+        TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT, 2);
+        vsl::StagingBuffer<> source(device, std::size_t{16});
+        auto manager = make_manager();
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        transition(manager, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, {}, vk::AccessFlagBits::eTransferWrite);
+        expect_validation_abort("");
+        vsl::command::CopyBufferToArrayImage command(image, &source, vsl::ImageLayout::GENERAL, 2);
+        EXPECT_THROW(phase << command, std::out_of_range);
+        EXPECT_FALSE(has_validation_errors());
+    }
+    TEST_F(ImageUploadRangeVulkanIntegrationTest, RejectsLayoutsThatCannotReceiveTransfers) {
+        TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT, 2);
+        vsl::StagingBuffer<> source(device, std::size_t{16});
+        auto manager = make_manager();
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        expect_validation_abort("");
+        vsl::command::CopyBufferToImage single(image, &source, vsl::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
+        vsl::command::CopyBufferToArrayImage array(image, &source, vsl::ImageLayout::UNDEFINED, 1);
+        EXPECT_THROW(phase << single, std::invalid_argument);
+        EXPECT_THROW(phase << array, std::invalid_argument);
+        EXPECT_FALSE(has_validation_errors());
+    }
+    TEST_F(ImageUploadRangeVulkanIntegrationTest, RejectsNullSourceAndImagesWithoutTransferDestinationUsage) {
+        vsl::Image<vsl::ImageType::SAMPLED> image(device, 2, 2, vsl::data_format::UNSIGNED_INT);
+        vsl::StagingBuffer<> source(device, std::size_t{16});
+        auto manager = make_manager();
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        expect_validation_abort("");
+        vsl::command::CopyBufferToImage missing(image, nullptr, vsl::ImageLayout::GENERAL);
+        vsl::command::CopyBufferToArrayImage wrong_usage(image, &source, vsl::ImageLayout::GENERAL, 0);
+        EXPECT_THROW(phase << missing, std::invalid_argument);
+        EXPECT_THROW(phase << wrong_usage, std::invalid_argument);
+        EXPECT_FALSE(has_validation_errors());
+    }
     TEST_F(CopyBufferToImageVulkanIntegrationTest, CopiesEveryTexelAndSelectedArrayLayer) {
         const std::array<std::uint32_t, 4> expected{0x12345678, 0x90abcdef, 0, 0xffffffff};
         EXPECT_EQ(round_trip(false, false), expected);

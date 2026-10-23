@@ -11,8 +11,10 @@
 #include <ranges>
 #include <limits>
 #include <cstring>
+#include <algorithm>
 
 namespace {
+    using ReflectedBlock = VSL_NAMESPACE::utils::SPIRVReflector;
     struct ReflectionCompiler : spirv_cross::Compiler {
         using Compiler::Compiler;
         using Compiler::evaluate_constant_u32;
@@ -51,6 +53,109 @@ namespace {
             count *= extent;
         }
         return count;
+    }
+
+    ReflectedBlock::BlockType reflect_block_type(const ReflectionCompiler& compiler, spirv_cross::TypeID id,
+                                                 size_t matrix_stride = 0, bool row_major = false) {
+        const auto& type = compiler.get_type(id);
+        ReflectedBlock::BlockType result;
+        if (type.pointer) {
+            if (type.storage != spv::StorageClassPhysicalStorageBuffer)
+                throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "Unsupported pointer in a shader block");
+            result.numeric = ReflectedBlock::NumericType::UNSIGNED_INTEGER;
+            result.width = 64;
+            result.size = 8;
+            return result;
+        }
+        result.width = type.width;
+        result.components = type.vecsize;
+        result.columns = type.columns;
+        if (!type.array.empty()) {
+            result.kind = ReflectedBlock::BlockKind::ARRAY;
+            const auto index = type.array.size() - 1;
+            result.count = type.array_size_literal[index] ? type.array[index] : compiler.evaluate_constant_u32(type.array[index]);
+            result.stride = compiler.get_decoration(id, spv::DecorationArrayStride);
+            if (!type.parent_type || !result.stride)
+                throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "Block array is missing its element type/ArrayStride");
+            result.elements.push_back(reflect_block_type(compiler, type.parent_type, matrix_stride, row_major));
+            if (result.count) {
+                const auto size = result.elements.front().size;
+                if ((result.count - 1) > (std::numeric_limits<size_t>::max() - size) / result.stride)
+                    throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "Block array extent overflow");
+                result.size = (result.count - 1) * result.stride + size;
+            }
+            return result;
+        }
+        if (type.basetype == spirv_cross::SPIRType::Struct) {
+            result.kind = ReflectedBlock::BlockKind::STRUCTURE;
+            for (std::uint32_t i = 0; i < type.member_types.size(); ++i) {
+                const auto stride = compiler.get_member_decoration(type.self, i, spv::DecorationMatrixStride);
+                const auto major = compiler.has_member_decoration(type.self, i, spv::DecorationRowMajor);
+                auto member = reflect_block_type(compiler, type.member_types[i], stride, major);
+                const auto offset = compiler.type_struct_member_offset(type, i);
+                if (member.size > std::numeric_limits<size_t>::max() - offset)
+                    throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "Block member extent overflow");
+                result.size = std::max(result.size, offset + member.size);
+                result.members.push_back({compiler.get_member_name(type.self, i), offset,
+                                          compiler.get_declared_struct_member_size(type, i), std::move(member)});
+            }
+            return result;
+        }
+        using Numeric = ReflectedBlock::NumericType;
+        switch (type.basetype) {
+            case spirv_cross::SPIRType::Half:
+            case spirv_cross::SPIRType::Float:
+            case spirv_cross::SPIRType::Double:
+                result.numeric = Numeric::FLOATING_POINT;
+                break;
+            case spirv_cross::SPIRType::SByte:
+            case spirv_cross::SPIRType::Short:
+            case spirv_cross::SPIRType::Int:
+            case spirv_cross::SPIRType::Int64:
+                result.numeric = Numeric::SIGNED_INTEGER;
+                break;
+            case spirv_cross::SPIRType::UByte:
+            case spirv_cross::SPIRType::UShort:
+            case spirv_cross::SPIRType::UInt:
+            case spirv_cross::SPIRType::UInt64:
+                result.numeric = Numeric::UNSIGNED_INTEGER;
+                break;
+            case spirv_cross::SPIRType::Boolean:
+                result.numeric = Numeric::UNSIGNED_INTEGER;
+                result.width = 32;
+                break;
+            default:
+                break;
+        }
+        if (result.numeric == Numeric::UNSUPPORTED)
+            throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "Unsupported shader block numeric type");
+        if (type.columns > 1) {
+            if (!matrix_stride)
+                throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "Block matrix is missing MatrixStride");
+            result.kind = ReflectedBlock::BlockKind::MATRIX;
+            result.stride = matrix_stride;
+            result.row_major = row_major;
+            result.size = ((row_major ? type.vecsize : type.columns) - 1) * matrix_stride + (row_major ? type.columns : type.vecsize) * result.width / 8;
+        } else {
+            result.kind = type.vecsize > 1 ? ReflectedBlock::BlockKind::VECTOR : ReflectedBlock::BlockKind::SCALAR;
+            result.size = type.vecsize * result.width / 8;
+        }
+        return result;
+    }
+
+    ReflectedBlock::Block reflect_block(const ReflectionCompiler& compiler, const spirv_cross::Resource& resource,
+                                        VSL_NAMESPACE::ShaderFlag stages, std::optional<VSL_NAMESPACE::graphic_resource::Type> kind) {
+        ReflectedBlock::Block result;
+        result.name = resource.name;
+        result.kind = kind;
+        result.stages = stages;
+        if (kind) {
+            result.set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
+            result.binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
+        }
+        result.declared_size = compiler.get_declared_struct_size(compiler.get_type(resource.base_type_id));
+        result.type = reflect_block_type(compiler, resource.base_type_id);
+        return result;
     }
 } // namespace
 
@@ -154,6 +259,12 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
 
     spirv_cross::ShaderResources shader_resources = comp.get_shader_resources();
     if (scope == Scope::ALL) {
+        for (const auto& resource : shader_resources.uniform_buffers)
+            generated.blocks.push_back(reflect_block(comp, resource, shader_type, Type::UNIFORM_BUFFER));
+        for (const auto& resource : shader_resources.storage_buffers)
+            generated.blocks.push_back(reflect_block(comp, resource, shader_type, Type::STORAGE_BUFFER));
+        for (const auto& resource : shader_resources.push_constant_buffers)
+            generated.blocks.push_back(reflect_block(comp, resource, shader_type, std::nullopt));
         std::vector<std::tuple<spirv_cross::SmallVector<spirv_cross::Resource>, graphic_resource::Type>> mapped_resources = {
             {shader_resources.uniform_buffers, graphic_resource::Type::UNIFORM_BUFFER},
             {shader_resources.storage_buffers, graphic_resource::Type::STORAGE_BUFFER},

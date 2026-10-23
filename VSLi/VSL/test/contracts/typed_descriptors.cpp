@@ -8,10 +8,12 @@ namespace {
     struct Payload {
         float rgba[4];
     };
+
+    using PayloadRecord = t::BlockRecord<Payload, VSL_BLOCK_MEMBER(Payload, rgba)>;
     struct Wrong {
         float rgba[4];
     };
-    using Uniform = t::UniformBinding<3, Payload, vsl::ShaderFlag::VERTEX, 2>;
+    using Uniform = t::UniformBinding<3, PayloadRecord, vsl::ShaderFlag::VERTEX, 2>;
     using Set = t::DescriptorSet<2, Uniform>;
     using Schema = t::ResourceSchema<Set>;
     using Pipeline = t::TypedGraphicsPipeline<t::TypedVertexInput<>, Schema>;
@@ -39,7 +41,7 @@ namespace {
         set.write<9>(std::array{buffer, buffer});
     }
 #elif VSL_TYPED_CASE == 5
-    using Other = t::DescriptorSet<1, t::UniformBinding<4, Payload, vsl::ShaderFlag::VERTEX, 2>>;
+    using Other = t::DescriptorSet<1, t::UniformBinding<4, PayloadRecord, vsl::ShaderFlag::VERTEX, 2>>;
     void rejected(Pipeline& pipeline, t::TypedDescriptorSet<Other>& set) {
         pipeline.bind_vertices().bind_resources(set);
     }
@@ -56,7 +58,7 @@ namespace {
 #elif VSL_TYPED_CASE == 9
     static_assert(t::ResourceSchema<Set, Set>::COUNT == 2);
 #elif VSL_TYPED_CASE == 10
-    using Invalid = t::UniformBinding<0, Payload, vsl::ShaderFlag::VERTEX, 0>;
+    using Invalid = t::UniformBinding<0, PayloadRecord, vsl::ShaderFlag::VERTEX, 0>;
     static_assert(Invalid::POINT.amount == 0);
 #elif VSL_TYPED_CASE == 11
     void rejected(Pipeline& pipeline, vsl::GraphicResource& set) {

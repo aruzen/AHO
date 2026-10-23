@@ -35,6 +35,38 @@ namespace VSL_NAMESPACE::utils {
             std::uint32_t location, component, width, components;
             NumericType numeric_type;
         };
+        enum class BlockKind {
+            SCALAR,
+            VECTOR,
+            MATRIX,
+            ARRAY,
+            STRUCTURE
+        };
+        struct BlockMember;
+        struct BlockType {
+            BlockKind kind = BlockKind::SCALAR;
+            NumericType numeric = NumericType::UNSUPPORTED;
+            std::uint32_t width = 0, components = 1, columns = 1;
+            size_t size = 0, count = 0, stride = 0;
+            bool row_major = false;
+            std::vector<BlockMember> members;
+            // Array types have one child. A vector keeps the reflection tree copyable.
+            std::vector<BlockType> elements;
+        };
+        struct BlockMember {
+            std::string name;
+            size_t offset, declared_size;
+            BlockType type;
+        };
+        struct Block {
+            std::string name;
+            // A null kind denotes a push constant block.
+            std::optional<graphic_resource::Type> kind;
+            std::uint32_t set = 0, binding = 0;
+            ShaderFlag stages = ShaderFlag::ERROR_;
+            size_t declared_size = 0;
+            BlockType type;
+        };
         struct GenerateData {
             LogicalDeviceAccessor logical_device;
 
@@ -47,6 +79,7 @@ namespace VSL_NAMESPACE::utils {
             std::string entry_point;
             // Active inputs of the selected entry point, expanded into array elements/matrix columns.
             std::vector<VertexInputVariable> vertex_inputs;
+            std::vector<Block> blocks;
 
             // レイアウトの添字はディスクリプターセット番号に対応し、欠番には空のレイアウトを配置する。
             // repeatで指定した回数だけ、セット全体の並びを追加で複製する。

@@ -1,3 +1,4 @@
+#include <VSL/utils/typed_block_validation.hpp>
 #include <VSL/utils/typed_push_constants.hpp>
 #include <VSL/utils/spir_reflector.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
@@ -31,6 +32,7 @@ namespace VSL_NAMESPACE::typed::detail {
                     cursor = next;
                 }
             }
+            validate_push_blocks(reflection.generated, requirements);
         }
     }
     void validate_push_values(std::span<const PushRequirement> requirements, std::span<const std::byte> values) {

@@ -1,5 +1,6 @@
 #pragma once
 #include "../vulkan/stages/push_contents.hpp"
+#include "typed_block_layout.hpp"
 #include "../vulkan/pipeline.hpp"
 #include "../vulkan/command.hpp"
 #include <array>
@@ -15,6 +16,7 @@ namespace VSL_NAMESPACE::typed {
         struct PushRequirement {
             pipeline_layout::PushContentDefinition range;
             size_t data_offset;
+            const BlockType* memory_layout = nullptr;
         };
         void validate_push_values(std::span<const PushRequirement> requirements, std::span<const std::byte> values);
         void inject_push_schema(PipelineLayoutEditAccessor layout, std::span<const PushRequirement> requirements);
@@ -28,7 +30,10 @@ namespace VSL_NAMESPACE::typed {
 
     template<typename Payload_, ShaderFlag stages, std::uint32_t offset = 0>
     struct PushRange {
-        using Payload = Payload_;
+        using MemoryLayout = PayloadLayout<Payload_>;
+        using Payload = typename MemoryLayout::Payload;
+        static_assert(detail::block_layout_known(MemoryLayout::LAYOUT), "Typed push payload requires BlockRecord/BlockLayout metadata");
+        static_assert(MemoryLayout::LAYOUT.size <= sizeof(Payload), "Typed push layout exceeds payload sizeof");
         static_assert(std::is_standard_layout_v<Payload> && std::is_trivially_copyable_v<Payload>, "Typed push payload must be a trivial standard-layout record");
         static_assert(sizeof(Payload) % 4 == 0 && offset % 4 == 0 && std::uint64_t(offset) + sizeof(Payload) <= UINT32_MAX,
                       "Invalid typed push offset/size: 4-byte alignment and uint32 extent required");
@@ -74,7 +79,7 @@ namespace VSL_NAMESPACE::typed {
     consteval auto PushSchema<RangeTypes...>::MakeRequirements() {
         std::array<detail::PushRequirement, sizeof...(RangeTypes)> result{};
         size_t offset = 0, index = 0;
-        auto add = [&]<typename Range>() { result[index++] = {Range::RANGE, offset}; offset += sizeof(typename Range::Payload); };
+        auto add = [&]<typename Range>() { result[index++] = {Range::RANGE, offset, &Range::MemoryLayout::LAYOUT}; offset += sizeof(typename Range::Payload); };
         (add.template operator()<RangeTypes>(), ...);
         return result;
     }

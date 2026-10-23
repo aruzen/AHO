@@ -35,7 +35,8 @@
 - Descriptor自身のruntime配列、dynamic offset、texel buffer、acceleration structure等はこの段階の対象外。SSBO内部のruntime配列にはTypedStorageBuffer<T>の要素数を使える。画像layout遷移、CPU/GPU同期、使用中descriptor更新の制御は既存VSLと同じく利用側の責任。
 
 ```cpp
-using TintLayout = t::DescriptorLayout<t::UniformBinding<3, Tint, vsl::ShaderFlag::VERTEX, 2>>;
+using TintRecord = t::BlockRecord<Tint, VSL_BLOCK_MEMBER(Tint, rgba)>;
+using TintLayout = t::DescriptorLayout<t::UniformBinding<3, TintRecord, vsl::ShaderFlag::VERTEX, 2>>;
 using Schema = t::ResourceSchema<t::DescriptorSetBinding<2, TintLayout>>;
 t::TypedDescriptorSet<TintLayout> tints(device, manager);
 tints.write<3>(std::array{first_uniform, second_uniform});
@@ -61,7 +62,7 @@ PR: [#236](https://github.com/aruzen/AHO/pull/236)、`feat/vsl-typed-descriptors
 `TypedGraphicsPipeline<Input, Resources, Pushes>` / `TypedComputePipeline<Resources, Pushes>` はPushesも型として保持する。必要なpushをセットするまでdraw/dispatchは制約で拒否し、binding/commandがValuesを所有する。元変数や一時Valuesの破棄後も安全に記録できる。descriptorのbindとpush値の設定はどちらの順でも行える。
 
 ```cpp
-using Pushes = t::PushSchema<t::PushRange<Transform, vsl::ShaderFlag::VERTEX>>;
+using Pushes = t::PushSchema<t::PushRange<TransformLayout, vsl::ShaderFlag::VERTEX>>;
 auto bound = pipeline.bind_vertices(vertices).push_constants(Pushes::Values(transform));
 phase << bound.draw(3);
 ```
@@ -81,3 +82,35 @@ shaderのpush memberがschemaのstageとbyte範囲で覆われていることを
 同じM1/MoltenVK環境で関連CTest **206/206成功、skipなし**。新規CPU 1件、実GPU 7件、compile contract 12件（正例1、負例11）と既存のTyped/descriptor/shader/push等を確認。元変数破棄後のsnapshot、非zero offset、共有offset・異なるoffset・部分重複、descriptorとの設定順、shader側のstage/offset/extent不一致、compute dispatchを検証した。修正後のunexpected validation errorなし。
 
 変更6ファイル/5TUの命名・配置・format検査は違反0件。詳細member配置は次段で扱うため、この段では範囲・stageとC++ payload型の契約を保証する。
+
+
+PR: [#237](https://github.com/aruzen/AHO/pull/237)、`feat/vsl-typed-push-constants` → `feat/vsl-typed-descriptors`。
+
+## 3. shader blockのメモリ配置検証
+
+`BlockRecord<Record, Members...>` と `VSL_BLOCK_MEMBER(Record, member)` でC++のmember型・offsetofを宣言する。UBO/SSBOのbindingとPushRangeへこのlayout型を渡し、bufferやValuesは元のRecordを受け取る。未注釈の任意structをsizeofだけで通すことは廃止した。算術型・短いC配列のvector・GRAPHIC_TYPEのある既存vector型は推論できる。
+
+```cpp
+struct Tint { float rgba[4]; };
+using TintRecord = t::BlockRecord<Tint, VSL_BLOCK_MEMBER(Tint, rgba)>;
+using Binding = t::UniformBinding<0, TintRecord, vsl::ShaderFlag::VERTEX>;
+using Pushes = t::PushSchema<t::PushRange<TintRecord, vsl::ShaderFlag::VERTEX>>;
+t::TypedUniformBuffer<TintRecord> buffer(device, Tint{{1, 0, 0, 1}});
+```
+
+`std::array` は配列として扱う。短いC配列はvectorと推論するため、shaderのscalar配列を表す場合はBlockArrayで明示する。入れ子struct・配列要素の注釈にはBlockRecord/BlockArrayを使う。行列は `BlockMatrix<Scalar, columns, rows, stride, row_major>` をmemberのpolicyとして明示する。BlockValueで既存型全体にもpolicyを付けられる。数値の変換やstd140/std430の自動padding生成は行わず、実際のC++ storageを照合する。
+
+SPIR-V reflectionにblock・memberのoffset、数値種別/bit幅、配列の各次元とstride、行列のstride/major、入れ子structを追加した。descriptor/pushのpipeline作成時に既存のreflection結果を使って照合する。宣言metadataはconstexprの参照木で、memberごとの実行時allocationは不要。reflectionの結果はコピー可能な値として保持する。
+
+SSBO末尾のruntime配列は、C++の固定capacity配列または単独の要素型で表せる。単独要素の場合はsizeofとshaderのArrayStrideも一致が必要。固定配列はshader以上のcapacityを要求する。memberの有効extentを検証し、shader末尾のアクセスしないpaddingは強制しない。pushはstage/byte範囲の検査に加え、各shader memberを対応するC++ memberの配置と照合する。行列等の1memberを複数の別payloadへ分割する注釈は未対応で、member全体を表すpolicyを使う。
+
+明示policyとGRAPHIC_TYPEは利用者によるstorageの意味付けであり、C++の自動reflectionではない。deviceの8/16/64bit機能有効化、画像layout、GPU同期は別の契約として残る。physical storage buffer pointerは64bitアドレスとして反映し、循環するstructを無制限に辿らない。
+
+
+### block配置の検証
+
+同じM1/MoltenVK環境で関連CTest **228/228成功、skipなし**。新規CPU 6件、実GPU 3件、compile contract 13件（正例1、負例12）。std140/std430、入れ子struct・多次元配列・行列配列・非正方行列・row/column major、8/16/32/64bit数値のreflection、runtime要素stride、同じsizeofで異なるoffset/strideを検証した。数値幅のreflectionはCPUで確認し、GPU計算は有効なdevice機能の32bit型で実行した。unexpected validation errorなし。
+
+製品VSL・vsl-testと各正例contractをビルドし、SPIR-V validatorとMSBuild XMLの検査も成功。Windows/Linux、sanitizer、全AHO/VSLテストは未実施。
+
+変更16ファイル/10TUの命名・配置・format検査は違反0件。

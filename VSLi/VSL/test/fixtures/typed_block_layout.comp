@@ -1,0 +1,17 @@
+#version 450
+layout(local_size_x = 1) in;
+struct Inner { vec2 uv; uint code; };
+layout(set = 0, binding = 2, std140) uniform Data {
+    vec4 color;
+    mat3 basis;
+    float weights[3];
+    Inner nested[2];
+} input_data;
+layout(set = 1, binding = 4, std430) buffer Output { uint values[]; } output_data;
+layout(push_constant, row_major) uniform Push { mat2 transform; uint index; } push_data;
+void main() {
+    float value = input_data.color.x + input_data.basis[2].y + input_data.weights[1];
+    value += input_data.nested[1].uv.y + float(input_data.nested[1].code);
+    value += push_data.transform[1][0] + float(push_data.index);
+    output_data.values[0] = uint(value);
+}

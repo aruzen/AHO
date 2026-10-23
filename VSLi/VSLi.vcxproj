@@ -174,6 +174,8 @@
     <ClInclude Include="VSL\include\VSL\utils\typed_shader.hpp" />
     <ClInclude Include="VSL\include\VSL\utils\typed_resources.hpp" />
     <ClInclude Include="VSL\include\VSL\utils\typed_push_constants.hpp" />
+    <ClInclude Include="VSL\include\VSL\utils\typed_block_layout.hpp" />
+    <ClInclude Include="VSL\include\VSL\utils\typed_block_validation.hpp" />
     <ClInclude Include="VSL\include\VSL\utils\typed_compute.hpp" />
     <ClInclude Include="VSL\include\VSL\utils\vsl_array.hpp" />
     <ClInclude Include="VSL\include\VSL\vsl.hpp" />
@@ -240,6 +242,7 @@
     <ClCompile Include="VSL\src\utils\typed_shader.cpp" />
     <ClCompile Include="VSL\src\utils\typed_resources.cpp" />
     <ClCompile Include="VSL\src\utils\typed_push_constants.cpp" />
+    <ClCompile Include="VSL\src\utils\typed_block_validation.cpp" />
     <ClCompile Include="VSL\src\utils\string.cpp" />
     <ClCompile Include="VSL\src\vulkan\buffer.cpp" />
     <ClCompile Include="VSL\src\vulkan\command.cpp" />

@@ -36,6 +36,8 @@ void framebuffer_resize_callback(GLFWwindow* window, int width, int height) {
         auto p = wd->plugins[VSL_NAMESPACE::window_plugin::HookResize::HOOK_RESIZE_USED_ID];
         if (auto hook = std::dynamic_pointer_cast<VSL_NAMESPACE::window_plugin::HookResize>(p); hook)
             hook->callback(VSL_NAMESPACE::PureWindow(wd), width, height);
+        // callbackでWINDOWSが再確保される可能性があるため、走査を継続しない。
+        return;
     }
 }
 

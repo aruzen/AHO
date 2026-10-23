@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "VSLi/VSL/test/vulkan/synchronize_test.cpp",
+      "line": 12,
+      "column": 14,
+      "rule": "aho-in-class-definition",
+      "symbol": "(anonymous namespace)::SynchronizeVulkanIntegrationTest::TearDown",
+      "message": "クラス内は宣言とし、関数本体を型定義の後へ移してください",
+      "source": "void TearDown() override {",
+      "key": "d4e7cbe5f5a6e04e635ce51dfe920c8c572f81073bc0c0311f7560123a76e154",
+      "count": 1,
+      "code_lines": 5
+    }
+  ]
+}

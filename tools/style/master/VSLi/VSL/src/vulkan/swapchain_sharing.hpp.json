@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "VSLi/VSL/src/vulkan/swapchain_sharing.hpp",
+      "line": 19,
+      "column": 1,
+      "rule": "clang-format",
+      "symbol": "",
+      "message": "clang-formatの結果と一致しません",
+      "source": "d2aa5213b1ae0a8588e8ef3b10e8588902aa48bb86e2fbe6886681b86e8e0231",
+      "key": "d7bfa23f578c0e143e384ed6af4c63cc4a3ddc9359c474b7066b1d9f5bb69f41",
+      "count": 1
+    }
+  ]
+}

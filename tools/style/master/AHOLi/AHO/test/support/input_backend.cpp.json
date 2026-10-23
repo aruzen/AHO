@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "AHOLi/AHO/test/support/input_backend.cpp",
+      "line": 4,
+      "column": 1,
+      "rule": "clang-format",
+      "symbol": "",
+      "message": "clang-formatの結果と一致しません",
+      "source": "2e64df3c7a578cef76e50c00b98de5f399bf93f62de26b15efd7f128291176fa",
+      "key": "56d0e9bc1d892af31f45e9c112cc4364b1b494632e34e22d8929d4d978e5cdb6",
+      "count": 1
+    }
+  ]
+}

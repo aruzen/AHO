@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "AHOLi/AHO/include/AHO/pipeline/layouts.hpp",
+      "line": 55,
+      "column": 45,
+      "rule": "aho-declaration-order",
+      "symbol": "aho::pipeline::GetBaseLayoutFunc",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "typedef VSL_NAMESPACE::PipelineLayout (*GetBaseLayoutFunc)(engine::EngineAccessor* engine);",
+      "key": "e6c2e9528a7c3c00571d7f3dff09cbfb4ac631f12a474006ed04d5dad9f4b77d",
+      "count": 1
+    }
+  ]
+}

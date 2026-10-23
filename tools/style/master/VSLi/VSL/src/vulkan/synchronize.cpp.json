@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "VSLi/VSL/src/vulkan/synchronize.cpp",
+      "line": 36,
+      "column": 1,
+      "rule": "clang-format",
+      "symbol": "",
+      "message": "clang-formatの結果と一致しません",
+      "source": "42db9138becd837c08b10590fcba9b6818a68a043d1ac53d275bd1e2194627e2",
+      "key": "9b96bbb17806ee0d7d451e6452b4963184bc673e1694bf2491dac65fcd71f9a5",
+      "count": 1
+    }
+  ]
+}

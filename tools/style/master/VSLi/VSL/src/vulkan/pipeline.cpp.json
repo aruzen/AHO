@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "VSLi/VSL/src/vulkan/pipeline.cpp",
+      "line": 16,
+      "column": 1,
+      "rule": "clang-format",
+      "symbol": "",
+      "message": "clang-formatの結果と一致しません",
+      "source": "eea7e79acfef545675c3b9fff87a8a957140a47d6f5173e412fbc165a24a7769",
+      "key": "b539c15de6734a8e04a80cd84e912b03896c3cc4a6d84a7771105698d949bfc5",
+      "count": 1
+    }
+  ]
+}

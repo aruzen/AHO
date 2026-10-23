@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "AHOLi/AHO/test/support/live_gpu.hpp",
+      "line": 16,
+      "column": 21,
+      "rule": "aho-in-class-definition",
+      "symbol": "aho_test::LiveGPUTest::CaptureLog",
+      "message": "クラス内は宣言とし、関数本体を型定義の後へ移してください",
+      "source": "static void CaptureLog(const char* text) {",
+      "key": "598e5ff11ca29178fbdd8a8b2d212d5abe2e2ba32b6754b935b8312367b52c33",
+      "count": 1,
+      "code_lines": 5
+    },
+    {
+      "file": "AHOLi/AHO/test/support/live_gpu.hpp",
+      "line": 26,
+      "column": 14,
+      "rule": "aho-in-class-definition",
+      "symbol": "aho_test::LiveGPUTest::SetUp",
+      "message": "クラス内は宣言とし、関数本体を型定義の後へ移してください",
+      "source": "void SetUp() override {",
+      "key": "72870f8201372c48bdbdf811a3be2381d378df60e8503b4e6115fa453b09e7a3",
+      "count": 1,
+      "code_lines": 33
+    },
+    {
+      "file": "AHOLi/AHO/test/support/live_gpu.hpp",
+      "line": 64,
+      "column": 14,
+      "rule": "aho-in-class-definition",
+      "symbol": "aho_test::LiveGPUTest::TearDown",
+      "message": "クラス内は宣言とし、関数本体を型定義の後へ移してください",
+      "source": "void TearDown() override {",
+      "key": "a06d18c46547455365a21855a75f71ae95fe392916c4a7330bf95aaf1ffd7f4c",
+      "count": 1,
+      "code_lines": 18
+    }
+  ]
+}

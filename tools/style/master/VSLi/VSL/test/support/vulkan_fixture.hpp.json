@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "VSLi/VSL/test/support/vulkan_fixture.hpp",
+      "line": 30,
+      "column": 1,
+      "rule": "clang-format",
+      "symbol": "",
+      "message": "clang-formatの結果と一致しません",
+      "source": "5b16ca2c88e3bf0ca71669ff4f7d32a2d1d3ca62d29471c1f43e203edebc2eeb",
+      "key": "b96b4b2226f4ade27a663ebb148fe603f2a5f794bc9f195d9c62790cff145cc8",
+      "count": 1
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "VSLi/VSL/include/VSL/vulkan/image.hpp",
+      "line": 32,
+      "column": 1,
+      "rule": "clang-format",
+      "symbol": "",
+      "message": "clang-formatの結果と一致しません",
+      "source": "45ef7ae303d6fe632e8ec17e4702c8e67b363d1c592d400dd648c2f2b9873fd3",
+      "key": "16cb2e02d12aa9839651455d500cdb64c29c88e3b35a034429ee112e7d7c97bf",
+      "count": 1
+    }
+  ]
+}

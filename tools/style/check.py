@@ -147,9 +147,61 @@ def translation_check(job, args, selected, tidy, extra):
     return diagnostics, coverage
 
 
-def compare(diagnostics, baseline):
+def load_master(directory, selected, in_class_min_lines):
+    diagnostics = []
+    if directory.exists() and not directory.is_dir():
+        raise ValueError(f'masterにはディレクトリを指定してください: {directory}')
+    for file in sorted(selected):
+        path = directory / (file + '.json')
+        if not path.exists():
+            continue
+        master = json.loads(path.read_text())
+        if (not isinstance(master, dict) or master.get('version') != 1 or master.get('llvm_major') != 20 or
+                master.get('in_class_min_lines') != in_class_min_lines):
+            raise ValueError(f'masterの形式・LLVM・行数条件が一致しません: {path}')
+        if not isinstance(master.get('diagnostics'), list):
+            raise ValueError(f'masterの診断一覧が不正です: {path}')
+        for item in master['diagnostics']:
+            if (not isinstance(item, dict) or item.get('file') != file or
+                    not isinstance(item.get('key'), str) or
+                    type(item.get('count')) is not int or item['count'] <= 0):
+                raise ValueError(f'masterの対象ファイル・件数が不正です: {path}')
+            diagnostics.append(item)
+    return diagnostics
+
+
+def update_master(directory, selected, diagnostics, in_class_min_lines, remove_deleted=False):
+    # 検証済みの既存登録だけを減らす。新しい違反を許可へ追加しない。
+    selected = set(selected)
+    if remove_deleted:
+        for path in directory.rglob('*.json'):
+            file = path.relative_to(directory).as_posix()[:-5]
+            if not file.startswith(ROOTS) or Path(file).suffix not in SUFFIXES:
+                raise ValueError(f'masterの対象パスが不正です: {path}')
+            selected.add(file)
+    existing = load_master(directory, selected, in_class_min_lines)
+    remaining = Counter(item['key'] for item in diagnostics)
+    grouped = {}
+    for item in existing:
+        count = min(item['count'], remaining[item['key']])
+        if count:
+            grouped.setdefault(item['file'], []).append({**item, 'count': count})
+            remaining[item['key']] -= count
+    for file in sorted(selected):
+        path = directory / (file + '.json')
+        if file in grouped:
+            master = dict(version=1, llvm_major=20, in_class_min_lines=in_class_min_lines,
+                          diagnostics=grouped[file])
+            path.write_text(json.dumps(master, indent=2, ensure_ascii=False) + '\n')
+        elif path.exists():
+            path.unlink()
+
+
+def compare(diagnostics, master):
     # 同じ違反を複製した場合も検出する。TUをまたぐ重複除去は呼び出し側で行う。
-    remaining = Counter({item['key']: item['count'] for item in baseline.get('diagnostics', [])})
+    remaining = Counter()
+    for item in master:
+        remaining[item['key']] += item['count']
     new = []
     for item in diagnostics:
         if remaining[item['key']]:
@@ -170,8 +222,8 @@ def main():
     parser.add_argument('--jobs', type=int, default=2)
     parser.add_argument('--in-class-min-lines', type=int, default=5, help='クラス外定義を要求する本体の最小コード行数。既定5、0は全件')
     parser.add_argument('--output', type=Path)
-    parser.add_argument('--baseline', type=Path)
-    parser.add_argument('--write-baseline', action='store_true')
+    parser.add_argument('--master', type=Path, help='ソースごとの既存違反を記録するmasterディレクトリ')
+    parser.add_argument('--update-master', action='store_true', help='検査したファイルの解消済み登録だけを削除する')
     parser.add_argument('--strict', action='store_true', help='既存違反も含めて失敗にする')
     parser.add_argument('files', nargs='*', help='指定時はtracked対象ファイルの一部を検査')
     args = parser.parse_args()
@@ -184,7 +236,9 @@ def main():
     if args.in_class_min_lines < 0:
         parser.error('--in-class-min-linesは0以上です')
     args.output = (args.output or args.root / 'build/style-report').resolve()
-    args.baseline = (args.baseline or args.root / 'tools/style/baseline.json').resolve()
+    args.master = (args.master or args.root / 'tools/style/master').resolve()
+    if args.update_master and (args.strict or args.checks != {'format', 'naming', 'layout'}):
+        parser.error('masterの更新はstrictなし・全検査でのみ可能です')
     selected = set(tracked_files(args.root))
     if args.files:
         requested = {Path(file).as_posix() for file in args.files}
@@ -239,22 +293,16 @@ def main():
             diagnostics.append(diagnostic(args.root, file, 1, 1, 'aho-unparsed-header', '', 'どのTUからも解析されていないヘッダーです', digest))
     unique = {(item['file'], item['line'], item['column'], item['rule'], item['symbol']): item for item in diagnostics}
     diagnostics = sorted(unique.values(), key=lambda item: (item['file'], item['line'], item['column'], item['rule']))
-    if args.write_baseline:
-        if args.files or args.checks != {'format', 'naming', 'layout'}:
-            parser.error('baselineの更新は全ファイル・全検査でのみ可能です')
-        grouped = {}
-        for item in diagnostics:
-            if item['key'] not in grouped:
-                grouped[item['key']] = {**item, 'count': 0}
-            grouped[item['key']]['count'] += 1
-        args.baseline.write_text(json.dumps({'version': 1, 'llvm_major': 20, 'in_class_min_lines': args.in_class_min_lines,
-                                            'diagnostics': list(grouped.values())}, indent=2, ensure_ascii=False) + '\n')
-    baseline = json.loads(args.baseline.read_text()) if args.baseline.exists() and not args.strict else {}
-    new = compare(diagnostics, baseline)
+    master = load_master(args.master, selected, args.in_class_min_lines) if not args.strict else []
+    new = compare(diagnostics, master)
     report = dict(files=len(selected), translation_units=len(jobs), in_class_min_lines=args.in_class_min_lines,
                   diagnostics=diagnostics, new=new,
                   unmapped_sources=unmapped, unparsed_headers=unparsed if 'layout' in args.checks else [])
     (args.output / 'report.json').write_text(json.dumps(report, indent=2, ensure_ascii=False) + '\n')
+    if args.update_master:
+        if unmapped or unparsed:
+            raise ValueError('未登録ソース・未解析ヘッダーがあるためmasterを更新しません')
+        update_master(args.master, selected, diagnostics, args.in_class_min_lines, remove_deleted=not args.files)
     for item in new:
         print(f"{item['file']}:{item['line']}:{item['column']}: {item['message']} [{item['rule']}]")
     print(f'対象{len(selected)}ファイル/{len(jobs)}TU、違反{len(diagnostics)}件、新規{len(new)}件。{args.output / "report.json"}')

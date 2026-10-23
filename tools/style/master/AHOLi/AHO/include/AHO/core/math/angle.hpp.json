@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "AHOLi/AHO/include/AHO/core/math/angle.hpp",
+      "line": 125,
+      "column": 1,
+      "rule": "clang-format",
+      "symbol": "",
+      "message": "clang-formatの結果と一致しません",
+      "source": "3a4c53722131c70b7ece3cad031296268b02a83bb41b2aa5916e4045d9c87543",
+      "key": "4144c8ebe71765df9375a8e337fd4921b0a4eee429f6ce157be4fb71c15958db",
+      "count": 1
+    }
+  ]
+}

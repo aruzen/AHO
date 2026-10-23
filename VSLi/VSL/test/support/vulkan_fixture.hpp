@@ -27,7 +27,7 @@ namespace vsl_test {
         std::size_t _expected_abort_count = 0;
         static VKAPI_ATTR VkBool32 VKAPI_CALL
         ValidationCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT,
-                            const VkDebugUtilsMessengerCallbackDataEXT* data, void* user);
+                           const VkDebugUtilsMessengerCallbackDataEXT* data, void* user);
 
     protected:
         bool has_validation_errors();
@@ -63,7 +63,7 @@ namespace vsl_test {
 
     inline VKAPI_ATTR VkBool32 VKAPI_CALL
     VulkanIntegrationTest::ValidationCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT,
-                                               const VkDebugUtilsMessengerCallbackDataEXT* data, void* user) {
+                                              const VkDebugUtilsMessengerCallbackDataEXT* data, void* user) {
         if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
             auto& self = *static_cast<VulkanIntegrationTest*>(user);
             std::lock_guard lock(self._validation_mutex);

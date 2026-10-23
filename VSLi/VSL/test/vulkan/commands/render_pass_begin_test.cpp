@@ -2,6 +2,32 @@
 #include "support/read_image.hpp"
 namespace {
     using RenderPassBeginVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
+
+    struct PackedIntegerClearCase {
+        vk::Format format;
+        bool is_signed;
+    };
+
+    class PackedIntegerClearTest : public testing::TestWithParam<PackedIntegerClearCase> {};
+
+    class PackedIntegerClearVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest,
+                                                    public testing::WithParamInterface<PackedIntegerClearCase> {
+        void SetUp() override {
+            require_validation = true;
+            VulkanIntegrationTest::SetUp();
+        }
+    };
+
+    class LegacyClearVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        void SetUp() override {
+            require_validation = true;
+            VulkanIntegrationTest::SetUp();
+        }
+    };
+
+    class LegacyClearFormatVulkanIntegrationTest : public LegacyClearVulkanIntegrationTest,
+                                                   public testing::WithParamInterface<vk::Format> {};
+
     TEST_F(RenderPassBeginVulkanIntegrationTest, RetainsPassAndFramebufferAndClearsBlack) {
         VSL_NAMESPACE::command::RenderPassBegin begin(*pass, *framebuffer);
         EXPECT_EQ(begin.render_pass.data_, pass->data_);
@@ -53,14 +79,9 @@ namespace {
 } // namespace
 
 namespace {
-    struct PackedIntegerClearCase {
-        vk::Format format;
-        bool is_signed;
-    };
     void PrintTo(const PackedIntegerClearCase& value, std::ostream* stream) {
         *stream << vk::to_string(value.format);
     }
-    class PackedIntegerClearTest : public testing::TestWithParam<PackedIntegerClearCase> {};
     VSL_NAMESPACE::FrameBufferAccessor metadata_framebuffer(vk::Format format) {
         auto description = std::make_shared<VSL_NAMESPACE::RenderPassDescription>();
         description->add_color({.format = {static_cast<VSL_NAMESPACE::data_format::FormatTypes>(format), 4}});
@@ -88,22 +109,11 @@ namespace {
         EXPECT_THROW((VSL_NAMESPACE::command::RenderPassBegin(target, {VSL_NAMESPACE::ClearColor{}})), std::invalid_argument);
         EXPECT_THROW((VSL_NAMESPACE::command::RenderPassBegin(target, {opposite})), std::invalid_argument);
     }
-    INSTANTIATE_TEST_SUITE_P(PackedFormats, PackedIntegerClearTest, testing::Values(
-        PackedIntegerClearCase{vk::Format::eA2R10G10B10SintPack32, true},
-        PackedIntegerClearCase{vk::Format::eA2B10G10R10SintPack32, true},
-        PackedIntegerClearCase{vk::Format::eA2R10G10B10UintPack32, false},
-        PackedIntegerClearCase{vk::Format::eA2B10G10R10UintPack32, false}),
-        [](const testing::TestParamInfo<PackedIntegerClearCase>& info) { return vk::to_string(info.param.format); });
-}
+    INSTANTIATE_TEST_SUITE_P(PackedFormats, PackedIntegerClearTest, testing::Values(PackedIntegerClearCase{vk::Format::eA2R10G10B10SintPack32, true}, PackedIntegerClearCase{vk::Format::eA2B10G10R10SintPack32, true}, PackedIntegerClearCase{vk::Format::eA2R10G10B10UintPack32, false}, PackedIntegerClearCase{vk::Format::eA2B10G10R10UintPack32, false}),
+                             [](const testing::TestParamInfo<PackedIntegerClearCase>& info) { return vk::to_string(info.param.format); });
+} // namespace
 
 namespace {
-    class PackedIntegerClearVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest,
-                                                   public testing::WithParamInterface<PackedIntegerClearCase> {
-        void SetUp() override {
-            require_validation = true;
-            VulkanIntegrationTest::SetUp();
-        }
-    };
     TEST_P(PackedIntegerClearVulkanIntegrationTest, IntegerClearReachesEveryPackedPixel) {
         const auto [format, is_signed] = GetParam();
         const auto flags = physical.data_->device.getFormatProperties(format).optimalTilingFeatures;
@@ -132,18 +142,19 @@ namespace {
             vk::ImageMemoryBarrier image_barrier{
                 .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,
                 .dstAccessMask = vk::AccessFlagBits::eTransferRead,
-                .oldLayout = vk::ImageLayout::eGeneral, .newLayout = vk::ImageLayout::eTransferSrcOptimal,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = image.data_->image, .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
+                .oldLayout = vk::ImageLayout::eGeneral,
+                .newLayout = vk::ImageLayout::eTransferSrcOptimal,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = image.data_->image,
+                .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
             command.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eTransfer,
                                     {}, {}, {}, image_barrier);
             vk::BufferImageCopy copy{.imageSubresource = {vk::ImageAspectFlagBits::eColor, 0, 0, 1},
                                      .imageExtent = {2, 2, 1}};
             command.copyImageToBuffer(image.data_->image, vk::ImageLayout::eTransferSrcOptimal, destination.data_->buffer, copy);
             vk::BufferMemoryBarrier host_visibility{
-                .srcAccessMask = vk::AccessFlagBits::eTransferWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .buffer = destination.data_->buffer, .offset = 0, .size = 16};
+                .srcAccessMask = vk::AccessFlagBits::eTransferWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead, .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .buffer = destination.data_->buffer, .offset = 0, .size = 16};
             command.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost,
                                     {}, {}, host_visibility, {});
             completion = phase.completion();
@@ -163,23 +174,11 @@ namespace {
             EXPECT_EQ(pixel, expected) << "pixel " << i;
         }
     }
-    INSTANTIATE_TEST_SUITE_P(PackedFormats, PackedIntegerClearVulkanIntegrationTest, testing::Values(
-        PackedIntegerClearCase{vk::Format::eA2R10G10B10SintPack32, true},
-        PackedIntegerClearCase{vk::Format::eA2B10G10R10SintPack32, true},
-        PackedIntegerClearCase{vk::Format::eA2R10G10B10UintPack32, false},
-        PackedIntegerClearCase{vk::Format::eA2B10G10R10UintPack32, false}),
-        [](const testing::TestParamInfo<PackedIntegerClearCase>& info) { return vk::to_string(info.param.format); });
-}
+    INSTANTIATE_TEST_SUITE_P(PackedFormats, PackedIntegerClearVulkanIntegrationTest, testing::Values(PackedIntegerClearCase{vk::Format::eA2R10G10B10SintPack32, true}, PackedIntegerClearCase{vk::Format::eA2B10G10R10SintPack32, true}, PackedIntegerClearCase{vk::Format::eA2R10G10B10UintPack32, false}, PackedIntegerClearCase{vk::Format::eA2B10G10R10UintPack32, false}),
+                             [](const testing::TestParamInfo<PackedIntegerClearCase>& info) { return vk::to_string(info.param.format); });
+} // namespace
 
 namespace {
-    class LegacyClearVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
-        void SetUp() override {
-            require_validation = true;
-            VulkanIntegrationTest::SetUp();
-        }
-    };
-    class LegacyClearFormatVulkanIntegrationTest : public LegacyClearVulkanIntegrationTest,
-                                                  public testing::WithParamInterface<vk::Format> {};
     vsl::FrameBufferAccessor legacy_metadata_target(vsl::RenderPassAccessor pass) {
         auto target = std::make_shared<vsl::impl::FrameBufferImpl>();
         target->render_pass = std::move(pass.data_);
@@ -192,7 +191,7 @@ namespace {
         const bool depth = format == vk::Format::eD32Sfloat;
         vsl::RenderPassDescription description;
         vsl::AttachmentDescription attachment{.format = {static_cast<vsl::data_format::FormatTypes>(format), 4},
-                                               .final_layout = depth ? vsl::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL : vsl::ImageLayout::COLOR_ATTACHMENT_OPTIMAL};
+                                              .final_layout = depth ? vsl::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL : vsl::ImageLayout::COLOR_ATTACHMENT_OPTIMAL};
         if (depth)
             description.set_depth_stencil(attachment);
         else
@@ -211,8 +210,8 @@ namespace {
         EXPECT_EQ(vsl::command::RenderPassBegin(pass, target).clear_values[0].index(), kind);
     }
     INSTANTIATE_TEST_SUITE_P(NumericFormats, LegacyClearFormatVulkanIntegrationTest,
-                            testing::Values(vk::Format::eR32Sint, vk::Format::eR32Uint, vk::Format::eD32Sfloat),
-                            [](const testing::TestParamInfo<vk::Format>& info) { return vk::to_string(info.param); });
+                             testing::Values(vk::Format::eR32Sint, vk::Format::eR32Uint, vk::Format::eD32Sfloat),
+                             [](const testing::TestParamInfo<vk::Format>& info) { return vk::to_string(info.param); });
     TEST_F(LegacyClearVulkanIntegrationTest, ExplicitRgbIsRejectedWhenThereAreNoAttachments) {
         vsl::RenderPass pass(device, vsl::RenderPassDescription{});
         auto target = legacy_metadata_target(pass);

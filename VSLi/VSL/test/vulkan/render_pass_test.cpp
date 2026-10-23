@@ -28,7 +28,7 @@ namespace {
         auto color = desc.add_color({.format = vsl::data_format::UNSIGNED_NORMALIZED8_RGBA});
         auto id = desc.add_color({.format = vsl::data_format::UNSIGNED_INT});
         auto depth = desc.set_depth_stencil({.format = vsl::data_format::DEPTH32_FLOAT,
-                                           .final_layout = vsl::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL});
+                                             .final_layout = vsl::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL});
         EXPECT_EQ(color, 0u);
         EXPECT_EQ(id, 1u);
         EXPECT_EQ(depth, 2u);

@@ -2,16 +2,45 @@
 #include <array>
 #include <limits>
 #include "support/compile_probe.hpp"
+#include "support/render_fixture.hpp"
+#include <VSL/vulkan/buffer.hpp>
+#include <VSL/vulkan/commands/image_readback.hpp>
 
 namespace {
     class BufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override;
     };
 
+    using HostBuffer = vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION>;
+
+    enum ElementCount : short {
+        NO_ELEMENTS = 0,
+        THREE_ELEMENTS = 3,
+        NEGATIVE_ELEMENTS = -1
+    };
+
+    class BufferSharingVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override;
+    };
+
+    using ConcurrentHostBuffer = vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION, vsl::MemoryProperty::NONE, vsl::SharingMode::CONCURRENT>;
+
+    struct FlushTrackingBuffer : vsl::Buffer<vsl::MemoryType::TRANSFER_SOURCE, vsl::MemoryProperty::HOST_VISIBLE> {
+        using Base = vsl::Buffer<vsl::MemoryType::TRANSFER_SOURCE, vsl::MemoryProperty::HOST_VISIBLE>;
+        using Base::Base;
+        int flush_calls = 0;
+        void flush(LocalBufferHolder& holder) override;
+    };
+
+    using ReadbackBuffer = vsl::Buffer<vsl::MemoryType::TRANSFER_DESTINATION, vsl::MemoryProperty::HOST_VISIBLE>;
+
+    class PersistentBufferVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
+        bool validate_vulkan() const override;
+    };
+
     bool BufferVulkanIntegrationTest::validate_vulkan() const {
         return true;
     }
-    using HostBuffer = vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION>;
     TEST_F(BufferVulkanIntegrationTest, MapsCopiesAndReadsBackSingleValues) {
         if (!host_coherent_available())
             GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
@@ -150,7 +179,7 @@ namespace {
         vsl::DeviceLocalBuffer<vsl::MemoryType::TRANSFER_SOURCE> value(device, manager, expected);
         auto payload = expected;
         vsl::DeviceLocalBuffer<vsl::MemoryType::TRANSFER_SOURCE> pointer(device, manager, payload.data(),
-                                                                        payload.size());
+                                                                         payload.size());
         HostBuffer readback(device, sizeof(expected));
         for (auto* buffer : {&value, &pointer}) {
             readback.copy_by_buffer(manager, buffer);
@@ -312,14 +341,10 @@ namespace {
 } // namespace
 
 namespace {
-    class BufferSharingVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
-        bool validate_vulkan() const override;
-    };
 
     bool BufferSharingVulkanIntegrationTest::validate_vulkan() const {
         return true;
     }
-    using ConcurrentHostBuffer = vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION, vsl::MemoryProperty::NONE, vsl::SharingMode::CONCURRENT>;
     TEST_F(BufferSharingVulkanIntegrationTest, ConcurrentRequestWorksWithOneQueueFamilyAndPreservesMappedPayload) {
         if (!host_coherent_available())
             GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
@@ -460,12 +485,6 @@ namespace {
 } // namespace
 
 namespace {
-    struct FlushTrackingBuffer : vsl::Buffer<vsl::MemoryType::TRANSFER_SOURCE, vsl::MemoryProperty::HOST_VISIBLE> {
-        using Base = vsl::Buffer<vsl::MemoryType::TRANSFER_SOURCE, vsl::MemoryProperty::HOST_VISIBLE>;
-        using Base::Base;
-        int flush_calls = 0;
-        void flush(LocalBufferHolder& holder) override;
-    };
 
     void FlushTrackingBuffer::flush(LocalBufferHolder& holder) {
         EXPECT_EQ(holder.parent, this);
@@ -565,11 +584,6 @@ namespace {
 } // namespace
 
 namespace {
-    enum ElementCount : short {
-        NO_ELEMENTS = 0,
-        THREE_ELEMENTS = 3,
-        NEGATIVE_ELEMENTS = -1
-    };
     TEST_F(BufferVulkanIntegrationTest, UnscopedEnumCountsCopyPointerAndCArrayElementsWithoutSerializingTheCount) {
         const std::array<std::uint32_t, 4> initial{0xa5a5a5a5u, 0xa5a5a5a5u, 0xa5a5a5a5u, 0xa5a5a5a5u};
         const std::array<std::uint32_t, 3> source{17, 23, 29};
@@ -673,14 +687,7 @@ void probe(vsl::LogicalDeviceAccessor device){
     }
 } // namespace
 
-#include "support/render_fixture.hpp"
-#include <VSL/vulkan/buffer.hpp>
-#include <VSL/vulkan/commands/image_readback.hpp>
 namespace {
-    using ReadbackBuffer = vsl::Buffer<vsl::MemoryType::TRANSFER_DESTINATION, vsl::MemoryProperty::HOST_VISIBLE>;
-    class PersistentBufferVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
-        bool validate_vulkan() const override;
-    };
 
     bool PersistentBufferVulkanIntegrationTest::validate_vulkan() const {
         return true;

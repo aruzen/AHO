@@ -7,18 +7,7 @@ namespace vsl_test {
         std::filesystem::path _path;
 
     public:
-        TemporaryDirectory() {
-            std::random_device random;
-            for (int attempt = 0; attempt < 100; ++attempt) {
-                auto candidate =
-                    std::filesystem::temp_directory_path() / ("aho-vsl-test-" + std::to_string(random()));
-                if (std::filesystem::create_directory(candidate)) {
-                    _path = candidate;
-                    return;
-                }
-            }
-            throw std::runtime_error("Cannot create unique test directory");
-        }
+        TemporaryDirectory();
         TemporaryDirectory(const TemporaryDirectory&) = delete;
         TemporaryDirectory& operator=(const TemporaryDirectory&) = delete;
         ~TemporaryDirectory() {
@@ -29,4 +18,17 @@ namespace vsl_test {
             return _path;
         }
     };
+
+    inline TemporaryDirectory::TemporaryDirectory() {
+        std::random_device random;
+        for (int attempt = 0; attempt < 100; ++attempt) {
+            auto candidate =
+                std::filesystem::temp_directory_path() / ("aho-vsl-test-" + std::to_string(random()));
+            if (std::filesystem::create_directory(candidate)) {
+                _path = candidate;
+                return;
+            }
+        }
+        throw std::runtime_error("Cannot create unique test directory");
+    }
 } // namespace vsl_test

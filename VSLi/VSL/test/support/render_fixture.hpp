@@ -42,7 +42,7 @@ namespace vsl_test {
         description.images = {*color};
         vsl::RenderPassDescription pass_description;
         pass_description.add_color({.format = vsl::data_format::UNSIGNED_NORMALIZED8_RGBA,
-                                  .final_layout = vsl::ImageLayout::GENERAL});
+                                    .final_layout = vsl::ImageLayout::GENERAL});
         pass.emplace(device, pass_description);
         framebuffer.emplace(*pass, WIDTH, HEIGHT, std::vector<vsl::ImageAccessor>{*color});
         configure_pipeline(false);

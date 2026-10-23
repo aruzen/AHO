@@ -43,7 +43,7 @@ namespace {
         }
         device.data_->device.waitIdle();
         EXPECT_TRUE(static_cast<vsl::ImageAccessor&>(image).copy_by_buffer(manager, &upload,
-                                                                         vsl::ImageLayout::GENERAL, 0));
+                                                                           vsl::ImageLayout::GENERAL, 0));
         device.data_->device.waitIdle();
         {
             auto phase = manager.start_phase<vsl::ComputePhase>();

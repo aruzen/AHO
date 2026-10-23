@@ -21,20 +21,20 @@ namespace {
     };
 } // namespace
 template<>
-struct kk::Schema<VertexData> {
-    using Members = kk::MemberList<&VertexData::normal, &VertexData::uv0, &VertexData::uv1>;
+struct aho::x::MeshAttributeSchema<VertexData> {
+    using Members = aho::x::MeshAttributeMembers<&VertexData::normal, &VertexData::uv0, &VertexData::uv1>;
 };
 template<>
-struct kk::Schema<TriangleData> {
-    using Members = kk::MemberList<&TriangleData::material>;
+struct aho::x::MeshAttributeSchema<TriangleData> {
+    using Members = aho::x::MeshAttributeMembers<&TriangleData::material>;
 };
 template<>
-struct kk::Schema<NoData> {
-    using Members = kk::MemberList<>;
+struct aho::x::MeshAttributeSchema<NoData> {
+    using Members = aho::x::MeshAttributeMembers<>;
 };
 template<>
-struct kk::Schema<Label> {
-    using Members = kk::MemberList<&Label::text>;
+struct aho::x::MeshAttributeSchema<Label> {
+    using Members = aho::x::MeshAttributeMembers<&Label::text>;
 };
 
 namespace {
@@ -49,7 +49,7 @@ namespace {
     static_assert(std::same_as<Mesh::TriangleType, Polygon::TriangleType>);
     static_assert(std::same_as<Mesh::TriangleDataType, TriangleData>);
     static_assert(std::same_as<decltype(std::declval<Mesh&>().geometry()), const Polygon&>);
-    static_assert(std::same_as<decltype(std::declval<Mesh&>().vertex_data()), const kk::SoA<VertexData>&>);
+    static_assert(std::same_as<decltype(std::declval<Mesh&>().vertex_data()), const aho::x::MeshAttributes<VertexData>&>);
     static_assert(std::same_as<decltype(std::declval<const Mesh&>().triangle_column<&TriangleData::material>()), std::span<const std::uint32_t>>);
 
     TEST(ExperimentalMeshTest, DefaultIsEmptyAndRejectsAttributeAccess) {
@@ -142,7 +142,7 @@ namespace {
     }
 
     TEST(ExperimentalMeshTest, CustomStorageCanChangeColumnOrderWithoutChangingFieldAccess) {
-        using Vertices = kk::SoA<VertexData, kk::MemberList<&VertexData::uv1, &VertexData::uv0, &VertexData::normal>>;
+        using Vertices = aho::x::MeshAttributes<VertexData, aho::x::MeshAttributeMembers<&VertexData::uv1, &VertexData::uv0, &VertexData::normal>>;
         aho::x::Mesh<Polygon, VertexData, TriangleData, Vertices> mesh{Polygon(POINTS, INDICES)};
         mesh.vertex_column<&VertexData::uv1>()[0] = {7, 8};
         EXPECT_EQ(mesh.vertex(0).read().uv1[0], 7);

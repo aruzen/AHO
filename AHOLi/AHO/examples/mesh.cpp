@@ -15,13 +15,13 @@ namespace {
 } // namespace
 
 template<>
-struct kk::Schema<VertexData> {
-    using Members = kk::MemberList<&VertexData::normal, &VertexData::uv0, &VertexData::uv1>;
+struct aho::x::MeshAttributeSchema<VertexData> {
+    using Members = aho::x::MeshAttributeMembers<&VertexData::normal, &VertexData::uv0, &VertexData::uv1>;
 };
 
 template<>
-struct kk::Schema<TriangleData> {
-    using Members = kk::MemberList<&TriangleData::material>;
+struct aho::x::MeshAttributeSchema<TriangleData> {
+    using Members = aho::x::MeshAttributeMembers<&TriangleData::material>;
 };
 
 int main() {

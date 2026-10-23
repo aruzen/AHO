@@ -28,6 +28,7 @@ add_test(NAME Style.CheckerContracts
 if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     # 通常のTUが読まない公開umbrellaと空の予約ヘッダーも解析対象にする。
     add_library(aho-style-headers OBJECT EXCLUDE_FROM_ALL headers.cpp)
+    target_link_libraries(aho-style-headers PRIVATE saitekikuukan::saitekikuukan)
     target_include_directories(aho-style-headers PRIVATE
         "${AHO_HOME}/include" "${VSL_HOME}/include"
         ${Vulkan_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS})

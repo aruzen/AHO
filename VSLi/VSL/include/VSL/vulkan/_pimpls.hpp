@@ -337,8 +337,8 @@ namespace VSL_NAMESPACE::impl {
         };
 
         std::uint32_t find_memory_type(std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl> device,
-                                     std::uint32_t type_filter,
-                                     vk::MemoryPropertyFlags properties);
+                                       std::uint32_t type_filter,
+                                       vk::MemoryPropertyFlags properties);
         QueueFamilyIndices find_queue_families(vk::PhysicalDevice device, vk::SurfaceKHR surface);
         void destroy_debug_utils_messenger_ext(vk::Instance& instance, vk::DebugUtilsMessengerEXT& debug_messenger, const VkAllocationCallbacks* p_allocator);
     } // namespace helper

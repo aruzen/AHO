@@ -20,8 +20,16 @@
 namespace VSL_NAMESPACE::utils {
     class SPIRVReflector {
     public:
-        enum class Scope { ALL, VERTEX_INPUT };
-        enum class NumericType { FLOATING_POINT, SIGNED_INTEGER, UNSIGNED_INTEGER, UNSUPPORTED };
+        enum class Scope {
+            ALL,
+            VERTEX_INPUT
+        };
+        enum class NumericType {
+            FLOATING_POINT,
+            SIGNED_INTEGER,
+            UNSIGNED_INTEGER,
+            UNSUPPORTED
+        };
         struct VertexInputVariable {
             std::string name;
             std::uint32_t location, component, width, components;

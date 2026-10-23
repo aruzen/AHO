@@ -1706,17 +1706,6 @@
       "count": 1
     },
     {
-      "file": "VSLi/VSL/include/VSL/vulkan/_pimpls.hpp",
-      "line": 339,
-      "column": 1,
-      "rule": "clang-format",
-      "symbol": "",
-      "message": "clang-formatの結果と一致しません",
-      "source": "002a5223a213b6297ddadcfb0a8968ee0dbbd8ed87be43b6d15731b3896c35c8",
-      "key": "5071eb52a9edff687b57cf03eae655618ef86301eeb69012564e6d691f5ebf46",
-      "count": 1
-    },
-    {
       "file": "VSLi/VSL/include/VSL/vulkan/buffer_and_image_accessor.hpp",
       "line": 300,
       "column": 1,
@@ -1780,17 +1769,6 @@
       "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
       "source": "struct Shader : public ShaderAccessor {",
       "key": "8d7ae49db0a7e056fea3ebe1b9f8f8a7cb228b6476b2c92df74905e9fcb3d49a",
-      "count": 1
-    },
-    {
-      "file": "VSLi/VSL/src/utils/spir_reflector.cpp",
-      "line": 36,
-      "column": 12,
-      "rule": "aho-declaration-order",
-      "symbol": "(anonymous namespace)::ReflectionCompiler",
-      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
-      "source": "struct ReflectionCompiler : spirv_cross::Compiler {",
-      "key": "81c898fd3e539b71a7fc50dda3a282f54b246d384d60cdfd802e9c3889b0ee0e",
       "count": 1
     },
     {

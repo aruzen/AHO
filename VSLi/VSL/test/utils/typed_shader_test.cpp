@@ -51,7 +51,8 @@ namespace {
         ASSERT_EQ(shader.generated.vertex_inputs.size(), 3u);
         using Packed = Input<t::VertexInputDefinition<f::FLOAT_RGBA, 0>>;
         EXPECT_NO_THROW(t::validate_vertex_shader<Packed>(shader.generated));
-        for (const auto& variable : shader.generated.vertex_inputs) EXPECT_EQ(variable.location, 0u);
+        for (const auto& variable : shader.generated.vertex_inputs)
+            EXPECT_EQ(variable.location, 0u);
     }
 
     TEST(TypedShaderInputTest, WideComponentsMayUseTheSecondLocationButNeverMissingDefaults) {
@@ -100,7 +101,7 @@ namespace {
     }
     TEST(TypedShaderInputTest, VertexOnlyScopeDoesNotRequireDescriptorRuntimeArrayCounts) {
         Reflector shader({}, vsl_test::shader_path("typed_runtime_descriptors.vert.spv"),
-            "main", vsl::ShaderType::VERTEX, Reflector::Scope::VERTEX_INPUT);
+                         "main", vsl::ShaderType::VERTEX, Reflector::Scope::VERTEX_INPUT);
         using Position = Input<t::VertexInputDefinition<f::FLOAT_RG, 0>>;
         EXPECT_NO_THROW(t::validate_vertex_shader<Position>(shader.generated));
         EXPECT_TRUE(shader.generated.binding_points.empty());
@@ -132,4 +133,4 @@ namespace {
         EXPECT_THROW(Reflector({}, std::span<const std::uint32_t>(no_entries)), vsl::exceptions::RuntimeException);
     }
 
-}
+} // namespace

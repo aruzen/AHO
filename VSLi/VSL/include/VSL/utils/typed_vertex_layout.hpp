@@ -23,7 +23,8 @@ namespace VSL_NAMESPACE::typed {
         static constexpr VertexTiming TIMING = timing;
         static constexpr std::array<pipeline_layout::VertexInputLayoutDefinition, sizeof...(Attributes)> ATTRIBUTES{Attributes::VALUE...};
         static constexpr size_t Size() { return sizeof...(Attributes); }
-        template<size_t index> static constexpr auto Get() { return std::get<index>(ATTRIBUTES); }
+        template<size_t index>
+        static constexpr auto Get() { return std::get<index>(ATTRIBUTES); }
         static pipeline_layout::VertexInputShapeDefinition Make() {
             return {.layouts = {ATTRIBUTES.begin(), ATTRIBUTES.end()}, .binding = binding, .size = size, .update_timing = timing};
         }
@@ -50,14 +51,6 @@ namespace VSL_NAMESPACE::typed {
     };
 
     namespace detail {
-        constexpr std::uint32_t VertexLocations(data_format::Format format) {
-            using enum data_format::FormatTypes;
-            switch (format.type()) {
-                case UNSIGNED_INT64_RGB: case SIGNED_INT64_RGB: case SIGNED_FLOAT64_RGB:
-                case UNSIGNED_INT64_RGBA: case SIGNED_INT64_RGBA: case SIGNED_FLOAT64_RGBA: return 2;
-                default: return 1;
-            }
-        }
         template<size_t bindings, size_t attributes>
         struct VertexLayoutData {
             std::array<VertexBindingLayout, bindings> binding{};
@@ -65,8 +58,62 @@ namespace VSL_NAMESPACE::typed {
             bool valid = true;
         };
 
+        template<typename T>
+        struct VertexMemberFormat {
+            static constexpr auto VALUE = [] {
+                if constexpr (std::is_same_v<std::remove_cv_t<T>, signed char>)
+                    return data_format::INT8;
+                else
+                    return data_format::convert_graphic_type<std::remove_cv_t<T>>();
+            }();
+        };
+
+        template<typename T, size_t count>
+        struct VertexMemberFormat<T[count]> {
+            static constexpr auto VALUE = [] {
+                constexpr auto scalar = VertexMemberFormat<T>::VALUE;
+                if constexpr (scalar.size() == sizeof(T) && scalar.get_vec_length() == 1)
+                    return scalar.template to_vec<count>();
+                else
+                    return data_format::UNDEFINED;
+            }();
+        };
+
+        template<typename T, size_t count>
+        struct VertexMemberFormat<std::array<T, count>> : VertexMemberFormat<T[count]> {};
+
+        template<typename Record, std::uint32_t binding, VertexTiming timing, std::uint32_t first_location, typename Indices>
+        struct RecordBinding;
+
+        template<typename Record, std::uint32_t binding, VertexTiming timing, std::uint32_t first_location, size_t... indices>
+        struct RecordBinding<Record, binding, timing, first_location, std::index_sequence<indices...>> {
+            static_assert(((std::uint64_t(first_location) + Record::ATTRIBUTES[indices].location +
+                                Record::ATTRIBUTES[indices].locations <=
+                            AUTO) &&
+                           ...),
+                          "Vertex record location overflow");
+            using Type = VertexBinding<typename Record::Vertex, binding, timing,
+                                       VertexInputDefinition<Record::ATTRIBUTES[indices].format, first_location + Record::ATTRIBUTES[indices].location,
+                                                             Record::ATTRIBUTES[indices].offset>...>;
+        };
+
+        constexpr std::uint32_t vertex_locations(data_format::Format format) {
+            using enum data_format::FormatTypes;
+            switch (format.type()) {
+                case UNSIGNED_INT64_RGB:
+                case SIGNED_INT64_RGB:
+                case SIGNED_FLOAT64_RGB:
+                case UNSIGNED_INT64_RGBA:
+                case SIGNED_INT64_RGBA:
+                case SIGNED_FLOAT64_RGBA:
+                    return 2;
+                default:
+                    return 1;
+            }
+        }
+
         template<typename... Shapes>
-        consteval auto ResolveVertexLayout() {
+        consteval auto resolve_vertex_layout() {
             VertexLayoutData<sizeof...(Shapes), (Shapes::ATTRIBUTES.size() + ... + 0)> result;
             std::uint64_t next_binding = 0, next_location = 0;
             size_t binding_index = 0, attribute_index = 0;
@@ -75,13 +122,14 @@ namespace VSL_NAMESPACE::typed {
                 if (binding >= AUTO || (Shape::TIMING != VertexTiming::NEXT_VERTEX && Shape::TIMING != VertexTiming::NEXT_INSTANCE))
                     result.valid = false;
                 for (size_t i = 0; i < binding_index; ++i)
-                    if (result.binding[i].binding == binding) result.valid = false;
+                    if (result.binding[i].binding == binding)
+                        result.valid = false;
                 next_binding = binding + 1;
                 std::uint64_t next_offset = 0, extent = 0;
                 for (auto attribute : Shape::ATTRIBUTES) {
                     const std::uint64_t location = attribute.location == AUTO ? next_location : attribute.location;
                     const std::uint64_t offset = attribute.offset == AUTO ? next_offset : attribute.offset;
-                    const auto locations = VertexLocations(attribute.format);
+                    const auto locations = vertex_locations(attribute.format);
                     if (!attribute.format.size() || attribute.format.type() == data_format::FormatTypes::UNDEFINED ||
                         location + locations > AUTO || offset + attribute.format.size() > AUTO)
                         result.valid = false;
@@ -93,72 +141,30 @@ namespace VSL_NAMESPACE::typed {
                     result.attribute[attribute_index++] = {attribute.format, std::uint32_t(location), std::uint32_t(offset), std::uint32_t(binding), locations};
                     next_location = location + locations;
                     next_offset = offset + attribute.format.size();
-                    if (extent < next_offset) extent = next_offset;
+                    if (extent < next_offset)
+                        extent = next_offset;
                 }
                 const std::uint64_t stride = Shape::STRIDE == AUTO ? extent : Shape::STRIDE;
-                if (stride > AUTO || stride < extent) result.valid = false;
+                if (stride > AUTO || stride < extent)
+                    result.valid = false;
                 result.binding[binding_index++] = {std::uint32_t(binding), std::uint32_t(stride), Shape::TIMING};
             };
             (shape.template operator()<Shapes>(), ...);
             return result;
         }
-    }
+    } // namespace detail
 
     template<typename... Shapes_>
     struct TypedVertexInput {
         using Shapes = std::tuple<Shapes_...>;
-        static constexpr auto LAYOUT = detail::ResolveVertexLayout<Shapes_...>();
+        static constexpr auto LAYOUT = detail::resolve_vertex_layout<Shapes_...>();
         static_assert(LAYOUT.valid, "Invalid typed vertex layout: duplicate binding/location, format, extent or stride");
         static constexpr size_t BINDING_COUNT = sizeof...(Shapes_);
-        template<size_t index> using Shape = std::tuple_element_t<index, Shapes>;
+        template<size_t index>
+        using Shape = std::tuple_element_t<index, Shapes>;
 
-        void injection(VSL_NAMESPACE::PipelineLayoutEditAccessor layout) const {
-            // All automatic values are already resolved. Reuse the backend's owned Vulkan metadata.
-            pipeline_layout::VertexInput input;
-            input.definitions.reserve(BINDING_COUNT);
-            for (const auto& binding : LAYOUT.binding) {
-                pipeline_layout::VertexInputShapeDefinition shape;
-                shape.binding = binding.binding;
-                shape.size = binding.stride;
-                shape.update_timing = binding.timing;
-                for (const auto& attribute : LAYOUT.attribute)
-                    if (attribute.binding == binding.binding)
-                        shape.layouts.push_back({attribute.format, attribute.location, attribute.offset});
-                input.definitions.push_back(std::move(shape));
-            }
-            input.injection(layout);
-        }
+        void injection(VSL_NAMESPACE::PipelineLayoutEditAccessor layout) const;
     };
-
-    namespace detail {
-        template<typename T> struct VertexMemberFormat {
-            static constexpr auto VALUE = [] {
-                if constexpr (std::is_same_v<std::remove_cv_t<T>, signed char>) return data_format::INT8;
-                else return data_format::convert_graphic_type<std::remove_cv_t<T>>();
-            }();
-        };
-        template<typename T, size_t count> struct VertexMemberFormat<T[count]> {
-            static constexpr auto VALUE = [] {
-                constexpr auto scalar = VertexMemberFormat<T>::VALUE;
-                if constexpr (scalar.size() == sizeof(T) && scalar.get_vec_length() == 1)
-                    return scalar.template to_vec<count>();
-                else
-                    return data_format::UNDEFINED;
-            }();
-        };
-        template<typename T, size_t count> struct VertexMemberFormat<std::array<T, count>> : VertexMemberFormat<T[count]> {};
-
-        template<typename Record, std::uint32_t binding, VertexTiming timing, std::uint32_t first_location, typename Indices>
-        struct RecordBinding;
-        template<typename Record, std::uint32_t binding, VertexTiming timing, std::uint32_t first_location, size_t... indices>
-        struct RecordBinding<Record, binding, timing, first_location, std::index_sequence<indices...>> {
-            static_assert(((std::uint64_t(first_location) + Record::ATTRIBUTES[indices].location +
-                            Record::ATTRIBUTES[indices].locations <= AUTO) && ...), "Vertex record location overflow");
-            using Type = VertexBinding<typename Record::Vertex, binding, timing,
-                VertexInputDefinition<Record::ATTRIBUTES[indices].format, first_location + Record::ATTRIBUTES[indices].location,
-                                      Record::ATTRIBUTES[indices].offset>...>;
-        };
-    }
 
     // Keep the member's actual type and offsetof together; a format override expresses e.g. UNORM storage.
     template<typename Vertex_, typename Member, std::uint32_t offset, std::uint32_t location = AUTO,
@@ -177,11 +183,30 @@ namespace VSL_NAMESPACE::typed {
         static constexpr auto ATTRIBUTES = LAYOUT.attribute;
         template<std::uint32_t binding, VertexTiming timing = VertexTiming::NEXT_VERTEX, std::uint32_t first_location = 0>
         using Binding = typename detail::RecordBinding<VertexRecord, binding, timing, first_location,
-            std::make_index_sequence<sizeof...(Members)>>::Type;
+                                                       std::make_index_sequence<sizeof...(Members)>>::Type;
     };
-}
+
+    template<typename... Shapes_>
+    void TypedVertexInput<Shapes_...>::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor layout) const {
+        // All automatic values are already resolved. Reuse the backend's owned Vulkan metadata.
+        pipeline_layout::VertexInput input;
+        input.definitions.reserve(BINDING_COUNT);
+        for (const auto& binding : LAYOUT.binding) {
+            pipeline_layout::VertexInputShapeDefinition shape;
+            shape.binding = binding.binding;
+            shape.size = binding.stride;
+            shape.update_timing = binding.timing;
+            for (const auto& attribute : LAYOUT.attribute)
+                if (attribute.binding == binding.binding)
+                    shape.layouts.push_back({attribute.format, attribute.location, attribute.offset});
+            input.definitions.push_back(std::move(shape));
+        }
+        input.injection(layout);
+    }
+
+} // namespace VSL_NAMESPACE::typed
 
 // C++23 has no portable constexpr offsetof(member-pointer). This macro only captures type + offsetof;
 // all layout resolution and validation remains in the templates above. Optional arguments: location, format.
 #define VSL_VERTEX_MEMBER(Record, member, ...) \
-    ::VSL_NAMESPACE::typed::VertexMember<Record, decltype(Record::member), offsetof(Record, member) __VA_OPT__(,) __VA_ARGS__>
+    ::VSL_NAMESPACE::typed::VertexMember<Record, decltype(Record::member), offsetof(Record, member) __VA_OPT__(, ) __VA_ARGS__>

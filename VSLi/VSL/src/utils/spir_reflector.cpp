@@ -13,6 +13,12 @@
 #include <cstring>
 
 namespace {
+    struct ReflectionCompiler : spirv_cross::Compiler {
+        using Compiler::Compiler;
+        using Compiler::evaluate_constant_u32;
+        using Compiler::get_entry_point;
+    };
+
     void validate_spirv_size(std::size_t size) {
         if (size < 5 * sizeof(std::uint32_t) || size % sizeof(std::uint32_t) != 0)
             throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "Invalid SPIR-V binary size: expected at least five complete 32-bit words");
@@ -32,12 +38,6 @@ namespace {
             throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "Failed to read SPIR-V file: " + path.string());
         return words;
     }
-
-    struct ReflectionCompiler : spirv_cross::Compiler {
-        using Compiler::Compiler;
-        using Compiler::evaluate_constant_u32;
-        using Compiler::get_entry_point;
-    };
 
     std::uint32_t descriptor_count(const ReflectionCompiler& compiler, const spirv_cross::SPIRType& type) {
         std::uint32_t count = 1;
@@ -83,7 +83,7 @@ VSL_NAMESPACE::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logic
 }
 
 VSL_NAMESPACE::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device, std::span<const std::uint32_t> words,
-    std::string_view entry_point, ShaderType stage, Scope scope) : generated{std::move(logical_device)} {
+                                                     std::string_view entry_point, ShaderType stage, Scope scope) : generated{std::move(logical_device)} {
     validate_spirv_size(words.size_bytes());
     init({words.begin(), words.end()}, entry_point, stage, scope);
 }
@@ -227,7 +227,6 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
                 });
             }
         }
-
     }
 
     if (shader_type != ShaderFlag::VERTEX)
@@ -292,16 +291,26 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
             if (active_variables.contains(resource.id)) {
                 auto numeric = NumericType::UNSUPPORTED;
                 switch (type.basetype) {
-                    case spirv_cross::SPIRType::Half: case spirv_cross::SPIRType::Float: case spirv_cross::SPIRType::Double:
-                        numeric = NumericType::FLOATING_POINT; break;
-                    case spirv_cross::SPIRType::Short: case spirv_cross::SPIRType::Int: case spirv_cross::SPIRType::Int64:
-                        numeric = NumericType::SIGNED_INTEGER; break;
-                    case spirv_cross::SPIRType::UShort: case spirv_cross::SPIRType::UInt: case spirv_cross::SPIRType::UInt64:
-                        numeric = NumericType::UNSIGNED_INTEGER; break;
-                    default: break;
+                    case spirv_cross::SPIRType::Half:
+                    case spirv_cross::SPIRType::Float:
+                    case spirv_cross::SPIRType::Double:
+                        numeric = NumericType::FLOATING_POINT;
+                        break;
+                    case spirv_cross::SPIRType::Short:
+                    case spirv_cross::SPIRType::Int:
+                    case spirv_cross::SPIRType::Int64:
+                        numeric = NumericType::SIGNED_INTEGER;
+                        break;
+                    case spirv_cross::SPIRType::UShort:
+                    case spirv_cross::SPIRType::UInt:
+                    case spirv_cross::SPIRType::UInt64:
+                        numeric = NumericType::UNSIGNED_INTEGER;
+                        break;
+                    default:
+                        break;
                 }
                 generated.vertex_inputs.push_back({resource.name, column_location,
-                    comp.get_decoration(resource.id, spv::DecorationComponent), type.width, type.vecsize, numeric});
+                                                   comp.get_decoration(resource.id, spv::DecorationComponent), type.width, type.vecsize, numeric});
             }
         }
         generated.vertex_input->definitions.push_back(std::move(definition));

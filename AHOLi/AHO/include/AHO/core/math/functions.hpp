@@ -55,8 +55,10 @@ namespace AHO_NAMESPACE::math {
             return T{math::lerp(a[0], b[0], amount)};
         else if constexpr (T::Dimension::DIMENSION == 2)
             return T{math::lerp(a[0], b[0], amount), math::lerp(a[1], b[1], amount)};
-        else
+        else if constexpr (T::Dimension::DIMENSION == 3)
             return T{math::lerp(a[0], b[0], amount), math::lerp(a[1], b[1], amount), math::lerp(a[2], b[2], amount)};
+        else
+            return T{math::lerp(a[0], b[0], amount), math::lerp(a[1], b[1], amount), math::lerp(a[2], b[2], amount), math::lerp(a[3], b[3], amount)};
     }
 
     template<std::floating_point T, std::size_t size>
@@ -89,13 +91,17 @@ namespace AHO_NAMESPACE::math {
             return std::abs(b[0] - a[0]);
         else if constexpr (T::Dimension::DIMENSION == 2)
             return std::hypot(b[0] - a[0], b[1] - a[1]);
-        else
+        else if constexpr (T::Dimension::DIMENSION == 3)
             return std::hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+        else
+            return std::hypot(std::hypot(b[0] - a[0], b[1] - a[1]), std::hypot(b[2] - a[2], b[3] - a[3]));
     }
 
     template<concepts::is_vector T>
     requires std::floating_point<typename T::ElementType>
     auto normalized(const T& value) {
+        if constexpr (T::Dimension::DIMENSION == 4)
+            return value.get_normalized();
         const auto length = value.length();
         if (!std::isfinite(length) || length <= 0)
             throw std::invalid_argument("Cannot normalize a zero or non-finite vector");
@@ -109,7 +115,9 @@ namespace AHO_NAMESPACE::math {
             return std::array<R, 1>{value.value.___AN1};
         else if constexpr (T::Dimension::DIMENSION == 2)
             return std::array<R, 2>{value.value.___AN1, value.value.___AN2};
-        else
+        else if constexpr (T::Dimension::DIMENSION == 3)
             return std::array<R, 3>{value.value.___AN1, value.value.___AN2, value.value.___AN3};
+        else
+            return std::array<R, 4>{value.value.___AN1, value.value.___AN2, value.value.___AN3, value.value.___AN4};
     }
 } // namespace AHO_NAMESPACE::math

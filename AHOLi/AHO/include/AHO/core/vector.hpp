@@ -5,8 +5,10 @@
 #include "VSL/dimension.hpp"
 
 #include <compare>
+#include <algorithm>
 #include <cmath>
 #include <type_traits>
+#include <stdexcept>
 #include "ov.hpp"
 #include "math/coordinate.hpp"
 #include "math/mat.hpp"
@@ -322,6 +324,109 @@ namespace AHO_NAMESPACE {
 
         constexpr operator Mat<R, 4, 4>() const;
     };
+
+    template<typename R, typename CI>
+    struct Vector_<R, VSL_NAMESPACE::D4, CI> {
+        using Dimension = VSL_NAMESPACE::D4;
+        using ElementType = R;
+        using CoordinateInfo = CI;
+        coordinate::CoordinateSet<R, CI> value{};
+
+        constexpr Vector_() = default;
+        constexpr Vector_(R x, R y, R z, R w) : value(x, y, z, w) {}
+        constexpr Vector_(const coordinate::CoordinateSet<R, CI>& value) : value(value) {}
+        constexpr bool operator==(const Vector_&) const = default;
+        constexpr auto operator<=>(const Vector_&) const = default;
+        constexpr Vector_ operator+() const { return *this; }
+        constexpr auto operator-() const {
+            return Vector_<decltype(-value.___AN1), Dimension, CI>{
+                -value.___AN1, -value.___AN2, -value.___AN3, -value.___AN4};
+        }
+        template<typename T>
+        requires concepts::add_as<const R&, const T&>
+        constexpr auto operator+(const Vector_<T, Dimension, CI>& p) const {
+            return Vector_<decltype(value.___AN1 + p.value.___AN1), Dimension, CI>{
+                value.___AN1 + p.value.___AN1, value.___AN2 + p.value.___AN2,
+                value.___AN3 + p.value.___AN3, value.___AN4 + p.value.___AN4};
+        }
+        template<typename T>
+        requires concepts::subtract_as<const R&, const T&>
+        constexpr auto operator-(const Vector_<T, Dimension, CI>& p) const {
+            return Vector_<decltype(value.___AN1 - p.value.___AN1), Dimension, CI>{
+                value.___AN1 - p.value.___AN1, value.___AN2 - p.value.___AN2,
+                value.___AN3 - p.value.___AN3, value.___AN4 - p.value.___AN4};
+        }
+        template<typename T>
+        requires(!concepts::is_vector<T>) && concepts::multiply_as<const R&, const T&>
+        constexpr auto operator*(const T& m) const {
+            return Vector_<decltype(value.___AN1 * m), Dimension, CI>{
+                value.___AN1 * m, value.___AN2 * m, value.___AN3 * m, value.___AN4 * m};
+        }
+        template<typename T>
+        requires(!concepts::is_vector<T>) && concepts::division_as<const R&, const T&>
+        constexpr auto operator/(const T& m) const {
+            return Vector_<decltype(value.___AN1 / m), Dimension, CI>{
+                value.___AN1 / m, value.___AN2 / m, value.___AN3 / m, value.___AN4 / m};
+        }
+        template<typename T>
+        requires concepts::add_assign_as<R&, const T&>
+        constexpr Vector_& operator+=(const Vector_<T, Dimension, CI>& p);
+        template<typename T>
+        requires concepts::subtract_assign_as<R&, const T&>
+        constexpr Vector_& operator-=(const Vector_<T, Dimension, CI>& p);
+        template<typename T>
+        requires(!concepts::is_vector<T>) && concepts::multiply_assign_as<R&, const T&>
+        constexpr Vector_& operator*=(const T& m);
+        template<typename T>
+        requires(!concepts::is_vector<T>) && concepts::division_assign_as<R&, const T&>
+        constexpr Vector_& operator/=(const T& m);
+        template<typename T>
+        requires concepts::cast_as<R, T>
+        constexpr Vector_<T, Dimension, CI> cast() const {
+            return {static_cast<T>(value.___AN1), static_cast<T>(value.___AN2),
+                    static_cast<T>(value.___AN3), static_cast<T>(value.___AN4)};
+        }
+        template<typename T>
+        requires concepts::multiply_as<const R&, const T&>
+        constexpr auto dot(const Vector_<T, Dimension, CI>& p) const {
+            return value.___AN1 * p.value.___AN1 + value.___AN2 * p.value.___AN2 +
+                   value.___AN3 * p.value.___AN3 + value.___AN4 * p.value.___AN4;
+        }
+        template<typename T>
+        requires concepts::multiply_as<const R&, const T&>
+        constexpr auto hadamard(const Vector_<T, Dimension, CI>& p) const {
+            return Vector_<decltype(value.___AN1 * p.value.___AN1), Dimension, CI>{
+                value.___AN1 * p.value.___AN1, value.___AN2 * p.value.___AN2,
+                value.___AN3 * p.value.___AN3, value.___AN4 * p.value.___AN4};
+        }
+        auto length() const
+        requires std::is_arithmetic_v<R>
+        {
+            using Result = std::conditional_t<std::floating_point<R>, R, long double>;
+            return std::hypot(std::hypot(static_cast<Result>(value.___AN1), static_cast<Result>(value.___AN2)),
+                              std::hypot(static_cast<Result>(value.___AN3), static_cast<Result>(value.___AN4)));
+        }
+        Vector_& normalize()
+        requires std::floating_point<R>;
+        Vector_ get_normalized() const
+        requires std::floating_point<R>
+        {
+            auto result = *this;
+            result.normalize();
+            return result;
+        }
+        constexpr operator Mat<R, 1, 4>() const {
+            return {{value.___AN1, value.___AN2, value.___AN3, value.___AN4}};
+        }
+    };
+
+    namespace d4 {
+        template<typename R, typename CI = typename coordinate::DefaultCoordinateInfo<VSL_NAMESPACE::D4>::Value>
+        using Vector = Vector_<R, VSL_NAMESPACE::D4, CI>;
+        using VectorI = Vector<int>;
+        using VectorF = Vector<float>;
+        using VectorD = Vector<double>;
+    } // namespace d4
 
     namespace product::dot {
         template<typename Dim, typename CI, typename R1, typename R2>
@@ -824,7 +929,68 @@ namespace AHO_NAMESPACE {
             return Result(l * components.___AN1);
         else if constexpr (Dim::DIMENSION == 2)
             return Result(l * components.___AN1, l * components.___AN2);
-        else
+        else if constexpr (Dim::DIMENSION == 3)
             return Result(l * components.___AN1, l * components.___AN2, l * components.___AN3);
+        else
+            return Result(l * components.___AN1, l * components.___AN2, l * components.___AN3, l * components.___AN4);
     }
+    template<typename R, typename CI>
+    template<typename T>
+    requires concepts::add_assign_as<R&, const T&>
+    constexpr Vector_<R, VSL_NAMESPACE::D4, CI>& Vector_<R, VSL_NAMESPACE::D4, CI>::operator+=(const Vector_<T, Dimension, CI>& p) {
+        value.___AN1 += p.value.___AN1;
+        value.___AN2 += p.value.___AN2;
+        value.___AN3 += p.value.___AN3;
+        value.___AN4 += p.value.___AN4;
+        return *this;
+    }
+
+    template<typename R, typename CI>
+    template<typename T>
+    requires concepts::subtract_assign_as<R&, const T&>
+    constexpr Vector_<R, VSL_NAMESPACE::D4, CI>& Vector_<R, VSL_NAMESPACE::D4, CI>::operator-=(const Vector_<T, Dimension, CI>& p) {
+        value.___AN1 -= p.value.___AN1;
+        value.___AN2 -= p.value.___AN2;
+        value.___AN3 -= p.value.___AN3;
+        value.___AN4 -= p.value.___AN4;
+        return *this;
+    }
+
+    template<typename R, typename CI>
+    template<typename T>
+    requires(!concepts::is_vector<T>) && concepts::multiply_assign_as<R&, const T&>
+    constexpr Vector_<R, VSL_NAMESPACE::D4, CI>& Vector_<R, VSL_NAMESPACE::D4, CI>::operator*=(const T& m) {
+        value.___AN1 *= m;
+        value.___AN2 *= m;
+        value.___AN3 *= m;
+        value.___AN4 *= m;
+        return *this;
+    }
+
+    template<typename R, typename CI>
+    template<typename T>
+    requires(!concepts::is_vector<T>) && concepts::division_assign_as<R&, const T&>
+    constexpr Vector_<R, VSL_NAMESPACE::D4, CI>& Vector_<R, VSL_NAMESPACE::D4, CI>::operator/=(const T& m) {
+        value.___AN1 /= m;
+        value.___AN2 /= m;
+        value.___AN3 /= m;
+        value.___AN4 /= m;
+        return *this;
+    }
+
+    template<typename R, typename CI>
+    Vector_<R, VSL_NAMESPACE::D4, CI>& Vector_<R, VSL_NAMESPACE::D4, CI>::normalize()
+    requires std::floating_point<R>
+    {
+        const auto scale = std::max({std::abs(value.___AN1), std::abs(value.___AN2), std::abs(value.___AN3), std::abs(value.___AN4)});
+        if (!std::isfinite(scale) || scale == 0)
+            throw std::invalid_argument("Cannot normalize a zero or non-finite vector");
+        auto scaled = *this / scale;
+        const auto norm = scaled.length();
+        if (!std::isfinite(norm))
+            throw std::invalid_argument("Cannot normalize a non-finite vector");
+        *this = scaled / norm;
+        return *this;
+    }
+
 } // namespace AHO_NAMESPACE

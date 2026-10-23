@@ -16,6 +16,10 @@ namespace VSL_NAMESPACE {
         constexpr static char DIMENSION = 3;
     };
 
+    struct D4 {
+        constexpr static char DIMENSION = 4;
+    };
+
     template<int d>
     struct Dimension {};
 
@@ -34,6 +38,11 @@ namespace VSL_NAMESPACE {
         using Value = VSL_NAMESPACE::D3;
     };
 
+    template<>
+    struct Dimension<4> : D4 {
+        using Value = VSL_NAMESPACE::D4;
+    };
+
     template<typename D>
     concept __has_char_dimension = requires {
         { D::DIMENSION } -> std::convertible_to<char>;
@@ -43,5 +52,9 @@ namespace VSL_NAMESPACE {
     concept is_dimension = __has_char_dimension<D> &&
                                std::same_as<D, VSL_NAMESPACE::D1> ||
                            std::same_as<D, VSL_NAMESPACE::D2> ||
-                           std::same_as<D, VSL_NAMESPACE::D3>;
+                           std::same_as<D, VSL_NAMESPACE::D3> ||
+                           std::same_as<D, VSL_NAMESPACE::D4>;
+
+    template<typename D>
+    concept is_image_dimension = std::same_as<D, D1> || std::same_as<D, D2> || std::same_as<D, D3>;
 } // namespace VSL_NAMESPACE

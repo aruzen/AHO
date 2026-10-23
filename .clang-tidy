@@ -1,0 +1,60 @@
+Checks: '-*,readability-identifier-naming'
+HeaderFilterRegex: '(AHOLi[/\\]AHO|VSLi[/\\]VSL)[/\\]'
+SystemHeaders: false
+FormatStyle: none
+CheckOptions:
+  readability-identifier-naming.GetConfigPerFile: false
+  readability-identifier-naming.AggressiveDependentMemberLookup: false
+  readability-identifier-naming.IgnoreMainLikeFunctions: false
+  readability-identifier-naming.ClassCase: CamelCase
+  readability-identifier-naming.StructCase: CamelCase
+  readability-identifier-naming.UnionCase: CamelCase
+  readability-identifier-naming.EnumCase: CamelCase
+  readability-identifier-naming.TypeAliasCase: CamelCase
+  readability-identifier-naming.TypedefCase: CamelCase
+  readability-identifier-naming.ClassMethodCase: CamelCase
+  readability-identifier-naming.FunctionCase: lower_case
+  readability-identifier-naming.GlobalFunctionCase: lower_case
+  readability-identifier-naming.MethodCase: lower_case
+  readability-identifier-naming.VirtualMethodCase: lower_case
+  readability-identifier-naming.NamespaceCase: lower_case
+  readability-identifier-naming.VariableCase: lower_case
+  readability-identifier-naming.ParameterCase: lower_case
+  readability-identifier-naming.MemberCase: lower_case
+  readability-identifier-naming.PrivateMemberCase: lower_case
+  readability-identifier-naming.PrivateMemberPrefix: '_'
+  readability-identifier-naming.StaticVariableCase: UPPER_CASE
+  readability-identifier-naming.StaticConstantCase: UPPER_CASE
+  readability-identifier-naming.GlobalVariableCase: UPPER_CASE
+  readability-identifier-naming.GlobalConstantCase: UPPER_CASE
+  readability-identifier-naming.ClassMemberCase: UPPER_CASE
+  readability-identifier-naming.ClassConstantCase: UPPER_CASE
+  readability-identifier-naming.EnumConstantCase: UPPER_CASE
+  readability-identifier-naming.ScopedEnumConstantCase: UPPER_CASE
+  # 衝突回避の末尾_は、その前が各分類の規則に適合する場合だけ許可する。
+  # 衝突の根拠はレビュー対象。任意の旧名やcamelCaseを許可するものではない。
+  readability-identifier-naming.ClassIgnoredRegexp: '^[A-Z][a-zA-Z0-9]*_$'
+  readability-identifier-naming.StructIgnoredRegexp: '^[A-Z][a-zA-Z0-9]*_$'
+  readability-identifier-naming.UnionIgnoredRegexp: '^[A-Z][a-zA-Z0-9]*_$'
+  readability-identifier-naming.EnumIgnoredRegexp: '^[A-Z][a-zA-Z0-9]*_$'
+  readability-identifier-naming.ClassMethodIgnoredRegexp: '^[A-Z][a-zA-Z0-9]*_$'
+  readability-identifier-naming.MethodIgnoredRegexp: '^[a-z][a-z0-9]*(_[a-z0-9]+)*_$'
+  readability-identifier-naming.VirtualMethodIgnoredRegexp: '^[a-z][a-z0-9]*(_[a-z0-9]+)*_$'
+  readability-identifier-naming.NamespaceIgnoredRegexp: '^[a-z][a-z0-9]*(_[a-z0-9]+)*_$'
+  readability-identifier-naming.VariableIgnoredRegexp: '^[a-z][a-z0-9]*(_[a-z0-9]+)*_$'
+  readability-identifier-naming.ParameterIgnoredRegexp: '^[a-z][a-z0-9]*(_[a-z0-9]+)*_$'
+  readability-identifier-naming.MemberIgnoredRegexp: '^[a-z][a-z0-9]*(_[a-z0-9]+)*_$'
+  readability-identifier-naming.PrivateMemberIgnoredRegexp: '^_[a-z][a-z0-9]*(_[a-z0-9]+)*_$'
+  readability-identifier-naming.StaticVariableIgnoredRegexp: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*_$'
+  readability-identifier-naming.StaticConstantIgnoredRegexp: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*_$'
+  readability-identifier-naming.GlobalVariableIgnoredRegexp: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*_$'
+  readability-identifier-naming.GlobalConstantIgnoredRegexp: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*_$'
+  readability-identifier-naming.ClassMemberIgnoredRegexp: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*_$'
+  readability-identifier-naming.ClassConstantIgnoredRegexp: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*_$'
+  readability-identifier-naming.EnumConstantIgnoredRegexp: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*_$'
+  readability-identifier-naming.ScopedEnumConstantIgnoredRegexp: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*_$'
+  # STLとGTestの公開契約。プロジェクト内部APIの旧名は除外しない。
+  readability-identifier-naming.TypeAliasIgnoredRegexp: '^(value_type|reference|const_reference|pointer|const_pointer|difference_type|size_type|iterator|const_iterator|reverse_iterator|const_reverse_iterator|iterator_category|iterator_concept|element_type|allocator_type|char_type|traits_type|int_type|pos_type|off_type|state_type|result_type|argument_type|first_argument_type|second_argument_type|type|[A-Z][a-zA-Z0-9]*_)$'
+  readability-identifier-naming.TypedefIgnoredRegexp: '^(value_type|reference|const_reference|pointer|const_pointer|difference_type|size_type|iterator|const_iterator|reverse_iterator|const_reverse_iterator|iterator_category|iterator_concept|element_type|allocator_type|char_type|traits_type|int_type|pos_type|off_type|state_type|result_type|argument_type|first_argument_type|second_argument_type|type|[A-Z][a-zA-Z0-9]*_)$'
+  readability-identifier-naming.FunctionIgnoredRegexp: '^(PrintTo|[a-z][a-z0-9]*(_[a-z0-9]+)*_)$'
+  readability-identifier-naming.GlobalFunctionIgnoredRegexp: '^(PrintTo|[a-z][a-z0-9]*(_[a-z0-9]+)*_)$'

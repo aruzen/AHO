@@ -11,6 +11,7 @@ namespace VSL_NAMESPACE::command {
     struct BindVertexBufferAt : Command {
         BindVertexBufferAt(std::uint32_t binding, const BufferAccessor& source);
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
+
     private:
         std::uint32_t _binding;
         std::shared_ptr<impl::BufferImpl> _source;

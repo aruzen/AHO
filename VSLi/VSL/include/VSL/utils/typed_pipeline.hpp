@@ -24,13 +24,13 @@ namespace VSL_NAMESPACE::typed {
 
     public:
         TypedVertexBuffer(LogicalDeviceAccessor device, std::span<const Vertex> vertices)
-            requires(contain<memory_property, MemoryProperty::HOST_VISIBLE>())
+        requires(contain<memory_property, MemoryProperty::HOST_VISIBLE>())
             : _device(device), _buffer(device, VSL_NAMESPACE::helper::checked_buffer_array_size<Vertex>(vertices.size())), _count(vertices.size()) {
             copy(vertices);
         }
 
         TypedVertexBuffer(LogicalDeviceAccessor device, CommandManager manager, std::span<const Vertex> vertices)
-            requires(!contain<memory_property, MemoryProperty::HOST_VISIBLE>())
+        requires(!contain<memory_property, MemoryProperty::HOST_VISIBLE>())
             : _device(device), _buffer(device, manager, vertices.data(), vertices.size()), _count(vertices.size()) {}
 
         size_t size() const noexcept { return _count; }
@@ -38,7 +38,9 @@ namespace VSL_NAMESPACE::typed {
         // Explicit escape to the existing dynamic API. Typed binding does not accept a raw BufferAccessor.
         Storage& backend() { return _buffer; }
         const Storage& backend() const { return _buffer; }
-        void copy(std::span<const Vertex> vertices) requires(contain<memory_property, MemoryProperty::HOST_VISIBLE>()) {
+        void copy(std::span<const Vertex> vertices)
+        requires(contain<memory_property, MemoryProperty::HOST_VISIBLE>())
+        {
             if (vertices.size() != _count)
                 throw std::invalid_argument("Typed vertex update must preserve the record count");
             if (!_buffer.copy(vertices.data(), vertices.size()))
@@ -47,12 +49,13 @@ namespace VSL_NAMESPACE::typed {
     };
 
     namespace detail {
-        template<typename T> struct IsVertexBuffer : std::false_type {};
+        template<typename T>
+        struct IsVertexBuffer : std::false_type {};
         template<typename Vertex, MemoryProperty property>
         struct IsVertexBuffer<TypedVertexBuffer<Vertex, property>> : std::true_type {};
 
         template<typename Input, typename... Buffers, size_t... indices>
-        consteval bool VertexBuffersMatch(std::index_sequence<indices...>) {
+        consteval bool vertex_buffers_match(std::index_sequence<indices...>) {
             if constexpr (sizeof...(Buffers) != Input::BINDING_COUNT || !(IsVertexBuffer<std::remove_cvref_t<Buffers>>::value && ...))
                 return false;
             else if constexpr (!(requires { typename Input::template Shape<indices>::Vertex; } && ...))
@@ -60,13 +63,15 @@ namespace VSL_NAMESPACE::typed {
             else
                 return (std::same_as<typename std::remove_cvref_t<Buffers>::Vertex, typename Input::template Shape<indices>::Vertex> && ...);
         }
-    }
+    } // namespace detail
 
     template<typename Input, typename... Buffers>
-    concept compatible_vertex_buffers = detail::VertexBuffersMatch<Input, Buffers...>(std::index_sequence_for<Buffers...>{});
+    concept compatible_vertex_buffers = detail::vertex_buffers_match<Input, Buffers...>(std::index_sequence_for<Buffers...>{});
 
-    template<typename Input> class TypedGraphicsPipeline;
-    template<typename Input> class TypedVertexBinding;
+    template<typename Input>
+    class TypedGraphicsPipeline;
+    template<typename Input>
+    class TypedVertexBinding;
 
     // One command explicitly binds the pipeline, every input binding, and then draws.
     // Captured owners survive wrapper destruction and are retained through GPU completion.
@@ -84,14 +89,7 @@ namespace VSL_NAMESPACE::typed {
     public:
         using VertexInput = Input;
         PipelineAccessor get_pipeline() override { return _pipeline; }
-        void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override {
-            if (_device.data_ != manager.get_device().data_)
-                throw std::invalid_argument("Typed pipeline and command manager use different devices");
-            _pipeline.invoke(pool, buffer, manager);
-            for (auto& binding : _buffers)
-                binding.invoke(pool, buffer, manager);
-            _draw.invoke(pool, buffer, manager);
-        }
+        void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
     };
 
     template<typename Input>
@@ -112,17 +110,7 @@ namespace VSL_NAMESPACE::typed {
 
     public:
         using VertexInput = Input;
-        TypedDraw<Input> draw(size_t vertex_count, size_t instance_count = 1, size_t first_vertex = 0, size_t first_instance = 0) const {
-            command::Draw command(vertex_count, instance_count, first_vertex, first_instance);
-            for (size_t i = 0; i < Input::BINDING_COUNT; ++i) {
-                const bool instanced = Input::LAYOUT.binding[i].timing == VertexTiming::NEXT_INSTANCE;
-                const auto first = instanced ? first_instance : first_vertex;
-                const auto count = instanced ? instance_count : vertex_count;
-                if (first > _counts[i] || count > _counts[i] - first)
-                    throw std::out_of_range("Typed draw exceeds its vertex/instance buffer");
-            }
-            return TypedDraw<Input>(_pipeline, _device, _buffers, std::move(command));
-        }
+        TypedDraw<Input> draw(size_t vertex_count, size_t instance_count = 1, size_t first_vertex = 0, size_t first_instance = 0) const;
     };
 
     template<typename Input>
@@ -145,9 +133,34 @@ namespace VSL_NAMESPACE::typed {
 
         const VSL_NAMESPACE::GraphicsPipeline& backend() const { return _pipeline; }
 
-        template<typename... Buffers> requires compatible_vertex_buffers<Input, Buffers...>
+        template<typename... Buffers>
+        requires compatible_vertex_buffers<Input, Buffers...>
         TypedVertexBinding<Input> bind_vertices(const Buffers&... buffers) const {
             return TypedVertexBinding<Input>(_pipeline, _device, std::index_sequence_for<Buffers...>{}, buffers...);
         }
     };
-}
+
+    template<typename Input>
+    void TypedDraw<Input>::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
+        if (_device.data_ != manager.get_device().data_)
+            throw std::invalid_argument("Typed pipeline and command manager use different devices");
+        _pipeline.invoke(pool, buffer, manager);
+        for (auto& binding : _buffers)
+            binding.invoke(pool, buffer, manager);
+        _draw.invoke(pool, buffer, manager);
+    }
+
+    template<typename Input>
+    TypedDraw<Input> TypedVertexBinding<Input>::draw(size_t vertex_count, size_t instance_count, size_t first_vertex, size_t first_instance) const {
+        command::Draw command(vertex_count, instance_count, first_vertex, first_instance);
+        for (size_t i = 0; i < Input::BINDING_COUNT; ++i) {
+            const bool instanced = Input::LAYOUT.binding[i].timing == VertexTiming::NEXT_INSTANCE;
+            const auto first = instanced ? first_instance : first_vertex;
+            const auto count = instanced ? instance_count : vertex_count;
+            if (first > _counts[i] || count > _counts[i] - first)
+                throw std::out_of_range("Typed draw exceeds its vertex/instance buffer");
+        }
+        return TypedDraw<Input>(_pipeline, _device, _buffers, std::move(command));
+    }
+
+} // namespace VSL_NAMESPACE::typed

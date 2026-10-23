@@ -206,7 +206,7 @@ bool VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::copy_by_image(CommandMana
     if (!_owner)
         throw std::logic_error("Buffer mapping is empty");
     auto phase = manager.start_phase<ComputePhase>();
-    phase << command::CopyImageToBuffer(_owner, image, ImageLayout::GENERAL);
+    phase << command::CopyImageToBuffer(_owner, image, ImageLayout::GENERAL, {}, true, offset, size);
     return true;
 }
 

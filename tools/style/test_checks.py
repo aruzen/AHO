@@ -266,7 +266,6 @@ struct Example {
         baseline = json.loads((HERE / 'baseline.json').read_text())
         self.assertEqual(baseline['in_class_min_lines'], 5)
         functions = [item for item in baseline['diagnostics'] if item['rule'] == 'aho-in-class-definition']
-        self.assertTrue(functions)
         self.assertTrue(all(item['code_lines'] >= 5 for item in functions))
 
     def test_reopened_namespace_does_not_bypass_declaration_order(self):

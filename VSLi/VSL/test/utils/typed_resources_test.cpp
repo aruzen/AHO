@@ -9,11 +9,13 @@ namespace {
     struct Tint {
         float rgba[4];
     };
+
+    using TintRecord = t::BlockRecord<Tint, VSL_BLOCK_MEMBER(Tint, rgba)>;
     struct WrongTint {
         float rgba[4];
     };
-    using Tints = t::DescriptorSet<2, t::UniformBinding<3, Tint, vsl::ShaderFlag::VERTEX, 2>>;
-    using Extra = t::DescriptorSet<0, t::StorageBinding<5, Tint, vsl::ShaderFlag::VERTEX>>;
+    using Tints = t::DescriptorSet<2, t::UniformBinding<3, TintRecord, vsl::ShaderFlag::VERTEX, 2>>;
+    using Extra = t::DescriptorSet<0, t::StorageBinding<5, TintRecord, vsl::ShaderFlag::VERTEX>>;
     using Schema = t::ResourceSchema<Tints, Extra>;
     using EmptyInput = t::TypedVertexInput<>;
     static_assert(Schema::SET_COUNT == 3 && Schema::COUNT == 2);
@@ -94,9 +96,9 @@ namespace {
     }
 
     TEST_F(TypedDescriptorVulkanIntegrationTest, ShaderSchemaMismatchIsRejectedBeforeGraphicsPipelineCreation) {
-        using WrongArray = t::DescriptorSet<2, t::UniformBinding<3, Tint, vsl::ShaderFlag::VERTEX>>;
-        using WrongStage = t::DescriptorSet<2, t::UniformBinding<3, Tint, vsl::ShaderFlag::FRAGMENT, 2>>;
-        using WrongKind = t::DescriptorSet<2, t::StorageBinding<3, Tint, vsl::ShaderFlag::VERTEX, 2>>;
+        using WrongArray = t::DescriptorSet<2, t::UniformBinding<3, TintRecord, vsl::ShaderFlag::VERTEX>>;
+        using WrongStage = t::DescriptorSet<2, t::UniformBinding<3, TintRecord, vsl::ShaderFlag::FRAGMENT, 2>>;
+        using WrongKind = t::DescriptorSet<2, t::StorageBinding<3, TintRecord, vsl::ShaderFlag::VERTEX, 2>>;
         EXPECT_THROW((make_typed<t::ResourceSchema<WrongArray, Extra>>()), std::invalid_argument);
         EXPECT_THROW((make_typed<t::ResourceSchema<WrongStage, Extra>>()), std::invalid_argument);
         EXPECT_THROW((make_typed<t::ResourceSchema<WrongKind, Extra>>()), std::invalid_argument);
@@ -186,7 +188,8 @@ namespace {
         struct Parameters {
             std::uint32_t base;
         };
-        using ParametersSet = t::DescriptorSet<0, t::UniformBinding<2, Parameters, vsl::ShaderFlag::COMPUTE>>;
+        using ParametersRecord = t::BlockRecord<Parameters, VSL_BLOCK_MEMBER(Parameters, base)>;
+        using ParametersSet = t::DescriptorSet<0, t::UniformBinding<2, ParametersRecord, vsl::ShaderFlag::COMPUTE>>;
         using OutputSet = t::DescriptorSet<1, t::StorageBinding<4, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
         using ComputeSchema = t::ResourceSchema<OutputSet, ParametersSet>;
         vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_descriptors.comp.spv"));

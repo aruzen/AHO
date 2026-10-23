@@ -41,6 +41,32 @@ namespace {
         EXPECT_EQ(width, 128);
         EXPECT_EQ(height, 96);
     }
+    TEST_F(WindowPluginWindowIntegrationTest, ResizeHookCanCreateWindowsWithoutInvalidatingDispatch) {
+        vsl::PureWindow other("resize hook neighbor", 32, 24);
+        std::vector<vsl::PureWindow> created;
+        const auto previous_capacity = vsl::PureWindow::WINDOWS.capacity();
+        const auto extra = previous_capacity - vsl::PureWindow::WINDOWS.size() + 1;
+        bool entered = false;
+        auto hook = window->add_plugin<vsl::window_plugin::HookResize>([&](auto, int, int) {
+            if (entered)
+                return;
+            entered = true;
+            for (std::size_t i = 0; i < extra; ++i)
+                created.emplace_back("created by resize hook", 32, 24);
+        });
+        auto handle = static_cast<GLFWwindow*>(window->data_->window_handle);
+        const auto callback = glfwSetFramebufferSizeCallback(handle, nullptr);
+        EXPECT_NE(callback, nullptr);
+        glfwSetFramebufferSizeCallback(handle, callback);
+        if (callback)
+            callback(handle, 128, 96);
+        EXPECT_GT(vsl::PureWindow::WINDOWS.capacity(), previous_capacity);
+        EXPECT_EQ(created.size(), extra);
+        EXPECT_TRUE(static_cast<bool>(other));
+        for (auto& added : created)
+            added.close();
+        other.close();
+    }
     TEST_F(WindowPluginWindowIntegrationTest, CloseHookCanBeAddedWithPublicPluginHelper) {
         int called = 0;
         auto hook = window->add_plugin<vsl::window_plugin::HookShouldClose>([&](vsl::PureWindow copy) {

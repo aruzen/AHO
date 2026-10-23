@@ -14,9 +14,7 @@
 
 namespace AHO_NAMESPACE {
     template<class... Ts>
-    constexpr auto pack(Ts&&... xs) noexcept {
-        return std::forward_as_tuple(std::forward<Ts>(xs)...);
-    }
+    constexpr auto pack(Ts&&... xs) noexcept;
 
     /*
      * 引き出しと絵描きをかけます
@@ -37,6 +35,11 @@ namespace AHO_NAMESPACE {
 
         ThisType& operator<<(VSL_NAMESPACE::command::is_delegate_command auto&& cmd);
     };
+
+    template<class... Ts>
+    constexpr auto pack(Ts&&... xs) noexcept {
+        return std::forward_as_tuple(std::forward<Ts>(xs)...);
+    }
 
     template<typename PhaseStream>
     DrawStream<PhaseStream>& DrawStream<PhaseStream>::operator<<(VSL_NAMESPACE::command::is_command auto&& cmd) {

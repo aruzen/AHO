@@ -161,8 +161,8 @@ namespace AHO_NAMESPACE {
     }
 
     std::optional<ImageReadbackTicket> ImageReadback::capture_ticket(VSL_NAMESPACE::ImageAccessor image,
-                                                                    VSL_NAMESPACE::ImageLayout layout,
-                                                                    VSL_NAMESPACE::ImageRegion region, std::uint64_t frame_id) {
+                                                                     VSL_NAMESPACE::ImageLayout layout,
+                                                                     VSL_NAMESPACE::ImageRegion region, std::uint64_t frame_id) {
         if (!_data)
             throw std::logic_error("Readback handle is empty");
         auto info = _data->describe(image, layout, region);

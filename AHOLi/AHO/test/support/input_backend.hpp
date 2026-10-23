@@ -21,13 +21,7 @@ namespace aho_test {
         InputWindow(const InputWindow&) = delete;
         InputWindow& operator=(const InputWindow&) = delete;
         GLFWwindow* handle() { return reinterpret_cast<GLFWwindow*>(this); }
-        static InputWindow* Find(GLFWwindow* handle) {
-            const auto found = WINDOWS.find(handle);
-            if (found != WINDOWS.end())
-                return found->second;
-            ++INVALID_HANDLES;
-            return nullptr;
-        }
+        static InputWindow* Find(GLFWwindow* handle);
     };
     class InputBackendTest : public testing::Test {
     protected:
@@ -39,4 +33,12 @@ namespace aho_test {
                 << "Input objects must keep the window handle through callback unregistration.";
         }
     };
+
+    inline InputWindow* InputWindow::Find(GLFWwindow* handle) {
+        const auto found = WINDOWS.find(handle);
+        if (found != WINDOWS.end())
+            return found->second;
+        ++INVALID_HANDLES;
+        return nullptr;
+    }
 } // namespace aho_test

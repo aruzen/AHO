@@ -11,10 +11,10 @@ void AHO_NAMESPACE::engine::StandardEngine::boot(const std::string& application_
     using namespace VSL_NAMESPACE;
 #ifdef _MSC_VER
     Vulkan<> instance(application_name.c_str(), {"VK_KHR_win32_surface", "VK_KHR_surface",
-                                                "VK_KHR_get_physical_device_properties2"});
+                                                 "VK_KHR_get_physical_device_properties2"});
 #elif defined(__APPLE_CC__)
     Vulkan<> instance(application_name.c_str(), {"VK_KHR_portability_enumeration", "VK_KHR_surface",
-                                                "VK_EXT_metal_surface", "VK_KHR_get_physical_device_properties2"});
+                                                 "VK_EXT_metal_surface", "VK_KHR_get_physical_device_properties2"});
 #endif
     auto physical_device = PhysicalDevices(instance).search();
 
@@ -59,13 +59,13 @@ void AHO_NAMESPACE::engine::StandardEngine::boot(const std::string& application_
                                                                        render_pass),
                             .image_available = synchro_manager
                                                    .create_semaphore(application_name + "ImageAvailable",
-                                                                    command_manager.get_buffer().get_size()),
+                                                                     command_manager.get_buffer().get_size()),
                             .render_finished = synchro_manager
                                                    .create_semaphore(application_name + "RenderFinished",
-                                                                    swapchain.get_swap_image_size()),
+                                                                     swapchain.get_swap_image_size()),
                             .in_flight = synchro_manager
                                              .create_fence(application_name + "InFlight",
-                                                          command_manager.get_buffer().get_size(), true)}));
+                                                           command_manager.get_buffer().get_size(), true)}));
 }
 
 AHO_NAMESPACE::Window AHO_NAMESPACE::engine::StandardEngine::get_window() {

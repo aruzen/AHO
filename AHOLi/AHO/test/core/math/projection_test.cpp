@@ -4,11 +4,23 @@
 namespace {
     template<typename T>
     class ProjectionPolicyTest : public testing::Test {};
+
+    template<typename T>
+    class OrthographicTest : public testing::Test {};
+
+    template<typename T>
+    class OrthographicPolicyTest : public testing::Test {};
+
     using FloatingTypes = testing::Types<float, double>;
     TYPED_TEST_SUITE(ProjectionPolicyTest, FloatingTypes);
+    TYPED_TEST_SUITE(OrthographicTest, FloatingTypes);
+    TYPED_TEST_SUITE(OrthographicPolicyTest, FloatingTypes);
 
     template<typename T, aho::HandedCoordinate handed, aho::DepthRange depth, aho::ClipY y, aho::VectorConvention convention>
     void expect_projection();
+
+    template<typename T, aho::HandedCoordinate handed, aho::DepthRange depth, aho::ClipY y, aho::VectorConvention convention>
+    void expect_orthographic();
 
     template<typename T, aho::HandedCoordinate handed, aho::DepthRange depth, aho::ClipY y, aho::VectorConvention convention>
     void expect_projection() {
@@ -58,11 +70,6 @@ namespace {
 } // namespace
 
 namespace {
-    template<typename T>
-    class OrthographicTest : public testing::Test {};
-    using FloatingTypes = testing::Types<float, double>;
-    TYPED_TEST_SUITE(OrthographicTest, FloatingTypes);
-
     TYPED_TEST(OrthographicTest, OffCenterBoundsMapCornersAndDepthToTheClipVolume) {
         using T = TypeParam;
         const auto matrix = aho::matrix::make_orthographic<aho::HandedCoordinate::RIGHT, aho::DepthRange::ZERO_TO_ONE, aho::ClipY::UP>(T{2}, T{10}, T{-3}, T{5}, T{1}, T{11});
@@ -120,14 +127,6 @@ namespace {
 } // namespace
 
 namespace {
-    template<typename T>
-    class OrthographicPolicyTest : public testing::Test {};
-    using FloatingTypes = testing::Types<float, double>;
-    TYPED_TEST_SUITE(OrthographicPolicyTest, FloatingTypes);
-
-    template<typename T, aho::HandedCoordinate handed, aho::DepthRange depth, aho::ClipY y, aho::VectorConvention convention>
-    void expect_orthographic();
-
     template<typename T, aho::HandedCoordinate handed, aho::DepthRange depth, aho::ClipY y, aho::VectorConvention convention>
     void expect_orthographic() {
         const auto matrix = aho::matrix::make_orthographic<handed, depth, y, convention>(T{-2}, T{2}, T{-1}, T{1}, T{1}, T{11});

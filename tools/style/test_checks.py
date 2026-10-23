@@ -30,12 +30,14 @@ class CheckerContracts(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name).resolve()
 
-    def ast(self, header):
+    def ast(self, header, min_lines=0):
         (self.root / 'probe.hpp').write_text(header)
         source = self.root / 'probe.cpp'
         source.write_text('#include "probe.hpp"\n')
-        result = subprocess.run([str(ARGS.ast_tool), '--root=' + str(self.root), str(source), '--', '-std=c++23'],
-                                text=True, capture_output=True)
+        command = [str(ARGS.ast_tool), '--root=' + str(self.root)]
+        if min_lines is not None:
+            command.append('--in-class-min-lines=' + str(min_lines))
+        result = subprocess.run([*command, str(source), '--', '-std=c++23'], text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         return [item for line in result.stdout.splitlines() if 'coverage' not in (item := json.loads(line))]
 
@@ -152,6 +154,120 @@ void declared_later();
         self.assertEqual(counts['aho-in-class-definition'], 2)
         self.assertEqual(counts['aho-header-definition'], 1)
         self.assertEqual(counts['aho-declaration-order'], 2)
+
+    def test_code_lines_exclude_signature_comments_outer_braces_and_initializers(self):
+        items = self.ast('''
+class Example {
+    int a, b, c, d, e;
+public:
+    Example()
+        : a(1),
+          b(2),
+          c(3),
+          d(4),
+          e(5) {}
+    int empty() {
+        // コメントは数えない。
+        /* 複数行の
+           コメントも除外する。 */
+        return 0;
+    }
+    int four(
+        int value,
+        int other
+    ) {
+        value += other;
+
+        value += 2; // 行末コメント
+        /* comment */ value += 3;
+        return value;
+    }
+    int literals() {
+        const char* url = "https://example.test";
+        const char* comment = "/* not a comment */";
+        return url[0] + comment[0];
+    }
+    int one_line() { int value = 1; value += 2; value += 3; value += 4; return value; }
+};
+''')
+        counts = {item['symbol']: item['code_lines'] for item in items if item['rule'] == 'aho-in-class-definition'}
+        self.assertEqual(counts, {'Example::Example': 0, 'Example::empty': 1, 'Example::four': 4,
+                                  'Example::literals': 3, 'Example::one_line': 1})
+
+    def test_in_class_threshold_includes_five_lines_and_excludes_four(self):
+        source = '''
+struct Example {
+    int four() {
+        int value = 1;
+        value += 2;
+        value += 3;
+        return value;
+    }
+    int five() {
+        int value = 1;
+        value += 2;
+        value += 3;
+        value += 4;
+        return value;
+    }
+};
+'''
+        items = self.ast(source, min_lines=5)
+        relevant = [item for item in items if item['rule'] == 'aho-in-class-definition']
+        self.assertEqual([(item['symbol'], item['code_lines']) for item in relevant], [('Example::five', 5)])
+        defaults = self.ast(source, min_lines=None)
+        self.assertEqual([(item['symbol'], item['code_lines']) for item in defaults], [('Example::five', 5)])
+        self.assertEqual(self.ast(source, min_lines=6), [])
+
+    def test_function_try_block_keeps_a_diagnostic_when_count_is_unavailable(self):
+        items = self.ast('''
+struct Example {
+    int value;
+    Example() try : value(1) {} catch (...) { throw; }
+};
+''', min_lines=100)
+        self.assertEqual([item['rule'] for item in items], ['aho-in-class-definition'])
+        self.assertNotIn('code_lines', items[0])
+
+    def test_default_cli_detects_growth_from_four_to_five_lines(self):
+        directory = self.root / 'AHOLi/AHO'
+        directory.mkdir(parents=True)
+        source = directory / 'probe.cpp'
+        original = '''
+struct Example {
+    int value() {
+        int result = 1;
+        result += 2;
+        result += 3;
+        return result;
+    }
+};
+'''
+        source.write_text(original)
+        database = self.root / 'compile_commands.json'
+        database.write_text(json.dumps([dict(directory=str(self.root), file=str(source),
+                                             arguments=['clang++', '-std=c++23', '-c', str(source)])]))
+        subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
+        subprocess.run(['git', 'add', '.'], cwd=self.root, check=True)
+        baseline = self.root / 'baseline.json'
+        baseline.write_text(json.dumps({'version': 1, 'llvm_major': 20, 'in_class_min_lines': 5, 'diagnostics': []}))
+        command = [sys.executable, str(HERE / 'check.py'), '--root', str(self.root), '--checks=layout',
+                   '--database', str(database), '--baseline', str(baseline), '--ast-tool', str(ARGS.ast_tool.resolve())]
+        first = subprocess.run(command, text=True, capture_output=True)
+        self.assertEqual(first.returncode, 0, first.stderr)
+        source.write_text(original.replace('        return result;', '        result += 4;\n        return result;'))
+        changed = subprocess.run(command, text=True, capture_output=True)
+        self.assertEqual(changed.returncode, 1, changed.stderr)
+        report = json.loads((self.root / 'build/style-report/report.json').read_text())
+        self.assertEqual(report['in_class_min_lines'], 5)
+        self.assertEqual([(item['rule'], item['code_lines']) for item in report['new']], [('aho-in-class-definition', 5)])
+
+    def test_repository_baseline_has_no_short_function_allowances(self):
+        baseline = json.loads((HERE / 'baseline.json').read_text())
+        self.assertEqual(baseline['in_class_min_lines'], 5)
+        functions = [item for item in baseline['diagnostics'] if item['rule'] == 'aho-in-class-definition']
+        self.assertTrue(functions)
+        self.assertTrue(all(item['code_lines'] >= 5 for item in functions))
 
     def test_reopened_namespace_does_not_bypass_declaration_order(self):
         items = self.ast('''

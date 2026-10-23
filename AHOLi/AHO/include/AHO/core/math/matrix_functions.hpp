@@ -22,7 +22,7 @@ namespace AHO_NAMESPACE::matrix {
     template<typename R, size_t row, size_t column>
     std::expected<Mat<R, row, column>, FailedCause> inverse_gauss_jordan(const Mat<R, row, column>& mat);
 
-    template<typename R>
+    template<VectorConvention convention = DEFAULT_VECTOR_CONVENTION, typename R>
     std::expected<Mat<R, 4, 4>, FailedCause> inverse_affine(const Mat<R, 4, 4>& mat);
 
     template<typename T, std::size_t rows, std::size_t columns>
@@ -253,84 +253,91 @@ namespace AHO_NAMESPACE::matrix {
         }
     }
 
-    template<typename R>
+    template<VectorConvention convention, typename R>
     std::expected<Mat<R, 4, 4>, FailedCause> inverse_affine(const Mat<R, 4, 4>& mat) {
-        auto abs_value = [](const R& v) {
-            using std::abs;
-            return abs(v);
-        };
-        auto is_near_zero = [&](const R& v) {
-            if constexpr (std::is_floating_point_v<R>) {
-                return abs_value(v) <= std::numeric_limits<R>::epsilon() * static_cast<R>(32);
-            } else {
-                return v == R{};
-            }
-        };
-        auto is_near_one = [&](const R& v) {
-            return is_near_zero(v - static_cast<R>(1));
-        };
-
-        if (!is_near_zero(mat[3][0]) || !is_near_zero(mat[3][1]) || !is_near_zero(mat[3][2]) ||
-            !is_near_one(mat[3][3])) {
-            return std::unexpected(FailedCause::NON_AFFINE);
-        }
-
-        Mat<R, 4, 4> inverse{};
-        if constexpr (std::is_floating_point_v<R>) {
-            Mat<R, 3, 3> linear{};
-            for (size_t i = 0; i < 3; ++i)
-                for (size_t j = 0; j < 3; ++j)
-                    linear[i][j] = mat[i][j];
-            const auto result = inverse_gauss_jordan(linear);
+        if constexpr (convention == VectorConvention::ROW) {
+            const auto result = inverse_affine<VectorConvention::COLUMN>(transpose(mat));
             if (!result)
                 return std::unexpected(result.error());
-            for (size_t i = 0; i < 3; ++i)
-                for (size_t j = 0; j < 3; ++j)
-                    inverse[i][j] = (*result)[i][j];
+            return transpose(*result);
         } else {
-            const R a00 = mat[0][0];
-            const R a01 = mat[0][1];
-            const R a02 = mat[0][2];
-            const R a10 = mat[1][0];
-            const R a11 = mat[1][1];
-            const R a12 = mat[1][2];
-            const R a20 = mat[2][0];
-            const R a21 = mat[2][1];
-            const R a22 = mat[2][2];
+            auto abs_value = [](const R& v) {
+                using std::abs;
+                return abs(v);
+            };
+            auto is_near_zero = [&](const R& v) {
+                if constexpr (std::is_floating_point_v<R>) {
+                    return abs_value(v) <= std::numeric_limits<R>::epsilon() * static_cast<R>(32);
+                } else {
+                    return v == R{};
+                }
+            };
+            auto is_near_one = [&](const R& v) {
+                return is_near_zero(v - static_cast<R>(1));
+            };
 
-            const R det = a00 * (a11 * a22 - a12 * a21) - a01 * (a10 * a22 - a12 * a20) + a02 * (a10 * a21 - a11 * a20);
-
-            if (is_near_zero(det)) {
-                return std::unexpected(FailedCause::SINGULAR);
+            if (!is_near_zero(mat[3][0]) || !is_near_zero(mat[3][1]) || !is_near_zero(mat[3][2]) ||
+                !is_near_one(mat[3][3])) {
+                return std::unexpected(FailedCause::NON_AFFINE);
             }
 
-            const R inv_det = static_cast<R>(1) / det;
+            Mat<R, 4, 4> inverse{};
+            if constexpr (std::is_floating_point_v<R>) {
+                Mat<R, 3, 3> linear{};
+                for (size_t i = 0; i < 3; ++i)
+                    for (size_t j = 0; j < 3; ++j)
+                        linear[i][j] = mat[i][j];
+                const auto result = inverse_gauss_jordan(linear);
+                if (!result)
+                    return std::unexpected(result.error());
+                for (size_t i = 0; i < 3; ++i)
+                    for (size_t j = 0; j < 3; ++j)
+                        inverse[i][j] = (*result)[i][j];
+            } else {
+                const R a00 = mat[0][0];
+                const R a01 = mat[0][1];
+                const R a02 = mat[0][2];
+                const R a10 = mat[1][0];
+                const R a11 = mat[1][1];
+                const R a12 = mat[1][2];
+                const R a20 = mat[2][0];
+                const R a21 = mat[2][1];
+                const R a22 = mat[2][2];
 
-            inverse[0][0] = (a11 * a22 - a12 * a21) * inv_det;
-            inverse[0][1] = (a02 * a21 - a01 * a22) * inv_det;
-            inverse[0][2] = (a01 * a12 - a02 * a11) * inv_det;
-            inverse[1][0] = (a12 * a20 - a10 * a22) * inv_det;
-            inverse[1][1] = (a00 * a22 - a02 * a20) * inv_det;
-            inverse[1][2] = (a02 * a10 - a00 * a12) * inv_det;
-            inverse[2][0] = (a10 * a21 - a11 * a20) * inv_det;
-            inverse[2][1] = (a01 * a20 - a00 * a21) * inv_det;
-            inverse[2][2] = (a00 * a11 - a01 * a10) * inv_det;
+                const R det = a00 * (a11 * a22 - a12 * a21) - a01 * (a10 * a22 - a12 * a20) + a02 * (a10 * a21 - a11 * a20);
+
+                if (is_near_zero(det)) {
+                    return std::unexpected(FailedCause::SINGULAR);
+                }
+
+                const R inv_det = static_cast<R>(1) / det;
+
+                inverse[0][0] = (a11 * a22 - a12 * a21) * inv_det;
+                inverse[0][1] = (a02 * a21 - a01 * a22) * inv_det;
+                inverse[0][2] = (a01 * a12 - a02 * a11) * inv_det;
+                inverse[1][0] = (a12 * a20 - a10 * a22) * inv_det;
+                inverse[1][1] = (a00 * a22 - a02 * a20) * inv_det;
+                inverse[1][2] = (a02 * a10 - a00 * a12) * inv_det;
+                inverse[2][0] = (a10 * a21 - a11 * a20) * inv_det;
+                inverse[2][1] = (a01 * a20 - a00 * a21) * inv_det;
+                inverse[2][2] = (a00 * a11 - a01 * a10) * inv_det;
+            }
+
+            const R t0 = mat[0][3];
+            const R t1 = mat[1][3];
+            const R t2 = mat[2][3];
+
+            inverse[0][3] = -(inverse[0][0] * t0 + inverse[0][1] * t1 + inverse[0][2] * t2);
+            inverse[1][3] = -(inverse[1][0] * t0 + inverse[1][1] * t1 + inverse[1][2] * t2);
+            inverse[2][3] = -(inverse[2][0] * t0 + inverse[2][1] * t1 + inverse[2][2] * t2);
+
+            inverse[3][0] = static_cast<R>(0);
+            inverse[3][1] = static_cast<R>(0);
+            inverse[3][2] = static_cast<R>(0);
+            inverse[3][3] = static_cast<R>(1);
+
+            return inverse;
         }
-
-        const R t0 = mat[0][3];
-        const R t1 = mat[1][3];
-        const R t2 = mat[2][3];
-
-        inverse[0][3] = -(inverse[0][0] * t0 + inverse[0][1] * t1 + inverse[0][2] * t2);
-        inverse[1][3] = -(inverse[1][0] * t0 + inverse[1][1] * t1 + inverse[1][2] * t2);
-        inverse[2][3] = -(inverse[2][0] * t0 + inverse[2][1] * t1 + inverse[2][2] * t2);
-
-        inverse[3][0] = static_cast<R>(0);
-        inverse[3][1] = static_cast<R>(0);
-        inverse[3][2] = static_cast<R>(0);
-        inverse[3][3] = static_cast<R>(1);
-
-        return inverse;
     }
 
 } // namespace AHO_NAMESPACE::matrix

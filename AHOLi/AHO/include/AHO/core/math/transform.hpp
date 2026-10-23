@@ -176,11 +176,10 @@ namespace AHO_NAMESPACE::matrix {
 
     template<VectorConvention convention, std::floating_point T>
     std::expected<Vector_<T, VSL_NAMESPACE::D3>, FailedCause> transform_normal(const Mat4x4<T>& value, const Vector_<T, VSL_NAMESPACE::D3>& normal) {
-        const auto canonical = detail::with_vector_convention<convention>(value);
-        const auto inverse = inverse_affine(canonical);
+        const auto inverse = inverse_affine<convention>(value);
         if (!inverse)
             return std::unexpected(inverse.error());
-        return transform_vector<VectorConvention::COLUMN>(transpose(*inverse), normal);
+        return transform_vector<convention>(transpose(*inverse), normal);
     }
 
     template<HandedCoordinate handed, ViewOrientation orientation, VectorConvention convention, std::floating_point T, typename CI>

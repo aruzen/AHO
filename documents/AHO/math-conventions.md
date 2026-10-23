@@ -33,6 +33,8 @@ auto gpu_matrix = aho::matrix::to_array<aho::MatrixLayout::COLUMN_MAJOR>(project
 - ROW: `v*M`。同じ幾何変換を転置で表し、合成時も積の順を変える。translate→rotate→scaleはS*R*Tになる。
 - ROW_MAJOR/COLUMN_MAJORはto_array/from_arrayやinitializer-list factoryの入出力順序。ベクトル規約を自動的に変えない。
 
+最適化されたアフィン逆行列も`inverse_affine<VectorConvention::ROW/COLUMN>()`で規約を選ぶ。一般の逆行列・転置は数値行列そのものへの演算なので、手系を指定しない。
+
 ## ヘッダーの責務
 
 | ヘッダー | 内容 |

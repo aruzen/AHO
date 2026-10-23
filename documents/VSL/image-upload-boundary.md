@@ -1,0 +1,7 @@
+# 画像アップロードの範囲
+
+`CopyBufferToImage`と`CopyBufferToArrayImage`は、コマンドの記録前に送信元バッファの容量と転送先レイヤーを検証する。必要容量は画像の1レイヤー分で、画像配列の全レイヤー分ではない。容量不足や範囲外のレイヤーは`std::out_of_range`で拒否する。
+
+対応範囲はsingle-sampleのcolor画像で、送信元は`TRANSFER_SOURCE`、画像は`TRANSFER_DST`を持ち、コマンドと同じデバイスに属する必要がある。指定できるlayoutは`GENERAL`と`TRANSFER_DST_OPTIMAL`で、対象サブリソースを実際にそのlayoutへ遷移させる責任は呼び出し側にある。
+
+検証は保持済みのmetadataに対する定数時間の処理のみで、画素の走査、SPIR-Vの再解析、GPU問い合わせは行わない。元のBufferハンドルが破棄された後も、コマンドが取得したストレージを検証・保持する。

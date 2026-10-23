@@ -21,6 +21,11 @@ string(REPLACE "-fcolor-diagnostics" "-fdiagnostics-color=auto" CMAKE_CXX_FLAGS 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+option(AHO_STYLE_CHECKS "Enable AHO/VSL format, naming and layout checks" OFF)
+if(AHO_STYLE_CHECKS)
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
+
 include(CTest)
 if (BUILD_TESTING)
     find_package(GTest REQUIRED)
@@ -67,6 +72,10 @@ message("glfw3: ${GLFW_INCLUDE_DIRS}, ${GLFW_LIBRARY_DIRS}, ${GLFW_LIBRARIES}")
 add_subdirectory(AHO)
 add_subdirectory(AHOLi)
 add_subdirectory(VSLi)
+
+if(AHO_STYLE_CHECKS)
+    add_subdirectory(tools/style)
+endif()
 
 if (BUILD_TESTING)
     add_custom_target(build-tests DEPENDS aho-tests vsl-tests)

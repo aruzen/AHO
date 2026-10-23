@@ -17,21 +17,20 @@ namespace {
 
 #if VSL_TYPED_CASE == 0
     static_assert(Input::LAYOUT.binding[0].stride == sizeof(Vertex));
-    static_assert(t::compatible_vertex_buffers<Input, t::TypedVertexBuffer<Binding>>);
-    static_assert(!std::convertible_to<t::TypedVertexBuffer<Binding>, vsl::BufferAccessor&>);
+    static_assert(t::compatible_vertex_buffers<Input, t::TypedVertexBuffer<Vertex>>);
+    static_assert(!std::convertible_to<t::TypedVertexBuffer<Vertex>, vsl::BufferAccessor&>);
     static_assert(!std::convertible_to<Pipeline, vsl::PipelineAccessor>);
-    void accepted(Pipeline& pipeline, t::TypedVertexBuffer<Binding>& buffer) {
+    void accepted(Pipeline& pipeline, t::TypedVertexBuffer<Vertex>& buffer) {
         auto command = pipeline.bind_vertices(buffer).draw(3);
         static_assert(std::same_as<typename decltype(command)::VertexInput, Input>);
     }
 #elif VSL_TYPED_CASE == 1
-    using Wrong = t::VertexBinding<Vertex, 1, Timing::NEXT_VERTEX, Attribute>;
-    void rejected(Pipeline& pipeline, t::TypedVertexBuffer<Wrong>& buffer) { pipeline.bind_vertices(buffer); }
+    void rejected(Pipeline& pipeline, t::TypedVertexBuffer<OtherVertex>& buffer) { pipeline.bind_vertices(buffer); }
 #elif VSL_TYPED_CASE == 2
     void rejected(Pipeline& pipeline) { pipeline.bind_vertices(); }
 #elif VSL_TYPED_CASE == 3
     void rejected(vsl::LogicalDeviceAccessor device, std::span<const OtherVertex> values) {
-        t::TypedVertexBuffer<Binding> buffer(device, values);
+        t::TypedVertexBuffer<Vertex> buffer(device, values);
     }
 #elif VSL_TYPED_CASE == 4
     using Second = t::VertexBinding<Vertex, 0, Timing::NEXT_VERTEX,

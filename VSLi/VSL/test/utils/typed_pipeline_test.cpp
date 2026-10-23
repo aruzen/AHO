@@ -16,9 +16,9 @@ namespace {
     static_assert(Input::LAYOUT.binding[0].stride == sizeof(Position));
     static_assert(Input::LAYOUT.binding[1].stride == sizeof(Color));
     static_assert(Input::LAYOUT.attribute[1].location == 1);
-    static_assert(typed::compatible_vertex_buffers<Input, typed::TypedVertexBuffer<Positions>, typed::TypedVertexBuffer<Colors>>);
-    static_assert(!typed::compatible_vertex_buffers<Input, typed::TypedVertexBuffer<Colors>, typed::TypedVertexBuffer<Positions>>);
-    static_assert(!typed::compatible_vertex_buffers<Input, typed::TypedVertexBuffer<Positions>>);
+    static_assert(typed::compatible_vertex_buffers<Input, typed::TypedVertexBuffer<Position>, typed::TypedVertexBuffer<Color>>);
+    static_assert(!typed::compatible_vertex_buffers<Input, typed::TypedVertexBuffer<Color>, typed::TypedVertexBuffer<Position>>);
+    static_assert(!typed::compatible_vertex_buffers<Input, typed::TypedVertexBuffer<Position>>);
     static_assert(!typed::compatible_vertex_buffers<Input, int, int>);
     static_assert(typed::compatible_vertex_buffers<typed::TypedVertexInput<>>);
     static_assert(std::same_as<typed::TypedGraphicsPipeline<Input>::VertexInput, Input>);
@@ -68,8 +68,8 @@ namespace {
 
     TEST_F(TypedPipelineVulkanIntegrationTest, TypedPipelineAndBuffersProduceTheExpectedPixel) {
         auto typed_pipeline = make_typed<Input>();
-        typed::TypedVertexBuffer<Positions> positions(device, POSITIONS);
-        typed::TypedVertexBuffer<Colors> colors(device, COLORS);
+        typed::TypedVertexBuffer<Position> positions(device, POSITIONS);
+        typed::TypedVertexBuffer<Color> colors(device, COLORS);
         auto bindings = typed_pipeline.bind_vertices(positions, colors);
         static_assert(std::same_as<typename decltype(bindings)::VertexInput, Input>);
         ExpectTriangleColor(render([&](auto& stream) { stream << bindings.draw(3); }));
@@ -79,9 +79,13 @@ namespace {
         using SparsePositions = typed::VertexBinding<Position, 4, Timing::NEXT_VERTEX, PositionAttribute>;
         using SparseColors = typed::VertexBinding<Color, 7, Timing::NEXT_VERTEX, ColorAttribute>;
         auto typed_pipeline = make_typed<typed::TypedVertexInput<SparsePositions, SparseColors>>();
-        typed::TypedVertexBuffer<SparsePositions> positions(device, POSITIONS);
-        typed::TypedVertexBuffer<SparseColors> colors(device, COLORS);
+        typed::TypedVertexBuffer<Position> positions(device, POSITIONS);
+        typed::TypedVertexBuffer<Color> colors(device, COLORS);
+        auto original_pipeline = make_typed<Input>();
+        const auto owner = positions.backend().data_;
+        ExpectTriangleColor(render([&](auto& stream) { stream << original_pipeline.bind_vertices(positions, colors).draw(3); }));
         ExpectTriangleColor(render([&](auto& stream) { stream << typed_pipeline.bind_vertices(positions, colors).draw(3); }));
+        EXPECT_EQ(owner, positions.backend().data_) << "Binding changes must reuse the same GPU allocation";
     }
 
     TEST_F(TypedPipelineVulkanIntegrationTest, InstanceRateAndFirstVertexAndInstanceSelectTheCorrectRecords) {
@@ -89,8 +93,8 @@ namespace {
         auto typed_pipeline = make_typed<typed::TypedVertexInput<Positions, Instances>>();
         const std::array<Position, 4> source{{{{0, 0}}, POSITIONS[0], POSITIONS[1], POSITIONS[2]}};
         const std::array<Color, 2> tints{{{{1, 0, 0}}, COLORS[0]}};
-        typed::TypedVertexBuffer<Positions> positions(device, source);
-        typed::TypedVertexBuffer<Instances> colors(device, tints);
+        typed::TypedVertexBuffer<Position> positions(device, source);
+        typed::TypedVertexBuffer<Color> colors(device, tints);
         ExpectTriangleColor(render([&](auto& stream) { stream << typed_pipeline.bind_vertices(positions, colors).draw(3, 1, 1, 1); }));
     }
 
@@ -101,8 +105,8 @@ namespace {
 
     TEST_F(TypedPipelineVulkanIntegrationTest, DrawRejectsOutOfBoundsRecordsBeforeRecording) {
         auto typed_pipeline = make_typed<Input>();
-        typed::TypedVertexBuffer<Positions> positions(device, POSITIONS);
-        typed::TypedVertexBuffer<Colors> colors(device, COLORS);
+        typed::TypedVertexBuffer<Position> positions(device, POSITIONS);
+        typed::TypedVertexBuffer<Color> colors(device, COLORS);
         auto bindings = typed_pipeline.bind_vertices(positions, colors);
         EXPECT_THROW(bindings.draw(4), std::out_of_range);
         EXPECT_THROW(bindings.draw(3, 1, 1), std::out_of_range);
@@ -117,9 +121,9 @@ namespace {
         const auto pixel = render([&](auto& stream) {
             {
                 auto typed_pipeline = make_typed<Input>();
-                typed::TypedVertexBuffer<Positions> positions(device, POSITIONS);
+                typed::TypedVertexBuffer<Position> positions(device, POSITIONS);
                 const std::array<Color, 3> tints{{{{.8f, .2f, .4f}}, {{.8f, .2f, .4f}}, {{.8f, .2f, .4f}}}};
-                typed::TypedVertexBuffer<Colors> colors(device, tints);
+                typed::TypedVertexBuffer<Color> colors(device, tints);
                 weak = positions.backend().data_;
                 auto command = typed_pipeline.bind_vertices(positions, colors).draw(3);
                 stream << *pipeline << command;
@@ -134,8 +138,8 @@ namespace {
 
     TEST_F(TypedPipelineVulkanIntegrationTest, TypedUpdatesKeepRecordCountAndDeviceLocalUploadIsSupported) {
         auto typed_pipeline = make_typed<Input>();
-        typed::TypedVertexBuffer<Positions> positions(device, POSITIONS);
-        typed::TypedVertexBuffer<Colors, vsl::MemoryProperty::DEVICE_LOCAL> colors(device, make_manager(), COLORS);
+        typed::TypedVertexBuffer<Position> positions(device, POSITIONS);
+        typed::TypedVertexBuffer<Color, vsl::MemoryProperty::DEVICE_LOCAL> colors(device, make_manager(), COLORS);
         EXPECT_EQ(positions.size(), 3u);
         positions.copy(POSITIONS);
         EXPECT_THROW(positions.copy(std::span<const Position>(POSITIONS).first(2)), std::invalid_argument);
@@ -153,14 +157,14 @@ namespace {
         const std::array<Vertex, 3> records{{{{-1, -1}, {64, 128, 191, 255}, 123},
                                             {{3, -1}, {64, 128, 191, 255}, 456},
                                             {{-1, 3}, {64, 128, 191, 255}, 789}}};
-        typed::TypedVertexBuffer<Record> buffer(device, records);
+        typed::TypedVertexBuffer<Vertex> buffer(device, records);
         ExpectTriangleColor(render([&](auto& stream) { stream << typed_pipeline.bind_vertices(buffer).draw(3); }));
     }
 
     TEST_F(TypedPipelineVulkanIntegrationTest, ExistingDynamicApiCanUseExplicitBackendAccess) {
         auto typed_pipeline = make_typed<Input>();
-        typed::TypedVertexBuffer<Positions> positions(device, POSITIONS);
-        typed::TypedVertexBuffer<Colors> colors(device, COLORS);
+        typed::TypedVertexBuffer<Position> positions(device, POSITIONS);
+        typed::TypedVertexBuffer<Color> colors(device, COLORS);
         ExpectTriangleColor(render([&](auto& stream) {
             stream << typed_pipeline.backend() << vsl::command::BindVertexBuffer(positions.backend(), colors.backend())
                    << vsl::command::Draw(3);

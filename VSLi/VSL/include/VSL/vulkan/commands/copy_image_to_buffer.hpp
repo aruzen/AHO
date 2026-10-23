@@ -26,6 +26,9 @@ namespace VSL_NAMESPACE::command {
                           ImageRegion region = {}, bool host_read = false);
         CopyImageToBuffer(std::shared_ptr<impl::BufferImpl> buffer, ImageAccessor image, ImageLayout layout,
                           ImageRegion region = {}, bool host_read = false);
+        // コピー先を指定範囲に限定する。offsetは画像のtexelサイズの倍数にする。
+        CopyImageToBuffer(std::shared_ptr<impl::BufferImpl> buffer, ImageAccessor image, ImageLayout layout,
+                          ImageRegion region, bool host_read, std::size_t offset, std::size_t size);
 
         template<MemoryType mem_type, MemoryProperty buf_mem_prop, SharingMode share_mode,
                  VSL_NAMESPACE::ImageType img_type, VSL_NAMESPACE::MemoryProperty img_mem_prop, VSL_NAMESPACE::ImageLayout layout_>
@@ -44,6 +47,7 @@ namespace VSL_NAMESPACE::command {
 
     private:
         std::shared_ptr<impl::BufferImpl> _destination;
+        std::size_t _destination_offset = 0, _destination_size = 0;
     };
 
     template<MemoryType mem_type, MemoryProperty buf_mem_prop, SharingMode share_mode,

@@ -33,6 +33,58 @@ namespace VSL_NAMESPACE::helper {
 
     template<is_supported_charsets CharType, char c, char8_t c8,
              wchar_t wc, char16_t c16, char32_t c32>
+    consteval auto adjust_char();
+
+    template<is_supported_charsets CharType, ConstantStringHolder c, ConstantStringHolder c8,
+             ConstantStringHolder wc, ConstantStringHolder c16, ConstantStringHolder c32>
+    consteval auto adjust_string();
+
+    class CharacterContainer {
+        char _char_holder;
+        char8_t _char8_t_holder;
+        wchar_t _wchar_t_holder;
+        char16_t _char16_t_holder;
+        char32_t _char32_t_holder;
+
+    public:
+        CharacterContainer(char char_holder,
+                           char8_t char8_t_holder,
+                           wchar_t wchar_t_holder,
+                           char16_t char16_t_holder,
+                           char32_t char32_t_holder) : _char_holder(char_holder),
+                                                       _char8_t_holder(char8_t_holder),
+                                                       _wchar_t_holder(wchar_t_holder),
+                                                       _char16_t_holder(char16_t_holder),
+                                                       _char32_t_holder(char32_t_holder) {}
+
+        template<is_supported_charsets CharType>
+        CharType get() const;
+    };
+
+    class StringContainer {
+        std::basic_string<char> _char_holder;
+        std::basic_string<char8_t> _char8_t_holder;
+        std::basic_string<wchar_t> _wchar_t_holder;
+        std::basic_string<char16_t> _char16_t_holder;
+        std::basic_string<char32_t> _char32_t_holder;
+
+    public:
+        StringContainer(std::basic_string<char> char_holder,
+                        std::basic_string<char8_t> char8_t_holder,
+                        std::basic_string<wchar_t> wchar_t_holder,
+                        std::basic_string<char16_t> char16_t_holder,
+                        std::basic_string<char32_t> char32_t_holder) : _char_holder(char_holder),
+                                                                       _char8_t_holder(char8_t_holder),
+                                                                       _wchar_t_holder(wchar_t_holder),
+                                                                       _char16_t_holder(char16_t_holder),
+                                                                       _char32_t_holder(char32_t_holder) {}
+
+        template<is_supported_charsets CharType>
+        std::basic_string<CharType> get() const;
+    };
+
+    template<is_supported_charsets CharType, char c, char8_t c8,
+             wchar_t wc, char16_t c16, char32_t c32>
     consteval auto adjust_char() {
         if constexpr (std::is_same_v<CharType, char>)
             return c;
@@ -61,140 +113,102 @@ namespace VSL_NAMESPACE::helper {
             return c32;
     }
 
-    class CharacterContainer {
-        char _char_holder;
-        char8_t _char8_t_holder;
-        wchar_t _wchar_t_holder;
-        char16_t _char16_t_holder;
-        char32_t _char32_t_holder;
-
-    public:
-        CharacterContainer(char char_holder,
-                            char8_t char8_t_holder,
-                            wchar_t wchar_t_holder,
-                            char16_t char16_t_holder,
-                            char32_t char32_t_holder) : _char_holder(char_holder),
-                                                        _char8_t_holder(char8_t_holder),
-                                                        _wchar_t_holder(wchar_t_holder),
-                                                        _char16_t_holder(char16_t_holder),
-                                                        _char32_t_holder(char32_t_holder) {}
-
-        template<is_supported_charsets CharType>
-        CharType get() const {
-            if constexpr (std::is_same_v<CharType, char>) {
-                return _char_holder;
-            }
-            if constexpr (std::is_same_v<CharType, char8_t>) {
-                return _char8_t_holder;
-            }
-            if constexpr (std::is_same_v<CharType, wchar_t>) {
-                return _wchar_t_holder;
-            }
-            if constexpr (std::is_same_v<CharType, char16_t>) {
-                return _char16_t_holder;
-            }
-            if constexpr (std::is_same_v<CharType, char32_t>) {
-                return _char32_t_holder;
-            }
+    template<is_supported_charsets CharType>
+    CharType CharacterContainer::get() const {
+        if constexpr (std::is_same_v<CharType, char>) {
+            return _char_holder;
         }
-    };
-
-    class StringContainer {
-        std::basic_string<char> _char_holder;
-        std::basic_string<char8_t> _char8_t_holder;
-        std::basic_string<wchar_t> _wchar_t_holder;
-        std::basic_string<char16_t> _char16_t_holder;
-        std::basic_string<char32_t> _char32_t_holder;
-
-    public:
-        StringContainer(std::basic_string<char> char_holder,
-                         std::basic_string<char8_t> char8_t_holder,
-                         std::basic_string<wchar_t> wchar_t_holder,
-                         std::basic_string<char16_t> char16_t_holder,
-                         std::basic_string<char32_t> char32_t_holder) : _char_holder(char_holder),
-                                                                        _char8_t_holder(char8_t_holder),
-                                                                        _wchar_t_holder(wchar_t_holder),
-                                                                        _char16_t_holder(char16_t_holder),
-                                                                        _char32_t_holder(char32_t_holder) {}
-
-        template<is_supported_charsets CharType>
-        std::basic_string<CharType> get() const {
-            if constexpr (std::is_same_v<CharType, char>) {
-                return _char_holder;
-            }
-            if constexpr (std::is_same_v<CharType, char8_t>) {
-                return _char8_t_holder;
-            }
-            if constexpr (std::is_same_v<CharType, wchar_t>) {
-                return _wchar_t_holder;
-            }
-            if constexpr (std::is_same_v<CharType, char16_t>) {
-                return _char16_t_holder;
-            }
-            if constexpr (std::is_same_v<CharType, char32_t>) {
-                return _char32_t_holder;
-            }
+        if constexpr (std::is_same_v<CharType, char8_t>) {
+            return _char8_t_holder;
         }
-    };
+        if constexpr (std::is_same_v<CharType, wchar_t>) {
+            return _wchar_t_holder;
+        }
+        if constexpr (std::is_same_v<CharType, char16_t>) {
+            return _char16_t_holder;
+        }
+        if constexpr (std::is_same_v<CharType, char32_t>) {
+            return _char32_t_holder;
+        }
+    }
+
+    template<is_supported_charsets CharType>
+    std::basic_string<CharType> StringContainer::get() const {
+        if constexpr (std::is_same_v<CharType, char>) {
+            return _char_holder;
+        }
+        if constexpr (std::is_same_v<CharType, char8_t>) {
+            return _char8_t_holder;
+        }
+        if constexpr (std::is_same_v<CharType, wchar_t>) {
+            return _wchar_t_holder;
+        }
+        if constexpr (std::is_same_v<CharType, char16_t>) {
+            return _char16_t_holder;
+        }
+        if constexpr (std::is_same_v<CharType, char32_t>) {
+            return _char32_t_holder;
+        }
+    }
 } // namespace VSL_NAMESPACE::helper
 
 #define VSL_PREFIX(str) VSL_NAMESPACE::helper::adjust_string<Character,               \
-                                                            str,                     \
-                                                            ___VSL_JOIN_2(u8, str),  \
-                                                            ___VSL_JOIN_2(L, str),   \
-                                                            ___VSL_JOIN_2(u, str),   \
-                                                            ___VSL_JOIN_2(U, str)>() \
+                                                             str,                     \
+                                                             ___VSL_JOIN_2(u8, str),  \
+                                                             ___VSL_JOIN_2(L, str),   \
+                                                             ___VSL_JOIN_2(u, str),   \
+                                                             ___VSL_JOIN_2(U, str)>() \
                             .value
 
 #define VSL_CHAR_PREFIX(str) VSL_NAMESPACE::helper::adjust_char<Character,              \
-                                                               str,                    \
-                                                               ___VSL_JOIN_2(u8, str), \
-                                                               ___VSL_JOIN_2(L, str),  \
-                                                               ___VSL_JOIN_2(u, str),  \
-                                                               ___VSL_JOIN_2(U, str)>()
+                                                                str,                    \
+                                                                ___VSL_JOIN_2(u8, str), \
+                                                                ___VSL_JOIN_2(L, str),  \
+                                                                ___VSL_JOIN_2(u, str),  \
+                                                                ___VSL_JOIN_2(U, str)>()
 
 #define VSL_STR_PREFIX(str) std::basic_string<Character>(VSL_NAMESPACE::helper::adjust_string<Character,               \
-                                                                                             str,                     \
-                                                                                             ___VSL_JOIN_2(u8, str),  \
-                                                                                             ___VSL_JOIN_2(L, str),   \
-                                                                                             ___VSL_JOIN_2(u, str),   \
-                                                                                             ___VSL_JOIN_2(U, str)>() \
+                                                                                              str,                     \
+                                                                                              ___VSL_JOIN_2(u8, str),  \
+                                                                                              ___VSL_JOIN_2(L, str),   \
+                                                                                              ___VSL_JOIN_2(u, str),   \
+                                                                                              ___VSL_JOIN_2(U, str)>() \
                                                              .value)
 
 #define VSL_T_PREFIX(type, str) VSL_NAMESPACE::helper::adjust_string<type,                    \
-                                                                    str,                     \
-                                                                    ___VSL_JOIN_2(u8, str),  \
-                                                                    ___VSL_JOIN_2(L, str),   \
-                                                                    ___VSL_JOIN_2(u, str),   \
-                                                                    ___VSL_JOIN_2(U, str)>() \
+                                                                     str,                     \
+                                                                     ___VSL_JOIN_2(u8, str),  \
+                                                                     ___VSL_JOIN_2(L, str),   \
+                                                                     ___VSL_JOIN_2(u, str),   \
+                                                                     ___VSL_JOIN_2(U, str)>() \
                                     .value
 
 #define VSL_T_CHAR_PREFIX(type, str) VSL_NAMESPACE::helper::adjust_char<type,                   \
-                                                                       str,                    \
-                                                                       ___VSL_JOIN_2(u8, str), \
-                                                                       ___VSL_JOIN_2(L, str),  \
-                                                                       ___VSL_JOIN_2(u, str),  \
-                                                                       ___VSL_JOIN_2(U, str)>()
+                                                                        str,                    \
+                                                                        ___VSL_JOIN_2(u8, str), \
+                                                                        ___VSL_JOIN_2(L, str),  \
+                                                                        ___VSL_JOIN_2(u, str),  \
+                                                                        ___VSL_JOIN_2(U, str)>()
 
 #define VSL_T_STR_PREFIX(type, str) std::basic_string<type>(VSL_NAMESPACE::helper::adjust_string<type,                    \
-                                                                                                str,                     \
-                                                                                                ___VSL_JOIN_2(u8, str),  \
-                                                                                                ___VSL_JOIN_2(L, str),   \
-                                                                                                ___VSL_JOIN_2(u, str),   \
-                                                                                                ___VSL_JOIN_2(U, str)>() \
+                                                                                                 str,                     \
+                                                                                                 ___VSL_JOIN_2(u8, str),  \
+                                                                                                 ___VSL_JOIN_2(L, str),   \
+                                                                                                 ___VSL_JOIN_2(u, str),   \
+                                                                                                 ___VSL_JOIN_2(U, str)>() \
                                                                 .value)
 
 #define VSL_STRING_CONTAINER(str) VSL_NAMESPACE::helper::StringContainer(str,                    \
-                                                                          ___VSL_JOIN_2(u8, str), \
-                                                                          ___VSL_JOIN_2(L, str),  \
-                                                                          ___VSL_JOIN_2(u, str),  \
-                                                                          ___VSL_JOIN_2(U, str))
+                                                                         ___VSL_JOIN_2(u8, str), \
+                                                                         ___VSL_JOIN_2(L, str),  \
+                                                                         ___VSL_JOIN_2(u, str),  \
+                                                                         ___VSL_JOIN_2(U, str))
 
 #define VSL_CHARACTER_CONTAINER(str) VSL_NAMESPACE::helper::CharacterContainer(str,                    \
-                                                                                ___VSL_JOIN_2(u8, str), \
-                                                                                ___VSL_JOIN_2(L, str),  \
-                                                                                ___VSL_JOIN_2(u, str),  \
-                                                                                ___VSL_JOIN_2(U, str))
+                                                                               ___VSL_JOIN_2(u8, str), \
+                                                                               ___VSL_JOIN_2(L, str),  \
+                                                                               ___VSL_JOIN_2(u, str),  \
+                                                                               ___VSL_JOIN_2(U, str))
 
 #define VSL_DEFAULT_PREFIX(str) ___VSL_JOIN_2(PARALLEL_PARADIGM_PREFIX, str)
 

@@ -1,10 +1,12 @@
 #pragma once
 #include "../vulkan/stages/vertex_input.hpp"
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <tuple>
 #include <type_traits>
+#include <utility>
 
 namespace VSL_NAMESPACE::typed {
     inline constexpr std::uint32_t AUTO = UINT32_MAX;
@@ -127,4 +129,50 @@ namespace VSL_NAMESPACE::typed {
             input.injection(layout);
         }
     };
+
+    namespace detail {
+        template<typename T> struct VertexMemberFormat {
+            static constexpr auto VALUE = data_format::convert_graphic_type<std::remove_cv_t<T>>();
+        };
+        template<typename T, size_t count> struct VertexMemberFormat<T[count]> {
+            static constexpr auto VALUE = VertexMemberFormat<T>::VALUE.template to_vec<count>();
+        };
+        template<typename T, size_t count> struct VertexMemberFormat<std::array<T, count>> : VertexMemberFormat<T[count]> {};
+
+        template<typename Record, std::uint32_t binding, VertexTiming timing, std::uint32_t first_location, typename Indices>
+        struct RecordBinding;
+        template<typename Record, std::uint32_t binding, VertexTiming timing, std::uint32_t first_location, size_t... indices>
+        struct RecordBinding<Record, binding, timing, first_location, std::index_sequence<indices...>> {
+            static_assert(((std::uint64_t(first_location) + Record::ATTRIBUTES[indices].location +
+                            Record::ATTRIBUTES[indices].locations <= AUTO) && ...), "Vertex record location overflow");
+            using Type = VertexBinding<typename Record::Vertex, binding, timing,
+                VertexInputDefinition<Record::ATTRIBUTES[indices].format, first_location + Record::ATTRIBUTES[indices].location,
+                                      Record::ATTRIBUTES[indices].offset>...>;
+        };
+    }
+
+    // Keep the member's actual type and offsetof together; a format override expresses e.g. UNORM storage.
+    template<typename Vertex_, typename Member, std::uint32_t offset, std::uint32_t location = AUTO,
+             data_format::Format format = detail::VertexMemberFormat<Member>::VALUE>
+    struct VertexMember : VertexInputDefinition<format, location, offset> {
+        using Vertex = Vertex_;
+        static_assert(format.size() != 0 && format.size() <= sizeof(Member), "Vertex member format exceeds its C++ storage or is undefined");
+        static_assert(offset <= sizeof(Vertex) && sizeof(Member) <= sizeof(Vertex) - offset, "Vertex member exceeds its record");
+    };
+
+    template<typename Vertex_, typename... Members>
+    struct VertexRecord {
+        using Vertex = Vertex_;
+        static_assert((std::is_same_v<Vertex, typename Members::Vertex> && ...), "Vertex member belongs to a different record");
+        static constexpr auto LAYOUT = TypedVertexInput<VertexBinding<Vertex, 0, VertexTiming::NEXT_VERTEX, Members...>>::LAYOUT;
+        static constexpr auto ATTRIBUTES = LAYOUT.attribute;
+        template<std::uint32_t binding, VertexTiming timing = VertexTiming::NEXT_VERTEX, std::uint32_t first_location = 0>
+        using Binding = typename detail::RecordBinding<VertexRecord, binding, timing, first_location,
+            std::make_index_sequence<sizeof...(Members)>>::Type;
+    };
 }
+
+// C++23 has no portable constexpr offsetof(member-pointer). This macro only captures type + offsetof;
+// all layout resolution and validation remains in the templates above. Optional arguments: location, format.
+#define VSL_VERTEX_MEMBER(Record, member, ...) \
+    ::VSL_NAMESPACE::typed::VertexMember<Record, decltype(Record::member), offsetof(Record, member) __VA_OPT__(,) __VA_ARGS__>

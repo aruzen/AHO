@@ -21,154 +21,86 @@ namespace AHO_NAMESPACE {
         template<typename H, typename SV = H>
         struct HSVA;
 
-#define RGB_ELEMENT_TYPE_DEFINITION_EXPANDER(Upper, Lower)                                       \
-    template<typename T>                                                                         \
-    struct Upper {                                                                               \
-        using ElementType = T;                                                                   \
-        constexpr static bool IS_RGB_ELEMENET = true;                                            \
-                                                                                                 \
-        T value;                                                                                 \
-                                                                                                 \
-        constexpr static char UPPER_CHAR = #Upper[0];                                            \
-        constexpr static char LOWER_CHAR = #Lower[0];                                            \
-                                                                                                 \
-        constexpr Upper(const T& t) : value(t) {};                                               \
-        constexpr Upper() : value{} {};                                                          \
-                                                                                                 \
-        constexpr Upper<T> operator+() const {                                                   \
-            static_assert(concepts::plusable<T>);                                                \
-            return {value};                                                                      \
-        };                                                                                       \
-        constexpr Upper<T> operator-() const {                                                   \
-            static_assert(concepts::minusable<T>);                                               \
-            return Upper<T>(-value);                                                             \
-        };                                                                                       \
-        template<typename RV>                                                                    \
-        requires concepts::add_as<const T&, const RV&>                                           \
-        constexpr auto operator+(const Upper<RV>& t) const -> Upper<decltype(value + t.value)> { \
-            return {value + t.value};                                                            \
-        };                                                                                       \
-        template<typename RV>                                                                    \
-        requires concepts::subtract_as<const T&, const RV&>                                      \
-        constexpr auto operator-(const Upper<RV>& t) const -> Upper<decltype(value - t.value)> { \
-            return {value - t.value};                                                            \
-        };                                                                                       \
-        template<typename RV>                                                                    \
-        requires concepts::multiply_as<const T&, const RV&>                                      \
-        constexpr auto operator*(const Upper<RV>& t) const -> Upper<decltype(value * t.value)> { \
-            return {value * t.value};                                                            \
-        };                                                                                       \
-        template<typename RV>                                                                    \
-        requires concepts::division_as<const T&, const RV&>                                      \
-        constexpr auto operator/(const Upper<RV>& t) const -> Upper<decltype(value / t.value)> { \
-            return {value / t.value};                                                            \
-        };                                                                                       \
-                                                                                                 \
-        template<typename RV>                                                                    \
-        requires concepts::add_assign_as<T&, const RV&>                                          \
-        constexpr Upper<T>& operator+=(const Upper<RV>& t) {                                     \
-            value += t.value;                                                                    \
-            return *this;                                                                        \
-        };                                                                                       \
-        template<typename RV>                                                                    \
-        requires concepts::subtract_assign_as<T&, const RV&>                                     \
-        constexpr Upper<T>& operator-=(const Upper<RV>& t) {                                     \
-            value -= t.value;                                                                    \
-            return *this;                                                                        \
-        };                                                                                       \
-        template<typename RV>                                                                    \
-        requires concepts::multiply_assign_as<T&, const RV&>                                     \
-        constexpr Upper<T>& operator*=(const Upper<RV>& t) {                                     \
-            value *= t.value;                                                                    \
-            return *this;                                                                        \
-        };                                                                                       \
-        template<typename RV>                                                                    \
-        requires concepts::division_assign_as<T&, const RV&>                                     \
-        constexpr Upper<T>& operator/=(const Upper<RV>& t) {                                     \
-            value /= t.value;                                                                    \
-            return *this;                                                                        \
-        };                                                                                       \
-                                                                                                 \
-        template<typename RV>                                                                    \
-        requires concepts::cast_as<T, RV>                                                        \
-        Upper<RV> cast() const {                                                                 \
-            return {(RV)value};                                                                  \
-        }                                                                                        \
+#define RGB_ELEMENT_TYPE_DEFINITION_EXPANDER(Upper, Lower)                                      \
+    template<typename T>                                                                        \
+    struct Upper {                                                                              \
+        using ElementType = T;                                                                  \
+        constexpr static bool IS_RGB_ELEMENET = true;                                           \
+        T value;                                                                                \
+        constexpr static char UPPER_CHAR = #Upper[0];                                           \
+        constexpr static char LOWER_CHAR = #Lower[0];                                           \
+        constexpr Upper(const T& t);                                                            \
+        constexpr Upper();                                                                      \
+        constexpr Upper<T> operator+() const;                                                   \
+        constexpr Upper<T> operator-() const;                                                   \
+        template<typename RV>                                                                   \
+        requires AHO_NAMESPACE::concepts::add_as<const T&, const RV&>                           \
+        constexpr auto operator+(const Upper<RV>& t) const -> Upper<decltype(value + t.value)>; \
+        template<typename RV>                                                                   \
+        requires AHO_NAMESPACE::concepts::subtract_as<const T&, const RV&>                      \
+        constexpr auto operator-(const Upper<RV>& t) const -> Upper<decltype(value - t.value)>; \
+        template<typename RV>                                                                   \
+        requires AHO_NAMESPACE::concepts::multiply_as<const T&, const RV&>                      \
+        constexpr auto operator*(const Upper<RV>& t) const -> Upper<decltype(value * t.value)>; \
+        template<typename RV>                                                                   \
+        requires AHO_NAMESPACE::concepts::division_as<const T&, const RV&>                      \
+        constexpr auto operator/(const Upper<RV>& t) const -> Upper<decltype(value / t.value)>; \
+        template<typename RV>                                                                   \
+        requires AHO_NAMESPACE::concepts::add_assign_as<T&, const RV&>                          \
+        constexpr Upper<T>& operator+=(const Upper<RV>& t);                                     \
+        template<typename RV>                                                                   \
+        requires AHO_NAMESPACE::concepts::subtract_assign_as<T&, const RV&>                     \
+        constexpr Upper<T>& operator-=(const Upper<RV>& t);                                     \
+        template<typename RV>                                                                   \
+        requires AHO_NAMESPACE::concepts::multiply_assign_as<T&, const RV&>                     \
+        constexpr Upper<T>& operator*=(const Upper<RV>& t);                                     \
+        template<typename RV>                                                                   \
+        requires AHO_NAMESPACE::concepts::division_assign_as<T&, const RV&>                     \
+        constexpr Upper<T>& operator/=(const Upper<RV>& t);                                     \
+        template<typename RV>                                                                   \
+        requires AHO_NAMESPACE::concepts::cast_as<T, RV>                                        \
+        Upper<RV> cast() const;                                                                 \
     };
 
-#define HSV_ELEMENT_TYPE_DEFINITION_EXPANDER(Upper, Lower)                                       \
-    template<typename T>                                                                         \
-    struct Upper {                                                                               \
-        using ElementType = T;                                                                   \
-        constexpr static bool IS_HSV_ELEMENET = true;                                            \
-                                                                                                 \
-        T value;                                                                                 \
-                                                                                                 \
-        constexpr static char UPPER_CHAR = #Upper[0];                                            \
-        constexpr static char LOWER_CHAR = #Lower[0];                                            \
-                                                                                                 \
-        constexpr Upper(const T& t) : value(t) {};                                               \
-        constexpr Upper() : value{} {};                                                          \
-                                                                                                 \
-        constexpr Upper<T> operator+() const {                                                   \
-            static_assert(concepts::plusable<T>);                                                \
-            return {value};                                                                      \
-        };                                                                                       \
-        constexpr Upper<T> operator-() const {                                                   \
-            static_assert(concepts::minusable<T>);                                               \
-            return Upper<T>(-value);                                                             \
-        };                                                                                       \
-        template<typename RV>                                                                    \
-        requires concepts::add_as<const T&, const RV&>                                           \
-        constexpr auto operator+(const Upper<RV>& t) const -> Upper<decltype(value + t.value)> { \
-            return {value + t.value};                                                            \
-        };                                                                                       \
-        template<typename RV>                                                                    \
-        requires concepts::subtract_as<const T&, const RV&>                                      \
-        constexpr auto operator-(const Upper<RV>& t) const -> Upper<decltype(value - t.value)> { \
-            return {value - t.value};                                                            \
-        };                                                                                       \
-        template<typename RV>                                                                    \
-        requires concepts::multiply_as<const T&, const RV&>                                      \
-        constexpr auto operator*(const Upper<RV>& t) const -> Upper<decltype(value * t.value)> { \
-            return {value * t.value};                                                            \
-        };                                                                                       \
-        template<typename RV>                                                                    \
-        requires concepts::division_as<const T&, const RV&>                                      \
-        constexpr auto operator/(const Upper<RV>& t) const -> Upper<decltype(value / t.value)> { \
-            return {value / t.value};                                                            \
-        };                                                                                       \
-                                                                                                 \
-        template<typename RV>                                                                    \
-        requires concepts::add_assign_as<T&, const RV&>                                          \
-        constexpr Upper<T>& operator+=(const Upper<RV>& t) {                                     \
-            value += t.value;                                                                    \
-            return *this;                                                                        \
-        };                                                                                       \
-        template<typename RV>                                                                    \
-        requires concepts::subtract_assign_as<T&, const RV&>                                     \
-        constexpr Upper<T>& operator-=(const Upper<RV>& t) {                                     \
-            value -= t.value;                                                                    \
-            return *this;                                                                        \
-        };                                                                                       \
-        template<typename RV>                                                                    \
-        requires concepts::multiply_assign_as<T&, const RV&>                                     \
-        constexpr Upper<T>& operator*=(const Upper<RV>& t) {                                     \
-            value *= t.value;                                                                    \
-            return *this;                                                                        \
-        };                                                                                       \
-        template<typename RV>                                                                    \
-        requires concepts::division_assign_as<T&, const RV&>                                     \
-        constexpr Upper<T>& operator/=(const Upper<RV>& t) {                                     \
-            value /= t.value;                                                                    \
-            return *this;                                                                        \
-        };                                                                                       \
-                                                                                                 \
-        template<typename RV>                                                                    \
-        requires concepts::cast_as<T, RV>                                                        \
-        Upper<RV> cast() const {                                                                 \
-            return {(RV)value};                                                                  \
-        }                                                                                        \
+#define HSV_ELEMENT_TYPE_DEFINITION_EXPANDER(Upper, Lower)                                      \
+    template<typename T>                                                                        \
+    struct Upper {                                                                              \
+        using ElementType = T;                                                                  \
+        constexpr static bool IS_HSV_ELEMENET = true;                                           \
+        T value;                                                                                \
+        constexpr static char UPPER_CHAR = #Upper[0];                                           \
+        constexpr static char LOWER_CHAR = #Lower[0];                                           \
+        constexpr Upper(const T& t);                                                            \
+        constexpr Upper();                                                                      \
+        constexpr Upper<T> operator+() const;                                                   \
+        constexpr Upper<T> operator-() const;                                                   \
+        template<typename RV>                                                                   \
+        requires AHO_NAMESPACE::concepts::add_as<const T&, const RV&>                           \
+        constexpr auto operator+(const Upper<RV>& t) const -> Upper<decltype(value + t.value)>; \
+        template<typename RV>                                                                   \
+        requires AHO_NAMESPACE::concepts::subtract_as<const T&, const RV&>                      \
+        constexpr auto operator-(const Upper<RV>& t) const -> Upper<decltype(value - t.value)>; \
+        template<typename RV>                                                                   \
+        requires AHO_NAMESPACE::concepts::multiply_as<const T&, const RV&>                      \
+        constexpr auto operator*(const Upper<RV>& t) const -> Upper<decltype(value * t.value)>; \
+        template<typename RV>                                                                   \
+        requires AHO_NAMESPACE::concepts::division_as<const T&, const RV&>                      \
+        constexpr auto operator/(const Upper<RV>& t) const -> Upper<decltype(value / t.value)>; \
+        template<typename RV>                                                                   \
+        requires AHO_NAMESPACE::concepts::add_assign_as<T&, const RV&>                          \
+        constexpr Upper<T>& operator+=(const Upper<RV>& t);                                     \
+        template<typename RV>                                                                   \
+        requires AHO_NAMESPACE::concepts::subtract_assign_as<T&, const RV&>                     \
+        constexpr Upper<T>& operator-=(const Upper<RV>& t);                                     \
+        template<typename RV>                                                                   \
+        requires AHO_NAMESPACE::concepts::multiply_assign_as<T&, const RV&>                     \
+        constexpr Upper<T>& operator*=(const Upper<RV>& t);                                     \
+        template<typename RV>                                                                   \
+        requires AHO_NAMESPACE::concepts::division_assign_as<T&, const RV&>                     \
+        constexpr Upper<T>& operator/=(const Upper<RV>& t);                                     \
+        template<typename RV>                                                                   \
+        requires AHO_NAMESPACE::concepts::cast_as<T, RV>                                        \
+        Upper<RV> cast() const;                                                                 \
     };
 
         template<typename T>
@@ -688,6 +620,87 @@ namespace AHO_NAMESPACE {
         using FloatHSV = color::HSV<float, float>;
         using FloatHSVA = color::HSVA<float, float>;
 
+#define COLOR_ELEMENT_FUNCTION_DEFINITION_EXPANDER(Upper)                                              \
+    template<typename T>                                                                               \
+    constexpr Upper<T>::Upper(const T& t) : value(t) {}                                                \
+    template<typename T>                                                                               \
+    constexpr Upper<T>::Upper() : value{} {}                                                           \
+    template<typename T>                                                                               \
+    constexpr Upper<T> Upper<T>::operator+() const {                                                   \
+        static_assert(AHO_NAMESPACE::concepts::plusable<T>);                                           \
+        return {value};                                                                                \
+    }                                                                                                  \
+    template<typename T>                                                                               \
+    constexpr Upper<T> Upper<T>::operator-() const {                                                   \
+        static_assert(AHO_NAMESPACE::concepts::minusable<T>);                                          \
+        return Upper<T>(-value);                                                                       \
+    }                                                                                                  \
+    template<typename T>                                                                               \
+    template<typename RV>                                                                              \
+    requires AHO_NAMESPACE::concepts::add_as<const T&, const RV&>                                      \
+    constexpr auto Upper<T>::operator+(const Upper<RV>& t) const -> Upper<decltype(value + t.value)> { \
+        return {value + t.value};                                                                      \
+    }                                                                                                  \
+    template<typename T>                                                                               \
+    template<typename RV>                                                                              \
+    requires AHO_NAMESPACE::concepts::subtract_as<const T&, const RV&>                                 \
+    constexpr auto Upper<T>::operator-(const Upper<RV>& t) const -> Upper<decltype(value - t.value)> { \
+        return {value - t.value};                                                                      \
+    }                                                                                                  \
+    template<typename T>                                                                               \
+    template<typename RV>                                                                              \
+    requires AHO_NAMESPACE::concepts::multiply_as<const T&, const RV&>                                 \
+    constexpr auto Upper<T>::operator*(const Upper<RV>& t) const -> Upper<decltype(value * t.value)> { \
+        return {value * t.value};                                                                      \
+    }                                                                                                  \
+    template<typename T>                                                                               \
+    template<typename RV>                                                                              \
+    requires AHO_NAMESPACE::concepts::division_as<const T&, const RV&>                                 \
+    constexpr auto Upper<T>::operator/(const Upper<RV>& t) const -> Upper<decltype(value / t.value)> { \
+        return {value / t.value};                                                                      \
+    }                                                                                                  \
+    template<typename T>                                                                               \
+    template<typename RV>                                                                              \
+    requires AHO_NAMESPACE::concepts::add_assign_as<T&, const RV&>                                     \
+    constexpr Upper<T>& Upper<T>::operator+=(const Upper<RV>& t) {                                     \
+        value += t.value;                                                                              \
+        return *this;                                                                                  \
+    }                                                                                                  \
+    template<typename T>                                                                               \
+    template<typename RV>                                                                              \
+    requires AHO_NAMESPACE::concepts::subtract_assign_as<T&, const RV&>                                \
+    constexpr Upper<T>& Upper<T>::operator-=(const Upper<RV>& t) {                                     \
+        value -= t.value;                                                                              \
+        return *this;                                                                                  \
+    }                                                                                                  \
+    template<typename T>                                                                               \
+    template<typename RV>                                                                              \
+    requires AHO_NAMESPACE::concepts::multiply_assign_as<T&, const RV&>                                \
+    constexpr Upper<T>& Upper<T>::operator*=(const Upper<RV>& t) {                                     \
+        value *= t.value;                                                                              \
+        return *this;                                                                                  \
+    }                                                                                                  \
+    template<typename T>                                                                               \
+    template<typename RV>                                                                              \
+    requires AHO_NAMESPACE::concepts::division_assign_as<T&, const RV&>                                \
+    constexpr Upper<T>& Upper<T>::operator/=(const Upper<RV>& t) {                                     \
+        value /= t.value;                                                                              \
+        return *this;                                                                                  \
+    }                                                                                                  \
+    template<typename T>                                                                               \
+    template<typename RV>                                                                              \
+    requires AHO_NAMESPACE::concepts::cast_as<T, RV>                                                   \
+    Upper<RV> Upper<T>::cast() const {                                                                 \
+        return {(RV)value};                                                                            \
+    }
+
+        COLOR_ELEMENT_FUNCTION_DEFINITION_EXPANDER(R);
+        COLOR_ELEMENT_FUNCTION_DEFINITION_EXPANDER(G);
+        COLOR_ELEMENT_FUNCTION_DEFINITION_EXPANDER(B);
+        COLOR_ELEMENT_FUNCTION_DEFINITION_EXPANDER(H);
+        COLOR_ELEMENT_FUNCTION_DEFINITION_EXPANDER(S);
+        COLOR_ELEMENT_FUNCTION_DEFINITION_EXPANDER(V);
+
         template<typename T>
         std::ostream& operator<<(std::ostream& out, const R<T>& r) {
             out << "red : " << r.value;
@@ -1199,4 +1212,5 @@ namespace AHO_NAMESPACE {
 
 #undef RGB_ELEMENT_TYPE_DEFINITION_EXPANDER
 #undef HSV_ELEMENT_TYPE_DEFINITION_EXPANDER
+#undef COLOR_ELEMENT_FUNCTION_DEFINITION_EXPANDER
 #undef LITERAL_EXPANDER

@@ -31,7 +31,7 @@ GLSL内の組み込み関数や、地形・木の生成、湖や障害物との�
 
 ## 行列の規約
 
-新しいtransform APIは`mat[row][column]`、列ベクトル、右手系を採用する。`A * B`はB→Aの順に作用する。`translate`→`rotate`→`scale`の呼び出しは`T * R * S`となるため、頂点には拡縮→回転→平行移動の順で作用する。
+transform APIは`mat[row][column]`を使い、手系と行/列ベクトルの規約をtemplate引数で選ぶ。既定値は左手系・列ベクトル。列ベクトルでは`A * B`はB→Aの順に作用し、`translate`→`rotate`→`scale`は`T * R * S`となる。行ベクトルでは転置表現と対応する積の順を使い、同じ拡縮→回転→平行移動を表す。
 
 GPUへ渡すときは`to_array<MatrixLayout::COLUMN_MAJOR>()`を使う。この結果はGLSLの既定のmat4とglTFの行列配列に対応する。Mat内部の二重配列を`float*`へキャストしたり、Point/Vectorのメモリをそのまま頂点属性とみなしたりしない。転送用頂点には`std::array<float, 3>`等を使い、stride/offsetを明示する。
 

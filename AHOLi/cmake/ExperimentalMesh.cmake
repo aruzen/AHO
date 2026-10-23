@@ -7,6 +7,7 @@ if(AHO_ENABLE_EXPERIMENTAL_MESH)
     FetchContent_MakeAvailable(saitekikuukan)
     add_library(aho-experimental-mesh INTERFACE)
     add_library(AHO::ExperimentalMesh ALIAS aho-experimental-mesh)
+    target_compile_features(aho-experimental-mesh INTERFACE cxx_std_26)
     target_link_libraries(aho-experimental-mesh INTERFACE saitekikuukan::saitekikuukan)
     target_include_directories(aho-experimental-mesh INTERFACE
         "${CMAKE_CURRENT_LIST_DIR}/../AHO/include"

@@ -1,7 +1,7 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.30)
 project(AHOLi VERSION 1.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(AHOLi
@@ -68,6 +68,8 @@ add_library(AHOLi
         AHO/include/aho/define.hpp
         AHO/src/drawer/draw_phase.cpp
 )
+
+target_compile_features(AHOLi PUBLIC cxx_std_26)
 
 target_include_directories(AHOLi
         PRIVATE

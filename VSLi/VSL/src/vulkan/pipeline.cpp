@@ -13,7 +13,7 @@ VSL_NAMESPACE::GraphicsPipeline::GraphicsPipeline(VSL_NAMESPACE::PipelineLayoutA
         throw std::invalid_argument("Pipeline color blend count does not match subpass outputs");
     for (auto ref : outputs.colors)
         if (ref.attachment != UNUSED_ATTACHMENT && layout.data_->info->multisample.rasterizationSamples !=
-                                                      static_cast<vk::SampleCountFlagBits>(pass.description().attachments[ref.attachment].samples))
+                                                       static_cast<vk::SampleCountFlagBits>(pass.description().attachments[ref.attachment].samples))
             throw std::invalid_argument("Pipeline sample count does not match subpass");
     if (outputs.depth_stencil && outputs.depth_stencil->attachment != UNUSED_ATTACHMENT &&
         layout.data_->info->multisample.rasterizationSamples != static_cast<vk::SampleCountFlagBits>(
@@ -59,7 +59,7 @@ VSL_NAMESPACE::GraphicsPipeline::GraphicsPipeline(VSL_NAMESPACE::PipelineLayoutA
 void VSL_NAMESPACE::GraphicsPipeline::invoke(VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
     buffer.retain(data_);
     buffer.data_->command_buffers[buffer.get_current_buffer_idx()].bindPipeline(vk::PipelineBindPoint::eGraphics,
-                                                                            data_->pipeline);
+                                                                                data_->pipeline);
 }
 
 VSL_NAMESPACE::ComputePipeline::ComputePipeline(VSL_NAMESPACE::PipelineLayoutAccessor layout) {
@@ -85,7 +85,7 @@ VSL_NAMESPACE::ComputePipeline::ComputePipeline(VSL_NAMESPACE::PipelineLayoutAcc
 void VSL_NAMESPACE::ComputePipeline::invoke(VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
     buffer.retain(data_);
     buffer.data_->command_buffers[buffer.get_current_buffer_idx()].bindPipeline(vk::PipelineBindPoint::eCompute,
-                                                                            data_->pipeline);
+                                                                                data_->pipeline);
 }
 
 VSL_NAMESPACE::impl::PipelineImpl::~PipelineImpl() {

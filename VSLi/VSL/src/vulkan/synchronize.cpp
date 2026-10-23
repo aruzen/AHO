@@ -33,7 +33,9 @@ namespace VSL_NAMESPACE {
     }
     impl::SynchroManagerImpl::~SynchroManagerImpl() = default;
 
-    std::size_t SemaphoreHolder::size() const { return data_ ? data_->semaphores.size() : 0; }
+    std::size_t SemaphoreHolder::size() const {
+        return data_ ? data_->semaphores.size() : 0;
+    }
     void SemaphoreHolder::destroy() {
         if (!data_)
             return;
@@ -81,8 +83,12 @@ namespace VSL_NAMESPACE {
         data->submissions.clear();
     }
     SynchroManager::SynchroManager(LogicalDeviceAccessor device)
-        : data_(std::make_shared<impl::SynchroManagerImpl>()) { data_->device = device.data_; }
-    SemaphoreHolder SynchroManager::create_semaphore(std::string name) { return create_semaphore(std::move(name), 1); }
+        : data_(std::make_shared<impl::SynchroManagerImpl>()) {
+        data_->device = device.data_;
+    }
+    SemaphoreHolder SynchroManager::create_semaphore(std::string name) {
+        return create_semaphore(std::move(name), 1);
+    }
     SemaphoreHolder SynchroManager::create_semaphore(std::string name, std::size_t amount) {
         if (!amount)
             throw std::invalid_argument("Semaphore count must be positive");
@@ -137,5 +143,7 @@ namespace VSL_NAMESPACE {
         holder->destroy();
         return true;
     }
-    std::optional<FenceHolder> SynchroManager::operator[](std::string name) { return get_fence(std::move(name)); }
+    std::optional<FenceHolder> SynchroManager::operator[](std::string name) {
+        return get_fence(std::move(name));
+    }
 } // namespace VSL_NAMESPACE

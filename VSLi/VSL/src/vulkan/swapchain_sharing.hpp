@@ -16,7 +16,7 @@ namespace VSL_NAMESPACE::impl::helper {
 
     // The queue-family array must remain alive until the native swapchain creation call returns.
     inline void configure_swapchain_sharing(vk::SwapchainCreateInfoKHR& info, const std::uint32_t (&families)[2],
-                                          vk::SurfaceTransformFlagBitsKHR transform) {
+                                            vk::SurfaceTransformFlagBitsKHR transform) {
         info.preTransform = transform;
         if (families[0] != families[1]) {
             info.imageSharingMode = vk::SharingMode::eConcurrent;

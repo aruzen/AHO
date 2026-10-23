@@ -1,4 +1,4 @@
-#include <AHO/core/math/transform.hpp>
+#include <AHO/core/math/projection.hpp>
 
 #ifdef GLM_VERSION
 #error AHO math must not include GLM
@@ -24,10 +24,10 @@ namespace {
     Scene scene(float time, const aho::d3::PointF& eye, const aho::d3::VectorF& direction) {
         const auto forward = aho::math::normalized(direction);
         const auto right = aho::math::normalized(forward.cross(aho::d3::VectorF{0, 1, 0}));
-        const auto view = aho::matrix::make_look_at(eye, eye + direction, aho::d3::VectorF{0, 1, 0});
-        const auto projection = aho::matrix::make_perspective_zero_to_one(aho::Degree{66}, 1.6f, .1f, 1600.f, true);
+        const auto view = aho::matrix::make_view<aho::HandedCoordinate::RIGHT>(eye, eye + direction, aho::d3::VectorF{0, 1, 0});
+        const auto projection = aho::matrix::make_perspective<aho::HandedCoordinate::RIGHT, aho::DepthRange::ZERO_TO_ONE, aho::ClipY::DOWN>(aho::Degree{66}, 1.6f, .1f, 1600.f);
         const auto e = aho::math::to_array(eye), f = aho::math::to_array(forward), r = aho::math::to_array(right);
-        return {aho::matrix::to_column_major(projection * view),
+        return {aho::matrix::to_array<aho::MatrixLayout::COLUMN_MAJOR>(projection * view),
                 {e[0], e[1], e[2], time},
                 {0, 1.6f, 1, 0},
                 {f[0], f[1], f[2], 800},
@@ -37,9 +37,9 @@ namespace {
     std::array<float, 16> model(const aho::d2::PointF& position, aho::Radian yaw) {
         const auto p = aho::math::to_array(position);
         auto matrix = aho::matrix::translate(aho::matrix::make_identity<float, 4>(), aho::d3::VectorF{p[0], 2, p[1]});
-        matrix = aho::matrix::rotate(matrix, yaw, aho::d3::VectorF{0, 1, 0});
+        matrix = aho::matrix::rotate<aho::HandedCoordinate::RIGHT>(matrix, yaw, aho::d3::VectorF{0, 1, 0});
         matrix = aho::matrix::scale(matrix, aho::d3::VectorF{.014f, .014f, .014f});
-        return aho::matrix::to_column_major(matrix);
+        return aho::matrix::to_array<aho::MatrixLayout::COLUMN_MAJOR>(matrix);
     }
 
     Vertex triangle_vertex(const aho::d3::PointF& a, const aho::d3::PointF& b, const aho::d3::PointF& c, float altitude) {

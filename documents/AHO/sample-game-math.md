@@ -17,12 +17,12 @@
 | `smoothstep` | `math::smoothstep()`。昇順かつ有限のedgeを要求し、範囲外は0/1へclampする。 |
 | `mat4(1)` | 既存`matrix::make_identity<float, 4>()`。 |
 | `translate` / `rotate` / `scale` | `matrix::translate/rotate/scale()`。右側へ変換を合成する。回転には既存Degree/Radianを使う。 |
-| `value_ptr`による行列コピー | `matrix::to_column_major()`で所有する配列を返す。glTFの行列を読むときは`from_column_major<float, 4, 4>()`。 |
-| 独自の行列積 | 既存Matの`operator*`。column-major配列のまま乗算せず、先にfrom_column_majorする。 |
+| `value_ptr`による行列コピー | `matrix::to_array<MatrixLayout::COLUMN_MAJOR>()`で所有する配列を返す。glTFの行列を読むときは`from_array<float, 4, 4, MatrixLayout::COLUMN_MAJOR>()`。 |
+| 独自の行列積 | 既存Matの`operator*`。column-major配列のまま乗算せず、先にfrom_arrayする。 |
 | 独自の行列による点変換 | `matrix::transform_point()`、方向は`transform_vector()`。 |
 | shaderへ渡す逆転置・法線変換 | `matrix::transpose()`、`transform_normal()`。逆行列は既存inverse_affineを再利用し、失敗理由をexpectedで返す。正規化は呼び出し側で行う。 |
-| Cameraのview | `matrix::make_look_at()`。右手系の通常のview。 |
-| Cameraの射影要素の手動補正 | `matrix::make_perspective_zero_to_one()`。右手系・-Z視線・depth[0,1]。Vulkanの画面向きには`flip_y=true`を指定する。 |
+| Cameraのview | `matrix::make_view<HandedCoordinate::RIGHT>()`。右手系の通常のview。 |
+| Cameraの射影要素の手動補正 | `matrix::make_perspective<HandedCoordinate::RIGHT, DepthRange::ZERO_TO_ONE>()`。右手系・-Z視線・depth[0,1]。Vulkanの画面向きには`ClipY::DOWN`を指定する。 |
 | 射影後の座標 | `matrix::project_point()`で透視除算。w=0や非有限wを拒否する。 |
 | `pi` / `two_pi` | `std::numbers::pi_v<T>` / `2 * std::numbers::pi_v<T>`。 |
 | `sin` / `cos` / `atan2` / `sqrt` / `exp` / `ceil` / `abs` / clamp等 | 引き続き標準ライブラリを使う。 |
@@ -33,26 +33,26 @@ GLSL内の組み込み関数や、地形・木の生成、湖や障害物との�
 
 新しいtransform APIは`mat[row][column]`、列ベクトル、右手系を採用する。`A * B`はB→Aの順に作用する。`translate`→`rotate`→`scale`の呼び出しは`T * R * S`となるため、頂点には拡縮→回転→平行移動の順で作用する。
 
-GPUへ渡すときは`to_column_major()`を使う。この結果はGLSLの既定のmat4とglTFの行列配列に対応する。Mat内部の二重配列を`float*`へキャストしたり、Point/Vectorのメモリをそのまま頂点属性とみなしたりしない。転送用頂点には`std::array<float, 3>`等を使い、stride/offsetを明示する。
+GPUへ渡すときは`to_array<MatrixLayout::COLUMN_MAJOR>()`を使う。この結果はGLSLの既定のmat4とglTFの行列配列に対応する。Mat内部の二重配列を`float*`へキャストしたり、Point/Vectorのメモリをそのまま頂点属性とみなしたりしない。転送用頂点には`std::array<float, 3>`等を使い、stride/offsetを明示する。
 
-既存の軸回転・inverse_affineはrow/column規約で利用する。`make_move`は列指定のinitializer-list factoryを使うため、translate内で転置して既存の計算を再利用する。従来の`make_view`と`make_perspective`も互換性のため以前の保存形式・rollを維持する。それらを新しいtransform APIの入力に使う場合は明示的な変換が必要。新しいCameraでは`make_look_at`と`make_perspective_zero_to_one`を組み合わせる。
+既定の手系は左手系。sample-game/glTFの右手系を使う経路では明示的にRIGHTを指定する。Matからの非メンバー関数の移動先と、旧規約を再現するtemplate引数は[数学APIの規約](math-conventions.md)を参照する。
 
 ## 地形・モデル・カメラの使用例
 
 ```cpp
-#include <AHO/core/math/transform.hpp>
+#include <AHO/core/math/projection.hpp>
 
 auto model = aho::matrix::make_identity<float, 4>();
 model = aho::matrix::translate(model, aho::d3::VectorF{4, 2, 81});
-model = aho::matrix::rotate(model, aho::Radian{.3f}, aho::d3::VectorF{0, 1, 0});
+model = aho::matrix::rotate<aho::HandedCoordinate::RIGHT>(model, aho::Radian{.3f}, aho::d3::VectorF{0, 1, 0});
 model = aho::matrix::scale(model, aho::d3::VectorF{.014f, .014f, .014f});
-auto fox_world = aho::matrix::to_column_major(model);
+auto fox_world = aho::matrix::to_array<aho::MatrixLayout::COLUMN_MAJOR>(model);
 
-const auto view = aho::matrix::make_look_at(
+const auto view = aho::matrix::make_view<aho::HandedCoordinate::RIGHT>(
     aho::d3::PointF{0, 3, 87}, aho::d3::PointF{0, 3, 86}, aho::d3::VectorF{0, 1, 0});
-const auto projection = aho::matrix::make_perspective_zero_to_one(
-    aho::Degree{66}, 1.6f, .1f, 1600.f, true);
-auto view_projection = aho::matrix::to_column_major(projection * view);
+const auto projection = aho::matrix::make_perspective<aho::HandedCoordinate::RIGHT, aho::DepthRange::ZERO_TO_ONE, aho::ClipY::DOWN>(
+    aho::Degree{66}, 1.6f, .1f, 1600.f);
+auto view_projection = aho::matrix::to_array<aho::MatrixLayout::COLUMN_MAJOR>(projection * view);
 
 const auto normal = aho::math::normalized(
     (aho::d3::PointF{1, 0, 0} - aho::d3::PointF{0, 0, 0}).cross(

@@ -195,6 +195,7 @@
     <ClInclude Include="AHO\include\AHO\drawer\standard_drawer.hpp" />
     <ClInclude Include="AHO\include\AHO\image_readback.hpp" />
     <ClInclude Include="AHO\include\AHO\x\screenshot.hpp" />
+    <ClInclude Include="AHO\include\AHO\x\core\mesh.hpp" />
     <ClInclude Include="AHO\include\AHO\engine.hpp" />
     <ClInclude Include="AHO\include\AHO\engine\graphical_engine.hpp" />
     <ClInclude Include="AHO\include\AHO\engine\standard_engine.hpp" />

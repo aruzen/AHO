@@ -129,6 +129,8 @@ install(
         DESTINATION share/AHO/cmake
 )
 
+include(cmake/ExperimentalMesh.cmake)
+
 if (BUILD_TESTING)
     add_subdirectory(AHO/test)
 endif ()

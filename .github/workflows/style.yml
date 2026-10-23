@@ -33,6 +33,7 @@ jobs:
           cmake -S . -B build/style -G Ninja \
             -DAHO_HOME="$PWD/AHOLi/AHO" -DVSL_HOME="$PWD/VSLi/VSL" \
             -DBUILD_TESTING=ON -DAHO_STYLE_CHECKS=ON -DAHO_STYLE_JOBS=3 -DCMAKE_BUILD_TYPE=Release \
+            -DAHO_ENABLE_EXPERIMENTAL_MESH=ON -DAHO_BUILD_MESH_EXAMPLE=ON \
             -DLLVM_DIR="$(brew --prefix llvm@20)/lib/cmake/llvm" \
             -DClang_DIR="$(brew --prefix llvm@20)/lib/cmake/clang"
       - name: Build checker

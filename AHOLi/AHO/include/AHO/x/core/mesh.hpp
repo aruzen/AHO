@@ -1,14 +1,14 @@
 #pragma once
 #include "../../core/polygon.hpp"
-#include <saitekikuukan/soa.hpp>
+#include "mesh_attributes.hpp"
 #include <span>
 #include <stdexcept>
 #include <utility>
 
 namespace AHO_NAMESPACE::x {
     template<typename PolygonType, typename VertexData, typename TriangleData,
-             typename VertexStorage = SAITEKIKUUKAN_NAMESPACE::SoA<VertexData>,
-             typename TriangleStorage = SAITEKIKUUKAN_NAMESPACE::SoA<TriangleData>>
+             typename VertexStorage = MeshAttributes<VertexData>,
+             typename TriangleStorage = MeshAttributes<TriangleData>>
     class Mesh {
         static_assert(std::same_as<typename VertexStorage::ValueType, VertexData>);
         static_assert(std::same_as<typename TriangleStorage::ValueType, TriangleData>);

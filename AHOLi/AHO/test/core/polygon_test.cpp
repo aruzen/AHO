@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cmath>
 #include <limits>
+#include <unordered_map>
 
 namespace {
     using P = aho::d2::PointD;
@@ -13,6 +14,77 @@ namespace {
     static_assert(aho::concepts::is_lines_object<Mesh>);
     static_assert(aho::concepts::is_triangles_object<Mesh>);
     static_assert(std::same_as<decltype(std::declval<const Mesh&>().points()[0]), const P&>);
+
+    struct PolygonAllocationState {
+        inline static std::size_t NEXT_ID = 0;
+        inline static bool FAIL_NEXT = false;
+        inline static int CONSTRUCT_BEFORE_FAILURE = -1;
+        inline static std::unordered_map<void*, std::size_t> OWNERS;
+    };
+
+    template<typename T>
+    class PolygonAllocator {
+        std::size_t _id = ++PolygonAllocationState::NEXT_ID;
+
+    public:
+        using value_type = T;
+        PolygonAllocator() = default;
+        template<typename U>
+        PolygonAllocator(const PolygonAllocator<U>& other) noexcept;
+        [[nodiscard]] T* allocate(std::size_t count);
+        void deallocate(T* data, std::size_t count) noexcept;
+        template<typename U, typename... Args>
+        void construct(U* data, Args&&... args);
+        [[nodiscard]] std::size_t id() const noexcept;
+        [[nodiscard]] PolygonAllocator select_on_container_copy_construction() const;
+        bool operator==(const PolygonAllocator&) const noexcept = default;
+    };
+
+    template<typename T>
+    template<typename U>
+    PolygonAllocator<T>::PolygonAllocator(const PolygonAllocator<U>& other) noexcept : _id(other.id()) {}
+
+    template<typename T>
+    T* PolygonAllocator<T>::allocate(std::size_t count) {
+        if (std::exchange(PolygonAllocationState::FAIL_NEXT, false))
+            throw std::bad_alloc();
+        auto* result = std::allocator<T>{}.allocate(count);
+        PolygonAllocationState::OWNERS.emplace(result, _id);
+        return result;
+    }
+
+    template<typename T>
+    void PolygonAllocator<T>::deallocate(T* data, std::size_t count) noexcept {
+        const auto found = PolygonAllocationState::OWNERS.find(data);
+        EXPECT_NE(found, PolygonAllocationState::OWNERS.end());
+        if (found != PolygonAllocationState::OWNERS.end()) {
+            EXPECT_EQ(found->second, _id);
+            PolygonAllocationState::OWNERS.erase(found);
+        }
+        std::allocator<T>{}.deallocate(data, count);
+    }
+
+    template<typename T>
+    template<typename U, typename... Args>
+    void PolygonAllocator<T>::construct(U* data, Args&&... args) {
+        if (PolygonAllocationState::CONSTRUCT_BEFORE_FAILURE == 0) {
+            PolygonAllocationState::CONSTRUCT_BEFORE_FAILURE = -1;
+            throw std::runtime_error("allocator construction");
+        }
+        if (PolygonAllocationState::CONSTRUCT_BEFORE_FAILURE > 0)
+            --PolygonAllocationState::CONSTRUCT_BEFORE_FAILURE;
+        std::construct_at(data, std::forward<Args>(args)...);
+    }
+
+    template<typename T>
+    std::size_t PolygonAllocator<T>::id() const noexcept {
+        return _id;
+    }
+
+    template<typename T>
+    auto PolygonAllocator<T>::select_on_container_copy_construction() const -> PolygonAllocator {
+        return {};
+    }
 
     TEST(PolygonTest, DefaultMeshIsEmpty) {
         const Mesh mesh;
@@ -88,5 +160,94 @@ namespace {
         EXPECT_THROW(Small(points, {}), std::length_error);
         const std::vector<P> maximum(256);
         EXPECT_NO_THROW(Small(maximum, {}));
+    }
+
+    TEST(PolygonTest, SpanContractAndContiguousGeometrySurviveCopyMoveAndAssignment) {
+        static_assert(std::same_as<decltype(std::declval<const Mesh&>().points()), std::span<const P>>);
+        static_assert(std::same_as<decltype(std::declval<const Mesh&>().indices()), std::span<const I>>);
+        static_assert(std::is_nothrow_move_constructible_v<Mesh>);
+        static_assert(std::is_nothrow_move_assignable_v<Mesh>);
+        const std::array points{P(0, 0), P(2, 0), P(0, 3)};
+        const std::array indices{I{{0}, {1}, {2}}};
+        Mesh source(points, indices), copy;
+        copy = source;
+        EXPECT_NE(copy.points().data(), source.points().data());
+        EXPECT_NE(copy.indices().data(), source.indices().data());
+        EXPECT_DOUBLE_EQ(copy.area(), 3);
+        const auto* vertex_data = copy.points().data();
+        const auto* index_data = copy.indices().data();
+        Mesh moved;
+        moved = std::move(copy);
+        EXPECT_EQ(moved.points().data(), vertex_data);
+        EXPECT_EQ(moved.indices().data(), index_data);
+        EXPECT_TRUE(copy.points().empty());
+        EXPECT_TRUE(copy.indices().empty());
+        EXPECT_EQ(&moved.points()[1], moved.points().data() + 1);
+        EXPECT_EQ(moved.indices()[0].idx3.index, 2u);
+        auto& self = moved;
+        moved = self;
+        moved = std::move(self);
+        EXPECT_DOUBLE_EQ(moved.area(), 3);
+    }
+
+    TEST(PolygonTest, StatefulAllocatorKeepsItsOwnAllocationsDuringAssignment) {
+        using Allocated = aho::Polygon<double, vsl::D2,
+                                       aho::coordinate::DefaultCoordinateInfo<vsl::D2>::Value, std::size_t, PolygonAllocator<I>>;
+        static_assert(!std::is_nothrow_move_assignable_v<Allocated>);
+        const std::array points{P(0, 0), P(2, 0), P(0, 3)};
+        const std::array indices{I{{0}, {1}, {2}}, I{{0}, {2}, {1}}};
+        {
+            Allocated source(points, indices), destination(points, std::span{indices}.first(1));
+            destination = source;
+            EXPECT_EQ(destination.size(), 2u);
+            EXPECT_DOUBLE_EQ(destination.area(), 6);
+            Allocated moved(points, std::span{indices}.first(1));
+            moved = std::move(destination);
+            EXPECT_EQ(moved.size(), 2u);
+            EXPECT_DOUBLE_EQ(moved.area(), 6);
+            EXPECT_TRUE(destination.points().empty());
+            EXPECT_TRUE(destination.indices().empty());
+            auto copied = source;
+            EXPECT_EQ(copied.size(), 2u);
+            auto constructed = std::move(copied);
+            EXPECT_TRUE(copied.indices().empty());
+            EXPECT_DOUBLE_EQ(constructed.area(), 6);
+        }
+        EXPECT_TRUE(PolygonAllocationState::OWNERS.empty());
+    }
+
+    TEST(PolygonTest, AllocatorFailureLeavesBothGeometriesValid) {
+        using Allocated = aho::Polygon<double, vsl::D2,
+                                       aho::coordinate::DefaultCoordinateInfo<vsl::D2>::Value, std::size_t, PolygonAllocator<I>>;
+        const std::array points{P(0, 0), P(2, 0), P(0, 3)};
+        const std::array indices{I{{0}, {1}, {2}}, I{{0}, {2}, {1}}};
+        {
+            Allocated source(points, indices), destination(points, std::span{indices}.first(1));
+            PolygonAllocationState::FAIL_NEXT = true;
+            EXPECT_THROW(destination = std::move(source), std::bad_alloc);
+            EXPECT_EQ(source.size(), 2u);
+            EXPECT_EQ(destination.size(), 1u);
+            EXPECT_DOUBLE_EQ(source.area(), 6);
+            EXPECT_DOUBLE_EQ(destination.area(), 3);
+        }
+        EXPECT_TRUE(PolygonAllocationState::OWNERS.empty());
+    }
+    TEST(PolygonTest, AllocatorConstructionFailureRestoresSourceGeometry) {
+        using Allocated = aho::Polygon<double, vsl::D2,
+                                       aho::coordinate::DefaultCoordinateInfo<vsl::D2>::Value, std::size_t, PolygonAllocator<I>>;
+        const std::array points{P(0, 0), P(2, 0), P(0, 3)};
+        const std::array indices{I{{0}, {1}, {2}}, I{{0}, {2}, {1}}};
+        {
+            Allocated source(points, indices), destination;
+            const auto* data = source.points().data();
+            PolygonAllocationState::CONSTRUCT_BEFORE_FAILURE = 1;
+            EXPECT_THROW(destination = std::move(source), std::runtime_error);
+            EXPECT_EQ(source.points().data(), data);
+            EXPECT_EQ(source.size(), 2u);
+            EXPECT_DOUBLE_EQ(source.area(), 6);
+            EXPECT_TRUE(destination.points().empty());
+            EXPECT_TRUE(destination.indices().empty());
+        }
+        EXPECT_TRUE(PolygonAllocationState::OWNERS.empty());
     }
 } // namespace

@@ -1,5 +1,7 @@
 #pragma once
 #include "typed_shader.hpp"
+#include "typed_index_buffer.hpp"
+#include "../vulkan/commands/draw_indexed.hpp"
 #include "typed_resources.hpp"
 #include "typed_push_constants.hpp"
 #include "../vulkan/commands/bind_graphic_resource.hpp"
@@ -100,6 +102,31 @@ namespace VSL_NAMESPACE::typed {
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
     };
 
+    template<typename Input, typename Resources = ResourceSchema<>, typename Pushes = PushSchema<>>
+    class TypedIndexedDraw final : public command::Command, public command::PipelineHolder {
+        template<typename, typename, typename, bool, bool>
+        friend class TypedVertexBinding;
+        VSL_NAMESPACE::GraphicsPipeline _pipeline;
+        LogicalDeviceAccessor _device;
+        std::array<command::BindVertexBufferAt, Input::BINDING_COUNT> _buffers;
+        command::BindIndexBufferAt _indices;
+        command::DrawIndexed _draw;
+        std::vector<command::BindGraphicResource> _resources;
+        std::optional<typename Pushes::Values> _pushes;
+        TypedIndexedDraw(VSL_NAMESPACE::GraphicsPipeline pipeline, LogicalDeviceAccessor device,
+                         std::array<command::BindVertexBufferAt, Input::BINDING_COUNT> buffers, command::BindIndexBufferAt indices,
+                         command::DrawIndexed draw, std::vector<command::BindGraphicResource> resources, std::optional<typename Pushes::Values> pushes)
+            : _pipeline(std::move(pipeline)), _device(device), _buffers(std::move(buffers)), _indices(std::move(indices)),
+              _draw(std::move(draw)), _resources(std::move(resources)), _pushes(std::move(pushes)) {}
+
+    public:
+        using VertexInput = Input;
+        using ResourceLayout = Resources;
+        using PushLayout = Pushes;
+        PipelineAccessor get_pipeline() override { return _pipeline; }
+        void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
+    };
+
     template<typename Input, typename Resources, typename Pushes, bool bound, bool pushed>
     class TypedVertexBinding {
         friend class TypedGraphicsPipeline<Input, Resources, Pushes>;
@@ -131,6 +158,10 @@ namespace VSL_NAMESPACE::typed {
         requires compatible_descriptor_sets<Resources, Sets...>
         TypedVertexBinding<Input, Resources, Pushes, true, pushed> bind_resources(const Sets&... sets) const;
         TypedDraw<Input, Resources, Pushes> draw(size_t vertex_count, size_t instance_count = 1, size_t first_vertex = 0, size_t first_instance = 0) const
+        requires(bound && pushed);
+        template<index_element Index, MemoryProperty property>
+        TypedIndexedDraw<Input, Resources, Pushes> draw_indexed(const TypedIndexBuffer<Index, property>& indices, size_t index_count,
+                                                                size_t instance_count = 1, size_t first_index = 0, std::int64_t vertex_offset = 0, size_t first_instance = 0) const
         requires(bound && pushed);
         TypedVertexBinding<Input, Resources, Pushes, bound, true> push_constants(const typename Pushes::Values& values) const;
     };
@@ -218,6 +249,42 @@ namespace VSL_NAMESPACE::typed {
     template<typename Input, typename Resources, typename Pushes, bool bound, bool pushed>
     TypedVertexBinding<Input, Resources, Pushes, bound, true> TypedVertexBinding<Input, Resources, Pushes, bound, pushed>::push_constants(const typename Pushes::Values& values) const {
         return TypedVertexBinding<Input, Resources, Pushes, bound, true>(*this, _resources, std::optional<typename Pushes::Values>(values));
+    }
+
+    template<typename Input, typename Resources, typename Pushes>
+    void TypedIndexedDraw<Input, Resources, Pushes>::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
+        if (_device.data_ != manager.get_device().data_)
+            throw std::invalid_argument("Typed pipeline and command manager use different devices");
+        _pipeline.invoke(pool, buffer, manager);
+        for (auto& binding : _buffers)
+            binding.invoke(pool, buffer, manager);
+        _indices.invoke(pool, buffer, manager);
+        for (auto& resource : _resources)
+            resource.invoke(pool, buffer, manager);
+        if constexpr (!Pushes::EMPTY)
+            detail::invoke_push_values(_pipeline, buffer, Pushes::REQUIREMENTS, _pushes->bytes());
+        _draw.invoke(pool, buffer, manager);
+    }
+
+    template<typename Input, typename Resources, typename Pushes, bool bound, bool pushed>
+    template<index_element Index, MemoryProperty property>
+    TypedIndexedDraw<Input, Resources, Pushes> TypedVertexBinding<Input, Resources, Pushes, bound, pushed>::draw_indexed(
+        const TypedIndexBuffer<Index, property>& indices, size_t index_count, size_t instance_count, size_t first_index, std::int64_t vertex_offset, size_t first_instance) const
+    requires(bound && pushed)
+    {
+        command::DrawIndexed command(index_count, instance_count, first_index, vertex_offset, first_instance);
+        if (indices.device().data_ != _device.data_)
+            throw std::invalid_argument("Typed index buffer and pipeline use different devices");
+        const auto [low, high] = indices.bounds(first_index, index_count);
+        for (size_t i = 0; i < Input::BINDING_COUNT; ++i) {
+            if (Input::LAYOUT.binding[i].timing == VertexTiming::NEXT_INSTANCE) {
+                if (first_instance > _counts[i] || instance_count > _counts[i] - first_instance)
+                    throw std::out_of_range("Typed indexed draw exceeds its instance buffer");
+            } else if (index_count && instance_count && (std::int64_t(low) + vertex_offset < 0 || std::uint64_t(std::int64_t(high) + vertex_offset) >= _counts[i]))
+                throw std::out_of_range("Typed indexed draw exceeds its vertex buffer");
+        }
+        return TypedIndexedDraw<Input, Resources, Pushes>(_pipeline, _device, _buffers,
+                                                          command::BindIndexBufferAt(indices.backend(), TypedIndexBuffer<Index, property>::INDEX_TYPE), std::move(command), _resources, _pushes);
     }
 
 } // namespace VSL_NAMESPACE::typed

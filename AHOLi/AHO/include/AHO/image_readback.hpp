@@ -66,7 +66,7 @@ namespace AHO_NAMESPACE {
 
         // 空きスロットがなければnulloptを返す。完了済みでも保持中のチケットはスロットを占有する。
         std::optional<ImageReadbackTicket> capture_ticket(VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::ImageLayout current_layout,
-                                                         VSL_NAMESPACE::ImageRegion region = {}, std::uint64_t frame_id = 0);
+                                                          VSL_NAMESPACE::ImageRegion region = {}, std::uint64_t frame_id = 0);
         // RenderPassEndの後に記録する。追加の送信やCPUでの完了待ちは行わない。
         std::optional<ImageReadbackTicket> record(VSL_NAMESPACE::ComputePhase& phase, VSL_NAMESPACE::ImageAccessor image,
                                                   VSL_NAMESPACE::ImageLayout current_layout, VSL_NAMESPACE::ImageRegion region = {},

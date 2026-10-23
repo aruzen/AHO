@@ -4,9 +4,13 @@ constexpr aho::input::MouseID FIRST_BUTTON(0), LAST_BUTTON(7);
 static_assert(FIRST_BUTTON.code() == aho::input::MouseCode::LEFT_CLICK);
 static_assert(LAST_BUTTON.code() == aho::input::MouseCode::BUTTON8);
 #elif defined(AHO_LINK_INPUT_KEY_NAME)
-int main() { return aho::input::KeyID(aho::input::KeyCode::A).name().empty(); }
+int main() {
+    return aho::input::KeyID(aho::input::KeyCode::A).name().empty();
+}
 #elif defined(AHO_LINK_INPUT_MOUSE_NAME)
-int main() { return aho::input::MouseID(aho::input::MouseCode::LEFT_CLICK).name() != "LeftClick"; }
+int main() {
+    return aho::input::MouseID(aho::input::MouseCode::LEFT_CLICK).name() != "LeftClick";
+}
 #else
 #include <gtest/gtest.h>
 #include <set>

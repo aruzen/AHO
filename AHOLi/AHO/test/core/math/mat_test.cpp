@@ -1,3 +1,4 @@
+#include <AHO/core/math/projection.hpp>
 #include <AHO/core/vector.hpp>
 #include <AHO/core/point.hpp>
 
@@ -28,8 +29,8 @@ void check_factory() {
 }
 #elif defined(AHO_CONTRACT_MAT_AXIS_ROTATION)
 void check_rotation() {
-    const auto radians = aho::matrix::make_rotation<double>(aho::Radian{1}, aho::d3::VectorD(0, 0, 1));
-    const auto degrees = aho::matrix::make_rotation<double>(aho::Degree{90}, aho::d3::VectorD(0, 0, 1));
+    const auto radians = aho::matrix::make_rotation<aho::HandedCoordinate::RIGHT, aho::VectorConvention::COLUMN, double>(aho::Radian{1}, aho::d3::VectorD(0, 0, 1));
+    const auto degrees = aho::matrix::make_rotation<aho::HandedCoordinate::RIGHT, aho::VectorConvention::COLUMN, double>(aho::Degree{90}, aho::d3::VectorD(0, 0, 1));
 }
 #elif defined(AHO_CONTRACT_MAT_VIEW)
 #include "../../support/matrix.hpp"
@@ -37,7 +38,7 @@ TEST(MatContractTest, ViewMatrixMovesEyeToOriginForFloatAndDouble) {
     auto verify = []<class T>() {
         using P = aho::Point_<T, vsl::D3>;
         using V = aho::Vector_<T, vsl::D3>;
-        const auto view = aho::matrix::make_view(P(0, 0, 1), P(0, 0, 0), V(0, 1, 0));
+        const auto view = aho::matrix::make_view<aho::HandedCoordinate::RIGHT, aho::ViewOrientation::ROLL_180, aho::VectorConvention::ROW>(P(0, 0, 1), P(0, 0, 0), V(0, 1, 0));
         // AHO retains a 180-degree camera roll relative to the conventional right-handed lookAt.
         aho_test::expect_matrix(view, std::array<std::array<double, 4>, 4>{{{-1, 0, 0, 0}, {0, -1, 0, 0}, {0, 0, 1, 0}, {0, 0, -1, 1}}});
     };
@@ -46,11 +47,11 @@ TEST(MatContractTest, ViewMatrixMovesEyeToOriginForFloatAndDouble) {
 }
 #elif defined(AHO_CONTRACT_MAT_AXIS_DEGREE_OVERLOAD)
 using Rotation = aho::Mat4x4<double> (*)(aho::Degree, aho::d3::VectorD);
-constexpr Rotation ROTATION = &aho::matrix::make_rotation<double>;
+constexpr Rotation ROTATION = &aho::matrix::make_rotation<aho::HandedCoordinate::RIGHT, aho::VectorConvention::COLUMN, double>;
 #elif defined(AHO_CONTRACT_MAT_PERSPECTIVE)
 void check_perspective() {
-    const auto radians = aho::matrix::make_perspective(aho::Radian{1}, 1.0, 0.1, 100.0);
-    const auto degrees = aho::matrix::make_perspective(aho::Degree{90}, 1.0, 0.1, 100.0);
+    const auto radians = aho::matrix::make_perspective<aho::HandedCoordinate::RIGHT, aho::DepthRange::NEGATIVE_ONE_TO_ONE, aho::ClipY::UP, aho::VectorConvention::ROW>(aho::Radian{1}, 1.0, 0.1, 100.0);
+    const auto degrees = aho::matrix::make_perspective<aho::HandedCoordinate::RIGHT, aho::DepthRange::NEGATIVE_ONE_TO_ONE, aho::ClipY::UP, aho::VectorConvention::ROW>(aho::Degree{90}, 1.0, 0.1, 100.0);
 }
 #elif defined(AHO_CONTRACT_MAT_SCALAR_RIGHT_MULTIPLY)
 constexpr aho::Mat<int, 1, 2> MATRIX(std::array<std::array<int, 2>, 1>{{{2, 4}}});
@@ -222,7 +223,9 @@ namespace {
             return *this;
         }
     };
-    constexpr int operator*(const MatrixWritebackElement& lhs, const Operand& rhs) { return lhs.value * rhs.value; }
+    constexpr int operator*(const MatrixWritebackElement& lhs, const Operand& rhs) {
+        return lhs.value * rhs.value;
+    }
     struct RvalueMatrixSum {
         int value{};
         constexpr RvalueMatrixSum& operator+=(RvalueMatrixSum&& rhs) {
@@ -234,14 +237,18 @@ namespace {
     struct RvalueMatrixFactor {
         int value{};
     };
-    constexpr RvalueMatrixSum operator*(const RvalueMatrixFactor& lhs, const RvalueMatrixFactor& rhs) { return {lhs.value * rhs.value}; }
+    constexpr RvalueMatrixSum operator*(const RvalueMatrixFactor& lhs, const RvalueMatrixFactor& rhs) {
+        return {lhs.value * rhs.value};
+    }
     struct MissingMatrixSum {
         int value{};
     };
     struct MissingMatrixSumFactor {
         int value{};
     };
-    constexpr MissingMatrixSum operator*(const MissingMatrixSumFactor& lhs, const MissingMatrixSumFactor& rhs) { return {lhs.value * rhs.value}; }
+    constexpr MissingMatrixSum operator*(const MissingMatrixSumFactor& lhs, const MissingMatrixSumFactor& rhs) {
+        return {lhs.value * rhs.value};
+    }
     struct NonDefaultMatrixSum {
         int value;
         NonDefaultMatrixSum() = delete;
@@ -254,7 +261,9 @@ namespace {
     struct NonDefaultMatrixFactor {
         int value{};
     };
-    constexpr NonDefaultMatrixSum operator*(const NonDefaultMatrixFactor& lhs, const NonDefaultMatrixFactor& rhs) { return NonDefaultMatrixSum(lhs.value * rhs.value); }
+    constexpr NonDefaultMatrixSum operator*(const NonDefaultMatrixFactor& lhs, const NonDefaultMatrixFactor& rhs) {
+        return NonDefaultMatrixSum(lhs.value * rhs.value);
+    }
 
     TEST(MatProductConstraintTest, OneDirectionalRectangularProductsKeepOperandOrderAndOutputShape) {
         constexpr aho::Mat<LeftOperand, 2, 3> lhs{{LeftOperand{1}, LeftOperand{2}, LeftOperand{3}}, {LeftOperand{4}, LeftOperand{5}, LeftOperand{6}}};
@@ -617,7 +626,7 @@ namespace {
         expect_identity(aho::matrix::make_identity<Matrix2>());
     }
     TEST(MatFactoryTest, InitializerFactoryStoresInputAsColumns) {
-        const auto matrix = aho::matrix::make<int, 2, 2>({{1, 2}, {3, 4}});
+        const auto matrix = aho::matrix::make<int, 2, 2, aho::MatrixLayout::COLUMN_MAJOR>({{1, 2}, {3, 4}});
         expect_matrix(matrix, std::array<std::array<int, 2>, 2>{{{1, 3}, {2, 4}}});
     }
     TEST(MatFactoryTest, ArrayFactoryCopiesSquareRowsWithoutTransposition) {
@@ -630,8 +639,8 @@ namespace {
     TYPED_TEST_SUITE(MatListFactoryTest, ListFactoryScalars);
     TYPED_TEST(MatListFactoryTest, RectangularInputsPreserveColumnOrdering) {
         using T = TypeParam;
-        constexpr auto wide = aho::matrix::make<T, 2, 3>({{1, 4}, {2, 5}, {3, 6}});
-        constexpr auto tall = aho::matrix::make<T, 3, 2>({{1, 3, 5}, {2, 4, 6}});
+        constexpr auto wide = aho::matrix::make<T, 2, 3, aho::MatrixLayout::COLUMN_MAJOR>({{1, 4}, {2, 5}, {3, 6}});
+        constexpr auto tall = aho::matrix::make<T, 3, 2, aho::MatrixLayout::COLUMN_MAJOR>({{1, 3, 5}, {2, 4, 6}});
         static_assert(std::same_as<std::remove_cv_t<decltype(wide)>, aho::Mat<T, 2, 3>>);
         static_assert(std::same_as<std::remove_cv_t<decltype(tall)>, aho::Mat<T, 3, 2>>);
         static_assert(wide[0][2] == T{3} && wide[1][2] == T{6});
@@ -641,39 +650,39 @@ namespace {
     }
     TYPED_TEST(MatListFactoryTest, MissingRowsAndColumnsAreZeroInitialized) {
         using T = TypeParam;
-        const auto partial = aho::matrix::make<T, 2, 3>({{1}, {}, {3, 6}});
+        const auto partial = aho::matrix::make<T, 2, 3, aho::MatrixLayout::COLUMN_MAJOR>({{1}, {}, {3, 6}});
         expect_matrix(partial, std::array<std::array<int, 3>, 2>{{{1, 0, 3}, {0, 0, 6}}});
-        expect_matrix(aho::matrix::make<T, 3, 2>({{1}}),
+        expect_matrix(aho::matrix::make<T, 3, 2, aho::MatrixLayout::COLUMN_MAJOR>({{1}}),
                       std::array<std::array<int, 2>, 3>{{{1, 0}, {0, 0}, {0, 0}}});
-        expect_matrix(aho::matrix::make<T, 2, 2>({}), std::array<std::array<int, 2>, 2>{});
+        expect_matrix(aho::matrix::make<T, 2, 2, aho::MatrixLayout::COLUMN_MAJOR>({}), std::array<std::array<int, 2>, 2>{});
     }
     TYPED_TEST(MatListFactoryTest, ExcessRowsAndColumnsAreIgnored) {
         using T = TypeParam;
-        const auto matrix = aho::matrix::make<T, 2, 3>({{1, 4, 7}, {2, 5, 8}, {3, 6, 9}, {10}});
+        const auto matrix = aho::matrix::make<T, 2, 3, aho::MatrixLayout::COLUMN_MAJOR>({{1, 4, 7}, {2, 5, 8}, {3, 6, 9}, {10}});
         expect_matrix(matrix, std::array<std::array<int, 3>, 2>{{{1, 2, 3}, {4, 5, 6}}});
     }
     TEST(MatListFactoryTest, ZeroDimensionsDoNotReadOrWriteElements) {
-        const auto no_rows = aho::matrix::make<int, 0, 2>({{1}, {2}, {3}});
-        const auto no_columns = aho::matrix::make<int, 2, 0>({{1}, {2}});
+        const auto no_rows = aho::matrix::make<int, 0, 2, aho::MatrixLayout::COLUMN_MAJOR>({{1}, {2}, {3}});
+        const auto no_columns = aho::matrix::make<int, 2, 0, aho::MatrixLayout::COLUMN_MAJOR>({{1}, {2}});
         EXPECT_TRUE(no_rows.empty());
         EXPECT_TRUE(no_columns[0].empty());
         EXPECT_TRUE(no_columns[1].empty());
     }
 
     TEST(MatFactoryTest, TranslationFactoryUsesHomogeneousRowVectorCoordinates) {
-        const auto matrix = aho::matrix::make_move(aho::d3::VectorD(2, 3, 4));
+        const auto matrix = aho::matrix::make_move<aho::VectorConvention::ROW>(aho::d3::VectorD(2, 3, 4));
         expect_matrix(matrix, std::array<std::array<double, 4>, 4>{{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {2, 3, 4, 1}}});
     }
     TEST(MatFactoryTest, RadianRotationProducesKnownQuarterTurn) {
-        const auto matrix = aho::matrix::make_rotation<double>(aho::Radian{std::numbers::pi / 2});
+        const auto matrix = aho::matrix::make_rotation<aho::HandedCoordinate::RIGHT, aho::VectorConvention::COLUMN, double>(aho::Radian{std::numbers::pi / 2});
         expect_matrix(matrix, std::array<std::array<double, 2>, 2>{{{0, -1}, {1, 0}}});
     }
     TEST(MatFactoryTest, DegreeRotationProducesKnownQuarterTurn) {
-        const auto matrix = aho::matrix::make_rotation<double>(aho::Degree{90});
+        const auto matrix = aho::matrix::make_rotation<aho::HandedCoordinate::RIGHT, aho::VectorConvention::COLUMN, double>(aho::Degree{90});
         expect_matrix(matrix, std::array<std::array<double, 2>, 2>{{{0, -1}, {1, 0}}});
     }
     TEST(MatFactoryTest, AxisRotationNormalizesAxisAndPreservesHomogeneousCoordinate) {
-        const auto matrix = aho::matrix::make_rotation<double>(aho::Radian{std::numbers::pi / 2}, aho::d3::VectorD(0, 0, 2));
+        const auto matrix = aho::matrix::make_rotation<aho::HandedCoordinate::RIGHT, aho::VectorConvention::COLUMN, double>(aho::Radian{std::numbers::pi / 2}, aho::d3::VectorD(0, 0, 2));
         expect_matrix(matrix, std::array<std::array<double, 4>, 4>{{{0, -1, 0, 0}, {1, 0, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}}});
     }
     template<class T>
@@ -684,10 +693,10 @@ namespace {
         using T = TypeParam;
         using V = aho::Vector_<T, vsl::D3>;
         using DegreeRotation = aho::Mat4x4<T> (*)(aho::Degree, V);
-        constexpr DegreeRotation rotation = &aho::matrix::make_rotation<T>;
+        constexpr DegreeRotation rotation = &aho::matrix::make_rotation<aho::HandedCoordinate::RIGHT, aho::VectorConvention::COLUMN, T>;
         const V axis(0, 0, 2);
         const auto degrees = rotation(aho::Degree{90}, axis);
-        const auto radians = aho::matrix::make_rotation<T>(aho::Radian{std::numbers::pi / 2}, axis);
+        const auto radians = aho::matrix::make_rotation<aho::HandedCoordinate::RIGHT, aho::VectorConvention::COLUMN, T>(aho::Radian{std::numbers::pi / 2}, axis);
         const std::array<std::array<double, 4>, 4> expected{{{0, -1, 0, 0}, {1, 0, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}}};
         expect_matrix(degrees, expected);
         expect_matrix(radians, expected);
@@ -696,16 +705,16 @@ namespace {
     TYPED_TEST(MatAxisRotationTest, AxisRotationsHaveKnownOrientationAndAreOrthogonal) {
         using T = TypeParam;
         using V = aho::Vector_<T, vsl::D3>;
-        const auto x = aho::matrix::make_rotation<T>(aho::Degree{90}, V(2, 0, 0));
-        const auto y = aho::matrix::make_rotation<T>(aho::Degree{90}, V(0, 3, 0));
+        const auto x = aho::matrix::make_rotation<aho::HandedCoordinate::RIGHT, aho::VectorConvention::COLUMN, T>(aho::Degree{90}, V(2, 0, 0));
+        const auto y = aho::matrix::make_rotation<aho::HandedCoordinate::RIGHT, aho::VectorConvention::COLUMN, T>(aho::Degree{90}, V(0, 3, 0));
         expect_matrix(x, std::array<std::array<double, 4>, 4>{{{1, 0, 0, 0}, {0, 0, -1, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}}});
         expect_matrix(y, std::array<std::array<double, 4>, 4>{{{0, 0, 1, 0}, {0, 1, 0, 0}, {-1, 0, 0, 0}, {0, 0, 0, 1}}});
-        expect_identity(x * aho::matrix::make_rotation<T>(aho::Degree{-90}, V(2, 0, 0)));
-        expect_identity(y * aho::matrix::make_rotation<T>(aho::Degree{-90}, V(0, 3, 0)));
+        expect_identity(x * aho::matrix::make_rotation<aho::HandedCoordinate::RIGHT, aho::VectorConvention::COLUMN, T>(aho::Degree{-90}, V(2, 0, 0)));
+        expect_identity(y * aho::matrix::make_rotation<aho::HandedCoordinate::RIGHT, aho::VectorConvention::COLUMN, T>(aho::Degree{-90}, V(0, 3, 0)));
     }
     TEST(MatFactoryTest, PerspectiveOverloadsProduceKnownProjectionAndInvertibleMatrix) {
-        const auto radians = aho::matrix::make_perspective(aho::Radian{std::numbers::pi / 2}, 2.0, 1.0, 11.0);
-        const auto degrees = aho::matrix::make_perspective(aho::Degree{90}, 2.0, 1.0, 11.0);
+        const auto radians = aho::matrix::make_perspective<aho::HandedCoordinate::RIGHT, aho::DepthRange::NEGATIVE_ONE_TO_ONE, aho::ClipY::UP, aho::VectorConvention::ROW>(aho::Radian{std::numbers::pi / 2}, 2.0, 1.0, 11.0);
+        const auto degrees = aho::matrix::make_perspective<aho::HandedCoordinate::RIGHT, aho::DepthRange::NEGATIVE_ONE_TO_ONE, aho::ClipY::UP, aho::VectorConvention::ROW>(aho::Degree{90}, 2.0, 1.0, 11.0);
         const std::array<std::array<double, 4>, 4> expected{{{0.5, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, -1.2, -1}, {0, 0, -2.2, 0}}};
         expect_matrix(radians, expected);
         expect_matrix(degrees, expected);
@@ -726,7 +735,7 @@ namespace {
         const P eye(1, 2, 3), target(1, 2, 2);
         const V up(0, 2, 0);
         using ViewFactory = aho::Mat4x4<T> (*)(P, P, V);
-        constexpr ViewFactory factory = &aho::matrix::make_view<T, CI>;
+        constexpr ViewFactory factory = &aho::matrix::make_view<aho::HandedCoordinate::RIGHT, aho::ViewOrientation::ROLL_180, aho::VectorConvention::ROW, T, CI>;
         const auto view = factory(eye, target, up);
         static_assert(std::same_as<std::remove_cv_t<decltype(view)>, aho::Mat4x4<T>>);
         expect_matrix(view, std::array<std::array<double, 4>, 4>{{{-1, 0, 0, 0}, {0, -1, 0, 0}, {0, 0, 1, 0}, {1, 2, -3, 1}}});
@@ -739,7 +748,7 @@ namespace {
         using T = TypeParam;
         using P = aho::Point_<T, vsl::D3>;
         using V = aho::Vector_<T, vsl::D3>;
-        const auto view = aho::matrix::make_view(P(2, 0, 0), P(0, 0, 0), V(0, 1, 0));
+        const auto view = aho::matrix::make_view<aho::HandedCoordinate::RIGHT, aho::ViewOrientation::ROLL_180, aho::VectorConvention::ROW>(P(2, 0, 0), P(0, 0, 0), V(0, 1, 0));
         const aho::Mat<T, 1, 4> eye(std::array<std::array<T, 4>, 1>{{{2, 0, 0, 1}}});
         const aho::Mat<T, 1, 4> target(std::array<std::array<T, 4>, 1>{{{0, 0, 0, 1}}});
         expect_matrix(eye * view, std::array<std::array<double, 4>, 1>{{{0, 0, 0, 1}}});
@@ -752,8 +761,8 @@ namespace {
         using T = TypeParam;
         using P = aho::Point_<T, vsl::D3>;
         using V = aho::Vector_<T, vsl::D3>;
-        const auto view = aho::matrix::make_view(P(0, 2, 2), P(0, 0, 0), V(0, 0, 1));
-        const auto projection = aho::matrix::make_perspective(aho::Degree{45}, T{1}, T{0.1}, T{10});
+        const auto view = aho::matrix::make_view<aho::HandedCoordinate::RIGHT, aho::ViewOrientation::ROLL_180, aho::VectorConvention::ROW>(P(0, 2, 2), P(0, 0, 0), V(0, 0, 1));
+        const auto projection = aho::matrix::make_perspective<aho::HandedCoordinate::RIGHT, aho::DepthRange::NEGATIVE_ONE_TO_ONE, aho::ClipY::UP, aho::VectorConvention::ROW>(aho::Degree{45}, T{1}, T{0.1}, T{10});
         const auto screen_position = [&](T x, T y, T z) {
             const aho::Mat<T, 1, 4> point(std::array<std::array<T, 4>, 1>{{{x, y, z, 1}}});
             const auto clip = point * view * projection;

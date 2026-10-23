@@ -184,6 +184,9 @@
     <ClInclude Include="AHO\include\AHO\core\math\mat.hpp" />
     <ClInclude Include="AHO\include\AHO\core\math\functions.hpp" />
     <ClInclude Include="AHO\include\AHO\core\math\transform.hpp" />
+    <ClInclude Include="AHO\include\AHO\core\math\conventions.hpp" />
+    <ClInclude Include="AHO\include\AHO\core\math\matrix_functions.hpp" />
+    <ClInclude Include="AHO\include\AHO\core\math\projection.hpp" />
     <ClInclude Include="AHO\include\AHO\core\ov.hpp" />
     <ClInclude Include="AHO\include\AHO\core\point.hpp" />
     <ClInclude Include="AHO\include\AHO\core\triangulation.hpp" />

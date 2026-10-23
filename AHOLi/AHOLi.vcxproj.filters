@@ -41,6 +41,15 @@
     <ClInclude Include="AHO\include\AHO\core\math\transform.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="AHO\include\AHO\core\math\conventions.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="AHO\include\AHO\core\math\matrix_functions.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="AHO\include\AHO\core\math\projection.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClInclude Include="AHO\include\AHO\core\collision.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>

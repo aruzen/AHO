@@ -279,22 +279,22 @@ breakpoint disable swift_willThrow
               key_f,
               key_mode,
               key_restart] = input_manager.get<input::Keys>(input::KeyCode::UP,
-                                                           input::KeyCode::DOWN,
-                                                           input::KeyCode::LEFT,
-                                                           input::KeyCode::RIGHT,
-                                                           input::KeyCode::R,
-                                                           input::KeyCode::F,
-                                                           input::KeyCode::I,
-                                                           input::KeyCode::ENTER)
-                                ->keys;
+                                                            input::KeyCode::DOWN,
+                                                            input::KeyCode::LEFT,
+                                                            input::KeyCode::RIGHT,
+                                                            input::KeyCode::R,
+                                                            input::KeyCode::F,
+                                                            input::KeyCode::I,
+                                                            input::KeyCode::ENTER)
+                                 ->keys;
         auto mouse = input_manager.get<input::Mouse>();
 
         main_window.add_plugin<window::WindowResizeHookPlugin>([&ubo, &scissor, &viewport, &swapchain](auto w) {
             auto size = w->frame_size();
             ubo.proj = matrix::make_perspective<HandedCoordinate::RIGHT, DepthRange::NEGATIVE_ONE_TO_ONE, ClipY::UP, VectorConvention::ROW>(45.0_deg,
-                                                (float)size.value.x.value / size.value.y.value,
-                                                0.1f,
-                                                10.0f);
+                                                                                                                                            (float)size.value.x.value / size.value.y.value,
+                                                                                                                                            0.1f,
+                                                                                                                                            10.0f);
             viewport = Viewport(swapchain);
             scissor = Scissor(swapchain);
         });

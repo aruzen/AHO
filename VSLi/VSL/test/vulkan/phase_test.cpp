@@ -1,17 +1,56 @@
 #include "support/vulkan_fixture.hpp"
+#include "support/window_fixture.hpp"
+#include <VSL/vulkan/commands/image_readback.hpp>
 namespace {
     struct RecordCommand : VSL_NAMESPACE::command::Command {
         std::shared_ptr<int> calls;
         explicit RecordCommand(std::shared_ptr<int> calls);
         void invoke(VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) override;
     };
+
     struct RecordDelegate : VSL_NAMESPACE::command::DelegateCommand {
         std::shared_ptr<int> calls;
         explicit RecordDelegate(std::shared_ptr<int> calls);
         void invoke(VSL_NAMESPACE::DefaultPhaseStream& stream, VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer,
                     VSL_NAMESPACE::CommandManager manager) override;
     };
+
     using PhaseVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
+    class PhaseCompletionVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override;
+    };
+
+    class PresentPhaseWindowIntegrationTest : public vsl_test::WindowIntegrationTest {
+        bool validate_vulkan() const override;
+    };
+
+    struct VertexCountSource {
+        std::size_t count;
+        std::size_t get_vertex_size() { return count; }
+        void invoke(VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) {}
+    };
+
+    struct VertexCountConsumer {
+        std::shared_ptr<std::optional<std::size_t>> received;
+        void set_vertex_size(std::optional<std::size_t> value) { *received = value; }
+        void invoke(VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) {}
+    };
+
+    struct VertexCountDelegate : VSL_NAMESPACE::command::DelegateCommand, VSL_NAMESPACE::command::VertexSizeRequire {
+        std::optional<std::size_t> received;
+        void set_vertex_size(std::optional<std::size_t> value) override { received = value; }
+        void invoke(VSL_NAMESPACE::DefaultPhaseStream&, VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) override {}
+    };
+
+    struct IncrementVertexCount : VSL_NAMESPACE::command::Command,
+                                  VSL_NAMESPACE::command::VertexSizeRequire,
+                                  VSL_NAMESPACE::command::VertexSizeHolder {
+        std::optional<std::size_t> input;
+        void set_vertex_size(std::optional<std::size_t> count) override { input = count; }
+        std::size_t get_vertex_size() override { return input.value_or(0) + 1; }
+        void invoke(VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) override {}
+    };
 
     RecordCommand::RecordCommand(std::shared_ptr<int> calls) : calls(std::move(calls)) {}
 
@@ -72,9 +111,6 @@ namespace {
 } // namespace
 
 namespace {
-    class PhaseCompletionVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
-        bool validate_vulkan() const override;
-    };
 
     bool PhaseCompletionVulkanIntegrationTest::validate_vulkan() const {
         return true;
@@ -200,12 +236,7 @@ namespace {
     }
 } // namespace
 
-#include "support/window_fixture.hpp"
-#include <VSL/vulkan/commands/image_readback.hpp>
 namespace {
-    class PresentPhaseWindowIntegrationTest : public vsl_test::WindowIntegrationTest {
-        bool validate_vulkan() const override;
-    };
 
     bool PresentPhaseWindowIntegrationTest::validate_vulkan() const {
         return true;
@@ -301,21 +332,6 @@ namespace {
 } // namespace
 
 namespace {
-    struct VertexCountSource {
-        std::size_t count;
-        std::size_t get_vertex_size() { return count; }
-        void invoke(VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) {}
-    };
-    struct VertexCountConsumer {
-        std::shared_ptr<std::optional<std::size_t>> received;
-        void set_vertex_size(std::optional<std::size_t> value) { *received = value; }
-        void invoke(VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) {}
-    };
-    struct VertexCountDelegate : VSL_NAMESPACE::command::DelegateCommand, VSL_NAMESPACE::command::VertexSizeRequire {
-        std::optional<std::size_t> received;
-        void set_vertex_size(std::optional<std::size_t> value) override { received = value; }
-        void invoke(VSL_NAMESPACE::DefaultPhaseStream&, VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) override {}
-    };
     TEST_F(PhaseVulkanIntegrationTest, ValueCommandsExportAndReceiveVertexCountsThroughTheirOwnRoles) {
         auto manager = make_manager();
         auto received = std::make_shared<std::optional<std::size_t>>(99);
@@ -346,14 +362,6 @@ namespace {
 } // namespace
 
 namespace {
-    struct IncrementVertexCount : VSL_NAMESPACE::command::Command,
-                                  VSL_NAMESPACE::command::VertexSizeRequire,
-                                  VSL_NAMESPACE::command::VertexSizeHolder {
-        std::optional<std::size_t> input;
-        void set_vertex_size(std::optional<std::size_t> count) override { input = count; }
-        std::size_t get_vertex_size() override { return input.value_or(0) + 1; }
-        void invoke(VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) override {}
-    };
     TEST_F(PhaseVulkanIntegrationTest, CommandsConsumeThePreviousCountBeforeExportingTheirOwnCount) {
         auto manager = make_manager();
         VSL_NAMESPACE::DefaultPhaseStream value_stream{manager, 17};

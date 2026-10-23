@@ -9,13 +9,7 @@ namespace {
             if (!HasFatalFailure() && !IsSkipped())
                 manager.emplace(device);
         }
-        void TearDown() override {
-            if (manager) {
-                device.data_->device.waitIdle();
-                manager.reset();
-            }
-            VulkanIntegrationTest::TearDown();
-        }
+        void TearDown() override;
     };
     TEST_F(SynchronizeVulkanIntegrationTest, NamedLookupAndSemaphoreCounts) {
         EXPECT_FALSE(manager->get_fence("missing"));
@@ -133,5 +127,13 @@ namespace {
         EXPECT_EQ(manager->get_semaphore("same")->data_, current_semaphore.data_);
         EXPECT_EQ(manager->get_fence("same")->data_, current_fence.data_);
         EXPECT_TRUE(current_fence.wait(std::uint64_t{0}));
+    }
+
+    void SynchronizeVulkanIntegrationTest::TearDown() {
+        if (manager) {
+            device.data_->device.waitIdle();
+            manager.reset();
+        }
+        VulkanIntegrationTest::TearDown();
     }
 } // namespace

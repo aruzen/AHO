@@ -359,7 +359,10 @@ namespace {
         inline static unsigned CALLS = 0;
         GLFWerrorfun previous;
         WindowCloseErrorCapture() : previous(glfwSetErrorCallback([](int, const char*) { ++CALLS; })) { CALLS = 0; }
-        ~WindowCloseErrorCapture() { glfwSetErrorCallback(previous); glfwGetError(nullptr); }
+        ~WindowCloseErrorCapture() {
+            glfwSetErrorCallback(previous);
+            glfwGetError(nullptr);
+        }
     };
     TEST(WindowValidityTest, EmptyNativeDataCloseAndDestroyDoNotCallUninitializedGlfw) {
         ASSERT_TRUE(vsl::PureWindow::WINDOWS.empty());
@@ -426,7 +429,10 @@ namespace {
         RegistrationListener(vsl::PureWindow*, int& calls, unsigned char fixed_id = 0) : calls(calls) {
             id = fixed_id;
         }
-        bool on_update(vsl::PureWindow) override { ++calls; return true; }
+        bool on_update(vsl::PureWindow) override {
+            ++calls;
+            return true;
+        }
     };
     struct RegistrationPlugin : vsl::PureWindow::Plugin {
         explicit RegistrationPlugin(vsl::PureWindow*, unsigned char fixed_id = 0) { id = fixed_id; }

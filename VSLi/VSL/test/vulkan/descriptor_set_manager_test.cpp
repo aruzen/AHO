@@ -220,34 +220,8 @@ namespace {
         PFN_vkDestroyDebugUtilsMessengerEXT _destroy_messenger = nullptr;
         std::atomic<unsigned> _validation_errors{0};
         static VKAPI_ATTR VkBool32 VKAPI_CALL RecordError(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
-                                                           VkDebugUtilsMessageTypeFlagsEXT, const VkDebugUtilsMessengerCallbackDataEXT* message, void* user) {
-            if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-                ++*static_cast<std::atomic<unsigned>*>(user);
-                std::cerr << message->pMessageIdName << ": " << message->pMessage << '\n';
-                return VK_TRUE; // Abort an invalid Vulkan call before it reaches the driver.
-            }
-            return VK_FALSE;
-        }
-        void SetUp() override {
-            require_validation = true;
-            VulkanIntegrationTest::SetUp();
-            if (HasFatalFailure() || IsSkipped())
-                return;
-            const auto create = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
-                instance->instance.getProcAddr("vkCreateDebugUtilsMessengerEXT"));
-            _destroy_messenger = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
-                instance->instance.getProcAddr("vkDestroyDebugUtilsMessengerEXT"));
-            ASSERT_NE(create, nullptr);
-            ASSERT_NE(_destroy_messenger, nullptr);
-            VkDebugUtilsMessengerCreateInfoEXT info{};
-            info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-            info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-            info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                               VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-            info.pfnUserCallback = RecordError;
-            info.pUserData = &_validation_errors;
-            ASSERT_EQ(create(instance->instance, &info, nullptr, &_messenger), VK_SUCCESS);
-        }
+                                                          VkDebugUtilsMessageTypeFlagsEXT, const VkDebugUtilsMessengerCallbackDataEXT* message, void* user);
+        void SetUp() override;
         void TearDown() override {
             EXPECT_EQ(_validation_errors.load(), 0u) << "Descriptor pool operations emitted validation errors";
             if (_messenger)
@@ -312,5 +286,36 @@ namespace {
         EXPECT_TRUE(pools.empty());
         EXPECT_TRUE(allocated.empty());
         EXPECT_EQ(resources->data_->pools.size(), previous);
+    }
+
+    VKAPI_ATTR VkBool32 VKAPI_CALL DescriptorPoolValidationVulkanIntegrationTest::RecordError(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+                                                                                              VkDebugUtilsMessageTypeFlagsEXT, const VkDebugUtilsMessengerCallbackDataEXT* message, void* user) {
+        if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+            ++*static_cast<std::atomic<unsigned>*>(user);
+            std::cerr << message->pMessageIdName << ": " << message->pMessage << '\n';
+            return VK_TRUE; // Abort an invalid Vulkan call before it reaches the driver.
+        }
+        return VK_FALSE;
+    }
+
+    void DescriptorPoolValidationVulkanIntegrationTest::SetUp() {
+        require_validation = true;
+        VulkanIntegrationTest::SetUp();
+        if (HasFatalFailure() || IsSkipped())
+            return;
+        const auto create = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
+            instance->instance.getProcAddr("vkCreateDebugUtilsMessengerEXT"));
+        _destroy_messenger = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+            instance->instance.getProcAddr("vkDestroyDebugUtilsMessengerEXT"));
+        ASSERT_NE(create, nullptr);
+        ASSERT_NE(_destroy_messenger, nullptr);
+        VkDebugUtilsMessengerCreateInfoEXT info{};
+        info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+        info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+        info.pfnUserCallback = RecordError;
+        info.pUserData = &_validation_errors;
+        ASSERT_EQ(create(instance->instance, &info, nullptr, &_messenger), VK_SUCCESS);
     }
 } // namespace

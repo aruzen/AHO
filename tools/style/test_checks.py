@@ -446,7 +446,7 @@ inline int probe() {
         file = 'AHOLi/AHO/probe.cpp'
         self.prepare_cli({file: 'int   VALUE=1;\n'}, [file])
         path = self.write_master(file, [{**item, 'count': 1}
-                                       for item in CHECK.format_check(self.root, file, ARGS.clang_format)])
+                                       for item in CHECK.format_check(self.root, file, ARGS.clang_format)], min_lines=0)
         shutil.copy2(HERE / 'check.py', self.root / 'tools/style/check.py')
         (self.root / 'CMakeLists.txt').write_text(f'''
 cmake_minimum_required(VERSION 3.20)
@@ -462,7 +462,8 @@ set(AHO_CLANG_TIDY [==[{ARGS.clang_tidy}]==])
 include([==[{HERE.parents[1] / 'cmake/StyleChecks.cmake'}]==])
 ''')
         build = self.root / 'build/cmake'
-        configure = subprocess.run(['cmake', '-S', str(self.root), '-B', str(build), '-G', 'Ninja'],
+        configure = subprocess.run(['cmake', '-S', str(self.root), '-B', str(build), '-G', 'Ninja',
+                                    '-DAHO_STYLE_IN_CLASS_MIN_LINES=0'],
                                    text=True, capture_output=True)
         self.assertEqual(configure.returncode, 0, configure.stdout + configure.stderr)
         before = path.read_bytes()

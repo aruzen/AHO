@@ -11,6 +11,7 @@ export PATH="$(brew --prefix llvm@20)/bin:$PATH"
 cmake -S . -B build/style \
   -DAHO_HOME="$PWD/AHOLi/AHO" -DVSL_HOME="$PWD/VSLi/VSL" \
   -DBUILD_TESTING=ON -DAHO_STYLE_CHECKS=ON -DCMAKE_BUILD_TYPE=Release \
+  -DAHO_ENABLE_EXPERIMENTAL_MESH=ON -DAHO_BUILD_MESH_EXAMPLE=ON \
   -DLLVM_DIR="$(brew --prefix llvm@20)/lib/cmake/llvm" \
   -DClang_DIR="$(brew --prefix llvm@20)/lib/cmake/clang"
 cmake --build build/style --target aho-style-ast

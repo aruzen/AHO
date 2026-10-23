@@ -49,3 +49,35 @@ APIの型宣言と実体生成を分離しているため、将来arenaへ移行
 Apple M1/macOS、LLVM 20/C++23/Debug、MoltenVK 1.4.2で関連CTest **180/180成功、skipなし**。新規はCPU 1件、実GPU 7件、compile contract 13件（正例1、負例12）。GPUはvalidation layerを有効にしてUBO/SSBO・固定配列・疎なset・同一setの別番号での再利用・texture配列・compute dispatch・初期化/usage不一致・所有権を検証した。
 
 既存のTyped/reflection/shader/descriptor/頂点入力/bind/drawも実行。製品VSLとvsl-test、正例contract objectをビルドした。変更6ファイルを4TUで命名・配置・format検査し、違反0件。macOSのstyle frontendは製品buildと同じLLVM libc++・MacOSX26 SDKへ揃えた。Windows/Linux、sanitizer、全AHO/VSLテストは未実施。
+
+PR: [#236](https://github.com/aruzen/AHO/pull/236)、`feat/vsl-typed-descriptors` → `typed-stack-base`。
+
+## 2. push constantのTyped化
+
+`PushRange<Payload, stages, offset>` と `PushSchema<Ranges...>` を追加。payloadの型・sizeof・stage・offsetを保持し、4byte単位・overflow・空stage・同stage内の重複をコンパイル時に拒否する。
+
+`PushSchema::Values` は全rangeのpayloadを型・順序・数まで照合し、内部の固定長byte配列へコピーする。非空schemaのValuesを引数なしで作ることはできない。GPU用offsetとCPU内のpayload収納位置は別々に保持する。
+
+`TypedGraphicsPipeline<Input, Resources, Pushes>` / `TypedComputePipeline<Resources, Pushes>` はPushesも型として保持する。必要なpushをセットするまでdraw/dispatchは制約で拒否し、binding/commandがValuesを所有する。元変数や一時Valuesの破棄後も安全に記録できる。descriptorのbindとpush値の設定はどちらの順でも行える。
+
+```cpp
+using Pushes = t::PushSchema<t::PushRange<Transform, vsl::ShaderFlag::VERTEX>>;
+auto bound = pipeline.bind_vertices(vertices).push_constants(Pushes::Values(transform));
+phase << bound.draw(3);
+```
+
+shaderのpush memberがschemaのstageとbyte範囲で覆われていることをpipeline作成前に確認する。詳細なmember型・offset/array/matrix strideは3段目で接続する。
+
+### 実装中に確認したVulkanの制約
+
+最初は異なるstageなら同offsetに別値を保持できると誤解していた。実GPUのvalidationでVUID-vkCmdPushConstants-offset-01796が発生し、仕様を確認して修正した。
+
+[vkCmdPushConstantsの仕様](https://docs.vulkan.org/refpages/latest/refpages/source/vkCmdPushConstants.html)では、更新するbyteと重なるnative rangeの全stageをstageFlagsへ含める必要がある。したがって重なるbyteは共有値となる。異なるstageの重複rangeは許可するが、Values作成時にbyte列の一致を検証し、矛盾する値は例外で拒否する。異なる値が必要ならoffsetを分ける。
+
+記録時は実際のnative range境界で更新を分割し、各区間のstageを合成する。range全体へ単純にstageを追加すると、部分重複でVUID-offset-01795に違反するため、境界ごとの分割が必要。同stageのrangeがnative backendで隙間込みに統合される場合も、実際のlayoutを参照して処理する。
+
+### push constantの検証
+
+同じM1/MoltenVK環境で関連CTest **206/206成功、skipなし**。新規CPU 1件、実GPU 7件、compile contract 12件（正例1、負例11）と既存のTyped/descriptor/shader/push等を確認。元変数破棄後のsnapshot、非zero offset、共有offset・異なるoffset・部分重複、descriptorとの設定順、shader側のstage/offset/extent不一致、compute dispatchを検証した。修正後のunexpected validation errorなし。
+
+変更6ファイル/5TUの命名・配置・format検査は違反0件。詳細member配置は次段で扱うため、この段では範囲・stageとC++ payload型の契約を保証する。

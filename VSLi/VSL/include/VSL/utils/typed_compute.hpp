@@ -6,6 +6,8 @@
 #include "../vulkan/commands/dispatch.hpp"
 
 namespace VSL_NAMESPACE::typed {
+    template<typename...>
+    class TypedBatch;
     namespace detail {
         void validate_dispatch(LogicalDeviceAccessor device, size_t x, size_t y, size_t z);
     }
@@ -14,6 +16,8 @@ namespace VSL_NAMESPACE::typed {
 
     template<typename Resources, typename Pushes>
     class TypedDispatch final : public command::Command, public command::PipelineHolder {
+        template<typename...>
+        friend class TypedBatch;
         template<typename, typename, bool>
         friend class TypedComputeBinding;
         VSL_NAMESPACE::ComputePipeline _pipeline;

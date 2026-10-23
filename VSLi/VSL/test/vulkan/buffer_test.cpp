@@ -206,6 +206,57 @@ namespace {
             buffer.flush(mapped);
         }
     }
+    TEST_F(BufferVulkanIntegrationTest, BufferTransferRejectsSourceLargerThanDestinationBeforeRecording) {
+        const std::array<std::uint32_t, 4> values{1, 2, 3, 4};
+        HostBuffer source(device, values), destination(device, std::size_t{4});
+        auto manager = make_manager();
+        // 予期しないvalidationエラーはfixtureで失敗させ、driverへの不正命令は抑止する。
+        expect_validation_abort("");
+        EXPECT_THROW(destination.copy_by_buffer(manager, &source), std::out_of_range);
+        EXPECT_FALSE(has_validation_errors());
+    }
+    TEST_F(BufferVulkanIntegrationTest, MappedBufferTransferRejectsSourceLargerThanMapping) {
+        const std::array<std::uint32_t, 4> values{1, 2, 3, 4};
+        HostBuffer source(device, values), destination(device, std::size_t{32});
+        auto mapping = destination.data(std::size_t{4}, 8);
+        auto manager = make_manager();
+        EXPECT_THROW(mapping.copy_by_buffer(manager, &source), std::out_of_range);
+    }
+    TEST_F(BufferVulkanIntegrationTest, MappedBufferTransferWritesOnlyAtTheMappingOffset) {
+        const std::array<std::uint32_t, 8> initial{10, 20, 30, 40, 50, 60, 70, 80};
+        const std::array<std::uint32_t, 2> payload{101, 102};
+        HostBuffer source(device, payload), destination(device, initial);
+        auto manager = make_manager();
+        auto mapping = destination.data(sizeof(payload), 3 * sizeof(std::uint32_t));
+        EXPECT_TRUE(mapping.copy_by_buffer(manager, &source));
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            vk::MemoryBarrier visible{.srcAccessMask = vk::AccessFlagBits::eTransferWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
+            auto commands = manager.get_buffer();
+            commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+                vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, visible, {}, {});
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            ASSERT_TRUE(phase.completion().wait());
+        }
+        const std::array<std::uint32_t, 8> expected{10, 20, 30, 101, 102, 60, 70, 80};
+        auto contents = destination.data();
+        contents.invalidate(sizeof(expected));
+        EXPECT_EQ(std::memcmp(contents.data, expected.data(), sizeof(expected)), 0);
+    }
+    TEST_F(BufferVulkanIntegrationTest, BufferTransferRejectsNullSourceAndOverlappingStorage) {
+        HostBuffer buffer(device, std::size_t{16});
+        auto alias = buffer;
+        auto manager = make_manager();
+        EXPECT_THROW(buffer.copy_by_buffer(manager, nullptr), std::invalid_argument);
+        EXPECT_THROW(buffer.copy_by_buffer(manager, &alias), std::invalid_argument);
+    }
+    TEST_F(BufferVulkanIntegrationTest, BufferTransferRejectsBuffersWithoutTransferUsage) {
+        vsl::Buffer<vsl::MemoryType::UNIFORM_BUFFER, vsl::MemoryProperty::HOST_VISIBLE> uniform(device, std::size_t{16});
+        HostBuffer transfer(device, std::size_t{16});
+        auto manager = make_manager();
+        EXPECT_THROW(transfer.copy_by_buffer(manager, &uniform), std::invalid_argument);
+        EXPECT_THROW(uniform.copy_by_buffer(manager, &transfer), std::invalid_argument);
+    }
     TEST_F(BufferVulkanIntegrationTest, SuccessfulBufferTransferReturnsTrue) {
         std::array<std::uint32_t, 2> expected{47, 53};
         HostBuffer source(device, expected), destination(device, sizeof(expected));

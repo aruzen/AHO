@@ -7,7 +7,9 @@ namespace {
     struct Tint {
         float rgba[4];
     };
-    using Push = t::PushSchema<t::PushRange<Tint, vsl::ShaderFlag::VERTEX, 16>>;
+
+    using TintRecord = t::BlockRecord<Tint, VSL_BLOCK_MEMBER(Tint, rgba)>;
+    using Push = t::PushSchema<t::PushRange<TintRecord, vsl::ShaderFlag::VERTEX, 16>>;
     using Empty = t::TypedVertexInput<>;
 
     class TypedPushVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
@@ -32,7 +34,7 @@ namespace {
     }
 
     TEST(TypedPushSchemaTest, ValuesOwnTheirSnapshotAndKeepDistinctOffsetsInCpuStorage) {
-        using Overlap = t::PushSchema<t::PushRange<Tint, vsl::ShaderFlag::VERTEX>, t::PushRange<Tint, vsl::ShaderFlag::FRAGMENT, 16>>;
+        using Overlap = t::PushSchema<t::PushRange<TintRecord, vsl::ShaderFlag::VERTEX>, t::PushRange<TintRecord, vsl::ShaderFlag::FRAGMENT, 16>>;
         static_assert(Overlap::DATA_SIZE == 2 * sizeof(Tint));
         static_assert(Overlap::REQUIREMENTS[0].range.offset == 0 && Overlap::REQUIREMENTS[1].range.offset == 16);
         static_assert(Overlap::REQUIREMENTS[1].data_offset == sizeof(Tint));
@@ -60,7 +62,7 @@ namespace {
     }
 
     TEST_F(TypedPushVulkanIntegrationTest, SharedOffsetRequiresEqualBytesAndUpdatesEveryOverlappingStage) {
-        using Overlap = t::PushSchema<t::PushRange<Tint, vsl::ShaderFlag::VERTEX>, t::PushRange<Tint, vsl::ShaderFlag::FRAGMENT>>;
+        using Overlap = t::PushSchema<t::PushRange<TintRecord, vsl::ShaderFlag::VERTEX>, t::PushRange<TintRecord, vsl::ShaderFlag::FRAGMENT>>;
         auto typed_pipeline = make_typed<Overlap>("typed_push_overlap.vert.spv", "typed_push_overlap.frag.spv");
         const Tint shared{{.125f, .25f, .375f, 1}}, conflicting{{0, 0, 0, 1}};
         EXPECT_THROW((Overlap::Values(shared, conflicting)), std::invalid_argument);
@@ -69,7 +71,7 @@ namespace {
     }
 
     TEST_F(TypedPushVulkanIntegrationTest, DistinctStageOffsetsKeepIndependentValues) {
-        using Pushes = t::PushSchema<t::PushRange<Tint, vsl::ShaderFlag::VERTEX>, t::PushRange<Tint, vsl::ShaderFlag::FRAGMENT, 16>>;
+        using Pushes = t::PushSchema<t::PushRange<TintRecord, vsl::ShaderFlag::VERTEX>, t::PushRange<TintRecord, vsl::ShaderFlag::FRAGMENT, 16>>;
         auto typed_pipeline = make_typed<Pushes>("typed_push_overlap.vert.spv", "typed_push_distinct.frag.spv");
         const Tint vertex{{.25f, 0, .25f, 1}}, fragment{{0, .5f, .5f, 1}};
         auto bound = typed_pipeline.bind_vertices().push_constants(Pushes::Values(vertex, fragment));
@@ -80,7 +82,8 @@ namespace {
         struct Partial {
             float xy[2];
         };
-        using Pushes = t::PushSchema<t::PushRange<Tint, vsl::ShaderFlag::VERTEX>, t::PushRange<Partial, vsl::ShaderFlag::FRAGMENT, 8>>;
+        using PartialRecord = t::BlockRecord<Partial, VSL_BLOCK_MEMBER(Partial, xy)>;
+        using Pushes = t::PushSchema<t::PushRange<TintRecord, vsl::ShaderFlag::VERTEX>, t::PushRange<PartialRecord, vsl::ShaderFlag::FRAGMENT, 8>>;
         auto typed_pipeline = make_typed<Pushes>("typed_push_overlap.vert.spv", "typed_push_partial.frag.spv");
         const Tint vertex{{.25f, .5f, .25f, 1}};
         const Partial fragment{{.25f, 1}};
@@ -89,7 +92,7 @@ namespace {
     }
 
     TEST_F(TypedPushVulkanIntegrationTest, ResourceAndPushBindingCanBeAppliedInEitherOrder) {
-        using Bias = t::DescriptorSet<1, t::UniformBinding<4, Tint, vsl::ShaderFlag::VERTEX>>;
+        using Bias = t::DescriptorSet<1, t::UniformBinding<4, TintRecord, vsl::ShaderFlag::VERTEX>>;
         using Resources = t::ResourceSchema<Bias>;
         auto typed_pipeline = make_typed<Push, Resources>("typed_push_resources.vert.spv");
         const Tint zero{}, color{{.25f, .5f, .75f, 1}};
@@ -104,8 +107,8 @@ namespace {
     }
 
     TEST_F(TypedPushVulkanIntegrationTest, ShaderPushStageOffsetAndExtentAreValidatedBeforeGraphicsPipelineCreation) {
-        using WrongStage = t::PushSchema<t::PushRange<Tint, vsl::ShaderFlag::FRAGMENT, 16>>;
-        using WrongOffset = t::PushSchema<t::PushRange<Tint, vsl::ShaderFlag::VERTEX>>;
+        using WrongStage = t::PushSchema<t::PushRange<TintRecord, vsl::ShaderFlag::FRAGMENT, 16>>;
+        using WrongOffset = t::PushSchema<t::PushRange<TintRecord, vsl::ShaderFlag::VERTEX>>;
         using TooSmall = t::PushSchema<t::PushRange<std::uint32_t, vsl::ShaderFlag::VERTEX, 16>>;
         EXPECT_THROW(make_typed<WrongStage>(), std::invalid_argument);
         EXPECT_THROW(make_typed<WrongOffset>(), std::invalid_argument);
@@ -118,7 +121,8 @@ namespace {
         struct Base {
             std::uint32_t value;
         };
-        using Pushes = t::PushSchema<t::PushRange<Base, vsl::ShaderFlag::COMPUTE>>;
+        using BaseRecord = t::BlockRecord<Base, VSL_BLOCK_MEMBER(Base, value)>;
+        using Pushes = t::PushSchema<t::PushRange<BaseRecord, vsl::ShaderFlag::COMPUTE>>;
         using Output = t::DescriptorSet<0, t::StorageBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
         using Resources = t::ResourceSchema<Output>;
         vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("fill.comp.spv"));

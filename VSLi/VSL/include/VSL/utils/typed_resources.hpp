@@ -1,5 +1,5 @@
 #pragma once
-#include "typed_vertex_layout.hpp"
+#include "typed_block_layout.hpp"
 #include "../vulkan/descriptor_set_manager.hpp"
 #include "../vulkan/stages/resource_binding.hpp"
 #include <algorithm>
@@ -18,6 +18,8 @@ namespace VSL_NAMESPACE::typed {
         struct DescriptorRequirement {
             std::uint32_t set;
             graphic_resource::BindingPoint point;
+            const BlockType* memory_layout = nullptr;
+            size_t payload_size = 0;
         };
         void write_descriptor(GraphicResource resource, graphic_resource::BindingPoint point, std::span<const DescriptorValue> values);
         void inject_resource_schema(PipelineLayoutEditAccessor layout, std::span<const DescriptorRequirement> requirements, std::uint32_t set_count);
@@ -38,7 +40,12 @@ namespace VSL_NAMESPACE::typed {
 
     template<std::uint32_t binding, graphic_resource::Type kind, ShaderFlag stages, typename Payload_ = void, std::uint32_t count = 1>
     struct DescriptorBinding {
-        using Payload = Payload_;
+        using MemoryLayout = PayloadLayout<Payload_>;
+        using Payload = typename MemoryLayout::Payload;
+        static constexpr const BlockType* MEMORY_LAYOUT = std::is_void_v<Payload> ? nullptr : &MemoryLayout::LAYOUT;
+        static constexpr size_t PAYLOAD_SIZE = [] { if constexpr (std::is_void_v<Payload>) return size_t{0}; else return sizeof(Payload); }();
+        static_assert(std::is_void_v<Payload> || detail::block_layout_known(MemoryLayout::LAYOUT), "Typed descriptor payload requires BlockRecord/BlockLayout metadata");
+        static_assert(MemoryLayout::LAYOUT.size <= PAYLOAD_SIZE, "Typed descriptor layout exceeds payload sizeof");
         static constexpr graphic_resource::BindingPoint POINT{binding, kind, stages, count};
         static_assert(std::is_void_v<Payload> || (std::is_trivially_copyable_v<Payload> && std::is_standard_layout_v<Payload>), "Typed descriptor payload must be a trivial standard-layout record");
         static_assert(binding != UINT32_MAX && count != 0 && stages != ShaderFlag::ERROR_, "Invalid typed descriptor binding/count/stages");
@@ -62,6 +69,8 @@ namespace VSL_NAMESPACE::typed {
         using Bindings = std::tuple<Bindings_...>;
         static constexpr std::array<graphic_resource::BindingPoint, sizeof...(Bindings_)> POINTS{Bindings_::POINT...};
         static constexpr size_t BINDING_COUNT = sizeof...(Bindings_);
+        static constexpr std::array<const BlockType*, BINDING_COUNT> MEMORY_TYPES{Bindings_::MEMORY_LAYOUT...};
+        static constexpr std::array<size_t, BINDING_COUNT> PAYLOAD_SIZES{Bindings_::PAYLOAD_SIZE...};
         static consteval bool IsValid();
         static_assert(IsValid(), "Duplicate typed descriptor binding");
         template<std::uint32_t binding>
@@ -96,15 +105,18 @@ namespace VSL_NAMESPACE::typed {
 
     template<typename Payload_, graphic_resource::Type kind, MemoryProperty property = MemoryProperty::HOST_VISIBLE | MemoryProperty::HOST_COHERENT>
     class TypedResourceBuffer {
+    public:
+        using Payload = typename PayloadLayout<Payload_>::Payload;
+
+    private:
         static_assert(kind == graphic_resource::Type::UNIFORM_BUFFER || kind == graphic_resource::Type::STORAGE_BUFFER);
-        static_assert(std::is_trivially_copyable_v<Payload_> && std::is_standard_layout_v<Payload_>);
+        static_assert(std::is_trivially_copyable_v<Payload> && std::is_standard_layout_v<Payload>);
         static constexpr MemoryType USAGE = kind == graphic_resource::Type::UNIFORM_BUFFER ? MemoryType::UNIFORM_BUFFER : MemoryType::STORAGE_BUFFER;
         using Storage = Buffer<USAGE | MemoryType::TRANSFER_DESTINATION, property>;
         Storage _buffer;
         size_t _count;
 
     public:
-        using Payload = Payload_;
         static constexpr auto KIND = kind;
         TypedResourceBuffer(LogicalDeviceAccessor device, std::span<const Payload> values)
         requires(contain<property, MemoryProperty::HOST_VISIBLE>());
@@ -214,7 +226,10 @@ namespace VSL_NAMESPACE::typed {
     consteval auto ResourceSchema<SetTypes...>::MakeRequirements() {
         std::array<detail::DescriptorRequirement, (SetTypes::BINDING_COUNT + ... + 0)> result{};
         size_t index = 0;
-        auto add = [&]<typename Set>() { for (const auto& point : Set::POINTS) result[index++] = {Set::SET, point}; };
+        auto add = [&]<typename Set>() {
+            for (size_t i = 0; i < Set::POINTS.size(); ++i)
+                result[index++] = {Set::SET, Set::POINTS[i], Set::MEMORY_TYPES[i], Set::PAYLOAD_SIZES[i]};
+        };
         (add.template operator()<SetTypes>(), ...);
         return result;
     }
@@ -227,14 +242,14 @@ namespace VSL_NAMESPACE::typed {
                     return false;
         return true;
     }
-    template<typename Payload, graphic_resource::Type kind, MemoryProperty property>
-    TypedResourceBuffer<Payload, kind, property>::TypedResourceBuffer(LogicalDeviceAccessor device, std::span<const Payload> values)
+    template<typename PayloadTag, graphic_resource::Type kind, MemoryProperty property>
+    TypedResourceBuffer<PayloadTag, kind, property>::TypedResourceBuffer(LogicalDeviceAccessor device, std::span<const Payload> values)
     requires(contain<property, MemoryProperty::HOST_VISIBLE>())
         : _buffer(device, helper::checked_buffer_array_size<Payload>(values.size())), _count(values.size()) {
         copy(values);
     }
-    template<typename Payload, graphic_resource::Type kind, MemoryProperty property>
-    void TypedResourceBuffer<Payload, kind, property>::copy(std::span<const Payload> values)
+    template<typename PayloadTag, graphic_resource::Type kind, MemoryProperty property>
+    void TypedResourceBuffer<PayloadTag, kind, property>::copy(std::span<const Payload> values)
     requires(contain<property, MemoryProperty::HOST_VISIBLE>())
     {
         if (values.size() != _count)

@@ -9,11 +9,13 @@ namespace {
     struct Tint {
         float rgba[4];
     };
+
+    using TintRecord = t::BlockRecord<Tint, VSL_BLOCK_MEMBER(Tint, rgba)>;
     struct Wrong {
         float rgba[4];
     };
-    using Push = t::PushSchema<t::PushRange<Tint, vsl::ShaderFlag::VERTEX, 16>>;
-    using Other = t::PushSchema<t::PushRange<Tint, vsl::ShaderFlag::FRAGMENT, 16>>;
+    using Push = t::PushSchema<t::PushRange<TintRecord, vsl::ShaderFlag::VERTEX, 16>>;
+    using Other = t::PushSchema<t::PushRange<TintRecord, vsl::ShaderFlag::FRAGMENT, 16>>;
     using Pipeline = t::TypedGraphicsPipeline<t::TypedVertexInput<>, t::ResourceSchema<>, Push>;
     using Compute = t::TypedComputePipeline<t::ResourceSchema<>, Push>;
 #if VSL_TYPED_CASE == 0
@@ -43,16 +45,16 @@ namespace {
         pipeline.bind_vertices().push_constants(values);
     }
 #elif VSL_TYPED_CASE == 6
-    using Overlap = t::PushSchema<t::PushRange<Tint, vsl::ShaderFlag::VERTEX>, t::PushRange<std::uint32_t, vsl::ShaderFlag::VERTEX, 8>>;
+    using Overlap = t::PushSchema<t::PushRange<TintRecord, vsl::ShaderFlag::VERTEX>, t::PushRange<std::uint32_t, vsl::ShaderFlag::VERTEX, 8>>;
     static_assert(Overlap::COUNT == 2);
 #elif VSL_TYPED_CASE == 7
-    using Bad = t::PushRange<Tint, vsl::ShaderFlag::VERTEX, 2>;
+    using Bad = t::PushRange<TintRecord, vsl::ShaderFlag::VERTEX, 2>;
     static_assert(Bad::RANGE.offset == 2);
 #elif VSL_TYPED_CASE == 8
     using Bad = t::PushRange<std::uint8_t, vsl::ShaderFlag::VERTEX>;
     static_assert(Bad::RANGE.size == 1);
 #elif VSL_TYPED_CASE == 9
-    using Bad = t::PushRange<Tint, vsl::ShaderFlag::ERROR_>;
+    using Bad = t::PushRange<TintRecord, vsl::ShaderFlag::ERROR_>;
     static_assert(Bad::RANGE.size == sizeof(Tint));
 #elif VSL_TYPED_CASE == 10
     void rejected(Compute& pipeline) {

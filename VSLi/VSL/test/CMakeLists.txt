@@ -15,7 +15,7 @@ if (VSL_TEST_SOURCES)
             reflection_texel_buffers.comp reflection_texel_arrays.comp
             reflection_input_attachment.frag reflection_input_arrays.frag
             reflection_vertex_arrays.vert reflection_vertex_array_shapes.vert
-            typed_push.vert typed_push_overlap.vert typed_push_overlap.frag typed_push_distinct.frag typed_push_partial.frag typed_push_resources.vert
+            typed_block_layout.comp typed_block_arrays.comp typed_block_numeric.comp typed_push.vert typed_push_overlap.vert typed_push_overlap.frag typed_push_distinct.frag typed_push_partial.frag typed_push_resources.vert
             typed_descriptors.vert typed_descriptors_relocated.vert typed_descriptors.comp typed_texture.frag typed_components.vert typed_numeric.vert typed_wide.vert typed_runtime_descriptors.vert)
         set(VSL_TEST_SHADER_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/shaders/${VSL_TEST_SHADER}.spv")
         set(VSL_TEST_SHADER_OPTIONS)
@@ -96,4 +96,18 @@ if (VSL_TEST_SOURCES)
     add_library(vsl-push-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_push_constants.cpp)
     target_compile_definitions(vsl-push-style-contract PRIVATE VSL_TYPED_CASE=0)
     target_include_directories(vsl-push-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
+    set(typed_block_names Valid MissingDescriptorMetadata MissingPushMetadata WrongMemberRecord MemberStorageOverflow
+        MemberOffsetOverflow InvalidMatrixDimensions IntegerMatrix InvalidMatrixStride ExtentOverflow ZeroArrayCapacity WrongBufferPayload InvalidFormatExtent)
+    foreach(case RANGE 0 12)
+        list(GET typed_block_names ${case} name)
+        add_test(NAME "VSL.TypedBlock.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_block_layout.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=Typed block|Typed descriptor|Typed push|TypedUniformBuffer|TypedResourceBuffer|constant expression"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.TypedBlock.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
+    add_library(vsl-block-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_block_layout.cpp)
+    target_compile_definitions(vsl-block-style-contract PRIVATE VSL_TYPED_CASE=0)
+    target_include_directories(vsl-block-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
 endif ()

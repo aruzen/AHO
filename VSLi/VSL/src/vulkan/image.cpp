@@ -59,7 +59,7 @@ VSL_NAMESPACE::ImageAccessor::MakeImage(VSL_NAMESPACE::ImageType type,
     vk::MemoryAllocateInfo alloc_info;
     alloc_info.allocationSize = mem_requirements.size;
     alloc_info.memoryTypeIndex = VSL_NAMESPACE::impl::helper::find_memory_type(device.data_, mem_requirements.memoryTypeBits,
-                                                                             (vk::MemoryPropertyFlagBits)prop);
+                                                                               (vk::MemoryPropertyFlagBits)prop);
 
     data_->memory = device.data_->device.allocateMemory(alloc_info);
 

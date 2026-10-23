@@ -56,13 +56,13 @@ namespace VSL_NAMESPACE {
         if (buffers->recording)
             throw std::logic_error("A phase is already recording on this manager");
         if (next_image_available && (!next_image_available->data_ ||
-                                   next_image_available->data_->device != manager.data_->device))
+                                     next_image_available->data_->device != manager.data_->device))
             throw std::invalid_argument("Acquire semaphore device mismatch");
         if (calculation_finish && (!calculation_finish->data_ ||
-                                  calculation_finish->data_->device != manager.data_->device))
+                                   calculation_finish->data_->device != manager.data_->device))
             throw std::invalid_argument("Signal semaphore device mismatch");
         if (in_flight_fence && (!in_flight_fence->data_ ||
-                              in_flight_fence->data_->device != manager.data_->device))
+                                in_flight_fence->data_->device != manager.data_->device))
             throw std::invalid_argument("Completion fence device mismatch");
         frame_slot = buffers->current_buffer_idx;
         signal_index = frame_slot;
@@ -249,7 +249,7 @@ namespace VSL_NAMESPACE {
         if (state != State::FINISH_SUBMIT || _presented)
             return SubmitResult::FAILED;
         vk::Semaphore finished = calculation_finish ? calculation_finish->data_->semaphores.at(image_index)
-                                                   : *swapchain.data_->presentation_semaphores.at(image_index);
+                                                    : *swapchain.data_->presentation_semaphores.at(image_index);
         auto chain = swapchain.data_->swap_chain;
         vk::PresentInfoKHR info{.waitSemaphoreCount = 1, .pWaitSemaphores = &finished, .swapchainCount = 1, .pSwapchains = &chain, .pImageIndices = &image_index};
         auto result = manager.data_->present_queue.presentKHR(&info);
@@ -285,9 +285,7 @@ namespace VSL_NAMESPACE {
             completion_.retain(swapchain.data_);
             vk::ImageMemoryBarrier barrier{
                 .oldLayout = vk::ImageLayout::eUndefined, .newLayout = vk::ImageLayout::ePresentSrcKHR, .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .image = swapchain.data_->swap_chain_images.at(image_index), .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
-            buffers->command_buffers.at(frame_slot).pipelineBarrier(
-                vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eBottomOfPipe,
-                {}, {}, {}, barrier);
+            buffers->command_buffers.at(frame_slot).pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eBottomOfPipe, {}, {}, {}, barrier);
             DefaultPhase::submit_commands(); // キャンセル時は派生クラスの終了コールバックを呼ばない。
         }
         if (state == State::FINISH_SUBMIT)

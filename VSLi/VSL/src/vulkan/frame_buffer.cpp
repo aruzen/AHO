@@ -6,7 +6,7 @@
 namespace VSL_NAMESPACE {
     namespace {
         std::shared_ptr<impl::FrameBufferImpl> make_data(RenderPassAccessor pass, std::uint32_t width,
-                                                           std::uint32_t height, std::uint32_t layers) {
+                                                         std::uint32_t height, std::uint32_t layers) {
             if (!pass.data_ || !width || !height || !layers)
                 throw std::invalid_argument("Invalid framebuffer pass/extent/layers");
             auto data = std::make_shared<impl::FrameBufferImpl>();

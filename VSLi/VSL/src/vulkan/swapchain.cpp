@@ -54,9 +54,9 @@ vk::Extent2D choose_swap_extent(const vk::SurfaceCapabilitiesKHR& capabilities, 
             static_cast<uint32_t>(height)};
 
         actual_extent.width = std::clamp(actual_extent.width, capabilities.minImageExtent.width,
-                                        capabilities.maxImageExtent.width);
+                                         capabilities.maxImageExtent.width);
         actual_extent.height = std::clamp(actual_extent.height, capabilities.minImageExtent.height,
-                                         capabilities.maxImageExtent.height);
+                                          capabilities.maxImageExtent.height);
 
         return actual_extent;
     }

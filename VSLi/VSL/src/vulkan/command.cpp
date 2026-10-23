@@ -95,7 +95,9 @@ std::uint32_t VSL_NAMESPACE::CommandManager::get_current_buffer_idx() {
 VSL_NAMESPACE::CommandBuffer VSL_NAMESPACE::CommandManager::make_exclusive_buffer(size_t size) {
     return CommandBuffer(CommandPool{data_->command_pool}, size);
 }
-void VSL_NAMESPACE::CommandManager::wait_idle() { data_->device->device.waitIdle(); }
+void VSL_NAMESPACE::CommandManager::wait_idle() {
+    data_->device->device.waitIdle();
+}
 
 VSL_NAMESPACE::impl::CommandPoolImpl::~CommandPoolImpl() {
     if (command_pool)

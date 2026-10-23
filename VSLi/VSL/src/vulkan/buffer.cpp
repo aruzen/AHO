@@ -19,7 +19,7 @@ VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException::MemoryNotHostVisibleEx
                                                                                                                                                                     sourece) {}
 
 std::uint32_t VSL_NAMESPACE::impl::helper::find_memory_type(std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl> device, std::uint32_t type_filter,
-                                                           vk::MemoryPropertyFlags properties) {
+                                                            vk::MemoryPropertyFlags properties) {
     if (not device->parent_device->mem_props.has_value())
         device->parent_device->make_mem_props();
     auto& mem_properties = device->parent_device->mem_props.value();

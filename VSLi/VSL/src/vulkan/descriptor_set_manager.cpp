@@ -12,9 +12,13 @@
 
 namespace VSL_NAMESPACE::graphic_resource {
     ManagerInterface::ManagerInterface()
-        : _identity(std::make_shared<impl::GraphicResourceManagerIdentity>()) { _identity->manager = this; }
+        : _identity(std::make_shared<impl::GraphicResourceManagerIdentity>()) {
+        _identity->manager = this;
+    }
     ManagerInterface::~ManagerInterface() = default;
-    ManagerInterface::ManagerInterface(const ManagerInterface& other) : ManagerInterface() { data_ = other.data_; }
+    ManagerInterface::ManagerInterface(const ManagerInterface& other) : ManagerInterface() {
+        data_ = other.data_;
+    }
     ManagerInterface& ManagerInterface::operator=(const ManagerInterface& other) {
         if (this != &other) {
             auto identity = std::make_shared<impl::GraphicResourceManagerIdentity>();

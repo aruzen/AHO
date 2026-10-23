@@ -51,12 +51,12 @@ static VkBool32 VKAPI_PTR debug_callback(
 
 void populate_debug_messenger_create_info(vk::DebugUtilsMessengerCreateInfoEXT& create_info) {
     create_info.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo |
-                                 vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
-                                 vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
-                                 vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
+                                  vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
+                                  vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
+                                  vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
     create_info.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
-                             vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
-                             vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
+                              vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
+                              vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
     create_info.pfnUserCallback = (vk::PFN_DebugUtilsMessengerCallbackEXT)debug_callback;
 }
 

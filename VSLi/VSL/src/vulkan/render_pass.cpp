@@ -54,15 +54,15 @@ namespace VSL_NAMESPACE {
                 if (ref.attachment >= attachments.size())
                     throw std::out_of_range("Attachment reference");
                 const bool is_depth = impl::helper::image_aspects(
-                                         static_cast<vk::Format>(attachments[ref.attachment].format.type())) !=
-                                     vk::ImageAspectFlagBits::eColor;
+                                          static_cast<vk::Format>(attachments[ref.attachment].format.type())) !=
+                                      vk::ImageAspectFlagBits::eColor;
                 if (is_depth != depth)
                     throw std::invalid_argument("Attachment role does not match format");
                 const bool valid_layout = depth ? ref.layout == ImageLayout::GENERAL ||
-                                                     ref.layout == ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL ||
-                                                     ref.layout == ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL
-                                               : ref.layout == ImageLayout::GENERAL ||
-                                                     ref.layout == ImageLayout::COLOR_ATTACHMENT_OPTIMAL;
+                                                      ref.layout == ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL ||
+                                                      ref.layout == ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                                                : ref.layout == ImageLayout::GENERAL ||
+                                                      ref.layout == ImageLayout::COLOR_ATTACHMENT_OPTIMAL;
                 if (!valid_layout)
                     throw std::invalid_argument("Invalid layout for attachment role");
             };
@@ -200,7 +200,7 @@ namespace VSL_NAMESPACE {
                 throw std::invalid_argument("Swapchain required");
             RenderPassDescription desc;
             desc.add_color({.format = swapchain.get_format(),
-                           .final_layout = ImageLayout::PRESENT});
+                            .final_layout = ImageLayout::PRESENT});
             if (picking)
                 desc.add_color({.format = data_format::UNSIGNED_INT});
             return desc;

@@ -3,7 +3,9 @@
 
 VSL_NAMESPACE::command::BindPipeline::BindPipeline(PipelineAccessor pipeline) : pipeline(pipeline) {}
 
-VSL_NAMESPACE::PipelineAccessor VSL_NAMESPACE::command::BindPipeline::get_pipeline() { return pipeline; }
+VSL_NAMESPACE::PipelineAccessor VSL_NAMESPACE::command::BindPipeline::get_pipeline() {
+    return pipeline;
+}
 
 void VSL_NAMESPACE::command::BindPipeline::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
     buffer.retain(pipeline.data_);

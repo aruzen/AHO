@@ -131,7 +131,7 @@ namespace VSL_NAMESPACE::command {
             .clearValueCount = static_cast<std::uint32_t>(values.size()),
             .pClearValues = values.data()};
         buffer.data_->command_buffers[buffer.get_current_buffer_idx()].beginRenderPass(info,
-                                                                                   vk::SubpassContents::eInline);
+                                                                                       vk::SubpassContents::eInline);
     }
     void NextSubpass::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
         buffer.data_->command_buffers[buffer.get_current_buffer_idx()].nextSubpass(vk::SubpassContents::eInline);

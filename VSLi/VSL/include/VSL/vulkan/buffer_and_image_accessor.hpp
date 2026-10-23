@@ -297,13 +297,13 @@ namespace VSL_NAMESPACE {
         size_t size();
 
         static std::shared_ptr<impl::ImageImpl> MakeImage(VSL_NAMESPACE::ImageType type,
-                                                            VSL_NAMESPACE::MemoryProperty prop,
-                                                            VSL_NAMESPACE::ImageLayout layout,
-                                                            VSL_NAMESPACE::LogicalDeviceAccessor device,
-                                                            std::uint32_t width,
-                                                            std::uint32_t height,
-                                                            data_format::Format format,
-                                                            std::uint32_t count, SampleCount samples = SampleCount::ONE);
+                                                          VSL_NAMESPACE::MemoryProperty prop,
+                                                          VSL_NAMESPACE::ImageLayout layout,
+                                                          VSL_NAMESPACE::LogicalDeviceAccessor device,
+                                                          std::uint32_t width,
+                                                          std::uint32_t height,
+                                                          data_format::Format format,
+                                                          std::uint32_t count, SampleCount samples = SampleCount::ONE);
 
         static void TransformLayout(CommandManager manager,
                                     std::shared_ptr<impl::ImageImpl> data,

@@ -103,8 +103,8 @@ def apple_arguments():
     if sys.platform != 'darwin':
         return []
     sdk = subprocess.check_output(['xcrun', '--show-sdk-path'], text=True).strip()
-    return ['--extra-arg=-isysroot', '--extra-arg=' + sdk,
-            '--extra-arg=-isystem', '--extra-arg=' + sdk + '/usr/include/c++/v1']
+    # 標準ライブラリはコンパイルDBのコンパイラーに選ばせ、AppleとLLVMのヘッダーを混在させない。
+    return ['--extra-arg=-isysroot', '--extra-arg=' + sdk]
 
 
 def translation_check(job, args, selected, tidy, extra):

@@ -175,7 +175,8 @@ Swapchain末尾のusage引数に `ImageType::COLOR_ATTACHMENT | ImageType::TRANS
 
 - RenderPass(swapchain)、FrameBuffer(swapchain, pass)、旧RenderPassBegin(pass, framebuffer, color)を維持する。
 - IDPickingRenderPass/IDPickingRenderPassBegin/pl::IDPickingは共通実装へ委譲する互換ラッパー。新しい用途では追加不要。
-- 新FrameBufferは1対象でBeginのindexは既定0。旧一括FrameBufferでも新Beginのtarget_indexで取得画像を明示できる。旧Beginの自動選択は従来のフレーム番号を維持する。既知のフレーム/取得画像番号の全面整理は今回の範囲外。
+- IDPickingRenderPass::readは描画時に取得したswapchain画像番号からIDを読む。command bufferのslot番号と画像番号は独立している。取得番号がない従来の呼び出しは現在のslot番号へフォールバックする。読み取りは描画の完了後、同じmanagerで次のPhaseを開始する前に行う。
+- 新FrameBufferは1対象でBeginのindexは既定0。旧一括FrameBufferでも新Beginのtarget_indexで取得画像を明示できる。旧Beginの自動選択は取得済み画像番号を優先し、ない場合は従来のslot番号を使う。
 - FrameBufferは画像とRenderPassを保持する。借用Swapchain画像はSwapchainとSurfaceを保持する。描画送信後のFrameBuffer/Pipeline等は利用側がGPU完了まで保持する。
 - aho::ImageReadbackが保持するのは転送に必要なリソースであり、描画リソース全体のGPU寿命管理を代替しない。
 - リサイズは利用側で新画像とFrameBufferを作る。同じformat/sample構成ならRenderPassを再利用できる。旧リソースはGPU利用完了後に解放する。

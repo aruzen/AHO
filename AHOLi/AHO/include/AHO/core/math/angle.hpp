@@ -122,61 +122,133 @@ namespace AHO_NAMESPACE {
             constexpr operator Radian() const;
         };
 
-        constexpr Radian operator+(const Radian& o, const Radian& r) { return {o.value + r.value}; }
-        constexpr Radian operator-(const Radian& o, const Radian& r) { return {o.value - r.value}; }
-        constexpr Radian operator*(const Radian& o, const double& m) { return {o.value * m}; }
-        constexpr Radian operator*(const Radian& o, const size_t& m) { return {o.value * m}; }
-        constexpr Radian operator*(const Radian& o, const float& m) { return {o.value * m}; }
-        constexpr Radian operator/(const Radian& o, const double& m) { return {o.value / m}; }
-        constexpr Radian operator/(const Radian& o, const size_t& m) { return {o.value / m}; }
-        constexpr Radian operator/(const Radian& o, const float& m) { return {o.value / m}; }
-        constexpr Radian operator*(const double& m, const Radian& o) { return {m * o.value}; }
-        constexpr Radian operator*(const size_t& m, const Radian& o) { return {m * o.value}; }
-        constexpr Radian operator*(const float& m, const Radian& o) { return {m * o.value}; }
-        constexpr Radian operator/(const double& m, const Radian& o) { return {m / o.value}; }
-        constexpr Radian operator/(const size_t& m, const Radian& o) { return {m / o.value}; }
-        constexpr Radian operator/(const float& m, const Radian& o) { return {m / o.value}; }
+        constexpr Radian operator+(const Radian& o, const Radian& r) {
+            return {o.value + r.value};
+        }
+        constexpr Radian operator-(const Radian& o, const Radian& r) {
+            return {o.value - r.value};
+        }
+        constexpr Radian operator*(const Radian& o, const double& m) {
+            return {o.value * m};
+        }
+        constexpr Radian operator*(const Radian& o, const size_t& m) {
+            return {o.value * m};
+        }
+        constexpr Radian operator*(const Radian& o, const float& m) {
+            return {o.value * m};
+        }
+        constexpr Radian operator/(const Radian& o, const double& m) {
+            return {o.value / m};
+        }
+        constexpr Radian operator/(const Radian& o, const size_t& m) {
+            return {o.value / m};
+        }
+        constexpr Radian operator/(const Radian& o, const float& m) {
+            return {o.value / m};
+        }
+        constexpr Radian operator*(const double& m, const Radian& o) {
+            return {m * o.value};
+        }
+        constexpr Radian operator*(const size_t& m, const Radian& o) {
+            return {m * o.value};
+        }
+        constexpr Radian operator*(const float& m, const Radian& o) {
+            return {m * o.value};
+        }
+        constexpr Radian operator/(const double& m, const Radian& o) {
+            return {m / o.value};
+        }
+        constexpr Radian operator/(const size_t& m, const Radian& o) {
+            return {m / o.value};
+        }
+        constexpr Radian operator/(const float& m, const Radian& o) {
+            return {m / o.value};
+        }
 
-        constexpr Degree operator+(const Degree& o, const Degree& r) { return {o.value + r.value}; }
-        constexpr Degree operator-(const Degree& o, const Degree& r) { return {o.value - r.value}; }
-        constexpr Degree operator*(const Degree& o, const double& m) { return {o.value * m}; }
-        constexpr Degree operator*(const Degree& o, const size_t& m) { return {o.value * m}; }
-        constexpr Degree operator*(const Degree& o, const float& m) { return {o.value * m}; }
-        constexpr Degree operator/(const Degree& o, const double& m) { return {o.value / m}; }
-        constexpr Degree operator/(const Degree& o, const size_t& m) { return {o.value / m}; }
-        constexpr Degree operator/(const Degree& o, const float& m) { return {o.value / m}; }
-        constexpr Degree operator*(const double& m, const Degree& o) { return {m * o.value}; }
-        constexpr Degree operator*(const size_t& m, const Degree& o) { return {m * o.value}; }
-        constexpr Degree operator*(const float& m, const Degree& o) { return {m * o.value}; }
-        constexpr Degree operator/(const double& m, const Degree& o) { return {m / o.value}; }
-        constexpr Degree operator/(const size_t& m, const Degree& o) { return {m / o.value}; }
-        constexpr Degree operator/(const float& m, const Degree& o) { return {m / o.value}; }
+        constexpr Degree operator+(const Degree& o, const Degree& r) {
+            return {o.value + r.value};
+        }
+        constexpr Degree operator-(const Degree& o, const Degree& r) {
+            return {o.value - r.value};
+        }
+        constexpr Degree operator*(const Degree& o, const double& m) {
+            return {o.value * m};
+        }
+        constexpr Degree operator*(const Degree& o, const size_t& m) {
+            return {o.value * m};
+        }
+        constexpr Degree operator*(const Degree& o, const float& m) {
+            return {o.value * m};
+        }
+        constexpr Degree operator/(const Degree& o, const double& m) {
+            return {o.value / m};
+        }
+        constexpr Degree operator/(const Degree& o, const size_t& m) {
+            return {o.value / m};
+        }
+        constexpr Degree operator/(const Degree& o, const float& m) {
+            return {o.value / m};
+        }
+        constexpr Degree operator*(const double& m, const Degree& o) {
+            return {m * o.value};
+        }
+        constexpr Degree operator*(const size_t& m, const Degree& o) {
+            return {m * o.value};
+        }
+        constexpr Degree operator*(const float& m, const Degree& o) {
+            return {m * o.value};
+        }
+        constexpr Degree operator/(const double& m, const Degree& o) {
+            return {m / o.value};
+        }
+        constexpr Degree operator/(const size_t& m, const Degree& o) {
+            return {m / o.value};
+        }
+        constexpr Degree operator/(const float& m, const Degree& o) {
+            return {m / o.value};
+        }
 
         template<typename Scalar>
         requires std::is_arithmetic_v<Scalar>
-        constexpr Radian operator*(const Radian& o, const Scalar& m) { return {o.value * m}; }
+        constexpr Radian operator*(const Radian& o, const Scalar& m) {
+            return {o.value * m};
+        }
         template<typename Scalar>
         requires std::is_arithmetic_v<Scalar>
-        constexpr Radian operator*(const Scalar& m, const Radian& o) { return {m * o.value}; }
+        constexpr Radian operator*(const Scalar& m, const Radian& o) {
+            return {m * o.value};
+        }
         template<typename Scalar>
         requires std::is_arithmetic_v<Scalar>
-        constexpr Radian operator/(const Radian& o, const Scalar& m) { return {o.value / m}; }
+        constexpr Radian operator/(const Radian& o, const Scalar& m) {
+            return {o.value / m};
+        }
         template<typename Scalar>
         requires std::is_arithmetic_v<Scalar>
-        constexpr Radian operator/(const Scalar& m, const Radian& o) { return {m / o.value}; }
+        constexpr Radian operator/(const Scalar& m, const Radian& o) {
+            return {m / o.value};
+        }
 
         template<typename Scalar>
         requires std::is_arithmetic_v<Scalar>
-        constexpr Degree operator*(const Degree& o, const Scalar& m) { return {o.value * m}; }
+        constexpr Degree operator*(const Degree& o, const Scalar& m) {
+            return {o.value * m};
+        }
         template<typename Scalar>
         requires std::is_arithmetic_v<Scalar>
-        constexpr Degree operator*(const Scalar& m, const Degree& o) { return {m * o.value}; }
+        constexpr Degree operator*(const Scalar& m, const Degree& o) {
+            return {m * o.value};
+        }
         template<typename Scalar>
         requires std::is_arithmetic_v<Scalar>
-        constexpr Degree operator/(const Degree& o, const Scalar& m) { return {o.value / m}; }
+        constexpr Degree operator/(const Degree& o, const Scalar& m) {
+            return {o.value / m};
+        }
         template<typename Scalar>
         requires std::is_arithmetic_v<Scalar>
-        constexpr Degree operator/(const Scalar& m, const Degree& o) { return {m / o.value}; }
+        constexpr Degree operator/(const Scalar& m, const Degree& o) {
+            return {m / o.value};
+        }
 
         namespace literals {
             // Preserve the precision of the long double value, including on older standard libraries.

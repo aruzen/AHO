@@ -6,6 +6,7 @@ namespace aho_test::arithmetic {
         int value{};
         auto operator<=>(const Operand&) const = default;
     };
+
     struct LeftOperand {
         int value{};
         auto operator<=>(const LeftOperand&) const = default;
@@ -26,10 +27,6 @@ namespace aho_test::arithmetic {
             return *this;
         }
     };
-    constexpr int operator+(const LeftOperand& lhs, const Operand& rhs) { return lhs.value + rhs.value; }
-    constexpr int operator-(const LeftOperand& lhs, const Operand& rhs) { return lhs.value - rhs.value; }
-    constexpr int operator*(const LeftOperand& lhs, const Operand& rhs) { return lhs.value * rhs.value; }
-    constexpr int operator/(const LeftOperand& lhs, const Operand& rhs) { return lhs.value / rhs.value; }
 
     struct AssignmentOnly {
         int value{};
@@ -51,21 +48,11 @@ namespace aho_test::arithmetic {
             return *this;
         }
     };
+
     struct CategoryResult {
         int value{};
         auto operator<=>(const CategoryResult&) const = default;
     };
-    constexpr int operator+(const CategoryResult& lhs, const CategoryResult& rhs) { return lhs.value + rhs.value; }
-    constexpr long operator+(CategoryResult&& lhs, CategoryResult&& rhs) { return static_cast<long>(lhs.value + rhs.value); }
-    constexpr int operator-(const CategoryResult& lhs, const CategoryResult& rhs) { return lhs.value - rhs.value; }
-    constexpr long operator-(CategoryResult&& lhs, CategoryResult&& rhs) { return static_cast<long>(lhs.value - rhs.value); }
-    constexpr int operator*(const CategoryResult& lhs, const CategoryResult& rhs) { return lhs.value * rhs.value; }
-    constexpr long operator*(CategoryResult&& lhs, CategoryResult&& rhs) { return static_cast<long>(lhs.value * rhs.value); }
-    constexpr int operator/(const CategoryResult& lhs, const CategoryResult& rhs) { return lhs.value / rhs.value; }
-    constexpr long operator/(CategoryResult&& lhs, CategoryResult&& rhs) { return static_cast<long>(lhs.value / rhs.value); }
-
-    constexpr long operator*(CategoryResult&& lhs, const CategoryResult& rhs) { return static_cast<long>(lhs.value * rhs.value); }
-    constexpr long operator/(CategoryResult&& lhs, const CategoryResult& rhs) { return static_cast<long>(lhs.value / rhs.value); }
 
     struct MutableOnly {
         int value{};
@@ -75,6 +62,57 @@ namespace aho_test::arithmetic {
         constexpr int operator*(const MutableOnly& rhs) { return value * rhs.value; }
         constexpr int operator/(const MutableOnly& rhs) { return value / rhs.value; }
     };
+
+    template<template<class> class Wrapper>
+    struct Family {
+        template<class T>
+        using Of = Wrapper<T>;
+    };
+
+    constexpr int operator+(const LeftOperand& lhs, const Operand& rhs) {
+        return lhs.value + rhs.value;
+    }
+    constexpr int operator-(const LeftOperand& lhs, const Operand& rhs) {
+        return lhs.value - rhs.value;
+    }
+    constexpr int operator*(const LeftOperand& lhs, const Operand& rhs) {
+        return lhs.value * rhs.value;
+    }
+    constexpr int operator/(const LeftOperand& lhs, const Operand& rhs) {
+        return lhs.value / rhs.value;
+    }
+
+    constexpr int operator+(const CategoryResult& lhs, const CategoryResult& rhs) {
+        return lhs.value + rhs.value;
+    }
+    constexpr long operator+(CategoryResult&& lhs, CategoryResult&& rhs) {
+        return static_cast<long>(lhs.value + rhs.value);
+    }
+    constexpr int operator-(const CategoryResult& lhs, const CategoryResult& rhs) {
+        return lhs.value - rhs.value;
+    }
+    constexpr long operator-(CategoryResult&& lhs, CategoryResult&& rhs) {
+        return static_cast<long>(lhs.value - rhs.value);
+    }
+    constexpr int operator*(const CategoryResult& lhs, const CategoryResult& rhs) {
+        return lhs.value * rhs.value;
+    }
+    constexpr long operator*(CategoryResult&& lhs, CategoryResult&& rhs) {
+        return static_cast<long>(lhs.value * rhs.value);
+    }
+    constexpr int operator/(const CategoryResult& lhs, const CategoryResult& rhs) {
+        return lhs.value / rhs.value;
+    }
+    constexpr long operator/(CategoryResult&& lhs, CategoryResult&& rhs) {
+        return static_cast<long>(lhs.value / rhs.value);
+    }
+
+    constexpr long operator*(CategoryResult&& lhs, const CategoryResult& rhs) {
+        return static_cast<long>(lhs.value * rhs.value);
+    }
+    constexpr long operator/(CategoryResult&& lhs, const CategoryResult& rhs) {
+        return static_cast<long>(lhs.value / rhs.value);
+    }
 
     template<class L, class R>
     concept CanAdd = requires(const L& lhs, const R& rhs) { lhs + rhs; };
@@ -93,9 +131,4 @@ namespace aho_test::arithmetic {
     template<class L, class R>
     concept CanDivideAssign = requires(L& lhs, const R& rhs) { lhs /= rhs; };
 
-    template<template<class> class Wrapper>
-    struct Family {
-        template<class T>
-        using Of = Wrapper<T>;
-    };
 } // namespace aho_test::arithmetic

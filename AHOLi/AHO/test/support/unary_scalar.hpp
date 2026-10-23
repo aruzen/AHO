@@ -14,6 +14,10 @@ namespace aho_test {
         constexpr explicit UnaryScalar(UnaryResult result) : value(result.value + 100) {}
         constexpr auto operator<=>(const UnaryScalar&) const = default;
     };
-    constexpr UnaryResult operator-(const UnaryScalar& source) { return {-source.value}; }
-    constexpr UnaryResult::operator UnaryScalar() const { return UnaryScalar(value); }
+    constexpr UnaryResult operator-(const UnaryScalar& source) {
+        return {-source.value};
+    }
+    constexpr UnaryResult::operator UnaryScalar() const {
+        return UnaryScalar(value);
+    }
 } // namespace aho_test

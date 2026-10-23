@@ -1,6 +1,8 @@
 #include <AHO/core/triangle.hpp>
 #if defined(AHO_CONTRACT_TRIANGLE_TRIANGLES)
-void verify() { const auto result = aho::Triangle<double, vsl::D2>{}.triangles(); }
+void verify() {
+    const auto result = aho::Triangle<double, vsl::D2>{}.triangles();
+}
 #elif defined(AHO_CONTRACT_TRIANGLE_POINTER_POINTS)
 void verify() {
     aho::Triangle<double, vsl::D2> triangle;
@@ -171,35 +173,36 @@ namespace {
 } // namespace
 
 namespace {
-template<class R, bool x, bool y, bool z>
-struct OneDimensionalTriangleCase {
-    using CoordinateInfo = typename aho::coordinate::MakeCoordinateInfo<x, y, z>::Value;
-    using Triangle = aho::Triangle<R, vsl::D1, CoordinateInfo>;
-};
-template<class T> class OneDimensionalTriangleAreaTest : public testing::Test {};
-using OneDimensionalTriangles = testing::Types<
-    OneDimensionalTriangleCase<int, true, false, false>,
-    OneDimensionalTriangleCase<int, false, true, false>,
-    OneDimensionalTriangleCase<int, false, false, true>,
-    OneDimensionalTriangleCase<double, true, false, false>,
-    OneDimensionalTriangleCase<double, false, true, false>,
-    OneDimensionalTriangleCase<double, false, false, true>>;
-TYPED_TEST_SUITE(OneDimensionalTriangleAreaTest, OneDimensionalTriangles);
-TYPED_TEST(OneDimensionalTriangleAreaTest, ValueAndPointerTrianglesHaveZeroAreaAtCompileTimeAndRuntime) {
-    using Triangle = typename TypeParam::Triangle;
-    constexpr auto has_zero_area = [] {
-        Triangle triangle({-3}, {2}, {7});
-        return triangle.area() == 0 && triangle.adress().area() == 0;
+    template<class R, bool x, bool y, bool z>
+    struct OneDimensionalTriangleCase {
+        using CoordinateInfo = typename aho::coordinate::MakeCoordinateInfo<x, y, z>::Value;
+        using Triangle = aho::Triangle<R, vsl::D1, CoordinateInfo>;
     };
-    static_assert(has_zero_area());
-    EXPECT_TRUE(has_zero_area());
-    Triangle triangle({-3}, {2}, {7});
-    auto borrowed = triangle.adress();
-    EXPECT_DOUBLE_EQ(triangle.area(), 0);
-    EXPECT_DOUBLE_EQ(borrowed.area(), 0);
-    triangle.pos2 = decltype(triangle.pos2)(11);
-    EXPECT_DOUBLE_EQ(borrowed.area(), 0);
-}
+    template<class T>
+    class OneDimensionalTriangleAreaTest : public testing::Test {};
+    using OneDimensionalTriangles = testing::Types<
+        OneDimensionalTriangleCase<int, true, false, false>,
+        OneDimensionalTriangleCase<int, false, true, false>,
+        OneDimensionalTriangleCase<int, false, false, true>,
+        OneDimensionalTriangleCase<double, true, false, false>,
+        OneDimensionalTriangleCase<double, false, true, false>,
+        OneDimensionalTriangleCase<double, false, false, true>>;
+    TYPED_TEST_SUITE(OneDimensionalTriangleAreaTest, OneDimensionalTriangles);
+    TYPED_TEST(OneDimensionalTriangleAreaTest, ValueAndPointerTrianglesHaveZeroAreaAtCompileTimeAndRuntime) {
+        using Triangle = typename TypeParam::Triangle;
+        constexpr auto has_zero_area = [] {
+            Triangle triangle({-3}, {2}, {7});
+            return triangle.area() == 0 && triangle.adress().area() == 0;
+        };
+        static_assert(has_zero_area());
+        EXPECT_TRUE(has_zero_area());
+        Triangle triangle({-3}, {2}, {7});
+        auto borrowed = triangle.adress();
+        EXPECT_DOUBLE_EQ(triangle.area(), 0);
+        EXPECT_DOUBLE_EQ(borrowed.area(), 0);
+        triangle.pos2 = decltype(triangle.pos2)(11);
+        EXPECT_DOUBLE_EQ(borrowed.area(), 0);
+    }
 } // namespace
 
 #include <cmath>
@@ -219,7 +222,8 @@ namespace {
                 return Point(first, second, T{});
         }
     };
-    template<class T> class TriangleAreaRangeTest : public testing::Test {};
+    template<class T>
+    class TriangleAreaRangeTest : public testing::Test {};
     using TriangleAreaRanges = testing::Types<
         TriangleAreaRangeCase<float, true, true, false>,
         TriangleAreaRangeCase<float, true, false, true>,

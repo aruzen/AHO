@@ -80,35 +80,151 @@ namespace {
         template<class T>
         using Of = aho::Mat<T, rows, columns>;
         template<class T>
-        static constexpr Of<T> Values(bool right = false) {
-            Of<T> result{};
-            for (std::size_t i = 0; i < rows; ++i)
-                for (std::size_t j = 0; j < columns; ++j) {
-                    const int index = static_cast<int>(i * columns + j);
-                    result[i][j] = T{right ? 4 + index : 12 + 4 * index};
-                }
-            return result;
-        }
+        static constexpr Of<T> Values(bool right = false);
         template<class T>
-        static constexpr bool Equal(const Of<T>& actual, const std::array<int, 6>& expected) {
-            for (std::size_t i = 0; i < rows; ++i)
-                for (std::size_t j = 0; j < columns; ++j) {
-                    const auto& value = actual[i][j];
-                    const int integer = [&] {
-                        if constexpr (std::integral<T>)
-                            return value;
-                        else
-                            return value.value;
-                    }();
-                    if (integer != expected[i * columns + j])
-                        return false;
-                }
-            return true;
-        }
+        static constexpr bool Equal(const Of<T>& actual, const std::array<int, 6>& expected);
     };
+
     template<class T>
     class MatElementConstraintTest : public testing::Test {};
+
     using ElementMatrixShapes = testing::Types<ElementMatrixShape<1, 1>, ElementMatrixShape<1, 3>, ElementMatrixShape<2, 3>>;
+
+    struct MatrixWritebackElement {
+        int value{};
+        constexpr MatrixWritebackElement& operator=(int result) {
+            value = result;
+            return *this;
+        }
+    };
+
+    struct RvalueMatrixSum {
+        int value{};
+        constexpr RvalueMatrixSum& operator+=(RvalueMatrixSum&& rhs) {
+            value += rhs.value;
+            return *this;
+        }
+        RvalueMatrixSum& operator+=(const RvalueMatrixSum&) = delete;
+    };
+
+    struct RvalueMatrixFactor {
+        int value{};
+    };
+
+    struct MissingMatrixSum {
+        int value{};
+    };
+
+    struct MissingMatrixSumFactor {
+        int value{};
+    };
+
+    struct NonDefaultMatrixSum {
+        int value;
+        NonDefaultMatrixSum() = delete;
+        constexpr explicit NonDefaultMatrixSum(int v) : value(v) {}
+        constexpr NonDefaultMatrixSum& operator+=(NonDefaultMatrixSum&& rhs) {
+            value += rhs.value;
+            return *this;
+        }
+    };
+
+    struct NonDefaultMatrixFactor {
+        int value{};
+    };
+
+    using Matrix2 = aho::Mat<int, 2, 2>;
+
+    template<class T>
+    class MatConstCastTest : public testing::Test {};
+
+    using ConstCastScalars = testing::Types<float, double, long double>;
+
+    template<class T>
+    class MatScalarOperatorTest : public testing::Test {};
+
+    using ScalarTypes = testing::Types<int, float, double>;
+
+    template<class Element, class Scalar, class Result>
+    struct MixedMatrixScalarCase {
+        using ElementType = Element;
+        using ScalarType = Scalar;
+        using ResultType = Result;
+    };
+
+    using MixedMatrixScalars = testing::Types<
+        MixedMatrixScalarCase<int, float, float>,
+        MixedMatrixScalarCase<float, double, double>,
+        MixedMatrixScalarCase<double, int, double>>;
+
+    template<class T>
+    class MatMixedScalarOperatorTest : public testing::Test {};
+
+    template<class T>
+    class MatScalarAssignmentTest : public testing::Test {};
+
+    using AssignmentScalars = testing::Types<int, float, double>;
+
+    template<class T>
+    class MatListFactoryTest : public testing::Test {};
+
+    using ListFactoryScalars = testing::Types<int, float, double>;
+
+    template<class T>
+    class MatAxisRotationTest : public testing::Test {};
+
+    using RotationScalars = testing::Types<float, double>;
+
+    template<class T>
+    class MatViewTest : public testing::Test {};
+
+    using ViewScalars = testing::Types<float, double>;
+
+    template<class T>
+    class MatInverseTest : public testing::Test {};
+
+    using NumericTypes = testing::Types<float, double>;
+
+    template<class T>
+    class MatScaledInverseTest : public testing::Test {};
+
+    using ScaledInverseScalars = testing::Types<float, double, long double>;
+
+    template<class T>
+    class MatAffineScaleTest : public testing::Test {};
+
+    using AffineScaleScalars = testing::Types<float, double, long double>;
+
+    template<std::size_t rows, std::size_t columns>
+    template<class T>
+    constexpr auto ElementMatrixShape<rows, columns>::Values(bool right) -> Of<T> {
+        Of<T> result{};
+        for (std::size_t i = 0; i < rows; ++i)
+            for (std::size_t j = 0; j < columns; ++j) {
+                const int index = static_cast<int>(i * columns + j);
+                result[i][j] = T{right ? 4 + index : 12 + 4 * index};
+            }
+        return result;
+    }
+
+    template<std::size_t rows, std::size_t columns>
+    template<class T>
+    constexpr bool ElementMatrixShape<rows, columns>::Equal(const Of<T>& actual, const std::array<int, 6>& expected) {
+        for (std::size_t i = 0; i < rows; ++i)
+            for (std::size_t j = 0; j < columns; ++j) {
+                const auto& value = actual[i][j];
+                const int integer = [&] {
+                    if constexpr (std::integral<T>)
+                        return value;
+                    else
+                        return value.value;
+                }();
+                if (integer != expected[i * columns + j])
+                    return false;
+            }
+        return true;
+    }
+
     TYPED_TEST_SUITE(MatElementConstraintTest, ElementMatrixShapes);
     TYPED_TEST(MatElementConstraintTest, BinaryAndScalarOperatorsUseTheWrittenOperandOrder) {
         using S = TypeParam;
@@ -216,51 +332,15 @@ namespace {
 } // namespace
 
 namespace {
-    struct MatrixWritebackElement {
-        int value{};
-        constexpr MatrixWritebackElement& operator=(int result) {
-            value = result;
-            return *this;
-        }
-    };
     constexpr int operator*(const MatrixWritebackElement& lhs, const Operand& rhs) {
         return lhs.value * rhs.value;
     }
-    struct RvalueMatrixSum {
-        int value{};
-        constexpr RvalueMatrixSum& operator+=(RvalueMatrixSum&& rhs) {
-            value += rhs.value;
-            return *this;
-        }
-        RvalueMatrixSum& operator+=(const RvalueMatrixSum&) = delete;
-    };
-    struct RvalueMatrixFactor {
-        int value{};
-    };
     constexpr RvalueMatrixSum operator*(const RvalueMatrixFactor& lhs, const RvalueMatrixFactor& rhs) {
         return {lhs.value * rhs.value};
     }
-    struct MissingMatrixSum {
-        int value{};
-    };
-    struct MissingMatrixSumFactor {
-        int value{};
-    };
     constexpr MissingMatrixSum operator*(const MissingMatrixSumFactor& lhs, const MissingMatrixSumFactor& rhs) {
         return {lhs.value * rhs.value};
     }
-    struct NonDefaultMatrixSum {
-        int value;
-        NonDefaultMatrixSum() = delete;
-        constexpr explicit NonDefaultMatrixSum(int v) : value(v) {}
-        constexpr NonDefaultMatrixSum& operator+=(NonDefaultMatrixSum&& rhs) {
-            value += rhs.value;
-            return *this;
-        }
-    };
-    struct NonDefaultMatrixFactor {
-        int value{};
-    };
     constexpr NonDefaultMatrixSum operator*(const NonDefaultMatrixFactor& lhs, const NonDefaultMatrixFactor& rhs) {
         return NonDefaultMatrixSum(lhs.value * rhs.value);
     }
@@ -382,7 +462,6 @@ namespace {
 namespace {
     using aho_test::expect_identity;
     using aho_test::expect_matrix;
-    using Matrix2 = aho::Mat<int, 2, 2>;
     const std::array<std::array<int, 2>, 2> VALUES{{{1, 2}, {3, 4}}};
     const std::array<std::array<int, 2>, 2> OTHERS{{{5, 6}, {7, 8}}};
     static_assert(Matrix2::Type_().row == 2 && Matrix2::Type_().column == 2);
@@ -505,9 +584,6 @@ namespace {
         expect_matrix(mutable_matrix /= 2, VALUES);
         expect_matrix(mutable_matrix, VALUES);
     }
-    template<class T>
-    class MatConstCastTest : public testing::Test {};
-    using ConstCastScalars = testing::Types<float, double, long double>;
     TYPED_TEST_SUITE(MatConstCastTest, ConstCastScalars);
     TYPED_TEST(MatConstCastTest, ConstRectangularMatricesConvertEveryElementWithoutChangingTheirSource) {
         using T = TypeParam;
@@ -535,9 +611,6 @@ namespace {
         EXPECT_TRUE(converted_columns[1].empty());
     }
 
-    template<class T>
-    class MatScalarOperatorTest : public testing::Test {};
-    using ScalarTypes = testing::Types<int, float, double>;
     TYPED_TEST_SUITE(MatScalarOperatorTest, ScalarTypes);
     TYPED_TEST(MatScalarOperatorTest, LeftAndRightOperatorsUseOperandOrderAndKeepSourceUnchanged) {
         using T = TypeParam;
@@ -553,18 +626,6 @@ namespace {
         expect_matrix(matrix * T{0}, std::array<std::array<T, 3>, 2>{});
         expect_matrix(matrix, values);
     }
-    template<class Element, class Scalar, class Result>
-    struct MixedMatrixScalarCase {
-        using ElementType = Element;
-        using ScalarType = Scalar;
-        using ResultType = Result;
-    };
-    using MixedMatrixScalars = testing::Types<
-        MixedMatrixScalarCase<int, float, float>,
-        MixedMatrixScalarCase<float, double, double>,
-        MixedMatrixScalarCase<double, int, double>>;
-    template<class T>
-    class MatMixedScalarOperatorTest : public testing::Test {};
     TYPED_TEST_SUITE(MatMixedScalarOperatorTest, MixedMatrixScalars);
     TYPED_TEST(MatMixedScalarOperatorTest, BothOperandOrdersPromoteResultTypesAndPreserveFractions) {
         using E = typename TypeParam::ElementType;
@@ -600,9 +661,6 @@ namespace {
         aho::Mat<double, 1, 2> fractional(std::array<std::array<double, 2>, 1>{{{2.75, -3.25}}});
         expect_matrix(fractional.cast<int>(), std::array<std::array<int, 2>, 1>{{{2, -3}}});
     }
-    template<class T>
-    class MatScalarAssignmentTest : public testing::Test {};
-    using AssignmentScalars = testing::Types<int, float, double>;
     TYPED_TEST_SUITE(MatScalarAssignmentTest, AssignmentScalars);
     TYPED_TEST(MatScalarAssignmentTest, ReturnsTheOriginalMatrixAndSupportsChainedUpdates) {
         using T = TypeParam;
@@ -633,9 +691,6 @@ namespace {
         const std::array<int, 2> rows[2]{{1, 2}, {3, 4}};
         expect_matrix(aho::matrix::make(rows), VALUES);
     }
-    template<class T>
-    class MatListFactoryTest : public testing::Test {};
-    using ListFactoryScalars = testing::Types<int, float, double>;
     TYPED_TEST_SUITE(MatListFactoryTest, ListFactoryScalars);
     TYPED_TEST(MatListFactoryTest, RectangularInputsPreserveColumnOrdering) {
         using T = TypeParam;
@@ -685,9 +740,6 @@ namespace {
         const auto matrix = aho::matrix::make_rotation<aho::HandedCoordinate::RIGHT, aho::VectorConvention::COLUMN, double>(aho::Radian{std::numbers::pi / 2}, aho::d3::VectorD(0, 0, 2));
         expect_matrix(matrix, std::array<std::array<double, 4>, 4>{{{0, -1, 0, 0}, {1, 0, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}}});
     }
-    template<class T>
-    class MatAxisRotationTest : public testing::Test {};
-    using RotationScalars = testing::Types<float, double>;
     TYPED_TEST_SUITE(MatAxisRotationTest, RotationScalars);
     TYPED_TEST(MatAxisRotationTest, DegreeOverloadHasTheDeclaredSignatureAndMatchesRadians) {
         using T = TypeParam;
@@ -723,9 +775,6 @@ namespace {
         expect_identity(radians * *inverse);
     }
 
-    template<class T>
-    class MatViewTest : public testing::Test {};
-    using ViewScalars = testing::Types<float, double>;
     TYPED_TEST_SUITE(MatViewTest, ViewScalars);
     TYPED_TEST(MatViewTest, ExplicitCoordinateTypePreservesPrecisionAndExistingCameraBasis) {
         using T = TypeParam;
@@ -781,9 +830,6 @@ namespace {
         EXPECT_LT(positive_z[1], origin[1]);
     }
 
-    template<class T>
-    class MatInverseTest : public testing::Test {};
-    using NumericTypes = testing::Types<float, double>;
     TYPED_TEST_SUITE(MatInverseTest, NumericTypes);
     TYPED_TEST(MatInverseTest, GaussJordanReturnsKnownInverseAndPreservesInput) {
         const std::array<std::array<TypeParam, 2>, 2> original{{{4, 7}, {2, 6}}};
@@ -910,9 +956,6 @@ namespace {
 } // namespace
 
 namespace {
-    template<class T>
-    class MatScaledInverseTest : public testing::Test {};
-    using ScaledInverseScalars = testing::Types<float, double, long double>;
     TYPED_TEST_SUITE(MatScaledInverseTest, ScaledInverseScalars);
     TYPED_TEST(MatScaledInverseTest, OneElementMatricesHaveRepresentableReciprocalsAtSmallAndLargeScales) {
         using T = TypeParam;
@@ -1073,9 +1116,6 @@ namespace {
 } // namespace
 
 namespace {
-    template<class T>
-    class MatAffineScaleTest : public testing::Test {};
-    using AffineScaleScalars = testing::Types<float, double, long double>;
     TYPED_TEST_SUITE(MatAffineScaleTest, AffineScaleScalars);
     TYPED_TEST(MatAffineScaleTest, UniformSmallAndLargeScalesPreserveReflectionAndTranslation) {
         using T = TypeParam;

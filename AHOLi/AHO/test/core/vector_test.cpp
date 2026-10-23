@@ -113,13 +113,95 @@ namespace {
 
 #include "../support/asymmetric_arithmetic.hpp"
 #include "../support/arithmetic_geometry.hpp"
+#include "../support/one_way_cast.hpp"
 namespace {
     using namespace aho_test::arithmetic;
     template<class CI, class T>
     using ArithmeticVector = aho::Vector_<T, typename CI::Dimension, CI>;
+
     template<class CI>
     class VectorArithmeticConstraintTest : public testing::Test {};
+
     using ArithmeticVectorCoordinates = ArithmeticGeometryCoordinates;
+
+    template<class CI>
+    class VectorLeftProductTest : public testing::Test {};
+
+    template<class T>
+    class VectorOneWayCastTest : public testing::Test {};
+
+    using OneWayVectors = testing::Types<aho::Vector_<aho_test::CastSource, vsl::D1>,
+                                         aho::Vector_<aho_test::CastSource, vsl::D2>, aho::Vector_<aho_test::CastSource, vsl::D3>,
+                                         aho::Vector_<aho_test::CastSource, vsl::D2, aho::coordinate::MakeCoordinateInfo<false, true, true>::Value>>;
+
+    template<class T>
+    class VectorDefaultCoordinatesTest : public testing::Test {};
+
+    using DefaultVectorScalars = testing::Types<int, float, double>;
+
+    template<class T>
+    class VectorTest : public testing::Test {};
+
+    template<class T>
+    class VectorFloatingLengthRangeTest : public testing::Test {};
+
+    using VectorFloatingLengthScalars = testing::Types<float, double>;
+
+    template<class T>
+    class VectorOneDimensionalProductTest : public testing::Test {};
+
+    using ProductScalars = testing::Types<int, float, double>;
+
+    template<class T>
+    class VectorThreeDimensionalInputTest : public testing::Test {};
+
+    template<class T>
+    class VectorNormalization1DTest : public testing::Test {};
+
+    using Normalization1DTypes = testing::Types<int, float, double>;
+
+    template<class T>
+    class VectorOneDimensionalLengthTest : public testing::Test {};
+
+    using VectorLengthScalars = testing::Types<int, float, double>;
+
+    template<class T, bool x, bool y, bool z>
+    struct VectorPlaneCase {
+        using Info = aho::coordinate::MakeCoordinateInfo<x, y, z>::Value;
+        using Vector = aho::Vector_<T, vsl::D2, Info>;
+    };
+
+    using VectorPlanes = testing::Types<
+        VectorPlaneCase<int, true, true, false>, VectorPlaneCase<int, true, false, true>, VectorPlaneCase<int, false, true, true>,
+        VectorPlaneCase<float, true, true, false>, VectorPlaneCase<float, true, false, true>, VectorPlaneCase<float, false, true, true>,
+        VectorPlaneCase<double, true, true, false>, VectorPlaneCase<double, true, false, true>, VectorPlaneCase<double, false, true, true>>;
+
+    template<class T>
+    class VectorPlaneTest : public testing::Test {};
+
+    template<class CI>
+    class VectorTwoDimensionalInputTest : public testing::Test {};
+
+    using ProductPlanes = testing::Types<
+        aho::coordinate::MakeCoordinateInfo<true, true, false>::Value,
+        aho::coordinate::MakeCoordinateInfo<true, false, true>::Value,
+        aho::coordinate::MakeCoordinateInfo<false, true, true>::Value>;
+
+    template<bool x, bool y, bool z>
+    struct OneDimensionalInputCase {
+        using Info = aho::coordinate::MakeCoordinateInfo<x, y, z>::Value;
+    };
+
+    using OneDimensionalInputAxes = testing::Types<OneDimensionalInputCase<true, false, false>,
+                                                   OneDimensionalInputCase<false, true, false>, OneDimensionalInputCase<false, false, true>>;
+
+    template<class T>
+    class VectorOneDimensionalInputTest : public testing::Test {};
+
+    using ProductAxisX = aho::coordinate::MakeCoordinateInfo<true, false, false>::Value;
+
+    using ProductAxisY = aho::coordinate::MakeCoordinateInfo<false, true, false>::Value;
+
     TYPED_TEST_SUITE(VectorArithmeticConstraintTest, ArithmeticVectorCoordinates);
     TYPED_TEST(VectorArithmeticConstraintTest, BinaryOperatorsUseTheStoredScalarOnTheLeft) {
         using CI = TypeParam;
@@ -218,8 +300,6 @@ namespace {
 
 #include "../support/integer_matrix2.hpp"
 namespace {
-    template<class CI>
-    class VectorLeftProductTest : public testing::Test {};
     TYPED_TEST_SUITE(VectorLeftProductTest, ArithmeticGeometryCoordinates);
     TYPED_TEST(VectorLeftProductTest, SupportsOnlyTheWrittenScalarToComponentDirection) {
         using CI = TypeParam;
@@ -295,13 +375,7 @@ namespace {
         EXPECT_FALSE((CanMultiply<ArithmeticVector<CI, int>, ArithmeticVector<CI, int>>));
     }
 } // namespace
-#include "../support/one_way_cast.hpp"
 namespace {
-    template<class T>
-    class VectorOneWayCastTest : public testing::Test {};
-    using OneWayVectors = testing::Types<aho::Vector_<aho_test::CastSource, vsl::D1>,
-                                         aho::Vector_<aho_test::CastSource, vsl::D2>, aho::Vector_<aho_test::CastSource, vsl::D3>,
-                                         aho::Vector_<aho_test::CastSource, vsl::D2, aho::coordinate::MakeCoordinateInfo<false, true, true>::Value>>;
     TYPED_TEST_SUITE(VectorOneWayCastTest, OneWayVectors);
     TYPED_TEST(VectorOneWayCastTest, ChecksConversionFromTheStoredScalarToTheRequestedType) {
         static_assert(aho_test::HasCast<TypeParam, aho_test::CastTarget>);
@@ -332,9 +406,6 @@ namespace {
 #include "../support/geometry.hpp"
 #include "../support/matrix.hpp"
 namespace {
-    template<class T>
-    class VectorDefaultCoordinatesTest : public testing::Test {};
-    using DefaultVectorScalars = testing::Types<int, float, double>;
     TYPED_TEST_SUITE(VectorDefaultCoordinatesTest, DefaultVectorScalars);
     TYPED_TEST(VectorDefaultCoordinatesTest, DimensionWrappersUseMatchingDefaultCoordinatesAndDeduceScalarTypes) {
         using T = TypeParam;
@@ -375,8 +446,6 @@ namespace {
         EXPECT_EQ(yz.value.z.value, 4);
     }
 
-    template<class T>
-    class VectorTest : public testing::Test {};
     TYPED_TEST_SUITE(VectorTest, aho_test::GeometryCases);
     TYPED_TEST(VectorTest, DefaultScalarAndCoordinateConstructorsPreserveValues) {
         using V = typename TypeParam::Vector;
@@ -427,9 +496,6 @@ namespace {
         EXPECT_DOUBLE_EQ(plane.length(), 100000);
         EXPECT_DOUBLE_EQ(space.length(), 70000);
     }
-    template<class T>
-    class VectorFloatingLengthRangeTest : public testing::Test {};
-    using VectorFloatingLengthScalars = testing::Types<float, double>;
     TYPED_TEST_SUITE(VectorFloatingLengthRangeTest, VectorFloatingLengthScalars);
     TYPED_TEST(VectorFloatingLengthRangeTest, LargeAndSmallCoordinatesAvoidIntermediateOverflowAndUnderflow) {
         using T = TypeParam;
@@ -458,9 +524,6 @@ namespace {
         EXPECT_DOUBLE_EQ(value.length(), expected);
         EXPECT_TRUE(aho_test::geometry<V>(1) < value);
     }
-    template<class T>
-    class VectorOneDimensionalProductTest : public testing::Test {};
-    using ProductScalars = testing::Types<int, float, double>;
     TYPED_TEST_SUITE(VectorOneDimensionalProductTest, ProductScalars);
     TYPED_TEST(VectorOneDimensionalProductTest, DotAndHadamardUseScalarProductsAndPreserveInputs) {
         using V = aho::Vector_<TypeParam, vsl::D1>;
@@ -521,8 +584,6 @@ namespace {
             aho_test::expect_coordinates(x * y, 0, 0, 0);
         }
     }
-    template<class T>
-    class VectorThreeDimensionalInputTest : public testing::Test {};
     TYPED_TEST_SUITE(VectorThreeDimensionalInputTest, ProductScalars);
     TYPED_TEST(VectorThreeDimensionalInputTest, ProductsAcceptDerivedVectorInputsAndPreserveValues) {
         using V = aho::Vector_<TypeParam, vsl::D3>;
@@ -570,9 +631,6 @@ namespace {
         negative.normalize();
         aho_test::expect_coordinates(negative, -1);
     }
-    template<class T>
-    class VectorNormalization1DTest : public testing::Test {};
-    using Normalization1DTypes = testing::Types<int, float, double>;
     TYPED_TEST_SUITE(VectorNormalization1DTest, Normalization1DTypes);
     TYPED_TEST(VectorNormalization1DTest, CopyAndInPlaceNormalizationPreserveDirectionIncludingExtremeValues) {
         using V = aho::Vector_<TypeParam, vsl::D1>;
@@ -636,9 +694,6 @@ namespace {
         EXPECT_EQ(&b.normalize(), &b);
         aho_test::expect_coordinates(b, 1.0 / 3, 2.0 / 3, 2.0 / 3);
     }
-    template<class T>
-    class VectorOneDimensionalLengthTest : public testing::Test {};
-    using VectorLengthScalars = testing::Types<int, float, double>;
     TYPED_TEST_SUITE(VectorOneDimensionalLengthTest, VectorLengthScalars);
     TYPED_TEST(VectorOneDimensionalLengthTest, LengthUsesTheEnabledAxisAndPreservesInputs) {
         using T = TypeParam;
@@ -700,17 +755,6 @@ namespace {
         EXPECT_DOUBLE_EQ(matrix[1][1], 3);
         EXPECT_DOUBLE_EQ(matrix[2][2], 4);
     }
-    template<class T, bool x, bool y, bool z>
-    struct VectorPlaneCase {
-        using Info = aho::coordinate::MakeCoordinateInfo<x, y, z>::Value;
-        using Vector = aho::Vector_<T, vsl::D2, Info>;
-    };
-    using VectorPlanes = testing::Types<
-        VectorPlaneCase<int, true, true, false>, VectorPlaneCase<int, true, false, true>, VectorPlaneCase<int, false, true, true>,
-        VectorPlaneCase<float, true, true, false>, VectorPlaneCase<float, true, false, true>, VectorPlaneCase<float, false, true, true>,
-        VectorPlaneCase<double, true, true, false>, VectorPlaneCase<double, true, false, true>, VectorPlaneCase<double, false, true, true>>;
-    template<class T>
-    class VectorPlaneTest : public testing::Test {};
     TYPED_TEST_SUITE(VectorPlaneTest, VectorPlanes);
     template<class V>
     void expect_plane(const V& value, double first, double second) {
@@ -783,12 +827,6 @@ namespace {
         aho_test::expect_coordinates(aho::d2::Vector<int, CI2>{}, 0, 0);
         aho_test::expect_coordinates(aho::d3::Vector<int, CI3>{}, 0, 0, 0);
     }
-    template<class CI>
-    class VectorTwoDimensionalInputTest : public testing::Test {};
-    using ProductPlanes = testing::Types<
-        aho::coordinate::MakeCoordinateInfo<true, true, false>::Value,
-        aho::coordinate::MakeCoordinateInfo<true, false, true>::Value,
-        aho::coordinate::MakeCoordinateInfo<false, true, true>::Value>;
     TYPED_TEST_SUITE(VectorTwoDimensionalInputTest, ProductPlanes);
     TYPED_TEST(VectorTwoDimensionalInputTest, DerivedInputsPreservePlaneAndPromoteMixedProducts) {
         using CI = TypeParam;
@@ -835,14 +873,6 @@ namespace {
         aho_test::expect_coordinates(aho::d2::VectorD(-2.75, 3.75).cast<int>(), -2, 3);
         aho_test::expect_coordinates(aho::d3::VectorD(-2.75, 3.75, 4.5).cast<int>(), -2, 3, 4);
     }
-    template<bool x, bool y, bool z>
-    struct OneDimensionalInputCase {
-        using Info = aho::coordinate::MakeCoordinateInfo<x, y, z>::Value;
-    };
-    using OneDimensionalInputAxes = testing::Types<OneDimensionalInputCase<true, false, false>,
-                                                   OneDimensionalInputCase<false, true, false>, OneDimensionalInputCase<false, false, true>>;
-    template<class T>
-    class VectorOneDimensionalInputTest : public testing::Test {};
     TYPED_TEST_SUITE(VectorOneDimensionalInputTest, OneDimensionalInputAxes);
     TYPED_TEST(VectorOneDimensionalInputTest, ProductsAcceptBaseAndDerivedInputsOnTheSameAxis) {
         using CI = typename TypeParam::Info;
@@ -876,8 +906,6 @@ namespace {
         left.dot(right);
         left.hadamard(right);
     };
-    using ProductAxisX = aho::coordinate::MakeCoordinateInfo<true, false, false>::Value;
-    using ProductAxisY = aho::coordinate::MakeCoordinateInfo<false, true, false>::Value;
     static_assert(!HasOneDimensionalProducts<aho::Vector_<double, vsl::D1, ProductAxisX>, aho::Vector_<float, vsl::D1, ProductAxisY>>);
     static_assert(!HasOneDimensionalProducts<aho::d1::VectorD, aho::d2::VectorD>);
     static_assert(!HasOneDimensionalProducts<aho::d1::VectorD, aho::d1::PointD>);

@@ -103,9 +103,7 @@ namespace AHO_NAMESPACE {
         };
 
         template<bool... booleans>
-        constexpr size_t count_trues_func() {
-            return (size_t{0} + ... + booleans);
-        }
+        constexpr size_t count_trues_func();
 
         template<bool... booleans>
         struct CountTrues {
@@ -144,6 +142,23 @@ namespace AHO_NAMESPACE {
         template<VSL_NAMESPACE::is_dimension D>
         struct DefaultCoordinateInfo {};
 
+        template<typename ElementType_, typename CoordinateInfo>
+        struct CoordinateSet {
+            static constexpr bool IS_COORDINATE_SET = true;
+        };
+
+        template<typename CI1, typename CI2>
+        struct SumCoordinateInfo {
+            using Value = std::conditional_t<CI1::Dimension::DIMENSION == 4 || CI2::Dimension::DIMENSION == 4,
+                                             CoordinateInfo4,
+                                             typename MakeCoordinateInfo<CI1::ENABLED_X || CI2::ENABLED_X, CI1::ENABLED_Y || CI2::ENABLED_Y, CI1::ENABLED_Z || CI2::ENABLED_Z>::Value>;
+        };
+
+        template<bool... booleans>
+        constexpr size_t count_trues_func() {
+            return (size_t{0} + ... + booleans);
+        }
+
         template<>
         struct DefaultCoordinateInfo<VSL_NAMESPACE::D1> {
             using Value = CoordinateInfo<VSL_NAMESPACE::D1, true>;
@@ -162,11 +177,6 @@ namespace AHO_NAMESPACE {
         template<>
         struct DefaultCoordinateInfo<VSL_NAMESPACE::D4> {
             using Value = CoordinateInfo4;
-        };
-
-        template<typename ElementType_, typename CoordinateInfo>
-        struct CoordinateSet {
-            static constexpr bool IS_COORDINATE_SET = true;
         };
 
 #define AHO_COORDINATE_NUMBERD_MEMBER_1 ___AHO_JOIN(AHO_COORDINATE_NUMBERD_MEMBER_NAME, 1)
@@ -339,13 +349,6 @@ namespace AHO_NAMESPACE {
             AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Y, y);
             AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(Z, z);
             AHO_COORDINATE_SET_OPERATOR_ADD_ASSIGN(W, w);
-        };
-
-        template<typename CI1, typename CI2>
-        struct SumCoordinateInfo {
-            using Value = std::conditional_t<CI1::Dimension::DIMENSION == 4 || CI2::Dimension::DIMENSION == 4,
-                                             CoordinateInfo4,
-                                             typename MakeCoordinateInfo<CI1::ENABLED_X || CI2::ENABLED_X, CI1::ENABLED_Y || CI2::ENABLED_Y, CI1::ENABLED_Z || CI2::ENABLED_Z>::Value>;
         };
 
         template<typename T1, typename CI1, typename T2, typename CI2>

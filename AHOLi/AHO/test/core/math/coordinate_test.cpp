@@ -59,7 +59,84 @@ namespace {
     using namespace aho_test::arithmetic;
     template<class T>
     class CoordinateArithmeticConstraintTest : public testing::Test {};
+
     using CoordinateArithmeticFamilies = testing::Types<Family<aho::coordinate::X>, Family<aho::coordinate::Y>, Family<aho::coordinate::Z>>;
+
+    template<class T>
+    class CoordinateNarrowNegationTest : public testing::Test {};
+
+    using CoordinateNarrowNegationTestTypes = testing::Types<aho::coordinate::X<std::int8_t>, aho::coordinate::X<std::int16_t>,
+                                                             aho::coordinate::Y<std::int8_t>, aho::coordinate::Y<std::int16_t>,
+                                                             aho::coordinate::Z<std::int8_t>, aho::coordinate::Z<std::int16_t>>;
+
+    template<class T>
+    class CoordinateOneWayCastTest : public testing::Test {};
+
+    using OneWayAxes = testing::Types<aho::coordinate::X<aho_test::CastSource>,
+                                      aho::coordinate::Y<aho_test::CastSource>,
+                                      aho::coordinate::Z<aho_test::CastSource>>;
+
+    template<bool x_, bool y_, bool z_>
+    struct CoordinateMask {
+        static constexpr bool X = x_, Y = y_, Z = z_;
+        using Info = aho::coordinate::MakeCoordinateInfo<x_, y_, z_>::Value;
+        using Set = aho::coordinate::CoordinateSet<int, Info>;
+        static constexpr Set Make(int x = 1, int y = 2, int z = 3);
+    };
+
+    using CoordinateMasks = testing::Types<CoordinateMask<true, false, false>, CoordinateMask<false, true, false>,
+                                           CoordinateMask<false, false, true>, CoordinateMask<true, true, false>, CoordinateMask<true, false, true>,
+                                           CoordinateMask<false, true, true>, CoordinateMask<true, true, true>>;
+
+    template<class T>
+    class CoordinateMaskTest : public testing::Test {};
+
+    struct UnmarkedCoordinateType {};
+
+    struct DisabledCoordinateType {
+        static constexpr bool IS_COORDINATE_SET = false;
+    };
+
+    template<class T>
+    class CoordinateElementTest : public testing::Test {};
+
+    using CoordinateElements = testing::Types<aho::X<double>, aho::Y<double>, aho::Z<double>>;
+
+    template<class T>
+    class CoordinateAxisPairTest : public testing::Test {};
+
+    using PairScalars = testing::Types<int, float, double>;
+
+    template<class T>
+    class CoordinateArithmeticConstexprTest : public testing::Test {};
+
+    using ArithmeticCoordinates = testing::Types<
+        aho::coordinate::MakeCoordinateInfo<true, false, false>::Value,
+        aho::coordinate::MakeCoordinateInfo<false, true, false>::Value,
+        aho::coordinate::MakeCoordinateInfo<false, false, true>::Value,
+        aho::coordinate::MakeCoordinateInfo<true, true, false>::Value,
+        aho::coordinate::MakeCoordinateInfo<true, false, true>::Value,
+        aho::coordinate::MakeCoordinateInfo<false, true, true>::Value,
+        aho::coordinate::MakeCoordinateInfo<true, true, true>::Value>;
+
+    template<bool x_, bool y_, bool z_>
+    constexpr auto CoordinateMask<x_, y_, z_>::Make(int x, int y, int z) -> Set {
+        if constexpr (x_ && y_ && z_)
+            return Set(aho::X<int>(x), aho::Y<int>(y), aho::Z<int>(z));
+        else if constexpr (x_ && y_)
+            return Set(aho::X<int>(x), aho::Y<int>(y));
+        else if constexpr (x_ && z_)
+            return Set(aho::X<int>(x), aho::Z<int>(z));
+        else if constexpr (y_ && z_)
+            return Set(aho::Y<int>(y), aho::Z<int>(z));
+        else if constexpr (x_)
+            return Set(aho::X<int>(x));
+        else if constexpr (y_)
+            return Set(aho::Y<int>(y));
+        else
+            return Set(aho::Z<int>(z));
+    }
+
     TYPED_TEST_SUITE(CoordinateArithmeticConstraintTest, CoordinateArithmeticFamilies);
     TYPED_TEST(CoordinateArithmeticConstraintTest, BinaryOperationsUseTheStoredScalarOnTheLeft) {
         using Left = typename TypeParam::template Of<LeftOperand>;
@@ -165,11 +242,6 @@ namespace {
         EXPECT_FALSE((CanDivide<Mutable, Mutable>));
         EXPECT_FALSE((CanDivideAssign<BinaryOnly, BinaryOnly>));
     }
-    template<class T>
-    class CoordinateNarrowNegationTest : public testing::Test {};
-    using CoordinateNarrowNegationTestTypes = testing::Types<aho::coordinate::X<std::int8_t>, aho::coordinate::X<std::int16_t>,
-                                                             aho::coordinate::Y<std::int8_t>, aho::coordinate::Y<std::int16_t>,
-                                                             aho::coordinate::Z<std::int8_t>, aho::coordinate::Z<std::int16_t>>;
     TYPED_TEST_SUITE(CoordinateNarrowNegationTest, CoordinateNarrowNegationTestTypes);
     TYPED_TEST(CoordinateNarrowNegationTest, PromotedNegationReturnsTheDeclaredNarrowScalarType) {
         using Scalar = std::remove_cvref_t<decltype(std::declval<TypeParam>().value)>;
@@ -189,11 +261,6 @@ namespace {
         static_assert((-source).value.value == -7);
         EXPECT_EQ((-source).value.value, -7);
     }
-    template<class T>
-    class CoordinateOneWayCastTest : public testing::Test {};
-    using OneWayAxes = testing::Types<aho::coordinate::X<aho_test::CastSource>,
-                                      aho::coordinate::Y<aho_test::CastSource>,
-                                      aho::coordinate::Z<aho_test::CastSource>>;
     TYPED_TEST_SUITE(CoordinateOneWayCastTest, OneWayAxes);
     TYPED_TEST(CoordinateOneWayCastTest, ChecksConversionFromTheStoredScalarToTheRequestedType) {
         static_assert(aho::concepts::cast_as<aho_test::CastSource, aho_test::CastTarget>);
@@ -208,33 +275,6 @@ namespace {
     }
 } // namespace
 namespace {
-    template<bool x_, bool y_, bool z_>
-    struct CoordinateMask {
-        static constexpr bool X = x_, Y = y_, Z = z_;
-        using Info = aho::coordinate::MakeCoordinateInfo<x_, y_, z_>::Value;
-        using Set = aho::coordinate::CoordinateSet<int, Info>;
-        static constexpr Set Make(int x = 1, int y = 2, int z = 3) {
-            if constexpr (x_ && y_ && z_)
-                return Set(aho::X<int>(x), aho::Y<int>(y), aho::Z<int>(z));
-            else if constexpr (x_ && y_)
-                return Set(aho::X<int>(x), aho::Y<int>(y));
-            else if constexpr (x_ && z_)
-                return Set(aho::X<int>(x), aho::Z<int>(z));
-            else if constexpr (y_ && z_)
-                return Set(aho::Y<int>(y), aho::Z<int>(z));
-            else if constexpr (x_)
-                return Set(aho::X<int>(x));
-            else if constexpr (y_)
-                return Set(aho::Y<int>(y));
-            else
-                return Set(aho::Z<int>(z));
-        }
-    };
-    using CoordinateMasks = testing::Types<CoordinateMask<true, false, false>, CoordinateMask<false, true, false>,
-                                           CoordinateMask<false, false, true>, CoordinateMask<true, true, false>, CoordinateMask<true, false, true>,
-                                           CoordinateMask<false, true, true>, CoordinateMask<true, true, true>>;
-    template<class T>
-    class CoordinateMaskTest : public testing::Test {};
     TYPED_TEST_SUITE(CoordinateMaskTest, CoordinateMasks);
     TYPED_TEST(CoordinateMaskTest, DefaultAndAxisConstructorsInitializeOnlyEnabledAxes) {
         typename TypeParam::Set zero;
@@ -264,10 +304,6 @@ namespace {
         EXPECT_EQ(Info::INDEX_Y, static_cast<unsigned>(TypeParam::X) + TypeParam::Y);
         EXPECT_EQ(Info::INDEX_Z, static_cast<unsigned>(TypeParam::X) + TypeParam::Y + TypeParam::Z);
     }
-    struct UnmarkedCoordinateType {};
-    struct DisabledCoordinateType {
-        static constexpr bool IS_COORDINATE_SET = false;
-    };
     static_assert(!aho::concepts::IS_COORDINATE_SET<int>);
     static_assert(!aho::concepts::IS_COORDINATE_SET<UnmarkedCoordinateType>);
     static_assert(!aho::concepts::IS_COORDINATE_SET<DisabledCoordinateType>);
@@ -371,9 +407,6 @@ namespace {
             EXPECT_NE(stream.str().find('3'), std::string::npos);
         }
     }
-    template<class T>
-    class CoordinateElementTest : public testing::Test {};
-    using CoordinateElements = testing::Types<aho::X<double>, aho::Y<double>, aho::Z<double>>;
     TYPED_TEST_SUITE(CoordinateElementTest, CoordinateElements);
     TYPED_TEST(CoordinateElementTest, ConstructorsUnaryBinaryAndComparisonOperatorsPreserveValues) {
         const TypeParam a(12), b(3);
@@ -461,9 +494,6 @@ namespace {
         EXPECT_EQ(moved.y.value, 3);
         EXPECT_EQ(moved.z.value, 4);
     }
-    template<class T>
-    class CoordinateAxisPairTest : public testing::Test {};
-    using PairScalars = testing::Types<int, float, double>;
     TYPED_TEST_SUITE(CoordinateAxisPairTest, PairScalars);
     TYPED_TEST(CoordinateAxisPairTest, AdditionUsesTheAxesOfBothOperands) {
         using T = TypeParam;
@@ -642,16 +672,6 @@ namespace {
         vector /= 2;
         return matches_active_axes(vector.value, {3, 6, 9});
     }
-    template<class T>
-    class CoordinateArithmeticConstexprTest : public testing::Test {};
-    using ArithmeticCoordinates = testing::Types<
-        aho::coordinate::MakeCoordinateInfo<true, false, false>::Value,
-        aho::coordinate::MakeCoordinateInfo<false, true, false>::Value,
-        aho::coordinate::MakeCoordinateInfo<false, false, true>::Value,
-        aho::coordinate::MakeCoordinateInfo<true, true, false>::Value,
-        aho::coordinate::MakeCoordinateInfo<true, false, true>::Value,
-        aho::coordinate::MakeCoordinateInfo<false, true, true>::Value,
-        aho::coordinate::MakeCoordinateInfo<true, true, true>::Value>;
     TYPED_TEST_SUITE(CoordinateArithmeticConstexprTest, ArithmeticCoordinates);
     TYPED_TEST(CoordinateArithmeticConstexprTest, PointAndVectorOperationsKeepActiveAxisValuesAtCompileTime) {
         static_assert(check_point_vector_arithmetic<TypeParam>());

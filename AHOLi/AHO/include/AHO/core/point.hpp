@@ -81,7 +81,7 @@ namespace AHO_NAMESPACE {
         using CoordinateInfo = CI;
 
         constexpr static VSL_NAMESPACE::data_format::Format GRAPHIC_TYPE = VSL_NAMESPACE::data_format::convert_graphic_type<R>()
-                                                                                  .template to_vec<(size_t)Dimension::DIMENSION>();
+                                                                               .template to_vec<(size_t)Dimension::DIMENSION>();
 
         coordinate::CoordinateSet<R, CI> value;
 

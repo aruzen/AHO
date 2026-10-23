@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "VSLi/VSL/test/support/compile_probe.hpp",
+      "line": 24,
+      "column": 12,
+      "rule": "aho-declaration-order",
+      "symbol": "vsl_test::CompileResult",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "struct CompileResult {",
+      "key": "222a45ae3bb154f54151777b4613d4bd4f88c1a9ce7e49110771fb71c8e5d55f",
+      "count": 1
+    }
+  ]
+}

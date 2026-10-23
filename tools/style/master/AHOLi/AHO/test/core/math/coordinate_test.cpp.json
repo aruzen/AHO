@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "AHOLi/AHO/test/core/math/coordinate_test.cpp",
+      "line": 216,
+      "column": 30,
+      "rule": "aho-in-class-definition",
+      "symbol": "(anonymous namespace)::CoordinateMask::Make",
+      "message": "クラス内は宣言とし、関数本体を型定義の後へ移してください",
+      "source": "static constexpr Set Make(int x = 1, int y = 2, int z = 3) {",
+      "key": "1e6c4e03d0a628e3b05615af29e435337f89855ae427ac4ed073c06ffe623244",
+      "count": 1,
+      "code_lines": 14
+    },
+    {
+      "file": "AHOLi/AHO/test/core/math/coordinate_test.cpp",
+      "line": 646,
+      "column": 11,
+      "rule": "aho-declaration-order",
+      "symbol": "(anonymous namespace)::CoordinateArithmeticConstexprTest",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "class CoordinateArithmeticConstexprTest : public testing::Test {};",
+      "key": "5c3e298a479dfdd0a8205e4020eab1a1181abaf8efb36093d0766b90e140d95e",
+      "count": 1
+    },
+    {
+      "file": "AHOLi/AHO/test/core/math/coordinate_test.cpp",
+      "line": 647,
+      "column": 11,
+      "rule": "aho-declaration-order",
+      "symbol": "(anonymous namespace)::ArithmeticCoordinates",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "using ArithmeticCoordinates = testing::Types<",
+      "key": "f9d717bba52cfd0915497e9acba8fc8dcaaac1c0f1a4c42aff67f1e858b0f568",
+      "count": 1
+    }
+  ]
+}

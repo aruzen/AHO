@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "AHOLi/AHO/test/image_readback_test.cpp",
+      "line": 135,
+      "column": 1,
+      "rule": "clang-format",
+      "symbol": "",
+      "message": "clang-formatの結果と一致しません",
+      "source": "f114d06dca2a2e2710f5087101fd1588c5055b571bf465218ba1114002f7f779",
+      "key": "7badf8cf197c048c3a3855b62835f6e34337f752082d3d4b3abfb84e0e4469b0",
+      "count": 1
+    },
+    {
+      "file": "AHOLi/AHO/test/image_readback_test.cpp",
+      "line": 336,
+      "column": 11,
+      "rule": "aho-declaration-order",
+      "symbol": "(anonymous namespace)::ImageReadbackBusyVulkanIntegrationTest",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "class ImageReadbackBusyVulkanIntegrationTest : public ImageReadbackVulkanIntegrationTest {",
+      "key": "15d81725c3f9b88929a8710e18a92e6e75943668ed7c0ac40f64e0779284a58a",
+      "count": 1
+    }
+  ]
+}

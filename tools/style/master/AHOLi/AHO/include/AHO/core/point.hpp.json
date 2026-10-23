@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "AHOLi/AHO/include/AHO/core/point.hpp",
+      "line": 84,
+      "column": 1,
+      "rule": "clang-format",
+      "symbol": "",
+      "message": "clang-formatの結果と一致しません",
+      "source": "3a78a67b79e560f22aad137da6907d71e2d8c1429d1eca0e828db59ad2e8e9ba",
+      "key": "1cb7d56a26d1a54e930d786284616679a9db32c4d86e60d9fdf6c310464f8d16",
+      "count": 1
+    }
+  ]
+}

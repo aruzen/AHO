@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "AHOLi/AHO/test/support/asymmetric_arithmetic.hpp",
+      "line": 29,
+      "column": 1,
+      "rule": "clang-format",
+      "symbol": "",
+      "message": "clang-formatの結果と一致しません",
+      "source": "d39443bf6ac682b3123d54d7209b4b405b46cf1d7ed62484822953316f20f833",
+      "key": "fdc2af96f960eec81252028bc4c54acf2763295fbcef690afcac7ddf0741cb73",
+      "count": 1
+    },
+    {
+      "file": "AHOLi/AHO/test/support/asymmetric_arithmetic.hpp",
+      "line": 34,
+      "column": 12,
+      "rule": "aho-declaration-order",
+      "symbol": "aho_test::arithmetic::AssignmentOnly",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "struct AssignmentOnly {",
+      "key": "a6010276b3339adcb5b017bb153c970d8ed0c09a333e742ce54d74ab27f4e6a8",
+      "count": 1
+    },
+    {
+      "file": "AHOLi/AHO/test/support/asymmetric_arithmetic.hpp",
+      "line": 54,
+      "column": 12,
+      "rule": "aho-declaration-order",
+      "symbol": "aho_test::arithmetic::CategoryResult",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "struct CategoryResult {",
+      "key": "cf49b811759914006e7852236fb315d6d84228dc44d31fbab98e7ec9612422bc",
+      "count": 1
+    },
+    {
+      "file": "AHOLi/AHO/test/support/asymmetric_arithmetic.hpp",
+      "line": 70,
+      "column": 12,
+      "rule": "aho-declaration-order",
+      "symbol": "aho_test::arithmetic::MutableOnly",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "struct MutableOnly {",
+      "key": "3c54b6c2815c774a3bbfd0f08371cfe596e134d7c2eba7d8881c7ebc8b6b5b3d",
+      "count": 1
+    },
+    {
+      "file": "AHOLi/AHO/test/support/asymmetric_arithmetic.hpp",
+      "line": 97,
+      "column": 12,
+      "rule": "aho-declaration-order",
+      "symbol": "aho_test::arithmetic::Family",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "struct Family {",
+      "key": "537d5f3f35848557ea59da9da73a30de9a5011736e12faa457841b2098239449",
+      "count": 1
+    }
+  ]
+}

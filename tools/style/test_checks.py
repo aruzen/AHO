@@ -49,6 +49,32 @@ class CheckerContracts(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         return result.stdout + result.stderr
 
+    def write_master(self, file, diagnostics, directory=None, min_lines=5):
+        directory = directory or self.root / 'tools/style/master'
+        path = directory / (file + '.json')
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(dict(version=1, llvm_major=20, in_class_min_lines=min_lines,
+                                        diagnostics=diagnostics)))
+        return path
+
+    def prepare_cli(self, files, registered):
+        for file, contents in files.items():
+            path = self.root / file
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(contents)
+        for config in ['.clang-format', '.clang-tidy']:
+            shutil.copy2(HERE.parents[1] / config, self.root / config)
+        subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
+        subprocess.run(['git', 'add', '.'], cwd=self.root, check=True)
+        database = self.root / 'compile_commands.json'
+        database.write_text(json.dumps([
+            dict(directory=str(self.root), file=str(self.root / file),
+                 arguments=['clang++', '-std=c++23', '-c', str(self.root / file)])
+            for file in registered]))
+        return [sys.executable, str(HERE / 'check.py'), '--root', str(self.root),
+                '--database', str(database), '--ast-tool', str(ARGS.ast_tool.resolve()),
+                '--clang-format', ARGS.clang_format, '--clang-tidy', ARGS.clang_tidy]
+
     def test_static_members_and_free_functions_and_const_locals_are_distinguished(self):
         output = self.tidy('''
 namespace good_scope {
@@ -249,10 +275,8 @@ struct Example {
                                              arguments=['clang++', '-std=c++23', '-c', str(source)])]))
         subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
         subprocess.run(['git', 'add', '.'], cwd=self.root, check=True)
-        baseline = self.root / 'baseline.json'
-        baseline.write_text(json.dumps({'version': 1, 'llvm_major': 20, 'in_class_min_lines': 5, 'diagnostics': []}))
         command = [sys.executable, str(HERE / 'check.py'), '--root', str(self.root), '--checks=layout',
-                   '--database', str(database), '--baseline', str(baseline), '--ast-tool', str(ARGS.ast_tool.resolve())]
+                   '--database', str(database), '--ast-tool', str(ARGS.ast_tool.resolve())]
         first = subprocess.run(command, text=True, capture_output=True)
         self.assertEqual(first.returncode, 0, first.stderr)
         source.write_text(original.replace('        return result;', '        result += 4;\n        return result;'))
@@ -262,10 +286,9 @@ struct Example {
         self.assertEqual(report['in_class_min_lines'], 5)
         self.assertEqual([(item['rule'], item['code_lines']) for item in report['new']], [('aho-in-class-definition', 5)])
 
-    def test_repository_baseline_has_no_short_function_allowances(self):
-        baseline = json.loads((HERE / 'baseline.json').read_text())
-        self.assertEqual(baseline['in_class_min_lines'], 5)
-        functions = [item for item in baseline['diagnostics'] if item['rule'] == 'aho-in-class-definition']
+    def test_repository_master_has_no_short_function_allowances(self):
+        master = CHECK.load_master(HERE / 'master', CHECK.tracked_files(HERE.parents[1]), 5)
+        functions = [item for item in master if item['rule'] == 'aho-in-class-definition']
         self.assertTrue(all(item['code_lines'] >= 5 for item in functions))
 
     def test_reopened_namespace_does_not_bypass_declaration_order(self):
@@ -312,19 +335,19 @@ inline int probe() {
         coverage = next(json.loads(line)['coverage'] for line in result.stdout.splitlines() if '"coverage"' in line)
         self.assertEqual(set(coverage), {'probe.cpp', *(f'include/{name}' for name in headers)})
 
-    def test_baseline_allows_only_recorded_occurrences_and_source_content(self):
+    def test_master_allows_only_recorded_occurrences_and_source_content(self):
         source = self.root / 'probe.cpp'
         source.write_text('int badName;\nint badName;\n')
         old = CHECK.diagnostic(self.root, 'probe.cpp', 1, 1, 'name', 'badName', 'bad name')
-        baseline = {'diagnostics': [{**old, 'count': 1}]}
-        self.assertEqual(CHECK.compare([old], baseline), [])
+        master = [{**old, 'count': 1}]
+        self.assertEqual(CHECK.compare([old], master), [])
         duplicate = CHECK.diagnostic(self.root, 'probe.cpp', 2, 1, 'name', 'badName', 'bad name')
-        self.assertEqual(CHECK.compare([old, duplicate], baseline), [duplicate])
+        self.assertEqual(CHECK.compare([old, duplicate], master), [duplicate])
         source.write_text('const int badName = 1;\n')
         changed = CHECK.diagnostic(self.root, 'probe.cpp', 1, 1, 'name', 'badName', 'bad name')
-        self.assertEqual(CHECK.compare([changed], baseline), [changed])
+        self.assertEqual(CHECK.compare([changed], master), [changed])
 
-    def test_cli_format_baseline_and_new_violation_exit_status(self):
+    def test_cli_format_master_and_new_violation_exit_status(self):
         directory = self.root / 'AHOLi/AHO/src'
         directory.mkdir(parents=True)
         source = directory / 'probe.cpp'
@@ -337,13 +360,145 @@ inline int probe() {
         first = subprocess.run(command, text=True, capture_output=True)
         self.assertEqual(first.returncode, 1, first.stderr)
         report = json.loads((self.root / 'build/style-report/report.json').read_text())
-        baseline = {'diagnostics': [{**item, 'count': 1} for item in report['diagnostics']]}
-        (self.root / 'baseline.json').write_text(json.dumps(baseline))
-        same = subprocess.run(command + ['--baseline', str(self.root / 'baseline.json')], text=True, capture_output=True)
+        self.write_master('AHOLi/AHO/src/probe.cpp', [{**item, 'count': 1} for item in report['diagnostics']])
+        same = subprocess.run(command, text=True, capture_output=True)
         self.assertEqual(same.returncode, 0, same.stderr)
         source.write_text('int   value=2;\n')
-        changed = subprocess.run(command + ['--baseline', str(self.root / 'baseline.json')], text=True, capture_output=True)
+        changed = subprocess.run(command, text=True, capture_output=True)
         self.assertEqual(changed.returncode, 1, changed.stderr)
+
+    def test_master_reads_only_the_selected_source_files(self):
+        first = CHECK.diagnostic(self.root, 'AHOLi/AHO/first.cpp', 1, 1, 'name', 'bad', 'bad', source='int bad;')
+        other = CHECK.diagnostic(self.root, 'VSLi/VSL/other.cpp', 1, 1, 'name', 'bad', 'bad', source='int bad;')
+        directory = self.root / 'custom-master'
+        self.write_master(first['file'], [{**first, 'count': 1}], directory)
+        self.write_master(other['file'], [{**other, 'count': 1}], directory)
+        master = CHECK.load_master(directory, {first['file']}, 5)
+        self.assertEqual(CHECK.compare([first, other], master), [other])
+        self.assertEqual(CHECK.load_master(self.root / 'absent', {first['file']}, 5), [])
+
+    def test_master_rejects_invalid_metadata_paths_and_counts(self):
+        file = 'AHOLi/AHO/probe.cpp'
+        item = CHECK.diagnostic(self.root, file, 1, 1, 'name', 'bad', 'bad', source='int bad;')
+        path = self.write_master(file, [{**item, 'count': 1}])
+        original = json.loads(path.read_text())
+        invalid = [dict(original, version=2), dict(original, llvm_major=19),
+                   dict(original, in_class_min_lines=0), dict(original, diagnostics={}), []]
+        for fields in [{'file': 'VSLi/VSL/other.cpp'}, {'count': 0}, {'count': -1}, {'count': True}, {'key': None}]:
+            invalid.append(dict(original, diagnostics=[{**item, 'count': 1, **fields}]))
+        for value in invalid:
+            with self.subTest(value=value):
+                path.write_text(json.dumps(value))
+                with self.assertRaises(ValueError):
+                    CHECK.load_master(path.parents[2], {file}, 5)
+
+    def test_update_master_reduces_occurrences_without_adding_new_permissions(self):
+        file = 'AHOLi/AHO/probe.cpp'
+        old = CHECK.diagnostic(self.root, file, 1, 1, 'name', 'bad', 'bad', source='int bad;')
+        other = CHECK.diagnostic(self.root, 'VSLi/VSL/other.cpp', 1, 1, 'name', 'bad', 'bad', source='int bad;')
+        path = self.write_master(file, [{**old, 'count': 2}])
+        untouched = self.write_master(other['file'], [{**other, 'count': 1}])
+        before = untouched.read_bytes()
+        directory = self.root / 'tools/style/master'
+        new = CHECK.diagnostic(self.root, file, 2, 1, 'name', 'another', 'bad', source='int another;')
+        CHECK.update_master(directory, {file}, [old, new], 5)
+        self.assertEqual(CHECK.load_master(directory, {file}, 5), [{**old, 'count': 1}])
+        self.assertEqual(untouched.read_bytes(), before)
+        CHECK.update_master(directory, {file}, [new], 5)
+        self.assertFalse(path.exists())
+        self.assertEqual(untouched.read_bytes(), before)
+
+    def test_cli_update_master_is_scoped_and_keeps_new_violations_failing(self):
+        first, other = 'AHOLi/AHO/first.cpp', 'VSLi/VSL/other.cpp'
+        command = self.prepare_cli({first: 'int   VALUE=1;\n', other: 'int   OTHER=1;\n'}, [first, other])
+        old = CHECK.format_check(self.root, first, ARGS.clang_format)
+        path = self.write_master(first, [{**item, 'count': 1} for item in old])
+        untouched = self.write_master(other, [{**item, 'count': 1}
+                                            for item in CHECK.format_check(self.root, other, ARGS.clang_format)])
+        before = untouched.read_bytes()
+        (self.root / first).write_text('int VALUE = 1;\n')
+        result = subprocess.run(command + ['--update-master', first], text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(path.exists())
+        self.assertEqual(untouched.read_bytes(), before)
+        self.write_master(first, [{**item, 'count': 1} for item in old])
+        (self.root / first).write_text('int bad_value = 1;\n')
+        result = subprocess.run(command + ['--update-master', first], text=True, capture_output=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertFalse(path.exists())
+        self.assertEqual(untouched.read_bytes(), before)
+        for options in [['--checks=format'], ['--strict']]:
+            result = subprocess.run(command + ['--update-master', *options, first], text=True, capture_output=True)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertEqual(untouched.read_bytes(), before)
+
+    def test_full_master_update_removes_records_for_deleted_sources(self):
+        file = 'AHOLi/AHO/deleted.cpp'
+        item = CHECK.diagnostic(self.root, file, 1, 1, 'name', 'bad', 'bad', source='int bad;')
+        path = self.write_master(file, [{**item, 'count': 1}])
+        directory = self.root / 'tools/style/master'
+        CHECK.update_master(directory, set(), [], 5)
+        self.assertTrue(path.exists())
+        CHECK.update_master(directory, set(), [], 5, remove_deleted=True)
+        self.assertFalse(path.exists())
+
+    def test_cmake_targets_check_and_update_the_per_source_master(self):
+        file = 'AHOLi/AHO/probe.cpp'
+        self.prepare_cli({file: 'int   VALUE=1;\n'}, [file])
+        path = self.write_master(file, [{**item, 'count': 1}
+                                       for item in CHECK.format_check(self.root, file, ARGS.clang_format)])
+        shutil.copy2(HERE / 'check.py', self.root / 'tools/style/check.py')
+        (self.root / 'CMakeLists.txt').write_text(f'''
+cmake_minimum_required(VERSION 3.20)
+project(StyleMasterFixture LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+add_library(probe OBJECT {file})
+add_executable(aho-style-ast IMPORTED GLOBAL)
+set_property(TARGET aho-style-ast PROPERTY IMPORTED_LOCATION [==[{ARGS.ast_tool.resolve()}]==])
+set(Python3_EXECUTABLE [==[{sys.executable}]==])
+set(AHO_CLANG_FORMAT [==[{ARGS.clang_format}]==])
+set(AHO_CLANG_TIDY [==[{ARGS.clang_tidy}]==])
+include([==[{HERE.parents[1] / 'cmake/StyleChecks.cmake'}]==])
+''')
+        build = self.root / 'build/cmake'
+        configure = subprocess.run(['cmake', '-S', str(self.root), '-B', str(build), '-G', 'Ninja'],
+                                   text=True, capture_output=True)
+        self.assertEqual(configure.returncode, 0, configure.stdout + configure.stderr)
+        before = path.read_bytes()
+        check = subprocess.run(['cmake', '--build', str(build), '--target', 'check-format'],
+                               text=True, capture_output=True)
+        self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+        self.assertEqual(path.read_bytes(), before)
+        (self.root / file).write_text('int VALUE = 1;\n')
+        for target in ['update-style-master', 'check-style']:
+            result = subprocess.run(['cmake', '--build', str(build), '--target', target],
+                                    text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(path.exists())
+
+    def test_cli_update_master_does_not_prune_when_files_cannot_be_analyzed(self):
+        file = 'AHOLi/AHO/probe.cpp'
+        command = self.prepare_cli({file: 'int VALUE;\n', 'AHOLi/AHO/unused.hpp': '#pragma once\n',
+                                    'AHOLi/AHO/unregistered.cpp': 'int OTHER;\n'}, [file])
+        old = CHECK.diagnostic(self.root, file, 1, 1, 'name', 'bad', 'bad', source='int bad;')
+        path = self.write_master(file, [{**old, 'count': 1}])
+        before = path.read_bytes()
+        result = subprocess.run(command + ['--update-master'], text=True, capture_output=True)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn('masterを更新しません', result.stderr)
+        self.assertEqual(path.read_bytes(), before)
+
+    def test_cli_custom_master_and_strict_mode(self):
+        file = 'AHOLi/AHO/probe.cpp'
+        command = self.prepare_cli({file: 'int   VALUE=1;\n'}, [file])
+        directory = self.root / 'custom-master'
+        self.write_master(file, [{**item, 'count': 1}
+                                for item in CHECK.format_check(self.root, file, ARGS.clang_format)], directory)
+        for options, expected in [([], 1), (['--master', str(directory)], 0),
+                                  (['--master', str(directory), '--strict'], 1)]:
+            result = subprocess.run(command + options, text=True, capture_output=True)
+            self.assertEqual(result.returncode, expected, result.stderr)
 
     def test_unused_headers_and_unregistered_sources_are_reported(self):
         directory = self.root / 'AHOLi/AHO'

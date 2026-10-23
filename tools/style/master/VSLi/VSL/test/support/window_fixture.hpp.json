@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "VSLi/VSL/test/support/window_fixture.hpp",
+      "line": 11,
+      "column": 14,
+      "rule": "aho-in-class-definition",
+      "symbol": "vsl_test::WindowIntegrationTest::SetUp",
+      "message": "クラス内は宣言とし、関数本体を型定義の後へ移してください",
+      "source": "void SetUp() override {",
+      "key": "9e6ec3570436ae47ac1169eeb3bfb860b7ce74a68976c278541a6de3e5983689",
+      "count": 1,
+      "code_lines": 15
+    },
+    {
+      "file": "VSLi/VSL/test/support/window_fixture.hpp",
+      "line": 32,
+      "column": 14,
+      "rule": "aho-in-class-definition",
+      "symbol": "vsl_test::WindowIntegrationTest::TearDown",
+      "message": "クラス内は宣言とし、関数本体を型定義の後へ移してください",
+      "source": "void TearDown() override {",
+      "key": "6d63031b91a5ddafc07425642a871b2d8e79e5775797eb9f18bbac28eee4f955",
+      "count": 1,
+      "code_lines": 10
+    }
+  ]
+}

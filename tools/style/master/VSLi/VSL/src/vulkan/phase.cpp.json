@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "VSLi/VSL/src/vulkan/phase.cpp",
+      "line": 59,
+      "column": 1,
+      "rule": "clang-format",
+      "symbol": "",
+      "message": "clang-formatの結果と一致しません",
+      "source": "f0421900b6fe4365997e44ef5465a7e861b34ba72f15c678cc6006e6edc4b8db",
+      "key": "72f66a153c895b9c029f8762e193f2b5e87fe971d695d00a4d36cb450964d8d1",
+      "count": 1
+    }
+  ]
+}

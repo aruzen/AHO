@@ -1,0 +1,161 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "VSLi/VSL/include/VSL/utils/vsl_array.hpp",
+      "line": 46,
+      "column": 12,
+      "rule": "aho-declaration-order",
+      "symbol": "vsl::VSLArray",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "struct VSLArray {",
+      "key": "57d5a22ece61c44c8e72cea1cdd3a026073222a6a9bb6c6380578ca68699e735",
+      "count": 1
+    },
+    {
+      "file": "VSLi/VSL/include/VSL/utils/vsl_array.hpp",
+      "line": 61,
+      "column": 12,
+      "rule": "aho-declaration-order",
+      "symbol": "vsl::VSLD2PointDefault",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "struct VSLD2PointDefault {",
+      "key": "b472adb7047728b1f7942c699ce46702d75749ce1237c167828a9c705ed89d11",
+      "count": 1
+    },
+    {
+      "file": "VSLi/VSL/include/VSL/utils/vsl_array.hpp",
+      "line": 67,
+      "column": 12,
+      "rule": "aho-declaration-order",
+      "symbol": "vsl::VSLD2PointAccessor",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "struct VSLD2PointAccessor {",
+      "key": "57f99da603b9421f224a33652de1fe8bf6fd0427bed6a439d691a12fb1a2d8c9",
+      "count": 1
+    },
+    {
+      "file": "VSLi/VSL/include/VSL/utils/vsl_array.hpp",
+      "line": 73,
+      "column": 12,
+      "rule": "aho-declaration-order",
+      "symbol": "vsl::VSLD2Point",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "struct VSLD2Point {",
+      "key": "ebc72ca104bc173c21fcc2015f4e288102463f0c547efa50d549ae6a6abfbcab",
+      "count": 1
+    },
+    {
+      "file": "VSLi/VSL/include/VSL/utils/vsl_array.hpp",
+      "line": 120,
+      "column": 1,
+      "rule": "clang-format",
+      "symbol": "",
+      "message": "clang-formatの結果と一致しません",
+      "source": "c6dcd835e73a6ead07b9839b363c1c10032951b31423940cb9cf9efc3aca92fb",
+      "key": "d937b89c6c09e48b85ab20402c5a733766a8dd0f8c07f4ea3a79243210d3d81d",
+      "count": 1
+    },
+    {
+      "file": "VSLi/VSL/include/VSL/utils/vsl_array.hpp",
+      "line": 128,
+      "column": 12,
+      "rule": "aho-declaration-order",
+      "symbol": "vsl::VSLD2SizeDefault",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "struct VSLD2SizeDefault {",
+      "key": "082e4de2102a9ac6e5ea9938e0b42a97cd9e590783279fa39c5cd001ad9b6d0b",
+      "count": 1
+    },
+    {
+      "file": "VSLi/VSL/include/VSL/utils/vsl_array.hpp",
+      "line": 134,
+      "column": 12,
+      "rule": "aho-declaration-order",
+      "symbol": "vsl::VSLD2SizeAccessor",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "struct VSLD2SizeAccessor {",
+      "key": "b252b9e1d3d4fbc0188313da4dfd69147040efae34ac8f6e10f0dd85ff41897c",
+      "count": 1
+    },
+    {
+      "file": "VSLi/VSL/include/VSL/utils/vsl_array.hpp",
+      "line": 140,
+      "column": 12,
+      "rule": "aho-declaration-order",
+      "symbol": "vsl::VSLD2Size",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "struct VSLD2Size {};",
+      "key": "decefa3abd6906b0c3220347a592234f23d0214a65d67d1d9c83aeb587989b80",
+      "count": 1
+    },
+    {
+      "file": "VSLi/VSL/include/VSL/utils/vsl_array.hpp",
+      "line": 189,
+      "column": 12,
+      "rule": "aho-declaration-order",
+      "symbol": "vsl::VSLD2RectangleDefault",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "struct VSLD2RectangleDefault : public VSLD2PointDefault<ElementType_>, public VSLD2SizeDefault<ElementType_> {",
+      "key": "eb3e339f8b4e92828897826ef07d6c96a080787170fdde4b87c546fc63a4ccf9",
+      "count": 1
+    },
+    {
+      "file": "VSLi/VSL/include/VSL/utils/vsl_array.hpp",
+      "line": 195,
+      "column": 12,
+      "rule": "aho-declaration-order",
+      "symbol": "vsl::VSLD2RectangleAccessor",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "struct VSLD2RectangleAccessor : public VSLD2PointAccessor<ElementType_>, public VSLD2SizeAccessor<ElementType_> {",
+      "key": "adc30e9a1ca595f496da3e94b127680636042b69ab722c48f1168bc925c0fc10",
+      "count": 1
+    },
+    {
+      "file": "VSLi/VSL/include/VSL/utils/vsl_array.hpp",
+      "line": 200,
+      "column": 12,
+      "rule": "aho-declaration-order",
+      "symbol": "vsl::VSLD2Rectangle",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "struct VSLD2Rectangle {};",
+      "key": "77e6da98c6168c6cbb4007f943727e707e34c550bb283a646901fc117ed0c410",
+      "count": 1
+    },
+    {
+      "file": "VSLi/VSL/include/VSL/utils/vsl_array.hpp",
+      "line": 239,
+      "column": 12,
+      "rule": "aho-declaration-order",
+      "symbol": "vsl::VSLDRGBColorDefault",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "struct VSLDRGBColorDefault {",
+      "key": "0fb0abdb3a306b6b0e6624047abb3435443b46c208d7e7952e20c5e948dd5121",
+      "count": 1
+    },
+    {
+      "file": "VSLi/VSL/include/VSL/utils/vsl_array.hpp",
+      "line": 246,
+      "column": 12,
+      "rule": "aho-declaration-order",
+      "symbol": "vsl::VSLDRGBColorAccessor",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "struct VSLDRGBColorAccessor {",
+      "key": "25eae848043f1945caade213ff9061b696a44b8bf759664666f59e8d9a952259",
+      "count": 1
+    },
+    {
+      "file": "VSLi/VSL/include/VSL/utils/vsl_array.hpp",
+      "line": 253,
+      "column": 12,
+      "rule": "aho-declaration-order",
+      "symbol": "vsl::VSLDRGBColor",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "struct VSLDRGBColor {};",
+      "key": "c6e6f1d919f5cef586a915f52961d287f69fae0170822ae2c4424a87bc699962",
+      "count": 1
+    }
+  ]
+}

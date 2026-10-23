@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "AHOLi/AHO/test/support/unary_scalar.hpp",
+      "line": 17,
+      "column": 1,
+      "rule": "clang-format",
+      "symbol": "",
+      "message": "clang-formatの結果と一致しません",
+      "source": "7b84fc97af273bb72b8ddee19e72215e374daeaa8cb188ab709f1edb45b64aff",
+      "key": "d52ea80ab864e8452db659f23a918b87255b207512f2c2dbabf6fb5aefce3d7e",
+      "count": 1
+    }
+  ]
+}

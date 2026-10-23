@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "AHOLi/AHO/include/AHO/image_readback.hpp",
+      "line": 69,
+      "column": 1,
+      "rule": "clang-format",
+      "symbol": "",
+      "message": "clang-formatの結果と一致しません",
+      "source": "7a8b54852d9129e6f9f3685b0383d12dd6da346d14f79425e6bc08510d0ddb57",
+      "key": "40c08f1c20308fac0558b7653b26bff3e638f0830cbb4f390d82ed7d1810b684",
+      "count": 1
+    }
+  ]
+}

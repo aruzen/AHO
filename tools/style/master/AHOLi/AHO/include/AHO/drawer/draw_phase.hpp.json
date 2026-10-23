@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "AHOLi/AHO/include/AHO/drawer/draw_phase.hpp",
+      "line": 44,
+      "column": 1,
+      "rule": "clang-format",
+      "symbol": "",
+      "message": "clang-formatの結果と一致しません",
+      "source": "2df50de92260191fdef5b54fed5e6219a0fd674fb53a43403f4e88ed954c65b5",
+      "key": "97bd9224c85f1733b8888be0e6c4b2859b46246bd17f1449d44725781adacb84",
+      "count": 1
+    }
+  ]
+}

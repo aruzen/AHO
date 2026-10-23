@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "VSLi/VSL/test/utils/spir_reflector_test.cpp",
+      "line": 641,
+      "column": 11,
+      "rule": "aho-declaration-order",
+      "symbol": "(anonymous namespace)::ReflectedSeparateImageVulkanIntegrationTest",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "class ReflectedSeparateImageVulkanIntegrationTest : public vsl_test::ImageTransferVulkanIntegrationTest {",
+      "key": "1a391188da83c10fd5e6510373c5474f68e08d1a9a20a1891e865e2372221ac3",
+      "count": 1
+    },
+    {
+      "file": "VSLi/VSL/test/utils/spir_reflector_test.cpp",
+      "line": 645,
+      "column": 1,
+      "rule": "clang-format",
+      "symbol": "",
+      "message": "clang-formatの結果と一致しません",
+      "source": "18d3647c735cf986c77c454aa27bca9834e05049b788e2c56c5724e33080f05e",
+      "key": "c38ed88acae976c7584409685a1c9baf11a73be504ad81d3f66d1caa8d1c793d",
+      "count": 1
+    },
+    {
+      "file": "VSLi/VSL/test/utils/spir_reflector_test.cpp",
+      "line": 717,
+      "column": 11,
+      "rule": "aho-declaration-order",
+      "symbol": "(anonymous namespace)::ReflectedTexelBufferVulkanIntegrationTest",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "class ReflectedTexelBufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {",
+      "key": "22e5fb470dd223248787b58230530887172f6e80842562c5dc024642cc5b8e64",
+      "count": 1
+    },
+    {
+      "file": "VSLi/VSL/test/utils/spir_reflector_test.cpp",
+      "line": 808,
+      "column": 11,
+      "rule": "aho-declaration-order",
+      "symbol": "(anonymous namespace)::ReflectedInputAttachmentVulkanIntegrationTest",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "class ReflectedInputAttachmentVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {",
+      "key": "e37d41a3f97eb72f4ffc0484f8e6f7462d5f6fbfb46eb1d57e4cea6d188fc544",
+      "count": 1
+    }
+  ]
+}

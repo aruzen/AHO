@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "AHOLi/AHO/test/support/input_backend.hpp",
+      "line": 24,
+      "column": 29,
+      "rule": "aho-in-class-definition",
+      "symbol": "aho_test::InputWindow::Find",
+      "message": "クラス内は宣言とし、関数本体を型定義の後へ移してください",
+      "source": "static InputWindow* Find(GLFWwindow* handle) {",
+      "key": "2cf7784686a6ec3b93a8139d64a0312c7fe05cf46088034b4c7e5da1219211c1",
+      "count": 1,
+      "code_lines": 5
+    }
+  ]
+}

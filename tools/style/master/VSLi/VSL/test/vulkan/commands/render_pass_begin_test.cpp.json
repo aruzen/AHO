@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "VSLi/VSL/test/vulkan/commands/render_pass_begin_test.cpp",
+      "line": 63,
+      "column": 11,
+      "rule": "aho-declaration-order",
+      "symbol": "(anonymous namespace)::PackedIntegerClearTest",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "class PackedIntegerClearTest : public testing::TestWithParam<PackedIntegerClearCase> {};",
+      "key": "b7558571f5bb4cf4ce9c8ddd0c116f4708b7f469621da05c1e874a7649097955",
+      "count": 1
+    },
+    {
+      "file": "VSLi/VSL/test/vulkan/commands/render_pass_begin_test.cpp",
+      "line": 91,
+      "column": 1,
+      "rule": "clang-format",
+      "symbol": "",
+      "message": "clang-formatの結果と一致しません",
+      "source": "37d866c9c73c30f21785082ba09a56c80c62d14806d2d075c734a0925d1dd6ce",
+      "key": "0b2baf3b8bfc3254d4aed6fc97d7953b8ec258122713713c7724418335273f5a",
+      "count": 1
+    },
+    {
+      "file": "VSLi/VSL/test/vulkan/commands/render_pass_begin_test.cpp",
+      "line": 100,
+      "column": 11,
+      "rule": "aho-declaration-order",
+      "symbol": "(anonymous namespace)::PackedIntegerClearVulkanIntegrationTest",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "class PackedIntegerClearVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest,",
+      "key": "5b89e7ea135c29aa254d20748db549a5308252b290253f3d0238910b0b292ccb",
+      "count": 1
+    },
+    {
+      "file": "VSLi/VSL/test/vulkan/commands/render_pass_begin_test.cpp",
+      "line": 175,
+      "column": 11,
+      "rule": "aho-declaration-order",
+      "symbol": "(anonymous namespace)::LegacyClearVulkanIntegrationTest",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "class LegacyClearVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {",
+      "key": "fd983c216a49dc67220618562cc7154e5bcfef0ed3f105a8d761bab5f8a9b345",
+      "count": 1
+    },
+    {
+      "file": "VSLi/VSL/test/vulkan/commands/render_pass_begin_test.cpp",
+      "line": 181,
+      "column": 11,
+      "rule": "aho-declaration-order",
+      "symbol": "(anonymous namespace)::LegacyClearFormatVulkanIntegrationTest",
+      "message": "同じファイル・namespaceの型定義と関数宣言を実装より上へまとめてください",
+      "source": "class LegacyClearFormatVulkanIntegrationTest : public LegacyClearVulkanIntegrationTest,",
+      "key": "8c081b8bb4db3f8ef57333bacdc1af6d32441d45b4f81b800d5907b0bd583266",
+      "count": 1
+    }
+  ]
+}

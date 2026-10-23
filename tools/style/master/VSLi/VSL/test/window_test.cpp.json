@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "llvm_major": 20,
+  "in_class_min_lines": 5,
+  "diagnostics": [
+    {
+      "file": "VSLi/VSL/test/window_test.cpp",
+      "line": 362,
+      "column": 1,
+      "rule": "clang-format",
+      "symbol": "",
+      "message": "clang-formatの結果と一致しません",
+      "source": "636a92956668dae8ac2078d1ed78e27d000ef26a2c8a8a2b06357415cb344866",
+      "key": "604f88ca8dae5090d7b72e71ca500293d53795b7ca9b03317049cc35823c46a8",
+      "count": 1
+    }
+  ]
+}

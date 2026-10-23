@@ -20,6 +20,41 @@ namespace {
         const vsl::RenderPassAccessor base = picking;
         EXPECT_EQ(base.data_, picking.data_);
     }
+
+    class PickingReadVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
+        bool validate_vulkan() const override;
+    };
+
+    bool PickingReadVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
+
+    TEST_F(PickingReadVulkanIntegrationTest, ReadsAcquiredImageRatherThanTheCommandBufferSlot) {
+        description.images.resize(2, *color);
+        vsl::IDPickingRenderPass picking(description);
+        vsl::RenderPassDescription clear_description;
+        clear_description.add_color({.format = vsl::data_format::UNSIGNED_INT,
+                                     .final_layout = vsl::ImageLayout::COLOR_ATTACHMENT_OPTIMAL});
+        vsl::RenderPass clear_pass(device, clear_description);
+        auto manager = make_manager();
+        for (std::uint32_t i = 0; i < picking.picking_buffer.size(); ++i) {
+            vsl::FrameBuffer target(clear_pass, WIDTH, HEIGHT, {picking.picking_buffer[i]});
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << vsl::command::RenderPassBegin(target, {vsl::ClearUint{101 + i}})
+                  << vsl::command::RenderPassEnd{};
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            ASSERT_TRUE(phase.completion().wait());
+        }
+        vsl::SynchroManager sync(device);
+        auto ready = sync.create_fence("picking read ready", true);
+        const auto buffers = manager.get_buffer().data_;
+        ASSERT_EQ(buffers->current_buffer_idx, 0u);
+        // WSIの取得順に依存せず、別画像を取得したフレームの状態を再現する。
+        buffers->acquired_image_index = 1;
+        EXPECT_EQ(picking.read(manager, ready, 0, 0), 102u);
+        buffers->acquired_image_index.reset();
+        EXPECT_EQ(picking.read(manager, ready, WIDTH - 1, HEIGHT - 1), 101u);
+    }
 } // namespace
 
 namespace {

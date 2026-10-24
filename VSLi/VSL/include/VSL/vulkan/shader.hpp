@@ -6,6 +6,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <string_view>
 
 #include "device.hpp"
 #include "../utils/flags.hpp"
@@ -85,11 +86,14 @@ namespace VSL_NAMESPACE {
 
     template<helper::ConstantStringHolder txt>
     consteval ShaderType get_shader_type() {
-        if (std::string(txt.value).contains(".vert.")) {
+        const std::string_view path(txt.value);
+        const auto separator = path.find_last_of("/\\");
+        const auto name = separator == std::string_view::npos ? path : path.substr(separator + 1);
+        if (name.contains(".vert.")) {
             return ShaderType::VERTEX;
-        } else if (std::string(txt.value).contains(".frag.")) {
+        } else if (name.contains(".frag.")) {
             return ShaderType::FRAGMENT;
-        } else if (std::string(txt.value).contains(".comp.")) {
+        } else if (name.contains(".comp.")) {
             return ShaderType::COMPUTE;
         }
         return ShaderType::ERROR_;

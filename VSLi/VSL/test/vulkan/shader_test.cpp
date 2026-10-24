@@ -1,5 +1,6 @@
 #include "support/vulkan_fixture.hpp"
 #include "support/temporary_directory.hpp"
+#include "support/scoped_environment.hpp"
 
 namespace {
     using ShaderVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
@@ -7,6 +8,11 @@ namespace {
     static_assert(vsl::get_shader_type<"fixture.frag.spv">() == vsl::ShaderType::FRAGMENT);
     static_assert(vsl::get_shader_type<"fixture.comp.spv">() == vsl::ShaderType::COMPUTE);
     static_assert(vsl::get_shader_type<"fixture.unknown">() == vsl::ShaderType::ERROR_);
+    TEST(ShaderPathTest, DirectoryNamesDoNotChooseTheShaderStage) {
+        EXPECT_EQ(vsl::get_shader_type<"cache.vert.data/lighting.frag.spv">(), vsl::ShaderType::FRAGMENT);
+        EXPECT_EQ(vsl::get_shader_type<"cache.frag.data\\simulation.comp.spv">(), vsl::ShaderType::COMPUTE);
+        EXPECT_EQ(vsl::get_shader_type<"cache.vert.data/unknown.spv">(), vsl::ShaderType::ERROR_);
+    }
     TEST_F(ShaderVulkanIntegrationTest, LoadsVertexAndFragmentModulesWithEntryPointNames) {
         const vsl::Shader<vsl::ShaderType::VERTEX> vertex(device, vsl_test::shader_path("triangle.vert.spv"));
         const vsl::Shader<vsl::ShaderType::FRAGMENT> fragment(device, vsl_test::shader_path("triangle.frag.spv"),
@@ -42,6 +48,18 @@ namespace {
         EXPECT_EQ(fragment.name(), "main");
         EXPECT_TRUE(static_cast<bool>(vertex.data_->shader_module));
         EXPECT_TRUE(static_cast<bool>(fragment.data_->shader_module));
+    }
+
+    TEST_F(ShaderVulkanIntegrationTest, FactoryLoadsAFragmentShaderInsideADirectoryWithAVertexMarker) {
+        vsl_test::TemporaryDirectory temporary;
+        const auto directory = temporary.path() / "cache.vert.data";
+        std::filesystem::create_directory(directory);
+        std::filesystem::copy_file(vsl_test::shader_path("triangle.frag.spv"), directory / "triangle.frag.spv");
+        vsl_test::ScopedEnvironment environment("VSL_SHADER_STAGE_TEST_ROOT", temporary.path().string().c_str());
+        const auto shader = vsl::make_shader<"${VSL_SHADER_STAGE_TEST_ROOT}/cache.vert.data/triangle.frag.spv">(device);
+        EXPECT_EQ(decltype(shader)::TYPE, vsl::ShaderType::FRAGMENT);
+        EXPECT_EQ(shader.data_->shader_stage_create_info.stage, vk::ShaderStageFlagBits::eFragment);
+        EXPECT_TRUE(static_cast<bool>(shader.data_->shader_module));
     }
 } // namespace
 

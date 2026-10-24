@@ -1,9 +1,20 @@
 #include "support/compute_fixture.hpp"
+#include "support/scoped_environment.hpp"
 namespace {
     using DescriptorVulkanIntegrationTest = vsl_test::ComputeVulkanIntegrationTest;
+    class DescriptorImageBarrierVulkanIntegrationTest : public vsl_test::ComputeVulkanIntegrationTest {
+        vsl_test::ScopedEnvironment _synchronization{"VK_LAYER_VALIDATE_SYNC", "1"};
+        vsl_test::ScopedEnvironment _shader_accesses{"VK_LAYER_SYNCVAL_SHADER_ACCESSES_HEURISTIC", "1"};
+        bool validate_vulkan() const override;
+    };
+
     class DescriptorOwnershipVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override;
     };
+
+    bool DescriptorImageBarrierVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
 
     bool DescriptorOwnershipVulkanIntegrationTest::validate_vulkan() const {
         return true;
@@ -117,7 +128,7 @@ namespace {
 } // namespace
 #include "support/image_transfer_fixture.hpp"
 namespace {
-    TEST_F(DescriptorVulkanIntegrationTest, ImageAndCombinedSamplerUpdatesReachComputeShader) {
+    TEST_F(DescriptorImageBarrierVulkanIntegrationTest, ImageAndCombinedSamplerUpdatesReachComputeShader) {
         using namespace vsl::graphic_resource;
         pipeline.reset();
         layout.reset();
@@ -176,10 +187,6 @@ namespace {
             phase << vsl::command::CopyBufferToImage(sampled, &upload, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
             phase << vsl::command::ChangeImageBarrier(sampled, vsl::ImageLayout::TRANSFER_DST_OPTIMAL,
                                                       vsl::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
-            // The public barrier targets FragmentShader only (I10). Extend visibility
-            // in the fixture so this descriptor test has a valid ComputeShader dependency.
-            change(sampled, vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
-                   vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eShaderRead);
             phase << *pipeline << vsl::command::BindGraphicResource(resource, BindingDestination::COMPUTE)
                   << vsl::command::Dispatch(1, 1, 1);
             vk::MemoryBarrier barrier{};

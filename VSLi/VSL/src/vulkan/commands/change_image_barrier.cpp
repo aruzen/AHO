@@ -54,7 +54,7 @@ void VSL_NAMESPACE::command::ChangeImageBarrier::invoke(VSL_NAMESPACE::CommandPo
         barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
 
         source_stage = vk::PipelineStageFlagBits::eTransfer;
-        destination_stage = vk::PipelineStageFlagBits::eFragmentShader;
+        destination_stage = vk::PipelineStageFlagBits::eAllCommands;
     } else if (old_layout == ImageLayout::COLOR_ATTACHMENT_OPTIMAL && new_layout == ImageLayout::TRANSFER_SRC_OPTIMAL) {
         barrier.srcAccessMask = vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite;
         barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;

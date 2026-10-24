@@ -1,0 +1,7 @@
+# 画像アップロード後のシェーダー可視性
+
+`ChangeImageBarrier(image, TRANSFER_DST_OPTIMAL, SHADER_READ_ONLY_OPTIMAL)`は、転送書き込みと後続のシェーダー読み取りを同期する。Computeや頂点シェーダーでも画像をサンプリングできるため、フラグメントシェーダーだけに可視性を限定しない。
+
+送信元はTransfer/TransferWrite、送信先はAllCommands/ShaderReadを使う。個々のオプショナルなシェーダーステージを列挙せず、デバイスで有効なステージをまとめて扱う。従来よりGPU上の実行依存の対象は広がる。CPUでの追加検証、送信、queue/deviceの完了待ちは追加しない。
+
+既存のCompute画像テストにあった追加のnativeバリアを削除し、公開コマンドだけで同期する。対象ケースに限ってSynchronization Validationとshader access追跡を有効にし、転送した画素がComputeのサンプリング結果へ反映されることと、同期エラーがないことを確認する。環境設定はテスト終了時に復元する。

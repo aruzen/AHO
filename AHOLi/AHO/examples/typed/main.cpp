@@ -29,7 +29,7 @@ namespace {
 
     WindowGuard::~WindowGuard() {
         try {
-            window.engine.data_->command_manager.wait_idle();
+            window.render_context().commands().wait_idle();
         } catch (...) {
         }
         window.close();
@@ -107,6 +107,19 @@ namespace {
     void verify(aho::StandardEngine& engine, aho::Window window, typed_example::Scene& scene,
                 aho::x::Screenshot& screenshot, const std::filesystem::path& directory) {
         std::filesystem::create_directories(directory);
+        // Submit without readback waits so every command slot is reused repeatedly.
+        const auto target = scene.frame_count() * 4;
+        size_t submitted = 0;
+        for (size_t attempt = 0; attempt < target + 60 && submitted < target; ++attempt) {
+            if (!aho::Window::Update() || !window)
+                throw std::runtime_error("Verification window was closed");
+            if (draw_frame(engine, scene, float(submitted) * .1f))
+                ++submitted;
+            else
+                window.recreate_swapchain();
+        }
+        if (submitted != target)
+            throw std::runtime_error("Could not submit the frame resource reuse sequence");
         const auto first = capture_frame(engine, scene, screenshot, directory / "01-typed.png", 0);
         const auto rotated = capture_frame(engine, scene, screenshot, directory / "02-rotated.png", 1);
         if (first.width != rotated.width || first.height != rotated.height)
@@ -116,22 +129,24 @@ namespace {
             if (!std::equal(first.bytes.begin() + i, first.bytes.begin() + i + 4, rotated.bytes.begin() + i))
                 ++changed;
         if (changed < size_t(first.width) * first.height / 100)
-            throw std::runtime_error("Push constants did not change the rendered image");
+            throw std::runtime_error("Per-frame UBO updates did not change the rendered image");
         const auto builds = scene.pipeline_builds();
-        const auto format = window.data2->swapchain.get_format();
+        const auto context = window.render_context();
+        const auto format = context.format();
         window.resize(1000, 680);
         const auto resized = capture_frame(engine, scene, screenshot, directory / "03-resized.png", 1);
         if (first.width == resized.width && first.height == resized.height)
             throw std::runtime_error("Resize did not change the framebuffer dimensions");
-        if (format == window.data2->swapchain.get_format() && scene.pipeline_builds() != builds)
+        if (format == context.format() && scene.pipeline_builds() != builds)
             throw std::runtime_error("Compatible resize rebuilt the Typed pipeline");
-        std::cout << "Verification passed: 2 colored draws, " << changed << " animated pixels, resize "
+        std::cout << "Verification passed: " << scene.frame_count() << " frame slots, " << submitted
+                  << " submissions before readback, 2 colored draws, " << changed << " UBO-animated pixels, resize "
                   << first.width << 'x' << first.height << " -> " << resized.width << 'x' << resized.height
                   << ", pipeline builds=" << scene.pipeline_builds() << '\n';
     }
 
     int run(const Options& options) {
-        aho::StandardEngine engine("Typed | vertex + UBO + push + indexed draw + view + batch");
+        aho::StandardEngine engine("Typed | frame UBO + camera + push + indexed draw + batch");
         auto window = engine.get_window();
         WindowGuard close{window};
         window.resize(860, 540);

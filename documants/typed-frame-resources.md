@@ -25,6 +25,9 @@
 - 変更C++ 6ファイル／4TUのformat・命名・配置検査で違反0件。
 - TypedFrameResources: GPUテスト7件・コンパイル契約7件成功。3枠／12送信でUBO値と計算結果、descriptorの独立性と再利用を確認。skip・validation errorなし。
 - TypedFrameResourcesの変更C++ 4ファイル／3TUのformat・命名・配置検査で違反0件。
+- 既存Typed各機能・Phase・新規frame資源の回帰テスト177件成功。公開コンテキスト側と合わせて計223件、skip・validation errorなし。
+- Sampleの画像検証: 3枠／12送信後に読み戻し、238831画素のUBOによる時間変化、1720×1080 → 2000×1360へのresize、pipeline生成1回を確認。実画像でも左右のquadを確認。
+- Sample変更C++ 3ファイル／2TUのformat・命名・配置検査で違反0件。Sampleの2shaderと新規compute fixtureのspirv-val成功。
 
 ## 型付きフレーム資源
 
@@ -59,6 +62,12 @@ Factoryは各slotに独立した可変資源を作成する。同じUBOやdescri
 update callbackの可変参照やbuffer/setの可変aliasを保存し、後から更新してはならない。callback内ではcommandの記録・submit・cancelを行わず、資源の更新に限る。getの参照と、それを使って作成したcommandは取得したPhase内で使用する。既存Typed APIのbackend escapeと同様、C++の外部aliasまで静的に封じるものではない。descriptorを差し替える場合も最初のupdate内で行う。Frameは資源の所有者をまとめ、管理元のCommandManagerやTypedFrameResourcesへの所有参照を含めない。
 
 現段階ではResourceSchemaから全資源を自動生成しない。shaderのdescriptor schemaはbindingとpayload配置を表す一方、storage bufferの要素数や共有資源の配置は利用側が決める必要がある。これらの割当方針を型へ拡張する前段として、任意の型付き資源構成と安全な再利用の境界を導入する。
+
+## Sampleへの適用
+
+Sampleの`SceneFrame`へUBO／descriptorをまとめ、全slotで独立して生成する。カメラ位置・色・aspect比・時刻を現在のslotへ書き、quadごとの位置・scale・回転速度はpush snapshotへ渡す。保持したRenderContextから現在のrender pass・viewport/scissorを取得する。
+
+Sampleから内部の`data_`／`data2`参照を除いた。`--verify`ではフレーム枠の4周分を読み戻し待ちなしで送信してから画像を取得し、UBOだけの時刻変更で画素が変わることと、resize後の描画・互換pipelineの再利用を検査する。
 
 ## 今回の範囲外
 

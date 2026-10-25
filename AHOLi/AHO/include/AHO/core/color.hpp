@@ -5,6 +5,7 @@
 #include "VSL/format.hpp"
 #include <cmath>
 #include <limits>
+#include <stdexcept>
 
 #include <iostream>
 #include <cstdint>
@@ -810,6 +811,8 @@ namespace AHO_NAMESPACE {
 
             if constexpr (std::is_integral_v<H>) {
                 h = std::round(h);
+                if (!std::isfinite(h) || h < std::numeric_limits<H>::lowest() || h > std::numeric_limits<H>::max())
+                    throw std::invalid_argument("Hue cannot be represented in the selected integer type");
             }
             return {static_cast<H>(h), detail::channel_from_normalized<SV>(s), detail::channel_from_normalized<SV>(v)};
         }

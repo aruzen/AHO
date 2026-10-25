@@ -4,7 +4,18 @@ on:
   pull_request:
   push:
     branches: [master]
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      full:
+        description: Run the full style scan
+        type: boolean
+        default: false
+      base_ref:
+        description: Base ref for an incremental run (defaults to HEAD parent)
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -21,12 +32,36 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Select changed files
+        id: scope
+        run: python3 tools/style/ci_scope.py
       - name: Install tools and headers
+        if: steps.scope.outputs.needed == 'true'
+        env:
+          STYLE_CHECKS: ${{ steps.scope.outputs.checks }}
         run: |
-          brew install llvm@20 cmake ninja boost glfw glm googletest pkgconf vulkan-headers vulkan-loader spirv-cross spirv-tools shaderc
+          brew install llvm@20 cmake ninja
+          if [ "$STYLE_CHECKS" = true ]; then
+            brew install boost glfw glm googletest pkgconf vulkan-headers vulkan-loader spirv-cross spirv-tools shaderc
+          fi
           echo "$(brew --prefix llvm@20)/bin" >> "$GITHUB_PATH"
       - name: Configure
+        if: steps.scope.outputs.needed == 'true'
+        env:
+          STYLE_BASE_REF: ${{ steps.scope.outputs.base }}
+          STYLE_CHECKS: ${{ steps.scope.outputs.checks }}
         run: |
+          if [ "$STYLE_CHECKS" != true ]; then
+            cmake -S tools/style -B build/style -G Ninja \
+              -DCMAKE_C_COMPILER="$(brew --prefix llvm@20)/bin/clang" \
+              -DCMAKE_CXX_COMPILER="$(brew --prefix llvm@20)/bin/clang++" \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_DIR="$(brew --prefix llvm@20)/lib/cmake/llvm" \
+              -DClang_DIR="$(brew --prefix llvm@20)/lib/cmake/clang"
+            exit 0
+          fi
           mkdir -p thirdparty
           curl --fail --location --retry 3 https://raw.githubusercontent.com/nothings/stb/003501f6d7a8668ce8b6d875e34dd97ad0d5d5b5/stb_image.h -o thirdparty/stb_image.h
           curl --fail --location --retry 3 https://raw.githubusercontent.com/nothings/stb/003501f6d7a8668ce8b6d875e34dd97ad0d5d5b5/stb_image_write.h -o thirdparty/stb_image_write.h
@@ -36,18 +71,31 @@ jobs:
             -DAHO_HOME="$PWD/AHOLi/AHO" -DVSL_HOME="$PWD/VSLi/VSL" \
             -DBUILD_TESTING=ON -DAHO_STYLE_CHECKS=ON -DAHO_STYLE_JOBS=3 -DCMAKE_BUILD_TYPE=Release \
             -DAHO_ENABLE_EXPERIMENTAL_MESH=ON -DAHO_BUILD_MESH_EXAMPLE=ON \
+            -DAHO_STYLE_BASE_REF="$STYLE_BASE_REF" \
             -DLLVM_DIR="$(brew --prefix llvm@20)/lib/cmake/llvm" \
             -DClang_DIR="$(brew --prefix llvm@20)/lib/cmake/clang"
       - name: Build checker
+        if: steps.scope.outputs.needed == 'true'
         run: cmake --build build/style --target aho-style-ast --parallel 2
       - name: Verify checker contracts
+        if: steps.scope.outputs.contracts == 'true'
         run: ctest --test-dir build/style -R '^Style\.' --output-on-failure
       - name: Check format, naming and layout
-        run: cmake --build build/style --target check-style
+        if: steps.scope.outputs.checks == 'true'
+        env:
+          STYLE_FULL: ${{ steps.scope.outputs.full }}
+        run: |
+          if [ "$STYLE_FULL" = true ]; then
+            cmake --build build/style --target check-style-full
+          else
+            cmake --build build/style --target check-style
+          fi
       - name: Preserve diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: style-report
-          path: build/style-report
+          path: |
+            build/style-report
+            build/style-scope.json
           if-no-files-found: ignore

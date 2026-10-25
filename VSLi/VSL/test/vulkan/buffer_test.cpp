@@ -57,6 +57,24 @@ namespace {
         EXPECT_EQ(mapped.offset, 0u);
         mapped.flush();
     }
+    TEST_F(BufferVulkanIntegrationTest, MappedPointerCopiesPreserveOverlappingSourceRanges) {
+        if (!host_coherent_available())
+            GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
+        const std::array<std::uint32_t, 8> initial{1, 2, 3, 4, 5, 6, 7, 8};
+        HostBuffer buffer(device, initial);
+        auto whole = buffer.data();
+        auto tail = buffer.data(6 * sizeof(std::uint32_t), sizeof(std::uint32_t));
+        EXPECT_TRUE(tail.copy(static_cast<std::uint32_t*>(whole.data), std::size_t{6}));
+        std::array<std::uint32_t, 8> actual{};
+        std::memcpy(actual.data(), whole.data, sizeof(actual));
+        EXPECT_EQ(actual, (std::array<std::uint32_t, 8>{1, 1, 2, 3, 4, 5, 6, 8}));
+        ASSERT_TRUE(buffer.copy(initial));
+        auto head = buffer.data(6 * sizeof(std::uint32_t));
+        EXPECT_TRUE(head.copy(static_cast<std::uint32_t*>(whole.data) + 1, std::size_t{6}));
+        std::memcpy(actual.data(), whole.data, sizeof(actual));
+        EXPECT_EQ(actual, (std::array<std::uint32_t, 8>{2, 3, 4, 5, 6, 7, 7, 8}));
+    }
+
     TEST_F(BufferVulkanIntegrationTest, PointerConstructorAndPointerCopyPreserveArrayContents) {
         if (!host_coherent_available())
             GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";

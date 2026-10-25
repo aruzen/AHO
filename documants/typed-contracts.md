@@ -1,5 +1,15 @@
 # Typed APIの所有・宣言・shader契約の整理
 
+## 画像の読み取りステージ（PR #251）
+
+`ResourceBindingPoint`の`MakeShaderReadBarrier(image)`で、sampled imageのbinding宣言から転送後の読み取り同期を作れる。shader_typeを既存のChangeImageBarrierへ伝え、画像がSAMPLED用途を持つこと、bindingがSAMPLED_IMAGE/COMBINED_IMAGE_SAMPLERであること、shader stageが有効な非空集合であることをコンパイル時に検査する。型消去されたImageAccessorを直接渡す経路は持たない。
+
+Typedの頂点入力・vertex buffer・drawの型や処理は変更しない。コマンドの生成時にpipeline stageへ変換し、draw時のreflectionや自動待機は増やさない。使用例と制約は[画像同期の説明](../documents/VSL/image-shader-visibility.md)を参照。
+
+次のTyped整備では、`TypedGraphicsPipeline<Input>`へresource schemaを結び、descriptorの番号・種別・配列数・shader stageをロード済みSPIR-Vと照合し、型付きresource bindingからdrawまで保持する経路を扱う。画像layoutの実行履歴と状態型を結ぶ設計は別途必要で、今回のfactoryだけでlayout遷移を保証するものではない。
+
+## これまでの整備
+
 PR #221の後続。次の3点を順に解決する。
 
 1. `TypedVertexBuffer<Binding>` がbinding番号・location・入力頻度まで所有型へ結び付けており、同じGPUデータを別pipelineへ再利用しにくい。bufferをレコード型へ結び、接続情報はpipelineのbindingへ分離する。

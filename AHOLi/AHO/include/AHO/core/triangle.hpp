@@ -12,6 +12,7 @@
 
 #include <array>
 #include <type_traits>
+#include <cstdint>
 
 namespace AHO_NAMESPACE {
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
@@ -93,6 +94,35 @@ namespace AHO_NAMESPACE {
         using namespace product::cross;
         if constexpr (std::same_as<D, VSL_NAMESPACE::D1>) {
             return 0;
+        } else if constexpr (std::integral<R> && sizeof(R) <= sizeof(std::uint32_t)) {
+            using Magnitude = std::make_unsigned_t<decltype(R{} - R{})>;
+            auto difference = [](R a, R b) -> Magnitude {
+                return a < b ? Magnitude(b) - Magnitude(a) : Magnitude(a) - Magnitude(b);
+            };
+            auto absolute_determinant = [&](R ax, R ay, R bx, R by, R cx, R cy) {
+                const auto p = std::uint64_t(difference(bx, ax)) * difference(cy, ay);
+                const auto q = std::uint64_t(difference(by, ay)) * difference(cx, ax);
+                const bool p_negative = (bx < ax) != (cy < ay);
+                const bool q_negative = (by < ay) != (cx < ax);
+                // 相殺する積は整数のまま引き、微小な面積を丸めで失わない。
+                if (p_negative == q_negative)
+                    return static_cast<long double>(p > q ? p - q : q - p);
+                return static_cast<long double>(p) + static_cast<long double>(q);
+            };
+            const auto xy = absolute_determinant(pos1.value.___AN1, pos1.value.___AN2,
+                                                 pos2.value.___AN1, pos2.value.___AN2,
+                                                 pos3.value.___AN1, pos3.value.___AN2);
+            if constexpr (std::same_as<D, VSL_NAMESPACE::D2>) {
+                return xy / 2;
+            } else {
+                const auto yz = absolute_determinant(pos1.value.___AN2, pos1.value.___AN3,
+                                                     pos2.value.___AN2, pos2.value.___AN3,
+                                                     pos3.value.___AN2, pos3.value.___AN3);
+                const auto zx = absolute_determinant(pos1.value.___AN3, pos1.value.___AN1,
+                                                     pos2.value.___AN3, pos2.value.___AN1,
+                                                     pos3.value.___AN3, pos3.value.___AN1);
+                return std::hypot(xy, yz, zx) / 2;
+            }
         } else {
             using CalculationType = std::conditional_t<std::is_floating_point_v<R>, long double, R>;
             const auto origin = pos1.template cast<CalculationType>();
@@ -150,6 +180,8 @@ namespace AHO_NAMESPACE {
         using namespace product::cross;
         if constexpr (std::same_as<D, VSL_NAMESPACE::D1>) {
             return 0;
+        } else if constexpr (std::integral<R> && sizeof(R) <= sizeof(std::uint32_t)) {
+            return inderect().area();
         } else {
             using CalculationType = std::conditional_t<std::is_floating_point_v<R>, long double, R>;
             const auto origin = pos1->template cast<CalculationType>();

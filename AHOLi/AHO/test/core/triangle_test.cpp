@@ -224,6 +224,33 @@ namespace {
     };
     template<class T>
     class TriangleAreaRangeTest : public testing::Test {};
+    template<class T>
+    class IntegerTriangleAreaTest : public testing::Test {};
+    using IntegerTriangleCases = testing::Types<
+        TriangleAreaRangeCase<std::int8_t, true, true, false>,
+        TriangleAreaRangeCase<std::int8_t, true, false, true>,
+        TriangleAreaRangeCase<std::int8_t, false, true, true>,
+        TriangleAreaRangeCase<std::int8_t, true, true, true>,
+        TriangleAreaRangeCase<std::uint8_t, true, true, false>,
+        TriangleAreaRangeCase<std::uint8_t, true, false, true>,
+        TriangleAreaRangeCase<std::uint8_t, false, true, true>,
+        TriangleAreaRangeCase<std::uint8_t, true, true, true>,
+        TriangleAreaRangeCase<std::int16_t, true, true, false>,
+        TriangleAreaRangeCase<std::int16_t, true, false, true>,
+        TriangleAreaRangeCase<std::int16_t, false, true, true>,
+        TriangleAreaRangeCase<std::int16_t, true, true, true>,
+        TriangleAreaRangeCase<std::uint16_t, true, true, false>,
+        TriangleAreaRangeCase<std::uint16_t, true, false, true>,
+        TriangleAreaRangeCase<std::uint16_t, false, true, true>,
+        TriangleAreaRangeCase<std::uint16_t, true, true, true>,
+        TriangleAreaRangeCase<std::int32_t, true, true, false>,
+        TriangleAreaRangeCase<std::int32_t, true, false, true>,
+        TriangleAreaRangeCase<std::int32_t, false, true, true>,
+        TriangleAreaRangeCase<std::int32_t, true, true, true>,
+        TriangleAreaRangeCase<std::uint32_t, true, true, false>,
+        TriangleAreaRangeCase<std::uint32_t, true, false, true>,
+        TriangleAreaRangeCase<std::uint32_t, false, true, true>,
+        TriangleAreaRangeCase<std::uint32_t, true, true, true>>;
     using TriangleAreaRanges = testing::Types<
         TriangleAreaRangeCase<float, true, true, false>,
         TriangleAreaRangeCase<float, true, false, true>,
@@ -255,6 +282,42 @@ namespace {
         check("mixed exponents", zero, C::Point_(large, 0), C::Point_(0, tiny), 0.5);
         const T subnormal = std::ldexp(T{1}, -149);
         check("area below float minimum", zero, C::Point_(subnormal, 0), C::Point_(0, 1), std::ldexp(1.0, -150));
+    }
+    TYPED_TEST_SUITE(IntegerTriangleAreaTest, IntegerTriangleCases);
+    TYPED_TEST(IntegerTriangleAreaTest, WindingAndFullCoordinateRangePreserveArea) {
+        using C = TypeParam;
+        using R = typename C::Scalar;
+        using P = typename C::Point;
+        if constexpr (C::CI::Dimension::DIMENSION == 2) {
+            constexpr auto supports_constant_evaluation = [] {
+                typename C::Triangle triangle{P(0, 0), P(0, 4), P(3, 0)};
+                return triangle.area() == 6 && triangle.adress().area() == 6;
+            };
+            static_assert(supports_constant_evaluation());
+        }
+        auto check = [](const char* name, P a, P b, P c, double expected) {
+            SCOPED_TRACE(name);
+            const auto tolerance = 32 * std::numeric_limits<double>::epsilon() * std::max(1., expected);
+            const std::array points{a, b, c};
+            std::array<std::size_t, 3> order{0, 1, 2};
+            do {
+                typename C::Triangle triangle(points[order[0]], points[order[1]], points[order[2]]);
+                auto borrowed = triangle.adress();
+                EXPECT_NEAR(triangle.area(), expected, tolerance);
+                EXPECT_NEAR(borrowed.area(), expected, tolerance);
+                triangle.pos2 = triangle.pos1;
+                EXPECT_EQ(borrowed.area(), 0);
+            } while (std::next_permutation(order.begin(), order.end()));
+        };
+        const auto zero = C::Point_(0, 0);
+        check("winding", zero, C::Point_(3, 0), C::Point_(0, 4), 6);
+        const auto low = std::numeric_limits<R>::min(), high = std::numeric_limits<R>::max();
+        const auto span = static_cast<long double>(high) - low;
+        check("full coordinate range", C::Point_(low, low), C::Point_(high, low), C::Point_(low, high),
+              static_cast<double>(span * span / 2));
+        check("unit determinant", zero, C::Point_(high - 1, high - 2), C::Point_(high, high - 1), .5);
+        if constexpr (C::CI::Dimension::DIMENSION == 3)
+            check("three cross components", P(0, 0, 0), P(1, 2, 2), P(2, 1, 2), std::sqrt(17.) / 2);
     }
     TEST(TriangleAreaRangeTest, LargeUnsignedCoordinatesRetainTheUnitDeterminant) {
         using T = std::uint64_t;

@@ -8,6 +8,10 @@ namespace {
         bool validate_vulkan() const override;
     };
 
+    class ImageReadbackBusyVulkanIntegrationTest : public ImageReadbackVulkanIntegrationTest {
+        bool require_timeline_semaphore() const override;
+    };
+
     bool ImageReadbackVulkanIntegrationTest::validate_vulkan() const {
         return true;
     }
@@ -132,7 +136,7 @@ namespace {
         VSL_NAMESPACE::RenderPassDescription desc;
         desc.add_color({.format = VSL_NAMESPACE::data_format::UNSIGNED_NORMALIZED8_RGBA});
         desc.set_depth_stencil({.format = VSL_NAMESPACE::data_format::DEPTH32_FLOAT,
-                              .final_layout = VSL_NAMESPACE::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL});
+                                .final_layout = VSL_NAMESPACE::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL});
         VSL_NAMESPACE::RenderPass pass(device, desc);
         VSL_NAMESPACE::FrameBuffer target(pass, 8, 8, {*color, depth});
         VSL_NAMESPACE::PipelineLayout settings(device, pl::ShaderGroup("depth", {*vertex, *fragment}), pl::VertexInput{},
@@ -332,10 +336,6 @@ namespace {
         EXPECT_THROW(reader.capture(larger, VSL_NAMESPACE::ImageLayout::GENERAL, {16, 0, 1, 1}), std::out_of_range);
         EXPECT_EQ(reader.read().bytes, pixels.bytes);
     }
-
-    class ImageReadbackBusyVulkanIntegrationTest : public ImageReadbackVulkanIntegrationTest {
-        bool require_timeline_semaphore() const override;
-    };
 
     bool ImageReadbackBusyVulkanIntegrationTest::require_timeline_semaphore() const {
         return true;

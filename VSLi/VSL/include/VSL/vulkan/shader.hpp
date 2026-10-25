@@ -6,6 +6,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <string_view>
 
 #include "device.hpp"
 #include "../utils/flags.hpp"
@@ -51,22 +52,6 @@ namespace VSL_NAMESPACE {
         //        All = 0x7FFFFFFF,
     };
 
-    ___VSL_EXPAND_FLAGS_OPERATOR(ShaderFlag);
-
-    constexpr ShaderFlag operator|(ShaderType l, ShaderType r) {
-        return static_cast<ShaderFlag>(static_cast<std::underlying_type_t<ShaderType>>(l) | static_cast<std::underlying_type_t<ShaderType>>(r));
-    }
-
-    constexpr ShaderFlag operator&(ShaderType l, ShaderType r) {
-        return static_cast<ShaderFlag>(static_cast<std::underlying_type_t<ShaderType>>(l) & static_cast<std::underlying_type_t<ShaderType>>(r));
-    }
-
-    constexpr ShaderFlag operator^(ShaderType l, ShaderType r) {
-        return static_cast<ShaderFlag>(static_cast<std::underlying_type_t<ShaderType>>(l) ^ static_cast<std::underlying_type_t<ShaderType>>(r));
-    }
-
-    constexpr ShaderFlag convert(const ShaderType& t) { return (ShaderFlag)t; };
-
     struct ShaderAccessor {
         std::shared_ptr<VSL_NAMESPACE::impl::ShaderImpl> data_;
     };
@@ -81,13 +66,34 @@ namespace VSL_NAMESPACE {
         std::string name() const;
     };
 
+    ___VSL_EXPAND_FLAGS_OPERATOR(ShaderFlag);
+
+    constexpr ShaderFlag operator|(ShaderType l, ShaderType r) {
+        return static_cast<ShaderFlag>(static_cast<std::underlying_type_t<ShaderType>>(l) | static_cast<std::underlying_type_t<ShaderType>>(r));
+    }
+
+    constexpr ShaderFlag operator&(ShaderType l, ShaderType r) {
+        return static_cast<ShaderFlag>(static_cast<std::underlying_type_t<ShaderType>>(l) & static_cast<std::underlying_type_t<ShaderType>>(r));
+    }
+
+    constexpr ShaderFlag operator^(ShaderType l, ShaderType r) {
+        return static_cast<ShaderFlag>(static_cast<std::underlying_type_t<ShaderType>>(l) ^ static_cast<std::underlying_type_t<ShaderType>>(r));
+    }
+
+    constexpr ShaderFlag convert(const ShaderType& t) {
+        return (ShaderFlag)t;
+    };
+
     template<helper::ConstantStringHolder txt>
     consteval ShaderType get_shader_type() {
-        if (std::string(txt.value).contains(".vert.")) {
+        const std::string_view path(txt.value);
+        const auto separator = path.find_last_of("/\\");
+        const auto name = separator == std::string_view::npos ? path : path.substr(separator + 1);
+        if (name.contains(".vert.")) {
             return ShaderType::VERTEX;
-        } else if (std::string(txt.value).contains(".frag.")) {
+        } else if (name.contains(".frag.")) {
             return ShaderType::FRAGMENT;
-        } else if (std::string(txt.value).contains(".comp.")) {
+        } else if (name.contains(".comp.")) {
             return ShaderType::COMPUTE;
         }
         return ShaderType::ERROR_;

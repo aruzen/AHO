@@ -41,7 +41,8 @@ namespace AHO_NAMESPACE {
         DrawPhase* _previous_phase = nullptr;
         void restore_previous_phase() noexcept;
         static DrawPhase* CurrentForManager(const VSL_NAMESPACE::CommandManager& manager) noexcept;
-        template<typename> friend struct DrawStream;
+        template<typename>
+        friend struct DrawStream;
         friend struct AHO_NAMESPACE::window::Window;
     };
 

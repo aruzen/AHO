@@ -1,7 +1,7 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.30)
 project(VSL VERSION 1.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(VSL STATIC
@@ -142,6 +142,7 @@ add_library(VSL STATIC
         VSL/src/vulkan/stages/id_picking.cpp
 )
 
+target_compile_features(VSL PUBLIC cxx_std_26)
 target_include_directories(VSL PRIVATE ${Vulkan_INCLUDE_DIRS})
 target_link_libraries(VSL PRIVATE ${Vulkan_LIBRARIES})
 target_link_libraries(VSL PRIVATE

@@ -18,9 +18,9 @@ namespace VSL_NAMESPACE::command {
     struct CopyBufferToImage : public Command {
         CopyBufferToImage(ImageAccessor image, BufferAccessor* buffer, VSL_NAMESPACE::ImageLayout layout);
 
-        template<VSL_NAMESPACE::ImageType img_type, VSL_NAMESPACE::MemoryProperty img_mem_prop, VSL_NAMESPACE::ImageLayout layout,
+        template<VSL_NAMESPACE::ImageType img_type, VSL_NAMESPACE::MemoryProperty img_mem_prop, VSL_NAMESPACE::ImageLayout layout_,
                  MemoryType mem_type, MemoryProperty buf_mem_prop, SharingMode share_mode>
-        CopyBufferToImage(Image<img_type, img_mem_prop, layout>& image, Buffer<mem_type, buf_mem_prop, share_mode>& buffer);
+        CopyBufferToImage(Image<img_type, img_mem_prop, layout_>& image, Buffer<mem_type, buf_mem_prop, share_mode>& buffer);
 
         VSL_NAMESPACE::ImageLayout layout;
         ImageAccessor image;
@@ -35,9 +35,9 @@ namespace VSL_NAMESPACE::command {
     struct CopyBufferToArrayImage : public Command {
         CopyBufferToArrayImage(ImageAccessor image, BufferAccessor* buffer, VSL_NAMESPACE::ImageLayout layout, std::uint32_t target_idx);
 
-        template<VSL_NAMESPACE::ImageType img_type, VSL_NAMESPACE::MemoryProperty img_mem_prop, VSL_NAMESPACE::ImageLayout layout,
+        template<VSL_NAMESPACE::ImageType img_type, VSL_NAMESPACE::MemoryProperty img_mem_prop, VSL_NAMESPACE::ImageLayout layout_,
                  MemoryType mem_type, MemoryProperty buf_mem_prop, SharingMode share_mode>
-        CopyBufferToArrayImage(Image<img_type, img_mem_prop, layout>& image, Buffer<mem_type, buf_mem_prop, share_mode>& buffer, std::uint32_t target_idx);
+        CopyBufferToArrayImage(Image<img_type, img_mem_prop, layout_>& image, Buffer<mem_type, buf_mem_prop, share_mode>& buffer, std::uint32_t target_idx);
 
         VSL_NAMESPACE::ImageLayout layout;
         ImageAccessor image;
@@ -50,15 +50,15 @@ namespace VSL_NAMESPACE::command {
         std::shared_ptr<impl::BufferImpl> _source;
     };
 
-    template<VSL_NAMESPACE::ImageType img_type, VSL_NAMESPACE::MemoryProperty img_mem_prop, VSL_NAMESPACE::ImageLayout layout,
+    template<VSL_NAMESPACE::ImageType img_type, VSL_NAMESPACE::MemoryProperty img_mem_prop, VSL_NAMESPACE::ImageLayout layout_,
              MemoryType mem_type, MemoryProperty buf_mem_prop, SharingMode share_mode>
-    CopyBufferToImage::CopyBufferToImage(Image<img_type, img_mem_prop, layout>& image, Buffer<mem_type, buf_mem_prop, share_mode>& buffer)
-        : CopyBufferToImage(image, &buffer, layout) {}
+    CopyBufferToImage::CopyBufferToImage(Image<img_type, img_mem_prop, layout_>& image, Buffer<mem_type, buf_mem_prop, share_mode>& buffer)
+        : CopyBufferToImage(image, &buffer, layout_) {}
 
-    template<VSL_NAMESPACE::ImageType img_type, VSL_NAMESPACE::MemoryProperty img_mem_prop, VSL_NAMESPACE::ImageLayout layout,
+    template<VSL_NAMESPACE::ImageType img_type, VSL_NAMESPACE::MemoryProperty img_mem_prop, VSL_NAMESPACE::ImageLayout layout_,
              MemoryType mem_type, MemoryProperty buf_mem_prop, SharingMode share_mode>
-    CopyBufferToArrayImage::CopyBufferToArrayImage(Image<img_type, img_mem_prop, layout>& image, Buffer<mem_type, buf_mem_prop, share_mode>& buffer, std::uint32_t target_idx)
-        : CopyBufferToArrayImage(image, &buffer, layout, target_idx) {}
+    CopyBufferToArrayImage::CopyBufferToArrayImage(Image<img_type, img_mem_prop, layout_>& image, Buffer<mem_type, buf_mem_prop, share_mode>& buffer, std::uint32_t target_idx)
+        : CopyBufferToArrayImage(image, &buffer, layout_, target_idx) {}
 } // namespace VSL_NAMESPACE::command
 
 #endif //AHO_ALL_COPY_BUFFER_TO_IMAGE_H

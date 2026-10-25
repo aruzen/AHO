@@ -1,7 +1,51 @@
 #include "support/vulkan_fixture.hpp"
+#include <limits>
 
 namespace {
     using CommandVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+    class CommandRangeVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+    TEST_F(CommandRangeVulkanIntegrationTest, OutOfRangeResetIsRejectedAndValidBuffersRemainUsable) {
+        auto pool = make_pool();
+        vsl::CommandBuffer buffers(pool, 2);
+        const auto handles = buffers.data_->command_buffers;
+        for (const auto index : {2u, std::numeric_limits<std::uint32_t>::max()})
+            EXPECT_THROW(buffers.reset(index), std::out_of_range);
+        EXPECT_EQ(buffers.data_->command_buffers, handles);
+        EXPECT_EQ(buffers.get_current_buffer_idx(), 0u);
+        EXPECT_NO_THROW(buffers.reset(0));
+        EXPECT_NO_THROW(buffers.reset(1));
+        EXPECT_NO_THROW(buffers.reset());
+    }
+    TEST_F(CommandRangeVulkanIntegrationTest, ExclusiveBufferCountCannotBeTruncatedToOne) {
+        if constexpr (sizeof(std::size_t) <= sizeof(std::uint32_t)) {
+            GTEST_SKIP() << "size_t has no values above uint32_t";
+        } else {
+            auto manager = make_manager();
+            const auto count = std::size_t{std::numeric_limits<std::uint32_t>::max()} + 2;
+            EXPECT_THROW(manager.make_exclusive_buffer(count), std::length_error);
+            auto valid = manager.make_exclusive_buffer(1);
+            EXPECT_EQ(valid.get_size(), 1u);
+            EXPECT_NO_THROW(valid.reset(0));
+        }
+    }
+    TEST_F(CommandVulkanIntegrationTest, DefaultBufferCountAgreesAcrossTheCallerAndLibrary) {
+        struct RestoreCount {
+            std::uint32_t previous = vsl::DEFAULT_BUFFER_SIZE;
+            ~RestoreCount() { vsl::DEFAULT_BUFFER_SIZE = previous; }
+        } restore;
+        auto pool = make_pool();
+        for (const auto count : {1u, 2u}) {
+            vsl::DEFAULT_BUFFER_SIZE = count;
+            vsl::CommandBuffer direct(pool);
+            auto manager = make_manager();
+            EXPECT_EQ(direct.get_size(), count);
+            EXPECT_EQ(manager.get_buffer().get_size(), count);
+            vsl::CommandBuffer explicit_count(pool, 4);
+            EXPECT_EQ(explicit_count.get_size(), 4u);
+        }
+    }
     TEST_F(CommandVulkanIntegrationTest, PoolAndBuffersShareExpectedOwnerAndCanReset) {
         auto pool = make_pool();
         vsl::CommandPool borrowed(pool.data_);
@@ -114,6 +158,39 @@ namespace {
         phase << vsl::command::BindIndexBuffer(indices);
         EXPECT_GT(indices.data_.use_count(), owners);
         phase.cancel();
+    }
+} // namespace
+
+namespace {
+    class CommandAllocationVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override;
+    };
+
+    bool CommandAllocationVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
+
+    TEST_F(CommandAllocationVulkanIntegrationTest, RejectsZeroBufferCountsBeforeCallingVulkan) {
+        // 検証エラーはテストを失敗させ、不正な割当・解放をdriverへ渡さない。
+        expect_validation_abort("");
+        auto pool = make_pool();
+        EXPECT_THROW((vsl::CommandBuffer(pool, 0)), std::invalid_argument);
+        struct RestoreCount {
+            std::uint32_t previous = vsl::DEFAULT_BUFFER_SIZE;
+            ~RestoreCount() { vsl::DEFAULT_BUFFER_SIZE = previous; }
+        } restore;
+        vsl::DEFAULT_BUFFER_SIZE = 0;
+        EXPECT_THROW((vsl::CommandBuffer(pool)), std::invalid_argument);
+    }
+
+    TEST_F(CommandAllocationVulkanIntegrationTest, UnallocatedStorageCanUnwindWithoutFreeingNativeBuffers) {
+        expect_validation_abort("");
+        auto pool = make_pool();
+        {
+            // 割当が失敗したconstructorの後処理と同じ、poolだけを保持した状態。
+            auto storage = std::make_shared<vsl::impl::CommandBufferImpl>();
+            storage->command_pool = pool.data_;
+        }
     }
 } // namespace
 

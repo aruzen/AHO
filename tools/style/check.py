@@ -14,11 +14,14 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
 ROOTS = ('AHOLi/AHO/', 'VSLi/VSL/', 'tools/style/')
-SUFFIXES = {'.c', '.cc', '.cpp', '.cxx', '.h', '.hh', '.hpp', '.hxx', '.inl'}
+SOURCE_SUFFIXES = {'.c', '.cc', '.cpp', '.cxx'}
+HEADER_SUFFIXES = {'.h', '.hh', '.hpp', '.hxx', '.inl'}
+SUFFIXES = SOURCE_SUFFIXES | HEADER_SUFFIXES
 NAMING_DIAGNOSTIC = re.compile(r'^(.*):(\d+):(\d+): (?:warning|error): (.*?) \[readability-identifier-naming\]$')
 
 
@@ -40,6 +43,28 @@ def tracked_files(root):
     result = subprocess.run(['git', 'ls-files', '-z'], cwd=root, check=True, stdout=subprocess.PIPE)
     return sorted(path.decode() for path in result.stdout.split(b'\0')
                   if path and path.decode().startswith(ROOTS) and Path(path.decode()).suffix in SUFFIXES)
+
+
+def git_output(root, *arguments, input=None):
+    return subprocess.run(['git', *arguments], cwd=root, input=input, check=True,
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout
+
+
+def changed_files(root, base=None):
+    options = ['--name-only', '-z', '--diff-filter=ACMRT', '--no-renames']
+    if base is not None:
+        # Resolve options/ref expressions before placing the object ID into git diff.
+        revision = git_output(root, 'rev-parse', '--verify', '--end-of-options', base).decode().strip()
+        paths = git_output(root, 'diff', *options, revision, 'HEAD', '--')
+    else:
+        paths = git_output(root, 'diff', *options, '--')
+        paths += git_output(root, 'diff', '--cached', *options, '--')
+        paths += git_output(root, 'ls-files', '--others', '--exclude-standard', '-z')
+    return {path.decode() for path in paths.split(b'\0') if path}
+
+
+def style_files(paths):
+    return {file for file in paths if file.startswith(ROOTS) and Path(file).suffix in SUFFIXES}
 
 
 def diagnostic(root, file, line, column, rule, symbol, message, source=None, code_lines=None):
@@ -99,12 +124,57 @@ def compile_jobs(databases, selected, root):
     return sorted(jobs.items())
 
 
+def dependency_files(job, root):
+    key, (file, entry) = job
+    original = entry['arguments']
+    arguments = [original[0]]
+    skip = False
+    for argument in original[1:]:
+        if skip:
+            skip = False
+        elif argument in ('-o', '-MF', '-MT', '-MQ'):
+            skip = True
+        elif argument not in ('-c', '-MD', '-MMD', '-MP', '-M', '-MM'):
+            arguments.append(argument)
+    with tempfile.TemporaryDirectory(prefix='aho-style-dependencies-') as directory:
+        dependencies = Path(directory) / 'files.d'
+        # Preprocessing follows conditional, macro and transitive includes without AST analysis.
+        command = [arguments[0], '-M', '-MG', '-MF', str(dependencies), '-MT', 'aho_style', *arguments[1:]]
+        result = run(command, cwd=entry['directory'])
+        if result.returncode:
+            raise RuntimeError(f'{file}: ヘッダー依存の取得に失敗しました。\n{result.stderr}')
+        contents = dependencies.read_text().replace('\\' + '\n', '')
+    target, separator, contents = contents.partition(':')
+    if not separator or target.strip() != 'aho_style':
+        raise ValueError(f'{file}: 依存ファイルの形式が不正です')
+    files = set()
+    for name in shlex.split(contents):
+        path = (Path(entry['directory']) / name.replace('$$', '$')).resolve()
+        try:
+            files.add(path.relative_to(root).as_posix())
+        except ValueError:
+            pass
+    return files
+
+
+def affected_jobs(jobs, selected, root, workers):
+    headers = {file for file in selected if Path(file).suffix in HEADER_SUFFIXES}
+    direct = [job for job in jobs if job[1][0] in selected]
+    if not headers:
+        return direct, 0
+    candidates = [job for job in jobs if job[1][0] not in selected]
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        dependencies = executor.map(lambda job: dependency_files(job, root), candidates)
+        indirect = [job for job, files in zip(candidates, dependencies) if headers & files]
+    return sorted(direct + indirect), len(candidates)
+
+
 def apple_arguments():
     if sys.platform != 'darwin':
         return []
     sdk = subprocess.check_output(['xcrun', '--show-sdk-path'], text=True).strip()
-    return ['--extra-arg=-isysroot', '--extra-arg=' + sdk,
-            '--extra-arg=-isystem', '--extra-arg=' + sdk + '/usr/include/c++/v1']
+    # 標準ライブラリはコンパイルDBのコンパイラーに選ばせ、AppleとLLVMのヘッダーを混在させない。
+    return ['--extra-arg=-isysroot', '--extra-arg=' + sdk]
 
 
 def translation_check(job, args, selected, tidy, extra):
@@ -225,6 +295,9 @@ def main():
     parser.add_argument('--master', type=Path, help='ソースごとの既存違反を記録するmasterディレクトリ')
     parser.add_argument('--update-master', action='store_true', help='検査したファイルの解消済み登録だけを削除する')
     parser.add_argument('--strict', action='store_true', help='既存違反も含めて失敗にする')
+    scope = parser.add_mutually_exclusive_group()
+    scope.add_argument('--changed', action='store_true', help='index・作業ツリー・未追跡の変更ファイルだけを検査')
+    scope.add_argument('--changed-since', metavar='REF', help='REFとHEADのコミット差分だけを検査')
     parser.add_argument('files', nargs='*', help='指定時はtracked対象ファイルの一部を検査')
     args = parser.parse_args()
     args.root = args.root.resolve()
@@ -239,14 +312,28 @@ def main():
     args.master = (args.master or args.root / 'tools/style/master').resolve()
     if args.update_master and (args.strict or args.checks != {'format', 'naming', 'layout'}):
         parser.error('masterの更新はstrictなし・全検査でのみ可能です')
+    partial = bool(args.files or args.changed or args.changed_since is not None)
+    if args.files and (args.changed or args.changed_since is not None):
+        parser.error('ファイル指定と差分指定は併用できません')
     selected = set(tracked_files(args.root))
-    if args.files:
+    if args.changed:
+        selected = style_files(changed_files(args.root))
+    elif args.changed_since is not None:
+        selected &= changed_files(args.root, args.changed_since)
+    elif args.files:
         requested = {Path(file).as_posix() for file in args.files}
         if requested - selected:
             parser.error(f'対象外または未追跡のファイルです: {sorted(requested - selected)}')
         selected = requested
     if not selected:
-        parser.error('検査対象がありません')
+        if not partial:
+            parser.error('検査対象がありません')
+        args.output.mkdir(parents=True, exist_ok=True)
+        report = dict(files=0, translation_units=0, dependency_scans=0, in_class_min_lines=args.in_class_min_lines,
+                      diagnostics=[], new=[], unmapped_sources=[], unparsed_headers=[])
+        (args.output / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
+        print('変更された検査対象がないため、検査を省略します。')
+        return 0
     formatter = require_tool(args.clang_format) if 'format' in args.checks else None
     tidy = require_tool(args.clang_tidy) if 'naming' in args.checks else None
     args.output.mkdir(parents=True, exist_ok=True)
@@ -257,16 +344,14 @@ def main():
             for items in executor.map(lambda file: format_check(args.root, file, formatter), sorted(selected)):
                 diagnostics.extend(items)
     jobs = []
+    dependency_scans = 0
     if args.checks & {'naming', 'layout'}:
         if not args.database or ('layout' in args.checks and (not args.ast_tool or not args.ast_tool.is_file())):
             parser.error('命名・配置検査には--database、配置検査には--ast-toolが必要です')
         args.ast_tool = args.ast_tool.resolve() if args.ast_tool else None
-        # ヘッダー指定では全TUを読み、ソースだけの指定では該当する全コンパイル条件を読む。
-        sources_only = args.files and all(Path(file).suffix in {'.c', '.cc', '.cpp', '.cxx'} for file in selected)
-        job_files = selected if sources_only else set(tracked_files(args.root))
-        jobs = compile_jobs(args.database, job_files, args.root)
-        if not jobs:
-            parser.error('compile_commands.jsonに対象の翻訳単位がありません')
+        jobs = compile_jobs(args.database, set(tracked_files(args.root)) | selected, args.root)
+        if partial:
+            jobs, dependency_scans = affected_jobs(jobs, selected, args.root, args.jobs)
         extra = apple_arguments()
         with ThreadPoolExecutor(max_workers=args.jobs) as executor:
             futures = {executor.submit(translation_check, job, args, selected, tidy, extra): job for job in jobs}
@@ -295,14 +380,15 @@ def main():
     diagnostics = sorted(unique.values(), key=lambda item: (item['file'], item['line'], item['column'], item['rule']))
     master = load_master(args.master, selected, args.in_class_min_lines) if not args.strict else []
     new = compare(diagnostics, master)
-    report = dict(files=len(selected), translation_units=len(jobs), in_class_min_lines=args.in_class_min_lines,
+    report = dict(files=len(selected), translation_units=len(jobs), dependency_scans=dependency_scans,
+                  in_class_min_lines=args.in_class_min_lines,
                   diagnostics=diagnostics, new=new,
                   unmapped_sources=unmapped, unparsed_headers=unparsed if 'layout' in args.checks else [])
     (args.output / 'report.json').write_text(json.dumps(report, indent=2, ensure_ascii=False) + '\n')
     if args.update_master:
         if unmapped or unparsed:
             raise ValueError('未登録ソース・未解析ヘッダーがあるためmasterを更新しません')
-        update_master(args.master, selected, diagnostics, args.in_class_min_lines, remove_deleted=not args.files)
+        update_master(args.master, selected, diagnostics, args.in_class_min_lines, remove_deleted=not partial)
     for item in new:
         print(f"{item['file']}:{item['line']}:{item['column']}: {item['message']} [{item['rule']}]")
     print(f'対象{len(selected)}ファイル/{len(jobs)}TU、違反{len(diagnostics)}件、新規{len(new)}件。{args.output / "report.json"}')

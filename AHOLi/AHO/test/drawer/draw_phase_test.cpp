@@ -78,7 +78,9 @@ namespace {
             EXPECT_EQ(finished, 1u);
             EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &outer);
             expect_tuple_phase(outer);
-            { aho::DrawPhase next(other); }
+            {
+                aho::DrawPhase next(other);
+            }
             EXPECT_EQ(finished, 1u);
             EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &outer);
         }
@@ -92,7 +94,9 @@ namespace {
             EXPECT_THROW((aho::DrawPhase(other, [&](auto&) { throw std::runtime_error("nested initialization failed"); })), std::runtime_error);
             EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &outer);
             expect_tuple_phase(outer);
-            { aho::DrawPhase next(other); }
+            {
+                aho::DrawPhase next(other);
+            }
             EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &outer);
         }
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
@@ -123,9 +127,10 @@ namespace {
         NestedDrawEngine other;
         std::unique_ptr<aho::DrawPhase> inner;
         EXPECT_THROW((aho::DrawPhase(*engine, [&](auto&) {
-            inner = std::make_unique<aho::DrawPhase>(other);
-            throw std::runtime_error("outer initialization failed");
-        })), std::runtime_error);
+                         inner = std::make_unique<aho::DrawPhase>(other);
+                         throw std::runtime_error("outer initialization failed");
+                     })),
+                     std::runtime_error);
         ASSERT_TRUE(inner);
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, inner.get());
         expect_tuple_phase(*inner);

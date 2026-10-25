@@ -23,6 +23,8 @@ VSL_NAMESPACE::command::BindGraphicResource::BindGraphicResource(const std::vect
     : resources(resources), destination(dst), pipeline(std::move(pipeline)), first_binding(first_binding) {}
 
 void VSL_NAMESPACE::command::BindGraphicResource::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
+    if (resources.empty())
+        return;
     if (pipeline) {
         for (const auto& resource : resources) {
             if (!resource.data_ || !resource.data_->pool || !resource.data_->pool->descriptor_pool || !resource.data_->descriptor_set)
@@ -40,5 +42,5 @@ void VSL_NAMESPACE::command::BindGraphicResource::invoke(CommandPool pool, Comma
 }
 
 void VSL_NAMESPACE::command::BindGraphicResource::set_pipeline(std::optional<PipelineAccessor> pipeline) {
-    this->pipeline = pipeline;
+    this->pipeline = pipeline ? pipeline : _fallback_pipeline;
 }

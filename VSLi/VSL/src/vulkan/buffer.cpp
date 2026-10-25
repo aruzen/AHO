@@ -31,7 +31,25 @@ std::uint32_t VSL_NAMESPACE::impl::helper::find_memory_type(std::shared_ptr<VSL_
     throw VSL_NAMESPACE::exceptions::RuntimeException("MemoryTypeNotFound", "No compatible memory type satisfies the requested properties");
 }
 
-static bool copy_buffer(const std::shared_ptr<VSL_NAMESPACE::impl::BufferImpl>& destination, VSL_NAMESPACE::CommandManager command_manager, VSL_NAMESPACE::BufferAccessor* buf) {
+static bool copy_buffer(const std::shared_ptr<VSL_NAMESPACE::impl::BufferImpl>& destination, VSL_NAMESPACE::CommandManager command_manager,
+                        VSL_NAMESPACE::BufferAccessor* buf, std::size_t offset = 0, std::optional<std::size_t> size = std::nullopt) {
+    const auto source = buf ? buf->data_ : nullptr;
+    if (!source || !destination || !source->buffer || !destination->buffer ||
+        !source->device || source->device != destination->device || !command_manager.data_ ||
+        command_manager.data_->device != destination->device)
+        throw std::invalid_argument("Buffer copy requires valid buffers and a command manager on the same device");
+    if (!VSL_NAMESPACE::contain(source->usage, VSL_NAMESPACE::MemoryType::TRANSFER_SOURCE) ||
+        !VSL_NAMESPACE::contain(destination->usage, VSL_NAMESPACE::MemoryType::TRANSFER_DESTINATION))
+        throw std::invalid_argument("Buffer copy requires TransferSource and TransferDestination usage");
+    if (source->buffer == destination->buffer)
+        throw std::invalid_argument("Buffer copy source and destination must not overlap");
+    if (offset > destination->requirement_size)
+        throw std::out_of_range("Buffer copy destination offset exceeds storage");
+    const auto remaining = destination->requirement_size - offset;
+    const auto capacity = size.value_or(remaining);
+    if (capacity > remaining || source->requirement_size > capacity)
+        throw std::out_of_range("Buffer copy exceeds destination range");
+
     auto command_buf = command_manager.make_exclusive_buffer();
 
     auto vk_command_buf = command_buf.data_->command_buffers[0];
@@ -39,12 +57,8 @@ static bool copy_buffer(const std::shared_ptr<VSL_NAMESPACE::impl::BufferImpl>& 
     vk::CommandBufferBeginInfo begin_info;
     vk_command_buf.begin(begin_info);
 
-    vk::BufferCopy copy_region;
-    copy_region.size = buf->data_->requirement_size;
-    /* TODO offset
-    copyRegion.srcOffset = buf->
-    */
-    vk_command_buf.copyBuffer(buf->data_->buffer, destination->buffer, {copy_region});
+    vk::BufferCopy copy_region{.srcOffset = 0, .dstOffset = offset, .size = source->requirement_size};
+    vk_command_buf.copyBuffer(source->buffer, destination->buffer, {copy_region});
 
     vk_command_buf.end();
 
@@ -206,14 +220,14 @@ bool VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::copy_by_image(CommandMana
     if (!_owner)
         throw std::logic_error("Buffer mapping is empty");
     auto phase = manager.start_phase<ComputePhase>();
-    phase << command::CopyImageToBuffer(_owner, image, ImageLayout::GENERAL);
+    phase << command::CopyImageToBuffer(_owner, image, ImageLayout::GENERAL, {}, true, offset, size);
     return true;
 }
 
 bool VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::copy_by_buffer(CommandManager manager, BufferAccessor* buffer) {
     if (!_owner)
         throw std::logic_error("Buffer mapping is empty");
-    return copy_buffer(_owner, std::move(manager), buffer);
+    return copy_buffer(_owner, std::move(manager), buffer, offset, size);
 }
 
 VSL_NAMESPACE::impl::BufferImpl::~BufferImpl() {

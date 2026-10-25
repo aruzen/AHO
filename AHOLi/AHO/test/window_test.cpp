@@ -8,6 +8,11 @@
 namespace {
     using AHOWindowVulkanIntegration = aho_test::LiveGPUTest;
 
+    struct FixedIdResizeHook : aho::window::WindowResizeHookPlugin {
+        FixedIdResizeHook(vsl::PureWindow* window, unsigned char id, std::function<void(aho::Window*)> callback)
+            : WindowResizeHookPlugin(window, std::move(callback)) { this->id = id; }
+    };
+
     bool expect_recreation_guard(aho::Window& window) {
         // ガードが欠けても、VSLのusage検証で止めて記録中のswapchainを破棄しない。
         const auto unsupported = static_cast<vsl::ImageType>(std::uint32_t{1} << 31);
@@ -205,10 +210,6 @@ namespace {
         EXPECT_TRUE(window.data_->plugins.empty());
         EXPECT_TRUE(window.resize(400, 400));
     }
-    struct FixedIdResizeHook : aho::window::WindowResizeHookPlugin {
-        FixedIdResizeHook(vsl::PureWindow* window, unsigned char id, std::function<void(aho::Window*)> callback)
-            : WindowResizeHookPlugin(window, std::move(callback)) { this->id = id; }
-    };
     TEST_F(AHOWindowVulkanIntegration, ReplacementAtTheSameIdWaitsUntilTheNextResize) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;

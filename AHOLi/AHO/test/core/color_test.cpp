@@ -134,7 +134,112 @@ namespace {
     using namespace aho_test::arithmetic;
     template<class T>
     class ColorChannelArithmeticConstraintTest : public testing::Test {};
+
     using ColorChannelArithmeticFamilies = testing::Types<Family<aho::color::R>, Family<aho::color::G>, Family<aho::color::B>, Family<aho::color::H>, Family<aho::color::S>, Family<aho::color::V>, Family<aho::color::A>>;
+
+    struct MutableAlphaRight {
+        int value{};
+        auto operator<=>(const MutableAlphaRight&) const = default;
+    };
+
+    struct AlphaLeft {
+        int value{};
+        auto operator<=>(const AlphaLeft&) const = default;
+        constexpr AlphaLeft& operator+=(MutableAlphaRight& rhs) {
+            value += rhs.value;
+            return *this;
+        }
+        constexpr AlphaLeft& operator-=(MutableAlphaRight& rhs) {
+            value -= rhs.value;
+            return *this;
+        }
+        constexpr AlphaLeft& operator*=(MutableAlphaRight& rhs) {
+            value *= rhs.value;
+            return *this;
+        }
+        constexpr AlphaLeft& operator/=(MutableAlphaRight& rhs) {
+            value /= rhs.value;
+            return *this;
+        }
+    };
+
+    template<class T>
+    class ColorNarrowNegationTest : public testing::Test {};
+
+    using ColorNarrowNegationTestTypes = testing::Types<aho::color::R<std::int8_t>, aho::color::R<std::int16_t>,
+                                                        aho::color::G<std::int8_t>, aho::color::G<std::int16_t>,
+                                                        aho::color::B<std::int8_t>, aho::color::B<std::int16_t>,
+                                                        aho::color::H<std::int8_t>, aho::color::H<std::int16_t>,
+                                                        aho::color::S<std::int8_t>, aho::color::S<std::int16_t>,
+                                                        aho::color::V<std::int8_t>, aho::color::V<std::int16_t>,
+                                                        aho::color::A<std::int8_t>, aho::color::A<std::int16_t>>;
+
+    template<class T>
+    class ColorUnaryConversionTest : public testing::Test {};
+
+    using ColorUnaryConversionTypes = testing::Types<aho::color::R<aho_test::UnaryScalar>, aho::color::H<aho_test::UnaryScalar>, aho::color::A<aho_test::UnaryScalar>>;
+
+    template<class T>
+    class ColorOneWayCastTest : public testing::Test {};
+
+    using OneWayChannels = testing::Types<aho::color::R<aho_test::CastSource>,
+                                          aho::color::G<aho_test::CastSource>, aho::color::B<aho_test::CastSource>,
+                                          aho::color::H<aho_test::CastSource>, aho::color::S<aho_test::CastSource>,
+                                          aho::color::V<aho_test::CastSource>, aho::color::A<aho_test::CastSource>>;
+
+    template<class T>
+    class ColorElementTest : public testing::Test {};
+
+    using ColorElements = testing::Types<aho::color::R<double>, aho::color::G<double>, aho::color::B<double>,
+                                         aho::color::H<double>, aho::color::S<double>, aho::color::V<double>, aho::color::A<double>>;
+
+    struct PrimaryColor {
+        float hue, red, green, blue;
+    };
+
+    class ColorConversionTest : public testing::TestWithParam<PrimaryColor> {};
+
+    template<class H, class SV>
+    struct HsvaArithmeticCase {
+        using Color = aho::color::HSVA<H, SV>;
+        using Hue = H;
+        using Channel = SV;
+    };
+
+    using HsvaArithmeticTypes = testing::Types<HsvaArithmeticCase<short, std::int8_t>, HsvaArithmeticCase<int, int>,
+                                               HsvaArithmeticCase<float, float>, HsvaArithmeticCase<double, double>, HsvaArithmeticCase<short, float>>;
+
+    template<class T>
+    class HsvaArithmeticTest : public testing::Test {};
+
+    template<class T>
+    class RgbaArithmeticTest : public testing::Test {};
+
+    using RgbaArithmeticScalars = testing::Types<std::int8_t, int, float, double>;
+
+    template<class H, class SV>
+    struct HsvArithmeticCase {
+        using Color = aho::color::HSV<H, SV>;
+        using Hue = H;
+        using Channel = SV;
+    };
+
+    using HsvArithmeticTypes = testing::Types<HsvArithmeticCase<short, std::int8_t>, HsvArithmeticCase<int, int>,
+                                              HsvArithmeticCase<float, float>, HsvArithmeticCase<double, double>, HsvArithmeticCase<short, float>>;
+
+    template<class T>
+    class HsvArithmeticTest : public testing::Test {};
+
+    template<class T>
+    class RgbArithmeticTest : public testing::Test {};
+
+    using RgbArithmeticScalars = testing::Types<std::int8_t, int, float, double>;
+
+    template<class T>
+    class ColorChannelSubtractionTest : public testing::Test {};
+
+    using SignedChannelTypes = testing::Types<int, float, double>;
+
     TYPED_TEST_SUITE(ColorChannelArithmeticConstraintTest, ColorChannelArithmeticFamilies);
     TYPED_TEST(ColorChannelArithmeticConstraintTest, BinaryOperationsUseTheStoredScalarOnTheLeft) {
         using Left = typename TypeParam::template Of<LeftOperand>;
@@ -240,34 +345,18 @@ namespace {
         EXPECT_FALSE((CanDivide<Mutable, Mutable>));
         EXPECT_FALSE((CanDivideAssign<BinaryOnly, BinaryOnly>));
     }
-    struct MutableAlphaRight {
-        int value{};
-        auto operator<=>(const MutableAlphaRight&) const = default;
-    };
-    struct AlphaLeft {
-        int value{};
-        auto operator<=>(const AlphaLeft&) const = default;
-        constexpr AlphaLeft& operator+=(MutableAlphaRight& rhs) {
-            value += rhs.value;
-            return *this;
-        }
-        constexpr AlphaLeft& operator-=(MutableAlphaRight& rhs) {
-            value -= rhs.value;
-            return *this;
-        }
-        constexpr AlphaLeft& operator*=(MutableAlphaRight& rhs) {
-            value *= rhs.value;
-            return *this;
-        }
-        constexpr AlphaLeft& operator/=(MutableAlphaRight& rhs) {
-            value /= rhs.value;
-            return *this;
-        }
-    };
-    constexpr int operator+(const AlphaLeft& lhs, MutableAlphaRight& rhs) { return lhs.value + rhs.value; }
-    constexpr int operator-(const AlphaLeft& lhs, MutableAlphaRight& rhs) { return lhs.value - rhs.value; }
-    constexpr int operator*(const AlphaLeft& lhs, MutableAlphaRight& rhs) { return lhs.value * rhs.value; }
-    constexpr int operator/(const AlphaLeft& lhs, MutableAlphaRight& rhs) { return lhs.value / rhs.value; }
+    constexpr int operator+(const AlphaLeft& lhs, MutableAlphaRight& rhs) {
+        return lhs.value + rhs.value;
+    }
+    constexpr int operator-(const AlphaLeft& lhs, MutableAlphaRight& rhs) {
+        return lhs.value - rhs.value;
+    }
+    constexpr int operator*(const AlphaLeft& lhs, MutableAlphaRight& rhs) {
+        return lhs.value * rhs.value;
+    }
+    constexpr int operator/(const AlphaLeft& lhs, MutableAlphaRight& rhs) {
+        return lhs.value / rhs.value;
+    }
     TEST(ColorAlphaArithmeticConstraintTest, BinaryOperationsUseTheMutableCopyOfTheRightOperand) {
         const aho::color::A<AlphaLeft> lhs(AlphaLeft{24});
         const aho::color::A<MutableAlphaRight> rhs(MutableAlphaRight{4});
@@ -306,15 +395,6 @@ namespace {
         EXPECT_EQ(lhs.value.value, 24);
         EXPECT_EQ(rhs.value.value, 4);
     }
-    template<class T>
-    class ColorNarrowNegationTest : public testing::Test {};
-    using ColorNarrowNegationTestTypes = testing::Types<aho::color::R<std::int8_t>, aho::color::R<std::int16_t>,
-                                                        aho::color::G<std::int8_t>, aho::color::G<std::int16_t>,
-                                                        aho::color::B<std::int8_t>, aho::color::B<std::int16_t>,
-                                                        aho::color::H<std::int8_t>, aho::color::H<std::int16_t>,
-                                                        aho::color::S<std::int8_t>, aho::color::S<std::int16_t>,
-                                                        aho::color::V<std::int8_t>, aho::color::V<std::int16_t>,
-                                                        aho::color::A<std::int8_t>, aho::color::A<std::int16_t>>;
     TYPED_TEST_SUITE(ColorNarrowNegationTest, ColorNarrowNegationTestTypes);
     TYPED_TEST(ColorNarrowNegationTest, PromotedNegationReturnsTheDeclaredNarrowScalarType) {
         using Scalar = std::remove_cvref_t<decltype(std::declval<TypeParam>().value)>;
@@ -328,9 +408,6 @@ namespace {
         EXPECT_EQ(static_cast<int>((-zero).value), 0);
         EXPECT_EQ(static_cast<int>((-(-positive)).value), 7);
     }
-    template<class T>
-    class ColorUnaryConversionTest : public testing::Test {};
-    using ColorUnaryConversionTypes = testing::Types<aho::color::R<aho_test::UnaryScalar>, aho::color::H<aho_test::UnaryScalar>, aho::color::A<aho_test::UnaryScalar>>;
     TYPED_TEST_SUITE(ColorUnaryConversionTest, ColorUnaryConversionTypes);
     TYPED_TEST(ColorUnaryConversionTest, NegationKeepsTheImplicitScalarArgumentConversion) {
         constexpr TypeParam source(aho_test::UnaryScalar{7});
@@ -338,12 +415,6 @@ namespace {
         static_assert((-source).value.value == -7);
         EXPECT_EQ((-source).value.value, -7);
     }
-    template<class T>
-    class ColorOneWayCastTest : public testing::Test {};
-    using OneWayChannels = testing::Types<aho::color::R<aho_test::CastSource>,
-                                          aho::color::G<aho_test::CastSource>, aho::color::B<aho_test::CastSource>,
-                                          aho::color::H<aho_test::CastSource>, aho::color::S<aho_test::CastSource>,
-                                          aho::color::V<aho_test::CastSource>, aho::color::A<aho_test::CastSource>>;
     TYPED_TEST_SUITE(ColorOneWayCastTest, OneWayChannels);
     TYPED_TEST(ColorOneWayCastTest, ChecksConversionFromTheStoredScalarToTheRequestedType) {
         static_assert(aho_test::HasCast<TypeParam, aho_test::CastTarget>);
@@ -356,10 +427,6 @@ namespace {
     }
 } // namespace
 namespace {
-    template<class T>
-    class ColorElementTest : public testing::Test {};
-    using ColorElements = testing::Types<aho::color::R<double>, aho::color::G<double>, aho::color::B<double>,
-                                         aho::color::H<double>, aho::color::S<double>, aho::color::V<double>, aho::color::A<double>>;
     TYPED_TEST_SUITE(ColorElementTest, ColorElements);
     TYPED_TEST(ColorElementTest, ConstructorsAndUnaryAndBinaryOperatorsPreserveValues) {
         const TypeParam a(12), b(3);
@@ -406,10 +473,6 @@ namespace {
         }();
         EXPECT_EQ(stream.str(), std::string(name) + " : 12");
     }
-    struct PrimaryColor {
-        float hue, red, green, blue;
-    };
-    class ColorConversionTest : public testing::TestWithParam<PrimaryColor> {};
     TEST_P(ColorConversionTest, RgbAndHsvConversionsMatchPrimaryColors) {
         const auto color = GetParam();
         aho::color::RGB<float> rgb(color.red, color.green, color.blue);
@@ -449,16 +512,6 @@ namespace {
         EXPECT_EQ(result.g.value, 255);
         EXPECT_EQ(result.b.value, 0);
     }
-    template<class H, class SV>
-    struct HsvaArithmeticCase {
-        using Color = aho::color::HSVA<H, SV>;
-        using Hue = H;
-        using Channel = SV;
-    };
-    using HsvaArithmeticTypes = testing::Types<HsvaArithmeticCase<short, std::int8_t>, HsvaArithmeticCase<int, int>,
-                                               HsvaArithmeticCase<float, float>, HsvaArithmeticCase<double, double>, HsvaArithmeticCase<short, float>>;
-    template<class T>
-    class HsvaArithmeticTest : public testing::Test {};
     TYPED_TEST_SUITE(HsvaArithmeticTest, HsvaArithmeticTypes);
     TYPED_TEST(HsvaArithmeticTest, AlphaCombinesWithHsvaAndStaysUnchangedWithHsv) {
         using C = typename TypeParam::Color;
@@ -541,9 +594,6 @@ namespace {
         EXPECT_FLOAT_EQ(hsva.v.value, 0);
         EXPECT_FLOAT_EQ(hsva.a.value, 0);
     }
-    template<class T>
-    class RgbaArithmeticTest : public testing::Test {};
-    using RgbaArithmeticScalars = testing::Types<std::int8_t, int, float, double>;
     TYPED_TEST_SUITE(RgbaArithmeticTest, RgbaArithmeticScalars);
     TYPED_TEST(RgbaArithmeticTest, ColorAndScalarArithmeticCombinesOrPreservesAlpha) {
         using T = TypeParam;
@@ -657,16 +707,6 @@ namespace {
         hsva -= A<int>(1);
         aho_test::expect_hsva(hsva, 1, 2, 3, 4);
     }
-    template<class H, class SV>
-    struct HsvArithmeticCase {
-        using Color = aho::color::HSV<H, SV>;
-        using Hue = H;
-        using Channel = SV;
-    };
-    using HsvArithmeticTypes = testing::Types<HsvArithmeticCase<short, std::int8_t>, HsvArithmeticCase<int, int>,
-                                              HsvArithmeticCase<float, float>, HsvArithmeticCase<double, double>, HsvArithmeticCase<short, float>>;
-    template<class T>
-    class HsvArithmeticTest : public testing::Test {};
     TYPED_TEST_SUITE(HsvArithmeticTest, HsvArithmeticTypes);
     TYPED_TEST(HsvArithmeticTest, ArithmeticPreservesSeparateChannelTypesAndOriginalValues) {
         using C = typename TypeParam::Color;
@@ -733,9 +773,6 @@ namespace {
         EXPECT_EQ((2_l_v).value, 2u);
         EXPECT_EQ((2_l_a).value, 2u);
     }
-    template<class T>
-    class RgbArithmeticTest : public testing::Test {};
-    using RgbArithmeticScalars = testing::Types<std::int8_t, int, float, double>;
     TYPED_TEST_SUITE(RgbArithmeticTest, RgbArithmeticScalars);
     TYPED_TEST(RgbArithmeticTest, ArithmeticAndCompoundUpdatesPreserveElementTypeAndSource) {
         using T = TypeParam;
@@ -853,9 +890,6 @@ namespace {
         aho_test::expect_hsva(H<double>(120) - A<double>(0.5), 120, 0, 0, -0.5);
         aho_test::expect_hsva(A<double>(0.5) - H<double>(120), -120, 0, 0, 0.5);
     }
-    template<class T>
-    class ColorChannelSubtractionTest : public testing::Test {};
-    using SignedChannelTypes = testing::Types<int, float, double>;
     TYPED_TEST_SUITE(ColorChannelSubtractionTest, SignedChannelTypes);
     TYPED_TEST(ColorChannelSubtractionTest, RgbAndHsvPairsPreserveTheLeftChannelAndNegateTheRight) {
         using namespace aho::color;

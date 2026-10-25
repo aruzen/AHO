@@ -206,7 +206,7 @@ namespace VSL_NAMESPACE::typed {
 
 } // namespace VSL_NAMESPACE::typed
 
-// C++23 has no portable constexpr offsetof(member-pointer). This macro only captures type + offsetof;
-// all layout resolution and validation remains in the templates above. Optional arguments: location, format.
+// コンパイラー間で使える型とoffsetofだけを取得し、layoutの解決と検証は上のtemplateで行う。
+// 省略可能な引数はlocationとformat。
 #define VSL_VERTEX_MEMBER(Record, member, ...) \
     ::VSL_NAMESPACE::typed::VertexMember<Record, decltype(Record::member), offsetof(Record, member) __VA_OPT__(, ) __VA_ARGS__>

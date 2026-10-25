@@ -9,26 +9,37 @@ namespace {
         inline static const char* SIZE_INDEX = "size";
         inline static const char* COLOR_INDEX = "color";
     };
+
     template<class T, std::size_t n>
     struct Packed : std::array<T, n> {
         using ElementType = T;
     };
+
     template<class T>
     struct IndexedPacked : Packed<T, 8> {
         static constexpr std::size_t POINT_INDEX = 3, SIZE_INDEX = 1, COLOR_INDEX = 4;
     };
+
     template<class T>
     struct PointIndexedPacked : Packed<T, 8> {
         static constexpr std::size_t POINT_INDEX = 4;
     };
+
     template<class T>
     struct SizeIndexedPacked : Packed<T, 8> {
         static constexpr std::size_t SIZE_INDEX = 5;
     };
+
     template<class T>
     struct RuntimeIndexedPacked : Packed<T, 8> {
         inline static std::size_t POINT_INDEX = 1, SIZE_INDEX = 3, COLOR_INDEX = 5;
     };
+
+    template<class T>
+    class VSLArrayTest : public testing::Test {};
+
+    using ArrayScalars = testing::Types<int, float, double>;
+
     template<class P>
     P packed_values() {
         static_assert(std::is_standard_layout_v<P>);
@@ -37,9 +48,6 @@ namespace {
             result[i] = static_cast<typename P::ElementType>(i + 1);
         return result;
     }
-    template<class T>
-    class VSLArrayTest : public testing::Test {};
-    using ArrayScalars = testing::Types<int, float, double>;
     TYPED_TEST_SUITE(VSLArrayTest, ArrayScalars);
     TYPED_TEST(VSLArrayTest, ElementTypeAliasesProduceTheExpectedArraySize) {
         using P = Packed<TypeParam, 8>;

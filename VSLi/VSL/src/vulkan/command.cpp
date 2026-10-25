@@ -7,6 +7,8 @@
 #include <VSL/vulkan/command.hpp>
 #include <VSL/vulkan/phase.hpp>
 #include <VSL/vulkan/surface.hpp>
+#include <limits>
+#include <stdexcept>
 
 VSL_NAMESPACE::CommandPool::CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor device) {
     data_ = std::shared_ptr<VSL_NAMESPACE::impl::CommandPoolImpl>(new VSL_NAMESPACE::impl::CommandPoolImpl);
@@ -22,6 +24,8 @@ VSL_NAMESPACE::CommandPool::CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor dev
 VSL_NAMESPACE::CommandPool::CommandPool(std::shared_ptr<VSL_NAMESPACE::impl::CommandPoolImpl> data) : data_(data) {}
 
 VSL_NAMESPACE::CommandBuffer::CommandBuffer(VSL_NAMESPACE::CommandPool pool, std::uint32_t size) {
+    if (!size)
+        throw std::invalid_argument("Command buffer count must be positive");
     data_ = std::shared_ptr<VSL_NAMESPACE::impl::CommandBufferImpl>(new VSL_NAMESPACE::impl::CommandBufferImpl);
     data_->command_pool = pool.data_;
 
@@ -55,14 +59,15 @@ void VSL_NAMESPACE::CommandBuffer::reset() {
 }
 
 void VSL_NAMESPACE::CommandBuffer::reset(std::uint32_t idx) {
-    data_->command_buffers[idx].reset();
+    data_->command_buffers.at(idx).reset();
 }
 
 VSL_NAMESPACE::impl::CommandBufferImpl::~CommandBufferImpl() {
     for (const auto& submission : submissions)
         if (submission && submission->status == Completion::Status::SUBMITTED)
             Completion{submission}.wait();
-    command_pool->device->device.freeCommandBuffers(command_pool->command_pool, this->command_buffers);
+    if (!command_buffers.empty())
+        command_pool->device->device.freeCommandBuffers(command_pool->command_pool, command_buffers);
 }
 
 VSL_NAMESPACE::CommandManager::CommandManager(std::shared_ptr<VSL_NAMESPACE::impl::CommandManagerImpl> data) : data_(data) {}
@@ -93,7 +98,9 @@ std::uint32_t VSL_NAMESPACE::CommandManager::get_current_buffer_idx() {
 }
 
 VSL_NAMESPACE::CommandBuffer VSL_NAMESPACE::CommandManager::make_exclusive_buffer(size_t size) {
-    return CommandBuffer(CommandPool{data_->command_pool}, size);
+    if (size > std::numeric_limits<std::uint32_t>::max())
+        throw std::length_error("Command buffer count exceeds uint32_t");
+    return CommandBuffer(CommandPool{data_->command_pool}, static_cast<std::uint32_t>(size));
 }
 void VSL_NAMESPACE::CommandManager::wait_idle() {
     data_->device->device.waitIdle();

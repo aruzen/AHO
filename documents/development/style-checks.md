@@ -4,11 +4,13 @@ AHO/VSLの整形・命名・宣言/実装の配置を検査します。検査は
 
 ## 実行
 
-通常のビルド依存に加えて、LLVM 20のclang-format・clang-tidy・Clang/LLVM開発ライブラリとPython 3.10以上が必要です。macOSでは`brew install llvm@20`で用意できます。Vulkan SDK等の通常のヘッダー検索設定も有効にしてください。
+通常のビルド依存に加えて、LLVM 20のclang-format・clang-tidy・Clang/LLVM開発ライブラリとPython 3.10以上が必要です。CMakeは3.30以上、製品・検査ツール・コンパイル契約の言語モードは[C++26](cxx-standard.md)で統一します。macOSでは`brew install llvm@20`で用意できます。Vulkan SDK等の通常のヘッダー検索設定も有効にしてください。
 
 ```sh
 export PATH="$(brew --prefix llvm@20)/bin:$PATH"
 cmake -S . -B build/style \
+  -DCMAKE_C_COMPILER="$(brew --prefix llvm@20)/bin/clang" \
+  -DCMAKE_CXX_COMPILER="$(brew --prefix llvm@20)/bin/clang++" \
   -DAHO_HOME="$PWD/AHOLi/AHO" -DVSL_HOME="$PWD/VSLi/VSL" \
   -DBUILD_TESTING=ON -DAHO_STYLE_CHECKS=ON -DCMAKE_BUILD_TYPE=Release \
   -DAHO_ENABLE_EXPERIMENTAL_MESH=ON -DAHO_BUILD_MESH_EXAMPLE=ON \
@@ -24,12 +26,27 @@ cmake --build build/style --target check-style
 整形だけなら通常ビルドのconfigureも不要です。
 
 ```sh
-python3 tools/style/check.py --checks=format
+python3 tools/style/check.py --checks=format --changed
 ```
 
 全違反を失敗として扱う場合は`--strict`を付けます。通常実行では`tools/style/master/`内のソース別の登録と比較し、新しい違反があれば終了コード1、コンパイラの解析失敗や設定不備では2を返します。JSONとTUごとのログは`build/style-report/`へ出力します。
 
-末尾へファイル名を指定すると対象を絞れます。ソースだけを指定した場合はそのソースのコンパイル条件をすべて検査し、ヘッダーを指定した場合は漏れを避けるため全TUを読みます。
+通常の`check-style` / `check-format`は、index・作業ツリー・未追跡の変更を対象にします。コミット済みの変更は`-DAHO_STYLE_BASE_REF=<基点>`をconfigureへ指定するか、CLIへ`--changed-since <基点>`を渡します。引数なしのCLIと`check-style-full`は全体検査です。
+
+```sh
+# 作業中のファイル
+python3 tools/style/check.py --changed --database build/style \
+  --ast-tool build/style/tools/style/aho-style-ast
+# 基点からHEADまでに含まれる変更（cleanなcheckoutでも検査する）
+python3 tools/style/check.py --changed-since origin/master --database build/style \
+  --ast-tool build/style/tools/style/aho-style-ast
+# 明示的な全体検査
+cmake --build build/style --target check-style-full
+```
+
+末尾へファイル名を指定して対象を絞る方法も維持しています。ソースだけならそのソースの全コンパイル条件を読みます。ヘッダーが含まれる場合は、コンパイラーの依存情報で対象ヘッダーを読むTUだけを選びます。macro・条件付きinclude・推移的include・空白のあるpathにも対応し、複数のコンパイル条件も保持します。変更のないソースの診断は対象に追加しません。変更されたファイル全体を検査し、変更行だけへの制限は行いません。
+
+依存情報の取得にはGCC/Clang互換の`-M`を使用します。ヘッダーが使われるかの確認は前処理だけで済ませ、無関係なTUのASTは作りません。共通ヘッダーを変更した場合は影響するTUが多くなります。依存の取得失敗・DB外の変更ソース・どのTUからも読まれない変更ヘッダーは従来どおり失敗です。対象なしならツールの起動も省きます。
 
 クラス内定義は、本体のコード行が5行以上の場合に分離を必須とします。4行以下はクラス内定義を許可します。宣言・外側の波括弧・空行・コメント・通常のコンストラクタ初期化子リストは数えません。内部のブロックの波括弧や文字列リテラルはコードとして数えます。長い初期化子リストや、短くても複雑な処理はレビューで分離を判断します。
 
@@ -59,7 +76,7 @@ python3 tools/style/check.py --checks=format
 
 衝突回避用の末尾`_`は、その前が命名規則に適合する場合だけ許可します。衝突が実在するかの判定はレビューで確認します。
 
-対象はGitで追跡された`AHOLi/AHO/`・`VSLi/VSL/`・`tools/style/`内のC/C++です。整形は全対象、ASTとclang-tidyはコンパイルDBの全対象TUを走査し、その中で読まれたヘッダーも検査します。同じファイルでもGPU等のコンパイル定義が異なるコマンドはそれぞれ解析します。DB外のソースと未解析のヘッダーも診断します。新たに追加するファイルはDBまたはヘッダーを読むTUへ登録してください。未選択の`#if`分岐や未展開マクロの内部はAST検査の対象になりません。
+対象はGitで追跡された`AHOLi/AHO/`・`VSLi/VSL/`・`tools/style/`内のC/C++です。全体検査では整形は全対象、ASTとclang-tidyはコンパイルDBの全対象TUを走査します。差分検査は選択した変更ファイルと、そのヘッダーを読むTUへ絞ります。同じファイルでもGPU等のコンパイル定義が異なるコマンドはそれぞれ解析します。検査対象のDB外のソースと未解析のヘッダーも診断します。新たに追加するファイルはDBまたはヘッダーを読むTUへ登録してください。未選択の`#if`分岐や未展開マクロの内部はAST検査の対象になりません。
 
 `tools/style/headers.cpp`は公開umbrellaを読み、通常のTUが使わない予約ヘッダーも解析対象へ含めます。このために製品のリンクやアプリの起動は行いません。
 
@@ -88,4 +105,8 @@ cmake --build build/style --target update-style-master
 
 `Style.CheckerContracts`は小さな正常例と違反例をコンパイラに入力します。static/非static、const/constexpr、外部契約、配置の例外、namespace再開、構造化束縛、解析エラー、masterで許可した違反の複製、ソース別の更新、更新時の新規違反の拒否を確認します。
 
-`.github/workflows/style.yml`ではmacOSとLLVM 20で同じ検証・全体検査を実行し、診断をartifactへ保存します。Windows/Linux固有の分岐を網羅するものではありません。
+`.github/workflows/style.yml`はmacOSとLLVM 20で実行します。通常PRではbase/headの共通祖先からPR headまで、masterへのpushではpush前commitからHEADまでを比較します。CIのcheckoutはcleanなのでgit statusには依存しません。追加・変更・rename先を検査し、削除済みファイルは除外します。初回pushは全ファイルを追加差分として扱います。
+
+GitHub Releaseのpublishedイベントでは全体検査と検査器のcontractを実行します。手動実行も既定はHEADの直前commitからの差分で、`base_ref`で比較基点、`full=true`で全体検査を指定できます。通常のPR/pushは変更範囲だけです。
+
+C++も検査設定も変わらない場合は、依存インストール・configure・checker buildを省きます。検査器や規約設定だけの変更ではcontractを実行し、AHO本体の依存や全TU解析は不要です。検査範囲はbuild/style-scope.json、診断はbuild/style-reportへ保存します。Windows/Linux固有の分岐を網羅するものではありません。

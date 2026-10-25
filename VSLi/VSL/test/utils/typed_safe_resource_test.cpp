@@ -2,6 +2,26 @@
 #include <VSL/utils/typed_safe_resource.hpp>
 
 namespace {
+    template<typename Point, typename Image>
+    concept has_shader_read_barrier = requires(const Image& image) {
+        { Point::MakeShaderReadBarrier(image) } -> std::same_as<vsl::command::ChangeImageBarrier>;
+    };
+
+    using SampledImage = vsl::Image<vsl::ImageType::SAMPLED | vsl::ImageType::TRANSFER_DST>;
+    using TransferImage = vsl::Image<vsl::ImageType::TRANSFER_DST>;
+    using SampledPoint = vsl::typed::ResourceBindingPoint<2, vsl::graphic_resource::Type::SAMPLED_IMAGE, vsl::ShaderFlag::FRAGMENT>;
+    using TexturePoint = vsl::typed::ResourceBindingPoint<3, vsl::graphic_resource::Type::COMBINED_IMAGE_SAMPLER, vsl::ShaderFlag::COMPUTE>;
+    using StoragePoint = vsl::typed::ResourceBindingPoint<4, vsl::graphic_resource::Type::STORAGE_IMAGE, vsl::ShaderFlag::COMPUTE>;
+    using EmptyStagesPoint = vsl::typed::ResourceBindingPoint<5, vsl::graphic_resource::Type::SAMPLED_IMAGE, vsl::ShaderFlag::ERROR_>;
+    using UnknownStagesPoint = vsl::typed::ResourceBindingPoint<6, vsl::graphic_resource::Type::SAMPLED_IMAGE, static_cast<vsl::ShaderFlag>(0x40000000)>;
+    static_assert(has_shader_read_barrier<SampledPoint, SampledImage>);
+    static_assert(has_shader_read_barrier<TexturePoint, SampledImage>);
+    static_assert(!has_shader_read_barrier<SampledPoint, TransferImage>);
+    static_assert(!has_shader_read_barrier<StoragePoint, SampledImage>);
+    static_assert(!has_shader_read_barrier<EmptyStagesPoint, SampledImage>);
+    static_assert(!has_shader_read_barrier<UnknownStagesPoint, SampledImage>);
+    static_assert(!has_shader_read_barrier<SampledPoint, vsl::ImageAccessor>);
+
     using First =
         vsl::typed::ResourceBindingPoint<2, vsl::graphic_resource::Type::UNIFORM_BUFFER, vsl::ShaderFlag::VERTEX>;
     using Second = vsl::typed::ResourceBindingPoint<5, vsl::graphic_resource::Type::STORAGE_BUFFER,
@@ -39,6 +59,21 @@ namespace {
         ASSERT_EQ(actual.size(), 2u);
         EXPECT_EQ(actual[0], First::VALUE);
         EXPECT_EQ(actual[1], Second::VALUE);
+    }
+
+    TEST_F(TypedResourceVulkanIntegrationTest, SampledBindingBuildsShaderReadBarrierWithDeclaredStagesAndLayers) {
+        SampledImage image(device, 1, 1, vsl::data_format::SRGB8_RGBA, 3);
+        const auto fragment = SampledPoint::MakeShaderReadBarrier(image, 1, 2);
+        const auto compute = TexturePoint::MakeShaderReadBarrier(image);
+        EXPECT_EQ(fragment.shader_read_stages(), SampledPoint::VALUE.shader_type);
+        EXPECT_EQ(compute.shader_read_stages(), TexturePoint::VALUE.shader_type);
+        EXPECT_EQ(fragment.old_layout, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
+        EXPECT_EQ(fragment.new_layout, vsl::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
+        EXPECT_EQ(fragment.image.data_, image.data_);
+        EXPECT_EQ(fragment.base_layer, 1u);
+        EXPECT_EQ(fragment.layer_count, 2u);
+        EXPECT_EQ(compute.base_layer, 0u);
+        EXPECT_EQ(compute.layer_count, 0u);
     }
 } // namespace
 namespace {

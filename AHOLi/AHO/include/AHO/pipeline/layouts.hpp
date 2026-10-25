@@ -34,6 +34,10 @@ namespace AHO_NAMESPACE::pipeline {
             .amount = 1};
     }; // namespace standard_resources
 
+    typedef VSL_NAMESPACE::PipelineLayout (*GetBaseLayoutFunc)(engine::EngineAccessor* engine);
+
+    extern GetBaseLayoutFunc GET_BASE_LAYOUT;
+
     constexpr auto get_binding_point(ResourceName name) {
         switch (name) {
             case ResourceName::VP_MATRIX_UBO:
@@ -52,9 +56,6 @@ namespace AHO_NAMESPACE::pipeline {
             return standard_resources::TEXTURE;
     }
 
-    typedef VSL_NAMESPACE::PipelineLayout (*GetBaseLayoutFunc)(engine::EngineAccessor* engine);
-
-    extern GetBaseLayoutFunc GET_BASE_LAYOUT;
 } // namespace AHO_NAMESPACE::pipeline
 
 #endif //AHO_ALL_LAYOUTS_H

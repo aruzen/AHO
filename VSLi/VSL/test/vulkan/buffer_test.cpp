@@ -57,6 +57,24 @@ namespace {
         EXPECT_EQ(mapped.offset, 0u);
         mapped.flush();
     }
+    TEST_F(BufferVulkanIntegrationTest, MappedPointerCopiesPreserveOverlappingSourceRanges) {
+        if (!host_coherent_available())
+            GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
+        const std::array<std::uint32_t, 8> initial{1, 2, 3, 4, 5, 6, 7, 8};
+        HostBuffer buffer(device, initial);
+        auto whole = buffer.data();
+        auto tail = buffer.data(6 * sizeof(std::uint32_t), sizeof(std::uint32_t));
+        EXPECT_TRUE(tail.copy(static_cast<std::uint32_t*>(whole.data), std::size_t{6}));
+        std::array<std::uint32_t, 8> actual{};
+        std::memcpy(actual.data(), whole.data, sizeof(actual));
+        EXPECT_EQ(actual, (std::array<std::uint32_t, 8>{1, 1, 2, 3, 4, 5, 6, 8}));
+        ASSERT_TRUE(buffer.copy(initial));
+        auto head = buffer.data(6 * sizeof(std::uint32_t));
+        EXPECT_TRUE(head.copy(static_cast<std::uint32_t*>(whole.data) + 1, std::size_t{6}));
+        std::memcpy(actual.data(), whole.data, sizeof(actual));
+        EXPECT_EQ(actual, (std::array<std::uint32_t, 8>{2, 3, 4, 5, 6, 7, 7, 8}));
+    }
+
     TEST_F(BufferVulkanIntegrationTest, PointerConstructorAndPointerCopyPreserveArrayContents) {
         if (!host_coherent_available())
             GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
@@ -143,6 +161,31 @@ namespace {
         EXPECT_EQ(offset, std::numeric_limits<std::size_t>::max() - 1);
         EXPECT_EQ(storage, before);
     }
+    void expect_overlapping_value_copy(bool checked) {
+        struct Payload {
+            std::uint32_t values[4];
+            std::uint32_t tail;
+        } payload{{1, 2, 3, 4}, 5};
+        vsl::BufferAccessor::LocalBufferHolder mapped(nullptr, sizeof(payload.values), sizeof(std::uint32_t),
+                                                      reinterpret_cast<std::byte*>(&payload) + sizeof(std::uint32_t));
+        if (checked)
+            EXPECT_TRUE(mapped.copy(payload.values));
+        else
+            mapped.uncheck_copy(payload.values);
+        EXPECT_EQ(payload.values[0], 1u);
+        EXPECT_EQ(payload.values[1], 1u);
+        EXPECT_EQ(payload.values[2], 2u);
+        EXPECT_EQ(payload.values[3], 3u);
+    }
+
+    TEST(BufferCopyHelperTest, CheckedMappedValueCopiesPreserveOverlappingSource) {
+        expect_overlapping_value_copy(true);
+    }
+
+    TEST(BufferCopyHelperTest, UncheckedMappedValueCopiesPreserveOverlappingSource) {
+        expect_overlapping_value_copy(false);
+    }
+
     TEST(BufferCopyHelperTest, UncheckedCopyAppendsAndAdvancesItsOffset) {
         std::array<unsigned char, 12> storage{};
         const std::uint32_t first = 17, second = 29;
@@ -205,6 +248,57 @@ namespace {
             EXPECT_EQ(actual, first);
             buffer.flush(mapped);
         }
+    }
+    TEST_F(BufferVulkanIntegrationTest, BufferTransferRejectsSourceLargerThanDestinationBeforeRecording) {
+        const std::array<std::uint32_t, 4> values{1, 2, 3, 4};
+        HostBuffer source(device, values), destination(device, std::size_t{4});
+        auto manager = make_manager();
+        // 予期しないvalidationエラーはfixtureで失敗させ、driverへの不正命令は抑止する。
+        expect_validation_abort("");
+        EXPECT_THROW(destination.copy_by_buffer(manager, &source), std::out_of_range);
+        EXPECT_FALSE(has_validation_errors());
+    }
+    TEST_F(BufferVulkanIntegrationTest, MappedBufferTransferRejectsSourceLargerThanMapping) {
+        const std::array<std::uint32_t, 4> values{1, 2, 3, 4};
+        HostBuffer source(device, values), destination(device, std::size_t{32});
+        auto mapping = destination.data(std::size_t{4}, 8);
+        auto manager = make_manager();
+        EXPECT_THROW(mapping.copy_by_buffer(manager, &source), std::out_of_range);
+    }
+    TEST_F(BufferVulkanIntegrationTest, MappedBufferTransferWritesOnlyAtTheMappingOffset) {
+        const std::array<std::uint32_t, 8> initial{10, 20, 30, 40, 50, 60, 70, 80};
+        const std::array<std::uint32_t, 2> payload{101, 102};
+        HostBuffer source(device, payload), destination(device, initial);
+        auto manager = make_manager();
+        auto mapping = destination.data(sizeof(payload), 3 * sizeof(std::uint32_t));
+        EXPECT_TRUE(mapping.copy_by_buffer(manager, &source));
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            vk::MemoryBarrier visible{.srcAccessMask = vk::AccessFlagBits::eTransferWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
+            auto commands = manager.get_buffer();
+            commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+                vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, visible, {}, {});
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            ASSERT_TRUE(phase.completion().wait());
+        }
+        const std::array<std::uint32_t, 8> expected{10, 20, 30, 101, 102, 60, 70, 80};
+        auto contents = destination.data();
+        contents.invalidate(sizeof(expected));
+        EXPECT_EQ(std::memcmp(contents.data, expected.data(), sizeof(expected)), 0);
+    }
+    TEST_F(BufferVulkanIntegrationTest, BufferTransferRejectsNullSourceAndOverlappingStorage) {
+        HostBuffer buffer(device, std::size_t{16});
+        auto alias = buffer;
+        auto manager = make_manager();
+        EXPECT_THROW(buffer.copy_by_buffer(manager, nullptr), std::invalid_argument);
+        EXPECT_THROW(buffer.copy_by_buffer(manager, &alias), std::invalid_argument);
+    }
+    TEST_F(BufferVulkanIntegrationTest, BufferTransferRejectsBuffersWithoutTransferUsage) {
+        vsl::Buffer<vsl::MemoryType::UNIFORM_BUFFER, vsl::MemoryProperty::HOST_VISIBLE> uniform(device, std::size_t{16});
+        HostBuffer transfer(device, std::size_t{16});
+        auto manager = make_manager();
+        EXPECT_THROW(transfer.copy_by_buffer(manager, &uniform), std::invalid_argument);
+        EXPECT_THROW(uniform.copy_by_buffer(manager, &transfer), std::invalid_argument);
     }
     TEST_F(BufferVulkanIntegrationTest, SuccessfulBufferTransferReturnsTrue) {
         std::array<std::uint32_t, 2> expected{47, 53};

@@ -257,7 +257,8 @@ breakpoint disable swift_willThrow
                 phase << command::ChangeImageBarrier(image, ImageLayout::TRANSFER_DST_OPTIMAL);
                 phase << command::CopyBufferToImage(image, &image_staging_buffer, ImageLayout::TRANSFER_DST_OPTIMAL);
                 phase << command::ChangeImageBarrier(image, ImageLayout::TRANSFER_DST_OPTIMAL,
-                                                     ImageLayout::SHADER_READ_ONLY_OPTIMAL);
+                                                     ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                                                     aho::pipeline::get_binding_point(aho::pipeline::ResourceName::TEXTURE).shader_type);
             }
             in_flight.wait();
         }

@@ -22,6 +22,8 @@ void VSL_NAMESPACE::command::BindVertexBufferAt::invoke(CommandPool pool, Comman
 }
 
 void VSL_NAMESPACE::command::BindVertexBuffer::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
+    if (buffers.empty())
+        return;
     for (auto* source : buffers)
         buffer.retain(source->data_);
     buffer.data_->command_buffers[buffer.get_current_buffer_idx()]

@@ -16,6 +16,14 @@ namespace {
         int width = 0, height = 0;
         std::vector<unsigned char> bytes;
     };
+#ifdef AHO_GPU_TESTS
+    class ScreenshotWindowIntegration : public aho_test::LiveGPUTest {
+    protected:
+        void require_readback();
+        auto clear(float red, float green, float blue);
+    };
+#endif
+
     PngPixels load_png(const std::filesystem::path& path) {
         std::ifstream stream(path, std::ios::binary);
         const std::vector<unsigned char> encoded{std::istreambuf_iterator<char>(stream), {}};
@@ -107,11 +115,6 @@ namespace {
         EXPECT_THROW(aho::x::save_screenshot(pixels, directory.path), std::runtime_error);
     }
 #else
-    class ScreenshotWindowIntegration : public aho_test::LiveGPUTest {
-    protected:
-        void require_readback();
-        auto clear(float red, float green, float blue);
-    };
 
     void ScreenshotWindowIntegration::require_readback() {
         start_engine();

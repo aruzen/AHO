@@ -1,8 +1,10 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.30)
 project(AHOLi VERSION 1.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+include(cmake/Saitekikuukan.cmake)
 
 add_library(AHOLi
         AHO/src/pipeline/layouts.cpp
@@ -69,6 +71,8 @@ add_library(AHOLi
         AHO/src/drawer/draw_phase.cpp
 )
 
+target_compile_features(AHOLi PUBLIC cxx_std_26)
+
 target_include_directories(AHOLi
         PRIVATE
         ${Boost_INCLUDE_DIRS}
@@ -84,6 +88,7 @@ target_link_directories(AHOLi
 )
 
 target_link_libraries(AHOLi
+        PUBLIC saitekikuukan::saitekikuukan
         PRIVATE
         ${Boost_LIBRARIES}
         ${GLFW_LIBRARIES}
@@ -91,6 +96,11 @@ target_link_libraries(AHOLi
 )
 
 if(APPLE)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT DEFINED CMAKE_OBJC_COMPILER)
+        find_program(CMAKE_OBJC_COMPILER NAMES clang REQUIRED)
+    endif()
+    enable_language(OBJC)
+    target_sources(AHOLi PRIVATE AHO/src/window_macos.m)
     target_link_libraries(AHOLi PRIVATE "-framework CoreGraphics")
 endif()
 

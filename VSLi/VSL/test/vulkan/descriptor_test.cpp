@@ -1,9 +1,52 @@
 #include "support/compute_fixture.hpp"
+#include "support/scoped_environment.hpp"
+#include <VSL/utils/typed_safe_resource.hpp>
 namespace {
+    enum class ImageReadBarrierMode {
+        AUTOMATIC,
+        COMPUTE,
+        TYPED,
+        MULTI_STAGE,
+        ALL_GRAPHICS_COMPUTE
+    };
+    using SampledTexture = vsl::typed::ResourceBindingPoint<2, vsl::graphic_resource::Type::COMBINED_IMAGE_SAMPLER, vsl::ShaderFlag::COMPUTE>;
+    using SampledImage = vsl::Image<vsl::ImageType::SAMPLED | vsl::ImageType::TRANSFER_DST>;
+    vsl::command::ChangeImageBarrier make_shader_read_barrier(ImageReadBarrierMode mode, const SampledImage& image);
+
     using DescriptorVulkanIntegrationTest = vsl_test::ComputeVulkanIntegrationTest;
+    class DescriptorImageBarrierVulkanIntegrationTest : public vsl_test::ComputeVulkanIntegrationTest,
+                                                        public testing::WithParamInterface<ImageReadBarrierMode> {
+        vsl_test::ScopedEnvironment _synchronization{"VK_LAYER_VALIDATE_SYNC", "1"};
+        vsl_test::ScopedEnvironment _shader_accesses{"VK_LAYER_SYNCVAL_SHADER_ACCESSES_HEURISTIC", "1"};
+        bool validate_vulkan() const override;
+    };
+
     class DescriptorOwnershipVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override;
     };
+
+    vsl::command::ChangeImageBarrier make_shader_read_barrier(ImageReadBarrierMode mode, const SampledImage& image) {
+        using namespace vsl;
+        constexpr auto old_layout = ImageLayout::TRANSFER_DST_OPTIMAL;
+        constexpr auto new_layout = ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+        switch (mode) {
+            case ImageReadBarrierMode::AUTOMATIC:
+                return {image, old_layout, new_layout};
+            case ImageReadBarrierMode::COMPUTE:
+                return {image, old_layout, new_layout, ShaderFlag::COMPUTE};
+            case ImageReadBarrierMode::TYPED:
+                return SampledTexture::MakeShaderReadBarrier(image);
+            case ImageReadBarrierMode::MULTI_STAGE:
+                return {image, old_layout, new_layout, ShaderFlag::VERTEX | ShaderFlag::COMPUTE};
+            case ImageReadBarrierMode::ALL_GRAPHICS_COMPUTE:
+                return {image, old_layout, new_layout, ShaderFlag::ALL_GRAPHICS | ShaderFlag::COMPUTE};
+        }
+        throw std::logic_error("Unknown shader read barrier mode");
+    }
+
+    bool DescriptorImageBarrierVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
 
     bool DescriptorOwnershipVulkanIntegrationTest::validate_vulkan() const {
         return true;
@@ -117,14 +160,14 @@ namespace {
 } // namespace
 #include "support/image_transfer_fixture.hpp"
 namespace {
-    TEST_F(DescriptorVulkanIntegrationTest, ImageAndCombinedSamplerUpdatesReachComputeShader) {
+    TEST_P(DescriptorImageBarrierVulkanIntegrationTest, ImageAndCombinedSamplerUpdatesReachComputeShader) {
         using namespace vsl::graphic_resource;
         pipeline.reset();
         layout.reset();
         binding.emplace(device, std::initializer_list<BindingPoint>{
                                     {0, Type::STORAGE_BUFFER, vsl::ShaderFlag::COMPUTE, 1},
                                     {1, Type::STORAGE_IMAGE, vsl::ShaderFlag::COMPUTE, 1},
-                                    {2, Type::COMBINED_IMAGE_SAMPLER, vsl::ShaderFlag::COMPUTE, 1}});
+                                    SampledTexture::VALUE});
         auto [image_pool, allocated] = resources->make(std::vector{*binding});
         struct ReclaimCycle {
             vsl::GraphicResourcePool pool;
@@ -135,7 +178,6 @@ namespace {
         ASSERT_EQ(allocated.size(), 1u);
         resource = allocated.front();
         using StorageImage = vsl::Image<vsl::ImageType::STORAGE | vsl::ImageType::TRANSFER_DST>;
-        using SampledImage = vsl::Image<vsl::ImageType::SAMPLED | vsl::ImageType::TRANSFER_DST>;
         StorageImage storage(device, 1, 1, vsl::data_format::UNSIGNED_NORMALIZED8_RGBA);
         SampledImage sampled(device, 1, 1, vsl::data_format::UNSIGNED_NORMALIZED8_RGBA);
         vsl::Sampler sampler(device, vsl::SamplingMode::NEAREST, vsl::EdgeMode::CLAMP_TO_EDGE);
@@ -174,12 +216,7 @@ namespace {
             change(sampled, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, {},
                    vk::AccessFlagBits::eTransferWrite);
             phase << vsl::command::CopyBufferToImage(sampled, &upload, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
-            phase << vsl::command::ChangeImageBarrier(sampled, vsl::ImageLayout::TRANSFER_DST_OPTIMAL,
-                                                      vsl::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
-            // The public barrier targets FragmentShader only (I10). Extend visibility
-            // in the fixture so this descriptor test has a valid ComputeShader dependency.
-            change(sampled, vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
-                   vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eShaderRead);
+            phase << make_shader_read_barrier(GetParam(), sampled);
             phase << *pipeline << vsl::command::BindGraphicResource(resource, BindingDestination::COMPUTE)
                   << vsl::command::Dispatch(1, 1, 1);
             vk::MemoryBarrier barrier{};
@@ -195,6 +232,11 @@ namespace {
         std::memcpy(actual.data(), mapped.data, sizeof(actual));
         EXPECT_EQ(actual, (std::array<std::uint32_t, 2>{37, 83}));
     }
+
+    INSTANTIATE_TEST_SUITE_P(ShaderReadStages, DescriptorImageBarrierVulkanIntegrationTest,
+                             testing::Values(ImageReadBarrierMode::AUTOMATIC, ImageReadBarrierMode::COMPUTE,
+                                             ImageReadBarrierMode::TYPED, ImageReadBarrierMode::MULTI_STAGE,
+                                             ImageReadBarrierMode::ALL_GRAPHICS_COMPUTE));
 } // namespace
 
 namespace {

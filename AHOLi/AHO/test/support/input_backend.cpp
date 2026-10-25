@@ -1,7 +1,9 @@
 #include "input_backend.hpp"
 
 extern "C" {
-int glfwRawMouseMotionSupported() { return aho_test::InputWindow::RAW_SUPPORTED ? GLFW_TRUE : GLFW_FALSE; }
+int glfwRawMouseMotionSupported() {
+    return aho_test::InputWindow::RAW_SUPPORTED ? GLFW_TRUE : GLFW_FALSE;
+}
 int glfwGetWindowAttrib(GLFWwindow* handle, int attribute) {
     auto* window = aho_test::InputWindow::Find(handle);
     return window && attribute == GLFW_FOCUSED ? window->focused : 0;

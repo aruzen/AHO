@@ -89,10 +89,7 @@ void VSL_NAMESPACE::ImageAccessor::TransformLayout(VSL_NAMESPACE::CommandManager
 
 bool VSL_NAMESPACE::ImageAccessor::copy_by_buffer(CommandManager manager, BufferAccessor* buf, VSL_NAMESPACE::ImageLayout layout, std::uint32_t target_idx) {
     auto phase = manager.start_phase<ComputePhase>();
-    if (this->data_->count == 1)
-        phase << command::CopyBufferToImage(*this, buf, layout);
-    else
-        phase << command::CopyBufferToArrayImage(*this, buf, layout, target_idx);
+    phase << command::CopyBufferToArrayImage(*this, buf, layout, target_idx);
     return true;
 }
 

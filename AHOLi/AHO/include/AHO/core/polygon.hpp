@@ -2,6 +2,7 @@
 #include "triangle.hpp"
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <ranges>
 #include <span>
@@ -160,7 +161,23 @@ namespace AHO_NAMESPACE {
                 const auto origin = triangle.pos1.template cast<long double>();
                 const auto ab = triangle.pos2.template cast<long double>() - origin;
                 const auto ac = triangle.pos3.template cast<long double>() - origin;
-                result += ab.cross(ac).length() / 2;
+                if constexpr (std::integral<R> && sizeof(R) == sizeof(std::uint32_t) && std::numeric_limits<long double>::digits < 64) {
+                    // 整数座標の積で失われた丸め誤差を戻し、ほぼ等しい積の差を保つ。
+                    auto determinant = [](long double a, long double b, long double c, long double d) {
+                        const auto cd = c * d;
+                        return std::fma(a, b, -cd) + std::fma(-c, d, cd);
+                    };
+                    if constexpr (D::DIMENSION == 2) {
+                        result += std::abs(determinant(ab.value.___AN1, ac.value.___AN2, ab.value.___AN2, ac.value.___AN1)) / 2;
+                    } else {
+                        result += std::hypot(determinant(ab.value.___AN2, ac.value.___AN3, ab.value.___AN3, ac.value.___AN2),
+                                             determinant(ab.value.___AN3, ac.value.___AN1, ab.value.___AN1, ac.value.___AN3),
+                                             determinant(ab.value.___AN1, ac.value.___AN2, ab.value.___AN2, ac.value.___AN1)) /
+                                  2;
+                    }
+                } else {
+                    result += ab.cross(ac).length() / 2;
+                }
             }
         }
         return static_cast<double>(result);

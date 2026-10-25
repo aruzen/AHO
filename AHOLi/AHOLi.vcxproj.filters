@@ -156,6 +156,7 @@
     <ClInclude Include="AHO\include\AHO\engine.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="AHO\include\AHO\render_context.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="AHO\include\AHO\window.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -206,6 +207,7 @@
     <ClCompile Include="AHO\src\engine.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="AHO\src\render_context.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClCompile Include="AHO\src\window.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>

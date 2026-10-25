@@ -5,6 +5,10 @@
 
 thread_local AHO_NAMESPACE::DrawPhase* AHO_NAMESPACE::THREAD_LOCAL_DRAW_PHASE;
 
+AHO_NAMESPACE::RenderContext AHO_NAMESPACE::DrawPhase::context() const {
+    return engine->get_window().render_context();
+}
+
 AHO_NAMESPACE::DrawPhase::DrawPhase(AHO_NAMESPACE::engine::GraphicalEngine& engine,
                                     std::function<void(DrawStream<VSL_NAMESPACE::DefaultPhaseStream>&)> initialize,
                                     std::function<void(DrawStream<VSL_NAMESPACE::DefaultPhaseStream>&)> finit)

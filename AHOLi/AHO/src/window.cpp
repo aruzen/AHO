@@ -3,8 +3,7 @@
 #include <GLFW/glfw3.h>
 #include <VSL/exceptions.hpp>
 #ifdef __APPLE__
-#define GLFW_EXPOSE_NATIVE_COCOA
-#include <GLFW/glfw3native.h>
+#include "window_macos.h"
 #endif
 
 #include <algorithm>
@@ -19,12 +18,9 @@ AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::get_monitor_size() {
 #if defined(GLFW_PLATFORM_COCOA)
     if (glfwGetPlatform() == GLFW_PLATFORM_COCOA) {
 #endif
-        auto mode = CGDisplayCopyDisplayMode(glfwGetCocoaMonitor(monitor));
-        if (!mode)
+        int width, height;
+        if (!aho_get_cocoa_monitor_size(monitor, &width, &height))
             throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "Primary monitor video mode is not available");
-        const auto width = static_cast<int>(CGDisplayModeGetWidth(mode));
-        const auto height = static_cast<int>(CGDisplayModeGetHeight(mode));
-        CGDisplayModeRelease(mode);
         return {width, height};
 #if defined(GLFW_PLATFORM_COCOA)
     }

@@ -10,6 +10,10 @@ Clang/GCCの手動コンパイル契約は`-std=c++2c`、Visual Studioの各構�
 
 LLVM 20を既存の規約検査基盤として継続使用する。C++26モードで利用できる個々の言語・標準ライブラリ機能はツールチェーンの実装状況に従う。reflection等の機能は標準モードを上げただけでは利用可能にならないため、使用する際は対応コンパイラーとfeatureを別途確認する。
 
+experimental MeshはGCC 16の`-freflection`で構造体から属性列を自動生成できる。`AHO::ExperimentalMesh`が対応判定とオプションの伝播を行い、`AHO_REQUIRE_MESH_REFLECTION=ON`で機能を必須にする。[Meshの説明](../experimental/mesh.md)を参照。GCCとClangを切り替える場合はbuildディレクトリを分け、GTestなどのC++依存ライブラリも標準ライブラリを揃える。
+
+macOSのCocoaによる画面サイズ取得は、Apple ClangでコンパイルするObjective-Cファイルへ分離する。GCCが解析できないApple SDKのBlocks構文をC++側へ持ち込まず、整数値をCの関数で受け渡す。CMakeはmacOSでObjective-Cを有効にし、GCC使用時はこの部分に`clang`を選ぶ。VulkanのloaderはC ABIなので共用できるが、SDK付属のClang製SPIRV-CrossアーカイブはGCC用に再ビルドする必要がある。
+
 macOSではCMakeが既定のAppleClangを選ぶ場合がある。Homebrew LLVM 20を使う場合はconfigure時に明示する。
 
 ```sh

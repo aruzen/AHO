@@ -96,6 +96,11 @@ target_link_libraries(AHOLi
 )
 
 if(APPLE)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT DEFINED CMAKE_OBJC_COMPILER)
+        find_program(CMAKE_OBJC_COMPILER NAMES clang REQUIRED)
+    endif()
+    enable_language(OBJC)
+    target_sources(AHOLi PRIVATE AHO/src/window_macos.m)
     target_link_libraries(AHOLi PRIVATE "-framework CoreGraphics")
 endif()
 

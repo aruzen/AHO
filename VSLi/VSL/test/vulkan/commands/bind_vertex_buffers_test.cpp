@@ -69,6 +69,20 @@ namespace {
     class DrawResourceLifetimeVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+    TEST_F(DrawResourceLifetimeVulkanIntegrationTest, EmptyBindingPreservesThePreviouslyBoundVertexBuffers) {
+        // 検証エラーはテストを失敗させ、不正なコマンドをdriverへ渡さない。
+        expect_validation_abort("");
+        configure_pipeline(true);
+        const std::array<float, 6> positions{-1, -1, 3, -1, -1, 3};
+        const std::array<float, 9> colors{.25f, .5f, .75f, .25f, .5f, .75f, .25f, .5f, .75f};
+        vsl::StagingBuffer<vsl::MemoryType::VERTEX_BUFFER> position(device, positions), color_buffer(device, colors);
+        ExpectTriangleColor(render([&](auto& stream) {
+            stream << vsl::command::BindVertexBuffer(position, color_buffer)
+                   << vsl::command::BindVertexBuffer{}
+                   << vsl::command::Draw{3};
+        }));
+    }
+
     TEST_F(DrawResourceLifetimeVulkanIntegrationTest, DrawSurvivesDroppingBuffersAndPipelineBeforeSubmission) {
         configure_pipeline(true);
         std::weak_ptr<vsl::impl::BufferImpl> weak_vertex, weak_color, weak_index;

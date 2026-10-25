@@ -24,4 +24,6 @@ completion.wait();
 
 BindVertexBuffer/BindIndexBuffer等が借用するラッパーはinvokeまで必要です。記録後のラッパー解放に対応する変更であり、invoke前の借用先解放には対応しません。descriptorのupdateやPoolの明示destroy、bufferの書き換えに必要なGPU同期は呼び出し側の責任です。
 
+BindVertexBufferの空一覧とBindGraphicResourceの空vectorは、nativeコマンドを記録せず、既存のbindingを保持します。個数0のnative bindはVulkanで許可されないため、空の場合は呼び出しを省略します。
+
 追加する処理はCPU上のshared_ptr保持です。GPUコマンド、送信回数、完了待ち、nativeリソースの生成回数は増やしません。CPU処理時間のベンチマークは実施していません。

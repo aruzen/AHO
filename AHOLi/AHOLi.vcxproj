@@ -224,6 +224,7 @@
     <ClInclude Include="AHO\include\AHO\resource\object_model.hpp" />
     <ClInclude Include="AHO\include\AHO\utils\polygon.hpp" />
     <ClInclude Include="AHO\include\AHO\window.hpp" />
+    <ClInclude Include="AHO\include\AHO\render_context.hpp" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
@@ -245,6 +246,7 @@
     <ClCompile Include="AHO\src\resource\buffer.cpp" />
     <ClCompile Include="AHO\src\resource\image.cpp" />
     <ClCompile Include="AHO\src\window.cpp" />
+    <ClCompile Include="AHO\src\render_context.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

@@ -65,6 +65,7 @@ if (AHO_TEST_SOURCES)
             engine/standard_engine_test.cpp
             io/mouse_test.cpp
             window_test.cpp
+            render_context_test.cpp
             pipeline/layouts_test.cpp
             drawer/draw_phase_test.cpp
             image_readback_test.cpp

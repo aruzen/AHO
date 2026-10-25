@@ -29,3 +29,9 @@ Apple M1/macOS、LLVM 20/C++23/Debug。MoltenVK 1.4.2 + validation layerで`--ve
 追加のdriver指定なしでもSDK既定のMoltenVKで`--frames 8`が成功した。helpと不正CLI引数4ケース、2shaderのspirv-val、変更3ファイル/2TUの命名・配置・format検査（違反0件）も確認した。Typed本体への変更はなく、このSampleで全AHO/VSLテストは再実行していない。Windows/Linuxは未実行。
 
 `BUILD_TESTING=OFF`の新規buildディレクトリでもconfigure成功。Sampleを使うためにGTestの有効化は不要。
+
+## style CIの構成漏れ
+
+初回のPR CIではSampleが既定のOFFのままで、main.cpp / scene.cppのコンパイルDB未登録とscene.hppの未解析による3件のエラーで失敗した。ローカルのSample有効構成だけを確認し、CI側の有効化を漏らしていた。style workflowのconfigureにも`AHO_BUILD_TYPED_EXAMPLE=ON`を追加し、検査対象から除外せずに両TUとヘッダーを解析させる。
+
+修正したworkflowと同じCMakeオプションでconfigureし、生成されたAppleClangのコンパイルDBへSampleの2TUが含まれることを確認した。その2TUを無改変のcheck.pyで解析し、3ファイル/2TUで命名・配置・format違反0件、未登録ソース・未解析ヘッダー0件を確認。

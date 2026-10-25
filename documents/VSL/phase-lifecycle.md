@@ -2,6 +2,8 @@
 
 RenderPass構成APIのPR #56に続く修正。frame slotはCommandBuffer・acquire用Semaphore・完了Fenceの添字、image_indexは取得したSwapchain画像・FrameBuffer・present用Semaphoreの添字として扱う。
 
+`DEFAULT_BUFFER_SIZE`は利用側とライブラリが共有する既定値で、CommandBufferの省略時個数とSwapchainの要求画像数に使う。変更する場合は、それらを生成する前に正の値を設定する。既存オブジェクトの個数は変更せず、明示したCommandBufferの個数も優先する。
+
 - `DefaultPhase::get_current_index()` はframe slot、`get_image_index()` は取得画像番号。取得前のimage_indexはUINT32_MAX。
 - 旧RenderPassBeginも取得画像番号を参照する。新Beginの明示target_indexはそのまま優先する。
 - present用SemaphoreはSwapchain画像単位で用意する。ユーザーが渡すcalculation_finishも実画像枚数分が必要。省略時はSwapchainが保持するSemaphoreを利用する。

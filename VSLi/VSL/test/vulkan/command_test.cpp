@@ -2,6 +2,23 @@
 
 namespace {
     using CommandVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+    TEST_F(CommandVulkanIntegrationTest, DefaultBufferCountAgreesAcrossTheCallerAndLibrary) {
+        struct RestoreCount {
+            std::uint32_t previous = vsl::DEFAULT_BUFFER_SIZE;
+            ~RestoreCount() { vsl::DEFAULT_BUFFER_SIZE = previous; }
+        } restore;
+        auto pool = make_pool();
+        for (const auto count : {1u, 2u}) {
+            vsl::DEFAULT_BUFFER_SIZE = count;
+            vsl::CommandBuffer direct(pool);
+            auto manager = make_manager();
+            EXPECT_EQ(direct.get_size(), count);
+            EXPECT_EQ(manager.get_buffer().get_size(), count);
+            vsl::CommandBuffer explicit_count(pool, 4);
+            EXPECT_EQ(explicit_count.get_size(), 4u);
+        }
+    }
+
     TEST_F(CommandVulkanIntegrationTest, PoolAndBuffersShareExpectedOwnerAndCanReset) {
         auto pool = make_pool();
         vsl::CommandPool borrowed(pool.data_);

@@ -7,6 +7,7 @@
 #include <VSL/vulkan/command.hpp>
 #include <VSL/vulkan/phase.hpp>
 #include <VSL/vulkan/surface.hpp>
+#include <limits>
 #include <stdexcept>
 
 VSL_NAMESPACE::CommandPool::CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor device) {
@@ -58,7 +59,7 @@ void VSL_NAMESPACE::CommandBuffer::reset() {
 }
 
 void VSL_NAMESPACE::CommandBuffer::reset(std::uint32_t idx) {
-    data_->command_buffers[idx].reset();
+    data_->command_buffers.at(idx).reset();
 }
 
 VSL_NAMESPACE::impl::CommandBufferImpl::~CommandBufferImpl() {
@@ -97,7 +98,9 @@ std::uint32_t VSL_NAMESPACE::CommandManager::get_current_buffer_idx() {
 }
 
 VSL_NAMESPACE::CommandBuffer VSL_NAMESPACE::CommandManager::make_exclusive_buffer(size_t size) {
-    return CommandBuffer(CommandPool{data_->command_pool}, size);
+    if (size > std::numeric_limits<std::uint32_t>::max())
+        throw std::length_error("Command buffer count exceeds uint32_t");
+    return CommandBuffer(CommandPool{data_->command_pool}, static_cast<std::uint32_t>(size));
 }
 void VSL_NAMESPACE::CommandManager::wait_idle() {
     data_->device->device.waitIdle();

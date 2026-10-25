@@ -1,6 +1,7 @@
 #include <AHO/core/color.hpp>
 #include <gtest/gtest.h>
 #include <cstdint>
+#include <limits>
 #include <sstream>
 #include <utility>
 #include "../support/color.hpp"
@@ -132,6 +133,11 @@ TEST(ColorContractTest, AlphaPreservingConversionsReturnCorrectSpaceAndChannels)
 #include "../support/unary_scalar.hpp"
 namespace {
     using namespace aho_test::arithmetic;
+    template<typename T>
+    class ColorIntegerEndpointTest : public testing::Test {};
+    using IntegerEndpointChannels = testing::Types<std::int8_t, std::uint8_t, std::int16_t, std::uint16_t,
+                                                   std::int32_t, std::uint32_t, std::int64_t, std::uint64_t>;
+
     template<class T>
     class ColorChannelArithmeticConstraintTest : public testing::Test {};
 
@@ -833,6 +839,66 @@ namespace {
         EXPECT_EQ(hsva.a.value, 0.5);
         aho_test::expect_rgba(R<double>(2) + A<double>(0.5), 2, 0, 0, 0.5);
         aho_test::expect_hsva(H<double>(120) + A<double>(0.5), 120, 0, 0, 0.5);
+    }
+    TYPED_TEST_SUITE(ColorIntegerEndpointTest, IntegerEndpointChannels);
+    TYPED_TEST(ColorIntegerEndpointTest, RgbToHsvPreservesZeroAndFullScaleChannels) {
+        using T = TypeParam;
+        auto check = []<typename F>() {
+            for (const F value : {F{0}, F{1}}) {
+                aho::color::RGB<F> source(value, 0, 0);
+                const auto result = source.template hsv<int, T>();
+                const T expected = value == 0 ? T{0} : std::numeric_limits<T>::max();
+                EXPECT_EQ(result.h.value, 0);
+                EXPECT_EQ(result.s.value, expected);
+                EXPECT_EQ(result.v.value, expected);
+            }
+        };
+        check.template operator()<float>();
+        check.template operator()<double>();
+    }
+    TYPED_TEST(ColorIntegerEndpointTest, HsvToRgbPreservesFullScalePrimaryColors) {
+        using T = TypeParam;
+        auto check = []<typename F>() {
+            for (const int hue : {0, 120, 240}) {
+                aho::color::HSV<int, F> source(hue, 1, 1);
+                const auto result = source.template rgb<T>();
+                const auto maximum = std::numeric_limits<T>::max();
+                EXPECT_EQ(result.r.value, hue == 0 ? maximum : T{0});
+                EXPECT_EQ(result.g.value, hue == 120 ? maximum : T{0});
+                EXPECT_EQ(result.b.value, hue == 240 ? maximum : T{0});
+            }
+        };
+        check.template operator()<float>();
+        check.template operator()<double>();
+    }
+    TYPED_TEST(ColorIntegerEndpointTest, RgbaToHsvaPreservesTransparentAndOpaqueBlack) {
+        using T = TypeParam;
+        auto check = []<typename F>() {
+            for (const F alpha : {F{0}, F{1}}) {
+                aho::color::RGBA<F> source(0, 0, 0, alpha);
+                const auto result = source.template hsva<int, T>();
+                EXPECT_EQ(result.a.value, alpha == 0 ? T{0} : std::numeric_limits<T>::max());
+                EXPECT_EQ(result.s.value, T{0});
+                EXPECT_EQ(result.v.value, T{0});
+            }
+        };
+        check.template operator()<float>();
+        check.template operator()<double>();
+    }
+    TYPED_TEST(ColorIntegerEndpointTest, HsvaToRgbaPreservesTransparentAndOpaqueBlack) {
+        using T = TypeParam;
+        auto check = []<typename F>() {
+            for (const F alpha : {F{0}, F{1}}) {
+                aho::color::HSVA<int, F> source(0, 0, 0, alpha);
+                const auto result = source.template rgba<T>();
+                EXPECT_EQ(result.a.value, alpha == 0 ? T{0} : std::numeric_limits<T>::max());
+                EXPECT_EQ(result.r.value, T{0});
+                EXPECT_EQ(result.g.value, T{0});
+                EXPECT_EQ(result.b.value, T{0});
+            }
+        };
+        check.template operator()<float>();
+        check.template operator()<double>();
     }
     TEST(ColorAlphaConversionTest, ExplicitIntegerTypesRoundTripAllChannels) {
         aho::color::RGBA<std::uint8_t> rgba(255, 0, 0, 128);

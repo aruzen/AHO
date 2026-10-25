@@ -26,6 +26,63 @@ namespace {
         EXPECT_EQ(input.definitions[1].binding, 2u);
     }
     using VertexInputVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+    TEST_F(VertexInputVulkanIntegrationTest, WideAttributesReserveBothLocationsWithinAndAcrossBindings) {
+        using enum vsl::data_format::FormatTypes;
+        for (const auto type : {SIGNED_FLOAT64_RGB, SIGNED_FLOAT64_RGBA, SIGNED_INT64_RGB, SIGNED_INT64_RGBA, UNSIGNED_INT64_RGB, UNSIGNED_INT64_RGBA}) {
+            const auto format = vsl::data_format::convert(type);
+            SCOPED_TRACE(static_cast<int>(type));
+            pl::VertexInput input;
+            input.add_shape({format, vsl::data_format::FLOAT});
+            input.add_shape({format, vsl::data_format::FLOAT});
+            auto layout = make_layout_state();
+            input.injection(layout);
+            const auto& info = layout.data_->info->vertex_input;
+            ASSERT_EQ(info.vertexAttributeDescriptionCount, 4u);
+            for (std::size_t i = 0; i < 4; ++i) {
+                EXPECT_EQ(info.pVertexAttributeDescriptions[i].location, (std::array{0u, 2u, 3u, 5u})[i]);
+                EXPECT_EQ(info.pVertexAttributeDescriptions[i].binding, i / 2);
+            }
+            EXPECT_EQ(info.pVertexAttributeDescriptions[1].offset, format.size());
+            EXPECT_EQ(info.pVertexAttributeDescriptions[3].offset, format.size());
+            pl::VertexInput explicit_input({{.layouts = {{format, 3}, {vsl::data_format::FLOAT}}},
+                                            {.layouts = {{format, 9}}},
+                                            {.layouts = {{vsl::data_format::FLOAT}}}});
+            explicit_input.injection(layout);
+            const auto& explicit_info = layout.data_->info->vertex_input;
+            ASSERT_EQ(explicit_info.vertexAttributeDescriptionCount, 4u);
+            for (std::size_t i = 0; i < 4; ++i)
+                EXPECT_EQ(explicit_info.pVertexAttributeDescriptions[i].location, (std::array{3u, 5u, 9u, 11u})[i]);
+        }
+    }
+    TEST_F(VertexInputVulkanIntegrationTest, ScalarAndPair64BitAndFourComponent32BitFormatsKeepOneLocation) {
+        using enum vsl::data_format::FormatTypes;
+        for (const auto type : {SIGNED_FLOAT64_R, SIGNED_FLOAT64_RG, SIGNED_INT64_R, SIGNED_INT64_RG, UNSIGNED_INT64_R, UNSIGNED_INT64_RG,
+                                SIGNED_FLOAT32_RGBA, SIGNED_INT32_RGBA, UNSIGNED_INT32_RGBA}) {
+            const auto format = vsl::data_format::convert(type);
+            pl::VertexInput input;
+            input.add_shape({format, vsl::data_format::FLOAT});
+            auto layout = make_layout_state();
+            input.injection(layout);
+            const auto& info = layout.data_->info->vertex_input;
+            ASSERT_EQ(info.vertexAttributeDescriptionCount, 2u);
+            EXPECT_EQ(info.pVertexAttributeDescriptions[0].location, 0u);
+            EXPECT_EQ(info.pVertexAttributeDescriptions[1].location, 1u);
+        }
+    }
+    TEST_F(VertexInputVulkanIntegrationTest, LocationExtentOverflowPreservesPreviouslyInjectedDescriptions) {
+        auto layout = make_layout_state();
+        pl::VertexInput valid;
+        valid.add(vsl::data_format::FLOAT);
+        valid.injection(layout);
+        const auto previous = layout.data_->info->vertex_input;
+        pl::VertexInput wide({{.layouts = {{vsl::data_format::FLOAT64_RGB, UINT32_MAX - 1}}}});
+        EXPECT_THROW(wide.injection(layout), vsl::exceptions::RuntimeException);
+        pl::VertexInput automatic({{.layouts = {{vsl::data_format::FLOAT, UINT32_MAX - 1}, {vsl::data_format::FLOAT}}}});
+        EXPECT_THROW(automatic.injection(layout), vsl::exceptions::RuntimeException);
+        EXPECT_EQ(layout.data_->info->vertex_input.pVertexAttributeDescriptions, previous.pVertexAttributeDescriptions);
+        EXPECT_EQ(layout.data_->info->vertex_input.pVertexBindingDescriptions, previous.pVertexBindingDescriptions);
+        EXPECT_EQ(layout.data_->info->vertex_input.vertexAttributeDescriptionCount, 1u);
+    }
     TEST_F(VertexInputVulkanIntegrationTest, InjectsExplicitAndAutomaticLocationsStridesAndOffsets) {
         pl::VertexInput input({{.layouts = {{vsl::data_format::FLOAT_RG, 3, 4}, {vsl::data_format::FLOAT_RGB}},
                                 .binding = 2,

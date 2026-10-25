@@ -27,7 +27,7 @@ namespace AHO_NAMESPACE::detail::geometry2d {
     template<typename P>
     Point convert(const P& p);
 
-    // 軸ごとの正の係数で縮小し、向き・交差・包含を保ちながらスケール差による潰れを避ける。
+    // 軸ごとに基数の冪で拡縮し、差と外積の桁あふれと不要な丸めを抑える。
     inline void normalize(std::span<Point> points);
 
     inline long double cross(Point a, Point b, Point c) {
@@ -73,11 +73,11 @@ namespace AHO_NAMESPACE::detail::geometry2d {
             x_scale = std::max(x_scale, std::abs(p.value.___AN1));
             y_scale = std::max(y_scale, std::abs(p.value.___AN2));
         }
+        const auto x_shift = x_scale > 0 ? -std::ilogb(x_scale) : 0;
+        const auto y_shift = y_scale > 0 ? -std::ilogb(y_scale) : 0;
         for (auto& p : points) {
-            if (x_scale > 0)
-                p.value.___AN1 /= x_scale;
-            if (y_scale > 0)
-                p.value.___AN2 /= y_scale;
+            p.value.___AN1 = std::scalbn(p.value.___AN1, x_shift);
+            p.value.___AN2 = std::scalbn(p.value.___AN2, y_shift);
         }
     }
 } // namespace AHO_NAMESPACE::detail::geometry2d

@@ -161,6 +161,31 @@ namespace {
         EXPECT_EQ(offset, std::numeric_limits<std::size_t>::max() - 1);
         EXPECT_EQ(storage, before);
     }
+    void expect_overlapping_value_copy(bool checked) {
+        struct Payload {
+            std::uint32_t values[4];
+            std::uint32_t tail;
+        } payload{{1, 2, 3, 4}, 5};
+        vsl::BufferAccessor::LocalBufferHolder mapped(nullptr, sizeof(payload.values), sizeof(std::uint32_t),
+                                                      reinterpret_cast<std::byte*>(&payload) + sizeof(std::uint32_t));
+        if (checked)
+            EXPECT_TRUE(mapped.copy(payload.values));
+        else
+            mapped.uncheck_copy(payload.values);
+        EXPECT_EQ(payload.values[0], 1u);
+        EXPECT_EQ(payload.values[1], 1u);
+        EXPECT_EQ(payload.values[2], 2u);
+        EXPECT_EQ(payload.values[3], 3u);
+    }
+
+    TEST(BufferCopyHelperTest, CheckedMappedValueCopiesPreserveOverlappingSource) {
+        expect_overlapping_value_copy(true);
+    }
+
+    TEST(BufferCopyHelperTest, UncheckedMappedValueCopiesPreserveOverlappingSource) {
+        expect_overlapping_value_copy(false);
+    }
+
     TEST(BufferCopyHelperTest, UncheckedCopyAppendsAndAdvancesItsOffset) {
         std::array<unsigned char, 12> storage{};
         const std::uint32_t first = 17, second = 29;

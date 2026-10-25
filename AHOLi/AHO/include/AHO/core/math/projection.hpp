@@ -21,7 +21,10 @@ namespace AHO_NAMESPACE::matrix {
             !std::isfinite(aspect) || aspect <= 0 || !std::isfinite(near_plane) || near_plane <= 0 ||
             !std::isfinite(far_plane) || far_plane <= near_plane)
             throw std::invalid_argument("Invalid perspective parameters");
-        const T focal = static_cast<T>(1 / std::tan(fov.value / 2));
+        const auto focal_value = 1 / std::tan(fov.value / 2);
+        if (!std::isfinite(focal_value) || focal_value > std::numeric_limits<T>::max())
+            throw std::invalid_argument("Perspective focal length cannot be represented in the selected scalar type");
+        const T focal = static_cast<T>(focal_value);
         const T ratio = near_plane / (far_plane - near_plane);
         const T far_ratio = far_plane / (far_plane - near_plane);
         constexpr T sign = handed == HandedCoordinate::LEFT ? T{1} : T{-1};
@@ -36,6 +39,10 @@ namespace AHO_NAMESPACE::matrix {
             result[2][2] = sign * (1 + 2 * ratio);
             result[2][3] = -(near_plane * far_ratio) * 2;
         }
+        if (!std::isfinite(result[0][0]) || !std::isfinite(result[1][1]) ||
+            !std::isfinite(result[2][2]) || !std::isfinite(result[2][3]) ||
+            result[0][0] == 0 || result[1][1] == 0)
+            throw std::invalid_argument("Perspective matrix cannot be represented in the selected scalar type");
         return detail::with_vector_convention<convention>(result);
     }
 

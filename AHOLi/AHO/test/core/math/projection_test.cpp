@@ -67,6 +67,41 @@ namespace {
         EXPECT_GT(matrix[3][2], 0);
         EXPECT_NEAR(aho::math::to_array(aho::matrix::project_point(matrix, aho::d3::PointF{0, 0, 1}))[2], 0, 1e-6);
     }
+    TYPED_TEST(ProjectionPolicyTest, FiniteInputsCannotProduceNonFiniteOrSingularPerspectiveCoefficients) {
+        using T = TypeParam;
+        const auto maximum = std::numeric_limits<T>::max();
+        const auto smallest = std::numeric_limits<T>::denorm_min();
+        const auto near_pi = std::nextafter(std::numbers::pi_v<long double>, 0.L);
+        auto check = [&]<aho::HandedCoordinate handed, aho::DepthRange depth, aho::ClipY y, aho::VectorConvention convention>() {
+            auto perspective = [](aho::Radian fov, T aspect, T near_plane, T far_plane) {
+                return aho::matrix::make_perspective<handed, depth, y, convention>(fov, aspect, near_plane, far_plane);
+            };
+            EXPECT_THROW(perspective(aho::Radian{smallest}, T{1}, T{1}, T{10}), std::invalid_argument);
+            EXPECT_THROW(perspective(aho::Radian{1}, smallest, T{1}, T{10}), std::invalid_argument);
+            EXPECT_THROW(perspective(aho::Radian{near_pi}, maximum, T{1}, T{10}), std::invalid_argument);
+            const auto near_plane = maximum / 2;
+            EXPECT_THROW(perspective(aho::Radian{1}, T{1}, near_plane, std::nextafter(near_plane, maximum)), std::invalid_argument);
+            const auto large = perspective(aho::Radian{1}, maximum, maximum / 16, maximum / 4);
+            EXPECT_GT(large[0][0], T{0});
+            EXPECT_LT(large[0][0], std::numeric_limits<T>::min());
+            for (const auto& row : large)
+                for (const auto coefficient : row)
+                    EXPECT_TRUE(std::isfinite(coefficient));
+            constexpr T sign = handed == aho::HandedCoordinate::LEFT ? T{1} : T{-1};
+            const auto near = aho::math::to_array(aho::matrix::project_point<convention>(large, aho::d3::Point<T>{0, 0, sign * (maximum / 16)}));
+            const auto far = aho::math::to_array(aho::matrix::project_point<convention>(large, aho::d3::Point<T>{0, 0, sign * (maximum / 4)}));
+            EXPECT_NEAR(near[2], depth == aho::DepthRange::ZERO_TO_ONE ? 0 : -1, 16 * std::numeric_limits<T>::epsilon());
+            EXPECT_NEAR(far[2], 1, 16 * std::numeric_limits<T>::epsilon());
+        };
+        using H = aho::HandedCoordinate;
+        using D = aho::DepthRange;
+        using Y = aho::ClipY;
+        using C = aho::VectorConvention;
+        check.template operator()<H::LEFT, D::ZERO_TO_ONE, Y::UP, C::COLUMN>();
+        check.template operator()<H::LEFT, D::NEGATIVE_ONE_TO_ONE, Y::DOWN, C::ROW>();
+        check.template operator()<H::RIGHT, D::ZERO_TO_ONE, Y::DOWN, C::ROW>();
+        check.template operator()<H::RIGHT, D::NEGATIVE_ONE_TO_ONE, Y::UP, C::COLUMN>();
+    }
 } // namespace
 
 namespace {

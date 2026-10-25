@@ -3,6 +3,7 @@
 #include <array>
 #include <forward_list>
 #include <numbers>
+#include <limits>
 
 namespace {
     using P = aho::d2::PointD;
@@ -29,6 +30,26 @@ namespace {
         for (std::size_t i = 0; i < result->points().size(); ++i) {
             EXPECT_EQ(result->points()[i].value.___AN1, points[i].value.___AN1);
             EXPECT_EQ(result->points()[i].value.___AN2, points[i].value.___AN2);
+        }
+    }
+
+    TYPED_TEST(TriangulationCoordinateTest, PreservesContoursWithIndependentAxisScales) {
+        const auto wide = std::numeric_limits<long double>::max() / 16;
+        const auto narrow = std::numeric_limits<long double>::min() * 16;
+        for (const bool transpose : {false, true}) {
+            const auto x = transpose ? narrow : wide;
+            const auto y = transpose ? wide : narrow;
+            std::array points{TypeParam(0, 0), TypeParam(x, 0), TypeParam(x, y), TypeParam(0, y)};
+            for (const bool reverse : {false, true}) {
+                if (reverse)
+                    std::ranges::reverse(points);
+                const auto result = aho::triangulate(points);
+                ASSERT_TRUE(result) << "transpose=" << transpose << " reverse=" << reverse;
+                EXPECT_EQ(result->size(), 2u);
+                const auto expected = static_cast<double>(x * y);
+                // 積と二つの三角形面積の丸め差を許容する。
+                EXPECT_NEAR(result->area(), expected, 32 * std::numeric_limits<double>::epsilon() * expected);
+            }
         }
     }
 

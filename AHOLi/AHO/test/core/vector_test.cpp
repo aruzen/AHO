@@ -516,6 +516,33 @@ namespace {
             EXPECT_NEAR(space.get_normalized().length(), 1, tolerance);
         }
     }
+    TYPED_TEST(VectorFloatingLengthRangeTest, NormalizationPreservesDirectionAtTheFloatingPointRangeLimits) {
+        using T = TypeParam;
+        const auto tolerance = T{32} * std::numeric_limits<T>::epsilon();
+        const auto expect_unit = [&](auto source) {
+            const auto normalized = source.get_normalized();
+            const auto components = aho::math::to_array(normalized);
+            const auto expected = T{1} / std::sqrt(static_cast<T>(components.size()));
+            EXPECT_NEAR(normalized.length(), T{1}, tolerance);
+            for (std::size_t i = 0; i < components.size(); ++i)
+                EXPECT_NEAR(components[i], i == 1 ? -expected : expected, tolerance);
+            auto inplace = source;
+            EXPECT_EQ(&inplace.normalize(), &inplace);
+            EXPECT_NEAR(inplace.length(), T{1}, tolerance);
+            const auto inplace_components = aho::math::to_array(inplace);
+            for (std::size_t i = 0; i < inplace_components.size(); ++i)
+                EXPECT_NEAR(inplace_components[i], i == 1 ? -expected : expected, tolerance);
+        };
+        using XZ = aho::coordinate::MakeCoordinateInfo<true, false, true>::Value;
+        using YZ = aho::coordinate::MakeCoordinateInfo<false, true, true>::Value;
+        for (const auto scale : {std::numeric_limits<T>::max(), std::numeric_limits<T>::denorm_min()}) {
+            expect_unit(aho::Vector_<T, vsl::D2>{scale, -scale});
+            expect_unit(aho::Vector_<T, vsl::D2, XZ>{scale, -scale});
+            expect_unit(aho::Vector_<T, vsl::D2, YZ>{scale, -scale});
+            expect_unit(aho::Vector_<T, vsl::D3>{scale, -scale, scale});
+        }
+    }
+
     TYPED_TEST(VectorTest, LengthAndLessThanUseMagnitude) {
         using V = typename TypeParam::Vector;
         const auto value = aho_test::geometry<V>(-3, 4, 12);

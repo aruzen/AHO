@@ -57,6 +57,24 @@ namespace {
         EXPECT_EQ(mapped.offset, 0u);
         mapped.flush();
     }
+    TEST_F(BufferVulkanIntegrationTest, MappedPointerCopiesPreserveOverlappingSourceRanges) {
+        if (!host_coherent_available())
+            GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
+        const std::array<std::uint32_t, 8> initial{1, 2, 3, 4, 5, 6, 7, 8};
+        HostBuffer buffer(device, initial);
+        auto whole = buffer.data();
+        auto tail = buffer.data(6 * sizeof(std::uint32_t), sizeof(std::uint32_t));
+        EXPECT_TRUE(tail.copy(static_cast<std::uint32_t*>(whole.data), std::size_t{6}));
+        std::array<std::uint32_t, 8> actual{};
+        std::memcpy(actual.data(), whole.data, sizeof(actual));
+        EXPECT_EQ(actual, (std::array<std::uint32_t, 8>{1, 1, 2, 3, 4, 5, 6, 8}));
+        ASSERT_TRUE(buffer.copy(initial));
+        auto head = buffer.data(6 * sizeof(std::uint32_t));
+        EXPECT_TRUE(head.copy(static_cast<std::uint32_t*>(whole.data) + 1, std::size_t{6}));
+        std::memcpy(actual.data(), whole.data, sizeof(actual));
+        EXPECT_EQ(actual, (std::array<std::uint32_t, 8>{2, 3, 4, 5, 6, 7, 7, 8}));
+    }
+
     TEST_F(BufferVulkanIntegrationTest, PointerConstructorAndPointerCopyPreserveArrayContents) {
         if (!host_coherent_available())
             GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
@@ -143,6 +161,31 @@ namespace {
         EXPECT_EQ(offset, std::numeric_limits<std::size_t>::max() - 1);
         EXPECT_EQ(storage, before);
     }
+    void expect_overlapping_value_copy(bool checked) {
+        struct Payload {
+            std::uint32_t values[4];
+            std::uint32_t tail;
+        } payload{{1, 2, 3, 4}, 5};
+        vsl::BufferAccessor::LocalBufferHolder mapped(nullptr, sizeof(payload.values), sizeof(std::uint32_t),
+                                                      reinterpret_cast<std::byte*>(&payload) + sizeof(std::uint32_t));
+        if (checked)
+            EXPECT_TRUE(mapped.copy(payload.values));
+        else
+            mapped.uncheck_copy(payload.values);
+        EXPECT_EQ(payload.values[0], 1u);
+        EXPECT_EQ(payload.values[1], 1u);
+        EXPECT_EQ(payload.values[2], 2u);
+        EXPECT_EQ(payload.values[3], 3u);
+    }
+
+    TEST(BufferCopyHelperTest, CheckedMappedValueCopiesPreserveOverlappingSource) {
+        expect_overlapping_value_copy(true);
+    }
+
+    TEST(BufferCopyHelperTest, UncheckedMappedValueCopiesPreserveOverlappingSource) {
+        expect_overlapping_value_copy(false);
+    }
+
     TEST(BufferCopyHelperTest, UncheckedCopyAppendsAndAdvancesItsOffset) {
         std::array<unsigned char, 12> storage{};
         const std::uint32_t first = 17, second = 29;

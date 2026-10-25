@@ -12,14 +12,20 @@ VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(VSL_NAMESPACE::Buff
 
 VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(VSL_NAMESPACE::BufferAccessor* buffer, VSL_NAMESPACE::ImageAccessor image,
                                                              ImageLayout layout, ImageRegion region, bool host_read)
-    : image(std::move(image)), buffer(buffer), layout(layout), region(region), host_read(host_read),
-      _destination(buffer ? buffer->data_ : nullptr) {}
+    : CopyImageToBuffer(buffer ? buffer->data_ : nullptr, std::move(image), layout, region, host_read) {
+    this->buffer = buffer;
+}
 
 VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(std::shared_ptr<impl::BufferImpl> buffer,
                                                              VSL_NAMESPACE::ImageAccessor image, ImageLayout layout,
                                                              ImageRegion region, bool host_read)
+    : CopyImageToBuffer(buffer, std::move(image), layout, region, host_read, 0, buffer ? buffer->requirement_size : 0) {}
+
+VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(std::shared_ptr<impl::BufferImpl> buffer,
+                                                             VSL_NAMESPACE::ImageAccessor image, ImageLayout layout,
+                                                             ImageRegion region, bool host_read, std::size_t offset, std::size_t size)
     : image(std::move(image)), buffer(nullptr), layout(layout), region(region), host_read(host_read),
-      _destination(std::move(buffer)) {}
+      _destination(std::move(buffer)), _destination_offset(offset), _destination_size(size) {}
 
 VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer::Describe(ImageAccessor image, ImageRegion region) {
     if (!image.data_ || !image.data_->image || !image.data_->device)
@@ -59,8 +65,11 @@ VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer:
         throw std::invalid_argument("Host read requires host-visible buffer memory");
     if (layout != ImageLayout::GENERAL && layout != ImageLayout::TRANSFER_SRC_OPTIMAL)
         throw std::invalid_argument("Image copy requires General or TransferSrcOptimal layout");
-    if (info.byte_size > destination->requirement_size)
+    if (_destination_offset > destination->requirement_size ||
+        _destination_size > destination->requirement_size - _destination_offset || info.byte_size > _destination_size)
         throw std::out_of_range("Image copy exceeds destination buffer");
+    if (_destination_offset % info.format.size())
+        throw std::invalid_argument("Image copy destination offset must be aligned to the texel size");
     return info;
 }
 
@@ -75,6 +84,7 @@ void VSL_NAMESPACE::command::CopyImageToBuffer::invoke(CommandPool pool, Command
     buffer.retain(destination);
     const auto& area = info.region;
     vk::BufferImageCopy copy{
+        .bufferOffset = _destination_offset,
         .imageSubresource = {vk::ImageAspectFlagBits::eColor, 0, area.layer, 1},
         .imageOffset = {static_cast<std::int32_t>(area.x), static_cast<std::int32_t>(area.y), 0},
         .imageExtent = {area.width, area.height, 1}};
@@ -87,7 +97,7 @@ void VSL_NAMESPACE::command::CopyImageToBuffer::invoke(CommandPool pool, Command
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .buffer = destination->buffer,
-            .offset = 0,
+            .offset = _destination_offset,
             .size = info.byte_size};
         command.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost,
                                 {}, {}, barrier, {});

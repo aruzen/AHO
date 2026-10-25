@@ -1004,6 +1004,7 @@ namespace VSL_NAMESPACE::data_format {
             case FormatTypes::SIGNED_FLOAT64_RGBA:
                 return SIGNED_FLOAT64_RGBA;
             default:
+                break;
         }
         return UNDEFINED;
     }

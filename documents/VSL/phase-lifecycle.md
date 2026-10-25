@@ -2,6 +2,8 @@
 
 RenderPass構成APIのPR #56に続く修正。frame slotはCommandBuffer・acquire用Semaphore・完了Fenceの添字、image_indexは取得したSwapchain画像・FrameBuffer・present用Semaphoreの添字として扱う。
 
+`DEFAULT_BUFFER_SIZE`は利用側とライブラリが共有する既定値で、CommandBufferの省略時個数とSwapchainの要求画像数に使う。変更する場合は、それらを生成する前に正の値を設定する。既存オブジェクトの個数は変更せず、明示したCommandBufferの個数も優先する。
+
 - `DefaultPhase::get_current_index()` はframe slot、`get_image_index()` は取得画像番号。取得前のimage_indexはUINT32_MAX。
 - 旧RenderPassBeginも取得画像番号を参照する。新Beginの明示target_indexはそのまま優先する。
 - present用SemaphoreはSwapchain画像単位で用意する。ユーザーが渡すcalculation_finishも実画像枚数分が必要。省略時はSwapchainが保持するSemaphoreを利用する。
@@ -32,6 +34,7 @@ phase.present();
 ## 寿命管理の修正
 
 - CommandPoolは最後の所有者で破棄する。CommandBufferは使用した送信の完了後に解放し、その後poolを解放する。
+- CommandBufferの個数0は割当前にinvalid_argumentで拒否する。明示値と既定値の両方を対象とし、未割当状態の後処理ではnative freeを呼ばない。
 - 同期HolderからSynchroManagerへの参照はweak、deviceへの参照はsharedとする。HolderはManagerより長生きでき、Managerとの循環所有を作らない。
 - native Fence / Semaphoreは最後のHolderで解放する。明示destroyは対応する登録を安全に除去し、配列を空にするため繰り返し呼び出せる。同名の新しいHolderを古いHolderのdestroyで消さない。
 - GPUが参照中の同期オブジェクトの明示destroyは呼び出し側が避ける。

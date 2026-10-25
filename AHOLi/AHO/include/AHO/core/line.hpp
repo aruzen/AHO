@@ -94,7 +94,21 @@ namespace AHO_NAMESPACE {
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
     inline constexpr auto Line<R, D, CI>::length() const {
-        return (pos1 - pos2).length();
+        if constexpr (std::integral<R>) {
+            using Magnitude = std::make_unsigned_t<decltype(R{} - R{})>;
+            auto difference = [](R a, R b) -> Magnitude {
+                return a < b ? Magnitude(b) - Magnitude(a) : Magnitude(a) - Magnitude(b);
+            };
+            Vector_<Magnitude, D, CI> delta;
+            delta.value.___AN1 = difference(pos1.value.___AN1, pos2.value.___AN1);
+            if constexpr (D::DIMENSION >= 2)
+                delta.value.___AN2 = difference(pos1.value.___AN2, pos2.value.___AN2);
+            if constexpr (D::DIMENSION >= 3)
+                delta.value.___AN3 = difference(pos1.value.___AN3, pos2.value.___AN3);
+            return delta.length();
+        } else {
+            return (pos1 - pos2).length();
+        }
     };
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
@@ -143,7 +157,10 @@ namespace AHO_NAMESPACE {
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>
     inline constexpr auto PtrLine<R, D, CI>::length() const {
-        return (*pos1 - *pos2).length();
+        if constexpr (std::integral<R>)
+            return indirect().length();
+        else
+            return (*pos1 - *pos2).length();
     };
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI>

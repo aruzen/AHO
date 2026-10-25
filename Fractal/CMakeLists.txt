@@ -1,8 +1,7 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.30)
 project(Fractal VERSION 1.0 LANGUAGES CXX)
 
-# C++20を使用
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # リテラルの_がないことを無視する

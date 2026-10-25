@@ -8,6 +8,7 @@
 #include <VSL/vulkan/phase.hpp>
 #include <VSL/vulkan/surface.hpp>
 #include <limits>
+#include <stdexcept>
 
 VSL_NAMESPACE::CommandPool::CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor device) {
     data_ = std::shared_ptr<VSL_NAMESPACE::impl::CommandPoolImpl>(new VSL_NAMESPACE::impl::CommandPoolImpl);
@@ -23,6 +24,8 @@ VSL_NAMESPACE::CommandPool::CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor dev
 VSL_NAMESPACE::CommandPool::CommandPool(std::shared_ptr<VSL_NAMESPACE::impl::CommandPoolImpl> data) : data_(data) {}
 
 VSL_NAMESPACE::CommandBuffer::CommandBuffer(VSL_NAMESPACE::CommandPool pool, std::uint32_t size) {
+    if (!size)
+        throw std::invalid_argument("Command buffer count must be positive");
     data_ = std::shared_ptr<VSL_NAMESPACE::impl::CommandBufferImpl>(new VSL_NAMESPACE::impl::CommandBufferImpl);
     data_->command_pool = pool.data_;
 
@@ -63,7 +66,8 @@ VSL_NAMESPACE::impl::CommandBufferImpl::~CommandBufferImpl() {
     for (const auto& submission : submissions)
         if (submission && submission->status == Completion::Status::SUBMITTED)
             Completion{submission}.wait();
-    command_pool->device->device.freeCommandBuffers(command_pool->command_pool, this->command_buffers);
+    if (!command_buffers.empty())
+        command_pool->device->device.freeCommandBuffers(command_pool->command_pool, command_buffers);
 }
 
 VSL_NAMESPACE::CommandManager::CommandManager(std::shared_ptr<VSL_NAMESPACE::impl::CommandManagerImpl> data) : data_(data) {}

@@ -12,7 +12,7 @@ namespace VSL_NAMESPACE {
             auto data = std::make_shared<impl::FrameBufferImpl>();
             data->device = pass.data_->device;
             data->render_pass = pass.data_;
-            data->extent = {width, height};
+            data->extent = vk::Extent2D{width, height};
             data->layers = layers;
             return data;
         }

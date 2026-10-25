@@ -4,6 +4,7 @@
 #include <type_traits>
 #include <concepts>
 #include <optional>
+#include <tuple>
 
 namespace AHO_NAMESPACE::concepts {
     namespace helper {

@@ -246,5 +246,7 @@ VSL_NAMESPACE::impl::LogicalDeviceImpl::~LogicalDeviceImpl() {
 }
 
 template struct VSL_NAMESPACE::PhysicalDevices<VSL_NAMESPACE::PhysicalDevicesSercher>;
+template struct VSL_NAMESPACE::LogicalDeviceGraphicCreator<true>;
+template struct VSL_NAMESPACE::LogicalDeviceGraphicCreator<false>;
 template struct VSL_NAMESPACE::LogicalDevice<VSL_NAMESPACE::LogicalDeviceGraphicCreator<true>>;
 template struct VSL_NAMESPACE::LogicalDevice<VSL_NAMESPACE::LogicalDeviceGraphicCreator<false>>;

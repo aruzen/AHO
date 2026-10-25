@@ -20,6 +20,7 @@ namespace {
         std::string text;
     };
 } // namespace
+#if !defined(__cpp_impl_reflection) || __cpp_impl_reflection < 202506L
 template<>
 struct aho::x::MeshAttributeSchema<VertexData> {
     using Members = aho::x::MeshAttributeMembers<&VertexData::normal, &VertexData::uv0, &VertexData::uv1>;
@@ -36,6 +37,7 @@ template<>
 struct aho::x::MeshAttributeSchema<Label> {
     using Members = aho::x::MeshAttributeMembers<&Label::text>;
 };
+#endif
 
 namespace {
     using Polygon = aho::Polygon<float, vsl::D3>;

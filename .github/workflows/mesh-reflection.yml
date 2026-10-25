@@ -1,0 +1,57 @@
+name: Mesh C++26 reflection
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mesh-reflection-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install tools and headers
+        run: |
+          brew install gcc cmake ninja boost glfw glm pkgconf vulkan-headers vulkan-loader spirv-cross spirv-tools shaderc
+      - name: Build GTest with GCC
+        run: |
+          curl --fail --location --retry 3 https://github.com/google/googletest/archive/52eb8108c5bdec04579160ae17225d66034bd723.tar.gz -o "$RUNNER_TEMP/gtest.tar.gz"
+          mkdir -p "$RUNNER_TEMP/gtest-src"
+          tar -xzf "$RUNNER_TEMP/gtest.tar.gz" -C "$RUNNER_TEMP/gtest-src" --strip-components=1
+          cmake -S "$RUNNER_TEMP/gtest-src" -B "$RUNNER_TEMP/gtest-build" -G Ninja \
+            -DCMAKE_C_COMPILER="$(brew --prefix)/bin/gcc-16" \
+            -DCMAKE_CXX_COMPILER="$(brew --prefix)/bin/g++-16" \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_GMOCK=OFF \
+            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/gcc-deps"
+          cmake --build "$RUNNER_TEMP/gtest-build" --target install --parallel 2
+      - name: Configure with required reflection
+        run: |
+          mkdir -p thirdparty
+          curl --fail --location --retry 3 https://raw.githubusercontent.com/nothings/stb/003501f6d7a8668ce8b6d875e34dd97ad0d5d5b5/stb_image.h -o thirdparty/stb_image.h
+          curl --fail --location --retry 3 https://raw.githubusercontent.com/nothings/stb/003501f6d7a8668ce8b6d875e34dd97ad0d5d5b5/stb_image_write.h -o thirdparty/stb_image_write.h
+          cmake -S . -B build/reflection -G Ninja \
+            -DCMAKE_C_COMPILER="$(brew --prefix)/bin/gcc-16" \
+            -DCMAKE_CXX_COMPILER="$(brew --prefix)/bin/g++-16" \
+            -DAHO_HOME="$PWD/AHOLi/AHO" -DVSL_HOME="$PWD/VSLi/VSL" \
+            -DGTest_DIR="$RUNNER_TEMP/gcc-deps/lib/cmake/GTest" \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON \
+            -DAHO_ENABLE_EXPERIMENTAL_MESH=ON -DAHO_REQUIRE_MESH_REFLECTION=ON \
+            -DAHO_BUILD_MESH_EXAMPLE=ON -DSAITEKIKUUKAN_BUILD_REFLECTION_TESTS=ON
+      - name: Build libraries, Mesh and native reflection tests
+        run: cmake --build build/reflection --target AHOLi VSL aho-mesh-test aho-mesh-example reflection-test soa-reflection-test --parallel 2
+      - name: Test reflected Mesh
+        run: |
+          ctest --test-dir build/reflection --output-on-failure \
+            -R '^(AHO[.]Mesh[.]|AHO[.]Compile[.]Header[.](core[.]polygon|x[.]core[.](mesh|mesh_attributes))[.]hpp$|reflection-test$|soa-reflection-test$)'
+          ./build/reflection/AHOLi/aho-mesh-example

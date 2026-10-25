@@ -22,6 +22,9 @@ ARGS, TEST_ARGS = PARSER.parse_known_args()
 SPEC = importlib.util.spec_from_file_location('style_check', HERE / 'check.py')
 CHECK = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CHECK)
+CI_SPEC = importlib.util.spec_from_file_location('style_ci_scope', HERE / 'ci_scope.py')
+CI = importlib.util.module_from_spec(CI_SPEC)
+CI_SPEC.loader.exec_module(CI)
 
 
 class CheckerContracts(unittest.TestCase):
@@ -537,6 +540,256 @@ include([==[{HERE.parents[1] / 'cmake/StyleChecks.cmake'}]==])
         report = json.loads((self.root / 'build/style-report/report.json').read_text())
         changed = next(item for item in report['new'] if item['rule'] == 'aho-unparsed-header')
         self.assertNotEqual(old['key'], changed['key'])
+
+    def git(self, *arguments):
+        return subprocess.check_output(['git', *arguments], cwd=self.root, text=True).strip()
+
+    def commit(self):
+        self.git('add', '--all')
+        self.git('-c', 'user.name=Style Tests', '-c', 'user.email=style@example.invalid', 'commit', '-qm', 'fixture')
+        return self.git('rev-parse', 'HEAD')
+
+    def test_changed_sources_do_not_parse_unrelated_broken_translation_units(self):
+        changed, other = 'AHOLi/AHO/changed.cpp', 'AHOLi/AHO/broken.cpp'
+        command = self.prepare_cli({changed: 'int VALUE;\n', other: 'unknown_type BROKEN;\n'}, [changed, other])
+        base = self.commit()
+        (self.root / changed).write_text('int VALUE = 1;\n')
+        self.commit()
+        result = subprocess.run(command + ['--checks=layout', '--changed-since', base], text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads((self.root / 'build/style-report/report.json').read_text())
+        self.assertEqual((report['files'], report['translation_units'], report['dependency_scans']), (1, 1, 0))
+
+    def test_changed_sources_keep_all_compilation_variants(self):
+        file = 'VSLi/VSL/changed.cpp'
+        command = self.prepare_cli({file: 'int VALUE;\n'}, [file])
+        database = self.root / 'compile_commands.json'
+        entries = json.loads(database.read_text())
+        entries.append({**entries[0], 'arguments': [*entries[0]['arguments'], '-DFEATURE=1']})
+        database.write_text(json.dumps(entries))
+        base = self.commit()
+        (self.root / file).write_text('int VALUE = 2;\n')
+        self.commit()
+        result = subprocess.run(command + ['--checks=layout', '--changed-since', base], text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads((self.root / 'build/style-report/report.json').read_text())
+        self.assertEqual(report['translation_units'], 2)
+
+    def test_working_changes_include_index_worktree_untracked_and_rename_destination(self):
+        first, second = 'AHOLi/AHO/first.cpp', 'AHOLi/AHO/second.cpp'
+        old, deleted = 'AHOLi/AHO/old.cpp', 'AHOLi/AHO/deleted.hpp'
+        self.prepare_cli({file: 'int VALUE;\n' for file in [first, second, old, deleted]}, [first, second, old])
+        self.commit()
+        (self.root / first).write_text('int VALUE = 1;\n')
+        self.git('add', first)
+        (self.root / second).write_text('int VALUE = 2;\n')
+        renamed, untracked = 'AHOLi/AHO/renamed file.cpp', 'VSLi/VSL/new file.hpp'
+        (self.root / old).rename(self.root / renamed)
+        (self.root / deleted).unlink()
+        self.git('add', '--all', old, renamed, deleted)
+        (self.root / untracked).parent.mkdir(parents=True, exist_ok=True)
+        (self.root / untracked).write_text('#pragma once\n')
+        self.assertEqual(CHECK.changed_files(self.root), {first, second, renamed, untracked})
+
+    def test_no_code_changes_skip_tools_and_database(self):
+        command = self.prepare_cli({'AHOLi/AHO/first.cpp': 'int VALUE;\n'}, [])
+        base = self.commit()
+        (self.root / 'README.md').write_text('Documentation only\n')
+        self.commit()
+        for selection in [['--changed'], ['--changed-since', base]]:
+            result = subprocess.run([sys.executable, str(HERE / 'check.py'), '--root', str(self.root),
+                                     '--clang-format', 'missing-tool', *selection], text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            report = json.loads((self.root / 'build/style-report/report.json').read_text())
+            self.assertEqual((report['files'], report['translation_units']), (0, 0))
+
+    def test_header_dependencies_follow_macros_transitive_includes_and_all_active_variants(self):
+        header, bridge = 'AHOLi/AHO/detail with space.hpp', 'AHOLi/AHO/bridge.hpp'
+        first, other = 'AHOLi/AHO/first.cpp', 'AHOLi/AHO/other.cpp'
+        files = {header: '#pragma once\nstruct Example {};\n',
+                 bridge: '#define CHOSEN_HEADER "detail with space.hpp"\n#include CHOSEN_HEADER\n',
+                 first: '#if ACTIVE\n#include "bridge.hpp"\n#endif\nint VALUE;\n',
+                 other: '#include "generated.hpp"\nunknown_type BROKEN;\n'}
+        command = self.prepare_cli(files, [first, other])
+        database = self.root / 'compile_commands.json'
+        entries = json.loads(database.read_text())
+        source_entry = entries[0]
+        entries = [{**source_entry, 'arguments': [*source_entry['arguments'], '-DACTIVE=' + str(value)]}
+                   for value in [0, 1, 2]] + [entries[1]]
+        database.write_text(json.dumps(entries))
+        base = self.commit()
+        (self.root / header).write_text('''#pragma once
+struct Example {
+    int value() {
+        int result = 0;
+        result += 1;
+        result += 2;
+        result += 3;
+        return result;
+    }
+};
+''')
+        self.commit()
+        result = subprocess.run(command + ['--checks=layout', '--changed-since', base], text=True, capture_output=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        report = json.loads((self.root / 'build/style-report/report.json').read_text())
+        self.assertEqual((report['files'], report['translation_units'], report['dependency_scans']), (1, 2, 4))
+        self.assertEqual(report['unparsed_headers'], [])
+        self.assertEqual([(item['file'], item['rule']) for item in report['new']], [(header, 'aho-in-class-definition')])
+
+    def test_changed_unused_header_is_reported_without_parsing_unrelated_source(self):
+        header, source = 'AHOLi/AHO/unused.hpp', 'AHOLi/AHO/broken.cpp'
+        command = self.prepare_cli({header: '#pragma once\n', source: 'unknown_type VALUE;\n'}, [source])
+        base = self.commit()
+        (self.root / header).write_text('#pragma once\nstruct Example {};\n')
+        self.commit()
+        result = subprocess.run(command + ['--checks=layout', '--changed-since', base], text=True, capture_output=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        report = json.loads((self.root / 'build/style-report/report.json').read_text())
+        self.assertEqual(report['translation_units'], 0)
+        self.assertEqual(report['unparsed_headers'], [header])
+
+    def test_dependency_errors_fail_instead_of_skipping_the_header(self):
+        header, source = 'AHOLi/AHO/header.hpp', 'AHOLi/AHO/probe.cpp'
+        command = self.prepare_cli({header: '#pragma once\n', source: '#include "header.hpp"\n'}, [source])
+        database = self.root / 'compile_commands.json'
+        entries = json.loads(database.read_text())
+        entries[0]['arguments'].append('--aho-no-such-compiler-option')
+        database.write_text(json.dumps(entries))
+        result = subprocess.run(command + ['--checks=layout', header], text=True, capture_output=True)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn('ヘッダー依存の取得に失敗', result.stderr)
+
+    def test_pr_scope_uses_merge_base_when_base_branch_advances(self):
+        first, other = 'AHOLi/AHO/first.cpp', 'VSLi/VSL/other.cpp'
+        self.prepare_cli({first: 'int FIRST;\n', other: 'int OTHER;\n'}, [first, other])
+        common = self.commit()
+        (self.root / first).write_text('int FIRST = 1;\n')
+        head = self.commit()
+        self.git('checkout', '-qb', 'advanced-base', common)
+        (self.root / other).write_text('int OTHER = 2;\n')
+        base = self.commit()
+        self.git('checkout', '--detach', head)
+        result = CI.plan(self.root, 'pull_request', {'pull_request': {'base': {'sha': base}, 'head': {'sha': head}}})
+        self.assertEqual(result['base'], common)
+        self.assertEqual(result['files'], [first])
+        self.assertFalse(result['full'])
+        self.assertTrue(result['checks'])
+        self.assertFalse(result['contracts'])
+
+    def test_push_scope_keeps_all_pushed_commits_and_release_is_full(self):
+        first, other = 'AHOLi/AHO/first.cpp', 'VSLi/VSL/other.cpp'
+        self.prepare_cli({first: 'int FIRST;\n', other: 'int OTHER;\n'}, [first, other])
+        base = self.commit()
+        (self.root / first).write_text('int FIRST = 1;\n')
+        self.commit()
+        (self.root / other).write_text('int OTHER = 2;\n')
+        self.commit()
+        push = CI.plan(self.root, 'push', {'before': base})
+        self.assertEqual(push['files'], [first, other])
+        self.assertEqual(self.git('status', '--porcelain'), '')
+        manual = CI.plan(self.root, 'workflow_dispatch', {'inputs': {'full': 'false'}})
+        self.assertEqual(manual['files'], [other])
+        for event, payload in [('release', {}), ('workflow_dispatch', {'inputs': {'full': True}})]:
+            result = CI.plan(self.root, event, payload)
+            self.assertTrue(result['full'])
+            self.assertTrue(result['contracts'])
+            self.assertEqual(result['files'], [first, other])
+
+    def test_first_push_and_root_manual_run_treat_all_files_as_added(self):
+        file = 'AHOLi/AHO/first.cpp'
+        self.prepare_cli({file: 'int VALUE;\n'}, [file])
+        self.commit()
+        for event, payload in [('push', {'before': '0' * 40}), ('workflow_dispatch', {})]:
+            result = CI.plan(self.root, event, payload)
+            self.assertFalse(result['full'])
+            self.assertEqual(result['files'], [file])
+
+    def test_documentation_skips_environment_but_checker_changes_run_contracts(self):
+        self.prepare_cli({'AHOLi/AHO/first.cpp': 'int VALUE;\n'}, [])
+        base = self.commit()
+        (self.root / 'README.md').write_text('Documentation\n')
+        self.commit()
+        result = CI.plan(self.root, 'push', {'before': base})
+        self.assertFalse(result['needed'])
+        base = self.git('rev-parse', 'HEAD')
+        (self.root / 'tools/style').mkdir(parents=True)
+        (self.root / 'tools/style/check.py').write_text('# checker update\n')
+        self.commit()
+        result = CI.plan(self.root, 'push', {'before': base})
+        self.assertEqual(result['files'], [])
+        self.assertTrue(result['needed'])
+        self.assertTrue(result['contracts'])
+        self.assertFalse(result['checks'])
+
+    def test_cmake_incremental_and_full_targets_select_different_scopes(self):
+        first, other = 'AHOLi/AHO/first.cpp', 'AHOLi/AHO/other.cpp'
+        bad = "struct Example {\n    int value() {\n        int result = 0;\n        result += 1;\n        result += 2;\n        result += 3;\n        return result;\n    }\n};\n"
+        self.prepare_cli({first: 'int VALUE;\n', other: bad}, [first, other])
+        for file in [first, other]:
+            formatted = subprocess.check_output([ARGS.clang_format, str(self.root / file)])
+            (self.root / file).write_bytes(formatted)
+        base = self.commit()
+        (self.root / first).write_text('int VALUE = 1;\n')
+        self.commit()
+        (self.root / 'tools/style').mkdir(parents=True)
+        shutil.copy2(HERE / 'check.py', self.root / 'tools/style/check.py')
+        (self.root / 'CMakeLists.txt').write_text(f"""
+cmake_minimum_required(VERSION 3.30)
+project(StyleIncrementalFixture LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 26)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+add_library(probe OBJECT {first} {other})
+add_executable(aho-style-ast IMPORTED GLOBAL)
+set_property(TARGET aho-style-ast PROPERTY IMPORTED_LOCATION [==[{ARGS.ast_tool.resolve()}]==])
+set(Python3_EXECUTABLE [==[{sys.executable}]==])
+set(AHO_CLANG_FORMAT [==[{ARGS.clang_format}]==])
+set(AHO_CLANG_TIDY [==[{ARGS.clang_tidy}]==])
+include([==[{HERE.parents[1] / 'cmake/StyleChecks.cmake'}]==])
+""")
+        build = self.root / 'build/cmake'
+        configure = subprocess.run(['cmake', '-S', str(self.root), '-B', str(build), '-G', 'Ninja',
+                                    '-DAHO_STYLE_BASE_REF=' + base], text=True, capture_output=True)
+        self.assertEqual(configure.returncode, 0, configure.stdout + configure.stderr)
+        for target, expected in [('check-style', 0), ('check-style-full', 1)]:
+            result = subprocess.run(['cmake', '--build', str(build), '--target', target], text=True, capture_output=True)
+            self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+
+    def test_ci_scope_cli_writes_resolved_github_outputs_without_loading_style_tools(self):
+        import os
+        file = 'AHOLi/AHO/first.cpp'
+        self.prepare_cli({file: 'int VALUE;\n'}, [file])
+        directory = self.root / 'tools/style'
+        directory.mkdir(parents=True)
+        for name in ['ci_scope.py', 'check.py']:
+            shutil.copy2(HERE / name, directory / name)
+        base = self.commit()
+        (self.root / file).write_text('int VALUE = 1;\n')
+        self.commit()
+        event = self.root / 'event.json'
+        event.write_text(json.dumps({'before': base}))
+        output = self.root / 'outputs.txt'
+        result = subprocess.run([sys.executable, str(directory / 'ci_scope.py')], cwd=self.root,
+                                env={**os.environ, 'GITHUB_EVENT_NAME': 'push', 'GITHUB_EVENT_PATH': str(event),
+                                     'GITHUB_OUTPUT': str(output)}, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        values = dict(line.split('=', 1) for line in output.read_text().splitlines())
+        self.assertEqual(values, dict(full='false', base=base, checks='true', contracts='false', needed='true'))
+        report = json.loads((self.root / 'build/style-scope.json').read_text())
+        self.assertEqual(report['files'], [file])
+
+    def test_new_source_missing_from_database_still_fails_incremental_checks(self):
+        first, added = 'AHOLi/AHO/first.cpp', 'AHOLi/AHO/added.cpp'
+        command = self.prepare_cli({first: 'int VALUE;\n'}, [first])
+        base = self.commit()
+        (self.root / added).write_text('int OTHER;\n')
+        self.commit()
+        result = subprocess.run(command + ['--checks=layout', '--changed-since', base], text=True, capture_output=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        report = json.loads((self.root / 'build/style-report/report.json').read_text())
+        self.assertEqual(report['unmapped_sources'], [added])
+        self.assertEqual(report['new'][0]['rule'], 'aho-missing-command')
 
 
 if __name__ == '__main__':

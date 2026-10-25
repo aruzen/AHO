@@ -137,6 +137,11 @@ install(
 
 include(cmake/ExperimentalMesh.cmake)
 
+option(AHO_BUILD_TYPED_EXAMPLE "Build the Typed graphics example" OFF)
+if(AHO_BUILD_TYPED_EXAMPLE)
+    add_subdirectory(AHO/examples/typed)
+endif()
+
 if (BUILD_TESTING)
     add_subdirectory(AHO/test)
 endif ()

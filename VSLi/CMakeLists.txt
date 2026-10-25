@@ -11,6 +11,7 @@ add_library(VSL STATIC
         ./VSL/src/utils/spir_reflector.cpp
         VSL/src/utils/typed_shader.cpp
         VSL/src/utils/typed_resources.cpp
+        VSL/src/utils/typed_frame_resources.cpp
         VSL/src/utils/typed_push_constants.cpp
         VSL/src/utils/typed_block_validation.cpp
         ./VSL/src/utils/string.cpp
@@ -70,6 +71,7 @@ add_library(VSL STATIC
         VSL/include/VSL/utils/typed_batch.hpp
         VSL/include/VSL/utils/typed_shader.hpp
         VSL/include/VSL/utils/typed_resources.hpp
+        VSL/include/VSL/utils/typed_frame_resources.hpp
         VSL/include/VSL/utils/typed_descriptor_schema.hpp
         VSL/include/VSL/utils/typed_push_constants.hpp
         VSL/include/VSL/utils/typed_block_layout.hpp

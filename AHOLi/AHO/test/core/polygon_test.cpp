@@ -15,6 +15,14 @@ namespace {
     static_assert(aho::concepts::is_triangles_object<Mesh>);
     static_assert(std::same_as<decltype(std::declval<const Mesh&>().points()[0]), const P&>);
 
+    template<typename T>
+    class IntegerPolygonAreaTest : public testing::Test {};
+    using XZ = aho::coordinate::MakeCoordinateInfo<true, false, true>::Value;
+    using YZ = aho::coordinate::MakeCoordinateInfo<false, true, true>::Value;
+    using IntegerAreaPoints = testing::Types<
+        aho::d2::Point<std::int32_t>, aho::d2::Point<std::int32_t, XZ>, aho::d2::Point<std::int32_t, YZ>, aho::d3::Point<std::int32_t>,
+        aho::d2::Point<std::uint32_t>, aho::d2::Point<std::uint32_t, XZ>, aho::d2::Point<std::uint32_t, YZ>, aho::d3::Point<std::uint32_t>>;
+
     struct PolygonAllocationState {
         inline static std::size_t NEXT_ID = 0;
         inline static bool FAIL_NEXT = false;
@@ -84,6 +92,30 @@ namespace {
     template<typename T>
     auto PolygonAllocator<T>::select_on_container_copy_construction() const -> PolygonAllocator {
         return {};
+    }
+
+    TYPED_TEST_SUITE(IntegerPolygonAreaTest, IntegerAreaPoints);
+    TYPED_TEST(IntegerPolygonAreaTest, UnitDeterminantSurvivesEveryVertexOrderAndAreaAccumulation) {
+        using Polygon = aho::Polygon<typename TypeParam::ElementType, typename TypeParam::Dimension, typename TypeParam::CoordinateInfo>;
+        using Point = typename Polygon::PointType;
+        using R = typename Point::ElementType;
+        auto point = [](R first, R second) {
+            if constexpr (Point::Dimension::DIMENSION == 2)
+                return Point(first, second);
+            else
+                return Point(first, second, first - second);
+        };
+        const auto high = std::numeric_limits<R>::max();
+        const std::array points{point(0, 0), point(high - 1, high - 2), point(high, high - 1)};
+        const auto expected = Point::Dimension::DIMENSION == 2 ? .5 : std::sqrt(3.) / 2;
+        std::array<std::size_t, 3> order{0, 1, 2};
+        do {
+            const I triangle{{order[0]}, {order[1]}, {order[2]}};
+            const Polygon one(points, std::array{triangle});
+            EXPECT_DOUBLE_EQ(one.area(), expected);
+            const Polygon two(points, std::array{triangle, triangle});
+            EXPECT_DOUBLE_EQ(two.area(), 2 * expected);
+        } while (std::next_permutation(order.begin(), order.end()));
     }
 
     TEST(PolygonTest, DefaultMeshIsEmpty) {

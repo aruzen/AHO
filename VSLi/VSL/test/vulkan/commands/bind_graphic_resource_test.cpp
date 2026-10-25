@@ -24,6 +24,53 @@ namespace {
     bool DescriptorResourceLifetimeVulkanIntegrationTest::validate_vulkan() const {
         return true;
     }
+    TEST_F(DescriptorResourceLifetimeVulkanIntegrationTest, ExplicitPipelineBindsAcrossSeparateStreamExpressions) {
+        expect_validation_abort("");
+        for (const bool vector_resources : {false, true}) {
+            for (const bool shared_command : {false, true}) {
+                auto manager = make_manager();
+                auto phase = manager.start_phase<vsl::ComputePhase>();
+                phase << *pipeline;
+                auto command = std::make_shared<vsl::command::BindGraphicResource>(
+                    vector_resources ? vsl::command::BindGraphicResource(std::vector{resource}, vsl::graphic_resource::BindingDestination::COMPUTE, *pipeline)
+                                     : vsl::command::BindGraphicResource(resource, vsl::graphic_resource::BindingDestination::COMPUTE, *pipeline));
+                if (shared_command)
+                    phase << std::static_pointer_cast<vsl::command::Command>(command);
+                else
+                    phase << *command;
+                std::uint32_t base = 503 + 10 * vector_resources + shared_command;
+                phase << vsl::command::PushConstant(*layout, vsl::ShaderFlag::COMPUTE, base)
+                      << vsl::command::Dispatch(COUNT);
+                vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+                                          .dstAccessMask = vk::AccessFlagBits::eHostRead};
+                auto buffer = manager.get_buffer();
+                buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
+                    vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+                ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+                ASSERT_TRUE(phase.completion().wait());
+                auto mapped = output->data();
+                std::array<std::uint32_t, COUNT> actual;
+                std::memcpy(actual.data(), mapped.data, sizeof(actual));
+                ExpectSequence(actual, base);
+            }
+        }
+    }
+    TEST_F(DescriptorResourceLifetimeVulkanIntegrationTest, MissingContextRestoresTheConstructorPipelineWithoutKeepingImplicitState) {
+        vsl::ComputePipeline other(*layout);
+        vsl::command::BindGraphicResource explicit_command(resource, vsl::graphic_resource::BindingDestination::COMPUTE, *pipeline);
+        explicit_command.set_pipeline(other);
+        ASSERT_TRUE(explicit_command.pipeline);
+        EXPECT_EQ(explicit_command.pipeline->data_, other.data_);
+        explicit_command.set_pipeline(std::nullopt);
+        ASSERT_TRUE(explicit_command.pipeline);
+        EXPECT_EQ(explicit_command.pipeline->data_, pipeline->data_);
+        vsl::command::BindGraphicResource implicit_command(resource, vsl::graphic_resource::BindingDestination::COMPUTE);
+        implicit_command.set_pipeline(other);
+        ASSERT_TRUE(implicit_command.pipeline);
+        EXPECT_EQ(implicit_command.pipeline->data_, other.data_);
+        implicit_command.set_pipeline(std::nullopt);
+        EXPECT_FALSE(implicit_command.pipeline);
+    }
     TEST_F(DescriptorResourceLifetimeVulkanIntegrationTest, DispatchKeepsDescriptorBufferAndPipelineAliveUntilCompletion) {
         auto manager = make_manager();
         vsl::Completion completion;

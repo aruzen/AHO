@@ -24,7 +24,11 @@ namespace VSL_NAMESPACE::command {
 
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
 
+        // ストリームの指定を優先し、空なら構築時のpipelineを使う。
         void set_pipeline(std::optional<PipelineAccessor> pipeline) override;
+
+    private:
+        std::optional<PipelineAccessor> _fallback_pipeline = pipeline;
     };
 } // namespace VSL_NAMESPACE::command
 

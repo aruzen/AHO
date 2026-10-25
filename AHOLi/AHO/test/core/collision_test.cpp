@@ -2,6 +2,7 @@
 #include <AHO/core/triangulation.hpp>
 #include <gtest/gtest.h>
 #include <array>
+#include <limits>
 
 namespace {
     using P = aho::d2::PointD;
@@ -28,6 +29,25 @@ namespace {
         EXPECT_TRUE(aho::collision::intersects(touching, shape));
         EXPECT_FALSE(aho::collision::intersects(shape, separated));
         EXPECT_FALSE(aho::collision::intersects(separated, shape));
+    }
+
+    TYPED_TEST(CollisionCoordinateTest, IndependentAxisScalesDoNotCollapseSeparatedShapes) {
+        using Triangle = aho::Triangle<long double, vsl::D2, typename TypeParam::CoordinateInfo>;
+        const auto wide = std::numeric_limits<long double>::max() / 16;
+        const auto narrow = std::numeric_limits<long double>::min() * 16;
+        for (const bool transpose : {false, true}) {
+            const auto x = transpose ? narrow : wide;
+            const auto y = transpose ? wide : narrow;
+            const Triangle shape{TypeParam(0, 0), TypeParam(x, 0), TypeParam(0, y)};
+            EXPECT_TRUE(aho::collision::contains(shape, TypeParam(x / 4, y / 4)));
+            const auto outside = transpose ? TypeParam(2 * x, y / 4) : TypeParam(x / 4, 2 * y);
+            EXPECT_FALSE(aho::collision::contains(shape, outside));
+            const auto dx = transpose ? 2 * x : 0;
+            const auto dy = transpose ? 0 : 2 * y;
+            const Triangle separated{TypeParam(dx, dy), TypeParam(dx + x, dy), TypeParam(dx, dy + y)};
+            EXPECT_FALSE(aho::collision::intersects(shape, separated));
+            EXPECT_FALSE(aho::collision::intersects(separated, shape));
+        }
     }
 
     auto rectangle(double x, double y, double w, double h) {

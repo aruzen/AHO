@@ -64,6 +64,9 @@ vk::Extent2D choose_swap_extent(const vk::SurfaceCapabilitiesKHR& capabilities, 
 
 VSL_NAMESPACE::Swapchain::Swapchain(VSL_NAMESPACE::LogicalDeviceAccessor device, std::shared_ptr<Surface> surface, std::optional<VSL_NAMESPACE::SwapchainAccessor> old,
                                     std::optional<int> width, std::optional<int> height, ImageType usage) {
+    if (old && (!old->data_ || !old->data_->swap_chain || old->data_->device != device.data_ ||
+                !surface || old->data_->surface != surface->data_))
+        throw std::invalid_argument("Old swapchain must be valid and use the same device and surface");
     data_ = std::shared_ptr<impl::SwapchainImpl>(new impl::SwapchainImpl);
     data_->device = device.data_;
     data_->surface = surface->data_;

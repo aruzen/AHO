@@ -50,6 +50,21 @@ namespace {
         }
     }
 
+    TYPED_TEST(CollisionCoordinateTest, AdjacentRepresentableCoordinatesRemainOutsideTheBoundary) {
+        using Triangle = aho::Triangle<long double, vsl::D2, typename TypeParam::CoordinateInfo>;
+        long double left = 2;
+        for (int i = 0; i < 4; ++i) {
+            const auto outside = std::nextafter(left, 0.L);
+            const Triangle shape{TypeParam(left, 0), TypeParam(left, 1), TypeParam(3, 0)};
+            EXPECT_TRUE(aho::collision::contains(shape, TypeParam(left, .5L)));
+            EXPECT_FALSE(aho::collision::contains(shape, TypeParam(outside, .5L)));
+            const Triangle separated{TypeParam(outside, 0), TypeParam(outside, 1), TypeParam(outside, .5L)};
+            EXPECT_FALSE(aho::collision::intersects(shape, separated));
+            EXPECT_FALSE(aho::collision::intersects(separated, shape));
+            left = outside;
+        }
+    }
+
     auto rectangle(double x, double y, double w, double h) {
         return aho::triangulate(std::array{P(x, y), P(x + w, y), P(x + w, y + h), P(x, y + h)}).value();
     }

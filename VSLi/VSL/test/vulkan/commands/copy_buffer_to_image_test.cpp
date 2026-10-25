@@ -1,4 +1,5 @@
 #include "support/image_transfer_fixture.hpp"
+#include <VSL/vulkan/commands/image_readback.hpp>
 namespace {
     class ImageUploadRangeVulkanIntegrationTest : public vsl_test::ImageTransferVulkanIntegrationTest {
         bool validate_vulkan() const override;
@@ -8,6 +9,47 @@ namespace {
 
     bool ImageUploadRangeVulkanIntegrationTest::validate_vulkan() const {
         return true;
+    }
+    TEST_F(ImageUploadRangeVulkanIntegrationTest, AccessorRejectsAnEmptyImageBeforeRecording) {
+        vsl::ImageAccessor image;
+        vsl::StagingBuffer<> source(device, std::array<std::uint32_t, 1>{99});
+        auto manager = make_manager();
+        expect_validation_abort("");
+        EXPECT_THROW(image.copy_by_buffer(manager, &source, vsl::ImageLayout::GENERAL, 0), std::invalid_argument);
+        EXPECT_FALSE(has_validation_errors());
+    }
+    TEST_F(ImageUploadRangeVulkanIntegrationTest, AccessorRejectsNonexistentLayerWithoutOverwritingTheImage) {
+        TransferImage image(device, 1, 1, vsl::data_format::UNSIGNED_INT);
+        vsl::ImageAccessor accessor = image;
+        vsl::StagingBuffer<> source(device, std::array<std::uint32_t, 1>{99});
+        vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION> destination(device, sizeof(std::uint32_t));
+        auto manager = make_manager();
+        expect_validation_abort("");
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            transition(manager, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, {}, vk::AccessFlagBits::eTransferWrite);
+            auto buffer = manager.get_buffer();
+            buffer.data_->command_buffers[buffer.get_current_buffer_idx()].clearColorImage(
+                image.data_->image, vk::ImageLayout::eGeneral, vk::ClearColorValue(std::array<std::uint32_t, 4>{17, 0, 0, 0}),
+                vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+            transition(manager, image, vk::ImageLayout::eGeneral, vk::ImageLayout::eGeneral,
+                       vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eTransferWrite);
+        }
+        auto read_pixel = [&] {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << vsl::command::ImageReadback(&destination, image, vsl::ImageLayout::GENERAL);
+            EXPECT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            EXPECT_TRUE(phase.completion().wait());
+            auto mapped = destination.data();
+            std::uint32_t value = 0;
+            std::memcpy(&value, mapped.data, sizeof(value));
+            return value;
+        };
+        EXPECT_THROW(accessor.copy_by_buffer(manager, &source, vsl::ImageLayout::GENERAL, 1), std::out_of_range);
+        EXPECT_EQ(read_pixel(), 17u);
+        EXPECT_TRUE(accessor.copy_by_buffer(manager, &source, vsl::ImageLayout::GENERAL, 0));
+        EXPECT_EQ(read_pixel(), 99u);
+        EXPECT_FALSE(has_validation_errors());
     }
     TEST_F(ImageUploadRangeVulkanIntegrationTest, RejectsSourceSmallerThanOneImageLayerBeforeRecording) {
         TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT);

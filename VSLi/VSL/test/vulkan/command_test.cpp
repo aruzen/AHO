@@ -118,6 +118,39 @@ namespace {
 } // namespace
 
 namespace {
+    class CommandAllocationVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override;
+    };
+
+    bool CommandAllocationVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
+
+    TEST_F(CommandAllocationVulkanIntegrationTest, RejectsZeroBufferCountsBeforeCallingVulkan) {
+        // 検証エラーはテストを失敗させ、不正な割当・解放をdriverへ渡さない。
+        expect_validation_abort("");
+        auto pool = make_pool();
+        EXPECT_THROW((vsl::CommandBuffer(pool, 0)), std::invalid_argument);
+        struct RestoreCount {
+            std::uint32_t previous = vsl::DEFAULT_BUFFER_SIZE;
+            ~RestoreCount() { vsl::DEFAULT_BUFFER_SIZE = previous; }
+        } restore;
+        vsl::DEFAULT_BUFFER_SIZE = 0;
+        EXPECT_THROW((vsl::CommandBuffer(pool)), std::invalid_argument);
+    }
+
+    TEST_F(CommandAllocationVulkanIntegrationTest, UnallocatedStorageCanUnwindWithoutFreeingNativeBuffers) {
+        expect_validation_abort("");
+        auto pool = make_pool();
+        {
+            // 割当が失敗したconstructorの後処理と同じ、poolだけを保持した状態。
+            auto storage = std::make_shared<vsl::impl::CommandBufferImpl>();
+            storage->command_pool = pool.data_;
+        }
+    }
+} // namespace
+
+namespace {
     TEST_F(CommandResourceVulkanIntegrationTest, CancellationReleasesRetainedBuffersWhenTheTokenIsDropped) {
         auto manager = make_manager();
         std::weak_ptr<vsl::impl::BufferImpl> weak;

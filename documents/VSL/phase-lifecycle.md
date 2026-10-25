@@ -32,6 +32,7 @@ phase.present();
 ## 寿命管理の修正
 
 - CommandPoolは最後の所有者で破棄する。CommandBufferは使用した送信の完了後に解放し、その後poolを解放する。
+- CommandBufferの個数0は割当前にinvalid_argumentで拒否する。明示値と既定値の両方を対象とし、未割当状態の後処理ではnative freeを呼ばない。
 - 同期HolderからSynchroManagerへの参照はweak、deviceへの参照はsharedとする。HolderはManagerより長生きでき、Managerとの循環所有を作らない。
 - native Fence / Semaphoreは最後のHolderで解放する。明示destroyは対応する登録を安全に除去し、配列を空にするため繰り返し呼び出せる。同名の新しいHolderを古いHolderのdestroyで消さない。
 - GPUが参照中の同期オブジェクトの明示destroyは呼び出し側が避ける。

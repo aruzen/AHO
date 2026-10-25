@@ -15,7 +15,8 @@ if (VSL_TEST_SOURCES)
             reflection_texel_buffers.comp reflection_texel_arrays.comp
             reflection_input_attachment.frag reflection_input_arrays.frag
             reflection_vertex_arrays.vert reflection_vertex_array_shapes.vert
-            typed_components.vert typed_numeric.vert typed_wide.vert typed_runtime_descriptors.vert)
+            typed_batch.comp typed_batch_red.vert typed_block_layout.comp typed_block_arrays.comp typed_block_numeric.comp typed_push.vert typed_push_overlap.vert typed_push_overlap.frag typed_push_distinct.frag typed_push_partial.frag typed_push_resources.vert
+            typed_descriptors.vert typed_descriptors_relocated.vert typed_descriptors.comp typed_texture.frag typed_components.vert typed_numeric.vert typed_wide.vert typed_runtime_descriptors.vert)
         set(VSL_TEST_SHADER_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/shaders/${VSL_TEST_SHADER}.spv")
         set(VSL_TEST_SHADER_OPTIONS)
         if (VSL_TEST_SHADER MATCHES "\\.(rgen|rmiss|rint|rahit|rchit|rcall|task|mesh)$")
@@ -67,4 +68,85 @@ if (VSL_TEST_SOURCES)
             "-DTEST_CASE=${case}" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
         set_tests_properties("VSL.TypedPipeline.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
     endforeach()
+    set(typed_descriptor_names Valid WrongPayload WrongKind WrongArrayCount UnknownBinding WrongSet MissingSet
+        MissingBind DuplicateBinding DuplicateSet ZeroArrayCount RawSet RawBuffer)
+    foreach(case RANGE 0 12)
+        list(GET typed_descriptor_names ${case} name)
+        add_test(NAME "VSL.TypedDescriptor.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_descriptors.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=write|bind_resources|draw|Duplicate typed|Invalid typed"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.TypedDescriptor.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
+    add_library(vsl-descriptor-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_descriptors.cpp)
+    target_compile_definitions(vsl-descriptor-style-contract PRIVATE VSL_TYPED_CASE=0)
+    target_include_directories(vsl-descriptor-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
+    set(typed_push_names Valid WrongPayload MissingPayload ExtraPayload MissingDrawPush WrongSchema Overlap
+        MisalignedOffset MisalignedSize EmptyStages MissingDispatchPush WrongDispatchSchema)
+    foreach(case RANGE 0 11)
+        list(GET typed_push_names ${case} name)
+        add_test(NAME "VSL.TypedPush.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_push_constants.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=PushValues|push_constants|draw|dispatch|Overlapping typed push|Invalid typed push|Typed push stages"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.TypedPush.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
+    add_library(vsl-push-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_push_constants.cpp)
+    target_compile_definitions(vsl-push-style-contract PRIVATE VSL_TYPED_CASE=0)
+    target_include_directories(vsl-push-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
+    set(typed_block_names Valid MissingDescriptorMetadata MissingPushMetadata WrongMemberRecord MemberStorageOverflow
+        MemberOffsetOverflow InvalidMatrixDimensions IntegerMatrix InvalidMatrixStride ExtentOverflow ZeroArrayCapacity WrongBufferPayload InvalidFormatExtent)
+    foreach(case RANGE 0 12)
+        list(GET typed_block_names ${case} name)
+        add_test(NAME "VSL.TypedBlock.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_block_layout.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=Typed block|Typed descriptor|Typed push|TypedUniformBuffer|TypedResourceBuffer|constant expression"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.TypedBlock.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
+    add_library(vsl-block-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_block_layout.cpp)
+    target_compile_definitions(vsl-block-style-contract PRIVATE VSL_TYPED_CASE=0)
+    target_include_directories(vsl-block-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
+    set(typed_index_names Valid Uint8Index SignedIndex Uint64Index RawBuffer MissingResources MissingPush)
+    foreach(case RANGE 0 6)
+        list(GET typed_index_names ${case} name)
+        add_test(NAME "VSL.TypedIndex.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_index_buffer.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=index_element|draw_indexed"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.TypedIndex.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
+    add_library(vsl-index-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_index_buffer.cpp)
+    target_compile_definitions(vsl-index-style-contract PRIVATE VSL_TYPED_CASE=0)
+    target_include_directories(vsl-index-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
+    set(typed_view_names Valid WrongVertexRecord WrongDescriptorKind WrongDescriptorPayload RawVertexBuffer NegativeSubpass)
+    foreach(case RANGE 0 5)
+        list(GET typed_view_names ${case} name)
+        add_test(NAME "VSL.TypedView.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_buffer_view.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=bind_vertices|write|narrowed|narrowing"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.TypedView.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
+    add_library(vsl-view-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_buffer_view.cpp)
+    target_compile_definitions(vsl-view-style-contract PRIVATE VSL_TYPED_CASE=0)
+    target_include_directories(vsl-view-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
+    set(typed_batch_names Valid Empty MixedGraphicsCompute RawCommand InvalidCommand UnfinishedBinding)
+    foreach(case RANGE 0 5)
+        list(GET typed_batch_names ${case} name)
+        add_test(NAME "VSL.TypedBatch.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_batch.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=Typed batch requires"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.TypedBatch.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
+    add_library(vsl-batch-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_batch.cpp)
+    target_compile_definitions(vsl-batch-style-contract PRIVATE VSL_TYPED_CASE=0)
+    target_include_directories(vsl-batch-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
 endif ()

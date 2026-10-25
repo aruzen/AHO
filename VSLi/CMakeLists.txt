@@ -10,6 +10,9 @@ add_library(VSL STATIC
         ./VSL/src/window_plugin.cpp
         ./VSL/src/utils/spir_reflector.cpp
         VSL/src/utils/typed_shader.cpp
+        VSL/src/utils/typed_resources.cpp
+        VSL/src/utils/typed_push_constants.cpp
+        VSL/src/utils/typed_block_validation.cpp
         ./VSL/src/utils/string.cpp
         ./VSL/src/utils/shader_compiler.cpp
         VSL/src/vulkan/render_pass.cpp
@@ -61,7 +64,17 @@ add_library(VSL STATIC
         VSL/include/VSL/utils/typed_safe_resource.hpp
         VSL/include/VSL/utils/typed_vertex_layout.hpp
         VSL/include/VSL/utils/typed_pipeline.hpp
+        VSL/include/VSL/utils/typed_vertex_buffer.hpp
+        VSL/include/VSL/utils/typed_index_buffer.hpp
+        VSL/include/VSL/utils/typed_buffer_view.hpp
+        VSL/include/VSL/utils/typed_batch.hpp
         VSL/include/VSL/utils/typed_shader.hpp
+        VSL/include/VSL/utils/typed_resources.hpp
+        VSL/include/VSL/utils/typed_descriptor_schema.hpp
+        VSL/include/VSL/utils/typed_push_constants.hpp
+        VSL/include/VSL/utils/typed_block_layout.hpp
+        VSL/include/VSL/utils/typed_block_validation.hpp
+        VSL/include/VSL/utils/typed_compute.hpp
         VSL/include/VSL/utils/shader_compiler.hpp
         VSL/include/VSL/utils/spir_reflector.hpp
         VSL/include/VSL/utils/string.hpp

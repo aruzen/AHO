@@ -1,0 +1,23 @@
+find_program(AHO_TYPED_GLSLC NAMES glslc HINTS "$ENV{VULKAN_SDK}/bin" REQUIRED)
+foreach(header stb_image.h stb_image_write.h)
+    if(NOT EXISTS "${CMAKE_SOURCE_DIR}/thirdparty/${header}")
+        message(FATAL_ERROR "Typed example needs thirdparty/${header}; see thirdparty/setup.md")
+    endif()
+endforeach()
+set(typed_shaders)
+foreach(shader scene.vert scene.frag)
+    set(output "${CMAKE_CURRENT_BINARY_DIR}/shaders/${shader}.spv")
+    add_custom_command(OUTPUT "${output}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/shaders"
+        COMMAND "${AHO_TYPED_GLSLC}" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/${shader}" -o "${output}"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/shaders/${shader}" VERBATIM)
+    list(APPEND typed_shaders "${output}")
+endforeach()
+add_custom_target(aho-typed-example-shaders DEPENDS ${typed_shaders})
+add_executable(aho-typed-example main.cpp scene.cpp scene.hpp)
+add_dependencies(aho-typed-example aho-typed-example-shaders)
+target_compile_definitions(aho-typed-example PRIVATE AHO_TYPED_SHADER_DIR="${CMAKE_CURRENT_BINARY_DIR}/shaders")
+target_include_directories(aho-typed-example PRIVATE "${AHO_HOME}/include" "${VSL_HOME}/include" ${GLFW_INCLUDE_DIRS})
+target_link_directories(aho-typed-example PRIVATE ${GLFW_LIBRARY_DIRS})
+target_link_libraries(aho-typed-example PRIVATE AHOLi VSL)
+set_target_properties(aho-typed-example PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")

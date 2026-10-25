@@ -5,9 +5,12 @@
 #include <ranges>
 #include <stdexcept>
 
-VSL_NAMESPACE::command::BindVertexBufferAt::BindVertexBufferAt(std::uint32_t binding, const BufferAccessor& source)
-    : _binding(binding), _source(source.data_) {
-    if (_binding == UINT32_MAX || !_source || !VSL_NAMESPACE::contain(_source->usage, MemoryType::VERTEX_BUFFER))
+VSL_NAMESPACE::command::BindVertexBufferAt::BindVertexBufferAt(std::uint32_t binding, const BufferAccessor& source, size_t offset)
+    : BindVertexBufferAt(binding, source.data_, offset) {}
+
+VSL_NAMESPACE::command::BindVertexBufferAt::BindVertexBufferAt(std::uint32_t binding, std::shared_ptr<impl::BufferImpl> source, size_t offset)
+    : _binding(binding), _offset(offset), _source(std::move(source)) {
+    if (_binding == UINT32_MAX || !_source || offset >= _source->requirement_size || !VSL_NAMESPACE::contain(_source->usage, MemoryType::VERTEX_BUFFER))
         throw std::invalid_argument("BindVertexBufferAt requires a vertex buffer");
 }
 
@@ -15,7 +18,7 @@ void VSL_NAMESPACE::command::BindVertexBufferAt::invoke(CommandPool pool, Comman
     if (_source->device != manager.data_->device)
         throw std::invalid_argument("Vertex buffer and command manager use different devices");
     buffer.retain(_source);
-    buffer.data_->command_buffers[buffer.get_current_buffer_idx()].bindVertexBuffers(_binding, {_source->buffer}, {0});
+    buffer.data_->command_buffers[buffer.get_current_buffer_idx()].bindVertexBuffers(_binding, {_source->buffer}, {_offset});
 }
 
 void VSL_NAMESPACE::command::BindVertexBuffer::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {

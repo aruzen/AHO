@@ -9,11 +9,16 @@
 namespace VSL_NAMESPACE::command {
     // Explicit binding, with ownership retained even if the C++ buffer wrapper is destroyed.
     struct BindVertexBufferAt : Command {
-        BindVertexBufferAt(std::uint32_t binding, const BufferAccessor& source);
+        BindVertexBufferAt(std::uint32_t binding, const BufferAccessor& source, size_t offset = 0);
+        BindVertexBufferAt(std::uint32_t binding, std::shared_ptr<impl::BufferImpl> source, size_t offset = 0);
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
+        std::uint32_t binding() const { return _binding; }
+        size_t offset() const { return _offset; }
+        const std::shared_ptr<impl::BufferImpl>& source() const { return _source; }
 
     private:
         std::uint32_t _binding;
+        size_t _offset;
         std::shared_ptr<impl::BufferImpl> _source;
     };
 

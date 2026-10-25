@@ -1,3 +1,19 @@
+#if defined(AHO_CONTRACT_IMAGE_VSL_FIRST)
+#include <VSL/vulkan/image.hpp>
+#include <AHO/resource/image.hpp>
+#elif defined(AHO_CONTRACT_IMAGE_AHO_FIRST)
+#include <AHO/resource/image.hpp>
+#include <VSL/vulkan/image.hpp>
+#endif
+
+#if defined(AHO_CONTRACT_IMAGE_VSL_FIRST) || defined(AHO_CONTRACT_IMAGE_AHO_FIRST)
+void verify() {
+    aho::resource::Image image;
+    const auto pixels = image.data();
+    using GPUImage = vsl::Image<vsl::ImageType::SAMPLED>;
+    static_assert(sizeof(GPUImage) > 0);
+}
+#else
 #include <gtest/gtest.h>
 #include <AHO/resource/image.hpp>
 #include "../support/temp_directory.hpp"
@@ -72,3 +88,4 @@ namespace {
     }
 #endif
 } // namespace
+#endif

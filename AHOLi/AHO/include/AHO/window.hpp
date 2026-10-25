@@ -11,6 +11,7 @@
 
 #include "core/vector.hpp"
 #include "engine.hpp"
+#include "render_context.hpp"
 
 namespace AHO_NAMESPACE::window {
     d2::VectorI get_monitor_size();
@@ -36,6 +37,8 @@ namespace AHO_NAMESPACE::window {
 
         engine::EngineAccessor engine;
         std::shared_ptr<AHO_NAMESPACE::window::WindowData> data2;
+
+        RenderContext render_context() const;
 
         bool resize(d2::VectorI size);
 

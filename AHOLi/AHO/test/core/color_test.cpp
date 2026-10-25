@@ -137,6 +137,9 @@ namespace {
     class ColorIntegerEndpointTest : public testing::Test {};
     using IntegerEndpointChannels = testing::Types<std::int8_t, std::uint8_t, std::int16_t, std::uint16_t,
                                                    std::int32_t, std::uint32_t, std::int64_t, std::uint64_t>;
+    template<typename T>
+    class ColorNarrowHueTest : public testing::Test {};
+    using NarrowHueTypes = testing::Types<std::int8_t, std::uint8_t>;
 
     template<class T>
     class ColorChannelArithmeticConstraintTest : public testing::Test {};
@@ -896,6 +899,36 @@ namespace {
                 EXPECT_EQ(result.g.value, T{0});
                 EXPECT_EQ(result.b.value, T{0});
             }
+        };
+        check.template operator()<float>();
+        check.template operator()<double>();
+    }
+    TYPED_TEST_SUITE(ColorNarrowHueTest, NarrowHueTypes);
+    TYPED_TEST(ColorNarrowHueTest, UnrepresentableHueIsRejectedBeforeIntegerConversion) {
+        using H = TypeParam;
+        auto check = []<typename F>() {
+            aho::color::RGB<F> magenta(1, 0, 1);
+            aho::color::RGBA<F> opaque_magenta(1, 0, 1, 1);
+            EXPECT_THROW((magenta.template hsv<H, F>()), std::invalid_argument);
+            EXPECT_THROW((opaque_magenta.template hsva<H, F>()), std::invalid_argument);
+            EXPECT_EQ((magenta.template hsv<short, F>()).h.value, 300);
+            EXPECT_EQ((opaque_magenta.template hsva<short, F>()).h.value, 300);
+        };
+        check.template operator()<float>();
+        check.template operator()<double>();
+    }
+    TYPED_TEST(ColorNarrowHueTest, RepresentableHueAndFractionalAlphaRemainAvailable) {
+        using H = TypeParam;
+        auto check = []<typename F>() {
+            aho::color::RGB<F> green(0, 1, 0);
+            const auto hsv = green.template hsv<H, F>();
+            EXPECT_EQ(hsv.h.value, 120);
+            EXPECT_EQ(hsv.s.value, F{1});
+            EXPECT_EQ(hsv.v.value, F{1});
+            aho::color::RGBA<F> transparent_green(0, 1, 0, F{.5});
+            const auto hsva = transparent_green.template hsva<H, F>();
+            EXPECT_EQ(hsva.h.value, 120);
+            EXPECT_EQ(hsva.a.value, F{.5});
         };
         check.template operator()<float>();
         check.template operator()<double>();

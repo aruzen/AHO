@@ -101,7 +101,11 @@ void VSL_NAMESPACE::pipeline_layout::VertexInput::injection(VSL_NAMESPACE::Pipel
 
             vk::VertexInputAttributeDescription vertex_attribute_description;
             vertex_attribute_description.location = layout.location != (std::uint32_t)-1 ? layout.location : next_location;
-            next_location = vertex_attribute_description.location + 1;
+            // 64bitの3・4成分属性は連続する2 locationを占有する。
+            const auto locations = layout.format.to_vec<1>().size() == 8 && layout.format.get_vec_length() > 2 ? 2u : 1u;
+            if (vertex_attribute_description.location > std::numeric_limits<std::uint32_t>::max() - locations)
+                throw VSL_NAMESPACE::exceptions::RuntimeException("VertexInput", "Vertex attribute locations exceed uint32 range");
+            next_location = vertex_attribute_description.location + locations;
             vertex_attribute_description.binding = vertex_binding_description.binding;
             vertex_attribute_description.offset = layout.offset != (std::uint32_t)-1 ? layout.offset : next_offset;
             vertex_attribute_description.format = (vk::Format)layout.format.type();

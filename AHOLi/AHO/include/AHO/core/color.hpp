@@ -21,6 +21,11 @@ namespace AHO_NAMESPACE {
         template<typename H, typename SV = H>
         struct HSVA;
 
+        namespace detail {
+            template<typename T, typename FloatType>
+            constexpr T channel_from_normalized(FloatType value);
+        }
+
 #define RGB_ELEMENT_TYPE_DEFINITION_EXPANDER(Upper, Lower)                                      \
     template<typename T>                                                                        \
     struct Upper {                                                                              \
@@ -752,6 +757,20 @@ namespace AHO_NAMESPACE {
                 o.a.value};
         }
 
+        namespace detail {
+            template<typename T, typename FloatType>
+            constexpr T channel_from_normalized(FloatType value) {
+                if constexpr (std::is_integral_v<T>) {
+                    // 整数最大値を浮動小数点へ丸めると範囲外になり得るため、端点は直接返す。
+                    if (value == 1)
+                        return std::numeric_limits<T>::max();
+                    return static_cast<T>(std::round(value * std::numeric_limits<T>::max()));
+                } else {
+                    return static_cast<T>(value);
+                }
+            }
+        } // namespace detail
+
         template<typename ElementType_>
         template<typename H, typename SV>
         constexpr HSV<H, SV> RGB<ElementType_>::hsv() {
@@ -792,12 +811,7 @@ namespace AHO_NAMESPACE {
             if constexpr (std::is_integral_v<H>) {
                 h = std::round(h);
             }
-            if constexpr (std::is_integral_v<SV>) {
-                s = std::round(s * std::numeric_limits<SV>::max());
-                v = std::round(v * std::numeric_limits<SV>::max());
-            }
-
-            return {static_cast<H>(h), static_cast<SV>(s), static_cast<SV>(v)};
+            return {static_cast<H>(h), detail::channel_from_normalized<SV>(s), detail::channel_from_normalized<SV>(v)};
         }
 
         template<typename ElementType_>
@@ -877,18 +891,14 @@ namespace AHO_NAMESPACE {
         constexpr HSVA<H, SV> RGBA<ElementType_>::hsva() {
             using FloatType = std::conditional_t<
                 std::is_floating_point_v<ElementType_>, ElementType_, double>; // 浮動小数点型を確保
-            using ChannelType = ElementType_;
 
             FloatType a = static_cast<FloatType>(this->a.value);
 
             if constexpr (std::is_integral_v<ElementType_>)
                 a /= std::numeric_limits<ElementType_>::max();
 
-            if constexpr (std::is_integral_v<SV>)
-                a = std::round(a * std::numeric_limits<SV>::max());
-
             const auto hsv = this->template hsv<H, SV>();
-            return {hsv.h.value, hsv.s.value, hsv.v.value, static_cast<SV>(a)};
+            return {hsv.h.value, hsv.s.value, hsv.v.value, detail::channel_from_normalized<SV>(a)};
         }
 
         template<typename HueType_, typename SaturationAndValueType>
@@ -905,7 +915,6 @@ namespace AHO_NAMESPACE {
         constexpr RGB<T> HSV<HueType_, SaturationAndValueType>::rgb() {
             using FloatType = std::conditional_t<
                 std::is_floating_point_v<SaturationAndValueType>, SaturationAndValueType, double>; // 浮動小数点型を確保
-            using ChannelType = T;
 
             FloatType h = static_cast<FloatType>(this->h.value);
             FloatType s = static_cast<FloatType>(this->s.value);
@@ -951,14 +960,7 @@ namespace AHO_NAMESPACE {
             g += m;
             b += m;
 
-            if constexpr (std::is_integral_v<T>) {
-                constexpr T max_val = std::numeric_limits<T>::max();
-                return {static_cast<T>(std::round(r * max_val)),
-                        static_cast<T>(std::round(g * max_val)),
-                        static_cast<T>(std::round(b * max_val))};
-            } else {
-                return {static_cast<T>(r), static_cast<T>(g), static_cast<T>(b)};
-            }
+            return {detail::channel_from_normalized<T>(r), detail::channel_from_normalized<T>(g), detail::channel_from_normalized<T>(b)};
         }
 
         template<typename HueType_, typename SaturationAndValueType>
@@ -1020,7 +1022,6 @@ namespace AHO_NAMESPACE {
         constexpr RGBA<T> HSVA<HueType_, SaturationAndValueType>::rgba() {
             using FloatType = std::conditional_t<
                 std::is_floating_point_v<SaturationAndValueType>, SaturationAndValueType, double>; // 浮動小数点型を確保
-            using ChannelType = T;
 
             FloatType a = static_cast<FloatType>(this->a.value);
 
@@ -1029,9 +1030,7 @@ namespace AHO_NAMESPACE {
             }
 
             const auto rgb = this->template rgb<T>();
-            if constexpr (std::is_integral_v<T>)
-                a = std::round(a * std::numeric_limits<ChannelType>::max());
-            return {rgb.r.value, rgb.g.value, rgb.b.value, static_cast<ChannelType>(a)};
+            return {rgb.r.value, rgb.g.value, rgb.b.value, detail::channel_from_normalized<T>(a)};
         }
 
         template<typename T>

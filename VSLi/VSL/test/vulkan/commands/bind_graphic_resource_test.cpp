@@ -71,6 +71,31 @@ namespace {
         implicit_command.set_pipeline(std::nullopt);
         EXPECT_FALSE(implicit_command.pipeline);
     }
+    TEST_F(DescriptorResourceLifetimeVulkanIntegrationTest, EmptyBindingPreservesThePreviouslyBoundDescriptorSets) {
+        // 検証エラーはテストを失敗させ、不正なコマンドをdriverへ渡さない。
+        expect_validation_abort("");
+        auto manager = make_manager();
+        const std::uint32_t base = 421;
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << *pipeline
+                  << vsl::command::BindGraphicResource(resource, vsl::graphic_resource::BindingDestination::COMPUTE)
+                  << vsl::command::BindGraphicResource(std::vector<vsl::GraphicResource>{}, vsl::graphic_resource::BindingDestination::COMPUTE)
+                  << vsl::command::PushConstant(*layout, vsl::ShaderFlag::COMPUTE, base)
+                  << vsl::command::Dispatch(COUNT);
+            const auto buffer = manager.get_buffer();
+            vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+                                      .dstAccessMask = vk::AccessFlagBits::eHostRead};
+            buffer.data_->command_buffers[buffer.data_->current_buffer_idx].pipelineBarrier(
+                vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            ASSERT_TRUE(phase.completion().wait());
+        }
+        auto mapped = output->data();
+        std::array<std::uint32_t, COUNT> actual{};
+        std::memcpy(actual.data(), mapped.data, sizeof(actual));
+        ExpectSequence(actual, base);
+    }
     TEST_F(DescriptorResourceLifetimeVulkanIntegrationTest, DispatchKeepsDescriptorBufferAndPipelineAliveUntilCompletion) {
         auto manager = make_manager();
         vsl::Completion completion;

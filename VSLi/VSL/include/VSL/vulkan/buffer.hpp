@@ -137,14 +137,14 @@ namespace VSL_NAMESPACE {
         bool copy_with_shift_offset(void* data, size_t max_size, size_t& offset, const T& t, const Args&... args) {
             if (offset > max_size || sizeof(T) > max_size - offset)
                 return false;
-            memcpy(static_cast<char*>(data) + offset, &t, sizeof(T));
+            std::memmove(static_cast<char*>(data) + offset, &t, sizeof(T));
             offset += sizeof(T);
             return helper::copy_with_shift_offset(data, max_size, offset, args...);
         }
 
         template<typename T>
         void uncheck_copy_with_shift_offset(void* data, size_t& offset, const T& t) {
-            memcpy(static_cast<char*>(data) + offset, &t, sizeof(T));
+            std::memmove(static_cast<char*>(data) + offset, &t, sizeof(T));
             offset += sizeof(T);
         }
     } // namespace helper
@@ -220,7 +220,7 @@ namespace VSL_NAMESPACE {
             return false;
         if (size == 0)
             return true;
-        memcpy(data, t, sizeof(T) * size);
+        std::memmove(data, t, sizeof(T) * size);
         return true;
     }
 

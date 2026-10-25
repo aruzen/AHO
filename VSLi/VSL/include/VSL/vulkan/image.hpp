@@ -1,5 +1,5 @@
-#ifndef AHO_ALL_IMAGE_HPP
-#define AHO_ALL_IMAGE_HPP
+#ifndef VSL_VULKAN_IMAGE_HPP
+#define VSL_VULKAN_IMAGE_HPP
 #include "../define.hpp"
 #include "pv.hpp"
 

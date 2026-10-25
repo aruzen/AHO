@@ -88,4 +88,61 @@ namespace {
         EXPECT_THROW(invoke(vsl::ImageLayout::GENERAL, {1, 0, 0, 0}), std::invalid_argument);
         EXPECT_THROW(invoke(vsl::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, {0, 0, 1, 1}), std::invalid_argument);
     }
+
+    TEST_F(CopyImageToBufferVulkanIntegrationTest, HolderReadbackPreservesBytesOutsideItsRange) {
+        const std::array<std::uint32_t, 4> pixels{11, 22, 33, 44};
+        const std::array<std::uint32_t, 8> initial{91, 92, 93, 94, 95, 96, 97, 98};
+        TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT);
+        vsl::StagingBuffer<> source(device, pixels);
+        vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION> destination(device, initial);
+        auto manager = make_manager();
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            transition(manager, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, {},
+                       vk::AccessFlagBits::eTransferWrite);
+            phase << vsl::command::CopyBufferToImage(image, &source, vsl::ImageLayout::GENERAL);
+            transition(manager, image, vk::ImageLayout::eGeneral, vk::ImageLayout::eGeneral,
+                       vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eTransferRead);
+        }
+        manager.wait_idle();
+        auto holder = destination.data(sizeof(pixels), 2 * sizeof(std::uint32_t));
+        EXPECT_TRUE(holder.copy_by_image(manager, image));
+        manager.wait_idle();
+        auto result = destination.data();
+        std::array<std::uint32_t, 8> actual{};
+        const auto bytes = result.read(sizeof(actual));
+        std::memcpy(actual.data(), bytes.data(), bytes.size());
+        const std::array<std::uint32_t, 8> expected{91, 92, 11, 22, 33, 44, 97, 98};
+        EXPECT_EQ(actual, expected);
+    }
+
+    TEST_F(CopyImageToBufferVulkanIntegrationTest, HolderReadbackRejectsCapacitySmallerThanTheImage) {
+        TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT);
+        vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION> destination(device, std::size_t{32});
+        auto manager = make_manager();
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            transition(manager, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, {},
+                       vk::AccessFlagBits::eTransferRead);
+        }
+        manager.wait_idle();
+        auto holder = destination.data(sizeof(std::uint32_t), sizeof(std::uint32_t));
+        EXPECT_THROW(holder.copy_by_image(manager, image), std::out_of_range);
+        manager.wait_idle();
+    }
+
+    TEST_F(CopyImageToBufferVulkanIntegrationTest, HolderReadbackRejectsUnalignedTexelOffset) {
+        TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT);
+        vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION> destination(device, std::size_t{32});
+        auto manager = make_manager();
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            transition(manager, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, {},
+                       vk::AccessFlagBits::eTransferRead);
+        }
+        manager.wait_idle();
+        auto holder = destination.data(std::size_t{16}, 1);
+        EXPECT_THROW(holder.copy_by_image(manager, image), std::invalid_argument);
+        manager.wait_idle();
+    }
 } // namespace

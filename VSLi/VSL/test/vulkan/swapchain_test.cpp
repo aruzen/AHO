@@ -4,6 +4,37 @@ namespace {
     class SwapchainWindowIntegrationTest : public vsl_test::WindowIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+    TEST_F(SwapchainWindowIntegrationTest, EmptyOldAccessorIsRejectedBeforeNativeCreation) {
+        make_surface();
+        ASSERT_FALSE(HasFatalFailure());
+        EXPECT_THROW((vsl::Swapchain(device, surface, vsl::SwapchainAccessor{}, 64, 48)), std::invalid_argument);
+    }
+
+    TEST_F(SwapchainWindowIntegrationTest, OldSwapchainFromAnotherSurfaceIsRejectedWithoutRetiringIt) {
+        expect_validation_abort("");
+        make_surface();
+        ASSERT_FALSE(HasFatalFailure());
+        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+            GTEST_SKIP() << "Selected graphics queue cannot present to this surface";
+        vsl::Swapchain original(device, surface, std::nullopt, 64, 48);
+        vsl::PureWindow other("other swapchain surface", 64, 48);
+        struct CloseWindow {
+            vsl::PureWindow& window;
+            ~CloseWindow() {
+                window.data_->plugins.clear();
+                window.close();
+            }
+        } close{other};
+        auto other_surface = other.add_plugin<vsl::Surface>(vsl::VulkanAccessor{instance});
+        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, other_surface->data_->surface))
+            GTEST_SKIP() << "Selected graphics queue cannot present to the second surface";
+        EXPECT_THROW((vsl::Swapchain(device, other_surface, original, 64, 48)), std::invalid_argument);
+        auto acquired = device.data_->device.createFenceUnique({});
+        const auto index = device.data_->device.acquireNextImageKHR(original.data_->swap_chain, UINT64_MAX, nullptr, *acquired).value;
+        ASSERT_EQ(device.data_->device.waitForFences(*acquired, true, UINT64_MAX), vk::Result::eSuccess);
+        EXPECT_LT(index, original.images.size());
+    }
+
     TEST_F(SwapchainWindowIntegrationTest, CreatesImagesAndRecreatesUsingOldSwapchain) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());

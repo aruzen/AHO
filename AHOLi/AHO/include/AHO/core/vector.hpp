@@ -729,12 +729,22 @@ namespace AHO_NAMESPACE {
 
     template<typename R, typename CI>
     constexpr Vector_<R, VSL_NAMESPACE::D2, CI>& Vector_<R, VSL_NAMESPACE::D2, CI>::normalize() {
-        *this /= length();
+        if constexpr (std::floating_point<R>)
+            *this = get_normalized();
+        else
+            *this /= length();
         return *this;
     }
 
     template<typename R, typename CI>
     constexpr auto Vector_<R, VSL_NAMESPACE::D2, CI>::get_normalized() const {
+        if constexpr (std::floating_point<R>) {
+            const auto scale = std::max(std::abs(value.___AN1), std::abs(value.___AN2));
+            if (scale > 0 && std::isfinite(scale)) {
+                const auto scaled = *this / scale;
+                return scaled / scaled.length();
+            }
+        }
         return *this / length();
     }
 
@@ -876,12 +886,22 @@ namespace AHO_NAMESPACE {
 
     template<typename R, typename CI>
     constexpr Vector_<R, VSL_NAMESPACE::D3, CI>& Vector_<R, VSL_NAMESPACE::D3, CI>::normalize() {
-        *this /= length();
+        if constexpr (std::floating_point<R>)
+            *this = get_normalized();
+        else
+            *this /= length();
         return *this;
     }
 
     template<typename R, typename CI>
     constexpr auto Vector_<R, VSL_NAMESPACE::D3, CI>::get_normalized() const {
+        if constexpr (std::floating_point<R>) {
+            const auto scale = std::max({std::abs(value.___AN1), std::abs(value.___AN2), std::abs(value.___AN3)});
+            if (scale > 0 && std::isfinite(scale)) {
+                const auto scaled = *this / scale;
+                return scaled / scaled.length();
+            }
+        }
         return *this / length();
     }
 

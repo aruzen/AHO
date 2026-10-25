@@ -8,6 +8,7 @@ RenderPass構成のPR #56、PhaseのPR #105に続く変更。AHOのImageReadback
 - `Buffer::data()`: 割当全体を初回だけmapし、Bufferの共有ストレージが破棄されるまで維持する。複数のholderやBufferのコピーはmapを共有する。holder自身もストレージを保持する。
 - `LocalBufferHolder::read(bytes, offset)` / `write(bytes, offset)`: holder内の相対範囲を検証し、readはinvalidate、writeはコピー後flushを行う。非coherentの範囲はatom境界へ拡張する。GPU完了待ちは呼び出し側の責務。spanの利用中はholderまたはBufferを保持する。
 - `LocalBufferHolder::flush()` / `flush(bytes, offset)` / `invalidate(bytes, offset)`: dataポインタへ直接アクセスした場合のキャッシュ操作。長寿命holderではGPUによる更新後にもreadまたはinvalidateを呼ぶ。
+- `LocalBufferHolder::copy_by_image(manager, image)`: GENERAL配置の画像の先頭レイヤーをholderのoffsetへ読み戻す。holderのsizeを超える転送やtexelサイズに整列しないoffsetは記録前に拒否する。転送後のhost可視性を確保するが、CPUで読む前にGPU完了待ちは別途必要。holder外の領域は変更しない。
 - `BufferAccessor::size()` / `requested_size()`: 要求した論理サイズ。masterのサイズ検証と戻り値の契約を維持する。
 - `CommandManager::independent(count)`: 同じdevice / queueを使う独立したpoolとCommandBuffer群を作る。元managerで記録中のCommandBufferをresetしない。
 - `CommandManager::get_device()` / `ImageAccessor::get_device()`: 公開Accessor同士でdeviceの整合性を確認できる。

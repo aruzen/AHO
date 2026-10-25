@@ -50,7 +50,7 @@ namespace VSL_NAMESPACE::command {
                     else if constexpr (std::is_same_v<T, ClearUint>)
                         result.color = vk::ClearColorValue(std::array<std::uint32_t, 4>{v.r, v.g, v.b, v.a});
                     else
-                        result.depthStencil = {.depth = v.depth, .stencil = v.stencil};
+                        result.depthStencil = vk::ClearDepthStencilValue{.depth = v.depth, .stencil = v.stencil};
                 },
                 value);
             return result;

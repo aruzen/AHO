@@ -4,11 +4,13 @@ AHO/VSLの整形・命名・宣言/実装の配置を検査します。検査は
 
 ## 実行
 
-通常のビルド依存に加えて、LLVM 20のclang-format・clang-tidy・Clang/LLVM開発ライブラリとPython 3.10以上が必要です。macOSでは`brew install llvm@20`で用意できます。Vulkan SDK等の通常のヘッダー検索設定も有効にしてください。
+通常のビルド依存に加えて、LLVM 20のclang-format・clang-tidy・Clang/LLVM開発ライブラリとPython 3.10以上が必要です。CMakeは3.30以上、製品・検査ツール・コンパイル契約の言語モードは[C++26](cxx-standard.md)で統一します。macOSでは`brew install llvm@20`で用意できます。Vulkan SDK等の通常のヘッダー検索設定も有効にしてください。
 
 ```sh
 export PATH="$(brew --prefix llvm@20)/bin:$PATH"
 cmake -S . -B build/style \
+  -DCMAKE_C_COMPILER="$(brew --prefix llvm@20)/bin/clang" \
+  -DCMAKE_CXX_COMPILER="$(brew --prefix llvm@20)/bin/clang++" \
   -DAHO_HOME="$PWD/AHOLi/AHO" -DVSL_HOME="$PWD/VSLi/VSL" \
   -DBUILD_TESTING=ON -DAHO_STYLE_CHECKS=ON -DCMAKE_BUILD_TYPE=Release \
   -DAHO_ENABLE_EXPERIMENTAL_MESH=ON -DAHO_BUILD_MESH_EXAMPLE=ON \

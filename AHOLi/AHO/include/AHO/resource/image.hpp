@@ -2,8 +2,8 @@
 // Created by morimoto_hibiki on 2025/07/10.
 //
 
-#ifndef AHO_ALL_IMAGE_HPP
-#define AHO_ALL_IMAGE_HPP
+#ifndef AHO_RESOURCE_IMAGE_HPP
+#define AHO_RESOURCE_IMAGE_HPP
 
 #include "AHO/define.hpp"
 
@@ -31,4 +31,4 @@ namespace AHO_NAMESPACE::resource {
     };
 } // namespace AHO_NAMESPACE::resource
 
-#endif //AHO_ALL_IMAGE_HPP
+#endif //AHO_RESOURCE_IMAGE_HPP

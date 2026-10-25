@@ -42,5 +42,5 @@ void VSL_NAMESPACE::command::BindGraphicResource::invoke(CommandPool pool, Comma
 }
 
 void VSL_NAMESPACE::command::BindGraphicResource::set_pipeline(std::optional<PipelineAccessor> pipeline) {
-    this->pipeline = pipeline;
+    this->pipeline = pipeline ? pipeline : _fallback_pipeline;
 }

@@ -60,14 +60,32 @@ namespace VSL_NAMESPACE::typed {
     };
     template<typename Scalar, size_t components>
     struct BlockVector {
-        static_assert(components > 0 && components <= 4 && BlockLayout<Scalar>::LAYOUT.kind == BlockKind::SCALAR && BlockLayout<Scalar>::LAYOUT.size == sizeof(Scalar));
-        static constexpr BlockType LAYOUT{.kind = BlockKind::VECTOR, .numeric = BlockLayout<Scalar>::LAYOUT.numeric, .width = BlockLayout<Scalar>::LAYOUT.width, .components = components, .size = components * sizeof(Scalar)};
+        static_assert(components > 0 && components <= 4 &&
+                      BlockLayout<Scalar>::LAYOUT.kind == BlockKind::SCALAR &&
+                      BlockLayout<Scalar>::LAYOUT.size == sizeof(Scalar));
+        static constexpr BlockType LAYOUT{
+            .kind = BlockKind::VECTOR,
+            .numeric = BlockLayout<Scalar>::LAYOUT.numeric,
+            .width = BlockLayout<Scalar>::LAYOUT.width,
+            .components = components,
+            .size = components * sizeof(Scalar)};
     };
     template<typename Scalar, size_t columns, size_t rows, size_t stride = sizeof(Scalar) * rows, bool row_major = false>
     struct BlockMatrix {
-        static_assert(columns >= 2 && columns <= 4 && rows >= 2 && rows <= 4 && BlockLayout<Scalar>::LAYOUT.kind == BlockKind::SCALAR && BlockLayout<Scalar>::LAYOUT.size == sizeof(Scalar) && BlockLayout<Scalar>::LAYOUT.numeric == BlockNumeric::FLOATING_POINT,
+        static_assert(columns >= 2 && columns <= 4 && rows >= 2 && rows <= 4 &&
+                          BlockLayout<Scalar>::LAYOUT.kind == BlockKind::SCALAR &&
+                          BlockLayout<Scalar>::LAYOUT.size == sizeof(Scalar) &&
+                          BlockLayout<Scalar>::LAYOUT.numeric == BlockNumeric::FLOATING_POINT,
                       "Typed block matrices require floating-point components and 2..4 dimensions");
-        static constexpr BlockType LAYOUT{.kind = BlockKind::MATRIX, .numeric = BlockLayout<Scalar>::LAYOUT.numeric, .width = BlockLayout<Scalar>::LAYOUT.width, .components = rows, .columns = columns, .size = detail::block_extent(row_major ? rows : columns, stride, sizeof(Scalar) * (row_major ? columns : rows)), .stride = stride, .row_major = row_major};
+        static constexpr BlockType LAYOUT{
+            .kind = BlockKind::MATRIX,
+            .numeric = BlockLayout<Scalar>::LAYOUT.numeric,
+            .width = BlockLayout<Scalar>::LAYOUT.width,
+            .components = rows,
+            .columns = columns,
+            .size = detail::block_extent(row_major ? rows : columns, stride, sizeof(Scalar) * (row_major ? columns : rows)),
+            .stride = stride,
+            .row_major = row_major};
     };
     template<typename Element, size_t count, size_t stride = sizeof(typename PayloadLayout<Element>::Payload)>
     struct BlockArray {
@@ -100,7 +118,10 @@ namespace VSL_NAMESPACE::typed {
         static_assert(std::is_trivially_copyable_v<Record> && std::is_standard_layout_v<Record>, "Typed block record must be trivial and standard-layout");
         static_assert((std::same_as<Record, typename Members::Record> && ...), "Typed block member belongs to a different record");
         static constexpr std::array<BlockField, sizeof...(Members)> FIELDS{Members::FIELD...};
-        static constexpr BlockType LAYOUT{.kind = BlockKind::STRUCTURE, .size = sizeof(Record), .fields = FIELDS};
+        static constexpr BlockType LAYOUT{
+            .kind = BlockKind::STRUCTURE,
+            .size = sizeof(Record),
+            .fields = FIELDS};
     };
     template<typename Record_, typename Policy>
     struct BlockValue {
@@ -158,7 +179,12 @@ namespace VSL_NAMESPACE::typed {
                             numeric = BlockNumeric::UNSIGNED_INTEGER;
                             break;
                     }
-                    return {.kind = format.get_vec_length() == 1 ? BlockKind::SCALAR : BlockKind::VECTOR, .numeric = numeric, .width = scalar.size() * 8, .components = std::uint32_t(format.get_vec_length()), .size = format.size()};
+                    return {
+                        .kind = format.get_vec_length() == 1 ? BlockKind::SCALAR : BlockKind::VECTOR,
+                        .numeric = numeric,
+                        .width = scalar.size() * 8,
+                        .components = std::uint32_t(format.get_vec_length()),
+                        .size = format.size()};
                 }
             }
         }

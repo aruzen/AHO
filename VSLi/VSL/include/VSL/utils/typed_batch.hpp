@@ -60,6 +60,11 @@ namespace VSL_NAMESPACE::typed {
             std::array<BatchResourceKey, resources> resource_keys{};
             BatchIndexKey index;
             size_t vertex_count = 0, resource_count = 0;
+
+            bool update_pipeline(const void* next);
+            bool update_vertex(const command::BindVertexBufferAt& binding);
+            bool update_index(const command::BindIndexBufferAt& binding);
+            bool update_resource(const command::BindGraphicResource& binding);
         };
         template<typename... Commands>
         consteval bool valid_batch() {
@@ -81,10 +86,10 @@ namespace VSL_NAMESPACE::typed {
         std::tuple<Commands...> _commands;
         std::tuple<detail::BatchPlan<Commands>...> _plans;
         BatchStatistics _statistics;
-        template<typename C>
-        void plan_one(const C& command, detail::BatchPlan<C>& plan, State& state);
-        template<typename C>
-        void invoke_one(C& command, const detail::BatchPlan<C>& plan, CommandPool pool, CommandBuffer buffer, CommandManager manager);
+        template<typename CommandType>
+        void plan_one(const CommandType& command, detail::BatchPlan<CommandType>& plan, State& state);
+        template<typename CommandType>
+        void invoke_one(CommandType& command, const detail::BatchPlan<CommandType>& plan, CommandPool pool, CommandBuffer buffer, CommandManager manager);
         template<size_t... indices>
         void build_plans(std::index_sequence<indices...>);
         template<size_t... indices>
@@ -98,6 +103,55 @@ namespace VSL_NAMESPACE::typed {
     };
     template<typename... Commands>
     TypedBatch(Commands...) -> TypedBatch<Commands...>;
+
+    namespace detail {
+        template<size_t vertices, size_t resources>
+        bool BatchState<vertices, resources>::update_pipeline(const void* next) {
+            if (pipeline == next)
+                return false;
+            pipeline = next;
+            // Descriptor compatibility is not inferred across different pipeline layouts.
+            resource_count = 0;
+            return true;
+        }
+
+        template<size_t vertices, size_t resources>
+        bool BatchState<vertices, resources>::update_vertex(const command::BindVertexBufferAt& binding) {
+            const BatchVertexKey key{binding.binding(), binding.source().get(), binding.offset()};
+            auto keys = std::span(vertex_keys).first(vertex_count);
+            const auto found = std::ranges::find(keys, key.binding, &BatchVertexKey::binding);
+            if (found != keys.end() && *found == key)
+                return false;
+            if (found == keys.end())
+                vertex_keys[vertex_count++] = key;
+            else
+                *found = key;
+            return true;
+        }
+
+        template<size_t vertices, size_t resources>
+        bool BatchState<vertices, resources>::update_index(const command::BindIndexBufferAt& binding) {
+            const BatchIndexKey key{binding.source().get(), binding.offset(), binding.type()};
+            if (index == key)
+                return false;
+            index = key;
+            return true;
+        }
+
+        template<size_t vertices, size_t resources>
+        bool BatchState<vertices, resources>::update_resource(const command::BindGraphicResource& binding) {
+            const BatchResourceKey key{binding.first_binding, binding.resources.front().data_.get()};
+            auto keys = std::span(resource_keys).first(resource_count);
+            const auto found = std::ranges::find(keys, key.set, &BatchResourceKey::set);
+            if (found != keys.end() && *found == key)
+                return false;
+            if (found == keys.end())
+                resource_keys[resource_count++] = key;
+            else
+                *found = key;
+            return true;
+        }
+    } // namespace detail
 
     template<typename... Commands>
     TypedBatch<Commands...>::TypedBatch(Commands... commands) : _commands(std::move(commands)...) {
@@ -114,76 +168,50 @@ namespace VSL_NAMESPACE::typed {
         (plan_one(std::get<indices>(_commands), std::get<indices>(_plans), state), ...);
     }
     template<typename... Commands>
-    template<typename C>
-    void TypedBatch<Commands...>::plan_one(const C& command, detail::BatchPlan<C>& plan, State& state) {
-        const auto pipeline = command._pipeline.data_.get();
-        if (state.pipeline != pipeline) {
-            plan.pipeline = true;
-            state.pipeline = pipeline;
-            state.resource_count = 0;
-            ++_statistics.pipeline_binds;
-        }
+    template<typename CommandType>
+    void TypedBatch<Commands...>::plan_one(const CommandType& command, detail::BatchPlan<CommandType>& plan, State& state) {
+        plan.pipeline = state.update_pipeline(command._pipeline.data_.get());
+        _statistics.pipeline_binds += plan.pipeline;
+
         if constexpr (requires { command._buffers; }) {
             for (size_t i = 0; i < command._buffers.size(); ++i) {
-                const auto& binding = command._buffers[i];
-                const detail::BatchVertexKey key{binding.binding(), binding.source().get(), binding.offset()};
-                auto keys = std::span(state.vertex_keys).first(state.vertex_count);
-                const auto found = std::ranges::find(keys, key.binding, &detail::BatchVertexKey::binding);
-                if (found == keys.end() || *found != key) {
-                    plan.vertices[i] = true;
-                    if (found == keys.end())
-                        state.vertex_keys[state.vertex_count++] = key;
-                    else
-                        *found = key;
-                    ++_statistics.vertex_binds;
-                }
+                plan.vertices[i] = state.update_vertex(command._buffers[i]);
+                _statistics.vertex_binds += plan.vertices[i];
             }
         }
         if constexpr (requires { command._indices; }) {
-            const auto& indices = command._indices;
-            const detail::BatchIndexKey key{indices.source().get(), indices.offset(), indices.type()};
-            if (state.index != key) {
-                plan.index = true;
-                state.index = key;
-                ++_statistics.index_binds;
-            }
+            plan.index = state.update_index(command._indices);
+            _statistics.index_binds += plan.index;
         }
         for (size_t i = 0; i < command._resources.size(); ++i) {
-            const auto& binding = command._resources[i];
-            const detail::BatchResourceKey key{binding.first_binding, binding.resources.front().data_.get()};
-            auto keys = std::span(state.resource_keys).first(state.resource_count);
-            const auto found = std::ranges::find(keys, key.set, &detail::BatchResourceKey::set);
-            if (found == keys.end() || *found != key) {
-                plan.resources[i] = true;
-                if (found == keys.end())
-                    state.resource_keys[state.resource_count++] = key;
-                else
-                    *found = key;
-                ++_statistics.descriptor_binds;
-            }
+            plan.resources[i] = state.update_resource(command._resources[i]);
+            _statistics.descriptor_binds += plan.resources[i];
         }
-        if constexpr (detail::BatchTraits<C>::COMMAND_DOMAIN == detail::BatchDomain::GRAPHICS)
+
+        if constexpr (detail::BatchTraits<CommandType>::COMMAND_DOMAIN == detail::BatchDomain::GRAPHICS)
             ++_statistics.draws;
         else
             ++_statistics.dispatches;
     }
     template<typename... Commands>
-    template<typename C>
-    void TypedBatch<Commands...>::invoke_one(C& command, const detail::BatchPlan<C>& plan, CommandPool pool, CommandBuffer buffer, CommandManager manager) {
+    template<typename CommandType>
+    void TypedBatch<Commands...>::invoke_one(CommandType& command, const detail::BatchPlan<CommandType>& plan, CommandPool pool, CommandBuffer buffer, CommandManager manager) {
         if (plan.pipeline)
             command._pipeline.invoke(pool, buffer, manager);
-        if constexpr (requires { command._buffers; })
+        if constexpr (requires { command._buffers; }) {
             for (size_t i = 0; i < command._buffers.size(); ++i)
                 if (plan.vertices[i])
                     command._buffers[i].invoke(pool, buffer, manager);
-        if constexpr (requires { command._indices; })
+        }
+        if constexpr (requires { command._indices; }) {
             if (plan.index)
                 command._indices.invoke(pool, buffer, manager);
+        }
         for (size_t i = 0; i < command._resources.size(); ++i)
             if (plan.resources[i])
                 command._resources[i].invoke(pool, buffer, manager);
-        if constexpr (!C::PushLayout::EMPTY)
-            detail::invoke_push_values(command._pipeline, buffer, C::PushLayout::REQUIREMENTS, command._pushes->bytes());
+        if constexpr (!CommandType::PushLayout::EMPTY)
+            detail::invoke_push_values(command._pipeline, buffer, CommandType::PushLayout::REQUIREMENTS, command._pushes->bytes());
         if constexpr (requires { command._draw; })
             command._draw.invoke(pool, buffer, manager);
         else

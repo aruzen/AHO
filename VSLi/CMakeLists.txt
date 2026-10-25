@@ -64,11 +64,13 @@ add_library(VSL STATIC
         VSL/include/VSL/utils/typed_safe_resource.hpp
         VSL/include/VSL/utils/typed_vertex_layout.hpp
         VSL/include/VSL/utils/typed_pipeline.hpp
+        VSL/include/VSL/utils/typed_vertex_buffer.hpp
         VSL/include/VSL/utils/typed_index_buffer.hpp
         VSL/include/VSL/utils/typed_buffer_view.hpp
         VSL/include/VSL/utils/typed_batch.hpp
         VSL/include/VSL/utils/typed_shader.hpp
         VSL/include/VSL/utils/typed_resources.hpp
+        VSL/include/VSL/utils/typed_descriptor_schema.hpp
         VSL/include/VSL/utils/typed_push_constants.hpp
         VSL/include/VSL/utils/typed_block_layout.hpp
         VSL/include/VSL/utils/typed_block_validation.hpp

@@ -78,19 +78,25 @@ namespace VSL_NAMESPACE::typed {
     template<typename... RangeTypes>
     consteval auto PushSchema<RangeTypes...>::MakeRequirements() {
         std::array<detail::PushRequirement, sizeof...(RangeTypes)> result{};
-        size_t offset = 0, index = 0;
-        auto add = [&]<typename Range>() { result[index++] = {Range::RANGE, offset, &Range::MemoryLayout::LAYOUT}; offset += sizeof(typename Range::Payload); };
+        size_t data_offset = 0;
+        size_t requirement_index = 0;
+        auto add = [&]<typename Range>() {
+            result[requirement_index++] = {Range::RANGE, data_offset, &Range::MemoryLayout::LAYOUT};
+            data_offset += sizeof(typename Range::Payload);
+        };
         (add.template operator()<RangeTypes>(), ...);
         return result;
     }
     template<typename... RangeTypes>
     consteval bool PushSchema<RangeTypes...>::IsValid() {
         for (size_t i = 0; i < REQUIREMENTS.size(); ++i) {
-            const auto& a = REQUIREMENTS[i].range;
+            const auto& current = REQUIREMENTS[i].range;
             for (size_t j = 0; j < i; ++j) {
-                const auto& b = REQUIREMENTS[j].range;
-                if ((a.target_shader & b.target_shader) != ShaderFlag::ERROR_ &&
-                    a.offset < std::uint64_t(b.offset) + b.size && b.offset < std::uint64_t(a.offset) + a.size)
+                const auto& previous = REQUIREMENTS[j].range;
+                const bool same_stage = (current.target_shader & previous.target_shader) != ShaderFlag::ERROR_;
+                const bool overlaps = current.offset < std::uint64_t(previous.offset) + previous.size &&
+                                      previous.offset < std::uint64_t(current.offset) + current.size;
+                if (same_stage && overlaps)
                     return false;
             }
         }
@@ -101,7 +107,10 @@ namespace VSL_NAMESPACE::typed {
     requires(detail::push_values_match<Schema, Values...>(std::index_sequence_for<Values...>{}))
     PushValues<Schema>::PushValues(const Values&... values) {
         size_t offset = 0;
-        auto copy = [&](const auto& value) { std::memcpy(_bytes.data() + offset, &value, sizeof(value)); offset += sizeof(value); };
+        auto copy = [&](const auto& value) {
+            std::memcpy(_bytes.data() + offset, &value, sizeof(value));
+            offset += sizeof(value);
+        };
         (copy(values), ...);
         detail::validate_push_values(Schema::REQUIREMENTS, _bytes);
     }

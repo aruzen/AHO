@@ -220,7 +220,7 @@ namespace VSL_NAMESPACE {
             return false;
         if (size == 0)
             return true;
-        memcpy(data, t, sizeof(T) * size);
+        std::memmove(data, t, sizeof(T) * size);
         return true;
     }
 

@@ -27,8 +27,9 @@ upload.wait();
 
 - CPUデータは`aho::resource::Buffer<GENERAL>`、転送元は`Buffer<GPU_FRIENDLY>`を使います。詳細は[Bufferの契約](resource-buffer.md)を参照してください。
 - `Texture::update()`はgpu_buffer conceptを受け、GPU_FRIENDLY・ON_GPU・VSL Bufferを包んだCustomを同じ経路で利用できます。必要なTRANSFER_SOURCE usageはVSL側で検証します。
+- `Texture::update(Buffer<GENERAL>)`はCPU画素をコマンド記録時にstagingへコピーします。stagingの所有権はGPU完了まで維持され、記録後のCPU Bufferを書き換えても転送内容は変わりません。反復更新では既存のGPU_FRIENDLY Bufferを再利用できます。
 - コピーしたResourceは容量・内容・使用状態を共有します。独立した内容が必要なら別のResourceを構築してください。CPUのspanはresize/reserveで無効になる場合があります。
-- `Texture`は線形RGBA8、1レイヤー・1ミップのGPUテクスチャです。MSDFの3チャンネルはRGBへ、余ったAは呼び出し側で設定してください。色空間変換は行いません。初回更新時はページ全体をゼロで埋め、その後の更新では他の画素を維持します。
+- `Texture`は線形RGBA8（既定）またはsRGB RGBA8、1レイヤー・1ミップのGPUテクスチャです。MSDFの3チャンネルはRGBへ、余ったAは呼び出し側で設定してください。転送時は元のバイト列を保持し、sRGB形式ではサンプリング時にRGBを線形値へ復号します。初回更新時はページ全体をゼロで埋め、その後の更新では他の画素を維持します。
 
 ## コマンドの配置
 
@@ -61,6 +62,6 @@ Phase側はBufferのResource（Storage・Customization・マップ）と画像�
 
 Vulkan固有の操作はVSLに閉じ込めています。AHOの実装をVulkan識別子禁止でコンパイルする契約テストも追加しています。
 
-複数upload slot、画像format追加、atlasの矩形配置は今回の範囲外です。
+複数upload slot、RGBA8以外の画像形式、atlasの矩形配置は未対応です。
 
 矩形・バッファoffsetの定義は[VulkanのVkBufferImageCopy](https://docs.vulkan.org/refpages/latest/refpages/source/VkBufferImageCopy.html)に対応します。

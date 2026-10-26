@@ -6,6 +6,7 @@ option(AHO_TEST_COVERAGE "Collect Clang source coverage for AHO and its tests" O
 file(GLOB_RECURSE AHO_TEST_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
 list(FILTER AHO_TEST_SOURCES EXCLUDE REGEX "/(io|support)/")
 list(FILTER AHO_TEST_SOURCES EXCLUDE REGEX "/x/core/mesh(_attributes)?_test.cpp$")
+list(FILTER AHO_TEST_SOURCES EXCLUDE REGEX "/x/(resource/msdf_font|text/text_layout)_test.cpp$")
 if(AHO_ENABLE_EXPERIMENTAL_MESH)
     add_executable(aho-mesh-test x/core/mesh_test.cpp x/core/mesh_attributes_test.cpp
         core/polygon_test.cpp core/collision_test.cpp core/triangulation_test.cpp)

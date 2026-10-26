@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(cmake/Saitekikuukan.cmake)
+option(AHO_ENABLE_MSDF "Build CPU MSDF font, atlas and text layout resources" OFF)
 
 add_library(AHOLi
         AHO/src/pipeline/layouts.cpp
@@ -165,3 +166,5 @@ endif()
 if (BUILD_TESTING)
     add_subdirectory(AHO/test)
 endif ()
+
+include(cmake/MSDF.cmake)

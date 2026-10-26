@@ -93,7 +93,7 @@ namespace VSL_NAMESPACE::typed {
         TypedVertexBinding(VSL_NAMESPACE::GraphicsPipeline pipeline, LogicalDeviceAccessor device,
                            std::index_sequence<indices...>, const Buffers&... buffers)
             : _pipeline(std::move(pipeline)), _device(device),
-              _buffers{command::BindVertexBufferAt(Input::LAYOUT.binding[indices].binding, buffers.backend(), buffers.byte_offset())...}, _counts{buffers.size()...} {
+              _buffers{command::BindVertexBufferAt(Input::LAYOUT.binding[indices].binding, buffers.backend(), buffers.byte_offset(), buffers.resource_use())...}, _counts{buffers.size()...} {
             if (((buffers.device().data_ != device.data_) || ...))
                 throw std::invalid_argument("Typed pipeline and vertex buffers use different devices");
         }
@@ -190,7 +190,7 @@ namespace VSL_NAMESPACE::typed {
         commands.reserve(sizeof...(Sets));
         size_t set_index = 0;
         (commands.emplace_back(sets.backend(), graphic_resource::BindingDestination::GRAPHICS, _pipeline,
-                               Resources::SET_NUMBERS[set_index++]),
+                               Resources::SET_NUMBERS[set_index++], sets.resource_use()),
          ...);
         return TypedVertexBinding<Input, Resources, Pushes, true, pushed>(*this, std::move(commands), _pushes);
     }
@@ -233,7 +233,7 @@ namespace VSL_NAMESPACE::typed {
                 throw std::out_of_range("Typed indexed draw exceeds its vertex buffer");
         }
         return TypedIndexedDraw<Input, Resources, Pushes>(_pipeline, _device, _buffers,
-                                                          command::BindIndexBufferAt(indices.backend(), TypedIndexBuffer<Index, property>::INDEX_TYPE), std::move(command), _resources, _pushes);
+                                                          command::BindIndexBufferAt(indices.backend(), TypedIndexBuffer<Index, property>::INDEX_TYPE, 0, indices.resource_use()), std::move(command), _resources, _pushes);
     }
 
 } // namespace VSL_NAMESPACE::typed

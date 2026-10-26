@@ -15,8 +15,7 @@ namespace AHO_NAMESPACE::x::command {
             throw std::logic_error("Texture update requires a recording phase");
         texture.settle();
         source.check_available(completion);
-        if (texture.update && texture.update != completion)
-            throw std::logic_error("Texture or upload source is still in use by another phase");
+        texture.check_available(completion);
         auto layout = texture.initialized || texture.update ? VSL_NAMESPACE::ImageLayout::SHADER_READ_ONLY_OPTIMAL : VSL_NAMESPACE::ImageLayout::UNDEFINED;
         VSL_NAMESPACE::command::ImageUpload command(&source.native(), texture.image, layout, _region, _offset);
         const auto info = command.copy.description();
@@ -26,7 +25,8 @@ namespace AHO_NAMESPACE::x::command {
             throw std::invalid_argument("Texture update device mismatch");
         buffer.retain(source.owner());
         command.invoke(pool, buffer, manager);
-        texture.update = completion;
+        texture.update = VSL_NAMESPACE::CompletionObservation(completion);
+        texture.mark_used(completion);
         source.mark_used(std::move(completion));
     }
 } // namespace AHO_NAMESPACE::x::command

@@ -1,5 +1,6 @@
 #pragma once
 #include "../vulkan/buffer.hpp"
+#include "../vulkan/resource_use.hpp"
 #include "../vulkan/commands/bind_index_buffers.hpp"
 #include <algorithm>
 #include <concepts>
@@ -21,6 +22,7 @@ namespace VSL_NAMESPACE::typed {
         LogicalDeviceAccessor _device;
         Storage _buffer;
         std::shared_ptr<std::vector<Index>> _values;
+        std::shared_ptr<ResourceUseState> _use = std::make_shared<ResourceUseState>();
 
     public:
         TypedIndexBuffer(LogicalDeviceAccessor device, std::span<const Index> values)
@@ -30,6 +32,7 @@ namespace VSL_NAMESPACE::typed {
             : _device(device), _buffer(device, manager, values.data(), values.size()), _values(std::make_shared<std::vector<Index>>(values.begin(), values.end())) {}
         size_t size() const { return _values->size(); }
         LogicalDeviceAccessor device() const { return _device; }
+        ResourceUse resource_use() const { return {_use, _buffer.data_}; }
         const Storage& backend() const { return _buffer; }
         Storage& backend() { return _buffer; }
         void copy(std::span<const Index> values)
@@ -48,6 +51,7 @@ namespace VSL_NAMESPACE::typed {
     void TypedIndexBuffer<Index, property>::copy(std::span<const Index> values)
     requires(contain<property, MemoryProperty::HOST_VISIBLE>())
     {
+        _use->require_idle();
         if (values.size() != size())
             throw std::invalid_argument("Typed index update must preserve the element count");
         std::vector<Index> snapshot(values.begin(), values.end());

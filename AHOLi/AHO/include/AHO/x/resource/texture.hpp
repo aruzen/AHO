@@ -19,6 +19,7 @@ namespace AHO_NAMESPACE::x::resource {
         std::uint32_t height() const;
         VSL_NAMESPACE::data_format::Format format() const;
         VSL_NAMESPACE::ImageAccessor image() const;
+        VSL_NAMESPACE::ResourceUse resource_use() const;
         // レンダーパス外で記録する。初回は未更新の画素もゼロになる。
         AHO_NAMESPACE::x::command::TextureUpdate update(AHO_NAMESPACE::resource::BufferBinding source, VSL_NAMESPACE::ImageRegion region = {}, std::size_t offset = 0) const;
         template<AHO_NAMESPACE::resource::gpu_buffer Source>

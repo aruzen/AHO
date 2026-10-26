@@ -5,7 +5,7 @@
 #include <stdexcept>
 
 namespace AHO_NAMESPACE::x::resource {
-    std::vector<std::uint32_t> loadSpirv(const std::filesystem::path& path) {
+    std::vector<std::uint32_t> load_spirv(const std::filesystem::path& path) {
         std::ifstream file(path, std::ios::binary | std::ios::ate);
         if (!file)
             throw std::runtime_error("Could not open SPIR-V: " + path.string());

@@ -10,24 +10,24 @@ int main(int argc, char** argv) {
     }
     try {
         using namespace AHO_NAMESPACE::x::resource;
-        const auto model = GltfModel::load(argv[1]);
+        const auto model = GltfModel::Load(argv[1]);
         std::size_t vertices = 0, indices = 0;
         for (const auto& mesh : model.meshes())
             for (const auto& primitive : mesh.primitives) {
-                vertices += primitive.vertices.size();
-                indices += primitive.indices.size();
+                vertices += primitive.mesh.vertex_count();
+                indices += primitive.index_count();
             }
         std::cout << "meshes=" << model.meshes().size() << " vertices=" << vertices << " indices=" << indices
                   << " materials=" << model.materials().size() << " images=" << model.images().size()
                   << " nodes=" << model.nodes().size() << " skins=" << model.skins().size()
                   << " animations=" << model.animations().size() << '\n';
-        const auto pose = model.animations().empty() ? model.restPose() : model.sample(0, argc > 2 ? std::stod(argv[2]) : 0);
+        const auto pose = model.animations().empty() ? model.rest_pose() : model.sample(0, argc > 2 ? std::stod(argv[2]) : 0);
         for (std::size_t node = 0; node < model.nodes().size(); ++node) {
             if (model.nodes()[node].skin >= 0)
-                std::cout << "node=" << node << " joint-matrices=" << model.skinMatrices(pose, node).size() << '\n';
+                std::cout << "node=" << node << " joint-matrices=" << model.skin_matrices(pose, node).size() << '\n';
         }
         if (argc > 3)
-            std::cout << "shader-words=" << loadSpirv(argv[3]).size() << '\n';
+            std::cout << "shader-words=" << load_spirv(argv[3]).size() << '\n';
         if (!model.warnings().empty())
             std::cerr << model.warnings();
     } catch (const std::exception& error) {

@@ -1,5 +1,7 @@
 #include <AHO/drawer/draw_phase.hpp>
 #include <AHO/engine/standard_engine.hpp>
+#include <AHO/command/buffer_upload.hpp>
+#include <AHO/x/command/texture_update.hpp>
 #include <AHO/x/resource/gltf.hpp>
 #include <AHO/x/screenshot.hpp>
 #include <VSL/vsl.hpp>
@@ -21,43 +23,91 @@
 #include <tuple>
 
 namespace {
-    std::atomic_bool validationError = false;
-    vsl::logger_t previousLogger = nullptr;
-    void captureValidation(const char* text) {
-        const std::string_view message(text);
-        if (message.find("VUID-") != std::string_view::npos || message.find("Validation Error") != std::string_view::npos)
-            validationError = true;
-        if (previousLogger)
-            previousLogger(text);
-    }
-    struct ValidationLog {
-        ValidationLog() {
-            previousLogger = vsl::logger;
-            vsl::logger = captureValidation;
-        }
-        ~ValidationLog() { vsl::logger = previousLogger; }
-    };
+    std::atomic_bool VALIDATION_ERROR = false;
+    vsl::LoggerT PREVIOUS_LOGGER = nullptr;
+
     namespace asset = aho::x::resource;
     namespace pl = vsl::pipeline_layout;
     namespace cmd = vsl::command;
     namespace gfx = vsl::graphic_resource;
     using Matrix = asset::GltfMatrix;
     using Vec3 = std::array<float, 3>;
+    using CPUBuffer = aho::resource::Buffer<aho::resource::BufferType::GENERAL>;
+    using GPUBuffer = aho::resource::Buffer<aho::resource::BufferType::ON_GPU>;
+    using JointBuffer = aho::resource::Buffer<aho::resource::BufferType::GPU_FRIENDLY>;
+    using Depth = vsl::Image<vsl::ImageType::DEPTH_STENCIL_ATTACHMENT>;
+
+    void capture_validation(const char* text);
+
+    struct ValidationLog {
+        ValidationLog() {
+            PREVIOUS_LOGGER = vsl::LOGGER;
+            vsl::LOGGER = capture_validation;
+        }
+        ~ValidationLog() { vsl::LOGGER = PREVIOUS_LOGGER; }
+    };
+
     struct Vertex {
         Vec3 position, normal;
         std::array<float, 2> uv;
         std::array<float, 4> color;
         std::array<float, 4> joints{}, weights{};
     };
+
     struct Transform {
-        Matrix world, viewProjection;
+        Matrix world, view_projection;
     };
+
+    struct Camera {
+        Vec3 center{};
+        float radius = 1;
+        Matrix projection(unsigned width, unsigned height) const;
+    };
+
+    struct GPUMesh {
+        int node;
+        std::uint32_t count;
+        GPUBuffer vertices;
+        GPUBuffer indices;
+        asset::Texture image;
+        vsl::Sampler sampler;
+        bool skinned;
+        std::vector<JointBuffer> joints;
+        std::vector<gfx::Pool> pools;
+        std::vector<gfx::Resource> resources;
+        GPUMesh(aho::RenderContext context, int node, const asset::GltfPrimitive& source, const asset::GltfModel& model, gfx::BindingLayout binding);
+        void update_joints(const asset::GltfModel& model, const asset::GltfPose& pose, std::size_t slot);
+        static std::uint32_t IndexCount(const asset::GltfPrimitive& source);
+        static asset::Texture MakeTexture(aho::RenderContext context, const asset::GltfPrimitive& primitive, const asset::GltfModel& model);
+    };
+
+    struct Targets {
+        vsl::SwapchainAccessor swapchain;
+        vsl::RenderPass pass;
+        std::vector<Depth> depths;
+        std::vector<vsl::FrameBuffer> frames;
+        unsigned width, height;
+        static vsl::RenderPass MakePass(vsl::LogicalDeviceAccessor device, vsl::SwapchainAccessor swapchain);
+        Targets(aho::RenderContext context, aho::Window window);
+    };
+
+    struct Options {
+        std::filesystem::path model = std::filesystem::path(AHO_GLTF_VIEWER_ASSET_DIR) / "Fox.glb";
+        std::optional<std::string> animation;
+        std::filesystem::path verify;
+        std::optional<double> time;
+        unsigned frames = 0;
+    };
+
     static_assert(sizeof(Transform) == 128);
-    using VertexBuffer = vsl::Buffer<vsl::MemoryType::VertexBuffer, vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>;
-    using IndexBuffer = vsl::Buffer<vsl::MemoryType::IndexBuffer, vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>;
-    using JointBuffer = vsl::Buffer<vsl::MemoryType::StorageBuffer, vsl::MemoryProperty::HostVisible | vsl::MemoryProperty::HostCoherent>;
-    using Texture = vsl::Image<vsl::ImageType::TransferDst | vsl::ImageType::Sampled>;
-    using Depth = vsl::Image<vsl::ImageType::DepthStencilAttachment>;
+
+    void capture_validation(const char* text) {
+        const std::string_view message(text);
+        if (message.find("VUID-") != std::string_view::npos || message.find("Validation Error") != std::string_view::npos)
+            VALIDATION_ERROR = true;
+        if (PREVIOUS_LOGGER)
+            PREVIOUS_LOGGER(text);
+    }
 
     Matrix multiply(const Matrix& a, const Matrix& b) {
         Matrix out{};
@@ -73,7 +123,9 @@ namespace {
             out[r] = m[12 + r] + m[r] * v[0] + m[4 + r] * v[1] + m[8 + r] * v[2];
         return out;
     }
-    float dot(Vec3 a, Vec3 b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+    float dot(Vec3 a, Vec3 b) {
+        return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    }
     Vec3 normalized(Vec3 v) {
         const auto d = std::sqrt(dot(v, v));
         if (d <= 0)
@@ -82,33 +134,32 @@ namespace {
             x /= d;
         return v;
     }
-    Vec3 cross(Vec3 a, Vec3 b) { return {a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]}; }
-    struct Camera {
-        Vec3 center{};
-        float radius = 1;
-        Matrix projection(unsigned width, unsigned height) const {
-            const float scale = 1 / std::tan(45.f * 3.14159265f / 360), near = radius * 0.01f, far = radius * 20;
-            Matrix p{};
-            p[0] = scale * height / width;
-            p[5] = -scale;
-            p[10] = far / (near - far);
-            p[11] = -1;
-            p[14] = near * far / (near - far);
-            Vec3 direction = normalized({3, 1, 1.5f});
-            Vec3 eye{}, forward{};
-            for (int i = 0; i < 3; ++i) {
-                eye[i] = center[i] + direction[i] * radius * 3.4f;
-                forward[i] = -direction[i];
-            }
-            auto side = normalized(cross(forward, {0, 1, 0})), up = cross(side, forward);
-            Matrix view{side[0], up[0], -forward[0], 0, side[1], up[1], -forward[1], 0, side[2], up[2], -forward[2], 0, -dot(side, eye), -dot(up, eye), dot(forward, eye), 1};
-            return multiply(p, view);
+    Vec3 cross(Vec3 a, Vec3 b) {
+        return {a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]};
+    }
+
+    Matrix Camera::projection(unsigned width, unsigned height) const {
+        const float scale = 1 / std::tan(45.f * 3.14159265f / 360), near = radius * 0.01f, far = radius * 20;
+        Matrix p{};
+        p[0] = scale * height / width;
+        p[5] = -scale;
+        p[10] = far / (near - far);
+        p[11] = -1;
+        p[14] = near * far / (near - far);
+        Vec3 direction = normalized({3, 1, 1.5f});
+        Vec3 eye{}, forward{};
+        for (int i = 0; i < 3; ++i) {
+            eye[i] = center[i] + direction[i] * radius * 3.4f;
+            forward[i] = -direction[i];
         }
-    };
-    std::vector<int> visibleNodes(const asset::GltfModel& model) {
+        auto side = normalized(cross(forward, {0, 1, 0})), up = cross(side, forward);
+        Matrix view{side[0], up[0], -forward[0], 0, side[1], up[1], -forward[1], 0, side[2], up[2], -forward[2], 0, -dot(side, eye), -dot(up, eye), dot(forward, eye), 1};
+        return multiply(p, view);
+    }
+    std::vector<int> visible_nodes(const asset::GltfModel& model) {
         std::vector<int> nodes;
-        if (model.defaultScene() >= 0)
-            nodes = model.scenes()[std::size_t(model.defaultScene())].roots;
+        if (model.default_scene() >= 0)
+            nodes = model.scenes()[std::size_t(model.default_scene())].roots;
         else
             for (std::size_t i = 0; i < model.nodes().size(); ++i)
                 if (model.nodes()[i].parent < 0)
@@ -118,8 +169,8 @@ namespace {
                 nodes.push_back(child);
         return nodes;
     }
-    Camera frameModel(const asset::GltfModel& model, const std::vector<int>& nodes) {
-        auto pose = model.restPose();
+    Camera frame_model(const asset::GltfModel& model, const std::vector<int>& nodes) {
+        auto pose = model.rest_pose();
         Vec3 min, max;
         min.fill(std::numeric_limits<float>::max());
         max.fill(std::numeric_limits<float>::lowest());
@@ -128,22 +179,25 @@ namespace {
             const auto& n = model.nodes()[index];
             if (n.mesh < 0)
                 continue;
-            auto palette = n.skin >= 0 ? model.skinMatrices(pose, index) : std::vector<Matrix>{};
+            auto palette = n.skin >= 0 ? model.skin_matrices(pose, index) : std::vector<Matrix>{};
             for (const auto& primitive : model.meshes()[n.mesh].primitives)
-                for (const auto& v : primitive.vertices) {
-                    auto position = v.position;
-                    if (n.skin >= 0 && primitive.hasSkin) {
+                for (std::size_t i = 0; i < primitive.mesh.vertex_count(); ++i) {
+                    const auto& p = primitive.mesh.points()[i];
+                    const Vec3 original{p.value.___AN1, p.value.___AN2, p.value.___AN3};
+                    const auto v = primitive.mesh.vertex(i).read();
+                    auto position = original;
+                    if (n.skin >= 0 && primitive.has_skin) {
                         position = {};
                         for (int j = 0; j < 4; ++j) {
-                            auto jointPosition = point(palette.at(v.joints[j]), v.position);
+                            auto joint_position = point(palette.at(v.joints[j]), original);
                             for (int c = 0; c < 3; ++c)
-                                position[c] += v.weights[j] * jointPosition[c];
+                                position[c] += v.weights[j] * joint_position[c];
                         }
                     }
-                    auto p = point(pose.worldMatrices[index], position);
+                    auto world_position = point(pose.world_matrices[index], position);
                     for (int c = 0; c < 3; ++c) {
-                        min[c] = std::min(min[c], p[c]);
-                        max[c] = std::max(max[c], p[c]);
+                        min[c] = std::min(min[c], world_position[c]);
+                        max[c] = std::max(max[c], world_position[c]);
                     }
                     found = true;
                 }
@@ -159,131 +213,127 @@ namespace {
         camera.radius = std::max(std::sqrt(dot(diagonal, diagonal)) * 0.5f, 0.001f);
         return camera;
     }
-    struct Mesh {
-        int node;
-        std::uint32_t count;
-        VertexBuffer vertices;
-        IndexBuffer indices;
-        Texture image;
-        vsl::Sampler sampler;
-        bool skinned;
-        std::vector<JointBuffer> joints;
-        std::vector<gfx::Pool> pools;
-        std::vector<gfx::Resource> resources;
-        Mesh(aho::StandardEngine& engine, int node, const asset::GltfPrimitive& source, const asset::GltfModel& model, gfx::BindingLayout binding)
-            : node(node), count(std::uint32_t(source.indices.size())), vertices(engine._data->logical_device, source.vertices.size() * sizeof(Vertex)),
-              indices(engine._data->logical_device, source.indices.size() * sizeof(std::uint32_t)),
-              image(makeTexture(engine, source, model)), sampler(engine._data->logical_device, vsl::SamplingMode::Linear, vsl::EdgeMode::Repeat),
-              skinned(model.nodes()[node].skin >= 0 && source.hasSkin) {
-            const asset::GltfMaterial material = source.material < 0 ? asset::GltfMaterial{} : model.materials()[source.material];
-            if (source.topology != asset::GltfTopology::Triangles || material.alphaMode != asset::GltfAlphaMode::Opaque)
-                throw std::runtime_error("Example requires opaque triangle primitives");
-            std::vector<Vertex> data;
-            data.reserve(source.vertices.size());
-            for (const auto& v : source.vertices) {
-                Vertex out{v.position, v.normal, {}, v.color};
-                if (skinned) {
-                    for (int j = 0; j < 4; ++j)
-                        out.joints[j] = float(v.joints[j]);
-                    out.weights = v.weights;
+
+    std::uint32_t GPUMesh::IndexCount(const asset::GltfPrimitive& source) {
+        if (!source.is_triangular())
+            throw std::runtime_error("Example requires triangle primitives");
+        if (source.index_count() > std::numeric_limits<std::uint32_t>::max())
+            throw std::length_error("Primitive index count exceeds DrawIndexed limit");
+        return static_cast<std::uint32_t>(source.index_count());
+    }
+
+    GPUMesh::GPUMesh(aho::RenderContext context, int node, const asset::GltfPrimitive& source, const asset::GltfModel& model, gfx::BindingLayout binding)
+        : node(node), count(IndexCount(source)), vertices(context.device(), source.mesh.vertex_count() * sizeof(Vertex)),
+          indices(context.device(), source.index_count() * sizeof(std::uint32_t)),
+          image(MakeTexture(context, source, model)), sampler(context.device(), vsl::SamplingMode::LINEAR, vsl::EdgeMode::REPEAT),
+          skinned(model.nodes()[node].skin >= 0 && source.has_skin) {
+        const asset::GltfMaterial material = source.material < 0 ? asset::GltfMaterial{} : model.materials()[source.material];
+        if (!source.is_triangular() || material.alpha_mode != asset::GltfAlphaMode::OPAQUE)
+            throw std::runtime_error("Example requires opaque triangle primitives");
+        std::vector<Vertex> data;
+        data.reserve(source.mesh.vertex_count());
+        for (std::size_t i = 0; i < source.mesh.vertex_count(); ++i) {
+            const auto& p = source.mesh.points()[i];
+            const auto v = source.mesh.vertex(i).read();
+            Vertex out{{p.value.___AN1, p.value.___AN2, p.value.___AN3}, v.normal, {}, v.color};
+            if (skinned) {
+                for (int j = 0; j < 4; ++j)
+                    out.joints[j] = float(v.joints[j]);
+                out.weights = v.weights;
+            }
+            const auto& info = material.base_color_texture;
+            const auto& uv = v.tex_coords[info.texture < 0 ? 0 : std::size_t(info.tex_coord)];
+            const float x = uv[0] * info.scale[0], y = uv[1] * info.scale[1];
+            out.uv = {info.offset[0] + std::cos(info.rotation) * x - std::sin(info.rotation) * y, info.offset[1] + std::sin(info.rotation) * x + std::cos(info.rotation) * y};
+            for (int c = 0; c < 4; ++c)
+                out.color[c] *= material.base_color[c];
+            data.push_back(out);
+        }
+        std::vector<std::uint32_t> element_indices;
+        element_indices.reserve(count);
+        for (const auto& triangle : source.mesh.indices())
+            element_indices.insert(element_indices.end(), {triangle.idx1.index, triangle.idx2.index, triangle.idx3.index});
+        // 法線省略時は各三角形の面積に応じて加算する。
+        if (!source.has_normals) {
+            for (auto& v : data)
+                v.normal = {};
+            for (std::size_t i = 0; i < element_indices.size(); i += 3) {
+                auto& a = data.at(element_indices[i]);
+                auto& b = data.at(element_indices[i + 1]);
+                auto& c = data.at(element_indices[i + 2]);
+                Vec3 ab{}, ac{};
+                for (int k = 0; k < 3; ++k) {
+                    ab[k] = b.position[k] - a.position[k];
+                    ac[k] = c.position[k] - a.position[k];
                 }
-                const auto& info = material.baseColorTexture;
-                const auto& uv = v.texCoords[info.texture < 0 ? 0 : std::size_t(info.texCoord)];
-                const float x = uv[0] * info.scale[0], y = uv[1] * info.scale[1];
-                out.uv = {info.offset[0] + std::cos(info.rotation) * x - std::sin(info.rotation) * y, info.offset[1] + std::sin(info.rotation) * x + std::cos(info.rotation) * y};
-                for (int c = 0; c < 4; ++c)
-                    out.color[c] *= material.baseColor[c];
-                data.push_back(out);
+                auto normal = cross(ab, ac);
+                for (auto* v : {&a, &b, &c})
+                    for (int k = 0; k < 3; ++k)
+                        v->normal[k] += normal[k];
             }
-            // glTF permits omitted normals. Accumulate area-weighted triangle normals.
-            if (!source.hasNormals) {
-                for (auto& v : data)
-                    v.normal = {};
-                for (std::size_t i = 0; i + 2 < source.indices.size(); i += 3) {
-                    auto& a = data.at(source.indices[i]);
-                    auto& b = data.at(source.indices[i + 1]);
-                    auto& c = data.at(source.indices[i + 2]);
-                    Vec3 ab{}, ac{};
-                    for (int k = 0; k < 3; ++k) {
-                        ab[k] = b.position[k] - a.position[k];
-                        ac[k] = c.position[k] - a.position[k];
-                    }
-                    auto normal = cross(ab, ac);
-                    for (auto* v : {&a, &b, &c})
-                        for (int k = 0; k < 3; ++k)
-                            v->normal[k] += normal[k];
-                }
-                for (auto& v : data)
-                    v.normal = dot(v.normal, v.normal) > 0 ? normalized(v.normal) : Vec3{0, 1, 0};
-            }
-            if (!vertices.copy(data.data(), data.size()) || !indices.copy(source.indices.data(), source.indices.size()))
-                throw std::runtime_error("Model buffer upload failed");
-            const auto slots = engine._data->command_manager.getBuffer().getSize();
-            std::tie(pools, resources) = engine._data->graphic_resource_manager->allocate(std::vector(slots, binding));
-            const auto jointCount = skinned ? model.skins()[model.nodes()[node].skin].joints.size() : 1;
-            joints.reserve(slots);
-            for (std::size_t slot = 0; slot < slots; ++slot) {
-                joints.emplace_back(engine._data->logical_device, jointCount * sizeof(Matrix));
-                resources[slot].update(image, sampler);
-                resources[slot].update(&joints.back(), 1, gfx::Type::StorageBuffer);
-            }
+            for (auto& v : data)
+                v.normal = dot(v.normal, v.normal) > 0 ? normalized(v.normal) : Vec3{0, 1, 0};
         }
-        void updateJoints(const asset::GltfModel& model, const asset::GltfPose& pose, std::size_t slot) {
-            // DrawPhase has waited for this command slot before its palette is overwritten.
-            const Matrix identity{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
-            auto palette = skinned ? model.skinMatrices(pose, node) : std::vector{identity};
-            if (!joints.at(slot).copy(palette.data(), palette.size()))
-                throw std::runtime_error("Joint palette upload failed");
+        CPUBuffer vertex_data, index_data;
+        vertex_data.assign(std::as_bytes(std::span(data)));
+        index_data.assign(std::as_bytes(std::span(element_indices)));
+        auto phase = context.commands().start_phase<vsl::ComputePhase>();
+        phase << vertices.upload(vertex_data) << indices.upload(index_data);
+        if (phase.submit() != vsl::ComputePhase::SubmitResult::SUCCESS || !phase.completion().wait())
+            throw std::runtime_error("Model buffer upload failed");
+        const auto slots = context.frame_count();
+        std::tie(pools, resources) = context.descriptor_manager().allocate(std::vector(slots, binding));
+        const auto joint_count = skinned ? model.skins()[model.nodes()[node].skin].joints.size() : 1;
+        joints.reserve(slots);
+        for (std::size_t slot = 0; slot < slots; ++slot) {
+            joints.emplace_back(context.device(), joint_count * sizeof(Matrix));
+            resources[slot].update(image.image(), sampler);
+            resources[slot].update(&joints.back().native(), 1, gfx::Type::STORAGE_BUFFER);
         }
-        static Texture makeTexture(aho::StandardEngine& engine, const asset::GltfPrimitive& primitive, const asset::GltfModel& model) {
-            asset::GltfImage white{"white", 1, 1, {255, 255, 255, 255}};
-            const asset::GltfImage* source = &white;
-            if (primitive.material >= 0) {
-                const auto& m = model.materials()[primitive.material];
-                if (m.baseColorTexture.texture >= 0)
-                    source = &model.images()[model.textures()[m.baseColorTexture.texture].image];
-            }
-            Texture image(engine._data->logical_device, source->width, source->height, vsl::data_format::Srgb8RGBA);
-            vsl::StagingBuffer<> staging(engine._data->logical_device, source->rgba.size());
-            if (!staging.copy(source->rgba.data(), source->rgba.size()))
-                throw std::runtime_error("Texture staging failed");
-            auto phase = engine._data->command_manager.startPhase<vsl::ComputePhase>();
-            phase << cmd::ChangeImageBarrier(image, vsl::ImageLayout::TransferDstOptimal) << cmd::CopyBufferToImage(image, &staging, vsl::ImageLayout::TransferDstOptimal)
-                  << cmd::ChangeImageBarrier(image, vsl::ImageLayout::TransferDstOptimal, vsl::ImageLayout::ShaderReadOnlyOptimal);
-            if (phase.submit() != vsl::ComputePhase::SubmitResult::Success || !phase.completion().wait())
-                throw std::runtime_error("Texture transfer failed");
-            return image;
+    }
+
+    void GPUMesh::update_joints(const asset::GltfModel& model, const asset::GltfPose& pose, std::size_t slot) {
+        // DrawPhaseがこのslotのGPU完了を待ってから更新する。
+        const Matrix identity{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+        auto palette = skinned ? model.skin_matrices(pose, node) : std::vector{identity};
+        joints.at(slot).write(std::as_bytes(std::span(palette)));
+    }
+
+    asset::Texture GPUMesh::MakeTexture(aho::RenderContext context, const asset::GltfPrimitive& primitive, const asset::GltfModel& model) {
+        asset::GltfImage white{"white", 1, 1, {255, 255, 255, 255}};
+        const asset::GltfImage* source = &white;
+        if (primitive.material >= 0) {
+            const auto& m = model.materials()[primitive.material];
+            if (m.base_color_texture.texture >= 0)
+                source = &model.images()[model.textures()[m.base_color_texture.texture].image];
         }
-    };
-    struct Targets {
-        vsl::SwapchainAccessor swapchain;
-        vsl::RenderPass pass;
-        std::vector<Depth> depths;
-        std::vector<vsl::FrameBuffer> frames;
-        unsigned width, height;
-        static vsl::RenderPass makePass(vsl::LogicalDeviceAccessor device, vsl::SwapchainAccessor swapchain) {
-            vsl::RenderPassDescription description;
-            description.addColor({.format = swapchain.getFormat(), .finalLayout = vsl::ImageLayout::Present});
-            description.setDepthStencil({.format = vsl::data_format::Depth32Float, .store = vsl::StoreOp::DontCare, .finalLayout = vsl::ImageLayout::DepthStencilAttachmentOptimal});
-            return {device, std::move(description)};
+        asset::Texture image(context.device(), source->width, source->height, vsl::data_format::SRGB8_RGBA);
+        CPUBuffer pixels;
+        pixels.assign(std::as_bytes(std::span(source->rgba)));
+        auto phase = context.commands().start_phase<vsl::ComputePhase>();
+        phase << image.update(pixels);
+        if (phase.submit() != vsl::ComputePhase::SubmitResult::SUCCESS || !phase.completion().wait())
+            throw std::runtime_error("Texture transfer failed");
+        return image;
+    }
+
+    vsl::RenderPass Targets::MakePass(vsl::LogicalDeviceAccessor device, vsl::SwapchainAccessor swapchain) {
+        vsl::RenderPassDescription description;
+        description.add_color({.format = swapchain.get_format(), .final_layout = vsl::ImageLayout::PRESENT});
+        description.set_depth_stencil({.format = vsl::data_format::DEPTH32_FLOAT, .store = vsl::StoreOp::DONT_CARE, .final_layout = vsl::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL});
+        return {device, std::move(description)};
+    }
+
+    Targets::Targets(aho::RenderContext context, aho::Window window) : swapchain(window.data2->swapchain), pass(MakePass(context.device(), swapchain)) {
+        auto size = window.frame_size();
+        width = size.value.x.value;
+        height = size.value.y.value;
+        for (auto image : swapchain.images) {
+            depths.emplace_back(context.device(), width, height, vsl::data_format::DEPTH32_FLOAT);
+            frames.emplace_back(pass, width, height, std::vector<vsl::ImageAccessor>{image, depths.back()});
         }
-        Targets(aho::StandardEngine& engine, aho::Window window) : swapchain(window._data2->swapchain), pass(makePass(engine._data->logical_device, swapchain)) {
-            auto size = window.frame_size();
-            width = size.value.x.value;
-            height = size.value.y.value;
-            for (auto image : swapchain.images) {
-                depths.emplace_back(engine._data->logical_device, width, height, vsl::data_format::Depth32Float);
-                frames.emplace_back(pass, width, height, std::vector<vsl::ImageAccessor>{image, depths.back()});
-            }
-        }
-    };
-    struct Options {
-        std::filesystem::path model = std::filesystem::path(AHO_GLTF_VIEWER_ASSET_DIR) / "Fox.glb";
-        std::optional<std::string> animation;
-        std::filesystem::path verify;
-        std::optional<double> time;
-        unsigned frames = 0;
-    };
+    }
+
     Options options(int argc, char** argv) {
         Options out;
         for (int i = 1; i < argc; ++i) {
@@ -315,15 +365,15 @@ namespace {
             throw std::invalid_argument("Time must be finite");
         return out;
     }
-    void verifyFrames(const aho::ImagePixels& first, const aho::ImagePixels& second) {
+    void verify_frames(const aho::ImagePixels& first, const aho::ImagePixels& second) {
         if (first.width != second.width || first.height != second.height)
             throw std::runtime_error("Verification capture dimensions changed unexpectedly");
         std::size_t foreground = 0, changed = 0;
         std::set<std::array<std::byte, 3>> colors;
         for (std::size_t y = 0; y < first.height; ++y)
             for (std::size_t x = 0; x < first.width; ++x) {
-                auto a = first.bytes.data() + y * first.rowStride + x * 4;
-                auto b = second.bytes.data() + y * second.rowStride + x * 4;
+                auto a = first.bytes.data() + y * first.row_stride + x * 4;
+                auto b = second.bytes.data() + y * second.row_stride + x * 4;
                 if (std::memcmp(a, first.bytes.data(), 3) != 0) {
                     ++foreground;
                     colors.insert({a[0], a[1], a[2]});
@@ -337,9 +387,9 @@ namespace {
         std::cout << "GPU verified: foreground=" << foreground << " changed=" << changed << " colors=" << colors.size() << '\n';
     }
     int run(const Options& opt) {
-        auto model = asset::GltfModel::load(opt.model);
-        auto nodes = visibleNodes(model);
-        auto camera = frameModel(model, nodes);
+        auto model = asset::GltfModel::Load(opt.model);
+        auto nodes = visible_nodes(model);
+        auto camera = frame_model(model, nodes);
         if (model.animations().empty())
             throw std::runtime_error("Choose a model containing an animation");
         std::size_t animation = 0;
@@ -349,61 +399,62 @@ namespace {
         if (opt.animation && model.animations()[animation].name != *opt.animation)
             throw std::invalid_argument("Animation name not found: " + *opt.animation);
         aho::StandardEngine engine("AHO glTF - " + model.animations()[animation].name + " - Space: pause / Esc: close");
-        auto window = engine.getWindow();
+        auto window = engine.get_window();
         window.resize(800, 640);
         std::cout << "Model: " << opt.model << " | animation: " << model.animations()[animation].name << std::endl;
         {
             aho::x::Screenshot screenshot(window);
-            gfx::BindingLayout textureBinding(engine._data->logical_device, {{0, gfx::Type::CombinedImageSampler, vsl::ShaderFlag::Fragment}, {1, gfx::Type::StorageBuffer, vsl::ShaderFlag::Vertex}});
-            std::vector<Mesh> meshes;
+            auto context = window.render_context();
+            gfx::BindingLayout texture_binding(context.device(), {{0, gfx::Type::COMBINED_IMAGE_SAMPLER, vsl::ShaderFlag::FRAGMENT}, {1, gfx::Type::STORAGE_BUFFER, vsl::ShaderFlag::VERTEX}});
+            std::vector<GPUMesh> meshes;
             for (auto node : nodes)
                 if (model.nodes()[node].mesh >= 0)
                     for (const auto& p : model.meshes()[model.nodes()[node].mesh].primitives)
-                        meshes.emplace_back(engine, node, p, model, textureBinding);
-            vsl::Shader<vsl::ShaderType::Vertex> vertex(engine._data->logical_device, std::filesystem::path(AHO_GLTF_VIEWER_SHADER_DIR) / "gltf_viewer.vert.spv");
-            vsl::Shader<vsl::ShaderType::Fragment> fragment(engine._data->logical_device, std::filesystem::path(AHO_GLTF_VIEWER_SHADER_DIR) / "gltf_viewer.frag.spv");
+                        meshes.emplace_back(context, node, p, model, texture_binding);
+            vsl::Shader<vsl::ShaderType::VERTEX> vertex(context.device(), std::filesystem::path(AHO_GLTF_VIEWER_SHADER_DIR) / "gltf_viewer.vert.spv");
+            vsl::Shader<vsl::ShaderType::FRAGMENT> fragment(context.device(), std::filesystem::path(AHO_GLTF_VIEWER_SHADER_DIR) / "gltf_viewer.frag.spv");
             std::optional<Targets> targets;
             std::optional<vsl::PipelineLayout> layout;
             std::optional<vsl::GraphicsPipeline> pipeline;
             auto rebuild = [&]() {
-                engine._data->command_manager.waitIdle();
+                context.commands().wait_idle();
                 pipeline.reset();
                 layout.reset();
                 targets.reset();
-                targets.emplace(engine, window);
+                targets.emplace(context, window);
                 pl::VertexInput input;
                 input.add(pl::VertexInputShapeDefinition{
                     .layouts = {
-                        {vsl::data_format::FloatRGB, 0, offsetof(Vertex, position)},
-                        {vsl::data_format::FloatRGB, 1, offsetof(Vertex, normal)},
-                        {vsl::data_format::FloatRG, 2, offsetof(Vertex, uv)},
-                        {vsl::data_format::FloatRGBA, 3, offsetof(Vertex, color)},
-                        {vsl::data_format::FloatRGBA, 4, offsetof(Vertex, joints)},
-                        {vsl::data_format::FloatRGBA, 5, offsetof(Vertex, weights)}},
+                        {vsl::data_format::FLOAT_RGB, 0, offsetof(Vertex, position)},
+                        {vsl::data_format::FLOAT_RGB, 1, offsetof(Vertex, normal)},
+                        {vsl::data_format::FLOAT_RG, 2, offsetof(Vertex, uv)},
+                        {vsl::data_format::FLOAT_RGBA, 3, offsetof(Vertex, color)},
+                        {vsl::data_format::FLOAT_RGBA, 4, offsetof(Vertex, joints)},
+                        {vsl::data_format::FLOAT_RGBA, 5, offsetof(Vertex, weights)}},
                     .binding = 0,
                     .size = sizeof(Vertex)});
                 pl::PushConstants constants;
-                constants.definitions = {{vsl::ShaderFlag::Vertex, 0, sizeof(Transform)}};
-                layout.emplace(engine._data->logical_device, pl::ShaderGroup("gltf-viewer", {vertex, fragment}), input,
-                               pl::ResourceBinding({textureBinding}), constants, pl::ColorBlend{}, pl::InputAssembly{},
-                               pl::Rasterization{pl::CullingMode::None}, pl::DepthStencil{}, pl::Multisample{}, pl::DynamicState{},
+                constants.definitions = {{vsl::ShaderFlag::VERTEX, 0, sizeof(Transform)}};
+                layout.emplace(context.device(), pl::ShaderGroup("gltf-viewer", {vertex, fragment}), input,
+                               pl::ResourceBinding({texture_binding}), constants, pl::ColorBlend{}, pl::InputAssembly{},
+                               pl::Rasterization{pl::CullingMode::NONE}, pl::DepthStencil{}, pl::Multisample{}, pl::DynamicState{},
                                vsl::Viewport(targets->swapchain), vsl::Scissor(targets->swapchain));
                 pipeline.emplace(*layout, targets->pass);
             };
             rebuild();
             auto draw = [&](double time, bool capture) {
-                if (targets->swapchain._data != window._data2->swapchain._data)
+                if (targets->swapchain.data_ != window.data2->swapchain.data_)
                     rebuild();
                 auto pose = model.sample(animation, time);
                 aho::DrawPhase phase(engine, [](auto&) {});
-                if (phase.state != vsl::ComputePhase::State::WaitSubmit)
+                if (phase.state != vsl::ComputePhase::State::WAIT_SUBMIT)
                     return false;
-                phase << cmd::RenderPassBegin(targets->frames.at(phase.getImageIndex()), {vsl::ClearColor{0.025f, 0.035f, 0.06f, 1}, vsl::ClearDepthStencil{1, 0}});
+                phase << cmd::RenderPassBegin(targets->frames.at(phase.get_image_index()), {vsl::ClearColor{0.025f, 0.035f, 0.06f, 1}, vsl::ClearDepthStencil{1, 0}});
                 auto stream = phase << *pipeline << vsl::Viewport(targets->swapchain) << vsl::Scissor(targets->swapchain);
                 for (auto& mesh : meshes) {
-                    mesh.updateJoints(model, pose, phase.frameSlot);
-                    Transform transform{pose.worldMatrices[mesh.node], camera.projection(targets->width, targets->height)};
-                    stream << cmd::PushConstant(*layout, vsl::ShaderFlag::Vertex, transform) << cmd::BindGraphicResource(mesh.resources.at(phase.frameSlot), gfx::BindingDestination::Graphics, *pipeline) << cmd::BindVertexBuffer(mesh.vertices) << cmd::BindIndexBuffer(mesh.indices) << cmd::DrawIndexed(mesh.count);
+                    mesh.update_joints(model, pose, phase.frame_slot);
+                    Transform transform{pose.world_matrices[mesh.node], camera.projection(targets->width, targets->height)};
+                    stream << cmd::PushConstant(*layout, vsl::ShaderFlag::VERTEX, transform) << cmd::BindGraphicResource(mesh.resources.at(phase.frame_slot), gfx::BindingDestination::GRAPHICS, *pipeline) << cmd::BindVertexBuffer(mesh.vertices.native()) << cmd::BindIndexBuffer(mesh.indices.native()) << cmd::DrawIndexed(mesh.count);
                 }
                 if (capture && !screenshot.capture(phase))
                     throw std::runtime_error("Screenshot is busy");
@@ -421,9 +472,9 @@ namespace {
                     throw std::runtime_error("Second verification frame could not be acquired");
                 auto second = screenshot.read();
                 screenshot.save(opt.verify / "frame-1.png");
-                verifyFrames(first, second);
-                // Reuse every command slot without a readback wait between submissions.
-                const auto slots = engine._data->command_manager.getBuffer().getSize();
+                verify_frames(first, second);
+                // 読み戻しで待たずに全slotを再利用し、paletteの寿命を確認する。
+                const auto slots = context.frame_count();
                 for (std::size_t frame = 0; frame < slots * 4; ++frame)
                     if (!draw(t0 + (clip.end - clip.start) * double(frame) / double(slots * 4), false))
                         throw std::runtime_error("Palette reuse frame could not be acquired");
@@ -434,7 +485,7 @@ namespace {
                 if (first.width != repeated.width || first.height != repeated.height)
                     throw std::runtime_error("Repeated capture dimensions changed unexpectedly");
                 for (std::size_t y = 0; y < first.height; ++y)
-                    if (std::memcmp(first.bytes.data() + y * first.rowStride, repeated.bytes.data() + y * repeated.rowStride, first.width * 4) != 0)
+                    if (std::memcmp(first.bytes.data() + y * first.row_stride, repeated.bytes.data() + y * repeated.row_stride, first.width * 4) != 0)
                         throw std::runtime_error("Repeated pose differs after joint palette slot reuse");
                 std::cout << "GPU verified: repeated pose identical after " << slots * 4 << " frames\n";
                 window.resize(640, 480);
@@ -448,16 +499,16 @@ namespace {
             } else {
                 auto previous = std::chrono::steady_clock::now();
                 double time = opt.time.value_or(model.animations()[animation].start);
-                bool paused = opt.time.has_value(), wasSpace = false;
+                bool paused = opt.time.has_value(), was_space = false;
                 unsigned rendered = 0;
                 while (aho::Window::Update() && window) {
-                    auto* handle = static_cast<GLFWwindow*>(window._data->window_handle);
+                    auto* handle = static_cast<GLFWwindow*>(window.data_->window_handle);
                     if (glfwGetKey(handle, GLFW_KEY_ESCAPE) == GLFW_PRESS)
                         break;
                     bool space = glfwGetKey(handle, GLFW_KEY_SPACE) == GLFW_PRESS;
-                    if (space && !wasSpace)
+                    if (space && !was_space)
                         paused = !paused;
-                    wasSpace = space;
+                    was_space = space;
                     auto now = std::chrono::steady_clock::now();
                     if (!paused)
                         time += std::chrono::duration<double>(now - previous).count();
@@ -473,7 +524,7 @@ namespace {
                         break;
                 }
             }
-            engine._data->command_manager.waitIdle();
+            context.commands().wait_idle();
         }
         window.close();
         return 0;
@@ -483,7 +534,7 @@ int main(int argc, char** argv) {
     try {
         ValidationLog validation;
         const auto result = run(options(argc, argv));
-        if (validationError)
+        if (VALIDATION_ERROR)
             throw std::runtime_error("Vulkan validation reported an error");
         return result;
     } catch (const std::exception& e) {

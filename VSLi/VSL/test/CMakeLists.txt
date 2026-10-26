@@ -162,4 +162,17 @@ if (VSL_TEST_SOURCES)
     add_library(vsl-frame-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_frame_resources.cpp)
     target_compile_definitions(vsl-frame-style-contract PRIVATE VSL_TYPED_CASE=0)
     target_include_directories(vsl-frame-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
+    set(typed_allocation_names Valid Missing Duplicate UnknownSet UnknownBinding ImageBuffer ZeroElements InvalidScope FixedRuntimeSize UnknownRuntimeSize InvalidElements)
+    foreach(case RANGE 0 10)
+        list(GET typed_allocation_names ${case} name)
+        add_test(NAME "VSL.TypedAllocation.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_resource_allocation.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=Typed allocation|typed allocation|set"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.TypedAllocation.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
+    add_library(vsl-allocation-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_resource_allocation.cpp)
+    target_compile_definitions(vsl-allocation-style-contract PRIVATE VSL_TYPED_CASE=0)
+    target_include_directories(vsl-allocation-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
 endif ()

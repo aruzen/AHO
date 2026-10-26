@@ -1,5 +1,6 @@
 #pragma once
 #include <AHO/drawer/draw_phase.hpp>
+#include <AHO/resource/typed_buffer.hpp>
 #include <VSL/utils/typed_batch.hpp>
 #include <VSL/utils/typed_frame_resources.hpp>
 #include <filesystem>
@@ -30,7 +31,7 @@ namespace typed_example {
     using Pipeline = t::TypedGraphicsPipeline<Input, Resources, Pushes>;
 
     struct SceneFrame {
-        t::TypedUniformBuffer<UniformLayout> uniform;
+        aho::resource::Buffer<aho::resource::BufferType::GPU_FRIENDLY> uniform;
         t::TypedDescriptorSet<Set::Layout> set;
         SceneFrame(vsl::LogicalDeviceAccessor device, vsl::graphic_resource::ManagerInterface& descriptors);
     };
@@ -38,7 +39,7 @@ namespace typed_example {
     class Scene {
         aho::Window _window;
         aho::RenderContext _context;
-        t::TypedVertexBuffer<Vertex> _vertices;
+        aho::resource::Buffer<aho::resource::BufferType::GPU_FRIENDLY> _vertices;
         t::TypedIndexBuffer<std::uint16_t> _indices;
         t::TypedFrameResources<SceneFrame> _frames;
         vsl::Shader<vsl::ShaderType::VERTEX> _vertex_shader;

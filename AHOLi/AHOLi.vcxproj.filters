@@ -133,6 +133,8 @@
     <ClInclude Include="AHO\include\AHO\resource\audio.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="AHO\include\AHO\resource\typed_buffer.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="AHO\include\AHO\x\resource\typed_texture.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="AHO\include\AHO\resource\buffer.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>

@@ -15,15 +15,16 @@ namespace typed_example {
     } // namespace
 
     SceneFrame::SceneFrame(vsl::LogicalDeviceAccessor device, vsl::graphic_resource::ManagerInterface& descriptors)
-        : uniform(device, SceneUniform{{1, 1, 1, 1}, {0, 0, 1, 0}}), set(device, descriptors) {
-        set.write<0>(uniform);
+        : uniform(device, sizeof(SceneUniform)), set(device, descriptors) {
+        set.write<0>(aho::resource::uniform_view<UniformLayout>(uniform));
     }
 
     Scene::Scene(aho::Window window, const std::filesystem::path& shaders)
         : _window(std::move(window)), _context(_window.render_context()),
-          _vertices(_context.device(), VERTICES), _indices(_context.device(), INDICES),
+          _vertices(_context.device(), sizeof(VERTICES)), _indices(_context.device(), INDICES),
           _frames(_context.commands(), [&](size_t) { return SceneFrame(_context.device(), _context.descriptor_manager()); }),
           _vertex_shader(_context.device(), shaders / "scene.vert.spv"), _fragment_shader(_context.device(), shaders / "scene.frag.spv") {
+        _vertices.write(std::as_bytes(std::span(VERTICES)));
         rebuild_pipeline();
         _resize_hook = _window.add_plugin<aho::window::WindowResizeHookPlugin>([this](aho::Window*) { rebuild_pipeline(); });
     }
@@ -52,9 +53,9 @@ namespace typed_example {
         const SceneUniform uniform{
             {.75f + .25f * std::cos(time), .75f + .25f * std::cos(time + 1), .75f + .25f * std::cos(time + 2), 1},
             {.15f * std::sin(time * .5f), .1f * std::sin(time * .8f), float(extent.width) / float(extent.height), time}};
-        _frames.update(phase, [&](SceneFrame& frame) { frame.uniform.copy(std::span(&uniform, 1)); });
+        _frames.update(phase, [&](SceneFrame& frame) { frame.uniform.write(std::as_bytes(std::span(&uniform, 1))); });
         const auto& frame = _frames.get(phase);
-        const auto vertices = _vertices.view(1, 4);
+        const auto vertices = aho::resource::vertex_view<Vertex>(_vertices, 1, 4);
         const auto bound = _pipeline->bind_vertices(vertices).bind_resources(frame.set);
         const DrawTransform left{{-.48f, 0, .48f, .7f}};
         const DrawTransform right{{.48f, 0, .48f, -.9f}};

@@ -12,11 +12,11 @@ namespace typed_example {
     };
     struct SceneUniform {
         float tint[4];
-        // camera translation xy, framebuffer aspect ratio, animation time
+        // カメラの平行移動xy、framebufferの縦横比、アニメーション時刻。
         float camera[4];
     };
     struct DrawTransform {
-        // translation xy, scale, angular velocity
+        // 平行移動xy、倍率、角速度。
         float transform[4];
     };
 

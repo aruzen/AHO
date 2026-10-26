@@ -66,7 +66,7 @@ namespace {
             throw std::runtime_error("Screenshot request was not accepted");
         const auto result = phase.submit();
         if (result == vsl::ComputePhase::SubmitResult::WANT_RECREATE_SWAPCHAIN) {
-            // Finish this phase before recreating through Window on the next iteration.
+            // このPhaseを終了し、次の反復でWindowからswapchainを再生成する。
             return false;
         }
         if (result != vsl::ComputePhase::SubmitResult::SUCCESS)
@@ -107,7 +107,7 @@ namespace {
     void verify(aho::StandardEngine& engine, aho::Window window, typed_example::Scene& scene,
                 aho::x::Screenshot& screenshot, const std::filesystem::path& directory) {
         std::filesystem::create_directories(directory);
-        // Submit without readback waits so every command slot is reused repeatedly.
+        // 読み戻しを待たずに送信し、すべてのcommand slotを繰り返し再利用する。
         const auto target = scene.frame_count() * 4;
         size_t submitted = 0;
         for (size_t attempt = 0; attempt < target + 60 && submitted < target; ++attempt) {

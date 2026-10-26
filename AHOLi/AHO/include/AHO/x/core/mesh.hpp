@@ -32,6 +32,7 @@ namespace AHO_NAMESPACE::x {
 
         Mesh() = default;
         explicit Mesh(PolygonType geometry);
+        Mesh(PolygonType geometry, std::span<const VertexData> vertices);
         Mesh(PolygonType geometry, std::span<const VertexData> vertices, std::span<const TriangleData> triangles);
         Mesh(const Mesh&) = default;
         Mesh(Mesh&& other) noexcept(std::is_nothrow_default_constructible_v<PolygonType> &&
@@ -71,6 +72,14 @@ namespace AHO_NAMESPACE::x {
     Mesh<P, V, T, VS, TS>::Mesh(P geometry)
         : _geometry(std::move(geometry)), _vertex_data(_geometry.points().size()),
           _triangle_data(_geometry.indices().size()) {}
+
+    template<typename P, typename V, typename T, typename VS, typename TS>
+    Mesh<P, V, T, VS, TS>::Mesh(P geometry, std::span<const V> vertices)
+        : _geometry(std::move(geometry)), _triangle_data(_geometry.indices().size()) {
+        if (vertices.size() != _geometry.points().size())
+            throw std::invalid_argument("Mesh vertex attribute count differs from geometry");
+        _vertex_data = VS(vertices);
+    }
 
     template<typename P, typename V, typename T, typename VS, typename TS>
     Mesh<P, V, T, VS, TS>::Mesh(P geometry, std::span<const V> vertices, std::span<const T> triangles)

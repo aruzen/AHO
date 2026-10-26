@@ -1,6 +1,7 @@
 #pragma once
 #include <AHO/x/resource/texture.hpp>
 #include <VSL/vulkan/command.hpp>
+#include <variant>
 
 namespace AHO_NAMESPACE::x::command {
     // 描画streamと同じ<<で記録する。生成時には転送せず、invoke時のデータを使う。
@@ -10,8 +11,10 @@ namespace AHO_NAMESPACE::x::command {
     private:
         friend class resource::Texture;
         TextureUpdate(resource::Texture texture, AHO_NAMESPACE::resource::BufferBinding source, VSL_NAMESPACE::ImageRegion region, std::size_t offset);
+        TextureUpdate(resource::Texture texture, AHO_NAMESPACE::resource::Buffer<AHO_NAMESPACE::resource::BufferType::GENERAL> source,
+                      VSL_NAMESPACE::ImageRegion region, std::size_t offset);
         resource::Texture _texture;
-        AHO_NAMESPACE::resource::BufferBinding _source;
+        std::variant<AHO_NAMESPACE::resource::BufferBinding, AHO_NAMESPACE::resource::Buffer<AHO_NAMESPACE::resource::BufferType::GENERAL>> _source;
         VSL_NAMESPACE::ImageRegion _region;
         std::size_t _offset;
     };

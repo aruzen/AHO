@@ -4,9 +4,10 @@
 
 namespace AHO_NAMESPACE::x::resource {
     Texture::Texture(VSL_NAMESPACE::LogicalDeviceAccessor device, std::uint32_t width, std::uint32_t height, VSL_NAMESPACE::data_format::Format format) {
-        // アトラス用の線形RGBA8に絞る。整数形式やsRGBの暗黙変換は行わない。
-        if (!device.data_ || !width || !height || format != VSL_NAMESPACE::data_format::UNSIGNED_NORMALIZED8_RGBA)
-            throw std::invalid_argument("Texture prototype requires a device, nonzero extent and linear RGBA8");
+        // 転送時はRGBA8のバイト列を保持し、sRGBの復号はサンプリング時に行う。
+        if (!device.data_ || !width || !height ||
+            (format != VSL_NAMESPACE::data_format::UNSIGNED_NORMALIZED8_RGBA && format != VSL_NAMESPACE::data_format::SRGB8_RGBA))
+            throw std::invalid_argument("Texture requires a device, nonzero extent and RGBA8 or sRGB RGBA8");
         _data = std::make_shared<Data>(device, width, height, format);
     }
 

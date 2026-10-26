@@ -104,6 +104,18 @@ namespace {
         EXPECT_EQ(mesh.triangle(0).read().material, 88u);
     }
 
+    TEST(ExperimentalMeshTest, VertexRowsCanUseDefaultTriangleAttributes) {
+        std::array<VertexData, 3> vertices{};
+        vertices[1].uv0 = {0.25f, 0.75f};
+        Mesh mesh{Polygon(POINTS, INDICES), vertices};
+        vertices[1].uv0 = {};
+        EXPECT_EQ(mesh.vertex_column<&VertexData::uv0>()[1], (std::array<float, 2>{0.25f, 0.75f}));
+        EXPECT_EQ(mesh.triangle_data().size(), 1u);
+        EXPECT_EQ(mesh.triangle(0).read().material, 7u);
+        EXPECT_DOUBLE_EQ(mesh.area(), 3);
+        EXPECT_THROW((Mesh{Polygon(POINTS, INDICES), std::span{vertices}.first(2)}), std::invalid_argument);
+    }
+
     TEST(ExperimentalMeshTest, RejectsVertexAndTriangleAttributeCountMismatch) {
         const std::array<VertexData, 3> vertices{};
         const std::array<TriangleData, 1> triangles{};

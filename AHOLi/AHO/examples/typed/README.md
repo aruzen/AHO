@@ -1,6 +1,6 @@
 # Typed graphics sample
 
-2つの色付きquadを異なる向きに回転させ、カメラと色も動かす、ウィンドウ付きのSampleです。頂点入力・フレームごとのUBO／descriptor・push constant・16bit index・頂点view・batchを組み合わせています。
+2つの色付きquadを異なる向きに回転させ、カメラと色も動かす、ウィンドウ付きのSampleです。AHO BufferをTyped viewで接続し、頂点入力・フレームごとのUBO／descriptor・push constant・16bit index・頂点view・batchを組み合わせています。
 
 まず[scene.hpp](scene.hpp)の型宣言、次に[scene.cpp](scene.cpp)の生成と`record()`を読むと描画経路を追えます。[main.cpp](main.cpp)は起動・イベントループ・画像による検証です。
 
@@ -40,9 +40,9 @@ C++26対応のcompilerを使います。macOSの検証はLLVM 20/libc++で行い
 
 - `VertexRecord` → `TypedVertexInput`でC++の頂点structからattributeとbindingを宣言します。
 - `BlockRecord` → `UniformBinding` / `PushRange`でshaderの配置とC++の型を結びます。
-- `SceneFrame`へ`TypedUniformBuffer`と`TypedDescriptorSet`をまとめ、`TypedFrameResources<SceneFrame>`でcommand slotごとに独立して生成します。
+- `SceneFrame`へAHOの`Buffer<GPU_FRIENDLY>`と`TypedDescriptorSet`をまとめ、`TypedFrameResources<SceneFrame>`でcommand slotごとに独立して生成します。`uniform_view<UniformLayout>(buffer)`でUBOのpayload型を渡します。
 - `frames.update(phase, callback)`で現在の枠のUBOだけを更新し、`frames.get(phase)`で描画に使います。色係数・カメラ位置・aspect比・時刻を毎フレーム渡します。GPU完了待ちは既存Phaseが担当します。
-- `TypedVertexBuffer::view(1, 4)`で先頭の不要レコードを除外します。
+- `vertex_view<Vertex>(buffer, 1, 4)`で先頭の不要レコードを除外します。draw／dispatchの記録後はAHO Bufferのbusyへ反映され、完了前のwrite／再確保を拒否します。
 - `TypedIndexBuffer<uint16_t>`を使ってquadの2三角形を描きます。
 - `Pushes::Values`へ各quadの位置・scale・回転速度をコピーし、`TypedBatch`で2描画をまとめます。同じpipeline・vertex/index buffer・descriptorへのbindは各1回です。画像の時間変化はUBOが担当するため、検証でUBO更新の効果を確認できます。
 

@@ -1,37 +1,43 @@
 # Typed Sampleで確認した範囲
 
-`AHOLi/AHO/examples/typed`へ`aho-typed-example`を追加。頂点、descriptor、push、index、view、batchを使う描画は現在のTyped APIだけで構築でき、Typed本体の追加実装は不要だった。
+`AHOLi/AHO/examples/typed`の`aho-typed-example`は、頂点、descriptor、push、index、view、batchと、フレーム単位のTyped資源を組み合わせるウィンドウ付きSample。
 
 ## 実装と同期
 
-型宣言はscene.hpp、描画資源と記録はscene.cppへまとめた。型からnative layoutを作り、GLSLの実際の入力とblock配置はpipeline生成時に照合する。毎フレーム変わる変換はcommandが所有するpush snapshotへ渡す。UBOとvertex/indexは構築後に変更しないため、使用中のbuffer更新を発生させない。
+型宣言はscene.hpp、描画資源と記録はscene.cppへまとめた。型からnative layoutを作り、GLSLの実際の入力とblock配置はpipeline生成時に照合する。
 
-windowのswapchain/標準pass/framebufferはAHOに任せる。GPU完了後のWindowResizeHookPluginでattachment形式を確認し、互換ならTyped pipelineを保持する。viewport/scissorは毎フレーム動的に設定し、形式が変わればpipelineを再生成する。このSampleは標準windowの1色attachment・subpass 0を使う。
+`SceneFrame`にTypedUniformBufferとTypedDescriptorSetをまとめ、`TypedFrameResources<SceneFrame>`のFactoryがcommand buffer slotごとに別々のbuffer/setを作る。毎フレーム、色・カメラ位置・aspect比・時刻を`frames.update(phase, callback)`で書き込み、`frames.get(phase)`のconst参照からsetを描画へ渡す。既存Phaseが枠の前回送信の完了を待つため、使用中のUBOを更新しない。
 
-## 作成時に詰まった点
+quadごとの位置・scale・回転速度はpush snapshotで渡す。pushの値自体は時間で変えず、アニメーションはUBOの時刻を使用する。画像の変化だけでpushとUBOの効果が混同されないようにした。vertex/indexは構築後に変更しない。
 
-このworktreeにはgit管理外のstb_image.h / stb_image_write.hが無く、AHOLiの既存image/Screenshot実装のビルドで止まった。手元の同じ依存ファイルをworktreeのthirdpartyへ配置して解消した。SampleのCMakeで不足をconfigure時に案内し、READMEへ既存のthirdparty/setup.mdを案内した。新しい描画機能の不足ではなかった。
+device・descriptor manager・render pass・format・viewport/scissorは公開`RenderContext`から取得する。Sampleから`data_`／`data2`への直接アクセスを除いた。保持したcontextはresize後の描画先に追従する。
 
-## 今後Typedへ広げられる部分
+swapchain/標準pass/framebufferはAHOのWindowに任せる。GPU完了後のWindowResizeHookPluginでattachment形式を確認し、互換ならTyped pipelineを保持する。viewport/scissorは毎フレーム動的に設定し、形式が変わればpipelineを再生成する。標準windowの1色attachment・subpass 0を使う。
 
-- 初期化でengine.data_からdevice/descriptor manager、window.data2からpass/swapchainを取得する。Typed contextや公開accessorへまとめれば、利用側が内部構造を辿る記述を減らせる。
+## 今回追加して解消した不足
 
-- windowの取得画像・frame slot・完了待ちは既存DrawPhaseの実行時API。これらを型で結び付けるframe/contextの層は今回追加していない。
-- 毎フレームUBOを書き換える用途は、frame slotごとのTyped buffer/setとfence待ちを利用側で組み合わせる必要がある。これをまとめるTyped frame resourceがあるとSampleをさらに短くできる。
-- 入力イベント、起動、swapchain、画像保存は動的APIを使用する。描画の型制約だけではGPU同期やwindowの寿命は決まらない。
+- エンジン／window内部を辿って描画に必要なサービスを取得していた部分を、公開描画コンテキストへまとめた。
+- フレーム枠ごとのbuffer/setの作成・選択・所有をTypedFrameResourcesへまとめた。
+- staticなUBOでは確認できなかった更新と再利用を、動くカメラと色のUBOで確認できるようにした。
 
-これらは今回の描画を成立させるための不足ではなく、ゲーム側の記述をさらにまとめるための拡張点。一括arena確保は引き続き別の将来課題とする。
+型付き資源の所有、callbackとaliasの契約、今後の割当schemaについては[typed-frame-resources.md](typed-frame-resources.md)を参照。
 
-## 検証
+入力イベント、起動、swapchain、画像保存は動的APIを使用する。一括arena確保、型宣言からの割当サイズの自動計算は今後の課題。
 
-Apple M1/macOS、LLVM 20/C++23/Debug。MoltenVK 1.4.2 + validation layerで`--verify`が成功し、3枚のPNGを保存した。左右の描画、360627画素のアニメーション変化、1720x1080 → 2000x1360へのresizeを確認。pipeline生成は1回のまま、2drawに対するpipeline/vertex/index/descriptor bindは各1回だった。validation errorなし。
+## 画像検証
 
-追加のdriver指定なしでもSDK既定のMoltenVKで`--frames 8`が成功した。helpと不正CLI引数4ケース、2shaderのspirv-val、変更3ファイル/2TUの命名・配置・format検査（違反0件）も確認した。Typed本体への変更はなく、このSampleで全AHO/VSLテストは再実行していない。Windows/Linuxは未実行。
+`--verify DIRECTORY`は最初にフレーム枠の4周分を画像読み戻し待ちなしで送信し、その後、通常・UBO変更後・resize後の3枚を保存する。左右それぞれのquad、UBOによる画素変化、resize後の画像サイズ、互換形式でのpipeline再利用を検査する。
 
-`BUILD_TESTING=OFF`の新規buildディレクトリでもconfigure成功。Sampleを使うためにGTestの有効化は不要。
+元PRでの検証ではLLVM 20 / C++26 / Debug、MoltenVK 1.4.2 + validation layerで成功。3枠／12送信、238831画素の時間変化、1720×1080 → 2000×1360へのresize、pipeline生成1回、2drawのpipeline/vertex/index/descriptor bind各1回を確認した。validation errorなし。変更C++ 3ファイル／2TUのstyle検査は違反0件、2shaderのspirv-valも成功。
 
-## style CIの構成漏れ
+2026-10-26のmaster統合時はLLVM 20 / Release / ASan・UBSan / MoltenVKで`--frames 120`が成功した。`--verify`は通常・回転後の2枚を保存したが、resize後に`Could not acquire a verification frame`で失敗した。この構成ではresizeを含む画像検証は未達。失敗する検証経路を残し、既存のswapchain再取得処理は今回変更していない。
 
-初回のPR CIではSampleが既定のOFFのままで、main.cpp / scene.cppのコンパイルDB未登録とscene.hppの未解析による3件のエラーで失敗した。ローカルのSample有効構成だけを確認し、CI側の有効化を漏らしていた。style workflowのconfigureにも`AHO_BUILD_TYPED_EXAMPLE=ON`を追加し、検査対象から除外せずに両TUとヘッダーを解析させる。
+追加のdriver指定なしでも通常イベントループの`--frames 120`が成功し、validation errorなし。
 
-修正したworkflowと同じCMakeオプションでconfigureし、生成されたAppleClangのコンパイルDBへSampleの2TUが含まれることを確認した。その2TUを無改変のcheck.pyで解析し、3ファイル/2TUで命名・配置・format違反0件、未登録ソース・未解析ヘッダー0件を確認。
+## ビルド時の注意と既知の構成
+
+git管理外の`thirdparty/stb_image.h` / `stb_image_write.h`が別worktreeに無い場合は、既存の`thirdparty/setup.md`に従って配置する。SampleのCMakeでも不足をconfigure時に案内する。
+
+初回Sampleのstyle CIでは`AHO_BUILD_TYPED_EXAMPLE=ON`が無く、main.cpp / scene.cppのコンパイルDB未登録とscene.hppの未解析で失敗した。workflowにもSampleの有効化を追加済み。今回も有効構成のDBでSampleの両TUとヘッダーを検査する。
+
+通常ビルドは`BUILD_TESTING=OFF`で使用でき、SampleにGTestは不要。C++26、macOSの検証はLLVM 20/libc++で行う。Windows/Linuxは未実行。

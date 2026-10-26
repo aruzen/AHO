@@ -26,6 +26,8 @@ namespace AHO_NAMESPACE {
 
         SubmitResult submit_commands() override;
 
+        RenderContext context() const;
+
         DrawStream<VSL_NAMESPACE::DefaultPhaseStream> operator<<(AHO_NAMESPACE::concepts::is_std_tuple auto&&);
 
         DrawStream<VSL_NAMESPACE::DefaultPhaseStream> operator<<(std::shared_ptr<VSL_NAMESPACE::command::Command> cmd);

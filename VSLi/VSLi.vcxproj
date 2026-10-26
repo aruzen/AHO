@@ -181,6 +181,7 @@
     <ClInclude Include="VSL\include\VSL\utils\typed_index_buffer.hpp" />
     <ClInclude Include="VSL\include\VSL\utils\typed_buffer_view.hpp" />
     <ClInclude Include="VSL\include\VSL\utils\typed_batch.hpp" />
+    <ClInclude Include="VSL\include\VSL\utils\typed_frame_resources.hpp" />
     <ClInclude Include="VSL\include\VSL\utils\typed_shader.hpp" />
     <ClInclude Include="VSL\include\VSL\utils\typed_resources.hpp" />
     <ClInclude Include="VSL\include\VSL\utils\typed_descriptor_schema.hpp" />
@@ -301,6 +302,7 @@
     <ClCompile Include="VSL\src\vulkan\viewport.cpp" />
     <ClCompile Include="VSL\src\vulkan\vulkan.cpp" />
     <ClCompile Include="VSL\src\window.cpp" />
+    <ClCompile Include="VSL\src\utils\typed_frame_resources.cpp" />
     <ClCompile Include="VSL\src\window_plugin.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

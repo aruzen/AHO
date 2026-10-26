@@ -66,16 +66,6 @@ namespace AHO_NAMESPACE::resource {
             std::memmove(static_cast<std::byte*>(data()) + offset, bytes.data(), bytes.size());
     }
 
-    bool detail::BufferState::busy() const {
-        const auto status = use.status();
-        return status == VSL_NAMESPACE::Completion::Status::PENDING || status == VSL_NAMESPACE::Completion::Status::SUBMITTED;
-    }
-
-    void detail::BufferState::require_idle() const {
-        if (busy())
-            throw std::logic_error("Buffer is still in use");
-    }
-
     std::size_t BufferBinding::size() const {
         return _state ? _state->size : 0;
     }
@@ -110,15 +100,18 @@ namespace AHO_NAMESPACE::resource {
     void BufferBinding::check_available(const VSL_NAMESPACE::Completion& completion) const {
         if (!_state)
             throw std::logic_error("Buffer binding is empty");
-        if (!completion || completion.status() != VSL_NAMESPACE::Completion::Status::PENDING)
-            throw std::logic_error("Buffer transfer requires a recording phase");
-        if (_state->busy() && _state->use != completion)
-            throw std::logic_error("Buffer is in use by another phase");
+        _state->check_available(completion);
     }
 
     void BufferBinding::mark_used(VSL_NAMESPACE::Completion completion) const {
         if (!_state)
             throw std::logic_error("Buffer binding is empty");
-        _state->use = std::move(completion);
+        _state->check_available(completion);
+        _state->mark_used(std::move(completion));
+    }
+    VSL_NAMESPACE::ResourceUse BufferBinding::resource_use() const {
+        if (!_state)
+            throw std::logic_error("Buffer binding is empty");
+        return {_state, owner()};
     }
 } // namespace AHO_NAMESPACE::resource

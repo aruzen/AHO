@@ -2,6 +2,7 @@
 #include <AHO/define.hpp>
 #include <VSL/vulkan/buffer.hpp>
 #include <VSL/vulkan/command.hpp>
+#include <VSL/vulkan/resource_use.hpp>
 #include <concepts>
 #include <cstddef>
 #include <memory>
@@ -54,17 +55,13 @@ namespace AHO_NAMESPACE::resource {
 
     namespace detail {
         // Submissionはresourceだけを保持し、Completionを持つこの状態は保持しない。
-        struct BufferState {
+        struct BufferState : VSL_NAMESPACE::ResourceUseState {
             VSL_NAMESPACE::LogicalDeviceAccessor device;
             std::weak_ptr<void> resource;
             VSL_NAMESPACE::BufferAccessor* native = nullptr;
             std::size_t size = 0;
             bool host_readable = false;
-            VSL_NAMESPACE::Completion use;
             std::shared_ptr<Buffer<BufferType::GPU_FRIENDLY>> staging;
-
-            bool busy() const;
-            void require_idle() const;
         };
 
         template<typename Storage, typename Customization>
@@ -87,6 +84,7 @@ namespace AHO_NAMESPACE::resource {
         VSL_NAMESPACE::BufferAccessor& native() const;
         std::shared_ptr<void> owner() const;
         bool host_readable() const;
+        VSL_NAMESPACE::ResourceUse resource_use() const;
 
         void check_available(const VSL_NAMESPACE::Completion& completion) const;
         void mark_used(VSL_NAMESPACE::Completion completion) const;
@@ -359,7 +357,7 @@ namespace AHO_NAMESPACE::resource {
         template<typename Storage, typename Customization>
         bool GPUBufferBase<Storage, Customization>::wait(std::uint64_t timeout) const {
             (void)resource();
-            return !busy() || _state->use.wait(timeout);
+            return _state->wait(timeout);
         }
 
         template<typename Storage, typename Customization>

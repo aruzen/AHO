@@ -95,6 +95,7 @@ namespace VSL_NAMESPACE::impl {
         std::shared_ptr<FenceImpl> external_fence;
         vk::Fence fence;
         Completion::Status status = Completion::Status::PENDING;
+        std::shared_ptr<Completion::Status> observed_status;
         std::vector<std::shared_ptr<void>> resources;
         ~SubmissionImpl();
     };

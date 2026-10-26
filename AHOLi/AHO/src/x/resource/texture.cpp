@@ -29,4 +29,9 @@ namespace AHO_NAMESPACE::x::resource {
             throw std::logic_error("Texture is empty");
         return _data->image;
     }
+    VSL_NAMESPACE::ResourceUse Texture::resource_use() const {
+        if (!_data)
+            throw std::logic_error("Texture is empty");
+        return {_data, _data->image.data_};
+    }
 } // namespace AHO_NAMESPACE::x::resource

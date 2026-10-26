@@ -17,6 +17,8 @@ TypedFrameResourcesは任意の型付き資源構造体を管理するが、buff
 
 `ResourceAllocationPlan<Schema>`はGPUを使わずにbuffer数、descriptor set／descriptor数、論理payload byte数を計算する。固定容量ならconstexprでも利用できる。積と合計のoverflowは検出する。
 
+外部資源のbuffer数／payload bytesは新規確保に数えない。外部資源を接続するために生成するdescriptorは計画へ含める。
+
 ## メモリ計画の境界
 
 payload byte数はC++のsizeofと要素数の積。Vulkan memory requirements、alignment、専用allocation、descriptor poolのdriver内部メモリ、ホスト側pimplの確保量は含めない。今回は既存の所有方式で生成し、arena・placement newは後続の段階とする。
@@ -62,9 +64,16 @@ SHAREDは共有の宣言であり、GPUのbarrier挿入ではない。共有stor
 - typed_resource_bundle_detail.hpp: tupleからのbuffer／set生成と自動接続、外部入力の型照合。
 - typed_resource_bundle.cpp: device依存の事前検証。
 
+## Sampleへの適用
+
+Scene UBOをPER_FRAME、Palette UBOをSHAREDで宣言し、手書きの資源constructor・Factory・write接続を削除した。`initialize_shared`でPalette、`update`で現在のSceneを更新し、`frame.bind_resources`で生成済みsetを描画へ渡す。3枠で4 buffers／4 sets／4 descriptors／112 payload bytesを計画する。
+
 ## 検証
 
 - 割当計画: LLVM 20 / C++26 / DebugでVSLとテストをビルド。CPUテスト5件・コンパイル契約11件成功。変更C++ 3ファイル／2TUのformat・命名・配置検査は違反0件。
 - Debugビルド中に環境の空き容量不足が発生した。並列数を6から2へ下げて再開し、ビルド完了。製品コードや他の作業ファイルの削除は不要だった。
 - 自動生成: MoltenVK 1.4.2とvalidation layerでGPUテスト9件、コンパイル契約15件成功。3枠／12送信、疎なset・共有と独立性・UBO/SSBO・descriptor配列・外部texture配列・失敗時の巻き戻しを検証。skip・validation errorなし。
 - 自動生成層の変更C++ 6ファイル／3TUのformat・命名・配置検査は違反0件。
+- 既存Typed機能・Phase・新規schema／bundleを含む回帰テスト217件成功、skip・validation errorなし。
+- Sample画像検証: 3枠／12送信、238831画素のUBOによる時間変化、1720×1080 → 2000×1360へのresize、pipeline生成1回、2つのdescriptor setを各1回bind。実画像でも左右のquadを確認。変更C++ 2ファイル／2TUのstyle検査は違反0件。
+- Sample通常イベントループは追加driver指定なしで120フレーム成功、validation errorなし。Sampleの2shader・bundle compute fixtureのspirv-val、MSBuild XML検査も成功。Windows/Linuxの実行は未検証。

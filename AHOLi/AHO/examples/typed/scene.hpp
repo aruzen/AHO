@@ -1,7 +1,7 @@
 #pragma once
 #include <AHO/drawer/draw_phase.hpp>
 #include <VSL/utils/typed_batch.hpp>
-#include <VSL/utils/typed_frame_resources.hpp>
+#include <VSL/utils/typed_resource_bundle.hpp>
 #include <filesystem>
 
 namespace typed_example {
@@ -19,28 +19,32 @@ namespace typed_example {
         // translation xy, scale, angular velocity
         float transform[4];
     };
+    struct PaletteUniform {
+        float gain[4];
+    };
 
     using VertexRecord = t::VertexRecord<Vertex, VSL_VERTEX_MEMBER(Vertex, position), VSL_VERTEX_MEMBER(Vertex, color)>;
     using Input = t::TypedVertexInput<VertexRecord::Binding<0>>;
     using UniformLayout = t::BlockRecord<SceneUniform, VSL_BLOCK_MEMBER(SceneUniform, tint), VSL_BLOCK_MEMBER(SceneUniform, camera)>;
     using TransformLayout = t::BlockRecord<DrawTransform, VSL_BLOCK_MEMBER(DrawTransform, transform)>;
+    using PaletteLayout = t::BlockRecord<PaletteUniform, VSL_BLOCK_MEMBER(PaletteUniform, gain)>;
     using Set = t::DescriptorSet<0, t::UniformBinding<0, UniformLayout, vsl::ShaderFlag::VERTEX>>;
-    using Resources = t::ResourceSchema<Set>;
+    using PaletteSet = t::DescriptorSet<1, t::UniformBinding<0, PaletteLayout, vsl::ShaderFlag::VERTEX>>;
+    using Resources = t::ResourceSchema<Set, PaletteSet>;
+    using Allocation = t::ResourceAllocationSchema<Resources, t::BufferAllocation<0, 0>,
+                                                   t::BufferAllocation<1, 0, t::FixedElements<1>, t::ResourceScope::SHARED>>;
+    using Bundle = t::TypedResourceBundle<Allocation>;
     using Pushes = t::PushSchema<t::PushRange<TransformLayout, vsl::ShaderFlag::VERTEX>>;
     using Pipeline = t::TypedGraphicsPipeline<Input, Resources, Pushes>;
 
-    struct SceneFrame {
-        t::TypedUniformBuffer<UniformLayout> uniform;
-        t::TypedDescriptorSet<Set::Layout> set;
-        SceneFrame(vsl::LogicalDeviceAccessor device, vsl::graphic_resource::ManagerInterface& descriptors);
-    };
+    using SceneFrame = Bundle::Frame;
 
     class Scene {
         aho::Window _window;
         aho::RenderContext _context;
         t::TypedVertexBuffer<Vertex> _vertices;
         t::TypedIndexBuffer<std::uint16_t> _indices;
-        t::TypedFrameResources<SceneFrame> _frames;
+        Bundle _resources;
         vsl::Shader<vsl::ShaderType::VERTEX> _vertex_shader;
         vsl::Shader<vsl::ShaderType::FRAGMENT> _fragment_shader;
         std::optional<Pipeline> _pipeline;
@@ -55,7 +59,7 @@ namespace typed_example {
         Scene(const Scene&) = delete;
         Scene& operator=(const Scene&) = delete;
         size_t pipeline_builds() const { return _pipeline_builds; }
-        size_t frame_count() const { return _frames.frame_count(); }
+        size_t frame_count() const { return _resources.frame_count(); }
         void record(aho::DrawPhase& phase, float time);
     };
 } // namespace typed_example

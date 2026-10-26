@@ -2,6 +2,7 @@
 layout(location = 0) in vec2 position;
 layout(location = 1) in vec3 color;
 layout(set = 0, binding = 0, std140) uniform Scene { vec4 tint; vec4 camera; } scene;
+layout(set = 1, binding = 0, std140) uniform Palette { vec4 gain; } palette;
 layout(push_constant) uniform Draw { vec4 transform; } draw;
 layout(location = 0) out vec3 vertex_color;
 void main() {
@@ -10,5 +11,5 @@ void main() {
     vec2 point = mat2(c, s, -s, c) * position * draw.transform.z;
     vec2 aspect = vec2(min(1.0, 1.0 / scene.camera.z), min(1.0, scene.camera.z));
     gl_Position = vec4((point + draw.transform.xy - scene.camera.xy) * aspect, 0, 1);
-    vertex_color = color * scene.tint.rgb;
+    vertex_color = color * scene.tint.rgb * palette.gain.rgb;
 }

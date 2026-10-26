@@ -40,10 +40,11 @@ C++26対応のcompilerを使います。macOSの検証はLLVM 20/libc++で行い
 
 - `VertexRecord` → `TypedVertexInput`でC++の頂点structからattributeとbindingを宣言します。
 - `BlockRecord` → `UniformBinding` / `PushRange`でshaderの配置とC++の型を結びます。
-- `SceneFrame`へ`TypedUniformBuffer`と`TypedDescriptorSet`をまとめ、`TypedFrameResources<SceneFrame>`でcommand slotごとに独立して生成します。
-- `frames.update(phase, callback)`で現在の枠のUBOだけを更新し、`frames.get(phase)`で描画に使います。色係数・カメラ位置・aspect比・時刻を毎フレーム渡します。GPU完了待ちは既存Phaseが担当します。
+- `ResourceAllocationSchema`へフレームごとのScene UBOと共有Palette UBOを宣言し、`TypedResourceBundle`がbuffer／descriptorの生成とwrite接続を行います。手書きの資源constructorやFactoryは不要です。
+- `resources.initialize_shared(callback)`で共有Paletteを一度初期化し、`resources.update(phase, callback)`で現在の枠のScene UBOだけを更新します。色係数・カメラ位置・aspect比・時刻を毎フレーム渡します。GPU完了待ちは既存Phaseが担当します。
+- `resources.get(phase)`と`frame.bind_resources(...)`で生成済みの全setを描画へ接続します。起動時には計画したbuffer数・set数・descriptor数・論理payload bytesを出力します。標準の3枠では4 buffers／4 sets／4 descriptors／112 bytesです。
 - `TypedVertexBuffer::view(1, 4)`で先頭の不要レコードを除外します。
 - `TypedIndexBuffer<uint16_t>`を使ってquadの2三角形を描きます。
-- `Pushes::Values`へ各quadの位置・scale・回転速度をコピーし、`TypedBatch`で2描画をまとめます。同じpipeline・vertex/index buffer・descriptorへのbindは各1回です。画像の時間変化はUBOが担当するため、検証でUBO更新の効果を確認できます。
+- `Pushes::Values`へ各quadの位置・scale・回転速度をコピーし、`TypedBatch`で2描画をまとめます。pipeline・vertex/index bufferのbindは各1回、descriptorは2つのsetを各1回bindします。画像の時間変化はUBOが担当するため、検証でUBO更新の効果を確認できます。
 
-device・allocator・render pass・format・viewport/scissorは`RenderContext`から取得します。window、送信、resize通知、Screenshotは既存AHO/VSLのAPIを使います。詳細は[documants/typed-frame-resources.md](../../../../documants/typed-frame-resources.md)と[documants/typed-example.md](../../../../documants/typed-example.md)に記録しています。
+device・allocator・render pass・format・viewport/scissorは`RenderContext`から取得します。window、送信、resize通知、Screenshotは既存AHO/VSLのAPIを使います。割当宣言の詳細は[documants/typed-resource-allocation.md](../../../../documants/typed-resource-allocation.md)、フレーム管理は[documants/typed-frame-resources.md](../../../../documants/typed-frame-resources.md)、Sampleは[documants/typed-example.md](../../../../documants/typed-example.md)に記録しています。

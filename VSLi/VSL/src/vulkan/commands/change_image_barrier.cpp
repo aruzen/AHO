@@ -99,6 +99,11 @@ void VSL_NAMESPACE::command::ChangeImageBarrier::invoke(VSL_NAMESPACE::CommandPo
 
         source_stage = vk::PipelineStageFlagBits::eTopOfPipe;
         destination_stage = vk::PipelineStageFlagBits::eTransfer;
+    } else if (old_layout == ImageLayout::SHADER_READ_ONLY_OPTIMAL && new_layout == ImageLayout::TRANSFER_DST_OPTIMAL) {
+        barrier.srcAccessMask = vk::AccessFlagBits::eShaderRead;
+        barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+        source_stage = vk::PipelineStageFlagBits::eAllCommands;
+        destination_stage = vk::PipelineStageFlagBits::eTransfer;
     } else if (old_layout == ImageLayout::UNDEFINED && new_layout == ImageLayout::COLOR_ATTACHMENT_OPTIMAL) {
         barrier.srcAccessMask = {};
         barrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;

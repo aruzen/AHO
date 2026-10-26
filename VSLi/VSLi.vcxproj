@@ -157,6 +157,10 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\image_upload.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\commands\copy_buffer.hpp" />
+    <ClCompile Include="VSL\src\vulkan\commands\image_upload.cpp" />
+    <ClCompile Include="VSL\src\vulkan\commands\copy_buffer.cpp" />
     <ClInclude Include="VSL\consteval_string.h" />
     <ClInclude Include="VSL\include\VSL\concepts.hpp" />
     <ClInclude Include="VSL\include\VSL\consteval_string.hpp" />

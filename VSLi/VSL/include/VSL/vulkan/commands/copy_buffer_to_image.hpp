@@ -13,10 +13,12 @@
 
 #include "../image.hpp"
 #include "../buffer.hpp"
+#include "copy_image_to_buffer.hpp"
 
 namespace VSL_NAMESPACE::command {
     struct CopyBufferToImage : public Command {
         CopyBufferToImage(ImageAccessor image, BufferAccessor* buffer, VSL_NAMESPACE::ImageLayout layout);
+        CopyBufferToImage(ImageAccessor image, BufferAccessor* buffer, ImageLayout layout, ImageRegion region, std::size_t offset = 0);
 
         template<VSL_NAMESPACE::ImageType img_type, VSL_NAMESPACE::MemoryProperty img_mem_prop, VSL_NAMESPACE::ImageLayout layout_,
                  MemoryType mem_type, MemoryProperty buf_mem_prop, SharingMode share_mode>
@@ -25,7 +27,10 @@ namespace VSL_NAMESPACE::command {
         VSL_NAMESPACE::ImageLayout layout;
         ImageAccessor image;
         BufferAccessor* buffer;
+        ImageRegion region;
+        std::size_t offset = 0;
 
+        ImageCopyInfo description() const;
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
 
     private:

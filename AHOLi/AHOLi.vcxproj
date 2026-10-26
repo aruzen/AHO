@@ -176,6 +176,13 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="AHO\include\AHO\command\buffer_upload.hpp" />
+    <ClInclude Include="AHO\include\AHO\x\command\texture_update.hpp" />
+    <ClInclude Include="AHO\src\x\resource\texture_impl.hpp" />
+    <ClCompile Include="AHO\src\command\buffer_upload.cpp" />
+    <ClCompile Include="AHO\src\x\command\texture_update.cpp" />
+    <ClInclude Include="AHO\include\AHO\x\resource\texture.hpp" />
+    <ClCompile Include="AHO\src\x\resource\texture.cpp" />
     <ClInclude Include="AHO\include\AHO\aho.hpp" />
     <ClInclude Include="AHO\include\AHO\concepts.hpp" />
     <ClInclude Include="AHO\include\AHO\core\collision.hpp" />

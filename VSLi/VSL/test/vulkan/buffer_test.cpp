@@ -46,6 +46,9 @@ namespace {
             GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
         HostBuffer buffer(device, std::size_t{64});
         EXPECT_GE(buffer.size(), 64u);
+        EXPECT_EQ(buffer.get_device(), device);
+        EXPECT_EQ(buffer.get_usage(), HostBuffer::TYPE);
+        EXPECT_TRUE(vsl::contain(buffer.get_memory_properties(), HostBuffer::PROPERTY));
         const std::uint32_t expected = 0x10203040;
         EXPECT_TRUE(buffer.copy(expected));
         auto mapped = buffer.data(sizeof(expected));
@@ -949,5 +952,29 @@ namespace {
             GTEST_SKIP() << "This device has protected memory";
         using ProtectedBuffer = vsl::Buffer<vsl::MemoryType::TRANSFER_SOURCE, vsl::MemoryProperty::HOST_VISIBLE | vsl::MemoryProperty::PROTECTED>;
         EXPECT_THROW((ProtectedBuffer(device, std::size_t{4})), vsl::exceptions::RuntimeException);
+    }
+} // namespace
+
+namespace {
+    TEST_F(PersistentBufferVulkanIntegrationTest, WritesBoundedRangesAndFlushesWithoutReplacingTheMapping) {
+        vsl::Buffer<vsl::MemoryType::TRANSFER_SOURCE, vsl::MemoryProperty::HOST_VISIBLE> source(device, std::size_t{32});
+        auto mapping = source.data();
+        std::array<std::byte, 4> payload{std::byte{17}, std::byte{29}, std::byte{43}, std::byte{71}};
+        mapping.write(payload, 4);
+        auto bytes = mapping.read(4, 4);
+        EXPECT_EQ(bytes[0], payload[0]);
+        EXPECT_EQ(bytes[3], payload[3]);
+        const auto* address = bytes.data();
+        auto alias = source;
+        auto alias_mapping = alias.data();
+        alias_mapping.write(std::span(payload).first(2), 4);
+        EXPECT_EQ(alias_mapping.read(4, 4).data(), address);
+        EXPECT_THROW(mapping.write(payload, 30), std::out_of_range);
+        EXPECT_THROW(mapping.write({}, SIZE_MAX), std::out_of_range);
+        EXPECT_NO_THROW(mapping.write({}, 32));
+        source.data_->properties = vsl::MemoryProperty::HOST_VISIBLE;
+        source.data_->atom_size = physical.data_->device.getProperties().limits.nonCoherentAtomSize;
+        mapping.write(std::span(payload).first(1), 31);
+        EXPECT_EQ(mapping.read(1, 31)[0], payload[0]);
     }
 } // namespace

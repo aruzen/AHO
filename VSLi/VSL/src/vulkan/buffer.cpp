@@ -90,6 +90,20 @@ std::size_t VSL_NAMESPACE::BufferAccessor::requested_size() const {
     return data_ ? data_->requirement_size : 0;
 }
 
+VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::BufferAccessor::get_device() const {
+    if (!data_ || !data_->device)
+        throw std::logic_error("Buffer is empty");
+    return LogicalDeviceAccessor{data_->device};
+}
+
+VSL_NAMESPACE::MemoryType VSL_NAMESPACE::BufferAccessor::get_usage() const {
+    return data_ ? data_->usage : MemoryType::NONE;
+}
+
+VSL_NAMESPACE::MemoryProperty VSL_NAMESPACE::BufferAccessor::get_memory_properties() const {
+    return data_ ? data_->properties : MemoryProperty::NONE;
+}
+
 void VSL_NAMESPACE::BufferAccessor::flush_copied(LocalBufferHolder& holder, std::size_t bytes) {
     if (!bytes)
         return;

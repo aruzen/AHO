@@ -5,7 +5,7 @@
 
 namespace typed_example {
     namespace {
-        // The first record is deliberately excluded by the vertex view.
+        // 先頭レコードは頂点viewの範囲から意図的に除外する。
         const std::array<Vertex, 5> VERTICES{{{{99, 99}, {0, 0, 0}},
                                               {{-.6f, -.6f}, {1, .2f, .35f}},
                                               {{.6f, -.6f}, {.2f, .8f, 1}},

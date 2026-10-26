@@ -8,7 +8,7 @@ namespace AHO_NAMESPACE::window {
 } // namespace AHO_NAMESPACE::window
 
 namespace AHO_NAMESPACE {
-    // A live window's drawing services. Target accessors follow swapchain recreation.
+    // 生存中のWindowの描画機能を公開する。描画先の取得はswapchainの再生成に追従する。
     class RenderContext {
         std::shared_ptr<engine::EngineData> _engine;
         std::shared_ptr<window::WindowData> _target;

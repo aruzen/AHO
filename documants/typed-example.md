@@ -28,7 +28,9 @@ swapchain/標準pass/framebufferはAHOのWindowに任せる。GPU完了後のWin
 
 `--verify DIRECTORY`は最初にフレーム枠の4周分を画像読み戻し待ちなしで送信し、その後、通常・UBO変更後・resize後の3枚を保存する。左右それぞれのquad、UBOによる画素変化、resize後の画像サイズ、互換形式でのpipeline再利用を検査する。
 
-LLVM 20 / C++26 / Debug、MoltenVK 1.4.2 + validation layerで成功。3枠／12送信、238831画素の時間変化、1720×1080 → 2000×1360へのresize、pipeline生成1回、2drawのpipeline/vertex/index/descriptor bind各1回を確認した。validation errorなし。変更C++ 3ファイル／2TUのstyle検査は違反0件、2shaderのspirv-valも成功。
+元PRでの検証ではLLVM 20 / C++26 / Debug、MoltenVK 1.4.2 + validation layerで成功。3枠／12送信、238831画素の時間変化、1720×1080 → 2000×1360へのresize、pipeline生成1回、2drawのpipeline/vertex/index/descriptor bind各1回を確認した。validation errorなし。変更C++ 3ファイル／2TUのstyle検査は違反0件、2shaderのspirv-valも成功。
+
+2026-10-26のmaster統合時はLLVM 20 / Release / ASan・UBSan / MoltenVKで`--frames 120`が成功した。`--verify`は通常・回転後の2枚を保存したが、resize後に`Could not acquire a verification frame`で失敗した。この構成ではresizeを含む画像検証は未達。失敗する検証経路を残し、既存のswapchain再取得処理は今回変更していない。
 
 追加のdriver指定なしでも通常イベントループの`--frames 120`が成功し、validation errorなし。
 

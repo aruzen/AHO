@@ -47,11 +47,10 @@ namespace AHO_NAMESPACE::command {
             if (!cpu_source.size())
                 return;
             if (!_destination._state->staging) {
-                resource::Buffer<resource::BufferType::GPU_FRIENDLY> staging(_destination.device());
-                _destination._state->staging = staging.binding()._state;
+                _destination._state->staging = std::make_shared<resource::Buffer<resource::BufferType::GPU_FRIENDLY>>(_destination.device());
             }
 
-            resource::Buffer<resource::BufferType::GPU_FRIENDLY> staging(_destination._state->staging);
+            auto& staging = *_destination._state->staging;
             staging.assign(cpu_source.bytes());
             record(staging.binding(), 0, cpu_source.size());
         }

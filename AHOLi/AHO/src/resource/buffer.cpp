@@ -97,7 +97,7 @@ namespace AHO_NAMESPACE::resource {
     std::shared_ptr<void> BufferBinding::owner() const {
         if (!_state)
             throw std::logic_error("Buffer binding is empty");
-        return _state->resource;
+        return _state->resource.lock();
     }
 
     bool BufferBinding::host_readable() const {

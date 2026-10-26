@@ -1,0 +1,10 @@
+#version 450
+layout(local_size_x = 1) in;
+layout(set = 2, binding = 0, std140) uniform Input { uint value; } input_data;
+layout(set = 2, binding = 1, std140) uniform Bias { uint value; } bias_data;
+layout(set = 2, binding = 3, std430) buffer Output { uint values[]; } output_data;
+layout(set = 5, binding = 0, std140) uniform Extra { uint value; } extra[2];
+void main() {
+    uint index = gl_GlobalInvocationID.x;
+    output_data.values[index] = input_data.value + bias_data.value + extra[0].value + extra[1].value + index;
+}

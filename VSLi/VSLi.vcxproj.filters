@@ -52,6 +52,8 @@
     <ClInclude Include="VSL\include\VSL\utils\typed_buffer_view.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\utils\typed_batch.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\utils\typed_resource_allocation.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\utils\typed_resource_bundle.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\utils\typed_resource_bundle_detail.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\utils\typed_frame_resources.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\utils\typed_shader.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\utils\typed_resources.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
@@ -394,6 +396,7 @@
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="VSL\src\utils\typed_frame_resources.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClCompile Include="VSL\src\utils\typed_resource_bundle.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClCompile Include="VSL\src\window.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>

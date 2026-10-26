@@ -1,6 +1,6 @@
 # glTFアニメーション表示サンプル
 
-`feat/aho-gltf-assets`（PR #201）から分岐した、`examples/gltf_viewer.cpp`の画面表示サンプル。
+`feat/aho-gltf-assets`（PR #201）に含まれる、`examples/gltf_viewer.cpp`の画面表示サンプル。
 同梱のFoxをtinygltf経由で読み、脚・胴体・尻尾が動くRun（走行）の骨格アニメーションをウィンドウで再生する。
 
 ## 起動
@@ -37,17 +37,18 @@ ctest --test-dir build --output-on-failure -R '^AHO.GltfViewer.WindowIntegration
 
 ## 描画経路
 
-`GltfModel::load` → 選択sceneのnode探索 → vertex/index/画像をVSLへupload →
-`sample(animation, time)`で姿勢を評価 → node world matrixと`skinMatrices`のpaletteを渡す → GPUで4関節のlinear blend skinning → `DrawPhase`で描画。
+`GltfModel::Load` → 選択sceneのnode探索 → 共通Meshの形状・SoA属性を取得 → AHO Buffer/Textureへupload →
+`sample(animation, time)`で姿勢を評価 → node world matrixと`skin_matrices`のpaletteを渡す → GPUで4関節のlinear blend skinning → `DrawPhase`で描画。
 カメラはrest poseの境界から配置する。glTFのcolumn-major/右手系を維持し、射影でVulkan用にYを1回反転する。
 
 baseColor画像はsRGB形式でupload。material/vertex colorと簡単な拡散照明を適用する。
 swapchain画像ごとのdepth attachmentを作成し、リサイズ時はGPU完了後にframebuffer/pipelineを再作成する。
-vertex/index/textureは初期化時のみuploadし、毎フレームは姿勢行列を更新する。
-関節paletteのstorage bufferとdescriptor setはcommand slotごとに用意し、DrawPhaseがそのslotの完了を待ってから書き換える。
+vertex/indexは`Buffer<ON_GPU>::upload()`、画像は`Texture::update(Buffer<GENERAL>)`で初期化時に転送する。stagingとbarrierは共通コマンドが処理する。
+関節paletteの`Buffer<GPU_FRIENDLY>`とdescriptor setはcommand slotごとに用意し、DrawPhaseがそのslotの完了を待ってから書き換える。毎フレームのGPU資源の生成は行わない。
+device・descriptor manager・command managerの取得には`Window::render_context()`を使う。
 法線のないモデルでは面積で重み付けした頂点法線を生成する。skinとworldを合成した行列の逆転置で法線を変換する。
 
-このサンプルは不透明なtriangle、nodeのTRS animation、JOINTS_0/WEIGHTS_0による4関節までのskinningを対象にする。morph、透過、完全なPBR、mipmap生成、素材別の全sampler設定には未対応。
+このサンプルは不透明な三角形（strip/fanを含む）、nodeのTRS animation、JOINTS_0/WEIGHTS_0による4関節までのskinningを対象にする。morph、透過、完全なPBR、mipmap生成、素材別の全sampler設定には未対応。
 別モデルでも同じ範囲に対応する。nodeの回転だけをプログラムで追加する処理はなく、同梱glTFに記録されたanimationを再生する。
 
 ## 素材と利用条件

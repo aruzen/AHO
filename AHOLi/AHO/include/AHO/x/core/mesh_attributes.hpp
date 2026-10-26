@@ -1,6 +1,6 @@
 #pragma once
 #include "../../define.hpp"
-#include <saitekikuukan.hpp>
+#include "../../core/detail/soa_storage.hpp"
 #include <array>
 #include <algorithm>
 #include <concepts>
@@ -51,44 +51,48 @@ namespace AHO_NAMESPACE::x {
             }
         };
 
-        template<typename Row, typename List>
+        template<typename Row, typename List, typename Layout>
         struct MeshAttributeColumns;
 
-        template<typename Row, auto... Members>
-        struct MeshAttributeColumns<Row, MeshAttributeMembers<Members...>> {
+        template<typename Row, typename Layout, auto... Members>
+        struct MeshAttributeColumns<Row, MeshAttributeMembers<Members...>, Layout> {
             static_assert((std::same_as<Row, typename MeshAttributeMemberType<decltype(Members)>::OwnerType> && ...),
                           "MeshAttributeSchema fields must belong to the row type");
             static_assert(((MeshAttributeIndex::Get<Members, Members...>() < sizeof...(Members)) && ...));
-            using Columns = SAITEKIKUUKAN_NAMESPACE::soa<typename MeshAttributeMemberType<decltype(Members)>::ValueType...>;
+            using Columns = SAITEKIKUUKAN_NAMESPACE::buffer<
+                SAITEKIKUUKAN_NAMESPACE::type_list<typename MeshAttributeMemberType<decltype(Members)>::ValueType...>,
+                SAITEKIKUUKAN_NAMESPACE::strategy::structure_of_array, Layout>;
 
             template<auto Member>
             static consteval std::size_t Index();
             static void Append(Columns& columns, const Row& row);
+            static void Initialize(Columns& columns, std::size_t count);
             static Row Read(const Columns& columns, std::size_t index);
             static void Write(Columns& columns, std::size_t index, const Row& row);
         };
 
 #if defined(__cpp_impl_reflection) && __cpp_impl_reflection >= 202506L
-        template<typename Row>
-        struct MeshAttributeColumns<Row, void> {
-            using Columns = SAITEKIKUUKAN_NAMESPACE::record_soa<Row>;
+        template<typename Row, typename Layout>
+        struct MeshAttributeColumns<Row, void, Layout> {
+            using Columns = SAITEKIKUUKAN_NAMESPACE::buffer<Row, SAITEKIKUUKAN_NAMESPACE::strategy::structure_of_array, Layout>;
 
             template<auto Member>
             static consteval std::size_t Index();
             static void Append(Columns& columns, const Row& row);
+            static void Initialize(Columns& columns, std::size_t count);
             static Row Read(const Columns& columns, std::size_t index);
             static void Write(Columns& columns, std::size_t index, const Row& row);
         };
 #else
-        template<typename Row>
-        struct MeshAttributeColumns<Row, void> : MeshAttributeColumns<Row, typename MeshAttributeSchema<Row>::Members> {};
+        template<typename Row, typename Layout>
+        struct MeshAttributeColumns<Row, void, Layout> : MeshAttributeColumns<Row, typename MeshAttributeSchema<Row>::Members, Layout> {};
 #endif
     } // namespace detail
 
-    template<typename Row, typename Members = void>
+    template<typename Row, typename Members = void, typename Layout = SAITEKIKUUKAN_NAMESPACE::storage::dynamic_layout<>>
     class MeshAttributes {
         static_assert(std::default_initializable<Row> && std::copy_constructible<Row>);
-        using Storage = detail::MeshAttributeColumns<Row, Members>;
+        using Storage = detail::MeshAttributeColumns<Row, Members, Layout>;
         using Columns = typename Storage::Columns;
         Columns _columns;
 
@@ -132,33 +136,42 @@ namespace AHO_NAMESPACE::x {
         void write(std::size_t index, const Row& row);
     };
 
-    template<typename Row, auto... Members>
+    template<typename Row, typename Layout, auto... Members>
     template<auto Member>
-    consteval std::size_t detail::MeshAttributeColumns<Row, MeshAttributeMembers<Members...>>::Index() {
+    consteval std::size_t detail::MeshAttributeColumns<Row, MeshAttributeMembers<Members...>, Layout>::Index() {
         return MeshAttributeIndex::Get<Member, Members...>();
     }
 
-    template<typename Row, auto... Members>
-    void detail::MeshAttributeColumns<Row, MeshAttributeMembers<Members...>>::Append(Columns& columns, const Row& row) {
-        columns.push_back(row.*Members...);
+    template<typename Row, typename Layout, auto... Members>
+    void detail::MeshAttributeColumns<Row, MeshAttributeMembers<Members...>, Layout>::Append(Columns& columns, const Row& row) {
+        AHO_NAMESPACE::detail::check_soa_result(columns.push_back(row.*Members...));
     }
 
-    template<typename Row, auto... Members>
-    Row detail::MeshAttributeColumns<Row, MeshAttributeMembers<Members...>>::Read(const Columns& columns, std::size_t index) {
+    template<typename Row, typename Layout, auto... Members>
+    void detail::MeshAttributeColumns<Row, MeshAttributeMembers<Members...>, Layout>::Initialize(Columns& columns, std::size_t count) {
+        columns.reserve(count);
+        for (std::size_t i = 0; i < count; ++i) {
+            const Row row{};
+            Append(columns, row);
+        }
+    }
+
+    template<typename Row, typename Layout, auto... Members>
+    Row detail::MeshAttributeColumns<Row, MeshAttributeMembers<Members...>, Layout>::Read(const Columns& columns, std::size_t index) {
         Row result{};
         ((result.*Members = columns.template column<MeshAttributeIndex::Get<Members, Members...>()>()[index]), ...);
         return result;
     }
 
-    template<typename Row, auto... Members>
-    void detail::MeshAttributeColumns<Row, MeshAttributeMembers<Members...>>::Write(Columns& columns, std::size_t index, const Row& row) {
+    template<typename Row, typename Layout, auto... Members>
+    void detail::MeshAttributeColumns<Row, MeshAttributeMembers<Members...>, Layout>::Write(Columns& columns, std::size_t index, const Row& row) {
         columns.write(index, typename Columns::value_type{row.*Members...});
     }
 
 #if defined(__cpp_impl_reflection) && __cpp_impl_reflection >= 202506L
-    template<typename Row>
+    template<typename Row, typename Layout>
     template<auto Member>
-    consteval std::size_t detail::MeshAttributeColumns<Row, void>::Index() {
+    consteval std::size_t detail::MeshAttributeColumns<Row, void, Layout>::Index() {
         using MemberType = decltype(Member);
         using Value = typename MeshAttributeMemberType<MemberType>::ValueType;
         static_assert(std::same_as<Row, typename MeshAttributeMemberType<MemberType>::OwnerType>);
@@ -173,117 +186,118 @@ namespace AHO_NAMESPACE::x {
         throw "The field must be a direct data member of the row type";
     }
 
-    template<typename Row>
-    void detail::MeshAttributeColumns<Row, void>::Append(Columns& columns, const Row& row) {
-        columns.push_back(row);
+    template<typename Row, typename Layout>
+    void detail::MeshAttributeColumns<Row, void, Layout>::Append(Columns& columns, const Row& row) {
+        AHO_NAMESPACE::detail::check_soa_result(columns.push_back(row));
     }
 
-    template<typename Row>
-    Row detail::MeshAttributeColumns<Row, void>::Read(const Columns& columns, std::size_t index) {
+    template<typename Row, typename Layout>
+    void detail::MeshAttributeColumns<Row, void, Layout>::Initialize(Columns& columns, std::size_t count) {
+        AHO_NAMESPACE::detail::check_soa_result(columns.resize(count));
+    }
+
+    template<typename Row, typename Layout>
+    Row detail::MeshAttributeColumns<Row, void, Layout>::Read(const Columns& columns, std::size_t index) {
         return columns.read(index);
     }
 
-    template<typename Row>
-    void detail::MeshAttributeColumns<Row, void>::Write(Columns& columns, std::size_t index, const Row& row) {
+    template<typename Row, typename Layout>
+    void detail::MeshAttributeColumns<Row, void, Layout>::Write(Columns& columns, std::size_t index, const Row& row) {
         columns.write(index, row);
     }
 #endif
 
-    template<typename Row, typename Members>
-    MeshAttributes<Row, Members>::MeshAttributes(std::span<const Row> rows) {
+    template<typename Row, typename Members, typename Layout>
+    MeshAttributes<Row, Members, Layout>::MeshAttributes(std::span<const Row> rows) {
         _columns.reserve(rows.size());
         for (const auto& row : rows)
             Storage::Append(_columns, row);
     }
 
-    template<typename Row, typename Members>
-    MeshAttributes<Row, Members>::MeshAttributes(std::size_t count) {
-        _columns.reserve(count);
-        for (std::size_t i = 0; i < count; ++i) {
-            const Row row{};
-            Storage::Append(_columns, row);
-        }
+    template<typename Row, typename Members, typename Layout>
+    MeshAttributes<Row, Members, Layout>::MeshAttributes(std::size_t count) {
+        Storage::Initialize(_columns, count);
     }
 
-    template<typename Row, typename Members>
-    std::size_t MeshAttributes<Row, Members>::size() const noexcept {
+    template<typename Row, typename Members, typename Layout>
+    std::size_t MeshAttributes<Row, Members, Layout>::size() const noexcept {
         return _columns.size();
     }
 
-    template<typename Row, typename Members>
-    bool MeshAttributes<Row, Members>::empty() const noexcept {
+    template<typename Row, typename Members, typename Layout>
+    bool MeshAttributes<Row, Members, Layout>::empty() const noexcept {
         return _columns.empty();
     }
 
-    template<typename Row, typename Members>
+    template<typename Row, typename Members, typename Layout>
     template<auto Member>
-    auto MeshAttributes<Row, Members>::column() noexcept {
+    auto MeshAttributes<Row, Members, Layout>::column() noexcept {
         return _columns.template column<Storage::template Index<Member>()>();
     }
 
-    template<typename Row, typename Members>
+    template<typename Row, typename Members, typename Layout>
     template<auto Member>
-    auto MeshAttributes<Row, Members>::column() const noexcept {
+    auto MeshAttributes<Row, Members, Layout>::column() const noexcept {
         return _columns.template column<Storage::template Index<Member>()>();
     }
 
-    template<typename Row, typename Members>
-    auto MeshAttributes<Row, Members>::operator[](std::size_t index) noexcept -> RowRef<false> {
+    template<typename Row, typename Members, typename Layout>
+    auto MeshAttributes<Row, Members, Layout>::operator[](std::size_t index) noexcept -> RowRef<false> {
         return {*this, index};
     }
 
-    template<typename Row, typename Members>
-    auto MeshAttributes<Row, Members>::operator[](std::size_t index) const noexcept -> RowRef<true> {
+    template<typename Row, typename Members, typename Layout>
+    auto MeshAttributes<Row, Members, Layout>::operator[](std::size_t index) const noexcept -> RowRef<true> {
         return {*this, index};
     }
 
-    template<typename Row, typename Members>
-    auto MeshAttributes<Row, Members>::at(std::size_t index) -> RowRef<false> {
+    template<typename Row, typename Members, typename Layout>
+    auto MeshAttributes<Row, Members, Layout>::at(std::size_t index) -> RowRef<false> {
         if (index >= size())
             throw std::out_of_range("MeshAttributes row index exceeds size");
         return (*this)[index];
     }
 
-    template<typename Row, typename Members>
-    auto MeshAttributes<Row, Members>::at(std::size_t index) const -> RowRef<true> {
+    template<typename Row, typename Members, typename Layout>
+    auto MeshAttributes<Row, Members, Layout>::at(std::size_t index) const -> RowRef<true> {
         if (index >= size())
             throw std::out_of_range("MeshAttributes row index exceeds size");
         return (*this)[index];
     }
 
-    template<typename Row, typename Members>
-    Row MeshAttributes<Row, Members>::read(std::size_t index) const {
+    template<typename Row, typename Members, typename Layout>
+    Row MeshAttributes<Row, Members, Layout>::read(std::size_t index) const {
         (void)at(index);
         return Storage::Read(_columns, index);
     }
 
-    template<typename Row, typename Members>
-    void MeshAttributes<Row, Members>::write(std::size_t index, const Row& row) {
+    template<typename Row, typename Members, typename Layout>
+    void MeshAttributes<Row, Members, Layout>::write(std::size_t index, const Row& row) {
         (void)at(index);
         Storage::Write(_columns, index, row);
     }
 
-    template<typename Row, typename Members>
+    template<typename Row, typename Members, typename Layout>
     template<bool IS_CONST>
-    MeshAttributes<Row, Members>::RowRef<IS_CONST>::RowRef(Parent& parent, std::size_t index) noexcept
+    MeshAttributes<Row, Members, Layout>::RowRef<IS_CONST>::RowRef(Parent& parent, std::size_t index) noexcept
         : _parent(&parent), _index(index) {}
 
-    template<typename Row, typename Members>
+    template<typename Row, typename Members, typename Layout>
     template<bool IS_CONST>
     template<auto Member>
-    decltype(auto) MeshAttributes<Row, Members>::RowRef<IS_CONST>::get() const noexcept {
+    decltype(auto) MeshAttributes<Row, Members, Layout>::RowRef<IS_CONST>::get() const noexcept {
         return _parent->template column<Member>()[_index];
     }
 
-    template<typename Row, typename Members>
+    template<typename Row, typename Members, typename Layout>
     template<bool IS_CONST>
-    Row MeshAttributes<Row, Members>::RowRef<IS_CONST>::read() const {
+    Row MeshAttributes<Row, Members, Layout>::RowRef<IS_CONST>::read() const {
         return _parent->read(_index);
     }
 
-    template<typename Row, typename Members>
+    template<typename Row, typename Members, typename Layout>
     template<bool IS_CONST>
-    void MeshAttributes<Row, Members>::RowRef<IS_CONST>::write(const Row& row) const
+    void MeshAttributes<Row, Members, Layout>::RowRef<IS_CONST>::write(const Row& row) const
     requires(!IS_CONST)
     {
         _parent->write(_index, row);

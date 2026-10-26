@@ -195,6 +195,7 @@
     <ClInclude Include="AHO\include\AHO\core\point.hpp" />
     <ClInclude Include="AHO\include\AHO\core\triangulation.hpp" />
     <ClInclude Include="AHO\include\AHO\core\detail\geometry2d.hpp" />
+    <ClInclude Include="AHO\include\AHO\core\detail\soa_storage.hpp" />
     <ClInclude Include="AHO\include\AHO\core\polygon.hpp" />
     <ClInclude Include="AHO\include\AHO\core\triangle.hpp" />
     <ClInclude Include="AHO\include\AHO\core\vector.hpp" />

@@ -18,6 +18,12 @@ points()/indices()はconst span、triangles()/lines()は読み取り用の遅延
 
 メッシュは任意の三角形集合を受け付け、自己交差・重複・退化した三角形を禁止しません。輪郭からの構築とは契約を分けます。従来Line/Triangleの仮実装operator+の意味の変更は含めません。
 
+## ストレージ
+
+位置と三角形インデックスはsaitekikuukanの`buffer<type_list<T>>`で保持します。ID管理やイベントを持たない連続したSoA列を使い、取得時のコピーを挟まずconst spanへ接続します。`Alloc`は三角形列へ適用します。
+
+追加が返す`expected`はAHO側で確認し、容量超過を`std::length_error`へ変換します。確保・構築の例外は伝播し、代入時は従来どおりallocatorと形状の整合性を保ちます。nativeのチャンク配置への変更は含まず、GPUへ渡せる連続性を維持します。
+
 ## 輪郭の三角形分割
 
 `<AHO/core/triangulation.hpp>`の`triangulate<Size = std::size_t>(points)`は、輪郭順の2D点列を`std::expected<Polygon<...>, TriangulationFailedCause>`として返します。input_rangeを受け、時計回り・反時計回りを維持します。終点の始点繰り返しは除去し、直線上の中間頂点は三角形の参照から外します。元の頂点番号を維持するため、未参照の頂点が残る場合があります。

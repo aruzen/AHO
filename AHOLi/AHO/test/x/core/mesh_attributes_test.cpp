@@ -8,12 +8,44 @@ namespace {
         std::string name = "default";
         bool visible = true;
     };
-    using Attributes = aho::x::MeshAttributes<Attribute,
-                                              aho::x::MeshAttributeMembers<&Attribute::uv0, &Attribute::uv1, &Attribute::name, &Attribute::visible>>;
+    using Members = aho::x::MeshAttributeMembers<&Attribute::uv0, &Attribute::uv1, &Attribute::name, &Attribute::visible>;
+    using Attributes = aho::x::MeshAttributes<Attribute, Members>;
+
+    template<typename Layout, typename Fields = Members>
+    void check_bounded_attributes() {
+        using Bounded = aho::x::MeshAttributes<Attribute, Fields, Layout>;
+        Bounded empty;
+        EXPECT_TRUE(empty.empty());
+        Bounded attributes(1);
+        EXPECT_EQ(attributes.size(), 1u);
+        EXPECT_EQ(attributes.template column<&Attribute::name>().size(), 1u);
+        EXPECT_EQ(attributes.read(0).name, "default");
+        EXPECT_EQ(attributes.read(0).uv1[0], 1);
+        auto copy = attributes;
+        copy[0].write(Attribute{{2, 3}, {4, 5}, "changed", false});
+        EXPECT_EQ(attributes.read(0).name, "default");
+        EXPECT_FALSE(copy.read(0).visible);
+        auto moved = std::move(copy);
+        EXPECT_TRUE(copy.empty());
+        EXPECT_EQ(moved.read(0).uv1[1], 5);
+        const auto& read_only = attributes;
+        static_assert(std::same_as<decltype(read_only.template column<&Attribute::name>()), std::span<const std::string>>);
+        Bounded full(2);
+        EXPECT_EQ(full.size(), 2u);
+        EXPECT_THROW((void)Bounded(3), std::length_error);
+        const std::array rows{Attribute{}, Attribute{}, Attribute{}};
+        EXPECT_THROW((void)Bounded(rows), std::length_error);
+        EXPECT_EQ(attributes.read(0).name, "default");
+    }
 } // namespace
 
 #if defined(__cpp_impl_reflection) && __cpp_impl_reflection >= 202506L
 namespace {
+    TEST(MeshAttributesTest, ReflectedFixedAndBoundedStoragePreserveRowsAndRejectCapacityOverflow) {
+        check_bounded_attributes<kk::storage::fixed_layout<2>, void>();
+        check_bounded_attributes<kk::storage::dynamic_layout<2>, void>();
+    }
+
     TEST(MeshAttributesTest, ReflectionUsesUnregisteredStructWithRepeatedTypesAndDefaults) {
         aho::x::MeshAttributes<Attribute> attributes(2);
         EXPECT_EQ(attributes.read(1).name, "default");
@@ -49,6 +81,11 @@ namespace {
 #endif
 
 namespace {
+    TEST(MeshAttributesTest, ExplicitFixedAndBoundedStoragePreserveRowsAndRejectCapacityOverflow) {
+        check_bounded_attributes<kk::storage::fixed_layout<2>>();
+        check_bounded_attributes<kk::storage::dynamic_layout<2>>();
+    }
+
     TEST(MeshAttributesTest, NativeSoAColumnsKeepDefaultsConstnessAndProxyFields) {
         Attributes attributes(2);
         EXPECT_EQ(attributes.size(), 2u);

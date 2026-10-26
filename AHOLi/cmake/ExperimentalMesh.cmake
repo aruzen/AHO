@@ -22,8 +22,8 @@ if(AHO_ENABLE_EXPERIMENTAL_MESH)
         #endif
         struct Row { int value = 7; };
         int main() {
-            SAITEKIKUUKAN_NAMESPACE::record_soa<Row> rows;
-            rows.resize(1);
+            SAITEKIKUUKAN_NAMESPACE::buffer<Row> rows;
+            rows.resize(1).value();
             rows.column<^^Row::value>()[0] = 42;
             return rows.read(0).value != 42;
         }

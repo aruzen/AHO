@@ -152,6 +152,26 @@ namespace {
         EXPECT_EQ(mesh.vertex_data().size(), mesh.vertex_count());
     }
 
+    TEST(ExperimentalMeshTest, BoundedAttributesKeepGeometryAndColumnsTogetherAcrossCopyAndMove) {
+        using Vertices = aho::x::MeshAttributes<VertexData, void, kk::storage::fixed_layout<3>>;
+        using Triangles = aho::x::MeshAttributes<TriangleData, void, kk::storage::dynamic_layout<1>>;
+        using BoundedMesh = aho::x::Mesh<Polygon, VertexData, TriangleData, Vertices, Triangles>;
+        BoundedMesh mesh{Polygon(POINTS, INDICES)};
+        EXPECT_EQ(mesh.vertex_count(), 3u);
+        EXPECT_EQ(mesh.vertex_column<&VertexData::uv0>().size(), 3u);
+        EXPECT_EQ(mesh.triangle(0).read().material, 7u);
+        auto copy = mesh;
+        copy.vertex_column<&VertexData::uv0>()[0] = {7, 8};
+        auto moved = std::move(copy);
+        EXPECT_TRUE(copy.empty());
+        EXPECT_TRUE(copy.vertex_data().empty());
+        EXPECT_EQ(moved.vertex(0).read().uv0[1], 8);
+        EXPECT_EQ(mesh.vertex(0).read().uv0[0], 0);
+        const std::array points{POINTS[0], POINTS[1], POINTS[2], POINTS[0]};
+        EXPECT_THROW((void)BoundedMesh{Polygon(points, INDICES)}, std::length_error);
+        EXPECT_EQ(mesh.vertex_count(), 3u);
+    }
+
     TEST(ExperimentalMeshTest, DuplicatePositionsRetainDistinctUVsAndNarrowIndices) {
         using Geometry = aho::Polygon<float, vsl::D2,
                                       aho::coordinate::DefaultCoordinateInfo<vsl::D2>::Value, std::uint16_t>;

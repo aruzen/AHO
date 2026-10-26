@@ -1,5 +1,6 @@
 #pragma once
 #include "triangle.hpp"
+#include "detail/soa_storage.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -11,7 +12,6 @@
 #include <vector>
 #include <memory>
 #include <utility>
-#include <saitekikuukan.hpp>
 
 namespace AHO_NAMESPACE {
     namespace detail {
@@ -35,8 +35,10 @@ namespace AHO_NAMESPACE {
         static_assert(std::is_integral_v<Size> && std::is_unsigned_v<Size> && !std::same_as<Size, bool>);
 
     private:
-        using PointStorage = SAITEKIKUUKAN_NAMESPACE::soa<PointType>;
-        using TriangleStorage = SAITEKIKUUKAN_NAMESPACE::basic_soa<detail::PolygonTriangleLayout<Alloc>, TriangleType>;
+        using PointStorage = SAITEKIKUUKAN_NAMESPACE::buffer<SAITEKIKUUKAN_NAMESPACE::type_list<PointType>>;
+        using TriangleStorage = SAITEKIKUUKAN_NAMESPACE::buffer<
+            SAITEKIKUUKAN_NAMESPACE::type_list<TriangleType>, SAITEKIKUUKAN_NAMESPACE::strategy::structure_of_array,
+            detail::PolygonTriangleLayout<Alloc>>;
         static constexpr bool FAST_TRIANGLE_MOVE =
             std::allocator_traits<Alloc>::is_always_equal::value ||
             std::allocator_traits<Alloc>::propagate_on_container_swap::value;
@@ -76,9 +78,9 @@ namespace AHO_NAMESPACE {
         _points.reserve(points.size());
         _triangles.reserve(triangles.size());
         for (const auto& point : points)
-            _points.push_back(point);
+            detail::check_soa_result(_points.push_back(point));
         for (const auto& triangle : triangles)
-            _triangles.push_back(triangle);
+            detail::check_soa_result(_triangles.push_back(triangle));
     }
 
     template<typename R, VSL_NAMESPACE::is_dimension D, typename CI, typename Size, typename Alloc>
@@ -104,7 +106,7 @@ namespace AHO_NAMESPACE {
             _points = std::move(other._points);
             try {
                 for (const auto& triangle : other.indices())
-                    _triangles.push_back(triangle);
+                    detail::check_soa_result(_triangles.push_back(triangle));
             } catch (...) {
                 other._points = std::move(_points);
                 _triangles.clear();

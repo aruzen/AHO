@@ -75,6 +75,7 @@ add_library(VSL STATIC
         VSL/include/VSL/utils/typed_batch.hpp
         VSL/include/VSL/utils/typed_shader.hpp
         VSL/include/VSL/utils/typed_resources.hpp
+        VSL/include/VSL/utils/typed_resource_allocation.hpp
         VSL/include/VSL/utils/typed_frame_resources.hpp
         VSL/include/VSL/utils/typed_descriptor_schema.hpp
         VSL/include/VSL/utils/typed_push_constants.hpp

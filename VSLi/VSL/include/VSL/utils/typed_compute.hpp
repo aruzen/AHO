@@ -114,7 +114,7 @@ namespace VSL_NAMESPACE::typed {
         resources.reserve(sizeof...(Sets));
         size_t set_index = 0;
         (resources.emplace_back(sets.backend(), graphic_resource::BindingDestination::COMPUTE, _pipeline,
-                                Resources::SET_NUMBERS[set_index++]),
+                                Resources::SET_NUMBERS[set_index++], sets.resource_use()),
          ...);
         return TypedComputeBinding<Resources, Pushes>(_pipeline, _device, std::move(resources));
     }

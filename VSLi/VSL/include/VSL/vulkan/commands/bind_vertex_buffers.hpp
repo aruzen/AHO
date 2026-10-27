@@ -2,6 +2,7 @@
 #include "../../define.hpp"
 #include "../pv.hpp"
 #include "../command.hpp"
+#include "../resource_use.hpp"
 
 #include "../buffer.hpp"
 #include <concepts>
@@ -9,9 +10,10 @@
 namespace VSL_NAMESPACE::command {
     // Explicit binding, with ownership retained even if the C++ buffer wrapper is destroyed.
     struct BindVertexBufferAt : Command {
-        BindVertexBufferAt(std::uint32_t binding, const BufferAccessor& source, size_t offset = 0);
-        BindVertexBufferAt(std::uint32_t binding, std::shared_ptr<impl::BufferImpl> source, size_t offset = 0);
+        BindVertexBufferAt(std::uint32_t binding, const BufferAccessor& source, size_t offset = 0, ResourceUse use = {});
+        BindVertexBufferAt(std::uint32_t binding, std::shared_ptr<impl::BufferImpl> source, size_t offset = 0, ResourceUse use = {});
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
+        void track(const CommandBuffer& buffer) const { _use.record(buffer); }
         std::uint32_t binding() const { return _binding; }
         size_t offset() const { return _offset; }
         const std::shared_ptr<impl::BufferImpl>& source() const { return _source; }
@@ -20,6 +22,7 @@ namespace VSL_NAMESPACE::command {
         std::uint32_t _binding;
         size_t _offset;
         std::shared_ptr<impl::BufferImpl> _source;
+        ResourceUse _use;
     };
 
     struct BindVertexBuffer : Command {

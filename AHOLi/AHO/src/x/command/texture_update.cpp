@@ -17,8 +17,7 @@ namespace AHO_NAMESPACE::x::command {
         if (!completion || completion.status() != VSL_NAMESPACE::Completion::Status::PENDING)
             throw std::logic_error("Texture update requires a recording phase");
         texture.settle();
-        if (texture.update && texture.update != completion)
-            throw std::logic_error("Texture or upload source is still in use by another phase");
+        texture.check_available(completion);
         auto source = std::visit(
             [&](const auto& value) -> AHO_NAMESPACE::resource::BufferBinding {
                 if constexpr (std::same_as<std::decay_t<decltype(value)>, AHO_NAMESPACE::resource::Buffer<AHO_NAMESPACE::resource::BufferType::GENERAL>>) {
@@ -39,7 +38,8 @@ namespace AHO_NAMESPACE::x::command {
             throw std::invalid_argument("Texture update device mismatch");
         buffer.retain(source.owner());
         command.invoke(pool, buffer, manager);
-        texture.update = completion;
+        texture.update = VSL_NAMESPACE::CompletionObservation(completion);
+        texture.mark_used(completion);
         source.mark_used(std::move(completion));
     }
 } // namespace AHO_NAMESPACE::x::command

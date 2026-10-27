@@ -2,6 +2,7 @@
 #include <AHO/define.hpp>
 #include <VSL/vulkan/buffer.hpp>
 #include <VSL/vulkan/command.hpp>
+#include <VSL/vulkan/resource_use.hpp>
 #include <concepts>
 #include <cstddef>
 #include <memory>
@@ -54,17 +55,13 @@ namespace AHO_NAMESPACE::resource {
 
     namespace detail {
         // Submissionはresourceだけを保持し、Completionを持つこの状態は保持しない。
-        struct BufferState {
+        struct BufferState : VSL_NAMESPACE::ResourceUseState {
             VSL_NAMESPACE::LogicalDeviceAccessor device;
-            std::shared_ptr<void> resource;
+            std::weak_ptr<void> resource;
             VSL_NAMESPACE::BufferAccessor* native = nullptr;
             std::size_t size = 0;
             bool host_readable = false;
-            VSL_NAMESPACE::Completion use;
-            std::shared_ptr<BufferState> staging;
-
-            bool busy() const;
-            void require_idle() const;
+            std::shared_ptr<Buffer<BufferType::GPU_FRIENDLY>> staging;
         };
 
         template<typename Storage, typename Customization>
@@ -87,6 +84,7 @@ namespace AHO_NAMESPACE::resource {
         VSL_NAMESPACE::BufferAccessor& native() const;
         std::shared_ptr<void> owner() const;
         bool host_readable() const;
+        VSL_NAMESPACE::ResourceUse resource_use() const;
 
         void check_available(const VSL_NAMESPACE::Completion& completion) const;
         void mark_used(VSL_NAMESPACE::Completion completion) const;
@@ -138,6 +136,11 @@ namespace AHO_NAMESPACE::resource {
         };
 
         template<typename Storage, typename Customization>
+        struct TypedBufferState : BufferState {
+            std::shared_ptr<BufferResource<Storage, Customization>> typed_resource;
+        };
+
+        template<typename Storage, typename Customization>
         concept resizable_storage =
             mappable_storage<Storage, Customization> &&
             std::copy_constructible<Customization> &&
@@ -148,7 +151,7 @@ namespace AHO_NAMESPACE::resource {
         template<typename Storage, typename Customization>
         class GPUBufferBase {
             using Resource = BufferResource<Storage, Customization>;
-            std::shared_ptr<BufferState> _state;
+            std::shared_ptr<TypedBufferState<Storage, Customization>> _state;
 
             Resource& resource() const;
 
@@ -156,8 +159,6 @@ namespace AHO_NAMESPACE::resource {
             requires resizable_storage<Storage, Customization>;
 
         protected:
-            explicit GPUBufferBase(std::shared_ptr<BufferState> state);
-
             void initialize(VSL_NAMESPACE::LogicalDeviceAccessor device, std::optional<Storage> storage,
                             Customization customization, std::size_t size);
 
@@ -226,9 +227,6 @@ namespace AHO_NAMESPACE::resource {
     class Buffer<BufferType::GPU_FRIENDLY> : public detail::GPUBufferBase<detail::HostBuffer, detail::HostBufferCustomization> {
         using Base = detail::GPUBufferBase<detail::HostBuffer, detail::HostBufferCustomization>;
 
-        explicit Buffer(std::shared_ptr<detail::BufferState> state);
-        friend class AHO_NAMESPACE::command::BufferUpload;
-
     public:
         explicit Buffer(VSL_NAMESPACE::LogicalDeviceAccessor device, std::size_t size = 0);
     };
@@ -286,7 +284,7 @@ namespace AHO_NAMESPACE::resource {
         auto GPUBufferBase<Storage, Customization>::resource() const -> Resource& {
             if (!_state)
                 throw std::logic_error("Buffer is empty");
-            return *static_cast<Resource*>(_state->resource.get());
+            return *_state->typed_resource;
         }
 
         template<typename Storage, typename Customization>
@@ -309,11 +307,9 @@ namespace AHO_NAMESPACE::resource {
             if (preserve && _state->size)
                 next->mapping->write(old.mapping->read(_state->size), 0);
             _state->native = &*next->storage;
-            _state->resource = std::move(next);
+            _state->typed_resource = std::move(next);
+            _state->resource = _state->typed_resource;
         }
-
-        template<typename Storage, typename Customization>
-        GPUBufferBase<Storage, Customization>::GPUBufferBase(std::shared_ptr<BufferState> state) : _state(std::move(state)) {}
 
         template<typename Storage, typename Customization>
         void GPUBufferBase<Storage, Customization>::initialize(VSL_NAMESPACE::LogicalDeviceAccessor device, std::optional<Storage> storage,
@@ -321,12 +317,13 @@ namespace AHO_NAMESPACE::resource {
             if (!device.data_)
                 throw std::invalid_argument("Buffer requires a device");
             auto owner = std::make_shared<Resource>(std::move(storage), std::move(customization));
-            _state = std::make_shared<BufferState>();
+            _state = std::make_shared<TypedBufferState<Storage, Customization>>();
             _state->device = device;
             _state->size = size;
             _state->host_readable = mappable_storage<Storage, Customization>;
             _state->native = owner->storage ? &*owner->storage : nullptr;
-            _state->resource = std::move(owner);
+            _state->typed_resource = std::move(owner);
+            _state->resource = _state->typed_resource;
         }
 
         template<typename Storage, typename Customization>
@@ -360,7 +357,7 @@ namespace AHO_NAMESPACE::resource {
         template<typename Storage, typename Customization>
         bool GPUBufferBase<Storage, Customization>::wait(std::uint64_t timeout) const {
             (void)resource();
-            return !busy() || _state->use.wait(timeout);
+            return _state->wait(timeout);
         }
 
         template<typename Storage, typename Customization>
@@ -467,8 +464,6 @@ namespace AHO_NAMESPACE::resource {
             return create(bytes);
         }
     } // namespace detail
-
-    inline Buffer<BufferType::GPU_FRIENDLY>::Buffer(std::shared_ptr<detail::BufferState> state) : Base(std::move(state)) {}
 
     inline Buffer<BufferType::GPU_FRIENDLY>::Buffer(VSL_NAMESPACE::LogicalDeviceAccessor device, std::size_t size)
         : Base(device, size ? std::optional<detail::HostBuffer>(std::in_place, device, size) : std::nullopt,

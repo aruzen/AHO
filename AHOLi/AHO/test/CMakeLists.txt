@@ -71,6 +71,7 @@ if (AHO_TEST_SOURCES)
             drawer/draw_phase_test.cpp
             image_readback_test.cpp
             resource/buffer_test.cpp
+            resource/typed_buffer_test.cpp
             command/buffer_upload_test.cpp
             x/command/texture_update_test.cpp
             x/resource/texture_test.cpp
@@ -91,6 +92,19 @@ if (AHO_TEST_SOURCES)
             PROPERTIES LABELS gpu RESOURCE_LOCK aho_graphics TIMEOUT 45)
     include(cmake/CompileContracts.cmake)
     aho_register_header_tests()
+    set(aho_typed_buffer_names Valid UniformUsage VertexUsage CpuBuffer DescriptorKind DescriptorPayload VertexType NontrivialVertex)
+    set(aho_typed_buffer_expected unused uniform_view vertex_view vertex_view write write bind_vertices trivially_copyable)
+    foreach(case RANGE 0 7)
+        list(GET aho_typed_buffer_names ${case} name)
+        list(GET aho_typed_buffer_expected ${case} expected)
+        add_test(NAME "AHO.Compile.TypedBuffer.${name}"
+                COMMAND "${CMAKE_COMMAND}"
+                "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/compile-environment-$<CONFIG>.cmake"
+                "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_buffer.cpp"
+                "-DTEST_CASE=${case}" "-DTEST_EXPECTED=${expected}"
+                -P "${VSL_HOME}/test/cmake/RunTypedContract.cmake")
+        set_tests_properties("AHO.Compile.TypedBuffer.${name}" PROPERTIES LABELS "AHO;compile" TIMEOUT 60)
+    endforeach()
     aho_add_compile_test(Image.VslHeaderFirst
             "${CMAKE_CURRENT_SOURCE_DIR}/resource/image_test.cpp" AHO_CONTRACT_IMAGE_VSL_FIRST)
     aho_add_compile_test(Image.AhoHeaderFirst

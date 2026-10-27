@@ -45,7 +45,26 @@ GPU Bufferからは`destination.upload(source, destination_offset, source_offset
 
 使用中はassign/write/read/map/reserve/resizeを拒否する。busyはPENDING/SUBMITTEDでtrue、waitは未送信ならfalse、送信済みなら指定timeoutで待機する。同じPhaseでの複数転送は許可するが、その間にCPUから内容を変更してはならない。キャンセル後は再利用できる。
 
-同じResourceへの並行したCPUアクセスは呼び出し側で同期する。AHOの使用状態はAHOのupload/Texture更新によるものを追跡する。native()や取得済みのmapから直接操作する場合、以後のCPU/GPUアクセスの同期は呼び出し側で管理する。
+同じResourceへの並行したCPUアクセスは呼び出し側で同期する。AHOの使用状態はupload/Texture更新と、Typed adapterを介したdraw/dispatchを追跡する。native()や取得済みのmapから直接操作する場合、以後のCPU/GPUアクセスの同期は呼び出し側で管理する。
+
+## Typedとの接続
+
+```cpp
+#include <AHO/resource/typed_buffer.hpp>
+auto vertices = aho::resource::vertex_view<Vertex>(buffer, 1, 4);
+auto uniform = aho::resource::uniform_view<UniformLayout>(uniform_buffer);
+auto storage = aho::resource::storage_view<Payload>(storage_buffer);
+set.write<0>(uniform);
+phase << pipeline.bind_vertices(vertices).bind_resources(set).draw(4);
+```
+
+GPUFriendly／OnGPU／Customから、既存VSLのTypedVertexBufferViewまたはTypedResourceBufferViewを返す。引数のfirst/countはpayloadのレコード数で、count省略時は論理サイズの末尾までを選ぶ。capacityの未使用領域は含めない。非空・範囲・usage・型のalignmentを検査し、静的に分かるusage不一致はコンパイル時に拒否する。uniform/storage descriptor固有のoffset alignmentや最大rangeはset.write時にもVSLが検査する。
+
+viewは生成時の所有者・範囲のスナップショットで、元Bufferの再確保やresizeを自動追従しない。変更後はviewとdescriptorを書き直す。GPUで使用中の更新は既存のbusy/waitと同じ状態で拒否する。複数Phaseから読み込む場合は、すべての完了が必要となる。
+
+Textureは`<AHO/x/resource/typed_texture.hpp>`の`aho::x::resource::typed_texture(texture, sampler)`でTypedTextureへ接続する。descriptor配列にも渡せ、draw中のTextureに対する別Phaseからのupdateを拒否する。画像の初期uploadとGPU間の同期は呼び出し側で行う。
+
+indexはCPU側の値を使うbounds検証を保つため既存TypedIndexBufferを使用する。任意のbyte bufferをindex viewへ変換するAPIは追加しない。AHO adapterの実行例は`AHOLi/AHO/test/resource/typed_buffer_test.cpp`を参照する。ウィンドウ付きTyped Sampleは`AHOLi/AHO/examples/typed`にある。
 
 ## CUSTOM
 

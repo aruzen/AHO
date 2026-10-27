@@ -65,6 +65,8 @@ update callbackの可変参照やbuffer/setの可変aliasを保存し、後か�
 
 ## Sampleへの適用
 
+後続の割当宣言・自動生成の追加により、現在のSampleでは手書きのSceneFrame constructorを削除した。TypedFrameResourcesによる枠と所有の管理はTypedResourceBundleの内部で再利用する。現在の生成経路は[typed-resource-allocation.md](typed-resource-allocation.md)を参照。
+
 Sampleの`SceneFrame`へUBO／descriptorをまとめ、全slotで独立して生成する。カメラ位置・色・aspect比・時刻を現在のslotへ書き、quadごとの位置・scale・回転速度はpush snapshotへ渡す。保持したRenderContextから現在のrender pass・viewport/scissorを取得する。
 
 Sampleから内部の`data_`／`data2`参照を除いた。`--verify`ではフレーム枠の4周分を読み戻し待ちなしで送信してから画像を取得し、UBOだけの時刻変更で画素が変わることと、resize後の描画・互換pipelineの再利用を検査する。

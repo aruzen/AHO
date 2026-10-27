@@ -4,6 +4,7 @@
 #include "../vulkan/descriptor_set_manager.hpp"
 #include <algorithm>
 #include <concepts>
+#include <cstring>
 #include <span>
 #include <stdexcept>
 
@@ -55,6 +56,8 @@ namespace VSL_NAMESPACE::typed {
 
     public:
         static constexpr auto KIND = kind;
+        TypedResourceBuffer(LogicalDeviceAccessor device, std::in_place_t, size_t count)
+        requires(contain<property, MemoryProperty::HOST_VISIBLE>());
         TypedResourceBuffer(LogicalDeviceAccessor device, std::span<const Payload> values)
         requires(contain<property, MemoryProperty::HOST_VISIBLE>());
         TypedResourceBuffer(LogicalDeviceAccessor device, const Payload& value)
@@ -158,6 +161,15 @@ namespace VSL_NAMESPACE::typed {
         value.offset = detail::checked_view_offset(0, first, count, _count, sizeof(Payload));
         value.bytes = count * sizeof(Payload);
         return TypedResourceBufferView<Payload_, kind>(value, count);
+    }
+    template<typename PayloadTag, graphic_resource::Type kind, MemoryProperty property>
+    TypedResourceBuffer<PayloadTag, kind, property>::TypedResourceBuffer(LogicalDeviceAccessor device, std::in_place_t, size_t count)
+    requires(contain<property, MemoryProperty::HOST_VISIBLE>())
+        : _buffer(device, helper::checked_buffer_array_size<Payload>(count)), _count(count) {
+        const auto bytes = helper::checked_buffer_array_size<Payload>(count);
+        auto mapped = _buffer.data(bytes);
+        std::memset(mapped.data, 0, bytes);
+        _buffer.flush(mapped);
     }
     template<typename PayloadTag, graphic_resource::Type kind, MemoryProperty property>
     TypedResourceBuffer<PayloadTag, kind, property>::TypedResourceBuffer(LogicalDeviceAccessor device, std::span<const Payload> values)

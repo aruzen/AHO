@@ -15,7 +15,7 @@ if (VSL_TEST_SOURCES)
             reflection_texel_buffers.comp reflection_texel_arrays.comp
             reflection_input_attachment.frag reflection_input_arrays.frag
             reflection_vertex_arrays.vert reflection_vertex_array_shapes.vert
-            typed_frame.comp typed_batch.comp typed_batch_red.vert typed_block_layout.comp typed_block_arrays.comp typed_block_numeric.comp typed_push.vert typed_push_overlap.vert typed_push_overlap.frag typed_push_distinct.frag typed_push_partial.frag typed_push_resources.vert
+            typed_bundle.comp typed_frame.comp typed_batch.comp typed_batch_red.vert typed_block_layout.comp typed_block_arrays.comp typed_block_numeric.comp typed_push.vert typed_push_overlap.vert typed_push_overlap.frag typed_push_distinct.frag typed_push_partial.frag typed_push_resources.vert
             typed_descriptors.vert typed_descriptors_relocated.vert typed_descriptors.comp typed_texture.frag typed_components.vert typed_numeric.vert typed_wide.vert typed_runtime_descriptors.vert)
         set(VSL_TEST_SHADER_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/shaders/${VSL_TEST_SHADER}.spv")
         set(VSL_TEST_SHADER_OPTIONS)
@@ -162,4 +162,30 @@ if (VSL_TEST_SOURCES)
     add_library(vsl-frame-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_frame_resources.cpp)
     target_compile_definitions(vsl-frame-style-contract PRIVATE VSL_TYPED_CASE=0)
     target_include_directories(vsl-frame-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
+    set(typed_allocation_names Valid Missing Duplicate UnknownSet UnknownBinding ImageBuffer ZeroElements InvalidScope FixedRuntimeSize UnknownRuntimeSize InvalidElements)
+    foreach(case RANGE 0 10)
+        list(GET typed_allocation_names ${case} name)
+        add_test(NAME "VSL.TypedAllocation.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_resource_allocation.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=Typed allocation|typed allocation|set"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.TypedAllocation.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
+    add_library(vsl-allocation-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_resource_allocation.cpp)
+    target_compile_definitions(vsl-allocation-style-contract PRIVATE VSL_TYPED_CASE=0)
+    target_include_directories(vsl-allocation-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
+    set(typed_bundle_names Valid WrongKind WrongPayload WrongArrayCount MissingInput ExtraInput SharedMutation ConstMutation ArrayBounds UnknownBinding SharedLocal NonVoidUpdate DuplicateInput CopyBundle CopyFrame)
+    foreach(case RANGE 0 14)
+        list(GET typed_bundle_names ${case} name)
+        add_test(NAME "VSL.TypedBundle.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_resource_bundle.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=TypedResourceBundle|buffer|copy|update|deleted"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.TypedBundle.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
+    add_library(vsl-bundle-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_resource_bundle.cpp)
+    target_compile_definitions(vsl-bundle-style-contract PRIVATE VSL_TYPED_CASE=0)
+    target_include_directories(vsl-bundle-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
 endif ()

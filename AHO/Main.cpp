@@ -254,9 +254,9 @@ breakpoint disable swift_willThrow
             memcpy(data.data, pixels, tex_height * tex_width * tex_channels);
             {
                 auto phase = command_manager.start_phase<ComputePhase>(std::nullopt, std::nullopt, in_flight);
-                phase << command::ChangeImageBarrier(image, ImageLayout::TRANSFER_DST_OPTIMAL);
-                phase << command::CopyBufferToImage(image, &image_staging_buffer, ImageLayout::TRANSFER_DST_OPTIMAL);
-                phase << command::ChangeImageBarrier(image, ImageLayout::TRANSFER_DST_OPTIMAL,
+                phase << vsl::command::ChangeImageBarrier(image, ImageLayout::TRANSFER_DST_OPTIMAL);
+                phase << vsl::command::CopyBufferToImage(image, &image_staging_buffer, ImageLayout::TRANSFER_DST_OPTIMAL);
+                phase << vsl::command::ChangeImageBarrier(image, ImageLayout::TRANSFER_DST_OPTIMAL,
                                                      ImageLayout::SHADER_READ_ONLY_OPTIMAL,
                                                      aho::pipeline::get_binding_point(aho::pipeline::ResourceName::TEXTURE).shader_type);
             }
@@ -350,11 +350,11 @@ breakpoint disable swift_willThrow
                 //ubo_resource[phase.get_current_index()].update(ubo_buffers[phase.get_current_index()], 0);
 
                 phase << input_vertices << scissor << viewport
-                      << command::BindGraphicResource(ubo_resource[phase.get_image_index()],
+                      << vsl::command::BindGraphicResource(ubo_resource[phase.get_image_index()],
                                                       graphic_resource::BindingDestination::GRAPHICS, input_vertices)
-                      << command::BindVertexBuffer(vert_buffer, color_buffer)
-                      << command::BindIndexBuffer(index_buffer)
-                      << command::DrawIndexed(indices.size());
+                      << vsl::command::BindVertexBuffer(vert_buffer, color_buffer)
+                      << vsl::command::BindIndexBuffer(index_buffer)
+                      << vsl::command::DrawIndexed(indices.size());
 
                 /*
                 struct alignas(16) {

@@ -185,6 +185,46 @@ namespace {
         EXPECT_EQ(read(manager, texture).bytes, (std::vector<std::byte>(pixel.begin(), pixel.end())));
     }
 
+    TEST_F(TextureUpdateVulkanIntegrationTest, CPUBufferIsStagedAtInvocationAndPreservesSrgbBytes) {
+        auto manager = make_manager();
+        resource::Texture texture(device, 2, 1, vsl::data_format::SRGB8_RGBA);
+        aho::resource::Buffer<aho::resource::BufferType::GENERAL> pixels(12);
+        const std::array<std::byte, 8> encoded{std::byte{17}, std::byte{91}, std::byte{173}, std::byte{255},
+                                               std::byte{201}, std::byte{37}, std::byte{73}, std::byte{128}};
+        auto update = texture.update(pixels, {}, 4);
+        pixels.write(encoded, 4);
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << update;
+            pixels.assign({});
+            submit(phase);
+        }
+        EXPECT_EQ(read(manager, texture).bytes, (std::vector<std::byte>(encoded.begin(), encoded.end())));
+    }
+
+    TEST_F(TextureUpdateVulkanIntegrationTest, CancelledCPUUpdateCanBeRetriedAndInvalidPayloadLeavesTextureUsable) {
+        auto manager = make_manager();
+        resource::Texture texture(device, 2, 1);
+        aho::resource::Buffer<aho::resource::BufferType::GENERAL> pixels;
+        const std::array<std::byte, 4> color{std::byte{19}, std::byte{71}, std::byte{137}, std::byte{255}};
+        pixels.assign(color);
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            EXPECT_THROW(phase << texture.update(pixels), std::out_of_range);
+            phase << texture.update(pixels, {.width = 1, .height = 1});
+            phase.cancel();
+        }
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << texture.update(pixels, {.x = 1, .width = 1, .height = 1});
+            submit(phase);
+        }
+        const auto result = read(manager, texture);
+        ASSERT_EQ(result.bytes.size(), 8u);
+        for (std::size_t i = 0; i < 8; ++i)
+            EXPECT_EQ(result.bytes[i], i < 4 ? std::byte{} : color[i - 4]);
+    }
+
     TEST_F(TextureUpdateVulkanIntegrationTest, CustomVSLBufferUsesTheSameTextureUpdateAndBusyTracking) {
         using Native = vsl::Buffer<vsl::MemoryType::TRANSFER_SOURCE, vsl::MemoryProperty::HOST_VISIBLE>;
         auto source = aho::resource::make_custom_buffer(Native(device, 4));

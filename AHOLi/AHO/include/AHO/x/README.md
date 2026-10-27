@@ -20,4 +20,4 @@ AHOのexperimental機能は、次のディレクトリに配置する。
 
 空の分類ディレクトリは`.gitkeep`でGit上に保持する。ファイルを追加した分類では`.gitkeep`を削除してよい。
 
-実装済みの機能: [スクリーンショット](../../../../../documents/AHO/experimental-screenshot.md)。
+実装済みの機能: [glTF/GLB・画像・外部SPIR-Vの読み込み](../../../../../documents/AHO/experimental-gltf.md)、 [スクリーンショット](../../../../../documents/AHO/experimental-screenshot.md)。

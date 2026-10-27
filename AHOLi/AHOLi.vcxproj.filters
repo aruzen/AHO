@@ -8,6 +8,10 @@
     <ClCompile Include="AHO\src\x\command\texture_update.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="AHO\include\AHO\x\resource\texture.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClCompile Include="AHO\src\x\resource\texture.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClInclude Include="AHO\include\AHO\x\resource\shader.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClCompile Include="AHO\src\x\resource\shader.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClInclude Include="AHO\include\AHO\x\resource\gltf.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClCompile Include="AHO\src\x\resource\gltf.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="AHO\include\AHO\x\screenshot.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="AHO\include\AHO\x\core\mesh.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="AHO\include\AHO\x\core\mesh_attributes.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>

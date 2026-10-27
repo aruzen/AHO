@@ -18,7 +18,9 @@ namespace {
         EXPECT_EQ(texture.height(), 3u);
         EXPECT_EQ(texture.format(), vsl::data_format::UNSIGNED_NORMALIZED8_RGBA);
         EXPECT_THROW((resource::Texture(device, 0, 1)), std::invalid_argument);
-        EXPECT_THROW((resource::Texture(device, 1, 1, vsl::data_format::SRGB8_RGBA)), std::invalid_argument);
+        resource::Texture color(device, 1, 1, vsl::data_format::SRGB8_RGBA);
+        EXPECT_EQ(color.format(), vsl::data_format::SRGB8_RGBA);
+        EXPECT_THROW((resource::Texture(device, 1, 1, vsl::data_format::FLOAT_RGBA)), std::invalid_argument);
     }
 } // namespace
 #endif

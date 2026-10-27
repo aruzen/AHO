@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(cmake/Saitekikuukan.cmake)
 include(cmake/TinyGltf.cmake)
+option(AHO_ENABLE_MSDF "Build CPU MSDF font, atlas and text layout resources" OFF)
 
 add_library(AHOLi
         AHO/src/pipeline/layouts.cpp
@@ -171,6 +172,8 @@ endif()
 if (BUILD_TESTING)
     add_subdirectory(AHO/test)
 endif ()
+
+include(cmake/MSDF.cmake)
 
 option(AHO_BUILD_GLTF_EXAMPLE "Build the CPU glTF/GLB inspection example" OFF)
 if(AHO_BUILD_GLTF_EXAMPLE)

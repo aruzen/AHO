@@ -44,7 +44,7 @@ jobs:
         run: |
           brew install llvm@20 cmake ninja
           if [ "$STYLE_CHECKS" = true ]; then
-            brew install boost glfw glm googletest pkgconf vulkan-headers vulkan-loader spirv-cross spirv-tools shaderc
+            brew install boost glfw glm googletest pkgconf vulkan-headers vulkan-loader spirv-cross spirv-tools shaderc freetype
           fi
           echo "$(brew --prefix llvm@20)/bin" >> "$GITHUB_PATH"
       - name: Configure
@@ -72,6 +72,7 @@ jobs:
             -DBUILD_TESTING=ON -DAHO_STYLE_CHECKS=ON -DAHO_STYLE_JOBS=3 -DCMAKE_BUILD_TYPE=Release \
             -DAHO_ENABLE_EXPERIMENTAL_MESH=ON -DAHO_BUILD_MESH_EXAMPLE=ON \
             -DAHO_BUILD_TYPED_EXAMPLE=ON \
+            -DAHO_ENABLE_MSDF=ON -DAHO_BUILD_MSDF_EXAMPLE=ON \
             -DAHO_STYLE_BASE_REF="$STYLE_BASE_REF" \
             -DLLVM_DIR="$(brew --prefix llvm@20)/lib/cmake/llvm" \
             -DClang_DIR="$(brew --prefix llvm@20)/lib/cmake/clang"

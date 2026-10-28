@@ -95,6 +95,17 @@ namespace {
         ++*calls;
     }
 
+    TEST(PhaseStreamTest, EmptyPointersAreRejectedBeforeAccessingAManagerOrChangingBindings) {
+        vsl::CommandManager empty(std::shared_ptr<vsl::impl::CommandManagerImpl>{});
+        vsl::DefaultPhaseStream stream{empty, 17, vsl::PipelineAccessor{}};
+        EXPECT_THROW(stream << std::shared_ptr<vsl::command::Command>{}, std::invalid_argument);
+        EXPECT_THROW(stream << std::shared_ptr<vsl::command::DelegateCommand>{}, std::invalid_argument);
+        EXPECT_THROW(stream << std::shared_ptr<RecordCommand>{}, std::invalid_argument);
+        EXPECT_THROW(stream << std::shared_ptr<RecordDelegate>{}, std::invalid_argument);
+        EXPECT_EQ(stream.vertex_size, 17u);
+        EXPECT_TRUE(stream.pipeline);
+    }
+
     TEST_F(PhaseVulkanIntegrationTest, PostponedSetupAndSubmissionFollowStateTransitions) {
         auto manager = make_manager();
         VSL_NAMESPACE::ComputePhase phase(manager, std::nullopt, std::nullopt, std::nullopt, true);
@@ -127,6 +138,18 @@ namespace {
             EXPECT_EQ(*calls, 8);
         }
         device.data_->device.waitIdle();
+    }
+    TEST_F(PhaseVulkanIntegrationTest, EmptyPointersLeaveThePhaseRecordingAndAllowFollowingCommands) {
+        auto manager = make_manager();
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        EXPECT_THROW(phase << std::shared_ptr<vsl::command::Command>{}, std::invalid_argument);
+        EXPECT_THROW(phase << std::shared_ptr<vsl::command::DelegateCommand>{}, std::invalid_argument);
+        EXPECT_EQ(phase.state, vsl::ComputePhase::State::WAIT_SUBMIT);
+        auto calls = std::make_shared<int>(0);
+        phase << RecordCommand(calls);
+        EXPECT_EQ(*calls, 1);
+        EXPECT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        EXPECT_TRUE(phase.completion().wait());
     }
     TEST_F(PhaseVulkanIntegrationTest, FailedValueAndSharedCommandsAndDelegatesInvalidateStreamBindings) {
         auto manager = make_manager();

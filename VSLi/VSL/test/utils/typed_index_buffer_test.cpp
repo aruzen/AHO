@@ -76,6 +76,24 @@ namespace {
         EXPECT_THROW(vsl::command::BindIndexBufferAt(indices.backend(), vsl::command::IndexType::UINT16, 1), std::invalid_argument);
         EXPECT_FALSE(has_validation_errors());
     }
+    TEST_F(TypedIndexVulkanIntegrationTest, FullAndPartialBoundsFollowSharedUpdatesAndFailedCopiesPreserveThem) {
+        const std::array<std::uint32_t, 4> values{UINT32_MAX, 4, 5, 7}, changed{0, 20, 6, 8};
+        t::TypedIndexBuffer<std::uint32_t> indices(device, values);
+        auto alias = indices;
+        const auto full = indices.view(0, values.size()), partial = indices.view(1, 2);
+        EXPECT_EQ(indices.bounds(0, 4), (std::pair<std::uint32_t, std::uint32_t>{4, UINT32_MAX}));
+        EXPECT_EQ(full.bounds(0, 4), indices.bounds(0, 4));
+        EXPECT_EQ(partial.bounds(0, 2), (std::pair<std::uint32_t, std::uint32_t>{4, 5}));
+        alias.copy(changed);
+        EXPECT_EQ(indices.bounds(0, 4), (std::pair<std::uint32_t, std::uint32_t>{0, 20}));
+        EXPECT_EQ(full.bounds(0, 4), indices.bounds(0, 4));
+        EXPECT_EQ(partial.bounds(0, 2), (std::pair<std::uint32_t, std::uint32_t>{6, 20}));
+        EXPECT_THROW(alias.copy(std::span(changed).first(3)), std::invalid_argument);
+        EXPECT_EQ(indices.bounds(0, 4), (std::pair<std::uint32_t, std::uint32_t>{0, 20}));
+        EXPECT_EQ(indices.bounds(4, 0), (std::pair<std::uint32_t, std::uint32_t>{0, 0}));
+        EXPECT_THROW(indices.bounds(1, 4), std::out_of_range);
+        EXPECT_THROW(indices.bounds(5, 0), std::out_of_range);
+    }
     TEST_F(TypedIndexVulkanIntegrationTest, CapturedCommandRejectsIndexUpdatesBeforeRecording) {
         auto typed = make_typed();
         t::TypedVertexBuffer<Position> positions(device, POSITIONS);

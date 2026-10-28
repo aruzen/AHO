@@ -16,7 +16,6 @@ message(STATUS "AHO_HOME : ${AHO_HOME}")
 message(STATUS "VSL_HOME : ${VSL_HOME}")
 
 project(AHO-all)
-string(REPLACE "-fcolor-diagnostics" "-fdiagnostics-color=auto" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -33,25 +32,7 @@ if (BUILD_TESTING)
     include(GoogleTest)
 endif ()
 
-# Debug option
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -DDEBUG -fstandalone-debug -fno-omit-frame-pointer")
-    set(CMAKE_C_FLAGS_DEBUG   "-O0 -g3 -DDEBUG -fstandalone-debug -fno-omit-frame-pointer")
-    add_compile_options(-Wno-user-defined-literals)
-elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    string(APPEND CMAKE_CXX_FLAGS " -fconcepts-diagnostics-depth=7")
-    set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g2 -DDEBUG -gdwarf-4 -fvar-tracking-assignments -fno-omit-frame-pointer")
-    set(CMAKE_C_FLAGS_DEBUG   "-O0 -g2 -DDEBUG -gdwarf-4 -fvar-tracking-assignments -fno-omit-frame-pointer")
-endif()
-
-# Release option
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native -ftree-vectorize")
-    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -march=native -ftree-vectorize")
-elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native -ftree-vectorize -fomit-frame-pointer")
-    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -march=native -ftree-vectorize -fomit-frame-pointer")
-endif()
+include(cmake/BuildOptions.cmake)
 
 # setting Libraries
 find_package(PkgConfig REQUIRED)

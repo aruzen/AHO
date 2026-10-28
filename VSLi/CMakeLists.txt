@@ -156,6 +156,7 @@ add_library(VSL STATIC
 )
 
 target_compile_features(VSL PUBLIC cxx_std_26)
+aho_target_build_options(VSL)
 target_include_directories(VSL PRIVATE ${Vulkan_INCLUDE_DIRS})
 target_link_libraries(VSL PRIVATE ${Vulkan_LIBRARIES})
 target_link_libraries(VSL PRIVATE

@@ -205,3 +205,9 @@ viewからのviewも相対範囲で作れます。drawのfirst_indexはview内�
 元Bufferのcopyは既存viewへ反映されますが、既に構築したcommandは更新世代の検査で拒否されるため作り直してください。view経由で描画中の場合も元BufferのCPU更新は禁止され、完了／cancel後に再開できます。元wrapperを破棄してもview／commandは必要な所有者を保持します。batchは同じ元Bufferでもoffsetが異なる場合にindex bindを更新します。
 
 viewは既存TypedIndexBufferからだけ生成します。任意のGPU Bufferへ未検証のCPU値を添えてTyped indexとして扱うfactoryは提供しません。
+
+## index全範囲の検査コスト
+
+index Buffer全体の最小値／最大値は生成・更新時に保持します。全範囲を使うdraw commandの構築時はO(1)で検査できます。元Buffer全体を表すviewにも同じ結果を使い、部分範囲は必要なindexだけをO(count)で走査します。
+
+値の保持は更新世代と一緒に共有されます。upload前に拒否された更新は従来の結果を維持し、upload失敗後の未検証状態では保持結果も利用しません。記録時の世代検査・commandの再利用条件は変わりません。

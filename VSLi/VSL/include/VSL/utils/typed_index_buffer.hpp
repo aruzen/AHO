@@ -15,11 +15,16 @@ namespace VSL_NAMESPACE::typed {
 
     namespace detail {
         template<index_element Index>
+        std::pair<std::uint32_t, std::uint32_t> index_bounds(std::span<const Index> values);
+
+        template<index_element Index>
         struct IndexSnapshot {
             std::vector<Index> values;
+            std::pair<std::uint32_t, std::uint32_t> extrema;
             std::uint64_t revision = 0;
             bool valid = true;
-            explicit IndexSnapshot(std::span<const Index> values) : values(values.begin(), values.end()) {}
+            explicit IndexSnapshot(std::span<const Index> values)
+                : values(values.begin(), values.end()), extrema(index_bounds<Index>(this->values)) {}
             std::pair<std::uint32_t, std::uint32_t> bounds(size_t first, size_t count) const;
         };
     } // namespace detail
@@ -89,6 +94,14 @@ namespace VSL_NAMESPACE::typed {
 
     namespace detail {
         template<index_element Index>
+        std::pair<std::uint32_t, std::uint32_t> index_bounds(std::span<const Index> values) {
+            if (values.empty())
+                return {0, 0};
+            const auto [low, high] = std::ranges::minmax_element(values);
+            return {*low, *high};
+        }
+
+        template<index_element Index>
         std::pair<std::uint32_t, std::uint32_t> IndexSnapshot<Index>::bounds(size_t first, size_t count) const {
             if (!valid)
                 throw std::logic_error("Typed index data requires a successful upload");
@@ -96,9 +109,9 @@ namespace VSL_NAMESPACE::typed {
                 throw std::out_of_range("Typed indexed draw exceeds its index buffer");
             if (!count)
                 return {0, 0};
-            const auto range = std::span<const Index>(values).subspan(first, count);
-            const auto [low, high] = std::ranges::minmax_element(range);
-            return {*low, *high};
+            if (!first && count == values.size())
+                return extrema;
+            return index_bounds<Index>(std::span<const Index>(values).subspan(first, count));
         }
     } // namespace detail
 
@@ -132,12 +145,14 @@ namespace VSL_NAMESPACE::typed {
         if (_values->revision == std::numeric_limits<std::uint64_t>::max())
             throw std::overflow_error("Typed index revision exhausted");
         std::vector<Index> snapshot(values.begin(), values.end());
+        const auto extrema = detail::index_bounds<Index>(snapshot);
         // 書込み中の失敗でGPU内容が不明になった場合も、古い検証結果は利用しない。
         ++_values->revision;
         _values->valid = false;
         if (!_buffer.copy(snapshot.data(), snapshot.size()))
             throw std::runtime_error("Typed index upload failed");
         _values->values.swap(snapshot);
+        _values->extrema = extrema;
         _values->valid = true;
     }
     template<index_element Index, MemoryProperty property>

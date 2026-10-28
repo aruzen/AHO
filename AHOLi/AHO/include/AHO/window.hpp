@@ -14,6 +14,10 @@
 #include "engine.hpp"
 #include "render_context.hpp"
 
+namespace AHO_NAMESPACE::drawer::detail {
+    struct StandardDrawState;
+}
+
 namespace AHO_NAMESPACE::window {
     d2::VectorI get_monitor_size();
 
@@ -24,6 +28,7 @@ namespace AHO_NAMESPACE::window {
         VSL_NAMESPACE::FrameBuffer frame_buffer;
         VSL_NAMESPACE::SemaphoreHolder image_available, render_finished;
         VSL_NAMESPACE::FenceHolder in_flight;
+        std::shared_ptr<drawer::detail::StandardDrawState> standard_draw;
 
         ~WindowData();
     };

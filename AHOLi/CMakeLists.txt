@@ -90,6 +90,7 @@ add_library(AHOLi
         AHO/include/AHO/engine/standard_engine.hpp
         AHO/include/AHO/define.hpp
         AHO/src/drawer/draw_phase.cpp
+        AHO/src/drawer/standard_drawer.cpp
 )
 
 target_compile_features(AHOLi PUBLIC cxx_std_26)
@@ -170,6 +171,14 @@ endif ()
 
 include(cmake/MSDF.cmake)
 cmake_language(DEFER CALL aho_copy_windows_runtime)
+
+option(AHO_BUILD_TRIANGLE_EXAMPLE "Build the Typed aho::draw example" OFF)
+if(AHO_BUILD_TRIANGLE_EXAMPLE)
+    add_executable(aho-triangle-example AHO/examples/triangle.cpp)
+    target_include_directories(aho-triangle-example PRIVATE "${AHO_HOME}/include" "${VSL_HOME}/include")
+    target_link_directories(aho-triangle-example PRIVATE ${GLFW_LIBRARY_DIRS})
+    target_link_libraries(aho-triangle-example PRIVATE AHOLi VSL)
+endif()
 
 option(AHO_BUILD_GLTF_EXAMPLE "Build the CPU glTF/GLB inspection example" OFF)
 if(AHO_BUILD_GLTF_EXAMPLE)

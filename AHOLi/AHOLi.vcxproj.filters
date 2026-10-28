@@ -179,6 +179,12 @@
     <ClCompile Include="AHO\src\drawer\draw_phase.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="AHO\src\drawer\standard_drawer.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClInclude Include="AHO\src\drawer\standard_shaders.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClCompile Include="AHO\src\engine\graphical_engine.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>

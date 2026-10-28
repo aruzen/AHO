@@ -82,6 +82,7 @@ if (AHO_TEST_SOURCES)
             render_context_test.cpp
             pipeline/layouts_test.cpp
             drawer/draw_phase_test.cpp
+            drawer/standard_drawer_test.cpp
             image_readback_test.cpp
             resource/buffer_test.cpp
             resource/typed_buffer_test.cpp

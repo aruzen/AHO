@@ -11,7 +11,11 @@
 #include "AHO/core/triangle.hpp"
 
 namespace AHO_NAMESPACE {
+    struct DrawPhase;
+    // 座標はNDC。色は線形RGBA。現在のDrawPhaseへ即時に記録する。
     void draw(const Triangle<float, VSL_NAMESPACE::D2>& triangle, const RGBA& rgba);
-}
+    void draw(const Triangle<float, VSL_NAMESPACE::D2>& triangle, const RGBA& rgba, DrawPhase& phase);
+    void draw(const Triangle<float, VSL_NAMESPACE::D2>& triangle, const RGBA& rgba, DrawPhase* phase);
+} // namespace AHO_NAMESPACE
 
 #endif //AHO_ALL_STANDARDDRAWER_H

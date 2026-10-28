@@ -47,4 +47,4 @@ C++26対応のcompilerを使います。macOSの検証はLLVM 20/libc++で行い
 - `TypedIndexBuffer<uint16_t>`を使ってquadの2三角形を描きます。
 - `Pushes::Values`へ各quadの位置・scale・回転速度をコピーし、`TypedBatch`で2描画をまとめます。pipeline・vertex/index bufferのbindは各1回、descriptorは2つのsetを各1回bindします。画像の時間変化はUBOが担当するため、検証でUBO更新の効果を確認できます。
 
-device・allocator・render pass・format・viewport/scissorは`RenderContext`から取得します。window、送信、resize通知、Screenshotは既存AHO/VSLのAPIを使います。割当宣言の詳細は[documants/typed-resource-allocation.md](../../../../documants/typed-resource-allocation.md)、フレーム管理は[documants/typed-frame-resources.md](../../../../documants/typed-frame-resources.md)、Sampleは[documants/typed-example.md](../../../../documants/typed-example.md)に記録しています。
+device・allocator・render pass・format・viewport/scissorは`RenderContext`から取得します。window、送信、resize通知、Screenshotは既存AHO/VSLのAPIを使います。割当宣言の詳細は[typed-resource-allocation.md](../../../../documents/typed-resource-allocation.md)、フレーム管理は[typed-frame-resources.md](../../../../documents/typed-frame-resources.md)、Sampleは[typed-example.md](../../../../documents/typed-example.md)に記録しています。

@@ -24,6 +24,7 @@ message(STATUS "AHO_HOME : ${AHO_HOME}")
 message(STATUS "VSL_HOME : ${VSL_HOME}")
 
 project(AHO-all)
+option(AHO_BUILD_SAMPLE "Build the original AHO application" ${PROJECT_IS_TOP_LEVEL})
 
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -80,9 +81,11 @@ find_package(glfw3 CONFIG REQUIRED)
 message("glfw3: ${GLFW_INCLUDE_DIRS}, ${GLFW_LIBRARY_DIRS}, ${GLFW_LIBRARIES}")
 endif()
 
-add_subdirectory(AHO)
-add_subdirectory(AHOLi)
 add_subdirectory(VSLi)
+add_subdirectory(AHOLi)
+if(AHO_BUILD_SAMPLE)
+    add_subdirectory(AHO)
+endif()
 
 if(AHO_STYLE_CHECKS)
     add_subdirectory(tools/style)

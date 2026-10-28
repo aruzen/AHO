@@ -1,74 +1,112 @@
 #include <AHO/engine/standard_engine.hpp>
-
+#include "../window_impl.hpp"
+#include <algorithm>
+#include <limits>
+#include <stdexcept>
 #include <utility>
 
-AHO_NAMESPACE::engine::StandardEngine::StandardEngine(std::string application_name, bool boot_on) {
-    if (boot_on)
-        boot(std::move(application_name));
-}
+namespace {
+    using AHO_NAMESPACE::engine::EngineConfig;
+    using AHO_NAMESPACE::engine::EngineData;
+    using AHO_NAMESPACE::engine::StandardEngineConfig;
 
-void AHO_NAMESPACE::engine::StandardEngine::boot(const std::string& application_name) {
-    using namespace VSL_NAMESPACE;
-#ifdef _MSC_VER
-    Vulkan<> instance(application_name.c_str(), {"VK_KHR_win32_surface", "VK_KHR_surface",
-                                                 "VK_KHR_get_physical_device_properties2"});
-#elif defined(__APPLE_CC__)
-    Vulkan<> instance(application_name.c_str(), {"VK_KHR_portability_enumeration", "VK_KHR_surface",
-                                                 "VK_EXT_metal_surface", "VK_KHR_get_physical_device_properties2"});
+    struct BootResources {
+        std::shared_ptr<EngineData> engine;
+        std::shared_ptr<VSL_NAMESPACE::Surface> surface;
+    };
+
+    void validate_config(const StandardEngineConfig& config);
+    BootResources create_engine_resources(const EngineConfig& config, VSL_NAMESPACE::Window& window);
+
+    void validate_config(const StandardEngineConfig& config) {
+        if (config.engine.application_name.empty())
+            throw std::invalid_argument("StandardEngine requires an application name");
+        if (config.initial_window.width <= 0 || config.initial_window.height <= 0)
+            throw std::invalid_argument("StandardEngine requires positive initial window dimensions");
+        std::size_t remaining = std::numeric_limits<std::uint32_t>::max();
+        for (const auto& [type, amount] : config.engine.descriptor_budget) {
+            if (type > VSL_NAMESPACE::graphic_resource::Type::INPUT_ATTACHMENT || amount == 0 || amount > remaining)
+                throw std::invalid_argument("StandardEngine requires valid, positive descriptor budgets");
+            remaining -= amount;
+        }
+    }
+
+    BootResources create_engine_resources(const EngineConfig& config, VSL_NAMESPACE::Window& window) {
+        using namespace VSL_NAMESPACE;
+        std::vector<const char*> extensions{"VK_KHR_get_physical_device_properties2"};
+#ifdef __APPLE__
+        extensions.push_back("VK_KHR_portability_enumeration");
 #endif
-    auto physical_device = PhysicalDevices(instance).search();
+        for (const auto& extension : config.instance_extensions) {
+            if (std::ranges::find(extensions, extension) == extensions.end())
+                extensions.push_back(extension.c_str());
+        }
+        Vulkan<> instance(config.application_name.c_str(), extensions);
+        auto surface = window.add_plugin<Surface>(instance);
+        PhysicalDevices devices(instance);
+        auto physical = config.physical_device_index ? devices.get().at(*config.physical_device_index) : devices.search();
+        LogicalDevice device(physical, surface);
+        return {std::make_shared<EngineData>(EngineData{
+                    .vulkan_instance = instance,
+                    .physical_device = physical,
+                    .logical_device = device,
+                    .command_manager = CommandManager(device),
+                    .graphic_resource_manager = std::make_shared<graphic_resource::OverAllocateManager>(
+                        device, config.descriptor_budget, 0),
+                    .synchro_manager = SynchroManager(device)}),
+                std::move(surface)};
+    }
+} // namespace
 
-    // ロゴ表示を想定し、初期ウィンドウを400×400で作成する。
-    VSL_NAMESPACE::Window window(application_name, 400, 400);
-    auto surface = window.add_plugin<Surface>(instance);
+namespace AHO_NAMESPACE::engine {
+    StandardEngine::StandardEngine(std::string application_name, bool boot_on)
+        : StandardEngine(StandardEngineConfig{.engine = {.application_name = std::move(application_name)}}, boot_on) {}
 
-    LogicalDevice device(physical_device, surface);
+    StandardEngine::StandardEngine(StandardEngineConfig config, bool boot_on) : _config(std::move(config)) {
+        validate_config(_config);
+        if (boot_on)
+            boot();
+    }
 
-    SynchroManager synchro_manager(device);
-    CommandManager command_manager(device);
-    std::shared_ptr<graphic_resource::OverAllocateManager>
-        graphic_resource_manager(new graphic_resource::OverAllocateManager(device, {
-                                                                                       {graphic_resource::Type::SAMPLER, 100},
-                                                                                       {graphic_resource::Type::COMBINED_IMAGE_SAMPLER, 100},
-                                                                                       {graphic_resource::Type::SAMPLED_IMAGE, 100},
-                                                                                       {graphic_resource::Type::STORAGE_IMAGE, 100},
-                                                                                       {graphic_resource::Type::UNIFORM_TEXEL_BUFFER, 100},
-                                                                                       {graphic_resource::Type::STORAGE_TEXEL_BUFFER, 100},
-                                                                                       {graphic_resource::Type::UNIFORM_BUFFER, 100},
-                                                                                       {graphic_resource::Type::STORAGE_BUFFER, 100},
-                                                                                   },
-                                                                           0));
+    void StandardEngine::boot() {
+        if (data())
+            throw std::logic_error("StandardEngine is already booted");
+        validate_config(_config);
+        const auto& initial = _config.initial_window;
+        const auto& title = initial.title.empty() ? _config.engine.application_name : initial.title;
+        VSL_NAMESPACE::Window native(title, initial.width, initial.height);
+        try {
+            auto resources = create_engine_resources(_config.engine, native);
+            EngineAccessor handle(resources.engine);
+            auto drawing = window::detail::make_window_data(handle, std::move(resources.surface), title);
+            Window window(handle, native.data_, std::move(drawing));
+            std::optional<DefaultEngineRegistration> registration;
+            if (_config.register_as_default)
+                registration.emplace(handle);
+            boot_window.emplace(std::move(window));
+            reset_data(std::move(resources.engine));
+            _default_registration = std::move(registration);
+        } catch (...) {
+            native.data_->plugins.clear();
+            native.close();
+            throw;
+        }
+    }
 
-    reset_data(std::make_shared<EngineData>(EngineData{
-        .vulkan_instance = instance,
-        .physical_device = physical_device,
-        .logical_device = device,
-        .command_manager = command_manager,
-        .graphic_resource_manager = graphic_resource_manager,
-        .synchro_manager = synchro_manager}));
+    void StandardEngine::boot(const std::string& application_name) {
+        if (data())
+            throw std::logic_error("StandardEngine is already booted");
+        if (application_name.empty())
+            throw std::invalid_argument("StandardEngine requires an application name");
+        _config.engine.application_name = application_name;
+        boot();
+    }
 
-    VSL_NAMESPACE::Swapchain swapchain(device, surface);
-    VSL_NAMESPACE::RenderPass render_pass(swapchain);
+    const StandardEngineConfig& StandardEngine::config() const {
+        return _config;
+    }
 
-    boot_window.emplace(*this, window.data_,
-                        std::make_shared<AHO_NAMESPACE::window::WindowData>(AHO_NAMESPACE::window::WindowData{
-                            .surface = surface,
-                            .swapchain = swapchain,
-                            .render_pass = render_pass,
-                            .frame_buffer = VSL_NAMESPACE::FrameBuffer(swapchain,
-                                                                       render_pass),
-                            .image_available = synchro_manager
-                                                   .create_semaphore(application_name + "ImageAvailable",
-                                                                     command_manager.get_buffer().get_size()),
-                            .render_finished = synchro_manager
-                                                   .create_semaphore(application_name + "RenderFinished",
-                                                                     swapchain.get_swap_image_size()),
-                            .in_flight = synchro_manager
-                                             .create_fence(application_name + "InFlight",
-                                                           command_manager.get_buffer().get_size(), true)}));
-    _default_registration.emplace(*this);
-}
-
-AHO_NAMESPACE::Window AHO_NAMESPACE::engine::StandardEngine::get_window() {
-    return boot_window.value();
-}
+    Window StandardEngine::get_window() {
+        return boot_window.value();
+    }
+} // namespace AHO_NAMESPACE::engine

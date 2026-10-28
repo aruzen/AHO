@@ -1,4 +1,5 @@
 #include <AHO/window.hpp>
+#include "window_impl.hpp"
 #include <AHO/drawer/draw_phase.hpp>
 #include <GLFW/glfw3.h>
 #include <VSL/exceptions.hpp>
@@ -47,6 +48,22 @@ namespace {
     }
 } // namespace
 
+std::shared_ptr<AHO_NAMESPACE::window::WindowData> AHO_NAMESPACE::window::detail::make_window_data(
+    const engine::EngineAccessor& engine, std::shared_ptr<VSL_NAMESPACE::Surface> surface, const std::string& name) {
+    auto& data = *engine.data();
+    VSL_NAMESPACE::Swapchain swapchain(data.logical_device, surface);
+    VSL_NAMESPACE::RenderPass pass(swapchain);
+    const auto frames = data.command_manager.get_buffer().get_size();
+    return std::make_shared<WindowData>(WindowData{
+        .surface = std::move(surface),
+        .swapchain = swapchain,
+        .render_pass = pass,
+        .frame_buffer = VSL_NAMESPACE::FrameBuffer(swapchain, pass),
+        .image_available = data.synchro_manager.create_semaphore(name + "ImageAvailable", frames),
+        .render_finished = data.synchro_manager.create_semaphore(name + "RenderFinished", swapchain.get_swap_image_size()),
+        .in_flight = data.synchro_manager.create_fence(name + "InFlight", frames, true)});
+}
+
 AHO_NAMESPACE::engine::EngineAccessor AHO_NAMESPACE::window::Window::DefaultEngine() {
     auto current = AHO_NAMESPACE::engine::DefaultEngineRegistration::Current();
     if (!current.data())
@@ -59,17 +76,7 @@ AHO_NAMESPACE::window::Window::Window(std::string name, int width, int height, A
     try {
         engine = engine_;
         auto surface = this->add_plugin<VSL_NAMESPACE::Surface>(engine_.data()->vulkan_instance);
-        VSL_NAMESPACE::Swapchain swapchain(engine_.data()->logical_device, surface);
-        VSL_NAMESPACE::RenderPass pass(swapchain);
-
-        data2 = std::make_shared<AHO_NAMESPACE::window::WindowData>(AHO_NAMESPACE::window::WindowData{
-            .surface = surface,
-            .swapchain = swapchain,
-            .render_pass = pass,
-            .frame_buffer = VSL_NAMESPACE::FrameBuffer(swapchain, pass),
-            .image_available = engine_.data()->synchro_manager.create_semaphore(name + "ImageAvailable", engine_.data()->command_manager.get_buffer().get_size()),
-            .render_finished = engine_.data()->synchro_manager.create_semaphore(name + "RenderFinished", swapchain.get_swap_image_size()),
-            .in_flight = engine_.data()->synchro_manager.create_fence(name + "InFlight", engine_.data()->command_manager.get_buffer().get_size(), true)});
+        data2 = detail::make_window_data(engine, std::move(surface), name);
     } catch (...) {
         data_->plugins.clear();
         VSL_NAMESPACE::PureWindow::close();

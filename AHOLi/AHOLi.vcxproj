@@ -233,6 +233,7 @@
     <ClCompile Include="AHO\src\resource\buffer.cpp" />
     <ClCompile Include="AHO\src\resource\image.cpp" />
     <ClCompile Include="AHO\src\window.cpp" />
+    <ClInclude Include="AHO\src\window_impl.hpp" />
     <ClCompile Include="AHO\src\render_context.cpp" />
   </ItemGroup>
   <ItemGroup>

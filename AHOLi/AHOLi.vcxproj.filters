@@ -219,6 +219,7 @@
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="AHO\src\render_context.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClInclude Include="AHO\src\window_impl.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClCompile Include="AHO\src\window.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>

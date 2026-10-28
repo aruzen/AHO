@@ -4,7 +4,7 @@
 
 EngineAccessorを構築しただけでは、既定エンジンを登録しません。`DefaultEngineRegistration registration(handle);`の寿命が既定登録の有効期間です。最新の有効な登録を`Current()`から値で取得し、登録が終了すると以前の有効な登録へ戻ります。古い登録を先に破棄した場合や、登録オブジェクトをムーブした場合も有効です。登録内部の生ポインタは公開しません。
 
-StandardEngineは起動に成功した後で自身を登録し、破棄時に登録を解除します。未起動のStandardEngineが、別の起動済みエンジンの既定登録を置き換えることはありません。既定登録の取得・追加は同期しますが、GPUやWindowの操作を任意スレッドから行えるという保証ではありません。
+StandardEngineは既定では起動に成功した後で自身を登録し、破棄時に登録を解除します。[起動設定](engine-configuration.md)で登録を無効にすることもできます。未起動のStandardEngineが、別の起動済みエンジンの既定登録を置き換えることはありません。既定登録の取得・追加は同期しますが、GPUやWindowの操作を任意スレッドから行えるという保証ではありません。
 
 ```cpp
 aho::StandardEngine owner("application");

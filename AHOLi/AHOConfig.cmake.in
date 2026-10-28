@@ -1,9 +1,11 @@
 @PACKAGE_INIT@
 
 include(CMakeFindDependencyMacro)
+find_dependency(VSL CONFIG)
 find_dependency(saitekikuukan CONFIG)
 if(@AHO_ENABLE_MSDF@)
     find_dependency(msdfgen CONFIG)
 endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/AHOTargets.cmake")
+check_required_components(AHO)

@@ -49,6 +49,7 @@ find_package(Vulkan REQUIRED)
 get_filename_component(Vulkan_LIBRARY_DIRS "${Vulkan_LIBRARIES}" DIRECTORY)
 message("Vulkan: ${Vulkan_INCLUDE_DIRS}, ${Vulkan_LIBRARIES}")
 pkg_check_modules(GLFW REQUIRED glfw3)
+find_package(glfw3 CONFIG REQUIRED)
 message("glfw3: ${GLFW_INCLUDE_DIRS}, ${GLFW_LIBRARY_DIRS}, ${GLFW_LIBRARIES}")
 
 add_subdirectory(AHO)

@@ -35,6 +35,19 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release -DBUILD_GMOCK=OFF \
             -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/gcc-deps"
           cmake --build "$RUNNER_TEMP/gtest-build" --target install --parallel 2
+      - name: Build SPIRV-Cross with GCC
+        run: |
+          curl --fail --location --retry 3 https://github.com/KhronosGroup/SPIRV-Cross/archive/2c32b6bf86f3c4a5539aa1f0bacbd59fe61759cf.tar.gz -o "$RUNNER_TEMP/spirv-cross.tar.gz"
+          mkdir -p "$RUNNER_TEMP/spirv-cross-src"
+          tar -xzf "$RUNNER_TEMP/spirv-cross.tar.gz" -C "$RUNNER_TEMP/spirv-cross-src" --strip-components=1
+          cmake -S "$RUNNER_TEMP/spirv-cross-src" -B "$RUNNER_TEMP/spirv-cross-build" -G Ninja \
+            -DCMAKE_CXX_COMPILER="$(brew --prefix)/bin/g++-16" \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/gcc-deps" \
+            -DSPIRV_CROSS_CLI=OFF -DSPIRV_CROSS_ENABLE_TESTS=OFF \
+            -DSPIRV_CROSS_ENABLE_GLSL=OFF -DSPIRV_CROSS_ENABLE_HLSL=OFF -DSPIRV_CROSS_ENABLE_MSL=OFF \
+            -DSPIRV_CROSS_ENABLE_CPP=OFF -DSPIRV_CROSS_ENABLE_REFLECT=OFF \
+            -DSPIRV_CROSS_ENABLE_C_API=OFF -DSPIRV_CROSS_ENABLE_UTIL=OFF
+          cmake --build "$RUNNER_TEMP/spirv-cross-build" --target install --parallel 2
       - name: Configure with required reflection
         run: |
           mkdir -p thirdparty
@@ -45,6 +58,7 @@ jobs:
             -DCMAKE_CXX_COMPILER="$(brew --prefix)/bin/g++-16" \
             -DAHO_HOME="$PWD/AHOLi/AHO" -DVSL_HOME="$PWD/VSLi/VSL" \
             -DGTest_DIR="$RUNNER_TEMP/gcc-deps/lib/cmake/GTest" \
+            -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/gcc-deps" \
             -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON \
             -DAHO_ENABLE_EXPERIMENTAL_MESH=ON -DAHO_REQUIRE_MESH_REFLECTION=ON \
             -DAHO_BUILD_MESH_EXAMPLE=ON -DSAITEKIKUUKAN_BUILD_REFLECTION_TESTS=ON
@@ -55,3 +69,5 @@ jobs:
           ctest --test-dir build/reflection --output-on-failure \
             -R '^(AHO[.]Mesh[.]|AHO[.]Compile[.]Header[.](core[.]polygon|core[.]detail[.]soa_storage|x[.]core[.](mesh|mesh_attributes))[.]hpp$|reflection-test$|soa-reflection-test$|chunk-reflection-test$|strategy-reflection-test$)'
           ./build/reflection/AHOLi/aho-mesh-example
+      - name: Test relocated install with isolated dependencies
+        run: python3 tools/cmake/check_installed_package.py --build-dir build/reflection

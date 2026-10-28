@@ -3,6 +3,8 @@ project(VSL VERSION 1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+include(GNUInstallDirs)
+find_package(spirv_cross_core CONFIG REQUIRED)
 
 add_library(VSL STATIC
         ./VSL/src/exceptions.cpp
@@ -156,22 +158,12 @@ add_library(VSL STATIC
 )
 
 target_compile_features(VSL PUBLIC cxx_std_26)
+add_library(VSL::VSL ALIAS VSL)
 aho_target_build_options(VSL)
-target_include_directories(VSL PRIVATE ${Vulkan_INCLUDE_DIRS})
-target_link_libraries(VSL PRIVATE ${Vulkan_LIBRARIES})
-target_link_libraries(VSL PRIVATE
-        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-core.a"
-        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-cpp.a"
-        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-glsl.a"
-        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-hlsl.a"
-        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-msl.a"
-        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-reflect.a"
-        "${Vulkan_LIBRARY_DIRS}/libspirv-cross-util.a"
-)
-
-
-target_include_directories(VSL PRIVATE ${GLFW_INCLUDE_DIRS} ${VSL_HOME}/include/)
-target_link_libraries(VSL PRIVATE glfw)
+target_include_directories(VSL PUBLIC
+        "$<BUILD_INTERFACE:${VSL_HOME}/include>"
+        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+target_link_libraries(VSL PUBLIC Vulkan::Vulkan PRIVATE glfw spirv-cross-core)
 
 if(APPLE)
     target_link_libraries(VSL PRIVATE "-framework Cocoa" "-framework OpenGL" "-framework IOKit")
@@ -181,12 +173,12 @@ set_target_properties(VSL PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR
 
 install(TARGETS VSL
         EXPORT VSLTargets
-        ARCHIVE DESTINATION lib
-        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/VSLi/VSL/include/
-        DESTINATION include
+install(DIRECTORY "${VSL_HOME}/include/"
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
 install(EXPORT VSLTargets
@@ -203,7 +195,7 @@ write_basic_package_version_file(
 )
 
 configure_package_config_file(
-        ${CMAKE_SOURCE_DIR}/VSLi/VSLConfig.cmake.in
+        ${CMAKE_CURRENT_SOURCE_DIR}/VSLConfig.cmake.in
         ${CMAKE_BINARY_DIR}/share/VSL/cmake/VSLConfig.cmake
         INSTALL_DESTINATION share/VSL/cmake
 )

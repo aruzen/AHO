@@ -3,6 +3,7 @@ project(AHOLi VERSION 1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+include(GNUInstallDirs)
 
 include(cmake/Saitekikuukan.cmake)
 include(cmake/TinyGltf.cmake)
@@ -90,29 +91,18 @@ add_library(AHOLi
 )
 
 target_compile_features(AHOLi PUBLIC cxx_std_26)
+add_library(AHO::AHOLi ALIAS AHOLi)
 aho_target_build_options(AHOLi)
 target_include_directories(AHOLi SYSTEM PRIVATE "${AHO_TINYGLTF_INCLUDE_DIR}")
 
 target_include_directories(AHOLi
-        PRIVATE
-        ${Boost_INCLUDE_DIRS}
-        "${VSL_HOME}/include" # ~/repos/AHO/VSLi
-        "${AHO_HOME}/include"
-        ${GLFW_INCLUDE_DIRS}
-)
-
-target_link_directories(AHOLi
-        PRIVATE
-        lib
-        ${GLFW_LIBRARY_DIRS}
-)
+        PUBLIC
+        "$<BUILD_INTERFACE:${AHO_HOME}/include>"
+        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 
 target_link_libraries(AHOLi
-        PUBLIC saitekikuukan::saitekikuukan
-        PRIVATE
-        ${Boost_LIBRARIES}
-        ${GLFW_LIBRARIES}
-        VSL
+        PUBLIC saitekikuukan::saitekikuukan VSL
+        PRIVATE glfw
 )
 
 if(APPLE)
@@ -131,12 +121,12 @@ set_target_properties(AHOLi
 
 install(TARGETS AHOLi
         EXPORT AHOTargets
-        ARCHIVE DESTINATION lib
-        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/AHOLi/AHO/include/
-        DESTINATION include
+install(DIRECTORY "${AHO_HOME}/include/"
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
 install(EXPORT AHOTargets
@@ -153,7 +143,7 @@ write_basic_package_version_file(
 )
 
 configure_package_config_file(
-        ${CMAKE_SOURCE_DIR}/AHOLi/AHOConfig.cmake.in
+        ${CMAKE_CURRENT_SOURCE_DIR}/AHOConfig.cmake.in
         ${CMAKE_BINARY_DIR}/share/AHO/cmake/AHOConfig.cmake
         INSTALL_DESTINATION share/AHO/cmake
 )

@@ -1,10 +1,9 @@
 name: MSDF CPU resources
 
 on:
-  pull_request:
-  push:
-    branches: [master]
-  workflow_dispatch:
+  # プレリリース・正式リリースの公開時に検査する。
+  release:
+    types: [published]
 
 permissions:
   contents: read

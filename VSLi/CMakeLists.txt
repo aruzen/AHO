@@ -38,6 +38,8 @@ add_library(VSL STATIC
         VSL/src/vulkan/stages/dynamic_state.cpp
         VSL/src/vulkan/stages/color_blend.cpp
         VSL/src/vulkan/pipeline_layout.cpp
+        VSL/src/vulkan/resource_use.cpp
+        VSL/src/utils/typed_buffer_view.cpp
         VSL/src/vulkan/command.cpp
         VSL/src/vulkan/device.cpp
         VSL/src/vulkan/sampler.cpp
@@ -72,6 +74,7 @@ add_library(VSL STATIC
         VSL/include/VSL/utils/typed_pipeline.hpp
         VSL/include/VSL/utils/typed_vertex_buffer.hpp
         VSL/include/VSL/utils/typed_index_buffer.hpp
+        VSL/include/VSL/vulkan/resource_use.hpp
         VSL/include/VSL/utils/typed_buffer_view.hpp
         VSL/include/VSL/utils/typed_batch.hpp
         VSL/include/VSL/utils/typed_shader.hpp

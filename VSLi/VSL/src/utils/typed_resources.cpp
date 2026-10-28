@@ -19,6 +19,8 @@ namespace VSL_NAMESPACE::typed::detail {
         images.reserve(values.size());
         using enum graphic_resource::Type;
         for (const auto& value : values) {
+            if (value.use.owner)
+                owners.push_back(value.use.owner);
             if (point.binding_type == UNIFORM_BUFFER || point.binding_type == STORAGE_BUFFER) {
                 const auto usage = point.binding_type == UNIFORM_BUFFER ? MemoryType::UNIFORM_BUFFER : MemoryType::STORAGE_BUFFER;
                 if (!value.buffer || value.buffer->device != device || !contain(value.buffer->usage, usage))

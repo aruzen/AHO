@@ -149,6 +149,7 @@
     <ClInclude Include="VSL\include\VSL\vulkan\buffer_and_image_accessor.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\resource_use.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\vulkan\command.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -335,6 +336,8 @@
     <ClCompile Include="VSL\src\vulkan\buffer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="VSL\src\vulkan\resource_use.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClCompile Include="VSL\src\utils\typed_buffer_view.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClCompile Include="VSL\src\vulkan\command.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>

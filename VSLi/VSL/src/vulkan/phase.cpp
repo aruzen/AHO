@@ -36,8 +36,12 @@ namespace VSL_NAMESPACE {
         data_->resources.push_back(std::move(resource));
     }
     impl::SubmissionImpl::~SubmissionImpl() {
-        if (status == Completion::Status::SUBMITTED)
-            (void)device->device.waitForFences(1, &fence, true, UINT64_MAX);
+        if (status == Completion::Status::SUBMITTED) {
+            const auto result = device->device.waitForFences(1, &fence, true, UINT64_MAX);
+            status = result == vk::Result::eSuccess ? Completion::Status::COMPLETE : Completion::Status::CANCELLED;
+        }
+        if (observed_status)
+            *observed_status = status == Completion::Status::PENDING ? Completion::Status::CANCELLED : status;
     }
 
     ComputePhase::ComputePhase(CommandManager manager,

@@ -2,11 +2,11 @@
 #include <AHO/x/resource/texture.hpp>
 
 namespace AHO_NAMESPACE::x::resource {
-    struct Texture::Data {
+    struct Texture::Data : VSL_NAMESPACE::ResourceUseState {
         VSL_NAMESPACE::Image<VSL_NAMESPACE::ImageType::SAMPLED | VSL_NAMESPACE::ImageType::TRANSFER_DST | VSL_NAMESPACE::ImageType::TRANSFER_SRC> image;
         std::uint32_t width, height;
         bool initialized = false;
-        VSL_NAMESPACE::Completion update;
+        VSL_NAMESPACE::CompletionObservation update;
         Data(VSL_NAMESPACE::LogicalDeviceAccessor device, std::uint32_t width, std::uint32_t height, VSL_NAMESPACE::data_format::Format format);
         void settle();
     };

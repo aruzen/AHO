@@ -202,14 +202,20 @@ namespace VSL_NAMESPACE::typed {
             for (size_t i = 0; i < command._buffers.size(); ++i)
                 if (plan.vertices[i])
                     command._buffers[i].invoke(pool, buffer, manager);
+                else
+                    command._buffers[i].track(buffer);
         }
         if constexpr (requires { command._indices; }) {
             if (plan.index)
                 command._indices.invoke(pool, buffer, manager);
+            else
+                command._indices.track(buffer);
         }
         for (size_t i = 0; i < command._resources.size(); ++i)
             if (plan.resources[i])
                 command._resources[i].invoke(pool, buffer, manager);
+            else
+                command._resources[i].track(buffer);
         if constexpr (!CommandType::PushLayout::EMPTY)
             detail::invoke_push_values(command._pipeline, buffer, CommandType::PushLayout::REQUIREMENTS, command._pushes->bytes());
         if constexpr (requires { command._draw; })

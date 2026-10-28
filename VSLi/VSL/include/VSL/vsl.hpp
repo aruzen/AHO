@@ -50,6 +50,7 @@
 #include "vulkan/commands/draw.hpp"
 #include "vulkan/commands/draw_indexed_instance.hpp"
 #include "vulkan/command.hpp"
+#include "vulkan/resource_use.hpp"
 #include "vulkan/render_pass.hpp"
 #include "vulkan/frame_buffer.hpp"
 #include "vulkan/pipeline_layout.hpp"

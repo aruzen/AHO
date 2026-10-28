@@ -225,6 +225,28 @@ namespace {
             EXPECT_EQ(result.bytes[i], i < 4 ? std::byte{} : color[i - 4]);
     }
 
+    TEST_F(TextureUpdateVulkanIntegrationTest, CompletedUpdateKeepsItsLayoutAfterTheSubmittingManagerIsDestroyed) {
+        resource::Texture texture(device, 2, 1);
+        aho::resource::Buffer<aho::resource::BufferType::GPU_FRIENDLY> upload(device);
+        const std::array<std::byte, 4> red{std::byte{255}, {}, {}, std::byte{255}};
+        upload.assign(red);
+        {
+            auto manager = make_manager().independent(1);
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << texture.update(upload, {.width = 1, .height = 1});
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        auto manager = make_manager();
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << texture.update(upload, {.x = 1, .width = 1, .height = 1});
+            submit(phase);
+        }
+        const auto pixels = read(manager, texture);
+        for (size_t i = 0; i < pixels.bytes.size(); ++i)
+            EXPECT_EQ(pixels.bytes[i], red[i % red.size()]);
+    }
+
     TEST_F(TextureUpdateVulkanIntegrationTest, CustomVSLBufferUsesTheSameTextureUpdateAndBusyTracking) {
         using Native = vsl::Buffer<vsl::MemoryType::TRANSFER_SOURCE, vsl::MemoryProperty::HOST_VISIBLE>;
         auto source = aho::resource::make_custom_buffer(Native(device, 4));

@@ -13,14 +13,14 @@
 VSL_NAMESPACE::command::BindGraphicResource::BindGraphicResource(VSL_NAMESPACE::GraphicResource resource,
                                                                  VSL_NAMESPACE::graphic_resource::BindingDestination dst,
                                                                  std::optional<PipelineAccessor> pipeline,
-                                                                 std::uint32_t first_binding)
-    : resources{resource}, destination(dst), pipeline(std::move(pipeline)), first_binding(first_binding) {}
+                                                                 std::uint32_t first_binding, std::shared_ptr<ResourceUseGroup> use)
+    : resources{resource}, destination(dst), pipeline(std::move(pipeline)), first_binding(first_binding), _use(std::move(use)) {}
 
 VSL_NAMESPACE::command::BindGraphicResource::BindGraphicResource(const std::vector<GraphicResource>& resources,
                                                                  VSL_NAMESPACE::graphic_resource::BindingDestination dst,
                                                                  std::optional<PipelineAccessor> pipeline,
-                                                                 std::uint32_t first_binding)
-    : resources(resources), destination(dst), pipeline(std::move(pipeline)), first_binding(first_binding) {}
+                                                                 std::uint32_t first_binding, std::shared_ptr<ResourceUseGroup> use)
+    : resources(resources), destination(dst), pipeline(std::move(pipeline)), first_binding(first_binding), _use(std::move(use)) {}
 
 void VSL_NAMESPACE::command::BindGraphicResource::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
     if (resources.empty())
@@ -31,6 +31,7 @@ void VSL_NAMESPACE::command::BindGraphicResource::invoke(CommandPool pool, Comma
                 throw std::logic_error("Descriptor resource has been destroyed");
             buffer.retain(resource.data_);
         }
+        track(buffer);
         buffer.retain(pipeline->data_);
         buffer.data_->command_buffers[buffer.get_current_buffer_idx()]
             .bindDescriptorSets((vk::PipelineBindPoint)destination,
@@ -43,4 +44,9 @@ void VSL_NAMESPACE::command::BindGraphicResource::invoke(CommandPool pool, Comma
 
 void VSL_NAMESPACE::command::BindGraphicResource::set_pipeline(std::optional<PipelineAccessor> pipeline) {
     this->pipeline = pipeline ? pipeline : _fallback_pipeline;
+}
+
+void VSL_NAMESPACE::command::BindGraphicResource::track(const CommandBuffer& buffer) const {
+    if (_use)
+        _use->record(buffer);
 }

@@ -13,6 +13,7 @@ namespace VSL_NAMESPACE::command {
     };
     struct BindIndexBufferAt : Command {
         BindIndexBufferAt(const BufferAccessor& source, IndexType type, size_t offset = 0, ResourceUse use = {});
+        BindIndexBufferAt(std::shared_ptr<impl::BufferImpl> source, IndexType type, size_t offset = 0, ResourceUse use = {});
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
         void track(const CommandBuffer& buffer) const { _use.record(buffer); }
         const std::shared_ptr<impl::BufferImpl>& source() const { return _source; }

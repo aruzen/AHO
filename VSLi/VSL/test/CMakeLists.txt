@@ -111,13 +111,14 @@ if (VSL_TEST_SOURCES)
     add_library(vsl-block-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_block_layout.cpp)
     target_compile_definitions(vsl-block-style-contract PRIVATE VSL_TYPED_CASE=0)
     target_include_directories(vsl-block-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
-    set(typed_index_names Valid Uint8Index SignedIndex Uint64Index RawBuffer MissingResources MissingPush)
-    foreach(case RANGE 0 6)
+    set(typed_index_names Valid Uint8Index SignedIndex Uint64Index RawBuffer MissingResources MissingPush
+        Uint8View RawView MissingViewResources MissingViewPush)
+    foreach(case RANGE 0 10)
         list(GET typed_index_names ${case} name)
         add_test(NAME "VSL.TypedIndex.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
             "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
             "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_index_buffer.cpp"
-            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=index_element|draw_indexed"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=index_element|draw_indexed|TypedIndexBufferView"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
         set_tests_properties("VSL.TypedIndex.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
     endforeach()

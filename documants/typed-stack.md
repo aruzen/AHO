@@ -190,3 +190,18 @@ phase << batch;
 `TypedBatch` は全indexの世代を確認してから、bindとdrawを始めます。後半のcommandが古くなった場合にも、前半だけを記録したり資源を使用中にしたりしません。indexを変更しなければ、commandとbatchを再利用できます。要素数が不正な更新など、GPUへの書込み前に失敗した操作は既存commandを無効にしません。
 
 実際のuploadを開始して失敗した場合は、GPUの内容を検証済みとして扱わず、次にuploadが成功するまで範囲検査も拒否します。記録時の世代比較はO(1)で、毎回のindex再走査は行いません。CPU snapshotと世代を同じ所有領域へまとめて保持します。backendからの直接書込みはこの更新契約の対象外です。
+
+## index Bufferの部分view
+
+`TypedIndexBuffer::view(first, count)` は、元Bufferの所有権・16/32bitの要素型・CPU snapshot・使用状態を共有する `TypedIndexBufferView<Index>` を返します。GPU Bufferの再確保やindexのコピーは行いません。DeviceLocalの元Bufferにも利用できます。
+
+```cpp
+auto primitive = indices.view(first_index, index_count);
+phase << pipeline.bind_vertices(vertices).draw_indexed(primitive, primitive.size());
+```
+
+viewからのviewも相対範囲で作れます。drawのfirst_indexはview内での相対位置、byte_offsetは元Buffer先頭からの絶対byte位置です。空・範囲外のviewは拒否し、drawのindex数、vertex offset、instance範囲の検証もviewの範囲で行います。0個のdrawは非空viewにcount=0を指定できます。
+
+元Bufferのcopyは既存viewへ反映されますが、既に構築したcommandは更新世代の検査で拒否されるため作り直してください。view経由で描画中の場合も元BufferのCPU更新は禁止され、完了／cancel後に再開できます。元wrapperを破棄してもview／commandは必要な所有者を保持します。batchは同じ元Bufferでもoffsetが異なる場合にindex bindを更新します。
+
+viewは既存TypedIndexBufferからだけ生成します。任意のGPU Bufferへ未検証のCPU値を添えてTyped indexとして扱うfactoryは提供しません。

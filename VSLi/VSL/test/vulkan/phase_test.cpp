@@ -1,5 +1,6 @@
 #include "support/vulkan_fixture.hpp"
 #include "support/window_fixture.hpp"
+#include "support/render_fixture.hpp"
 #include <VSL/vulkan/commands/image_readback.hpp>
 namespace {
     struct RecordCommand : VSL_NAMESPACE::command::Command {
@@ -52,6 +53,34 @@ namespace {
         void invoke(VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) override {}
     };
 
+    struct FailingStateCommand : vsl::command::Command, vsl::command::PipelineHolder, vsl::command::VertexSizeHolder {
+        vsl::PipelineAccessor get_pipeline() override { return {}; }
+        std::size_t get_vertex_size() override { return 99; }
+        void invoke(vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) override { throw std::runtime_error("recording failed"); }
+    };
+    struct FailingStateDelegate : vsl::command::DelegateCommand, vsl::command::PipelineHolder, vsl::command::VertexSizeHolder {
+        vsl::PipelineAccessor get_pipeline() override { return {}; }
+        std::size_t get_vertex_size() override { return 99; }
+        void invoke(vsl::DefaultPhaseStream&, vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) override { throw std::runtime_error("delegate failed"); }
+    };
+    struct FailingRequirement : vsl::command::Command, vsl::command::VertexSizeRequire {
+        void set_vertex_size(std::optional<std::size_t>) override { throw std::runtime_error("requirement failed"); }
+        void invoke(vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) override { ADD_FAILURE() << "Rejected requirements must not invoke the command"; }
+    };
+    struct FailingAfterPipelineBind : vsl::command::Command, vsl::command::PipelineHolder, vsl::command::VertexSizeHolder {
+        vsl::GraphicsPipeline target;
+        explicit FailingAfterPipelineBind(vsl::GraphicsPipeline target) : target(std::move(target)) {}
+        vsl::PipelineAccessor get_pipeline() override { return target; }
+        std::size_t get_vertex_size() override { return 99; }
+        void invoke(vsl::CommandPool pool, vsl::CommandBuffer buffer, vsl::CommandManager manager) override {
+            target.invoke(pool, buffer, manager);
+            throw std::runtime_error("pipeline bound before failure");
+        }
+    };
+    class StreamRecoveryVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+
     RecordCommand::RecordCommand(std::shared_ptr<int> calls) : calls(std::move(calls)) {}
 
     void RecordCommand::invoke(VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) {
@@ -98,6 +127,51 @@ namespace {
             EXPECT_EQ(*calls, 8);
         }
         device.data_->device.waitIdle();
+    }
+    TEST_F(PhaseVulkanIntegrationTest, FailedValueAndSharedCommandsAndDelegatesInvalidateStreamBindings) {
+        auto manager = make_manager();
+        for (unsigned mode = 0; mode < 4; ++mode) {
+            SCOPED_TRACE(mode);
+            vsl::DefaultPhaseStream stream{manager, 17, vsl::PipelineAccessor{}};
+            switch (mode) {
+                case 0:
+                    EXPECT_THROW(stream << FailingStateCommand{}, std::runtime_error);
+                    break;
+                case 1:
+                    EXPECT_THROW(stream << std::shared_ptr<vsl::command::Command>(std::make_shared<FailingStateCommand>()), std::runtime_error);
+                    break;
+                case 2:
+                    EXPECT_THROW(stream << FailingStateDelegate{}, std::runtime_error);
+                    break;
+                case 3:
+                    EXPECT_THROW(stream << std::shared_ptr<vsl::command::DelegateCommand>(std::make_shared<FailingStateDelegate>()), std::runtime_error);
+                    break;
+            }
+            EXPECT_FALSE(stream.pipeline);
+            EXPECT_FALSE(stream.vertex_size);
+            auto received = std::make_shared<std::optional<std::size_t>>(100);
+            stream << VertexCountConsumer{received};
+            EXPECT_FALSE(*received);
+            stream << VertexCountSource{3} << VertexCountConsumer{received};
+            EXPECT_EQ(*received, 3u);
+        }
+    }
+    TEST_F(PhaseVulkanIntegrationTest, FailedRequirementResolutionAlsoInvalidatesStreamBindings) {
+        auto manager = make_manager();
+        vsl::DefaultPhaseStream stream{manager, 17, vsl::PipelineAccessor{}};
+        EXPECT_THROW(stream << FailingRequirement{}, std::runtime_error);
+        EXPECT_FALSE(stream.pipeline);
+        EXPECT_FALSE(stream.vertex_size);
+    }
+    TEST_F(StreamRecoveryVulkanIntegrationTest, ExplicitRebindingAfterPartialRecordingRendersCorrectPixels) {
+        vsl::GraphicsPipeline other(*layout, *pass);
+        ExpectTriangleColor(render([&](auto& stream) {
+            stream << VertexCountSource{3};
+            EXPECT_THROW(stream << FailingAfterPipelineBind(other), std::runtime_error);
+            EXPECT_FALSE(stream.pipeline);
+            EXPECT_FALSE(stream.vertex_size);
+            stream << *pipeline << VertexCountSource{3} << vsl::command::DRAW;
+        }));
     }
     TEST_F(PhaseVulkanIntegrationTest, PostponedDefaultPhaseCanBeInspectedWithoutAcquiringAnImage) {
         auto manager = make_manager();

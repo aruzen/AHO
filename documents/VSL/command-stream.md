@@ -1,0 +1,11 @@
+# command streamと記録失敗
+
+`DefaultPhaseStream` は、後続のcommandへ渡すためにPipelineと頂点数を保持します。value／shared_ptrのcommandとdelegateで同じ引き渡し規則を使用します。
+
+requirementsの解決またはcommandのinvokeが例外になった場合、そのstreamの `pipeline` と `vertex_size` は未確定の状態へ戻し、元の例外を再送出します。失敗したcommandがまだbindしていなかった場合も、途中までnative命令を記録した場合も同じ規則です。
+
+同じPhaseで記録を続ける場合は、必要なPipeline・頂点Buffer・descriptor等を明示的にbindし直してください。失敗時に古い推測状態を戻しても、実際のGPU状態と一致する保証はないため、以前の値へのrollbackは行いません。
+
+これは既に記録されたnative命令を巻き戻す機能ではありません。Phaseを継続するかcancelするかは呼び出し側で決めます。使用済み資源の所有権・Completion・GPU同期も変更しません。また、推測状態はstreamごとなので、複数のstreamを交互に使ってnative状態を変更する場合にも必要な状態を明示してください。
+
+正常に記録できる場合のholder／requirementの順序、戻り値、bindの引き渡しは変わりません。成功経路に状態のスナップショットや追加の確保を入れず、失敗時だけ推測を無効にします。

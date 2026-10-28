@@ -10,10 +10,12 @@ static_assert(std::is_base_of_v<aho::engine::EngineAccessor, aho::engine::Graphi
 static_assert(std::has_virtual_destructor_v<aho::engine::GraphicalEngine>);
 namespace {
     struct DeferredGraphicalEngine : aho::engine::GraphicalEngine {
+        DeferredGraphicalEngine() = default;
+        explicit DeferredGraphicalEngine(std::shared_ptr<aho::engine::EngineData> data) { reset_data(std::move(data)); }
         aho::Window get_window() override { throw std::logic_error("no window"); }
     };
-    static_assert(std::is_nothrow_move_constructible_v<DeferredGraphicalEngine>);
-    static_assert(std::is_nothrow_move_assignable_v<DeferredGraphicalEngine>);
+    static_assert(!std::is_copy_constructible_v<DeferredGraphicalEngine>);
+    static_assert(!std::is_move_constructible_v<DeferredGraphicalEngine>);
     struct TrackedGraphicalEngine : DeferredGraphicalEngine {
         int& destructions;
         std::shared_ptr<int> resource = std::make_shared<int>(7);
@@ -34,21 +36,14 @@ namespace {
         EXPECT_EQ(destructions, 1);
         EXPECT_TRUE(resource.expired());
     }
-    TEST(GraphicalEngineTest, CopyAndMoveKeepExistingSharedHandleSemantics) {
+    TEST(GraphicalEngineTest, SharedHandleOutlivesItsOwner) {
         const auto backing = std::make_shared<int>(7);
-        DeferredGraphicalEngine original;
-        original.data_ = std::shared_ptr<aho::engine::EngineData>(backing, nullptr);
-        const DeferredGraphicalEngine copy(original);
-        EXPECT_EQ(backing.use_count(), 3);
-        DeferredGraphicalEngine moved(std::move(original));
-        EXPECT_EQ(original.data_.use_count(), 0);
-        EXPECT_EQ(moved.data_.use_count(), 3);
-        DeferredGraphicalEngine assigned;
-        assigned = std::move(moved);
-        EXPECT_EQ(moved.data_.use_count(), 0);
-        EXPECT_EQ(assigned.data_.use_count(), 3);
-        DeferredGraphicalEngine copy_assigned;
-        copy_assigned = copy;
-        EXPECT_EQ(backing.use_count(), 4);
+        aho::engine::EngineAccessor handle;
+        {
+            DeferredGraphicalEngine original(std::shared_ptr<aho::engine::EngineData>(backing, nullptr));
+            handle = original;
+            EXPECT_EQ(backing.use_count(), 3);
+        }
+        EXPECT_EQ(handle.data().use_count(), 2);
     }
 } // namespace

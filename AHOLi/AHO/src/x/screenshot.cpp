@@ -92,12 +92,12 @@ namespace AHO_NAMESPACE::x {
     }
 
     Screenshot::Screenshot(window::Window window) {
-        if (!window || !window.data2 || !window.engine.data_)
+        if (!window || !window.data2 || !window.engine.data())
             throw std::invalid_argument("Screenshot requires a live AHO window");
         if (THREAD_LOCAL_DRAW_PHASE)
             throw std::logic_error("Create Screenshot outside a DrawPhase");
         auto& resources = *window.data2;
-        auto manager = window.engine.data_->command_manager;
+        auto manager = window.engine.data()->command_manager;
         (void)is_bgra(resources.swapchain.get_format());
         auto data = std::make_shared<Data>(window.data2, manager);
         const auto usage = resources.swapchain.images.at(0).get_usage();

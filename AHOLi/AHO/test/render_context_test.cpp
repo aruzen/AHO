@@ -9,10 +9,10 @@ namespace {
     TEST_F(RenderContextVulkanIntegration, WindowAndPhaseExposeTheSameDrawingServices) {
         ASSERT_NO_THROW(start_engine());
         const auto context = engine->get_window().render_context();
-        EXPECT_EQ(context.device().data_, engine->data_->logical_device.data_);
-        EXPECT_EQ(context.commands().data_, engine->data_->command_manager.data_);
-        EXPECT_EQ(&context.descriptor_manager(), engine->data_->graphic_resource_manager.get());
-        EXPECT_EQ(context.frame_count(), engine->data_->command_manager.get_buffer().get_size());
+        EXPECT_EQ(context.device().data_, engine->data()->logical_device.data_);
+        EXPECT_EQ(context.commands().data_, engine->data()->command_manager.data_);
+        EXPECT_EQ(&context.descriptor_manager(), engine->data()->graphic_resource_manager.get());
+        EXPECT_EQ(context.frame_count(), engine->data()->command_manager.get_buffer().get_size());
         aho::DrawPhase phase(*engine);
         const auto drawing = phase.context();
         EXPECT_EQ(drawing.device().data_, context.device().data_);

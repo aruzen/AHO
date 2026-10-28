@@ -8,7 +8,7 @@ namespace {
         ASSERT_NE(aho::pipeline::GET_BASE_LAYOUT, nullptr);
         const auto layout = aho::pipeline::GET_BASE_LAYOUT(engine.get());
         ASSERT_NE(layout.data_, nullptr);
-        EXPECT_EQ(layout.data_->device, engine->data_->logical_device.data_);
+        EXPECT_EQ(layout.data_->device, engine->data()->logical_device.data_);
         EXPECT_TRUE(static_cast<bool>(layout.data_->pipeline_layout));
         ASSERT_NE(layout.data_->info, nullptr);
         EXPECT_EQ(layout.data_->info->rasterization.cullMode, vk::CullModeFlags(vk::CullModeFlagBits::eBack));

@@ -19,7 +19,7 @@ AHO_NAMESPACE::DrawPhase::DrawPhase(AHO_NAMESPACE::engine::GraphicalEngine& engi
 AHO_NAMESPACE::DrawPhase::DrawPhase(AHO_NAMESPACE::engine::GraphicalEngine* engine,
                                     std::function<void(DrawStream<VSL_NAMESPACE::DefaultPhaseStream>&)> initialize,
                                     std::function<void(DrawStream<VSL_NAMESPACE::DefaultPhaseStream>&)> finit)
-    : VSL_NAMESPACE::DefaultPhase(engine->data_->command_manager,
+    : VSL_NAMESPACE::DefaultPhase(engine->data()->command_manager,
                                   engine->get_window().data2->swapchain,
                                   engine->get_window().data2->image_available,
                                   engine->get_window().data2->render_finished,

@@ -13,10 +13,10 @@ namespace AHO_NAMESPACE::engine {
         GraphicalEngine() = default;
         virtual ~GraphicalEngine() = default;
 
-        GraphicalEngine(const GraphicalEngine&) = default;
-        GraphicalEngine& operator=(const GraphicalEngine&) = default;
-        GraphicalEngine(GraphicalEngine&&) noexcept = default;
-        GraphicalEngine& operator=(GraphicalEngine&&) noexcept = default;
+        GraphicalEngine(const GraphicalEngine&) = delete;
+        GraphicalEngine& operator=(const GraphicalEngine&) = delete;
+        GraphicalEngine(GraphicalEngine&&) = delete;
+        GraphicalEngine& operator=(GraphicalEngine&&) = delete;
 
         virtual AHO_NAMESPACE::Window get_window() = 0;
     };

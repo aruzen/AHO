@@ -25,7 +25,8 @@ namespace VSL_NAMESPACE::typed {
 
     public:
         using Vertex = Vertex_;
-        static_assert(std::is_standard_layout_v<Vertex> && std::is_trivially_copyable_v<Vertex>);
+        static_assert(std::is_standard_layout_v<Vertex> && std::is_trivially_copyable_v<Vertex>,
+                      "Typed vertex records must be standard-layout and trivially_copyable");
         static TypedVertexBufferView FromBuffer(const BufferAccessor& source, size_t count, size_t byte_offset = 0, ResourceUse use = {});
         const ResourceUse& resource_use() const { return _use; }
         size_t size() const { return _count; }

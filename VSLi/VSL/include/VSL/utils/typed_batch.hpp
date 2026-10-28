@@ -183,7 +183,7 @@ namespace VSL_NAMESPACE::typed {
             plan.index = state.update_index(command._indices);
             _statistics.index_binds += plan.index;
         }
-        for (size_t i = 0; i < command._resources.size(); ++i) {
+        for (size_t i = 0; i < plan.resources.size(); ++i) {
             plan.resources[i] = state.update_resource(command._resources[i]);
             _statistics.descriptor_binds += plan.resources[i];
         }
@@ -211,7 +211,7 @@ namespace VSL_NAMESPACE::typed {
             else
                 command._indices.track(buffer);
         }
-        for (size_t i = 0; i < command._resources.size(); ++i)
+        for (size_t i = 0; i < plan.resources.size(); ++i)
             if (plan.resources[i])
                 command._resources[i].invoke(pool, buffer, manager);
             else

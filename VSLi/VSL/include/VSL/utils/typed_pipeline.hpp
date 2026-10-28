@@ -116,6 +116,8 @@ namespace VSL_NAMESPACE::typed {
 
     template<typename Input, typename Resources, typename Pushes, std::uint32_t subpass>
     class TypedGraphicsPipeline {
+        // UINT32_MAX is VK_SUBPASS_EXTERNAL, never a graphics pipeline subpass.
+        static_assert(subpass != UINT32_MAX, "Typed subpass index must not be narrowed to VK_SUBPASS_EXTERNAL");
         LogicalDeviceAccessor _device;
         VSL_NAMESPACE::GraphicsPipeline _pipeline;
         template<pipeline_layout_injecter... Stages>

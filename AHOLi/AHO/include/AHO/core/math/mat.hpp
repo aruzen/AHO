@@ -292,9 +292,9 @@ namespace AHO_NAMESPACE {
             return std::move(buf);
         }
 
-        template<typename R, size_t row, size_t column, typename T>
-        requires(!requires {{ T::IS_MAT } -> std::convertible_to<bool>; }) && concepts::multiply_as<const R&, const T&>
-        constexpr auto operator*(const Mat<R, row, column>& mat, const T& m) {
+        template<typename L, size_t row, size_t column, typename R>
+        requires(!requires {{ R::IS_MAT } -> std::convertible_to<bool>; }) && concepts::multiply_as<const L&, const R&>
+        constexpr auto operator*(const matrix::Mat<L, row, column>& mat, const R& m) {
             AHO_NAMESPACE::matrix::Mat<decltype(mat[0][0] * m), row, column> buf;
             for (size_t i = 0; i < row; i++)
                 for (size_t j = 0; j < column; j++)
@@ -302,9 +302,9 @@ namespace AHO_NAMESPACE {
             return std::move(buf);
         }
 
-        template<typename R, size_t row, size_t column, typename T>
-        requires(!requires {{ T::IS_MAT } -> std::convertible_to<bool>; }) && concepts::division_as<const R&, const T&>
-        constexpr auto operator/(const Mat<R, row, column>& mat, const T& m) {
+        template<typename L, size_t row, size_t column, typename R>
+        requires(!requires {{ R::IS_MAT } -> std::convertible_to<bool>; }) && concepts::division_as<const L&, const R&>
+        constexpr auto operator/(const matrix::Mat<L, row, column>& mat, const R& m) {
             AHO_NAMESPACE::matrix::Mat<decltype(mat[0][0] / m), row, column> buf;
 
             for (size_t i = 0; i < row; i++)
@@ -313,9 +313,9 @@ namespace AHO_NAMESPACE {
             return std::move(buf);
         }
 
-        template<typename R, size_t row, size_t column, typename T>
-        requires(!requires {{ T::IS_MAT } -> std::convertible_to<bool>; }) && concepts::multiply_as<const T&, const R&>
-        constexpr auto operator*(const T& m, const Mat<R, row, column>& mat) {
+        template<typename L, size_t row, size_t column, typename R>
+        requires(!requires {{ R::IS_MAT } -> std::convertible_to<bool>; }) && concepts::multiply_as<const R&, const L&>
+        constexpr auto operator*(const R& m, const matrix::Mat<L, row, column>& mat) {
             AHO_NAMESPACE::matrix::Mat<decltype(m * mat[0][0]), row, column> buf;
 
             for (size_t i = 0; i < row; i++)
@@ -324,9 +324,9 @@ namespace AHO_NAMESPACE {
             return std::move(buf);
         }
 
-        template<typename R, size_t row, size_t column, typename T>
-        requires(!requires {{ T::IS_MAT } -> std::convertible_to<bool>; }) && concepts::division_as<const T&, const R&>
-        constexpr auto operator/(const T& m, const Mat<R, row, column>& mat) {
+        template<typename L, size_t row, size_t column, typename R>
+        requires(!requires {{ R::IS_MAT } -> std::convertible_to<bool>; }) && concepts::division_as<const R&, const L&>
+        constexpr auto operator/(const R& m, const matrix::Mat<L, row, column>& mat) {
             AHO_NAMESPACE::matrix::Mat<decltype(m / mat[0][0]), row, column> buf;
 
             for (size_t i = 0; i < row; i++)

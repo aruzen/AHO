@@ -159,13 +159,14 @@ VSL_NAMESPACE::Vulkan<validation>::Vulkan(const char* app_name, const std::vecto
     if constexpr (validation) {
         setup_debug_messenger(data_);
     } else {
-        // Release等で検証を無効にする運用では、一般ユーザーに不要なコンソール画面（黒いウィンドウ）を残さない意図の処理。
-        // 標準入出力を閉じ、MSVCではFreeConsole()でコンソールから切り離す。
+#ifdef _MSC_VER
+        // Keep CRT streams valid for hosts with redirected output, including CTest.
+        // Detaching the console is enough to hide a release application's console.
+        FreeConsole();
+#else
         fclose(stdin);
         fclose(stdout);
         fclose(stderr);
-#ifdef _MSC_VER
-        FreeConsole();
 #endif
     }
 }

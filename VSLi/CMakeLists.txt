@@ -159,6 +159,12 @@ target_compile_features(VSL PUBLIC cxx_std_26)
 aho_target_build_options(VSL)
 target_include_directories(VSL PRIVATE ${Vulkan_INCLUDE_DIRS})
 target_link_libraries(VSL PRIVATE ${Vulkan_LIBRARIES})
+if(WIN32)
+    foreach(component core cpp glsl hlsl msl reflect util)
+        target_link_libraries(VSL PRIVATE
+                "${Vulkan_LIBRARY_DIRS}/spirv-cross-${component}$<$<CONFIG:Debug>:d>.lib")
+    endforeach()
+else()
 target_link_libraries(VSL PRIVATE
         "${Vulkan_LIBRARY_DIRS}/libspirv-cross-core.a"
         "${Vulkan_LIBRARY_DIRS}/libspirv-cross-cpp.a"
@@ -168,6 +174,7 @@ target_link_libraries(VSL PRIVATE
         "${Vulkan_LIBRARY_DIRS}/libspirv-cross-reflect.a"
         "${Vulkan_LIBRARY_DIRS}/libspirv-cross-util.a"
 )
+endif()
 
 
 target_include_directories(VSL PRIVATE ${GLFW_INCLUDE_DIRS} ${VSL_HOME}/include/)

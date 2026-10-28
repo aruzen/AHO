@@ -17,7 +17,16 @@ target_include_directories(AHO PRIVATE ${GLFW_INCLUDE_DIRS})
 target_link_directories(AHO PRIVATE ${GLFW_LIBRARY_DIRS})
 target_link_libraries(AHO PRIVATE ${GLFW_LIBRARIES})
 
-find_package(glm CONFIG REQUIRED)
+if(NOT TARGET glm::glm)
+    find_package(glm CONFIG REQUIRED)
+endif()
 target_link_libraries(AHO PRIVATE glm::glm)
 
 target_include_directories(AHO PRIVATE ../thirdparty/)
+
+if(WIN32)
+    set_target_properties(AHO PROPERTIES
+            VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            VS_DEBUGGER_ENVIRONMENT "AHO_HOME=${AHO_HOME}\nPATH=${VULKAN_SDK}/Bin;%PATH%")
+endif()
+aho_copy_windows_runtime()

@@ -98,6 +98,7 @@ target_include_directories(AHOLi
         ${Boost_INCLUDE_DIRS}
         "${VSL_HOME}/include" # ~/repos/AHO/VSLi
         "${AHO_HOME}/include"
+        ${Vulkan_INCLUDE_DIRS}
         ${GLFW_INCLUDE_DIRS}
 )
 
@@ -177,6 +178,7 @@ if (BUILD_TESTING)
 endif ()
 
 include(cmake/MSDF.cmake)
+cmake_language(DEFER CALL aho_copy_windows_runtime)
 
 option(AHO_BUILD_GLTF_EXAMPLE "Build the CPU glTF/GLB inspection example" OFF)
 if(AHO_BUILD_GLTF_EXAMPLE)

@@ -154,12 +154,12 @@ namespace {
         CountingManager descriptors(device);
         Bundle bundle(manager, descriptors, sizes());
         auto phase = manager.start_phase<vsl::ComputePhase>();
-        EXPECT_THROW(bundle.initialize_shared([&](Bundle::Shared&) {
+        const auto failed_initialize = [&](Bundle::Shared&) {
             EXPECT_THROW(bundle.get(phase), std::logic_error);
             EXPECT_THROW(initialize_shared(bundle), std::logic_error);
             throw std::runtime_error("Initialization failed");
-        }),
-                     std::runtime_error);
+        };
+        EXPECT_THROW(bundle.initialize_shared(failed_initialize), std::runtime_error);
         EXPECT_THROW(bundle.get(phase), std::logic_error);
         EXPECT_THROW(bundle.update(phase, [](Bundle::Frame&) {}), std::logic_error);
         EXPECT_THROW(initialize_shared(bundle), std::logic_error);

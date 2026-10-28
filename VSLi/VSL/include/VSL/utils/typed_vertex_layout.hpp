@@ -92,9 +92,10 @@ namespace VSL_NAMESPACE::typed {
                             AUTO) &&
                            ...),
                           "Vertex record location overflow");
-            using Type = VertexBinding<typename Record::Vertex, binding, timing,
-                                       VertexInputDefinition<Record::ATTRIBUTES[indices].format, first_location + Record::ATTRIBUTES[indices].location,
-                                                             Record::ATTRIBUTES[indices].offset>...>;
+            template<size_t index>
+            using Attribute = VertexInputDefinition<Record::ATTRIBUTES[index].format, first_location + Record::ATTRIBUTES[index].location,
+                                                    Record::ATTRIBUTES[index].offset>;
+            using Type = VertexBinding<typename Record::Vertex, binding, timing, Attribute<indices>...>;
         };
 
         constexpr std::uint32_t vertex_locations(data_format::Format format) {

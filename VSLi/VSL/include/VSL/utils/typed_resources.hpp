@@ -124,10 +124,10 @@ namespace VSL_NAMESPACE::typed {
         const std::shared_ptr<ResourceUseGroup>& resource_use() const { return _use; }
         void require_complete() const;
         template<std::uint32_t binding, typename Value>
-        requires(detail::descriptor_matches<typename Spec::template Binding<binding>, Value>() && Spec::template Binding<binding>::POINT.amount == 1)
+        requires(detail::descriptor_matches<typename Spec_::template Binding<binding>, Value>() && Spec_::template Binding<binding>::POINT.amount == 1)
         void write(const Value& value);
         template<std::uint32_t binding, typename Value, size_t count>
-        requires(detail::descriptor_matches<typename Spec::template Binding<binding>, Value>() && Spec::template Binding<binding>::POINT.amount == count)
+        requires(detail::descriptor_matches<typename Spec_::template Binding<binding>, Value>() && Spec_::template Binding<binding>::POINT.amount == count)
         void write(const std::array<Value, count>& values);
     };
 
@@ -216,10 +216,10 @@ namespace VSL_NAMESPACE::typed {
         if (!std::ranges::all_of(*_initialized, [](bool value) { return value; }))
             throw std::logic_error("Typed descriptor set has uninitialized bindings");
     }
-    template<typename Spec>
+    template<typename Spec_>
     template<std::uint32_t binding, typename Value>
-    requires(detail::descriptor_matches<typename Spec::template Binding<binding>, Value>() && Spec::template Binding<binding>::POINT.amount == 1)
-    void TypedDescriptorSet<Spec>::write(const Value& value) {
+    requires(detail::descriptor_matches<typename Spec_::template Binding<binding>, Value>() && Spec_::template Binding<binding>::POINT.amount == 1)
+    void TypedDescriptorSet<Spec_>::write(const Value& value) {
         _use->require_idle();
         const auto descriptor = value.descriptor();
         std::vector<ResourceUse> uses{descriptor.use};
@@ -227,10 +227,10 @@ namespace VSL_NAMESPACE::typed {
         _use->replace(Spec::BindingIndex(binding), std::move(uses));
         (*_initialized)[Spec::BindingIndex(binding)] = true;
     }
-    template<typename Spec>
+    template<typename Spec_>
     template<std::uint32_t binding, typename Value, size_t count>
-    requires(detail::descriptor_matches<typename Spec::template Binding<binding>, Value>() && Spec::template Binding<binding>::POINT.amount == count)
-    void TypedDescriptorSet<Spec>::write(const std::array<Value, count>& values) {
+    requires(detail::descriptor_matches<typename Spec_::template Binding<binding>, Value>() && Spec_::template Binding<binding>::POINT.amount == count)
+    void TypedDescriptorSet<Spec_>::write(const std::array<Value, count>& values) {
         _use->require_idle();
         std::array<detail::DescriptorValue, count> descriptors{};
         std::vector<ResourceUse> uses;

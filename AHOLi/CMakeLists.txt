@@ -167,6 +167,7 @@ if (BUILD_TESTING)
 endif ()
 
 include(cmake/MSDF.cmake)
+cmake_language(DEFER CALL aho_copy_windows_runtime)
 
 option(AHO_BUILD_GLTF_EXAMPLE "Build the CPU glTF/GLB inspection example" OFF)
 if(AHO_BUILD_GLTF_EXAMPLE)

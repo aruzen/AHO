@@ -27,9 +27,6 @@
     <ClInclude Include="pch.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="VSL\consteval_string.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="VSL\include\VSL\utils\flags.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -248,9 +245,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="pch.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="VSL\src\utils\shader_compiler.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>

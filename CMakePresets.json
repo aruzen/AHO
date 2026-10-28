@@ -1,0 +1,57 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "windows-vs2026-debug",
+      "displayName": "Windows VS 2026 Debug",
+      "generator": "Visual Studio 18 2026",
+      "binaryDir": "${sourceDir}/build/vs2026",
+      "architecture": "x64",
+      "toolset": "v145",
+      "cacheVariables": {
+        "CMAKE_CONFIGURATION_TYPES": "Debug;Release",
+        "AHO_HOME": "${sourceDir}/AHOLi/AHO",
+        "VSL_HOME": "${sourceDir}/VSLi/VSL"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "windows-vs2026-debug",
+      "configurePreset": "windows-vs2026-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-vs2026-release",
+      "configurePreset": "windows-vs2026-debug",
+      "configuration": "Release"
+    },
+    {
+      "name": "windows-vs2026-tests",
+      "configurePreset": "windows-vs2026-debug",
+      "configuration": "Debug",
+      "targets": [
+        "vsl-tests",
+        "aho-tests"
+      ]
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "windows-vs2026-debug",
+      "configurePreset": "windows-vs2026-debug",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-vs2026-release",
+      "configurePreset": "windows-vs2026-debug",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

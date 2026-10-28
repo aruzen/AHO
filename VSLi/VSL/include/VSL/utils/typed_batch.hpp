@@ -226,6 +226,11 @@ namespace VSL_NAMESPACE::typed {
     template<typename... Commands>
     template<size_t... indices>
     void TypedBatch<Commands...>::invoke_all(CommandPool pool, CommandBuffer buffer, CommandManager manager, std::index_sequence<indices...>) {
+        const auto validate = [](const auto& command) {
+            if constexpr (requires { command._indices; })
+                command.validate_indices();
+        };
+        (validate(std::get<indices>(_commands)), ...);
         (invoke_one(std::get<indices>(_commands), std::get<indices>(_plans), pool, buffer, manager), ...);
     }
     template<typename... Commands>

@@ -60,11 +60,16 @@ namespace VSL_NAMESPACE::typed {
         command::DrawIndexed _draw;
         std::vector<command::BindGraphicResource> _resources;
         std::optional<typename Pushes::Values> _pushes;
+        std::shared_ptr<const std::uint64_t> _index_revision;
+        std::uint64_t _expected_index_revision;
+        void validate_indices() const;
         TypedIndexedDraw(VSL_NAMESPACE::GraphicsPipeline pipeline, LogicalDeviceAccessor device,
                          std::array<command::BindVertexBufferAt, Input::BINDING_COUNT> buffers, command::BindIndexBufferAt indices,
-                         command::DrawIndexed draw, std::vector<command::BindGraphicResource> resources, std::optional<typename Pushes::Values> pushes)
+                         command::DrawIndexed draw, std::vector<command::BindGraphicResource> resources, std::optional<typename Pushes::Values> pushes,
+                         std::shared_ptr<const std::uint64_t> index_revision)
             : _pipeline(std::move(pipeline)), _device(device), _buffers(std::move(buffers)), _indices(std::move(indices)),
-              _draw(std::move(draw)), _resources(std::move(resources)), _pushes(std::move(pushes)) {}
+              _draw(std::move(draw)), _resources(std::move(resources)), _pushes(std::move(pushes)),
+              _index_revision(std::move(index_revision)), _expected_index_revision(*_index_revision) {}
 
     public:
         using VertexInput = Input;
@@ -203,9 +208,16 @@ namespace VSL_NAMESPACE::typed {
     }
 
     template<typename Input, typename Resources, typename Pushes>
+    void TypedIndexedDraw<Input, Resources, Pushes>::validate_indices() const {
+        if (*_index_revision != _expected_index_revision)
+            throw std::logic_error("Typed index data changed after draw command creation");
+    }
+
+    template<typename Input, typename Resources, typename Pushes>
     void TypedIndexedDraw<Input, Resources, Pushes>::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
         if (_device.data_ != manager.get_device().data_)
             throw std::invalid_argument("Typed pipeline and command manager use different devices");
+        validate_indices();
         _pipeline.invoke(pool, buffer, manager);
         for (auto& binding : _buffers)
             binding.invoke(pool, buffer, manager);
@@ -235,7 +247,8 @@ namespace VSL_NAMESPACE::typed {
                 throw std::out_of_range("Typed indexed draw exceeds its vertex buffer");
         }
         return TypedIndexedDraw<Input, Resources, Pushes>(_pipeline, _device, _buffers,
-                                                          command::BindIndexBufferAt(indices.backend(), TypedIndexBuffer<Index, property>::INDEX_TYPE, 0, indices.resource_use()), std::move(command), _resources, _pushes);
+                                                          command::BindIndexBufferAt(indices.backend(), TypedIndexBuffer<Index, property>::INDEX_TYPE, 0, indices.resource_use()), std::move(command), _resources, _pushes,
+                                                          std::shared_ptr<const std::uint64_t>(indices._values, &indices._values->revision));
     }
 
 } // namespace VSL_NAMESPACE::typed

@@ -182,3 +182,11 @@ phase << batch;
 同じM1/MoltenVK環境で関連CTest **290/290成功、skipなし**。新規実GPU 6件、compile contract 6件（正例1、負例5）。同じpipelineのbind省略とbatch再利用、同じ型の別pipelineと最後のpipelineの通知、vertex bufferのidentity/offset、index型、descriptorの切り替え・pipeline変更時の再bind、全push snapshot、wrapper/batch破棄後の所有権、computeの別範囲への出力を確認した。unexpected validation errorなし。変更5ファイル/2TUのstyle違反0件。新規SPIR-V validator、MSBuild XML、diff検査も成功。
 
 6段の機能はそれぞれのbaseから製品VSL・vsl-test・正例contractをビルドし、各段の新規テストと既存経路を実行した。最終290件はTypedの全compile contract 73件と関連CPU/GPUテストを含む。全AHO/VSLテスト、Windows/Linux、sanitizerは未実施。masterへのmergeは行わず、最後のbranchは `feat/vsl-typed-batches`、baseは `feat/vsl-typed-views-subpass`。
+
+## index更新と構築済みcommand
+
+`draw_indexed()` はcommandの構築時にindexの範囲を検査します。その後、記録前に `TypedIndexBuffer::copy()` でindexを変更した場合は、そのcommandを作り直してください。元のbufferとコピーしたwrapperは更新世代を共有し、古いcommandを記録しようとすると `logic_error` になります。同じ内容を再uploadした場合も更新として扱います。
+
+`TypedBatch` は全indexの世代を確認してから、bindとdrawを始めます。後半のcommandが古くなった場合にも、前半だけを記録したり資源を使用中にしたりしません。indexを変更しなければ、commandとbatchを再利用できます。要素数が不正な更新など、GPUへの書込み前に失敗した操作は既存commandを無効にしません。
+
+実際のuploadを開始して失敗した場合は、GPUの内容を検証済みとして扱わず、次にuploadが成功するまで範囲検査も拒否します。記録時の世代比較はO(1)で、毎回のindex再走査は行いません。CPU snapshotと世代を同じ所有領域へまとめて保持します。backendからの直接書込みはこの更新契約の対象外です。

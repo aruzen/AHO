@@ -1,4 +1,5 @@
 #include <VSL/utils/typed_pipeline.hpp>
+#include <VSL/utils/typed_batch.hpp>
 #include "support/render_fixture.hpp"
 
 namespace {
@@ -74,6 +75,51 @@ namespace {
         EXPECT_THROW(indices.copy(std::span(values).first(2)), std::invalid_argument);
         EXPECT_THROW(vsl::command::BindIndexBufferAt(indices.backend(), vsl::command::IndexType::UINT16, 1), std::invalid_argument);
         EXPECT_FALSE(has_validation_errors());
+    }
+    TEST_F(TypedIndexVulkanIntegrationTest, CapturedCommandRejectsIndexUpdatesBeforeRecording) {
+        auto typed = make_typed();
+        t::TypedVertexBuffer<Position> positions(device, POSITIONS);
+        t::TypedVertexBuffer<Color> colors(device, COLORS);
+        const std::array<std::uint16_t, 3> values{0, 1, 2}, changed{0, 2, 1};
+        t::TypedIndexBuffer<std::uint16_t> indices(device, values);
+        const auto binding = typed.bind_vertices(positions, colors);
+        auto command = binding.draw_indexed(indices, 3, 1, 0, 0, 1);
+        auto alias = indices;
+        // 修正前の再現でも、driverへ渡すのは有効なindexだけにする。
+        alias.copy(changed);
+        ExpectTriangleColor(render([&](auto& stream) {
+            EXPECT_THROW(stream << command, std::logic_error);
+            EXPECT_FALSE(positions.resource_use().state->busy());
+            EXPECT_FALSE(indices.resource_use().state->busy());
+            stream << binding.draw_indexed(indices, 3, 1, 0, 0, 1);
+        }));
+    }
+    TEST_F(TypedIndexVulkanIntegrationTest, BatchRejectsUpdatedIndicesBeforeAnyResourceIsUsed) {
+        auto typed = make_typed();
+        t::TypedVertexBuffer<Position> positions(device, POSITIONS);
+        t::TypedVertexBuffer<Color> colors(device, COLORS);
+        const std::array<std::uint32_t, 3> values{0, 1, 2}, changed{0, 2, 1};
+        t::TypedIndexBuffer<std::uint32_t> first(device, values), second(device, values);
+        const auto binding = typed.bind_vertices(positions, colors);
+        auto batch = t::TypedBatch(binding.draw_indexed(first, 3, 1, 0, 0, 1), binding.draw_indexed(second, 3, 1, 0, 0, 1));
+        second.copy(changed);
+        ExpectTriangleColor(render([&](auto& stream) {
+            EXPECT_THROW(stream << batch, std::logic_error);
+            EXPECT_FALSE(first.resource_use().state->busy());
+            EXPECT_FALSE(positions.resource_use().state->busy());
+            stream << binding.draw_indexed(second, 3, 1, 0, 0, 1);
+        }));
+    }
+    TEST_F(TypedIndexVulkanIntegrationTest, UnchangedAndFailedIndexCopiesKeepCapturedCommandsUsable) {
+        auto typed = make_typed();
+        t::TypedVertexBuffer<Position> positions(device, POSITIONS);
+        t::TypedVertexBuffer<Color> colors(device, COLORS);
+        const std::array<std::uint16_t, 3> values{0, 1, 2};
+        t::TypedIndexBuffer<std::uint16_t> indices(device, values);
+        auto command = typed.bind_vertices(positions, colors).draw_indexed(indices, 3, 1, 0, 0, 1);
+        ExpectTriangleColor(render([&](auto& stream) { stream << command; }));
+        EXPECT_THROW(indices.copy(std::span(values).first(2)), std::invalid_argument);
+        ExpectTriangleColor(render([&](auto& stream) { stream << command; }));
     }
     TEST_F(TypedIndexVulkanIntegrationTest, CommandsKeepIndexAndVertexOwnersAfterAllWrappersAreDestroyed) {
         std::weak_ptr<vsl::impl::BufferImpl> owner;

@@ -229,7 +229,6 @@
     <ClCompile Include="AHO\src\io\keyboard.cpp" />
     <ClCompile Include="AHO\src\io\mouse.cpp" />
     <ClCompile Include="AHO\src\pipeline\layouts.cpp" />
-    <ClCompile Include="AHO\src\pipeline\pipeline.cpp" />
     <ClCompile Include="AHO\src\resource\buffer.cpp" />
     <ClCompile Include="AHO\src\resource\image.cpp" />
     <ClCompile Include="AHO\src\window.cpp" />

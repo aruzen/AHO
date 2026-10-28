@@ -5,6 +5,7 @@ project(AHO VERSION 1.0 LANGUAGES CXX)
 add_executable(AHO
         Main.cpp
 )
+aho_target_build_options(AHO)
 
 # ライブラリをリンク
 link_directories(lib)

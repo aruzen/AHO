@@ -4,7 +4,7 @@
 
 `ResourceBindingPoint`の`MakeShaderReadBarrier(image)`で、sampled imageのbinding宣言から転送後の読み取り同期を作れる。shader_typeを既存のChangeImageBarrierへ伝え、画像がSAMPLED用途を持つこと、bindingがSAMPLED_IMAGE/COMBINED_IMAGE_SAMPLERであること、shader stageが有効な非空集合であることをコンパイル時に検査する。型消去されたImageAccessorを直接渡す経路は持たない。
 
-Typedの頂点入力・vertex buffer・drawの型や処理は変更しない。コマンドの生成時にpipeline stageへ変換し、draw時のreflectionや自動待機は増やさない。使用例と制約は[画像同期の説明](../documents/VSL/image-shader-visibility.md)を参照。
+Typedの頂点入力・vertex buffer・drawの型や処理は変更しない。コマンドの生成時にpipeline stageへ変換し、draw時のreflectionや自動待機は増やさない。使用例と制約は[画像同期の説明](VSL/image-shader-visibility.md)を参照。
 
 次のTyped整備では、`TypedGraphicsPipeline<Input>`へresource schemaを結び、descriptorの番号・種別・配列数・shader stageをロード済みSPIR-Vと照合し、型付きresource bindingからdrawまで保持する経路を扱う。画像layoutの実行履歴と状態型を結ぶ設計は別途必要で、今回のfactoryだけでlayout遷移を保証するものではない。
 
@@ -30,7 +30,7 @@ PR #221の後続。次の3点を順に解決する。
 
 `Record::Binding<binding, timing, first_location>` は共通layoutからbindingを生成する。locationはレコード内の相対値を一度解決し、first_locationを加算する。strideはsizeof(Vertex)、offsetはoffsetofを使う。異なるrecordのmember、memberのstorageを超えるformat、未対応型、location overflowはコンパイル時に拒否する。明示formatの意味上の解釈は呼び出し側が選ぶ。
 
-コンパイラー間で使える型とoffsetofだけをマクロで取得し、layout生成と検査はテンプレートで行う。言語モードは[C++26](../documents/development/cxx-standard.md)を使用する。padding付き構造体、float/正規化整数の混在、std::array<double,3>の2location消費を検証する。
+コンパイラー間で使える型とoffsetofだけをマクロで取得し、layout生成と検査はテンプレートで行う。言語モードは[C++26](development/cxx-standard.md)を使用する。padding付き構造体、float/正規化整数の混在、std::array<double,3>の2location消費を検証する。
 
 自動推論の配列はscalarの1〜4要素をvectorとして扱う。配列の配列を一つのvectorへ誤変換しないよう、行列やvector配列の自動推論は拒否する。これらは低水準の属性宣言で列/要素を指定する。`std::int8_t` のsigned charにも対応し、std::arrayや `GRAPHIC_TYPE` を持つ独自型も検証する。
 

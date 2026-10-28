@@ -9,6 +9,7 @@ cmake-build*/
 build/
 build-*/
 worktrees/
+/AHO.exe
 
 document
 AGENT.md

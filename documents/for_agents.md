@@ -28,6 +28,8 @@ Known compiler identification:
 MSVC 19.51.36252.0
 ```
 
+The compiler is selected by the Visual Studio generator. Do not hardcode an MSVC installation or compiler version in `CMakeLists.txt`.
+
 Known working Visual Studio generator:
 
 ```text
@@ -56,14 +58,22 @@ Or explicitly:
 cmake --fresh -S . -B build/vs2026 -G "Visual Studio 18 2026" -A x64 -T v145
 ```
 
-The project currently hardcodes common Windows dependency paths in CMake:
+The Windows preset uses `${sourceDir}` for `AHO_HOME` and `VSL_HOME`. Without a preset, CMake accepts these environment variables and otherwise defaults to the libraries in this checkout.
 
-```text
-VULKAN_SDK = C:/VulkanSDK/1.4.304.0
-GLFW_ROOT  = D:/CLibrary/glfw-3.3.8.bin.WIN64
-AHO_HOME   = C:/Users/user/source/repos/aruzen/AHO/AHOLi/AHO
-VSL_HOME   = C:/Users/user/source/repos/aruzen/AHO/VSLi/VSL
+Set the dependency roots before configuring (the paths below are examples for the current machine):
+
+```powershell
+$env:VULKAN_SDK = 'C:\VulkanSDK\1.4.304.0'
+$env:GLFW_ROOT = 'D:\CLibrary\glfw-3.3.8.bin.WIN64'
 ```
+
+`-DVULKAN_SDK=...` and `-DGLFW_ROOT=...` can also be used. The legacy `GLFW` environment variable is accepted when `GLFW_ROOT` is not set. GLFW's `lib-vc2022` directory is preferred, with `lib-vc2019` as a fallback. The Vulkan SDK must include GLM and the Debug/Release SPIRV-Cross libraries used by VSL. Use x64 dependencies with the x64 preset.
+
+The checked-in `AHO.sln` / `.vcxproj` build uses the same dependency roots through `Windows.props`. Project references build and link AHO's libraries automatically. Both native projects and CMake use C++23 features, the conforming MSVC preprocessor, and UTF-8 source encoding.
+
+Windows builds use `glfw3dll.lib` by default and copy `glfw3.dll` beside each executable, including the CMake test binaries. This avoids linking the prebuilt Release GLFW static library's CRT into Debug applications. To use a static GLFW built with a compatible CRT, configure with `-DAHO_GLFW_SHARED=OFF` or build the native project with `/p:AHO_GLFW_SHARED=false`.
+
+In Visual Studio, select AHO as the startup project. Both build routes set its debugger working directory to `AHO/` and provide `AHO_HOME` and the Vulkan SDK tools on `PATH`. When launching an executable directly, set `AHO_HOME` to this checkout's `AHOLi/AHO`, add the SDK's `Bin` directory to `PATH`, and launch from `AHO/` so that relative shader paths resolve.
 
 Linux/macOS compatibility matters. Do not remove the non-Windows `find_package` / `pkg_check_modules` path unless the user explicitly asks for a Windows-only setup.
 
@@ -130,11 +140,20 @@ Equivalent direct command:
 ctest --test-dir build/vs2026 -C Debug --output-on-failure
 ```
 
-Last known passing result:
+Build and test Release:
+
+```powershell
+cmake --build --preset windows-vs2026-release
+ctest --preset windows-vs2026-release
+```
+
+Last verified on 2026-10-28 with MSVC x64: CMake and the native Visual Studio solution build in Debug and Release. CMake tests pass in both configurations:
 
 ```text
 41 tests passed, 0 failed, 4 disabled
 ```
+
+The Debug applications from both build routes were also launched with copied test resources and closed normally (exit code 0). The Vulkan SDK's missing SPIRV-Cross PDB warning (`LNK4099`) and existing numeric-conversion warnings remain; the GLFW CRT conflict (`LNK4098`) is resolved by the DLL build.
 
 When testing VSL, do not delete tests just because they expose a current bug. If a case documents an expected failure, unsafe call order, missing state guard, or Vulkan lifecycle issue, keep it as a GoogleTest disabled test by prefixing the test or suite name with `DISABLED_`.
 

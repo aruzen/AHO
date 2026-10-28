@@ -1,29 +1,34 @@
-﻿# CMakeList.txt : CMake project for vulkan_guide, include source and define
+# CMakeList.txt : CMake project for vulkan_guide, include source and define
 # project specific logic here.
 #
-cmake_minimum_required(VERSION 3.10...3.28)
+cmake_minimum_required(VERSION 3.20...3.28)
 if(POLICY CMP0167)
     cmake_policy(SET CMP0167 NEW)
-endif()
-
-if(WIN32 AND NOT DEFINED CMAKE_CXX_COMPILER)
-    set(CMAKE_C_COMPILER "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe" CACHE FILEPATH "MSVC 2026 C compiler")
-    set(CMAKE_CXX_COMPILER "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe" CACHE FILEPATH "MSVC 2026 C++ compiler")
 endif()
 
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 if(NOT DEFINED AHO_HOME)
-    set(AHO_HOME $ENV{AHO_HOME})
+    if(DEFINED ENV{AHO_HOME} AND NOT "$ENV{AHO_HOME}" STREQUAL "")
+        set(AHO_HOME "$ENV{AHO_HOME}" CACHE PATH "AHO library root")
+    else()
+        set(AHO_HOME "${CMAKE_CURRENT_SOURCE_DIR}/AHOLi/AHO" CACHE PATH "AHO library root")
+    endif()
 endif ()
 if (NOT DEFINED VSL_HOME)
-    set(VSL_HOME $ENV{VSL_HOME})
+    if(DEFINED ENV{VSL_HOME} AND NOT "$ENV{VSL_HOME}" STREQUAL "")
+        set(VSL_HOME "$ENV{VSL_HOME}" CACHE PATH "VSL library root")
+    else()
+        set(VSL_HOME "${CMAKE_CURRENT_SOURCE_DIR}/VSLi/VSL" CACHE PATH "VSL library root")
+    endif()
 endif ()
 if(WIN32)
-    set(AHO_HOME "C:/Users/user/source/repos/aruzen/AHO/AHOLi/AHO" CACHE PATH "AHO library root")
-    set(VSL_HOME "C:/Users/user/source/repos/aruzen/AHO/VSLi/VSL" CACHE PATH "VSL library root")
-    set(VULKAN_SDK "C:/VulkanSDK/1.4.304.0" CACHE PATH "Vulkan SDK root")
-    set(GLFW_ROOT "D:/CLibrary/glfw-3.3.8.bin.WIN64" CACHE PATH "GLFW root")
+    set(VULKAN_SDK "$ENV{VULKAN_SDK}" CACHE PATH "Vulkan SDK root")
+    if(DEFINED ENV{GLFW_ROOT})
+        set(GLFW_ROOT "$ENV{GLFW_ROOT}" CACHE PATH "GLFW root")
+    else()
+        set(GLFW_ROOT "$ENV{GLFW}" CACHE PATH "GLFW root (legacy GLFW environment variable)")
+    endif()
 endif()
 message(STATUS "AHO_HOME : ${AHO_HOME}")
 message(STATUS "VSL_HOME : ${VSL_HOME}")
@@ -36,22 +41,34 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(MSVC)
-    add_compile_options(/std:c++latest /permissive- /Zc:preprocessor)
+    add_compile_options(/std:c++latest /permissive- /Zc:preprocessor /utf-8)
 endif()
 
 # setting Libraries
 if(WIN32)
-    set(Vulkan_INCLUDE_DIRS "${VULKAN_SDK}/Include")
-    set(Vulkan_LIBRARY_DIRS "${VULKAN_SDK}/Lib")
-    set(Vulkan_LIBRARIES "${Vulkan_LIBRARY_DIRS}/vulkan-1.lib")
+    find_path(Vulkan_INCLUDE_DIR vulkan/vulkan.h HINTS "${VULKAN_SDK}/Include" REQUIRED)
+    find_library(Vulkan_LIBRARY NAMES vulkan-1 HINTS "${VULKAN_SDK}/Lib" REQUIRED)
+    find_package(Vulkan REQUIRED)
+    get_filename_component(Vulkan_LIBRARY_DIRS "${Vulkan_LIBRARY}" DIRECTORY)
 
-    set(GLFW_INCLUDE_DIRS "${GLFW_ROOT}/include")
-    set(GLFW_LIBRARY_DIRS "${GLFW_ROOT}/lib-vc2022")
-    set(GLFW_LIBRARIES "${GLFW_LIBRARY_DIRS}/glfw3.lib")
+    find_path(GLFW_INCLUDE_DIRS GLFW/glfw3.h HINTS "${GLFW_ROOT}/include" REQUIRED)
+    option(AHO_GLFW_SHARED "Use the GLFW DLL to avoid mixing Debug and Release CRTs" ON)
+    if(AHO_GLFW_SHARED)
+        find_library(GLFW_DLL_LIBRARY NAMES glfw3dll HINTS "${GLFW_ROOT}/lib-vc2022" "${GLFW_ROOT}/lib-vc2019" REQUIRED)
+        set(GLFW_LIBRARIES "${GLFW_DLL_LIBRARY}")
+        add_compile_definitions(GLFW_DLL)
+    else()
+        find_library(GLFW_LIBRARIES NAMES glfw3 HINTS "${GLFW_ROOT}/lib-vc2022" "${GLFW_ROOT}/lib-vc2019" REQUIRED)
+    endif()
+    get_filename_component(GLFW_LIBRARY_DIRS "${GLFW_LIBRARIES}" DIRECTORY)
+    if(AHO_GLFW_SHARED)
+        find_file(GLFW_RUNTIME_LIBRARY glfw3.dll HINTS "${GLFW_LIBRARY_DIRS}" REQUIRED)
+    endif()
 
     if(NOT TARGET glm::glm)
+        find_path(GLM_INCLUDE_DIR glm/glm.hpp HINTS "${Vulkan_INCLUDE_DIRS}" REQUIRED)
         add_library(glm::glm INTERFACE IMPORTED)
-        target_include_directories(glm::glm INTERFACE "${VULKAN_SDK}/Include")
+        target_include_directories(glm::glm INTERFACE "${GLM_INCLUDE_DIR}")
     endif()
 
     find_package(Boost COMPONENTS system QUIET)
@@ -81,6 +98,16 @@ endif()
 
 message("Vulkan: ${Vulkan_INCLUDE_DIRS}, ${Vulkan_LIBRARIES}")
 message("glfw3: ${GLFW_INCLUDE_DIRS}, ${GLFW_LIBRARY_DIRS}, ${GLFW_LIBRARIES}")
+
+function(aho_copy_glfw_runtime target)
+    if(WIN32 AND AHO_GLFW_SHARED)
+        add_custom_command(TARGET ${target} POST_BUILD
+                COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+                        "${GLFW_RUNTIME_LIBRARY}" "$<TARGET_FILE_DIR:${target}>"
+                VERBATIM
+        )
+    endif()
+endfunction()
 
 include(CTest)
 set(AHO_TESTING_HAS_GTEST OFF)

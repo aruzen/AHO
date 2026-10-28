@@ -10,10 +10,8 @@
       "toolset": "v145",
       "cacheVariables": {
         "CMAKE_CONFIGURATION_TYPES": "Debug;Release",
-        "AHO_HOME": "C:/Users/user/source/repos/aruzen/AHO/AHOLi/AHO",
-        "VSL_HOME": "C:/Users/user/source/repos/aruzen/AHO/VSLi/VSL",
-        "VULKAN_SDK": "C:/VulkanSDK/1.4.304.0",
-        "GLFW_ROOT": "D:/CLibrary/glfw-3.3.8.bin.WIN64"
+        "AHO_HOME": "${sourceDir}/AHOLi/AHO",
+        "VSL_HOME": "${sourceDir}/VSLi/VSL"
       }
     }
   ],
@@ -43,6 +41,14 @@
       "name": "windows-vs2026-debug",
       "configurePreset": "windows-vs2026-debug",
       "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-vs2026-release",
+      "configurePreset": "windows-vs2026-debug",
+      "configuration": "Release",
       "output": {
         "outputOnFailure": true
       }

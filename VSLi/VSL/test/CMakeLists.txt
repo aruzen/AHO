@@ -19,5 +19,7 @@ target_link_libraries(vsl-test
         GTest::gtest_main
 )
 
+aho_copy_glfw_runtime(vsl-test)
+
 include(GoogleTest)
 gtest_discover_tests(vsl-test)

@@ -24,5 +24,7 @@ target_link_libraries(aho-test
         GTest::gtest_main
 )
 
+aho_copy_glfw_runtime(aho-test)
+
 include(GoogleTest)
 gtest_discover_tests(aho-test)

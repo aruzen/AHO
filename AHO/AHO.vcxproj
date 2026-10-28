@@ -70,21 +70,18 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <Import Project="..\Windows.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>C:\Users\aruze\source\repos\AHO\AHOLi;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>C:\Users\aruze\source\repos\AHO\AHOLi;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(AHO_HOME)\include;$(VSL_HOME)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(AHO_HOME)\include;$(VSL_HOME)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -97,7 +94,6 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>"C:\Users\aruze\source\repos\AHO\x64\Debug\AHOLi.lib";%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -115,7 +111,6 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>"C:\Users\aruze\source\repos\AHO\x64\Release\AHOLi.lib";%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -130,7 +125,6 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>"$(TargetDir)\VSLi.lib";"$(TargetDir)\AHOLi.lib";"$(GLFW)\lib-vc2019\glfw3.lib";"$(VULKAN_SDK)\Lib\Vulkan-1.lib";"$(VULKAN_SDK)\Lib\spirv-cross-cppd.lib";"$(VULKAN_SDK)\Lib\spirv-cross-cored.lib";%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -148,11 +142,18 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>"$(TargetDir)\VSLi.lib";"$(TargetDir)\AHOLi.lib";"$(GLFW)\lib-vc2019\glfw3.lib";"$(VULKAN_SDK)\Lib\Vulkan-1.lib";"$(VULKAN_SDK)\Lib\spirv-cross-cpp.lib";"$(VULKAN_SDK)\Lib\spirv-cross-core.lib";%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AHOLi\AHOLi.vcxproj">
+      <Project>{55176023-7102-43D4-BC8D-903381F6014E}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\VSLi\VSLi.vcxproj">
+      <Project>{2575CA0B-3E3A-4B25-8302-4B6EE06EF91D}</Project>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\raw\colorfull.frag" />

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <AHO_HOME Condition="'$(AHO_HOME)'==''">$(MSBuildThisFileDirectory)AHOLi\AHO</AHO_HOME>
+    <VSL_HOME Condition="'$(VSL_HOME)'==''">$(MSBuildThisFileDirectory)VSLi\VSL</VSL_HOME>
+    <GLFW_ROOT Condition="'$(GLFW_ROOT)'==''">$(GLFW)</GLFW_ROOT>
+    <AHO_GLFW_SHARED Condition="'$(AHO_GLFW_SHARED)'==''">true</AHO_GLFW_SHARED>
+    <GLFWLinkLibrary Condition="'$(AHO_GLFW_SHARED)'=='true'">glfw3dll.lib</GLFWLinkLibrary>
+    <GLFWLinkLibrary Condition="'$(AHO_GLFW_SHARED)'!='true'">glfw3.lib</GLFWLinkLibrary>
+    <GLFWLibraryDir Condition="'$(GLFWLibraryDir)'=='' and Exists('$(GLFW_ROOT)\lib-vc2022\$(GLFWLinkLibrary)')">$(GLFW_ROOT)\lib-vc2022</GLFWLibraryDir>
+    <GLFWLibraryDir Condition="'$(GLFWLibraryDir)'==''">$(GLFW_ROOT)\lib-vc2019</GLFWLibraryDir>
+    <SPIRVCrossSuffix Condition="'$(Configuration)'=='Debug'">d</SPIRVCrossSuffix>
+    <OutDir>$(MSBuildThisFileDirectory)$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(MSBuildThisFileDirectory)build\msbuild\$(MSBuildProjectName)\$(Platform)\$(Configuration)\</IntDir>
+    <LocalDebuggerWorkingDirectory>$(MSBuildThisFileDirectory)AHO</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerEnvironment>AHO_HOME=$(AHO_HOME)&#x0A;PATH=$(VULKAN_SDK)\Bin;%PATH%&#x0A;$(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(AHO_HOME)\include;$(VSL_HOME)\include;$(VULKAN_SDK)\Include;$(GLFW_ROOT)\include;$(MSBuildThisFileDirectory)thirdparty;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/Zc:preprocessor /utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <PreprocessorDefinitions Condition="'$(AHO_GLFW_SHARED)'=='true'">GLFW_DLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(GLFWLibraryDir);$(VULKAN_SDK)\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>$(GLFWLinkLibrary);vulkan-1.lib;spirv-cross-cpp$(SPIRVCrossSuffix).lib;spirv-cross-core$(SPIRVCrossSuffix).lib;spirv-cross-glsl$(SPIRVCrossSuffix).lib;spirv-cross-hlsl$(SPIRVCrossSuffix).lib;spirv-cross-msl$(SPIRVCrossSuffix).lib;spirv-cross-reflect$(SPIRVCrossSuffix).lib;spirv-cross-util$(SPIRVCrossSuffix).lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <Target Name="CopyGLFWRuntime" AfterTargets="Build" Condition="'$(ConfigurationType)'=='Application' and '$(AHO_GLFW_SHARED)'=='true'">
+    <Copy SourceFiles="$(GLFWLibraryDir)\glfw3.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

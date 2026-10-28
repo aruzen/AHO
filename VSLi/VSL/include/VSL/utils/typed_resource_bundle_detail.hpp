@@ -1,6 +1,6 @@
 #pragma once
 #include "typed_resource_allocation.hpp"
-#include "typed_resources.hpp"
+#include "typed_resource_storage.hpp"
 #include "typed_frame_resources.hpp"
 #include <optional>
 
@@ -38,26 +38,27 @@ namespace VSL_NAMESPACE::typed {
             DescriptorValue value;
             DescriptorValue descriptor() const { return value; }
         };
-        template<typename Schema, typename Spec, bool external = Spec::EXTERNAL>
+        template<typename Schema, typename Spec, typename Policy, bool external = Spec::EXTERNAL>
         struct BundleValue {
             using Binding = typename Schema::template Binding<Spec::SET, Spec::BINDING>;
-            using Element = TypedResourceBuffer<typename Binding::Payload, Binding::POINT.binding_type>;
+            static_assert(storage_policy_binding_matches<Policy, Binding, Spec>(), "Invalid typed resource storage policy");
+            using Element = typename Policy::template Buffer<Binding, Spec>;
             using Type = std::array<Element, Binding::POINT.amount>;
         };
-        template<typename Schema, typename Spec>
-        struct BundleValue<Schema, Spec, true> {
+        template<typename Schema, typename Spec, typename Policy>
+        struct BundleValue<Schema, Spec, Policy, true> {
             using Binding = typename Schema::template Binding<Spec::SET, Spec::BINDING>;
             using Element = BundleExternalValue<Binding>;
             using Type = std::array<Element, Binding::POINT.amount>;
         };
-        template<typename Schema, typename Tuple>
+        template<typename Schema, typename Tuple, typename Policy>
         struct BundleStorage;
-        template<typename Schema, typename... Specs>
-        struct BundleStorage<Schema, std::tuple<Specs...>> {
-            using Type = std::tuple<std::optional<typename BundleValue<Schema, Specs>::Type>...>;
+        template<typename Schema, typename Policy, typename... Specs>
+        struct BundleStorage<Schema, std::tuple<Specs...>, Policy> {
+            using Type = std::tuple<std::optional<typename BundleValue<Schema, Specs, Policy>::Type>...>;
         };
-        template<typename Schema>
-        using BundleStorageType = typename BundleStorage<Schema, typename Schema::Allocations>::Type;
+        template<typename Schema, typename Policy>
+        using BundleStorageType = typename BundleStorage<Schema, typename Schema::Allocations, Policy>::Type;
         template<typename Tuple>
         struct BundleSets;
         template<typename... Sets>
@@ -65,25 +66,27 @@ namespace VSL_NAMESPACE::typed {
             using Type = std::tuple<TypedDescriptorSet<typename Sets::Layout>...>;
             using Optional = std::tuple<std::optional<TypedDescriptorSet<typename Sets::Layout>>...>;
         };
-        template<typename Schema>
+        template<typename Schema, typename Policy>
         struct BundleSharedState {
-            BundleStorageType<Schema> resources;
+            BundleStorageType<Schema, Policy> resources;
             typename BundleSets<typename Schema::Resources::Sets>::Optional sets;
         };
-        template<typename Schema, typename Spec, typename Inputs>
-        auto make_bundle_values(LogicalDeviceAccessor device, const ResourceAllocationPlan<Schema>& plan, const Inputs& inputs);
-        template<ResourceScope scope, typename Schema, typename Inputs>
-        auto make_bundle_storage(LogicalDeviceAccessor device, const ResourceAllocationPlan<Schema>& plan, const Inputs& inputs);
-        template<typename Schema, typename Spec>
-        const auto& bundle_values(const BundleStorageType<Schema>& frame, const BundleSharedState<Schema>& shared);
-        template<typename Schema, typename Set>
-        void connect_bundle_set(TypedDescriptorSet<typename Set::Layout>& set, const BundleStorageType<Schema>& frame, const BundleSharedState<Schema>& shared);
-        template<typename Schema, typename Set>
-        auto make_bundle_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema>& frame, const BundleSharedState<Schema>& shared);
-        template<typename Schema>
-        auto make_bundle_sets(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema>& frame, const BundleSharedState<Schema>& shared);
-        template<typename Schema, typename Inputs>
-        auto make_bundle_shared(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const ResourceAllocationPlan<Schema>& plan, const Inputs& inputs);
+        template<typename Schema, typename Spec, typename Policy>
+        auto make_bundle_buffer(LogicalDeviceAccessor device, Policy& policy, size_t count, size_t element);
+        template<typename Schema, typename Spec, typename Policy, typename Inputs>
+        auto make_bundle_values(LogicalDeviceAccessor device, const ResourceAllocationPlan<Schema>& plan, Policy& policy, const Inputs& inputs);
+        template<ResourceScope scope, typename Schema, typename Policy, typename Inputs>
+        auto make_bundle_storage(LogicalDeviceAccessor device, const ResourceAllocationPlan<Schema>& plan, Policy& policy, const Inputs& inputs);
+        template<typename Schema, typename Spec, typename Policy>
+        const auto& bundle_values(const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared);
+        template<typename Schema, typename Set, typename Policy>
+        void connect_bundle_set(TypedDescriptorSet<typename Set::Layout>& set, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared);
+        template<typename Schema, typename Set, typename Policy>
+        auto make_bundle_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared);
+        template<typename Schema, typename Policy>
+        auto make_bundle_sets(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared);
+        template<typename Schema, typename Policy, typename Inputs>
+        auto make_bundle_shared(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const ResourceAllocationPlan<Schema>& plan, Policy& policy, const Inputs& inputs);
     } // namespace detail
 
     template<std::uint32_t set, std::uint32_t binding, typename Value>
@@ -138,37 +141,44 @@ namespace VSL_NAMESPACE::typed {
                 throw "Missing typed allocation input";
             }(std::make_index_sequence<std::tuple_size_v<Tuple>>{});
         }
-        template<typename Schema, typename Spec, typename Inputs>
-        auto make_bundle_values(LogicalDeviceAccessor device, const ResourceAllocationPlan<Schema>& plan, const Inputs& inputs) {
-            using Value = BundleValue<Schema, Spec>;
+        template<typename Schema, typename Spec, typename Policy>
+        auto make_bundle_buffer(LogicalDeviceAccessor device, Policy& policy, size_t count, size_t element) {
+            using Binding = typename Schema::template Binding<Spec::SET, Spec::BINDING>;
+            auto value = policy.template make_buffer<Binding, Spec>(device, count, element);
+            validate_storage_policy_buffer(value.descriptor(), value.size(), count, sizeof(typename Binding::Payload));
+            return value;
+        }
+        template<typename Schema, typename Spec, typename Policy, typename Inputs>
+        auto make_bundle_values(LogicalDeviceAccessor device, const ResourceAllocationPlan<Schema>& plan, Policy& policy, const Inputs& inputs) {
+            using Value = BundleValue<Schema, Spec, Policy>;
             return [&]<size_t... indices>(std::index_sequence<indices...>) {
                 if constexpr (Spec::EXTERNAL) {
                     const auto& input = std::get<bundle_input_index<Inputs>(Spec::SET, Spec::BINDING)>(inputs);
                     return typename Value::Type{{typename Value::Element{input.values[indices].descriptor()}...}};
                 } else {
                     const auto count = plan.template entry<Spec::SET, Spec::BINDING>().elements;
-                    return typename Value::Type{{(static_cast<void>(indices), typename Value::Element(device, std::in_place, count))...}};
+                    return typename Value::Type{{make_bundle_buffer<Schema, Spec>(device, policy, count, indices)...}};
                 }
             }(std::make_index_sequence<Value::Binding::POINT.amount>{});
         }
-        template<ResourceScope scope, typename Schema, typename Inputs>
-        auto make_bundle_storage(LogicalDeviceAccessor device, const ResourceAllocationPlan<Schema>& plan, const Inputs& inputs) {
-            BundleStorageType<Schema> storage;
+        template<ResourceScope scope, typename Schema, typename Policy, typename Inputs>
+        auto make_bundle_storage(LogicalDeviceAccessor device, const ResourceAllocationPlan<Schema>& plan, Policy& policy, const Inputs& inputs) {
+            BundleStorageType<Schema, Policy> storage;
             bundle_for_each<typename Schema::Allocations>([&]<typename Spec>() {
                 if constexpr (Spec::SCOPE == scope)
-                    std::get<Schema::Index(Spec::SET, Spec::BINDING)>(storage).emplace(make_bundle_values<Schema, Spec>(device, plan, inputs));
+                    std::get<Schema::Index(Spec::SET, Spec::BINDING)>(storage).emplace(make_bundle_values<Schema, Spec>(device, plan, policy, inputs));
             });
             return storage;
         }
-        template<typename Schema, typename Spec>
-        const auto& bundle_values(const BundleStorageType<Schema>& frame, const BundleSharedState<Schema>& shared) {
+        template<typename Schema, typename Spec, typename Policy>
+        const auto& bundle_values(const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared) {
             if constexpr (Spec::SCOPE == ResourceScope::PER_FRAME)
                 return std::get<Schema::Index(Spec::SET, Spec::BINDING)>(frame).value();
             else
                 return std::get<Schema::Index(Spec::SET, Spec::BINDING)>(shared.resources).value();
         }
-        template<typename Schema, typename Set>
-        void connect_bundle_set(TypedDescriptorSet<typename Set::Layout>& set, const BundleStorageType<Schema>& frame, const BundleSharedState<Schema>& shared) {
+        template<typename Schema, typename Set, typename Policy>
+        void connect_bundle_set(TypedDescriptorSet<typename Set::Layout>& set, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared) {
             bundle_for_each<typename Set::Bindings>([&]<typename Binding>() {
                 using Spec = typename Schema::template Spec<Set::SET, Binding::POINT.binding>;
                 const auto& values = bundle_values<Schema, Spec>(frame, shared);
@@ -178,31 +188,30 @@ namespace VSL_NAMESPACE::typed {
                     set.template write<Binding::POINT.binding>(values);
             });
         }
-        template<typename Schema, typename Set>
-        auto make_bundle_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema>& frame, const BundleSharedState<Schema>& shared) {
+        template<typename Schema, typename Set, typename Policy>
+        auto make_bundle_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared) {
             if constexpr (Schema::SetIsPerFrame(Set::SET)) {
                 TypedDescriptorSet<typename Set::Layout> result(device, manager);
-                connect_bundle_set<Schema, Set>(result, frame, shared);
+                connect_bundle_set<Schema, Set, Policy>(result, frame, shared);
                 return result;
             } else
                 return std::get<Schema::SetIndex(Set::SET)>(shared.sets).value();
         }
-        template<typename Schema>
-        auto make_bundle_sets(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema>& frame, const BundleSharedState<Schema>& shared) {
+        template<typename Schema, typename Policy>
+        auto make_bundle_sets(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared) {
             return [&]<size_t... indices>(std::index_sequence<indices...>) {
-                return typename BundleSets<typename Schema::Resources::Sets>::Type{make_bundle_set<Schema, typename Schema::Resources::template Set<indices>>(device, manager, frame, shared)...};
+                return typename BundleSets<typename Schema::Resources::Sets>::Type{make_bundle_set<Schema, typename Schema::Resources::template Set<indices>, Policy>(device, manager, frame, shared)...};
             }(std::make_index_sequence<Schema::Resources::COUNT>{});
         }
-        template<typename Schema, typename Inputs>
-        auto make_bundle_shared(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const ResourceAllocationPlan<Schema>& plan, const Inputs& inputs) {
+        template<typename Schema, typename Policy, typename Inputs>
+        auto make_bundle_shared(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const ResourceAllocationPlan<Schema>& plan, Policy& policy, const Inputs& inputs) {
             validate_bundle_plan(device, manager, plan.entries());
-            auto shared = std::make_shared<BundleSharedState<Schema>>();
-            shared->resources = make_bundle_storage<ResourceScope::SHARED>(device, plan, inputs);
+            auto shared = std::make_shared<BundleSharedState<Schema, Policy>>(make_bundle_storage<ResourceScope::SHARED>(device, plan, policy, inputs));
             bundle_for_each<typename Schema::Resources::Sets>([&]<typename Set>() {
                 if constexpr (!Schema::SetIsPerFrame(Set::SET)) {
                     auto& target = std::get<Schema::SetIndex(Set::SET)>(shared->sets);
                     target.emplace(device, manager);
-                    connect_bundle_set<Schema, Set>(*target, shared->resources, *shared);
+                    connect_bundle_set<Schema, Set, Policy>(*target, shared->resources, *shared);
                 }
             });
             return shared;

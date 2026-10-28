@@ -27,6 +27,8 @@ add_library(AHOLi
         AHO/src/x/resource/texture.cpp
         AHO/include/AHO/x/resource/texture.hpp
         AHO/include/AHO/x/resource/typed_texture.hpp
+        AHO/include/AHO/resource/typed_resource_buffer.hpp
+        AHO/include/AHO/resource/typed_storage_policy.hpp
         AHO/include/AHO/resource/typed_buffer.hpp
         AHO/src/engine.cpp
         AHO/src/resource/image.cpp

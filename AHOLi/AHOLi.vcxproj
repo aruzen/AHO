@@ -202,6 +202,8 @@
     <ClInclude Include="AHO\include\AHO\pipeline\pipeline.hpp" />
     <ClInclude Include="AHO\include\AHO\resource\audio.hpp" />
     <ClInclude Include="AHO\include\AHO\resource\buffer.hpp" />
+    <ClInclude Include="AHO\include\AHO\resource\typed_resource_buffer.hpp" />
+    <ClInclude Include="AHO\include\AHO\resource\typed_storage_policy.hpp" />
     <ClInclude Include="AHO\include\AHO\resource\typed_buffer.hpp" />
     <ClInclude Include="AHO\include\AHO\x\resource\typed_texture.hpp" />
     <ClInclude Include="AHO\include\AHO\resource\image.hpp" />

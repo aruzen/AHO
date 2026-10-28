@@ -49,6 +49,7 @@
     <ClInclude Include="VSL\include\VSL\utils\typed_buffer_view.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\utils\typed_batch.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\utils\typed_resource_allocation.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\utils\typed_resource_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\utils\typed_resource_bundle.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\utils\typed_resource_bundle_detail.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\utils\typed_frame_resources.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>

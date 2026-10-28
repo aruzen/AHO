@@ -14,6 +14,7 @@ add_library(AHOLi
         AHO/src/pipeline/layouts.cpp
         AHO/src/pipeline/pipeline.cpp
         AHO/src/window.cpp
+        AHO/src/window_impl.hpp
         AHO/src/render_context.cpp
         AHO/include/AHO/render_context.hpp
         AHO/src/io/input.cpp

@@ -12,8 +12,10 @@
 #include <VSL/vulkan/command.hpp>
 #include <VSL/vulkan/descriptor_set_manager.hpp>
 #include <VSL/vulkan/synchronize.hpp>
-#include <filesystem>
+#include <cstddef>
+#include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -22,9 +24,19 @@ namespace AHO_NAMESPACE::window {
 }
 
 namespace AHO_NAMESPACE::engine {
-    struct EnginePrespecification {
-        std::string name;
-        std::vector<std::filesystem::path> shaders_directories;
+    struct EngineConfig {
+        std::string application_name = "AHO";
+        std::vector<std::string> instance_extensions;
+        std::optional<std::size_t> physical_device_index;
+        std::map<VSL_NAMESPACE::graphic_resource::Type, std::size_t> descriptor_budget = {
+            {VSL_NAMESPACE::graphic_resource::Type::SAMPLER, 100},
+            {VSL_NAMESPACE::graphic_resource::Type::COMBINED_IMAGE_SAMPLER, 100},
+            {VSL_NAMESPACE::graphic_resource::Type::SAMPLED_IMAGE, 100},
+            {VSL_NAMESPACE::graphic_resource::Type::STORAGE_IMAGE, 100},
+            {VSL_NAMESPACE::graphic_resource::Type::UNIFORM_TEXEL_BUFFER, 100},
+            {VSL_NAMESPACE::graphic_resource::Type::STORAGE_TEXEL_BUFFER, 100},
+            {VSL_NAMESPACE::graphic_resource::Type::UNIFORM_BUFFER, 100},
+            {VSL_NAMESPACE::graphic_resource::Type::STORAGE_BUFFER, 100}};
     };
 
     struct EngineData {

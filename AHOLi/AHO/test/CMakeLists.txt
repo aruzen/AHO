@@ -118,6 +118,10 @@ if (AHO_TEST_SOURCES)
                 -P "${VSL_HOME}/test/cmake/RunTypedContract.cmake")
         set_tests_properties("AHO.Compile.TypedBuffer.${name}" PROPERTIES LABELS "AHO;compile" TIMEOUT 60)
     endforeach()
+    aho_add_compile_test(Engine.VslHeaderFirst
+            "${CMAKE_CURRENT_SOURCE_DIR}/engine_test.cpp" AHO_CONTRACT_ENGINE_VSL_FIRST)
+    aho_add_compile_test(Engine.AhoHeaderFirst
+            "${CMAKE_CURRENT_SOURCE_DIR}/engine_test.cpp" AHO_CONTRACT_ENGINE_AHO_FIRST)
     aho_add_compile_test(Image.VslHeaderFirst
             "${CMAKE_CURRENT_SOURCE_DIR}/resource/image_test.cpp" AHO_CONTRACT_IMAGE_VSL_FIRST)
     aho_add_compile_test(Image.AhoHeaderFirst

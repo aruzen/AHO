@@ -8,6 +8,8 @@
 #include "AHO/define.hpp"
 
 #include <optional>
+#include <VSL/vulkan/pipeline_layout.hpp>
+#include <VSL/vulkan/stages/resource_binding.hpp>
 
 #include "AHO/engine.hpp"
 #include "AHO/window.hpp"

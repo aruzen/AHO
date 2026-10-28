@@ -1,4 +1,10 @@
 #include "scene.hpp"
+#include <VSL/vulkan/stages/shader_group.hpp>
+#include <VSL/vulkan/stages/color_blend.hpp>
+#include <VSL/vulkan/stages/input_assembly.hpp>
+#include <VSL/vulkan/stages/rasterization.hpp>
+#include <VSL/vulkan/stages/multisample.hpp>
+#include <VSL/vulkan/stages/dynamic_state.hpp>
 #include <array>
 #include <cmath>
 #include <iostream>

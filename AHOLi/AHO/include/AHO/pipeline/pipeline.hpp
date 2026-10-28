@@ -6,6 +6,8 @@
 #define AHO_ALL_PIPELINE_H
 
 #include "layouts.hpp"
+#include <VSL/vulkan/pipeline.hpp>
+#include <VSL/vulkan/stages/shader_group.hpp>
 
 namespace AHO_NAMESPACE {
     /*

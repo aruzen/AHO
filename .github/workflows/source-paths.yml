@@ -17,4 +17,4 @@ jobs:
         with:
           persist-credentials: false
       - name: Validate source paths and case
-          run: python3 tools/cmake/check_source_paths.py
+        run: python3 tools/cmake/check_source_paths.py

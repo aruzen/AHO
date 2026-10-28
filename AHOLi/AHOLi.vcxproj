@@ -248,6 +248,8 @@
   <ItemGroup>
     <ClCompile Include="AHO\src\drawer.cpp" />
     <ClCompile Include="AHO\src\drawer\draw_phase.cpp" />
+    <ClCompile Include="AHO\src\drawer\standard_drawer.cpp" />
+    <ClInclude Include="AHO\src\drawer\standard_shaders.hpp" />
     <ClCompile Include="AHO\src\image_readback.cpp" />
     <ClCompile Include="AHO\src\x\resource\gltf.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
     <ClCompile Include="AHO\src\x\resource\shader.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>

@@ -9,6 +9,8 @@
 #ifdef AHO_GPU_TESTS
 #include "../support/live_gpu.hpp"
 #include <AHO/drawer/draw_phase.hpp>
+#include <VSL/vulkan/commands/render_pass_begin.hpp>
+#include <VSL/vulkan/commands/render_pass_end.hpp>
 #endif
 
 namespace {

@@ -4,6 +4,7 @@ project(AHOLi VERSION 1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(GNUInstallDirs)
+find_package(Threads REQUIRED)
 
 include(cmake/Saitekikuukan.cmake)
 include(cmake/TinyGltf.cmake)
@@ -102,7 +103,7 @@ target_include_directories(AHOLi
 
 target_link_libraries(AHOLi
         PUBLIC saitekikuukan::saitekikuukan VSL
-        PRIVATE glfw
+        PRIVATE glfw Threads::Threads
 )
 
 if(APPLE)

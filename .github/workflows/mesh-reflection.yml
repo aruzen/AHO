@@ -62,11 +62,15 @@ jobs:
             -DAHO_ENABLE_EXPERIMENTAL_MESH=ON -DAHO_REQUIRE_MESH_REFLECTION=ON \
             -DAHO_BUILD_MESH_EXAMPLE=ON -DSAITEKIKUUKAN_BUILD_REFLECTION_TESTS=ON
       - name: Build libraries, Mesh and native reflection tests
-        run: cmake --build build/reflection --target AHOLi VSL aho-mesh-test aho-mesh-example reflection-test soa-reflection-test chunk-reflection-test strategy-reflection-test --parallel 2
+        run: cmake --build build/reflection --target AHOLi VSL aho-test aho-mesh-test aho-mesh-example reflection-test soa-reflection-test chunk-reflection-test strategy-reflection-test --parallel 2
       - name: Test reflected Mesh
         run: |
           ctest --test-dir build/reflection --output-on-failure \
             -R '^(AHO[.]Mesh[.]|AHO[.]Compile[.]Header[.](core[.]polygon|core[.]detail[.]soa_storage|x[.]core[.](mesh|mesh_attributes))[.]hpp$|reflection-test$|soa-reflection-test$|chunk-reflection-test$|strategy-reflection-test$)'
           ./build/reflection/AHOLi/aho-mesh-example
+      - name: Test engine ownership without a GPU
+        run: |
+          ctest --test-dir build/reflection --output-on-failure \
+            -R '^AHO[.](EngineAccessor|GraphicalEngine|StandardEngineTest|AHOWindowConstructionTest|AHOWindowTest|WindowResizeHookTest|RenderContextTest|Compile[.]Engine[.])'
       - name: Test relocated install with isolated dependencies
         run: python3 tools/cmake/check_installed_package.py --build-dir build/reflection

@@ -36,22 +36,41 @@ namespace AHO_NAMESPACE::engine {
         VSL_NAMESPACE::SynchroManager synchro_manager;
     };
 
-    struct EngineAccessor {
-    private:
-        static EngineAccessor* INSTANCE;
+    class EngineAccessor {
+        std::shared_ptr<EngineData> _data;
+
+    protected:
+        void reset_data(std::shared_ptr<EngineData> data);
 
     public:
-        static EngineAccessor* Instance();
-
-        EngineAccessor();
-        ~EngineAccessor();
+        EngineAccessor() = default;
+        explicit EngineAccessor(std::shared_ptr<EngineData> data);
+        ~EngineAccessor() = default;
 
         EngineAccessor(const EngineAccessor&) = default;
         EngineAccessor& operator=(const EngineAccessor&) = default;
         EngineAccessor(EngineAccessor&&) noexcept = default;
         EngineAccessor& operator=(EngineAccessor&&) noexcept = default;
 
-        std::shared_ptr<EngineData> data_;
+        const std::shared_ptr<EngineData>& data() const;
+    };
+
+    // 登録の寿命だけ既定エンジンを保持する。新しい登録の終了後は前の登録へ戻る。
+    class DefaultEngineRegistration {
+        struct Registration;
+        struct Registry;
+        std::shared_ptr<Registration> _registration;
+        static Registry& State();
+
+    public:
+        explicit DefaultEngineRegistration(EngineAccessor engine);
+        ~DefaultEngineRegistration() = default;
+        DefaultEngineRegistration(const DefaultEngineRegistration&) = delete;
+        DefaultEngineRegistration& operator=(const DefaultEngineRegistration&) = delete;
+        DefaultEngineRegistration(DefaultEngineRegistration&&) noexcept = default;
+        DefaultEngineRegistration& operator=(DefaultEngineRegistration&&) noexcept = default;
+
+        static EngineAccessor Current();
     };
 } // namespace AHO_NAMESPACE::engine
 

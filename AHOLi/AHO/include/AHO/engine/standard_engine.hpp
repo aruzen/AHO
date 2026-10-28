@@ -16,6 +16,9 @@ namespace AHO_NAMESPACE::engine {
         void boot(const std::string& application_name);
 
         Window get_window() override;
+
+    private:
+        std::optional<DefaultEngineRegistration> _default_registration;
     };
 } // namespace AHO_NAMESPACE::engine
 

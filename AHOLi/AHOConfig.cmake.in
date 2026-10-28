@@ -2,6 +2,7 @@
 
 include(CMakeFindDependencyMacro)
 find_dependency(VSL CONFIG)
+find_dependency(Threads)
 find_dependency(saitekikuukan CONFIG)
 if(@AHO_ENABLE_MSDF@)
     find_dependency(msdfgen CONFIG)

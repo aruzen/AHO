@@ -20,8 +20,8 @@ namespace {
     struct NestedDrawEngine : aho::StandardEngine {
         NestedDrawEngine() : aho::StandardEngine("AHO nested phase test") {}
         ~NestedDrawEngine() override {
-            if (data_)
-                data_->command_manager.wait_idle();
+            if (data())
+                data()->command_manager.wait_idle();
             if (boot_window && static_cast<bool>(*boot_window))
                 boot_window->close();
         }
@@ -224,7 +224,7 @@ namespace {
         ASSERT_NO_THROW(start_engine());
         NestedDrawEngine other;
         aho::DrawPhase outer(*engine);
-        aho::DrawStream<vsl::DefaultPhaseStream> unrelated{vsl::DefaultPhaseStream{other.data_->command_manager}};
+        aho::DrawStream<vsl::DefaultPhaseStream> unrelated{vsl::DefaultPhaseStream{other.data()->command_manager}};
         int calls = 0;
         aho::DrawPhase* received = &outer;
         unrelated << aho::pack(phase_payload::Value{&calls, &received});
@@ -285,7 +285,7 @@ namespace {
     }
     TEST_F(DrawPhaseVulkanIntegration, RepeatedFramesWorkAcrossCommandBufferWraparound) {
         ASSERT_NO_THROW(start_engine());
-        const auto frames = engine->data_->command_manager.get_buffer().get_size() + 2;
+        const auto frames = engine->data()->command_manager.get_buffer().get_size() + 2;
         for (std::size_t frame = 0; frame < frames; ++frame) {
             SCOPED_TRACE(frame);
             AHO_NAMESPACE::DrawPhase phase(*engine);
@@ -316,7 +316,7 @@ namespace {
             }
             EXPECT_EQ(finished, 1u);
         }
-        engine->data_->command_manager.wait_idle();
+        engine->data()->command_manager.wait_idle();
     }
     TEST_F(DrawPhaseVulkanIntegration, ExplicitSubmissionClosesTheDefaultRenderPass) {
         ASSERT_NO_THROW(start_engine());
@@ -330,7 +330,7 @@ namespace {
             }
             EXPECT_TRUE(phase.completion().wait());
         }
-        engine->data_->command_manager.wait_idle();
+        engine->data()->command_manager.wait_idle();
     }
     TEST_F(DrawPhaseVulkanIntegration, ExplicitThrowingFinishCancelsAndDoesNotRetryDuringDestruction) {
         ASSERT_NO_THROW(start_engine());
@@ -347,13 +347,13 @@ namespace {
         {
             AHO_NAMESPACE::DrawPhase next(*engine);
         }
-        engine->data_->command_manager.wait_idle();
+        engine->data()->command_manager.wait_idle();
     }
     TEST_F(DrawPhaseVulkanIntegration, FinishCallbackRecordsReadbackBeforeSubmitAndPresent) {
         ASSERT_NO_THROW(start_engine());
         auto window = engine->get_window();
-        auto manager = engine->data_->command_manager;
-        auto device = engine->data_->logical_device;
+        auto manager = engine->data()->command_manager;
+        auto device = engine->data()->logical_device;
         const auto capabilities = device.data_->parent_device->device.getSurfaceCapabilitiesKHR(window.data2->surface->data_->surface);
         if (!(capabilities.supportedUsageFlags & vk::ImageUsageFlagBits::eTransferSrc))
             GTEST_SKIP() << "Swapchain does not support TransferSrc";
@@ -363,7 +363,7 @@ namespace {
         window.data2->swapchain = chain;
         window.data2->frame_buffer = VSL_NAMESPACE::FrameBuffer(chain, window.data2->render_pass);
         if (window.data2->render_finished.size() != chain.get_swap_image_size())
-            window.data2->render_finished = engine->data_->synchro_manager.create_semaphore("ticket-present", chain.get_swap_image_size());
+            window.data2->render_finished = engine->data()->synchro_manager.create_semaphore("ticket-present", chain.get_swap_image_size());
         AHO_NAMESPACE::ImageReadback reader(manager);
         std::optional<AHO_NAMESPACE::ImageReadbackTicket> ticket;
         {
@@ -391,8 +391,8 @@ namespace {
 
     TEST_F(DrawPhaseVulkanIntegration, ThrowingFinishCallbackCancelsTicketAndAllowsNextFrame) {
         ASSERT_NO_THROW(start_engine());
-        auto manager = engine->data_->command_manager;
-        auto device = engine->data_->logical_device;
+        auto manager = engine->data()->command_manager;
+        auto device = engine->data()->logical_device;
         VSL_NAMESPACE::Image<VSL_NAMESPACE::ImageType::COLOR_ATTACHMENT | VSL_NAMESPACE::ImageType::TRANSFER_SRC> image(
             device, 8, 8, VSL_NAMESPACE::data_format::UNSIGNED_NORMALIZED8_RGBA);
         VSL_NAMESPACE::RenderPassDescription description;
@@ -423,7 +423,7 @@ namespace {
         {
             AHO_NAMESPACE::DrawPhase next(*engine);
         }
-        engine->data_->command_manager.wait_idle();
+        engine->data()->command_manager.wait_idle();
     }
     TEST_F(DrawPhaseVulkanIntegration, StackUnwindingCancelsFrameWithoutInvokingFinishCallback) {
         ASSERT_NO_THROW(start_engine());
@@ -438,7 +438,7 @@ namespace {
         {
             AHO_NAMESPACE::DrawPhase next(*engine);
         }
-        engine->data_->command_manager.wait_idle();
+        engine->data()->command_manager.wait_idle();
     }
 
 } // namespace

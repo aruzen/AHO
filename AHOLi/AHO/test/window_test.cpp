@@ -66,7 +66,7 @@ namespace {
     TEST_F(AHOWindowVulkanIntegration, RecordingGuardFindsTheOuterPhaseOfAnotherEngine) {
         ASSERT_NO_THROW(start_engine());
         auto close_engine = [](aho::StandardEngine* other) {
-            other->data_->command_manager.wait_idle();
+            other->data()->command_manager.wait_idle();
             other->boot_window->close();
             delete other;
         };
@@ -231,8 +231,7 @@ namespace {
     }
     TEST_F(AHOWindowVulkanIntegration, GraphicsInitializationFailureUnregistersTheNewNativeWindow) {
         ASSERT_NO_THROW(start_engine());
-        aho::engine::EngineAccessor failing = *engine;
-        failing.data_ = std::make_shared<aho::engine::EngineData>(*engine->data_);
+        aho::engine::EngineAccessor failing(std::make_shared<aho::engine::EngineData>(*engine->data()));
         std::vector<const char*> extensions{VK_KHR_SURFACE_EXTENSION_NAME};
 #ifdef __APPLE__
         extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
@@ -245,12 +244,12 @@ namespace {
         info.enabledExtensionCount = static_cast<std::uint32_t>(extensions.size());
         info.ppEnabledExtensionNames = extensions.data();
         unsupported->instance = vk::createInstance(info);
-        failing.data_->vulkan_instance.accessor = unsupported;
+        failing.data()->vulkan_instance.accessor = unsupported;
         const auto previous = vsl::PureWindow::WINDOWS;
-        const auto singleton = aho::engine::EngineAccessor::Instance();
+        const auto previous_default = aho::engine::DefaultEngineRegistration::Current().data();
         EXPECT_THROW((aho::Window("cannot create graphics", 48, 32, failing)), vsl::exceptions::RuntimeException);
         EXPECT_EQ(vsl::PureWindow::WINDOWS, previous);
-        EXPECT_EQ(aho::engine::EngineAccessor::Instance(), singleton);
+        EXPECT_EQ(aho::engine::DefaultEngineRegistration::Current().data(), previous_default);
         EXPECT_TRUE(static_cast<bool>(*engine->boot_window));
         aho::Window retry("valid construction after failure", 48, 32, *engine);
         EXPECT_TRUE(static_cast<bool>(retry));
@@ -261,7 +260,7 @@ namespace {
         ASSERT_NO_THROW(start_engine());
         const auto previous = vsl::PureWindow::WINDOWS.size();
         aho::Window second("default engine construction", 48, 32);
-        EXPECT_EQ(second.engine.data_, engine->data_);
+        EXPECT_EQ(second.engine.data(), engine->data());
         EXPECT_EQ(vsl::PureWindow::WINDOWS.size(), previous + 1);
         EXPECT_TRUE(second.close());
         EXPECT_EQ(vsl::PureWindow::WINDOWS.size(), previous);
@@ -327,13 +326,13 @@ namespace {
         const std::string name = "AHO secondary synchronization resources";
         aho::Window second(name, 240, 160, *engine);
         EXPECT_NE(second.data_, engine->boot_window->data_);
-        EXPECT_EQ(second.engine.data_, engine->data_);
+        EXPECT_EQ(second.engine.data(), engine->data());
         EXPECT_EQ(second.window_size().value.x.value, 240);
         EXPECT_EQ(second.window_size().value.y.value, 160);
         EXPECT_EQ(second.name(), name);
-        auto available = engine->data_->synchro_manager.get_semaphore(name + "ImageAvailable");
-        auto finished = engine->data_->synchro_manager.get_semaphore(name + "RenderFinished");
-        auto in_flight = engine->data_->synchro_manager.get_fence(name + "InFlight");
+        auto available = engine->data()->synchro_manager.get_semaphore(name + "ImageAvailable");
+        auto finished = engine->data()->synchro_manager.get_semaphore(name + "RenderFinished");
+        auto in_flight = engine->data()->synchro_manager.get_fence(name + "InFlight");
         EXPECT_TRUE(available.has_value());
         EXPECT_TRUE(finished.has_value());
         EXPECT_TRUE(in_flight.has_value());
@@ -352,25 +351,25 @@ namespace {
 #include <AHO/engine/standard_engine.hpp>
 namespace {
     TEST(AHOWindowConstructionTest, MissingDefaultEngineThrowsBeforeWindowRegistration) {
-        ASSERT_EQ(aho::engine::EngineAccessor::Instance(), nullptr);
+        ASSERT_EQ(aho::engine::DefaultEngineRegistration::Current().data(), nullptr);
         ASSERT_TRUE(vsl::PureWindow::WINDOWS.empty());
         EXPECT_THROW((aho::Window("no default engine")), vsl::exceptions::RuntimeException);
         EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
-        EXPECT_EQ(aho::engine::EngineAccessor::Instance(), nullptr);
+        EXPECT_EQ(aho::engine::DefaultEngineRegistration::Current().data(), nullptr);
     }
     TEST(AHOWindowConstructionTest, UnbootedDefaultEngineThrowsBeforeWindowRegistration) {
         aho::StandardEngine engine("not booted", false);
-        ASSERT_FALSE(engine.data_);
+        ASSERT_FALSE(engine.data());
         EXPECT_THROW((aho::Window("unbooted default engine")), vsl::exceptions::RuntimeException);
         EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
-        EXPECT_EQ(aho::engine::EngineAccessor::Instance(), &engine);
+        EXPECT_EQ(aho::engine::DefaultEngineRegistration::Current().data(), nullptr);
     }
     TEST(AHOWindowConstructionTest, UnbootedExplicitEngineThrowsBeforeWindowRegistration) {
         aho::StandardEngine engine("not booted", false);
-        ASSERT_FALSE(engine.data_);
+        ASSERT_FALSE(engine.data());
         EXPECT_THROW((aho::Window("unbooted explicit engine", 48, 32, engine)), vsl::exceptions::RuntimeException);
         EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
-        EXPECT_EQ(aho::engine::EngineAccessor::Instance(), &engine);
+        EXPECT_EQ(aho::engine::DefaultEngineRegistration::Current().data(), nullptr);
     }
     TEST(AHOWindowTest, SharedDataConstructorKeepsNativeOwnershipAndEmptyDrawingData) {
         aho::engine::EngineAccessor engine;
@@ -379,7 +378,7 @@ namespace {
         aho::Window window(engine, native, drawing);
         EXPECT_EQ(window.data_, native);
         EXPECT_EQ(window.data2, drawing);
-        EXPECT_EQ(window.engine.data_, engine.data_);
+        EXPECT_EQ(window.engine.data(), engine.data());
     }
     TEST(WindowResizeHookTest, ConstructorStoresCallableAndPassesWindowPointer) {
         aho::Window* received = nullptr;

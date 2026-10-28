@@ -4,7 +4,7 @@
 
 namespace AHO_NAMESPACE {
     RenderContext::RenderContext(const window::Window& window)
-        : _engine(window.engine.data_), _target(window.data2), _window(window.data_) {
+        : _engine(window.engine.data()), _target(window.data2), _window(window.data_) {
         require_live();
     }
 

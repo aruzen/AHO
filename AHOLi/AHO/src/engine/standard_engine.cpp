@@ -39,13 +39,13 @@ void AHO_NAMESPACE::engine::StandardEngine::boot(const std::string& application_
                                                                                    },
                                                                            0));
 
-    data_ = std::make_shared<EngineData>(EngineData{
+    reset_data(std::make_shared<EngineData>(EngineData{
         .vulkan_instance = instance,
         .physical_device = physical_device,
         .logical_device = device,
         .command_manager = command_manager,
         .graphic_resource_manager = graphic_resource_manager,
-        .synchro_manager = synchro_manager});
+        .synchro_manager = synchro_manager}));
 
     VSL_NAMESPACE::Swapchain swapchain(device, surface);
     VSL_NAMESPACE::RenderPass render_pass(swapchain);
@@ -66,6 +66,7 @@ void AHO_NAMESPACE::engine::StandardEngine::boot(const std::string& application_
                             .in_flight = synchro_manager
                                              .create_fence(application_name + "InFlight",
                                                            command_manager.get_buffer().get_size(), true)}));
+    _default_registration.emplace(*this);
 }
 
 AHO_NAMESPACE::Window AHO_NAMESPACE::engine::StandardEngine::get_window() {

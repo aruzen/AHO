@@ -10,64 +10,41 @@
 static_assert(sizeof(vsl::utils::SPIRVReflector) > 0);
 #else
 #include <gtest/gtest.h>
-#include <cstdlib>
 #include <memory>
+#include <stdexcept>
 #include <type_traits>
 #include <utility>
 #include <AHO/engine.hpp>
 namespace {
-    TEST(EngineAccessorTest, FirstAccessorBecomesSingletonAndLaterAccessorsDoNotReplaceIt) {
-        const auto previous = aho::engine::EngineAccessor::Instance();
+    TEST(EngineAccessorTest, EmptyHandlesDoNotRegisterADefaultEngine) {
+        const auto previous = aho::engine::DefaultEngineRegistration::Current().data();
         aho::engine::EngineAccessor first;
         aho::engine::EngineAccessor second;
-        EXPECT_EQ(aho::engine::EngineAccessor::Instance(), previous ? previous : &first);
-        EXPECT_EQ(first.data_, nullptr);
-        EXPECT_EQ(second.data_, nullptr);
+        EXPECT_EQ(aho::engine::DefaultEngineRegistration::Current().data(), previous);
+        EXPECT_EQ(first.data(), nullptr);
+        EXPECT_EQ(second.data(), nullptr);
+        EXPECT_THROW((aho::engine::DefaultEngineRegistration{first}), std::invalid_argument);
     }
     TEST(EngineAccessorLifetimeTest, CopiesShareDataAndMovesKeepTransferringOwnership) {
         using Accessor = aho::engine::EngineAccessor;
         static_assert(std::is_nothrow_move_constructible_v<Accessor>);
         static_assert(std::is_nothrow_move_assignable_v<Accessor>);
-        // Own a control block without constructing GPU-backed EngineData.
+        // GPU資源を作らず、共有所有権のcontrol blockだけを検証する。
         auto token = std::make_shared<int>(7);
-        Accessor source;
-        source.data_ = std::shared_ptr<aho::engine::EngineData>(token, nullptr);
-        const auto registered = Accessor::Instance();
+        Accessor source(std::shared_ptr<aho::engine::EngineData>(token, nullptr));
+        static_assert(std::is_const_v<std::remove_reference_t<decltype(source.data())>>);
         Accessor copy(source);
         EXPECT_EQ(token.use_count(), 3);
         Accessor moved(std::move(copy));
-        EXPECT_EQ(copy.data_.use_count(), 0);
-        EXPECT_EQ(moved.data_.use_count(), 3);
+        EXPECT_EQ(copy.data().use_count(), 0);
+        EXPECT_EQ(moved.data().use_count(), 3);
         Accessor assigned;
         assigned = source;
         EXPECT_EQ(token.use_count(), 4);
         Accessor move_assigned;
         move_assigned = std::move(assigned);
-        EXPECT_EQ(assigned.data_.use_count(), 0);
-        EXPECT_EQ(move_assigned.data_.use_count(), 4);
-        EXPECT_EQ(Accessor::Instance(), registered);
-    }
-    TEST(EngineAccessorLifetimeTest, DestroyingTheRegisteredAccessorClearsItAndAllowsTheNextOwner) {
-        const auto previous_style = GTEST_FLAG_GET(death_test_style);
-        GTEST_FLAG_SET(death_test_style, "threadsafe");
-        // Re-exec this case so other tests' static accessors cannot affect the registry.
-        EXPECT_EXIT({
-        using Accessor = aho::engine::EngineAccessor;
-        if (Accessor::Instance() != nullptr) std::_Exit(1);
-        {
-            Accessor first;
-            if (Accessor::Instance() != &first) std::_Exit(2);
-            { Accessor later; }
-            if (Accessor::Instance() != &first) std::_Exit(3);
-        }
-        if (Accessor::Instance() != nullptr) std::_Exit(4);
-        {
-            Accessor next;
-            if (Accessor::Instance() != &next) std::_Exit(5);
-        }
-        if (Accessor::Instance() != nullptr) std::_Exit(6);
-        std::_Exit(0); }, testing::ExitedWithCode(0), "");
-        GTEST_FLAG_SET(death_test_style, previous_style);
+        EXPECT_EQ(assigned.data().use_count(), 0);
+        EXPECT_EQ(move_assigned.data().use_count(), 4);
     }
 
 } // namespace

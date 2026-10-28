@@ -121,7 +121,7 @@ namespace {
     void ScreenshotWindowIntegration::require_readback() {
         start_engine();
         const auto window = engine->get_window();
-        const auto device = engine->data_->logical_device.data_;
+        const auto device = engine->data()->logical_device.data_;
         const auto caps = device->parent_device->device.getSurfaceCapabilitiesKHR(window.data2->surface->data_->surface);
         if (!(caps.supportedUsageFlags & vk::ImageUsageFlagBits::eTransferSrc))
             GTEST_SKIP() << "Surface does not support TransferSrc";

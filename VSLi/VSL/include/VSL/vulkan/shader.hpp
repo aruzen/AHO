@@ -7,6 +7,8 @@
 #include <filesystem>
 #include <functional>
 #include <string_view>
+#include <span>
+#include <cstdint>
 
 #include "device.hpp"
 #include "../utils/flags.hpp"
@@ -62,6 +64,8 @@ namespace VSL_NAMESPACE {
 
         Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path);
         Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path, std::string name);
+        // SPIR-Vを所有コピーする。呼び出し元の配列は構築後に破棄できる。
+        Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::span<const std::uint32_t> code, std::string name = "main");
 
         std::string name() const;
     };

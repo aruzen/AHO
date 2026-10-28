@@ -1,4 +1,5 @@
 add_custom_target(vsl-tests)
+cmake_language(DEFER CALL aho_copy_windows_runtime)
 
 file(GLOB_RECURSE VSL_TEST_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
 list(FILTER VSL_TEST_SOURCES EXCLUDE REGEX "/contracts/")

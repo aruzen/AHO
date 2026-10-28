@@ -18,7 +18,8 @@ namespace {
         EXPECT_EQ(physical.driver_version(), expected.driverVersion);
         EXPECT_EQ(physical.vendor_id(), expected.vendorID);
         EXPECT_EQ(physical.device_id(), expected.deviceID);
-        EXPECT_EQ(physical.name(), std::string(expected.deviceName));
+        const std::string expected_name = expected.deviceName;
+        EXPECT_EQ(physical.name(), expected_name);
         auto type = physical.type();
         EXPECT_EQ(type.index(), static_cast<char>(expected.deviceType));
         EXPECT_TRUE(physical.data_->props.has_value());

@@ -17,6 +17,9 @@ namespace VSL_NAMESPACE {
         constexpr const T index() const;
 
         constexpr auto operator<=>(const C& t) const;
+        friend constexpr auto operator<=>(const C& first, const C& second) {
+            return second._index <=> first._index;
+        }
     };
 
     template<typename C, typename T>

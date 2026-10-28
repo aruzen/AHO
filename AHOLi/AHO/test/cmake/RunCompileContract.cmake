@@ -1,7 +1,8 @@
 include("${TEST_ENVIRONMENT}")
 separate_arguments(driver_flags NATIVE_COMMAND "${TEST_FLAGS}")
 if(TEST_COMPILER_ID STREQUAL "MSVC")
-    set(arguments /nologo /std:c++latest /Zs)
+    # Syntax checks do not share the compiler PDB when callers enable /Zi.
+    set(arguments /nologo /std:c++latest /Z7 /Zs)
     set(include_prefix /I)
     set(definition_prefix /D)
 else()

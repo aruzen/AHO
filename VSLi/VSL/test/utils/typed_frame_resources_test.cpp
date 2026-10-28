@@ -105,12 +105,12 @@ namespace {
         t::TypedFrameResources<FrameValue> frames(manager, [](size_t index) { return FrameValue{index}; });
         {
             auto phase = manager.start_phase<vsl::ComputePhase>();
-            EXPECT_THROW(frames.update(phase, [&](FrameValue&) {
+            const auto failed_update = [&](FrameValue&) {
                 EXPECT_THROW(frames.get(phase), std::logic_error);
                 EXPECT_THROW(frames.update(phase, [](FrameValue&) {}), std::logic_error);
                 throw std::runtime_error("Update failed");
-            }),
-                         std::runtime_error);
+            };
+            EXPECT_THROW(frames.update(phase, failed_update), std::runtime_error);
             EXPECT_THROW(frames.get(phase), std::logic_error);
             EXPECT_THROW(frames.update(phase, [](FrameValue&) {}), std::logic_error);
             phase.cancel();

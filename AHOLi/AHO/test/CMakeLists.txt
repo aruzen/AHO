@@ -1,4 +1,5 @@
 add_custom_target(aho-tests)
+cmake_language(DEFER CALL aho_copy_windows_runtime)
 
 option(AHO_TEST_SANITIZERS "Instrument AHO and its tests with AddressSanitizer and UBSan" OFF)
 option(AHO_TEST_COVERAGE "Collect Clang source coverage for AHO and its tests" OFF)
@@ -57,6 +58,18 @@ if (AHO_TEST_SOURCES)
             PROPERTIES LABELS cpu TIMEOUT 20 FIXTURES_REQUIRED aho_temp_workspace
             ENVIRONMENT "AHO_TEST_TMPDIR=${AHO_TEST_TMPDIR}")
     add_executable(aho-input-test ${AHO_INPUT_TEST_SOURCES} support/input_backend.cpp)
+    if(WIN32)
+        # Input tests replace GLFW calls with a CPU backend. Build the input
+        # implementation without dllimport so calls reach that backend.
+        target_sources(aho-input-test PRIVATE
+                ../src/io/input.cpp ../src/io/input_manager.cpp ../src/io/key.cpp
+                ../src/io/keyboard.cpp ../src/io/mouse.cpp)
+        if(MSVC)
+            target_compile_options(aho-input-test PRIVATE /UGLFW_DLL)
+        else()
+            target_compile_options(aho-input-test PRIVATE -UGLFW_DLL)
+        endif()
+    endif()
     target_include_directories(aho-input-test PRIVATE "$<TARGET_PROPERTY:aho-test,INCLUDE_DIRECTORIES>")
     target_link_libraries(aho-input-test PRIVATE AHOLi VSL GTest::gtest_main)
     target_link_directories(aho-input-test PRIVATE ${GLFW_LIBRARY_DIRS})

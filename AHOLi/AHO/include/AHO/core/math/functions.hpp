@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <concepts>
+#include <limits>
 #include <stdexcept>
 
 namespace AHO_NAMESPACE::math {
@@ -71,7 +72,9 @@ namespace AHO_NAMESPACE::math {
 
     template<std::floating_point T>
     constexpr T smoothstep(T first_edge, T second_edge, T value) {
-        if (!std::isfinite(first_edge) || !std::isfinite(second_edge) || !(first_edge < second_edge) || std::isnan(value))
+        const auto maximum = std::numeric_limits<T>::max();
+        if (!(first_edge >= -maximum && first_edge <= maximum) || !(second_edge >= -maximum && second_edge <= maximum) ||
+            !(first_edge < second_edge) || value != value)
             throw std::invalid_argument("smoothstep requires finite ascending edges and a non-NaN value");
         if (value <= first_edge)
             return T{0};
@@ -79,8 +82,8 @@ namespace AHO_NAMESPACE::math {
             return T{1};
         // edgeの差が型の最大値を超える場合も、中間の補間率を保つ。
         const auto width = second_edge - first_edge;
-        const auto t = std::isfinite(width) ? (value - first_edge) / width
-                                            : (value / T{2} - first_edge / T{2}) / (second_edge / T{2} - first_edge / T{2});
+        const auto t = width <= maximum ? (value - first_edge) / width
+                                        : (value / T{2} - first_edge / T{2}) / (second_edge / T{2} - first_edge / T{2});
         return t * t * (T{3} - T{2} * t);
     }
 

@@ -30,6 +30,10 @@ namespace vsl_test {
             FAIL() << "GLFW initialization failed: " << error << " " << reason;
         }
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+#ifdef _WIN32
+        // Hidden test windows do not need the caption's minimum width.
+        glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+#endif
         window.emplace("VSL hidden integration test", 64, 48);
         ASSERT_TRUE(static_cast<bool>(*window)) << "Hidden GLFW window creation failed";
     }

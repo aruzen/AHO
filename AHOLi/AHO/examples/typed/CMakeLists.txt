@@ -21,3 +21,4 @@ target_include_directories(aho-typed-example PRIVATE "${AHO_HOME}/include" "${VS
 target_link_directories(aho-typed-example PRIVATE ${GLFW_LIBRARY_DIRS})
 target_link_libraries(aho-typed-example PRIVATE AHOLi VSL)
 set_target_properties(aho-typed-example PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+aho_copy_windows_runtime()

@@ -176,7 +176,7 @@ breakpoint disable swift_willThrow
                                     .generated;
 #endif
             const auto vert_layout = texture_vert.make_binding_layout()[0];
-            const auto frag_layout = texture_frag.make_binding_layout()[0];
+            const auto frag_layout = texture_frag.make_binding_layout().at(1);
             std::vector layouts = {vert_layout,
                                    frag_layout};
             return std::make_tuple(layouts,
@@ -257,8 +257,8 @@ breakpoint disable swift_willThrow
                 phase << vsl::command::ChangeImageBarrier(image, ImageLayout::TRANSFER_DST_OPTIMAL);
                 phase << vsl::command::CopyBufferToImage(image, &image_staging_buffer, ImageLayout::TRANSFER_DST_OPTIMAL);
                 phase << vsl::command::ChangeImageBarrier(image, ImageLayout::TRANSFER_DST_OPTIMAL,
-                                                     ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-                                                     aho::pipeline::get_binding_point(aho::pipeline::ResourceName::TEXTURE).shader_type);
+                                                          ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                                                          aho::pipeline::get_binding_point(aho::pipeline::ResourceName::TEXTURE).shader_type);
             }
             in_flight.wait();
         }
@@ -351,7 +351,7 @@ breakpoint disable swift_willThrow
 
                 phase << input_vertices << scissor << viewport
                       << vsl::command::BindGraphicResource(ubo_resource[phase.get_image_index()],
-                                                      graphic_resource::BindingDestination::GRAPHICS, input_vertices)
+                                                           graphic_resource::BindingDestination::GRAPHICS, input_vertices)
                       << vsl::command::BindVertexBuffer(vert_buffer, color_buffer)
                       << vsl::command::BindIndexBuffer(index_buffer)
                       << vsl::command::DrawIndexed(indices.size());

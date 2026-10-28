@@ -15,6 +15,7 @@ AGENT.md
 
 .idea/
 thirdparty/
+CMakeUserPresets.json
 
 # User-specific files
 *.rsuser

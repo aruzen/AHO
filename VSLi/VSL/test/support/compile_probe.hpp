@@ -34,7 +34,7 @@ namespace vsl_test {
             stream << source;
         }
 #ifdef _MSC_VER
-        std::string command = shell_quote(VSL_TEST_CXX) + " /nologo /std:c++latest /Zs";
+        std::string command = shell_quote(VSL_TEST_CXX) + " /nologo /EHsc /std:c++latest /permissive- /Zc:preprocessor /utf-8 /DNOMINMAX /Zs";
         constexpr auto include_prefix = " /I";
 #else
         std::string command = shell_quote(VSL_TEST_CXX) + " -std=c++2c -fsyntax-only -Werror=return-type";
@@ -43,6 +43,9 @@ namespace vsl_test {
         for (const auto* include : {VSL_TEST_INCLUDE, VSL_TEST_VULKAN_INCLUDE, VSL_TEST_GLFW_INCLUDE})
             command += include_prefix + shell_quote(include);
         command += " " + shell_quote(input.string()) + " >" + shell_quote(output.string()) + " 2>&1";
+#ifdef _WIN32
+        command = '"' + command + '"';
+#endif
         const int status = std::system(command.c_str());
         std::ifstream stream(output);
         return {status, {std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>()}};

@@ -40,7 +40,7 @@ namespace VSL_NAMESPACE::typed {
     public:
         using Frame = Frame_;
         template<typename Factory>
-        requires std::invocable<Factory&, size_t> && std::same_as<std::invoke_result_t<Factory&, size_t>, Frame>
+        requires std::invocable<Factory&, size_t> && std::same_as<std::invoke_result_t<Factory&, size_t>, Frame_>
         TypedFrameResources(CommandManager manager, Factory&& factory);
         TypedFrameResources(const TypedFrameResources&) = delete;
         TypedFrameResources& operator=(const TypedFrameResources&) = delete;
@@ -48,15 +48,15 @@ namespace VSL_NAMESPACE::typed {
         TypedFrameResources& operator=(TypedFrameResources&&) noexcept = default;
         size_t frame_count() const { return _slots.size(); }
         template<typename Update>
-        requires std::invocable<Update&, Frame&> && std::same_as<std::invoke_result_t<Update&, Frame&>, void>
+        requires std::invocable<Update&, Frame_&> && std::same_as<std::invoke_result_t<Update&, Frame_&>, void>
         void update(const ComputePhase& phase, Update&& update);
         const Frame& get(const ComputePhase& phase);
     };
 
-    template<typename Frame>
+    template<typename Frame_>
     template<typename Factory>
-    requires std::invocable<Factory&, size_t> && std::same_as<std::invoke_result_t<Factory&, size_t>, Frame>
-    TypedFrameResources<Frame>::TypedFrameResources(CommandManager manager, Factory&& factory)
+    requires std::invocable<Factory&, size_t> && std::same_as<std::invoke_result_t<Factory&, size_t>, Frame_>
+    TypedFrameResources<Frame_>::TypedFrameResources(CommandManager manager, Factory&& factory)
         : _domain(std::move(manager)) {
         _slots.reserve(_domain.count);
         for (size_t index = 0; index < _domain.count; ++index)
@@ -81,10 +81,10 @@ namespace VSL_NAMESPACE::typed {
         return slot;
     }
 
-    template<typename Frame>
+    template<typename Frame_>
     template<typename Update>
-    requires std::invocable<Update&, Frame&> && std::same_as<std::invoke_result_t<Update&, Frame&>, void>
-    void TypedFrameResources<Frame>::update(const ComputePhase& phase, Update&& update) {
+    requires std::invocable<Update&, Frame_&> && std::same_as<std::invoke_result_t<Update&, Frame_&>, void>
+    void TypedFrameResources<Frame_>::update(const ComputePhase& phase, Update&& update) {
         auto& slot = acquire(phase, true);
         slot.updating = true;
         try {

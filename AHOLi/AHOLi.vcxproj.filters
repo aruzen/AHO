@@ -176,9 +176,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="pch.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="AHO\src\drawer\draw_phase.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>

@@ -29,6 +29,35 @@ namespace {
         EXPECT_THROW((vsl::Shader<vsl::ShaderType::COMPUTE>(device, vsl_test::shader_path("missing.comp.spv"))),
                      vsl::exceptions::RuntimeException);
     }
+    TEST_F(ShaderVulkanIntegrationTest, MemoryModulesOwnCodeAndEntryPointAfterSourceChanges) {
+        const auto bytes = vsl_test::read_binary(vsl_test::shader_path("triangle.vert.spv"));
+        std::vector<std::uint32_t> code(bytes.size() / sizeof(std::uint32_t));
+        std::memcpy(code.data(), bytes.data(), bytes.size());
+        const auto original = code;
+        std::string entry = "main";
+        const vsl::Shader<vsl::ShaderType::VERTEX> named(device, std::span(code), entry);
+        const vsl::Shader<vsl::ShaderType::VERTEX> unnamed(device, std::span(code));
+        std::fill(code.begin(), code.end(), 0);
+        entry = "changed";
+        EXPECT_EQ(named.data_->code, original);
+        EXPECT_EQ(unnamed.data_->code, original);
+        EXPECT_EQ(named.name(), "main");
+        EXPECT_EQ(unnamed.name(), "main");
+        EXPECT_TRUE(named.data_->shader_module);
+        EXPECT_STREQ(named.data_->shader_stage_create_info.pName, "main");
+        EXPECT_EQ(named.data_->shader_stage_create_info.stage, vk::ShaderStageFlagBits::eVertex);
+        EXPECT_THROW((vsl::Shader<vsl::ShaderType::VERTEX>(device, std::span(original), "")), vsl::exceptions::RuntimeException);
+        EXPECT_THROW((vsl::Shader<vsl::ShaderType::VERTEX>(device, std::span(original), std::string("ma\0in", 5))), vsl::exceptions::RuntimeException);
+    }
+    TEST(ShaderMemoryTest, InvalidHeadersAndMissingDeviceAreRejectedBeforeModuleCreation) {
+        const vsl::LogicalDeviceAccessor empty;
+        const std::array<std::uint32_t, 5> invalid{};
+        EXPECT_THROW((vsl::Shader<>(empty, std::span<const std::uint32_t>{})), vsl::exceptions::RuntimeException);
+        EXPECT_THROW((vsl::Shader<>(empty, std::span(invalid).first(4))), vsl::exceptions::RuntimeException);
+        EXPECT_THROW((vsl::Shader<>(empty, std::span(invalid))), vsl::exceptions::RuntimeException);
+        const std::array<std::uint32_t, 5> header{0x07230203, 0x10000, 0, 1, 0};
+        EXPECT_THROW((vsl::Shader<>(empty, std::span(header))), vsl::exceptions::RuntimeException);
+    }
     TEST(ShaderFlagsTest, BitwiseStageCombinationsPreserveMembership) {
         using namespace vsl;
         const auto stages = ShaderType::VERTEX | ShaderType::FRAGMENT;

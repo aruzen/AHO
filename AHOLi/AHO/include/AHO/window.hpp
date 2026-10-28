@@ -8,6 +8,7 @@
 #include "define.hpp"
 
 #include <VSL/window.hpp>
+#include <VSL/vulkan/frame_buffer.hpp>
 
 #include "core/vector.hpp"
 #include "engine.hpp"

@@ -1,6 +1,9 @@
 #pragma once
 #include "engine.hpp"
 #include <VSL/window.hpp>
+#include <VSL/vulkan/render_pass.hpp>
+#include <VSL/vulkan/viewport.hpp>
+#include <VSL/vulkan/scissor.hpp>
 
 namespace AHO_NAMESPACE::window {
     struct Window;

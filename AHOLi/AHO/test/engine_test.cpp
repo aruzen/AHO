@@ -1,3 +1,14 @@
+#ifdef AHO_CONTRACT_ENGINE_VSL_FIRST
+#include <VSL/vsl.hpp>
+#endif
+#include <AHO/engine.hpp>
+#if defined(AHO_CONTRACT_ENGINE_VSL_FIRST) || defined(AHO_CONTRACT_ENGINE_AHO_FIRST)
+#ifdef VSL_ENABLE_SPIRV_REFLECTOR
+#error AHO headers must not define VSL_ENABLE_SPIRV_REFLECTOR
+#endif
+#include <VSL/utils/spir_reflector.hpp>
+static_assert(sizeof(vsl::utils::SPIRVReflector) > 0);
+#else
 #include <gtest/gtest.h>
 #include <cstdlib>
 #include <memory>
@@ -60,3 +71,4 @@ namespace {
     }
 
 } // namespace
+#endif

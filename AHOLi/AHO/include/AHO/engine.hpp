@@ -7,8 +7,15 @@
 
 #include "define.hpp"
 
-#define VSL_ENABLE_SPIRV_REFLECTOR
-#include <VSL/vsl.hpp>
+#include <VSL/vulkan/vulkan.hpp>
+#include <VSL/vulkan/device.hpp>
+#include <VSL/vulkan/command.hpp>
+#include <VSL/vulkan/descriptor_set_manager.hpp>
+#include <VSL/vulkan/synchronize.hpp>
+#include <filesystem>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace AHO_NAMESPACE::window {
     struct Window;

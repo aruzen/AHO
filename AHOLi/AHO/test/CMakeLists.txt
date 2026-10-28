@@ -85,6 +85,7 @@ if (AHO_TEST_SOURCES)
             image_readback_test.cpp
             resource/buffer_test.cpp
             resource/typed_buffer_test.cpp
+            resource/typed_storage_policy_test.cpp
             command/buffer_upload_test.cpp
             x/command/texture_update_test.cpp
             x/resource/texture_test.cpp
@@ -117,6 +118,17 @@ if (AHO_TEST_SOURCES)
                 "-DTEST_CASE=${case}" "-DTEST_EXPECTED=${expected}"
                 -P "${VSL_HOME}/test/cmake/RunTypedContract.cmake")
         set_tests_properties("AHO.Compile.TypedBuffer.${name}" PROPERTIES LABELS "AHO;compile" TIMEOUT 60)
+    endforeach()
+    set(aho_typed_storage_names Valid WrongCopy UnmappableStorage WrongUsage)
+    foreach(case RANGE 0 3)
+        list(GET aho_typed_storage_names ${case} name)
+        add_test(NAME "AHO.Compile.TypedStorage.${name}"
+                COMMAND "${CMAKE_COMMAND}"
+                "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/compile-environment-$<CONFIG>.cmake"
+                "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_storage_policy.cpp"
+                "-DTEST_CASE=${case}" "-DTEST_EXPECTED=copy|writable_gpu_buffer|buffer usage"
+                -P "${VSL_HOME}/test/cmake/RunTypedContract.cmake")
+        set_tests_properties("AHO.Compile.TypedStorage.${name}" PROPERTIES LABELS "AHO;compile" TIMEOUT 60)
     endforeach()
     aho_add_compile_test(Image.VslHeaderFirst
             "${CMAKE_CURRENT_SOURCE_DIR}/resource/image_test.cpp" AHO_CONTRACT_IMAGE_VSL_FIRST)

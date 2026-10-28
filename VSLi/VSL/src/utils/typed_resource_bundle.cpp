@@ -2,6 +2,12 @@
 #include <VSL/vulkan/_pimpls.hpp>
 
 namespace VSL_NAMESPACE::typed::detail {
+    void validate_storage_policy_buffer(const DescriptorValue& value, size_t count, size_t expected, size_t payload_size) {
+        if (count != expected || value.bytes != allocation_multiply(expected, payload_size))
+            throw std::invalid_argument("Typed storage policy buffer must preserve the planned record count and range");
+        if (!value.buffer || !value.use.state || !value.use.owner)
+            throw std::invalid_argument("Typed storage policy requires an owned buffer with resource use tracking");
+    }
     size_t bundle_frame_count(CommandManager manager) {
         return FrameResourceDomain(std::move(manager)).count;
     }

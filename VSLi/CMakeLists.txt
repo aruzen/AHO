@@ -80,6 +80,7 @@ add_library(VSL STATIC
         VSL/include/VSL/utils/typed_shader.hpp
         VSL/include/VSL/utils/typed_resources.hpp
         VSL/include/VSL/utils/typed_resource_allocation.hpp
+        VSL/include/VSL/utils/typed_resource_storage.hpp
         VSL/include/VSL/utils/typed_resource_bundle.hpp
         VSL/include/VSL/utils/typed_resource_bundle_detail.hpp
         VSL/include/VSL/utils/typed_frame_resources.hpp

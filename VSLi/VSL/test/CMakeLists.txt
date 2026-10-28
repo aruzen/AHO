@@ -189,4 +189,17 @@ if (VSL_TEST_SOURCES)
     add_library(vsl-bundle-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_resource_bundle.cpp)
     target_compile_definitions(vsl-bundle-style-contract PRIVATE VSL_TYPED_CASE=0)
     target_include_directories(vsl-bundle-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
+    set(typed_storage_names Valid MissingBuffer WrongPayload WrongKind WrongReturn MissingCopy MissingFactory WrongFrame NoDefaultPolicy WrongCopy)
+    foreach(case RANGE 0 9)
+        list(GET typed_storage_names ${case} name)
+        add_test(NAME "VSL.TypedStorage.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_resource_storage.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=storage policy|TypedResourceBundle|copy|update|default_initializable"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.TypedStorage.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
+    add_library(vsl-storage-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_resource_storage.cpp)
+    target_compile_definitions(vsl-storage-style-contract PRIVATE VSL_TYPED_CASE=0)
+    target_include_directories(vsl-storage-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
 endif ()

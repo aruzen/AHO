@@ -7,8 +7,12 @@ namespace {
     using Pipeline = t::TypedGraphicsPipeline<t::TypedVertexInput<>>;
 #if VSL_TYPED_CASE == 0
     static_assert(t::index_element<std::uint16_t> && t::index_element<std::uint32_t>);
+    static_assert(!std::default_initializable<t::TypedIndexBufferView<std::uint16_t>>);
     void accepted(Pipeline& pipeline, const t::TypedIndexBuffer<std::uint16_t>& indices) {
         pipeline.bind_vertices().draw_indexed(indices, 3);
+        const auto view = indices.view(0, 3);
+        static_assert(std::same_as<typename decltype(view)::Index, std::uint16_t>);
+        pipeline.bind_vertices().draw_indexed(view, 3);
     }
 #elif VSL_TYPED_CASE == 1
     static_assert(sizeof(t::TypedIndexBuffer<std::uint8_t>) > 0);
@@ -28,6 +32,22 @@ namespace {
 #elif VSL_TYPED_CASE == 6
     using Push = t::PushSchema<t::PushRange<float, vsl::ShaderFlag::VERTEX>>;
     void rejected(t::TypedGraphicsPipeline<t::TypedVertexInput<>, t::ResourceSchema<>, Push>& pipeline, const t::TypedIndexBuffer<std::uint16_t>& indices) {
+        pipeline.bind_vertices().draw_indexed(indices, 3);
+    }
+#elif VSL_TYPED_CASE == 7
+    static_assert(sizeof(t::TypedIndexBufferView<std::uint8_t>) > 0);
+#elif VSL_TYPED_CASE == 8
+    void rejected(const vsl::BufferAccessor& raw) {
+        t::TypedIndexBufferView<std::uint16_t> view(raw, 0, 3);
+    }
+#elif VSL_TYPED_CASE == 9
+    using Resources = t::ResourceSchema<t::DescriptorSet<0, t::UniformBinding<0, float, vsl::ShaderFlag::VERTEX>>>;
+    void rejected(t::TypedGraphicsPipeline<t::TypedVertexInput<>, Resources>& pipeline, const t::TypedIndexBufferView<std::uint16_t>& indices) {
+        pipeline.bind_vertices().draw_indexed(indices, 3);
+    }
+#elif VSL_TYPED_CASE == 10
+    using Push = t::PushSchema<t::PushRange<float, vsl::ShaderFlag::VERTEX>>;
+    void rejected(t::TypedGraphicsPipeline<t::TypedVertexInput<>, t::ResourceSchema<>, Push>& pipeline, const t::TypedIndexBufferView<std::uint16_t>& indices) {
         pipeline.bind_vertices().draw_indexed(indices, 3);
     }
 #endif

@@ -91,6 +91,9 @@ namespace VSL_NAMESPACE::typed {
         std::array<size_t, Input::BINDING_COUNT> _counts;
         std::vector<command::BindGraphicResource> _resources;
         std::optional<typename Pushes::Values> _pushes;
+        template<typename Indices>
+        TypedIndexedDraw<Input, Resources, Pushes> make_indexed_draw(const Indices& indices, size_t index_count,
+                                                                     size_t instance_count, size_t first_index, std::int64_t vertex_offset, size_t first_instance) const;
         template<bool other_bound, bool other_pushed>
         TypedVertexBinding(const TypedVertexBinding<Input, Resources, Pushes, other_bound, other_pushed>& source, std::vector<command::BindGraphicResource> resources, std::optional<typename Pushes::Values> pushes)
             : _pipeline(source._pipeline), _device(source._device), _buffers(source._buffers), _counts(source._counts), _resources(std::move(resources)), _pushes(std::move(pushes)) {}
@@ -114,6 +117,10 @@ namespace VSL_NAMESPACE::typed {
         requires(bound && pushed);
         template<index_element Index, MemoryProperty property>
         TypedIndexedDraw<Input, Resources, Pushes> draw_indexed(const TypedIndexBuffer<Index, property>& indices, size_t index_count,
+                                                                size_t instance_count = 1, size_t first_index = 0, std::int64_t vertex_offset = 0, size_t first_instance = 0) const
+        requires(bound && pushed);
+        template<index_element Index>
+        TypedIndexedDraw<Input, Resources, Pushes> draw_indexed(const TypedIndexBufferView<Index>& indices, size_t index_count,
                                                                 size_t instance_count = 1, size_t first_index = 0, std::int64_t vertex_offset = 0, size_t first_instance = 0) const
         requires(bound && pushed);
         TypedVertexBinding<Input, Resources, Pushes, bound, true> push_constants(const typename Pushes::Values& values) const;
@@ -235,6 +242,22 @@ namespace VSL_NAMESPACE::typed {
         const TypedIndexBuffer<Index, property>& indices, size_t index_count, size_t instance_count, size_t first_index, std::int64_t vertex_offset, size_t first_instance) const
     requires(bound && pushed)
     {
+        return make_indexed_draw(indices, index_count, instance_count, first_index, vertex_offset, first_instance);
+    }
+
+    template<typename Input, typename Resources, typename Pushes, bool bound, bool pushed>
+    template<index_element Index>
+    TypedIndexedDraw<Input, Resources, Pushes> TypedVertexBinding<Input, Resources, Pushes, bound, pushed>::draw_indexed(
+        const TypedIndexBufferView<Index>& indices, size_t index_count, size_t instance_count, size_t first_index, std::int64_t vertex_offset, size_t first_instance) const
+    requires(bound && pushed)
+    {
+        return make_indexed_draw(indices, index_count, instance_count, first_index, vertex_offset, first_instance);
+    }
+
+    template<typename Input, typename Resources, typename Pushes, bool bound, bool pushed>
+    template<typename Indices>
+    TypedIndexedDraw<Input, Resources, Pushes> TypedVertexBinding<Input, Resources, Pushes, bound, pushed>::make_indexed_draw(
+        const Indices& indices, size_t index_count, size_t instance_count, size_t first_index, std::int64_t vertex_offset, size_t first_instance) const {
         command::DrawIndexed command(index_count, instance_count, first_index, vertex_offset, first_instance);
         if (indices.device().data_ != _device.data_)
             throw std::invalid_argument("Typed index buffer and pipeline use different devices");
@@ -247,7 +270,7 @@ namespace VSL_NAMESPACE::typed {
                 throw std::out_of_range("Typed indexed draw exceeds its vertex buffer");
         }
         return TypedIndexedDraw<Input, Resources, Pushes>(_pipeline, _device, _buffers,
-                                                          command::BindIndexBufferAt(indices.backend(), TypedIndexBuffer<Index, property>::INDEX_TYPE, 0, indices.resource_use()), std::move(command), _resources, _pushes,
+                                                          command::BindIndexBufferAt(indices.backend(), Indices::INDEX_TYPE, indices.byte_offset(), indices.resource_use()), std::move(command), _resources, _pushes,
                                                           std::shared_ptr<const std::uint64_t>(indices._values, &indices._values->revision));
     }
 

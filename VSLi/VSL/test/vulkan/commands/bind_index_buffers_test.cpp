@@ -22,6 +22,9 @@ namespace {
         static_assert(!std::is_constructible_v<Command, const Buffer&>);
         SUCCEED();
     }
+    TEST(BindIndexBufferTest, ExplicitBindingRejectsAnEmptyOwner) {
+        EXPECT_THROW((vsl::command::BindIndexBufferAt(std::shared_ptr<vsl::impl::BufferImpl>{}, vsl::command::IndexType::UINT16)), std::invalid_argument);
+    }
     using BindIndexRenderVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
     TEST_F(BindIndexRenderVulkanIntegrationTest, DrawsUsingTheCallerBufferAndDefaultOffset) {
         std::array<std::uint32_t, 3> indices{0, 1, 2};
@@ -40,6 +43,25 @@ namespace {
         const auto copied_command = command;
         ExpectTriangleColor(render([&](auto& stream) {
             stream << copied_command << vsl::command::DrawIndexed{3};
+        }));
+    }
+    TEST_F(BindIndexRenderVulkanIntegrationTest, OwnedExplicitBindingRetainsSourceAndOffsetAfterWrapperDestruction) {
+        std::weak_ptr<vsl::impl::BufferImpl> owner;
+        std::optional<vsl::command::BindIndexBufferAt> command;
+        {
+            const std::array<std::uint16_t, 4> values{99, 0, 1, 2};
+            vsl::StagingBuffer<vsl::MemoryType::INDEX_BUFFER> buffer(device, values);
+            owner = buffer.data_;
+            command.emplace(buffer.data_, vsl::command::IndexType::UINT16, sizeof(std::uint16_t));
+            EXPECT_EQ(command->source(), buffer.data_);
+            EXPECT_EQ(command->offset(), sizeof(std::uint16_t));
+            EXPECT_EQ(command->type(), vsl::command::IndexType::UINT16);
+        }
+        EXPECT_FALSE(owner.expired());
+        ExpectTriangleColor(render([&](auto& stream) {
+            stream << *command << vsl::command::DrawIndexed{3};
+            command.reset();
+            EXPECT_FALSE(owner.expired());
         }));
     }
 } // namespace

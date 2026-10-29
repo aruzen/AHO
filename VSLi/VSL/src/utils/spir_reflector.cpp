@@ -5,7 +5,7 @@
 #include <VSL/utils/spir_reflector.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 
-#include <spirv_cross/spirv_cross.hpp>
+#include <spirv_cross.hpp>
 #include <fstream>
 #include <utility>
 #include <ranges>

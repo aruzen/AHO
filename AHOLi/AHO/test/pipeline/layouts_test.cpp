@@ -1,6 +1,6 @@
 #ifdef AHO_GPU_TESTS
 #include "../support/live_gpu.hpp"
-#include <AHO/pipeline/layouts.hpp>
+#include <AHO/pipeline/pipeline.hpp>
 namespace {
     using AHOLayoutsVulkanIntegration = aho_test::LiveGPUTest;
     TEST_F(AHOLayoutsVulkanIntegration, BaseLayoutFactoryCreatesLayoutUsingEngineDevice) {
@@ -17,7 +17,7 @@ namespace {
 } // namespace
 #else
 #include <gtest/gtest.h>
-#include <AHO/pipeline/layouts.hpp>
+#include <AHO/pipeline/pipeline.hpp>
 namespace {
     TEST(AHOLayoutsTest, RuntimeAndTemplateBindingLookupsAgreeOnResourceContracts) {
         using namespace aho::pipeline;

@@ -203,9 +203,6 @@
     <ClCompile Include="AHO\src\pipeline\layouts.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="AHO\src\pipeline\pipeline.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="AHO\src\resource\buffer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>

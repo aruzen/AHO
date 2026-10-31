@@ -1,7 +1,7 @@
 #pragma once
-#include "../define.hpp"
-#include "buffer_and_image_accessor.hpp"
-#include "command.hpp"
+#include <VSL/define.hpp>
+#include <VSL/vulkan/buffer_and_image_accessor.hpp>
+#include <VSL/vulkan/command.hpp>
 
 #include <compare>
 
@@ -27,6 +27,7 @@
 #include <set>
 
 namespace VSL_NAMESPACE {
+    class ResourceUseState;
     namespace graphic_resource {
         struct ManagerInterface;
     }
@@ -73,7 +74,7 @@ namespace VSL_NAMESPACE::impl {
         ~SurfaceImpl();
     };
 
-    struct LogicalDeviceImpl {
+    struct LogicalDeviceImpl : std::enable_shared_from_this<LogicalDeviceImpl> {
         std::shared_ptr<PhysicalDeviceImpl> parent_device;
 
         uint32_t graphics_family = 0, present_family = 0;
@@ -97,6 +98,8 @@ namespace VSL_NAMESPACE::impl {
         Completion::Status status = Completion::Status::PENDING;
         std::shared_ptr<Completion::Status> observed_status;
         std::vector<std::shared_ptr<void>> resources;
+        std::vector<std::shared_ptr<void>> completion_resources;
+        void (*release_resources)(SubmissionImpl&) noexcept = nullptr;
         ~SubmissionImpl();
     };
 
@@ -244,7 +247,9 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct BufferImpl {
-        std::shared_ptr<LogicalDeviceImpl> device;
+        LogicalDeviceImpl* device = nullptr;
+        vk::Device native_device;
+        ResourceUseState* use = nullptr;
 
         vk::Buffer buffer;
         vk::DeviceMemory device_mem;
@@ -253,8 +258,6 @@ namespace VSL_NAMESPACE::impl {
         MemoryProperty properties = MemoryProperty::NONE;
         void* mapped = nullptr;
         vk::DeviceSize atom_size = 1;
-
-        ~BufferImpl();
     };
 
     struct ResourceBindingLayoutImpl {

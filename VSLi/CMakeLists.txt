@@ -49,6 +49,21 @@ add_library(VSL STATIC
         VSL/src/vulkan/synchronize.cpp
         VSL/src/vulkan/shader.cpp
         VSL/src/vulkan/buffer.cpp
+        VSL/src/backend/buffer_ops.cpp
+        VSL/src/sync/buffer_access.cpp
+        VSL/src/lifetime/buffer_storage.cpp
+        VSL/src/lifetime/submission_retention.cpp
+        VSL/src/storage/buffer_arena.cpp
+        VSL/src/storage/arena_memory.cpp
+        VSL/include/VSL/storage/arena_memory.hpp
+        VSL/src/storage/buffer_layout.cpp
+        VSL/src/vulkan/buffer_view.cpp
+        VSL/include/VSL/vulkan/buffer_view.hpp
+        VSL/include/VSL/vulkan/buffer_create_info.hpp
+        VSL/include/VSL/storage/buffer_abi.hpp
+        VSL/include/VSL/storage/buffer_layout.hpp
+        VSL/include/VSL/storage/buffer_arena.hpp
+        VSL/include/VSL/utils/typed_buffer_arena.hpp
         VSL/src/vulkan/swapchain.cpp
         VSL/src/vulkan/commands/copy_image_to_buffer.cpp
         VSL/src/vulkan/commands/render_pass_end.cpp
@@ -105,7 +120,7 @@ add_library(VSL STATIC
         VSL/include/VSL/vulkan/viewport.hpp
         VSL/include/VSL/vulkan/vulkan.hpp
         VSL/include/VSL/vulkan/window_plugin/hook_window_resize.hpp
-        VSL/include/VSL/vulkan/_pimpls.hpp
+        VSL/src/private/VSL/vulkan/_pimpls.hpp
         VSL/include/VSL/vulkan/post_definition.hpp
         VSL/include/VSL/vulkan/stages/input_assembly.hpp
         VSL/include/VSL/vulkan/stages/dynamic_state.hpp
@@ -160,6 +175,9 @@ add_library(VSL STATIC
 target_compile_features(VSL PUBLIC cxx_std_26)
 add_library(VSL::VSL ALIAS VSL)
 aho_target_build_options(VSL)
+target_include_directories(VSL PRIVATE "${VSL_HOME}/src/private")
+include(cmake/BufferLayout.cmake)
+vsl_generate_buffer_layout()
 target_include_directories(VSL PUBLIC
         "$<BUILD_INTERFACE:${VSL_HOME}/include>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")

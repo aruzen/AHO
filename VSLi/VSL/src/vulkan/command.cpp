@@ -1,6 +1,7 @@
 #include <VSL/define.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>
+#include <VSL/lifetime/submission_retention.hpp>
 #include <VSL/exceptions.hpp>
 
 #include <VSL/vulkan/vulkan.hpp>
@@ -139,4 +140,15 @@ void VSL_NAMESPACE::CommandBuffer::retain(std::shared_ptr<void> resource) const 
 
 VSL_NAMESPACE::Completion VSL_NAMESPACE::CommandBuffer::completion() const {
     return {data_ ? data_->recording_submission : nullptr};
+}
+
+void VSL_NAMESPACE::CommandBuffer::retain_until_complete(std::shared_ptr<void> resource) const {
+    if (!data_ || !data_->recording_submission || data_->recording_submission->status != Completion::Status::PENDING)
+        throw std::logic_error("Buffer retention requires a recording phase");
+    if (resource.use_count()) {
+        data_->recording_submission->release_resources = lifetime::release_completed_resources;
+        auto& resources = data_->recording_submission->completion_resources;
+        if (!std::ranges::any_of(resources, [&](const auto& existing) { return !existing.owner_before(resource) && !resource.owner_before(existing); }))
+            resources.push_back(std::move(resource));
+    }
 }

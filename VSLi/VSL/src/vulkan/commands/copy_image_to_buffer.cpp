@@ -57,7 +57,7 @@ VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer:
 VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer::description() const {
     const auto info = Describe(image, region);
     const auto& destination = _destination;
-    if (!destination || !destination->buffer || destination->device != image.data_->device)
+    if (!destination || !destination->buffer || destination->device != image.data_->device.get())
         throw std::invalid_argument("Image copy requires a destination on the same device");
     if (!contain(destination->usage, MemoryType::TRANSFER_DESTINATION))
         throw std::invalid_argument("Image copy requires TransferDestination buffer usage");

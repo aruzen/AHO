@@ -12,7 +12,7 @@ VSL_NAMESPACE::command::BindIndexBufferAt::BindIndexBufferAt(const BufferAccesso
 }
 
 void VSL_NAMESPACE::command::BindIndexBufferAt::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
-    if (_source->device != manager.data_->device)
+    if (_source->device != manager.data_->device.get())
         throw std::invalid_argument("Index buffer and command manager use different devices");
     track(buffer);
     buffer.retain(_source);

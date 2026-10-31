@@ -14,6 +14,8 @@ namespace VSL_NAMESPACE {
         if (data_->status == Status::SUBMITTED &&
             data_->device->device.getFenceStatus(data_->fence) == vk::Result::eSuccess)
             data_->status = Status::COMPLETE;
+        if (data_->status == Status::COMPLETE && data_->release_resources)
+            data_->release_resources(*data_);
         return data_->status;
     }
     bool Completion::ready() const {
@@ -28,6 +30,8 @@ namespace VSL_NAMESPACE {
         if (data_->device->device.waitForFences(data_->fence, true, timeout) != vk::Result::eSuccess)
             return false;
         data_->status = Status::COMPLETE;
+        if (data_->release_resources)
+            data_->release_resources(*data_);
         return true;
     }
     void Completion::retain(std::shared_ptr<void> resource) const {
@@ -160,9 +164,13 @@ namespace VSL_NAMESPACE {
     void ComputePhase::cancel() {
         if (state != State::WAIT_SUBMIT && state != State::BEFORE_SETUP)
             return;
+        auto buffers = manager.data_->command_buffer;
+        if (completion_ && completion_.data_->release_resources) {
+            buffers->command_buffers.at(frame_slot).reset();
+            completion_.data_->release_resources(*completion_.data_);
+        }
         if (completion_)
             completion_.data_->status = Completion::Status::CANCELLED;
-        auto buffers = manager.data_->command_buffer;
         if (buffers->recording_submission == completion_.data_) {
             buffers->recording = false;
             buffers->recording_submission.reset();

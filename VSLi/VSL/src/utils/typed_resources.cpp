@@ -23,7 +23,7 @@ namespace VSL_NAMESPACE::typed::detail {
                 owners.push_back(value.use.owner);
             if (point.binding_type == UNIFORM_BUFFER || point.binding_type == STORAGE_BUFFER) {
                 const auto usage = point.binding_type == UNIFORM_BUFFER ? MemoryType::UNIFORM_BUFFER : MemoryType::STORAGE_BUFFER;
-                if (!value.buffer || value.buffer->device != device || !contain(value.buffer->usage, usage))
+                if (!value.buffer || value.buffer->device != device.get() || !contain(value.buffer->usage, usage))
                     throw std::invalid_argument("Typed descriptor buffer device/usage mismatch");
                 if (!value.bytes || value.offset > value.buffer->requirement_size || value.bytes > value.buffer->requirement_size - value.offset)
                     throw std::out_of_range("Typed descriptor buffer range mismatch");

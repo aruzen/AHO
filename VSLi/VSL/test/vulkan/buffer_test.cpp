@@ -774,7 +774,6 @@ namespace {
 namespace {
     TEST(BufferCompilationTest, HostVisibleNonCoherentValueConstructorCanFlush) {
         const auto result = vsl_test::compile_probe(R"cpp(
-#include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/vsl.hpp>
 void probe(vsl::LogicalDeviceAccessor device){
     vsl::Buffer<vsl::MemoryType::UNIFORM_BUFFER,vsl::MemoryProperty::HOST_VISIBLE> buffer(device,1.0f);

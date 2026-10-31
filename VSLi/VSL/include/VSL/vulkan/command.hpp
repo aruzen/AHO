@@ -40,6 +40,8 @@ namespace VSL_NAMESPACE {
 
         // Phaseの記録中は、送信完了まで使用する所有者を保持する。
         void retain(std::shared_ptr<void> resource) const;
+        // 新しい保持契約。完了結果の観測とは別に、完了/取消時に解放する。
+        void retain_until_complete(std::shared_ptr<void> resource) const;
 
         std::shared_ptr<VSL_NAMESPACE::impl::CommandBufferImpl> data_;
     };

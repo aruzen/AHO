@@ -1,6 +1,14 @@
 #include <AHO/drawer/standard_drawer.hpp>
 #include <AHO/drawer/draw_phase.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
+#include <VSL/vulkan/stages/color_blend.hpp>
+#include <VSL/vulkan/stages/shader_group.hpp>
+#include <VSL/vulkan/stages/input_assembly.hpp>
+#include <VSL/vulkan/stages/rasterization.hpp>
+#include <VSL/vulkan/stages/multisample.hpp>
+#include <VSL/vulkan/stages/dynamic_state.hpp>
+#include <VSL/vulkan/viewport.hpp>
+#include <VSL/vulkan/scissor.hpp>
 #include "standard_shaders.hpp"
 #include <cmath>
 #include <stdexcept>

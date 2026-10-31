@@ -1,0 +1,13 @@
+#pragma once
+#include <cstddef>
+#include <cstdint>
+@compiler_guard@
+namespace vsl::storage {
+    inline constexpr std::size_t BUFFER_IMPL_SIZE = @BUFFER_IMPL_SIZE@;
+    inline constexpr std::size_t BUFFER_IMPL_ALIGNMENT = @BUFFER_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t BUFFER_USE_SIZE = @BUFFER_USE_SIZE@;
+    inline constexpr std::size_t BUFFER_USE_ALIGNMENT = @BUFFER_USE_ALIGNMENT@;
+    inline constexpr std::size_t BUFFER_EXPECTED_CPP_ABI_MODE = @cpp_mode@;
+    inline constexpr std::uint64_t BUFFER_LAYOUT_ABI = 0x@abi@ULL;
+    static_assert(sizeof(void*) == @CMAKE_SIZEOF_VOID_P@, "Buffer target pointer ABI mismatch");
+} // namespace vsl::storage

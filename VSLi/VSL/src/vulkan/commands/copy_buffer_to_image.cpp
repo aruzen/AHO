@@ -17,7 +17,7 @@ namespace {
         VSL_NAMESPACE::ImageLayout layout, VSL_NAMESPACE::ImageRegion region, std::size_t offset) {
         const auto& destination = image.data_;
         if (!source || !source->buffer || !destination || !destination->image || !destination->device ||
-            source->device != destination->device)
+            source->device != destination->device.get())
             throw std::invalid_argument("Image upload requires valid resources on the same device");
         if (!VSL_NAMESPACE::contain(source->usage, VSL_NAMESPACE::MemoryType::TRANSFER_SOURCE) ||
             !VSL_NAMESPACE::contain(destination->usage, VSL_NAMESPACE::ImageType::TRANSFER_DST))

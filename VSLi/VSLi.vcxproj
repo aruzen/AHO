@@ -136,6 +136,25 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="VSL\src\lifetime\submission_retention.cpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\submission_retention.hpp" />
+    <ClCompile Include="VSL\src\sync\buffer_access.cpp" />
+    <ClInclude Include="VSL\src\private\VSL\sync\buffer_access.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\contracts\buffer_access.hpp" />
+    <ClInclude Include="VSL\include\VSL\storage\arena_memory.hpp" />
+    <ClInclude Include="VSL\include\VSL\storage\buffer_abi.hpp" />
+    <ClInclude Include="VSL\include\VSL\storage\buffer_arena.hpp" />
+    <ClInclude Include="VSL\include\VSL\storage\buffer_layout.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\backend\buffer_ops.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\buffer_storage.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\storage\cpu_region.hpp" />
+    <ClInclude Include="VSL\include\VSL\utils\typed_buffer_arena.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\buffer_view.hpp" />
+    <ClInclude Include="VSL\include\VSL\vulkan\buffer_create_info.hpp" />
+    <ClCompile Include="VSL\src\backend\buffer_ops.cpp" />
+    <ClCompile Include="VSL\src\lifetime\buffer_storage.cpp" />
+    <ClCompile Include="VSL\src\vulkan\buffer_view.cpp" />
+    <ClCompile Include="VSL\src\storage\arena_memory.cpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\commands\image_upload.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\commands\copy_buffer.hpp" />
     <ClCompile Include="VSL\src\vulkan\commands\image_upload.cpp" />
@@ -223,7 +242,7 @@
     <ClInclude Include="VSL\include\VSL\vulkan\vulkan.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\window_plugin\hook_window_resize.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\_dimension.hpp" />
-    <ClInclude Include="VSL\include\VSL\vulkan\_pimpls.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\vulkan\_pimpls.hpp" />
     <ClInclude Include="VSL\include\VSL\window.hpp" />
     <ClInclude Include="VSL\include\VSL\window_plugin.hpp" />
     <ClInclude Include="framework.h" />

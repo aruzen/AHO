@@ -15,7 +15,7 @@ VSL_NAMESPACE::command::BindVertexBufferAt::BindVertexBufferAt(std::uint32_t bin
 }
 
 void VSL_NAMESPACE::command::BindVertexBufferAt::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
-    if (_source->device != manager.data_->device)
+    if (_source->device != manager.data_->device.get())
         throw std::invalid_argument("Vertex buffer and command manager use different devices");
     track(buffer);
     buffer.retain(_source);

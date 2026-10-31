@@ -1,6 +1,25 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <ClCompile Include="VSL\src\lifetime\submission_retention.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClInclude Include="VSL\src\private\VSL\lifetime\submission_retention.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClCompile Include="VSL\src\sync\buffer_access.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClInclude Include="VSL\src\private\VSL\sync\buffer_access.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\src\private\VSL\contracts\buffer_access.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\storage\arena_memory.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\storage\buffer_abi.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\storage\buffer_arena.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\storage\buffer_layout.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\src\private\VSL\backend\buffer_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\src\private\VSL\lifetime\buffer_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\src\private\VSL\storage\cpu_region.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\utils\typed_buffer_arena.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\buffer_view.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\vulkan\buffer_create_info.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClCompile Include="VSL\src\backend\buffer_ops.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClCompile Include="VSL\src\lifetime\buffer_storage.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClCompile Include="VSL\src\vulkan\buffer_view.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClCompile Include="VSL\src\storage\arena_memory.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\include\VSL\vulkan\commands\image_upload.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\vulkan\commands\copy_buffer.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClCompile Include="VSL\src\vulkan\commands\image_upload.cpp"><Filter>ソース ファイル</Filter></ClCompile>
@@ -137,7 +156,7 @@
     <ClInclude Include="VSL\include\VSL\vulkan\_dimension.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="VSL\include\VSL\vulkan\_pimpls.hpp">
+    <ClInclude Include="VSL\src\private\VSL\vulkan\_pimpls.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="VSL\include\VSL\vulkan\buffer.hpp">

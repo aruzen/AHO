@@ -195,7 +195,7 @@ VSL_NAMESPACE::graphic_resource::Pool VSL_NAMESPACE::graphic_resource::Resource:
 void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::BufferAccessor* buffer, size_t binding, std::optional<Type> type,
                                                        size_t offset, std::optional<size_t> size) {
     validate_resource(data_);
-    if (!buffer || !buffer->data_ || buffer->data_->device != data_->pool->device)
+    if (!buffer || !buffer->data_ || buffer->data_->device != data_->pool->device.get())
         throw std::invalid_argument("Descriptor buffer device mismatch");
     const auto buffer_size = buffer->data_->requirement_size;
     if (offset >= buffer_size)

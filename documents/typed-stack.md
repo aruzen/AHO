@@ -2,7 +2,7 @@
 
 実装の構成と読む順序は[Typed実装の読み方](typed-readability.md)を参照。
 
-後続のCPU Impl配置は[Buffer配置の実装](VSL/buffer-placement.md)を参照。同型の複数slot、owning view、Typed転送、完了／cancelまでを追加した。以下は当初のstack範囲であり、既存bundle全体のarena移行はまだ行っていない。
+後続のCPU Impl配置は[Buffer配置の実装](VSL/buffer-placement.md)と[世代・読み取り・資源ID・寿命群](VSL/buffer-generation-contracts.md)を参照。同型の複数slot、owning view、Typed転送、完了／cancelまでを追加し、通常VSL／既存Typed／viewの使用状態をstorage世代へ統一した。以下は当初のstack範囲であり、既存bundle全体のarena移行はまだ行っていない。
 
 基点は作業開始時のmaster（`433f3e3`）から切った `typed-stack-base`。今回は以下のTyped経路を順番に実装し、各PRのbaseを直前のbranchとする。arenaによる一括確保は将来の方向として記録するが、今回のstackには追加しない。
 

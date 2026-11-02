@@ -37,6 +37,10 @@ namespace VSL_NAMESPACE {
         std::shared_ptr<ResourceUseState> state;
         // Snapshot of the actual resource, excluding state and its Completions.
         std::shared_ptr<void> owner;
+        // Bufferのstorage状態とは別に重ねる、AHO等の論理資源の制限。
+        std::shared_ptr<ResourceUseState> constraint_state;
+        std::shared_ptr<void> constraint_owner;
+        static ResourceUse ForBuffer(const std::shared_ptr<impl::BufferImpl>& buffer, ResourceUse constraint);
         void record(const CommandBuffer& buffer) const;
     };
 

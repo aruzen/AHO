@@ -1,6 +1,7 @@
 #include <VSL/vulkan/commands/copy_image_to_buffer.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>
+#include <VSL/vulkan/resource_use.hpp>
 
 #include "../image_format.hpp"
 #include <limits>
@@ -81,6 +82,7 @@ void VSL_NAMESPACE::command::CopyImageToBuffer::invoke(CommandPool pool, Command
         buffer.data_->command_pool->device != image.data_->device)
         throw std::invalid_argument("Image copy requires a command buffer on the same device");
     buffer.retain(image.data_);
+    ResourceUse::ForBuffer(destination, {}).record(buffer);
     buffer.retain(destination);
     const auto& area = info.region;
     vk::BufferImageCopy copy{

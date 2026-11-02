@@ -62,6 +62,11 @@ namespace AHO_NAMESPACE::resource {
             std::size_t size = 0;
             bool host_readable = false;
             std::shared_ptr<Buffer<BufferType::GPU_FRIENDLY>> staging;
+            bool busy() const;
+            bool wait(std::uint64_t timeout) const;
+            void require_idle() const;
+            void check_available(const VSL_NAMESPACE::Completion& completion) const;
+            void mark_used(VSL_NAMESPACE::Completion completion) const;
         };
 
         template<typename Storage, typename Customization>

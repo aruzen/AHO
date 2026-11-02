@@ -1,6 +1,6 @@
 # Bufferの共通backendとTyped CPU配置
 
-2026-10-31。[再設計案](ownership-and-placement.md)の最初の移行経路を、`8959e5bf`を基点に実装した。ホスト可視Bufferの複数slot配置とTyped転送を対象とし、image／descriptor／pipelineの配置変更やGPUメモリsuballocationは行わない。
+初版2026-10-31、レビュー反映2026-11-02。[世代・アクセス・識別・寿命群の契約](buffer-generation-contracts.md)を先に確定した。[再設計案](ownership-and-placement.md)の最初の移行経路を、`8959e5bf`を基点に実装した。ホスト可視Bufferの複数slot配置とTyped転送を対象とし、image／descriptor／pipelineの配置変更やGPUメモリsuballocationは行わない。
 
 ## 実装した境界
 
@@ -42,8 +42,8 @@ auto phase = manager.start_phase<vsl::ComputePhase>();
 phase << vsl::command::CopyBuffer(&source, &destination, sizeof(values), 0, 0, true);
 phase.submit();
 phase.completion().wait();
-auto mapped = destination.data();
-auto result = mapped.read(sizeof(values));
+std::array<std::uint32_t, 4> result{};
+destination.read_into(std::as_writable_bytes(std::span(result)));
 ```
 
 constructor・mapping・共有コピー・既存コマンドの呼び方は維持する。旧CopyBuffer overloadの保持期間も従来のままとし、古いCompletionを保持するとその経路の資源も残る。
@@ -58,34 +58,37 @@ namespace t = vsl::typed;
 constexpr auto usage = vsl::MemoryType::TRANSFER_SOURCE |
                        vsl::MemoryType::TRANSFER_DESTINATION;
 using Arena = t::TypedBufferArena<
-    t::BufferSlot<2, 0, std::uint32_t, usage>,
-    t::BufferSlot<2, 0, std::uint32_t, usage, 1>>;
+    t::BufferResource<t::ResourceId{10}, std::uint32_t, usage>,
+    t::BufferResource<t::ResourceId{20}, std::uint32_t, usage>>;
 constexpr Arena::Plan plan({4, 4});
 Arena arena(device, plan);
-auto source = arena.view<2, 0>();
-auto destination = arena.view<2, 0, 1>();
+auto source = arena.view<t::ResourceId{10}>();
+auto destination = arena.view<t::ResourceId{20}>();
 source.copy(std::array<std::uint32_t, 4>{1, 2, 3, 4});
 auto command = source.copy_to(destination);
 auto phase = manager.start_phase<vsl::ComputePhase>();
 phase << command;
 phase.submit();
 phase.completion().wait();
-auto bytes = destination.read_bytes();
+std::array<std::uint32_t, 4> result{};
+destination.read_into(result);
 ```
 
-slot keyはset／binding／descriptor配列要素／frame番号。Impl型は同じでも各slotのoffset・実体・使用状態は独立する。payload個数はplanへ明示し、コンパイル時定数にも実行時の値にもできる。既存ResourceAllocationSchemaからframe／scopeを自動展開する機能は今回追加していない。
+ResourceIdが資源を識別し、planが各IDをslot／offsetへ割り当てる。BindingKeyはset／binding／配列要素を表し、別のmapからResourceIdを参照する。同じIDを複数bindingへ接続してもImplは増えない。Impl型が同じ別IDは独立した実体・使用状態を持つ。payload個数はplanへ明示し、コンパイル時定数にも実行時の値にもできる。既存ResourceAllocationSchemaからframe／scopeを自動展開する機能は今回追加していない。
 
 `PlacedBufferView`は実体とoffset／rangeを固定し、arena全体を保持する。部分viewも同じownerを保持する。copyのrecord数・usage・payload型を検査する。`copy_to`はTypedな引数検査を終えたCopyBufferを作り、通常BufferとはBufferView adapterで混在できる。
 
 ```cpp
 using View = t::PlacedBufferView<std::uint32_t, usage>;
 auto output = View::FromBuffer(existing_vsl_buffer);
-auto command = arena.view<2, 0>().view(1, 2).copy_to(output.view(0, 2));
+auto command = arena.view<t::ResourceId{10}>().view(1, 2).copy_to(output.view(0, 2));
 ```
 
-借用は`arena.storage().borrow(index)`から明示的な`BufferRef`として取得する。これはarenaの有効scope内だけで使い、arenaを保持しない。rvalueからのborrowは禁止する。安全に外部保存する場合はowning viewを使う。viewから返るbyte spanも、対応view／ownerの有効期間内で利用する。
+借用は`arena.storage().borrow(index)`から明示的な`BufferRef`として取得する。これはarenaの有効scope内だけで使い、arenaを保持しない。rvalueからのborrowは禁止する。安全に外部保存する場合はowning viewを使う。新しいviewはraw spanを返さず、read_into内で呼出側の領域へコピーする。
 
 ## CPU領域と構築
+
+一つのTyped arenaは一つのLifetimeGroupだけを扱い、SHARED／各FRAME／各TRANSIENT群は別の領域・所有者へ分ける。異なるscopeを混在させたplanはコンパイル時に拒否する。
 
 `BufferLayout`はImpl・ResourceUseStateの寸法からslot strideを計算する。各slotはBufferImplとResourceUseStateのC++本体を同じCPU領域に持つ。Typed planはslot数・offset・全体bytes・alignmentを計算する。
 
@@ -155,7 +158,7 @@ multi-configでは使用するconfigを明示する。別configへの暗黙impor
 
 - 既定arenaはCPU領域一つと、CPURegion／ArenaOwnerの共有control blockを持つ。Implごとのshared_ptr control blockは作らないが、CPU確保が全体で一回になったわけではない。
 - ResourceUseStateのweak submission vector、submissionのowner vector等の要素用確保は残る。GPUの専用device memory確保もBufferごとに行う。
-- 通常Bufferはheap ownerのinline領域を使う。既存TypedUniformBuffer等が別に作る使用状態、descriptor／frame／pipelineの従来の個別確保は維持する。
+- 通常Bufferはheap ownerのinline領域を使う。既存Typedの所有Bufferはこのstorage状態を参照し、個別のUseState確保を廃止した。descriptor-set自体／AHO論理Bufferの状態、frame／pipelineの従来の個別確保は別責務として維持する。
 - `.data_`は移行用のaliasing shared_ptrとして残す。BufferViewのlegacy_owner／resource_useも既存Typed bindingへの境界adapterであり、arena内部へ格納しない。
 - 既存`get_device()`は所有するAccessorを返すため、device側のshared_from_thisを使うadapterを残す。BufferImpl自身はdeviceを所有しない。将来deviceもarena化する前に、この境界を再設計する必要がある。
 - 通常操作はImplへ直接届くが、legacy facade、virtual command entry、manager、deviceへの参照を全廃したわけではない。同期付きの旧copy_by_buffer等も既存経路を残す。
@@ -163,17 +166,19 @@ multi-configでは使用するconfigを明示する。別configへの暗黙impor
 
 ## 次の範囲と制約
 
-次は既存ResourceAllocationSchemaからこのCPU planを導出し、SHARED／PER_FRAME／配列を自動展開すること。その前提として、arena内部descriptorにはowning ResourceUseを格納せず、borrowと外部domain依存を分ける設計を実装する必要がある。
+schema自動展開の前提を[世代・アクセス・識別・寿命群の契約](buffer-generation-contracts.md)として実装した。今後のResourceAllocationSchema変換では、ResourceIdの共有と寿命群ごとのplanを導出する。descriptor配置へ進む前に、内部borrowと外部domain依存を分ける必要がある。
 
-AHOの共有Buffer再確保・旧view snapshot・Custom所有者は今回は変更しない。AHO native()経由のescapeを新しい同期保証へ自動接続するものでもない。型付き転送APIで作ったviewの使用状態と、既存AHO側の状態を統合する段階が必要。
+AHOの共有Buffer再確保・旧view snapshot・Custom所有者の意味は維持し、現在storageの使用状態をAHO側のbusy／wait／更新検査へ重ねた。旧viewは旧storage状態に加えてAHO論理Bufferの制約を保持する。
 
-新しいbusy検査はBufferView／PlacedBufferView経由の操作に適用する。旧Buffer::data／copyやnative escapeがこの状態を自動追跡するようには変更しておらず、それらを混在させる場合の同期は従来通り利用側の責任。
+通常VSL／既存Typed／新viewのhelperとVSL commandは共通状態を参照する。raw pointer／spanやVulkan handleのescapeを通じた直接操作の期間全体は追跡できず、利用側の同期が必要。安全な上位read_intoと区別する。
 
 異なるqueue間の所有権移動、並行CPU操作、device lost等で結果が不確定なsubmit失敗の回収方針、image／descriptor／pipeline／presentation全体の配置は未解決または未移行。今回の正常完了・未送信cancelの検証と区別する。
 
 速度向上率は測定していない。構造上は、複数Implと使用状態の本体を一領域へ配置し、Implごとの強いdevice所有とcontrol blockをなくし、記録時の実体参照を事前解決し、送信側のarena pinを重複排除している。
 
-## 検証記録
+## 初版の検証記録（2026-10-31）
+
+レビュー修正後の検証は[契約文書](buffer-generation-contracts.md)に記録する。以下は初版の結果。
 
 macOS arm64／Apple M1、Clang 20.1.8、C++26、CMake 4.1.1、Release `-O1 -g0`、ASan／UBSan、Vulkan SDK 1.4.309.0、MoltenVK 1.4.2で検証した。
 

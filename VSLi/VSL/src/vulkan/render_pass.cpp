@@ -3,6 +3,7 @@
 #include <VSL/vulkan/swapchain.hpp>
 #include <VSL/vulkan/image.hpp>
 #include <VSL/vulkan/commands/image_readback.hpp>
+#include <VSL/vulkan/phase.hpp>
 #include "image_format.hpp"
 #include <algorithm>
 #include <cstring>
@@ -229,20 +230,13 @@ namespace VSL_NAMESPACE {
         auto image = picking_buffer.at(index);
         (void)command::ImageReadback::Describe(image, ImageLayout::COLOR_ATTACHMENT_OPTIMAL, {x, y, 1, 1});
         StagingBuffer<MemoryType::TRANSFER_DESTINATION> destination(LogicalDeviceAccessor{data_->device}, sizeof(std::uint32_t));
-        auto buffer = manager.make_exclusive_buffer(1);
-        auto native = buffer.data_->command_buffers.front();
-        auto device = data_->device->device;
-        auto fence = device.createFenceUnique({});
-        native.begin(vk::CommandBufferBeginInfo{});
-        command::ImageReadback(&destination, image, ImageLayout::COLOR_ATTACHMENT_OPTIMAL, {x, y, 1, 1})
-            .invoke(manager.get_pool(), buffer, manager);
-        native.end();
-        manager.data_->graphics_queue.submit(vk::SubmitInfo{.commandBufferCount = 1, .pCommandBuffers = &native}, *fence);
-        if (device.waitForFences(*fence, true, UINT64_MAX) != vk::Result::eSuccess)
+        auto transfer = manager.independent(1);
+        auto phase = transfer.start_phase<ComputePhase>();
+        phase << command::ImageReadback(&destination, image, ImageLayout::COLOR_ATTACHMENT_OPTIMAL, {x, y, 1, 1});
+        if (phase.submit() != ComputePhase::SubmitResult::SUCCESS || !phase.completion().wait())
             throw std::runtime_error("Picking transfer did not complete");
-        auto mapped = destination.data(sizeof(std::uint32_t));
         std::uint32_t id;
-        std::memcpy(&id, mapped.data, sizeof(id));
+        destination.read_into(std::as_writable_bytes(std::span(&id, 1)));
         return id;
     }
     impl::RenderPassImpl::~RenderPassImpl() {

@@ -3,6 +3,21 @@
 #include <cstring>
 
 namespace VSL_NAMESPACE {
+    ResourceUse ResourceUse::ForBuffer(const std::shared_ptr<impl::BufferImpl>& buffer, ResourceUse constraint) {
+        if (!buffer || !buffer->use)
+            throw std::invalid_argument("Buffer requires a constructed storage generation");
+        ResourceUse use{{buffer, buffer->use}, buffer};
+        if (constraint.state == use.state) {
+            use.constraint_state = std::move(constraint.constraint_state);
+            use.constraint_owner = std::move(constraint.constraint_owner);
+        } else {
+            if (constraint.constraint_state || constraint.constraint_owner.use_count())
+                throw std::invalid_argument("Cannot attach a different storage generation as a logical constraint");
+            use.constraint_state = std::move(constraint.state);
+            use.constraint_owner = std::move(constraint.owner);
+        }
+        return use;
+    }
     size_t BufferRef::size() const {
         if (!data)
             throw std::logic_error("Buffer reference is empty");
@@ -25,11 +40,12 @@ namespace VSL_NAMESPACE {
             std::memmove(destination, bytes.data(), bytes.size());
         backend::synchronize_buffer(*data, offset, bytes.size(), true);
     }
-    std::span<const std::byte> BufferRef::read(size_t bytes, size_t offset) const {
+    void BufferRef::read_into(std::span<std::byte> destination, size_t offset) const {
         use().require_idle();
-        auto* source = backend::map_buffer(*data, offset, bytes);
-        backend::synchronize_buffer(*data, offset, bytes, false);
-        return {static_cast<const std::byte*>(source), bytes};
+        auto* source = backend::map_buffer(*data, offset, destination.size());
+        backend::synchronize_buffer(*data, offset, destination.size(), false);
+        if (!destination.empty())
+            std::memmove(destination.data(), source, destination.size());
     }
     BufferView::BufferView(BufferRef ref, std::shared_ptr<void> owner, size_t offset, size_t bytes)
         : _ref(ref), _owner(std::move(owner)), _offset(offset), _bytes(bytes) {
@@ -51,9 +67,9 @@ namespace VSL_NAMESPACE {
             throw std::out_of_range("Buffer view write range");
         _ref.write(bytes, _offset + offset);
     }
-    std::span<const std::byte> BufferView::read(size_t bytes, size_t offset) const {
-        if (offset > _bytes || bytes > _bytes - offset)
+    void BufferView::read_into(std::span<std::byte> destination, size_t offset) const {
+        if (offset > _bytes || destination.size() > _bytes - offset)
             throw std::out_of_range("Buffer view read range");
-        return _ref.read(bytes, _offset + offset);
+        _ref.read_into(destination, _offset + offset);
     }
 } // namespace VSL_NAMESPACE

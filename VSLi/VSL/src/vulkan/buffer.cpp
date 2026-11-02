@@ -1,6 +1,7 @@
 #include <VSL/lifetime/buffer_storage.hpp>
 
 #include <VSL/vulkan/buffer.hpp>
+#include <VSL/vulkan/buffer_view.hpp>
 #include <VSL/vulkan/buffer_and_image_accessor.hpp>
 #include <VSL/vulkan/phase.hpp>
 #include <VSL/vulkan/commands/copy_image_to_buffer.hpp>
@@ -49,6 +50,8 @@ static bool copy_buffer(const std::shared_ptr<VSL_NAMESPACE::impl::BufferImpl>& 
     const auto capacity = size.value_or(remaining);
     if (capacity > remaining || source->requirement_size > capacity)
         throw std::out_of_range("Buffer copy exceeds destination range");
+    source->use->require_idle();
+    destination->use->require_idle();
 
     auto command_buf = command_manager.make_exclusive_buffer();
 
@@ -105,6 +108,19 @@ VSL_NAMESPACE::MemoryProperty VSL_NAMESPACE::BufferAccessor::get_memory_properti
     return data_ ? data_->properties : MemoryProperty::NONE;
 }
 
+VSL_NAMESPACE::ResourceUseState& VSL_NAMESPACE::BufferAccessor::use_state() const {
+    return BufferRef{data_.get()}.use();
+}
+VSL_NAMESPACE::ResourceUse VSL_NAMESPACE::BufferAccessor::resource_use() const {
+    return ResourceUse::ForBuffer(data_, {});
+}
+VSL_NAMESPACE::ResourceUse VSL_NAMESPACE::BufferAccessor::resource_use(ResourceUse constraint) const {
+    return ResourceUse::ForBuffer(data_, std::move(constraint));
+}
+void VSL_NAMESPACE::BufferAccessor::read_into(std::span<std::byte> destination, size_t offset) const {
+    BufferRef{data_.get()}.read_into(destination, offset);
+}
+
 void VSL_NAMESPACE::BufferAccessor::flush_copied(LocalBufferHolder& holder, std::size_t bytes) {
     if (!bytes)
         return;
@@ -116,9 +132,16 @@ void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::flush() {
     flush(size);
 }
 
+void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::require_idle() const {
+    // 互換用にCPU領域だけを渡したholderには、GPU storageの状態はない。
+    if (_owner)
+        _owner->use->require_idle();
+}
+
 void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::synchronize(std::size_t bytes, std::size_t relative_offset, bool flush) const {
     if (!_owner || !data || !_owner->mapped)
         throw std::logic_error("Buffer mapping is empty");
+    _owner->use->require_idle();
     if (relative_offset > size || bytes > size - relative_offset ||
         offset > _owner->requirement_size || size > _owner->requirement_size - offset)
         throw std::out_of_range("Buffer mapping range");
@@ -143,6 +166,7 @@ std::span<const std::byte> VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::rea
 void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::write(std::span<const std::byte> bytes, std::size_t relative_offset) const {
     if (!_owner || !data)
         throw std::logic_error("Buffer mapping is empty");
+    _owner->use->require_idle();
     if (relative_offset > size || bytes.size() > size - relative_offset ||
         offset > _owner->requirement_size || size > _owner->requirement_size - offset)
         throw std::out_of_range("Buffer mapping write range");
@@ -170,6 +194,7 @@ VSL_NAMESPACE::BufferAccessor::LocalBufferHolder VSL_NAMESPACE::BufferAccessor::
     if (!buffer || !buffer->data_)
         throw std::logic_error("Buffer is empty");
     const auto& storage = buffer->data_;
+    storage->use->require_idle();
     if (offset > storage->requirement_size)
         throw exceptions::RuntimeException("buffer", "mapped offset is outside requested storage");
     const auto length = bytes.value_or(storage->requirement_size - offset);

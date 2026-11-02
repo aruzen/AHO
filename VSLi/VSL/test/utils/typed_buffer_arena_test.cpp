@@ -6,14 +6,14 @@ namespace {
     namespace t = vsl::typed;
     namespace s = vsl::storage;
     constexpr auto USAGE = vsl::MemoryType::TRANSFER_SOURCE | vsl::MemoryType::TRANSFER_DESTINATION;
-    using Arena = t::TypedBufferArena<t::BufferSlot<2, 0, std::uint32_t, USAGE>,
-                                      t::BufferSlot<2, 0, std::uint32_t, USAGE, 1>>;
+    using Arena = t::TypedBufferArena<t::BufferResource<t::ResourceId{0}, std::uint32_t, USAGE>,
+                                      t::BufferResource<t::ResourceId{1}, std::uint32_t, USAGE>>;
     using View = t::PlacedBufferView<std::uint32_t, USAGE>;
     using Native = vsl::Buffer<USAGE, vsl::MemoryProperty::HOST_VISIBLE>;
     constexpr Arena::Plan PLAN({4, 4});
     static_assert(PLAN.BYTES == 2 * s::BufferLayout::STRIDE);
     static_assert(PLAN.Offset(1) % PLAN.ALIGNMENT == 0);
-    static_assert(PLAN.Index<2, 0, 1>() == 1);
+    static_assert(PLAN.Index<t::ResourceId{1}>() == 1);
 
     class BufferArenaVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
@@ -39,8 +39,8 @@ namespace {
 
     TEST_F(BufferArenaVulkanIntegrationTest, SameImplTypesOccupyDistinctDirectSlotsAndKeepIndependentValues) {
         Arena arena(device, PLAN);
-        auto first = arena.view<2, 0>();
-        auto second = arena.view<2, 0, 1>();
+        auto first = arena.view<t::ResourceId{0}>();
+        auto second = arena.view<t::ResourceId{1}>();
         const auto a = first.backend().ref();
         const auto b = second.backend().ref();
         EXPECT_NE(a.data, b.data);
@@ -49,8 +49,11 @@ namespace {
         EXPECT_NE(&a.use(), &b.use());
         first.copy(std::array<std::uint32_t, 4>{1, 2, 3, 4});
         second.copy(std::array<std::uint32_t, 4>{5, 6, 7, 8});
-        EXPECT_EQ(first.read_bytes()[0], std::byte{1});
-        EXPECT_EQ(second.read_bytes()[0], std::byte{5});
+        std::array<std::uint32_t, 4> readback{};
+        first.read_into(readback);
+        EXPECT_EQ(readback[0], 1u);
+        second.read_into(readback);
+        EXPECT_EQ(readback[0], 5u);
         EXPECT_THROW(arena.storage().borrow(2), std::out_of_range);
         EXPECT_THROW(first.copy(std::array<std::uint32_t, 1>{0}), std::invalid_argument);
         EXPECT_THROW(first.view(4, 1), std::out_of_range);
@@ -68,7 +71,7 @@ namespace {
         {
             Arena arena(device, PLAN, memory);
             EXPECT_THROW(Arena(device, PLAN, memory), std::invalid_argument);
-            retained.emplace(arena.view<2, 0>());
+            retained.emplace(arena.view<t::ResourceId{0}>());
         }
         EXPECT_THROW(Arena(device, PLAN, memory), std::invalid_argument);
         retained.reset();
@@ -95,7 +98,7 @@ namespace {
         {
             Arena arena(device, PLAN);
             owner = arena.storage().owner();
-            auto view = arena.view<2, 0>().view(1, 2);
+            auto view = arena.view<t::ResourceId{0}>().view(1, 2);
             view.copy(std::array<std::uint32_t, 2>{42, 73});
             borrowed = view.backend().ref();
             // 格納pointerがnullでも、control blockを持つtokenは所有境界として有効。
@@ -113,9 +116,8 @@ namespace {
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         ASSERT_TRUE(completion.wait());
         EXPECT_TRUE(owner.expired());
-        const auto bytes = result.read_bytes();
         std::array<std::uint32_t, 2> actual{};
-        std::memcpy(actual.data(), bytes.data(), bytes.size());
+        result.read_into(actual);
         EXPECT_EQ(actual, (std::array<std::uint32_t, 2>{42, 73}));
         EXPECT_EQ(completion.status(), vsl::Completion::Status::COMPLETE);
     }
@@ -128,8 +130,8 @@ namespace {
         {
             Arena arena(device, PLAN);
             owner = arena.storage().owner();
-            arena.view<2, 0>().copy(std::array<std::uint32_t, 4>{1, 2, 3, 4});
-            command.emplace(arena.view<2, 0>().copy_to(View::FromBuffer(destination)));
+            arena.view<t::ResourceId{0}>().copy(std::array<std::uint32_t, 4>{1, 2, 3, 4});
+            command.emplace(arena.view<t::ResourceId{0}>().copy_to(View::FromBuffer(destination)));
         }
         auto phase = manager.start_phase<vsl::ComputePhase>();
         phase << *command;
@@ -145,14 +147,16 @@ namespace {
     TEST_F(BufferArenaVulkanIntegrationTest, SameArenaCopyDeduplicatesRetentionAndEmptyArenaAllocatesNoSlots) {
         auto manager = make_manager();
         Arena arena(device, PLAN);
-        auto first = arena.view<2, 0>();
+        auto first = arena.view<t::ResourceId{0}>();
         first.copy(std::array<std::uint32_t, 4>{9, 8, 7, 6});
         auto phase = manager.start_phase<vsl::ComputePhase>();
-        phase << first.copy_to(arena.view<2, 0, 1>());
+        phase << first.copy_to(arena.view<t::ResourceId{1}>());
         ASSERT_EQ(manager.get_buffer().data_->recording_submission->completion_resources.size(), 1u);
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         ASSERT_TRUE(phase.completion().wait());
-        EXPECT_EQ((arena.view<2, 0, 1>().read_bytes()[0]), std::byte{9});
+        std::array<std::uint32_t, 4> readback{};
+        arena.view<t::ResourceId{1}>().read_into(readback);
+        EXPECT_EQ(readback[0], 9u);
         s::BufferArena empty(device, {});
         EXPECT_EQ(empty.size(), 0u);
         EXPECT_THROW(empty.borrow(0), std::out_of_range);
@@ -167,8 +171,8 @@ namespace {
             {
                 Arena arena(device, PLAN);
                 owner = arena.storage().owner();
-                arena.view<2, 0>().copy(std::array<std::uint32_t, 4>{1, 2, 3, 4});
-                phase << arena.view<2, 0>().copy_to(View::FromBuffer(destination));
+                arena.view<t::ResourceId{0}>().copy(std::array<std::uint32_t, 4>{1, 2, 3, 4});
+                phase << arena.view<t::ResourceId{0}>().copy_to(View::FromBuffer(destination));
             }
             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         }
@@ -192,8 +196,8 @@ namespace {
                              });
                              s::ArenaMemory memory(std::span(bytes, PLAN.BYTES), PLAN.ALIGNMENT, owner);
                              Arena arena(device, PLAN, memory);
-                             arena.view<2, 0>().copy(std::array<std::uint32_t, 4>{1, 2, 3, 4});
-                             phase << arena.view<2, 0>().copy_to(View::FromBuffer(destination));
+                             arena.view<t::ResourceId{0}>().copy(std::array<std::uint32_t, 4>{1, 2, 3, 4});
+                             phase << arena.view<t::ResourceId{0}>().copy_to(View::FromBuffer(destination));
                          }
                          EXPECT_EQ(*releases, 0u);
                          throw std::runtime_error("Cancel recorded copy");

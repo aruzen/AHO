@@ -3,6 +3,7 @@
 //
 
 #include <VSL/vulkan/_pimpls.hpp>
+#include <VSL/vulkan/resource_use.hpp>
 
 #include <VSL/vulkan/commands/copy_buffer_to_image.hpp>
 
@@ -63,6 +64,7 @@ namespace {
     void record_upload(const VSL_NAMESPACE::ImageAccessor& image, const std::shared_ptr<VSL_NAMESPACE::impl::BufferImpl>& source,
                        VSL_NAMESPACE::ImageLayout layout, const VSL_NAMESPACE::command::ImageCopyInfo& info,
                        std::size_t offset, VSL_NAMESPACE::CommandBuffer buffer) {
+        VSL_NAMESPACE::ResourceUse::ForBuffer(source, {}).record(buffer);
         buffer.retain(image.data_);
         buffer.retain(source);
         vk::BufferImageCopy region;

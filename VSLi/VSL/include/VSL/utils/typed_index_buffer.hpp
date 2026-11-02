@@ -35,7 +35,6 @@ namespace VSL_NAMESPACE::typed {
         LogicalDeviceAccessor _device;
         Storage _buffer;
         std::shared_ptr<detail::IndexSnapshot<Index>> _values;
-        std::shared_ptr<ResourceUseState> _use = std::make_shared<ResourceUseState>();
 
     public:
         TypedIndexBuffer(LogicalDeviceAccessor device, std::span<const Index> values)
@@ -45,7 +44,7 @@ namespace VSL_NAMESPACE::typed {
             : _device(device), _buffer(device, manager, values.data(), values.size()), _values(std::make_shared<detail::IndexSnapshot<Index>>(values)) {}
         size_t size() const { return _values->values.size(); }
         LogicalDeviceAccessor device() const { return _device; }
-        ResourceUse resource_use() const { return {_use, _buffer.data_}; }
+        ResourceUse resource_use() const { return _buffer.resource_use(); }
         const Storage& backend() const { return _buffer; }
         Storage& backend() { return _buffer; }
         void copy(std::span<const Index> values)
@@ -64,7 +63,7 @@ namespace VSL_NAMESPACE::typed {
     void TypedIndexBuffer<Index, property>::copy(std::span<const Index> values)
     requires(contain<property, MemoryProperty::HOST_VISIBLE>())
     {
-        _use->require_idle();
+        _buffer.use_state().require_idle();
         if (values.size() != size())
             throw std::invalid_argument("Typed index update must preserve the element count");
         if (_values->revision == std::numeric_limits<std::uint64_t>::max())

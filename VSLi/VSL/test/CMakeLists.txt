@@ -56,13 +56,14 @@ if (VSL_TEST_SOURCES)
     add_dependencies(vsl-tests vsl-test)
     add_library(vsl-arena-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_buffer_arena.cpp)
     target_link_libraries(vsl-arena-style-contract PRIVATE VSL)
-    set(arena_contract_names Valid WrongPayload WrongDestination WrongUsage UnknownSlot TemporaryBorrow DuplicateSlot)
-    foreach(case RANGE 0 6)
+    set(arena_contract_names Valid WrongPayload WrongDestination WrongUsage UnknownResource TemporaryBorrow DuplicateResource
+        MixedLifetime EscapingRead DuplicateBinding UnknownBinding UnknownBindingResource WrongReadPayload)
+    foreach(case RANGE 0 12)
         list(GET arena_contract_names ${case} name)
         add_test(NAME "VSL.TypedArena.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
             "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
             "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_buffer_arena.cpp"
-            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=copy|copy_to|constant expression|deleted|Duplicate typed|Unknown typed"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=copy|copy_to|constant expression|deleted|Duplicate buffer|Unknown buffer|lifetime scope|read_bytes|read_into"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
         set_tests_properties("VSL.TypedArena.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
     endforeach()

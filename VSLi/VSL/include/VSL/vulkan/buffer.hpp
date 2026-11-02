@@ -160,6 +160,7 @@ namespace VSL_NAMESPACE {
 
     template<typename... Args>
     bool VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::copy(const Args&... args) {
+        require_idle();
         size_t offset = 0;
         return helper::copy_with_shift_offset(this->data, this->size, offset, args...);
     }
@@ -216,6 +217,7 @@ namespace VSL_NAMESPACE {
 
     template<typename T>
     bool BufferAccessor::LocalBufferHolder::copy(T* t, size_t size) {
+        require_idle();
         if (size > this->size / sizeof(T))
             return false;
         if (size == 0)
@@ -234,6 +236,7 @@ namespace VSL_NAMESPACE {
 
     template<typename... Args>
     void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::uncheck_copy(const Args&... args) {
+        require_idle();
         size_t offset = 0;
         (helper::uncheck_copy_with_shift_offset(this->data, offset, args), ...);
     }

@@ -15,12 +15,15 @@ namespace VSL_NAMESPACE::typed::detail {
         std::vector<vk::DescriptorBufferInfo> buffers;
         std::vector<vk::DescriptorImageInfo> images;
         std::vector<std::shared_ptr<void>> owners;
+        std::vector<impl::GraphicResourceImpl::BufferBindingRef> buffer_refs;
         buffers.reserve(values.size());
         images.reserve(values.size());
         using enum graphic_resource::Type;
         for (const auto& value : values) {
-            if (value.use.owner)
+            if (value.use.owner.use_count())
                 owners.push_back(value.use.owner);
+            if (value.use.constraint_owner.use_count())
+                owners.push_back(value.use.constraint_owner);
             if (point.binding_type == UNIFORM_BUFFER || point.binding_type == STORAGE_BUFFER) {
                 const auto usage = point.binding_type == UNIFORM_BUFFER ? MemoryType::UNIFORM_BUFFER : MemoryType::STORAGE_BUFFER;
                 if (!value.buffer || value.buffer->device != device.get() || !contain(value.buffer->usage, usage))
@@ -35,6 +38,7 @@ namespace VSL_NAMESPACE::typed::detail {
                 if (alignment && value.offset % alignment)
                     throw std::invalid_argument("Typed descriptor buffer offset violates device alignment");
                 buffers.push_back({value.buffer->buffer, value.offset, value.bytes});
+                buffer_refs.push_back({value.buffer.get(), owners.size()});
                 owners.push_back(value.buffer);
             } else {
                 vk::DescriptorImageInfo info{};
@@ -62,7 +66,10 @@ namespace VSL_NAMESPACE::typed::detail {
         write.descriptorCount = point.amount;
         write.pBufferInfo = buffers.empty() ? nullptr : buffers.data();
         write.pImageInfo = images.empty() ? nullptr : images.data();
-        target->bindings[point.binding] = std::move(owners);
+        auto& refs = target->buffer_refs.try_emplace(point.binding).first->second;
+        auto& retained = target->bindings.try_emplace(point.binding).first->second;
+        retained = std::move(owners);
+        refs = std::move(buffer_refs);
         device->device.updateDescriptorSets(write, {});
     }
 

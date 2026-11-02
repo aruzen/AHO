@@ -519,7 +519,7 @@ aliasing shared_ptr adapterは外部互換境界だけに設ける。arena内部
 
 実装基点はBの`8959e5bf`。設計時のroot checkoutや利用者の変更は更新せず、専用worktreeから実装した。
 
-- 単slot案を、利用者の今回の要求に合わせて複数Buffer slotへ拡張した。set／binding／配列要素／frameのkeyとruntime payload個数を分ける。既存ResourceAllocationSchemaの自動展開はM2として残す。
+- 単slot案を、利用者の要求に合わせて複数Buffer slotへ拡張した。レビュー後はResourceId→slot／offsetとBindingKey→ResourceIdを分け、frameはLifetimeGroupへ移した。runtime payload個数を別に与える。既存ResourceAllocationSchemaの自動展開はM2として残す。
 - slotはprivate BufferImplとResourceUseStateの本体を含む。Deviceはownerが保持し、Implは解決済みのborrowed device identity・native handle・UseStateだけを持つ。内部コンテナのcapacityやGPU memoryは含めない。
 - 共通native backendの初期化をheap owner／arena ownerから呼ぶ。CPU領域・構築prefix・失敗時rollbackは別のstorage／lifetime実装が扱う。
 - 完了観測と資源保持は、既存SubmissionImplへの非所有のterminal callbackで接続した。新経路は完了／cancelでpinを解放する。旧resources保持の意味は変えない。CompletionSignal／InFlightRecordの全面分離はM7。
@@ -527,3 +527,5 @@ aliasing shared_ptr adapterは外部互換境界だけに設ける。arena内部
 - private定義のcompile-only probe、寸法static_assert、artifact固有link guardを実装した。CMake以外の直接MSBuildでは新しい配置APIを提供せず、CMake生成を使用する。
 
 使用例、保証の範囲、残った確保、未解決事項は[実装報告](buffer-placement.md)に集約する。速度の改善率は未測定。
+
+2026-11-02のレビューで、storageの使用状態を全Buffer入口で共有すること、新しい読み取りはread_intoで完結すること、資源ID・binding・slotを分けること、寿命群ごとに配置と所有者を分けることをM2より前の前提として確定した。旧LocalBufferHolder等のraw escapeと、安全なMappedAccessは区別する。[採用した契約と移行例](buffer-generation-contracts.md)を参照。

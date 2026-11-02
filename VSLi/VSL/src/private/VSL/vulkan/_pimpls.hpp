@@ -294,11 +294,17 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct GraphicResourceImpl {
+        struct BufferBindingRef {
+            BufferImpl* buffer;
+            size_t owner_index;
+        };
         std::shared_ptr<impl::GraphicResourcePoolImpl> pool;
         std::shared_ptr<impl::ResourceBindingLayoutImpl> layout;
 
         vk::DescriptorSet descriptor_set;
         std::map<std::uint32_t, std::vector<std::shared_ptr<void>>> bindings;
+        // bindings内のownerを借用する。記録時にstorageの使用状態を登録する。
+        std::map<std::uint32_t, std::vector<BufferBindingRef>> buffer_refs;
 
         ~GraphicResourceImpl();
     };

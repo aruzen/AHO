@@ -1,11 +1,40 @@
 #include <AHO/resource/buffer.hpp>
 #include <vector>
 #include <cstring>
+#include <chrono>
 
 namespace AHO_NAMESPACE::resource {
     struct Buffer<BufferType::GENERAL>::Data {
         std::vector<std::byte> bytes;
     };
+
+    bool detail::BufferState::busy() const {
+        return VSL_NAMESPACE::ResourceUseState::busy() || (native && native->use_state().busy());
+    }
+    bool detail::BufferState::wait(std::uint64_t timeout) const {
+        const auto start = std::chrono::steady_clock::now();
+        if (!VSL_NAMESPACE::ResourceUseState::wait(timeout))
+            return false;
+        const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count();
+        const auto remaining = timeout == UINT64_MAX ? timeout : (std::uint64_t(elapsed) < timeout ? timeout - std::uint64_t(elapsed) : 0);
+        return !native || native->use_state().wait(remaining);
+    }
+    void detail::BufferState::require_idle() const {
+        VSL_NAMESPACE::ResourceUseState::require_idle();
+        if (native)
+            native->use_state().require_idle();
+    }
+    void detail::BufferState::check_available(const VSL_NAMESPACE::Completion& completion) const {
+        VSL_NAMESPACE::ResourceUseState::check_available(completion);
+        if (native)
+            native->use_state().check_available(completion);
+    }
+    void detail::BufferState::mark_used(VSL_NAMESPACE::Completion completion) const {
+        check_available(completion);
+        VSL_NAMESPACE::ResourceUseState::mark_used(completion);
+        if (native)
+            native->use_state().mark_used(completion);
+    }
 
     Buffer<BufferType::GENERAL>::Buffer(std::size_t size) : _data(std::make_shared<Data>()) {
         _data->bytes.resize(size);
@@ -112,6 +141,6 @@ namespace AHO_NAMESPACE::resource {
     VSL_NAMESPACE::ResourceUse BufferBinding::resource_use() const {
         if (!_state)
             throw std::logic_error("Buffer binding is empty");
-        return {_state, owner()};
+        return native().resource_use({_state, owner()});
     }
 } // namespace AHO_NAMESPACE::resource

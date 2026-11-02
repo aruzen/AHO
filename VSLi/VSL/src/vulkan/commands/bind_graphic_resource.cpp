@@ -49,4 +49,10 @@ void VSL_NAMESPACE::command::BindGraphicResource::set_pipeline(std::optional<Pip
 void VSL_NAMESPACE::command::BindGraphicResource::track(const CommandBuffer& buffer) const {
     if (_use)
         _use->record(buffer);
+    for (const auto& resource : resources)
+        for (const auto& [binding, refs] : resource.data_->buffer_refs)
+            for (const auto& ref : refs) {
+                buffer.retain(resource.data_->bindings.at(binding).at(ref.owner_index));
+                ref.buffer->use->mark_used(buffer.completion());
+            }
 }

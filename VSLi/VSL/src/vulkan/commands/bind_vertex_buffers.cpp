@@ -12,6 +12,7 @@ VSL_NAMESPACE::command::BindVertexBufferAt::BindVertexBufferAt(std::uint32_t bin
     : _binding(binding), _offset(offset), _source(std::move(source)), _use(std::move(use)) {
     if (_binding == UINT32_MAX || !_source || offset >= _source->requirement_size || !VSL_NAMESPACE::contain(_source->usage, MemoryType::VERTEX_BUFFER))
         throw std::invalid_argument("BindVertexBufferAt requires a vertex buffer");
+    _use = ResourceUse::ForBuffer(_source, std::move(_use));
 }
 
 void VSL_NAMESPACE::command::BindVertexBufferAt::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
@@ -25,8 +26,10 @@ void VSL_NAMESPACE::command::BindVertexBufferAt::invoke(CommandPool pool, Comman
 void VSL_NAMESPACE::command::BindVertexBuffer::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
     if (buffers.empty())
         return;
-    for (auto* source : buffers)
+    for (auto* source : buffers) {
+        source->resource_use().record(buffer);
         buffer.retain(source->data_);
+    }
     buffer.data_->command_buffers[buffer.get_current_buffer_idx()]
         .bindVertexBuffers(0,
                            this->buffers | std::views::transform([](auto& b) { return b->data_->buffer; }) | std::ranges::to<std::vector<vk::Buffer>>(),

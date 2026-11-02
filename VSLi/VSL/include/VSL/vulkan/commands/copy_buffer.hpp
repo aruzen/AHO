@@ -18,8 +18,7 @@ namespace VSL_NAMESPACE::command {
         impl::BufferImpl* _source;
         impl::BufferImpl* _destination;
         std::shared_ptr<void> _source_owner, _destination_owner;
-        ResourceUseState* _source_use = nullptr;
-        ResourceUseState* _destination_use = nullptr;
+        bool _release_on_completion = false;
         std::size_t _bytes;
         std::size_t _source_offset;
         std::size_t _destination_offset;

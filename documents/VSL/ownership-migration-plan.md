@@ -178,3 +178,5 @@ M1a〜M1cをホスト可視Bufferの複数slotで実装した。M1bの単slotは
 設計時には旧Completionの保持が残るadapterを許容していたが、新経路にはterminal callbackを追加し、Completionを保存したままでもpinを解放できるようにした。同期が完了を判断し、lifetime callbackが所有者を解放する。既存全体のCompletionSignal化は未実施。
 
 次はM2のResourceAllocationSchema→CPU plan変換。descriptorを配置する前に、同じarena内部の借用依存と外部owner依存を分け、ResourceUseGroupがowning viewを再帰保持しない接続を検証する。実装と受入結果は[実装報告](buffer-placement.md)を参照。
+
+M2に進む前のレビュー修正として、[storage世代・アクセス・識別・寿命群](buffer-generation-contracts.md)を実装した。既存Typedの独立UseStateを廃止し、通常VSLも共通状態へ接続する。span返却の新APIはread_intoへ変更し、ResourceIdとBindingKeyを分け、異なる寿命scopeの同一planへの配置を拒否する。自動展開はこの契約を使い、binding単位の資源複製や、shared／frameをまとめた単一ownerへ戻さない。

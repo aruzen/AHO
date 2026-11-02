@@ -49,7 +49,6 @@ namespace VSL_NAMESPACE::typed {
         LogicalDeviceAccessor _device;
         Storage _buffer;
         size_t _count;
-        std::shared_ptr<ResourceUseState> _use = std::make_shared<ResourceUseState>();
 
     public:
         TypedVertexBuffer(LogicalDeviceAccessor device, std::span<const Vertex> vertices)
@@ -68,7 +67,7 @@ namespace VSL_NAMESPACE::typed {
             return TypedVertexBufferView<Vertex>(_device, _buffer.data_, detail::checked_view_offset(0, first, count, _count, sizeof(Vertex)), count, resource_use());
         }
         LogicalDeviceAccessor device() const { return _device; }
-        ResourceUse resource_use() const { return {_use, _buffer.data_}; }
+        ResourceUse resource_use() const { return _buffer.resource_use(); }
         // Explicit escape to the existing dynamic API. Typed binding does not accept a raw BufferAccessor.
         Storage& backend() { return _buffer; }
         const Storage& backend() const { return _buffer; }
@@ -80,7 +79,7 @@ namespace VSL_NAMESPACE::typed {
     void TypedVertexBuffer<Vertex, memory_property>::copy(std::span<const Vertex> vertices)
     requires(contain<memory_property, MemoryProperty::HOST_VISIBLE>())
     {
-        _use->require_idle();
+        _buffer.use_state().require_idle();
         if (vertices.size() != _count)
             throw std::invalid_argument("Typed vertex update must preserve the record count");
         if (!_buffer.copy(vertices.data(), vertices.size()))
@@ -90,7 +89,7 @@ namespace VSL_NAMESPACE::typed {
     template<typename Vertex>
     TypedVertexBufferView<Vertex> TypedVertexBufferView<Vertex>::FromBuffer(const BufferAccessor& source, size_t count, size_t byte_offset, ResourceUse use) {
         detail::validate_buffer_view(source, MemoryType::VERTEX_BUFFER, byte_offset, count, sizeof(Vertex), alignof(Vertex));
-        return TypedVertexBufferView(source.get_device(), source.data_, byte_offset, count, std::move(use));
+        return TypedVertexBufferView(source.get_device(), source.data_, byte_offset, count, source.resource_use(std::move(use)));
     }
 
     namespace detail {

@@ -6,6 +6,7 @@
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
 #include <VSL/utils/typed_resource_bundle.hpp>
+#include <VSL/vulkan/buffer_view.hpp>
 #include "support/render_fixture.hpp"
 
 namespace {
@@ -16,6 +17,49 @@ namespace {
     class TypedAHOBufferVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
+    TEST_F(TypedAHOBufferVulkanIntegrationTest, NativeCommandsShareStorageStateWithAhoAndTypedEntrances) {
+        const std::array<std::uint32_t, 4> values{1, 2, 3, 4};
+        Host source(device, sizeof(values)), destination(device, sizeof(values));
+        source.write(std::as_bytes(std::span(values)));
+        auto view = r::vertex_view<std::uint32_t>(destination);
+        EXPECT_EQ(view.resource_use().state.get(), &destination.native().use_state());
+        EXPECT_NE(view.resource_use().constraint_state, nullptr);
+        auto manager = make_manager();
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        phase << vsl::command::CopyBuffer(&source.native(), &destination.native(), sizeof(values), 0, 0, true);
+        EXPECT_TRUE(source.busy());
+        EXPECT_TRUE(destination.busy());
+        EXPECT_FALSE(destination.wait(0));
+        EXPECT_THROW(destination.write({}), std::logic_error);
+        EXPECT_THROW(destination.reserve(128), std::logic_error);
+        EXPECT_THROW(destination.assign({}), std::logic_error);
+        phase.cancel();
+        EXPECT_FALSE(destination.busy());
+        EXPECT_NO_THROW(destination.write(std::as_bytes(std::span(values))));
+    }
+
+    TEST_F(TypedAHOBufferVulkanIntegrationTest, StorageGenerationsStaySeparateAndLogicalRestrictionsRemainAdditional) {
+        const std::uint32_t value = 17;
+        Host buffer(device, sizeof(value));
+        buffer.write(std::as_bytes(std::span(&value, 1)));
+        auto old_view = r::uniform_view<std::uint32_t>(buffer);
+        auto* old_state = old_view.descriptor().use.state.get();
+        buffer.reserve(128);
+        auto current_view = r::uniform_view<std::uint32_t>(buffer);
+        EXPECT_NE(old_state, current_view.descriptor().use.state.get());
+        EXPECT_EQ(current_view.descriptor().use.state.get(), &buffer.native().use_state());
+        auto manager = make_manager();
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        old_view.descriptor().use.record(manager.get_buffer());
+        EXPECT_TRUE(old_state->busy());
+        EXPECT_FALSE(buffer.native().use_state().busy());
+        EXPECT_TRUE(buffer.busy());
+        EXPECT_THROW(buffer.resize(0), std::logic_error);
+        phase.cancel();
+        EXPECT_FALSE(buffer.busy());
+        EXPECT_NO_THROW(buffer.resize(0));
+    }
     struct Vertex {
         float xy[2];
         float rgb[3];

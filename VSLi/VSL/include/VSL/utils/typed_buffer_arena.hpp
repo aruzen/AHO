@@ -4,6 +4,7 @@
 #include "typed_block_layout.hpp"
 #include "typed_buffer_view.hpp"
 #include <tuple>
+#include <compare>
 
 namespace VSL_NAMESPACE::typed {
     template<typename Payload_, MemoryType usage_>
@@ -20,19 +21,64 @@ namespace VSL_NAMESPACE::typed {
         const BufferView& backend() const { return _view; }
         PlacedBufferView view(size_t first, size_t count) const;
         void copy(std::span<const Payload> values) const;
-        std::span<const std::byte> read_bytes() const { return _view.read(_view.size()); }
+        void read_into(std::span<Payload> destination) const;
         template<MemoryType destination_usage>
         requires(contain<usage_, MemoryType::TRANSFER_SOURCE>() && contain<destination_usage, MemoryType::TRANSFER_DESTINATION>())
         command::CopyBuffer copy_to(const PlacedBufferView<Payload_, destination_usage>& destination, bool host_read = true) const;
     };
 
-    template<std::uint32_t set, std::uint32_t binding, typename Payload_, MemoryType usage,
-             size_t element = 0, size_t frame = 0>
-    struct BufferSlot {
+    struct ResourceId {
+        std::uint64_t value;
+        constexpr auto operator<=>(const ResourceId&) const = default;
+    };
+    struct BindingKey {
+        std::uint32_t set, binding;
+        size_t element = 0;
+        constexpr auto operator<=>(const BindingKey&) const = default;
+    };
+    enum class LifetimeScope {
+        SHARED,
+        FRAME,
+        TRANSIENT
+    };
+    struct LifetimeGroup {
+        LifetimeScope scope;
+        size_t instance;
+        constexpr auto operator<=>(const LifetimeGroup&) const = default;
+    };
+    struct BufferPlacement {
+        ResourceId resource;
+        size_t slot, offset;
+    };
+    template<BindingKey key, ResourceId resource>
+    struct ResourceBinding {
+        static constexpr auto KEY = key;
+        static constexpr auto RESOURCE = resource;
+    };
+    template<typename... Bindings>
+    struct BufferBindingMap {
+        static constexpr std::array<BindingKey, sizeof...(Bindings)> KEYS{Bindings::KEY...};
+        static constexpr std::array<ResourceId, sizeof...(Bindings)> RESOURCES{Bindings::RESOURCE...};
+        static_assert([] {
+            for (size_t i = 0; i < KEYS.size(); ++i)
+                for (size_t j = 0; j < i; ++j)
+                    if (KEYS[i] == KEYS[j])
+                        return false;
+            return true;
+        }(),
+                      "Duplicate buffer binding key");
+        template<BindingKey key>
+        static consteval ResourceId Resolve();
+    };
+
+    // 資源の宣言。bindingや物理slot番号はこのIDに含めない。
+    template<ResourceId id, typename Payload_, MemoryType usage, LifetimeScope scope = LifetimeScope::SHARED>
+    struct BufferResource {
         using PayloadTag = Payload_;
         using Payload = typename PayloadLayout<Payload_>::Payload;
         static constexpr auto USAGE = usage;
-        static constexpr std::array<size_t, 4> KEY{set, binding, element, frame};
+        static constexpr auto ID = id;
+        static constexpr auto SCOPE = scope;
         static_assert(std::is_trivially_copyable_v<Payload> && std::is_standard_layout_v<Payload>);
     };
 
@@ -41,34 +87,51 @@ namespace VSL_NAMESPACE::typed {
         static constexpr size_t COUNT = sizeof...(Slots);
         static constexpr size_t ALIGNMENT = COUNT ? storage::BufferLayout::ALIGNMENT : 1;
         static constexpr size_t BYTES = storage::BufferLayout::Bytes(COUNT);
-        static constexpr std::array<std::array<size_t, 4>, COUNT> KEYS{Slots::KEY...};
+        static constexpr std::array<ResourceId, COUNT> IDS{Slots::ID...};
+        static constexpr std::array<LifetimeScope, COUNT> SCOPES{Slots::SCOPE...};
+        static constexpr auto SCOPE = COUNT ? SCOPES[0] : LifetimeScope::SHARED;
+        static_assert(((Slots::SCOPE == SCOPE) && ...), "A buffer arena must contain one lifetime scope");
         static_assert([] {
             for (size_t i = 0; i < COUNT; ++i)
                 for (size_t j = 0; j < i; ++j)
-                    if (KEYS[i] == KEYS[j])
+                    if (IDS[i] == IDS[j])
                         return false;
             return true;
         }(),
-                      "Duplicate typed buffer slot key");
+                      "Duplicate buffer resource ID");
+        static constexpr std::array<BufferPlacement, COUNT> PLACEMENTS = [] {
+            std::array<BufferPlacement, COUNT> placements{};
+            for (size_t i = 0; i < COUNT; ++i)
+                placements[i] = {IDS[i], i, storage::BufferLayout::Offset(i)};
+            return placements;
+        }();
         std::array<BufferCreateInfo, COUNT> buffers;
-        constexpr explicit BufferArenaPlan(const std::array<size_t, COUNT>& counts);
+        constexpr explicit BufferArenaPlan(const std::array<size_t, COUNT>& counts, size_t lifetime_instance = 0);
+        constexpr LifetimeGroup lifetime() const { return _lifetime; }
         static constexpr size_t Offset(size_t index);
-        template<std::uint32_t set, std::uint32_t binding, size_t element = 0, size_t frame = 0>
+        template<ResourceId id>
         static consteval size_t Index();
+
+    private:
+        LifetimeGroup _lifetime;
     };
 
     template<typename... Slots>
     class TypedBufferArena {
         storage::BufferArena _storage;
+        LifetimeGroup _lifetime;
 
     public:
         using Plan = BufferArenaPlan<Slots...>;
-        explicit TypedBufferArena(LogicalDeviceAccessor device, const Plan& plan) : _storage(device, plan.buffers) {}
+        explicit TypedBufferArena(LogicalDeviceAccessor device, const Plan& plan) : _storage(device, plan.buffers), _lifetime(plan.lifetime()) {}
         TypedBufferArena(LogicalDeviceAccessor device, const Plan& plan, storage::ArenaMemory memory)
-            : _storage(device, plan.buffers, std::move(memory)) {}
+            : _storage(device, plan.buffers, std::move(memory)), _lifetime(plan.lifetime()) {}
         const storage::BufferArena& storage() const { return _storage; }
-        template<std::uint32_t set, std::uint32_t binding, size_t element = 0, size_t frame = 0>
+        LifetimeGroup lifetime() const { return _lifetime; }
+        template<ResourceId id>
         auto view() const;
+        template<typename Bindings, BindingKey key>
+        auto binding_view() const { return view<Bindings::template Resolve<key>()>(); }
     };
 
     template<typename Payload_, MemoryType usage>
@@ -90,6 +153,20 @@ namespace VSL_NAMESPACE::typed {
         _view.write(std::as_bytes(values));
     }
     template<typename Payload_, MemoryType usage>
+    void PlacedBufferView<Payload_, usage>::read_into(std::span<Payload> destination) const {
+        if (destination.size() != size())
+            throw std::invalid_argument("Typed placed buffer read must preserve record count");
+        _view.read_into(std::as_writable_bytes(destination));
+    }
+    template<typename... Bindings>
+    template<BindingKey key>
+    consteval ResourceId BufferBindingMap<Bindings...>::Resolve() {
+        for (size_t i = 0; i < KEYS.size(); ++i)
+            if (KEYS[i] == key)
+                return RESOURCES[i];
+        throw "Unknown buffer binding key";
+    }
+    template<typename Payload_, MemoryType usage>
     template<MemoryType destination_usage>
     requires(contain<usage, MemoryType::TRANSFER_SOURCE>() && contain<destination_usage, MemoryType::TRANSFER_DESTINATION>())
     command::CopyBuffer PlacedBufferView<Payload_, usage>::copy_to(const PlacedBufferView<Payload_, destination_usage>& destination, bool host_read) const {
@@ -98,7 +175,10 @@ namespace VSL_NAMESPACE::typed {
         return command::CopyBuffer(_view, destination.backend(), _view.size(), 0, 0, host_read);
     }
     template<typename... Slots>
-    constexpr BufferArenaPlan<Slots...>::BufferArenaPlan(const std::array<size_t, COUNT>& counts) {
+    constexpr BufferArenaPlan<Slots...>::BufferArenaPlan(const std::array<size_t, COUNT>& counts, size_t lifetime_instance)
+        : _lifetime{SCOPE, lifetime_instance} {
+        if (SCOPE == LifetimeScope::SHARED && lifetime_instance)
+            throw std::invalid_argument("Shared buffer lifetime instance must be zero");
         size_t index = 0;
         buffers = {BufferCreateInfo{helper::checked_buffer_array_size<typename Slots::Payload>(counts[index++]), Slots::USAGE}...};
     }
@@ -109,17 +189,17 @@ namespace VSL_NAMESPACE::typed {
         return storage::BufferLayout::Offset(index);
     }
     template<typename... Slots>
-    template<std::uint32_t set, std::uint32_t binding, size_t element, size_t frame>
+    template<ResourceId id>
     consteval size_t BufferArenaPlan<Slots...>::Index() {
         for (size_t i = 0; i < COUNT; ++i)
-            if (KEYS[i] == std::array<size_t, 4>{set, binding, element, frame})
+            if (IDS[i] == id)
                 return i;
-        throw "Unknown typed buffer slot";
+        throw "Unknown buffer resource ID";
     }
     template<typename... Slots>
-    template<std::uint32_t set, std::uint32_t binding, size_t element, size_t frame>
+    template<ResourceId id>
     auto TypedBufferArena<Slots...>::view() const {
-        constexpr auto index = Plan::template Index<set, binding, element, frame>();
+        constexpr auto index = Plan::template Index<id>();
         using Slot = std::tuple_element_t<index, std::tuple<Slots...>>;
         return PlacedBufferView<typename Slot::PayloadTag, Slot::USAGE>(_storage.view(index));
     }

@@ -10,7 +10,7 @@ namespace VSL_NAMESPACE {
         MemoryType usage() const;
         ResourceUseState& use() const;
         void write(std::span<const std::byte> bytes, size_t offset = 0) const;
-        std::span<const std::byte> read(size_t bytes, size_t offset = 0) const;
+        void read_into(std::span<std::byte> destination, size_t offset = 0) const;
     };
 
     // 公開viewはstorageを保持する。内部slotにこのowning viewを格納しない。
@@ -28,7 +28,7 @@ namespace VSL_NAMESPACE {
         size_t size() const { return _bytes; }
         BufferView view(size_t offset, size_t bytes) const;
         void write(std::span<const std::byte> bytes, size_t offset = 0) const;
-        std::span<const std::byte> read(size_t bytes, size_t offset = 0) const;
+        void read_into(std::span<std::byte> destination, size_t offset = 0) const;
         // 既存Typed/native bindingへ接続する移行用adapter。
         std::shared_ptr<impl::BufferImpl> legacy_owner() const { return {_owner, _ref.data}; }
         ResourceUse resource_use() const { return {{_owner, &_ref.use()}, _owner}; }

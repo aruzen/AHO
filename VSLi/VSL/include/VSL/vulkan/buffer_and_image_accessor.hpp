@@ -187,6 +187,8 @@ namespace VSL_NAMESPACE {
     ___VSL_EXPAND_FLAGS_OPERATOR(MemoryType);
 
     struct ImageAccessor;
+    class ResourceUseState;
+    struct ResourceUse;
 
     struct BufferAccessor {
         BufferAccessor() = default;
@@ -240,6 +242,7 @@ namespace VSL_NAMESPACE {
 
         private:
             std::shared_ptr<impl::BufferImpl> _owner;
+            void require_idle() const;
             void synchronize(std::size_t bytes, std::size_t offset, bool flush) const;
         };
 
@@ -273,6 +276,11 @@ namespace VSL_NAMESPACE {
         LogicalDeviceAccessor get_device() const;
         MemoryType get_usage() const;
         MemoryProperty get_memory_properties() const;
+        // 同じstorage世代を参照する入口は、この状態を共有する。
+        ResourceUseState& use_state() const;
+        ResourceUse resource_use() const;
+        ResourceUse resource_use(ResourceUse constraint) const;
+        void read_into(std::span<std::byte> destination, size_t offset = 0) const;
 
         static std::shared_ptr<impl::BufferImpl>
         MakeBuffer(VSL_NAMESPACE::LogicalDeviceAccessor device, size_t size, MemoryType mem_type,

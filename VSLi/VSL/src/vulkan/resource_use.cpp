@@ -63,15 +63,19 @@ namespace VSL_NAMESPACE {
             _uses.push_back(completion.data_);
     }
     void ResourceUse::record(const CommandBuffer& buffer) const {
-        if (!state && !owner)
+        if (!state && !owner.use_count() && !constraint_state && !constraint_owner.use_count())
             return;
         const auto completion = buffer.completion();
         if (!completion || completion.status() != Completion::Status::PENDING)
             throw std::logic_error("Tracked resources require a recording phase");
-        if (owner)
+        if (owner.use_count())
             completion.retain(owner);
+        if (constraint_owner.use_count())
+            completion.retain(constraint_owner);
         if (state)
             state->mark_used(completion);
+        if (constraint_state)
+            constraint_state->mark_used(completion);
     }
     ResourceUseGroup::ResourceUseGroup(size_t bindings, std::shared_ptr<void> owner)
         : _owner(std::move(owner)), _bindings(bindings) {}

@@ -232,7 +232,11 @@ void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::BufferAcce
     descriptor_write.pTexelBufferView = nullptr; // Optional
 
     auto owners = std::vector<std::shared_ptr<void>>{buffer->data_};
-    data_->bindings[static_cast<std::uint32_t>(binding)] = std::move(owners);
+    auto buffer_refs = std::vector<impl::GraphicResourceImpl::BufferBindingRef>{{buffer->data_.get(), 0}};
+    auto& refs = data_->buffer_refs.try_emplace(static_cast<std::uint32_t>(binding)).first->second;
+    auto& retained = data_->bindings.try_emplace(static_cast<std::uint32_t>(binding)).first->second;
+    retained = std::move(owners);
+    refs = std::move(buffer_refs);
     data_->pool->device->device.updateDescriptorSets({descriptor_write}, {});
 }
 
@@ -270,6 +274,7 @@ found_type:
     descriptor_write.pTexelBufferView = nullptr; // Optional
 
     data_->bindings[static_cast<std::uint32_t>(binding)] = {image.data_};
+    data_->buffer_refs.erase(static_cast<std::uint32_t>(binding));
     data_->pool->device->device.updateDescriptorSets({descriptor_write}, {});
 }
 
@@ -311,6 +316,7 @@ found_type:
     descriptor_write.pTexelBufferView = nullptr; // Optional
 
     data_->bindings[static_cast<std::uint32_t>(binding)] = {image.data_, sampler.data_};
+    data_->buffer_refs.erase(static_cast<std::uint32_t>(binding));
     data_->pool->device->device.updateDescriptorSets({descriptor_write}, {});
 }
 

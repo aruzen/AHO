@@ -313,6 +313,8 @@ VSL_NAMESPACE::DefaultPhaseStream VSL_NAMESPACE::ComputePhase::operator<<(std::s
 }
 
 VSL_NAMESPACE::DefaultPhaseStream& VSL_NAMESPACE::DefaultPhaseStream::operator<<(std::shared_ptr<command::Command> cmd) {
+    if (!cmd)
+        throw std::invalid_argument("Cannot record an empty command pointer");
     try {
         resolve_holder_require_ptr(cmd);
         cmd->invoke(manager.get_pool(), manager.get_buffer(), manager);
@@ -324,6 +326,8 @@ VSL_NAMESPACE::DefaultPhaseStream& VSL_NAMESPACE::DefaultPhaseStream::operator<<
 }
 
 VSL_NAMESPACE::DefaultPhaseStream& VSL_NAMESPACE::DefaultPhaseStream::operator<<(std::shared_ptr<command::DelegateCommand> cmd) {
+    if (!cmd)
+        throw std::invalid_argument("Cannot record an empty delegate pointer");
     try {
         resolve_holder_require_ptr(cmd);
         cmd->invoke(*this, manager.get_pool(), manager.get_buffer(), manager);

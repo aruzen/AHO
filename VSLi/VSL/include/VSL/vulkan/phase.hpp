@@ -120,6 +120,7 @@ namespace VSL_NAMESPACE {
         DefaultPhaseStream& operator<<(command::is_delegate_command auto cmd);
 
     private:
+        void invalidate_bindings() noexcept;
         template<typename T>
         void resolve_holder_require(T& t);
 
@@ -144,14 +145,24 @@ namespace VSL_NAMESPACE {
     }
 
     DefaultPhaseStream& DefaultPhaseStream::operator<<(command::is_command auto cmd) {
-        resolve_holder_require(cmd);
-        (&cmd)->invoke(manager.get_pool(), manager.get_buffer(), manager);
+        try {
+            resolve_holder_require(cmd);
+            (&cmd)->invoke(manager.get_pool(), manager.get_buffer(), manager);
+        } catch (...) {
+            invalidate_bindings();
+            throw;
+        }
         return *this;
     }
 
     DefaultPhaseStream& DefaultPhaseStream::operator<<(command::is_delegate_command auto cmd) {
-        resolve_holder_require(cmd);
-        (&cmd)->invoke(*this, manager.get_pool(), manager.get_buffer(), manager);
+        try {
+            resolve_holder_require(cmd);
+            (&cmd)->invoke(*this, manager.get_pool(), manager.get_buffer(), manager);
+        } catch (...) {
+            invalidate_bindings();
+            throw;
+        }
         return *this;
     }
 } // namespace VSL_NAMESPACE

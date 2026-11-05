@@ -313,13 +313,28 @@ VSL_NAMESPACE::DefaultPhaseStream VSL_NAMESPACE::ComputePhase::operator<<(std::s
 }
 
 VSL_NAMESPACE::DefaultPhaseStream& VSL_NAMESPACE::DefaultPhaseStream::operator<<(std::shared_ptr<command::Command> cmd) {
-    resolve_holder_require_ptr(cmd);
-    cmd->invoke(manager.get_pool(), manager.get_buffer(), manager);
+    try {
+        resolve_holder_require_ptr(cmd);
+        cmd->invoke(manager.get_pool(), manager.get_buffer(), manager);
+    } catch (...) {
+        invalidate_bindings();
+        throw;
+    }
     return *this;
 }
 
 VSL_NAMESPACE::DefaultPhaseStream& VSL_NAMESPACE::DefaultPhaseStream::operator<<(std::shared_ptr<command::DelegateCommand> cmd) {
-    resolve_holder_require_ptr(cmd);
-    cmd->invoke(*this, manager.get_pool(), manager.get_buffer(), manager);
+    try {
+        resolve_holder_require_ptr(cmd);
+        cmd->invoke(*this, manager.get_pool(), manager.get_buffer(), manager);
+    } catch (...) {
+        invalidate_bindings();
+        throw;
+    }
     return *this;
+}
+
+void VSL_NAMESPACE::DefaultPhaseStream::invalidate_bindings() noexcept {
+    vertex_size.reset();
+    pipeline.reset();
 }

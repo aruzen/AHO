@@ -139,6 +139,8 @@
     <ClInclude Include="VSL\include\VSL\lifetime\buffer_arena.hpp" />
     <ClInclude Include="VSL\include\VSL\lifetime\buffer_view.hpp" />
     <ClInclude Include="VSL\include\VSL\lifetime\typed_buffer_arena.hpp" />
+    <ClInclude Include="VSL\include\VSL\lifetime\typed_bundle_plan.hpp" />
+    <ClInclude Include="VSL\include\VSL\lifetime\typed_resource_buffer_view.hpp" />
     <ClInclude Include="VSL\include\VSL\lifetime\resource_use.hpp" />
     <ClInclude Include="VSL\include\VSL\sync\resource_use_state.hpp" />
     <ClInclude Include="VSL\include\VSL\sync\completion.hpp" />

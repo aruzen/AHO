@@ -6,7 +6,12 @@ namespace {
     namespace t = vsl::typed;
     using Resources = t::ResourceSchema<t::DescriptorSet<0, t::UniformBinding<0, float, vsl::ShaderFlag::VERTEX>, t::UniformBinding<1, std::uint32_t, vsl::ShaderFlag::VERTEX>>>;
     using Allocation = t::ResourceAllocationSchema<Resources, t::BufferAllocation<0, 0>, t::BufferAllocation<0, 1, t::FixedElements<1>, t::ResourceScope::SHARED>>;
-    using Bundle = t::TypedResourceBundle<Allocation>;
+#ifdef VSL_TYPED_BUNDLE_ARENA
+    using Storage = t::ArenaStorage<>;
+#else
+    using Storage = t::HeapStorage;
+#endif
+    using Bundle = t::TypedResourceBundle<Allocation, Storage>;
     using Textures = t::ResourceSchema<t::DescriptorSet<1, t::TextureBinding<2, vsl::ShaderFlag::FRAGMENT, 2>>>;
     using External = t::ResourceAllocationSchema<Textures, t::ExternalAllocation<1, 2>>;
 #if VSL_TYPED_CASE == 0
@@ -23,24 +28,24 @@ namespace {
             frame.buffer<0, 0>().copy(std::span(&value, 1));
         });
         bundle.get(phase).set<0>().require_complete();
-        t::TypedResourceBundle<External> external(manager, descriptors, t::external_resource<1, 2>(std::array{texture, texture}));
+        t::TypedResourceBundle<External, Storage> external(manager, descriptors, t::external_resource<1, 2>(std::array{texture, texture}));
     }
 #elif VSL_TYPED_CASE == 1
     void rejected(vsl::CommandManager manager, vsl::graphic_resource::ManagerInterface& descriptors, const t::TypedSampler& sampler) {
-        t::TypedResourceBundle<External> bundle(manager, descriptors, t::external_resource<1, 2>(std::array{sampler, sampler}));
+        t::TypedResourceBundle<External, Storage> bundle(manager, descriptors, t::external_resource<1, 2>(std::array{sampler, sampler}));
     }
 #elif VSL_TYPED_CASE == 2
     using One = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<0, t::UniformBinding<0, float, vsl::ShaderFlag::VERTEX>>>, t::ExternalAllocation<0, 0>>;
     void rejected(vsl::CommandManager manager, vsl::graphic_resource::ManagerInterface& descriptors, const t::TypedUniformBuffer<std::uint32_t>& buffer) {
-        t::TypedResourceBundle<One> bundle(manager, descriptors, t::external_resource<0, 0>(buffer));
+        t::TypedResourceBundle<One, Storage> bundle(manager, descriptors, t::external_resource<0, 0>(buffer));
     }
 #elif VSL_TYPED_CASE == 3
     void rejected(vsl::CommandManager manager, vsl::graphic_resource::ManagerInterface& descriptors, const t::TypedTexture& texture) {
-        t::TypedResourceBundle<External> bundle(manager, descriptors, t::external_resource<1, 2>(texture));
+        t::TypedResourceBundle<External, Storage> bundle(manager, descriptors, t::external_resource<1, 2>(texture));
     }
 #elif VSL_TYPED_CASE == 4
     void rejected(vsl::CommandManager manager, vsl::graphic_resource::ManagerInterface& descriptors) {
-        t::TypedResourceBundle<External> bundle(manager, descriptors);
+        t::TypedResourceBundle<External, Storage> bundle(manager, descriptors);
     }
 #elif VSL_TYPED_CASE == 5
     void rejected(vsl::CommandManager manager, vsl::graphic_resource::ManagerInterface& descriptors, const t::TypedUniformBuffer<float>& buffer) {
@@ -73,7 +78,7 @@ namespace {
 #elif VSL_TYPED_CASE == 12
     using Two = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<1, t::TextureBinding<2, vsl::ShaderFlag::FRAGMENT>, t::TextureBinding<3, vsl::ShaderFlag::FRAGMENT>>>, t::ExternalAllocation<1, 2>, t::ExternalAllocation<1, 3>>;
     void rejected(vsl::CommandManager manager, vsl::graphic_resource::ManagerInterface& descriptors, const t::TypedTexture& texture) {
-        t::TypedResourceBundle<Two> bundle(manager, descriptors, t::external_resource<1, 2>(texture), t::external_resource<1, 2>(texture));
+        t::TypedResourceBundle<Two, Storage> bundle(manager, descriptors, t::external_resource<1, 2>(texture), t::external_resource<1, 2>(texture));
     }
 #elif VSL_TYPED_CASE == 13
     void rejected(Bundle& bundle) {
@@ -83,5 +88,8 @@ namespace {
     void rejected(const Bundle::Frame& frame) {
         Bundle::Frame copy(frame);
     }
+#elif VSL_TYPED_CASE == 15
+    using Rejected = t::PlacedResourceBufferView<std::string, vsl::graphic_resource::Type::UNIFORM_BUFFER>;
+    static_assert(sizeof(Rejected));
 #endif
 } // namespace

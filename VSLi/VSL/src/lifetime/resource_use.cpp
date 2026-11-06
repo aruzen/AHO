@@ -19,16 +19,22 @@ namespace VSL_NAMESPACE {
         }
         return use;
     }
-    void ResourceUse::record(const CommandBuffer& buffer) const {
+    void ResourceUse::record(const CommandBuffer& buffer, ResourceRetention retention) const {
         if (!state && !owner.use_count() && !constraint_state && !constraint_owner.use_count())
             return;
         const auto completion = buffer.completion();
         if (!completion || completion.status() != Completion::Status::PENDING)
             throw std::logic_error("Tracked resources require a recording phase");
-        if (owner.use_count())
-            completion.retain(owner);
-        if (constraint_owner.use_count())
-            completion.retain(constraint_owner);
+        const auto retain = [&](const auto& owner) {
+            if (!owner.use_count())
+                return;
+            if (retention == ResourceRetention::COMPLETION)
+                buffer.retain_until_complete(owner);
+            else
+                completion.retain(owner);
+        };
+        retain(owner);
+        retain(constraint_owner);
         if (state)
             state->mark_used(completion);
         if (constraint_state)
@@ -36,11 +42,12 @@ namespace VSL_NAMESPACE {
     }
     ResourceUseGroup::ResourceUseGroup(size_t bindings, std::shared_ptr<void> owner)
         : _owner(std::move(owner)), _bindings(bindings) {}
-    std::shared_ptr<ResourceUseGroup> ResourceUseGroup::ForDescriptor(size_t bindings, const std::shared_ptr<impl::GraphicResourceImpl>& resource) {
+    std::shared_ptr<ResourceUseGroup> ResourceUseGroup::ForDescriptor(size_t bindings, const std::shared_ptr<impl::GraphicResourceImpl>& resource, ResourceRetention retention) {
         if (!resource)
             throw std::invalid_argument("Descriptor use requires a resource");
         auto group = std::make_shared<ResourceUseGroup>(bindings, resource);
         group->_resource = resource.get();
+        group->_retention = retention;
         return group;
     }
     void ResourceUseGroup::require_idle() const {
@@ -54,13 +61,17 @@ namespace VSL_NAMESPACE {
         const auto completion = buffer.completion();
         if (!completion || completion.status() != Completion::Status::PENDING)
             throw std::logic_error("Tracked descriptor sets require a recording phase");
-        if (_owner.use_count())
-            completion.retain(_owner);
+        if (_owner.use_count()) {
+            if (_retention == ResourceRetention::COMPLETION)
+                buffer.retain_until_complete(_owner);
+            else
+                completion.retain(_owner);
+        }
         _state.mark_used(completion);
         if (_resource)
-            lifetime::record_descriptor_buffers(*_resource, buffer);
+            lifetime::record_descriptor_buffers(*_resource, buffer, _retention);
         for (const auto& binding : _bindings)
             for (const auto& resource : binding)
-                resource.record(buffer);
+                resource.record(buffer, _retention);
     }
 } // namespace VSL_NAMESPACE

@@ -118,7 +118,7 @@ namespace VSL_NAMESPACE::typed {
     public:
         using Spec = Spec_;
         using Layout = typename Spec::Layout;
-        TypedDescriptorSet(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager);
+        TypedDescriptorSet(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, ResourceRetention retention = ResourceRetention::SUBMISSION);
         const GraphicResource& backend() const { return _resource; }
         LogicalDeviceAccessor device() const { return _device; }
         const std::shared_ptr<ResourceUseGroup>& resource_use() const { return _use; }
@@ -202,14 +202,14 @@ namespace VSL_NAMESPACE::typed {
             throw std::runtime_error("Typed descriptor buffer upload failed");
     }
     template<typename Spec>
-    TypedDescriptorSet<Spec>::TypedDescriptorSet(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager)
+    TypedDescriptorSet<Spec>::TypedDescriptorSet(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, ResourceRetention retention)
         : _initialized(std::make_shared<std::array<bool, Spec::BINDING_COUNT>>()), _device(device) {
         graphic_resource::BindingLayout layout(device, std::vector<graphic_resource::BindingPoint>(Spec::POINTS.begin(), Spec::POINTS.end()));
         auto [pools, resources] = manager.allocate({layout});
         if (resources.size() != 1)
             throw std::runtime_error("Typed descriptor allocation failed");
         _resource = resources.front();
-        _use = ResourceUseGroup::ForDescriptor(Spec::BINDING_COUNT, _resource.data_);
+        _use = ResourceUseGroup::ForDescriptor(Spec::BINDING_COUNT, _resource.data_, retention);
     }
     template<typename Spec>
     void TypedDescriptorSet<Spec>::require_complete() const {

@@ -1,4 +1,5 @@
 #include <AHO/resource/typed_buffer.hpp>
+#include <AHO/resource/imported_buffer.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
 #include <string>
 
@@ -28,7 +29,7 @@ namespace {
     static_assert(std::same_as<decltype(r::vertex_view<Vertex>(std::declval<const Device&>())), t::TypedVertexBufferView<Vertex>>);
     static_assert(std::same_as<decltype(r::uniform_view<std::uint32_t>(std::declval<const Host&>())), t::TypedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>>);
 
-    [[maybe_unused]] void contract(Host& host, Device& gpu, Transfer& transfer, r::Buffer<r::BufferType::GENERAL>& cpu, t::TypedDescriptorSet<Set>& set, Pipeline& pipeline) {
+    [[maybe_unused]] void contract(Host& host, Device& gpu, Transfer& transfer, r::Buffer<r::BufferType::GENERAL>& cpu, t::TypedDescriptorSet<Set>& set, Pipeline& pipeline, r::ImportedBuffer& imported) {
 #if VSL_TYPED_CASE == 1
         r::uniform_view<std::uint32_t>(transfer);
 #elif VSL_TYPED_CASE == 2
@@ -43,10 +44,21 @@ namespace {
         pipeline.bind_vertices(r::vertex_view<OtherVertex>(host));
 #elif VSL_TYPED_CASE == 7
         r::vertex_view<Nontrivial>(host);
+#elif VSL_TYPED_CASE == 8
+        imported.reserve(128);
+#elif VSL_TYPED_CASE == 9
+        auto ref = host.binding().snapshot().storage().ref();
+#elif VSL_TYPED_CASE == 10
+        set.write<0>(r::uniform_view<float>(imported));
+#elif VSL_TYPED_CASE == 11
+        const auto snapshot = host.binding().snapshot();
+        auto ref = std::move(snapshot).storage().ref();
 #else
         set.write<0>(r::uniform_view<std::uint32_t>(host, 0, 1));
         pipeline.bind_vertices(r::vertex_view<Vertex>(host)).draw(3);
         pipeline.bind_vertices(r::vertex_view<Vertex>(gpu)).draw(3);
+        pipeline.bind_vertices(r::vertex_view<Vertex>(imported)).draw(3);
+        set.write<0>(r::uniform_view<std::uint32_t>(imported));
 #endif
     }
 } // namespace

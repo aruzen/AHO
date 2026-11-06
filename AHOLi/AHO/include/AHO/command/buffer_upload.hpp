@@ -1,5 +1,6 @@
 #pragma once
 #include <AHO/resource/buffer.hpp>
+#include <AHO/resource/imported_buffer.hpp>
 #include <VSL/vulkan/command.hpp>
 
 namespace AHO_NAMESPACE::command {
@@ -20,6 +21,10 @@ namespace AHO_NAMESPACE::command {
 } // namespace AHO_NAMESPACE::command
 
 namespace AHO_NAMESPACE::resource {
+    template<gpu_buffer Source>
+    AHO_NAMESPACE::command::BufferUpload ImportedBuffer::upload(const Source& source, size_t destination_offset, size_t source_offset, std::optional<size_t> bytes) const {
+        return AHO_NAMESPACE::command::BufferUpload(binding(), source.binding(), destination_offset, source_offset, bytes);
+    }
     template<typename Storage, typename Customization>
     AHO_NAMESPACE::command::BufferUpload detail::GPUBufferBase<Storage, Customization>::upload(const Buffer<BufferType::GENERAL>& source, std::size_t offset) const {
         return AHO_NAMESPACE::command::BufferUpload(binding(), source, offset);

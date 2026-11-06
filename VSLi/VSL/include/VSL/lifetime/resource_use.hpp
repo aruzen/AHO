@@ -2,6 +2,10 @@
 #include "../sync/resource_use_state.hpp"
 
 namespace VSL_NAMESPACE {
+    enum class ResourceRetention {
+        SUBMISSION,
+        COMPLETION
+    };
     struct CommandBuffer;
     struct ResourceUse {
         std::shared_ptr<ResourceUseState> state;
@@ -11,7 +15,7 @@ namespace VSL_NAMESPACE {
         std::shared_ptr<ResourceUseState> constraint_state;
         std::shared_ptr<void> constraint_owner;
         static ResourceUse ForBuffer(const std::shared_ptr<impl::BufferImpl>& buffer, ResourceUse constraint);
-        void record(const CommandBuffer& buffer) const;
+        void record(const CommandBuffer& buffer, ResourceRetention retention = ResourceRetention::SUBMISSION) const;
     };
 
     // bind_resources()以降の更新も含め、記録時点のdescriptor bindingを参照する。
@@ -19,11 +23,12 @@ namespace VSL_NAMESPACE {
         ResourceUseState _state;
         std::shared_ptr<void> _owner;
         impl::GraphicResourceImpl* _resource = nullptr;
+        ResourceRetention _retention = ResourceRetention::SUBMISSION;
         std::vector<std::vector<ResourceUse>> _bindings;
 
     public:
         explicit ResourceUseGroup(size_t bindings, std::shared_ptr<void> owner = {});
-        static std::shared_ptr<ResourceUseGroup> ForDescriptor(size_t bindings, const std::shared_ptr<impl::GraphicResourceImpl>& resource);
+        static std::shared_ptr<ResourceUseGroup> ForDescriptor(size_t bindings, const std::shared_ptr<impl::GraphicResourceImpl>& resource, ResourceRetention retention = ResourceRetention::SUBMISSION);
         bool tracks_descriptor(const impl::GraphicResourceImpl* resource) const { return _resource && _resource == resource; }
         void require_idle() const;
         void replace(size_t binding, std::vector<ResourceUse> resources);

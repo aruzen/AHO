@@ -198,8 +198,22 @@ if (VSL_TEST_SOURCES)
             "-DTEST_CASE=${case}" "-DTEST_EXPECTED=TypedResourceBundle|buffer|copy|update|deleted"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
         set_tests_properties("VSL.TypedBundle.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+        add_test(NAME "VSL.TypedArenaBundle.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_resource_bundle.cpp"
+            "-DTEST_EXTRA_DEFINITIONS=VSL_TYPED_BUNDLE_ARENA"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=TypedResourceBundle|buffer|copy|update|deleted"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.TypedArenaBundle.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
     endforeach()
     add_library(vsl-bundle-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_resource_bundle.cpp)
+    add_test(NAME VSL.TypedArenaBundle.Compile.NontrivialView COMMAND "${CMAKE_COMMAND}"
+        "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+        "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_resource_bundle.cpp"
+        "-DTEST_CASE=15" "-DTEST_EXPECTED=is_trivially_copyable"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+    set_tests_properties(VSL.TypedArenaBundle.Compile.NontrivialView PROPERTIES LABELS compile TIMEOUT 60)
+    target_link_libraries(vsl-bundle-style-contract PRIVATE VSL)
     target_compile_definitions(vsl-bundle-style-contract PRIVATE VSL_TYPED_CASE=0)
     target_include_directories(vsl-bundle-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
 endif ()

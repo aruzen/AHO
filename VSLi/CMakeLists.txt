@@ -61,6 +61,8 @@ add_library(VSL STATIC
         VSL/include/VSL/lifetime/buffer_arena.hpp
         VSL/include/VSL/lifetime/buffer_view.hpp
         VSL/include/VSL/lifetime/typed_buffer_arena.hpp
+        VSL/include/VSL/lifetime/typed_bundle_plan.hpp
+        VSL/include/VSL/lifetime/typed_resource_buffer_view.hpp
         VSL/include/VSL/lifetime/resource_use.hpp
         VSL/include/VSL/sync/resource_use_state.hpp
         VSL/include/VSL/sync/completion.hpp

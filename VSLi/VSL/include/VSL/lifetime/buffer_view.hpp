@@ -11,6 +11,7 @@ namespace VSL_NAMESPACE {
         ResourceUseState& use() const;
         void write(std::span<const std::byte> bytes, size_t offset = 0) const;
         void read_into(std::span<std::byte> destination, size_t offset = 0) const;
+        void fill(std::byte value) const;
     };
 
     // 公開viewはstorageを保持する。内部slotにこのowning viewを格納しない。

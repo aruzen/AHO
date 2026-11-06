@@ -1,4 +1,5 @@
 include("${TEST_ENVIRONMENT}")
+list(APPEND TEST_DEFINITIONS ${TEST_EXTRA_DEFINITIONS})
 set(arguments)
 if(TEST_COMPILER_ID STREQUAL "MSVC" OR TEST_FRONTEND STREQUAL "MSVC")
     list(APPEND arguments /nologo /EHsc /std:c++latest /permissive- /Zc:preprocessor /utf-8 /DNOMINMAX /Zs "/DVSL_TYPED_CASE=${TEST_CASE}")

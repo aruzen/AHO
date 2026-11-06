@@ -18,6 +18,12 @@ namespace VSL_NAMESPACE {
             throw std::logic_error("Buffer reference has no use state");
         return *data->use;
     }
+    void BufferRef::fill(std::byte value) const {
+        use().require_idle();
+        auto* destination = operation::map_buffer(*data, 0, size());
+        std::memset(destination, std::to_integer<int>(value), size());
+        operation::synchronize_buffer(*data, 0, size(), true);
+    }
     void BufferRef::write(std::span<const std::byte> bytes, size_t offset) const {
         use().require_idle();
         auto* destination = operation::map_buffer(*data, offset, bytes.size());

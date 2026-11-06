@@ -23,11 +23,15 @@ namespace VSL_NAMESPACE::lifetime {
         if (accepted.use_count() && !contains_owner(resources, accepted))
             resources.push_back(std::move(accepted));
     }
-    void record_descriptor_buffers(const impl::GraphicResourceImpl& resource, const CommandBuffer& buffer) {
+    void record_descriptor_buffers(const impl::GraphicResourceImpl& resource, const CommandBuffer& buffer, ResourceRetention retention) {
         const auto completion = buffer.completion();
         for (const auto& [binding, refs] : resource.buffer_refs)
             for (const auto& ref : refs) {
-                buffer.retain(resource.bindings.at(binding).at(ref.owner_index));
+                const auto& owner = resource.bindings.at(binding).at(ref.owner_index);
+                if (retention == ResourceRetention::COMPLETION)
+                    buffer.retain_until_complete(owner);
+                else
+                    buffer.retain(owner);
                 ref.buffer->use->mark_used(completion);
             }
     }

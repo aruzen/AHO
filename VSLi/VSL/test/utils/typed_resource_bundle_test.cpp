@@ -14,6 +14,7 @@ namespace {
                                                    t::BufferAllocation<2, 3, t::RuntimeElements>,
                                                    t::BufferAllocation<5, 0, t::FixedElements<1>, t::ResourceScope::SHARED>>;
     using Bundle = t::TypedResourceBundle<Allocation>;
+    using ArenaBundle = t::TypedResourceBundle<Allocation, t::ArenaStorage<>>;
     class TypedBundleVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
@@ -25,7 +26,8 @@ namespace {
         std::tuple<std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>> allocate(std::vector<vsl::graphic_resource::BindingLayout> layouts) override;
     };
     t::ResourceAllocationSizes<Allocation> sizes();
-    void initialize_shared(Bundle& bundle);
+    template<typename B>
+    void initialize_shared(B& bundle);
     void host_read_barrier(vsl::CommandManager manager, std::uint32_t slot);
 
     auto CountingManager::allocate(std::vector<vsl::graphic_resource::BindingLayout> layouts)
@@ -44,12 +46,13 @@ namespace {
         result.set<2, 3>(4);
         return result;
     }
-    void initialize_shared(Bundle& bundle) {
-        bundle.initialize_shared([](Bundle::Shared& shared) {
+    template<typename B>
+    void initialize_shared(B& bundle) {
+        bundle.initialize_shared([](typename B::Shared& shared) {
             const std::uint32_t bias = 10, first = 20, second = 30;
-            shared.buffer<2, 1>().copy(std::span(&bias, 1));
-            shared.buffer<5, 0, 0>().copy(std::span(&first, 1));
-            shared.buffer<5, 0, 1>().copy(std::span(&second, 1));
+            shared.template buffer<2, 1>().copy(std::span(&bias, 1));
+            shared.template buffer<5, 0, 0>().copy(std::span(&first, 1));
+            shared.template buffer<5, 0, 1>().copy(std::span(&second, 1));
         });
     }
     void host_read_barrier(vsl::CommandManager manager, std::uint32_t slot) {
@@ -94,6 +97,192 @@ namespace {
         EXPECT_NE(local_sets[0], local_sets[1]);
         EXPECT_EQ(shared_sets[0], shared_sets[1]);
         EXPECT_EQ(shared_sets[1], shared_sets[2]);
+    }
+
+    TEST_F(TypedBundleVulkanIntegrationTest, ArenaPolicyPlacesBuffersContiguouslyWithinSeparateLifetimeGroups) {
+        auto manager = make_manager().independent(3);
+        CountingManager descriptors(device);
+        ArenaBundle bundle(manager, descriptors, sizes());
+        EXPECT_EQ(bundle.placement_plan().buffers(t::ResourceScope::SHARED).size(), 3u);
+        EXPECT_EQ(bundle.placement_plan().buffers(t::ResourceScope::PER_FRAME).size(), 2u);
+        std::array<const void*, 3> local{}, shared{};
+        for (size_t slot = 0; slot < 3; ++slot) {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            const auto& frame = bundle.get(phase);
+            const auto& first = frame.buffer<2, 0>().backend();
+            const auto& second = frame.buffer<2, 3>().backend();
+            local[slot] = first.owner().get();
+            shared[slot] = frame.buffer<2, 1>().backend().owner().get();
+            EXPECT_EQ(first.owner(), second.owner());
+            EXPECT_NE(local[slot], shared[slot]);
+            EXPECT_EQ(reinterpret_cast<const std::byte*>(second.ref().data) - reinterpret_cast<const std::byte*>(first.ref().data), vsl::storage::BufferLayout::STRIDE);
+            std::array<std::uint32_t, 4> zero{1, 1, 1, 1};
+            frame.buffer<2, 3>().read_into(zero);
+            EXPECT_EQ(zero, (std::array<std::uint32_t, 4>{}));
+            phase.cancel();
+            manager.get_buffer().next();
+        }
+        EXPECT_NE(local[0], local[1]);
+        EXPECT_NE(local[1], local[2]);
+        EXPECT_EQ(shared[0], shared[1]);
+        EXPECT_EQ(shared[1], shared[2]);
+    }
+
+    TEST_F(TypedBundleVulkanIntegrationTest, ArenaResourcesReachTheShaderThroughArraysAndFrameReuse) {
+        auto manager = make_manager().independent(3);
+        CountingManager descriptors(device);
+        ArenaBundle bundle(manager, descriptors, sizes());
+        initialize_shared(bundle);
+        vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_bundle.comp.spv"));
+        t::TypedComputePipeline<Resources> pipeline(device, vsl::pipeline_layout::ShaderGroup("arena bundle", {shader}));
+        for (std::uint32_t iteration = 0; iteration < 12; ++iteration) {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            bundle.update(phase, [&](ArenaBundle::Frame& frame) {
+                frame.buffer<2, 0>().copy(std::span(&iteration, 1));
+            });
+            const auto& frame = bundle.get(phase);
+            phase << frame.bind_resources(pipeline).dispatch(4);
+            EXPECT_THROW((frame.buffer<2, 3>().read_into(std::span<std::uint32_t>{})), std::invalid_argument);
+            std::array<std::uint32_t, 4> result{};
+            EXPECT_THROW((frame.buffer<2, 3>().read_into(result)), std::logic_error);
+            host_read_barrier(manager, phase.frame_slot);
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            ASSERT_TRUE(phase.completion().wait());
+            frame.buffer<2, 3>().read_into(result);
+            for (size_t i = 0; i < result.size(); ++i)
+                EXPECT_EQ(result[i], iteration + 60u + i);
+        }
+    }
+
+    TEST_F(TypedBundleVulkanIntegrationTest, OneResourceCanServeMultipleBindingsWithoutDuplicateStorage) {
+        using Map = t::BufferBindingMap<t::ResourceBinding<t::BindingKey{5, 0, 0}, t::ResourceId{42}>,
+                                        t::ResourceBinding<t::BindingKey{5, 0, 1}, t::ResourceId{42}>>;
+        using Aliased = t::TypedResourceBundle<Allocation, t::ArenaStorage<Map>>;
+        auto manager = make_manager();
+        CountingManager descriptors(device);
+        Aliased bundle(manager, descriptors, sizes());
+        initialize_shared(bundle);
+        EXPECT_EQ(bundle.placement_plan().buffers(t::ResourceScope::SHARED).size(), 2u);
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        const auto& frame = bundle.get(phase);
+        EXPECT_EQ((frame.buffer<5, 0, 0>().backend().ref().data), (frame.buffer<5, 0, 1>().backend().ref().data));
+        std::array<std::uint32_t, 1> value{};
+        frame.buffer<5, 0, 0>().read_into(value);
+        EXPECT_EQ(value[0], 30u);
+    }
+
+    TEST_F(TypedBundleVulkanIntegrationTest, CancelReleasesFrameArenaWhileSharedViewAndCompletionRemainAlive) {
+        auto manager = make_manager();
+        CountingManager descriptors(device);
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        const auto completion = phase.completion();
+        std::weak_ptr<void> local, shared;
+        std::optional<t::PlacedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>> kept;
+        {
+            ArenaBundle bundle(manager, descriptors, sizes());
+            const auto& frame = bundle.get(phase);
+            local = frame.buffer<2, 0>().backend().owner();
+            shared = frame.buffer<2, 1>().backend().owner();
+            kept.emplace(frame.buffer<2, 1>());
+            frame.set<2>().resource_use()->record(manager.get_buffer());
+        }
+        EXPECT_FALSE(local.expired());
+        phase.cancel();
+        EXPECT_EQ(completion.status(), vsl::Completion::Status::CANCELLED);
+        EXPECT_TRUE(local.expired());
+        EXPECT_FALSE(shared.expired());
+        kept.reset();
+        EXPECT_TRUE(shared.expired());
+    }
+
+    TEST_F(TypedBundleVulkanIntegrationTest, SubmittedArenaBundleIsReleasedAfterGpuCompletionWithSavedCompletion) {
+        auto manager = make_manager();
+        CountingManager descriptors(device);
+        vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_bundle.comp.spv"));
+        t::TypedComputePipeline<Resources> pipeline(device, vsl::pipeline_layout::ShaderGroup("arena lifetime", {shader}));
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        const auto completion = phase.completion();
+        std::weak_ptr<void> owner;
+        {
+            ArenaBundle bundle(manager, descriptors, sizes());
+            const auto& frame = bundle.get(phase);
+            owner = frame.buffer<2, 3>().backend().owner();
+            phase << frame.bind_resources(pipeline).dispatch(4);
+        }
+        EXPECT_FALSE(owner.expired());
+        ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        ASSERT_TRUE(completion.wait());
+        EXPECT_TRUE(owner.expired());
+    }
+
+    TEST_F(TypedBundleVulkanIntegrationTest, ArenaFailureUnwindsSetsAndCanBeRetried) {
+        auto manager = make_manager().independent(3);
+        CountingManager descriptors(device);
+        descriptors.fail_after = 2;
+        EXPECT_THROW((ArenaBundle(manager, descriptors, sizes())), std::runtime_error);
+        for (const auto& record : descriptors.records)
+            EXPECT_TRUE(record.expired());
+        descriptors.fail_after = SIZE_MAX;
+        EXPECT_NO_THROW((ArenaBundle(manager, descriptors, sizes())));
+    }
+
+    TEST_F(TypedBundleVulkanIntegrationTest, CommandKeepsArenaAfterOriginalBundleAndRecordingPhaseAreGone) {
+        auto manager = make_manager();
+        CountingManager descriptors(device);
+        vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_bundle.comp.spv"));
+        t::TypedComputePipeline<Resources> pipeline(device, vsl::pipeline_layout::ShaderGroup("deferred arena", {shader}));
+        std::weak_ptr<void> owner;
+        vsl::Completion completed;
+        {
+            auto command = [&] {
+                auto phase = manager.start_phase<vsl::ComputePhase>();
+                ArenaBundle bundle(manager, descriptors, sizes());
+                const auto& frame = bundle.get(phase);
+                owner = frame.buffer<2, 3>().backend().owner();
+                auto result = frame.bind_resources(pipeline).dispatch(4);
+                phase.cancel();
+                return result;
+            }();
+            EXPECT_FALSE(owner.expired());
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << command;
+            completed = phase.completion();
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            ASSERT_TRUE(completed.wait());
+            EXPECT_FALSE(owner.expired());
+        }
+        EXPECT_TRUE(owner.expired());
+    }
+
+    TEST_F(TypedBundleVulkanIntegrationTest, ExternalBufferUsesNoSlotAndSharesPhysicalUpdateConstraints) {
+        using External = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>>>, t::ExternalAllocation<0, 0>>;
+        auto manager = make_manager();
+        CountingManager descriptors(device);
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        const auto completion = phase.completion();
+        std::weak_ptr<vsl::impl::BufferImpl> owner;
+        {
+            t::TypedUniformBuffer<std::uint32_t> external(device, 7u);
+            owner = external.backend().data_;
+            t::TypedResourceBundle<External, t::ArenaStorage<>> bundle(manager, descriptors, t::external_resource<0, 0>(external));
+            EXPECT_EQ(bundle.placement_plan().total_bytes(), 0u);
+            bundle.get(phase).set<0>().resource_use()->record(manager.get_buffer());
+            const std::uint32_t value = 8;
+            EXPECT_THROW(external.copy(std::span(&value, 1)), std::logic_error);
+        }
+        EXPECT_FALSE(owner.expired());
+        phase.cancel();
+        EXPECT_TRUE(owner.expired());
+        EXPECT_EQ(completion.status(), vsl::Completion::Status::CANCELLED);
+    }
+
+    TEST_F(TypedBundleVulkanIntegrationTest, InvalidResourceAliasFailsBeforeAnyDescriptorAllocation) {
+        using Map = t::BufferBindingMap<t::ResourceBinding<t::BindingKey{2, 0}, t::ResourceId{42}>,
+                                        t::ResourceBinding<t::BindingKey{2, 1}, t::ResourceId{42}>>;
+        auto manager = make_manager();
+        CountingManager descriptors(device);
+        EXPECT_THROW((t::TypedResourceBundle<Allocation, t::ArenaStorage<Map>>(manager, descriptors, sizes())), std::invalid_argument);
+        EXPECT_EQ(descriptors.allocations, 0u);
     }
 
     TEST_F(TypedBundleVulkanIntegrationTest, AutomaticallyConnectedSparseSetsAndArraysReachTheShaderAcrossSlotReuse) {

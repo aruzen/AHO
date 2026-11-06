@@ -119,6 +119,13 @@ namespace {
             std::array<std::uint32_t, 4> zero{1, 1, 1, 1};
             frame.buffer<2, 3>().read_into(zero);
             EXPECT_EQ(zero, (std::array<std::uint32_t, 4>{}));
+            auto slice = frame.buffer<2, 3>().view(1, 2);
+            slice.copy(std::array<std::uint32_t, 2>{7, 9});
+            frame.buffer<2, 3>().read_into(zero);
+            EXPECT_EQ(zero, (std::array<std::uint32_t, 4>{0, 7, 9, 0}));
+            EXPECT_EQ(slice.backend().owner(), second.owner());
+            EXPECT_THROW(slice.copy(std::array<std::uint32_t, 1>{}), std::invalid_argument);
+            EXPECT_THROW((frame.buffer<2, 3>().view(4, 1)), std::out_of_range);
             phase.cancel();
             manager.get_buffer().next();
         }

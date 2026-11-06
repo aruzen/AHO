@@ -7,6 +7,9 @@
 namespace {
     static_assert(aho::resource::gpu_buffer<aho::resource::ArenaBuffer>);
     static_assert(std::is_copy_constructible_v<aho::resource::ArenaBuffer>);
+    static_assert(!std::is_base_of_v<aho::resource::ImportedBuffer, aho::resource::ArenaBuffer>);
+    static_assert(!std::is_convertible_v<aho::resource::ArenaBuffer, aho::resource::ImportedBuffer>);
+    static_assert(!std::is_constructible_v<aho::resource::ImportedBuffer, const aho::resource::ArenaBuffer&>);
 } // namespace
 #ifdef AHO_GPU_TESTS
 #include "support/vulkan_fixture.hpp"
@@ -134,7 +137,7 @@ namespace {
         pending.cancel();
         EXPECT_TRUE(candidate.expired());
     }
-    TEST_F(ArenaBufferVulkanIntegrationTest, GenerationRetainsFactoryContextUntilItsFinalSnapshotIsDestroyed) {
+    TEST_F(ArenaBufferVulkanIntegrationTest, SnapshotDoesNotRetainFactoryConfigurationOrTheLatestGeneration) {
         std::weak_ptr<int> context;
         std::optional<r::BufferSnapshot> old;
         std::weak_ptr<void> latest;
@@ -150,9 +153,84 @@ namespace {
             latest = buffer.binding().owner();
         }
         EXPECT_TRUE(latest.expired());
-        EXPECT_FALSE(context.expired());
-        old.reset();
         EXPECT_TRUE(context.expired());
+        std::array<std::byte, 4> result{};
+        EXPECT_NO_THROW(old->read_into(result));
+        old.reset();
+    }
+    TEST_F(ArenaBufferVulkanIntegrationTest, ExplicitSnapshotImportKeepsItsFixedCapacityAndOldGeneration) {
+        auto growing = r::make_arena_buffer(device, 4);
+        const std::uint32_t initial = 7, changed = 23;
+        growing.write(std::as_bytes(std::span(&initial, 1)));
+        const auto snapshot = growing.binding().snapshot();
+        auto fixed = r::import_buffer(snapshot.storage());
+        auto alias = fixed;
+        growing.reserve(64);
+        growing.write(std::as_bytes(std::span(&changed, 1)));
+        EXPECT_EQ(fixed.capacity(), 4u);
+        EXPECT_EQ(alias.capacity(), 4u);
+        EXPECT_EQ(growing.capacity(), 64u);
+        std::uint32_t result = 0;
+        fixed.read_into(std::as_writable_bytes(std::span(&result, 1)));
+        EXPECT_EQ(result, initial);
+        EXPECT_THROW(fixed.resize(8), std::out_of_range);
+        alias.resize(0);
+        EXPECT_EQ(fixed.size(), 0u);
+        EXPECT_EQ(growing.size(), 4u);
+    }
+    TEST_F(ArenaBufferVulkanIntegrationTest, SharedArenaSlotsKeepTheirCanonicalOwnerAndRetainItOnce) {
+        const std::array<vsl::BufferCreateInfo, 2> infos{{{4, r::detail::STANDARD_BUFFER_USAGE}, {4, r::detail::STANDARD_BUFFER_USAGE}}};
+        vsl::lifetime::BufferArena arena(device, infos);
+        const std::weak_ptr<void> owner = arena.owner();
+        r::ArenaBuffer first(device, 4, [view = arena.view(0)](auto, size_t) { return view; });
+        r::ArenaBuffer second(device, 4, [view = arena.view(1)](auto, size_t) { return view; });
+        const auto a = first.binding().owner(), b = second.binding().owner();
+        EXPECT_FALSE(a.owner_before(owner));
+        EXPECT_FALSE(owner.owner_before(a));
+        EXPECT_FALSE(a.owner_before(b));
+        EXPECT_FALSE(b.owner_before(a));
+        const auto first_view = r::uniform_view<std::uint32_t>(first);
+        const auto second_view = r::storage_view<std::uint32_t>(second);
+        EXPECT_NE(first_view.descriptor().use.state, second_view.descriptor().use.state);
+        auto manager = make_manager();
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        const auto baseline = owner.use_count();
+        phase << second.upload(first);
+        EXPECT_EQ(owner.use_count(), baseline + 1);
+        first_view.descriptor().use.record(manager.get_buffer(), vsl::ResourceRetention::COMPLETION);
+        second_view.descriptor().use.record(manager.get_buffer(), vsl::ResourceRetention::COMPLETION);
+        EXPECT_EQ(owner.use_count(), baseline + 1);
+        EXPECT_TRUE(first.busy());
+        EXPECT_TRUE(second.busy());
+        EXPECT_THROW(arena.borrow(0).fill(std::byte{}), std::logic_error);
+        EXPECT_THROW(arena.borrow(1).fill(std::byte{}), std::logic_error);
+        phase.cancel();
+        EXPECT_EQ(owner.use_count(), baseline);
+        EXPECT_FALSE(first.busy());
+        EXPECT_FALSE(second.busy());
+    }
+    TEST_F(ArenaBufferVulkanIntegrationTest, ReturnedOwnerKeepsResourceDependenciesAfterTheFactoryIsReleased) {
+        struct Storage {
+            std::shared_ptr<int> dependency;
+            vsl::lifetime::BufferArena arena;
+        };
+        std::weak_ptr<int> dependency;
+        std::optional<r::BufferSnapshot> snapshot;
+        {
+            auto token = std::make_shared<int>(19);
+            dependency = token;
+            const vsl::BufferCreateInfo info{4, r::detail::STANDARD_BUFFER_USAGE};
+            auto owner = std::make_shared<Storage>(token, vsl::lifetime::BufferArena(device, std::span(&info, 1)));
+            auto buffer = r::make_arena_buffer(device, 4, [owner](auto, size_t) {
+                return vsl::BufferView(owner->arena.borrow(0), owner, 0, 4);
+            });
+            snapshot.emplace(buffer.binding().snapshot());
+        }
+        EXPECT_FALSE(dependency.expired());
+        std::array<std::byte, 4> result{};
+        EXPECT_NO_THROW(snapshot->read_into(result));
+        snapshot.reset();
+        EXPECT_TRUE(dependency.expired());
     }
     TEST_F(ArenaBufferVulkanIntegrationTest, FactoryCannotReuseTheCurrentImplOrDropRequiredUsage) {
         const vsl::BufferCreateInfo info{128, r::detail::STANDARD_BUFFER_USAGE};

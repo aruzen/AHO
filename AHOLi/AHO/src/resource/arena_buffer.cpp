@@ -3,74 +3,69 @@
 #include <vector>
 
 namespace AHO_NAMESPACE::resource::detail {
-    struct ArenaBufferProvider {
+    struct ArenaBufferState : BufferState {
         ArenaBufferFactory factory;
-    };
-    struct ArenaBufferGeneration {
-        std::shared_ptr<ArenaBufferProvider> provider;
-        VSL_NAMESPACE::BufferView storage;
+        ArenaBufferState(VSL_NAMESPACE::LogicalDeviceAccessor device, ArenaBufferFactory factory)
+            : factory(std::move(factory)) { this->device = std::move(device); }
     };
 } // namespace AHO_NAMESPACE::resource::detail
 
 namespace AHO_NAMESPACE::resource {
     ArenaBuffer::ArenaBuffer(VSL_NAMESPACE::LogicalDeviceAccessor device, size_t size, ArenaBufferFactory factory)
-        : ImportedBuffer(device), _provider(std::make_shared<detail::ArenaBufferProvider>(std::move(factory))) {
+        : Base(std::make_shared<detail::ArenaBufferState>(std::move(device), std::move(factory))) {
         if (size)
             publish(allocate(size));
-        _state->host_readable = true;
-        _state->size = size;
+        state().host_readable = true;
+        state().size = size;
     }
     VSL_NAMESPACE::BufferView ArenaBuffer::allocate(size_t bytes) const {
+        const auto& state = static_cast<const detail::ArenaBufferState&>(this->state());
         auto view = [&] {
-            if (_provider->factory)
-                return _provider->factory(_state->device, bytes);
+            if (state.factory)
+                return state.factory(state.device, bytes);
             const VSL_NAMESPACE::BufferCreateInfo info{bytes, detail::STANDARD_BUFFER_USAGE};
-            return VSL_NAMESPACE::lifetime::BufferArena(_state->device, std::span(&info, 1)).view(0);
+            return VSL_NAMESPACE::lifetime::BufferArena(state.device, std::span(&info, 1)).view(0);
         }();
-        if (view.ref().device() != _state->device || view.size() < bytes ||
+        if (view.ref().device() != state.device || view.size() < bytes ||
             !VSL_NAMESPACE::contain(view.ref().properties(), VSL_NAMESPACE::MemoryProperty::HOST_VISIBLE) ||
             !VSL_NAMESPACE::contain(view.ref().usage(), detail::STANDARD_BUFFER_USAGE) ||
-            (_state->current && view.ref().data == _state->current->ref().data))
+            (state.current && view.ref().data == state.current->ref().data))
             throw std::invalid_argument("Arena buffer factory must return a new, sufficient host-visible generation on the same device");
         return view;
     }
     void ArenaBuffer::publish(VSL_NAMESPACE::BufferView storage) {
-        auto generation = std::make_shared<detail::ArenaBufferGeneration>(_provider, std::move(storage));
-        const auto& view = generation->storage;
-        VSL_NAMESPACE::BufferView next(view.ref(), generation, view.byte_offset(), view.size());
-        _state->compatibility.reset();
-        _state->current = std::move(next);
-        _state->resource = generation;
+        auto& state = this->state();
+        state.compatibility.reset();
+        state.resource = storage.owner();
+        state.current = std::move(storage);
     }
     void ArenaBuffer::replace(size_t bytes, bool preserve) {
         auto next = allocate(bytes);
         if (preserve && size()) {
             std::vector<std::byte> content(size());
-            _state->current->read_into(content);
+            state().current->read_into(content);
             next.write(content);
         }
         publish(std::move(next));
     }
     void ArenaBuffer::reserve(size_t capacity) {
-        (void)binding();
-        _state->require_idle();
+        state().require_idle();
         if (capacity > this->capacity())
             replace(capacity, true);
     }
     void ArenaBuffer::resize(size_t size) {
         reserve(size);
-        _state->size = size;
+        state().size = size;
     }
     void ArenaBuffer::assign(std::span<const std::byte> bytes) {
-        (void)binding();
-        _state->require_idle();
+        state().require_idle();
         if (bytes.size() > capacity()) {
             auto next = allocate(bytes.size());
             next.write(bytes);
             publish(std::move(next));
-            _state->size = bytes.size();
+            state().size = bytes.size();
         } else
-            ImportedBuffer::assign(bytes);
+            Base::assign(bytes);
     }
     ArenaBuffer make_arena_buffer(VSL_NAMESPACE::LogicalDeviceAccessor device, size_t size, ArenaBufferFactory factory) {
         return ArenaBuffer(std::move(device), size, std::move(factory));

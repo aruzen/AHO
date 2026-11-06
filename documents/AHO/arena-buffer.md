@@ -1,6 +1,6 @@
 # AHO Bufferのsnapshotとarena世代
 
-2026-11-06。[VSLの段階的移行](../VSL/arena-migration.md)のD1〜D3。既存GPU_FRIENDLY／ON_GPU／CUSTOMは併設し、arena利用を明示選択する。VSLのprivate ImplやVulkan APIをAHOから直接使用しない。
+2026-11-07更新。[VSLの段階的移行](../VSL/arena-migration.md)のD1〜D3。既存GPU_FRIENDLY／ON_GPU／CUSTOMは併設し、arena利用を明示選択する。VSLのprivate ImplやVulkan APIをAHOから直接使用しない。
 
 ## D1: live bindingとsnapshot
 
@@ -42,11 +42,28 @@ auto old = buffer.binding().snapshot();
 buffer.reserve(new_capacity);
 ```
 
-`ArenaBuffer`はImportedBufferの操作にreserveと拡張可能なresize／assignを加える。既定では世代ごとに単slot arenaを作る。CPU領域内のBufferImplとUseStateはVSLの共通構築処理を使い、使用中のImplを移動しない。複数slotの既存arenaを拡張したり、同居資源を再生成したりしない。
+`ArenaBuffer`と`ImportedBuffer`は別の公開型で、相互の暗黙変換はない。両者は内部の`detail::ViewBufferBase`をprivate継承し、読み書き・binding・uploadだけを共用する。公開型同士に継承関係はなく、共通利用は`gpu_buffer` conceptで扱う。ArenaBufferのコピーは現在世代とfactoryを含む論理状態を共有し、reserveと拡張可能なresize／assignを持つ。
+
+固定importが必要な場合は、snapshotのowning viewから明示的に作る。
+
+```cpp
+auto snapshot = buffer.binding().snapshot();
+auto fixed = aho::resource::import_buffer(snapshot.storage());
+buffer.reserve(new_capacity);
+// fixedはsnapshot時の物理世代・容量を保持する。
+```
+
+このimportは独立した論理Bufferを作る。同じ物理世代のUseStateは共用するが、元Bufferの論理サイズや現在世代には追従せず、元Buffer全体の論理制約も引き継がない。`ImportedBuffer fixed = buffer`というコピーや参照による変換はcompile拒否する。
+
+既定では世代ごとに単slot arenaを作る。CPU領域内のBufferImplとUseStateはVSLの共通構築処理を使い、使用中のImplを移動しない。複数slotの既存arenaを拡張したり、同居資源を再生成したりしない。
 
 reserve／resizeの拡張では、候補の構築・host mapping・旧内容のコピー後に現在世代を公開する。assignの拡張では新内容を書き終えてから公開する。例外時は旧実体・論理サイズ・容量・内容を維持する。GPU_FRIENDLYと同じく、新しく増えた領域のゼロ初期化は保証しない。
 
-任意のfactoryを第3引数へ渡せる。返却値は新しいImplを指すowning BufferViewで、同じdevice、要求以上の容量、HOST_VISIBLE、標準AHO Bufferのusageを満たす必要がある。既存の現在Implを別範囲で返して世代切替する指定は拒否する。factoryは旧storageを変更しないこと。generationはfactory依存を保持し、storageの破棄後にfactoryを解放する。factoryが返すview自体も、外部領域やallocator等に必要な依存を保持すること。
+任意のfactoryを第3引数へ渡せる。返却値は新しいImplを指すowning BufferViewで、同じdevice、要求以上の容量、HOST_VISIBLE、標準AHO Bufferのusageを満たす必要がある。既存の現在Implを別範囲で返して世代切替する指定は拒否する。factoryは旧storageを変更しないこと。
+
+publishは返却されたviewとownerをそのまま保存する。Bufferごとのgeneration ownerへ包み直さず、同じarenaの異なるslotも共通のcontrol blockを保つ。VSLは保持ownerをcontrol blockで重複排除し、各slotの物理UseStateとAHOの論理制約はそれぞれ登録する。操作は解決済みBufferRefへ直接届く。
+
+factoryの設定は論理Buffer状態内に置き、最後のArenaBuffer／live bindingと一緒に解放する。旧snapshotはfactoryや現在世代を保持しない。**返却viewのownerが、資源の破棄に必要な領域・device・allocator等の依存をすべて保持すること**。factoryのcaptureだけで破棄依存を維持する使い方は不可である。外部allocatorを使う場合は、factoryが返す共通arena ownerに依存を持たせ、arenaの破棄後に解放する。AHOは追加の所有階層を補わない。factory自身が特定のarenaをcaptureするなら、そのfactoryが生存する間は当該arenaも保持される。
 
 ## 記録と保持
 
@@ -60,7 +77,7 @@ TypedDescriptorSet等の既存の保持境界は維持する。完了時回収�
 
 ## 残る確保と次の範囲
 
-CPU一括領域に含まれるのはBufferImplと物理UseStateの本体。AHOの論理状態、現在値の管理、provider／generationの所有境界、遅延native adapter、使用状態vector、内容保持用の一時CPUコピーは別確保として残る。Vulkan device memoryもBufferごとの確保である。速度向上率は測定していない。
+CPU一括領域に含まれるのはBufferImplと物理UseStateの本体。AHOの論理状態（factoryも同居）、論理UseState、遅延native adapter、使用状態vector、内容保持用の一時CPUコピーは別確保として残る。std::functionのcapture次第では内部確保も発生する。provider／generationの追加control blockは除去した。Vulkan device memoryもBufferごとの確保である。速度向上率は測定していない。
 
 次はImage／Samplerの共通operationと所有・同期を分離し、異種Implの配置へ進む。descriptor／pipeline／presentationと、Impl集合ヘッダーの資源別分割は後続段階で扱う。
 
@@ -68,12 +85,14 @@ CPU一括領域に含まれるのはBufferImplと物理UseStateの本体。AHO�
 
 Clang20／C++26、macOS arm64／Apple M1、ASan／UBSan、MoltenVK／Vulkan validationで確認した。
 
-- VSL712件中709成功、既知のpacked format3件skip。AHO GPU133件・CPU1070件成功。
-- Typed compile137件＋AHO TypedBuffer12件の149件成功。固定importのreserve拒否、snapshotの一時値／const rvalueからの借用拒否、importした資源のpayload不一致を含む。
-- 新規はsnapshot寿命1件、固定import4件、可変arena7件。部分範囲、heap／arena／CPU転送、Typed compute、元wrapper破棄後の記録、共有alias、旧世代、移動元の拒否、完了／取消回収を検証した。
-- factory例外、容量不足、usage不足、同一Impl再利用、候補へのコピー拒否で旧世代を維持することを確認。factory依存が最後のsnapshotまで保持され、新世代を不要に保持しないこともweak_ptrで確認した。
+- D1〜D3初回はVSL712件中709成功、既知のpacked format3件skip。AHO GPU133件・CPU1070件成功。
+- 初回はTyped compile137件＋AHO TypedBuffer12件の149件成功。固定importのreserve拒否、snapshotの一時値／const rvalueからの借用拒否、importした資源のpayload不一致を含む。
+- 初回の新規はsnapshot寿命1件、固定import4件、可変arena7件。部分範囲、heap／arena／CPU転送、Typed compute、元wrapper破棄後の記録、共有alias、旧世代、移動元の拒否、完了／取消回収を検証した。
+- factory例外、容量不足、usage不足、同一Impl再利用、候補へのコピー拒否で旧世代を維持することを確認。11月7日の所有整理では、factory設定の寿命と、返却ownerが保持する実際の破棄依存の寿命を分けて検証した。固定snapshot importの容量不変、暗黙変換拒否、異なるslotのowner同一性・保持1件・個別UseState登録の回帰検証も追加した。
 - 変更C++21ファイル／18TUを検査し、修正した4ファイル／12TUと追加GPUテスト2ファイル／2TUを再検査してstrict違反0。最終formatも確認した。
 - heap／arenaサンプルのverifyで3 frame slot／12 submission／2 draw／UBO更新／resize／pipeline生成1回が成功。3枚のPNGは両経路でバイト一致した。
 - install後の公開ヘッダーだけでsnapshot・import・可変arena・Typed接続・uploadのconsumerがbuild／linkし、空device拒否のCPU検証も成功。private Implはinstallしない。
+
+11月7日の修正後は、AHO GPU136件・CPU1070件・AHO TypedBuffer compile14件が成功。変更C++8ファイル／10TU（GPU条件付きの本体を含む）のstrict違反0。両Typedサンプルのbuildと、再installした公開APIのconsumerのbuild／link・空device拒否も成功した。この修正ではVSL製品コードを変更しておらず、VSL全件と描画画像比較の結果は上記の初回検証による。
 
 Windows／Linux実機、device lost、実際のVulkan生成／mapping失敗の注入、CPU並行操作、性能比較は未検証。Vulkan処理は既存の共通backendを使う。LeakSanitizerは無効化し、weak_ptrと既存の破棄検査を併用した。MSBuildはXML・新規path・重複登録を検査し、生成情報を必要とするarenaのbuildはCMake targetを使用する。

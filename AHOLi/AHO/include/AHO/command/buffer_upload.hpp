@@ -22,7 +22,7 @@ namespace AHO_NAMESPACE::command {
 
 namespace AHO_NAMESPACE::resource {
     template<gpu_buffer Source>
-    AHO_NAMESPACE::command::BufferUpload ImportedBuffer::upload(const Source& source, size_t destination_offset, size_t source_offset, std::optional<size_t> bytes) const {
+    AHO_NAMESPACE::command::BufferUpload detail::ViewBufferBase::upload(const Source& source, size_t destination_offset, size_t source_offset, std::optional<size_t> bytes) const {
         return AHO_NAMESPACE::command::BufferUpload(binding(), source.binding(), destination_offset, source_offset, bytes);
     }
     template<typename Storage, typename Customization>

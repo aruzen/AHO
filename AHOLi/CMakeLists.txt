@@ -35,6 +35,7 @@ add_library(AHOLi
         AHO/src/resource/image.cpp
         AHO/src/resource/buffer.cpp
         AHO/src/resource/imported_buffer.cpp
+        AHO/src/resource/arena_buffer.cpp
         AHO/src/command/buffer_upload.cpp
         AHO/include/AHO/command/buffer_upload.hpp
         AHO/src/x/command/texture_update.cpp
@@ -85,6 +86,7 @@ add_library(AHOLi
         AHO/include/AHO/resource/audio.hpp
         AHO/include/AHO/resource/buffer.hpp
         AHO/include/AHO/resource/imported_buffer.hpp
+        AHO/include/AHO/resource/arena_buffer.hpp
         AHO/include/AHO/resource/object_hitbox.hpp
         AHO/include/AHO/resource/image.hpp
         AHO/include/AHO/resource/object_model.hpp

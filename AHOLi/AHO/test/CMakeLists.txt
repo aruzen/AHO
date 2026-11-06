@@ -86,6 +86,7 @@ if (AHO_TEST_SOURCES)
             image_readback_test.cpp
             resource/buffer_test.cpp
             resource/imported_buffer_test.cpp
+            resource/arena_buffer_test.cpp
             resource/typed_buffer_test.cpp
             command/buffer_upload_test.cpp
             x/command/texture_update_test.cpp

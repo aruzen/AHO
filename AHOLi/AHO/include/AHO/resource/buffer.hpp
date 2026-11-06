@@ -78,6 +78,7 @@ namespace AHO_NAMESPACE::resource {
 
         template<typename Storage, typename Customization>
         class GPUBufferBase;
+        class ViewBufferBase;
     } // namespace detail
 
     class BufferSnapshot {
@@ -116,7 +117,7 @@ namespace AHO_NAMESPACE::resource {
         template<typename, typename>
         friend class detail::GPUBufferBase;
         friend class AHO_NAMESPACE::command::BufferUpload;
-        friend class ImportedBuffer;
+        friend class detail::ViewBufferBase;
 
     public:
         std::size_t size() const;

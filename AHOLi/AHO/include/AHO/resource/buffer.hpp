@@ -3,6 +3,7 @@
 #include <VSL/vulkan/buffer.hpp>
 #include <VSL/vulkan/command.hpp>
 #include <VSL/vulkan/resource_use.hpp>
+#include <VSL/lifetime/buffer_view.hpp>
 #include <concepts>
 #include <cstddef>
 #include <memory>
@@ -12,6 +13,7 @@
 #include <type_traits>
 #include <utility>
 #include <variant>
+#include <cstring>
 
 namespace AHO_NAMESPACE::command {
     class BufferUpload;
@@ -55,13 +57,18 @@ namespace AHO_NAMESPACE::resource {
 
     namespace detail {
         // Submissionはresourceだけを保持し、Completionを持つこの状態は保持しない。
-        struct BufferState : VSL_NAMESPACE::ResourceUseState {
+        struct BufferState {
+            std::shared_ptr<VSL_NAMESPACE::ResourceUseState> logical = std::make_shared<VSL_NAMESPACE::ResourceUseState>();
             VSL_NAMESPACE::LogicalDeviceAccessor device;
             std::weak_ptr<void> resource;
             VSL_NAMESPACE::BufferAccessor* native = nullptr;
+            std::optional<VSL_NAMESPACE::BufferView> current;
+            mutable std::shared_ptr<VSL_NAMESPACE::BufferAccessor> compatibility;
+            VSL_NAMESPACE::ResourceRetention retention = VSL_NAMESPACE::ResourceRetention::SUBMISSION;
             std::size_t size = 0;
             bool host_readable = false;
             std::shared_ptr<Buffer<BufferType::GPU_FRIENDLY>> staging;
+            VSL_NAMESPACE::ResourceUseState* physical() const;
             bool busy() const;
             bool wait(std::uint64_t timeout) const;
             void require_idle() const;
@@ -73,6 +80,33 @@ namespace AHO_NAMESPACE::resource {
         class GPUBufferBase;
     } // namespace detail
 
+    class BufferSnapshot {
+        VSL_NAMESPACE::BufferView _storage;
+        VSL_NAMESPACE::LogicalDeviceAccessor _device;
+        std::size_t _size;
+        VSL_NAMESPACE::ResourceUse _constraints;
+        VSL_NAMESPACE::ResourceRetention _retention;
+        bool _host_readable;
+        friend class BufferBinding;
+        BufferSnapshot(VSL_NAMESPACE::BufferView storage, VSL_NAMESPACE::LogicalDeviceAccessor device,
+                       std::size_t size, VSL_NAMESPACE::ResourceUse constraints, VSL_NAMESPACE::ResourceRetention retention, bool host_readable);
+
+    public:
+        const VSL_NAMESPACE::BufferView& storage() const& {
+            if (!_storage.owner().use_count())
+                throw std::logic_error("Buffer snapshot is empty");
+            return _storage;
+        }
+        const VSL_NAMESPACE::BufferView& storage() const&& = delete;
+        std::size_t size() const { return _size; }
+        VSL_NAMESPACE::LogicalDeviceAccessor device() const { return _device; }
+        VSL_NAMESPACE::ResourceUse constraints() const { return _constraints; }
+        VSL_NAMESPACE::ResourceUse resource_use() const { return storage().resource_use(_constraints); }
+        VSL_NAMESPACE::ResourceRetention retention() const { return _retention; }
+        bool host_readable() const { return _host_readable; }
+        void read_into(std::span<std::byte> destination, std::size_t offset = 0) const;
+    };
+
     // 型を消すのは転送に必要な参照だけ。CustomのStorage/Customizationは元の型で保持する。
     class BufferBinding {
         std::shared_ptr<detail::BufferState> _state;
@@ -82,6 +116,7 @@ namespace AHO_NAMESPACE::resource {
         template<typename, typename>
         friend class detail::GPUBufferBase;
         friend class AHO_NAMESPACE::command::BufferUpload;
+        friend class ImportedBuffer;
 
     public:
         std::size_t size() const;
@@ -90,6 +125,7 @@ namespace AHO_NAMESPACE::resource {
         std::shared_ptr<void> owner() const;
         bool host_readable() const;
         VSL_NAMESPACE::ResourceUse resource_use() const;
+        BufferSnapshot snapshot() const;
 
         void check_available(const VSL_NAMESPACE::Completion& completion) const;
         void mark_used(VSL_NAMESPACE::Completion completion) const;
@@ -191,6 +227,8 @@ namespace AHO_NAMESPACE::resource {
             requires mappable_storage<Storage, Customization>;
 
             std::span<const std::byte> read(std::size_t bytes, std::size_t offset = 0) const
+            requires mappable_storage<Storage, Customization>;
+            void read_into(std::span<std::byte> destination, std::size_t offset = 0) const
             requires mappable_storage<Storage, Customization>;
 
             void write(std::span<const std::byte> bytes, std::size_t offset = 0)
@@ -409,6 +447,15 @@ namespace AHO_NAMESPACE::resource {
             if (!bytes)
                 return {};
             return r.mapping->read(bytes, offset);
+        }
+
+        template<typename Storage, typename Customization>
+        void GPUBufferBase<Storage, Customization>::read_into(std::span<std::byte> destination, std::size_t offset) const
+        requires mappable_storage<Storage, Customization>
+        {
+            const auto source = read(destination.size(), offset);
+            if (!source.empty())
+                std::memmove(destination.data(), source.data(), source.size());
         }
 
         template<typename Storage, typename Customization>

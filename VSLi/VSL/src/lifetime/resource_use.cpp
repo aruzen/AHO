@@ -7,7 +7,15 @@ namespace VSL_NAMESPACE {
     ResourceUse ResourceUse::ForBuffer(const std::shared_ptr<impl::BufferImpl>& buffer, ResourceUse constraint) {
         if (!buffer || !buffer->use)
             throw std::invalid_argument("Buffer requires a constructed storage generation");
-        ResourceUse use{{buffer, buffer->use}, buffer};
+        return ResourceUse{{buffer, buffer->use}, buffer}.with_constraint(std::move(constraint));
+    }
+    ResourceUse ResourceUse::with_constraint(ResourceUse constraint) const {
+        if (constraint_state || constraint_owner.use_count()) {
+            if (constraint.state || constraint.owner.use_count() || constraint.constraint_state || constraint.constraint_owner.use_count())
+                throw std::invalid_argument("Resource already has a logical constraint");
+            return *this;
+        }
+        auto use = *this;
         if (constraint.state == use.state) {
             use.constraint_state = std::move(constraint.constraint_state);
             use.constraint_owner = std::move(constraint.constraint_owner);

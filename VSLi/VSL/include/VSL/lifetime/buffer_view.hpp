@@ -8,6 +8,8 @@ namespace VSL_NAMESPACE {
         impl::BufferImpl* data = nullptr;
         size_t size() const;
         MemoryType usage() const;
+        MemoryProperty properties() const;
+        LogicalDeviceAccessor device() const;
         ResourceUseState& use() const;
         void write(std::span<const std::byte> bytes, size_t offset = 0) const;
         void read_into(std::span<std::byte> destination, size_t offset = 0) const;
@@ -32,6 +34,6 @@ namespace VSL_NAMESPACE {
         void read_into(std::span<std::byte> destination, size_t offset = 0) const;
         // 既存Typed/native bindingへ接続する移行用adapter。
         std::shared_ptr<impl::BufferImpl> legacy_owner() const { return {_owner, _ref.data}; }
-        ResourceUse resource_use() const { return {{_owner, &_ref.use()}, _owner}; }
+        ResourceUse resource_use(ResourceUse constraint = {}) const { return ResourceUse{{_owner, &_ref.use()}, _owner}.with_constraint(std::move(constraint)); }
     };
 } // namespace VSL_NAMESPACE

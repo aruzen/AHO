@@ -18,6 +18,34 @@ namespace {
         bool validate_vulkan() const override { return true; }
     };
 
+    TEST_F(TypedAHOBufferVulkanIntegrationTest, SnapshotIsIndependentOfTheLiveBindingAndDoesNotPinTheNextGeneration) {
+        std::optional<r::BufferSnapshot> old;
+        std::weak_ptr<vsl::impl::BufferImpl> current;
+        {
+            Host buffer(device, sizeof(std::uint32_t));
+            const std::uint32_t value = 37;
+            buffer.write(std::as_bytes(std::span(&value, 1)));
+            auto binding = buffer.binding();
+            old.emplace(binding.snapshot());
+            buffer.reserve(128);
+            EXPECT_EQ(binding.native().requested_size(), 128u);
+            EXPECT_EQ(old->storage().size(), sizeof(value));
+            const auto next = binding.snapshot();
+            EXPECT_NE(old->storage().ref().data, next.storage().ref().data);
+            current = buffer.native().data_;
+        }
+        EXPECT_TRUE(current.expired());
+        std::uint32_t result = 0;
+        old->read_into(std::as_writable_bytes(std::span(&result, 1)));
+        EXPECT_EQ(result, 37u);
+        EXPECT_THROW(old->read_into(std::as_writable_bytes(std::span(&result, 1)), SIZE_MAX), std::out_of_range);
+        auto moved = std::move(*old);
+        EXPECT_THROW(old->read_into(std::as_writable_bytes(std::span(&result, 1))), std::logic_error);
+        EXPECT_THROW(old->resource_use(), std::logic_error);
+        moved.read_into(std::as_writable_bytes(std::span(&result, 1)));
+        EXPECT_EQ(result, 37u);
+    }
+
     TEST_F(TypedAHOBufferVulkanIntegrationTest, NativeCommandsShareStorageStateWithAhoAndTypedEntrances) {
         const std::array<std::uint32_t, 4> values{1, 2, 3, 4};
         Host source(device, sizeof(values)), destination(device, sizeof(values));

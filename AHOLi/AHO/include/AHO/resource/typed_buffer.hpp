@@ -50,7 +50,8 @@ namespace AHO_NAMESPACE::resource {
             using Payload = typename VSL_NAMESPACE::typed::PayloadLayout<PayloadTag>::Payload;
             auto binding = source.binding();
             const auto range = typed_buffer_range<Payload>(binding.size(), first, count);
-            return VSL_NAMESPACE::typed::TypedResourceBufferView<PayloadTag, kind>::FromBuffer(binding.native(), range.count, range.offset, binding.resource_use());
+            const auto snapshot = binding.snapshot();
+            return VSL_NAMESPACE::typed::TypedResourceBufferView<PayloadTag, kind>::FromView(snapshot.storage(), range.count, range.offset, snapshot.constraints());
         }
     } // namespace detail
 
@@ -69,6 +70,7 @@ namespace AHO_NAMESPACE::resource {
     auto vertex_view(const Source& source, size_t first, std::optional<size_t> count) {
         auto binding = source.binding();
         const auto range = detail::typed_buffer_range<Vertex>(binding.size(), first, count);
-        return VSL_NAMESPACE::typed::TypedVertexBufferView<Vertex>::FromBuffer(binding.native(), range.count, range.offset, binding.resource_use());
+        const auto snapshot = binding.snapshot();
+        return VSL_NAMESPACE::typed::TypedVertexBufferView<Vertex>::FromView(snapshot.storage(), range.count, range.offset, snapshot.constraints());
     }
 } // namespace AHO_NAMESPACE::resource

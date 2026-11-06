@@ -4,36 +4,63 @@
 #include <chrono>
 
 namespace AHO_NAMESPACE::resource {
+    namespace detail {
+        struct NativeBufferAdapter : VSL_NAMESPACE::BufferAccessor {
+            explicit NativeBufferAdapter(std::shared_ptr<VSL_NAMESPACE::impl::BufferImpl> owner) { data_ = std::move(owner); }
+            LocalBufferHolder data(std::optional<size_t> bytes = std::nullopt, size_t offset = 0) override {
+                return GetData(this, bytes, offset, get_usage(), get_memory_properties(), VSL_NAMESPACE::SharingMode::EXCLUSIVE);
+            }
+            void flush(LocalBufferHolder& holder) override { holder.flush(); }
+        };
+    } // namespace detail
     struct Buffer<BufferType::GENERAL>::Data {
         std::vector<std::byte> bytes;
     };
+    BufferSnapshot::BufferSnapshot(VSL_NAMESPACE::BufferView storage, VSL_NAMESPACE::LogicalDeviceAccessor device,
+                                   std::size_t size, VSL_NAMESPACE::ResourceUse constraints, VSL_NAMESPACE::ResourceRetention retention, bool host_readable)
+        : _storage(std::move(storage)), _device(std::move(device)), _size(size), _constraints(std::move(constraints)), _retention(retention), _host_readable(host_readable) {
+        if (_size > _storage.size())
+            throw std::out_of_range("Buffer snapshot exceeds its storage generation");
+    }
+    void BufferSnapshot::read_into(std::span<std::byte> destination, std::size_t offset) const {
+        if (offset > _size || destination.size() > _size - offset)
+            throw std::out_of_range("Buffer snapshot read range");
+        if (_constraints.state)
+            _constraints.state->require_idle();
+        storage().read_into(destination, offset);
+    }
 
+    VSL_NAMESPACE::ResourceUseState* detail::BufferState::physical() const {
+        if (native)
+            return &native->use_state();
+        return current ? &current->ref().use() : nullptr;
+    }
     bool detail::BufferState::busy() const {
-        return VSL_NAMESPACE::ResourceUseState::busy() || (native && native->use_state().busy());
+        return logical->busy() || (physical() && physical()->busy());
     }
     bool detail::BufferState::wait(std::uint64_t timeout) const {
         const auto start = std::chrono::steady_clock::now();
-        if (!VSL_NAMESPACE::ResourceUseState::wait(timeout))
+        if (!logical->wait(timeout))
             return false;
         const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count();
         const auto remaining = timeout == UINT64_MAX ? timeout : (std::uint64_t(elapsed) < timeout ? timeout - std::uint64_t(elapsed) : 0);
-        return !native || native->use_state().wait(remaining);
+        return !physical() || physical()->wait(remaining);
     }
     void detail::BufferState::require_idle() const {
-        VSL_NAMESPACE::ResourceUseState::require_idle();
-        if (native)
-            native->use_state().require_idle();
+        logical->require_idle();
+        if (auto* state = physical())
+            state->require_idle();
     }
     void detail::BufferState::check_available(const VSL_NAMESPACE::Completion& completion) const {
-        VSL_NAMESPACE::ResourceUseState::check_available(completion);
-        if (native)
-            native->use_state().check_available(completion);
+        logical->check_available(completion);
+        if (auto* state = physical())
+            state->check_available(completion);
     }
     void detail::BufferState::mark_used(VSL_NAMESPACE::Completion completion) const {
         check_available(completion);
-        VSL_NAMESPACE::ResourceUseState::mark_used(completion);
-        if (native)
-            native->use_state().mark_used(completion);
+        logical->mark_used(completion);
+        if (auto* state = physical())
+            state->mark_used(completion);
     }
 
     Buffer<BufferType::GENERAL>::Buffer(std::size_t size) : _data(std::make_shared<Data>()) {
@@ -108,9 +135,16 @@ namespace AHO_NAMESPACE::resource {
     VSL_NAMESPACE::BufferAccessor& BufferBinding::native() const {
         if (!_state)
             throw std::logic_error("Buffer binding is empty");
-        if (!_state->native)
+        if (_state->native)
+            return *_state->native;
+        if (!_state->current)
             throw std::logic_error("Buffer has no GPU storage");
-        return *_state->native;
+        const auto& view = *_state->current;
+        if (view.byte_offset() || view.size() != view.ref().size())
+            throw std::logic_error("A partial buffer requires the snapshot API");
+        if (!_state->compatibility)
+            _state->compatibility = std::make_shared<detail::NativeBufferAdapter>(view.legacy_owner());
+        return *_state->compatibility;
     }
 
     std::shared_ptr<void> BufferBinding::owner() const {
@@ -122,8 +156,9 @@ namespace AHO_NAMESPACE::resource {
     bool BufferBinding::host_readable() const {
         if (!_state)
             throw std::logic_error("Buffer binding is empty");
-        return _state->host_readable && _state->native &&
-               VSL_NAMESPACE::contain(_state->native->get_memory_properties(), VSL_NAMESPACE::MemoryProperty::HOST_VISIBLE);
+        return _state->host_readable &&
+               ((_state->native && VSL_NAMESPACE::contain(_state->native->get_memory_properties(), VSL_NAMESPACE::MemoryProperty::HOST_VISIBLE)) ||
+                (_state->current && VSL_NAMESPACE::contain(_state->current->ref().properties(), VSL_NAMESPACE::MemoryProperty::HOST_VISIBLE)));
     }
 
     void BufferBinding::check_available(const VSL_NAMESPACE::Completion& completion) const {
@@ -141,6 +176,12 @@ namespace AHO_NAMESPACE::resource {
     VSL_NAMESPACE::ResourceUse BufferBinding::resource_use() const {
         if (!_state)
             throw std::logic_error("Buffer binding is empty");
-        return native().resource_use({_state, owner()});
+        return snapshot().resource_use();
+    }
+    BufferSnapshot BufferBinding::snapshot() const {
+        if (!_state || (!_state->native && !_state->current))
+            throw std::logic_error("Buffer has no GPU storage");
+        auto view = _state->native ? VSL_NAMESPACE::BufferView::FromBuffer(*_state->native) : *_state->current;
+        return BufferSnapshot(std::move(view), _state->device, _state->size, {_state->logical, owner()}, _state->retention, host_readable());
     }
 } // namespace AHO_NAMESPACE::resource

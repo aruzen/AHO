@@ -1,24 +1,34 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <ClInclude Include="VSL\include\VSL\lifetime\buffer_arena.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\lifetime\buffer_view.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\lifetime\typed_buffer_arena.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\lifetime\resource_use.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\sync\resource_use_state.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\sync\completion.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\operation\buffer_create_info.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\src\private\VSL\sync\submission_completion.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClCompile Include="VSL\src\sync\resource_use_state.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClCompile Include="VSL\src\sync\completion.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClCompile Include="VSL\src\lifetime\submission_retention.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\src\private\VSL\lifetime\submission_retention.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClCompile Include="VSL\src\sync\buffer_access.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\src\private\VSL\sync\buffer_access.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
-    <ClInclude Include="VSL\src\private\VSL\contracts\buffer_access.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\src\private\VSL\operation\buffer_access.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\storage\arena_memory.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\storage\buffer_abi.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\storage\buffer_arena.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\storage\buffer_layout.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
-    <ClInclude Include="VSL\src\private\VSL\backend\buffer_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\src\private\VSL\operation\buffer_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\src\private\VSL\lifetime\buffer_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\src\private\VSL\storage\cpu_region.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\utils\typed_buffer_arena.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\vulkan\buffer_view.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\vulkan\buffer_create_info.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
-    <ClCompile Include="VSL\src\backend\buffer_ops.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClCompile Include="VSL\src\operation\buffer_ops.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClCompile Include="VSL\src\lifetime\buffer_storage.cpp"><Filter>ソース ファイル</Filter></ClCompile>
-    <ClCompile Include="VSL\src\vulkan\buffer_view.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClCompile Include="VSL\src\lifetime\buffer_view.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClCompile Include="VSL\src\storage\arena_memory.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\include\VSL\vulkan\commands\image_upload.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\vulkan\commands\copy_buffer.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
@@ -349,7 +359,7 @@
     <ClCompile Include="VSL\src\vulkan\buffer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="VSL\src\vulkan\resource_use.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClCompile Include="VSL\src\lifetime\resource_use.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClCompile Include="VSL\src\utils\typed_buffer_view.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClCompile Include="VSL\src\vulkan\command.cpp">
       <Filter>ソース ファイル</Filter>

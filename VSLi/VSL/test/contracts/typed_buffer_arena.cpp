@@ -1,4 +1,7 @@
 #include <VSL/utils/typed_buffer_arena.hpp>
+#include <VSL/storage/buffer_arena.hpp>
+#include <VSL/vulkan/buffer_view.hpp>
+#include <VSL/vulkan/buffer_create_info.hpp>
 #include <VSL/vulkan/phase.hpp>
 #ifndef VSL_TYPED_CASE
 #define VSL_TYPED_CASE 0
@@ -6,6 +9,7 @@
 
 namespace {
     namespace t = vsl::typed;
+    static_assert(std::is_same_v<vsl::storage::BufferArena, vsl::lifetime::BufferArena>);
     constexpr auto USAGE = vsl::MemoryType::TRANSFER_SOURCE | vsl::MemoryType::TRANSFER_DESTINATION;
     using Arena = t::TypedBufferArena<t::BufferResource<t::ResourceId{10}, std::uint32_t, USAGE>,
                                       t::BufferResource<t::ResourceId{20}, std::uint32_t, USAGE>>;
@@ -56,9 +60,17 @@ namespace {
         Arena arena(device, Arena::Plan({4, 4}));
         std::array<float, 4> invalid{};
         arena.view<t::ResourceId{10}>().read_into(invalid);
+#elif VSL_TYPED_CASE == 13
+        auto dangling = Arena(device, Arena::Plan({4, 4})).storage().borrow(0);
+#elif VSL_TYPED_CASE == 14
+        const Arena arena(device, Arena::Plan({4, 4}));
+        auto dangling = std::move(arena).storage().borrow(0);
 #else
         constexpr Arena::Plan plan({4, 4});
         Arena arena(device, plan);
+        const Arena& immutable = arena;
+        auto borrowed = immutable.storage().borrow(0);
+        auto owned = Arena(device, plan).view<t::ResourceId{10}>();
         const std::array<std::uint32_t, 4> values{1, 2, 3, 4};
         arena.view<t::ResourceId{10}>().copy(values);
         auto copy = arena.view<t::ResourceId{10}>().copy_to(arena.view<t::ResourceId{20}>());

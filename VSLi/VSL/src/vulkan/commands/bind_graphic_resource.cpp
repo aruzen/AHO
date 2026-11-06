@@ -5,6 +5,7 @@
 #include <VSL/vulkan/_pimpls.hpp>
 
 #include <VSL/vulkan/commands/bind_graphic_resource.hpp>
+#include <VSL/lifetime/submission_retention.hpp>
 
 #include <ranges>
 #include <utility>
@@ -29,7 +30,6 @@ void VSL_NAMESPACE::command::BindGraphicResource::invoke(CommandPool pool, Comma
         for (const auto& resource : resources) {
             if (!resource.data_ || !resource.data_->pool || !resource.data_->pool->descriptor_pool || !resource.data_->descriptor_set)
                 throw std::logic_error("Descriptor resource has been destroyed");
-            buffer.retain(resource.data_);
         }
         track(buffer);
         buffer.retain(pipeline->data_);
@@ -49,10 +49,10 @@ void VSL_NAMESPACE::command::BindGraphicResource::set_pipeline(std::optional<Pip
 void VSL_NAMESPACE::command::BindGraphicResource::track(const CommandBuffer& buffer) const {
     if (_use)
         _use->record(buffer);
-    for (const auto& resource : resources)
-        for (const auto& [binding, refs] : resource.data_->buffer_refs)
-            for (const auto& ref : refs) {
-                buffer.retain(resource.data_->bindings.at(binding).at(ref.owner_index));
-                ref.buffer->use->mark_used(buffer.completion());
-            }
+    for (const auto& resource : resources) {
+        if (_use && _use->tracks_descriptor(resource.data_.get()))
+            continue;
+        buffer.retain(resource.data_);
+        lifetime::record_descriptor_buffers(*resource.data_, buffer);
+    }
 }

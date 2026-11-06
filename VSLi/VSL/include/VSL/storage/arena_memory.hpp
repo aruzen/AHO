@@ -4,15 +4,18 @@
 #include <memory>
 #include <span>
 
-namespace VSL_NAMESPACE::storage {
+namespace VSL_NAMESPACE::lifetime {
     class BufferArena;
+}
+namespace VSL_NAMESPACE::storage {
+    using BufferArena = lifetime::BufferArena;
     namespace detail {
         struct CPURegion;
     }
     // CPU領域だけを管理する。コピーは同じ領域と使用権を共有する。
     class ArenaMemory {
         std::shared_ptr<detail::CPURegion> _region;
-        friend class BufferArena;
+        friend class lifetime::BufferArena;
 
     public:
         ArenaMemory(size_t bytes, size_t alignment);

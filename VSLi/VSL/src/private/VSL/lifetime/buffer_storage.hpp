@@ -1,6 +1,6 @@
 #pragma once
-#include <VSL/backend/buffer_ops.hpp>
-#include <VSL/vulkan/buffer_view.hpp>
+#include <VSL/operation/buffer_ops.hpp>
+#include <VSL/lifetime/buffer_view.hpp>
 
 namespace VSL_NAMESPACE::lifetime {
     struct BufferSlotStorage {

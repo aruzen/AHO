@@ -1,5 +1,5 @@
 #include <VSL/vulkan/commands/copy_buffer.hpp>
-#include <VSL/backend/buffer_ops.hpp>
+#include <VSL/operation/buffer_ops.hpp>
 #include <VSL/sync/buffer_access.hpp>
 
 namespace VSL_NAMESPACE::command {
@@ -24,7 +24,7 @@ namespace VSL_NAMESPACE::command {
     void CopyBuffer::validate() const {
         if (!_source || !_destination)
             throw std::invalid_argument("Buffer copy requires valid buffers");
-        backend::validate_copy(*_source, *_destination, _bytes, _source_offset, _destination_offset, _host_read);
+        operation::validate_copy(*_source, *_destination, _bytes, _source_offset, _destination_offset, _host_read);
     }
     void CopyBuffer::invoke(CommandPool, CommandBuffer buffer, CommandManager manager) {
         validate();
@@ -45,7 +45,7 @@ namespace VSL_NAMESPACE::command {
         }
         _source->use->mark_used(completion);
         _destination->use->mark_used(completion);
-        backend::record_copy(buffer.data_->command_buffers.at(buffer.get_current_buffer_idx()),
-                             *_source, *_destination, _bytes, _source_offset, _destination_offset, sync::buffer_copy_visibility(_host_read));
+        operation::record_copy(buffer.data_->command_buffers.at(buffer.get_current_buffer_idx()),
+                               *_source, *_destination, _bytes, _source_offset, _destination_offset, sync::buffer_copy_visibility(_host_read));
     }
 } // namespace VSL_NAMESPACE::command

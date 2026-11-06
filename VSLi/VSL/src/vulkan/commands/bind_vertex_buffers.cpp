@@ -19,17 +19,14 @@ void VSL_NAMESPACE::command::BindVertexBufferAt::invoke(CommandPool pool, Comman
     if (_source->device != manager.data_->device.get())
         throw std::invalid_argument("Vertex buffer and command manager use different devices");
     track(buffer);
-    buffer.retain(_source);
     buffer.data_->command_buffers[buffer.get_current_buffer_idx()].bindVertexBuffers(_binding, {_source->buffer}, {_offset});
 }
 
 void VSL_NAMESPACE::command::BindVertexBuffer::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
     if (buffers.empty())
         return;
-    for (auto* source : buffers) {
+    for (auto* source : buffers)
         source->resource_use().record(buffer);
-        buffer.retain(source->data_);
-    }
     buffer.data_->command_buffers[buffer.get_current_buffer_idx()]
         .bindVertexBuffers(0,
                            this->buffers | std::views::transform([](auto& b) { return b->data_->buffer; }) | std::ranges::to<std::vector<vk::Buffer>>(),

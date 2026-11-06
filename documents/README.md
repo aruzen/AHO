@@ -13,3 +13,4 @@
 - [RenderPassの構成](VSL/render-pass-composition.md)・[commandの資源寿命](VSL/command-resource-lifetime.md)・[画像同期](VSL/image-shader-visibility.md)
 - [VSLの所有・配置再設計](VSL/ownership-and-placement.md)・[移行計画](VSL/ownership-migration-plan.md)・[Buffer配置の実装と使用例](VSL/buffer-placement.md)
 - [Bufferの世代・読み取り・資源ID・寿命群](VSL/buffer-generation-contracts.md)
+- [Bufferの4層配置・借用入口・owner保持](VSL/buffer-layer-layout.md)

@@ -1,7 +1,7 @@
 #pragma once
 #include "../define.hpp"
 #include "buffer_abi.hpp"
-#include "../vulkan/resource_use.hpp"
+#include "../sync/resource_use_state.hpp"
 #ifndef VSL_BUFFER_LAYOUT_HEADER
 #error "Buffer placement requires a matching VSL CMake target and generated layout"
 #endif
@@ -14,7 +14,6 @@
 
 namespace VSL_NAMESPACE::storage {
     static_assert(BUFFER_CPP_ABI_MODE == BUFFER_EXPECTED_CPP_ABI_MODE, "Buffer placement C++ ABI mode mismatch");
-    static_assert(sizeof(SharingMode) == sizeof(std::uint32_t), "Buffer enum ABI mismatch");
     static_assert(sizeof(ResourceUseState) == BUFFER_USE_SIZE, "Buffer placement standard library ABI mismatch");
     static_assert(alignof(ResourceUseState) == BUFFER_USE_ALIGNMENT, "Buffer placement alignment mismatch");
     constexpr size_t checked_align(size_t bytes, size_t alignment);

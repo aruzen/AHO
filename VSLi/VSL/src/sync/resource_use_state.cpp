@@ -1,4 +1,4 @@
-#include <VSL/vulkan/resource_use.hpp>
+#include <VSL/sync/resource_use_state.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 #include <algorithm>
 #include <chrono>
@@ -61,40 +61,5 @@ namespace VSL_NAMESPACE {
         discard_finished();
         if (!std::ranges::any_of(_uses, [&](const auto& use) { return use.lock() == completion.data_; }))
             _uses.push_back(completion.data_);
-    }
-    void ResourceUse::record(const CommandBuffer& buffer) const {
-        if (!state && !owner.use_count() && !constraint_state && !constraint_owner.use_count())
-            return;
-        const auto completion = buffer.completion();
-        if (!completion || completion.status() != Completion::Status::PENDING)
-            throw std::logic_error("Tracked resources require a recording phase");
-        if (owner.use_count())
-            completion.retain(owner);
-        if (constraint_owner.use_count())
-            completion.retain(constraint_owner);
-        if (state)
-            state->mark_used(completion);
-        if (constraint_state)
-            constraint_state->mark_used(completion);
-    }
-    ResourceUseGroup::ResourceUseGroup(size_t bindings, std::shared_ptr<void> owner)
-        : _owner(std::move(owner)), _bindings(bindings) {}
-    void ResourceUseGroup::require_idle() const {
-        _state.require_idle();
-    }
-    void ResourceUseGroup::replace(size_t binding, std::vector<ResourceUse> resources) {
-        require_idle();
-        _bindings.at(binding) = std::move(resources);
-    }
-    void ResourceUseGroup::record(const CommandBuffer& buffer) const {
-        const auto completion = buffer.completion();
-        if (!completion || completion.status() != Completion::Status::PENDING)
-            throw std::logic_error("Tracked descriptor sets require a recording phase");
-        if (_owner)
-            completion.retain(_owner);
-        _state.mark_used(completion);
-        for (const auto& binding : _bindings)
-            for (const auto& resource : binding)
-                resource.record(buffer);
     }
 } // namespace VSL_NAMESPACE

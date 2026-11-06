@@ -68,6 +68,40 @@ namespace {
         EXPECT_TRUE(owner.expired());
     }
 
+    TEST_F(ResourceUseVulkanIntegrationTest, RetentionUsesControlIdentityIncludingAliasesAndNullPointers) {
+        auto manager = make_manager();
+        vsl::Completion cancelled;
+        std::weak_ptr<std::array<int, 2>> observed;
+        size_t releases = 0;
+        int marker = 0;
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            cancelled = phase.completion();
+            {
+                auto root = std::make_shared<std::array<int, 2>>();
+                observed = root;
+                std::shared_ptr<void> first(root, &(*root)[0]), second(root, &(*root)[1]), null_alias(root, nullptr);
+                cancelled.retain(first);
+                manager.get_buffer().retain(second);
+                cancelled.retain(null_alias);
+                std::shared_ptr<void> different_a(&marker, [&](void*) { ++releases; });
+                std::shared_ptr<void> different_b(&marker, [&](void*) { ++releases; });
+                cancelled.retain(std::move(different_a));
+                manager.get_buffer().retain(std::move(different_b));
+                EXPECT_FALSE(different_a);
+                EXPECT_FALSE(different_b);
+                EXPECT_EQ(cancelled.data_->resources.size(), 3u);
+            }
+            EXPECT_EQ(releases, 0u);
+            EXPECT_FALSE(observed.expired());
+            phase.cancel();
+        }
+        EXPECT_FALSE(observed.expired());
+        cancelled = {};
+        EXPECT_TRUE(observed.expired());
+        EXPECT_EQ(releases, 2u);
+    }
+
     TEST_F(ResourceUseVulkanIntegrationTest, ExternalViewFactoriesValidateUsageAlignmentAndCapacity) {
         vsl::Buffer<vsl::MemoryType::VERTEX_BUFFER, vsl::MemoryProperty::HOST_VISIBLE> vertex(device, 32);
         vsl::Buffer<vsl::MemoryType::UNIFORM_BUFFER, vsl::MemoryProperty::HOST_VISIBLE> uniform(device, 32);

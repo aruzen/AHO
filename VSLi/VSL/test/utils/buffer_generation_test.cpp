@@ -4,6 +4,7 @@
 #include <VSL/utils/typed_index_buffer.hpp>
 #include <VSL/utils/typed_resources.hpp>
 #include <VSL/vulkan/commands/bind_vertex_buffers.hpp>
+#include <VSL/vulkan/commands/bind_index_buffers.hpp>
 
 namespace {
     namespace t = vsl::typed;
@@ -17,6 +18,101 @@ namespace {
     class BufferGenerationVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
+    TEST_F(BufferGenerationVulkanIntegrationTest, VertexAndIndexBindsRetainTheSameOwnerOnlyOnce) {
+        using Buffer = vsl::Buffer<vsl::MemoryType::VERTEX_BUFFER | vsl::MemoryType::INDEX_BUFFER,
+                                   vsl::MemoryProperty::HOST_VISIBLE>;
+        auto manager = make_manager();
+        std::weak_ptr<vsl::impl::BufferImpl> observed;
+        vsl::Completion cancelled;
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            cancelled = phase.completion();
+            {
+                Buffer native(device, 16);
+                observed = native.data_;
+                phase << vsl::command::BindVertexBuffer(native)
+                      << vsl::command::BindVertexBufferAt(0, native)
+                      << vsl::command::BindIndexBuffer(native)
+                      << vsl::command::BindIndexBufferAt(native, vsl::command::IndexType::UINT32);
+            }
+            EXPECT_EQ(cancelled.data_->resources.size(), 1u);
+            EXPECT_FALSE(observed.expired());
+            phase.cancel();
+        }
+        EXPECT_FALSE(observed.expired());
+        cancelled = {};
+        EXPECT_TRUE(observed.expired());
+    }
+
+    TEST_F(BufferGenerationVulkanIntegrationTest, OneArenaOwnerStillRegistersEveryDistinctBufferState) {
+        auto manager = make_manager();
+        Arena arena(device, Arena::Plan({4, 4}));
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        arena.view<SOURCE>().backend().resource_use().record(manager.get_buffer());
+        arena.view<DESTINATION>().backend().resource_use().record(manager.get_buffer());
+        EXPECT_EQ(phase.completion().data_->resources.size(), 1u);
+        EXPECT_TRUE(arena.storage().borrow(0).use().busy());
+        EXPECT_TRUE(arena.storage().borrow(1).use().busy());
+        phase.cancel();
+        EXPECT_FALSE(arena.storage().borrow(0).use().busy());
+        EXPECT_FALSE(arena.storage().borrow(1).use().busy());
+    }
+
+    TEST_F(BufferGenerationVulkanIntegrationTest, DescriptorTrackingReadsCurrentNativeBindingsAndRetainsEachOwnerOnce) {
+        using Set = t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>,
+                                     t::UniformBinding<1, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
+        vsl::GraphicResourceManager descriptors(device);
+        t::TypedDescriptorSet<Set> set(device, descriptors);
+        t::TypedUniformBuffer<std::uint32_t> first(device, 1u), second(device, 2u);
+        set.write<0>(first);
+        set.write<1>(second);
+        auto native = set.backend();
+        native.update(&second.backend(), 0);
+        auto manager = make_manager();
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        vsl::command::BindGraphicResource command(native, vsl::graphic_resource::BindingDestination::COMPUTE,
+                                                  std::nullopt, 0, set.resource_use());
+        command.track(manager.get_buffer());
+        command.track(manager.get_buffer());
+        EXPECT_EQ(phase.completion().data_->resources.size(), 2u);
+        EXPECT_FALSE(first.backend().use_state().busy());
+        EXPECT_TRUE(second.backend().use_state().busy());
+        EXPECT_THROW(set.write<0>(first), std::logic_error);
+        phase.cancel();
+        EXPECT_NO_THROW(set.write<0>(first));
+    }
+
+    TEST_F(BufferGenerationVulkanIntegrationTest, OneTypedTrackingGroupStillKeepsEverySetInANativeMultiSetBinding) {
+        using Set = t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
+        vsl::GraphicResourceManager descriptors(device);
+        auto manager = make_manager();
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        std::weak_ptr<vsl::impl::GraphicResourceImpl> first_set, second_set;
+        std::weak_ptr<vsl::impl::BufferImpl> first_buffer, second_buffer;
+        {
+            t::TypedDescriptorSet<Set> first(device, descriptors), second(device, descriptors);
+            t::TypedUniformBuffer<std::uint32_t> a(device, 1u), b(device, 2u);
+            first.write<0>(a);
+            second.write<0>(b);
+            first_set = first.backend().data_;
+            second_set = second.backend().data_;
+            first_buffer = a.backend().data_;
+            second_buffer = b.backend().data_;
+            vsl::command::BindGraphicResource command(std::vector<vsl::GraphicResource>{first.backend(), second.backend()},
+                                                      vsl::graphic_resource::BindingDestination::COMPUTE,
+                                                      std::nullopt, 0, first.resource_use());
+            command.track(manager.get_buffer());
+        }
+        EXPECT_EQ(phase.completion().data_->resources.size(), 4u);
+        ASSERT_FALSE(first_set.expired());
+        ASSERT_FALSE(second_set.expired());
+        ASSERT_FALSE(first_buffer.expired());
+        ASSERT_FALSE(second_buffer.expired());
+        EXPECT_TRUE(first_buffer.lock()->use->busy());
+        EXPECT_TRUE(second_buffer.lock()->use->busy());
+        phase.cancel();
+    }
 
     TEST_F(BufferGenerationVulkanIntegrationTest, NativeTypedAndImportedViewsShareOneStorageState) {
         t::TypedVertexBuffer<std::uint32_t> vertices(device, VALUES);

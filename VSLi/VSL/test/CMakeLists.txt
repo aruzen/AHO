@@ -57,8 +57,8 @@ if (VSL_TEST_SOURCES)
     add_library(vsl-arena-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_buffer_arena.cpp)
     target_link_libraries(vsl-arena-style-contract PRIVATE VSL)
     set(arena_contract_names Valid WrongPayload WrongDestination WrongUsage UnknownResource TemporaryBorrow DuplicateResource
-        MixedLifetime EscapingRead DuplicateBinding UnknownBinding UnknownBindingResource WrongReadPayload)
-    foreach(case RANGE 0 12)
+        MixedLifetime EscapingRead DuplicateBinding UnknownBinding UnknownBindingResource WrongReadPayload TypedTemporaryStorage ConstTypedTemporaryStorage)
+    foreach(case RANGE 0 14)
         list(GET arena_contract_names ${case} name)
         add_test(NAME "VSL.TypedArena.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
             "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"

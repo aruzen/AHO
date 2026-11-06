@@ -1,11 +1,3 @@
 #pragma once
-#include "buffer_and_image_accessor.hpp"
-
-namespace VSL_NAMESPACE {
-    struct BufferCreateInfo {
-        size_t bytes;
-        MemoryType usage;
-        MemoryProperty properties = MemoryProperty::HOST_VISIBLE;
-        SharingMode sharing = SharingMode::EXCLUSIVE;
-    };
-} // namespace VSL_NAMESPACE
+// 既存includeパスの互換入口。実装は責務ごとのヘッダーへ集約する。
+#include <VSL/operation/buffer_create_info.hpp>

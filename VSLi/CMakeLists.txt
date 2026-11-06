@@ -40,7 +40,9 @@ add_library(VSL STATIC
         VSL/src/vulkan/stages/dynamic_state.cpp
         VSL/src/vulkan/stages/color_blend.cpp
         VSL/src/vulkan/pipeline_layout.cpp
-        VSL/src/vulkan/resource_use.cpp
+        VSL/src/lifetime/resource_use.cpp
+        VSL/src/sync/resource_use_state.cpp
+        VSL/src/sync/completion.cpp
         VSL/src/utils/typed_buffer_view.cpp
         VSL/src/vulkan/command.cpp
         VSL/src/vulkan/device.cpp
@@ -49,15 +51,22 @@ add_library(VSL STATIC
         VSL/src/vulkan/synchronize.cpp
         VSL/src/vulkan/shader.cpp
         VSL/src/vulkan/buffer.cpp
-        VSL/src/backend/buffer_ops.cpp
+        VSL/src/operation/buffer_ops.cpp
         VSL/src/sync/buffer_access.cpp
         VSL/src/lifetime/buffer_storage.cpp
         VSL/src/lifetime/submission_retention.cpp
-        VSL/src/storage/buffer_arena.cpp
+        VSL/src/lifetime/buffer_arena.cpp
         VSL/src/storage/arena_memory.cpp
         VSL/include/VSL/storage/arena_memory.hpp
+        VSL/include/VSL/lifetime/buffer_arena.hpp
+        VSL/include/VSL/lifetime/buffer_view.hpp
+        VSL/include/VSL/lifetime/typed_buffer_arena.hpp
+        VSL/include/VSL/lifetime/resource_use.hpp
+        VSL/include/VSL/sync/resource_use_state.hpp
+        VSL/include/VSL/sync/completion.hpp
+        VSL/include/VSL/operation/buffer_create_info.hpp
         VSL/src/storage/buffer_layout.cpp
-        VSL/src/vulkan/buffer_view.cpp
+        VSL/src/lifetime/buffer_view.cpp
         VSL/include/VSL/vulkan/buffer_view.hpp
         VSL/include/VSL/vulkan/buffer_create_info.hpp
         VSL/include/VSL/storage/buffer_abi.hpp

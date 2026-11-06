@@ -4,11 +4,13 @@
 
 ## 実装した境界
 
+現在のディレクトリと互換入口は[4層配置](buffer-layer-layout.md)を参照する。
+
 | 責務 | 実装 |
 | --- | --- |
 | CPUメモリ | `storage::ArenaMemory`／private `CPURegion`。aligned allocation、外部領域adopt、容量・alignment・使用権、返却 |
-| Vulkan操作 | private `backend::initialize_buffer`／`destroy_buffer`／`map_buffer`／`synchronize_buffer`／`validate_copy`／`record_copy`。解決済みImpl参照と具体的なnative操作 |
-| 構築・所有・破棄 | `lifetime::construct_buffer`／`destroy_buffer`、HeapBufferOwner、ArenaOwner、完了時retention解放。slot構築、prefix journal、rollback、外部ownerの保持 |
+| Vulkan操作 | private `operation::initialize_buffer`／`destroy_buffer`／`map_buffer`／`synchronize_buffer`／`validate_copy`／`record_copy`。解決済みImpl参照と具体的なnative操作 |
+| 構築・所有・破棄 | `lifetime::BufferArena`、`construct_buffer`／`destroy_buffer`、HeapBufferOwner、ArenaOwner、完了時retention解放。slot構築、prefix journal、rollback、外部ownerの保持 |
 | 同期 | 既存ResourceUseState、`sync::buffer_copy_visibility`、Completionの完了通知。使用中のhost更新拒否、barrier方針、送信結果 |
 
 通常の`BufferAccessor::MakeBuffer`もheap ownerが持つ領域へ`lifetime::construct_buffer`し、Typedと同じbackendを使う。native生成・memory type選択・map／flush／invalidate・転送の検証を新しい生成経路へ複製していない。

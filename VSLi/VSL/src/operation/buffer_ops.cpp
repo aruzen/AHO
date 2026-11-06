@@ -1,8 +1,8 @@
-#include <VSL/backend/buffer_ops.hpp>
+#include <VSL/operation/buffer_ops.hpp>
 #include <VSL/exceptions.hpp>
 #include <stdexcept>
 
-namespace VSL_NAMESPACE::backend {
+namespace VSL_NAMESPACE::operation {
     void initialize_buffer(impl::BufferImpl& target, impl::LogicalDeviceImpl& device, const BufferCreateInfo& parameters) {
         const auto size = parameters.bytes;
         const auto mem_type = parameters.usage;
@@ -143,4 +143,4 @@ namespace VSL_NAMESPACE::backend {
 
         command.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, visibility.after_destination, {}, {}, after, {});
     }
-} // namespace VSL_NAMESPACE::backend
+} // namespace VSL_NAMESPACE::operation

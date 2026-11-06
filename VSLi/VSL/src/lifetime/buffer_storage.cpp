@@ -27,7 +27,7 @@ namespace VSL_NAMESPACE::lifetime {
         auto* use = std::construct_at(reinterpret_cast<ResourceUseState*>(slot->use));
         buffer->use = use;
         try {
-            backend::initialize_buffer(*buffer, *device.data_, info);
+            operation::initialize_buffer(*buffer, *device.data_, info);
         } catch (...) {
             std::destroy_at(use);
             std::destroy_at(buffer);
@@ -42,7 +42,7 @@ namespace VSL_NAMESPACE::lifetime {
     void destroy_buffer(void* storage) noexcept {
         auto ref = buffer_at(storage);
         auto* slot = static_cast<BufferSlotStorage*>(storage);
-        backend::destroy_buffer(*ref.data);
+        operation::destroy_buffer(*ref.data);
         std::destroy_at(ref.data->use);
         std::destroy_at(ref.data);
         std::destroy_at(slot);

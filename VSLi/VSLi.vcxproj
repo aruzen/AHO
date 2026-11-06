@@ -136,24 +136,34 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="VSL\include\VSL\lifetime\buffer_arena.hpp" />
+    <ClInclude Include="VSL\include\VSL\lifetime\buffer_view.hpp" />
+    <ClInclude Include="VSL\include\VSL\lifetime\typed_buffer_arena.hpp" />
+    <ClInclude Include="VSL\include\VSL\lifetime\resource_use.hpp" />
+    <ClInclude Include="VSL\include\VSL\sync\resource_use_state.hpp" />
+    <ClInclude Include="VSL\include\VSL\sync\completion.hpp" />
+    <ClInclude Include="VSL\include\VSL\operation\buffer_create_info.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\sync\submission_completion.hpp" />
+    <ClCompile Include="VSL\src\sync\resource_use_state.cpp" />
+    <ClCompile Include="VSL\src\sync\completion.cpp" />
     <ClCompile Include="VSL\src\lifetime\submission_retention.cpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\submission_retention.hpp" />
     <ClCompile Include="VSL\src\sync\buffer_access.cpp" />
     <ClInclude Include="VSL\src\private\VSL\sync\buffer_access.hpp" />
-    <ClInclude Include="VSL\src\private\VSL\contracts\buffer_access.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\operation\buffer_access.hpp" />
     <ClInclude Include="VSL\include\VSL\storage\arena_memory.hpp" />
     <ClInclude Include="VSL\include\VSL\storage\buffer_abi.hpp" />
     <ClInclude Include="VSL\include\VSL\storage\buffer_arena.hpp" />
     <ClInclude Include="VSL\include\VSL\storage\buffer_layout.hpp" />
-    <ClInclude Include="VSL\src\private\VSL\backend\buffer_ops.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\operation\buffer_ops.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\buffer_storage.hpp" />
     <ClInclude Include="VSL\src\private\VSL\storage\cpu_region.hpp" />
     <ClInclude Include="VSL\include\VSL\utils\typed_buffer_arena.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\buffer_view.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\buffer_create_info.hpp" />
-    <ClCompile Include="VSL\src\backend\buffer_ops.cpp" />
+    <ClCompile Include="VSL\src\operation\buffer_ops.cpp" />
     <ClCompile Include="VSL\src\lifetime\buffer_storage.cpp" />
-    <ClCompile Include="VSL\src\vulkan\buffer_view.cpp" />
+    <ClCompile Include="VSL\src\lifetime\buffer_view.cpp" />
     <ClCompile Include="VSL\src\storage\arena_memory.cpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\commands\image_upload.hpp" />
     <ClInclude Include="VSL\include\VSL\vulkan\commands\copy_buffer.hpp" />
@@ -259,7 +269,7 @@
     <ClCompile Include="VSL\src\utils\string.cpp" />
     <ClCompile Include="VSL\src\vulkan\buffer.cpp" />
     <ClCompile Include="VSL\src\vulkan\command.cpp" />
-    <ClCompile Include="VSL\src\vulkan\resource_use.cpp" />
+    <ClCompile Include="VSL\src\lifetime\resource_use.cpp" />
     <ClCompile Include="VSL\src\utils\typed_buffer_view.cpp" />
     <ClCompile Include="VSL\src\vulkan\commands\bind_graphic_resource.cpp" />
     <ClCompile Include="VSL\src\vulkan\commands\bind_index_buffers.cpp" />

@@ -1,9 +1,9 @@
 #pragma once
 #include <VSL/vulkan/_pimpls.hpp>
-#include <VSL/vulkan/buffer_create_info.hpp>
-#include <VSL/contracts/buffer_access.hpp>
+#include <VSL/operation/buffer_create_info.hpp>
+#include <VSL/operation/buffer_access.hpp>
 
-namespace VSL_NAMESPACE::backend {
+namespace VSL_NAMESPACE::operation {
     // CPU領域・所有者・submissionを選ばないnative操作。
     void initialize_buffer(impl::BufferImpl& target, impl::LogicalDeviceImpl& device, const BufferCreateInfo& info);
     void destroy_buffer(impl::BufferImpl& target) noexcept;
@@ -13,4 +13,4 @@ namespace VSL_NAMESPACE::backend {
                        size_t bytes, size_t source_offset, size_t destination_offset, bool host_read);
     void record_copy(vk::CommandBuffer command, const impl::BufferImpl& source, const impl::BufferImpl& destination,
                      size_t bytes, size_t source_offset, size_t destination_offset, const BufferCopyVisibility& visibility);
-} // namespace VSL_NAMESPACE::backend
+} // namespace VSL_NAMESPACE::operation

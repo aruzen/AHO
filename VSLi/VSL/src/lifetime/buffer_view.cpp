@@ -1,23 +1,8 @@
-#include <VSL/vulkan/buffer_view.hpp>
-#include <VSL/backend/buffer_ops.hpp>
+#include <VSL/lifetime/buffer_view.hpp>
+#include <VSL/operation/buffer_ops.hpp>
 #include <cstring>
 
 namespace VSL_NAMESPACE {
-    ResourceUse ResourceUse::ForBuffer(const std::shared_ptr<impl::BufferImpl>& buffer, ResourceUse constraint) {
-        if (!buffer || !buffer->use)
-            throw std::invalid_argument("Buffer requires a constructed storage generation");
-        ResourceUse use{{buffer, buffer->use}, buffer};
-        if (constraint.state == use.state) {
-            use.constraint_state = std::move(constraint.constraint_state);
-            use.constraint_owner = std::move(constraint.constraint_owner);
-        } else {
-            if (constraint.constraint_state || constraint.constraint_owner.use_count())
-                throw std::invalid_argument("Cannot attach a different storage generation as a logical constraint");
-            use.constraint_state = std::move(constraint.state);
-            use.constraint_owner = std::move(constraint.owner);
-        }
-        return use;
-    }
     size_t BufferRef::size() const {
         if (!data)
             throw std::logic_error("Buffer reference is empty");
@@ -35,15 +20,15 @@ namespace VSL_NAMESPACE {
     }
     void BufferRef::write(std::span<const std::byte> bytes, size_t offset) const {
         use().require_idle();
-        auto* destination = backend::map_buffer(*data, offset, bytes.size());
+        auto* destination = operation::map_buffer(*data, offset, bytes.size());
         if (!bytes.empty())
             std::memmove(destination, bytes.data(), bytes.size());
-        backend::synchronize_buffer(*data, offset, bytes.size(), true);
+        operation::synchronize_buffer(*data, offset, bytes.size(), true);
     }
     void BufferRef::read_into(std::span<std::byte> destination, size_t offset) const {
         use().require_idle();
-        auto* source = backend::map_buffer(*data, offset, destination.size());
-        backend::synchronize_buffer(*data, offset, destination.size(), false);
+        auto* source = operation::map_buffer(*data, offset, destination.size());
+        operation::synchronize_buffer(*data, offset, destination.size(), false);
         if (!destination.empty())
             std::memmove(destination.data(), source, destination.size());
     }

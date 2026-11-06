@@ -2,6 +2,8 @@
 
 2026-11-02。PR #317のレビューで指摘された4点を、他の資源のarena化とschema自動展開より先に修正する。コード名は引き続き仮案。[配置実装](buffer-placement.md)の現行契約を補う。
 
+2026-11-06の追加修正は[4層配置・Typed借用入口・owner保持](buffer-layer-layout.md)を参照。公開ヘッダーの正式な配置先も同文書にまとめる。
+
 ## 同じstorage世代は同じ使用状態
 
 BufferImplごとに一つのResourceUseStateを構築する。通常のBufferAccessor、BufferView、TypedVertexBuffer／TypedIndexBuffer／TypedResourceBuffer、外部Bufferから作るTyped viewはこの状態を参照する。Typedの所有Bufferが別の_useを確保する経路は廃止した。

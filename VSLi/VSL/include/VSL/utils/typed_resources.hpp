@@ -19,6 +19,7 @@ namespace VSL_NAMESPACE::typed {
             size_t offset = 0;
             ResourceUse use;
         };
+        ResourceUse descriptor_constraints(const DescriptorValue& value);
         void write_descriptor(GraphicResource resource, graphic_resource::BindingPoint point, std::span<const DescriptorValue> values);
         template<typename Binding, typename Value>
         consteval bool descriptor_matches();
@@ -208,7 +209,7 @@ namespace VSL_NAMESPACE::typed {
         if (resources.size() != 1)
             throw std::runtime_error("Typed descriptor allocation failed");
         _resource = resources.front();
-        _use = std::make_shared<ResourceUseGroup>(Spec::BINDING_COUNT, _resource.data_);
+        _use = ResourceUseGroup::ForDescriptor(Spec::BINDING_COUNT, _resource.data_);
     }
     template<typename Spec>
     void TypedDescriptorSet<Spec>::require_complete() const {
@@ -221,7 +222,7 @@ namespace VSL_NAMESPACE::typed {
     void TypedDescriptorSet<Spec_>::write(const Value& value) {
         _use->require_idle();
         const auto descriptor = value.descriptor();
-        std::vector<ResourceUse> uses{descriptor.use};
+        std::vector<ResourceUse> uses{detail::descriptor_constraints(descriptor)};
         detail::write_descriptor(_resource, Spec::template Binding<binding>::POINT, std::span(&descriptor, 1));
         _use->replace(Spec::BindingIndex(binding), std::move(uses));
         (*_initialized)[Spec::BindingIndex(binding)] = true;
@@ -236,7 +237,7 @@ namespace VSL_NAMESPACE::typed {
         uses.reserve(count);
         for (size_t i = 0; i < count; ++i) {
             descriptors[i] = values[i].descriptor();
-            uses.push_back(descriptors[i].use);
+            uses.push_back(detail::descriptor_constraints(descriptors[i]));
         }
         detail::write_descriptor(_resource, Spec::template Binding<binding>::POINT, descriptors);
         _use->replace(Spec::BindingIndex(binding), std::move(uses));

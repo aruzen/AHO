@@ -5,6 +5,11 @@
 #include <algorithm>
 
 namespace VSL_NAMESPACE::typed::detail {
+    ResourceUse descriptor_constraints(const DescriptorValue& value) {
+        if (value.buffer)
+            return {value.use.constraint_state, value.use.constraint_owner};
+        return value.use;
+    }
     void write_descriptor(GraphicResource resource, graphic_resource::BindingPoint point, std::span<const DescriptorValue> values) {
         const auto& target = resource.data_;
         if (!target || !target->pool || !target->pool->descriptor_pool || !target->descriptor_set)

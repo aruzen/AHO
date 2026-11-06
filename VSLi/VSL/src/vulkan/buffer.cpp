@@ -1,7 +1,7 @@
 #include <VSL/lifetime/buffer_storage.hpp>
 
 #include <VSL/vulkan/buffer.hpp>
-#include <VSL/vulkan/buffer_view.hpp>
+#include <VSL/lifetime/buffer_view.hpp>
 #include <VSL/vulkan/buffer_and_image_accessor.hpp>
 #include <VSL/vulkan/phase.hpp>
 #include <VSL/vulkan/commands/copy_image_to_buffer.hpp>
@@ -147,7 +147,7 @@ void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::synchronize(std::size_t b
         throw std::out_of_range("Buffer mapping range");
     if (!bytes || contain(_owner->properties, MemoryProperty::HOST_COHERENT))
         return;
-    backend::synchronize_buffer(*_owner, offset + relative_offset, bytes, flush);
+    operation::synchronize_buffer(*_owner, offset + relative_offset, bytes, flush);
 }
 
 void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::flush(std::size_t bytes, std::size_t offset) const {
@@ -200,7 +200,7 @@ VSL_NAMESPACE::BufferAccessor::LocalBufferHolder VSL_NAMESPACE::BufferAccessor::
     const auto length = bytes.value_or(storage->requirement_size - offset);
     if (length > storage->requirement_size - offset)
         throw exceptions::RuntimeException("buffer", "mapped range is outside requested storage");
-    auto* mapped = backend::map_buffer(*storage, offset, length);
+    auto* mapped = operation::map_buffer(*storage, offset, length);
     LocalBufferHolder holder(buffer, length, offset, mapped);
     holder.invalidate(length);
     return holder;

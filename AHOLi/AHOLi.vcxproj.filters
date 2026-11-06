@@ -143,6 +143,7 @@
     <ClInclude Include="AHO\include\AHO\resource\buffer.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="AHO\include\AHO\resource\imported_buffer.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="AHO\include\AHO\resource\image.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -215,6 +216,7 @@
     <ClCompile Include="AHO\src\resource\buffer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="AHO\src\resource\imported_buffer.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClCompile Include="AHO\src\resource\image.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>

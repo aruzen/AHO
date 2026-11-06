@@ -85,6 +85,7 @@ if (AHO_TEST_SOURCES)
             drawer/standard_drawer_test.cpp
             image_readback_test.cpp
             resource/buffer_test.cpp
+            resource/imported_buffer_test.cpp
             resource/typed_buffer_test.cpp
             command/buffer_upload_test.cpp
             x/command/texture_update_test.cpp
@@ -106,9 +107,9 @@ if (AHO_TEST_SOURCES)
             PROPERTIES LABELS gpu RESOURCE_LOCK aho_graphics TIMEOUT 45)
     include(cmake/CompileContracts.cmake)
     aho_register_header_tests()
-    set(aho_typed_buffer_names Valid UniformUsage VertexUsage CpuBuffer DescriptorKind DescriptorPayload VertexType NontrivialVertex)
-    set(aho_typed_buffer_expected unused uniform_view vertex_view vertex_view write write bind_vertices trivially_copyable)
-    foreach(case RANGE 0 7)
+    set(aho_typed_buffer_names Valid UniformUsage VertexUsage CpuBuffer DescriptorKind DescriptorPayload VertexType NontrivialVertex FixedArenaReserve TemporarySnapshot ImportedPayload ConstTemporarySnapshot)
+    set(aho_typed_buffer_expected unused uniform_view vertex_view vertex_view write write bind_vertices trivially_copyable reserve deleted write deleted)
+    foreach(case RANGE 0 11)
         list(GET aho_typed_buffer_names ${case} name)
         list(GET aho_typed_buffer_expected ${case} expected)
         add_test(NAME "AHO.Compile.TypedBuffer.${name}"

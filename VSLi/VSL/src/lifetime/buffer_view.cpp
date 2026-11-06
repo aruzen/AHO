@@ -18,6 +18,16 @@ namespace VSL_NAMESPACE {
             throw std::logic_error("Buffer reference has no use state");
         return *data->use;
     }
+    MemoryProperty BufferRef::properties() const {
+        if (!data)
+            throw std::logic_error("Buffer reference is empty");
+        return data->properties;
+    }
+    LogicalDeviceAccessor BufferRef::device() const {
+        if (!data || !data->device)
+            throw std::logic_error("Buffer reference has no device");
+        return {data->device->shared_from_this()};
+    }
     void BufferRef::fill(std::byte value) const {
         use().require_idle();
         auto* destination = operation::map_buffer(*data, 0, size());

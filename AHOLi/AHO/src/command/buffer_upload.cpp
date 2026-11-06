@@ -23,15 +23,15 @@ namespace AHO_NAMESPACE::command {
                 throw std::out_of_range("Buffer upload destination range");
             if (!bytes)
                 return;
+            const auto destination = _destination.snapshot();
+            const auto snapshot = source.snapshot();
             VSL_NAMESPACE::command::CopyBuffer command(
-                &source.native(), &_destination.native(), bytes,
-                source_offset, _destination_offset, _destination.host_readable());
+                snapshot.storage(), destination.storage(), bytes,
+                source_offset, _destination_offset, destination.host_readable());
             command.validate();
-            buffer.retain(source.owner());
-            buffer.retain(_destination.owner());
+            snapshot.constraints().record(buffer, snapshot.retention());
+            destination.constraints().record(buffer, destination.retention());
             command.invoke(pool, buffer, manager);
-            source.mark_used(completion);
-            _destination.mark_used(completion);
         };
         if (auto* source = std::get_if<resource::BufferBinding>(&_source)) {
             if (_source_offset > source->size())

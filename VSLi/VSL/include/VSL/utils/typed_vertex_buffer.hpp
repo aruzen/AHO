@@ -28,6 +28,7 @@ namespace VSL_NAMESPACE::typed {
         static_assert(std::is_standard_layout_v<Vertex> && std::is_trivially_copyable_v<Vertex>,
                       "Typed vertex records must be standard-layout and trivially_copyable");
         static TypedVertexBufferView FromBuffer(const BufferAccessor& source, size_t count, size_t byte_offset = 0, ResourceUse use = {});
+        static TypedVertexBufferView FromView(const BufferView& source, size_t count, size_t byte_offset = 0, ResourceUse use = {});
         const ResourceUse& resource_use() const { return _use; }
         size_t size() const { return _count; }
         size_t byte_offset() const { return _offset; }
@@ -88,8 +89,14 @@ namespace VSL_NAMESPACE::typed {
 
     template<typename Vertex>
     TypedVertexBufferView<Vertex> TypedVertexBufferView<Vertex>::FromBuffer(const BufferAccessor& source, size_t count, size_t byte_offset, ResourceUse use) {
+        if (!source.data_)
+            throw std::invalid_argument("Typed buffer view requires a buffer");
+        return FromView(BufferView::FromBuffer(source), count, byte_offset, std::move(use));
+    }
+    template<typename Vertex>
+    TypedVertexBufferView<Vertex> TypedVertexBufferView<Vertex>::FromView(const BufferView& source, size_t count, size_t byte_offset, ResourceUse use) {
         detail::validate_buffer_view(source, MemoryType::VERTEX_BUFFER, byte_offset, count, sizeof(Vertex), alignof(Vertex));
-        return TypedVertexBufferView(source.get_device(), source.data_, byte_offset, count, source.resource_use(std::move(use)));
+        return TypedVertexBufferView(source.ref().device(), source.legacy_owner(), source.byte_offset() + byte_offset, count, source.resource_use(std::move(use)));
     }
 
     namespace detail {

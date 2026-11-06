@@ -41,6 +41,7 @@ namespace VSL_NAMESPACE::typed {
         static_assert(kind == graphic_resource::Type::UNIFORM_BUFFER || kind == graphic_resource::Type::STORAGE_BUFFER);
         static_assert(std::is_standard_layout_v<Payload> && std::is_trivially_copyable_v<Payload>);
         static TypedResourceBufferView FromBuffer(const BufferAccessor& source, size_t count, size_t byte_offset = 0, ResourceUse use = {});
+        static TypedResourceBufferView FromView(const BufferView& source, size_t count, size_t byte_offset = 0, ResourceUse use = {});
         size_t size() const { return _count; }
         size_t byte_offset() const { return _value.offset; }
         detail::DescriptorValue descriptor() const { return _value; }
@@ -158,9 +159,15 @@ namespace VSL_NAMESPACE::typed {
 
     template<typename Payload_, graphic_resource::Type kind>
     TypedResourceBufferView<Payload_, kind> TypedResourceBufferView<Payload_, kind>::FromBuffer(const BufferAccessor& source, size_t count, size_t byte_offset, ResourceUse use) {
+        if (!source.data_)
+            throw std::invalid_argument("Typed buffer view requires a buffer");
+        return FromView(BufferView::FromBuffer(source), count, byte_offset, std::move(use));
+    }
+    template<typename Payload_, graphic_resource::Type kind>
+    TypedResourceBufferView<Payload_, kind> TypedResourceBufferView<Payload_, kind>::FromView(const BufferView& source, size_t count, size_t byte_offset, ResourceUse use) {
         constexpr auto usage = kind == graphic_resource::Type::UNIFORM_BUFFER ? MemoryType::UNIFORM_BUFFER : MemoryType::STORAGE_BUFFER;
         detail::validate_buffer_view(source, usage, byte_offset, count, sizeof(Payload), alignof(Payload));
-        return TypedResourceBufferView({source.data_, {}, {}, count * sizeof(Payload), byte_offset, source.resource_use(std::move(use))}, count);
+        return TypedResourceBufferView({source.legacy_owner(), {}, {}, count * sizeof(Payload), source.byte_offset() + byte_offset, source.resource_use(std::move(use))}, count);
     }
     template<typename Payload_, graphic_resource::Type kind>
     TypedResourceBufferView<Payload_, kind> TypedResourceBufferView<Payload_, kind>::view(size_t first, size_t count) const {

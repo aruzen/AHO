@@ -1,4 +1,5 @@
 #include <VSL/utils/typed_resource_allocation.hpp>
+#include <VSL/lifetime/typed_bundle_plan.hpp>
 #include <gtest/gtest.h>
 
 namespace {
@@ -78,5 +79,53 @@ namespace {
         EXPECT_EQ(plan.totals().buffers, 0u);
         EXPECT_EQ(plan.totals().descriptor_sets, 0u);
         EXPECT_EQ(plan.totals().payload_bytes, 0u);
+    }
+
+    TEST(TypedAllocationPlanTest, ArenaPlanSeparatesLifetimeGroupsAndExcludesExternalSlots) {
+        constexpr t::TypedBundlePlan<Fixed> plan(FIXED_PLAN);
+        static_assert(plan.buffers(t::ResourceScope::SHARED).size() == 3);
+        static_assert(plan.buffers(t::ResourceScope::PER_FRAME).size() == 1);
+        static_assert(plan.total_bytes() == vsl::storage::BufferLayout::Bytes(6));
+        EXPECT_TRUE((plan.placement({7, 0, 1}).external));
+        EXPECT_EQ((plan.placement({7, 0, 1}).slot), SIZE_MAX);
+        EXPECT_NE((plan.placement({0, 0, 0}).slot), (plan.placement({0, 0, 1}).slot));
+        EXPECT_EQ(plan.alignment(t::ResourceScope::SHARED), vsl::storage::BufferLayout::ALIGNMENT);
+        EXPECT_THROW(plan.placement({4, 1, 2}), std::invalid_argument);
+    }
+
+    TEST(TypedAllocationPlanTest, ExplicitResourceIdentitySharesSlotsWithoutEncodingBindingNumbers) {
+        using Map = t::BufferBindingMap<t::ResourceBinding<t::BindingKey{0, 0, 0}, t::ResourceId{0}>,
+                                        t::ResourceBinding<t::BindingKey{0, 0, 1}, t::ResourceId{0}>>;
+        constexpr t::TypedBundlePlan<Fixed, Map> plan(FIXED_PLAN);
+        static_assert(plan.buffers(t::ResourceScope::SHARED).size() == 2);
+        EXPECT_EQ((plan.placement({0, 0, 0}).resource), (t::ResourceId{0}));
+        EXPECT_EQ((plan.placement({0, 0, 0}).slot), (plan.placement({0, 0, 1}).slot));
+        EXPECT_NE((plan.placement({4, 1, 0}).resource), (t::ResourceId{0}));
+    }
+
+    TEST(TypedAllocationPlanTest, ArenaPlanRejectsConflictingDeclarationsAndUnknownMapKeys) {
+        using Conflict = t::BufferBindingMap<t::ResourceBinding<t::BindingKey{0, 0, 0}, t::ResourceId{0}>,
+                                             t::ResourceBinding<t::BindingKey{4, 1, 0}, t::ResourceId{0}>>;
+        EXPECT_THROW((t::TypedBundlePlan<Fixed, Conflict>(FIXED_PLAN)), std::invalid_argument);
+        using Unknown = t::BufferBindingMap<t::ResourceBinding<t::BindingKey{123, 0}, t::ResourceId{0}>>;
+        EXPECT_THROW((t::TypedBundlePlan<Fixed, Unknown>(FIXED_PLAN)), std::invalid_argument);
+        using Empty = t::ResourceAllocationSchema<t::ResourceSchema<>>;
+        constexpr t::TypedBundlePlan<Empty> empty(t::ResourceAllocationPlan<Empty>(1));
+        static_assert(empty.total_bytes() == 0 && empty.alignment(t::ResourceScope::SHARED) == 1);
+    }
+
+    TEST(TypedAllocationPlanTest, EqualPayloadSizeDoesNotPermitAliasingDifferentTypes) {
+        using Two = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<0,
+                                                                                   t::UniformBinding<0, float, vsl::ShaderFlag::COMPUTE>, t::UniformBinding<1, std::uint32_t, vsl::ShaderFlag::COMPUTE>>>,
+                                                t::BufferAllocation<0, 0>, t::BufferAllocation<0, 1>>;
+        using Map = t::BufferBindingMap<t::ResourceBinding<t::BindingKey{0, 0}, t::ResourceId{1}>, t::ResourceBinding<t::BindingKey{0, 1}, t::ResourceId{1}>>;
+        EXPECT_THROW((t::TypedBundlePlan<Two, Map>(t::ResourceAllocationPlan<Two>(1))), std::invalid_argument);
+    }
+
+    TEST(TypedAllocationPlanTest, ArenaCpuByteOverflowIsIndependentOfPayloadByteOverflow) {
+        using Bytes = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<0, t::UniformBinding<0, std::uint8_t, vsl::ShaderFlag::COMPUTE>>>, t::BufferAllocation<0, 0>>;
+        const t::ResourceAllocationPlan<Bytes> logical(SIZE_MAX);
+        EXPECT_EQ(logical.totals().payload_bytes, SIZE_MAX);
+        EXPECT_THROW((t::TypedBundlePlan<Bytes>(logical)), std::overflow_error);
     }
 } // namespace

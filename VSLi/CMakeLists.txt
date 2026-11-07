@@ -60,6 +60,8 @@ add_library(VSL STATIC
         VSL/src/lifetime/sampler_storage.cpp
         VSL/src/lifetime/submission_retention.cpp
         VSL/src/lifetime/buffer_arena.cpp
+        VSL/src/lifetime/resource_arena.cpp
+        VSL/include/VSL/lifetime/resource_arena.hpp
         VSL/src/storage/arena_memory.cpp
         VSL/include/VSL/storage/arena_memory.hpp
         VSL/include/VSL/lifetime/buffer_arena.hpp

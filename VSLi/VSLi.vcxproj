@@ -170,6 +170,8 @@
     <ClInclude Include="VSL\include\VSL\storage\resource_layout.hpp" />
     <ClInclude Include="VSL\include\VSL\lifetime\resource_id.hpp" />
     <ClInclude Include="VSL\include\VSL\lifetime\resource_plan.hpp" />
+    <ClInclude Include="VSL\include\VSL\lifetime\resource_arena.hpp" />
+    <ClCompile Include="VSL\src\lifetime\resource_arena.cpp" />
     <ClCompile Include="VSL\src\storage\resource_layout.cpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\buffer_ops.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\buffer_storage.hpp" />

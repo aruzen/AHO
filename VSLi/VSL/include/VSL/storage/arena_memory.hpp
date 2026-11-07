@@ -6,7 +6,8 @@
 
 namespace VSL_NAMESPACE::lifetime {
     class BufferArena;
-}
+    class ResourceArena;
+} // namespace VSL_NAMESPACE::lifetime
 namespace VSL_NAMESPACE::storage {
     using BufferArena = lifetime::BufferArena;
     namespace detail {
@@ -16,6 +17,7 @@ namespace VSL_NAMESPACE::storage {
     class ArenaMemory {
         std::shared_ptr<detail::CPURegion> _region;
         friend class lifetime::BufferArena;
+        friend class lifetime::ResourceArena;
 
     public:
         ArenaMemory(size_t bytes, size_t alignment);

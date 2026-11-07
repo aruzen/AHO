@@ -1,4 +1,5 @@
 #include <VSL/vulkan/_pimpls.hpp>
+#include <VSL/lifetime/resource_use.hpp>
 
 #include <VSL/vulkan/commands/change_image_barrier.hpp>
 #include "../image_format.hpp"
@@ -72,8 +73,8 @@ void VSL_NAMESPACE::command::ChangeImageBarrier::invoke(VSL_NAMESPACE::CommandPo
         (old_layout != ImageLayout::TRANSFER_DST_OPTIMAL || new_layout != ImageLayout::SHADER_READ_ONLY_OPTIMAL))
         throw std::invalid_argument("Shader read stages require a transfer-destination to shader-read transition");
     if (!image.data_ || !image.data_->image || !buffer.data_ || !buffer.data_->command_pool || !manager.data_ ||
-        image.data_->device != manager.data_->device ||
-        buffer.data_->command_pool->device != image.data_->device)
+        image.data_->device != manager.data_->device.get() ||
+        buffer.data_->command_pool->device.get() != image.data_->device)
         throw std::invalid_argument("Image barrier requires an image and command buffer on the same device");
     if (base_layer >= image.data_->count)
         throw std::out_of_range("Image barrier base layer exceeds image");
@@ -147,6 +148,6 @@ void VSL_NAMESPACE::command::ChangeImageBarrier::invoke(VSL_NAMESPACE::CommandPo
         throw std::invalid_argument("unsupported layout transition!");
     }
 
-    buffer.retain(image.data_);
+    image.resource_use().record(buffer);
     buffer.data_->command_buffers.at(buffer.get_current_buffer_idx()).pipelineBarrier(source_stage, destination_stage, {}, nullptr, nullptr, barrier);
 }

@@ -5,7 +5,7 @@ namespace {
     TEST_F(SamplerVulkanIntegrationTest, CreatesNearestSamplerWithoutAnisotropyRequirement) {
         vsl::Sampler sampler(device, vsl::SamplingMode::NEAREST, vsl::EdgeMode::CLAMP_TO_EDGE);
         EXPECT_TRUE(sampler.data_->sampler);
-        EXPECT_EQ(sampler.data_->device, device.data_);
+        EXPECT_EQ(sampler.data_->device, device.data_.get());
     }
     TEST_F(SamplerVulkanIntegrationTest, CreatesDefaultLinearSamplerWhenFeatureIsAvailable) {
         if (!physical.data_->features->samplerAnisotropy)

@@ -6,7 +6,10 @@
 
 namespace VSL_NAMESPACE::typed::detail {
     ResourceUse descriptor_constraints(const DescriptorValue& value) {
-        if (value.buffer)
+        const auto* physical = value.use.state.get();
+        if ((value.buffer && physical == value.buffer->use) ||
+            (value.image && physical == value.image->use) ||
+            (value.sampler && physical == value.sampler->use))
             return {value.use.constraint_state, value.use.constraint_owner};
         return value.use;
     }
@@ -20,7 +23,7 @@ namespace VSL_NAMESPACE::typed::detail {
         std::vector<vk::DescriptorBufferInfo> buffers;
         std::vector<vk::DescriptorImageInfo> images;
         std::vector<std::shared_ptr<void>> owners;
-        std::vector<impl::GraphicResourceImpl::BufferBindingRef> buffer_refs;
+        std::vector<impl::GraphicResourceImpl::ResourceBindingRef> resource_refs;
         buffers.reserve(values.size());
         images.reserve(values.size());
         using enum graphic_resource::Type;
@@ -43,22 +46,24 @@ namespace VSL_NAMESPACE::typed::detail {
                 if (alignment && value.offset % alignment)
                     throw std::invalid_argument("Typed descriptor buffer offset violates device alignment");
                 buffers.push_back({value.buffer->buffer, value.offset, value.bytes});
-                buffer_refs.push_back({value.buffer.get(), owners.size()});
+                resource_refs.push_back({value.buffer->use, owners.size()});
                 owners.push_back(value.buffer);
             } else {
                 vk::DescriptorImageInfo info{};
                 if (point.binding_type != SAMPLER) {
                     const auto usage = point.binding_type == STORAGE_IMAGE ? ImageType::STORAGE : ImageType::SAMPLED;
-                    if (!value.image || value.image->device != device || !contain(value.image->usage, usage))
+                    if (!value.image || value.image->device != device.get() || !contain(value.image->usage, usage))
                         throw std::invalid_argument("Typed descriptor image device/usage mismatch");
                     info.imageView = value.image->view;
                     info.imageLayout = point.binding_type == STORAGE_IMAGE ? vk::ImageLayout::eGeneral : vk::ImageLayout::eShaderReadOnlyOptimal;
+                    resource_refs.push_back({value.image->use, owners.size()});
                     owners.push_back(value.image);
                 }
                 if (point.binding_type == SAMPLER || point.binding_type == COMBINED_IMAGE_SAMPLER) {
-                    if (!value.sampler || value.sampler->device != device)
+                    if (!value.sampler || value.sampler->device != device.get())
                         throw std::invalid_argument("Typed descriptor sampler device mismatch");
                     info.sampler = value.sampler->sampler;
+                    resource_refs.push_back({value.sampler->use, owners.size()});
                     owners.push_back(value.sampler);
                 }
                 images.push_back(info);
@@ -71,10 +76,10 @@ namespace VSL_NAMESPACE::typed::detail {
         write.descriptorCount = point.amount;
         write.pBufferInfo = buffers.empty() ? nullptr : buffers.data();
         write.pImageInfo = images.empty() ? nullptr : images.data();
-        auto& refs = target->buffer_refs.try_emplace(point.binding).first->second;
+        auto& refs = target->resource_refs.try_emplace(point.binding).first->second;
         auto& retained = target->bindings.try_emplace(point.binding).first->second;
         retained = std::move(owners);
-        refs = std::move(buffer_refs);
+        refs = std::move(resource_refs);
         device->device.updateDescriptorSets(write, {});
     }
 

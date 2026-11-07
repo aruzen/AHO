@@ -58,7 +58,7 @@ VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer:
 VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer::description() const {
     const auto info = Describe(image, region);
     const auto& destination = _destination;
-    if (!destination || !destination->buffer || destination->device != image.data_->device.get())
+    if (!destination || !destination->buffer || destination->device != image.data_->device)
         throw std::invalid_argument("Image copy requires a destination on the same device");
     if (!contain(destination->usage, MemoryType::TRANSFER_DESTINATION))
         throw std::invalid_argument("Image copy requires TransferDestination buffer usage");
@@ -78,12 +78,11 @@ void VSL_NAMESPACE::command::CopyImageToBuffer::invoke(CommandPool pool, Command
     const auto info = description();
     const auto& destination = _destination;
     if (!buffer.data_ || !buffer.data_->command_pool || !manager.data_ ||
-        manager.data_->device != image.data_->device ||
-        buffer.data_->command_pool->device != image.data_->device)
+        manager.data_->device.get() != image.data_->device ||
+        buffer.data_->command_pool->device.get() != image.data_->device)
         throw std::invalid_argument("Image copy requires a command buffer on the same device");
-    buffer.retain(image.data_);
+    image.resource_use().record(buffer);
     ResourceUse::ForBuffer(destination, {}).record(buffer);
-    buffer.retain(destination);
     const auto& area = info.region;
     vk::BufferImageCopy copy{
         .bufferOffset = _destination_offset,

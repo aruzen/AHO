@@ -18,7 +18,7 @@ namespace {
         VSL_NAMESPACE::ImageLayout layout, VSL_NAMESPACE::ImageRegion region, std::size_t offset) {
         const auto& destination = image.data_;
         if (!source || !source->buffer || !destination || !destination->image || !destination->device ||
-            source->device != destination->device.get())
+            source->device != destination->device)
             throw std::invalid_argument("Image upload requires valid resources on the same device");
         if (!VSL_NAMESPACE::contain(source->usage, VSL_NAMESPACE::MemoryType::TRANSFER_SOURCE) ||
             !VSL_NAMESPACE::contain(destination->usage, VSL_NAMESPACE::ImageType::TRANSFER_DST))
@@ -57,7 +57,7 @@ namespace {
                            const VSL_NAMESPACE::CommandManager& manager) {
         const auto& device = image.data_->device;
         if (!commands.data_ || !commands.data_->command_pool || !manager.data_ ||
-            commands.data_->command_pool->device != device || manager.data_->device != device)
+            commands.data_->command_pool->device.get() != device || manager.data_->device.get() != device)
             throw std::invalid_argument("Image upload requires commands on the same device");
     }
 
@@ -65,8 +65,7 @@ namespace {
                        VSL_NAMESPACE::ImageLayout layout, const VSL_NAMESPACE::command::ImageCopyInfo& info,
                        std::size_t offset, VSL_NAMESPACE::CommandBuffer buffer) {
         VSL_NAMESPACE::ResourceUse::ForBuffer(source, {}).record(buffer);
-        buffer.retain(image.data_);
-        buffer.retain(source);
+        image.resource_use().record(buffer);
         vk::BufferImageCopy region;
         region.bufferOffset = offset;
         region.bufferRowLength = 0;

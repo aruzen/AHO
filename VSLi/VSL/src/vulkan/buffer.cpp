@@ -19,19 +19,6 @@ VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException::MemoryNotHostVisibleEx
                                                                                                                                                                     "This buffer's memory is not host-visible. Mapping is not allowed.",
                                                                                                                                                                     sourece) {}
 
-std::uint32_t VSL_NAMESPACE::impl::helper::find_memory_type(std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl> device, std::uint32_t type_filter,
-                                                            vk::MemoryPropertyFlags properties) {
-    if (not device->parent_device->mem_props.has_value())
-        device->parent_device->make_mem_props();
-    auto& mem_properties = device->parent_device->mem_props.value();
-    for (size_t i = 0; i < mem_properties.memoryTypeCount; i++) {
-        if ((type_filter & (1 << i)) && (mem_properties.memoryTypes[i].propertyFlags & properties) == properties) {
-            return i;
-        }
-    }
-    throw VSL_NAMESPACE::exceptions::RuntimeException("MemoryTypeNotFound", "No compatible memory type satisfies the requested properties");
-}
-
 static bool copy_buffer(const std::shared_ptr<VSL_NAMESPACE::impl::BufferImpl>& destination, VSL_NAMESPACE::CommandManager command_manager,
                         VSL_NAMESPACE::BufferAccessor* buf, std::size_t offset = 0, std::optional<std::size_t> size = std::nullopt) {
     const auto source = buf ? buf->data_ : nullptr;

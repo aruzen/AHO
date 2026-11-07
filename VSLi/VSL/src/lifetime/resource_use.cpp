@@ -9,6 +9,16 @@ namespace VSL_NAMESPACE {
             throw std::invalid_argument("Buffer requires a constructed storage generation");
         return ResourceUse{{buffer, buffer->use}, buffer}.with_constraint(std::move(constraint));
     }
+    ResourceUse ResourceUse::ForImage(const std::shared_ptr<impl::ImageImpl>& image) {
+        if (!image || !image->use)
+            throw std::invalid_argument("Image requires a constructed storage generation");
+        return {{image, image->use}, image};
+    }
+    ResourceUse ResourceUse::ForSampler(const std::shared_ptr<impl::SamplerImpl>& sampler) {
+        if (!sampler || !sampler->use)
+            throw std::invalid_argument("Sampler requires a constructed storage generation");
+        return {{sampler, sampler->use}, sampler};
+    }
     ResourceUse ResourceUse::with_constraint(ResourceUse constraint) const {
         if (constraint_state || constraint_owner.use_count()) {
             if (constraint.state || constraint.owner.use_count() || constraint.constraint_state || constraint.constraint_owner.use_count())
@@ -77,7 +87,7 @@ namespace VSL_NAMESPACE {
         }
         _state.mark_used(completion);
         if (_resource)
-            lifetime::record_descriptor_buffers(*_resource, buffer, _retention);
+            lifetime::record_descriptor_resources(*_resource, buffer, _retention);
         for (const auto& binding : _bindings)
             for (const auto& resource : binding)
                 resource.record(buffer, _retention);

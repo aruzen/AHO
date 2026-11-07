@@ -302,6 +302,8 @@ namespace VSL_NAMESPACE {
         data_format::Format get_format() const;
         ImageType get_usage() const;
         LogicalDeviceAccessor get_device() const;
+        ResourceUseState& use_state() const;
+        ResourceUse resource_use() const;
 
         bool copy_by_buffer(CommandManager command_manager, BufferAccessor* buf, VSL_NAMESPACE::ImageLayout layout, std::uint32_t target_idx);
 

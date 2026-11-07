@@ -11,10 +11,12 @@ namespace VSL_NAMESPACE {
         std::shared_ptr<ResourceUseState> state;
         // stateやCompletionを含めず、使用する資源の世代を保持する。
         std::shared_ptr<void> owner;
-        // Bufferのstorage状態とは別に重ねる、AHO等の論理資源の制限。
+        // 物理storage状態とは別に重ねる、AHO等の論理資源の制限。
         std::shared_ptr<ResourceUseState> constraint_state;
         std::shared_ptr<void> constraint_owner;
         static ResourceUse ForBuffer(const std::shared_ptr<impl::BufferImpl>& buffer, ResourceUse constraint);
+        static ResourceUse ForImage(const std::shared_ptr<impl::ImageImpl>& image);
+        static ResourceUse ForSampler(const std::shared_ptr<impl::SamplerImpl>& sampler);
         ResourceUse with_constraint(ResourceUse constraint) const;
         void record(const CommandBuffer& buffer, ResourceRetention retention = ResourceRetention::SUBMISSION) const;
     };

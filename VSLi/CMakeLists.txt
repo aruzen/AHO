@@ -52,8 +52,12 @@ add_library(VSL STATIC
         VSL/src/vulkan/shader.cpp
         VSL/src/vulkan/buffer.cpp
         VSL/src/operation/buffer_ops.cpp
+        VSL/src/operation/image_ops.cpp
+        VSL/src/operation/sampler_ops.cpp
         VSL/src/sync/buffer_access.cpp
         VSL/src/lifetime/buffer_storage.cpp
+        VSL/src/lifetime/image_storage.cpp
+        VSL/src/lifetime/sampler_storage.cpp
         VSL/src/lifetime/submission_retention.cpp
         VSL/src/lifetime/buffer_arena.cpp
         VSL/src/storage/arena_memory.cpp
@@ -67,6 +71,8 @@ add_library(VSL STATIC
         VSL/include/VSL/sync/resource_use_state.hpp
         VSL/include/VSL/sync/completion.hpp
         VSL/include/VSL/operation/buffer_create_info.hpp
+        VSL/include/VSL/operation/image_create_info.hpp
+        VSL/include/VSL/operation/sampler_create_info.hpp
         VSL/src/storage/buffer_layout.cpp
         VSL/src/lifetime/buffer_view.cpp
         VSL/include/VSL/vulkan/buffer_view.hpp

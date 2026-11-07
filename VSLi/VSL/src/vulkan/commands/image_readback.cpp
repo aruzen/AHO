@@ -32,8 +32,8 @@ namespace VSL_NAMESPACE::command {
         if (copy.layout != ImageLayout::TRANSFER_SRC_OPTIMAL || !copy.host_read)
             throw std::invalid_argument("Readback copy must use TransferSrcOptimal and host visibility");
         if (!buffer.data_ || !buffer.data_->command_pool || !manager.data_ ||
-            manager.data_->device != copy.image.data_->device ||
-            buffer.data_->command_pool->device != copy.image.data_->device)
+            manager.data_->device.get() != copy.image.data_->device ||
+            buffer.data_->command_pool->device.get() != copy.image.data_->device)
             throw std::invalid_argument("Readback requires a command buffer and manager on the image device");
         if (auto submission = buffer.data_->recording_submission) {
             submission->resources.reserve(submission->resources.size() + 4);

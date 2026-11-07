@@ -54,6 +54,18 @@ if (VSL_TEST_SOURCES)
     target_compile_definitions(vsl-typed-style-contract PRIVATE VSL_TYPED_CASE=0)
     target_include_directories(vsl-typed-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
     add_dependencies(vsl-tests vsl-test)
+    add_library(vsl-resource-plan-style-contract OBJECT EXCLUDE_FROM_ALL contracts/resource_plan.cpp)
+    target_link_libraries(vsl-resource-plan-style-contract PRIVATE VSL)
+    set(resource_plan_contract_names Valid DuplicateResource InvalidLifetime InvalidKind Capacity TemporaryPlacements ConstTemporaryPlacements)
+    foreach(case RANGE 0 6)
+        list(GET resource_plan_contract_names ${case} name)
+        add_test(NAME "VSL.ResourcePlan.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/resource_plan.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=constant expression|deleted"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.ResourcePlan.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
     add_library(vsl-arena-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_buffer_arena.cpp)
     target_link_libraries(vsl-arena-style-contract PRIVATE VSL)
     set(arena_contract_names Valid WrongPayload WrongDestination WrongUsage UnknownResource TemporaryBorrow DuplicateResource

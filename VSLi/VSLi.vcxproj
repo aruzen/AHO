@@ -167,6 +167,10 @@
     <ClInclude Include="VSL\include\VSL\storage\buffer_abi.hpp" />
     <ClInclude Include="VSL\include\VSL\storage\buffer_arena.hpp" />
     <ClInclude Include="VSL\include\VSL\storage\buffer_layout.hpp" />
+    <ClInclude Include="VSL\include\VSL\storage\resource_layout.hpp" />
+    <ClInclude Include="VSL\include\VSL\lifetime\resource_id.hpp" />
+    <ClInclude Include="VSL\include\VSL\lifetime\resource_plan.hpp" />
+    <ClCompile Include="VSL\src\storage\resource_layout.cpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\buffer_ops.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\buffer_storage.hpp" />
     <ClInclude Include="VSL\src\private\VSL\storage\cpu_region.hpp" />

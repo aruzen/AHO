@@ -1,0 +1,63 @@
+# VSLの4責務分離とTyped arena化の完了計画
+
+2026-11-08。#325（Image／Samplerの共通backend）を基点とする最新の移行方針。従来の[段階的移行](arena-migration.md)に対し、利用者が次を選択した。
+
+- Instance／DeviceもCPU配置の対象にする。
+- 最終的にTypedの既定をarenaへ変更し、heapは明示選択として残す。
+- 公開 `.data_`／`shared_ptr<Impl>` 入口も最終的に廃止し、利用側を移行する。
+- 内部コンテナとGPUメモリの確保は計測し、別課題として残す。
+
+最初のPRだけで終了せず、下記の順で実装・検証・独立レビューを継続する。PRの公開前には最新masterとの差分を確認する。新しい製品ディレクトリが必要な場合は作成前に確認する。
+
+## 責務と保証
+
+storageはCPU領域と配置、operationは解決済み実体へのVulkan操作、lifetimeは構築・所有・回収、syncは使用状態と完了観測を担当する。通常VSLとTypedでbackendを共用する。操作中にownerを何段も解決せず、公開view／command／外部依存の境界で所有を取得する。
+
+CPU arenaにはImplと使用状態の本体を含める。内部vector／map、生成scratch、Vulkan device memoryは別の確保として明示する。同型の複数資源はResourceIdとslotで区別し、BindingKeyはResourceIdへの接続情報とする。shared／frame／transient／起動／swapchain世代等の寿命群を別ownerに分け、生存中のarenaは移動・拡張しない。
+
+同じarena内は借用だけ、別arenaの依存はownerを保持する。依存は非循環とし、構築前に検査する。外部入力は元のImpl・物理UseState・ownerを使い、新しい使用状態へ包み直さない。構築失敗は成功済みの実体だけを依存の逆順で回収する。
+
+## 実装単位と完了条件
+
+| 順序 | PR単位 | 完了条件 |
+| --- | --- | --- |
+| 1 | 異種Implの寸法と配置計画 | Buffer／Image／Samplerの実寸法生成、private定義との一致、ResourceIdとslotの分離、runtime個数、外部入力、公開ヘッダーだけのconstexpr配置計算 |
+| 2 | 異種ResourceArena | 共通backendを指定領域から使用し、直接参照・所有・失敗時rollback・完了後破棄を通す |
+| 3 | Typed image／sampler | 寿命群ごとのplanとbundleでbuffer／image／samplerを混在させ、upload・sampling・readback・完了解放を通す |
+| 4 | 完了結果と資源保持 | 結果を保存してもin-flight資源を保持し続けない。取消・送信失敗・device lostの終端処理とreadback所有を整理 |
+| 5 | descriptor layout／pool／set | 共通backendと配置へ接続し、runtime容量・記録時binding・更新制限・bind省略を維持 |
+| 6 | shader／pipeline layout | 生成scratchと永続実体を分離し、共有layout・外部shaderを利用可能にする |
+| 7 | render pass／pipeline／framebuffer | 依存資源を借用して配置し、resizeのattachment世代更新と互換pipelineの再利用を維持 |
+| 8 | command／同期資源／frame | command pool・command buffer・fence・semaphoreを分離／配置し、記録→送信→frame再利用を接続 |
+| 9 | Instance／PhysicalDevice／Surface／Device | 起動arenaへ配置し、子Implの強い所有とshared_from_this依存を除去 |
+| 10 | swapchain／presentation／AHO | 取得画像・世代・presentation完了まで保持し、Engineの起動・resize・終了を新経路で通す |
+| 11 | Typedのarena既定化 | 標準policy変更、heapの明示指定、AHO／サンプル／テストの既定経路を移行 |
+| 12 | 旧入口の廃止と監査 | 公開data_／shared_ptr<Impl>と移行adapterを除去し、残る確保・参照・保持量を測定 |
+
+完了管理は主要資源を配置した後、descriptor等の展開より前に分離する。後続資源が旧Completion所有構造へ依存し続けないようにする。
+
+## 起動と所有境界
+
+起動用arenaにはInstance・選択したPhysicalDevice・必要なSurface・Deviceを配置する。候補列挙はscratchで行い、選択後の能力情報で後続のarenaを計画する。PhysicalDeviceのnative handleはInstanceに属する借用として扱う。
+
+Deviceの正規ownerは起動側に置く。内部はdevice refを借用し、公開getter等で所有が必要な場合だけ借用contextと弱いowner参照から取得する。getterで子image／bufferを保持するaliasを返さない。通常のVulkan操作ではこの所有解決を行わない。
+
+OS windowは外部依存とする。Surfaceが保持するOS window ownerと、Runtimeを参照するAHO Window facadeを分離する。起動owner→OS owner→起動ownerという循環を作らない。graphics fenceの完了とpresentation完了は区別する。
+
+## 公開APIの切替
+
+移行中は旧入口をadapterで併設し、削除する段階を明記する。最終的には通常VSLもowning handle／viewと借用refを使用する。現在のbuffer.data_等は、操作ではbuffer.ref()、保持が必要な境界ではbuffer.view()を渡す形式へ移行する（名称は仮案）。heapとarenaで生成・検証処理は共用する。
+
+Typedの既定変更は、主要資源と起動・終了の経路が揃ってから行う。旧公開入口の廃止時に利用例・破壊的変更の一覧を用意する。
+
+## 検証と進捗の扱い
+
+各単位で配置・alignment・overflow・未構築参照・二重構築・外部所有・途中失敗・逆順破棄を確認する。元wrapper破棄後の利用、入口をまたぐ共通状態、循環不在、取消／送信失敗／完了後の回収を検証する。
+
+GPUでは転送・sampling・compute・描画・readback、descriptor更新、旧世代、resize、pipeline再利用、取得画像の取消とpresentation終了を確認する。install consumer、異なるartifactの拒否、構成別生成、クロスコンパイル、compile契約、規約検査を併用する。実行できない環境を明記する。
+
+最終比較は同じ処理・結果のheap／arena経路で行い、CPU確保数・owner操作数・保持メモリ・時間を計測する。性能改善は計測前に断定しない。
+
+各PRの実装・検証結果を関連文書へ追記し、この一覧の終了条件を満たした単位だけを完了とする。Instance／Device、既定変更、旧入口廃止まで終えるまでは、全体完了と扱わない。
+
+順序1の実装と受入検証は[異種資源のCPU配置計画](resource-placement-plan.md)を参照。次は順序2のResourceArenaである。

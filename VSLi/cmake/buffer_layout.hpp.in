@@ -5,9 +5,14 @@
 namespace vsl::storage {
     inline constexpr std::size_t BUFFER_IMPL_SIZE = @BUFFER_IMPL_SIZE@;
     inline constexpr std::size_t BUFFER_IMPL_ALIGNMENT = @BUFFER_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t IMAGE_IMPL_SIZE = @IMAGE_IMPL_SIZE@;
+    inline constexpr std::size_t IMAGE_IMPL_ALIGNMENT = @IMAGE_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t SAMPLER_IMPL_SIZE = @SAMPLER_IMPL_SIZE@;
+    inline constexpr std::size_t SAMPLER_IMPL_ALIGNMENT = @SAMPLER_IMPL_ALIGNMENT@;
     inline constexpr std::size_t BUFFER_USE_SIZE = @BUFFER_USE_SIZE@;
     inline constexpr std::size_t BUFFER_USE_ALIGNMENT = @BUFFER_USE_ALIGNMENT@;
     inline constexpr std::size_t BUFFER_EXPECTED_CPP_ABI_MODE = @cpp_mode@;
     inline constexpr std::uint64_t BUFFER_LAYOUT_ABI = 0x@abi@ULL;
+    inline constexpr std::uint64_t RESOURCE_LAYOUT_ABI = BUFFER_LAYOUT_ABI;
     static_assert(sizeof(void*) == @CMAKE_SIZEOF_VOID_P@, "Buffer target pointer ABI mismatch");
 } // namespace vsl::storage

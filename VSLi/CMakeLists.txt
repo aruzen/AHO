@@ -74,6 +74,10 @@ add_library(VSL STATIC
         VSL/include/VSL/operation/image_create_info.hpp
         VSL/include/VSL/operation/sampler_create_info.hpp
         VSL/src/storage/buffer_layout.cpp
+        VSL/src/storage/resource_layout.cpp
+        VSL/include/VSL/storage/resource_layout.hpp
+        VSL/include/VSL/lifetime/resource_id.hpp
+        VSL/include/VSL/lifetime/resource_plan.hpp
         VSL/src/lifetime/buffer_view.cpp
         VSL/include/VSL/vulkan/buffer_view.hpp
         VSL/include/VSL/vulkan/buffer_create_info.hpp

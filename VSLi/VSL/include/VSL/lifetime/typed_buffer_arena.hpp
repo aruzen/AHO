@@ -1,5 +1,6 @@
 #pragma once
 #include "buffer_arena.hpp"
+#include "resource_id.hpp"
 #include "../vulkan/commands/copy_buffer.hpp"
 #include "../utils/typed_block_layout.hpp"
 #include "../utils/typed_buffer_view.hpp"
@@ -27,24 +28,10 @@ namespace VSL_NAMESPACE::typed {
         command::CopyBuffer copy_to(const PlacedBufferView<Payload_, destination_usage>& destination, bool host_read = true) const;
     };
 
-    struct ResourceId {
-        std::uint64_t value;
-        constexpr auto operator<=>(const ResourceId&) const = default;
-    };
     struct BindingKey {
         std::uint32_t set, binding;
         size_t element = 0;
         constexpr auto operator<=>(const BindingKey&) const = default;
-    };
-    enum class LifetimeScope {
-        SHARED,
-        FRAME,
-        TRANSIENT
-    };
-    struct LifetimeGroup {
-        LifetimeScope scope;
-        size_t instance;
-        constexpr auto operator<=>(const LifetimeGroup&) const = default;
     };
     struct BufferPlacement {
         ResourceId resource;

@@ -6,23 +6,13 @@
 #define AHO_ALL_SAMPLER_H
 
 #include "image.hpp"
+#include "../operation/sampler_create_info.hpp"
 
 namespace VSL_NAMESPACE {
-    enum class SamplingMode {
-        NEAREST = 0,
-        LINEAR = 1,
-    };
-
-    enum class EdgeMode {
-        REPEAT = 0,
-        MIRRORED_REPEAT = 1,
-        CLAMP_TO_EDGE = 2,
-        CLAMP_TO_BORDER = 3,
-        MIRROR_CLAMP_TO_EDGE = 4,
-    };
-
     struct SamplerAccessor {
         std::shared_ptr<impl::SamplerImpl> data_;
+        ResourceUseState& use_state() const;
+        ResourceUse resource_use() const;
     };
 
     struct Sampler : public SamplerAccessor {

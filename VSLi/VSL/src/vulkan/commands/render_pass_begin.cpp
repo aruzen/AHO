@@ -1,5 +1,6 @@
 #include <VSL/vulkan/commands/render_pass_begin.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
+#include <VSL/sync/resource_use_state.hpp>
 #include "../image_format.hpp"
 #include <stdexcept>
 #include <type_traits>
@@ -121,6 +122,9 @@ namespace VSL_NAMESPACE::command {
     void RenderPassBegin::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
         const auto index = target_index.value_or(buffer.data_->acquired_image_index.value_or(buffer.get_current_buffer_idx()));
         buffer.retain(frame_buffer.data_);
+        // framebufferがattachmentを所有する。追加のowner保持をせず、各実体の使用だけを登録する。
+        for (const auto& image : frame_buffer.data_->attachments.at(index))
+            image->use->mark_used(buffer.completion());
         std::vector<vk::ClearValue> values;
         for (const auto& clear : clear_values)
             values.push_back(convert(clear));

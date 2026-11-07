@@ -1,0 +1,97 @@
+#include <VSL/operation/image_ops.hpp>
+#include <VSL/exceptions.hpp>
+#include "../vulkan/image_format.hpp"
+#include <stdexcept>
+
+namespace VSL_NAMESPACE::operation {
+    namespace {
+        std::uint32_t select_image_memory(impl::LogicalDeviceImpl& device, std::uint32_t types, vk::MemoryPropertyFlags required) {
+            const auto properties = device.parent_device->device.getMemoryProperties();
+            for (std::uint32_t i = 0; i < properties.memoryTypeCount; ++i)
+                if ((types & (1u << i)) && (properties.memoryTypes[i].propertyFlags & required) == required)
+                    return i;
+            throw exceptions::RuntimeException("MemoryTypeNotFound", "No compatible memory type satisfies the requested properties");
+        }
+        void describe_image(impl::ImageImpl& target, impl::LogicalDeviceImpl& device, const ImageCreateInfo& info) {
+            if (!device.device || !info.width || !info.height || !info.layers || info.usage == ImageType::NONE ||
+                info.format.type() == data_format::FormatTypes::UNDEFINED)
+                throw std::invalid_argument("Invalid image device/extent/format/usage");
+            const auto samples = static_cast<std::uint32_t>(info.samples);
+            if (!samples || samples > 64 || (samples & (samples - 1)))
+                throw std::invalid_argument("Invalid image sample count");
+            target.device = &device;
+            target.native_device = device.device;
+            target.width = info.width;
+            target.height = info.height;
+            target.count = info.layers;
+            target.usage = info.usage;
+            target.samples = info.samples;
+            target.format = static_cast<vk::Format>(info.format.type());
+        }
+        void create_image_view(impl::ImageImpl& target) {
+            const vk::ImageViewCreateInfo info{
+                .image = target.image,
+                .viewType = target.count == 1 ? vk::ImageViewType::e2D : vk::ImageViewType::e2DArray,
+                .format = target.format,
+                .subresourceRange = {impl::helper::image_aspects(target.format), 0, 1, 0, target.count},
+            };
+            target.view = target.native_device.createImageView(info);
+        }
+    } // namespace
+
+    void initialize_image(impl::ImageImpl& target, impl::LogicalDeviceImpl& device, const ImageCreateInfo& info) {
+        try {
+            describe_image(target, device, info);
+            if (info.initial_layout != ImageLayout::UNDEFINED && info.initial_layout != ImageLayout::PREINITIALIZED)
+                throw std::invalid_argument("Image creation requires Undefined or Preinitialized layout");
+            target.owns_image = true;
+            const vk::ImageCreateInfo native{
+                .imageType = vk::ImageType::e2D,
+                .format = target.format,
+                .extent = {info.width, info.height, 1},
+                .mipLevels = 1,
+                .arrayLayers = info.layers,
+                .samples = static_cast<vk::SampleCountFlagBits>(info.samples),
+                .tiling = vk::ImageTiling::eOptimal,
+                .usage = vk::ImageUsageFlags(static_cast<unsigned int>(info.usage)),
+                .initialLayout = static_cast<vk::ImageLayout>(info.initial_layout),
+            };
+            target.image = target.native_device.createImage(native);
+            const auto requirements = target.native_device.getImageMemoryRequirements(target.image);
+            const auto memory_type = select_image_memory(device, requirements.memoryTypeBits,
+                                                         vk::MemoryPropertyFlags(static_cast<unsigned int>(info.properties)));
+            target.memory = target.native_device.allocateMemory({.allocationSize = requirements.size, .memoryTypeIndex = memory_type});
+            target.native_device.bindImageMemory(target.image, target.memory, 0);
+            create_image_view(target);
+        } catch (...) {
+            destroy_image(target);
+            throw;
+        }
+    }
+    void initialize_borrowed_image(impl::ImageImpl& target, impl::LogicalDeviceImpl& device,
+                                   const ImageCreateInfo& info, vk::Image image) {
+        try {
+            describe_image(target, device, info);
+            if (!image)
+                throw std::invalid_argument("Borrowed image requires a native image");
+            target.image = image;
+            create_image_view(target);
+        } catch (...) {
+            destroy_image(target);
+            throw;
+        }
+    }
+    void destroy_image(impl::ImageImpl& target) noexcept {
+        if (!target.native_device)
+            return;
+        target.native_device.destroyImageView(target.view);
+        if (target.owns_image) {
+            target.native_device.destroyImage(target.image);
+            target.native_device.freeMemory(target.memory);
+        }
+        target.view = nullptr;
+        target.image = nullptr;
+        target.memory = nullptr;
+        target.owns_image = false;
+    }
+} // namespace VSL_NAMESPACE::operation

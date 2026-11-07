@@ -10,6 +10,16 @@
     <ClInclude Include="VSL\include\VSL\sync\resource_use_state.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\sync\completion.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\operation\buffer_create_info.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\operation\image_create_info.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\operation\sampler_create_info.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\src\private\VSL\operation\image_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\src\private\VSL\operation\sampler_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\src\private\VSL\lifetime\image_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\src\private\VSL\lifetime\sampler_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClCompile Include="VSL\src\operation\image_ops.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClCompile Include="VSL\src\operation\sampler_ops.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClCompile Include="VSL\src\lifetime\image_storage.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClCompile Include="VSL\src\lifetime\sampler_storage.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\src\private\VSL\sync\submission_completion.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClCompile Include="VSL\src\sync\resource_use_state.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClCompile Include="VSL\src\sync\completion.cpp"><Filter>ソース ファイル</Filter></ClCompile>

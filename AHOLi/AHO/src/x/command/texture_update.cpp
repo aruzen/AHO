@@ -17,6 +17,7 @@ namespace AHO_NAMESPACE::x::command {
         if (!completion || completion.status() != VSL_NAMESPACE::Completion::Status::PENDING)
             throw std::logic_error("Texture update requires a recording phase");
         texture.settle();
+        texture.image.use_state().check_available(completion);
         texture.check_available(completion);
         auto source = std::visit(
             [&](const auto& value) -> AHO_NAMESPACE::resource::BufferBinding {

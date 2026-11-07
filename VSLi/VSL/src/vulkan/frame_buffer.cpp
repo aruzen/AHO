@@ -25,7 +25,7 @@ namespace VSL_NAMESPACE {
             for (std::size_t i = 0; i < images.size(); ++i) {
                 const auto& image = images[i].data_;
                 const auto& a = desc.attachments[i];
-                if (!image || !image->view || image->device != target.device ||
+                if (!image || !image->view || image->device != target.device.get() ||
                     image->format != static_cast<vk::Format>(a.format.type()) || image->samples != a.samples ||
                     image->width < target.extent.width || image->height < target.extent.height ||
                     image->count < target.layers)

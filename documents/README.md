@@ -16,3 +16,4 @@
 - [Bufferの4層配置・借用入口・owner保持](VSL/buffer-layer-layout.md)
 - [4責務とarenaの段階的移行・Typed bundle配置](VSL/arena-migration.md)
 - [AHO Bufferのsnapshot・固定import・可変arena世代](AHO/arena-buffer.md)
+- [Image／Samplerの共通backend・所有・使用状態](VSL/image-sampler-backend.md)

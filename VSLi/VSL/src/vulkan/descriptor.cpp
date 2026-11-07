@@ -232,17 +232,17 @@ void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::BufferAcce
     descriptor_write.pTexelBufferView = nullptr; // Optional
 
     auto owners = std::vector<std::shared_ptr<void>>{buffer->data_};
-    auto buffer_refs = std::vector<impl::GraphicResourceImpl::BufferBindingRef>{{buffer->data_.get(), 0}};
-    auto& refs = data_->buffer_refs.try_emplace(static_cast<std::uint32_t>(binding)).first->second;
+    auto resource_refs = std::vector<impl::GraphicResourceImpl::ResourceBindingRef>{{buffer->data_->use, 0}};
+    auto& refs = data_->resource_refs.try_emplace(static_cast<std::uint32_t>(binding)).first->second;
     auto& retained = data_->bindings.try_emplace(static_cast<std::uint32_t>(binding)).first->second;
     retained = std::move(owners);
-    refs = std::move(buffer_refs);
+    refs = std::move(resource_refs);
     data_->pool->device->device.updateDescriptorSets({descriptor_write}, {});
 }
 
 void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::ImageAccessor image, size_t binding, std::optional<Type> type) {
     validate_resource(data_);
-    if (!image.data_ || image.data_->device != data_->pool->device)
+    if (!image.data_ || image.data_->device != data_->pool->device.get())
         throw std::invalid_argument("Descriptor image device mismatch");
     vk::DescriptorImageInfo image_info;
     image_info.imageView = image.data_->view;
@@ -273,20 +273,24 @@ found_type:
     descriptor_write.pImageInfo = &image_info;
     descriptor_write.pTexelBufferView = nullptr; // Optional
 
-    data_->bindings[static_cast<std::uint32_t>(binding)] = {image.data_};
-    data_->buffer_refs.erase(static_cast<std::uint32_t>(binding));
+    auto owners = std::vector<std::shared_ptr<void>>{image.data_};
+    auto resource_refs = std::vector<impl::GraphicResourceImpl::ResourceBindingRef>{{image.data_->use, 0}};
+    auto& refs = data_->resource_refs.try_emplace(static_cast<std::uint32_t>(binding)).first->second;
+    auto& retained = data_->bindings.try_emplace(static_cast<std::uint32_t>(binding)).first->second;
+    retained = std::move(owners);
+    refs = std::move(resource_refs);
     data_->pool->device->device.updateDescriptorSets({descriptor_write}, {});
 }
 
 void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::ImageAccessor image, SamplerAccessor sampler,
                                                        size_t binding, std::optional<Type> type) {
     validate_resource(data_);
-    if (!image.data_ || image.data_->device != data_->pool->device)
+    if (!image.data_ || image.data_->device != data_->pool->device.get())
         throw std::invalid_argument("Descriptor image device mismatch");
     vk::DescriptorImageInfo image_info;
     image_info.imageView = image.data_->view;
     image_info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-    if (!sampler.data_ || sampler.data_->device != data_->pool->device)
+    if (!sampler.data_ || sampler.data_->device != data_->pool->device.get())
         throw std::invalid_argument("Descriptor sampler device mismatch");
     image_info.sampler = sampler.data_->sampler;
 
@@ -315,8 +319,12 @@ found_type:
     descriptor_write.pImageInfo = &image_info;
     descriptor_write.pTexelBufferView = nullptr; // Optional
 
-    data_->bindings[static_cast<std::uint32_t>(binding)] = {image.data_, sampler.data_};
-    data_->buffer_refs.erase(static_cast<std::uint32_t>(binding));
+    auto owners = std::vector<std::shared_ptr<void>>{image.data_, sampler.data_};
+    auto resource_refs = std::vector<impl::GraphicResourceImpl::ResourceBindingRef>{{image.data_->use, 0}, {sampler.data_->use, 1}};
+    auto& refs = data_->resource_refs.try_emplace(static_cast<std::uint32_t>(binding)).first->second;
+    auto& retained = data_->bindings.try_emplace(static_cast<std::uint32_t>(binding)).first->second;
+    retained = std::move(owners);
+    refs = std::move(resource_refs);
     data_->pool->device->device.updateDescriptorSets({descriptor_write}, {});
 }
 

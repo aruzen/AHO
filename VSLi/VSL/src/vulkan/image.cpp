@@ -1,6 +1,7 @@
 #include <VSL/define.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>
+#include <VSL/lifetime/image_storage.hpp>
 #include <VSL/exceptions.hpp>
 
 #include <VSL/vulkan/image.hpp>
@@ -27,58 +28,7 @@ VSL_NAMESPACE::ImageAccessor::MakeImage(VSL_NAMESPACE::ImageType type,
                                         std::uint32_t height,
                                         VSL_NAMESPACE::data_format::Format format,
                                         std::uint32_t count, SampleCount samples) {
-    if (!device.data_ || !width || !height || !count || format.type() == data_format::FormatTypes::UNDEFINED)
-        throw std::invalid_argument("Invalid image device/extent/format");
-    const auto sample_bits = static_cast<std::uint32_t>(samples);
-    if (!sample_bits || sample_bits > 64 || (sample_bits & (sample_bits - 1)))
-        throw std::invalid_argument("Invalid image sample count");
-    auto data_ = std::make_shared<impl::ImageImpl>();
-    data_->device = device.data_;
-    data_->height = height;
-    data_->width = width;
-    data_->count = count;
-    data_->usage = type;
-    data_->samples = samples;
-    data_->format = (vk::Format)format.type();
-
-    vk::ImageCreateInfo image_info;
-    image_info.imageType = vk::ImageType::e2D;
-    image_info.format = data_->format;
-    image_info.extent = vk::Extent3D{width, height, 1};
-    image_info.mipLevels = 1;
-    image_info.arrayLayers = count;
-    image_info.samples = static_cast<vk::SampleCountFlagBits>(samples);
-    image_info.tiling = vk::ImageTiling::eOptimal;
-    image_info.usage = (vk::ImageUsageFlagBits)type;
-    image_info.initialLayout = (vk::ImageLayout)layout;
-
-    auto image = device.data_->device.createImageUnique(image_info);
-
-    vk::MemoryRequirements mem_requirements = device.data_->device.getImageMemoryRequirements(*image);
-
-    vk::MemoryAllocateInfo alloc_info;
-    alloc_info.allocationSize = mem_requirements.size;
-    alloc_info.memoryTypeIndex = VSL_NAMESPACE::impl::helper::find_memory_type(device.data_, mem_requirements.memoryTypeBits,
-                                                                               (vk::MemoryPropertyFlagBits)prop);
-
-    data_->memory = device.data_->device.allocateMemory(alloc_info);
-
-    device.data_->device.bindImageMemory(*image, data_->memory, 0);
-    data_->image = image.release();
-
-    vk::ImageViewCreateInfo view_info;
-    view_info.image = data_->image;
-    view_info.viewType = count == 1 ? vk::ImageViewType::e2D : vk::ImageViewType::e2DArray;
-    view_info.format = (vk::Format)format.type();
-    ;
-    view_info.subresourceRange.aspectMask = impl::helper::image_aspects(data_->format);
-    view_info.subresourceRange.baseMipLevel = 0;
-    view_info.subresourceRange.levelCount = 1;
-    view_info.subresourceRange.baseArrayLayer = 0;
-    view_info.subresourceRange.layerCount = count;
-
-    data_->view = device.data_->device.createImageView(view_info);
-    return data_;
+    return lifetime::make_heap_image(device, {type, width, height, format, count, samples, prop, layout});
 }
 
 void VSL_NAMESPACE::ImageAccessor::TransformLayout(VSL_NAMESPACE::CommandManager manager, std::shared_ptr<impl::ImageImpl> data,
@@ -93,15 +43,6 @@ bool VSL_NAMESPACE::ImageAccessor::copy_by_buffer(CommandManager manager, Buffer
     return true;
 }
 
-VSL_NAMESPACE::impl::ImageImpl::~ImageImpl() {
-    if (!device)
-        return;
-    device->device.destroy(view);
-    if (memory != VK_NULL_HANDLE) {
-        device->device.destroy(image);
-        device->device.free(memory);
-    }
-}
 VSL_NAMESPACE::data_format::Format VSL_NAMESPACE::ImageAccessor::get_format() const {
     const auto type = static_cast<data_format::FormatTypes>(data_->format);
     const auto format = data_format::convert(type);
@@ -111,11 +52,20 @@ VSL_NAMESPACE::data_format::Format VSL_NAMESPACE::ImageAccessor::get_format() co
 VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::ImageAccessor::get_device() const {
     if (!data_)
         throw std::invalid_argument("Image is empty");
-    return {data_->device};
+    return {data_->device->shared_from_this()};
 }
 
 VSL_NAMESPACE::ImageType VSL_NAMESPACE::ImageAccessor::get_usage() const {
     if (!data_)
         throw std::invalid_argument("Image is empty");
     return data_->usage;
+}
+
+VSL_NAMESPACE::ResourceUseState& VSL_NAMESPACE::ImageAccessor::use_state() const {
+    if (!data_ || !data_->use)
+        throw std::invalid_argument("Image is empty");
+    return *data_->use;
+}
+VSL_NAMESPACE::ResourceUse VSL_NAMESPACE::ImageAccessor::resource_use() const {
+    return ResourceUse::ForImage(data_);
 }

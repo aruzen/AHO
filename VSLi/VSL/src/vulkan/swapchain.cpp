@@ -7,6 +7,7 @@
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/vulkan/buffer_and_image_accessor.hpp>
 #include <VSL/vulkan/command.hpp>
+#include <VSL/lifetime/image_storage.hpp>
 #include "swapchain_sharing.hpp"
 
 #undef max
@@ -129,31 +130,8 @@ VSL_NAMESPACE::Swapchain::Swapchain(VSL_NAMESPACE::LogicalDeviceAccessor device,
 
     images.resize(data_->swap_chain_images.size());
     for (size_t i = 0; i < data_->swap_chain_images.size(); i++) {
-        vk::ImageViewCreateInfo create_info;
-        create_info.image = data_->swap_chain_images[i];
-        create_info.viewType = vk::ImageViewType::e2D;
-        create_info.format = data_->swap_chain_image_format;
-        create_info.components.r = vk::ComponentSwizzle::eIdentity;
-        create_info.components.g = vk::ComponentSwizzle::eIdentity;
-        create_info.components.b = vk::ComponentSwizzle::eIdentity;
-        create_info.components.a = vk::ComponentSwizzle::eIdentity;
-        create_info.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
-        create_info.subresourceRange.baseMipLevel = 0;
-        create_info.subresourceRange.levelCount = 1;
-        create_info.subresourceRange.baseArrayLayer = 0;
-        create_info.subresourceRange.layerCount = 1;
-
-        auto image_data = std::make_shared<impl::ImageImpl>();
-        image_data->device = device.data_;
-        image_data->swapchain = data_;
-        image_data->usage = usage;
-        image_data->format = data_->swap_chain_image_format;
-        image_data->count = 1;
-        image_data->width = data_->swap_chain_extent.width;
-        image_data->height = data_->swap_chain_extent.height;
-        image_data->view = data_->device->device.createImageView(create_info);
-        image_data->image = data_->swap_chain_images[i];
-        images[i].data_ = image_data;
+        const ImageCreateInfo info{usage, data_->swap_chain_extent.width, data_->swap_chain_extent.height, get_format()};
+        images[i].data_ = lifetime::make_swapchain_image(device, info, data_, data_->swap_chain_images[i]);
     }
 }
 

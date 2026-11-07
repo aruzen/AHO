@@ -53,6 +53,6 @@ void VSL_NAMESPACE::command::BindGraphicResource::track(const CommandBuffer& buf
         if (_use && _use->tracks_descriptor(resource.data_.get()))
             continue;
         buffer.retain(resource.data_);
-        lifetime::record_descriptor_buffers(*resource.data_, buffer);
+        lifetime::record_descriptor_resources(*resource.data_, buffer);
     }
 }

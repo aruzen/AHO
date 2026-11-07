@@ -294,8 +294,8 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct GraphicResourceImpl {
-        struct BufferBindingRef {
-            BufferImpl* buffer;
+        struct ResourceBindingRef {
+            ResourceUseState* state;
             size_t owner_index;
         };
         std::shared_ptr<impl::GraphicResourcePoolImpl> pool;
@@ -304,30 +304,30 @@ namespace VSL_NAMESPACE::impl {
         vk::DescriptorSet descriptor_set;
         std::map<std::uint32_t, std::vector<std::shared_ptr<void>>> bindings;
         // bindings内のownerを借用する。記録時にstorageの使用状態を登録する。
-        std::map<std::uint32_t, std::vector<BufferBindingRef>> buffer_refs;
+        std::map<std::uint32_t, std::vector<ResourceBindingRef>> resource_refs;
 
         ~GraphicResourceImpl();
     };
 
     struct ImageImpl {
-        std::shared_ptr<LogicalDeviceImpl> device;
+        LogicalDeviceImpl* device = nullptr;
+        vk::Device native_device;
+        ResourceUseState* use = nullptr;
         vk::Image image;
-        std::shared_ptr<SwapchainImpl> swapchain;
+        bool owns_image = false;
         ImageType usage = ImageType::NONE;
         SampleCount samples = SampleCount::ONE;
         vk::ImageView view;
         vk::DeviceMemory memory;
-        std::uint32_t width, height, count;
-        vk::Format format;
-
-        ~ImageImpl();
+        std::uint32_t width = 0, height = 0, count = 0;
+        vk::Format format = vk::Format::eUndefined;
     };
 
     struct SamplerImpl {
-        std::shared_ptr<LogicalDeviceImpl> device;
+        LogicalDeviceImpl* device = nullptr;
+        vk::Device native_device;
+        ResourceUseState* use = nullptr;
         vk::Sampler sampler;
-
-        ~SamplerImpl();
     };
 
     namespace pipeline_layout {
@@ -346,9 +346,6 @@ namespace VSL_NAMESPACE::impl {
             bool is_complete();
         };
 
-        std::uint32_t find_memory_type(std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl> device,
-                                       std::uint32_t type_filter,
-                                       vk::MemoryPropertyFlags properties);
         QueueFamilyIndices find_queue_families(vk::PhysicalDevice device, vk::SurfaceKHR surface);
         void destroy_debug_utils_messenger_ext(vk::Instance& instance, vk::DebugUtilsMessengerEXT& debug_messenger, const VkAllocationCallbacks* p_allocator);
     } // namespace helper

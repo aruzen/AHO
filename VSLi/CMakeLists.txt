@@ -100,6 +100,7 @@ add_library(VSL STATIC
         VSL/src/private/VSL/lifetime/command_storage.hpp
         VSL/src/lifetime/command_storage.cpp
         VSL/src/private/VSL/sync/synchronization_state.hpp
+        VSL/src/private/VSL/sync/resource_use_access.hpp
         VSL/src/sync/synchronization_state.cpp
         VSL/src/private/VSL/lifetime/synchronization_use.hpp
         VSL/src/lifetime/synchronization_use.cpp
@@ -133,6 +134,13 @@ add_library(VSL STATIC
         VSL/include/VSL/storage/startup_plan.hpp
         VSL/include/VSL/lifetime/startup_arena.hpp
         VSL/src/lifetime/startup_arena.cpp
+        VSL/include/VSL/operation/swapchain_create_info.hpp
+        VSL/include/VSL/storage/swapchain_layout.hpp
+        VSL/include/VSL/lifetime/swapchain_arena.hpp
+        VSL/src/private/VSL/operation/swapchain_ops.hpp
+        VSL/src/operation/swapchain_ops.cpp
+        VSL/src/private/VSL/lifetime/swapchain_storage.hpp
+        VSL/src/lifetime/swapchain_storage.cpp
         VSL/src/lifetime/glfw_instance.cpp
         VSL/src/private/VSL/lifetime/synchronization_storage.hpp
         VSL/src/lifetime/synchronization_storage.cpp

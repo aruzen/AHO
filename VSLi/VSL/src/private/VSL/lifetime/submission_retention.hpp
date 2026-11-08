@@ -12,6 +12,7 @@ namespace VSL_NAMESPACE::lifetime {
     // control block単位で保持する。同じarenaの別slotを指すaliasも一回だけ保持する。
     void retain_resource(std::vector<std::shared_ptr<void>>& resources, const std::shared_ptr<void>& resource);
     void retain_resource(std::vector<std::shared_ptr<void>>& resources, std::shared_ptr<void>&& resource);
+    void retain_until_complete(impl::SubmissionWork& submission, std::shared_ptr<void> resource);
     void require_recording(const CommandBuffer& buffer, const Completion& completion);
     void record_descriptor_resources(impl::GraphicResourceImpl& resource, const CommandBuffer& buffer, ResourceRetention retention = ResourceRetention::SUBMISSION);
     void release_completed_resources(impl::SubmissionWork& submission) noexcept;

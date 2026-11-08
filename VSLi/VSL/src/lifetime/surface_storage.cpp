@@ -82,4 +82,11 @@ namespace VSL_NAMESPACE::lifetime {
         surface->owner_node = &owner->node;
         return {std::move(owner), surface};
     }
+    void require_surface_owner(const Surface& source) {
+        require_surface_owner(source.data_);
+    }
+    void require_surface_owner(const std::shared_ptr<impl::SurfaceImpl>& value) {
+        if (!value || !value.use_count() || !value->surface || !value->owner_node || value->owner_node->retiring() || !value->owner_node->matches(value))
+            throw std::invalid_argument("Surface requires its live canonical owner");
+    }
 } // namespace VSL_NAMESPACE::lifetime

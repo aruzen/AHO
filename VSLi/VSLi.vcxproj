@@ -209,6 +209,7 @@
     <ClInclude Include="VSL\src\private\VSL\lifetime\command_storage.hpp" />
     <ClCompile Include="VSL\src\lifetime\command_storage.cpp" />
     <ClInclude Include="VSL\src\private\VSL\sync\synchronization_state.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\sync\resource_use_access.hpp" />
     <ClCompile Include="VSL\src\sync\synchronization_state.cpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\synchronization_use.hpp" />
     <ClCompile Include="VSL\src\lifetime\synchronization_use.cpp" />
@@ -236,6 +237,13 @@
     <ClInclude Include="VSL\include\VSL\operation\device_create_info.hpp" />
     <ClInclude Include="VSL\include\VSL\storage\startup_plan.hpp" />
     <ClInclude Include="VSL\include\VSL\lifetime\startup_arena.hpp" />
+    <ClInclude Include="VSL\include\VSL\operation\swapchain_create_info.hpp" />
+    <ClInclude Include="VSL\include\VSL\storage\swapchain_layout.hpp" />
+    <ClInclude Include="VSL\include\VSL\lifetime\swapchain_arena.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\operation\swapchain_ops.hpp" />
+    <ClCompile Include="VSL\src\operation\swapchain_ops.cpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\swapchain_storage.hpp" />
+    <ClCompile Include="VSL\src\lifetime\swapchain_storage.cpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\device_ops.hpp" />
     <ClCompile Include="VSL\src\operation\device_ops.cpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\device_storage.hpp" />

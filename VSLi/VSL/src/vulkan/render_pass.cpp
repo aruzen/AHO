@@ -42,10 +42,10 @@ namespace VSL_NAMESPACE {
         }
     } // namespace
     RenderPass::RenderPass(SwapchainAccessor swapchain)
-        : RenderPass(LogicalDeviceAccessor{swapchain.data_ ? swapchain.data_->device : nullptr},
+        : RenderPass(swapchain.get_device(),
                      present_description(swapchain, false)) {}
     IDPickingRenderPass::IDPickingRenderPass(SwapchainAccessor swapchain) {
-        RenderPass pass(LogicalDeviceAccessor{swapchain.data_ ? swapchain.data_->device : nullptr},
+        RenderPass pass(swapchain.get_device(),
                         present_description(swapchain, true));
         data_ = pass.data_;
         picking_buffer.resize(swapchain.images.size());

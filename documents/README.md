@@ -18,5 +18,6 @@
 - [Device／Instanceまで含むarena化の完了計画](VSL/arena-completion-plan.md)
 - [異種Implの寸法生成とResourceIdからのCPU配置計画](VSL/resource-placement-plan.md)
 - [Buffer／Image／Samplerを同じ領域へ構築するResourceArena](VSL/resource-arena.md)
+- [Typed schema／bundleによるImage／Samplerの配置とcomponent共有](VSL/typed-owned-resources.md)
 - [AHO Bufferのsnapshot・固定import・可変arena世代](AHO/arena-buffer.md)
 - [Image／Samplerの共通backend・所有・使用状態](VSL/image-sampler-backend.md)

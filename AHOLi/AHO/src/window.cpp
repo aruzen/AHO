@@ -1,5 +1,6 @@
 #include <AHO/window.hpp>
 #include "window_impl.hpp"
+#include <VSL/lifetime/startup_arena.hpp>
 #include <AHO/drawer/draw_phase.hpp>
 #include <GLFW/glfw3.h>
 #include <VSL/exceptions.hpp>
@@ -51,9 +52,24 @@ namespace {
     }
 } // namespace
 
+std::shared_ptr<VSL_NAMESPACE::Surface> AHO_NAMESPACE::window::detail::make_window_surface(
+    VSL_NAMESPACE::Window& window, VSL_NAMESPACE::VulkanAccessor instance) {
+    using namespace VSL_NAMESPACE;
+    const auto data = window.data_;
+    const auto os = window.window_owner();
+    const std::array requests{storage::StartupRequest{{0}, storage::StartupKind::SURFACE}};
+    const storage::StartupPlan<1> plan(requests);
+    const std::array<lifetime::StartupInit, 1> inputs{lifetime::SurfaceInit{std::move(instance), os}};
+    lifetime::StartupArena arena(plan, inputs);
+    if (!data || !data->window_handle || window.data_ != data)
+        throw exceptions::RuntimeException("Window", "Window closed during Surface creation");
+    return window.add_plugin<Surface>(arena.surface({0}));
+}
+
 std::shared_ptr<AHO_NAMESPACE::window::WindowData> AHO_NAMESPACE::window::detail::make_window_data(
     const engine::EngineAccessor& engine, std::shared_ptr<VSL_NAMESPACE::Surface> surface, const std::string& name) {
-    auto& data = *engine.data();
+    const auto engine_data = engine.data();
+    auto& data = *engine_data;
     VSL_NAMESPACE::Swapchain swapchain(data.logical_device, surface);
     VSL_NAMESPACE::RenderPass pass(swapchain);
     const auto frames = data.command_manager.get_buffer().get_size();
@@ -76,10 +92,15 @@ AHO_NAMESPACE::engine::EngineAccessor AHO_NAMESPACE::window::Window::DefaultEngi
 
 AHO_NAMESPACE::window::Window::Window(std::string name, int width, int height, AHO_NAMESPACE::engine::EngineAccessor engine_)
     : VSL_NAMESPACE::Window(checked_window_name(name, engine_), width, height) {
+    const auto data = data_;
+    const auto os = window_owner();
     try {
         engine = engine_;
-        auto surface = this->add_plugin<VSL_NAMESPACE::Surface>(engine_.data()->vulkan_instance);
-        data2 = detail::make_window_data(engine, std::move(surface), name);
+        auto surface = detail::make_window_surface(*this, engine_.data()->vulkan_instance);
+        auto drawing = detail::make_window_data(engine, std::move(surface), name);
+        if (data_ != data || !data->window_handle || data->window_handle != os.native_handle())
+            throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "Window closed during drawing resource creation");
+        data2 = std::move(drawing);
     } catch (...) {
         data_->plugins.clear();
         VSL_NAMESPACE::PureWindow::close();

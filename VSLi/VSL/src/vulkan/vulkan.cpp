@@ -28,39 +28,24 @@ namespace VSL_NAMESPACE {
     Vulkan<validation>::Vulkan(const char* app_name, const std::vector<const char*>& require_extensions) {
         if (!app_name)
             throw std::invalid_argument("Instance application name is null");
-        lifetime::GLFWCallScope scope;
-        const auto glfw = lifetime::GLFWLease::Acquire();
         InstanceCreateInfo info;
         info.application_name = app_name;
         info.validation = validation;
         info.debug_printf = validation;
-        std::uint32_t count = 0;
-        const auto* glfw_extensions = glfwGetRequiredInstanceExtensions(&count);
-        if (count && !glfw_extensions)
-            throw std::runtime_error("GLFW instance extensions are unavailable");
-        for (std::uint32_t i = 0; i < count; ++i) {
-            if (!glfw_extensions[i])
-                throw std::invalid_argument("GLFW instance extension is null");
-            info.extensions.emplace_back(glfw_extensions[i]);
-        }
         for (const auto* extension : require_extensions) {
             if (!extension)
                 throw std::invalid_argument("Instance extension is null");
             info.extensions.emplace_back(extension);
         }
-        if constexpr (validation) {
-            for (const auto* extension : VALIDATION_EXTENSIONS) {
-                if (!extension)
-                    throw std::invalid_argument("Validation extension is null");
-                info.extensions.emplace_back(extension);
-            }
-            for (const auto* layer : VALIDATION_LAYERS) {
-                if (!layer)
-                    throw std::invalid_argument("Validation layer is null");
-                info.layers.emplace_back(layer);
-            }
-        }
-        accessor = lifetime::make_heap_instance(std::move(info));
+        accessor = lifetime::make_heap_instance(lifetime::glfw_instance_info(std::move(info)));
+        data_ = accessor;
+    }
+    template<bool validation>
+    Vulkan<validation>::Vulkan(VulkanAccessor instance) {
+        const auto owner = instance.owner_ref();
+        if (!instance.accessor->instance || instance.accessor->owner_node->retiring())
+            throw std::invalid_argument("Vulkan facade requires a live canonical Instance");
+        accessor = std::move(instance.accessor);
         data_ = accessor;
     }
     template<bool validation>

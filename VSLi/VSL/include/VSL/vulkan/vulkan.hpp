@@ -40,6 +40,8 @@ namespace VSL_NAMESPACE {
         bool check_validation_layer_support();
 
         Vulkan(const char* app_name, const std::vector<const char*>& require_extensions = {});
+        // 移行用。配置済みInstanceを再生成せず旧facadeへ接続する。
+        explicit Vulkan(VulkanAccessor instance);
         ~Vulkan();
 
         template<typename S = VSL_NAMESPACE::PhysicalDevicesSercher>

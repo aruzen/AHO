@@ -40,6 +40,7 @@ function(vsl_generate_buffer_layout)
     file(SHA256 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/buffer_layout.hpp.in" template_hash)
     set(public_layout_hashes "")
     foreach(api IN ITEMS lifetime/resource_id.hpp lifetime/resource_plan.hpp lifetime/resource_arena.hpp lifetime/logical_use_state.hpp
+            storage/startup_plan.hpp lifetime/startup_arena.hpp
             lifetime/owner_ref.hpp lifetime/dependency_node.hpp lifetime/glfw_lease.hpp lifetime/window_owner.hpp window.hpp vulkan/surface.hpp
             lifetime/buffer_view.hpp storage/resource_layout.hpp storage/arena_memory.hpp operation/buffer_create_info.hpp
             operation/image_create_info.hpp operation/sampler_create_info.hpp operation/descriptor_create_info.hpp operation/shader_create_info.hpp operation/pipeline_layout_create_info.hpp operation/render_pass_description.hpp operation/graphics_pipeline_state.hpp

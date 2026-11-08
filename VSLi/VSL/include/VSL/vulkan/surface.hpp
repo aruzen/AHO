@@ -9,6 +9,8 @@
 namespace VSL_NAMESPACE {
     struct Surface : public VSL_NAMESPACE::PureWindow::Plugin {
         Surface(VSL_NAMESPACE::PureWindow* data, VSL_NAMESPACE::VulkanAccessor instance);
+        // 移行用plugin登録。sourceのnative Surfaceとownerをそのまま使う。
+        Surface(VSL_NAMESPACE::PureWindow* window, Surface source);
         explicit Surface(std::shared_ptr<impl::SurfaceImpl> data);
         lifetime::OwnerRef owner_ref() const;
         VulkanAccessor get_instance() const;

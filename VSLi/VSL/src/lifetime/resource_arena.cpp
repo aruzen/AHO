@@ -3,6 +3,7 @@
 #include <VSL/lifetime/image_storage.hpp>
 #include <VSL/lifetime/sampler_storage.hpp>
 #include <VSL/lifetime/descriptor_storage.hpp>
+#include <VSL/lifetime/shader_storage.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/storage/cpu_region.hpp>
@@ -16,6 +17,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
         impl::ResourceBindingLayoutImpl* layout = nullptr;
         impl::GraphicResourcePoolImpl* pool = nullptr;
         impl::GraphicResourceImpl* set = nullptr;
+        impl::ShaderImpl* shader = nullptr;
         size_t buffer_offset = 0, buffer_bytes = 0;
         size_t owner_index = 0;
     };
@@ -57,6 +59,8 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 return external ? std::holds_alternative<graphic_resource::Pool>(value) : std::holds_alternative<DescriptorPoolCreateInfo>(value);
             case storage::ResourceKind::DESCRIPTOR_SET:
                 return !external && std::holds_alternative<DescriptorSetInit>(value);
+            case storage::ResourceKind::SHADER:
+                return external ? std::holds_alternative<ShaderAccessor>(value) : std::holds_alternative<ShaderCreateInfo>(value);
         }
         return false;
     }
@@ -135,6 +139,11 @@ namespace VSL_NAMESPACE::lifetime::detail {
                         throw std::invalid_argument("External descriptor pool requires its canonical owner");
                     resource.pool = pool->data_.get();
                     resource.owner_index = retain_dependency(owned_ref(owner, pool->data_->owner_node));
+                } else if (const auto* shader = std::get_if<ShaderAccessor>(&value)) {
+                    if (!shader->data_.use_count() || !shader->data_ || !shader->data_->shader_module || shader->data_->device != device.data_.get())
+                        throw std::invalid_argument("External shader requires an owner on the arena device");
+                    resource.shader = shader->data_.get();
+                    resource.owner_index = retain_dependency(shader->owner_ref());
                 }
             }
             resources.push_back(std::move(resource));
@@ -178,6 +187,10 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 resource.set = &descriptor_set_at(slot);
                 break;
             }
+            case storage::ResourceKind::SHADER:
+                construct_shader(slot, device, std::get<ShaderCreateInfo>(initializer));
+                resource.shader = &shader_at(slot);
+                break;
         }
     }
     void ResourceArenaOwner::publish(const std::shared_ptr<ResourceArenaOwner>& owner) {
@@ -211,6 +224,8 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     resource.pool->owner_node = node;
                 if (resource.set)
                     resource.set->owner_node = node;
+                if (resource.shader)
+                    resource.shader->owner_node = node;
             }
             if (resource.pool && !resource.placement.external)
                 resource.pool->owner = owner;
@@ -242,6 +257,9 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     break;
                 case storage::ResourceKind::DESCRIPTOR_SET:
                     destroy_descriptor_set(slot);
+                    break;
+                case storage::ResourceKind::SHADER:
+                    destroy_shader(slot);
                     break;
             }
             constructed.pop_back();
@@ -326,6 +344,12 @@ namespace VSL_NAMESPACE::lifetime {
         if (resource.placement.external)
             return {_owner->dependencies.at(resource.owner_index).alias(resource.image).share()};
         return {{_owner, resource.image}};
+    }
+    ShaderAccessor ResourceArena::shader(typed::ResourceId id) const {
+        if (!_owner)
+            throw std::logic_error("Resource arena is empty");
+        const auto& resource = _owner->find(id, storage::ResourceKind::SHADER);
+        return {{resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.shader}};
     }
     SamplerAccessor ResourceArena::sampler(typed::ResourceId id) const {
         if (!_owner)

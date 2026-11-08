@@ -15,6 +15,8 @@ namespace vsl::storage {
     inline constexpr std::size_t DESCRIPTOR_POOL_IMPL_ALIGNMENT = @DESCRIPTOR_POOL_IMPL_ALIGNMENT@;
     inline constexpr std::size_t DESCRIPTOR_SET_IMPL_SIZE = @DESCRIPTOR_SET_IMPL_SIZE@;
     inline constexpr std::size_t DESCRIPTOR_SET_IMPL_ALIGNMENT = @DESCRIPTOR_SET_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t SHADER_IMPL_SIZE = @SHADER_IMPL_SIZE@;
+    inline constexpr std::size_t SHADER_IMPL_ALIGNMENT = @SHADER_IMPL_ALIGNMENT@;
     inline constexpr std::size_t BUFFER_USE_SIZE = @BUFFER_USE_SIZE@;
     inline constexpr std::size_t BUFFER_USE_ALIGNMENT = @BUFFER_USE_ALIGNMENT@;
     inline constexpr std::size_t BUFFER_EXPECTED_CPP_ABI_MODE = @cpp_mode@;

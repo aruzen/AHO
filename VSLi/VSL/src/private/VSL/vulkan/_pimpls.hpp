@@ -158,7 +158,6 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct CreateInfo {
-        std::vector<vk::PipelineShaderStageCreateInfo> shader_stages;
         std::vector<std::shared_ptr<ShaderImpl>> shaders;
         std::vector<std::shared_ptr<ResourceBindingLayoutImpl>> binding_layouts;
         vk::PipelineDynamicStateCreateInfo dynamic_state;
@@ -188,11 +187,13 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct ShaderImpl {
+        lifetime::DependencyNode* owner_node = nullptr;
         std::string name;
         std::vector<std::uint32_t> code;
-        std::shared_ptr<LogicalDeviceImpl> device;
+        LogicalDeviceImpl* device = nullptr;
+        vk::Device native_device;
         vk::ShaderModule shader_module;
-        vk::PipelineShaderStageCreateInfo shader_stage_create_info;
+        vk::ShaderStageFlagBits stage = vk::ShaderStageFlagBits::eVertex;
 
         ~ShaderImpl();
     };

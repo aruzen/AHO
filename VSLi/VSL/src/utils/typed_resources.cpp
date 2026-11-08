@@ -126,9 +126,9 @@ namespace VSL_NAMESPACE::typed::detail {
 
     void validate_resource_schema(PipelineLayoutAccessor layout, std::span<const DescriptorRequirement> requirements) {
         for (const auto& shader : layout.data_->info->shaders) {
-            if (shader->device != layout.data_->device)
+            if (shader->device != layout.data_->device.get())
                 throw std::invalid_argument("Typed shader/pipeline device mismatch");
-            const auto stage = ShaderType(shader->shader_stage_create_info.stage);
+            const auto stage = ShaderType(shader->stage);
             utils::SPIRVReflector reflection({}, std::span<const std::uint32_t>(shader->code), shader->name, stage);
             for (const auto& [set, points] : reflection.generated.binding_points) {
                 for (const auto& point : points) {

@@ -3,8 +3,14 @@
 #include <VSL/lifetime/image_storage.hpp>
 #include <VSL/lifetime/sampler_storage.hpp>
 #include <VSL/lifetime/descriptor_storage.hpp>
+#include <VSL/lifetime/shader_storage.hpp>
 
 namespace VSL_NAMESPACE::storage {
+    static_assert(sizeof(impl::ShaderImpl) == ImplLayout<impl::ShaderImpl>::SIZE);
+    static_assert(alignof(impl::ShaderImpl) == ImplLayout<impl::ShaderImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::ShaderSlotStorage) == ResourceSlotLayout<impl::ShaderImpl>::SIZE);
+    static_assert(alignof(lifetime::ShaderSlotStorage) == ResourceSlotLayout<impl::ShaderImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::ShaderImpl>::USE_OFFSET == NO_SEPARATE_USE);
     static_assert(sizeof(impl::BufferImpl) == ImplLayout<impl::BufferImpl>::SIZE);
     static_assert(alignof(impl::BufferImpl) == ImplLayout<impl::BufferImpl>::ALIGNMENT);
     static_assert(sizeof(impl::ImageImpl) == ImplLayout<impl::ImageImpl>::SIZE);

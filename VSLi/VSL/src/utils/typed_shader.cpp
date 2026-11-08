@@ -85,7 +85,7 @@ void VSL_NAMESPACE::typed::detail::validate_pipeline_vertex_shader(PipelineLayou
         throw std::invalid_argument("Typed pipeline requires an initialized layout");
     const impl::ShaderImpl* vertex = nullptr;
     for (const auto& shader : layout.data_->info->shaders) {
-        if (shader->shader_stage_create_info.stage != vk::ShaderStageFlagBits::eVertex)
+        if (shader->stage != vk::ShaderStageFlagBits::eVertex)
             continue;
         if (vertex)
             throw std::invalid_argument("Typed pipeline requires exactly one vertex shader");

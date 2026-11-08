@@ -2,6 +2,7 @@
 #include "../define.hpp"
 #include "../consteval_string.hpp"
 #include "../utils/string.hpp"
+#include "../lifetime/owner_ref.hpp"
 #include "pv.hpp"
 
 #include <filesystem>
@@ -56,11 +57,17 @@ namespace VSL_NAMESPACE {
 
     struct ShaderAccessor {
         std::shared_ptr<VSL_NAMESPACE::impl::ShaderImpl> data_;
+        std::string name() const;
+        ShaderType type() const;
+        std::span<const std::uint32_t> code() const&;
+        std::span<const std::uint32_t> code() const&& = delete;
+        LogicalDeviceAccessor get_device() const;
+        lifetime::OwnerRef owner_ref() const;
     };
 
-    template<VSL_NAMESPACE::ShaderType type = ShaderType::VERTEX>
+    template<VSL_NAMESPACE::ShaderType type_ = ShaderType::VERTEX>
     struct Shader : public ShaderAccessor {
-        constexpr static ShaderType TYPE = type;
+        constexpr static ShaderType TYPE = type_;
 
         Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path);
         Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path, std::string name);

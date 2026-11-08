@@ -9,7 +9,7 @@
 
 最初のPRだけで終了せず、下記の順で実装・検証・独立レビューを継続する。PRの公開前には最新masterとの差分を確認する。新しい製品ディレクトリが必要な場合は作成前に確認する。
 
-現在の到達点は順序1〜5である。順序6〜12は未完了であり、起動資源、既定policy変更、旧入口廃止と最終監査まで継続する。
+現在の到達点は順序1〜5と6aのShaderである。順序6b以降は未完了であり、起動資源、既定policy変更、旧入口廃止と最終監査まで継続する。
 
 ## 責務と保証
 
@@ -92,7 +92,7 @@ Layout数は宣言set数のResources::COUNT、Set数はshared／frameの実数�
 
 ## 順序6の着手単位
 
-6aはShaderのoperation／lifetime backend、heap所有、寸法生成、ResourceArena配置を通す。native実体へGPU UseStateは持たせず、stage create-infoとpNameを生成scratchへ分ける。entry／codeの永続値と外部Shaderの正規ownerを維持する。
+6aは[Shaderのoperation／lifetime backend、heap所有、寸法生成、ResourceArena配置](shader-arena.md)を実装した。native実体へGPU UseStateを持たせず、stage create-infoとpNameを生成scratchへ分け、entry／codeの永続値と外部Shaderの正規ownerを維持する。配置・失敗・import固定親・Frozen再生成・実描画／compute・install／artifactを検証した。
 
 6bはPipelineLayoutのruntimeと編集／Frozenのrecipeを分離し、配置へ接続する。push constant記録で読むrangesはruntimeへ移し、recipeのshader／descriptor sourceは借用とroot外部所有へ正規化する。Shader／DescriptorLayout→PipelineLayout、Pool／Layout→Setの構築順と実構築の逆順破棄を保証する。
 

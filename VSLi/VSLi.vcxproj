@@ -156,6 +156,11 @@
     <ClInclude Include="VSL\include\VSL\operation\sampler_create_info.hpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\image_ops.hpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\sampler_ops.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\operation\shader_ops.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\shader_storage.hpp" />
+    <ClInclude Include="VSL\include\VSL\operation\shader_create_info.hpp" />
+    <ClCompile Include="VSL\src\operation\shader_ops.cpp" />
+    <ClCompile Include="VSL\src\lifetime\shader_storage.cpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\submission_ops.hpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\descriptor_ops.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\descriptor_bindings.hpp" />

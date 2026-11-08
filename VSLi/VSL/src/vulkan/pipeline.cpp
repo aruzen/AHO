@@ -2,6 +2,27 @@
 #include <VSL/vulkan/render_pass.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>
+#include <VSL/operation/shader_ops.hpp>
+#include <limits>
+
+namespace {
+    std::vector<vk::PipelineShaderStageCreateInfo> shader_stages(VSL_NAMESPACE::PipelineLayoutAccessor layout);
+    std::vector<vk::PipelineShaderStageCreateInfo> shader_stages(VSL_NAMESPACE::PipelineLayoutAccessor layout) {
+        if (!layout.data_ || !layout.data_->info || !layout.data_->device)
+            throw std::invalid_argument("Pipeline requires an initialized layout");
+        const auto& shaders = layout.data_->info->shaders;
+        if (shaders.size() > std::numeric_limits<std::uint32_t>::max())
+            throw std::out_of_range("Pipeline shader count exceeds uint32_t");
+        std::vector<vk::PipelineShaderStageCreateInfo> result;
+        result.reserve(shaders.size());
+        for (const auto& shader : shaders) {
+            if (!shader || !shader.use_count() || shader->device != layout.data_->device.get())
+                throw std::invalid_argument("Pipeline shaders require the layout device");
+            result.push_back(VSL_NAMESPACE::operation::shader_stage(*shader));
+        }
+        return result;
+    }
+} // namespace
 
 VSL_NAMESPACE::GraphicsPipeline::GraphicsPipeline(VSL_NAMESPACE::PipelineLayoutAccessor layout, VSL_NAMESPACE::RenderPassAccessor pass, std::uint32_t subpass) {
     if (!pass.data_ || subpass >= pass.description().subpasses.size())
@@ -19,6 +40,7 @@ VSL_NAMESPACE::GraphicsPipeline::GraphicsPipeline(VSL_NAMESPACE::PipelineLayoutA
         layout.data_->info->multisample.rasterizationSamples != static_cast<vk::SampleCountFlagBits>(
                                                                     pass.description().attachments[outputs.depth_stencil->attachment].samples))
         throw std::invalid_argument("Pipeline depth sample count does not match subpass");
+    const auto stages = shader_stages(layout);
     data_ = std::shared_ptr<impl::PipelineImpl>(new impl::PipelineImpl);
     data_->device = layout.data_->device;
     data_->layout = layout.data_;
@@ -28,8 +50,8 @@ VSL_NAMESPACE::GraphicsPipeline::GraphicsPipeline(VSL_NAMESPACE::PipelineLayoutA
     auto cache = data_->device->device.createPipelineCacheUnique(pipeline_info_cache);
 
     vk::GraphicsPipelineCreateInfo pipeline_info;
-    pipeline_info.stageCount = (uint32_t)layout.data_->info->shader_stages.size();
-    pipeline_info.pStages = layout.data_->info->shader_stages.data();
+    pipeline_info.stageCount = static_cast<std::uint32_t>(stages.size());
+    pipeline_info.pStages = stages.data();
     pipeline_info.pVertexInputState = &layout.data_->info->vertex_input;
     pipeline_info.pInputAssemblyState = &layout.data_->info->input_assembly;
     pipeline_info.pViewportState = &layout.data_->info->viewport;
@@ -63,8 +85,8 @@ void VSL_NAMESPACE::GraphicsPipeline::invoke(VSL_NAMESPACE::CommandPool pool, VS
 }
 
 VSL_NAMESPACE::ComputePipeline::ComputePipeline(VSL_NAMESPACE::PipelineLayoutAccessor layout) {
-    if (!layout.data_ || !layout.data_->info || layout.data_->info->shader_stages.size() != 1 ||
-        layout.data_->info->shader_stages.front().stage != vk::ShaderStageFlagBits::eCompute)
+    const auto stages = shader_stages(layout);
+    if (stages.size() != 1 || stages.front().stage != vk::ShaderStageFlagBits::eCompute)
         throw std::invalid_argument("ComputePipeline requires exactly one compute shader");
 
     data_ = std::shared_ptr<impl::PipelineImpl>(new impl::PipelineImpl);
@@ -77,7 +99,7 @@ VSL_NAMESPACE::ComputePipeline::ComputePipeline(VSL_NAMESPACE::PipelineLayoutAcc
 
     vk::ComputePipelineCreateInfo pipeline_info;
     pipeline_info.layout = layout.data_->pipeline_layout;
-    pipeline_info.stage = layout.data_->info->shader_stages[0];
+    pipeline_info.stage = stages.front();
 
     data_->pipeline = data_->device->device.createComputePipeline(*cache, pipeline_info).value;
 }

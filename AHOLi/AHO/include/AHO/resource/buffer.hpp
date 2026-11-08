@@ -3,6 +3,7 @@
 #include <VSL/vulkan/buffer.hpp>
 #include <VSL/vulkan/command.hpp>
 #include <VSL/vulkan/resource_use.hpp>
+#include <VSL/lifetime/dependency_node.hpp>
 #include <VSL/lifetime/buffer_view.hpp>
 #include <concepts>
 #include <cstddef>
@@ -60,13 +61,14 @@ namespace AHO_NAMESPACE::resource {
         struct BufferState {
             std::shared_ptr<VSL_NAMESPACE::ResourceUseState> logical = std::make_shared<VSL_NAMESPACE::ResourceUseState>();
             VSL_NAMESPACE::LogicalDeviceAccessor device;
-            std::weak_ptr<void> resource;
+            VSL_NAMESPACE::lifetime::WeakOwnerRef resource;
             VSL_NAMESPACE::BufferAccessor* native = nullptr;
             std::optional<VSL_NAMESPACE::BufferView> current;
             mutable std::shared_ptr<VSL_NAMESPACE::BufferAccessor> compatibility;
             VSL_NAMESPACE::ResourceRetention retention = VSL_NAMESPACE::ResourceRetention::SUBMISSION;
             std::size_t size = 0;
             bool host_readable = false;
+            bool updating = false;
             std::shared_ptr<Buffer<BufferType::GPU_FRIENDLY>> staging;
             VSL_NAMESPACE::ResourceUseState* physical() const;
             bool busy() const;
@@ -74,6 +76,18 @@ namespace AHO_NAMESPACE::resource {
             void require_idle() const;
             void check_available(const VSL_NAMESPACE::Completion& completion) const;
             void mark_used(VSL_NAMESPACE::Completion completion) const;
+        };
+
+        // CPU側の世代切替中に、customization等から同じ論理Bufferを変更しない。
+        class BufferMutation {
+            std::shared_ptr<BufferState> _state;
+
+        public:
+            explicit BufferMutation(std::shared_ptr<BufferState> state);
+            BufferMutation(const BufferMutation&) = delete;
+            BufferMutation& operator=(const BufferMutation&) = delete;
+            ~BufferMutation() { finish(); }
+            void finish() noexcept;
         };
 
         template<typename Storage, typename Customization>
@@ -124,6 +138,7 @@ namespace AHO_NAMESPACE::resource {
         VSL_NAMESPACE::LogicalDeviceAccessor device() const;
         VSL_NAMESPACE::BufferAccessor& native() const;
         std::shared_ptr<void> owner() const;
+        VSL_NAMESPACE::lifetime::OwnerRef owner_ref() const;
         bool host_readable() const;
         VSL_NAMESPACE::ResourceUse resource_use() const;
         BufferSnapshot snapshot() const;
@@ -169,12 +184,16 @@ namespace AHO_NAMESPACE::resource {
         struct BufferResource {
             using Mapping = typename MappingType<Storage, Customization>::Type;
 
+            VSL_NAMESPACE::lifetime::DependencyNode node;
             // 割当管理などの依存先を、Storageの破棄後まで保持する。
             Customization customization;
             std::optional<Storage> storage;
             std::optional<Mapping> mapping;
 
             BufferResource(std::optional<Storage> storage, Customization customization);
+            ~BufferResource() { node.retire(); }
+            static std::shared_ptr<BufferResource> Make(std::optional<Storage> storage, Customization customization);
+            static void Visit(const void* context, VSL_NAMESPACE::lifetime::DependencyNode::EdgeVisitor visitor, void* output);
         };
 
         template<typename Storage, typename Customization>
@@ -193,12 +212,14 @@ namespace AHO_NAMESPACE::resource {
         template<typename Storage, typename Customization>
         class GPUBufferBase {
             using Resource = BufferResource<Storage, Customization>;
-            std::shared_ptr<TypedBufferState<Storage, Customization>> _state;
+            using State = TypedBufferState<Storage, Customization>;
+            std::shared_ptr<State> _state;
 
             Resource& resource() const;
 
-            void replace(std::size_t capacity, bool preserve)
+            static std::shared_ptr<Resource> Prepare(const std::shared_ptr<State>& state, std::size_t capacity, bool preserve)
             requires resizable_storage<Storage, Customization>;
+            static std::shared_ptr<Resource> Publish(const std::shared_ptr<State>& state, std::shared_ptr<Resource> next);
 
         protected:
             void initialize(VSL_NAMESPACE::LogicalDeviceAccessor device, std::optional<Storage> storage,
@@ -325,6 +346,21 @@ namespace AHO_NAMESPACE::resource {
         }
 
         template<typename Storage, typename Customization>
+        auto BufferResource<Storage, Customization>::Make(std::optional<Storage> storage, Customization customization) -> std::shared_ptr<BufferResource> {
+            auto result = std::make_shared<BufferResource>(std::move(storage), std::move(customization));
+            result->node.publish(result, result.get(), Visit);
+            result->node.check_additions(result.get(), Visit);
+            return result;
+        }
+
+        template<typename Storage, typename Customization>
+        void BufferResource<Storage, Customization>::Visit(const void* context, VSL_NAMESPACE::lifetime::DependencyNode::EdgeVisitor visitor, void* output) {
+            const auto& resource = *static_cast<const BufferResource*>(context);
+            if (resource.storage)
+                visitor(output, static_cast<const VSL_NAMESPACE::BufferAccessor&>(*resource.storage).resource_use().owner);
+        }
+
+        template<typename Storage, typename Customization>
         auto GPUBufferBase<Storage, Customization>::resource() const -> Resource& {
             if (!_state)
                 throw std::logic_error("Buffer is empty");
@@ -332,27 +368,36 @@ namespace AHO_NAMESPACE::resource {
         }
 
         template<typename Storage, typename Customization>
-        void GPUBufferBase<Storage, Customization>::replace(std::size_t capacity, bool preserve)
+        auto GPUBufferBase<Storage, Customization>::Prepare(const std::shared_ptr<State>& state, std::size_t capacity, bool preserve) -> std::shared_ptr<Resource>
         requires resizable_storage<Storage, Customization>
         {
-            auto& old = resource();
+            const auto old = state->typed_resource;
             auto storage = [&]() -> Storage {
-                if (old.storage)
-                    return old.customization.reallocate(*old.storage, capacity);
-                if constexpr (requires { old.customization.create(capacity); })
-                    return old.customization.create(capacity);
+                if (old->storage)
+                    return old->customization.reallocate(*old->storage, capacity);
+                if constexpr (requires { old->customization.create(capacity); })
+                    return old->customization.create(capacity);
                 else
                     throw std::logic_error("Buffer has no storage to reallocate");
             }();
-            auto next = std::make_shared<Resource>(std::optional<Storage>(std::move(storage)), old.customization);
-            if (next->storage->get_device() != _state->device ||
+            auto next = Resource::Make(std::optional<Storage>(std::move(storage)), old->customization);
+            if (next->storage->get_device() != state->device ||
                 next->storage->requested_size() < capacity)
                 throw std::invalid_argument("CUSTOM reallocation requires sufficient storage on the same device");
-            if (preserve && _state->size)
-                next->mapping->write(old.mapping->read(_state->size), 0);
-            _state->native = &*next->storage;
-            _state->typed_resource = std::move(next);
-            _state->resource = _state->typed_resource;
+            if (preserve && state->size)
+                next->mapping->write(old->mapping->read(state->size), 0);
+            return next;
+        }
+
+        template<typename Storage, typename Customization>
+        auto GPUBufferBase<Storage, Customization>::Publish(const std::shared_ptr<State>& state, std::shared_ptr<Resource> next) -> std::shared_ptr<Resource> {
+            auto owner = next->node.ref(next).weak();
+            state->require_idle();
+            auto previous = std::move(state->typed_resource);
+            state->native = next->storage ? &*next->storage : nullptr;
+            state->resource = std::move(owner);
+            state->typed_resource = std::move(next);
+            return previous;
         }
 
         template<typename Storage, typename Customization>
@@ -360,14 +405,14 @@ namespace AHO_NAMESPACE::resource {
                                                                Customization customization, std::size_t size) {
             if (!device.data_)
                 throw std::invalid_argument("Buffer requires a device");
-            auto owner = std::make_shared<Resource>(std::move(storage), std::move(customization));
-            _state = std::make_shared<TypedBufferState<Storage, Customization>>();
+            auto owner = Resource::Make(std::move(storage), std::move(customization));
+            _state = std::make_shared<State>();
             _state->device = device;
             _state->size = size;
             _state->host_readable = mappable_storage<Storage, Customization>;
             _state->native = owner->storage ? &*owner->storage : nullptr;
             _state->typed_resource = std::move(owner);
-            _state->resource = _state->typed_resource;
+            _state->resource = _state->typed_resource->node.ref(_state->typed_resource).weak();
         }
 
         template<typename Storage, typename Customization>
@@ -395,13 +440,15 @@ namespace AHO_NAMESPACE::resource {
 
         template<typename Storage, typename Customization>
         bool GPUBufferBase<Storage, Customization>::busy() const {
-            return _state && _state->busy();
+            const auto state = _state;
+            return state && state->busy();
         }
 
         template<typename Storage, typename Customization>
         bool GPUBufferBase<Storage, Customization>::wait(std::uint64_t timeout) const {
             (void)resource();
-            return _state->wait(timeout);
+            const auto state = _state;
+            return state->wait(timeout);
         }
 
         template<typename Storage, typename Customization>
@@ -430,45 +477,62 @@ namespace AHO_NAMESPACE::resource {
         auto GPUBufferBase<Storage, Customization>::map()
         requires mappable_storage<Storage, Customization>
         {
-            auto& r = resource();
-            _state->require_idle();
-            if (!r.mapping)
+            (void)resource();
+            const auto state = _state;
+            BufferMutation mutation(state);
+            state->require_idle();
+            const auto r = state->typed_resource;
+            if (!r->mapping)
                 throw std::logic_error("Buffer has no mapping");
-            return map_storage(*r.storage, r.customization);
+            return map_storage(*r->storage, r->customization);
         }
 
         template<typename Storage, typename Customization>
         std::span<const std::byte> GPUBufferBase<Storage, Customization>::read(std::size_t bytes, std::size_t offset) const
         requires mappable_storage<Storage, Customization>
         {
-            auto& r = resource();
-            _state->require_idle();
-            if (offset > size() || bytes > size() - offset)
+            (void)resource();
+            const auto state = _state;
+            BufferMutation mutation(state);
+            state->require_idle();
+            const auto r = state->typed_resource;
+            if (offset > state->size || bytes > state->size - offset)
                 throw std::out_of_range("Buffer read range");
             if (!bytes)
                 return {};
-            return r.mapping->read(bytes, offset);
+            return r->mapping->read(bytes, offset);
         }
 
         template<typename Storage, typename Customization>
         void GPUBufferBase<Storage, Customization>::read_into(std::span<std::byte> destination, std::size_t offset) const
         requires mappable_storage<Storage, Customization>
         {
-            const auto source = read(destination.size(), offset);
-            if (!source.empty())
+            (void)resource();
+            const auto state = _state;
+            BufferMutation mutation(state);
+            state->require_idle();
+            const auto r = state->typed_resource;
+            if (offset > state->size || destination.size() > state->size - offset)
+                throw std::out_of_range("Buffer read range");
+            if (!destination.empty()) {
+                const auto source = r->mapping->read(destination.size(), offset);
                 std::memmove(destination.data(), source.data(), source.size());
+            }
         }
 
         template<typename Storage, typename Customization>
         void GPUBufferBase<Storage, Customization>::write(std::span<const std::byte> bytes, std::size_t offset)
         requires mappable_storage<Storage, Customization>
         {
-            auto& r = resource();
-            _state->require_idle();
-            if (offset > size() || bytes.size() > size() - offset)
+            (void)resource();
+            const auto state = _state;
+            BufferMutation mutation(state);
+            state->require_idle();
+            const auto r = state->typed_resource;
+            if (offset > state->size || bytes.size() > state->size - offset)
                 throw std::out_of_range("Buffer write range");
             if (!bytes.empty())
-                r.mapping->write(bytes, offset);
+                r->mapping->write(bytes, offset);
         }
 
         template<typename Storage, typename Customization>
@@ -476,37 +540,50 @@ namespace AHO_NAMESPACE::resource {
         requires resizable_storage<Storage, Customization>
         {
             (void)resource();
-            _state->require_idle();
-            if (capacity <= this->capacity())
+            const auto state = _state;
+            BufferMutation mutation(state);
+            state->require_idle();
+            if (capacity <= (state->native ? state->native->requested_size() : 0))
                 return;
-            replace(capacity, true);
+            auto previous = Publish(state, Prepare(state, capacity, true));
+            mutation.finish();
         }
 
         template<typename Storage, typename Customization>
         void GPUBufferBase<Storage, Customization>::resize(std::size_t size)
         requires resizable_storage<Storage, Customization>
         {
-            resource();
-            _state->require_idle();
-            reserve(size);
-            _state->size = size;
+            (void)resource();
+            const auto state = _state;
+            BufferMutation mutation(state);
+            state->require_idle();
+            std::shared_ptr<Resource> previous;
+            if (size > (state->native ? state->native->requested_size() : 0))
+                previous = Publish(state, Prepare(state, size, true));
+            state->size = size;
+            mutation.finish();
         }
 
         template<typename Storage, typename Customization>
         void GPUBufferBase<Storage, Customization>::assign(std::span<const std::byte> bytes)
         requires mappable_storage<Storage, Customization>
         {
-            resource();
-            _state->require_idle();
-            if (bytes.size() > capacity()) {
-                if constexpr (resizable_storage<Storage, Customization>)
-                    replace(bytes.size(), false);
-                else
+            (void)resource();
+            const auto state = _state;
+            BufferMutation mutation(state);
+            state->require_idle();
+            std::shared_ptr<Resource> previous;
+            if (bytes.size() > (state->native ? state->native->requested_size() : 0)) {
+                if constexpr (resizable_storage<Storage, Customization>) {
+                    auto next = Prepare(state, bytes.size(), false);
+                    next->mapping->write(bytes, 0);
+                    previous = Publish(state, std::move(next));
+                } else
                     throw std::out_of_range("Fixed Buffer assignment exceeds capacity");
-            }
-            if (!bytes.empty())
-                resource().mapping->write(bytes, 0);
-            _state->size = bytes.size();
+            } else if (!bytes.empty())
+                state->typed_resource->mapping->write(bytes, 0);
+            state->size = bytes.size();
+            mutation.finish();
         }
 
         inline HostBuffer HostBufferCustomization::create(std::size_t bytes) const {

@@ -6,6 +6,9 @@
 #include <utility>
 
 #ifdef AHO_GPU_TESTS
+#include <VSL/lifetime/resource_arena.hpp>
+#include <VSL/utils/typed_resources.hpp>
+#include <functional>
 #include "../support/buffer_customization.hpp"
 #include "support/vulkan_fixture.hpp"
 #else
@@ -203,11 +206,37 @@ TEST(GeneralBufferOwnershipTest, LastOwnerDestructionReleasesTheArray) {
 
 #else
 namespace {
+    using aho_test::CustomCounters;
+    using aho_test::NativeHost;
+    using aho_test::CountingCustomization;
+
     struct MoveOnlyCustomization {
         std::unique_ptr<int> value = std::make_unique<int>(7);
         MoveOnlyCustomization() = default;
         MoveOnlyCustomization(MoveOnlyCustomization&&) = default;
         MoveOnlyCustomization(const MoveOnlyCustomization&) = delete;
+    };
+
+    struct ObservedStorage : NativeHost {
+        std::shared_ptr<std::function<void()>> released;
+        ObservedStorage(vsl::LogicalDeviceAccessor device, size_t bytes, std::shared_ptr<std::function<void()>> released)
+            : NativeHost(device, bytes), released(std::move(released)) {}
+        ObservedStorage(ObservedStorage&& other) noexcept
+            : NativeHost(std::move(other)), released(std::move(other.released)) { other.data_.reset(); }
+        ~ObservedStorage() override {
+            if (data_ && released && *released)
+                (*released)();
+        }
+    };
+    struct ObservedCustomization {
+        vsl::LogicalDeviceAccessor device;
+        std::shared_ptr<std::function<void()>> released;
+        std::function<void()> preparing;
+        ObservedStorage reallocate(const ObservedStorage&, size_t bytes) {
+            if (preparing)
+                preparing();
+            return {device, bytes, released};
+        }
     };
 
     class GPUFriendlyBufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
@@ -256,9 +285,141 @@ namespace {
     }
 } // namespace
 namespace {
-    using aho_test::CustomCounters;
-    using aho_test::NativeHost;
-    using aho_test::CountingCustomization;
+    TEST_F(GPUFriendlyBufferVulkanIntegrationTest, OldGenerationCallbacksSeeTheCommittedOwnerSizeAndContents) {
+        for (const auto operation : {0, 1, 2}) {
+            auto released = std::make_shared<std::function<void()>>();
+            auto buffer = aho::resource::make_custom_buffer(ObservedStorage(device, 4, released), ObservedCustomization{device, released, {}});
+            const std::uint32_t value = 37;
+            buffer.write(std::as_bytes(std::span(&value, 1)));
+            const std::array<std::uint32_t, 2> assigned{41, 43};
+            const auto old = buffer.binding().native().data_.get();
+            auto weak = buffer.binding().owner_ref().weak();
+            size_t calls = 0;
+            *released = [&] {
+                ++calls;
+                const auto snapshot = buffer.binding().snapshot();
+                EXPECT_NE(snapshot.storage().ref().data, old);
+                EXPECT_TRUE(snapshot.constraints().owner.managed());
+                EXPECT_TRUE(buffer.binding().owner_ref().managed());
+                EXPECT_EQ(snapshot.size(), operation ? 8u : 4u);
+                std::uint32_t actual = 0;
+                buffer.read_into(std::as_writable_bytes(std::span(&actual, 1)));
+                EXPECT_EQ(actual, operation == 2 ? assigned[0] : value);
+            };
+            if (operation == 0)
+                buffer.reserve(8);
+            else if (operation == 1)
+                buffer.resize(8);
+            else
+                buffer.assign(std::as_bytes(std::span(assigned)));
+            EXPECT_EQ(calls, 1u);
+            EXPECT_TRUE(weak.expired());
+            *released = {};
+        }
+    }
+    TEST_F(GPUFriendlyBufferVulkanIntegrationTest, CustomPreparationCannotReenterTheSameLogicalBufferMutation) {
+        auto released = std::make_shared<std::function<void()>>();
+        std::function<void()> reenter;
+        auto buffer = aho::resource::make_custom_buffer(ObservedStorage(device, 4, released),
+                                                        ObservedCustomization{device, released, [&] { reenter(); }});
+        const std::uint32_t value = 17;
+        buffer.write(std::as_bytes(std::span(&value, 1)));
+        const auto old = buffer.binding().snapshot();
+        reenter = [&] {
+            const auto current = buffer.binding().snapshot();
+            EXPECT_EQ(current.storage().ref().data, old.storage().ref().data);
+            buffer.resize(0);
+        };
+        EXPECT_THROW(buffer.reserve(8), std::logic_error);
+        EXPECT_EQ(buffer.size(), 4u);
+        EXPECT_EQ(buffer.capacity(), 4u);
+        const auto after = buffer.binding().snapshot();
+        EXPECT_EQ(after.storage().ref().data, old.storage().ref().data);
+        reenter = [] {};
+        EXPECT_NO_THROW(buffer.reserve(8));
+        EXPECT_EQ(buffer.read(4)[0], std::as_bytes(std::span(&value, 1))[0]);
+    }
+    TEST_F(GPUFriendlyBufferVulkanIntegrationTest, FailedCandidateAssignmentKeepsTheOriginalGenerationAndData) {
+        struct Customization {
+            vsl::LogicalDeviceAccessor device;
+            std::shared_ptr<bool> fail;
+            struct Mapping {
+                NativeHost::LocalBufferHolder mapped;
+                std::shared_ptr<bool> fail;
+                auto read(size_t bytes, size_t offset = 0) { return mapped.read(bytes, offset); }
+                void write(std::span<const std::byte> bytes, size_t offset) {
+                    if (*fail)
+                        throw std::runtime_error("Injected candidate write failure");
+                    mapped.write(bytes, offset);
+                }
+            };
+            Mapping map(NativeHost& storage) { return {storage.data(), fail}; }
+            NativeHost reallocate(const NativeHost&, size_t bytes) { return {device, bytes}; }
+        };
+        auto fail = std::make_shared<bool>(false);
+        auto buffer = aho::resource::make_custom_buffer(NativeHost(device, 4), Customization{device, fail});
+        const std::array<std::uint32_t, 2> values{17, 31};
+        buffer.write(std::as_bytes(std::span(values).first(1)));
+        const auto old = buffer.binding().snapshot();
+        *fail = true;
+        EXPECT_THROW(buffer.assign(std::as_bytes(std::span(values))), std::runtime_error);
+        EXPECT_EQ(buffer.capacity(), 4u);
+        EXPECT_EQ(buffer.size(), 4u);
+        const auto after = buffer.binding().snapshot();
+        EXPECT_EQ(after.storage().ref().data, old.storage().ref().data);
+        EXPECT_EQ(buffer.binding().owner_ref().get(), old.constraints().owner.get());
+        *fail = false;
+        std::uint32_t actual = 0;
+        buffer.read_into(std::as_writable_bytes(std::span(&actual, 1)));
+        EXPECT_EQ(actual, values[0]);
+        EXPECT_NO_THROW(buffer.assign(std::as_bytes(std::span(values))));
+        EXPECT_EQ(buffer.size(), 8u);
+    }
+    TEST_F(GPUFriendlyBufferVulkanIntegrationTest, GenerationStorageDependencyRejectsAnIndirectDescriptorCycle) {
+        namespace t = vsl::typed;
+        namespace l = vsl::lifetime;
+        using Set = t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
+        using View = t::TypedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>;
+        using enum vsl::storage::ResourceKind;
+        constexpr std::array<t::ResourceRequest, 4> requests{{{{1}, BUFFER}, {{2}, DESCRIPTOR_LAYOUT}, {{3}, DESCRIPTOR_POOL}, {{4}, DESCRIPTOR_SET}}};
+        const t::ResourcePlan<4> plan(requests);
+        const vsl::DescriptorLayoutCreateInfo layout{{Set::POINTS.begin(), Set::POINTS.end()}};
+        const vsl::DescriptorPoolCreateInfo pool{{{vsl::graphic_resource::Type::UNIFORM_BUFFER, 1}}, 1};
+        const std::array<l::ResourceInit, 4> initializers{vsl::BufferCreateInfo{4, aho::resource::detail::STANDARD_BUFFER_USAGE}, layout, pool, l::DescriptorSetInit{{3}, {2}}};
+        l::ResourceArena arena(device, plan, initializers, l::DependencyPolicy::DYNAMIC);
+        auto storage = NativeHost(device, 4);
+        storage.data_ = arena.buffer({1}).legacy_owner();
+        auto buffer = aho::resource::make_custom_buffer(std::move(storage));
+        const auto snapshot = buffer.binding().snapshot();
+        EXPECT_TRUE(snapshot.constraints().owner.managed());
+        EXPECT_FALSE(snapshot.constraints().state.managed());
+        auto set = t::TypedDescriptorSet<Set>::FromResource(device, arena.descriptor_set({4}));
+        set.write<0>(View::FromView(arena.buffer({1}), 1));
+        Host independent(device, 4);
+        // 物理入力は別owner。論理制約のR→arenaだけで循環を検出する。
+        EXPECT_THROW(set.write<0>(View::FromView(vsl::BufferView::FromBuffer(independent.native()), 1, 0, snapshot.constraints())), std::invalid_argument);
+        EXPECT_NO_THROW(set.write<0>(View::FromView(vsl::BufferView::FromBuffer(independent.native()), 1)));
+    }
+    TEST_F(GPUFriendlyBufferVulkanIntegrationTest, PreparationMayReleaseTheFacadeWhileTheTransactionKeepsItsStateAlive) {
+        for (const auto operation : {0, 1, 2}) {
+            auto released = std::make_shared<std::function<void()>>();
+            std::function<void()> preparing;
+            using Buffer = decltype(aho::resource::make_custom_buffer(std::declval<ObservedStorage>(), std::declval<ObservedCustomization>()));
+            std::optional<Buffer> buffer;
+            buffer.emplace(ObservedStorage(device, 4, released), ObservedCustomization{device, released, [&] { preparing(); }});
+            const auto weak = buffer->binding().owner_ref().weak();
+            preparing = [&] { buffer.reset(); };
+            const std::array<std::byte, 8> bytes{};
+            if (operation == 0)
+                EXPECT_NO_THROW(buffer->reserve(8));
+            else if (operation == 1)
+                EXPECT_NO_THROW(buffer->resize(8));
+            else
+                EXPECT_NO_THROW(buffer->assign(bytes));
+            EXPECT_FALSE(buffer);
+            EXPECT_TRUE(weak.expired());
+        }
+    }
 
     TEST_F(GPUFriendlyBufferVulkanIntegrationTest, ConstructorsExposeStandardUsageAndReuseTheirMapping) {
         Host source(device, 8);

@@ -16,6 +16,17 @@ namespace AHO_NAMESPACE::resource {
     struct Buffer<BufferType::GENERAL>::Data {
         std::vector<std::byte> bytes;
     };
+    detail::BufferMutation::BufferMutation(std::shared_ptr<BufferState> state) : _state(std::move(state)) {
+        if (!_state || _state->updating)
+            throw std::logic_error("Buffer is already being changed");
+        _state->updating = true;
+    }
+    void detail::BufferMutation::finish() noexcept {
+        if (_state) {
+            _state->updating = false;
+            _state.reset();
+        }
+    }
     BufferSnapshot::BufferSnapshot(VSL_NAMESPACE::BufferView storage, VSL_NAMESPACE::LogicalDeviceAccessor device,
                                    std::size_t size, VSL_NAMESPACE::ResourceUse constraints, VSL_NAMESPACE::ResourceRetention retention, bool host_readable)
         : _storage(std::move(storage)), _device(std::move(device)), _size(size), _constraints(std::move(constraints)), _retention(retention), _host_readable(host_readable) {
@@ -23,11 +34,14 @@ namespace AHO_NAMESPACE::resource {
             throw std::out_of_range("Buffer snapshot exceeds its storage generation");
     }
     void BufferSnapshot::read_into(std::span<std::byte> destination, std::size_t offset) const {
-        if (offset > _size || destination.size() > _size - offset)
+        const auto source = storage();
+        const auto constraints = _constraints;
+        const auto size = _size;
+        if (offset > size || destination.size() > size - offset)
             throw std::out_of_range("Buffer snapshot read range");
-        if (_constraints.state)
-            _constraints.state->require_idle();
-        storage().read_into(destination, offset);
+        if (constraints.state)
+            constraints.state->require_idle();
+        source.read_into(destination, offset);
     }
 
     VSL_NAMESPACE::ResourceUseState* detail::BufferState::physical() const {
@@ -36,31 +50,43 @@ namespace AHO_NAMESPACE::resource {
         return current ? &current->ref().use() : nullptr;
     }
     bool detail::BufferState::busy() const {
-        return logical->busy() || (physical() && physical()->busy());
+        const auto owner = resource.lock();
+        auto* const storage = physical();
+        return logical->busy() || (storage && storage->busy());
     }
     bool detail::BufferState::wait(std::uint64_t timeout) const {
+        const auto owner = resource.lock();
+        auto* const storage = physical();
         const auto start = std::chrono::steady_clock::now();
         if (!logical->wait(timeout))
             return false;
         const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count();
         const auto remaining = timeout == UINT64_MAX ? timeout : (std::uint64_t(elapsed) < timeout ? timeout - std::uint64_t(elapsed) : 0);
-        return !physical() || physical()->wait(remaining);
+        return !storage || storage->wait(remaining);
     }
     void detail::BufferState::require_idle() const {
+        const auto owner = resource.lock();
+        auto* const storage = physical();
         logical->require_idle();
-        if (auto* state = physical())
-            state->require_idle();
+        if (storage)
+            storage->require_idle();
     }
     void detail::BufferState::check_available(const VSL_NAMESPACE::Completion& completion) const {
+        if (updating)
+            throw std::logic_error("Buffer is being changed");
+        const auto owner = resource.lock();
+        auto* const storage = physical();
         logical->check_available(completion);
-        if (auto* state = physical())
-            state->check_available(completion);
+        if (storage)
+            storage->check_available(completion);
     }
     void detail::BufferState::mark_used(VSL_NAMESPACE::Completion completion) const {
+        const auto owner = resource.lock();
+        auto* const storage = physical();
         check_available(completion);
         logical->mark_used(completion);
-        if (auto* state = physical())
-            state->mark_used(completion);
+        if (storage)
+            storage->mark_used(completion);
     }
 
     Buffer<BufferType::GENERAL>::Buffer(std::size_t size) : _data(std::make_shared<Data>()) {
@@ -148,6 +174,9 @@ namespace AHO_NAMESPACE::resource {
     }
 
     std::shared_ptr<void> BufferBinding::owner() const {
+        return owner_ref().share();
+    }
+    VSL_NAMESPACE::lifetime::OwnerRef BufferBinding::owner_ref() const {
         if (!_state)
             throw std::logic_error("Buffer binding is empty");
         return _state->resource.lock();
@@ -162,16 +191,17 @@ namespace AHO_NAMESPACE::resource {
     }
 
     void BufferBinding::check_available(const VSL_NAMESPACE::Completion& completion) const {
-        if (!_state)
+        const auto state = _state;
+        if (!state)
             throw std::logic_error("Buffer binding is empty");
-        _state->check_available(completion);
+        state->check_available(completion);
     }
 
     void BufferBinding::mark_used(VSL_NAMESPACE::Completion completion) const {
-        if (!_state)
+        const auto state = _state;
+        if (!state)
             throw std::logic_error("Buffer binding is empty");
-        _state->check_available(completion);
-        _state->mark_used(std::move(completion));
+        state->mark_used(std::move(completion));
     }
     VSL_NAMESPACE::ResourceUse BufferBinding::resource_use() const {
         if (!_state)
@@ -182,6 +212,6 @@ namespace AHO_NAMESPACE::resource {
         if (!_state || (!_state->native && !_state->current))
             throw std::logic_error("Buffer has no GPU storage");
         auto view = _state->native ? VSL_NAMESPACE::BufferView::FromBuffer(*_state->native) : *_state->current;
-        return BufferSnapshot(std::move(view), _state->device, _state->size, {_state->logical, owner()}, _state->retention, host_readable());
+        return BufferSnapshot(std::move(view), _state->device, _state->size, {_state->logical, owner_ref()}, _state->retention, host_readable());
     }
 } // namespace AHO_NAMESPACE::resource

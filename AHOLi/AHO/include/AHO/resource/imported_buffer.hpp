@@ -11,12 +11,19 @@ namespace AHO_NAMESPACE::resource {
             explicit ViewBufferBase(std::shared_ptr<BufferState> state);
             explicit ViewBufferBase(VSL_NAMESPACE::BufferView storage);
             BufferState& state() const;
+            std::shared_ptr<BufferState> state_owner() const {
+                (void)state();
+                return _state;
+            }
 
         public:
             BufferBinding binding() const;
             size_t size() const { return _state ? _state->size : 0; }
             size_t capacity() const { return _state && _state->current ? _state->current->size() : 0; }
-            bool busy() const { return _state && _state->busy(); }
+            bool busy() const {
+                const auto state = _state;
+                return state && state->busy();
+            }
             bool wait(std::uint64_t timeout = UINT64_MAX) const;
             void resize(size_t size);
             void assign(std::span<const std::byte> bytes);

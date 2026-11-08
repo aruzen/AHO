@@ -55,6 +55,125 @@ namespace {
         EXPECT_EQ(alias.size(), 128u);
         EXPECT_EQ(alias.capacity(), 128u);
     }
+    TEST_F(ArenaBufferVulkanIntegrationTest, GenerationReleaseCallbacksObserveTheCompleteCommitAndCanRead) {
+        for (const auto operation : {0, 1, 2}) {
+            struct Storage {
+                vsl::lifetime::BufferArena arena;
+                std::shared_ptr<std::function<void()>> released;
+                ~Storage() {
+                    if (*released)
+                        (*released)();
+                }
+            };
+            auto released = std::make_shared<std::function<void()>>();
+            r::ArenaBuffer buffer(device, 4, [released](auto logical_device, size_t bytes) {
+                const vsl::BufferCreateInfo info{bytes, r::detail::STANDARD_BUFFER_USAGE};
+                auto root = std::make_shared<Storage>(vsl::lifetime::BufferArena(logical_device, std::span(&info, 1)), released);
+                return vsl::BufferView(root->arena.borrow(0), root, 0, bytes);
+            });
+            const std::uint32_t initial = 17;
+            const std::array<std::uint32_t, 2> assigned{31, 37};
+            buffer.write(std::as_bytes(std::span(&initial, 1)));
+            const auto old = buffer.binding().native().data_.get();
+            const auto weak = buffer.binding().owner_ref().weak();
+            (void)buffer.binding().native();
+            size_t calls = 0;
+            *released = [&] {
+                ++calls;
+                const auto snapshot = buffer.binding().snapshot();
+                EXPECT_NE(snapshot.storage().ref().data, old);
+                EXPECT_EQ(snapshot.size(), operation ? 8u : 4u);
+                EXPECT_FALSE(snapshot.constraints().owner.owner_before(buffer.binding().owner_ref()));
+                EXPECT_FALSE(buffer.binding().owner_ref().owner_before(snapshot.constraints().owner));
+                EXPECT_EQ(buffer.binding().native().data_.get(), snapshot.storage().ref().data);
+                std::uint32_t actual = 0;
+                buffer.read_into(std::as_writable_bytes(std::span(&actual, 1)));
+                EXPECT_EQ(actual, operation == 2 ? assigned[0] : initial);
+            };
+            if (operation == 0)
+                buffer.reserve(8);
+            else if (operation == 1)
+                buffer.resize(8);
+            else
+                buffer.assign(std::as_bytes(std::span(assigned)));
+            EXPECT_EQ(calls, 1u);
+            EXPECT_TRUE(weak.expired());
+            *released = {};
+        }
+    }
+    TEST_F(ArenaBufferVulkanIntegrationTest, FactoryReentryCannotReplaceOrResizeTheGenerationBeingPrepared) {
+        std::function<void()> preparing;
+        r::ArenaBuffer buffer(device, 4, [&](auto logical_device, size_t bytes) {
+            if (preparing)
+                preparing();
+            const vsl::BufferCreateInfo info{bytes, r::detail::STANDARD_BUFFER_USAGE};
+            return vsl::lifetime::BufferArena(logical_device, std::span(&info, 1)).view(0);
+        });
+        const auto before = buffer.binding().snapshot();
+        preparing = [&] { buffer.assign({}); };
+        EXPECT_THROW(buffer.reserve(8), std::logic_error);
+        EXPECT_EQ(buffer.size(), 4u);
+        EXPECT_EQ(buffer.capacity(), 4u);
+        const auto after = buffer.binding().snapshot();
+        EXPECT_EQ(after.storage().ref().data, before.storage().ref().data);
+        auto manager = make_manager();
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        r::Buffer<r::BufferType::GENERAL> source(4);
+        preparing = [&] { phase << buffer.upload(source); };
+        EXPECT_THROW(buffer.reserve(8), std::logic_error);
+        EXPECT_FALSE(buffer.busy());
+        phase.cancel();
+        preparing = {};
+        EXPECT_NO_THROW(buffer.resize(8));
+        EXPECT_TRUE(buffer.binding().owner_ref().managed());
+    }
+    TEST_F(ArenaBufferVulkanIntegrationTest, CompletionCallbacksMayReleaseFacadesBindingsAndSnapshotsDuringObservation) {
+        auto verify = [&]<typename Buffer>(Buffer value, int operation) {
+            std::optional<Buffer> buffer(std::move(value));
+            std::optional<r::BufferBinding> binding(buffer->binding());
+            std::optional<r::BufferSnapshot> snapshot(binding->snapshot());
+            const std::uint32_t expected = 71;
+            buffer->write(std::as_bytes(std::span(&expected, 1)));
+            auto manager = make_manager().independent(1), next_manager = make_manager().independent(1);
+            auto phase = manager.template start_phase<vsl::ComputePhase>();
+            auto next = next_manager.template start_phase<vsl::ComputePhase>();
+            const auto completion = phase.completion();
+            snapshot->resource_use().record(manager.get_buffer(), vsl::ResourceRetention::COMPLETION);
+            bool released = false;
+            manager.get_buffer().retain_until_complete(std::shared_ptr<void>(new int, [&](void* pointer) {
+                delete static_cast<int*>(pointer);
+                buffer.reset();
+                binding.reset();
+                snapshot.reset();
+                released = true;
+            }));
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            device.data_->device.waitIdle();
+            if (operation == 0)
+                EXPECT_FALSE(buffer->busy());
+            else if (operation == 1)
+                EXPECT_TRUE(buffer->wait());
+            else if (operation == 2)
+                EXPECT_NO_THROW(binding->check_available(next.completion()));
+            else if (operation == 3)
+                EXPECT_NO_THROW(binding->mark_used(next.completion()));
+            else {
+                std::uint32_t actual = 0;
+                EXPECT_NO_THROW(snapshot->read_into(std::as_writable_bytes(std::span(&actual, 1))));
+                EXPECT_EQ(actual, expected);
+            }
+            EXPECT_TRUE(released);
+            EXPECT_FALSE(buffer);
+            EXPECT_FALSE(binding);
+            EXPECT_FALSE(snapshot);
+            EXPECT_EQ(completion.status(), vsl::Completion::Status::COMPLETE);
+            next.cancel();
+        };
+        for (const auto operation : {0, 1, 2, 3, 4}) {
+            verify(r::make_arena_buffer(device, 4), operation);
+            verify(r::Buffer<r::BufferType::GPU_FRIENDLY>(device, 4), operation);
+        }
+    }
     TEST_F(ArenaBufferVulkanIntegrationTest, AllocationFailureAndInvalidFactoryLeaveTheOldGenerationUnchanged) {
         bool fail = false, undersized = false;
         r::ArenaBuffer buffer(device, 8, [&](auto logical_device, size_t bytes) {

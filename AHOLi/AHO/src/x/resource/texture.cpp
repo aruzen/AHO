@@ -9,6 +9,7 @@ namespace AHO_NAMESPACE::x::resource {
             (format != VSL_NAMESPACE::data_format::UNSIGNED_NORMALIZED8_RGBA && format != VSL_NAMESPACE::data_format::SRGB8_RGBA))
             throw std::invalid_argument("Texture requires a device, nonzero extent and RGBA8 or sRGB RGBA8");
         _data = std::make_shared<Data>(device, width, height, format);
+        _data->node.publish(_data, _data.get(), Data::Visit);
     }
 
     std::uint32_t Texture::width() const {
@@ -33,6 +34,7 @@ namespace AHO_NAMESPACE::x::resource {
     VSL_NAMESPACE::ResourceUse Texture::resource_use() const {
         if (!_data)
             throw std::logic_error("Texture is empty");
-        return _data->image.resource_use().with_constraint({_data, _data->image.data_});
+        const auto owner = _data->node.ref(_data);
+        return _data->image.resource_use().with_constraint({owner.alias(static_cast<VSL_NAMESPACE::ResourceUseState*>(_data.get())), owner});
     }
 } // namespace AHO_NAMESPACE::x::resource

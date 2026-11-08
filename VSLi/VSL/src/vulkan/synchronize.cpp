@@ -1,3 +1,4 @@
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/vulkan/synchronize.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/lifetime/synchronization_use.hpp>
@@ -19,7 +20,7 @@ namespace VSL_NAMESPACE {
         (void)owner_ref();
         if (!data_->device || !data_->native_device || data_->semaphores.empty())
             throw std::invalid_argument("Semaphore has been destroyed");
-        return {data_->device->shared_from_this()};
+        return lifetime::device_from_child(data_);
     }
     std::size_t FenceHolder::size() const {
         return data_ ? data_->fences.size() : 0;
@@ -33,7 +34,7 @@ namespace VSL_NAMESPACE {
         (void)owner_ref();
         if (!data_->device || !data_->native_device || data_->fences.empty())
             throw std::invalid_argument("Fence has been destroyed");
-        return {data_->device->shared_from_this()};
+        return lifetime::device_from_child(data_);
     }
     void SemaphoreHolder::destroy() {
         lifetime::destroy_semaphores(data_);
@@ -55,8 +56,7 @@ namespace VSL_NAMESPACE {
     }
     SynchroManager::SynchroManager(LogicalDeviceAccessor device)
         : data_(std::make_shared<impl::SynchroManagerImpl>()) {
-        if (!device.data_ || !device.data_.use_count() || !device.data_->device)
-            throw std::invalid_argument("Synchronization requires a logical device owner");
+        lifetime::require_device_owner(device);
         data_->device = device.data_;
     }
     SemaphoreHolder SynchroManager::create_semaphore(std::string name) {

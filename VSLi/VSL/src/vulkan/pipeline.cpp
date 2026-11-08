@@ -1,3 +1,4 @@
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/vulkan/pipeline.hpp>
 #include <VSL/lifetime/pipeline_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
@@ -30,7 +31,7 @@ namespace VSL_NAMESPACE {
     LogicalDeviceAccessor PipelineAccessor::get_device() const {
         if (!data_ || !data_.use_count() || !data_->pipeline || !data_->device || !data_->layout)
             throw std::invalid_argument("Pipeline requires a live owner");
-        return {data_->device->shared_from_this()};
+        return lifetime::device_from_child(data_);
     }
     lifetime::OwnerRef PipelineAccessor::owner_ref() const {
         if (!data_ || !data_.use_count())

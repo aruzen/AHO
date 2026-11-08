@@ -8,7 +8,9 @@ namespace VSL_NAMESPACE::lifetime {
     };
     // Layoutは呼出側rootが永続保持し、生成入力のState/Shader/Passは呼出中だけ借用する。
     void construct_pipeline(void* storage, LogicalDeviceAccessor device, const operation::GraphicsPipelineInput& input);
+    void construct_pipeline(void* storage, impl::LogicalDeviceImpl& device, const operation::GraphicsPipelineInput& input);
     void construct_pipeline(void* storage, LogicalDeviceAccessor device, const operation::ComputePipelineInput& input);
+    void construct_pipeline(void* storage, impl::LogicalDeviceImpl& device, const operation::ComputePipelineInput& input);
     impl::PipelineImpl& pipeline_at(void* storage);
     void destroy_pipeline(void* storage) noexcept;
     std::shared_ptr<impl::PipelineImpl> make_heap_pipeline(LogicalDeviceAccessor device, OwnerRef layout, const operation::GraphicsPipelineInput& input);

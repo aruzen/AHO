@@ -1,6 +1,8 @@
 #include <VSL/define.hpp>
 #include <VSL/vulkan/device.hpp>
 #include <VSL/lifetime/physical_device_storage.hpp>
+#include <VSL/lifetime/device_storage.hpp>
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/dependency_node.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>
@@ -9,9 +11,7 @@
 
 #include <VSL/vulkan/surface.hpp>
 
-#include <set>
-#include <cstdint>   // Necessary for UINT32_MAX
-#include <algorithm> // Necessary for std::clamp
+#include <algorithm>
 
 namespace VSL_NAMESPACE {
     namespace {
@@ -24,112 +24,14 @@ namespace VSL_NAMESPACE {
     } // namespace
 } // namespace VSL_NAMESPACE
 
-bool VSL_NAMESPACE::impl::helper::QueueFamilyIndices::is_complete() {
-    return graphics_family.has_value() && present_family.has_value();
-}
-
-VSL_NAMESPACE::impl::helper::QueueFamilyIndices VSL_NAMESPACE::impl::helper::find_queue_families(vk::PhysicalDevice device, vk::SurfaceKHR surface) {
-    QueueFamilyIndices indices;
-    std::vector<vk::QueueFamilyProperties> queue_families = device.getQueueFamilyProperties();
-    int i = 0;
-    for (const auto& queue_family : queue_families) {
-        if (queue_family.queueFlags & vk::QueueFlagBits::eGraphics) {
-            indices.graphics_family = i;
-        }
-        vk::Bool32 present_support = device.getSurfaceSupportKHR(i, surface);
-        if (present_support) {
-            indices.present_family = i;
-        }
-        i++;
-    }
-    return indices;
-}
-
-using namespace VSL_NAMESPACE::impl::helper;
-
-const std::vector<const char*> DEVICE_EXTENSIONS = {
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-#ifndef _MSC_VER
-    "VK_KHR_portability_subset",
-#else
-    "VK_KHR_shader_non_semantic_info"
-#endif // _MSC_VER
-
-    // VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
-    // VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
-};
-
-bool check_device_extension_support(vk::PhysicalDevice device) {
-    std::vector<vk::ExtensionProperties> available_extensions = device.enumerateDeviceExtensionProperties();
-
-    std::set<std::string> required_extensions(DEVICE_EXTENSIONS.begin(), DEVICE_EXTENSIONS.end());
-
-    for (const auto& extension : available_extensions) {
-        required_extensions.erase(extension.extensionName);
-    }
-
-    return required_extensions.empty();
-}
-
 template<bool v>
 std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl> VSL_NAMESPACE::LogicalDeviceGraphicCreator<v>::create(VSL_NAMESPACE::PhysicalDevice device, VSL_NAMESPACE::Surface surface) {
     (void)device.owner_ref();
     (void)surface.owner_ref();
     if (!surface.data_->surface || surface.data_->vulkan != device.data_->vulkan)
         throw std::invalid_argument("Logical device requires a surface on the physical device Instance");
-    std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl> data_ = std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl>(new VSL_NAMESPACE::impl::LogicalDeviceImpl);
-
-    QueueFamilyIndices indices = find_queue_families(device.data_->device, surface.data_->surface);
-
-    if (not check_device_extension_support(device.data_->device) || not indices.is_complete())
-        throw VSL_NAMESPACE::exceptions::RuntimeException("PhysicalDevices", "PhysicalDevices do not have requirements.");
-
-    std::vector<vk::DeviceQueueCreateInfo> queue_create_infos;
-    std::set<uint32_t> unique_queue_families = {indices.graphics_family.value(), indices.present_family.value()};
-
-    float queue_priority = 1.0f;
-    for (uint32_t queue_family : unique_queue_families) {
-        vk::DeviceQueueCreateInfo queue_create_info{};
-        queue_create_info.queueFamilyIndex = queue_family;
-        queue_create_info.queueCount = 1;
-        queue_create_info.pQueuePriorities = &queue_priority;
-        queue_create_infos.push_back(queue_create_info);
-    }
-
-    vk::PhysicalDeviceFeatures device_features;
-    if constexpr (VALIDATION) {
-        device_features.vertexPipelineStoresAndAtomics = true;
-        device_features.fragmentStoresAndAtomics = true;
-    }
-    device_features.independentBlend = true;
-    device_features.samplerAnisotropy = true;
-
-    /* MoltenVK未対応
-    vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT extendedDynamicStateFeatures;
-    extendedDynamicStateFeatures.extendedDynamicState = true;
-     */
-
-    vk::DeviceCreateInfo create_info;
-    create_info.queueCreateInfoCount = static_cast<uint32_t>(queue_create_infos.size());
-    create_info.pQueueCreateInfos = queue_create_infos.data();
-    create_info.pEnabledFeatures = &device_features;
-    create_info.enabledExtensionCount = static_cast<uint32_t>(DEVICE_EXTENSIONS.size());
-    create_info.ppEnabledExtensionNames = DEVICE_EXTENSIONS.data();
-    // createInfo.pNext = &nonSemanticFeatures;
-    //createInfo.pNext = &extendedDynamicStateFeatures;
-
-    if constexpr (v) {
-        create_info.enabledLayerCount = static_cast<uint32_t>(VSL_NAMESPACE::VALIDATION_LAYERS.size());
-        create_info.ppEnabledLayerNames = VSL_NAMESPACE::VALIDATION_LAYERS.data();
-    } else {
-        create_info.enabledLayerCount = 0;
-    }
-
-    data_->device = device.data_->device.createDevice(create_info);
-    data_->graphics_family = indices.graphics_family.value();
-    data_->present_family = indices.present_family.value();
-
-    return data_;
+    auto info = operation::graphics_device_info(*device.data_, *surface.data_, v);
+    return lifetime::make_heap_device(std::move(device), std::move(info));
 }
 
 VSL_NAMESPACE::PhysicalDevice::PhysicalDevice(std::shared_ptr<impl::PhysicalDeviceImpl> data_) : data_(std::move(data_)) {}
@@ -257,13 +159,38 @@ void VSL_NAMESPACE::helper::retain_physical_device_owner(
     const std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl>& logical,
     const VSL_NAMESPACE::PhysicalDevice& physical) {
     (void)physical.owner_ref();
-    if (!logical || !logical.use_count())
-        throw std::invalid_argument("Logical device creator must return an owner");
-    logical->parent_device = physical.data_;
+    lifetime::require_device_owner({logical});
+    if (logical->parent_device != physical.data_.get())
+        throw std::invalid_argument("Logical device creator returned a different PhysicalDevice parent");
+}
+VSL_NAMESPACE::Surface VSL_NAMESPACE::helper::checked_surface(const std::shared_ptr<Surface>& surface) {
+    if (!surface || !surface.use_count())
+        throw std::invalid_argument("Logical Device requires a Surface owner");
+    (void)surface->owner_ref();
+    return *surface;
 }
 
-VSL_NAMESPACE::impl::LogicalDeviceImpl::~LogicalDeviceImpl() {
-    device.destroy();
+VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::LogicalDeviceAccessor::Create(PhysicalDevice physical, DeviceCreateInfo info) {
+    return {lifetime::make_heap_device(std::move(physical), std::move(info))};
+}
+VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::LogicalDeviceAccessor::owner_ref() const {
+    lifetime::require_device_owner(*this);
+    return data_->owner_node->ref(data_);
+}
+VSL_NAMESPACE::PhysicalDevice VSL_NAMESPACE::LogicalDeviceAccessor::get_physical_device() const {
+    lifetime::require_device_owner(*this);
+    const auto parent = data_->owner_context ? data_->owner_context->physical.lock() : lifetime::OwnedRef<impl::PhysicalDeviceImpl>{};
+    if (!parent.use_count() || parent.get() != data_->parent_device)
+        throw std::logic_error("Device has no PhysicalDevice owner");
+    return PhysicalDevice(parent.share());
+}
+VSL_NAMESPACE::DeviceFeature VSL_NAMESPACE::LogicalDeviceAccessor::enabled_features() const {
+    lifetime::require_device_owner(*this);
+    return data_->enabled_features;
+}
+VSL_NAMESPACE::DeviceFeature VSL_NAMESPACE::PhysicalDevice::supported_features() const {
+    const auto source = physical_device_owner(data_);
+    return operation::supported_device_features(*source);
 }
 
 template struct VSL_NAMESPACE::PhysicalDevices<VSL_NAMESPACE::PhysicalDevicesSercher>;

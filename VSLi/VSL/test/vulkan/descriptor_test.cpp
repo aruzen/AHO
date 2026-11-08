@@ -206,18 +206,17 @@ namespace {
     }
     TEST_F(DescriptorVulkanIntegrationTest, SingleBindingConstructorsRetainDeviceOwner) {
         using namespace vsl::graphic_resource;
-        auto owner = std::make_shared<vsl::LogicalDeviceAccessor>(device);
-        const std::weak_ptr<vsl::LogicalDeviceAccessor> observed = owner;
-        vsl::LogicalDeviceAccessor imported{{owner, device.data_.get()}};
+        auto imported = vsl::LogicalDeviceAccessor::Create(physical);
+        const std::weak_ptr<vsl::impl::LogicalDeviceImpl> observed = imported.data_;
+        const auto* native_owner = imported.data_.get();
         BindingLayout explicit_binding(imported, 2, Type::UNIFORM_BUFFER, vsl::ShaderFlag::VERTEX, 1);
-        EXPECT_EQ(explicit_binding.data_->device, device.data_.get());
+        EXPECT_EQ(explicit_binding.data_->device, native_owner);
         EXPECT_EQ(explicit_binding.get_binding_points(),
                   (std::vector<BindingPoint>{{2, Type::UNIFORM_BUFFER, vsl::ShaderFlag::VERTEX, 1}}));
         BindingLayout automatic(imported, Type::UNIFORM_BUFFER, vsl::ShaderFlag::VERTEX);
-        EXPECT_EQ(automatic.data_->device, device.data_.get());
+        EXPECT_EQ(automatic.data_->device, native_owner);
         EXPECT_EQ(automatic.get_binding_points().front().binding, 0u);
         EXPECT_EQ(automatic.data_->layout_bindings.front().binding, 0u);
-        owner.reset();
         imported.data_.reset();
         EXPECT_FALSE(observed.expired());
         explicit_binding.data_.reset();

@@ -1,5 +1,6 @@
 #include <VSL/lifetime/resource_arena.hpp>
 #include <VSL/lifetime/arena_resource.hpp>
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/buffer_storage.hpp>
 #include <VSL/lifetime/image_storage.hpp>
 #include <VSL/lifetime/sampler_storage.hpp>
@@ -91,11 +92,13 @@ namespace VSL_NAMESPACE::lifetime::detail {
                                            std::shared_ptr<storage::detail::CPURegion> memory, size_t bytes, size_t alignment,
                                            std::span<const LogicalUseState> owners, DependencyPolicy policy)
         : device(device), memory(std::move(memory)), group(group) {
+        require_device_owner(device);
         if (!device.data_.use_count() || !device.data_ || !device.data_->device || !this->memory)
             throw std::invalid_argument("Resource arena requires a live device and CPU region");
         if (policy != DependencyPolicy::FIXED && policy != DependencyPolicy::DYNAMIC)
             throw std::invalid_argument("Unknown resource dependency policy");
         descriptor_context.policy = policy;
+        descriptor_context.device_parent = device.data_->owner_node;
         preflight(placements, initializers);
         for (const auto& owner : owners)
             retain_dependency(owner.resource_use().state);
@@ -330,15 +333,15 @@ namespace VSL_NAMESPACE::lifetime::detail {
         auto* slot = memory->base + resource.placement.offset;
         switch (resource.placement.kind) {
             case storage::ResourceKind::COMMAND_POOL:
-                construct_command_pool(slot, device, std::get<CommandPoolCreateInfo>(initializer));
+                construct_command_pool(slot, *device.data_, std::get<CommandPoolCreateInfo>(initializer));
                 resource.reference = &command_pool_at(slot);
                 break;
             case storage::ResourceKind::SEMAPHORE:
-                construct_semaphore(slot, device, std::get<SemaphoreCreateInfo>(initializer));
+                construct_semaphore(slot, *device.data_, std::get<SemaphoreCreateInfo>(initializer));
                 resource.reference = &semaphore_at(slot);
                 break;
             case storage::ResourceKind::FENCE:
-                construct_fence(slot, device, std::get<FenceCreateInfo>(initializer));
+                construct_fence(slot, *device.data_, std::get<FenceCreateInfo>(initializer));
                 resource.reference = &fence_at(slot);
                 break;
             case storage::ResourceKind::COMMAND_BUFFER: {
@@ -358,24 +361,24 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 break;
             }
             case storage::ResourceKind::BUFFER:
-                construct_buffer(slot, device, std::get<BufferCreateInfo>(initializer));
+                construct_buffer(slot, *device.data_, std::get<BufferCreateInfo>(initializer));
                 resource.reference = buffer_at(slot).data;
                 resource.buffer_bytes = resource.buffer().size();
                 break;
             case storage::ResourceKind::IMAGE:
-                construct_image(slot, device, std::get<ImageCreateInfo>(initializer));
+                construct_image(slot, *device.data_, std::get<ImageCreateInfo>(initializer));
                 resource.reference = &image_at(slot);
                 break;
             case storage::ResourceKind::SAMPLER:
-                construct_sampler(slot, device, std::get<SamplerCreateInfo>(initializer));
+                construct_sampler(slot, *device.data_, std::get<SamplerCreateInfo>(initializer));
                 resource.reference = &sampler_at(slot);
                 break;
             case storage::ResourceKind::DESCRIPTOR_LAYOUT:
-                construct_descriptor_layout(slot, device, std::get<DescriptorLayoutCreateInfo>(initializer));
+                construct_descriptor_layout(slot, *device.data_, std::get<DescriptorLayoutCreateInfo>(initializer));
                 resource.reference = &descriptor_layout_at(slot);
                 break;
             case storage::ResourceKind::DESCRIPTOR_POOL:
-                construct_descriptor_pool(slot, device, std::get<DescriptorPoolCreateInfo>(initializer));
+                construct_descriptor_pool(slot, *device.data_, std::get<DescriptorPoolCreateInfo>(initializer));
                 resource.reference = &descriptor_pool_at(slot);
                 break;
             case storage::ResourceKind::DESCRIPTOR_SET: {
@@ -387,7 +390,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 break;
             }
             case storage::ResourceKind::RENDER_PASS:
-                construct_render_pass(slot, device, std::get<RenderPassDescription>(initializer));
+                construct_render_pass(slot, *device.data_, std::get<RenderPassDescription>(initializer));
                 resource.reference = &render_pass_at(slot);
                 break;
             case storage::ResourceKind::PIPELINE:
@@ -398,11 +401,11 @@ namespace VSL_NAMESPACE::lifetime::detail {
                         shaders.push_back(resolve(source));
                     const operation::GraphicsPipelineInput input{resolve(graphics->layout), resolve(graphics->pass),
                                                                  &graphics->state.definition(), shaders, graphics->subpass};
-                    construct_pipeline(slot, device, input);
+                    construct_pipeline(slot, *device.data_, input);
                 } else {
                     const auto& compute = std::get<ComputePipelineInit>(initializer);
                     const operation::ComputePipelineInput input{resolve(compute.layout), resolve(compute.shader)};
-                    construct_pipeline(slot, device, input);
+                    construct_pipeline(slot, *device.data_, input);
                 }
                 resource.reference = &pipeline_at(slot);
                 break;
@@ -425,7 +428,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 } else {
                     pass_owner = std::get<RenderPassAccessor>(info.pass).owner_ref().alias(input.pass).weak();
                 }
-                construct_frame_buffer(slot, device, std::move(input));
+                construct_frame_buffer(slot, *device.data_, std::move(input));
                 resource.reference = &frame_buffer_at(slot);
                 resource.get<impl::FrameBufferImpl>()->owner_context->pass = std::move(pass_owner);
                 break;
@@ -439,12 +442,12 @@ namespace VSL_NAMESPACE::lifetime::detail {
                         layouts.push_back(find(*id, storage::ResourceKind::DESCRIPTOR_LAYOUT).get<impl::ResourceBindingLayoutImpl>());
                     else
                         layouts.push_back(std::get<graphic_resource::BindingLayout>(source).data_.get());
-                construct_pipeline_layout(slot, device, layouts, info.push_ranges);
+                construct_pipeline_layout(slot, *device.data_, layouts, info.push_ranges);
                 resource.reference = &pipeline_layout_at(slot);
                 break;
             }
             case storage::ResourceKind::SHADER:
-                construct_shader(slot, device, std::get<ShaderCreateInfo>(initializer));
+                construct_shader(slot, *device.data_, std::get<ShaderCreateInfo>(initializer));
                 resource.reference = &shader_at(slot);
                 break;
         }
@@ -566,6 +569,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
     }
     void ResourceArenaOwner::VisitDependencies(const void* input, DependencyNode::EdgeVisitor visitor, void* context) {
         const auto& root = *static_cast<const ResourceArenaOwner*>(input);
+        visitor(context, root.device.owner_ref());
         for (const auto& owner : root.dependencies)
             visitor(context, owner);
         for (const auto& resource : root.resources)

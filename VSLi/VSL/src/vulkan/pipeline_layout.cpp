@@ -1,3 +1,4 @@
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/vulkan/pipeline_layout.hpp>
 #include <VSL/lifetime/pipeline_layout_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
@@ -19,7 +20,7 @@ const VSL_NAMESPACE::impl::PipelineRecipe& VSL_NAMESPACE::PipelineLayoutAccessor
 VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::PipelineLayoutAccessor::get_device() const {
     if (!data_ || !data_.use_count() || !data_->device || !data_->pipeline_layout)
         throw std::invalid_argument("Pipeline layout requires a live runtime owner");
-    return {data_->device->shared_from_this()};
+    return lifetime::device_from_child(data_);
 }
 VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::PipelineLayoutAccessor::owner_ref() const {
     if (!data_ || !data_.use_count())
@@ -38,8 +39,7 @@ VSL_NAMESPACE::GraphicsPipelineStateEditRef VSL_NAMESPACE::PipelineLayoutEditAcc
     return {&edit_recipe().graphics_state};
 }
 void VSL_NAMESPACE::PipelineLayoutEditAccessor::init_start(LogicalDeviceAccessor device) {
-    if (!device.data_ || !device.data_.use_count())
-        throw std::invalid_argument("PipelineLayout requires a device owner");
+    lifetime::require_device_owner(device);
     operation::validate_pipeline_device(*device.data_);
     _edit_recipe = std::make_shared<impl::PipelineRecipe>();
     _recipe = _edit_recipe;

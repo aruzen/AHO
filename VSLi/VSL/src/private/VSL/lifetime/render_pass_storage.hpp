@@ -6,6 +6,7 @@ namespace VSL_NAMESPACE::lifetime {
         alignas(impl::RenderPassImpl) std::byte value[sizeof(impl::RenderPassImpl)];
     };
     void construct_render_pass(void* storage, LogicalDeviceAccessor device, RenderPassDescription description);
+    void construct_render_pass(void* storage, impl::LogicalDeviceImpl& device, RenderPassDescription description);
     void destroy_render_pass(void* storage) noexcept;
     impl::RenderPassImpl& render_pass_at(void* storage);
     std::shared_ptr<impl::RenderPassImpl> make_heap_render_pass(LogicalDeviceAccessor device, RenderPassDescription description);

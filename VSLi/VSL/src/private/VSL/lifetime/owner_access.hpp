@@ -23,4 +23,12 @@ namespace VSL_NAMESPACE::lifetime::detail {
         value->owner_node = &owner->node;
         return {std::move(owner), value};
     }
+    template<typename Owner, typename Impl>
+    std::shared_ptr<Impl> publish_device_leaf(std::shared_ptr<Owner> owner, Impl* value) {
+        owner->node.publish(owner, owner.get(), [](const void* input, DependencyNode::EdgeVisitor visitor, void* context) {
+            visitor(context, static_cast<const Owner*>(input)->device.owner_ref());
+        });
+        value->owner_node = &owner->node;
+        return {std::move(owner), value};
+    }
 } // namespace VSL_NAMESPACE::lifetime::detail

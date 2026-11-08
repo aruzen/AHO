@@ -10,6 +10,7 @@ namespace VSL_NAMESPACE::lifetime {
     // 呼出側が未構築・sizeof/alignof(BufferSlotStorage)以上の領域を予約し、deviceを保持する。
     // 失敗時はnative資源とC++実体を回収し、領域を未構築へ戻す。
     void construct_buffer(void* storage, LogicalDeviceAccessor device, const BufferCreateInfo& info);
+    void construct_buffer(void* storage, impl::LogicalDeviceImpl& device, const BufferCreateInfo& info);
     // GPU使用の完了または未送信記録の取消を確認後、構築済みslotへ一度だけ呼ぶ。
     void destroy_buffer(void* storage) noexcept;
     BufferRef buffer_at(void* storage);

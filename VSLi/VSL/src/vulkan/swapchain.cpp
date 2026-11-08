@@ -1,4 +1,5 @@
 #include <VSL/define.hpp>
+#include <VSL/lifetime/device_owner.hpp>
 
 #include <VSL/vulkan/surface.hpp>
 #include <VSL/lifetime/glfw_lease.hpp>
@@ -12,8 +13,6 @@
 #include "swapchain_sharing.hpp"
 
 #undef max
-
-using namespace VSL_NAMESPACE::impl::helper;
 
 struct SwapChainSupportDetails {
     vk::SurfaceCapabilitiesKHR capabilities{};
@@ -70,7 +69,8 @@ VSL_NAMESPACE::Swapchain::Swapchain(VSL_NAMESPACE::LogicalDeviceAccessor device,
         throw std::invalid_argument("Swapchain requires a Surface owner");
     const auto source = surface->data_;
     (void)Surface(source).owner_ref();
-    if (!device.data_ || !device.data_.use_count() || !device.data_->device || !device.data_->parent_device ||
+    lifetime::require_device_owner(device);
+    if (!device.data_->swapchain_enabled || !device.data_->parent_device ||
         device.data_->parent_device->vulkan != source->vulkan)
         throw std::invalid_argument("Swapchain requires a Device on its Surface Instance");
     lifetime::GLFWCallScope scope;
@@ -81,7 +81,9 @@ VSL_NAMESPACE::Swapchain::Swapchain(VSL_NAMESPACE::LogicalDeviceAccessor device,
     data_->device = device.data_;
     data_->surface = source;
 
-    std::shared_ptr<impl::PhysicalDeviceImpl> pdevice = device.data_->parent_device;
+    auto* pdevice = device.data_->parent_device;
+    if (!pdevice->device.getSurfaceSupportKHR(device.data_->present_family, source->surface))
+        throw std::invalid_argument("Device presentation queue does not support this Surface");
 
     SwapChainSupportDetails swap_chain_support = query_swap_chain_support(pdevice->device, source->surface);
     auto swap_chain_adequate = !swap_chain_support.formats.empty() && !swap_chain_support.present_modes.empty();
@@ -118,12 +120,11 @@ VSL_NAMESPACE::Swapchain::Swapchain(VSL_NAMESPACE::LogicalDeviceAccessor device,
         (swap_chain_support.capabilities.supportedUsageFlags & create_info.imageUsage) != create_info.imageUsage)
         throw std::invalid_argument("Surface does not support requested swapchain image usage");
 
-    QueueFamilyIndices indices = find_queue_families(pdevice->device, source->surface);
-    uint32_t queue_family_indices[] = {indices.graphics_family.value(), indices.present_family.value()};
+    uint32_t queue_family_indices[] = {device.data_->graphics_family, device.data_->present_family};
 
-    configure_swapchain_sharing(create_info, queue_family_indices, data_->pre_transform);
+    impl::helper::configure_swapchain_sharing(create_info, queue_family_indices, data_->pre_transform);
 
-    create_info.compositeAlpha = choose_swapchain_composite_alpha(swap_chain_support.capabilities.supportedCompositeAlpha);
+    create_info.compositeAlpha = impl::helper::choose_swapchain_composite_alpha(swap_chain_support.capabilities.supportedCompositeAlpha);
     create_info.presentMode = data_->present_mode;
     create_info.clipped = VK_TRUE;
     create_info.oldSwapchain = old.has_value() ? old->data_->swap_chain : VK_NULL_HANDLE;

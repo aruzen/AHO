@@ -124,6 +124,12 @@ add_library(VSL STATIC
         VSL/src/operation/surface_ops.cpp
         VSL/src/private/VSL/lifetime/surface_storage.hpp
         VSL/src/lifetime/surface_storage.cpp
+        VSL/include/VSL/operation/device_create_info.hpp
+        VSL/src/private/VSL/operation/device_ops.hpp
+        VSL/src/operation/device_ops.cpp
+        VSL/src/private/VSL/lifetime/device_storage.hpp
+        VSL/src/private/VSL/lifetime/device_owner.hpp
+        VSL/src/lifetime/device_storage.cpp
         VSL/src/private/VSL/lifetime/synchronization_storage.hpp
         VSL/src/lifetime/synchronization_storage.cpp
         VSL/src/private/VSL/operation/synchronization_ops.hpp

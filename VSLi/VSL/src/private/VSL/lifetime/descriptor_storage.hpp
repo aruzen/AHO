@@ -13,9 +13,11 @@ namespace VSL_NAMESPACE::lifetime {
     using DescriptorSetSlotStorage = DescriptorSlotStorage<impl::GraphicResourceImpl>;
     // 未構築の適切なsize/alignmentの領域を渡し、依存Device/Pool/Layoutを呼出側が保持する。
     void construct_descriptor_layout(void* storage, LogicalDeviceAccessor device, const DescriptorLayoutCreateInfo& info);
+    void construct_descriptor_layout(void* storage, impl::LogicalDeviceImpl& device, const DescriptorLayoutCreateInfo& info);
     void destroy_descriptor_layout(void* storage) noexcept;
     impl::ResourceBindingLayoutImpl& descriptor_layout_at(void* storage);
     void construct_descriptor_pool(void* storage, LogicalDeviceAccessor device, const DescriptorPoolCreateInfo& info);
+    void construct_descriptor_pool(void* storage, impl::LogicalDeviceImpl& device, const DescriptorPoolCreateInfo& info);
     void destroy_descriptor_pool(void* storage) noexcept;
     impl::GraphicResourcePoolImpl& descriptor_pool_at(void* storage);
     // bulk allocation用のCPU構築。nativeが空でもdestroyできる。

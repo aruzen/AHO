@@ -1,3 +1,4 @@
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/shader_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/exceptions.hpp>
@@ -14,7 +15,8 @@ namespace VSL_NAMESPACE::lifetime {
             ~HeapShaderOwner();
         };
         HeapShaderOwner::HeapShaderOwner(LogicalDeviceAccessor device, ShaderCreateInfo info) : device(device) {
-            construct_shader(storage, device, std::move(info));
+            require_device_owner(device);
+            construct_shader(storage, *device.data_, std::move(info));
         }
         HeapShaderOwner::~HeapShaderOwner() {
             node.retire();
@@ -22,12 +24,16 @@ namespace VSL_NAMESPACE::lifetime {
         }
     } // namespace
     void construct_shader(void* storage, LogicalDeviceAccessor device, ShaderCreateInfo info) {
-        if (!device.data_ || !device.data_.use_count())
+        require_device_owner(device);
+        construct_shader(storage, *device.data_, std::move(info));
+    }
+    void construct_shader(void* storage, impl::LogicalDeviceImpl& device, ShaderCreateInfo info) {
+        if (!device.device)
             throw exceptions::RuntimeException("Shader", "A logical device owner is required");
         auto* slot = std::construct_at(static_cast<ShaderSlotStorage*>(storage));
         auto* shader = std::construct_at(reinterpret_cast<impl::ShaderImpl*>(slot->shader));
         try {
-            operation::initialize_shader(*shader, *device.data_, std::move(info));
+            operation::initialize_shader(*shader, device, std::move(info));
         } catch (...) {
             std::destroy_at(shader);
             std::destroy_at(slot);
@@ -42,9 +48,11 @@ namespace VSL_NAMESPACE::lifetime {
         std::destroy_at(static_cast<ShaderSlotStorage*>(storage));
     }
     std::shared_ptr<impl::ShaderImpl> make_heap_shader(LogicalDeviceAccessor device, ShaderCreateInfo info) {
+        if (!device.data_ || !device.data_->device)
+            throw exceptions::RuntimeException("Shader", "A live logical device is required");
         auto owner = std::make_shared<HeapShaderOwner>(device, std::move(info));
         auto* shader = &shader_at(owner->storage);
-        return detail::publish_leaf(std::move(owner), shader);
+        return detail::publish_device_leaf(std::move(owner), shader);
     }
 } // namespace VSL_NAMESPACE::lifetime
 

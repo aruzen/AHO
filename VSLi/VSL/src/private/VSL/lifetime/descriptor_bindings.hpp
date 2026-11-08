@@ -7,6 +7,7 @@ namespace VSL_NAMESPACE::lifetime {
     struct DescriptorOwnerContext {
         DependencyNode node;
         std::span<const OwnerRef> dependencies;
+        const DependencyNode* device_parent = nullptr;
         std::vector<OwnerRef>* dependency_storage = nullptr;
         DependencyPolicy policy = DependencyPolicy::FIXED;
         bool single_resource = false;

@@ -7,6 +7,8 @@ namespace VSL_NAMESPACE::operation {
             if (!device.device || (info.sampling != SamplingMode::NEAREST && info.sampling != SamplingMode::LINEAR) ||
                 static_cast<unsigned int>(info.edge) > static_cast<unsigned int>(EdgeMode::MIRROR_CLAMP_TO_EDGE))
                 throw std::invalid_argument("Invalid sampler device/filter/address mode");
+            if (info.sampling != SamplingMode::NEAREST && !has_device_features(device.enabled_features, DeviceFeature::SAMPLER_ANISOTROPY))
+                throw std::invalid_argument("Linear sampling requires enabled sampler anisotropy");
             target.device = &device;
             target.native_device = device.device;
             const vk::SamplerCreateInfo native{

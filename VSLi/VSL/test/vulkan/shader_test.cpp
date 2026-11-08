@@ -33,17 +33,9 @@ namespace {
         return words;
     }
     vsl::LogicalDeviceAccessor another_device(vsl::PhysicalDevice physical, std::uint32_t queue) {
-        const float priority = 1;
-        const vk::DeviceQueueCreateInfo queue_info{.queueFamilyIndex = queue, .queueCount = 1, .pQueuePriorities = &priority};
-        std::vector<const char*> extensions;
-        const auto available = physical.data_->device.enumerateDeviceExtensionProperties();
-        if (std::ranges::any_of(available, [](const auto& value) { return std::string_view(value.extensionName.data()) == "VK_KHR_portability_subset"; }))
-            extensions.push_back("VK_KHR_portability_subset");
-        auto owner = std::make_shared<vsl::impl::LogicalDeviceImpl>();
-        owner->parent_device = physical.data_;
-        owner->graphics_family = owner->present_family = queue;
-        owner->device = physical.data_->device.createDevice({.queueCreateInfoCount = 1, .pQueueCreateInfos = &queue_info, .enabledExtensionCount = static_cast<std::uint32_t>(extensions.size()), .ppEnabledExtensionNames = extensions.data()});
-        return {std::move(owner)};
+        vsl::DeviceCreateInfo info;
+        info.graphics_family = queue;
+        return vsl::LogicalDeviceAccessor::Create(std::move(physical), std::move(info));
     }
     TEST(ShaderAccessorTest, EmptyAccessorRejectsOperationsAndHasNoOwner) {
         const vsl::ShaderAccessor empty;

@@ -22,17 +22,9 @@ namespace {
     static_assert(!std::is_copy_constructible_v<vsl::impl::RenderPassImpl>);
     static_assert(!std::is_move_constructible_v<vsl::impl::RenderPassImpl>);
     vsl::LogicalDeviceAccessor another_device(vsl::PhysicalDevice physical, std::uint32_t family) {
-        const float priority = 1;
-        const vk::DeviceQueueCreateInfo queue{.queueFamilyIndex = family, .queueCount = 1, .pQueuePriorities = &priority};
-        std::vector<const char*> extensions;
-        const auto available = physical.data_->device.enumerateDeviceExtensionProperties();
-        if (std::ranges::any_of(available, [](const auto& value) { return std::string_view(value.extensionName.data()) == "VK_KHR_portability_subset"; }))
-            extensions.push_back("VK_KHR_portability_subset");
-        auto data = std::make_shared<vsl::impl::LogicalDeviceImpl>();
-        data->parent_device = physical.data_;
-        data->graphics_family = data->present_family = family;
-        data->device = physical.data_->device.createDevice({.queueCreateInfoCount = 1, .pQueueCreateInfos = &queue, .enabledExtensionCount = static_cast<std::uint32_t>(extensions.size()), .ppEnabledExtensionNames = extensions.data()});
-        return {std::move(data)};
+        vsl::DeviceCreateInfo info;
+        info.graphics_family = family;
+        return vsl::LogicalDeviceAccessor::Create(std::move(physical), std::move(info));
     }
     TEST(RenderPassPlacementTest, ExactSizeAndAlignmentIdentifyDistinctSlotsWithoutGpuUseState) {
         static_assert(s::ResourceSlotLayout<vsl::impl::RenderPassImpl>::USE_OFFSET == s::NO_SEPARATE_USE);

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/pipeline_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <new>
@@ -16,7 +17,7 @@ namespace VSL_NAMESPACE::lifetime {
             static void VisitDependencies(const void* owner, DependencyNode::EdgeVisitor visitor, void* context);
         };
         template<typename Input>
-        void construct(void* storage, LogicalDeviceAccessor device, const Input& input);
+        void construct(void* storage, impl::LogicalDeviceImpl& device, const Input& input);
         template<typename Input>
         std::shared_ptr<impl::PipelineImpl> make_heap(LogicalDeviceAccessor device, OwnerRef layout, const Input& input);
 
@@ -25,7 +26,8 @@ namespace VSL_NAMESPACE::lifetime {
             : device(device), layout(std::move(layout)) {
             if (!this->layout.use_count() || this->layout.get() != input.layout)
                 throw std::invalid_argument("Pipeline root requires its runtime layout owner");
-            construct_pipeline(storage, device, input);
+            require_device_owner(device);
+            construct_pipeline(storage, *device.data_, input);
         }
         HeapPipelineOwner::~HeapPipelineOwner() {
             node.retire();
@@ -34,16 +36,16 @@ namespace VSL_NAMESPACE::lifetime {
         void HeapPipelineOwner::VisitDependencies(const void* owner, DependencyNode::EdgeVisitor visitor, void* context) {
             const auto& value = *static_cast<const HeapPipelineOwner*>(owner);
             visitor(context, value.layout);
-            visitor(context, OwnerRef(value.device.data_));
+            visitor(context, value.device.owner_ref());
         }
         template<typename Input>
-        void construct(void* storage, LogicalDeviceAccessor device, const Input& input) {
-            if (!device.data_ || !device.data_.use_count())
+        void construct(void* storage, impl::LogicalDeviceImpl& device, const Input& input) {
+            if (!device.device)
                 throw std::invalid_argument("Pipeline requires a logical device owner");
             auto* slot = std::construct_at(static_cast<PipelineSlotStorage*>(storage));
             auto* pipeline = std::construct_at(reinterpret_cast<impl::PipelineImpl*>(slot->value));
             try {
-                operation::initialize_pipeline(*pipeline, *device.data_, input);
+                operation::initialize_pipeline(*pipeline, device, input);
             } catch (...) {
                 std::destroy_at(pipeline);
                 std::destroy_at(slot);
@@ -60,9 +62,17 @@ namespace VSL_NAMESPACE::lifetime {
         }
     } // namespace
     void construct_pipeline(void* storage, LogicalDeviceAccessor device, const operation::GraphicsPipelineInput& input) {
+        require_device_owner(device);
+        construct_pipeline(storage, *device.data_, input);
+    }
+    void construct_pipeline(void* storage, impl::LogicalDeviceImpl& device, const operation::GraphicsPipelineInput& input) {
         construct(storage, device, input);
     }
     void construct_pipeline(void* storage, LogicalDeviceAccessor device, const operation::ComputePipelineInput& input) {
+        require_device_owner(device);
+        construct_pipeline(storage, *device.data_, input);
+    }
+    void construct_pipeline(void* storage, impl::LogicalDeviceImpl& device, const operation::ComputePipelineInput& input) {
         construct(storage, device, input);
     }
     impl::PipelineImpl& pipeline_at(void* storage) {

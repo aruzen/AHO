@@ -16,6 +16,6 @@ namespace VSL_NAMESPACE::operation {
         vk::PipelineVertexInputStateCreateInfo vertex_input;
         vk::PipelineViewportStateCreateInfo viewport;
         vk::PipelineColorBlendStateCreateInfo color_blend;
-        explicit PipelineScratch(const impl::PipelineRecipe& recipe);
+        explicit PipelineScratch(const impl::GraphicsPipelineStateData& state);
     };
 } // namespace VSL_NAMESPACE::operation

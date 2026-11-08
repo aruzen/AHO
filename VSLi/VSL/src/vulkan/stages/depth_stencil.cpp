@@ -1,6 +1,10 @@
 #include <VSL/vulkan/stages/depth_stencil.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
-void VSL_NAMESPACE::pipeline_layout::DepthStencil::injection(PipelineLayoutEditAccessor pl) {
+void VSL_NAMESPACE::pipeline_layout::DepthStencil::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
+    injection(pl.edit_state());
+}
+
+void VSL_NAMESPACE::pipeline_layout::DepthStencil::injection(VSL_NAMESPACE::GraphicsPipelineStateEditRef state) {
     auto convert = [](const StencilFace& face) {
         return vk::StencilOpState{.failOp = static_cast<vk::StencilOp>(face.fail),
                                   .passOp = static_cast<vk::StencilOp>(face.pass),
@@ -10,7 +14,7 @@ void VSL_NAMESPACE::pipeline_layout::DepthStencil::injection(PipelineLayoutEditA
                                   .writeMask = face.write_mask,
                                   .reference = face.reference};
     };
-    pl.edit_recipe().depth_stencil =
+    state.get().depth_stencil =
         vk::PipelineDepthStencilStateCreateInfo{.depthTestEnable = depth_test,
                                                 .depthWriteEnable = depth_write,
                                                 .depthCompareOp = static_cast<vk::CompareOp>(depth_compare),

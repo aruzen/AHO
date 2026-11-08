@@ -23,8 +23,8 @@ namespace {
         vsl::Scissor scissor(0, 0, 1, 1);
         auto state = make_layout_state();
         scissor.injection(state);
-        ASSERT_EQ(state.recipe().scissors.size(), 1u);
-        EXPECT_EQ(state.recipe().scissors[0].extent, (vk::Extent2D{1, 1}));
+        ASSERT_EQ(state.recipe().graphics_state.scissors.size(), 1u);
+        EXPECT_EQ(state.recipe().graphics_state.scissors[0].extent, (vk::Extent2D{1, 1}));
         vsl::Scissor all(description);
         EXPECT_EQ(all.width, 8u);
         EXPECT_EQ(all.height, 8u);

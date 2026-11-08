@@ -2,6 +2,7 @@
 #include "../define.hpp"
 #include "../exceptions.hpp"
 #include "../lifetime/owner_ref.hpp"
+#include "../operation/graphics_pipeline_state.hpp"
 #include "pv.hpp"
 #include "device.hpp"
 #include "shader.hpp"
@@ -34,6 +35,8 @@ namespace VSL_NAMESPACE {
         PipelineLayoutEditAccessor& operator=(PipelineLayoutEditAccessor other) noexcept;
         impl::PipelineRecipe& edit_recipe() const&;
         impl::PipelineRecipe& edit_recipe() const&& = delete;
+        GraphicsPipelineStateEditRef edit_state() const&;
+        GraphicsPipelineStateEditRef edit_state() const&& = delete;
         LogicalDeviceAccessor get_device() const;
 
     protected:

@@ -56,7 +56,7 @@ namespace {
         auto added = layout.add(vsl::pipeline_layout::Rasterization(vsl::pipeline_layout::CullingMode::FRONT));
         EXPECT_EQ(added.data_, layout.data_);
         EXPECT_TRUE(layout.data_->pipeline_layout);
-        EXPECT_EQ(layout.recipe().rasterization.cullMode, vk::CullModeFlagBits::eFront);
+        EXPECT_EQ(layout.recipe().graphics_state.rasterization.cullMode, vk::CullModeFlagBits::eFront);
     }
 } // namespace
 
@@ -325,7 +325,7 @@ namespace {
         EXPECT_EQ(frozen.data_, alias.data_);
         EXPECT_NE(&frozen.recipe(), &alias.recipe());
         vsl::pipeline_layout::Rasterization(vsl::pipeline_layout::CullingMode::FRONT).injection(alias);
-        EXPECT_NE(frozen.recipe().rasterization.cullMode, alias.recipe().rasterization.cullMode);
+        EXPECT_NE(frozen.recipe().graphics_state.rasterization.cullMode, alias.recipe().graphics_state.rasterization.cullMode);
     }
     TEST_F(PipelineLayoutVulkanIntegrationTest, FailedAdditionPreservesTheOriginalLayout) {
         struct FailingStage {

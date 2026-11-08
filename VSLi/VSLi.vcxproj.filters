@@ -29,8 +29,10 @@
     <ClInclude Include="VSL\include\VSL\operation\pipeline_layout_create_info.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\src\private\VSL\operation\pipeline_layout_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\operation\render_pass_description.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\operation\graphics_pipeline_state.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\src\private\VSL\operation\render_pass_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClCompile Include="VSL\src\operation\render_pass_ops.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClCompile Include="VSL\src\operation\graphics_pipeline_state.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\src\private\VSL\lifetime\render_pass_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClCompile Include="VSL\src\lifetime\render_pass_storage.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClCompile Include="VSL\src\operation\pipeline_layout_ops.cpp"><Filter>ソース ファイル</Filter></ClCompile>

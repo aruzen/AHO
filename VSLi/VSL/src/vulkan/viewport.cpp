@@ -11,7 +11,11 @@ VSL_NAMESPACE::Viewport::Viewport(VSLD2RectangleAccessor<float> rect) : x(rect.x
 VSL_NAMESPACE::Viewport::Viewport(SwapchainAccessor swapchain) : x(0), y(0), height(swapchain.data_->swap_chain_extent.height), width(swapchain.data_->swap_chain_extent.width) {}
 
 void VSL_NAMESPACE::Viewport::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
-    auto& info = pl.edit_recipe();
+    injection(pl.edit_state());
+}
+
+void VSL_NAMESPACE::Viewport::injection(VSL_NAMESPACE::GraphicsPipelineStateEditRef state) {
+    auto& info = state.get();
 
     vk::Viewport viewport;
     viewport.x = x;

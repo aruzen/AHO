@@ -159,13 +159,7 @@ namespace VSL_NAMESPACE::impl {
         ~SwapchainImpl();
     };
 
-    struct PipelineRecipe {
-        // recipeはruntime rootの外に置く。同じsource ownerはここで一度だけ保持する。
-        std::vector<lifetime::OwnerRef> sources;
-        std::vector<size_t> shader_sources;
-        std::vector<ShaderImpl*> shaders;
-        std::vector<ResourceBindingLayoutImpl*> binding_layouts;
-        std::vector<PushConstantRange> push_ranges;
+    struct GraphicsPipelineStateData {
         std::vector<vk::VertexInputBindingDescription> vertex_bindings;
         std::vector<vk::VertexInputAttributeDescription> vertex_attributes;
         std::vector<vk::PipelineColorBlendAttachmentState> blend_attachments;
@@ -179,6 +173,16 @@ namespace VSL_NAMESPACE::impl {
         std::optional<vk::PipelineDepthStencilStateCreateInfo> depth_stencil;
 
         std::vector<vk::DynamicState> enabled_dynamic_states;
+    };
+
+    struct PipelineRecipe {
+        // recipeはruntime rootの外に置く。同じsource ownerはここで一度だけ保持する。
+        std::vector<lifetime::OwnerRef> sources;
+        std::vector<size_t> shader_sources;
+        std::vector<ShaderImpl*> shaders;
+        std::vector<ResourceBindingLayoutImpl*> binding_layouts;
+        std::vector<PushConstantRange> push_ranges;
+        GraphicsPipelineStateData graphics_state;
     };
 
     struct PipelineLayoutImpl {

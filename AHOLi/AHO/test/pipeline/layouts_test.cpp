@@ -11,8 +11,8 @@ namespace {
         EXPECT_EQ(layout.data_->device, engine->data()->logical_device.data_.get());
         EXPECT_TRUE(static_cast<bool>(layout.data_->pipeline_layout));
         ASSERT_TRUE(layout.has_recipe());
-        EXPECT_EQ(layout.recipe().rasterization.cullMode, vk::CullModeFlags(vk::CullModeFlagBits::eBack));
-        EXPECT_EQ(layout.recipe().input_assembly.topology, vk::PrimitiveTopology::eTriangleList);
+        EXPECT_EQ(layout.recipe().graphics_state.rasterization.cullMode, vk::CullModeFlags(vk::CullModeFlagBits::eBack));
+        EXPECT_EQ(layout.recipe().graphics_state.input_assembly.topology, vk::PrimitiveTopology::eTriangleList);
     }
 } // namespace
 #else

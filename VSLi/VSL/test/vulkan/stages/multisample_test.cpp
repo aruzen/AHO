@@ -7,7 +7,7 @@ namespace {
         auto layout = make_layout_state();
 
         pl::Multisample{}.injection(layout);
-        const auto& state = layout.recipe().multisample;
+        const auto& state = layout.recipe().graphics_state.multisample;
         EXPECT_EQ(state.rasterizationSamples, vk::SampleCountFlagBits::e1);
         EXPECT_FALSE(state.sampleShadingEnable);
         EXPECT_FALSE(state.alphaToCoverageEnable);

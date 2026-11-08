@@ -1,8 +1,12 @@
 #include <VSL/vulkan/stages/color_blend.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 namespace VSL_NAMESPACE::pipeline_layout {
-    void ColorBlend::injection(PipelineLayoutEditAccessor pl) {
-        auto& info = pl.edit_recipe();
+    void ColorBlend::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
+        injection(pl.edit_state());
+    }
+
+    void ColorBlend::injection(VSL_NAMESPACE::GraphicsPipelineStateEditRef state) {
+        auto& info = state.get();
         auto& states = info.blend_attachments;
         for (const auto& a : attachments)
             states.push_back(

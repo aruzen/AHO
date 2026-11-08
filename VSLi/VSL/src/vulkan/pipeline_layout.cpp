@@ -3,6 +3,13 @@
 #include <VSL/lifetime/owner_access.hpp>
 #include <stdexcept>
 #include <utility>
+#include <type_traits>
+
+void VSL_NAMESPACE::GraphicsPipelineState::injection(PipelineLayoutEditAccessor layout) const {
+    static_assert(std::is_nothrow_swappable_v<impl::GraphicsPipelineStateData>);
+    auto next = definition();
+    std::swap(layout.edit_state().get(), next);
+}
 
 const VSL_NAMESPACE::impl::PipelineRecipe& VSL_NAMESPACE::PipelineLayoutAccessor::recipe() const& {
     if (!_recipe)
@@ -26,6 +33,9 @@ VSL_NAMESPACE::impl::PipelineRecipe& VSL_NAMESPACE::PipelineLayoutEditAccessor::
 }
 VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::PipelineLayoutEditAccessor::get_device() const {
     return _edit_device.data_ ? _edit_device : PipelineLayoutAccessor::get_device();
+}
+VSL_NAMESPACE::GraphicsPipelineStateEditRef VSL_NAMESPACE::PipelineLayoutEditAccessor::edit_state() const& {
+    return {&edit_recipe().graphics_state};
 }
 void VSL_NAMESPACE::PipelineLayoutEditAccessor::init_start(LogicalDeviceAccessor device) {
     if (!device.data_ || !device.data_.use_count())

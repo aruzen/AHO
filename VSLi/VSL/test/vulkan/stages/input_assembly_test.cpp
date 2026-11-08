@@ -7,7 +7,7 @@ namespace {
         auto layout = make_layout_state();
 
         pl::InputAssembly{}.injection(layout);
-        EXPECT_EQ(layout.recipe().input_assembly.topology, vk::PrimitiveTopology::eTriangleList);
-        EXPECT_FALSE(layout.recipe().input_assembly.primitiveRestartEnable);
+        EXPECT_EQ(layout.recipe().graphics_state.input_assembly.topology, vk::PrimitiveTopology::eTriangleList);
+        EXPECT_FALSE(layout.recipe().graphics_state.input_assembly.primitiveRestartEnable);
     }
 } // namespace

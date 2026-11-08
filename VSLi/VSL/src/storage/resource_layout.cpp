@@ -9,8 +9,19 @@
 #include <VSL/lifetime/pipeline_storage.hpp>
 #include <VSL/lifetime/frame_buffer_storage.hpp>
 #include <VSL/lifetime/command_storage.hpp>
+#include <VSL/lifetime/synchronization_storage.hpp>
 
 namespace VSL_NAMESPACE::storage {
+    static_assert(sizeof(impl::SemaphoreImpl) == ImplLayout<impl::SemaphoreImpl>::SIZE);
+    static_assert(alignof(impl::SemaphoreImpl) == ImplLayout<impl::SemaphoreImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::SemaphoreSlotStorage) == ResourceSlotLayout<impl::SemaphoreImpl>::SIZE);
+    static_assert(alignof(lifetime::SemaphoreSlotStorage) == ResourceSlotLayout<impl::SemaphoreImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::SemaphoreImpl>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(sizeof(impl::FenceImpl) == ImplLayout<impl::FenceImpl>::SIZE);
+    static_assert(alignof(impl::FenceImpl) == ImplLayout<impl::FenceImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::FenceSlotStorage) == ResourceSlotLayout<impl::FenceImpl>::SIZE);
+    static_assert(alignof(lifetime::FenceSlotStorage) == ResourceSlotLayout<impl::FenceImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::FenceImpl>::USE_OFFSET == NO_SEPARATE_USE);
     static_assert(sizeof(impl::CommandPoolImpl) == ImplLayout<impl::CommandPoolImpl>::SIZE);
     static_assert(alignof(impl::CommandPoolImpl) == ImplLayout<impl::CommandPoolImpl>::ALIGNMENT);
     static_assert(sizeof(lifetime::CommandPoolSlotStorage) == ResourceSlotLayout<impl::CommandPoolImpl>::SIZE);

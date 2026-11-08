@@ -9,6 +9,7 @@
 #include <VSL/lifetime/pipeline_storage.hpp>
 #include <VSL/lifetime/frame_buffer_storage.hpp>
 #include <VSL/lifetime/command_storage.hpp>
+#include <VSL/lifetime/synchronization_storage.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/owner_access.hpp>
@@ -30,6 +31,8 @@ namespace VSL_NAMESPACE::lifetime::detail {
         impl::FrameBufferImpl* frame_buffer = nullptr;
         impl::CommandPoolImpl* command_pool = nullptr;
         impl::CommandBufferImpl* command_buffer = nullptr;
+        impl::SemaphoreImpl* semaphore = nullptr;
+        impl::FenceImpl* fence = nullptr;
         size_t buffer_offset = 0, buffer_bytes = 0;
         size_t owner_index = 0;
     };
@@ -95,6 +98,10 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 return external ? std::holds_alternative<CommandPool>(value) : std::holds_alternative<CommandPoolCreateInfo>(value);
             case storage::ResourceKind::COMMAND_BUFFER:
                 return external ? std::holds_alternative<CommandBuffer>(value) : std::holds_alternative<CommandBufferInit>(value);
+            case storage::ResourceKind::SEMAPHORE:
+                return external ? std::holds_alternative<SemaphoreHolder>(value) : std::holds_alternative<SemaphoreCreateInfo>(value);
+            case storage::ResourceKind::FENCE:
+                return external ? std::holds_alternative<FenceHolder>(value) : std::holds_alternative<FenceCreateInfo>(value);
         }
         return false;
     }
@@ -180,6 +187,16 @@ namespace VSL_NAMESPACE::lifetime::detail {
                         throw std::invalid_argument("External descriptor pool requires its canonical owner");
                     resource.pool = pool->data_.get();
                     resource.owner_index = retain_dependency(owned_ref(owner, pool->data_->owner_node));
+                } else if (const auto* semaphore = std::get_if<SemaphoreHolder>(&value)) {
+                    if (semaphore->get_device().data_ != device.data_)
+                        throw std::invalid_argument("External semaphore requires the arena device");
+                    resource.semaphore = semaphore->data_.get();
+                    resource.owner_index = retain_dependency(semaphore->owner_ref());
+                } else if (const auto* fence = std::get_if<FenceHolder>(&value)) {
+                    if (fence->get_device().data_ != device.data_)
+                        throw std::invalid_argument("External fence requires the arena device");
+                    resource.fence = fence->data_.get();
+                    resource.owner_index = retain_dependency(fence->owner_ref());
                 } else if (const auto* command_pool = std::get_if<CommandPool>(&value)) {
                     if (command_pool->get_device().data_ != device.data_)
                         throw std::invalid_argument("External command pool requires the arena device");
@@ -335,6 +352,14 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 construct_command_pool(slot, device, std::get<CommandPoolCreateInfo>(initializer));
                 resource.command_pool = &command_pool_at(slot);
                 break;
+            case storage::ResourceKind::SEMAPHORE:
+                construct_semaphore(slot, device, std::get<SemaphoreCreateInfo>(initializer));
+                resource.semaphore = &semaphore_at(slot);
+                break;
+            case storage::ResourceKind::FENCE:
+                construct_fence(slot, device, std::get<FenceCreateInfo>(initializer));
+                resource.fence = &fence_at(slot);
+                break;
             case storage::ResourceKind::COMMAND_BUFFER: {
                 const auto& info = std::get<CommandBufferInit>(initializer);
                 auto* pool = resolve(info.pool);
@@ -488,6 +513,10 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     resource.command_pool->owner_node = node;
                 if (resource.command_buffer)
                     resource.command_buffer->owner_node = node;
+                if (resource.semaphore)
+                    resource.semaphore->owner_node = node;
+                if (resource.fence)
+                    resource.fence->owner_node = node;
             }
             if (resource.pool && !resource.placement.external)
                 resource.pool->owner = owner;
@@ -516,6 +545,12 @@ namespace VSL_NAMESPACE::lifetime::detail {
             const auto& placement = resources[constructed.back()].placement;
             auto* slot = memory->base + placement.offset;
             switch (placement.kind) {
+                case storage::ResourceKind::SEMAPHORE:
+                    destroy_semaphore(slot);
+                    break;
+                case storage::ResourceKind::FENCE:
+                    destroy_fence(slot);
+                    break;
                 case storage::ResourceKind::COMMAND_POOL:
                     destroy_command_pool(slot);
                     break;
@@ -662,6 +697,18 @@ namespace VSL_NAMESPACE::lifetime {
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::COMMAND_POOL);
         return {{resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.command_pool}};
+    }
+    SemaphoreHolder ResourceArena::semaphore(typed::ResourceId id) const {
+        if (!_owner)
+            throw std::logic_error("Resource arena is empty");
+        const auto& resource = _owner->find(id, storage::ResourceKind::SEMAPHORE);
+        return {{resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.semaphore}};
+    }
+    FenceHolder ResourceArena::fence(typed::ResourceId id) const {
+        if (!_owner)
+            throw std::logic_error("Resource arena is empty");
+        const auto& resource = _owner->find(id, storage::ResourceKind::FENCE);
+        return {{resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.fence}};
     }
     CommandBuffer ResourceArena::command_buffer(typed::ResourceId id) const {
         if (!_owner)

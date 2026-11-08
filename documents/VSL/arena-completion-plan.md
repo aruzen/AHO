@@ -9,7 +9,7 @@
 
 最初のPRだけで終了せず、下記の順で実装・検証・独立レビューを継続する。PRの公開前には最新masterとの差分を確認する。新しい製品ディレクトリが必要な場合は作成前に確認する。
 
-現在の到達点は順序1〜7、8aのcommand所有分離、8b前半のCommandPool／CommandBuffer配置と、同期資源の使用制約である。Fence／SemaphoreのCPU配置と8c以降は未完了であり、起動資源、既定policy変更、旧入口廃止と最終監査まで継続する。
+現在の到達点は順序1〜7、8aのcommand所有分離、8bのCommandPool／CommandBuffer／Fence／Semaphore配置と、同期資源の使用制約である。8c以降は未完了であり、起動資源、既定policy変更、旧入口廃止と最終監査まで継続する。
 
 ## 責務と保証
 
@@ -137,3 +137,9 @@ Pipelineが記録時に使うLayoutは保持し、Shader／Pass／再生成recip
 [同期資源の共通使用状態](synchronization-state.md)で、Fence要素別のPENDING予約／公開wait拒否／全対象先行検査、Semaphoreの複数graphics結果とWSI marker、cleanupへの予約・元sourceの移譲、named replacement保護を実装した。native配列生成・破棄・待機／resetも共通operationへ移した。次はそのbackendを指定領域から使うFence／SemaphoreのCPU配置である。
 
 8cでTyped frameの配置・再利用へ接続する。8aの所有分離だけでは順序8全体の完了と扱わない。
+
+[8b後半の同期資源配置](synchronization-arena.md)で、通常の名前付き生成とarenaのbackendを共通化した。Implはraw Deviceと保存native Deviceを使い、隣接contextはweak registryだけを保持する。同Rootの異なるSemaphore／FenceをWorkの1所有要素で保持しつつ、各実体の使用状態を維持する。nativeの明示破棄、CPU slot寿命、importの正規owner、途中失敗・同region再利用、Typed転送と完了／取消回収を検証する。
+
+8cは実行用資源とper-frameのデータ資源を別ownerに分ける。独立ComputeではPool×1、ring Impl×1（native CB×F）、Fence Impl×1（native×F）を実行群へ配置し、同じManagerを既存FrameResources／Bundleへ渡す。外部FenceをPhaseへ明示して内部heap Fence生成を回避する。Manager／DomainをFrame値やarena rootへ強所有させず、Domain→Work→Frame→Domainの循環を作らない。Computeの巡回は明示、DefaultPhaseの巡回は既存のsetupへ残す。
+
+AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in-flight Fence×F）、swapchain世代のrender-finished×Mを分ける。Fと画像数Mを混同しない。DefaultPhaseが別途生成するacquire Fenceはgraphics Fenceと兼用せず、WSI予約・取消返却・厳密完了とともに順序10で扱う。

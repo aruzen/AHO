@@ -372,6 +372,8 @@ namespace VSL_NAMESPACE::typed {
                         case storage::ResourceKind::FRAME_BUFFER:
                         case storage::ResourceKind::COMMAND_POOL:
                         case storage::ResourceKind::COMMAND_BUFFER:
+                        case storage::ResourceKind::SEMAPHORE:
+                        case storage::ResourceKind::FENCE:
                             throw std::logic_error("Unexpected descriptor in the data-only bundle plan");
                     }
                 }

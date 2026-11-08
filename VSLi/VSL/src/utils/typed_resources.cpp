@@ -35,14 +35,9 @@ namespace VSL_NAMESPACE::typed::detail {
             throw std::invalid_argument("Typed descriptor import requires a resource");
         lifetime::require_descriptor_valid(*resource.data_);
         const auto& target = *resource.data_;
-        if (!device.data_ || !device.data_.use_count() || target.pool->device != device.data_.get() || !target.layout || target.layout->layout_bindings.size() != points.size())
+        if (!device.data_ || !device.data_.use_count() || target.pool->device != device.data_.get() || !target.layout)
             throw std::invalid_argument("Typed descriptor import device/layout mismatch");
-        for (const auto& point : points) {
-            const auto found = std::ranges::find(target.layout->layout_bindings, point.binding, &vk::DescriptorSetLayoutBinding::binding);
-            if (found == target.layout->layout_bindings.end() || found->descriptorType != vk::DescriptorType(point.binding_type) ||
-                found->descriptorCount != point.amount || found->stageFlags != vk::ShaderStageFlags(vk::ShaderStageFlagBits(point.shader_type)))
-                throw std::invalid_argument("Typed descriptor import binding mismatch");
-        }
+        operation::validate_descriptor_layout(*target.layout, *device.data_, points);
     }
     GraphicResource allocate_descriptor_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager,
                                             std::span<const graphic_resource::BindingPoint> points) {

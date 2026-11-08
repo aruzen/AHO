@@ -245,4 +245,18 @@ if (VSL_TEST_SOURCES)
     target_link_libraries(vsl-bundle-style-contract PRIVATE VSL)
     target_compile_definitions(vsl-bundle-style-contract PRIVATE VSL_TYPED_CASE=0)
     target_include_directories(vsl-bundle-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
+    set(typed_shared_layout_names Accepted ComputeSchema GraphicsSchema UnknownSet HeapEntry RawInjection)
+    foreach(case RANGE 0 5)
+        list(GET typed_shared_layout_names ${case} name)
+        add_test(NAME "VSL.SharedLayouts.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_descriptor_layouts.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=TypedComputePipeline|TypedGraphicsPipeline|layout|PipelineLayout"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.SharedLayouts.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
+    add_library(vsl-shared-layouts-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_descriptor_layouts.cpp)
+    target_link_libraries(vsl-shared-layouts-style-contract PRIVATE VSL)
+    target_compile_definitions(vsl-shared-layouts-style-contract PRIVATE VSL_TYPED_CASE=0)
+    target_include_directories(vsl-shared-layouts-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
 endif ()

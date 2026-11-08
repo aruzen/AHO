@@ -4,7 +4,7 @@
 
 ## schemaと配置
 
-`ArenaStorage`はBuffer／Image／Samplerに加え、宣言したSetのLayout／Pool／SetをResourceArenaへ配置する。set番号の穴は配置数に含めない。Layoutはshared群へ宣言数だけ配置し、shared Setを持つときだけその群のPoolを一つ作る。各frameは自分のSetが必要とするLayoutをsharedからimportし、Pool一つと実際のframe Setを配置する。
+`ArenaStorage`はBuffer／Image／Samplerに加え、宣言したSetのLayout／Pool／SetをResourceArenaへ配置する。set番号の穴をSet／Poolの個数へ含めない。Layoutはshared群へ宣言数を配置し、[共有pipeline入力](typed-shared-layouts.md)のために必要なら空Layoutを末尾へ一つ追加する。宣言済みの空Setがあれば再利用する。shared Setを持つときだけその群のPoolを一つ作る。各frameは自分のSetが必要とするLayoutをsharedからimportし、Pool一つと実際のframe Setを配置する。
 
 `TypedBundlePlan::arena_plan(scope, instance)`はdescriptorとimportも含む配置計画を返す。既存データ資源のID／slot／offsetを変えず、owned descriptorを後ろへ加える。descriptor用IDは、externalを含む既存IDを予約したうえで未使用の値から決定的に割り当てる。同じ資源を共有するbindingも予約の対象とし、明示的なUINT64_MAXを使っていても最大値＋1の採番は行わない。
 

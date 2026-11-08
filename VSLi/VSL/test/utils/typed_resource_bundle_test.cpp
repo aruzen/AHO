@@ -295,7 +295,7 @@ namespace {
         ArenaBundle bundle(manager, descriptors, sizes());
         initialize_shared(bundle);
         vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_bundle.comp.spv"));
-        t::TypedComputePipeline<Resources> pipeline(device, vsl::pipeline_layout::ShaderGroup("arena bundle", {shader}));
+        t::TypedComputePipeline<Resources> pipeline(device, bundle.descriptor_layouts(), vsl::pipeline_layout::ShaderGroup("arena bundle", {shader}));
         for (std::uint32_t iteration = 0; iteration < 12; ++iteration) {
             auto phase = manager.start_phase<vsl::ComputePhase>();
             bundle.update(phase, [&](ArenaBundle::Frame& frame) {

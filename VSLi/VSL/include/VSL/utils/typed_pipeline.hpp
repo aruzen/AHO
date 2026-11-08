@@ -4,6 +4,7 @@
 #include "typed_vertex_buffer.hpp"
 #include "../vulkan/commands/draw_indexed.hpp"
 #include "typed_resources.hpp"
+#include "../lifetime/typed_descriptor_layouts.hpp"
 #include "typed_push_constants.hpp"
 #include "../vulkan/commands/bind_graphic_resource.hpp"
 #include "../vulkan/pipeline.hpp"
@@ -125,8 +126,8 @@ namespace VSL_NAMESPACE::typed {
         static_assert(subpass != UINT32_MAX, "Typed subpass index must not be narrowed to VK_SUBPASS_EXTERNAL");
         LogicalDeviceAccessor _device;
         VSL_NAMESPACE::GraphicsPipeline _pipeline;
-        template<pipeline_layout_injecter... Stages>
-        static VSL_NAMESPACE::GraphicsPipeline MakePipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, Stages&&... stages);
+        template<pipeline_layout_injecter ResourceStage, pipeline_layout_injecter... Stages>
+        static VSL_NAMESPACE::GraphicsPipeline MakePipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, ResourceStage&& resources, Stages&&... stages);
 
     public:
         using VertexInput = Input;
@@ -135,7 +136,10 @@ namespace VSL_NAMESPACE::typed {
         static constexpr std::uint32_t SUBPASS = subpass;
         template<pipeline_layout_injecter... Stages>
         TypedGraphicsPipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, Stages&&... stages)
-            : _device(device), _pipeline(MakePipeline(device, std::move(pass), std::forward<Stages>(stages)...)) {}
+            : _device(device), _pipeline(MakePipeline(device, std::move(pass), Resources{}, std::forward<Stages>(stages)...)) {}
+        template<pipeline_layout_injecter... Stages>
+        TypedGraphicsPipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, const TypedDescriptorLayouts<Resources>& layouts, Stages&&... stages)
+            : _device(device), _pipeline(MakePipeline(device, std::move(pass), detail::DescriptorLayoutInjection<Resources>{layouts}, std::forward<Stages>(stages)...)) {}
 
         const VSL_NAMESPACE::GraphicsPipeline& backend() const { return _pipeline; }
 
@@ -147,10 +151,10 @@ namespace VSL_NAMESPACE::typed {
     };
 
     template<typename Input, typename Resources, typename Pushes, std::uint32_t subpass>
-    template<pipeline_layout_injecter... Stages>
-    VSL_NAMESPACE::GraphicsPipeline TypedGraphicsPipeline<Input, Resources, Pushes, subpass>::MakePipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, Stages&&... stages) {
+    template<pipeline_layout_injecter ResourceStage, pipeline_layout_injecter... Stages>
+    VSL_NAMESPACE::GraphicsPipeline TypedGraphicsPipeline<Input, Resources, Pushes, subpass>::MakePipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, ResourceStage&& resources, Stages&&... stages) {
         // Input is deliberately last: earlier stages cannot replace the typed vertex layout.
-        PipelineLayout layout(device, std::forward<Stages>(stages)..., Input{}, Resources{}, Pushes{});
+        PipelineLayout layout(device, std::forward<Stages>(stages)..., Input{}, std::forward<ResourceStage>(resources), Pushes{});
         detail::validate_pipeline_vertex_shader(layout, Input::LAYOUT.attribute);
         detail::validate_resource_schema(layout, Resources::REQUIREMENTS);
         detail::validate_push_schema(layout, Pushes::REQUIREMENTS);

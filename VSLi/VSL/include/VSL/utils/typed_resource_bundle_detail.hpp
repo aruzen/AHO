@@ -174,6 +174,8 @@ namespace VSL_NAMESPACE::typed {
                         for (const auto& set : layout.descriptors().sets(scope))
                             infos.emplace_back(lifetime::DescriptorSetInit{*pool, layout.descriptor_layout(set.set)});
                     }
+                    if constexpr (scope == ResourceScope::SHARED && BundlePlacementPlan<Schema, Policy>::NEEDS_EMPTY_LAYOUT)
+                        infos.emplace_back(DescriptorLayoutCreateInfo{});
                     lifetime::ResourceArena arena(device, physical, infos, lifetime::DependencyPolicy::DYNAMIC);
                     for (const auto& slot : physical.placements())
                         if (slot.kind == storage::ResourceKind::BUFFER)

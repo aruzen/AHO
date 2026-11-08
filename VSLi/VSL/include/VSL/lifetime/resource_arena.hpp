@@ -2,6 +2,7 @@
 #include "resource_plan.hpp"
 #include "buffer_view.hpp"
 #include "logical_use_state.hpp"
+#include "dependency_node.hpp"
 #include "../operation/image_create_info.hpp"
 #include "../operation/sampler_create_info.hpp"
 #include "../operation/descriptor_create_info.hpp"
@@ -25,15 +26,18 @@ namespace VSL_NAMESPACE::lifetime {
         ResourceArena(LogicalDeviceAccessor device, typed::LifetimeGroup group,
                       std::span<const typed::ResourcePlacement> placements, std::span<const ResourceInit> initializers,
                       std::shared_ptr<storage::detail::CPURegion> memory, size_t bytes, size_t alignment,
-                      std::span<const LogicalUseState> dependencies);
+                      std::span<const LogicalUseState> dependencies, DependencyPolicy policy);
 
     public:
         template<size_t capacity>
         ResourceArena(LogicalDeviceAccessor device, const typed::ResourcePlan<capacity>& plan, std::span<const ResourceInit> initializers);
         template<size_t capacity>
+        ResourceArena(LogicalDeviceAccessor device, const typed::ResourcePlan<capacity>& plan, std::span<const ResourceInit> initializers, DependencyPolicy policy);
+        template<size_t capacity>
         ResourceArena(LogicalDeviceAccessor device, const typed::ResourcePlan<capacity>& plan, std::span<const ResourceInit> initializers, storage::ArenaMemory memory,
-                      std::span<const LogicalUseState> dependencies = {});
+                      std::span<const LogicalUseState> dependencies = {}, DependencyPolicy policy = DependencyPolicy::FIXED);
         std::shared_ptr<void> owner() const;
+        OwnerRef owner_ref() const;
         size_t size() const;
         size_t slots() const;
         typed::LifetimeGroup lifetime() const;
@@ -52,7 +56,10 @@ namespace VSL_NAMESPACE::lifetime {
     ResourceArena::ResourceArena(LogicalDeviceAccessor device, const typed::ResourcePlan<capacity>& plan, std::span<const ResourceInit> initializers)
         : ResourceArena(device, plan, initializers, storage::ArenaMemory(plan.bytes(), plan.alignment())) {}
     template<size_t capacity>
+    ResourceArena::ResourceArena(LogicalDeviceAccessor device, const typed::ResourcePlan<capacity>& plan, std::span<const ResourceInit> initializers, DependencyPolicy policy)
+        : ResourceArena(device, plan, initializers, storage::ArenaMemory(plan.bytes(), plan.alignment()), {}, policy) {}
+    template<size_t capacity>
     ResourceArena::ResourceArena(LogicalDeviceAccessor device, const typed::ResourcePlan<capacity>& plan, std::span<const ResourceInit> initializers, storage::ArenaMemory memory,
-                                 std::span<const LogicalUseState> dependencies)
-        : ResourceArena((plan.require_region(memory.size(), memory.alignment()), device), plan.lifetime(), plan.placements(), initializers, memory._region, plan.bytes(), plan.alignment(), dependencies) {}
+                                 std::span<const LogicalUseState> dependencies, DependencyPolicy policy)
+        : ResourceArena((plan.require_region(memory.size(), memory.alignment()), device), plan.lifetime(), plan.placements(), initializers, memory._region, plan.bytes(), plan.alignment(), dependencies, policy) {}
 } // namespace VSL_NAMESPACE::lifetime

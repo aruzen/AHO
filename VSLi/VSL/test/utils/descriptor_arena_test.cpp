@@ -28,6 +28,7 @@ namespace {
     void write_value(const vsl::BufferView& buffer, std::uint32_t value);
     std::uint32_t read_value(const vsl::BufferView& buffer);
     void make_host_visible(vsl::CommandManager manager);
+    std::uint32_t execute_set(Pipeline& pipeline, vsl::CommandManager manager, const TypedSet& set, const vsl::BufferView& output);
     class DescriptorArenaVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
 
@@ -58,6 +59,14 @@ namespace {
     Pipeline DescriptorArenaVulkanIntegrationTest::make_pipeline() {
         vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_frame.comp.spv"));
         return {device, vsl::pipeline_layout::ShaderGroup("arena descriptors", {shader})};
+    }
+    std::uint32_t execute_set(Pipeline& pipeline, vsl::CommandManager manager, const TypedSet& set, const vsl::BufferView& output) {
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        phase << pipeline.bind_resources(set).dispatch(1);
+        make_host_visible(manager);
+        if (phase.submit() != vsl::ComputePhase::SubmitResult::SUCCESS || !phase.completion().wait())
+            throw std::runtime_error("Descriptor ownership test submission failed");
+        return read_value(output);
     }
 
     TEST_F(DescriptorArenaVulkanIntegrationTest, ReorderedDependenciesAndTwoSetSlotsUseTypedCommandsAndOneOwner) {
@@ -145,7 +154,7 @@ namespace {
         std::weak_ptr<vsl::ResourceUseState> logical;
         {
             const std::array dependencies{l::LogicalUseState{}};
-            logical = dependencies.front().resource_use().state;
+            logical = dependencies.front().resource_use().state.share();
             const auto initializers = inputs();
             arena.emplace(device, PLAN, initializers, s::ArenaMemory(PLAN.bytes(), PLAN.alignment()), dependencies);
             set.emplace(TypedSet::FromResource(device, arena->descriptor_set({101}), vsl::ResourceRetention::COMPLETION));
@@ -410,5 +419,162 @@ namespace {
             EXPECT_EQ(actual, color);
         }
         EXPECT_TRUE(observed.expired());
+    }
+    TEST_F(DescriptorArenaVulkanIntegrationTest, DynamicExternalStorageIsReleasedOnlyAfterItsLastBindingIsReplaced) {
+        const auto initializers = inputs();
+        l::ResourceArena arena(device, PLAN, initializers, l::DependencyPolicy::DYNAMIC);
+        auto first = TypedSet::FromResource(device, arena.descriptor_set({101}), vsl::ResourceRetention::COMPLETION);
+        auto second = TypedSet::FromResource(device, arena.descriptor_set({102}), vsl::ResourceRetention::COMPLETION);
+        std::weak_ptr<void> external;
+        write_value(arena.buffer({1}), 17);
+        {
+            l::ResourceArena other(device, PLAN, initializers, l::DependencyPolicy::DYNAMIC);
+            external = other.owner();
+            write_value(other.buffer({1}), 73);
+            first.write<0>(UniformView::FromView(other.buffer({1}), 1));
+            second.write<0>(UniformView::FromView(other.buffer({1}), 1));
+        }
+        first.write<1>(StorageView::FromView(arena.buffer({2}), 1));
+        second.write<1>(StorageView::FromView(arena.buffer({3}), 1));
+        EXPECT_FALSE(external.expired());
+        auto pipeline = make_pipeline();
+        auto manager = make_manager().independent(1);
+        EXPECT_EQ(execute_set(pipeline, manager, first, arena.buffer({2})), 73u);
+        first.write<0>(UniformView::FromView(arena.buffer({1}), 1));
+        EXPECT_FALSE(external.expired());
+        EXPECT_EQ(execute_set(pipeline, manager, first, arena.buffer({2})), 17u);
+        EXPECT_EQ(execute_set(pipeline, manager, second, arena.buffer({3})), 73u);
+        second.write<0>(UniformView::FromView(arena.buffer({1}), 1));
+        EXPECT_TRUE(external.expired());
+        EXPECT_EQ(execute_set(pipeline, manager, second, arena.buffer({3})), 17u);
+    }
+    TEST_F(DescriptorArenaVulkanIntegrationTest, DynamicManagedCyclesRejectPhysicalAndLogicalUpdatesInBothDirections) {
+        const auto initializers = inputs();
+        l::ResourceArena a(device, PLAN, initializers, l::DependencyPolicy::DYNAMIC);
+        l::ResourceArena b(device, PLAN, initializers, l::DependencyPolicy::DYNAMIC);
+        auto first = TypedSet::FromResource(device, a.descriptor_set({101}), vsl::ResourceRetention::COMPLETION);
+        auto second = TypedSet::FromResource(device, b.descriptor_set({101}), vsl::ResourceRetention::COMPLETION);
+        write_value(a.buffer({1}), 37);
+        write_value(b.buffer({1}), 83);
+        first.write<0>(UniformView::FromView(b.buffer({1}), 1));
+        first.write<1>(StorageView::FromView(a.buffer({2}), 1));
+        second.write<0>(UniformView::FromView(b.buffer({1}), 1));
+        second.write<1>(StorageView::FromView(b.buffer({2}), 1));
+        EXPECT_THROW(second.write<0>(UniformView::FromView(a.buffer({1}), 1)), std::invalid_argument);
+        const auto logical = std::make_shared<vsl::ResourceUseState>();
+        EXPECT_THROW(second.write<0>(UniformView::FromView(b.buffer({1}), 1, 0, {logical, a.owner_ref()})), std::invalid_argument);
+        EXPECT_THROW(second.resource_use()->replace(0, {{logical, first.backend().owner_ref()}}), std::invalid_argument);
+        EXPECT_TRUE(second.backend().data_->bindings.at(0).front().constraint.states.empty());
+        auto pipeline = make_pipeline();
+        auto manager = make_manager().independent(1);
+        EXPECT_EQ(execute_set(pipeline, manager, second, b.buffer({2})), 83u);
+        first.write<0>(UniformView::FromView(a.buffer({1}), 1));
+        EXPECT_NO_THROW(second.write<0>(UniformView::FromView(a.buffer({1}), 1)));
+        EXPECT_THROW(first.write<0>(UniformView::FromView(b.buffer({1}), 1)), std::invalid_argument);
+        EXPECT_THROW(first.write<1>(StorageView::FromView(b.buffer({2}), 1)), std::invalid_argument);
+        EXPECT_EQ(execute_set(pipeline, manager, second, b.buffer({2})), 37u);
+    }
+    TEST_F(DescriptorArenaVulkanIntegrationTest, HeapSetPoolAndLayoutParentsPreventAnArenaCycleAndKeepTheNativeStorageAlive) {
+        const std::array<t::ResourceRequest, 6> requests{{{{101}, DESCRIPTOR_SET}, {{1}, BUFFER}, {{2}, BUFFER}, {{3}, BUFFER}, {{201}, DESCRIPTOR_LAYOUT}, {{202}, DESCRIPTOR_POOL}}};
+        const t::ResourcePlan<6> plan(requests);
+        const auto all = inputs();
+        const std::array<l::ResourceInit, 6> initializers{all[0], all[2], all[3], all[4], all[5], all[6]};
+        std::optional<TypedSet> retained;
+        std::weak_ptr<void> observed;
+        {
+            l::ResourceArena arena(device, plan, initializers, l::DependencyPolicy::DYNAMIC);
+            observed = arena.owner();
+            auto source = TypedSet::FromResource(device, arena.descriptor_set({101}), vsl::ResourceRetention::COMPLETION);
+            auto [success, heap] = arena.descriptor_pool({202}).bind(arena.descriptor_layout({201}));
+            ASSERT_TRUE(success);
+            retained.emplace(TypedSet::FromResource(device, heap, vsl::ResourceRetention::COMPLETION));
+            const auto logical = std::make_shared<vsl::ResourceUseState>();
+            EXPECT_THROW(source.write<0>(UniformView::FromView(arena.buffer({1}), 1, 0, {logical, heap.owner_ref()})), std::invalid_argument);
+            const auto physical = arena.buffer({1}).resource_use();
+            EXPECT_THROW(source.write<0>(UniformView::FromView(arena.buffer({1}), 1, 0, {physical.state, heap.owner_ref()})), std::invalid_argument);
+            EXPECT_THROW(source.write<0>(UniformView::FromView(arena.buffer({1}), 1, 0, {physical.state, heap.owner_ref().alias(static_cast<void*>(nullptr))})), std::invalid_argument);
+            EXPECT_THROW(source.write<0>(UniformView::FromView(arena.buffer({1}), 1, 0, {heap.owner_ref().alias(static_cast<vsl::ResourceUseState*>(nullptr)), {}})), std::invalid_argument);
+            retained->write<0>(UniformView::FromView(arena.buffer({1}), 1));
+            retained->write<1>(StorageView::FromView(arena.buffer({2}), 1));
+            EXPECT_TRUE(retained->backend().data_->bindings.at(0).front().owners.empty());
+            write_value(arena.buffer({1}), 97);
+            auto pipeline = make_pipeline();
+            EXPECT_EQ(execute_set(pipeline, make_manager().independent(1), *retained, arena.buffer({2})), 97u);
+        }
+        EXPECT_FALSE(observed.expired());
+        retained.reset();
+        EXPECT_TRUE(observed.expired());
+    }
+    TEST_F(DescriptorArenaVulkanIntegrationTest, ReplacedOwnerCallbacksSeeCommittedMetadataAndCanUpdateTheSameRoot) {
+        const auto initializers = inputs();
+        l::ResourceArena a(device, PLAN, initializers, l::DependencyPolicy::DYNAMIC);
+        l::ResourceArena b(device, PLAN, initializers, l::DependencyPolicy::DYNAMIC);
+        auto first = TypedSet::FromResource(device, a.descriptor_set({101}), vsl::ResourceRetention::COMPLETION);
+        auto second = TypedSet::FromResource(device, b.descriptor_set({101}), vsl::ResourceRetention::COMPLETION);
+        first.write<1>(StorageView::FromView(a.buffer({2}), 1));
+        const auto state = std::make_shared<vsl::ResourceUseState>();
+        size_t callbacks = 0;
+        auto previous = std::shared_ptr<int>(new int(1), [&](int* value) {
+            delete value;
+            ++callbacks;
+            EXPECT_TRUE(first.backend().data_->bindings.at(0).front().constraint.states.empty());
+            EXPECT_NO_THROW(first.write<1>(StorageView::FromView(b.buffer({2}), 1)));
+            EXPECT_THROW(second.write<0>(UniformView::FromView(a.buffer({1}), 1)), std::invalid_argument);
+        });
+        first.write<0>(UniformView::FromView(a.buffer({1}), 1, 0, {state, previous}));
+        previous.reset();
+        EXPECT_EQ(callbacks, 0u);
+        first.write<0>(UniformView::FromView(a.buffer({1}), 1));
+        EXPECT_EQ(callbacks, 1u);
+        write_value(a.buffer({1}), 61);
+        auto pipeline = make_pipeline();
+        EXPECT_EQ(execute_set(pipeline, make_manager().independent(1), first, b.buffer({2})), 61u);
+    }
+    TEST_F(DescriptorArenaVulkanIntegrationTest, NativePartialArrayUpdatesKeepTheUntouchedManagedEdgeUntilTheLastElementChanges) {
+        using ArraySpec = t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE, 2>>;
+        const std::array<t::ResourceRequest, 4> requests{{{{101}, DESCRIPTOR_SET}, {{1}, BUFFER}, {{201}, DESCRIPTOR_LAYOUT}, {{202}, DESCRIPTOR_POOL}}};
+        const t::ResourcePlan<4> plan(requests);
+        const std::array<l::ResourceInit, 4> initializers{
+            l::DescriptorSetInit{{202}, {201}}, vsl::BufferCreateInfo{4, vsl::MemoryType::UNIFORM_BUFFER},
+            vsl::DescriptorLayoutCreateInfo{{ArraySpec::POINTS.begin(), ArraySpec::POINTS.end()}},
+            vsl::DescriptorPoolCreateInfo{{{vsl::graphic_resource::Type::UNIFORM_BUFFER, 2}}, 1}};
+        l::ResourceArena a(device, plan, initializers, l::DependencyPolicy::DYNAMIC);
+        const auto other_inputs = inputs();
+        l::ResourceArena b(device, PLAN, other_inputs, l::DependencyPolicy::DYNAMIC);
+        auto array = t::TypedDescriptorSet<ArraySpec>::FromResource(device, a.descriptor_set({101}));
+        auto second = TypedSet::FromResource(device, b.descriptor_set({101}));
+        const auto foreign = UniformView::FromView(b.buffer({1}), 1);
+        array.write<0>(std::array{foreign, foreign});
+        const auto logical = std::make_shared<vsl::ResourceUseState>();
+        EXPECT_THROW(second.write<0>(UniformView::FromView(b.buffer({1}), 1, 0, {logical, a.owner_ref()})), std::invalid_argument);
+        t::TypedUniformBuffer<std::uint32_t> replacement(device, std::uint32_t{7});
+        auto native = array.backend();
+        native.update(&replacement.backend(), 0);
+        EXPECT_EQ(native.data_->bindings.at(0).size(), 2u);
+        EXPECT_THROW(second.write<0>(UniformView::FromView(b.buffer({1}), 1, 0, {logical, a.owner_ref()})), std::invalid_argument);
+        const auto local = UniformView::FromView(a.buffer({1}), 1);
+        array.write<0>(std::array{local, local});
+        EXPECT_NO_THROW(second.write<0>(UniformView::FromView(b.buffer({1}), 1, 0, {logical, a.owner_ref()})));
+        EXPECT_THROW(array.write<0>(std::array{foreign, local}), std::invalid_argument);
+    }
+    TEST_F(DescriptorArenaVulkanIntegrationTest, ImportedLayoutIsAFixedManagedParentEvenBeforeItsSetsHaveBindings) {
+        const auto initializers = inputs();
+        l::ResourceArena a(device, PLAN, initializers, l::DependencyPolicy::DYNAMIC);
+        auto requests = REQUESTS;
+        requests[5].external = true;
+        const t::ResourcePlan<7> plan(requests);
+        auto imported = initializers;
+        imported[5] = a.descriptor_layout({201});
+        l::ResourceArena b(device, plan, imported, l::DependencyPolicy::DYNAMIC);
+        auto first = TypedSet::FromResource(device, a.descriptor_set({101}));
+        const auto logical = std::make_shared<vsl::ResourceUseState>();
+        EXPECT_THROW(first.write<0>(UniformView::FromView(a.buffer({1}), 1, 0, {logical, b.owner_ref()})), std::invalid_argument);
+        auto second = TypedSet::FromResource(device, b.descriptor_set({101}), vsl::ResourceRetention::COMPLETION);
+        second.write<0>(UniformView::FromView(a.buffer({1}), 1));
+        second.write<1>(StorageView::FromView(b.buffer({2}), 1));
+        EXPECT_TRUE(second.backend().data_->bindings.at(0).front().owners.empty());
+        write_value(a.buffer({1}), 107);
+        auto pipeline = make_pipeline();
+        EXPECT_EQ(execute_set(pipeline, make_manager().independent(1), second, b.buffer({2})), 107u);
     }
 } // namespace

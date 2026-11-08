@@ -54,7 +54,7 @@ namespace {
             for (const auto& [binding, elements] : previous->bindings)
                 for (const auto& element : elements)
                     for (const auto& owner : element.owners)
-                        observed.push_back(owner);
+                        observed.push_back(owner.share());
             throw std::runtime_error("Injected descriptor failure after the first mixed frame");
         }
         auto result = vsl::GraphicResourceManager::allocate(std::move(layouts));

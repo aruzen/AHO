@@ -3,6 +3,7 @@
 #include <VSL/sync/submission_completion.hpp>
 #include <VSL/sync/resource_use_state.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
+#include <VSL/lifetime/owner_access.hpp>
 #include <algorithm>
 #include <stdexcept>
 
@@ -18,6 +19,8 @@ namespace VSL_NAMESPACE::lifetime {
             require_descriptor_valid(resource);
             if (resource.recording)
                 throw std::logic_error("Descriptor resource is being recorded");
+            if (resource.owner_context && resource.owner_context->node.updating())
+                throw std::logic_error("Ownership root is being updated");
             resource.recording = true;
         }
         bool contains_owner(const std::vector<std::shared_ptr<void>>& resources, const std::shared_ptr<void>& resource) {
@@ -43,16 +46,16 @@ namespace VSL_NAMESPACE::lifetime {
             for (const auto& element : elements) {
                 for (const auto& owner : element.owners)
                     if (retention == ResourceRetention::COMPLETION)
-                        buffer.retain_until_complete(owner);
+                        buffer.retain_until_complete(detail::OwnerAccess::Shared(owner));
                     else
-                        buffer.retain(owner);
+                        buffer.retain(detail::OwnerAccess::Shared(owner));
                 for (const auto* state : element.states)
                     state->mark_used(completion);
                 for (const auto& owner : element.constraint.owners)
                     if (retention == ResourceRetention::COMPLETION)
-                        buffer.retain_until_complete(owner);
+                        buffer.retain_until_complete(detail::OwnerAccess::Shared(owner));
                     else
-                        buffer.retain(owner);
+                        buffer.retain(detail::OwnerAccess::Shared(owner));
                 for (const auto* state : element.constraint.states)
                     state->mark_used(completion);
             }

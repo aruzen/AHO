@@ -81,7 +81,7 @@ namespace {
             l::LogicalUseState state, other;
             auto alias = state;
             auto moved = std::move(state);
-            observed = moved.resource_use().state;
+            observed = moved.resource_use().state.share();
             EXPECT_THROW(state.resource_use(), std::logic_error);
             EXPECT_THROW(state.busy(), std::logic_error);
             EXPECT_THROW(state.wait(0), std::logic_error);

@@ -4,6 +4,7 @@
 #include <VSL/lifetime/sampler_storage.hpp>
 #include <VSL/lifetime/descriptor_storage.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
+#include <VSL/lifetime/owner_access.hpp>
 #include <VSL/storage/cpu_region.hpp>
 
 namespace VSL_NAMESPACE::lifetime::detail {
@@ -23,20 +24,21 @@ namespace VSL_NAMESPACE::lifetime::detail {
         std::shared_ptr<storage::detail::CPURegion> memory;
         typed::LifetimeGroup group;
         std::vector<ArenaResource> resources;
-        std::vector<std::shared_ptr<void>> dependencies;
+        std::vector<OwnerRef> dependencies;
         std::vector<size_t> constructed;
         DescriptorOwnerContext descriptor_context;
         bool claimed = false;
         ResourceArenaOwner(LogicalDeviceAccessor device, typed::LifetimeGroup group,
                            std::span<const typed::ResourcePlacement> placements, std::span<const ResourceInit> initializers,
                            std::shared_ptr<storage::detail::CPURegion> memory, size_t bytes, size_t alignment,
-                           std::span<const LogicalUseState> owners);
+                           std::span<const LogicalUseState> owners, DependencyPolicy policy);
         ~ResourceArenaOwner();
         void preflight(std::span<const typed::ResourcePlacement> placements, std::span<const ResourceInit> initializers);
         void construct(size_t index, const ResourceInit& initializer);
         void publish(const std::shared_ptr<ResourceArenaOwner>& owner);
         void clear() noexcept;
-        size_t retain_dependency(const std::shared_ptr<void>& owner);
+        size_t retain_dependency(OwnerRef owner);
+        static void VisitDependencies(const void* input, DependencyNode::EdgeVisitor visitor, void* context);
         const ArenaResource& find(typed::ResourceId id, storage::ResourceKind kind) const;
     };
     bool initializer_matches(const ResourceInit& value, storage::ResourceKind kind, bool external);
@@ -61,10 +63,13 @@ namespace VSL_NAMESPACE::lifetime::detail {
     ResourceArenaOwner::ResourceArenaOwner(LogicalDeviceAccessor device, typed::LifetimeGroup group,
                                            std::span<const typed::ResourcePlacement> placements, std::span<const ResourceInit> initializers,
                                            std::shared_ptr<storage::detail::CPURegion> memory, size_t bytes, size_t alignment,
-                                           std::span<const LogicalUseState> owners)
+                                           std::span<const LogicalUseState> owners, DependencyPolicy policy)
         : device(device), memory(std::move(memory)), group(group) {
         if (!device.data_.use_count() || !device.data_ || !device.data_->device || !this->memory)
             throw std::invalid_argument("Resource arena requires a live device and CPU region");
+        if (policy != DependencyPolicy::FIXED && policy != DependencyPolicy::DYNAMIC)
+            throw std::invalid_argument("Unknown resource dependency policy");
+        descriptor_context.policy = policy;
         preflight(placements, initializers);
         for (const auto& owner : owners)
             retain_dependency(owner.resource_use().state);
@@ -101,26 +106,26 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     resource.buffer = buffer->ref();
                     resource.buffer_offset = buffer->byte_offset();
                     resource.buffer_bytes = buffer->size();
-                    resource.owner_index = retain_dependency(buffer->owner());
+                    resource.owner_index = retain_dependency(buffer->owner_ref());
                 } else if (const auto* image = std::get_if<ImageAccessor>(&value)) {
                     if (!image->data_.use_count() || !image->data_ || !image->data_->image || !image->data_->view ||
                         !image->data_->use || image->data_->device != device.data_.get())
                         throw std::invalid_argument("External image requires an owner on the arena device");
                     (void)image->use_state();
                     resource.image = image->data_.get();
-                    resource.owner_index = retain_dependency(image->data_);
+                    resource.owner_index = retain_dependency(owned_ref(image->data_, image->data_->owner_node));
                 } else if (const auto* sampler = std::get_if<SamplerAccessor>(&value)) {
                     if (!sampler->data_.use_count() || !sampler->data_ || !sampler->data_->sampler || !sampler->data_->use ||
                         sampler->data_->device != device.data_.get())
                         throw std::invalid_argument("External sampler requires an owner on the arena device");
                     (void)sampler->use_state();
                     resource.sampler = sampler->data_.get();
-                    resource.owner_index = retain_dependency(sampler->data_);
+                    resource.owner_index = retain_dependency(owned_ref(sampler->data_, sampler->data_->owner_node));
                 } else if (const auto* layout = std::get_if<graphic_resource::BindingLayout>(&value)) {
                     if (!layout->data_.use_count() || !layout->data_ || !layout->data_->layout || layout->data_->device != device.data_.get())
                         throw std::invalid_argument("External descriptor layout requires an owner on the arena device");
                     resource.layout = layout->data_.get();
-                    resource.owner_index = retain_dependency(layout->data_);
+                    resource.owner_index = retain_dependency(owned_ref(layout->data_, layout->data_->owner_node));
                 } else if (const auto* pool = std::get_if<graphic_resource::Pool>(&value)) {
                     if (!pool->data_.use_count() || !pool->data_ || !pool->data_->descriptor_pool || pool->data_->retiring ||
                         pool->data_->device != device.data_.get())
@@ -129,7 +134,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     if (!owner.use_count() || pool->data_.owner_before(owner) || owner.owner_before(pool->data_))
                         throw std::invalid_argument("External descriptor pool requires its canonical owner");
                     resource.pool = pool->data_.get();
-                    resource.owner_index = retain_dependency(owner);
+                    resource.owner_index = retain_dependency(owned_ref(owner, pool->data_->owner_node));
                 }
             }
             resources.push_back(std::move(resource));
@@ -189,9 +194,24 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     throw std::length_error("Descriptor resource registry capacity exceeded");
                 pool->resources.reserve(pool->resources.size() + count);
             }
-        descriptor_context.self = owner;
-        descriptor_context.dependencies = &dependencies;
+        descriptor_context.dependencies = dependencies;
+        descriptor_context.node.publish(owner, this, VisitDependencies);
         for (auto& resource : resources) {
+            if (!resource.placement.external) {
+                auto* node = &descriptor_context.node;
+                if (resource.buffer.data)
+                    resource.buffer.data->owner_node = node;
+                if (resource.image)
+                    resource.image->owner_node = node;
+                if (resource.sampler)
+                    resource.sampler->owner_node = node;
+                if (resource.layout)
+                    resource.layout->owner_node = node;
+                if (resource.pool)
+                    resource.pool->owner_node = node;
+                if (resource.set)
+                    resource.set->owner_node = node;
+            }
             if (resource.pool && !resource.placement.external)
                 resource.pool->owner = owner;
             if (resource.set) {
@@ -232,16 +252,25 @@ namespace VSL_NAMESPACE::lifetime::detail {
         }
     }
     ResourceArenaOwner::~ResourceArenaOwner() {
+        descriptor_context.node.retire();
         clear();
     }
-    size_t ResourceArenaOwner::retain_dependency(const std::shared_ptr<void>& owner) {
+    size_t ResourceArenaOwner::retain_dependency(OwnerRef owner) {
         if (!owner.use_count())
             throw std::invalid_argument("Resource arena dependency requires an owner");
+        retain_owner(dependencies, owner);
         for (size_t i = 0; i < dependencies.size(); ++i)
             if (!dependencies[i].owner_before(owner) && !owner.owner_before(dependencies[i]))
                 return i;
-        dependencies.push_back(owner);
-        return dependencies.size() - 1;
+        throw std::logic_error("Resource arena dependency was not retained");
+    }
+    void ResourceArenaOwner::VisitDependencies(const void* input, DependencyNode::EdgeVisitor visitor, void* context) {
+        const auto& root = *static_cast<const ResourceArenaOwner*>(input);
+        for (const auto& owner : root.dependencies)
+            visitor(context, owner);
+        for (const auto& resource : root.resources)
+            if (resource.set)
+                visit_descriptor_edges(*resource.set, visitor, context);
     }
     const ArenaResource& ResourceArenaOwner::find(typed::ResourceId id, storage::ResourceKind kind) const {
         for (const auto& resource : resources)
@@ -258,13 +287,18 @@ namespace VSL_NAMESPACE::lifetime {
     ResourceArena::ResourceArena(LogicalDeviceAccessor device, typed::LifetimeGroup group,
                                  std::span<const typed::ResourcePlacement> placements, std::span<const ResourceInit> initializers,
                                  std::shared_ptr<storage::detail::CPURegion> memory, size_t bytes, size_t alignment,
-                                 std::span<const LogicalUseState> dependencies) {
+                                 std::span<const LogicalUseState> dependencies, DependencyPolicy policy) {
         storage::detail::require_resource_layout(std::integral_constant<std::uint64_t, storage::RESOURCE_LAYOUT_ABI>{});
-        _owner = std::make_shared<detail::ResourceArenaOwner>(device, group, placements, initializers, std::move(memory), bytes, alignment, dependencies);
+        _owner = std::make_shared<detail::ResourceArenaOwner>(device, group, placements, initializers, std::move(memory), bytes, alignment, dependencies, policy);
         _owner->publish(_owner);
     }
     std::shared_ptr<void> ResourceArena::owner() const {
         return _owner;
+    }
+    OwnerRef ResourceArena::owner_ref() const {
+        if (!_owner)
+            throw std::logic_error("Resource arena is empty");
+        return _owner->descriptor_context.node.ref(_owner);
     }
     size_t ResourceArena::size() const {
         return _owner ? _owner->resources.size() : 0;
@@ -290,7 +324,7 @@ namespace VSL_NAMESPACE::lifetime {
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::IMAGE);
         if (resource.placement.external)
-            return {{_owner->dependencies.at(resource.owner_index), resource.image}};
+            return {_owner->dependencies.at(resource.owner_index).alias(resource.image).share()};
         return {{_owner, resource.image}};
     }
     SamplerAccessor ResourceArena::sampler(typed::ResourceId id) const {
@@ -298,7 +332,7 @@ namespace VSL_NAMESPACE::lifetime {
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::SAMPLER);
         if (resource.placement.external)
-            return {{_owner->dependencies.at(resource.owner_index), resource.sampler}};
+            return {_owner->dependencies.at(resource.owner_index).alias(resource.sampler).share()};
         return {{_owner, resource.sampler}};
     }
     graphic_resource::BindingLayout ResourceArena::descriptor_layout(typed::ResourceId id) const {
@@ -306,13 +340,13 @@ namespace VSL_NAMESPACE::lifetime {
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::DESCRIPTOR_LAYOUT);
         return graphic_resource::BindingLayout(std::shared_ptr<impl::ResourceBindingLayoutImpl>{
-            resource.placement.external ? _owner->dependencies.at(resource.owner_index) : _owner, resource.layout});
+            resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.layout});
     }
     graphic_resource::Pool ResourceArena::descriptor_pool(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::DESCRIPTOR_POOL);
-        return {{resource.placement.external ? _owner->dependencies.at(resource.owner_index) : _owner, resource.pool}};
+        return {{resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.pool}};
     }
     GraphicResource ResourceArena::descriptor_set(typed::ResourceId id) const {
         if (!_owner)

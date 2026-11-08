@@ -83,3 +83,5 @@ Layout数は宣言set数のResources::COUNT、Set数はshared／frameの実数�
 5bは[共通backendとheap所有の移行](descriptor-backend.md)と[寸法生成・ResourceArenaへの配置](descriptor-arena.md)を実装した。同rootの物理／論理ownerを借用へ正規化し、構築時に固定した依存以外のowner追加を拒否する。次の5cで動的な依存graphとTyped schemaの自動配置へ接続する。
 
 5cは[constexpr descriptor論理計画](typed-descriptor-plan.md)を先に分離する。Layout宣言、shared／frame別のSet実数とPool容量を固定配列で計算し、生成用scratchと資源ID／slot割当は後続接続へ分ける。descriptor実体のbundle内配置、可変依存graphと追加logical constraintの接続までは5c全体を完了としない。
+
+次の[所有参照とroot依存graph](owner-dependencies.md)で、既知ownerの出所、固定親、更新のcycle検査とcommitを接続する。AHO固有の所有境界とTyped descriptorの実配置は、このcoreの上に接続する。

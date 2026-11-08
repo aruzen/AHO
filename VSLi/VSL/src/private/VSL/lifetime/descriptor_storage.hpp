@@ -24,6 +24,7 @@ namespace VSL_NAMESPACE::lifetime {
     // 公開前にSetのowner aliasをpool.resourcesへ弱登録する。destroyはGPU完了/取消後に一度だけ行う。
     void destroy_descriptor_set(void* storage) noexcept;
     impl::GraphicResourceImpl& descriptor_set_at(void* storage);
+    const impl::GraphicResourceImpl& descriptor_set_at(const void* storage);
     std::shared_ptr<impl::ResourceBindingLayoutImpl> make_heap_descriptor_layout(LogicalDeviceAccessor device, const DescriptorLayoutCreateInfo& info);
     std::shared_ptr<impl::GraphicResourcePoolImpl> make_heap_descriptor_pool(LogicalDeviceAccessor device, const DescriptorPoolCreateInfo& info);
     using DescriptorSetAllocator = decltype(&operation::allocate_descriptor_sets);

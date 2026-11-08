@@ -51,7 +51,7 @@ externalの項目はslotとoffsetの両方がNO_SLOTとなり、CPU領域を消�
 
 Clang20／C++26、macOS arm64、ASan／UBSanでCPU配置5件、Typed compile158件（新規7件、うち負例6件）を確認。VSLは725件中722成功／既知packed format3 skip、AHO GPU137件・CPU1070件が成功。変更C++7ファイル／4TUのstrict違反0。
 
-private実定義とのstatic assert、公開ヘッダーだけのconstexpr／runtime利用、install consumerのbuild／link／実行を確認した。3種を一つずつ配置したCPU領域はこの構成で264 byte・alignment 8。payload／GPUメモリ量ではない。
+private実定義とのstatic assert、公開ヘッダーだけのconstexpr／runtime利用、install consumerのbuild／link／実行を確認した。順序1の構成で3種を一つずつ配置したCPU領域は264 byte・alignment 8だった。[所有依存graph](owner-dependencies.md)のnode pointer追加後は同じ3種で288 byte、descriptorを含む6種で584 byteとなる。payload／GPUメモリ量ではない。
 
 Debug／Releaseの両構成で実寸法検査とCPU実行に成功。両構成の寸法は同じでも異artifactのheader／binary混在はlink guardで拒否した。x86_64向けobject／static library生成にも成功した（実行なし）。Windows／Linux実機、性能計測は未実施。GPU回帰はMoltenVK／Vulkan validationを使用し、LSanは無効化した。
 

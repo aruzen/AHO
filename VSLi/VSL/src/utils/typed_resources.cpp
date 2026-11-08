@@ -3,10 +3,17 @@
 #include <VSL/utils/spir_reflector.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
+#include <VSL/lifetime/owner_access.hpp>
 #include <VSL/operation/descriptor_ops.hpp>
 #include <algorithm>
 
 namespace VSL_NAMESPACE::typed::detail {
+    lifetime::OwnedRef<impl::ImageImpl> descriptor_owner(const ImageAccessor& image) {
+        return lifetime::detail::owned_ref(image.data_, image.data_ ? image.data_->owner_node : nullptr);
+    }
+    lifetime::OwnedRef<impl::SamplerImpl> descriptor_owner(const SamplerAccessor& sampler) {
+        return lifetime::detail::owned_ref(sampler.data_, sampler.data_ ? sampler.data_->owner_node : nullptr);
+    }
     ResourceUse descriptor_constraints(const DescriptorValue& value) {
         const auto* physical = value.use.state.get();
         if ((value.buffer && physical == value.buffer->use) ||

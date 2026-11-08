@@ -1,10 +1,12 @@
 #include <VSL/lifetime/image_storage.hpp>
+#include <VSL/lifetime/owner_access.hpp>
 #include <new>
 
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_nothrow_default_constructible_v<impl::ImageImpl>);
     namespace {
         struct HeapImageOwner {
+            DependencyNode node;
             LogicalDeviceAccessor device;
             std::shared_ptr<impl::SwapchainImpl> swapchain;
             alignas(ImageSlotStorage) std::byte storage[sizeof(ImageSlotStorage)];
@@ -18,6 +20,7 @@ namespace VSL_NAMESPACE::lifetime {
             construct_image(storage, device, info, borrowed);
         }
         HeapImageOwner::~HeapImageOwner() {
+            node.retire();
             destroy_image(storage);
         }
     } // namespace
@@ -54,7 +57,7 @@ namespace VSL_NAMESPACE::lifetime {
     std::shared_ptr<impl::ImageImpl> make_heap_image(LogicalDeviceAccessor device, const ImageCreateInfo& info) {
         auto owner = std::make_shared<HeapImageOwner>(device, info);
         auto* image = &image_at(owner->storage);
-        return {std::move(owner), image};
+        return detail::publish_leaf(std::move(owner), image);
     }
     std::shared_ptr<impl::ImageImpl> make_swapchain_image(LogicalDeviceAccessor device, const ImageCreateInfo& info,
                                                           std::shared_ptr<impl::SwapchainImpl> swapchain, vk::Image image) {
@@ -62,6 +65,6 @@ namespace VSL_NAMESPACE::lifetime {
             throw std::invalid_argument("Borrowed swapchain image requires its owning swapchain and device");
         auto owner = std::make_shared<HeapImageOwner>(device, info, std::move(swapchain), image);
         auto* result = &image_at(owner->storage);
-        return {std::move(owner), result};
+        return detail::publish_leaf(std::move(owner), result);
     }
 } // namespace VSL_NAMESPACE::lifetime

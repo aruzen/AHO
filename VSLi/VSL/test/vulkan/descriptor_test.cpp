@@ -1,6 +1,7 @@
 #include "support/compute_fixture.hpp"
 #include "support/scoped_environment.hpp"
 #include <VSL/utils/typed_safe_resource.hpp>
+#include <VSL/lifetime/descriptor_storage.hpp>
 namespace {
     enum class ImageReadBarrierMode {
         AUTOMATIC,
@@ -78,6 +79,44 @@ namespace {
         retained = {};
         EXPECT_TRUE(weak_layout.expired());
     }
+    TEST_F(DescriptorOwnershipVulkanIntegrationTest, PlacedDescriptorBackendReusesFailedStorageAndConstructsDistinctSetSlots) {
+        namespace l = vsl::lifetime;
+        namespace op = vsl::operation;
+        using Type = vsl::graphic_resource::Type;
+        l::DescriptorLayoutSlotStorage layout_slot;
+        l::DescriptorPoolSlotStorage pool_slot;
+        std::array<l::DescriptorSetSlotStorage, 2> set_slots;
+        const vsl::DescriptorLayoutCreateInfo layout_info{{{0, Type::STORAGE_BUFFER, vsl::ShaderFlag::COMPUTE, 1}}};
+        auto invalid_layout = layout_info;
+        invalid_layout.bindings.push_back(invalid_layout.bindings.front());
+        EXPECT_THROW(l::construct_descriptor_layout(&layout_slot, device, invalid_layout), std::invalid_argument);
+        l::construct_descriptor_layout(&layout_slot, device, layout_info);
+        std::unique_ptr<void, void (*)(void*)> layout_guard(&layout_slot, l::destroy_descriptor_layout);
+        vsl::DescriptorPoolCreateInfo pool_info{{{Type::STORAGE_BUFFER, 2}}, 0};
+        EXPECT_THROW(l::construct_descriptor_pool(&pool_slot, device, pool_info), std::out_of_range);
+        pool_info.max_sets = 2;
+        l::construct_descriptor_pool(&pool_slot, device, pool_info);
+        std::unique_ptr<void, void (*)(void*)> pool_guard(&pool_slot, l::destroy_descriptor_pool);
+        auto& layout = l::descriptor_layout_at(&layout_slot);
+        auto& pool = l::descriptor_pool_at(&pool_slot);
+        l::prepare_descriptor_set(&set_slots[0], pool, layout);
+        std::unique_ptr<void, void (*)(void*)> first_guard(&set_slots[0], l::destroy_descriptor_set);
+        auto& first = l::descriptor_set_at(&set_slots[0]);
+        const std::array duplicate{&first, &first};
+        EXPECT_THROW(op::allocate_descriptor_sets(pool, duplicate), std::invalid_argument);
+        EXPECT_FALSE(first.descriptor_set);
+        const std::array prepared{&first};
+        ASSERT_EQ(op::allocate_descriptor_sets(pool, prepared), vk::Result::eSuccess);
+        l::construct_descriptor_set(&set_slots[1], pool, layout);
+        std::unique_ptr<void, void (*)(void*)> second_guard(&set_slots[1], l::destroy_descriptor_set);
+        auto& second = l::descriptor_set_at(&set_slots[1]);
+        EXPECT_NE(&first, &second);
+        EXPECT_NE(first.descriptor_set, second.descriptor_set);
+        EXPECT_EQ(first.pool, &pool);
+        EXPECT_EQ(second.layout, &layout);
+        EXPECT_FALSE(first.use.busy());
+        EXPECT_FALSE(second.use.busy());
+    }
     TEST(BindingPointTest, ComparisonIncludesBindingTypeStageAndAmount) {
         using namespace vsl::graphic_resource;
         BindingPoint first{2, Type::STORAGE_BUFFER, vsl::ShaderFlag::COMPUTE, 1};
@@ -104,6 +143,20 @@ namespace {
         EXPECT_EQ(resource.get_pool().data_, pool.data_);
         ExpectSequence(execute(17), 17);
     }
+    TEST_F(DescriptorVulkanIntegrationTest, PoolGetterUsesTheCanonicalOwnerAndDoesNotRetainItsSourceSet) {
+        auto [created, allocated] = resources->make(std::vector{*binding});
+        auto retained = allocated.front().get_pool();
+        EXPECT_FALSE(retained.data_.owner_before(created.data_));
+        EXPECT_FALSE(created.data_.owner_before(retained.data_));
+        const std::weak_ptr<vsl::impl::GraphicResourceImpl> old = allocated.front().data_;
+        allocated.clear();
+        EXPECT_TRUE(old.expired());
+        auto [success, rebound] = retained.bind(*binding);
+        ASSERT_TRUE(success);
+        rebound.update(&*output);
+        resource = rebound;
+        ExpectSequence(execute(19), 19);
+    }
     TEST_F(DescriptorVulkanIntegrationTest, BindsSingleAndRepeatedLayoutsWithExplicitTypeUpdates) {
         using namespace vsl::graphic_resource;
         auto [single_ok, single] = pool.bind(*binding);
@@ -115,10 +168,10 @@ namespace {
         ASSERT_EQ(many.size(), 2u);
         EXPECT_NE(many[0].data_->descriptor_set, many[1].data_->descriptor_set);
         EXPECT_EQ(many[0].get_pool().data_, pool.data_);
-        EXPECT_EQ(single.data_->layout, binding->data_);
+        EXPECT_EQ(single.data_->layout, binding->data_.get());
         EXPECT_NO_THROW(single.update(&*output));
         for (auto& entry : many) {
-            EXPECT_EQ(entry.data_->layout, binding->data_);
+            EXPECT_EQ(entry.data_->layout, binding->data_.get());
             EXPECT_NO_THROW(entry.update(&*output));
         }
         resource = single;
@@ -128,29 +181,54 @@ namespace {
         resource.update(*output, 0, vsl::graphic_resource::Type::STORAGE_BUFFER, 0, COUNT * sizeof(std::uint32_t));
         ExpectSequence(execute(31), 31);
     }
+    TEST_F(DescriptorVulkanIntegrationTest, BulkNativeAllocationFailureRollsBackPreparedOwnersAndAllowsRetry) {
+        const auto before = pool.data_->resources.size();
+        const auto owners_before = pool.data_.use_count();
+        const std::array layouts{binding->data_, binding->data_};
+        const auto failed_allocate = [](vsl::impl::GraphicResourcePoolImpl&, std::span<vsl::impl::GraphicResourceImpl* const> sets) -> vk::Result {
+            EXPECT_EQ(sets.size(), 2u);
+            for (const auto* resource : sets)
+                EXPECT_FALSE(resource->descriptor_set);
+            return vk::Result::eErrorOutOfPoolMemory;
+        };
+        auto [failed, empty] = vsl::lifetime::make_heap_descriptor_sets(pool.data_, layouts, failed_allocate);
+        EXPECT_EQ(failed, vk::Result::eErrorOutOfPoolMemory);
+        EXPECT_TRUE(empty.empty());
+        EXPECT_EQ(pool.data_->resources.size(), before);
+        EXPECT_EQ(pool.data_.use_count(), owners_before);
+        auto [success, allocated] = pool.bind(2, *binding);
+        ASSERT_TRUE(success);
+        ASSERT_EQ(allocated.size(), 2u);
+        allocated.back().update(&*output);
+        resource = allocated.back();
+        ExpectSequence(execute(37), 37);
+    }
     TEST_F(DescriptorVulkanIntegrationTest, SingleBindingConstructorsRetainDeviceOwner) {
         using namespace vsl::graphic_resource;
-        BindingLayout explicit_binding(device, 2, Type::UNIFORM_BUFFER, vsl::ShaderFlag::VERTEX, 1);
-        const bool had_owner = static_cast<bool>(explicit_binding.data_->device);
-        explicit_binding.data_->device = device.data_; // Ensure safe test-only destruction (I13).
-        EXPECT_TRUE(had_owner);
+        auto owner = std::make_shared<vsl::LogicalDeviceAccessor>(device);
+        const std::weak_ptr<vsl::LogicalDeviceAccessor> observed = owner;
+        vsl::LogicalDeviceAccessor imported{{owner, device.data_.get()}};
+        BindingLayout explicit_binding(imported, 2, Type::UNIFORM_BUFFER, vsl::ShaderFlag::VERTEX, 1);
+        EXPECT_EQ(explicit_binding.data_->device, device.data_.get());
         EXPECT_EQ(explicit_binding.get_binding_points(),
                   (std::vector<BindingPoint>{{2, Type::UNIFORM_BUFFER, vsl::ShaderFlag::VERTEX, 1}}));
-        BindingLayout automatic(device, Type::UNIFORM_BUFFER, vsl::ShaderFlag::VERTEX);
-        const bool automatic_owner = static_cast<bool>(automatic.data_->device);
-        automatic.data_->device = device.data_;
-        EXPECT_TRUE(automatic_owner);
+        BindingLayout automatic(imported, Type::UNIFORM_BUFFER, vsl::ShaderFlag::VERTEX);
+        EXPECT_EQ(automatic.data_->device, device.data_.get());
         EXPECT_EQ(automatic.get_binding_points().front().binding, 0u);
         EXPECT_EQ(automatic.data_->layout_bindings.front().binding, 0u);
+        owner.reset();
+        imported.data_.reset();
+        EXPECT_FALSE(observed.expired());
+        explicit_binding.data_.reset();
+        EXPECT_FALSE(observed.expired());
+        automatic.data_.reset();
+        EXPECT_TRUE(observed.expired());
     }
     TEST_F(DescriptorVulkanIntegrationTest, ExplicitSentinelsUseTheSameAutomaticBindingAsTheVectorConstructor) {
         using namespace vsl::graphic_resource;
         for (const auto sentinel : {std::size_t{UINT32_MAX}, std::size_t(-1)}) {
             BindingLayout automatic(device, sentinel, Type::STORAGE_BUFFER, vsl::ShaderFlag::COMPUTE, 3);
-            const auto original_owner = automatic.data_->device;
-            if (!original_owner)
-                automatic.data_->device = device.data_;
-            EXPECT_EQ(original_owner, device.data_);
+            EXPECT_EQ(automatic.data_->device, device.data_.get());
             ASSERT_EQ(automatic.data_->layout_bindings.size(), 1u);
             EXPECT_EQ(automatic.data_->layout_bindings[0].binding, 0u);
             EXPECT_EQ(automatic.get_binding_points(),
@@ -446,7 +524,7 @@ namespace {
         ExpectSequence(execute(149), 149);
     }
     TEST_F(DescriptorVulkanIntegrationTest, ExplicitBufferTypeWorksWithoutLayoutMetadataWhileInferenceReportsTheMissingLayout) {
-        resource.data_->layout.reset();
+        resource.data_->layout = nullptr;
         try {
             resource.update(&*output);
             FAIL() << "Inferring the descriptor type requires layout metadata";

@@ -42,6 +42,7 @@ add_library(VSL STATIC
         VSL/src/vulkan/pipeline_layout.cpp
         VSL/src/lifetime/resource_use.cpp
         VSL/src/lifetime/descriptor_bindings.cpp
+        VSL/src/lifetime/descriptor_storage.cpp
         VSL/src/operation/descriptor_ops.cpp
         VSL/src/sync/resource_use_state.cpp
         VSL/src/sync/completion.cpp
@@ -78,6 +79,7 @@ add_library(VSL STATIC
         VSL/include/VSL/operation/buffer_create_info.hpp
         VSL/include/VSL/operation/image_create_info.hpp
         VSL/include/VSL/operation/sampler_create_info.hpp
+        VSL/include/VSL/operation/descriptor_create_info.hpp
         VSL/src/storage/buffer_layout.cpp
         VSL/src/storage/resource_layout.cpp
         VSL/include/VSL/storage/resource_layout.hpp

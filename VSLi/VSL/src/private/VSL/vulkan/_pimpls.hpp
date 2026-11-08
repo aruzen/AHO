@@ -269,7 +269,8 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct ResourceBindingLayoutImpl {
-        std::shared_ptr<LogicalDeviceImpl> device;
+        LogicalDeviceImpl* device = nullptr;
+        vk::Device native_device;
 
         std::vector<vk::DescriptorSetLayoutBinding> layout_bindings;
         vk::DescriptorSetLayout layout;
@@ -293,7 +294,10 @@ namespace VSL_NAMESPACE::impl {
     struct GraphicResourceImpl;
     struct GraphicResourcePoolImpl {
         std::weak_ptr<GraphicResourceManagerIdentity> manager;
-        std::shared_ptr<LogicalDeviceImpl> device;
+        LogicalDeviceImpl* device = nullptr;
+        vk::Device native_device;
+        // getterの所有境界でだけ解決する。内部Setはpoolを直接借用する。
+        std::weak_ptr<void> owner;
 
         vk::DescriptorPool descriptor_pool;
         bool retiring = false;
@@ -310,8 +314,9 @@ namespace VSL_NAMESPACE::impl {
             ResourceUse constraint;
             bool initialized = false;
         };
-        std::shared_ptr<impl::GraphicResourcePoolImpl> pool;
-        std::shared_ptr<impl::ResourceBindingLayoutImpl> layout;
+        impl::GraphicResourcePoolImpl* pool = nullptr;
+        impl::ResourceBindingLayoutImpl* layout = nullptr;
+        vk::Device native_device;
 
         vk::DescriptorSet descriptor_set;
         ResourceUseState use;

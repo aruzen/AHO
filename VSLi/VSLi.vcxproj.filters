@@ -17,6 +17,8 @@
     <ClInclude Include="VSL\src\private\VSL\operation\submission_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\src\private\VSL\operation\descriptor_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\src\private\VSL\lifetime\descriptor_bindings.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\src\private\VSL\lifetime\descriptor_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\operation\descriptor_create_info.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\src\private\VSL\lifetime\image_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\src\private\VSL\lifetime\sampler_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClCompile Include="VSL\src\operation\image_ops.cpp"><Filter>ソース ファイル</Filter></ClCompile>
@@ -24,6 +26,7 @@
     <ClCompile Include="VSL\src\operation\submission_ops.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClCompile Include="VSL\src\operation\descriptor_ops.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClCompile Include="VSL\src\lifetime\descriptor_bindings.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClCompile Include="VSL\src\lifetime\descriptor_storage.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClCompile Include="VSL\src\lifetime\image_storage.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClCompile Include="VSL\src\lifetime\sampler_storage.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\src\private\VSL\sync\submission_completion.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>

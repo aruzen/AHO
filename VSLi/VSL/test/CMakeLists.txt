@@ -304,4 +304,11 @@ if (VSL_TEST_SOURCES)
         "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/pipeline.cpp"
         "-DTEST_CASE=0" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
     set_tests_properties(VSL.Pipeline.Compile.ExplicitRuntime PROPERTIES LABELS compile TIMEOUT 60)
+    add_library(vsl-frame-buffer-style-contract OBJECT EXCLUDE_FROM_ALL contracts/frame_buffer.cpp)
+    target_link_libraries(vsl-frame-buffer-style-contract PRIVATE VSL)
+    add_test(NAME VSL.FrameBuffer.Compile.PublicPlacement COMMAND "${CMAKE_COMMAND}"
+        "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+        "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/frame_buffer.cpp"
+        "-DTEST_CASE=0" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+    set_tests_properties(VSL.FrameBuffer.Compile.PublicPlacement PROPERTIES LABELS compile TIMEOUT 60)
 endif ()

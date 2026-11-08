@@ -5,6 +5,10 @@
 namespace VSL_NAMESPACE {
     struct FrameBufferAccessor {
         std::shared_ptr<impl::FrameBufferImpl> data_;
+        RenderPassAccessor get_render_pass() const;
+        LogicalDeviceAccessor get_device() const;
+        lifetime::OwnerRef owner_ref() const;
+        size_t frame_count() const;
     };
     struct AttachmentImage {
         AttachmentId attachment;

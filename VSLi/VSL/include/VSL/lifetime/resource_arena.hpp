@@ -11,6 +11,7 @@
 #include "../vulkan/pipeline_layout.hpp"
 #include "../vulkan/render_pass.hpp"
 #include "../vulkan/pipeline.hpp"
+#include "../vulkan/frame_buffer.hpp"
 #include "../storage/arena_memory.hpp"
 #include "../vulkan/image.hpp"
 #include "../vulkan/sampler.hpp"
@@ -44,10 +45,17 @@ namespace VSL_NAMESPACE::lifetime {
         RuntimeLayoutSource layout;
         PipelineShaderSource shader;
     };
+    using FrameBufferImageSource = std::variant<typed::ResourceId, ImageAccessor>;
+    struct FrameBufferInit {
+        PipelinePassSource pass;
+        std::uint32_t width = 0, height = 0, layers = 1;
+        // 全sourceを永続依存とする。行=native framebuffer、列=AttachmentId。
+        std::vector<std::vector<FrameBufferImageSource>> attachments;
+    };
     using ResourceInit = std::variant<BufferCreateInfo, ImageCreateInfo, SamplerCreateInfo, BufferView, ImageAccessor, SamplerAccessor,
                                       DescriptorLayoutCreateInfo, DescriptorPoolCreateInfo, DescriptorSetInit,
                                       graphic_resource::BindingLayout, graphic_resource::Pool, ShaderCreateInfo, ShaderAccessor, PipelineLayoutInit, PipelineLayoutAccessor, RenderPassDescription, RenderPassAccessor,
-                                      GraphicsPipelineInit, ComputePipelineInit, PipelineAccessor>;
+                                      GraphicsPipelineInit, ComputePipelineInit, PipelineAccessor, FrameBufferInit, FrameBufferAccessor>;
     class ResourceArena {
         std::shared_ptr<detail::ResourceArenaOwner> _owner;
         ResourceArena(LogicalDeviceAccessor device, typed::LifetimeGroup group,
@@ -78,6 +86,7 @@ namespace VSL_NAMESPACE::lifetime {
         PipelineLayoutAccessor pipeline_layout(typed::ResourceId id) const;
         RenderPassAccessor render_pass(typed::ResourceId id) const;
         PipelineAccessor pipeline(typed::ResourceId id) const;
+        FrameBufferAccessor frame_buffer(typed::ResourceId id) const;
         // 非所有の物理Buffer全体。外部の部分viewに対してはbuffer()を使用する。
         BufferRef borrow_buffer(typed::ResourceId id) const&;
         BufferRef borrow_buffer(typed::ResourceId id) const&& = delete;

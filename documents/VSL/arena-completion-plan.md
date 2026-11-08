@@ -9,7 +9,7 @@
 
 最初のPRだけで終了せず、下記の順で実装・検証・独立レビューを継続する。PRの公開前には最新masterとの差分を確認する。新しい製品ディレクトリが必要な場合は作成前に確認する。
 
-現在の到達点は順序1〜6と、順序7a RenderPass／7b Pipelineである。7c Framebuffer以降は未完了であり、起動資源、既定policy変更、旧入口廃止と最終監査まで継続する。
+現在の到達点は順序1〜7である。順序8のcommand／同期資源以降は未完了であり、起動資源、既定policy変更、旧入口廃止と最終監査まで継続する。
 
 ## 責務と保証
 
@@ -114,10 +114,12 @@ Layout数は宣言set数のResources::COUNT、Set数はshared／frameの実数�
 
 7b後半のImplはDevice／Layoutへの借用とnative handleだけを持ち、heap rootはLayout ownerを保持して依存graphへ列挙する。native生成はResultを明示検査し、失敗時の非null handleを未公開のまま回収する。明示入力のShader／Passはnative生成呼出し中だけ所有を借り、Layoutはruntime ownerだけを固定親とする。Shaderの既存get_device()だけでは非所有aliasを拒否できないため、source境界でowner／live module／Deviceを検査する。構築とrollback、importの正規control block、逆向きdescriptor依存拒否を受入項目にする。
 
-[7b後半のPipeline backendと配置](pipeline-arena.md)を通常VSL／Typedの既存生成とResourceArenaへ接続した。直接source回収後の描画／compute／push、Layout固定親の循環拒否、元ownerのimport、途中失敗・同region再利用、GPU完了／取消回収を検証し、7bの受入条件を満たした。次は7c Framebufferへ進む。順序7全体と8以降は未完了である。
+[7b後半のPipeline backendと配置](pipeline-arena.md)を通常VSL／Typedの既存生成とResourceArenaへ接続した。直接source回収後の描画／compute／push、Layout固定親の循環拒否、元ownerのimport、途中失敗・同region再利用、GPU完了／取消回収を検証し、7bの受入条件を満たした。
+
+7cのPass getter用weak metadataはlifetime contextへ分け、Implと同じslotの隣接byte領域へ構築する。Implはcontextを借用し、通常のVulkan操作はraw Pass／Imageへ直接届く。slot本体はstandard-layoutなaligned byte配列だけとし、Impl先頭offset0とactual slot寸法を検査する。CPU配置計画にはcontext込みのslot寸法を公開する。direct Pass／Imageは固定親として永続保持し、同rootのPass weakはpublish後に設定する。getterは外部Passの元control blockを返す。
 
 Pipelineが記録時に使うLayoutは保持し、Shader／Pass／再生成recipeは生成時依存へ分ける。Framebufferから既定Passとclear descriptionを参照するVSLの契約は、native生成時だけの依存と区別する。attachment Imageの既存物理UseStateを使い、RenderPass／Pipeline／Framebufferへ独立したGPU UseStateは追加しない。
 
-現frame_buffer.cppにはnative createFramebuffer成功後のpush_back確保失敗で未登録handleを残す経路がある。共通backendへの移行時にlocal RAIIまたは先行確保とcommitを用い、途中失敗を巻き戻す。resizeは待機→次世代構築→公開→hook通知を維持し、失敗時の旧世代、保存command／旧view、互換Pipelineの再利用を検証する。
+[7cのFramebuffer backendと配置](frame-buffer-arena.md)で、native生成前の全行検証と配列確保、途中失敗の逆順rollback、元のPass ownerを返すgetter、共通Image状態での記録を実装した。保存command／旧view、CPU世代の失敗保証、互換Pipeline再利用、記録中poll callbackの取消・自己破棄・再入を検証し、順序7の受入条件を満たした。WSIのretired swapchainからの復旧とpresentation完了は順序10に残す。
 
 順序8の配置前に、CommandBufferImplのsubmissions／recording_submission／presentation_resourcesを外部domainへ移す。現在のImpl→Work→Device/resourcesのまま同arenaへ入れるとroot→Work→rootの循環になる。外部Registry→Work→起動／資源root、Impl→contextの借用／weak、Completion→結果だけという向きを確定する。通常invokeは解決済みcontextへ直接届き、Registryの探索はphase境界に限る。shutdown時の新規登録拒否・snapshot終端処理と、DefaultPhase cancelの取得画像返却用の内部送信も検証する。presentation完了の証明は順序10へ残す。

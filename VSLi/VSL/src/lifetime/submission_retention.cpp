@@ -38,6 +38,11 @@ namespace VSL_NAMESPACE::lifetime {
         if (accepted.use_count() && !contains_owner(resources, accepted))
             resources.push_back(std::move(accepted));
     }
+    void require_recording(const CommandBuffer& buffer, const Completion& completion) {
+        if (!buffer.data_ || !buffer.data_->recording_submission || !completion.data_ ||
+            buffer.data_->recording_submission->result != completion.data_ || completion.data_->status != Completion::Status::PENDING)
+            throw std::logic_error("Recording phase changed while tracking resources");
+    }
     void record_descriptor_resources(impl::GraphicResourceImpl& resource, const CommandBuffer& buffer, ResourceRetention retention) {
         const DescriptorRecording recording(resource);
         const auto completion = buffer.completion();
@@ -59,8 +64,7 @@ namespace VSL_NAMESPACE::lifetime {
                 for (const auto* state : element.constraint.states)
                     state->mark_used(completion);
             }
-        if (buffer.completion().data_ != completion.data_ || completion.status() != Completion::Status::PENDING)
-            throw std::logic_error("Recording phase changed while tracking a descriptor");
+        require_recording(buffer, completion);
         require_descriptor_valid(resource);
     }
     void release_completed_resources(impl::SubmissionWork& submission) noexcept {

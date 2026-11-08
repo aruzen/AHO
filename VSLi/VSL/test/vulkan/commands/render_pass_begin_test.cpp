@@ -1,5 +1,6 @@
 #include "support/render_fixture.hpp"
 #include "support/read_image.hpp"
+#include "support/frame_buffer_metadata.hpp"
 namespace {
     using RenderPassBeginVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
 
@@ -87,11 +88,7 @@ namespace {
         description->add_color({.format = {static_cast<VSL_NAMESPACE::data_format::FormatTypes>(format), 4}});
         auto pass = std::make_shared<VSL_NAMESPACE::impl::RenderPassImpl>();
         pass->description.emplace(std::move(*description));
-        auto target = std::make_shared<VSL_NAMESPACE::impl::FrameBufferImpl>();
-        target->render_pass = std::move(pass);
-        target->swap_chain_framebuffers.emplace_back();
-        target->extent = vk::Extent2D{1, 1};
-        return {std::move(target)};
+        return vsl_test::metadata_frame_buffer(std::move(pass));
     }
     TEST_P(PackedIntegerClearTest, DefaultsAndExplicitClearsUseTheIntegerNumericType) {
         const auto [format, is_signed] = GetParam();
@@ -180,11 +177,7 @@ namespace {
 
 namespace {
     vsl::FrameBufferAccessor legacy_metadata_target(vsl::RenderPassAccessor pass) {
-        auto target = std::make_shared<vsl::impl::FrameBufferImpl>();
-        target->render_pass = std::move(pass.data_);
-        target->swap_chain_framebuffers.emplace_back();
-        target->extent = vk::Extent2D{2, 2};
-        return {std::move(target)};
+        return vsl_test::metadata_frame_buffer(std::move(pass.data_), 2, 2);
     }
     TEST_P(LegacyClearFormatVulkanIntegrationTest, ExplicitRgbMustNotBypassIntegerOrDepthClearValidation) {
         const auto format = GetParam();

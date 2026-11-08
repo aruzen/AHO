@@ -54,7 +54,7 @@ ResourceKind::PIPELINEとImplLayout／ResourceSlotLayoutをcompile-only probe、
 
 private PipelineImplのdevice／layoutはshared_ptrから借用pointerへ変わる。private定義を読む利用側は`.get()`等を外し、保持が必要なら公開owning facadeを保存する。公開の既存生成引数は維持する。記録用に空／非所有／別Deviceの入力を渡すことと、誤ったbind pointへの接続は拒否する。
 
-次はFramebufferの共通backendと配置である。一つのImplが複数native framebufferとattachment行列を持つ現在の意味を維持し、Pass／Image依存をrootへ移す。Shared Pipeline／Layoutから古いattachment世代を保持する辺を作らず、resizeの失敗時旧世代と互換Pipeline再利用を検証する。
+後続の[Framebufferの共通backendと配置](frame-buffer-arena.md)で、複数native framebufferとattachment行列、Pass／Imageの固定親、CPU世代の失敗保証と互換Pipeline再利用を検証した。次はcommand／同期資源を分離する。
 
 ## 検証
 

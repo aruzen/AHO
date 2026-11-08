@@ -167,13 +167,17 @@
     <ClInclude Include="VSL\include\VSL\operation\graphics_pipeline_state.hpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\render_pass_ops.hpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\pipeline_ops.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\operation\frame_buffer_ops.hpp" />
     <ClCompile Include="VSL\src\operation\render_pass_ops.cpp" />
     <ClCompile Include="VSL\src\operation\pipeline_ops.cpp" />
+    <ClCompile Include="VSL\src\operation\frame_buffer_ops.cpp" />
     <ClCompile Include="VSL\src\operation\graphics_pipeline_state.cpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\render_pass_storage.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\pipeline_storage.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\frame_buffer_storage.hpp" />
     <ClCompile Include="VSL\src\lifetime\render_pass_storage.cpp" />
     <ClCompile Include="VSL\src\lifetime\pipeline_storage.cpp" />
+    <ClCompile Include="VSL\src\lifetime\frame_buffer_storage.cpp" />
     <ClCompile Include="VSL\src\operation\pipeline_layout_ops.cpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\pipeline_layout_storage.hpp" />
     <ClCompile Include="VSL\src\lifetime\pipeline_layout_storage.cpp" />

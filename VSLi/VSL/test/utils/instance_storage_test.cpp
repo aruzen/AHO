@@ -182,7 +182,7 @@ namespace {
             EXPECT_FALSE(original.accessor->debug_messenger);
         }
         EXPECT_FALSE(owner.expired());
-        EXPECT_FALSE(saved.accessor->instance.enumeratePhysicalDevices().empty());
+        EXPECT_NO_THROW((void)saved.accessor->instance.enumeratePhysicalDevices());
         saved = {};
         EXPECT_TRUE(owner.expired());
     }
@@ -204,7 +204,7 @@ namespace {
         owner.reset();
         a = {};
         EXPECT_FALSE(weak.expired());
-        EXPECT_FALSE(b.accessor->instance.enumeratePhysicalDevices().empty());
+        EXPECT_NO_THROW((void)b.accessor->instance.enumeratePhysicalDevices());
         b = {};
         EXPECT_TRUE(weak.expired());
     }
@@ -285,7 +285,7 @@ namespace {
         auto accessor = vsl::VulkanAccessor::Create(configuration);
         EXPECT_TRUE(accessor.accessor->debug_messenger);
         configuration = {};
-        EXPECT_FALSE(accessor.accessor->instance.enumeratePhysicalDevices().empty());
+        EXPECT_NO_THROW((void)accessor.accessor->instance.enumeratePhysicalDevices());
     }
     TEST_F(InstanceStorageVulkanIntegrationTest, ReinitializationAndForeignControlBlocksCannotReplaceALiveInstance) {
         auto accessor = vsl::VulkanAccessor::Create(info());

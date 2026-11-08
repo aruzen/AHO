@@ -91,9 +91,12 @@ namespace VSL_NAMESPACE::typed {
         TypedResourceBundle(TypedResourceBundle&&) noexcept = default;
         TypedResourceBundle& operator=(TypedResourceBundle&&) noexcept = default;
         const ResourceAllocationPlan<Schema>& plan() const { return _plan; }
-        const auto& placement_plan() const
+        const auto& placement_plan() const&
         requires(detail::BundlePolicy<StoragePolicy>::ARENA)
         { return _placement.value(); }
+        const auto& placement_plan() const&&
+        requires(detail::BundlePolicy<StoragePolicy>::ARENA)
+        = delete;
         size_t frame_count() const { return _frames.frame_count(); }
         template<typename Initialize>
         requires std::invocable<Initialize&, TypedSharedResources<Schema, StoragePolicy>&> && std::same_as<std::invoke_result_t<Initialize&, TypedSharedResources<Schema, StoragePolicy>&>, void>

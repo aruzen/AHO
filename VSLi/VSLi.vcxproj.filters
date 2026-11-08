@@ -5,6 +5,7 @@
     <ClInclude Include="VSL\include\VSL\lifetime\buffer_view.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\lifetime\typed_buffer_arena.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\lifetime\typed_bundle_plan.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\lifetime\typed_descriptor_plan.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\lifetime\typed_resource_buffer_view.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\lifetime\resource_use.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\lifetime\logical_use_state.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>

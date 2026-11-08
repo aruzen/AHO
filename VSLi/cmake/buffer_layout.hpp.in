@@ -3,6 +3,8 @@
 #include <cstdint>
 @compiler_guard@
 namespace vsl::storage {
+    inline constexpr std::size_t INSTANCE_IMPL_SIZE = @INSTANCE_IMPL_SIZE@, INSTANCE_IMPL_ALIGNMENT = @INSTANCE_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t INSTANCE_SLOT_SIZE = @INSTANCE_SLOT_SIZE@, INSTANCE_SLOT_ALIGNMENT = @INSTANCE_SLOT_ALIGNMENT@;
     inline constexpr std::size_t BUFFER_IMPL_SIZE = @BUFFER_IMPL_SIZE@;
     inline constexpr std::size_t BUFFER_IMPL_ALIGNMENT = @BUFFER_IMPL_ALIGNMENT@;
     inline constexpr std::size_t IMAGE_IMPL_SIZE = @IMAGE_IMPL_SIZE@;

@@ -105,6 +105,11 @@ add_library(VSL STATIC
         VSL/src/lifetime/synchronization_use.cpp
         VSL/include/VSL/operation/synchronization_create_info.hpp
         VSL/include/VSL/storage/typed_storage_policy.hpp
+        VSL/include/VSL/operation/instance_create_info.hpp
+        VSL/src/private/VSL/operation/instance_ops.hpp
+        VSL/src/operation/instance_ops.cpp
+        VSL/src/private/VSL/lifetime/instance_storage.hpp
+        VSL/src/lifetime/instance_storage.cpp
         VSL/src/private/VSL/lifetime/synchronization_storage.hpp
         VSL/src/lifetime/synchronization_storage.cpp
         VSL/src/private/VSL/operation/synchronization_ops.hpp

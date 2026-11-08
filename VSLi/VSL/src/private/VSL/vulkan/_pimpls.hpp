@@ -50,15 +50,16 @@ namespace VSL_NAMESPACE {
 
 namespace VSL_NAMESPACE::impl {
     struct VulkanImplAccessor {
+        lifetime::DependencyNode* owner_node = nullptr;
         vk::Instance instance;
         vk::DebugUtilsMessengerEXT debug_messenger;
-
-        virtual ~VulkanImplAccessor() {};
-    };
-
-    template<bool v>
-    struct VulkanImpl : public VulkanImplAccessor {
-        virtual ~VulkanImpl() override;
+        PFN_vkDestroyDebugUtilsMessengerEXT destroy_debug_messenger = nullptr;
+        VulkanImplAccessor() = default;
+        VulkanImplAccessor(const VulkanImplAccessor&) = delete;
+        VulkanImplAccessor& operator=(const VulkanImplAccessor&) = delete;
+        VulkanImplAccessor(VulkanImplAccessor&&) = delete;
+        VulkanImplAccessor& operator=(VulkanImplAccessor&&) = delete;
+        ~VulkanImplAccessor();
     };
 
     struct PhysicalDeviceImpl {
@@ -454,6 +455,5 @@ namespace VSL_NAMESPACE::impl {
         };
 
         QueueFamilyIndices find_queue_families(vk::PhysicalDevice device, vk::SurfaceKHR surface);
-        void destroy_debug_utils_messenger_ext(vk::Instance& instance, vk::DebugUtilsMessengerEXT& debug_messenger, const VkAllocationCallbacks* p_allocator);
     } // namespace helper
 } // namespace VSL_NAMESPACE::impl

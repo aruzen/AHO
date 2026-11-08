@@ -4,7 +4,7 @@
 namespace VSL_NAMESPACE::impl {
     struct VulkanImplAccessor;
     template<bool v>
-    struct VulkanImpl;
+    using VulkanImpl = VulkanImplAccessor;
     struct PhysicalDeviceImpl;
     struct PhysicalDevicesImpl;
     struct LogicalDeviceImpl;

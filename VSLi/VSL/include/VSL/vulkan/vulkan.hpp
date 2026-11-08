@@ -7,6 +7,8 @@
 
 #include "../test.hpp"
 #include "pv.hpp"
+#include "../operation/instance_create_info.hpp"
+#include "../lifetime/owner_ref.hpp"
 
 #include <memory>
 #include <concepts>
@@ -28,6 +30,8 @@ namespace VSL_NAMESPACE {
 
     struct VulkanAccessor {
         std::shared_ptr<impl::VulkanImplAccessor> accessor;
+        static VulkanAccessor Create(InstanceCreateInfo info);
+        lifetime::OwnerRef owner_ref() const;
     };
 
     template<bool validation = VSL_NAMESPACE::VALIDATION>

@@ -10,8 +10,14 @@
 #include <VSL/lifetime/frame_buffer_storage.hpp>
 #include <VSL/lifetime/command_storage.hpp>
 #include <VSL/lifetime/synchronization_storage.hpp>
+#include <VSL/lifetime/instance_storage.hpp>
 
 namespace VSL_NAMESPACE::storage {
+    static_assert(sizeof(impl::VulkanImplAccessor) == ImplLayout<impl::VulkanImplAccessor>::SIZE);
+    static_assert(alignof(impl::VulkanImplAccessor) == ImplLayout<impl::VulkanImplAccessor>::ALIGNMENT);
+    static_assert(sizeof(lifetime::InstanceSlotStorage) == ResourceSlotLayout<impl::VulkanImplAccessor>::SIZE);
+    static_assert(alignof(lifetime::InstanceSlotStorage) == ResourceSlotLayout<impl::VulkanImplAccessor>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::VulkanImplAccessor>::USE_OFFSET == NO_SEPARATE_USE);
     static_assert(sizeof(impl::SemaphoreImpl) == ImplLayout<impl::SemaphoreImpl>::SIZE);
     static_assert(alignof(impl::SemaphoreImpl) == ImplLayout<impl::SemaphoreImpl>::ALIGNMENT);
     static_assert(sizeof(lifetime::SemaphoreSlotStorage) == ResourceSlotLayout<impl::SemaphoreImpl>::SIZE);

@@ -2,6 +2,7 @@
 #include <VSL/vulkan/_pimpls.hpp>
 
 namespace VSL_NAMESPACE::lifetime {
+    struct SurfacePresentationDomain;
     // Domain内で住所が安定する。通常の記録は所有を探索せず解決済みWorkへ届く。
     struct CommandRecordingContext {
         impl::SubmissionWork* work = nullptr;
@@ -18,8 +19,7 @@ namespace VSL_NAMESPACE::lifetime {
         std::shared_ptr<impl::CommandBufferImpl> buffer;
         std::vector<std::shared_ptr<impl::SubmissionWork>> submissions;
         std::shared_ptr<impl::SubmissionWork> recording_submission;
-        // graphics完了と区別し、Device idleまで保持する。厳密なWSI完了は後続段階。
-        std::vector<std::shared_ptr<void>> presentation_resources;
+        std::vector<std::shared_ptr<SurfacePresentationDomain>> presentation_domains;
         CommandRecordingContext context;
 
         explicit CommandDomain(std::shared_ptr<impl::CommandBufferImpl> buffer);

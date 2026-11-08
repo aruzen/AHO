@@ -46,9 +46,11 @@ if (VSL_TEST_SOURCES)
             "${CMAKE_CURRENT_SOURCE_DIR}/../include"
             "${CMAKE_CURRENT_SOURCE_DIR}"
             "${CMAKE_CURRENT_BINARY_DIR}"
-            "$<TARGET_PROPERTY:VSL,INCLUDE_DIRECTORIES>"
+            "${VSL_HOME}/src/private"
     )
     target_link_directories(vsl-test PRIVATE ${GLFW_LIBRARY_DIRS})
+    # 寸法probeと同じSDKを先にし、GLFWのprefix内にある別版Vulkanを混在させない。
+    target_include_directories(vsl-test SYSTEM BEFORE PRIVATE ${Vulkan_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS})
     target_link_libraries(vsl-test PRIVATE VSL GTest::gtest_main)
     add_library(vsl-typed-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_pipeline.cpp)
     target_compile_definitions(vsl-typed-style-contract PRIVATE VSL_TYPED_CASE=0)

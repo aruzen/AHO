@@ -1,0 +1,28 @@
+#pragma once
+#include <VSL/define.hpp>
+#include <vulkan/vulkan.hpp>
+#include <cstdint>
+
+namespace VSL_NAMESPACE::operation {
+    struct PresentationNativeCalls {
+        void* context = nullptr;
+        VkResult (*present)(void*, VkQueue, const VkPresentInfoKHR*) noexcept = nullptr;
+        VkResult (*poll)(void*, VkDevice, VkFence) noexcept = nullptr;
+        VkResult (*wait)(void*, VkDevice, VkFence, std::uint64_t) noexcept = nullptr;
+    };
+    // 故障注入は呼出しスレッドのscopeに限定し、Impl／Recordへ保存しない。
+    class ScopedPresentationNativeCalls {
+        PresentationNativeCalls _calls;
+        const PresentationNativeCalls* _previous;
+
+    public:
+        explicit ScopedPresentationNativeCalls(PresentationNativeCalls calls) noexcept;
+        ScopedPresentationNativeCalls(const ScopedPresentationNativeCalls&) = delete;
+        ScopedPresentationNativeCalls& operator=(const ScopedPresentationNativeCalls&) = delete;
+        ~ScopedPresentationNativeCalls();
+    };
+    vk::Result queue_present(vk::Queue queue, vk::SwapchainKHR swapchain, std::uint32_t image,
+                             vk::Semaphore finished, vk::Fence present_fence = {}) noexcept;
+    vk::Result poll_present_fence(vk::Device device, vk::Fence fence) noexcept;
+    vk::Result wait_present_fence(vk::Device device, vk::Fence fence, std::uint64_t timeout) noexcept;
+} // namespace VSL_NAMESPACE::operation

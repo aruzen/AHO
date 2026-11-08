@@ -97,4 +97,23 @@ namespace {
         EXPECT_EQ(result.failure(), Failure::NONE);
         EXPECT_EQ(observation.status(), Status::COMPLETE);
     }
+    TEST(SubmissionResultTest, BatchTerminalResultsPrecedeEveryReleaseAndAreReleasedOnce) {
+        auto first = pending_work(), second = pending_work();
+        first->result->status = second->result->status = Status::SUBMITTED;
+        const vsl::Completion peer{second->result};
+        unsigned releases = 0;
+        first->completion_resources.push_back(std::shared_ptr<void>(new int(1), [&](void* value) {
+            EXPECT_EQ(peer.status(), Status::FAILED);
+            EXPECT_EQ(peer.failure(), Failure::DEVICE_LOST);
+            ++releases;
+            delete static_cast<int*>(value);
+        }));
+        EXPECT_TRUE(vsl::sync::save_terminal(*first, Status::FAILED, Failure::DEVICE_LOST, VK_ERROR_DEVICE_LOST));
+        EXPECT_TRUE(vsl::sync::save_terminal(*second, Status::FAILED, Failure::DEVICE_LOST, VK_ERROR_DEVICE_LOST));
+        EXPECT_EQ(releases, 0u);
+        vsl::sync::finish_submission(*first);
+        vsl::sync::finish_submission(*first);
+        EXPECT_EQ(releases, 1u);
+        EXPECT_FALSE(vsl::sync::save_terminal(*second, Status::COMPLETE));
+    }
 } // namespace

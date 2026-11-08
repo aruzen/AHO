@@ -13,5 +13,5 @@ namespace VSL_NAMESPACE::lifetime {
     void retain_resource(std::vector<std::shared_ptr<void>>& resources, const std::shared_ptr<void>& resource);
     void retain_resource(std::vector<std::shared_ptr<void>>& resources, std::shared_ptr<void>&& resource);
     void record_descriptor_resources(const impl::GraphicResourceImpl& resource, const CommandBuffer& buffer, ResourceRetention retention = ResourceRetention::SUBMISSION);
-    void release_completed_resources(impl::SubmissionImpl& submission) noexcept;
+    void release_completed_resources(impl::SubmissionWork& submission) noexcept;
 } // namespace VSL_NAMESPACE::lifetime

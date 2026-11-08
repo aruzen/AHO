@@ -91,16 +91,21 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct SubmissionImpl {
+        Completion::Status status = Completion::Status::PENDING;
+        Completion::Failure failure = Completion::Failure::NONE;
+        std::int32_t error_code = 0;
+        std::weak_ptr<SubmissionWork> work;
+    };
+    struct SubmissionWork {
+        std::shared_ptr<SubmissionImpl> result = std::make_shared<SubmissionImpl>();
         std::shared_ptr<LogicalDeviceImpl> device;
         std::shared_ptr<vk::UniqueFence> owned_fence;
         std::shared_ptr<FenceImpl> external_fence;
         vk::Fence fence;
-        Completion::Status status = Completion::Status::PENDING;
-        std::shared_ptr<Completion::Status> observed_status;
         std::vector<std::shared_ptr<void>> resources;
         std::vector<std::shared_ptr<void>> completion_resources;
-        void (*release_resources)(SubmissionImpl&) noexcept = nullptr;
-        ~SubmissionImpl();
+        void (*release_resources)(SubmissionWork&) noexcept = nullptr;
+        ~SubmissionWork();
     };
 
     struct CommandBufferImpl {
@@ -109,8 +114,10 @@ namespace VSL_NAMESPACE::impl {
         std::uint32_t current_buffer_idx;
 
         std::vector<vk::CommandBuffer> command_buffers;
-        std::vector<std::shared_ptr<SubmissionImpl>> submissions;
-        std::shared_ptr<SubmissionImpl> recording_submission;
+        std::vector<std::shared_ptr<SubmissionWork>> submissions;
+        std::shared_ptr<SubmissionWork> recording_submission;
+        // graphics完了とは別に、present queueのidleまで保持するWSI依存。
+        std::vector<std::shared_ptr<void>> presentation_resources;
         std::optional<std::uint32_t> acquired_image_index;
         std::weak_ptr<SwapchainImpl> acquired_swapchain;
         bool recording = false;

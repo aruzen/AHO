@@ -93,7 +93,7 @@ namespace {
         EXPECT_FALSE(first.use_state().busy());
         EXPECT_TRUE(second.use_state().busy());
         EXPECT_TRUE(sampler.use_state().busy());
-        EXPECT_EQ(phase.completion().data_->completion_resources.size(), 3u);
+        EXPECT_EQ(phase.completion().data_->work.lock()->completion_resources.size(), 3u);
         EXPECT_THROW(set.write<0>(t::TypedTexture(first, sampler)), std::logic_error);
         phase.cancel();
         EXPECT_FALSE(second.use_state().busy());
@@ -158,7 +158,7 @@ namespace {
         auto phase = manager.start_phase<vsl::ComputePhase>();
         phase << vsl::command::RenderPassBegin(target) << vsl::command::RenderPassEnd{};
         EXPECT_TRUE(image.use_state().busy());
-        EXPECT_EQ(phase.completion().data_->resources.size(), 1u);
+        EXPECT_EQ(phase.completion().data_->work.lock()->resources.size(), 1u);
         phase.cancel();
         EXPECT_FALSE(image.use_state().busy());
     }

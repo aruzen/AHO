@@ -5,24 +5,15 @@
 #include <stdexcept>
 
 namespace VSL_NAMESPACE {
-    CompletionObservation::CompletionObservation(const Completion& completion) : _submission(completion.data_) {
-        if (!completion)
-            return;
-        auto& terminal = completion.data_->observed_status;
-        if (!terminal)
-            terminal = std::make_shared<Completion::Status>(completion.status());
-        _terminal = terminal;
-    }
+    CompletionObservation::CompletionObservation(const Completion& completion) : _result(completion) {}
     Completion::Status CompletionObservation::status() const {
-        if (auto submission = _submission.lock())
-            return Completion{std::move(submission)}.status();
-        return _terminal ? *_terminal : Completion::Status::CANCELLED;
+        return _result.status();
     }
 
     void ResourceUseState::discard_finished() const {
         std::erase_if(_uses, [](const auto& use) {
             const auto status = Completion{use.lock()}.status();
-            return status == Completion::Status::COMPLETE || status == Completion::Status::CANCELLED;
+            return status == Completion::Status::COMPLETE || status == Completion::Status::CANCELLED || status == Completion::Status::FAILED;
         });
     }
     bool ResourceUseState::busy() const {

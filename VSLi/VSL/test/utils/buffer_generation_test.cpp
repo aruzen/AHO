@@ -36,12 +36,11 @@ namespace {
                       << vsl::command::BindIndexBuffer(native)
                       << vsl::command::BindIndexBufferAt(native, vsl::command::IndexType::UINT32);
             }
-            EXPECT_EQ(cancelled.data_->resources.size(), 1u);
+            EXPECT_EQ(cancelled.data_->work.lock()->resources.size(), 1u);
             EXPECT_FALSE(observed.expired());
             phase.cancel();
         }
-        EXPECT_FALSE(observed.expired());
-        cancelled = {};
+        EXPECT_EQ(cancelled.status(), vsl::Completion::Status::CANCELLED);
         EXPECT_TRUE(observed.expired());
     }
 
@@ -51,7 +50,7 @@ namespace {
         auto phase = manager.start_phase<vsl::ComputePhase>();
         arena.view<SOURCE>().backend().resource_use().record(manager.get_buffer());
         arena.view<DESTINATION>().backend().resource_use().record(manager.get_buffer());
-        EXPECT_EQ(phase.completion().data_->resources.size(), 1u);
+        EXPECT_EQ(phase.completion().data_->work.lock()->resources.size(), 1u);
         EXPECT_TRUE(arena.storage().borrow(0).use().busy());
         EXPECT_TRUE(arena.storage().borrow(1).use().busy());
         phase.cancel();
@@ -75,7 +74,7 @@ namespace {
                                                   std::nullopt, 0, set.resource_use());
         command.track(manager.get_buffer());
         command.track(manager.get_buffer());
-        EXPECT_EQ(phase.completion().data_->resources.size(), 2u);
+        EXPECT_EQ(phase.completion().data_->work.lock()->resources.size(), 2u);
         EXPECT_FALSE(first.backend().use_state().busy());
         EXPECT_TRUE(second.backend().use_state().busy());
         EXPECT_THROW(set.write<0>(first), std::logic_error);
@@ -104,7 +103,7 @@ namespace {
                                                       std::nullopt, 0, first.resource_use());
             command.track(manager.get_buffer());
         }
-        EXPECT_EQ(phase.completion().data_->resources.size(), 4u);
+        EXPECT_EQ(phase.completion().data_->work.lock()->resources.size(), 4u);
         ASSERT_FALSE(first_set.expired());
         ASSERT_FALSE(second_set.expired());
         ASSERT_FALSE(first_buffer.expired());

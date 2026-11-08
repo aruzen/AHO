@@ -209,11 +209,15 @@ namespace {
         }
     }
 
-    TEST_F(PhaseCompletionVulkanIntegrationTest, RetainedResourcesSurviveUntilCompletionTokenIsReleased) {
+    TEST_F(PhaseCompletionVulkanIntegrationTest, LegacyResourcesBelongToTheSubmittedWorkUntilSlotReplacement) {
         auto manager = make_manager();
         std::weak_ptr<int> resource;
+        VSL_NAMESPACE::Completion result;
+        std::weak_ptr<VSL_NAMESPACE::impl::SubmissionWork> work;
         {
             VSL_NAMESPACE::ComputePhase phase(manager);
+            result = phase.completion();
+            work = result.data_->work;
             auto retained = std::make_shared<int>(7);
             resource = retained;
             phase.completion().retain(retained);
@@ -233,6 +237,138 @@ namespace {
             next.completion().wait();
         }
         EXPECT_TRUE(resource.expired());
+        EXPECT_TRUE(work.expired());
+        EXPECT_TRUE(result.ready());
+    }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, SavedResultDoesNotKeepNativeWorkAndFenceAliveAfterManagerDestruction) {
+        vsl::Completion result;
+        vsl::CompletionObservation observation;
+        std::weak_ptr<vsl::impl::SubmissionWork> work;
+        std::weak_ptr<vk::UniqueFence> fence;
+        std::weak_ptr<int> owner;
+        {
+            auto manager = make_manager();
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            result = phase.completion();
+            observation = vsl::CompletionObservation(result);
+            work = result.data_->work;
+            fence = work.lock()->owned_fence;
+            auto retained = std::make_shared<int>(7);
+            owner = retained;
+            result.retain(retained);
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        EXPECT_TRUE(work.expired());
+        EXPECT_TRUE(fence.expired());
+        EXPECT_TRUE(owner.expired());
+        EXPECT_TRUE(result.ready());
+        EXPECT_EQ(observation.status(), vsl::Completion::Status::COMPLETE);
+    }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, SubmittedWorkKeepsTheOwnerWithoutASavedCompletionUntilObservedIdle) {
+        auto manager = make_manager();
+        vsl::ResourceUseState use;
+        std::weak_ptr<int> owner;
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            auto retained = std::make_shared<int>(7);
+            owner = retained;
+            manager.get_buffer().retain_until_complete(retained);
+            use.mark_used(phase.completion());
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        EXPECT_FALSE(owner.expired());
+        manager.wait_idle();
+        EXPECT_TRUE(owner.expired());
+        EXPECT_FALSE(use.busy());
+    }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, TerminalReleaseMayResetTheObservingCompletionHandle) {
+        auto manager = make_manager();
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        vsl::Completion result = phase.completion();
+        size_t releases = 0;
+        {
+            auto owner = std::shared_ptr<void>(new int(7), [&](void* value) {
+                result = {};
+                ++releases;
+                delete static_cast<int*>(value);
+            });
+            manager.get_buffer().retain_until_complete(owner);
+        }
+        ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        manager.get_device().data_->device.waitIdle();
+        EXPECT_EQ(result.status(), vsl::Completion::Status::COMPLETE);
+        EXPECT_FALSE(result);
+        EXPECT_EQ(releases, 1u);
+        EXPECT_TRUE(phase.completion().ready());
+    }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, IdleReleaseCanSubmitAnotherJobWithoutDestroyingTheWorkBeingReleased) {
+        auto manager = make_manager();
+        vsl::Completion first, next;
+        std::weak_ptr<vsl::impl::SubmissionWork> old_work;
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            first = phase.completion();
+            old_work = first.data_->work;
+            auto owner = std::shared_ptr<void>(new int(7), [&](void* value) {
+                delete static_cast<int*>(value);
+                auto followup = manager.start_phase<vsl::ComputePhase>();
+                next = followup.completion();
+                EXPECT_EQ(followup.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            });
+            manager.get_buffer().retain_until_complete(owner);
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        manager.wait_idle();
+        EXPECT_TRUE(old_work.expired());
+        EXPECT_TRUE(first.ready());
+        ASSERT_TRUE(next);
+        EXPECT_TRUE(next.wait());
+    }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, PreparationDoesNotResetAJobStartedByAReleaseCallback) {
+        for (const bool submit_peer : {false, true}) {
+            auto manager = make_manager();
+            std::unique_ptr<vsl::ComputePhase> peer;
+            {
+                auto first = manager.start_phase<vsl::ComputePhase>();
+                auto owner = std::shared_ptr<void>(new int(7), [&](void* value) {
+                    delete static_cast<int*>(value);
+                    peer = std::make_unique<vsl::ComputePhase>(manager);
+                    if (submit_peer)
+                        EXPECT_EQ(peer->submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+                });
+                manager.get_buffer().retain_until_complete(owner);
+                ASSERT_EQ(first.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            }
+            EXPECT_THROW(manager.start_phase<vsl::ComputePhase>(), std::logic_error);
+            ASSERT_TRUE(peer);
+            if (!submit_peer) {
+                EXPECT_EQ(peer->completion().status(), vsl::Completion::Status::PENDING);
+                ASSERT_EQ(peer->submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            }
+            ASSERT_TRUE(peer->completion().wait());
+        }
+    }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, SubmitPreflightFailurePublishesFailureAndReleasesCompletionPinsOnce) {
+        auto manager = make_manager();
+        vsl::SynchroManager sync(device);
+        auto available = sync.create_semaphore("unused");
+        vsl::ComputePhase phase(manager, available, std::nullopt, std::nullopt, false, static_cast<vsl::PipelineStage>(0));
+        const auto result = phase.completion();
+        size_t releases = 0;
+        {
+            auto owner = std::shared_ptr<void>(new int(7), [&](void* value) { ++releases; delete static_cast<int*>(value); });
+            manager.get_buffer().retain_until_complete(owner);
+        }
+        EXPECT_THROW(phase.submit(), std::invalid_argument);
+        EXPECT_EQ(result.status(), vsl::Completion::Status::FAILED);
+        EXPECT_EQ(result.failure(), vsl::Completion::Failure::SUBMIT_FAILED);
+        EXPECT_EQ(releases, 1u);
+        EXPECT_FALSE(manager.get_buffer().data_->recording);
+        phase.cancel();
+        EXPECT_EQ(releases, 1u);
+        auto next = manager.start_phase<vsl::ComputePhase>();
+        ASSERT_EQ(next.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        ASSERT_TRUE(next.completion().wait());
     }
 } // namespace
 
@@ -266,7 +402,12 @@ namespace {
             phase << begin << VSL_NAMESPACE::command::RenderPassEnd{}
                   << VSL_NAMESPACE::command::ImageReadback(&destination, chain.images.at(index), VSL_NAMESPACE::ImageLayout::PRESENT);
             EXPECT_EQ(phase.submit_commands(), VSL_NAMESPACE::ComputePhase::SubmitResult::SUCCESS);
+            if (!frame) {
+                manager.wait_idle();
+                EXPECT_TRUE(manager.get_buffer().data_->presentation_resources.empty());
+            }
             EXPECT_EQ(phase.present(), VSL_NAMESPACE::ComputePhase::SubmitResult::SUCCESS);
+            EXPECT_FALSE(manager.get_buffer().data_->presentation_resources.empty());
             ASSERT_TRUE(phase.completion().wait());
             auto mapped = destination.data();
             const bool bgra = chain.get_format().type() == VSL_NAMESPACE::data_format::FormatTypes::SRGB8_BGRA ||

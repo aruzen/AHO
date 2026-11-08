@@ -54,6 +54,7 @@ add_library(VSL STATIC
         VSL/src/operation/buffer_ops.cpp
         VSL/src/operation/image_ops.cpp
         VSL/src/operation/sampler_ops.cpp
+        VSL/src/operation/submission_ops.cpp
         VSL/src/sync/buffer_access.cpp
         VSL/src/lifetime/buffer_storage.cpp
         VSL/src/lifetime/image_storage.cpp

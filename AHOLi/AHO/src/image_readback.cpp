@@ -71,8 +71,11 @@ namespace AHO_NAMESPACE {
         const auto current = status();
         if (!_data || current == VSL_NAMESPACE::Completion::Status::PENDING || current == VSL_NAMESPACE::Completion::Status::CANCELLED)
             throw std::logic_error("Readback was not submitted or was cancelled");
-        if (!wait(timeout))
+        if (!wait(timeout)) {
+            if (status() == VSL_NAMESPACE::Completion::Status::FAILED)
+                throw std::runtime_error("Readback submission failed");
             throw std::runtime_error("Readback timed out");
+        }
         const auto& meta = _data->info;
         destination.bytes.resize(meta.byte_size);
         auto mapped = _data->slot->mapping->read(meta.byte_size);

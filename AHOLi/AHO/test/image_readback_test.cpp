@@ -503,6 +503,35 @@ namespace {
         phase.submit();
         EXPECT_EQ(ticket->read().bytes[2], std::byte{255});
     }
+    TEST_F(ImageReadbackVulkanIntegrationTest, FailedSubmissionReportsFailureInsteadOfTimeoutAndReleasesTheSlot) {
+        auto manager = make_manager();
+        AHO_NAMESPACE::ImageReadback reader(manager);
+        VSL_NAMESPACE::SynchroManager sync(device);
+        auto available = sync.create_semaphore("unused");
+        std::optional<AHO_NAMESPACE::ImageReadbackTicket> ticket;
+        {
+            VSL_NAMESPACE::ComputePhase phase(manager, available, std::nullopt, std::nullopt, false, static_cast<VSL_NAMESPACE::PipelineStage>(0));
+            phase << VSL_NAMESPACE::command::RenderPassBegin(*framebuffer) << VSL_NAMESPACE::command::RenderPassEnd{};
+            ticket = reader.record(phase, *color, VSL_NAMESPACE::ImageLayout::GENERAL);
+            ASSERT_TRUE(ticket);
+            EXPECT_THROW(phase.submit(), std::invalid_argument);
+        }
+        EXPECT_EQ(ticket->status(), VSL_NAMESPACE::Completion::Status::FAILED);
+        EXPECT_FALSE(ticket->wait(0));
+        try {
+            ticket->read(0);
+            FAIL() << "Failed readback must not return pixels";
+        } catch (const std::runtime_error& error) {
+            EXPECT_STREQ(error.what(), "Readback submission failed");
+        }
+        ticket.reset();
+        auto phase = manager.start_phase<VSL_NAMESPACE::ComputePhase>();
+        phase << VSL_NAMESPACE::command::RenderPassBegin(*framebuffer, {VSL_NAMESPACE::ClearColor{0, 0, 1, 1}}) << VSL_NAMESPACE::command::RenderPassEnd{};
+        ticket = reader.record(phase, *color, VSL_NAMESPACE::ImageLayout::GENERAL);
+        ASSERT_TRUE(ticket);
+        ASSERT_EQ(phase.submit(), VSL_NAMESPACE::ComputePhase::SubmitResult::SUCCESS);
+        EXPECT_EQ(ticket->read().bytes[2], std::byte{255});
+    }
     TEST_F(ImageReadbackVulkanIntegrationTest, ReusesReleasedTicketSlotAcrossRecordedFrames) {
         auto manager = make_manager();
         AHO_NAMESPACE::ImageReadback reader(manager);

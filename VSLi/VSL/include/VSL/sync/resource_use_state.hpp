@@ -5,14 +5,15 @@
 namespace VSL_NAMESPACE {
     // submissionや保持中のframeを所有せず、最終的な完了状態を観測する。
     class CompletionObservation {
-        std::weak_ptr<impl::SubmissionImpl> _submission;
-        std::shared_ptr<const Completion::Status> _terminal;
+        Completion _result;
 
     public:
         CompletionObservation() = default;
         explicit CompletionObservation(const Completion& completion);
         Completion::Status status() const;
-        explicit operator bool() const { return bool(_terminal); }
+        Completion::Failure failure() const { return _result.failure(); }
+        std::int32_t error_code() const { return _result.error_code(); }
+        explicit operator bool() const { return bool(_result); }
     };
 
     // 弱参照により、この状態を含むframeをsubmission側から保持できる。

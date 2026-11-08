@@ -1,7 +1,12 @@
 #pragma once
 #include <VSL/vulkan/pv.hpp>
+#include <VSL/sync/completion.hpp>
 
 namespace VSL_NAMESPACE::sync {
-    // 最終所有者から呼ばれ、送信の完了と観測結果を確定する。資源保持は解放しない。
-    void finish_submission(impl::SubmissionImpl& submission) noexcept;
+    // 結果を先に確定してterminal callbackを通知する。SUBMISSION保持はWork寿命。
+    bool terminal_status(Completion::Status status) noexcept;
+    void publish_terminal(impl::SubmissionWork& work, Completion::Status status,
+                          Completion::Failure failure = Completion::Failure::NONE, std::int32_t error_code = 0) noexcept;
+    void observe_submission_result(impl::SubmissionWork& work, std::int32_t native_result);
+    void finish_submission(impl::SubmissionWork& submission) noexcept;
 } // namespace VSL_NAMESPACE::sync

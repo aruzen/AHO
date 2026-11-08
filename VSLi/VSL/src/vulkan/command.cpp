@@ -7,6 +7,8 @@
 #include <VSL/vulkan/command.hpp>
 #include <VSL/vulkan/phase.hpp>
 #include <VSL/vulkan/surface.hpp>
+#include <VSL/sync/submission_completion.hpp>
+#include <VSL/operation/submission_ops.hpp>
 #include <limits>
 #include <stdexcept>
 
@@ -64,8 +66,14 @@ void VSL_NAMESPACE::CommandBuffer::reset(std::uint32_t idx) {
 
 VSL_NAMESPACE::impl::CommandBufferImpl::~CommandBufferImpl() {
     for (const auto& submission : submissions)
-        if (submission && submission->status == Completion::Status::SUBMITTED)
-            Completion{submission}.wait();
+        if (submission)
+            sync::finish_submission(*submission);
+    if (!presentation_resources.empty()) {
+        auto result = operation::wait_device_idle(command_pool->device->device);
+        while (result != vk::Result::eSuccess && result != vk::Result::eErrorDeviceLost)
+            result = operation::wait_device_idle(command_pool->device->device);
+        presentation_resources.clear();
+    }
     if (!command_buffers.empty())
         command_pool->device->device.freeCommandBuffers(command_pool->command_pool, command_buffers);
 }
@@ -103,7 +111,14 @@ VSL_NAMESPACE::CommandBuffer VSL_NAMESPACE::CommandManager::make_exclusive_buffe
     return CommandBuffer(CommandPool{data_->command_pool}, static_cast<std::uint32_t>(size));
 }
 void VSL_NAMESPACE::CommandManager::wait_idle() {
-    data_->device->device.waitIdle();
+    const auto data = data_;
+    const auto presentation = data->command_buffer->presentation_resources;
+    data->device->device.waitIdle();
+    data->command_buffer->presentation_resources.clear();
+    const auto submissions = data->command_buffer->submissions;
+    for (const auto& submission : submissions)
+        if (submission)
+            sync::finish_submission(*submission);
 }
 
 VSL_NAMESPACE::impl::CommandPoolImpl::~CommandPoolImpl() {
@@ -131,5 +146,5 @@ VSL_NAMESPACE::CommandManager VSL_NAMESPACE::CommandManager::independent(std::ui
 }
 
 VSL_NAMESPACE::Completion VSL_NAMESPACE::CommandBuffer::completion() const {
-    return {data_ ? data_->recording_submission : nullptr};
+    return {data_ && data_->recording_submission ? data_->recording_submission->result : nullptr};
 }

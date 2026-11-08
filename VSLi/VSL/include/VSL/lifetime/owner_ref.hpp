@@ -6,6 +6,8 @@
 
 namespace VSL_NAMESPACE::lifetime {
     class DependencyNode;
+    template<typename T>
+    class WeakOwnedRef;
     namespace detail {
         struct OwnerAccess;
     }
@@ -14,6 +16,8 @@ namespace VSL_NAMESPACE::lifetime {
     class OwnedRef {
         template<typename>
         friend class OwnedRef;
+        template<typename>
+        friend class WeakOwnedRef;
         friend class DependencyNode;
         friend struct detail::OwnerAccess;
         std::shared_ptr<T> _value;
@@ -51,6 +55,7 @@ namespace VSL_NAMESPACE::lifetime {
         bool managed() const noexcept { return _node && use_count(); }
         // provenanceを持たない既存APIへ渡す明示的な移行境界。
         std::shared_ptr<T> share() const { return _value; }
+        WeakOwnedRef<T> weak() const noexcept;
         template<typename U>
         OwnedRef<U> alias(U* pointer) const { return {_value, pointer, _node}; }
         template<typename U>
@@ -67,6 +72,37 @@ namespace VSL_NAMESPACE::lifetime {
     };
     using OwnerRef = OwnedRef<void>;
 
+    // lockでownerを確保した後にだけ、同じowner内のnodeを参照する。
+    template<typename T>
+    class WeakOwnedRef {
+        template<typename>
+        friend class WeakOwnedRef;
+        std::weak_ptr<T> _value;
+        const DependencyNode* _node = nullptr;
+
+    public:
+        WeakOwnedRef() = default;
+        WeakOwnedRef(const WeakOwnedRef&) = default;
+        WeakOwnedRef(WeakOwnedRef&& other) noexcept : _value(std::move(other._value)), _node(std::exchange(other._node, nullptr)) {}
+        template<typename U>
+        requires(std::is_convertible_v<U*, T*>)
+        WeakOwnedRef(const OwnedRef<U>& owner) noexcept : _value(owner._value), _node(owner._node) {}
+        template<typename U>
+        requires(std::is_convertible_v<U*, T*>)
+        WeakOwnedRef(const WeakOwnedRef<U>& other) noexcept : _value(other._value), _node(other._node) {}
+        template<typename U>
+        requires(std::is_convertible_v<U*, T*>)
+        WeakOwnedRef(WeakOwnedRef<U>&& other) noexcept : _value(std::move(other._value)), _node(std::exchange(other._node, nullptr)) {}
+        static WeakOwnedRef Opaque(std::weak_ptr<T> value) noexcept;
+        WeakOwnedRef& operator=(WeakOwnedRef replacement) noexcept;
+        void swap(WeakOwnedRef& other) noexcept;
+        void reset() noexcept;
+        OwnedRef<T> lock() const noexcept;
+        bool expired() const noexcept { return _value.expired(); }
+        long use_count() const noexcept { return _value.use_count(); }
+    };
+    using WeakOwnerRef = WeakOwnedRef<void>;
+
     template<typename T>
     OwnedRef<T>& OwnedRef<T>::operator=(OwnedRef replacement) noexcept {
         swap(replacement);
@@ -81,5 +117,37 @@ namespace VSL_NAMESPACE::lifetime {
     void OwnedRef<T>::reset() noexcept {
         OwnedRef empty;
         swap(empty);
+    }
+    template<typename T>
+    WeakOwnedRef<T> OwnedRef<T>::weak() const noexcept {
+        return *this;
+    }
+    template<typename T>
+    WeakOwnedRef<T> WeakOwnedRef<T>::Opaque(std::weak_ptr<T> value) noexcept {
+        WeakOwnedRef result;
+        result._value = std::move(value);
+        return result;
+    }
+    template<typename T>
+    WeakOwnedRef<T>& WeakOwnedRef<T>::operator=(WeakOwnedRef replacement) noexcept {
+        swap(replacement);
+        return *this;
+    }
+    template<typename T>
+    void WeakOwnedRef<T>::swap(WeakOwnedRef& other) noexcept {
+        _value.swap(other._value);
+        std::swap(_node, other._node);
+    }
+    template<typename T>
+    void WeakOwnedRef<T>::reset() noexcept {
+        WeakOwnedRef empty;
+        swap(empty);
+    }
+    template<typename T>
+    OwnedRef<T> WeakOwnedRef<T>::lock() const noexcept {
+        auto owner = _value.lock();
+        if (!owner.use_count())
+            return {};
+        return {std::move(owner), _node};
     }
 } // namespace VSL_NAMESPACE::lifetime

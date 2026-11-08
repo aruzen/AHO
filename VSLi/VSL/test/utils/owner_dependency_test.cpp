@@ -96,6 +96,45 @@ namespace {
         EXPECT_EQ(owners.size(), 1u);
         EXPECT_EQ(l::detail::OwnerAccess::Node(owners.front()), &first->node);
     }
+    TEST(OwnerDependencyTest, WeakAliasesKeepProvenanceWithoutExtendingTheRootLifetime) {
+        l::WeakOwnedRef<const int> weak;
+        l::WeakOwnerRef null_weak;
+        {
+            auto root = make_root();
+            weak = root->node.ref(root).alias(&root->value).weak();
+            null_weak = root->node.owner_ref().alias(static_cast<void*>(nullptr)).weak();
+            EXPECT_EQ(root.use_count(), 1);
+            auto locked = weak.lock();
+            EXPECT_EQ(locked.get(), &root->value);
+            EXPECT_EQ(l::detail::OwnerAccess::Node(locked), &root->node);
+            auto null_locked = null_weak.lock();
+            EXPECT_FALSE(null_locked);
+            EXPECT_TRUE(null_locked.managed());
+            EXPECT_EQ(l::detail::OwnerAccess::Node(null_locked), &root->node);
+        }
+        EXPECT_TRUE(weak.expired());
+        EXPECT_TRUE(null_weak.expired());
+        EXPECT_EQ(weak.lock().use_count(), 0);
+        EXPECT_FALSE(null_weak.lock().managed());
+    }
+    TEST(OwnerDependencyTest, WeakMovesSwapsResetAndOpaqueInputsKeepPointerAndNodeTogether) {
+        static_assert(!std::is_convertible_v<std::weak_ptr<int>, l::WeakOwnedRef<int>>);
+        auto first = make_root(), second = make_root();
+        auto weak = first->node.ref(first).alias(&first->value).weak();
+        l::WeakOwnedRef<const int> moved = std::move(weak);
+        EXPECT_TRUE(weak.expired());
+        EXPECT_EQ(l::detail::OwnerAccess::Node(moved.lock()), &first->node);
+        l::WeakOwnedRef<const int> next = second->node.ref(second).alias(&second->value).weak();
+        moved.swap(next);
+        EXPECT_EQ(l::detail::OwnerAccess::Node(moved.lock()), &second->node);
+        EXPECT_EQ(l::detail::OwnerAccess::Node(next.lock()), &first->node);
+        moved = l::WeakOwnedRef<const int>::Opaque(second->node.ref(second).alias(&second->value).share());
+        EXPECT_FALSE(moved.lock().managed());
+        EXPECT_EQ(moved.lock().get(), &second->value);
+        next.reset();
+        EXPECT_TRUE(next.expired());
+        EXPECT_EQ(l::detail::OwnerAccess::Node(next.lock()), nullptr);
+    }
     TEST(OwnerDependencyTest, DedupUpgradesOpaqueAliasesWithoutLosingKnownEdgesOrNullOwners) {
         auto source = make_root(), target = make_root();
         connect(target, {source->node.owner_ref()});

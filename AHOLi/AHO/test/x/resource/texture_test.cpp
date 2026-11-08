@@ -45,5 +45,26 @@ namespace {
         EXPECT_FALSE(image.use_state().busy());
         EXPECT_FALSE(use.constraint_state->busy());
     }
+    TEST_F(ExperimentalTextureVulkanIntegrationTest, ManagedLogicalOwnerKeepsTheImageWithoutAnOwnershipCycle) {
+        std::optional<aho::x::resource::Texture> texture(std::in_place, device, 1, 1);
+        std::optional<vsl::ImageAccessor> image(texture->image());
+        auto use = texture->resource_use();
+        EXPECT_TRUE(use.owner.managed());
+        EXPECT_TRUE(use.constraint_state.managed());
+        EXPECT_TRUE(use.constraint_owner.managed());
+        EXPECT_FALSE(use.owner.owner_before(image->resource_use().owner));
+        EXPECT_FALSE(image->resource_use().owner.owner_before(use.owner));
+        EXPECT_TRUE(use.owner.owner_before(use.constraint_owner) || use.constraint_owner.owner_before(use.owner));
+        EXPECT_FALSE(use.constraint_state.owner_before(use.constraint_owner));
+        EXPECT_FALSE(use.constraint_owner.owner_before(use.constraint_state));
+        auto physical = use.owner.weak(), logical = use.constraint_owner.weak();
+        texture.reset();
+        EXPECT_FALSE(logical.expired());
+        use = {};
+        EXPECT_TRUE(logical.expired());
+        EXPECT_FALSE(physical.expired());
+        image.reset();
+        EXPECT_TRUE(physical.expired());
+    }
 } // namespace
 #endif

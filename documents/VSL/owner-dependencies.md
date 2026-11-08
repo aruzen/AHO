@@ -24,6 +24,8 @@ std::shared_ptr<void> legacy = owned.share();
 
 raw shared_ptrからの構築は移行用のopaque入口で、出所を推測しない。`share()`を通した値を再格納しても一般にはnodeは復元できない。通常のVSL factoryが作る物理実体では、正規ownerとImplのnodeのcontrol blockが一致した場合にだけ復元する。低水準で手作りした別ownerの内部を追跡する保証はない。
 
+`OwnedRef::weak()`は出所を保つ`WeakOwnedRef<T>`を返す。lockは先にstrong所有を取得し、use_countが正のときだけ同じnodeを伴うOwnedRefを返す。null aliasにも対応し、期限切れではnodeへ触れない。weakのmove／代入／resetもpointerとnodeを一体で扱う。raw weak入力は明示的な`WeakOwnedRef::Opaque()`に限り、nodeを推測しない。
+
 ## 固定依存と可変依存
 
 ResourceArenaは既定で従来のFIXED方針を維持する。構築時の依存以外へのbinding更新は拒否する。DYNAMICを明示すると、bindingごとの外部ownerを保持し、更新時に既知の管理root間の循環を拒否する。
@@ -68,7 +70,30 @@ stack上の別nodeへ任意のshared_ptrをpublishする使い方は、この寿
 
 一括領域は引き続きCPU Implと物理状態を対象とする。各Implのnode pointer、外側rootのnode、OwnedRefの出所情報の分だけmetadataは増える。node自体の個別確保はなく、DFS scratch、bindingコンテナ、動的ownerのbinding間重複保持、Vulkan device memoryは別に残る。性能率は未測定。
 
-AHOのBufferではphysical storage P・logical state L・custom generation R、TextureではData D→Image Pの固定所有を区別する。これらのAHO root visitorとTyped bundle内のSet／Pool／Layout実配置は、次の接続で行う。Device／起動・command／WSIの所有境界も完了計画の後続に残る。現段階で全VSL／AHOの所有をgraph化したとは扱わない。
+AHOの接続は次節の範囲まで行う。Typed bundle内のSet／Pool／Layout実配置とDevice／起動・command／WSIの所有境界は、完了計画の後続に残る。現段階で全VSL／AHOの所有をgraph化したとは扱わない。
+
+## AHOの世代と固定親
+
+Bufferはphysical storage P、独立したlogical state L、CUSTOM／通常Bufferのgeneration Rを分ける。Rにnodeを埋め込み、Rが所有するStorageのPを固定辺として列挙する。Lは資源を所有しないleafで、旧snapshotと新世代の双方から同じ論理制約を利用する。Rのdestructorはmapping／storage／customizationの破棄より先にnodeをretireする。
+
+BufferStateのweak resourceは出所を保持する。`BufferBinding::owner_ref()`とsnapshotはRの出所を維持し、互換用`owner()`だけがraw shared_ptrへ戻す。ArenaBuffer／ImportedBufferでは返却viewのPを直接使い、世代用ownerで包み直さない。同じarenaの別slotを複数のAHO Bufferへ渡してもcontrol blockは共通のままである。
+
+再確保はcandidateの生成・mapping・copy／writeを成功させてから、native／strong owner／weak owner／view／最終sizeを切り替える。旧Resource、旧view、native互換adapterは局所へ退避し、commit後に解放する。旧ownerの解放callbackは新しいsnapshot／size／内容を参照でき、更新APIも再入できる。prepareと完了pollの途中の同じ論理Bufferへの再入変更は`BufferMutation`で拒否する。局所state所有はcallbackが元facadeを破棄した場合にもcommitと解放を完了するための保持であり、送信へBufferStateを保持する変更ではない。
+
+TextureはData DのnodeからImage Pへの固定辺を列挙する。Dは物理状態と異なる論理状態を持ち、resource_useにはDのchecked state／ownerを制約として渡す。完了結果の観測とD／Pの保持は引き続き別の契約である。
+
+```cpp
+auto buffer = aho::resource::make_arena_buffer(device, 16);
+auto old = buffer.binding().snapshot();
+auto weak = buffer.binding().owner_ref().weak();
+buffer.resize(64);
+// oldは旧Pと共通Lを保持する。新世代やfactory設定は保持しない。
+auto old_owner = weak.lock();
+```
+
+Customization／custom mappingの任意の内部所有、factory closure、公開native／data_による直接置換は今回のgraph保証の外側にある。これらは呼出側が非循環と寿命を保証する移行境界であり、nodeを付けたことで内部の任意所有まで追跡できるとは扱わない。関連rootのhost操作は外部で直列化する。custom mapping callbackからGPUの競合使用を追加することは許可しない。raw spanを返す既存read()の長期アクセス契約も変更せず、安全な呼出内コピーにはread_into()を使用する。
+
+今回追加したのは既存R／D内のnodeとweak参照の出所で、arena世代wrapperやnode用の個別確保は増やさない。R、logical leaf、既存adapter、mapping／コンテナの個別確保は移行途中として残る。初期化と再確保のcycle検査にはDFS scratchを使う。性能率は未測定である。
 
 ## 検証
 
@@ -79,3 +104,7 @@ macOS arm64／Clang20／C++26、ASan・UBSan、MoltenVK・Vulkan validationで�
 公開ヘッダーだけのinstalled consumer6targetがbuild／link／CPU実行し、新public header提供とprivate Impl／owner_access非公開を確認した。Debug／Releaseの実寸法assert・CPU実行、同寸法でも異artifactのlink拒否、x86_64 cross archiveが成功した。このarm64構成で6種Implを一つずつ配置する領域は584 byte・alignment 8である。
 
 heap／arenaサンプルは3frame・12submission・2draw、238831更新画素とresize、pipeline生成1回を維持し、PNG3枚が一致した。VUID／ASan／UBSan errorはない。LSan、Windows／Linux実機、CPU並行、実DeviceLost、全native失敗位置、性能率は未検証。driver最終メモリ表示をリーク不在の証拠として扱わない。
+
+AHO接続ではCPU2件・GPU9件を追加した。weakの期限切れ／null alias／型変換、R→Pを通る間接cycle、DとPの個別回収、候補書込み失敗、prepare中の再入変更拒否、旧owner callbackが観測する新世代の内容を確認した。prepare callbackがfacadeを破棄する3操作、完了callbackがBuffer／Binding／Snapshotを破棄する5入口は、heap／arena双方でASan・UBSan下を通した。既存の同arena重複排除と旧snapshot寿命も維持する。
+
+最終コードでVSL810件中807成功・既知3skip、AHO GPU149件／CPU1070件、compile契約175件、strict13C++／11TU違反0、CMake280パス検査が成功した。installed consumerはAHO／WeakOwnedRefを加えた7targetのbuild／link／CPU実行、private定義非公開を確認した。Debug／Releaseで実寸法288／584 byte（alignment 8）、x86_64 cross archiveと異artifactのlink拒否を再確認した。両描画サンプルの実測結果とPNG3枚は前記と同じである。独立レビュー2名の指摘を反映し、VUID／sanitizer errorはない。上記の未検証環境・性能率は今回も未測定のままとする。

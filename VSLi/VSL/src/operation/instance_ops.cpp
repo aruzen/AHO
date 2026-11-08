@@ -71,6 +71,11 @@ namespace VSL_NAMESPACE::operation {
         validate_text(info.engine_name, true);
         normalize(info.extensions);
         normalize(info.layers);
+        const bool surface = std::ranges::find(info.extensions, VK_KHR_SURFACE_EXTENSION_NAME) != info.extensions.end();
+        const bool capabilities2 = std::ranges::find(info.extensions, VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME) != info.extensions.end();
+        const bool maintenance1 = std::ranges::find(info.extensions, VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME) != info.extensions.end();
+        if ((capabilities2 && !surface) || (maintenance1 && (!surface || !capabilities2)))
+            throw std::invalid_argument("Surface maintenance requires KHR_surface and KHR_get_surface_capabilities2");
         if (info.debug_printf && !info.validation)
             throw std::invalid_argument("Debug printf requires validation");
         if (info.validation) {
@@ -135,6 +140,8 @@ namespace VSL_NAMESPACE::operation {
         instance.destroy_debug_messenger = std::exchange(pending.destroy_debug_messenger, nullptr);
         instance.api_version = info.api_version ? info.api_version : VK_API_VERSION_1_0;
         instance.physical_device_properties2 = std::ranges::find(info.extensions, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME) != info.extensions.end();
+        instance.surface_capabilities2 = capabilities2;
+        instance.surface_maintenance1 = maintenance1;
     }
     void destroy_instance(impl::VulkanImplAccessor& instance, const InstanceNativeCalls& calls) noexcept {
         if (instance.debug_messenger) {
@@ -154,5 +161,7 @@ namespace VSL_NAMESPACE::operation {
                 vkDestroyInstance(instance.instance, nullptr);
             instance.instance = nullptr;
         }
+        instance.surface_capabilities2 = false;
+        instance.surface_maintenance1 = false;
     }
 } // namespace VSL_NAMESPACE::operation

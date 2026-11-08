@@ -60,6 +60,7 @@ namespace VSL_NAMESPACE::impl {
         PFN_vkDestroyDebugUtilsMessengerEXT destroy_debug_messenger = nullptr;
         std::uint32_t api_version = VK_API_VERSION_1_0;
         bool physical_device_properties2 = false;
+        bool surface_capabilities2 = false, surface_maintenance1 = false;
         VulkanImplAccessor() = default;
         VulkanImplAccessor(const VulkanImplAccessor&) = delete;
         VulkanImplAccessor& operator=(const VulkanImplAccessor&) = delete;

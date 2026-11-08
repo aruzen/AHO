@@ -66,7 +66,7 @@ namespace VSL_NAMESPACE::operation {
             &VkPhysicalDeviceFeatures::variableMultisampleRate,
             &VkPhysicalDeviceFeatures::inheritedQueries};
         static_assert(static_cast<std::uint64_t>(DeviceFeature::INHERITED_QUERIES) == (1ull << (CORE_FEATURE_FIELDS.size() - 1)));
-        constexpr std::uint64_t KNOWN_FEATURES = (static_cast<std::uint64_t>(DeviceFeature::TIMELINE_SEMAPHORE) << 1) - 1;
+        constexpr std::uint64_t KNOWN_FEATURES = (static_cast<std::uint64_t>(DeviceFeature::SWAPCHAIN_MAINTENANCE1) << 1) - 1;
         bool has_extension(std::span<const vk::ExtensionProperties> extensions, std::string_view name);
         std::uint32_t effective_api(impl::PhysicalDeviceImpl& physical);
         DeviceFeature query_features(impl::PhysicalDeviceImpl& physical, std::span<const vk::ExtensionProperties> extensions);
@@ -89,16 +89,23 @@ namespace VSL_NAMESPACE::operation {
             const auto& instance = *physical.vulkan;
             const bool core_query = instance.api_version >= VK_API_VERSION_1_1;
             const bool timeline_available = effective_api(physical) >= VK_API_VERSION_1_2 || has_extension(extensions, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
-            if (timeline_available && (core_query || instance.physical_device_properties2)) {
+            const bool maintenance_available = instance.surface_maintenance1 && instance.surface_capabilities2 &&
+                                               has_extension(extensions, VK_KHR_SWAPCHAIN_EXTENSION_NAME) && has_extension(extensions, VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME);
+            if ((timeline_available || maintenance_available) && (core_query || instance.physical_device_properties2)) {
                 const auto query = reinterpret_cast<PFN_vkGetPhysicalDeviceFeatures2>(vkGetInstanceProcAddr(instance.instance,
                                                                                                             core_query ? "vkGetPhysicalDeviceFeatures2" : "vkGetPhysicalDeviceFeatures2KHR"));
                 if (!query)
                     throw std::runtime_error("Enabled PhysicalDevice features2 entry point is unavailable");
-                VkPhysicalDeviceTimelineSemaphoreFeatures timeline{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES};
-                VkPhysicalDeviceFeatures2 features{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, .pNext = &timeline};
+                VkPhysicalDeviceSwapchainMaintenance1FeaturesEXT maintenance{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_EXT};
+                VkPhysicalDeviceTimelineSemaphoreFeatures timeline{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
+                                                                   .pNext = maintenance_available ? &maintenance : nullptr};
+                VkPhysicalDeviceFeatures2 features{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+                                                   .pNext = timeline_available ? static_cast<void*>(&timeline) : &maintenance};
                 query(physical.device, &features);
-                if (timeline.timelineSemaphore)
+                if (timeline_available && timeline.timelineSemaphore)
                     mask |= static_cast<std::uint64_t>(DeviceFeature::TIMELINE_SEMAPHORE);
+                if (maintenance_available && maintenance.swapchainMaintenance1)
+                    mask |= static_cast<std::uint64_t>(DeviceFeature::SWAPCHAIN_MAINTENANCE1);
             }
             return static_cast<DeviceFeature>(mask);
         }
@@ -109,7 +116,9 @@ namespace VSL_NAMESPACE::operation {
         const auto extensions = physical.device.enumerateDeviceExtensionProperties();
         return query_features(physical, extensions);
     }
-    DeviceCreateInfo graphics_device_info(impl::PhysicalDeviceImpl& physical, impl::SurfaceImpl& surface, bool validation) {
+    DeviceCreateInfo graphics_device_info(impl::PhysicalDeviceImpl& physical, impl::SurfaceImpl& surface, bool validation, PresentFencePolicy present_fences) {
+        if (present_fences != PresentFencePolicy::LEGACY && present_fences != PresentFencePolicy::REQUIRE_FENCE)
+            throw std::invalid_argument("Unknown presentation fence policy");
         if (!physical.device || !physical.vulkan || surface.vulkan != physical.vulkan || !surface.surface)
             throw std::invalid_argument("Graphics Device requires a Surface on its PhysicalDevice Instance");
         DeviceCreateInfo info;
@@ -132,6 +141,8 @@ namespace VSL_NAMESPACE::operation {
         info.features = DeviceFeature::SAMPLER_ANISOTROPY | DeviceFeature::INDEPENDENT_BLEND;
         if (validation)
             info.features = info.features | DeviceFeature::VERTEX_PIPELINE_STORES_AND_ATOMICS | DeviceFeature::FRAGMENT_STORES_AND_ATOMICS;
+        if (present_fences == PresentFencePolicy::REQUIRE_FENCE)
+            info.features = info.features | DeviceFeature::SWAPCHAIN_MAINTENANCE1;
         return info;
     }
     void initialize_device(impl::LogicalDeviceImpl& target, impl::PhysicalDeviceImpl& physical, DeviceCreateInfo info, const DeviceNativeCalls& calls) {
@@ -185,6 +196,14 @@ namespace VSL_NAMESPACE::operation {
         const bool timeline_enabled = has_device_features(info.features, DeviceFeature::TIMELINE_SEMAPHORE);
         if (timeline_enabled && effective_api(physical) < VK_API_VERSION_1_2)
             info.extensions.emplace_back(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
+        const bool maintenance_enabled = has_device_features(info.features, DeviceFeature::SWAPCHAIN_MAINTENANCE1);
+        if (maintenance_enabled || std::ranges::find(info.extensions, VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME) != info.extensions.end()) {
+            if (!physical.vulkan->surface_maintenance1 || !physical.vulkan->surface_capabilities2 ||
+                (physical.vulkan->api_version < VK_API_VERSION_1_1 && !physical.vulkan->physical_device_properties2))
+                throw std::invalid_argument("Swapchain maintenance requires enabled Instance dependencies and features2");
+            info.extensions.emplace_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+            info.extensions.emplace_back(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME);
+        }
         std::vector<const char*> names;
         names.reserve(info.extensions.size());
         for (const auto& name : info.extensions) {
@@ -198,8 +217,14 @@ namespace VSL_NAMESPACE::operation {
         VkPhysicalDeviceFeatures features{};
         for (size_t i = 0; i < CORE_FEATURE_FIELDS.size(); ++i)
             features.*CORE_FEATURE_FIELDS[i] = (static_cast<std::uint64_t>(info.features) >> i) & 1u;
-        const VkPhysicalDeviceTimelineSemaphoreFeatures timeline{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES, .timelineSemaphore = timeline_enabled};
-        const VkDeviceCreateInfo native{.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO, .pNext = timeline_enabled ? &timeline : nullptr, .queueCreateInfoCount = static_cast<std::uint32_t>(queues.size()), .pQueueCreateInfos = queues.data(), .enabledExtensionCount = static_cast<std::uint32_t>(names.size()), .ppEnabledExtensionNames = names.data(), .pEnabledFeatures = &features};
+        VkPhysicalDeviceSwapchainMaintenance1FeaturesEXT maintenance{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_EXT,
+                                                                     .swapchainMaintenance1 = maintenance_enabled};
+        VkPhysicalDeviceTimelineSemaphoreFeatures timeline{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
+                                                           .pNext = maintenance_enabled ? &maintenance : nullptr,
+                                                           .timelineSemaphore = timeline_enabled};
+        const void* chain = timeline_enabled ? static_cast<const void*>(&timeline) : maintenance_enabled ? &maintenance
+                                                                                                         : nullptr;
+        const VkDeviceCreateInfo native{.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO, .pNext = chain, .queueCreateInfoCount = static_cast<std::uint32_t>(queues.size()), .pQueueCreateInfos = queues.data(), .enabledExtensionCount = static_cast<std::uint32_t>(names.size()), .ppEnabledExtensionNames = names.data(), .pEnabledFeatures = &features};
         VkDevice handle = VK_NULL_HANDLE;
         const auto result = calls.create ? calls.create(calls.context, physical.device, &native, &handle)
                                          : vkCreateDevice(physical.device, &native, nullptr, &handle);

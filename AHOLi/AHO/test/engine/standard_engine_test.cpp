@@ -1,4 +1,5 @@
 #include <limits>
+#include <algorithm>
 #ifdef AHO_GPU_TESTS
 #include "../support/live_gpu.hpp"
 namespace {
@@ -59,6 +60,28 @@ namespace {
         EXPECT_TRUE(static_cast<bool>(second));
         EXPECT_TRUE(second.resize(80, 64));
         EXPECT_TRUE(second.close());
+    }
+    TEST_F(StandardEngineVulkanIntegration, ExplicitPresentFencePolicyEnablesInstanceAndDeviceTogether) {
+        const auto available = vk::enumerateInstanceExtensionProperties();
+        if (!std::ranges::any_of(available, [](const auto& extension) {
+                return std::string_view(extension.extensionName.data()) == VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME;
+            }))
+            GTEST_SKIP() << "Surface maintenance Instance extension unavailable";
+        vsl::InstanceCreateInfo info;
+#ifdef __APPLE__
+        info.extensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+#endif
+        const auto probe = vsl::VulkanAccessor::Create(vsl::lifetime::glfw_instance_info(std::move(info), vsl::PresentFencePolicy::REQUIRE_FENCE));
+        const auto physical = vsl::PhysicalDevice::Select(probe);
+        if (!vsl::has_device_features(physical.supported_features(), vsl::DeviceFeature::SWAPCHAIN_MAINTENANCE1))
+            GTEST_SKIP() << "Swapchain maintenance feature unavailable";
+        aho::engine::StandardEngineConfig config;
+        config.engine.present_fences = vsl::PresentFencePolicy::REQUIRE_FENCE;
+        engine = std::make_unique<aho::StandardEngine>(config);
+        EXPECT_TRUE(engine->data()->vulkan_instance.accessor->surface_capabilities2);
+        EXPECT_TRUE(engine->data()->vulkan_instance.accessor->surface_maintenance1);
+        EXPECT_TRUE(vsl::has_device_features(engine->data()->logical_device.enabled_features(), vsl::DeviceFeature::SWAPCHAIN_MAINTENANCE1));
+        EXPECT_TRUE(static_cast<bool>(engine->get_window()));
     }
     TEST_F(StandardEngineVulkanIntegration, BasePointerDestructionReleasesClosedWindowAndEngineResources) {
         ASSERT_NO_THROW(start_engine());
@@ -228,6 +251,9 @@ namespace {
         EXPECT_THROW((aho::StandardEngine{config, false}), std::invalid_argument);
         config.engine.descriptor_budget = {{vsl::graphic_resource::Type::UNIFORM_BUFFER, std::numeric_limits<std::uint32_t>::max()},
                                            {vsl::graphic_resource::Type::STORAGE_BUFFER, 1}};
+        EXPECT_THROW((aho::StandardEngine{config, false}), std::invalid_argument);
+        config.engine.descriptor_budget = {{vsl::graphic_resource::Type::UNIFORM_BUFFER, 1}};
+        config.engine.present_fences = static_cast<vsl::PresentFencePolicy>(99);
         EXPECT_THROW((aho::StandardEngine{config, false}), std::invalid_argument);
         EXPECT_EQ(vsl::PureWindow::WINDOWS, windows);
     }

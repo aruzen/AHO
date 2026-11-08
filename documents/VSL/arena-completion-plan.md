@@ -9,7 +9,7 @@
 
 最初のPRだけで終了せず、下記の順で実装・検証・独立レビューを継続する。PRの公開前には最新masterとの差分を確認する。新しい製品ディレクトリが必要な場合は作成前に確認する。
 
-現在の到達点は順序1〜9である。command／同期資源の配置とTyped frame再利用、Instance／PhysicalDevice／Surface／Deviceの共通backend、OS windowの寿命分離、公開StartupArenaとAHO起動を接続した。順序10〜12は未完了であり、WSI接続、既定policy変更、旧入口廃止と最終監査まで継続する。
+現在の到達点は順序1〜9と10aである。command／同期資源の配置とTyped frame再利用、起動資源の共通backend、OS windowの寿命分離、公開StartupArenaとAHO起動、maintenance1の能力照会／有効化を接続した。順序10全体と11〜12は未完了であり、WSI接続、既定policy変更、旧入口廃止と最終監査まで継続する。
 
 ## 責務と保証
 
@@ -177,6 +177,8 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 ## 順序10の分割
 
 10aはmaintenance1の能力照会・Instance依存・Device feature chainを接続する。厳密な資源回収を要求する入口では未対応を生成前に拒否し、互換fallbackは独立policyとする。現SDKのEXT型と実driverの能力を照合し、device idleをpresentation完了の証明へ昇格させない。
+
+[10aのPresent Fence能力と有効化](present-fence-features.md)で、独立した生成要求、実Instance設定、core／KHR queryとtimeline併用、supportedとenabledの分離を実装・検証した。拡張名だけやLEGACYでfeatureを暗黙に有効化しない。実際のFence付きpresent／厳密回収は10cで接続し、この段階では保証しない。
 
 10bはSwapchainの共通backend／指定領域構築と、全aliasで共有する現役／退役状態。nativeへoldSwapchainを渡した後は、生成失敗でも退役を取り消さない。実画像数に従うImage／世代同期群の計画を、native pending状態から構築する。
 

@@ -12,6 +12,7 @@
 #include <VSL/vulkan/descriptor_set_manager.hpp>
 #include <VSL/lifetime/descriptor_storage.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
+#include <VSL/lifetime/device_owner.hpp>
 
 namespace VSL_NAMESPACE::graphic_resource {
     ManagerInterface::ManagerInterface()
@@ -155,6 +156,8 @@ VSL_NAMESPACE::impl::GraphicResourceManagerImpl::~GraphicResourceManagerImpl() {
 }
 
 VSL_NAMESPACE::graphic_resource::ExactAllocateManager::ExactAllocateManager(LogicalDeviceAccessor device) {
+    if (device.data_)
+        lifetime::require_device_owner(device);
     data_ = std::make_shared<impl::GraphicResourceManagerImpl>();
     data_->device = device.data_;
 }
@@ -188,12 +191,16 @@ void VSL_NAMESPACE::graphic_resource::ExactAllocateManager::destroy(const VSL_NA
 VSL_NAMESPACE::graphic_resource::OverAllocateManager::OverAllocateManager(VSL_NAMESPACE::LogicalDeviceAccessor device,
                                                                           std::map<Type, size_t> count, size_t other)
     : size(count), other(other) {
+    if (device.data_)
+        lifetime::require_device_owner(device);
     data_ = std::make_shared<impl::GraphicResourceManagerImpl>();
     data_->device = device.data_;
     pools.push_back(make(count, other));
 }
 
 VSL_NAMESPACE::graphic_resource::OverAllocateManager::OverAllocateManager(VSL_NAMESPACE::LogicalDeviceAccessor device) {
+    if (device.data_)
+        lifetime::require_device_owner(device);
     data_ = std::make_shared<impl::GraphicResourceManagerImpl>();
     data_->device = device.data_;
 }

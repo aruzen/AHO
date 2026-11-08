@@ -1,3 +1,4 @@
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/synchronization_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <new>
@@ -10,7 +11,7 @@ namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_nothrow_default_constructible_v<impl::FenceImpl>);
     static_assert(std::is_nothrow_default_constructible_v<SynchronizationOwnerContext>);
     namespace {
-        template<typename Slot, typename Info, void (*Construct)(void*, LogicalDeviceAccessor, Info), void (*Destroy)(void*) noexcept>
+        template<typename Slot, typename Info, void (*Construct)(void*, impl::LogicalDeviceImpl&, Info), void (*Destroy)(void*) noexcept>
         struct HeapSynchronizationOwner {
             DependencyNode node;
             LogicalDeviceAccessor device;
@@ -19,29 +20,30 @@ namespace VSL_NAMESPACE::lifetime {
             ~HeapSynchronizationOwner();
             static void VisitDependencies(const void* owner, DependencyNode::EdgeVisitor visitor, void* context);
         };
-        template<typename Slot, typename Info, void (*Construct)(void*, LogicalDeviceAccessor, Info), void (*Destroy)(void*) noexcept>
+        template<typename Slot, typename Info, void (*Construct)(void*, impl::LogicalDeviceImpl&, Info), void (*Destroy)(void*) noexcept>
         HeapSynchronizationOwner<Slot, Info, Construct, Destroy>::HeapSynchronizationOwner(LogicalDeviceAccessor device, Info info) : device(device) {
-            Construct(storage, device, info);
+            require_device_owner(device);
+            Construct(storage, *device.data_, info);
         }
-        template<typename Slot, typename Info, void (*Construct)(void*, LogicalDeviceAccessor, Info), void (*Destroy)(void*) noexcept>
+        template<typename Slot, typename Info, void (*Construct)(void*, impl::LogicalDeviceImpl&, Info), void (*Destroy)(void*) noexcept>
         HeapSynchronizationOwner<Slot, Info, Construct, Destroy>::~HeapSynchronizationOwner() {
             node.retire();
             Destroy(storage);
         }
-        template<typename Slot, typename Info, void (*Construct)(void*, LogicalDeviceAccessor, Info), void (*Destroy)(void*) noexcept>
+        template<typename Slot, typename Info, void (*Construct)(void*, impl::LogicalDeviceImpl&, Info), void (*Destroy)(void*) noexcept>
         void HeapSynchronizationOwner<Slot, Info, Construct, Destroy>::VisitDependencies(const void* owner, DependencyNode::EdgeVisitor visitor, void* context) {
-            visitor(context, OwnerRef(static_cast<const HeapSynchronizationOwner*>(owner)->device.data_));
+            visitor(context, static_cast<const HeapSynchronizationOwner*>(owner)->device.owner_ref());
         }
         template<typename Slot, typename Impl, typename Info, void (*Initialize)(Impl&, impl::LogicalDeviceImpl&, Info)>
-        void construct(void* storage, LogicalDeviceAccessor device, Info info) {
-            if (!device.data_ || !device.data_.use_count())
+        void construct(void* storage, impl::LogicalDeviceImpl& device, Info info) {
+            if (!device.device)
                 throw std::invalid_argument("Synchronization requires a logical device owner");
             auto* slot = std::construct_at(static_cast<Slot*>(storage));
             auto* context = std::construct_at(reinterpret_cast<SynchronizationOwnerContext*>(slot->context));
             auto* value = std::construct_at(reinterpret_cast<Impl*>(slot->value));
             value->owner_context = context;
             try {
-                Initialize(*value, *device.data_, info);
+                Initialize(*value, device, info);
             } catch (...) {
                 std::destroy_at(value);
                 std::destroy_at(context);
@@ -51,9 +53,17 @@ namespace VSL_NAMESPACE::lifetime {
         }
     } // namespace
     void construct_semaphore(void* storage, LogicalDeviceAccessor device, SemaphoreCreateInfo info) {
+        require_device_owner(device);
+        construct_semaphore(storage, *device.data_, info);
+    }
+    void construct_semaphore(void* storage, impl::LogicalDeviceImpl& device, SemaphoreCreateInfo info) {
         construct<SemaphoreSlotStorage, impl::SemaphoreImpl, SemaphoreCreateInfo, operation::initialize_semaphore>(storage, device, info);
     }
     void construct_fence(void* storage, LogicalDeviceAccessor device, FenceCreateInfo info) {
+        require_device_owner(device);
+        construct_fence(storage, *device.data_, info);
+    }
+    void construct_fence(void* storage, impl::LogicalDeviceImpl& device, FenceCreateInfo info) {
         construct<FenceSlotStorage, impl::FenceImpl, FenceCreateInfo, operation::initialize_fence>(storage, device, info);
     }
     impl::SemaphoreImpl& semaphore_at(void* storage) {

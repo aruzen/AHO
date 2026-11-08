@@ -1,3 +1,4 @@
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/buffer_storage.hpp>
 
 #include <VSL/vulkan/buffer.hpp>
@@ -81,10 +82,10 @@ std::size_t VSL_NAMESPACE::BufferAccessor::requested_size() const {
 }
 
 VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::BufferAccessor::get_device() const {
-    if (!data_ || !data_->device)
+    if (!data_ || !data_->device || !data_->buffer)
         throw std::logic_error("Buffer is empty");
     // 既存の所有するAccessorへの移行用adapter。通常のbackend操作では呼ばない。
-    return LogicalDeviceAccessor{data_->device->shared_from_this()};
+    return lifetime::device_from_child(data_);
 }
 
 VSL_NAMESPACE::MemoryType VSL_NAMESPACE::BufferAccessor::get_usage() const {

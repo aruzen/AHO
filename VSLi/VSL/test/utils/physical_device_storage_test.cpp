@@ -253,21 +253,15 @@ namespace {
             if (found == queues.end())
                 GTEST_SKIP() << "Selected physical device has no graphics queue";
             const auto family = static_cast<std::uint32_t>(found - queues.begin());
-            const float priority = 1.0f;
-            const vk::DeviceQueueCreateInfo queue{.queueFamilyIndex = family, .queueCount = 1, .pQueuePriorities = &priority};
-            std::vector<const char*> extensions;
-            for (const auto& extension : selected.data_->device.enumerateDeviceExtensionProperties())
-                if (std::strcmp(extension.extensionName, "VK_KHR_portability_subset") == 0)
-                    extensions.push_back("VK_KHR_portability_subset");
-            logical = std::make_shared<vsl::impl::LogicalDeviceImpl>();
-            logical->parent_device = selected.data_;
-            logical->graphics_family = logical->present_family = family;
-            logical->device = selected.data_->device.createDevice({.queueCreateInfoCount = 1, .pQueueCreateInfos = &queue, .enabledExtensionCount = static_cast<std::uint32_t>(extensions.size()), .ppEnabledExtensionNames = extensions.data()});
+            vsl::DeviceCreateInfo info;
+            info.graphics_family = family;
+            info.require_compute = false;
+            logical = vsl::LogicalDeviceAccessor::Create(selected, std::move(info)).data_;
         }
         EXPECT_FALSE(parent.expired());
         EXPECT_FALSE(selected_owner.expired());
         EXPECT_TRUE(logical->device.getQueue(logical->graphics_family, 0));
-        EXPECT_TRUE(vsl::PhysicalDevice(logical->parent_device).get_instance().owner_ref().managed());
+        EXPECT_TRUE(vsl::LogicalDeviceAccessor{logical}.get_physical_device().get_instance().owner_ref().managed());
         logical.reset();
         EXPECT_TRUE(parent.expired());
         EXPECT_TRUE(selected_owner.expired());

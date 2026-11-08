@@ -133,6 +133,8 @@ namespace VSL_NAMESPACE::operation {
         instance.instance = std::exchange(pending.instance, nullptr);
         instance.debug_messenger = std::exchange(pending.debug_messenger, nullptr);
         instance.destroy_debug_messenger = std::exchange(pending.destroy_debug_messenger, nullptr);
+        instance.api_version = info.api_version ? info.api_version : VK_API_VERSION_1_0;
+        instance.physical_device_properties2 = std::ranges::find(info.extensions, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME) != info.extensions.end();
     }
     void destroy_instance(impl::VulkanImplAccessor& instance, const InstanceNativeCalls& calls) noexcept {
         if (instance.debug_messenger) {

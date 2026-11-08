@@ -1,3 +1,4 @@
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/frame_buffer_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <new>
@@ -22,7 +23,8 @@ namespace VSL_NAMESPACE::lifetime {
             if (!pass.use_count() || pass.get() != input.pass)
                 throw std::invalid_argument("Framebuffer root requires its pass owner");
             detail::retain_owner(this->dependencies, pass);
-            construct_frame_buffer(storage, device, std::move(input));
+            require_device_owner(device);
+            construct_frame_buffer(storage, *device.data_, std::move(input));
             try {
                 set_frame_buffer_pass_owner(frame_buffer_at(storage), pass.alias(frame_buffer_at(storage).render_pass));
             } catch (...) {
@@ -38,18 +40,22 @@ namespace VSL_NAMESPACE::lifetime {
             const auto& value = *static_cast<const HeapFrameBufferOwner*>(owner);
             for (const auto& dependency : value.dependencies)
                 visitor(context, dependency);
-            visitor(context, OwnerRef(value.device.data_));
+            visitor(context, value.device.owner_ref());
         }
     } // namespace
     void construct_frame_buffer(void* storage, LogicalDeviceAccessor device, operation::FrameBufferInput input) {
-        if (!device.data_ || !device.data_.use_count())
+        require_device_owner(device);
+        construct_frame_buffer(storage, *device.data_, std::move(input));
+    }
+    void construct_frame_buffer(void* storage, impl::LogicalDeviceImpl& device, operation::FrameBufferInput input) {
+        if (!device.device)
             throw std::invalid_argument("Framebuffer requires a logical device owner");
         auto* slot = std::construct_at(static_cast<FrameBufferSlotStorage*>(storage));
         auto* context = std::construct_at(reinterpret_cast<FrameBufferOwnerContext*>(slot->context));
         auto* target = std::construct_at(reinterpret_cast<impl::FrameBufferImpl*>(slot->value));
         target->owner_context = context;
         try {
-            operation::initialize_frame_buffer(*target, *device.data_, std::move(input));
+            operation::initialize_frame_buffer(*target, device, std::move(input));
         } catch (...) {
             std::destroy_at(target);
             std::destroy_at(context);

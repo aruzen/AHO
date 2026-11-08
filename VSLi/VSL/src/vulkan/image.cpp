@@ -1,3 +1,4 @@
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/define.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>
@@ -50,9 +51,9 @@ VSL_NAMESPACE::data_format::Format VSL_NAMESPACE::ImageAccessor::get_format() co
 }
 
 VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::ImageAccessor::get_device() const {
-    if (!data_)
+    if (!data_ || !data_->image || !data_->device)
         throw std::invalid_argument("Image is empty");
-    return {data_->device->shared_from_this()};
+    return lifetime::device_from_child(data_);
 }
 
 VSL_NAMESPACE::ImageType VSL_NAMESPACE::ImageAccessor::get_usage() const {

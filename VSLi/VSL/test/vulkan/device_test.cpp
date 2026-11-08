@@ -68,8 +68,8 @@ namespace {
 #endif
         using Device = vsl::LogicalDevice<vsl::LogicalDeviceGraphicCreator<false>>;
         Device by_pointer(physical, surface), by_value(physical, *surface);
-        EXPECT_EQ(by_pointer.data_->parent_device, physical.data_);
-        EXPECT_EQ(by_value.data_->parent_device, physical.data_);
+        EXPECT_EQ(by_pointer.get_physical_device().data_, physical.data_);
+        EXPECT_EQ(by_value.get_physical_device().data_, physical.data_);
         EXPECT_TRUE(static_cast<bool>(by_pointer.data_->device.getQueue(by_pointer.data_->graphics_family, 0)));
         EXPECT_TRUE(static_cast<bool>(by_value.data_->device.getQueue(by_value.data_->present_family, 0)));
         by_pointer.data_->device.waitIdle();
@@ -114,17 +114,15 @@ namespace {
             }
         } cleanup;
         SuppliedLogicalDeviceCreator::SUPPLIED = device.data_;
-        device.data_->parent_device.reset();
         using Device = vsl::LogicalDevice<SuppliedLogicalDeviceCreator>;
         Device by_value(physical, *surface);
         EXPECT_EQ(by_value.data_, device.data_);
-        EXPECT_EQ(by_value.data_->parent_device, physical.data_);
+        EXPECT_EQ(by_value.get_physical_device().data_, physical.data_);
         EXPECT_EQ(SuppliedLogicalDeviceCreator::RECEIVED_PHYSICAL, physical.data_);
         EXPECT_EQ(SuppliedLogicalDeviceCreator::RECEIVED_SURFACE, surface->data_);
-        device.data_->parent_device.reset();
         Device by_pointer(physical, surface);
         EXPECT_EQ(by_pointer.data_, device.data_);
-        EXPECT_EQ(by_pointer.data_->parent_device, physical.data_);
+        EXPECT_EQ(by_pointer.get_physical_device().data_, physical.data_);
         EXPECT_TRUE(static_cast<bool>(by_pointer.data_->device.getQueue(queue_family, 0)));
     }
 } // namespace

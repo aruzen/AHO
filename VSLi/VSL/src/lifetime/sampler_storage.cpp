@@ -1,3 +1,4 @@
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/sampler_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <new>
@@ -13,7 +14,8 @@ namespace VSL_NAMESPACE::lifetime {
             ~HeapSamplerOwner();
         };
         HeapSamplerOwner::HeapSamplerOwner(LogicalDeviceAccessor device, const SamplerCreateInfo& info) : device(device) {
-            construct_sampler(storage, device, info);
+            require_device_owner(device);
+            construct_sampler(storage, *device.data_, info);
         }
         HeapSamplerOwner::~HeapSamplerOwner() {
             node.retire();
@@ -22,13 +24,17 @@ namespace VSL_NAMESPACE::lifetime {
     } // namespace
 
     void construct_sampler(void* storage, LogicalDeviceAccessor device, const SamplerCreateInfo& info) {
-        if (!device.data_ || !device.data_->device)
+        require_device_owner(device);
+        construct_sampler(storage, *device.data_, info);
+    }
+    void construct_sampler(void* storage, impl::LogicalDeviceImpl& device, const SamplerCreateInfo& info) {
+        if (!device.device)
             throw std::invalid_argument("Sampler requires a live device");
         auto* slot = std::construct_at(static_cast<SamplerSlotStorage*>(storage));
         auto* sampler = std::construct_at(reinterpret_cast<impl::SamplerImpl*>(slot->sampler));
         sampler->use = std::construct_at(reinterpret_cast<ResourceUseState*>(slot->use));
         try {
-            operation::initialize_sampler(*sampler, *device.data_, info);
+            operation::initialize_sampler(*sampler, device, info);
         } catch (...) {
             std::destroy_at(sampler->use);
             std::destroy_at(sampler);
@@ -50,6 +56,6 @@ namespace VSL_NAMESPACE::lifetime {
     std::shared_ptr<impl::SamplerImpl> make_heap_sampler(LogicalDeviceAccessor device, const SamplerCreateInfo& info) {
         auto owner = std::make_shared<HeapSamplerOwner>(device, info);
         auto* sampler = &sampler_at(owner->storage);
-        return detail::publish_leaf(std::move(owner), sampler);
+        return detail::publish_device_leaf(std::move(owner), sampler);
     }
 } // namespace VSL_NAMESPACE::lifetime

@@ -184,17 +184,10 @@ namespace {
         const vsl::FenceHolder forged{{std::make_shared<int>(0), canonical.data_.get()}};
         EXPECT_THROW((t::TypedFrameCommands(manager, forged)), std::invalid_argument);
         EXPECT_THROW((t::TypedFrameCommands(vsl::CommandManager(nullptr), canonical)), std::invalid_argument);
-        const float priority = 1.0f;
-        const vk::DeviceQueueCreateInfo queue{.queueFamilyIndex = queue_family, .queueCount = 1, .pQueuePriorities = &priority};
-        std::vector<const char*> extensions;
-        for (const auto& extension : physical.data_->device.enumerateDeviceExtensionProperties())
-            if (std::strcmp(extension.extensionName, "VK_KHR_portability_subset") == 0)
-                extensions.push_back("VK_KHR_portability_subset");
-        auto foreign = std::make_shared<vsl::impl::LogicalDeviceImpl>();
-        foreign->parent_device = physical.data_;
-        foreign->graphics_family = foreign->present_family = queue_family;
-        foreign->device = physical.data_->device.createDevice({.queueCreateInfoCount = 1, .pQueueCreateInfos = &queue, .enabledExtensionCount = static_cast<std::uint32_t>(extensions.size()), .ppEnabledExtensionNames = extensions.data()});
-        auto foreign_fence = vsl::SynchroManager({foreign}).create_fence("foreign", size_t{3}, false);
+        vsl::DeviceCreateInfo info;
+        info.graphics_family = queue_family;
+        auto foreign = vsl::LogicalDeviceAccessor::Create(physical, std::move(info));
+        auto foreign_fence = vsl::SynchroManager(foreign).create_fence("foreign", size_t{3}, false);
         EXPECT_THROW((t::TypedFrameCommands(manager, foreign_fence)), std::invalid_argument);
         auto replacement = manager.make_exclusive_buffer();
         manager.data_->command_buffer = replacement.data_;

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/define.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 
@@ -68,9 +69,9 @@ std::span<const std::uint32_t> VSL_NAMESPACE::ShaderAccessor::code() const& {
     return data_->code;
 }
 VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::ShaderAccessor::get_device() const {
-    if (!data_ || !data_->device)
+    if (!data_ || !data_->device || !data_->shader_module)
         throw std::logic_error("Shader is empty");
-    return {data_->device->shared_from_this()};
+    return lifetime::device_from_child(data_);
 }
 VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::ShaderAccessor::owner_ref() const {
     return lifetime::detail::owned_ref(data_, data_ ? data_->owner_node : nullptr);

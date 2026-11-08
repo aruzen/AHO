@@ -2,6 +2,7 @@
 #include <VSL/define.hpp>
 #include <VSL/operation/pipeline_layout_create_info.hpp>
 #include <VSL/operation/render_pass_description.hpp>
+#include <VSL/operation/device_create_info.hpp>
 #include <VSL/vulkan/buffer_and_image_accessor.hpp>
 #include <VSL/vulkan/command.hpp>
 #include <VSL/lifetime/resource_use.hpp>
@@ -43,6 +44,7 @@ namespace VSL_NAMESPACE {
         struct SynchronizationOwnerContext;
         struct PhysicalDeviceOwnerContext;
         struct SurfaceOwnerContext;
+        struct DeviceOwnerContext;
     } // namespace lifetime
     namespace graphic_resource {
         struct ManagerInterface;
@@ -56,6 +58,8 @@ namespace VSL_NAMESPACE::impl {
         vk::Instance instance;
         vk::DebugUtilsMessengerEXT debug_messenger;
         PFN_vkDestroyDebugUtilsMessengerEXT destroy_debug_messenger = nullptr;
+        std::uint32_t api_version = VK_API_VERSION_1_0;
+        bool physical_device_properties2 = false;
         VulkanImplAccessor() = default;
         VulkanImplAccessor(const VulkanImplAccessor&) = delete;
         VulkanImplAccessor& operator=(const VulkanImplAccessor&) = delete;
@@ -105,12 +109,19 @@ namespace VSL_NAMESPACE::impl {
         ~SurfaceImpl();
     };
 
-    struct LogicalDeviceImpl : std::enable_shared_from_this<LogicalDeviceImpl> {
-        std::shared_ptr<PhysicalDeviceImpl> parent_device;
-
+    struct LogicalDeviceImpl {
+        lifetime::DependencyNode* owner_node = nullptr;
+        PhysicalDeviceImpl* parent_device = nullptr;
+        lifetime::DeviceOwnerContext* owner_context = nullptr;
+        DeviceFeature enabled_features = DeviceFeature::NONE;
         uint32_t graphics_family = 0, present_family = 0;
         vk::Device device;
-
+        bool swapchain_enabled = false;
+        LogicalDeviceImpl() = default;
+        LogicalDeviceImpl(const LogicalDeviceImpl&) = delete;
+        LogicalDeviceImpl& operator=(const LogicalDeviceImpl&) = delete;
+        LogicalDeviceImpl(LogicalDeviceImpl&&) = delete;
+        LogicalDeviceImpl& operator=(LogicalDeviceImpl&&) = delete;
         ~LogicalDeviceImpl();
     };
 
@@ -462,14 +473,4 @@ namespace VSL_NAMESPACE::impl {
 
     } // namespace pipeline_layout
 
-    namespace helper {
-        struct QueueFamilyIndices {
-            std::optional<uint32_t> graphics_family;
-            std::optional<uint32_t> present_family;
-
-            bool is_complete();
-        };
-
-        QueueFamilyIndices find_queue_families(vk::PhysicalDevice device, vk::SurfaceKHR surface);
-    } // namespace helper
 } // namespace VSL_NAMESPACE::impl

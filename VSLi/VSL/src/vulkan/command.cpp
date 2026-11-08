@@ -1,3 +1,4 @@
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/define.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>
@@ -20,7 +21,7 @@ VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::CommandPool::get_device() co
     (void)owner_ref();
     if (!data_->device || !data_->native_device || !data_->command_pool)
         throw std::invalid_argument("Command pool is empty");
-    return {data_->device->shared_from_this()};
+    return lifetime::device_from_child(data_);
 }
 VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::CommandPool::owner_ref() const {
     if (!data_ || !data_.use_count() || !data_->owner_node || !data_->owner_node->matches(data_))

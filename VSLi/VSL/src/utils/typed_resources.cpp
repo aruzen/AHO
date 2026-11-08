@@ -1,5 +1,6 @@
 #include <VSL/utils/typed_block_validation.hpp>
 #include <VSL/utils/typed_resources.hpp>
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/utils/spir_reflector.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
@@ -43,6 +44,7 @@ namespace VSL_NAMESPACE::typed::detail {
         lifetime::require_descriptor_complete(*resource.data_);
     }
     void validate_descriptor_resource(const GraphicResource& resource, LogicalDeviceAccessor device, std::span<const graphic_resource::BindingPoint> points) {
+        lifetime::require_device_owner(device);
         if (!resource.data_ || !resource.data_.use_count())
             throw std::invalid_argument("Typed descriptor import requires a resource");
         lifetime::require_descriptor_valid(*resource.data_);

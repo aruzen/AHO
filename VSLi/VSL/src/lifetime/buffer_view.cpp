@@ -1,3 +1,4 @@
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/buffer_view.hpp>
 #include <VSL/operation/buffer_ops.hpp>
 #include <VSL/lifetime/owner_access.hpp>
@@ -27,7 +28,7 @@ namespace VSL_NAMESPACE {
     LogicalDeviceAccessor BufferRef::device() const {
         if (!data || !data->device)
             throw std::logic_error("Buffer reference has no device");
-        return {data->device->shared_from_this()};
+        return lifetime::device_from_impl(*data->device);
     }
     void BufferRef::fill(std::byte value) const {
         use().require_idle();

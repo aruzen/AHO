@@ -9,7 +9,7 @@
 
 最初のPRだけで終了せず、下記の順で実装・検証・独立レビューを継続する。PRの公開前には最新masterとの差分を確認する。新しい製品ディレクトリが必要な場合は作成前に確認する。
 
-現在の到達点は順序1〜8と9a／9b／9cである。command所有分離、CommandPool／CommandBuffer／Fence／Semaphore配置、同期資源の使用制約とTyped frame再利用に加え、Instance／PhysicalDevice／Surfaceの共通backend／指定領域構築と、OS windowの寿命分離まで接続した。順序9全体と10〜12は未完了であり、Device、公開起動arena、WSI／AHO接続、既定policy変更、旧入口廃止と最終監査まで継続する。
+現在の到達点は順序1〜8と9a〜9dである。command所有分離、CommandPool／CommandBuffer／Fence／Semaphore配置、同期資源の使用制約とTyped frame再利用に加え、Instance／PhysicalDevice／Surface／Deviceの共通backend／指定領域構築と、OS windowの寿命分離まで接続した。順序9全体と10〜12は未完了であり、9eの公開起動arenaとAHO起動、WSI接続、既定policy変更、旧入口廃止と最終監査まで継続する。
 
 ## 責務と保証
 
@@ -162,6 +162,14 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 
 [9cのOS window／Surface実装](surface-arena.md)で、独立OS leafとGLFW lease、main thread退役queue、Surfaceの共通backend／指定領域／元親getterを接続した。GPU／CPU／compile／配布構成と同一画像の回帰を検証し、9cの受入条件を満たした。次は9dへ進む。
 
-9dでLogicalDeviceの固定親と正規owner、Device引数不要の公開起動arenaへ進む。子のDevice getter等に残るshared_from_thisを置換する。Deviceを依存graphへ公開する時は、既存heap leaf／ResourceArena／visitorにも正規Deviceの固定辺を列挙する。
+9dはLogicalDeviceの固定親と正規owner、共通backendと指定領域構築を対象にする。子のDevice getter等に残るshared_from_thisを置換する。Deviceを依存graphへ公開する時は、既存heap leaf／ResourceArena／visitorにも正規Deviceの固定辺を列挙する。
+
+[9dのDevice backendと正規owner](device-arena.md)で、通常heap／配置の共通生成、所有するqueue／feature入力、元PhysicalDeviceの固定親、子の元Device getter、全Device辺の公開、未公開Deviceからのraw子構築を実装・検証した。Device自身の正規ownerと既存のopaqueな子ownerは区別する。生成境界でownerを検査し、通常操作ではraw実体参照を利用する。
+
+当初9dへまとめていた公開起動arenaとAHO起動は9eへ分割する。Deviceの共通backendと、その利用者である配置ownerの変更を独立に検証するためであり、順序9の完了条件は減らさない。
+
+9eではDevice引数不要の公開StartupArenaを作る。共通Instance root、選択PhysicalDevice／Deviceの群、各WindowのSurface群を別ownerとして構築し、既存の生成処理と寸法情報を使う。同型slot、外部Instance、失敗rollback、元ownerのgetter、Deviceだけを残したWindow回収を検証し、AHOの起動／終了と複数Windowへ接続する。候補列挙scratchと実体の永続配置は分け、公開前の同群依存はraw参照にする。
+
+順序10ではSwapchainの共通backend／配置、graphicsとpresentationの完了の区別、取消・退役世代の保持と再生成失敗からの復旧、acquire Fenceを扱う。9cで確認した無効resize引数のnative前拒否と、最小化で0になったframebufferの再生成延期も必須の検証項目とする。
 
 SurfaceがWindowDataを強所有するとpluginからの所有と循環するため、plugin／Engine／描画状態を含まないOSWindowOwnerを独立させる。論理closeと最後のnative window／GLFW破棄を分離する。Device生成時のSurfaceはqueue選択用であり、Deviceの永久親へ追加しない。StartupArenaの公開はこれらの契約とrollbackが揃ってから行う。

@@ -1,5 +1,6 @@
 #include <VSL/lifetime/command_domain.hpp>
 #include "support/render_fixture.hpp"
+#include "support/fixed_parent.hpp"
 #include "support/read_image.hpp"
 #include "support/deferred_action.hpp"
 #include <VSL/lifetime/resource_arena.hpp>
@@ -84,6 +85,10 @@ namespace {
         EXPECT_EQ(empty.owner_ref().use_count(), 0);
         EXPECT_THROW(empty.get_device(), std::invalid_argument);
         EXPECT_THROW(empty.get_render_pass(), std::invalid_argument);
+    }
+    TEST_F(FrameBufferArenaVulkanIntegrationTest, HeapGraphicsResourcesExposeTheirDirectDeviceEdge) {
+        vsl_test::expect_fixed_parent(pipeline->owner_ref(), device.owner_ref());
+        vsl_test::expect_fixed_parent(framebuffer->owner_ref(), device.owner_ref());
     }
     TEST_F(FrameBufferArenaVulkanIntegrationTest, MixedSlotsAndRowsShareOneOwnerAndUseTheDeclaredImages) {
         constexpr std::array<t::ResourceRequest, 5> requests{{{{1}, s::ResourceKind::FRAME_BUFFER}, {{2}, s::ResourceKind::FRAME_BUFFER}, {{3}, s::ResourceKind::RENDER_PASS}, {{4}, s::ResourceKind::IMAGE}, {{5}, s::ResourceKind::IMAGE}}};

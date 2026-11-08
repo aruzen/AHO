@@ -1,3 +1,4 @@
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/typed_descriptor_layouts.hpp>
 #include <VSL/operation/descriptor_ops.hpp>
 #include <VSL/vulkan/stages/resource_binding.hpp>
@@ -10,10 +11,11 @@ namespace VSL_NAMESPACE::typed::detail {
         const auto& first = layouts.front();
         if (!first.data_ || !first.data_.use_count() || !first.data_->layout || !first.data_->device)
             throw std::invalid_argument("Typed layout collection requires owning live sources");
-        return {first.data_->device->shared_from_this()};
+        return lifetime::device_from_child(first.data_);
     }
     void validate_descriptor_layout_source(LogicalDeviceAccessor device, const graphic_resource::BindingLayout& layout,
                                            std::span<const graphic_resource::BindingPoint> points) {
+        lifetime::require_device_owner(device);
         if (!device.data_ || !device.data_.use_count() || !device.data_->device || !layout.data_ || !layout.data_.use_count())
             throw std::invalid_argument("Typed layout collection requires device and source owners");
         operation::validate_descriptor_layout(*layout.data_, *device.data_, points);

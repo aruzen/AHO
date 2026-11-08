@@ -1,4 +1,5 @@
 #include <VSL/utils/typed_resource_bundle.hpp>
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 
 namespace VSL_NAMESPACE::typed::detail {
@@ -44,6 +45,7 @@ namespace VSL_NAMESPACE::typed::detail {
         return FrameResourceDomain(std::move(manager)).count;
     }
     void validate_bundle_plan(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, std::span<const ResourceAllocationRecord> entries) {
+        lifetime::require_device_owner(device);
         if (!device.data_ || !manager.data_ || manager.data_->device != device.data_)
             throw std::invalid_argument("Typed bundle descriptor manager device mismatch");
         const auto limits = device.data_->parent_device->device.getProperties().limits;

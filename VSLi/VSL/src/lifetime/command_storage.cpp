@@ -1,3 +1,4 @@
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/command_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <new>
@@ -27,14 +28,15 @@ namespace VSL_NAMESPACE::lifetime {
             static void VisitDependencies(const void* owner, DependencyNode::EdgeVisitor visitor, void* context);
         };
         HeapCommandPoolOwner::HeapCommandPoolOwner(LogicalDeviceAccessor device, CommandPoolCreateInfo info) : device(device) {
-            construct_command_pool(storage, device, info);
+            require_device_owner(device);
+            construct_command_pool(storage, *device.data_, info);
         }
         HeapCommandPoolOwner::~HeapCommandPoolOwner() {
             node.retire();
             destroy_command_pool(storage);
         }
         void HeapCommandPoolOwner::VisitDependencies(const void* owner, DependencyNode::EdgeVisitor visitor, void* context) {
-            visitor(context, OwnerRef(static_cast<const HeapCommandPoolOwner*>(owner)->device.data_));
+            visitor(context, static_cast<const HeapCommandPoolOwner*>(owner)->device.owner_ref());
         }
         HeapCommandBufferOwner::HeapCommandBufferOwner(CommandPool pool, std::uint32_t count) : pool(pool.owner_ref()) {
             construct_command_buffer(storage, *pool.data_, count);
@@ -54,12 +56,16 @@ namespace VSL_NAMESPACE::lifetime {
         }
     } // namespace
     void construct_command_pool(void* storage, LogicalDeviceAccessor device, CommandPoolCreateInfo info) {
-        if (!device.data_ || !device.data_.use_count())
+        require_device_owner(device);
+        construct_command_pool(storage, *device.data_, info);
+    }
+    void construct_command_pool(void* storage, impl::LogicalDeviceImpl& device, CommandPoolCreateInfo info) {
+        if (!device.device)
             throw std::invalid_argument("Command pool requires a logical device owner");
         auto* slot = std::construct_at(static_cast<CommandPoolSlotStorage*>(storage));
         auto* pool = std::construct_at(reinterpret_cast<impl::CommandPoolImpl*>(slot->value));
         try {
-            operation::initialize_command_pool(*pool, *device.data_, info);
+            operation::initialize_command_pool(*pool, device, info);
         } catch (...) {
             std::destroy_at(pool);
             std::destroy_at(slot);

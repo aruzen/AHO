@@ -4,7 +4,7 @@ function(vsl_generate_buffer_layout)
     include(CheckTypeSize)
     set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
     set(CMAKE_REQUIRED_INCLUDES "${VSL_HOME}/src/private" "${VSL_HOME}/include" ${Vulkan_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS})
-    set(CMAKE_EXTRA_INCLUDE_FILES "VSL/vulkan/_pimpls.hpp" "VSL/sync/resource_use_state.hpp" "VSL/storage/buffer_abi.hpp" "VSL/lifetime/frame_buffer_storage.hpp" "VSL/lifetime/command_storage.hpp" "VSL/lifetime/synchronization_storage.hpp" "VSL/lifetime/instance_storage.hpp" "VSL/lifetime/physical_device_storage.hpp" "VSL/lifetime/surface_storage.hpp")
+    set(CMAKE_EXTRA_INCLUDE_FILES "VSL/vulkan/_pimpls.hpp" "VSL/sync/resource_use_state.hpp" "VSL/storage/buffer_abi.hpp" "VSL/lifetime/frame_buffer_storage.hpp" "VSL/lifetime/command_storage.hpp" "VSL/lifetime/synchronization_storage.hpp" "VSL/lifetime/instance_storage.hpp" "VSL/lifetime/physical_device_storage.hpp" "VSL/lifetime/surface_storage.hpp" "VSL/lifetime/device_storage.hpp")
     if(WIN32)
         set(CMAKE_REQUIRED_DEFINITIONS -DNOMINMAX -DWIN32_LEAN_AND_MEAN -DGLFW_DLL)
     endif()
@@ -24,6 +24,7 @@ function(vsl_generate_buffer_layout)
     file(SHA256 "${VSL_HOME}/src/private/VSL/lifetime/command_storage.hpp" command_slot_hash)
     file(SHA256 "${VSL_HOME}/src/private/VSL/lifetime/physical_device_storage.hpp" physical_device_slot_hash)
     file(SHA256 "${VSL_HOME}/src/private/VSL/lifetime/surface_storage.hpp" surface_slot_hash)
+    file(SHA256 "${VSL_HOME}/src/private/VSL/lifetime/device_storage.hpp" device_slot_hash)
     file(SHA256 "${VSL_HOME}/src/private/VSL/lifetime/window_runtime.hpp" window_runtime_hash)
     file(SHA256 "${VSL_HOME}/src/private/VSL/lifetime/instance_storage.hpp" instance_slot_hash)
     file(SHA256 "${VSL_HOME}/src/private/VSL/lifetime/synchronization_storage.hpp" synchronization_slot_hash)
@@ -42,7 +43,7 @@ function(vsl_generate_buffer_layout)
             lifetime/owner_ref.hpp lifetime/dependency_node.hpp lifetime/glfw_lease.hpp lifetime/window_owner.hpp window.hpp vulkan/surface.hpp
             lifetime/buffer_view.hpp storage/resource_layout.hpp storage/arena_memory.hpp operation/buffer_create_info.hpp
             operation/image_create_info.hpp operation/sampler_create_info.hpp operation/descriptor_create_info.hpp operation/shader_create_info.hpp operation/pipeline_layout_create_info.hpp operation/render_pass_description.hpp operation/graphics_pipeline_state.hpp
-            operation/instance_create_info.hpp vulkan/vulkan.hpp vulkan/pv.hpp vulkan/device.hpp operation/command_create_info.hpp operation/synchronization_create_info.hpp vulkan/command.hpp vulkan/synchronize.hpp
+            operation/instance_create_info.hpp operation/device_create_info.hpp vulkan/vulkan.hpp vulkan/pv.hpp vulkan/device.hpp operation/command_create_info.hpp operation/synchronization_create_info.hpp vulkan/command.hpp vulkan/synchronize.hpp
             vulkan/buffer_and_image_accessor.hpp vulkan/sampler.hpp vulkan/descriptor.hpp vulkan/shader.hpp vulkan/pipeline_layout.hpp vulkan/render_pass.hpp vulkan/pipeline.hpp vulkan/frame_buffer.hpp)
         file(SHA256 "${VSL_HOME}/include/VSL/${api}" api_hash)
         string(APPEND public_layout_hashes ";${api_hash}")
@@ -67,6 +68,7 @@ function(vsl_generate_buffer_layout)
         "${VSL_HOME}/src/private/VSL/lifetime/instance_storage.hpp"
         "${VSL_HOME}/src/private/VSL/lifetime/physical_device_storage.hpp"
         "${VSL_HOME}/src/private/VSL/lifetime/surface_storage.hpp"
+        "${VSL_HOME}/src/private/VSL/lifetime/device_storage.hpp"
         "${VSL_HOME}/src/private/VSL/lifetime/window_runtime.hpp"
         "${VSL_HOME}/src/private/VSL/sync/synchronization_state.hpp"
         "${VSL_HOME}/src/private/VSL/lifetime/descriptor_bindings.hpp"
@@ -83,9 +85,13 @@ function(vsl_generate_buffer_layout)
     foreach(configuration IN LISTS configurations)
         string(TOUPPER "${configuration}" upper)
         set(CMAKE_TRY_COMPILE_CONFIGURATION "${configuration}")
-        string(SHA256 input_hash "17;${surface_slot_hash};${window_runtime_hash};${physical_device_slot_hash};${instance_slot_hash};${synchronization_slot_hash};${synchronization_hash};${command_slot_hash};${frame_buffer_slot_hash};${pipeline_slot_hash};${render_pass_slot_hash};${pipeline_layout_slot_hash};${shader_slot_hash};${owner_access_hash};${state_hash};${buffer_slot_hash};${image_slot_hash};${sampler_slot_hash};${descriptor_slot_hash};${descriptor_owner_hash};${use_hash};${completion_hash};${lifetime_hash};${vulkan_hash};${vulkan_cpp_hash};${abi_mode_hash};${template_hash};${public_layout_hashes};${CMAKE_CXX_COMPILER_ID};${CMAKE_CXX_COMPILER_VERSION};${CMAKE_CXX_COMPILER_TARGET};${CMAKE_CXX_COMPILER_FRONTEND_VARIANT};${CMAKE_SYSTEM_NAME};${CMAKE_SYSTEM_VERSION};${CMAKE_SYSTEM_PROCESSOR};${CMAKE_OSX_ARCHITECTURES};${CMAKE_OSX_DEPLOYMENT_TARGET};${CMAKE_SIZEOF_VOID_P};${CMAKE_CXX_FLAGS};${CMAKE_CXX_FLAGS_${upper}};${CMAKE_MSVC_RUNTIME_LIBRARY};${CMAKE_OSX_SYSROOT};${CMAKE_SYSROOT};${configuration}")
-        foreach(kind IN ITEMS BUFFER_IMPL IMAGE_IMPL SAMPLER_IMPL DESCRIPTOR_LAYOUT_IMPL DESCRIPTOR_POOL_IMPL DESCRIPTOR_SET_IMPL SHADER_IMPL PIPELINE_LAYOUT_IMPL RENDER_PASS_IMPL PIPELINE_IMPL FRAME_BUFFER_IMPL FRAME_BUFFER_SLOT COMMAND_POOL_IMPL COMMAND_POOL_SLOT COMMAND_BUFFER_IMPL COMMAND_BUFFER_SLOT SEMAPHORE_IMPL SEMAPHORE_SLOT FENCE_IMPL FENCE_SLOT INSTANCE_IMPL INSTANCE_SLOT PHYSICAL_DEVICE_IMPL PHYSICAL_DEVICE_SLOT SURFACE_IMPL SURFACE_SLOT BUFFER_USE)
-            if(kind STREQUAL BUFFER_IMPL)
+        string(SHA256 input_hash "18;${device_slot_hash};${surface_slot_hash};${window_runtime_hash};${physical_device_slot_hash};${instance_slot_hash};${synchronization_slot_hash};${synchronization_hash};${command_slot_hash};${frame_buffer_slot_hash};${pipeline_slot_hash};${render_pass_slot_hash};${pipeline_layout_slot_hash};${shader_slot_hash};${owner_access_hash};${state_hash};${buffer_slot_hash};${image_slot_hash};${sampler_slot_hash};${descriptor_slot_hash};${descriptor_owner_hash};${use_hash};${completion_hash};${lifetime_hash};${vulkan_hash};${vulkan_cpp_hash};${abi_mode_hash};${template_hash};${public_layout_hashes};${CMAKE_CXX_COMPILER_ID};${CMAKE_CXX_COMPILER_VERSION};${CMAKE_CXX_COMPILER_TARGET};${CMAKE_CXX_COMPILER_FRONTEND_VARIANT};${CMAKE_SYSTEM_NAME};${CMAKE_SYSTEM_VERSION};${CMAKE_SYSTEM_PROCESSOR};${CMAKE_OSX_ARCHITECTURES};${CMAKE_OSX_DEPLOYMENT_TARGET};${CMAKE_SIZEOF_VOID_P};${CMAKE_CXX_FLAGS};${CMAKE_CXX_FLAGS_${upper}};${CMAKE_MSVC_RUNTIME_LIBRARY};${CMAKE_OSX_SYSROOT};${CMAKE_SYSROOT};${configuration}")
+        foreach(kind IN ITEMS BUFFER_IMPL IMAGE_IMPL SAMPLER_IMPL DESCRIPTOR_LAYOUT_IMPL DESCRIPTOR_POOL_IMPL DESCRIPTOR_SET_IMPL SHADER_IMPL PIPELINE_LAYOUT_IMPL RENDER_PASS_IMPL PIPELINE_IMPL FRAME_BUFFER_IMPL FRAME_BUFFER_SLOT COMMAND_POOL_IMPL COMMAND_POOL_SLOT COMMAND_BUFFER_IMPL COMMAND_BUFFER_SLOT SEMAPHORE_IMPL SEMAPHORE_SLOT FENCE_IMPL FENCE_SLOT INSTANCE_IMPL INSTANCE_SLOT PHYSICAL_DEVICE_IMPL PHYSICAL_DEVICE_SLOT SURFACE_IMPL SURFACE_SLOT DEVICE_IMPL DEVICE_SLOT BUFFER_USE)
+            if(kind STREQUAL DEVICE_IMPL)
+                set(type "vsl::impl::LogicalDeviceImpl")
+            elseif(kind STREQUAL DEVICE_SLOT)
+                set(type "vsl::lifetime::DeviceSlotStorage")
+            elseif(kind STREQUAL BUFFER_IMPL)
                 set(type "vsl::impl::BufferImpl")
             elseif(kind STREQUAL IMAGE_IMPL)
                 set(type "vsl::impl::ImageImpl")

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/vulkan/render_pass.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
@@ -20,7 +21,7 @@ namespace VSL_NAMESPACE {
     LogicalDeviceAccessor RenderPassAccessor::get_device() const {
         if (!data_ || !data_.use_count() || !data_->render_pass || !data_->device || !data_->description)
             throw std::invalid_argument("Render pass requires a live owner");
-        return {data_->device->shared_from_this()};
+        return lifetime::device_from_child(data_);
     }
     lifetime::OwnerRef RenderPassAccessor::owner_ref() const {
         return lifetime::detail::owned_ref(data_, data_ ? data_->owner_node : nullptr);

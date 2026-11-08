@@ -2,6 +2,7 @@
 #include "../define.hpp"
 #include "vulkan.hpp"
 #include "surface.hpp"
+#include "../operation/device_create_info.hpp"
 
 #include "../type.hpp"
 #include "../concepts.hpp"
@@ -58,6 +59,7 @@ namespace VSL_NAMESPACE {
         static PhysicalDevice Select(VulkanAccessor instance);
         VulkanAccessor get_instance() const;
         lifetime::OwnerRef owner_ref() const;
+        DeviceFeature supported_features() const;
         uint32_t api_version();
         uint32_t driver_version();
         uint32_t vendor_id();
@@ -70,11 +72,16 @@ namespace VSL_NAMESPACE {
     struct LogicalDeviceAccessor {
         std::shared_ptr<impl::LogicalDeviceImpl> data_ = nullptr;
         bool operator==(const LogicalDeviceAccessor&) const = default;
+        static LogicalDeviceAccessor Create(PhysicalDevice physical, DeviceCreateInfo info = {});
+        lifetime::OwnerRef owner_ref() const;
+        PhysicalDevice get_physical_device() const;
+        DeviceFeature enabled_features() const;
     };
 
     namespace helper {
         void retain_physical_device_owner(const std::shared_ptr<impl::LogicalDeviceImpl>& logical, const PhysicalDevice& physical);
-    }
+        Surface checked_surface(const std::shared_ptr<Surface>& surface);
+    } // namespace helper
 
     template<typename C = LogicalDeviceGraphicCreator<VALIDATION>>
     struct LogicalDevice : public LogicalDeviceAccessor {
@@ -84,7 +91,7 @@ namespace VSL_NAMESPACE {
             helper::retain_physical_device_owner(data_, device);
         }
         LogicalDevice(PhysicalDevice device, std::shared_ptr<VSL_NAMESPACE::Surface> surface)
-            : LogicalDevice(device, *surface) {}
+            : LogicalDevice(std::move(device), helper::checked_surface(surface)) {}
 
 #ifdef VSL_NAMESPACE_TEST
 #endif

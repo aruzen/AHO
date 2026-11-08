@@ -11,6 +11,7 @@ namespace VSL_NAMESPACE::lifetime {
         alignas(FrameBufferOwnerContext) std::byte context[sizeof(FrameBufferOwnerContext)];
     };
     void construct_frame_buffer(void* storage, LogicalDeviceAccessor device, operation::FrameBufferInput input);
+    void construct_frame_buffer(void* storage, impl::LogicalDeviceImpl& device, operation::FrameBufferInput input);
     impl::FrameBufferImpl& frame_buffer_at(void* storage);
     void destroy_frame_buffer(void* storage) noexcept;
     void set_frame_buffer_pass_owner(impl::FrameBufferImpl& target, OwnedRef<impl::RenderPassImpl> owner);

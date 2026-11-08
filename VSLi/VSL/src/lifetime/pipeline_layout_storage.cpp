@@ -1,3 +1,4 @@
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/pipeline_layout_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <new>
@@ -15,7 +16,8 @@ namespace VSL_NAMESPACE::lifetime {
         };
         HeapPipelineLayoutOwner::HeapPipelineLayoutOwner(LogicalDeviceAccessor device, std::span<impl::ResourceBindingLayoutImpl* const> layouts,
                                                          std::span<const PushConstantRange> ranges) : device(device) {
-            construct_pipeline_layout(storage, device, layouts, ranges);
+            require_device_owner(device);
+            construct_pipeline_layout(storage, *device.data_, layouts, ranges);
         }
         HeapPipelineLayoutOwner::~HeapPipelineLayoutOwner() {
             node.retire();
@@ -31,12 +33,17 @@ namespace VSL_NAMESPACE::lifetime {
     }
     void construct_pipeline_layout(void* storage, LogicalDeviceAccessor device,
                                    std::span<impl::ResourceBindingLayoutImpl* const> layouts, std::span<const PushConstantRange> ranges) {
-        if (!device.data_ || !device.data_.use_count())
+        require_device_owner(device);
+        construct_pipeline_layout(storage, *device.data_, layouts, ranges);
+    }
+    void construct_pipeline_layout(void* storage, impl::LogicalDeviceImpl& device,
+                                   std::span<impl::ResourceBindingLayoutImpl* const> layouts, std::span<const PushConstantRange> ranges) {
+        if (!device.device)
             throw std::invalid_argument("Pipeline layout requires a logical device owner");
         auto* slot = std::construct_at(static_cast<PipelineLayoutSlotStorage*>(storage));
         auto* layout = std::construct_at(reinterpret_cast<impl::PipelineLayoutImpl*>(slot->value));
         try {
-            operation::initialize_pipeline_layout(*layout, *device.data_, layouts, ranges);
+            operation::initialize_pipeline_layout(*layout, device, layouts, ranges);
         } catch (...) {
             std::destroy_at(layout);
             std::destroy_at(slot);
@@ -54,7 +61,7 @@ namespace VSL_NAMESPACE::lifetime {
                                                                         std::span<impl::ResourceBindingLayoutImpl* const> layouts, std::span<const PushConstantRange> ranges) {
         auto owner = std::make_shared<HeapPipelineLayoutOwner>(device, layouts, ranges);
         auto* layout = &pipeline_layout_at(owner->storage);
-        return detail::publish_leaf(std::move(owner), layout);
+        return detail::publish_device_leaf(std::move(owner), layout);
     }
 } // namespace VSL_NAMESPACE::lifetime
 

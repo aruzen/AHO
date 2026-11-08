@@ -53,7 +53,8 @@ namespace VSL_NAMESPACE::lifetime {
     void DescriptorOwnerContext::normalize(std::vector<OwnerRef>& owners) const {
         const auto borrowed = [&](const auto& owner) {
             const auto same = [&](const auto& known) { return !known.owner_before(owner) && !owner.owner_before(known); };
-            return node.matches(detail::OwnerAccess::Shared(owner)) || std::ranges::any_of(dependencies, same);
+            return node.matches(detail::OwnerAccess::Shared(owner)) ||
+                   (device_parent && device_parent->matches(detail::OwnerAccess::Shared(owner))) || std::ranges::any_of(dependencies, same);
         };
         for (const auto& owner : owners) {
             if (owner.use_count() && !borrowed(owner) && policy == DependencyPolicy::FIXED)

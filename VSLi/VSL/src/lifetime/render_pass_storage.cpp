@@ -1,3 +1,4 @@
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/render_pass_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <new>
@@ -13,7 +14,8 @@ namespace VSL_NAMESPACE::lifetime {
             ~HeapRenderPassOwner();
         };
         HeapRenderPassOwner::HeapRenderPassOwner(LogicalDeviceAccessor device, RenderPassDescription description) : device(device) {
-            construct_render_pass(storage, device, std::move(description));
+            require_device_owner(device);
+            construct_render_pass(storage, *device.data_, std::move(description));
         }
         HeapRenderPassOwner::~HeapRenderPassOwner() {
             node.retire();
@@ -21,12 +23,16 @@ namespace VSL_NAMESPACE::lifetime {
         }
     } // namespace
     void construct_render_pass(void* storage, LogicalDeviceAccessor device, RenderPassDescription description) {
-        if (!device.data_ || !device.data_.use_count())
+        require_device_owner(device);
+        construct_render_pass(storage, *device.data_, std::move(description));
+    }
+    void construct_render_pass(void* storage, impl::LogicalDeviceImpl& device, RenderPassDescription description) {
+        if (!device.device)
             throw std::invalid_argument("Render pass requires a device owner");
         auto* slot = std::construct_at(static_cast<RenderPassSlotStorage*>(storage));
         auto* pass = std::construct_at(reinterpret_cast<impl::RenderPassImpl*>(slot->value));
         try {
-            operation::initialize_render_pass(*pass, *device.data_, std::move(description));
+            operation::initialize_render_pass(*pass, device, std::move(description));
         } catch (...) {
             std::destroy_at(pass);
             std::destroy_at(slot);
@@ -43,7 +49,7 @@ namespace VSL_NAMESPACE::lifetime {
     std::shared_ptr<impl::RenderPassImpl> make_heap_render_pass(LogicalDeviceAccessor device, RenderPassDescription description) {
         auto owner = std::make_shared<HeapRenderPassOwner>(device, std::move(description));
         auto* pass = &render_pass_at(owner->storage);
-        return detail::publish_leaf(std::move(owner), pass);
+        return detail::publish_device_leaf(std::move(owner), pass);
     }
 } // namespace VSL_NAMESPACE::lifetime
 

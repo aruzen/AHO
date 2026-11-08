@@ -1,3 +1,4 @@
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/vulkan/frame_buffer.hpp>
 #include <VSL/lifetime/frame_buffer_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
@@ -45,7 +46,7 @@ namespace VSL_NAMESPACE {
     LogicalDeviceAccessor FrameBufferAccessor::get_device() const {
         if (!data_ || !data_.use_count() || !data_->device || data_->swap_chain_framebuffers.empty() || !data_->swap_chain_framebuffers.front())
             throw std::invalid_argument("Framebuffer requires a live owner");
-        return {data_->device->shared_from_this()};
+        return lifetime::device_from_child(data_);
     }
     lifetime::OwnerRef FrameBufferAccessor::owner_ref() const {
         if (!data_ || !data_.use_count())

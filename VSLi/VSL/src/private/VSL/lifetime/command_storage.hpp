@@ -15,6 +15,7 @@ namespace VSL_NAMESPACE::lifetime {
         alignas(CommandBufferOwnerContext) std::byte context[sizeof(CommandBufferOwnerContext)];
     };
     void construct_command_pool(void* storage, LogicalDeviceAccessor device, CommandPoolCreateInfo info);
+    void construct_command_pool(void* storage, impl::LogicalDeviceImpl& device, CommandPoolCreateInfo info);
     void destroy_command_pool(void* storage) noexcept;
     impl::CommandPoolImpl& command_pool_at(void* storage);
     void construct_command_buffer(void* storage, impl::CommandPoolImpl& pool, std::uint32_t count);

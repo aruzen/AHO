@@ -199,28 +199,16 @@ namespace vsl_test {
                 GTEST_SKIP() << "Timeline semaphore feature unavailable";
             device_extensions.push_back(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
         }
-        const float priority = 1.0f;
-        vk::DeviceQueueCreateInfo queue_info{};
-        queue_info.queueFamilyIndex = queue_family;
-        queue_info.queueCount = 1;
-        queue_info.pQueuePriorities = &priority;
-        vk::PhysicalDeviceFeatures features{};
-        features.samplerAnisotropy = physical.data_->features->samplerAnisotropy;
-        features.independentBlend = physical.data_->features->independentBlend;
-        vk::DeviceCreateInfo device_info{};
+        vsl::DeviceCreateInfo device_info;
+        device_info.graphics_family = queue_family;
+        device_info.extensions.assign(device_extensions.begin(), device_extensions.end());
+        if (physical.data_->features->samplerAnisotropy)
+            device_info.features = device_info.features | vsl::DeviceFeature::SAMPLER_ANISOTROPY;
+        if (physical.data_->features->independentBlend)
+            device_info.features = device_info.features | vsl::DeviceFeature::INDEPENDENT_BLEND;
         if (require_timeline_semaphore())
-            device_info.pNext = &timeline;
-        device_info.queueCreateInfoCount = 1;
-        device_info.pQueueCreateInfos = &queue_info;
-        device_info.enabledExtensionCount = static_cast<std::uint32_t>(device_extensions.size());
-        device_info.ppEnabledExtensionNames = device_extensions.data();
-        device_info.pEnabledFeatures = &features;
-        const auto raw_device = selected.createDevice(device_info);
-        auto data = std::make_shared<vsl::impl::LogicalDeviceImpl>();
-        data->parent_device = physical.data_;
-        data->graphics_family = data->present_family = queue_family;
-        data->device = raw_device;
-        device.data_ = std::move(data);
+            device_info.features = device_info.features | vsl::DeviceFeature::TIMELINE_SEMAPHORE;
+        device = vsl::LogicalDeviceAccessor::Create(physical, std::move(device_info));
     }
 
     inline void VulkanIntegrationTest::TearDown() {

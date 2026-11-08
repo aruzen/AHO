@@ -110,6 +110,10 @@ add_library(VSL STATIC
         VSL/src/operation/instance_ops.cpp
         VSL/src/private/VSL/lifetime/instance_storage.hpp
         VSL/src/lifetime/instance_storage.cpp
+        VSL/src/private/VSL/operation/physical_device_ops.hpp
+        VSL/src/operation/physical_device_ops.cpp
+        VSL/src/private/VSL/lifetime/physical_device_storage.hpp
+        VSL/src/lifetime/physical_device_storage.cpp
         VSL/src/private/VSL/lifetime/synchronization_storage.hpp
         VSL/src/lifetime/synchronization_storage.cpp
         VSL/src/private/VSL/operation/synchronization_ops.hpp

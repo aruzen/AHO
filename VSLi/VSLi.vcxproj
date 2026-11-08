@@ -219,6 +219,10 @@
     <ClCompile Include="VSL\src\operation\instance_ops.cpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\instance_storage.hpp" />
     <ClCompile Include="VSL\src\lifetime\instance_storage.cpp" />
+    <ClInclude Include="VSL\src\private\VSL\operation\physical_device_ops.hpp" />
+    <ClCompile Include="VSL\src\operation\physical_device_ops.cpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\physical_device_storage.hpp" />
+    <ClCompile Include="VSL\src\lifetime\physical_device_storage.cpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\synchronization_storage.hpp" />
     <ClCompile Include="VSL\src\lifetime\synchronization_storage.cpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\synchronization_ops.hpp" />

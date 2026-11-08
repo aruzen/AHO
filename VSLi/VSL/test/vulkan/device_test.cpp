@@ -37,6 +37,20 @@ namespace {
 #include "support/window_fixture.hpp"
 namespace {
     using LogicalDeviceWindowIntegrationTest = vsl_test::WindowIntegrationTest;
+    TEST_F(LogicalDeviceWindowIntegrationTest, ForeignInstanceSurfaceIsRejectedBeforeLogicalDeviceCreation) {
+        make_surface();
+        ASSERT_FALSE(HasFatalFailure());
+        vsl::InstanceCreateInfo info;
+        info.application_name = "foreign physical Instance";
+        info.api_version = VK_API_VERSION_1_0;
+        for (const auto& extension : vk::enumerateInstanceExtensionProperties())
+            if (std::strcmp(extension.extensionName, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME) == 0)
+                info.extensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+        auto other = vsl::VulkanAccessor::Create(std::move(info));
+        auto selected = vsl::PhysicalDevice::Select(other);
+        using Device = vsl::LogicalDevice<vsl::LogicalDeviceGraphicCreator<false>>;
+        EXPECT_THROW((Device(selected, *surface)), std::invalid_argument);
+    }
     TEST_F(LogicalDeviceWindowIntegrationTest, BothSurfaceOverloadsCreateUsableQueuesAndRetainPhysicalOwner) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());

@@ -11,8 +11,14 @@
 #include <VSL/lifetime/command_storage.hpp>
 #include <VSL/lifetime/synchronization_storage.hpp>
 #include <VSL/lifetime/instance_storage.hpp>
+#include <VSL/lifetime/physical_device_storage.hpp>
 
 namespace VSL_NAMESPACE::storage {
+    static_assert(sizeof(impl::PhysicalDeviceImpl) == ImplLayout<impl::PhysicalDeviceImpl>::SIZE);
+    static_assert(alignof(impl::PhysicalDeviceImpl) == ImplLayout<impl::PhysicalDeviceImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::PhysicalDeviceSlotStorage) == ResourceSlotLayout<impl::PhysicalDeviceImpl>::SIZE);
+    static_assert(alignof(lifetime::PhysicalDeviceSlotStorage) == ResourceSlotLayout<impl::PhysicalDeviceImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::PhysicalDeviceImpl>::USE_OFFSET == NO_SEPARATE_USE);
     static_assert(sizeof(impl::VulkanImplAccessor) == ImplLayout<impl::VulkanImplAccessor>::SIZE);
     static_assert(alignof(impl::VulkanImplAccessor) == ImplLayout<impl::VulkanImplAccessor>::ALIGNMENT);
     static_assert(sizeof(lifetime::InstanceSlotStorage) == ResourceSlotLayout<impl::VulkanImplAccessor>::SIZE);

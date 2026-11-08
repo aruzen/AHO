@@ -8,5 +8,5 @@ namespace VSL_NAMESPACE::lifetime {
     void construct_instance(void* storage, InstanceCreateInfo info, const operation::InstanceNativeCalls& calls = {});
     void destroy_instance(void* storage) noexcept;
     impl::VulkanImplAccessor& instance_at(void* storage);
-    std::shared_ptr<impl::VulkanImplAccessor> make_heap_instance(InstanceCreateInfo info);
+    std::shared_ptr<impl::VulkanImplAccessor> make_heap_instance(InstanceCreateInfo info, const operation::InstanceNativeCalls& calls = {});
 } // namespace VSL_NAMESPACE::lifetime

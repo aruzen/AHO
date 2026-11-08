@@ -41,6 +41,7 @@ namespace VSL_NAMESPACE {
         struct CommandRecordingContext;
         struct CommandBufferOwnerContext;
         struct SynchronizationOwnerContext;
+        struct PhysicalDeviceOwnerContext;
     } // namespace lifetime
     namespace graphic_resource {
         struct ManagerInterface;
@@ -63,13 +64,20 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct PhysicalDeviceImpl {
-        std::shared_ptr<VulkanImplAccessor> vulkan;
+        lifetime::DependencyNode* owner_node = nullptr;
+        VulkanImplAccessor* vulkan = nullptr;
+        lifetime::PhysicalDeviceOwnerContext* owner_context = nullptr;
 
         vk::PhysicalDevice device;
         std::optional<vk::PhysicalDeviceProperties> props;
         std::optional<vk::PhysicalDeviceFeatures> features;
         std::optional<vk::PhysicalDeviceMemoryProperties> mem_props;
 
+        PhysicalDeviceImpl() = default;
+        PhysicalDeviceImpl(const PhysicalDeviceImpl&) = delete;
+        PhysicalDeviceImpl& operator=(const PhysicalDeviceImpl&) = delete;
+        PhysicalDeviceImpl(PhysicalDeviceImpl&&) = delete;
+        PhysicalDeviceImpl& operator=(PhysicalDeviceImpl&&) = delete;
         void make_props();
         void make_mem_props();
     };

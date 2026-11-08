@@ -9,7 +9,7 @@
 
 最初のPRだけで終了せず、下記の順で実装・検証・独立レビューを継続する。PRの公開前には最新masterとの差分を確認する。新しい製品ディレクトリが必要な場合は作成前に確認する。
 
-現在の到達点は順序1〜7、8aのcommand所有分離、8bのCommandPool／CommandBuffer／Fence／Semaphore配置と、同期資源の使用制約である。8c以降は未完了であり、起動資源、既定policy変更、旧入口廃止と最終監査まで継続する。
+現在の到達点は順序1〜8である。command所有分離、CommandPool／CommandBuffer／Fence／Semaphore配置、同期資源の使用制約とTyped frame再利用を接続した。順序9〜12は未完了であり、起動資源、WSI／AHO接続、既定policy変更、旧入口廃止と最終監査まで継続する。
 
 ## 責務と保証
 
@@ -143,3 +143,13 @@ Pipelineが記録時に使うLayoutは保持し、Shader／Pass／再生成recip
 8cは実行用資源とper-frameのデータ資源を別ownerに分ける。独立ComputeではPool×1、ring Impl×1（native CB×F）、Fence Impl×1（native×F）を実行群へ配置し、同じManagerを既存FrameResources／Bundleへ渡す。外部FenceをPhaseへ明示して内部heap Fence生成を回避する。Manager／DomainをFrame値やarena rootへ強所有させず、Domain→Work→Frame→Domainの循環を作らない。Computeの巡回は明示、DefaultPhaseの巡回は既存のsetupへ残す。
 
 AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in-flight Fence×F）、swapchain世代のrender-finished×Mを分ける。Fと画像数Mを混同しない。DefaultPhaseが別途生成するacquire Fenceはgraphics Fenceと兼用せず、WSI予約・取消返却・厳密完了とともに順序10で扱う。
+
+[8cのTyped frame実行arena](typed-frame-command-arena.md)で、明示heap／arenaの共通facade、元Managerとringの固定、外部FenceによるPhase生成、明示巡回を接続した。3slot反復・取消・Frame値の完了解放・Facade破棄後の使用・組全体の移動代入を検証し、両policyのuniform／descriptor実computeとarena版bundleの配列／readbackを確認した。これで順序8の受入条件を満たす。AHOの生成移行とWSI acquire Fenceは順序9／10へ残す。
+
+## 順序9の着手単位
+
+9aはInstance単体の共通operation／lifetime backendと指定領域構築。validation有無の実体をruntimeデータへ揃え、旧Vulkan facadeはadapterとする。所有値の生成入力とGLFW拡張収集を分け、Instance→debug messengerの途中失敗を巻き戻す。プロセス全体のstdio／console変更をlibrary backendへ持ち込まない。
+
+後続でPhysicalDeviceの候補scratchと選択済み実体を分け、SurfaceのOS owner／GLFW lease、LogicalDeviceの固定親と正規owner、Device引数不要の起動arenaへ進む。子のDevice getter等に残るshared_from_thisを置換する。Deviceを依存graphへ公開する時は、既存heap leaf／ResourceArena／visitorにも正規Deviceの固定辺を列挙する。
+
+SurfaceがWindowDataを強所有するとpluginからの所有と循環するため、plugin／Engine／描画状態を含まないOSWindowOwnerを独立させる。論理closeと最後のnative window／GLFW破棄を分離する。Device生成時のSurfaceはqueue選択用であり、Deviceの永久親へ追加しない。StartupArenaの公開はこれらの契約とrollbackが揃ってから行う。

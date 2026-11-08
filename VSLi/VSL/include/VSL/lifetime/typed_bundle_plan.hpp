@@ -1,6 +1,7 @@
 #pragma once
 #include "typed_buffer_arena.hpp"
 #include "resource_plan.hpp"
+#include "../storage/typed_storage_policy.hpp"
 #include "typed_descriptor_plan.hpp"
 #include "typed_descriptor_layouts.hpp"
 #include "../utils/typed_resource_allocation.hpp"
@@ -9,12 +10,6 @@
 #include <optional>
 
 namespace VSL_NAMESPACE::typed {
-    struct HeapStorage {};
-    template<typename Bindings_ = ResourceBindingMap<>>
-    struct ArenaStorage {
-        using Bindings = Bindings_;
-    };
-
     using BundleResourceInit = std::variant<BufferCreateInfo, ImageCreateInfo, SamplerCreateInfo>;
     struct BundleResourcePlacement {
         BindingKey binding;

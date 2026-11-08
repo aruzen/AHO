@@ -166,47 +166,50 @@ namespace {
     }
 
     TEST_F(TypedFrameVulkanIntegrationTest, PerSlotUniformsAndDescriptorsReachTheGpuAcrossRepeatedReuse) {
-        auto manager = make_manager().independent(3);
-        vsl::GraphicResourceManager descriptors(device);
-        t::TypedFrameResources<ComputeResources> frames(manager, [&](size_t) { return ComputeResources(device, descriptors); });
-        vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_frame.comp.spv"));
-        t::TypedComputePipeline<t::ResourceSchema<FrameSet>> pipeline(device, vsl::pipeline_layout::ShaderGroup("typed frames", {shader}));
-        std::array<vsl::Completion, 3> previous;
-        std::array<std::shared_ptr<vsl::impl::GraphicResourceImpl>, 3> sets;
-        for (std::uint32_t iteration = 0; iteration < 12; ++iteration) {
-            auto phase = manager.start_phase<vsl::ComputePhase>();
-            const auto slot = phase.frame_slot;
-            if (previous[slot])
-                EXPECT_EQ(previous[slot].status(), vsl::Completion::Status::COMPLETE);
-            frames.update(phase, [&](ComputeResources& resources) {
-                auto mapped = resources.output.backend().data();
-                EXPECT_EQ(*static_cast<const std::uint32_t*>(mapped.data), resources.expected);
-                resources.expected = iteration + 100;
-                resources.uniform.copy(std::span(&resources.expected, 1));
-            });
-            const auto& current = frames.get(phase);
-            if (iteration < 3)
-                sets[slot] = current.set.backend().data_;
-            EXPECT_EQ(current.set.backend().data_, sets[slot]);
-            phase << pipeline.bind_resources(current.set).dispatch(1);
-            auto buffer = manager.get_buffer();
-            vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
-            buffer.data_->command_buffers.at(slot).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
-            previous[slot] = phase.completion();
-            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-            manager.get_buffer().next();
-        }
-        EXPECT_NE(sets[0], sets[1]);
-        EXPECT_NE(sets[1], sets[2]);
-        EXPECT_NE(sets[0], sets[2]);
-        for (size_t index = 0; index < frames.frame_count(); ++index) {
-            auto phase = manager.start_phase<vsl::ComputePhase>();
-            const auto& current = frames.get(phase);
-            auto buffer = current.output.backend();
-            auto mapped = buffer.data();
-            EXPECT_EQ(*static_cast<const std::uint32_t*>(mapped.data), current.expected);
-            phase.cancel();
-            manager.get_buffer().next();
+        for (const bool arena : {false, true}) {
+            auto commands = arena ? t::TypedFrameCommands(device, 3, t::ArenaStorage<>{}) : t::TypedFrameCommands(device, 3, t::HeapStorage{});
+            auto manager = commands.manager();
+            vsl::GraphicResourceManager descriptors(device);
+            t::TypedFrameResources<ComputeResources> frames(manager, [&](size_t) { return ComputeResources(device, descriptors); });
+            vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_frame.comp.spv"));
+            t::TypedComputePipeline<t::ResourceSchema<FrameSet>> pipeline(device, vsl::pipeline_layout::ShaderGroup("typed frames", {shader}));
+            std::array<vsl::Completion, 3> previous;
+            std::array<std::shared_ptr<vsl::impl::GraphicResourceImpl>, 3> sets;
+            for (std::uint32_t iteration = 0; iteration < 12; ++iteration) {
+                auto phase = commands.start_compute();
+                const auto slot = phase.frame_slot;
+                if (previous[slot])
+                    EXPECT_EQ(previous[slot].status(), vsl::Completion::Status::COMPLETE);
+                frames.update(phase, [&](ComputeResources& resources) {
+                    auto mapped = resources.output.backend().data();
+                    EXPECT_EQ(*static_cast<const std::uint32_t*>(mapped.data), resources.expected);
+                    resources.expected = iteration + 100;
+                    resources.uniform.copy(std::span(&resources.expected, 1));
+                });
+                const auto& current = frames.get(phase);
+                if (iteration < 3)
+                    sets[slot] = current.set.backend().data_;
+                EXPECT_EQ(current.set.backend().data_, sets[slot]);
+                phase << pipeline.bind_resources(current.set).dispatch(1);
+                auto buffer = manager.get_buffer();
+                vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
+                buffer.data_->command_buffers.at(slot).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+                previous[slot] = phase.completion();
+                ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+                commands.next();
+            }
+            EXPECT_NE(sets[0], sets[1]);
+            EXPECT_NE(sets[1], sets[2]);
+            EXPECT_NE(sets[0], sets[2]);
+            for (size_t index = 0; index < frames.frame_count(); ++index) {
+                auto phase = commands.start_compute();
+                const auto& current = frames.get(phase);
+                auto buffer = current.output.backend();
+                auto mapped = buffer.data();
+                EXPECT_EQ(*static_cast<const std::uint32_t*>(mapped.data), current.expected);
+                phase.cancel();
+                commands.next();
+            }
         }
     }
 } // namespace

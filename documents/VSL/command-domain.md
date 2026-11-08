@@ -1,0 +1,60 @@
+# Commandのnative実体とWork保持の分離
+
+[完了計画](arena-completion-plan.md)の8a。Pool／Buffer／Fence／Semaphoreを配置する前に、native CommandBufferImplから送信資源の強い所有を外へ移す。8全体の配置は後続であり、この単位ではheapのnative生成を維持する。
+
+## 所有と責務
+
+CommandBuffer ringごとにlifetimeのCommandDomainを置く。CommandBuffer／CommandManager／PhaseのfacadeがDomainを保持し、Domainは正規native Buffer owner、slotごとのlast-submitted Work、recording候補、WSI pinと住所の安定したRecordingContextを持つ。native ownerを別のalias control blockへ包み直さない。
+
+ImplはDomainのweak参照とcontextの借用だけを持つ。WorkはDevice／fence／使用資源rootを保持し、Domain／manager／Phaseを保持しない。従ってWorkに同じnative Buffer ownerを保持しても、Impl→Work→Implの循環にならない。同じarenaへ資源とcommandを置く後続段階でもこの向きを維持する。
+
+contextは解決済みWorkへの借用、取得画像metadata、記録世代、記録・再入・終了のhost状態を持つ。通常のcompletion／retain／invokeはcontextから直接Workへ届き、registry探索やweak lockを行わない。完了結果は引き続きsyncのSubmissionImplだけを所有し、Workの資源保持と区別する。
+
+operationのnative送信・完了APIとsyncの完了観測／terminal公開は維持する。lifetime Domainはsyncの完了情報を使って回収時点を決める。Pool／Bufferのnative生成・破棄backendとCPU配置は8b以降へ残す。
+
+## 記録・送信と取消
+
+prepareは直前のslot Workを保持したまま新候補を構築する。beginで候補をcontextへpublishし、成功したsubmitだけがlast-submittedを置換する。cancelや送信前失敗は自分の候補だけをresetし、以前のSUBMISSION保持を残す。slotの旧Work破棄は新しい記録状態とPhase状態の公開後に行う。
+
+prepare中の完了callbackが別Jobを開始する既存契約を維持する。開始前の世代・slot・Workを再検査し、外側prepareだけを失敗させる。他のJobをresetしない。通常の記録中に同じringで新しいPhaseを始めることは拒否する。
+
+DefaultPhaseのcancelは元の記録をdetachし、取得semaphore消費と画像返却用の別Workを作り、phase.completion()を新結果へ切り替える。返却の記録・送信・present後に保存した旧CompletionをCANCELLEDとして公開する。返却処理中はringを予約し、終端callbackから別Jobが返却slotを奪うことを拒否する。WorkのcallbackへPhase／managerを保存しない。
+
+cancel／failはWorkとnative facadeを局所保持してからterminalを公開し、その後はPhaseに触れない。終端callbackが呼出元Phaseを破棄しても、Workの資源一覧を処理し終えるまでWork本体が生存する。DefaultPhaseの旧結果callbackも返却処理の末尾に置き、自己破棄後のthis参照を避ける。
+
+通常submitと画像返却の外側でも旧slot Workを局所保持し、SUBMISSION pinの解放callbackがpresent前にPhaseを破棄することを防ぐ。返却用begin後の例外では、その部分記録をfail／detachしてから元結果を公開する。
+
+## wait_idleと終了
+
+wait_idleはDomainとlast-submitted一覧を局所保持し、native Device idleを待つ。PENDINGのrecording候補は完了対象へ渡さない。完了callbackが新しい送信を作ってもsnapshotだけを処理し、新WorkとWSI pinを消さない。SUBMISSION保持は次の成功submitまたはDomain終了までslotへ残る。
+
+shutdownは内部destructorだけとする。生存中のPhaseがDomainを保持するので、外部から強制終了するAPIは追加しない。closingを先に公開し、一覧をdetachし、記録をreset、送信済みWorkをdrain、WSI pinを待機してから解放する。未知の完了エラーはfinish_submissionの再待機を維持し、早期解放しない。contextはDomainの破棄前にImplから切断する。
+
+現在のWSI pinはDevice idleまでの暫定契約である。graphics fenceとpresentation完了の厳密な区別・復旧は順序10で扱う。host同時呼出しのthread safetyを追加する変更ではない。
+
+## 互換入口と移行
+
+共有facadeのコピーは正規Domainを共有する。data_とDomainの代入はcopy-and-swapで同時に公開し、旧ownerの解放callbackが途中状態を見ないようにする。
+
+既存のshared_ptr<Impl> constructorは、生きた正規Domainを取得する移行adapterである。失効またはclosingなら拒否し、新しいregistryを黙って作らない。data_だけを保存してもWorkの保持を意味しなくなるため、所有を必要とする側はfacadeを保存する。
+
+```cpp
+auto owner = manager.get_buffer();
+auto shared = owner;                 // native ownerとDomainを共有する。
+// 移行中の旧入口もownerの生存中なら同じDomainを解決する。
+vsl::CommandBuffer legacy(owner.data_);
+```
+
+managerの公開data_からringを直接差し替える既存の検査入口では、置換ringのowning facadeも保存する。元のDomainを置換ringで上書きしない。Typed frame resourcesは元ringとの不一致を引き続き拒否する。公開data_／shared_ptr入口そのものの廃止は順序12へ残す。
+
+## 検証と次の範囲
+
+GPU10ケースを追加した。同じnative ownerをWorkへ保持しても循環しないこと、facade／Phaseだけを残した利用、失効したshared-only入口の拒否、代入callbackでの一貫した所有、wait_idleからの再送信、PENDING記録の維持、cancel／fail／WSI返却／通常present中のPhase自己破棄を確認した。WSI取消は現在WorkのCOMPLETIONと旧slotのSUBMISSION両方を検査した。
+
+macOS arm64／Clang20／C++26／ASan・UBSan／MoltenVK・validationで、重点74件、VSL890件中887成功・既知packed format3skip、AHO GPU150件／CPU1070件、compile契約194件が成功した。heap／arenaサンプルの3frame・12submission・2draw・238831更新画素、resize1720×1080→2000×1360、pipeline生成1回を維持し、PNG3枚が一致した。VUID／sanitizer errorはない。
+
+変更C++23ファイル／18TUのstrict違反0、CMake309パスとMSBuild／filtersの新2パスの一意登録を確認した。installed public consumer15targetのbuild／link／CPU実行、Debug／Releaseの実寸法assertとCPU利用、x86_64 cross archive、異artifactのlink拒否が成功した。private Domain／Implはinstallしない。
+
+この段階で保証する自己破棄callbackは、自身のCOMPLETIONと置換される旧slotのSUBMISSIONである。external FenceのPENDING予約は8bで導入する。それまでは同じFence要素を複数Phaseへ同時に貸し出さない。未追跡のnative submitは利用側の同期契約である。
+
+Domain／Work／結果／fence、Impl内部vectorと生成scratchは個別確保として残る。公開facadeのdata_によるnative owner保持も移行adapterとして残る。Pool／Buffer／Fence／Semaphoreの共通backendと配置、厳密なWSI完了、Device配置、Typed既定変更と旧入口廃止は後続段階である。性能率、実driver OOM／DeviceLost、Windows／Linux実機、LSanとCPU並行は未検証である。

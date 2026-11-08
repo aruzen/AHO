@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_domain.hpp>
 #include <VSL/vulkan/commands/render_pass_begin.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/sync/resource_use_state.hpp>
@@ -10,12 +11,12 @@ namespace VSL_NAMESPACE::command {
         struct FrameBufferRecording {
             impl::CommandBufferImpl& buffer;
             explicit FrameBufferRecording(impl::CommandBufferImpl& buffer);
-            ~FrameBufferRecording() { buffer.frame_buffer_recording = false; }
+            ~FrameBufferRecording() { buffer.recording_context->frame_buffer_recording = false; }
         };
         FrameBufferRecording::FrameBufferRecording(impl::CommandBufferImpl& buffer) : buffer(buffer) {
-            if (buffer.frame_buffer_recording)
+            if (buffer.recording_context->frame_buffer_recording)
                 throw std::logic_error("Framebuffer recording cannot reenter the same command buffer");
-            buffer.frame_buffer_recording = true;
+            buffer.recording_context->frame_buffer_recording = true;
         }
         std::vector<ClearValue> legacy_clears(FrameBufferAccessor target,
                                               std::optional<VSLDRGBColorAccessor<float>> color) {
@@ -85,7 +86,7 @@ namespace VSL_NAMESPACE::command {
         lifetime::require_recording(buffer, completion);
         const auto slot = buffer.get_current_buffer_idx();
         const auto native = buffer.data_->command_buffers.at(slot);
-        const auto index = target_index.value_or(buffer.data_->acquired_image_index.value_or(slot));
+        const auto index = target_index.value_or(buffer.data_->recording_context->acquired_image_index.value_or(slot));
         const operation::FrameBufferBeginScratch scratch(*target, index, {{area.x, area.y}, {area.width, area.height}}, clear_values);
         buffer.retain(target);
         for (const auto* image : target->attachments.at(index))
@@ -96,7 +97,7 @@ namespace VSL_NAMESPACE::command {
         operation::record_frame_buffer_begin(native, scratch);
     }
     void NextSubpass::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
-        if (buffer.data_->frame_buffer_recording)
+        if (buffer.data_->recording_context->frame_buffer_recording)
             throw std::logic_error("Subpass recording cannot reenter framebuffer tracking");
         operation::record_next_subpass(buffer.data_->command_buffers.at(buffer.get_current_buffer_idx()));
     }

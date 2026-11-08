@@ -7,8 +7,7 @@
 #include <VSL/vulkan/command.hpp>
 #include <VSL/vulkan/phase.hpp>
 #include <VSL/vulkan/surface.hpp>
-#include <VSL/sync/submission_completion.hpp>
-#include <VSL/operation/submission_ops.hpp>
+#include <VSL/lifetime/command_domain.hpp>
 #include <limits>
 #include <stdexcept>
 
@@ -39,9 +38,22 @@ VSL_NAMESPACE::CommandBuffer::CommandBuffer(VSL_NAMESPACE::CommandPool pool, std
 
     data_->current_buffer_idx = 0;
     data_->command_buffers = pool.data_->device->device.allocateCommandBuffers(alloc_info);
+    _domain = std::make_shared<lifetime::CommandDomain>(data_);
+    data_->domain = _domain;
+    data_->recording_context = &_domain->context;
 }
 
-VSL_NAMESPACE::CommandBuffer::CommandBuffer(std::shared_ptr<VSL_NAMESPACE::impl::CommandBufferImpl> data) : data_(data) {}
+VSL_NAMESPACE::CommandBuffer::CommandBuffer(std::shared_ptr<VSL_NAMESPACE::impl::CommandBufferImpl> data)
+    : data_(std::move(data)), _domain(data_ ? lifetime::CommandAccess::Resolve(data_) : nullptr) {}
+
+VSL_NAMESPACE::CommandBuffer& VSL_NAMESPACE::CommandBuffer::operator=(CommandBuffer other) noexcept {
+    swap(other);
+    return *this;
+}
+void VSL_NAMESPACE::CommandBuffer::swap(CommandBuffer& other) noexcept {
+    data_.swap(other.data_);
+    _domain.swap(other._domain);
+}
 
 std::uint32_t VSL_NAMESPACE::CommandBuffer::get_current_buffer_idx() {
     return data_->current_buffer_idx;
@@ -65,20 +77,21 @@ void VSL_NAMESPACE::CommandBuffer::reset(std::uint32_t idx) {
 }
 
 VSL_NAMESPACE::impl::CommandBufferImpl::~CommandBufferImpl() {
-    for (const auto& submission : submissions)
-        if (submission)
-            sync::finish_submission(*submission);
-    if (!presentation_resources.empty()) {
-        auto result = operation::wait_device_idle(command_pool->device->device);
-        while (result != vk::Result::eSuccess && result != vk::Result::eErrorDeviceLost)
-            result = operation::wait_device_idle(command_pool->device->device);
-        presentation_resources.clear();
-    }
     if (!command_buffers.empty())
         command_pool->device->device.freeCommandBuffers(command_pool->command_pool, command_buffers);
 }
 
-VSL_NAMESPACE::CommandManager::CommandManager(std::shared_ptr<VSL_NAMESPACE::impl::CommandManagerImpl> data) : data_(data) {}
+VSL_NAMESPACE::CommandManager::CommandManager(std::shared_ptr<VSL_NAMESPACE::impl::CommandManagerImpl> data)
+    : data_(std::move(data)), _domain(data_ ? lifetime::CommandAccess::Resolve(data_->command_buffer) : nullptr) {}
+
+VSL_NAMESPACE::CommandManager& VSL_NAMESPACE::CommandManager::operator=(CommandManager other) noexcept {
+    swap(other);
+    return *this;
+}
+void VSL_NAMESPACE::CommandManager::swap(CommandManager& other) noexcept {
+    data_.swap(other.data_);
+    _domain.swap(other._domain);
+}
 
 VSL_NAMESPACE::CommandManager::CommandManager(VSL_NAMESPACE::LogicalDeviceAccessor device) {
     data_ = std::shared_ptr<VSL_NAMESPACE::impl::CommandManagerImpl>(new VSL_NAMESPACE::impl::CommandManagerImpl);
@@ -89,6 +102,7 @@ VSL_NAMESPACE::CommandManager::CommandManager(VSL_NAMESPACE::LogicalDeviceAccess
 
     data_->command_pool = pool.data_;
     data_->command_buffer = buffer.data_;
+    _domain = lifetime::CommandAccess::Owner(buffer);
     data_->graphics_queue = de.getQueue(device.data_->graphics_family, 0);
     data_->present_queue = de.getQueue(device.data_->present_family, 0);
 }
@@ -98,7 +112,12 @@ VSL_NAMESPACE::CommandPool VSL_NAMESPACE::CommandManager::get_pool() {
 }
 
 VSL_NAMESPACE::CommandBuffer VSL_NAMESPACE::CommandManager::get_buffer() {
-    return CommandBuffer{data_->command_buffer};
+    if (!data_ || !data_->command_buffer)
+        throw std::invalid_argument("Command manager is empty");
+    // data_直接差替えの互換入口だけで、元ringのDomainを上書きしない。
+    if (!_domain || _domain->buffer != data_->command_buffer)
+        return CommandBuffer{data_->command_buffer};
+    return lifetime::CommandAccess::Buffer(_domain);
 }
 
 std::uint32_t VSL_NAMESPACE::CommandManager::get_current_buffer_idx() {
@@ -111,14 +130,8 @@ VSL_NAMESPACE::CommandBuffer VSL_NAMESPACE::CommandManager::make_exclusive_buffe
     return CommandBuffer(CommandPool{data_->command_pool}, static_cast<std::uint32_t>(size));
 }
 void VSL_NAMESPACE::CommandManager::wait_idle() {
-    const auto data = data_;
-    const auto presentation = data->command_buffer->presentation_resources;
-    data->device->device.waitIdle();
-    data->command_buffer->presentation_resources.clear();
-    const auto submissions = data->command_buffer->submissions;
-    for (const auto& submission : submissions)
-        if (submission)
-            sync::finish_submission(*submission);
+    const auto domain = lifetime::CommandAccess::Owner(get_buffer());
+    domain->wait_idle();
 }
 
 VSL_NAMESPACE::impl::CommandPoolImpl::~CommandPoolImpl() {
@@ -142,9 +155,10 @@ VSL_NAMESPACE::CommandManager VSL_NAMESPACE::CommandManager::independent(std::ui
     next->command_buffer = buffers.data_;
     next->graphics_queue = data_->graphics_queue;
     next->present_queue = data_->present_queue;
-    return CommandManager(next);
+    return lifetime::CommandAccess::Manager(std::move(next), lifetime::CommandAccess::Owner(buffers));
 }
 
 VSL_NAMESPACE::Completion VSL_NAMESPACE::CommandBuffer::completion() const {
-    return {data_ && data_->recording_submission ? data_->recording_submission->result : nullptr};
+    const auto* context = data_ ? data_->recording_context : nullptr;
+    return {context && context->work ? context->work->result : nullptr};
 }

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_domain.hpp>
 #include <VSL/vulkan/commands/image_upload.hpp>
 #include <VSL/vulkan/commands/change_image_barrier.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
@@ -19,7 +20,7 @@ namespace VSL_NAMESPACE::command {
             throw std::invalid_argument("ImageUpload copy layout was modified");
         if (!contain(copy.image.data_->usage, ImageType::SAMPLED))
             throw std::invalid_argument("ImageUpload requires a sampled image");
-        if (auto submission = buffer.data_->recording_submission)
+        if (auto submission = buffer.data_->recording_context->work)
             submission->resources.reserve(submission->resources.size() + 8);
         ChangeImageBarrier(copy.image, current_layout, ImageLayout::TRANSFER_DST_OPTIMAL).invoke(pool, buffer, manager);
         if (current_layout == ImageLayout::UNDEFINED) {

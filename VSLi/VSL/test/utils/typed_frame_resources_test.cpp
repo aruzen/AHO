@@ -89,7 +89,8 @@ namespace {
         auto manager = make_manager();
         const auto original = manager.get_buffer();
         t::TypedFrameResources<FrameValue> frames(manager, [](size_t index) { return FrameValue{index}; });
-        manager.data_->command_buffer = manager.make_exclusive_buffer().data_;
+        const auto replacement = manager.make_exclusive_buffer();
+        manager.data_->command_buffer = replacement.data_;
         {
             auto phase = manager.start_phase<vsl::ComputePhase>();
             EXPECT_THROW(frames.get(phase), std::invalid_argument);

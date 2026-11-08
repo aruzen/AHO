@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_domain.hpp>
 #include <VSL/vulkan/commands/copy_buffer.hpp>
 #include <VSL/operation/buffer_ops.hpp>
 #include <VSL/sync/buffer_access.hpp>
@@ -38,7 +39,7 @@ namespace VSL_NAMESPACE::command {
             buffer.retain_until_complete(_source_owner);
             buffer.retain_until_complete(_destination_owner);
         } else {
-            if (auto submission = buffer.data_->recording_submission)
+            if (auto submission = buffer.data_->recording_context->work)
                 submission->resources.reserve(submission->resources.size() + 2);
             buffer.retain(_source_owner);
             buffer.retain(_destination_owner);

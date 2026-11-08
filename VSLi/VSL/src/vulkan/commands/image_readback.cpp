@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_domain.hpp>
 #include <VSL/vulkan/commands/image_readback.hpp>
 #include <VSL/vulkan/commands/change_image_barrier.hpp>
 #include <stdexcept>
@@ -35,7 +36,7 @@ namespace VSL_NAMESPACE::command {
             manager.data_->device.get() != copy.image.data_->device ||
             buffer.data_->command_pool->device.get() != copy.image.data_->device)
             throw std::invalid_argument("Readback requires a command buffer and manager on the image device");
-        if (auto submission = buffer.data_->recording_submission) {
+        if (auto submission = buffer.data_->recording_context->work) {
             submission->resources.reserve(submission->resources.size() + 4);
         }
         ChangeImageBarrier(copy.image, current_layout, ImageLayout::TRANSFER_SRC_OPTIMAL, info.region.layer, 1)

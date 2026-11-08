@@ -2,11 +2,24 @@
 #include <VSL/vulkan/phase.hpp>
 #include <VSL/sync/submission_completion.hpp>
 #include <VSL/lifetime/submission_retention.hpp>
+#include <VSL/lifetime/command_domain.hpp>
 #include <VSL/operation/submission_ops.hpp>
 #include <exception>
 #include <stdexcept>
 
 namespace VSL_NAMESPACE {
+    namespace {
+        struct ReturningImage {
+            lifetime::CommandRecordingContext& context;
+            explicit ReturningImage(lifetime::CommandRecordingContext& context);
+            ~ReturningImage() { context.returning_image = false; }
+        };
+        ReturningImage::ReturningImage(lifetime::CommandRecordingContext& context) : context(context) {
+            if (context.returning_image)
+                throw std::logic_error("Acquired image is already being returned");
+            context.returning_image = true;
+        }
+    } // namespace
     struct DefaultPhase::Presentation {
         std::shared_ptr<impl::LogicalDeviceImpl> device;
         std::shared_ptr<impl::SemaphoreImpl> available;
@@ -35,10 +48,15 @@ namespace VSL_NAMESPACE {
             setup();
     }
 
-    void ComputePhase::prepare() {
-        auto buffers = manager.data_->command_buffer;
-        if (buffers->recording)
-            throw std::logic_error("A phase is already recording on this manager");
+    void ComputePhase::prepare(bool returning_image) {
+        recording_buffer = manager.get_buffer();
+        const auto domain = lifetime::CommandAccess::Owner(recording_buffer);
+        auto buffers = domain->buffer;
+        if (domain->context.returning_image && !returning_image)
+            throw std::logic_error("Acquired image is being returned");
+        if (domain->context.closing || domain->context.recording)
+            throw std::logic_error("Command domain is unavailable for recording");
+        const auto generation = domain->context.generation;
         if (next_image_available && (!next_image_available->data_ ||
                                      next_image_available->data_->device != manager.data_->device))
             throw std::invalid_argument("Acquire semaphore device mismatch");
@@ -51,9 +69,7 @@ namespace VSL_NAMESPACE {
         frame_slot = buffers->current_buffer_idx;
         signal_index = frame_slot;
         auto device = manager.data_->device->device;
-        if (buffers->submissions.size() < buffers->command_buffers.size())
-            buffers->submissions.resize(buffers->command_buffers.size());
-        auto previous = buffers->submissions.at(frame_slot);
+        auto previous = domain->submissions.at(frame_slot);
         if (previous && previous->result->status == Completion::Status::SUBMITTED && !Completion{previous->result}.wait())
             throw std::runtime_error("Previous frame completion failed");
         if (next_image_available && next_image_available->data_->semaphores.size() <= frame_slot)
@@ -78,34 +94,42 @@ namespace VSL_NAMESPACE {
                 next->owned_fence = std::make_shared<vk::UniqueFence>(device.createFenceUnique({}));
             next->fence = **next->owned_fence;
         }
-        if (buffers->recording || buffers->current_buffer_idx != frame_slot || buffers->submissions.at(frame_slot) != previous)
+        if (domain->context.closing || domain->context.recording || domain->context.generation != generation ||
+            manager.data_->command_buffer != buffers ||
+            buffers->current_buffer_idx != frame_slot || domain->submissions.at(frame_slot) != previous)
             throw std::logic_error("Frame slot changed while preparing");
         next->result->work = next;
         submission = std::move(next);
         completion_ = Completion{submission->result};
-        buffers->acquired_image_index.reset();
-        buffers->acquired_swapchain.reset();
+        domain->context.acquired_image_index.reset();
+        domain->context.acquired_swapchain.reset();
     }
 
     void ComputePhase::fail(Completion::Failure failure, std::int32_t error_code) noexcept {
-        auto buffers = manager.data_->command_buffer;
-        if (submission && buffers->recording_submission == submission) {
+        const auto buffer = recording_buffer;
+        const auto work = submission;
+        const auto buffers = buffer.data_;
+        auto* context = buffers ? buffers->recording_context : nullptr;
+        if (work && context && context->work == work.get()) {
             try {
                 buffers->command_buffers.at(frame_slot).reset();
             } catch (...) {
             }
-            buffers->recording = false;
-            buffers->recording_submission.reset();
+            context->recording = false;
+            context->work = nullptr;
+            lifetime::CommandAccess::Owner(buffer)->recording_submission.reset();
         }
-        if (submission)
-            sync::publish_terminal(*submission, Completion::Status::FAILED, failure, error_code);
         state = State::ERROR_;
+        if (work)
+            sync::publish_terminal(*work, Completion::Status::FAILED, failure, error_code);
     }
     void ComputePhase::begin() {
-        auto buffers = manager.data_->command_buffer;
+        const auto domain = lifetime::CommandAccess::Owner(recording_buffer);
+        auto buffers = domain->buffer;
         try {
-            if (buffers->recording || buffers->current_buffer_idx != frame_slot ||
-                (buffers->submissions.at(frame_slot) && buffers->submissions.at(frame_slot)->result->status == Completion::Status::SUBMITTED))
+            if (domain->context.closing || domain->context.recording || manager.data_->command_buffer != buffers ||
+                buffers->current_buffer_idx != frame_slot ||
+                (domain->submissions.at(frame_slot) && domain->submissions.at(frame_slot)->result->status == Completion::Status::SUBMITTED))
                 throw std::logic_error("Frame slot is no longer available for recording");
             buffers->command_buffers.at(frame_slot).reset();
             buffers->command_buffers.at(frame_slot).begin(vk::CommandBufferBeginInfo{});
@@ -117,8 +141,10 @@ namespace VSL_NAMESPACE {
             fail(Completion::Failure::SUBMIT_FAILED);
             throw;
         }
-        buffers->recording = true;
-        buffers->recording_submission = submission;
+        domain->recording_submission = submission;
+        domain->context.work = submission.get();
+        domain->context.recording = true;
+        ++domain->context.generation;
         state = State::WAIT_SUBMIT;
     }
     void ComputePhase::setup() {
@@ -138,16 +164,18 @@ namespace VSL_NAMESPACE {
     ComputePhase::SubmitResult ComputePhase::submit() {
         if (state != State::WAIT_SUBMIT)
             return SubmitResult::FAILED;
-        auto buffers = manager.data_->command_buffer;
+        const auto domain = lifetime::CommandAccess::Owner(recording_buffer);
+        auto buffers = domain->buffer;
         try {
-            if (buffers->current_buffer_idx != frame_slot)
+            if (domain->context.closing || !domain->context.recording || domain->context.work != submission.get() ||
+                manager.data_->command_buffer != buffers || buffers->current_buffer_idx != frame_slot)
                 throw std::logic_error("Frame slot changed while recording");
             std::vector<vk::Semaphore> waits, signals;
             if (next_image_available)
                 waits.push_back(next_image_available->data_->semaphores.at(frame_slot));
             if (calculation_finish)
                 signals.push_back(calculation_finish->data_->semaphores.at(signal_index));
-            else if (auto chain = buffers->acquired_swapchain.lock())
+            else if (auto chain = domain->context.acquired_swapchain.lock())
                 signals.push_back(*chain->presentation_semaphores.at(signal_index));
             auto stages = vk::PipelineStageFlags(static_cast<std::uint32_t>(wait_stage));
             if (!stages && !waits.empty())
@@ -170,19 +198,19 @@ namespace VSL_NAMESPACE {
         completion_.data_->status = Completion::Status::SUBMITTED;
         if (auto& external = submission->external_fence)
             external->submissions.at(frame_slot) = completion_.data_;
-        buffers->submissions.at(frame_slot) = submission;
-        buffers->recording = false;
-        buffers->recording_submission.reset();
+        auto previous = std::move(domain->submissions.at(frame_slot));
+        domain->submissions.at(frame_slot) = submission;
+        domain->context.recording = false;
+        domain->context.work = nullptr;
+        domain->recording_submission.reset();
         state = State::FINISH_SUBMIT;
         return SubmitResult::SUCCESS;
     }
-    void ComputePhase::cancel() {
-        if (state != State::WAIT_SUBMIT && state != State::BEFORE_SETUP)
-            return;
-        auto buffers = manager.data_->command_buffer;
+    Completion::Failure ComputePhase::cancel_recording(std::int32_t& error_code) {
+        const auto buffers = recording_buffer.data_;
+        auto* context = buffers ? buffers->recording_context : nullptr;
         Completion::Failure failure = Completion::Failure::NONE;
-        std::int32_t error_code = 0;
-        if (submission && buffers->recording_submission == submission) {
+        if (submission && context && context->work == submission.get()) {
             try {
                 buffers->command_buffers.at(frame_slot).reset();
             } catch (const vk::SystemError& error) {
@@ -191,12 +219,22 @@ namespace VSL_NAMESPACE {
             } catch (...) {
                 failure = Completion::Failure::SUBMIT_FAILED;
             }
-            buffers->recording = false;
-            buffers->recording_submission.reset();
+            context->recording = false;
+            context->work = nullptr;
+            lifetime::CommandAccess::Owner(recording_buffer)->recording_submission.reset();
         }
-        if (submission)
-            sync::publish_terminal(*submission, failure == Completion::Failure::NONE ? Completion::Status::CANCELLED : Completion::Status::FAILED, failure, error_code);
         state = State::ERROR_;
+        return failure;
+    }
+    void ComputePhase::cancel() {
+        if (state != State::WAIT_SUBMIT && state != State::BEFORE_SETUP)
+            return;
+        const auto buffer = recording_buffer;
+        const auto work = submission;
+        std::int32_t error_code = 0;
+        const auto failure = cancel_recording(error_code);
+        if (work)
+            sync::publish_terminal(*work, failure == Completion::Failure::NONE ? Completion::Status::CANCELLED : Completion::Status::FAILED, failure, error_code);
     }
     void ComputePhase::finish_noexcept() noexcept {
         try {
@@ -231,8 +269,10 @@ namespace VSL_NAMESPACE {
             if (!swapchain.data_ || !swapchain.data_->swap_chain ||
                 swapchain.data_->device != manager.data_->device)
                 throw std::invalid_argument("A swapchain is required");
-            auto buffers = manager.data_->command_buffer;
-            if (buffers->recording)
+            const auto buffer = manager.get_buffer();
+            const auto domain = lifetime::CommandAccess::Owner(buffer);
+            auto buffers = domain->buffer;
+            if (domain->context.recording || domain->context.returning_image)
                 throw std::logic_error("A phase is already recording");
             buffers->current_buffer_idx = (buffers->current_buffer_idx + 1) % buffers->command_buffers.size();
             prepare();
@@ -255,7 +295,7 @@ namespace VSL_NAMESPACE {
             }
             const auto acquired = *_presentation->acquire_fence;
             completion_.retain(_presentation);
-            lifetime::retain_resource(buffers->presentation_resources, swapchain.data_);
+            lifetime::retain_resource(domain->presentation_resources, swapchain.data_);
             auto result = device.acquireNextImageKHR(swapchain.data_->swap_chain, UINT64_MAX,
                                                      available, acquired, &image_index);
             if (result == vk::Result::eErrorOutOfDateKHR) {
@@ -273,12 +313,12 @@ namespace VSL_NAMESPACE {
                 throw std::runtime_error("Swapchain acquire wait failed");
             signal_index = image_index;
             begin();
-            buffers->acquired_image_index = image_index;
-            buffers->acquired_swapchain = swapchain.data_;
+            domain->context.acquired_image_index = image_index;
+            domain->context.acquired_swapchain = swapchain.data_;
             completion_.retain(swapchain.data_);
-            lifetime::retain_resource(buffers->presentation_resources, swapchain.data_);
+            lifetime::retain_resource(domain->presentation_resources, swapchain.data_);
             if (calculation_finish)
-                lifetime::retain_resource(buffers->presentation_resources, calculation_finish->data_);
+                lifetime::retain_resource(domain->presentation_resources, calculation_finish->data_);
         } catch (const vk::SystemError& error) {
             fail(error.code().value() == static_cast<int>(vk::Result::eErrorDeviceLost) ? Completion::Failure::DEVICE_LOST : Completion::Failure::SUBMIT_FAILED, error.code().value());
             throw;
@@ -302,9 +342,10 @@ namespace VSL_NAMESPACE {
                                                     : *swapchain.data_->presentation_semaphores.at(image_index);
         auto chain = swapchain.data_->swap_chain;
         vk::PresentInfoKHR info{.waitSemaphoreCount = 1, .pWaitSemaphores = &finished, .swapchainCount = 1, .pSwapchains = &chain, .pImageIndices = &image_index};
-        lifetime::retain_resource(manager.data_->command_buffer->presentation_resources, swapchain.data_);
+        const auto domain = lifetime::CommandAccess::Owner(recording_buffer);
+        lifetime::retain_resource(domain->presentation_resources, swapchain.data_);
         if (calculation_finish)
-            lifetime::retain_resource(manager.data_->command_buffer->presentation_resources, calculation_finish->data_);
+            lifetime::retain_resource(domain->presentation_resources, calculation_finish->data_);
         auto result = manager.data_->present_queue.presentKHR(&info);
         _presented = true;
         if (recreate || result == vk::Result::eSuboptimalKHR || result == vk::Result::eErrorOutOfDateKHR)
@@ -316,6 +357,8 @@ namespace VSL_NAMESPACE {
     DefaultPhase::SubmitResult DefaultPhase::submit() {
         if (state == State::ERROR_ && recreate)
             return SubmitResult::WANT_RECREATE_SWAPCHAIN;
+        const auto domain = recording_buffer.data_ ? lifetime::CommandAccess::Owner(recording_buffer) : nullptr;
+        const auto previous = domain ? domain->submissions.at(frame_slot) : nullptr;
         if (state == State::WAIT_SUBMIT && submit_commands() != SubmitResult::SUCCESS)
             return SubmitResult::FAILED;
         return present();
@@ -326,20 +369,40 @@ namespace VSL_NAMESPACE {
             return;
         }
         if (state == State::WAIT_SUBMIT) {
+            const auto domain = lifetime::CommandAccess::Owner(recording_buffer);
+            const ReturningImage returning(domain->context);
+            const auto cancelled = submission;
+            const auto previous = domain->submissions.at(frame_slot);
+            std::int32_t error_code = 0;
+            const auto failure = cancel_recording(error_code);
+            if (failure != Completion::Failure::NONE) {
+                sync::publish_terminal(*cancelled, Completion::Status::FAILED, failure, error_code);
+                return;
+            }
             // 途中の記録を破棄し、取得時のセマフォを消費して画像を画面表示に戻す。
-            // 破棄した記録の完了状態はキャンセルのまま維持する。
-            ComputePhase::cancel();
-            prepare();
-            signal_index = image_index;
-            begin();
-            auto buffers = manager.data_->command_buffer;
-            buffers->acquired_image_index = image_index;
-            buffers->acquired_swapchain = swapchain.data_;
-            completion_.retain(swapchain.data_);
-            vk::ImageMemoryBarrier barrier{
-                .oldLayout = vk::ImageLayout::eUndefined, .newLayout = vk::ImageLayout::ePresentSrcKHR, .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .image = swapchain.data_->swap_chain_images.at(image_index), .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
-            buffers->command_buffers.at(frame_slot).pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eBottomOfPipe, {}, {}, {}, barrier);
-            DefaultPhase::submit_commands(); // キャンセル時は派生クラスの終了コールバックを呼ばない。
+            // 元結果のcallbackは返却の記録・送信後に呼び、Phase自己破棄後にthisへ触れない。
+            try {
+                prepare(true);
+                signal_index = image_index;
+                begin();
+                auto buffers = domain->buffer;
+                domain->context.acquired_image_index = image_index;
+                domain->context.acquired_swapchain = swapchain.data_;
+                completion_.retain(swapchain.data_);
+                vk::ImageMemoryBarrier barrier{
+                    .oldLayout = vk::ImageLayout::eUndefined, .newLayout = vk::ImageLayout::ePresentSrcKHR, .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .image = swapchain.data_->swap_chain_images.at(image_index), .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
+                buffers->command_buffers.at(frame_slot).pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eBottomOfPipe, {}, {}, {}, barrier);
+                DefaultPhase::submit_commands(); // キャンセル時は派生クラスの終了コールバックを呼ばない。
+                if (state == State::FINISH_SUBMIT)
+                    present();
+            } catch (...) {
+                if (state == State::WAIT_SUBMIT)
+                    fail(Completion::Failure::SUBMIT_FAILED);
+                sync::publish_terminal(*cancelled, Completion::Status::CANCELLED);
+                throw;
+            }
+            sync::publish_terminal(*cancelled, Completion::Status::CANCELLED);
+            return;
         }
         if (state == State::FINISH_SUBMIT)
             present();

@@ -1,5 +1,7 @@
+#include <VSL/lifetime/command_domain.hpp>
 #include "support/render_fixture.hpp"
 #include "support/read_image.hpp"
+#include "support/deferred_action.hpp"
 #include <VSL/lifetime/resource_arena.hpp>
 #include <VSL/lifetime/frame_buffer_storage.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
@@ -13,11 +15,7 @@ namespace {
     namespace pl = vsl::pipeline_layout;
     constexpr std::array<t::ResourceRequest, 1> REQUESTS{{{{1}, s::ResourceKind::FRAME_BUFFER}}};
     constexpr t::ResourcePlan<1> PLAN(REQUESTS);
-    struct DeferredAction {
-        std::shared_ptr<std::function<void()>> callback;
-        explicit DeferredAction(std::function<void()> callback) : callback(std::make_shared<std::function<void()>>(std::move(callback))) {}
-        ~DeferredAction() { *callback = {}; }
-    };
+    using vsl_test::DeferredAction;
     struct NativeFailure {
         size_t fail_at = 0, calls = 0;
         std::vector<vk::Framebuffer> created, destroyed;
@@ -53,11 +51,7 @@ namespace {
         return {vsl::RenderPassAccessor{*pass}, WIDTH, HEIGHT, 1, {{vsl::ImageAccessor{*color}}}};
     }
     void FrameBufferArenaVulkanIntegrationTest::prime_callback(vsl::CommandManager& manager, const DeferredAction& action) {
-        auto hook = std::shared_ptr<int>(new int(0), [callback = action.callback](int* value) {
-            delete value;
-            if (*callback)
-                (*callback)();
-        });
+        auto hook = action.owner();
         auto phase = manager.start_phase<vsl::ComputePhase>();
         phase << vsl::command::RenderPassBegin(*framebuffer) << vsl::command::RenderPassEnd{};
         manager.get_buffer().retain_until_complete(hook);
@@ -121,7 +115,7 @@ namespace {
                   << vsl::command::RenderPassBegin(first, {vsl::ClearColor{0, 1, 0, 1}}, {}, 1) << vsl::command::RenderPassEnd{};
             EXPECT_TRUE(arena.image({4}).use_state().busy());
             const auto root = arena.owner();
-            const auto& owners = manager.get_buffer().data_->recording_submission->resources;
+            const auto& owners = manager.get_buffer().data_->recording_context->work->resources;
             EXPECT_EQ(std::ranges::count_if(owners, [&](const auto& owner) { return !owner.owner_before(root) && !root.owner_before(owner); }), 1);
             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
             ASSERT_TRUE(phase.completion().wait());

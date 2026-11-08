@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_domain.hpp>
 #include <VSL/utils/typed_frame_resources.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 
@@ -15,8 +16,8 @@ namespace VSL_NAMESPACE::typed::detail {
             throw std::invalid_argument("Typed frame resources belong to a different command manager or buffer ring");
         const auto completion = phase.completion();
         if (phase.state != ComputePhase::State::WAIT_SUBMIT || !completion ||
-            completion.status() != Completion::Status::PENDING || !buffer.data_->recording ||
-            (!buffer.data_->recording_submission || buffer.data_->recording_submission->result != completion.data_) ||
+            completion.status() != Completion::Status::PENDING || !buffer.data_->recording_context->recording ||
+            (!buffer.data_->recording_context->work || buffer.data_->recording_context->work->result != completion.data_) ||
             phase.frame_slot != buffer.data_->current_buffer_idx ||
             phase.frame_slot >= count || buffer.data_->command_buffers.size() != count)
             throw std::logic_error("Typed frame resources require the currently recording phase");

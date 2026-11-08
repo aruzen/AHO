@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_domain.hpp>
 #include "support/render_fixture.hpp"
 namespace {
     using RenderPassVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
@@ -50,9 +51,9 @@ namespace {
         const auto buffers = manager.get_buffer().data_;
         ASSERT_EQ(buffers->current_buffer_idx, 0u);
         // WSIの取得順に依存せず、別画像を取得したフレームの状態を再現する。
-        buffers->acquired_image_index = 1;
+        buffers->recording_context->acquired_image_index = 1;
         EXPECT_EQ(picking.read(manager, ready, 0, 0), 102u);
-        buffers->acquired_image_index.reset();
+        buffers->recording_context->acquired_image_index.reset();
         EXPECT_EQ(picking.read(manager, ready, WIDTH - 1, HEIGHT - 1), 101u);
     }
 } // namespace

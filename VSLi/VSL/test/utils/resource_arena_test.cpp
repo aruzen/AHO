@@ -230,7 +230,7 @@ namespace {
             EXPECT_TRUE(arena.image({2}).use_state().busy());
             EXPECT_TRUE(arena.sampler({3}).use_state().busy());
             EXPECT_FALSE(arena.borrow_buffer({1}).use().busy());
-            EXPECT_EQ(phase.completion().data_->completion_resources.size(), 2u);
+            EXPECT_EQ(phase.completion().data_->work.lock()->completion_resources.size(), 2u);
         }
         EXPECT_FALSE(owner.expired());
         phase.cancel();

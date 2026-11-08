@@ -11,10 +11,18 @@ namespace VSL_NAMESPACE {
             PENDING,
             SUBMITTED,
             COMPLETE,
-            CANCELLED
+            CANCELLED,
+            FAILED
+        };
+        enum class Failure {
+            NONE,
+            SUBMIT_FAILED,
+            DEVICE_LOST
         };
         std::shared_ptr<impl::SubmissionImpl> data_;
         Status status() const;
+        Failure failure() const;
+        std::int32_t error_code() const;
         bool ready() const;
         bool wait(std::uint64_t timeout_ns = UINT64_MAX) const;
         void retain(const std::shared_ptr<void>& resource) const;

@@ -195,7 +195,7 @@ namespace {
 } // namespace
 
 namespace {
-    TEST_F(CommandResourceVulkanIntegrationTest, CancellationReleasesRetainedBuffersWhenTheTokenIsDropped) {
+    TEST_F(CommandResourceVulkanIntegrationTest, CancelledResultDoesNotKeepBuffersAliveAfterThePhaseIsDestroyed) {
         auto manager = make_manager();
         std::weak_ptr<vsl::impl::BufferImpl> weak;
         vsl::Completion cancelled;
@@ -211,9 +211,8 @@ namespace {
             phase.cancel();
         }
         EXPECT_EQ(cancelled.status(), vsl::Completion::Status::CANCELLED);
-        EXPECT_FALSE(weak.expired());
-        cancelled = {};
         EXPECT_TRUE(weak.expired());
+        EXPECT_TRUE(cancelled.data_->work.expired());
     }
     TEST_F(CommandResourceVulkanIntegrationTest, CustomCommandsCanRetainOwnersUntilFrameSlotReuse) {
         auto manager = make_manager();

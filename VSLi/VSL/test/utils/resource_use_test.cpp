@@ -90,14 +90,13 @@ namespace {
                 manager.get_buffer().retain(std::move(different_b));
                 EXPECT_FALSE(different_a);
                 EXPECT_FALSE(different_b);
-                EXPECT_EQ(cancelled.data_->resources.size(), 3u);
+                EXPECT_EQ(cancelled.data_->work.lock()->resources.size(), 3u);
             }
             EXPECT_EQ(releases, 0u);
             EXPECT_FALSE(observed.expired());
             phase.cancel();
         }
-        EXPECT_FALSE(observed.expired());
-        cancelled = {};
+        EXPECT_EQ(cancelled.status(), vsl::Completion::Status::CANCELLED);
         EXPECT_TRUE(observed.expired());
         EXPECT_EQ(releases, 2u);
     }
@@ -155,6 +154,34 @@ namespace {
             phase.cancel();
         }
         EXPECT_EQ(cancelled.status(), vsl::Completion::Status::CANCELLED);
+    }
+    TEST_F(ResourceUseVulkanIntegrationTest, RetainedFrameCanStoreItsOwnCompletionWithoutAWorkOwnershipCycle) {
+        struct Frame {
+            vsl::ResourceUseState use;
+            vsl::Completion completion;
+        };
+        for (const bool cancel : {false, true}) {
+            auto manager = make_manager();
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            std::weak_ptr<Frame> observed;
+            const auto result = phase.completion();
+            {
+                auto frame = std::make_shared<Frame>();
+                observed = frame;
+                frame->completion = result;
+                frame->use.mark_used(result);
+                manager.get_buffer().retain_until_complete(frame);
+            }
+            EXPECT_FALSE(observed.expired());
+            if (cancel)
+                phase.cancel();
+            else {
+                ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+                ASSERT_TRUE(result.wait());
+            }
+            EXPECT_TRUE(observed.expired());
+            EXPECT_EQ(result.status(), cancel ? vsl::Completion::Status::CANCELLED : vsl::Completion::Status::COMPLETE);
+        }
     }
 
     TEST_F(ResourceUseVulkanIntegrationTest, DescriptorUpdatesAfterBindingUseTheLatestResourcesAndFreezeDuringRecording) {

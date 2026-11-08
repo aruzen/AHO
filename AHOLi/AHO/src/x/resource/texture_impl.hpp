@@ -1,5 +1,6 @@
 #pragma once
 #include <AHO/x/resource/texture.hpp>
+#include <stdexcept>
 
 namespace AHO_NAMESPACE::x::resource {
     struct Texture::Data : VSL_NAMESPACE::ResourceUseState {
@@ -18,6 +19,10 @@ namespace AHO_NAMESPACE::x::resource {
         const auto status = update.status();
         if (status == VSL_NAMESPACE::Completion::Status::COMPLETE) {
             initialized = true;
+            update = {};
+        } else if (status == VSL_NAMESPACE::Completion::Status::FAILED) {
+            if (update.failure() == VSL_NAMESPACE::Completion::Failure::DEVICE_LOST)
+                throw std::runtime_error("Texture device was lost; recreate the texture with a new device");
             update = {};
         } else if (status == VSL_NAMESPACE::Completion::Status::CANCELLED)
             update = {};

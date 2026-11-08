@@ -1,12 +1,28 @@
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/vulkan/phase.hpp>
+#include <VSL/sync/submission_completion.hpp>
+#include <VSL/lifetime/submission_retention.hpp>
+#include <VSL/operation/submission_ops.hpp>
 #include <exception>
 #include <stdexcept>
 
 namespace VSL_NAMESPACE {
     struct DefaultPhase::Presentation {
+        std::shared_ptr<impl::LogicalDeviceImpl> device;
+        std::shared_ptr<impl::SemaphoreImpl> available;
+        std::shared_ptr<impl::SwapchainImpl> swapchain;
         vk::UniqueFence acquire_fence;
+        bool acquired = false;
+        ~Presentation();
     };
+
+    DefaultPhase::Presentation::~Presentation() {
+        if (!acquired)
+            return;
+        auto result = operation::wait_fence(device->device, *acquire_fence, UINT64_MAX);
+        while (result != vk::Result::eSuccess && result != vk::Result::eErrorDeviceLost)
+            result = operation::wait_fence(device->device, *acquire_fence, UINT64_MAX);
+    }
 
     ComputePhase::ComputePhase(CommandManager manager,
                                std::optional<SemaphoreHolder> available,
@@ -38,13 +54,13 @@ namespace VSL_NAMESPACE {
         if (buffers->submissions.size() < buffers->command_buffers.size())
             buffers->submissions.resize(buffers->command_buffers.size());
         auto previous = buffers->submissions.at(frame_slot);
-        if (previous && previous->status == Completion::Status::SUBMITTED)
-            Completion{previous}.wait();
+        if (previous && previous->result->status == Completion::Status::SUBMITTED && !Completion{previous->result}.wait())
+            throw std::runtime_error("Previous frame completion failed");
         if (next_image_available && next_image_available->data_->semaphores.size() <= frame_slot)
             throw std::invalid_argument("Acquire semaphore count must cover frame slots");
         if (in_flight_fence && in_flight_fence->data_->fences.size() <= frame_slot)
             throw std::invalid_argument("Fence count must cover frame slots");
-        auto next = std::make_shared<impl::SubmissionImpl>();
+        auto next = std::make_shared<impl::SubmissionWork>();
         next->device = manager.data_->device;
         if (next_image_available)
             next->resources.push_back(next_image_available->data_);
@@ -62,60 +78,99 @@ namespace VSL_NAMESPACE {
                 next->owned_fence = std::make_shared<vk::UniqueFence>(device.createFenceUnique({}));
             next->fence = **next->owned_fence;
         }
-        completion_ = Completion{next};
+        if (buffers->recording || buffers->current_buffer_idx != frame_slot || buffers->submissions.at(frame_slot) != previous)
+            throw std::logic_error("Frame slot changed while preparing");
+        next->result->work = next;
+        submission = std::move(next);
+        completion_ = Completion{submission->result};
         buffers->acquired_image_index.reset();
         buffers->acquired_swapchain.reset();
     }
 
+    void ComputePhase::fail(Completion::Failure failure, std::int32_t error_code) noexcept {
+        auto buffers = manager.data_->command_buffer;
+        if (submission && buffers->recording_submission == submission) {
+            try {
+                buffers->command_buffers.at(frame_slot).reset();
+            } catch (...) {
+            }
+            buffers->recording = false;
+            buffers->recording_submission.reset();
+        }
+        if (submission)
+            sync::publish_terminal(*submission, Completion::Status::FAILED, failure, error_code);
+        state = State::ERROR_;
+    }
     void ComputePhase::begin() {
         auto buffers = manager.data_->command_buffer;
-        buffers->command_buffers.at(frame_slot).reset();
-        buffers->command_buffers.at(frame_slot).begin(vk::CommandBufferBeginInfo{});
+        try {
+            if (buffers->recording || buffers->current_buffer_idx != frame_slot ||
+                (buffers->submissions.at(frame_slot) && buffers->submissions.at(frame_slot)->result->status == Completion::Status::SUBMITTED))
+                throw std::logic_error("Frame slot is no longer available for recording");
+            buffers->command_buffers.at(frame_slot).reset();
+            buffers->command_buffers.at(frame_slot).begin(vk::CommandBufferBeginInfo{});
+        } catch (const vk::SystemError& error) {
+            const auto failure = error.code().value() == static_cast<int>(vk::Result::eErrorDeviceLost) ? Completion::Failure::DEVICE_LOST : Completion::Failure::SUBMIT_FAILED;
+            fail(failure, error.code().value());
+            throw;
+        } catch (...) {
+            fail(Completion::Failure::SUBMIT_FAILED);
+            throw;
+        }
         buffers->recording = true;
-        buffers->recording_submission = completion_.data_;
+        buffers->recording_submission = submission;
         state = State::WAIT_SUBMIT;
     }
     void ComputePhase::setup() {
         if (state != State::BEFORE_SETUP)
             return;
-        prepare();
-        begin();
+        try {
+            prepare();
+            begin();
+        } catch (const vk::SystemError& error) {
+            fail(error.code().value() == static_cast<int>(vk::Result::eErrorDeviceLost) ? Completion::Failure::DEVICE_LOST : Completion::Failure::SUBMIT_FAILED, error.code().value());
+            throw;
+        } catch (...) {
+            fail(Completion::Failure::SUBMIT_FAILED);
+            throw;
+        }
     }
     ComputePhase::SubmitResult ComputePhase::submit() {
         if (state != State::WAIT_SUBMIT)
             return SubmitResult::FAILED;
         auto buffers = manager.data_->command_buffer;
-        if (buffers->current_buffer_idx != frame_slot)
-            throw std::logic_error("Frame slot changed while recording");
-        std::vector<vk::Semaphore> waits, signals;
-        if (next_image_available)
-            waits.push_back(next_image_available->data_->semaphores.at(frame_slot));
-        if (calculation_finish)
-            signals.push_back(calculation_finish->data_->semaphores.at(signal_index));
-        else if (auto chain = buffers->acquired_swapchain.lock())
-            signals.push_back(*chain->presentation_semaphores.at(signal_index));
-        auto stages = vk::PipelineStageFlags(static_cast<std::uint32_t>(wait_stage));
-        if (!stages && !waits.empty())
-            throw std::invalid_argument("Semaphore wait stage cannot be empty");
-        auto command = buffers->command_buffers.at(frame_slot);
-        command.end();
-        auto device = manager.data_->device->device;
-        device.resetFences(completion_.data_->fence); // 画像の取得に成功するまでフェンスをリセットしない。
-        vk::SubmitInfo info{
-            .waitSemaphoreCount = static_cast<std::uint32_t>(waits.size()), .pWaitSemaphores = waits.data(), .pWaitDstStageMask = &stages, .commandBufferCount = 1, .pCommandBuffers = &command, .signalSemaphoreCount = static_cast<std::uint32_t>(signals.size()), .pSignalSemaphores = signals.data()};
         try {
-            manager.data_->graphics_queue.submit(info, completion_.data_->fence);
+            if (buffers->current_buffer_idx != frame_slot)
+                throw std::logic_error("Frame slot changed while recording");
+            std::vector<vk::Semaphore> waits, signals;
+            if (next_image_available)
+                waits.push_back(next_image_available->data_->semaphores.at(frame_slot));
+            if (calculation_finish)
+                signals.push_back(calculation_finish->data_->semaphores.at(signal_index));
+            else if (auto chain = buffers->acquired_swapchain.lock())
+                signals.push_back(*chain->presentation_semaphores.at(signal_index));
+            auto stages = vk::PipelineStageFlags(static_cast<std::uint32_t>(wait_stage));
+            if (!stages && !waits.empty())
+                throw std::invalid_argument("Semaphore wait stage cannot be empty");
+            auto command = buffers->command_buffers.at(frame_slot);
+            command.end();
+            auto device = manager.data_->device->device;
+            device.resetFences(submission->fence);
+            vk::SubmitInfo info{
+                .waitSemaphoreCount = static_cast<std::uint32_t>(waits.size()), .pWaitSemaphores = waits.data(), .pWaitDstStageMask = &stages, .commandBufferCount = 1, .pCommandBuffers = &command, .signalSemaphoreCount = static_cast<std::uint32_t>(signals.size()), .pSignalSemaphores = signals.data()};
+            manager.data_->graphics_queue.submit(info, submission->fence);
+        } catch (const vk::SystemError& error) {
+            const auto failure = error.code().value() == static_cast<int>(vk::Result::eErrorDeviceLost) ? Completion::Failure::DEVICE_LOST : Completion::Failure::SUBMIT_FAILED;
+            fail(failure, error.code().value());
+            throw;
         } catch (...) {
-            buffers->recording = false;
-            buffers->recording_submission.reset();
-            completion_.data_->status = Completion::Status::CANCELLED;
-            state = State::ERROR_;
+            fail(Completion::Failure::SUBMIT_FAILED);
             throw;
         }
         completion_.data_->status = Completion::Status::SUBMITTED;
-        if (auto& external = completion_.data_->external_fence)
+        if (auto& external = submission->external_fence)
             external->submissions.at(frame_slot) = completion_.data_;
-        buffers->submissions.at(frame_slot) = completion_.data_;
+        buffers->submissions.at(frame_slot) = submission;
         buffers->recording = false;
         buffers->recording_submission.reset();
         state = State::FINISH_SUBMIT;
@@ -125,16 +180,22 @@ namespace VSL_NAMESPACE {
         if (state != State::WAIT_SUBMIT && state != State::BEFORE_SETUP)
             return;
         auto buffers = manager.data_->command_buffer;
-        if (completion_ && completion_.data_->release_resources) {
-            buffers->command_buffers.at(frame_slot).reset();
-            completion_.data_->release_resources(*completion_.data_);
-        }
-        if (completion_)
-            completion_.data_->status = Completion::Status::CANCELLED;
-        if (buffers->recording_submission == completion_.data_) {
+        Completion::Failure failure = Completion::Failure::NONE;
+        std::int32_t error_code = 0;
+        if (submission && buffers->recording_submission == submission) {
+            try {
+                buffers->command_buffers.at(frame_slot).reset();
+            } catch (const vk::SystemError& error) {
+                error_code = error.code().value();
+                failure = error_code == static_cast<int>(vk::Result::eErrorDeviceLost) ? Completion::Failure::DEVICE_LOST : Completion::Failure::SUBMIT_FAILED;
+            } catch (...) {
+                failure = Completion::Failure::SUBMIT_FAILED;
+            }
             buffers->recording = false;
             buffers->recording_submission.reset();
         }
+        if (submission)
+            sync::publish_terminal(*submission, failure == Completion::Failure::NONE ? Completion::Status::CANCELLED : Completion::Status::FAILED, failure, error_code);
         state = State::ERROR_;
     }
     void ComputePhase::finish_noexcept() noexcept {
@@ -166,48 +227,65 @@ namespace VSL_NAMESPACE {
     void DefaultPhase::setup() {
         if (state != State::BEFORE_SETUP)
             return;
-        if (!swapchain.data_ || !swapchain.data_->swap_chain ||
-            swapchain.data_->device != manager.data_->device)
-            throw std::invalid_argument("A swapchain is required");
-        auto buffers = manager.data_->command_buffer;
-        if (buffers->recording)
-            throw std::logic_error("A phase is already recording");
-        buffers->current_buffer_idx = (buffers->current_buffer_idx + 1) % buffers->command_buffers.size();
-        prepare();
-        const auto count = swapchain.data_->swap_chain_images.size();
-        if (calculation_finish && calculation_finish->data_->semaphores.size() < count)
-            throw std::invalid_argument("Present semaphores must cover swapchain images");
-        auto device = manager.data_->device->device;
-        if (!calculation_finish && swapchain.data_->presentation_semaphores.empty()) {
-            for (std::size_t i = 0; i < count; ++i)
-                swapchain.data_->presentation_semaphores.push_back(device.createSemaphoreUnique({}));
-        }
-        vk::Semaphore available;
-        vk::Fence acquired;
-        if (next_image_available)
-            available = next_image_available->data_->semaphores.at(frame_slot);
-        else {
+        try {
+            if (!swapchain.data_ || !swapchain.data_->swap_chain ||
+                swapchain.data_->device != manager.data_->device)
+                throw std::invalid_argument("A swapchain is required");
+            auto buffers = manager.data_->command_buffer;
+            if (buffers->recording)
+                throw std::logic_error("A phase is already recording");
+            buffers->current_buffer_idx = (buffers->current_buffer_idx + 1) % buffers->command_buffers.size();
+            prepare();
+            const auto count = swapchain.data_->swap_chain_images.size();
+            if (calculation_finish && calculation_finish->data_->semaphores.size() < count)
+                throw std::invalid_argument("Present semaphores must cover swapchain images");
+            auto device = manager.data_->device->device;
+            if (!calculation_finish && swapchain.data_->presentation_semaphores.empty()) {
+                for (std::size_t i = 0; i < count; ++i)
+                    swapchain.data_->presentation_semaphores.push_back(device.createSemaphoreUnique({}));
+            }
+            vk::Semaphore available;
             _presentation = std::make_shared<Presentation>();
+            _presentation->device = manager.data_->device;
+            _presentation->swapchain = swapchain.data_;
             _presentation->acquire_fence = device.createFenceUnique({});
-            acquired = *_presentation->acquire_fence;
+            if (next_image_available) {
+                _presentation->available = next_image_available->data_;
+                available = next_image_available->data_->semaphores.at(frame_slot);
+            }
+            const auto acquired = *_presentation->acquire_fence;
+            completion_.retain(_presentation);
+            lifetime::retain_resource(buffers->presentation_resources, swapchain.data_);
+            auto result = device.acquireNextImageKHR(swapchain.data_->swap_chain, UINT64_MAX,
+                                                     available, acquired, &image_index);
+            if (result == vk::Result::eErrorOutOfDateKHR) {
+                recreate = true;
+                ComputePhase::cancel();
+                return;
+            }
+            if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
+                fail(result == vk::Result::eErrorDeviceLost ? Completion::Failure::DEVICE_LOST : Completion::Failure::SUBMIT_FAILED, static_cast<std::int32_t>(result));
+                throw std::runtime_error("Swapchain acquire failed: " + vk::to_string(result));
+            }
+            _presentation->acquired = true;
+            recreate = result == vk::Result::eSuboptimalKHR;
+            if (!available && device.waitForFences(acquired, true, UINT64_MAX) != vk::Result::eSuccess)
+                throw std::runtime_error("Swapchain acquire wait failed");
+            signal_index = image_index;
+            begin();
+            buffers->acquired_image_index = image_index;
+            buffers->acquired_swapchain = swapchain.data_;
+            completion_.retain(swapchain.data_);
+            lifetime::retain_resource(buffers->presentation_resources, swapchain.data_);
+            if (calculation_finish)
+                lifetime::retain_resource(buffers->presentation_resources, calculation_finish->data_);
+        } catch (const vk::SystemError& error) {
+            fail(error.code().value() == static_cast<int>(vk::Result::eErrorDeviceLost) ? Completion::Failure::DEVICE_LOST : Completion::Failure::SUBMIT_FAILED, error.code().value());
+            throw;
+        } catch (...) {
+            fail(Completion::Failure::SUBMIT_FAILED);
+            throw;
         }
-        auto result = device.acquireNextImageKHR(swapchain.data_->swap_chain, UINT64_MAX,
-                                                 available, acquired, &image_index);
-        if (result == vk::Result::eErrorOutOfDateKHR) {
-            recreate = true;
-            ComputePhase::cancel();
-            return;
-        }
-        if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR)
-            throw std::runtime_error("Swapchain acquire failed: " + vk::to_string(result));
-        recreate = result == vk::Result::eSuboptimalKHR;
-        if (acquired && device.waitForFences(acquired, true, UINT64_MAX) != vk::Result::eSuccess)
-            throw std::runtime_error("Swapchain acquire wait failed");
-        signal_index = image_index;
-        begin();
-        buffers->acquired_image_index = image_index;
-        buffers->acquired_swapchain = swapchain.data_;
-        completion_.retain(swapchain.data_);
     }
     std::uint32_t DefaultPhase::get_current_index() {
         return manager.get_current_buffer_idx();
@@ -224,6 +302,9 @@ namespace VSL_NAMESPACE {
                                                     : *swapchain.data_->presentation_semaphores.at(image_index);
         auto chain = swapchain.data_->swap_chain;
         vk::PresentInfoKHR info{.waitSemaphoreCount = 1, .pWaitSemaphores = &finished, .swapchainCount = 1, .pSwapchains = &chain, .pImageIndices = &image_index};
+        lifetime::retain_resource(manager.data_->command_buffer->presentation_resources, swapchain.data_);
+        if (calculation_finish)
+            lifetime::retain_resource(manager.data_->command_buffer->presentation_resources, calculation_finish->data_);
         auto result = manager.data_->present_queue.presentKHR(&info);
         _presented = true;
         if (recreate || result == vk::Result::eSuboptimalKHR || result == vk::Result::eErrorOutOfDateKHR)

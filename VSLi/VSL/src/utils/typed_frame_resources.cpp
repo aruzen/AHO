@@ -16,7 +16,7 @@ namespace VSL_NAMESPACE::typed::detail {
         const auto completion = phase.completion();
         if (phase.state != ComputePhase::State::WAIT_SUBMIT || !completion ||
             completion.status() != Completion::Status::PENDING || !buffer.data_->recording ||
-            buffer.data_->recording_submission != completion.data_ ||
+            (!buffer.data_->recording_submission || buffer.data_->recording_submission->result != completion.data_) ||
             phase.frame_slot != buffer.data_->current_buffer_idx ||
             phase.frame_slot >= count || buffer.data_->command_buffers.size() != count)
             throw std::logic_error("Typed frame resources require the currently recording phase");

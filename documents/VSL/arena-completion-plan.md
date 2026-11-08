@@ -64,4 +64,16 @@ GPUでは転送・sampling・compute・描画・readback、descriptor更新、�
 
 順序2は[ResourceArena](resource-arena.md)へ接続する。通常operation、外部owner／物理状態の共有、逆順rollback、GPU完了／取消回収を検証した後、順序3のschema／bundle拡張へ進む。
 
-順序3は[Typedのowned Image／Sampler](typed-owned-resources.md)へ接続する。component単位のID共有、寿命群の分離、heap互換、upload／sampling／readbackを扱う。次の実装単位は順序4の完了結果とin-flight保持の分離。
+順序3は[Typedのowned Image／Sampler](typed-owned-resources.md)へ接続する。component単位のID共有、寿命群の分離、heap互換、upload／sampling／readbackを扱う。
+
+順序4は[結果とin-flight所有の分離](completion-ownership.md)で、保存結果による資源延命、terminal、取消／失敗、readbackを整理した。次は順序5のdescriptorである。WSIの厳密な完了証明と失敗からの復旧は順序10に残す。
+
+## 順序5の分割
+
+descriptorは配置を始める前に、既存の使用状態と更新metadataを揃える。
+
+1. Setの物理UseStateをnative／Typedで共有し、bindingを配列要素単位で管理する。native scalar updateが要素0だけを書いたとき、未更新要素のownerを解放しない。logical constraintと初期化状態も同じ表へ集約する。
+2. Layout／Pool／Setの共通backendと配置へ接続する。LayoutにはGPU UseStateを持たせず、Poolはhost側の排他と各Setのidleを管理する。依存順構築・逆順rollbackと正確な容量を検証する。
+3. Typed schemaへ接続する。同rootの物理／logical aliasは内部borrowへ正規化し、可変の外部依存をcommit前に検査する。既知の管理root間の循環と、opaque owner内に隠れた循環に対する保証を区別する。
+
+Layout数は宣言set数のResources::COUNT、Set数はshared／frameの実数、Poolはdescriptorを持つ寿命群ごととする。最大set番号＋1のSET_COUNTをSet実体数へ混ぜない。pipelineのhole用empty layoutは順序6で扱う。

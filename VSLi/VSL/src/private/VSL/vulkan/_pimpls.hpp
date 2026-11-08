@@ -1,6 +1,7 @@
 #pragma once
 #include <VSL/define.hpp>
 #include <VSL/operation/pipeline_layout_create_info.hpp>
+#include <VSL/operation/render_pass_description.hpp>
 #include <VSL/vulkan/buffer_and_image_accessor.hpp>
 #include <VSL/vulkan/command.hpp>
 #include <VSL/lifetime/resource_use.hpp>
@@ -205,9 +206,16 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct RenderPassImpl {
-        std::shared_ptr<LogicalDeviceImpl> device;
+        RenderPassImpl() = default;
+        RenderPassImpl(const RenderPassImpl&) = delete;
+        RenderPassImpl(RenderPassImpl&&) = delete;
+        RenderPassImpl& operator=(const RenderPassImpl&) = delete;
+        RenderPassImpl& operator=(RenderPassImpl&&) = delete;
+        lifetime::DependencyNode* owner_node = nullptr;
+        LogicalDeviceImpl* device = nullptr;
+        vk::Device native_device;
         vk::RenderPass render_pass;
-        std::shared_ptr<const RenderPassDescription> description;
+        std::optional<const RenderPassDescription> description;
 
         ~RenderPassImpl();
     };

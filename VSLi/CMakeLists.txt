@@ -64,6 +64,11 @@ add_library(VSL STATIC
         VSL/src/operation/sampler_ops.cpp
         VSL/include/VSL/operation/pipeline_layout_create_info.hpp
         VSL/src/private/VSL/operation/pipeline_layout_ops.hpp
+        VSL/include/VSL/operation/render_pass_description.hpp
+        VSL/src/private/VSL/operation/render_pass_ops.hpp
+        VSL/src/operation/render_pass_ops.cpp
+        VSL/src/private/VSL/lifetime/render_pass_storage.hpp
+        VSL/src/lifetime/render_pass_storage.cpp
         VSL/src/operation/pipeline_layout_ops.cpp
         VSL/src/private/VSL/lifetime/pipeline_layout_storage.hpp
         VSL/src/lifetime/pipeline_layout_storage.cpp

@@ -33,7 +33,8 @@ namespace VSL_NAMESPACE::command {
                 return {};
             if (!target.data_ || !target.data_->render_pass)
                 throw std::invalid_argument("Framebuffer required");
-            auto values = defaults(RenderPassAccessor{target.data_->render_pass}.description());
+            const RenderPassAccessor pass{target.data_->render_pass};
+            auto values = defaults(pass.description());
             if (values.empty())
                 throw std::invalid_argument("Legacy clear color requires an attachment");
             values.front() = ClearColor{color->r, color->g, color->b, 0.f};
@@ -89,7 +90,8 @@ namespace VSL_NAMESPACE::command {
                                                 RenderArea area, std::uint32_t index) {
         if (!target.data_ || !target.data_->render_pass)
             throw std::invalid_argument("Framebuffer required");
-        auto values = defaults(*target.data_->render_pass->description);
+        const RenderPassAccessor pass{target.data_->render_pass};
+        auto values = defaults(pass.description());
         std::vector<bool> bound(values.size());
         for (auto& binding : bindings) {
             if (binding.attachment >= values.size())

@@ -37,6 +37,10 @@ namespace VSL_NAMESPACE::storage {
     struct ImplLayout<impl::PipelineLayoutImpl> {
         static constexpr size_t SIZE = PIPELINE_LAYOUT_IMPL_SIZE, ALIGNMENT = PIPELINE_LAYOUT_IMPL_ALIGNMENT;
     };
+    template<>
+    struct ImplLayout<impl::RenderPassImpl> {
+        static constexpr size_t SIZE = RENDER_PASS_IMPL_SIZE, ALIGNMENT = RENDER_PASS_IMPL_ALIGNMENT;
+    };
     inline constexpr size_t NO_SEPARATE_USE = std::numeric_limits<size_t>::max();
     template<typename Impl>
     struct ResourceSlotLayout {
@@ -64,6 +68,10 @@ namespace VSL_NAMESPACE::storage {
     struct ResourceSlotLayout<impl::PipelineLayoutImpl> {
         static constexpr size_t SIZE = PIPELINE_LAYOUT_IMPL_SIZE, ALIGNMENT = PIPELINE_LAYOUT_IMPL_ALIGNMENT, USE_OFFSET = NO_SEPARATE_USE;
     };
+    template<>
+    struct ResourceSlotLayout<impl::RenderPassImpl> {
+        static constexpr size_t SIZE = RENDER_PASS_IMPL_SIZE, ALIGNMENT = RENDER_PASS_IMPL_ALIGNMENT, USE_OFFSET = NO_SEPARATE_USE;
+    };
     enum class ResourceKind : std::uint32_t {
         BUFFER,
         IMAGE,
@@ -72,7 +80,8 @@ namespace VSL_NAMESPACE::storage {
         DESCRIPTOR_POOL,
         DESCRIPTOR_SET,
         SHADER,
-        PIPELINE_LAYOUT
+        PIPELINE_LAYOUT,
+        RENDER_PASS
     };
     struct SlotLayout {
         size_t size, alignment, use_offset;
@@ -92,6 +101,7 @@ namespace VSL_NAMESPACE::storage {
         using Set = ResourceSlotLayout<impl::GraphicResourceImpl>;
         using Shader = ResourceSlotLayout<impl::ShaderImpl>;
         using PipelineLayout = ResourceSlotLayout<impl::PipelineLayoutImpl>;
+        using RenderPass = ResourceSlotLayout<impl::RenderPassImpl>;
         switch (kind) {
             case ResourceKind::BUFFER:
                 return {Buffer::SIZE, Buffer::ALIGNMENT, Buffer::USE_OFFSET};
@@ -109,6 +119,8 @@ namespace VSL_NAMESPACE::storage {
                 return {Shader::SIZE, Shader::ALIGNMENT, Shader::USE_OFFSET};
             case ResourceKind::PIPELINE_LAYOUT:
                 return {PipelineLayout::SIZE, PipelineLayout::ALIGNMENT, PipelineLayout::USE_OFFSET};
+            case ResourceKind::RENDER_PASS:
+                return {RenderPass::SIZE, RenderPass::ALIGNMENT, RenderPass::USE_OFFSET};
         }
         throw std::invalid_argument("Unknown resource implementation kind");
     }

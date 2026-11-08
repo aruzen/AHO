@@ -86,7 +86,7 @@ namespace {
         auto description = std::make_shared<VSL_NAMESPACE::RenderPassDescription>();
         description->add_color({.format = {static_cast<VSL_NAMESPACE::data_format::FormatTypes>(format), 4}});
         auto pass = std::make_shared<VSL_NAMESPACE::impl::RenderPassImpl>();
-        pass->description = std::move(description);
+        pass->description.emplace(std::move(*description));
         auto target = std::make_shared<VSL_NAMESPACE::impl::FrameBufferImpl>();
         target->render_pass = std::move(pass);
         target->swap_chain_framebuffers.emplace_back();

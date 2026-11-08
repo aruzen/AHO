@@ -30,7 +30,7 @@ namespace {
 VSL_NAMESPACE::GraphicsPipeline::GraphicsPipeline(VSL_NAMESPACE::PipelineLayoutAccessor layout, VSL_NAMESPACE::RenderPassAccessor pass, std::uint32_t subpass) {
     if (!pass.data_ || subpass >= pass.description().subpasses.size())
         throw std::out_of_range("Pipeline subpass index");
-    if (!layout.data_ || !layout.has_recipe() || layout.data_->device != pass.data_->device.get())
+    if (!layout.data_ || !layout.has_recipe() || layout.data_->device != pass.data_->device)
         throw std::invalid_argument("Pipeline requires initialized layout and pass on the same device");
     const auto& outputs = pass.description().subpasses[subpass];
     if (layout.recipe().blend_attachments.size() != outputs.colors.size())

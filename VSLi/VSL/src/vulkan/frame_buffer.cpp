@@ -10,7 +10,7 @@ namespace VSL_NAMESPACE {
             if (!pass.data_ || !width || !height || !layers)
                 throw std::invalid_argument("Invalid framebuffer pass/extent/layers");
             auto data = std::make_shared<impl::FrameBufferImpl>();
-            data->device = pass.data_->device;
+            data->device = pass.get_device().data_;
             data->render_pass = pass.data_;
             data->extent = vk::Extent2D{width, height};
             data->layers = layers;

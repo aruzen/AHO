@@ -55,6 +55,9 @@ namespace VSL_NAMESPACE {
         PhysicalDevice(std::shared_ptr<impl::PhysicalDeviceImpl> data_);
         ~PhysicalDevice();
 
+        static PhysicalDevice Select(VulkanAccessor instance);
+        VulkanAccessor get_instance() const;
+        lifetime::OwnerRef owner_ref() const;
         uint32_t api_version();
         uint32_t driver_version();
         uint32_t vendor_id();
@@ -96,6 +99,7 @@ VSL_NAMESPACE::PhysicalDevices<S> VSL_NAMESPACE::Vulkan<validation>::devices() {
 namespace VSL_NAMESPACE::helper {
     std::shared_ptr<impl::PhysicalDevicesImpl> enumerate_physical_devices(VulkanAccessor vulkan);
     std::vector<PhysicalDevice> physical_devices(const std::shared_ptr<impl::PhysicalDevicesImpl>& data);
+    PhysicalDevice select_physical_device(const std::shared_ptr<impl::PhysicalDevicesImpl>& data);
 } // namespace VSL_NAMESPACE::helper
 
 template<typename S>
@@ -112,6 +116,8 @@ std::vector<VSL_NAMESPACE::PhysicalDevice> VSL_NAMESPACE::PhysicalDevices<S>::ge
 
 template<typename S>
 VSL_NAMESPACE::PhysicalDevice VSL_NAMESPACE::PhysicalDevices<S>::search() {
+    if constexpr (std::same_as<S, PhysicalDevicesSercher>)
+        return helper::select_physical_device(data_);
     S searcher;
     int max_score = -1;
     std::shared_ptr<impl::PhysicalDeviceImpl> selected;

@@ -1,5 +1,7 @@
 #pragma once
 #include <VSL/operation/pipeline_layout_ops.hpp>
+#include <VSL/lifetime/instance_storage.hpp>
+#include <VSL/lifetime/physical_device_storage.hpp>
 
 #include <gtest/gtest.h>
 #include <VSL/vulkan/_pimpls.hpp>
@@ -20,7 +22,6 @@ namespace vsl_test {
     // GLFW/surfaceを必要としないGPU環境。小さいfeature集合で初期化し、公開APIを検証する。
     class VulkanIntegrationTest : public testing::Test {
         std::vector<std::shared_ptr<vsl::impl::CommandPoolImpl>> _command_pools;
-        VkDebugUtilsMessengerEXT _validation_messenger = VK_NULL_HANDLE;
         std::vector<std::string> _validation_errors;
         std::mutex _validation_mutex;
         bool _abort_validation_errors = false;
@@ -29,6 +30,8 @@ namespace vsl_test {
         static VKAPI_ATTR VkBool32 VKAPI_CALL
         ValidationCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT,
                            const VkDebugUtilsMessengerCallbackDataEXT* data, void* user);
+        static VkResult CreateInstance(void* context, const VkInstanceCreateInfo* info, VkInstance* output);
+        static VkResult CreateMessenger(void* context, VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* info, VkDebugUtilsMessengerEXT* output);
 
     protected:
         bool has_validation_errors();
@@ -84,6 +87,29 @@ namespace vsl_test {
         return VK_FALSE;
     }
 
+    inline VkResult VulkanIntegrationTest::CreateInstance(void* context, const VkInstanceCreateInfo* info, VkInstance* output) {
+        auto actual = *info;
+        VkDebugUtilsMessengerCreateInfoEXT debug{};
+        if (info->pNext && static_cast<const VkBaseInStructure*>(info->pNext)->sType == VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT) {
+            debug = *static_cast<const VkDebugUtilsMessengerCreateInfoEXT*>(info->pNext);
+            debug.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+            debug.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
+            debug.pfnUserCallback = ValidationCallback;
+            debug.pUserData = context;
+            actual.pNext = &debug;
+        }
+        return vkCreateInstance(&actual, nullptr, output);
+    }
+    inline VkResult VulkanIntegrationTest::CreateMessenger(void* context, VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* info, VkDebugUtilsMessengerEXT* output) {
+        auto actual = *info;
+        actual.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        actual.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
+        actual.pfnUserCallback = ValidationCallback;
+        actual.pUserData = context;
+        const auto create = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
+        return create(instance, &actual, nullptr, output);
+    }
+
     inline bool VulkanIntegrationTest::has_validation_errors() {
         std::lock_guard lock(_validation_mutex);
         return !_validation_errors.empty();
@@ -106,62 +132,30 @@ namespace vsl_test {
     }
 
     inline void VulkanIntegrationTest::SetUp() {
-        std::vector<const char*> instance_extensions;
-        vk::InstanceCreateInfo instance_info{};
+        vsl::InstanceCreateInfo instance_info;
+        instance_info.application_name = "VSL GPU test";
+        instance_info.api_version = VK_API_VERSION_1_0;
         const auto extensions = vk::enumerateInstanceExtensionProperties();
         for (const auto& extension : extensions)
             for (const auto* name : {"VK_KHR_get_physical_device_properties2", "VK_KHR_surface", "VK_EXT_metal_surface", "VK_KHR_xcb_surface",
-                                     "VK_KHR_xlib_surface", "VK_KHR_wayland_surface", "VK_KHR_win32_surface"})
+                                     "VK_KHR_xlib_surface", "VK_KHR_wayland_surface", "VK_KHR_win32_surface", "VK_KHR_portability_enumeration"})
                 if (std::strcmp(extension.extensionName, name) == 0)
-                    instance_extensions.push_back(name);
-        if (std::ranges::any_of(extensions, [](const auto& extension) {
-                return std::strcmp(extension.extensionName, "VK_KHR_portability_enumeration") == 0;
-            })) {
-            instance_extensions.push_back("VK_KHR_portability_enumeration");
-            instance_info.flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
-        }
-        instance_info.enabledExtensionCount = static_cast<std::uint32_t>(instance_extensions.size());
-        instance_info.ppEnabledExtensionNames = instance_extensions.data();
-        const char* validation_layer = "VK_LAYER_KHRONOS_validation";
-        VkDebugUtilsMessengerCreateInfoEXT debug_info{};
-        const bool validation_enabled = require_validation || validate_vulkan();
-        if (validation_enabled) {
-            const auto layers = vk::enumerateInstanceLayerProperties();
-            if (!std::ranges::any_of(layers, [&](const auto& layer) {
-                    return std::strcmp(layer.layerName, validation_layer) == 0;
-                }))
+                    instance_info.extensions.emplace_back(name);
+        instance_info.validation = require_validation || validate_vulkan();
+        if (instance_info.validation) {
+            const std::array<std::string, 1> layers{"VK_LAYER_KHRONOS_validation"};
+            if (!vsl::operation::instance_layers_supported(layers))
                 GTEST_SKIP() << "Validation layer required for composition tests";
-            if (!std::ranges::any_of(extensions, [](const auto& extension) {
-                    return std::strcmp(extension.extensionName, "VK_EXT_debug_utils") == 0;
-                }))
+            if (!std::ranges::any_of(extensions, [](const auto& extension) { return std::strcmp(extension.extensionName, "VK_EXT_debug_utils") == 0; }))
                 GTEST_SKIP() << "VK_EXT_debug_utils is required";
-            instance_extensions.push_back("VK_EXT_debug_utils");
-            instance_info.enabledExtensionCount = static_cast<std::uint32_t>(instance_extensions.size());
-            instance_info.ppEnabledExtensionNames = instance_extensions.data();
-            instance_info.enabledLayerCount = 1;
-            instance_info.ppEnabledLayerNames = &validation_layer;
-            debug_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-            debug_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-            debug_info.messageType =
-                VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
-            debug_info.pfnUserCallback = ValidationCallback;
-            debug_info.pUserData = this;
-            instance_info.pNext = &debug_info;
         }
-        vk::Instance raw_instance;
-        const auto result = vk::createInstance(&instance_info, nullptr, &raw_instance);
-        if (result == vk::Result::eErrorIncompatibleDriver)
-            GTEST_SKIP() << "Vulkan driver/GPU unavailable: " << vk::to_string(result);
-        ASSERT_EQ(result, vk::Result::eSuccess);
-        instance = std::make_shared<vsl::impl::VulkanImpl<false>>();
-        instance->instance = raw_instance;
-        if (validation_enabled) {
-            auto create = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
-                vkGetInstanceProcAddr(raw_instance, "vkCreateDebugUtilsMessengerEXT"));
-            ASSERT_NE(create, nullptr);
-            ASSERT_EQ(create(raw_instance, &debug_info, nullptr, &_validation_messenger), VK_SUCCESS);
+        try {
+            const vsl::operation::InstanceNativeCalls calls{.context = this, .create_instance = CreateInstance, .create_messenger = CreateMessenger};
+            instance = vsl::lifetime::make_heap_instance(std::move(instance_info), calls);
+        } catch (const vk::IncompatibleDriverError& error) {
+            GTEST_SKIP() << "Vulkan driver/GPU unavailable: " << error.what();
         }
-
+        const auto raw_instance = instance->instance;
         vk::PhysicalDevice selected;
         for (const auto candidate : raw_instance.enumeratePhysicalDevices()) {
             const auto queues = candidate.getQueueFamilyProperties();
@@ -179,12 +173,9 @@ namespace vsl_test {
         if (!selected)
             GTEST_SKIP() << "No device has a graphics and compute queue";
 
-        physical.data_ = std::make_shared<vsl::impl::PhysicalDeviceImpl>();
-        physical.data_->device = selected;
-        physical.data_->vulkan = instance;
-        physical.data_->props = selected.getProperties();
-        physical.data_->features = selected.getFeatures();
-        physical.data_->mem_props = selected.getMemoryProperties();
+        const auto candidate = vsl::operation::inspect_physical_device(*instance, selected);
+        physical.data_ = vsl::lifetime::make_heap_physical_device(vsl::VulkanAccessor{instance}, candidate);
+        physical.data_->make_mem_props();
 
         std::vector<const char*> device_extensions;
         for (const auto& extension : selected.enumerateDeviceExtensionProperties())
@@ -244,12 +235,6 @@ namespace vsl_test {
         _command_pools.clear();
         device.data_.reset();
         physical.data_.reset();
-        if (_validation_messenger) {
-            auto destroy = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
-                vkGetInstanceProcAddr(instance->instance, "vkDestroyDebugUtilsMessengerEXT"));
-            destroy(instance->instance, _validation_messenger, nullptr);
-            _validation_messenger = VK_NULL_HANDLE;
-        }
         instance.reset();
         for (const auto& error : _validation_errors)
             ADD_FAILURE() << error;

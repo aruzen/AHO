@@ -51,7 +51,7 @@ private `InstanceNativeCalls`は呼出し単位でのみ差替え可能にした
 
 release constructorの`fclose(stdin/stdout/stderr)`／`FreeConsole()`は除去した。標準入出力とconsoleの管理はhostアプリケーションの責務であり、Instance構築からプロセス全体へ作用させない。
 
-PhysicalDevice／Surfaceは現状の共有親を維持する。後続でraw Instanceと固定親root／weak getter contextへ移行する。LogicalDeviceの配置前には、子のshared_from_this取得と全Device固定辺も置換する。OS windowはpluginを含まないownerへ分け、Surfaceとの循環を防ぐ。
+PhysicalDeviceは[9b](physical-device-arena.md)でraw Instanceと固定親root／weak getter contextへ移行した。Surfaceは後続で同じ方針へ移す。LogicalDeviceの配置前には、子のshared_from_this取得と全Device固定辺も置換する。OS windowはpluginを含まないownerへ分け、Surfaceとの循環を防ぐ。
 
 ## 検証
 

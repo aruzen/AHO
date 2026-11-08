@@ -9,11 +9,11 @@ namespace VSL_NAMESPACE::lifetime {
         struct HeapInstanceOwner {
             DependencyNode node;
             alignas(InstanceSlotStorage) std::byte storage[sizeof(InstanceSlotStorage)];
-            explicit HeapInstanceOwner(InstanceCreateInfo info);
+            HeapInstanceOwner(InstanceCreateInfo info, const operation::InstanceNativeCalls& calls);
             ~HeapInstanceOwner();
         };
-        HeapInstanceOwner::HeapInstanceOwner(InstanceCreateInfo info) {
-            construct_instance(storage, std::move(info));
+        HeapInstanceOwner::HeapInstanceOwner(InstanceCreateInfo info, const operation::InstanceNativeCalls& calls) {
+            construct_instance(storage, std::move(info), calls);
         }
         HeapInstanceOwner::~HeapInstanceOwner() {
             node.retire();
@@ -38,8 +38,8 @@ namespace VSL_NAMESPACE::lifetime {
         std::destroy_at(&instance_at(storage));
         std::destroy_at(static_cast<InstanceSlotStorage*>(storage));
     }
-    std::shared_ptr<impl::VulkanImplAccessor> make_heap_instance(InstanceCreateInfo info) {
-        auto owner = std::make_shared<HeapInstanceOwner>(std::move(info));
+    std::shared_ptr<impl::VulkanImplAccessor> make_heap_instance(InstanceCreateInfo info, const operation::InstanceNativeCalls& calls) {
+        auto owner = std::make_shared<HeapInstanceOwner>(std::move(info), calls);
         auto* instance = &instance_at(owner->storage);
         return detail::publish_leaf(std::move(owner), instance);
     }

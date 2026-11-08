@@ -84,6 +84,10 @@
     <ClCompile Include="VSL\src\operation\instance_ops.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\src\private\VSL\lifetime\instance_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClCompile Include="VSL\src\lifetime\instance_storage.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClInclude Include="VSL\src\private\VSL\operation\physical_device_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClCompile Include="VSL\src\operation\physical_device_ops.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClInclude Include="VSL\src\private\VSL\lifetime\physical_device_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClCompile Include="VSL\src\lifetime\physical_device_storage.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\src\private\VSL\lifetime\synchronization_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClCompile Include="VSL\src\lifetime\synchronization_storage.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\src\private\VSL\operation\synchronization_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>

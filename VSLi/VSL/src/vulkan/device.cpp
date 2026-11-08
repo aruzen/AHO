@@ -1,5 +1,7 @@
 #include <VSL/define.hpp>
 #include <VSL/vulkan/device.hpp>
+#include <VSL/lifetime/physical_device_storage.hpp>
+#include <VSL/lifetime/dependency_node.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>
 
@@ -10,6 +12,17 @@
 #include <set>
 #include <cstdint>   // Necessary for UINT32_MAX
 #include <algorithm> // Necessary for std::clamp
+
+namespace VSL_NAMESPACE {
+    namespace {
+        lifetime::OwnedRef<impl::PhysicalDeviceImpl> physical_device_owner(std::shared_ptr<impl::PhysicalDeviceImpl> data) {
+            if (!data || !data.use_count() || !data->owner_node || !data->owner_node->matches(data))
+                throw std::invalid_argument("Physical device requires its canonical owner");
+            auto* node = data->owner_node;
+            return node->ref(std::move(data));
+        }
+    } // namespace
+} // namespace VSL_NAMESPACE
 
 bool VSL_NAMESPACE::impl::helper::QueueFamilyIndices::is_complete() {
     return graphics_family.has_value() && present_family.has_value();
@@ -60,6 +73,9 @@ bool check_device_extension_support(vk::PhysicalDevice device) {
 
 template<bool v>
 std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl> VSL_NAMESPACE::LogicalDeviceGraphicCreator<v>::create(VSL_NAMESPACE::PhysicalDevice device, VSL_NAMESPACE::Surface surface) {
+    (void)device.owner_ref();
+    if (!surface.data_ || !surface.data_->surface || surface.data_->vulkan.get() != device.data_->vulkan)
+        throw std::invalid_argument("Logical device requires a surface on the physical device Instance");
     std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl> data_ = std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl>(new VSL_NAMESPACE::impl::LogicalDeviceImpl);
 
     QueueFamilyIndices indices = find_queue_families(device.data_->device, surface.data_->surface);
@@ -115,73 +131,91 @@ std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl> VSL_NAMESPACE::LogicalDe
     return data_;
 }
 
-void VSL_NAMESPACE::impl::PhysicalDeviceImpl::make_props() {
-    props = device.getProperties();
+VSL_NAMESPACE::PhysicalDevice::PhysicalDevice(std::shared_ptr<impl::PhysicalDeviceImpl> data_) : data_(std::move(data_)) {}
+
+VSL_NAMESPACE::PhysicalDevice::~PhysicalDevice() = default;
+VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::PhysicalDevice::owner_ref() const {
+    return physical_device_owner(data_);
 }
-
-void VSL_NAMESPACE::impl::PhysicalDeviceImpl::make_mem_props() {
-    mem_props = device.getMemoryProperties();
+VSL_NAMESPACE::VulkanAccessor VSL_NAMESPACE::PhysicalDevice::get_instance() const {
+    const auto data = physical_device_owner(data_);
+    const auto parent = data->owner_context ? data->owner_context->instance.lock() : lifetime::OwnedRef<impl::VulkanImplAccessor>{};
+    if (!parent.use_count() || parent.get() != data->vulkan)
+        throw std::logic_error("Physical device has no Instance owner");
+    VulkanAccessor instance{parent.share()};
+    (void)instance.owner_ref();
+    return instance;
 }
-
-VSL_NAMESPACE::PhysicalDevice::PhysicalDevice(std::shared_ptr<impl::PhysicalDeviceImpl> data_) : data_(data_) {}
-
-VSL_NAMESPACE::PhysicalDevice::~PhysicalDevice() {}
+VSL_NAMESPACE::PhysicalDevice VSL_NAMESPACE::PhysicalDevice::Select(VulkanAccessor instance) {
+    (void)instance.owner_ref();
+    const auto selected = operation::select_physical_device(*instance.accessor);
+    return {lifetime::make_heap_physical_device(std::move(instance), selected)};
+}
 
 uint32_t VSL_NAMESPACE::PhysicalDevice::api_version() {
-    if (!data_->props.has_value())
-        data_->make_props();
-    return data_->props.value().apiVersion;
+    const auto data = physical_device_owner(data_);
+    return operation::physical_device_properties(*data).apiVersion;
 }
 
 uint32_t VSL_NAMESPACE::PhysicalDevice::driver_version() {
-    if (!data_->props.has_value())
-        data_->make_props();
-    return data_->props.value().driverVersion;
+    const auto data = physical_device_owner(data_);
+    return operation::physical_device_properties(*data).driverVersion;
 }
 
 uint32_t VSL_NAMESPACE::PhysicalDevice::vendor_id() {
-    if (!data_->props.has_value())
-        data_->make_props();
-    return data_->props.value().vendorID;
+    const auto data = physical_device_owner(data_);
+    return operation::physical_device_properties(*data).vendorID;
 }
 
 uint32_t VSL_NAMESPACE::PhysicalDevice::device_id() {
-    if (!data_->props.has_value())
-        data_->make_props();
-    return data_->props.value().deviceID;
+    const auto data = physical_device_owner(data_);
+    return operation::physical_device_properties(*data).deviceID;
 }
 
 VSL_NAMESPACE::physical_device_type::PhysicalDeviceType VSL_NAMESPACE::PhysicalDevice::type() {
-    if (!data_->props.has_value())
-        data_->make_props();
-    return VSL_NAMESPACE::physical_device_type::get_type((size_t)data_->props.value().deviceType);
+    const auto data = physical_device_owner(data_);
+    return physical_device_type::get_type(static_cast<int>(operation::physical_device_properties(*data).deviceType));
 }
 
 std::string VSL_NAMESPACE::PhysicalDevice::name() {
-    if (!data_->props.has_value())
-        data_->make_props();
-    return data_->props.value().deviceName;
+    const auto data = physical_device_owner(data_);
+    return operation::physical_device_properties(*data).deviceName;
 }
 
 std::shared_ptr<VSL_NAMESPACE::impl::PhysicalDevicesImpl>
 VSL_NAMESPACE::helper::enumerate_physical_devices(VulkanAccessor vulkan) {
+    (void)vulkan.owner_ref();
     auto data = std::make_shared<impl::PhysicalDevicesImpl>();
-    data->devices = vulkan.accessor->instance.enumeratePhysicalDevices();
+    data->devices = operation::enumerate_physical_devices(*vulkan.accessor);
     data->vulkan = vulkan.accessor;
     return data;
 }
 
 std::vector<VSL_NAMESPACE::PhysicalDevice>
 VSL_NAMESPACE::helper::physical_devices(const std::shared_ptr<impl::PhysicalDevicesImpl>& data) {
+    const auto snapshot = data;
+    if (!snapshot || !snapshot.use_count())
+        throw std::invalid_argument("Physical devices snapshot is empty");
+    const VulkanAccessor instance{snapshot->vulkan};
+    const auto handles = snapshot->devices;
+    (void)instance.owner_ref();
     std::vector<PhysicalDevice> devices;
-    devices.reserve(data->devices.size());
-    for (auto handle : data->devices) {
-        auto device = std::make_shared<impl::PhysicalDeviceImpl>();
-        device->device = handle;
-        device->vulkan = data->vulkan;
-        devices.emplace_back(std::move(device));
+    devices.reserve(handles.size());
+    for (const auto handle : handles) {
+        const auto candidate = operation::inspect_physical_device(*instance.accessor, handle);
+        devices.emplace_back(lifetime::make_heap_physical_device(instance, candidate));
     }
     return devices;
+}
+VSL_NAMESPACE::PhysicalDevice VSL_NAMESPACE::helper::select_physical_device(const std::shared_ptr<impl::PhysicalDevicesImpl>& data) {
+    const auto snapshot = data;
+    if (!snapshot || !snapshot.use_count())
+        throw std::invalid_argument("Physical devices snapshot is empty");
+    const VulkanAccessor instance{snapshot->vulkan};
+    const auto handles = snapshot->devices;
+    (void)instance.owner_ref();
+    const auto selected = operation::select_physical_device(*instance.accessor, handles);
+    return {lifetime::make_heap_physical_device(instance, selected)};
 }
 
 #ifdef VSL_NAMESPACE_TEST
@@ -213,31 +247,17 @@ VSL_NAMESPACE::physical_device_type::PhysicalDeviceType VSL_NAMESPACE::physical_
     }
 }
 
-int rate_device_suitability(vk::PhysicalDevice device) {
-    auto device_properties = device.getProperties();
-    auto device_features = device.getFeatures();
-
-    int score = 0;
-
-    if (device_properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu) {
-        score += 1000;
-    }
-
-    score += device_properties.limits.maxImageDimension2D;
-
-    if (!device_features.geometryShader) {
-        return 0;
-    }
-    return score;
-}
-
 int VSL_NAMESPACE::PhysicalDevicesSercher::benchmark(VSL_NAMESPACE::PhysicalDevice device) {
-    return rate_device_suitability(device.data_->device);
+    (void)device.owner_ref();
+    return operation::rate_physical_device(device.data_->device);
 }
 
 void VSL_NAMESPACE::helper::retain_physical_device_owner(
     const std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl>& logical,
     const VSL_NAMESPACE::PhysicalDevice& physical) {
+    (void)physical.owner_ref();
+    if (!logical || !logical.use_count())
+        throw std::invalid_argument("Logical device creator must return an owner");
     logical->parent_device = physical.data_;
 }
 

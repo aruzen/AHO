@@ -290,14 +290,15 @@ namespace {
     }
 
     TEST_F(TypedBundleVulkanIntegrationTest, ArenaResourcesReachTheShaderThroughArraysAndFrameReuse) {
-        auto manager = make_manager().independent(3);
+        t::TypedFrameCommands commands(device, 3, t::ArenaStorage<>{});
+        auto manager = commands.manager();
         CountingManager descriptors(device);
         ArenaBundle bundle(manager, descriptors, sizes());
         initialize_shared(bundle);
         vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_bundle.comp.spv"));
         t::TypedComputePipeline<Resources> pipeline(device, bundle.descriptor_layouts(), vsl::pipeline_layout::ShaderGroup("arena bundle", {shader}));
         for (std::uint32_t iteration = 0; iteration < 12; ++iteration) {
-            auto phase = manager.start_phase<vsl::ComputePhase>();
+            auto phase = commands.start_compute();
             bundle.update(phase, [&](ArenaBundle::Frame& frame) {
                 frame.buffer<2, 0>().copy(std::span(&iteration, 1));
             });
@@ -312,6 +313,7 @@ namespace {
             frame.buffer<2, 3>().read_into(result);
             for (size_t i = 0; i < result.size(); ++i)
                 EXPECT_EQ(result[i], iteration + 60u + i);
+            commands.next();
         }
     }
 

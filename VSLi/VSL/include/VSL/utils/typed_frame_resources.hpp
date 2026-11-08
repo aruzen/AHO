@@ -1,6 +1,7 @@
 #pragma once
 #include "../vulkan/phase.hpp"
 #include "../lifetime/resource_use.hpp"
+#include "../storage/typed_storage_policy.hpp"
 #include <concepts>
 #include <functional>
 #include <memory>
@@ -19,9 +20,34 @@ namespace VSL_NAMESPACE::typed {
             CommandBuffer buffer;
             size_t count;
             explicit FrameResourceDomain(CommandManager manager);
+            void require_current() const;
             FrameResourceAccess access(const ComputePhase& phase) const;
         };
     } // namespace detail
+
+    // 実行群の所有者。各Frame値へManager/Domainを入れず、データ領域と寿命を分ける。
+    class TypedFrameCommands {
+        struct Resources;
+        detail::FrameResourceDomain _domain;
+        FenceHolder _fence;
+        explicit TypedFrameCommands(Resources resources);
+        static Resources MakeArena(LogicalDeviceAccessor device, std::uint32_t count);
+        static Resources MakeHeap(LogicalDeviceAccessor device, std::uint32_t count);
+
+    public:
+        TypedFrameCommands(LogicalDeviceAccessor device, std::uint32_t count, ArenaStorage<>);
+        TypedFrameCommands(LogicalDeviceAccessor device, std::uint32_t count, HeapStorage);
+        TypedFrameCommands(CommandManager manager, FenceHolder fence);
+        TypedFrameCommands(const TypedFrameCommands&) = delete;
+        TypedFrameCommands(TypedFrameCommands&&) noexcept = default;
+        TypedFrameCommands& operator=(TypedFrameCommands other) noexcept;
+        void swap(TypedFrameCommands& other) noexcept;
+        size_t frame_count() const;
+        CommandManager manager() const;
+        FenceHolder fence() const;
+        ComputePhase start_compute() const;
+        void next();
+    };
 
     // Frameにはアプリ側で型付きbuffer・set等の所有者をまとめる。
     // 各記録Phaseでは、get()より前に一度だけ更新できる。

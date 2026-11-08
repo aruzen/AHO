@@ -3,6 +3,7 @@
 #include <VSL/sync/submission_completion.hpp>
 #include <VSL/lifetime/submission_retention.hpp>
 #include <VSL/lifetime/swapchain_storage.hpp>
+#include <VSL/lifetime/presentation_retention.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/lifetime/synchronization_use.hpp>
 #include <VSL/sync/synchronization_state.hpp>
@@ -51,18 +52,32 @@ namespace VSL_NAMESPACE {
         std::shared_ptr<impl::SemaphoreImpl> finished;
         std::shared_ptr<sync::SemaphoreWSIUse> available_use, finished_use;
         std::shared_ptr<impl::SwapchainImpl> swapchain;
+        std::shared_ptr<lifetime::SurfacePresentationDomain> presentations;
+        std::shared_ptr<lifetime::AcquireEvidence> evidence;
+        std::shared_ptr<lifetime::PresentRecord> record;
         vk::UniqueFence acquire_fence;
         std::uint32_t acquired_index = UINT32_MAX;
         bool acquired = false;
+        void reject_acquisition() noexcept;
         ~Presentation();
     };
 
-    DefaultPhase::Presentation::~Presentation() {
-        if (acquired) {
-            auto result = operation::wait_fence(device->device, *acquire_fence, UINT64_MAX);
-            while (result != vk::Result::eSuccess && result != vk::Result::eErrorDeviceLost)
-                result = operation::wait_fence(device->device, *acquire_fence, UINT64_MAX);
+    void DefaultPhase::Presentation::reject_acquisition() noexcept {
+        if (evidence) {
+            evidence->proof.status = sync::FenceProofStatus::NOT_ACQUIRED;
+            evidence->finished = true;
         }
+        if (available_use)
+            available_use->complete = true;
+        if (finished_use)
+            finished_use->complete = true;
+    }
+    DefaultPhase::Presentation::~Presentation() {
+        if (acquired && evidence)
+            while (!sync::fence_proof_terminal(evidence->proof))
+                sync::wait_fence_proof(evidence->proof);
+        if (!acquired)
+            reject_acquisition();
         if (available_use)
             available_use->complete = true;
         if (finished_use)
@@ -356,7 +371,10 @@ namespace VSL_NAMESPACE {
             _presentation = std::make_shared<Presentation>();
             _presentation->device = manager.data_->device;
             _presentation->swapchain = chain;
+            _presentation->presentations = lifetime::presentation_domain(chain);
+            lifetime::register_presentation_domain(*domain, _presentation->presentations);
             _presentation->acquire_fence = device.createFenceUnique({});
+            _presentation->evidence = lifetime::prepare_acquire_evidence(*_presentation->presentations, chain, *_presentation->acquire_fence);
             if (submission->wait_semaphore) {
                 _presentation->available = synchronization_owner(*submission, impl::SubmissionSource::WAIT_SEMAPHORE, submission->wait_semaphore);
                 _presentation->available_use = sync::track_semaphore_wsi(*_presentation->available, submission->result);
@@ -368,47 +386,43 @@ namespace VSL_NAMESPACE {
             }
             const auto acquired = *_presentation->acquire_fence;
             lifetime::retain_until_complete(*submission, _presentation);
-            lifetime::retain_resource(domain->presentation_resources, chain);
             if (swapchain.data_ != chain || !chain->swap_chain || chain->state != SwapchainState::ACTIVE) {
-                if (_presentation->available_use)
-                    _presentation->available_use->complete = true;
-                if (_presentation->finished_use)
-                    _presentation->finished_use->complete = true;
+                _presentation->reject_acquisition();
                 throw std::logic_error("Swapchain changed before image acquisition");
             }
             std::uint32_t acquired_index = UINT32_MAX;
             auto result = device.acquireNextImageKHR(chain->swap_chain, UINT64_MAX,
                                                      available, acquired, &acquired_index);
             if (result == vk::Result::eErrorOutOfDateKHR) {
-                if (_presentation->available_use)
-                    _presentation->available_use->complete = true;
-                if (_presentation->finished_use)
-                    _presentation->finished_use->complete = true;
+                _presentation->reject_acquisition();
                 recreate = true;
                 ComputePhase::cancel();
                 return;
             }
             if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
+                _presentation->reject_acquisition();
                 fail(result == vk::Result::eErrorDeviceLost ? Completion::Failure::DEVICE_LOST : Completion::Failure::SUBMIT_FAILED, static_cast<std::int32_t>(result));
                 throw std::runtime_error("Swapchain acquire failed: " + vk::to_string(result));
             }
             _presentation->acquired = true;
             _presentation->acquired_index = acquired_index;
+            lifetime::commit_acquire_evidence(_presentation->evidence, *chain, acquired_index);
             image_index = acquired_index;
             recreate = result == vk::Result::eSuboptimalKHR;
-            if (!available && device.waitForFences(acquired, true, UINT64_MAX) != vk::Result::eSuccess)
+            if (!available && !sync::wait_fence_proof(_presentation->evidence->proof))
                 throw std::runtime_error("Swapchain acquire wait failed");
             signal_index = _presentation->acquired_index;
             begin();
             domain->context.acquired_image_index = _presentation->acquired_index;
             domain->context.acquired_swapchain = chain;
-            lifetime::retain_resource(domain->presentation_resources, chain);
-            if (submission->signal_semaphore)
-                lifetime::retain_resource(domain->presentation_resources, _presentation->finished);
         } catch (const vk::SystemError& error) {
+            if (_presentation && !_presentation->acquired)
+                _presentation->reject_acquisition();
             fail(error.code().value() == static_cast<int>(vk::Result::eErrorDeviceLost) ? Completion::Failure::DEVICE_LOST : Completion::Failure::SUBMIT_FAILED, error.code().value());
             throw;
         } catch (...) {
+            if (_presentation && !_presentation->acquired)
+                _presentation->reject_acquisition();
             fail(Completion::Failure::SUBMIT_FAILED);
             throw;
         }
@@ -424,27 +438,28 @@ namespace VSL_NAMESPACE {
     DefaultPhase::SubmitResult DefaultPhase::present() {
         if (state != State::FINISH_SUBMIT || _presented || !_presentation || !_presentation->acquired)
             return SubmitResult::FAILED;
-        const auto generation = _presentation->swapchain;
-        const auto index = _presentation->acquired_index;
-        vk::Semaphore finished = _presentation->finished ? _presentation->finished->semaphores.at(index)
-                                                         : *generation->presentation_semaphores.at(index);
-        auto chain = generation->swap_chain;
-        vk::PresentInfoKHR info{.waitSemaphoreCount = 1, .pWaitSemaphores = &finished, .swapchainCount = 1, .pSwapchains = &chain, .pImageIndices = &index};
+        const auto presentation = _presentation;
         const auto domain = lifetime::CommandAccess::Owner(recording_buffer);
-        lifetime::retain_resource(domain->presentation_resources, generation);
-        if (submission->signal_semaphore) {
-            lifetime::retain_resource(domain->presentation_resources, _presentation->finished);
-            lifetime::retain_resource(domain->presentation_resources, _presentation->finished_use);
+        const auto registry = presentation->presentations;
+        if (!presentation->record) {
+            lifetime::register_presentation_domain(*domain, registry);
+            presentation->record = lifetime::prepare_present_record(*registry, presentation->swapchain, presentation->finished,
+                                                                    presentation->finished_use, manager.data_->present_queue, presentation->acquired_index);
+            presentation->finished_use.reset();
         }
-        auto result = manager.data_->present_queue.presentKHR(&info);
-        _presented = true;
-        if (_presentation)
-            _presentation->finished_use.reset();
-        if (recreate || result == vk::Result::eSuboptimalKHR || result == vk::Result::eErrorOutOfDateKHR)
-            return SubmitResult::WANT_RECREATE_SWAPCHAIN;
-        if (result != vk::Result::eSuccess)
-            return SubmitResult::FAILED;
-        return SubmitResult::SUCCESS;
+        const auto outcome = lifetime::enqueue_present_record(*presentation->record);
+        const auto native = presentation->record->state.result;
+        _presented = outcome != sync::PresentEnqueue::NOT_ENQUEUED;
+        auto result = SubmitResult::FAILED;
+        if (outcome == sync::PresentEnqueue::ENQUEUED) {
+            if (recreate || native == vk::Result::eSuboptimalKHR || native == vk::Result::eErrorOutOfDateKHR)
+                result = SubmitResult::WANT_RECREATE_SWAPCHAIN;
+            else if (native == vk::Result::eSuccess)
+                result = SubmitResult::SUCCESS;
+        }
+        lifetime::collect_quarantined_presentations(registry->surface, presentation->swapchain->native_device);
+        lifetime::collect_presentations(registry);
+        return result; // callbackがPhaseを破棄しても、以降thisを参照しない。
     }
     DefaultPhase::SubmitResult DefaultPhase::submit() {
         if (state == State::ERROR_ && recreate)

@@ -3,6 +3,7 @@
 #include <VSL/operation/submission_ops.hpp>
 #include <VSL/lifetime/command_storage.hpp>
 #include <VSL/lifetime/dependency_node.hpp>
+#include <VSL/lifetime/presentation_retention.hpp>
 #include <stdexcept>
 #include <utility>
 
@@ -33,7 +34,7 @@ namespace VSL_NAMESPACE::lifetime {
         const auto native = buffer;
         auto recording = std::move(recording_submission);
         auto submitted = std::move(submissions);
-        auto presentation = std::move(presentation_resources);
+        auto presentation = std::move(presentation_domains);
         if (context.recording) {
             try {
                 operation::reset_command_buffer(native->command_buffers.at(native->current_buffer_idx));
@@ -46,11 +47,6 @@ namespace VSL_NAMESPACE::lifetime {
         for (const auto& work : submitted)
             if (work)
                 sync::finish_submission(*work);
-        if (!presentation.empty()) {
-            auto result = operation::wait_device_idle(native->command_pool->device->device);
-            while (result != vk::Result::eSuccess && result != vk::Result::eErrorDeviceLost)
-                result = operation::wait_device_idle(native->command_pool->device->device);
-        }
         presentation.clear();
         submitted.clear();
         recording.reset();
@@ -62,12 +58,33 @@ namespace VSL_NAMESPACE::lifetime {
         if (context.closing)
             throw std::logic_error("Command domain is closing");
         const auto native = buffer;
-        const auto submitted = submissions;
-        native->command_pool->device->device.waitIdle();
-        auto presentation = std::move(presentation_resources);
+        std::vector<std::shared_ptr<impl::SubmissionWork>> submitted;
+        for (const auto& work : submissions)
+            if (work && work->result->status == Completion::Status::SUBMITTED)
+                submitted.push_back(work);
+        std::vector<PresentationSnapshot> presentation;
+        presentation.reserve(presentation_domains.size());
+        for (const auto& domain : presentation_domains)
+            presentation.push_back(snapshot_presentations(domain, native->command_pool->device->device));
+        const auto idle = operation::wait_device_idle(native->command_pool->device->device);
+        if (idle != vk::Result::eSuccess && idle != vk::Result::eErrorDeviceLost)
+            vk::detail::throwResultException(idle, "Device idle failed");
+        if (idle == vk::Result::eErrorDeviceLost) {
+            // 全snapshotへ損失を保存してからownerを外す。callbackからpeerのFenceを成功観測させない。
+            for (const auto& work : submitted)
+                sync::save_terminal(*work, Completion::Status::FAILED, Completion::Failure::DEVICE_LOST, static_cast<std::int32_t>(idle));
+            for (const auto& snapshot : presentation)
+                for (const auto& record : snapshot.records)
+                    sync::fail_present(record->state, idle);
+        }
+        for (const auto& snapshot : presentation)
+            collect_quarantined_presentations(snapshot.domain->surface, native->command_pool->device->device, idle);
         for (const auto& work : submitted)
-            if (work)
-                sync::finish_submission(*work);
+            sync::finish_submission(*work);
+        for (auto& snapshot : presentation)
+            finish_presentations(snapshot, idle);
+        if (idle == vk::Result::eErrorDeviceLost)
+            vk::detail::throwResultException(idle, "Device lost while waiting idle");
     }
 
     const std::shared_ptr<CommandDomain>& CommandAccess::Owner(const CommandBuffer& buffer) {

@@ -1,4 +1,5 @@
 #include <VSL/lifetime/command_domain.hpp>
+#include <VSL/lifetime/presentation_retention.hpp>
 #include "support/deferred_action.hpp"
 #include "support/vulkan_fixture.hpp"
 #include "support/window_fixture.hpp"
@@ -406,10 +407,12 @@ namespace {
             EXPECT_EQ(phase.submit_commands(), VSL_NAMESPACE::ComputePhase::SubmitResult::SUCCESS);
             if (!frame) {
                 manager.wait_idle();
-                EXPECT_TRUE(vsl::lifetime::CommandAccess::Owner(manager.get_buffer())->presentation_resources.empty());
+                const auto& domains = vsl::lifetime::CommandAccess::Owner(manager.get_buffer())->presentation_domains;
+                EXPECT_TRUE(std::ranges::all_of(domains, [](const auto& domain) { return domain->records.empty(); }));
             }
             EXPECT_EQ(phase.present(), VSL_NAMESPACE::ComputePhase::SubmitResult::SUCCESS);
-            EXPECT_FALSE(vsl::lifetime::CommandAccess::Owner(manager.get_buffer())->presentation_resources.empty());
+            const auto& domains = vsl::lifetime::CommandAccess::Owner(manager.get_buffer())->presentation_domains;
+            EXPECT_TRUE(std::ranges::any_of(domains, [](const auto& domain) { return !domain->records.empty(); }));
             ASSERT_TRUE(phase.completion().wait());
             auto mapped = destination.data();
             const bool bgra = chain.get_format().type() == VSL_NAMESPACE::data_format::FormatTypes::SRGB8_BGRA ||

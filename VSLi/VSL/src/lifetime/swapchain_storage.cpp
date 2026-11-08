@@ -5,6 +5,8 @@
 #include <VSL/lifetime/image_storage.hpp>
 #include <VSL/lifetime/glfw_lease.hpp>
 #include <VSL/lifetime/owner_access.hpp>
+#include <VSL/lifetime/presentation_retention.hpp>
+#include <VSL/lifetime/synchronization_storage.hpp>
 #include <VSL/storage/cpu_region.hpp>
 #include <new>
 
@@ -18,8 +20,9 @@ namespace VSL_NAMESPACE::lifetime {
             size_t parent_count = 0;
             std::shared_ptr<storage::detail::CPURegion> memory;
             storage::SwapchainLayout layout;
+            SwapchainPresentationContext presentation;
             size_t images_constructed = 0;
-            bool claimed = false, chain_constructed = false;
+            bool claimed = false, chain_constructed = false, fences_constructed = false;
             SwapchainGenerationOwner(operation::PendingSwapchain& pending, storage::SwapchainLayout layout,
                                      std::shared_ptr<storage::detail::CPURegion> memory, std::array<OwnerRef, 2> parents, size_t parent_count,
                                      const operation::ImageViewNativeCalls& image_calls);
@@ -31,7 +34,7 @@ namespace VSL_NAMESPACE::lifetime {
         SwapchainGenerationOwner::SwapchainGenerationOwner(operation::PendingSwapchain& pending, storage::SwapchainLayout layout,
                                                            std::shared_ptr<storage::detail::CPURegion> memory, std::array<OwnerRef, 2> parents,
                                                            size_t parent_count, const operation::ImageViewNativeCalls& image_calls)
-            : parents(std::move(parents)), parent_count(parent_count), memory(std::move(memory)), layout(layout) {
+            : parents(std::move(parents)), parent_count(parent_count), memory(std::move(memory)), layout(layout), presentation(layout.images()) {
             if (!this->memory)
                 throw std::invalid_argument("Swapchain requires CPU memory");
             layout.require_region(this->memory->bytes, this->memory->alignment);
@@ -45,6 +48,12 @@ namespace VSL_NAMESPACE::lifetime {
                 for (size_t i = 0; i < pending.images.size(); ++i) {
                     construct_image(image_slot(i), *pending.device, info, pending.images[i], image_calls);
                     ++images_constructed;
+                }
+                if (layout.has_present_fences()) {
+                    auto* slot = this->memory->base + layout.present_fence_offset();
+                    construct_fence(slot, *pending.device, {.count = layout.images()});
+                    fences_constructed = true;
+                    presentation.fences = &fence_at(slot);
                 }
                 construct_swapchain(this->memory->base, pending);
                 chain_constructed = true;
@@ -61,6 +70,10 @@ namespace VSL_NAMESPACE::lifetime {
             return memory->base + layout.image_offset(index);
         }
         void SwapchainGenerationOwner::clear() noexcept {
+            if (fences_constructed) {
+                destroy_fence(memory->base + layout.present_fence_offset());
+                fences_constructed = false;
+            }
             while (images_constructed)
                 destroy_image(image_slot(--images_constructed));
             if (chain_constructed) {
@@ -132,7 +145,7 @@ namespace VSL_NAMESPACE::lifetime {
         }
         // device/surface ownerはPendingより先に作り、native破棄が済むまで保持する。
         auto pending = operation::prepare_swapchain(*device_owner, *surface_owner, info, previous.get(), calls);
-        const storage::SwapchainLayout layout(pending.images.size());
+        const storage::SwapchainLayout layout(pending.images.size(), pending.present_fences);
         auto region = memory(layout);
         std::vector<ImageAccessor> images(layout.images());
         std::array<OwnerRef, 2> parents;
@@ -143,8 +156,12 @@ namespace VSL_NAMESPACE::lifetime {
         auto& value = swapchain_at(root->memory->base);
         value.image_storage = root->memory->base + layout.image_offset(0);
         value.image_stride = sizeof(ImageSlotStorage);
+        value.presentation_context = &root->presentation;
+        root->presentation.generation = &value;
         root->node.publish(root, root.get(), SwapchainGenerationOwner::VisitDependencies);
         value.owner_node = &root->node;
+        if (root->presentation.fences)
+            root->presentation.fences->owner_node = &root->node;
         for (size_t i = 0; i < images.size(); ++i) {
             auto& image = image_at(root->image_slot(i));
             image.owner_node = &root->node;

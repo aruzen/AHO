@@ -22,8 +22,9 @@ if(AHO_ENABLE_EXPERIMENTAL_MESH)
     target_compile_definitions(aho-mesh-gpu-test PRIVATE AHO_MESH_GPU_TESTS=1
         VSL_TEST_SHADER_DIR="${CMAKE_BINARY_DIR}/VSLi/VSL/test/shaders")
     target_include_directories(aho-mesh-gpu-test PRIVATE "${VSL_HOME}/test"
-        "${Vulkan_INCLUDE_DIRS}" "$<TARGET_PROPERTY:VSL,INCLUDE_DIRECTORIES>")
+        "${Vulkan_INCLUDE_DIRS}" "${VSL_HOME}/src/private")
     target_link_libraries(aho-mesh-gpu-test PRIVATE AHO::ExperimentalMesh VSL GTest::gtest_main)
+    target_include_directories(aho-mesh-gpu-test SYSTEM BEFORE PRIVATE ${Vulkan_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS})
     target_link_directories(aho-mesh-gpu-test PRIVATE ${GLFW_LIBRARY_DIRS})
     add_dependencies(aho-tests aho-mesh-gpu-test)
     if(AHO_TEST_SANITIZERS AND CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
@@ -40,10 +41,11 @@ if (AHO_TEST_SOURCES)
     target_include_directories(aho-test PRIVATE
             ${Vulkan_INCLUDE_DIRS}
             "${CMAKE_CURRENT_SOURCE_DIR}/../include"
-            "$<TARGET_PROPERTY:AHOLi,INCLUDE_DIRECTORIES>"
-            "$<TARGET_PROPERTY:VSL,INCLUDE_DIRECTORIES>"
+            "${VSL_HOME}/src/private"
+            "${AHO_TINYGLTF_INCLUDE_DIR}"
     )
     target_link_libraries(aho-test PRIVATE AHOLi VSL GTest::gtest_main)
+    target_include_directories(aho-test SYSTEM BEFORE PRIVATE ${Vulkan_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS})
     if(AHO_ENABLE_EXPERIMENTAL_MESH)
         target_link_libraries(aho-test PRIVATE AHO::ExperimentalMesh)
     endif()
@@ -99,6 +101,7 @@ if (AHO_TEST_SOURCES)
     add_dependencies(aho-gpu-test vsl-test-shaders)
     target_include_directories(aho-gpu-test PRIVATE "$<TARGET_PROPERTY:aho-test,INCLUDE_DIRECTORIES>")
     target_link_libraries(aho-gpu-test PRIVATE AHOLi VSL GTest::gtest_main)
+    target_include_directories(aho-gpu-test SYSTEM BEFORE PRIVATE ${Vulkan_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS})
     target_link_directories(aho-gpu-test PRIVATE ${GLFW_LIBRARY_DIRS})
     if(APPLE)
         target_link_libraries(aho-gpu-test PRIVATE "-framework CoreGraphics")

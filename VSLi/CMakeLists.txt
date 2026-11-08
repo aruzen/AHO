@@ -51,6 +51,12 @@ add_library(VSL STATIC
         VSL/src/operation/descriptor_ops.cpp
         VSL/src/sync/resource_use_state.cpp
         VSL/src/sync/completion.cpp
+        VSL/src/sync/presentation_state.cpp
+        VSL/src/operation/presentation_ops.cpp
+        VSL/src/private/VSL/sync/presentation_state.hpp
+        VSL/src/private/VSL/lifetime/presentation_retention.hpp
+        VSL/src/lifetime/presentation_retention.cpp
+        VSL/src/private/VSL/operation/presentation_ops.hpp
         VSL/src/utils/typed_buffer_view.cpp
         VSL/src/vulkan/command.cpp
         VSL/src/vulkan/device.cpp

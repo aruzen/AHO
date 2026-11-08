@@ -9,7 +9,7 @@
 
 最初のPRだけで終了せず、下記の順で実装・検証・独立レビューを継続する。PRの公開前には最新masterとの差分を確認する。新しい製品ディレクトリが必要な場合は作成前に確認する。
 
-現在の到達点は順序1〜9と10a・10bである。command／同期資源の配置とTyped frame再利用、起動資源の共通backend、OS windowの寿命分離、公開StartupArenaとAHO起動、maintenance1の能力照会／有効化、Swapchain世代の共通backendと実画像数に従うCPU配置を接続した。順序10全体と11〜12は未完了であり、WSI完了証明、既定policy変更、旧入口廃止と最終監査まで継続する。
+現在の到達点は順序1〜9と10a・10b・10cである。command／同期資源の配置とTyped frame再利用、起動資源の共通backend、OS windowの寿命分離、公開StartupArenaとAHO起動、maintenance1の能力照会／有効化、Swapchain世代のCPU配置とpresent専用の完了観測・資源保持を接続した。順序10全体と11〜12は未完了であり、取得後失敗の復旧、AHOの世代公開、既定policy変更、旧入口廃止と最終監査まで継続する。
 
 ## 責務と保証
 
@@ -184,7 +184,9 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 
 [10bのSwapchain世代とCPU配置](swapchain-arena.md)で、native Pending→実画像M→CPU領域→Image slots→世代公開を接続した。全aliasの退役状態、元親owner、途中失敗の逆順rollbackと同領域再利用、準備callbackの世代変更拒否、実取得世代／indexによる取消を検証した。取消の使用登録は同じ物理ImageUseStateへ非pollで接続し、取得情報はGPU完了まで保持する。世代同期群の実present証明とacquire Fenceの再利用は10c／10dへ続く。
 
-10cは外部DomainのPresentRecordが世代と同期資源を保持し、present Fence等の証明でmarkerとownerを回収する。10dはframeごとのacquire FenceとAcquireTicket、取得後失敗・取消時のsignal消費／画像返却、present失敗の分類を扱う。Swapchain内部からRecordを強所有しない。
+10cは[Presentの完了観測と世代保持](presentation-retention.md)で、Surface共通の外部Domain／PresentRecord、世代内のFence pool、enqueue結果の分類、snapshot回収とcallback再入を接続した。graphics完了とstrict present証明を分け、DeviceLostは全snapshotへ先に保存してから保持を解除する。不明結果の終了は退避し、同Surface／Deviceに限定して非blocking回収する。Swapchain内部からRecordを強所有しない。
+
+10dはframeごとのacquire FenceとAcquireTicket、取得後失敗・取消時のsignal消費／画像返却、present OOMのretryと破棄を扱う。準備中の完了callbackがPhase自身を破棄する場合にも、借用thisへ戻らない構成を先に確定する。
 
 10eはAHOのframe同期群とSwapchain世代群を分け、候補生成後のattachment失敗から復旧する。0 extentでは再生成・acquire・Fence resetを延期し、復元後に一括公開する。最後のpresent直後close、連続resize、marker保持量の有界化と互換Pipeline再利用を検証して順序10完了とする。
 

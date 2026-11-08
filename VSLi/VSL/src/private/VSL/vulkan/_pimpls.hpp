@@ -47,6 +47,7 @@ namespace VSL_NAMESPACE {
         struct PhysicalDeviceOwnerContext;
         struct SurfaceOwnerContext;
         struct DeviceOwnerContext;
+        struct SwapchainPresentationContext;
     } // namespace lifetime
     namespace graphic_resource {
         struct ManagerInterface;
@@ -204,6 +205,7 @@ namespace VSL_NAMESPACE::impl {
         // 世代ownerが構築した物理Image slotの借用。GPU記録は同じUseStateへ登録する。
         std::byte* image_storage = nullptr;
         size_t image_stride = 0;
+        lifetime::SwapchainPresentationContext* presentation_context = nullptr;
 
         vk::SurfaceFormatKHR surface_format;
         vk::PresentModeKHR present_mode;

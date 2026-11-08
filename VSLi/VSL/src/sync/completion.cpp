@@ -4,20 +4,31 @@
 #include <VSL/vulkan/_pimpls.hpp>
 #include <stdexcept>
 #include <thread>
+#include <utility>
 
 namespace VSL_NAMESPACE::sync {
+    namespace {
+        void release_terminal_resources(impl::SubmissionWork& work) noexcept;
+        void release_terminal_resources(impl::SubmissionWork& work) noexcept {
+            if (const auto release = std::exchange(work.release_resources, nullptr))
+                release(work);
+        }
+    } // namespace
     bool terminal_status(Completion::Status status) noexcept {
         return status == Completion::Status::COMPLETE || status == Completion::Status::CANCELLED || status == Completion::Status::FAILED;
     }
-    void publish_terminal(impl::SubmissionWork& work, Completion::Status status, Completion::Failure failure, std::int32_t error_code) noexcept {
+    bool save_terminal(impl::SubmissionWork& work, Completion::Status status, Completion::Failure failure, std::int32_t error_code) noexcept {
         if (terminal_status(work.result->status))
-            return;
+            return false;
         work.result->failure = failure;
         work.result->error_code = error_code;
         work.result->status = status;
         work.result->work.reset();
-        if (work.release_resources)
-            work.release_resources(work);
+        return true;
+    }
+    void publish_terminal(impl::SubmissionWork& work, Completion::Status status, Completion::Failure failure, std::int32_t error_code) noexcept {
+        if (save_terminal(work, status, failure, error_code))
+            release_terminal_resources(work);
     }
     void observe_submission_result(impl::SubmissionWork& work, std::int32_t native_result) {
         if (work.result->status != Completion::Status::SUBMITTED)
@@ -44,6 +55,7 @@ namespace VSL_NAMESPACE::sync {
             else
                 std::this_thread::yield(); // 完了を確定できない間は資源を破棄しない。
         }
+        release_terminal_resources(work);
     }
 } // namespace VSL_NAMESPACE::sync
 

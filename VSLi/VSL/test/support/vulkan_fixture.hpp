@@ -40,6 +40,7 @@ namespace vsl_test {
         std::size_t validation_abort_count();
         virtual bool validate_vulkan() const;
         virtual bool require_timeline_semaphore() const;
+        virtual vsl::PresentFencePolicy present_fence_policy() const;
         std::shared_ptr<vsl::impl::VulkanImpl<false>> instance;
         vsl::PhysicalDevice physical{std::shared_ptr<vsl::impl::PhysicalDeviceImpl>{}};
         vsl::LogicalDeviceAccessor device;
@@ -130,6 +131,9 @@ namespace vsl_test {
     inline bool VulkanIntegrationTest::require_timeline_semaphore() const {
         return false;
     }
+    inline vsl::PresentFencePolicy VulkanIntegrationTest::present_fence_policy() const {
+        return vsl::PresentFencePolicy::LEGACY;
+    }
 
     inline void VulkanIntegrationTest::SetUp() {
         vsl::InstanceCreateInfo instance_info;
@@ -142,6 +146,15 @@ namespace vsl_test {
                 if (std::strcmp(extension.extensionName, name) == 0)
                     instance_info.extensions.emplace_back(name);
         instance_info.validation = require_validation || validate_vulkan();
+        if (present_fence_policy() == vsl::PresentFencePolicy::REQUIRE_FENCE) {
+            for (const auto* name : {VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
+                                     VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}) {
+                if (!std::ranges::any_of(extensions, [&](const auto& extension) { return std::strcmp(extension.extensionName, name) == 0; }))
+                    GTEST_SKIP() << "Required present Fence Instance extension unavailable: " << name;
+                if (std::ranges::find(instance_info.extensions, name) == instance_info.extensions.end())
+                    instance_info.extensions.emplace_back(name);
+            }
+        }
         if (instance_info.validation) {
             const std::array<std::string, 1> layers{"VK_LAYER_KHRONOS_validation"};
             if (!vsl::operation::instance_layers_supported(layers))
@@ -208,6 +221,11 @@ namespace vsl_test {
             device_info.features = device_info.features | vsl::DeviceFeature::INDEPENDENT_BLEND;
         if (require_timeline_semaphore())
             device_info.features = device_info.features | vsl::DeviceFeature::TIMELINE_SEMAPHORE;
+        if (present_fence_policy() == vsl::PresentFencePolicy::REQUIRE_FENCE) {
+            if (!vsl::has_device_features(physical.supported_features(), vsl::DeviceFeature::SWAPCHAIN_MAINTENANCE1))
+                GTEST_SKIP() << "Present Fence maintenance1 feature unavailable";
+            device_info.features = device_info.features | vsl::DeviceFeature::SWAPCHAIN_MAINTENANCE1;
+        }
         device = vsl::LogicalDeviceAccessor::Create(physical, std::move(device_info));
     }
 

@@ -186,7 +186,7 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 
 10cは[Presentの完了観測と世代保持](presentation-retention.md)で、Surface共通の外部Domain／PresentRecord、世代内のFence pool、enqueue結果の分類、snapshot回収とcallback再入を接続した。graphics完了とstrict present証明を分け、DeviceLostは全snapshotへ先に保存してから保持を解除する。不明結果の終了は退避し、同Surface／Deviceに限定して非blocking回収する。Swapchain内部からRecordを強所有しない。
 
-10dはframeごとのacquire FenceとAcquireTicket、取得後失敗・取消時のsignal消費／画像返却、present OOMのretryと破棄を扱う。準備中の完了callbackがPhase自身を破棄する場合にも、借用thisへ戻らない構成を先に確定する。
+10dはframeごとのacquire FenceとAcquireTicket、取得後失敗・取消時のsignal消費／画像返却、present OOMのretryと破棄を扱う。[前半の準備中の借用寿命](phase-call-lifetime.md)で、stack guardによる自己破棄検知、局所ownerの解放・例外後の中断、共有Fence予約と既存peer-start契約を検証した。Ticket／Fence pool／取得後回復は未完了であり、10d全体は継続する。
 
 10eはAHOのframe同期群とSwapchain世代群を分け、候補生成後のattachment失敗から復旧する。0 extentでは再生成・acquire・Fence resetを延期し、復元後に一括公開する。最後のpresent直後close、連続resize、marker保持量の有界化と互換Pipeline再利用を検証して順序10完了とする。
 

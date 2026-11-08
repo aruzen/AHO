@@ -4,6 +4,7 @@
 #include <VSL/lifetime/submission_retention.hpp>
 #include <VSL/lifetime/swapchain_storage.hpp>
 #include <VSL/lifetime/presentation_retention.hpp>
+#include <VSL/lifetime/phase_call.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/lifetime/synchronization_use.hpp>
 #include <VSL/sync/synchronization_state.hpp>
@@ -95,7 +96,8 @@ namespace VSL_NAMESPACE {
             setup();
     }
 
-    void ComputePhase::prepare(bool returning_image) {
+    bool ComputePhase::prepare(bool returning_image) {
+        lifetime::PhaseCall call(*this);
         recording_buffer = manager.get_buffer();
         const auto domain = lifetime::CommandAccess::Owner(recording_buffer);
         auto buffers = domain->buffer;
@@ -123,8 +125,13 @@ namespace VSL_NAMESPACE {
         signal_index = frame_slot;
         auto device = manager_data->device->device;
         auto previous = domain->submissions.at(frame_slot);
-        if (!inherited && previous && previous->result->status == Completion::Status::SUBMITTED && !Completion{previous->result}.wait())
-            throw std::runtime_error("Previous frame completion failed");
+        if (!inherited && previous && previous->result->status == Completion::Status::SUBMITTED) {
+            const auto completed = Completion{previous->result}.wait();
+            if (!call.alive())
+                return false;
+            if (!completed)
+                throw std::runtime_error("Previous frame completion failed");
+        }
         if (available && available->semaphores.size() <= frame_slot)
             throw std::invalid_argument("Acquire semaphore count must cover frame slots");
         if (external && external->fences.size() <= frame_slot)
@@ -154,6 +161,8 @@ namespace VSL_NAMESPACE {
             next->external_fence = external.get();
             next->fence = external->fences.at(frame_slot);
             next->fence_reservation = lifetime::reserve_fence(external, frame_slot, next->result);
+            if (!call.alive())
+                return false;
         } else {
             next->owned_fence = previous ? previous->owned_fence : nullptr;
             if (!next->owned_fence)
@@ -171,6 +180,7 @@ namespace VSL_NAMESPACE {
         completion_ = Completion{submission->result};
         domain->context.acquired_image_index.reset();
         domain->context.acquired_swapchain.reset();
+        return true;
     }
 
     void ComputePhase::fail(Completion::Failure failure, std::int32_t error_code) noexcept {
@@ -216,16 +226,20 @@ namespace VSL_NAMESPACE {
         state = State::WAIT_SUBMIT;
     }
     void ComputePhase::setup() {
+        lifetime::PhaseCall call(*this);
         if (state != State::BEFORE_SETUP)
             return;
         try {
-            prepare();
+            if (!prepare() || !call.alive())
+                return;
             begin();
         } catch (const vk::SystemError& error) {
-            fail(error.code().value() == static_cast<int>(vk::Result::eErrorDeviceLost) ? Completion::Failure::DEVICE_LOST : Completion::Failure::SUBMIT_FAILED, error.code().value());
+            if (call.alive())
+                fail(error.code().value() == static_cast<int>(vk::Result::eErrorDeviceLost) ? Completion::Failure::DEVICE_LOST : Completion::Failure::SUBMIT_FAILED, error.code().value());
             throw;
         } catch (...) {
-            fail(Completion::Failure::SUBMIT_FAILED);
+            if (call.alive())
+                fail(Completion::Failure::SUBMIT_FAILED);
             throw;
         }
     }
@@ -322,6 +336,7 @@ namespace VSL_NAMESPACE {
         }
     }
     ComputePhase::~ComputePhase() {
+        lifetime::PhaseCall::Invalidate(*this);
         finish_noexcept();
     }
     std::uint32_t ComputePhase::get_image_index() {
@@ -337,6 +352,7 @@ namespace VSL_NAMESPACE {
             setup();
     }
     void DefaultPhase::setup() {
+        lifetime::PhaseCall call(*this);
         if (state != State::BEFORE_SETUP)
             return;
         try {
@@ -352,7 +368,8 @@ namespace VSL_NAMESPACE {
             if (domain->context.recording || domain->context.returning_image || domain->context.mutating || domain->context.frame_buffer_recording)
                 throw std::logic_error("A phase is already recording");
             buffers->current_buffer_idx = (buffers->current_buffer_idx + 1) % buffers->command_buffers.size();
-            prepare();
+            if (!prepare() || !call.alive())
+                return;
             if (swapchain.data_ != chain)
                 throw std::logic_error("Swapchain changed while preparing a phase");
             operation::require_active_swapchain(*chain);
@@ -416,11 +433,15 @@ namespace VSL_NAMESPACE {
             domain->context.acquired_image_index = _presentation->acquired_index;
             domain->context.acquired_swapchain = chain;
         } catch (const vk::SystemError& error) {
+            if (!call.alive())
+                throw;
             if (_presentation && !_presentation->acquired)
                 _presentation->reject_acquisition();
             fail(error.code().value() == static_cast<int>(vk::Result::eErrorDeviceLost) ? Completion::Failure::DEVICE_LOST : Completion::Failure::SUBMIT_FAILED, error.code().value());
             throw;
         } catch (...) {
+            if (!call.alive())
+                throw;
             if (_presentation && !_presentation->acquired)
                 _presentation->reject_acquisition();
             fail(Completion::Failure::SUBMIT_FAILED);
@@ -471,6 +492,7 @@ namespace VSL_NAMESPACE {
         return present();
     }
     void DefaultPhase::cancel() {
+        lifetime::PhaseCall call(*this);
         if (!_presentation || !_presentation->acquired || _presented) {
             ComputePhase::cancel();
             return;
@@ -491,7 +513,8 @@ namespace VSL_NAMESPACE {
             // 途中の記録を破棄し、取得時のセマフォを消費して画像を画面表示に戻す。
             // 元結果のcallbackは返却の記録・送信後に呼び、Phase自己破棄後にthisへ触れない。
             try {
-                prepare(true);
+                if (!prepare(true) || !call.alive())
+                    return;
                 if (_presentation->available_use)
                     _presentation->available_use->acquisition = submission->result;
                 signal_index = index;
@@ -509,7 +532,7 @@ namespace VSL_NAMESPACE {
                 if (state == State::FINISH_SUBMIT)
                     present();
             } catch (...) {
-                if (state == State::WAIT_SUBMIT)
+                if (call.alive() && state == State::WAIT_SUBMIT)
                     fail(Completion::Failure::SUBMIT_FAILED);
                 sync::publish_terminal(*cancelled, Completion::Status::CANCELLED);
                 throw;
@@ -521,6 +544,7 @@ namespace VSL_NAMESPACE {
             present();
     }
     DefaultPhase::~DefaultPhase() {
+        lifetime::PhaseCall::Invalidate(*this);
         finish_noexcept();
     }
 } // namespace VSL_NAMESPACE

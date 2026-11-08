@@ -24,5 +24,6 @@
 - [Descriptorの共通構築backendとheapの所有境界](VSL/descriptor-backend.md)
 - [Descriptorのarena配置・固定依存・Typed import](VSL/descriptor-arena.md)
 - [Typed schemaからのLayout・Set・Pool容量の論理計画](VSL/typed-descriptor-plan.md)
+- [所有参照・root間の依存graph・descriptor更新のcommit](VSL/owner-dependencies.md)
 - [AHO Bufferのsnapshot・固定import・可変arena世代](AHO/arena-buffer.md)
 - [Image／Samplerの共通backend・所有・使用状態](VSL/image-sampler-backend.md)

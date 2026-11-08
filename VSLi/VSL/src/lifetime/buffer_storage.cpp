@@ -1,4 +1,5 @@
 #include <VSL/lifetime/buffer_storage.hpp>
+#include <VSL/lifetime/owner_access.hpp>
 #include <new>
 
 namespace VSL_NAMESPACE::lifetime {
@@ -6,6 +7,7 @@ namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_nothrow_default_constructible_v<ResourceUseState>);
     namespace {
         struct HeapBufferOwner {
+            DependencyNode node;
             LogicalDeviceAccessor device;
             alignas(BufferSlotStorage) std::byte storage[sizeof(BufferSlotStorage)];
             HeapBufferOwner(LogicalDeviceAccessor device, const BufferCreateInfo& info);
@@ -15,6 +17,7 @@ namespace VSL_NAMESPACE::lifetime {
             construct_buffer(storage, device, info);
         }
         HeapBufferOwner::~HeapBufferOwner() {
+            node.retire();
             destroy_buffer(storage);
         }
     } // namespace
@@ -50,6 +53,6 @@ namespace VSL_NAMESPACE::lifetime {
     std::shared_ptr<impl::BufferImpl> make_heap_buffer(LogicalDeviceAccessor device, const BufferCreateInfo& info) {
         auto owner = std::make_shared<HeapBufferOwner>(device, info);
         auto* buffer = buffer_at(owner->storage).data;
-        return {std::move(owner), buffer};
+        return detail::publish_leaf(std::move(owner), buffer);
     }
 } // namespace VSL_NAMESPACE::lifetime

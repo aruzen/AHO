@@ -1,10 +1,12 @@
 #include <VSL/lifetime/buffer_arena.hpp>
 #include <VSL/lifetime/buffer_storage.hpp>
 #include <VSL/storage/cpu_region.hpp>
+#include <VSL/lifetime/dependency_node.hpp>
 
 namespace VSL_NAMESPACE::lifetime {
     namespace {
         struct ArenaOwner {
+            DependencyNode node;
             LogicalDeviceAccessor device;
             std::shared_ptr<storage::detail::CPURegion> memory;
             std::byte* base;
@@ -41,6 +43,7 @@ namespace VSL_NAMESPACE::lifetime {
             base = nullptr;
         }
         ArenaOwner::~ArenaOwner() {
+            node.retire();
             clear();
         }
     } // namespace
@@ -49,6 +52,9 @@ namespace VSL_NAMESPACE::lifetime {
                              std::shared_ptr<storage::detail::CPURegion> memory) {
         storage::detail::require_buffer_layout(std::integral_constant<std::uint64_t, storage::BUFFER_LAYOUT_ABI>{});
         auto owner = std::make_shared<ArenaOwner>(device, buffers, std::move(memory));
+        owner->node.publish(owner);
+        for (size_t slot = 0; slot < owner->constructed; ++slot)
+            buffer_at(owner->base + storage::BufferLayout::Offset(slot)).data->owner_node = &owner->node;
         _base = owner->base;
         _count = owner->constructed;
         _owner = std::move(owner);

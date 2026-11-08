@@ -1,5 +1,6 @@
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/submission_retention.hpp>
+#include <VSL/lifetime/owner_access.hpp>
 #include <VSL/operation/descriptor_ops.hpp>
 #include <VSL/exceptions.hpp>
 #include <algorithm>
@@ -7,40 +8,91 @@
 #include <stdexcept>
 
 namespace VSL_NAMESPACE::lifetime {
-    void DescriptorOwnerContext::normalize(std::vector<std::shared_ptr<void>>& owners) const {
-        const auto root = self.lock();
-        if (!root.use_count() || !dependencies)
-            throw std::logic_error("Descriptor arena owner is not published");
-        for (const auto& owner : owners) {
+    namespace {
+        struct DescriptorMutation {
+            impl::GraphicResourceImpl& resource;
+            bool active = true;
+            explicit DescriptorMutation(impl::GraphicResourceImpl& resource);
+            ~DescriptorMutation() { finish(); }
+            void check(std::span<const impl::GraphicResourceImpl::BindingElement> elements) const;
+            void finish() noexcept;
+        };
+        void visit_elements(std::span<const impl::GraphicResourceImpl::BindingElement> elements, DependencyNode::EdgeVisitor visitor, void* context);
+        void visit_elements(std::span<const impl::GraphicResourceImpl::BindingElement> elements, DependencyNode::EdgeVisitor visitor, void* context) {
+            for (const auto& element : elements) {
+                for (const auto& owner : element.owners)
+                    visitor(context, owner);
+                for (const auto& owner : element.constraint.owners)
+                    visitor(context, owner);
+            }
+        }
+        DescriptorMutation::DescriptorMutation(impl::GraphicResourceImpl& resource) : resource(resource) {
+            if (resource.recording)
+                throw std::logic_error("Descriptor resource is already being changed");
+            if (resource.owner_context)
+                resource.owner_context->node.begin_update();
+            resource.recording = true;
+        }
+        void DescriptorMutation::check(std::span<const impl::GraphicResourceImpl::BindingElement> elements) const {
+            resource.use.require_idle();
+            require_descriptor_valid(resource);
+            if (resource.owner_context)
+                resource.owner_context->node.check_additions(&elements, [](const void* input, DependencyNode::EdgeVisitor visitor, void* context) {
+                    visit_elements(*static_cast<const std::span<const impl::GraphicResourceImpl::BindingElement>*>(input), visitor, context);
+                });
+        }
+        void DescriptorMutation::finish() noexcept {
+            if (!active)
+                return;
+            active = false;
+            resource.recording = false;
+            if (resource.owner_context)
+                resource.owner_context->node.end_update();
+        }
+    } // namespace
+    void DescriptorOwnerContext::normalize(std::vector<OwnerRef>& owners) const {
+        const auto root = node.owner_ref();
+        const auto borrowed = [&](const auto& owner) {
             const auto same = [&](const auto& known) { return !known.owner_before(owner) && !owner.owner_before(known); };
-            if (owner.use_count() && !same(root) && !std::ranges::any_of(*dependencies, same))
+            return same(root) || std::ranges::any_of(dependencies, same);
+        };
+        for (const auto& owner : owners) {
+            if (owner.use_count() && !borrowed(owner) && policy == DependencyPolicy::FIXED)
                 throw std::invalid_argument("Descriptor arena requires a declared external owner");
         }
-        owners.clear();
+        std::erase_if(owners, borrowed);
+    }
+    void visit_descriptor_edges(const impl::GraphicResourceImpl& resource, DependencyNode::EdgeVisitor visitor, void* context) {
+        for (const auto& [binding, elements] : resource.bindings)
+            visit_elements(elements, visitor, context);
     }
     impl::GraphicResourceImpl::BindingConstraint descriptor_constraint(const ResourceUse& use, const DescriptorOwnerContext* context) {
         impl::GraphicResourceImpl::BindingConstraint result;
         for (const auto& state : {use.state, use.constraint_state}) {
-            if (!state)
+            if (!state && !state.use_count())
                 continue;
             if (!state.use_count())
                 throw std::invalid_argument("Descriptor logical state requires an owning reference");
-            retain_resource(result.owners, state);
-            if (!std::ranges::contains(result.states, state.get()))
+            detail::retain_owner(result.owners, state);
+            if (state && !std::ranges::contains(result.states, state.get()))
                 result.states.push_back(state.get());
         }
-        retain_resource(result.owners, use.owner);
-        retain_resource(result.owners, use.constraint_owner);
+        detail::retain_owner(result.owners, use.owner);
+        detail::retain_owner(result.owners, use.constraint_owner);
         if (context)
             context->normalize(result.owners);
         return result;
     }
     void require_descriptor_valid(const impl::GraphicResourceImpl& resource) {
+        if (resource.owner_context && resource.owner_context->node.retiring())
+            throw std::logic_error("Descriptor ownership root has been retired");
         if (!resource.pool || !resource.pool->descriptor_pool || !resource.descriptor_set || resource.pool->retiring)
             throw std::logic_error("Descriptor resource has been destroyed");
     }
     void require_descriptor_idle(const impl::GraphicResourceImpl& resource) {
         require_descriptor_valid(resource);
+        if (resource.owner_context && resource.owner_context->node.updating())
+            throw std::logic_error("Descriptor ownership root is being updated");
         if (resource.recording)
             throw std::logic_error("Descriptor resource is being recorded");
         resource.use.require_idle();
@@ -93,11 +145,32 @@ namespace VSL_NAMESPACE::lifetime {
             elements[i].initialized = true;
             prepared[write.dstArrayElement + i] = std::move(elements[i]);
         }
-        // mapの確保もnative呼び出し前に終える。失敗しても既存要素は変更しない。
+        DescriptorMutation mutation(resource);
+        mutation.check(prepared);
+        // cycle検査と確保をnative前に済ませ、公開後に旧ownerを解放する。
         auto& target = resource.bindings.try_emplace(write.dstBinding).first->second;
         write.dstSet = resource.descriptor_set;
         write.descriptorCount = static_cast<std::uint32_t>(elements.size());
         operation::write_descriptor(resource.native_device, write);
         target.swap(prepared);
+        mutation.finish();
+    }
+    void replace_descriptor_constraints(impl::GraphicResourceImpl& resource, size_t binding, std::span<const ResourceUse> uses) {
+        require_descriptor_idle(resource);
+        if (!resource.layout)
+            throw std::logic_error("Descriptor layout metadata is unavailable");
+        const auto& point = resource.layout->layout_bindings.at(binding);
+        if (!point.descriptorCount && uses.empty())
+            return;
+        auto& elements = resource.bindings.at(point.binding);
+        if (uses.size() != elements.size())
+            throw std::invalid_argument("Descriptor constraint array size mismatch");
+        auto prepared = elements;
+        for (size_t i = 0; i < uses.size(); ++i)
+            prepared[i].constraint = descriptor_constraint(uses[i], resource.owner_context);
+        DescriptorMutation mutation(resource);
+        mutation.check(prepared);
+        elements.swap(prepared);
+        mutation.finish();
     }
 } // namespace VSL_NAMESPACE::lifetime

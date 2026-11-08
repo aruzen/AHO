@@ -11,6 +11,7 @@
 
 #include <VSL/vulkan/descriptor_set_manager.hpp>
 #include <VSL/lifetime/descriptor_storage.hpp>
+#include <VSL/lifetime/descriptor_bindings.hpp>
 
 namespace VSL_NAMESPACE::graphic_resource {
     ManagerInterface::ManagerInterface()
@@ -63,18 +64,26 @@ namespace {
             if (auto resource = entry.lock())
                 resources.push_back(std::move(resource));
         for (const auto& resource : resources) {
-            if (resource->recording)
+            if (resource->recording || (resource->owner_context && resource->owner_context->node.updating()))
                 throw std::logic_error("Descriptor resource is being recorded");
             resource->use.require_idle();
         }
     }
-    void release_descriptor_pool(const std::shared_ptr<VSL_NAMESPACE::impl::GraphicResourcePoolImpl>& data) {
+    template<typename Detach>
+    void release_descriptor_pool(const std::shared_ptr<VSL_NAMESPACE::impl::GraphicResourcePoolImpl>& data, Detach&& detach) {
+        std::vector<std::shared_ptr<VSL_NAMESPACE::impl::GraphicResourceImpl>> resources;
+        resources.reserve(data->resources.size());
+        for (const auto& entry : data->resources)
+            if (auto resource = entry.lock())
+                resources.push_back(std::move(resource));
+        std::vector<decltype(VSL_NAMESPACE::impl::GraphicResourceImpl::bindings)> previous(resources.size());
+        if (!detach())
+            return;
         VSL_NAMESPACE::operation::destroy_descriptor_pool(*data);
-        for (auto& entry : data->resources)
-            if (auto resource = entry.lock()) {
-                resource->descriptor_set = nullptr;
-                resource->bindings.clear();
-            }
+        for (size_t i = 0; i < resources.size(); ++i) {
+            resources[i]->descriptor_set = nullptr;
+            resources[i]->bindings.swap(previous[i]);
+        }
         data->resources.clear();
     }
 } // namespace
@@ -173,8 +182,7 @@ void VSL_NAMESPACE::graphic_resource::ExactAllocateManager::destroy(const VSL_NA
         return;
     const PoolRetirement retirement(*data);
     require_pool_idle(data);
-    if (std::erase(manager->pools, data) != 0)
-        release_descriptor_pool(data);
+    release_descriptor_pool(data, [&] { return std::erase(manager->pools, data) != 0; });
 }
 
 VSL_NAMESPACE::graphic_resource::OverAllocateManager::OverAllocateManager(VSL_NAMESPACE::LogicalDeviceAccessor device,
@@ -224,8 +232,10 @@ void VSL_NAMESPACE::graphic_resource::OverAllocateManager::destroy(const VSL_NAM
         return;
     const PoolRetirement retirement(*data);
     require_pool_idle(data);
-    if (std::erase(manager->pools, data) == 0)
-        return;
-    std::erase_if(pools, [&](const auto& owned) { return owned.data_ == data; });
-    release_descriptor_pool(data);
+    release_descriptor_pool(data, [&] {
+        if (std::erase(manager->pools, data) == 0)
+            return false;
+        std::erase_if(pools, [&](const auto& owned) { return owned.data_ == data; });
+        return true;
+    });
 }

@@ -1,10 +1,12 @@
 #include <VSL/lifetime/sampler_storage.hpp>
+#include <VSL/lifetime/owner_access.hpp>
 #include <new>
 
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_nothrow_default_constructible_v<impl::SamplerImpl>);
     namespace {
         struct HeapSamplerOwner {
+            DependencyNode node;
             LogicalDeviceAccessor device;
             alignas(SamplerSlotStorage) std::byte storage[sizeof(SamplerSlotStorage)];
             HeapSamplerOwner(LogicalDeviceAccessor device, const SamplerCreateInfo& info);
@@ -14,6 +16,7 @@ namespace VSL_NAMESPACE::lifetime {
             construct_sampler(storage, device, info);
         }
         HeapSamplerOwner::~HeapSamplerOwner() {
+            node.retire();
             destroy_sampler(storage);
         }
     } // namespace
@@ -47,6 +50,6 @@ namespace VSL_NAMESPACE::lifetime {
     std::shared_ptr<impl::SamplerImpl> make_heap_sampler(LogicalDeviceAccessor device, const SamplerCreateInfo& info) {
         auto owner = std::make_shared<HeapSamplerOwner>(device, info);
         auto* sampler = &sampler_at(owner->storage);
-        return {std::move(owner), sampler};
+        return detail::publish_leaf(std::move(owner), sampler);
     }
 } // namespace VSL_NAMESPACE::lifetime

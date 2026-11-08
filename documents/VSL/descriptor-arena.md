@@ -103,7 +103,7 @@ macOS arm64／Clang20／C++26、ASan・UBSan、MoltenVK・Vulkan validationで�
 
 VSL789件中786成功・既知packed format3skip、AHO GPU140件・CPU1070件、compile契約175件成功。変更C++21ファイル／14TUのstrict違反は0。CMake276パス、MSBuild／filtersの新規2パスと重複も検査した。
 
-公開ヘッダーだけのinstalled consumer4targetがbuild／link／CPU実行でき、新LogicalUseStateの提供とprivate Impl非公開を確認した。Debug／Releaseの実定義assertとCPU利用、同寸法でも異artifactの混在時のlink拒否、x86_64 cross archiveも成功した。このarm64構成で6種を一つずつ配置したCPU領域は536 byte・alignment 8であり、GPUメモリ量ではない。
+公開ヘッダーだけのinstalled consumer4targetがbuild／link／CPU実行でき、新LogicalUseStateの提供とprivate Impl非公開を確認した。Debug／Releaseの実定義assertとCPU利用、同寸法でも異artifactの混在時のlink拒否、x86_64 cross archiveも成功した。5b時点のarm64構成で6種を一つずつ配置したCPU領域は536 byte・alignment 8だった。[所有依存graph](owner-dependencies.md)のnode pointer追加後は584 byteとなる。GPUメモリ量ではない。
 
 heap／arena両サンプルは3frame・12submission・2draw・238831更新画素・resizeとpipeline生成1回を維持し、PNG3枚が一致した。VUID／ASan／UBSan errorはなかった。AHOの非対応整数format blendingを意図的に拒否する既存テストでは、期待どおりdriver warningが出る。
 

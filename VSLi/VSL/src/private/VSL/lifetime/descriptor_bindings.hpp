@@ -1,13 +1,17 @@
 #pragma once
 #include <VSL/vulkan/_pimpls.hpp>
+#include <VSL/lifetime/dependency_node.hpp>
 
 namespace VSL_NAMESPACE::lifetime {
-    // arena内部はselfと構築時に固定した外部依存だけを借用する。
+    // 同rootと固定依存は借用し、可変依存はbinding metadataで所有する。
     struct DescriptorOwnerContext {
-        std::weak_ptr<void> self;
-        const std::vector<std::shared_ptr<void>>* dependencies = nullptr;
-        void normalize(std::vector<std::shared_ptr<void>>& owners) const;
+        DependencyNode node;
+        std::span<const OwnerRef> dependencies;
+        DependencyPolicy policy = DependencyPolicy::FIXED;
+        void normalize(std::vector<OwnerRef>& owners) const;
     };
+    void visit_descriptor_edges(const impl::GraphicResourceImpl& resource, DependencyNode::EdgeVisitor visitor, void* context);
+    void replace_descriptor_constraints(impl::GraphicResourceImpl& resource, size_t binding, std::span<const ResourceUse> uses);
     impl::GraphicResourceImpl::BindingConstraint descriptor_constraint(const ResourceUse& use, const DescriptorOwnerContext* context = nullptr);
     // 全検証とmetadataの準備を済ませてからnative更新し、要素範囲を一度にcommitする。
     void write_descriptor_binding(impl::GraphicResourceImpl& resource, vk::WriteDescriptorSet write,

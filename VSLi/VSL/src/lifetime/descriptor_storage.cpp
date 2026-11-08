@@ -1,5 +1,6 @@
 #include <VSL/lifetime/descriptor_storage.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
+#include <VSL/lifetime/owner_access.hpp>
 #include <new>
 #include <algorithm>
 #include <array>
@@ -11,45 +12,68 @@ namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_nothrow_default_constructible_v<impl::GraphicResourceImpl>);
     namespace {
         struct HeapDescriptorLayoutOwner {
+            DependencyNode node;
             LogicalDeviceAccessor device;
             alignas(DescriptorLayoutSlotStorage) std::byte storage[sizeof(DescriptorLayoutSlotStorage)];
             HeapDescriptorLayoutOwner(LogicalDeviceAccessor device, const DescriptorLayoutCreateInfo& info);
             ~HeapDescriptorLayoutOwner();
         };
         struct HeapDescriptorPoolOwner {
+            DependencyNode node;
             LogicalDeviceAccessor device;
             alignas(DescriptorPoolSlotStorage) std::byte storage[sizeof(DescriptorPoolSlotStorage)];
             HeapDescriptorPoolOwner(LogicalDeviceAccessor device, const DescriptorPoolCreateInfo& info);
             ~HeapDescriptorPoolOwner();
         };
         struct HeapDescriptorSetOwner {
-            std::shared_ptr<impl::GraphicResourcePoolImpl> pool;
-            std::shared_ptr<impl::ResourceBindingLayoutImpl> layout;
+            std::array<OwnerRef, 2> dependencies;
+            size_t dependency_count = 0;
+            DescriptorOwnerContext context;
             alignas(DescriptorSetSlotStorage) std::byte storage[sizeof(DescriptorSetSlotStorage)];
             HeapDescriptorSetOwner(std::shared_ptr<impl::GraphicResourcePoolImpl> pool, std::shared_ptr<impl::ResourceBindingLayoutImpl> layout);
             ~HeapDescriptorSetOwner();
+            void publish(const std::shared_ptr<HeapDescriptorSetOwner>& owner);
+            static void VisitDependencies(const void* input, DependencyNode::EdgeVisitor visitor, void* context);
         };
         HeapDescriptorLayoutOwner::HeapDescriptorLayoutOwner(LogicalDeviceAccessor device, const DescriptorLayoutCreateInfo& info) : device(device) {
             construct_descriptor_layout(storage, device, info);
         }
         HeapDescriptorLayoutOwner::~HeapDescriptorLayoutOwner() {
+            node.retire();
             destroy_descriptor_layout(storage);
         }
         HeapDescriptorPoolOwner::HeapDescriptorPoolOwner(LogicalDeviceAccessor device, const DescriptorPoolCreateInfo& info) : device(device) {
             construct_descriptor_pool(storage, device, info);
         }
         HeapDescriptorPoolOwner::~HeapDescriptorPoolOwner() {
+            node.retire();
             destroy_descriptor_pool(storage);
         }
         HeapDescriptorSetOwner::HeapDescriptorSetOwner(std::shared_ptr<impl::GraphicResourcePoolImpl> pool,
-                                                       std::shared_ptr<impl::ResourceBindingLayoutImpl> layout)
-            : pool(std::move(pool)), layout(std::move(layout)) {
-            if (!this->layout)
-                throw std::invalid_argument("Descriptor allocation requires a layout");
-            prepare_descriptor_set(storage, *this->pool, *this->layout);
+                                                       std::shared_ptr<impl::ResourceBindingLayoutImpl> layout) {
+            if (!pool || !pool.use_count() || !layout || !layout.use_count())
+                throw std::invalid_argument("Descriptor allocation requires owning pool and layout");
+            detail::retain_owner(dependencies, dependency_count, detail::owned_ref(pool, pool->owner_node));
+            detail::retain_owner(dependencies, dependency_count, detail::owned_ref(layout, layout->owner_node));
+            context.dependencies = std::span(dependencies).first(dependency_count);
+            context.policy = DependencyPolicy::DYNAMIC;
+            prepare_descriptor_set(storage, *pool, *layout);
         }
         HeapDescriptorSetOwner::~HeapDescriptorSetOwner() {
+            context.node.retire();
             destroy_descriptor_set(storage);
+        }
+        void HeapDescriptorSetOwner::publish(const std::shared_ptr<HeapDescriptorSetOwner>& owner) {
+            context.node.publish(owner, this, VisitDependencies);
+            auto& resource = descriptor_set_at(storage);
+            resource.owner_context = &context;
+            resource.owner_node = &context.node;
+        }
+        void HeapDescriptorSetOwner::VisitDependencies(const void* input, DependencyNode::EdgeVisitor visitor, void* output) {
+            const auto& root = *static_cast<const HeapDescriptorSetOwner*>(input);
+            for (const auto& owner : root.context.dependencies)
+                visitor(output, owner);
+            visit_descriptor_edges(descriptor_set_at(root.storage), visitor, output);
         }
     } // namespace
 
@@ -120,6 +144,9 @@ namespace VSL_NAMESPACE::lifetime {
     impl::GraphicResourceImpl& descriptor_set_at(void* storage) {
         return *std::launder(reinterpret_cast<impl::GraphicResourceImpl*>(static_cast<DescriptorSetSlotStorage*>(storage)->value));
     }
+    const impl::GraphicResourceImpl& descriptor_set_at(const void* storage) {
+        return *std::launder(reinterpret_cast<const impl::GraphicResourceImpl*>(static_cast<const DescriptorSetSlotStorage*>(storage)->value));
+    }
     void destroy_descriptor_set(void* storage) noexcept {
         std::destroy_at(&descriptor_set_at(storage));
         std::destroy_at(static_cast<DescriptorSetSlotStorage*>(storage));
@@ -127,13 +154,13 @@ namespace VSL_NAMESPACE::lifetime {
     std::shared_ptr<impl::ResourceBindingLayoutImpl> make_heap_descriptor_layout(LogicalDeviceAccessor device, const DescriptorLayoutCreateInfo& info) {
         auto owner = std::make_shared<HeapDescriptorLayoutOwner>(device, info);
         auto* layout = &descriptor_layout_at(owner->storage);
-        return {std::move(owner), layout};
+        return detail::publish_leaf(std::move(owner), layout);
     }
     std::shared_ptr<impl::GraphicResourcePoolImpl> make_heap_descriptor_pool(LogicalDeviceAccessor device, const DescriptorPoolCreateInfo& info) {
         auto owner = std::make_shared<HeapDescriptorPoolOwner>(device, info);
         auto* pool = &descriptor_pool_at(owner->storage);
         pool->owner = owner;
-        return {std::move(owner), pool};
+        return detail::publish_leaf(std::move(owner), pool);
     }
     std::pair<vk::Result, std::vector<std::shared_ptr<impl::GraphicResourceImpl>>> make_heap_descriptor_sets(
         const std::shared_ptr<impl::GraphicResourcePoolImpl>& pool, std::span<const std::shared_ptr<impl::ResourceBindingLayoutImpl>> layouts,
@@ -155,6 +182,7 @@ namespace VSL_NAMESPACE::lifetime {
         for (const auto& layout : layouts) {
             auto owner = std::make_shared<HeapDescriptorSetOwner>(pool, layout);
             auto* resource = &descriptor_set_at(owner->storage);
+            owner->publish(owner);
             resources.emplace_back(std::move(owner), resource);
             prepared.push_back(resource);
         }

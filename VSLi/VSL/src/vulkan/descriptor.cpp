@@ -11,6 +11,7 @@
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/operation/descriptor_ops.hpp>
 #include <VSL/lifetime/descriptor_storage.hpp>
+#include <VSL/lifetime/owner_access.hpp>
 #include <limits>
 
 #include <utility>
@@ -122,6 +123,9 @@ VSL_NAMESPACE::graphic_resource::Pool VSL_NAMESPACE::graphic_resource::Resource:
         throw std::logic_error("Descriptor pool owner is unavailable");
     return {{std::move(owner), resource->pool}};
 }
+VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::graphic_resource::Resource::owner_ref() const {
+    return lifetime::detail::owned_ref(data_, data_ ? data_->owner_node : nullptr);
+}
 
 void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::BufferAccessor* buffer, size_t binding, std::optional<Type> type,
                                                        size_t offset, std::optional<size_t> size) {
@@ -164,7 +168,7 @@ void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::BufferAcce
     descriptor_write.pTexelBufferView = nullptr; // Optional
 
     operation::validate_descriptor_buffer(*buffer->data_, descriptor_write.descriptorType, offset, range);
-    lifetime::write_descriptor_binding(*target, descriptor_write, {{{buffer->data_}, {buffer->data_->use}, {}}});
+    lifetime::write_descriptor_binding(*target, descriptor_write, {{{lifetime::detail::owned_ref(buffer->data_, buffer->data_->owner_node)}, {buffer->data_->use}, {}}});
 }
 
 void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::ImageAccessor image, size_t binding, std::optional<Type> type) {
@@ -205,7 +209,7 @@ found_type:
     descriptor_write.pTexelBufferView = nullptr; // Optional
 
     operation::validate_descriptor_image(*image.data_, descriptor_write.descriptorType);
-    lifetime::write_descriptor_binding(*target, descriptor_write, {{{image.data_}, {image.data_->use}, {}}});
+    lifetime::write_descriptor_binding(*target, descriptor_write, {{{lifetime::detail::owned_ref(image.data_, image.data_->owner_node)}, {image.data_->use}, {}}});
 }
 
 void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::ImageAccessor image, SamplerAccessor sampler,
@@ -247,10 +251,10 @@ found_type:
     descriptor_write.pTexelBufferView = nullptr; // Optional
 
     if (descriptor_write.descriptorType == vk::DescriptorType::eSampler) {
-        lifetime::write_descriptor_binding(*target, descriptor_write, {{{sampler.data_}, {sampler.data_->use}, {}}});
+        lifetime::write_descriptor_binding(*target, descriptor_write, {{{lifetime::detail::owned_ref(sampler.data_, sampler.data_->owner_node)}, {sampler.data_->use}, {}}});
         return;
     }
     operation::validate_descriptor_image(*image.data_, descriptor_write.descriptorType);
     lifetime::write_descriptor_binding(*target, descriptor_write,
-                                       {{{image.data_, sampler.data_}, {image.data_->use, sampler.data_->use}, {}}});
+                                       {{{lifetime::detail::owned_ref(image.data_, image.data_->owner_node), lifetime::detail::owned_ref(sampler.data_, sampler.data_->owner_node)}, {image.data_->use, sampler.data_->use}, {}}});
 }

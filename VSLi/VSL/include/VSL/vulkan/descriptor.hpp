@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "../define.hpp"
+#include "../lifetime/owner_ref.hpp"
 
 #include "device.hpp"
 #include "shader.hpp"
@@ -103,6 +104,7 @@ namespace VSL_NAMESPACE::graphic_resource {
 
     struct Resource {
         std::shared_ptr<impl::GraphicResourceImpl> data_;
+        lifetime::OwnerRef owner_ref() const;
 
         Pool get_pool();
 

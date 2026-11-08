@@ -258,6 +258,7 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct BufferImpl {
+        lifetime::DependencyNode* owner_node = nullptr;
         LogicalDeviceImpl* device = nullptr;
         vk::Device native_device;
         ResourceUseState* use = nullptr;
@@ -272,6 +273,7 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct ResourceBindingLayoutImpl {
+        lifetime::DependencyNode* owner_node = nullptr;
         LogicalDeviceImpl* device = nullptr;
         vk::Device native_device;
 
@@ -296,6 +298,7 @@ namespace VSL_NAMESPACE::impl {
 
     struct GraphicResourceImpl;
     struct GraphicResourcePoolImpl {
+        lifetime::DependencyNode* owner_node = nullptr;
         struct Capacity {
             std::uint32_t limit = 0, allocated = 0;
         };
@@ -316,17 +319,18 @@ namespace VSL_NAMESPACE::impl {
 
     struct GraphicResourceImpl {
         struct BindingConstraint {
-            std::vector<std::shared_ptr<void>> owners;
+            std::vector<lifetime::OwnerRef> owners;
             std::vector<ResourceUseState*> states;
         };
         struct BindingElement {
-            std::vector<std::shared_ptr<void>> owners;
+            std::vector<lifetime::OwnerRef> owners;
             // ownersに属する物理実体を借用する。論理制約も同じ要素で管理する。
             std::vector<ResourceUseState*> states;
             BindingConstraint constraint;
             bool initialized = false;
         };
         impl::GraphicResourcePoolImpl* pool = nullptr;
+        lifetime::DependencyNode* owner_node = nullptr;
         impl::ResourceBindingLayoutImpl* layout = nullptr;
         // private metadataを省略したviewでも、解放時の割当数は元layoutで戻す。
         impl::ResourceBindingLayoutImpl* allocation_layout = nullptr;
@@ -342,6 +346,7 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct ImageImpl {
+        lifetime::DependencyNode* owner_node = nullptr;
         LogicalDeviceImpl* device = nullptr;
         vk::Device native_device;
         ResourceUseState* use = nullptr;
@@ -356,6 +361,7 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct SamplerImpl {
+        lifetime::DependencyNode* owner_node = nullptr;
         LogicalDeviceImpl* device = nullptr;
         vk::Device native_device;
         ResourceUseState* use = nullptr;

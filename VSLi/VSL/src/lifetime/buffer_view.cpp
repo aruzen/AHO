@@ -1,5 +1,6 @@
 #include <VSL/lifetime/buffer_view.hpp>
 #include <VSL/operation/buffer_ops.hpp>
+#include <VSL/lifetime/owner_access.hpp>
 #include <cstring>
 
 namespace VSL_NAMESPACE {
@@ -48,12 +49,14 @@ namespace VSL_NAMESPACE {
         if (!destination.empty())
             std::memmove(destination.data(), source, destination.size());
     }
-    BufferView::BufferView(BufferRef ref, std::shared_ptr<void> owner, size_t offset, size_t bytes)
+    BufferView::BufferView(BufferRef ref, lifetime::OwnerRef owner, size_t offset, size_t bytes)
         : _ref(ref), _owner(std::move(owner)), _offset(offset), _bytes(bytes) {
         if (!_owner.use_count())
             throw std::invalid_argument("Buffer view requires an owner");
         if (!bytes || offset > ref.size() || bytes > ref.size() - offset)
             throw std::out_of_range("Buffer view range");
+        if (!_owner.managed())
+            _owner = lifetime::detail::owned_ref(_owner.share(), ref.data->owner_node);
     }
     BufferView BufferView::FromBuffer(const BufferAccessor& buffer) {
         return {{buffer.data_.get()}, buffer.data_, 0, buffer.requested_size()};

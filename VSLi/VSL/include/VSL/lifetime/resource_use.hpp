@@ -1,5 +1,6 @@
 #pragma once
 #include "../sync/resource_use_state.hpp"
+#include "owner_ref.hpp"
 
 namespace VSL_NAMESPACE {
     enum class ResourceRetention {
@@ -8,12 +9,12 @@ namespace VSL_NAMESPACE {
     };
     struct CommandBuffer;
     struct ResourceUse {
-        std::shared_ptr<ResourceUseState> state;
+        lifetime::OwnedRef<ResourceUseState> state;
         // stateやCompletionを含めず、使用する資源の世代を保持する。
-        std::shared_ptr<void> owner;
+        lifetime::OwnerRef owner;
         // 物理storage状態とは別に重ねる、AHO等の論理資源の制限。
-        std::shared_ptr<ResourceUseState> constraint_state;
-        std::shared_ptr<void> constraint_owner;
+        lifetime::OwnedRef<ResourceUseState> constraint_state;
+        lifetime::OwnerRef constraint_owner;
         static ResourceUse ForBuffer(const std::shared_ptr<impl::BufferImpl>& buffer, ResourceUse constraint);
         static ResourceUse ForImage(const std::shared_ptr<impl::ImageImpl>& image);
         static ResourceUse ForSampler(const std::shared_ptr<impl::SamplerImpl>& sampler);

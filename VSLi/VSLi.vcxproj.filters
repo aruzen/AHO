@@ -7,6 +7,8 @@
     <ClInclude Include="VSL\include\VSL\lifetime\typed_bundle_plan.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\lifetime\typed_resource_buffer_view.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\lifetime\resource_use.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\lifetime\logical_use_state.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClCompile Include="VSL\src\lifetime\logical_use_state.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\include\VSL\sync\resource_use_state.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\sync\completion.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\operation\buffer_create_info.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>

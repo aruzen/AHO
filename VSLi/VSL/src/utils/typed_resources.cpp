@@ -20,6 +20,28 @@ namespace VSL_NAMESPACE::typed::detail {
             throw std::logic_error("Typed descriptor resource has been destroyed");
         lifetime::require_descriptor_complete(*resource.data_);
     }
+    void validate_descriptor_resource(const GraphicResource& resource, LogicalDeviceAccessor device, std::span<const graphic_resource::BindingPoint> points) {
+        if (!resource.data_ || !resource.data_.use_count())
+            throw std::invalid_argument("Typed descriptor import requires a resource");
+        lifetime::require_descriptor_valid(*resource.data_);
+        const auto& target = *resource.data_;
+        if (!device.data_ || !device.data_.use_count() || target.pool->device != device.data_.get() || !target.layout || target.layout->layout_bindings.size() != points.size())
+            throw std::invalid_argument("Typed descriptor import device/layout mismatch");
+        for (const auto& point : points) {
+            const auto found = std::ranges::find(target.layout->layout_bindings, point.binding, &vk::DescriptorSetLayoutBinding::binding);
+            if (found == target.layout->layout_bindings.end() || found->descriptorType != vk::DescriptorType(point.binding_type) ||
+                found->descriptorCount != point.amount || found->stageFlags != vk::ShaderStageFlags(vk::ShaderStageFlagBits(point.shader_type)))
+                throw std::invalid_argument("Typed descriptor import binding mismatch");
+        }
+    }
+    GraphicResource allocate_descriptor_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager,
+                                            std::span<const graphic_resource::BindingPoint> points) {
+        graphic_resource::BindingLayout layout(device, std::vector<graphic_resource::BindingPoint>(points.begin(), points.end()));
+        auto [pools, resources] = manager.allocate({layout});
+        if (resources.size() != 1)
+            throw std::runtime_error("Typed descriptor allocation failed");
+        return std::move(resources.front());
+    }
     void write_descriptor(GraphicResource resource, graphic_resource::BindingPoint point, std::span<const DescriptorValue> values) {
         const auto& target = resource.data_;
         if (!target || !target->pool || !target->pool->descriptor_pool || !target->descriptor_set)
@@ -36,7 +58,7 @@ namespace VSL_NAMESPACE::typed::detail {
         using enum graphic_resource::Type;
         for (const auto& value : values) {
             impl::GraphicResourceImpl::BindingElement element;
-            element.constraint = descriptor_constraints(value);
+            element.constraint = lifetime::descriptor_constraint(descriptor_constraints(value));
             if (point.binding_type == UNIFORM_BUFFER || point.binding_type == STORAGE_BUFFER) {
                 if (!value.buffer || value.buffer->device != device)
                     throw std::invalid_argument("Typed descriptor buffer device/usage mismatch");

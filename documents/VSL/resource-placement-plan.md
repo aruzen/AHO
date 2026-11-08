@@ -1,6 +1,6 @@
 # 異種資源のCPU配置計画
 
-2026-11-08。[完了計画](arena-completion-plan.md)の順序1。Buffer／Image／Samplerの不透明なImpl型から正確な寸法を取得し、Typed側で配置を計算する。native生成とarena所有への接続は順序2で行う。
+2026-11-08。[完了計画](arena-completion-plan.md)の順序1。Buffer／Image／Samplerの不透明なImpl型から正確な寸法を取得し、Typed側で配置を計算する。native生成とarena所有への接続は順序2で行う。順序5bで[Layout／Pool／Setの寸法と配置](descriptor-arena.md)を追加した。
 
 ## 寸法とartifact
 
@@ -8,7 +8,7 @@
 
 `ResourceSlotLayout<Impl>`はImpl先頭と物理UseStateのoffset、slot全体のsize／alignmentを計算する。VSLの翻訳単位で、実際のBufferSlotStorage／ImageSlotStorage／SamplerSlotStorageとのsize・alignment・両field offsetをstatic assertする。将来Device等を加える際は、その資源に必要な状態に合わせてslotを定義し、UseStateを不要な型へ押し付けない。
 
-生成ヘッダーとbinaryの対応を表すRESOURCE_LAYOUT_ABIは、3種のImpl寸法・使用状態・private slotヘッダー・Vulkan C／C++ヘッダー・compiler・対象環境・構成・flags等から生成する。runtime plan構築／領域検査で対応symbolを要求する。constexprでの純計算にはbinaryを要求しない。次のResourceArenaも実構築入口で必ずruntime検査を行う。
+生成ヘッダーとbinaryの対応を表すRESOURCE_LAYOUT_ABIは、対象Impl寸法・使用状態・private slotヘッダー・Vulkan C／C++ヘッダー・compiler・対象環境・構成・flags等から生成する。runtime plan構築／領域検査で対応symbolを要求する。constexprでの純計算にはbinaryを要求しない。ResourceArenaも実構築入口で必ずruntime検査を行う。
 
 BufferLayout、既存の生成macro／ヘッダー名、既存Bufferのartifact guardは互換入口として残す。RESOURCE_LAYOUT_ABIは同じ生成artifactを表す。生成方式は引き続きVSL全体で必須。生成ヘッダーは構成ごとにinstallされ、consumerはCMake targetから選択情報を受け取る。
 

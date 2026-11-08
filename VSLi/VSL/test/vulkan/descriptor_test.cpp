@@ -1,6 +1,7 @@
 #include "support/compute_fixture.hpp"
 #include "support/scoped_environment.hpp"
 #include <VSL/utils/typed_safe_resource.hpp>
+#include <VSL/utils/typed_resources.hpp>
 #include <VSL/lifetime/descriptor_storage.hpp>
 namespace {
     enum class ImageReadBarrierMode {
@@ -532,5 +533,47 @@ namespace {
             EXPECT_NE(error.reason.find("Layout"), std::string::npos);
         }
         EXPECT_NO_THROW(resource.update(&*output, 0, vsl::graphic_resource::Type::STORAGE_BUFFER));
+        resource = {};
+        EXPECT_EQ(pool.data_->allocated_sets, 0u);
+        EXPECT_EQ(pool.data_->capacities.at(vk::DescriptorType::eStorageBuffer).allocated, 0u);
+        auto [success, allocated] = pool.bind(4, *binding);
+        ASSERT_TRUE(success);
+        ASSERT_EQ(allocated.size(), 4u);
+        resource = allocated.front();
+        resource.update(&*output);
+        ExpectSequence(execute(151), 151);
+    }
+    TEST_F(DescriptorVulkanIntegrationTest, DescriptorTypeCapacityRejectsOverflowWithoutChangingLiveSetsAndRecoversAfterFree) {
+        auto [success, extra] = pool.bind(3, *binding);
+        ASSERT_TRUE(success);
+        ASSERT_EQ(extra.size(), 3u);
+        EXPECT_EQ(pool.data_->allocated_sets, 4u);
+        const auto before = pool.data_->resources.size();
+        auto [overflow, rejected] = pool.bind(*binding);
+        EXPECT_FALSE(overflow);
+        EXPECT_FALSE(rejected.data_);
+        EXPECT_EQ(pool.data_->resources.size(), before);
+        EXPECT_EQ(pool.data_->allocated_sets, 4u);
+        ExpectSequence(execute(157), 157);
+        extra.clear();
+        EXPECT_EQ(pool.data_->allocated_sets, 1u);
+        auto [retried, replacement] = pool.bind(3, *binding);
+        EXPECT_TRUE(retried);
+        EXPECT_EQ(replacement.size(), 3u);
+    }
+    TEST_F(DescriptorVulkanIntegrationTest, ReservedZeroCountBindingsDoNotConsumeDescriptorCapacity) {
+        using namespace vsl::graphic_resource;
+        BindingLayout reserved(device, {{7, Type::STORAGE_BUFFER, static_cast<vsl::ShaderFlag>(0), 0}});
+        auto [empty_pool, allocated] = resources->make(std::vector{reserved});
+        ASSERT_EQ(allocated.size(), 1u);
+        EXPECT_TRUE(empty_pool.data_->capacities.empty());
+        EXPECT_EQ(empty_pool.data_->allocated_sets, 1u);
+        EXPECT_NO_THROW(vsl::typed::detail::require_descriptor_complete(allocated.front()));
+        auto group = vsl::ResourceUseGroup::ForDescriptor(1, allocated.front().data_);
+        EXPECT_NO_THROW(group->replace(0, {}));
+        EXPECT_THROW(allocated.front().update(&*output, 7), std::out_of_range);
+        group.reset();
+        allocated.clear();
+        EXPECT_EQ(empty_pool.data_->allocated_sets, 0u);
     }
 } // namespace

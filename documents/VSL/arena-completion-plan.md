@@ -78,6 +78,6 @@ descriptorは配置を始める前に、既存の使用状態と更新metadata�
 
 Layout数は宣言set数のResources::COUNT、Set数はshared／frameの実数、Poolはdescriptorを持つ寿命群ごととする。最大set番号＋1のSET_COUNTをSet実体数へ混ぜない。pipelineのhole用empty layoutは順序6で扱う。
 
-5aの実装契約は[Descriptorの共通使用状態](descriptor-state.md)を参照。5bの配置はまだ未実装である。
+5aの実装契約は[Descriptorの共通使用状態](descriptor-state.md)を参照。
 
-5bは[共通backendとheap所有の移行](descriptor-backend.md)を先に行い、続いて寸法生成・ResourceArenaへの配置を接続する。配置を公開する前にsame-rootの物理／論理ownerを借用へ正規化し、構築時に固定した依存以外のowner追加を拒否する。動的な依存graphは5cで扱う。
+5bは[共通backendとheap所有の移行](descriptor-backend.md)と[寸法生成・ResourceArenaへの配置](descriptor-arena.md)を実装した。同rootの物理／論理ownerを借用へ正規化し、構築時に固定した依存以外のowner追加を拒否する。次の5cで動的な依存graphとTyped schemaの自動配置へ接続する。

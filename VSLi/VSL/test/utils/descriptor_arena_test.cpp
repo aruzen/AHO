@@ -1,0 +1,414 @@
+#include "support/vulkan_fixture.hpp"
+#include <VSL/lifetime/resource_arena.hpp>
+#include <VSL/lifetime/descriptor_bindings.hpp>
+#include <VSL/lifetime/descriptor_storage.hpp>
+#include <VSL/utils/typed_compute.hpp>
+#include <VSL/vulkan/commands/image_upload.hpp>
+#include <VSL/vulkan/commands/image_readback.hpp>
+
+namespace {
+    namespace t = vsl::typed;
+    namespace l = vsl::lifetime;
+    namespace s = vsl::storage;
+    using enum s::ResourceKind;
+    using Set = t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>,
+                                 t::StorageBinding<1, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
+    using Schema = t::ResourceSchema<Set>;
+    using TypedSet = t::TypedDescriptorSet<Set>;
+    using Pipeline = t::TypedComputePipeline<Schema>;
+    using UniformView = t::TypedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>;
+    using StorageView = t::TypedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::STORAGE_BUFFER>;
+    constexpr std::array<t::ResourceRequest, 7> REQUESTS{{{{101}, DESCRIPTOR_SET}, {{102}, DESCRIPTOR_SET}, {{1}, BUFFER}, {{2}, BUFFER}, {{3}, BUFFER}, {{201}, DESCRIPTOR_LAYOUT}, {{202}, DESCRIPTOR_POOL}}};
+    constexpr t::ResourcePlan<7> PLAN(REQUESTS, {t::LifetimeScope::FRAME, 2});
+    const vsl::DescriptorLayoutCreateInfo LAYOUT_INFO{{Set::POINTS.begin(), Set::POINTS.end()}};
+    const vsl::DescriptorPoolCreateInfo POOL_INFO{{{vsl::graphic_resource::Type::UNIFORM_BUFFER, 2},
+                                                   {vsl::graphic_resource::Type::STORAGE_BUFFER, 2}},
+                                                  2};
+    std::array<l::ResourceInit, 7> inputs();
+    void write_value(const vsl::BufferView& buffer, std::uint32_t value);
+    std::uint32_t read_value(const vsl::BufferView& buffer);
+    void make_host_visible(vsl::CommandManager manager);
+    class DescriptorArenaVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+
+    protected:
+        Pipeline make_pipeline();
+    };
+
+    std::array<l::ResourceInit, 7> inputs() {
+        return {l::DescriptorSetInit{{202}, {201}}, l::DescriptorSetInit{{202}, {201}},
+                vsl::BufferCreateInfo{4, vsl::MemoryType::UNIFORM_BUFFER},
+                vsl::BufferCreateInfo{4, vsl::MemoryType::STORAGE_BUFFER},
+                vsl::BufferCreateInfo{4, vsl::MemoryType::STORAGE_BUFFER}, LAYOUT_INFO, POOL_INFO};
+    }
+    void write_value(const vsl::BufferView& buffer, std::uint32_t value) {
+        buffer.write(std::as_bytes(std::span(&value, 1)));
+    }
+    std::uint32_t read_value(const vsl::BufferView& buffer) {
+        std::uint32_t value = 0;
+        buffer.read_into(std::as_writable_bytes(std::span(&value, 1)));
+        return value;
+    }
+    void make_host_visible(vsl::CommandManager manager) {
+        const vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
+        auto buffer = manager.get_buffer();
+        buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
+            vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+    }
+    Pipeline DescriptorArenaVulkanIntegrationTest::make_pipeline() {
+        vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_frame.comp.spv"));
+        return {device, vsl::pipeline_layout::ShaderGroup("arena descriptors", {shader})};
+    }
+
+    TEST_F(DescriptorArenaVulkanIntegrationTest, ReorderedDependenciesAndTwoSetSlotsUseTypedCommandsAndOneOwner) {
+        const auto initializers = inputs();
+        l::ResourceArena arena(device, PLAN, initializers);
+        auto first = TypedSet::FromResource(device, arena.descriptor_set({101}), vsl::ResourceRetention::COMPLETION);
+        auto second = TypedSet::FromResource(device, arena.descriptor_set({102}), vsl::ResourceRetention::COMPLETION);
+        const auto root = arena.owner();
+        const auto base = reinterpret_cast<std::uintptr_t>(first.backend().data_.get()) - PLAN.placement({101}).offset;
+        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(second.backend().data_.get()) - base, PLAN.placement({102}).offset);
+        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(arena.descriptor_pool({202}).data_.get()) - base, PLAN.placement({202}).offset);
+        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(arena.descriptor_layout({201}).data_.get()) - base, PLAN.placement({201}).offset);
+        EXPECT_NE(&first.backend().data_->use, &second.backend().data_->use);
+        EXPECT_FALSE(first.backend().data_.owner_before(second.backend().data_));
+        EXPECT_FALSE(second.backend().data_.owner_before(first.backend().data_));
+        const auto uniform = UniformView::FromView(arena.buffer({1}), 1);
+        first.write<0>(uniform);
+        first.write<1>(StorageView::FromView(arena.buffer({2}), 1));
+        second.write<0>(uniform);
+        second.write<1>(StorageView::FromView(arena.buffer({3}), 1));
+        write_value(arena.buffer({1}), 37);
+        auto pipeline = make_pipeline();
+        auto manager = make_manager().independent(1);
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        phase << pipeline.bind_resources(first).dispatch(1) << pipeline.bind_resources(second).dispatch(1);
+        const auto& retained = phase.completion().data_->work.lock()->completion_resources;
+        EXPECT_EQ(std::ranges::count_if(retained, [&](const auto& owner) { return !root.owner_before(owner) && !owner.owner_before(root); }), 1);
+        make_host_visible(manager);
+        ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        ASSERT_TRUE(phase.completion().wait());
+        EXPECT_EQ(read_value(arena.buffer({2})), 37u);
+        EXPECT_EQ(read_value(arena.buffer({3})), 37u);
+        const auto pool = arena.descriptor_pool({202});
+        const auto from_set = arena.descriptor_set({101}).get_pool();
+        EXPECT_FALSE(pool.data_.owner_before(from_set.data_));
+        EXPECT_FALSE(from_set.data_.owner_before(pool.data_));
+        EXPECT_EQ(pool.data_->resources.size(), 2u);
+        using Wrong = t::DescriptorSet<0, t::UniformBinding<9, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
+        EXPECT_THROW(t::TypedDescriptorSet<Wrong>::FromResource(device, arena.descriptor_set({101})), std::invalid_argument);
+        EXPECT_THROW(TypedSet::FromResource({}, arena.descriptor_set({101})), std::invalid_argument);
+        const auto owned = arena.descriptor_set({101});
+        const vsl::GraphicResource borrowed{std::shared_ptr<vsl::impl::GraphicResourceImpl>(std::shared_ptr<void>{}, owned.data_.get())};
+        EXPECT_THROW(TypedSet::FromResource(device, borrowed), std::invalid_argument);
+        EXPECT_THROW(vsl::ResourceUseGroup::ForDescriptor(2, borrowed.data_), std::invalid_argument);
+        const vsl::LogicalDeviceAccessor borrowed_device{std::shared_ptr<vsl::impl::LogicalDeviceImpl>(std::shared_ptr<void>{}, device.data_.get())};
+        EXPECT_THROW(TypedSet::FromResource(borrowed_device, owned), std::invalid_argument);
+        EXPECT_THROW(l::ResourceArena(borrowed_device, PLAN, initializers), std::invalid_argument);
+    }
+
+    TEST_F(DescriptorArenaVulkanIntegrationTest, SameRootPhysicalAndLogicalAliasesAreBorrowedUntilCompletionOrCancellation) {
+        auto pipeline = make_pipeline();
+        for (const bool cancel : {false, true}) {
+            auto manager = make_manager().independent(1);
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            std::weak_ptr<void> observed;
+            {
+                const auto initializers = inputs();
+                l::ResourceArena arena(device, PLAN, initializers);
+                observed = arena.owner();
+                write_value(arena.buffer({1}), 41);
+                auto set = TypedSet::FromResource(device, arena.descriptor_set({101}), vsl::ResourceRetention::COMPLETION);
+                set.write<0>(UniformView::FromView(arena.buffer({1}), 1, 0, arena.buffer({3}).resource_use()));
+                set.write<1>(StorageView::FromView(arena.buffer({2}), 1));
+                const auto& element = set.backend().data_->bindings.at(0).front();
+                EXPECT_TRUE(element.owners.empty());
+                EXPECT_TRUE(element.constraint.owners.empty());
+                EXPECT_EQ(element.constraint.states.size(), 1u);
+                phase << pipeline.bind_resources(set).dispatch(1);
+                EXPECT_TRUE(arena.borrow_buffer({3}).use().busy());
+            }
+            EXPECT_FALSE(observed.expired());
+            if (cancel)
+                phase.cancel();
+            else {
+                ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+                ASSERT_TRUE(phase.completion().wait());
+            }
+            EXPECT_TRUE(observed.expired());
+        }
+    }
+
+    TEST_F(DescriptorArenaVulkanIntegrationTest, IndependentLogicalDependenciesAndUnknownOwnerRejectionPreserveGPUData) {
+        std::optional<l::ResourceArena> arena;
+        std::optional<TypedSet> set;
+        std::weak_ptr<vsl::ResourceUseState> logical;
+        {
+            const std::array dependencies{l::LogicalUseState{}};
+            logical = dependencies.front().resource_use().state;
+            const auto initializers = inputs();
+            arena.emplace(device, PLAN, initializers, s::ArenaMemory(PLAN.bytes(), PLAN.alignment()), dependencies);
+            set.emplace(TypedSet::FromResource(device, arena->descriptor_set({101}), vsl::ResourceRetention::COMPLETION));
+            set->write<0>(UniformView::FromView(arena->buffer({1}), 1, 0, dependencies.front().resource_use()));
+            set->write<1>(StorageView::FromView(arena->buffer({2}), 1));
+            write_value(arena->buffer({1}), 53);
+        }
+        EXPECT_FALSE(logical.expired());
+        auto unknown = std::make_shared<vsl::ResourceUseState>();
+        t::TypedUniformBuffer<std::uint32_t> external(device, std::uint32_t{99});
+        EXPECT_THROW(set->write<0>(external), std::invalid_argument);
+        auto native = set->backend();
+        EXPECT_THROW(native.update(&external.backend()), std::invalid_argument);
+        EXPECT_THROW(set->write<0>(UniformView::FromView(arena->buffer({1}), 1, 0, {unknown, {}})), std::invalid_argument);
+        EXPECT_THROW(set->resource_use()->replace(0, {{unknown, {}}}), std::invalid_argument);
+        EXPECT_NO_THROW(set->require_complete());
+        auto manager = make_manager().independent(1);
+        auto pipeline = make_pipeline();
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        phase << pipeline.bind_resources(*set).dispatch(1);
+        EXPECT_TRUE(logical.lock()->busy());
+        EXPECT_FALSE(unknown->busy());
+        make_host_visible(manager);
+        ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        ASSERT_TRUE(phase.completion().wait());
+        EXPECT_EQ(read_value(arena->buffer({2})), 53u);
+        native = {};
+        set.reset();
+        arena.reset();
+        EXPECT_TRUE(logical.expired());
+    }
+
+    TEST_F(DescriptorArenaVulkanIntegrationTest, DeclaredExternalStorageSurvivesWrapperDestructionAndBindingReplacement) {
+        constexpr std::array<t::ResourceRequest, 8> requests{{{{101}, DESCRIPTOR_SET}, {{102}, DESCRIPTOR_SET}, {{1}, BUFFER}, {{2}, BUFFER}, {{3}, BUFFER}, {{201}, DESCRIPTOR_LAYOUT}, {{202}, DESCRIPTOR_POOL}, {{9}, BUFFER, true}}};
+        const t::ResourcePlan<8> plan(requests);
+        std::optional<l::ResourceArena> arena;
+        std::optional<TypedSet> set;
+        std::weak_ptr<vsl::impl::BufferImpl> external_owner;
+        {
+            t::TypedUniformBuffer<std::uint32_t> external(device, std::uint32_t{61});
+            external_owner = external.backend().data_;
+            const auto base = inputs();
+            const std::array<l::ResourceInit, 8> initializers{base[0], base[1], base[2], base[3], base[4], base[5], base[6],
+                                                              vsl::BufferView::FromBuffer(external.backend())};
+            arena.emplace(device, plan, initializers);
+            set.emplace(TypedSet::FromResource(device, arena->descriptor_set({101}), vsl::ResourceRetention::COMPLETION));
+            set->write<0>(UniformView::FromView(arena->buffer({9}), 1));
+            set->write<1>(StorageView::FromView(arena->buffer({2}), 1));
+        }
+        EXPECT_FALSE(external_owner.expired());
+        auto manager = make_manager().independent(1);
+        auto pipeline = make_pipeline();
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << pipeline.bind_resources(*set).dispatch(1);
+            make_host_visible(manager);
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            ASSERT_TRUE(phase.completion().wait());
+        }
+        EXPECT_EQ(read_value(arena->buffer({2})), 61u);
+        set->write<0>(UniformView::FromView(arena->buffer({1}), 1));
+        EXPECT_FALSE(external_owner.expired());
+        set.reset();
+        arena.reset();
+        EXPECT_TRUE(external_owner.expired());
+    }
+
+    TEST_F(DescriptorArenaVulkanIntegrationTest, ImportedPoolTracksEverySetAndInvalidatesMetadataOnlyAfterAllUsesFinish) {
+        vsl::GraphicResourceManager manager(device);
+        vsl::graphic_resource::BindingLayout layout(device, LAYOUT_INFO.bindings);
+        auto pool = manager.make(POOL_INFO.descriptors);
+        constexpr std::array<t::ResourceRequest, 6> requests{{{{101}, DESCRIPTOR_SET}, {{102}, DESCRIPTOR_SET}, {{201}, DESCRIPTOR_LAYOUT, true}, {{202}, DESCRIPTOR_POOL, true}, {{1}, BUFFER}, {{2}, BUFFER}}};
+        const t::ResourcePlan<6> plan(requests);
+        const std::array<l::ResourceInit, 6> initializers{l::DescriptorSetInit{{202}, {201}}, l::DescriptorSetInit{{202}, {201}}, layout, pool,
+                                                          vsl::BufferCreateInfo{4, vsl::MemoryType::UNIFORM_BUFFER},
+                                                          vsl::BufferCreateInfo{4, vsl::MemoryType::STORAGE_BUFFER}};
+        l::ResourceArena arena(device, plan, initializers);
+        auto first = TypedSet::FromResource(device, arena.descriptor_set({101}), vsl::ResourceRetention::COMPLETION);
+        auto second = TypedSet::FromResource(device, arena.descriptor_set({102}), vsl::ResourceRetention::COMPLETION);
+        for (auto* set : {&first, &second}) {
+            set->write<0>(UniformView::FromView(arena.buffer({1}), 1));
+            set->write<1>(StorageView::FromView(arena.buffer({2}), 1));
+        }
+        EXPECT_EQ(pool.data_->resources.size(), 2u);
+        EXPECT_EQ(pool.data_->allocated_sets, 2u);
+        const auto imported_pool = arena.descriptor_pool({202});
+        EXPECT_FALSE(imported_pool.data_.owner_before(pool.data_));
+        EXPECT_FALSE(pool.data_.owner_before(imported_pool.data_));
+        auto commands = make_manager().independent(1), other = commands.independent(1);
+        auto pending = commands.start_phase<vsl::ComputePhase>();
+        auto submitted = other.start_phase<vsl::ComputePhase>();
+        first.resource_use()->record(commands.get_buffer());
+        second.resource_use()->record(other.get_buffer());
+        ASSERT_EQ(submitted.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        ASSERT_TRUE(submitted.completion().wait());
+        EXPECT_THROW(manager.destroy(pool), std::logic_error);
+        EXPECT_NO_THROW(first.require_complete());
+        pending.cancel();
+        EXPECT_NO_THROW(manager.destroy(pool));
+        EXPECT_EQ(pool.data_->allocated_sets, 0u);
+        EXPECT_FALSE(first.backend().data_->descriptor_set);
+        EXPECT_FALSE(second.backend().data_->descriptor_set);
+        EXPECT_TRUE(first.backend().data_->bindings.empty());
+        EXPECT_TRUE(second.backend().data_->bindings.empty());
+        EXPECT_THROW(first.require_complete(), std::logic_error);
+        EXPECT_THROW(second.resource_use()->record(other.get_buffer()), std::logic_error);
+    }
+
+    TEST_F(DescriptorArenaVulkanIntegrationTest, LaterSetCapacityFailureRollsBackNativeAllocationAndRegionBeforeRetry) {
+        auto info = POOL_INFO;
+        vsl::graphic_resource::Pool pool{l::make_heap_descriptor_pool(device, info)};
+        vsl::graphic_resource::BindingLayout layout(device, LAYOUT_INFO.bindings);
+        auto [allocated, occupied] = pool.bind(layout);
+        ASSERT_TRUE(allocated);
+        ASSERT_EQ(pool.data_->allocated_sets, 1u);
+        constexpr std::array<t::ResourceRequest, 4> requests{{{{101}, DESCRIPTOR_SET}, {{102}, DESCRIPTOR_SET}, {{201}, DESCRIPTOR_LAYOUT, true}, {{202}, DESCRIPTOR_POOL, true}}};
+        const t::ResourcePlan<4> plan(requests);
+        const std::array<l::ResourceInit, 4> initializers{l::DescriptorSetInit{{202}, {201}}, l::DescriptorSetInit{{202}, {201}}, layout, pool};
+        s::ArenaMemory memory(plan.bytes(), plan.alignment());
+        EXPECT_THROW((l::ResourceArena(device, plan, initializers, memory)), std::runtime_error);
+        EXPECT_EQ(pool.data_->allocated_sets, 1u);
+        EXPECT_EQ(pool.data_->resources.size(), 1u);
+        EXPECT_TRUE(occupied.data_->descriptor_set);
+        occupied = {};
+        EXPECT_EQ(pool.data_->allocated_sets, 0u);
+        {
+            l::ResourceArena retried(device, plan, initializers, memory);
+            EXPECT_EQ(pool.data_->allocated_sets, 2u);
+            EXPECT_EQ(pool.data_->resources.size(), 2u);
+            EXPECT_TRUE(retried.descriptor_set({101}).data_->descriptor_set);
+            EXPECT_TRUE(retried.descriptor_set({102}).data_->descriptor_set);
+        }
+        EXPECT_EQ(pool.data_->allocated_sets, 0u);
+        auto wrong = initializers;
+        wrong[1] = l::DescriptorSetInit{{201}, {202}};
+        EXPECT_THROW((l::ResourceArena(device, plan, wrong, memory)), std::invalid_argument);
+        EXPECT_EQ(pool.data_->allocated_sets, 0u);
+        EXPECT_NO_THROW((l::ResourceArena(device, plan, initializers, memory)));
+    }
+
+    TEST_F(DescriptorArenaVulkanIntegrationTest, ImportedPoolGetterDoesNotRetainTheSetArenaAndRemainsReusable) {
+        vsl::GraphicResourceManager manager(device);
+        vsl::graphic_resource::BindingLayout layout(device, LAYOUT_INFO.bindings);
+        auto pool = manager.make(POOL_INFO.descriptors);
+        constexpr std::array<t::ResourceRequest, 3> requests{{{{101}, DESCRIPTOR_SET}, {{201}, DESCRIPTOR_LAYOUT, true}, {{202}, DESCRIPTOR_POOL, true}}};
+        const t::ResourcePlan<3> plan(requests);
+        const std::array<l::ResourceInit, 3> initializers{l::DescriptorSetInit{{202}, {201}}, layout, pool};
+        vsl::graphic_resource::Pool retained;
+        std::weak_ptr<void> observed;
+        {
+            l::ResourceArena arena(device, plan, initializers);
+            observed = arena.owner();
+            auto set = arena.descriptor_set({101});
+            retained = set.get_pool();
+            EXPECT_FALSE(retained.data_.owner_before(pool.data_));
+            EXPECT_FALSE(pool.data_.owner_before(retained.data_));
+        }
+        EXPECT_TRUE(observed.expired());
+        EXPECT_EQ(pool.data_->allocated_sets, 0u);
+        auto [success, resource] = retained.bind(layout);
+        EXPECT_TRUE(success);
+        EXPECT_TRUE(resource.data_->descriptor_set);
+    }
+
+    TEST_F(DescriptorArenaVulkanIntegrationTest, SameRootImageAndSamplerBindingsDoNotKeepTheArenaAlive) {
+        using Textures = t::DescriptorSet<0, t::TextureBinding<2, vsl::ShaderFlag::COMPUTE>>;
+        constexpr std::array<t::ResourceRequest, 5> requests{{{{1}, DESCRIPTOR_SET}, {{2}, IMAGE}, {{3}, SAMPLER}, {{4}, DESCRIPTOR_LAYOUT}, {{5}, DESCRIPTOR_POOL}}};
+        const t::ResourcePlan<5> plan(requests);
+        const vsl::DescriptorLayoutCreateInfo layout{{Textures::POINTS.begin(), Textures::POINTS.end()}};
+        const vsl::DescriptorPoolCreateInfo pool{{{vsl::graphic_resource::Type::COMBINED_IMAGE_SAMPLER, 1}}, 1};
+        const std::array<l::ResourceInit, 5> initializers{l::DescriptorSetInit{{5}, {4}},
+                                                          vsl::ImageCreateInfo{vsl::ImageType::SAMPLED, 1, 1},
+                                                          vsl::SamplerCreateInfo{}, layout, pool};
+        auto manager = make_manager().independent(1);
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        std::weak_ptr<void> observed;
+        {
+            l::ResourceArena arena(device, plan, initializers);
+            observed = arena.owner();
+            auto set = t::TypedDescriptorSet<Textures>::FromResource(device, arena.descriptor_set({1}), vsl::ResourceRetention::COMPLETION);
+            set.write<2>(t::TypedTexture(arena.image({2}), arena.sampler({3})));
+            EXPECT_TRUE(set.backend().data_->bindings.at(2).front().owners.empty());
+            set.resource_use()->record(manager.get_buffer());
+            EXPECT_TRUE(arena.image({2}).use_state().busy());
+            EXPECT_TRUE(arena.sampler({3}).use_state().busy());
+        }
+        EXPECT_FALSE(observed.expired());
+        phase.cancel();
+        EXPECT_TRUE(observed.expired());
+    }
+
+    TEST_F(DescriptorArenaVulkanIntegrationTest, ReorderedNativeBindingsImportAndKeepLegacyConstraintIndicesInNativeOrder) {
+        auto initializers = inputs();
+        auto layout = LAYOUT_INFO;
+        std::ranges::reverse(layout.bindings);
+        initializers[5] = layout;
+        const std::array dependencies{l::LogicalUseState{}, l::LogicalUseState{}};
+        l::ResourceArena arena(device, PLAN, initializers, s::ArenaMemory(PLAN.bytes(), PLAN.alignment()), dependencies);
+        auto set = TypedSet::FromResource(device, arena.descriptor_set({101}), vsl::ResourceRetention::COMPLETION);
+        set.write<0>(UniformView::FromView(arena.buffer({1}), 1, 0, dependencies[0].resource_use()));
+        set.write<1>(StorageView::FromView(arena.buffer({2}), 1, 0, dependencies[0].resource_use()));
+        set.resource_use()->replace(0, {dependencies[1].resource_use()});
+        EXPECT_EQ(set.backend().data_->bindings.at(0).front().constraint.states.front(), dependencies[0].resource_use().state.get());
+        EXPECT_EQ(set.backend().data_->bindings.at(1).front().constraint.states.front(), dependencies[1].resource_use().state.get());
+        write_value(arena.buffer({1}), 73);
+        auto pipeline = make_pipeline();
+        auto manager = make_manager().independent(1);
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        phase << pipeline.bind_resources(set).dispatch(1);
+        EXPECT_TRUE(dependencies[0].busy());
+        EXPECT_TRUE(dependencies[1].busy());
+        make_host_visible(manager);
+        ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        ASSERT_TRUE(phase.completion().wait());
+        EXPECT_EQ(read_value(arena.buffer({2})), 73u);
+    }
+
+    TEST_F(DescriptorArenaVulkanIntegrationTest, CombinedAndSeparateArenaDescriptorsSampleUploadedPixelsAndReadBack) {
+        using SampleSet = t::DescriptorSet<0, t::StorageBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>,
+                                           t::TextureBinding<1, vsl::ShaderFlag::COMPUTE>,
+                                           t::DescriptorBinding<2, vsl::graphic_resource::Type::SAMPLED_IMAGE, vsl::ShaderFlag::COMPUTE>,
+                                           t::DescriptorBinding<3, vsl::graphic_resource::Type::SAMPLER, vsl::ShaderFlag::COMPUTE>>;
+        constexpr std::array<t::ResourceRequest, 6> requests{{{{1}, DESCRIPTOR_SET}, {{2}, BUFFER}, {{3}, IMAGE}, {{4}, SAMPLER}, {{5}, DESCRIPTOR_LAYOUT}, {{6}, DESCRIPTOR_POOL}}};
+        const t::ResourcePlan<6> plan(requests);
+        const vsl::DescriptorLayoutCreateInfo layout{{SampleSet::POINTS.begin(), SampleSet::POINTS.end()}};
+        const vsl::DescriptorPoolCreateInfo pool{{{vsl::graphic_resource::Type::STORAGE_BUFFER, 1},
+                                                  {vsl::graphic_resource::Type::COMBINED_IMAGE_SAMPLER, 1},
+                                                  {vsl::graphic_resource::Type::SAMPLED_IMAGE, 1},
+                                                  {vsl::graphic_resource::Type::SAMPLER, 1}},
+                                                 1};
+        const std::array<l::ResourceInit, 6> initializers{l::DescriptorSetInit{{6}, {5}}, vsl::BufferCreateInfo{8, vsl::MemoryType::STORAGE_BUFFER},
+                                                          vsl::ImageCreateInfo{vsl::ImageType::SAMPLED | vsl::ImageType::TRANSFER_DST | vsl::ImageType::TRANSFER_SRC,
+                                                                               1, 1, vsl::data_format::UNSIGNED_NORMALIZED8_RGBA},
+                                                          vsl::SamplerCreateInfo{vsl::SamplingMode::NEAREST, vsl::EdgeMode::CLAMP_TO_EDGE}, layout, pool};
+        std::weak_ptr<void> observed;
+        const std::array<std::uint8_t, 4> color{37, 83, 0, 255};
+        vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_arena_images.comp.spv"));
+        t::TypedComputePipeline<t::ResourceSchema<SampleSet>> pipeline(device, vsl::pipeline_layout::ShaderGroup("placed sampling", {shader}));
+        {
+            auto manager = make_manager().independent(1);
+            l::ResourceArena arena(device, plan, initializers);
+            observed = arena.owner();
+            auto set = t::TypedDescriptorSet<SampleSet>::FromResource(device, arena.descriptor_set({1}), vsl::ResourceRetention::COMPLETION);
+            set.write<0>(StorageView::FromView(arena.buffer({2}), 2));
+            set.write<1>(t::TypedTexture(arena.image({3}), arena.sampler({4})));
+            set.write<2>(t::TypedSampledImage(arena.image({3})));
+            set.write<3>(t::TypedSampler(arena.sampler({4})));
+            vsl::StagingBuffer<> pixels(device, color);
+            vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION> readback(device, color.size());
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << vsl::command::ImageUpload(&pixels, arena.image({3}), vsl::ImageLayout::UNDEFINED)
+                  << pipeline.bind_resources(set).dispatch(1)
+                  << vsl::command::ImageReadback(&readback, arena.image({3}), vsl::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
+            make_host_visible(manager);
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            ASSERT_TRUE(phase.completion().wait());
+            std::array<std::uint32_t, 2> values{};
+            arena.buffer({2}).read_into(std::as_writable_bytes(std::span(values)));
+            EXPECT_EQ(values, (std::array<std::uint32_t, 2>{37, 83}));
+            std::array<std::uint8_t, 4> actual{};
+            readback.read_into(std::as_writable_bytes(std::span(actual)));
+            EXPECT_EQ(actual, color);
+        }
+        EXPECT_TRUE(observed.expired());
+    }
+} // namespace

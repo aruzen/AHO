@@ -21,6 +21,9 @@ namespace VSL_NAMESPACE::typed {
         };
         ResourceUse descriptor_constraints(const DescriptorValue& value);
         void require_descriptor_complete(const GraphicResource& resource);
+        void validate_descriptor_resource(const GraphicResource& resource, LogicalDeviceAccessor device, std::span<const graphic_resource::BindingPoint> points);
+        GraphicResource allocate_descriptor_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager,
+                                                std::span<const graphic_resource::BindingPoint> points);
         void write_descriptor(GraphicResource resource, graphic_resource::BindingPoint point, std::span<const DescriptorValue> values);
         template<typename Binding, typename Value>
         consteval bool descriptor_matches();
@@ -115,11 +118,13 @@ namespace VSL_NAMESPACE::typed {
         GraphicResource _resource;
         LogicalDeviceAccessor _device;
         std::shared_ptr<ResourceUseGroup> _use;
+        TypedDescriptorSet(LogicalDeviceAccessor device, GraphicResource resource, ResourceRetention retention);
 
     public:
         using Spec = Spec_;
         using Layout = typename Spec::Layout;
         TypedDescriptorSet(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, ResourceRetention retention = ResourceRetention::SUBMISSION);
+        static TypedDescriptorSet FromResource(LogicalDeviceAccessor device, GraphicResource resource, ResourceRetention retention = ResourceRetention::SUBMISSION);
         const GraphicResource& backend() const { return _resource; }
         LogicalDeviceAccessor device() const { return _device; }
         const std::shared_ptr<ResourceUseGroup>& resource_use() const { return _use; }
@@ -210,13 +215,16 @@ namespace VSL_NAMESPACE::typed {
     }
     template<typename Spec>
     TypedDescriptorSet<Spec>::TypedDescriptorSet(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, ResourceRetention retention)
-        : _device(device) {
-        graphic_resource::BindingLayout layout(device, std::vector<graphic_resource::BindingPoint>(Spec::POINTS.begin(), Spec::POINTS.end()));
-        auto [pools, resources] = manager.allocate({layout});
-        if (resources.size() != 1)
-            throw std::runtime_error("Typed descriptor allocation failed");
-        _resource = resources.front();
+        : TypedDescriptorSet(device, detail::allocate_descriptor_set(device, manager, Spec::POINTS), retention) {}
+    template<typename Spec>
+    TypedDescriptorSet<Spec>::TypedDescriptorSet(LogicalDeviceAccessor device, GraphicResource resource, ResourceRetention retention)
+        : _resource(std::move(resource)), _device(device) {
+        detail::validate_descriptor_resource(_resource, device, Spec::POINTS);
         _use = ResourceUseGroup::ForDescriptor(Spec::BINDING_COUNT, _resource.data_, retention);
+    }
+    template<typename Spec>
+    TypedDescriptorSet<Spec> TypedDescriptorSet<Spec>::FromResource(LogicalDeviceAccessor device, GraphicResource resource, ResourceRetention retention) {
+        return TypedDescriptorSet(device, std::move(resource), retention);
     }
     template<typename Spec>
     void TypedDescriptorSet<Spec>::require_complete() const {

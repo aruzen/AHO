@@ -1,6 +1,6 @@
 # 異種ResourceArena
 
-2026-11-08。[完了計画](arena-completion-plan.md)の順序2。[ResourcePlan](resource-placement-plan.md)に従い、Buffer／Image／SamplerのImplと物理UseStateを同じCPU領域へ構築する。通常VSLと同じconstruct／operationを利用する。
+2026-11-08。[完了計画](arena-completion-plan.md)の順序2。[ResourcePlan](resource-placement-plan.md)に従い、Buffer／Image／SamplerのImplと物理UseStateを同じCPU領域へ構築する。通常VSLと同じconstruct／operationを利用する。順序5bで[Layout／Pool／Setの配置](descriptor-arena.md)も追加した。
 
 ```cpp
 #include <VSL/lifetime/resource_arena.hpp>
@@ -27,7 +27,7 @@ auto sampler = arena.sampler({3});
 
 ## 構築と破棄
 
-入力はexternalを含むplan.size()と同数・同順とし、kindとowned／externalの区別を一致させる。constexpr planも実構築時のABI／領域検査へ通す。型・owner・device等の外部入力検査を済ませ、領域をclaimしてからowned slotを宣言順に構築する。3資源間のnative生成依存はdeviceのみである。descriptor等の資源間依存は後続段階で明示的なDAGへ拡張する。
+入力はexternalを含むplan.size()と同数・同順とし、kindとowned／externalの区別を一致させる。constexpr planも実構築時のABI／領域検査へ通す。型・owner・device等の外部入力検査を済ませ、領域をclaimしてからSet以外、続いてSetをそれぞれ宣言順に構築する。Setは初期化情報の資源IDでPool／Layoutを参照する。後続の資源間依存は必要に応じて一般的なDAGへ拡張する。
 
 構築成功の記録に使う領域はclaim前に予約する。後続slotが失敗すると、成功したslotだけを逆順に破棄して自分のclaimを解除する。claim自体の失敗では、既存arenaの使用権を変更しない。最後のarena ownerが解放されるまで領域を再使用できない。
 

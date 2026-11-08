@@ -2,6 +2,7 @@
 #include <VSL/lifetime/buffer_storage.hpp>
 #include <VSL/lifetime/image_storage.hpp>
 #include <VSL/lifetime/sampler_storage.hpp>
+#include <VSL/lifetime/descriptor_storage.hpp>
 
 namespace VSL_NAMESPACE::storage {
     static_assert(sizeof(impl::BufferImpl) == ImplLayout<impl::BufferImpl>::SIZE);
@@ -10,6 +11,21 @@ namespace VSL_NAMESPACE::storage {
     static_assert(alignof(impl::ImageImpl) == ImplLayout<impl::ImageImpl>::ALIGNMENT);
     static_assert(sizeof(impl::SamplerImpl) == ImplLayout<impl::SamplerImpl>::SIZE);
     static_assert(alignof(impl::SamplerImpl) == ImplLayout<impl::SamplerImpl>::ALIGNMENT);
+    static_assert(sizeof(impl::ResourceBindingLayoutImpl) == ImplLayout<impl::ResourceBindingLayoutImpl>::SIZE);
+    static_assert(alignof(impl::ResourceBindingLayoutImpl) == ImplLayout<impl::ResourceBindingLayoutImpl>::ALIGNMENT);
+    static_assert(sizeof(impl::GraphicResourcePoolImpl) == ImplLayout<impl::GraphicResourcePoolImpl>::SIZE);
+    static_assert(alignof(impl::GraphicResourcePoolImpl) == ImplLayout<impl::GraphicResourcePoolImpl>::ALIGNMENT);
+    static_assert(sizeof(impl::GraphicResourceImpl) == ImplLayout<impl::GraphicResourceImpl>::SIZE);
+    static_assert(alignof(impl::GraphicResourceImpl) == ImplLayout<impl::GraphicResourceImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::DescriptorLayoutSlotStorage) == ResourceSlotLayout<impl::ResourceBindingLayoutImpl>::SIZE);
+    static_assert(alignof(lifetime::DescriptorLayoutSlotStorage) == ResourceSlotLayout<impl::ResourceBindingLayoutImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::DescriptorPoolSlotStorage) == ResourceSlotLayout<impl::GraphicResourcePoolImpl>::SIZE);
+    static_assert(alignof(lifetime::DescriptorPoolSlotStorage) == ResourceSlotLayout<impl::GraphicResourcePoolImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::DescriptorSetSlotStorage) == ResourceSlotLayout<impl::GraphicResourceImpl>::SIZE);
+    static_assert(alignof(lifetime::DescriptorSetSlotStorage) == ResourceSlotLayout<impl::GraphicResourceImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::ResourceBindingLayoutImpl>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(ResourceSlotLayout<impl::GraphicResourcePoolImpl>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(ResourceSlotLayout<impl::GraphicResourceImpl>::USE_OFFSET == NO_SEPARATE_USE);
     static_assert(sizeof(lifetime::BufferSlotStorage) == ResourceSlotLayout<impl::BufferImpl>::SIZE);
     static_assert(alignof(lifetime::BufferSlotStorage) == ResourceSlotLayout<impl::BufferImpl>::ALIGNMENT);
     static_assert(offsetof(lifetime::BufferSlotStorage, use) == ResourceSlotLayout<impl::BufferImpl>::USE_OFFSET);

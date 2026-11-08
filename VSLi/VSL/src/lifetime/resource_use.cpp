@@ -62,7 +62,7 @@ namespace VSL_NAMESPACE {
     ResourceUseGroup::ResourceUseGroup(size_t bindings, std::shared_ptr<void> owner)
         : _owner(std::move(owner)), _bindings(bindings) {}
     std::shared_ptr<ResourceUseGroup> ResourceUseGroup::ForDescriptor(size_t bindings, const std::shared_ptr<impl::GraphicResourceImpl>& resource, ResourceRetention retention) {
-        if (!resource)
+        if (!resource || !resource.use_count())
             throw std::invalid_argument("Descriptor use requires a resource");
         if (!resource->layout || resource->layout->layout_bindings.size() != bindings)
             throw std::invalid_argument("Descriptor use binding count mismatch");
@@ -86,13 +86,16 @@ namespace VSL_NAMESPACE {
             lifetime::require_descriptor_idle(*resource);
             if (!resource->layout)
                 throw std::logic_error("Descriptor layout metadata is unavailable");
-            const auto key = resource->layout->layout_bindings.at(binding).binding;
+            const auto& point = resource->layout->layout_bindings.at(binding);
+            if (!point.descriptorCount && resources.empty())
+                return;
+            const auto key = point.binding;
             auto& elements = resource->bindings.at(key);
             if (resources.size() != elements.size())
                 throw std::invalid_argument("Descriptor constraint array size mismatch");
             auto prepared = elements;
             for (size_t i = 0; i < resources.size(); ++i)
-                prepared[i].constraint = std::move(resources[i]);
+                prepared[i].constraint = lifetime::descriptor_constraint(resources[i], resource->owner_context);
             elements.swap(prepared);
             return;
         }

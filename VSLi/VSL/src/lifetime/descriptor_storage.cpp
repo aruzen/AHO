@@ -102,6 +102,7 @@ namespace VSL_NAMESPACE::lifetime {
         auto* resource = std::construct_at(reinterpret_cast<impl::GraphicResourceImpl*>(slot->value));
         resource->pool = &pool;
         resource->layout = &layout;
+        resource->allocation_layout = &layout;
         resource->native_device = pool.native_device;
     }
     void construct_descriptor_set(void* storage, impl::GraphicResourcePoolImpl& pool, impl::ResourceBindingLayoutImpl& layout) {

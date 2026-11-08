@@ -94,6 +94,11 @@ add_library(VSL STATIC
         VSL/src/private/VSL/lifetime/shader_storage.hpp
         VSL/src/lifetime/submission_retention.cpp
         VSL/src/lifetime/command_domain.cpp
+        VSL/include/VSL/operation/command_create_info.hpp
+        VSL/src/private/VSL/operation/command_ops.hpp
+        VSL/src/operation/command_ops.cpp
+        VSL/src/private/VSL/lifetime/command_storage.hpp
+        VSL/src/lifetime/command_storage.cpp
         VSL/src/private/VSL/lifetime/command_domain.hpp
         VSL/src/lifetime/buffer_arena.cpp
         VSL/src/lifetime/resource_arena.cpp

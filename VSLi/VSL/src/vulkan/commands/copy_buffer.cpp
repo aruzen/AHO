@@ -30,7 +30,7 @@ namespace VSL_NAMESPACE::command {
     void CopyBuffer::invoke(CommandPool, CommandBuffer buffer, CommandManager manager) {
         validate();
         if (!buffer.data_ || !buffer.data_->command_pool || !manager.data_ ||
-            buffer.data_->command_pool->device.get() != _source->device || manager.data_->device.get() != _source->device)
+            buffer.data_->command_pool->device != _source->device || manager.data_->device.get() != _source->device)
             throw std::invalid_argument("Buffer copy command device mismatch");
         const auto completion = buffer.completion();
         _source->use->check_available(completion);

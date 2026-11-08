@@ -74,7 +74,7 @@ void VSL_NAMESPACE::command::ChangeImageBarrier::invoke(VSL_NAMESPACE::CommandPo
         throw std::invalid_argument("Shader read stages require a transfer-destination to shader-read transition");
     if (!image.data_ || !image.data_->image || !buffer.data_ || !buffer.data_->command_pool || !manager.data_ ||
         image.data_->device != manager.data_->device.get() ||
-        buffer.data_->command_pool->device.get() != image.data_->device)
+        buffer.data_->command_pool->device != image.data_->device)
         throw std::invalid_argument("Image barrier requires an image and command buffer on the same device");
     if (base_layer >= image.data_->count)
         throw std::out_of_range("Image barrier base layer exceeds image");

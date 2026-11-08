@@ -8,8 +8,19 @@
 #include <VSL/lifetime/render_pass_storage.hpp>
 #include <VSL/lifetime/pipeline_storage.hpp>
 #include <VSL/lifetime/frame_buffer_storage.hpp>
+#include <VSL/lifetime/command_storage.hpp>
 
 namespace VSL_NAMESPACE::storage {
+    static_assert(sizeof(impl::CommandPoolImpl) == ImplLayout<impl::CommandPoolImpl>::SIZE);
+    static_assert(alignof(impl::CommandPoolImpl) == ImplLayout<impl::CommandPoolImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::CommandPoolSlotStorage) == ResourceSlotLayout<impl::CommandPoolImpl>::SIZE);
+    static_assert(alignof(lifetime::CommandPoolSlotStorage) == ResourceSlotLayout<impl::CommandPoolImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::CommandPoolImpl>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(sizeof(impl::CommandBufferImpl) == ImplLayout<impl::CommandBufferImpl>::SIZE);
+    static_assert(alignof(impl::CommandBufferImpl) == ImplLayout<impl::CommandBufferImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::CommandBufferSlotStorage) == ResourceSlotLayout<impl::CommandBufferImpl>::SIZE);
+    static_assert(alignof(lifetime::CommandBufferSlotStorage) == ResourceSlotLayout<impl::CommandBufferImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::CommandBufferImpl>::USE_OFFSET == NO_SEPARATE_USE);
     static_assert(sizeof(impl::FrameBufferImpl) == ImplLayout<impl::FrameBufferImpl>::SIZE);
     static_assert(alignof(impl::FrameBufferImpl) == ImplLayout<impl::FrameBufferImpl>::ALIGNMENT);
     static_assert(sizeof(lifetime::FrameBufferSlotStorage) == ResourceSlotLayout<impl::FrameBufferImpl>::SIZE);

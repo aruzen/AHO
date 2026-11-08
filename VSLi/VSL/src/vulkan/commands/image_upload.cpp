@@ -14,7 +14,7 @@ namespace VSL_NAMESPACE::command {
         if (current_layout != ImageLayout::UNDEFINED && current_layout != ImageLayout::SHADER_READ_ONLY_OPTIMAL)
             throw std::invalid_argument("ImageUpload requires UNDEFINED or SHADER_READ_ONLY_OPTIMAL layout");
         if (!buffer.data_ || !buffer.data_->command_pool || !manager.data_ ||
-            buffer.data_->command_pool->device.get() != copy.image.data_->device || manager.get_device() != copy.image.get_device())
+            buffer.data_->command_pool->device != copy.image.data_->device || manager.get_device() != copy.image.get_device())
             throw std::invalid_argument("ImageUpload command device mismatch");
         if (copy.layout != ImageLayout::TRANSFER_DST_OPTIMAL)
             throw std::invalid_argument("ImageUpload copy layout was modified");

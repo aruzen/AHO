@@ -12,6 +12,7 @@ namespace VSL_NAMESPACE::lifetime {
         bool returning_image = false;
         bool frame_buffer_recording = false;
         bool closing = false;
+        bool mutating = false;
     };
     struct CommandDomain {
         std::shared_ptr<impl::CommandBufferImpl> buffer;
@@ -30,7 +31,12 @@ namespace VSL_NAMESPACE::lifetime {
     struct CommandAccess {
         static const std::shared_ptr<CommandDomain>& Owner(const CommandBuffer& buffer);
         static std::shared_ptr<CommandDomain> Resolve(const std::shared_ptr<impl::CommandBufferImpl>& buffer);
+        using Factory = std::shared_ptr<CommandDomain> (*)(std::shared_ptr<impl::CommandBufferImpl>);
+        static std::shared_ptr<CommandDomain> CreateDomain(std::shared_ptr<impl::CommandBufferImpl> buffer);
+        static CommandBuffer Attach(std::shared_ptr<impl::CommandBufferImpl> buffer, Factory factory = CreateDomain);
         static CommandBuffer Buffer(const std::shared_ptr<CommandDomain>& domain);
         static CommandManager Manager(std::shared_ptr<impl::CommandManagerImpl> data, std::shared_ptr<CommandDomain> domain);
     };
+    void reset_command_buffers(const CommandBuffer& buffer, std::optional<std::uint32_t> index);
+    void next_command_buffer(const CommandBuffer& buffer);
 } // namespace VSL_NAMESPACE::lifetime

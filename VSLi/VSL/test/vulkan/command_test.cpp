@@ -1,5 +1,6 @@
 #include "support/vulkan_fixture.hpp"
 #include <VSL/lifetime/command_domain.hpp>
+#include <VSL/lifetime/command_storage.hpp>
 #include "support/deferred_action.hpp"
 #include <limits>
 
@@ -55,7 +56,7 @@ namespace {
         vsl::CommandBuffer buffers(pool, 2);
         EXPECT_EQ(buffers.get_size(), 2u);
         EXPECT_EQ(buffers.get_current_buffer_idx(), 0u);
-        EXPECT_EQ(buffers.data_->command_pool, pool.data_);
+        EXPECT_EQ(buffers.data_->command_pool, pool.data_.get());
         vsl::CommandBuffer shared(buffers.data_);
         EXPECT_EQ(shared.data_, buffers.data_);
         buffers.reset(0);
@@ -94,7 +95,7 @@ namespace {
         auto exclusive = manager.make_exclusive_buffer(2);
         EXPECT_EQ(exclusive.get_size(), 2u);
         EXPECT_NE(exclusive.data_, manager.get_buffer().data_);
-        EXPECT_EQ(exclusive.data_->command_pool, manager.get_pool().data_);
+        EXPECT_EQ(exclusive.data_->command_pool, manager.get_pool().data_.get());
         EXPECT_NE(exclusive.data_->command_buffers[0], manager.get_buffer().data_->command_buffers[0]);
     }
     struct CommandShape {
@@ -191,7 +192,7 @@ namespace {
         {
             // 割当が失敗したconstructorの後処理と同じ、poolだけを保持した状態。
             auto storage = std::make_shared<vsl::impl::CommandBufferImpl>();
-            storage->command_pool = pool.data_;
+            storage->command_pool = pool.data_.get();
         }
     }
 } // namespace
@@ -293,7 +294,7 @@ namespace {
             native = manager.get_buffer().data_;
         }
         ASSERT_TRUE(native);
-        EXPECT_TRUE(native->domain.expired());
+        EXPECT_TRUE(native->owner_context->domain.expired());
         EXPECT_EQ(native->recording_context, nullptr);
         EXPECT_THROW(vsl::CommandBuffer{native}, std::logic_error);
         EXPECT_THROW(vsl::CommandManager{manager_data}, std::logic_error);

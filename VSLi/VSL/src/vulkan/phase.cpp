@@ -4,6 +4,7 @@
 #include <VSL/lifetime/submission_retention.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/operation/submission_ops.hpp>
+#include <VSL/operation/command_ops.hpp>
 #include <exception>
 #include <stdexcept>
 
@@ -54,7 +55,8 @@ namespace VSL_NAMESPACE {
         auto buffers = domain->buffer;
         if (domain->context.returning_image && !returning_image)
             throw std::logic_error("Acquired image is being returned");
-        if (domain->context.closing || domain->context.recording)
+        if (domain->context.closing || domain->context.recording || domain->context.mutating ||
+            (!returning_image && domain->context.frame_buffer_recording))
             throw std::logic_error("Command domain is unavailable for recording");
         const auto generation = domain->context.generation;
         if (next_image_available && (!next_image_available->data_ ||
@@ -112,7 +114,7 @@ namespace VSL_NAMESPACE {
         auto* context = buffers ? buffers->recording_context : nullptr;
         if (work && context && context->work == work.get()) {
             try {
-                buffers->command_buffers.at(frame_slot).reset();
+                operation::reset_command_buffer(buffers->command_buffers.at(frame_slot));
             } catch (...) {
             }
             context->recording = false;
@@ -131,8 +133,8 @@ namespace VSL_NAMESPACE {
                 buffers->current_buffer_idx != frame_slot ||
                 (domain->submissions.at(frame_slot) && domain->submissions.at(frame_slot)->result->status == Completion::Status::SUBMITTED))
                 throw std::logic_error("Frame slot is no longer available for recording");
-            buffers->command_buffers.at(frame_slot).reset();
-            buffers->command_buffers.at(frame_slot).begin(vk::CommandBufferBeginInfo{});
+            operation::reset_command_buffer(buffers->command_buffers.at(frame_slot));
+            operation::begin_command_buffer(buffers->command_buffers.at(frame_slot));
         } catch (const vk::SystemError& error) {
             const auto failure = error.code().value() == static_cast<int>(vk::Result::eErrorDeviceLost) ? Completion::Failure::DEVICE_LOST : Completion::Failure::SUBMIT_FAILED;
             fail(failure, error.code().value());
@@ -181,7 +183,7 @@ namespace VSL_NAMESPACE {
             if (!stages && !waits.empty())
                 throw std::invalid_argument("Semaphore wait stage cannot be empty");
             auto command = buffers->command_buffers.at(frame_slot);
-            command.end();
+            operation::end_command_buffer(command);
             auto device = manager.data_->device->device;
             device.resetFences(submission->fence);
             vk::SubmitInfo info{
@@ -212,7 +214,7 @@ namespace VSL_NAMESPACE {
         Completion::Failure failure = Completion::Failure::NONE;
         if (submission && context && context->work == submission.get()) {
             try {
-                buffers->command_buffers.at(frame_slot).reset();
+                operation::reset_command_buffer(buffers->command_buffers.at(frame_slot));
             } catch (const vk::SystemError& error) {
                 error_code = error.code().value();
                 failure = error_code == static_cast<int>(vk::Result::eErrorDeviceLost) ? Completion::Failure::DEVICE_LOST : Completion::Failure::SUBMIT_FAILED;
@@ -272,7 +274,7 @@ namespace VSL_NAMESPACE {
             const auto buffer = manager.get_buffer();
             const auto domain = lifetime::CommandAccess::Owner(buffer);
             auto buffers = domain->buffer;
-            if (domain->context.recording || domain->context.returning_image)
+            if (domain->context.recording || domain->context.returning_image || domain->context.mutating || domain->context.frame_buffer_recording)
                 throw std::logic_error("A phase is already recording");
             buffers->current_buffer_idx = (buffers->current_buffer_idx + 1) % buffers->command_buffers.size();
             prepare();

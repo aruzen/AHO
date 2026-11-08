@@ -8,6 +8,8 @@
 #include <VSL/lifetime/render_pass_storage.hpp>
 #include <VSL/lifetime/pipeline_storage.hpp>
 #include <VSL/lifetime/frame_buffer_storage.hpp>
+#include <VSL/lifetime/command_storage.hpp>
+#include <VSL/lifetime/command_domain.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/storage/cpu_region.hpp>
@@ -26,6 +28,8 @@ namespace VSL_NAMESPACE::lifetime::detail {
         impl::RenderPassImpl* render_pass = nullptr;
         impl::PipelineImpl* pipeline = nullptr;
         impl::FrameBufferImpl* frame_buffer = nullptr;
+        impl::CommandPoolImpl* command_pool = nullptr;
+        impl::CommandBufferImpl* command_buffer = nullptr;
         size_t buffer_offset = 0, buffer_bytes = 0;
         size_t owner_index = 0;
     };
@@ -48,10 +52,12 @@ namespace VSL_NAMESPACE::lifetime::detail {
         void preflight(const PipelinePassSource& source);
         void preflight(const PipelineShaderSource& source);
         void preflight(const FrameBufferInit& input);
+        void preflight(const CommandBufferInit& input);
         impl::PipelineLayoutImpl* resolve(const RuntimeLayoutSource& source) const;
         impl::RenderPassImpl* resolve(const PipelinePassSource& source) const;
         impl::ShaderImpl* resolve(const PipelineShaderSource& source) const;
         impl::ImageImpl* resolve(const FrameBufferImageSource& source) const;
+        impl::CommandPoolImpl* resolve(const CommandPoolSource& source) const;
         void construct(size_t index, const ResourceInit& initializer);
         void publish(const std::shared_ptr<ResourceArenaOwner>& owner);
         void clear() noexcept;
@@ -85,6 +91,10 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 return external ? std::holds_alternative<PipelineAccessor>(value) : std::holds_alternative<GraphicsPipelineInit>(value) || std::holds_alternative<ComputePipelineInit>(value);
             case storage::ResourceKind::FRAME_BUFFER:
                 return external ? std::holds_alternative<FrameBufferAccessor>(value) : std::holds_alternative<FrameBufferInit>(value);
+            case storage::ResourceKind::COMMAND_POOL:
+                return external ? std::holds_alternative<CommandPool>(value) : std::holds_alternative<CommandPoolCreateInfo>(value);
+            case storage::ResourceKind::COMMAND_BUFFER:
+                return external ? std::holds_alternative<CommandBuffer>(value) : std::holds_alternative<CommandBufferInit>(value);
         }
         return false;
     }
@@ -109,7 +119,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
             const auto stage = [](storage::ResourceKind kind) {
                 if (kind == storage::ResourceKind::PIPELINE || kind == storage::ResourceKind::FRAME_BUFFER)
                     return 2;
-                if (kind == storage::ResourceKind::DESCRIPTOR_SET || kind == storage::ResourceKind::PIPELINE_LAYOUT)
+                if (kind == storage::ResourceKind::DESCRIPTOR_SET || kind == storage::ResourceKind::PIPELINE_LAYOUT || kind == storage::ResourceKind::COMMAND_BUFFER)
                     return 1;
                 return 0;
             };
@@ -170,6 +180,16 @@ namespace VSL_NAMESPACE::lifetime::detail {
                         throw std::invalid_argument("External descriptor pool requires its canonical owner");
                     resource.pool = pool->data_.get();
                     resource.owner_index = retain_dependency(owned_ref(owner, pool->data_->owner_node));
+                } else if (const auto* command_pool = std::get_if<CommandPool>(&value)) {
+                    if (command_pool->get_device().data_ != device.data_)
+                        throw std::invalid_argument("External command pool requires the arena device");
+                    resource.command_pool = command_pool->data_.get();
+                    resource.owner_index = retain_dependency(command_pool->owner_ref());
+                } else if (const auto* command_buffer = std::get_if<CommandBuffer>(&value)) {
+                    if (command_buffer->get_pool().get_device().data_ != device.data_)
+                        throw std::invalid_argument("External command ring requires the arena device");
+                    resource.command_buffer = command_buffer->data_.get();
+                    resource.owner_index = retain_dependency(command_buffer->owner_ref());
                 } else if (const auto* frame_buffer = std::get_if<FrameBufferAccessor>(&value)) {
                     if (frame_buffer->get_device().data_ != device.data_)
                         throw std::invalid_argument("External framebuffer requires the arena device");
@@ -208,6 +228,8 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 (void)find(set->layout, storage::ResourceKind::DESCRIPTOR_LAYOUT);
             } else if (const auto* framebuffer = std::get_if<FrameBufferInit>(&value)) {
                 preflight(*framebuffer);
+            } else if (const auto* command_buffer = std::get_if<CommandBufferInit>(&value)) {
+                preflight(*command_buffer);
             } else if (const auto* graphics = std::get_if<GraphicsPipelineInit>(&value)) {
                 preflight(graphics->layout);
                 preflight(graphics->pass);
@@ -236,6 +258,21 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 throw std::invalid_argument("Pipeline runtime layout requires the arena device");
             retain_dependency(layout.owner_ref());
         }
+    }
+    void ResourceArenaOwner::preflight(const CommandBufferInit& input) {
+        if (const auto* id = std::get_if<typed::ResourceId>(&input.pool)) {
+            (void)find(*id, storage::ResourceKind::COMMAND_POOL);
+        } else {
+            const auto& pool = std::get<CommandPool>(input.pool);
+            if (pool.get_device().data_ != device.data_)
+                throw std::invalid_argument("Command ring source requires the arena device");
+            retain_dependency(pool.owner_ref());
+        }
+    }
+    impl::CommandPoolImpl* ResourceArenaOwner::resolve(const CommandPoolSource& source) const {
+        if (const auto* id = std::get_if<typed::ResourceId>(&source))
+            return find(*id, storage::ResourceKind::COMMAND_POOL).command_pool;
+        return std::get<CommandPool>(source).data_.get();
     }
     void ResourceArenaOwner::preflight(const PipelinePassSource& source) {
         if (const auto* id = std::get_if<typed::ResourceId>(&source)) {
@@ -294,6 +331,26 @@ namespace VSL_NAMESPACE::lifetime::detail {
         auto& resource = resources[index];
         auto* slot = memory->base + resource.placement.offset;
         switch (resource.placement.kind) {
+            case storage::ResourceKind::COMMAND_POOL:
+                construct_command_pool(slot, device, std::get<CommandPoolCreateInfo>(initializer));
+                resource.command_pool = &command_pool_at(slot);
+                break;
+            case storage::ResourceKind::COMMAND_BUFFER: {
+                const auto& info = std::get<CommandBufferInit>(initializer);
+                auto* pool = resolve(info.pool);
+                WeakOwnedRef<impl::CommandPoolImpl> pool_owner;
+                if (const auto* id = std::get_if<typed::ResourceId>(&info.pool)) {
+                    const auto& source = find(*id, storage::ResourceKind::COMMAND_POOL);
+                    if (source.placement.external)
+                        pool_owner = dependencies.at(source.owner_index).alias(pool).weak();
+                } else {
+                    pool_owner = std::get<CommandPool>(info.pool).owner_ref().alias(pool).weak();
+                }
+                construct_command_buffer(slot, *pool, info.count);
+                resource.command_buffer = &command_buffer_at(slot);
+                resource.command_buffer->owner_context->pool = std::move(pool_owner);
+                break;
+            }
             case storage::ResourceKind::BUFFER:
                 construct_buffer(slot, device, std::get<BufferCreateInfo>(initializer));
                 resource.buffer = buffer_at(slot);
@@ -427,6 +484,10 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     resource.pipeline->owner_node = node;
                 if (resource.frame_buffer)
                     resource.frame_buffer->owner_node = node;
+                if (resource.command_pool)
+                    resource.command_pool->owner_node = node;
+                if (resource.command_buffer)
+                    resource.command_buffer->owner_node = node;
             }
             if (resource.pool && !resource.placement.external)
                 resource.pool->owner = owner;
@@ -442,12 +503,25 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     throw std::logic_error("Framebuffer pass owner was not retained");
                 set_frame_buffer_pass_owner(*resource.frame_buffer, descriptor_context.node.ref(owner).alias(pass));
             }
+        for (const auto& resource : resources)
+            if (!resource.placement.external && resource.command_buffer && !resource.command_buffer->owner_context->pool.use_count()) {
+                auto* pool = resource.command_buffer->command_pool;
+                if (pool->owner_node != &descriptor_context.node)
+                    throw std::logic_error("Command ring pool owner was not retained");
+                set_command_buffer_pool_owner(*resource.command_buffer, descriptor_context.node.ref(owner).alias(pool));
+            }
     }
     void ResourceArenaOwner::clear() noexcept {
         while (!constructed.empty()) {
             const auto& placement = resources[constructed.back()].placement;
             auto* slot = memory->base + placement.offset;
             switch (placement.kind) {
+                case storage::ResourceKind::COMMAND_POOL:
+                    destroy_command_pool(slot);
+                    break;
+                case storage::ResourceKind::COMMAND_BUFFER:
+                    destroy_command_buffer(slot);
+                    break;
                 case storage::ResourceKind::BUFFER:
                     destroy_buffer(slot);
                     break;
@@ -582,6 +656,18 @@ namespace VSL_NAMESPACE::lifetime {
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::FRAME_BUFFER);
         return {{resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.frame_buffer}};
+    }
+    CommandPool ResourceArena::command_pool(typed::ResourceId id) const {
+        if (!_owner)
+            throw std::logic_error("Resource arena is empty");
+        const auto& resource = _owner->find(id, storage::ResourceKind::COMMAND_POOL);
+        return {{resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.command_pool}};
+    }
+    CommandBuffer ResourceArena::command_buffer(typed::ResourceId id) const {
+        if (!_owner)
+            throw std::logic_error("Resource arena is empty");
+        const auto& resource = _owner->find(id, storage::ResourceKind::COMMAND_BUFFER);
+        return CommandAccess::Attach({resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.command_buffer});
     }
     PipelineLayoutAccessor ResourceArena::pipeline_layout(typed::ResourceId id) const {
         if (!_owner)

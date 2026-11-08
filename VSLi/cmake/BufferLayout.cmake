@@ -22,6 +22,7 @@ function(vsl_generate_buffer_layout)
     file(SHA256 "${VSL_HOME}/src/private/VSL/lifetime/pipeline_storage.hpp" pipeline_slot_hash)
     file(SHA256 "${VSL_HOME}/src/private/VSL/lifetime/frame_buffer_storage.hpp" frame_buffer_slot_hash)
     file(SHA256 "${VSL_HOME}/src/private/VSL/lifetime/command_storage.hpp" command_slot_hash)
+    file(SHA256 "${VSL_HOME}/src/private/VSL/sync/synchronization_state.hpp" synchronization_hash)
     file(SHA256 "${VSL_HOME}/src/private/VSL/lifetime/descriptor_bindings.hpp" descriptor_owner_hash)
     file(SHA256 "${VSL_HOME}/src/private/VSL/lifetime/owner_access.hpp" owner_access_hash)
     file(SHA256 "${VSL_HOME}/include/VSL/sync/resource_use_state.hpp" use_hash)
@@ -57,6 +58,7 @@ function(vsl_generate_buffer_layout)
         "${VSL_HOME}/src/private/VSL/lifetime/pipeline_storage.hpp"
         "${VSL_HOME}/src/private/VSL/lifetime/frame_buffer_storage.hpp"
         "${VSL_HOME}/src/private/VSL/lifetime/command_storage.hpp"
+        "${VSL_HOME}/src/private/VSL/sync/synchronization_state.hpp"
         "${VSL_HOME}/src/private/VSL/lifetime/descriptor_bindings.hpp"
         "${VSL_HOME}/src/private/VSL/lifetime/owner_access.hpp"
         "${Vulkan_INCLUDE_DIRS}/vulkan/vulkan_core.h" "${Vulkan_INCLUDE_DIRS}/vulkan/vulkan.hpp")
@@ -71,7 +73,7 @@ function(vsl_generate_buffer_layout)
     foreach(configuration IN LISTS configurations)
         string(TOUPPER "${configuration}" upper)
         set(CMAKE_TRY_COMPILE_CONFIGURATION "${configuration}")
-        string(SHA256 input_hash "12;${command_slot_hash};${frame_buffer_slot_hash};${pipeline_slot_hash};${render_pass_slot_hash};${pipeline_layout_slot_hash};${shader_slot_hash};${owner_access_hash};${state_hash};${buffer_slot_hash};${image_slot_hash};${sampler_slot_hash};${descriptor_slot_hash};${descriptor_owner_hash};${use_hash};${completion_hash};${lifetime_hash};${vulkan_hash};${vulkan_cpp_hash};${abi_mode_hash};${template_hash};${public_layout_hashes};${CMAKE_CXX_COMPILER_ID};${CMAKE_CXX_COMPILER_VERSION};${CMAKE_CXX_COMPILER_TARGET};${CMAKE_CXX_COMPILER_FRONTEND_VARIANT};${CMAKE_SYSTEM_NAME};${CMAKE_SYSTEM_VERSION};${CMAKE_SYSTEM_PROCESSOR};${CMAKE_OSX_ARCHITECTURES};${CMAKE_OSX_DEPLOYMENT_TARGET};${CMAKE_SIZEOF_VOID_P};${CMAKE_CXX_FLAGS};${CMAKE_CXX_FLAGS_${upper}};${CMAKE_MSVC_RUNTIME_LIBRARY};${CMAKE_OSX_SYSROOT};${CMAKE_SYSROOT};${configuration}")
+        string(SHA256 input_hash "13;${synchronization_hash};${command_slot_hash};${frame_buffer_slot_hash};${pipeline_slot_hash};${render_pass_slot_hash};${pipeline_layout_slot_hash};${shader_slot_hash};${owner_access_hash};${state_hash};${buffer_slot_hash};${image_slot_hash};${sampler_slot_hash};${descriptor_slot_hash};${descriptor_owner_hash};${use_hash};${completion_hash};${lifetime_hash};${vulkan_hash};${vulkan_cpp_hash};${abi_mode_hash};${template_hash};${public_layout_hashes};${CMAKE_CXX_COMPILER_ID};${CMAKE_CXX_COMPILER_VERSION};${CMAKE_CXX_COMPILER_TARGET};${CMAKE_CXX_COMPILER_FRONTEND_VARIANT};${CMAKE_SYSTEM_NAME};${CMAKE_SYSTEM_VERSION};${CMAKE_SYSTEM_PROCESSOR};${CMAKE_OSX_ARCHITECTURES};${CMAKE_OSX_DEPLOYMENT_TARGET};${CMAKE_SIZEOF_VOID_P};${CMAKE_CXX_FLAGS};${CMAKE_CXX_FLAGS_${upper}};${CMAKE_MSVC_RUNTIME_LIBRARY};${CMAKE_OSX_SYSROOT};${CMAKE_SYSROOT};${configuration}")
         foreach(kind IN ITEMS BUFFER_IMPL IMAGE_IMPL SAMPLER_IMPL DESCRIPTOR_LAYOUT_IMPL DESCRIPTOR_POOL_IMPL DESCRIPTOR_SET_IMPL SHADER_IMPL PIPELINE_LAYOUT_IMPL RENDER_PASS_IMPL PIPELINE_IMPL FRAME_BUFFER_IMPL FRAME_BUFFER_SLOT COMMAND_POOL_IMPL COMMAND_POOL_SLOT COMMAND_BUFFER_IMPL COMMAND_BUFFER_SLOT BUFFER_USE)
             if(kind STREQUAL BUFFER_IMPL)
                 set(type "vsl::impl::BufferImpl")

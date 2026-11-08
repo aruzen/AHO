@@ -99,6 +99,12 @@ add_library(VSL STATIC
         VSL/src/operation/command_ops.cpp
         VSL/src/private/VSL/lifetime/command_storage.hpp
         VSL/src/lifetime/command_storage.cpp
+        VSL/src/private/VSL/sync/synchronization_state.hpp
+        VSL/src/sync/synchronization_state.cpp
+        VSL/src/private/VSL/lifetime/synchronization_use.hpp
+        VSL/src/lifetime/synchronization_use.cpp
+        VSL/src/private/VSL/operation/synchronization_ops.hpp
+        VSL/src/operation/synchronization_ops.cpp
         VSL/src/private/VSL/lifetime/command_domain.hpp
         VSL/src/lifetime/buffer_arena.cpp
         VSL/src/lifetime/resource_arena.cpp

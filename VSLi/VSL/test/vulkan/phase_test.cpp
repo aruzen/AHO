@@ -436,8 +436,10 @@ namespace {
         {
             VSL_NAMESPACE::DefaultPhase phase(manager, chain);
             auto discarded = phase.completion();
+            const auto owned = manager.get_buffer().data_->recording_context->work->owned_fence;
             phase << VSL_NAMESPACE::command::RenderPassBegin(pass, target); // 終了コマンドを省略し、記録途中のキャンセルを確かめる。
             phase.cancel();
+            EXPECT_EQ(vsl::lifetime::CommandAccess::Owner(manager.get_buffer())->submissions.at(phase.frame_slot)->owned_fence, owned);
             EXPECT_EQ(discarded.status(), VSL_NAMESPACE::Completion::Status::CANCELLED);
             EXPECT_TRUE(phase.completion().wait());
         }
@@ -541,6 +543,107 @@ namespace {
         EXPECT_TRUE(phase.completion().wait());
         EXPECT_FALSE(fences.wait(static_cast<std::uint32_t>(unrelated), 0));
         device.data_->device.waitIdle();
+    }
+    TEST_F(PresentPhaseWindowIntegrationTest, WSIMarkersProtectPendingAcquireAndPlannedPresentAcrossWaitIdle) {
+        make_surface();
+        ASSERT_FALSE(HasFatalFailure());
+        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+            GTEST_SKIP() << "Graphics queue cannot present";
+        vsl::Swapchain chain(device, surface, std::nullopt, 64, 48);
+        vsl::RenderPass pass(chain);
+        vsl::FrameBuffer target(chain, pass);
+        auto commands = make_manager().independent(1);
+        vsl::SynchroManager sync(device);
+        auto available = sync.create_semaphore("available");
+        auto finished = sync.create_semaphore("finished", chain.data_->swap_chain_images.size());
+        auto fence = sync.create_fence("complete", false);
+        vsl::DefaultPhase phase(commands, chain, available, finished, fence);
+        commands.wait_idle();
+        EXPECT_THROW(available.destroy(), std::logic_error);
+        EXPECT_THROW(finished.destroy(), std::logic_error);
+        EXPECT_THROW(fence.wait(std::uint64_t{0}), std::logic_error);
+        phase << vsl::command::RenderPassBegin(pass, target) << vsl::command::RenderPassEnd{};
+        ASSERT_EQ(phase.submit_commands(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        const auto result = phase.completion();
+        ASSERT_TRUE(result.wait());
+        commands.wait_idle();
+        EXPECT_NO_THROW(available.destroy());
+        EXPECT_THROW(finished.destroy(), std::logic_error);
+        EXPECT_NO_THROW(fence.reset());
+        EXPECT_NO_THROW(fence.destroy());
+        EXPECT_EQ(result.status(), vsl::Completion::Status::COMPLETE);
+        ASSERT_EQ(phase.present(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        EXPECT_THROW(finished.destroy(), std::logic_error);
+        commands.wait_idle();
+        EXPECT_NO_THROW(finished.destroy());
+    }
+    TEST_F(PresentPhaseWindowIntegrationTest, CancelTransfersReservationAndOriginalSemaphoresBeforeNotifyingTheOldResult) {
+        make_surface();
+        ASSERT_FALSE(HasFatalFailure());
+        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+            GTEST_SKIP() << "Graphics queue cannot present";
+        vsl::Swapchain chain(device, surface, std::nullopt, 64, 48);
+        auto commands = make_manager().independent(1);
+        vsl::SynchroManager sync(device);
+        auto available = sync.create_semaphore("original available");
+        auto finished = sync.create_semaphore("original finished", chain.data_->swap_chain_images.size());
+        auto fence = sync.create_fence("original fence", false);
+        auto phase = std::make_unique<vsl::DefaultPhase>(commands, chain, available, finished, fence);
+        const auto discarded = phase->completion();
+        const auto reservation = fence.data_->uses[0].reservation.lock();
+        vsl::Completion returned;
+        bool invoked = false;
+        const vsl_test::DeferredAction callback([&] {
+            invoked = true;
+            returned = phase->completion();
+            EXPECT_EQ(discarded.status(), vsl::Completion::Status::CANCELLED);
+            EXPECT_EQ(reservation, fence.data_->uses[0].reservation.lock());
+            EXPECT_EQ(reservation->result.lock(), returned.data_);
+            EXPECT_NE(reservation->result.lock(), discarded.data_);
+            const auto& work = vsl::lifetime::CommandAccess::Owner(commands.get_buffer())->submissions.at(0);
+            EXPECT_EQ(work->wait_semaphore, available.data_.get());
+            EXPECT_EQ(work->signal_semaphore, finished.data_.get());
+            phase.reset();
+        });
+        commands.get_buffer().retain_until_complete(callback.owner());
+        auto unused_available = sync.create_semaphore("new field available");
+        auto unused_finished = sync.create_semaphore("new field finished", chain.data_->swap_chain_images.size());
+        auto unused_fence = sync.create_fence("new field fence", false);
+        phase->next_image_available = unused_available;
+        phase->calculation_finish = unused_finished;
+        phase->in_flight_fence = unused_fence;
+        phase->cancel();
+        EXPECT_TRUE(invoked);
+        EXPECT_FALSE(phase);
+        ASSERT_TRUE(returned.wait());
+        EXPECT_EQ(discarded.status(), vsl::Completion::Status::CANCELLED);
+        EXPECT_EQ(reservation->result.lock(), returned.data_);
+        EXPECT_NO_THROW(unused_available.destroy());
+        EXPECT_NO_THROW(unused_finished.destroy());
+        EXPECT_NO_THROW(unused_fence.destroy());
+        commands.wait_idle();
+        EXPECT_NO_THROW(available.destroy());
+        EXPECT_NO_THROW(finished.destroy());
+        EXPECT_NO_THROW(fence.destroy());
+    }
+    TEST_F(PresentPhaseWindowIntegrationTest, FailedSetupLeavesNoFenceReservationOrWSIMarker) {
+        make_surface();
+        ASSERT_FALSE(HasFatalFailure());
+        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+            GTEST_SKIP() << "Graphics queue cannot present";
+        vsl::Swapchain chain(device, surface, std::nullopt, 64, 48);
+        if (chain.data_->swap_chain_images.size() < 2)
+            GTEST_SKIP() << "A too-small present semaphore array requires multiple images";
+        auto commands = make_manager().independent(1);
+        vsl::SynchroManager sync(device);
+        auto available = sync.create_semaphore("available");
+        auto finished = sync.create_semaphore("too small");
+        auto fence = sync.create_fence("completion", false);
+        EXPECT_THROW((vsl::DefaultPhase(commands, chain, available, finished, fence)), std::invalid_argument);
+        EXPECT_NO_THROW(available.destroy());
+        EXPECT_NO_THROW(finished.destroy());
+        EXPECT_NO_THROW(fence.destroy());
+        EXPECT_FALSE(commands.get_buffer().completion());
     }
 
 } // namespace

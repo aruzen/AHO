@@ -1,5 +1,16 @@
 #include "support/vulkan_fixture.hpp"
+#include "support/deferred_action.hpp"
+#include <VSL/lifetime/synchronization_use.hpp>
+#include <VSL/lifetime/command_domain.hpp>
+#include <VSL/sync/submission_completion.hpp>
+#include <limits>
 namespace {
+    // queue未送信のunsignaled fenceでSUBMITTED判定を固定する。
+    struct SubmittedFence {
+        std::shared_ptr<vsl::impl::SubmissionWork> work;
+        SubmittedFence(vsl::FenceHolder fence, std::uint32_t index);
+        ~SubmittedFence();
+    };
     class SynchronizeVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
     protected:
         bool validate_vulkan() const override { return true; }
@@ -11,6 +22,20 @@ namespace {
         }
         void TearDown() override;
     };
+    SubmittedFence::SubmittedFence(vsl::FenceHolder fence, std::uint32_t index) : work(std::make_shared<vsl::impl::SubmissionWork>()) {
+        work->device = fence.data_->device;
+        work->external_fence = fence.data_.get();
+        work->resources.push_back(fence.data_);
+        work->synchronization_owners[static_cast<size_t>(vsl::impl::SubmissionSource::FENCE)] = 0;
+        work->fence = fence.data_->fences.at(index);
+        work->fence_reservation = vsl::lifetime::reserve_fence(fence.data_, index, work->result);
+        work->result->work = work;
+        work->result->status = vsl::Completion::Status::SUBMITTED;
+        fence.data_->uses.at(index).submitted = work->result;
+    }
+    SubmittedFence::~SubmittedFence() {
+        vsl::sync::publish_terminal(*work, vsl::Completion::Status::COMPLETE);
+    }
     TEST_F(SynchronizeVulkanIntegrationTest, NamedLookupAndSemaphoreCounts) {
         EXPECT_FALSE(manager->get_fence("missing"));
         EXPECT_FALSE(manager->get_semaphore("missing"));
@@ -42,6 +67,227 @@ namespace {
         queue.submit(vk::SubmitInfo{}, many.data_->fences[1]);
         EXPECT_TRUE(single.wait());
         EXPECT_TRUE(many.wait(std::uint64_t{UINT64_MAX}));
+    }
+} // namespace
+
+namespace {
+    TEST_F(SynchronizeVulkanIntegrationTest, PendingFenceReservationsRejectWaitAndMutationButOtherElementsRemainIndependent) {
+        auto fence = manager->create_fence("reserved", std::size_t{2}, false);
+        auto first = make_manager().independent(1), second = make_manager().independent(2), contender = make_manager().independent(1);
+        second.get_buffer().next();
+        auto a = first.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence);
+        auto b = second.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence);
+        const auto old_token = fence.data_->uses[0].reservation.lock();
+        EXPECT_THROW(contender.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence), std::logic_error);
+        EXPECT_THROW(fence.wait(std::uint64_t{0}), std::logic_error);
+        EXPECT_THROW(fence.wait(0, 0), std::logic_error);
+        EXPECT_THROW(fence.reset(), std::logic_error);
+        EXPECT_THROW(fence.reset(1), std::logic_error);
+        EXPECT_THROW(fence.destroy(), std::logic_error);
+        a.cancel();
+        EXPECT_NO_THROW(fence.reset(0));
+        EXPECT_FALSE(fence.wait(0, 0));
+        auto next = contender.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence);
+        EXPECT_NE(fence.data_->uses[0].reservation.lock(), old_token);
+        EXPECT_EQ(old_token->result.lock()->status, vsl::Completion::Status::CANCELLED);
+        next.cancel();
+        ASSERT_EQ(b.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        ASSERT_TRUE(b.completion().wait());
+        EXPECT_NO_THROW(fence.reset(1));
+        EXPECT_EQ(b.completion().status(), vsl::Completion::Status::COMPLETE);
+    }
+    TEST_F(SynchronizeVulkanIntegrationTest, AllFenceMutationsCheckEveryElementBeforeNativeChanges) {
+        auto fence = manager->create_fence("array", std::size_t{2}, true);
+        fence.reset(1);
+        SubmittedFence pending(fence, 1);
+        const auto handles = fence.data_->fences;
+        EXPECT_THROW(fence.reset(), std::logic_error);
+        EXPECT_THROW(fence.destroy(), std::logic_error);
+        EXPECT_EQ(fence.data_->fences, handles);
+        EXPECT_TRUE(fence.wait(0, 0));
+        EXPECT_FALSE(fence.wait(std::uint64_t{0}));
+        EXPECT_NO_THROW(fence.reset(0));
+        EXPECT_FALSE(fence.wait(0, 0));
+    }
+    TEST_F(SynchronizeVulkanIntegrationTest, FenceCallbacksUseTheOriginalOwnerAndPreserveNamedReplacements) {
+        for (const int operation : {0, 1, 2}) {
+            auto commands = make_manager().independent(1);
+            auto holder = manager->create_fence("replace", false);
+            const auto alias = holder;
+            bool invoked = false;
+            const vsl_test::DeferredAction callback([&] {
+                invoked = true;
+                auto reentrant = alias;
+                EXPECT_THROW(reentrant.wait(std::uint64_t{0}), std::logic_error);
+                EXPECT_THROW(reentrant.reset(), std::logic_error);
+                EXPECT_THROW(reentrant.destroy(), std::logic_error);
+                holder = manager->create_fence("replace", true);
+            });
+            vsl::Completion result;
+            {
+                auto phase = commands.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, holder);
+                commands.get_buffer().retain_until_complete(callback.owner());
+                result = phase.completion();
+                ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            }
+            device.data_->device.waitIdle();
+            if (operation == 0)
+                EXPECT_TRUE(holder.wait());
+            else if (operation == 1)
+                holder.reset();
+            else
+                holder.destroy();
+            EXPECT_TRUE(invoked);
+            EXPECT_NE(holder.data_, alias.data_);
+            ASSERT_TRUE(manager->get_fence("replace"));
+            EXPECT_EQ(manager->get_fence("replace")->data_, holder.data_);
+            EXPECT_TRUE(holder.wait(std::uint64_t{0}));
+            EXPECT_EQ(result.status(), vsl::Completion::Status::COMPLETE);
+            if (operation == 1) {
+                auto old = alias;
+                EXPECT_FALSE(old.wait(std::uint64_t{0}));
+            }
+            if (operation == 2)
+                EXPECT_TRUE(alias.data_->fences.empty());
+        }
+    }
+    TEST_F(SynchronizeVulkanIntegrationTest, SemaphoreTracksEveryPendingUseAndReleasesTerminalUsesWithoutOwnerCountHeuristics) {
+        auto semaphore = manager->create_semaphore("shared");
+        auto producer = make_manager().independent(1), consumer = make_manager().independent(1);
+        auto first = producer.start_phase<vsl::ComputePhase>(std::nullopt, semaphore);
+        auto later = consumer.start_phase<vsl::ComputePhase>(semaphore);
+        EXPECT_THROW(semaphore.destroy(), std::logic_error);
+        later.cancel();
+        EXPECT_THROW(semaphore.destroy(), std::logic_error);
+        ASSERT_EQ(first.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        ASSERT_TRUE(first.completion().wait());
+        EXPECT_GT(semaphore.data_.use_count(), 1);
+        EXPECT_NO_THROW(semaphore.destroy());
+        EXPECT_EQ(semaphore.size(), 0u);
+    }
+    TEST_F(SynchronizeVulkanIntegrationTest, SharedWaitAndSignalSourceRetainsOneOwnerAndOneUse) {
+        auto semaphore = manager->create_semaphore("two roles");
+        auto commands = make_manager().independent(1);
+        auto phase = commands.start_phase<vsl::ComputePhase>(semaphore, semaphore);
+        const auto* work = commands.get_buffer().data_->recording_context->work;
+        ASSERT_TRUE(work);
+        EXPECT_EQ(work->wait_semaphore, semaphore.data_.get());
+        EXPECT_EQ(work->signal_semaphore, semaphore.data_.get());
+        EXPECT_EQ(work->synchronization_owners[static_cast<size_t>(vsl::impl::SubmissionSource::WAIT_SEMAPHORE)],
+                  work->synchronization_owners[static_cast<size_t>(vsl::impl::SubmissionSource::SIGNAL_SEMAPHORE)]);
+        EXPECT_EQ(std::ranges::count_if(work->resources, [&](const auto& owner) {
+                      return !owner.owner_before(semaphore.data_) && !semaphore.data_.owner_before(owner);
+                  }),
+                  1);
+        EXPECT_EQ(semaphore.data_->use.graphics.size(), 1u);
+        phase.cancel();
+        EXPECT_NO_THROW(semaphore.destroy());
+    }
+    TEST_F(SynchronizeVulkanIntegrationTest, SemaphoreSubmittedUseAndBusyNamedReplacementAreIndependent) {
+        auto old = manager->create_semaphore("same");
+        auto fence = manager->create_fence("probe", false);
+        SubmittedFence pending(fence, 0);
+        vsl::sync::track_semaphore(*old.data_, pending.work->result);
+        auto replacement = manager->create_semaphore("same");
+        EXPECT_THROW(old.destroy(), std::logic_error);
+        ASSERT_TRUE(manager->get_semaphore("same"));
+        EXPECT_EQ(manager->get_semaphore("same")->data_, replacement.data_);
+        vsl::sync::publish_terminal(*pending.work, vsl::Completion::Status::COMPLETE);
+        EXPECT_NO_THROW(old.destroy());
+        EXPECT_EQ(manager->get_semaphore("same")->data_, replacement.data_);
+    }
+    TEST_F(SynchronizeVulkanIntegrationTest, SemaphoreDestroyCanReplaceItsHolderAndReleaseItsRegistryDuringCompletion) {
+        auto holder = manager->create_semaphore("snapshot");
+        const auto alias = holder;
+        std::weak_ptr<vsl::impl::SynchroManagerImpl> registry = manager->data_;
+        auto commands = make_manager().independent(1);
+        bool invoked = false;
+        const vsl_test::DeferredAction callback([&] {
+            invoked = true;
+            auto reentrant = alias;
+            EXPECT_THROW(reentrant.destroy(), std::logic_error);
+            holder = manager->create_semaphore("snapshot");
+            manager.reset();
+        });
+        {
+            auto phase = commands.start_phase<vsl::ComputePhase>(std::nullopt, holder);
+            commands.get_buffer().retain_until_complete(callback.owner());
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        device.data_->device.waitIdle();
+        holder.destroy();
+        EXPECT_TRUE(invoked);
+        EXPECT_TRUE(registry.expired());
+        EXPECT_TRUE(alias.data_->semaphores.empty());
+        EXPECT_EQ(holder.size(), 1u);
+    }
+    TEST_F(SynchronizeVulkanIntegrationTest, CreationValidationLeavesExistingNamesAndHandlesIntact) {
+        auto fence = manager->create_fence("fence", true);
+        auto semaphore = manager->create_semaphore("semaphore");
+        for (const size_t count : {size_t{0}, std::numeric_limits<size_t>::max()}) {
+            EXPECT_THROW(manager->create_fence("fence", count), std::invalid_argument);
+            EXPECT_THROW(manager->create_semaphore("semaphore", count), std::invalid_argument);
+            EXPECT_EQ(manager->get_fence("fence")->data_, fence.data_);
+            EXPECT_EQ(manager->get_semaphore("semaphore")->data_, semaphore.data_);
+        }
+        EXPECT_TRUE(fence.wait(std::uint64_t{0}));
+        EXPECT_EQ(semaphore.size(), 1u);
+    }
+    TEST_F(SynchronizeVulkanIntegrationTest, ForeignControlBlocksCannotBorrowOrDestroyTheSameNativeObjects) {
+        auto fence = manager->create_fence("canonical", true);
+        auto semaphore = manager->create_semaphore("canonical");
+        vsl::FenceHolder forged_fence{std::shared_ptr<vsl::impl::FenceImpl>(std::make_shared<int>(0), fence.data_.get())};
+        vsl::SemaphoreHolder forged_semaphore{std::shared_ptr<vsl::impl::SemaphoreImpl>(std::make_shared<int>(0), semaphore.data_.get())};
+        EXPECT_THROW(forged_fence.wait(std::uint64_t{0}), std::invalid_argument);
+        EXPECT_THROW(forged_fence.destroy(), std::invalid_argument);
+        EXPECT_THROW(forged_semaphore.destroy(), std::invalid_argument);
+        auto commands = make_manager().independent(1);
+        EXPECT_THROW(commands.start_phase<vsl::ComputePhase>(std::nullopt, forged_semaphore), std::invalid_argument);
+        EXPECT_THROW(commands.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, forged_fence), std::invalid_argument);
+        EXPECT_TRUE(fence.wait(std::uint64_t{0}));
+        EXPECT_EQ(semaphore.size(), 1u);
+    }
+    TEST_F(SynchronizeVulkanIntegrationTest, ReservationWaitCallbackCannotResetDestroyOrStealTheElement) {
+        auto fence = manager->create_fence("gate", std::size_t{2}, true);
+        auto first = make_manager().independent(1), next = make_manager().independent(1), thief = make_manager().independent(1);
+        bool invoked = false;
+        const vsl_test::DeferredAction callback([&] {
+            invoked = true;
+            EXPECT_THROW(fence.reset(0), std::logic_error);
+            EXPECT_THROW(fence.destroy(), std::logic_error);
+            EXPECT_THROW(thief.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence), std::logic_error);
+            EXPECT_NO_THROW(fence.reset(1));
+        });
+        {
+            auto phase = first.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence);
+            first.get_buffer().retain_until_complete(callback.owner());
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        device.data_->device.waitIdle();
+        auto phase = next.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence);
+        EXPECT_TRUE(invoked);
+        EXPECT_EQ(phase.completion().status(), vsl::Completion::Status::PENDING);
+        phase.cancel();
+    }
+    TEST_F(SynchronizeVulkanIntegrationTest, FailedPreparationAndChangedFieldsDoNotLeavePendingUses) {
+        auto commands = make_manager().independent(1);
+        auto fence = manager->create_fence("failure", false);
+        auto wait = manager->create_semaphore("wait");
+        auto signal = manager->create_semaphore("signal");
+        {
+            auto phase = commands.start_phase<vsl::ComputePhase>(wait, signal, fence, false, static_cast<vsl::PipelineStage>(0));
+            const auto result = phase.completion();
+            EXPECT_THROW(phase.submit(), std::invalid_argument);
+            EXPECT_EQ(result.status(), vsl::Completion::Status::FAILED);
+        }
+        EXPECT_NO_THROW(fence.reset());
+        EXPECT_NO_THROW(wait.destroy());
+        EXPECT_NO_THROW(signal.destroy());
+        auto changed = commands.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence);
+        changed.in_flight_fence = manager->create_fence("new field", true);
+        EXPECT_THROW(changed.submit(), std::logic_error);
+        EXPECT_EQ(changed.completion().status(), vsl::Completion::Status::FAILED);
+        EXPECT_NO_THROW(fence.destroy());
     }
 } // namespace
 

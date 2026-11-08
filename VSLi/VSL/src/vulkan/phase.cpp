@@ -3,10 +3,13 @@
 #include <VSL/sync/submission_completion.hpp>
 #include <VSL/lifetime/submission_retention.hpp>
 #include <VSL/lifetime/command_domain.hpp>
+#include <VSL/lifetime/synchronization_use.hpp>
+#include <VSL/sync/synchronization_state.hpp>
 #include <VSL/operation/submission_ops.hpp>
 #include <VSL/operation/command_ops.hpp>
 #include <exception>
 #include <stdexcept>
+#include <algorithm>
 
 namespace VSL_NAMESPACE {
     namespace {
@@ -15,6 +18,25 @@ namespace VSL_NAMESPACE {
             explicit ReturningImage(lifetime::CommandRecordingContext& context);
             ~ReturningImage() { context.returning_image = false; }
         };
+        template<typename T>
+        std::shared_ptr<T> synchronization_owner(const impl::SubmissionWork& work, impl::SubmissionSource source, T* value);
+        size_t retain_synchronization_owner(impl::SubmissionWork& work, const std::shared_ptr<void>& owner);
+
+        template<typename T>
+        std::shared_ptr<T> synchronization_owner(const impl::SubmissionWork& work, impl::SubmissionSource source, T* value) {
+            if (!value)
+                return {};
+            return {work.resources.at(work.synchronization_owners.at(static_cast<size_t>(source))), value};
+        }
+        size_t retain_synchronization_owner(impl::SubmissionWork& work, const std::shared_ptr<void>& owner) {
+            if (!owner.use_count())
+                return impl::SubmissionWork::NO_OWNER;
+            lifetime::retain_resource(work.resources, owner);
+            const auto found = std::ranges::find_if(work.resources, [&](const auto& existing) {
+                return !existing.owner_before(owner) && !owner.owner_before(existing);
+            });
+            return static_cast<size_t>(found - work.resources.begin());
+        }
         ReturningImage::ReturningImage(lifetime::CommandRecordingContext& context) : context(context) {
             if (context.returning_image)
                 throw std::logic_error("Acquired image is already being returned");
@@ -24,6 +46,8 @@ namespace VSL_NAMESPACE {
     struct DefaultPhase::Presentation {
         std::shared_ptr<impl::LogicalDeviceImpl> device;
         std::shared_ptr<impl::SemaphoreImpl> available;
+        std::shared_ptr<impl::SemaphoreImpl> finished;
+        std::shared_ptr<sync::SemaphoreWSIUse> available_use, finished_use;
         std::shared_ptr<impl::SwapchainImpl> swapchain;
         vk::UniqueFence acquire_fence;
         bool acquired = false;
@@ -31,11 +55,15 @@ namespace VSL_NAMESPACE {
     };
 
     DefaultPhase::Presentation::~Presentation() {
-        if (!acquired)
-            return;
-        auto result = operation::wait_fence(device->device, *acquire_fence, UINT64_MAX);
-        while (result != vk::Result::eSuccess && result != vk::Result::eErrorDeviceLost)
-            result = operation::wait_fence(device->device, *acquire_fence, UINT64_MAX);
+        if (acquired) {
+            auto result = operation::wait_fence(device->device, *acquire_fence, UINT64_MAX);
+            while (result != vk::Result::eSuccess && result != vk::Result::eErrorDeviceLost)
+                result = operation::wait_fence(device->device, *acquire_fence, UINT64_MAX);
+        }
+        if (available_use)
+            available_use->complete = true;
+        if (finished_use)
+            finished_use->complete = true;
     }
 
     ComputePhase::ComputePhase(CommandManager manager,
@@ -59,37 +87,55 @@ namespace VSL_NAMESPACE {
             (!returning_image && domain->context.frame_buffer_recording))
             throw std::logic_error("Command domain is unavailable for recording");
         const auto generation = domain->context.generation;
-        if (next_image_available && (!next_image_available->data_ ||
-                                     next_image_available->data_->device != manager.data_->device))
+        const auto manager_data = manager.data_;
+        const auto inherited = returning_image ? submission : nullptr;
+        const auto available = inherited ? synchronization_owner(*inherited, impl::SubmissionSource::WAIT_SEMAPHORE, inherited->wait_semaphore)
+                                         : (next_image_available ? next_image_available->data_ : nullptr);
+        const auto finished = inherited ? synchronization_owner(*inherited, impl::SubmissionSource::SIGNAL_SEMAPHORE, inherited->signal_semaphore)
+                                        : (calculation_finish ? calculation_finish->data_ : nullptr);
+        const auto external = inherited ? synchronization_owner(*inherited, impl::SubmissionSource::FENCE, inherited->external_fence)
+                                        : (in_flight_fence ? in_flight_fence->data_ : nullptr);
+        if ((!inherited && next_image_available && !available) || (available && available->device != manager_data->device))
             throw std::invalid_argument("Acquire semaphore device mismatch");
-        if (calculation_finish && (!calculation_finish->data_ ||
-                                   calculation_finish->data_->device != manager.data_->device))
+        if ((!inherited && calculation_finish && !finished) || (finished && finished->device != manager_data->device))
             throw std::invalid_argument("Signal semaphore device mismatch");
-        if (in_flight_fence && (!in_flight_fence->data_ ||
-                                in_flight_fence->data_->device != manager.data_->device))
+        if ((!inherited && in_flight_fence && !external) || (external && external->device != manager_data->device))
             throw std::invalid_argument("Completion fence device mismatch");
         frame_slot = buffers->current_buffer_idx;
         signal_index = frame_slot;
-        auto device = manager.data_->device->device;
+        auto device = manager_data->device->device;
         auto previous = domain->submissions.at(frame_slot);
-        if (previous && previous->result->status == Completion::Status::SUBMITTED && !Completion{previous->result}.wait())
+        if (!inherited && previous && previous->result->status == Completion::Status::SUBMITTED && !Completion{previous->result}.wait())
             throw std::runtime_error("Previous frame completion failed");
-        if (next_image_available && next_image_available->data_->semaphores.size() <= frame_slot)
+        if (available && available->semaphores.size() <= frame_slot)
             throw std::invalid_argument("Acquire semaphore count must cover frame slots");
-        if (in_flight_fence && in_flight_fence->data_->fences.size() <= frame_slot)
+        if (external && external->fences.size() <= frame_slot)
             throw std::invalid_argument("Fence count must cover frame slots");
         auto next = std::make_shared<impl::SubmissionWork>();
-        next->device = manager.data_->device;
-        if (next_image_available)
-            next->resources.push_back(next_image_available->data_);
-        if (calculation_finish)
-            next->resources.push_back(calculation_finish->data_);
-        if (in_flight_fence) {
-            next->external_fence = in_flight_fence->data_;
-            next->external_fence->submissions.resize(next->external_fence->fences.size());
-            next->fence = in_flight_fence->data_->fences.at(frame_slot);
-            if (!in_flight_fence->wait(frame_slot, UINT64_MAX))
-                throw std::runtime_error("Frame completion wait failed");
+        next->device = manager_data->device;
+        next->wait_semaphore = available.get();
+        next->signal_semaphore = finished.get();
+        next->synchronization_owners[static_cast<size_t>(impl::SubmissionSource::WAIT_SEMAPHORE)] = retain_synchronization_owner(*next, available);
+        next->synchronization_owners[static_cast<size_t>(impl::SubmissionSource::SIGNAL_SEMAPHORE)] = retain_synchronization_owner(*next, finished);
+        next->synchronization_owners[static_cast<size_t>(impl::SubmissionSource::FENCE)] = retain_synchronization_owner(*next, external);
+        if (available) {
+            lifetime::require_semaphore_owner(available);
+            sync::track_semaphore(*available, next->result);
+        }
+        if (finished) {
+            lifetime::require_semaphore_owner(finished);
+            sync::track_semaphore(*finished, next->result);
+        }
+        if (inherited) {
+            lifetime::require_fence_reservation(*inherited, frame_slot);
+            next->external_fence = external.get();
+            next->owned_fence = inherited->owned_fence;
+            next->fence = inherited->fence;
+            next->fence_reservation = inherited->fence_reservation;
+        } else if (external) {
+            next->external_fence = external.get();
+            next->fence = external->fences.at(frame_slot);
+            next->fence_reservation = lifetime::reserve_fence(external, frame_slot, next->result);
         } else {
             next->owned_fence = previous ? previous->owned_fence : nullptr;
             if (!next->owned_fence)
@@ -97,10 +143,12 @@ namespace VSL_NAMESPACE {
             next->fence = **next->owned_fence;
         }
         if (domain->context.closing || domain->context.recording || domain->context.generation != generation ||
-            manager.data_->command_buffer != buffers ||
+            manager.data_ != manager_data || manager_data->command_buffer != buffers ||
             buffers->current_buffer_idx != frame_slot || domain->submissions.at(frame_slot) != previous)
             throw std::logic_error("Frame slot changed while preparing");
         next->result->work = next;
+        if (inherited && next->fence_reservation)
+            next->fence_reservation->result = next->result;
         submission = std::move(next);
         completion_ = Completion{submission->result};
         domain->context.acquired_image_index.reset();
@@ -172,11 +220,17 @@ namespace VSL_NAMESPACE {
             if (domain->context.closing || !domain->context.recording || domain->context.work != submission.get() ||
                 manager.data_->command_buffer != buffers || buffers->current_buffer_idx != frame_slot)
                 throw std::logic_error("Frame slot changed while recording");
+            lifetime::require_fence_reservation(*submission, frame_slot);
+            if (!domain->context.returning_image &&
+                ((next_image_available ? next_image_available->data_.get() : nullptr) != submission->wait_semaphore ||
+                 (calculation_finish ? calculation_finish->data_.get() : nullptr) != submission->signal_semaphore ||
+                 (in_flight_fence ? in_flight_fence->data_.get() : nullptr) != submission->external_fence))
+                throw std::logic_error("Phase synchronization owners changed after preparation");
             std::vector<vk::Semaphore> waits, signals;
-            if (next_image_available)
-                waits.push_back(next_image_available->data_->semaphores.at(frame_slot));
-            if (calculation_finish)
-                signals.push_back(calculation_finish->data_->semaphores.at(signal_index));
+            if (submission->wait_semaphore)
+                waits.push_back(submission->wait_semaphore->semaphores.at(frame_slot));
+            if (submission->signal_semaphore)
+                signals.push_back(submission->signal_semaphore->semaphores.at(signal_index));
             else if (auto chain = domain->context.acquired_swapchain.lock())
                 signals.push_back(*chain->presentation_semaphores.at(signal_index));
             auto stages = vk::PipelineStageFlags(static_cast<std::uint32_t>(wait_stage));
@@ -199,7 +253,7 @@ namespace VSL_NAMESPACE {
         }
         completion_.data_->status = Completion::Status::SUBMITTED;
         if (auto& external = submission->external_fence)
-            external->submissions.at(frame_slot) = completion_.data_;
+            external->uses.at(frame_slot).submitted = completion_.data_;
         auto previous = std::move(domain->submissions.at(frame_slot));
         domain->submissions.at(frame_slot) = submission;
         domain->context.recording = false;
@@ -279,21 +333,29 @@ namespace VSL_NAMESPACE {
             buffers->current_buffer_idx = (buffers->current_buffer_idx + 1) % buffers->command_buffers.size();
             prepare();
             const auto count = swapchain.data_->swap_chain_images.size();
-            if (calculation_finish && calculation_finish->data_->semaphores.size() < count)
+            if (submission->signal_semaphore && submission->signal_semaphore->semaphores.size() < count)
                 throw std::invalid_argument("Present semaphores must cover swapchain images");
             auto device = manager.data_->device->device;
-            if (!calculation_finish && swapchain.data_->presentation_semaphores.empty()) {
+            if (!submission->signal_semaphore && swapchain.data_->presentation_semaphores.empty()) {
+                std::vector<vk::UniqueSemaphore> semaphores;
+                semaphores.reserve(count);
                 for (std::size_t i = 0; i < count; ++i)
-                    swapchain.data_->presentation_semaphores.push_back(device.createSemaphoreUnique({}));
+                    semaphores.push_back(device.createSemaphoreUnique({}));
+                swapchain.data_->presentation_semaphores = std::move(semaphores);
             }
             vk::Semaphore available;
             _presentation = std::make_shared<Presentation>();
             _presentation->device = manager.data_->device;
             _presentation->swapchain = swapchain.data_;
             _presentation->acquire_fence = device.createFenceUnique({});
-            if (next_image_available) {
-                _presentation->available = next_image_available->data_;
-                available = next_image_available->data_->semaphores.at(frame_slot);
+            if (submission->wait_semaphore) {
+                _presentation->available = synchronization_owner(*submission, impl::SubmissionSource::WAIT_SEMAPHORE, submission->wait_semaphore);
+                _presentation->available_use = sync::track_semaphore_wsi(*_presentation->available, submission->result);
+                available = _presentation->available->semaphores.at(frame_slot);
+            }
+            if (submission->signal_semaphore) {
+                _presentation->finished = synchronization_owner(*submission, impl::SubmissionSource::SIGNAL_SEMAPHORE, submission->signal_semaphore);
+                _presentation->finished_use = sync::track_semaphore_wsi(*_presentation->finished);
             }
             const auto acquired = *_presentation->acquire_fence;
             completion_.retain(_presentation);
@@ -301,6 +363,10 @@ namespace VSL_NAMESPACE {
             auto result = device.acquireNextImageKHR(swapchain.data_->swap_chain, UINT64_MAX,
                                                      available, acquired, &image_index);
             if (result == vk::Result::eErrorOutOfDateKHR) {
+                if (_presentation->available_use)
+                    _presentation->available_use->complete = true;
+                if (_presentation->finished_use)
+                    _presentation->finished_use->complete = true;
                 recreate = true;
                 ComputePhase::cancel();
                 return;
@@ -319,8 +385,8 @@ namespace VSL_NAMESPACE {
             domain->context.acquired_swapchain = swapchain.data_;
             completion_.retain(swapchain.data_);
             lifetime::retain_resource(domain->presentation_resources, swapchain.data_);
-            if (calculation_finish)
-                lifetime::retain_resource(domain->presentation_resources, calculation_finish->data_);
+            if (submission->signal_semaphore)
+                lifetime::retain_resource(domain->presentation_resources, _presentation->finished);
         } catch (const vk::SystemError& error) {
             fail(error.code().value() == static_cast<int>(vk::Result::eErrorDeviceLost) ? Completion::Failure::DEVICE_LOST : Completion::Failure::SUBMIT_FAILED, error.code().value());
             throw;
@@ -340,16 +406,20 @@ namespace VSL_NAMESPACE {
     DefaultPhase::SubmitResult DefaultPhase::present() {
         if (state != State::FINISH_SUBMIT || _presented)
             return SubmitResult::FAILED;
-        vk::Semaphore finished = calculation_finish ? calculation_finish->data_->semaphores.at(image_index)
-                                                    : *swapchain.data_->presentation_semaphores.at(image_index);
+        vk::Semaphore finished = submission->signal_semaphore ? submission->signal_semaphore->semaphores.at(image_index)
+                                                              : *swapchain.data_->presentation_semaphores.at(image_index);
         auto chain = swapchain.data_->swap_chain;
         vk::PresentInfoKHR info{.waitSemaphoreCount = 1, .pWaitSemaphores = &finished, .swapchainCount = 1, .pSwapchains = &chain, .pImageIndices = &image_index};
         const auto domain = lifetime::CommandAccess::Owner(recording_buffer);
         lifetime::retain_resource(domain->presentation_resources, swapchain.data_);
-        if (calculation_finish)
-            lifetime::retain_resource(domain->presentation_resources, calculation_finish->data_);
+        if (submission->signal_semaphore) {
+            lifetime::retain_resource(domain->presentation_resources, _presentation->finished);
+            lifetime::retain_resource(domain->presentation_resources, _presentation->finished_use);
+        }
         auto result = manager.data_->present_queue.presentKHR(&info);
         _presented = true;
+        if (_presentation)
+            _presentation->finished_use.reset();
         if (recreate || result == vk::Result::eSuboptimalKHR || result == vk::Result::eErrorOutOfDateKHR)
             return SubmitResult::WANT_RECREATE_SWAPCHAIN;
         if (result != vk::Result::eSuccess)
@@ -385,12 +455,15 @@ namespace VSL_NAMESPACE {
             // 元結果のcallbackは返却の記録・送信後に呼び、Phase自己破棄後にthisへ触れない。
             try {
                 prepare(true);
+                if (_presentation->available_use)
+                    _presentation->available_use->acquisition = submission->result;
                 signal_index = image_index;
                 begin();
                 auto buffers = domain->buffer;
                 domain->context.acquired_image_index = image_index;
                 domain->context.acquired_swapchain = swapchain.data_;
                 completion_.retain(swapchain.data_);
+                completion_.retain(_presentation);
                 vk::ImageMemoryBarrier barrier{
                     .oldLayout = vk::ImageLayout::eUndefined, .newLayout = vk::ImageLayout::ePresentSrcKHR, .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .image = swapchain.data_->swap_chain_images.at(image_index), .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
                 buffers->command_buffers.at(frame_slot).pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eBottomOfPipe, {}, {}, {}, barrier);

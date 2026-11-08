@@ -1,6 +1,7 @@
 #pragma once
 #include "typed_buffer_arena.hpp"
 #include "resource_plan.hpp"
+#include "typed_descriptor_plan.hpp"
 #include "../utils/typed_resource_allocation.hpp"
 #include <algorithm>
 #include <variant>
@@ -59,12 +60,15 @@ namespace VSL_NAMESPACE::typed {
         // 旧Buffer専用の計画参照を維持する移行用の一覧。
         std::array<std::array<BufferCreateInfo, BindingCount()>, 2> _buffers{};
         std::array<size_t, 2> _counts{}, _buffer_counts{};
+        TypedDescriptorPlan<Schema> _descriptors;
         size_t _frames;
         static constexpr size_t ScopeIndex(ResourceScope scope);
 
     public:
         static constexpr size_t CAPACITY = BindingCount();
         constexpr explicit TypedBundlePlan(const ResourceAllocationPlan<Schema>& plan);
+        constexpr const TypedDescriptorPlan<Schema>& descriptors() const& { return _descriptors; }
+        constexpr const TypedDescriptorPlan<Schema>& descriptors() const&& = delete;
         constexpr const auto& placements() const& { return _placements; }
         constexpr const auto& placements() const&& = delete;
         constexpr std::span<const BundleResourceInit> resources(ResourceScope scope) const& {
@@ -150,7 +154,7 @@ namespace VSL_NAMESPACE::typed {
         throw std::logic_error("Missing resource identity");
     }
     template<typename Schema, typename Bindings>
-    constexpr TypedBundlePlan<Schema, Bindings>::TypedBundlePlan(const ResourceAllocationPlan<Schema>& plan) : _frames(plan.frame_count()) {
+    constexpr TypedBundlePlan<Schema, Bindings>::TypedBundlePlan(const ResourceAllocationPlan<Schema>& plan) : _descriptors(plan), _frames(plan.frame_count()) {
         constexpr auto payloads = [] {
             std::array<std::array<bool, Schema::COUNT>, Schema::COUNT> result{};
             [&]<size_t... i>(std::index_sequence<i...>) {

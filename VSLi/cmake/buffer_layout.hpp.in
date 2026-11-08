@@ -23,6 +23,10 @@ namespace vsl::storage {
     inline constexpr std::size_t RENDER_PASS_IMPL_ALIGNMENT = @RENDER_PASS_IMPL_ALIGNMENT@;
     inline constexpr std::size_t PIPELINE_IMPL_SIZE = @PIPELINE_IMPL_SIZE@;
     inline constexpr std::size_t PIPELINE_IMPL_ALIGNMENT = @PIPELINE_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t FRAME_BUFFER_IMPL_SIZE = @FRAME_BUFFER_IMPL_SIZE@;
+    inline constexpr std::size_t FRAME_BUFFER_IMPL_ALIGNMENT = @FRAME_BUFFER_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t FRAME_BUFFER_SLOT_SIZE = @FRAME_BUFFER_SLOT_SIZE@;
+    inline constexpr std::size_t FRAME_BUFFER_SLOT_ALIGNMENT = @FRAME_BUFFER_SLOT_ALIGNMENT@;
     inline constexpr std::size_t BUFFER_USE_SIZE = @BUFFER_USE_SIZE@;
     inline constexpr std::size_t BUFFER_USE_ALIGNMENT = @BUFFER_USE_ALIGNMENT@;
     inline constexpr std::size_t BUFFER_EXPECTED_CPP_ABI_MODE = @cpp_mode@;

@@ -45,6 +45,10 @@ namespace VSL_NAMESPACE::storage {
     struct ImplLayout<impl::PipelineImpl> {
         static constexpr size_t SIZE = PIPELINE_IMPL_SIZE, ALIGNMENT = PIPELINE_IMPL_ALIGNMENT;
     };
+    template<>
+    struct ImplLayout<impl::FrameBufferImpl> {
+        static constexpr size_t SIZE = FRAME_BUFFER_IMPL_SIZE, ALIGNMENT = FRAME_BUFFER_IMPL_ALIGNMENT;
+    };
     inline constexpr size_t NO_SEPARATE_USE = std::numeric_limits<size_t>::max();
     template<typename Impl>
     struct ResourceSlotLayout {
@@ -80,6 +84,11 @@ namespace VSL_NAMESPACE::storage {
     struct ResourceSlotLayout<impl::PipelineImpl> {
         static constexpr size_t SIZE = PIPELINE_IMPL_SIZE, ALIGNMENT = PIPELINE_IMPL_ALIGNMENT, USE_OFFSET = NO_SEPARATE_USE;
     };
+    template<>
+    struct ResourceSlotLayout<impl::FrameBufferImpl> {
+        // Implに隣接するlifetime contextを含む。GPU UseStateではない。
+        static constexpr size_t SIZE = FRAME_BUFFER_SLOT_SIZE, ALIGNMENT = FRAME_BUFFER_SLOT_ALIGNMENT, USE_OFFSET = NO_SEPARATE_USE;
+    };
     enum class ResourceKind : std::uint32_t {
         BUFFER,
         IMAGE,
@@ -90,7 +99,8 @@ namespace VSL_NAMESPACE::storage {
         SHADER,
         PIPELINE_LAYOUT,
         RENDER_PASS,
-        PIPELINE
+        PIPELINE,
+        FRAME_BUFFER
     };
     struct SlotLayout {
         size_t size, alignment, use_offset;
@@ -112,6 +122,7 @@ namespace VSL_NAMESPACE::storage {
         using PipelineLayout = ResourceSlotLayout<impl::PipelineLayoutImpl>;
         using RenderPass = ResourceSlotLayout<impl::RenderPassImpl>;
         using Pipeline = ResourceSlotLayout<impl::PipelineImpl>;
+        using FrameBuffer = ResourceSlotLayout<impl::FrameBufferImpl>;
         switch (kind) {
             case ResourceKind::BUFFER:
                 return {Buffer::SIZE, Buffer::ALIGNMENT, Buffer::USE_OFFSET};
@@ -133,6 +144,8 @@ namespace VSL_NAMESPACE::storage {
                 return {RenderPass::SIZE, RenderPass::ALIGNMENT, RenderPass::USE_OFFSET};
             case ResourceKind::PIPELINE:
                 return {Pipeline::SIZE, Pipeline::ALIGNMENT, Pipeline::USE_OFFSET};
+            case ResourceKind::FRAME_BUFFER:
+                return {FrameBuffer::SIZE, FrameBuffer::ALIGNMENT, FrameBuffer::USE_OFFSET};
         }
         throw std::invalid_argument("Unknown resource implementation kind");
     }

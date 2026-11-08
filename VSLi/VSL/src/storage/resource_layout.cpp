@@ -7,8 +7,14 @@
 #include <VSL/lifetime/pipeline_layout_storage.hpp>
 #include <VSL/lifetime/render_pass_storage.hpp>
 #include <VSL/lifetime/pipeline_storage.hpp>
+#include <VSL/lifetime/frame_buffer_storage.hpp>
 
 namespace VSL_NAMESPACE::storage {
+    static_assert(sizeof(impl::FrameBufferImpl) == ImplLayout<impl::FrameBufferImpl>::SIZE);
+    static_assert(alignof(impl::FrameBufferImpl) == ImplLayout<impl::FrameBufferImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::FrameBufferSlotStorage) == ResourceSlotLayout<impl::FrameBufferImpl>::SIZE);
+    static_assert(alignof(lifetime::FrameBufferSlotStorage) == ResourceSlotLayout<impl::FrameBufferImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::FrameBufferImpl>::USE_OFFSET == NO_SEPARATE_USE);
     static_assert(sizeof(impl::PipelineImpl) == ImplLayout<impl::PipelineImpl>::SIZE);
     static_assert(alignof(impl::PipelineImpl) == ImplLayout<impl::PipelineImpl>::ALIGNMENT);
     static_assert(sizeof(lifetime::PipelineSlotStorage) == ResourceSlotLayout<impl::PipelineImpl>::SIZE);

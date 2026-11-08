@@ -68,13 +68,17 @@ add_library(VSL STATIC
         VSL/include/VSL/operation/graphics_pipeline_state.hpp
         VSL/src/private/VSL/operation/render_pass_ops.hpp
         VSL/src/private/VSL/operation/pipeline_ops.hpp
+        VSL/src/private/VSL/operation/frame_buffer_ops.hpp
         VSL/src/operation/render_pass_ops.cpp
         VSL/src/operation/pipeline_ops.cpp
+        VSL/src/operation/frame_buffer_ops.cpp
         VSL/src/operation/graphics_pipeline_state.cpp
         VSL/src/private/VSL/lifetime/render_pass_storage.hpp
         VSL/src/private/VSL/lifetime/pipeline_storage.hpp
+        VSL/src/private/VSL/lifetime/frame_buffer_storage.hpp
         VSL/src/lifetime/render_pass_storage.cpp
         VSL/src/lifetime/pipeline_storage.cpp
+        VSL/src/lifetime/frame_buffer_storage.cpp
         VSL/src/operation/pipeline_layout_ops.cpp
         VSL/src/private/VSL/lifetime/pipeline_layout_storage.hpp
         VSL/src/lifetime/pipeline_layout_storage.cpp

@@ -1,5 +1,6 @@
 #include "support/render_fixture.hpp"
 #include "support/read_image.hpp"
+#include "support/frame_buffer_metadata.hpp"
 #include <VSL/lifetime/resource_arena.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
 
@@ -53,11 +54,7 @@ namespace {
         EXPECT_THROW((vsl::RenderPass(missing, vsl::RenderPassDescription{})), std::invalid_argument);
     }
     TEST(RenderPassPlacementTest, MissingDescriptionIsRejectedByBothClearConstructors) {
-        auto data = std::make_shared<vsl::impl::FrameBufferImpl>();
-        data->render_pass = std::make_shared<vsl::impl::RenderPassImpl>();
-        data->swap_chain_framebuffers.emplace_back();
-        data->extent = vk::Extent2D{1, 1};
-        const vsl::FrameBufferAccessor target{data};
+        const auto target = vsl_test::metadata_frame_buffer(std::make_shared<vsl::impl::RenderPassImpl>());
         EXPECT_THROW((vsl::command::RenderPassBegin(target, std::vector<vsl::ClearValue>{})), std::logic_error);
         EXPECT_THROW((vsl::command::RenderPassBegin::WithClears(target, {})), std::logic_error);
     }

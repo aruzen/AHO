@@ -33,7 +33,8 @@ namespace VSL_NAMESPACE {
     class ResourceUseState;
     namespace lifetime {
         struct DescriptorOwnerContext;
-    }
+        struct FrameBufferOwnerContext;
+    } // namespace lifetime
     namespace graphic_resource {
         struct ManagerInterface;
     }
@@ -127,6 +128,7 @@ namespace VSL_NAMESPACE::impl {
         std::optional<std::uint32_t> acquired_image_index;
         std::weak_ptr<SwapchainImpl> acquired_swapchain;
         bool recording = false;
+        bool frame_buffer_recording = false;
 
         ~CommandBufferImpl();
     };
@@ -243,12 +245,18 @@ namespace VSL_NAMESPACE::impl {
     struct ImageImpl;
 
     struct FrameBufferImpl {
-        std::shared_ptr<LogicalDeviceImpl> device;
-        std::shared_ptr<SwapchainImpl> swapchain;
-
+        FrameBufferImpl() = default;
+        FrameBufferImpl(const FrameBufferImpl&) = delete;
+        FrameBufferImpl(FrameBufferImpl&&) = delete;
+        FrameBufferImpl& operator=(const FrameBufferImpl&) = delete;
+        FrameBufferImpl& operator=(FrameBufferImpl&&) = delete;
+        lifetime::DependencyNode* owner_node = nullptr;
+        LogicalDeviceImpl* device = nullptr;
+        vk::Device native_device;
+        lifetime::FrameBufferOwnerContext* owner_context = nullptr;
         std::vector<vk::Framebuffer> swap_chain_framebuffers;
-        std::shared_ptr<RenderPassImpl> render_pass;
-        std::vector<std::vector<std::shared_ptr<ImageImpl>>> attachments;
+        RenderPassImpl* render_pass = nullptr;
+        std::vector<std::vector<ImageImpl*>> attachments;
         vk::Extent2D extent;
         std::uint32_t layers = 1;
 

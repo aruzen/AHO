@@ -8,6 +8,18 @@
 #include <algorithm>
 
 namespace VSL_NAMESPACE::typed::detail {
+    void freeze_descriptor_dependencies(const GraphicResource& resource) {
+        const auto data = resource.data_;
+        if (!data || !data->owner_context)
+            throw std::invalid_argument("Descriptor freeze requires a managed resource");
+        if (!data->owner_node || data->owner_node->retiring() || !data->owner_node->matches(data) ||
+            data->owner_node != &data->owner_context->node)
+            throw std::invalid_argument("Descriptor freeze requires its canonical owner");
+        if (!data->owner_context->single_resource)
+            throw std::invalid_argument("Freeze all arena descriptors through ResourceArena");
+        const std::array sets{data.get()};
+        lifetime::freeze_descriptor_dependencies(*data->owner_context, sets);
+    }
     lifetime::OwnedRef<impl::ImageImpl> descriptor_owner(const ImageAccessor& image) {
         return lifetime::detail::owned_ref(image.data_, image.data_ ? image.data_->owner_node : nullptr);
     }

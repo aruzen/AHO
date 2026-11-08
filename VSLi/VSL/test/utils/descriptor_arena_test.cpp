@@ -69,6 +69,73 @@ namespace {
         return read_value(output);
     }
 
+    TEST_F(DescriptorArenaVulkanIntegrationTest, FreezeRejectsASeparateControlBlockBeforePollingTheRealResource) {
+        vsl::GraphicResourceManager descriptors(device);
+        TypedSet source(device, descriptors);
+        vsl::GraphicResource forged{{std::make_shared<int>(0), source.backend().data_.get()}};
+        auto imported = TypedSet::FromResource(device, forged);
+        EXPECT_THROW(imported.freeze_dependencies(), std::invalid_argument);
+        EXPECT_EQ(source.backend().data_->owner_context->policy, l::DependencyPolicy::DYNAMIC);
+        EXPECT_FALSE(source.backend().data_->owner_context->node.updating());
+    }
+    TEST_F(DescriptorArenaVulkanIntegrationTest, FreezeFailureKeepsDynamicOwnersAndCanBeRetriedAfterCancellation) {
+        const auto initializers = inputs();
+        l::ResourceArena arena(device, PLAN, initializers, l::DependencyPolicy::DYNAMIC);
+        auto first = TypedSet::FromResource(device, arena.descriptor_set({101}));
+        auto second = TypedSet::FromResource(device, arena.descriptor_set({102}));
+        t::TypedUniformBuffer<std::uint32_t> external(device, 7u), other(device, 9u);
+        for (auto* set : {&first, &second}) {
+            set->write<0>(external);
+            set->write<1>(StorageView::FromView(arena.buffer({2}), 1));
+        }
+        EXPECT_THROW(first.freeze_dependencies(), std::invalid_argument);
+        auto manager = make_manager();
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        second.resource_use()->record(manager.get_buffer());
+        EXPECT_THROW(arena.freeze_dependencies(), std::logic_error);
+        EXPECT_EQ(first.backend().data_->owner_context->policy, l::DependencyPolicy::DYNAMIC);
+        EXPECT_FALSE(first.backend().data_->owner_context->node.updating());
+        phase.cancel();
+        EXPECT_NO_THROW(arena.freeze_dependencies());
+        EXPECT_EQ(first.backend().data_->owner_context->policy, l::DependencyPolicy::FIXED);
+        EXPECT_TRUE(first.backend().data_->bindings.at(0).front().owners.empty());
+        EXPECT_TRUE(second.backend().data_->bindings.at(0).front().owners.empty());
+        EXPECT_NO_THROW(first.write<0>(external));
+        EXPECT_THROW(second.write<0>(other), std::invalid_argument);
+    }
+    TEST_F(DescriptorArenaVulkanIntegrationTest, FreezeGatesPollCallbacksAndPinsTheRootWhenItsFacadeIsDestroyed) {
+        const auto initializers = inputs();
+        std::optional<l::ResourceArena> arena(std::in_place, device, PLAN, initializers, l::DependencyPolicy::DYNAMIC);
+        std::optional<TypedSet> first(TypedSet::FromResource(device, arena->descriptor_set({101})));
+        std::optional<TypedSet> second(TypedSet::FromResource(device, arena->descriptor_set({102})));
+        first->write<0>(UniformView::FromView(arena->buffer({1}), 1));
+        second->write<0>(UniformView::FromView(arena->buffer({1}), 1));
+        first->write<1>(StorageView::FromView(arena->buffer({2}), 1));
+        second->write<1>(StorageView::FromView(arena->buffer({3}), 1));
+        std::weak_ptr<void> root = arena->owner();
+        auto manager = make_manager();
+        auto reentrant = make_manager().independent(1);
+        auto recording = reentrant.start_phase<vsl::ComputePhase>();
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        second->resource_use()->record(manager.get_buffer());
+        bool callback = false;
+        manager.get_buffer().retain_until_complete(std::shared_ptr<int>(new int(0), [&](int* value) {
+            delete value;
+            callback = true;
+            EXPECT_THROW(first->resource_use()->record(reentrant.get_buffer()), std::logic_error);
+            first.reset();
+            second.reset();
+            arena.reset();
+            EXPECT_FALSE(root.expired());
+        }));
+        ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        device.data_->device.waitIdle();
+        EXPECT_NO_THROW(arena->freeze_dependencies());
+        EXPECT_TRUE(callback);
+        EXPECT_FALSE(arena);
+        recording.cancel();
+        EXPECT_TRUE(root.expired());
+    }
     TEST_F(DescriptorArenaVulkanIntegrationTest, ReorderedDependenciesAndTwoSetSlotsUseTypedCommandsAndOneOwner) {
         const auto initializers = inputs();
         l::ResourceArena arena(device, PLAN, initializers);

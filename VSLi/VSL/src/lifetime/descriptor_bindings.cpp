@@ -51,10 +51,9 @@ namespace VSL_NAMESPACE::lifetime {
         }
     } // namespace
     void DescriptorOwnerContext::normalize(std::vector<OwnerRef>& owners) const {
-        const auto root = node.owner_ref();
         const auto borrowed = [&](const auto& owner) {
             const auto same = [&](const auto& known) { return !known.owner_before(owner) && !owner.owner_before(known); };
-            return same(root) || std::ranges::any_of(dependencies, same);
+            return node.matches(detail::OwnerAccess::Shared(owner)) || std::ranges::any_of(dependencies, same);
         };
         for (const auto& owner : owners) {
             if (owner.use_count() && !borrowed(owner) && policy == DependencyPolicy::FIXED)
@@ -65,6 +64,40 @@ namespace VSL_NAMESPACE::lifetime {
     void visit_descriptor_edges(const impl::GraphicResourceImpl& resource, DependencyNode::EdgeVisitor visitor, void* context) {
         for (const auto& [binding, elements] : resource.bindings)
             visit_elements(elements, visitor, context);
+    }
+    void freeze_descriptor_dependencies(DescriptorOwnerContext& context, std::span<impl::GraphicResourceImpl* const> resources) {
+        if (context.policy == DependencyPolicy::FIXED)
+            return;
+        if (!context.dependency_storage)
+            throw std::logic_error("Descriptor owner cannot freeze dependencies");
+        context.node.begin_update();
+        struct Guard {
+            DependencyNode& node;
+            ~Guard() { node.end_update(); }
+        } guard{context.node};
+        for (auto* resource : resources) {
+            if (!resource || resource->owner_context != &context)
+                throw std::invalid_argument("Descriptor freeze requires one ownership root");
+            require_descriptor_valid(*resource);
+            if (resource->recording)
+                throw std::logic_error("Descriptor resource is being recorded");
+            resource->use.require_idle();
+            require_descriptor_valid(*resource);
+        }
+        auto prepared = *context.dependency_storage;
+        for (const auto* resource : resources)
+            visit_descriptor_edges(*resource, [](void* output, const OwnerRef& owner) { detail::retain_owner(*static_cast<std::vector<OwnerRef>*>(output), owner); }, &prepared);
+        context.node.check_additions(prepared);
+        context.dependency_storage->swap(prepared);
+        context.dependencies = *context.dependency_storage;
+        context.policy = DependencyPolicy::FIXED;
+        // 全ownerを固定親へ移した後にだけ内部参照へ正規化する。
+        for (auto* resource : resources)
+            for (auto& [binding, elements] : resource->bindings)
+                for (auto& element : elements) {
+                    context.normalize(element.owners);
+                    context.normalize(element.constraint.owners);
+                }
     }
     impl::GraphicResourceImpl::BindingConstraint descriptor_constraint(const ResourceUse& use, const DescriptorOwnerContext* context) {
         impl::GraphicResourceImpl::BindingConstraint result;

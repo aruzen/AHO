@@ -1,6 +1,7 @@
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/lifetime/resource_arena.hpp>
 #include <VSL/lifetime/synchronization_storage.hpp>
+#include <VSL/lifetime/dependency_node.hpp>
 #include <VSL/utils/typed_frame_resources.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 #include <limits>
@@ -28,8 +29,12 @@ namespace VSL_NAMESPACE::typed::detail {
             manager.data_->command_pool.get() != buffer.data_->command_pool ||
             buffer.data_->command_buffers.size() != count || buffer.data_->current_buffer_idx >= count)
             throw std::invalid_argument("Typed frame commands require their original buffer ring");
-        (void)buffer.owner_ref();
-        (void)CommandPool{manager.data_->command_pool}.owner_ref();
+        const auto& pool = manager.data_->command_pool;
+        const auto* ring_node = buffer.data_->owner_node;
+        const auto* pool_node = pool ? pool->owner_node : nullptr;
+        if (!ring_node || ring_node->retiring() || !ring_node->matches(buffer.data_) ||
+            !pool_node || pool_node->retiring() || !pool_node->matches(pool))
+            throw std::invalid_argument("Typed frame commands require their canonical ring and pool owners");
     }
 
     FrameResourceAccess FrameResourceDomain::access(const ComputePhase& phase) const {
@@ -38,7 +43,7 @@ namespace VSL_NAMESPACE::typed::detail {
         require_current();
         const auto completion = phase.completion();
         if (phase.state != ComputePhase::State::WAIT_SUBMIT || !completion ||
-            completion.status() != Completion::Status::PENDING || !buffer.data_->recording_context->recording ||
+            completion.status() != Completion::Status::PENDING || !buffer.data_->recording_context || !buffer.data_->recording_context->recording ||
             (!buffer.data_->recording_context->work || buffer.data_->recording_context->work->result != completion.data_) ||
             phase.frame_slot != buffer.data_->current_buffer_idx ||
             phase.frame_slot >= count || buffer.data_->command_buffers.size() != count)

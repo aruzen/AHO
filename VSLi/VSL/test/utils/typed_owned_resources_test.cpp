@@ -1,5 +1,6 @@
 #include "support/vulkan_fixture.hpp"
 #include <VSL/utils/typed_resource_bundle.hpp>
+#include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/vulkan/commands/image_upload.hpp>
 #include <VSL/vulkan/commands/image_readback.hpp>
@@ -51,6 +52,12 @@ namespace {
     }
     auto FailingDescriptorManager::allocate(std::vector<vsl::graphic_resource::BindingLayout> layouts) -> std::tuple<std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>> {
         if (auto previous = _previous.lock(); fail && previous) {
+            for (const auto& owner : previous->owner_context->dependencies) {
+                const auto shared = owner.share();
+                const auto matches = [&](const auto* node) { return node && node->matches(shared); };
+                if (!matches(previous->pool->owner_node) && !matches(previous->allocation_layout->owner_node))
+                    observed.push_back(shared);
+            }
             for (const auto& [binding, elements] : previous->bindings)
                 for (const auto& element : elements)
                     for (const auto& owner : element.owners)

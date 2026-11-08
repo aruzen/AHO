@@ -351,6 +351,33 @@ namespace {
             ASSERT_TRUE(peer->completion().wait());
         }
     }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, PreparationCanReleaseTheCurrentPostponedPhase) {
+        for (const bool through_shared_fence : {false, true}) {
+            SCOPED_TRACE(through_shared_fence);
+            auto manager = make_manager().independent(1);
+            auto source = through_shared_fence ? make_manager().independent(1) : manager;
+            vsl::SynchroManager sync(device);
+            const auto fence = sync.create_fence("completion");
+            std::unique_ptr<vsl::ComputePhase> pending;
+            bool invoked = false;
+            const vsl_test::DeferredAction callback([&] {
+                invoked = true;
+                pending.reset();
+            });
+            {
+                auto previous = source.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence);
+                source.get_buffer().retain_until_complete(callback.owner());
+                ASSERT_EQ(previous.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            }
+            pending = std::make_unique<vsl::ComputePhase>(manager, std::nullopt, std::nullopt, fence, true);
+            EXPECT_NO_THROW(pending->setup());
+            EXPECT_TRUE(invoked);
+            EXPECT_FALSE(pending);
+            auto next = manager.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence);
+            EXPECT_EQ(next.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            EXPECT_TRUE(next.completion().wait());
+        }
+    }
     TEST_F(PhaseCompletionVulkanIntegrationTest, SubmitPreflightFailurePublishesFailureAndReleasesCompletionPinsOnce) {
         auto manager = make_manager();
         vsl::SynchroManager sync(device);
@@ -381,6 +408,32 @@ namespace {
         return true;
     }
 
+    TEST_F(PresentPhaseWindowIntegrationTest, PreparationCanReleaseTheCurrentPostponedPhaseBeforeAcquisition) {
+        make_surface();
+        ASSERT_FALSE(HasFatalFailure());
+        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+            GTEST_SKIP() << "Graphics queue cannot present";
+        auto manager = make_manager().independent(1);
+        vsl::Swapchain chain(device, surface, {}, 64, 48);
+        std::unique_ptr<vsl::DefaultPhase> pending;
+        bool invoked = false;
+        const vsl_test::DeferredAction callback([&] {
+            invoked = true;
+            pending.reset();
+        });
+        {
+            auto previous = manager.start_phase<vsl::ComputePhase>();
+            manager.get_buffer().retain_until_complete(callback.owner());
+            ASSERT_EQ(previous.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        pending = std::make_unique<vsl::DefaultPhase>(manager, chain, std::nullopt, std::nullopt, std::nullopt, true);
+        EXPECT_NO_THROW(pending->setup());
+        EXPECT_TRUE(invoked);
+        EXPECT_FALSE(pending);
+        auto next = manager.start_phase<vsl::DefaultPhase>(chain);
+        next.cancel();
+        EXPECT_TRUE(next.completion().wait());
+    }
     TEST_F(PresentPhaseWindowIntegrationTest, UsesAcquiredImageForFramebufferReadbackAndPresentAcrossFrames) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());

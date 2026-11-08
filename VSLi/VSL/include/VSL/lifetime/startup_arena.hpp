@@ -29,6 +29,7 @@ namespace VSL_NAMESPACE::lifetime {
         // 直接渡すSurfaceは生成中だけ保持する。永続依存へ追加しない。
         SurfaceSource surface;
         bool validation = VALIDATION;
+        PresentFencePolicy present_fences = PresentFencePolicy::LEGACY;
     };
     using StartupInit = std::variant<InstanceCreateInfo, PhysicalDeviceInit, SurfaceInit, DeviceInit, GraphicsDeviceInit,
                                      VulkanAccessor, PhysicalDevice, Surface, LogicalDeviceAccessor>;

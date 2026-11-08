@@ -1,10 +1,20 @@
 #include <VSL/lifetime/glfw_lease.hpp>
 #include <VSL/vulkan/vulkan.hpp>
+#include <vulkan/vulkan_core.h>
 #include <GLFW/glfw3.h>
 #include <stdexcept>
 
 namespace VSL_NAMESPACE::lifetime {
-    InstanceCreateInfo glfw_instance_info(InstanceCreateInfo info) {
+    InstanceCreateInfo glfw_instance_info(InstanceCreateInfo info, PresentFencePolicy present_fences) {
+        if (present_fences != PresentFencePolicy::LEGACY && present_fences != PresentFencePolicy::REQUIRE_FENCE)
+            throw std::invalid_argument("Unknown presentation fence policy");
+        if (present_fences == PresentFencePolicy::REQUIRE_FENCE) {
+            info.extensions.emplace_back(VK_KHR_SURFACE_EXTENSION_NAME);
+            info.extensions.emplace_back(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
+            info.extensions.emplace_back(VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME);
+            if (!info.api_version || info.api_version < VK_API_VERSION_1_1)
+                info.extensions.emplace_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+        }
         GLFWCallScope scope;
         const auto lease = GLFWLease::Acquire();
         std::uint32_t count = 0;

@@ -9,7 +9,8 @@ namespace VSL_NAMESPACE::operation {
         void (*destroy)(void*, VkDevice) noexcept = nullptr;
     };
     DeviceFeature supported_device_features(impl::PhysicalDeviceImpl& physical);
-    DeviceCreateInfo graphics_device_info(impl::PhysicalDeviceImpl& physical, impl::SurfaceImpl& surface, bool validation);
+    DeviceCreateInfo graphics_device_info(impl::PhysicalDeviceImpl& physical, impl::SurfaceImpl& surface, bool validation,
+                                          PresentFencePolicy present_fences = PresentFencePolicy::LEGACY);
     void initialize_device(impl::LogicalDeviceImpl& target, impl::PhysicalDeviceImpl& physical, DeviceCreateInfo info,
                            const DeviceNativeCalls& calls = {});
     void destroy_device(impl::LogicalDeviceImpl& target, const DeviceNativeCalls& calls = {}) noexcept;

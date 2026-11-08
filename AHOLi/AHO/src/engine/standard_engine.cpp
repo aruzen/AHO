@@ -25,6 +25,9 @@ namespace {
             throw std::invalid_argument("StandardEngine requires an application name");
         if (config.initial_window.width <= 0 || config.initial_window.height <= 0)
             throw std::invalid_argument("StandardEngine requires positive initial window dimensions");
+        if (config.engine.present_fences != VSL_NAMESPACE::PresentFencePolicy::LEGACY &&
+            config.engine.present_fences != VSL_NAMESPACE::PresentFencePolicy::REQUIRE_FENCE)
+            throw std::invalid_argument("Unknown presentation fence policy");
         std::size_t remaining = std::numeric_limits<std::uint32_t>::max();
         for (const auto& [type, amount] : config.engine.descriptor_budget) {
             if (type > VSL_NAMESPACE::graphic_resource::Type::INPUT_ATTACHMENT || amount == 0 || amount > remaining)
@@ -49,7 +52,7 @@ namespace {
         }
         const std::array instance_requests{storage::StartupRequest{{0}, storage::StartupKind::INSTANCE}};
         const storage::StartupPlan<1> instance_plan(instance_requests);
-        const std::array<lifetime::StartupInit, 1> instance_inputs{lifetime::glfw_instance_info(std::move(instance_info))};
+        const std::array<lifetime::StartupInit, 1> instance_inputs{lifetime::glfw_instance_info(std::move(instance_info), config.present_fences)};
         lifetime::StartupArena instance_arena(instance_plan, instance_inputs);
         Vulkan<> instance(instance_arena.instance({0}));
         auto surface = AHO_NAMESPACE::window::detail::make_window_surface(window, instance);
@@ -58,7 +61,7 @@ namespace {
         const storage::StartupPlan<2> device_plan(device_requests);
         const std::array<lifetime::StartupInit, 2> device_inputs{
             lifetime::PhysicalDeviceInit{instance, config.physical_device_index},
-            lifetime::GraphicsDeviceInit{typed::ResourceId{1}, *surface, VALIDATION}};
+            lifetime::GraphicsDeviceInit{typed::ResourceId{1}, *surface, VALIDATION, config.present_fences}};
         lifetime::StartupArena device_arena(device_plan, device_inputs);
         auto physical = device_arena.physical_device({1});
         auto device = device_arena.device({2});

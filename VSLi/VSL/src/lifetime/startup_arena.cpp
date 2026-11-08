@@ -226,7 +226,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
             resource.reference = &device_at(storage);
         } else if (const auto* graphics = std::get_if<GraphicsDeviceInit>(&input)) {
             auto& physical = resolve(graphics->physical);
-            auto info = operation::graphics_device_info(physical, resolve(graphics->surface), graphics->validation);
+            auto info = operation::graphics_device_info(physical, resolve(graphics->surface), graphics->validation, graphics->present_fences);
             construct_device(storage, physical, std::move(info));
             resource.reference = &device_at(storage);
         }

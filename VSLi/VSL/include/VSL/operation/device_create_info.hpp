@@ -6,6 +6,11 @@
 #include <vector>
 
 namespace VSL_NAMESPACE {
+    // 生成時の能力要求。10aでは有効化までで、Fence付きpresent／厳密回収は10cで接続する。
+    enum class PresentFencePolicy {
+        LEGACY,
+        REQUIRE_FENCE
+    };
     enum class DeviceFeature : std::uint64_t {
         NONE = 0,
         ROBUST_BUFFER_ACCESS = 1ull << 0,
@@ -63,7 +68,8 @@ namespace VSL_NAMESPACE {
         SPARSE_RESIDENCY_ALIASED = 1ull << 52,
         VARIABLE_MULTISAMPLE_RATE = 1ull << 53,
         INHERITED_QUERIES = 1ull << 54,
-        TIMELINE_SEMAPHORE = 1ull << 55
+        TIMELINE_SEMAPHORE = 1ull << 55,
+        SWAPCHAIN_MAINTENANCE1 = 1ull << 56
     };
     struct DeviceQueueRequest {
         std::uint32_t family = 0;

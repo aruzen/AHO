@@ -37,6 +37,8 @@ namespace AHO_NAMESPACE::engine {
             {VSL_NAMESPACE::graphic_resource::Type::STORAGE_TEXEL_BUFFER, 100},
             {VSL_NAMESPACE::graphic_resource::Type::UNIFORM_BUFFER, 100},
             {VSL_NAMESPACE::graphic_resource::Type::STORAGE_BUFFER, 100}};
+        // 生成時の能力要求。presentでのFence使用と厳密回収は後続の10cで接続する。
+        VSL_NAMESPACE::PresentFencePolicy present_fences = VSL_NAMESPACE::PresentFencePolicy::LEGACY;
     };
 
     struct EngineData {

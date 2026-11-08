@@ -18,7 +18,8 @@ namespace VSL_NAMESPACE {
         Viewport(VSLD2RectangleAccessor<float> rect);
         Viewport(SwapchainAccessor swapchain);
 
-        void injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl);
+        void injection(GraphicsPipelineStateEditRef state);
+        void injection(PipelineLayoutEditAccessor pl);
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
     };
 } // namespace VSL_NAMESPACE

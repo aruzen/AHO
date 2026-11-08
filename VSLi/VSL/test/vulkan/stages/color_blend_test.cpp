@@ -19,6 +19,6 @@ namespace {
         EXPECT_EQ(attachment.colorBlendOp, vk::BlendOp::eAdd);
         EXPECT_FALSE(state.logicOpEnable);
         pl::ColorBlend{}.injection(layout);
-        EXPECT_EQ(layout.recipe().blend_attachments.size(), 2u);
+        EXPECT_EQ(layout.recipe().graphics_state.blend_attachments.size(), 2u);
     }
 } // namespace

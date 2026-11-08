@@ -33,18 +33,18 @@ VSL_NAMESPACE::GraphicsPipeline::GraphicsPipeline(VSL_NAMESPACE::PipelineLayoutA
     if (!layout.data_ || !layout.has_recipe() || layout.data_->device != pass.data_->device)
         throw std::invalid_argument("Pipeline requires initialized layout and pass on the same device");
     const auto& outputs = pass.description().subpasses[subpass];
-    if (layout.recipe().blend_attachments.size() != outputs.colors.size())
+    if (layout.recipe().graphics_state.blend_attachments.size() != outputs.colors.size())
         throw std::invalid_argument("Pipeline color blend count does not match subpass outputs");
     for (auto ref : outputs.colors)
-        if (ref.attachment != UNUSED_ATTACHMENT && layout.recipe().multisample.rasterizationSamples !=
+        if (ref.attachment != UNUSED_ATTACHMENT && layout.recipe().graphics_state.multisample.rasterizationSamples !=
                                                        static_cast<vk::SampleCountFlagBits>(pass.description().attachments[ref.attachment].samples))
             throw std::invalid_argument("Pipeline sample count does not match subpass");
     if (outputs.depth_stencil && outputs.depth_stencil->attachment != UNUSED_ATTACHMENT &&
-        layout.recipe().multisample.rasterizationSamples != static_cast<vk::SampleCountFlagBits>(
-                                                                pass.description().attachments[outputs.depth_stencil->attachment].samples))
+        layout.recipe().graphics_state.multisample.rasterizationSamples != static_cast<vk::SampleCountFlagBits>(
+                                                                               pass.description().attachments[outputs.depth_stencil->attachment].samples))
         throw std::invalid_argument("Pipeline depth sample count does not match subpass");
     const auto stages = shader_stages(layout);
-    const operation::PipelineScratch scratch(layout.recipe());
+    const operation::PipelineScratch scratch(layout.recipe().graphics_state);
     data_ = std::shared_ptr<impl::PipelineImpl>(new impl::PipelineImpl);
     data_->device = layout.get_device().data_;
     data_->layout = layout.data_;
@@ -57,12 +57,12 @@ VSL_NAMESPACE::GraphicsPipeline::GraphicsPipeline(VSL_NAMESPACE::PipelineLayoutA
     pipeline_info.stageCount = static_cast<std::uint32_t>(stages.size());
     pipeline_info.pStages = stages.data();
     pipeline_info.pVertexInputState = &scratch.vertex_input;
-    pipeline_info.pInputAssemblyState = &layout.recipe().input_assembly;
+    pipeline_info.pInputAssemblyState = &layout.recipe().graphics_state.input_assembly;
     pipeline_info.pViewportState = &scratch.viewport;
-    pipeline_info.pRasterizationState = &layout.recipe().rasterization;
-    pipeline_info.pMultisampleState = &layout.recipe().multisample;
-    if (layout.recipe().depth_stencil)
-        pipeline_info.pDepthStencilState = &layout.recipe().depth_stencil.value();
+    pipeline_info.pRasterizationState = &layout.recipe().graphics_state.rasterization;
+    pipeline_info.pMultisampleState = &layout.recipe().graphics_state.multisample;
+    if (layout.recipe().graphics_state.depth_stencil)
+        pipeline_info.pDepthStencilState = &layout.recipe().graphics_state.depth_stencil.value();
     else
         pipeline_info.pDepthStencilState = nullptr;
     pipeline_info.pColorBlendState = &scratch.color_blend;

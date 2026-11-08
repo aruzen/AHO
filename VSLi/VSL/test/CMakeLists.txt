@@ -284,4 +284,17 @@ if (VSL_TEST_SOURCES)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
         set_tests_properties("VSL.RenderPass.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
     endforeach()
+    add_library(vsl-graphics-state-style-contract OBJECT EXCLUDE_FROM_ALL contracts/graphics_pipeline_state.cpp)
+    target_link_libraries(vsl-graphics-state-style-contract PRIVATE VSL)
+    target_compile_definitions(vsl-graphics-state-style-contract PRIVATE VSL_TYPED_CASE=0)
+    set(graphics_state_contract_names Valid ShaderSource DescriptorSource PushSource TemporaryEdit ConstTemporaryDefinition TemporaryLayoutState)
+    foreach(case RANGE 0 6)
+        list(GET graphics_state_contract_names ${case} name)
+        add_test(NAME "VSL.GraphicsState.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/graphics_pipeline_state.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=GraphicsPipelineState|deleted"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.GraphicsState.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
 endif ()

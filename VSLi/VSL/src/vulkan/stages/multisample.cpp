@@ -2,7 +2,11 @@
 #include <VSL/vulkan/_pimpls.hpp>
 
 void VSL_NAMESPACE::pipeline_layout::Multisample::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
-    auto& info = pl.edit_recipe();
+    injection(pl.edit_state());
+}
+
+void VSL_NAMESPACE::pipeline_layout::Multisample::injection(VSL_NAMESPACE::GraphicsPipelineStateEditRef state) {
+    auto& info = state.get();
 
     info.multisample.sampleShadingEnable = false;
     info.multisample.rasterizationSamples = static_cast<vk::SampleCountFlagBits>(samples);

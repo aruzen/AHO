@@ -210,8 +210,8 @@ namespace {
         pl::VertexInput invalid({{.layouts = {{vsl::data_format::FLOAT_RG, 0,
                                                std::numeric_limits<std::uint32_t>::max() - 2}}}});
         EXPECT_THROW(invalid.injection(layout), vsl::exceptions::RuntimeException);
-        const auto& bindings = layout.recipe().vertex_bindings;
-        const auto& attributes = layout.recipe().vertex_attributes;
+        const auto& bindings = layout.recipe().graphics_state.vertex_bindings;
+        const auto& attributes = layout.recipe().graphics_state.vertex_attributes;
         ASSERT_EQ(bindings.size(), 1u);
         ASSERT_EQ(attributes.size(), 1u);
         const auto& native = vsl_test::inspect_layout(layout).vertex_input;

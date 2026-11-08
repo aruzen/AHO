@@ -31,6 +31,7 @@ namespace VSL_NAMESPACE::pipeline_layout {
         CompareOp depth_compare = CompareOp::LESS;
         bool stencil_test = false;
         StencilFace front, back;
+        void injection(GraphicsPipelineStateEditRef state);
         void injection(PipelineLayoutEditAccessor pl);
     };
 } // namespace VSL_NAMESPACE::pipeline_layout

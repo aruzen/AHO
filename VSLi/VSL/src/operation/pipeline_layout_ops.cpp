@@ -92,18 +92,18 @@ namespace VSL_NAMESPACE::operation {
             target.native_device.destroyPipelineLayout(target.pipeline_layout);
         target.pipeline_layout = nullptr;
     }
-    PipelineScratch::PipelineScratch(const impl::PipelineRecipe& recipe) : color_blend(recipe.color_blend) {
-        dynamic_state.dynamicStateCount = count(recipe.enabled_dynamic_states.size());
-        dynamic_state.pDynamicStates = recipe.enabled_dynamic_states.data();
-        vertex_input.vertexBindingDescriptionCount = count(recipe.vertex_bindings.size());
-        vertex_input.pVertexBindingDescriptions = recipe.vertex_bindings.data();
-        vertex_input.vertexAttributeDescriptionCount = count(recipe.vertex_attributes.size());
-        vertex_input.pVertexAttributeDescriptions = recipe.vertex_attributes.data();
-        viewport.viewportCount = count(recipe.viewports.size());
-        viewport.pViewports = recipe.viewports.data();
-        viewport.scissorCount = count(recipe.scissors.size());
-        viewport.pScissors = recipe.scissors.data();
-        color_blend.attachmentCount = count(recipe.blend_attachments.size());
-        color_blend.pAttachments = recipe.blend_attachments.data();
+    PipelineScratch::PipelineScratch(const impl::GraphicsPipelineStateData& state) : color_blend(state.color_blend) {
+        dynamic_state.dynamicStateCount = count(state.enabled_dynamic_states.size());
+        dynamic_state.pDynamicStates = state.enabled_dynamic_states.data();
+        vertex_input.vertexBindingDescriptionCount = count(state.vertex_bindings.size());
+        vertex_input.pVertexBindingDescriptions = state.vertex_bindings.data();
+        vertex_input.vertexAttributeDescriptionCount = count(state.vertex_attributes.size());
+        vertex_input.pVertexAttributeDescriptions = state.vertex_attributes.data();
+        viewport.viewportCount = count(state.viewports.size());
+        viewport.pViewports = state.viewports.data();
+        viewport.scissorCount = count(state.scissors.size());
+        viewport.pScissors = state.scissors.data();
+        color_blend.attachmentCount = count(state.blend_attachments.size());
+        color_blend.pAttachments = state.blend_attachments.data();
     }
 } // namespace VSL_NAMESPACE::operation

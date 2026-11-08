@@ -32,7 +32,7 @@ function(vsl_generate_buffer_layout)
     foreach(api IN ITEMS lifetime/resource_id.hpp lifetime/resource_plan.hpp lifetime/resource_arena.hpp lifetime/logical_use_state.hpp
             lifetime/owner_ref.hpp lifetime/dependency_node.hpp
             lifetime/buffer_view.hpp storage/resource_layout.hpp storage/arena_memory.hpp operation/buffer_create_info.hpp
-            operation/image_create_info.hpp operation/sampler_create_info.hpp operation/descriptor_create_info.hpp operation/shader_create_info.hpp operation/pipeline_layout_create_info.hpp operation/render_pass_description.hpp
+            operation/image_create_info.hpp operation/sampler_create_info.hpp operation/descriptor_create_info.hpp operation/shader_create_info.hpp operation/pipeline_layout_create_info.hpp operation/render_pass_description.hpp operation/graphics_pipeline_state.hpp
             vulkan/buffer_and_image_accessor.hpp vulkan/sampler.hpp vulkan/descriptor.hpp vulkan/shader.hpp vulkan/pipeline_layout.hpp vulkan/render_pass.hpp)
         file(SHA256 "${VSL_HOME}/include/VSL/${api}" api_hash)
         string(APPEND public_layout_hashes ";${api_hash}")

@@ -108,6 +108,10 @@ Layout数は宣言set数のResources::COUNT、Set数はshared／frameの実数�
 
 7aは[RenderPassの共通backendとCPU配置](render-pass-arena.md)を実装した。不変descriptionをImpl内へ置き、通常／arenaの生成、外部importの正規owner、失敗時rollback、lvalueの借用制約とGPU完了／取消までの保持を検証した。Pipeline／Framebufferの配置は未実装であり、順序7全体は未完了である。次は7bへ進む。
 
+7bのstate入力は、Device／native／source ownerを含まない`GraphicsPipelineState`の深い値型にする。公開値は不完全な内部データをunique_ptrで所有し、既存Recipeは同じデータ型をinlineで持つ。これにより既存Layoutにはstate用の追加確保を増やさない。固定stageの注入本体を借用EditRefへ移し、旧Layout注入は委譲する。生成入力のCPU確保はnative資源配置と区別して監査する。Shader／Pass／Layoutを必要とするstageをstate-only入力へ混ぜない。Typedの入口では実Shaderを検証し、型名だけを付ける無検査の変換を追加しない。
+
+[7b前半のstate分離](graphics-pipeline-state.md)を先に独立した変更として実装・検証する。後半のPipeline operation／heap所有／寸法／arena配置まで7bを完了扱いしない。
+
 Pipelineが記録時に使うLayoutは保持し、Shader／Pass／再生成recipeは生成時依存へ分ける。Framebufferから既定Passとclear descriptionを参照するVSLの契約は、native生成時だけの依存と区別する。attachment Imageの既存物理UseStateを使い、RenderPass／Pipeline／Framebufferへ独立したGPU UseStateは追加しない。
 
 現frame_buffer.cppにはnative createFramebuffer成功後のpush_back確保失敗で未登録handleを残す経路がある。共通backendへの移行時にlocal RAIIまたは先行確保とcommitを用い、途中失敗を巻き戻す。resizeは待機→次世代構築→公開→hook通知を維持し、失敗時の旧世代、保存command／旧view、互換Pipelineの再利用を検証する。

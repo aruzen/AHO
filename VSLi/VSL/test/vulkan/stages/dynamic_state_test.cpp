@@ -7,9 +7,9 @@ namespace {
         auto layout = make_layout_state();
 
         pl::DynamicState{}.injection(layout);
-        const auto& states = layout.recipe().enabled_dynamic_states;
+        const auto& states = layout.recipe().graphics_state.enabled_dynamic_states;
         EXPECT_EQ(states, (std::vector{vk::DynamicState::eScissor, vk::DynamicState::eViewport}));
         pl::DynamicState{}.injection(layout);
-        EXPECT_EQ(layout.recipe().enabled_dynamic_states.size(), 2u);
+        EXPECT_EQ(layout.recipe().graphics_state.enabled_dynamic_states.size(), 2u);
     }
 } // namespace

@@ -269,7 +269,7 @@ namespace vsl_test {
         return pool;
     }
 
-    inline LayoutInspection::LayoutInspection(vsl::PipelineLayoutAccessor layout) : PipelineScratch(layout.recipe()) {
+    inline LayoutInspection::LayoutInspection(vsl::PipelineLayoutAccessor layout) : PipelineScratch(layout.recipe().graphics_state) {
         for (const auto* binding : layout.recipe().binding_layouts)
             layouts.push_back(binding->layout);
         for (const auto& range : layout.recipe().push_ranges)

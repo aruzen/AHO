@@ -70,12 +70,14 @@ namespace VSL_NAMESPACE {
     protected:
         Completion completion_;
         std::shared_ptr<impl::SubmissionWork> submission;
+        CommandBuffer recording_buffer{nullptr};
         std::uint32_t signal_index = 0;
         bool recreate = false;
         int initial_exceptions = 0;
-        void prepare();
+        void prepare(bool returning_image = false);
         void begin();
         void fail(Completion::Failure failure, std::int32_t error_code = 0) noexcept;
+        Completion::Failure cancel_recording(std::int32_t& error_code);
         void finish_noexcept() noexcept;
     };
 

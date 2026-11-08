@@ -1,4 +1,6 @@
 #include "support/vulkan_fixture.hpp"
+#include <VSL/lifetime/command_domain.hpp>
+#include "support/deferred_action.hpp"
 #include <limits>
 
 namespace {
@@ -232,5 +234,182 @@ namespace {
             ASSERT_TRUE(phase.completion().wait());
         }
         EXPECT_TRUE(weak.expired());
+    }
+
+    TEST_F(CommandResourceVulkanIntegrationTest, NativeStorageDoesNotOwnTheWorkThatRetainsIt) {
+        std::weak_ptr<vsl::impl::CommandBufferImpl> native;
+        std::weak_ptr<vsl::lifetime::CommandDomain> domain;
+        std::weak_ptr<int> retained;
+        vsl::Completion result;
+        {
+            auto manager = make_manager().independent(1);
+            auto buffer = manager.get_buffer();
+            native = buffer.data_;
+            domain = vsl::lifetime::CommandAccess::Owner(buffer);
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            auto owner = std::make_shared<int>(42);
+            retained = owner;
+            buffer.retain(owner);
+            buffer.retain(buffer.data_);
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            result = phase.completion();
+        }
+        EXPECT_TRUE(domain.expired());
+        EXPECT_TRUE(native.expired());
+        EXPECT_TRUE(retained.expired());
+        EXPECT_EQ(result.status(), vsl::Completion::Status::COMPLETE);
+        EXPECT_TRUE(result.data_->work.expired());
+    }
+
+    TEST_F(CommandResourceVulkanIntegrationTest, BufferFacadeKeepsCanonicalDomainAfterManagerDestruction) {
+        vsl::CommandBuffer saved(nullptr);
+        std::weak_ptr<vsl::lifetime::CommandDomain> domain;
+        std::weak_ptr<int> retained;
+        {
+            auto manager = make_manager().independent(1);
+            saved = manager.get_buffer();
+            const auto shared = vsl::CommandBuffer(saved.data_);
+            domain = vsl::lifetime::CommandAccess::Owner(saved);
+            EXPECT_EQ(domain.lock(), vsl::lifetime::CommandAccess::Owner(shared));
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            auto owner = std::make_shared<int>(9);
+            retained = owner;
+            saved.retain(owner);
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        EXPECT_FALSE(domain.expired());
+        EXPECT_FALSE(retained.expired());
+        saved = vsl::CommandBuffer(nullptr);
+        EXPECT_TRUE(domain.expired());
+        EXPECT_TRUE(retained.expired());
+    }
+
+    TEST_F(CommandResourceVulkanIntegrationTest, ExpiredNativeOnlyAdaptersCannotRecreateADomain) {
+        std::shared_ptr<vsl::impl::CommandBufferImpl> native;
+        std::shared_ptr<vsl::impl::CommandManagerImpl> manager_data;
+        {
+            auto manager = make_manager().independent(1);
+            manager_data = manager.data_;
+            native = manager.get_buffer().data_;
+        }
+        ASSERT_TRUE(native);
+        EXPECT_TRUE(native->domain.expired());
+        EXPECT_EQ(native->recording_context, nullptr);
+        EXPECT_THROW(vsl::CommandBuffer{native}, std::logic_error);
+        EXPECT_THROW(vsl::CommandManager{manager_data}, std::logic_error);
+    }
+
+    TEST_F(CommandResourceVulkanIntegrationTest, PhaseOwnsDomainWithoutTheOriginalManagerFacade) {
+        std::optional<vsl::CommandManager> manager(make_manager().independent(1));
+        std::weak_ptr<vsl::lifetime::CommandDomain> domain = vsl::lifetime::CommandAccess::Owner(manager->get_buffer());
+        vsl::Completion result;
+        {
+            auto phase = manager->start_phase<vsl::ComputePhase>();
+            result = phase.completion();
+            manager.reset();
+            EXPECT_FALSE(domain.expired());
+            EXPECT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        EXPECT_TRUE(domain.expired());
+        EXPECT_EQ(result.status(), vsl::Completion::Status::COMPLETE);
+    }
+
+    TEST_F(CommandResourceVulkanIntegrationTest, ManagerAssignmentPublishesBothOwnersBeforeOldCallbacks) {
+        auto manager = make_manager().independent(1);
+        auto replacement = make_manager().independent(1);
+        bool coherent = false;
+        bool rejected_reconnection = false;
+        const auto old_native = manager.get_buffer().data_;
+        std::weak_ptr<vsl::lifetime::CommandDomain> old_domain = vsl::lifetime::CommandAccess::Owner(manager.get_buffer());
+        const vsl_test::DeferredAction callback([&] {
+            coherent = manager.data_ == replacement.data_ &&
+                       vsl::lifetime::CommandAccess::Owner(manager.get_buffer())->buffer == manager.data_->command_buffer;
+            try {
+                vsl::CommandBuffer reconnect(old_native);
+            } catch (const std::logic_error&) {
+                rejected_reconnection = true;
+            }
+            auto next = manager.start_phase<vsl::ComputePhase>();
+            next.cancel();
+        });
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            manager.get_buffer().retain(callback.owner());
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        manager = replacement;
+        EXPECT_TRUE(coherent);
+        EXPECT_TRUE(rejected_reconnection);
+        EXPECT_TRUE(old_domain.expired());
+    }
+
+    TEST_F(CommandResourceVulkanIntegrationTest, WaitIdlePreservesANewSubmissionCreatedByACompletionCallback) {
+        auto manager = make_manager().independent(1);
+        vsl::Completion next_result;
+        std::weak_ptr<int> next_owner;
+        bool invoked = false;
+        const vsl_test::DeferredAction callback([&] {
+            invoked = true;
+            auto next = manager.start_phase<vsl::ComputePhase>();
+            auto resource = std::make_shared<int>(73);
+            next_owner = resource;
+            manager.get_buffer().retain(resource);
+            next_result = next.completion();
+            EXPECT_EQ(next.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        });
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            manager.get_buffer().retain_until_complete(callback.owner());
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        manager.wait_idle();
+        EXPECT_TRUE(invoked);
+        ASSERT_TRUE(next_result);
+        EXPECT_FALSE(next_owner.expired());
+        const auto domain = vsl::lifetime::CommandAccess::Owner(manager.get_buffer());
+        ASSERT_TRUE(domain->submissions.at(0));
+        EXPECT_EQ(domain->submissions.at(0)->result, next_result.data_);
+        EXPECT_TRUE(next_result.wait());
+        {
+            auto next = manager.start_phase<vsl::ComputePhase>();
+            EXPECT_EQ(next.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        EXPECT_TRUE(next_owner.expired());
+    }
+
+    TEST_F(CommandResourceVulkanIntegrationTest, WaitIdleLeavesRecordingPending) {
+        auto manager = make_manager().independent(1);
+        auto next = manager.start_phase<vsl::ComputePhase>();
+        manager.wait_idle();
+        EXPECT_EQ(next.completion().status(), vsl::Completion::Status::PENDING);
+        EXPECT_EQ(manager.get_buffer().completion().data_, next.completion().data_);
+        EXPECT_EQ(next.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+    }
+
+    TEST_F(CommandResourceVulkanIntegrationTest, CancelAndFailureCallbacksCanDestroyTheirPhase) {
+        for (const bool fail : {false, true}) {
+            auto manager = make_manager().independent(1);
+            vsl::SynchroManager sync(device);
+            const auto available = sync.create_semaphore("unused wait");
+            auto phase = std::make_unique<vsl::ComputePhase>(manager, fail ? std::optional(available) : std::nullopt,
+                                                             std::nullopt, std::nullopt, false, static_cast<vsl::PipelineStage>(0));
+            const auto result = phase->completion();
+            int releases = 0;
+            const vsl_test::DeferredAction callback([&] {
+                ++releases;
+                phase.reset();
+            });
+            manager.get_buffer().retain_until_complete(callback.owner());
+            if (fail)
+                EXPECT_THROW(phase->submit(), std::invalid_argument);
+            else
+                phase->cancel();
+            EXPECT_FALSE(phase);
+            EXPECT_EQ(releases, 1);
+            EXPECT_EQ(result.status(), fail ? vsl::Completion::Status::FAILED : vsl::Completion::Status::CANCELLED);
+            EXPECT_TRUE(result.data_->work.expired());
+            auto next = manager.start_phase<vsl::ComputePhase>();
+            EXPECT_EQ(next.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
     }
 } // namespace

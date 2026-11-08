@@ -34,6 +34,8 @@ namespace VSL_NAMESPACE {
     namespace lifetime {
         struct DescriptorOwnerContext;
         struct FrameBufferOwnerContext;
+        struct CommandDomain;
+        struct CommandRecordingContext;
     } // namespace lifetime
     namespace graphic_resource {
         struct ManagerInterface;
@@ -118,17 +120,11 @@ namespace VSL_NAMESPACE::impl {
     struct CommandBufferImpl {
         std::shared_ptr<CommandPoolImpl> command_pool;
 
-        std::uint32_t current_buffer_idx;
+        std::uint32_t current_buffer_idx = 0;
 
         std::vector<vk::CommandBuffer> command_buffers;
-        std::vector<std::shared_ptr<SubmissionWork>> submissions;
-        std::shared_ptr<SubmissionWork> recording_submission;
-        // graphics完了とは別に、present queueのidleまで保持するWSI依存。
-        std::vector<std::shared_ptr<void>> presentation_resources;
-        std::optional<std::uint32_t> acquired_image_index;
-        std::weak_ptr<SwapchainImpl> acquired_swapchain;
-        bool recording = false;
-        bool frame_buffer_recording = false;
+        std::weak_ptr<lifetime::CommandDomain> domain;
+        lifetime::CommandRecordingContext* recording_context = nullptr;
 
         ~CommandBufferImpl();
     };

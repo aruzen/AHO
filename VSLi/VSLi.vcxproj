@@ -202,6 +202,8 @@
     <ClCompile Include="VSL\src\sync\resource_use_state.cpp" />
     <ClCompile Include="VSL\src\sync\completion.cpp" />
     <ClCompile Include="VSL\src\lifetime\submission_retention.cpp" />
+    <ClCompile Include="VSL\src\lifetime\command_domain.cpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\command_domain.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\submission_retention.hpp" />
     <ClCompile Include="VSL\src\sync\buffer_access.cpp" />
     <ClInclude Include="VSL\src\private\VSL\sync\buffer_access.hpp" />

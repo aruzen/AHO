@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_domain.hpp>
 #include "support/image_transfer_fixture.hpp"
 #include <VSL/vulkan/commands/image_readback.hpp>
 #include <VSL/vulkan/commands/change_image_barrier.hpp>
@@ -113,11 +114,11 @@ namespace {
         const vsl::CommandManager empty(std::shared_ptr<vsl::impl::CommandManagerImpl>{});
         vsl::ComputePhase phase(manager);
         const auto buffer = manager.get_buffer();
-        ASSERT_TRUE(buffer.data_->recording_submission);
-        const auto retained = buffer.data_->recording_submission->resources;
+        ASSERT_TRUE(buffer.data_->recording_context->work);
+        const auto retained = buffer.data_->recording_context->work->resources;
         vsl::command::ImageReadback command(&destination, image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
         EXPECT_THROW(command.invoke(manager.get_pool(), buffer, empty), std::invalid_argument);
-        EXPECT_EQ(buffer.data_->recording_submission->resources, retained);
+        EXPECT_EQ(buffer.data_->recording_context->work->resources, retained);
         phase.cancel();
     }
     TEST_F(ImageReadbackCommandVulkanIntegrationTest, CommandKeepsDestinationWhenOriginalHandleIsDestroyedBeforeRecording) {

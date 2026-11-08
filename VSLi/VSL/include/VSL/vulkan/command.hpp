@@ -6,6 +6,10 @@
 #include "swapchain.hpp"
 
 namespace VSL_NAMESPACE {
+    namespace lifetime {
+        struct CommandDomain;
+        struct CommandAccess;
+    } // namespace lifetime
     struct CommandManager;
     struct Completion;
     struct DefaultPhase;
@@ -25,6 +29,10 @@ namespace VSL_NAMESPACE {
         CommandBuffer(VSL_NAMESPACE::CommandPool pool, std::uint32_t size = DEFAULT_BUFFER_SIZE);
 
         CommandBuffer(std::shared_ptr<VSL_NAMESPACE::impl::CommandBufferImpl> data);
+        CommandBuffer(const CommandBuffer&) = default;
+        CommandBuffer(CommandBuffer&&) noexcept = default;
+        CommandBuffer& operator=(CommandBuffer other) noexcept;
+        void swap(CommandBuffer& other) noexcept;
 
         std::uint32_t get_current_buffer_idx();
 
@@ -47,6 +55,10 @@ namespace VSL_NAMESPACE {
         void retain_until_complete(std::shared_ptr<void>&& resource) const;
 
         std::shared_ptr<VSL_NAMESPACE::impl::CommandBufferImpl> data_;
+
+    private:
+        std::shared_ptr<lifetime::CommandDomain> _domain;
+        friend struct lifetime::CommandAccess;
     };
 
     struct PipelineAccessor;
@@ -116,6 +128,10 @@ namespace VSL_NAMESPACE {
         CommandManager(std::shared_ptr<VSL_NAMESPACE::impl::CommandManagerImpl> data);
 
         CommandManager(VSL_NAMESPACE::LogicalDeviceAccessor device);
+        CommandManager(const CommandManager&) = default;
+        CommandManager(CommandManager&&) noexcept = default;
+        CommandManager& operator=(CommandManager other) noexcept;
+        void swap(CommandManager& other) noexcept;
 
         std::shared_ptr<VSL_NAMESPACE::impl::CommandManagerImpl> data_;
 
@@ -134,6 +150,10 @@ namespace VSL_NAMESPACE {
         std::uint32_t get_current_buffer_idx();
 
         CommandBuffer make_exclusive_buffer(size_t size = 1);
+
+    private:
+        std::shared_ptr<lifetime::CommandDomain> _domain;
+        friend struct lifetime::CommandAccess;
     };
 
 } // namespace VSL_NAMESPACE

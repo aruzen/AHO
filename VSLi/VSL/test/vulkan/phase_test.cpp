@@ -1,3 +1,5 @@
+#include <VSL/lifetime/command_domain.hpp>
+#include "support/deferred_action.hpp"
 #include "support/vulkan_fixture.hpp"
 #include "support/window_fixture.hpp"
 #include <VSL/vulkan/commands/image_readback.hpp>
@@ -363,7 +365,7 @@ namespace {
         EXPECT_EQ(result.status(), vsl::Completion::Status::FAILED);
         EXPECT_EQ(result.failure(), vsl::Completion::Failure::SUBMIT_FAILED);
         EXPECT_EQ(releases, 1u);
-        EXPECT_FALSE(manager.get_buffer().data_->recording);
+        EXPECT_FALSE(manager.get_buffer().data_->recording_context->recording);
         phase.cancel();
         EXPECT_EQ(releases, 1u);
         auto next = manager.start_phase<vsl::ComputePhase>();
@@ -404,10 +406,10 @@ namespace {
             EXPECT_EQ(phase.submit_commands(), VSL_NAMESPACE::ComputePhase::SubmitResult::SUCCESS);
             if (!frame) {
                 manager.wait_idle();
-                EXPECT_TRUE(manager.get_buffer().data_->presentation_resources.empty());
+                EXPECT_TRUE(vsl::lifetime::CommandAccess::Owner(manager.get_buffer())->presentation_resources.empty());
             }
             EXPECT_EQ(phase.present(), VSL_NAMESPACE::ComputePhase::SubmitResult::SUCCESS);
-            EXPECT_FALSE(manager.get_buffer().data_->presentation_resources.empty());
+            EXPECT_FALSE(vsl::lifetime::CommandAccess::Owner(manager.get_buffer())->presentation_resources.empty());
             ASSERT_TRUE(phase.completion().wait());
             auto mapped = destination.data();
             const bool bgra = chain.get_format().type() == VSL_NAMESPACE::data_format::FormatTypes::SRGB8_BGRA ||
@@ -446,6 +448,77 @@ namespace {
             EXPECT_TRUE(phase.completion().wait());
         }
         device.data_->device.waitIdle();
+    }
+    TEST_F(PresentPhaseWindowIntegrationTest, CancelCallbacksCanDestroyThePhaseAfterItsImageIsReturned) {
+        make_surface();
+        ASSERT_FALSE(HasFatalFailure());
+        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+            GTEST_SKIP() << "Graphics queue cannot present";
+        vsl::Swapchain chain(device, surface, std::nullopt, 64, 48);
+        for (const bool previous_slot : {false, true}) {
+            auto manager = make_manager().independent(1);
+            std::unique_ptr<vsl::DefaultPhase> phase;
+            vsl::Completion returned;
+            bool rejected = false;
+            const vsl_test::DeferredAction callback([&] {
+                returned = phase->completion();
+                try {
+                    auto other = manager.start_phase<vsl::ComputePhase>();
+                } catch (const std::logic_error&) {
+                    rejected = true;
+                }
+                phase.reset();
+            });
+            if (previous_slot) {
+                auto first = manager.start_phase<vsl::ComputePhase>();
+                manager.get_buffer().retain(callback.owner());
+                ASSERT_EQ(first.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+                ASSERT_TRUE(first.completion().wait());
+            }
+            phase = std::make_unique<vsl::DefaultPhase>(manager, chain);
+            const auto discarded = phase->completion();
+            if (!previous_slot)
+                manager.get_buffer().retain_until_complete(callback.owner());
+            phase->cancel();
+            EXPECT_FALSE(phase);
+            EXPECT_TRUE(rejected);
+            EXPECT_EQ(discarded.status(), vsl::Completion::Status::CANCELLED);
+            EXPECT_NE(discarded.data_, returned.data_);
+            EXPECT_TRUE(returned.wait());
+            vsl::DefaultPhase next(manager, chain);
+            next.cancel();
+            EXPECT_TRUE(next.completion().wait());
+        }
+    }
+    TEST_F(PresentPhaseWindowIntegrationTest, PreviousSlotReleaseCanDestroyThePhaseAfterNormalPresentation) {
+        make_surface();
+        ASSERT_FALSE(HasFatalFailure());
+        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+            GTEST_SKIP() << "Graphics queue cannot present";
+        vsl::Swapchain chain(device, surface, std::nullopt, 64, 48);
+        auto manager = make_manager().independent(1);
+        vsl::RenderPass pass(chain);
+        vsl::FrameBuffer target(chain, pass);
+        std::unique_ptr<vsl::DefaultPhase> phase;
+        vsl::Completion presented;
+        const vsl_test::DeferredAction callback([&] {
+            presented = phase->completion();
+            phase.reset();
+        });
+        {
+            auto first = manager.start_phase<vsl::ComputePhase>();
+            manager.get_buffer().retain(callback.owner());
+            ASSERT_EQ(first.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            ASSERT_TRUE(first.completion().wait());
+        }
+        phase = std::make_unique<vsl::DefaultPhase>(manager, chain);
+        *phase << vsl::command::RenderPassBegin(pass, target) << vsl::command::RenderPassEnd{};
+        EXPECT_EQ(phase->submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        EXPECT_FALSE(phase);
+        EXPECT_TRUE(presented.wait());
+        vsl::DefaultPhase next(manager, chain);
+        next.cancel();
+        EXPECT_TRUE(next.completion().wait());
     }
     TEST_F(PresentPhaseWindowIntegrationTest, PresentDoesNotWaitForUnrelatedUnsignaledFrameFences) {
         make_surface();

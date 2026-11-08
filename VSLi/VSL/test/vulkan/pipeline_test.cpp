@@ -3,7 +3,7 @@ namespace {
     using GraphicsPipelineVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
     TEST_F(GraphicsPipelineVulkanIntegrationTest, CreatesPipelineAndInvokesItToProducePixels) {
         ASSERT_TRUE(static_cast<bool>(pipeline->data_->pipeline));
-        EXPECT_EQ(pipeline->data_->layout, layout->data_);
+        EXPECT_EQ(pipeline->data_->layout, layout->data_.get());
         ExpectTriangleColor(render([](auto& stream) { stream << vsl::command::Draw{3}; }));
     }
 } // namespace
@@ -12,7 +12,7 @@ namespace {
     using ComputePipelineVulkanIntegrationTest = vsl_test::ComputeVulkanIntegrationTest;
     TEST_F(ComputePipelineVulkanIntegrationTest, CreatesAndInvokesComputePipeline) {
         ASSERT_TRUE(static_cast<bool>(pipeline->data_->pipeline));
-        EXPECT_EQ(pipeline->data_->layout, layout->data_);
+        EXPECT_EQ(pipeline->data_->layout, layout->data_.get());
         ExpectSequence(execute(211), 211);
     }
 } // namespace
@@ -34,7 +34,7 @@ namespace {
     TEST_F(PipelineSnapshotVulkanIntegrationTest, EditingLayoutKeepsExistingPipelineSnapshotAlive) {
         const auto snapshot = pipeline->data_->layout;
         layout->add(vsl::pipeline_layout::Rasterization(vsl::pipeline_layout::CullingMode::FRONT));
-        EXPECT_NE(layout->data_, snapshot);
+        EXPECT_NE(layout->data_.get(), snapshot);
         EXPECT_EQ(pipeline->data_->layout, snapshot);
         ExpectTriangleColor(render([](auto& stream) { stream << vsl::command::Draw{3}; }));
     }

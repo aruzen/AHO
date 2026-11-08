@@ -1,6 +1,6 @@
 # RenderPassの共通backendとCPU配置
 
-[完了計画](arena-completion-plan.md)の7a。通常のRenderPassとResourceArenaから、同じoperation／lifetime処理を利用する。Pipeline／Framebufferの配置は7b／7cに続ける。
+[完了計画](arena-completion-plan.md)の7a。通常のRenderPassとResourceArenaから、同じoperation／lifetime処理を利用する。Pipelineは[7b](pipeline-arena.md)へ接続し、Framebufferの配置は7cに続ける。
 
 ## 責務と構築
 

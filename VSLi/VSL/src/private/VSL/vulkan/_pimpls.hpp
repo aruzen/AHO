@@ -225,9 +225,15 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct PipelineImpl {
-        std::shared_ptr<LogicalDeviceImpl> device;
-        std::shared_ptr<PipelineLayoutImpl> layout;
-
+        PipelineImpl() = default;
+        PipelineImpl(const PipelineImpl&) = delete;
+        PipelineImpl(PipelineImpl&&) = delete;
+        PipelineImpl& operator=(const PipelineImpl&) = delete;
+        PipelineImpl& operator=(PipelineImpl&&) = delete;
+        lifetime::DependencyNode* owner_node = nullptr;
+        LogicalDeviceImpl* device = nullptr;
+        vk::Device native_device;
+        PipelineLayoutImpl* layout = nullptr;
         vk::Pipeline pipeline;
         vk::PipelineBindPoint bind_point = vk::PipelineBindPoint::eGraphics;
 

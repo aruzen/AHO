@@ -3,6 +3,7 @@
 
 #include "concepts.hpp"
 #include "exceptions.hpp"
+#include "lifetime/window_owner.hpp"
 
 #include <memory>
 #include <vector>
@@ -35,6 +36,7 @@ namespace VSL_NAMESPACE {
 
             // void* plugdata = nullptr;
             void* window_handle = nullptr;
+            lifetime::OSWindowOwner os_window;
             std::string name;
             int width, height;
 
@@ -42,9 +44,6 @@ namespace VSL_NAMESPACE {
         };
 
         static std::vector<std::shared_ptr<WindowData>> WINDOWS;
-
-    private:
-        static bool INITED;
 
     public:
         PureWindow(std::string name, int width = 800, int height = 600);
@@ -69,6 +68,7 @@ namespace VSL_NAMESPACE {
 
         std::string name();
         virtual bool close();
+        lifetime::OSWindowOwner window_owner() const;
 
         operator bool();
         bool operator==(const PureWindow& o);
@@ -86,6 +86,8 @@ namespace VSL_NAMESPACE {
     template<typename T, typename... Args>
     // requires vsl::concepts::initializer<T, VSL_NAMESPACE::PureWindow::WindowData*, Args&&...>&& std::derived_from<T, VSL_NAMESPACE::PureWindow::Plugin>
     inline std::shared_ptr<T> VSL_NAMESPACE::PureWindow::add_plugin(Args&&... args) {
+        if (!data_)
+            throw exceptions::RuntimeException("window", "Window data is required");
         auto t = std::shared_ptr<T>(new T(this, std::forward<Args>(args)...));
         std::shared_ptr<Plugin> p = std::static_pointer_cast<Plugin>(t);
 

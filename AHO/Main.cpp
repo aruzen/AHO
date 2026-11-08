@@ -43,7 +43,7 @@ breakpoint disable swift_willThrow
         auto& [vulkan_instance, physical_device, device, command_manager, graphic_resource_manager, synchro_manager] = *engine.data();
         auto& main_window = engine.boot_window.value();
         auto& [surface, swapchain, render_pass,
-               frame_buffer, image_available, render_finish, in_flight] = *engine.boot_window.value().data2;
+               frame_buffer, image_available, render_finish, in_flight, standard_draw] = *engine.boot_window.value().data2;
         if (!image_available.data_)
             loggingln("image not available ; ;");
         main_window.resize(500, 500);

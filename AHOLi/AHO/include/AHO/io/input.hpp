@@ -6,6 +6,7 @@
 #define AHO_ALL_INPUT_HPP
 
 #include "../define.hpp"
+#include <VSL/lifetime/window_owner.hpp>
 
 #include <string>
 #include <vector>
@@ -325,8 +326,12 @@ namespace AHO_NAMESPACE::input {
     std::string CodeID<MouseCode>::name() const;
 
     namespace abstract {
+        class WindowBound {
+            friend AHO_NAMESPACE::InputManager;
+            VSL_NAMESPACE::lifetime::OSWindowOwner _window_owner;
+        };
         template<typename T>
-        struct Input {
+        struct Input : WindowBound {
             virtual ~Input() = default;
 
             virtual T state() = 0;

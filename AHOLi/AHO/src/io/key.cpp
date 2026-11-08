@@ -3,6 +3,7 @@
 //
 
 #include <AHO/io/key.hpp>
+#include <VSL/lifetime/glfw_lease.hpp>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -31,6 +32,7 @@ bool AHO_NAMESPACE::input::Key::pressed() {
 }
 
 void AHO_NAMESPACE::input::Key::update() {
+    VSL_NAMESPACE::lifetime::GLFWCallScope scope;
     switch (glfwGetKey((GLFWwindow*)_context, (int)_code.code())) {
         default:
         case GLFW_RELEASE:

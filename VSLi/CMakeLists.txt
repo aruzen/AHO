@@ -114,6 +114,16 @@ add_library(VSL STATIC
         VSL/src/operation/physical_device_ops.cpp
         VSL/src/private/VSL/lifetime/physical_device_storage.hpp
         VSL/src/lifetime/physical_device_storage.cpp
+        VSL/include/VSL/lifetime/glfw_lease.hpp
+        VSL/include/VSL/lifetime/window_owner.hpp
+        VSL/src/private/VSL/lifetime/window_runtime.hpp
+        VSL/src/lifetime/window_runtime.cpp
+        VSL/src/private/VSL/operation/window_ops.hpp
+        VSL/src/operation/window_ops.cpp
+        VSL/src/private/VSL/operation/surface_ops.hpp
+        VSL/src/operation/surface_ops.cpp
+        VSL/src/private/VSL/lifetime/surface_storage.hpp
+        VSL/src/lifetime/surface_storage.cpp
         VSL/src/private/VSL/lifetime/synchronization_storage.hpp
         VSL/src/lifetime/synchronization_storage.cpp
         VSL/src/private/VSL/operation/synchronization_ops.hpp

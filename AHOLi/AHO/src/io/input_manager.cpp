@@ -6,7 +6,12 @@
 
 AHO_NAMESPACE::InputManager::InputManager(void* context) : context(context) {}
 
-AHO_NAMESPACE::InputManager::InputManager(VSL_NAMESPACE::PureWindow window) : context(window.data_->window_handle) {}
+AHO_NAMESPACE::InputManager::InputManager(VSL_NAMESPACE::PureWindow window) {
+    if (!window.data_ || !window.data_->window_handle)
+        throw std::invalid_argument("Input manager requires a live window");
+    context = window.data_->window_handle;
+    _window_owner = window.data_->os_window;
+}
 
 void AHO_NAMESPACE::InputManager::update() {
     const auto targets = update_targets;

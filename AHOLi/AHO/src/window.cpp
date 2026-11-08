@@ -3,6 +3,7 @@
 #include <AHO/drawer/draw_phase.hpp>
 #include <GLFW/glfw3.h>
 #include <VSL/exceptions.hpp>
+#include <VSL/lifetime/glfw_lease.hpp>
 #ifdef __APPLE__
 #include "window_macos.h"
 #endif
@@ -12,6 +13,7 @@
 #include <vector>
 
 AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::get_monitor_size() {
+    VSL_NAMESPACE::lifetime::GLFWCallScope scope;
     GLFWmonitor* monitor = glfwGetPrimaryMonitor();
     if (!monitor)
         throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "Primary monitor is not available");
@@ -35,6 +37,7 @@ AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::get_monitor_size() {
 
 namespace {
     thread_local std::vector<std::shared_ptr<AHO_NAMESPACE::window::WindowData>> RECREATING_WINDOWS;
+    thread_local std::vector<std::shared_ptr<AHO_NAMESPACE::window::WindowData>> CLOSING_WINDOWS;
 
     const std::string& checked_window_name(const std::string& name, const AHO_NAMESPACE::engine::EngineAccessor& engine) {
         const auto& data = engine.data();
@@ -91,8 +94,13 @@ AHO_NAMESPACE::window::Window::Window(engine::EngineAccessor engine, std::shared
 }
 
 bool AHO_NAMESPACE::window::Window::resize(int width, int height) {
+    VSL_NAMESPACE::lifetime::GLFWCallScope scope;
     check_recreation_allowed();
+    const auto data = data_;
+    const auto drawing = data2;
     if (not VSL_NAMESPACE::PureWindow::resize(width, height))
+        return false;
+    if (!data->window_handle || data_ != data || data2 != drawing)
         return false;
     return recreate_swapchain();
 }
@@ -108,28 +116,39 @@ void AHO_NAMESPACE::window::Window::check_recreation_allowed() {
 }
 
 bool AHO_NAMESPACE::window::Window::recreate_swapchain(VSL_NAMESPACE::ImageType additional_usage) {
+    VSL_NAMESPACE::lifetime::GLFWCallScope scope;
     check_recreation_allowed();
+    const auto data = data_;
+    const auto drawing = data2;
+    const auto runtime = engine.data();
+    auto manager = runtime->command_manager;
+    const auto os = window_owner();
     // callbackがwindowを閉じても、共有状態を生存させて確実にガードを解除する。
-    RECREATING_WINDOWS.push_back(data2);
+    RECREATING_WINDOWS.push_back(drawing);
     struct RecreationGuard {
         ~RecreationGuard() { RECREATING_WINDOWS.pop_back(); }
     } guard;
-    engine.data()->command_manager.wait_idle();
-    const auto usage = data2->swapchain.images.at(0).get_usage() | additional_usage;
-    auto next = VSL_NAMESPACE::Swapchain(engine.data()->logical_device, data2->surface, data2->swapchain,
+    manager.wait_idle();
+    if (!data->window_handle || data_ != data || data2 != drawing)
+        return false;
+    const auto usage = drawing->swapchain.images.at(0).get_usage() | additional_usage;
+    auto next = VSL_NAMESPACE::Swapchain(runtime->logical_device, drawing->surface, drawing->swapchain,
                                          std::nullopt, std::nullopt, usage);
-    auto pass = data2->render_pass;
+    if (!data->window_handle || data_ != data || data2 != drawing)
+        return false;
+    auto pass = drawing->render_pass;
     if (pass.description().attachments.front().format.type() != next.get_format().type())
         pass = VSL_NAMESPACE::RenderPass(next);
     auto frames = VSL_NAMESPACE::FrameBuffer(next, pass);
-    auto finished = data2->render_finished;
+    auto finished = drawing->render_finished;
     if (finished.size() != next.get_swap_image_size())
-        finished = engine.data()->synchro_manager.create_semaphore(name() + "RenderFinished", next.get_swap_image_size());
-    data2->swapchain = std::move(next);
-    data2->render_pass = std::move(pass);
-    data2->frame_buffer = std::move(frames);
-    data2->render_finished = std::move(finished);
-    const auto data = data_;
+        finished = runtime->synchro_manager.create_semaphore(data->name + "RenderFinished", next.get_swap_image_size());
+    if (!data->window_handle || data_ != data || data2 != drawing)
+        return false;
+    drawing->swapchain = std::move(next);
+    drawing->render_pass = std::move(pass);
+    drawing->frame_buffer = std::move(frames);
+    drawing->render_finished = std::move(finished);
     std::vector<std::pair<unsigned char, std::weak_ptr<WindowResizeHookPlugin>>> hooks;
     hooks.reserve(data->plugins.size());
     for (const auto& [id, plugin] : data->plugins)
@@ -148,27 +167,37 @@ bool AHO_NAMESPACE::window::Window::recreate_swapchain(VSL_NAMESPACE::ImageType 
 }
 
 void AHO_NAMESPACE::window::Window::maximize() {
-    glfwMaximizeWindow((GLFWwindow*)data_->window_handle);
+    VSL_NAMESPACE::lifetime::GLFWCallScope scope;
+    const auto os = window_owner();
+    glfwMaximizeWindow(static_cast<GLFWwindow*>(os.native_handle()));
 }
 
 void AHO_NAMESPACE::window::Window::restore() {
-    glfwRestoreWindow((GLFWwindow*)data_->window_handle);
+    VSL_NAMESPACE::lifetime::GLFWCallScope scope;
+    const auto os = window_owner();
+    glfwRestoreWindow(static_cast<GLFWwindow*>(os.native_handle()));
 }
 
 bool AHO_NAMESPACE::window::Window::set_title(const std::string& title) {
-    glfwSetWindowTitle((GLFWwindow*)data_->window_handle, title.c_str());
+    VSL_NAMESPACE::lifetime::GLFWCallScope scope;
+    const auto os = window_owner();
+    glfwSetWindowTitle(static_cast<GLFWwindow*>(os.native_handle()), title.c_str());
     return true;
 }
 
 AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::Window::window_size() {
+    VSL_NAMESPACE::lifetime::GLFWCallScope scope;
+    const auto os = window_owner();
     d2::VectorI v;
-    glfwGetWindowSize((GLFWwindow*)data_->window_handle, &v.value.x.value, &v.value.y.value);
+    glfwGetWindowSize(static_cast<GLFWwindow*>(os.native_handle()), &v.value.x.value, &v.value.y.value);
     return v;
 }
 
 AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::Window::frame_size() {
+    VSL_NAMESPACE::lifetime::GLFWCallScope scope;
+    const auto os = window_owner();
     d2::VectorI v;
-    glfwGetFramebufferSize((GLFWwindow*)data_->window_handle, &v.value.x.value, &v.value.y.value);
+    glfwGetFramebufferSize(static_cast<GLFWwindow*>(os.native_handle()), &v.value.x.value, &v.value.y.value);
     return v;
 }
 
@@ -178,10 +207,33 @@ AHO_NAMESPACE::window::WindowResizeHookPlugin::WindowResizeHookPlugin(VSL_NAMESP
 }
 
 bool AHO_NAMESPACE::window::Window::close() {
-    if (data2)
-        engine.data()->command_manager.wait_idle();
-    data2.reset();
-    return VSL_NAMESPACE::PureWindow::close();
+    if (!data_ || (!data_->window_handle && !data2) || (data2 && std::ranges::contains(CLOSING_WINDOWS, data2)))
+        return false;
+    VSL_NAMESPACE::lifetime::GLFWCallScope scope;
+    const auto data = data_;
+    const auto drawing = data2;
+    const auto runtime = engine.data();
+    if (!data || (!data->window_handle && !drawing) || (drawing && std::ranges::contains(CLOSING_WINDOWS, drawing)))
+        return false;
+    if (drawing && !runtime)
+        throw std::logic_error("Closing graphics requires its engine");
+    if (drawing)
+        CLOSING_WINDOWS.push_back(drawing);
+    struct ClosingGuard {
+        bool active;
+        ~ClosingGuard() {
+            if (active)
+                CLOSING_WINDOWS.pop_back();
+        }
+    } guard{bool(drawing)};
+    const auto closed = VSL_NAMESPACE::PureWindow::close();
+    if (drawing) {
+        auto manager = runtime->command_manager;
+        manager.wait_idle();
+    }
+    if (data_ == data && data2 == drawing)
+        data2.reset();
+    return closed;
 }
 
 AHO_NAMESPACE::window::WindowData::~WindowData() {

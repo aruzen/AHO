@@ -1,6 +1,9 @@
 #ifdef AHO_GPU_TESTS
 #include "support/live_gpu.hpp"
 #include <AHO/drawer/draw_phase.hpp>
+#include <AHO/io/mouse.hpp>
+#include <AHO/io/keyboard.hpp>
+#include <VSL/window_plugin.hpp>
 #ifdef __APPLE__
 #define GLFW_EXPOSE_NATIVE_COCOA
 #include <GLFW/glfw3native.h>
@@ -12,7 +15,6 @@ namespace {
         FixedIdResizeHook(vsl::PureWindow* window, unsigned char id, std::function<void(aho::Window*)> callback)
             : WindowResizeHookPlugin(window, std::move(callback)) { this->id = id; }
     };
-
     bool expect_recreation_guard(aho::Window& window) {
         // ガードが欠けても、VSLのusage検証で止めて記録中のswapchainを破棄しない。
         const auto unsupported = static_cast<vsl::ImageType>(std::uint32_t{1} << 31);
@@ -27,6 +29,74 @@ namespace {
         return false;
     }
 
+    TEST_F(AHOWindowVulkanIntegration, CompletionCallbackCanCloseTheWindowWhileRecreationWaits) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        auto manager = engine->data()->command_manager;
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        bool callback = false;
+        manager.get_buffer().retain_until_complete(std::shared_ptr<int>(new int(0), [&](int* value) {
+            delete value;
+            callback = true;
+            EXPECT_TRUE(window.close());
+            EXPECT_FALSE(window.close());
+        }));
+        ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        EXPECT_FALSE(window.recreate_swapchain());
+        EXPECT_TRUE(callback);
+        EXPECT_FALSE(static_cast<bool>(window));
+        EXPECT_FALSE(window.data2);
+    }
+    TEST_F(AHOWindowVulkanIntegration, NativeResizeCallbackClosePreventsLaterRecreationAndResize) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        window.add_plugin<vsl::window_plugin::HookResize>([&](vsl::PureWindow, int, int) { EXPECT_TRUE(window.close()); });
+        auto* native = static_cast<GLFWwindow*>(window.data_->window_handle);
+        const auto callback = glfwSetFramebufferSizeCallback(native, nullptr);
+        ASSERT_NE(callback, nullptr);
+        callback(native, 80, 64);
+        EXPECT_FALSE(static_cast<bool>(window));
+        EXPECT_FALSE(window.data2);
+        EXPECT_THROW(window.recreate_swapchain(), std::logic_error);
+        EXPECT_THROW(window.resize(80, 64), std::logic_error);
+    }
+    TEST_F(AHOWindowVulkanIntegration, ClosedWindowsRejectNativeQueriesAndOperations) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        ASSERT_TRUE(window.close());
+        EXPECT_THROW(window.maximize(), vsl::exceptions::RuntimeException);
+        EXPECT_THROW(window.restore(), vsl::exceptions::RuntimeException);
+        EXPECT_THROW(window.set_title("closed"), vsl::exceptions::RuntimeException);
+        EXPECT_THROW(window.window_size(), vsl::exceptions::RuntimeException);
+        EXPECT_THROW(window.frame_size(), vsl::exceptions::RuntimeException);
+    }
+    TEST_F(AHOWindowVulkanIntegration, ManagedInputsAndTheirCopiesKeepTheOsWindowAfterManagerAndWindowClose) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        std::weak_ptr<void> native = window.window_owner().owner_ref().share();
+        std::shared_ptr<aho::input::Cursor> cursor;
+        std::optional<aho::input::KeyBoard> keyboard;
+        std::optional<aho::input::MouseWheel> wheel;
+        {
+            aho::InputManager manager(window);
+            cursor = manager.get<aho::input::Cursor>();
+            const auto original_keyboard = manager.get<aho::input::KeyBoard>();
+            const auto original_wheel = manager.get<aho::input::MouseWheel>();
+            keyboard.emplace(*original_keyboard);
+            wheel.emplace(*original_wheel);
+        }
+        ASSERT_TRUE(window.close());
+        EXPECT_FALSE(native.expired());
+        EXPECT_NO_THROW(cursor->update());
+        EXPECT_NO_THROW(keyboard->state());
+        EXPECT_NO_THROW(wheel->state());
+        cursor.reset();
+        keyboard.reset();
+        EXPECT_FALSE(native.expired());
+        wheel.reset();
+        EXPECT_TRUE(native.expired());
+        vsl::lifetime::GLFWLease::Drain();
+    }
     TEST_F(AHOWindowVulkanIntegration, RecreationNotifiesAfterReplacingResourcesWithoutResizingTheNativeWindow) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
@@ -232,19 +302,14 @@ namespace {
     TEST_F(AHOWindowVulkanIntegration, GraphicsInitializationFailureUnregistersTheNewNativeWindow) {
         ASSERT_NO_THROW(start_engine());
         aho::engine::EngineAccessor failing(std::make_shared<aho::engine::EngineData>(*engine->data()));
-        std::vector<const char*> extensions{VK_KHR_SURFACE_EXTENSION_NAME};
+        vsl::InstanceCreateInfo info;
+        info.extensions.emplace_back(VK_KHR_SURFACE_EXTENSION_NAME);
 #ifdef __APPLE__
-        extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+        info.extensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
 #endif
-        auto unsupported = std::make_shared<vsl::impl::VulkanImpl<false>>();
-        vk::InstanceCreateInfo info{};
-#ifdef __APPLE__
-        info.flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
-#endif
-        info.enabledExtensionCount = static_cast<std::uint32_t>(extensions.size());
-        info.ppEnabledExtensionNames = extensions.data();
-        unsupported->instance = vk::createInstance(info);
-        failing.data()->vulkan_instance.accessor = unsupported;
+        const auto unsupported = vsl::VulkanAccessor::Create(std::move(info));
+        failing.data()->vulkan_instance.accessor = unsupported.accessor;
+        failing.data()->vulkan_instance.data_ = unsupported.accessor;
         const auto previous = vsl::PureWindow::WINDOWS;
         const auto previous_default = aho::engine::DefaultEngineRegistration::Current().data();
         EXPECT_THROW((aho::Window("cannot create graphics", 48, 32, failing)), vsl::exceptions::RuntimeException);
@@ -393,10 +458,12 @@ namespace {
 #ifndef AHO_GPU_TESTS
 #include <gtest/gtest.h>
 #include <AHO/window.hpp>
+#include <VSL/lifetime/glfw_lease.hpp>
 #include <GLFW/glfw3.h>
 namespace {
     TEST(MonitorSizeTest, UninitializedGlfwThrowsInsteadOfDereferencingANullMode) {
         ASSERT_TRUE(vsl::PureWindow::WINDOWS.empty());
+        vsl::lifetime::GLFWLease::Drain();
         glfwTerminate();
         try {
             (void)aho::window::get_monitor_size();
@@ -409,6 +476,7 @@ namespace {
 #if defined(GLFW_PLATFORM_NULL)
     TEST(MonitorSizeTest, InitializedNullPlatformReturnsItsVirtualMonitorSize) {
         ASSERT_TRUE(vsl::PureWindow::WINDOWS.empty());
+        vsl::lifetime::GLFWLease::Drain();
         struct RestorePlatform {
             ~RestorePlatform() {
                 glfwTerminate();

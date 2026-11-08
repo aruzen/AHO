@@ -3,9 +3,11 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <optional>
+#include <VSL/lifetime/glfw_lease.hpp>
 namespace vsl_test {
     class WindowIntegrationTest : public VulkanIntegrationTest {
     protected:
+        vsl::lifetime::GLFWLease glfw_lease;
         std::optional<vsl::PureWindow> window;
         std::shared_ptr<vsl::Surface> surface;
         void SetUp() override;
@@ -20,14 +22,14 @@ namespace vsl_test {
         VulkanIntegrationTest::SetUp();
         if (HasFatalFailure() || IsSkipped())
             return;
-        if (!glfwInit()) {
-            const char* description = nullptr;
-            const int error = glfwGetError(&description);
-            const std::string reason = description ? description : "unknown GLFW error";
-            if (error == GLFW_PLATFORM_UNAVAILABLE || reason.find("DISPLAY") != std::string::npos ||
+        try {
+            glfw_lease = vsl::lifetime::GLFWLease::Acquire();
+        } catch (const vsl::exceptions::RuntimeException& error) {
+            const std::string reason = error.what();
+            if (reason.find(std::to_string(GLFW_PLATFORM_UNAVAILABLE)) != std::string::npos || reason.find("DISPLAY") != std::string::npos ||
                 reason.find("display connection") != std::string::npos)
                 GTEST_SKIP() << "Window/display unavailable: " << reason;
-            FAIL() << "GLFW initialization failed: " << error << " " << reason;
+            FAIL() << "GLFW initialization failed: " << reason;
         }
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 #ifdef _WIN32
@@ -47,7 +49,8 @@ namespace vsl_test {
         if (window && static_cast<bool>(*window))
             window->close();
         window.reset();
-        glfwTerminate();
+        glfw_lease = {};
+        vsl::lifetime::GLFWLease::Drain();
         VulkanIntegrationTest::TearDown();
     }
 } // namespace vsl_test

@@ -3,6 +3,8 @@
 #include <algorithm>
 
 #include <VSL/exceptions.hpp>
+#include <VSL/lifetime/window_runtime.hpp>
+#include <VSL/operation/window_ops.hpp>
 #include <utility>
 
 #define GLFW_INCLUDE_VULKAN
@@ -17,53 +19,28 @@
 #include <VSL/vulkan/surface.hpp>
 
 std::vector<std::shared_ptr<VSL_NAMESPACE::PureWindow::WindowData>> VSL_NAMESPACE::PureWindow::WINDOWS;
-bool VSL_NAMESPACE::PureWindow::INITED = false;
-
-namespace {
-    [[noreturn]] void throw_glfw_error(const char* operation) {
-        const char* description = nullptr;
-        const int error = glfwGetError(&description);
-        throw VSL_NAMESPACE::exceptions::RuntimeException("GLFW",
-                                                          std::string(operation) + ": " + (description ? description : "Unknown error") +
-                                                              " (error " + std::to_string(error) + ")");
-    }
-} // namespace
 
 VSL_NAMESPACE::PureWindow::PureWindow(std::string name, int width, int height) {
+    lifetime::GLFWCallScope scope;
     data_ = std::make_shared<WindowData>();
     data_->height = height;
     data_->width = width;
     data_->name = std::move(name);
 
-    if (!INITED) {
-        if (glfwInit() != GLFW_TRUE)
-            throw_glfw_error("Failed to initialize GLFW");
-        INITED = true;
-    }
-    try {
-        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-        data_->window_handle = glfwCreateWindow(width, height, data_->name.c_str(), nullptr, nullptr);
-        if (!data_->window_handle)
-            throw_glfw_error("Failed to create GLFW window");
-        WINDOWS.push_back(data_);
-    } catch (...) {
-        if (data_->window_handle) {
-            glfwDestroyWindow(static_cast<GLFWwindow*>(data_->window_handle));
-            data_->window_handle = nullptr;
-        }
-        if (WINDOWS.empty()) {
-            glfwTerminate();
-            INITED = false;
-        }
-        throw;
-    }
+    auto owner = lifetime::OSWindowOwner::Create(data_->name, width, height);
+    WINDOWS.push_back(data_);
+    data_->window_handle = owner.native_handle();
+    data_->os_window = std::move(owner);
 }
 
 VSL_NAMESPACE::PureWindow::PureWindow(std::shared_ptr<WindowData> data_) : data_(data_) {}
 
 bool VSL_NAMESPACE::PureWindow::Update() {
-    glfwPollEvents();
+    lifetime::GLFWCallScope scope;
+    if (lifetime::in_glfw_callback())
+        throw std::logic_error("Cannot poll GLFW from a callback");
+    if (lifetime::glfw_runtime_active())
+        glfwPollEvents();
     bool s = true;
     const std::vector<std::weak_ptr<WindowData>> windows(WINDOWS.begin(), WINDOWS.end());
     for (const auto& candidate : windows) {
@@ -85,15 +62,19 @@ bool VSL_NAMESPACE::PureWindow::Update() {
 }
 
 bool VSL_NAMESPACE::PureWindow::NoCheckUpdate() {
-    glfwPollEvents();
+    lifetime::GLFWCallScope scope;
+    if (lifetime::in_glfw_callback())
+        throw std::logic_error("Cannot poll GLFW from a callback");
+    if (lifetime::glfw_runtime_active())
+        glfwPollEvents();
     return true;
 }
 
 bool VSL_NAMESPACE::PureWindow::close() {
-    if (!data_ || !data_->window_handle)
+    const auto data = data_;
+    if (!data || !data->window_handle)
         return false;
-
-    data_->destroy();
+    data->destroy();
 
     return true;
 }
@@ -115,26 +96,34 @@ bool VSL_NAMESPACE::PureWindow::operator==(const PureWindow::WindowData* o) {
 }
 
 bool VSL_NAMESPACE::PureWindow::resize(int width, int height) {
-    glfwSetWindowSize((GLFWwindow*)data_->window_handle, width, height);
-    return true;
+    lifetime::GLFWCallScope scope;
+    const auto data = data_;
+    if (!data || !data->window_handle)
+        return false;
+    const auto owner = data->os_window;
+    glfwSetWindowSize(static_cast<GLFWwindow*>(owner.native_handle()), width, height);
+    return data->window_handle != nullptr;
+}
+
+VSL_NAMESPACE::lifetime::OSWindowOwner VSL_NAMESPACE::PureWindow::window_owner() const {
+    if (!data_ || !data_->window_handle || !data_->os_window)
+        throw exceptions::RuntimeException("Window", "A live managed window is required");
+    return data_->os_window;
 }
 
 void VSL_NAMESPACE::PureWindow::WindowData::destroy() {
     if (!window_handle)
         return;
-    for (auto i = WINDOWS.begin(); i != WINDOWS.end(); i++)
-        if (i->get() == this) {
-            WINDOWS.erase(i);
-            break;
-        }
-    glfwDestroyWindow((GLFWwindow*)window_handle);
-
+    const auto registered = std::ranges::find_if(WINDOWS, [this](const auto& data) { return data.get() == this; });
+    const auto keep = registered == WINDOWS.end() ? std::shared_ptr<WindowData>{} : *registered;
+    lifetime::GLFWCallScope scope;
+    auto owner = std::move(os_window);
+    const auto native = window_handle;
     window_handle = nullptr;
-
-    if (WINDOWS.size() == 0) {
-        glfwTerminate();
-        INITED = false;
-    }
+    std::erase_if(WINDOWS, [this](const auto& data) { return data.get() == this; });
+    auto detached_plugins = std::move(plugins);
+    auto detached_updates = std::move(update);
+    operation::detach_os_window(native);
 }
 
 VSL_NAMESPACE::Window::Window(std::string name, int width, int height) : PureWindow(name, width, height) {

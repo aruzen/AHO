@@ -38,7 +38,7 @@ namespace VSL_NAMESPACE::typed::detail {
             impl::GraphicResourceImpl::BindingElement element;
             element.constraint = descriptor_constraints(value);
             if (point.binding_type == UNIFORM_BUFFER || point.binding_type == STORAGE_BUFFER) {
-                if (!value.buffer || value.buffer->device != device.get())
+                if (!value.buffer || value.buffer->device != device)
                     throw std::invalid_argument("Typed descriptor buffer device/usage mismatch");
                 operation::validate_descriptor_buffer(*value.buffer, vk::DescriptorType(point.binding_type), value.offset, value.bytes);
                 buffers.push_back({value.buffer->buffer, value.offset, value.bytes});
@@ -47,7 +47,7 @@ namespace VSL_NAMESPACE::typed::detail {
             } else {
                 vk::DescriptorImageInfo info{};
                 if (point.binding_type != SAMPLER) {
-                    if (!value.image || value.image->device != device.get())
+                    if (!value.image || value.image->device != device)
                         throw std::invalid_argument("Typed descriptor image device/usage mismatch");
                     operation::validate_descriptor_image(*value.image, vk::DescriptorType(point.binding_type));
                     info.imageView = value.image->view;
@@ -56,7 +56,7 @@ namespace VSL_NAMESPACE::typed::detail {
                     element.owners.push_back(value.image);
                 }
                 if (point.binding_type == SAMPLER || point.binding_type == COMBINED_IMAGE_SAMPLER) {
-                    if (!value.sampler || value.sampler->device != device.get())
+                    if (!value.sampler || value.sampler->device != device)
                         throw std::invalid_argument("Typed descriptor sampler device mismatch");
                     info.sampler = value.sampler->sampler;
                     element.states.push_back(value.sampler->use);

@@ -10,6 +10,7 @@
 #include <algorithm>
 
 #include <VSL/vulkan/descriptor_set_manager.hpp>
+#include <VSL/lifetime/descriptor_storage.hpp>
 
 namespace VSL_NAMESPACE::graphic_resource {
     ManagerInterface::ManagerInterface()
@@ -68,10 +69,7 @@ namespace {
         }
     }
     void release_descriptor_pool(const std::shared_ptr<VSL_NAMESPACE::impl::GraphicResourcePoolImpl>& data) {
-        if (data->descriptor_pool) {
-            data->device->device.destroyDescriptorPool(data->descriptor_pool);
-            data->descriptor_pool = nullptr;
-        }
+        VSL_NAMESPACE::operation::destroy_descriptor_pool(*data);
         for (auto& entry : data->resources)
             if (auto resource = entry.lock()) {
                 resource->descriptor_set = nullptr;
@@ -111,13 +109,7 @@ VSL_NAMESPACE::graphic_resource::ManagerInterface::make(std::map<Type, size_t> c
         if (amount > maximum)
             throw VSL_NAMESPACE::exceptions::RuntimeException("DescriptorPool", "Descriptor count exceeds uint32_t");
 
-    GraphicResourcePool pool;
-    pool.data_ = std::make_shared<impl::GraphicResourcePoolImpl>();
-    pool.data_->manager = _identity;
-    pool.data_->device = data_->device;
-
-    std::vector<vk::DescriptorPoolSize> pool_sizes;
-    // size_t size;
+    DescriptorPoolCreateInfo info;
     for (const auto& type : {Type::SAMPLER,
                              Type::COMBINED_IMAGE_SAMPLER,
                              Type::SAMPLED_IMAGE,
@@ -136,23 +128,12 @@ VSL_NAMESPACE::graphic_resource::ManagerInterface::make(std::map<Type, size_t> c
                              Type::BLOCK_MATCH_IMAGE_QCOM,
                              Type::MUTABLE_VALVE,
                              Type::PARTITIONED_ACCELERATION_STRUCTURE_NV}) {
-        vk::DescriptorPoolSize pool_size;
-        pool_size.type = (vk::DescriptorType)type;
-        if (count.contains(type))
-            pool_size.descriptorCount = static_cast<uint32_t>(count[type]);
-        else
-            pool_size.descriptorCount = other;
-        if (pool_size.descriptorCount != 0) {
-            pool_sizes.push_back(pool_size);
-            // size += poolSize.descriptorCount;
-        }
+        const auto capacity = count.contains(type) ? count.at(type) : other;
+        if (capacity)
+            info.descriptors.emplace(type, capacity);
     }
-    vk::DescriptorPoolCreateInfo pool_info;
-    pool_info.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
-    pool_info.poolSizeCount = pool_sizes.size();
-    pool_info.pPoolSizes = pool_sizes.data();
-    pool_info.maxSets = static_cast<uint32_t>(MAX_POOL_SIZE);
-    pool.data_->descriptor_pool = data_->device->device.createDescriptorPool(pool_info);
+    GraphicResourcePool pool{lifetime::make_heap_descriptor_pool(LogicalDeviceAccessor{data_->device}, info)};
+    pool.data_->manager = _identity;
 
     data_->pools.push_back(pool.data_);
     return pool;

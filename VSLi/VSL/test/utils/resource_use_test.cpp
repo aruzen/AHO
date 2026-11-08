@@ -349,7 +349,7 @@ namespace {
         phase.cancel();
         auto native = set.backend();
         const auto layout = native.data_->layout;
-        native.data_->layout.reset();
+        native.data_->layout = nullptr;
         EXPECT_THROW(set.resource_use()->replace(0, {{new_state, {}}}), std::logic_error);
         native.data_->layout = layout;
     }

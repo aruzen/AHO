@@ -60,7 +60,7 @@ namespace VSL_NAMESPACE::lifetime {
         auto& target = resource.bindings.try_emplace(write.dstBinding).first->second;
         write.dstSet = resource.descriptor_set;
         write.descriptorCount = static_cast<std::uint32_t>(elements.size());
-        operation::write_descriptor(resource.pool->device->device, write);
+        operation::write_descriptor(resource.native_device, write);
         target.swap(prepared);
     }
 } // namespace VSL_NAMESPACE::lifetime

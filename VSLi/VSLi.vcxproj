@@ -152,6 +152,8 @@
     <ClInclude Include="VSL\src\private\VSL\operation\submission_ops.hpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\descriptor_ops.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\descriptor_bindings.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\descriptor_storage.hpp" />
+    <ClInclude Include="VSL\include\VSL\operation\descriptor_create_info.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\image_storage.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\sampler_storage.hpp" />
     <ClCompile Include="VSL\src\operation\image_ops.cpp" />
@@ -159,6 +161,7 @@
     <ClCompile Include="VSL\src\operation\submission_ops.cpp" />
     <ClCompile Include="VSL\src\operation\descriptor_ops.cpp" />
     <ClCompile Include="VSL\src\lifetime\descriptor_bindings.cpp" />
+    <ClCompile Include="VSL\src\lifetime\descriptor_storage.cpp" />
     <ClCompile Include="VSL\src\lifetime\image_storage.cpp" />
     <ClCompile Include="VSL\src\lifetime\sampler_storage.cpp" />
     <ClInclude Include="VSL\src\private\VSL\sync\submission_completion.hpp" />

@@ -57,7 +57,7 @@ namespace {
                            const VSL_NAMESPACE::CommandManager& manager) {
         const auto& device = image.data_->device;
         if (!commands.data_ || !commands.data_->command_pool || !manager.data_ ||
-            commands.data_->command_pool->device.get() != device || manager.data_->device.get() != device)
+            commands.data_->command_pool->device != device || manager.data_->device.get() != device)
             throw std::invalid_argument("Image upload requires commands on the same device");
     }
 

@@ -12,6 +12,7 @@
 #include "../vulkan/render_pass.hpp"
 #include "../vulkan/pipeline.hpp"
 #include "../vulkan/frame_buffer.hpp"
+#include "../vulkan/command.hpp"
 #include "../storage/arena_memory.hpp"
 #include "../vulkan/image.hpp"
 #include "../vulkan/sampler.hpp"
@@ -52,10 +53,16 @@ namespace VSL_NAMESPACE::lifetime {
         // 全sourceを永続依存とする。行=native framebuffer、列=AttachmentId。
         std::vector<std::vector<FrameBufferImageSource>> attachments;
     };
+    using CommandPoolSource = std::variant<typed::ResourceId, CommandPool>;
+    struct CommandBufferInit {
+        CommandPoolSource pool;
+        std::uint32_t count = DEFAULT_BUFFER_SIZE;
+    };
     using ResourceInit = std::variant<BufferCreateInfo, ImageCreateInfo, SamplerCreateInfo, BufferView, ImageAccessor, SamplerAccessor,
                                       DescriptorLayoutCreateInfo, DescriptorPoolCreateInfo, DescriptorSetInit,
                                       graphic_resource::BindingLayout, graphic_resource::Pool, ShaderCreateInfo, ShaderAccessor, PipelineLayoutInit, PipelineLayoutAccessor, RenderPassDescription, RenderPassAccessor,
-                                      GraphicsPipelineInit, ComputePipelineInit, PipelineAccessor, FrameBufferInit, FrameBufferAccessor>;
+                                      GraphicsPipelineInit, ComputePipelineInit, PipelineAccessor, FrameBufferInit, FrameBufferAccessor,
+                                      CommandPoolCreateInfo, CommandBufferInit, CommandPool, CommandBuffer>;
     class ResourceArena {
         std::shared_ptr<detail::ResourceArenaOwner> _owner;
         ResourceArena(LogicalDeviceAccessor device, typed::LifetimeGroup group,
@@ -87,6 +94,8 @@ namespace VSL_NAMESPACE::lifetime {
         RenderPassAccessor render_pass(typed::ResourceId id) const;
         PipelineAccessor pipeline(typed::ResourceId id) const;
         FrameBufferAccessor frame_buffer(typed::ResourceId id) const;
+        CommandPool command_pool(typed::ResourceId id) const;
+        CommandBuffer command_buffer(typed::ResourceId id) const;
         // 非所有の物理Buffer全体。外部の部分viewに対してはbuffer()を使用する。
         BufferRef borrow_buffer(typed::ResourceId id) const&;
         BufferRef borrow_buffer(typed::ResourceId id) const&& = delete;

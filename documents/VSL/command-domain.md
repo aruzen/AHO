@@ -2,6 +2,8 @@
 
 [完了計画](arena-completion-plan.md)の8a。Pool／Buffer／Fence／Semaphoreを配置する前に、native CommandBufferImplから送信資源の強い所有を外へ移す。8全体の配置は後続であり、この単位ではheapのnative生成を維持する。
 
+後続の[CommandPool／CommandBuffer配置](command-arena.md)で、共通backend・arena生成と明示再attachを接続した。Fence／Semaphoreの配置・使用予約とTyped frameは引き続き後続である。
+
 ## 所有と責務
 
 CommandBuffer ringごとにlifetimeのCommandDomainを置く。CommandBuffer／CommandManager／PhaseのfacadeがDomainを保持し、Domainは正規native Buffer owner、slotごとのlast-submitted Work、recording候補、WSI pinと住所の安定したRecordingContextを持つ。native ownerを別のalias control blockへ包み直さない。

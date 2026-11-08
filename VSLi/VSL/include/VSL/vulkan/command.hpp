@@ -4,6 +4,8 @@
 #include "synchronize.hpp"
 #include "device.hpp"
 #include "swapchain.hpp"
+#include "../operation/command_create_info.hpp"
+#include "../lifetime/owner_ref.hpp"
 
 namespace VSL_NAMESPACE {
     namespace lifetime {
@@ -18,11 +20,13 @@ namespace VSL_NAMESPACE {
     inline std::uint32_t DEFAULT_BUFFER_SIZE = 3;
 
     struct CommandPool {
-        CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor device);
+        CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor device, CommandPoolCreateInfo info = {});
 
         CommandPool(std::shared_ptr<VSL_NAMESPACE::impl::CommandPoolImpl> data);
 
         std::shared_ptr<VSL_NAMESPACE::impl::CommandPoolImpl> data_;
+        LogicalDeviceAccessor get_device() const;
+        lifetime::OwnerRef owner_ref() const;
     };
 
     struct CommandBuffer {
@@ -33,6 +37,8 @@ namespace VSL_NAMESPACE {
         CommandBuffer(CommandBuffer&&) noexcept = default;
         CommandBuffer& operator=(CommandBuffer other) noexcept;
         void swap(CommandBuffer& other) noexcept;
+        CommandPool get_pool() const;
+        lifetime::OwnerRef owner_ref() const;
 
         std::uint32_t get_current_buffer_idx();
 
@@ -128,6 +134,7 @@ namespace VSL_NAMESPACE {
         CommandManager(std::shared_ptr<VSL_NAMESPACE::impl::CommandManagerImpl> data);
 
         CommandManager(VSL_NAMESPACE::LogicalDeviceAccessor device);
+        static CommandManager FromBuffer(CommandBuffer buffer);
         CommandManager(const CommandManager&) = default;
         CommandManager(CommandManager&&) noexcept = default;
         CommandManager& operator=(CommandManager other) noexcept;

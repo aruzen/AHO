@@ -49,6 +49,14 @@ namespace VSL_NAMESPACE::storage {
     struct ImplLayout<impl::FrameBufferImpl> {
         static constexpr size_t SIZE = FRAME_BUFFER_IMPL_SIZE, ALIGNMENT = FRAME_BUFFER_IMPL_ALIGNMENT;
     };
+    template<>
+    struct ImplLayout<impl::CommandPoolImpl> {
+        static constexpr size_t SIZE = COMMAND_POOL_IMPL_SIZE, ALIGNMENT = COMMAND_POOL_IMPL_ALIGNMENT;
+    };
+    template<>
+    struct ImplLayout<impl::CommandBufferImpl> {
+        static constexpr size_t SIZE = COMMAND_BUFFER_IMPL_SIZE, ALIGNMENT = COMMAND_BUFFER_IMPL_ALIGNMENT;
+    };
     inline constexpr size_t NO_SEPARATE_USE = std::numeric_limits<size_t>::max();
     template<typename Impl>
     struct ResourceSlotLayout {
@@ -89,6 +97,14 @@ namespace VSL_NAMESPACE::storage {
         // Implに隣接するlifetime contextを含む。GPU UseStateではない。
         static constexpr size_t SIZE = FRAME_BUFFER_SLOT_SIZE, ALIGNMENT = FRAME_BUFFER_SLOT_ALIGNMENT, USE_OFFSET = NO_SEPARATE_USE;
     };
+    template<>
+    struct ResourceSlotLayout<impl::CommandPoolImpl> {
+        static constexpr size_t SIZE = COMMAND_POOL_SLOT_SIZE, ALIGNMENT = COMMAND_POOL_SLOT_ALIGNMENT, USE_OFFSET = NO_SEPARATE_USE;
+    };
+    template<>
+    struct ResourceSlotLayout<impl::CommandBufferImpl> {
+        static constexpr size_t SIZE = COMMAND_BUFFER_SLOT_SIZE, ALIGNMENT = COMMAND_BUFFER_SLOT_ALIGNMENT, USE_OFFSET = NO_SEPARATE_USE;
+    };
     enum class ResourceKind : std::uint32_t {
         BUFFER,
         IMAGE,
@@ -100,7 +116,9 @@ namespace VSL_NAMESPACE::storage {
         PIPELINE_LAYOUT,
         RENDER_PASS,
         PIPELINE,
-        FRAME_BUFFER
+        FRAME_BUFFER,
+        COMMAND_POOL,
+        COMMAND_BUFFER
     };
     struct SlotLayout {
         size_t size, alignment, use_offset;
@@ -123,6 +141,8 @@ namespace VSL_NAMESPACE::storage {
         using RenderPass = ResourceSlotLayout<impl::RenderPassImpl>;
         using Pipeline = ResourceSlotLayout<impl::PipelineImpl>;
         using FrameBuffer = ResourceSlotLayout<impl::FrameBufferImpl>;
+        using CommandPool = ResourceSlotLayout<impl::CommandPoolImpl>;
+        using CommandBuffer = ResourceSlotLayout<impl::CommandBufferImpl>;
         switch (kind) {
             case ResourceKind::BUFFER:
                 return {Buffer::SIZE, Buffer::ALIGNMENT, Buffer::USE_OFFSET};
@@ -146,6 +166,10 @@ namespace VSL_NAMESPACE::storage {
                 return {Pipeline::SIZE, Pipeline::ALIGNMENT, Pipeline::USE_OFFSET};
             case ResourceKind::FRAME_BUFFER:
                 return {FrameBuffer::SIZE, FrameBuffer::ALIGNMENT, FrameBuffer::USE_OFFSET};
+            case ResourceKind::COMMAND_POOL:
+                return {CommandPool::SIZE, CommandPool::ALIGNMENT, CommandPool::USE_OFFSET};
+            case ResourceKind::COMMAND_BUFFER:
+                return {CommandBuffer::SIZE, CommandBuffer::ALIGNMENT, CommandBuffer::USE_OFFSET};
         }
         throw std::invalid_argument("Unknown resource implementation kind");
     }

@@ -36,6 +36,7 @@ namespace VSL_NAMESPACE {
         struct FrameBufferOwnerContext;
         struct CommandDomain;
         struct CommandRecordingContext;
+        struct CommandBufferOwnerContext;
     } // namespace lifetime
     namespace graphic_resource {
         struct ManagerInterface;
@@ -93,8 +94,12 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct CommandPoolImpl {
-        std::shared_ptr<LogicalDeviceImpl> device;
-
+        CommandPoolImpl() = default;
+        CommandPoolImpl(const CommandPoolImpl&) = delete;
+        CommandPoolImpl& operator=(const CommandPoolImpl&) = delete;
+        lifetime::DependencyNode* owner_node = nullptr;
+        LogicalDeviceImpl* device = nullptr;
+        vk::Device native_device;
         vk::CommandPool command_pool;
         ~CommandPoolImpl();
     };
@@ -118,12 +123,17 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct CommandBufferImpl {
-        std::shared_ptr<CommandPoolImpl> command_pool;
-
+        CommandBufferImpl() = default;
+        CommandBufferImpl(const CommandBufferImpl&) = delete;
+        CommandBufferImpl& operator=(const CommandBufferImpl&) = delete;
+        lifetime::DependencyNode* owner_node = nullptr;
+        CommandPoolImpl* command_pool = nullptr;
+        vk::Device native_device;
+        vk::CommandPool native_pool;
         std::uint32_t current_buffer_idx = 0;
 
         std::vector<vk::CommandBuffer> command_buffers;
-        std::weak_ptr<lifetime::CommandDomain> domain;
+        lifetime::CommandBufferOwnerContext* owner_context = nullptr;
         lifetime::CommandRecordingContext* recording_context = nullptr;
 
         ~CommandBufferImpl();

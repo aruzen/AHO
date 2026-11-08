@@ -79,7 +79,7 @@ void VSL_NAMESPACE::command::CopyImageToBuffer::invoke(CommandPool pool, Command
     const auto& destination = _destination;
     if (!buffer.data_ || !buffer.data_->command_pool || !manager.data_ ||
         manager.data_->device.get() != image.data_->device ||
-        buffer.data_->command_pool->device.get() != image.data_->device)
+        buffer.data_->command_pool->device != image.data_->device)
         throw std::invalid_argument("Image copy requires a command buffer on the same device");
     image.resource_use().record(buffer);
     ResourceUse::ForBuffer(destination, {}).record(buffer);

@@ -79,7 +79,7 @@ namespace VSL_NAMESPACE::command {
         // poll中のcallbackがcommandや元wrapperを破棄しても、このsnapshotだけを使う。
         const auto target = frame_buffer.data_;
         if (!target || !target.use_count() || !target->device || !target->render_pass || !target->render_pass->description ||
-            !buffer.data_ || !buffer.data_->command_pool || buffer.data_->command_pool->device.get() != target->device)
+            !buffer.data_ || !buffer.data_->command_pool || buffer.data_->command_pool->device != target->device)
             throw std::invalid_argument("Render pass begin requires a target on the recording device");
         const FrameBufferRecording recording(*buffer.data_);
         const auto completion = buffer.completion();

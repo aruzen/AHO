@@ -9,7 +9,7 @@
 
 最初のPRだけで終了せず、下記の順で実装・検証・独立レビューを継続する。PRの公開前には最新masterとの差分を確認する。新しい製品ディレクトリが必要な場合は作成前に確認する。
 
-現在の到達点は順序1〜7と、8aのcommand所有分離である。8b以降のcommand／同期資源の配置は未完了であり、起動資源、既定policy変更、旧入口廃止と最終監査まで継続する。
+現在の到達点は順序1〜7、8aのcommand所有分離、8b前半のCommandPool／CommandBuffer配置である。8b後半の同期資源と8c以降は未完了であり、起動資源、既定policy変更、旧入口廃止と最終監査まで継続する。
 
 ## 責務と保証
 
@@ -129,6 +129,8 @@ Pipelineが記録時に使うLayoutは保持し、Shader／Pass／再生成recip
 8aは[Command Domain](command-domain.md)でWork registryを外へ移す。nativeのheap生成はこの単位で維持し、元facade破棄、同native ownerのWork保持、完了callbackからの再送信、準備中のpeer保護、wait_idle中のPENDING維持、取消時の旧SUBMISSION保持を検証する。
 
 8b前半はCommandPool／CommandBufferの共通operation・placement構築・寸法生成とResourceArenaへの配置。Buffer→Pool→Deviceの固定親を正規化し、明示的な配置入口でだけDomainをattachする。Domainをarena rootへ強所有させない。attach用配列確保はpublish前に終え、終了callback中の再attachは拒否する。reset／nextは記録・取消・対象slotのGPU使用を検査し、全resetは事前に全slotを検査する。
+
+[8b前半の実装](command-arena.md)で、通常VSL／arenaの共通backend、同rootの複数ring、Domain再接続、元Poolのgetterと固定辺、Typed copyと自己root保持、逆rollback、resetの全slot事前検査・再入・世代照合を検証した。nextはnativeを変更せずhost巡回だけなので、送信済みslotへも進める。GPU待機は次Phaseのprepareが行う。
 
 8b後半はFence／Semaphoreの共通backendと配置、明示destroy／resetの使用制約、名前付き登録と古いHolderの同名置換を扱う。Fenceは未送信予約から保護し、SemaphoreのWSI待ちはgraphics結果と分離する。native配列のCPU容量を生成前に確保し、部分失敗を逆順で巻き戻す。
 

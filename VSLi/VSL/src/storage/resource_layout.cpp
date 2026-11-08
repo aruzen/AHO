@@ -12,8 +12,14 @@
 #include <VSL/lifetime/synchronization_storage.hpp>
 #include <VSL/lifetime/instance_storage.hpp>
 #include <VSL/lifetime/physical_device_storage.hpp>
+#include <VSL/lifetime/surface_storage.hpp>
 
 namespace VSL_NAMESPACE::storage {
+    static_assert(sizeof(impl::SurfaceImpl) == ImplLayout<impl::SurfaceImpl>::SIZE);
+    static_assert(alignof(impl::SurfaceImpl) == ImplLayout<impl::SurfaceImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::SurfaceSlotStorage) == ResourceSlotLayout<impl::SurfaceImpl>::SIZE);
+    static_assert(alignof(lifetime::SurfaceSlotStorage) == ResourceSlotLayout<impl::SurfaceImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::SurfaceImpl>::USE_OFFSET == NO_SEPARATE_USE);
     static_assert(sizeof(impl::PhysicalDeviceImpl) == ImplLayout<impl::PhysicalDeviceImpl>::SIZE);
     static_assert(alignof(impl::PhysicalDeviceImpl) == ImplLayout<impl::PhysicalDeviceImpl>::ALIGNMENT);
     static_assert(sizeof(lifetime::PhysicalDeviceSlotStorage) == ResourceSlotLayout<impl::PhysicalDeviceImpl>::SIZE);

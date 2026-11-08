@@ -88,6 +88,16 @@
     <ClCompile Include="VSL\src\operation\physical_device_ops.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\src\private\VSL\lifetime\physical_device_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClCompile Include="VSL\src\lifetime\physical_device_storage.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClInclude Include="VSL\include\VSL\lifetime\glfw_lease.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\lifetime\window_owner.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\src\private\VSL\lifetime\window_runtime.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClCompile Include="VSL\src\lifetime\window_runtime.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClInclude Include="VSL\src\private\VSL\operation\window_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClCompile Include="VSL\src\operation\window_ops.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClInclude Include="VSL\src\private\VSL\operation\surface_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClCompile Include="VSL\src\operation\surface_ops.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClInclude Include="VSL\src\private\VSL\lifetime\surface_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClCompile Include="VSL\src\lifetime\surface_storage.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\src\private\VSL\lifetime\synchronization_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClCompile Include="VSL\src\lifetime\synchronization_storage.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\src\private\VSL\operation\synchronization_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>

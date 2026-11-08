@@ -4,7 +4,8 @@ namespace {
     TEST_F(SurfaceWindowIntegrationTest, CreatesSurfaceForWindowAndRetainsInstance) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        EXPECT_EQ(surface->data_->vulkan, instance);
+        EXPECT_EQ(surface->data_->vulkan, instance.get());
+        EXPECT_EQ(surface->get_instance().accessor, instance);
         EXPECT_EQ(surface->data_->window, window->data_->window_handle);
         const auto capabilities = physical.data_->device.getSurfaceCapabilitiesKHR(surface->data_->surface);
         EXPECT_GE(capabilities.maxImageExtent.width, 64u);
@@ -37,20 +38,16 @@ namespace {
         EXPECT_THROW((vsl::Surface(&*window, vsl::VulkanAccessor{empty})), vsl::exceptions::RuntimeException);
     }
     TEST_F(SurfaceWindowIntegrationTest, MissingPlatformExtensionThrowsWithReasonAndDoesNotRegisterAPlugin) {
-        auto unsupported = std::make_shared<vsl::impl::VulkanImpl<false>>();
-        std::vector<const char*> extensions{VK_KHR_SURFACE_EXTENSION_NAME};
-        vk::InstanceCreateInfo info{};
+        vsl::InstanceCreateInfo info;
+        info.extensions.emplace_back(VK_KHR_SURFACE_EXTENSION_NAME);
 #ifdef __APPLE__
-        extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-        info.flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
+        info.extensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
 #endif
-        info.enabledExtensionCount = static_cast<std::uint32_t>(extensions.size());
-        info.ppEnabledExtensionNames = extensions.data();
-        unsupported->instance = vk::createInstance(info);
+        const auto unsupported = vsl::VulkanAccessor::Create(std::move(info));
         const auto previous_count = window->data_->plugins.size();
         const auto previous_id = window->data_->plugins_next_id;
         try {
-            window->add_plugin<vsl::Surface>(vsl::VulkanAccessor{unsupported});
+            window->add_plugin<vsl::Surface>(unsupported);
             ADD_FAILURE() << "Failed surface creation returned a registered plugin";
         } catch (const vsl::exceptions::RuntimeException& error) {
             const std::string reason = error.what();

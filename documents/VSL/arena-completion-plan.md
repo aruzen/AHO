@@ -9,7 +9,7 @@
 
 最初のPRだけで終了せず、下記の順で実装・検証・独立レビューを継続する。PRの公開前には最新masterとの差分を確認する。新しい製品ディレクトリが必要な場合は作成前に確認する。
 
-現在の到達点は順序1〜8と9a／9bである。command所有分離、CommandPool／CommandBuffer／Fence／Semaphore配置、同期資源の使用制約とTyped frame再利用に加え、InstanceとPhysicalDeviceの共通backend／指定領域構築まで接続した。順序9全体と10〜12は未完了であり、OS window／Surface／Device、公開起動arena、WSI／AHO接続、既定policy変更、旧入口廃止と最終監査まで継続する。
+現在の到達点は順序1〜8と9a／9b／9cである。command所有分離、CommandPool／CommandBuffer／Fence／Semaphore配置、同期資源の使用制約とTyped frame再利用に加え、Instance／PhysicalDevice／Surfaceの共通backend／指定領域構築と、OS windowの寿命分離まで接続した。順序9全体と10〜12は未完了であり、Device、公開起動arena、WSI／AHO接続、既定policy変更、旧入口廃止と最終監査まで継続する。
 
 ## 責務と保証
 
@@ -159,6 +159,8 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 [9bのPhysicalDevice backendと指定領域構築](physical-device-arena.md)で、候補scratch／選択済み実体と旧custom searcherのowning候補を分けた。heap／配置の共通構築、Instance固定親と元ownerのgetter、同型slotの直接参照、能力cache、失敗rollbackを接続した。Device前提のResourceArenaへstartup kindを混ぜず、PhysicalDeviceのlayout traitを生成・配布する。
 
 9cはSurfaceのOS owner／GLFW leaseと共通backend／指定領域構築である。WindowDataの論理的closeとnative windowの最終破棄を分ける。OS ownerはplugins／Engineを持たず、Surfaceの外側ownerがInstanceとOS ownerを固定保持する。GLFW callback内ではnative破棄を延期し、管理側のmain-thread境界で回収する。leaseの共有範囲と外部GLFW利用の契約を明記し、Surface／Swapchainだけが残る場合にもGLFWを終了しない。
+
+[9cのOS window／Surface実装](surface-arena.md)で、独立OS leafとGLFW lease、main thread退役queue、Surfaceの共通backend／指定領域／元親getterを接続した。GPU／CPU／compile／配布構成と同一画像の回帰を検証し、9cの受入条件を満たした。次は9dへ進む。
 
 9dでLogicalDeviceの固定親と正規owner、Device引数不要の公開起動arenaへ進む。子のDevice getter等に残るshared_from_thisを置換する。Deviceを依存graphへ公開する時は、既存heap leaf／ResourceArena／visitorにも正規Deviceの固定辺を列挙する。
 

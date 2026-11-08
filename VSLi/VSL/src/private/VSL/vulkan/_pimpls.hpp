@@ -42,6 +42,7 @@ namespace VSL_NAMESPACE {
         struct CommandBufferOwnerContext;
         struct SynchronizationOwnerContext;
         struct PhysicalDeviceOwnerContext;
+        struct SurfaceOwnerContext;
     } // namespace lifetime
     namespace graphic_resource {
         struct ManagerInterface;
@@ -89,11 +90,18 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct SurfaceImpl {
-        std::shared_ptr<VulkanImplAccessor> vulkan;
-
+        lifetime::DependencyNode* owner_node = nullptr;
+        VulkanImplAccessor* vulkan = nullptr;
+        OSWindowImpl* os_window = nullptr;
+        vk::Instance native_instance;
         vk::SurfaceKHR surface;
-        void* window;
-
+        void* window = nullptr;
+        lifetime::SurfaceOwnerContext* owner_context = nullptr;
+        SurfaceImpl() = default;
+        SurfaceImpl(const SurfaceImpl&) = delete;
+        SurfaceImpl& operator=(const SurfaceImpl&) = delete;
+        SurfaceImpl(SurfaceImpl&&) = delete;
+        SurfaceImpl& operator=(SurfaceImpl&&) = delete;
         ~SurfaceImpl();
     };
 

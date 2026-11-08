@@ -1,6 +1,7 @@
 #include <VSL/vulkan/vulkan.hpp>
 #include <VSL/lifetime/instance_storage.hpp>
 #include <VSL/lifetime/dependency_node.hpp>
+#include <VSL/lifetime/glfw_lease.hpp>
 #include <stdexcept>
 
 namespace VSL_NAMESPACE {
@@ -27,6 +28,8 @@ namespace VSL_NAMESPACE {
     Vulkan<validation>::Vulkan(const char* app_name, const std::vector<const char*>& require_extensions) {
         if (!app_name)
             throw std::invalid_argument("Instance application name is null");
+        lifetime::GLFWCallScope scope;
+        const auto glfw = lifetime::GLFWLease::Acquire();
         InstanceCreateInfo info;
         info.application_name = app_name;
         info.validation = validation;

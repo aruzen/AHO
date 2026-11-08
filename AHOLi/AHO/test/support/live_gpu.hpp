@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 #include <AHO/engine/standard_engine.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
+#include <VSL/lifetime/glfw_lease.hpp>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <memory>
@@ -11,6 +12,7 @@
 namespace aho_test {
     class LiveGPUTest : public testing::Test {
         vsl::LoggerT _previous_logger = nullptr;
+        vsl::lifetime::GLFWLease _glfw;
         inline static std::vector<std::string> VALIDATION_ERRORS;
         inline static std::mutex VALIDATION_MUTEX;
         static void CaptureLog(const char* text);
@@ -39,10 +41,10 @@ namespace aho_test {
             VALIDATION_ERRORS.clear();
         }
         vsl::LOGGER = CaptureLog;
-        if (glfwInit() != GLFW_TRUE) {
-            const char* reason = nullptr;
-            glfwGetError(&reason);
-            GTEST_SKIP() << "GLFW display is unavailable: " << (reason ? reason : "unknown initialization error");
+        try {
+            _glfw = vsl::lifetime::GLFWLease::Acquire();
+        } catch (const vsl::exceptions::RuntimeException& error) {
+            GTEST_SKIP() << "GLFW display is unavailable: " << error.what();
         }
         VkApplicationInfo app{VK_STRUCTURE_TYPE_APPLICATION_INFO};
         app.apiVersion = VK_API_VERSION_1_0;
@@ -75,11 +77,14 @@ namespace aho_test {
             engine->boot_window->close();
         engine.reset();
         // The library closes its GLFW windows explicitly; never leave a failed case's window open.
-        const auto windows = vsl::PureWindow::WINDOWS;
-        for (const auto& window : windows)
-            if (window->window_handle)
-                vsl::PureWindow(window).close();
-        glfwTerminate();
+        {
+            const auto windows = vsl::PureWindow::WINDOWS;
+            for (const auto& window : windows)
+                if (window->window_handle)
+                    vsl::PureWindow(window).close();
+        }
+        _glfw = {};
+        vsl::lifetime::GLFWLease::Drain();
         vsl::LOGGER = _previous_logger;
         std::vector<std::string> errors;
         {

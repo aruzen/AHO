@@ -74,7 +74,8 @@ bool check_device_extension_support(vk::PhysicalDevice device) {
 template<bool v>
 std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl> VSL_NAMESPACE::LogicalDeviceGraphicCreator<v>::create(VSL_NAMESPACE::PhysicalDevice device, VSL_NAMESPACE::Surface surface) {
     (void)device.owner_ref();
-    if (!surface.data_ || !surface.data_->surface || surface.data_->vulkan.get() != device.data_->vulkan)
+    (void)surface.owner_ref();
+    if (!surface.data_->surface || surface.data_->vulkan != device.data_->vulkan)
         throw std::invalid_argument("Logical device requires a surface on the physical device Instance");
     std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl> data_ = std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl>(new VSL_NAMESPACE::impl::LogicalDeviceImpl);
 

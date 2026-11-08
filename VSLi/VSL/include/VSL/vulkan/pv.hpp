@@ -15,6 +15,7 @@ namespace VSL_NAMESPACE::impl {
     struct SubmissionImpl;
     struct SubmissionWork;
     struct SurfaceImpl;
+    struct OSWindowImpl;
     struct SwapchainImpl;
     struct ViewImpl;
     struct PipelineRecipe;

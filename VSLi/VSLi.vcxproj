@@ -223,6 +223,16 @@
     <ClCompile Include="VSL\src\operation\physical_device_ops.cpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\physical_device_storage.hpp" />
     <ClCompile Include="VSL\src\lifetime\physical_device_storage.cpp" />
+    <ClInclude Include="VSL\include\VSL\lifetime\glfw_lease.hpp" />
+    <ClInclude Include="VSL\include\VSL\lifetime\window_owner.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\window_runtime.hpp" />
+    <ClCompile Include="VSL\src\lifetime\window_runtime.cpp" />
+    <ClInclude Include="VSL\src\private\VSL\operation\window_ops.hpp" />
+    <ClCompile Include="VSL\src\operation\window_ops.cpp" />
+    <ClInclude Include="VSL\src\private\VSL\operation\surface_ops.hpp" />
+    <ClCompile Include="VSL\src\operation\surface_ops.cpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\surface_storage.hpp" />
+    <ClCompile Include="VSL\src\lifetime\surface_storage.cpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\synchronization_storage.hpp" />
     <ClCompile Include="VSL\src\lifetime\synchronization_storage.cpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\synchronization_ops.hpp" />

@@ -290,6 +290,7 @@ TEST(WindowInitializationTest, FailedGlfwInitializationThrowsWithoutRegisteringA
         }
     } restore;
     ASSERT_TRUE(vsl::PureWindow::WINDOWS.empty());
+    vsl::lifetime::GLFWLease::Drain();
     glfwInitHint(GLFW_PLATFORM, -1); // GLFW rejects an unsupported platform ID during initialization.
     std::optional<vsl::PureWindow> failed;
     try {

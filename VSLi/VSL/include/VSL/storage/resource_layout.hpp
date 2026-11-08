@@ -6,6 +6,10 @@ namespace VSL_NAMESPACE::storage {
     template<typename Impl>
     struct ImplLayout;
     template<>
+    struct ImplLayout<impl::SurfaceImpl> {
+        static constexpr size_t SIZE = SURFACE_IMPL_SIZE, ALIGNMENT = SURFACE_IMPL_ALIGNMENT;
+    };
+    template<>
     struct ImplLayout<impl::VulkanImplAccessor> {
         static constexpr size_t SIZE = INSTANCE_IMPL_SIZE, ALIGNMENT = INSTANCE_IMPL_ALIGNMENT;
     };
@@ -136,6 +140,10 @@ namespace VSL_NAMESPACE::storage {
     template<>
     struct ResourceSlotLayout<impl::PhysicalDeviceImpl> {
         static constexpr size_t SIZE = PHYSICAL_DEVICE_SLOT_SIZE, ALIGNMENT = PHYSICAL_DEVICE_SLOT_ALIGNMENT, USE_OFFSET = NO_SEPARATE_USE;
+    };
+    template<>
+    struct ResourceSlotLayout<impl::SurfaceImpl> {
+        static constexpr size_t SIZE = SURFACE_SLOT_SIZE, ALIGNMENT = SURFACE_SLOT_ALIGNMENT, USE_OFFSET = NO_SEPARATE_USE;
     };
     enum class ResourceKind : std::uint32_t {
         BUFFER,

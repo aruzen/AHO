@@ -1,6 +1,7 @@
 #include <VSL/define.hpp>
 
 #include <VSL/vulkan/surface.hpp>
+#include <VSL/lifetime/glfw_lease.hpp>
 #include <VSL/vulkan/swapchain.hpp>
 #include <VSL/exceptions.hpp>
 
@@ -65,16 +66,24 @@ vk::Extent2D choose_swap_extent(const vk::SurfaceCapabilitiesKHR& capabilities, 
 
 VSL_NAMESPACE::Swapchain::Swapchain(VSL_NAMESPACE::LogicalDeviceAccessor device, std::shared_ptr<Surface> surface, std::optional<VSL_NAMESPACE::SwapchainAccessor> old,
                                     std::optional<int> width, std::optional<int> height, ImageType usage) {
+    if (!surface)
+        throw std::invalid_argument("Swapchain requires a Surface owner");
+    const auto source = surface->data_;
+    (void)Surface(source).owner_ref();
+    if (!device.data_ || !device.data_.use_count() || !device.data_->device || !device.data_->parent_device ||
+        device.data_->parent_device->vulkan != source->vulkan)
+        throw std::invalid_argument("Swapchain requires a Device on its Surface Instance");
+    lifetime::GLFWCallScope scope;
     if (old && (!old->data_ || !old->data_->swap_chain || old->data_->device != device.data_ ||
-                !surface || old->data_->surface != surface->data_))
+                old->data_->surface != source))
         throw std::invalid_argument("Old swapchain must be valid and use the same device and surface");
     data_ = std::shared_ptr<impl::SwapchainImpl>(new impl::SwapchainImpl);
     data_->device = device.data_;
-    data_->surface = surface->data_;
+    data_->surface = source;
 
     std::shared_ptr<impl::PhysicalDeviceImpl> pdevice = device.data_->parent_device;
 
-    SwapChainSupportDetails swap_chain_support = query_swap_chain_support(pdevice->device, surface->data_->surface);
+    SwapChainSupportDetails swap_chain_support = query_swap_chain_support(pdevice->device, source->surface);
     auto swap_chain_adequate = !swap_chain_support.formats.empty() && !swap_chain_support.present_modes.empty();
 
     if (!swap_chain_adequate)
@@ -84,7 +93,7 @@ VSL_NAMESPACE::Swapchain::Swapchain(VSL_NAMESPACE::LogicalDeviceAccessor device,
     data_->present_mode = choose_swap_present_mode(swap_chain_support.present_modes);
 
     if (not width.has_value() || not height.has_value())
-        glfwGetFramebufferSize((GLFWwindow*)surface->data_->window,
+        glfwGetFramebufferSize((GLFWwindow*)source->window,
                                width ? nullptr : &width.emplace(0),
                                height ? nullptr : &height.emplace(0));
     data_->extent = choose_swap_extent(swap_chain_support.capabilities, width.value(), height.value());
@@ -98,7 +107,7 @@ VSL_NAMESPACE::Swapchain::Swapchain(VSL_NAMESPACE::LogicalDeviceAccessor device,
     }
 
     vk::SwapchainCreateInfoKHR create_info{};
-    create_info.surface = surface->data_->surface;
+    create_info.surface = source->surface;
     create_info.minImageCount = data_->image_count;
     create_info.imageFormat = data_->surface_format.format;
     create_info.imageColorSpace = data_->surface_format.colorSpace;
@@ -109,7 +118,7 @@ VSL_NAMESPACE::Swapchain::Swapchain(VSL_NAMESPACE::LogicalDeviceAccessor device,
         (swap_chain_support.capabilities.supportedUsageFlags & create_info.imageUsage) != create_info.imageUsage)
         throw std::invalid_argument("Surface does not support requested swapchain image usage");
 
-    QueueFamilyIndices indices = find_queue_families(pdevice->device, surface->data_->surface);
+    QueueFamilyIndices indices = find_queue_families(pdevice->device, source->surface);
     uint32_t queue_family_indices[] = {indices.graphics_family.value(), indices.present_family.value()};
 
     configure_swapchain_sharing(create_info, queue_family_indices, data_->pre_transform);

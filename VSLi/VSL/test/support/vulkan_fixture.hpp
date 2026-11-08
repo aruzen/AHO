@@ -1,4 +1,5 @@
 #pragma once
+#include <VSL/operation/pipeline_layout_ops.hpp>
 
 #include <gtest/gtest.h>
 #include <VSL/vulkan/_pimpls.hpp>
@@ -50,6 +51,12 @@ namespace vsl_test {
         bool host_coherent_available() const;
     };
 
+    struct LayoutInspection : vsl::operation::PipelineScratch {
+        std::vector<vk::DescriptorSetLayout> layouts;
+        std::vector<vk::PushConstantRange> ranges;
+        vk::PipelineLayoutCreateInfo pipeline_layout;
+        explicit LayoutInspection(vsl::PipelineLayoutAccessor layout);
+    };
     inline std::filesystem::path shader_path(const char* name) {
         return std::filesystem::path(VSL_TEST_SHADER_DIR) / name;
     }
@@ -262,11 +269,26 @@ namespace vsl_test {
         return pool;
     }
 
+    inline LayoutInspection::LayoutInspection(vsl::PipelineLayoutAccessor layout) : PipelineScratch(layout.recipe()) {
+        for (const auto* binding : layout.recipe().binding_layouts)
+            layouts.push_back(binding->layout);
+        for (const auto& range : layout.recipe().push_ranges)
+            ranges.push_back({.stageFlags = vk::ShaderStageFlags(static_cast<std::uint32_t>(range.target_shader)),
+                              .offset = range.offset,
+                              .size = range.size});
+        pipeline_layout.setLayoutCount = static_cast<std::uint32_t>(layouts.size());
+        pipeline_layout.pSetLayouts = layouts.empty() ? nullptr : layouts.data();
+        pipeline_layout.pushConstantRangeCount = static_cast<std::uint32_t>(ranges.size());
+        pipeline_layout.pPushConstantRanges = ranges.empty() ? nullptr : ranges.data();
+    }
+    inline LayoutInspection inspect_layout(vsl::PipelineLayoutAccessor layout) {
+        return LayoutInspection(std::move(layout));
+    }
     inline vsl::PipelineLayoutEditAccessor VulkanIntegrationTest::make_layout_state() {
-        auto data = std::make_shared<vsl::impl::PipelineLayoutImpl>();
-        data->device = device.data_;
-        data->info = std::make_shared<vsl::impl::CreateInfo>();
-        return {{std::move(data)}};
+        struct LayoutState : vsl::PipelineLayoutEditAccessor {
+            explicit LayoutState(vsl::LogicalDeviceAccessor device) { init_start(device); }
+        };
+        return LayoutState(device);
     }
 
     inline bool VulkanIntegrationTest::host_coherent_available() const {

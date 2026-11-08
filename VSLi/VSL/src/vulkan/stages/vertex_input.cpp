@@ -74,7 +74,7 @@ size_t VSL_NAMESPACE::pipeline_layout::VertexInput::requirements_size() {
 }
 
 void VSL_NAMESPACE::pipeline_layout::VertexInput::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
-    auto& info = *pl.data_->info;
+    auto& info = pl.edit_recipe();
 
     using VIBDs = std::vector<vk::VertexInputBindingDescription>;
     using VIADs = std::vector<vk::VertexInputAttributeDescription>;
@@ -131,16 +131,6 @@ void VSL_NAMESPACE::pipeline_layout::VertexInput::injection(VSL_NAMESPACE::Pipel
         });
     */
 
-    std::any next_bindings = std::move(vertex_binding_descriptions);
-    std::any next_attributes = std::move(vertex_attribute_descriptions);
-    auto& binding_storage = info.pool["vertexBindingDescriptions"];
-    auto& attribute_storage = info.pool["vertexAttributeDescriptions"];
-    binding_storage.swap(next_bindings);
-    attribute_storage.swap(next_attributes);
-    const auto& bindings = std::any_cast<const VIBDs&>(binding_storage);
-    const auto& attributes = std::any_cast<const VIADs&>(attribute_storage);
-    info.vertex_input.vertexBindingDescriptionCount = bindings.size();
-    info.vertex_input.pVertexBindingDescriptions = bindings.data();
-    info.vertex_input.vertexAttributeDescriptionCount = attributes.size();
-    info.vertex_input.pVertexAttributeDescriptions = attributes.data();
+    info.vertex_bindings.swap(vertex_binding_descriptions);
+    info.vertex_attributes.swap(vertex_attribute_descriptions);
 }

@@ -284,7 +284,7 @@ namespace {
             ASSERT_TRUE(reflector.generated.vertex_input);
             auto layout = make_layout_state();
             reflector.generated.vertex_input->injection(layout);
-            const auto& native = layout.data_->info->vertex_input;
+            const auto& native = vsl_test::inspect_layout(layout).vertex_input;
             ASSERT_EQ(native.vertexAttributeDescriptionCount, expected_locations.size());
             std::vector<std::uint32_t> locations;
             for (std::uint32_t i = 0; i < native.vertexAttributeDescriptionCount; ++i) {
@@ -377,9 +377,9 @@ namespace {
         EXPECT_EQ(reflector.generated.binding_points, before);
         auto layout = make_layout_state();
         vsl::pipeline_layout::ResourceBinding(layouts).injection(layout);
-        ASSERT_EQ(layout.data_->info->pipeline_layout.setLayoutCount, 3u);
+        ASSERT_EQ(vsl_test::inspect_layout(layout).pipeline_layout.setLayoutCount, 3u);
         for (std::size_t set = 0; set < layouts.size(); ++set)
-            EXPECT_EQ(layout.data_->info->pipeline_layout.pSetLayouts[set], layouts[set].data_->layout);
+            EXPECT_EQ(vsl_test::inspect_layout(layout).pipeline_layout.pSetLayouts[set], layouts[set].data_->layout);
     }
     TEST_F(ReflectedSetSlotsVulkanIntegrationTest, RepeatedSparseSetsKeepTheFullSequenceAndIndependentOwners) {
         vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_sparse_sets.comp.spv"));
@@ -504,7 +504,7 @@ namespace {
         ASSERT_TRUE(reflector.generated.vertex_input);
         auto layout = make_layout_state();
         reflector.generated.vertex_input->injection(layout);
-        const auto& native = layout.data_->info->vertex_input;
+        const auto& native = vsl_test::inspect_layout(layout).vertex_input;
         ASSERT_EQ(native.vertexBindingDescriptionCount, 9u);
         ASSERT_EQ(native.vertexAttributeDescriptionCount, 12u);
         const auto attributes = std::span(native.pVertexAttributeDescriptions, native.vertexAttributeDescriptionCount);
@@ -934,7 +934,7 @@ namespace {
         ASSERT_TRUE(reflector.generated.vertex_input);
         auto layout = make_layout_state();
         reflector.generated.vertex_input->injection(layout);
-        const auto& native = layout.data_->info->vertex_input;
+        const auto& native = vsl_test::inspect_layout(layout).vertex_input;
         ASSERT_EQ(native.vertexAttributeDescriptionCount, 12u);
         const auto attributes = std::span(native.pVertexAttributeDescriptions, native.vertexAttributeDescriptionCount);
         const auto bindings = std::span(native.pVertexBindingDescriptions, native.vertexBindingDescriptionCount);

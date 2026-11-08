@@ -1,78 +1,78 @@
 #include <VSL/vulkan/pipeline_layout.hpp>
-#include <VSL/vulkan/_pimpls.hpp>
+#include <VSL/lifetime/pipeline_layout_storage.hpp>
+#include <VSL/lifetime/owner_access.hpp>
 #include <stdexcept>
 #include <utility>
 
-namespace {
-    template<typename T>
-    void rebind(const VSL_NAMESPACE::impl::CreateInfo& info, const char* key, const T*& pointer, std::uint32_t& count) {
-        if (auto it = info.pool.find(key); it != info.pool.end()) {
-            const auto& values = std::any_cast<const std::vector<T>&>(it->second);
-            pointer = values.empty() ? nullptr : values.data();
-            count = static_cast<std::uint32_t>(values.size());
-        }
-    }
-    void rebind_storage(VSL_NAMESPACE::impl::CreateInfo& info) {
-        info.viewport.viewportCount = static_cast<std::uint32_t>(info.viewports.size());
-        info.viewport.pViewports = info.viewports.empty() ? nullptr : info.viewports.data();
-        info.viewport.scissorCount = static_cast<std::uint32_t>(info.scissors.size());
-        info.viewport.pScissors = info.scissors.empty() ? nullptr : info.scissors.data();
-        info.dynamic_state.dynamicStateCount = static_cast<std::uint32_t>(info.enabled_dynamic_states.size());
-        info.dynamic_state.pDynamicStates = info.enabled_dynamic_states.empty() ? nullptr : info.enabled_dynamic_states.data();
-        rebind(info, "DescriptorSetLayouts", info.pipeline_layout.pSetLayouts, info.pipeline_layout.setLayoutCount);
-        rebind(info, "colorBlendAttachment", info.pipeline_layout.pPushConstantRanges, info.pipeline_layout.pushConstantRangeCount);
-        rebind(info, "vertexBindingDescriptions", info.vertex_input.pVertexBindingDescriptions, info.vertex_input.vertexBindingDescriptionCount);
-        rebind(info, "vertexAttributeDescriptions", info.vertex_input.pVertexAttributeDescriptions, info.vertex_input.vertexAttributeDescriptionCount);
-        rebind(info, "colorBlendAttachments", info.color_blend.pAttachments, info.color_blend.attachmentCount);
-    }
-} // namespace
-
+const VSL_NAMESPACE::impl::PipelineRecipe& VSL_NAMESPACE::PipelineLayoutAccessor::recipe() const& {
+    if (!_recipe)
+        throw std::logic_error("Pipeline layout has no regeneration recipe");
+    return *_recipe;
+}
+VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::PipelineLayoutAccessor::get_device() const {
+    if (!data_ || !data_.use_count() || !data_->device || !data_->pipeline_layout)
+        throw std::invalid_argument("Pipeline layout requires a live runtime owner");
+    return {data_->device->shared_from_this()};
+}
+VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::PipelineLayoutAccessor::owner_ref() const {
+    if (!data_ || !data_.use_count())
+        throw std::invalid_argument("Pipeline layout requires an owner");
+    return lifetime::detail::owned_ref(data_, data_->owner_node);
+}
+VSL_NAMESPACE::impl::PipelineRecipe& VSL_NAMESPACE::PipelineLayoutEditAccessor::edit_recipe() const& {
+    if (!_edit_recipe)
+        throw std::logic_error("Pipeline layout has been consumed");
+    return *_edit_recipe;
+}
+VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::PipelineLayoutEditAccessor::get_device() const {
+    return _edit_device.data_ ? _edit_device : PipelineLayoutAccessor::get_device();
+}
 void VSL_NAMESPACE::PipelineLayoutEditAccessor::init_start(LogicalDeviceAccessor device) {
-    if (!device.data_)
-        throw std::invalid_argument("PipelineLayout requires a device");
-    data_ = std::make_shared<impl::PipelineLayoutImpl>();
-    data_->device = device.data_;
-    data_->info = std::make_shared<impl::CreateInfo>();
+    if (!device.data_ || !device.data_.use_count())
+        throw std::invalid_argument("PipelineLayout requires a device owner");
+    operation::validate_pipeline_device(*device.data_);
+    _edit_recipe = std::make_shared<impl::PipelineRecipe>();
+    _recipe = _edit_recipe;
+    _edit_device = std::move(device);
 }
-
-void VSL_NAMESPACE::PipelineLayoutEditAccessor::init_finish() {
-    rebind_storage(*data_->info);
-    auto handle = data_->device->device.createPipelineLayout(data_->info->pipeline_layout);
-    data_->device->device.destroyPipelineLayout(data_->pipeline_layout);
-    data_->pipeline_layout = handle;
+void VSL_NAMESPACE::PipelineLayoutEditAccessor::init_finish(PipelineLayoutAccessor runtime) {
+    const auto& info = edit_recipe();
+    if (runtime.data_) {
+        (void)runtime.get_device();
+        if (runtime.data_->device != _edit_device.data_.get() ||
+            !operation::pipeline_layout_matches(*runtime.data_, info.binding_layouts, info.push_ranges))
+            throw std::invalid_argument("Pipeline recipe does not match the runtime layout");
+        data_ = std::move(runtime.data_);
+    } else {
+        data_ = lifetime::make_heap_pipeline_layout(_edit_device, info.binding_layouts, info.push_ranges);
+    }
+    _edit_device.data_.reset();
 }
-
-VSL_NAMESPACE::PipelineLayout::PipelineLayout(std::shared_ptr<impl::PipelineLayoutImpl> data)
-    : PipelineLayoutEditAccessor{{std::move(data)}} {}
-
+void VSL_NAMESPACE::PipelineLayoutEditAccessor::swap_state(PipelineLayoutEditAccessor& other) noexcept {
+    PipelineLayoutAccessor::swap_state(other);
+    _edit_recipe.swap(other._edit_recipe);
+    _edit_device.data_.swap(other._edit_device.data_);
+}
 VSL_NAMESPACE::PipelineLayout VSL_NAMESPACE::PipelineLayout::clone_state() const {
-    if (!data_ || !data_->info)
+    if (!data_ || !_recipe || !_edit_recipe)
         throw std::logic_error("PipelineLayout has been consumed");
-    auto data = std::make_shared<impl::PipelineLayoutImpl>();
-    data->device = data_->device;
-    data->info = std::make_shared<impl::CreateInfo>(*data_->info);
-    return PipelineLayout(std::move(data));
+    PipelineLayout result;
+    result._edit_device = get_device();
+    result._edit_recipe = std::make_shared<impl::PipelineRecipe>(*_edit_recipe);
+    result._recipe = result._edit_recipe;
+    return result;
 }
-
 VSL_NAMESPACE::PipelineLayout VSL_NAMESPACE::PipelineLayout::copy() const {
     auto result = clone_state();
     result.init_finish();
     return result;
 }
-
 VSL_NAMESPACE::FrozenPipelineLayout VSL_NAMESPACE::PipelineLayout::freeze() && {
-    if (!data_ || !data_->info)
+    if (!data_ || !_recipe || !_edit_recipe)
         throw std::logic_error("PipelineLayout has been consumed");
-    // 編集用の別名が残る場合も、構築済みの状態を共有編集させない。
-    if (data_.use_count() != 1) {
-        auto snapshot = copy();
-        data_.reset();
-        return FrozenPipelineLayout(std::move(snapshot.data_));
-    }
-    return FrozenPipelineLayout(std::exchange(data_, {}));
-}
-
-VSL_NAMESPACE::impl::PipelineLayoutImpl::~PipelineLayoutImpl() {
-    if (device)
-        device->device.destroyPipelineLayout(pipeline_layout);
+    PipelineLayoutAccessor result(data_);
+    result._recipe = _edit_recipe.use_count() == 2 ? _recipe : std::make_shared<impl::PipelineRecipe>(*_edit_recipe);
+    PipelineLayout previous;
+    swap_state(previous);
+    return FrozenPipelineLayout(std::move(result));
 }

@@ -3,6 +3,8 @@
 #include <VSL/vulkan/pipeline_layout.hpp>
 #include <VSL/operation/shader_ops.hpp>
 #include <vector>
+#include <VSL/lifetime/owner_access.hpp>
+#include <VSL/lifetime/pipeline_layout_storage.hpp>
 
 VSL_NAMESPACE::pipeline_layout::ShaderGroup::ShaderGroup(std::string name, std::initializer_list<ShaderAccessor> shaders) {
     data_ = std::shared_ptr<VSL_NAMESPACE::impl::pipeline_layout::ShaderGroupImpl>(new VSL_NAMESPACE::impl::pipeline_layout::ShaderGroupImpl);
@@ -29,12 +31,19 @@ void VSL_NAMESPACE::pipeline_layout::ShaderGroup::remove_shader(ShaderAccessor s
 }
 
 void VSL_NAMESPACE::pipeline_layout::ShaderGroup::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
-    auto& info = *pl.data_->info;
+    auto& info = pl.edit_recipe();
+    auto shaders = info.shaders;
+    auto shader_sources = info.shader_sources;
+    auto sources = info.sources;
 
     for (auto& itr : data_->shaders) {
-        if (!itr || !itr.use_count() || itr->device != pl.data_->device.get())
+        if (!itr || !itr.use_count() || itr->device != pl.get_device().data_.get())
             throw std::invalid_argument("Shader group requires modules on the pipeline device");
         (void)VSL_NAMESPACE::operation::shader_stage(*itr);
-        info.shaders.push_back(itr);
+        shader_sources.push_back(lifetime::retain_recipe_owner(sources, lifetime::detail::owned_ref(itr, itr->owner_node)));
+        shaders.push_back(itr.get());
     }
+    info.shaders.swap(shaders);
+    info.sources.swap(sources);
+    info.shader_sources.swap(shader_sources);
 }

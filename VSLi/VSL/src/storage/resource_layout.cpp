@@ -4,8 +4,14 @@
 #include <VSL/lifetime/sampler_storage.hpp>
 #include <VSL/lifetime/descriptor_storage.hpp>
 #include <VSL/lifetime/shader_storage.hpp>
+#include <VSL/lifetime/pipeline_layout_storage.hpp>
 
 namespace VSL_NAMESPACE::storage {
+    static_assert(sizeof(impl::PipelineLayoutImpl) == ImplLayout<impl::PipelineLayoutImpl>::SIZE);
+    static_assert(alignof(impl::PipelineLayoutImpl) == ImplLayout<impl::PipelineLayoutImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::PipelineLayoutSlotStorage) == ResourceSlotLayout<impl::PipelineLayoutImpl>::SIZE);
+    static_assert(alignof(lifetime::PipelineLayoutSlotStorage) == ResourceSlotLayout<impl::PipelineLayoutImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::PipelineLayoutImpl>::USE_OFFSET == NO_SEPARATE_USE);
     static_assert(sizeof(impl::ShaderImpl) == ImplLayout<impl::ShaderImpl>::SIZE);
     static_assert(alignof(impl::ShaderImpl) == ImplLayout<impl::ShaderImpl>::ALIGNMENT);
     static_assert(sizeof(lifetime::ShaderSlotStorage) == ResourceSlotLayout<impl::ShaderImpl>::SIZE);

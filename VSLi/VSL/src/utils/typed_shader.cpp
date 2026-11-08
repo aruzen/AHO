@@ -81,15 +81,15 @@ void VSL_NAMESPACE::typed::detail::validate_vertex_shader(const Reflector::Gener
 
 void VSL_NAMESPACE::typed::detail::validate_pipeline_vertex_shader(PipelineLayoutAccessor layout,
                                                                    std::span<const VertexAttributeLayout> attributes) {
-    if (!layout.data_ || !layout.data_->info)
+    if (!layout.data_ || !layout.has_recipe())
         throw std::invalid_argument("Typed pipeline requires an initialized layout");
     const impl::ShaderImpl* vertex = nullptr;
-    for (const auto& shader : layout.data_->info->shaders) {
+    for (const auto& shader : layout.recipe().shaders) {
         if (shader->stage != vk::ShaderStageFlagBits::eVertex)
             continue;
         if (vertex)
             throw std::invalid_argument("Typed pipeline requires exactly one vertex shader");
-        vertex = shader.get();
+        vertex = shader;
     }
     if (!vertex)
         throw std::invalid_argument("Typed pipeline requires exactly one vertex shader");

@@ -11,7 +11,7 @@ VSL_NAMESPACE::Scissor::Scissor(VSLD2RectangleAccessor<float> rect) : x(rect.x),
 VSL_NAMESPACE::Scissor::Scissor(SwapchainAccessor swapchain) : x(0), y(0), height(swapchain.data_->swap_chain_extent.height), width(swapchain.data_->swap_chain_extent.width) {}
 
 void VSL_NAMESPACE::Scissor::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
-    auto& info = *pl.data_->info;
+    auto& info = pl.edit_recipe();
 
     vk::Rect2D scissor;
     scissor.offset = vk::Offset2D{x, y};

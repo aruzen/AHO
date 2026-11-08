@@ -18,6 +18,18 @@ namespace {
     constexpr t::ResourcePlan<0> EMPTY(std::span<const t::ResourceRequest>{});
     static_assert(EMPTY.bytes() == 0 && EMPTY.alignment() == 1 && EMPTY.slots() == 0);
 
+    TEST(ResourcePlanTest, PipelineLayoutsUseExactAlignedSlotsWithoutGpuUseState) {
+        constexpr std::array<t::ResourceRequest, 3> requests{{{{1}, PIPELINE_LAYOUT}, {{2}, PIPELINE_LAYOUT}, {{3}, PIPELINE_LAYOUT, true}}};
+        constexpr t::ResourcePlan<3> plan(requests);
+        static_assert(s::ResourceSlotLayout<vsl::impl::PipelineLayoutImpl>::USE_OFFSET == s::NO_SEPARATE_USE);
+        static_assert(s::ResourceSlotLayout<vsl::impl::PipelineLayoutImpl>::SIZE == s::PIPELINE_LAYOUT_IMPL_SIZE);
+        static_assert(plan.placement({1}).offset != plan.placement({2}).offset);
+        EXPECT_EQ(plan.slots(), 2u);
+        EXPECT_EQ(plan.bytes(), 2 * s::ResourceSlotLayout<vsl::impl::PipelineLayoutImpl>::SIZE);
+        EXPECT_EQ(plan.placement({3}).slot, t::ResourcePlacement::NO_SLOT);
+        EXPECT_EQ(plan.placement({2}).offset % s::PIPELINE_LAYOUT_IMPL_ALIGNMENT, 0u);
+    }
+
     TEST(ResourcePlanTest, MixedKindsAndRepeatedImplTypesHaveAlignedNonoverlappingSlots) {
         const std::array<t::ResourceRequest, 4> requests{{{{1}, SAMPLER}, {{2}, BUFFER}, {{3}, IMAGE}, {{4}, SAMPLER}}};
         const t::ResourcePlan<4> plan(requests);

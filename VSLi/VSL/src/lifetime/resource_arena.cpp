@@ -4,6 +4,7 @@
 #include <VSL/lifetime/sampler_storage.hpp>
 #include <VSL/lifetime/descriptor_storage.hpp>
 #include <VSL/lifetime/shader_storage.hpp>
+#include <VSL/lifetime/pipeline_layout_storage.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/storage/cpu_region.hpp>
@@ -18,6 +19,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
         impl::GraphicResourcePoolImpl* pool = nullptr;
         impl::GraphicResourceImpl* set = nullptr;
         impl::ShaderImpl* shader = nullptr;
+        impl::PipelineLayoutImpl* pipeline_layout = nullptr;
         size_t buffer_offset = 0, buffer_bytes = 0;
         size_t owner_index = 0;
     };
@@ -61,6 +63,8 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 return !external && std::holds_alternative<DescriptorSetInit>(value);
             case storage::ResourceKind::SHADER:
                 return external ? std::holds_alternative<ShaderAccessor>(value) : std::holds_alternative<ShaderCreateInfo>(value);
+            case storage::ResourceKind::PIPELINE_LAYOUT:
+                return external ? std::holds_alternative<PipelineLayoutAccessor>(value) : std::holds_alternative<PipelineLayoutInit>(value);
         }
         return false;
     }
@@ -84,7 +88,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
             // Setは同じarena内のPool/Layoutを借用する。配置順と構築順は独立する。
             for (const bool sets : {false, true})
                 for (size_t i = 0; i < resources.size(); ++i)
-                    if (!resources[i].placement.external && (resources[i].placement.kind == storage::ResourceKind::DESCRIPTOR_SET) == sets) {
+                    if (!resources[i].placement.external && (resources[i].placement.kind == storage::ResourceKind::DESCRIPTOR_SET || resources[i].placement.kind == storage::ResourceKind::PIPELINE_LAYOUT) == sets) {
                         construct(i, initializers[i]);
                         constructed.push_back(i);
                     }
@@ -139,6 +143,12 @@ namespace VSL_NAMESPACE::lifetime::detail {
                         throw std::invalid_argument("External descriptor pool requires its canonical owner");
                     resource.pool = pool->data_.get();
                     resource.owner_index = retain_dependency(owned_ref(owner, pool->data_->owner_node));
+                } else if (const auto* layout = std::get_if<PipelineLayoutAccessor>(&value)) {
+                    (void)layout->get_device();
+                    if (layout->data_->device != device.data_.get())
+                        throw std::invalid_argument("External pipeline layout requires the arena device");
+                    resource.pipeline_layout = layout->data_.get();
+                    resource.owner_index = retain_dependency(layout->owner_ref());
                 } else if (const auto* shader = std::get_if<ShaderAccessor>(&value)) {
                     if (!shader->data_.use_count() || !shader->data_ || !shader->data_->shader_module || shader->data_->device != device.data_.get())
                         throw std::invalid_argument("External shader requires an owner on the arena device");
@@ -152,6 +162,15 @@ namespace VSL_NAMESPACE::lifetime::detail {
             if (const auto* set = std::get_if<DescriptorSetInit>(&value)) {
                 (void)find(set->pool, storage::ResourceKind::DESCRIPTOR_POOL);
                 (void)find(set->layout, storage::ResourceKind::DESCRIPTOR_LAYOUT);
+            } else if (const auto* layout = std::get_if<PipelineLayoutInit>(&value)) {
+                for (const auto& source : layout->layouts)
+                    if (const auto* id = std::get_if<typed::ResourceId>(&source)) {
+                        (void)find(*id, storage::ResourceKind::DESCRIPTOR_LAYOUT);
+                    } else {
+                        const auto& binding = std::get<graphic_resource::BindingLayout>(source);
+                        if (!binding.data_ || !binding.data_.use_count() || !binding.data_->layout || binding.data_->device != device.data_.get())
+                            throw std::invalid_argument("Pipeline layout source requires an owning layout on the arena device");
+                    }
             }
     }
     void ResourceArenaOwner::construct(size_t index, const ResourceInit& initializer) {
@@ -185,6 +204,19 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 auto* layout = find(info.layout, storage::ResourceKind::DESCRIPTOR_LAYOUT).layout;
                 construct_descriptor_set(slot, *pool, *layout);
                 resource.set = &descriptor_set_at(slot);
+                break;
+            }
+            case storage::ResourceKind::PIPELINE_LAYOUT: {
+                const auto& info = std::get<PipelineLayoutInit>(initializer);
+                std::vector<impl::ResourceBindingLayoutImpl*> layouts;
+                layouts.reserve(info.layouts.size());
+                for (const auto& source : info.layouts)
+                    if (const auto* id = std::get_if<typed::ResourceId>(&source))
+                        layouts.push_back(find(*id, storage::ResourceKind::DESCRIPTOR_LAYOUT).layout);
+                    else
+                        layouts.push_back(std::get<graphic_resource::BindingLayout>(source).data_.get());
+                construct_pipeline_layout(slot, device, layouts, info.push_ranges);
+                resource.pipeline_layout = &pipeline_layout_at(slot);
                 break;
             }
             case storage::ResourceKind::SHADER:
@@ -226,6 +258,8 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     resource.set->owner_node = node;
                 if (resource.shader)
                     resource.shader->owner_node = node;
+                if (resource.pipeline_layout)
+                    resource.pipeline_layout->owner_node = node;
             }
             if (resource.pool && !resource.placement.external)
                 resource.pool->owner = owner;
@@ -257,6 +291,9 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     break;
                 case storage::ResourceKind::DESCRIPTOR_SET:
                     destroy_descriptor_set(slot);
+                    break;
+                case storage::ResourceKind::PIPELINE_LAYOUT:
+                    destroy_pipeline_layout(slot);
                     break;
                 case storage::ResourceKind::SHADER:
                     destroy_shader(slot);
@@ -344,6 +381,12 @@ namespace VSL_NAMESPACE::lifetime {
         if (resource.placement.external)
             return {_owner->dependencies.at(resource.owner_index).alias(resource.image).share()};
         return {{_owner, resource.image}};
+    }
+    PipelineLayoutAccessor ResourceArena::pipeline_layout(typed::ResourceId id) const {
+        if (!_owner)
+            throw std::logic_error("Resource arena is empty");
+        const auto& resource = _owner->find(id, storage::ResourceKind::PIPELINE_LAYOUT);
+        return PipelineLayoutAccessor({resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.pipeline_layout});
     }
     ShaderAccessor ResourceArena::shader(typed::ResourceId id) const {
         if (!_owner)

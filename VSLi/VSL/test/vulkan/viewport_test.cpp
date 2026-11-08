@@ -25,8 +25,8 @@ namespace {
         EXPECT_EQ(viewport.height, 8);
         auto state = make_layout_state();
         viewport.injection(state);
-        ASSERT_EQ(state.data_->info->viewports.size(), 1u);
-        const auto& actual = state.data_->info->viewports[0];
+        ASSERT_EQ(state.recipe().viewports.size(), 1u);
+        const auto& actual = state.recipe().viewports[0];
         EXPECT_EQ(actual.width, 8);
         EXPECT_EQ(actual.height, 8);
         EXPECT_EQ(actual.minDepth, 0);

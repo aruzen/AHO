@@ -109,7 +109,7 @@ namespace VSL_NAMESPACE::typed::detail {
     }
 
     void inject_resource_schema(PipelineLayoutEditAccessor layout, std::span<const DescriptorRequirement> requirements, std::uint32_t set_count) {
-        const auto device = layout.data_->device;
+        const auto device = layout.get_device().data_;
         if (set_count > device->parent_device->device.getProperties().limits.maxBoundDescriptorSets)
             throw std::out_of_range("Typed descriptor set exceeds the device limit");
         std::vector<graphic_resource::BindingLayout> sets;
@@ -125,8 +125,8 @@ namespace VSL_NAMESPACE::typed::detail {
     }
 
     void validate_resource_schema(PipelineLayoutAccessor layout, std::span<const DescriptorRequirement> requirements) {
-        for (const auto& shader : layout.data_->info->shaders) {
-            if (shader->device != layout.data_->device.get())
+        for (const auto& shader : layout.recipe().shaders) {
+            if (shader->device != layout.data_->device)
                 throw std::invalid_argument("Typed shader/pipeline device mismatch");
             const auto stage = ShaderType(shader->stage);
             utils::SPIRVReflector reflection({}, std::span<const std::uint32_t>(shader->code), shader->name, stage);

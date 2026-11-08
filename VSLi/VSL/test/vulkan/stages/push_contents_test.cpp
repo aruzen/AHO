@@ -22,7 +22,7 @@ namespace {
         pl::PushConstants constants;
         constants.definitions = {{vsl::ShaderFlag::VERTEX, 0, 16}, {vsl::ShaderFlag::VERTEX, 16, 4}};
         constants.injection(layout);
-        const auto& info = layout.data_->info->pipeline_layout;
+        const auto& info = vsl_test::inspect_layout(layout).pipeline_layout;
         ASSERT_EQ(info.pushConstantRangeCount, 1u);
         EXPECT_EQ(info.pPushConstantRanges[0].stageFlags, vk::ShaderStageFlagBits::eVertex);
         EXPECT_EQ(info.pPushConstantRanges[0].offset, 0u);
@@ -72,7 +72,7 @@ namespace {
         }
     };
     vk::PushConstantRange range_for(vsl::PipelineLayoutEditAccessor layout, vk::ShaderStageFlagBits stage) {
-        const auto& info = layout.data_->info->pipeline_layout;
+        const auto& info = vsl_test::inspect_layout(layout).pipeline_layout;
         unsigned found = 0;
         vk::PushConstantRange result{};
         for (unsigned i = 0; i < info.pushConstantRangeCount; ++i)
@@ -115,11 +115,11 @@ namespace {
         EXPECT_EQ(vertex.size, 4u);
         EXPECT_EQ(fragment.offset, 4u);
         EXPECT_EQ(fragment.size, 12u);
-        const auto& info = layout.data_->info->pipeline_layout;
+        const auto& info = vsl_test::inspect_layout(layout).pipeline_layout;
         for (unsigned i = 0; i < info.pushConstantRangeCount; ++i)
             for (unsigned j = i + 1; j < info.pushConstantRangeCount; ++j)
                 ASSERT_FALSE(static_cast<bool>(info.pPushConstantRanges[i].stageFlags & info.pPushConstantRanges[j].stageFlags));
-        const auto handle = device.data_->device.createPipelineLayoutUnique(layout.data_->info->pipeline_layout);
+        const auto handle = device.data_->device.createPipelineLayoutUnique(vsl_test::inspect_layout(layout).pipeline_layout);
         EXPECT_TRUE(static_cast<bool>(handle));
     }
     TEST_F(PushRangeVulkanIntegrationTest, InvalidDefinitionsLeavePreviouslyInjectedRangesUnchanged) {
@@ -127,7 +127,8 @@ namespace {
         pl::PushConstants valid;
         valid.definitions = {{vsl::ShaderFlag::COMPUTE, 8, 8}};
         valid.injection(layout);
-        const auto old = layout.data_->info->pipeline_layout;
+        const auto* previous = layout.recipe().push_ranges.data();
+        const auto old_count = layout.recipe().push_ranges.size();
         const auto limit = physical.data_->device.getProperties().limits.maxPushConstantsSize;
         for (const pl::PushContentDefinition definition : {
                  pl::PushContentDefinition{vsl::ShaderFlag::COMPUTE, 2, 4},
@@ -139,9 +140,9 @@ namespace {
             pl::PushConstants invalid;
             invalid.definitions = {definition};
             EXPECT_THROW(invalid.injection(layout), std::invalid_argument);
-            const auto& current = layout.data_->info->pipeline_layout;
-            EXPECT_EQ(current.pushConstantRangeCount, old.pushConstantRangeCount);
-            EXPECT_EQ(current.pPushConstantRanges, old.pPushConstantRanges);
+            const auto& current = vsl_test::inspect_layout(layout).pipeline_layout;
+            EXPECT_EQ(current.pushConstantRangeCount, old_count);
+            EXPECT_EQ(layout.recipe().push_ranges.data(), previous);
             if (current.pushConstantRangeCount == 1) {
                 EXPECT_EQ(current.pPushConstantRanges[0].offset, 8u);
                 EXPECT_EQ(current.pPushConstantRanges[0].size, 8u);
@@ -152,15 +153,15 @@ namespace {
         auto layout = make_layout_state();
         pl::ColorBlend blend;
         blend.injection(layout);
-        const auto* colors = layout.data_->info->color_blend.pAttachments;
+        const auto* colors = vsl_test::inspect_layout(layout).color_blend.pAttachments;
         pl::PushConstants constants;
         constants.definitions = {{vsl::ShaderFlag::COMPUTE, 12, 4}};
         constants.injection(layout);
         constants.definitions.clear();
         constants.injection(layout);
-        EXPECT_EQ(layout.data_->info->pipeline_layout.pushConstantRangeCount, 0u);
-        EXPECT_EQ(layout.data_->info->pipeline_layout.pPushConstantRanges, nullptr);
-        EXPECT_EQ(layout.data_->info->color_blend.pAttachments, colors);
+        EXPECT_EQ(vsl_test::inspect_layout(layout).pipeline_layout.pushConstantRangeCount, 0u);
+        EXPECT_EQ(vsl_test::inspect_layout(layout).pipeline_layout.pPushConstantRanges, nullptr);
+        EXPECT_EQ(vsl_test::inspect_layout(layout).color_blend.pAttachments, colors);
         constants.definitions = {{vsl::ShaderFlag::COMPUTE, 4, 8}};
         constants.injection(layout);
         const auto range = range_for(layout, vk::ShaderStageFlagBits::eCompute);
@@ -191,6 +192,6 @@ TEST_F(PushRangeVulkanIntegrationTest, RangeMayEndExactlyAtThePhysicalDeviceLimi
     const auto range = range_for(layout, vk::ShaderStageFlagBits::eCompute);
     EXPECT_EQ(range.offset, limit - 4);
     EXPECT_EQ(range.size, 4u);
-    const auto native = device.data_->device.createPipelineLayoutUnique(layout.data_->info->pipeline_layout);
+    const auto native = device.data_->device.createPipelineLayoutUnique(vsl_test::inspect_layout(layout).pipeline_layout);
     EXPECT_TRUE(static_cast<bool>(native));
 }

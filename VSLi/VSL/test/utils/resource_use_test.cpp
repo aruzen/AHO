@@ -222,6 +222,302 @@ namespace {
         EXPECT_FALSE(new_use->busy());
     }
 
+    TEST_F(ResourceUseVulkanIntegrationTest, NativeAndTypedDescriptorBindingsFreezeBothUpdateEntrances) {
+        auto manager = make_manager().independent(1);
+        vsl::GraphicResourceManager descriptors(device);
+        t::TypedDescriptorSet<Set> set(device, descriptors);
+        const std::uint32_t value = 100, zero = 0;
+        t::TypedUniformBuffer<std::uint32_t> input(device, value);
+        t::TypedStorageBuffer<std::uint32_t> output(device, zero);
+        set.write<0>(input);
+        set.write<1>(output);
+        vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_frame.comp.spv"));
+        t::TypedComputePipeline<Schema> pipeline(device, vsl::pipeline_layout::ShaderGroup("tracked", {shader}));
+        auto native = set.backend();
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << vsl::command::BindGraphicResource(native, vsl::graphic_resource::BindingDestination::COMPUTE, pipeline.backend());
+            EXPECT_THROW(set.write<0>(input), std::logic_error);
+            EXPECT_THROW(native.update(&input.backend()), std::logic_error);
+            phase.cancel();
+        }
+        EXPECT_NO_THROW(set.write<0>(input));
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        phase << pipeline.bind_resources(set).dispatch(1);
+        EXPECT_THROW(native.update(&input.backend()), std::logic_error);
+        ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        ASSERT_TRUE(phase.completion().wait());
+        EXPECT_NO_THROW(native.update(&input.backend()));
+    }
+
+    TEST_F(ResourceUseVulkanIntegrationTest, PartialNativeReplacementUpdatesLogicalConstraintsAndTracksEveryPhase) {
+        using ArraySet = t::DescriptorSet<0, t::UniformBinding<3, std::uint32_t, vsl::ShaderFlag::COMPUTE, 2>>;
+        using View = t::TypedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>;
+        vsl::GraphicResourceManager descriptors(device);
+        t::TypedDescriptorSet<ArraySet> set(device, descriptors);
+        const std::uint32_t value = 1;
+        t::TypedUniformBuffer<std::uint32_t> a(device, value), b(device, value), replacement(device, value);
+        auto first_constraint = std::make_shared<vsl::ResourceUseState>();
+        auto second_constraint = std::make_shared<vsl::ResourceUseState>();
+        set.write<3>(std::array{View::FromBuffer(a.backend(), 1, 0, {first_constraint, {}}),
+                                View::FromBuffer(b.backend(), 1, 0, {second_constraint, {}})});
+        auto native = set.backend();
+        native.update(&replacement.backend(), 3);
+        const vsl::command::BindGraphicResource command(native, vsl::graphic_resource::BindingDestination::COMPUTE);
+        auto manager = make_manager().independent(1), other = manager.independent(1);
+        auto first = manager.start_phase<vsl::ComputePhase>();
+        auto second = other.start_phase<vsl::ComputePhase>();
+        // bind省略時と同じtrack入口で、それぞれの使用を登録する。
+        command.track(manager.get_buffer());
+        set.resource_use()->record(other.get_buffer());
+        EXPECT_FALSE(first_constraint->busy());
+        EXPECT_TRUE(second_constraint->busy());
+        EXPECT_FALSE(a.backend().use_state().busy());
+        EXPECT_TRUE(b.backend().use_state().busy());
+        EXPECT_TRUE(replacement.backend().use_state().busy());
+        first.cancel();
+        EXPECT_THROW(native.update(&replacement.backend(), 3), std::logic_error);
+        ASSERT_EQ(second.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        ASSERT_TRUE(second.completion().wait());
+        EXPECT_FALSE(second_constraint->busy());
+        EXPECT_NO_THROW(native.update(&replacement.backend(), 3));
+    }
+
+    TEST_F(ResourceUseVulkanIntegrationTest, BusyPoolDestroyKeepsManagerOwnershipAndCancellingAllowsDestruction) {
+        for (const bool overallocate : {false, true}) {
+            std::optional<vsl::graphic_resource::ExactAllocateManager> exact;
+            std::optional<vsl::graphic_resource::OverAllocateManager> over;
+            if (overallocate)
+                over.emplace(device);
+            else
+                exact.emplace(device);
+            auto& descriptors = overallocate ? static_cast<vsl::graphic_resource::ManagerInterface&>(*over)
+                                             : static_cast<vsl::graphic_resource::ManagerInterface&>(*exact);
+            t::TypedDescriptorSet<Set> set(device, descriptors);
+            const std::uint32_t value = 1;
+            t::TypedUniformBuffer<std::uint32_t> input(device, value);
+            t::TypedStorageBuffer<std::uint32_t> output(device, value);
+            set.write<0>(input);
+            set.write<1>(output);
+            auto native = set.backend();
+            auto pool = native.get_pool();
+            const auto count = descriptors.data_->pools.size();
+            auto manager = make_manager().independent(1);
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            set.resource_use()->record(manager.get_buffer());
+            EXPECT_THROW(descriptors.destroy(pool), std::logic_error);
+            EXPECT_EQ(descriptors.data_->pools.size(), count);
+            if (over)
+                EXPECT_EQ(over->pools.front().data_, pool.data_);
+            EXPECT_NO_THROW(set.require_complete());
+            phase.cancel();
+            EXPECT_NO_THROW(descriptors.destroy(pool));
+            EXPECT_FALSE(native.data_->descriptor_set);
+            EXPECT_TRUE(native.data_->bindings.empty());
+            EXPECT_THROW(set.require_complete(), std::logic_error);
+        }
+    }
+
+    TEST_F(ResourceUseVulkanIntegrationTest, DescriptorConstraintReplacementReleasesTheOldOwnerAndUsesTheNewState) {
+        vsl::GraphicResourceManager descriptors(device);
+        t::TypedDescriptorSet<Set> set(device, descriptors);
+        const std::uint32_t value = 1;
+        t::TypedUniformBuffer<std::uint32_t> input(device, value);
+        t::TypedStorageBuffer<std::uint32_t> output(device, value);
+        auto old_state = std::make_shared<vsl::ResourceUseState>(), new_state = std::make_shared<vsl::ResourceUseState>();
+        std::weak_ptr<int> old_owner, new_owner;
+        {
+            auto owner = std::make_shared<int>(1);
+            old_owner = owner;
+            using View = t::TypedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>;
+            set.write<0>(View::FromBuffer(input.backend(), 1, 0, {old_state, owner}));
+        }
+        set.write<1>(output);
+        EXPECT_FALSE(old_owner.expired());
+        {
+            auto owner = std::make_shared<int>(2);
+            new_owner = owner;
+            set.resource_use()->replace(0, {{new_state, owner}});
+        }
+        EXPECT_TRUE(old_owner.expired());
+        EXPECT_FALSE(new_owner.expired());
+        auto manager = make_manager().independent(1);
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        set.resource_use()->record(manager.get_buffer());
+        EXPECT_FALSE(old_state->busy());
+        EXPECT_TRUE(new_state->busy());
+        phase.cancel();
+        auto native = set.backend();
+        const auto layout = native.data_->layout;
+        native.data_->layout.reset();
+        EXPECT_THROW(set.resource_use()->replace(0, {{new_state, {}}}), std::logic_error);
+        native.data_->layout = layout;
+    }
+
+    TEST_F(ResourceUseVulkanIntegrationTest, UseStatePollingAllowsReentryAndPreservesUsesAddedByCompletionCallbacks) {
+        for (const bool wait : {false, true}) {
+            auto manager = make_manager().independent(1), other = manager.independent(1), last = manager.independent(1);
+            vsl::ResourceUseState state;
+            bool released = false;
+            auto submitted = manager.start_phase<vsl::ComputePhase>();
+            auto peer = last.start_phase<vsl::ComputePhase>();
+            state.mark_used(submitted.completion());
+            manager.get_buffer().retain_until_complete(std::shared_ptr<int>(new int(1), [&](int* value) {
+                delete value;
+                released = true;
+                EXPECT_EQ(state.busy(), !wait);
+                state.mark_used(peer.completion());
+                EXPECT_TRUE(state.busy());
+                EXPECT_THROW(state.require_idle(), std::logic_error);
+            }));
+            ASSERT_EQ(submitted.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            device.data_->device.waitIdle();
+            auto recording = other.start_phase<vsl::ComputePhase>();
+            if (wait)
+                EXPECT_FALSE(state.wait());
+            else
+                EXPECT_NO_THROW(state.mark_used(recording.completion()));
+            EXPECT_TRUE(released);
+            EXPECT_TRUE(state.busy());
+            recording.cancel();
+            EXPECT_TRUE(state.busy());
+            peer.cancel();
+            EXPECT_TRUE(state.wait(0));
+        }
+    }
+
+    TEST_F(ResourceUseVulkanIntegrationTest, PoolRetirementRejectsReentryAndUpdatesRecheckValidityAfterIdleObservation) {
+        for (const bool retire : {false, true}) {
+            vsl::GraphicResourceManager descriptors(device);
+            t::TypedDescriptorSet<Set> set(device, descriptors, vsl::ResourceRetention::COMPLETION);
+            const std::uint32_t value = 1;
+            t::TypedUniformBuffer<std::uint32_t> input(device, value);
+            t::TypedStorageBuffer<std::uint32_t> output(device, value);
+            set.write<0>(input);
+            set.write<1>(output);
+            auto native = set.backend();
+            auto pool = native.get_pool();
+            vsl::graphic_resource::BindingLayout layout(device, vsl::graphic_resource::Type::UNIFORM_BUFFER, vsl::ShaderFlag::COMPUTE);
+            auto manager = make_manager().independent(1), other = manager.independent(1);
+            bool released = false;
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            auto peer = other.start_phase<vsl::ComputePhase>();
+            set.resource_use()->record(manager.get_buffer());
+            manager.get_buffer().retain_until_complete(std::shared_ptr<int>(new int(1), [&](int* value) {
+                delete value;
+                released = true;
+                if (retire) {
+                    EXPECT_THROW(pool.bind(layout), std::logic_error);
+                    EXPECT_THROW(set.resource_use()->record(other.get_buffer()), std::logic_error);
+                    EXPECT_THROW(native.update(&input.backend()), std::logic_error);
+                    EXPECT_THROW(descriptors.destroy(pool), std::logic_error);
+                } else
+                    EXPECT_NO_THROW(descriptors.destroy(pool));
+            }));
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            device.data_->device.waitIdle();
+            if (retire)
+                EXPECT_NO_THROW(descriptors.destroy(pool));
+            else
+                EXPECT_THROW(native.update(&input.backend()), std::logic_error);
+            EXPECT_TRUE(released);
+            EXPECT_FALSE(pool.data_->descriptor_pool);
+            EXPECT_FALSE(pool.data_->retiring);
+            EXPECT_TRUE(native.data_->bindings.empty());
+            peer.cancel();
+        }
+    }
+
+    TEST_F(ResourceUseVulkanIntegrationTest, DescriptorTrackingRejectsCancellationInsidePhysicalUseObservation) {
+        vsl::GraphicResourceManager descriptors(device);
+        t::TypedDescriptorSet<Set> set(device, descriptors);
+        const std::uint32_t value = 1;
+        t::TypedUniformBuffer<std::uint32_t> input(device, value);
+        t::TypedStorageBuffer<std::uint32_t> output(device, value);
+        set.write<0>(input);
+        set.write<1>(output);
+        auto native = set.backend();
+        auto pool = native.get_pool();
+        auto manager = make_manager().independent(1), other = manager.independent(1);
+        std::optional<vsl::ComputePhase> recording;
+        bool released = false;
+        auto submitted = manager.start_phase<vsl::ComputePhase>();
+        input.backend().resource_use().record(manager.get_buffer());
+        manager.get_buffer().retain_until_complete(std::shared_ptr<int>(new int(1), [&](int* value) {
+            delete value;
+            released = true;
+            if (recording)
+                recording->cancel();
+            EXPECT_THROW(set.write<0>(input), std::logic_error);
+            EXPECT_THROW(descriptors.destroy(pool), std::logic_error);
+        }));
+        ASSERT_EQ(submitted.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        device.data_->device.waitIdle();
+        recording.emplace(other);
+        EXPECT_THROW(set.resource_use()->record(other.get_buffer()), std::logic_error);
+        EXPECT_TRUE(released);
+        EXPECT_FALSE(set.backend().data_->recording);
+        EXPECT_NO_THROW(set.write<0>(input));
+    }
+
+    TEST_F(ResourceUseVulkanIntegrationTest, NativeUpdateKeepsItsTargetWhenCompletionDestroysTheCallingWrapper) {
+        vsl::GraphicResourceManager descriptors(device);
+        vsl::graphic_resource::BindingLayout layout(device, vsl::graphic_resource::Type::UNIFORM_BUFFER, vsl::ShaderFlag::COMPUTE);
+        auto [pool, allocated] = descriptors.make(std::vector{layout});
+        auto native = allocated.front();
+        const std::weak_ptr<vsl::impl::GraphicResourceImpl> target = native.data_;
+        allocated.clear();
+        const std::uint32_t value = 1;
+        t::TypedUniformBuffer<std::uint32_t> input(device, value);
+        native.update(&input.backend());
+        auto manager = make_manager().independent(1);
+        bool released = false;
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        vsl::ResourceUseGroup::ForDescriptor(1, native.data_, vsl::ResourceRetention::COMPLETION)->record(manager.get_buffer());
+        manager.get_buffer().retain_until_complete(std::shared_ptr<int>(new int(1), [&](int* value) {
+            delete value;
+            released = true;
+            native = {};
+        }));
+        ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        device.data_->device.waitIdle();
+        EXPECT_NO_THROW(native.update(&input.backend()));
+        EXPECT_TRUE(released);
+        EXPECT_FALSE(native.data_);
+        EXPECT_TRUE(target.expired());
+    }
+
+    TEST_F(ResourceUseVulkanIntegrationTest, DescriptorRecordingKeepsTheSetWhenCallbackDestroysTheGroupAndCancelsItsPins) {
+        vsl::GraphicResourceManager descriptors(device);
+        vsl::graphic_resource::BindingLayout layout(device, vsl::graphic_resource::Type::UNIFORM_BUFFER, vsl::ShaderFlag::COMPUTE);
+        auto [pool, allocated] = descriptors.make(std::vector{layout});
+        const std::weak_ptr<vsl::impl::GraphicResourceImpl> target = allocated.front().data_;
+        const std::uint32_t value = 1;
+        t::TypedUniformBuffer<std::uint32_t> input(device, value);
+        allocated.front().update(&input.backend());
+        auto group = vsl::ResourceUseGroup::ForDescriptor(1, allocated.front().data_, vsl::ResourceRetention::COMPLETION);
+        allocated.clear();
+        auto manager = make_manager().independent(1), other = manager.independent(1);
+        std::optional<vsl::ComputePhase> recording;
+        bool released = false;
+        auto submitted = manager.start_phase<vsl::ComputePhase>();
+        input.backend().resource_use().record(manager.get_buffer());
+        manager.get_buffer().retain_until_complete(std::shared_ptr<int>(new int(1), [&](int* value) {
+            delete value;
+            released = true;
+            group.reset();
+            if (recording)
+                recording->cancel();
+        }));
+        ASSERT_EQ(submitted.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        device.data_->device.waitIdle();
+        recording.emplace(other);
+        EXPECT_THROW(group->record(other.get_buffer()), std::logic_error);
+        EXPECT_TRUE(released);
+        EXPECT_FALSE(group);
+        EXPECT_TRUE(target.expired());
+    }
+
     TEST_F(TrackedDrawVulkanIntegrationTest, BatchTracksEveryVertexOwnerEvenWhenItsBindIsSkipped) {
         vsl::Buffer<vsl::MemoryType::VERTEX_BUFFER, vsl::MemoryProperty::HOST_VISIBLE> native(device, VERTICES);
         auto first = std::make_shared<vsl::ResourceUseState>();

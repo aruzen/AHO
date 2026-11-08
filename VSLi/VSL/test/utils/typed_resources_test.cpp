@@ -14,6 +14,12 @@ namespace {
     struct WrongTint {
         float rgba[4];
     };
+    struct DescriptorTestValue {
+        using Payload = Tint;
+        static constexpr auto KIND = vsl::graphic_resource::Type::UNIFORM_BUFFER;
+        t::detail::DescriptorValue value;
+        t::detail::DescriptorValue descriptor() const { return value; }
+    };
     using Tints = t::DescriptorSet<2, t::UniformBinding<3, TintRecord, vsl::ShaderFlag::VERTEX, 2>>;
     using Extra = t::DescriptorSet<0, t::StorageBinding<5, TintRecord, vsl::ShaderFlag::VERTEX>>;
     using Schema = t::ResourceSchema<Tints, Extra>;
@@ -95,6 +101,88 @@ namespace {
         }));
     }
 
+    TEST_F(TypedDescriptorVulkanIntegrationTest, NativeUpdatesShareElementInitializationAndPreserveArrayOwnersAndPixels) {
+        auto typed_pipeline = make_typed<Schema>();
+        vsl::GraphicResourceManager manager(device);
+        t::TypedDescriptorSet<Tints> tints(device, manager);
+        t::TypedDescriptorSet<Extra> extra(device, manager);
+        auto native = tints.backend();
+        const Tint replacement{{.7f, .1f, .3f, 1}}, zero{};
+        t::TypedUniformBuffer<Tint> updated(device, replacement);
+        t::TypedStorageBuffer<Tint> storage(device, zero);
+        auto native_extra = extra.backend();
+        EXPECT_THROW(native.update(&storage.backend(), 3), std::invalid_argument);
+        EXPECT_THROW(tints.require_complete(), std::logic_error);
+        const auto alignment = physical.data_->props->limits.minUniformBufferOffsetAlignment;
+        if (alignment > 1)
+            EXPECT_THROW(native.update(&updated.backend(), 3, std::nullopt, 1, sizeof(float)), std::invalid_argument);
+        native_extra.update(&storage.backend(), 5);
+        EXPECT_NO_THROW(extra.require_complete());
+        native.update(&updated.backend(), 3);
+        EXPECT_THROW(tints.require_complete(), std::logic_error);
+        std::weak_ptr<vsl::impl::BufferImpl> first_owner, second_owner;
+        {
+            const Tint first{{.2f, .4f, .6f, 1}}, second{{.3f, .6f, .9f, 1}};
+            t::TypedUniformBuffer<Tint> a(device, first), b(device, second);
+            first_owner = a.backend().data_;
+            second_owner = b.backend().data_;
+            tints.write<3>(std::array{a, b});
+        }
+        EXPECT_FALSE(first_owner.expired());
+        EXPECT_FALSE(second_owner.expired());
+        native.update(&updated.backend(), 3);
+        EXPECT_TRUE(first_owner.expired());
+        EXPECT_FALSE(second_owner.expired());
+        EXPECT_NO_THROW(tints.require_complete());
+        const auto pixel = render([&](auto& stream) { stream << typed_pipeline.bind_vertices().bind_resources(tints, extra).draw(3); });
+        EXPECT_NEAR(pixel[0], 128, 1);
+        EXPECT_NEAR(pixel[1], 89, 1);
+        EXPECT_NEAR(pixel[2], 153, 1);
+        EXPECT_EQ(pixel[3], 255);
+        native = {};
+        tints = t::TypedDescriptorSet<Tints>(device, manager);
+        EXPECT_TRUE(second_owner.expired());
+    }
+
+    TEST_F(TypedDescriptorVulkanIntegrationTest, InvalidArrayTailKeepsThePreviousOwnersInitializationAndGPUValues) {
+        auto typed_pipeline = make_typed<Schema>();
+        vsl::GraphicResourceManager manager(device);
+        t::TypedDescriptorSet<Tints> tints(device, manager);
+        t::TypedDescriptorSet<Extra> extra(device, manager);
+        const Tint original{{.25f, .5f, .75f, 1}}, replacement{{1, 0, 0, 1}}, zero{};
+        t::TypedStorageBuffer<Tint> storage(device, zero);
+        extra.write<5>(storage);
+        std::weak_ptr<vsl::impl::BufferImpl> previous;
+        {
+            t::TypedUniformBuffer<Tint> buffer(device, original);
+            previous = buffer.backend().data_;
+            tints.write<3>(std::array{buffer, buffer});
+        }
+        t::TypedUniformBuffer<Tint> buffer(device, replacement);
+        EXPECT_THROW(tints.write<3>(std::array{DescriptorTestValue{buffer.descriptor()}, DescriptorTestValue{}}), std::invalid_argument);
+        EXPECT_FALSE(previous.expired());
+        EXPECT_NO_THROW(tints.require_complete());
+        ExpectTriangleColor(render([&](auto& stream) { stream << typed_pipeline.bind_vertices().bind_resources(tints, extra).draw(3); }));
+    }
+
+    TEST_F(TypedDescriptorVulkanIntegrationTest, DestroyedPoolInvalidatesInitializationIncludingAnEmptyLayout) {
+        vsl::GraphicResourceManager manager(device);
+        t::TypedDescriptorSet<Tints> set(device, manager);
+        const Tint value{{.25f, .5f, .75f, 1}};
+        t::TypedUniformBuffer<Tint> buffer(device, value);
+        set.write<3>(std::array{buffer, buffer});
+        auto native = set.backend();
+        manager.destroy(native.get_pool());
+        EXPECT_TRUE(native.data_->bindings.empty());
+        EXPECT_THROW(set.require_complete(), std::logic_error);
+        EXPECT_THROW(set.write<3>(std::array{buffer, buffer}), std::logic_error);
+        t::TypedDescriptorSet<t::DescriptorSet<0>> empty(device, manager);
+        EXPECT_NO_THROW(empty.require_complete());
+        native = empty.backend();
+        manager.destroy(native.get_pool());
+        EXPECT_THROW(empty.require_complete(), std::logic_error);
+    }
+
     TEST_F(TypedDescriptorVulkanIntegrationTest, ShaderSchemaMismatchIsRejectedBeforeGraphicsPipelineCreation) {
         using WrongArray = t::DescriptorSet<2, t::UniformBinding<3, TintRecord, vsl::ShaderFlag::VERTEX>>;
         using WrongStage = t::DescriptorSet<2, t::UniformBinding<3, TintRecord, vsl::ShaderFlag::FRAGMENT, 2>>;
@@ -143,9 +231,13 @@ namespace {
         {
             vsl::Image<vsl::ImageType::SAMPLED> image(device, 1, 1, vsl::data_format::UNSIGNED_NORMALIZED8_RGBA);
             vsl::Sampler local(device, vsl::SamplingMode::NEAREST, vsl::EdgeMode::CLAMP_TO_EDGE);
+            auto native = set.backend();
+            EXPECT_THROW(native.update(image, 2), std::invalid_argument);
+            EXPECT_THROW(set.require_complete(), std::logic_error);
             weak_image = image.data_;
             weak_sampler = local.data_;
             set.write<2>(std::array{t::TypedTexture(image, sampler), t::TypedTexture(image, local)});
+            EXPECT_THROW(native.update(image, 2), std::invalid_argument);
         }
         EXPECT_FALSE(weak_image.expired());
         EXPECT_FALSE(weak_sampler.expired());

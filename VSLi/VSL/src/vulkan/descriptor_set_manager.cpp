@@ -7,6 +7,7 @@
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/exceptions.hpp>
 #include <limits>
+#include <algorithm>
 
 #include <VSL/vulkan/descriptor_set_manager.hpp>
 
@@ -45,6 +46,27 @@ namespace VSL_NAMESPACE::graphic_resource {
 } // namespace VSL_NAMESPACE::graphic_resource
 
 namespace {
+    struct PoolRetirement {
+        VSL_NAMESPACE::impl::GraphicResourcePoolImpl& pool;
+        explicit PoolRetirement(VSL_NAMESPACE::impl::GraphicResourcePoolImpl& pool);
+        ~PoolRetirement() { pool.retiring = false; }
+    };
+    PoolRetirement::PoolRetirement(VSL_NAMESPACE::impl::GraphicResourcePoolImpl& pool) : pool(pool) {
+        if (pool.retiring)
+            throw std::logic_error("Descriptor pool is being destroyed");
+        pool.retiring = true;
+    }
+    void require_pool_idle(const std::shared_ptr<VSL_NAMESPACE::impl::GraphicResourcePoolImpl>& data) {
+        std::vector<std::shared_ptr<VSL_NAMESPACE::impl::GraphicResourceImpl>> resources;
+        for (const auto& entry : data->resources)
+            if (auto resource = entry.lock())
+                resources.push_back(std::move(resource));
+        for (const auto& resource : resources) {
+            if (resource->recording)
+                throw std::logic_error("Descriptor resource is being recorded");
+            resource->use.require_idle();
+        }
+    }
     void release_descriptor_pool(const std::shared_ptr<VSL_NAMESPACE::impl::GraphicResourcePoolImpl>& data) {
         if (data->descriptor_pool) {
             data->device->device.destroyDescriptorPool(data->descriptor_pool);
@@ -165,7 +187,12 @@ void VSL_NAMESPACE::graphic_resource::ExactAllocateManager::destroy(const VSL_NA
     if (!pool.data_)
         return;
     const auto data = pool.data_;
-    if (std::erase(data_->pools, data) != 0)
+    const auto manager = data_;
+    if (!std::ranges::contains(manager->pools, data))
+        return;
+    const PoolRetirement retirement(*data);
+    require_pool_idle(data);
+    if (std::erase(manager->pools, data) != 0)
         release_descriptor_pool(data);
 }
 
@@ -211,7 +238,12 @@ void VSL_NAMESPACE::graphic_resource::OverAllocateManager::destroy(const VSL_NAM
     if (!pool.data_)
         return;
     const auto data = pool.data_;
-    if (std::erase(data_->pools, data) == 0)
+    const auto manager = data_;
+    if (!std::ranges::contains(manager->pools, data))
+        return;
+    const PoolRetirement retirement(*data);
+    require_pool_idle(data);
+    if (std::erase(manager->pools, data) == 0)
         return;
     std::erase_if(pools, [&](const auto& owned) { return owned.data_ == data; });
     release_descriptor_pool(data);

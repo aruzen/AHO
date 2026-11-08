@@ -41,6 +41,8 @@ add_library(VSL STATIC
         VSL/src/vulkan/stages/color_blend.cpp
         VSL/src/vulkan/pipeline_layout.cpp
         VSL/src/lifetime/resource_use.cpp
+        VSL/src/lifetime/descriptor_bindings.cpp
+        VSL/src/operation/descriptor_ops.cpp
         VSL/src/sync/resource_use_state.cpp
         VSL/src/sync/completion.cpp
         VSL/src/utils/typed_buffer_view.cpp

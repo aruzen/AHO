@@ -106,6 +106,7 @@ namespace {
         EXPECT_EQ(bundle.placement_plan().buffers(t::ResourceScope::SHARED).size(), 3u);
         EXPECT_EQ(bundle.placement_plan().buffers(t::ResourceScope::PER_FRAME).size(), 2u);
         std::array<const void*, 3> local{}, shared{};
+        std::array<const void*, 3> layouts{}, pools{}, sets{};
         for (size_t slot = 0; slot < 3; ++slot) {
             auto phase = manager.start_phase<vsl::ComputePhase>();
             const auto& frame = bundle.get(phase);
@@ -116,6 +117,29 @@ namespace {
             EXPECT_EQ(first.owner(), second.owner());
             EXPECT_NE(local[slot], shared[slot]);
             EXPECT_EQ(reinterpret_cast<const std::byte*>(second.ref().data) - reinterpret_cast<const std::byte*>(first.ref().data), vsl::storage::BufferLayout::STRIDE);
+            const auto& native = frame.set<2>().backend();
+            const auto& shared_native = frame.set<5>().backend();
+            const auto& plan = bundle.placement_plan();
+            const auto physical = plan.arena_plan(t::ResourceScope::PER_FRAME, slot);
+            const auto base = reinterpret_cast<std::uintptr_t>(first.ref().data) - plan.placement({2, 0}).offset;
+            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(native.data_.get()) - base, physical.placement(plan.descriptor_set(2)).offset);
+            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(native.data_->pool) - base, physical.placement(*plan.descriptor_pool(t::ResourceScope::PER_FRAME)).offset);
+            const auto shared_base = reinterpret_cast<std::uintptr_t>(frame.buffer<2, 1>().backend().ref().data) - plan.placement({2, 1}).offset;
+            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(native.data_->layout) - shared_base, plan.arena_plan(t::ResourceScope::SHARED).placement(plan.descriptor_layout(2)).offset);
+            EXPECT_FALSE(native.owner_ref().owner_before(first.owner_ref()));
+            EXPECT_FALSE(first.owner_ref().owner_before(native.owner_ref()));
+            EXPECT_FALSE(shared_native.owner_ref().owner_before(frame.buffer<2, 1>().backend().owner_ref()));
+            EXPECT_FALSE((frame.buffer<2, 1>().backend().owner_ref().owner_before(shared_native.owner_ref())));
+            EXPECT_EQ(native.data_->pool->max_sets, 1u);
+            EXPECT_EQ(native.data_->pool->allocated_sets, 1u);
+            EXPECT_EQ(native.data_->pool->capacities.at(vk::DescriptorType::eUniformBuffer).limit, 2u);
+            EXPECT_EQ(native.data_->pool->capacities.at(vk::DescriptorType::eStorageBuffer).limit, 1u);
+            for (const auto& [binding, elements] : native.data_->bindings)
+                for (const auto& element : elements)
+                    EXPECT_TRUE(element.owners.empty());
+            layouts[slot] = native.data_->layout;
+            pools[slot] = native.data_->pool;
+            sets[slot] = native.data_.get();
             std::array<std::uint32_t, 4> zero{1, 1, 1, 1};
             frame.buffer<2, 3>().read_into(zero);
             EXPECT_EQ(zero, (std::array<std::uint32_t, 4>{}));
@@ -133,6 +157,136 @@ namespace {
         EXPECT_NE(local[1], local[2]);
         EXPECT_EQ(shared[0], shared[1]);
         EXPECT_EQ(shared[1], shared[2]);
+        EXPECT_EQ(layouts[0], layouts[1]);
+        EXPECT_EQ(layouts[1], layouts[2]);
+        EXPECT_NE(pools[0], pools[1]);
+        EXPECT_NE(pools[1], pools[2]);
+        EXPECT_NE(sets[0], sets[1]);
+        EXPECT_NE(sets[1], sets[2]);
+        EXPECT_EQ(descriptors.allocations, 0u);
+    }
+    TEST_F(TypedBundleVulkanIntegrationTest, DeclaredEmptySetUsesAnArenaAndEmptySchemaUsesNone) {
+        auto manager = make_manager().independent(3);
+        CountingManager descriptors(device);
+        descriptors.fail_after = 0;
+        using Empty = t::ResourceAllocationSchema<t::ResourceSchema<>>;
+        t::TypedResourceBundle<Empty, t::ArenaStorage<>> empty(manager, descriptors);
+        EXPECT_EQ(empty.placement_plan().total_arena_bytes(), 0u);
+        empty.initialize_shared([](auto&) {});
+        using Declared = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<500>>>;
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        const auto completion = phase.completion();
+        std::weak_ptr<void> root;
+        {
+            t::TypedResourceBundle<Declared, t::ArenaStorage<>> bundle(manager, descriptors);
+            EXPECT_EQ(bundle.placement_plan().total_bytes(), 0u);
+            EXPECT_GT(bundle.placement_plan().total_arena_bytes(), 0u);
+            const auto& set = bundle.get(phase).set<500>();
+            const auto& native = set.backend();
+            root = native.data_;
+            EXPECT_EQ(native.data_->pool->max_sets, 1u);
+            EXPECT_TRUE(native.data_->pool->capacities.empty());
+            EXPECT_NO_THROW(set.require_complete());
+            set.resource_use()->record(manager.get_buffer());
+        }
+        EXPECT_FALSE(root.expired());
+        phase.cancel();
+        EXPECT_TRUE(root.expired());
+        EXPECT_EQ(completion.status(), vsl::Completion::Status::CANCELLED);
+        EXPECT_EQ(descriptors.allocations, 0u);
+    }
+    TEST_F(TypedBundleVulkanIntegrationTest, FrameSetAloneRetainsSharedLayoutsWithoutRetainingOtherFramesOrTheFacade) {
+        auto manager = make_manager().independent(2);
+        CountingManager descriptors(device);
+        std::optional<t::TypedDescriptorSet<LocalSet::Layout>> kept;
+        std::weak_ptr<void> frame, shared, other;
+        {
+            ArenaBundle bundle(manager, descriptors, sizes());
+            auto first = manager.start_phase<vsl::ComputePhase>();
+            const auto& value = bundle.get(first);
+            kept.emplace(value.set<2>());
+            frame = value.buffer<2, 0>().backend().owner();
+            shared = value.buffer<2, 1>().backend().owner();
+            first.cancel();
+            manager.get_buffer().next();
+            auto next = manager.start_phase<vsl::ComputePhase>();
+            other = bundle.get(next).buffer<2, 0>().backend().owner();
+            next.cancel();
+        }
+        EXPECT_TRUE(other.expired());
+        EXPECT_FALSE(frame.expired());
+        EXPECT_FALSE(shared.expired());
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        const auto completion = phase.completion();
+        EXPECT_NO_THROW(kept->require_complete());
+        kept->resource_use()->record(manager.get_buffer());
+        kept.reset();
+        EXPECT_FALSE(frame.expired());
+        EXPECT_FALSE(shared.expired());
+        phase.cancel();
+        EXPECT_TRUE(frame.expired());
+        EXPECT_TRUE(shared.expired());
+        EXPECT_EQ(completion.status(), vsl::Completion::Status::CANCELLED);
+    }
+    TEST_F(TypedBundleVulkanIntegrationTest, SharedSetRejectsAReverseDependencyIntoItsFrameArena) {
+        auto manager = make_manager();
+        CountingManager descriptors(device);
+        std::weak_ptr<void> local_owner, shared_owner;
+        {
+            ArenaBundle bundle(manager, descriptors, sizes());
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            const auto& frame = bundle.get(phase);
+            auto shared = frame.set<5>();
+            const auto local = frame.buffer<2, 0>();
+            local_owner = local.backend().owner();
+            shared_owner = shared.backend().data_;
+            EXPECT_TRUE(local.descriptor().buffer.managed());
+            EXPECT_THROW(shared.write<0>(std::array{local, local}), std::invalid_argument);
+            using External = t::detail::BundleExternalValue<SharedSet::Binding<0>>;
+            for (const auto form : {0, 1, 2}) {
+                auto value = frame.buffer<5, 0>().descriptor();
+                const auto owner = frame.set<2>().backend().owner_ref();
+                if (form == 2) {
+                    value.use.state = owner.alias(value.use.state.get());
+                    value.use.owner.reset();
+                } else
+                    value.use.owner = form ? owner.alias(static_cast<void*>(nullptr)) : owner;
+                EXPECT_THROW(shared.write<0>(std::array{External{value}, External{value}}), std::invalid_argument);
+            }
+            const auto logical = std::make_shared<vsl::ResourceUseState>();
+            EXPECT_THROW(shared.resource_use()->replace(0, {{logical, frame.set<2>().backend().owner_ref()}, {}}), std::invalid_argument);
+            EXPECT_NO_THROW(shared.require_complete());
+            EXPECT_TRUE(shared.backend().data_->bindings.at(0).front().constraint.states.empty());
+            phase.cancel();
+        }
+        EXPECT_TRUE(local_owner.expired());
+        EXPECT_TRUE(shared_owner.expired());
+    }
+    TEST_F(TypedBundleVulkanIntegrationTest, FailedInitialArrayBindingUnwindsTheArenaAndExternalOwnersBeforeRetry) {
+        using Layout = t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>,
+                                        t::StorageBinding<1, std::uint32_t, vsl::ShaderFlag::COMPUTE>,
+                                        t::TextureBinding<2, vsl::ShaderFlag::COMPUTE, 2>>;
+        using Allocation = t::ResourceAllocationSchema<t::ResourceSchema<Layout>, t::ExternalAllocation<0, 0>,
+                                                       t::BufferAllocation<0, 1>, t::ExternalAllocation<0, 2>>;
+        auto manager = make_manager().independent(3);
+        CountingManager descriptors(device);
+        t::TypedUniformBuffer<std::uint32_t> uniform(device, std::uint32_t{37});
+        vsl::Image<vsl::ImageType::SAMPLED> valid(device, 1, 1, vsl::data_format::UNSIGNED_NORMALIZED8_RGBA);
+        vsl::Image<vsl::ImageType::COLOR_ATTACHMENT> invalid(device, 1, 1, vsl::data_format::UNSIGNED_NORMALIZED8_RGBA);
+        vsl::Sampler sampler(device);
+        const auto uniform_input = t::external_resource<0, 0>(uniform);
+        auto textures = t::external_resource<0, 2>(std::array{t::TypedTexture(valid, sampler), t::TypedTexture(invalid, sampler)});
+        const auto uniform_refs = uniform.backend().data_.use_count();
+        const auto image_refs = valid.data_.use_count();
+        const auto sampler_refs = sampler.data_.use_count();
+        using Bundle = t::TypedResourceBundle<Allocation, t::ArenaStorage<>>;
+        EXPECT_THROW((Bundle(manager, descriptors, uniform_input, textures)), std::invalid_argument);
+        EXPECT_EQ(uniform.backend().data_.use_count(), uniform_refs);
+        EXPECT_EQ(valid.data_.use_count(), image_refs);
+        EXPECT_EQ(sampler.data_.use_count(), sampler_refs);
+        textures.values[1] = t::TypedTexture(valid, sampler);
+        EXPECT_NO_THROW((Bundle(manager, descriptors, uniform_input, textures)));
+        EXPECT_EQ(descriptors.allocations, 0u);
     }
 
     TEST_F(TypedBundleVulkanIntegrationTest, ArenaResourcesReachTheShaderThroughArraysAndFrameReuse) {
@@ -222,15 +376,13 @@ namespace {
         EXPECT_TRUE(owner.expired());
     }
 
-    TEST_F(TypedBundleVulkanIntegrationTest, ArenaFailureUnwindsSetsAndCanBeRetried) {
+    TEST_F(TypedBundleVulkanIntegrationTest, ArenaDescriptorsUseTheirPlannedPoolsWithoutLegacyManagerAllocation) {
         auto manager = make_manager().independent(3);
         CountingManager descriptors(device);
-        descriptors.fail_after = 2;
-        EXPECT_THROW((ArenaBundle(manager, descriptors, sizes())), std::runtime_error);
-        for (const auto& record : descriptors.records)
-            EXPECT_TRUE(record.expired());
-        descriptors.fail_after = SIZE_MAX;
+        descriptors.fail_after = 0;
         EXPECT_NO_THROW((ArenaBundle(manager, descriptors, sizes())));
+        EXPECT_EQ(descriptors.allocations, 0u);
+        EXPECT_TRUE(descriptors.records.empty());
     }
 
     TEST_F(TypedBundleVulkanIntegrationTest, CommandKeepsArenaAfterOriginalBundleAndRecordingPhaseAreGone) {

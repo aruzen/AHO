@@ -70,7 +70,7 @@ stack上の別nodeへ任意のshared_ptrをpublishする使い方は、この寿
 
 一括領域は引き続きCPU Implと物理状態を対象とする。各Implのnode pointer、外側rootのnode、OwnedRefの出所情報の分だけmetadataは増える。node自体の個別確保はなく、DFS scratch、bindingコンテナ、動的ownerのbinding間重複保持、Vulkan device memoryは別に残る。性能率は未測定。
 
-AHOの接続は次節の範囲まで行う。Typed bundle内のSet／Pool／Layout実配置とDevice／起動・command／WSIの所有境界は、完了計画の後続に残る。現段階で全VSL／AHOの所有をgraph化したとは扱わない。
+AHOの接続は次節の範囲まで行い、[Typed bundleのSet／Pool／Layout実配置](typed-descriptor-placement.md)も同じgraphへ接続した。Device／起動・command／WSIの所有境界は完了計画の後続に残る。現段階で全VSL／AHOの所有をgraph化したとは扱わない。
 
 ## AHOの世代と固定親
 

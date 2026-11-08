@@ -33,7 +33,7 @@ namespace typed_example {
         std::cout << "Typed allocation: " << totals.buffers << " buffers, " << totals.descriptor_sets
                   << " sets, " << totals.descriptors << " descriptors, " << totals.payload_bytes << " payload bytes\n";
 #ifdef AHO_TYPED_ARENA
-        std::cout << "Typed arena: " << _resources.placement_plan().total_bytes() << " CPU bytes in shared/frame groups\n";
+        std::cout << "Typed arena: " << _resources.placement_plan().total_arena_bytes() << " CPU bytes in shared/frame groups\n";
 #endif
         rebuild_pipeline();
         _resize_hook = _window.add_plugin<aho::window::WindowResizeHookPlugin>([this](aho::Window*) { rebuild_pipeline(); });

@@ -113,6 +113,76 @@ namespace {
         constexpr t::TypedBundlePlan<Empty> empty(t::ResourceAllocationPlan<Empty>(1));
         static_assert(empty.total_bytes() == 0 && empty.alignment(t::ResourceScope::SHARED) == 1);
     }
+    TEST(TypedAllocationPlanTest, DescriptorArenaPlanPreservesDataOffsetsAndCountsDeclaredSets) {
+        constexpr t::TypedBundlePlan<Fixed> plan(FIXED_PLAN);
+        constexpr auto shared = plan.arena_plan(t::ResourceScope::SHARED);
+        constexpr auto frame = plan.arena_plan(t::ResourceScope::PER_FRAME, 2);
+        static_assert(shared.size() == 9 && shared.slots() == 9);
+        static_assert(frame.size() == 4 && frame.slots() == 3);
+        static_assert(frame.lifetime() == t::LifetimeGroup{t::LifetimeScope::FRAME, 2});
+        static_assert(frame.placement(plan.descriptor_layout(0)).external);
+        static_assert(frame.placement(plan.descriptor_layout(0)).slot == t::ResourcePlacement::NO_SLOT);
+        static_assert(shared.placement(plan.descriptor_layout(7)).kind == vsl::storage::ResourceKind::DESCRIPTOR_LAYOUT);
+        static_assert(plan.total_arena_bytes() == shared.bytes() + 3 * frame.bytes());
+        EXPECT_GT(plan.total_arena_bytes(), plan.total_bytes());
+        for (const auto scope : {t::ResourceScope::SHARED, t::ResourceScope::PER_FRAME}) {
+            const auto full = plan.arena_plan(scope);
+            const auto data = plan.resource_plan(scope);
+            for (const auto& previous : data.placements()) {
+                const auto current = full.placement(previous.resource);
+                EXPECT_EQ(current.slot, previous.slot);
+                EXPECT_EQ(current.offset, previous.offset);
+                EXPECT_EQ(current.kind, previous.kind);
+            }
+            EXPECT_EQ(full.placement(*plan.descriptor_pool(scope)).kind, vsl::storage::ResourceKind::DESCRIPTOR_POOL);
+        }
+        EXPECT_EQ(shared.placement(plan.descriptor_set(7)).kind, vsl::storage::ResourceKind::DESCRIPTOR_SET);
+        EXPECT_THROW(plan.descriptor_layout(6), std::out_of_range);
+        EXPECT_THROW(plan.descriptor_set(6), std::out_of_range);
+        EXPECT_THROW(plan.arena_plan(t::ResourceScope::SHARED, 1), std::invalid_argument);
+        EXPECT_THROW(plan.descriptor_pool(static_cast<t::ResourceScope>(99)), std::invalid_argument);
+    }
+    TEST(TypedAllocationPlanTest, DescriptorIdsAvoidExplicitExternalAndMaximumResourceIds) {
+        using Map = t::ResourceBindingMap<t::ResourceBinding<t::BindingKey{0, 0, 0}, t::ResourceId{UINT64_MAX}>,
+                                          t::ResourceBinding<t::BindingKey{7, 0, 0}, t::ResourceId{0}>,
+                                          t::ResourceBinding<t::BindingKey{4, 1}, t::ResourceId{1}>>;
+        constexpr t::TypedBundlePlan<Fixed, Map> plan(FIXED_PLAN);
+        constexpr auto shared = plan.arena_plan(t::ResourceScope::SHARED);
+        constexpr auto frame = plan.arena_plan(t::ResourceScope::PER_FRAME);
+        static_assert(plan.placement({0, 0, 0}).resource == t::ResourceId{UINT64_MAX});
+        static_assert(plan.descriptor_layout(0) != t::ResourceId{0});
+        std::vector<t::ResourceId> descriptors;
+        for (const auto& declaration : plan.descriptors().Layouts()) {
+            descriptors.push_back(plan.descriptor_layout(declaration.set));
+            descriptors.push_back(plan.descriptor_set(declaration.set));
+        }
+        descriptors.push_back(*plan.descriptor_pool(t::ResourceScope::SHARED));
+        descriptors.push_back(*plan.descriptor_pool(t::ResourceScope::PER_FRAME));
+        for (size_t i = 0; i < descriptors.size(); ++i) {
+            for (const auto& data : plan.placements())
+                EXPECT_NE(descriptors[i], data.resource);
+            for (size_t j = 0; j < i; ++j)
+                EXPECT_NE(descriptors[i], descriptors[j]);
+        }
+        EXPECT_TRUE(frame.placement(plan.descriptor_layout(0)).external);
+        EXPECT_FALSE(shared.placement(plan.descriptor_layout(0)).external);
+    }
+    TEST(TypedAllocationPlanTest, EmptySchemaAndDeclaredEmptySetNeedDifferentArenaStorage) {
+        using Empty = t::ResourceAllocationSchema<t::ResourceSchema<>>;
+        constexpr t::TypedBundlePlan<Empty> empty(t::ResourceAllocationPlan<Empty>(3));
+        static_assert(empty.total_arena_bytes() == 0);
+        static_assert(!empty.descriptor_pool(t::ResourceScope::SHARED));
+        static_assert(!empty.descriptor_pool(t::ResourceScope::PER_FRAME));
+        static_assert(empty.arena_plan(t::ResourceScope::SHARED).slots() == 0);
+        using Declared = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<500>>>;
+        constexpr t::TypedBundlePlan<Declared> declared(t::ResourceAllocationPlan<Declared>(3));
+        static_assert(declared.total_bytes() == 0 && declared.total_arena_bytes() > 0);
+        static_assert(declared.arena_plan(t::ResourceScope::SHARED).slots() == 3);
+        static_assert(declared.arena_plan(t::ResourceScope::PER_FRAME).size() == 0);
+        static_assert(!declared.descriptor_pool(t::ResourceScope::PER_FRAME));
+        EXPECT_THROW(empty.descriptor_layout(0), std::out_of_range);
+        EXPECT_THROW(empty.descriptor_set(0), std::out_of_range);
+    }
 
     TEST(TypedAllocationPlanTest, EqualPayloadSizeDoesNotPermitAliasingDifferentTypes) {
         using Two = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<0,

@@ -279,7 +279,7 @@ namespace {
         EXPECT_FALSE(logical->busy());
         EXPECT_FALSE(image.use_state().busy());
     }
-    TEST_F(TypedOwnedResourcesVulkanIntegrationTest, DescriptorFailureRollsBackMixedHeapAndArenaOwnersAndAllowsRetry) {
+    TEST_F(TypedOwnedResourcesVulkanIntegrationTest, DescriptorManagerFailureRollsBackMixedHeapOwnersAndAllowsRetry) {
         auto manager = make_manager().independent(2);
         auto verify = [&]<typename Policy>() {
             FailingDescriptorManager descriptors(device);
@@ -290,7 +290,6 @@ namespace {
             descriptors.fail = false;
             EXPECT_NO_THROW((t::TypedResourceBundle<Schema, Policy>(manager, descriptors, sizes())));
         };
-        verify.template operator()<Arena>();
         verify.template operator()<t::HeapStorage>();
     }
 } // namespace

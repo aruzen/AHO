@@ -18,8 +18,7 @@ namespace VSL_NAMESPACE::typed {
         void copy(std::span<const Payload> values);
         void read_into(std::span<Payload> values) const;
         PlacedResourceBufferView view(size_t first, size_t count) const;
-        // native descriptor書込にだけ使う移行用のalias。内部に保持しない。
-        detail::DescriptorValue descriptor() const { return {_view.legacy_owner(), {}, {}, _view.size(), _view.byte_offset(), _view.resource_use()}; }
+        detail::DescriptorValue descriptor() const { return {_view.owner_ref().alias(_view.ref().data), {}, {}, _view.size(), _view.byte_offset(), _view.resource_use()}; }
     };
 
     template<typename Payload_, graphic_resource::Type kind>

@@ -2,6 +2,15 @@
 #include <VSL/vulkan/_pimpls.hpp>
 
 namespace VSL_NAMESPACE::typed::detail {
+    DescriptorLayoutCreateInfo make_bundle_layout(const DescriptorLayoutPlan& plan) {
+        return {{plan.bindings.begin(), plan.bindings.end()}};
+    }
+    DescriptorPoolCreateInfo make_bundle_pool(DescriptorPoolPlan plan) {
+        DescriptorPoolCreateInfo result{{}, plan.max_sets};
+        for (const auto& entry : plan.descriptors)
+            result.descriptors.emplace(entry.type, entry.count);
+        return result;
+    }
     ImageAccessor BundleNativeResources::image(ResourceId id) const {
         for (const auto& [resource, value] : images)
             if (resource == id)

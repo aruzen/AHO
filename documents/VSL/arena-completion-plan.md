@@ -9,6 +9,8 @@
 
 最初のPRだけで終了せず、下記の順で実装・検証・独立レビューを継続する。PRの公開前には最新masterとの差分を確認する。新しい製品ディレクトリが必要な場合は作成前に確認する。
 
+現在の到達点は順序1〜5である。順序6〜12は未完了であり、起動資源、既定policy変更、旧入口廃止と最終監査まで継続する。
+
 ## 責務と保証
 
 storageはCPU領域と配置、operationは解決済み実体へのVulkan操作、lifetimeは構築・所有・回収、syncは使用状態と完了観測を担当する。通常VSLとTypedでbackendを共用する。操作中にownerを何段も解決せず、公開view／command／外部依存の境界で所有を取得する。
@@ -80,8 +82,18 @@ Layout数は宣言set数のResources::COUNT、Set数はshared／frameの実数�
 
 5aの実装契約は[Descriptorの共通使用状態](descriptor-state.md)を参照。
 
-5bは[共通backendとheap所有の移行](descriptor-backend.md)と[寸法生成・ResourceArenaへの配置](descriptor-arena.md)を実装した。同rootの物理／論理ownerを借用へ正規化し、構築時に固定した依存以外のowner追加を拒否する。次の5cで動的な依存graphとTyped schemaの自動配置へ接続する。
+5bは[共通backendとheap所有の移行](descriptor-backend.md)と[寸法生成・ResourceArenaへの配置](descriptor-arena.md)を実装した。同rootの物理／論理ownerを借用へ正規化し、既定FIXEDでは構築時に固定した依存以外のowner追加を拒否する。
 
 5cは[constexpr descriptor論理計画](typed-descriptor-plan.md)を先に分離する。Layout宣言、shared／frame別のSet実数とPool容量を固定配列で計算し、生成用scratchと資源ID／slot割当は後続接続へ分ける。descriptor実体のbundle内配置、可変依存graphと追加logical constraintの接続までは5c全体を完了としない。
 
-[所有参照とroot依存graph](owner-dependencies.md)で、既知ownerの出所、固定親、更新のcycle検査とcommitを接続した。AHOのBuffer generation R→physical storage PとTexture Data D→Image Pも同じgraphへ接続し、弱参照の出所、世代切替のcommitと失敗rollbackを維持する。次はこのcoreを使うTyped descriptorの実配置であり、5c全体はまだ完了していない。
+[所有参照とroot依存graph](owner-dependencies.md)で、既知ownerの出所、固定親、更新のcycle検査とcommitを接続した。AHOのBuffer generation R→physical storage PとTexture Data D→Image Pも同じgraphへ接続し、弱参照の出所、世代切替のcommitと失敗rollbackを維持する。
+
+[Typed bundleのdescriptor配置](typed-descriptor-placement.md)で、schemaからshared／frameのLayout・Pool・SetをResourceArenaへ展開した。data-only配置との互換、正確な群別容量、固定親、DYNAMICな外部入力、記録時binding、更新制約、完了／取消回収を実装・検証した。これで順序5a／5b／5cの受入条件を満たす。Manager引数等の互換入口は順序12の廃止対象として残し、次は順序6のshader／pipeline layoutへ進む。
+
+## 順序6の着手単位
+
+6aはShaderのoperation／lifetime backend、heap所有、寸法生成、ResourceArena配置を通す。native実体へGPU UseStateは持たせず、stage create-infoとpNameを生成scratchへ分ける。entry／codeの永続値と外部Shaderの正規ownerを維持する。
+
+6bはPipelineLayoutのruntimeと編集／Frozenのrecipeを分離し、配置へ接続する。push constant記録で読むrangesはruntimeへ移し、recipeのshader／descriptor sourceは借用とroot外部所有へ正規化する。Shader／DescriptorLayout→PipelineLayout、Pool／Layout→Setの構築順と実構築の逆順破棄を保証する。
+
+6cはschema付き共有Layout集合をTyped pipelineへ渡す入口を作る。現在のResources注入が既存Layoutをheap再生成する経路を置き換え、set番号のholeは生成時に扱う。frame facadeをpipeline rootへ保持しない。Vulkan native依存と再生成用recipeの所有依存を区別し、それぞれgraphと寿命を検証する。

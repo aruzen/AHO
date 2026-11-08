@@ -36,7 +36,7 @@ Pool容量はdescriptor typeごとのbinding amountを合算する。descriptor�
 
 Vulkan生成用のvector／mapをconstexpr計画へ保存しない。次の接続で、このmetadataからruntime scratchを作り、既存の資源IDと衝突しないLayout／Pool／Set IDを付与する。shared arenaへLayoutとshared Set／Pool、各frame arenaへframe Set／Poolを配置し、shared Layout／payloadは元の正規ownerでimportする。
 
-この変更はまだTyped bundle内のdescriptor実体をarenaへ移していない。既存のManager経路を維持している。実配置に先立ち、任意の追加ResourceUseを保つための管理rootの依存graphとprovenanceを接続する。元DescriptorValueのsnapshotを依存宣言とbinding更新で共有し、外部世代の意味を維持する。
+この論理計画だけを導入した段階では、Typed bundle内のdescriptor実体は既存Manager経路にあった。後続の[所有依存graph](owner-dependencies.md)と[descriptor実配置](typed-descriptor-placement.md)で、追加ResourceUseと外部世代を保持したままarenaへ接続した。data-onlyのresource_plan／bytesは意味を維持し、descriptorを含む領域にはarena_planを使う。
 
 CPU6件を追加し、constexpr計算、疎set番号、明示empty Set、空schema、shared／frame別の正確な容量、外部画像、配列、巨大frame数、native容量／全体overflow、一時オブジェクトからの借用拒否を確認した。既存ResourceAllocationPlanのdescriptor_sets／descriptorsとの一致、物理IDを共有してもdescriptor容量が減らないことも検査した。関連する既存計画テストを含む21件が成功した。
 

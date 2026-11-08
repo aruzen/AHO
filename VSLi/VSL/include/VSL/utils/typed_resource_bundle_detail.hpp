@@ -38,7 +38,9 @@ namespace VSL_NAMESPACE::typed {
         template<typename Schema, typename Policy>
         using BundlePlacementPlan = TypedBundlePlan<Schema, typename BundlePolicy<Policy>::Bindings>;
         template<ResourceScope scope, typename Schema, typename Policy>
-        std::optional<lifetime::ResourceArena> make_bundle_arena(LogicalDeviceAccessor device, const ResourceAllocationPlan<Schema>& plan, size_t instance = 0);
+        std::optional<lifetime::ResourceArena> make_bundle_arena(LogicalDeviceAccessor device, const ResourceAllocationPlan<Schema>& plan, size_t instance = 0, const lifetime::ResourceArena* shared = nullptr);
+        DescriptorLayoutCreateInfo make_bundle_layout(const DescriptorLayoutPlan& plan);
+        DescriptorPoolCreateInfo make_bundle_pool(DescriptorPoolPlan plan);
         struct BundleNativeResources {
             std::vector<std::pair<ResourceId, ImageAccessor>> images;
             std::vector<std::pair<ResourceId, SamplerAccessor>> samplers;
@@ -126,9 +128,11 @@ namespace VSL_NAMESPACE::typed {
         template<typename Schema, typename Set, typename Policy>
         void connect_bundle_set(TypedDescriptorSet<typename Set::Layout>& set, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared);
         template<typename Schema, typename Set, typename Policy>
-        auto make_bundle_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared);
+        auto allocate_bundle_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundlePlacementPlan<Schema, Policy>& layout, const lifetime::ResourceArena* arena);
+        template<typename Schema, typename Set, typename Policy>
+        auto make_bundle_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared, const lifetime::ResourceArena* arena);
         template<typename Schema, typename Policy>
-        auto make_bundle_sets(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared);
+        auto make_bundle_sets(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared, const lifetime::ResourceArena* arena);
         template<typename Schema, typename Policy, typename Inputs>
         auto make_bundle_shared(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const ResourceAllocationPlan<Schema>& plan, const Inputs& inputs);
         template<typename Schema, typename Policy>
@@ -146,16 +150,31 @@ namespace VSL_NAMESPACE::typed {
 
     namespace detail {
         template<ResourceScope scope, typename Schema, typename Policy>
-        std::optional<lifetime::ResourceArena> make_bundle_arena(LogicalDeviceAccessor device, const ResourceAllocationPlan<Schema>& plan, size_t instance) {
+        std::optional<lifetime::ResourceArena> make_bundle_arena(LogicalDeviceAccessor device, const ResourceAllocationPlan<Schema>& plan, size_t instance, const lifetime::ResourceArena* shared) {
             if constexpr (BundlePolicy<Policy>::ARENA) {
                 const BundlePlacementPlan<Schema, Policy> layout(plan);
-                if (!layout.resources(scope).empty()) {
+                const auto physical = layout.arena_plan(scope, instance);
+                if (physical.size()) {
                     std::vector<lifetime::ResourceInit> infos;
-                    infos.reserve(layout.resources(scope).size());
+                    infos.reserve(physical.size());
                     for (const auto& info : layout.resources(scope))
                         std::visit([&](const auto& value) { infos.emplace_back(value); }, info);
-                    const auto physical = layout.resource_plan(scope, instance);
-                    lifetime::ResourceArena arena(device, physical, infos);
+                    if constexpr (scope == ResourceScope::SHARED) {
+                        for (const auto& declaration : layout.descriptors().Layouts())
+                            infos.emplace_back(make_bundle_layout(declaration));
+                    } else {
+                        for (const auto& set : layout.descriptors().sets(scope)) {
+                            if (!shared)
+                                throw std::logic_error("Frame descriptor layouts require the shared arena");
+                            infos.emplace_back(shared->descriptor_layout(layout.descriptor_layout(set.set)));
+                        }
+                    }
+                    if (const auto pool = layout.descriptor_pool(scope)) {
+                        infos.emplace_back(make_bundle_pool(layout.descriptors().pool(scope)));
+                        for (const auto& set : layout.descriptors().sets(scope))
+                            infos.emplace_back(lifetime::DescriptorSetInit{*pool, layout.descriptor_layout(set.set)});
+                    }
+                    lifetime::ResourceArena arena(device, physical, infos, lifetime::DependencyPolicy::DYNAMIC);
                     for (const auto& slot : physical.placements())
                         if (slot.kind == storage::ResourceKind::BUFFER)
                             arena.borrow_buffer(slot.resource).fill(std::byte{});
@@ -286,18 +305,28 @@ namespace VSL_NAMESPACE::typed {
             });
         }
         template<typename Schema, typename Set, typename Policy>
-        auto make_bundle_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared) {
+        auto allocate_bundle_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundlePlacementPlan<Schema, Policy>& layout, const lifetime::ResourceArena* arena) {
+            using Result = TypedDescriptorSet<typename Set::Layout>;
+            if constexpr (BundlePolicy<Policy>::ARENA) {
+                if (!arena)
+                    throw std::logic_error("Typed descriptor requires its resource arena");
+                return Result::FromResource(device, arena->descriptor_set(layout.descriptor_set(Set::SET)), BundlePolicy<Policy>::RETENTION);
+            } else
+                return Result(device, manager, BundlePolicy<Policy>::RETENTION);
+        }
+        template<typename Schema, typename Set, typename Policy>
+        auto make_bundle_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared, const lifetime::ResourceArena* arena) {
             if constexpr (Schema::SetIsPerFrame(Set::SET)) {
-                TypedDescriptorSet<typename Set::Layout> result(device, manager, BundlePolicy<Policy>::RETENTION);
+                auto result = allocate_bundle_set<Schema, Set, Policy>(device, manager, shared.layout, arena);
                 connect_bundle_set<Schema, Set, Policy>(result, frame, shared);
                 return result;
             } else
                 return std::get<Schema::SetIndex(Set::SET)>(shared.sets).value();
         }
         template<typename Schema, typename Policy>
-        auto make_bundle_sets(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared) {
+        auto make_bundle_sets(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared, const lifetime::ResourceArena* arena) {
             return [&]<size_t... indices>(std::index_sequence<indices...>) {
-                return typename BundleSets<typename Schema::Resources::Sets>::Type{make_bundle_set<Schema, typename Schema::Resources::template Set<indices>, Policy>(device, manager, frame, shared)...};
+                return typename BundleSets<typename Schema::Resources::Sets>::Type{make_bundle_set<Schema, typename Schema::Resources::template Set<indices>, Policy>(device, manager, frame, shared, arena)...};
             }(std::make_index_sequence<Schema::Resources::COUNT>{});
         }
         template<typename Schema, typename Policy, typename Inputs>
@@ -310,7 +339,7 @@ namespace VSL_NAMESPACE::typed {
             bundle_for_each<typename Schema::Resources::Sets>([&]<typename Set>() {
                 if constexpr (!Schema::SetIsPerFrame(Set::SET)) {
                     auto& target = std::get<Schema::SetIndex(Set::SET)>(shared->sets);
-                    target.emplace(device, manager, BundlePolicy<Policy>::RETENTION);
+                    target.emplace(allocate_bundle_set<Schema, Set, Policy>(device, manager, shared->layout, shared->arena ? &*shared->arena : nullptr));
                     connect_bundle_set<Schema, Set, Policy>(*target, shared->resources, *shared);
                 }
             });
@@ -334,7 +363,7 @@ namespace VSL_NAMESPACE::typed {
                         case storage::ResourceKind::DESCRIPTOR_LAYOUT:
                         case storage::ResourceKind::DESCRIPTOR_POOL:
                         case storage::ResourceKind::DESCRIPTOR_SET:
-                            throw std::logic_error("Typed descriptor placement is not connected to the bundle yet");
+                            throw std::logic_error("Unexpected descriptor in the data-only bundle plan");
                     }
                 }
             } else {
@@ -345,6 +374,10 @@ namespace VSL_NAMESPACE::typed {
                             value.descriptor().use.state->require_idle();
                 });
             }
+            bundle_for_each<typename Schema::Resources::Sets>([&]<typename Set>() {
+                if constexpr (!Schema::SetIsPerFrame(Set::SET))
+                    std::get<Schema::SetIndex(Set::SET)>(shared.sets).value().resource_use()->require_idle();
+            });
         }
     } // namespace detail
 } // namespace VSL_NAMESPACE::typed

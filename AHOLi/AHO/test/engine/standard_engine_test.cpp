@@ -18,6 +18,48 @@ namespace {
         EXPECT_GT(window.frame_size().value.y.value, 0);
         EXPECT_NE(window.data2->surface, nullptr);
     }
+    TEST_F(StandardEngineVulkanIntegration, StartupUsesIndependentInstanceDeviceAndSurfaceOwners) {
+        ASSERT_NO_THROW(start_engine());
+        const auto& data = *engine->data();
+        const auto& surface = engine->boot_window->data2->surface;
+        EXPECT_FALSE(data.logical_device.data_.owner_before(data.physical_device.data_));
+        EXPECT_FALSE(data.physical_device.data_.owner_before(data.logical_device.data_));
+        EXPECT_TRUE(data.logical_device.data_.owner_before(data.vulkan_instance.accessor) ||
+                    data.vulkan_instance.accessor.owner_before(data.logical_device.data_));
+        EXPECT_TRUE(surface->data_.owner_before(data.logical_device.data_) || data.logical_device.data_.owner_before(surface->data_));
+        EXPECT_TRUE(surface->data_.owner_before(data.vulkan_instance.accessor) || data.vulkan_instance.accessor.owner_before(surface->data_));
+        EXPECT_EQ(data.logical_device.get_physical_device().data_, data.physical_device.data_);
+        EXPECT_EQ(data.physical_device.get_instance().accessor, data.vulkan_instance.accessor);
+        EXPECT_EQ(surface->get_instance().accessor, data.vulkan_instance.accessor);
+        EXPECT_EQ(data.vulkan_instance.data_, data.vulkan_instance.accessor);
+    }
+    TEST_F(StandardEngineVulkanIntegration, SavedDeviceDoesNotKeepClosedSurfaceOrWindowAlive) {
+        ASSERT_NO_THROW(start_engine());
+        auto saved = engine->data()->logical_device;
+        const std::weak_ptr<vsl::impl::SurfaceImpl> surface = engine->boot_window->data2->surface->data_;
+        const auto os = engine->boot_window->window_owner().owner_ref().weak();
+        const std::weak_ptr<vsl::impl::VulkanImplAccessor> instance = engine->data()->vulkan_instance.accessor;
+        EXPECT_TRUE(engine->boot_window->close());
+        engine.reset();
+        EXPECT_TRUE(surface.expired());
+        EXPECT_TRUE(os.expired());
+        EXPECT_FALSE(instance.expired());
+        EXPECT_TRUE(saved.get_physical_device().owner_ref().managed());
+        saved.data_.reset();
+        EXPECT_TRUE(instance.expired());
+    }
+    TEST_F(StandardEngineVulkanIntegration, ClosingTheInitialWindowLeavesAnIndependentSurfaceUsable) {
+        ASSERT_NO_THROW(start_engine());
+        auto& first = *engine->boot_window;
+        aho::Window second("independent startup Surface", 64, 48, *engine);
+        const std::weak_ptr<vsl::impl::SurfaceImpl> previous = first.data2->surface->data_;
+        EXPECT_NE(second.data2->surface->data_, first.data2->surface->data_);
+        EXPECT_TRUE(first.close());
+        EXPECT_TRUE(previous.expired());
+        EXPECT_TRUE(static_cast<bool>(second));
+        EXPECT_TRUE(second.resize(80, 64));
+        EXPECT_TRUE(second.close());
+    }
     TEST_F(StandardEngineVulkanIntegration, BasePointerDestructionReleasesClosedWindowAndEngineResources) {
         ASSERT_NO_THROW(start_engine());
         ASSERT_TRUE(engine->boot_window.has_value());

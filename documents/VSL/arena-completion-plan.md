@@ -9,7 +9,7 @@
 
 最初のPRだけで終了せず、下記の順で実装・検証・独立レビューを継続する。PRの公開前には最新masterとの差分を確認する。新しい製品ディレクトリが必要な場合は作成前に確認する。
 
-現在の到達点は順序1〜8と9a〜9dである。command所有分離、CommandPool／CommandBuffer／Fence／Semaphore配置、同期資源の使用制約とTyped frame再利用に加え、Instance／PhysicalDevice／Surface／Deviceの共通backend／指定領域構築と、OS windowの寿命分離まで接続した。順序9全体と10〜12は未完了であり、9eの公開起動arenaとAHO起動、WSI接続、既定policy変更、旧入口廃止と最終監査まで継続する。
+現在の到達点は順序1〜9である。command／同期資源の配置とTyped frame再利用、Instance／PhysicalDevice／Surface／Deviceの共通backend、OS windowの寿命分離、公開StartupArenaとAHO起動を接続した。順序10〜12は未完了であり、WSI接続、既定policy変更、旧入口廃止と最終監査まで継続する。
 
 ## 責務と保証
 
@@ -170,6 +170,17 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 
 9eではDevice引数不要の公開StartupArenaを作る。共通Instance root、選択PhysicalDevice／Deviceの群、各WindowのSurface群を別ownerとして構築し、既存の生成処理と寸法情報を使う。同型slot、外部Instance、失敗rollback、元ownerのgetter、Deviceだけを残したWindow回収を検証し、AHOの起動／終了と複数Windowへ接続する。候補列挙scratchと実体の永続配置は分け、公開前の同群依存はraw参照にする。
 
+[9eの公開StartupArenaとAHO起動](startup-arena.md)で、生成済み寸法からのconstexpr計画、入力snapshot、親順構築と成功逆順rollback、元owner getter、AHOの三寿命群を接続した。Device生成中だけSurfaceを保持し、Deviceだけが残る場合のSurface／OS独立回収、複数Window、同領域retry、Typed転送を検証した。これで順序9の受入条件を満たす。
+
 順序10ではSwapchainの共通backend／配置、graphicsとpresentationの完了の区別、取消・退役世代の保持と再生成失敗からの復旧、acquire Fenceを扱う。9cで確認した無効resize引数のnative前拒否と、最小化で0になったframebufferの再生成延期も必須の検証項目とする。
 
-SurfaceがWindowDataを強所有するとpluginからの所有と循環するため、plugin／Engine／描画状態を含まないOSWindowOwnerを独立させる。論理closeと最後のnative window／GLFW破棄を分離する。Device生成時のSurfaceはqueue選択用であり、Deviceの永久親へ追加しない。StartupArenaの公開はこれらの契約とrollbackが揃ってから行う。
+## 順序10の分割
+
+10aはmaintenance1の能力照会・Instance依存・Device feature chainを接続する。厳密な資源回収を要求する入口では未対応を生成前に拒否し、互換fallbackは独立policyとする。現SDKのEXT型と実driverの能力を照合し、device idleをpresentation完了の証明へ昇格させない。
+
+10bはSwapchainの共通backend／指定領域構築と、全aliasで共有する現役／退役状態。nativeへoldSwapchainを渡した後は、生成失敗でも退役を取り消さない。実画像数に従うImage／世代同期群の計画を、native pending状態から構築する。
+
+10cは外部DomainのPresentRecordが世代と同期資源を保持し、present Fence等の証明でmarkerとownerを回収する。10dはframeごとのacquire FenceとAcquireTicket、取得後失敗・取消時のsignal消費／画像返却、present失敗の分類を扱う。Swapchain内部からRecordを強所有しない。
+
+10eはAHOのframe同期群とSwapchain世代群を分け、候補生成後のattachment失敗から復旧する。0 extentでは再生成・acquire・Fence resetを延期し、復元後に一括公開する。最後のpresent直後close、連続resize、marker保持量の有界化と互換Pipeline再利用を検証して順序10完了とする。
+

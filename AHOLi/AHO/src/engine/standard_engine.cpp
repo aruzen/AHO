@@ -1,5 +1,7 @@
 #include <AHO/engine/standard_engine.hpp>
 #include "../window_impl.hpp"
+#include <VSL/lifetime/startup_arena.hpp>
+#include <VSL/lifetime/glfw_lease.hpp>
 #include <algorithm>
 #include <limits>
 #include <stdexcept>
@@ -33,19 +35,33 @@ namespace {
 
     BootResources create_engine_resources(const EngineConfig& config, VSL_NAMESPACE::Window& window) {
         using namespace VSL_NAMESPACE;
-        std::vector<const char*> extensions{"VK_KHR_get_physical_device_properties2"};
+        InstanceCreateInfo instance_info;
+        instance_info.application_name = config.application_name;
+        instance_info.validation = VALIDATION;
+        instance_info.debug_printf = VALIDATION;
+        instance_info.extensions = {"VK_KHR_get_physical_device_properties2"};
 #ifdef __APPLE__
-        extensions.push_back("VK_KHR_portability_enumeration");
+        instance_info.extensions.push_back("VK_KHR_portability_enumeration");
 #endif
         for (const auto& extension : config.instance_extensions) {
-            if (std::ranges::find(extensions, extension) == extensions.end())
-                extensions.push_back(extension.c_str());
+            if (std::ranges::find(instance_info.extensions, extension) == instance_info.extensions.end())
+                instance_info.extensions.push_back(extension);
         }
-        Vulkan<> instance(config.application_name.c_str(), extensions);
-        auto surface = window.add_plugin<Surface>(instance);
-        PhysicalDevices devices(instance);
-        auto physical = config.physical_device_index ? devices.get().at(*config.physical_device_index) : devices.search();
-        LogicalDevice device(physical, surface);
+        const std::array instance_requests{storage::StartupRequest{{0}, storage::StartupKind::INSTANCE}};
+        const storage::StartupPlan<1> instance_plan(instance_requests);
+        const std::array<lifetime::StartupInit, 1> instance_inputs{lifetime::glfw_instance_info(std::move(instance_info))};
+        lifetime::StartupArena instance_arena(instance_plan, instance_inputs);
+        Vulkan<> instance(instance_arena.instance({0}));
+        auto surface = AHO_NAMESPACE::window::detail::make_window_surface(window, instance);
+        const std::array device_requests{storage::StartupRequest{{1}, storage::StartupKind::PHYSICAL_DEVICE},
+                                         storage::StartupRequest{{2}, storage::StartupKind::DEVICE}};
+        const storage::StartupPlan<2> device_plan(device_requests);
+        const std::array<lifetime::StartupInit, 2> device_inputs{
+            lifetime::PhysicalDeviceInit{instance, config.physical_device_index},
+            lifetime::GraphicsDeviceInit{typed::ResourceId{1}, *surface, VALIDATION}};
+        lifetime::StartupArena device_arena(device_plan, device_inputs);
+        auto physical = device_arena.physical_device({1});
+        auto device = device_arena.device({2});
         return {std::make_shared<EngineData>(EngineData{
                     .vulkan_instance = instance,
                     .physical_device = physical,
@@ -75,10 +91,16 @@ namespace AHO_NAMESPACE::engine {
         const auto& initial = _config.initial_window;
         const auto& title = initial.title.empty() ? _config.engine.application_name : initial.title;
         VSL_NAMESPACE::Window native(title, initial.width, initial.height);
+        const auto native_data = native.data_;
+        const auto os = native.window_owner();
         try {
             auto resources = create_engine_resources(_config.engine, native);
+            if (native.data_ != native_data || !native_data->window_handle || native_data->window_handle != os.native_handle())
+                throw std::runtime_error("Window closed during engine creation");
             EngineAccessor handle(resources.engine);
             auto drawing = window::detail::make_window_data(handle, std::move(resources.surface), title);
+            if (native.data_ != native_data || !native_data->window_handle || native_data->window_handle != os.native_handle())
+                throw std::runtime_error("Window closed during drawing resource creation");
             Window window(handle, native.data_, std::move(drawing));
             std::optional<DefaultEngineRegistration> registration;
             if (_config.register_as_default)

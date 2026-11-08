@@ -234,11 +234,15 @@
     <ClInclude Include="VSL\src\private\VSL\lifetime\surface_storage.hpp" />
     <ClCompile Include="VSL\src\lifetime\surface_storage.cpp" />
     <ClInclude Include="VSL\include\VSL\operation\device_create_info.hpp" />
+    <ClInclude Include="VSL\include\VSL\storage\startup_plan.hpp" />
+    <ClInclude Include="VSL\include\VSL\lifetime\startup_arena.hpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\device_ops.hpp" />
     <ClCompile Include="VSL\src\operation\device_ops.cpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\device_storage.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\device_owner.hpp" />
     <ClCompile Include="VSL\src\lifetime\device_storage.cpp" />
+    <ClCompile Include="VSL\src\lifetime\startup_arena.cpp" />
+    <ClCompile Include="VSL\src\lifetime\glfw_instance.cpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\synchronization_storage.hpp" />
     <ClCompile Include="VSL\src\lifetime\synchronization_storage.cpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\synchronization_ops.hpp" />

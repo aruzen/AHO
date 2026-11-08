@@ -130,6 +130,10 @@ add_library(VSL STATIC
         VSL/src/private/VSL/lifetime/device_storage.hpp
         VSL/src/private/VSL/lifetime/device_owner.hpp
         VSL/src/lifetime/device_storage.cpp
+        VSL/include/VSL/storage/startup_plan.hpp
+        VSL/include/VSL/lifetime/startup_arena.hpp
+        VSL/src/lifetime/startup_arena.cpp
+        VSL/src/lifetime/glfw_instance.cpp
         VSL/src/private/VSL/lifetime/synchronization_storage.hpp
         VSL/src/lifetime/synchronization_storage.cpp
         VSL/src/private/VSL/operation/synchronization_ops.hpp

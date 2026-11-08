@@ -18,6 +18,18 @@ namespace VSL_NAMESPACE {
         data_ = lifetime::make_heap_surface(std::move(instance), window->window_owner());
     }
     Surface::Surface(std::shared_ptr<impl::SurfaceImpl> data) : data_(std::move(data)) {}
+    Surface::Surface(PureWindow* window, Surface source) {
+        const auto owner = source.owner_ref();
+        const auto os = source.get_window_owner();
+        if (!window || !window->data_ || !window->data_->window_handle || !source.data_->surface || source.data_->owner_node->retiring() ||
+            source.data_->window != window->data_->window_handle || os.native_handle() != window->data_->window_handle)
+            throw std::invalid_argument("Surface plugin requires its original live OS window");
+        const auto target = window->window_owner().owner_ref();
+        const auto original = os.owner_ref();
+        if (target.owner_before(original) || original.owner_before(target))
+            throw std::invalid_argument("Surface plugin requires its original OS window owner");
+        data_ = std::move(source.data_);
+    }
     lifetime::OwnerRef Surface::owner_ref() const {
         return surface_owner(data_);
     }

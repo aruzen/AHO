@@ -1,4 +1,5 @@
 #pragma once
+#include "../operation/instance_create_info.hpp"
 #include "owner_ref.hpp"
 #include <new>
 
@@ -6,6 +7,8 @@ namespace VSL_NAMESPACE::impl {
     struct GLFWRuntimeImpl;
 }
 namespace VSL_NAMESPACE::lifetime {
+    // GLFWの文字列をlease内でコピーする。Instanceの生成／永久所有は行わない。
+    InstanceCreateInfo glfw_instance_info(InstanceCreateInfo info);
     // Acquire／DrainとGLFW操作はmain threadで行う。最後のreleaseは退役だけを登録する。
     class GLFWLease {
         OwnedRef<impl::GLFWRuntimeImpl> _runtime;

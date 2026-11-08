@@ -77,3 +77,5 @@ descriptorは配置を始める前に、既存の使用状態と更新metadata�
 3. Typed schemaへ接続する。同rootの物理／logical aliasは内部borrowへ正規化し、可変の外部依存をcommit前に検査する。既知の管理root間の循環と、opaque owner内に隠れた循環に対する保証を区別する。
 
 Layout数は宣言set数のResources::COUNT、Set数はshared／frameの実数、Poolはdescriptorを持つ寿命群ごととする。最大set番号＋1のSET_COUNTをSet実体数へ混ぜない。pipelineのhole用empty layoutは順序6で扱う。
+
+5aの実装契約は[Descriptorの共通使用状態](descriptor-state.md)を参照。5bの配置はまだ未実装である。

@@ -2,6 +2,7 @@
 #include <VSL/define.hpp>
 #include <VSL/vulkan/buffer_and_image_accessor.hpp>
 #include <VSL/vulkan/command.hpp>
+#include <VSL/lifetime/resource_use.hpp>
 
 #include <compare>
 
@@ -295,23 +296,27 @@ namespace VSL_NAMESPACE::impl {
         std::shared_ptr<LogicalDeviceImpl> device;
 
         vk::DescriptorPool descriptor_pool;
+        bool retiring = false;
         std::vector<std::weak_ptr<GraphicResourceImpl>> resources;
 
         ~GraphicResourcePoolImpl();
     };
 
     struct GraphicResourceImpl {
-        struct ResourceBindingRef {
-            ResourceUseState* state;
-            size_t owner_index;
+        struct BindingElement {
+            std::vector<std::shared_ptr<void>> owners;
+            // ownersに属する物理実体を借用する。論理制約も同じ要素で管理する。
+            std::vector<ResourceUseState*> states;
+            ResourceUse constraint;
+            bool initialized = false;
         };
         std::shared_ptr<impl::GraphicResourcePoolImpl> pool;
         std::shared_ptr<impl::ResourceBindingLayoutImpl> layout;
 
         vk::DescriptorSet descriptor_set;
-        std::map<std::uint32_t, std::vector<std::shared_ptr<void>>> bindings;
-        // bindings内のownerを借用する。記録時にstorageの使用状態を登録する。
-        std::map<std::uint32_t, std::vector<ResourceBindingRef>> resource_refs;
+        ResourceUseState use;
+        bool recording = false;
+        std::map<std::uint32_t, std::vector<BindingElement>> bindings;
 
         ~GraphicResourceImpl();
     };

@@ -2,6 +2,8 @@
 #include <VSL/utils/typed_resources.hpp>
 #include <VSL/utils/spir_reflector.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
+#include <VSL/lifetime/descriptor_bindings.hpp>
+#include <VSL/operation/descriptor_ops.hpp>
 #include <algorithm>
 
 namespace VSL_NAMESPACE::typed::detail {
@@ -13,6 +15,11 @@ namespace VSL_NAMESPACE::typed::detail {
             return {value.use.constraint_state, value.use.constraint_owner};
         return value.use;
     }
+    void require_descriptor_complete(const GraphicResource& resource) {
+        if (!resource.data_)
+            throw std::logic_error("Typed descriptor resource has been destroyed");
+        lifetime::require_descriptor_complete(*resource.data_);
+    }
     void write_descriptor(GraphicResource resource, graphic_resource::BindingPoint point, std::span<const DescriptorValue> values) {
         const auto& target = resource.data_;
         if (!target || !target->pool || !target->pool->descriptor_pool || !target->descriptor_set)
@@ -22,52 +29,42 @@ namespace VSL_NAMESPACE::typed::detail {
         const auto device = target->pool->device;
         std::vector<vk::DescriptorBufferInfo> buffers;
         std::vector<vk::DescriptorImageInfo> images;
-        std::vector<std::shared_ptr<void>> owners;
-        std::vector<impl::GraphicResourceImpl::ResourceBindingRef> resource_refs;
+        std::vector<impl::GraphicResourceImpl::BindingElement> elements;
+        elements.reserve(values.size());
         buffers.reserve(values.size());
         images.reserve(values.size());
         using enum graphic_resource::Type;
         for (const auto& value : values) {
-            if (value.use.owner.use_count())
-                owners.push_back(value.use.owner);
-            if (value.use.constraint_owner.use_count())
-                owners.push_back(value.use.constraint_owner);
+            impl::GraphicResourceImpl::BindingElement element;
+            element.constraint = descriptor_constraints(value);
             if (point.binding_type == UNIFORM_BUFFER || point.binding_type == STORAGE_BUFFER) {
-                const auto usage = point.binding_type == UNIFORM_BUFFER ? MemoryType::UNIFORM_BUFFER : MemoryType::STORAGE_BUFFER;
-                if (!value.buffer || value.buffer->device != device.get() || !contain(value.buffer->usage, usage))
+                if (!value.buffer || value.buffer->device != device.get())
                     throw std::invalid_argument("Typed descriptor buffer device/usage mismatch");
-                if (!value.bytes || value.offset > value.buffer->requirement_size || value.bytes > value.buffer->requirement_size - value.offset)
-                    throw std::out_of_range("Typed descriptor buffer range mismatch");
-                const auto limits = device->parent_device->device.getProperties().limits;
-                const auto limit = point.binding_type == UNIFORM_BUFFER ? limits.maxUniformBufferRange : limits.maxStorageBufferRange;
-                if (value.bytes > limit)
-                    throw std::out_of_range("Typed descriptor buffer exceeds the device range limit");
-                const auto alignment = point.binding_type == UNIFORM_BUFFER ? limits.minUniformBufferOffsetAlignment : limits.minStorageBufferOffsetAlignment;
-                if (alignment && value.offset % alignment)
-                    throw std::invalid_argument("Typed descriptor buffer offset violates device alignment");
+                operation::validate_descriptor_buffer(*value.buffer, vk::DescriptorType(point.binding_type), value.offset, value.bytes);
                 buffers.push_back({value.buffer->buffer, value.offset, value.bytes});
-                resource_refs.push_back({value.buffer->use, owners.size()});
-                owners.push_back(value.buffer);
+                element.states.push_back(value.buffer->use);
+                element.owners.push_back(value.buffer);
             } else {
                 vk::DescriptorImageInfo info{};
                 if (point.binding_type != SAMPLER) {
-                    const auto usage = point.binding_type == STORAGE_IMAGE ? ImageType::STORAGE : ImageType::SAMPLED;
-                    if (!value.image || value.image->device != device.get() || !contain(value.image->usage, usage))
+                    if (!value.image || value.image->device != device.get())
                         throw std::invalid_argument("Typed descriptor image device/usage mismatch");
+                    operation::validate_descriptor_image(*value.image, vk::DescriptorType(point.binding_type));
                     info.imageView = value.image->view;
                     info.imageLayout = point.binding_type == STORAGE_IMAGE ? vk::ImageLayout::eGeneral : vk::ImageLayout::eShaderReadOnlyOptimal;
-                    resource_refs.push_back({value.image->use, owners.size()});
-                    owners.push_back(value.image);
+                    element.states.push_back(value.image->use);
+                    element.owners.push_back(value.image);
                 }
                 if (point.binding_type == SAMPLER || point.binding_type == COMBINED_IMAGE_SAMPLER) {
                     if (!value.sampler || value.sampler->device != device.get())
                         throw std::invalid_argument("Typed descriptor sampler device mismatch");
                     info.sampler = value.sampler->sampler;
-                    resource_refs.push_back({value.sampler->use, owners.size()});
-                    owners.push_back(value.sampler);
+                    element.states.push_back(value.sampler->use);
+                    element.owners.push_back(value.sampler);
                 }
                 images.push_back(info);
             }
+            elements.push_back(std::move(element));
         }
         vk::WriteDescriptorSet write{};
         write.dstSet = target->descriptor_set;
@@ -76,11 +73,7 @@ namespace VSL_NAMESPACE::typed::detail {
         write.descriptorCount = point.amount;
         write.pBufferInfo = buffers.empty() ? nullptr : buffers.data();
         write.pImageInfo = images.empty() ? nullptr : images.data();
-        auto& refs = target->resource_refs.try_emplace(point.binding).first->second;
-        auto& retained = target->bindings.try_emplace(point.binding).first->second;
-        retained = std::move(owners);
-        refs = std::move(resource_refs);
-        device->device.updateDescriptorSets(write, {});
+        lifetime::write_descriptor_binding(*target, write, std::move(elements));
     }
 
     void inject_resource_schema(PipelineLayoutEditAccessor layout, std::span<const DescriptorRequirement> requirements, std::uint32_t set_count) {

@@ -1,5 +1,6 @@
 #include <VSL/lifetime/resource_use.hpp>
 #include <VSL/lifetime/submission_retention.hpp>
+#include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 #include <stdexcept>
 
@@ -63,31 +64,59 @@ namespace VSL_NAMESPACE {
     std::shared_ptr<ResourceUseGroup> ResourceUseGroup::ForDescriptor(size_t bindings, const std::shared_ptr<impl::GraphicResourceImpl>& resource, ResourceRetention retention) {
         if (!resource)
             throw std::invalid_argument("Descriptor use requires a resource");
-        auto group = std::make_shared<ResourceUseGroup>(bindings, resource);
+        if (!resource->layout || resource->layout->layout_bindings.size() != bindings)
+            throw std::invalid_argument("Descriptor use binding count mismatch");
+        auto group = std::make_shared<ResourceUseGroup>(0, resource);
         group->_resource = resource.get();
         group->_retention = retention;
         return group;
     }
     void ResourceUseGroup::require_idle() const {
-        _state.require_idle();
+        const auto owner = _owner;
+        auto* const resource = _resource;
+        if (resource) {
+            lifetime::require_descriptor_idle(*resource);
+        } else
+            _state.require_idle();
     }
     void ResourceUseGroup::replace(size_t binding, std::vector<ResourceUse> resources) {
-        require_idle();
+        const auto owner = _owner;
+        auto* const resource = _resource;
+        if (resource) {
+            lifetime::require_descriptor_idle(*resource);
+            if (!resource->layout)
+                throw std::logic_error("Descriptor layout metadata is unavailable");
+            const auto key = resource->layout->layout_bindings.at(binding).binding;
+            auto& elements = resource->bindings.at(key);
+            if (resources.size() != elements.size())
+                throw std::invalid_argument("Descriptor constraint array size mismatch");
+            auto prepared = elements;
+            for (size_t i = 0; i < resources.size(); ++i)
+                prepared[i].constraint = std::move(resources[i]);
+            elements.swap(prepared);
+            return;
+        }
+        _state.require_idle();
         _bindings.at(binding) = std::move(resources);
     }
     void ResourceUseGroup::record(const CommandBuffer& buffer) const {
+        const auto owner = _owner;
+        auto* const resource = _resource;
+        const auto retention = _retention;
         const auto completion = buffer.completion();
         if (!completion || completion.status() != Completion::Status::PENDING)
             throw std::logic_error("Tracked descriptor sets require a recording phase");
-        if (_owner.use_count()) {
-            if (_retention == ResourceRetention::COMPLETION)
-                buffer.retain_until_complete(_owner);
+        if (owner.use_count()) {
+            if (retention == ResourceRetention::COMPLETION)
+                buffer.retain_until_complete(owner);
             else
-                completion.retain(_owner);
+                completion.retain(owner);
+        }
+        if (resource) {
+            lifetime::record_descriptor_resources(*resource, buffer, retention);
+            return;
         }
         _state.mark_used(completion);
-        if (_resource)
-            lifetime::record_descriptor_resources(*_resource, buffer, _retention);
         for (const auto& binding : _bindings)
             for (const auto& resource : binding)
                 resource.record(buffer, _retention);

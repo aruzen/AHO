@@ -11,9 +11,15 @@ namespace VSL_NAMESPACE {
     }
 
     void ResourceUseState::discard_finished() const {
+        // 完了callbackは同じ状態へ再入できるため、pollとlive一覧の変更を分離する。
+        if (std::ranges::any_of(_uses, [](const auto& use) { const auto result = use.lock(); return result && result->status == Completion::Status::SUBMITTED; })) {
+            const auto observed = _uses;
+            for (const auto& use : observed)
+                (void)Completion{use.lock()}.status();
+        }
         std::erase_if(_uses, [](const auto& use) {
-            const auto status = Completion{use.lock()}.status();
-            return status == Completion::Status::COMPLETE || status == Completion::Status::CANCELLED || status == Completion::Status::FAILED;
+            const auto result = use.lock();
+            return !result || (result->status != Completion::Status::PENDING && result->status != Completion::Status::SUBMITTED);
         });
     }
     bool ResourceUseState::busy() const {
@@ -22,10 +28,11 @@ namespace VSL_NAMESPACE {
     }
     bool ResourceUseState::wait(std::uint64_t timeout) const {
         discard_finished();
-        if (std::ranges::any_of(_uses, [](const auto& use) { return Completion{use.lock()}.status() == Completion::Status::PENDING; }))
+        if (std::ranges::any_of(_uses, [](const auto& use) { const auto result = use.lock(); return result && result->status == Completion::Status::PENDING; }))
             return false;
+        const auto observed = _uses;
         const auto start = std::chrono::steady_clock::now();
-        for (const auto& use : _uses) {
+        for (const auto& use : observed) {
             const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count();
             const auto remaining = timeout == UINT64_MAX ? UINT64_MAX : (std::uint64_t(elapsed) < timeout ? timeout - std::uint64_t(elapsed) : 0);
             const auto completion = Completion{use.lock()};
@@ -33,7 +40,7 @@ namespace VSL_NAMESPACE {
                 return false;
         }
         discard_finished();
-        return true;
+        return _uses.empty();
     }
     void ResourceUseState::require_idle() const {
         if (busy())
@@ -49,8 +56,11 @@ namespace VSL_NAMESPACE {
     void ResourceUseState::mark_used(Completion completion) const {
         if (!completion || completion.status() != Completion::Status::PENDING)
             throw std::logic_error("Resource use requires a recording phase");
-        discard_finished();
         if (!std::ranges::any_of(_uses, [&](const auto& use) { return use.lock() == completion.data_; }))
             _uses.push_back(completion.data_);
+        // callback中も新しい記録が先に見えるようにする。観測失敗時も取消まで保持する。
+        discard_finished();
+        if (completion.status() != Completion::Status::PENDING)
+            throw std::logic_error("Recording phase changed while tracking a resource");
     }
 } // namespace VSL_NAMESPACE

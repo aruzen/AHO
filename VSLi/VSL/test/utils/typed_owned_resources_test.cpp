@@ -51,9 +51,10 @@ namespace {
     }
     auto FailingDescriptorManager::allocate(std::vector<vsl::graphic_resource::BindingLayout> layouts) -> std::tuple<std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>> {
         if (auto previous = _previous.lock(); fail && previous) {
-            for (const auto& [binding, owners] : previous->bindings)
-                for (const auto& owner : owners)
-                    observed.push_back(owner);
+            for (const auto& [binding, elements] : previous->bindings)
+                for (const auto& element : elements)
+                    for (const auto& owner : element.owners)
+                        observed.push_back(owner);
             throw std::runtime_error("Injected descriptor failure after the first mixed frame");
         }
         auto result = vsl::GraphicResourceManager::allocate(std::move(layouts));

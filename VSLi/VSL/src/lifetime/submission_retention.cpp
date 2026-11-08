@@ -2,12 +2,24 @@
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/sync/submission_completion.hpp>
 #include <VSL/sync/resource_use_state.hpp>
+#include <VSL/lifetime/descriptor_bindings.hpp>
 #include <algorithm>
 #include <stdexcept>
 
 namespace VSL_NAMESPACE::lifetime {
     namespace {
+        struct DescriptorRecording {
+            impl::GraphicResourceImpl& resource;
+            explicit DescriptorRecording(impl::GraphicResourceImpl& resource);
+            ~DescriptorRecording() { resource.recording = false; }
+        };
         bool contains_owner(const std::vector<std::shared_ptr<void>>& resources, const std::shared_ptr<void>& resource);
+        DescriptorRecording::DescriptorRecording(impl::GraphicResourceImpl& resource) : resource(resource) {
+            require_descriptor_valid(resource);
+            if (resource.recording)
+                throw std::logic_error("Descriptor resource is being recorded");
+            resource.recording = true;
+        }
         bool contains_owner(const std::vector<std::shared_ptr<void>>& resources, const std::shared_ptr<void>& resource) {
             return std::ranges::any_of(resources, [&](const auto& existing) {
                 return !existing.owner_before(resource) && !resource.owner_before(existing);
@@ -23,17 +35,24 @@ namespace VSL_NAMESPACE::lifetime {
         if (accepted.use_count() && !contains_owner(resources, accepted))
             resources.push_back(std::move(accepted));
     }
-    void record_descriptor_resources(const impl::GraphicResourceImpl& resource, const CommandBuffer& buffer, ResourceRetention retention) {
+    void record_descriptor_resources(impl::GraphicResourceImpl& resource, const CommandBuffer& buffer, ResourceRetention retention) {
+        const DescriptorRecording recording(resource);
         const auto completion = buffer.completion();
-        for (const auto& [binding, refs] : resource.resource_refs)
-            for (const auto& ref : refs) {
-                const auto& owner = resource.bindings.at(binding).at(ref.owner_index);
-                if (retention == ResourceRetention::COMPLETION)
-                    buffer.retain_until_complete(owner);
-                else
-                    buffer.retain(owner);
-                ref.state->mark_used(completion);
+        resource.use.mark_used(completion);
+        for (const auto& [binding, elements] : resource.bindings)
+            for (const auto& element : elements) {
+                for (const auto& owner : element.owners)
+                    if (retention == ResourceRetention::COMPLETION)
+                        buffer.retain_until_complete(owner);
+                    else
+                        buffer.retain(owner);
+                for (const auto* state : element.states)
+                    state->mark_used(completion);
+                element.constraint.record(buffer, retention);
             }
+        if (buffer.completion().data_ != completion.data_ || completion.status() != Completion::Status::PENDING)
+            throw std::logic_error("Recording phase changed while tracking a descriptor");
+        require_descriptor_valid(resource);
     }
     void release_completed_resources(impl::SubmissionWork& submission) noexcept {
         submission.release_resources = nullptr;

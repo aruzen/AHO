@@ -20,6 +20,7 @@ namespace VSL_NAMESPACE::typed {
             ResourceUse use;
         };
         ResourceUse descriptor_constraints(const DescriptorValue& value);
+        void require_descriptor_complete(const GraphicResource& resource);
         void write_descriptor(GraphicResource resource, graphic_resource::BindingPoint point, std::span<const DescriptorValue> values);
         template<typename Binding, typename Value>
         consteval bool descriptor_matches();
@@ -112,7 +113,6 @@ namespace VSL_NAMESPACE::typed {
     template<typename Spec_>
     class TypedDescriptorSet {
         GraphicResource _resource;
-        std::shared_ptr<std::array<bool, Spec_::BINDING_COUNT>> _initialized;
         LogicalDeviceAccessor _device;
         std::shared_ptr<ResourceUseGroup> _use;
 
@@ -210,7 +210,7 @@ namespace VSL_NAMESPACE::typed {
     }
     template<typename Spec>
     TypedDescriptorSet<Spec>::TypedDescriptorSet(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, ResourceRetention retention)
-        : _initialized(std::make_shared<std::array<bool, Spec::BINDING_COUNT>>()), _device(device) {
+        : _device(device) {
         graphic_resource::BindingLayout layout(device, std::vector<graphic_resource::BindingPoint>(Spec::POINTS.begin(), Spec::POINTS.end()));
         auto [pools, resources] = manager.allocate({layout});
         if (resources.size() != 1)
@@ -220,34 +220,22 @@ namespace VSL_NAMESPACE::typed {
     }
     template<typename Spec>
     void TypedDescriptorSet<Spec>::require_complete() const {
-        if (!std::ranges::all_of(*_initialized, [](bool value) { return value; }))
-            throw std::logic_error("Typed descriptor set has uninitialized bindings");
+        detail::require_descriptor_complete(_resource);
     }
     template<typename Spec_>
     template<std::uint32_t binding, typename Value>
     requires(detail::descriptor_matches<typename Spec_::template Binding<binding>, Value>() && Spec_::template Binding<binding>::POINT.amount == 1)
     void TypedDescriptorSet<Spec_>::write(const Value& value) {
-        _use->require_idle();
         const auto descriptor = value.descriptor();
-        std::vector<ResourceUse> uses{detail::descriptor_constraints(descriptor)};
         detail::write_descriptor(_resource, Spec::template Binding<binding>::POINT, std::span(&descriptor, 1));
-        _use->replace(Spec::BindingIndex(binding), std::move(uses));
-        (*_initialized)[Spec::BindingIndex(binding)] = true;
     }
     template<typename Spec_>
     template<std::uint32_t binding, typename Value, size_t count>
     requires(detail::descriptor_matches<typename Spec_::template Binding<binding>, Value>() && Spec_::template Binding<binding>::POINT.amount == count)
     void TypedDescriptorSet<Spec_>::write(const std::array<Value, count>& values) {
-        _use->require_idle();
         std::array<detail::DescriptorValue, count> descriptors{};
-        std::vector<ResourceUse> uses;
-        uses.reserve(count);
-        for (size_t i = 0; i < count; ++i) {
+        for (size_t i = 0; i < count; ++i)
             descriptors[i] = values[i].descriptor();
-            uses.push_back(detail::descriptor_constraints(descriptors[i]));
-        }
         detail::write_descriptor(_resource, Spec::template Binding<binding>::POINT, descriptors);
-        _use->replace(Spec::BindingIndex(binding), std::move(uses));
-        (*_initialized)[Spec::BindingIndex(binding)] = true;
     }
 } // namespace VSL_NAMESPACE::typed

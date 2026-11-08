@@ -20,5 +20,6 @@
 - [Buffer／Image／Samplerを同じ領域へ構築するResourceArena](VSL/resource-arena.md)
 - [Typed schema／bundleによるImage／Samplerの配置とcomponent共有](VSL/typed-owned-resources.md)
 - [Completionの結果とin-flight所有・失敗／取消の接続](VSL/completion-ownership.md)
+- [Descriptorの共通使用状態と配列要素ごとの所有・更新](VSL/descriptor-state.md)
 - [AHO Bufferのsnapshot・固定import・可変arena世代](AHO/arena-buffer.md)
 - [Image／Samplerの共通backend・所有・使用状態](VSL/image-sampler-backend.md)

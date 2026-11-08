@@ -1,5 +1,6 @@
 #ifdef AHO_GPU_TESTS
 #include <AHO/resource/typed_buffer.hpp>
+#include <AHO/resource/arena_buffer.hpp>
 #include <AHO/x/resource/typed_texture.hpp>
 #include <AHO/command/buffer_upload.hpp>
 #include <AHO/x/command/texture_update.hpp>
@@ -191,6 +192,40 @@ namespace {
         EXPECT_EQ(*static_cast<const std::uint32_t*>(mapped.data), value);
         EXPECT_FALSE(input.busy());
         EXPECT_NO_THROW(input.write({}));
+    }
+    TEST_F(TypedAHOBufferVulkanIntegrationTest, ArenaDescriptorBundleKeepsOldAHOStorageAndItsLogicalUpdateConstraint) {
+        using Allocation = t::ResourceAllocationSchema<Schema, t::ExternalAllocation<0, 0>, t::BufferAllocation<0, 1>>;
+        auto verify = [&](auto input) {
+            const std::uint32_t value = 53;
+            input.write(std::as_bytes(std::span(&value, 1)));
+            const auto view = r::uniform_view<std::uint32_t>(input);
+            input.reserve(64);
+            const auto current = input.binding().snapshot();
+            auto manager = make_manager().independent(1);
+            vsl::GraphicResourceManager descriptors(device);
+            t::TypedResourceBundle<Allocation, t::ArenaStorage<>> bundle(manager, descriptors, t::external_resource<0, 0>(view));
+            vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_frame.comp.spv"));
+            t::TypedComputePipeline<Schema> pipeline(device, vsl::pipeline_layout::ShaderGroup("AHO arena external", {shader}));
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            const auto& frame = bundle.get(phase);
+            phase << frame.bind_resources(pipeline).dispatch(1);
+            EXPECT_TRUE(input.busy());
+            EXPECT_FALSE(current.storage().ref().use().busy());
+            EXPECT_THROW(input.write({}), std::logic_error);
+            EXPECT_THROW(input.reserve(128), std::logic_error);
+            auto buffer = manager.get_buffer();
+            const vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
+            buffer.data_->command_buffers[0].pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            ASSERT_TRUE(phase.completion().wait());
+            std::uint32_t actual = 0;
+            frame.buffer<0, 1>().read_into(std::span(&actual, 1));
+            EXPECT_EQ(actual, value);
+            EXPECT_FALSE(input.busy());
+            EXPECT_NO_THROW(input.reserve(128));
+        };
+        verify(Host(device, sizeof(std::uint32_t)));
+        verify(r::make_arena_buffer(device, sizeof(std::uint32_t)));
     }
 
     TEST_F(TypedAHOBufferVulkanIntegrationTest, UploadedDeviceVerticesCanBeSlicedAndDrawnWithTypedIndices) {

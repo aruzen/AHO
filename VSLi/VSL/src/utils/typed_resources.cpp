@@ -15,10 +15,13 @@ namespace VSL_NAMESPACE::typed::detail {
         return lifetime::detail::owned_ref(sampler.data_, sampler.data_ ? sampler.data_->owner_node : nullptr);
     }
     ResourceUse descriptor_constraints(const DescriptorValue& value) {
-        const auto* physical = value.use.state.get();
-        if ((value.buffer && physical == value.buffer->use) ||
-            (value.image && physical == value.image->use) ||
-            (value.sampler && physical == value.sampler->use))
+        const auto matches = [&](const auto& owner) {
+            if (!owner || !value.use.state.use_count() || value.use.state.get() != owner->use)
+                return false;
+            const auto same = [&](const auto& other) { return !owner.owner_before(other) && !other.owner_before(owner); };
+            return same(value.use.state) && (!value.use.owner.use_count() || same(value.use.owner));
+        };
+        if (matches(value.buffer) || matches(value.image) || matches(value.sampler))
             return {value.use.constraint_state, value.use.constraint_owner};
         return value.use;
     }

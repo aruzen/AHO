@@ -110,10 +110,10 @@ namespace VSL_NAMESPACE::typed {
     template<typename Schema, typename StoragePolicy>
     TypedResourceFrame<Schema, StoragePolicy>::TypedResourceFrame(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager,
                                                                   std::shared_ptr<detail::BundleSharedState<Schema, StoragePolicy>> shared, const ResourceAllocationPlan<Schema>& plan, size_t instance)
-        : _shared(std::move(shared)), _arena(detail::make_bundle_arena<ResourceScope::PER_FRAME, Schema, StoragePolicy>(device, plan, instance)),
+        : _shared(std::move(shared)), _arena(detail::make_bundle_arena<ResourceScope::PER_FRAME, Schema, StoragePolicy>(device, plan, instance, _shared->arena ? &*_shared->arena : nullptr)),
           _native(detail::make_bundle_native<ResourceScope::PER_FRAME, Schema, StoragePolicy>(device, plan)),
           _resources(detail::make_bundle_storage<ResourceScope::PER_FRAME, Schema, StoragePolicy>(device, plan, std::tuple<>{}, _arena ? &*_arena : nullptr, _native, *_shared)),
-          _sets(detail::make_bundle_sets<Schema, StoragePolicy>(device, manager, _resources, *_shared)) {}
+          _sets(detail::make_bundle_sets<Schema, StoragePolicy>(device, manager, _resources, *_shared, _arena ? &*_arena : nullptr)) {}
 
     template<typename Schema, typename StoragePolicy>
     template<std::uint32_t set, std::uint32_t binding, size_t element>

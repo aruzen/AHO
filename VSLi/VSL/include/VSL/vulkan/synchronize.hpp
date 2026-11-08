@@ -7,18 +7,25 @@
 #include <optional>
 
 #include "device.hpp"
+#include "../operation/synchronization_create_info.hpp"
+#include "../lifetime/owner_ref.hpp"
 
 namespace VSL_NAMESPACE {
     struct SemaphoreHolder {
         std::shared_ptr<impl::SemaphoreImpl> data_;
 
         std::size_t size() const;
+        LogicalDeviceAccessor get_device() const;
+        lifetime::OwnerRef owner_ref() const;
         void destroy();
     };
 
     struct FenceHolder {
         std::shared_ptr<impl::FenceImpl> data_;
 
+        std::size_t size() const;
+        LogicalDeviceAccessor get_device() const;
+        lifetime::OwnerRef owner_ref() const;
         bool wait(std::uint64_t timeout_ns = UINT64_MAX);
         bool wait(std::uint32_t target_idx, std::uint64_t timeout_ns = UINT64_MAX);
         void reset();

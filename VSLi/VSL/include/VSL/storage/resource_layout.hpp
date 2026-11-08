@@ -57,6 +57,14 @@ namespace VSL_NAMESPACE::storage {
     struct ImplLayout<impl::CommandBufferImpl> {
         static constexpr size_t SIZE = COMMAND_BUFFER_IMPL_SIZE, ALIGNMENT = COMMAND_BUFFER_IMPL_ALIGNMENT;
     };
+    template<>
+    struct ImplLayout<impl::SemaphoreImpl> {
+        static constexpr size_t SIZE = SEMAPHORE_IMPL_SIZE, ALIGNMENT = SEMAPHORE_IMPL_ALIGNMENT;
+    };
+    template<>
+    struct ImplLayout<impl::FenceImpl> {
+        static constexpr size_t SIZE = FENCE_IMPL_SIZE, ALIGNMENT = FENCE_IMPL_ALIGNMENT;
+    };
     inline constexpr size_t NO_SEPARATE_USE = std::numeric_limits<size_t>::max();
     template<typename Impl>
     struct ResourceSlotLayout {
@@ -105,6 +113,14 @@ namespace VSL_NAMESPACE::storage {
     struct ResourceSlotLayout<impl::CommandBufferImpl> {
         static constexpr size_t SIZE = COMMAND_BUFFER_SLOT_SIZE, ALIGNMENT = COMMAND_BUFFER_SLOT_ALIGNMENT, USE_OFFSET = NO_SEPARATE_USE;
     };
+    template<>
+    struct ResourceSlotLayout<impl::SemaphoreImpl> {
+        static constexpr size_t SIZE = SEMAPHORE_SLOT_SIZE, ALIGNMENT = SEMAPHORE_SLOT_ALIGNMENT, USE_OFFSET = NO_SEPARATE_USE;
+    };
+    template<>
+    struct ResourceSlotLayout<impl::FenceImpl> {
+        static constexpr size_t SIZE = FENCE_SLOT_SIZE, ALIGNMENT = FENCE_SLOT_ALIGNMENT, USE_OFFSET = NO_SEPARATE_USE;
+    };
     enum class ResourceKind : std::uint32_t {
         BUFFER,
         IMAGE,
@@ -118,7 +134,9 @@ namespace VSL_NAMESPACE::storage {
         PIPELINE,
         FRAME_BUFFER,
         COMMAND_POOL,
-        COMMAND_BUFFER
+        COMMAND_BUFFER,
+        SEMAPHORE,
+        FENCE
     };
     struct SlotLayout {
         size_t size, alignment, use_offset;
@@ -170,6 +188,10 @@ namespace VSL_NAMESPACE::storage {
                 return {CommandPool::SIZE, CommandPool::ALIGNMENT, CommandPool::USE_OFFSET};
             case ResourceKind::COMMAND_BUFFER:
                 return {CommandBuffer::SIZE, CommandBuffer::ALIGNMENT, CommandBuffer::USE_OFFSET};
+            case ResourceKind::SEMAPHORE:
+                return {ResourceSlotLayout<impl::SemaphoreImpl>::SIZE, ResourceSlotLayout<impl::SemaphoreImpl>::ALIGNMENT, NO_SEPARATE_USE};
+            case ResourceKind::FENCE:
+                return {ResourceSlotLayout<impl::FenceImpl>::SIZE, ResourceSlotLayout<impl::FenceImpl>::ALIGNMENT, NO_SEPARATE_USE};
         }
         throw std::invalid_argument("Unknown resource implementation kind");
     }

@@ -95,11 +95,11 @@ namespace VSL_NAMESPACE {
                                         : (calculation_finish ? calculation_finish->data_ : nullptr);
         const auto external = inherited ? synchronization_owner(*inherited, impl::SubmissionSource::FENCE, inherited->external_fence)
                                         : (in_flight_fence ? in_flight_fence->data_ : nullptr);
-        if ((!inherited && next_image_available && !available) || (available && available->device != manager_data->device))
+        if ((!inherited && next_image_available && !available) || (available && available->device != manager_data->device.get()))
             throw std::invalid_argument("Acquire semaphore device mismatch");
-        if ((!inherited && calculation_finish && !finished) || (finished && finished->device != manager_data->device))
+        if ((!inherited && calculation_finish && !finished) || (finished && finished->device != manager_data->device.get()))
             throw std::invalid_argument("Signal semaphore device mismatch");
-        if ((!inherited && in_flight_fence && !external) || (external && external->device != manager_data->device))
+        if ((!inherited && in_flight_fence && !external) || (external && external->device != manager_data->device.get()))
             throw std::invalid_argument("Completion fence device mismatch");
         frame_slot = buffers->current_buffer_idx;
         signal_index = frame_slot;

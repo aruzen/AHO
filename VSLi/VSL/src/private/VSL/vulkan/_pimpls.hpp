@@ -40,6 +40,7 @@ namespace VSL_NAMESPACE {
         struct CommandDomain;
         struct CommandRecordingContext;
         struct CommandBufferOwnerContext;
+        struct SynchronizationOwnerContext;
     } // namespace lifetime
     namespace graphic_resource {
         struct ManagerInterface;
@@ -285,22 +286,34 @@ namespace VSL_NAMESPACE::impl {
 
     struct SynchroManagerImpl;
     struct SemaphoreImpl {
-        std::weak_ptr<SemaphoreImpl> owner;
-        std::weak_ptr<SynchroManagerImpl> manager;
-        std::shared_ptr<LogicalDeviceImpl> device;
+        lifetime::DependencyNode* owner_node = nullptr;
+        LogicalDeviceImpl* device = nullptr;
+        vk::Device native_device;
+        lifetime::SynchronizationOwnerContext* owner_context = nullptr;
 
         std::vector<vk::Semaphore> semaphores;
         sync::SemaphoreUseState use;
+        SemaphoreImpl() = default;
+        SemaphoreImpl(const SemaphoreImpl&) = delete;
+        SemaphoreImpl& operator=(const SemaphoreImpl&) = delete;
+        SemaphoreImpl(SemaphoreImpl&&) = delete;
+        SemaphoreImpl& operator=(SemaphoreImpl&&) = delete;
         ~SemaphoreImpl();
     };
 
     struct FenceImpl {
-        std::weak_ptr<FenceImpl> owner;
-        std::weak_ptr<SynchroManagerImpl> manager;
-        std::shared_ptr<LogicalDeviceImpl> device;
+        lifetime::DependencyNode* owner_node = nullptr;
+        LogicalDeviceImpl* device = nullptr;
+        vk::Device native_device;
+        lifetime::SynchronizationOwnerContext* owner_context = nullptr;
 
         std::vector<vk::Fence> fences;
         std::vector<sync::FenceUseState> uses;
+        FenceImpl() = default;
+        FenceImpl(const FenceImpl&) = delete;
+        FenceImpl& operator=(const FenceImpl&) = delete;
+        FenceImpl(FenceImpl&&) = delete;
+        FenceImpl& operator=(FenceImpl&&) = delete;
         ~FenceImpl();
     };
 

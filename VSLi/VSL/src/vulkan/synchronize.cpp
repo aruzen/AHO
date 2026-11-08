@@ -1,21 +1,39 @@
 #include <VSL/vulkan/synchronize.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/lifetime/synchronization_use.hpp>
-#include <VSL/operation/synchronization_ops.hpp>
+#include <VSL/lifetime/synchronization_storage.hpp>
+#include <VSL/lifetime/owner_access.hpp>
 #include <stdexcept>
 
 namespace VSL_NAMESPACE {
-    impl::SemaphoreImpl::~SemaphoreImpl() {
-        if (!semaphores.empty())
-            operation::destroy_semaphores(device->device, semaphores);
-    }
-    impl::FenceImpl::~FenceImpl() {
-        if (!fences.empty())
-            operation::destroy_fences(device->device, fences);
-    }
     impl::SynchroManagerImpl::~SynchroManagerImpl() = default;
     std::size_t SemaphoreHolder::size() const {
         return data_ ? data_->semaphores.size() : 0;
+    }
+    lifetime::OwnerRef SemaphoreHolder::owner_ref() const {
+        if (!data_ || !data_.use_count() || !data_->owner_node || !data_->owner_node->matches(data_))
+            throw std::invalid_argument("Semaphore requires its canonical owner");
+        return data_->owner_node->ref(data_);
+    }
+    LogicalDeviceAccessor SemaphoreHolder::get_device() const {
+        (void)owner_ref();
+        if (!data_->device || !data_->native_device || data_->semaphores.empty())
+            throw std::invalid_argument("Semaphore has been destroyed");
+        return {data_->device->shared_from_this()};
+    }
+    std::size_t FenceHolder::size() const {
+        return data_ ? data_->fences.size() : 0;
+    }
+    lifetime::OwnerRef FenceHolder::owner_ref() const {
+        if (!data_ || !data_.use_count() || !data_->owner_node || !data_->owner_node->matches(data_))
+            throw std::invalid_argument("Fence requires its canonical owner");
+        return data_->owner_node->ref(data_);
+    }
+    LogicalDeviceAccessor FenceHolder::get_device() const {
+        (void)owner_ref();
+        if (!data_->device || !data_->native_device || data_->fences.empty())
+            throw std::invalid_argument("Fence has been destroyed");
+        return {data_->device->shared_from_this()};
     }
     void SemaphoreHolder::destroy() {
         lifetime::destroy_semaphores(data_);
@@ -48,11 +66,8 @@ namespace VSL_NAMESPACE {
         const auto registry = data_;
         if (!registry || !registry->device)
             throw std::invalid_argument("Synchronization manager is empty");
-        auto data = std::make_shared<impl::SemaphoreImpl>();
-        data->manager = registry;
-        data->device = registry->device;
-        data->semaphores = operation::create_semaphores(data->device->device, amount);
-        data->owner = data;
+        auto data = lifetime::make_heap_semaphore({registry->device}, {amount});
+        data->owner_context->registry = registry;
         registry->semaphores[std::move(name)] = data;
         return {std::move(data)};
     }
@@ -63,13 +78,8 @@ namespace VSL_NAMESPACE {
         const auto registry = data_;
         if (!registry || !registry->device)
             throw std::invalid_argument("Synchronization manager is empty");
-        operation::validate_synchronization_count(registry->device->device, amount);
-        auto data = std::make_shared<impl::FenceImpl>();
-        data->manager = registry;
-        data->device = registry->device;
-        data->uses.resize(amount);
-        data->fences = operation::create_fences(data->device->device, amount, signal);
-        data->owner = data;
+        auto data = lifetime::make_heap_fence({registry->device}, {amount, signal});
+        data->owner_context->registry = registry;
         registry->fences[std::move(name)] = data;
         return {std::move(data)};
     }

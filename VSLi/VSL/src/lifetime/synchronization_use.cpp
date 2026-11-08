@@ -1,4 +1,6 @@
 #include <VSL/lifetime/synchronization_use.hpp>
+#include <VSL/lifetime/synchronization_storage.hpp>
+#include <VSL/vulkan/synchronize.hpp>
 #include <VSL/operation/synchronization_ops.hpp>
 #include <VSL/sync/submission_completion.hpp>
 #include <algorithm>
@@ -38,9 +40,7 @@ namespace VSL_NAMESPACE::lifetime {
         FenceAccess::FenceAccess(std::shared_ptr<impl::FenceImpl> data, std::optional<std::uint32_t> index) : data(std::move(data)) {
             if (!this->data || this->data->fences.empty() || this->data->uses.size() != this->data->fences.size())
                 throw std::logic_error("Fence has been destroyed or its state is invalid");
-            const auto canonical = this->data->owner.lock();
-            if (!canonical || canonical.owner_before(this->data) || this->data.owner_before(canonical))
-                throw std::invalid_argument("Fence requires its canonical owner");
+            (void)FenceHolder{this->data}.owner_ref();
             if (index && *index >= this->data->fences.size())
                 throw std::out_of_range("Fence index");
             first = index.value_or(0);
@@ -92,9 +92,7 @@ namespace VSL_NAMESPACE::lifetime {
         }
     } // namespace
     void require_semaphore_owner(const std::shared_ptr<impl::SemaphoreImpl>& semaphore) {
-        const auto owner = semaphore ? semaphore->owner.lock() : nullptr;
-        if (!owner || owner.owner_before(semaphore) || semaphore.owner_before(owner))
-            throw std::invalid_argument("Semaphore requires its canonical owner");
+        (void)SemaphoreHolder{semaphore}.owner_ref();
     }
     std::shared_ptr<sync::FenceReservation> reserve_fence(std::shared_ptr<impl::FenceImpl> fence, std::uint32_t index,
                                                           const std::shared_ptr<impl::SubmissionImpl>& result) {
@@ -119,7 +117,7 @@ namespace VSL_NAMESPACE::lifetime {
     bool wait_fences(std::shared_ptr<impl::FenceImpl> fence, std::optional<std::uint32_t> index, std::uint64_t timeout) {
         const FenceAccess access(std::move(fence), index);
         access.require_waitable();
-        const auto result = operation::wait_fences(access.data->device->device, access.handles, timeout);
+        const auto result = operation::wait_fences(access.data->native_device, access.handles, timeout);
         if (result == vk::Result::eTimeout)
             return false;
         if (result == vk::Result::eErrorDeviceLost)
@@ -136,15 +134,15 @@ namespace VSL_NAMESPACE::lifetime {
     void reset_fences(std::shared_ptr<impl::FenceImpl> fence, std::optional<std::uint32_t> index) {
         const FenceAccess access(std::move(fence), index);
         access.require_idle(false);
-        operation::reset_fences(access.data->device->device, access.handles);
+        operation::reset_fences(access.data->native_device, access.handles);
     }
     void destroy_fences(std::shared_ptr<impl::FenceImpl> fence) {
         if (!fence || fence->fences.empty())
             return;
-        const auto registry = fence->manager.lock();
+        const auto registry = fence->owner_context ? fence->owner_context->registry.lock() : nullptr;
         const FenceAccess access(fence, std::nullopt);
         access.require_idle(false);
-        operation::destroy_fences(fence->device->device, access.handles);
+        operation::destroy_fences(fence->native_device, access.handles);
         fence->fences.clear();
         for (auto& use : fence->uses) {
             use.reservation.reset();
@@ -157,13 +155,13 @@ namespace VSL_NAMESPACE::lifetime {
         if (!semaphore || semaphore->semaphores.empty())
             return;
         require_semaphore_owner(semaphore);
-        const auto registry = semaphore->manager.lock();
+        const auto registry = semaphore->owner_context ? semaphore->owner_context->registry.lock() : nullptr;
         const auto handles = semaphore->semaphores;
         const SemaphoreAccess access(semaphore->use);
         sync::require_semaphore_idle(semaphore->use);
         if (semaphore->semaphores != handles)
             throw std::logic_error("Semaphore storage changed while observing completion");
-        operation::destroy_semaphores(semaphore->device->device, handles);
+        operation::destroy_semaphores(semaphore->native_device, handles);
         semaphore->semaphores.clear();
         semaphore->use.graphics.clear();
         semaphore->use.wsi.clear();

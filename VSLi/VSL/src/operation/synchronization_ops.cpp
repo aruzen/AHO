@@ -3,6 +3,22 @@
 #include <stdexcept>
 
 namespace VSL_NAMESPACE::operation {
+    void initialize_semaphore(impl::SemaphoreImpl& semaphore, impl::LogicalDeviceImpl& device, SemaphoreCreateInfo info) {
+        if (!semaphore.semaphores.empty())
+            throw std::logic_error("Semaphore is already initialized");
+        semaphore.device = &device;
+        semaphore.native_device = device.device;
+        semaphore.semaphores = create_semaphores(device.device, info.count);
+    }
+    void initialize_fence(impl::FenceImpl& fence, impl::LogicalDeviceImpl& device, FenceCreateInfo info) {
+        if (!fence.fences.empty())
+            throw std::logic_error("Fence is already initialized");
+        validate_synchronization_count(device.device, info.count);
+        fence.device = &device;
+        fence.native_device = device.device;
+        fence.uses.resize(info.count);
+        fence.fences = create_fences(device.device, info.count, info.signaled);
+    }
     void validate_synchronization_count(vk::Device device, size_t count) {
         if (!device || !count || count > std::numeric_limits<std::uint32_t>::max())
             throw std::invalid_argument("Synchronization array requires a device and a positive uint32 count");

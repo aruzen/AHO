@@ -23,7 +23,7 @@ namespace {
         void TearDown() override;
     };
     SubmittedFence::SubmittedFence(vsl::FenceHolder fence, std::uint32_t index) : work(std::make_shared<vsl::impl::SubmissionWork>()) {
-        work->device = fence.data_->device;
+        work->device = fence.get_device().data_;
         work->external_fence = fence.data_.get();
         work->resources.push_back(fence.data_);
         work->synchronization_owners[static_cast<size_t>(vsl::impl::SubmissionSource::FENCE)] = 0;

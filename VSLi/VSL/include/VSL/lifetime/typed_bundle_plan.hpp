@@ -1,58 +1,119 @@
 #pragma once
 #include "typed_buffer_arena.hpp"
+#include "resource_plan.hpp"
 #include "../utils/typed_resource_allocation.hpp"
 #include <algorithm>
+#include <variant>
 
 namespace VSL_NAMESPACE::typed {
     struct HeapStorage {};
-    template<typename Bindings_ = BufferBindingMap<>>
+    template<typename Bindings_ = ResourceBindingMap<>>
     struct ArenaStorage {
         using Bindings = Bindings_;
     };
 
-    struct BundleBufferPlacement {
+    using BundleResourceInit = std::variant<BufferCreateInfo, ImageCreateInfo, SamplerCreateInfo>;
+    struct BundleResourcePlacement {
         BindingKey binding;
         ResourceId resource;
         ResourceScope scope;
         bool external;
         size_t slot;
+        ResourceComponent component;
+        storage::ResourceKind kind;
+        size_t offset;
     };
+    using BundleBufferPlacement = BundleResourcePlacement;
+    namespace detail {
+        struct BundleBindingKey {
+            BindingKey binding;
+            ResourceComponent component;
+            constexpr bool operator==(const BundleBindingKey&) const = default;
+        };
+        constexpr bool bundle_info_equal(const BundleResourceInit& a, const BundleResourceInit& b);
+    } // namespace detail
 
-    // binding一覧と、寿命群ごとの重複を除いた物理配置を分ける。
-    template<typename Schema, typename Bindings = BufferBindingMap<>>
+    // binding/componentからIDへの接続と、寿命群ごとの物理配置を分ける。
+    template<typename Schema, typename Bindings = ResourceBindingMap<>>
     class TypedBundlePlan {
         static consteval size_t BindingCount();
         template<size_t first, size_t second>
         static consteval bool SamePayload();
         static constexpr ResourceId Identity(size_t index);
         static constexpr auto KEYS = [] {
-            std::array<BindingKey, BindingCount()> keys{};
+            std::array<detail::BundleBindingKey, BindingCount()> keys{};
             size_t index = 0;
             for (const auto& entry : Schema::ENTRIES)
-                for (size_t element = 0; element < entry.descriptors; ++element)
-                    keys[index++] = {entry.set, entry.binding, element};
+                for (size_t element = 0; element < entry.descriptors; ++element) {
+                    if (entry.allocation == AllocationKind::TEXTURE) {
+                        keys[index++] = {{entry.set, entry.binding, element}, ResourceComponent::IMAGE};
+                        keys[index++] = {{entry.set, entry.binding, element}, ResourceComponent::SAMPLER};
+                    } else
+                        keys[index++] = {{entry.set, entry.binding, element}, ResourceComponent::PRIMARY};
+                }
             return keys;
         }();
-        std::array<BundleBufferPlacement, BindingCount()> _placements{};
-        std::array<BufferCreateInfo, BindingCount()> _shared{}, _frame{};
-        size_t _shared_count = 0, _frame_count = 0;
+        std::array<BundleResourcePlacement, BindingCount()> _placements{};
+        std::array<std::array<ResourceRequest, BindingCount()>, 2> _requests{};
+        std::array<std::array<BundleResourceInit, BindingCount()>, 2> _infos{};
+        // 旧Buffer専用の計画参照を維持する移行用の一覧。
+        std::array<std::array<BufferCreateInfo, BindingCount()>, 2> _buffers{};
+        std::array<size_t, 2> _counts{}, _buffer_counts{};
         size_t _frames;
+        static constexpr size_t ScopeIndex(ResourceScope scope);
 
     public:
+        static constexpr size_t CAPACITY = BindingCount();
         constexpr explicit TypedBundlePlan(const ResourceAllocationPlan<Schema>& plan);
-        constexpr const auto& placements() const { return _placements; }
-        constexpr std::span<const BufferCreateInfo> buffers(ResourceScope scope) const;
-        constexpr size_t bytes(ResourceScope scope) const { return storage::BufferLayout::Bytes(buffers(scope).size()); }
-        constexpr size_t alignment(ResourceScope scope) const { return buffers(scope).empty() ? 1 : storage::BufferLayout::ALIGNMENT; }
+        constexpr const auto& placements() const& { return _placements; }
+        constexpr const auto& placements() const&& = delete;
+        constexpr std::span<const BundleResourceInit> resources(ResourceScope scope) const& {
+            const auto i = ScopeIndex(scope);
+            return {_infos[i].data(), _counts[i]};
+        }
+        constexpr std::span<const BundleResourceInit> resources(ResourceScope scope) const&& = delete;
+        constexpr ResourcePlan<CAPACITY> resource_plan(ResourceScope scope, size_t instance = 0) const;
+        constexpr std::span<const BufferCreateInfo> buffers(ResourceScope scope) const& {
+            const auto i = ScopeIndex(scope);
+            return {_buffers[i].data(), _buffer_counts[i]};
+        }
+        constexpr std::span<const BufferCreateInfo> buffers(ResourceScope scope) const&& = delete;
+        constexpr size_t bytes(ResourceScope scope) const { return resource_plan(scope).bytes(); }
+        constexpr size_t alignment(ResourceScope scope) const { return resource_plan(scope).alignment(); }
         constexpr size_t total_bytes() const { return detail::allocation_add(bytes(ResourceScope::SHARED), detail::allocation_multiply(bytes(ResourceScope::PER_FRAME), _frames)); }
-        constexpr const BundleBufferPlacement& placement(BindingKey key) const;
+        constexpr BundleResourcePlacement placement(BindingKey key, ResourceComponent component = ResourceComponent::PRIMARY) const;
     };
 
+    namespace detail {
+        constexpr bool bundle_info_equal(const BundleResourceInit& a, const BundleResourceInit& b) {
+            if (a.index() != b.index())
+                return false;
+            if (const auto* x = std::get_if<BufferCreateInfo>(&a)) {
+                const auto& y = std::get<BufferCreateInfo>(b);
+                return x->bytes == y.bytes && x->usage == y.usage && x->properties == y.properties && x->sharing == y.sharing;
+            }
+            if (const auto* x = std::get_if<ImageCreateInfo>(&a)) {
+                const auto& y = std::get<ImageCreateInfo>(b);
+                return x->usage == y.usage && x->width == y.width && x->height == y.height && x->format == y.format && x->layers == y.layers && x->samples == y.samples && x->properties == y.properties && x->initial_layout == y.initial_layout;
+            }
+            const auto& x = std::get<SamplerCreateInfo>(a);
+            const auto& y = std::get<SamplerCreateInfo>(b);
+            return x.sampling == y.sampling && x.edge == y.edge;
+        }
+    } // namespace detail
+    template<typename Schema, typename Bindings>
+    constexpr size_t TypedBundlePlan<Schema, Bindings>::ScopeIndex(ResourceScope scope) {
+        if (scope == ResourceScope::SHARED)
+            return 0;
+        if (scope == ResourceScope::PER_FRAME)
+            return 1;
+        throw std::invalid_argument("Unknown resource scope");
+    }
     template<typename Schema, typename Bindings>
     consteval size_t TypedBundlePlan<Schema, Bindings>::BindingCount() {
         size_t count = 0;
         for (const auto& entry : Schema::ENTRIES)
-            count = detail::allocation_add(count, entry.descriptors);
+            count = detail::allocation_add(count, detail::allocation_multiply(entry.descriptors, entry.allocation == AllocationKind::TEXTURE ? 2 : 1));
         return count;
     }
     template<typename Schema, typename Bindings>
@@ -64,15 +125,15 @@ namespace VSL_NAMESPACE::typed {
     }
     template<typename Schema, typename Bindings>
     constexpr ResourceId TypedBundlePlan<Schema, Bindings>::Identity(size_t index) {
+        auto mapped = [](size_t i, size_t j) { return Bindings::KEYS[i] == KEYS[j].binding && Bindings::COMPONENTS[i] == KEYS[j].component; };
         for (size_t i = 0; i < Bindings::KEYS.size(); ++i)
-            if (Bindings::KEYS[i] == KEYS[index])
+            if (mapped(i, index))
                 return Bindings::RESOURCES[i];
-        // 自動IDは明示IDと衝突しない、宣言順の空き番号を使う。
         std::uint64_t id = 0;
         for (size_t current = 0; current <= index; ++current) {
             bool explicit_id = false;
-            for (const auto key : Bindings::KEYS)
-                explicit_id |= key == KEYS[current];
+            for (size_t i = 0; i < Bindings::KEYS.size(); ++i)
+                explicit_id |= mapped(i, current);
             if (explicit_id)
                 continue;
             while (std::ranges::find(Bindings::RESOURCES, ResourceId{id}) != Bindings::RESOURCES.end()) {
@@ -89,8 +150,7 @@ namespace VSL_NAMESPACE::typed {
         throw std::logic_error("Missing resource identity");
     }
     template<typename Schema, typename Bindings>
-    constexpr TypedBundlePlan<Schema, Bindings>::TypedBundlePlan(const ResourceAllocationPlan<Schema>& plan)
-        : _frames(plan.frame_count()) {
+    constexpr TypedBundlePlan<Schema, Bindings>::TypedBundlePlan(const ResourceAllocationPlan<Schema>& plan) : _frames(plan.frame_count()) {
         constexpr auto payloads = [] {
             std::array<std::array<bool, Schema::COUNT>, Schema::COUNT> result{};
             [&]<size_t... i>(std::index_sequence<i...>) {
@@ -99,54 +159,70 @@ namespace VSL_NAMESPACE::typed {
             }(std::make_index_sequence<Schema::COUNT>{});
             return result;
         }();
-        for (const auto key : Bindings::KEYS)
-            if (std::ranges::find(KEYS, key) == KEYS.end())
-                throw std::invalid_argument("Unknown bundle binding key");
-        size_t index = 0;
-        for (size_t entry_index = 0; entry_index < Schema::COUNT; ++entry_index) {
+        for (size_t i = 0; i < Bindings::KEYS.size(); ++i)
+            if (std::ranges::find(KEYS, detail::BundleBindingKey{Bindings::KEYS[i], Bindings::COMPONENTS[i]}) == KEYS.end())
+                throw std::invalid_argument("Unknown bundle binding component");
+        for (size_t index = 0; index < KEYS.size(); ++index) {
+            const auto key = KEYS[index];
+            const auto entry_index = Schema::Index(key.binding.set, key.binding.binding);
             const auto& entry = plan.entries()[entry_index];
-            const auto& declaration = entry.declaration;
-            for (size_t element = 0; element < declaration.descriptors; ++element, ++index) {
-                auto& target = _placements[index];
-                target = {KEYS[index], Identity(index), declaration.scope, declaration.external, SIZE_MAX};
-                const auto bytes = detail::allocation_multiply(entry.elements, declaration.payload_size);
-                for (size_t previous = 0; previous < index; ++previous) {
-                    const auto& other = _placements[previous];
-                    if (other.resource != target.resource)
-                        continue;
-                    const auto other_index = Schema::Index(other.binding.set, other.binding.binding);
-                    const auto& other_entry = plan.entries()[other_index];
-                    if (target.external || other.external || target.scope != other.scope ||
-                        declaration.kind != other_entry.declaration.kind || !payloads[entry_index][other_index] ||
-                        entry.elements != other_entry.elements)
-                        throw std::invalid_argument("Incompatible declarations for one bundle resource ID");
-                    target.slot = other.slot;
-                    break;
-                }
-                if (target.external || target.slot != SIZE_MAX)
+            const auto& d = entry.declaration;
+            const bool image = key.component == ResourceComponent::IMAGE || d.allocation == AllocationKind::IMAGE ||
+                               (d.external && (d.kind == graphic_resource::Type::SAMPLED_IMAGE || d.kind == graphic_resource::Type::STORAGE_IMAGE || d.kind == graphic_resource::Type::COMBINED_IMAGE_SAMPLER));
+            const bool sampler = key.component == ResourceComponent::SAMPLER || d.allocation == AllocationKind::SAMPLER || (d.external && d.kind == graphic_resource::Type::SAMPLER);
+            const auto scope = image ? d.image_scope : sampler ? d.sampler_scope
+                                                               : d.scope;
+            const auto kind = image ? storage::ResourceKind::IMAGE : sampler ? storage::ResourceKind::SAMPLER
+                                                                             : storage::ResourceKind::BUFFER;
+            auto& target = _placements[index];
+            target = {key.binding, Identity(index), scope, d.external, SIZE_MAX, key.component, kind, SIZE_MAX};
+            BundleResourceInit info;
+            if (image)
+                info = plan.sizes().image_info(entry_index, key.binding.element);
+            else if (sampler)
+                info = plan.sizes().sampler_info(entry_index, key.binding.element);
+            else
+                info = BufferCreateInfo{detail::allocation_multiply(entry.elements, d.payload_size),
+                                        (d.kind == graphic_resource::Type::UNIFORM_BUFFER ? MemoryType::UNIFORM_BUFFER : MemoryType::STORAGE_BUFFER) | MemoryType::TRANSFER_DESTINATION,
+                                        MemoryProperty::HOST_VISIBLE | MemoryProperty::HOST_COHERENT};
+            for (size_t previous = 0; previous < index; ++previous) {
+                const auto& other = _placements[previous];
+                if (other.resource != target.resource)
                     continue;
-                auto& count = target.scope == ResourceScope::SHARED ? _shared_count : _frame_count;
-                auto& buffers = target.scope == ResourceScope::SHARED ? _shared : _frame;
-                target.slot = count++;
-                const auto usage = declaration.kind == graphic_resource::Type::UNIFORM_BUFFER ? MemoryType::UNIFORM_BUFFER : MemoryType::STORAGE_BUFFER;
-                buffers[target.slot] = {bytes, usage | MemoryType::TRANSFER_DESTINATION, MemoryProperty::HOST_VISIBLE | MemoryProperty::HOST_COHERENT};
+                const auto other_index = Schema::Index(other.binding.set, other.binding.binding);
+                const auto& od = plan.entries()[other_index].declaration;
+                if (target.external || other.external || target.scope != other.scope || target.kind != other.kind ||
+                    (kind == storage::ResourceKind::BUFFER && (d.kind != od.kind || !payloads[entry_index][other_index])) ||
+                    (image && (d.kind == graphic_resource::Type::STORAGE_IMAGE) != (od.kind == graphic_resource::Type::STORAGE_IMAGE)) ||
+                    !detail::bundle_info_equal(info, _infos[ScopeIndex(other.scope)][other.slot]))
+                    throw std::invalid_argument("Incompatible declarations for one bundle resource ID");
+                target.slot = other.slot;
+                break;
             }
+            if (target.external || target.slot != SIZE_MAX)
+                continue;
+            const auto group = ScopeIndex(scope);
+            target.slot = _counts[group]++;
+            _requests[group][target.slot] = {target.resource, kind};
+            _infos[group][target.slot] = info;
+            if (kind == storage::ResourceKind::BUFFER)
+                _buffers[group][_buffer_counts[group]++] = std::get<BufferCreateInfo>(info);
         }
+        for (auto& target : _placements)
+            if (!target.external)
+                target.offset = resource_plan(target.scope).placement(target.resource).offset;
         static_cast<void>(total_bytes());
     }
     template<typename Schema, typename Bindings>
-    constexpr std::span<const BufferCreateInfo> TypedBundlePlan<Schema, Bindings>::buffers(ResourceScope scope) const {
-        if (scope == ResourceScope::SHARED)
-            return {_shared.data(), _shared_count};
-        if (scope == ResourceScope::PER_FRAME)
-            return {_frame.data(), _frame_count};
-        throw std::invalid_argument("Unknown resource scope");
+    constexpr ResourcePlan<TypedBundlePlan<Schema, Bindings>::CAPACITY> TypedBundlePlan<Schema, Bindings>::resource_plan(ResourceScope scope, size_t instance) const {
+        const auto group = ScopeIndex(scope);
+        return ResourcePlan<CAPACITY>(std::span(_requests[group].data(), _counts[group]), {scope == ResourceScope::SHARED ? LifetimeScope::SHARED : LifetimeScope::FRAME, instance});
     }
     template<typename Schema, typename Bindings>
-    constexpr const BundleBufferPlacement& TypedBundlePlan<Schema, Bindings>::placement(BindingKey key) const {
+    constexpr BundleResourcePlacement TypedBundlePlan<Schema, Bindings>::placement(BindingKey key, ResourceComponent component) const {
         for (const auto& entry : _placements)
-            if (entry.binding == key)
+            if (entry.binding == key && entry.component == component)
                 return entry;
-        throw std::invalid_argument("Unknown bundle binding key");
+        throw std::invalid_argument("Unknown bundle binding component");
     }
 } // namespace VSL_NAMESPACE::typed

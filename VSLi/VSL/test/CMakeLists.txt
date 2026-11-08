@@ -16,7 +16,7 @@ if (VSL_TEST_SOURCES)
             reflection_texel_buffers.comp reflection_texel_arrays.comp
             reflection_input_attachment.frag reflection_input_arrays.frag
             reflection_vertex_arrays.vert reflection_vertex_array_shapes.vert
-            typed_bundle.comp typed_frame.comp typed_batch.comp typed_batch_red.vert typed_block_layout.comp typed_block_arrays.comp typed_block_numeric.comp typed_push.vert typed_push_overlap.vert typed_push_overlap.frag typed_push_distinct.frag typed_push_partial.frag typed_push_resources.vert
+            typed_bundle.comp typed_arena_images.comp typed_frame.comp typed_batch.comp typed_batch_red.vert typed_block_layout.comp typed_block_arrays.comp typed_block_numeric.comp typed_push.vert typed_push_overlap.vert typed_push_overlap.frag typed_push_distinct.frag typed_push_partial.frag typed_push_resources.vert
             typed_descriptors.vert typed_descriptors_relocated.vert typed_descriptors.comp typed_texture.frag typed_components.vert typed_numeric.vert typed_wide.vert typed_runtime_descriptors.vert)
         set(VSL_TEST_SHADER_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/shaders/${VSL_TEST_SHADER}.spv")
         set(VSL_TEST_SHADER_OPTIONS)
@@ -188,13 +188,13 @@ if (VSL_TEST_SOURCES)
     add_library(vsl-frame-style-contract OBJECT EXCLUDE_FROM_ALL contracts/typed_frame_resources.cpp)
     target_compile_definitions(vsl-frame-style-contract PRIVATE VSL_TYPED_CASE=0)
     target_include_directories(vsl-frame-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
-    set(typed_allocation_names Valid Missing Duplicate UnknownSet UnknownBinding ImageBuffer ZeroElements InvalidScope FixedRuntimeSize UnknownRuntimeSize InvalidElements)
-    foreach(case RANGE 0 10)
+    set(typed_allocation_names Valid Missing Duplicate UnknownSet UnknownBinding ImageBuffer ZeroElements InvalidScope FixedRuntimeSize UnknownRuntimeSize InvalidElements BufferImage TextureSampler InvalidSamplerScope ImageArrayCount ExternalImageInfo)
+    foreach(case RANGE 0 15)
         list(GET typed_allocation_names ${case} name)
         add_test(NAME "VSL.TypedAllocation.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
             "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
             "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_resource_allocation.cpp"
-            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=Typed allocation|typed allocation|set"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=Typed allocation|typed allocation|set|image"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
         set_tests_properties("VSL.TypedAllocation.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
     endforeach()
@@ -225,6 +225,23 @@ if (VSL_TEST_SOURCES)
         "-DTEST_CASE=15" "-DTEST_EXPECTED=is_trivially_copyable"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
     set_tests_properties(VSL.TypedArenaBundle.Compile.NontrivialView PROPERTIES LABELS compile TIMEOUT 60)
+    set(typed_owned_names ImageBuffer SharedFrameImage TemporaryInfos TemporaryBuffers TemporaryPlacements)
+    foreach(case RANGE 16 20)
+        math(EXPR name_index "${case} - 16")
+        list(GET typed_owned_names ${name_index} name)
+        foreach(policy Heap Arena)
+            set(owned_definitions)
+            if(policy STREQUAL "Arena")
+                set(owned_definitions VSL_TYPED_BUNDLE_ARENA)
+            endif()
+            add_test(NAME "VSL.TypedOwned.Compile.${policy}.${name}" COMMAND "${CMAKE_COMMAND}"
+                "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+                "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_resource_bundle.cpp"
+                "-DTEST_EXTRA_DEFINITIONS=${owned_definitions}" "-DTEST_CASE=${case}" "-DTEST_EXPECTED=buffer|image|deleted"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+            set_tests_properties("VSL.TypedOwned.Compile.${policy}.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+        endforeach()
+    endforeach()
     target_link_libraries(vsl-bundle-style-contract PRIVATE VSL)
     target_compile_definitions(vsl-bundle-style-contract PRIVATE VSL_TYPED_CASE=0)
     target_include_directories(vsl-bundle-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")

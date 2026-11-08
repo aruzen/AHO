@@ -37,26 +37,35 @@ namespace VSL_NAMESPACE::typed {
         ResourceId resource;
         size_t slot, offset;
     };
-    template<BindingKey key, ResourceId resource>
+    enum class ResourceComponent {
+        PRIMARY,
+        IMAGE,
+        SAMPLER
+    };
+    template<BindingKey key, ResourceId resource, ResourceComponent component = ResourceComponent::PRIMARY>
     struct ResourceBinding {
         static constexpr auto KEY = key;
         static constexpr auto RESOURCE = resource;
+        static constexpr auto COMPONENT = component;
     };
     template<typename... Bindings>
-    struct BufferBindingMap {
+    struct ResourceBindingMap {
         static constexpr std::array<BindingKey, sizeof...(Bindings)> KEYS{Bindings::KEY...};
         static constexpr std::array<ResourceId, sizeof...(Bindings)> RESOURCES{Bindings::RESOURCE...};
+        static constexpr std::array<ResourceComponent, sizeof...(Bindings)> COMPONENTS{Bindings::COMPONENT...};
         static_assert([] {
             for (size_t i = 0; i < KEYS.size(); ++i)
                 for (size_t j = 0; j < i; ++j)
-                    if (KEYS[i] == KEYS[j])
+                    if (KEYS[i] == KEYS[j] && COMPONENTS[i] == COMPONENTS[j])
                         return false;
             return true;
         }(),
                       "Duplicate buffer binding key");
-        template<BindingKey key>
+        template<BindingKey key, ResourceComponent component = ResourceComponent::PRIMARY>
         static consteval ResourceId Resolve();
     };
+    template<typename... Bindings>
+    using BufferBindingMap = ResourceBindingMap<Bindings...>;
 
     // 資源の宣言。bindingや物理slot番号はこのIDに含めない。
     template<ResourceId id, typename Payload_, MemoryType usage, LifetimeScope scope = LifetimeScope::SHARED>
@@ -147,10 +156,10 @@ namespace VSL_NAMESPACE::typed {
         _view.read_into(std::as_writable_bytes(destination));
     }
     template<typename... Bindings>
-    template<BindingKey key>
-    consteval ResourceId BufferBindingMap<Bindings...>::Resolve() {
+    template<BindingKey key, ResourceComponent component>
+    consteval ResourceId ResourceBindingMap<Bindings...>::Resolve() {
         for (size_t i = 0; i < KEYS.size(); ++i)
-            if (KEYS[i] == key)
+            if (KEYS[i] == key && COMPONENTS[i] == component)
                 return RESOURCES[i];
         throw "Unknown buffer binding key";
     }

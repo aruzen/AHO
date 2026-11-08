@@ -128,4 +128,79 @@ namespace {
         EXPECT_EQ(logical.totals().payload_bytes, SIZE_MAX);
         EXPECT_THROW((t::TypedBundlePlan<Bytes>(logical)), std::overflow_error);
     }
+    using Type = vsl::graphic_resource::Type;
+    constexpr auto COMPUTE = vsl::ShaderFlag::COMPUTE;
+    constexpr auto IMAGE = t::ResourceComponent::IMAGE, SAMPLER = t::ResourceComponent::SAMPLER;
+    constexpr vsl::ImageCreateInfo IMAGE_INFO{vsl::ImageType::SAMPLED | vsl::ImageType::TRANSFER_DST, 3, 2, vsl::data_format::UNSIGNED_NORMALIZED8_RGBA};
+    using Mixed = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<0, t::TextureBinding<0, COMPUTE>, t::DescriptorBinding<1, Type::SAMPLED_IMAGE, COMPUTE>,
+                                                                                 t::DescriptorBinding<2, Type::SAMPLER, COMPUTE>, t::StorageBinding<3, std::uint32_t, COMPUTE>>>,
+                                              t::TextureAllocation<0, 0>, t::ImageAllocation<0, 1>, t::SamplerAllocation<0, 2>, t::BufferAllocation<0, 3>>;
+    constexpr auto MIXED_SIZES = [] { t::ResourceAllocationSizes<Mixed> sizes; sizes.image<0, 0>(IMAGE_INFO).image<0, 1>(IMAGE_INFO); return sizes; }();
+    using SharedComponents = t::ResourceBindingMap<t::ResourceBinding<t::BindingKey{0, 0}, t::ResourceId{12}, IMAGE>, t::ResourceBinding<t::BindingKey{0, 1}, t::ResourceId{12}>,
+                                                   t::ResourceBinding<t::BindingKey{0, 0}, t::ResourceId{13}, SAMPLER>, t::ResourceBinding<t::BindingKey{0, 2}, t::ResourceId{13}>>;
+    TEST(TypedAllocationPlanTest, MixedComponentsHaveIndependentCountsScopesAndPhysicalPlacements) {
+        constexpr t::ResourceAllocationPlan<Mixed> logical(3, MIXED_SIZES);
+        constexpr t::TypedBundlePlan<Mixed, SharedComponents> plan(logical);
+        static_assert(logical.totals().buffers == 3 && logical.totals().images == 6 && logical.totals().samplers == 2);
+        static_assert(logical.totals().payload_bytes == 12 && logical.totals().descriptor_sets == 3 && logical.totals().descriptors == 12);
+        static_assert(plan.resources(t::ResourceScope::SHARED).size() == 1 && plan.resources(t::ResourceScope::PER_FRAME).size() == 2);
+        static_assert(plan.placement({0, 0}, IMAGE).slot == plan.placement({0, 1}).slot);
+        static_assert(plan.placement({0, 0}, SAMPLER).slot == plan.placement({0, 2}).slot);
+        EXPECT_EQ(plan.resource_plan(t::ResourceScope::PER_FRAME, 2).lifetime(), (t::LifetimeGroup{t::LifetimeScope::FRAME, 2}));
+        EXPECT_EQ(plan.placement({0, 1}).kind, vsl::storage::ResourceKind::IMAGE);
+        EXPECT_NE(plan.placement({0, 1}).resource, plan.placement({0, 2}).resource);
+        const auto physical = plan.resource_plan(t::ResourceScope::PER_FRAME);
+        EXPECT_EQ(plan.placement({0, 3}).offset, physical.placement(plan.placement({0, 3}).resource).offset);
+        EXPECT_EQ(plan.bytes(t::ResourceScope::PER_FRAME), physical.bytes());
+        EXPECT_EQ(plan.total_bytes(), plan.bytes(t::ResourceScope::SHARED) + 3 * plan.bytes(t::ResourceScope::PER_FRAME));
+    }
+    TEST(TypedAllocationPlanTest, ImageCreationInputsAreRequiredAndDescriptorArraysKeepTheirOwnInfos) {
+        EXPECT_THROW((t::ResourceAllocationPlan<Mixed>(2)), std::invalid_argument);
+        auto invalid = MIXED_SIZES;
+        auto info = IMAGE_INFO;
+        info.usage = vsl::ImageType::TRANSFER_DST;
+        invalid.image<0, 0>(info);
+        EXPECT_THROW((t::ResourceAllocationPlan<Mixed>(2, invalid)), std::invalid_argument);
+        using Arrays = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<0, t::TextureBinding<0, COMPUTE, 2>>>, t::TextureAllocation<0, 0>>;
+        t::ResourceAllocationSizes<Arrays> sizes;
+        auto other = IMAGE_INFO;
+        other.width = 7;
+        sizes.image<0, 0>(std::array{IMAGE_INFO, other});
+        const t::ResourceAllocationPlan<Arrays> logical(2, sizes);
+        const t::TypedBundlePlan<Arrays> plan(logical);
+        EXPECT_EQ(std::get<vsl::ImageCreateInfo>(plan.resources(t::ResourceScope::PER_FRAME)[0]).width, 3u);
+        EXPECT_EQ(std::get<vsl::ImageCreateInfo>(plan.resources(t::ResourceScope::PER_FRAME)[1]).width, 7u);
+        EXPECT_EQ(logical.totals().images, 4u);
+        EXPECT_EQ(logical.totals().samplers, 2u);
+    }
+    TEST(TypedAllocationPlanTest, SharedIdsRejectDifferentCreationInfosAndPhysicalKinds) {
+        auto sizes = MIXED_SIZES;
+        auto info = IMAGE_INFO;
+        info.width = 7;
+        sizes.image<0, 1>(info);
+        EXPECT_THROW((t::TypedBundlePlan<Mixed, SharedComponents>(t::ResourceAllocationPlan<Mixed>(2, sizes))), std::invalid_argument);
+        sizes = MIXED_SIZES;
+        sizes.sampler<0, 2>({vsl::SamplingMode::NEAREST, vsl::EdgeMode::CLAMP_TO_EDGE});
+        EXPECT_THROW((t::TypedBundlePlan<Mixed, SharedComponents>(t::ResourceAllocationPlan<Mixed>(2, sizes))), std::invalid_argument);
+        using WrongKind = t::ResourceBindingMap<t::ResourceBinding<t::BindingKey{0, 0}, t::ResourceId{0}, IMAGE>, t::ResourceBinding<t::BindingKey{0, 0}, t::ResourceId{0}, SAMPLER>>;
+        EXPECT_THROW((t::TypedBundlePlan<Mixed, WrongKind>(t::ResourceAllocationPlan<Mixed>(2, MIXED_SIZES))), std::invalid_argument);
+    }
+    TEST(TypedAllocationPlanTest, SharingSampledAndStorageImagesRequiresAnExplicitLayoutPolicy) {
+        using Images = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<0, t::DescriptorBinding<0, Type::SAMPLED_IMAGE, COMPUTE>, t::DescriptorBinding<1, Type::STORAGE_IMAGE, COMPUTE>>>, t::ImageAllocation<0, 0>, t::ImageAllocation<0, 1>>;
+        t::ResourceAllocationSizes<Images> sizes;
+        auto info = IMAGE_INFO;
+        info.usage = info.usage | vsl::ImageType::STORAGE;
+        sizes.image<0, 0>(info).image<0, 1>(info);
+        using Map = t::ResourceBindingMap<t::ResourceBinding<t::BindingKey{0, 0}, t::ResourceId{1}>, t::ResourceBinding<t::BindingKey{0, 1}, t::ResourceId{1}>>;
+        EXPECT_THROW((t::TypedBundlePlan<Images, Map>(t::ResourceAllocationPlan<Images>(1, sizes))), std::invalid_argument);
+    }
+    TEST(TypedAllocationPlanTest, ExternalImageAndSamplerMetadataNeverAllocateOwnedSlots) {
+        using External = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<0, t::DescriptorBinding<0, Type::SAMPLED_IMAGE, COMPUTE>, t::DescriptorBinding<1, Type::SAMPLER, COMPUTE>>>, t::ExternalAllocation<0, 0>, t::ExternalAllocation<0, 1>>;
+        constexpr t::TypedBundlePlan<External> plan(t::ResourceAllocationPlan<External>(3));
+        static_assert(plan.placement({0, 0}).kind == vsl::storage::ResourceKind::IMAGE);
+        static_assert(plan.placement({0, 1}).kind == vsl::storage::ResourceKind::SAMPLER);
+        static_assert(plan.placement({0, 0}).slot == SIZE_MAX && plan.placement({0, 1}).slot == SIZE_MAX);
+        static_assert(plan.total_bytes() == 0);
+        EXPECT_TRUE(plan.resources(t::ResourceScope::SHARED).empty());
+    }
 } // namespace

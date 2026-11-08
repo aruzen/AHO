@@ -14,6 +14,8 @@ namespace {
     using Bundle = t::TypedResourceBundle<Allocation, Storage>;
     using Textures = t::ResourceSchema<t::DescriptorSet<1, t::TextureBinding<2, vsl::ShaderFlag::FRAGMENT, 2>>>;
     using External = t::ResourceAllocationSchema<Textures, t::ExternalAllocation<1, 2>>;
+    using OwnedSchema = t::ResourceAllocationSchema<Textures, t::TextureAllocation<1, 2>>;
+    using Owned = t::TypedResourceBundle<OwnedSchema, Storage>;
 #if VSL_TYPED_CASE == 0
     static_assert(!std::is_copy_constructible_v<Bundle> && std::is_nothrow_move_constructible_v<Bundle>);
     static_assert(!std::is_copy_constructible_v<Bundle::Frame>);
@@ -29,6 +31,13 @@ namespace {
         });
         bundle.get(phase).set<0>().require_complete();
         t::TypedResourceBundle<External, Storage> external(manager, descriptors, t::external_resource<1, 2>(std::array{texture, texture}));
+        t::ResourceAllocationSizes<OwnedSchema> infos;
+        const vsl::ImageCreateInfo info{vsl::ImageType::SAMPLED | vsl::ImageType::TRANSFER_DST, 1, 1};
+        infos.image<1, 2>(std::array{info, info});
+        Owned owned(manager, descriptors, infos);
+        owned.initialize_shared([](auto& shared) { shared.template sampler<1, 2, 0>(); });
+        owned.update(phase, [](auto& frame) { frame.template image<1, 2, 0>(); });
+        owned.get(phase).resource<1, 2, 1>().descriptor();
     }
 #elif VSL_TYPED_CASE == 1
     void rejected(vsl::CommandManager manager, vsl::graphic_resource::ManagerInterface& descriptors, const t::TypedSampler& sampler) {
@@ -91,5 +100,25 @@ namespace {
 #elif VSL_TYPED_CASE == 15
     using Rejected = t::PlacedResourceBufferView<std::string, vsl::graphic_resource::Type::UNIFORM_BUFFER>;
     static_assert(sizeof(Rejected));
+#elif VSL_TYPED_CASE == 16
+    void rejected(Owned::Frame& frame) {
+        frame.buffer<1, 2>();
+    }
+#elif VSL_TYPED_CASE == 17
+    void rejected(Owned::Shared& shared) {
+        shared.image<1, 2>();
+    }
+#elif VSL_TYPED_CASE == 18
+    auto rejected(const t::ResourceAllocationPlan<OwnedSchema>& plan) {
+        return t::TypedBundlePlan<OwnedSchema>(plan).resources(t::ResourceScope::SHARED);
+    }
+#elif VSL_TYPED_CASE == 19
+    auto rejected(const t::ResourceAllocationPlan<OwnedSchema>& plan) {
+        return t::TypedBundlePlan<OwnedSchema>(plan).buffers(t::ResourceScope::SHARED);
+    }
+#elif VSL_TYPED_CASE == 20
+    auto rejected(const t::ResourceAllocationPlan<OwnedSchema>& plan) {
+        return t::TypedBundlePlan<OwnedSchema>(plan).placements();
+    }
 #endif
 } // namespace

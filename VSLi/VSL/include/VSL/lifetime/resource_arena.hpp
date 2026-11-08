@@ -10,6 +10,7 @@
 #include "../operation/pipeline_layout_create_info.hpp"
 #include "../vulkan/pipeline_layout.hpp"
 #include "../vulkan/render_pass.hpp"
+#include "../vulkan/pipeline.hpp"
 #include "../storage/arena_memory.hpp"
 #include "../vulkan/image.hpp"
 #include "../vulkan/sampler.hpp"
@@ -29,9 +30,24 @@ namespace VSL_NAMESPACE::lifetime {
         std::vector<PipelineLayoutSource> layouts;
         std::vector<PushConstantRange> push_ranges;
     };
+    using RuntimeLayoutSource = std::variant<typed::ResourceId, PipelineLayoutAccessor>;
+    using PipelinePassSource = std::variant<typed::ResourceId, RenderPassAccessor>;
+    using PipelineShaderSource = std::variant<typed::ResourceId, ShaderAccessor>;
+    struct GraphicsPipelineInit {
+        RuntimeLayoutSource layout;
+        PipelinePassSource pass;
+        GraphicsPipelineState state;
+        std::vector<PipelineShaderSource> shaders;
+        std::uint32_t subpass = 0;
+    };
+    struct ComputePipelineInit {
+        RuntimeLayoutSource layout;
+        PipelineShaderSource shader;
+    };
     using ResourceInit = std::variant<BufferCreateInfo, ImageCreateInfo, SamplerCreateInfo, BufferView, ImageAccessor, SamplerAccessor,
                                       DescriptorLayoutCreateInfo, DescriptorPoolCreateInfo, DescriptorSetInit,
-                                      graphic_resource::BindingLayout, graphic_resource::Pool, ShaderCreateInfo, ShaderAccessor, PipelineLayoutInit, PipelineLayoutAccessor, RenderPassDescription, RenderPassAccessor>;
+                                      graphic_resource::BindingLayout, graphic_resource::Pool, ShaderCreateInfo, ShaderAccessor, PipelineLayoutInit, PipelineLayoutAccessor, RenderPassDescription, RenderPassAccessor,
+                                      GraphicsPipelineInit, ComputePipelineInit, PipelineAccessor>;
     class ResourceArena {
         std::shared_ptr<detail::ResourceArenaOwner> _owner;
         ResourceArena(LogicalDeviceAccessor device, typed::LifetimeGroup group,
@@ -61,6 +77,7 @@ namespace VSL_NAMESPACE::lifetime {
         ShaderAccessor shader(typed::ResourceId id) const;
         PipelineLayoutAccessor pipeline_layout(typed::ResourceId id) const;
         RenderPassAccessor render_pass(typed::ResourceId id) const;
+        PipelineAccessor pipeline(typed::ResourceId id) const;
         // 非所有の物理Buffer全体。外部の部分viewに対してはbuffer()を使用する。
         BufferRef borrow_buffer(typed::ResourceId id) const&;
         BufferRef borrow_buffer(typed::ResourceId id) const&& = delete;

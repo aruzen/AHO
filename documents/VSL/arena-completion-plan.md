@@ -9,7 +9,7 @@
 
 最初のPRだけで終了せず、下記の順で実装・検証・独立レビューを継続する。PRの公開前には最新masterとの差分を確認する。新しい製品ディレクトリが必要な場合は作成前に確認する。
 
-現在の到達点は順序1〜6である。順序7以降は未完了であり、起動資源、既定policy変更、旧入口廃止と最終監査まで継続する。
+現在の到達点は順序1〜6と、順序7a RenderPass／7b Pipelineである。7c Framebuffer以降は未完了であり、起動資源、既定policy変更、旧入口廃止と最終監査まで継続する。
 
 ## 責務と保証
 
@@ -110,7 +110,11 @@ Layout数は宣言set数のResources::COUNT、Set数はshared／frameの実数�
 
 7bのstate入力は、Device／native／source ownerを含まない`GraphicsPipelineState`の深い値型にする。公開値は不完全な内部データをunique_ptrで所有し、既存Recipeは同じデータ型をinlineで持つ。これにより既存Layoutにはstate用の追加確保を増やさない。固定stageの注入本体を借用EditRefへ移し、旧Layout注入は委譲する。生成入力のCPU確保はnative資源配置と区別して監査する。Shader／Pass／Layoutを必要とするstageをstate-only入力へ混ぜない。Typedの入口では実Shaderを検証し、型名だけを付ける無検査の変換を追加しない。
 
-[7b前半のstate分離](graphics-pipeline-state.md)を先に独立した変更として実装・検証する。後半のPipeline operation／heap所有／寸法／arena配置まで7bを完了扱いしない。
+[7b前半のstate分離](graphics-pipeline-state.md)を独立した変更として実装・検証した。
+
+7b後半のImplはDevice／Layoutへの借用とnative handleだけを持ち、heap rootはLayout ownerを保持して依存graphへ列挙する。native生成はResultを明示検査し、失敗時の非null handleを未公開のまま回収する。明示入力のShader／Passはnative生成呼出し中だけ所有を借り、Layoutはruntime ownerだけを固定親とする。Shaderの既存get_device()だけでは非所有aliasを拒否できないため、source境界でowner／live module／Deviceを検査する。構築とrollback、importの正規control block、逆向きdescriptor依存拒否を受入項目にする。
+
+[7b後半のPipeline backendと配置](pipeline-arena.md)を通常VSL／Typedの既存生成とResourceArenaへ接続した。直接source回収後の描画／compute／push、Layout固定親の循環拒否、元ownerのimport、途中失敗・同region再利用、GPU完了／取消回収を検証し、7bの受入条件を満たした。次は7c Framebufferへ進む。順序7全体と8以降は未完了である。
 
 Pipelineが記録時に使うLayoutは保持し、Shader／Pass／再生成recipeは生成時依存へ分ける。Framebufferから既定Passとclear descriptionを参照するVSLの契約は、native生成時だけの依存と区別する。attachment Imageの既存物理UseStateを使い、RenderPass／Pipeline／Framebufferへ独立したGPU UseStateは追加しない。
 

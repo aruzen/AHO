@@ -1,6 +1,6 @@
 # native構築から独立したGraphicsPipelineState
 
-[完了計画](arena-completion-plan.md)の7b前半。Pipelineをarenaへ配置する前に、fixed-functionの生成入力をDevice／native Layout／Shader／Passから分ける。Pipeline backendと配置は次の単位であり、この変更だけで7bを完了とはしない。
+[完了計画](arena-completion-plan.md)の7b前半。Pipelineをarenaへ配置する前に、fixed-functionの生成入力をDevice／native Layout／Shader／Passから分ける。後半の[Pipeline backendと配置](pipeline-arena.md)は、この入力を共用する。
 
 ```cpp
 namespace pl = vsl::pipeline_layout;

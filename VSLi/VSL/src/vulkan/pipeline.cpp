@@ -1,119 +1,88 @@
 #include <VSL/vulkan/pipeline.hpp>
-#include <VSL/vulkan/render_pass.hpp>
+#include <VSL/lifetime/pipeline_storage.hpp>
+#include <VSL/lifetime/owner_access.hpp>
+#include <stdexcept>
 
-#include <VSL/vulkan/_pimpls.hpp>
-#include <VSL/operation/shader_ops.hpp>
-#include <VSL/operation/pipeline_layout_ops.hpp>
-#include <limits>
-
-namespace {
-    std::vector<vk::PipelineShaderStageCreateInfo> shader_stages(VSL_NAMESPACE::PipelineLayoutAccessor layout);
-    std::vector<vk::PipelineShaderStageCreateInfo> shader_stages(VSL_NAMESPACE::PipelineLayoutAccessor layout) {
-        if (!layout.data_ || !layout.has_recipe() || !layout.data_->device)
-            throw std::invalid_argument("Pipeline requires an initialized layout");
-        if (!VSL_NAMESPACE::operation::pipeline_layout_matches(*layout.data_, layout.recipe().binding_layouts, layout.recipe().push_ranges))
-            throw std::invalid_argument("Pipeline recipe has changed since native layout construction");
-        const auto& shaders = layout.recipe().shaders;
-        if (shaders.size() > std::numeric_limits<std::uint32_t>::max())
-            throw std::out_of_range("Pipeline shader count exceeds uint32_t");
-        std::vector<vk::PipelineShaderStageCreateInfo> result;
-        result.reserve(shaders.size());
-        for (const auto& shader : shaders) {
-            if (!shader || shader->device != layout.data_->device)
-                throw std::invalid_argument("Pipeline shaders require the layout device");
-            result.push_back(VSL_NAMESPACE::operation::shader_stage(*shader));
+namespace VSL_NAMESPACE {
+    namespace {
+        const impl::PipelineRecipe& checked_recipe(const PipelineLayoutAccessor& layout);
+        std::vector<impl::ShaderImpl*> shader_sources(std::span<const ShaderAccessor> shaders);
+        const impl::PipelineRecipe& checked_recipe(const PipelineLayoutAccessor& layout) {
+            (void)layout.get_device();
+            if (!layout.has_recipe())
+                throw std::invalid_argument("Pipeline requires a layout recipe or explicit state and shaders");
+            const auto& recipe = layout.recipe();
+            if (!operation::pipeline_layout_matches(*layout.data_, recipe.binding_layouts, recipe.push_ranges))
+                throw std::invalid_argument("Pipeline recipe has changed since native layout construction");
+            return recipe;
         }
-        return result;
+        std::vector<impl::ShaderImpl*> shader_sources(std::span<const ShaderAccessor> shaders) {
+            std::vector<impl::ShaderImpl*> result;
+            result.reserve(shaders.size());
+            for (const auto& shader : shaders) {
+                if (!shader.data_ || !shader.data_.use_count())
+                    throw std::invalid_argument("Pipeline shader source requires an owner");
+                result.push_back(shader.data_.get());
+            }
+            return result;
+        }
+    } // namespace
+    LogicalDeviceAccessor PipelineAccessor::get_device() const {
+        if (!data_ || !data_.use_count() || !data_->pipeline || !data_->device || !data_->layout)
+            throw std::invalid_argument("Pipeline requires a live owner");
+        return {data_->device->shared_from_this()};
     }
-} // namespace
-
-VSL_NAMESPACE::GraphicsPipeline::GraphicsPipeline(VSL_NAMESPACE::PipelineLayoutAccessor layout, VSL_NAMESPACE::RenderPassAccessor pass, std::uint32_t subpass) {
-    if (!pass.data_ || subpass >= pass.description().subpasses.size())
-        throw std::out_of_range("Pipeline subpass index");
-    if (!layout.data_ || !layout.has_recipe() || layout.data_->device != pass.data_->device)
-        throw std::invalid_argument("Pipeline requires initialized layout and pass on the same device");
-    const auto& outputs = pass.description().subpasses[subpass];
-    if (layout.recipe().graphics_state.blend_attachments.size() != outputs.colors.size())
-        throw std::invalid_argument("Pipeline color blend count does not match subpass outputs");
-    for (auto ref : outputs.colors)
-        if (ref.attachment != UNUSED_ATTACHMENT && layout.recipe().graphics_state.multisample.rasterizationSamples !=
-                                                       static_cast<vk::SampleCountFlagBits>(pass.description().attachments[ref.attachment].samples))
-            throw std::invalid_argument("Pipeline sample count does not match subpass");
-    if (outputs.depth_stencil && outputs.depth_stencil->attachment != UNUSED_ATTACHMENT &&
-        layout.recipe().graphics_state.multisample.rasterizationSamples != static_cast<vk::SampleCountFlagBits>(
-                                                                               pass.description().attachments[outputs.depth_stencil->attachment].samples))
-        throw std::invalid_argument("Pipeline depth sample count does not match subpass");
-    const auto stages = shader_stages(layout);
-    const operation::PipelineScratch scratch(layout.recipe().graphics_state);
-    data_ = std::shared_ptr<impl::PipelineImpl>(new impl::PipelineImpl);
-    data_->device = layout.get_device().data_;
-    data_->layout = layout.data_;
-    data_->bind_point = vk::PipelineBindPoint::eGraphics;
-
-    vk::PipelineCacheCreateInfo pipeline_info_cache;
-    auto cache = data_->device->device.createPipelineCacheUnique(pipeline_info_cache);
-
-    vk::GraphicsPipelineCreateInfo pipeline_info;
-    pipeline_info.stageCount = static_cast<std::uint32_t>(stages.size());
-    pipeline_info.pStages = stages.data();
-    pipeline_info.pVertexInputState = &scratch.vertex_input;
-    pipeline_info.pInputAssemblyState = &layout.recipe().graphics_state.input_assembly;
-    pipeline_info.pViewportState = &scratch.viewport;
-    pipeline_info.pRasterizationState = &layout.recipe().graphics_state.rasterization;
-    pipeline_info.pMultisampleState = &layout.recipe().graphics_state.multisample;
-    if (layout.recipe().graphics_state.depth_stencil)
-        pipeline_info.pDepthStencilState = &layout.recipe().graphics_state.depth_stencil.value();
-    else
-        pipeline_info.pDepthStencilState = nullptr;
-    pipeline_info.pColorBlendState = &scratch.color_blend;
-    pipeline_info.pDynamicState = &scratch.dynamic_state;
-
-    pipeline_info.layout = layout.data_->pipeline_layout;
-    pipeline_info.renderPass = pass.data_->render_pass;
-    pipeline_info.subpass = subpass;
-
-    pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
-    pipeline_info.basePipelineIndex = -1;
-
-    const auto& result = data_->device->device.createGraphicsPipeline(*cache, pipeline_info);
-    if (result.result != vk::Result::eSuccess) {
-        loggingln(vk::to_string(result.result));
+    lifetime::OwnerRef PipelineAccessor::owner_ref() const {
+        if (!data_ || !data_.use_count())
+            return {};
+        return lifetime::detail::owned_ref(data_, data_->owner_node);
     }
-    data_->pipeline = result.value;
-}
-
-void VSL_NAMESPACE::GraphicsPipeline::invoke(VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
-    buffer.retain(data_);
-    buffer.data_->command_buffers[buffer.get_current_buffer_idx()].bindPipeline(vk::PipelineBindPoint::eGraphics,
-                                                                                data_->pipeline);
-}
-
-VSL_NAMESPACE::ComputePipeline::ComputePipeline(VSL_NAMESPACE::PipelineLayoutAccessor layout) {
-    const auto stages = shader_stages(layout);
-    if (stages.size() != 1 || stages.front().stage != vk::ShaderStageFlagBits::eCompute)
-        throw std::invalid_argument("ComputePipeline requires exactly one compute shader");
-
-    data_ = std::shared_ptr<impl::PipelineImpl>(new impl::PipelineImpl);
-    data_->device = layout.get_device().data_;
-    data_->layout = layout.data_;
-    data_->bind_point = vk::PipelineBindPoint::eCompute;
-
-    vk::PipelineCacheCreateInfo pipeline_info_cache;
-    auto cache = data_->device->device.createPipelineCacheUnique(pipeline_info_cache);
-
-    vk::ComputePipelineCreateInfo pipeline_info;
-    pipeline_info.layout = layout.data_->pipeline_layout;
-    pipeline_info.stage = stages.front();
-
-    data_->pipeline = data_->device->device.createComputePipeline(*cache, pipeline_info).value;
-}
-
-void VSL_NAMESPACE::ComputePipeline::invoke(VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
-    buffer.retain(data_);
-    buffer.data_->command_buffers[buffer.get_current_buffer_idx()].bindPipeline(vk::PipelineBindPoint::eCompute,
-                                                                                data_->pipeline);
-}
-
-VSL_NAMESPACE::impl::PipelineImpl::~PipelineImpl() {
-    device->device.destroyPipeline(pipeline);
-}
+    GraphicsPipeline::GraphicsPipeline(PipelineLayoutAccessor layout, RenderPassAccessor pass, std::uint32_t subpass) {
+        if (!pass.data_ || !pass.data_.use_count() || subpass >= pass.description().subpasses.size())
+            throw std::out_of_range("Pipeline subpass index");
+        (void)pass.get_device();
+        const auto& recipe = checked_recipe(layout);
+        const operation::GraphicsPipelineInput input{layout.data_.get(), pass.data_.get(), &recipe.graphics_state, recipe.shaders, subpass};
+        data_ = lifetime::make_heap_pipeline(layout.get_device(), layout.owner_ref(), input);
+    }
+    GraphicsPipeline::GraphicsPipeline(PipelineLayoutAccessor layout, RenderPassAccessor pass, const GraphicsPipelineState& state,
+                                       std::span<const ShaderAccessor> shaders, std::uint32_t subpass) {
+        (void)layout.get_device();
+        (void)pass.get_device();
+        const auto sources = shader_sources(shaders);
+        const operation::GraphicsPipelineInput input{layout.data_.get(), pass.data_.get(), &state.definition(), sources, subpass};
+        data_ = lifetime::make_heap_pipeline(layout.get_device(), layout.owner_ref(), input);
+    }
+    GraphicsPipeline::GraphicsPipeline(PipelineAccessor source) : PipelineAccessor(std::move(source)) {
+        (void)get_device();
+        if (data_->bind_point != vk::PipelineBindPoint::eGraphics)
+            throw std::invalid_argument("Graphics pipeline requires the graphics bind point");
+    }
+    void GraphicsPipeline::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
+        buffer.retain(data_);
+        buffer.data_->command_buffers[buffer.get_current_buffer_idx()].bindPipeline(vk::PipelineBindPoint::eGraphics, data_->pipeline);
+    }
+    ComputePipeline::ComputePipeline(PipelineLayoutAccessor layout) {
+        const auto& recipe = checked_recipe(layout);
+        if (recipe.shaders.size() != 1)
+            throw std::invalid_argument("Compute pipeline requires exactly one compute shader");
+        const operation::ComputePipelineInput input{layout.data_.get(), recipe.shaders.front()};
+        data_ = lifetime::make_heap_pipeline(layout.get_device(), layout.owner_ref(), input);
+    }
+    ComputePipeline::ComputePipeline(PipelineLayoutAccessor layout, ShaderAccessor shader) {
+        (void)layout.get_device();
+        const std::array<ShaderAccessor, 1> inputs{std::move(shader)};
+        const auto sources = shader_sources(inputs);
+        const operation::ComputePipelineInput input{layout.data_.get(), sources.front()};
+        data_ = lifetime::make_heap_pipeline(layout.get_device(), layout.owner_ref(), input);
+    }
+    ComputePipeline::ComputePipeline(PipelineAccessor source) : PipelineAccessor(std::move(source)) {
+        (void)get_device();
+        if (data_->bind_point != vk::PipelineBindPoint::eCompute)
+            throw std::invalid_argument("Compute pipeline requires the compute bind point");
+    }
+    void ComputePipeline::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
+        buffer.retain(data_);
+        buffer.data_->command_buffers[buffer.get_current_buffer_idx()].bindPipeline(vk::PipelineBindPoint::eCompute, data_->pipeline);
+    }
+} // namespace VSL_NAMESPACE

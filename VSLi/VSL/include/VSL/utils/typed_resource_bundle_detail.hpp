@@ -366,6 +366,8 @@ namespace VSL_NAMESPACE::typed {
                         case storage::ResourceKind::DESCRIPTOR_POOL:
                         case storage::ResourceKind::DESCRIPTOR_SET:
                         case storage::ResourceKind::SHADER:
+                        case storage::ResourceKind::PIPELINE_LAYOUT:
+                        case storage::ResourceKind::RENDER_PASS:
                             throw std::logic_error("Unexpected descriptor in the data-only bundle plan");
                     }
                 }

@@ -98,13 +98,15 @@ Layout数は宣言set数のResources::COUNT、Set数はshared／frameの実数�
 
 6cは[schema付き共有Layout集合](typed-shared-layouts.md)をbundleからTyped pipelineへ接続した。Resources注入が既存Layoutをheap再生成する経路を置き換え、set番号のholeは空Layout一つで埋める。必要時の追加slot／IDをshared計画の末尾へ置き、宣言emptyを優先して再利用する。frame facadeを保持せず、元bundle／source回収後にも利用できる。通常／共有constructorのshader検証、既存配置、Set／Pool容量、実compute／描画／resize／installを確認し、順序6の受入条件を満たした。次は順序7へ進む。
 
-## 順序7／8の前提調査と次の実装（未実装）
+## 順序7／8の前提調査と次の実装
 
 6c時点の独立レビューにより、次を順に扱う。
 
 1. RenderPassの共通operation／lifetime backendと配置。不変descriptionは記録・Framebuffer検証にも必要な値として保持し、不要なrecipe所有層を追加しない。Deviceの強い所有はrootへ移す。descriptionの借用はlvalue所有者に限定する。
 2. Pipelineの共通backendと配置。native Layoutを生成しないstate定義を用意し、arenaのGraphics入力はLayout ID・Pass ID・subpass・state・Shader IDまたは構築時sourceへ分ける。既存Frozen constructorも同backendへ接続する。定義取得のための余分なheap Layout生成を恒久化しない。
 3. Framebufferの共通backendと配置。まず一つのImplに複数native framebufferとattachment行列を持つ既存の意味を維持し、Pass／Image／swapchain所有を外側rootへ移す。同rootの参照は借用とし、getterは本来の正規ownerを返す。
+
+7aは[RenderPassの共通backendとCPU配置](render-pass-arena.md)を実装した。不変descriptionをImpl内へ置き、通常／arenaの生成、外部importの正規owner、失敗時rollback、lvalueの借用制約とGPU完了／取消までの保持を検証した。Pipeline／Framebufferの配置は未実装であり、順序7全体は未完了である。次は7bへ進む。
 
 Pipelineが記録時に使うLayoutは保持し、Shader／Pass／再生成recipeは生成時依存へ分ける。Framebufferから既定Passとclear descriptionを参照するVSLの契約は、native生成時だけの依存と区別する。attachment Imageの既存物理UseStateを使い、RenderPass／Pipeline／Framebufferへ独立したGPU UseStateは追加しない。
 

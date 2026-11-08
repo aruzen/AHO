@@ -5,6 +5,7 @@
 #include <VSL/lifetime/descriptor_storage.hpp>
 #include <VSL/lifetime/shader_storage.hpp>
 #include <VSL/lifetime/pipeline_layout_storage.hpp>
+#include <VSL/lifetime/render_pass_storage.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/storage/cpu_region.hpp>
@@ -20,6 +21,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
         impl::GraphicResourceImpl* set = nullptr;
         impl::ShaderImpl* shader = nullptr;
         impl::PipelineLayoutImpl* pipeline_layout = nullptr;
+        impl::RenderPassImpl* render_pass = nullptr;
         size_t buffer_offset = 0, buffer_bytes = 0;
         size_t owner_index = 0;
     };
@@ -65,6 +67,8 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 return external ? std::holds_alternative<ShaderAccessor>(value) : std::holds_alternative<ShaderCreateInfo>(value);
             case storage::ResourceKind::PIPELINE_LAYOUT:
                 return external ? std::holds_alternative<PipelineLayoutAccessor>(value) : std::holds_alternative<PipelineLayoutInit>(value);
+            case storage::ResourceKind::RENDER_PASS:
+                return external ? std::holds_alternative<RenderPassAccessor>(value) : std::holds_alternative<RenderPassDescription>(value);
         }
         return false;
     }
@@ -143,6 +147,12 @@ namespace VSL_NAMESPACE::lifetime::detail {
                         throw std::invalid_argument("External descriptor pool requires its canonical owner");
                     resource.pool = pool->data_.get();
                     resource.owner_index = retain_dependency(owned_ref(owner, pool->data_->owner_node));
+                } else if (const auto* pass = std::get_if<RenderPassAccessor>(&value)) {
+                    (void)pass->get_device();
+                    if (pass->data_->device != device.data_.get())
+                        throw std::invalid_argument("External render pass requires the arena device");
+                    resource.render_pass = pass->data_.get();
+                    resource.owner_index = retain_dependency(pass->owner_ref());
                 } else if (const auto* layout = std::get_if<PipelineLayoutAccessor>(&value)) {
                     (void)layout->get_device();
                     if (layout->data_->device != device.data_.get())
@@ -206,6 +216,10 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 resource.set = &descriptor_set_at(slot);
                 break;
             }
+            case storage::ResourceKind::RENDER_PASS:
+                construct_render_pass(slot, device, std::get<RenderPassDescription>(initializer));
+                resource.render_pass = &render_pass_at(slot);
+                break;
             case storage::ResourceKind::PIPELINE_LAYOUT: {
                 const auto& info = std::get<PipelineLayoutInit>(initializer);
                 std::vector<impl::ResourceBindingLayoutImpl*> layouts;
@@ -260,6 +274,8 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     resource.shader->owner_node = node;
                 if (resource.pipeline_layout)
                     resource.pipeline_layout->owner_node = node;
+                if (resource.render_pass)
+                    resource.render_pass->owner_node = node;
             }
             if (resource.pool && !resource.placement.external)
                 resource.pool->owner = owner;
@@ -291,6 +307,9 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     break;
                 case storage::ResourceKind::DESCRIPTOR_SET:
                     destroy_descriptor_set(slot);
+                    break;
+                case storage::ResourceKind::RENDER_PASS:
+                    destroy_render_pass(slot);
                     break;
                 case storage::ResourceKind::PIPELINE_LAYOUT:
                     destroy_pipeline_layout(slot);
@@ -381,6 +400,12 @@ namespace VSL_NAMESPACE::lifetime {
         if (resource.placement.external)
             return {_owner->dependencies.at(resource.owner_index).alias(resource.image).share()};
         return {{_owner, resource.image}};
+    }
+    RenderPassAccessor ResourceArena::render_pass(typed::ResourceId id) const {
+        if (!_owner)
+            throw std::logic_error("Resource arena is empty");
+        const auto& resource = _owner->find(id, storage::ResourceKind::RENDER_PASS);
+        return {{resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.render_pass}};
     }
     PipelineLayoutAccessor ResourceArena::pipeline_layout(typed::ResourceId id) const {
         if (!_owner)

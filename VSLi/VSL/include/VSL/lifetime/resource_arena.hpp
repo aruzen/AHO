@@ -9,6 +9,7 @@
 #include "../operation/shader_create_info.hpp"
 #include "../operation/pipeline_layout_create_info.hpp"
 #include "../vulkan/pipeline_layout.hpp"
+#include "../vulkan/render_pass.hpp"
 #include "../storage/arena_memory.hpp"
 #include "../vulkan/image.hpp"
 #include "../vulkan/sampler.hpp"
@@ -30,7 +31,7 @@ namespace VSL_NAMESPACE::lifetime {
     };
     using ResourceInit = std::variant<BufferCreateInfo, ImageCreateInfo, SamplerCreateInfo, BufferView, ImageAccessor, SamplerAccessor,
                                       DescriptorLayoutCreateInfo, DescriptorPoolCreateInfo, DescriptorSetInit,
-                                      graphic_resource::BindingLayout, graphic_resource::Pool, ShaderCreateInfo, ShaderAccessor, PipelineLayoutInit, PipelineLayoutAccessor>;
+                                      graphic_resource::BindingLayout, graphic_resource::Pool, ShaderCreateInfo, ShaderAccessor, PipelineLayoutInit, PipelineLayoutAccessor, RenderPassDescription, RenderPassAccessor>;
     class ResourceArena {
         std::shared_ptr<detail::ResourceArenaOwner> _owner;
         ResourceArena(LogicalDeviceAccessor device, typed::LifetimeGroup group,
@@ -59,6 +60,7 @@ namespace VSL_NAMESPACE::lifetime {
         GraphicResource descriptor_set(typed::ResourceId id) const;
         ShaderAccessor shader(typed::ResourceId id) const;
         PipelineLayoutAccessor pipeline_layout(typed::ResourceId id) const;
+        RenderPassAccessor render_pass(typed::ResourceId id) const;
         // 非所有の物理Buffer全体。外部の部分viewに対してはbuffer()を使用する。
         BufferRef borrow_buffer(typed::ResourceId id) const&;
         BufferRef borrow_buffer(typed::ResourceId id) const&& = delete;

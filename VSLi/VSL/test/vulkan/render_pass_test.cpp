@@ -4,7 +4,7 @@ namespace {
     TEST_F(RenderPassVulkanIntegrationTest, CreatesPublicRenderPassAndPickingImagesAtRequestedExtent) {
         vsl::RenderPass normal(description);
         EXPECT_TRUE(static_cast<bool>(normal.data_->render_pass));
-        EXPECT_EQ(normal.data_->device, device.data_);
+        EXPECT_EQ(normal.data_->device, device.data_.get());
         vsl::IDPickingRenderPass picking(description);
         ASSERT_EQ(picking.picking_buffer.size(), 1u);
         EXPECT_EQ(picking.picking_buffer.front().data_->width, 8u);

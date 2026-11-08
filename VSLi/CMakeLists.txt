@@ -62,11 +62,16 @@ add_library(VSL STATIC
         VSL/src/operation/buffer_ops.cpp
         VSL/src/operation/image_ops.cpp
         VSL/src/operation/sampler_ops.cpp
+        VSL/src/operation/shader_ops.cpp
+        VSL/src/private/VSL/operation/shader_ops.hpp
+        VSL/include/VSL/operation/shader_create_info.hpp
         VSL/src/operation/submission_ops.cpp
         VSL/src/sync/buffer_access.cpp
         VSL/src/lifetime/buffer_storage.cpp
         VSL/src/lifetime/image_storage.cpp
         VSL/src/lifetime/sampler_storage.cpp
+        VSL/src/lifetime/shader_storage.cpp
+        VSL/src/private/VSL/lifetime/shader_storage.hpp
         VSL/src/lifetime/submission_retention.cpp
         VSL/src/lifetime/buffer_arena.cpp
         VSL/src/lifetime/resource_arena.cpp

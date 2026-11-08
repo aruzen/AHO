@@ -14,7 +14,7 @@ namespace VSL_NAMESPACE::typed::detail {
     }
     void validate_push_schema(PipelineLayoutAccessor layout, std::span<const PushRequirement> requirements) {
         for (const auto& shader : layout.data_->info->shaders) {
-            utils::SPIRVReflector reflection({}, std::span<const std::uint32_t>(shader->code), shader->name, ShaderType(shader->shader_stage_create_info.stage));
+            utils::SPIRVReflector reflection({}, std::span<const std::uint32_t>(shader->code), shader->name, ShaderType(shader->stage));
             if (!reflection.generated.push_constants)
                 continue;
             for (const auto& member : reflection.generated.push_constants->definitions) {

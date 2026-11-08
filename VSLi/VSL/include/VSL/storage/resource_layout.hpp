@@ -29,6 +29,10 @@ namespace VSL_NAMESPACE::storage {
     struct ImplLayout<impl::GraphicResourceImpl> {
         static constexpr size_t SIZE = DESCRIPTOR_SET_IMPL_SIZE, ALIGNMENT = DESCRIPTOR_SET_IMPL_ALIGNMENT;
     };
+    template<>
+    struct ImplLayout<impl::ShaderImpl> {
+        static constexpr size_t SIZE = SHADER_IMPL_SIZE, ALIGNMENT = SHADER_IMPL_ALIGNMENT;
+    };
     inline constexpr size_t NO_SEPARATE_USE = std::numeric_limits<size_t>::max();
     template<typename Impl>
     struct ResourceSlotLayout {
@@ -48,13 +52,18 @@ namespace VSL_NAMESPACE::storage {
     struct ResourceSlotLayout<impl::GraphicResourceImpl> {
         static constexpr size_t SIZE = DESCRIPTOR_SET_IMPL_SIZE, ALIGNMENT = DESCRIPTOR_SET_IMPL_ALIGNMENT, USE_OFFSET = NO_SEPARATE_USE;
     };
+    template<>
+    struct ResourceSlotLayout<impl::ShaderImpl> {
+        static constexpr size_t SIZE = SHADER_IMPL_SIZE, ALIGNMENT = SHADER_IMPL_ALIGNMENT, USE_OFFSET = NO_SEPARATE_USE;
+    };
     enum class ResourceKind : std::uint32_t {
         BUFFER,
         IMAGE,
         SAMPLER,
         DESCRIPTOR_LAYOUT,
         DESCRIPTOR_POOL,
-        DESCRIPTOR_SET
+        DESCRIPTOR_SET,
+        SHADER
     };
     struct SlotLayout {
         size_t size, alignment, use_offset;
@@ -72,6 +81,7 @@ namespace VSL_NAMESPACE::storage {
         using Layout = ResourceSlotLayout<impl::ResourceBindingLayoutImpl>;
         using Pool = ResourceSlotLayout<impl::GraphicResourcePoolImpl>;
         using Set = ResourceSlotLayout<impl::GraphicResourceImpl>;
+        using Shader = ResourceSlotLayout<impl::ShaderImpl>;
         switch (kind) {
             case ResourceKind::BUFFER:
                 return {Buffer::SIZE, Buffer::ALIGNMENT, Buffer::USE_OFFSET};
@@ -85,6 +95,8 @@ namespace VSL_NAMESPACE::storage {
                 return {Pool::SIZE, Pool::ALIGNMENT, Pool::USE_OFFSET};
             case ResourceKind::DESCRIPTOR_SET:
                 return {Set::SIZE, Set::ALIGNMENT, Set::USE_OFFSET};
+            case ResourceKind::SHADER:
+                return {Shader::SIZE, Shader::ALIGNMENT, Shader::USE_OFFSET};
         }
         throw std::invalid_argument("Unknown resource implementation kind");
     }

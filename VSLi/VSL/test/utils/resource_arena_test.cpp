@@ -18,6 +18,36 @@ namespace {
     class ResourceArenaVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+    TEST_F(ResourceArenaVulkanIntegrationTest, ImportedShaderIsAFixedManagedParentWithoutAGpuUseState) {
+        using Set = t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
+        using View = t::TypedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>;
+        constexpr std::array<t::ResourceRequest, 5> source_requests{{{{1}, SHADER}, {{2}, BUFFER}, {{3}, DESCRIPTOR_LAYOUT}, {{4}, DESCRIPTOR_POOL}, {{5}, DESCRIPTOR_SET}}};
+        constexpr std::array<t::ResourceRequest, 2> target_requests{{{{1}, SHADER, true}, {{2}, BUFFER}}};
+        constexpr t::ResourcePlan<5> source_plan(source_requests);
+        constexpr t::ResourcePlan<2> target_plan(target_requests);
+        const auto bytes = vsl_test::read_binary(vsl_test::shader_path("triangle.vert.spv"));
+        std::vector<std::uint32_t> code(bytes.size() / sizeof(std::uint32_t));
+        std::memcpy(code.data(), bytes.data(), bytes.size());
+        const vsl::DescriptorLayoutCreateInfo layout{{Set::POINTS.begin(), Set::POINTS.end()}};
+        const vsl::DescriptorPoolCreateInfo pool{{{vsl::graphic_resource::Type::UNIFORM_BUFFER, 1}}, 1};
+        const vsl::BufferCreateInfo buffer{4, vsl::MemoryType::UNIFORM_BUFFER};
+        std::weak_ptr<void> a, b;
+        {
+            const std::array<l::ResourceInit, 5> inputs{vsl::ShaderCreateInfo{vsl::ShaderType::VERTEX, code}, buffer, layout, pool, l::DescriptorSetInit{{4}, {3}}};
+            l::ResourceArena source(device, source_plan, inputs, l::DependencyPolicy::DYNAMIC);
+            const std::array<l::ResourceInit, 2> imports{source.shader({1}), buffer};
+            l::ResourceArena target(device, target_plan, imports, l::DependencyPolicy::DYNAMIC);
+            a = source.owner();
+            b = target.owner();
+            EXPECT_TRUE(target.shader({1}).owner_ref().managed());
+            auto set = t::TypedDescriptorSet<Set>::FromResource(device, source.descriptor_set({5}));
+            set.write<0>(View::FromView(source.buffer({2}), 1));
+            EXPECT_THROW(set.write<0>(View::FromView(target.buffer({2}), 1)), std::invalid_argument);
+            EXPECT_NO_THROW(set.require_complete());
+        }
+        EXPECT_TRUE(a.expired());
+        EXPECT_TRUE(b.expired());
+    }
     TEST_F(ResourceArenaVulkanIntegrationTest, MixedObjectsFollowThePlanAndShareOneOwnerWithoutSharingUseStates) {
         const std::array<l::ResourceInit, 4> inputs{BUFFER_INFO, IMAGE_INFO, SAMPLER_INFO, BUFFER_INFO};
         l::ResourceArena arena(device, PLAN, inputs);

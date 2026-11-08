@@ -11,9 +11,9 @@ namespace {
         EXPECT_EQ(group.data_->name, "triangle");
         auto layout = make_layout_state();
         group.injection(layout);
-        ASSERT_EQ(layout.data_->info->shader_stages.size(), 2u);
-        EXPECT_EQ(layout.data_->info->shader_stages[0].module, vertex.data_->shader_module);
-        EXPECT_EQ(layout.data_->info->shader_stages[1].module, fragment.data_->shader_module);
+        ASSERT_EQ(layout.data_->info->shaders.size(), 2u);
+        EXPECT_EQ(layout.data_->info->shaders[0]->shader_module, vertex.data_->shader_module);
+        EXPECT_EQ(layout.data_->info->shaders[1]->shader_module, fragment.data_->shader_module);
     }
     TEST_F(ShaderGroupVulkanIntegrationTest, RemovesMatchingShaderByNameAndHandle) {
         vsl::Shader<vsl::ShaderType::VERTEX> vertex(device, vsl_test::shader_path("triangle.vert.spv"),
@@ -70,8 +70,8 @@ namespace {
         EXPECT_EQ(group.data_->shaders[1], fragment.data_);
         auto layout = make_layout_state();
         group.injection(layout);
-        ASSERT_EQ(layout.data_->info->shader_stages.size(), 2u);
-        EXPECT_EQ(layout.data_->info->shader_stages[0].module, vertex.data_->shader_module);
-        EXPECT_EQ(layout.data_->info->shader_stages[1].module, fragment.data_->shader_module);
+        ASSERT_EQ(layout.data_->info->shaders.size(), 2u);
+        EXPECT_EQ(layout.data_->info->shaders[0]->shader_module, vertex.data_->shader_module);
+        EXPECT_EQ(layout.data_->info->shaders[1]->shader_module, fragment.data_->shader_module);
     }
 } // namespace

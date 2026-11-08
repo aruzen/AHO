@@ -31,7 +31,7 @@ CPU arenaにはImplと使用状態の本体を含める。内部vector／map、�
 | 6 | shader／pipeline layout | 生成scratchと永続実体を分離し、共有layout・外部shaderを利用可能にする |
 | 7 | render pass／pipeline／framebuffer | 依存資源を借用して配置し、resizeのattachment世代更新と互換pipelineの再利用を維持 |
 | 8 | command／同期資源／frame | command pool・command buffer・fence・semaphoreを分離／配置し、記録→送信→frame再利用を接続 |
-| 9 | Instance／PhysicalDevice／Surface／Device | 起動arenaへ配置し、子Implの強い所有とshared_from_this依存を除去 |
+| 9 | Instance／PhysicalDevice／Surface／Device | 起動資源を寿命群別arenaへ配置し、子Implの強い所有とshared_from_this依存を除去 |
 | 10 | swapchain／presentation／AHO | 取得画像・世代・presentation完了まで保持し、Engineの起動・resize・終了を新経路で通す |
 | 11 | Typedのarena既定化 | 標準policy変更、heapの明示指定、AHO／サンプル／テストの既定経路を移行 |
 | 12 | 旧入口の廃止と監査 | 公開data_／shared_ptr<Impl>と移行adapterを除去し、残る確保・参照・保持量を測定 |
@@ -40,7 +40,9 @@ CPU arenaにはImplと使用状態の本体を含める。内部vector／map、�
 
 ## 起動と所有境界
 
-起動用arenaにはInstance・選択したPhysicalDevice・必要なSurface・Deviceを配置する。候補列挙はscratchで行い、選択後の能力情報で後続のarenaを計画する。PhysicalDeviceのnative handleはInstanceに属する借用として扱う。
+起動時の生成順と破棄単位を分ける。既定は共通Instance rootを先に完成し、Device群（選択したPhysicalDevice／Device）と、WindowごとのSurface群を別ownerに置き、それぞれ元Instanceをimportする。Device生成中だけSurfaceを保持し、Deviceの固定親にしない。SwapchainはDevice群とSurface群の両方を保持する。Deviceを必要とするBufferが残っているだけで、無関係なSurface／OS windowを延命しない構成を基本にする。
+
+Instance／Device／Surface等を単一ownerに同居させる配置は、寿命を揃えたい場合の明示選択に限る。依存辺を外しても同一owner内の破棄単位は分かれないため、複数Window／Window再作成の既定にしない。候補列挙はscratchで行い、選択後の能力情報で後続のarenaを計画する。PhysicalDeviceのnative handleはInstanceに属する借用として扱う。
 
 Deviceの正規ownerは起動側に置く。内部はdevice refを借用し、公開getter等で所有が必要な場合だけ借用contextと弱いowner参照から取得する。getterで子image／bufferを保持するaliasを返さない。通常のVulkan操作ではこの所有解決を行わない。
 
@@ -51,6 +53,8 @@ OS windowは外部依存とする。Surfaceが保持するOS window ownerと、R
 移行中は旧入口をadapterで併設し、削除する段階を明記する。最終的には通常VSLもowning handle／viewと借用refを使用する。現在のbuffer.data_等は、操作ではbuffer.ref()、保持が必要な境界ではbuffer.view()を渡す形式へ移行する（名称は仮案）。heapとarenaで生成・検証処理は共用する。
 
 Typedの既定変更は、主要資源と起動・終了の経路が揃ってから行う。旧公開入口の廃止時に利用例・破壊的変更の一覧を用意する。
+
+arena既定化より先に、[Typedの配置・保持期間・固定依存](typed-lifetime-boundaries.md)を分離する。heap／arenaの記録保持はCOMPLETIONを共通既定とし、旧SUBMISSIONは明示選択とする。管理recordは資源種ごとの参照欄を増やさず、固定schemaの依存を公開前にfreezeする。通常操作での管理表再探索や所有graph DFSは追加しない。
 
 ## 検証と進捗の扱い
 

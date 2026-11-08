@@ -26,8 +26,7 @@ namespace VSL_NAMESPACE::lifetime {
             ~HeapDescriptorPoolOwner();
         };
         struct HeapDescriptorSetOwner {
-            std::array<OwnerRef, 2> dependencies;
-            size_t dependency_count = 0;
+            std::vector<OwnerRef> dependencies;
             DescriptorOwnerContext context;
             alignas(DescriptorSetSlotStorage) std::byte storage[sizeof(DescriptorSetSlotStorage)];
             HeapDescriptorSetOwner(std::shared_ptr<impl::GraphicResourcePoolImpl> pool, std::shared_ptr<impl::ResourceBindingLayoutImpl> layout);
@@ -53,10 +52,13 @@ namespace VSL_NAMESPACE::lifetime {
                                                        std::shared_ptr<impl::ResourceBindingLayoutImpl> layout) {
             if (!pool || !pool.use_count() || !layout || !layout.use_count())
                 throw std::invalid_argument("Descriptor allocation requires owning pool and layout");
-            detail::retain_owner(dependencies, dependency_count, detail::owned_ref(pool, pool->owner_node));
-            detail::retain_owner(dependencies, dependency_count, detail::owned_ref(layout, layout->owner_node));
-            context.dependencies = std::span(dependencies).first(dependency_count);
+            dependencies.reserve(2);
+            detail::retain_owner(dependencies, detail::owned_ref(pool, pool->owner_node));
+            detail::retain_owner(dependencies, detail::owned_ref(layout, layout->owner_node));
+            context.dependencies = dependencies;
+            context.dependency_storage = &dependencies;
             context.policy = DependencyPolicy::DYNAMIC;
+            context.single_resource = true;
             prepare_descriptor_set(storage, *pool, *layout);
         }
         HeapDescriptorSetOwner::~HeapDescriptorSetOwner() {

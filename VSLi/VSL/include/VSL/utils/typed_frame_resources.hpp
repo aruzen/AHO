@@ -51,7 +51,7 @@ namespace VSL_NAMESPACE::typed {
 
     // Frameにはアプリ側で型付きbuffer・set等の所有者をまとめる。
     // 各記録Phaseでは、get()より前に一度だけ更新できる。
-    template<typename Frame_, ResourceRetention retention = ResourceRetention::SUBMISSION>
+    template<typename Frame_, ResourceRetention retention = ResourceRetention::COMPLETION>
     class TypedFrameResources {
         static_assert(std::is_object_v<Frame_> && !std::is_const_v<Frame_> && !std::is_volatile_v<Frame_>);
         struct Slot {

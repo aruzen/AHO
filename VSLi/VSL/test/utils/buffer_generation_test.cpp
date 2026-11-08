@@ -74,7 +74,7 @@ namespace {
                                                   std::nullopt, 0, set.resource_use());
         command.track(manager.get_buffer());
         command.track(manager.get_buffer());
-        EXPECT_EQ(phase.completion().data_->work.lock()->resources.size(), 2u);
+        EXPECT_EQ(phase.completion().data_->work.lock()->completion_resources.size(), 2u);
         EXPECT_FALSE(first.backend().use_state().busy());
         EXPECT_TRUE(second.backend().use_state().busy());
         EXPECT_THROW(set.write<0>(first), std::logic_error);
@@ -103,7 +103,8 @@ namespace {
                                                       std::nullopt, 0, first.resource_use());
             command.track(manager.get_buffer());
         }
-        EXPECT_EQ(phase.completion().data_->work.lock()->resources.size(), 4u);
+        EXPECT_EQ(phase.completion().data_->work.lock()->resources.size(), 2u);
+        EXPECT_EQ(phase.completion().data_->work.lock()->completion_resources.size(), 2u);
         ASSERT_FALSE(first_set.expired());
         ASSERT_FALSE(second_set.expired());
         ASSERT_FALSE(first_buffer.expired());
@@ -111,6 +112,10 @@ namespace {
         EXPECT_TRUE(first_buffer.lock()->use->busy());
         EXPECT_TRUE(second_buffer.lock()->use->busy());
         phase.cancel();
+        EXPECT_TRUE(first_set.expired());
+        EXPECT_TRUE(first_buffer.expired());
+        EXPECT_FALSE(second_set.expired());
+        EXPECT_FALSE(second_buffer.expired());
     }
 
     TEST_F(BufferGenerationVulkanIntegrationTest, NativeTypedAndImportedViewsShareOneStorageState) {

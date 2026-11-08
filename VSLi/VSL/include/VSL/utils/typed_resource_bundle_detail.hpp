@@ -26,13 +26,11 @@ namespace VSL_NAMESPACE::typed {
         template<>
         struct BundlePolicy<HeapStorage> {
             static constexpr bool ARENA = false;
-            static constexpr auto RETENTION = ResourceRetention::SUBMISSION;
             using Bindings = BufferBindingMap<>;
         };
         template<typename Map>
         struct BundlePolicy<ArenaStorage<Map>> {
             static constexpr bool ARENA = true;
-            static constexpr auto RETENTION = ResourceRetention::COMPLETION;
             using Bindings = Map;
         };
         template<typename Schema, typename Policy>
@@ -109,11 +107,14 @@ namespace VSL_NAMESPACE::typed {
         template<typename Schema, typename Policy>
         struct BundleSharedState {
             BundlePlacementPlan<Schema, Policy> layout;
+            ResourceRetention retention;
+            lifetime::DependencyPolicy dependency_policy;
             std::optional<lifetime::ResourceArena> arena;
             BundleNativeResources native;
             BundleStorageType<Schema, Policy> resources;
             typename BundleSets<typename Schema::Resources::Sets>::Optional sets;
-            explicit BundleSharedState(const ResourceAllocationPlan<Schema>& plan) : layout(plan) {}
+            BundleSharedState(const ResourceAllocationPlan<Schema>& plan, ResourceRetention retention, lifetime::DependencyPolicy dependencies)
+                : layout(plan), retention(retention), dependency_policy(dependencies) {}
         };
         template<typename Schema, typename Spec, typename Policy, typename Inputs>
         auto make_bundle_values(LogicalDeviceAccessor device, const ResourceAllocationPlan<Schema>& plan, const Inputs& inputs, const lifetime::ResourceArena* arena, const BundleNativeResources& native, const BundleSharedState<Schema, Policy>& shared);
@@ -128,13 +129,15 @@ namespace VSL_NAMESPACE::typed {
         template<typename Schema, typename Set, typename Policy>
         void connect_bundle_set(TypedDescriptorSet<typename Set::Layout>& set, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared);
         template<typename Schema, typename Set, typename Policy>
-        auto allocate_bundle_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundlePlacementPlan<Schema, Policy>& layout, const lifetime::ResourceArena* arena);
+        auto allocate_bundle_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundlePlacementPlan<Schema, Policy>& layout, const lifetime::ResourceArena* arena, ResourceRetention retention);
         template<typename Schema, typename Set, typename Policy>
         auto make_bundle_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared, const lifetime::ResourceArena* arena);
         template<typename Schema, typename Policy>
         auto make_bundle_sets(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared, const lifetime::ResourceArena* arena);
         template<typename Schema, typename Policy, typename Inputs>
-        auto make_bundle_shared(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const ResourceAllocationPlan<Schema>& plan, const Inputs& inputs);
+        auto make_bundle_shared(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const ResourceAllocationPlan<Schema>& plan, const Inputs& inputs, ResourceRetention retention, lifetime::DependencyPolicy dependencies);
+        template<typename Policy, typename Sets>
+        void freeze_bundle_dependencies(const std::optional<lifetime::ResourceArena>& arena, const Sets& sets, lifetime::DependencyPolicy policy);
         template<typename Schema, typename Policy>
         void require_bundle_shared_idle(const BundleSharedState<Schema, Policy>& shared);
     } // namespace detail
@@ -307,19 +310,19 @@ namespace VSL_NAMESPACE::typed {
             });
         }
         template<typename Schema, typename Set, typename Policy>
-        auto allocate_bundle_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundlePlacementPlan<Schema, Policy>& layout, const lifetime::ResourceArena* arena) {
+        auto allocate_bundle_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundlePlacementPlan<Schema, Policy>& layout, const lifetime::ResourceArena* arena, ResourceRetention retention) {
             using Result = TypedDescriptorSet<typename Set::Layout>;
             if constexpr (BundlePolicy<Policy>::ARENA) {
                 if (!arena)
                     throw std::logic_error("Typed descriptor requires its resource arena");
-                return Result::FromResource(device, arena->descriptor_set(layout.descriptor_set(Set::SET)), BundlePolicy<Policy>::RETENTION);
+                return Result::FromResource(device, arena->descriptor_set(layout.descriptor_set(Set::SET)), retention);
             } else
-                return Result(device, manager, BundlePolicy<Policy>::RETENTION);
+                return Result(device, manager, retention);
         }
         template<typename Schema, typename Set, typename Policy>
         auto make_bundle_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared, const lifetime::ResourceArena* arena) {
             if constexpr (Schema::SetIsPerFrame(Set::SET)) {
-                auto result = allocate_bundle_set<Schema, Set, Policy>(device, manager, shared.layout, arena);
+                auto result = allocate_bundle_set<Schema, Set, Policy>(device, manager, shared.layout, arena, shared.retention);
                 connect_bundle_set<Schema, Set, Policy>(result, frame, shared);
                 return result;
             } else
@@ -332,20 +335,42 @@ namespace VSL_NAMESPACE::typed {
             }(std::make_index_sequence<Schema::Resources::COUNT>{});
         }
         template<typename Schema, typename Policy, typename Inputs>
-        auto make_bundle_shared(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const ResourceAllocationPlan<Schema>& plan, const Inputs& inputs) {
+        auto make_bundle_shared(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const ResourceAllocationPlan<Schema>& plan, const Inputs& inputs, ResourceRetention retention, lifetime::DependencyPolicy dependencies) {
             validate_bundle_plan(device, manager, plan.entries());
-            auto shared = std::make_shared<BundleSharedState<Schema, Policy>>(plan);
+            auto shared = std::make_shared<BundleSharedState<Schema, Policy>>(plan, retention, dependencies);
             shared->arena = make_bundle_arena<ResourceScope::SHARED, Schema, Policy>(device, plan);
             shared->native = make_bundle_native<ResourceScope::SHARED, Schema, Policy>(device, plan);
             shared->resources = make_bundle_storage<ResourceScope::SHARED, Schema, Policy>(device, plan, inputs, shared->arena ? &*shared->arena : nullptr, shared->native, *shared);
             bundle_for_each<typename Schema::Resources::Sets>([&]<typename Set>() {
                 if constexpr (!Schema::SetIsPerFrame(Set::SET)) {
                     auto& target = std::get<Schema::SetIndex(Set::SET)>(shared->sets);
-                    target.emplace(allocate_bundle_set<Schema, Set, Policy>(device, manager, shared->layout, shared->arena ? &*shared->arena : nullptr));
+                    target.emplace(allocate_bundle_set<Schema, Set, Policy>(device, manager, shared->layout, shared->arena ? &*shared->arena : nullptr, shared->retention));
                     connect_bundle_set<Schema, Set, Policy>(*target, shared->resources, *shared);
                 }
             });
+            freeze_bundle_dependencies<Policy>(shared->arena, shared->sets, shared->dependency_policy);
             return shared;
+        }
+        template<typename Policy, typename Sets>
+        void freeze_bundle_dependencies(const std::optional<lifetime::ResourceArena>& arena, const Sets& sets, lifetime::DependencyPolicy policy) {
+            if (policy != lifetime::DependencyPolicy::FIXED)
+                return;
+            if constexpr (BundlePolicy<Policy>::ARENA) {
+                if (arena)
+                    arena->freeze_dependencies();
+            } else {
+                std::apply([](const auto&... set) {
+                    const auto freeze = [](const auto& value) {
+                        if constexpr (requires { value.has_value(); }) {
+                            if (value)
+                                value->freeze_dependencies();
+                        } else
+                            value.freeze_dependencies();
+                    };
+                    (freeze(set), ...);
+                },
+                           sets);
+            }
         }
         template<typename Schema, typename Policy>
         void require_bundle_shared_idle(const BundleSharedState<Schema, Policy>& shared) {

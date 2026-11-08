@@ -130,7 +130,7 @@ namespace {
         {
             auto phase = manager.start_phase<vsl::ComputePhase>();
             {
-                t::TypedFrameResources<Owners> original(manager, [&](size_t) {
+                t::TypedFrameResources<Owners, vsl::ResourceRetention::SUBMISSION> original(manager, [&](size_t) {
                     auto value = std::make_shared<int>(9);
                     owner = value;
                     return Owners{std::move(value)};

@@ -82,6 +82,7 @@ namespace VSL_NAMESPACE::lifetime {
                       std::span<const LogicalUseState> dependencies = {}, DependencyPolicy policy = DependencyPolicy::FIXED);
         std::shared_ptr<void> owner() const;
         OwnerRef owner_ref() const;
+        void freeze_dependencies() const;
         size_t size() const;
         size_t slots() const;
         typed::LifetimeGroup lifetime() const;

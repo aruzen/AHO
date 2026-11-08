@@ -1,5 +1,6 @@
 #include "support/vulkan_fixture.hpp"
 #include <VSL/lifetime/resource_arena.hpp>
+#include <VSL/lifetime/arena_resource.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/vulkan/commands/image_upload.hpp>
 
@@ -18,6 +19,23 @@ namespace {
     class ResourceArenaVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+    TEST(ResourceArenaMetadataTest, StoresOnlyOneTypedReferenceRegardlessOfResourceKindCount) {
+        using Record = l::detail::ArenaResource;
+        static_assert(sizeof(Record::Reference) <= 2 * sizeof(void*));
+        static_assert(std::is_nothrow_copy_assignable_v<Record::Reference>);
+        RecordProperty("record_bytes", static_cast<int>(sizeof(Record)));
+        RecordProperty("reference_bytes", static_cast<int>(sizeof(Record::Reference)));
+        Record record{{}};
+        vsl::impl::BufferImpl buffer;
+        vsl::impl::ImageImpl image;
+        record.reference = &buffer;
+        EXPECT_EQ(record.buffer().data, &buffer);
+        EXPECT_EQ(record.get<vsl::impl::ImageImpl>(), nullptr);
+        record.reference = &image;
+        EXPECT_EQ(record.get<vsl::impl::ImageImpl>(), &image);
+        EXPECT_EQ(record.buffer().data, nullptr);
+        EXPECT_LE(sizeof(Record), sizeof(t::ResourcePlacement) + 2 * sizeof(void*) + 3 * sizeof(size_t));
+    }
     TEST_F(ResourceArenaVulkanIntegrationTest, ImportedShaderIsAFixedManagedParentWithoutAGpuUseState) {
         using Set = t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
         using View = t::TypedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>;

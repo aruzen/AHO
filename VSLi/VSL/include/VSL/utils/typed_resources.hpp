@@ -21,6 +21,7 @@ namespace VSL_NAMESPACE::typed {
         };
         ResourceUse descriptor_constraints(const DescriptorValue& value);
         void require_descriptor_complete(const GraphicResource& resource);
+        void freeze_descriptor_dependencies(const GraphicResource& resource);
         void validate_descriptor_resource(const GraphicResource& resource, LogicalDeviceAccessor device, std::span<const graphic_resource::BindingPoint> points);
         GraphicResource allocate_descriptor_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager,
                                                 std::span<const graphic_resource::BindingPoint> points);
@@ -125,12 +126,13 @@ namespace VSL_NAMESPACE::typed {
     public:
         using Spec = Spec_;
         using Layout = typename Spec::Layout;
-        TypedDescriptorSet(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, ResourceRetention retention = ResourceRetention::SUBMISSION);
-        static TypedDescriptorSet FromResource(LogicalDeviceAccessor device, GraphicResource resource, ResourceRetention retention = ResourceRetention::SUBMISSION);
+        TypedDescriptorSet(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, ResourceRetention retention = ResourceRetention::COMPLETION);
+        static TypedDescriptorSet FromResource(LogicalDeviceAccessor device, GraphicResource resource, ResourceRetention retention = ResourceRetention::COMPLETION);
         const GraphicResource& backend() const { return _resource; }
         LogicalDeviceAccessor device() const { return _device; }
         const std::shared_ptr<ResourceUseGroup>& resource_use() const { return _use; }
         void require_complete() const;
+        void freeze_dependencies() const { detail::freeze_descriptor_dependencies(_resource); }
         template<std::uint32_t binding, typename Value>
         requires(detail::descriptor_matches<typename Spec_::template Binding<binding>, Value>() && Spec_::template Binding<binding>::POINT.amount == 1)
         void write(const Value& value);

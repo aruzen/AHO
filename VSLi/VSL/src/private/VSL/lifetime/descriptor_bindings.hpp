@@ -7,10 +7,13 @@ namespace VSL_NAMESPACE::lifetime {
     struct DescriptorOwnerContext {
         DependencyNode node;
         std::span<const OwnerRef> dependencies;
+        std::vector<OwnerRef>* dependency_storage = nullptr;
         DependencyPolicy policy = DependencyPolicy::FIXED;
+        bool single_resource = false;
         void normalize(std::vector<OwnerRef>& owners) const;
     };
     void visit_descriptor_edges(const impl::GraphicResourceImpl& resource, DependencyNode::EdgeVisitor visitor, void* context);
+    void freeze_descriptor_dependencies(DescriptorOwnerContext& context, std::span<impl::GraphicResourceImpl* const> resources);
     void replace_descriptor_constraints(impl::GraphicResourceImpl& resource, size_t binding, std::span<const ResourceUse> uses);
     impl::GraphicResourceImpl::BindingConstraint descriptor_constraint(const ResourceUse& use, const DescriptorOwnerContext* context = nullptr);
     // 全検証とmetadataの準備を済ませてからnative更新し、要素範囲を一度にcommitする。

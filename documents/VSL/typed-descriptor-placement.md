@@ -27,7 +27,7 @@ const auto cpu_bytes = placement.total_arena_bytes();
 
 ## 所有・利用・回収
 
-arenaのSetはFromResource(COMPLETION)でTyped APIへ接続する。通常操作は解決済みImplと共通のSet使用状態を参照する。同じrootと固定親に属するbinding所有は借用へ正規化し、別rootの可変入力と追加ResourceUseはDYNAMIC方針で保持・循環検査する。
+arenaのSetはFromResourceでTyped APIへ接続する。保持期間は[配置と独立した選択](typed-lifetime-boundaries.md)に変更し、heap／arenaともCOMPLETIONを既定とする。通常操作は解決済みImplと共通のSet使用状態を参照する。bundleは初期bindingと追加ResourceUseのownerを公開前に固定親へ移し、FIXEDを既定とする。別rootを後から追加する可変入力はDYNAMICの明示選択で保持・循環検査する。
 
 PlacedResourceBufferViewのdescriptorも、raw shared_ptrを経由せず、owner_refからImplへのaliasを返す。Typed入力の使用状態を省略できるのは、物理State*とcontrol blockが一致し、明示ownerも空または同じcontrol blockの場合に限る。同じ物理状態でも別owner、null alias owner、別controlのstateを伴う入力は追加制約として保持し、graph検査へ渡す。
 

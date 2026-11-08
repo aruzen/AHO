@@ -15,7 +15,24 @@ namespace {
                                                    t::BufferAllocation<5, 0, t::FixedElements<1>, t::ResourceScope::SHARED>>;
     using Bundle = t::TypedResourceBundle<Allocation>;
     using ArenaBundle = t::TypedResourceBundle<Allocation, t::ArenaStorage<>>;
+    static_assert(Bundle::RETENTION == vsl::ResourceRetention::COMPLETION);
+    static_assert(ArenaBundle::RETENTION == Bundle::RETENTION);
+    static_assert(Bundle::DEPENDENCIES == vsl::lifetime::DependencyPolicy::FIXED);
     class TypedBundleVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
+        bool validate_vulkan() const override { return true; }
+    };
+    template<typename Storage_, vsl::ResourceRetention retention>
+    struct BundleLifetimeCase {
+        using Storage = Storage_;
+        static constexpr auto RETENTION = retention;
+    };
+    using BundleLifetimeCases = ::testing::Types<
+        BundleLifetimeCase<t::HeapStorage, vsl::ResourceRetention::COMPLETION>,
+        BundleLifetimeCase<t::ArenaStorage<>, vsl::ResourceRetention::COMPLETION>,
+        BundleLifetimeCase<t::HeapStorage, vsl::ResourceRetention::SUBMISSION>,
+        BundleLifetimeCase<t::ArenaStorage<>, vsl::ResourceRetention::SUBMISSION>>;
+    template<typename Case>
+    class TypedBundleLifetimeVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
     class CountingManager : public vsl::GraphicResourceManager {
@@ -599,5 +616,120 @@ namespace {
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         ASSERT_TRUE(phase.completion().wait());
         EXPECT_TRUE(owner.expired());
+    }
+} // namespace
+
+namespace {
+    TYPED_TEST_SUITE(TypedBundleLifetimeVulkanIntegrationTest, BundleLifetimeCases);
+
+    TYPED_TEST(TypedBundleLifetimeVulkanIntegrationTest, CompletionRetentionIsIndependentOfPlacement) {
+        using B = t::TypedResourceBundle<Allocation, typename TypeParam::Storage, TypeParam::RETENTION>;
+        auto manager = this->make_manager();
+        CountingManager descriptors(this->device);
+        vsl::Shader<vsl::ShaderType::COMPUTE> shader(this->device, vsl_test::shader_path("typed_bundle.comp.spv"));
+        t::TypedComputePipeline<Resources> pipeline(this->device, vsl::pipeline_layout::ShaderGroup("retention", {shader}));
+        vsl::Completion completion;
+        std::weak_ptr<void> owner, shared;
+        {
+            auto phase = manager.template start_phase<vsl::ComputePhase>();
+            completion = phase.completion();
+            {
+                B bundle(manager, descriptors, sizes());
+                const auto& frame = bundle.get(phase);
+                owner = frame.template set<2>().backend().data_;
+                shared = frame.template set<5>().backend().data_;
+                phase << frame.bind_resources(pipeline).dispatch(4);
+            }
+            EXPECT_FALSE(owner.expired());
+            EXPECT_FALSE(shared.expired());
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            ASSERT_TRUE(completion.wait());
+            EXPECT_EQ(owner.expired(), TypeParam::RETENTION == vsl::ResourceRetention::COMPLETION);
+            EXPECT_EQ(shared.expired(), TypeParam::RETENTION == vsl::ResourceRetention::COMPLETION);
+        }
+        auto next = manager.template start_phase<vsl::ComputePhase>();
+        ASSERT_EQ(next.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        ASSERT_TRUE(next.completion().wait());
+        EXPECT_TRUE(owner.expired());
+        EXPECT_TRUE(shared.expired());
+    }
+    TYPED_TEST(TypedBundleLifetimeVulkanIntegrationTest, CancellationUsesTheSameRetentionContractForBothPlacements) {
+        using B = t::TypedResourceBundle<Allocation, typename TypeParam::Storage, TypeParam::RETENTION>;
+        auto manager = this->make_manager();
+        CountingManager descriptors(this->device);
+        vsl::Completion completion;
+        std::weak_ptr<void> owner, shared;
+        {
+            auto phase = manager.template start_phase<vsl::ComputePhase>();
+            completion = phase.completion();
+            {
+                B bundle(manager, descriptors, sizes());
+                const auto& frame = bundle.get(phase);
+                owner = frame.template set<2>().backend().data_;
+                shared = frame.template set<5>().backend().data_;
+                frame.template set<2>().resource_use()->record(manager.get_buffer());
+                frame.template set<5>().resource_use()->record(manager.get_buffer());
+            }
+            EXPECT_FALSE(owner.expired());
+            EXPECT_FALSE(shared.expired());
+            phase.cancel();
+            EXPECT_EQ(completion.status(), vsl::Completion::Status::CANCELLED);
+            EXPECT_EQ(owner.expired(), TypeParam::RETENTION == vsl::ResourceRetention::COMPLETION);
+            EXPECT_EQ(shared.expired(), TypeParam::RETENTION == vsl::ResourceRetention::COMPLETION);
+        }
+        EXPECT_TRUE(owner.expired());
+        EXPECT_TRUE(shared.expired());
+    }
+    TYPED_TEST(TypedBundleLifetimeVulkanIntegrationTest, SavedCommandRetainsResourcesAndCanBeRecordedAgain) {
+        using B = t::TypedResourceBundle<Allocation, typename TypeParam::Storage, TypeParam::RETENTION>;
+        auto manager = this->make_manager();
+        CountingManager descriptors(this->device);
+        vsl::Shader<vsl::ShaderType::COMPUTE> shader(this->device, vsl_test::shader_path("typed_bundle.comp.spv"));
+        t::TypedComputePipeline<Resources> pipeline(this->device, vsl::pipeline_layout::ShaderGroup("saved command", {shader}));
+        std::weak_ptr<void> owner;
+        vsl::Completion saved;
+        {
+            const auto command = [&] {
+                auto phase = manager.template start_phase<vsl::ComputePhase>();
+                B bundle(manager, descriptors, sizes());
+                const auto& frame = bundle.get(phase);
+                owner = frame.template set<2>().backend().data_;
+                auto result = frame.bind_resources(pipeline).dispatch(4);
+                phase.cancel();
+                return result;
+            }();
+            for (unsigned repeat = 0; repeat < 2; ++repeat) {
+                auto phase = manager.template start_phase<vsl::ComputePhase>();
+                phase << command;
+                saved = phase.completion();
+                ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+                ASSERT_TRUE(saved.wait());
+                EXPECT_FALSE(owner.expired());
+            }
+        }
+        EXPECT_EQ(owner.expired(), TypeParam::RETENTION == vsl::ResourceRetention::COMPLETION);
+        auto next = manager.template start_phase<vsl::ComputePhase>();
+        ASSERT_EQ(next.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        ASSERT_TRUE(next.completion().wait());
+        EXPECT_TRUE(owner.expired());
+    }
+    TYPED_TEST(TypedBundleLifetimeVulkanIntegrationTest, FixedDependenciesRejectNewOwnersAndDynamicIsExplicit) {
+        using B = t::TypedResourceBundle<Allocation, typename TypeParam::Storage, TypeParam::RETENTION>;
+        using Dynamic = t::TypedResourceBundle<Allocation, typename TypeParam::Storage, TypeParam::RETENTION, vsl::lifetime::DependencyPolicy::DYNAMIC>;
+        auto manager = this->make_manager();
+        CountingManager descriptors(this->device);
+        t::TypedUniformBuffer<std::uint32_t> other(this->device, 9u);
+        auto phase = manager.template start_phase<vsl::ComputePhase>();
+        B fixed(manager, descriptors, sizes());
+        const auto& frame = fixed.get(phase);
+        auto set = frame.template set<2>();
+        EXPECT_THROW(set.template write<0>(other), std::invalid_argument);
+        EXPECT_NO_THROW(set.template write<0>(frame.template buffer<2, 0>()));
+        EXPECT_NO_THROW(set.require_complete());
+        Dynamic dynamic(manager, descriptors, sizes());
+        auto editable = dynamic.get(phase).template set<2>();
+        EXPECT_NO_THROW(editable.template write<0>(other));
+        EXPECT_NO_THROW(editable.require_complete());
+        phase.cancel();
     }
 } // namespace

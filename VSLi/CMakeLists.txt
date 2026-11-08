@@ -121,6 +121,7 @@ add_library(VSL STATIC
         VSL/src/private/VSL/lifetime/command_domain.hpp
         VSL/src/lifetime/buffer_arena.cpp
         VSL/src/lifetime/resource_arena.cpp
+        VSL/src/private/VSL/lifetime/arena_resource.hpp
         VSL/include/VSL/lifetime/resource_arena.hpp
         VSL/src/storage/arena_memory.cpp
         VSL/include/VSL/storage/arena_memory.hpp

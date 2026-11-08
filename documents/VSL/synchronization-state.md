@@ -1,0 +1,74 @@
+# Fence／Semaphoreの共通使用状態と明示破棄の制約
+
+[完了計画](arena-completion-plan.md)の8b後半の前提となる単位。Native同期資源をarenaへ配置する前に、Phaseの予約・使用状態と明示wait／reset／destroyを接続する。CPU配置自体は次の単位であり、通常のshared Impl／Device保持は移行中である。
+
+## 責務と所有
+
+syncはFence要素ごとの予約・最後の送信結果と、Semaphoreのgraphics／WSI使用状態を持つ。lifetimeは正規owner、操作中のsnapshot、再入gate、予約の移譲と回収時点を管理する。operationは配列のnative生成・逆順破棄・wait／resetを行う。
+
+Native配列はCPU容量を生成前に確保する。後続のnative生成に失敗した場合は成功分を逆順で回収し、新しい名前を公開しない。生成・count検証は通常入口と後続の配置backendで共有する。named registryの置換は使用中の旧世代を強制破棄せず、旧destroyは元registryの同じ実体だけを削除する。
+
+正規ownerをweakに登録し、同じImpl pointerを別control blockで包む入力を拒否する。Implからregistry／Workを強所有しない。完了結果は引き続き結果だけを保持し、保存したCompletionが資源を延命しない。
+
+Workのwait Semaphore／signal Semaphore／external Fenceは解決済みの借用pointerとする。所有は既存resources一覧へcontrol block単位で一度保持し、3役のsourceは一覧のindexで識別する。記録時の追加も同じ一覧で重複排除する。一覧は追加のみなのでvector再確保でもpointerとindexは変わらない。
+
+取消の返却Workへは同期sourceのownerだけを再登録し、破棄した記録の他資源をコピーしない。GPU操作でownerの弱参照やregistryを探索しない。Presentationの保持はacquire／presentという別の所有境界である。
+
+## Fenceの要素別予約
+
+FenceImplの各要素はweak reservationとweak last-submitted Resultを持つ。Workはreservationを保持する。reservationは現在のResultのweak参照だけを持ち、Work／Fence／Domainへ強い参照を作らない。
+
+prepareからPENDING予約を公開する。同じ要素を別managerへ同時に貸し出す操作は拒否し、別要素は独立して利用できる。Trackedな前回送信がSUBMITTEDなら完了を待つ。VSLが生成した未使用のunsignaled Fenceも予約でき、submit前にnative resetを行う。未追跡のnative submitと混在させる場合は、利用者が貸出し前のidleを保証する。
+
+公開FenceHolder.wait(index/all)は対象にPENDING予約があればnative wait前に拒否する。Completion.wait(PENDING)がfalseを返す契約とは異なる。reset／destroyはPENDINGまたはSUBMITTEDを拒否し、全要素操作では全対象を先に検査する。terminal後は旧WorkがSUBMISSION方針で残っていても操作できる。
+
+wait／reset(index)は対象行だけ、all／destroyは全対象をgateする。owner・native handles・予約／結果をsnapshotし、poll callback中の同要素reset／destroy／再貸出しを拒否する。別要素の操作と同名の別世代生成は許可する。callbackが元Holderやregistry facadeを差し替えても、元の対象へ処理を続け、新しい登録を消さない。
+
+native reset前に元Resultを観測するため、保存CompletionのCOMPLETEはnative Fenceをreset／destroyした後も維持される。timeoutは終端扱いにしない。未知の観測エラーでは予約と資源を残す。native waitがDEVICE_LOSTを返した場合も対象の送信結果へ反映してから例外を返す。
+
+```cpp
+auto frames = sync.create_fence("frames", std::size_t{3}, false);
+auto phase = manager.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, frames);
+// この間の同要素wait/reset/destroyは拒否する。
+phase.submit();
+auto result = phase.completion();
+result.wait();
+frames.reset(phase.frame_slot);
+// resultは元送信の完了結果を保持する。
+```
+
+## 取消の予約移譲
+
+DefaultPhase.cancelは、未送信の元Workが持つexternal／owned Fence、native handle、reservationを返却用Workへ直接渡す。元prepareでidle確認済みなので再wait・再予約をしない。最初の取消でもowned Fenceを余分に生成しない。
+
+reservationの現在Resultを返却用へ切り替えてから、返却のsubmitでlast-submittedを更新し、元ResultをCANCELLEDとして公開する。旧terminal通知が新予約を解除しない。元Phaseの同期fieldが変更されても、acquireで実際に使った元sourceを引き継ぐ。通常submitはprepare後のsource変更を拒否する。
+
+自身のCOMPLETION／旧slot SUBMISSION callbackでPhaseが破棄される場合は、従来どおり局所Work／Domainを保持し、その後thisへ戻らない。別送信の外部Fence待機callbackから、setup中のPhase自体を破棄する操作は保証範囲外であり、そのPhaseを待機終了まで保持する。
+
+## SemaphoreのgraphicsとWSI
+
+graphics使用は複数Workのweak Result一覧で管理する。後続のPENDINGや取消が先行SUBMITTEDを上書きしない。同じResultの複数役は一度だけ登録する。PENDING／SUBMITTEDの間はdestroyを拒否し、terminal後のbusy判定にshared_ptrの参照数を使わない。
+
+WSI markerはgraphics Resultと別の状態である。Semaphore側はweak、Presentation／Domainが強保持する。acquire前にmarkerを登録し、Presentationのacquire Fence待機が終わるまで保持する。graphicsのwait完了（COMPLETE）またはDEVICE_LOSTもacquire signal終了の証拠となる。CANCELLED／SUBMIT_FAILEDだけではacquire完了とみなさない。cleanupへはacquire markerのResultも切り替える。
+
+finished markerは「これからpresentへ渡す予定」の間もPresentationが保持する。submit_commands→wait_idle→presentでgraphicsが完了し、Domain一覧が空になってもdestroyを拒否する。present直前にDomainへ再登録してからPhase側を解放する。graphicsとpresentationを同じ完了として扱わない。
+
+DomainのWSI保持の回収は現在のdevice-idle契約を維持する暫定接続である。追加拡張なしのDeviceWaitIdleだけでは厳密なpresentation完了を証明できず、presentation fence／reacquireによる証明は順序10で実装する。
+
+## 互換性と残る範囲
+
+公開のconstructor、named lookup、Holderコピー、wait／reset／destroyの形を維持する。使用中の明示破棄とPENDINGのnative waitが成功することには依存しない。通常のframe再利用はPhaseのprepareへ任せる。
+
+同期資源のCPU配置、Device／registryの所有分離、Typed frame接続は後続である。現在はreservationのcontrol block、WSI marker、可変使用一覧、Work／結果／Fenceの確保が残る。Source所有の重複排除を行ったが、総確保数や性能率は未測定である。host呼出しの直列化は利用側の責務であり、GPU同期管理とCPU thread safetyを混同しない。
+
+## 検証
+
+GPU14ケースを追加した。PENDING予約の二重貸出し／公開wait・reset・destroy拒否と別要素の独立、全要素先行検査、wait／reset／destroy中のHolder差替えと同名置換、registry facadeの破棄、複数Semaphore使用と取消、2役の1owner／1使用登録、canonical control block、生成前検証失敗での旧登録維持、予約時の再入gateを確認した。
+
+Windowでは、PENDING中のwait_idle、submit_commands→wait_idle→presentのfinished保持、cleanupが元のsource／reservationを使うこと、tokenと新Resultの一致、旧CANCELLED通知でのPhase自己破棄を確認した。setup失敗テストはmarker作成前の配列サイズ検査を対象とし、native acquire後の失敗注入ではない。未完了Fenceの一部は未queueのunsignaled fenceで判定を固定しており、実GPU停止とは区別する。
+
+macOS arm64／Clang20／C++26／ASan・UBSan／MoltenVK・validationで、重点26件、VSL918件中915成功・既知packed format3skip、AHO GPU150件／CPU1070件、compile契約195件が成功した。変更C++11ファイル／7TUのstrict違反0、CMake320パスとMSBuild／filtersの新6パスの一意登録を確認した。
+
+installed public consumer17targetのbuild／link／CPU実行、Debug／Releaseの実寸法assertとCPU利用、x86_64 cross archive、異artifact拒否が成功した。private state／lifetime／operationはinstallしない。既存13種類のslot寸法は変えず、同期状態headerもartifact fingerprintの入力へ追加した。
+
+heap／arenaサンプルの3frame・12submission・2draw・238831更新画素、resize1720×1080→2000×1360、pipeline生成1回を維持し、PNG3枚が一致した。VUID／sanitizer errorはない。driverの全生成／acquire／submit／present失敗位置、実DeviceLost、Windows／Linux実機、LSan、CPU並行、厳密なpresentation終了は未検証である。

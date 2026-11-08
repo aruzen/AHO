@@ -208,6 +208,12 @@
     <ClCompile Include="VSL\src\operation\command_ops.cpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\command_storage.hpp" />
     <ClCompile Include="VSL\src\lifetime\command_storage.cpp" />
+    <ClInclude Include="VSL\src\private\VSL\sync\synchronization_state.hpp" />
+    <ClCompile Include="VSL\src\sync\synchronization_state.cpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\synchronization_use.hpp" />
+    <ClCompile Include="VSL\src\lifetime\synchronization_use.cpp" />
+    <ClInclude Include="VSL\src\private\VSL\operation\synchronization_ops.hpp" />
+    <ClCompile Include="VSL\src\operation\synchronization_ops.cpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\command_domain.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\submission_retention.hpp" />
     <ClCompile Include="VSL\src\sync\buffer_access.cpp" />

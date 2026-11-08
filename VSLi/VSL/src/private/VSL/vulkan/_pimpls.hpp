@@ -5,8 +5,11 @@
 #include <VSL/vulkan/buffer_and_image_accessor.hpp>
 #include <VSL/vulkan/command.hpp>
 #include <VSL/lifetime/resource_use.hpp>
+#include <VSL/sync/synchronization_state.hpp>
 
 #include <compare>
+#include <array>
+#include <limits>
 
 #ifdef _MSC_VER
 #define VK_USE_PLATFORM_WIN32_KHR
@@ -110,11 +113,22 @@ namespace VSL_NAMESPACE::impl {
         std::int32_t error_code = 0;
         std::weak_ptr<SubmissionWork> work;
     };
+    enum class SubmissionSource : size_t {
+        WAIT_SEMAPHORE,
+        SIGNAL_SEMAPHORE,
+        FENCE,
+        COUNT
+    };
     struct SubmissionWork {
+        static constexpr size_t NO_OWNER = std::numeric_limits<size_t>::max();
         std::shared_ptr<SubmissionImpl> result = std::make_shared<SubmissionImpl>();
         std::shared_ptr<LogicalDeviceImpl> device;
         std::shared_ptr<vk::UniqueFence> owned_fence;
-        std::shared_ptr<FenceImpl> external_fence;
+        FenceImpl* external_fence = nullptr;
+        std::shared_ptr<sync::FenceReservation> fence_reservation;
+        SemaphoreImpl* wait_semaphore = nullptr;
+        SemaphoreImpl* signal_semaphore = nullptr;
+        std::array<size_t, static_cast<size_t>(SubmissionSource::COUNT)> synchronization_owners{NO_OWNER, NO_OWNER, NO_OWNER};
         vk::Fence fence;
         std::vector<std::shared_ptr<void>> resources;
         std::vector<std::shared_ptr<void>> completion_resources;
@@ -271,19 +285,22 @@ namespace VSL_NAMESPACE::impl {
 
     struct SynchroManagerImpl;
     struct SemaphoreImpl {
+        std::weak_ptr<SemaphoreImpl> owner;
         std::weak_ptr<SynchroManagerImpl> manager;
         std::shared_ptr<LogicalDeviceImpl> device;
 
         std::vector<vk::Semaphore> semaphores;
+        sync::SemaphoreUseState use;
         ~SemaphoreImpl();
     };
 
     struct FenceImpl {
+        std::weak_ptr<FenceImpl> owner;
         std::weak_ptr<SynchroManagerImpl> manager;
         std::shared_ptr<LogicalDeviceImpl> device;
 
         std::vector<vk::Fence> fences;
-        std::vector<std::weak_ptr<SubmissionImpl>> submissions;
+        std::vector<sync::FenceUseState> uses;
         ~FenceImpl();
     };
 

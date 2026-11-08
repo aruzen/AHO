@@ -9,7 +9,7 @@
 
 最初のPRだけで終了せず、下記の順で実装・検証・独立レビューを継続する。PRの公開前には最新masterとの差分を確認する。新しい製品ディレクトリが必要な場合は作成前に確認する。
 
-現在の到達点は順序1〜7、8aのcommand所有分離、8b前半のCommandPool／CommandBuffer配置である。8b後半の同期資源と8c以降は未完了であり、起動資源、既定policy変更、旧入口廃止と最終監査まで継続する。
+現在の到達点は順序1〜7、8aのcommand所有分離、8b前半のCommandPool／CommandBuffer配置と、同期資源の使用制約である。Fence／SemaphoreのCPU配置と8c以降は未完了であり、起動資源、既定policy変更、旧入口廃止と最終監査まで継続する。
 
 ## 責務と保証
 
@@ -133,5 +133,7 @@ Pipelineが記録時に使うLayoutは保持し、Shader／Pass／再生成recip
 [8b前半の実装](command-arena.md)で、通常VSL／arenaの共通backend、同rootの複数ring、Domain再接続、元Poolのgetterと固定辺、Typed copyと自己root保持、逆rollback、resetの全slot事前検査・再入・世代照合を検証した。nextはnativeを変更せずhost巡回だけなので、送信済みslotへも進める。GPU待機は次Phaseのprepareが行う。
 
 8b後半はFence／Semaphoreの共通backendと配置、明示destroy／resetの使用制約、名前付き登録と古いHolderの同名置換を扱う。Fenceは未送信予約から保護し、SemaphoreのWSI待ちはgraphics結果と分離する。native配列のCPU容量を生成前に確保し、部分失敗を逆順で巻き戻す。
+
+[同期資源の共通使用状態](synchronization-state.md)で、Fence要素別のPENDING予約／公開wait拒否／全対象先行検査、Semaphoreの複数graphics結果とWSI marker、cleanupへの予約・元sourceの移譲、named replacement保護を実装した。native配列生成・破棄・待機／resetも共通operationへ移した。次はそのbackendを指定領域から使うFence／SemaphoreのCPU配置である。
 
 8cでTyped frameの配置・再利用へ接続する。8aの所有分離だけでは順序8全体の完了と扱わない。

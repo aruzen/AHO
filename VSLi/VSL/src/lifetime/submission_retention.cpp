@@ -48,7 +48,13 @@ namespace VSL_NAMESPACE::lifetime {
                         buffer.retain(owner);
                 for (const auto* state : element.states)
                     state->mark_used(completion);
-                element.constraint.record(buffer, retention);
+                for (const auto& owner : element.constraint.owners)
+                    if (retention == ResourceRetention::COMPLETION)
+                        buffer.retain_until_complete(owner);
+                    else
+                        buffer.retain(owner);
+                for (const auto* state : element.constraint.states)
+                    state->mark_used(completion);
             }
         if (buffer.completion().data_ != completion.data_ || completion.status() != Completion::Status::PENDING)
             throw std::logic_error("Recording phase changed while tracking a descriptor");

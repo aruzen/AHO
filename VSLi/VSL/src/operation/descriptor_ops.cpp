@@ -15,9 +15,8 @@ namespace VSL_NAMESPACE::operation {
         for (size_t i = 0; i < info.bindings.size(); ++i) {
             const auto& point = info.bindings[i];
             const auto binding = point.binding == UINT32_MAX ? static_cast<std::uint32_t>(i) : point.binding;
-            if (!point.amount || !static_cast<std::uint32_t>(point.shader_type) ||
-                std::ranges::any_of(layout.layout_bindings, [&](const auto& value) { return value.binding == binding; }))
-                throw std::invalid_argument("Descriptor layout requires unique bindings with nonzero count/stages");
+            if (std::ranges::any_of(layout.layout_bindings, [&](const auto& value) { return value.binding == binding; }))
+                throw std::invalid_argument("Descriptor layout requires unique binding numbers");
             layout.layout_bindings.push_back({.binding = binding, .descriptorType = vk::DescriptorType(point.binding_type), .descriptorCount = point.amount, .stageFlags = vk::ShaderStageFlagBits(point.shader_type)});
         }
         const vk::DescriptorSetLayoutCreateInfo create{.bindingCount = static_cast<std::uint32_t>(layout.layout_bindings.size()),
@@ -34,13 +33,16 @@ namespace VSL_NAMESPACE::operation {
             throw std::out_of_range("Descriptor pool maxSets must fit nonzero uint32_t");
         pool.device = &device;
         pool.native_device = device.device;
+        pool.max_sets = static_cast<std::uint32_t>(info.max_sets);
         std::vector<vk::DescriptorPoolSize> sizes;
         sizes.reserve(info.descriptors.size());
         for (const auto& [type, count] : info.descriptors) {
             if (count > std::numeric_limits<std::uint32_t>::max())
                 throw std::out_of_range("Descriptor pool capacity exceeds uint32_t");
-            if (count)
+            if (count) {
                 sizes.push_back({vk::DescriptorType(type), static_cast<std::uint32_t>(count)});
+                pool.capacities.emplace(vk::DescriptorType(type), impl::GraphicResourcePoolImpl::Capacity{static_cast<std::uint32_t>(count), 0});
+            }
         }
         const vk::DescriptorPoolCreateInfo create{.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
                                                   .maxSets = static_cast<std::uint32_t>(info.max_sets),
@@ -52,6 +54,9 @@ namespace VSL_NAMESPACE::operation {
         if (pool.descriptor_pool)
             pool.native_device.destroyDescriptorPool(pool.descriptor_pool);
         pool.descriptor_pool = nullptr;
+        pool.max_sets = pool.allocated_sets = 0;
+        for (auto& [type, capacity] : pool.capacities)
+            capacity.allocated = 0;
     }
     vk::Result allocate_descriptor_sets(impl::GraphicResourcePoolImpl& pool, std::span<impl::GraphicResourceImpl* const> sets) {
         if (!pool.descriptor_pool || pool.retiring)
@@ -65,22 +70,55 @@ namespace VSL_NAMESPACE::operation {
             const auto* resource = sets[i];
             if (!resource || resource->descriptor_set || resource->pool != &pool || !resource->layout ||
                 !resource->layout->layout || resource->layout->device != pool.device ||
+                resource->allocation_layout != resource->layout || resource->native_device != pool.native_device ||
                 std::ranges::contains(sets.first(i), resource))
                 throw std::invalid_argument("Descriptor allocation requires prepared sets on the pool device");
             layouts.push_back(resource->layout->layout);
+        }
+        if (pool.allocated_sets > pool.max_sets || sets.size() > pool.max_sets - pool.allocated_sets)
+            return vk::Result::eErrorOutOfPoolMemory;
+        std::map<vk::DescriptorType, std::uint32_t> required;
+        for (const auto* resource : sets)
+            for (const auto& point : resource->layout->layout_bindings) {
+                if (!point.descriptorCount)
+                    continue;
+                auto& count = required[point.descriptorType];
+                if (point.descriptorCount > UINT32_MAX - count)
+                    return vk::Result::eErrorOutOfPoolMemory;
+                count += point.descriptorCount;
+            }
+        for (const auto& [type, count] : required) {
+            const auto found = pool.capacities.find(type);
+            if (found == pool.capacities.end() || found->second.allocated > found->second.limit || count > found->second.limit - found->second.allocated)
+                return vk::Result::eErrorOutOfPoolMemory;
         }
         const vk::DescriptorSetAllocateInfo allocate{.descriptorPool = pool.descriptor_pool,
                                                      .descriptorSetCount = static_cast<std::uint32_t>(sets.size()),
                                                      .pSetLayouts = layouts.data()};
         const auto result = pool.native_device.allocateDescriptorSets(&allocate, handles.data());
-        if (result == vk::Result::eSuccess)
+        if (result == vk::Result::eSuccess) {
             for (size_t i = 0; i < sets.size(); ++i)
                 sets[i]->descriptor_set = handles[i];
+            pool.allocated_sets += static_cast<std::uint32_t>(sets.size());
+            for (const auto& [type, count] : required)
+                pool.capacities.find(type)->second.allocated += count;
+        }
         return result;
     }
     void destroy_descriptor_set(impl::GraphicResourceImpl& resource) noexcept {
-        if (resource.descriptor_set && resource.pool && resource.pool->descriptor_pool)
-            (void)resource.native_device.freeDescriptorSets(resource.pool->descriptor_pool, 1, &resource.descriptor_set);
+        if (resource.descriptor_set && resource.pool && resource.pool->descriptor_pool) {
+            const auto result = resource.native_device.freeDescriptorSets(resource.pool->descriptor_pool, 1, &resource.descriptor_set);
+            if (result == vk::Result::eSuccess) {
+                if (resource.pool->allocated_sets)
+                    --resource.pool->allocated_sets;
+                if (resource.allocation_layout)
+                    for (const auto& point : resource.allocation_layout->layout_bindings) {
+                        const auto found = resource.pool->capacities.find(point.descriptorType);
+                        if (found != resource.pool->capacities.end() && found->second.allocated >= point.descriptorCount)
+                            found->second.allocated -= point.descriptorCount;
+                    }
+            }
+        }
         resource.descriptor_set = nullptr;
     }
     void write_descriptor(vk::Device device, const vk::WriteDescriptorSet& write) {

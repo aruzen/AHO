@@ -1,6 +1,6 @@
 # Descriptorの共通構築backend
 
-[完了計画](arena-completion-plan.md)の5b前半。5aの[共通使用状態](descriptor-state.md)を維持し、Layout／Pool／SetのCPU領域とnative生成・破棄を分離する。ResourceArenaへの公開接続と生成寸法の拡張は、続く5b後半で行う。
+[完了計画](arena-completion-plan.md)の5b前半。5aの[共通使用状態](descriptor-state.md)を維持し、Layout／Pool／SetのCPU領域とnative生成・破棄を分離する。5b後半の[ResourceArena接続](descriptor-arena.md)で公開配置と生成寸法も提供する。
 
 ## 生成・操作・所有
 
@@ -35,7 +35,7 @@ destroyは使用完了／取消を確認した後に、構築済みの実体へ�
 
 arena Setでは、同rootへの所有を借用へ正規化する必要がある。5bではowner contextを各arenaに一つ置き、構築時の固定依存だけを認める。5cで可変の外部依存とTyped schemaへ広げる。CPU配置と一括破棄の寿命群は引き続き分ける。
 
-現在の実装は共通backendとheap接続までであり、descriptorをResourceArenaへ配置する公開APIはまだ提供していない。性能改善率は未測定である。
+5b後半で固定依存contextとResourceArena配置を公開した。可変の外部依存とTyped自動配置は5cに残る。性能改善率は未測定である。
 
 ## 検証
 

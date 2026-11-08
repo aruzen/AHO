@@ -29,6 +29,9 @@
 
 namespace VSL_NAMESPACE {
     class ResourceUseState;
+    namespace lifetime {
+        struct DescriptorOwnerContext;
+    }
     namespace graphic_resource {
         struct ManagerInterface;
     }
@@ -293,6 +296,9 @@ namespace VSL_NAMESPACE::impl {
 
     struct GraphicResourceImpl;
     struct GraphicResourcePoolImpl {
+        struct Capacity {
+            std::uint32_t limit = 0, allocated = 0;
+        };
         std::weak_ptr<GraphicResourceManagerIdentity> manager;
         LogicalDeviceImpl* device = nullptr;
         vk::Device native_device;
@@ -300,6 +306,8 @@ namespace VSL_NAMESPACE::impl {
         std::weak_ptr<void> owner;
 
         vk::DescriptorPool descriptor_pool;
+        std::uint32_t max_sets = 0, allocated_sets = 0;
+        std::map<vk::DescriptorType, Capacity> capacities;
         bool retiring = false;
         std::vector<std::weak_ptr<GraphicResourceImpl>> resources;
 
@@ -307,16 +315,23 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct GraphicResourceImpl {
+        struct BindingConstraint {
+            std::vector<std::shared_ptr<void>> owners;
+            std::vector<ResourceUseState*> states;
+        };
         struct BindingElement {
             std::vector<std::shared_ptr<void>> owners;
             // ownersに属する物理実体を借用する。論理制約も同じ要素で管理する。
             std::vector<ResourceUseState*> states;
-            ResourceUse constraint;
+            BindingConstraint constraint;
             bool initialized = false;
         };
         impl::GraphicResourcePoolImpl* pool = nullptr;
         impl::ResourceBindingLayoutImpl* layout = nullptr;
+        // private metadataを省略したviewでも、解放時の割当数は元layoutで戻す。
+        impl::ResourceBindingLayoutImpl* allocation_layout = nullptr;
         vk::Device native_device;
+        lifetime::DescriptorOwnerContext* owner_context = nullptr;
 
         vk::DescriptorSet descriptor_set;
         ResourceUseState use;

@@ -14,6 +14,10 @@
 #include "image.hpp"
 #include "sampler.hpp"
 
+namespace VSL_NAMESPACE::lifetime {
+    class ResourceArena;
+}
+
 namespace VSL_NAMESPACE::graphic_resource {
     constexpr size_t MAX_POOL_SIZE = 200;
 
@@ -77,6 +81,10 @@ namespace VSL_NAMESPACE::graphic_resource {
         [[nodiscard]] std::vector<BindingPoint> get_binding_points() const;
 
         std::shared_ptr<impl::ResourceBindingLayoutImpl> data_;
+
+    private:
+        friend class lifetime::ResourceArena;
+        explicit BindingLayout(std::shared_ptr<impl::ResourceBindingLayoutImpl> data) : data_(std::move(data)) {}
     };
 
     struct ManagerInterface;

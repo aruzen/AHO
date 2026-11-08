@@ -43,6 +43,8 @@ add_library(VSL STATIC
         VSL/src/lifetime/resource_use.cpp
         VSL/src/lifetime/descriptor_bindings.cpp
         VSL/src/lifetime/descriptor_storage.cpp
+        VSL/src/lifetime/logical_use_state.cpp
+        VSL/include/VSL/lifetime/logical_use_state.hpp
         VSL/src/operation/descriptor_ops.cpp
         VSL/src/sync/resource_use_state.cpp
         VSL/src/sync/completion.cpp

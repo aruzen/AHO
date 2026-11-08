@@ -331,6 +331,10 @@ namespace VSL_NAMESPACE::typed {
                         case storage::ResourceKind::SAMPLER:
                             shared.arena->sampler(entry.resource).use_state().require_idle();
                             break;
+                        case storage::ResourceKind::DESCRIPTOR_LAYOUT:
+                        case storage::ResourceKind::DESCRIPTOR_POOL:
+                        case storage::ResourceKind::DESCRIPTOR_SET:
+                            throw std::logic_error("Typed descriptor placement is not connected to the bundle yet");
                     }
                 }
             } else {

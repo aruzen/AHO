@@ -1,4 +1,5 @@
 #include <VSL/lifetime/resource_plan.hpp>
+#include <VSL/lifetime/resource_arena.hpp>
 #include <gtest/gtest.h>
 
 namespace {
@@ -45,6 +46,55 @@ namespace {
         EXPECT_EQ(plan.lifetime(), (t::LifetimeGroup{t::LifetimeScope::FRAME, 9}));
         EXPECT_THROW(plan.placement({999}), std::out_of_range);
         EXPECT_THROW((t::ResourcePlan<2>(REQUESTS)), std::length_error);
+    }
+    TEST(ResourcePlanTest, DescriptorSlotsUseExactImplSizesWithoutTrailingUseStates) {
+        constexpr std::array<t::ResourceRequest, 7> requests{{{{1}, DESCRIPTOR_SET}, {{2}, BUFFER}, {{3}, DESCRIPTOR_LAYOUT}, {{4}, IMAGE}, {{5}, DESCRIPTOR_POOL}, {{6}, DESCRIPTOR_SET}, {{7}, SAMPLER}}};
+        constexpr t::ResourcePlan<7> plan(requests);
+        static_assert(plan.slots() == 7 && plan.placement({1}).offset != plan.placement({6}).offset);
+        static_assert(s::ResourceSlotLayout<vsl::impl::GraphicResourceImpl>::SIZE == s::ImplLayout<vsl::impl::GraphicResourceImpl>::SIZE);
+        static_assert(s::ResourceSlotLayout<vsl::impl::GraphicResourceImpl>::USE_OFFSET == s::NO_SEPARATE_USE);
+        size_t end = 0;
+        for (const auto& placement : plan.placements()) {
+            const auto layout = s::resource_slot_layout(placement.kind);
+            EXPECT_EQ(placement.offset % layout.alignment, 0u);
+            EXPECT_GE(placement.offset, end);
+            EXPECT_LE(placement.offset + layout.size, plan.bytes());
+            if (placement.kind == DESCRIPTOR_SET || placement.kind == DESCRIPTOR_LAYOUT || placement.kind == DESCRIPTOR_POOL)
+                EXPECT_EQ(layout.use_offset, s::NO_SEPARATE_USE);
+            else
+                EXPECT_LE(layout.use_offset + sizeof(vsl::ResourceUseState), layout.size);
+            end = placement.offset + layout.size;
+        }
+        EXPECT_EQ(s::resource_slot_layout(DESCRIPTOR_LAYOUT).size, s::DESCRIPTOR_LAYOUT_IMPL_SIZE);
+        EXPECT_EQ(s::resource_slot_layout(DESCRIPTOR_POOL).size, s::DESCRIPTOR_POOL_IMPL_SIZE);
+        EXPECT_EQ(s::resource_slot_layout(DESCRIPTOR_SET).size, s::DESCRIPTOR_SET_IMPL_SIZE);
+    }
+    TEST(LogicalUseStateTest, IndependentOwnersMoveSafelyAndExportOwningValuesOnly) {
+        namespace l = vsl::lifetime;
+        static_assert(!std::constructible_from<l::LogicalUseState, std::shared_ptr<void>>);
+        static_assert(!std::constructible_from<l::LogicalUseState, std::shared_ptr<vsl::ResourceUseState>>);
+        static_assert(!std::constructible_from<l::ResourceArena, vsl::LogicalDeviceAccessor, const t::ResourcePlan<7>&,
+                                               std::span<const l::ResourceInit>, s::ArenaMemory, std::span<const std::shared_ptr<void>>>);
+        vsl::ResourceUse saved;
+        std::weak_ptr<vsl::ResourceUseState> observed;
+        {
+            l::LogicalUseState state, other;
+            auto alias = state;
+            auto moved = std::move(state);
+            observed = moved.resource_use().state;
+            EXPECT_THROW(state.resource_use(), std::logic_error);
+            EXPECT_THROW(state.busy(), std::logic_error);
+            EXPECT_THROW(state.wait(0), std::logic_error);
+            EXPECT_EQ(moved.resource_use().state, alias.resource_use().state);
+            EXPECT_NE(moved.resource_use().state, other.resource_use().state);
+            EXPECT_FALSE(moved.busy());
+            EXPECT_TRUE(moved.wait(0));
+            saved = moved.resource_use();
+        }
+        EXPECT_FALSE(observed.expired());
+        saved = {};
+        EXPECT_TRUE(observed.expired());
+        EXPECT_FALSE(l::LogicalUseState{}.resource_use().state->busy());
     }
     TEST(ResourcePlanTest, ExternalEntriesHaveNoSlotOrOffsetAndNeedNoCpuRegion) {
         const std::array<t::ResourceRequest, 2> requests{{{{1}, IMAGE, true}, {{2}, SAMPLER, true}}};

@@ -1,4 +1,5 @@
 #include <VSL/lifetime/descriptor_bindings.hpp>
+#include <VSL/lifetime/submission_retention.hpp>
 #include <VSL/operation/descriptor_ops.hpp>
 #include <VSL/exceptions.hpp>
 #include <algorithm>
@@ -6,6 +7,34 @@
 #include <stdexcept>
 
 namespace VSL_NAMESPACE::lifetime {
+    void DescriptorOwnerContext::normalize(std::vector<std::shared_ptr<void>>& owners) const {
+        const auto root = self.lock();
+        if (!root.use_count() || !dependencies)
+            throw std::logic_error("Descriptor arena owner is not published");
+        for (const auto& owner : owners) {
+            const auto same = [&](const auto& known) { return !known.owner_before(owner) && !owner.owner_before(known); };
+            if (owner.use_count() && !same(root) && !std::ranges::any_of(*dependencies, same))
+                throw std::invalid_argument("Descriptor arena requires a declared external owner");
+        }
+        owners.clear();
+    }
+    impl::GraphicResourceImpl::BindingConstraint descriptor_constraint(const ResourceUse& use, const DescriptorOwnerContext* context) {
+        impl::GraphicResourceImpl::BindingConstraint result;
+        for (const auto& state : {use.state, use.constraint_state}) {
+            if (!state)
+                continue;
+            if (!state.use_count())
+                throw std::invalid_argument("Descriptor logical state requires an owning reference");
+            retain_resource(result.owners, state);
+            if (!std::ranges::contains(result.states, state.get()))
+                result.states.push_back(state.get());
+        }
+        retain_resource(result.owners, use.owner);
+        retain_resource(result.owners, use.constraint_owner);
+        if (context)
+            context->normalize(result.owners);
+        return result;
+    }
     void require_descriptor_valid(const impl::GraphicResourceImpl& resource) {
         if (!resource.pool || !resource.pool->descriptor_pool || !resource.descriptor_set || resource.pool->retiring)
             throw std::logic_error("Descriptor resource has been destroyed");
@@ -24,6 +53,8 @@ namespace VSL_NAMESPACE::lifetime {
         if (!resource.layout)
             throw std::logic_error("Descriptor layout metadata is unavailable");
         for (const auto& point : resource.layout->layout_bindings) {
+            if (!point.descriptorCount)
+                continue;
             const auto found = resource.bindings.find(point.binding);
             if (found == resource.bindings.end() || found->second.size() != point.descriptorCount ||
                 !std::ranges::all_of(found->second, [](const auto& element) { return element.initialized; }))
@@ -53,6 +84,12 @@ namespace VSL_NAMESPACE::lifetime {
         auto prepared = found == resource.bindings.end() ? std::vector<impl::GraphicResourceImpl::BindingElement>{} : found->second;
         prepared.resize(std::max(capacity, prepared.size()));
         for (size_t i = 0; i < elements.size(); ++i) {
+            if (std::ranges::any_of(elements[i].owners, [](const auto& owner) { return !owner.use_count(); }))
+                throw std::invalid_argument("Descriptor physical resource requires an owning reference");
+            if (resource.owner_context) {
+                resource.owner_context->normalize(elements[i].owners);
+                resource.owner_context->normalize(elements[i].constraint.owners);
+            }
             elements[i].initialized = true;
             prepared[write.dstArrayElement + i] = std::move(elements[i]);
         }

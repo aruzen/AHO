@@ -58,6 +58,8 @@ VSL_NAMESPACE::graphic_resource::BindingLayout::BindingLayout(LogicalDeviceAcces
     : BindingLayout(device, std::vector<BindingPoint>(points.begin(), points.end())) {}
 
 std::vector<VSL_NAMESPACE::graphic_resource::BindingPoint> VSL_NAMESPACE::graphic_resource::BindingLayout::get_binding_points() const {
+    if (!data_ || !data_->layout)
+        throw std::logic_error("Descriptor layout has been destroyed");
     std::vector<BindingPoint> result;
 
     result.resize(this->data_->layout_bindings.size());

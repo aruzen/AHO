@@ -2,6 +2,8 @@
 #include <VSL/lifetime/buffer_storage.hpp>
 #include <VSL/lifetime/image_storage.hpp>
 #include <VSL/lifetime/sampler_storage.hpp>
+#include <VSL/lifetime/descriptor_storage.hpp>
+#include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/storage/cpu_region.hpp>
 
 namespace VSL_NAMESPACE::lifetime::detail {
@@ -10,6 +12,9 @@ namespace VSL_NAMESPACE::lifetime::detail {
         BufferRef buffer;
         impl::ImageImpl* image = nullptr;
         impl::SamplerImpl* sampler = nullptr;
+        impl::ResourceBindingLayoutImpl* layout = nullptr;
+        impl::GraphicResourcePoolImpl* pool = nullptr;
+        impl::GraphicResourceImpl* set = nullptr;
         size_t buffer_offset = 0, buffer_bytes = 0;
         size_t owner_index = 0;
     };
@@ -20,13 +25,16 @@ namespace VSL_NAMESPACE::lifetime::detail {
         std::vector<ArenaResource> resources;
         std::vector<std::shared_ptr<void>> dependencies;
         std::vector<size_t> constructed;
+        DescriptorOwnerContext descriptor_context;
         bool claimed = false;
         ResourceArenaOwner(LogicalDeviceAccessor device, typed::LifetimeGroup group,
                            std::span<const typed::ResourcePlacement> placements, std::span<const ResourceInit> initializers,
-                           std::shared_ptr<storage::detail::CPURegion> memory, size_t bytes, size_t alignment);
+                           std::shared_ptr<storage::detail::CPURegion> memory, size_t bytes, size_t alignment,
+                           std::span<const LogicalUseState> owners);
         ~ResourceArenaOwner();
         void preflight(std::span<const typed::ResourcePlacement> placements, std::span<const ResourceInit> initializers);
         void construct(size_t index, const ResourceInit& initializer);
+        void publish(const std::shared_ptr<ResourceArenaOwner>& owner);
         void clear() noexcept;
         size_t retain_dependency(const std::shared_ptr<void>& owner);
         const ArenaResource& find(typed::ResourceId id, storage::ResourceKind kind) const;
@@ -41,25 +49,36 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 return external ? std::holds_alternative<ImageAccessor>(value) : std::holds_alternative<ImageCreateInfo>(value);
             case storage::ResourceKind::SAMPLER:
                 return external ? std::holds_alternative<SamplerAccessor>(value) : std::holds_alternative<SamplerCreateInfo>(value);
+            case storage::ResourceKind::DESCRIPTOR_LAYOUT:
+                return external ? std::holds_alternative<graphic_resource::BindingLayout>(value) : std::holds_alternative<DescriptorLayoutCreateInfo>(value);
+            case storage::ResourceKind::DESCRIPTOR_POOL:
+                return external ? std::holds_alternative<graphic_resource::Pool>(value) : std::holds_alternative<DescriptorPoolCreateInfo>(value);
+            case storage::ResourceKind::DESCRIPTOR_SET:
+                return !external && std::holds_alternative<DescriptorSetInit>(value);
         }
         return false;
     }
     ResourceArenaOwner::ResourceArenaOwner(LogicalDeviceAccessor device, typed::LifetimeGroup group,
                                            std::span<const typed::ResourcePlacement> placements, std::span<const ResourceInit> initializers,
-                                           std::shared_ptr<storage::detail::CPURegion> memory, size_t bytes, size_t alignment)
+                                           std::shared_ptr<storage::detail::CPURegion> memory, size_t bytes, size_t alignment,
+                                           std::span<const LogicalUseState> owners)
         : device(device), memory(std::move(memory)), group(group) {
-        if (!device.data_ || !device.data_->device || !this->memory)
+        if (!device.data_.use_count() || !device.data_ || !device.data_->device || !this->memory)
             throw std::invalid_argument("Resource arena requires a live device and CPU region");
         preflight(placements, initializers);
+        for (const auto& owner : owners)
+            retain_dependency(owner.resource_use().state);
         constructed.reserve(resources.size());
         this->memory->claim(bytes, alignment);
         claimed = true;
         try {
-            for (size_t i = 0; i < resources.size(); ++i)
-                if (!resources[i].placement.external) {
-                    construct(i, initializers[i]);
-                    constructed.push_back(i);
-                }
+            // Setは同じarena内のPool/Layoutを借用する。配置順と構築順は独立する。
+            for (const bool sets : {false, true})
+                for (size_t i = 0; i < resources.size(); ++i)
+                    if (!resources[i].placement.external && (resources[i].placement.kind == storage::ResourceKind::DESCRIPTOR_SET) == sets) {
+                        construct(i, initializers[i]);
+                        constructed.push_back(i);
+                    }
         } catch (...) {
             clear();
             throw;
@@ -90,18 +109,36 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     (void)image->use_state();
                     resource.image = image->data_.get();
                     resource.owner_index = retain_dependency(image->data_);
-                } else {
-                    const auto& sampler = std::get<SamplerAccessor>(value);
-                    if (!sampler.data_.use_count() || !sampler.data_ || !sampler.data_->sampler || !sampler.data_->use ||
-                        sampler.data_->device != device.data_.get())
+                } else if (const auto* sampler = std::get_if<SamplerAccessor>(&value)) {
+                    if (!sampler->data_.use_count() || !sampler->data_ || !sampler->data_->sampler || !sampler->data_->use ||
+                        sampler->data_->device != device.data_.get())
                         throw std::invalid_argument("External sampler requires an owner on the arena device");
-                    (void)sampler.use_state();
-                    resource.sampler = sampler.data_.get();
-                    resource.owner_index = retain_dependency(sampler.data_);
+                    (void)sampler->use_state();
+                    resource.sampler = sampler->data_.get();
+                    resource.owner_index = retain_dependency(sampler->data_);
+                } else if (const auto* layout = std::get_if<graphic_resource::BindingLayout>(&value)) {
+                    if (!layout->data_.use_count() || !layout->data_ || !layout->data_->layout || layout->data_->device != device.data_.get())
+                        throw std::invalid_argument("External descriptor layout requires an owner on the arena device");
+                    resource.layout = layout->data_.get();
+                    resource.owner_index = retain_dependency(layout->data_);
+                } else if (const auto* pool = std::get_if<graphic_resource::Pool>(&value)) {
+                    if (!pool->data_.use_count() || !pool->data_ || !pool->data_->descriptor_pool || pool->data_->retiring ||
+                        pool->data_->device != device.data_.get())
+                        throw std::invalid_argument("External descriptor pool requires a live owner on the arena device");
+                    const auto owner = pool->data_->owner.lock();
+                    if (!owner.use_count() || pool->data_.owner_before(owner) || owner.owner_before(pool->data_))
+                        throw std::invalid_argument("External descriptor pool requires its canonical owner");
+                    resource.pool = pool->data_.get();
+                    resource.owner_index = retain_dependency(owner);
                 }
             }
             resources.push_back(std::move(resource));
         }
+        for (const auto& value : initializers)
+            if (const auto* set = std::get_if<DescriptorSetInit>(&value)) {
+                (void)find(set->pool, storage::ResourceKind::DESCRIPTOR_POOL);
+                (void)find(set->layout, storage::ResourceKind::DESCRIPTOR_LAYOUT);
+            }
     }
     void ResourceArenaOwner::construct(size_t index, const ResourceInit& initializer) {
         auto& resource = resources[index];
@@ -120,6 +157,47 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 construct_sampler(slot, device, std::get<SamplerCreateInfo>(initializer));
                 resource.sampler = &sampler_at(slot);
                 break;
+            case storage::ResourceKind::DESCRIPTOR_LAYOUT:
+                construct_descriptor_layout(slot, device, std::get<DescriptorLayoutCreateInfo>(initializer));
+                resource.layout = &descriptor_layout_at(slot);
+                break;
+            case storage::ResourceKind::DESCRIPTOR_POOL:
+                construct_descriptor_pool(slot, device, std::get<DescriptorPoolCreateInfo>(initializer));
+                resource.pool = &descriptor_pool_at(slot);
+                break;
+            case storage::ResourceKind::DESCRIPTOR_SET: {
+                const auto& info = std::get<DescriptorSetInit>(initializer);
+                auto* pool = find(info.pool, storage::ResourceKind::DESCRIPTOR_POOL).pool;
+                auto* layout = find(info.layout, storage::ResourceKind::DESCRIPTOR_LAYOUT).layout;
+                construct_descriptor_set(slot, *pool, *layout);
+                resource.set = &descriptor_set_at(slot);
+                break;
+            }
+        }
+    }
+    void ResourceArenaOwner::publish(const std::shared_ptr<ResourceArenaOwner>& owner) {
+        // 登録に必要な確保を全部終えてからweak aliasを公開する。
+        for (const auto& resource : resources)
+            if (resource.set) {
+                size_t count = 0;
+                auto* pool = resource.set->pool;
+                std::erase_if(pool->resources, [](const auto& entry) { return entry.expired(); });
+                for (const auto& other : resources)
+                    if (other.set && other.set->pool == pool)
+                        ++count;
+                if (count > pool->resources.max_size() - pool->resources.size())
+                    throw std::length_error("Descriptor resource registry capacity exceeded");
+                pool->resources.reserve(pool->resources.size() + count);
+            }
+        descriptor_context.self = owner;
+        descriptor_context.dependencies = &dependencies;
+        for (auto& resource : resources) {
+            if (resource.pool && !resource.placement.external)
+                resource.pool->owner = owner;
+            if (resource.set) {
+                resource.set->owner_context = &descriptor_context;
+                resource.set->pool->resources.emplace_back(std::shared_ptr<impl::GraphicResourceImpl>{owner, resource.set});
+            }
         }
     }
     void ResourceArenaOwner::clear() noexcept {
@@ -136,6 +214,15 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 case storage::ResourceKind::SAMPLER:
                     destroy_sampler(slot);
                     break;
+                case storage::ResourceKind::DESCRIPTOR_LAYOUT:
+                    destroy_descriptor_layout(slot);
+                    break;
+                case storage::ResourceKind::DESCRIPTOR_POOL:
+                    destroy_descriptor_pool(slot);
+                    break;
+                case storage::ResourceKind::DESCRIPTOR_SET:
+                    destroy_descriptor_set(slot);
+                    break;
             }
             constructed.pop_back();
         }
@@ -148,6 +235,8 @@ namespace VSL_NAMESPACE::lifetime::detail {
         clear();
     }
     size_t ResourceArenaOwner::retain_dependency(const std::shared_ptr<void>& owner) {
+        if (!owner.use_count())
+            throw std::invalid_argument("Resource arena dependency requires an owner");
         for (size_t i = 0; i < dependencies.size(); ++i)
             if (!dependencies[i].owner_before(owner) && !owner.owner_before(dependencies[i]))
                 return i;
@@ -168,9 +257,11 @@ namespace VSL_NAMESPACE::lifetime::detail {
 namespace VSL_NAMESPACE::lifetime {
     ResourceArena::ResourceArena(LogicalDeviceAccessor device, typed::LifetimeGroup group,
                                  std::span<const typed::ResourcePlacement> placements, std::span<const ResourceInit> initializers,
-                                 std::shared_ptr<storage::detail::CPURegion> memory, size_t bytes, size_t alignment) {
+                                 std::shared_ptr<storage::detail::CPURegion> memory, size_t bytes, size_t alignment,
+                                 std::span<const LogicalUseState> dependencies) {
         storage::detail::require_resource_layout(std::integral_constant<std::uint64_t, storage::RESOURCE_LAYOUT_ABI>{});
-        _owner = std::make_shared<detail::ResourceArenaOwner>(device, group, placements, initializers, std::move(memory), bytes, alignment);
+        _owner = std::make_shared<detail::ResourceArenaOwner>(device, group, placements, initializers, std::move(memory), bytes, alignment, dependencies);
+        _owner->publish(_owner);
     }
     std::shared_ptr<void> ResourceArena::owner() const {
         return _owner;
@@ -209,6 +300,25 @@ namespace VSL_NAMESPACE::lifetime {
         if (resource.placement.external)
             return {{_owner->dependencies.at(resource.owner_index), resource.sampler}};
         return {{_owner, resource.sampler}};
+    }
+    graphic_resource::BindingLayout ResourceArena::descriptor_layout(typed::ResourceId id) const {
+        if (!_owner)
+            throw std::logic_error("Resource arena is empty");
+        const auto& resource = _owner->find(id, storage::ResourceKind::DESCRIPTOR_LAYOUT);
+        return graphic_resource::BindingLayout(std::shared_ptr<impl::ResourceBindingLayoutImpl>{
+            resource.placement.external ? _owner->dependencies.at(resource.owner_index) : _owner, resource.layout});
+    }
+    graphic_resource::Pool ResourceArena::descriptor_pool(typed::ResourceId id) const {
+        if (!_owner)
+            throw std::logic_error("Resource arena is empty");
+        const auto& resource = _owner->find(id, storage::ResourceKind::DESCRIPTOR_POOL);
+        return {{resource.placement.external ? _owner->dependencies.at(resource.owner_index) : _owner, resource.pool}};
+    }
+    GraphicResource ResourceArena::descriptor_set(typed::ResourceId id) const {
+        if (!_owner)
+            throw std::logic_error("Resource arena is empty");
+        const auto& resource = _owner->find(id, storage::ResourceKind::DESCRIPTOR_SET);
+        return {{_owner, resource.set}};
     }
     BufferRef ResourceArena::borrow_buffer(typed::ResourceId id) const& {
         if (!_owner)

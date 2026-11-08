@@ -6,13 +6,35 @@ namespace {
         EXPECT_EQ(first.accessor, second.accessor);
         EXPECT_TRUE(static_cast<bool>(first.accessor->instance));
         EXPECT_FALSE(first.accessor->instance.enumeratePhysicalDevices().empty());
-        // Public Vulkan<false> still closes stdio; validation-enabled construction is tested below.
     }
 } // namespace
 
 #include "support/window_fixture.hpp"
+#ifndef _WIN32
+#include <fcntl.h>
+#endif
 namespace {
     using VulkanConstructorWindowIntegrationTest = vsl_test::WindowIntegrationTest;
+    TEST_F(VulkanConstructorWindowIntegrationTest, ReleaseFacadeUsesTheSameRuntimeWithoutClosingHostDescriptors) {
+        std::vector<const char*> required;
+        for (const auto& extension : vk::enumerateInstanceExtensionProperties())
+            if (std::strcmp(extension.extensionName, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME) == 0)
+                required.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+#ifndef _WIN32
+        const std::array<int, 3> flags{fcntl(0, F_GETFD), fcntl(1, F_GETFD), fcntl(2, F_GETFD)};
+#endif
+        {
+            vsl::Vulkan<false> vulkan("release host streams", required);
+            EXPECT_EQ(vulkan.data_, vulkan.accessor);
+            EXPECT_FALSE(vulkan.data_->debug_messenger);
+            EXPECT_TRUE(vulkan.owner_ref().managed());
+            EXPECT_FALSE(vulkan.devices().get().empty());
+        }
+#ifndef _WIN32
+        for (int descriptor = 0; descriptor < 3; ++descriptor)
+            EXPECT_EQ(fcntl(descriptor, F_GETFD), flags[descriptor]);
+#endif
+    }
     TEST_F(VulkanConstructorWindowIntegrationTest, ValidationEnabledConstructorCreatesADebugMessengerWithDefaultAllocator) {
         const auto extensions = vk::enumerateInstanceExtensionProperties();
         const auto has_extension = [&](const char* name) {

@@ -214,6 +214,11 @@
     <ClCompile Include="VSL\src\lifetime\synchronization_use.cpp" />
     <ClInclude Include="VSL\include\VSL\operation\synchronization_create_info.hpp" />
     <ClInclude Include="VSL\include\VSL\storage\typed_storage_policy.hpp" />
+    <ClInclude Include="VSL\include\VSL\operation\instance_create_info.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\operation\instance_ops.hpp" />
+    <ClCompile Include="VSL\src\operation\instance_ops.cpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\instance_storage.hpp" />
+    <ClCompile Include="VSL\src\lifetime\instance_storage.cpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\synchronization_storage.hpp" />
     <ClCompile Include="VSL\src\lifetime\synchronization_storage.cpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\synchronization_ops.hpp" />

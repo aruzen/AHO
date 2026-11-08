@@ -17,6 +17,7 @@ function(vsl_generate_buffer_layout)
     file(SHA256 "${VSL_HOME}/src/private/VSL/lifetime/sampler_storage.hpp" sampler_slot_hash)
     file(SHA256 "${VSL_HOME}/src/private/VSL/lifetime/descriptor_storage.hpp" descriptor_slot_hash)
     file(SHA256 "${VSL_HOME}/src/private/VSL/lifetime/shader_storage.hpp" shader_slot_hash)
+    file(SHA256 "${VSL_HOME}/src/private/VSL/lifetime/pipeline_layout_storage.hpp" pipeline_layout_slot_hash)
     file(SHA256 "${VSL_HOME}/src/private/VSL/lifetime/descriptor_bindings.hpp" descriptor_owner_hash)
     file(SHA256 "${VSL_HOME}/src/private/VSL/lifetime/owner_access.hpp" owner_access_hash)
     file(SHA256 "${VSL_HOME}/include/VSL/sync/resource_use_state.hpp" use_hash)
@@ -30,8 +31,8 @@ function(vsl_generate_buffer_layout)
     foreach(api IN ITEMS lifetime/resource_id.hpp lifetime/resource_plan.hpp lifetime/resource_arena.hpp lifetime/logical_use_state.hpp
             lifetime/owner_ref.hpp lifetime/dependency_node.hpp
             lifetime/buffer_view.hpp storage/resource_layout.hpp storage/arena_memory.hpp operation/buffer_create_info.hpp
-            operation/image_create_info.hpp operation/sampler_create_info.hpp operation/descriptor_create_info.hpp operation/shader_create_info.hpp
-            vulkan/buffer_and_image_accessor.hpp vulkan/sampler.hpp vulkan/descriptor.hpp vulkan/shader.hpp)
+            operation/image_create_info.hpp operation/sampler_create_info.hpp operation/descriptor_create_info.hpp operation/shader_create_info.hpp operation/pipeline_layout_create_info.hpp
+            vulkan/buffer_and_image_accessor.hpp vulkan/sampler.hpp vulkan/descriptor.hpp vulkan/shader.hpp vulkan/pipeline_layout.hpp)
         file(SHA256 "${VSL_HOME}/include/VSL/${api}" api_hash)
         string(APPEND public_layout_hashes ";${api_hash}")
         set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${VSL_HOME}/include/VSL/${api}")
@@ -46,6 +47,7 @@ function(vsl_generate_buffer_layout)
         "${VSL_HOME}/src/private/VSL/lifetime/sampler_storage.hpp"
         "${VSL_HOME}/src/private/VSL/lifetime/descriptor_storage.hpp"
         "${VSL_HOME}/src/private/VSL/lifetime/shader_storage.hpp"
+        "${VSL_HOME}/src/private/VSL/lifetime/pipeline_layout_storage.hpp"
         "${VSL_HOME}/src/private/VSL/lifetime/descriptor_bindings.hpp"
         "${VSL_HOME}/src/private/VSL/lifetime/owner_access.hpp"
         "${Vulkan_INCLUDE_DIRS}/vulkan/vulkan_core.h" "${Vulkan_INCLUDE_DIRS}/vulkan/vulkan.hpp")
@@ -60,8 +62,8 @@ function(vsl_generate_buffer_layout)
     foreach(configuration IN LISTS configurations)
         string(TOUPPER "${configuration}" upper)
         set(CMAKE_TRY_COMPILE_CONFIGURATION "${configuration}")
-        string(SHA256 input_hash "7;${shader_slot_hash};${owner_access_hash};${state_hash};${buffer_slot_hash};${image_slot_hash};${sampler_slot_hash};${descriptor_slot_hash};${descriptor_owner_hash};${use_hash};${completion_hash};${lifetime_hash};${vulkan_hash};${vulkan_cpp_hash};${abi_mode_hash};${template_hash};${public_layout_hashes};${CMAKE_CXX_COMPILER_ID};${CMAKE_CXX_COMPILER_VERSION};${CMAKE_CXX_COMPILER_TARGET};${CMAKE_CXX_COMPILER_FRONTEND_VARIANT};${CMAKE_SYSTEM_NAME};${CMAKE_SYSTEM_VERSION};${CMAKE_SYSTEM_PROCESSOR};${CMAKE_OSX_ARCHITECTURES};${CMAKE_OSX_DEPLOYMENT_TARGET};${CMAKE_SIZEOF_VOID_P};${CMAKE_CXX_FLAGS};${CMAKE_CXX_FLAGS_${upper}};${CMAKE_MSVC_RUNTIME_LIBRARY};${CMAKE_OSX_SYSROOT};${CMAKE_SYSROOT};${configuration}")
-        foreach(kind IN ITEMS BUFFER_IMPL IMAGE_IMPL SAMPLER_IMPL DESCRIPTOR_LAYOUT_IMPL DESCRIPTOR_POOL_IMPL DESCRIPTOR_SET_IMPL SHADER_IMPL BUFFER_USE)
+        string(SHA256 input_hash "8;${pipeline_layout_slot_hash};${shader_slot_hash};${owner_access_hash};${state_hash};${buffer_slot_hash};${image_slot_hash};${sampler_slot_hash};${descriptor_slot_hash};${descriptor_owner_hash};${use_hash};${completion_hash};${lifetime_hash};${vulkan_hash};${vulkan_cpp_hash};${abi_mode_hash};${template_hash};${public_layout_hashes};${CMAKE_CXX_COMPILER_ID};${CMAKE_CXX_COMPILER_VERSION};${CMAKE_CXX_COMPILER_TARGET};${CMAKE_CXX_COMPILER_FRONTEND_VARIANT};${CMAKE_SYSTEM_NAME};${CMAKE_SYSTEM_VERSION};${CMAKE_SYSTEM_PROCESSOR};${CMAKE_OSX_ARCHITECTURES};${CMAKE_OSX_DEPLOYMENT_TARGET};${CMAKE_SIZEOF_VOID_P};${CMAKE_CXX_FLAGS};${CMAKE_CXX_FLAGS_${upper}};${CMAKE_MSVC_RUNTIME_LIBRARY};${CMAKE_OSX_SYSROOT};${CMAKE_SYSROOT};${configuration}")
+        foreach(kind IN ITEMS BUFFER_IMPL IMAGE_IMPL SAMPLER_IMPL DESCRIPTOR_LAYOUT_IMPL DESCRIPTOR_POOL_IMPL DESCRIPTOR_SET_IMPL SHADER_IMPL PIPELINE_LAYOUT_IMPL BUFFER_USE)
             if(kind STREQUAL BUFFER_IMPL)
                 set(type "vsl::impl::BufferImpl")
             elseif(kind STREQUAL IMAGE_IMPL)
@@ -76,6 +78,8 @@ function(vsl_generate_buffer_layout)
                 set(type "vsl::impl::GraphicResourceImpl")
             elseif(kind STREQUAL SHADER_IMPL)
                 set(type "vsl::impl::ShaderImpl")
+            elseif(kind STREQUAL PIPELINE_LAYOUT_IMPL)
+                set(type "vsl::impl::PipelineLayoutImpl")
             else()
                 set(type "vsl::ResourceUseState")
             endif()
@@ -105,7 +109,7 @@ function(vsl_generate_buffer_layout)
         else()
             message(FATAL_ERROR "Unsupported Buffer placement compiler")
         endif()
-        string(SHA256 abi_hash "${input_hash};${BUFFER_IMPL_SIZE};${BUFFER_IMPL_ALIGNMENT};${IMAGE_IMPL_SIZE};${IMAGE_IMPL_ALIGNMENT};${SAMPLER_IMPL_SIZE};${SAMPLER_IMPL_ALIGNMENT};${DESCRIPTOR_LAYOUT_IMPL_SIZE};${DESCRIPTOR_LAYOUT_IMPL_ALIGNMENT};${DESCRIPTOR_POOL_IMPL_SIZE};${DESCRIPTOR_POOL_IMPL_ALIGNMENT};${DESCRIPTOR_SET_IMPL_SIZE};${DESCRIPTOR_SET_IMPL_ALIGNMENT};${SHADER_IMPL_SIZE};${SHADER_IMPL_ALIGNMENT};${BUFFER_USE_SIZE};${BUFFER_USE_ALIGNMENT};${cpp_mode}")
+        string(SHA256 abi_hash "${input_hash};${BUFFER_IMPL_SIZE};${BUFFER_IMPL_ALIGNMENT};${IMAGE_IMPL_SIZE};${IMAGE_IMPL_ALIGNMENT};${SAMPLER_IMPL_SIZE};${SAMPLER_IMPL_ALIGNMENT};${DESCRIPTOR_LAYOUT_IMPL_SIZE};${DESCRIPTOR_LAYOUT_IMPL_ALIGNMENT};${DESCRIPTOR_POOL_IMPL_SIZE};${DESCRIPTOR_POOL_IMPL_ALIGNMENT};${DESCRIPTOR_SET_IMPL_SIZE};${DESCRIPTOR_SET_IMPL_ALIGNMENT};${SHADER_IMPL_SIZE};${SHADER_IMPL_ALIGNMENT};${PIPELINE_LAYOUT_IMPL_SIZE};${PIPELINE_LAYOUT_IMPL_ALIGNMENT};${BUFFER_USE_SIZE};${BUFFER_USE_ALIGNMENT};${cpp_mode}")
         string(SUBSTRING "${abi_hash}" 0 16 abi)
         set(header "VSL/generated/buffer_layout_${abi_hash}.hpp")
         file(MAKE_DIRECTORY "${output}/VSL/generated")

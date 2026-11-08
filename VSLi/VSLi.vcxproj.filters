@@ -24,6 +24,11 @@
     <ClInclude Include="VSL\src\private\VSL\operation\shader_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\src\private\VSL\lifetime\shader_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\operation\shader_create_info.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\operation\pipeline_layout_create_info.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\src\private\VSL\operation\pipeline_layout_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClCompile Include="VSL\src\operation\pipeline_layout_ops.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClInclude Include="VSL\src\private\VSL\lifetime\pipeline_layout_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClCompile Include="VSL\src\lifetime\pipeline_layout_storage.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClCompile Include="VSL\src\operation\shader_ops.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClCompile Include="VSL\src\lifetime\shader_storage.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\src\private\VSL\operation\submission_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>

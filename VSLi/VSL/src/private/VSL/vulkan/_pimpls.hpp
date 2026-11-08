@@ -1,5 +1,6 @@
 #pragma once
 #include <VSL/define.hpp>
+#include <VSL/operation/pipeline_layout_create_info.hpp>
 #include <VSL/vulkan/buffer_and_image_accessor.hpp>
 #include <VSL/vulkan/command.hpp>
 #include <VSL/lifetime/resource_use.hpp>
@@ -157,12 +158,16 @@ namespace VSL_NAMESPACE::impl {
         ~SwapchainImpl();
     };
 
-    struct CreateInfo {
-        std::vector<std::shared_ptr<ShaderImpl>> shaders;
-        std::vector<std::shared_ptr<ResourceBindingLayoutImpl>> binding_layouts;
-        vk::PipelineDynamicStateCreateInfo dynamic_state;
-        vk::PipelineLayoutCreateInfo pipeline_layout;
-        vk::PipelineVertexInputStateCreateInfo vertex_input;
+    struct PipelineRecipe {
+        // recipeはruntime rootの外に置く。同じsource ownerはここで一度だけ保持する。
+        std::vector<lifetime::OwnerRef> sources;
+        std::vector<size_t> shader_sources;
+        std::vector<ShaderImpl*> shaders;
+        std::vector<ResourceBindingLayoutImpl*> binding_layouts;
+        std::vector<PushConstantRange> push_ranges;
+        std::vector<vk::VertexInputBindingDescription> vertex_bindings;
+        std::vector<vk::VertexInputAttributeDescription> vertex_attributes;
+        std::vector<vk::PipelineColorBlendAttachmentState> blend_attachments;
         vk::PipelineInputAssemblyStateCreateInfo input_assembly;
         std::vector<vk::Viewport> viewports;
         std::vector<vk::Rect2D> scissors;
@@ -172,16 +177,17 @@ namespace VSL_NAMESPACE::impl {
 
         std::optional<vk::PipelineDepthStencilStateCreateInfo> depth_stencil;
 
-        vk::PipelineViewportStateCreateInfo viewport;
-
         std::vector<vk::DynamicState> enabled_dynamic_states;
-        std::map<std::string, std::any> pool;
     };
 
     struct PipelineLayoutImpl {
+        lifetime::DependencyNode* owner_node = nullptr;
+        LogicalDeviceImpl* device = nullptr;
+        vk::Device native_device;
         vk::PipelineLayout pipeline_layout;
-        std::shared_ptr<CreateInfo> info;
-        std::shared_ptr<LogicalDeviceImpl> device;
+        // 記録とruntime/recipeの照合に必要な値だけを保持する。
+        std::vector<vk::PushConstantRange> push_ranges;
+        std::vector<std::vector<vk::DescriptorSetLayoutBinding>> binding_signatures;
 
         ~PipelineLayoutImpl();
     };

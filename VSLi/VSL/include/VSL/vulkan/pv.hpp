@@ -17,7 +17,7 @@ namespace VSL_NAMESPACE::impl {
     struct SurfaceImpl;
     struct SwapchainImpl;
     struct ViewImpl;
-    struct CreateInfo;
+    struct PipelineRecipe;
     struct PipelineLayoutImpl;
     struct ShaderImpl;
     struct RenderPassImpl;

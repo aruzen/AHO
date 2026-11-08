@@ -3,20 +3,23 @@
 
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/operation/shader_ops.hpp>
+#include <VSL/operation/pipeline_layout_ops.hpp>
 #include <limits>
 
 namespace {
     std::vector<vk::PipelineShaderStageCreateInfo> shader_stages(VSL_NAMESPACE::PipelineLayoutAccessor layout);
     std::vector<vk::PipelineShaderStageCreateInfo> shader_stages(VSL_NAMESPACE::PipelineLayoutAccessor layout) {
-        if (!layout.data_ || !layout.data_->info || !layout.data_->device)
+        if (!layout.data_ || !layout.has_recipe() || !layout.data_->device)
             throw std::invalid_argument("Pipeline requires an initialized layout");
-        const auto& shaders = layout.data_->info->shaders;
+        if (!VSL_NAMESPACE::operation::pipeline_layout_matches(*layout.data_, layout.recipe().binding_layouts, layout.recipe().push_ranges))
+            throw std::invalid_argument("Pipeline recipe has changed since native layout construction");
+        const auto& shaders = layout.recipe().shaders;
         if (shaders.size() > std::numeric_limits<std::uint32_t>::max())
             throw std::out_of_range("Pipeline shader count exceeds uint32_t");
         std::vector<vk::PipelineShaderStageCreateInfo> result;
         result.reserve(shaders.size());
         for (const auto& shader : shaders) {
-            if (!shader || !shader.use_count() || shader->device != layout.data_->device.get())
+            if (!shader || shader->device != layout.data_->device)
                 throw std::invalid_argument("Pipeline shaders require the layout device");
             result.push_back(VSL_NAMESPACE::operation::shader_stage(*shader));
         }
@@ -27,22 +30,23 @@ namespace {
 VSL_NAMESPACE::GraphicsPipeline::GraphicsPipeline(VSL_NAMESPACE::PipelineLayoutAccessor layout, VSL_NAMESPACE::RenderPassAccessor pass, std::uint32_t subpass) {
     if (!pass.data_ || subpass >= pass.description().subpasses.size())
         throw std::out_of_range("Pipeline subpass index");
-    if (!layout.data_ || !layout.data_->info || layout.data_->device != pass.data_->device)
+    if (!layout.data_ || !layout.has_recipe() || layout.data_->device != pass.data_->device.get())
         throw std::invalid_argument("Pipeline requires initialized layout and pass on the same device");
     const auto& outputs = pass.description().subpasses[subpass];
-    if (layout.data_->info->color_blend.attachmentCount != outputs.colors.size())
+    if (layout.recipe().blend_attachments.size() != outputs.colors.size())
         throw std::invalid_argument("Pipeline color blend count does not match subpass outputs");
     for (auto ref : outputs.colors)
-        if (ref.attachment != UNUSED_ATTACHMENT && layout.data_->info->multisample.rasterizationSamples !=
+        if (ref.attachment != UNUSED_ATTACHMENT && layout.recipe().multisample.rasterizationSamples !=
                                                        static_cast<vk::SampleCountFlagBits>(pass.description().attachments[ref.attachment].samples))
             throw std::invalid_argument("Pipeline sample count does not match subpass");
     if (outputs.depth_stencil && outputs.depth_stencil->attachment != UNUSED_ATTACHMENT &&
-        layout.data_->info->multisample.rasterizationSamples != static_cast<vk::SampleCountFlagBits>(
-                                                                    pass.description().attachments[outputs.depth_stencil->attachment].samples))
+        layout.recipe().multisample.rasterizationSamples != static_cast<vk::SampleCountFlagBits>(
+                                                                pass.description().attachments[outputs.depth_stencil->attachment].samples))
         throw std::invalid_argument("Pipeline depth sample count does not match subpass");
     const auto stages = shader_stages(layout);
+    const operation::PipelineScratch scratch(layout.recipe());
     data_ = std::shared_ptr<impl::PipelineImpl>(new impl::PipelineImpl);
-    data_->device = layout.data_->device;
+    data_->device = layout.get_device().data_;
     data_->layout = layout.data_;
     data_->bind_point = vk::PipelineBindPoint::eGraphics;
 
@@ -52,17 +56,17 @@ VSL_NAMESPACE::GraphicsPipeline::GraphicsPipeline(VSL_NAMESPACE::PipelineLayoutA
     vk::GraphicsPipelineCreateInfo pipeline_info;
     pipeline_info.stageCount = static_cast<std::uint32_t>(stages.size());
     pipeline_info.pStages = stages.data();
-    pipeline_info.pVertexInputState = &layout.data_->info->vertex_input;
-    pipeline_info.pInputAssemblyState = &layout.data_->info->input_assembly;
-    pipeline_info.pViewportState = &layout.data_->info->viewport;
-    pipeline_info.pRasterizationState = &layout.data_->info->rasterization;
-    pipeline_info.pMultisampleState = &layout.data_->info->multisample;
-    if (layout.data_->info->depth_stencil)
-        pipeline_info.pDepthStencilState = &layout.data_->info->depth_stencil.value();
+    pipeline_info.pVertexInputState = &scratch.vertex_input;
+    pipeline_info.pInputAssemblyState = &layout.recipe().input_assembly;
+    pipeline_info.pViewportState = &scratch.viewport;
+    pipeline_info.pRasterizationState = &layout.recipe().rasterization;
+    pipeline_info.pMultisampleState = &layout.recipe().multisample;
+    if (layout.recipe().depth_stencil)
+        pipeline_info.pDepthStencilState = &layout.recipe().depth_stencil.value();
     else
         pipeline_info.pDepthStencilState = nullptr;
-    pipeline_info.pColorBlendState = &layout.data_->info->color_blend;
-    pipeline_info.pDynamicState = &layout.data_->info->dynamic_state;
+    pipeline_info.pColorBlendState = &scratch.color_blend;
+    pipeline_info.pDynamicState = &scratch.dynamic_state;
 
     pipeline_info.layout = layout.data_->pipeline_layout;
     pipeline_info.renderPass = pass.data_->render_pass;
@@ -90,7 +94,7 @@ VSL_NAMESPACE::ComputePipeline::ComputePipeline(VSL_NAMESPACE::PipelineLayoutAcc
         throw std::invalid_argument("ComputePipeline requires exactly one compute shader");
 
     data_ = std::shared_ptr<impl::PipelineImpl>(new impl::PipelineImpl);
-    data_->device = layout.data_->device;
+    data_->device = layout.get_device().data_;
     data_->layout = layout.data_;
     data_->bind_point = vk::PipelineBindPoint::eCompute;
 

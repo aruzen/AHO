@@ -10,7 +10,7 @@ void VSL_NAMESPACE::pipeline_layout::DepthStencil::injection(PipelineLayoutEditA
                                   .writeMask = face.write_mask,
                                   .reference = face.reference};
     };
-    pl.data_->info->depth_stencil =
+    pl.edit_recipe().depth_stencil =
         vk::PipelineDepthStencilStateCreateInfo{.depthTestEnable = depth_test,
                                                 .depthWriteEnable = depth_write,
                                                 .depthCompareOp = static_cast<vk::CompareOp>(depth_compare),

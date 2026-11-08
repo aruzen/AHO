@@ -36,7 +36,7 @@ namespace {
             input.add_shape({format, vsl::data_format::FLOAT});
             auto layout = make_layout_state();
             input.injection(layout);
-            const auto& info = layout.data_->info->vertex_input;
+            const auto& info = vsl_test::inspect_layout(layout).vertex_input;
             ASSERT_EQ(info.vertexAttributeDescriptionCount, 4u);
             for (std::size_t i = 0; i < 4; ++i) {
                 EXPECT_EQ(info.pVertexAttributeDescriptions[i].location, (std::array{0u, 2u, 3u, 5u})[i]);
@@ -48,7 +48,7 @@ namespace {
                                             {.layouts = {{format, 9}}},
                                             {.layouts = {{vsl::data_format::FLOAT}}}});
             explicit_input.injection(layout);
-            const auto& explicit_info = layout.data_->info->vertex_input;
+            const auto& explicit_info = vsl_test::inspect_layout(layout).vertex_input;
             ASSERT_EQ(explicit_info.vertexAttributeDescriptionCount, 4u);
             for (std::size_t i = 0; i < 4; ++i)
                 EXPECT_EQ(explicit_info.pVertexAttributeDescriptions[i].location, (std::array{3u, 5u, 9u, 11u})[i]);
@@ -63,7 +63,7 @@ namespace {
             input.add_shape({format, vsl::data_format::FLOAT});
             auto layout = make_layout_state();
             input.injection(layout);
-            const auto& info = layout.data_->info->vertex_input;
+            const auto& info = vsl_test::inspect_layout(layout).vertex_input;
             ASSERT_EQ(info.vertexAttributeDescriptionCount, 2u);
             EXPECT_EQ(info.pVertexAttributeDescriptions[0].location, 0u);
             EXPECT_EQ(info.pVertexAttributeDescriptions[1].location, 1u);
@@ -74,14 +74,14 @@ namespace {
         pl::VertexInput valid;
         valid.add(vsl::data_format::FLOAT);
         valid.injection(layout);
-        const auto previous = layout.data_->info->vertex_input;
+        const auto previous = vsl_test::inspect_layout(layout).vertex_input;
         pl::VertexInput wide({{.layouts = {{vsl::data_format::FLOAT64_RGB, UINT32_MAX - 1}}}});
         EXPECT_THROW(wide.injection(layout), vsl::exceptions::RuntimeException);
         pl::VertexInput automatic({{.layouts = {{vsl::data_format::FLOAT, UINT32_MAX - 1}, {vsl::data_format::FLOAT}}}});
         EXPECT_THROW(automatic.injection(layout), vsl::exceptions::RuntimeException);
-        EXPECT_EQ(layout.data_->info->vertex_input.pVertexAttributeDescriptions, previous.pVertexAttributeDescriptions);
-        EXPECT_EQ(layout.data_->info->vertex_input.pVertexBindingDescriptions, previous.pVertexBindingDescriptions);
-        EXPECT_EQ(layout.data_->info->vertex_input.vertexAttributeDescriptionCount, 1u);
+        EXPECT_EQ(vsl_test::inspect_layout(layout).vertex_input.pVertexAttributeDescriptions, previous.pVertexAttributeDescriptions);
+        EXPECT_EQ(vsl_test::inspect_layout(layout).vertex_input.pVertexBindingDescriptions, previous.pVertexBindingDescriptions);
+        EXPECT_EQ(vsl_test::inspect_layout(layout).vertex_input.vertexAttributeDescriptionCount, 1u);
     }
     TEST_F(VertexInputVulkanIntegrationTest, InjectsExplicitAndAutomaticLocationsStridesAndOffsets) {
         pl::VertexInput input({{.layouts = {{vsl::data_format::FLOAT_RG, 3, 4}, {vsl::data_format::FLOAT_RGB}},
@@ -90,7 +90,7 @@ namespace {
                                 .update_timing = pl::VertexInputShapeDefinition::UpdateTiming::NEXT_INSTANCE}});
         auto layout = make_layout_state();
         input.injection(layout);
-        const auto& info = layout.data_->info->vertex_input;
+        const auto& info = vsl_test::inspect_layout(layout).vertex_input;
         ASSERT_EQ(info.vertexBindingDescriptionCount, 1u);
         ASSERT_EQ(info.vertexAttributeDescriptionCount, 2u);
         EXPECT_EQ(info.pVertexBindingDescriptions[0].binding, 2u);
@@ -153,7 +153,7 @@ namespace {
                                {.layouts = {{vsl::data_format::FLOAT, 3, 4}}, .size = 20}});
         auto layout = make_layout_state();
         input.injection(layout);
-        const auto& info = layout.data_->info->vertex_input;
+        const auto& info = vsl_test::inspect_layout(layout).vertex_input;
         ASSERT_EQ(info.vertexBindingDescriptionCount, 2u);
         EXPECT_EQ(info.pVertexBindingDescriptions[0].stride, 32u);
         EXPECT_EQ(info.pVertexBindingDescriptions[1].stride, 20u);
@@ -210,13 +210,11 @@ namespace {
         pl::VertexInput invalid({{.layouts = {{vsl::data_format::FLOAT_RG, 0,
                                                std::numeric_limits<std::uint32_t>::max() - 2}}}});
         EXPECT_THROW(invalid.injection(layout), vsl::exceptions::RuntimeException);
-        const auto& bindings = std::any_cast<const std::vector<vk::VertexInputBindingDescription>&>(
-            layout.data_->info->pool.at("vertexBindingDescriptions"));
-        const auto& attributes = std::any_cast<const std::vector<vk::VertexInputAttributeDescription>&>(
-            layout.data_->info->pool.at("vertexAttributeDescriptions"));
+        const auto& bindings = layout.recipe().vertex_bindings;
+        const auto& attributes = layout.recipe().vertex_attributes;
         ASSERT_EQ(bindings.size(), 1u);
         ASSERT_EQ(attributes.size(), 1u);
-        const auto& native = layout.data_->info->vertex_input;
+        const auto& native = vsl_test::inspect_layout(layout).vertex_input;
         ASSERT_EQ(native.vertexBindingDescriptionCount, 1u);
         ASSERT_EQ(native.vertexAttributeDescriptionCount, 1u);
         EXPECT_EQ(native.pVertexBindingDescriptions, bindings.data());

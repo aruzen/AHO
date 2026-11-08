@@ -159,6 +159,11 @@
     <ClInclude Include="VSL\src\private\VSL\operation\shader_ops.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\shader_storage.hpp" />
     <ClInclude Include="VSL\include\VSL\operation\shader_create_info.hpp" />
+    <ClInclude Include="VSL\include\VSL\operation\pipeline_layout_create_info.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\operation\pipeline_layout_ops.hpp" />
+    <ClCompile Include="VSL\src\operation\pipeline_layout_ops.cpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\pipeline_layout_storage.hpp" />
+    <ClCompile Include="VSL\src\lifetime\pipeline_layout_storage.cpp" />
     <ClCompile Include="VSL\src\operation\shader_ops.cpp" />
     <ClCompile Include="VSL\src\lifetime\shader_storage.cpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\submission_ops.hpp" />

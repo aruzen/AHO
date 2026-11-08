@@ -15,8 +15,8 @@ vsl::GraphicsPipeline pipeline(frozen, render_pass);
 
 従来の`layout.freeze()`は`std::move(layout).freeze()`へ移行してください。独自ステージの`injection`は`PipelineLayoutAccessor`から`PipelineLayoutEditAccessor`へ変更します。内部実装ポインターから編集用オブジェクトを作る公開コンストラクターは廃止しました。
 
-`add()`は編集対象だけを置き換えます。コピー代入した別名や既存Pipelineが保持する状態は変化しません。ステージ注入・native生成に失敗した場合も元の状態を維持します。`copy()`は配列とnative layoutを独立させます。Shader、BindingLayoutは生成情報が所有します。
+`add()`は編集対象だけを置き換えます。コピー代入した別名や既存Pipelineが保持する状態は変化しません。ステージ注入・native生成に失敗した場合も元の状態を維持します。`copy()`は配列とnative layoutを独立させます。Shader、BindingLayoutはruntimeとは別所有のrecipeが保持します。
 
-従来のfreezeによる生成情報の破棄は行いません。凍結後もGRAPHICS/ComputePipelineを生成できるよう、生成情報とその所有者を保持します。追加のGPU送信・完了待ちは発生せず、編集・独立コピー時だけnative layoutを生成します。共有していない値のfreezeはハンドルを再生成しません。
+凍結後もGraphics／ComputePipelineを生成できるよう、Frozenはrecipeを保持します。作成済みPipelineはruntimeだけを保持し、生成用Shaderまで保持し続けません。freezeはnativeを再生成せず、編集可能なrecipeの別名がある場合だけrecipeをコピーします。追加のGPU送信・完了待ちは発生しません。
 
-独自ステージが直接native構造体のポインターを設定する場合、その参照先はステージ側で寿命とコピーを管理してください。VSL標準ステージの配列はコピー時に参照先を張り直します。`data_`は内部実装用であり、直接書き換えによる凍結解除はAPIの対象外です。同じ編集用オブジェクトへの並行操作には呼び出し側の同期が必要です。
+標準配列はrecipeの型付きvectorに所有し、native pointerは生成scratchへ組み立てます。privateのCreateInfo／map<string, any>は廃止しました。独自の内部stageはedit_recipe()へ移行します。recipe()／edit_recipe()は一時オブジェクトから呼べません。data_は後続段階で廃止する内部実装用入口です。同じ編集用オブジェクトへの並行操作には呼び出し側の同期が必要です。配置・所有と移行の詳細は[PipelineLayout arena](pipeline-layout-arena.md)を参照してください。

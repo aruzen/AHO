@@ -1,6 +1,6 @@
 # Shaderの共通backendとCPU配置
 
-[完了計画](arena-completion-plan.md)の6a。ShaderModuleのVulkan操作、CPU実体の構築、所有と配置を分離し、通常のShaderとResourceArenaから共通処理を利用する。PipelineLayoutのruntime／recipe分離とTyped共有Layoutは6b／6cに残る。
+[完了計画](arena-completion-plan.md)の6a。ShaderModuleのVulkan操作、CPU実体の構築、所有と配置を分離し、通常のShaderとResourceArenaから共通処理を利用する。PipelineLayoutのruntime／recipe分離は[6b](pipeline-layout-arena.md)で行い、Typed共有Layoutは6cに残る。
 
 ## 構築と配置
 
@@ -36,7 +36,7 @@ ShaderGroupは空／非所有Accessorを保存しない。injectionとpipeline�
 
 pointerを含むPipelineShaderStageCreateInfoをShaderImplとCreateInfoから除去した。Graphics／Computeはrecipe.shadersから生成時だけstage情報を組み立て、native呼出が終わるまで配列とShader／entryを保持する。reflectionは保存code／name／stageを使う。Frozenのコピーから元Shader／arena facadeの破棄後にも再生成できる。
 
-6a時点ではCreateInfo／ShaderGroupのshared_ptr<ShaderImpl>保持を維持している。作成済みPipelineもrecipe経由でShader arenaを保持する。GPU完了だけでShader arenaが必ず回収される構成とは扱わない。6bでnative runtimeと再生成recipeを分け、同rootの借用と外部source所有をgraphへ接続する。Device getterのshared_from_thisと公開data_も後続の移行対象である。
+6a時点ではCreateInfo経由でPipelineもShader arenaを保持していた。6bでruntimeとrecipeの所有を分け、Shader sourceの所有はLayout／Frozenのrecipeへ移した。別のarena／heapにあるsourceは全recipeの破棄後に回収できる。同じarenaへShaderとruntimeをまとめた場合は明示的な一括寿命が優先する。Device getterのshared_from_thisと公開data_は後続の移行対象である。
 
 ## 寸法と互換性
 

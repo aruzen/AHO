@@ -9,7 +9,7 @@
 
 最初のPRだけで終了せず、下記の順で実装・検証・独立レビューを継続する。PRの公開前には最新masterとの差分を確認する。新しい製品ディレクトリが必要な場合は作成前に確認する。
 
-現在の到達点は順序1〜5と6aのShaderである。順序6b以降は未完了であり、起動資源、既定policy変更、旧入口廃止と最終監査まで継続する。
+現在の到達点は順序1〜5と6aのShader／6bのPipelineLayoutである。順序6c以降は未完了であり、起動資源、既定policy変更、旧入口廃止と最終監査まで継続する。
 
 ## 責務と保証
 
@@ -94,6 +94,6 @@ Layout数は宣言set数のResources::COUNT、Set数はshared／frameの実数�
 
 6aは[Shaderのoperation／lifetime backend、heap所有、寸法生成、ResourceArena配置](shader-arena.md)を実装した。native実体へGPU UseStateを持たせず、stage create-infoとpNameを生成scratchへ分け、entry／codeの永続値と外部Shaderの正規ownerを維持する。配置・失敗・import固定親・Frozen再生成・実描画／compute・install／artifactを検証した。
 
-6bはPipelineLayoutのruntimeと編集／Frozenのrecipeを分離し、配置へ接続する。push constant記録で読むrangesはruntimeへ移し、recipeのshader／descriptor sourceは借用とroot外部所有へ正規化する。Shader／DescriptorLayout→PipelineLayout、Pool／Layout→Setの構築順と実構築の逆順破棄を保証する。
+6bは[PipelineLayoutのruntime／recipe／scratchとCPU配置](pipeline-layout-arena.md)を実装した。runtimeとrecipeのcontrol blockを分け、Pipeline／保存PushConstantはruntimeだけを保持する。Typed pushはruntime内のcanonical rangesから記録する。recipeのShader／DescriptorLayoutは借用と外部source所有へ正規化し、ownerを重複排除する。DescriptorLayout→PipelineLayout、Pool／Layout→Setの構築順と実構築の逆順rollbackを保証する。明示ID／importはarena全寿命、直接のBindingLayout sourceは構築呼出し中だけ保持する。FromRuntimeは構造を照合し、freezeはnativeを再生成せず編集aliasのrecipeだけを分離する。
 
 6cはschema付き共有Layout集合をTyped pipelineへ渡す入口を作る。現在のResources注入が既存Layoutをheap再生成する経路を置き換え、set番号のholeは生成時に扱う。frame facadeをpipeline rootへ保持しない。Vulkan native依存と再生成用recipeの所有依存を区別し、それぞれgraphと寿命を検証する。

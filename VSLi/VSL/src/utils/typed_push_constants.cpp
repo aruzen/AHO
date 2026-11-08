@@ -13,7 +13,7 @@ namespace VSL_NAMESPACE::typed::detail {
         pushes.injection(layout);
     }
     void validate_push_schema(PipelineLayoutAccessor layout, std::span<const PushRequirement> requirements) {
-        for (const auto& shader : layout.data_->info->shaders) {
+        for (const auto& shader : layout.recipe().shaders) {
             utils::SPIRVReflector reflection({}, std::span<const std::uint32_t>(shader->code), shader->name, ShaderType(shader->stage));
             if (!reflection.generated.push_constants)
                 continue;
@@ -55,8 +55,7 @@ namespace VSL_NAMESPACE::typed::detail {
         validate_push_values(requirements, values);
         buffer.retain(pipeline.data_);
         const auto& layout = pipeline.data_->layout;
-        const auto& info = layout->info->pipeline_layout;
-        const std::span native_ranges(info.pPushConstantRanges, info.pushConstantRangeCount);
+        const std::span native_ranges(layout->push_ranges);
         for (const auto& requirement : requirements) {
             const auto& range = requirement.range;
             auto cursor = range.offset;

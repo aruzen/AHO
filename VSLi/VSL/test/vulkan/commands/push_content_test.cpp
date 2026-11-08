@@ -52,7 +52,7 @@ namespace {
         constants.definitions = {{vsl::ShaderFlag::VERTEX, 0, 4}, {vsl::ShaderFlag::COMPUTE, 0, 4}};
         vsl::PipelineLayout edited(device, pl::ShaderGroup("shared-push", {*shader}),
                                    pl::ResourceBinding{{*binding}}, constants);
-        const auto& info = edited.data_->info->pipeline_layout;
+        const auto& info = vsl_test::inspect_layout(edited).pipeline_layout;
         bool found = false;
         for (unsigned i = 0; i < info.pushConstantRangeCount; ++i)
             if (info.pPushConstantRanges[i].stageFlags & vk::ShaderStageFlagBits::eCompute) {

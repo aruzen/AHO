@@ -62,6 +62,11 @@ add_library(VSL STATIC
         VSL/src/operation/buffer_ops.cpp
         VSL/src/operation/image_ops.cpp
         VSL/src/operation/sampler_ops.cpp
+        VSL/include/VSL/operation/pipeline_layout_create_info.hpp
+        VSL/src/private/VSL/operation/pipeline_layout_ops.hpp
+        VSL/src/operation/pipeline_layout_ops.cpp
+        VSL/src/private/VSL/lifetime/pipeline_layout_storage.hpp
+        VSL/src/lifetime/pipeline_layout_storage.cpp
         VSL/src/operation/shader_ops.cpp
         VSL/src/private/VSL/operation/shader_ops.hpp
         VSL/include/VSL/operation/shader_create_info.hpp

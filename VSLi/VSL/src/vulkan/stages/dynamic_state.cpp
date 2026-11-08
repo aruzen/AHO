@@ -2,7 +2,7 @@
 #include <VSL/vulkan/_pimpls.hpp>
 
 void VSL_NAMESPACE::pipeline_layout::DynamicState::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
-    auto& info = *pl.data_->info;
+    auto& info = pl.edit_recipe();
     info.enabled_dynamic_states.assign(
         {vk::DynamicState::eScissor,
          vk::DynamicState::eViewport});

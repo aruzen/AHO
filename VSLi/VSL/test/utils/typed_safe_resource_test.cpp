@@ -83,7 +83,7 @@ namespace {
             4, 16, vsl::pipeline_layout::VertexInputShapeDefinition::UpdateTiming::NEXT_INSTANCE, Attribute>;
         auto layout = make_layout_state();
         vsl::typed::TypedVertexInput<Shape>{}.injection(layout);
-        const auto& state = layout.data_->info->vertex_input;
+        const auto& state = vsl_test::inspect_layout(layout).vertex_input;
         ASSERT_EQ(state.vertexBindingDescriptionCount, 1u);
         ASSERT_EQ(state.vertexAttributeDescriptionCount, 1u);
         EXPECT_EQ(state.pVertexBindingDescriptions[0].binding, 4u);

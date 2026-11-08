@@ -9,15 +9,13 @@
 #include "../pv.hpp"
 #include "../pipeline_layout.hpp"
 #include "../shader.hpp"
+#include "../../operation/pipeline_layout_create_info.hpp"
 
 #include <utility>
 #include <array>
 
 namespace VSL_NAMESPACE::pipeline_layout {
-    struct PushContentDefinition {
-        VSL_NAMESPACE::ShaderFlag target_shader;
-        std::uint32_t offset = (std::uint32_t)-1, size = (std::uint32_t)-1;
-    };
+    using PushContentDefinition = PushConstantRange;
 
     struct PushConstants {
         PushConstants() = default;

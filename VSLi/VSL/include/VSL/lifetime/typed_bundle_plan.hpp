@@ -2,6 +2,7 @@
 #include "typed_buffer_arena.hpp"
 #include "resource_plan.hpp"
 #include "typed_descriptor_plan.hpp"
+#include "typed_descriptor_layouts.hpp"
 #include "../utils/typed_resource_allocation.hpp"
 #include <algorithm>
 #include <variant>
@@ -39,6 +40,7 @@ namespace VSL_NAMESPACE::typed {
     template<typename Schema, typename Bindings = ResourceBindingMap<>>
     class TypedBundlePlan {
         using Resources = typename Schema::Resources;
+        using LayoutShape = detail::DescriptorLayoutShape<Resources>;
         static consteval size_t BindingCount();
         template<size_t first, size_t second>
         static consteval bool SamePayload();
@@ -70,7 +72,8 @@ namespace VSL_NAMESPACE::typed {
 
     public:
         static constexpr size_t CAPACITY = BindingCount();
-        static constexpr size_t ARENA_CAPACITY = detail::allocation_add(CAPACITY, detail::allocation_add(detail::allocation_multiply(Resources::COUNT, 2), 1));
+        static constexpr bool NEEDS_EMPTY_LAYOUT = LayoutShape::NEEDS_EMPTY;
+        static constexpr size_t ARENA_CAPACITY = detail::allocation_add(CAPACITY, detail::allocation_add(detail::allocation_multiply(Resources::COUNT, 2), 1 + NEEDS_EMPTY_LAYOUT));
         constexpr explicit TypedBundlePlan(const ResourceAllocationPlan<Schema>& plan);
         constexpr const TypedDescriptorPlan<Schema>& descriptors() const& { return _descriptors; }
         constexpr const TypedDescriptorPlan<Schema>& descriptors() const&& = delete;
@@ -85,6 +88,7 @@ namespace VSL_NAMESPACE::typed {
         constexpr ResourcePlan<ARENA_CAPACITY> arena_plan(ResourceScope scope, size_t instance = 0) const;
         constexpr ResourceId descriptor_layout(std::uint32_t set) const;
         constexpr ResourceId descriptor_set(std::uint32_t set) const;
+        constexpr std::optional<ResourceId> empty_descriptor_layout() const;
         constexpr std::optional<ResourceId> descriptor_pool(ResourceScope scope) const;
         constexpr std::span<const BufferCreateInfo> buffers(ResourceScope scope) const& {
             const auto i = ScopeIndex(scope);
@@ -169,7 +173,7 @@ namespace VSL_NAMESPACE::typed {
         std::array<ResourceId, BindingCount()> reserved{};
         for (size_t i = 0; i < reserved.size(); ++i)
             reserved[i] = Identity(i);
-        std::array<ResourceId, detail::allocation_add(detail::allocation_multiply(Resources::COUNT, 2), 2)> result{};
+        std::array<ResourceId, detail::allocation_add(detail::allocation_multiply(Resources::COUNT, 2), 2 + LayoutShape::NEEDS_EMPTY)> result{};
         std::uint64_t next = 0;
         for (size_t i = 0; i < result.size(); ++i) {
             while (std::ranges::find(reserved, ResourceId{next}) != reserved.end()) {
@@ -273,6 +277,14 @@ namespace VSL_NAMESPACE::typed {
         throw std::out_of_range("Unknown bundle descriptor set");
     }
     template<typename Schema, typename Bindings>
+    constexpr std::optional<ResourceId> TypedBundlePlan<Schema, Bindings>::empty_descriptor_layout() const {
+        if constexpr (NEEDS_EMPTY_LAYOUT)
+            return DESCRIPTOR_IDS[Resources::COUNT * 2 + 2];
+        else if constexpr (LayoutShape::HAS_HOLES)
+            return DESCRIPTOR_IDS[LayoutShape::EMPTY_INDEX];
+        return std::nullopt;
+    }
+    template<typename Schema, typename Bindings>
     constexpr std::optional<ResourceId> TypedBundlePlan<Schema, Bindings>::descriptor_pool(ResourceScope scope) const {
         const auto group = ScopeIndex(scope);
         if (!_descriptors.pool(scope).max_sets)
@@ -297,6 +309,9 @@ namespace VSL_NAMESPACE::typed {
             for (const auto& set : _descriptors.sets(scope))
                 requests[count++] = {descriptor_set(set.set), storage::ResourceKind::DESCRIPTOR_SET};
         }
+        if constexpr (NEEDS_EMPTY_LAYOUT)
+            if (scope == ResourceScope::SHARED)
+                requests[count++] = {*empty_descriptor_layout(), storage::ResourceKind::DESCRIPTOR_LAYOUT};
         return ResourcePlan<ARENA_CAPACITY>(std::span(requests.data(), count), {scope == ResourceScope::SHARED ? LifetimeScope::SHARED : LifetimeScope::FRAME, instance});
     }
     template<typename Schema, typename Bindings>

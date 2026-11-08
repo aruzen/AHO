@@ -7,6 +7,9 @@
 namespace VSL_NAMESPACE {
     struct DescriptorLayoutCreateInfo;
     struct DescriptorPoolCreateInfo;
+    namespace graphic_resource {
+        struct BindingPoint;
+    }
 } // namespace VSL_NAMESPACE
 
 namespace VSL_NAMESPACE::impl {
@@ -19,6 +22,8 @@ namespace VSL_NAMESPACE::impl {
 } // namespace VSL_NAMESPACE::impl
 
 namespace VSL_NAMESPACE::operation {
+    void validate_descriptor_layout(const impl::ResourceBindingLayoutImpl& layout, const impl::LogicalDeviceImpl& device,
+                                    std::span<const graphic_resource::BindingPoint> points);
     void initialize_descriptor_layout(impl::ResourceBindingLayoutImpl& layout, impl::LogicalDeviceImpl& device, const DescriptorLayoutCreateInfo& info);
     void destroy_descriptor_layout(impl::ResourceBindingLayoutImpl& layout) noexcept;
     void initialize_descriptor_pool(impl::GraphicResourcePoolImpl& pool, impl::LogicalDeviceImpl& device, const DescriptorPoolCreateInfo& info);

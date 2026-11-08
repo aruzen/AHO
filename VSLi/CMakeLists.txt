@@ -87,6 +87,8 @@ add_library(VSL STATIC
         VSL/include/VSL/lifetime/buffer_view.hpp
         VSL/include/VSL/lifetime/typed_buffer_arena.hpp
         VSL/include/VSL/lifetime/typed_bundle_plan.hpp
+        VSL/include/VSL/lifetime/typed_descriptor_layouts.hpp
+        VSL/src/lifetime/typed_descriptor_layouts.cpp
         VSL/include/VSL/lifetime/typed_descriptor_plan.hpp
         VSL/include/VSL/lifetime/typed_resource_buffer_view.hpp
         VSL/include/VSL/lifetime/resource_use.hpp

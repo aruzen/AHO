@@ -98,6 +98,8 @@ namespace VSL_NAMESPACE::typed {
         requires(detail::BundlePolicy<StoragePolicy>::ARENA)
         = delete;
         size_t frame_count() const { return _frames.frame_count(); }
+        TypedDescriptorLayouts<Resources> descriptor_layouts() const
+        requires(detail::BundlePolicy<StoragePolicy>::ARENA);
         template<typename Initialize>
         requires std::invocable<Initialize&, TypedSharedResources<Schema, StoragePolicy>&> && std::same_as<std::invoke_result_t<Initialize&, TypedSharedResources<Schema, StoragePolicy>&>, void>
         void initialize_shared(Initialize&& initialize);
@@ -171,6 +173,20 @@ namespace VSL_NAMESPACE::typed {
           _shared(detail::make_bundle_shared<Schema, StoragePolicy>(manager.get_device(), descriptors, _plan, std::tie(inputs...))),
           _frames(manager, [&](size_t instance) { return Frame(manager.get_device(), descriptors, _shared, _plan, instance); }) {}
 
+    template<typename Schema, typename StoragePolicy>
+    TypedDescriptorLayouts<typename Schema::Resources> TypedResourceBundle<Schema, StoragePolicy>::descriptor_layouts() const
+    requires(detail::BundlePolicy<StoragePolicy>::ARENA)
+    {
+        require_available();
+        auto layouts = [&]<size_t... indices>(std::index_sequence<indices...>) {
+            return std::array<graphic_resource::BindingLayout, Resources::COUNT>{
+                _shared->arena.value().descriptor_layout(_shared->layout.descriptor_layout(Resources::template Set<indices>::SET))...};
+        }(std::make_index_sequence<Resources::COUNT>{});
+        std::optional<graphic_resource::BindingLayout> empty;
+        if constexpr (detail::BundlePlacementPlan<Schema, StoragePolicy>::NEEDS_EMPTY_LAYOUT)
+            empty = _shared->arena.value().descriptor_layout(*_shared->layout.empty_descriptor_layout());
+        return TypedDescriptorLayouts<Resources>(std::move(layouts), std::move(empty));
+    }
     template<typename Schema, typename StoragePolicy>
     void TypedResourceBundle<Schema, StoragePolicy>::require_available() const {
         if (!_shared || _initializing || _initialization_failed)

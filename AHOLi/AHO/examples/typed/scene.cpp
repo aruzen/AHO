@@ -49,6 +49,9 @@ namespace typed_example {
             return;
         namespace pl = vsl::pipeline_layout;
         _pipeline.emplace(_context.device(), _context.render_pass(),
+#ifdef AHO_TYPED_ARENA
+                          _resources.descriptor_layouts(),
+#endif
                           pl::ShaderGroup("Typed example", {_vertex_shader, _fragment_shader}),
                           pl::ColorBlend{}, pl::InputAssembly{}, pl::Rasterization{pl::CullingMode::NONE},
                           pl::Multisample{}, pl::DynamicState{}, vsl::Viewport{}, vsl::Scissor{});

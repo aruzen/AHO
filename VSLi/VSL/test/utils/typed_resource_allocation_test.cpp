@@ -117,7 +117,7 @@ namespace {
         constexpr t::TypedBundlePlan<Fixed> plan(FIXED_PLAN);
         constexpr auto shared = plan.arena_plan(t::ResourceScope::SHARED);
         constexpr auto frame = plan.arena_plan(t::ResourceScope::PER_FRAME, 2);
-        static_assert(shared.size() == 9 && shared.slots() == 9);
+        static_assert(shared.size() == 10 && shared.slots() == 10);
         static_assert(frame.size() == 4 && frame.slots() == 3);
         static_assert(frame.lifetime() == t::LifetimeGroup{t::LifetimeScope::FRAME, 2});
         static_assert(frame.placement(plan.descriptor_layout(0)).external);
@@ -137,6 +137,10 @@ namespace {
             EXPECT_EQ(full.placement(*plan.descriptor_pool(scope)).kind, vsl::storage::ResourceKind::DESCRIPTOR_POOL);
         }
         EXPECT_EQ(shared.placement(plan.descriptor_set(7)).kind, vsl::storage::ResourceKind::DESCRIPTOR_SET);
+        static_assert(plan.NEEDS_EMPTY_LAYOUT);
+        static_assert(shared.placements().back().resource == *plan.empty_descriptor_layout());
+        static_assert(shared.placement(*plan.empty_descriptor_layout()).kind == vsl::storage::ResourceKind::DESCRIPTOR_LAYOUT);
+        static_assert(shared.placement(plan.descriptor_set(7)).slot == 8);
         EXPECT_THROW(plan.descriptor_layout(6), std::out_of_range);
         EXPECT_THROW(plan.descriptor_set(6), std::out_of_range);
         EXPECT_THROW(plan.arena_plan(t::ResourceScope::SHARED, 1), std::invalid_argument);
@@ -158,6 +162,7 @@ namespace {
         }
         descriptors.push_back(*plan.descriptor_pool(t::ResourceScope::SHARED));
         descriptors.push_back(*plan.descriptor_pool(t::ResourceScope::PER_FRAME));
+        descriptors.push_back(*plan.empty_descriptor_layout());
         for (size_t i = 0; i < descriptors.size(); ++i) {
             for (const auto& data : plan.placements())
                 EXPECT_NE(descriptors[i], data.resource);

@@ -6,6 +6,18 @@
 #include <stdexcept>
 
 namespace VSL_NAMESPACE::operation {
+    void validate_descriptor_layout(const impl::ResourceBindingLayoutImpl& layout, const impl::LogicalDeviceImpl& device,
+                                    std::span<const graphic_resource::BindingPoint> points) {
+        if (!layout.layout || layout.device != &device || layout.layout_bindings.size() != points.size())
+            throw std::invalid_argument("Typed descriptor device/layout mismatch");
+        for (const auto& point : points) {
+            const auto found = std::ranges::find(layout.layout_bindings, point.binding, &vk::DescriptorSetLayoutBinding::binding);
+            if (found == layout.layout_bindings.end() || found->descriptorType != vk::DescriptorType(point.binding_type) ||
+                found->descriptorCount != point.amount || found->stageFlags != vk::ShaderStageFlags(vk::ShaderStageFlagBits(point.shader_type)) ||
+                found->pImmutableSamplers)
+                throw std::invalid_argument("Typed descriptor binding mismatch");
+        }
+    }
     void initialize_descriptor_layout(impl::ResourceBindingLayoutImpl& layout, impl::LogicalDeviceImpl& device, const DescriptorLayoutCreateInfo& info) {
         layout.device = &device;
         layout.native_device = device.device;

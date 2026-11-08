@@ -1,5 +1,6 @@
 #pragma once
 #include "typed_resources.hpp"
+#include "../lifetime/typed_descriptor_layouts.hpp"
 #include "typed_push_constants.hpp"
 #include "../vulkan/pipeline.hpp"
 #include "../vulkan/commands/bind_graphic_resource.hpp"
@@ -62,15 +63,18 @@ namespace VSL_NAMESPACE::typed {
     class TypedComputePipeline {
         LogicalDeviceAccessor _device;
         VSL_NAMESPACE::ComputePipeline _pipeline;
-        template<pipeline_layout_injecter... Stages>
-        static VSL_NAMESPACE::ComputePipeline MakePipeline(LogicalDeviceAccessor device, Stages&&... stages);
+        template<pipeline_layout_injecter ResourceStage, pipeline_layout_injecter... Stages>
+        static VSL_NAMESPACE::ComputePipeline MakePipeline(LogicalDeviceAccessor device, ResourceStage&& resources, Stages&&... stages);
 
     public:
         using ResourceLayout = Resources;
         using PushLayout = Pushes;
         template<pipeline_layout_injecter... Stages>
         TypedComputePipeline(LogicalDeviceAccessor device, Stages&&... stages)
-            : _device(device), _pipeline(MakePipeline(device, std::forward<Stages>(stages)...)) {}
+            : _device(device), _pipeline(MakePipeline(device, Resources{}, std::forward<Stages>(stages)...)) {}
+        template<pipeline_layout_injecter... Stages>
+        TypedComputePipeline(LogicalDeviceAccessor device, const TypedDescriptorLayouts<Resources>& layouts, Stages&&... stages)
+            : _device(device), _pipeline(MakePipeline(device, detail::DescriptorLayoutInjection<Resources>{layouts}, std::forward<Stages>(stages)...)) {}
         const VSL_NAMESPACE::ComputePipeline& backend() const { return _pipeline; }
         template<typename... Sets>
         requires compatible_descriptor_sets<Resources, Sets...>
@@ -96,9 +100,9 @@ namespace VSL_NAMESPACE::typed {
         return TypedDispatch<Resources, Pushes>(_pipeline, _device, _resources, std::uint32_t(x), std::uint32_t(y), std::uint32_t(z), _pushes);
     }
     template<typename Resources, typename Pushes>
-    template<pipeline_layout_injecter... Stages>
-    VSL_NAMESPACE::ComputePipeline TypedComputePipeline<Resources, Pushes>::MakePipeline(LogicalDeviceAccessor device, Stages&&... stages) {
-        PipelineLayout layout(device, std::forward<Stages>(stages)..., Resources{}, Pushes{});
+    template<pipeline_layout_injecter ResourceStage, pipeline_layout_injecter... Stages>
+    VSL_NAMESPACE::ComputePipeline TypedComputePipeline<Resources, Pushes>::MakePipeline(LogicalDeviceAccessor device, ResourceStage&& resources, Stages&&... stages) {
+        PipelineLayout layout(device, std::forward<Stages>(stages)..., std::forward<ResourceStage>(resources), Pushes{});
         detail::validate_resource_schema(layout, Resources::REQUIREMENTS);
         detail::validate_push_schema(layout, Pushes::REQUIREMENTS);
         return VSL_NAMESPACE::ComputePipeline(std::move(layout).freeze());

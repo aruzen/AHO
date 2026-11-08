@@ -9,7 +9,7 @@
 
 最初のPRだけで終了せず、下記の順で実装・検証・独立レビューを継続する。PRの公開前には最新masterとの差分を確認する。新しい製品ディレクトリが必要な場合は作成前に確認する。
 
-現在の到達点は順序1〜5と6aのShader／6bのPipelineLayoutである。順序6c以降は未完了であり、起動資源、既定policy変更、旧入口廃止と最終監査まで継続する。
+現在の到達点は順序1〜6である。順序7以降は未完了であり、起動資源、既定policy変更、旧入口廃止と最終監査まで継続する。
 
 ## 責務と保証
 
@@ -96,4 +96,18 @@ Layout数は宣言set数のResources::COUNT、Set数はshared／frameの実数�
 
 6bは[PipelineLayoutのruntime／recipe／scratchとCPU配置](pipeline-layout-arena.md)を実装した。runtimeとrecipeのcontrol blockを分け、Pipeline／保存PushConstantはruntimeだけを保持する。Typed pushはruntime内のcanonical rangesから記録する。recipeのShader／DescriptorLayoutは借用と外部source所有へ正規化し、ownerを重複排除する。DescriptorLayout→PipelineLayout、Pool／Layout→Setの構築順と実構築の逆順rollbackを保証する。明示ID／importはarena全寿命、直接のBindingLayout sourceは構築呼出し中だけ保持する。FromRuntimeは構造を照合し、freezeはnativeを再生成せず編集aliasのrecipeだけを分離する。
 
-6cはschema付き共有Layout集合をTyped pipelineへ渡す入口を作る。現在のResources注入が既存Layoutをheap再生成する経路を置き換え、set番号のholeは生成時に扱う。frame facadeをpipeline rootへ保持しない。Vulkan native依存と再生成用recipeの所有依存を区別し、それぞれgraphと寿命を検証する。
+6cは[schema付き共有Layout集合](typed-shared-layouts.md)をbundleからTyped pipelineへ接続した。Resources注入が既存Layoutをheap再生成する経路を置き換え、set番号のholeは空Layout一つで埋める。必要時の追加slot／IDをshared計画の末尾へ置き、宣言emptyを優先して再利用する。frame facadeを保持せず、元bundle／source回収後にも利用できる。通常／共有constructorのshader検証、既存配置、Set／Pool容量、実compute／描画／resize／installを確認し、順序6の受入条件を満たした。次は順序7へ進む。
+
+## 順序7／8の前提調査と次の実装（未実装）
+
+6c時点の独立レビューにより、次を順に扱う。
+
+1. RenderPassの共通operation／lifetime backendと配置。不変descriptionは記録・Framebuffer検証にも必要な値として保持し、不要なrecipe所有層を追加しない。Deviceの強い所有はrootへ移す。descriptionの借用はlvalue所有者に限定する。
+2. Pipelineの共通backendと配置。native Layoutを生成しないstate定義を用意し、arenaのGraphics入力はLayout ID・Pass ID・subpass・state・Shader IDまたは構築時sourceへ分ける。既存Frozen constructorも同backendへ接続する。定義取得のための余分なheap Layout生成を恒久化しない。
+3. Framebufferの共通backendと配置。まず一つのImplに複数native framebufferとattachment行列を持つ既存の意味を維持し、Pass／Image／swapchain所有を外側rootへ移す。同rootの参照は借用とし、getterは本来の正規ownerを返す。
+
+Pipelineが記録時に使うLayoutは保持し、Shader／Pass／再生成recipeは生成時依存へ分ける。Framebufferから既定Passとclear descriptionを参照するVSLの契約は、native生成時だけの依存と区別する。attachment Imageの既存物理UseStateを使い、RenderPass／Pipeline／Framebufferへ独立したGPU UseStateは追加しない。
+
+現frame_buffer.cppにはnative createFramebuffer成功後のpush_back確保失敗で未登録handleを残す経路がある。共通backendへの移行時にlocal RAIIまたは先行確保とcommitを用い、途中失敗を巻き戻す。resizeは待機→次世代構築→公開→hook通知を維持し、失敗時の旧世代、保存command／旧view、互換Pipelineの再利用を検証する。
+
+順序8の配置前に、CommandBufferImplのsubmissions／recording_submission／presentation_resourcesを外部domainへ移す。現在のImpl→Work→Device/resourcesのまま同arenaへ入れるとroot→Work→rootの循環になる。外部Registry→Work→起動／資源root、Impl→contextの借用／weak、Completion→結果だけという向きを確定する。通常invokeは解決済みcontextへ直接届き、Registryの探索はphase境界に限る。shutdown時の新規登録拒否・snapshot終端処理と、DefaultPhase cancelの取得画像返却用の内部送信も検証する。presentation完了の証明は順序10へ残す。

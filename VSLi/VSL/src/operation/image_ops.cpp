@@ -28,14 +28,21 @@ namespace VSL_NAMESPACE::operation {
             target.samples = info.samples;
             target.format = static_cast<vk::Format>(info.format.type());
         }
-        void create_image_view(impl::ImageImpl& target) {
+        void create_image_view(impl::ImageImpl& target, const ImageViewNativeCalls& calls = {}) {
             const vk::ImageViewCreateInfo info{
                 .image = target.image,
                 .viewType = target.count == 1 ? vk::ImageViewType::e2D : vk::ImageViewType::e2DArray,
                 .format = target.format,
                 .subresourceRange = {impl::helper::image_aspects(target.format), 0, 1, 0, target.count},
             };
-            target.view = target.native_device.createImageView(info);
+            VkImageView view = VK_NULL_HANDLE;
+            const auto result = calls.create ? calls.create(calls.context, target.native_device, &static_cast<const VkImageViewCreateInfo&>(info), &view)
+                                             : vkCreateImageView(target.native_device, &static_cast<const VkImageViewCreateInfo&>(info), nullptr, &view);
+            if (result != VK_SUCCESS)
+                vk::detail::throwResultException(static_cast<vk::Result>(result), "Image view creation failed");
+            if (!view)
+                throw std::runtime_error("Image view creation returned an empty handle");
+            target.view = view;
         }
     } // namespace
 
@@ -69,13 +76,13 @@ namespace VSL_NAMESPACE::operation {
         }
     }
     void initialize_borrowed_image(impl::ImageImpl& target, impl::LogicalDeviceImpl& device,
-                                   const ImageCreateInfo& info, vk::Image image) {
+                                   const ImageCreateInfo& info, vk::Image image, const ImageViewNativeCalls& calls) {
         try {
             describe_image(target, device, info);
             if (!image)
                 throw std::invalid_argument("Borrowed image requires a native image");
             target.image = image;
-            create_image_view(target);
+            create_image_view(target, calls);
         } catch (...) {
             destroy_image(target);
             throw;

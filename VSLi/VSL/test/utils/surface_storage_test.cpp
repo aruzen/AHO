@@ -202,7 +202,7 @@ namespace {
         EXPECT_FALSE(child.expired());
         EXPECT_FALSE(os.expired());
         EXPECT_FALSE(physical.data_->device.getSurfaceFormatsKHR(native_surface->surface).empty());
-        auto source = std::make_shared<vsl::Surface>(native_surface);
+        auto source = std::make_shared<vsl::Surface>(saved.get_surface());
         vsl::Swapchain next(device, source, saved);
         EXPECT_GT(next.data_->swap_chain_extent.width, 0u);
         EXPECT_GT(next.data_->swap_chain_extent.height, 0u);

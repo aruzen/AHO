@@ -2,9 +2,11 @@
 #include <VSL/vulkan/phase.hpp>
 #include <VSL/sync/submission_completion.hpp>
 #include <VSL/lifetime/submission_retention.hpp>
+#include <VSL/lifetime/swapchain_storage.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/lifetime/synchronization_use.hpp>
 #include <VSL/sync/synchronization_state.hpp>
+#include <VSL/sync/resource_use_access.hpp>
 #include <VSL/operation/submission_ops.hpp>
 #include <VSL/operation/command_ops.hpp>
 #include <exception>
@@ -50,6 +52,7 @@ namespace VSL_NAMESPACE {
         std::shared_ptr<sync::SemaphoreWSIUse> available_use, finished_use;
         std::shared_ptr<impl::SwapchainImpl> swapchain;
         vk::UniqueFence acquire_fence;
+        std::uint32_t acquired_index = UINT32_MAX;
         bool acquired = false;
         ~Presentation();
     };
@@ -322,9 +325,12 @@ namespace VSL_NAMESPACE {
         if (state != State::BEFORE_SETUP)
             return;
         try {
-            if (!swapchain.data_ || !swapchain.data_->swap_chain ||
-                swapchain.data_->device != manager.data_->device)
+            const auto chain = swapchain.data_;
+            if (!chain || !chain->swap_chain ||
+                chain->device != manager.data_->device.get())
                 throw std::invalid_argument("A swapchain is required");
+            lifetime::require_swapchain_owner(chain);
+            operation::require_active_swapchain(*chain);
             const auto buffer = manager.get_buffer();
             const auto domain = lifetime::CommandAccess::Owner(buffer);
             auto buffers = domain->buffer;
@@ -332,21 +338,24 @@ namespace VSL_NAMESPACE {
                 throw std::logic_error("A phase is already recording");
             buffers->current_buffer_idx = (buffers->current_buffer_idx + 1) % buffers->command_buffers.size();
             prepare();
-            const auto count = swapchain.data_->swap_chain_images.size();
+            if (swapchain.data_ != chain)
+                throw std::logic_error("Swapchain changed while preparing a phase");
+            operation::require_active_swapchain(*chain);
+            const auto count = chain->swap_chain_images.size();
             if (submission->signal_semaphore && submission->signal_semaphore->semaphores.size() < count)
                 throw std::invalid_argument("Present semaphores must cover swapchain images");
             auto device = manager.data_->device->device;
-            if (!submission->signal_semaphore && swapchain.data_->presentation_semaphores.empty()) {
+            if (!submission->signal_semaphore && chain->presentation_semaphores.empty()) {
                 std::vector<vk::UniqueSemaphore> semaphores;
                 semaphores.reserve(count);
                 for (std::size_t i = 0; i < count; ++i)
                     semaphores.push_back(device.createSemaphoreUnique({}));
-                swapchain.data_->presentation_semaphores = std::move(semaphores);
+                chain->presentation_semaphores = std::move(semaphores);
             }
             vk::Semaphore available;
             _presentation = std::make_shared<Presentation>();
             _presentation->device = manager.data_->device;
-            _presentation->swapchain = swapchain.data_;
+            _presentation->swapchain = chain;
             _presentation->acquire_fence = device.createFenceUnique({});
             if (submission->wait_semaphore) {
                 _presentation->available = synchronization_owner(*submission, impl::SubmissionSource::WAIT_SEMAPHORE, submission->wait_semaphore);
@@ -358,10 +367,18 @@ namespace VSL_NAMESPACE {
                 _presentation->finished_use = sync::track_semaphore_wsi(*_presentation->finished);
             }
             const auto acquired = *_presentation->acquire_fence;
-            completion_.retain(_presentation);
-            lifetime::retain_resource(domain->presentation_resources, swapchain.data_);
-            auto result = device.acquireNextImageKHR(swapchain.data_->swap_chain, UINT64_MAX,
-                                                     available, acquired, &image_index);
+            lifetime::retain_until_complete(*submission, _presentation);
+            lifetime::retain_resource(domain->presentation_resources, chain);
+            if (swapchain.data_ != chain || !chain->swap_chain || chain->state != SwapchainState::ACTIVE) {
+                if (_presentation->available_use)
+                    _presentation->available_use->complete = true;
+                if (_presentation->finished_use)
+                    _presentation->finished_use->complete = true;
+                throw std::logic_error("Swapchain changed before image acquisition");
+            }
+            std::uint32_t acquired_index = UINT32_MAX;
+            auto result = device.acquireNextImageKHR(chain->swap_chain, UINT64_MAX,
+                                                     available, acquired, &acquired_index);
             if (result == vk::Result::eErrorOutOfDateKHR) {
                 if (_presentation->available_use)
                     _presentation->available_use->complete = true;
@@ -376,15 +393,16 @@ namespace VSL_NAMESPACE {
                 throw std::runtime_error("Swapchain acquire failed: " + vk::to_string(result));
             }
             _presentation->acquired = true;
+            _presentation->acquired_index = acquired_index;
+            image_index = acquired_index;
             recreate = result == vk::Result::eSuboptimalKHR;
             if (!available && device.waitForFences(acquired, true, UINT64_MAX) != vk::Result::eSuccess)
                 throw std::runtime_error("Swapchain acquire wait failed");
-            signal_index = image_index;
+            signal_index = _presentation->acquired_index;
             begin();
-            domain->context.acquired_image_index = image_index;
-            domain->context.acquired_swapchain = swapchain.data_;
-            completion_.retain(swapchain.data_);
-            lifetime::retain_resource(domain->presentation_resources, swapchain.data_);
+            domain->context.acquired_image_index = _presentation->acquired_index;
+            domain->context.acquired_swapchain = chain;
+            lifetime::retain_resource(domain->presentation_resources, chain);
             if (submission->signal_semaphore)
                 lifetime::retain_resource(domain->presentation_resources, _presentation->finished);
         } catch (const vk::SystemError& error) {
@@ -404,14 +422,16 @@ namespace VSL_NAMESPACE {
         return ComputePhase::submit();
     }
     DefaultPhase::SubmitResult DefaultPhase::present() {
-        if (state != State::FINISH_SUBMIT || _presented)
+        if (state != State::FINISH_SUBMIT || _presented || !_presentation || !_presentation->acquired)
             return SubmitResult::FAILED;
-        vk::Semaphore finished = submission->signal_semaphore ? submission->signal_semaphore->semaphores.at(image_index)
-                                                              : *swapchain.data_->presentation_semaphores.at(image_index);
-        auto chain = swapchain.data_->swap_chain;
-        vk::PresentInfoKHR info{.waitSemaphoreCount = 1, .pWaitSemaphores = &finished, .swapchainCount = 1, .pSwapchains = &chain, .pImageIndices = &image_index};
+        const auto generation = _presentation->swapchain;
+        const auto index = _presentation->acquired_index;
+        vk::Semaphore finished = _presentation->finished ? _presentation->finished->semaphores.at(index)
+                                                         : *generation->presentation_semaphores.at(index);
+        auto chain = generation->swap_chain;
+        vk::PresentInfoKHR info{.waitSemaphoreCount = 1, .pWaitSemaphores = &finished, .swapchainCount = 1, .pSwapchains = &chain, .pImageIndices = &index};
         const auto domain = lifetime::CommandAccess::Owner(recording_buffer);
-        lifetime::retain_resource(domain->presentation_resources, swapchain.data_);
+        lifetime::retain_resource(domain->presentation_resources, generation);
         if (submission->signal_semaphore) {
             lifetime::retain_resource(domain->presentation_resources, _presentation->finished);
             lifetime::retain_resource(domain->presentation_resources, _presentation->finished_use);
@@ -436,11 +456,13 @@ namespace VSL_NAMESPACE {
         return present();
     }
     void DefaultPhase::cancel() {
-        if (image_index == UINT32_MAX || _presented) {
+        if (!_presentation || !_presentation->acquired || _presented) {
             ComputePhase::cancel();
             return;
         }
         if (state == State::WAIT_SUBMIT) {
+            const auto index = _presentation->acquired_index;
+            const auto generation = _presentation->swapchain;
             const auto domain = lifetime::CommandAccess::Owner(recording_buffer);
             const ReturningImage returning(domain->context);
             const auto cancelled = submission;
@@ -457,15 +479,16 @@ namespace VSL_NAMESPACE {
                 prepare(true);
                 if (_presentation->available_use)
                     _presentation->available_use->acquisition = submission->result;
-                signal_index = image_index;
+                signal_index = index;
                 begin();
                 auto buffers = domain->buffer;
-                domain->context.acquired_image_index = image_index;
-                domain->context.acquired_swapchain = swapchain.data_;
-                completion_.retain(swapchain.data_);
-                completion_.retain(_presentation);
+                domain->context.acquired_image_index = index;
+                domain->context.acquired_swapchain = generation;
+                lifetime::retain_until_complete(*submission, _presentation);
+                const auto image = lifetime::swapchain_image(generation, index);
+                sync::ResourceUseAccess::TrackPending(*image->use, completion_);
                 vk::ImageMemoryBarrier barrier{
-                    .oldLayout = vk::ImageLayout::eUndefined, .newLayout = vk::ImageLayout::ePresentSrcKHR, .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .image = swapchain.data_->swap_chain_images.at(image_index), .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
+                    .oldLayout = vk::ImageLayout::eUndefined, .newLayout = vk::ImageLayout::ePresentSrcKHR, .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .image = generation->swap_chain_images.at(index), .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
                 buffers->command_buffers.at(frame_slot).pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eBottomOfPipe, {}, {}, {}, barrier);
                 DefaultPhase::submit_commands(); // キャンセル時は派生クラスの終了コールバックを呼ばない。
                 if (state == State::FINISH_SUBMIT)

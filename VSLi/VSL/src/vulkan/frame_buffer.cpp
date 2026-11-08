@@ -30,9 +30,9 @@ namespace VSL_NAMESPACE {
             return lifetime::make_heap_frame_buffer(device, std::move(input), pass.owner_ref(), std::move(dependencies));
         }
         lifetime::OwnerRef swapchain_owner(const SwapchainAccessor& swapchain, const RenderPassAccessor& pass) {
-            if (!swapchain.data_ || !swapchain.data_.use_count() || swapchain.data_->device != pass.get_device().data_)
+            if (!swapchain.data_ || !swapchain.data_.use_count() || swapchain.data_->device != pass.get_device().data_.get())
                 throw std::invalid_argument("Framebuffer swapchain requires an owner on the pass device");
-            return swapchain.data_;
+            return swapchain.owner_ref();
         }
     } // namespace
     RenderPassAccessor FrameBufferAccessor::get_render_pass() const {

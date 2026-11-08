@@ -3,6 +3,9 @@
 #include <vector>
 
 namespace VSL_NAMESPACE {
+    namespace sync {
+        struct ResourceUseAccess;
+    }
     // submissionや保持中のframeを所有せず、最終的な完了状態を観測する。
     class CompletionObservation {
         Completion _result;
@@ -18,8 +21,10 @@ namespace VSL_NAMESPACE {
 
     // 弱参照により、この状態を含むframeをsubmission側から保持できる。
     class ResourceUseState {
+        friend struct sync::ResourceUseAccess;
         mutable std::vector<std::weak_ptr<impl::SubmissionImpl>> _uses;
         void discard_finished() const;
+        void track_pending(const Completion& completion) const;
 
     public:
         ResourceUseState() = default;

@@ -4,7 +4,7 @@ function(vsl_generate_buffer_layout)
     include(CheckTypeSize)
     set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
     set(CMAKE_REQUIRED_INCLUDES "${VSL_HOME}/src/private" "${VSL_HOME}/include" ${Vulkan_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS})
-    set(CMAKE_EXTRA_INCLUDE_FILES "VSL/vulkan/_pimpls.hpp" "VSL/sync/resource_use_state.hpp" "VSL/storage/buffer_abi.hpp" "VSL/lifetime/frame_buffer_storage.hpp" "VSL/lifetime/command_storage.hpp" "VSL/lifetime/synchronization_storage.hpp" "VSL/lifetime/instance_storage.hpp" "VSL/lifetime/physical_device_storage.hpp" "VSL/lifetime/surface_storage.hpp" "VSL/lifetime/device_storage.hpp")
+    set(CMAKE_EXTRA_INCLUDE_FILES "VSL/vulkan/_pimpls.hpp" "VSL/sync/resource_use_state.hpp" "VSL/storage/buffer_abi.hpp" "VSL/lifetime/frame_buffer_storage.hpp" "VSL/lifetime/command_storage.hpp" "VSL/lifetime/synchronization_storage.hpp" "VSL/lifetime/instance_storage.hpp" "VSL/lifetime/physical_device_storage.hpp" "VSL/lifetime/surface_storage.hpp" "VSL/lifetime/device_storage.hpp" "VSL/lifetime/swapchain_storage.hpp")
     if(WIN32)
         set(CMAKE_REQUIRED_DEFINITIONS -DNOMINMAX -DWIN32_LEAN_AND_MEAN -DGLFW_DLL)
     endif()
@@ -38,9 +38,11 @@ function(vsl_generate_buffer_layout)
     file(SHA256 "${Vulkan_INCLUDE_DIRS}/vulkan/vulkan.hpp" vulkan_cpp_hash)
     file(SHA256 "${VSL_HOME}/include/VSL/storage/buffer_abi.hpp" abi_mode_hash)
     file(SHA256 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/buffer_layout.hpp.in" template_hash)
+    file(SHA256 "${VSL_HOME}/src/private/VSL/lifetime/swapchain_storage.hpp" swapchain_slot_hash)
     set(public_layout_hashes "")
     foreach(api IN ITEMS lifetime/resource_id.hpp lifetime/resource_plan.hpp lifetime/resource_arena.hpp lifetime/logical_use_state.hpp
-            storage/startup_plan.hpp lifetime/startup_arena.hpp
+            storage/startup_plan.hpp lifetime/startup_arena.hpp storage/swapchain_layout.hpp lifetime/swapchain_arena.hpp
+            operation/swapchain_create_info.hpp vulkan/swapchain.hpp
             lifetime/owner_ref.hpp lifetime/dependency_node.hpp lifetime/glfw_lease.hpp lifetime/window_owner.hpp window.hpp vulkan/surface.hpp
             lifetime/buffer_view.hpp storage/resource_layout.hpp storage/arena_memory.hpp operation/buffer_create_info.hpp
             operation/image_create_info.hpp operation/sampler_create_info.hpp operation/descriptor_create_info.hpp operation/shader_create_info.hpp operation/pipeline_layout_create_info.hpp operation/render_pass_description.hpp operation/graphics_pipeline_state.hpp
@@ -69,7 +71,7 @@ function(vsl_generate_buffer_layout)
         "${VSL_HOME}/src/private/VSL/lifetime/instance_storage.hpp"
         "${VSL_HOME}/src/private/VSL/lifetime/physical_device_storage.hpp"
         "${VSL_HOME}/src/private/VSL/lifetime/surface_storage.hpp"
-        "${VSL_HOME}/src/private/VSL/lifetime/device_storage.hpp"
+        "${VSL_HOME}/src/private/VSL/lifetime/device_storage.hpp" "${VSL_HOME}/src/private/VSL/lifetime/swapchain_storage.hpp"
         "${VSL_HOME}/src/private/VSL/lifetime/window_runtime.hpp"
         "${VSL_HOME}/src/private/VSL/sync/synchronization_state.hpp"
         "${VSL_HOME}/src/private/VSL/lifetime/descriptor_bindings.hpp"
@@ -86,9 +88,13 @@ function(vsl_generate_buffer_layout)
     foreach(configuration IN LISTS configurations)
         string(TOUPPER "${configuration}" upper)
         set(CMAKE_TRY_COMPILE_CONFIGURATION "${configuration}")
-        string(SHA256 input_hash "18;${device_slot_hash};${surface_slot_hash};${window_runtime_hash};${physical_device_slot_hash};${instance_slot_hash};${synchronization_slot_hash};${synchronization_hash};${command_slot_hash};${frame_buffer_slot_hash};${pipeline_slot_hash};${render_pass_slot_hash};${pipeline_layout_slot_hash};${shader_slot_hash};${owner_access_hash};${state_hash};${buffer_slot_hash};${image_slot_hash};${sampler_slot_hash};${descriptor_slot_hash};${descriptor_owner_hash};${use_hash};${completion_hash};${lifetime_hash};${vulkan_hash};${vulkan_cpp_hash};${abi_mode_hash};${template_hash};${public_layout_hashes};${CMAKE_CXX_COMPILER_ID};${CMAKE_CXX_COMPILER_VERSION};${CMAKE_CXX_COMPILER_TARGET};${CMAKE_CXX_COMPILER_FRONTEND_VARIANT};${CMAKE_SYSTEM_NAME};${CMAKE_SYSTEM_VERSION};${CMAKE_SYSTEM_PROCESSOR};${CMAKE_OSX_ARCHITECTURES};${CMAKE_OSX_DEPLOYMENT_TARGET};${CMAKE_SIZEOF_VOID_P};${CMAKE_CXX_FLAGS};${CMAKE_CXX_FLAGS_${upper}};${CMAKE_MSVC_RUNTIME_LIBRARY};${CMAKE_OSX_SYSROOT};${CMAKE_SYSROOT};${configuration}")
-        foreach(kind IN ITEMS BUFFER_IMPL IMAGE_IMPL SAMPLER_IMPL DESCRIPTOR_LAYOUT_IMPL DESCRIPTOR_POOL_IMPL DESCRIPTOR_SET_IMPL SHADER_IMPL PIPELINE_LAYOUT_IMPL RENDER_PASS_IMPL PIPELINE_IMPL FRAME_BUFFER_IMPL FRAME_BUFFER_SLOT COMMAND_POOL_IMPL COMMAND_POOL_SLOT COMMAND_BUFFER_IMPL COMMAND_BUFFER_SLOT SEMAPHORE_IMPL SEMAPHORE_SLOT FENCE_IMPL FENCE_SLOT INSTANCE_IMPL INSTANCE_SLOT PHYSICAL_DEVICE_IMPL PHYSICAL_DEVICE_SLOT SURFACE_IMPL SURFACE_SLOT DEVICE_IMPL DEVICE_SLOT BUFFER_USE)
-            if(kind STREQUAL DEVICE_IMPL)
+        string(SHA256 input_hash "19;${swapchain_slot_hash};${device_slot_hash};${surface_slot_hash};${window_runtime_hash};${physical_device_slot_hash};${instance_slot_hash};${synchronization_slot_hash};${synchronization_hash};${command_slot_hash};${frame_buffer_slot_hash};${pipeline_slot_hash};${render_pass_slot_hash};${pipeline_layout_slot_hash};${shader_slot_hash};${owner_access_hash};${state_hash};${buffer_slot_hash};${image_slot_hash};${sampler_slot_hash};${descriptor_slot_hash};${descriptor_owner_hash};${use_hash};${completion_hash};${lifetime_hash};${vulkan_hash};${vulkan_cpp_hash};${abi_mode_hash};${template_hash};${public_layout_hashes};${CMAKE_CXX_COMPILER_ID};${CMAKE_CXX_COMPILER_VERSION};${CMAKE_CXX_COMPILER_TARGET};${CMAKE_CXX_COMPILER_FRONTEND_VARIANT};${CMAKE_SYSTEM_NAME};${CMAKE_SYSTEM_VERSION};${CMAKE_SYSTEM_PROCESSOR};${CMAKE_OSX_ARCHITECTURES};${CMAKE_OSX_DEPLOYMENT_TARGET};${CMAKE_SIZEOF_VOID_P};${CMAKE_CXX_FLAGS};${CMAKE_CXX_FLAGS_${upper}};${CMAKE_MSVC_RUNTIME_LIBRARY};${CMAKE_OSX_SYSROOT};${CMAKE_SYSROOT};${configuration}")
+        foreach(kind IN ITEMS BUFFER_IMPL IMAGE_IMPL SAMPLER_IMPL DESCRIPTOR_LAYOUT_IMPL DESCRIPTOR_POOL_IMPL DESCRIPTOR_SET_IMPL SHADER_IMPL PIPELINE_LAYOUT_IMPL RENDER_PASS_IMPL PIPELINE_IMPL FRAME_BUFFER_IMPL FRAME_BUFFER_SLOT COMMAND_POOL_IMPL COMMAND_POOL_SLOT COMMAND_BUFFER_IMPL COMMAND_BUFFER_SLOT SEMAPHORE_IMPL SEMAPHORE_SLOT FENCE_IMPL FENCE_SLOT INSTANCE_IMPL INSTANCE_SLOT PHYSICAL_DEVICE_IMPL PHYSICAL_DEVICE_SLOT SURFACE_IMPL SURFACE_SLOT DEVICE_IMPL DEVICE_SLOT SWAPCHAIN_IMPL SWAPCHAIN_SLOT BUFFER_USE)
+            if(kind STREQUAL SWAPCHAIN_IMPL)
+                set(type "vsl::impl::SwapchainImpl")
+            elseif(kind STREQUAL SWAPCHAIN_SLOT)
+                set(type "vsl::lifetime::SwapchainSlotStorage")
+            elseif(kind STREQUAL DEVICE_IMPL)
                 set(type "vsl::impl::LogicalDeviceImpl")
             elseif(kind STREQUAL DEVICE_SLOT)
                 set(type "vsl::lifetime::DeviceSlotStorage")
@@ -173,7 +179,7 @@ function(vsl_generate_buffer_layout)
         else()
             message(FATAL_ERROR "Unsupported Buffer placement compiler")
         endif()
-        string(SHA256 abi_hash "${input_hash};${BUFFER_IMPL_SIZE};${BUFFER_IMPL_ALIGNMENT};${IMAGE_IMPL_SIZE};${IMAGE_IMPL_ALIGNMENT};${SAMPLER_IMPL_SIZE};${SAMPLER_IMPL_ALIGNMENT};${DESCRIPTOR_LAYOUT_IMPL_SIZE};${DESCRIPTOR_LAYOUT_IMPL_ALIGNMENT};${DESCRIPTOR_POOL_IMPL_SIZE};${DESCRIPTOR_POOL_IMPL_ALIGNMENT};${DESCRIPTOR_SET_IMPL_SIZE};${DESCRIPTOR_SET_IMPL_ALIGNMENT};${SHADER_IMPL_SIZE};${SHADER_IMPL_ALIGNMENT};${PIPELINE_LAYOUT_IMPL_SIZE};${PIPELINE_LAYOUT_IMPL_ALIGNMENT};${RENDER_PASS_IMPL_SIZE};${RENDER_PASS_IMPL_ALIGNMENT};${PIPELINE_IMPL_SIZE};${PIPELINE_IMPL_ALIGNMENT};${FRAME_BUFFER_IMPL_SIZE};${FRAME_BUFFER_IMPL_ALIGNMENT};${FRAME_BUFFER_SLOT_SIZE};${FRAME_BUFFER_SLOT_ALIGNMENT};${COMMAND_POOL_IMPL_SIZE};${COMMAND_POOL_IMPL_ALIGNMENT};${COMMAND_POOL_SLOT_SIZE};${COMMAND_POOL_SLOT_ALIGNMENT};${COMMAND_BUFFER_IMPL_SIZE};${COMMAND_BUFFER_IMPL_ALIGNMENT};${COMMAND_BUFFER_SLOT_SIZE};${COMMAND_BUFFER_SLOT_ALIGNMENT};${SEMAPHORE_IMPL_SIZE};${SEMAPHORE_IMPL_ALIGNMENT};${SEMAPHORE_SLOT_SIZE};${SEMAPHORE_SLOT_ALIGNMENT};${FENCE_IMPL_SIZE};${FENCE_IMPL_ALIGNMENT};${FENCE_SLOT_SIZE};${FENCE_SLOT_ALIGNMENT};${INSTANCE_IMPL_SIZE};${INSTANCE_IMPL_ALIGNMENT};${INSTANCE_SLOT_SIZE};${INSTANCE_SLOT_ALIGNMENT};${PHYSICAL_DEVICE_IMPL_SIZE};${PHYSICAL_DEVICE_IMPL_ALIGNMENT};${PHYSICAL_DEVICE_SLOT_SIZE};${PHYSICAL_DEVICE_SLOT_ALIGNMENT};${SURFACE_IMPL_SIZE};${SURFACE_IMPL_ALIGNMENT};${SURFACE_SLOT_SIZE};${SURFACE_SLOT_ALIGNMENT};${BUFFER_USE_SIZE};${BUFFER_USE_ALIGNMENT};${cpp_mode}")
+        string(SHA256 abi_hash "${input_hash};${BUFFER_IMPL_SIZE};${BUFFER_IMPL_ALIGNMENT};${IMAGE_IMPL_SIZE};${IMAGE_IMPL_ALIGNMENT};${SAMPLER_IMPL_SIZE};${SAMPLER_IMPL_ALIGNMENT};${DESCRIPTOR_LAYOUT_IMPL_SIZE};${DESCRIPTOR_LAYOUT_IMPL_ALIGNMENT};${DESCRIPTOR_POOL_IMPL_SIZE};${DESCRIPTOR_POOL_IMPL_ALIGNMENT};${DESCRIPTOR_SET_IMPL_SIZE};${DESCRIPTOR_SET_IMPL_ALIGNMENT};${SHADER_IMPL_SIZE};${SHADER_IMPL_ALIGNMENT};${PIPELINE_LAYOUT_IMPL_SIZE};${PIPELINE_LAYOUT_IMPL_ALIGNMENT};${RENDER_PASS_IMPL_SIZE};${RENDER_PASS_IMPL_ALIGNMENT};${PIPELINE_IMPL_SIZE};${PIPELINE_IMPL_ALIGNMENT};${FRAME_BUFFER_IMPL_SIZE};${FRAME_BUFFER_IMPL_ALIGNMENT};${FRAME_BUFFER_SLOT_SIZE};${FRAME_BUFFER_SLOT_ALIGNMENT};${COMMAND_POOL_IMPL_SIZE};${COMMAND_POOL_IMPL_ALIGNMENT};${COMMAND_POOL_SLOT_SIZE};${COMMAND_POOL_SLOT_ALIGNMENT};${COMMAND_BUFFER_IMPL_SIZE};${COMMAND_BUFFER_IMPL_ALIGNMENT};${COMMAND_BUFFER_SLOT_SIZE};${COMMAND_BUFFER_SLOT_ALIGNMENT};${SEMAPHORE_IMPL_SIZE};${SEMAPHORE_IMPL_ALIGNMENT};${SEMAPHORE_SLOT_SIZE};${SEMAPHORE_SLOT_ALIGNMENT};${FENCE_IMPL_SIZE};${FENCE_IMPL_ALIGNMENT};${FENCE_SLOT_SIZE};${FENCE_SLOT_ALIGNMENT};${INSTANCE_IMPL_SIZE};${INSTANCE_IMPL_ALIGNMENT};${INSTANCE_SLOT_SIZE};${INSTANCE_SLOT_ALIGNMENT};${PHYSICAL_DEVICE_IMPL_SIZE};${PHYSICAL_DEVICE_IMPL_ALIGNMENT};${PHYSICAL_DEVICE_SLOT_SIZE};${PHYSICAL_DEVICE_SLOT_ALIGNMENT};${SURFACE_IMPL_SIZE};${SURFACE_IMPL_ALIGNMENT};${SURFACE_SLOT_SIZE};${SURFACE_SLOT_ALIGNMENT};${DEVICE_IMPL_SIZE};${DEVICE_IMPL_ALIGNMENT};${DEVICE_SLOT_SIZE};${DEVICE_SLOT_ALIGNMENT};${SWAPCHAIN_IMPL_SIZE};${SWAPCHAIN_IMPL_ALIGNMENT};${SWAPCHAIN_SLOT_SIZE};${SWAPCHAIN_SLOT_ALIGNMENT};${BUFFER_USE_SIZE};${BUFFER_USE_ALIGNMENT};${cpp_mode}")
         string(SUBSTRING "${abi_hash}" 0 16 abi)
         set(header "VSL/generated/buffer_layout_${abi_hash}.hpp")
         file(MAKE_DIRECTORY "${output}/VSL/generated")

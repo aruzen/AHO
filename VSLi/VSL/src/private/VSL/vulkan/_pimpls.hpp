@@ -3,12 +3,14 @@
 #include <VSL/operation/pipeline_layout_create_info.hpp>
 #include <VSL/operation/render_pass_description.hpp>
 #include <VSL/operation/device_create_info.hpp>
+#include <VSL/operation/swapchain_create_info.hpp>
 #include <VSL/vulkan/buffer_and_image_accessor.hpp>
 #include <VSL/vulkan/command.hpp>
 #include <VSL/lifetime/resource_use.hpp>
 #include <VSL/sync/synchronization_state.hpp>
 
 #include <compare>
+#include <cstddef>
 #include <array>
 #include <limits>
 
@@ -193,14 +195,21 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct SwapchainImpl {
-        std::shared_ptr<LogicalDeviceImpl> device;
-        std::shared_ptr<SurfaceImpl> surface;
+        lifetime::DependencyNode* owner_node = nullptr;
+        LogicalDeviceImpl* device = nullptr;
+        SurfaceImpl* surface = nullptr;
+        vk::Device native_device;
+        SwapchainState state = SwapchainState::UNINITIALIZED;
+        PresentFencePolicy present_fences = PresentFencePolicy::LEGACY;
+        // 世代ownerが構築した物理Image slotの借用。GPU記録は同じUseStateへ登録する。
+        std::byte* image_storage = nullptr;
+        size_t image_stride = 0;
 
         vk::SurfaceFormatKHR surface_format;
         vk::PresentModeKHR present_mode;
         vk::Extent2D extent;
-        uint32_t image_count;
-        vk::SurfaceTransformFlagBitsKHR pre_transform;
+        uint32_t image_count = 0;
+        vk::SurfaceTransformFlagBitsKHR pre_transform{};
 
         vk::SwapchainKHR swap_chain;
         std::vector<vk::Image> swap_chain_images;
@@ -208,6 +217,9 @@ namespace VSL_NAMESPACE::impl {
         vk::Extent2D swap_chain_extent;
         std::vector<vk::UniqueSemaphore> presentation_semaphores;
 
+        SwapchainImpl() = default;
+        SwapchainImpl(const SwapchainImpl&) = delete;
+        SwapchainImpl& operator=(const SwapchainImpl&) = delete;
         ~SwapchainImpl();
     };
 

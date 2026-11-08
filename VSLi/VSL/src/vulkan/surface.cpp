@@ -4,8 +4,7 @@
 namespace VSL_NAMESPACE {
     namespace {
         lifetime::OwnedRef<impl::SurfaceImpl> surface_owner(std::shared_ptr<impl::SurfaceImpl> data) {
-            if (!data || !data.use_count() || !data->owner_node || !data->owner_node->matches(data))
-                throw std::invalid_argument("Surface requires its canonical owner");
+            lifetime::require_surface_owner(data);
             const auto* node = data->owner_node;
             return node->ref(std::move(data));
         }

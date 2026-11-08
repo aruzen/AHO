@@ -2,6 +2,7 @@
 #include <algorithm>
 #ifdef AHO_GPU_TESTS
 #include "../support/live_gpu.hpp"
+#include <VSL/lifetime/swapchain_arena.hpp>
 namespace {
     using StandardEngineVulkanIntegration = aho_test::LiveGPUTest;
     TEST_F(StandardEngineVulkanIntegration, ConstructorCreatesDeviceWindowAndFrameResources) {
@@ -82,6 +83,12 @@ namespace {
         EXPECT_TRUE(engine->data()->vulkan_instance.accessor->surface_maintenance1);
         EXPECT_TRUE(vsl::has_device_features(engine->data()->logical_device.enabled_features(), vsl::DeviceFeature::SWAPCHAIN_MAINTENANCE1));
         EXPECT_TRUE(static_cast<bool>(engine->get_window()));
+        auto& window = *engine->boot_window;
+        const vsl::SwapchainCreateInfo chain_info{.present_fences = vsl::PresentFencePolicy::REQUIRE_FENCE};
+        vsl::lifetime::SwapchainArena candidate(engine->data()->logical_device, *window.data2->surface, chain_info, window.data2->swapchain);
+        window.data2->swapchain = std::move(candidate).view();
+        ASSERT_TRUE(window.recreate_swapchain());
+        EXPECT_EQ(window.data2->swapchain.present_fences(), vsl::PresentFencePolicy::REQUIRE_FENCE);
     }
     TEST_F(StandardEngineVulkanIntegration, BasePointerDestructionReleasesClosedWindowAndEngineResources) {
         ASSERT_NO_THROW(start_engine());

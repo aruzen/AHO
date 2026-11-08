@@ -53,11 +53,18 @@ namespace VSL_NAMESPACE {
         if (std::ranges::any_of(_uses, [&](const auto& use) { return use.lock() != completion.data_; }))
             throw std::logic_error("Resource is in use by another phase");
     }
-    void ResourceUseState::mark_used(Completion completion) const {
-        if (!completion || completion.status() != Completion::Status::PENDING)
+    void ResourceUseState::track_pending(const Completion& completion) const {
+        if (!completion || completion.data_->status != Completion::Status::PENDING)
             throw std::logic_error("Resource use requires a recording phase");
+        std::erase_if(_uses, [](const auto& use) {
+            const auto result = use.lock();
+            return !result || (result->status != Completion::Status::PENDING && result->status != Completion::Status::SUBMITTED);
+        });
         if (!std::ranges::any_of(_uses, [&](const auto& use) { return use.lock() == completion.data_; }))
             _uses.push_back(completion.data_);
+    }
+    void ResourceUseState::mark_used(Completion completion) const {
+        track_pending(completion);
         // callback中も新しい記録が先に見えるようにする。観測失敗時も取消まで保持する。
         discard_finished();
         if (completion.status() != Completion::Status::PENDING)

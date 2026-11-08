@@ -35,7 +35,7 @@ namespace vsl_test {
             GTEST_SKIP() << "Host coherent memory unavailable";
         color.emplace(device, WIDTH, HEIGHT, vsl::data_format::UNSIGNED_NORMALIZED8_RGBA);
         description.data_ = std::make_shared<vsl::impl::SwapchainImpl>();
-        description.data_->device = device.data_;
+        description.data_->device = device.data_.get();
         description.data_->extent = description.data_->swap_chain_extent = vk::Extent2D{WIDTH, HEIGHT};
         description.data_->image_count = 1;
         description.data_->swap_chain_image_format = vk::Format::eR8G8B8A8Unorm;

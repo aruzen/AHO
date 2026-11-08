@@ -74,6 +74,7 @@
     <ClInclude Include="VSL\src\private\VSL\lifetime\command_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClCompile Include="VSL\src\lifetime\command_storage.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\src\private\VSL\sync\synchronization_state.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\src\private\VSL\sync\resource_use_access.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClCompile Include="VSL\src\sync\synchronization_state.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\src\private\VSL\lifetime\synchronization_use.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClCompile Include="VSL\src\lifetime\synchronization_use.cpp"><Filter>ソース ファイル</Filter></ClCompile>
@@ -101,6 +102,13 @@
     <ClInclude Include="VSL\include\VSL\operation\device_create_info.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\storage\startup_plan.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\lifetime\startup_arena.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\operation\swapchain_create_info.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\storage\swapchain_layout.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\lifetime\swapchain_arena.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\src\private\VSL\operation\swapchain_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClCompile Include="VSL\src\operation\swapchain_ops.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClInclude Include="VSL\src\private\VSL\lifetime\swapchain_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClCompile Include="VSL\src\lifetime\swapchain_storage.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\src\private\VSL\operation\device_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClCompile Include="VSL\src\operation\device_ops.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\src\private\VSL\lifetime\device_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>

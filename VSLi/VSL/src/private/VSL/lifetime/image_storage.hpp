@@ -9,7 +9,8 @@ namespace VSL_NAMESPACE::lifetime {
     };
     // 未構築かつsizeof/alignof(ImageSlotStorage)を満たす領域を渡す。deviceは呼出側が保持する。
     void construct_image(void* storage, LogicalDeviceAccessor device, const ImageCreateInfo& info, vk::Image borrowed = {});
-    void construct_image(void* storage, impl::LogicalDeviceImpl& device, const ImageCreateInfo& info, vk::Image borrowed = {});
+    void construct_image(void* storage, impl::LogicalDeviceImpl& device, const ImageCreateInfo& info, vk::Image borrowed = {},
+                         const operation::ImageViewNativeCalls& calls = {});
     // 使用完了／取消の確認後、構築済みslotへ一度だけ呼ぶ。
     void destroy_image(void* storage) noexcept;
     impl::ImageImpl& image_at(void* storage);

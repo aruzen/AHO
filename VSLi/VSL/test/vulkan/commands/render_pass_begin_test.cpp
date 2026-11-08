@@ -218,7 +218,7 @@ namespace {
             SCOPED_TRACE(vk::to_string(format));
             vsl::SwapchainAccessor chain;
             chain.data_ = std::make_shared<vsl::impl::SwapchainImpl>();
-            chain.data_->device = device.data_;
+            chain.data_->device = device.data_.get();
             chain.data_->extent = chain.data_->swap_chain_extent = vk::Extent2D{2, 2};
             chain.data_->swap_chain_image_format = format;
             vsl::IDPickingRenderPass pass(chain);
@@ -235,7 +235,7 @@ namespace {
     TEST_F(LegacyClearVulkanIntegrationTest, PickingRgbPreservesTheIdAttachmentDefaultAndZeroAlpha) {
         vsl::SwapchainAccessor chain;
         chain.data_ = std::make_shared<vsl::impl::SwapchainImpl>();
-        chain.data_->device = device.data_;
+        chain.data_->device = device.data_.get();
         chain.data_->extent = chain.data_->swap_chain_extent = vk::Extent2D{2, 2};
         chain.data_->swap_chain_image_format = vk::Format::eR8G8B8A8Unorm;
         vsl::IDPickingRenderPass pass(chain);

@@ -39,6 +39,14 @@ namespace VSL_NAMESPACE::lifetime {
         if (accepted.use_count() && !contains_owner(resources, accepted))
             resources.push_back(std::move(accepted));
     }
+    void retain_until_complete(impl::SubmissionWork& submission, std::shared_ptr<void> resource) {
+        if (!submission.result || submission.result->status != Completion::Status::PENDING)
+            throw std::logic_error("Resource retention requires a pending submission");
+        if (resource.use_count()) {
+            retain_resource(submission.completion_resources, std::move(resource));
+            submission.release_resources = release_completed_resources;
+        }
+    }
     void require_recording(const CommandBuffer& buffer, const Completion& completion) {
         if (!buffer.data_ || !buffer.data_->recording_context || !buffer.data_->recording_context->work || !completion.data_ ||
             buffer.data_->recording_context->work->result != completion.data_ || completion.data_->status != Completion::Status::PENDING)
@@ -110,19 +118,13 @@ namespace VSL_NAMESPACE {
     void CommandBuffer::retain_until_complete(const std::shared_ptr<void>& resource) const {
         if (!data_ || !data_->recording_context || !data_->recording_context->work || data_->recording_context->work->result->status != Completion::Status::PENDING)
             throw std::logic_error("Buffer retention requires a recording phase");
-        if (resource.use_count()) {
-            data_->recording_context->work->release_resources = lifetime::release_completed_resources;
-            lifetime::retain_resource(data_->recording_context->work->completion_resources, resource);
-        }
+        lifetime::retain_until_complete(*data_->recording_context->work, resource);
     }
     void CommandBuffer::retain_until_complete(std::shared_ptr<void>&& resource) const {
         auto accepted = std::move(resource);
         if (!data_ || !data_->recording_context || !data_->recording_context->work || data_->recording_context->work->result->status != Completion::Status::PENDING)
             throw std::logic_error("Buffer retention requires a recording phase");
-        if (accepted.use_count()) {
-            data_->recording_context->work->release_resources = lifetime::release_completed_resources;
-            lifetime::retain_resource(data_->recording_context->work->completion_resources, std::move(accepted));
-        }
+        lifetime::retain_until_complete(*data_->recording_context->work, std::move(accepted));
     }
     impl::SubmissionWork::~SubmissionWork() {
         sync::finish_submission(*this);

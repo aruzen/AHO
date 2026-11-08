@@ -8,6 +8,7 @@ namespace VSL_NAMESPACE::lifetime {
     class BufferArena;
     class ResourceArena;
     class StartupArena;
+    class SwapchainArena;
 } // namespace VSL_NAMESPACE::lifetime
 namespace VSL_NAMESPACE::storage {
     using BufferArena = lifetime::BufferArena;
@@ -20,6 +21,7 @@ namespace VSL_NAMESPACE::storage {
         friend class lifetime::BufferArena;
         friend class lifetime::ResourceArena;
         friend class lifetime::StartupArena;
+        friend class lifetime::SwapchainArena;
 
     public:
         ArenaMemory(size_t bytes, size_t alignment);

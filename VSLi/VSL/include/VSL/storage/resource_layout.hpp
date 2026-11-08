@@ -6,6 +6,10 @@ namespace VSL_NAMESPACE::storage {
     template<typename Impl>
     struct ImplLayout;
     template<>
+    struct ImplLayout<impl::SwapchainImpl> {
+        static constexpr size_t SIZE = SWAPCHAIN_IMPL_SIZE, ALIGNMENT = SWAPCHAIN_IMPL_ALIGNMENT;
+    };
+    template<>
     struct ImplLayout<impl::LogicalDeviceImpl> {
         static constexpr size_t SIZE = DEVICE_IMPL_SIZE, ALIGNMENT = DEVICE_IMPL_ALIGNMENT;
     };
@@ -87,6 +91,10 @@ namespace VSL_NAMESPACE::storage {
         static constexpr size_t USE_OFFSET = checked_align(ImplLayout<Impl>::SIZE, BUFFER_USE_ALIGNMENT);
         static constexpr size_t ALIGNMENT = ImplLayout<Impl>::ALIGNMENT > BUFFER_USE_ALIGNMENT ? ImplLayout<Impl>::ALIGNMENT : BUFFER_USE_ALIGNMENT;
         static constexpr size_t SIZE = checked_align(USE_OFFSET + BUFFER_USE_SIZE, ALIGNMENT);
+    };
+    template<>
+    struct ResourceSlotLayout<impl::SwapchainImpl> {
+        static constexpr size_t SIZE = SWAPCHAIN_SLOT_SIZE, ALIGNMENT = SWAPCHAIN_SLOT_ALIGNMENT, USE_OFFSET = NO_SEPARATE_USE;
     };
     template<>
     struct ResourceSlotLayout<impl::LogicalDeviceImpl> {

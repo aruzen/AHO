@@ -9,7 +9,7 @@
 
 最初のPRだけで終了せず、下記の順で実装・検証・独立レビューを継続する。PRの公開前には最新masterとの差分を確認する。新しい製品ディレクトリが必要な場合は作成前に確認する。
 
-現在の到達点は順序1〜9と10aである。command／同期資源の配置とTyped frame再利用、起動資源の共通backend、OS windowの寿命分離、公開StartupArenaとAHO起動、maintenance1の能力照会／有効化を接続した。順序10全体と11〜12は未完了であり、WSI接続、既定policy変更、旧入口廃止と最終監査まで継続する。
+現在の到達点は順序1〜9と10a・10bである。command／同期資源の配置とTyped frame再利用、起動資源の共通backend、OS windowの寿命分離、公開StartupArenaとAHO起動、maintenance1の能力照会／有効化、Swapchain世代の共通backendと実画像数に従うCPU配置を接続した。順序10全体と11〜12は未完了であり、WSI完了証明、既定policy変更、旧入口廃止と最終監査まで継続する。
 
 ## 責務と保証
 
@@ -181,6 +181,8 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 [10aのPresent Fence能力と有効化](present-fence-features.md)で、独立した生成要求、実Instance設定、core／KHR queryとtimeline併用、supportedとenabledの分離を実装・検証した。拡張名だけやLEGACYでfeatureを暗黙に有効化しない。実際のFence付きpresent／厳密回収は10cで接続し、この段階では保証しない。
 
 10bはSwapchainの共通backend／指定領域構築と、全aliasで共有する現役／退役状態。nativeへoldSwapchainを渡した後は、生成失敗でも退役を取り消さない。実画像数に従うImage／世代同期群の計画を、native pending状態から構築する。
+
+[10bのSwapchain世代とCPU配置](swapchain-arena.md)で、native Pending→実画像M→CPU領域→Image slots→世代公開を接続した。全aliasの退役状態、元親owner、途中失敗の逆順rollbackと同領域再利用、準備callbackの世代変更拒否、実取得世代／indexによる取消を検証した。取消の使用登録は同じ物理ImageUseStateへ非pollで接続し、取得情報はGPU完了まで保持する。世代同期群の実present証明とacquire Fenceの再利用は10c／10dへ続く。
 
 10cは外部DomainのPresentRecordが世代と同期資源を保持し、present Fence等の証明でmarkerとownerを回収する。10dはframeごとのacquire FenceとAcquireTicket、取得後失敗・取消時のsignal消費／画像返却、present失敗の分類を扱う。Swapchain内部からRecordを強所有しない。
 

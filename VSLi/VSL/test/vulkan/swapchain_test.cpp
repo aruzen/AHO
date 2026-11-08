@@ -152,7 +152,7 @@ namespace {
 } // namespace
 
 namespace {
-    TEST_F(SwapchainWindowIntegrationTest, NativeCreationFailureIsReportedBeforeQueryingImagesAndAllowsValidRetry) {
+    TEST_F(SwapchainWindowIntegrationTest, RetiredOldSwapchainIsRejectedBeforeNativeCreationAndLeavesCurrentUsable) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
         if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
@@ -160,16 +160,9 @@ namespace {
         vsl::Swapchain first(device, surface, std::nullopt, 64, 48);
         vsl::Swapchain current(device, surface, first, 64, 48);
         const auto active = current.data_->swap_chain;
-        // A retired oldSwapchain is rejected by the validation layer, which aborts before the driver call.
-        expect_validation_abort("VUID-VkSwapchainCreateInfoKHR-oldSwapchain-01933");
-        try {
-            vsl::Swapchain rejected(device, surface, first, 64, 48);
-            ADD_FAILURE() << "vkCreateSwapchainKHR failure was accepted";
-        } catch (const vsl::exceptions::RuntimeException& error) {
-            EXPECT_NE(error.reason.find("vkCreateSwapchainKHR"), std::string::npos);
-            EXPECT_NE(error.reason.find("Validation"), std::string::npos);
-        }
-        EXPECT_EQ(validation_abort_count(), 1u);
+        EXPECT_EQ(first.state(), vsl::SwapchainState::RETIRED);
+        EXPECT_THROW((vsl::Swapchain(device, surface, first, 64, 48)), std::logic_error);
+        EXPECT_EQ(validation_abort_count(), 0u);
         EXPECT_EQ(current.data_->swap_chain, active);
         auto acquired = device.data_->device.createFenceUnique({});
         const auto index = device.data_->device.acquireNextImageKHR(active, UINT64_MAX, nullptr, *acquired).value;

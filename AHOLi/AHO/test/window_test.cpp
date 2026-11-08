@@ -4,6 +4,7 @@
 #include <AHO/io/mouse.hpp>
 #include <AHO/io/keyboard.hpp>
 #include <VSL/window_plugin.hpp>
+#include <VSL/lifetime/swapchain_arena.hpp>
 #ifdef __APPLE__
 #define GLFW_EXPOSE_NATIVE_COCOA
 #include <GLFW/glfw3native.h>
@@ -298,6 +299,21 @@ namespace {
         EXPECT_TRUE(window.resize(400, 400));
         EXPECT_EQ(old_calls, 0);
         EXPECT_EQ(replacement_calls, 1);
+    }
+    TEST_F(AHOWindowVulkanIntegration, NativeGenerationFailureRetiresTheOldChainAndRecreationRetriesWithoutIt) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        const auto previous = window.data2->swapchain;
+        const vsl::lifetime::SwapchainMemoryFactory fail = [](const vsl::storage::SwapchainLayout&) -> vsl::storage::ArenaMemory {
+            throw std::bad_alloc{};
+        };
+        EXPECT_THROW((vsl::lifetime::SwapchainArena{engine->data()->logical_device, *window.data2->surface, {}, previous, fail}), std::bad_alloc);
+        EXPECT_EQ(window.data2->swapchain.state(), vsl::SwapchainState::RETIRED);
+        EXPECT_TRUE(static_cast<bool>(window));
+        EXPECT_TRUE(window.recreate_swapchain());
+        EXPECT_EQ(window.data2->swapchain.state(), vsl::SwapchainState::ACTIVE);
+        EXPECT_EQ(previous.state(), vsl::SwapchainState::RETIRED);
+        EXPECT_NE(window.data2->swapchain.data_, previous.data_);
     }
     TEST_F(AHOWindowVulkanIntegration, GraphicsInitializationFailureUnregistersTheNewNativeWindow) {
         ASSERT_NO_THROW(start_engine());

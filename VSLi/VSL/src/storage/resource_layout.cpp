@@ -14,8 +14,14 @@
 #include <VSL/lifetime/physical_device_storage.hpp>
 #include <VSL/lifetime/surface_storage.hpp>
 #include <VSL/lifetime/device_storage.hpp>
+#include <VSL/lifetime/swapchain_storage.hpp>
 
 namespace VSL_NAMESPACE::storage {
+    static_assert(sizeof(impl::SwapchainImpl) == ImplLayout<impl::SwapchainImpl>::SIZE);
+    static_assert(alignof(impl::SwapchainImpl) == ImplLayout<impl::SwapchainImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::SwapchainSlotStorage) == ResourceSlotLayout<impl::SwapchainImpl>::SIZE);
+    static_assert(alignof(lifetime::SwapchainSlotStorage) == ResourceSlotLayout<impl::SwapchainImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::SwapchainImpl>::USE_OFFSET == NO_SEPARATE_USE);
     static_assert(sizeof(impl::LogicalDeviceImpl) == ImplLayout<impl::LogicalDeviceImpl>::SIZE);
     static_assert(alignof(impl::LogicalDeviceImpl) == ImplLayout<impl::LogicalDeviceImpl>::ALIGNMENT);
     static_assert(sizeof(lifetime::DeviceSlotStorage) == ResourceSlotLayout<impl::LogicalDeviceImpl>::SIZE);

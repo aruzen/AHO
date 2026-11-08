@@ -1,6 +1,7 @@
 #include <AHO/window.hpp>
 #include "window_impl.hpp"
 #include <VSL/lifetime/startup_arena.hpp>
+#include <VSL/lifetime/swapchain_arena.hpp>
 #include <AHO/drawer/draw_phase.hpp>
 #include <GLFW/glfw3.h>
 #include <VSL/exceptions.hpp>
@@ -153,8 +154,12 @@ bool AHO_NAMESPACE::window::Window::recreate_swapchain(VSL_NAMESPACE::ImageType 
     if (!data->window_handle || data_ != data || data2 != drawing)
         return false;
     const auto usage = drawing->swapchain.images.at(0).get_usage() | additional_usage;
-    auto next = VSL_NAMESPACE::Swapchain(runtime->logical_device, drawing->surface, drawing->swapchain,
-                                         std::nullopt, std::nullopt, usage);
+    std::optional<VSL_NAMESPACE::SwapchainAccessor> previous;
+    if (drawing->swapchain.state() == VSL_NAMESPACE::SwapchainState::ACTIVE)
+        previous = drawing->swapchain;
+    const VSL_NAMESPACE::SwapchainCreateInfo info{.usage = usage, .present_fences = drawing->swapchain.present_fences()};
+    VSL_NAMESPACE::lifetime::SwapchainArena candidate(runtime->logical_device, *drawing->surface, info, std::move(previous));
+    auto next = std::move(candidate).view();
     if (!data->window_handle || data_ != data || data2 != drawing)
         return false;
     auto pass = drawing->render_pass;

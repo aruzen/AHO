@@ -17,4 +17,6 @@ namespace VSL_NAMESPACE::lifetime {
     impl::SurfaceImpl& surface_at(void* storage);
     void set_surface_owners(impl::SurfaceImpl& target, OwnedRef<impl::VulkanImplAccessor> instance, const OSWindowOwner& window);
     std::shared_ptr<impl::SurfaceImpl> make_heap_surface(VulkanAccessor instance, OSWindowOwner window);
+    void require_surface_owner(const Surface& source);
+    void require_surface_owner(const std::shared_ptr<impl::SurfaceImpl>& source);
 } // namespace VSL_NAMESPACE::lifetime

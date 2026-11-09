@@ -36,7 +36,7 @@ namespace typed_example {
 #ifdef AHO_TYPED_ARENA
     using Bundle = t::TypedResourceBundle<Allocation, t::ArenaStorage<>>;
 #else
-    using Bundle = t::TypedResourceBundle<Allocation>;
+    using Bundle = t::TypedResourceBundle<Allocation, t::HeapStorage>;
 #endif
     using Pushes = t::PushSchema<t::PushRange<TransformLayout, vsl::ShaderFlag::VERTEX>>;
     using Pipeline = t::TypedGraphicsPipeline<Input, Resources, Pushes>;

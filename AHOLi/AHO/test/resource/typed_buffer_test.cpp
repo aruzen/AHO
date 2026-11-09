@@ -187,9 +187,9 @@ namespace {
         buffer.data_->command_buffers[0].pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         ASSERT_TRUE(phase.completion().wait());
-        auto native = frame.buffer<0, 1>().backend();
-        auto mapped = native.data(sizeof(value));
-        EXPECT_EQ(*static_cast<const std::uint32_t*>(mapped.data), value);
+        std::array<std::uint32_t, 1> output{};
+        frame.buffer<0, 1>().read_into(output);
+        EXPECT_EQ(output.front(), value);
         EXPECT_FALSE(input.busy());
         EXPECT_NO_THROW(input.write({}));
     }

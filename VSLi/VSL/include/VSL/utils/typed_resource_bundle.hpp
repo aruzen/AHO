@@ -2,10 +2,10 @@
 #include "typed_resource_bundle_detail.hpp"
 
 namespace VSL_NAMESPACE::typed {
-    template<typename Schema, typename StoragePolicy = HeapStorage, ResourceRetention retention = ResourceRetention::COMPLETION, lifetime::DependencyPolicy dependencies = lifetime::DependencyPolicy::FIXED>
+    template<typename Schema, typename StoragePolicy = DefaultStorage, ResourceRetention retention = ResourceRetention::COMPLETION, lifetime::DependencyPolicy dependencies = lifetime::DependencyPolicy::FIXED>
     class TypedResourceBundle;
 
-    template<typename Schema, typename StoragePolicy = HeapStorage>
+    template<typename Schema, typename StoragePolicy = DefaultStorage>
     class TypedResourceFrame {
         std::shared_ptr<detail::BundleSharedState<Schema, StoragePolicy>> _shared;
         std::optional<lifetime::ResourceArena> _arena;
@@ -46,7 +46,7 @@ namespace VSL_NAMESPACE::typed {
         auto bind_resources(const Binding& binding) const;
     };
 
-    template<typename Schema, typename StoragePolicy = HeapStorage>
+    template<typename Schema, typename StoragePolicy = DefaultStorage>
     class TypedSharedResources {
         std::shared_ptr<detail::BundleSharedState<Schema, StoragePolicy>> _shared;
         template<typename, typename, ResourceRetention, lifetime::DependencyPolicy>

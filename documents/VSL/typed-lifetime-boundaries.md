@@ -6,6 +6,8 @@ arena既定化より先に、配置方式とは独立した寿命契約と管理
 
 `BundlePolicy`はheap／arenaとbinding mapの選択だけを担当する。保持期間は`TypedResourceBundle`の独立した第3引数で選び、heap／arenaとも`COMPLETION`を既定にする。`TypedFrameResources`と`TypedDescriptorSet`の既定も同じに揃える。
 
+順序11aから省略時の配置は`DefaultStorage = ArenaStorage<>`となる。Frame／Sharedの既定とTypedFrameCommandsの2引数生成も同じ方針を使う。配置既定を変えても、保持と固定依存の既定は変えない。
+
 ```cpp
 using Heap = t::TypedResourceBundle<Schema, t::HeapStorage>;
 using Arena = t::TypedResourceBundle<Schema, t::ArenaStorage<>>;

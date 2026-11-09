@@ -13,8 +13,9 @@ namespace {
                                                    t::BufferAllocation<2, 1, t::FixedElements<1>, t::ResourceScope::SHARED>,
                                                    t::BufferAllocation<2, 3, t::RuntimeElements>,
                                                    t::BufferAllocation<5, 0, t::FixedElements<1>, t::ResourceScope::SHARED>>;
-    using Bundle = t::TypedResourceBundle<Allocation>;
-    using ArenaBundle = t::TypedResourceBundle<Allocation, t::ArenaStorage<>>;
+    using Bundle = t::TypedResourceBundle<Allocation, t::HeapStorage>;
+    using ArenaBundle = t::TypedResourceBundle<Allocation>;
+    static_assert(std::same_as<ArenaBundle, t::TypedResourceBundle<Allocation, t::ArenaStorage<>>>);
     static_assert(Bundle::RETENTION == vsl::ResourceRetention::COMPLETION);
     static_assert(ArenaBundle::RETENTION == Bundle::RETENTION);
     static_assert(Bundle::DEPENDENCIES == vsl::lifetime::DependencyPolicy::FIXED);
@@ -573,8 +574,8 @@ namespace {
             vsl::Image<vsl::ImageType::SAMPLED> second(device, 1, 1, vsl::data_format::UNSIGNED_NORMALIZED8_RGBA);
             vsl::Sampler sampler(device, vsl::SamplingMode::NEAREST, vsl::EdgeMode::CLAMP_TO_EDGE);
             owner = second.data_;
-            return t::TypedResourceBundle<External>(manager, descriptors,
-                                                    t::external_resource<1, 2>(std::array{t::TypedTexture(first, sampler), t::TypedTexture(second, sampler)}));
+            return t::TypedResourceBundle<External, t::HeapStorage>(manager, descriptors,
+                                                                    t::external_resource<1, 2>(std::array{t::TypedTexture(first, sampler), t::TypedTexture(second, sampler)}));
         }();
         EXPECT_FALSE(owner.expired());
         EXPECT_EQ(bundle.plan().totals().buffers, 0u);

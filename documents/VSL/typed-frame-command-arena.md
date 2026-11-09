@@ -1,6 +1,6 @@
 # Typed frameの実行資源とarena
 
-順序8c。`TypedFrameCommands`で、command pool・ring・in-flight Fenceを同じbackendのheap／arenaから生成し、既存の`TypedFrameResources`／bundleへ接続する。順序11の既定変更前なので、新規生成のpolicyは明示する。
+順序8c。`TypedFrameCommands`で、command pool・ring・in-flight Fenceを同じbackendのheap／arenaから生成し、既存の`TypedFrameResources`／bundleへ接続する。順序11aで2引数の既定arena生成を追加した。従来の明示heap／arenaも利用できる。
 
 ## 配置と寿命群
 
@@ -16,7 +16,8 @@ slot数Fに対して、Pool Impl×1、ring Impl×1（native command buffer×F）
 
 ```cpp
 namespace t = vsl::typed;
-t::TypedFrameCommands execution(device, 3, t::ArenaStorage<>{});
+t::TypedFrameCommands execution(device, 3);
+// 明示arenaは t::TypedFrameCommands(device, 3, t::ArenaStorage<>{})。
 // heap選択は t::TypedFrameCommands(device, 3, t::HeapStorage{})。
 t::TypedFrameResources<MyFrame> frames(execution.manager(), make_frame);
 
@@ -55,3 +56,7 @@ FacadeやFrameResourcesを破棄しても、作成済みPhaseはManager／Domain
 Impl寸法と生成fingerprintは親の同期資源配置から不変。構成別生成／x86_64 cross archive／異なるartifact拒否はその確認済み証跡を継承し、今回の追加公開APIはinstalled consumerで検証した。実driverの失敗注入・DeviceLost・Windows／Linux実機・LSan・CPU並行利用・性能率は未検証である。
 
 AHOのEngine／Windowの生成は起動arenaとWSIを扱う順序9／10へ残す。image-availableはF、render-finishedはswapchain画像数Mに属し、同じframe ownerへまとめない。DefaultPhaseが生成するacquire Fenceもgraphics Fenceとは別のWSI予約・取消返却として順序10で扱う。順序8cだけで厳密presentation完了や起動資源配置を完了とはしない。内部可変確保・所有操作の最終測定と既定policy変更は順序11／12で行う。
+
+## 順序11aの既定変更
+
+既存arena側の反復・元owner・取消・完了・移動代入試験を2引数生成へ接続した。明示HeapStorageの同じ試験も維持し、policyのconstructible契約とBundleのFrame／Shared型一致を確認する。全VSL1,124件（既知skip3）、AHO GPU190／CPU1,071、compile195、heap／arena PNG3枚一致、strict9ファイル／8TU、installed public consumer28種が成功した。寸法生成入力とImpl定義は変わらず、現在のarchiveと配布物の一致を確認している。単体TypedBuffer／Pipelineの生成方針は11bへ続く。

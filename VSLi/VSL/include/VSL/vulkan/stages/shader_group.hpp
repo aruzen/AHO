@@ -7,11 +7,19 @@
 #include "../shader.hpp"
 #include "../pipeline_layout.hpp"
 
+namespace VSL_NAMESPACE::lifetime::detail {
+    struct ShaderGroupAccess;
+}
 namespace VSL_NAMESPACE::pipeline_layout {
     struct ShaderGroup {
-        std::shared_ptr<impl::pipeline_layout::ShaderGroupImpl> data_;
+    private:
+        friend struct lifetime::detail::ShaderGroupAccess;
+        std::shared_ptr<impl::pipeline_layout::ShaderGroupImpl> _data;
+        std::shared_ptr<impl::pipeline_layout::ShaderGroupImpl> checked_state() const;
 
+    public:
         ShaderGroup(std::string name, std::initializer_list<ShaderAccessor> shaders);
+        explicit operator bool() const noexcept { return bool(_data); }
 
         void add_shader(ShaderAccessor shader);
 

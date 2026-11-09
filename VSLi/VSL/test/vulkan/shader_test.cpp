@@ -1,9 +1,14 @@
+#include <VSL/lifetime/shader_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include "support/temporary_directory.hpp"
 #include "support/scoped_environment.hpp"
 #include "support/render_fixture.hpp"
 #include "support/compute_fixture.hpp"
 #include <VSL/lifetime/resource_arena.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ShaderAccess;
+}
 
 namespace {
     using ShaderVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
@@ -39,6 +44,7 @@ namespace {
     }
     TEST(ShaderAccessorTest, EmptyAccessorRejectsOperationsAndHasNoOwner) {
         const vsl::ShaderAccessor empty;
+        EXPECT_FALSE(empty);
         EXPECT_EQ(empty.owner_ref().use_count(), 0);
         EXPECT_THROW(empty.name(), std::logic_error);
         EXPECT_THROW(empty.type(), std::logic_error);
@@ -73,9 +79,9 @@ namespace {
             owner = arena.owner();
             const auto first = arena.shader({11}), second = arena.shader({12});
             EXPECT_TRUE(first.owner_ref().managed());
-            EXPECT_FALSE(first.data_.owner_before(second.data_));
-            EXPECT_FALSE(second.data_.owner_before(first.data_));
-            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(second.data_.get()) - reinterpret_cast<std::uintptr_t>(first.data_.get()), plan.placement({12}).offset);
+            EXPECT_FALSE(ShaderAccess::Owned(first).owner_before(ShaderAccess::Owned(second)));
+            EXPECT_FALSE(ShaderAccess::Owned(second).owner_before(ShaderAccess::Owned(first)));
+            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(ShaderAccess::Owned(second).get()) - reinterpret_cast<std::uintptr_t>(ShaderAccess::Owned(first).get()), plan.placement({12}).offset);
             EXPECT_EQ(first.get_device(), device);
             EXPECT_EQ(first.type(), vsl::ShaderType::VERTEX);
             EXPECT_EQ(second.type(), vsl::ShaderType::FRAGMENT);
@@ -88,7 +94,7 @@ namespace {
         EXPECT_FALSE(owner.expired());
         EXPECT_EQ(kept->name(), "main");
         EXPECT_TRUE(std::ranges::equal(kept->code(), code));
-        EXPECT_TRUE(kept->data_->shader_module);
+        EXPECT_TRUE(ShaderAccess::Owned(*(kept))->shader_module);
         kept.reset();
         EXPECT_TRUE(owner.expired());
     }
@@ -101,7 +107,7 @@ namespace {
         vsl::Shader<vsl::ShaderType::VERTEX> imported(device, vsl_test::shader_path("triangle.vert.spv"));
         const vsl::ShaderCreateInfo valid{vsl::ShaderType::VERTEX, shader_words("triangle.vert.spv")};
         std::array<l::ResourceInit, 3> inputs{valid, valid, vsl::ShaderAccessor{imported}};
-        const auto references = imported.data_.use_count();
+        const auto references = ShaderAccess::Owned(imported).use_count();
         for (const auto error : {0, 1, 2, 3}) {
             auto invalid = valid;
             if (error == 0)
@@ -114,11 +120,11 @@ namespace {
                 invalid.name = std::string("ma\0in", 5);
             inputs[1] = std::move(invalid);
             EXPECT_THROW((l::ResourceArena(device, plan, inputs, memory)), vsl::exceptions::RuntimeException);
-            EXPECT_EQ(imported.data_.use_count(), references);
-            EXPECT_TRUE(imported.data_->shader_module);
+            EXPECT_EQ(ShaderAccess::Owned(imported).use_count(), references);
+            EXPECT_TRUE(ShaderAccess::Owned(imported)->shader_module);
             inputs[1] = valid;
             EXPECT_NO_THROW((l::ResourceArena(device, plan, inputs, memory)));
-            EXPECT_EQ(imported.data_.use_count(), references);
+            EXPECT_EQ(ShaderAccess::Owned(imported).use_count(), references);
         }
     }
     TEST_F(ShaderArenaVulkanIntegrationTest, ImportAndShaderGroupsRejectMissingOwnersAndOtherDevices) {
@@ -127,7 +133,7 @@ namespace {
         constexpr std::array<t::ResourceRequest, 1> requests{{{{1}, vsl::storage::ResourceKind::SHADER, true}}};
         constexpr t::ResourcePlan<1> plan(requests);
         vsl::Shader<> source(device, vsl_test::shader_path("triangle.vert.spv"));
-        const vsl::ShaderAccessor borrowed{std::shared_ptr<vsl::impl::ShaderImpl>(std::shared_ptr<void>{}, source.data_.get())};
+        const auto borrowed = ShaderAccess::FromShared(std::shared_ptr<vsl::impl::ShaderImpl>(std::shared_ptr<void>{}, ShaderAccess::Owned(source).get()));
         for (const auto& input : {vsl::ShaderAccessor{}, borrowed}) {
             const std::array<l::ResourceInit, 1> inputs{input};
             EXPECT_THROW((l::ResourceArena(device, plan, inputs)), std::invalid_argument);
@@ -174,7 +180,7 @@ namespace {
         namespace t = vsl::typed;
         namespace l = vsl::lifetime;
         namespace pl = vsl::pipeline_layout;
-        const auto original = std::weak_ptr<void>(shader->data_);
+        const auto original = std::weak_ptr<void>(ShaderAccess::Owned(*(shader)).share());
         constexpr std::array<t::ResourceRequest, 2> requests{{{{1}, vsl::storage::ResourceKind::SHADER, true}, {{2}, vsl::storage::ResourceKind::BUFFER}}};
         constexpr t::ResourcePlan<2> plan(requests);
         vsl::ShaderAccessor kept;
@@ -184,9 +190,9 @@ namespace {
             l::ResourceArena arena(device, plan, inputs);
             importer = arena.owner();
             kept = arena.shader({1});
-            EXPECT_EQ(kept.data_.get(), shader->data_.get());
-            EXPECT_FALSE(kept.data_.owner_before(shader->data_));
-            EXPECT_FALSE(shader->data_.owner_before(kept.data_));
+            EXPECT_EQ(ShaderAccess::Owned(kept).get(), ShaderAccess::Owned(*(shader)).get());
+            EXPECT_FALSE(ShaderAccess::Owned(kept).owner_before(ShaderAccess::Owned(*(shader))));
+            EXPECT_FALSE(ShaderAccess::Owned(*(shader)).owner_before(ShaderAccess::Owned(kept)));
             EXPECT_TRUE(kept.owner_ref().managed());
         }
         EXPECT_TRUE(importer.expired());
@@ -217,11 +223,18 @@ namespace {
                                                               "main");
         EXPECT_EQ(vertex.name(), "main");
         EXPECT_EQ(fragment.name(), "main");
-        EXPECT_TRUE(vertex.data_->shader_module);
-        EXPECT_TRUE(fragment.data_->shader_module);
+        EXPECT_TRUE(ShaderAccess::Owned(vertex)->shader_module);
+        EXPECT_TRUE(ShaderAccess::Owned(fragment)->shader_module);
         EXPECT_EQ(vertex.type(), vsl::ShaderType::VERTEX);
         EXPECT_EQ(fragment.type(), vsl::ShaderType::FRAGMENT);
         EXPECT_EQ(vertex.name(), "main");
+        vsl::ShaderAccessor original = vertex;
+        const vsl::ShaderAccessor moved = std::move(original);
+        EXPECT_TRUE(moved);
+        EXPECT_FALSE(original);
+        EXPECT_EQ(moved.name(), vertex.name());
+        EXPECT_EQ(moved.owner_ref(), vertex.owner_ref());
+        EXPECT_THROW(original.get_device(), std::logic_error);
     }
     TEST_F(ShaderVulkanIntegrationTest, RejectsMissingShaderFiles) {
         EXPECT_THROW((vsl::Shader<vsl::ShaderType::COMPUTE>(device, vsl_test::shader_path("missing.comp.spv"))),
@@ -237,11 +250,11 @@ namespace {
         const vsl::Shader<vsl::ShaderType::VERTEX> unnamed(device, std::span(code));
         std::fill(code.begin(), code.end(), 0);
         entry = "changed";
-        EXPECT_EQ(named.data_->code, original);
-        EXPECT_EQ(unnamed.data_->code, original);
+        EXPECT_EQ(ShaderAccess::Owned(named)->code, original);
+        EXPECT_EQ(ShaderAccess::Owned(unnamed)->code, original);
         EXPECT_EQ(named.name(), "main");
         EXPECT_EQ(unnamed.name(), "main");
-        EXPECT_TRUE(named.data_->shader_module);
+        EXPECT_TRUE(ShaderAccess::Owned(named)->shader_module);
         EXPECT_EQ(named.name(), "main");
         EXPECT_EQ(named.type(), vsl::ShaderType::VERTEX);
         EXPECT_THROW((vsl::Shader<vsl::ShaderType::VERTEX>(device, std::span(original), "")), vsl::exceptions::RuntimeException);
@@ -273,8 +286,8 @@ namespace {
         static_assert(decltype(fragment)::TYPE == vsl::ShaderType::FRAGMENT);
         EXPECT_EQ(vertex.name(), "main");
         EXPECT_EQ(fragment.name(), "main");
-        EXPECT_TRUE(static_cast<bool>(vertex.data_->shader_module));
-        EXPECT_TRUE(static_cast<bool>(fragment.data_->shader_module));
+        EXPECT_TRUE(static_cast<bool>(ShaderAccess::Owned(vertex)->shader_module));
+        EXPECT_TRUE(static_cast<bool>(ShaderAccess::Owned(fragment)->shader_module));
     }
 
     TEST_F(ShaderVulkanIntegrationTest, FactoryLoadsAFragmentShaderInsideADirectoryWithAVertexMarker) {
@@ -286,7 +299,7 @@ namespace {
         const auto shader = vsl::make_shader<"${VSL_SHADER_STAGE_TEST_ROOT}/cache.vert.data/triangle.frag.spv">(device);
         EXPECT_EQ(decltype(shader)::TYPE, vsl::ShaderType::FRAGMENT);
         EXPECT_EQ(shader.type(), vsl::ShaderType::FRAGMENT);
-        EXPECT_TRUE(static_cast<bool>(shader.data_->shader_module));
+        EXPECT_TRUE(static_cast<bool>(ShaderAccess::Owned(shader)->shader_module));
     }
 } // namespace
 

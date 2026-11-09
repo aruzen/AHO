@@ -1,6 +1,11 @@
 #include <VSL/lifetime/pipeline_recipe.hpp>
 #include <VSL/lifetime/pipeline_layout_storage.hpp>
 #include <VSL/lifetime/pipeline_storage.hpp>
+#include <VSL/lifetime/shader_access.hpp>
+
+VSL_NAMESPACE::ShaderAccessor VSL_NAMESPACE::lifetime::detail::ShaderAccess::FromRecipe(const impl::PipelineRecipe& recipe, size_t index) {
+    return FromOwned(recipe.sources.at(recipe.shader_sources.at(index)).alias(recipe.shaders.at(index)));
+}
 
 namespace VSL_NAMESPACE::lifetime {
     namespace {
@@ -26,7 +31,7 @@ namespace VSL_NAMESPACE::lifetime {
             std::vector<PipelineShaderSource> result;
             result.reserve(recipe.shaders.size());
             for (size_t i = 0; i < recipe.shaders.size(); ++i)
-                result.emplace_back(ShaderAccessor{std::shared_ptr<impl::ShaderImpl>(recipe.sources.at(recipe.shader_sources.at(i)).share(), recipe.shaders[i])});
+                result.emplace_back(detail::ShaderAccess::FromRecipe(recipe, i));
             return result;
         }
         void validate_target(LogicalDeviceAccessor device, const RenderPassAccessor& pass, std::uint32_t subpass) {

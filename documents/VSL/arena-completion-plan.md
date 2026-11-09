@@ -236,3 +236,5 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 
 12fの次の単位でBuffer／Image／Samplerの公開data_とImpl factoryを閉じ、元のOwnedRefをdescriptor／import／getterへ引き継いだ。runtimeのheap生成はBufferView::Create／ImageAccessor::Create、画像readbackは範囲付きBufferViewを使う。CPU操作のpoll前snapshot、viewの全値commit、転送の検証→使用登録→共通Native記録を揃え、純転送Imageには不要なviewを作らない。新runtime11件、全VSL1,156（対応外format3 skip）／AHO192・1,071／compile245、同一PNG、strict79ファイル／64TUと補完検査、installed consumer30種・新負例14種、Debug／Release／x86_64寸法生成、artifact混在拒否、archive／生成header一致を確認した。Shader／ShaderGroupから残りfacadeとrecipe／WindowDataの入口を順に閉じ、12gの実定義4責務分割と12hの測定へ続ける。
 
+Shader／ShaderGroupの単位では、公開data_／raw構築を閉じ、Group→recipe→snapshot→生成入力の復元→external import／getterに元のOwnedRefを引き継いだ。共有編集とmove元の拒否、削除結果の公開後に旧ownerを回収する契約を明示し、完成PipelineのShader回収を維持する。新runtime3件と既存Typed computeの両policy拡張、全VSL1,159（対応外format3 skip）／AHO192・1,071／compile252、同一PNG、strict17ファイル／12TU、installed consumer30種・新負例7種、構成別／cross寸法生成、archive／header一致が成功した。寸法定数が同じ旧親headerも新バイナリとの混在を拒否する。次はdescriptor3型とManagerの境界を閉じ、Poolの通常bind／external import／canonical getterの契約を保つ。順序12全体は継続中である。
+

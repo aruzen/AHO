@@ -173,6 +173,7 @@
     <ClCompile Include="VSL\src\operation\image_barrier.cpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\buffer_access.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\image_access.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\shader_access.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\sampler_access.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\command_access.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\identity_access.hpp" />

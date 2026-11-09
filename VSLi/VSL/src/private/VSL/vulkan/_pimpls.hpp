@@ -497,7 +497,7 @@ namespace VSL_NAMESPACE::impl {
     namespace pipeline_layout {
         struct ShaderGroupImpl {
             std::string name;
-            std::vector<std::shared_ptr<ShaderImpl>> shaders;
+            std::vector<lifetime::OwnedRef<ShaderImpl>> shaders;
         };
 
     } // namespace pipeline_layout

@@ -1,5 +1,17 @@
 #include <VSL/vulkan/pipeline.hpp>
 #include <VSL/lifetime/resource_arena.hpp>
+#include <VSL/vulkan/stages/shader_group.hpp>
+#include <type_traits>
+
+#ifndef VSL_TYPED_CASE
+#define VSL_TYPED_CASE 0
+#endif
+
+static_assert(!std::is_aggregate_v<vsl::ShaderAccessor>);
+static_assert(!std::is_aggregate_v<vsl::pipeline_layout::ShaderGroup>);
+static_assert(std::is_default_constructible_v<vsl::ShaderAccessor>);
+static_assert(std::is_copy_constructible_v<vsl::ShaderAccessor>);
+static_assert(std::is_nothrow_move_constructible_v<vsl::ShaderAccessor>);
 
 namespace s = vsl::storage;
 namespace t = vsl::typed;
@@ -26,3 +38,40 @@ void connect_pipeline(vsl::LogicalDeviceAccessor device, vsl::PipelineLayoutAcce
     (void)pipeline.owner_ref();
     (void)pipeline.get_device();
 }
+
+#if VSL_TYPED_CASE == 1
+void reject_shader(vsl::ShaderAccessor shader);
+void reject_shader(vsl::ShaderAccessor shader) {
+    (void)shader.data_;
+}
+#elif VSL_TYPED_CASE == 2
+void reject_shader(vsl::ShaderAccessor shader);
+void reject_shader(vsl::ShaderAccessor shader) {
+    (void)shader._owner;
+}
+#elif VSL_TYPED_CASE == 3
+void reject_shader(std::shared_ptr<vsl::impl::ShaderImpl> shader);
+void reject_shader(std::shared_ptr<vsl::impl::ShaderImpl> shader) {
+    (void)vsl::ShaderAccessor(std::move(shader));
+}
+#elif VSL_TYPED_CASE == 4
+void reject_shader(vsl::pipeline_layout::ShaderGroup group);
+void reject_shader(vsl::pipeline_layout::ShaderGroup group) {
+    (void)group.data_;
+}
+#elif VSL_TYPED_CASE == 5
+void reject_shader(vsl::pipeline_layout::ShaderGroup group);
+void reject_shader(vsl::pipeline_layout::ShaderGroup group) {
+    (void)group._data;
+}
+#elif VSL_TYPED_CASE == 6
+void reject_shader(vsl::ShaderAccessor shader);
+void reject_shader(vsl::ShaderAccessor shader) {
+    (void)std::move(shader).code();
+}
+#elif VSL_TYPED_CASE == 7
+void reject_shader(vsl::ShaderAccessor shader);
+void reject_shader(vsl::ShaderAccessor shader) {
+    (void)std::move(std::as_const(shader)).code();
+}
+#endif

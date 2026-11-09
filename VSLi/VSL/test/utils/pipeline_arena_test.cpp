@@ -1,7 +1,12 @@
+#include <VSL/lifetime/shader_access.hpp>
 #include "support/render_fixture.hpp"
 #include "support/compute_fixture.hpp"
 #include <VSL/lifetime/resource_arena.hpp>
 #include <VSL/utils/typed_resources.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ShaderAccess;
+}
 
 namespace {
     namespace t = vsl::typed;
@@ -167,9 +172,9 @@ namespace {
         EXPECT_TRUE(heap_owner.expired());
     }
     TEST_F(PipelineArenaVulkanIntegrationTest, GraphicsSourcesRejectEmptyAndNonowningShaderAccessors) {
-        const vsl::ShaderAccessor borrowed{std::shared_ptr<vsl::impl::ShaderImpl>(std::shared_ptr<void>{}, vertex->data_.get())};
-        const vsl::ShaderAccessor missing_module{std::make_shared<vsl::impl::ShaderImpl>()};
-        missing_module.data_->device = device.data_.get();
+        const auto borrowed = ShaderAccess::FromShared(std::shared_ptr<vsl::impl::ShaderImpl>(std::shared_ptr<void>{}, ShaderAccess::Owned(*(vertex)).get()));
+        const auto missing_module = ShaderAccess::FromShared(std::make_shared<vsl::impl::ShaderImpl>());
+        ShaderAccess::Owned(missing_module)->device = device.data_.get();
         for (const auto& invalid : {vsl::ShaderAccessor{}, borrowed, missing_module}) {
             auto input = direct_input();
             input.shaders[0] = invalid;
@@ -218,7 +223,7 @@ namespace {
         std::weak_ptr<void> source, owner;
         {
             vsl::Shader<vsl::ShaderType::COMPUTE> local(device, shader->code());
-            source = local.data_;
+            source = ShaderAccess::Owned(local).share();
             const std::array<l::ResourceInit, 1> inputs{l::ComputePipelineInit{layout->runtime(), vsl::ShaderAccessor{local}}};
             l::ResourceArena arena(device, PIPELINE_PLAN, inputs);
             owner = arena.owner();
@@ -232,9 +237,9 @@ namespace {
         EXPECT_TRUE(owner.expired());
     }
     TEST_F(ComputePipelineArenaVulkanIntegrationTest, ComputeSourcesRejectNonownersAndWrongShaderStages) {
-        const vsl::ShaderAccessor borrowed{std::shared_ptr<vsl::impl::ShaderImpl>(std::shared_ptr<void>{}, shader->data_.get())};
-        const vsl::ShaderAccessor missing_module{std::make_shared<vsl::impl::ShaderImpl>()};
-        missing_module.data_->device = device.data_.get();
+        const auto borrowed = ShaderAccess::FromShared(std::shared_ptr<vsl::impl::ShaderImpl>(std::shared_ptr<void>{}, ShaderAccess::Owned(*(shader)).get()));
+        const auto missing_module = ShaderAccess::FromShared(std::make_shared<vsl::impl::ShaderImpl>());
+        ShaderAccess::Owned(missing_module)->device = device.data_.get();
         for (const auto& invalid : {vsl::ShaderAccessor{}, borrowed, missing_module}) {
             const std::array<l::ResourceInit, 1> inputs{l::ComputePipelineInit{layout->runtime(), invalid}};
             EXPECT_THROW((l::ResourceArena(device, PIPELINE_PLAN, inputs)), std::invalid_argument);

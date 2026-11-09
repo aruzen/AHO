@@ -58,10 +58,6 @@ namespace VSL_NAMESPACE::operation {
             if (*it)
                 device.destroyFence(*it);
     }
-    vk::Result wait_fences(vk::Device device, std::span<const vk::Fence> fences, std::uint64_t timeout) noexcept {
-        return static_cast<vk::Result>(VULKAN_HPP_DEFAULT_DISPATCHER.vkWaitForFences(static_cast<VkDevice>(device),
-                                                                                     static_cast<std::uint32_t>(fences.size()), reinterpret_cast<const VkFence*>(fences.data()), VK_TRUE, timeout));
-    }
     void reset_fences(vk::Device device, std::span<const vk::Fence> fences) {
         device.resetFences(vk::ArrayProxy<const vk::Fence>(static_cast<std::uint32_t>(fences.size()), fences.data()));
     }

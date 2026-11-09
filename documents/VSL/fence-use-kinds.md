@@ -1,0 +1,54 @@
+# Fenceの物理要素ごとの用途と観測
+
+順序10dのAcquireTicketへ進む前に、graphics・acquire・presentが同じFence要素の使用状態を参照する。通常heap／ResourceArena／Swapchain世代のFenceImplは、同じ予約・観測・変更検査を使う。
+
+## 4責務
+
+- syncは現在の用途と保存結果を管理する。FenceUseStateはnone、graphics予約、graphics送信済み、acquire proof、present stateのどれか一つをweak variantで持つ。
+- lifetimeは正規ownerと対象要素を確保し、予約・全対象の事前検査・失敗時の用途復元を行う。観測値の保存とowner解放の順序も管理する。
+- operationはnative handleでwait／reset／destroyする。single／array waitは一つのC backendへ集約する。
+- storageのImpl配置とnative個数の計画は維持する。FenceImpl内部の可変長UseState／handle配列と、観測用scratchはCPU arena本体と区別する。
+
+同じ物理要素を別の入口から使っても、異なる使用表を作らない。現在の用途と、過去の結果／proofの寿命を分け、過去のCPU観測値が新しいnative Fenceを観測しないようにする。
+
+## 予約と再利用
+
+graphics予約は未送信Resultを弱参照し、native submit成功後だけSubmittedへ切り替える。取消の返却Workは元token・native Fence・ownerを引き継ぎ、tokenのResultを新Workへ付け替える。元Workの終端通知は、返却Workの現在用途を消さない。
+
+acquireは独立したCPU-only FenceProofを弱参照する。UNARMEDでは公開wait／reset／destroyを拒否する。成功時のsignalを旧Proofへ保存してからnative resetする。失敗解除はterminal Proofと現在のidentityが一致する場合だけ行い、古い解除が新しい予約へ作用しないようにする。予約中の完了callbackが引数shared_ptrを差し替えても、入口で保持した元Proofを使う。
+
+strict present poolはRecord内PresentStateへのweak aliasを使う。PENDINGは公開wait／変更を拒否し、UNCERTAINはpollだけを許可して無期限waitへ進まない。同じPENDING Stateを別handleへ予約しない。貸出し時に未観測の異種graphicsをpollせず拒否し、present準備中へ新しい完了callback点を作らない。Pure Proof／PresentStateの観測はownerを回収しない。
+
+## 観測とnative状態
+
+FenceAccessは元owner・native handle・必要なResult／Proof／PresentStateを局所snapshotする。全対象のgate設定後に観測し、callbackによるnative変更を拒否する。named holderが置き換わっても、元ownerと元entryだけを処理する。
+
+公開resetは、旧観測値の終端を保存してからnative resetし、成功後に用途をnoneへ戻す。保存COMPLETEだけを理由に、reset後のFenceHolder.waitを成功にしない。新しいnative状態を待つ。
+
+```cpp
+fence.wait();
+fence.reset();
+assert(!fence.wait(std::uint64_t{0}));
+```
+
+Native reset失敗時は旧用途へ戻す。旧Proofが既に完了していればその保存値を維持し、再利用後のnative handleを再pollしない。
+
+配列waitでDeviceLostを得たときは、開始時に確保した全Work／Proof／PresentStateへ失敗を先に保存し、その後callbackを通知する。peerの未分類Fenceを成功として公開しない。snapshot確保はNative呼出し前に行う。
+
+## 所有とAPI
+
+Fence要素の現在用途はweak参照であり、arena rootを自身から強所有しない。ResultはCPU観測値、AcquireEvidenceのProofは独立CBのままにする。PresentStateはRecordのaliasなので、局所snapshotがRecordのownerを伴う場合がある。長期の保持と回収は外部Domain／Recordへ置く。
+
+公開FenceHolderのwait／reset／destroy形式は維持する。移行中の公開sharedImpl入口から正規のpresent pool aliasを作った場合も、同じ物理使用状態で保護する。新しいacquire予約関数はprivateであり、利用者へ生のProof操作APIを追加しない。
+
+## 検証と残る作業
+
+acquire予約の要素独立、UNARMED保護、失敗後再予約、古い解除の不干渉、reset前のProof保存、引数差替えcallback、同じPresentStateの別要素への予約拒否、UNKNOWNのpoll限定、配列DeviceLostの通知順、strict poolの公開aliasを検証した。既存の取消token移譲・named置換・reset後のnative待機も維持した。
+
+Apple M1／MoltenVK1.4.2、Vulkan validationとASan／UBSanで、重点60件、新5件を含む全VSL1,063件（従来driver制約skip3）、AHO GPU159件／CPU1,070件、コンパイル契約195件が成功した。新規skipなし、LSanは無効。旧pool／Loss通知順の比較では2件が失敗し、元Proofをpinしない比較ではUBSanのnull参照を再現した。比較後は正しいsourceへbyte一致で復元し、再ビルドと全体検証を行った。
+
+規約15ファイル／10TUと、最新2ファイル／2TUで違反0。source370件の違反0。Impl寸法を維持し、install consumer26target、Debug／Release、x86_64 compile-only／archive、artifact混在／直接Arena構築のlink拒否、借用負例が成功した。heap／arenaはPNG3枚が対応ごと一致し、resize後もPipeline生成1回を維持した。実driverのDeviceLost／OOM、他OS、複数queue family実機は未検証である。損失testのnative Fenceは事前に実待機してから結果を注入した。
+
+F個のacquire Fence、実画像を持つAcquireTicket、取得後失敗のsignal消費／画像処理は後続で接続する。この変更だけで取得後回復を解決したとは扱わない。
+
+FenceAccessのhandle／observation vectorと、公開配列waitのWork snapshotには一時確保が残る。present poolを共通検査へ接続したため、従来の直接resetにはなかったscratch確保もある。単要素のinline化は順序12の計測・整理候補とし、性能改善率は断定しない。

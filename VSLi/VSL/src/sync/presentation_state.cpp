@@ -30,6 +30,14 @@ namespace VSL_NAMESPACE::sync {
     bool fence_proof_terminal(const FenceProof& proof) noexcept {
         return proof.status == FenceProofStatus::COMPLETE || proof.status == FenceProofStatus::DEVICE_LOST || proof.status == FenceProofStatus::NOT_ACQUIRED;
     }
+    void save_fence_observation(FenceProof& proof, vk::Result result) noexcept {
+        if (proof.status == FenceProofStatus::PENDING || proof.status == FenceProofStatus::UNCERTAIN)
+            observe_fence_proof(proof, result);
+    }
+    void save_present_observation(PresentState& state, vk::Result result) noexcept {
+        if (state.status == PresentStatus::SUBMITTED || state.status == PresentStatus::UNCERTAIN)
+            observe_present_proof(state, result);
+    }
     bool poll_fence_proof(FenceProof& proof) noexcept {
         if ((proof.status == FenceProofStatus::PENDING || proof.status == FenceProofStatus::UNCERTAIN) && proof.fence)
             observe_fence_proof(proof, operation::poll_fence(proof.device, proof.fence));
@@ -41,12 +49,13 @@ namespace VSL_NAMESPACE::sync {
         return proof.status == FenceProofStatus::COMPLETE;
     }
     PresentEnqueue classify_present_result(vk::Result result) noexcept {
+        if (result == static_cast<vk::Result>(VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT))
+            return PresentEnqueue::ENQUEUED;
         switch (result) {
             case vk::Result::eSuccess:
             case vk::Result::eSuboptimalKHR:
             case vk::Result::eErrorOutOfDateKHR:
             case vk::Result::eErrorSurfaceLostKHR:
-            case static_cast<vk::Result>(VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT):
                 return PresentEnqueue::ENQUEUED;
             case vk::Result::eErrorOutOfHostMemory:
             case vk::Result::eErrorOutOfDeviceMemory:

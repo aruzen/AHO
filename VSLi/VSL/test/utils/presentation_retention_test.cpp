@@ -405,6 +405,53 @@ namespace {
         EXPECT_TRUE(record->released);
         EXPECT_TRUE(owner.expired());
     }
+    TEST_F(PresentationRetentionWindowIntegrationTest, PresentPoolAliasesProtectPendingUseAndSaveCompletionBeforeNativeReset) {
+        auto manager = make_manager().independent(1);
+        auto chain = make_chain();
+        auto registry = l::presentation_domain(chain.data_);
+        vsl::FenceHolder fences(std::shared_ptr<vsl::impl::FenceImpl>(chain.data_, chain.data_->presentation_context->fences));
+        NativeProbe probe;
+        auto phase = manager.start_phase<vsl::DefaultPhase>(chain);
+        const auto index = phase.get_image_index();
+        probe.target = fences.data_->fences[index];
+        probe.forced = VK_ERROR_OUT_OF_HOST_MEMORY;
+        phase.cancel();
+        ASSERT_TRUE(phase.completion().wait());
+        ASSERT_EQ(registry->records.size(), 1u);
+        const auto record = registry->records[0];
+        bool pending_rejected = false;
+        try {
+            (void)fences.wait(index, 0);
+        } catch (const std::logic_error&) {
+            pending_rejected = true;
+        }
+        EXPECT_TRUE(pending_rejected);
+        if (!pending_rejected) {
+            // 旧実装との比較でもnative poolを破棄せず、実presentと待機を済ませる。
+            probe.forced = VK_SUCCESS;
+            ASSERT_EQ(phase.present(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            ASSERT_EQ(device.data_->device.waitForFences(vk::Fence(probe.target), true, UINT64_MAX), vk::Result::eSuccess);
+            s::save_present_observation(record->state, vk::Result::eSuccess);
+            manager.wait_idle();
+            return;
+        }
+        EXPECT_THROW(fences.reset(index), std::logic_error);
+        EXPECT_THROW(fences.destroy(), std::logic_error);
+        probe.forced = VK_SUCCESS;
+        ASSERT_EQ(phase.present(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        EXPECT_THROW(fences.reset(index), std::logic_error);
+        EXPECT_THROW(fences.destroy(), std::logic_error);
+        ASSERT_EQ(device.data_->device.waitForFences(vk::Fence(probe.target), true, UINT64_MAX), vk::Result::eSuccess);
+        probe.hold = false;
+        EXPECT_NO_THROW(fences.reset(index));
+        EXPECT_EQ(record->state.status, s::PresentStatus::COMPLETE);
+        EXPECT_FALSE(fences.wait(index, 0));
+        EXPECT_TRUE(s::poll_present(record->state));
+        // 比較実装が旧Recordを保存しなかった場合も、実待機済みの証拠を保存して後処理する。
+        s::save_present_observation(record->state, vk::Result::eSuccess);
+        manager.wait_idle();
+        EXPECT_TRUE(record->released);
+    }
     TEST_F(PresentationRetentionWindowIntegrationTest, ShutdownCallbacksCannotReattachUntilTheSameSurfaceDomainFinishesRetiring) {
         vsl::SwapchainAccessor next;
         bool rejected = false;

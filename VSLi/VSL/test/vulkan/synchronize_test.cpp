@@ -3,6 +3,8 @@
 #include <VSL/lifetime/synchronization_use.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/sync/submission_completion.hpp>
+#include <VSL/sync/presentation_state.hpp>
+#include <VSL/operation/submission_ops.hpp>
 #include <limits>
 namespace {
     // queue未送信のunsignaled fenceでSUBMITTED判定を固定する。
@@ -31,7 +33,7 @@ namespace {
         work->fence_reservation = vsl::lifetime::reserve_fence(fence.data_, index, work->result);
         work->result->work = work;
         work->result->status = vsl::Completion::Status::SUBMITTED;
-        fence.data_->uses.at(index).submitted = work->result;
+        vsl::sync::mark_fence_submitted(*fence.data_, index, work->result);
     }
     SubmittedFence::~SubmittedFence() {
         vsl::sync::publish_terminal(*work, vsl::Completion::Status::COMPLETE);
@@ -77,7 +79,7 @@ namespace {
         second.get_buffer().next();
         auto a = first.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence);
         auto b = second.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence);
-        const auto old_token = fence.data_->uses[0].reservation.lock();
+        const auto old_token = vsl::sync::current_fence_reservation(fence.data_->uses[0]);
         EXPECT_THROW(contender.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence), std::logic_error);
         EXPECT_THROW(fence.wait(std::uint64_t{0}), std::logic_error);
         EXPECT_THROW(fence.wait(0, 0), std::logic_error);
@@ -88,13 +90,117 @@ namespace {
         EXPECT_NO_THROW(fence.reset(0));
         EXPECT_FALSE(fence.wait(0, 0));
         auto next = contender.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence);
-        EXPECT_NE(fence.data_->uses[0].reservation.lock(), old_token);
+        EXPECT_NE(vsl::sync::current_fence_reservation(fence.data_->uses[0]), old_token);
         EXPECT_EQ(old_token->result.lock()->status, vsl::Completion::Status::CANCELLED);
         next.cancel();
         ASSERT_EQ(b.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         ASSERT_TRUE(b.completion().wait());
         EXPECT_NO_THROW(fence.reset(1));
         EXPECT_EQ(b.completion().status(), vsl::Completion::Status::COMPLETE);
+    }
+    TEST_F(SynchronizeVulkanIntegrationTest, AcquireReservationsProtectOnlyTheirElementAndSaveProofBeforeReset) {
+        auto fence = manager->create_fence("acquisition", std::size_t{2}, true);
+        auto first = std::make_shared<vsl::sync::FenceProof>();
+        vsl::lifetime::reserve_acquire_fence(fence.data_, 0, first);
+        EXPECT_THROW(fence.wait(0, 0), std::logic_error);
+        EXPECT_THROW(fence.reset(0), std::logic_error);
+        EXPECT_THROW(fence.destroy(), std::logic_error);
+        EXPECT_TRUE(fence.wait(1, 0));
+        EXPECT_NO_THROW(fence.reset(1));
+        vsl::lifetime::release_acquire_fence(*fence.data_, 0, first);
+        EXPECT_THROW(fence.reset(0), std::logic_error);
+        first->status = vsl::sync::FenceProofStatus::NOT_ACQUIRED;
+        vsl::lifetime::release_acquire_fence(*fence.data_, 0, first);
+        EXPECT_FALSE(fence.wait(0, 0));
+        auto next = std::make_shared<vsl::sync::FenceProof>();
+        vsl::lifetime::reserve_acquire_fence(fence.data_, 0, next);
+        vsl::lifetime::release_acquire_fence(*fence.data_, 0, first);
+        EXPECT_THROW(fence.reset(0), std::logic_error);
+        device.data_->device.getQueue(queue_family, 0).submit(vk::SubmitInfo{}, fence.data_->fences[0]);
+        next->status = vsl::sync::FenceProofStatus::PENDING;
+        ASSERT_EQ(device.data_->device.waitForFences(fence.data_->fences[0], true, UINT64_MAX), vk::Result::eSuccess);
+        EXPECT_NO_THROW(fence.reset(0));
+        EXPECT_EQ(next->status, vsl::sync::FenceProofStatus::COMPLETE);
+        EXPECT_FALSE(fence.wait(0, 0));
+        EXPECT_TRUE(vsl::sync::poll_fence_proof(*next));
+        EXPECT_EQ(first->status, vsl::sync::FenceProofStatus::NOT_ACQUIRED);
+    }
+    TEST_F(SynchronizeVulkanIntegrationTest, UnknownPresentEnqueueAllowsOnlyPollingAndRejectsReuse) {
+        auto fence = manager->create_fence("unknown present", std::size_t{2});
+        auto state = std::make_shared<vsl::sync::PresentState>();
+        state->device = device.data_->device;
+        state->strict = true;
+        vsl::lifetime::reserve_present_fence(fence.data_, 0, state);
+        EXPECT_THROW(vsl::lifetime::reserve_present_fence(fence.data_, 1, state), std::invalid_argument);
+        EXPECT_EQ(state->proof, fence.data_->fences[0]);
+        vsl::sync::commit_present(*state, vk::Result::eErrorUnknown);
+        EXPECT_FALSE(fence.wait(0, 0));
+        EXPECT_THROW(fence.wait(), std::logic_error);
+        EXPECT_THROW(fence.reset(), std::logic_error);
+        EXPECT_THROW(fence.destroy(), std::logic_error);
+        EXPECT_THROW(make_manager().independent(1).start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence), std::logic_error);
+        EXPECT_EQ(state->status, vsl::sync::PresentStatus::UNCERTAIN);
+        // この状態機械testはNative presentを送っていないため、後処理だけ取消を保存する。
+        state->status = vsl::sync::PresentStatus::CANCELLED;
+        EXPECT_NO_THROW(fence.destroy());
+    }
+    TEST_F(SynchronizeVulkanIntegrationTest, AcquireReservationPinsTheOriginalProofAcrossGraphicsRelease) {
+        auto fence = manager->create_fence("proof replacement");
+        auto commands = make_manager().independent(1);
+        auto requested = std::make_shared<vsl::sync::FenceProof>();
+        const auto original = requested;
+        bool invoked = false;
+        const vsl_test::DeferredAction callback([&] {
+            invoked = true;
+            requested.reset();
+        });
+        {
+            auto phase = commands.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence);
+            commands.get_buffer().retain_until_complete(callback.owner());
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        ASSERT_EQ(device.data_->device.waitForFences(fence.data_->fences[0], true, UINT64_MAX), vk::Result::eSuccess);
+        vsl::lifetime::reserve_acquire_fence(fence.data_, 0, requested);
+        EXPECT_TRUE(invoked);
+        EXPECT_FALSE(requested);
+        EXPECT_EQ(std::get<std::weak_ptr<vsl::sync::FenceProof>>(fence.data_->uses[0].use).lock(), original);
+        EXPECT_THROW(fence.reset(), std::logic_error);
+        original->status = vsl::sync::FenceProofStatus::NOT_ACQUIRED;
+        vsl::lifetime::release_acquire_fence(*fence.data_, 0, original);
+        EXPECT_NO_THROW(fence.reset());
+    }
+    TEST_F(SynchronizeVulkanIntegrationTest, FenceArrayLossIsSavedForEveryWorkBeforeReleaseCallbacks) {
+        auto fence = manager->create_fence("batch", std::size_t{2});
+        auto first = make_manager().independent(1), second = make_manager().independent(2);
+        second.get_buffer().next();
+        vsl::Completion a, b;
+        unsigned releases = 0;
+        const vsl_test::DeferredAction callback([&] {
+            ++releases;
+            EXPECT_EQ(a.status(), vsl::Completion::Status::FAILED);
+            EXPECT_EQ(b.status(), vsl::Completion::Status::FAILED);
+            EXPECT_EQ(a.failure(), vsl::Completion::Failure::DEVICE_LOST);
+            EXPECT_EQ(b.failure(), vsl::Completion::Failure::DEVICE_LOST);
+        });
+        {
+            auto phase = first.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence);
+            first.get_buffer().retain_until_complete(callback.owner());
+            a = phase.completion();
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        {
+            auto phase = second.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence);
+            b = phase.completion();
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        ASSERT_EQ(device.data_->device.waitForFences(fence.data_->fences, true, UINT64_MAX), vk::Result::eSuccess);
+        const vsl::operation::ScopedSubmissionNativeCalls native({.wait_fences = +[](void*, VkDevice, std::uint32_t, const VkFence*, VkBool32, std::uint64_t) noexcept {
+            return VK_ERROR_DEVICE_LOST;
+        }});
+        EXPECT_THROW(fence.wait(), vk::DeviceLostError);
+        EXPECT_EQ(releases, 1u);
+        EXPECT_EQ(a.error_code(), VK_ERROR_DEVICE_LOST);
+        EXPECT_EQ(b.error_code(), VK_ERROR_DEVICE_LOST);
     }
     TEST_F(SynchronizeVulkanIntegrationTest, AllFenceMutationsCheckEveryElementBeforeNativeChanges) {
         auto fence = manager->create_fence("array", std::size_t{2}, true);

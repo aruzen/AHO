@@ -5,6 +5,13 @@
 #include <stdexcept>
 
 namespace VSL_NAMESPACE::sync {
+    std::shared_ptr<FenceReservation> current_fence_reservation(const FenceUseState& state) noexcept {
+        const auto* reservation = std::get_if<std::weak_ptr<FenceReservation>>(&state.use);
+        return reservation ? reservation->lock() : nullptr;
+    }
+    void mark_fence_submitted(impl::FenceImpl& fence, std::uint32_t index, const std::shared_ptr<impl::SubmissionImpl>& result) {
+        fence.uses.at(index).use = std::weak_ptr<impl::SubmissionImpl>(result);
+    }
     bool pending_or_submitted(const std::shared_ptr<impl::SubmissionImpl>& result) {
         if (!result)
             return false;

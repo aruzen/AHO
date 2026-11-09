@@ -1,6 +1,7 @@
 #pragma once
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/operation/synchronization_create_info.hpp>
+#include <VSL/operation/submission_ops.hpp>
 #include <span>
 
 namespace VSL_NAMESPACE::operation {
@@ -11,6 +12,5 @@ namespace VSL_NAMESPACE::operation {
     std::vector<vk::Fence> create_fences(vk::Device device, size_t count, bool signaled);
     void destroy_semaphores(vk::Device device, std::span<const vk::Semaphore> semaphores) noexcept;
     void destroy_fences(vk::Device device, std::span<const vk::Fence> fences) noexcept;
-    vk::Result wait_fences(vk::Device device, std::span<const vk::Fence> fences, std::uint64_t timeout) noexcept;
     void reset_fences(vk::Device device, std::span<const vk::Fence> fences);
 } // namespace VSL_NAMESPACE::operation

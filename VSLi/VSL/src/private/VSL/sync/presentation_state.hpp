@@ -46,6 +46,8 @@ namespace VSL_NAMESPACE::sync {
     };
     PresentEnqueue classify_present_result(vk::Result result) noexcept;
     bool fence_proof_terminal(const FenceProof& proof) noexcept;
+    void save_fence_observation(FenceProof& proof, vk::Result result) noexcept;
+    void save_present_observation(PresentState& state, vk::Result result) noexcept;
     bool poll_fence_proof(FenceProof& proof) noexcept;
     bool wait_fence_proof(FenceProof& proof, std::uint64_t timeout = UINT64_MAX) noexcept;
     PresentEnqueue commit_present(PresentState& state, vk::Result result) noexcept;

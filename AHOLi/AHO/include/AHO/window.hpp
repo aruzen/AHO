@@ -22,6 +22,11 @@ namespace AHO_NAMESPACE::drawer::detail {
 namespace AHO_NAMESPACE::window {
     d2::VectorI get_monitor_size();
 
+    struct WindowGenerationCandidate {
+        VSL_NAMESPACE::SwapchainCreateInfo request;
+        std::optional<VSL_NAMESPACE::SwapchainAccessor> swapchain;
+    };
+
     struct WindowData {
         std::shared_ptr<VSL_NAMESPACE::Surface> surface;
         VSL_NAMESPACE::SwapchainAccessor swapchain;
@@ -31,6 +36,8 @@ namespace AHO_NAMESPACE::window {
         VSL_NAMESPACE::FenceHolder in_flight;
         std::shared_ptr<drawer::detail::StandardDrawState> standard_draw;
         VSL_NAMESPACE::FenceHolder acquire_fences;
+        // 完成済みSwapchainと、Native開始まで検証された再試行要求を保持する。
+        std::optional<WindowGenerationCandidate> pending_generation;
 
         ~WindowData();
     };

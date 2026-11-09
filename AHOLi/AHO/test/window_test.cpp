@@ -5,6 +5,8 @@
 #include <AHO/io/keyboard.hpp>
 #include <VSL/window_plugin.hpp>
 #include <VSL/lifetime/swapchain_arena.hpp>
+#include <VSL/operation/frame_buffer_ops.hpp>
+#include <VSL/operation/swapchain_ops.hpp>
 #ifdef __APPLE__
 #define GLFW_EXPOSE_NATIVE_COCOA
 #include <GLFW/glfw3native.h>
@@ -16,6 +18,133 @@ namespace {
         FixedIdResizeHook(vsl::PureWindow* window, unsigned char id, std::function<void(aho::Window*)> callback)
             : WindowResizeHookPlugin(window, std::move(callback)) { this->id = id; }
     };
+    struct GenerationProbe {
+        unsigned creates = 0, frames = 0, frame_destroys = 0;
+        bool fail_create = false, fail_frame = false;
+        VkSwapchainKHR previous = VK_NULL_HANDLE;
+        static VkResult Create(void* context, VkDevice device, const VkSwapchainCreateInfoKHR* info, VkSwapchainKHR* output);
+        static vk::Framebuffer Frame(void* context, vk::Device device, const vk::FramebufferCreateInfo& info);
+        static void DestroyFrame(void* context, vk::Device device, vk::Framebuffer frame) noexcept;
+    };
+    VkResult GenerationProbe::Create(void* context, VkDevice device, const VkSwapchainCreateInfoKHR* info, VkSwapchainKHR* output) {
+        auto& probe = *static_cast<GenerationProbe*>(context);
+        ++probe.creates;
+        probe.previous = info->oldSwapchain;
+        const auto result = vkCreateSwapchainKHR(device, info, nullptr, output);
+        if (!probe.fail_create || result != VK_SUCCESS)
+            return result;
+        // driver側でもoldを退役させてから、生成境界の失敗を再現する。
+        vkDestroySwapchainKHR(device, *output, nullptr);
+        *output = VK_NULL_HANDLE;
+        return VK_ERROR_OUT_OF_HOST_MEMORY;
+    }
+    vk::Framebuffer GenerationProbe::Frame(void* context, vk::Device device, const vk::FramebufferCreateInfo& info) {
+        auto& probe = *static_cast<GenerationProbe*>(context);
+        ++probe.frames;
+        if (probe.fail_frame)
+            throw vk::OutOfHostMemoryError("Framebuffer test failure");
+        return device.createFramebuffer(info);
+    }
+    void GenerationProbe::DestroyFrame(void* context, vk::Device device, vk::Framebuffer frame) noexcept {
+        ++static_cast<GenerationProbe*>(context)->frame_destroys;
+        device.destroyFramebuffer(frame);
+    }
+
+    TEST_F(AHOWindowVulkanIntegration, FramebufferFailureKeepsTheCandidateAndRetryPublishesItWithoutCreatingAnotherChain) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        const auto published = window.data2->swapchain;
+        const auto pass = window.data2->render_pass.data_;
+        const auto frames = window.data2->frame_buffer.data_;
+        const auto available = window.data2->image_available.data_;
+        const auto flight = window.data2->in_flight.data_;
+        const auto acquire = window.data2->acquire_fences.data_;
+        GenerationProbe probe;
+        const vsl::operation::ScopedSwapchainNativeCalls calls({&probe, GenerationProbe::Create});
+        const vsl::operation::ScopedFrameBufferNativeFactory factory({&probe, GenerationProbe::Frame, GenerationProbe::DestroyFrame});
+        probe.fail_frame = true;
+        EXPECT_THROW(window.recreate_swapchain(vsl::ImageType::TRANSFER_SRC), vk::OutOfHostMemoryError);
+        ASSERT_TRUE(window.data2->pending_generation);
+        ASSERT_TRUE(window.data2->pending_generation->swapchain);
+        const auto candidate = *window.data2->pending_generation->swapchain;
+        EXPECT_EQ(candidate.state(), vsl::SwapchainState::ACTIVE);
+        EXPECT_EQ(published.state(), vsl::SwapchainState::RETIRED);
+        EXPECT_EQ(window.data2->swapchain.data_, published.data_);
+        EXPECT_EQ(window.data2->frame_buffer.data_, frames);
+        EXPECT_EQ(probe.creates, 1u);
+        unsigned notifications = 0;
+        window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
+            ++notifications;
+            EXPECT_FALSE(current->data2->pending_generation);
+            EXPECT_EQ(current->data2->swapchain.data_, candidate.data_);
+            EXPECT_EQ(current->data2->render_finished.data_, candidate.finished_semaphores().data_);
+            EXPECT_EQ(current->data2->frame_buffer.data_->render_pass, pass.get());
+            EXPECT_EQ(current->data2->frame_buffer.data_->attachments.front().front(), candidate.images.front().data_.get());
+        });
+        probe.fail_frame = false;
+        EXPECT_TRUE(window.recreate_swapchain());
+        EXPECT_EQ(probe.creates, 1u);
+        EXPECT_EQ(notifications, 1u);
+        EXPECT_EQ(window.data2->render_pass.data_, pass);
+        EXPECT_EQ(window.data2->image_available.data_, available);
+        EXPECT_EQ(window.data2->in_flight.data_, flight);
+        EXPECT_EQ(window.data2->acquire_fences.data_, acquire);
+        EXPECT_TRUE(vsl::contain(window.data2->swapchain.images.front().get_usage(), vsl::ImageType::TRANSFER_SRC));
+    }
+    TEST_F(AHOWindowVulkanIntegration, ChangedExtentRetiresThePendingCandidateAndPublishesANewOne) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        GenerationProbe probe;
+        const vsl::operation::ScopedSwapchainNativeCalls calls({&probe, GenerationProbe::Create});
+        const vsl::operation::ScopedFrameBufferNativeFactory factory({&probe, GenerationProbe::Frame, GenerationProbe::DestroyFrame});
+        probe.fail_frame = true;
+        EXPECT_THROW(window.recreate_swapchain(), vk::OutOfHostMemoryError);
+        const auto candidate = *window.data2->pending_generation->swapchain;
+        probe.fail_frame = false;
+        EXPECT_TRUE(window.resize(420, 300));
+        EXPECT_EQ(probe.creates, 2u);
+        EXPECT_EQ(probe.previous, static_cast<VkSwapchainKHR>(candidate.data_->swap_chain));
+        EXPECT_EQ(candidate.state(), vsl::SwapchainState::RETIRED);
+        EXPECT_NE(window.data2->swapchain.data_, candidate.data_);
+    }
+    TEST_F(AHOWindowVulkanIntegration, NativeFailureRetainsTheValidatedRequestAndInvalidAdditionalUsageDoesNotPoisonRetry) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        GenerationProbe probe;
+        const vsl::operation::ScopedSwapchainNativeCalls calls({&probe, GenerationProbe::Create});
+        probe.fail_create = true;
+        EXPECT_THROW(window.recreate_swapchain(vsl::ImageType::TRANSFER_SRC), vsl::exceptions::RuntimeException);
+        ASSERT_TRUE(window.data2->pending_generation);
+        EXPECT_FALSE(window.data2->pending_generation->swapchain);
+        EXPECT_EQ(window.data2->swapchain.state(), vsl::SwapchainState::RETIRED);
+        const auto invalid = static_cast<vsl::ImageType>(std::uint32_t{1} << 31);
+        EXPECT_THROW(window.recreate_swapchain(invalid), std::invalid_argument);
+        EXPECT_EQ(probe.creates, 1u);
+        EXPECT_FALSE(vsl::contain(window.data2->pending_generation->request.usage, invalid));
+        probe.fail_create = false;
+        EXPECT_TRUE(window.recreate_swapchain());
+        EXPECT_EQ(probe.creates, 2u);
+        EXPECT_EQ(probe.previous, VK_NULL_HANDLE);
+        EXPECT_TRUE(vsl::contain(window.data2->swapchain.images.front().get_usage(), vsl::ImageType::TRANSFER_SRC));
+    }
+    TEST_F(AHOWindowVulkanIntegration, InvalidAdditionalUsageLeavesAnActivePendingCandidateAvailableForRetry) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        GenerationProbe probe;
+        const vsl::operation::ScopedSwapchainNativeCalls calls({&probe, GenerationProbe::Create});
+        const vsl::operation::ScopedFrameBufferNativeFactory factory({&probe, GenerationProbe::Frame, GenerationProbe::DestroyFrame});
+        probe.fail_frame = true;
+        EXPECT_THROW(window.recreate_swapchain(), vk::OutOfHostMemoryError);
+        const auto candidate = *window.data2->pending_generation->swapchain;
+        const auto invalid = static_cast<vsl::ImageType>(std::uint32_t{1} << 31);
+        EXPECT_THROW(window.recreate_swapchain(invalid), std::invalid_argument);
+        EXPECT_EQ(candidate.state(), vsl::SwapchainState::ACTIVE);
+        EXPECT_EQ(window.data2->pending_generation->swapchain->data_, candidate.data_);
+        probe.fail_frame = false;
+        EXPECT_TRUE(window.recreate_swapchain());
+        EXPECT_EQ(probe.creates, 1u);
+        EXPECT_EQ(window.data2->swapchain.data_, candidate.data_);
+    }
     bool expect_recreation_guard(aho::Window& window) {
         // ガードが欠けても、VSLのusage検証で止めて記録中のswapchainを破棄しない。
         const auto unsupported = static_cast<vsl::ImageType>(std::uint32_t{1} << 31);

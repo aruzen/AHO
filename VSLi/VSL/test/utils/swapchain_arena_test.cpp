@@ -313,6 +313,50 @@ namespace {
         ASSERT_EQ(device.data_->device.waitForFences(*acquired, true, UINT64_MAX), vk::Result::eSuccess);
         EXPECT_LT(index, old.images.size());
     }
+    TEST_F(SwapchainArenaWindowIntegrationTest, CreationProgressDistinguishesPreflightFromNativeFailureWithAndWithoutAnOldGeneration) {
+        NativeProbe probe;
+        const o::ScopedSwapchainNativeCalls calls(probe.calls());
+        vsl::Swapchain old(device, surface, {}, 64, 48);
+        for (const bool replacing : {true, false}) {
+            std::optional<vsl::SwapchainAccessor> previous;
+            if (replacing)
+                previous = old;
+            auto info = create_info();
+            info.usage = static_cast<vsl::ImageType>(std::uint32_t{1} << 31);
+            vsl::SwapchainCreateProgress progress{true};
+            const auto count = probe.creates;
+            EXPECT_THROW((l::SwapchainArena{device, *surface, info, previous, {}, &progress}), std::invalid_argument);
+            EXPECT_FALSE(progress.native_started);
+            EXPECT_EQ(probe.creates, count);
+            if (replacing)
+                EXPECT_EQ(old.state(), vsl::SwapchainState::ACTIVE);
+            probe.failure = Failure::CREATE;
+            EXPECT_THROW((l::SwapchainArena{device, *surface, create_info(), previous, {}, &progress}), vsl::exceptions::RuntimeException);
+            EXPECT_TRUE(progress.native_started);
+            EXPECT_EQ(probe.creates, count + 1);
+            if (replacing)
+                EXPECT_EQ(old.state(), vsl::SwapchainState::RETIRED);
+        }
+    }
+    TEST_F(SwapchainArenaWindowIntegrationTest, CreationProgressSurvivesImageAndCPUMemoryFailureAndIsResetBeforeTheNextAttempt) {
+        NativeProbe probe;
+        const o::ScopedSwapchainNativeCalls calls(probe.calls());
+        vsl::SwapchainCreateProgress progress;
+        probe.failure = Failure::IMAGES;
+        EXPECT_THROW((l::SwapchainArena{device, *surface, create_info(), {}, {}, &progress}), vk::SystemError);
+        EXPECT_TRUE(progress.native_started);
+        probe.failure = Failure::NONE;
+        const l::SwapchainMemoryFactory fail = [](const auto&) -> s::ArenaMemory { throw std::bad_alloc{}; };
+        EXPECT_THROW((l::SwapchainArena{device, *surface, create_info(), {}, fail, &progress}), std::bad_alloc);
+        EXPECT_TRUE(progress.native_started);
+        auto info = create_info();
+        info.width = 0;
+        EXPECT_THROW((l::SwapchainArena{device, *surface, info, {}, {}, &progress}), std::invalid_argument);
+        EXPECT_FALSE(progress.native_started);
+        l::SwapchainArena retry(device, *surface, create_info(), {}, {}, &progress);
+        EXPECT_TRUE(progress.native_started);
+        EXPECT_EQ(retry.view().state(), vsl::SwapchainState::ACTIVE);
+    }
     TEST_F(SwapchainArenaWindowIntegrationTest, PreparationCallbackCannotAcquireARetiredOrReplacedGeneration) {
         for (const bool replace : {false, true}) {
             vsl::Swapchain old(device, surface, {}, 64, 48);

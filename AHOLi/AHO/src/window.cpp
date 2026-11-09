@@ -12,6 +12,7 @@
 #endif
 
 #include <algorithm>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -55,6 +56,18 @@ namespace {
         if (!buffers.data_ || buffers.get_size() == 0)
             throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "A booted engine is required");
         return name;
+    }
+    bool matches_request(const VSL_NAMESPACE::SwapchainCreateInfo& a, const VSL_NAMESPACE::SwapchainCreateInfo& b) noexcept {
+        return a.width == b.width && a.height == b.height && a.usage == b.usage && a.present_fences == b.present_fences;
+    }
+    bool replaceable(const VSL_NAMESPACE::SwapchainAccessor& chain) {
+        return chain.state() == VSL_NAMESPACE::SwapchainState::ACTIVE || chain.state() == VSL_NAMESPACE::SwapchainState::RECOVERY_REQUIRED;
+    }
+    void replace_candidate(std::optional<AHO_NAMESPACE::window::WindowGenerationCandidate>& current,
+                           AHO_NAMESPACE::window::WindowGenerationCandidate next) noexcept {
+        auto replacement = std::make_optional(std::move(next));
+        static_assert(std::is_nothrow_swappable_v<decltype(current)>);
+        current.swap(replacement);
     }
 } // namespace
 
@@ -167,14 +180,30 @@ bool AHO_NAMESPACE::window::Window::recreate_swapchain(VSL_NAMESPACE::ImageType 
     manager.wait_idle();
     if (!data->window_handle || data_ != data || data2 != drawing)
         return false;
-    const auto usage = drawing->swapchain.images.at(0).get_usage() | additional_usage;
-    std::optional<VSL_NAMESPACE::SwapchainAccessor> previous;
-    if (drawing->swapchain.state() == VSL_NAMESPACE::SwapchainState::ACTIVE ||
-        drawing->swapchain.state() == VSL_NAMESPACE::SwapchainState::RECOVERY_REQUIRED)
-        previous = drawing->swapchain;
-    const VSL_NAMESPACE::SwapchainCreateInfo info{.usage = usage, .present_fences = drawing->swapchain.present_fences()};
-    VSL_NAMESPACE::lifetime::SwapchainArena candidate(runtime->logical_device, *drawing->surface, info, std::move(previous));
-    auto next = std::move(candidate).view();
+    int width = 0, height = 0;
+    glfwGetFramebufferSize(static_cast<GLFWwindow*>(os.native_handle()), &width, &height);
+    if (width < 0 || height < 0)
+        throw std::runtime_error("Swapchain framebuffer extent is negative");
+    const auto usage = (drawing->pending_generation ? drawing->pending_generation->request.usage : drawing->swapchain.images.at(0).get_usage()) | additional_usage;
+    const VSL_NAMESPACE::SwapchainCreateInfo info{.width = static_cast<std::uint32_t>(width), .height = static_cast<std::uint32_t>(height), .usage = usage, .present_fences = drawing->swapchain.present_fences()};
+    auto& pending = drawing->pending_generation;
+    if (!pending || !pending->swapchain || pending->swapchain->state() != VSL_NAMESPACE::SwapchainState::ACTIVE || !matches_request(pending->request, info)) {
+        std::optional<VSL_NAMESPACE::SwapchainAccessor> previous;
+        if (pending && pending->swapchain && replaceable(*pending->swapchain))
+            previous = pending->swapchain;
+        else if (replaceable(drawing->swapchain))
+            previous = drawing->swapchain;
+        VSL_NAMESPACE::SwapchainCreateProgress progress;
+        try {
+            VSL_NAMESPACE::lifetime::SwapchainArena candidate(runtime->logical_device, *drawing->surface, info, std::move(previous), {}, &progress);
+            replace_candidate(pending, WindowGenerationCandidate{info, std::move(candidate).view()});
+        } catch (...) {
+            if (progress.native_started)
+                replace_candidate(pending, WindowGenerationCandidate{info, std::nullopt});
+            throw;
+        }
+    }
+    auto next = *pending->swapchain;
     if (!data->window_handle || data_ != data || data2 != drawing)
         return false;
     auto pass = drawing->render_pass;
@@ -184,15 +213,20 @@ bool AHO_NAMESPACE::window::Window::recreate_swapchain(VSL_NAMESPACE::ImageType 
     auto finished = next.finished_semaphores();
     if (!data->window_handle || data_ != data || data2 != drawing)
         return false;
-    drawing->swapchain = std::move(next);
-    drawing->render_pass = std::move(pass);
-    drawing->frame_buffer = std::move(frames);
-    drawing->render_finished = std::move(finished);
     std::vector<std::pair<unsigned char, std::weak_ptr<WindowResizeHookPlugin>>> hooks;
     hooks.reserve(data->plugins.size());
     for (const auto& [id, plugin] : data->plugins)
         if (auto hook = std::dynamic_pointer_cast<WindowResizeHookPlugin>(plugin))
             hooks.emplace_back(id, hook);
+    // 旧ownerは全fieldの交換が済んでから解放し、破棄時の再入でも混合世代を見せない。
+    using std::swap;
+    static_assert(std::is_nothrow_swappable_v<decltype(next)> && std::is_nothrow_swappable_v<decltype(pass)> &&
+                  std::is_nothrow_swappable_v<decltype(frames)> && std::is_nothrow_swappable_v<decltype(finished)>);
+    swap(drawing->swapchain, next);
+    swap(drawing->render_pass, pass);
+    swap(drawing->frame_buffer, frames);
+    swap(drawing->render_finished, finished);
+    pending.reset();
     for (const auto& [id, candidate] : hooks) {
         if (data_ != data || !data2 || !data->window_handle)
             break;

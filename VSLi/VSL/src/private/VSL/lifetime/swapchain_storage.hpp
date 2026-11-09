@@ -23,5 +23,6 @@ namespace VSL_NAMESPACE::lifetime {
     std::shared_ptr<impl::SemaphoreImpl> swapchain_finished(const std::shared_ptr<impl::SwapchainImpl>& source);
     SwapchainAccessor make_swapchain(LogicalDeviceAccessor device, Surface surface, SwapchainCreateInfo info,
                                      const std::optional<SwapchainAccessor>& old, const SwapchainRegionFactory& memory,
-                                     const operation::SwapchainNativeCalls& calls = {}, const operation::ImageViewNativeCalls& image_calls = {});
+                                     const operation::SwapchainNativeCalls& calls = {}, const operation::ImageViewNativeCalls& image_calls = {},
+                                     SwapchainCreateProgress* progress = nullptr);
 } // namespace VSL_NAMESPACE::lifetime

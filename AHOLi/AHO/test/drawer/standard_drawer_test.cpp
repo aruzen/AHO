@@ -39,6 +39,7 @@ namespace {
 #include <VSL/vulkan/commands/render_pass_end.hpp>
 #include "../support/live_gpu.hpp"
 #include <AHO/image_readback.hpp>
+#include <VSL/operation/frame_buffer_ops.hpp>
 
 namespace {
     using StandardDrawerVulkanIntegration = aho_test::LiveGPUTest;
@@ -147,12 +148,32 @@ namespace {
         const Triangle full({-1, -1}, {3, -1}, {-1, 3});
         (void)capture_triangle(*engine, [&](auto& phase) { aho::draw(full, aho::RGBA(1, 0, 0, 1), phase); });
         const auto state = window.data2->standard_draw;
-        const auto pass = window.render_context().render_pass();
-        ASSERT_TRUE(window.resize(640, 360));
+        const auto context = window.render_context();
+        const auto pass = context.render_pass();
+        const auto previous_extent = context.scissor();
+        bool fail = true;
+        const vsl::operation::ScopedFrameBufferNativeFactory factory({&fail,
+                                                                      [](void* flag, vk::Device device, const vk::FramebufferCreateInfo& info) -> vk::Framebuffer {
+                                                                          if (*static_cast<bool*>(flag))
+                                                                              throw vk::OutOfHostMemoryError("Framebuffer retry test");
+                                                                          return device.createFramebuffer(info);
+                                                                      },
+                                                                      [](void*, vk::Device device, vk::Framebuffer frame) noexcept { device.destroyFramebuffer(frame); }});
+        EXPECT_THROW(window.resize(640, 360), vk::OutOfHostMemoryError);
+        ASSERT_TRUE(window.data2->pending_generation);
+        const auto candidate = window.data2->pending_generation->swapchain->data_;
+        EXPECT_EQ(context.scissor().width, previous_extent.width);
+        EXPECT_EQ(context.scissor().height, previous_extent.height);
+        EXPECT_EQ(context.render_pass().data_, pass.data_);
+        fail = false;
+        ASSERT_TRUE(window.recreate_swapchain());
+        EXPECT_EQ(window.data2->swapchain.data_, candidate);
         const auto pixels = capture_triangle(*engine, [&](auto& phase) { phase << aho::pack(full, aho::RGBA(0, 1, 0, 1)); });
         const auto extent = window.render_context().scissor();
         EXPECT_EQ(pixels.width, extent.width);
         EXPECT_EQ(pixels.height, extent.height);
+        EXPECT_EQ(context.scissor().width, extent.width);
+        EXPECT_EQ(context.scissor().height, extent.height);
         EXPECT_EQ(pixel_at(pixels, .95f, .95f), (std::array<unsigned, 4>{0, 255, 0, 255}));
         if (pass.data_ == window.render_context().render_pass().data_)
             EXPECT_EQ(state, window.data2->standard_draw);

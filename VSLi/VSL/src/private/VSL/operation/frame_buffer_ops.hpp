@@ -14,6 +14,16 @@ namespace VSL_NAMESPACE::operation {
         vk::Framebuffer (*create)(void*, vk::Device, const vk::FramebufferCreateInfo&) = nullptr;
         void (*destroy)(void*, vk::Device, vk::Framebuffer) noexcept = nullptr;
     };
+    class ScopedFrameBufferNativeFactory {
+        FrameBufferNativeFactory _factory;
+        const FrameBufferNativeFactory* _previous;
+
+    public:
+        explicit ScopedFrameBufferNativeFactory(FrameBufferNativeFactory factory) noexcept;
+        ScopedFrameBufferNativeFactory(const ScopedFrameBufferNativeFactory&) = delete;
+        ScopedFrameBufferNativeFactory& operator=(const ScopedFrameBufferNativeFactory&) = delete;
+        ~ScopedFrameBufferNativeFactory();
+    };
     struct FrameBufferBeginScratch {
         vk::RenderPass pass;
         vk::Framebuffer framebuffer;

@@ -6,6 +6,7 @@
 
 namespace VSL_NAMESPACE::operation {
     namespace {
+        thread_local const SwapchainNativeCalls* ACTIVE_CALLS = nullptr;
         vk::SurfaceFormatKHR select_format(const std::vector<vk::SurfaceFormatKHR>& formats);
         vk::PresentModeKHR select_mode(const std::vector<vk::PresentModeKHR>& modes);
         std::vector<vk::Image> enumerate_images(PendingSwapchain& pending);
@@ -61,8 +62,15 @@ namespace VSL_NAMESPACE::operation {
                 vkDestroySwapchainKHR(native_device, chain, nullptr);
         }
     }
+    ScopedSwapchainNativeCalls::ScopedSwapchainNativeCalls(SwapchainNativeCalls calls) noexcept
+        : _calls(calls), _previous(std::exchange(ACTIVE_CALLS, &_calls)) {}
+    ScopedSwapchainNativeCalls::~ScopedSwapchainNativeCalls() {
+        ACTIVE_CALLS = _previous;
+    }
     PendingSwapchain prepare_swapchain(impl::LogicalDeviceImpl& device, impl::SurfaceImpl& surface, const SwapchainCreateInfo& info,
-                                       impl::SwapchainImpl* old, const SwapchainNativeCalls& calls) {
+                                       impl::SwapchainImpl* old, const SwapchainNativeCalls& calls, SwapchainCreateProgress* progress) {
+        if (progress)
+            progress->native_started = false;
         if (!device.device || !device.swapchain_enabled || !device.parent_device || !surface.surface || device.parent_device->vulkan != surface.vulkan)
             throw std::invalid_argument("Swapchain requires a Device on its Surface Instance");
         if (info.present_fences != PresentFencePolicy::LEGACY && info.present_fences != PresentFencePolicy::REQUIRE_FENCE)
@@ -93,7 +101,7 @@ namespace VSL_NAMESPACE::operation {
         pending.transform = capabilities.currentTransform;
         pending.usage = info.usage;
         pending.present_fences = info.present_fences;
-        pending.calls = calls;
+        pending.calls = !calls.create && !calls.images && !calls.destroy && ACTIVE_CALLS ? *ACTIVE_CALLS : calls;
         pending.extent = capabilities.currentExtent;
         if (pending.extent.width == std::numeric_limits<std::uint32_t>::max())
             pending.extent = vk::Extent2D{std::clamp(*info.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
@@ -125,8 +133,10 @@ namespace VSL_NAMESPACE::operation {
             require_replaceable_swapchain(*old);
             old->state = SwapchainState::RETIRED;
         }
-        const auto result = calls.create ? calls.create(calls.context, device.device, &static_cast<const VkSwapchainCreateInfoKHR&>(native), &created)
-                                         : vkCreateSwapchainKHR(device.device, &static_cast<const VkSwapchainCreateInfoKHR&>(native), nullptr, &created);
+        if (progress)
+            progress->native_started = true;
+        const auto result = pending.calls.create ? pending.calls.create(pending.calls.context, device.device, &static_cast<const VkSwapchainCreateInfoKHR&>(native), &created)
+                                                 : vkCreateSwapchainKHR(device.device, &static_cast<const VkSwapchainCreateInfoKHR&>(native), nullptr, &created);
         if (result != VK_SUCCESS)
             throw exceptions::RuntimeException("Swapchain", "vkCreateSwapchainKHR failed: " + vk::to_string(static_cast<vk::Result>(result)));
         if (!created)

@@ -4,6 +4,22 @@
 
 ## 4責務と配置
 
+`SwapchainArena`の末尾の任意引数`SwapchainCreateProgress*`は、生成中だけ借用する。共通backendは入口で`native_started=false`へ戻し、入力／能力／旧世代の全検証後、`vkCreateSwapchainKHR`の直前にのみtrueへ進める。例外後にも値を保持するため、旧世代がない場合もpreflight失敗とNative開始後の失敗を区別できる。trueは生成成功の保証ではない。この値をImplやownerへ保存せず、再入／並行呼出しで同じ出力領域を共有しない。
+
+```cpp
+vsl::SwapchainCreateProgress progress;
+try {
+    vsl::lifetime::SwapchainArena next(device, surface, info, old, {}, &progress);
+    publish(next.view());
+} catch (...) {
+    if (progress.native_started)
+        remember_validated_request(info);
+    throw;
+}
+```
+
+既存の省略引数による生成は共通処理を使い続ける。公開constructorのリンク先変更を含むため、prebuilt利用側は再buildする。
+
 - operation：raw Device／Surfaceと生成入力を検証し、native Swapchain／ImageViewを生成・破棄する。成功したnonnull handleだけを採用する。
 - storage：実画像数MからSwapchain slotとImage slot×Mのoffset・全体サイズ・alignmentを計算し、領域を提供する。
 - lifetime：native生成中のPending、構築と巻き戻し、Device／Surfaceの固定親、世代ownerと公開aliasを管理する。

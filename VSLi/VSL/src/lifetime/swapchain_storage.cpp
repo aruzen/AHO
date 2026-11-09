@@ -135,7 +135,9 @@ namespace VSL_NAMESPACE::lifetime {
     }
     SwapchainAccessor make_swapchain(LogicalDeviceAccessor device, Surface surface, SwapchainCreateInfo info,
                                      const std::optional<SwapchainAccessor>& old, const SwapchainRegionFactory& memory,
-                                     const operation::SwapchainNativeCalls& calls, const operation::ImageViewNativeCalls& image_calls) {
+                                     const operation::SwapchainNativeCalls& calls, const operation::ImageViewNativeCalls& image_calls, SwapchainCreateProgress* progress) {
+        if (progress)
+            progress->native_started = false;
         require_device_owner(device);
         require_surface_owner(surface);
         if (!memory)
@@ -159,7 +161,7 @@ namespace VSL_NAMESPACE::lifetime {
                 info.height = static_cast<std::uint32_t>(height);
         }
         // device/surface ownerはPendingより先に作り、native破棄が済むまで保持する。
-        auto pending = operation::prepare_swapchain(*device_owner, *surface_owner, info, previous.get(), calls);
+        auto pending = operation::prepare_swapchain(*device_owner, *surface_owner, info, previous.get(), calls, progress);
         const storage::SwapchainLayout layout(pending.images.size(), pending.present_fences);
         auto region = memory(layout);
         std::vector<ImageAccessor> images(layout.images());
@@ -186,12 +188,11 @@ namespace VSL_NAMESPACE::lifetime {
         return {{root, &value}, std::move(images)};
     }
     SwapchainArena::SwapchainArena(LogicalDeviceAccessor device, Surface surface, SwapchainCreateInfo info,
-                                   std::optional<SwapchainAccessor> old, SwapchainMemoryFactory memory, ValidatedStorage) {
+                                   std::optional<SwapchainAccessor> old, SwapchainMemoryFactory memory, SwapchainCreateProgress* progress, ValidatedStorage) {
         _view = make_swapchain(std::move(device), std::move(surface), std::move(info), old, [&](const auto& layout) {
             auto region = memory ? memory(layout) : storage::ArenaMemory(layout.bytes(), layout.alignment());
             layout.require_region(region.size(), region.alignment());
-            return region._region;
-        });
+            return region._region; }, {}, {}, progress);
     }
     OwnerRef SwapchainArena::owner_ref() const {
         return _view.owner_ref();

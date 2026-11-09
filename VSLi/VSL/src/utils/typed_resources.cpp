@@ -22,22 +22,68 @@ namespace VSL_NAMESPACE::typed::detail {
         const std::array sets{data.get()};
         lifetime::freeze_descriptor_dependencies(*data->owner_context, sets);
     }
-    lifetime::OwnedRef<impl::ImageImpl> descriptor_owner(const ImageAccessor& image) {
-        return lifetime::detail::owned_ref(image.data_, image.data_ ? image.data_->owner_node : nullptr);
+    namespace {
+        template<typename Accessor>
+        auto descriptor_owner(const Accessor& source) {
+            return lifetime::detail::owned_ref(source.data_, source.data_ ? source.data_->owner_node : nullptr);
+        }
+    } // namespace
+    DescriptorValue DescriptorValue::FromBuffer(BufferView source, ResourceUse use) {
+        const auto owner = source.owner_ref();
+        if (!owner.use_count())
+            throw std::invalid_argument("Descriptor buffer requires an owning view");
+        DescriptorValue result;
+        result._buffer = owner.alias(source.ref().data);
+        result._bytes = source.size();
+        result._offset = source.byte_offset();
+        result._use = source.resource_use(std::move(use));
+        return result;
     }
-    lifetime::OwnedRef<impl::SamplerImpl> descriptor_owner(const SamplerAccessor& sampler) {
-        return lifetime::detail::owned_ref(sampler.data_, sampler.data_ ? sampler.data_->owner_node : nullptr);
+    DescriptorValue DescriptorValue::FromImage(ImageAccessor source, ResourceUse use) {
+        DescriptorValue result;
+        result._image = descriptor_owner(source);
+        result._use = std::move(use);
+        return result;
+    }
+    DescriptorValue DescriptorValue::FromSampler(SamplerAccessor source, ResourceUse use) {
+        DescriptorValue result;
+        result._sampler = descriptor_owner(source);
+        result._use = std::move(use);
+        return result;
+    }
+    DescriptorValue DescriptorValue::FromTexture(ImageAccessor image, SamplerAccessor sampler, ResourceUse use) {
+        DescriptorValue result;
+        result._image = descriptor_owner(image);
+        result._sampler = descriptor_owner(sampler);
+        result._use = std::move(use);
+        return result;
+    }
+    DescriptorValue DescriptorValue::buffer_subview(size_t offset, size_t bytes) const {
+        if (!_buffer)
+            throw std::logic_error("Descriptor value has no buffer");
+        if (!bytes || offset > _bytes || bytes > _bytes - offset)
+            throw std::out_of_range("Descriptor buffer subview range");
+        auto next = *this;
+        next._offset += offset;
+        next._bytes = bytes;
+        return next;
+    }
+    ImageAccessor DescriptorValue::image() const {
+        return {_image.share()};
+    }
+    SamplerAccessor DescriptorValue::sampler() const {
+        return {_sampler.share()};
     }
     ResourceUse descriptor_constraints(const DescriptorValue& value) {
         const auto matches = [&](const auto& owner) {
-            if (!owner || !value.use.state.use_count() || value.use.state.get() != owner->use)
+            if (!owner || !value._use.state.use_count() || value._use.state.get() != owner->use)
                 return false;
             const auto same = [&](const auto& other) { return !owner.owner_before(other) && !other.owner_before(owner); };
-            return same(value.use.state) && (!value.use.owner.use_count() || same(value.use.owner));
+            return same(value._use.state) && (!value._use.owner.use_count() || same(value._use.owner));
         };
-        if (matches(value.buffer) || matches(value.image) || matches(value.sampler))
-            return {value.use.constraint_state, value.use.constraint_owner};
-        return value.use;
+        if (matches(value._buffer) || matches(value._image) || matches(value._sampler))
+            return {value._use.constraint_state, value._use.constraint_owner};
+        return value._use;
     }
     void require_descriptor_complete(const GraphicResource& resource) {
         if (!resource.data_)
@@ -80,29 +126,29 @@ namespace VSL_NAMESPACE::typed::detail {
             impl::GraphicResourceImpl::BindingElement element;
             element.constraint = lifetime::descriptor_constraint(descriptor_constraints(value));
             if (point.binding_type == UNIFORM_BUFFER || point.binding_type == STORAGE_BUFFER) {
-                if (!value.buffer || value.buffer->device != device)
+                if (!value._buffer || value._buffer->device != device)
                     throw std::invalid_argument("Typed descriptor buffer device/usage mismatch");
-                operation::validate_descriptor_buffer(*value.buffer, vk::DescriptorType(point.binding_type), value.offset, value.bytes);
-                buffers.push_back({value.buffer->buffer, value.offset, value.bytes});
-                element.states.push_back(value.buffer->use);
-                element.owners.push_back(value.buffer);
+                operation::validate_descriptor_buffer(*value._buffer, vk::DescriptorType(point.binding_type), value._offset, value._bytes);
+                buffers.push_back({value._buffer->buffer, value._offset, value._bytes});
+                element.states.push_back(value._buffer->use);
+                element.owners.push_back(value._buffer);
             } else {
                 vk::DescriptorImageInfo info{};
                 if (point.binding_type != SAMPLER) {
-                    if (!value.image || value.image->device != device)
+                    if (!value._image || value._image->device != device)
                         throw std::invalid_argument("Typed descriptor image device/usage mismatch");
-                    operation::validate_descriptor_image(*value.image, vk::DescriptorType(point.binding_type));
-                    info.imageView = value.image->view;
+                    operation::validate_descriptor_image(*value._image, vk::DescriptorType(point.binding_type));
+                    info.imageView = value._image->view;
                     info.imageLayout = point.binding_type == STORAGE_IMAGE ? vk::ImageLayout::eGeneral : vk::ImageLayout::eShaderReadOnlyOptimal;
-                    element.states.push_back(value.image->use);
-                    element.owners.push_back(value.image);
+                    element.states.push_back(value._image->use);
+                    element.owners.push_back(value._image);
                 }
                 if (point.binding_type == SAMPLER || point.binding_type == COMBINED_IMAGE_SAMPLER) {
-                    if (!value.sampler || value.sampler->device != device)
+                    if (!value._sampler || value._sampler->device != device)
                         throw std::invalid_argument("Typed descriptor sampler device mismatch");
-                    info.sampler = value.sampler->sampler;
-                    element.states.push_back(value.sampler->use);
-                    element.owners.push_back(value.sampler);
+                    info.sampler = value._sampler->sampler;
+                    element.states.push_back(value._sampler->use);
+                    element.owners.push_back(value._sampler);
                 }
                 images.push_back(info);
             }

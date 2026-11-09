@@ -38,7 +38,7 @@ namespace {
         EXPECT_EQ(result, values);
         auto typed = r::storage_view<std::uint32_t>(imported);
         EXPECT_EQ(typed.byte_offset(), 8u);
-        EXPECT_EQ(typed.descriptor().use.state, imported.binding().resource_use().state);
+        EXPECT_EQ(typed.descriptor().resource_use().state, imported.binding().resource_use().state);
         EXPECT_THROW(imported.binding().native(), std::logic_error);
         EXPECT_THROW(imported.resize(17), std::out_of_range);
         EXPECT_THROW(imported.write(std::as_bytes(std::span(values)), SIZE_MAX), std::out_of_range);

@@ -75,12 +75,15 @@ namespace {
         t::TypedComputePipeline<Resources, Push> typed(device, vsl::pipeline_layout::ShaderGroup("storage view", {shader}));
         const auto alignment = device.data_->parent_device->device.getProperties().limits.minStorageBufferOffsetAlignment;
         const size_t first = std::max<size_t>(1, alignment / sizeof(std::uint32_t));
-        std::vector<std::uint32_t> zero(first + 4, 777);
+        std::vector<std::uint32_t> zero(3 * first + 4, 777);
         t::TypedStorageBuffer<std::uint32_t> storage(device, zero);
         vsl::GraphicResourceManager resources(device);
         t::TypedDescriptorSet<Set::Layout> set(device, resources);
-        auto view = storage.view(first, 4).view(0, 4);
-        EXPECT_EQ(view.byte_offset(), first * sizeof(std::uint32_t));
+        using View = t::TypedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::STORAGE_BUFFER>;
+        const auto selected = storage.storage_view().view(first * sizeof(std::uint32_t), (2 * first + 4) * sizeof(std::uint32_t));
+        auto view = View::FromView(selected, 2 * first + 4).view(first, first + 4).view(first, 4);
+        EXPECT_EQ(view.byte_offset(), 3 * first * sizeof(std::uint32_t));
+        EXPECT_EQ(view.descriptor().size(), 4 * sizeof(std::uint32_t));
         set.write<0>(view);
         auto manager = make_manager();
         {
@@ -93,11 +96,13 @@ namespace {
         device.data_->device.waitIdle();
         std::vector<std::uint32_t> actual(zero.size());
         storage.read_into(actual);
-        for (size_t i = 0; i < first; ++i)
+        for (size_t i = 0; i < 3 * first; ++i)
             EXPECT_EQ(actual[i], 777u);
         for (size_t i = 0; i < 4; ++i)
-            EXPECT_EQ(actual[first + i], 41u + i);
-        EXPECT_THROW(storage.view(first, 5), std::out_of_range);
+            EXPECT_EQ(actual[3 * first + i], 41u + i);
+        EXPECT_THROW(storage.view(3 * first, 5), std::out_of_range);
+        EXPECT_THROW(view.descriptor().buffer_subview(0, 0), std::out_of_range);
+        EXPECT_THROW(view.descriptor().buffer_subview(4 * sizeof(std::uint32_t), 1), std::out_of_range);
     }
     TEST_F(TypedViewVulkanIntegrationTest, MisalignedUniformViewsAreRejectedAndAlignedViewsRetainTheirOwners) {
         using Set = t::DescriptorLayout<t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::VERTEX>>;

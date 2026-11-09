@@ -103,13 +103,17 @@ if (VSL_TEST_SOURCES)
         set_tests_properties("VSL.TypedPipeline.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
     endforeach()
     set(typed_descriptor_names Valid WrongPayload WrongKind WrongArrayCount UnknownBinding WrongSet MissingSet
-        MissingBind DuplicateBinding DuplicateSet ZeroArrayCount RawSet RawBuffer)
-    foreach(case RANGE 0 12)
+        MissingBind DuplicateBinding DuplicateSet ZeroArrayCount RawSet RawBuffer PrivateDescriptorValue RawDescriptorValue)
+    foreach(case RANGE 0 14)
         list(GET typed_descriptor_names ${case} name)
+        set(typed_descriptor_expected "write|bind_resources|draw|Duplicate typed|Invalid typed")
+        if(case GREATER 12)
+            set(typed_descriptor_expected "private|no matching constructor|excess elements|C2248|C2440|C2661|C2665")
+        endif()
         add_test(NAME "VSL.TypedDescriptor.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
             "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
             "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_descriptors.cpp"
-            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=write|bind_resources|draw|Duplicate typed|Invalid typed"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=${typed_descriptor_expected}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
         set_tests_properties("VSL.TypedDescriptor.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
     endforeach()

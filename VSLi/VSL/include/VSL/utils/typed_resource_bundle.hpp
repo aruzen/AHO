@@ -36,10 +36,10 @@ namespace VSL_NAMESPACE::typed {
         const auto& resource() const;
         template<std::uint32_t set, std::uint32_t binding, size_t element = 0>
         requires(Schema::template HasImage<set, binding>() && element < Schema::template Binding<set, binding>::POINT.amount)
-        ImageAccessor image() const { return {resource<set, binding, element>().descriptor().image.share()}; }
+        ImageAccessor image() const { return resource<set, binding, element>().descriptor().image(); }
         template<std::uint32_t set, std::uint32_t binding, size_t element = 0>
         requires(Schema::template HasSampler<set, binding>() && element < Schema::template Binding<set, binding>::POINT.amount)
-        SamplerAccessor sampler() const { return {resource<set, binding, element>().descriptor().sampler.share()}; }
+        SamplerAccessor sampler() const { return resource<set, binding, element>().descriptor().sampler(); }
         template<std::uint32_t set_number>
         const auto& set() const { return std::get<Schema::SetIndex(set_number)>(_sets); }
         template<typename Binding>

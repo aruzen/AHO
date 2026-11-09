@@ -257,18 +257,23 @@ namespace {
             const auto local = frame.buffer<2, 0>();
             local_owner = local.backend().owner();
             shared_owner = shared.backend().data_;
-            EXPECT_TRUE(local.descriptor().buffer.managed());
+            EXPECT_TRUE(local.backend().owner_ref().managed());
             EXPECT_THROW(shared.write<0>(std::array{local, local}), std::invalid_argument);
             using External = t::detail::BundleExternalValue<SharedSet::Binding<0>>;
             for (const auto form : {0, 1, 2}) {
-                auto value = frame.buffer<5, 0>().descriptor();
+                const auto& buffer = frame.buffer<5, 0>().backend();
+                auto use = buffer.resource_use();
                 const auto owner = frame.set<2>().backend().owner_ref();
                 if (form == 2) {
-                    value.use.state = owner.alias(value.use.state.get());
-                    value.use.owner.reset();
+                    use.state = owner.alias(use.state.get());
+                    use.owner.reset();
                 } else
-                    value.use.owner = form ? owner.alias(static_cast<void*>(nullptr)) : owner;
-                EXPECT_THROW(shared.write<0>(std::array{External{value}, External{value}}), std::invalid_argument);
+                    use.owner = form ? owner.alias(static_cast<void*>(nullptr)) : owner;
+                EXPECT_THROW(([&] {
+                                 const auto value = t::detail::DescriptorValue::FromBuffer(buffer, use);
+                                 shared.write<0>(std::array{External{value}, External{value}});
+                             }()),
+                             std::invalid_argument);
             }
             const auto logical = std::make_shared<vsl::ResourceUseState>();
             EXPECT_THROW(shared.resource_use()->replace(0, {{logical, frame.set<2>().backend().owner_ref()}, {}}), std::invalid_argument);

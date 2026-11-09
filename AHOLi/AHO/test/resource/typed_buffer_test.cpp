@@ -73,14 +73,14 @@ namespace {
         Host buffer(device, sizeof(value));
         buffer.write(std::as_bytes(std::span(&value, 1)));
         auto old_view = r::uniform_view<std::uint32_t>(buffer);
-        auto* old_state = old_view.descriptor().use.state.get();
+        auto* old_state = old_view.descriptor().resource_use().state.get();
         buffer.reserve(128);
         auto current_view = r::uniform_view<std::uint32_t>(buffer);
-        EXPECT_NE(old_state, current_view.descriptor().use.state.get());
-        EXPECT_EQ(current_view.descriptor().use.state.get(), &buffer.native().use_state());
+        EXPECT_NE(old_state, current_view.descriptor().resource_use().state.get());
+        EXPECT_EQ(current_view.descriptor().resource_use().state.get(), &buffer.native().use_state());
         auto manager = make_manager();
         auto phase = manager.start_phase<vsl::ComputePhase>();
-        old_view.descriptor().use.record(manager.get_buffer());
+        old_view.descriptor().resource_use().record(manager.get_buffer());
         EXPECT_TRUE(old_state->busy());
         EXPECT_FALSE(buffer.native().use_state().busy());
         EXPECT_TRUE(buffer.busy());

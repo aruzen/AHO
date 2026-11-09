@@ -19,6 +19,7 @@ namespace VSL_NAMESPACE::lifetime {
         std::shared_ptr<impl::CommandBufferImpl> buffer;
         std::vector<std::shared_ptr<impl::SubmissionWork>> submissions;
         std::shared_ptr<impl::SubmissionWork> recording_submission;
+        std::shared_ptr<impl::FenceImpl> acquire_fences;
         std::vector<std::shared_ptr<SurfacePresentationDomain>> presentation_domains;
         CommandRecordingContext context;
 
@@ -28,6 +29,7 @@ namespace VSL_NAMESPACE::lifetime {
         ~CommandDomain();
         void wait_idle();
     };
+    std::shared_ptr<impl::FenceImpl> acquire_fences(CommandDomain& domain, LogicalDeviceAccessor device);
     struct CommandAccess {
         static const std::shared_ptr<CommandDomain>& Owner(const CommandBuffer& buffer);
         static std::shared_ptr<CommandDomain> Resolve(const std::shared_ptr<impl::CommandBufferImpl>& buffer);

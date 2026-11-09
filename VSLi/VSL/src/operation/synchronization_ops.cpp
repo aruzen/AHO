@@ -83,6 +83,12 @@ namespace VSL_NAMESPACE::operation {
                 device.destroyFence(*it);
     }
     void reset_fences(vk::Device device, std::span<const vk::Fence> fences) {
-        device.resetFences(vk::ArrayProxy<const vk::Fence>(static_cast<std::uint32_t>(fences.size()), fences.data()));
+        const auto count = static_cast<std::uint32_t>(fences.size());
+        const auto* handles = reinterpret_cast<const VkFence*>(fences.data());
+        const auto result = static_cast<vk::Result>(NATIVE_CALLS && NATIVE_CALLS->reset_fences
+                                                        ? NATIVE_CALLS->reset_fences(NATIVE_CALLS->context, device, count, handles)
+                                                        : VULKAN_HPP_DEFAULT_DISPATCHER.vkResetFences(device, count, handles));
+        if (result != vk::Result::eSuccess)
+            vk::detail::throwResultException(result, "Fence reset failed");
     }
 } // namespace VSL_NAMESPACE::operation

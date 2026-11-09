@@ -9,6 +9,7 @@ namespace VSL_NAMESPACE::operation {
         void* context = nullptr;
         VkResult (*create_semaphore)(void*, VkDevice, const VkSemaphoreCreateInfo*, VkSemaphore*) noexcept = nullptr;
         void (*destroy_semaphore)(void*, VkDevice, VkSemaphore) noexcept = nullptr;
+        VkResult (*reset_fences)(void*, VkDevice, std::uint32_t, const VkFence*) noexcept = nullptr;
     };
     class ScopedSynchronizationNativeCalls {
         SynchronizationNativeCalls _calls;

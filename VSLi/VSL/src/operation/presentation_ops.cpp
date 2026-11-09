@@ -12,6 +12,12 @@ namespace VSL_NAMESPACE::operation {
     ScopedPresentationNativeCalls::~ScopedPresentationNativeCalls() {
         NATIVE_CALLS = _previous;
     }
+    vk::Result acquire_next_image(vk::Device device, vk::SwapchainKHR swapchain, std::uint64_t timeout,
+                                  vk::Semaphore available, vk::Fence fence, std::uint32_t& image) noexcept {
+        return static_cast<vk::Result>(NATIVE_CALLS && NATIVE_CALLS->acquire
+                                           ? NATIVE_CALLS->acquire(NATIVE_CALLS->context, device, swapchain, timeout, available, fence, &image)
+                                           : VULKAN_HPP_DEFAULT_DISPATCHER.vkAcquireNextImageKHR(device, swapchain, timeout, available, fence, &image));
+    }
     vk::Result queue_present(vk::Queue queue, vk::SwapchainKHR swapchain, std::uint32_t image,
                              vk::Semaphore finished, vk::Fence present_fence) noexcept {
         const VkSwapchainKHR native_chain = swapchain;

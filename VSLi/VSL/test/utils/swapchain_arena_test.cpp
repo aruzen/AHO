@@ -3,6 +3,8 @@
 #include "support/deferred_action.hpp"
 #include <VSL/lifetime/swapchain_arena.hpp>
 #include <VSL/lifetime/swapchain_storage.hpp>
+#include <VSL/lifetime/presentation_retention.hpp>
+#include <VSL/operation/synchronization_ops.hpp>
 #include <VSL/storage/cpu_region.hpp>
 #include <limits>
 
@@ -29,6 +31,11 @@ namespace {
         static VkResult View(void* context, VkDevice device, const VkImageViewCreateInfo* info, VkImageView* output);
         o::SwapchainNativeCalls calls() { return {this, Create, Images, Destroy}; }
         o::ImageViewNativeCalls image_calls() { return {this, View}; }
+    };
+    struct SemaphoreProbe {
+        unsigned attempts = 0, created = 0, destroyed = 0, fail_at = 2;
+        static VkResult Create(void* context, VkDevice device, const VkSemaphoreCreateInfo* info, VkSemaphore* output) noexcept;
+        static void Destroy(void* context, VkDevice device, VkSemaphore semaphore) noexcept;
     };
     template<typename Handle>
     Handle sentinel();
@@ -84,6 +91,19 @@ namespace {
         }
         return vkCreateImageView(device, info, nullptr, output);
     }
+    VkResult SemaphoreProbe::Create(void* context, VkDevice device, const VkSemaphoreCreateInfo* info, VkSemaphore* output) noexcept {
+        auto& probe = *static_cast<SemaphoreProbe*>(context);
+        if (++probe.attempts == probe.fail_at)
+            return VK_ERROR_OUT_OF_HOST_MEMORY;
+        const auto result = vkCreateSemaphore(device, info, nullptr, output);
+        if (result == VK_SUCCESS)
+            ++probe.created;
+        return result;
+    }
+    void SemaphoreProbe::Destroy(void* context, VkDevice device, VkSemaphore semaphore) noexcept {
+        ++static_cast<SemaphoreProbe*>(context)->destroyed;
+        vkDestroySemaphore(device, semaphore, nullptr);
+    }
     TEST(SwapchainLayoutTest, RuntimeCountProducesAlignedDistinctSlotsAndChecksBounds) {
         constexpr s::SwapchainLayout layout(3);
         static_assert(layout.images() == 3);
@@ -91,12 +111,74 @@ namespace {
         static_assert(layout.image_offset(1) > layout.image_offset(0));
         static_assert(layout.image_offset(2) % s::IMAGE_IMPL_ALIGNMENT == 0);
         static_assert(layout.bytes() % layout.alignment() == 0);
+        static_assert(layout.finished_semaphore_offset() % s::SEMAPHORE_SLOT_ALIGNMENT == 0);
+        static_assert(layout.finished_semaphore_offset() >= layout.image_offset(2) + s::ResourceSlotLayout<vsl::impl::ImageImpl>::SIZE);
+        static_assert(layout.bytes() >= layout.finished_semaphore_offset() + s::SEMAPHORE_SLOT_SIZE);
         EXPECT_THROW((s::SwapchainLayout{0}), std::invalid_argument);
         EXPECT_THROW(layout.image_offset(3), std::out_of_range);
         EXPECT_THROW(layout.require_region(layout.bytes() - 1, layout.alignment()), std::invalid_argument);
         EXPECT_THROW(layout.require_region(layout.bytes(), 3), std::invalid_argument);
         if constexpr (sizeof(size_t) > sizeof(std::uint32_t))
             EXPECT_THROW((s::SwapchainLayout{size_t{std::numeric_limits<std::uint32_t>::max()} + 1}), std::invalid_argument);
+    }
+    TEST_F(SwapchainArenaWindowIntegrationTest, FinishedSemaphoreIsPlacedInTheGenerationAndRetainsTheOriginalOwner) {
+        std::optional<vsl::SemaphoreHolder> finished;
+        std::weak_ptr<vsl::impl::SwapchainImpl> generation;
+        {
+            l::SwapchainArena arena(device, *surface, create_info());
+            const auto chain = arena.view();
+            const s::SwapchainLayout layout(chain.images.size());
+            finished = chain.finished_semaphores();
+            generation = chain.data_;
+            EXPECT_EQ(finished->size(), chain.images.size());
+            EXPECT_FALSE(finished->data_.owner_before(chain.data_));
+            EXPECT_FALSE(chain.data_.owner_before(finished->data_));
+            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(finished->data_.get()) - reinterpret_cast<std::uintptr_t>(chain.data_.get()),
+                      layout.finished_semaphore_offset());
+            EXPECT_EQ(finished->get_device().data_, device.data_);
+        }
+        EXPECT_FALSE(generation.expired());
+        finished.reset();
+        EXPECT_TRUE(generation.expired());
+    }
+    TEST_F(SwapchainArenaWindowIntegrationTest, DefaultFinishedSelectsTheAcquiredImageWhenFramesOutnumberImages) {
+        l::SwapchainArena arena(device, *surface, create_info());
+        const auto chain = arena.view();
+        const auto count = static_cast<std::uint32_t>(chain.images.size());
+        auto manager = make_manager().independent(count + 1);
+        for (std::uint32_t i = 0; i + 1 < count; ++i)
+            manager.get_buffer().next();
+        auto phase = manager.start_phase<vsl::DefaultPhase>(chain);
+        EXPECT_EQ(phase.frame_slot, count);
+        ASSERT_TRUE(phase.calculation_finish);
+        EXPECT_EQ(phase.calculation_finish->data_, chain.finished_semaphores().data_);
+        EXPECT_EQ(phase.calculation_finish->size(), count);
+        EXPECT_THROW(phase.calculation_finish->destroy(), std::logic_error);
+        phase.cancel();
+        EXPECT_TRUE(phase.completion().wait());
+        manager.wait_idle();
+    }
+    TEST_F(SwapchainArenaWindowIntegrationTest, SemaphoreConstructionFailureRollsBackTheGenerationAndReusesTheCPURegion) {
+        SemaphoreProbe probe;
+        const o::ScopedSynchronizationNativeCalls native({&probe, SemaphoreProbe::Create, SemaphoreProbe::Destroy});
+        std::optional<s::ArenaMemory> memory;
+        const auto provide = [&](const s::SwapchainLayout& layout) {
+            if (!memory) {
+                probe.fail_at = static_cast<unsigned>(std::min(size_t{2}, layout.images()));
+                memory.emplace(layout.bytes(), layout.alignment());
+            }
+            return *memory;
+        };
+        EXPECT_THROW((l::SwapchainArena(device, *surface, create_info(), {}, provide)), vk::OutOfHostMemoryError);
+        EXPECT_EQ(probe.attempts, probe.fail_at);
+        EXPECT_EQ(probe.created, probe.fail_at - 1);
+        EXPECT_EQ(probe.destroyed, probe.created);
+        probe.fail_at = 0;
+        {
+            l::SwapchainArena retry(device, *surface, create_info(), {}, provide);
+            EXPECT_EQ(retry.view().finished_semaphores().size(), retry.image_count());
+        }
+        EXPECT_EQ(probe.destroyed, probe.created);
     }
     TEST_F(SwapchainArenaWindowIntegrationTest, NormalConstructorPlacesEveryImageWithItsOwnStateUnderOneOwner) {
         vsl::Swapchain chain(device, surface, {}, 64, 48);
@@ -256,7 +338,7 @@ namespace {
             EXPECT_THROW(phase->setup(), std::logic_error);
             EXPECT_TRUE(invoked);
             EXPECT_EQ(old.state(), vsl::SwapchainState::RETIRED);
-            EXPECT_TRUE(old.data_->presentation_semaphores.empty());
+            EXPECT_TRUE(old.data_->presentation_context->finished->use.wsi.empty());
             EXPECT_NO_THROW(available.destroy());
             EXPECT_NO_THROW(finished.destroy());
         }

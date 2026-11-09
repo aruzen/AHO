@@ -22,7 +22,7 @@ namespace VSL_NAMESPACE::lifetime {
             storage::SwapchainLayout layout;
             SwapchainPresentationContext presentation;
             size_t images_constructed = 0;
-            bool claimed = false, chain_constructed = false, fences_constructed = false;
+            bool claimed = false, chain_constructed = false, fences_constructed = false, semaphores_constructed = false;
             SwapchainGenerationOwner(operation::PendingSwapchain& pending, storage::SwapchainLayout layout,
                                      std::shared_ptr<storage::detail::CPURegion> memory, std::array<OwnerRef, 2> parents, size_t parent_count,
                                      const operation::ImageViewNativeCalls& image_calls);
@@ -55,6 +55,10 @@ namespace VSL_NAMESPACE::lifetime {
                     fences_constructed = true;
                     presentation.fences = &fence_at(slot);
                 }
+                auto* semaphores = this->memory->base + layout.finished_semaphore_offset();
+                construct_semaphore(semaphores, *pending.device, {.count = layout.images()});
+                semaphores_constructed = true;
+                presentation.finished = &semaphore_at(semaphores);
                 construct_swapchain(this->memory->base, pending);
                 chain_constructed = true;
             } catch (...) {
@@ -70,6 +74,10 @@ namespace VSL_NAMESPACE::lifetime {
             return memory->base + layout.image_offset(index);
         }
         void SwapchainGenerationOwner::clear() noexcept {
+            if (semaphores_constructed) {
+                destroy_semaphore(memory->base + layout.finished_semaphore_offset());
+                semaphores_constructed = false;
+            }
             if (fences_constructed) {
                 destroy_fence(memory->base + layout.present_fence_offset());
                 fences_constructed = false;
@@ -118,6 +126,13 @@ namespace VSL_NAMESPACE::lifetime {
         auto* image = std::launder(reinterpret_cast<impl::ImageImpl*>(source->image_storage + index * source->image_stride));
         return {source, image};
     }
+    std::shared_ptr<impl::SemaphoreImpl> swapchain_finished(const std::shared_ptr<impl::SwapchainImpl>& source) {
+        require_swapchain_owner(source);
+        const auto* context = source->presentation_context;
+        if (!context || !context->finished || context->finished->semaphores.size() != source->swap_chain_images.size())
+            throw std::logic_error("Swapchain has no finished semaphore group");
+        return {source, context->finished};
+    }
     SwapchainAccessor make_swapchain(LogicalDeviceAccessor device, Surface surface, SwapchainCreateInfo info,
                                      const std::optional<SwapchainAccessor>& old, const SwapchainRegionFactory& memory,
                                      const operation::SwapchainNativeCalls& calls, const operation::ImageViewNativeCalls& image_calls) {
@@ -162,6 +177,7 @@ namespace VSL_NAMESPACE::lifetime {
         value.owner_node = &root->node;
         if (root->presentation.fences)
             root->presentation.fences->owner_node = &root->node;
+        root->presentation.finished->owner_node = &root->node;
         for (size_t i = 0; i < images.size(); ++i) {
             auto& image = image_at(root->image_slot(i));
             image.owner_node = &root->node;

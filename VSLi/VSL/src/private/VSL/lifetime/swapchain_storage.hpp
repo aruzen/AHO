@@ -20,6 +20,7 @@ namespace VSL_NAMESPACE::lifetime {
     void require_swapchain_owner(const SwapchainAccessor& source);
     void require_swapchain_owner(const std::shared_ptr<impl::SwapchainImpl>& source);
     std::shared_ptr<impl::ImageImpl> swapchain_image(const std::shared_ptr<impl::SwapchainImpl>& source, size_t index);
+    std::shared_ptr<impl::SemaphoreImpl> swapchain_finished(const std::shared_ptr<impl::SwapchainImpl>& source);
     SwapchainAccessor make_swapchain(LogicalDeviceAccessor device, Surface surface, SwapchainCreateInfo info,
                                      const std::optional<SwapchainAccessor>& old, const SwapchainRegionFactory& memory,
                                      const operation::SwapchainNativeCalls& calls = {}, const operation::ImageViewNativeCalls& image_calls = {});

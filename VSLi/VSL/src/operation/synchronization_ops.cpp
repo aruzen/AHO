@@ -3,6 +3,16 @@
 #include <stdexcept>
 
 namespace VSL_NAMESPACE::operation {
+    namespace {
+        thread_local const SynchronizationNativeCalls* NATIVE_CALLS = nullptr;
+    }
+    ScopedSynchronizationNativeCalls::ScopedSynchronizationNativeCalls(SynchronizationNativeCalls calls) noexcept
+        : _calls(calls), _previous(NATIVE_CALLS) {
+        NATIVE_CALLS = &_calls;
+    }
+    ScopedSynchronizationNativeCalls::~ScopedSynchronizationNativeCalls() {
+        NATIVE_CALLS = _previous;
+    }
     void initialize_semaphore(impl::SemaphoreImpl& semaphore, impl::LogicalDeviceImpl& device, SemaphoreCreateInfo info) {
         if (!semaphore.semaphores.empty())
             throw std::logic_error("Semaphore is already initialized");
@@ -27,8 +37,18 @@ namespace VSL_NAMESPACE::operation {
         validate_synchronization_count(device, count);
         std::vector<vk::Semaphore> handles(count);
         try {
-            for (auto& handle : handles)
-                handle = device.createSemaphore({});
+            const VkSemaphoreCreateInfo info{.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .pNext = nullptr, .flags = 0};
+            for (auto& handle : handles) {
+                VkSemaphore native = VK_NULL_HANDLE;
+                const auto result = static_cast<vk::Result>(NATIVE_CALLS && NATIVE_CALLS->create_semaphore
+                                                                ? NATIVE_CALLS->create_semaphore(NATIVE_CALLS->context, device, &info, &native)
+                                                                : VULKAN_HPP_DEFAULT_DISPATCHER.vkCreateSemaphore(device, &info, nullptr, &native));
+                if (result != vk::Result::eSuccess)
+                    vk::detail::throwResultException(result, "Semaphore creation failed");
+                if (!native)
+                    throw std::runtime_error("Semaphore creation returned a null handle");
+                handle = native;
+            }
         } catch (...) {
             destroy_semaphores(device, handles);
             throw;
@@ -50,8 +70,12 @@ namespace VSL_NAMESPACE::operation {
     }
     void destroy_semaphores(vk::Device device, std::span<const vk::Semaphore> semaphores) noexcept {
         for (auto it = semaphores.rbegin(); it != semaphores.rend(); ++it)
-            if (*it)
-                device.destroySemaphore(*it);
+            if (*it) {
+                if (NATIVE_CALLS && NATIVE_CALLS->destroy_semaphore)
+                    NATIVE_CALLS->destroy_semaphore(NATIVE_CALLS->context, device, *it);
+                else
+                    device.destroySemaphore(*it);
+            }
     }
     void destroy_fences(vk::Device device, std::span<const vk::Fence> fences) noexcept {
         for (auto it = fences.rbegin(); it != fences.rend(); ++it)

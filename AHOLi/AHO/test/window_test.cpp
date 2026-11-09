@@ -402,6 +402,19 @@ namespace {
         EXPECT_EQ(window.window_size().value.x.value, 400);
         EXPECT_EQ(window.window_size().value.y.value, 400);
     }
+    TEST_F(AHOWindowVulkanIntegration, ResizeReplacesFinishedSemaphoresEvenWhenTheImageCountIsUnchanged) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        const auto old = window.data2->render_finished;
+        const auto count = old.size();
+        ASSERT_TRUE(window.resize(320, 240));
+        const auto current = window.data2->render_finished;
+        EXPECT_EQ(current.size(), count);
+        EXPECT_EQ(current.data_, window.data2->swapchain.finished_semaphores().data_);
+        EXPECT_NE(current.data_, old.data_);
+        EXPECT_TRUE(current.data_.owner_before(old.data_) || old.data_.owner_before(current.data_));
+        EXPECT_NE(current.data_->semaphores[0], old.data_->semaphores[0]);
+    }
     TEST_F(AHOWindowVulkanIntegration, ExplicitEngineConstructorCreatesIndependentWindow) {
         ASSERT_NO_THROW(start_engine());
         const std::string name = "AHO secondary synchronization resources";
@@ -415,12 +428,11 @@ namespace {
         auto finished = engine->data()->synchro_manager.get_semaphore(name + "RenderFinished");
         auto in_flight = engine->data()->synchro_manager.get_fence(name + "InFlight");
         EXPECT_TRUE(available.has_value());
-        EXPECT_TRUE(finished.has_value());
+        EXPECT_FALSE(finished.has_value());
         EXPECT_TRUE(in_flight.has_value());
         if (available)
             EXPECT_EQ(available->data_, second.data2->image_available.data_);
-        if (finished)
-            EXPECT_EQ(finished->data_, second.data2->render_finished.data_);
+        EXPECT_EQ(second.data2->render_finished.data_, second.data2->swapchain.finished_semaphores().data_);
         if (in_flight)
             EXPECT_EQ(in_flight->data_, second.data2->in_flight.data_);
         EXPECT_TRUE(second.close());

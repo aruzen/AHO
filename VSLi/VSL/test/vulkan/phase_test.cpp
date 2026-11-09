@@ -182,6 +182,45 @@ namespace {
         ASSERT_TRUE(completion.wait());
         manager.wait_idle();
     }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, TerminalWorkReleasesSynchronizationOwnersBeforeItsSlotIsReplaced) {
+        for (bool cancel : {false, true}) {
+            SCOPED_TRACE(cancel);
+            auto commands = make_manager().independent(1);
+            std::weak_ptr<vsl::impl::SemaphoreImpl> signal;
+            std::weak_ptr<vsl::impl::FenceImpl> fence;
+            std::unique_ptr<vsl::ComputePhase> phase;
+            {
+                vsl::SynchroManager synchronization(device);
+                auto finished = synchronization.create_semaphore("terminal signal");
+                auto external = synchronization.create_fence("terminal fence", false);
+                signal = finished.data_;
+                fence = external.data_;
+                phase = std::make_unique<vsl::ComputePhase>(commands, std::nullopt, finished, external);
+            }
+            const auto result = phase->completion();
+            const auto work = result.data_->work.lock();
+            ASSERT_TRUE(work);
+            if (!cancel)
+                ASSERT_EQ(phase->submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            phase->calculation_finish.reset();
+            phase->in_flight_fence.reset();
+            EXPECT_FALSE(signal.expired());
+            EXPECT_FALSE(fence.expired());
+            if (cancel)
+                phase->cancel();
+            else
+                ASSERT_TRUE(result.wait());
+            EXPECT_EQ(result.status(), cancel ? vsl::Completion::Status::CANCELLED : vsl::Completion::Status::COMPLETE);
+            EXPECT_TRUE(signal.expired());
+            EXPECT_TRUE(fence.expired());
+            EXPECT_EQ(work->signal_semaphore, nullptr);
+            EXPECT_EQ(work->external_fence, nullptr);
+            EXPECT_TRUE(work->completion_resources.empty());
+            EXPECT_TRUE(std::ranges::all_of(work->synchronization_owners, [](size_t index) {
+                return index == vsl::impl::SubmissionWork::NO_OWNER;
+            }));
+        }
+    }
     TEST_F(PhaseCompletionVulkanIntegrationTest, ExternalFenceWaitAndResetPreserveTheOriginalCompletion) {
         for (unsigned mode = 0; mode < 3; ++mode) {
             SCOPED_TRACE(mode);

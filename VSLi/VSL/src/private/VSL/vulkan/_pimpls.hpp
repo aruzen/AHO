@@ -217,7 +217,6 @@ namespace VSL_NAMESPACE::impl {
         std::vector<vk::Image> swap_chain_images;
         vk::Format swap_chain_image_format;
         vk::Extent2D swap_chain_extent;
-        std::vector<vk::UniqueSemaphore> presentation_semaphores;
 
         SwapchainImpl() = default;
         SwapchainImpl(const SwapchainImpl&) = delete;

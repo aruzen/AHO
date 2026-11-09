@@ -2,6 +2,7 @@
 #include "support/deferred_action.hpp"
 #include <VSL/lifetime/synchronization_use.hpp>
 #include <VSL/lifetime/command_domain.hpp>
+#include <VSL/lifetime/submission_retention.hpp>
 #include <VSL/sync/submission_completion.hpp>
 #include <VSL/sync/presentation_state.hpp>
 #include <VSL/operation/submission_ops.hpp>
@@ -27,7 +28,7 @@ namespace {
     SubmittedFence::SubmittedFence(vsl::FenceHolder fence, std::uint32_t index) : work(std::make_shared<vsl::impl::SubmissionWork>()) {
         work->device = fence.get_device().data_;
         work->external_fence = fence.data_.get();
-        work->resources.push_back(fence.data_);
+        vsl::lifetime::retain_until_complete(*work, fence.data_);
         work->synchronization_owners[static_cast<size_t>(vsl::impl::SubmissionSource::FENCE)] = 0;
         work->fence = fence.data_->fences.at(index);
         work->fence_reservation = vsl::lifetime::reserve_fence(fence.data_, index, work->result);
@@ -281,7 +282,7 @@ namespace {
         EXPECT_EQ(work->signal_semaphore, semaphore.data_.get());
         EXPECT_EQ(work->synchronization_owners[static_cast<size_t>(vsl::impl::SubmissionSource::WAIT_SEMAPHORE)],
                   work->synchronization_owners[static_cast<size_t>(vsl::impl::SubmissionSource::SIGNAL_SEMAPHORE)]);
-        EXPECT_EQ(std::ranges::count_if(work->resources, [&](const auto& owner) {
+        EXPECT_EQ(std::ranges::count_if(work->completion_resources, [&](const auto& owner) {
                       return !owner.owner_before(semaphore.data_) && !semaphore.data_.owner_before(owner);
                   }),
                   1);

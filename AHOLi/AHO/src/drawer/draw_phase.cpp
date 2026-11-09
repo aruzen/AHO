@@ -5,6 +5,11 @@
 #include <exception>
 #include <stdexcept>
 
+struct AHO_NAMESPACE::DrawPhase::Init {
+    AHO_NAMESPACE::engine::GraphicalEngine* engine;
+    AHO_NAMESPACE::Window window;
+};
+
 thread_local AHO_NAMESPACE::DrawPhase* AHO_NAMESPACE::THREAD_LOCAL_DRAW_PHASE;
 
 AHO_NAMESPACE::RenderContext AHO_NAMESPACE::DrawPhase::context() const {
@@ -19,12 +24,30 @@ AHO_NAMESPACE::DrawPhase::DrawPhase(AHO_NAMESPACE::engine::GraphicalEngine& engi
 AHO_NAMESPACE::DrawPhase::DrawPhase(AHO_NAMESPACE::engine::GraphicalEngine* engine,
                                     std::function<void(DrawStream<VSL_NAMESPACE::DefaultPhaseStream>&)> initialize,
                                     std::function<void(DrawStream<VSL_NAMESPACE::DefaultPhaseStream>&)> finit)
-    : VSL_NAMESPACE::DefaultPhase(engine->data()->command_manager,
-                                  engine->get_window().data2->swapchain,
-                                  engine->get_window().data2->image_available,
-                                  engine->get_window().data2->render_finished,
-                                  engine->get_window().data2->in_flight),
-      engine(engine),
+    : DrawPhase(Prepare(engine), std::move(initialize), std::move(finit)) {}
+
+AHO_NAMESPACE::DrawPhase::Init AHO_NAMESPACE::DrawPhase::Prepare(AHO_NAMESPACE::engine::GraphicalEngine* engine) {
+    if (!engine || !engine->data())
+        throw std::invalid_argument("DrawPhase requires a booted engine");
+    auto window = engine->get_window();
+    if (!window || !window.data2)
+        throw std::logic_error("DrawPhase requires a live drawing window");
+    return {engine, std::move(window)};
+}
+
+AHO_NAMESPACE::DrawPhase::DrawPhase(Init init,
+                                    std::function<void(DrawStream<VSL_NAMESPACE::DefaultPhaseStream>&)> initialize,
+                                    std::function<void(DrawStream<VSL_NAMESPACE::DefaultPhaseStream>&)> finit)
+    : VSL_NAMESPACE::DefaultPhase(init.engine->data()->command_manager,
+                                  init.window.data2->swapchain,
+                                  init.window.data2->image_available,
+                                  init.window.data2->render_finished,
+                                  init.window.data2->in_flight,
+                                  false,
+                                  init.window.data2->acquire_fences.data_
+                                      ? std::optional<VSL_NAMESPACE::FenceHolder>{init.window.data2->acquire_fences}
+                                      : std::nullopt),
+      engine(init.engine),
       initialize(initialize),
       finish(finit) {
     _previous_phase = std::exchange(THREAD_LOCAL_DRAW_PHASE, this);
@@ -35,8 +58,8 @@ AHO_NAMESPACE::DrawPhase::DrawPhase(AHO_NAMESPACE::engine::GraphicalEngine* engi
             DrawStream<VSL_NAMESPACE::DefaultPhaseStream> stream{VSL_NAMESPACE::DefaultPhaseStream{this->manager}};
             initialize(stream);
         } else {
-            *this << VSL_NAMESPACE::command::RenderPassBegin(engine->get_window().data2->render_pass,
-                                                             engine->get_window().data2->frame_buffer);
+            *this << VSL_NAMESPACE::command::RenderPassBegin(init.window.data2->render_pass,
+                                                             init.window.data2->frame_buffer);
         }
     } catch (...) {
         restore_previous_phase();

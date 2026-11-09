@@ -2,6 +2,7 @@
 #include "window_impl.hpp"
 #include <VSL/lifetime/startup_arena.hpp>
 #include <VSL/lifetime/swapchain_arena.hpp>
+#include <VSL/lifetime/resource_arena.hpp>
 #include <AHO/drawer/draw_phase.hpp>
 #include <GLFW/glfw3.h>
 #include <VSL/exceptions.hpp>
@@ -40,11 +41,15 @@ AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::get_monitor_size() {
 namespace {
     thread_local std::vector<std::shared_ptr<AHO_NAMESPACE::window::WindowData>> RECREATING_WINDOWS;
     thread_local std::vector<std::shared_ptr<AHO_NAMESPACE::window::WindowData>> CLOSING_WINDOWS;
+    constexpr std::array<VSL_NAMESPACE::typed::ResourceRequest, 3> WINDOW_SYNC_REQUESTS{{{{0}, VSL_NAMESPACE::storage::ResourceKind::SEMAPHORE},
+                                                                                         {{1}, VSL_NAMESPACE::storage::ResourceKind::FENCE},
+                                                                                         {{2}, VSL_NAMESPACE::storage::ResourceKind::FENCE}}};
+    constexpr VSL_NAMESPACE::typed::ResourcePlan<3> WINDOW_SYNC_PLAN(WINDOW_SYNC_REQUESTS);
 
     const std::string& checked_window_name(const std::string& name, const AHO_NAMESPACE::engine::EngineAccessor& engine) {
         const auto& data = engine.data();
         if (!data || !data->vulkan_instance.accessor || !data->logical_device.data_ ||
-            !data->command_manager.data_ || !data->synchro_manager.data_)
+            !data->command_manager.data_)
             throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "A booted engine is required");
         auto buffers = data->command_manager.get_buffer();
         if (!buffers.data_ || buffers.get_size() == 0)
@@ -68,20 +73,28 @@ std::shared_ptr<VSL_NAMESPACE::Surface> AHO_NAMESPACE::window::detail::make_wind
 }
 
 std::shared_ptr<AHO_NAMESPACE::window::WindowData> AHO_NAMESPACE::window::detail::make_window_data(
-    const engine::EngineAccessor& engine, std::shared_ptr<VSL_NAMESPACE::Surface> surface, const std::string& name) {
+    const engine::EngineAccessor& engine, std::shared_ptr<VSL_NAMESPACE::Surface> surface,
+    std::optional<VSL_NAMESPACE::PresentFencePolicy> present_fences) {
     const auto engine_data = engine.data();
     auto& data = *engine_data;
-    VSL_NAMESPACE::Swapchain swapchain(data.logical_device, surface);
+    const VSL_NAMESPACE::SwapchainCreateInfo info{.present_fences = present_fences.value_or(data.present_fences)};
+    auto swapchain = VSL_NAMESPACE::lifetime::SwapchainArena(data.logical_device, *surface, info).view();
     VSL_NAMESPACE::RenderPass pass(swapchain);
     const auto frames = data.command_manager.get_buffer().get_size();
+    const std::array<VSL_NAMESPACE::lifetime::ResourceInit, 3> inputs{
+        VSL_NAMESPACE::SemaphoreCreateInfo{frames},
+        VSL_NAMESPACE::FenceCreateInfo{frames, true},
+        VSL_NAMESPACE::FenceCreateInfo{frames, false}};
+    const VSL_NAMESPACE::lifetime::ResourceArena synchronization(data.logical_device, WINDOW_SYNC_PLAN, inputs);
     return std::make_shared<WindowData>(WindowData{
         .surface = std::move(surface),
         .swapchain = swapchain,
         .render_pass = pass,
         .frame_buffer = VSL_NAMESPACE::FrameBuffer(swapchain, pass),
-        .image_available = data.synchro_manager.create_semaphore(name + "ImageAvailable", frames),
+        .image_available = synchronization.semaphore({0}),
         .render_finished = swapchain.finished_semaphores(),
-        .in_flight = data.synchro_manager.create_fence(name + "InFlight", frames, true)});
+        .in_flight = synchronization.fence({1}),
+        .acquire_fences = synchronization.fence({2})});
 }
 
 AHO_NAMESPACE::engine::EngineAccessor AHO_NAMESPACE::window::Window::DefaultEngine() {
@@ -91,14 +104,15 @@ AHO_NAMESPACE::engine::EngineAccessor AHO_NAMESPACE::window::Window::DefaultEngi
     return current;
 }
 
-AHO_NAMESPACE::window::Window::Window(std::string name, int width, int height, AHO_NAMESPACE::engine::EngineAccessor engine_)
+AHO_NAMESPACE::window::Window::Window(std::string name, int width, int height, AHO_NAMESPACE::engine::EngineAccessor engine_,
+                                      std::optional<VSL_NAMESPACE::PresentFencePolicy> present_fences)
     : VSL_NAMESPACE::Window(checked_window_name(name, engine_), width, height) {
     const auto data = data_;
     const auto os = window_owner();
     try {
         engine = engine_;
         auto surface = detail::make_window_surface(*this, engine_.data()->vulkan_instance);
-        auto drawing = detail::make_window_data(engine, std::move(surface), name);
+        auto drawing = detail::make_window_data(engine, std::move(surface), present_fences);
         if (data_ != data || !data->window_handle || data->window_handle != os.native_handle())
             throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "Window closed during drawing resource creation");
         data2 = std::move(drawing);

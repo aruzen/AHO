@@ -84,11 +84,16 @@ namespace {
         EXPECT_TRUE(vsl::has_device_features(engine->data()->logical_device.enabled_features(), vsl::DeviceFeature::SWAPCHAIN_MAINTENANCE1));
         EXPECT_TRUE(static_cast<bool>(engine->get_window()));
         auto& window = *engine->boot_window;
-        const vsl::SwapchainCreateInfo chain_info{.present_fences = vsl::PresentFencePolicy::REQUIRE_FENCE};
-        vsl::lifetime::SwapchainArena candidate(engine->data()->logical_device, *window.data2->surface, chain_info, window.data2->swapchain);
-        window.data2->swapchain = std::move(candidate).view();
+        EXPECT_EQ(engine->data()->present_fences, vsl::PresentFencePolicy::REQUIRE_FENCE);
+        EXPECT_EQ(window.data2->swapchain.present_fences(), vsl::PresentFencePolicy::REQUIRE_FENCE);
+        aho::Window second("strict secondary", 64, 48, *engine);
+        EXPECT_EQ(second.data2->swapchain.present_fences(), vsl::PresentFencePolicy::REQUIRE_FENCE);
+        aho::Window legacy("explicit legacy", 64, 48, *engine, vsl::PresentFencePolicy::LEGACY);
+        EXPECT_EQ(legacy.data2->swapchain.present_fences(), vsl::PresentFencePolicy::LEGACY);
         ASSERT_TRUE(window.recreate_swapchain());
         EXPECT_EQ(window.data2->swapchain.present_fences(), vsl::PresentFencePolicy::REQUIRE_FENCE);
+        EXPECT_TRUE(second.close());
+        EXPECT_TRUE(legacy.close());
     }
     TEST_F(StandardEngineVulkanIntegration, BasePointerDestructionReleasesClosedWindowAndEngineResources) {
         ASSERT_NO_THROW(start_engine());

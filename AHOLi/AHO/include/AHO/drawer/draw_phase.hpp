@@ -39,6 +39,11 @@ namespace AHO_NAMESPACE {
         DrawStream<VSL_NAMESPACE::DefaultPhaseStream> operator<<(VSL_NAMESPACE::command::is_delegate_command auto cmd);
 
     private:
+        struct Init;
+        DrawPhase(Init init,
+                  std::function<void(DrawStream<VSL_NAMESPACE::DefaultPhaseStream>&)> initialize,
+                  std::function<void(DrawStream<VSL_NAMESPACE::DefaultPhaseStream>&)> finit);
+        static Init Prepare(AHO_NAMESPACE::engine::GraphicalEngine* engine);
         bool _finish_started = false;
         DrawPhase* _previous_phase = nullptr;
         void restore_previous_phase() noexcept;

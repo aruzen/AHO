@@ -200,3 +200,5 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 
 10eはAHOのframe同期群とSwapchain世代群を分け、候補生成後のattachment失敗から復旧する。0 extentでは再生成・acquire・Fence resetを延期し、復元後に一括公開する。最後のpresent直後close、連続resize、marker保持量の有界化と互換Pipeline再利用を検証して順序10完了とする。
 
+[10e1のWindow frame同期群](../AHO/window-synchronization.md)で、available／graphics Fence／acquire FenceをWindowの同rootへ配置し、M finishedと分離した。Engineの明示policyを初回・追加Windowへ伝達し、Window個別override、旧custom source省略、Ctorの一回snapshotを接続した。AHO GPU168／CPU1,071、compile195、public consumerと同一描画が成功。candidate保持、0 framebuffer、close統合を次の単位で続ける。
+

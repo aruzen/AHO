@@ -40,11 +40,14 @@ breakpoint disable swift_willThrow
         using namespace vsl;
         aho::engine::StandardEngine engine("test");
 
-        auto& [vulkan_instance, physical_device, device, command_manager, graphic_resource_manager, synchro_manager] = *engine.data();
+        auto& device = engine.data()->logical_device;
+        auto& command_manager = engine.data()->command_manager;
+        auto& graphic_resource_manager = engine.data()->graphic_resource_manager;
         auto& main_window = engine.boot_window.value();
-        auto& [surface, swapchain, render_pass,
-               frame_buffer, image_available, render_finish, in_flight, standard_draw] = *engine.boot_window.value().data2;
-        if (!image_available.data_)
+        auto& swapchain = main_window.data2->swapchain;
+        auto& render_pass = main_window.data2->render_pass;
+        auto& in_flight = main_window.data2->in_flight;
+        if (!main_window.data2->image_available.data_)
             loggingln("image not available ; ;");
         main_window.resize(500, 500);
 #ifdef _MSC_VER

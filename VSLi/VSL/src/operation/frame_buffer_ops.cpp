@@ -3,12 +3,14 @@
 #include "../vulkan/image_format.hpp"
 #include <type_traits>
 #include <stdexcept>
+#include <utility>
 
 namespace VSL_NAMESPACE::operation {
     namespace {
         vk::Framebuffer create_native(void*, vk::Device device, const vk::FramebufferCreateInfo& info);
         void destroy_native(void*, vk::Device device, vk::Framebuffer framebuffer) noexcept;
         constexpr FrameBufferNativeFactory NATIVE_FACTORY{nullptr, create_native, destroy_native};
+        thread_local const FrameBufferNativeFactory* ACTIVE_FACTORY = nullptr;
         void validate_image(const impl::ImageImpl* image, const impl::LogicalDeviceImpl& device,
                             const FrameBufferInput& input, AttachmentId attachment);
         vk::ClearValue convert_clear(const ClearValue& value);
@@ -61,6 +63,11 @@ namespace VSL_NAMESPACE::operation {
             }
         }
     } // namespace
+    ScopedFrameBufferNativeFactory::ScopedFrameBufferNativeFactory(FrameBufferNativeFactory factory) noexcept
+        : _factory(factory), _previous(std::exchange(ACTIVE_FACTORY, &_factory)) {}
+    ScopedFrameBufferNativeFactory::~ScopedFrameBufferNativeFactory() {
+        ACTIVE_FACTORY = _previous;
+    }
     std::vector<ClearValue> default_frame_buffer_clears(const RenderPassDescription& description) {
         std::vector<ClearValue> values;
         values.reserve(description.attachments.size());
@@ -121,7 +128,8 @@ namespace VSL_NAMESPACE::operation {
         buffer.nextSubpass(vk::SubpassContents::eInline);
     }
     void initialize_frame_buffer(impl::FrameBufferImpl& target, impl::LogicalDeviceImpl& device, FrameBufferInput input) {
-        initialize_frame_buffer(target, device, std::move(input), NATIVE_FACTORY);
+        const auto factory = ACTIVE_FACTORY ? *ACTIVE_FACTORY : NATIVE_FACTORY;
+        initialize_frame_buffer(target, device, std::move(input), factory);
     }
     void initialize_frame_buffer(impl::FrameBufferImpl& target, impl::LogicalDeviceImpl& device, FrameBufferInput input, const FrameBufferNativeFactory& factory) {
         if (std::ranges::any_of(target.swap_chain_framebuffers, [](const auto framebuffer) { return bool(framebuffer); }))

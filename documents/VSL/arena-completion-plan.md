@@ -202,3 +202,5 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 
 [10e1のWindow frame同期群](../AHO/window-synchronization.md)で、available／graphics Fence／acquire FenceをWindowの同rootへ配置し、M finishedと分離した。Engineの明示policyを初回・追加Windowへ伝達し、Window個別override、旧custom source省略、Ctorの一回snapshotを接続した。AHO GPU168／CPU1,071、compile195、public consumerと同一描画が成功。candidate保持、0 framebuffer、close統合を次の単位で続ける。
 
+10e2では同じWindowDataへ候補と検証済み要求を保持し、同要求のFramebuffer失敗からNative Swapchainを作り直さず再開する。共通backendの借用進行情報でpreflight失敗を区別し、旧ownerを保持した一括swapで世代を公開する。新6件と保持Context／描画cacheのreadback回帰、全VSL1,114／AHO172・1,071／compile195、install・配置情報・同一描画の検証が成功した。0 framebufferの取得前休止とclose統合は10e3／10e4へ続く。
+

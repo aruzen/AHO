@@ -11,11 +11,11 @@ namespace VSL_NAMESPACE::lifetime {
         struct ValidatedStorage {};
         SwapchainAccessor _view;
         SwapchainArena(LogicalDeviceAccessor device, Surface surface, SwapchainCreateInfo info,
-                       std::optional<SwapchainAccessor> old, SwapchainMemoryFactory memory, ValidatedStorage);
+                       std::optional<SwapchainAccessor> old, SwapchainMemoryFactory memory, SwapchainCreateProgress* progress, ValidatedStorage);
 
     public:
         SwapchainArena(LogicalDeviceAccessor device, Surface surface, SwapchainCreateInfo info = {},
-                       std::optional<SwapchainAccessor> old = {}, SwapchainMemoryFactory memory = {});
+                       std::optional<SwapchainAccessor> old = {}, SwapchainMemoryFactory memory = {}, SwapchainCreateProgress* progress = nullptr);
         SwapchainAccessor view() const& { return _view; }
         SwapchainAccessor view() && { return std::move(_view); }
         OwnerRef owner_ref() const;
@@ -23,7 +23,7 @@ namespace VSL_NAMESPACE::lifetime {
     };
 
     inline SwapchainArena::SwapchainArena(LogicalDeviceAccessor device, Surface surface, SwapchainCreateInfo info,
-                                          std::optional<SwapchainAccessor> old, SwapchainMemoryFactory memory)
-        : SwapchainArena(std::move(device), std::move(surface), std::move(info), std::move(old), std::move(memory),
+                                          std::optional<SwapchainAccessor> old, SwapchainMemoryFactory memory, SwapchainCreateProgress* progress)
+        : SwapchainArena(std::move(device), std::move(surface), std::move(info), std::move(old), std::move(memory), progress,
                          (storage::detail::require_resource_layout(std::integral_constant<std::uint64_t, storage::RESOURCE_LAYOUT_ABI>{}), ValidatedStorage{})) {}
 } // namespace VSL_NAMESPACE::lifetime

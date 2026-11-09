@@ -2,9 +2,13 @@
 #include <VSL/vulkan/pipeline.hpp>
 #include <VSL/lifetime/pipeline_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
+#include <VSL/lifetime/identity_access.hpp>
 #include <stdexcept>
 
 namespace VSL_NAMESPACE {
+    PipelineIdentity PipelineAccessor::identity() const {
+        return lifetime::detail::IdentityAccess::From<PipelineIdentity>(data_.get());
+    }
     namespace {
         const impl::PipelineRecipe& checked_recipe(const PipelineLayoutAccessor& layout);
         std::vector<impl::ShaderImpl*> shader_sources(std::span<const ShaderAccessor> shaders);

@@ -1,11 +1,13 @@
 #pragma once
 #include "../operation/buffer_create_info.hpp"
 #include "resource_use.hpp"
+#include "resource_identity.hpp"
 
 namespace VSL_NAMESPACE {
     // 非所有。所有者または構築scopeが有効な間だけ利用する。
     struct BufferRef {
         impl::BufferImpl* data = nullptr;
+        BufferIdentity identity() const;
         size_t size() const;
         MemoryType usage() const;
         MemoryProperty properties() const;
@@ -26,6 +28,7 @@ namespace VSL_NAMESPACE {
         BufferView(BufferRef ref, lifetime::OwnerRef owner, size_t offset, size_t bytes);
         static BufferView FromBuffer(const BufferAccessor& buffer);
         BufferRef ref() const { return _ref; }
+        BufferIdentity identity() const { return _ref.identity(); }
         std::shared_ptr<void> owner() const { return _owner.share(); }
         lifetime::OwnerRef owner_ref() const { return _owner; }
         size_t byte_offset() const { return _offset; }

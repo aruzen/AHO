@@ -90,7 +90,7 @@ namespace VSL_NAMESPACE::typed {
 
     template<typename Resources, typename Pushes>
     void TypedDispatch<Resources, Pushes>::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
-        if (_device.data_ != manager.get_device().data_)
+        if (_device != manager.get_device())
             throw std::invalid_argument("Typed compute pipeline/command manager device mismatch");
         _pipeline.invoke(pool, buffer, manager);
         for (auto& resource : _resources)
@@ -122,7 +122,7 @@ namespace VSL_NAMESPACE::typed {
     template<typename... Sets>
     requires compatible_descriptor_sets<Resources, Sets...>
     TypedComputeBinding<Resources, Pushes> TypedComputePipeline<Resources, Pushes>::bind_resources(const Sets&... sets) const {
-        if (((sets.device().data_ != _device.data_) || ...))
+        if (((sets.device() != _device) || ...))
             throw std::invalid_argument("Typed descriptor/compute pipeline device mismatch");
         (sets.require_complete(), ...);
         std::vector<command::BindGraphicResource> resources;

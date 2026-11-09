@@ -175,13 +175,17 @@ if (VSL_TEST_SOURCES)
     target_link_libraries(vsl-view-style-contract PRIVATE VSL)
     target_compile_definitions(vsl-view-style-contract PRIVATE VSL_TYPED_CASE=0)
     target_include_directories(vsl-view-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
-    set(typed_batch_names Valid Empty MixedGraphicsCompute RawCommand InvalidCommand UnfinishedBinding)
-    foreach(case RANGE 0 5)
+    set(typed_batch_names Valid Empty MixedGraphicsCompute RawCommand InvalidCommand UnfinishedBinding RawIdentity MixedIdentityKinds)
+    foreach(case RANGE 0 7)
         list(GET typed_batch_names ${case} name)
+        set(typed_batch_expected "Typed batch requires")
+        if(case GREATER 5)
+            set(typed_batch_expected "private|constructor|invalid operands|operator==|binary expression|C2248|C2678")
+        endif()
         add_test(NAME "VSL.TypedBatch.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
             "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
             "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_batch.cpp"
-            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=Typed batch requires"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=${typed_batch_expected}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
         set_tests_properties("VSL.TypedBatch.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
     endforeach()

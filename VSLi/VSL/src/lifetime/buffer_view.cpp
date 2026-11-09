@@ -2,9 +2,13 @@
 #include <VSL/lifetime/buffer_view.hpp>
 #include <VSL/operation/buffer_ops.hpp>
 #include <VSL/lifetime/owner_access.hpp>
+#include <VSL/lifetime/identity_access.hpp>
 #include <cstring>
 
 namespace VSL_NAMESPACE {
+    BufferIdentity BufferRef::identity() const {
+        return lifetime::detail::IdentityAccess::From<BufferIdentity>(data);
+    }
     size_t BufferRef::size() const {
         if (!data)
             throw std::logic_error("Buffer reference is empty");

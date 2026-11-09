@@ -38,30 +38,30 @@ namespace VSL_NAMESPACE::typed {
         };
         struct BatchVertexKey {
             std::uint32_t binding;
-            const void* source;
+            BufferIdentity source;
             size_t offset;
             bool operator==(const BatchVertexKey&) const = default;
         };
         struct BatchResourceKey {
             std::uint32_t set;
-            const void* source;
+            DescriptorIdentity source;
             bool operator==(const BatchResourceKey&) const = default;
         };
         struct BatchIndexKey {
-            const void* source = nullptr;
+            BufferIdentity source;
             size_t offset = 0;
             command::IndexType type = command::IndexType::UINT32;
             bool operator==(const BatchIndexKey&) const = default;
         };
         template<size_t vertices, size_t resources>
         struct BatchState {
-            const void* pipeline = nullptr;
+            PipelineIdentity pipeline;
             std::array<BatchVertexKey, vertices> vertex_keys{};
             std::array<BatchResourceKey, resources> resource_keys{};
             BatchIndexKey index;
             size_t vertex_count = 0, resource_count = 0;
 
-            bool update_pipeline(const void* next);
+            bool update_pipeline(PipelineIdentity next);
             bool update_vertex(const command::BindVertexBufferAt& binding);
             bool update_index(const command::BindIndexBufferAt& binding);
             bool update_resource(const command::BindGraphicResource& binding);
@@ -106,7 +106,7 @@ namespace VSL_NAMESPACE::typed {
 
     namespace detail {
         template<size_t vertices, size_t resources>
-        bool BatchState<vertices, resources>::update_pipeline(const void* next) {
+        bool BatchState<vertices, resources>::update_pipeline(PipelineIdentity next) {
             if (pipeline == next)
                 return false;
             pipeline = next;
@@ -117,7 +117,7 @@ namespace VSL_NAMESPACE::typed {
 
         template<size_t vertices, size_t resources>
         bool BatchState<vertices, resources>::update_vertex(const command::BindVertexBufferAt& binding) {
-            const BatchVertexKey key{binding.binding(), binding.source().get(), binding.offset()};
+            const BatchVertexKey key{binding.binding(), binding.identity(), binding.offset()};
             auto keys = std::span(vertex_keys).first(vertex_count);
             const auto found = std::ranges::find(keys, key.binding, &BatchVertexKey::binding);
             if (found != keys.end() && *found == key)
@@ -131,7 +131,7 @@ namespace VSL_NAMESPACE::typed {
 
         template<size_t vertices, size_t resources>
         bool BatchState<vertices, resources>::update_index(const command::BindIndexBufferAt& binding) {
-            const BatchIndexKey key{binding.source().get(), binding.offset(), binding.type()};
+            const BatchIndexKey key{binding.identity(), binding.offset(), binding.type()};
             if (index == key)
                 return false;
             index = key;
@@ -140,7 +140,7 @@ namespace VSL_NAMESPACE::typed {
 
         template<size_t vertices, size_t resources>
         bool BatchState<vertices, resources>::update_resource(const command::BindGraphicResource& binding) {
-            const BatchResourceKey key{binding.first_binding, binding.resources.front().data_.get()};
+            const BatchResourceKey key{binding.first_binding, binding.resources.front().identity()};
             auto keys = std::span(resource_keys).first(resource_count);
             const auto found = std::ranges::find(keys, key.set, &BatchResourceKey::set);
             if (found != keys.end() && *found == key)
@@ -155,8 +155,8 @@ namespace VSL_NAMESPACE::typed {
 
     template<typename... Commands>
     TypedBatch<Commands...>::TypedBatch(Commands... commands) : _commands(std::move(commands)...) {
-        const auto device = std::get<0>(_commands)._device.data_;
-        const bool same_device = std::apply([&](const auto&... value) { return ((value._device.data_ == device) && ...); }, _commands);
+        const auto& device = std::get<0>(_commands)._device;
+        const bool same_device = std::apply([&](const auto&... value) { return ((value._device == device) && ...); }, _commands);
         if (!same_device)
             throw std::invalid_argument("Typed batch commands use different devices");
         build_plans(std::index_sequence_for<Commands...>{});
@@ -170,7 +170,7 @@ namespace VSL_NAMESPACE::typed {
     template<typename... Commands>
     template<typename CommandType>
     void TypedBatch<Commands...>::plan_one(const CommandType& command, detail::BatchPlan<CommandType>& plan, State& state) {
-        plan.pipeline = state.update_pipeline(command._pipeline.data_.get());
+        plan.pipeline = state.update_pipeline(command._pipeline.identity());
         _statistics.pipeline_binds += plan.pipeline;
 
         if constexpr (requires { command._buffers; }) {
@@ -235,7 +235,7 @@ namespace VSL_NAMESPACE::typed {
     }
     template<typename... Commands>
     void TypedBatch<Commands...>::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
-        if (std::get<0>(_commands)._device.data_ != manager.get_device().data_)
+        if (std::get<0>(_commands)._device != manager.get_device())
             throw std::invalid_argument("Typed batch and command manager use different devices");
         invoke_all(pool, buffer, manager, std::index_sequence_for<Commands...>{});
     }

@@ -19,6 +19,7 @@ namespace VSL_NAMESPACE::command {
         std::uint32_t binding() const { return _binding; }
         size_t offset() const { return _offset; }
         const std::shared_ptr<impl::BufferImpl>& source() const { return _source; }
+        BufferIdentity identity() const;
 
     private:
         std::uint32_t _binding;

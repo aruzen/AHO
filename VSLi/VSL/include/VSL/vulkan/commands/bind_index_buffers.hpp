@@ -18,6 +18,7 @@ namespace VSL_NAMESPACE::command {
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
         void track(const CommandBuffer& buffer) const { _use.record(buffer); }
         const std::shared_ptr<impl::BufferImpl>& source() const { return _source; }
+        BufferIdentity identity() const;
         size_t offset() const { return _offset; }
         IndexType type() const { return _type; }
 

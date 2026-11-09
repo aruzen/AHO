@@ -24,6 +24,7 @@ namespace {
                                    vsl::MemoryProperty::HOST_VISIBLE>;
         auto manager = make_manager();
         std::weak_ptr<vsl::impl::BufferImpl> observed;
+        std::optional<vsl::BufferIdentity> identity;
         vsl::Completion cancelled;
         {
             auto phase = manager.start_phase<vsl::ComputePhase>();
@@ -31,6 +32,10 @@ namespace {
             {
                 Buffer native(device, 16);
                 observed = native.data_;
+                identity = native.identity();
+                EXPECT_EQ(*identity, vsl::BufferView::FromBuffer(native).identity());
+                EXPECT_EQ(*identity, vsl::command::BindVertexBufferAt(0, native).identity());
+                EXPECT_EQ(*identity, vsl::command::BindIndexBufferAt(native, vsl::command::IndexType::UINT32).identity());
                 phase << vsl::command::BindVertexBuffer(native)
                       << vsl::command::BindVertexBufferAt(0, native)
                       << vsl::command::BindIndexBuffer(native)
@@ -42,11 +47,16 @@ namespace {
         }
         EXPECT_EQ(cancelled.status(), vsl::Completion::Status::CANCELLED);
         EXPECT_TRUE(observed.expired());
+        identity.reset();
     }
 
     TEST_F(BufferGenerationVulkanIntegrationTest, OneArenaOwnerStillRegistersEveryDistinctBufferState) {
         auto manager = make_manager();
         Arena arena(device, Arena::Plan({4, 4}));
+        const auto first = arena.view<SOURCE>().backend().identity();
+        const auto second = arena.view<DESTINATION>().backend().identity();
+        EXPECT_NE(first, second);
+        EXPECT_EQ(first, arena.storage().borrow(0).identity());
         auto phase = manager.start_phase<vsl::ComputePhase>();
         arena.view<SOURCE>().backend().resource_use().record(manager.get_buffer());
         arena.view<DESTINATION>().backend().resource_use().record(manager.get_buffer());

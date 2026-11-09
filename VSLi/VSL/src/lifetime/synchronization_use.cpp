@@ -3,22 +3,28 @@
 #include <VSL/vulkan/synchronize.hpp>
 #include <VSL/operation/synchronization_ops.hpp>
 #include <VSL/sync/submission_completion.hpp>
+#include <VSL/sync/presentation_state.hpp>
 #include <algorithm>
 #include <stdexcept>
+#include <utility>
 
 namespace VSL_NAMESPACE::lifetime {
     namespace {
+        using FenceObservation = std::variant<std::monostate, std::shared_ptr<impl::SubmissionImpl>,
+                                              std::shared_ptr<sync::FenceProof>, std::shared_ptr<sync::PresentState>>;
         struct FenceAccess {
             std::shared_ptr<impl::FenceImpl> data;
             std::vector<vk::Fence> handles;
-            std::vector<std::shared_ptr<impl::SubmissionImpl>> results;
+            std::vector<FenceObservation> observations;
             size_t first = 0, end = 0;
             bool active = false;
             FenceAccess(std::shared_ptr<impl::FenceImpl> data, std::optional<std::uint32_t> index);
             ~FenceAccess();
             void check() const;
-            void require_idle(bool wait) const;
-            void require_waitable() const;
+            void require_idle(bool wait, bool poll_graphics = true) const;
+            void require_waitable(bool poll) const;
+            std::vector<std::shared_ptr<impl::SubmissionWork>> submitted_work() const;
+            void save_observations(vk::Result result) const noexcept;
         };
         struct SemaphoreAccess {
             sync::SemaphoreUseState& state;
@@ -27,11 +33,49 @@ namespace VSL_NAMESPACE::lifetime {
         };
         template<class Map, class T>
         void erase_target(Map& map, const std::shared_ptr<T>& data);
-        void append_result(std::vector<std::shared_ptr<impl::SubmissionImpl>>& results, std::shared_ptr<impl::SubmissionImpl> value);
-
-        void append_result(std::vector<std::shared_ptr<impl::SubmissionImpl>>& results, std::shared_ptr<impl::SubmissionImpl> value) {
-            if (value && std::ranges::find(results, value) == results.end())
-                results.push_back(std::move(value));
+        FenceObservation snapshot_use(const sync::FenceUseState& use);
+        void reset_reserved_fence(const FenceAccess& access, std::uint32_t index, sync::FenceUseState::Use use);
+        bool idle_acquisition(sync::FenceProof& proof, bool wait) noexcept;
+        bool idle_presentation(sync::PresentState& state, bool wait) noexcept;
+        bool idle_acquisition(sync::FenceProof& proof, bool wait) noexcept {
+            if (proof.status == sync::FenceProofStatus::UNARMED)
+                return false;
+            if (!sync::fence_proof_terminal(proof))
+                sync::poll_fence_proof(proof);
+            if (!sync::fence_proof_terminal(proof) && wait)
+                sync::wait_fence_proof(proof);
+            return sync::fence_proof_terminal(proof);
+        }
+        bool idle_presentation(sync::PresentState& state, bool wait) noexcept {
+            if (state.status == sync::PresentStatus::PENDING)
+                return false;
+            sync::poll_present(state);
+            if (!sync::present_terminal(state) && wait && state.status == sync::PresentStatus::SUBMITTED)
+                sync::wait_present(state);
+            return sync::present_terminal(state);
+        }
+        FenceObservation snapshot_use(const sync::FenceUseState& use) {
+            return std::visit([](const auto& source) -> FenceObservation {
+                using Source = std::decay_t<decltype(source)>;
+                if constexpr (std::is_same_v<Source, std::monostate>)
+                    return {};
+                else if constexpr (std::is_same_v<Source, std::weak_ptr<sync::FenceReservation>>) {
+                    const auto reservation = source.lock();
+                    return reservation ? FenceObservation(reservation->result.lock()) : FenceObservation{};
+                } else
+                    return source.lock();
+            },
+                              use.use);
+        }
+        void reset_reserved_fence(const FenceAccess& access, std::uint32_t index, sync::FenceUseState::Use use) {
+            auto& target = access.data->uses.at(index).use;
+            auto previous = std::exchange(target, std::move(use));
+            try {
+                operation::reset_fences(access.data->native_device, access.handles);
+            } catch (...) {
+                target = std::move(previous);
+                throw;
+            }
         }
         template<class Map, class T>
         void erase_target(Map& map, const std::shared_ptr<T>& data) {
@@ -46,14 +90,12 @@ namespace VSL_NAMESPACE::lifetime {
             first = index.value_or(0);
             end = index ? size_t(*index) + 1 : this->data->fences.size();
             handles.assign(this->data->fences.begin() + first, this->data->fences.begin() + end);
-            results.reserve(2 * handles.size());
+            observations.reserve(handles.size());
             for (size_t i = first; i < end; ++i) {
                 const auto& use = this->data->uses[i];
                 if (use.accessing)
                     throw std::logic_error("Fence element is being accessed");
-                if (const auto reservation = use.reservation.lock())
-                    append_result(results, reservation->result.lock());
-                append_result(results, use.submitted.lock());
+                observations.push_back(snapshot_use(use));
             }
             for (size_t i = first; i < end; ++i)
                 this->data->uses[i].accessing = true;
@@ -71,19 +113,69 @@ namespace VSL_NAMESPACE::lifetime {
                 if (!data->uses[i].accessing || data->fences[i] != handles[i - first])
                     throw std::logic_error("Fence element changed while observing completion");
         }
-        void FenceAccess::require_waitable() const {
-            for (const auto& result : results)
-                if (result->status == Completion::Status::PENDING)
-                    throw std::logic_error("Fence is reserved by an unsubmitted phase");
+        void FenceAccess::require_waitable(bool poll) const {
+            for (const auto& observation : observations)
+                std::visit([poll](const auto& value) {
+                    using Value = std::decay_t<decltype(value)>;
+                    if constexpr (!std::is_same_v<Value, std::monostate>) {
+                        if (!value)
+                            return;
+                        if constexpr (std::is_same_v<Value, std::shared_ptr<impl::SubmissionImpl>>) {
+                            if (value->status == Completion::Status::PENDING)
+                                throw std::logic_error("Fence is reserved by an unsubmitted phase");
+                        } else if constexpr (std::is_same_v<Value, std::shared_ptr<sync::FenceProof>>) {
+                            if (value->status == sync::FenceProofStatus::UNARMED || value->status == sync::FenceProofStatus::NOT_ACQUIRED)
+                                throw std::logic_error("Fence has no submitted acquisition");
+                        } else if (value->status == sync::PresentStatus::PENDING || (value->status == sync::PresentStatus::UNCERTAIN && !poll))
+                            throw std::logic_error("Present fence enqueue has not been established");
+                    }
+                },
+                           observation);
         }
-        void FenceAccess::require_idle(bool wait) const {
-            require_waitable();
-            for (const auto& result : results) {
-                const auto status = Completion{result}.status();
-                if (status == Completion::Status::SUBMITTED && (!wait || !Completion{result}.wait()))
-                    throw std::logic_error("Fence is in GPU use");
-            }
+        void FenceAccess::require_idle(bool wait, bool poll_graphics) const {
+            for (const auto& observation : observations)
+                std::visit([&](const auto& value) {
+                    using Value = std::decay_t<decltype(value)>;
+                    if constexpr (!std::is_same_v<Value, std::monostate>) {
+                        if (!value)
+                            return;
+                        if constexpr (std::is_same_v<Value, std::shared_ptr<impl::SubmissionImpl>>) {
+                            const auto status = poll_graphics ? Completion{value}.status() : value->status;
+                            if (status == Completion::Status::PENDING ||
+                                (status == Completion::Status::SUBMITTED && (!poll_graphics || !wait || !Completion{value}.wait())))
+                                throw std::logic_error("Fence is in graphics use");
+                        } else if constexpr (std::is_same_v<Value, std::shared_ptr<sync::FenceProof>>) {
+                            if (!idle_acquisition(*value, wait))
+                                throw std::logic_error("Fence is in acquisition use");
+                        } else {
+                            if (!idle_presentation(*value, wait))
+                                throw std::logic_error("Fence is in presentation use");
+                        }
+                    }
+                },
+                           observation);
             check();
+        }
+        std::vector<std::shared_ptr<impl::SubmissionWork>> FenceAccess::submitted_work() const {
+            std::vector<std::shared_ptr<impl::SubmissionWork>> result;
+            for (const auto& observation : observations)
+                if (const auto* value = std::get_if<std::shared_ptr<impl::SubmissionImpl>>(&observation); value && *value)
+                    if (auto work = (*value)->work.lock(); work && std::ranges::find(result, work) == result.end())
+                        result.push_back(std::move(work));
+            return result;
+        }
+        void FenceAccess::save_observations(vk::Result result) const noexcept {
+            for (const auto& observation : observations)
+                std::visit([&](const auto& value) {
+                    using Value = std::decay_t<decltype(value)>;
+                    if constexpr (std::is_same_v<Value, std::shared_ptr<sync::FenceProof>>) {
+                        if (value)
+                            sync::save_fence_observation(*value, result);
+                    } else if constexpr (std::is_same_v<Value, std::shared_ptr<sync::PresentState>>)
+                        if (value)
+                            sync::save_present_observation(*value, result);
+                },
+                           observation);
         }
         SemaphoreAccess::SemaphoreAccess(sync::SemaphoreUseState& state) : state(state) {
             if (state.accessing)
@@ -102,32 +194,72 @@ namespace VSL_NAMESPACE::lifetime {
         auto reservation = std::make_shared<sync::FenceReservation>();
         reservation->result = result;
         access.require_idle(true);
-        access.data->uses.at(index).reservation = reservation;
+        access.data->uses.at(index).use = std::weak_ptr<sync::FenceReservation>(reservation);
         return reservation;
+    }
+    void reserve_acquire_fence(std::shared_ptr<impl::FenceImpl> fence, std::uint32_t index, const std::shared_ptr<sync::FenceProof>& proof) {
+        const auto pending = proof;
+        const FenceAccess access(std::move(fence), index);
+        if (!pending || pending->status != sync::FenceProofStatus::UNARMED ||
+            (pending->device && pending->device != access.data->native_device) || (pending->fence && pending->fence != access.handles[0]))
+            throw std::invalid_argument("Acquisition requires a fresh proof for its fence element");
+        access.require_idle(true);
+        pending->device = access.data->native_device;
+        pending->fence = access.handles[0];
+        try {
+            reset_reserved_fence(access, index, std::weak_ptr<sync::FenceProof>(pending));
+        } catch (...) {
+            pending->status = sync::FenceProofStatus::NOT_ACQUIRED;
+            throw;
+        }
+    }
+    void release_acquire_fence(impl::FenceImpl& fence, std::uint32_t index, const std::shared_ptr<sync::FenceProof>& proof) noexcept {
+        if (!proof || !sync::fence_proof_terminal(*proof) || index >= fence.uses.size() || fence.uses[index].accessing)
+            return;
+        auto& use = fence.uses[index].use;
+        const auto* source = std::get_if<std::weak_ptr<sync::FenceProof>>(&use);
+        const auto current = source ? source->lock() : nullptr;
+        if (current && current == proof && !current.owner_before(proof) && !proof.owner_before(current))
+            use = std::monostate{};
+    }
+    void reserve_present_fence(std::shared_ptr<impl::FenceImpl> fence, std::uint32_t index, const std::shared_ptr<sync::PresentState>& state) {
+        const FenceAccess access(std::move(fence), index);
+        if (!state || !state->strict || state->status != sync::PresentStatus::PENDING || state->device != access.data->native_device ||
+            (state->proof && state->proof != access.handles[0]))
+            throw std::invalid_argument("Presentation requires a pending state for its fence element");
+        // 世代poolの借出しで異種graphicsのcallbackを発火させない。
+        access.require_idle(true, false);
+        state->proof = access.handles[0];
+        reset_reserved_fence(access, index, std::weak_ptr<sync::PresentState>(state));
     }
     void require_fence_reservation(const impl::SubmissionWork& work, std::uint32_t index) {
         if (!work.external_fence)
             return;
         const auto& fence = *work.external_fence;
         if (index >= fence.fences.size() || index >= fence.uses.size() || fence.uses[index].accessing ||
-            !work.fence_reservation || fence.uses[index].reservation.lock() != work.fence_reservation ||
+            !work.fence_reservation || sync::current_fence_reservation(fence.uses[index]) != work.fence_reservation ||
             work.fence_reservation->result.lock() != work.result || work.fence != fence.fences[index])
             throw std::logic_error("Phase no longer owns its fence reservation");
     }
     bool wait_fences(std::shared_ptr<impl::FenceImpl> fence, std::optional<std::uint32_t> index, std::uint64_t timeout) {
         const FenceAccess access(std::move(fence), index);
-        access.require_waitable();
+        access.require_waitable(timeout == 0);
+        const auto submitted = access.submitted_work();
         const auto result = operation::wait_fences(access.data->native_device, access.handles, timeout);
         if (result == vk::Result::eTimeout)
             return false;
-        if (result == vk::Result::eErrorDeviceLost)
-            for (const auto& completion : access.results)
-                if (const auto work = completion->work.lock())
-                    sync::observe_submission_result(*work, static_cast<std::int32_t>(result));
+        if (result == vk::Result::eSuccess || result == vk::Result::eErrorDeviceLost) {
+            // 全観測値を保存してからcallbackを通知し、peerを再pollさせない。
+            access.save_observations(result);
+            for (const auto& work : submitted)
+                sync::save_terminal(*work, result == vk::Result::eSuccess ? Completion::Status::COMPLETE : Completion::Status::FAILED,
+                                    result == vk::Result::eSuccess ? Completion::Failure::NONE : Completion::Failure::DEVICE_LOST,
+                                    result == vk::Result::eSuccess ? 0 : static_cast<std::int32_t>(result));
+            for (const auto& work : submitted)
+                sync::finish_submission(*work);
+        }
         if (result != vk::Result::eSuccess)
             vk::detail::throwResultException(result, "Fence wait failed");
-        for (const auto& completion : access.results)
-            (void)Completion{completion}.status();
         access.check();
         return true;
     }
@@ -135,6 +267,8 @@ namespace VSL_NAMESPACE::lifetime {
         const FenceAccess access(std::move(fence), index);
         access.require_idle(false);
         operation::reset_fences(access.data->native_device, access.handles);
+        for (size_t i = access.first; i < access.end; ++i)
+            access.data->uses[i].use = std::monostate{};
     }
     void destroy_fences(std::shared_ptr<impl::FenceImpl> fence) {
         if (!fence || fence->fences.empty())
@@ -145,8 +279,7 @@ namespace VSL_NAMESPACE::lifetime {
         operation::destroy_fences(fence->native_device, access.handles);
         fence->fences.clear();
         for (auto& use : fence->uses) {
-            use.reservation.reset();
-            use.submitted.reset();
+            use.use = std::monostate{};
         }
         if (registry)
             erase_target(registry->fences, fence);

@@ -219,8 +219,7 @@ namespace VSL_NAMESPACE::lifetime {
             if (record->state.strict) {
                 if (!context.fences || image >= context.fences->fences.size())
                     throw std::logic_error("Generation has no present fence pool");
-                record->state.proof = context.fences->fences[image];
-                operation::reset_fences(record->state.device, {&record->state.proof, 1});
+                reserve_present_fence({record->generation, context.fences}, image, {record, &record->state});
             }
         } catch (...) {
             if (slot.epoch == record->epoch && slot.record.lock() == record)

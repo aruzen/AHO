@@ -285,7 +285,7 @@ namespace VSL_NAMESPACE {
         }
         completion_.data_->status = Completion::Status::SUBMITTED;
         if (auto& external = submission->external_fence)
-            external->uses.at(frame_slot).submitted = completion_.data_;
+            sync::mark_fence_submitted(*external, frame_slot, completion_.data_);
         auto previous = std::move(domain->submissions.at(frame_slot));
         domain->submissions.at(frame_slot) = submission;
         domain->context.recording = false;

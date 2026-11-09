@@ -15,8 +15,14 @@ namespace VSL_NAMESPACE::operation {
         return static_cast<vk::Result>(VULKAN_HPP_DEFAULT_DISPATCHER.vkGetFenceStatus(static_cast<VkDevice>(device), static_cast<VkFence>(fence)));
     }
     vk::Result wait_fence(vk::Device device, vk::Fence fence, std::uint64_t timeout) noexcept {
-        const auto native_fence = static_cast<VkFence>(fence);
-        return static_cast<vk::Result>(VULKAN_HPP_DEFAULT_DISPATCHER.vkWaitForFences(static_cast<VkDevice>(device), 1, &native_fence, VK_TRUE, timeout));
+        return wait_fences(device, {&fence, 1}, timeout);
+    }
+    vk::Result wait_fences(vk::Device device, std::span<const vk::Fence> fences, std::uint64_t timeout) noexcept {
+        const auto count = static_cast<std::uint32_t>(fences.size());
+        const auto* handles = reinterpret_cast<const VkFence*>(fences.data());
+        return static_cast<vk::Result>(NATIVE_CALLS && NATIVE_CALLS->wait_fences
+                                           ? NATIVE_CALLS->wait_fences(NATIVE_CALLS->context, device, count, handles, VK_TRUE, timeout)
+                                           : VULKAN_HPP_DEFAULT_DISPATCHER.vkWaitForFences(device, count, handles, VK_TRUE, timeout));
     }
     vk::Result wait_device_idle(vk::Device device) noexcept {
         if (NATIVE_CALLS && NATIVE_CALLS->wait_idle)

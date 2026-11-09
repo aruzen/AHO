@@ -646,17 +646,18 @@ namespace {
         auto fence = sync.create_fence("original fence", false);
         auto phase = std::make_unique<vsl::DefaultPhase>(commands, chain, available, finished, fence);
         const auto discarded = phase->completion();
-        const auto reservation = fence.data_->uses[0].reservation.lock();
+        const auto reservation = vsl::sync::current_fence_reservation(fence.data_->uses[0]);
         vsl::Completion returned;
         bool invoked = false;
         const vsl_test::DeferredAction callback([&] {
             invoked = true;
             returned = phase->completion();
             EXPECT_EQ(discarded.status(), vsl::Completion::Status::CANCELLED);
-            EXPECT_EQ(reservation, fence.data_->uses[0].reservation.lock());
             EXPECT_EQ(reservation->result.lock(), returned.data_);
             EXPECT_NE(reservation->result.lock(), discarded.data_);
             const auto& work = vsl::lifetime::CommandAccess::Owner(commands.get_buffer())->submissions.at(0);
+            EXPECT_EQ(work->fence_reservation, reservation);
+            EXPECT_EQ(std::get<std::weak_ptr<vsl::impl::SubmissionImpl>>(fence.data_->uses[0].use).lock(), returned.data_);
             EXPECT_EQ(work->wait_semaphore, available.data_.get());
             EXPECT_EQ(work->signal_semaphore, finished.data_.get());
             phase.reset();

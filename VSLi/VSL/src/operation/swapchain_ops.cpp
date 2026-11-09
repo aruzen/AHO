@@ -7,9 +7,15 @@
 namespace VSL_NAMESPACE::operation {
     namespace {
         thread_local const SwapchainNativeCalls* ACTIVE_CALLS = nullptr;
+        void validate_image_usage(const vk::SurfaceCapabilitiesKHR& capabilities, ImageType usage);
         vk::SurfaceFormatKHR select_format(const std::vector<vk::SurfaceFormatKHR>& formats);
         vk::PresentModeKHR select_mode(const std::vector<vk::PresentModeKHR>& modes);
         std::vector<vk::Image> enumerate_images(PendingSwapchain& pending);
+        void validate_image_usage(const vk::SurfaceCapabilitiesKHR& capabilities, ImageType usage) {
+            const auto flags = vk::ImageUsageFlags(static_cast<std::uint32_t>(usage));
+            if (!contain(usage, ImageType::COLOR_ATTACHMENT) || (capabilities.supportedUsageFlags & flags) != flags)
+                throw std::invalid_argument("Surface does not support requested swapchain image usage");
+        }
         vk::SurfaceFormatKHR select_format(const std::vector<vk::SurfaceFormatKHR>& formats) {
             for (const auto& format : formats)
                 if (format.format == vk::Format::eB8G8R8A8Srgb && format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
@@ -119,8 +125,7 @@ namespace VSL_NAMESPACE::operation {
         native.imageExtent = pending.extent;
         native.imageArrayLayers = 1;
         native.imageUsage = vk::ImageUsageFlags(static_cast<std::uint32_t>(info.usage));
-        if (!contain(info.usage, ImageType::COLOR_ATTACHMENT) || (capabilities.supportedUsageFlags & native.imageUsage) != native.imageUsage)
-            throw std::invalid_argument("Surface does not support requested swapchain image usage");
+        validate_image_usage(capabilities, info.usage);
         const std::uint32_t families[]{device.graphics_family, device.present_family};
         impl::helper::configure_swapchain_sharing(native, families, pending.transform);
         native.compositeAlpha = impl::helper::choose_swapchain_composite_alpha(capabilities.supportedCompositeAlpha);
@@ -173,6 +178,11 @@ namespace VSL_NAMESPACE::operation {
     void require_replaceable_swapchain(const impl::SwapchainImpl& target) {
         if (!target.swap_chain || (target.state != SwapchainState::ACTIVE && target.state != SwapchainState::RECOVERY_REQUIRED))
             throw std::logic_error("Swapchain generation cannot be replaced");
+    }
+    void require_swapchain_image_usage(const impl::SwapchainImpl& target, ImageType usage) {
+        if (!target.device || !target.device->parent_device || !target.surface || !target.surface->surface)
+            throw std::invalid_argument("Swapchain requires a live Device and Surface");
+        validate_image_usage(target.device->parent_device->device.getSurfaceCapabilitiesKHR(target.surface->surface), usage);
     }
 } // namespace VSL_NAMESPACE::operation
 

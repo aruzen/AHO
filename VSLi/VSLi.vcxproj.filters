@@ -119,6 +119,7 @@
     <ClInclude Include="VSL\include\VSL\operation\swapchain_create_info.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\storage\swapchain_layout.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\lifetime\swapchain_arena.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\include\VSL\lifetime\phase_liveness.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\src\private\VSL\operation\swapchain_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClCompile Include="VSL\src\operation\swapchain_ops.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\src\private\VSL\lifetime\swapchain_storage.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>

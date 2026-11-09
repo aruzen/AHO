@@ -254,6 +254,7 @@
     <ClInclude Include="VSL\include\VSL\operation\swapchain_create_info.hpp" />
     <ClInclude Include="VSL\include\VSL\storage\swapchain_layout.hpp" />
     <ClInclude Include="VSL\include\VSL\lifetime\swapchain_arena.hpp" />
+    <ClInclude Include="VSL\include\VSL\lifetime\phase_liveness.hpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\swapchain_ops.hpp" />
     <ClCompile Include="VSL\src\operation\swapchain_ops.cpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\swapchain_storage.hpp" />

@@ -1,5 +1,6 @@
 #ifdef AHO_GPU_TESTS
 #include "support/live_gpu.hpp"
+#include "support/frame_buffer_query.hpp"
 #include <AHO/drawer/draw_phase.hpp>
 #include <AHO/io/mouse.hpp>
 #include <AHO/io/keyboard.hpp>
@@ -13,6 +14,61 @@
 #endif
 namespace {
     using AHOWindowVulkanIntegration = aho_test::LiveGPUTest;
+
+    TEST_F(AHOWindowVulkanIntegration, NonpositiveLogicalResizeIsRejectedBeforeAnyWindowOrGenerationChanges) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        const auto size = window.window_size();
+        const auto chain = window.data2->swapchain.data_;
+        aho_test::AcquisitionCalls native;
+        for (const auto [width, height] : {std::pair{0, 64}, std::pair{64, 0}, std::pair{-1, 64}, std::pair{64, -1}}) {
+            EXPECT_THROW(window.resize(width, height), std::invalid_argument);
+            EXPECT_THROW(window.VSL_NAMESPACE::PureWindow::resize(width, height), std::invalid_argument);
+        }
+        const auto current = window.window_size();
+        EXPECT_EQ(current.value.x.value, size.value.x.value);
+        EXPECT_EQ(current.value.y.value, size.value.y.value);
+        EXPECT_EQ(window.data2->swapchain.data_, chain);
+        EXPECT_FALSE(window.data2->pending_generation);
+        EXPECT_FALSE(window.data2->deferred_usage);
+        EXPECT_EQ(native.creates, 0u);
+    }
+    TEST_F(AHOWindowVulkanIntegration, ZeroFramebufferKeepsValidatedUsageAndRejectsInvalidAdditionsWithoutPoisoningResume) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        const auto previous = window.data2->swapchain.data_;
+        aho_test::FrameBufferQuery query;
+        aho_test::AcquisitionCalls native;
+        query.zero = true;
+        EXPECT_FALSE(window.recreate_swapchain(vsl::ImageType::TRANSFER_SRC));
+        ASSERT_TRUE(window.data2->deferred_usage);
+        const auto request = window.data2->deferred_usage;
+        const auto invalid = static_cast<vsl::ImageType>(std::uint32_t{1} << 31);
+        EXPECT_THROW(window.recreate_swapchain(invalid), std::invalid_argument);
+        EXPECT_EQ(window.data2->deferred_usage, request);
+        EXPECT_EQ(window.data2->swapchain.data_, previous);
+        EXPECT_EQ(window.data2->swapchain.state(), vsl::SwapchainState::ACTIVE);
+        EXPECT_EQ(native.creates, 0u);
+        query.zero = false;
+        EXPECT_THROW(window.recreate_swapchain(invalid), std::invalid_argument);
+        EXPECT_EQ(window.data2->deferred_usage, request);
+        EXPECT_TRUE(window.resize(420, 300));
+        EXPECT_FALSE(window.data2->deferred_usage);
+        EXPECT_EQ(native.creates, 1u);
+        EXPECT_TRUE(vsl::contain(window.data2->swapchain.images.front().get_usage(), vsl::ImageType::TRANSFER_SRC));
+    }
+    TEST_F(AHOWindowVulkanIntegration, ClosingDuringTheSecondFramebufferQueryStopsBeforeNativeCreation) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        aho_test::FrameBufferQuery query;
+        aho_test::AcquisitionCalls native;
+        query.callback_at = 2;
+        query.after_read = [&] { EXPECT_TRUE(window.close()); };
+        EXPECT_FALSE(window.recreate_swapchain());
+        EXPECT_FALSE(static_cast<bool>(window));
+        EXPECT_EQ(query.calls, 2u);
+        EXPECT_EQ(native.creates, 0u);
+    }
 
     struct FixedIdResizeHook : aho::window::WindowResizeHookPlugin {
         FixedIdResizeHook(vsl::PureWindow* window, unsigned char id, std::function<void(aho::Window*)> callback)

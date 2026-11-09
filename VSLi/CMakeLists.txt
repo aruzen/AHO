@@ -151,6 +151,7 @@ add_library(VSL STATIC
         VSL/include/VSL/operation/swapchain_create_info.hpp
         VSL/include/VSL/storage/swapchain_layout.hpp
         VSL/include/VSL/lifetime/swapchain_arena.hpp
+        VSL/include/VSL/lifetime/phase_liveness.hpp
         VSL/src/private/VSL/operation/swapchain_ops.hpp
         VSL/src/operation/swapchain_ops.cpp
         VSL/src/private/VSL/lifetime/swapchain_storage.hpp

@@ -6,6 +6,7 @@
 #include <VSL/lifetime/window_runtime.hpp>
 #include <VSL/operation/window_ops.hpp>
 #include <utility>
+#include <stdexcept>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -83,7 +84,7 @@ std::string VSL_NAMESPACE::PureWindow::name() {
     return data_->name;
 }
 
-VSL_NAMESPACE::PureWindow::operator bool() {
+VSL_NAMESPACE::PureWindow::operator bool() const {
     return data_ && data_->window_handle != nullptr;
 }
 
@@ -96,6 +97,8 @@ bool VSL_NAMESPACE::PureWindow::operator==(const PureWindow::WindowData* o) {
 }
 
 bool VSL_NAMESPACE::PureWindow::resize(int width, int height) {
+    if (width <= 0 || height <= 0)
+        throw std::invalid_argument("Window size must be positive");
     lifetime::GLFWCallScope scope;
     const auto data = data_;
     if (!data || !data->window_handle)

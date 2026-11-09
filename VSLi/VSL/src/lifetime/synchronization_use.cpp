@@ -241,13 +241,16 @@ namespace VSL_NAMESPACE::lifetime {
         access.data->uses.at(index).use = std::weak_ptr<sync::FenceReservation>(reservation);
         return reservation;
     }
-    void reserve_acquire_fence(std::shared_ptr<impl::FenceImpl> fence, std::uint32_t index, const std::shared_ptr<sync::FenceProof>& proof) {
+    bool reserve_acquire_fence(std::shared_ptr<impl::FenceImpl> fence, std::uint32_t index, const std::shared_ptr<sync::FenceProof>& proof,
+                               AcquireFenceGate gate) {
         const auto pending = proof;
         const FenceAccess access(std::move(fence), index);
         if (!pending || pending->status != sync::FenceProofStatus::UNARMED ||
             (pending->device && pending->device != access.data->native_device) || (pending->fence && pending->fence != access.handles[0]))
             throw std::invalid_argument("Acquisition requires a fresh proof for its fence element");
         access.require_idle(true);
+        if (gate.ready && !gate.ready(gate.context))
+            return false;
         pending->device = access.data->native_device;
         pending->fence = access.handles[0];
         try {
@@ -256,6 +259,7 @@ namespace VSL_NAMESPACE::lifetime {
             pending->status = sync::FenceProofStatus::NOT_ACQUIRED;
             throw;
         }
+        return true;
     }
     void release_acquire_fence(impl::FenceImpl& fence, std::uint32_t index, const std::shared_ptr<sync::FenceProof>& proof) noexcept {
         if (!proof || proof->observing || !sync::fence_proof_terminal(*proof) || index >= fence.uses.size() || fence.uses[index].accessing)

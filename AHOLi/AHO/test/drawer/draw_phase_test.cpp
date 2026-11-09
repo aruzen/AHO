@@ -6,6 +6,7 @@
 #ifdef AHO_GPU_TESTS
 #include "../support/live_gpu.hpp"
 #include "../support/commands.hpp"
+#include "../support/frame_buffer_query.hpp"
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/sync/presentation_state.hpp>
 namespace phase_payload {
@@ -45,6 +46,162 @@ namespace {
         EXPECT_EQ(calls, 1);
         EXPECT_EQ(received, &phase);
     }
+    TEST_F(DrawPhaseVulkanIntegration, ZeroFramebufferSuspendsWithoutAcquisitionResetOrCallbacksAndResumesWithANewPhase) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        auto manager = engine->data()->command_manager;
+        const auto slot = manager.get_buffer().data_->current_buffer_idx;
+        const auto previous = window.data2->swapchain.data_;
+        aho_test::FrameBufferQuery query;
+        aho_test::AcquisitionCalls native;
+        query.zero = true;
+        unsigned begins = 0, ends = 0;
+        {
+            aho::DrawPhase phase(*engine, [&](auto&) { ++begins; }, [&](auto&) { ++ends; });
+            EXPECT_FALSE(phase.recording());
+            EXPECT_EQ(phase.state, vsl::ComputePhase::State::SUSPENDED);
+            EXPECT_EQ(manager.get_buffer().data_->current_buffer_idx, slot);
+            EXPECT_EQ(native.acquisitions, 0u);
+            EXPECT_EQ(native.resets, 0u);
+            EXPECT_EQ(native.creates, 0u);
+            EXPECT_EQ(window.data2->swapchain.state(), vsl::SwapchainState::ACTIVE);
+            EXPECT_THROW((phase << vsl::Viewport{}), std::logic_error);
+            int calls = 0;
+            aho::DrawPhase* received = nullptr;
+            EXPECT_THROW((phase << aho::pack(phase_payload::Value{&calls, &received})), std::logic_error);
+            EXPECT_EQ(calls, 0);
+            EXPECT_THROW((phase << aho_test::RecordingCommand{&calls}), std::logic_error);
+            EXPECT_THROW((phase << aho_test::RecordingDelegate{&calls}), std::logic_error);
+            EXPECT_THROW((phase << std::make_shared<aho_test::RecordingCommand>(&calls)), std::logic_error);
+            EXPECT_THROW((phase << std::make_shared<aho_test::RecordingDelegate>(&calls)), std::logic_error);
+            EXPECT_EQ(calls, 0);
+            query.zero = false;
+            phase.setup();
+            EXPECT_FALSE(phase.recording());
+        }
+        EXPECT_EQ(begins, 0u);
+        EXPECT_EQ(ends, 0u);
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
+        aho::DrawPhase resumed(*engine);
+        EXPECT_TRUE(resumed.recording());
+        EXPECT_EQ(native.creates, 1u);
+        EXPECT_EQ(native.acquisitions, 1u);
+        EXPECT_NE(window.data2->swapchain.data_, previous);
+        EXPECT_FALSE(window.data2->deferred_usage);
+        resumed.cancel();
+        EXPECT_TRUE(resumed.completion().wait());
+    }
+    TEST_F(DrawPhaseVulkanIntegration, CompletionCallbacksCanSuspendAtEachPreparationBoundaryWithoutResettingTheFenceOrAdvancingTheSlot) {
+        ASSERT_NO_THROW(start_engine());
+        for (unsigned boundary = 0; boundary < 3; ++boundary) {
+            SCOPED_TRACE(boundary);
+            auto manager = engine->data()->command_manager.independent(3);
+            engine->data()->command_manager = manager;
+            auto producer = boundary == 0 ? manager : manager.independent(3);
+            auto& window = *engine->boot_window;
+            auto source = boundary == 2 ? window.data2->acquire_fences : window.data2->in_flight;
+            aho_test::FrameBufferQuery query;
+            aho_test::AcquisitionCalls native;
+            bool callback = false;
+            const auto live = std::make_shared<int>(0);
+            producer.get_buffer().data_->current_buffer_idx = 1;
+            {
+                vsl::ComputePhase prior(producer, std::nullopt, std::nullopt, source);
+                producer.get_buffer().retain_until_complete(std::shared_ptr<int>(new int(0), [&, alive = std::weak_ptr<int>(live)](int* value) {
+                    delete value;
+                    if (alive.expired())
+                        return;
+                    callback = true;
+                    query.zero = true;
+                }));
+                ASSERT_EQ(prior.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            }
+            manager.get_buffer().data_->current_buffer_idx = 0;
+            native.resets = 0;
+            {
+                aho::DrawPhase phase(*engine);
+                EXPECT_TRUE(callback);
+                EXPECT_FALSE(phase.recording());
+                EXPECT_EQ(phase.state, vsl::ComputePhase::State::SUSPENDED);
+                EXPECT_EQ(phase.completion().status(), vsl::Completion::Status::CANCELLED);
+                EXPECT_EQ(manager.get_buffer().data_->current_buffer_idx, 0u);
+                EXPECT_EQ(native.acquisitions, 0u);
+                EXPECT_EQ(native.resets, 0u);
+                EXPECT_EQ(native.creates, 0u);
+                EXPECT_EQ(window.data2->swapchain.state(), vsl::SwapchainState::ACTIVE);
+                EXPECT_EQ(source.data_->device->device.getFenceStatus(source.data_->fences.at(1)), vk::Result::eSuccess);
+            }
+            query.zero = false;
+            {
+                aho::DrawPhase resumed(*engine);
+                ASSERT_TRUE(resumed.recording());
+                resumed.cancel();
+                ASSERT_TRUE(resumed.completion().wait());
+            }
+            producer.wait_idle();
+            manager.wait_idle();
+        }
+    }
+    TEST_F(DrawPhaseVulkanIntegration, ZeroDetectedInsideNativeResetStopsAcquisitionAndDoesNotRestoreAnOldProof) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        auto manager = engine->data()->command_manager;
+        const auto slot = manager.get_buffer().data_->current_buffer_idx;
+        aho_test::FrameBufferQuery query;
+        aho_test::AcquisitionCalls native;
+        native.after_reset = [&] { query.zero = true; };
+        {
+            aho::DrawPhase phase(*engine);
+            EXPECT_FALSE(phase.recording());
+            EXPECT_EQ(native.resets, 1u);
+            EXPECT_EQ(native.acquisitions, 0u);
+            EXPECT_EQ(manager.get_buffer().data_->current_buffer_idx, slot);
+            EXPECT_EQ(phase.completion().status(), vsl::Completion::Status::CANCELLED);
+            EXPECT_EQ(window.data2->swapchain.state(), vsl::SwapchainState::ACTIVE);
+        }
+        query.zero = false;
+        aho::DrawPhase resumed(*engine);
+        ASSERT_TRUE(resumed.recording());
+        resumed.cancel();
+        EXPECT_TRUE(resumed.completion().wait());
+    }
+    TEST_F(DrawPhaseVulkanIntegration, FramebufferQueryCannotReenterSetupAndInitializationRunsOnce) {
+        ASSERT_NO_THROW(start_engine());
+        aho_test::FrameBufferQuery query;
+        query.callback_at = 2;
+        unsigned callbacks = 0, begins = 0;
+        query.after_read = [&] {
+            ++callbacks;
+            ASSERT_NE(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
+            EXPECT_THROW(aho::THREAD_LOCAL_DRAW_PHASE->setup(), std::logic_error);
+        };
+        aho::DrawPhase phase(*engine, [&](auto& stream) {
+            ++begins;
+            const auto& data = *engine->boot_window->data2;
+            stream << vsl::command::RenderPassBegin(data.render_pass, data.frame_buffer);
+        });
+        EXPECT_TRUE(phase.recording());
+        EXPECT_EQ(callbacks, 1u);
+        EXPECT_EQ(begins, 1u);
+        phase.setup();
+        EXPECT_EQ(begins, 1u);
+    }
+    TEST_F(DrawPhaseVulkanIntegration, ClosingFromAutomaticResumeNotificationStopsBeforeAcquisition) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        aho_test::FrameBufferQuery query;
+        aho_test::AcquisitionCalls native;
+        query.zero = true;
+        EXPECT_FALSE(window.recreate_swapchain());
+        ASSERT_TRUE(window.data2->deferred_usage);
+        query.zero = false;
+        window.add_plugin<aho::window::WindowResizeHookPlugin>([](aho::Window* current) { EXPECT_TRUE(current->close()); });
+        EXPECT_THROW((aho::DrawPhase(*engine)), std::logic_error);
+        EXPECT_FALSE(static_cast<bool>(window));
+        EXPECT_EQ(native.acquisitions, 0u);
+        EXPECT_EQ(native.resets, 0u);
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
+    }
     TEST_F(DrawPhaseVulkanIntegration, ConstructorUsesOneWindowSnapshotAndItsPlacedAcquisitionFence) {
         ASSERT_NO_THROW(start_engine());
         SnapshotEngine selected(*engine, *engine->boot_window);
@@ -57,6 +214,12 @@ namespace {
         const auto proof = std::get<std::weak_ptr<vsl::sync::FenceProof>>(source->uses.at(phase.frame_slot).use).lock();
         ASSERT_TRUE(proof);
         EXPECT_EQ(proof->fence, source->fences.at(phase.frame_slot));
+        const auto context = phase.context();
+        aho::Window second("snapshot stays on the first window", 64, 48, *engine);
+        selected.selected = second;
+        EXPECT_EQ(phase.context().render_pass().data_, context.render_pass().data_);
+        EXPECT_EQ(phase.target_window().data2, engine->boot_window->data2);
+        EXPECT_EQ(selected.calls, 1u);
         phase.cancel();
         ASSERT_TRUE(phase.completion().wait());
     }

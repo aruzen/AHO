@@ -36,7 +36,8 @@ namespace VSL_NAMESPACE {
             ERROR_,
             BEFORE_SETUP,
             WAIT_SUBMIT,
-            FINISH_SUBMIT
+            FINISH_SUBMIT,
+            SUSPENDED
         } state = State::BEFORE_SETUP;
 
         enum class SubmitResult {
@@ -109,8 +110,13 @@ namespace VSL_NAMESPACE {
         SubmitResult present();
         void cancel() override;
 
+    protected:
+        // 判定中に取得や世代変更を行わない。falseなら新しいPhaseで再開する。
+        virtual bool acquisition_ready() { return true; }
+
     private:
         bool _presented = false;
+        bool _setting_up = false;
         std::optional<FenceHolder> _acquire_fences;
         std::shared_ptr<lifetime::AcquireTicket> _presentation;
 

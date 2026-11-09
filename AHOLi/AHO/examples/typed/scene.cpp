@@ -60,6 +60,8 @@ namespace typed_example {
     }
 
     void Scene::record(aho::DrawPhase& phase, float time) {
+        if (!phase.recording())
+            return;
         const auto extent = _context.scissor();
         if (!extent.width || !extent.height)
             throw std::logic_error("Typed scene requires a nonzero framebuffer extent");

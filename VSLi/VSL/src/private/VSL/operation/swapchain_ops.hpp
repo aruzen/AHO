@@ -45,4 +45,5 @@ namespace VSL_NAMESPACE::operation {
     void destroy_swapchain(impl::SwapchainImpl& target) noexcept;
     void require_active_swapchain(const impl::SwapchainImpl& target);
     void require_replaceable_swapchain(const impl::SwapchainImpl& target);
+    void require_swapchain_image_usage(const impl::SwapchainImpl& target, ImageType usage);
 } // namespace VSL_NAMESPACE::operation

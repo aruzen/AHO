@@ -40,7 +40,7 @@ function(vsl_generate_buffer_layout)
     file(SHA256 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/buffer_layout.hpp.in" template_hash)
     file(SHA256 "${VSL_HOME}/src/private/VSL/lifetime/swapchain_storage.hpp" swapchain_slot_hash)
     set(public_layout_hashes "")
-    foreach(api IN ITEMS vulkan/phase.hpp lifetime/resource_id.hpp lifetime/resource_plan.hpp lifetime/resource_arena.hpp lifetime/logical_use_state.hpp
+    foreach(api IN ITEMS vulkan/phase.hpp lifetime/phase_liveness.hpp lifetime/resource_id.hpp lifetime/resource_plan.hpp lifetime/resource_arena.hpp lifetime/logical_use_state.hpp
             storage/startup_plan.hpp lifetime/startup_arena.hpp storage/swapchain_layout.hpp lifetime/swapchain_arena.hpp
             operation/swapchain_create_info.hpp vulkan/swapchain.hpp
             lifetime/owner_ref.hpp lifetime/dependency_node.hpp lifetime/glfw_lease.hpp lifetime/window_owner.hpp window.hpp vulkan/surface.hpp

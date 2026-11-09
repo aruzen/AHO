@@ -454,24 +454,47 @@ namespace VSL_NAMESPACE {
         lifetime::PhaseCall call(*this);
         if (state != State::BEFORE_SETUP)
             return;
+        if (_setting_up)
+            throw std::logic_error("Phase setup is already in progress");
+        _setting_up = true;
+        struct SetupGuard {
+            lifetime::PhaseCall& call;
+            bool& active;
+            ~SetupGuard() {
+                if (call.alive())
+                    active = false;
+            }
+        } guard{call, _setting_up};
         std::shared_ptr<lifetime::AcquireTicket> presentation;
         std::shared_ptr<lifetime::CommandDomain> owner_domain;
         try {
             const auto chain = swapchain.data_;
-            if (!chain || !chain->swap_chain ||
+            if (!chain || !chain->swap_chain || !manager.data_ ||
                 chain->device != manager.data_->device.get())
                 throw std::invalid_argument("A swapchain is required");
             lifetime::require_swapchain_owner(chain);
-            operation::require_active_swapchain(*chain);
             const auto buffer = manager.get_buffer();
             owner_domain = lifetime::CommandAccess::Owner(buffer);
             const auto& domain = owner_domain;
             auto buffers = domain->buffer;
-            if (domain->context.recording || domain->context.submitting || domain->context.returning_image || domain->context.mutating || domain->context.frame_buffer_recording)
+            const auto initial_manager = manager.data_;
+            if (domain->context.closing || domain->context.recording || domain->context.submitting || domain->context.returning_image || domain->context.mutating || domain->context.frame_buffer_recording)
                 throw std::logic_error("A phase is already recording");
+            const bool initially_ready = acquisition_ready();
+            if (!call.alive() || state != State::BEFORE_SETUP)
+                return;
+            if (manager.data_ != initial_manager || initial_manager->command_buffer != buffers || domain->buffer != buffers || swapchain.data_ != chain ||
+                domain->context.closing || domain->context.recording || domain->context.submitting || domain->context.returning_image || domain->context.mutating || domain->context.frame_buffer_recording)
+                throw std::logic_error("Command domain changed during acquisition readiness");
+            if (!initially_ready) {
+                state = State::SUSPENDED;
+                return;
+            }
+            operation::require_active_swapchain(*chain);
             if (!calculation_finish)
                 calculation_finish = SemaphoreHolder{lifetime::swapchain_finished(chain)};
-            buffers->current_buffer_idx = (buffers->current_buffer_idx + 1) % buffers->command_buffers.size();
+            const auto previous_slot = buffers->current_buffer_idx;
+            buffers->current_buffer_idx = (previous_slot + 1) % buffers->command_buffers.size();
             if (!prepare() || !call.alive())
                 return;
             if (swapchain.data_ != chain)
@@ -498,6 +521,36 @@ namespace VSL_NAMESPACE {
                 operation::require_active_swapchain(*chain);
                 return true;
             };
+            auto ready = [&] {
+                if (!require_prepared())
+                    return false;
+                const bool result = acquisition_ready();
+                return require_prepared() && result;
+            };
+            const auto suspend = [&] {
+                if (presentation)
+                    presentation->reject_acquisition();
+                sync::save_terminal(*work, Completion::Status::CANCELLED);
+                if (call.alive()) {
+                    buffers->current_buffer_idx = previous_slot;
+                    state = State::SUSPENDED;
+                    _presentation.reset();
+                    submission.reset();
+                }
+                sync::finish_submission(*work);
+                if (presentation) {
+                    const auto registry = presentation->presentations.lock();
+                    lifetime::release_acquire_owners(*presentation);
+                    if (registry && presentation->released) {
+                        std::erase(registry->tickets, presentation);
+                        std::erase(registry->acquisitions, presentation->evidence);
+                    }
+                }
+            };
+            if (!ready()) {
+                suspend();
+                return;
+            }
             vk::Semaphore available;
             const auto registry = lifetime::presentation_domain(chain);
             work->surface = registry->surface;
@@ -525,9 +578,11 @@ namespace VSL_NAMESPACE {
             _presentation = presentation;
             work->acquisition = presentation.get();
             work->synchronization_owners[static_cast<size_t>(impl::SubmissionSource::ACQUISITION)] = retain_synchronization_owner(*work, presentation);
-            lifetime::reserve_acquire_fence(source, slot, {presentation->evidence, &presentation->evidence->proof});
-            if (!require_prepared())
+            const lifetime::AcquireFenceGate gate{&ready, [](void* value) { return (*static_cast<decltype(ready)*>(value))(); }};
+            if (!lifetime::reserve_acquire_fence(source, slot, {presentation->evidence, &presentation->evidence->proof}, gate) || !ready()) {
+                suspend();
                 return;
+            }
             std::uint32_t acquired_index = UINT32_MAX;
             vk::Result result;
             {

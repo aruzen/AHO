@@ -2,6 +2,16 @@
 #include <stdexcept>
 
 namespace VSL_NAMESPACE::operation {
+    namespace {
+        thread_local const CommandNativeCalls* NATIVE_CALLS = nullptr;
+    }
+    ScopedCommandNativeCalls::ScopedCommandNativeCalls(CommandNativeCalls calls) noexcept
+        : _calls(calls), _previous(NATIVE_CALLS) {
+        NATIVE_CALLS = &_calls;
+    }
+    ScopedCommandNativeCalls::~ScopedCommandNativeCalls() {
+        NATIVE_CALLS = _previous;
+    }
     void initialize_command_pool(impl::CommandPoolImpl& pool, impl::LogicalDeviceImpl& device, CommandPoolCreateInfo info) {
         if (pool.command_pool)
             throw std::logic_error("Command pool is already initialized");
@@ -48,12 +58,25 @@ namespace VSL_NAMESPACE::operation {
         }
     }
     void reset_command_buffer(vk::CommandBuffer buffer) {
-        buffer.reset();
+        const auto result = static_cast<vk::Result>(NATIVE_CALLS && NATIVE_CALLS->reset
+                                                        ? NATIVE_CALLS->reset(NATIVE_CALLS->context, buffer, 0)
+                                                        : VULKAN_HPP_DEFAULT_DISPATCHER.vkResetCommandBuffer(buffer, 0));
+        if (result != vk::Result::eSuccess)
+            vk::detail::throwResultException(result, "Command buffer reset failed");
     }
     void begin_command_buffer(vk::CommandBuffer buffer) {
-        buffer.begin(vk::CommandBufferBeginInfo{});
+        const VkCommandBufferBeginInfo info{.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+        const auto result = static_cast<vk::Result>(NATIVE_CALLS && NATIVE_CALLS->begin
+                                                        ? NATIVE_CALLS->begin(NATIVE_CALLS->context, buffer, &info)
+                                                        : VULKAN_HPP_DEFAULT_DISPATCHER.vkBeginCommandBuffer(buffer, &info));
+        if (result != vk::Result::eSuccess)
+            vk::detail::throwResultException(result, "Command buffer begin failed");
     }
     void end_command_buffer(vk::CommandBuffer buffer) {
-        buffer.end();
+        const auto result = static_cast<vk::Result>(NATIVE_CALLS && NATIVE_CALLS->end
+                                                        ? NATIVE_CALLS->end(NATIVE_CALLS->context, buffer)
+                                                        : VULKAN_HPP_DEFAULT_DISPATCHER.vkEndCommandBuffer(buffer));
+        if (result != vk::Result::eSuccess)
+            vk::detail::throwResultException(result, "Command buffer end failed");
     }
 } // namespace VSL_NAMESPACE::operation

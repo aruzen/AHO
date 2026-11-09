@@ -93,6 +93,7 @@ namespace VSL_NAMESPACE::lifetime {
             }
         }
         ReleasedPresentOwners detach_present_owners(PresentRecord& record) noexcept {
+            record.semaphore_source = nullptr;
             record.released = true;
             ReleasedPresentOwners owners;
             owners.generation.swap(record.generation);
@@ -202,6 +203,7 @@ namespace VSL_NAMESPACE::lifetime {
         require_semaphore_owner(semaphore);
         if (semaphore->device != generation->device || semaphore->semaphores.size() <= image || !marker || marker->acquire)
             throw std::invalid_argument("Present semaphore does not match its image generation");
+        sync::require_semaphore_element(*semaphore, image);
         wait = semaphore->semaphores[image];
         record = std::make_shared<PresentRecord>();
         record->state.device = generation->native_device;
@@ -212,6 +214,7 @@ namespace VSL_NAMESPACE::lifetime {
         record->epoch = ++slot.epoch;
         record->generation = std::move(generation);
         record->marker = std::move(marker);
+        record->semaphore_source = semaphore.get();
         if (semaphore && (semaphore.owner_before(record->generation) || record->generation.owner_before(semaphore)))
             record->semaphore = std::move(semaphore);
         domain.records.push_back(record);
@@ -237,6 +240,9 @@ namespace VSL_NAMESPACE::lifetime {
         const ImagePresentAccess access(slot);
         if (slot.epoch != record.epoch || slot.record.lock().get() != &record)
             throw std::logic_error("Presentation image reservation changed");
+        if (!record.semaphore_source)
+            throw std::logic_error("Presentation semaphore has been released");
+        sync::require_semaphore_element(*record.semaphore_source, record.image);
         record.serial = next_present_serial();
         const auto result = operation::queue_present(record.queue, record.generation->swap_chain, record.image,
                                                      record.wait_semaphore, record.state.strict ? record.state.proof : vk::Fence{});

@@ -1,12 +1,23 @@
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/sync/submission_completion.hpp>
 #include <VSL/lifetime/submission_retention.hpp>
+#include <VSL/operation/submission_ops.hpp>
 #include <gtest/gtest.h>
 
 namespace {
     using Status = vsl::Completion::Status;
     using Failure = vsl::Completion::Failure;
+    struct CPUWorkScope {
+        std::shared_ptr<vsl::impl::SubmissionWork> work;
+        ~CPUWorkScope();
+    };
     std::shared_ptr<vsl::impl::SubmissionWork> pending_work();
+    CPUWorkScope::~CPUWorkScope() {
+        work->result->native.active = false;
+        work->result->native.complete = true;
+        vsl::sync::save_terminal(*work, Status::CANCELLED);
+        vsl::sync::finish_submission(*work);
+    }
     std::shared_ptr<vsl::impl::SubmissionWork> pending_work() {
         auto work = std::make_shared<vsl::impl::SubmissionWork>();
         work->result->work = work;
@@ -22,6 +33,121 @@ namespace {
         EXPECT_FALSE(empty.ready());
         EXPECT_FALSE(empty.wait(0));
         EXPECT_THROW(empty.retain(std::make_shared<int>(7)), std::logic_error);
+    }
+    TEST(SubmissionResultTest, SubmitClassificationSeparatesLogicalFailureFromNativeUse) {
+        for (const auto native : {VK_SUCCESS, VK_ERROR_OUT_OF_HOST_MEMORY, VK_ERROR_OUT_OF_DEVICE_MEMORY, VK_ERROR_DEVICE_LOST, VK_ERROR_UNKNOWN, VK_ERROR_VALIDATION_FAILED_EXT}) {
+            SCOPED_TRACE(native);
+            auto work = pending_work();
+            work->result->native.active = true;
+            const vsl::Completion result{work->result};
+            vsl::sync::save_submit_result(*work->result, native);
+            const bool uncertain = native == VK_ERROR_UNKNOWN || native == VK_ERROR_VALIDATION_FAILED_EXT;
+            const bool queued = native == VK_SUCCESS;
+            EXPECT_EQ(vsl::sync::native_pending(*work->result), queued || uncertain);
+            EXPECT_EQ(result.native_uncertain(), uncertain);
+            EXPECT_TRUE(result.busy());
+            EXPECT_FALSE(result.wait(0));
+            vsl::sync::save_terminal(*work, Status::FAILED, Failure::SUBMIT_FAILED, native);
+            EXPECT_EQ(result.error_code(), native);
+            vsl::sync::save_native_idle(*work, VK_SUCCESS);
+            work->result->native.active = false;
+            vsl::sync::finish_submission(*work);
+            EXPECT_FALSE(result.busy());
+            EXPECT_FALSE(result.wait());
+            EXPECT_EQ(result.status(), Status::FAILED);
+            EXPECT_EQ(result.error_code(), native);
+            EXPECT_EQ(result.native_uncertain(), uncertain);
+        }
+    }
+    TEST(SubmissionResultTest, UncertainHistoryKeepsOnlyCpuResultsAfterNativeCompletion) {
+        auto work = pending_work();
+        vsl::Completion result{work->result};
+        std::weak_ptr<vsl::impl::SubmissionImpl> observation = work->result;
+        vsl::ResourceUseState physical;
+        vsl::ResourceUseState logical(vsl::UncertainUsePolicy::REQUIRE_RECREATION);
+        physical.mark_used(result);
+        logical.mark_used(result);
+        std::weak_ptr<int> resource;
+        {
+            auto owner = std::make_shared<int>(7);
+            resource = owner;
+            work->completion_resources.push_back(owner);
+        }
+        work->result->native.active = true;
+        vsl::sync::save_submit_result(*work->result, VK_ERROR_UNKNOWN);
+        vsl::sync::save_terminal(*work, Status::FAILED, Failure::SUBMIT_FAILED, VK_ERROR_UNKNOWN);
+        EXPECT_TRUE(physical.busy());
+        EXPECT_TRUE(logical.busy());
+        EXPECT_FALSE(resource.expired());
+        vsl::sync::save_native_idle(*work, VK_SUCCESS);
+        work->result->native.active = false;
+        vsl::sync::finish_submission(*work);
+        work.reset();
+        EXPECT_TRUE(resource.expired());
+        EXPECT_TRUE(result.data_->work.expired());
+        result = {};
+        EXPECT_FALSE(physical.busy());
+        EXPECT_FALSE(logical.busy());
+        EXPECT_FALSE(observation.expired());
+        EXPECT_TRUE(logical.wait(0));
+        auto next = pending_work();
+        EXPECT_NO_THROW(physical.check_available({next->result}));
+        EXPECT_THROW(logical.mark_used({next->result}), std::logic_error);
+        EXPECT_THROW(logical.check_available({next->result}), std::logic_error);
+        EXPECT_FALSE(logical.busy());
+        EXPECT_EQ(vsl::Completion{observation.lock()}.status(), Status::FAILED);
+    }
+    TEST(SubmissionResultTest, CompletionCallbackCannotInvalidateTheCurrentAvailabilityCheck) {
+        auto previous = pending_work(), current = pending_work();
+        previous->device = std::make_shared<vsl::impl::LogicalDeviceImpl>();
+        vsl::ResourceUseState use;
+        use.mark_used({previous->result});
+        previous->result->status = Status::SUBMITTED;
+        previous->completion_resources.push_back(std::shared_ptr<void>(new int, [&](void* value) {
+            vsl::sync::publish_terminal(*current, Status::CANCELLED);
+            delete static_cast<int*>(value);
+        }));
+        const vsl::operation::ScopedSubmissionNativeCalls native({.fence_status = +[](void*, VkDevice, VkFence) noexcept { return VK_SUCCESS; }});
+        const CPUWorkScope cleanup{previous};
+        EXPECT_THROW(use.check_available({current->result}), std::logic_error);
+        EXPECT_EQ(current->result->status, Status::CANCELLED);
+    }
+    TEST(SubmissionResultTest, CompletionCallbackCannotInsertUnknownHistoryDuringMarkUsed) {
+        auto previous = pending_work(), current = pending_work(), peer = pending_work();
+        previous->device = std::make_shared<vsl::impl::LogicalDeviceImpl>();
+        vsl::ResourceUseState use(vsl::UncertainUsePolicy::REQUIRE_RECREATION);
+        use.mark_used({previous->result});
+        previous->result->status = Status::SUBMITTED;
+        previous->completion_resources.push_back(std::shared_ptr<void>(new int, [&](void* value) {
+            use.mark_used({peer->result});
+            vsl::sync::save_submit_result(*peer->result, VK_ERROR_UNKNOWN);
+            vsl::sync::save_terminal(*peer, Status::FAILED, Failure::SUBMIT_FAILED, VK_ERROR_UNKNOWN);
+            vsl::sync::save_native_idle(*peer, VK_SUCCESS);
+            delete static_cast<int*>(value);
+        }));
+        const vsl::operation::ScopedSubmissionNativeCalls native({.fence_status = +[](void*, VkDevice, VkFence) noexcept { return VK_SUCCESS; }});
+        const CPUWorkScope cleanup{previous};
+        EXPECT_THROW(use.mark_used({current->result}), std::logic_error);
+        EXPECT_EQ(current->result->status, Status::PENDING);
+        vsl::sync::publish_terminal(*current, Status::CANCELLED);
+    }
+    TEST(SubmissionResultTest, AvailabilityCheckKeepsItsOriginalCompletionAcrossCallbacks) {
+        auto previous = pending_work(), current = pending_work();
+        previous->device = std::make_shared<vsl::impl::LogicalDeviceImpl>();
+        vsl::ResourceUseState use;
+        use.mark_used({previous->result});
+        previous->result->status = Status::SUBMITTED;
+        vsl::Completion observed{current->result};
+        previous->completion_resources.push_back(std::shared_ptr<void>(new int, [&](void* value) {
+            observed = {};
+            delete static_cast<int*>(value);
+        }));
+        const vsl::operation::ScopedSubmissionNativeCalls native({.fence_status = +[](void*, VkDevice, VkFence) noexcept { return VK_SUCCESS; }});
+        const CPUWorkScope cleanup{previous};
+        EXPECT_NO_THROW(use.check_available(observed));
+        EXPECT_FALSE(observed);
+        EXPECT_EQ(current->result->status, Status::PENDING);
+        vsl::sync::publish_terminal(*current, Status::CANCELLED);
     }
     TEST(SubmissionResultTest, TerminalResultIsVisibleDuringReleaseAndCannotBeOverwritten) {
         vsl::Completion result;

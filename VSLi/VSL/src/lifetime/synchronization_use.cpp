@@ -121,8 +121,12 @@ namespace VSL_NAMESPACE::lifetime {
                         if (!value)
                             return;
                         if constexpr (std::is_same_v<Value, std::shared_ptr<impl::SubmissionImpl>>) {
-                            if (value->status == Completion::Status::PENDING)
+                            if (value->native.active || value->status == Completion::Status::PENDING)
                                 throw std::logic_error("Fence is reserved by an unsubmitted phase");
+                            if (!poll && (value->native.enqueue == sync::SubmissionEnqueue::UNKNOWN ||
+                                          value->native.enqueue == sync::SubmissionEnqueue::NOT_ENQUEUED ||
+                                          value->status == Completion::Status::CANCELLED))
+                                throw std::logic_error("Fence enqueue has not been established; only polling is allowed");
                         } else if constexpr (std::is_same_v<Value, std::shared_ptr<sync::FenceProof>>) {
                             if (value->status == sync::FenceProofStatus::UNARMED || value->status == sync::FenceProofStatus::NOT_ACQUIRED)
                                 throw std::logic_error("Fence has no submitted acquisition");
@@ -140,9 +144,13 @@ namespace VSL_NAMESPACE::lifetime {
                         if (!value)
                             return;
                         if constexpr (std::is_same_v<Value, std::shared_ptr<impl::SubmissionImpl>>) {
-                            const auto status = poll_graphics ? Completion{value}.status() : value->status;
-                            if (status == Completion::Status::PENDING ||
-                                (status == Completion::Status::SUBMITTED && (!poll_graphics || !wait || !Completion{value}.wait())))
+                            const Completion completion{value};
+                            if (poll_graphics)
+                                (void)completion.status();
+                            if (sync::pending_use(*value) && wait && poll_graphics && !value->native.active &&
+                                value->status == Completion::Status::SUBMITTED && value->native.enqueue == sync::SubmissionEnqueue::ENQUEUED)
+                                (void)completion.wait();
+                            if (sync::pending_use(*value))
                                 throw std::logic_error("Fence is in graphics use");
                         } else if constexpr (std::is_same_v<Value, std::shared_ptr<sync::FenceProof>>) {
                             if (!idle_acquisition(*value, wait))
@@ -245,16 +253,18 @@ namespace VSL_NAMESPACE::lifetime {
         const FenceAccess access(std::move(fence), index);
         access.require_waitable(timeout == 0);
         const auto submitted = access.submitted_work();
-        const auto result = operation::wait_fences(access.data->native_device, access.handles, timeout);
+        auto result = access.data->device->lost ? vk::Result::eErrorDeviceLost : operation::wait_fences(access.data->native_device, access.handles, timeout);
+        if (access.data->device->lost)
+            result = vk::Result::eErrorDeviceLost;
         if (result == vk::Result::eTimeout)
             return false;
         if (result == vk::Result::eSuccess || result == vk::Result::eErrorDeviceLost) {
             // 全観測値を保存してからcallbackを通知し、peerを再pollさせない。
+            if (result == vk::Result::eErrorDeviceLost)
+                access.data->device->lost = true;
             access.save_observations(result);
             for (const auto& work : submitted)
-                sync::save_terminal(*work, result == vk::Result::eSuccess ? Completion::Status::COMPLETE : Completion::Status::FAILED,
-                                    result == vk::Result::eSuccess ? Completion::Failure::NONE : Completion::Failure::DEVICE_LOST,
-                                    result == vk::Result::eSuccess ? 0 : static_cast<std::int32_t>(result));
+                sync::save_native_idle(*work, static_cast<std::int32_t>(result));
             for (const auto& work : submitted)
                 sync::finish_submission(*work);
         }
@@ -298,6 +308,7 @@ namespace VSL_NAMESPACE::lifetime {
         semaphore->semaphores.clear();
         semaphore->use.graphics.clear();
         semaphore->use.wsi.clear();
+        semaphore->use.poisoned.clear();
         if (registry)
             erase_target(registry->semaphores, semaphore);
     }

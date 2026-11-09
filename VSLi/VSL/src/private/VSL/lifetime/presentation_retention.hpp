@@ -24,6 +24,7 @@ namespace VSL_NAMESPACE::lifetime {
         sync::PresentState state;
         std::shared_ptr<impl::SwapchainImpl> generation;
         std::shared_ptr<impl::SemaphoreImpl> semaphore;
+        impl::SemaphoreImpl* semaphore_source = nullptr;
         std::shared_ptr<sync::SemaphoreWSIUse> marker;
         vk::Queue queue;
         vk::Semaphore wait_semaphore;

@@ -67,6 +67,20 @@ namespace {
         ASSERT_TRUE(phase.completion().wait());
         EXPECT_TRUE(owner.expired());
     }
+    TEST_F(ResourceUseVulkanIntegrationTest, SubmitValidationKeepsAnIndependentUncertainStateAliveUntilCompletion) {
+        auto commands = make_manager().independent(1);
+        auto phase = commands.start_phase<vsl::ComputePhase>();
+        std::weak_ptr<vsl::ResourceUseState> observed;
+        {
+            auto state = std::make_shared<vsl::ResourceUseState>(vsl::UncertainUsePolicy::REQUIRE_RECREATION);
+            observed = state;
+            vsl::ResourceUse{state, {}}.record(commands.get_buffer(), vsl::ResourceRetention::COMPLETION);
+        }
+        EXPECT_FALSE(observed.expired());
+        ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        ASSERT_TRUE(phase.completion().wait());
+        EXPECT_TRUE(observed.expired());
+    }
 
     TEST_F(ResourceUseVulkanIntegrationTest, RetentionUsesControlIdentityIncludingAliasesAndNullPointers) {
         auto manager = make_manager();

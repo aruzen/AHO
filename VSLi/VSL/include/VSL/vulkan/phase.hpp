@@ -157,14 +157,24 @@ namespace VSL_NAMESPACE {
     }
 
     DefaultPhaseStream& DefaultPhaseStream::operator<<(command::is_command auto cmd) {
+        auto current = manager;
+        const auto buffer = current.get_buffer();
+        const auto expected = buffer.completion();
+        buffer.require_recording(expected);
         resolve_holder_require(cmd);
-        (&cmd)->invoke(manager.get_pool(), manager.get_buffer(), manager);
+        buffer.require_recording(expected);
+        (&cmd)->invoke(current.get_pool(), buffer, current);
         return *this;
     }
 
     DefaultPhaseStream& DefaultPhaseStream::operator<<(command::is_delegate_command auto cmd) {
+        auto current = manager;
+        const auto buffer = current.get_buffer();
+        const auto expected = buffer.completion();
+        buffer.require_recording(expected);
         resolve_holder_require(cmd);
-        (&cmd)->invoke(*this, manager.get_pool(), manager.get_buffer(), manager);
+        buffer.require_recording(expected);
+        (&cmd)->invoke(*this, current.get_pool(), buffer, current);
         return *this;
     }
 } // namespace VSL_NAMESPACE

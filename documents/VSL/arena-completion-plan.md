@@ -11,6 +11,8 @@
 
 現在の到達点は順序1〜9と10a・10b・10cである。command／同期資源の配置とTyped frame再利用、起動資源の共通backend、OS windowの寿命分離、公開StartupArenaとAHO起動、maintenance1の能力照会／有効化、Swapchain世代のCPU配置とpresent専用の完了観測・資源保持を接続した。順序10全体と11〜12は未完了であり、取得後失敗の復旧、AHOの世代公開、既定policy変更、旧入口廃止と最終監査まで継続する。
 
+10dはPhaseCall、共通Fence用途、M個のfinished semaphore、F個のacquire Fenceを接続済み。[送信結果とnative使用完了](native-submission-proof.md)を分離し、UNKNOWNの安全な保持とNative中の破棄を先に検証する。AcquireTicket／signal drain／画像返却、10e、11、12は引き続き未完了である。
+
 ## 責務と保証
 
 storageはCPU領域と配置、operationは解決済み実体へのVulkan操作、lifetimeは構築・所有・回収、syncは使用状態と完了観測を担当する。通常VSLとTypedでbackendを共用する。操作中にownerを何段も解決せず、公開view／command／外部依存の境界で所有を取得する。

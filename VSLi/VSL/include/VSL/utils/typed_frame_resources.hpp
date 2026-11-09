@@ -99,8 +99,7 @@ namespace VSL_NAMESPACE::typed {
                 throw std::logic_error("Typed frame resources are already in use by this phase");
             return slot;
         }
-        const auto status = slot.completion.status();
-        if (status == Completion::Status::PENDING || status == Completion::Status::SUBMITTED)
+        if (slot.completion.busy())
             throw std::logic_error("Typed frame resources require a completed or cancelled previous phase");
         if constexpr (retention == ResourceRetention::COMPLETION)
             _domain.buffer.retain_until_complete(slot.value);

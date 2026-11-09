@@ -9,6 +9,7 @@
 #include <VSL/vulkan/phase.hpp>
 #include <VSL/vulkan/surface.hpp>
 #include <VSL/lifetime/command_domain.hpp>
+#include <VSL/lifetime/submission_retention.hpp>
 #include <VSL/lifetime/command_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <limits>
@@ -75,6 +76,19 @@ void VSL_NAMESPACE::CommandBuffer::next() {
 
 void VSL_NAMESPACE::CommandBuffer::reset() {
     lifetime::reset_command_buffers(*this, std::nullopt);
+}
+void VSL_NAMESPACE::CommandBuffer::require_recording() const {
+    lifetime::require_recording(*this, completion());
+}
+void VSL_NAMESPACE::CommandBuffer::require_recording(const Completion& expected) const {
+    if (!expected) {
+        const auto* context = data_ ? data_->recording_context : nullptr;
+        if (!context || context->closing || context->recording || context->submitting || context->mutating ||
+            context->returning_image || context->frame_buffer_recording || context->work)
+            throw std::logic_error("Idle stream context changed while resolving a command");
+        return;
+    }
+    lifetime::require_recording(*this, expected);
 }
 
 void VSL_NAMESPACE::CommandBuffer::reset(std::uint32_t idx) {

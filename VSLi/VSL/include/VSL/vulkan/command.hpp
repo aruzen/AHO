@@ -46,6 +46,8 @@ namespace VSL_NAMESPACE {
 
         // Phaseの記録中だけ、その送信の完了状態を返す。
         Completion completion() const;
+        void require_recording() const;
+        void require_recording(const Completion& expected) const;
 
         void next();
 

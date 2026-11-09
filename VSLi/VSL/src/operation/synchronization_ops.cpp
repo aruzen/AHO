@@ -16,6 +16,8 @@ namespace VSL_NAMESPACE::operation {
     void initialize_semaphore(impl::SemaphoreImpl& semaphore, impl::LogicalDeviceImpl& device, SemaphoreCreateInfo info) {
         if (!semaphore.semaphores.empty())
             throw std::logic_error("Semaphore is already initialized");
+        validate_synchronization_count(device.device, info.count);
+        semaphore.use.poisoned.resize(info.count, false);
         semaphore.device = &device;
         semaphore.native_device = device.device;
         semaphore.semaphores = create_semaphores(device.device, info.count);

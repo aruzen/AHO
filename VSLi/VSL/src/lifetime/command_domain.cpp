@@ -4,6 +4,7 @@
 #include <VSL/lifetime/command_storage.hpp>
 #include <VSL/lifetime/dependency_node.hpp>
 #include <VSL/lifetime/presentation_retention.hpp>
+#include <VSL/lifetime/submission_retention.hpp>
 #include <VSL/lifetime/resource_arena.hpp>
 #include <stdexcept>
 #include <utility>
@@ -20,17 +21,19 @@ namespace VSL_NAMESPACE::lifetime {
             return first && first == second && !first.owner_before(second) && !second.owner_before(first);
         }
         CommandMutation::CommandMutation(CommandRecordingContext& context) : context(context) {
-            if (context.closing || context.mutating || context.recording || context.returning_image || context.frame_buffer_recording)
+            if (context.closing || context.mutating || context.recording || context.submitting || context.returning_image || context.frame_buffer_recording)
                 throw std::logic_error("Command ring cannot change during recording or mutation");
             context.mutating = true;
             ++context.generation;
         }
     } // namespace
     CommandDomain::CommandDomain(std::shared_ptr<impl::CommandBufferImpl> buffer)
-        : buffer(std::move(buffer)), submissions(this->buffer->command_buffers.size()) {}
+        : buffer(std::move(buffer)), submissions(this->buffer->command_buffers.size()) {
+        inherit_quarantined_submissions(*this);
+    }
 
     std::shared_ptr<impl::FenceImpl> acquire_fences(CommandDomain& domain, LogicalDeviceAccessor device) {
-        if (domain.context.closing || domain.context.recording || domain.context.returning_image ||
+        if (domain.context.closing || domain.context.recording || domain.context.submitting || domain.context.returning_image ||
             domain.context.mutating || domain.context.frame_buffer_recording)
             throw std::logic_error("Command domain cannot prepare acquisition fences");
         if (!domain.acquire_fences) {
@@ -44,7 +47,7 @@ namespace VSL_NAMESPACE::lifetime {
             const std::array<ResourceInit, 1> inputs{FenceCreateInfo{count, false}};
             ResourceArena arena(device, PLAN, inputs);
             if (domain.acquire_fences || domain.buffer != buffer || domain.context.generation != generation ||
-                domain.context.closing || domain.context.recording || domain.context.returning_image || domain.context.mutating ||
+                domain.context.closing || domain.context.recording || domain.context.submitting || domain.context.returning_image || domain.context.mutating ||
                 domain.context.frame_buffer_recording || buffer->command_buffers.size() != count)
                 throw std::logic_error("Command domain changed while constructing acquisition fences");
             domain.acquire_fences = arena.fence({1}).data_;
@@ -79,21 +82,29 @@ namespace VSL_NAMESPACE::lifetime {
     }
 
     void CommandDomain::wait_idle() {
-        if (context.closing)
+        if (context.closing || context.submitting || (recording_submission && recording_submission->result->native.active) ||
+            std::ranges::any_of(submissions, [](const auto& work) { return work && work->result->native.active; }))
             throw std::logic_error("Command domain is closing");
         const auto native = buffer;
         std::vector<std::shared_ptr<impl::SubmissionWork>> submitted;
         for (const auto& work : submissions)
-            if (work && work->result->status == Completion::Status::SUBMITTED)
+            if (work && (work->result->status == Completion::Status::SUBMITTED || sync::native_pending(*work->result)))
                 submitted.push_back(work);
         std::vector<PresentationSnapshot> presentation;
         presentation.reserve(presentation_domains.size());
         for (const auto& domain : presentation_domains)
             presentation.push_back(snapshot_presentations(domain, native->command_pool->device->device));
-        const auto idle = operation::wait_device_idle(native->command_pool->device->device);
+        SubmissionSnapshot quarantine(native, presentation_domains);
+        auto idle = native->command_pool->device->lost ? vk::Result::eErrorDeviceLost : operation::wait_device_idle(native->command_pool->device->device);
+        if (native->command_pool->device->lost)
+            idle = vk::Result::eErrorDeviceLost;
         if (idle != vk::Result::eSuccess && idle != vk::Result::eErrorDeviceLost)
             vk::detail::throwResultException(idle, "Device idle failed");
+        quarantine.save_observations(static_cast<std::int32_t>(idle));
+        for (const auto& work : submitted)
+            sync::save_native_idle(*work, static_cast<std::int32_t>(idle));
         if (idle == vk::Result::eErrorDeviceLost) {
+            native->command_pool->device->lost = true;
             // 全snapshotへ損失を保存してからownerを外す。callbackからpeerのFenceを成功観測させない。
             for (const auto& work : submitted)
                 sync::save_terminal(*work, Completion::Status::FAILED, Completion::Failure::DEVICE_LOST, static_cast<std::int32_t>(idle));
@@ -101,6 +112,7 @@ namespace VSL_NAMESPACE::lifetime {
                 for (const auto& record : snapshot.records)
                     sync::fail_present(record->state, idle);
         }
+        quarantine.finish();
         for (const auto& snapshot : presentation)
             collect_quarantined_presentations(snapshot.domain->surface, native->command_pool->device->device, idle);
         for (const auto& work : submitted)
@@ -178,7 +190,7 @@ namespace VSL_NAMESPACE::lifetime {
         const auto submitted = domain->submissions;
         const size_t first = index.value_or(0), end = index ? size_t(*index) + 1 : native->command_buffers.size();
         for (size_t i = first; i < end; ++i)
-            if (const auto& work = submitted.at(i); work && Completion(work->result).status() == Completion::Status::SUBMITTED)
+            if (const auto& work = submitted.at(i); work && Completion(work->result).busy())
                 throw std::logic_error("Command buffer is still in GPU use");
         for (size_t i = first; i < end; ++i)
             operation::reset_command_buffer(native->command_buffers.at(i));

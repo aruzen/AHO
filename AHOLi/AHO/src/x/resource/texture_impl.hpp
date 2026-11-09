@@ -17,7 +17,7 @@ namespace AHO_NAMESPACE::x::resource {
     };
 
     inline Texture::Data::Data(VSL_NAMESPACE::LogicalDeviceAccessor device, std::uint32_t width, std::uint32_t height, VSL_NAMESPACE::data_format::Format format)
-        : image(device, width, height, format), width(width), height(height) {}
+        : ResourceUseState(VSL_NAMESPACE::UncertainUsePolicy::REQUIRE_RECREATION), image(device, width, height, format), width(width), height(height) {}
 
     inline void Texture::Data::Visit(const void* context, VSL_NAMESPACE::lifetime::DependencyNode::EdgeVisitor visitor, void* output) {
         visitor(output, static_cast<const Data*>(context)->image.resource_use().owner);
@@ -29,6 +29,8 @@ namespace AHO_NAMESPACE::x::resource {
             initialized = true;
             update = {};
         } else if (status == VSL_NAMESPACE::Completion::Status::FAILED) {
+            if (update.native_uncertain())
+                throw std::runtime_error("Texture state is uncertain; recreate the texture");
             if (update.failure() == VSL_NAMESPACE::Completion::Failure::DEVICE_LOST)
                 throw std::runtime_error("Texture device was lost; recreate the texture with a new device");
             update = {};

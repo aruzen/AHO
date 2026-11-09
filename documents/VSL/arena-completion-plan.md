@@ -230,3 +230,5 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 
 12dでBufferRefのraw field／構築、BufferViewのraw構築／legacy_owner、bindのraw入力／source getterと、一時Placed viewからの借用迂回を閉じた。頂点／index bindはImpl*と一つのResourceUseで所有・状態を持ち、native descriptor更新も元のmanaged composite nodeを保存する。転送元BufferViewを共通CopyBufferToImageへ接続し、source登録を画像barrier前へ移した。AHOは一度取得したsnapshotを使い、NativeBufferAdapterとcompatibilityを除去した。source専用retentionと具体StorageのTYPE／PROPERTY／Custom mappingは維持する。新VSL3件／AHO2件、全VSL1,139／AHO192・1,071／compile222、PNG3枚一致、strict43ファイル／32TU（補完を含む）、public consumer28種と旧入力拒否16種、Debug／Release／x86_64の寸法生成、artifact混在拒否が成功した。次はNative記録contextを用意し、残りの公開facadeと実定義の責務境界、同条件測定へ進む。
 
+12eでNativeRecordingContextを追加し、custom commandの記録を公開Implなしで検証できるようにした。既存CommandBuffer／Domainをpinし、Result／slot／世代／Native CBを保存して使用登録の前後に同じ記録か確かめる。Native借用区間のhost直列化とbarrier責務を明記し、新owner wrapperやWorkへの強所有は増やさない。既存compute／Typed barrierを移行し、新GPU4件、全VSL1,143／AHO192・1,071／compile224、同一描画、strict11ファイル／9TU、installed public consumer4種と新負例2種、archive／生成header一致が成功した。Implの定義とfingerprintは12dから不変で、同構成のmulti／crossとartifact guard検証を再利用する。次はCommand／起動資源等の残りの公開入口廃止へ進む。
+

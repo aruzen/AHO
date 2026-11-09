@@ -1,5 +1,6 @@
 #include <VSL/utils/typed_resource_bundle.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
+#include <VSL/lifetime/native_recording.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include "support/vulkan_fixture.hpp"
 
@@ -75,9 +76,11 @@ namespace {
         });
     }
     void host_read_barrier(vsl::CommandManager manager, std::uint32_t slot) {
-        auto buffer = manager.get_buffer();
+        const vsl::NativeRecordingContext recording(manager.get_buffer());
+        if (recording.slot() != slot)
+            throw std::logic_error("Host read barrier requires the selected frame slot");
         vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
-        buffer.data_->command_buffers.at(slot).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+        vk::CommandBuffer(recording.native_command_buffer()).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
     }
 
     TEST_F(TypedBundleVulkanIntegrationTest, AllocationPlanMatchesRealSetsAndIndependentBufferOwners) {

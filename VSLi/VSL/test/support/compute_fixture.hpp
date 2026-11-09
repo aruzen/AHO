@@ -2,6 +2,7 @@
 #include "vulkan_fixture.hpp"
 #include <VSL/vulkan/commands/dispatch.hpp>
 #include <VSL/vulkan/commands/push_content.hpp>
+#include <VSL/lifetime/native_recording.hpp>
 #include <optional>
 
 namespace vsl_test {
@@ -76,10 +77,8 @@ namespace vsl_test {
             vk::MemoryBarrier barrier{};
             barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
             barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
-            auto buffer = manager.get_buffer();
-            buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
-                vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {},
-                {});
+            const vsl::NativeRecordingContext recording(manager.get_buffer());
+            vk::CommandBuffer(recording.native_command_buffer()).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
         device.data_->device.waitIdle();
         auto mapped = output->data(COUNT * sizeof(std::uint32_t));

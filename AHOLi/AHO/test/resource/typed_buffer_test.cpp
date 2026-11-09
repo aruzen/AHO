@@ -8,6 +8,7 @@
 #include <VSL/utils/typed_pipeline.hpp>
 #include <VSL/utils/typed_resource_bundle.hpp>
 #include <VSL/vulkan/buffer_view.hpp>
+#include <VSL/lifetime/native_recording.hpp>
 #include "support/render_fixture.hpp"
 
 namespace {
@@ -155,9 +156,9 @@ namespace {
         EXPECT_THROW(uniform.reserve(128), std::logic_error);
         EXPECT_THROW(output.map(), std::logic_error);
         EXPECT_THROW(output.read(sizeof(zero)), std::logic_error);
-        auto buffer = manager.get_buffer();
+        const vsl::NativeRecordingContext recording(manager.get_buffer());
         vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
-        buffer.data_->command_buffers[0].pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+        vk::CommandBuffer(recording.native_command_buffer()).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         ASSERT_TRUE(output.wait());
         std::uint32_t result = 0;
@@ -182,9 +183,9 @@ namespace {
         phase << frame.bind_resources(pipeline).dispatch(1);
         EXPECT_TRUE(input.busy());
         EXPECT_THROW(input.write({}), std::logic_error);
-        auto buffer = manager.get_buffer();
+        const vsl::NativeRecordingContext recording(manager.get_buffer());
         vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
-        buffer.data_->command_buffers[0].pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+        vk::CommandBuffer(recording.native_command_buffer()).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         ASSERT_TRUE(phase.completion().wait());
         std::array<std::uint32_t, 1> output{};
@@ -213,9 +214,9 @@ namespace {
             EXPECT_FALSE(current.storage().ref().use().busy());
             EXPECT_THROW(input.write({}), std::logic_error);
             EXPECT_THROW(input.reserve(128), std::logic_error);
-            auto buffer = manager.get_buffer();
+            const vsl::NativeRecordingContext recording(manager.get_buffer());
             const vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
-            buffer.data_->command_buffers[0].pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+            vk::CommandBuffer(recording.native_command_buffer()).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
             ASSERT_TRUE(phase.completion().wait());
             std::uint32_t actual = 0;

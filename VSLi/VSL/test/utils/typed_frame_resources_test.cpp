@@ -1,4 +1,5 @@
 #include <VSL/utils/typed_frame_resources.hpp>
+#include <VSL/lifetime/native_recording.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include "support/vulkan_fixture.hpp"
 
@@ -192,9 +193,10 @@ namespace {
                     sets[slot] = current.set.backend().data_;
                 EXPECT_EQ(current.set.backend().data_, sets[slot]);
                 phase << pipeline.bind_resources(current.set).dispatch(1);
-                auto buffer = manager.get_buffer();
+                const vsl::NativeRecordingContext recording(manager.get_buffer());
                 vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
-                buffer.data_->command_buffers.at(slot).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+                ASSERT_EQ(recording.slot(), slot);
+                vk::CommandBuffer(recording.native_command_buffer()).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
                 previous[slot] = phase.completion();
                 ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
                 commands.next();

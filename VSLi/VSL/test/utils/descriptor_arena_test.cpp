@@ -3,6 +3,7 @@
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/descriptor_storage.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
+#include <VSL/lifetime/native_recording.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/vulkan/commands/image_upload.hpp>
 #include <VSL/vulkan/commands/image_readback.hpp>
@@ -53,9 +54,8 @@ namespace {
     }
     void make_host_visible(vsl::CommandManager manager) {
         const vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
-        auto buffer = manager.get_buffer();
-        buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
-            vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+        const vsl::NativeRecordingContext recording(manager.get_buffer());
+        vk::CommandBuffer(recording.native_command_buffer()).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
     }
     Pipeline DescriptorArenaVulkanIntegrationTest::make_pipeline() {
         vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_frame.comp.spv"));

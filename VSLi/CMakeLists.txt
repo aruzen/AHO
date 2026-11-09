@@ -43,6 +43,10 @@ add_library(VSL STATIC
         VSL/src/lifetime/pipeline_recipe.cpp
         VSL/include/VSL/lifetime/pipeline_recipe.hpp
         VSL/src/lifetime/resource_use.cpp
+        VSL/include/VSL/lifetime/native_recording.hpp
+        VSL/src/lifetime/native_recording.cpp
+        VSL/src/private/VSL/operation/native_recording.hpp
+        VSL/src/operation/native_recording.cpp
         VSL/src/lifetime/descriptor_bindings.cpp
         VSL/src/lifetime/descriptor_storage.cpp
         VSL/src/lifetime/logical_use_state.cpp

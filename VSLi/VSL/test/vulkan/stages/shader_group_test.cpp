@@ -183,3 +183,25 @@ namespace {
         EXPECT_EQ(layout.recipe().shaders[1]->shader_module, ShaderAccess::Owned(fragment)->shader_module);
     }
 } // namespace
+
+namespace {
+    TEST_F(ShaderGroupVulkanIntegrationTest, RetiredShaderInjectionLeavesTheRecipeUnchangedAndStillAllowsRemoval) {
+        const vsl::Shader<vsl::ShaderType::FRAGMENT> ready(device, vsl_test::shader_path("triangle.frag.spv"));
+        const vsl::Shader<vsl::ShaderType::VERTEX> shader(device, vsl_test::shader_path("triangle.vert.spv"));
+        vsl::pipeline_layout::ShaderGroup group("retiring", {ready, shader});
+        auto layout = make_layout_state();
+        const auto shaders = layout.recipe().shaders;
+        const auto sources = layout.recipe().sources;
+        const auto indices = layout.recipe().shader_sources;
+        const auto native = ShaderAccess::Owned(shader)->shader_module;
+        const_cast<vsl::lifetime::DependencyNode*>(ShaderAccess::Owned(shader)->owner_node)->retire();
+        EXPECT_THROW(group.injection(layout), std::invalid_argument);
+        EXPECT_EQ(layout.recipe().shaders, shaders);
+        EXPECT_EQ(layout.recipe().sources, sources);
+        EXPECT_EQ(layout.recipe().shader_sources, indices);
+        EXPECT_EQ(ShaderAccess::Owned(shader)->shader_module, native);
+        EXPECT_NO_THROW(group.remove_shader(shader));
+        ASSERT_EQ(ShaderGroupAccess::Data(group)->shaders.size(), 1u);
+        EXPECT_EQ(ShaderGroupAccess::Data(group)->shaders.front(), ShaderAccess::Owned(ready));
+    }
+} // namespace

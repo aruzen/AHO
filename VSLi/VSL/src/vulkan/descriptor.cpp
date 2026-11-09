@@ -1,3 +1,4 @@
+#include <VSL/lifetime/owner_validation.hpp>
 //
 // Created by morimoto_hibiki on 2025/06/09.
 //
@@ -155,6 +156,7 @@ VSL_NAMESPACE::DescriptorIdentity VSL_NAMESPACE::graphic_resource::Resource::ide
 }
 
 VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::graphic_resource::Resource::owner_ref() const {
+    lifetime::detail::require_live_owner(_owner);
     return _owner;
 }
 

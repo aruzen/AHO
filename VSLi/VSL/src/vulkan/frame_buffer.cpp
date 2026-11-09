@@ -1,3 +1,4 @@
+#include <VSL/lifetime/owner_validation.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/identity_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
@@ -63,6 +64,7 @@ namespace VSL_NAMESPACE {
         return lifetime::device_from_child(_owner);
     }
     lifetime::OwnerRef FrameBufferAccessor::owner_ref() const {
+        lifetime::detail::require_live_owner(_owner);
         return _owner;
     }
     size_t FrameBufferAccessor::frame_count() const {

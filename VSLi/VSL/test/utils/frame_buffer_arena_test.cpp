@@ -515,3 +515,23 @@ namespace {
         ExpectTriangleColor(pixel);
     }
 } // namespace
+
+namespace {
+    TEST_F(FrameBufferArenaVulkanIntegrationTest, RetiredOwnersCannotPublishFrameBufferOwnership) {
+        constexpr std::array<t::ResourceRequest, 1> requests{{{{1}, vsl::storage::ResourceKind::FRAME_BUFFER}}};
+        constexpr t::ResourcePlan<1> plan(requests);
+        const std::array<l::ResourceInit, 1> initializers{input()};
+        l::ResourceArena arena(device, plan, initializers);
+        auto target = arena.frame_buffer({1});
+        const auto native = GraphicsAccess::Owned(target)->swap_chain_framebuffers;
+        const_cast<l::DependencyNode*>(GraphicsAccess::Owned(target)->owner_node)->retire();
+        EXPECT_THROW(target.owner_ref(), std::invalid_argument);
+        auto copied = target;
+        vsl::FrameBufferAccessor moved(std::move(copied));
+        copied.swap(moved);
+        EXPECT_TRUE(copied);
+        EXPECT_FALSE(moved);
+        EXPECT_EQ(GraphicsAccess::Owned(copied)->swap_chain_framebuffers, native);
+        EXPECT_NO_THROW(copied = {});
+    }
+} // namespace

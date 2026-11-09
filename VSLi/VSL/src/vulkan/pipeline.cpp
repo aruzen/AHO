@@ -1,3 +1,4 @@
+#include <VSL/lifetime/owner_validation.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/shader_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
@@ -53,6 +54,7 @@ namespace VSL_NAMESPACE {
         return lifetime::device_from_child(_owner);
     }
     lifetime::OwnerRef PipelineAccessor::owner_ref() const {
+        lifetime::detail::require_live_owner(_owner);
         return _owner;
     }
     GraphicsPipeline::GraphicsPipeline(PipelineLayoutAccessor layout, RenderPassAccessor pass, std::uint32_t subpass) {

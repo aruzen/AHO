@@ -522,3 +522,15 @@ copy／noexcept move／by-value代入／swapは全値を公開してから旧own
 互換性変更は公開 `data_` とraw shared_ptr／OwnedRef constructorの廃止である。利用側は通常生成またはarena getterを使い、有無判定は `bool(value)`、元Deviceは `get_device()`、外部寿命保持は `owner_ref()` へ移行する。AHO製品側は同期facadeのmoveとpublic boolへ接続し、privateヘッダーを使わない。private bridge、registryのshared所有、Work／Proofへ渡すShared境界、native配列と同期状態内のvector確保は残る。
 
 追加runtime6件はmanaged composite拒否、同名置換の再入、Holder／Manager代入時の自己解放、copy／move／swap、退役nodeの拒否とNative不変を確認する。既存の予約・配列先行検査・観測再入・外部import・同root保持・完了／取消の試験も再利用した。macOS arm64／Clang20／C++26／MoltenVK・validation・ASan／UBSanで、全VSL1,183成功（既知format3 skip）、AHO GPU192／CPU1,071、compile306、同一PNG3枚、strict23files／21TUと補完1／1・2／2、installed consumer30種・公開正例1＋負例11、構成別／cross寸法、混在拒否、archive／header一致を確認した。次は他のgeneric facadeに残る既知nodeの退役検査を共通境界へ復元し、その後Swapchainの所有値と画像一覧を閉じる。
+
+## 退役済みownerの公開・登録の検査
+
+private `lifetime/owner_validation.hpp` の `require_live_owner` は、保持済みOwnedRefの既知nodeだけをconst参照で検査する。Shader／RenderPass／PipelineLayout／Pipeline／FrameBuffer／Resourceのowner_ref、BufferAccessor／Image／SamplerのResourceUse factory、ShaderGroupのrecipe依存登録へ、旧owned_ref→node.refが行っていた退役拒否を復元した。
+
+元nodeとcontrol blockを保存し、検証のためのOwnerRefコピーや新しいowner wrapperを作らない。generic資源にSyncのcanonical条件を強制せず、opaque ownerを許容する。managed compositeではその既知nodeの退役を検査する。updating拒否は追加しない。
+
+既存ownerのcopy／move／swap／解放、既に取得済みの使用状態の観測、ShaderGroupからの削除を一律に禁止しない。ShaderGroupは従来のDevice／stage検証後に退役を検査し、scratch内で全Shaderを準備してからrecipeの3vectorを交換する。後半のShaderで失敗しても元recipeを変更しない。
+
+この補修は旧検査の消失を復元する範囲である。以前から独立していたBufferView::resource_useとResourceUseGroup::ForDescriptorの入口は今回変更しないため、全ResourceUseの一律の退役拒否という保証ではない。既存viewの保持契約や取消・回収を、この補修だけで厳格化しない。
+
+有効なNative資源を保持したままnodeを退役させる新6件は、同じABIの親libraryでは6件とも失敗し、修正版では全成功した。比較時もvalidation／ASan／UBSanエラーはない。型・slot・公開headerは変更せず、生成IDは親と同じdbfを維持した。規約検査は14files／13TUと補強1file／1TUが違反0、installed consumer30種、private非配布とarchive／生成header一致も確認した。全体はVSL1,189成功（既知format3 skip）、AHO GPU192／CPU1,071、heap／arenaの3PNG一致を確認した。公開headerと配置入力が不変のため、親のcompile306・構成別／cross寸法とABI検証は再実行していない。

@@ -151,6 +151,7 @@
     <ClInclude Include="VSL\include\VSL\lifetime\owner_ref.hpp" />
     <ClInclude Include="VSL\include\VSL\lifetime\dependency_node.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\owner_access.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\owner_validation.hpp" />
     <ClInclude Include="VSL\include\VSL\sync\resource_use_state.hpp" />
     <ClInclude Include="VSL\include\VSL\sync\completion.hpp" />
     <ClInclude Include="VSL\include\VSL\operation\buffer_create_info.hpp" />

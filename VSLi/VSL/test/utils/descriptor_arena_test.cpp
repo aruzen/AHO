@@ -805,3 +805,45 @@ namespace {
         EXPECT_EQ(execute_set(pipeline, make_manager().independent(1), second, b.buffer({2})), 107u);
     }
 } // namespace
+
+namespace {
+    TEST_F(DescriptorArenaVulkanIntegrationTest, RetiredOwnersCannotPublishDescriptorOwnership) {
+        const auto initializers = inputs();
+        l::ResourceArena arena(device, PLAN, initializers);
+        const auto resource = arena.descriptor_set({101});
+        const auto native = DescriptorAccess::Owned(resource)->descriptor_set;
+        const_cast<l::DependencyNode*>(DescriptorAccess::Owned(resource)->owner_node)->retire();
+        EXPECT_THROW(resource.owner_ref(), std::invalid_argument);
+        EXPECT_EQ(DescriptorAccess::Owned(resource)->descriptor_set, native);
+    }
+    TEST_F(DescriptorArenaVulkanIntegrationTest, KnownCompositeNodesAreValidatedWithoutRestrictingOpaqueOwners) {
+        struct Composite {
+            l::DependencyNode node;
+            l::OwnerRef source;
+            explicit Composite(l::OwnerRef source) : source(std::move(source)) {}
+            ~Composite() { node.retire(); }
+            static void Visit(const void* context, l::DependencyNode::EdgeVisitor visitor, void* output) {
+                visitor(output, static_cast<const Composite*>(context)->source);
+            }
+        };
+        const auto initializers = inputs();
+        l::ResourceArena arena(device, PLAN, initializers);
+        const auto original = arena.descriptor_set({101});
+        const auto native = DescriptorAccess::Owned(original)->descriptor_set;
+        auto context = std::make_shared<Composite>(original.owner_ref());
+        context->node.publish(context, context.get(), Composite::Visit);
+        auto* target = DescriptorAccess::Owned(original).get();
+        const auto composite = DescriptorAccess::FromOwned(context->node.ref(context).alias(target));
+        const auto opaque = DescriptorAccess::FromShared(std::shared_ptr<vsl::impl::GraphicResourceImpl>(context, target));
+        const auto exported = composite.owner_ref();
+        EXPECT_TRUE(exported.managed());
+        EXPECT_FALSE(exported.share().owner_before(context));
+        EXPECT_FALSE(context.owner_before(exported.share()));
+        EXPECT_FALSE(opaque.owner_ref().managed());
+        context->node.retire();
+        EXPECT_THROW(composite.owner_ref(), std::invalid_argument);
+        EXPECT_FALSE(opaque.owner_ref().managed());
+        EXPECT_TRUE(original.owner_ref().managed());
+        EXPECT_EQ(DescriptorAccess::Owned(original)->descriptor_set, native);
+    }
+} // namespace

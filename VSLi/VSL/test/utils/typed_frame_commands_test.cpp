@@ -19,11 +19,12 @@ namespace {
     };
     t::TypedFrameCommands TypedFrameCommandsVulkanIntegrationTest::make_commands(std::uint32_t count) {
         if (GetParam())
-            return t::TypedFrameCommands(device, count, t::ArenaStorage<>{});
+            return t::TypedFrameCommands(device, count);
         return t::TypedFrameCommands(device, count, t::HeapStorage{});
     }
-    TEST(TypedFrameCommandsTest, PoliciesAreExplicitAndFacadeIsMovableButNotCopyable) {
-        static_assert(!std::is_constructible_v<t::TypedFrameCommands, vsl::LogicalDeviceAccessor, std::uint32_t>);
+    TEST(TypedFrameCommandsTest, DefaultsToArenaAndFacadeIsMovableButNotCopyable) {
+        static_assert(std::same_as<t::DefaultStorage, t::ArenaStorage<>>);
+        static_assert(std::is_constructible_v<t::TypedFrameCommands, vsl::LogicalDeviceAccessor, std::uint32_t>);
         static_assert(std::is_constructible_v<t::TypedFrameCommands, vsl::LogicalDeviceAccessor, std::uint32_t, t::HeapStorage>);
         static_assert(std::is_constructible_v<t::TypedFrameCommands, vsl::LogicalDeviceAccessor, std::uint32_t, t::ArenaStorage<>>);
         static_assert(!std::is_copy_constructible_v<t::TypedFrameCommands> && !std::is_copy_assignable_v<t::TypedFrameCommands>);

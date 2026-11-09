@@ -74,6 +74,7 @@ namespace VSL_NAMESPACE::typed {
         return {CommandManager::FromBuffer(buffer), {lifetime::make_heap_fence(device, {count, false})}};
     }
     TypedFrameCommands::TypedFrameCommands(Resources resources) : TypedFrameCommands(std::move(resources.manager), std::move(resources.fence)) {}
+    TypedFrameCommands::TypedFrameCommands(LogicalDeviceAccessor device, std::uint32_t count) : TypedFrameCommands(std::move(device), count, DefaultStorage{}) {}
     TypedFrameCommands::TypedFrameCommands(LogicalDeviceAccessor device, std::uint32_t count, ArenaStorage<>) : TypedFrameCommands(MakeArena(device, count)) {}
     TypedFrameCommands::TypedFrameCommands(LogicalDeviceAccessor device, std::uint32_t count, HeapStorage) : TypedFrameCommands(MakeHeap(device, count)) {}
     TypedFrameCommands::TypedFrameCommands(CommandManager manager, FenceHolder fence) : _domain(std::move(manager)), _fence(std::move(fence)) {

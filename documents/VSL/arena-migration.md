@@ -2,6 +2,31 @@
 
 2026-11-08追記: 以後の最終範囲と実装順序は[完了計画](arena-completion-plan.md)を参照。Instance／Deviceの配置、Typedのarena既定化、旧公開入口の廃止まで対象とする。以下は既存の実装経緯を含む。
 
+## 順序11aの生成既定と移行
+
+`storage/typed_storage_policy.hpp`の`DefaultStorage`は`ArenaStorage<>`を表す。TypedResourceBundle／TypedResourceFrame／TypedSharedResourcesの省略時policyと、TypedFrameCommandsの2引数生成はこの既定を使う。単体TypedBuffer／TypedPipelineの生成policyは後続11bで扱い、今回だけで全Typed生成をarenaへ移したとはしない。
+
+```cpp
+using Bundle = t::TypedResourceBundle<Allocation>; // arena
+using HeapBundle = t::TypedResourceBundle<Allocation, t::HeapStorage>;
+t::TypedFrameCommands commands(device, 3); // arena
+t::TypedFrameCommands heap_commands(device, 3, t::HeapStorage{});
+```
+
+保持の既定COMPLETIONと固定依存FIXEDは配置と独立して維持する。heap／arena比較には同じ保持契約を使い、`aho-typed-example`は明示HeapStorage、arena版は明示ArenaStorageを選ぶ。
+
+既定Bundleの`buffer()`はPlacedResourceBufferViewを返し、`backend()`はBufferViewとなる。旧BufferAccessorの`.data_`や直接mappingへ依存する場合は明示HeapStorageで移行を分けられる。通常の読み取りは`buffer.read_into(destination)`へ、所有境界の観測は`buffer.backend().owner_ref()`へ移す。callbackの具体型は`Bundle::Frame`／`Bundle::Shared`を使うと、選択したpolicyと型を揃えられる。
+
+arena生成は渡されたdescriptor Managerの`allocate()` overrideを使わない。元Managerの所有とDeviceの検査は維持するが、独自allocatorやその失敗hookが必要な利用は明示HeapStorageを選ぶ。既定templateの具体型が変わるため、その型を公開する利用側ライブラリも含めて再buildする。
+
+```cpp
+std::array<std::uint32_t, 1> result{};
+// GPU完了を観測した後に結果をCPU側の値へコピーする。
+frame.buffer<0, 1>().read_into(result);
+```
+
+CPU arenaの配置単位とSHARED／PER_FRAMEの寿命群は変えず、Vulkan device memoryや内部vectorの確保も統合しない。公開APIと内部確保の残りは11b／12で扱い、性能向上率は未測定である。
+
 2026-11-06。Bufferの4責務分離が統合されたmaster `6b1f0166`を基点とする。[Bufferの契約](buffer-generation-contracts.md)と[責務の配置](buffer-layer-layout.md)を維持する。
 
 ## 方針と段階
@@ -49,7 +74,7 @@ auto shared_bytes = placement.bytes(t::ResourceScope::SHARED);
 ## B: bundleと保持の接続
 
 ```cpp
-using HeapBundle = t::TypedResourceBundle<Allocation>; // 従来の既定
+using HeapBundle = t::TypedResourceBundle<Allocation, t::HeapStorage>;
 using ArenaBundle = t::TypedResourceBundle<Allocation, t::ArenaStorage<Map>>;
 ArenaBundle bundle(manager, descriptors, sizes);
 bundle.initialize_shared([](ArenaBundle::Shared& shared) {
@@ -70,7 +95,7 @@ phase.completion().wait();
 
 公開viewとbundle中のviewはarenaを保持するが、CPU領域内のImplはarenaを所有しない。frameからsharedへ所有が向く一方、sharedからframeへの参照は作らない。一つのshared viewはframe arenaを保持しない。
 
-`ResourceRetention::SUBMISSION`は従来どおりSubmission所有者の寿命まで保持する。`COMPLETION`はGPU完了観測／記録取消でlifetime側のpinを解放する。arena policyはframeの保持、Typed descriptor、外部資源の追加論理制約をすべてCOMPLETIONへ接続する。heap policyの保持契約は変えない。資源自体が持つ使用状態はどちらのpolicyでも共通で、同期の新しい状態を増設しない。
+`ResourceRetention::SUBMISSION`はSubmission所有者の寿命まで保持する。`COMPLETION`はGPU完了観測／記録取消でlifetime側のpinを解放する。現在は[保持期間の独立指定](typed-lifetime-boundaries.md)により、heap／arenaともframeの保持、Typed descriptor、外部資源の追加論理制約を同じ既定COMPLETIONへ接続し、旧SUBMISSIONは明示選択する。資源自体が持つ使用状態はどちらのpolicyでも共通で、同期の新しい状態を増設しない。
 
 commandを生存させている場合はcommand自身の保持も残る。GPU完了だけで、利用者が保存したviewやcommandまで無効化しない。native descriptorへの接続にはaliasing shared_ptrを使う移行adapterが残り、descriptor本体のarena化は段階5で扱う。
 

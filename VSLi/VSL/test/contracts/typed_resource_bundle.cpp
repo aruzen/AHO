@@ -17,6 +17,11 @@ namespace {
     using OwnedSchema = t::ResourceAllocationSchema<Textures, t::TextureAllocation<1, 2>>;
     using Owned = t::TypedResourceBundle<OwnedSchema, Storage>;
 #if VSL_TYPED_CASE == 0
+    using DefaultBundle = t::TypedResourceBundle<Allocation>;
+    static_assert(std::same_as<t::DefaultStorage, t::ArenaStorage<>>);
+    static_assert(std::same_as<DefaultBundle, t::TypedResourceBundle<Allocation, t::DefaultStorage>>);
+    static_assert(std::same_as<DefaultBundle::Frame, t::TypedResourceFrame<Allocation>>);
+    static_assert(std::same_as<DefaultBundle::Shared, t::TypedSharedResources<Allocation>>);
     static_assert(!std::is_copy_constructible_v<Bundle> && std::is_nothrow_move_constructible_v<Bundle>);
     static_assert(!std::is_copy_constructible_v<Bundle::Frame>);
     void accepted(vsl::CommandManager manager, vsl::graphic_resource::ManagerInterface& descriptors, const vsl::ComputePhase& phase, const t::TypedTexture& texture) {

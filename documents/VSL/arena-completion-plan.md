@@ -208,3 +208,9 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 
 10e4で共有closed状態と全ownerの退避、titlebarを含む共通close、対象Phaseの取消、弱いSurface退役queueと結果commit後の回収を接続した。Native中は同Deviceへの返却操作を延期し、未完了Workは元CB owner付きで保持する。AHO既定FBO保持は独立したCOMPLETION指定とし、通常VSLのSUBMISSION互換を維持する。新VSL7／AHO8と既存回帰、全VSL1,124／AHO190・1,071／compile195、同一描画、strict・public installを検証し、順序10の受入条件を満たした。
 
+## 順序11の分割
+
+11aでBundle／Frame／Sharedの省略時policyを`DefaultStorage = ArenaStorage<>`へ揃え、TypedFrameCommandsに2引数の既定arena生成を追加した。保持COMPLETIONと固定依存FIXEDは独立して維持する。旧backend型やcustom Managerのallocateに依存する利用は明示HeapStorageへ移し、通常の読み取りはread_intoへ接続する。既存のarena寿命／GPU試験を既定policyで再利用し、全VSL1,124／AHO190・1,071／compile195、heap／arenaのPNG一致、strict9ファイル／8TU、installed public consumer28種が成功した。
+
+11bでは単体TypedVertex／Index／ResourceBufferとTypedGraphics／ComputePipelineの生成policyを接続する。Bufferは同じBufferViewへ正規化し、固定容量・Index snapshot・共有物理状態・AHOの論理制約を維持する。PipelineはCPU recipeの検証をNative Layout生成より先へ分け、共通backendでLayout／Pipelineを配置する。11aだけで全Typed生成のarena既定化を完了としない。公開Impl入口・adapter廃止と測定は12へ続く。
+

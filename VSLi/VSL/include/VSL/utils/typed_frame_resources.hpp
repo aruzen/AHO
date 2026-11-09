@@ -35,6 +35,7 @@ namespace VSL_NAMESPACE::typed {
         static Resources MakeHeap(LogicalDeviceAccessor device, std::uint32_t count);
 
     public:
+        TypedFrameCommands(LogicalDeviceAccessor device, std::uint32_t count);
         TypedFrameCommands(LogicalDeviceAccessor device, std::uint32_t count, ArenaStorage<>);
         TypedFrameCommands(LogicalDeviceAccessor device, std::uint32_t count, HeapStorage);
         TypedFrameCommands(CommandManager manager, FenceHolder fence);

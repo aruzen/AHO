@@ -9,4 +9,5 @@ namespace VSL_NAMESPACE::typed {
     struct ArenaStorage {
         using Bindings = Bindings_;
     };
+    using DefaultStorage = ArenaStorage<>;
 } // namespace VSL_NAMESPACE::typed

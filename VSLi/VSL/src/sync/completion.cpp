@@ -119,7 +119,8 @@ namespace VSL_NAMESPACE::sync {
         }
         if (work.result->status == Completion::Status::PENDING)
             publish_terminal(work, Completion::Status::CANCELLED);
-        while (work.result->status == Completion::Status::SUBMITTED) {
+        while (work.result->status == Completion::Status::SUBMITTED ||
+               (native_pending(*work.result) && work.result->native.enqueue == SubmissionEnqueue::ENQUEUED)) {
             lifetime::SubmissionObservation observation(work);
             if (!observation.active())
                 return;

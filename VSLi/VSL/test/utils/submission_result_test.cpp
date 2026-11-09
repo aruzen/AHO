@@ -11,6 +11,10 @@ namespace {
         std::shared_ptr<vsl::impl::SubmissionWork> work;
         ~CPUWorkScope();
     };
+    struct WaitObservation {
+        std::weak_ptr<int> owner;
+        unsigned waits = 0;
+    };
     std::shared_ptr<vsl::impl::SubmissionWork> pending_work();
     CPUWorkScope::~CPUWorkScope() {
         work->result->native.active = false;
@@ -33,6 +37,35 @@ namespace {
         EXPECT_FALSE(empty.ready());
         EXPECT_FALSE(empty.wait(0));
         EXPECT_THROW(empty.retain(std::make_shared<int>(7)), std::logic_error);
+    }
+    TEST(SubmissionResultTest, LogicalFailureStillWaitsForAKnownEnqueuedNativeUseBeforeReleasingOwners) {
+        auto work = pending_work();
+        const CPUWorkScope cleanup{work};
+        work->device = std::make_shared<vsl::impl::LogicalDeviceImpl>();
+        vsl::sync::save_submit_result(*work->result, VK_SUCCESS);
+        vsl::sync::save_terminal(*work, Status::FAILED, Failure::SUBMIT_FAILED, VK_ERROR_UNKNOWN);
+        WaitObservation observed;
+        {
+            auto owner = std::make_shared<int>(1);
+            observed.owner = owner;
+            work->completion_resources.push_back(owner);
+        }
+        const vsl::operation::ScopedSubmissionNativeCalls native({.context = &observed,
+                                                                  .wait_fences = [](void* context, VkDevice, std::uint32_t, const VkFence*, VkBool32, std::uint64_t) noexcept {
+                                                                      auto& observation = *static_cast<WaitObservation*>(context);
+                                                                      EXPECT_FALSE(observation.owner.expired());
+                                                                      ++observation.waits;
+                                                                      return VK_SUCCESS;
+                                                                  }});
+        vsl::sync::finish_submission(*work);
+        EXPECT_EQ(observed.waits, 1u);
+        EXPECT_TRUE(observed.owner.expired());
+        EXPECT_FALSE(vsl::sync::native_pending(*work->result));
+        EXPECT_EQ(work->result->status, Status::FAILED);
+        EXPECT_EQ(work->result->failure, Failure::SUBMIT_FAILED);
+        EXPECT_EQ(work->result->error_code, VK_ERROR_UNKNOWN);
+        vsl::sync::finish_submission(*work);
+        EXPECT_EQ(observed.waits, 1u);
     }
     TEST(SubmissionResultTest, SubmitClassificationSeparatesLogicalFailureFromNativeUse) {
         for (const auto native : {VK_SUCCESS, VK_ERROR_OUT_OF_HOST_MEMORY, VK_ERROR_OUT_OF_DEVICE_MEMORY, VK_ERROR_DEVICE_LOST, VK_ERROR_UNKNOWN, VK_ERROR_VALIDATION_FAILED_EXT}) {

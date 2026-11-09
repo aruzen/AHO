@@ -234,7 +234,7 @@ namespace {
         t::TypedUniformBuffer<std::uint32_t> external(device, std::uint32_t{99});
         EXPECT_THROW(set->write<0>(external), std::invalid_argument);
         auto native = set->backend();
-        EXPECT_THROW(native.update(&external.backend()), std::invalid_argument);
+        EXPECT_THROW(native.update(external.backend()), std::invalid_argument);
         EXPECT_THROW(set->write<0>(UniformView::FromView(arena->buffer({1}), 1, 0, {unknown, {}})), std::invalid_argument);
         EXPECT_THROW(set->resource_use()->replace(0, {{unknown, {}}}), std::invalid_argument);
         EXPECT_NO_THROW(set->require_complete());
@@ -259,13 +259,13 @@ namespace {
         const t::ResourcePlan<8> plan(requests);
         std::optional<l::ResourceArena> arena;
         std::optional<TypedSet> set;
-        std::weak_ptr<vsl::impl::BufferImpl> external_owner;
+        std::weak_ptr<void> external_owner;
         {
             t::TypedUniformBuffer<std::uint32_t> external(device, std::uint32_t{61});
-            external_owner = external.backend().data_;
+            external_owner = external.storage_view().owner();
             const auto base = inputs();
             const std::array<l::ResourceInit, 8> initializers{base[0], base[1], base[2], base[3], base[4], base[5], base[6],
-                                                              vsl::BufferView::FromBuffer(external.backend())};
+                                                              external.storage_view()};
             arena.emplace(device, plan, initializers);
             set.emplace(TypedSet::FromResource(device, arena->descriptor_set({101}), vsl::ResourceRetention::COMPLETION));
             set->write<0>(UniformView::FromView(arena->buffer({9}), 1));
@@ -616,7 +616,7 @@ namespace {
         EXPECT_THROW(second.write<0>(UniformView::FromView(b.buffer({1}), 1, 0, {logical, a.owner_ref()})), std::invalid_argument);
         t::TypedUniformBuffer<std::uint32_t> replacement(device, std::uint32_t{7});
         auto native = array.backend();
-        native.update(&replacement.backend(), 0);
+        native.update(replacement.backend(), 0);
         EXPECT_EQ(native.data_->bindings.at(0).size(), 2u);
         EXPECT_THROW(second.write<0>(UniformView::FromView(b.buffer({1}), 1, 0, {logical, a.owner_ref()})), std::invalid_argument);
         const auto local = UniformView::FromView(a.buffer({1}), 1);

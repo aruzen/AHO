@@ -46,6 +46,27 @@ namespace {
         EXPECT_THROW(typed.bind_vertices(position_view, color_view).draw(4), std::out_of_range);
         EXPECT_THROW(position_view.view(3, 1), std::out_of_range);
     }
+    TEST_F(TypedViewVulkanIntegrationTest, DeviceLocalVertexViewsKeepTheirSelectedRangesAfterTheirWrappersAreDestroyed) {
+        const std::array<Position, 5> positions{{{{99, 99}}, {{99, 99}}, {{-1, -1}}, {{3, -1}}, {{-1, 3}}}};
+        const std::array<Color, 5> colors{{{{1, 0, 0}}, {{1, 0, 0}}, {{.25f, .5f, .75f}}, {{.25f, .5f, .75f}}, {{.25f, .5f, .75f}}}};
+        auto typed = make_typed<Input>(*pass);
+        auto verify = [&](auto policy) {
+            auto manager = make_manager();
+            const auto position_view = [&] {
+                t::TypedVertexBuffer<Position, vsl::MemoryProperty::DEVICE_LOCAL> buffer(device, manager, positions, policy);
+                return buffer.view(1, 4).view(1, 3);
+            }();
+            const auto color_view = [&] {
+                t::TypedVertexBuffer<Color, vsl::MemoryProperty::DEVICE_LOCAL> buffer(device, manager, colors, policy);
+                return buffer.view(2, 3);
+            }();
+            EXPECT_EQ(position_view.storage_view().byte_offset(), 2 * sizeof(Position));
+            EXPECT_EQ(color_view.storage_view().byte_offset(), 2 * sizeof(Color));
+            ExpectTriangleColor(render([&](auto& stream) { stream << typed.bind_vertices(position_view, color_view).draw(3); }));
+        };
+        verify(t::HeapStorage{});
+        verify(t::ArenaStorage<>{});
+    }
     TEST_F(TypedViewVulkanIntegrationTest, StorageDescriptorViewWritesOnlyTheSelectedBufferRange) {
         using Set = t::DescriptorSet<0, t::StorageBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
         using Resources = t::ResourceSchema<Set>;
@@ -70,8 +91,8 @@ namespace {
             native.data_->command_buffers[native.get_current_buffer_idx()].pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
         device.data_->device.waitIdle();
-        auto mapped = storage.backend().data();
-        const auto* actual = static_cast<const std::uint32_t*>(mapped.data);
+        std::vector<std::uint32_t> actual(zero.size());
+        storage.read_into(actual);
         for (size_t i = 0; i < first; ++i)
             EXPECT_EQ(actual[i], 777u);
         for (size_t i = 0; i < 4; ++i)
@@ -85,10 +106,10 @@ namespace {
         std::vector<std::uint32_t> values(first + 1, 7);
         vsl::GraphicResourceManager manager(device);
         t::TypedDescriptorSet<Set> set(device, manager);
-        std::weak_ptr<vsl::impl::BufferImpl> owner;
+        std::weak_ptr<void> owner;
         {
             t::TypedUniformBuffer<std::uint32_t> buffer(device, values);
-            owner = buffer.backend().data_;
+            owner = buffer.storage_view().owner();
             if (alignment > sizeof(std::uint32_t))
                 EXPECT_THROW(set.write<0>(buffer.view(1, 1)), std::invalid_argument);
             set.write<0>(buffer.view(first, 1));

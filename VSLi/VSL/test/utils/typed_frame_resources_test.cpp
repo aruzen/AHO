@@ -181,8 +181,9 @@ namespace {
                 if (previous[slot])
                     EXPECT_EQ(previous[slot].status(), vsl::Completion::Status::COMPLETE);
                 frames.update(phase, [&](ComputeResources& resources) {
-                    auto mapped = resources.output.backend().data();
-                    EXPECT_EQ(*static_cast<const std::uint32_t*>(mapped.data), resources.expected);
+                    std::array<std::uint32_t, 1> actual{};
+                    resources.output.read_into(actual);
+                    EXPECT_EQ(actual.front(), resources.expected);
                     resources.expected = iteration + 100;
                     resources.uniform.copy(std::span(&resources.expected, 1));
                 });
@@ -204,9 +205,9 @@ namespace {
             for (size_t index = 0; index < frames.frame_count(); ++index) {
                 auto phase = commands.start_compute();
                 const auto& current = frames.get(phase);
-                auto buffer = current.output.backend();
-                auto mapped = buffer.data();
-                EXPECT_EQ(*static_cast<const std::uint32_t*>(mapped.data), current.expected);
+                std::array<std::uint32_t, 1> actual{};
+                current.output.read_into(actual);
+                EXPECT_EQ(actual.front(), current.expected);
                 phase.cancel();
                 commands.next();
             }

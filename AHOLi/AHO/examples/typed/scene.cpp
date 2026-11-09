@@ -22,7 +22,7 @@ namespace typed_example {
 
     Scene::Scene(aho::Window window, const std::filesystem::path& shaders)
         : _window(std::move(window)), _context(_window.render_context()),
-          _vertices(_context.device(), VERTICES), _indices(_context.device(), INDICES),
+          _vertices(_context.device(), VERTICES, Storage{}), _indices(_context.device(), INDICES, Storage{}),
           _resources(_context.commands(), _context.descriptor_manager()),
           _vertex_shader(_context.device(), shaders / "scene.vert.spv"), _fragment_shader(_context.device(), shaders / "scene.frag.spv") {
         _resources.initialize_shared([](Bundle::Shared& shared) {

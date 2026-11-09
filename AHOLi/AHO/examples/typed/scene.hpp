@@ -34,10 +34,11 @@ namespace typed_example {
     using Allocation = t::ResourceAllocationSchema<Resources, t::BufferAllocation<0, 0>,
                                                    t::BufferAllocation<1, 0, t::FixedElements<1>, t::ResourceScope::SHARED>>;
 #ifdef AHO_TYPED_ARENA
-    using Bundle = t::TypedResourceBundle<Allocation, t::ArenaStorage<>>;
+    using Storage = t::ArenaStorage<>;
 #else
-    using Bundle = t::TypedResourceBundle<Allocation, t::HeapStorage>;
+    using Storage = t::HeapStorage;
 #endif
+    using Bundle = t::TypedResourceBundle<Allocation, Storage>;
     using Pushes = t::PushSchema<t::PushRange<TransformLayout, vsl::ShaderFlag::VERTEX>>;
     using Pipeline = t::TypedGraphicsPipeline<Input, Resources, Pushes>;
 

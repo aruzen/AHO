@@ -3,13 +3,20 @@
 #include <VSL/vulkan/commands/bind_index_buffers.hpp>
 #include <stdexcept>
 
+VSL_NAMESPACE::command::BindIndexBufferAt::BindIndexBufferAt(const BufferView& source, IndexType type, size_t offset, ResourceUse use)
+    : BindIndexBufferAt(source.legacy_owner(), type,
+                        source.view(offset, type == IndexType::UINT16 ? 2 : 4).byte_offset(), source.resource_use(std::move(use))) {}
+
 VSL_NAMESPACE::command::BindIndexBufferAt::BindIndexBufferAt(const BufferAccessor& source, IndexType type, size_t offset, ResourceUse use)
-    : _source(source.data_), _offset(offset), _type(type), _use(std::move(use)) {
+    : BindIndexBufferAt(source.data_, type, offset, std::move(use)) {}
+
+VSL_NAMESPACE::command::BindIndexBufferAt::BindIndexBufferAt(std::shared_ptr<impl::BufferImpl> source, IndexType type, size_t offset, ResourceUse use)
+    : _source(std::move(source)), _offset(offset), _type(type), _use(std::move(use)) {
     const size_t width = type == IndexType::UINT16 ? 2 : 4;
     if (!_source || !VSL_NAMESPACE::contain(_source->usage, MemoryType::INDEX_BUFFER) ||
         offset >= _source->requirement_size || offset % width || (type != IndexType::UINT16 && type != IndexType::UINT32))
         throw std::invalid_argument("BindIndexBufferAt requires an aligned index buffer range");
-    _use = source.resource_use(std::move(_use));
+    _use = ResourceUse::ForBuffer(_source, std::move(_use));
 }
 
 void VSL_NAMESPACE::command::BindIndexBufferAt::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {

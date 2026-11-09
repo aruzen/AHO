@@ -214,3 +214,5 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 
 11bでは単体TypedVertex／Index／ResourceBufferとTypedGraphics／ComputePipelineの生成policyを接続する。Bufferは同じBufferViewへ正規化し、固定容量・Index snapshot・共有物理状態・AHOの論理制約を維持する。PipelineはCPU recipeの検証をNative Layout生成より先へ分け、共通backendでLayout／Pipelineを配置する。11aだけで全Typed生成のarena既定化を完了としない。公開Impl入口・adapter廃止と測定は12へ続く。
 
+11b前半で単体Typed Bufferの生成時policyと共通BufferViewを接続した。共通backendのdevice-local構築、独立ringによる転送、Index snapshotの一回採取、Typed／Native descriptorとbindのview入口を揃えた。backendはlvalue限定const BufferView&、所有値はstorage_view()とする。enqueue済みnative使用が残るlogical FAILEDの保持も修正した。新規6件、全VSL1,130／AHO190・1,071／compile198、heap／arenaの同一描画、public install28種、構成別／cross／ABI検証が成功した。Typed PipelineのCPU draft／2slot配置を11b後半として続ける。
+

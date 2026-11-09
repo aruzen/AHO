@@ -16,6 +16,7 @@ namespace VSL_NAMESPACE::lifetime {
     struct SwapchainPresentationContext {
         impl::SwapchainImpl* generation = nullptr;
         impl::FenceImpl* fences = nullptr;
+        impl::SemaphoreImpl* finished = nullptr;
         std::vector<ImagePresentSlot> images;
         explicit SwapchainPresentationContext(size_t count) : images(count) {}
     };

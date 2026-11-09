@@ -5,6 +5,21 @@
 #include <span>
 
 namespace VSL_NAMESPACE::operation {
+    struct SynchronizationNativeCalls {
+        void* context = nullptr;
+        VkResult (*create_semaphore)(void*, VkDevice, const VkSemaphoreCreateInfo*, VkSemaphore*) noexcept = nullptr;
+        void (*destroy_semaphore)(void*, VkDevice, VkSemaphore) noexcept = nullptr;
+    };
+    class ScopedSynchronizationNativeCalls {
+        SynchronizationNativeCalls _calls;
+        const SynchronizationNativeCalls* _previous;
+
+    public:
+        explicit ScopedSynchronizationNativeCalls(SynchronizationNativeCalls calls) noexcept;
+        ~ScopedSynchronizationNativeCalls();
+        ScopedSynchronizationNativeCalls(const ScopedSynchronizationNativeCalls&) = delete;
+        ScopedSynchronizationNativeCalls& operator=(const ScopedSynchronizationNativeCalls&) = delete;
+    };
     void initialize_semaphore(impl::SemaphoreImpl& semaphore, impl::LogicalDeviceImpl& device, SemaphoreCreateInfo info);
     void initialize_fence(impl::FenceImpl& fence, impl::LogicalDeviceImpl& device, FenceCreateInfo info);
     void validate_synchronization_count(vk::Device device, size_t count);

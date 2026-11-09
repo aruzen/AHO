@@ -59,4 +59,7 @@ namespace VSL_NAMESPACE {
             throw std::invalid_argument("Swapchain has no presentation policy");
         return data_->present_fences;
     }
+    SemaphoreHolder SwapchainAccessor::finished_semaphores() const {
+        return {lifetime::swapchain_finished(data_)};
+    }
 } // namespace VSL_NAMESPACE

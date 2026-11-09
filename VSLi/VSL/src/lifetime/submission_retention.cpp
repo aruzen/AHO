@@ -78,6 +78,12 @@ namespace VSL_NAMESPACE::lifetime {
     }
     void release_completed_resources(impl::SubmissionWork& submission) noexcept {
         submission.release_resources = nullptr;
+        if (submission.external_fence)
+            submission.fence = nullptr;
+        submission.external_fence = nullptr;
+        submission.wait_semaphore = nullptr;
+        submission.signal_semaphore = nullptr;
+        submission.synchronization_owners.fill(impl::SubmissionWork::NO_OWNER);
         submission.completion_resources.clear();
     }
 } // namespace VSL_NAMESPACE::lifetime

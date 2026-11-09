@@ -240,7 +240,8 @@ namespace {
             EXPECT_EQ(work->wait_semaphore, wait.data_.get());
             EXPECT_EQ(work->signal_semaphore, signal.data_.get());
             EXPECT_EQ(work->external_fence, fence.data_.get());
-            EXPECT_EQ(work->resources.size(), 1u);
+            EXPECT_TRUE(work->resources.empty());
+            EXPECT_EQ(work->completion_resources.size(), 1u);
             EXPECT_EQ(work->synchronization_owners[0], work->synchronization_owners[1]);
             EXPECT_EQ(work->synchronization_owners[1], work->synchronization_owners[2]);
             EXPECT_EQ(wait.data_->use.graphics.size(), 2u);

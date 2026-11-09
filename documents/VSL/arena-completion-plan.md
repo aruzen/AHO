@@ -190,5 +190,7 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 
 [Fenceの共通用途状態](fence-use-kinds.md)で、graphics／acquire／presentの物理要素を一つのweak variantへ整理した。strict poolの正規aliasも同じ予約・変更検査を使い、旧Proof保存後のreset、UNKNOWNのpoll限定、配列Lossの全結果保存後通知を検証した。Ticketへ別の物理使用表を追加しないための前提であり、F個の実acquire poolと取得後回復へ続く。
 
+[世代の描画完了Semaphore](generation-semaphores.md)で、既定経路のUniqueSemaphore vectorを共通backendと世代内のSemaphoreImpl slot（native実画像M個）へ接続する。AHOは同Mのresizeでも新sourceへ更新する。同期source３役はCOMPLETION保持へ統一し、送信履歴で旧世代を延命しない。F個のacquire FenceとTicketは次の単位であり、10d全体は未完了である。
+
 10eはAHOのframe同期群とSwapchain世代群を分け、候補生成後のattachment失敗から復旧する。0 extentでは再生成・acquire・Fence resetを延期し、復元後に一括公開する。最後のpresent直後close、連続resize、marker保持量の有界化と互換Pipeline再利用を検証して順序10完了とする。
 

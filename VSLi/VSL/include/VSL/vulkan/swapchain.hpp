@@ -4,6 +4,7 @@
 #include "pv.hpp"
 
 #include "device.hpp"
+#include "synchronize.hpp"
 #include "buffer_and_image_accessor.hpp"
 #include "../operation/swapchain_create_info.hpp"
 #include <optional>
@@ -20,6 +21,7 @@ namespace VSL_NAMESPACE {
         Surface get_surface() const;
         SwapchainState state() const;
         PresentFencePolicy present_fences() const;
+        SemaphoreHolder finished_semaphores() const;
     };
 
     struct Swapchain : public SwapchainAccessor {

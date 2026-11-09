@@ -195,13 +195,14 @@ namespace VSL_NAMESPACE::lifetime {
         if (slot.epoch == std::numeric_limits<std::uint64_t>::max())
             throw std::overflow_error("Presentation image epoch overflow");
         vk::Semaphore wait;
-        if (semaphore) {
-            require_semaphore_owner(semaphore);
-            if (semaphore->device != generation->device || semaphore->semaphores.size() <= image || !marker || marker->acquire)
-                throw std::invalid_argument("Present semaphore does not match its image generation");
-            wait = semaphore->semaphores[image];
-        } else
-            wait = *generation->presentation_semaphores.at(image);
+        if (!semaphore) {
+            semaphore = swapchain_finished(generation);
+            marker = sync::track_semaphore_wsi(*semaphore);
+        }
+        require_semaphore_owner(semaphore);
+        if (semaphore->device != generation->device || semaphore->semaphores.size() <= image || !marker || marker->acquire)
+            throw std::invalid_argument("Present semaphore does not match its image generation");
+        wait = semaphore->semaphores[image];
         record = std::make_shared<PresentRecord>();
         record->state.device = generation->native_device;
         record->state.strict = generation->present_fences == PresentFencePolicy::REQUIRE_FENCE;

@@ -5,7 +5,7 @@
 
 namespace VSL_NAMESPACE::storage {
     class SwapchainLayout {
-        size_t _count, _images_begin, _stride, _fences_begin, _bytes, _alignment;
+        size_t _count, _images_begin, _stride, _fences_begin, _semaphores_begin, _bytes, _alignment;
         bool _present_fences;
 
     public:
@@ -15,12 +15,13 @@ namespace VSL_NAMESPACE::storage {
         constexpr size_t alignment() const { return _alignment; }
         constexpr bool has_present_fences() const { return _present_fences; }
         constexpr size_t present_fence_offset() const;
+        constexpr size_t finished_semaphore_offset() const { return _semaphores_begin; }
         constexpr size_t image_offset(size_t index) const;
         constexpr void require_region(size_t bytes, size_t alignment) const;
     };
 
     constexpr SwapchainLayout::SwapchainLayout(size_t image_count, PresentFencePolicy policy)
-        : _count(image_count), _images_begin(0), _stride(0), _fences_begin(0), _bytes(0), _alignment(1), _present_fences(policy == PresentFencePolicy::REQUIRE_FENCE) {
+        : _count(image_count), _images_begin(0), _stride(0), _fences_begin(0), _semaphores_begin(0), _bytes(0), _alignment(1), _present_fences(policy == PresentFencePolicy::REQUIRE_FENCE) {
         if (!image_count || image_count > std::numeric_limits<std::uint32_t>::max())
             throw std::invalid_argument("Swapchain image count must fit a nonzero uint32");
         if (policy != PresentFencePolicy::LEGACY && policy != PresentFencePolicy::REQUIRE_FENCE)
@@ -38,6 +39,10 @@ namespace VSL_NAMESPACE::storage {
             _fences_begin = checked_align(_bytes, Fence::ALIGNMENT);
             _bytes = checked_add(_fences_begin, Fence::SIZE);
         }
+        using Semaphore = ResourceSlotLayout<impl::SemaphoreImpl>;
+        _alignment = std::max(_alignment, Semaphore::ALIGNMENT);
+        _semaphores_begin = checked_align(_bytes, Semaphore::ALIGNMENT);
+        _bytes = checked_add(_semaphores_begin, Semaphore::SIZE);
         _bytes = checked_align(_bytes, _alignment);
         if (!std::is_constant_evaluated())
             detail::require_resource_layout(std::integral_constant<std::uint64_t, RESOURCE_LAYOUT_ABI>{});

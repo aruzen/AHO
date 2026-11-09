@@ -30,16 +30,16 @@ namespace VSL_NAMESPACE {
         std::shared_ptr<T> synchronization_owner(const impl::SubmissionWork& work, impl::SubmissionSource source, T* value) {
             if (!value)
                 return {};
-            return {work.resources.at(work.synchronization_owners.at(static_cast<size_t>(source))), value};
+            return {work.completion_resources.at(work.synchronization_owners.at(static_cast<size_t>(source))), value};
         }
         size_t retain_synchronization_owner(impl::SubmissionWork& work, const std::shared_ptr<void>& owner) {
             if (!owner.use_count())
                 return impl::SubmissionWork::NO_OWNER;
-            lifetime::retain_resource(work.resources, owner);
-            const auto found = std::ranges::find_if(work.resources, [&](const auto& existing) {
+            lifetime::retain_until_complete(work, owner);
+            const auto found = std::ranges::find_if(work.completion_resources, [&](const auto& existing) {
                 return !existing.owner_before(owner) && !owner.owner_before(existing);
             });
-            return static_cast<size_t>(found - work.resources.begin());
+            return static_cast<size_t>(found - work.completion_resources.begin());
         }
         ReturningImage::ReturningImage(lifetime::CommandRecordingContext& context) : context(context) {
             if (context.returning_image)
@@ -263,8 +263,6 @@ namespace VSL_NAMESPACE {
                 waits.push_back(submission->wait_semaphore->semaphores.at(frame_slot));
             if (submission->signal_semaphore)
                 signals.push_back(submission->signal_semaphore->semaphores.at(signal_index));
-            else if (auto chain = domain->context.acquired_swapchain.lock())
-                signals.push_back(*chain->presentation_semaphores.at(signal_index));
             auto stages = vk::PipelineStageFlags(static_cast<std::uint32_t>(wait_stage));
             if (!stages && !waits.empty())
                 throw std::invalid_argument("Semaphore wait stage cannot be empty");
@@ -367,6 +365,8 @@ namespace VSL_NAMESPACE {
             auto buffers = domain->buffer;
             if (domain->context.recording || domain->context.returning_image || domain->context.mutating || domain->context.frame_buffer_recording)
                 throw std::logic_error("A phase is already recording");
+            if (!calculation_finish)
+                calculation_finish = SemaphoreHolder{lifetime::swapchain_finished(chain)};
             buffers->current_buffer_idx = (buffers->current_buffer_idx + 1) % buffers->command_buffers.size();
             if (!prepare() || !call.alive())
                 return;
@@ -377,13 +377,6 @@ namespace VSL_NAMESPACE {
             if (submission->signal_semaphore && submission->signal_semaphore->semaphores.size() < count)
                 throw std::invalid_argument("Present semaphores must cover swapchain images");
             auto device = manager.data_->device->device;
-            if (!submission->signal_semaphore && chain->presentation_semaphores.empty()) {
-                std::vector<vk::UniqueSemaphore> semaphores;
-                semaphores.reserve(count);
-                for (std::size_t i = 0; i < count; ++i)
-                    semaphores.push_back(device.createSemaphoreUnique({}));
-                chain->presentation_semaphores = std::move(semaphores);
-            }
             vk::Semaphore available;
             _presentation = std::make_shared<Presentation>();
             _presentation->device = manager.data_->device;

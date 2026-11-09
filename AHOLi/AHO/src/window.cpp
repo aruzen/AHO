@@ -80,7 +80,7 @@ std::shared_ptr<AHO_NAMESPACE::window::WindowData> AHO_NAMESPACE::window::detail
         .render_pass = pass,
         .frame_buffer = VSL_NAMESPACE::FrameBuffer(swapchain, pass),
         .image_available = data.synchro_manager.create_semaphore(name + "ImageAvailable", frames),
-        .render_finished = data.synchro_manager.create_semaphore(name + "RenderFinished", swapchain.get_swap_image_size()),
+        .render_finished = swapchain.finished_semaphores(),
         .in_flight = data.synchro_manager.create_fence(name + "InFlight", frames, true)});
 }
 
@@ -166,9 +166,7 @@ bool AHO_NAMESPACE::window::Window::recreate_swapchain(VSL_NAMESPACE::ImageType 
     if (pass.description().attachments.front().format.type() != next.get_format().type())
         pass = VSL_NAMESPACE::RenderPass(next);
     auto frames = VSL_NAMESPACE::FrameBuffer(next, pass);
-    auto finished = drawing->render_finished;
-    if (finished.size() != next.get_swap_image_size())
-        finished = runtime->synchro_manager.create_semaphore(data->name + "RenderFinished", next.get_swap_image_size());
+    auto finished = next.finished_semaphores();
     if (!data->window_handle || data_ != data || data2 != drawing)
         return false;
     drawing->swapchain = std::move(next);

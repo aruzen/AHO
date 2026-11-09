@@ -3,6 +3,11 @@
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include "support/render_fixture.hpp"
+#include <VSL/lifetime/swapchain_access.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
+}
 #include "support/deferred_action.hpp"
 
 namespace {
@@ -64,7 +69,7 @@ namespace {
         }
     }
     TEST_F(PickingReadVulkanIntegrationTest, ReadsAcquiredImageRatherThanTheCommandBufferSlot) {
-        description.images.resize(2, *color);
+        description = SwapchainAccess::FromOwned(SwapchainAccess::Owned(description), std::vector<vsl::ImageAccessor>(2, *color));
         vsl::IDPickingRenderPass picking(description);
         auto manager = make_manager();
         fill_images(picking, manager);
@@ -79,7 +84,7 @@ namespace {
         EXPECT_EQ(picking.read(manager, ready, WIDTH - 1, HEIGHT - 1), 101u);
     }
     TEST_F(PickingReadVulkanIntegrationTest, ReadKeepsItsSelectedImageWhenFenceCompletionDestroysMovesOrRecreatesTheFacade) {
-        description.images.resize(2, *color);
+        description = SwapchainAccess::FromOwned(SwapchainAccess::Owned(description), std::vector<vsl::ImageAccessor>(2, *color));
         for (int action = 0; action < 3; ++action) {
             SCOPED_TRACE(action);
             auto picking = std::make_unique<vsl::IDPickingRenderPass>(description);

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <AHO/drawer/draw_phase.hpp>
@@ -57,7 +58,7 @@ namespace {
         auto& window = *engine->boot_window;
         auto manager = engine->data()->command_manager;
         const auto slot = CommandAccess::Data(manager.get_buffer())->current_buffer_idx;
-        const auto previous = window.data2->swapchain.data_;
+        const auto previous = VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(window.data2->swapchain);
         aho_test::FrameBufferQuery query;
         aho_test::AcquisitionCalls native;
         query.zero = true;
@@ -92,7 +93,7 @@ namespace {
         EXPECT_TRUE(resumed.recording());
         EXPECT_EQ(native.creates, 1u);
         EXPECT_EQ(native.acquisitions, 1u);
-        EXPECT_NE(window.data2->swapchain.data_, previous);
+        EXPECT_NE(VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(window.data2->swapchain), previous);
         EXPECT_FALSE(window.data2->deferred_usage);
         resumed.cancel();
         EXPECT_TRUE(resumed.completion().wait());
@@ -579,7 +580,7 @@ namespace {
                 begin.clear_values[0] = VSL_NAMESPACE::ClearColor{1, 0, 0, 1};
                 stream << begin; }, [&](auto& stream) {
                 stream << VSL_NAMESPACE::command::RenderPassEnd{};
-                ticket = reader.record(phase, chain.images.at(phase.get_image_index()), VSL_NAMESPACE::ImageLayout::PRESENT,
+                ticket = reader.record(phase, chain.image(phase.get_image_index()), VSL_NAMESPACE::ImageLayout::PRESENT,
                                        {0, 0, 1, 1}, 57);
                 ASSERT_TRUE(ticket);
                 EXPECT_EQ(ticket->status(), VSL_NAMESPACE::Completion::Status::PENDING); });

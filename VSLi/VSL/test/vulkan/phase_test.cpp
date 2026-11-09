@@ -1,3 +1,4 @@
+#include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
@@ -15,6 +16,10 @@
 #include <VSL/operation/submission_ops.hpp>
 #include <VSL/operation/command_ops.hpp>
 #include <functional>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SynchronizationAccess;
@@ -1036,7 +1041,7 @@ namespace {
             probe.failure = error;
             std::shared_ptr<vsl::lifetime::AcquireEvidence> evidence;
             probe.after_native = [&] {
-                const auto registry = vsl::lifetime::presentation_domain(chain.data_);
+                const auto registry = vsl::lifetime::presentation_domain(SwapchainAccess::Owned(chain).share());
                 ASSERT_FALSE(registry->acquisitions.empty());
                 evidence = registry->acquisitions.back();
             };
@@ -1200,7 +1205,7 @@ namespace {
         auto manager = make_manager().independent(1);
         const auto domain = vsl::lifetime::CommandAccess::Owner(manager.get_buffer());
         vsl::Swapchain chain(device, surface, {}, 64, 48);
-        const auto registry = vsl::lifetime::presentation_domain(chain.data_);
+        const auto registry = vsl::lifetime::presentation_domain(SwapchainAccess::Owned(chain).share());
         AcquireProbe probe;
         const vsl::operation::ScopedPresentationNativeCalls native(probe.native_calls());
         std::unique_ptr<vsl::DefaultPhase> phase;
@@ -1260,7 +1265,7 @@ namespace {
         VSL_NAMESPACE::RenderPass pass(chain);
         VSL_NAMESPACE::FrameBuffer target(chain, pass);
         auto manager = make_manager();
-        auto bytes = std::size_t(chain.data_->extent.width) * chain.data_->extent.height * 4;
+        auto bytes = std::size_t(SwapchainAccess::Owned(chain)->extent.width) * SwapchainAccess::Owned(chain)->extent.height * 4;
         VSL_NAMESPACE::StagingBuffer<VSL_NAMESPACE::MemoryType::TRANSFER_DESTINATION> destination(device, bytes);
         bool different_index = false;
         for (unsigned frame = 0; frame < 12; ++frame) {
@@ -1270,7 +1275,7 @@ namespace {
             auto begin = VSL_NAMESPACE::command::RenderPassBegin(pass, target);
             begin.clear_values[0] = VSL_NAMESPACE::ClearColor{1.f, 0.f, 0.f, 1.f};
             phase << begin << VSL_NAMESPACE::command::RenderPassEnd{}
-                  << VSL_NAMESPACE::command::ImageReadback(&destination, chain.images.at(index), VSL_NAMESPACE::ImageLayout::PRESENT);
+                  << VSL_NAMESPACE::command::ImageReadback(&destination, chain.image(index), VSL_NAMESPACE::ImageLayout::PRESENT);
             EXPECT_EQ(phase.submit_commands(), VSL_NAMESPACE::ComputePhase::SubmitResult::SUCCESS);
             if (!frame) {
                 manager.wait_idle();
@@ -1506,7 +1511,7 @@ namespace {
         auto commands = make_manager().independent(1);
         vsl::SynchroManager sync(device);
         auto available = sync.create_semaphore("available");
-        auto finished = sync.create_semaphore("finished", chain.data_->swap_chain_images.size());
+        auto finished = sync.create_semaphore("finished", SwapchainAccess::Owned(chain)->swap_chain_images.size());
         auto fence = sync.create_fence("complete", false);
         vsl::DefaultPhase phase(commands, chain, available, finished, fence);
         commands.wait_idle();
@@ -1537,7 +1542,7 @@ namespace {
         auto commands = make_manager().independent(1);
         vsl::SynchroManager sync(device);
         auto available = sync.create_semaphore("original available");
-        auto finished = sync.create_semaphore("original finished", chain.data_->swap_chain_images.size());
+        auto finished = sync.create_semaphore("original finished", SwapchainAccess::Owned(chain)->swap_chain_images.size());
         auto fence = sync.create_fence("original fence", false);
         auto phase = std::make_unique<vsl::DefaultPhase>(commands, chain, available, finished, fence);
         const auto discarded = phase->completion();
@@ -1559,7 +1564,7 @@ namespace {
         });
         commands.get_buffer().retain_until_complete(callback.owner());
         auto unused_available = sync.create_semaphore("new field available");
-        auto unused_finished = sync.create_semaphore("new field finished", chain.data_->swap_chain_images.size());
+        auto unused_finished = sync.create_semaphore("new field finished", SwapchainAccess::Owned(chain)->swap_chain_images.size());
         auto unused_fence = sync.create_fence("new field fence", false);
         phase->next_image_available = unused_available;
         phase->calculation_finish = unused_finished;
@@ -1584,7 +1589,7 @@ namespace {
         if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Graphics queue cannot present";
         vsl::Swapchain chain(device, surface, std::nullopt, 64, 48);
-        if (chain.data_->swap_chain_images.size() < 2)
+        if (SwapchainAccess::Owned(chain)->swap_chain_images.size() < 2)
             GTEST_SKIP() << "A too-small present semaphore array requires multiple images";
         auto commands = make_manager().independent(1);
         vsl::SynchroManager sync(device);

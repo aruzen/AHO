@@ -101,7 +101,7 @@ namespace AHO_NAMESPACE::x {
         auto manager = window.engine.data()->command_manager;
         (void)is_bgra(resources.swapchain.get_format());
         auto data = std::make_shared<Data>(window.data2, manager);
-        const auto usage = resources.swapchain.images.at(0).get_usage();
+        const auto usage = resources.swapchain.image(0).get_usage();
         if (!VSL_NAMESPACE::contain(usage, VSL_NAMESPACE::ImageType::TRANSFER_SRC))
             window.recreate_swapchain(VSL_NAMESPACE::ImageType::TRANSFER_SRC);
         _data = std::move(data);
@@ -114,15 +114,15 @@ namespace AHO_NAMESPACE::x {
             throw std::logic_error("Screenshot requires a recording DrawPhase");
         const auto window = data->window.lock();
         if (!window || !phase.target_window() || phase.target_window().data2 != window ||
-            phase.swapchain.data_ != window->swapchain.data_)
+            phase.swapchain.identity() != window->swapchain.identity())
             throw std::invalid_argument("DrawPhase belongs to a different or closed window");
-        const auto image = phase.swapchain.images.at(phase.get_image_index());
+        const auto image = phase.swapchain.image(phase.get_image_index());
         if (!VSL_NAMESPACE::contain(image.get_usage(), VSL_NAMESPACE::ImageType::TRANSFER_SRC))
             throw std::logic_error("Window no longer supports screenshot readback");
         const auto current = phase.completion();
         const auto status = data->completion.status();
         if (!call.alive() || !phase.recording() || phase.completion() != current || !phase.target_window() ||
-            phase.target_window().data2 != window || phase.swapchain.data_ != window->swapchain.data_)
+            phase.target_window().data2 != window || phase.swapchain.identity() != window->swapchain.identity())
             return false;
         if (status == VSL_NAMESPACE::Completion::Status::PENDING || status == VSL_NAMESPACE::Completion::Status::SUBMITTED)
             return false;

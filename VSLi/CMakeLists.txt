@@ -129,6 +129,7 @@ add_library(VSL STATIC
         VSL/src/private/VSL/lifetime/graphics_access.hpp
         VSL/src/private/VSL/lifetime/synchronization_access.hpp
         VSL/src/private/VSL/lifetime/owner_validation.hpp
+        VSL/src/private/VSL/lifetime/swapchain_access.hpp
         VSL/src/lifetime/submission_retention.cpp
         VSL/src/lifetime/command_domain.cpp
         VSL/include/VSL/operation/command_create_info.hpp

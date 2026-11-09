@@ -1,3 +1,4 @@
+#include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include "support/window_fixture.hpp"
@@ -9,6 +10,10 @@
 #include <VSL/operation/synchronization_ops.hpp>
 #include <VSL/storage/cpu_region.hpp>
 #include <limits>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SynchronizationAccess;
@@ -137,13 +142,13 @@ namespace {
         {
             l::SwapchainArena arena(device, *surface, create_info());
             const auto chain = arena.view();
-            const s::SwapchainLayout layout(chain.images.size());
+            const s::SwapchainLayout layout(chain.get_swap_image_size());
             finished = chain.finished_semaphores();
-            generation = chain.data_;
-            EXPECT_EQ(finished->size(), chain.images.size());
-            EXPECT_FALSE(SynchronizationAccess::Owned(*(finished)).owner_before(chain.data_));
-            EXPECT_FALSE(chain.data_.owner_before(SynchronizationAccess::Owned(*(finished)).share()));
-            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(SynchronizationAccess::Owned(*(finished)).get()) - reinterpret_cast<std::uintptr_t>(chain.data_.get()),
+            generation = SwapchainAccess::Owned(chain).share();
+            EXPECT_EQ(finished->size(), chain.get_swap_image_size());
+            EXPECT_FALSE(SynchronizationAccess::Owned(*(finished)).owner_before(SwapchainAccess::Owned(chain)));
+            EXPECT_FALSE(SwapchainAccess::Owned(chain).owner_before(SynchronizationAccess::Owned(*(finished)).share()));
+            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(SynchronizationAccess::Owned(*(finished)).get()) - reinterpret_cast<std::uintptr_t>(SwapchainAccess::Owned(chain).get()),
                       layout.finished_semaphore_offset());
             EXPECT_EQ(finished->get_device().data_, device.data_);
         }
@@ -154,7 +159,7 @@ namespace {
     TEST_F(SwapchainArenaWindowIntegrationTest, DefaultFinishedSelectsTheAcquiredImageWhenFramesOutnumberImages) {
         l::SwapchainArena arena(device, *surface, create_info());
         const auto chain = arena.view();
-        const auto count = static_cast<std::uint32_t>(chain.images.size());
+        const auto count = static_cast<std::uint32_t>(chain.get_swap_image_size());
         auto manager = make_manager().independent(count + 1);
         for (std::uint32_t i = 0; i + 1 < count; ++i)
             manager.get_buffer().next();
@@ -192,19 +197,19 @@ namespace {
     }
     TEST_F(SwapchainArenaWindowIntegrationTest, NormalConstructorPlacesEveryImageWithItsOwnStateUnderOneOwner) {
         vsl::Swapchain chain(device, surface, {}, 64, 48);
-        const s::SwapchainLayout layout(chain.images.size());
-        ASSERT_FALSE(chain.images.empty());
+        const s::SwapchainLayout layout(chain.get_swap_image_size());
+        ASSERT_FALSE(chain.images().empty());
         EXPECT_EQ(chain.state(), vsl::SwapchainState::ACTIVE);
         EXPECT_TRUE(chain.owner_ref().managed());
-        for (size_t i = 0; i < chain.images.size(); ++i) {
-            const auto& image = chain.images[i];
-            EXPECT_FALSE(ImageAccess::Owned(image).owner_before(chain.data_));
-            EXPECT_FALSE(chain.data_.owner_before(ImageAccess::Owned(image).share()));
+        for (size_t i = 0; i < chain.get_swap_image_size(); ++i) {
+            const auto& image = chain.image(i);
+            EXPECT_FALSE(ImageAccess::Owned(image).owner_before(SwapchainAccess::Owned(chain)));
+            EXPECT_FALSE(SwapchainAccess::Owned(chain).owner_before(ImageAccess::Owned(image).share()));
             EXPECT_EQ(&image.use_state(), ImageAccess::Owned(image)->use);
-            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(ImageAccess::Owned(image).get()) - reinterpret_cast<std::uintptr_t>(chain.data_.get()), layout.image_offset(i));
+            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(ImageAccess::Owned(image).get()) - reinterpret_cast<std::uintptr_t>(SwapchainAccess::Owned(chain).get()), layout.image_offset(i));
             if (i) {
-                EXPECT_NE(ImageAccess::Owned(image), ImageAccess::Owned(chain.images[i - 1]));
-                EXPECT_NE(ImageAccess::Owned(image)->use, ImageAccess::Owned(chain.images[i - 1])->use);
+                EXPECT_NE(ImageAccess::Owned(image), ImageAccess::Owned(chain.image(i - 1)));
+                EXPECT_NE(ImageAccess::Owned(image)->use, ImageAccess::Owned(chain.image(i - 1))->use);
             }
         }
         vsl_test::expect_fixed_parent(chain.owner_ref(), device.owner_ref());
@@ -226,7 +231,7 @@ namespace {
             EXPECT_EQ(original.data_, surface->data_);
             EXPECT_FALSE(original.data_.owner_before(surface->data_));
             EXPECT_FALSE(surface->data_.owner_before(original.data_));
-            saved = chain.images.front();
+            saved = chain.image(0);
         }
         EXPECT_FALSE(generation.expired());
         EXPECT_TRUE(ImageAccess::Owned(saved)->view);
@@ -242,7 +247,7 @@ namespace {
             return *memory;
         };
         auto first = std::make_optional<l::SwapchainArena>(device, *surface, create_info(), std::nullopt, allocate);
-        auto image = first->view().images.front();
+        auto image = first->view().image(0);
         EXPECT_THROW((l::SwapchainArena{device, *surface, create_info(), first->view(), allocate}), std::invalid_argument);
         EXPECT_EQ(first->view().state(), vsl::SwapchainState::RETIRED);
         first.reset();
@@ -319,9 +324,9 @@ namespace {
         EXPECT_THROW((l::SwapchainArena{device, *surface, info, old}), std::invalid_argument);
         EXPECT_EQ(old.state(), vsl::SwapchainState::ACTIVE);
         auto acquired = device.data_->device.createFenceUnique({});
-        const auto index = device.data_->device.acquireNextImageKHR(old.data_->swap_chain, UINT64_MAX, nullptr, *acquired).value;
+        const auto index = device.data_->device.acquireNextImageKHR(SwapchainAccess::Owned(old)->swap_chain, UINT64_MAX, nullptr, *acquired).value;
         ASSERT_EQ(device.data_->device.waitForFences(*acquired, true, UINT64_MAX), vk::Result::eSuccess);
-        EXPECT_LT(index, old.images.size());
+        EXPECT_LT(index, old.get_swap_image_size());
     }
     TEST_F(SwapchainArenaWindowIntegrationTest, CreationProgressDistinguishesPreflightFromNativeFailureWithAndWithoutAnOldGeneration) {
         NativeProbe probe;
@@ -387,12 +392,12 @@ namespace {
             }
             vsl::SynchroManager sync(device);
             auto available = sync.create_semaphore("prepare available");
-            auto finished = sync.create_semaphore("prepare finished", old.images.size());
+            auto finished = sync.create_semaphore("prepare finished", old.get_swap_image_size());
             phase = std::make_unique<vsl::DefaultPhase>(manager, old, available, finished, std::nullopt, true);
             EXPECT_THROW(phase->setup(), std::logic_error);
             EXPECT_TRUE(invoked);
             EXPECT_EQ(old.state(), vsl::SwapchainState::RETIRED);
-            EXPECT_TRUE(old.data_->presentation_context->finished->use.wsi.empty());
+            EXPECT_TRUE(SwapchainAccess::Owned(old)->presentation_context->finished->use.wsi.empty());
             EXPECT_NO_THROW(available.destroy());
             EXPECT_NO_THROW(finished.destroy());
         }
@@ -410,7 +415,7 @@ namespace {
         vsl::Completion completed;
         {
             auto previous = earlier.start_phase<vsl::ComputePhase>();
-            for (const auto& image : chain.images)
+            for (const auto& image : chain.images())
                 vsl::ResourceUse::ForImage(image).record(earlier.get_buffer(), vsl::ResourceRetention::COMPLETION);
             earlier.get_buffer().retain_until_complete(callback.owner());
             completed = previous.completion();
@@ -428,7 +433,7 @@ namespace {
     }
     TEST_F(SwapchainArenaWindowIntegrationTest, CancelUsesTheAcquiredGenerationAndIndexAfterPublicFieldsChange) {
         auto original = std::make_optional<vsl::Swapchain>(device, surface, std::nullopt, 64, 48);
-        const std::weak_ptr<vsl::impl::SwapchainImpl> owner = original->data_;
+        const std::weak_ptr<vsl::impl::SwapchainImpl> owner = SwapchainAccess::Owned(*(original)).share();
         auto manager = make_manager().independent(1);
         {
             auto phase = manager.start_phase<vsl::DefaultPhase>(*original);
@@ -440,5 +445,39 @@ namespace {
         }
         manager.wait_idle();
         EXPECT_TRUE(owner.expired());
+    }
+} // namespace
+
+namespace {
+    TEST_F(SwapchainArenaWindowIntegrationTest, CopiedFacadesAndOwningGettersKeepTheOriginalGenerationAndState) {
+        std::weak_ptr<void> generation;
+        std::optional<vsl::ImageAccessor> saved;
+        {
+            l::SwapchainArena arena(device, *surface, create_info());
+            auto original = arena.view();
+            generation = original.owner_ref().share();
+            const auto* state = SwapchainAccess::Owned(original)->presentation_context;
+            auto copied = original;
+            auto moved = std::move(copied);
+            EXPECT_FALSE(copied);
+            EXPECT_EQ(copied.get_swap_image_size(), 0u);
+            EXPECT_EQ(moved.identity(), original.identity());
+            EXPECT_EQ(SwapchainAccess::Owned(moved)->presentation_context, state);
+            EXPECT_EQ(moved.get_swap_image_size(), original.get_swap_image_size());
+            const auto finished = moved.finished_semaphores();
+            saved = std::move(moved).image(0);
+            const auto root = original.owner_ref();
+            const auto image_owner = saved->resource_use().owner;
+            EXPECT_FALSE(root.owner_before(image_owner));
+            EXPECT_FALSE(image_owner.owner_before(root));
+            EXPECT_FALSE(root.owner_before(finished.owner_ref()));
+            EXPECT_FALSE(finished.owner_ref().owner_before(root));
+            EXPECT_EQ(ImageAccess::Owned(*saved)->owner_node, SwapchainAccess::Owned(original)->owner_node);
+            EXPECT_EQ(SynchronizationAccess::Owned(finished)->owner_node, SwapchainAccess::Owned(original)->owner_node);
+        }
+        EXPECT_FALSE(generation.expired());
+        EXPECT_EQ(saved->get_device(), device);
+        saved.reset();
+        EXPECT_TRUE(generation.expired());
     }
 } // namespace

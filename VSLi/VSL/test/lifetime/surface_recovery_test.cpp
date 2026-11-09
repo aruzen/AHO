@@ -1,3 +1,4 @@
+#include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/window_fixture.hpp"
@@ -13,6 +14,10 @@
 #include <VSL/operation/submission_ops.hpp>
 #include <VSL/sync/submission_completion.hpp>
 #include <functional>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SynchronizationAccess;
@@ -197,7 +202,7 @@ namespace {
         vsl::SynchroManager synchronization(device);
         auto available = synchronization.create_semaphore("available");
         auto phase = std::make_unique<vsl::DefaultPhase>(manager, chain, available, std::nullopt, std::nullopt, true);
-        const auto registry = l::presentation_domain(chain.data_);
+        const auto registry = l::presentation_domain(SwapchainAccess::Owned(chain).share());
         RecoveryProbe probe;
         probe.drain_error = VK_ERROR_OUT_OF_HOST_MEMORY;
         const o::ScopedSubmissionNativeCalls submissions(probe.submissions());
@@ -230,7 +235,7 @@ namespace {
         auto manager = make_manager().independent(1);
         auto chain = make_chain();
         vsl::DefaultPhase phase(manager, chain, std::nullopt, std::nullopt, std::nullopt, true);
-        const auto registry = l::presentation_domain(chain.data_);
+        const auto registry = l::presentation_domain(SwapchainAccess::Owned(chain).share());
         RecoveryProbe probe;
         probe.on_acquire = [&] {
             EXPECT_EQ(l::recover_surface(device, *surface), l::SurfaceRecoveryStatus::PENDING);
@@ -258,7 +263,7 @@ namespace {
         const o::ScopedPresentationNativeCalls presentations(probe.presentations());
         std::weak_ptr<l::AcquireTicket> ticket;
         std::weak_ptr<vsl::impl::FenceImpl> fences;
-        std::weak_ptr<vsl::impl::SwapchainImpl> generation = chain.data_;
+        std::weak_ptr<vsl::impl::SwapchainImpl> generation = SwapchainAccess::Owned(chain).share();
         {
             const o::ScopedCommandNativeCalls commands({.begin = RecoveryProbe::BeginFailure});
             EXPECT_THROW(phase->setup(), vk::OutOfHostMemoryError);
@@ -288,7 +293,7 @@ namespace {
     TEST_F(SurfaceRecoveryWindowIntegrationTest, CancelDuringNativeGraphicsDoesNotPresentAnAlreadyRecoveredImage) {
         auto manager = make_manager().independent(1);
         auto chain = make_chain();
-        const auto registry = l::presentation_domain(chain.data_);
+        const auto registry = l::presentation_domain(SwapchainAccess::Owned(chain).share());
         RecoveryProbe probe;
         const o::ScopedSubmissionNativeCalls submissions(probe.submissions());
         const o::ScopedPresentationNativeCalls presentations(probe.presentations());
@@ -331,7 +336,7 @@ namespace {
         vsl::SynchroManager synchronization(device);
         auto available = synchronization.create_semaphore("available");
         auto phase = std::make_unique<vsl::DefaultPhase>(manager, chain, available, std::nullopt, std::nullopt, true);
-        const auto registry = l::presentation_domain(chain.data_);
+        const auto registry = l::presentation_domain(SwapchainAccess::Owned(chain).share());
         RecoveryProbe probe;
         probe.fail_idle = 2;
         const o::ScopedSubmissionNativeCalls submissions(probe.submissions());
@@ -357,7 +362,7 @@ namespace {
         vsl::SynchroManager synchronization(device);
         auto available = synchronization.create_semaphore("available");
         vsl::DefaultPhase phase(manager, chain, available, std::nullopt, std::nullopt, true);
-        const auto registry = l::presentation_domain(chain.data_);
+        const auto registry = l::presentation_domain(SwapchainAccess::Owned(chain).share());
         RecoveryProbe probe;
         probe.drain_error = VK_ERROR_UNKNOWN;
         const o::ScopedSubmissionNativeCalls submissions(probe.submissions());
@@ -375,7 +380,7 @@ namespace {
     TEST_F(SurfaceRecoveryWindowIntegrationTest, PresentOutOfMemoryKeepsRetryRightsUntilThePhaseIsAbandoned) {
         auto manager = make_manager().independent(1);
         auto chain = make_chain();
-        auto registry = l::presentation_domain(chain.data_);
+        auto registry = l::presentation_domain(SwapchainAccess::Owned(chain).share());
         RecoveryProbe probe;
         probe.present_error = VK_ERROR_OUT_OF_HOST_MEMORY;
         const o::ScopedSubmissionNativeCalls submissions(probe.submissions());
@@ -397,7 +402,7 @@ namespace {
     TEST_F(SurfaceRecoveryWindowIntegrationTest, LegacyPresentationPolicyDoesNotDisableAnEnabledImageReleaseFeature) {
         auto manager = make_manager().independent(1);
         auto chain = make_chain(vsl::PresentFencePolicy::LEGACY);
-        const auto registry = l::presentation_domain(chain.data_);
+        const auto registry = l::presentation_domain(SwapchainAccess::Owned(chain).share());
         RecoveryProbe probe;
         probe.graphics_error = VK_ERROR_OUT_OF_HOST_MEMORY;
         const o::ScopedSubmissionNativeCalls submissions(probe.submissions());
@@ -413,7 +418,7 @@ namespace {
     TEST_F(SurfaceRecoveryWindowIntegrationTest, RecoveryDefersNestedCollectionUntilEveryCapturedStateHasBeenSaved) {
         auto manager = make_manager().independent(1);
         auto chain = make_chain();
-        const auto registry = l::presentation_domain(chain.data_);
+        const auto registry = l::presentation_domain(SwapchainAccess::Owned(chain).share());
         {
             auto phase = manager.start_phase<vsl::DefaultPhase>(chain);
             phase.cancel();
@@ -433,7 +438,7 @@ namespace {
     TEST_F(SurfaceRecoveryWindowIntegrationTest, DeviceLossObservedInsideNativePresentDoesNotDetachTheActiveRecord) {
         auto manager = make_manager().independent(1);
         auto chain = make_chain();
-        const auto registry = l::presentation_domain(chain.data_);
+        const auto registry = l::presentation_domain(SwapchainAccess::Owned(chain).share());
         RecoveryProbe probe;
         probe.on_present = [&] {
             // 実GPUを完了させた後にCPU側だけDeviceLostへ進める。

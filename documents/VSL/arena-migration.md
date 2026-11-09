@@ -534,3 +534,32 @@ private `lifetime/owner_validation.hpp` の `require_live_owner` は、保持済
 この補修は旧検査の消失を復元する範囲である。以前から独立していたBufferView::resource_useとResourceUseGroup::ForDescriptorの入口は今回変更しないため、全ResourceUseの一律の退役拒否という保証ではない。既存viewの保持契約や取消・回収を、この補修だけで厳格化しない。
 
 有効なNative資源を保持したままnodeを退役させる新6件は、同じABIの親libraryでは6件とも失敗し、修正版では全成功した。比較時もvalidation／ASan／UBSanエラーはない。型・slot・公開headerは変更せず、生成IDは親と同じdbfを維持した。規約検査は14files／13TUと補強1file／1TUが違反0、installed consumer30種、private非配布とarchive／生成header一致も確認した。全体はVSL1,189成功（既知format3 skip）、AHO GPU192／CPU1,071、heap／arenaの3PNG一致を確認した。公開headerと配置入力が不変のため、親のcompile306・構成別／cross寸法とABI検証は再実行していない。
+
+## 順序12f: Swapchainの所有値と画像一覧
+
+SwapchainAccessorの公開data_／mutable imagesを、privateなOwnedRefと画像vectorへ閉じた。copy／noexcept move／値引数代入とswapは両fieldを公開してから旧値を回収する。新owner wrapperやcontrol blockを追加せず、通常SwapchainとSwapchainArenaは同じgeneration factoryを使う。
+
+```cpp
+vsl::Swapchain chain(device, surface);
+auto image = chain.image(0);          // 所有値。元の世代を保持する。
+auto generation = chain.identity();   // 比較中は元の所有者を保持する。
+for (const auto& current : chain.images()) {
+    // chainが生存する間だけ使う読み取り専用一覧。
+}
+```
+
+```cpp
+vsl::lifetime::SwapchainArena arena(device, *surface, {.width = 640, .height = 480});
+auto image = std::move(arena).view().image(0);
+// 一時Facadeの消滅後も、imageが元generationのCPU領域とNative資源を保持する。
+```
+
+images()はlvalue限定のconst spanで、一時値からの取得はdeleteする。image(index)はatからowning値を返す。get_swap_image_size()はconst/noexcept、boolは存在、state()はNative世代の状態を表す。比較は種類別のSwapchainIdentityを使う。退役世代からの画像取得は維持する。
+
+Native入口は元CB／Impl node／生存handleと保存nodeを検査する。metadata用のoffscreen fixtureはprivate factoryでだけ構築し、従来のformat／Device／Viewport／Picking利用を維持する。Phaseは開始時の元ownerを値保存して既存Work／Proofへ渡す。Root内のimage_storage／stride／finished／fences／contextは借用のままで、Sourceとepochを再生成しない。Device側とWindow／Surface側の寿命群も分けたまま保持する。
+
+利用側はimages.at(i)をimage(i)、一覧の走査をimages()、data_の世代比較をidentity()へ移す。AHO製品とglTF viewerは公開APIだけを使う。private SwapchainAccess、offscreen metadata構築、Work／Proofへ渡すShared境界は内部に残る。Facadeの画像vector、CPU管理データ、Native配列／GPUメモリ等の個別確保も残り、この変更で全メモリを一括領域へ含めたとは扱わない。
+
+macOS arm64／Clang20／C++26／MoltenVK・validation・ASan／UBSanで新4件と全VSL1,193（既知format3 skip）、AHO GPU192／CPU1,071、compile317を確認した。CPU回帰はmetadataと画像を別CBにして、一括公開前の旧owner回収を画像保持が隠さない構成とした。GPU回帰は元CB／node／presentation状態と最後の画像までのgeneration保持を確認する。heap／arenaの3PNGはバイト一致し、glTF viewerも姿勢・resize・12frame後の同姿勢一致を検証した。
+
+strict28files／23TU、gltf viewerの別整形・構文確認、installed consumer30種・公開正例1＋負例10、private非配布、archive／header一致、構成別／x86_64寸法、mixed構成と親dbf headerのlink拒否、source401／MSBuild登録が成功した。生成IDはed84546d…へ更新した。Windows／Linux実機、x86_64全体実行、device lost、並行CPU、性能率は未検証。次はrecipe参照、続いてstate編集借用の公開入口を閉じる。

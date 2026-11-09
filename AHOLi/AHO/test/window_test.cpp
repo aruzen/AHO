@@ -1,4 +1,5 @@
 #ifdef AHO_GPU_TESTS
+#include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
@@ -113,8 +114,8 @@ namespace {
         ASSERT_TRUE(data);
         EXPECT_TRUE(data->closed);
         EXPECT_FALSE(data->surface);
-        EXPECT_FALSE(data->swapchain.data_);
-        EXPECT_TRUE(data->swapchain.images.empty());
+        EXPECT_FALSE(VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(data->swapchain));
+        EXPECT_TRUE(data->swapchain.images().empty());
         EXPECT_FALSE(data->render_pass);
         EXPECT_FALSE(data->frame_buffer);
         EXPECT_FALSE(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(data->image_available));
@@ -131,7 +132,7 @@ namespace {
         const auto copy = window;
         const auto context = window.render_context();
         const auto drawing = window.data2;
-        const std::weak_ptr<void> generation = drawing->swapchain.data_;
+        const std::weak_ptr<void> generation = VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(drawing->swapchain).share();
         const std::weak_ptr<void> frames = VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(drawing->image_available).share();
         const std::weak_ptr<void> surface = drawing->surface->data_;
         {
@@ -153,7 +154,7 @@ namespace {
         auto& original = *engine->boot_window;
         aho::Window copy(*engine, original.data_, original.data2);
         const auto drawing = copy.data2;
-        const std::weak_ptr<void> owner = drawing->swapchain.data_;
+        const std::weak_ptr<void> owner = VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(drawing->swapchain).share();
         glfwSetWindowShouldClose(static_cast<GLFWwindow*>(copy.data_->window_handle), GLFW_TRUE);
         EXPECT_TRUE(vsl::PureWindow::Update());
         expect_closed_resources(drawing);
@@ -232,7 +233,7 @@ namespace {
                 auto phase = std::make_unique<aho::DrawPhase>(*runtime);
                 const auto result = phase->completion();
                 const auto drawing = a.data2;
-                const std::weak_ptr<void> generation = drawing->swapchain.data_;
+                const std::weak_ptr<void> generation = VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(drawing->swapchain).share();
                 const std::weak_ptr<void> synchronization = VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(drawing->image_available).share();
                 aho::DrawPhase native(other);
                 CloseNativeProbe probe;
@@ -275,7 +276,7 @@ namespace {
             aho::Window window("closing during Native", 64, 48, *engine);
             CloseTargetEngine runtime(*engine, window);
             const auto drawing = window.data2;
-            const std::weak_ptr<void> generation = drawing->swapchain.data_;
+            const std::weak_ptr<void> generation = VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(drawing->swapchain).share();
             const std::weak_ptr<void> frames = VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(drawing->image_available).share();
             CloseNativeProbe probe;
             bool called = false;
@@ -316,7 +317,7 @@ namespace {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
         const auto size = window.window_size();
-        const auto chain = window.data2->swapchain.data_;
+        const auto chain = VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(window.data2->swapchain);
         aho_test::AcquisitionCalls native;
         for (const auto [width, height] : {std::pair{0, 64}, std::pair{64, 0}, std::pair{-1, 64}, std::pair{64, -1}}) {
             EXPECT_THROW(window.resize(width, height), std::invalid_argument);
@@ -325,7 +326,7 @@ namespace {
         const auto current = window.window_size();
         EXPECT_EQ(current.value.x.value, size.value.x.value);
         EXPECT_EQ(current.value.y.value, size.value.y.value);
-        EXPECT_EQ(window.data2->swapchain.data_, chain);
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(window.data2->swapchain), chain);
         EXPECT_FALSE(window.data2->pending_generation);
         EXPECT_FALSE(window.data2->deferred_usage);
         EXPECT_EQ(native.creates, 0u);
@@ -333,7 +334,7 @@ namespace {
     TEST_F(AHOWindowVulkanIntegration, ZeroFramebufferKeepsValidatedUsageAndRejectsInvalidAdditionsWithoutPoisoningResume) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
-        const auto previous = window.data2->swapchain.data_;
+        const auto previous = VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(window.data2->swapchain);
         aho_test::FrameBufferQuery query;
         aho_test::AcquisitionCalls native;
         query.zero = true;
@@ -343,7 +344,7 @@ namespace {
         const auto invalid = static_cast<vsl::ImageType>(std::uint32_t{1} << 31);
         EXPECT_THROW(window.recreate_swapchain(invalid), std::invalid_argument);
         EXPECT_EQ(window.data2->deferred_usage, request);
-        EXPECT_EQ(window.data2->swapchain.data_, previous);
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(window.data2->swapchain), previous);
         EXPECT_EQ(window.data2->swapchain.state(), vsl::SwapchainState::ACTIVE);
         EXPECT_EQ(native.creates, 0u);
         query.zero = false;
@@ -352,7 +353,7 @@ namespace {
         EXPECT_TRUE(window.resize(420, 300));
         EXPECT_FALSE(window.data2->deferred_usage);
         EXPECT_EQ(native.creates, 1u);
-        EXPECT_TRUE(vsl::contain(window.data2->swapchain.images.front().get_usage(), vsl::ImageType::TRANSFER_SRC));
+        EXPECT_TRUE(vsl::contain(window.data2->swapchain.image(0).get_usage(), vsl::ImageType::TRANSFER_SRC));
     }
     TEST_F(AHOWindowVulkanIntegration, ClosingDuringTheSecondFramebufferQueryStopsBeforeNativeCreation) {
         ASSERT_NO_THROW(start_engine());
@@ -410,17 +411,17 @@ namespace {
         const auto candidate = *window.data2->pending_generation->swapchain;
         EXPECT_EQ(candidate.state(), vsl::SwapchainState::ACTIVE);
         EXPECT_EQ(published.state(), vsl::SwapchainState::RETIRED);
-        EXPECT_EQ(window.data2->swapchain.data_, published.data_);
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(window.data2->swapchain), VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(published));
         EXPECT_EQ(window.data2->frame_buffer.identity(), frames.identity());
         EXPECT_EQ(probe.creates, 1u);
         unsigned notifications = 0;
         window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
             ++notifications;
             EXPECT_FALSE(current->data2->pending_generation);
-            EXPECT_EQ(current->data2->swapchain.data_, candidate.data_);
+            EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(current->data2->swapchain), VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(candidate));
             EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(current->data2->render_finished), VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(candidate.finished_semaphores()));
             EXPECT_EQ(current->data2->frame_buffer.get_render_pass().identity(), pass.identity());
-            EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::GraphicsAccess::Owned(current->data2->frame_buffer)->attachments.front().front(), VSL_NAMESPACE::lifetime::detail::ImageAccess::Owned(candidate.images.front()).get());
+            EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::GraphicsAccess::Owned(current->data2->frame_buffer)->attachments.front().front(), VSL_NAMESPACE::lifetime::detail::ImageAccess::Owned(candidate.image(0)).get());
         });
         probe.fail_frame = false;
         EXPECT_TRUE(window.recreate_swapchain());
@@ -430,7 +431,7 @@ namespace {
         EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(window.data2->image_available), available);
         EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(window.data2->in_flight), flight);
         EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(window.data2->acquire_fences), acquire);
-        EXPECT_TRUE(vsl::contain(window.data2->swapchain.images.front().get_usage(), vsl::ImageType::TRANSFER_SRC));
+        EXPECT_TRUE(vsl::contain(window.data2->swapchain.image(0).get_usage(), vsl::ImageType::TRANSFER_SRC));
     }
     TEST_F(AHOWindowVulkanIntegration, ChangedExtentRetiresThePendingCandidateAndPublishesANewOne) {
         ASSERT_NO_THROW(start_engine());
@@ -444,9 +445,9 @@ namespace {
         probe.fail_frame = false;
         EXPECT_TRUE(window.resize(420, 300));
         EXPECT_EQ(probe.creates, 2u);
-        EXPECT_EQ(probe.previous, static_cast<VkSwapchainKHR>(candidate.data_->swap_chain));
+        EXPECT_EQ(probe.previous, static_cast<VkSwapchainKHR>(VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(candidate)->swap_chain));
         EXPECT_EQ(candidate.state(), vsl::SwapchainState::RETIRED);
-        EXPECT_NE(window.data2->swapchain.data_, candidate.data_);
+        EXPECT_NE(VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(window.data2->swapchain), VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(candidate));
     }
     TEST_F(AHOWindowVulkanIntegration, NativeFailureRetainsTheValidatedRequestAndInvalidAdditionalUsageDoesNotPoisonRetry) {
         ASSERT_NO_THROW(start_engine());
@@ -466,7 +467,7 @@ namespace {
         EXPECT_TRUE(window.recreate_swapchain());
         EXPECT_EQ(probe.creates, 2u);
         EXPECT_EQ(probe.previous, VK_NULL_HANDLE);
-        EXPECT_TRUE(vsl::contain(window.data2->swapchain.images.front().get_usage(), vsl::ImageType::TRANSFER_SRC));
+        EXPECT_TRUE(vsl::contain(window.data2->swapchain.image(0).get_usage(), vsl::ImageType::TRANSFER_SRC));
     }
     TEST_F(AHOWindowVulkanIntegration, InvalidAdditionalUsageLeavesAnActivePendingCandidateAvailableForRetry) {
         ASSERT_NO_THROW(start_engine());
@@ -480,11 +481,11 @@ namespace {
         const auto invalid = static_cast<vsl::ImageType>(std::uint32_t{1} << 31);
         EXPECT_THROW(window.recreate_swapchain(invalid), std::invalid_argument);
         EXPECT_EQ(candidate.state(), vsl::SwapchainState::ACTIVE);
-        EXPECT_EQ(window.data2->pending_generation->swapchain->data_, candidate.data_);
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(*(window.data2->pending_generation->swapchain)), VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(candidate));
         probe.fail_frame = false;
         EXPECT_TRUE(window.recreate_swapchain());
         EXPECT_EQ(probe.creates, 1u);
-        EXPECT_EQ(window.data2->swapchain.data_, candidate.data_);
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(window.data2->swapchain), VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(candidate));
     }
     bool expect_recreation_guard(aho::Window& window) {
         // ガードが欠けても、VSLのusage検証で止めて記録中のswapchainを破棄しない。
@@ -571,18 +572,18 @@ namespace {
     TEST_F(AHOWindowVulkanIntegration, RecreationNotifiesAfterReplacingResourcesWithoutResizingTheNativeWindow) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
-        const auto previous_swapchain = window.data2->swapchain.data_;
+        const auto previous_swapchain = VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(window.data2->swapchain);
         const auto previous_frames = window.data2->frame_buffer;
         const auto previous_pass = window.data2->render_pass;
-        const auto previous_usage = window.data2->swapchain.images.front().get_usage();
+        const auto previous_usage = window.data2->swapchain.image(0).get_usage();
         const auto size = window.window_size();
         int calls = 0;
         window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
             ++calls;
-            EXPECT_NE(current->data2->swapchain.data_, previous_swapchain);
+            EXPECT_NE(VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(current->data2->swapchain), previous_swapchain);
             EXPECT_NE(current->data2->frame_buffer.identity(), previous_frames.identity());
             EXPECT_EQ(current->data2->render_pass.identity(), previous_pass.identity());
-            EXPECT_EQ(current->data2->swapchain.images.front().get_usage(), previous_usage);
+            EXPECT_EQ(current->data2->swapchain.image(0).get_usage(), previous_usage);
             EXPECT_EQ(current->data2->render_finished.size(), current->data2->swapchain.get_swap_image_size());
         });
         EXPECT_TRUE(window.recreate_swapchain());
@@ -595,12 +596,12 @@ namespace {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
         const auto size = window.window_size();
-        const auto previous = window.data2->swapchain.data_;
+        const auto previous = VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(window.data2->swapchain);
         aho::DrawPhase phase(*engine);
         EXPECT_THROW(window.resize(480, 320), std::logic_error);
         EXPECT_EQ(window.window_size().value.x.value, size.value.x.value);
         EXPECT_EQ(window.window_size().value.y.value, size.value.y.value);
-        EXPECT_EQ(window.data2->swapchain.data_, previous);
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(window.data2->swapchain), previous);
         expect_recreation_guard(window);
     }
 
@@ -613,14 +614,14 @@ namespace {
         };
         std::unique_ptr<aho::StandardEngine, decltype(close_engine)> other(new aho::StandardEngine("nested recreation"), close_engine);
         auto& window = *engine->boot_window;
-        const auto previous = window.data2->swapchain.data_;
+        const auto previous = VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(window.data2->swapchain);
         aho::DrawPhase outer(*engine);
         {
             aho::DrawPhase inner(*other);
             expect_recreation_guard(window);
             EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &inner);
             EXPECT_EQ(outer.state, vsl::ComputePhase::State::WAIT_SUBMIT);
-            EXPECT_EQ(window.data2->swapchain.data_, previous);
+            EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(window.data2->swapchain), previous);
         }
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &outer);
     }
@@ -783,7 +784,7 @@ namespace {
         EXPECT_TRUE(window.recreate_swapchain());
         EXPECT_EQ(window.data2->swapchain.state(), vsl::SwapchainState::ACTIVE);
         EXPECT_EQ(previous.state(), vsl::SwapchainState::RETIRED);
-        EXPECT_NE(window.data2->swapchain.data_, previous.data_);
+        EXPECT_NE(VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(window.data2->swapchain), VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(previous));
     }
     TEST_F(AHOWindowVulkanIntegration, GraphicsInitializationFailureUnregistersTheNewNativeWindow) {
         ASSERT_NO_THROW(start_engine());

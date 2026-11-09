@@ -1,7 +1,12 @@
+#include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/vulkan/viewport.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -12,7 +17,7 @@ VSL_NAMESPACE::Viewport::Viewport(float x, float y, float width, float height) :
 
 VSL_NAMESPACE::Viewport::Viewport(VSLD2RectangleAccessor<float> rect) : x(rect.x), y(rect.y), width(rect.width), height(rect.height) {}
 
-VSL_NAMESPACE::Viewport::Viewport(SwapchainAccessor swapchain) : x(0), y(0), height(swapchain.data_->swap_chain_extent.height), width(swapchain.data_->swap_chain_extent.width) {}
+VSL_NAMESPACE::Viewport::Viewport(SwapchainAccessor swapchain) : x(0), y(0), height(SwapchainAccess::Owned(swapchain)->swap_chain_extent.height), width(SwapchainAccess::Owned(swapchain)->swap_chain_extent.width) {}
 
 void VSL_NAMESPACE::Viewport::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
     injection(pl.edit_state());

@@ -12,6 +12,7 @@ namespace VSL_NAMESPACE::lifetime {
         struct CommandPoolIdentityTag;
         struct CommandBufferIdentityTag;
         struct CommandManagerIdentityTag;
+        struct SwapchainIdentityTag;
     } // namespace detail
 
     // 物理実体の比較だけを行う非所有値。比較する間は元の所有者を保持する。
@@ -37,4 +38,5 @@ namespace VSL_NAMESPACE {
     using CommandPoolIdentity = lifetime::ResourceIdentity<lifetime::detail::CommandPoolIdentityTag>;
     using CommandBufferIdentity = lifetime::ResourceIdentity<lifetime::detail::CommandBufferIdentityTag>;
     using CommandManagerIdentity = lifetime::ResourceIdentity<lifetime::detail::CommandManagerIdentityTag>;
+    using SwapchainIdentity = lifetime::ResourceIdentity<lifetime::detail::SwapchainIdentityTag>;
 } // namespace VSL_NAMESPACE

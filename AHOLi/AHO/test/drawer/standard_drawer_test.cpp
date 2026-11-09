@@ -1,3 +1,4 @@
+#include <VSL/lifetime/swapchain_access.hpp>
 #include <AHO/drawer/standard_drawer.hpp>
 #include <AHO/drawer/draw_phase.hpp>
 #include <gtest/gtest.h>
@@ -59,7 +60,7 @@ namespace {
             aho::DrawPhase phase(engine, nullptr, [&](auto& stream) {
                 stream << vsl::command::RenderPassEnd{};
                 const auto chain = window.data2->swapchain;
-                ticket = readback.record(phase, chain.images.at(phase.get_image_index()), vsl::ImageLayout::PRESENT);
+                ticket = readback.record(phase, chain.image(phase.get_image_index()), vsl::ImageLayout::PRESENT);
             });
             record(phase);
         }
@@ -161,13 +162,13 @@ namespace {
                                                                       [](void*, vk::Device device, vk::Framebuffer frame) noexcept { device.destroyFramebuffer(frame); }});
         EXPECT_THROW(window.resize(640, 360), vk::OutOfHostMemoryError);
         ASSERT_TRUE(window.data2->pending_generation);
-        const auto candidate = window.data2->pending_generation->swapchain->data_;
+        const auto candidate = VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(*(window.data2->pending_generation->swapchain));
         EXPECT_EQ(context.scissor().width, previous_extent.width);
         EXPECT_EQ(context.scissor().height, previous_extent.height);
         EXPECT_EQ(context.render_pass().identity(), pass.identity());
         fail = false;
         ASSERT_TRUE(window.recreate_swapchain());
-        EXPECT_EQ(window.data2->swapchain.data_, candidate);
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(window.data2->swapchain), candidate);
         const auto pixels = capture_triangle(*engine, [&](auto& phase) { phase << aho::pack(full, aho::RGBA(0, 1, 0, 1)); });
         const auto extent = window.render_context().scissor();
         EXPECT_EQ(pixels.width, extent.width);

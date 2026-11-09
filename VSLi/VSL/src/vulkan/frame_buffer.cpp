@@ -1,3 +1,4 @@
+#include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/owner_validation.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/identity_access.hpp>
@@ -7,6 +8,10 @@
 #include <VSL/lifetime/frame_buffer_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <stdexcept>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
@@ -45,7 +50,7 @@ namespace VSL_NAMESPACE {
             return GraphicsAccess::FromShared(lifetime::make_heap_frame_buffer(device, std::move(input), pass.owner_ref(), std::move(dependencies)));
         }
         lifetime::OwnerRef swapchain_owner(const SwapchainAccessor& swapchain, const RenderPassAccessor& pass) {
-            if (!swapchain.data_ || !swapchain.data_.use_count() || swapchain.data_->device != pass.get_device().data_.get())
+            if (!SwapchainAccess::Owned(swapchain) || !SwapchainAccess::Owned(swapchain).use_count() || SwapchainAccess::Owned(swapchain)->device != pass.get_device().data_.get())
                 throw std::invalid_argument("Framebuffer swapchain requires an owner on the pass device");
             return swapchain.owner_ref();
         }
@@ -99,20 +104,20 @@ namespace VSL_NAMESPACE {
     FrameBuffer::FrameBuffer(SwapchainAccessor swapchain, RenderPass pass) {
         const auto owner = swapchain_owner(swapchain, pass);
         std::vector<std::vector<ImageAccessor>> rows;
-        rows.reserve(swapchain.images.size());
-        for (const auto& image : swapchain.images)
+        rows.reserve(swapchain.get_swap_image_size());
+        for (const auto& image : swapchain.images())
             rows.push_back({image});
-        FrameBufferAccessor::operator=(make_frame_buffer(pass, swapchain.data_->swap_chain_extent.width, swapchain.data_->swap_chain_extent.height, 1, rows, owner));
+        FrameBufferAccessor::operator=(make_frame_buffer(pass, SwapchainAccess::Owned(swapchain)->swap_chain_extent.width, SwapchainAccess::Owned(swapchain)->swap_chain_extent.height, 1, rows, owner));
     }
     FrameBuffer::FrameBuffer(SwapchainAccessor swapchain, IDPickingRenderPass pass) {
         const auto owner = swapchain_owner(swapchain, pass);
-        if (swapchain.images.size() != pass.image_count())
+        if (swapchain.get_swap_image_size() != pass.image_count())
             throw std::invalid_argument("Picking image count must match swapchain");
         std::vector<std::vector<ImageAccessor>> rows;
-        rows.reserve(swapchain.images.size());
-        for (size_t i = 0; i < swapchain.images.size(); ++i)
-            rows.push_back({swapchain.images[i], pass.picking_image(i)});
-        FrameBufferAccessor::operator=(make_frame_buffer(pass, swapchain.data_->swap_chain_extent.width, swapchain.data_->swap_chain_extent.height, 1, rows, owner));
+        rows.reserve(swapchain.get_swap_image_size());
+        for (size_t i = 0; i < swapchain.get_swap_image_size(); ++i)
+            rows.push_back({swapchain.image(i), pass.picking_image(i)});
+        FrameBufferAccessor::operator=(make_frame_buffer(pass, SwapchainAccess::Owned(swapchain)->swap_chain_extent.width, SwapchainAccess::Owned(swapchain)->swap_chain_extent.height, 1, rows, owner));
     }
 } // namespace VSL_NAMESPACE
 

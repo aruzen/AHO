@@ -1,4 +1,5 @@
 #include <VSL/utils/typed_pipeline.hpp>
+#include <VSL/utils/typed_compute.hpp>
 #include <cstddef>
 
 #ifndef VSL_TYPED_CASE
@@ -21,6 +22,11 @@ namespace {
     using Pipeline = t::TypedGraphicsPipeline<Input>;
 
 #if VSL_TYPED_CASE == 0
+    static_assert(std::is_constructible_v<Pipeline, t::HeapStorage, vsl::LogicalDeviceAccessor, vsl::RenderPassAccessor>);
+    static_assert(std::is_constructible_v<Pipeline, t::ArenaStorage<>, vsl::LogicalDeviceAccessor, vsl::RenderPassAccessor>);
+    static_assert(std::is_constructible_v<t::TypedComputePipeline<>, t::HeapStorage, vsl::LogicalDeviceAccessor>);
+    static_assert(std::is_constructible_v<t::TypedComputePipeline<>, t::ArenaStorage<>, vsl::LogicalDeviceAccessor>);
+    static_assert(!std::is_convertible_v<vsl::lifetime::PipelineRecipeDraft&, vsl::PipelineLayoutEditAccessor>);
     static_assert(Input::LAYOUT.binding[0].stride == sizeof(Vertex));
     static_assert(t::compatible_vertex_buffers<Input, t::TypedVertexBuffer<Vertex>>);
     static_assert(!std::convertible_to<t::TypedVertexBuffer<Vertex>, vsl::BufferAccessor&>);
@@ -89,5 +95,21 @@ namespace {
     };
     using Bad = t::VertexRecord<Matrix, VSL_VERTEX_MEMBER(Matrix, values)>;
     static_assert(Bad::LAYOUT.valid);
+#elif VSL_TYPED_CASE == 16
+    void rejected(vsl::LogicalDeviceAccessor device, vsl::RenderPassAccessor pass) {
+        Pipeline pipeline(t::ArenaStorage<int>{}, device, pass);
+    }
+#elif VSL_TYPED_CASE == 17
+    void rejected(vsl::LogicalDeviceAccessor device) {
+        t::TypedComputePipeline<> pipeline(t::ArenaStorage<int>{}, device);
+    }
+#elif VSL_TYPED_CASE == 18
+    void rejected(vsl::lifetime::PipelineRecipeSnapshot recipe) {
+        std::move(recipe).definition();
+    }
+#elif VSL_TYPED_CASE == 19
+    void rejected(vsl::lifetime::PipelineRecipeSnapshot recipe) {
+        std::move(recipe).pending_layouts();
+    }
 #endif
 } // namespace

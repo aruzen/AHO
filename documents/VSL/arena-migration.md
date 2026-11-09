@@ -60,6 +60,27 @@ IndexのCPU snapshotはNative生成・転送より先に一度作り、その同
 
 旧commandがshared_ptr<BufferImpl>を受ける箇所へのlegacy_owner aliasは順序12で除去する移行用である。新しいcontrol blockを作らず、元の所有境界を共有する。Index snapshotのvector、arenaの管理領域、独立command ring／Fence、Impl内部コンテナ、Vulkan device memoryの個別確保は残る。単体一slot arenaがheapより少ない確保になるとは主張しない。配置と独立したCOMPLETION保持を揃えた測定は順序12で行う。
 
+## 順序11b後半: Typed Pipeline
+
+TypedGraphicsPipeline／TypedComputePipelineは省略時にDefaultStorageを使い、先頭のpolicy引数でheap／arenaを選択する。class templateの型引数と返すPipeline facadeは共通である。shared TypedDescriptorLayoutsを渡す既存形にも同じ先頭引数を使える。
+
+```cpp
+t::TypedGraphicsPipeline<Input, Resources, Pushes> graphics(
+    device, pass, shader_group, state, viewport, scissor); // arena
+t::TypedComputePipeline<Resources> compute(
+    t::HeapStorage{}, device, shared_layouts, compute_shader_group);
+```
+
+lifetime::PipelineRecipeDraftは既存の編集accessorを内部で使い、CPU側でstageを注入する。snapshot()は別の不変recipeを作り、stageが保存したEditorから独立させる。Graphicsのstages→Input→Resources→Pushes、Computeのstages→Resources→Pushesの順を維持する。Vertex shader、descriptor、push、Compute shaderの種類／個数をsnapshotに対して検証し、成功後にNative Layoutを生成する。
+
+schemaによるdescriptor layout定義はDevice limit検査の後に遅延保存する。明示ResourceBindingとschemaは最後の注入が勝ち、両者はshader／bindingのowner index再配置と重複排除を共用する。通常のPipelineLayout constructor／copy／add／FromRuntimeはinit_finishで遅延定義を構築し、従来のNative Layoutを持つ結果を維持する。
+
+構築に必要なDescriptorLayoutは一時寿命群に置き、heap／arenaとも空set／holeのLayoutを共有する。arena planのcompile時容量はResources::COUNT+1であり、最大set番号SET_COUNTを固定領域の容量に使わない。確保するCPU領域は実際のslot数から求める。shared TypedDescriptorLayoutsを渡す場合は既存SetLayoutを構築中だけ保持する。
+
+heapは共通make_heap_pipeline_layout／make_heap_pipeline、arenaは既存ResourceArenaのLayout＋Pipelineの2 slotを使う。runtime PipelineはLayoutを保持し、生成用recipe・Shader・RenderPass・DescriptorLayoutは構築呼出しの後に保持しない。Native構築関数はsnapshotを値で保持し、callbackで呼出元が破棄されても入力を生存させる。arenaの構築失敗は既存の逆順rollbackに従う。
+
+記録後のPipeline保持契約は配置policyから独立し、従来のWork所有による保持を維持する。保存commandはPipelineと必要なBufferを所有する。CPU recipeのvector／snapshot、生成scratch、ResourceArena管理表、Vulkan PipelineCache等の個別確保は残る。CPU Implの2slot集約による構造変更と実測性能は区別し、測定は順序12で行う。
+
 2026-11-06。Bufferの4責務分離が統合されたmaster `6b1f0166`を基点とする。[Bufferの契約](buffer-generation-contracts.md)と[責務の配置](buffer-layer-layout.md)を維持する。
 
 ## 方針と段階

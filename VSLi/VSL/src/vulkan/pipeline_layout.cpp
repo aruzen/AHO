@@ -46,6 +46,13 @@ void VSL_NAMESPACE::PipelineLayoutEditAccessor::init_start(LogicalDeviceAccessor
     _edit_device = std::move(device);
 }
 void VSL_NAMESPACE::PipelineLayoutEditAccessor::init_finish(PipelineLayoutAccessor runtime) {
+    if (const auto& pending = edit_recipe().pending_layouts) {
+        std::vector<graphic_resource::BindingLayout> layouts;
+        layouts.reserve(pending->size());
+        for (const auto& info : *pending)
+            layouts.emplace_back(_edit_device, info.bindings);
+        lifetime::replace_recipe_layouts(edit_recipe(), _edit_device, layouts);
+    }
     const auto& info = edit_recipe();
     if (runtime.data_) {
         (void)runtime.get_device();

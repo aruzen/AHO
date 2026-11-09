@@ -159,32 +159,36 @@ namespace {
             EXPECT_EQ(actual[i], 73u + i);
     }
     TEST_F(SharedLayoutsVulkanIntegrationTest, ShaderAndLayoutsFromOneArenaKeepOneRecipeSourceWithoutRetainingItInThePipeline) {
-        namespace s = vsl::storage;
-        namespace l = vsl::lifetime;
-        constexpr std::array<t::ResourceRequest, 4> requests{{{{1}, s::ResourceKind::DESCRIPTOR_LAYOUT},
-                                                              {{2}, s::ResourceKind::DESCRIPTOR_LAYOUT},
-                                                              {{3}, s::ResourceKind::DESCRIPTOR_LAYOUT},
-                                                              {{4}, s::ResourceKind::SHADER}}};
-        constexpr t::ResourcePlan<4> plan(requests);
-        vsl::Shader<vsl::ShaderType::COMPUTE> source(device, vsl_test::shader_path("typed_bundle.comp.spv"));
-        const auto words = source.code();
-        std::optional<t::TypedComputePipeline<Resources>> pipeline;
-        std::weak_ptr<void> owner;
-        {
-            const std::array<l::ResourceInit, 4> inputs{
-                vsl::DescriptorLayoutCreateInfo{{LocalSet::POINTS.begin(), LocalSet::POINTS.end()}},
-                vsl::DescriptorLayoutCreateInfo{{SharedSet::POINTS.begin(), SharedSet::POINTS.end()}},
-                vsl::DescriptorLayoutCreateInfo{},
-                vsl::ShaderCreateInfo{vsl::ShaderType::COMPUTE, {words.begin(), words.end()}}};
-            l::ResourceArena arena(device, plan, inputs);
-            owner = arena.owner();
-            t::TypedDescriptorLayouts<Resources> layouts(std::array{arena.descriptor_layout({1}), arena.descriptor_layout({2})}, arena.descriptor_layout({3}));
-            pl::ShaderGroup shaders("one owner", {arena.shader({4})});
-            vsl::PipelineLayout recipe(device, shaders, t::detail::DescriptorLayoutInjection<Resources>{layouts});
-            EXPECT_EQ(recipe.recipe().sources.size(), 1u);
-            pipeline.emplace(device, layouts, shaders);
-        }
-        EXPECT_TRUE(owner.expired());
-        EXPECT_TRUE(pipeline->backend().data_->pipeline);
+        auto verify = [&](auto policy) {
+            namespace s = vsl::storage;
+            namespace l = vsl::lifetime;
+            constexpr std::array<t::ResourceRequest, 4> requests{{{{1}, s::ResourceKind::DESCRIPTOR_LAYOUT},
+                                                                  {{2}, s::ResourceKind::DESCRIPTOR_LAYOUT},
+                                                                  {{3}, s::ResourceKind::DESCRIPTOR_LAYOUT},
+                                                                  {{4}, s::ResourceKind::SHADER}}};
+            constexpr t::ResourcePlan<4> plan(requests);
+            vsl::Shader<vsl::ShaderType::COMPUTE> source(device, vsl_test::shader_path("typed_bundle.comp.spv"));
+            const auto words = source.code();
+            std::optional<t::TypedComputePipeline<Resources>> pipeline;
+            std::weak_ptr<void> owner;
+            {
+                const std::array<l::ResourceInit, 4> inputs{
+                    vsl::DescriptorLayoutCreateInfo{{LocalSet::POINTS.begin(), LocalSet::POINTS.end()}},
+                    vsl::DescriptorLayoutCreateInfo{{SharedSet::POINTS.begin(), SharedSet::POINTS.end()}},
+                    vsl::DescriptorLayoutCreateInfo{},
+                    vsl::ShaderCreateInfo{vsl::ShaderType::COMPUTE, {words.begin(), words.end()}}};
+                l::ResourceArena arena(device, plan, inputs);
+                owner = arena.owner();
+                t::TypedDescriptorLayouts<Resources> layouts(std::array{arena.descriptor_layout({1}), arena.descriptor_layout({2})}, arena.descriptor_layout({3}));
+                pl::ShaderGroup shaders("one owner", {arena.shader({4})});
+                vsl::PipelineLayout recipe(device, shaders, t::detail::DescriptorLayoutInjection<Resources>{layouts});
+                EXPECT_EQ(recipe.recipe().sources.size(), 1u);
+                pipeline.emplace(policy, device, layouts, shaders);
+            }
+            EXPECT_TRUE(owner.expired());
+            EXPECT_TRUE(pipeline->backend().data_->pipeline);
+        };
+        verify(t::HeapStorage{});
+        verify(t::ArenaStorage<>{});
     }
 } // namespace

@@ -1,6 +1,7 @@
 #include <VSL/utils/typed_block_validation.hpp>
 #include <VSL/utils/typed_resources.hpp>
 #include <VSL/lifetime/device_owner.hpp>
+#include <VSL/lifetime/pipeline_layout_storage.hpp>
 #include <VSL/utils/spir_reflector.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
@@ -121,21 +122,21 @@ namespace VSL_NAMESPACE::typed::detail {
         const auto device = layout.get_device().data_;
         if (set_count > device->parent_device->device.getProperties().limits.maxBoundDescriptorSets)
             throw std::out_of_range("Typed descriptor set exceeds the device limit");
-        std::vector<graphic_resource::BindingLayout> sets;
+        std::vector<DescriptorLayoutCreateInfo> sets;
         sets.reserve(set_count);
         for (std::uint32_t set = 0; set < set_count; ++set) {
             std::vector<graphic_resource::BindingPoint> points;
             for (const auto& requirement : requirements)
                 if (requirement.set == set)
                     points.push_back(requirement.point);
-            sets.emplace_back(LogicalDeviceAccessor{device}, points);
+            sets.push_back({std::move(points)});
         }
-        pipeline_layout::ResourceBinding(std::move(sets)).injection(layout);
+        lifetime::replace_recipe_layouts(layout.edit_recipe(), layout.get_device(), {}, std::move(sets));
     }
 
-    void validate_resource_schema(PipelineLayoutAccessor layout, std::span<const DescriptorRequirement> requirements) {
-        for (const auto& shader : layout.recipe().shaders) {
-            if (shader->device != layout.data_->device)
+    void validate_resource_schema(const lifetime::PipelineRecipeSnapshot& recipe, std::span<const DescriptorRequirement> requirements) {
+        for (const auto& shader : recipe.definition().shaders) {
+            if (shader->device != recipe.device().data_.get())
                 throw std::invalid_argument("Typed shader/pipeline device mismatch");
             const auto stage = ShaderType(shader->stage);
             utils::SPIRVReflector reflection({}, std::span<const std::uint32_t>(shader->code), shader->name, stage);

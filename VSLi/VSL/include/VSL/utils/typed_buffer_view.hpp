@@ -11,7 +11,7 @@
 
 namespace VSL_NAMESPACE::typed {
     template<typename Policy>
-    concept buffer_storage_policy = std::same_as<std::remove_cvref_t<Policy>, HeapStorage> || std::same_as<std::remove_cvref_t<Policy>, ArenaStorage<>>;
+    concept buffer_storage_policy = storage_policy<Policy>;
 }
 
 namespace VSL_NAMESPACE::typed::detail {

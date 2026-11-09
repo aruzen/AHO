@@ -1,5 +1,6 @@
 #pragma once
 #include "typed_block_layout.hpp"
+#include "../lifetime/pipeline_recipe.hpp"
 #include "../vulkan/stages/resource_binding.hpp"
 #include <algorithm>
 #include <array>
@@ -18,7 +19,7 @@ namespace VSL_NAMESPACE::typed {
             size_t payload_size = 0;
         };
         void inject_resource_schema(PipelineLayoutEditAccessor layout, std::span<const DescriptorRequirement> requirements, std::uint32_t set_count);
-        void validate_resource_schema(PipelineLayoutAccessor layout, std::span<const DescriptorRequirement> requirements);
+        void validate_resource_schema(const lifetime::PipelineRecipeSnapshot& recipe, std::span<const DescriptorRequirement> requirements);
         template<std::uint32_t binding, typename... Bindings>
         struct FindDescriptor;
         template<std::uint32_t binding>

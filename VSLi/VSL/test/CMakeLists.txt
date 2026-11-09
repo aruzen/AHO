@@ -87,13 +87,18 @@ if (VSL_TEST_SOURCES)
         CONTENT "set(TEST_COMPILER [==[${CMAKE_CXX_COMPILER}]==])\nset(TEST_COMPILER_ID [==[${CMAKE_CXX_COMPILER_ID}]==])\nset(TEST_FRONTEND [==[${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}]==])\nset(TEST_INCLUDE_DIRS [==[$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>]==])\nset(TEST_DEFINITIONS [==[$<TARGET_PROPERTY:VSL,INTERFACE_COMPILE_DEFINITIONS>]==])\nset(TEST_FLAGS [==[${CMAKE_CXX_FLAGS}]==])\nset(TEST_SYSROOT [==[${CMAKE_OSX_SYSROOT}]==])\nset(TEST_ARCHITECTURES [==[${CMAKE_OSX_ARCHITECTURES}]==])\n")
     set(typed_contract_names Valid WrongVertexBinding MissingBuffer WrongRecord DuplicateBinding DuplicateLocation
         ExtentOverflow StrideTooSmall ImplicitRecordOffset WideLocationOverlap UndefinedFormat
-        MemberStorageOverflow WrongMemberRecord RecordLocationOverflow UnsupportedMember UnsupportedMemberMatrix)
-    foreach(case RANGE 0 15)
+        MemberStorageOverflow WrongMemberRecord RecordLocationOverflow UnsupportedMember UnsupportedMemberMatrix
+        InvalidGraphicsStorage InvalidComputeStorage TemporaryRecipeDefinition TemporaryRecipeLayouts)
+    foreach(case RANGE 0 19)
         list(GET typed_contract_names ${case} name)
+        set(typed_storage_expected)
+        if(case GREATER 15)
+            set(typed_storage_expected "-DTEST_EXPECTED=constraints|constructor|no matching|deleted")
+        endif()
         add_test(NAME "VSL.TypedPipeline.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
             "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
             "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_pipeline.cpp"
-            "-DTEST_CASE=${case}" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+            "-DTEST_CASE=${case}" ${typed_storage_expected} -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
         set_tests_properties("VSL.TypedPipeline.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
     endforeach()
     set(typed_descriptor_names Valid WrongPayload WrongKind WrongArrayCount UnknownBinding WrongSet MissingSet

@@ -130,7 +130,7 @@ namespace {
         current.swap(replacement);
     }
     VSL_NAMESPACE::ImageType requested_usage(const AHO_NAMESPACE::window::WindowData& drawing, VSL_NAMESPACE::ImageType additional) {
-        return (drawing.pending_generation ? drawing.pending_generation->request.usage : drawing.swapchain.images.at(0).get_usage()) |
+        return (drawing.pending_generation ? drawing.pending_generation->request.usage : drawing.swapchain.image(0).get_usage()) |
                drawing.deferred_usage.value_or(VSL_NAMESPACE::ImageType::NONE) | additional;
     }
     void defer_recreation(AHO_NAMESPACE::window::WindowData& drawing, VSL_NAMESPACE::ImageType additional) {

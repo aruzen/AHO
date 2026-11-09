@@ -207,13 +207,13 @@ namespace {
         if (IsSkipped())
             return;
         auto window = engine->get_window();
-        ASSERT_FALSE(vsl::contain(window.data2->swapchain.images.front().get_usage(), vsl::ImageType::TRANSFER_SRC));
+        ASSERT_FALSE(vsl::contain(window.data2->swapchain.image(0).get_usage(), vsl::ImageType::TRANSFER_SRC));
         const auto previous = window.data2->frame_buffer;
         int calls = 0;
         window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
             ++calls;
             EXPECT_NE(current->data2->frame_buffer.identity(), previous.identity());
-            EXPECT_TRUE(vsl::contain(current->data2->swapchain.images.front().get_usage(), vsl::ImageType::TRANSFER_SRC));
+            EXPECT_TRUE(vsl::contain(current->data2->swapchain.image(0).get_usage(), vsl::ImageType::TRANSFER_SRC));
         });
         aho::x::Screenshot screenshot(window);
         EXPECT_EQ(calls, 1);
@@ -295,7 +295,7 @@ namespace {
         aho::x::Screenshot screenshot(window);
         for (const auto size : {48, 80}) {
             ASSERT_TRUE(window.resize(size, size / 2));
-            EXPECT_TRUE(vsl::contain(window.data2->swapchain.images.front().get_usage(), vsl::ImageType::TRANSFER_SRC));
+            EXPECT_TRUE(vsl::contain(window.data2->swapchain.image(0).get_usage(), vsl::ImageType::TRANSFER_SRC));
             {
                 aho::DrawPhase phase(*engine, clear(0, 0, 1));
                 ASSERT_TRUE(screenshot.capture(phase));

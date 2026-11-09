@@ -1,7 +1,12 @@
+#include <VSL/lifetime/swapchain_access.hpp>
 #include "support/window_fixture.hpp"
 #include <VSL/lifetime/surface_storage.hpp>
 #include <VSL/storage/resource_layout.hpp>
 #include <VSL/vulkan/swapchain.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
+}
 
 namespace {
     namespace l = vsl::lifetime;
@@ -196,7 +201,7 @@ namespace {
         auto saved = vsl::Swapchain(device, surface);
         std::weak_ptr<void> os = window->window_owner().owner_ref().share();
         std::weak_ptr<void> child = surface->data_;
-        const auto native_surface = saved.data_->surface;
+        const auto native_surface = SwapchainAccess::Owned(saved)->surface;
         ASSERT_TRUE(window->close());
         surface.reset();
         EXPECT_FALSE(child.expired());
@@ -204,7 +209,7 @@ namespace {
         EXPECT_FALSE(physical.data_->device.getSurfaceFormatsKHR(native_surface->surface).empty());
         auto source = std::make_shared<vsl::Surface>(saved.get_surface());
         vsl::Swapchain next(device, source, saved);
-        EXPECT_GT(next.data_->swap_chain_extent.width, 0u);
-        EXPECT_GT(next.data_->swap_chain_extent.height, 0u);
+        EXPECT_GT(SwapchainAccess::Owned(next)->swap_chain_extent.width, 0u);
+        EXPECT_GT(SwapchainAccess::Owned(next)->swap_chain_extent.height, 0u);
     }
 } // namespace

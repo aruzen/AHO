@@ -1,3 +1,4 @@
+#include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include "support/window_fixture.hpp"
 #include "support/deferred_action.hpp"
@@ -11,6 +12,10 @@
 #include <VSL/vulkan/commands/render_pass_begin.hpp>
 #include <VSL/vulkan/commands/render_pass_end.hpp>
 #include <new>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SynchronizationAccess;
@@ -203,11 +208,11 @@ namespace {
         auto manager = make_manager().independent(3);
         NativeProbe probe;
         auto chain = make_chain();
-        auto registry = l::presentation_domain(chain.data_);
+        auto registry = l::presentation_domain(SwapchainAccess::Owned(chain).share());
         vsl::Completion first, second;
         {
             auto phase = manager.start_phase<vsl::DefaultPhase>(chain);
-            probe.target = chain.data_->presentation_context->fences->fences[phase.get_image_index()];
+            probe.target = SwapchainAccess::Owned(chain)->presentation_context->fences->fences[phase.get_image_index()];
             phase.cancel();
             first = phase.completion();
         }
@@ -259,13 +264,13 @@ namespace {
         vsl::Completion graphics;
         {
             auto chain = make_chain();
-            const vsl::storage::SwapchainLayout layout(chain.images.size(), vsl::PresentFencePolicy::REQUIRE_FENCE);
-            auto* pool = chain.data_->presentation_context->fences;
+            const vsl::storage::SwapchainLayout layout(chain.get_swap_image_size(), vsl::PresentFencePolicy::REQUIRE_FENCE);
+            auto* pool = SwapchainAccess::Owned(chain)->presentation_context->fences;
             ASSERT_NE(pool, nullptr);
-            EXPECT_EQ(pool->fences.size(), chain.images.size());
-            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(pool) - reinterpret_cast<std::uintptr_t>(chain.data_.get()), layout.present_fence_offset());
-            owner = chain.data_;
-            registry = l::presentation_domain(chain.data_);
+            EXPECT_EQ(pool->fences.size(), chain.get_swap_image_size());
+            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(pool) - reinterpret_cast<std::uintptr_t>(SwapchainAccess::Owned(chain).get()), layout.present_fence_offset());
+            owner = SwapchainAccess::Owned(chain).share();
+            registry = l::presentation_domain(SwapchainAccess::Owned(chain).share());
             auto phase = manager.start_phase<vsl::DefaultPhase>(chain);
             probe.target = pool->fences[phase.get_image_index()];
             phase.cancel();
@@ -286,18 +291,18 @@ namespace {
         auto manager = make_manager().independent(1);
         NativeProbe probe;
         auto chain = make_chain();
-        auto registry = l::presentation_domain(chain.data_);
+        auto registry = l::presentation_domain(SwapchainAccess::Owned(chain).share());
         vsl::SynchroManager sync(device);
-        auto finished = sync.create_semaphore("present", chain.images.size());
+        auto finished = sync.create_semaphore("present", chain.get_swap_image_size());
         auto phase = manager.start_phase<vsl::DefaultPhase>(chain, std::nullopt, finished);
         const auto index = phase.get_image_index();
-        probe.target = chain.data_->presentation_context->fences->fences[index];
+        probe.target = SwapchainAccess::Owned(chain)->presentation_context->fences->fences[index];
         probe.forced = VK_ERROR_OUT_OF_HOST_MEMORY;
         phase.cancel();
         ASSERT_EQ(registry->records.size(), 1u);
         auto record = registry->records[0];
         EXPECT_EQ(record->state.status, s::PresentStatus::PENDING);
-        EXPECT_EQ(chain.data_->presentation_context->images[index].present_serial, 0u);
+        EXPECT_EQ(SwapchainAccess::Owned(chain)->presentation_context->images[index].present_serial, 0u);
         EXPECT_NO_THROW(manager.wait_idle());
         EXPECT_EQ(probe.target_waits, 0u);
         EXPECT_THROW(finished.destroy(), std::logic_error);
@@ -317,11 +322,11 @@ namespace {
             auto manager = make_manager().independent(1);
             NativeProbe probe;
             auto chain = make_chain();
-            auto registry = l::presentation_domain(chain.data_);
+            auto registry = l::presentation_domain(SwapchainAccess::Owned(chain).share());
             vsl::RenderPass pass(chain);
             vsl::FrameBuffer target(chain, pass);
             auto phase = manager.start_phase<vsl::DefaultPhase>(chain);
-            probe.target = chain.data_->presentation_context->fences->fences[phase.get_image_index()];
+            probe.target = SwapchainAccess::Owned(chain)->presentation_context->fences->fences[phase.get_image_index()];
             probe.forced = error;
             phase << vsl::command::RenderPassBegin(pass, target) << vsl::command::RenderPassEnd{};
             EXPECT_EQ(phase.submit(), error == VK_ERROR_OUT_OF_DATE_KHR ? vsl::ComputePhase::SubmitResult::WANT_RECREATE_SWAPCHAIN
@@ -340,15 +345,15 @@ namespace {
         auto manager = make_manager().independent(1);
         NativeProbe probe;
         auto chain = make_chain();
-        auto registry = l::presentation_domain(chain.data_);
-        const auto fences = chain.data_->presentation_context->fences->fences;
+        auto registry = l::presentation_domain(SwapchainAccess::Owned(chain).share());
+        const auto fences = SwapchainAccess::Owned(chain)->presentation_context->fences->fences;
         for (unsigned frame = 0; frame < 36; ++frame) {
             auto phase = manager.start_phase<vsl::DefaultPhase>(chain);
             const auto expected = fences[phase.get_image_index()];
             phase.cancel();
             ASSERT_TRUE(phase.completion().wait());
             EXPECT_EQ(probe.fences[frame], static_cast<VkFence>(expected));
-            EXPECT_LE(registry->records.size(), chain.images.size() + 1);
+            EXPECT_LE(registry->records.size(), chain.get_swap_image_size() + 1);
             EXPECT_LE(registry->acquisitions.size(), 2u);
         }
         EXPECT_EQ(probe.calls, 36u);
@@ -359,8 +364,8 @@ namespace {
         auto first = make_manager().independent(1);
         auto second = make_manager().independent(1);
         auto old = make_chain();
-        const auto registry = l::presentation_domain(old.data_);
-        const std::weak_ptr<vsl::impl::SwapchainImpl> owner = old.data_;
+        const auto registry = l::presentation_domain(SwapchainAccess::Owned(old).share());
+        const std::weak_ptr<vsl::impl::SwapchainImpl> owner = SwapchainAccess::Owned(old).share();
         {
             auto phase = first.start_phase<vsl::DefaultPhase>(old);
             phase.cancel();
@@ -370,8 +375,8 @@ namespace {
         auto next = l::SwapchainArena(device, *surface, info, old).view();
         old = {};
         ASSERT_FALSE(owner.expired());
-        EXPECT_EQ(registry, l::presentation_domain(next.data_));
-        for (size_t frame = 0; frame < next.images.size() + 2 && !owner.expired(); ++frame) {
+        EXPECT_EQ(registry, l::presentation_domain(SwapchainAccess::Owned(next).share()));
+        for (size_t frame = 0; frame < next.get_swap_image_size() + 2 && !owner.expired(); ++frame) {
             auto phase = second.start_phase<vsl::DefaultPhase>(next);
             phase.cancel();
             ASSERT_TRUE(phase.completion().wait());
@@ -402,7 +407,7 @@ namespace {
             auto old = arena.view();
             {
                 auto previous = first.start_phase<vsl::DefaultPhase>(old);
-                probe.target = old.data_->presentation_context->fences->fences[previous.get_image_index()];
+                probe.target = SwapchainAccess::Owned(old)->presentation_context->fences->fences[previous.get_image_index()];
                 previous.cancel();
                 ASSERT_TRUE(previous.completion().wait());
             }
@@ -426,10 +431,10 @@ namespace {
         std::shared_ptr<l::PresentRecord> record;
         {
             auto chain = make_chain();
-            owner = chain.data_;
-            auto registry = l::presentation_domain(chain.data_);
+            owner = SwapchainAccess::Owned(chain).share();
+            auto registry = l::presentation_domain(SwapchainAccess::Owned(chain).share());
             auto phase = manager.start_phase<vsl::DefaultPhase>(chain);
-            probe.target = chain.data_->presentation_context->fences->fences[phase.get_image_index()];
+            probe.target = SwapchainAccess::Owned(chain)->presentation_context->fences->fences[phase.get_image_index()];
             phase.cancel();
             ASSERT_TRUE(phase.completion().wait());
             ASSERT_EQ(registry->records.size(), 1u);
@@ -449,8 +454,8 @@ namespace {
     TEST_F(PresentationRetentionWindowIntegrationTest, PresentPoolAliasesProtectPendingUseAndSaveCompletionBeforeNativeReset) {
         auto manager = make_manager().independent(1);
         auto chain = make_chain();
-        auto registry = l::presentation_domain(chain.data_);
-        auto fences = SynchronizationAccess::FromShared(std::shared_ptr<vsl::impl::FenceImpl>(chain.data_, chain.data_->presentation_context->fences));
+        auto registry = l::presentation_domain(SwapchainAccess::Owned(chain).share());
+        auto fences = SynchronizationAccess::FromShared(std::shared_ptr<vsl::impl::FenceImpl>(SwapchainAccess::Owned(chain).share(), SwapchainAccess::Owned(chain)->presentation_context->fences));
         NativeProbe probe;
         auto phase = manager.start_phase<vsl::DefaultPhase>(chain);
         const auto index = phase.get_image_index();
@@ -497,7 +502,7 @@ namespace {
         vsl::SwapchainAccessor next;
         bool rejected = false;
         const vsl_test::DeferredAction callback([&] {
-            EXPECT_THROW(l::presentation_domain(next.data_), std::logic_error);
+            EXPECT_THROW(l::presentation_domain(SwapchainAccess::Owned(next).share()), std::logic_error);
             rejected = true;
         });
         std::weak_ptr<l::SurfacePresentationDomain> old_domain;
@@ -510,10 +515,10 @@ namespace {
                     return callback_memory(layout, callback.owner());
                 });
                 auto chain = arena.view();
-                old_domain = l::presentation_domain(chain.data_);
+                old_domain = l::presentation_domain(SwapchainAccess::Owned(chain).share());
                 {
                     auto phase = manager.start_phase<vsl::DefaultPhase>(chain);
-                    probe.target = chain.data_->presentation_context->fences->fences[phase.get_image_index()];
+                    probe.target = SwapchainAccess::Owned(chain)->presentation_context->fences->fences[phase.get_image_index()];
                     phase.cancel();
                     ASSERT_TRUE(phase.completion().wait());
                 }
@@ -524,7 +529,7 @@ namespace {
         }
         EXPECT_TRUE(rejected);
         EXPECT_TRUE(old_domain.expired());
-        EXPECT_TRUE(l::presentation_domain(next.data_));
+        EXPECT_TRUE(l::presentation_domain(SwapchainAccess::Owned(next).share()));
     }
     TEST_F(PresentationRetentionWindowIntegrationTest, WaitIdleKeepsNewPendingAndSubmittedWorkRegisteredByRetirementCallbacks) {
         for (const bool submit : {false, true}) {
@@ -536,7 +541,7 @@ namespace {
             const vsl_test::DeferredAction callback([&] {
                 invoked = true;
                 phase = std::make_unique<vsl::DefaultPhase>(manager, next);
-                probe.target = next.data_->presentation_context->fences->fences[phase->get_image_index()];
+                probe.target = SwapchainAccess::Owned(next)->presentation_context->fences->fences[phase->get_image_index()];
                 probe.hold = true;
                 if (submit)
                     phase->cancel();
@@ -549,7 +554,7 @@ namespace {
                 auto chain = arena.view();
                 {
                     auto previous = manager.start_phase<vsl::DefaultPhase>(chain);
-                    probe.target = chain.data_->presentation_context->fences->fences[previous.get_image_index()];
+                    probe.target = SwapchainAccess::Owned(chain)->presentation_context->fences->fences[previous.get_image_index()];
                     previous.cancel();
                     ASSERT_TRUE(previous.completion().wait());
                 }
@@ -560,7 +565,7 @@ namespace {
             ASSERT_TRUE(invoked);
             ASSERT_TRUE(phase);
             EXPECT_EQ(phase->completion().data_->status, submit ? vsl::Completion::Status::SUBMITTED : vsl::Completion::Status::PENDING);
-            const auto registry = l::presentation_domain(next.data_);
+            const auto registry = l::presentation_domain(SwapchainAccess::Owned(next).share());
             if (submit) {
                 ASSERT_EQ(registry->records.size(), 1u);
                 EXPECT_EQ(registry->records[0]->state.status, s::PresentStatus::SUBMITTED);
@@ -584,9 +589,9 @@ namespace {
             auto other = make_manager().independent(1);
             const vsl::SwapchainCreateInfo info{.width = 64, .height = 48, .present_fences = vsl::PresentFencePolicy::REQUIRE_FENCE};
             auto chain = l::SwapchainArena(device, *peer_surface, info).view();
-            peer_owner = chain.data_;
+            peer_owner = SwapchainAccess::Owned(chain).share();
             auto phase = other.start_phase<vsl::DefaultPhase>(chain);
-            probe.target = chain.data_->presentation_context->fences->fences[phase.get_image_index()];
+            probe.target = SwapchainAccess::Owned(chain)->presentation_context->fences->fences[phase.get_image_index()];
             probe.forced = VK_ERROR_UNKNOWN;
             probe.unknown_before = true;
             phase.cancel();
@@ -619,9 +624,9 @@ namespace {
             {
                 auto manager = make_manager().independent(1);
                 auto chain = make_chain();
-                owner = chain.data_;
+                owner = SwapchainAccess::Owned(chain).share();
                 auto phase = manager.start_phase<vsl::DefaultPhase>(chain);
-                probe.target = chain.data_->presentation_context->fences->fences[phase.get_image_index()];
+                probe.target = SwapchainAccess::Owned(chain)->presentation_context->fences->fences[phase.get_image_index()];
                 probe.forced = VK_ERROR_UNKNOWN;
                 phase.cancel();
                 ASSERT_TRUE(phase.completion().wait());

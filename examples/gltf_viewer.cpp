@@ -328,7 +328,7 @@ namespace {
         auto size = window.frame_size();
         width = size.value.x.value;
         height = size.value.y.value;
-        for (auto image : swapchain.images) {
+        for (auto image : swapchain.images()) {
             depths.emplace_back(context.device(), width, height, vsl::data_format::DEPTH32_FLOAT);
             frames.emplace_back(pass, width, height, std::vector<vsl::ImageAccessor>{image, depths.back()});
         }
@@ -443,7 +443,7 @@ namespace {
             };
             rebuild();
             auto draw = [&](double time, bool capture) {
-                if (targets->swapchain.data_ != window.data2->swapchain.data_)
+                if (targets->swapchain.identity() != window.data2->swapchain.identity())
                     rebuild();
                 auto pose = model.sample(animation, time);
                 aho::DrawPhase phase(engine, [](auto&) {});

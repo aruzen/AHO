@@ -18,6 +18,7 @@ namespace VSL_NAMESPACE::lifetime {
     impl::SwapchainImpl& swapchain_at(void* storage);
     void destroy_swapchain(void* storage) noexcept;
     void require_swapchain_owner(const SwapchainAccessor& source);
+    void require_swapchain_owner(const OwnedRef<impl::SwapchainImpl>& value);
     void require_swapchain_owner(const std::shared_ptr<impl::SwapchainImpl>& source);
     std::shared_ptr<impl::ImageImpl> swapchain_image(const std::shared_ptr<impl::SwapchainImpl>& source, size_t index);
     std::shared_ptr<impl::SemaphoreImpl> swapchain_finished(const std::shared_ptr<impl::SwapchainImpl>& source);

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/owner_validation.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/facade_call.hpp>
@@ -16,6 +17,10 @@
 #include <algorithm>
 #include <cstring>
 #include <stdexcept>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
@@ -47,7 +52,7 @@ namespace VSL_NAMESPACE {
     }
     namespace {
         RenderPassDescription present_description(SwapchainAccessor swapchain, bool picking) {
-            if (!swapchain.data_)
+            if (!SwapchainAccess::Owned(swapchain))
                 throw std::invalid_argument("Swapchain required");
             RenderPassDescription desc;
             desc.add_color({.format = swapchain.get_format(),
@@ -64,8 +69,8 @@ namespace VSL_NAMESPACE {
         RenderPass pass(swapchain.get_device(),
                         present_description(swapchain, true));
         _pass = std::move(pass);
-        _picking_buffer.resize(swapchain.images.size());
-        recreate_buffer(swapchain.data_->extent.width, swapchain.data_->extent.height);
+        _picking_buffer.resize(swapchain.get_swap_image_size());
+        recreate_buffer(SwapchainAccess::Owned(swapchain)->extent.width, SwapchainAccess::Owned(swapchain)->extent.height);
     }
     IDPickingRenderPass::IDPickingRenderPass(IDPickingRenderPass&& other) noexcept {
         lifetime::FacadeCall::Invalidate(&other);

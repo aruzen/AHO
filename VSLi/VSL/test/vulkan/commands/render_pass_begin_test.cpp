@@ -1,3 +1,4 @@
+#include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
@@ -5,6 +6,10 @@
 #include "support/render_fixture.hpp"
 #include "support/read_image.hpp"
 #include "support/frame_buffer_metadata.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
@@ -272,10 +277,10 @@ namespace {
         for (const auto format : {vk::Format::eR32Sint, vk::Format::eR32Uint}) {
             SCOPED_TRACE(vk::to_string(format));
             vsl::SwapchainAccessor chain;
-            chain.data_ = std::make_shared<vsl::impl::SwapchainImpl>();
-            chain.data_->device = device.data_.get();
-            chain.data_->extent = chain.data_->swap_chain_extent = vk::Extent2D{2, 2};
-            chain.data_->swap_chain_image_format = format;
+            SwapchainAccess::Owned(chain) = std::make_shared<vsl::impl::SwapchainImpl>();
+            SwapchainAccess::Owned(chain)->device = device.data_.get();
+            SwapchainAccess::Owned(chain)->extent = SwapchainAccess::Owned(chain)->swap_chain_extent = vk::Extent2D{2, 2};
+            SwapchainAccess::Owned(chain)->swap_chain_image_format = format;
             vsl::IDPickingRenderPass pass(chain);
             auto target = legacy_metadata_target(pass);
             const vsl::command::IDPickingRenderPassBegin defaults(pass, target);
@@ -289,10 +294,10 @@ namespace {
     }
     TEST_F(LegacyClearVulkanIntegrationTest, PickingRgbPreservesTheIdAttachmentDefaultAndZeroAlpha) {
         vsl::SwapchainAccessor chain;
-        chain.data_ = std::make_shared<vsl::impl::SwapchainImpl>();
-        chain.data_->device = device.data_.get();
-        chain.data_->extent = chain.data_->swap_chain_extent = vk::Extent2D{2, 2};
-        chain.data_->swap_chain_image_format = vk::Format::eR8G8B8A8Unorm;
+        SwapchainAccess::Owned(chain) = std::make_shared<vsl::impl::SwapchainImpl>();
+        SwapchainAccess::Owned(chain)->device = device.data_.get();
+        SwapchainAccess::Owned(chain)->extent = SwapchainAccess::Owned(chain)->swap_chain_extent = vk::Extent2D{2, 2};
+        SwapchainAccess::Owned(chain)->swap_chain_image_format = vk::Format::eR8G8B8A8Unorm;
         vsl::IDPickingRenderPass pass(chain);
         auto target = legacy_metadata_target(pass);
         float red = 0.25f, green = 0.5f, blue = 0.75f;

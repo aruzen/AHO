@@ -1,3 +1,4 @@
+#include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/swapchain_storage.hpp>
 #include <VSL/lifetime/swapchain_arena.hpp>
@@ -10,6 +11,10 @@
 #include <VSL/lifetime/synchronization_storage.hpp>
 #include <VSL/storage/cpu_region.hpp>
 #include <new>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::ImageAccess;
@@ -118,7 +123,12 @@ namespace VSL_NAMESPACE::lifetime {
         std::destroy_at(static_cast<SwapchainSlotStorage*>(storage));
     }
     void require_swapchain_owner(const SwapchainAccessor& source) {
-        require_swapchain_owner(source.data_);
+        require_swapchain_owner(SwapchainAccess::Owned(source));
+    }
+    void require_swapchain_owner(const OwnedRef<impl::SwapchainImpl>& value) {
+        require_swapchain_owner(detail::OwnerAccess::Shared(value));
+        if (detail::OwnerAccess::Node(value) != value->owner_node)
+            throw std::invalid_argument("Swapchain requires its canonical dependency node");
     }
     void require_swapchain_owner(const std::shared_ptr<impl::SwapchainImpl>& value) {
         if (!value || !value.use_count() || !value->swap_chain || !value->owner_node || value->owner_node->retiring() || !value->owner_node->matches(value))
@@ -152,7 +162,7 @@ namespace VSL_NAMESPACE::lifetime {
         std::shared_ptr<impl::SwapchainImpl> previous;
         if (old) {
             require_swapchain_owner(*old);
-            previous = old->data_;
+            previous = detail::OwnerAccess::Shared(SwapchainAccess::Owned(*old));
         }
         GLFWCallScope scope;
         if (!info.width || !info.height) {
@@ -190,7 +200,7 @@ namespace VSL_NAMESPACE::lifetime {
             image.owner_node = &root->node;
             images[i] = ImageAccess::FromOwned(root->node.ref(root).alias(&image));
         }
-        return {{root, &value}, std::move(images)};
+        return SwapchainAccess::FromOwned(root->node.ref(root).alias(&value), std::move(images));
     }
     SwapchainArena::SwapchainArena(LogicalDeviceAccessor device, Surface surface, SwapchainCreateInfo info,
                                    std::optional<SwapchainAccessor> old, SwapchainMemoryFactory memory, SwapchainCreateProgress* progress, ValidatedStorage) {
@@ -203,6 +213,6 @@ namespace VSL_NAMESPACE::lifetime {
         return _view.owner_ref();
     }
     size_t SwapchainArena::image_count() const {
-        return _view.images.size();
+        return _view.get_swap_image_size();
     }
 } // namespace VSL_NAMESPACE::lifetime

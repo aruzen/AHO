@@ -371,6 +371,19 @@ if (VSL_TEST_SOURCES)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
         set_tests_properties("VSL.Synchronization.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
     endforeach()
+    add_library(vsl-swapchain-style-contract OBJECT EXCLUDE_FROM_ALL contracts/swapchain.cpp)
+    target_link_libraries(vsl-swapchain-style-contract PRIVATE VSL)
+    target_compile_definitions(vsl-swapchain-style-contract PRIVATE VSL_TYPED_CASE=0)
+    set(swapchain_contract_names Valid SwapchainData SwapchainOwner SwapchainImages RawConstructor OwnedConstructor TemporaryImages ConstTemporaryImages MutableImages MixedIdentity IdentityRaw)
+    foreach(case RANGE 0 10)
+        list(GET swapchain_contract_names ${case} name)
+        add_test(NAME "VSL.Swapchain.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/swapchain.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=private|deleted|no member|no matching|conversion|reference|call|viable|invalid"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.Swapchain.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
     set(shader_contract_names Valid ShaderData ShaderOwner ShaderRawConstructor ShaderGroupData ShaderGroupOwner TemporaryShaderCode ConstTemporaryShaderCode)
     foreach(case RANGE 1 7)
         list(GET shader_contract_names ${case} name)

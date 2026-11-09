@@ -188,7 +188,7 @@ namespace {
         std::weak_ptr<VSL_NAMESPACE::impl::ImageImpl> source = VSL_NAMESPACE::lifetime::detail::ImageAccess::Owned(*(color)).share();
         auto request = AHO_NAMESPACE::ImageReadback(manager, *color, VSL_NAMESPACE::ImageLayout::GENERAL);
         framebuffer.reset();
-        description.images.clear();
+        description = {};
         color.reset();
         EXPECT_FALSE(source.expired());
         EXPECT_EQ(request.read().bytes[1], std::byte{255});

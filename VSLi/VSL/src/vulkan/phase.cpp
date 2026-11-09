@@ -1,3 +1,5 @@
+#include <VSL/lifetime/swapchain_access.hpp>
+#include <VSL/lifetime/owner_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
@@ -22,6 +24,10 @@
 #include <exception>
 #include <stdexcept>
 #include <algorithm>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SynchronizationAccess;
@@ -481,11 +487,11 @@ namespace VSL_NAMESPACE {
         std::shared_ptr<lifetime::AcquireTicket> presentation;
         std::shared_ptr<lifetime::CommandDomain> owner_domain;
         try {
-            const auto chain = swapchain.data_;
+            const auto chain = lifetime::detail::OwnerAccess::Shared(SwapchainAccess::Owned(swapchain));
             if (!chain || !chain->swap_chain || !CommandAccess::Data(manager) ||
                 chain->device != CommandAccess::Data(manager)->device.get())
                 throw std::invalid_argument("A swapchain is required");
-            lifetime::require_swapchain_owner(chain);
+            lifetime::require_swapchain_owner(swapchain);
             const auto buffer = manager.get_buffer();
             owner_domain = lifetime::CommandAccess::Owner(buffer);
             const auto& domain = owner_domain;
@@ -496,7 +502,7 @@ namespace VSL_NAMESPACE {
             const bool initially_ready = acquisition_ready();
             if (!call.alive() || state != State::BEFORE_SETUP)
                 return;
-            if (CommandAccess::Data(manager) != initial_manager || initial_manager->command_buffer != buffers || domain->buffer != buffers || swapchain.data_ != chain ||
+            if (CommandAccess::Data(manager) != initial_manager || initial_manager->command_buffer != buffers || domain->buffer != buffers || SwapchainAccess::Owned(swapchain) != chain ||
                 domain->context.closing || domain->context.recording || domain->context.submitting || domain->context.returning_image || domain->context.mutating || domain->context.frame_buffer_recording)
                 throw std::logic_error("Command domain changed during acquisition readiness");
             if (!initially_ready) {
@@ -510,7 +516,7 @@ namespace VSL_NAMESPACE {
             buffers->current_buffer_idx = (previous_slot + 1) % buffers->command_buffers.size();
             if (!prepare() || !call.alive())
                 return;
-            if (swapchain.data_ != chain)
+            if (SwapchainAccess::Owned(swapchain) != chain)
                 throw std::logic_error("Swapchain changed while preparing a phase");
             operation::require_active_swapchain(*chain);
             const auto count = chain->swap_chain_images.size();
@@ -533,7 +539,7 @@ namespace VSL_NAMESPACE {
                     return false;
                 }
                 if (submission != work || work->result->status != Completion::Status::PENDING ||
-                    swapchain.data_ != chain || CommandAccess::Data(manager) != manager_data || manager_data->command_buffer != buffers ||
+                    SwapchainAccess::Owned(swapchain) != chain || CommandAccess::Data(manager) != manager_data || manager_data->command_buffer != buffers ||
                     domain->buffer != buffers || buffers->current_buffer_idx != slot || frame_slot != slot ||
                     domain->submissions.at(slot) != previous || domain->context.generation != prepared_generation ||
                     domain->context.closing || domain->context.recording || domain->context.submitting || domain->context.returning_image ||

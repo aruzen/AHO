@@ -136,10 +136,10 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 throw std::invalid_argument("Resource initializer kind or ownership does not match its plan entry");
             if (resource.placement.external) {
                 if (const auto* buffer = std::get_if<BufferView>(&value)) {
-                    const auto* ref = buffer->ref().data;
+                    const auto* ref = detail::BufferAccess::Impl(buffer->ref());
                     if (!buffer->owner().use_count() || !ref || !ref->buffer || !ref->use || ref->device != device.data_.get())
                         throw std::invalid_argument("External buffer requires an owner on the arena device");
-                    resource.reference = buffer->ref().data;
+                    resource.reference = detail::BufferAccess::Impl(buffer->ref());
                     resource.buffer_offset = buffer->byte_offset();
                     resource.buffer_bytes = buffer->size();
                     resource.owner_index = retain_dependency(buffer->owner_ref());
@@ -362,7 +362,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
             }
             case storage::ResourceKind::BUFFER:
                 construct_buffer(slot, *device.data_, std::get<BufferCreateInfo>(initializer));
-                resource.reference = buffer_at(slot).data;
+                resource.reference = detail::BufferAccess::Impl(buffer_at(slot));
                 resource.buffer_bytes = resource.buffer().size();
                 break;
             case storage::ResourceKind::IMAGE:
@@ -630,8 +630,8 @@ namespace VSL_NAMESPACE::lifetime {
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::BUFFER);
         if (resource.placement.external)
-            return {resource.buffer(), _owner->dependencies.at(resource.owner_index), resource.buffer_offset, resource.buffer_bytes};
-        return {resource.buffer(), _owner, resource.buffer_offset, resource.buffer_bytes};
+            return detail::BufferAccess::View(resource.buffer(), _owner->dependencies.at(resource.owner_index), resource.buffer_offset, resource.buffer_bytes);
+        return detail::BufferAccess::View(resource.buffer(), _owner, resource.buffer_offset, resource.buffer_bytes);
     }
     ImageAccessor ResourceArena::image(typed::ResourceId id) const {
         if (!_owner)

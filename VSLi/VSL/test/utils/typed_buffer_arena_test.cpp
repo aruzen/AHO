@@ -2,6 +2,7 @@
 #include "support/vulkan_fixture.hpp"
 #include <VSL/utils/typed_buffer_arena.hpp>
 #include <VSL/lifetime/buffer_storage.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
 
 namespace {
     namespace t = vsl::typed;
@@ -31,7 +32,7 @@ namespace {
         alignas(s::BufferLayout::ALIGNMENT) std::array<std::byte, 64> region{};
         auto unowned = std::shared_ptr<void>(std::shared_ptr<void>{}, region.data());
         EXPECT_THROW(s::ArenaMemory(region, s::BufferLayout::ALIGNMENT, unowned), std::invalid_argument);
-        EXPECT_THROW(vsl::BufferView(vsl::BufferRef{}, unowned, 0, 1), std::invalid_argument);
+        EXPECT_THROW(vsl::lifetime::detail::BufferAccess::View(vsl::BufferRef{}, unowned, 0, 1), std::invalid_argument);
         t::BufferArenaPlan<> empty({});
         EXPECT_EQ(empty.BYTES, 0u);
         EXPECT_EQ(empty.ALIGNMENT, 1u);
@@ -44,9 +45,11 @@ namespace {
         auto second = arena.view<t::ResourceId{1}>();
         const auto a = first.backend().ref();
         const auto b = second.backend().ref();
-        EXPECT_NE(a.data, b.data);
-        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(b.data) - reinterpret_cast<std::uintptr_t>(a.data), PLAN.Offset(1));
-        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(a.data) % s::BUFFER_IMPL_ALIGNMENT, 0u);
+        const auto* first_impl = vsl::lifetime::detail::BufferAccess::Impl(a);
+        const auto* second_impl = vsl::lifetime::detail::BufferAccess::Impl(b);
+        EXPECT_NE(a.identity(), b.identity());
+        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(second_impl) - reinterpret_cast<std::uintptr_t>(first_impl), PLAN.Offset(1));
+        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(first_impl) % s::BUFFER_IMPL_ALIGNMENT, 0u);
         EXPECT_NE(&a.use(), &b.use());
         first.copy(std::array<std::uint32_t, 4>{1, 2, 3, 4});
         second.copy(std::array<std::uint32_t, 4>{5, 6, 7, 8});
@@ -104,7 +107,7 @@ namespace {
             borrowed = view.backend().ref();
             // 格納pointerがnullでも、control blockを持つtokenは所有境界として有効。
             auto owner_token = std::shared_ptr<void>(view.backend().owner(), nullptr);
-            View source(vsl::BufferView(borrowed, owner_token, view.backend().byte_offset(), view.backend().size()));
+            View source(vsl::lifetime::detail::BufferAccess::View(borrowed, owner_token, view.backend().byte_offset(), view.backend().size()));
             command.emplace(source.copy_to(result));
         }
         ASSERT_FALSE(owner.expired());

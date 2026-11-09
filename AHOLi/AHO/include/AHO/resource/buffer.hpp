@@ -64,7 +64,6 @@ namespace AHO_NAMESPACE::resource {
             VSL_NAMESPACE::lifetime::WeakOwnerRef resource;
             VSL_NAMESPACE::BufferAccessor* native = nullptr;
             std::optional<VSL_NAMESPACE::BufferView> current;
-            mutable std::shared_ptr<VSL_NAMESPACE::BufferAccessor> compatibility;
             VSL_NAMESPACE::ResourceRetention retention = VSL_NAMESPACE::ResourceRetention::SUBMISSION;
             std::size_t size = 0;
             bool host_readable = false;
@@ -136,7 +135,6 @@ namespace AHO_NAMESPACE::resource {
     public:
         std::size_t size() const;
         VSL_NAMESPACE::LogicalDeviceAccessor device() const;
-        VSL_NAMESPACE::BufferAccessor& native() const;
         std::shared_ptr<void> owner() const;
         VSL_NAMESPACE::lifetime::OwnerRef owner_ref() const;
         bool host_readable() const;

@@ -14,6 +14,7 @@
 #include <VSL/lifetime/descriptor_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/lifetime/identity_access.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
 #include <limits>
 
 #include <utility>
@@ -39,7 +40,7 @@ namespace {
 
 namespace VSL_NAMESPACE::graphic_resource {
     namespace {
-        void update_buffer(std::shared_ptr<impl::GraphicResourceImpl> target, std::shared_ptr<impl::BufferImpl> buffer,
+        void update_buffer(std::shared_ptr<impl::GraphicResourceImpl> target, lifetime::OwnedRef<impl::BufferImpl> buffer,
                            size_t binding, std::optional<Type> type, size_t offset, std::optional<size_t> size);
     }
 } // namespace VSL_NAMESPACE::graphic_resource
@@ -143,17 +144,18 @@ VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::graphic_resource::Resource::own
 void VSL_NAMESPACE::graphic_resource::Resource::update(const BufferView& buffer, size_t binding, std::optional<Type> type,
                                                        size_t offset, std::optional<size_t> size) {
     const auto range = buffer.view(offset, size.value_or(buffer.size() - offset));
-    update_buffer(data_, range.legacy_owner(), binding, type, range.byte_offset(), range.size());
+    update_buffer(data_, lifetime::detail::BufferAccess::Owned(range), binding, type, range.byte_offset(), range.size());
 }
 
 void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::BufferAccessor* buffer, size_t binding, std::optional<Type> type,
                                                        size_t offset, std::optional<size_t> size) {
-    update_buffer(data_, buffer ? buffer->data_ : nullptr, binding, type, offset, size);
+    const auto data = buffer ? buffer->data_ : nullptr;
+    update_buffer(data_, lifetime::detail::owned_ref(data, data ? data->owner_node : nullptr), binding, type, offset, size);
 }
 
 namespace VSL_NAMESPACE::graphic_resource {
     namespace {
-        void update_buffer(std::shared_ptr<impl::GraphicResourceImpl> target, std::shared_ptr<impl::BufferImpl> buffer,
+        void update_buffer(std::shared_ptr<impl::GraphicResourceImpl> target, lifetime::OwnedRef<impl::BufferImpl> buffer,
                            size_t binding, std::optional<Type> type, size_t offset, std::optional<size_t> size) {
             validate_resource(target);
             if (!buffer || buffer->device != target->pool->device)
@@ -193,7 +195,7 @@ namespace VSL_NAMESPACE::graphic_resource {
             descriptor_write.pTexelBufferView = nullptr; // Optional
 
             operation::validate_descriptor_buffer(*buffer, descriptor_write.descriptorType, offset, range);
-            lifetime::write_descriptor_binding(*target, descriptor_write, {{{lifetime::detail::owned_ref(buffer, buffer->owner_node)}, {buffer->use}, {}}});
+            lifetime::write_descriptor_binding(*target, descriptor_write, {{{buffer}, {buffer->use}, {}}});
         }
     } // namespace
 } // namespace VSL_NAMESPACE::graphic_resource

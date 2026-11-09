@@ -1,5 +1,6 @@
 #include "support/vulkan_fixture.hpp"
 #include <VSL/utils/typed_buffer_arena.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/utils/typed_vertex_buffer.hpp>
 #include <VSL/utils/typed_index_buffer.hpp>
 #include <VSL/utils/typed_resources.hpp>
@@ -53,13 +54,13 @@ namespace {
     TEST_F(BufferGenerationVulkanIntegrationTest, OneArenaOwnerStillRegistersEveryDistinctBufferState) {
         auto manager = make_manager();
         Arena arena(device, Arena::Plan({4, 4}));
-        const auto first = arena.view<SOURCE>().backend().identity();
-        const auto second = arena.view<DESTINATION>().backend().identity();
+        const auto first = arena.view<SOURCE>().storage_view().identity();
+        const auto second = arena.view<DESTINATION>().storage_view().identity();
         EXPECT_NE(first, second);
         EXPECT_EQ(first, arena.storage().borrow(0).identity());
         auto phase = manager.start_phase<vsl::ComputePhase>();
-        arena.view<SOURCE>().backend().resource_use().record(manager.get_buffer());
-        arena.view<DESTINATION>().backend().resource_use().record(manager.get_buffer());
+        arena.view<SOURCE>().storage_view().resource_use().record(manager.get_buffer());
+        arena.view<DESTINATION>().storage_view().resource_use().record(manager.get_buffer());
         EXPECT_EQ(phase.completion().data_->work.lock()->resources.size(), 1u);
         EXPECT_TRUE(arena.storage().borrow(0).use().busy());
         EXPECT_TRUE(arena.storage().borrow(1).use().busy());
@@ -153,7 +154,7 @@ namespace {
         Native source(device, sizeof(VALUES));
         source.copy(VALUES);
         auto native = source;
-        native.data_ = vertices.storage_view().legacy_owner();
+        native.data_ = vsl::lifetime::detail::BufferAccess::Owned(vertices.storage_view()).share();
         EXPECT_EQ(vsl::ResourceUse::ForBuffer(native).state.get(), &vertices.backend().ref().use());
         auto mapping = native.data();
         auto view = vertices.storage_view();
@@ -212,8 +213,8 @@ namespace {
         Arena arena(device, Arena::Plan({4, 4}));
         auto first = arena.binding_view<Map, t::BindingKey{2, 0}>();
         auto alias = arena.binding_view<Map, t::BindingKey{7, 3, 2}>();
-        EXPECT_EQ(first.backend().ref().data, alias.backend().ref().data);
-        EXPECT_NE(first.backend().ref().data, arena.view<DESTINATION>().backend().ref().data);
+        EXPECT_EQ(first.backend().identity(), alias.backend().identity());
+        EXPECT_NE(first.backend().identity(), arena.view<DESTINATION>().storage_view().identity());
         first.copy(VALUES);
         std::array<std::uint32_t, 4> actual{};
         alias.read_into(actual);

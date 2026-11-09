@@ -2,6 +2,7 @@
 #include <VSL/lifetime/resource_use_factory.hpp>
 #include <VSL/lifetime/identity_access.hpp>
 #include <VSL/lifetime/buffer_storage.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
 
 #include <VSL/vulkan/buffer.hpp>
 #include <VSL/lifetime/buffer_view.hpp>
@@ -103,7 +104,7 @@ VSL_NAMESPACE::MemoryProperty VSL_NAMESPACE::BufferAccessor::get_memory_properti
 }
 
 VSL_NAMESPACE::ResourceUseState& VSL_NAMESPACE::BufferAccessor::use_state() const {
-    return BufferRef{data_.get()}.use();
+    return lifetime::detail::BufferAccess::Ref(data_.get()).use();
 }
 VSL_NAMESPACE::ResourceUse VSL_NAMESPACE::BufferAccessor::resource_use() const {
     return lifetime::resource_use_for_buffer(data_, {});
@@ -112,7 +113,7 @@ VSL_NAMESPACE::ResourceUse VSL_NAMESPACE::BufferAccessor::resource_use(ResourceU
     return lifetime::resource_use_for_buffer(data_, std::move(constraint));
 }
 void VSL_NAMESPACE::BufferAccessor::read_into(std::span<std::byte> destination, size_t offset) const {
-    BufferRef{data_.get()}.read_into(destination, offset);
+    lifetime::detail::BufferAccess::Ref(data_.get()).read_into(destination, offset);
 }
 
 void VSL_NAMESPACE::BufferAccessor::flush_copied(LocalBufferHolder& holder, std::size_t bytes) {

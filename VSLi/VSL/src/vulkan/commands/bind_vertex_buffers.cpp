@@ -2,26 +2,23 @@
 
 #include <VSL/vulkan/commands/bind_vertex_buffers.hpp>
 #include <VSL/lifetime/identity_access.hpp>
-#include <VSL/lifetime/resource_use_factory.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
 
 #include <ranges>
 #include <stdexcept>
 
 VSL_NAMESPACE::BufferIdentity VSL_NAMESPACE::command::BindVertexBufferAt::identity() const {
-    return lifetime::detail::IdentityAccess::From<BufferIdentity>(_source.get());
+    return lifetime::detail::IdentityAccess::From<BufferIdentity>(_source);
 }
 
 VSL_NAMESPACE::command::BindVertexBufferAt::BindVertexBufferAt(std::uint32_t binding, const BufferAccessor& source, size_t offset, ResourceUse use)
-    : BindVertexBufferAt(binding, source.data_, offset, std::move(use)) {}
+    : BindVertexBufferAt(binding, BufferView::FromBuffer(source), offset, std::move(use)) {}
 
 VSL_NAMESPACE::command::BindVertexBufferAt::BindVertexBufferAt(std::uint32_t binding, const BufferView& source, size_t offset, ResourceUse use)
-    : BindVertexBufferAt(binding, source.legacy_owner(), source.view(offset, 1).byte_offset(), source.resource_use(std::move(use))) {}
-
-VSL_NAMESPACE::command::BindVertexBufferAt::BindVertexBufferAt(std::uint32_t binding, std::shared_ptr<impl::BufferImpl> source, size_t offset, ResourceUse use)
-    : _binding(binding), _offset(offset), _source(std::move(source)), _use(std::move(use)) {
-    if (_binding == UINT32_MAX || !_source || offset >= _source->requirement_size || !VSL_NAMESPACE::contain(_source->usage, MemoryType::VERTEX_BUFFER))
+    : _binding(binding), _offset(source.view(offset, 1).byte_offset()),
+      _source(lifetime::detail::BufferAccess::Impl(source.ref())), _use(source.resource_use(std::move(use))) {
+    if (_binding == UINT32_MAX || !_source || !VSL_NAMESPACE::contain(_source->usage, MemoryType::VERTEX_BUFFER))
         throw std::invalid_argument("BindVertexBufferAt requires a vertex buffer");
-    _use = lifetime::resource_use_for_buffer(_source, std::move(_use));
 }
 
 void VSL_NAMESPACE::command::BindVertexBufferAt::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {

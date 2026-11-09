@@ -13,18 +13,16 @@ namespace VSL_NAMESPACE::command {
     struct BindVertexBufferAt : Command {
         BindVertexBufferAt(std::uint32_t binding, const BufferAccessor& source, size_t offset = 0, ResourceUse use = {});
         BindVertexBufferAt(std::uint32_t binding, const BufferView& source, size_t offset = 0, ResourceUse use = {});
-        BindVertexBufferAt(std::uint32_t binding, std::shared_ptr<impl::BufferImpl> source, size_t offset = 0, ResourceUse use = {});
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
         void track(const CommandBuffer& buffer) const { _use.record(buffer); }
         std::uint32_t binding() const { return _binding; }
         size_t offset() const { return _offset; }
-        const std::shared_ptr<impl::BufferImpl>& source() const { return _source; }
         BufferIdentity identity() const;
 
     private:
         std::uint32_t _binding;
         size_t _offset;
-        std::shared_ptr<impl::BufferImpl> _source;
+        impl::BufferImpl* _source;
         ResourceUse _use;
     };
 

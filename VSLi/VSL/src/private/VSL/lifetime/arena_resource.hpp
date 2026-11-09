@@ -1,6 +1,7 @@
 #pragma once
 #include <VSL/lifetime/resource_plan.hpp>
 #include <VSL/lifetime/buffer_view.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
 #include <variant>
 #include <type_traits>
 
@@ -17,7 +18,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
         size_t owner_index = 0;
         template<typename Impl>
         Impl* get() const noexcept;
-        BufferRef buffer() const { return {get<impl::BufferImpl>()}; }
+        BufferRef buffer() const { return BufferAccess::Ref(get<impl::BufferImpl>()); }
     };
     template<typename Impl>
     Impl* ArenaResource::get() const noexcept {

@@ -165,6 +165,7 @@
     <ClInclude Include="VSL\include\VSL\lifetime\pipeline_recipe.hpp" />
     <ClInclude Include="VSL\include\VSL\lifetime\resource_identity.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\resource_use_factory.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\buffer_access.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\identity_access.hpp" />
     <ClCompile Include="VSL\src\lifetime\pipeline_recipe.cpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\pipeline_layout_ops.hpp" />

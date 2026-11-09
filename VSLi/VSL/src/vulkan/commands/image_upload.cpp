@@ -9,7 +9,14 @@ namespace VSL_NAMESPACE::command {
         : copy(image, source, ImageLayout::TRANSFER_DST_OPTIMAL, region, offset), current_layout(layout) {
     }
 
+    ImageUpload::ImageUpload(BufferView source, ImageAccessor image, ImageLayout layout, ImageRegion region, std::size_t offset,
+                             ResourceUse constraint, ResourceRetention retention)
+        : copy(std::move(image), std::move(source), ImageLayout::TRANSFER_DST_OPTIMAL, region, offset, std::move(constraint), retention), current_layout(layout) {}
+
     void ImageUpload::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
+        const auto upload = *this;
+        const auto& copy = upload.copy;
+        const auto current_layout = upload.current_layout;
         (void)copy.description();
         if (current_layout != ImageLayout::UNDEFINED && current_layout != ImageLayout::SHADER_READ_ONLY_OPTIMAL)
             throw std::invalid_argument("ImageUpload requires UNDEFINED or SHADER_READ_ONLY_OPTIMAL layout");
@@ -20,6 +27,7 @@ namespace VSL_NAMESPACE::command {
             throw std::invalid_argument("ImageUpload copy layout was modified");
         if (!contain(copy.image.data_->usage, ImageType::SAMPLED))
             throw std::invalid_argument("ImageUpload requires a sampled image");
+        const auto info = copy.prepare(buffer, manager);
         if (auto submission = buffer.data_->recording_context->work)
             submission->resources.reserve(submission->resources.size() + 8);
         ChangeImageBarrier(copy.image, current_layout, ImageLayout::TRANSFER_DST_OPTIMAL).invoke(pool, buffer, manager);
@@ -33,7 +41,7 @@ namespace VSL_NAMESPACE::command {
             command.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, {}, visible, {}, {});
         }
 
-        copy.invoke(pool, buffer, manager);
+        copy.record(info, buffer);
         ChangeImageBarrier(copy.image, ImageLayout::TRANSFER_DST_OPTIMAL, ImageLayout::SHADER_READ_ONLY_OPTIMAL).invoke(pool, buffer, manager);
     }
 } // namespace VSL_NAMESPACE::command

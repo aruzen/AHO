@@ -13,7 +13,9 @@ namespace VSL_NAMESPACE::typed {
         static_assert(std::is_trivially_copyable_v<Payload> && std::is_standard_layout_v<Payload>);
         static_assert(kind == graphic_resource::Type::UNIFORM_BUFFER || kind == graphic_resource::Type::STORAGE_BUFFER);
         explicit PlacedResourceBufferView(BufferView view);
-        const BufferView& backend() const { return _view; }
+        const BufferView& backend() const& { return _view; }
+        const BufferView& backend() const&& = delete;
+        BufferView storage_view() const { return _view; }
         size_t size() const { return _view.size() / sizeof(Payload); }
         void copy(std::span<const Payload> values);
         void read_into(std::span<Payload> values) const;

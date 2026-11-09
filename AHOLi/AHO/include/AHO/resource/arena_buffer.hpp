@@ -8,7 +8,7 @@ namespace AHO_NAMESPACE::resource {
 
     class ArenaBuffer : private detail::ViewBufferBase {
         using Base = detail::ViewBufferBase;
-        using RetiredStorage = std::pair<std::optional<VSL_NAMESPACE::BufferView>, std::shared_ptr<VSL_NAMESPACE::BufferAccessor>>;
+        using RetiredStorage = std::optional<VSL_NAMESPACE::BufferView>;
         static VSL_NAMESPACE::BufferView Prepare(const std::shared_ptr<detail::BufferState>& state, size_t bytes, bool preserve);
         static RetiredStorage Publish(detail::BufferState& state, VSL_NAMESPACE::BufferView storage);
 

@@ -1,4 +1,6 @@
 #include <VSL/utils/typed_pipeline.hpp>
+#include <VSL/lifetime/typed_buffer_arena.hpp>
+#include <VSL/lifetime/typed_resource_buffer_view.hpp>
 #ifndef VSL_TYPED_CASE
 #define VSL_TYPED_CASE 0
 #endif
@@ -15,7 +17,12 @@ namespace {
     using Set = t::DescriptorLayout<t::UniformBinding<0, float, vsl::ShaderFlag::VERTEX>>;
     template<typename Buffer>
     concept rvalue_backend = requires(Buffer&& buffer) { std::move(buffer).backend(); };
+    using Placed = t::PlacedBufferView<std::uint32_t, vsl::MemoryType::TRANSFER_SOURCE>;
+    using PlacedUniform = t::PlacedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>;
 #if VSL_TYPED_CASE == 0
+    static_assert(!rvalue_backend<Placed> && !rvalue_backend<const Placed>);
+    static_assert(!rvalue_backend<PlacedUniform> && !rvalue_backend<const PlacedUniform>);
+    static_assert(!std::is_aggregate_v<vsl::BufferRef>);
     void use_facades(const vsl::BufferAccessor& buffer, const vsl::BufferView& view,
                      const vsl::ImageAccessor& image, const vsl::SamplerAccessor& sampler, const vsl::GraphicResource& set) {
         vsl::ResourceUse::ForBuffer(buffer);
@@ -86,6 +93,46 @@ namespace {
 #elif VSL_TYPED_CASE == 13
     void rejected(const vsl::ResourceUseGroup& group, const vsl::impl::GraphicResourceImpl* resource) {
         group.tracks_descriptor(resource);
+    }
+#elif VSL_TYPED_CASE == 14
+    void rejected(vsl::BufferRef ref) {
+        ref.data;
+    }
+#elif VSL_TYPED_CASE == 15
+    void rejected(vsl::impl::BufferImpl* data) {
+        vsl::BufferRef ref{data};
+    }
+#elif VSL_TYPED_CASE == 16
+    void rejected(vsl::BufferRef ref, vsl::lifetime::OwnerRef owner) {
+        vsl::BufferView view(ref, owner, 0, 4);
+    }
+#elif VSL_TYPED_CASE == 17
+    void rejected(const vsl::BufferView& view) {
+        view.legacy_owner();
+    }
+#elif VSL_TYPED_CASE == 18
+    void rejected(vsl::BufferView view) {
+        std::move(view).ref();
+    }
+#elif VSL_TYPED_CASE == 19
+    void rejected(Placed view) {
+        std::move(view).backend().ref();
+    }
+#elif VSL_TYPED_CASE == 20
+    void rejected(PlacedUniform view) {
+        std::move(view).backend().ref();
+    }
+#elif VSL_TYPED_CASE == 21
+    void rejected(std::shared_ptr<vsl::impl::BufferImpl> data) {
+        vsl::command::BindVertexBufferAt command(0, data);
+    }
+#elif VSL_TYPED_CASE == 22
+    void rejected(const vsl::command::BindVertexBufferAt& command) {
+        command.source();
+    }
+#elif VSL_TYPED_CASE == 23
+    void rejected(const t::TypedVertexBuffer<Vertex>& buffer) {
+        buffer.storage_view().ref();
     }
 #endif
 } // namespace

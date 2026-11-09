@@ -29,10 +29,10 @@ namespace {
             auto binding = buffer.binding();
             old.emplace(binding.snapshot());
             buffer.reserve(128);
-            EXPECT_EQ(binding.native().requested_size(), 128u);
             EXPECT_EQ(old->storage().size(), sizeof(value));
             const auto next = binding.snapshot();
-            EXPECT_NE(old->storage().ref().data, next.storage().ref().data);
+            EXPECT_EQ(next.storage().size(), 128u);
+            EXPECT_NE(old->storage().identity(), next.storage().identity());
             current = buffer.native().data_;
         }
         EXPECT_TRUE(current.expired());

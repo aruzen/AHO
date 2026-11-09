@@ -1,4 +1,5 @@
 #include <AHO/resource/arena_buffer.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
 #include <AHO/resource/typed_buffer.hpp>
 #include <AHO/command/buffer_upload.hpp>
 #include <VSL/lifetime/buffer_arena.hpp>
@@ -32,7 +33,7 @@ namespace {
         EXPECT_EQ(alias.capacity(), 64u);
         EXPECT_EQ(alias.size(), sizeof(initial));
         const auto current = alias.binding().snapshot();
-        EXPECT_NE(old.storage().ref().data, current.storage().ref().data);
+        EXPECT_NE(old.storage().identity(), current.storage().identity());
         std::array<std::uint32_t, 2> result{};
         alias.read_into(std::as_writable_bytes(std::span(result)));
         EXPECT_EQ(result, initial);
@@ -69,23 +70,22 @@ namespace {
             r::ArenaBuffer buffer(device, 4, [released](auto logical_device, size_t bytes) {
                 const vsl::BufferCreateInfo info{bytes, r::detail::STANDARD_BUFFER_USAGE};
                 auto root = std::make_shared<Storage>(vsl::lifetime::BufferArena(logical_device, std::span(&info, 1)), released);
-                return vsl::BufferView(root->arena.borrow(0), root, 0, bytes);
+                return vsl::lifetime::detail::BufferAccess::View(root->arena.borrow(0), root, 0, bytes);
             });
             const std::uint32_t initial = 17;
             const std::array<std::uint32_t, 2> assigned{31, 37};
             buffer.write(std::as_bytes(std::span(&initial, 1)));
-            const auto old = buffer.binding().native().data_.get();
+            const auto old = [&] { const auto snapshot = buffer.binding().snapshot(); return snapshot.storage().identity(); }();
             const auto weak = buffer.binding().owner_ref().weak();
-            (void)buffer.binding().native();
             size_t calls = 0;
             *released = [&] {
                 ++calls;
                 const auto snapshot = buffer.binding().snapshot();
-                EXPECT_NE(snapshot.storage().ref().data, old);
+                EXPECT_NE(snapshot.storage().identity(), old);
                 EXPECT_EQ(snapshot.size(), operation ? 8u : 4u);
                 EXPECT_FALSE(snapshot.constraints().owner.owner_before(buffer.binding().owner_ref()));
                 EXPECT_FALSE(buffer.binding().owner_ref().owner_before(snapshot.constraints().owner));
-                EXPECT_EQ(buffer.binding().native().data_.get(), snapshot.storage().ref().data);
+                EXPECT_EQ(buffer.binding().resource_use().state.get(), &snapshot.storage().ref().use());
                 std::uint32_t actual = 0;
                 buffer.read_into(std::as_writable_bytes(std::span(&actual, 1)));
                 EXPECT_EQ(actual, operation == 2 ? assigned[0] : initial);
@@ -115,7 +115,7 @@ namespace {
         EXPECT_EQ(buffer.size(), 4u);
         EXPECT_EQ(buffer.capacity(), 4u);
         const auto after = buffer.binding().snapshot();
-        EXPECT_EQ(after.storage().ref().data, before.storage().ref().data);
+        EXPECT_EQ(after.storage().identity(), before.storage().identity());
         auto manager = make_manager();
         auto phase = manager.start_phase<vsl::ComputePhase>();
         r::Buffer<r::BufferType::GENERAL> source(4);
@@ -192,7 +192,7 @@ namespace {
         undersized = true;
         EXPECT_THROW(buffer.reserve(64), std::invalid_argument);
         const auto after = buffer.binding().snapshot();
-        EXPECT_EQ(before.storage().ref().data, after.storage().ref().data);
+        EXPECT_EQ(before.storage().identity(), after.storage().identity());
         EXPECT_EQ(buffer.size(), 8u);
         EXPECT_EQ(buffer.capacity(), 8u);
         std::array<std::uint32_t, 2> result{};
@@ -341,7 +341,7 @@ namespace {
             const vsl::BufferCreateInfo info{4, r::detail::STANDARD_BUFFER_USAGE};
             auto owner = std::make_shared<Storage>(token, vsl::lifetime::BufferArena(device, std::span(&info, 1)));
             auto buffer = r::make_arena_buffer(device, 4, [owner](auto, size_t) {
-                return vsl::BufferView(owner->arena.borrow(0), owner, 0, 4);
+                return vsl::lifetime::detail::BufferAccess::View(owner->arena.borrow(0), owner, 0, 4);
             });
             snapshot.emplace(buffer.binding().snapshot());
         }
@@ -366,16 +366,14 @@ namespace {
         EXPECT_THROW(buffer.reserve(64), std::invalid_argument);
         EXPECT_EQ(buffer.capacity(), 8u);
     }
-    TEST_F(ArenaBufferVulkanIntegrationTest, FullRangeNativeAdapterIsLazyAndSharesThePhysicalUseState) {
+    TEST_F(ArenaBufferVulkanIntegrationTest, SnapshotUsesTheOriginalPhysicalStateAndWritableStorage) {
         auto buffer = r::make_arena_buffer(device, 16);
         auto binding = buffer.binding();
         const auto snapshot = binding.snapshot();
-        auto& native = binding.native();
-        EXPECT_EQ(native.data_.get(), snapshot.storage().ref().data);
-        EXPECT_EQ(&native.use_state(), snapshot.resource_use().state.get());
-        auto mapped = native.data();
+        EXPECT_EQ(binding.resource_use().state.get(), &snapshot.storage().ref().use());
+        EXPECT_EQ(&snapshot.storage().ref().use(), snapshot.resource_use().state.get());
         const std::uint32_t value = 91;
-        mapped.write(std::as_bytes(std::span(&value, 1)));
+        snapshot.storage().write(std::as_bytes(std::span(&value, 1)));
         std::uint32_t result = 0;
         buffer.read_into(std::as_writable_bytes(std::span(&result, 1)));
         EXPECT_EQ(result, value);

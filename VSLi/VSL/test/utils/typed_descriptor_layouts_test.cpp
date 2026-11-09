@@ -127,7 +127,7 @@ namespace {
             shared = sources->layout<2>().data_;
             auto phase = manager.start_phase<vsl::ComputePhase>();
             const auto& frame = bundle.get(phase);
-            local = frame.buffer<2, 0>().backend().owner();
+            local = frame.buffer<2, 0>().storage_view().owner();
             phase.cancel();
         }
         EXPECT_TRUE(local.expired());

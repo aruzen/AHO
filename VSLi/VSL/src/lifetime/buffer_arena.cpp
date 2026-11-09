@@ -1,5 +1,6 @@
 #include <VSL/lifetime/buffer_arena.hpp>
 #include <VSL/lifetime/buffer_storage.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/storage/cpu_region.hpp>
 #include <VSL/lifetime/dependency_node.hpp>
 #include <VSL/lifetime/device_owner.hpp>
@@ -58,7 +59,7 @@ namespace VSL_NAMESPACE::lifetime {
         auto owner = std::make_shared<ArenaOwner>(device, buffers, std::move(memory));
         owner->node.publish(owner, owner.get(), ArenaOwner::VisitDependencies);
         for (size_t slot = 0; slot < owner->constructed; ++slot)
-            buffer_at(owner->base + storage::BufferLayout::Offset(slot)).data->owner_node = &owner->node;
+            detail::BufferAccess::Impl(buffer_at(owner->base + storage::BufferLayout::Offset(slot)))->owner_node = &owner->node;
         _base = owner->base;
         _count = owner->constructed;
         _owner = std::move(owner);
@@ -70,6 +71,6 @@ namespace VSL_NAMESPACE::lifetime {
     }
     BufferView BufferArena::view(size_t slot) const {
         const auto ref = borrow(slot);
-        return {ref, _owner, 0, ref.size()};
+        return detail::BufferAccess::View(ref, _owner, 0, ref.size());
     }
 } // namespace VSL_NAMESPACE::lifetime

@@ -59,6 +59,8 @@ namespace {
         r::ImportedBuffer fixed = arena;
 #elif VSL_TYPED_CASE == 13
         r::ImportedBuffer& fixed = arena;
+#elif VSL_TYPED_CASE == 14
+        host.binding().native();
 #else
         set.write<0>(r::uniform_view<std::uint32_t>(host, 0, 1));
         pipeline.bind_vertices(r::vertex_view<Vertex>(host)).draw(3);

@@ -13,12 +13,16 @@
 
 #include "../image.hpp"
 #include "../buffer.hpp"
+#include "../../lifetime/buffer_view.hpp"
 #include "copy_image_to_buffer.hpp"
 
 namespace VSL_NAMESPACE::command {
     struct CopyBufferToImage : public Command {
         CopyBufferToImage(ImageAccessor image, BufferAccessor* buffer, VSL_NAMESPACE::ImageLayout layout);
         CopyBufferToImage(ImageAccessor image, BufferAccessor* buffer, ImageLayout layout, ImageRegion region, std::size_t offset = 0);
+        // offsetはview内の相対値。retentionは転送元だけの保持契約。
+        CopyBufferToImage(ImageAccessor image, BufferView source, ImageLayout layout, ImageRegion region = {}, std::size_t offset = 0,
+                          ResourceUse constraint = {}, ResourceRetention retention = ResourceRetention::COMPLETION);
 
         template<VSL_NAMESPACE::ImageType img_type, VSL_NAMESPACE::MemoryProperty img_mem_prop, VSL_NAMESPACE::ImageLayout layout_,
                  MemoryType mem_type, MemoryProperty buf_mem_prop, SharingMode share_mode>
@@ -34,7 +38,13 @@ namespace VSL_NAMESPACE::command {
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
 
     private:
-        std::shared_ptr<impl::BufferImpl> _source;
+        friend struct ImageUpload;
+        impl::BufferImpl* _source;
+        ResourceUse _use;
+        std::size_t _source_offset = 0, _source_bytes = 0;
+        ResourceRetention _retention = ResourceRetention::SUBMISSION;
+        ImageCopyInfo prepare(CommandBuffer buffer, const CommandManager& manager) const;
+        void record(const ImageCopyInfo& info, const CommandBuffer& buffer) const;
     };
 
     struct CopyBufferToArrayImage : public Command {

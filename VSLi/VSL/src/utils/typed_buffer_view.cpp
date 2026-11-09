@@ -1,6 +1,7 @@
 #include <VSL/utils/typed_buffer_view.hpp>
 #include <VSL/lifetime/buffer_arena.hpp>
 #include <VSL/lifetime/buffer_storage.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/vulkan/commands/copy_buffer.hpp>
 #include <VSL/vulkan/phase.hpp>
 #include <array>
@@ -31,7 +32,7 @@ namespace VSL_NAMESPACE::typed::detail {
     } // namespace
     BufferView make_buffer_storage(LogicalDeviceAccessor device, const BufferCreateInfo& info, HeapStorage) {
         const auto owner = lifetime::make_heap_buffer(device, info);
-        return {{owner.get()}, owner, 0, info.bytes};
+        return lifetime::detail::BufferAccess::View(lifetime::detail::BufferAccess::Ref(owner.get()), owner, 0, info.bytes);
     }
     BufferView make_buffer_storage(LogicalDeviceAccessor device, const BufferCreateInfo& info, ArenaStorage<>) {
         const std::array inputs{info};

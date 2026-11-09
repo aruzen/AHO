@@ -16,6 +16,14 @@ namespace {
     template<typename Buffer>
     concept rvalue_backend = requires(Buffer&& buffer) { std::move(buffer).backend(); };
 #if VSL_TYPED_CASE == 0
+    void use_facades(const vsl::BufferAccessor& buffer, const vsl::BufferView& view,
+                     const vsl::ImageAccessor& image, const vsl::SamplerAccessor& sampler, const vsl::GraphicResource& set) {
+        vsl::ResourceUse::ForBuffer(buffer);
+        vsl::ResourceUse::ForBuffer(view);
+        vsl::ResourceUse::ForImage(image);
+        vsl::ResourceUse::ForSampler(sampler);
+        vsl::ResourceUseGroup::ForDescriptor(1, set)->tracks_descriptor(set);
+    }
     static_assert(!rvalue_backend<t::TypedVertexBuffer<Vertex>> && !rvalue_backend<const t::TypedVertexBuffer<Vertex>>);
     static_assert(!rvalue_backend<t::TypedVertexBufferView<Vertex>> && !rvalue_backend<const t::TypedVertexBufferView<Vertex>>);
     static_assert(!rvalue_backend<t::TypedIndexBuffer<std::uint32_t>> && !rvalue_backend<const t::TypedIndexBuffer<std::uint32_t>>);
@@ -58,6 +66,26 @@ namespace {
 #elif VSL_TYPED_CASE == 8
     void rejected(vsl::LogicalDeviceAccessor device, std::span<const Vertex> values) {
         t::TypedVertexBuffer<Vertex> buffer(device, values, t::ArenaStorage<int>{});
+    }
+#elif VSL_TYPED_CASE == 9
+    void rejected(const std::shared_ptr<vsl::impl::BufferImpl>& buffer) {
+        vsl::ResourceUse::ForBuffer(buffer);
+    }
+#elif VSL_TYPED_CASE == 10
+    void rejected(const std::shared_ptr<vsl::impl::ImageImpl>& image) {
+        vsl::ResourceUse::ForImage(image);
+    }
+#elif VSL_TYPED_CASE == 11
+    void rejected(const std::shared_ptr<vsl::impl::SamplerImpl>& sampler) {
+        vsl::ResourceUse::ForSampler(sampler);
+    }
+#elif VSL_TYPED_CASE == 12
+    void rejected(const std::shared_ptr<vsl::impl::GraphicResourceImpl>& resource) {
+        vsl::ResourceUseGroup::ForDescriptor(1, resource);
+    }
+#elif VSL_TYPED_CASE == 13
+    void rejected(const vsl::ResourceUseGroup& group, const vsl::impl::GraphicResourceImpl* resource) {
+        group.tracks_descriptor(resource);
     }
 #endif
 } // namespace

@@ -165,13 +165,14 @@ if (VSL_TEST_SOURCES)
     target_link_libraries(vsl-index-style-contract PRIVATE VSL)
     target_compile_definitions(vsl-index-style-contract PRIVATE VSL_TYPED_CASE=0)
     target_include_directories(vsl-index-style-contract PRIVATE "$<TARGET_PROPERTY:vsl-test,INCLUDE_DIRECTORIES>")
-    set(typed_view_names Valid WrongVertexRecord WrongDescriptorKind WrongDescriptorPayload RawVertexBuffer NegativeSubpass TemporaryBackend ConstTemporaryBackend InvalidStoragePolicy)
-    foreach(case RANGE 0 8)
+    set(typed_view_names Valid WrongVertexRecord WrongDescriptorKind WrongDescriptorPayload RawVertexBuffer NegativeSubpass TemporaryBackend ConstTemporaryBackend InvalidStoragePolicy
+        RawBufferUse RawImageUse RawSamplerUse RawDescriptorUse RawDescriptorComparison)
+    foreach(case RANGE 0 13)
         list(GET typed_view_names ${case} name)
         add_test(NAME "VSL.TypedView.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
             "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
             "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_buffer_view.cpp"
-            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=bind_vertices|write|narrowed|narrowing|deleted|constraints|constructor"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=bind_vertices|write|narrowed|narrowing|deleted|constraints|constructor|ForBuffer|ForImage|ForSampler|ForDescriptor|tracks_descriptor"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
         set_tests_properties("VSL.TypedView.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
     endforeach()

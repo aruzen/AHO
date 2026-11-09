@@ -175,9 +175,13 @@ namespace {
         EXPECT_THROW(t::TypedDescriptorSet<Wrong>::FromResource(device, arena.descriptor_set({101})), std::invalid_argument);
         EXPECT_THROW(TypedSet::FromResource({}, arena.descriptor_set({101})), std::invalid_argument);
         const auto owned = arena.descriptor_set({101});
+        const auto group = vsl::ResourceUseGroup::ForDescriptor(Set::BINDING_COUNT, owned);
+        EXPECT_TRUE(group->tracks_descriptor(owned));
+        EXPECT_TRUE(group->tracks_descriptor(arena.descriptor_set({101})));
+        EXPECT_FALSE(group->tracks_descriptor(arena.descriptor_set({102})));
         const vsl::GraphicResource borrowed{std::shared_ptr<vsl::impl::GraphicResourceImpl>(std::shared_ptr<void>{}, owned.data_.get())};
         EXPECT_THROW(TypedSet::FromResource(device, borrowed), std::invalid_argument);
-        EXPECT_THROW(vsl::ResourceUseGroup::ForDescriptor(2, borrowed.data_), std::invalid_argument);
+        EXPECT_THROW(vsl::ResourceUseGroup::ForDescriptor(2, borrowed), std::invalid_argument);
         const vsl::LogicalDeviceAccessor borrowed_device{std::shared_ptr<vsl::impl::LogicalDeviceImpl>(std::shared_ptr<void>{}, device.data_.get())};
         EXPECT_THROW(TypedSet::FromResource(borrowed_device, owned), std::invalid_argument);
         EXPECT_THROW(l::ResourceArena(borrowed_device, PLAN, initializers), std::invalid_argument);

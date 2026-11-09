@@ -1,4 +1,5 @@
 #include <VSL/vulkan/sampler.hpp>
+#include <VSL/lifetime/resource_use_factory.hpp>
 #include <VSL/lifetime/sampler_storage.hpp>
 
 namespace VSL_NAMESPACE {
@@ -11,6 +12,6 @@ namespace VSL_NAMESPACE {
         return *data_->use;
     }
     ResourceUse SamplerAccessor::resource_use() const {
-        return ResourceUse::ForSampler(data_);
+        return lifetime::resource_use_for_sampler(data_);
     }
 } // namespace VSL_NAMESPACE

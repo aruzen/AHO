@@ -2,6 +2,7 @@
 
 #include <VSL/vulkan/commands/bind_vertex_buffers.hpp>
 #include <VSL/lifetime/identity_access.hpp>
+#include <VSL/lifetime/resource_use_factory.hpp>
 
 #include <ranges>
 #include <stdexcept>
@@ -20,7 +21,7 @@ VSL_NAMESPACE::command::BindVertexBufferAt::BindVertexBufferAt(std::uint32_t bin
     : _binding(binding), _offset(offset), _source(std::move(source)), _use(std::move(use)) {
     if (_binding == UINT32_MAX || !_source || offset >= _source->requirement_size || !VSL_NAMESPACE::contain(_source->usage, MemoryType::VERTEX_BUFFER))
         throw std::invalid_argument("BindVertexBufferAt requires a vertex buffer");
-    _use = ResourceUse::ForBuffer(_source, std::move(_use));
+    _use = lifetime::resource_use_for_buffer(_source, std::move(_use));
 }
 
 void VSL_NAMESPACE::command::BindVertexBufferAt::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {

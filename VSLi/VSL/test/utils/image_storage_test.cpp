@@ -54,6 +54,14 @@ namespace {
             token = context->token;
             const vsl::ImageAccessor external_image{std::shared_ptr<vsl::impl::ImageImpl>(context, image.data_.get())};
             const vsl::SamplerAccessor external_sampler{std::shared_ptr<vsl::impl::SamplerImpl>(context, sampler.data_.get())};
+            const auto image_use = vsl::ResourceUse::ForImage(external_image);
+            const auto sampler_use = vsl::ResourceUse::ForSampler(external_sampler);
+            EXPECT_EQ(image_use.state.get(), &image.use_state());
+            EXPECT_EQ(sampler_use.state.get(), &sampler.use_state());
+            for (const auto& use : {image_use, sampler_use}) {
+                EXPECT_FALSE(use.owner.owner_before(context));
+                EXPECT_FALSE(context.owner_before(use.owner.share()));
+            }
             values.push_back(Value::FromImage(external_image, supplied));
             values.push_back(Value::FromSampler(external_sampler, supplied));
             values.push_back(Value::FromTexture(external_image, external_sampler, supplied));

@@ -568,7 +568,7 @@ namespace {
         EXPECT_TRUE(empty_pool.data_->capacities.empty());
         EXPECT_EQ(empty_pool.data_->allocated_sets, 1u);
         EXPECT_NO_THROW(vsl::typed::detail::require_descriptor_complete(allocated.front()));
-        auto group = vsl::ResourceUseGroup::ForDescriptor(1, allocated.front().data_);
+        auto group = vsl::ResourceUseGroup::ForDescriptor(1, allocated.front());
         EXPECT_NO_THROW(group->replace(0, {}));
         EXPECT_THROW(allocated.front().update(&*output, 7), std::out_of_range);
         group.reset();

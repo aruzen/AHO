@@ -1,9 +1,13 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
 #include "support/render_fixture.hpp"
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/vulkan/commands/copy_buffer_to_image.hpp>
 #include <VSL/vulkan/commands/change_image_barrier.hpp>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     namespace t = vsl::typed;
     struct Tint {
@@ -362,7 +366,7 @@ namespace {
                 phase << binding.dispatch(zero.size());
                 vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
                 auto buffer = commands.get_buffer();
-                buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
+                CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
                     vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
             }
             device.data_->device.waitIdle();

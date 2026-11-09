@@ -1,4 +1,9 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <AHO/render_context.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 #ifdef AHO_GPU_TESTS
 #include "support/live_gpu.hpp"
 #include <AHO/drawer/draw_phase.hpp>
@@ -10,7 +15,7 @@ namespace {
         ASSERT_NO_THROW(start_engine());
         const auto context = engine->get_window().render_context();
         EXPECT_EQ(context.device().data_, engine->data()->logical_device.data_);
-        EXPECT_EQ(context.commands().data_, engine->data()->command_manager.data_);
+        EXPECT_EQ(CommandAccess::Data(context.commands()), CommandAccess::Data(engine->data()->command_manager));
         EXPECT_EQ(&context.descriptor_manager(), engine->data()->graphic_resource_manager.get());
         EXPECT_EQ(context.frame_count(), engine->data()->command_manager.get_buffer().get_size());
         aho::DrawPhase phase(*engine);

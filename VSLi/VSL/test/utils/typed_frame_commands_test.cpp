@@ -1,8 +1,12 @@
+#include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include "support/deferred_action.hpp"
 #include <VSL/utils/typed_frame_resources.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     namespace t = vsl::typed;
     struct FrameValue {
@@ -38,8 +42,8 @@ namespace {
         auto fence = commands.fence();
         EXPECT_EQ(commands.frame_count(), 3u);
         EXPECT_EQ(fence.size(), 3u);
-        EXPECT_EQ(commands.manager().data_, manager.data_);
-        const bool same_owner = !buffer.data_.owner_before(fence.data_) && !fence.data_.owner_before(buffer.data_);
+        EXPECT_EQ(CommandAccess::Data(commands.manager()), CommandAccess::Data(manager));
+        const bool same_owner = !CommandAccess::Data(buffer).owner_before(fence.data_) && !fence.data_.owner_before(CommandAccess::Data(buffer));
         EXPECT_EQ(same_owner, GetParam());
         t::TypedFrameResources<FrameValue> frames(manager, [](size_t slot) { return FrameValue{slot}; });
         std::array<const FrameValue*, 3> values{};
@@ -47,7 +51,7 @@ namespace {
         for (size_t iteration = 0; iteration < 12; ++iteration) {
             auto phase = commands.start_compute();
             EXPECT_EQ(phase.frame_slot, iteration % 3);
-            const auto* work = buffer.data_->recording_context->work;
+            const auto* work = CommandAccess::Data(buffer)->recording_context->work;
             EXPECT_FALSE(work->owned_fence);
             EXPECT_EQ(work->external_fence, fence.data_.get());
             EXPECT_EQ(work->fence, handles[iteration % 3]);
@@ -91,7 +95,7 @@ namespace {
         auto original = make_commands(2);
         t::TypedFrameResources<FrameValue> frames(original.manager(), [](size_t slot) { return FrameValue{slot}; });
         t::TypedFrameCommands imported(original.manager(), original.fence());
-        EXPECT_EQ(imported.manager().data_, original.manager().data_);
+        EXPECT_EQ(CommandAccess::Data(imported.manager()), CommandAccess::Data(original.manager()));
         EXPECT_EQ(imported.fence().data_, original.fence().data_);
         auto phase = imported.start_compute();
         EXPECT_NO_THROW(frames.get(phase));
@@ -179,28 +183,28 @@ namespace {
         const auto short_fence = synchronization.create_fence("short");
         EXPECT_THROW((t::TypedFrameCommands(manager, short_fence)), std::invalid_argument);
         const auto canonical = commands.fence();
-        vsl::CommandManager borrowed({std::shared_ptr<void>{}, manager.data_.get()});
+        vsl::CommandManager borrowed(CommandAccess::RawManager({std::shared_ptr<void>{}, CommandAccess::Data(manager).get()}));
         EXPECT_THROW((t::TypedFrameCommands(borrowed, canonical)), std::invalid_argument);
         EXPECT_THROW((t::TypedFrameResources<FrameValue>(borrowed, [](size_t slot) { return FrameValue{slot}; })), std::invalid_argument);
         const vsl::FenceHolder forged{{std::make_shared<int>(0), canonical.data_.get()}};
         EXPECT_THROW((t::TypedFrameCommands(manager, forged)), std::invalid_argument);
-        EXPECT_THROW((t::TypedFrameCommands(vsl::CommandManager(nullptr), canonical)), std::invalid_argument);
+        EXPECT_THROW((t::TypedFrameCommands(vsl::CommandManager(CommandAccess::RawManager(nullptr)), canonical)), std::invalid_argument);
         vsl::DeviceCreateInfo info;
         info.graphics_family = queue_family;
         auto foreign = vsl::LogicalDeviceAccessor::Create(physical, std::move(info));
         auto foreign_fence = vsl::SynchroManager(foreign).create_fence("foreign", size_t{3}, false);
         EXPECT_THROW((t::TypedFrameCommands(manager, foreign_fence)), std::invalid_argument);
         auto replacement = manager.make_exclusive_buffer();
-        manager.data_->command_buffer = replacement.data_;
+        CommandAccess::Data(manager)->command_buffer = CommandAccess::Data(replacement);
         EXPECT_THROW(commands.manager(), std::invalid_argument);
         EXPECT_THROW(commands.start_compute(), std::invalid_argument);
         EXPECT_THROW(commands.next(), std::invalid_argument);
-        manager.data_->command_buffer = original.data_;
+        CommandAccess::Data(manager)->command_buffer = CommandAccess::Data(original);
         const auto pool = manager.get_pool();
-        manager.data_->command_pool = vsl::CommandPool(device).data_;
+        CommandAccess::Data(manager)->command_pool = CommandAccess::Data(vsl::CommandPool(device));
         EXPECT_THROW(commands.start_compute(), std::invalid_argument);
         EXPECT_THROW((t::TypedFrameCommands(manager, canonical)), std::invalid_argument);
-        manager.data_->command_pool = pool.data_;
+        CommandAccess::Data(manager)->command_pool = CommandAccess::Data(pool);
         auto phase = commands.start_compute();
         EXPECT_EQ(phase.frame_slot, 0u);
         phase.cancel();

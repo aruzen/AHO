@@ -1,6 +1,10 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/utils/typed_batch.hpp>
 #include "support/render_fixture.hpp"
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     namespace t = vsl::typed;
     using Empty = t::TypedVertexInput<>;
@@ -148,7 +152,7 @@ namespace {
             phase << batch;
             auto native = manager.get_buffer();
             vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
-            native.data_->command_buffers[native.get_current_buffer_idx()].pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+            CommandAccess::Data(native)->command_buffers[native.get_current_buffer_idx()].pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
         device.data_->device.waitIdle();
         std::array<std::uint32_t, 8> actual{};

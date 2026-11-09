@@ -1,4 +1,9 @@
+#include <VSL/lifetime/command_access.hpp>
 #include "support/render_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     class BindPipelineVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
@@ -12,6 +17,7 @@ namespace {
 
 #include "support/compute_fixture.hpp"
 #include <atomic>
+
 namespace {
     class BindComputePipelineVulkanIntegrationTest : public vsl_test::ComputeVulkanIntegrationTest {
         VkDebugUtilsMessengerEXT _abort_messenger = VK_NULL_HANDLE;
@@ -105,7 +111,7 @@ namespace {
             barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
             barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
             auto commands = manager.get_buffer();
-            commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
         device.data_->device.waitIdle();
@@ -138,7 +144,7 @@ namespace {
             barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
             barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
             auto commands = manager.get_buffer();
-            commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
         device.data_->device.waitIdle();

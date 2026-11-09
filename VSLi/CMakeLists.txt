@@ -55,6 +55,7 @@ add_library(VSL STATIC
         VSL/include/VSL/lifetime/resource_identity.hpp
         VSL/src/private/VSL/lifetime/resource_use_factory.hpp
         VSL/src/private/VSL/lifetime/buffer_access.hpp
+        VSL/src/private/VSL/lifetime/command_access.hpp
         VSL/src/private/VSL/lifetime/identity_access.hpp
         VSL/include/VSL/lifetime/dependency_node.hpp
         VSL/include/VSL/lifetime/logical_use_state.hpp

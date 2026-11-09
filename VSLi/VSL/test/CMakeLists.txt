@@ -168,13 +168,14 @@ if (VSL_TEST_SOURCES)
     set(typed_view_names Valid WrongVertexRecord WrongDescriptorKind WrongDescriptorPayload RawVertexBuffer NegativeSubpass TemporaryBackend ConstTemporaryBackend InvalidStoragePolicy
         RawBufferUse RawImageUse RawSamplerUse RawDescriptorUse RawDescriptorComparison
         RawBufferRefField RawBufferRefConstruction RawBufferViewConstruction LegacyBufferOwner TemporaryViewRef
-        TemporaryPlacedBackend TemporaryPlacedResourceBackend RawVertexBinding RawBindingSource TemporaryStorageRef TemporaryNativeRecording RawNativeRecording)
-    foreach(case RANGE 0 25)
+        TemporaryPlacedBackend TemporaryPlacedResourceBackend RawVertexBinding RawBindingSource TemporaryStorageRef TemporaryNativeRecording RawNativeRecording
+        PrivateCommandPool PrivateCommandBuffer PrivateCommandManager RawCommandPool RawCommandBuffer RawCommandManager MixedCommandIdentities)
+    foreach(case RANGE 0 32)
         list(GET typed_view_names ${case} name)
         add_test(NAME "VSL.TypedView.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
             "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
             "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/typed_buffer_view.cpp"
-            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=bind_vertices|write|narrowed|narrowing|deleted|constraints|constructor|private|no member|C2039|C2248|ForBuffer|ForImage|ForSampler|ForDescriptor|tracks_descriptor"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=bind_vertices|write|narrowed|narrowing|deleted|constraints|constructor|private|no member|operator==|invalid operands|binary expression|C2039|C2248|C2678|ForBuffer|ForImage|ForSampler|ForDescriptor|tracks_descriptor"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
         set_tests_properties("VSL.TypedView.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
     endforeach()

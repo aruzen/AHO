@@ -184,6 +184,29 @@ native_command_buffer()はlvalue contextから取得する借用値である。�
 
 capture／保持／再検査はlifetime、解決済みImplとslotからNative CBを借りる処理はoperation、recordableと使用状態は既存sync、CPU配置は既存storageを使う。C SDK型は専用headerだけから公開し、command.hpp／pv.hpp／define.hppへ新たなSDK依存を追加しない。private operationヘッダーはインストールしない。
 
+## 順序12f: Commandの公開所有境界
+
+CommandPool／CommandBuffer／CommandManagerの`data_`と`shared_ptr<Impl>`構築を非公開にした。空値は既定構築、存在検査は`explicit operator bool()`、同一性比較は種類別の`identity()`を使う。空値は操作可能な資源ではなく、device／pool／buffer／slot等の取得は例外で拒否する。通常構築、`FromBuffer()`、独立ring、arena配置とNativeRecordingContextは共通backendのままである。
+
+```cpp
+vsl::CommandManager empty;
+vsl::CommandManager manager(device);
+auto alias = manager;
+auto other = vsl::CommandManager::FromBuffer(manager.get_buffer());
+assert(!empty);
+assert(alias.identity() == manager.identity());
+assert(other.identity() != manager.identity());
+assert(other.get_buffer().identity() == manager.get_buffer().identity());
+```
+
+Managerのidentityと、そのManagerが共有するring／poolのidentityは別である。identityは比較中に元の所有者を必要とする非所有値であり、保持や世代管理を代替しない。旧`CommandBuffer(nullptr)`等は既定構築へ移し、Native記録にはNativeRecordingContextを使う。
+
+内部のCommandAccessはprivate lifetimeヘッダーだけへ配置し、解決済みImplの借用と、callbackを跨ぐ強い所有snapshotを区別する。通常のNative操作にDomainの再探索や新しい所有wrapperを追加しない。既存DomainのResolveと明示的なAttachも分離したまま、copy-and-swapと旧owner回収時の再入保証を維持する。AHOはbool／種類別identityへ移行し、VSLのprivate bridgeへ依存しない。
+
+この単位は12fの前半である。Buffer／Image／SamplerのAccessor、起動資源、descriptor manager、Pipeline recipe、WindowDataの公開Impl入口と、実定義の4責務分割・同条件測定は引き続き残る。
+
+最終成果物をmacOS arm64／Clang20 C++26、MoltenVK、Vulkan validation、ASan／UBSanで検証した。重点VSL209／AHO152、全VSL1,145成功（対応外format3 skip）／AHO GPU192・CPU1,071、compile契約231件が成功した。heap／arenaのPNG3枚は完全一致し、resize後のPipeline生成1回を維持する。strict82ファイル／74TUと補完検査、installed public consumer29種、新負例7種、Debug／Release／x86_64の寸法生成とartifact混在拒否、archive／生成header一致、source389件とMSBuild登録も確認した。Windows／Linux実機、device lost実機、並行CPUアクセスと性能比較は未検証である。
+
 2026-11-06。Bufferの4責務分離が統合されたmaster `6b1f0166`を基点とする。[Bufferの契約](buffer-generation-contracts.md)と[責務の配置](buffer-layer-layout.md)を維持する。
 
 ## 方針と段階

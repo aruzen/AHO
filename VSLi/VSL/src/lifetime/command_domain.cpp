@@ -100,7 +100,7 @@ namespace VSL_NAMESPACE::lifetime {
     }
 
     const std::shared_ptr<CommandDomain>& CommandAccess::Owner(const CommandBuffer& buffer) {
-        if (!buffer._domain || !same_buffer(buffer._domain->buffer, buffer.data_) || buffer._domain->context.closing)
+        if (!buffer._domain || !same_buffer(buffer._domain->buffer, buffer._data) || buffer._domain->context.closing)
             throw std::logic_error("Command buffer has no live lifetime domain");
         return buffer._domain;
     }
@@ -136,16 +136,16 @@ namespace VSL_NAMESPACE::lifetime {
     CommandBuffer CommandAccess::Buffer(const std::shared_ptr<CommandDomain>& domain) {
         if (!domain || domain->context.closing)
             throw std::logic_error("Command buffer lifetime domain has expired");
-        CommandBuffer result(nullptr);
-        result.data_ = domain->buffer;
+        CommandBuffer result;
+        result._data = domain->buffer;
         result._domain = domain;
         return result;
     }
     CommandManager CommandAccess::Manager(std::shared_ptr<impl::CommandManagerImpl> data, std::shared_ptr<CommandDomain> domain) {
         if (!data || !domain || !same_buffer(data->command_buffer, domain->buffer) || domain->context.closing)
             throw std::logic_error("Command manager requires the canonical buffer domain");
-        CommandManager result(nullptr);
-        result.data_ = std::move(data);
+        CommandManager result;
+        result._data = std::move(data);
         result._domain = std::move(domain);
         return result;
     }

@@ -2,6 +2,7 @@
 // Created by morimoto_hibiki on 2025/10/22.
 //
 
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/lifetime/resource_use_factory.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
@@ -14,6 +15,9 @@
 #include <stdexcept>
 #include <utility>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     VSL_NAMESPACE::command::ImageCopyInfo describe_upload(
         const VSL_NAMESPACE::ImageAccessor& image, const VSL_NAMESPACE::impl::BufferImpl* source,
@@ -61,8 +65,8 @@ namespace {
     void validate_commands(const VSL_NAMESPACE::ImageAccessor& image, const VSL_NAMESPACE::CommandBuffer& commands,
                            const VSL_NAMESPACE::CommandManager& manager) {
         const auto& device = image.data_->device;
-        if (!commands.data_ || !commands.data_->command_pool || !manager.data_ ||
-            commands.data_->command_pool->device != device || manager.data_->device.get() != device)
+        if (!CommandAccess::Data(commands) || !CommandAccess::Data(commands)->command_pool || !CommandAccess::Data(manager) ||
+            CommandAccess::Data(commands)->command_pool->device != device || CommandAccess::Data(manager)->device.get() != device)
             throw std::invalid_argument("Image upload requires commands on the same device");
     }
 
@@ -79,7 +83,7 @@ namespace {
         region.imageSubresource.layerCount = 1;
         region.imageOffset = vk::Offset3D{static_cast<std::int32_t>(info.region.x), static_cast<std::int32_t>(info.region.y), 0};
         region.imageExtent = vk::Extent3D{info.region.width, info.region.height, 1};
-        buffer.data_->command_buffers.at(buffer.get_current_buffer_idx()).copyBufferToImage(source.buffer, image.data_->image, static_cast<vk::ImageLayout>(layout), region);
+        CommandAccess::Data(buffer)->command_buffers.at(buffer.get_current_buffer_idx()).copyBufferToImage(source.buffer, image.data_->image, static_cast<vk::ImageLayout>(layout), region);
     }
 } // namespace
 
@@ -109,12 +113,12 @@ VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyBufferToImage:
     validate_commands(image, buffer, manager);
     const auto completion = buffer.completion();
     const auto slot = buffer.get_current_buffer_idx();
-    const auto context = buffer.data_->recording_context;
+    const auto context = CommandAccess::Data(buffer)->recording_context;
     if (!completion || completion.status() != Completion::Status::PENDING)
         throw std::logic_error("Image upload requires a recording phase");
     _use.record(buffer, _retention);
     image.resource_use().record(buffer);
-    if (buffer.completion() != completion || buffer.get_current_buffer_idx() != slot || buffer.data_->recording_context != context ||
+    if (buffer.completion() != completion || buffer.get_current_buffer_idx() != slot || CommandAccess::Data(buffer)->recording_context != context ||
         completion.status() != Completion::Status::PENDING)
         throw std::logic_error("Image upload recording changed during resource registration");
     return info;

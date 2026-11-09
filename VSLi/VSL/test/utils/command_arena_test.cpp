@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include "support/deferred_action.hpp"
 #include <VSL/lifetime/resource_arena.hpp>
@@ -6,6 +7,9 @@
 #include <VSL/utils/typed_buffer_arena.hpp>
 #include <VSL/sync/submission_completion.hpp>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     namespace t = vsl::typed;
     namespace s = vsl::storage;
@@ -55,8 +59,8 @@ namespace {
         EXPECT_THROW(PLAN.require_region(PLAN.bytes(), PLAN.alignment() / 2), std::invalid_argument);
     }
     TEST(CommandPlacementTest, EmptyFacadesRejectOwningGettersAndManagerAttachment) {
-        vsl::CommandPool pool(nullptr);
-        vsl::CommandBuffer buffer(nullptr);
+        vsl::CommandPool pool(CommandAccess::Pool(nullptr));
+        vsl::CommandBuffer buffer(CommandAccess::RawBuffer(nullptr));
         EXPECT_THROW(pool.get_device(), std::invalid_argument);
         EXPECT_THROW(pool.owner_ref(), std::invalid_argument);
         EXPECT_THROW(buffer.get_pool(), std::invalid_argument);
@@ -66,20 +70,20 @@ namespace {
     TEST_F(CommandArenaVulkanIntegrationTest, TwoRingsShareStorageAndKeepIndependentCanonicalDomains) {
         l::ResourceArena arena(device, PLAN, inputs());
         auto first = arena.command_buffer({1}), second = arena.command_buffer({2});
-        const auto base = reinterpret_cast<std::uintptr_t>(first.data_.get());
-        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(second.data_.get()) - base, PLAN.placement({2}).offset);
-        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(arena.command_pool({3}).data_.get()) - base, PLAN.placement({3}).offset);
-        const auto context = reinterpret_cast<std::uintptr_t>(first.data_->owner_context);
+        const auto base = reinterpret_cast<std::uintptr_t>(CommandAccess::Data(first).get());
+        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(CommandAccess::Data(second).get()) - base, PLAN.placement({2}).offset);
+        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(CommandAccess::Data(arena.command_pool({3})).get()) - base, PLAN.placement({3}).offset);
+        const auto context = reinterpret_cast<std::uintptr_t>(CommandAccess::Data(first)->owner_context);
         EXPECT_GE(context, base + s::COMMAND_BUFFER_IMPL_SIZE);
         EXPECT_LT(context, base + s::COMMAND_BUFFER_SLOT_SIZE);
         EXPECT_EQ(first.get_size(), 2u);
         EXPECT_EQ(second.get_size(), 3u);
-        EXPECT_FALSE(first.data_.owner_before(second.data_));
-        EXPECT_FALSE(second.data_.owner_before(first.data_));
+        EXPECT_FALSE(CommandAccess::Data(first).owner_before(CommandAccess::Data(second)));
+        EXPECT_FALSE(CommandAccess::Data(second).owner_before(CommandAccess::Data(first)));
         const auto first_domain = l::CommandAccess::Owner(first), second_domain = l::CommandAccess::Owner(second);
         EXPECT_NE(first_domain, second_domain);
         EXPECT_EQ(l::CommandAccess::Owner(arena.command_buffer({1})), first_domain);
-        EXPECT_EQ(first.get_pool().data_, arena.command_pool({3}).data_);
+        EXPECT_EQ(CommandAccess::Data(first.get_pool()), CommandAccess::Data(arena.command_pool({3})));
         EXPECT_TRUE(first.owner_ref().managed());
         EXPECT_TRUE(arena.command_pool({3}).owner_ref().managed());
         auto manager = vsl::CommandManager::FromBuffer(first);
@@ -118,8 +122,8 @@ namespace {
             phase << *command;
             command.reset();
             const auto native = manager->get_buffer();
-            native.retain(native.data_);
-            ASSERT_EQ(native.data_->recording_context->work->completion_resources.size(), 1u);
+            native.retain(CommandAccess::Data(native));
+            ASSERT_EQ(CommandAccess::Data(native)->recording_context->work->completion_resources.size(), 1u);
             result = phase.completion();
             manager.reset();
             EXPECT_FALSE(root.expired());
@@ -163,7 +167,7 @@ namespace {
     }
     TEST_F(CommandArenaVulkanIntegrationTest, FailedAttachmentAndRetirementDoNotPublishOrReplaceAnotherDomain) {
         l::ResourceArena arena(device, PLAN, inputs());
-        const auto native = arena.command_buffer({1}).data_;
+        const auto native = CommandAccess::Data(arena.command_buffer({1}));
         EXPECT_EQ(native->recording_context, nullptr);
         const auto fail = +[](std::shared_ptr<vsl::impl::CommandBufferImpl>) -> std::shared_ptr<l::CommandDomain> { throw std::bad_alloc(); };
         EXPECT_THROW(l::CommandAccess::Attach(native, fail), std::bad_alloc);
@@ -198,7 +202,7 @@ namespace {
         std::optional<l::ResourceArena> imported;
         std::weak_ptr<l::CommandDomain> previous;
         std::weak_ptr<void> original_root, importer_root;
-        vsl::CommandPool saved(nullptr);
+        vsl::CommandPool saved(CommandAccess::Pool(nullptr));
         {
             l::ResourceArena source(device, PLAN, inputs());
             auto buffer = source.command_buffer({1});
@@ -209,16 +213,16 @@ namespace {
             importer_root = imported->owner();
             auto from_import = imported->command_buffer({10});
             EXPECT_EQ(l::CommandAccess::Owner(from_import), previous.lock());
-            EXPECT_FALSE(from_import.data_.owner_before(buffer.data_));
-            EXPECT_FALSE(buffer.data_.owner_before(from_import.data_));
+            EXPECT_FALSE(CommandAccess::Data(from_import).owner_before(CommandAccess::Data(buffer)));
+            EXPECT_FALSE(CommandAccess::Data(buffer).owner_before(CommandAccess::Data(from_import)));
             saved = from_import.get_pool();
-            EXPECT_EQ(saved.data_, source.command_pool({3}).data_);
+            EXPECT_EQ(CommandAccess::Data(saved), CommandAccess::Data(source.command_pool({3})));
         }
         EXPECT_TRUE(previous.expired());
         EXPECT_FALSE(original_root.expired());
         auto renewed = imported->command_buffer({10});
-        EXPECT_TRUE(renewed.data_->recording_context);
-        EXPECT_EQ(renewed.get_pool().data_, saved.data_);
+        EXPECT_TRUE(CommandAccess::Data(renewed)->recording_context);
+        EXPECT_EQ(CommandAccess::Data(renewed.get_pool()), CommandAccess::Data(saved));
         imported.reset();
         EXPECT_TRUE(importer_root.expired());
         EXPECT_FALSE(original_root.expired());
@@ -230,15 +234,15 @@ namespace {
         {
             vsl::CommandPool pool(device);
             vsl::CommandBuffer buffer(pool, 2);
-            pool_root = pool.data_;
-            buffer_root = buffer.data_;
+            pool_root = CommandAccess::Data(pool);
+            buffer_root = CommandAccess::Data(buffer);
             saved = buffer.get_pool();
             device_only = saved->get_device();
             EXPECT_EQ(device_only.data_, device.data_);
-            EXPECT_FALSE(saved->data_.owner_before(pool.data_));
-            EXPECT_FALSE(pool.data_.owner_before(saved->data_));
+            EXPECT_FALSE(CommandAccess::Data(*saved).owner_before(CommandAccess::Data(pool)));
+            EXPECT_FALSE(CommandAccess::Data(pool).owner_before(CommandAccess::Data(*saved)));
             const std::array<l::OwnerRef, 1> reverse{buffer.owner_ref()};
-            EXPECT_THROW(pool.data_->owner_node->check_additions(reverse), std::invalid_argument);
+            EXPECT_THROW(CommandAccess::Data(pool)->owner_node->check_additions(reverse), std::invalid_argument);
         }
         EXPECT_TRUE(buffer_root.expired());
         EXPECT_FALSE(pool_root.expired());
@@ -249,18 +253,18 @@ namespace {
     TEST_F(CommandArenaVulkanIntegrationTest, ForeignControlBlocksCannotImpersonateTheSameRingOrPool) {
         l::ResourceArena arena(device, PLAN, inputs());
         auto buffer = arena.command_buffer({1});
-        const auto foreign = std::shared_ptr<vsl::impl::CommandBufferImpl>(std::make_shared<int>(0), buffer.data_.get());
-        EXPECT_THROW(vsl::CommandBuffer{foreign}, std::logic_error);
+        const auto foreign = std::shared_ptr<vsl::impl::CommandBufferImpl>(std::make_shared<int>(0), CommandAccess::Data(buffer).get());
+        EXPECT_THROW(vsl::CommandBuffer{CommandAccess::RawBuffer(foreign)}, std::logic_error);
         EXPECT_THROW(l::CommandAccess::Attach(foreign), std::invalid_argument);
         auto forged = buffer;
-        forged.data_ = foreign;
+        CommandAccess::Data(forged) = foreign;
         EXPECT_THROW(vsl::CommandManager::FromBuffer(forged), std::logic_error);
         auto manager = vsl::CommandManager::FromBuffer(buffer);
-        manager.data_->command_buffer = foreign;
+        CommandAccess::Data(manager)->command_buffer = foreign;
         EXPECT_THROW(manager.get_buffer(), std::logic_error);
-        manager.data_->command_buffer = buffer.data_;
-        const auto native_pool = arena.command_pool({3}).data_;
-        vsl::CommandPool forged_pool(std::shared_ptr<vsl::impl::CommandPoolImpl>(std::make_shared<int>(0), native_pool.get()));
+        CommandAccess::Data(manager)->command_buffer = CommandAccess::Data(buffer);
+        const auto native_pool = CommandAccess::Data(arena.command_pool({3}));
+        vsl::CommandPool forged_pool(CommandAccess::Pool(std::shared_ptr<vsl::impl::CommandPoolImpl>(std::make_shared<int>(0), native_pool.get())));
         EXPECT_THROW(forged_pool.get_device(), std::invalid_argument);
         EXPECT_THROW((vsl::CommandBuffer(forged_pool)), std::invalid_argument);
     }
@@ -299,7 +303,7 @@ namespace {
         vsl::Buffer<USAGE, vsl::MemoryProperty::HOST_VISIBLE> source(device, 4), target(device, 4);
         const std::uint32_t expected = 97;
         ASSERT_TRUE(source.copy(expected));
-        auto native = buffer.data_->command_buffers.at(0);
+        auto native = CommandAccess::Data(buffer)->command_buffers.at(0);
         native.begin(vk::CommandBufferBeginInfo{});
         native.copyBuffer(source.data_->buffer, target.data_->buffer, vk::BufferCopy{.size = 4});
         const vk::MemoryBarrier visible{.srcAccessMask = vk::AccessFlagBits::eTransferWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};

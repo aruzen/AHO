@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/vulkan/render_pass.hpp>
@@ -12,6 +13,9 @@
 #include <cstring>
 #include <stdexcept>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace VSL_NAMESPACE {
     const RenderPassDescription& RenderPassAccessor::description() const& {
         if (!data_ || !data_->description)
@@ -60,7 +64,7 @@ namespace VSL_NAMESPACE {
                                             std::uint32_t y) {
         if (!in_flight.wait())
             throw std::runtime_error("Picking render did not complete");
-        const auto index = manager.data_->command_buffer->recording_context->acquired_image_index.value_or(manager.get_current_buffer_idx());
+        const auto index = CommandAccess::Data(manager)->command_buffer->recording_context->acquired_image_index.value_or(manager.get_current_buffer_idx());
         auto image = picking_buffer.at(index);
         (void)command::ImageReadback::Describe(image, ImageLayout::COLOR_ATTACHMENT_OPTIMAL, {x, y, 1, 1});
         StagingBuffer<MemoryType::TRANSFER_DESTINATION> destination(get_device(), sizeof(std::uint32_t));

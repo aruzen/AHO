@@ -2,6 +2,7 @@
 // Created by morimoto_hibiki on 2025/07/30.
 //
 
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 
 #include <VSL/vulkan/commands/bind_graphic_resource.hpp>
@@ -11,6 +12,9 @@
 #include <utility>
 #include <utility>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 VSL_NAMESPACE::command::BindGraphicResource::BindGraphicResource(VSL_NAMESPACE::GraphicResource resource,
                                                                  VSL_NAMESPACE::graphic_resource::BindingDestination dst,
                                                                  std::optional<PipelineAccessor> pipeline,
@@ -33,12 +37,11 @@ void VSL_NAMESPACE::command::BindGraphicResource::invoke(CommandPool pool, Comma
         }
         track(buffer);
         buffer.retain(pipeline->data_);
-        buffer.data_->command_buffers[buffer.get_current_buffer_idx()]
-            .bindDescriptorSets((vk::PipelineBindPoint)destination,
-                                pipeline.value().data_->layout->pipeline_layout,
-                                first_binding,
-                                resources | std::views::transform([](auto& r) { return r.data_->descriptor_set; }) | std::ranges::to<std::vector<vk::DescriptorSet>>(),
-                                {});
+        CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].bindDescriptorSets((vk::PipelineBindPoint)destination,
+                                                                                                         pipeline.value().data_->layout->pipeline_layout,
+                                                                                                         first_binding,
+                                                                                                         resources | std::views::transform([](auto& r) { return r.data_->descriptor_set; }) | std::ranges::to<std::vector<vk::DescriptorSet>>(),
+                                                                                                         {});
     }
 }
 

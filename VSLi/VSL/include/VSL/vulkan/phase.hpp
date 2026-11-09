@@ -75,7 +75,7 @@ namespace VSL_NAMESPACE {
     protected:
         Completion completion_;
         std::shared_ptr<impl::SubmissionWork> submission;
-        CommandBuffer recording_buffer{nullptr};
+        CommandBuffer recording_buffer{};
         std::uint32_t signal_index = 0;
         bool recreate = false;
         int initial_exceptions = 0;

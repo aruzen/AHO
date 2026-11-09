@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/phase_liveness.hpp>
 #include <VSL/vulkan/phase.hpp>
 #include <gtest/gtest.h>
@@ -5,8 +6,11 @@
 #include <stdexcept>
 
 namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
+namespace {
     TEST(PhaseLivenessTest, NestedGuardsSurviveUnwindingAndObserveDestructionWithoutOwningThePhase) {
-        auto phase = std::make_unique<vsl::DefaultPhase>(vsl::CommandManager{nullptr}, vsl::SwapchainAccessor{},
+        auto phase = std::make_unique<vsl::DefaultPhase>(vsl::CommandManager{CommandAccess::RawManager(nullptr)}, vsl::SwapchainAccessor{},
                                                          std::nullopt, std::nullopt, std::nullopt, true);
         vsl::lifetime::PhaseCall outer(*phase);
         EXPECT_TRUE(outer.alive());

@@ -1,5 +1,10 @@
+#include <VSL/lifetime/command_access.hpp>
 #include "support/image_transfer_fixture.hpp"
 #include <VSL/vulkan/commands/image_readback.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     class ImageUploadRangeVulkanIntegrationTest : public vsl_test::ImageTransferVulkanIntegrationTest {
         bool validate_vulkan() const override;
@@ -29,7 +34,7 @@ namespace {
             auto phase = manager.start_phase<vsl::ComputePhase>();
             transition(manager, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, {}, vk::AccessFlagBits::eTransferWrite);
             auto buffer = manager.get_buffer();
-            buffer.data_->command_buffers[buffer.get_current_buffer_idx()].clearColorImage(
+            CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].clearColorImage(
                 image.data_->image, vk::ImageLayout::eGeneral, vk::ClearColorValue(std::array<std::uint32_t, 4>{17, 0, 0, 0}),
                 vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
             transition(manager, image, vk::ImageLayout::eGeneral, vk::ImageLayout::eGeneral,
@@ -150,13 +155,13 @@ namespace {
             region.imageSubresource = {vk::ImageAspectFlagBits::eColor, 0, 1, 1};
             region.imageExtent = {2, 2, 1};
             auto buffer = manager.get_buffer();
-            buffer.data_->command_buffers[buffer.get_current_buffer_idx()].copyImageToBuffer(
+            CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].copyImageToBuffer(
                 image.data_->image, vk::ImageLayout::eGeneral, readback.data_->buffer, region);
             vk::MemoryBarrier host_visibility{};
             host_visibility.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
             host_visibility.dstAccessMask = vk::AccessFlagBits::eHostRead;
             auto commands = manager.get_buffer();
-            commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, host_visibility, {}, {});
         }
         device.data_->device.waitIdle();

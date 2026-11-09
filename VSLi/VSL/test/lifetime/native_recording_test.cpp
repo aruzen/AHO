@@ -1,8 +1,12 @@
+#include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <VSL/lifetime/native_recording.hpp>
 #include <VSL/lifetime/buffer_arena.hpp>
 #include <optional>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     class NativeRecordingVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
@@ -39,7 +43,7 @@ namespace {
         auto phase = manager.start_phase<vsl::ComputePhase>();
         auto buffer = manager.get_buffer();
         const auto token = std::make_shared<int>(0);
-        buffer.data_ = std::shared_ptr<vsl::impl::CommandBufferImpl>(token, buffer.data_.get());
+        CommandAccess::Data(buffer) = std::shared_ptr<vsl::impl::CommandBufferImpl>(token, CommandAccess::Data(buffer).get());
         EXPECT_THROW((vsl::NativeRecordingContext{buffer}), std::logic_error);
         EXPECT_NO_THROW(vsl::NativeRecordingContext(manager.get_buffer()));
         phase.cancel();

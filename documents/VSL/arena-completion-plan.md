@@ -11,7 +11,7 @@
 
 現在の到達点は順序1〜11である。command／同期資源の配置とTyped frame再利用、起動資源の共通backend、OS windowの寿命分離、公開StartupArenaとAHO起動、maintenance1の能力照会／有効化、Swapchain世代のCPU配置、取得後失敗とpresent専用の完了観測・資源保持、AHOの世代公開・休止・resize／close、Typedの生成policyとarena既定化を接続した。12の旧入口廃止・定義の4責務分割・測定と最終監査まで継続する。
 
-10dはPhaseCall、共通Fence用途、M個のfinished semaphore、F個のacquire Fenceに、[送信結果とnative使用完了](native-submission-proof.md)と[AcquireTicket／Surface回収](acquire-ticket-recovery.md)を接続した。10eで候補保持と0 framebuffer休止、共有close、元Surface単位の退役を完了した。次は11のTyped既定配置であり、12の公開入口整理と最終監査も引き続き未完了である。
+10dはPhaseCall、共通Fence用途、M個のfinished semaphore、F個のacquire Fenceに、[送信結果とnative使用完了](native-submission-proof.md)と[AcquireTicket／Surface回収](acquire-ticket-recovery.md)を接続した。10eで候補保持と0 framebuffer休止、共有close、元Surface単位の退役、11でTypedの既定配置を完了した。現在は12の公開入口整理を進めており、実定義の4責務分割と最終監査は引き続き未完了である。
 
 ## 責務と保証
 
@@ -231,4 +231,6 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 12dでBufferRefのraw field／構築、BufferViewのraw構築／legacy_owner、bindのraw入力／source getterと、一時Placed viewからの借用迂回を閉じた。頂点／index bindはImpl*と一つのResourceUseで所有・状態を持ち、native descriptor更新も元のmanaged composite nodeを保存する。転送元BufferViewを共通CopyBufferToImageへ接続し、source登録を画像barrier前へ移した。AHOは一度取得したsnapshotを使い、NativeBufferAdapterとcompatibilityを除去した。source専用retentionと具体StorageのTYPE／PROPERTY／Custom mappingは維持する。新VSL3件／AHO2件、全VSL1,139／AHO192・1,071／compile222、PNG3枚一致、strict43ファイル／32TU（補完を含む）、public consumer28種と旧入力拒否16種、Debug／Release／x86_64の寸法生成、artifact混在拒否が成功した。次はNative記録contextを用意し、残りの公開facadeと実定義の責務境界、同条件測定へ進む。
 
 12eでNativeRecordingContextを追加し、custom commandの記録を公開Implなしで検証できるようにした。既存CommandBuffer／Domainをpinし、Result／slot／世代／Native CBを保存して使用登録の前後に同じ記録か確かめる。Native借用区間のhost直列化とbarrier責務を明記し、新owner wrapperやWorkへの強所有は増やさない。既存compute／Typed barrierを移行し、新GPU4件、全VSL1,143／AHO192・1,071／compile224、同一描画、strict11ファイル／9TU、installed public consumer4種と新負例2種、archive／生成header一致が成功した。Implの定義とfingerprintは12dから不変で、同構成のmulti／crossとartifact guard検証を再利用する。次はCommand／起動資源等の残りの公開入口廃止へ進む。
+
+12f前半でCommandPool／CommandBuffer／CommandManagerの公開data_／sharedImpl構築を閉じ、空値／bool／種類別identityへ移した。Managerと共有ringの同一性を分け、private bridge経由でも強いsnapshot、既存DomainのResolveと明示Attach、旧owner回収時の再入を維持する。AHOへprivate依存を追加しない。新runtime2件、全VSL1,145／AHO192・1,071／compile231、PNG3枚一致、strict82ファイル／74TUと補完検査、installed consumer29種と新負例7種、Debug／Release／x86_64の寸法生成、artifact混在拒否、archive／生成header一致が成功した。残るAccessor／起動資源／recipe／WindowData等の公開入口廃止、実定義の4責務分割と測定を継続する。
 

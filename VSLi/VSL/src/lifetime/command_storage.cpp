@@ -1,9 +1,13 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/command_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <new>
 #include <stdexcept>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_standard_layout_v<CommandPoolSlotStorage> && offsetof(CommandPoolSlotStorage, value) == 0);
     static_assert(std::is_standard_layout_v<CommandBufferSlotStorage> && offsetof(CommandBufferSlotStorage, value) == 0);
@@ -39,9 +43,9 @@ namespace VSL_NAMESPACE::lifetime {
             visitor(context, static_cast<const HeapCommandPoolOwner*>(owner)->device.owner_ref());
         }
         HeapCommandBufferOwner::HeapCommandBufferOwner(CommandPool pool, std::uint32_t count) : pool(pool.owner_ref()) {
-            construct_command_buffer(storage, *pool.data_, count);
+            construct_command_buffer(storage, *CommandAccess::Data(pool), count);
             try {
-                set_command_buffer_pool_owner(command_buffer_at(storage), this->pool.alias(pool.data_.get()));
+                set_command_buffer_pool_owner(command_buffer_at(storage), this->pool.alias(CommandAccess::Data(pool).get()));
             } catch (...) {
                 destroy_command_buffer(storage);
                 throw;

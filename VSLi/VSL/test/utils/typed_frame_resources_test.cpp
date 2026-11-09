@@ -1,8 +1,12 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/utils/typed_frame_resources.hpp>
 #include <VSL/lifetime/native_recording.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include "support/vulkan_fixture.hpp"
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     namespace t = vsl::typed;
     struct FrameValue {
@@ -86,18 +90,18 @@ namespace {
     }
 
     TEST_F(TypedFrameVulkanIntegrationTest, RejectsReplacedCommandBufferRingsAndEmptyManagers) {
-        EXPECT_THROW((t::TypedFrameResources<FrameValue>(vsl::CommandManager(nullptr), [](size_t index) { return FrameValue{index}; })), std::invalid_argument);
+        EXPECT_THROW((t::TypedFrameResources<FrameValue>(vsl::CommandManager(CommandAccess::RawManager(nullptr)), [](size_t index) { return FrameValue{index}; })), std::invalid_argument);
         auto manager = make_manager();
         const auto original = manager.get_buffer();
         t::TypedFrameResources<FrameValue> frames(manager, [](size_t index) { return FrameValue{index}; });
         const auto replacement = manager.make_exclusive_buffer();
-        manager.data_->command_buffer = replacement.data_;
+        CommandAccess::Data(manager)->command_buffer = CommandAccess::Data(replacement);
         {
             auto phase = manager.start_phase<vsl::ComputePhase>();
             EXPECT_THROW(frames.get(phase), std::invalid_argument);
             phase.cancel();
         }
-        manager.data_->command_buffer = original.data_;
+        CommandAccess::Data(manager)->command_buffer = CommandAccess::Data(original);
         auto phase = manager.start_phase<vsl::ComputePhase>();
         EXPECT_NO_THROW(frames.get(phase));
     }

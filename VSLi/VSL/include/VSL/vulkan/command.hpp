@@ -6,6 +6,7 @@
 #include "swapchain.hpp"
 #include "../operation/command_create_info.hpp"
 #include "../lifetime/owner_ref.hpp"
+#include "../lifetime/resource_identity.hpp"
 
 namespace VSL_NAMESPACE {
     namespace lifetime {
@@ -20,19 +21,27 @@ namespace VSL_NAMESPACE {
     inline std::uint32_t DEFAULT_BUFFER_SIZE = 3;
 
     struct CommandPool {
+        CommandPool() = default;
+        explicit operator bool() const { return bool(_data); }
+        CommandPoolIdentity identity() const;
         CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor device, CommandPoolCreateInfo info = {});
 
+    private:
+        friend struct lifetime::CommandAccess;
         CommandPool(std::shared_ptr<VSL_NAMESPACE::impl::CommandPoolImpl> data);
+        std::shared_ptr<VSL_NAMESPACE::impl::CommandPoolImpl> _data;
 
-        std::shared_ptr<VSL_NAMESPACE::impl::CommandPoolImpl> data_;
+    public:
         LogicalDeviceAccessor get_device() const;
         lifetime::OwnerRef owner_ref() const;
     };
 
     struct CommandBuffer {
+        CommandBuffer() = default;
+        explicit operator bool() const { return bool(_data); }
+        CommandBufferIdentity identity() const;
         CommandBuffer(VSL_NAMESPACE::CommandPool pool, std::uint32_t size = DEFAULT_BUFFER_SIZE);
 
-        CommandBuffer(std::shared_ptr<VSL_NAMESPACE::impl::CommandBufferImpl> data);
         CommandBuffer(const CommandBuffer&) = default;
         CommandBuffer(CommandBuffer&&) noexcept = default;
         CommandBuffer& operator=(CommandBuffer other) noexcept;
@@ -62,9 +71,9 @@ namespace VSL_NAMESPACE {
         void retain_until_complete(const std::shared_ptr<void>& resource) const;
         void retain_until_complete(std::shared_ptr<void>&& resource) const;
 
-        std::shared_ptr<VSL_NAMESPACE::impl::CommandBufferImpl> data_;
-
     private:
+        CommandBuffer(std::shared_ptr<VSL_NAMESPACE::impl::CommandBufferImpl> data);
+        std::shared_ptr<VSL_NAMESPACE::impl::CommandBufferImpl> _data;
         std::shared_ptr<lifetime::CommandDomain> _domain;
         friend struct lifetime::CommandAccess;
     };
@@ -133,16 +142,15 @@ namespace VSL_NAMESPACE {
     } // namespace command
 
     struct CommandManager {
-        CommandManager(std::shared_ptr<VSL_NAMESPACE::impl::CommandManagerImpl> data);
-
+        CommandManager() = default;
+        explicit operator bool() const { return bool(_data); }
+        CommandManagerIdentity identity() const;
         CommandManager(VSL_NAMESPACE::LogicalDeviceAccessor device);
         static CommandManager FromBuffer(CommandBuffer buffer);
         CommandManager(const CommandManager&) = default;
         CommandManager(CommandManager&&) noexcept = default;
         CommandManager& operator=(CommandManager other) noexcept;
         void swap(CommandManager& other) noexcept;
-
-        std::shared_ptr<VSL_NAMESPACE::impl::CommandManagerImpl> data_;
 
         template<class P = DefaultPhase, typename... Args>
         P start_phase(Args&&... args);
@@ -161,6 +169,8 @@ namespace VSL_NAMESPACE {
         CommandBuffer make_exclusive_buffer(size_t size = 1);
 
     private:
+        CommandManager(std::shared_ptr<VSL_NAMESPACE::impl::CommandManagerImpl> data);
+        std::shared_ptr<VSL_NAMESPACE::impl::CommandManagerImpl> _data;
         std::shared_ptr<lifetime::CommandDomain> _domain;
         friend struct lifetime::CommandAccess;
     };

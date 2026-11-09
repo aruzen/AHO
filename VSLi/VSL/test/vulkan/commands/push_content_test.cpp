@@ -1,4 +1,9 @@
+#include <VSL/lifetime/command_access.hpp>
 #include "support/compute_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     using PushConstantVulkanIntegrationTest = vsl_test::ComputeVulkanIntegrationTest;
     TEST_F(PushConstantVulkanIntegrationTest, TypedAndExplicitSizeOverloadsReachShader) {
@@ -33,7 +38,7 @@ namespace {
                 barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
                 barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
                 auto buffer = manager.get_buffer();
-                buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
+                CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
                     vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
             }
             device.data_->device.waitIdle();
@@ -72,7 +77,7 @@ namespace {
                    << vsl::command::Dispatch(COUNT);
             vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
             auto buffer = manager.get_buffer();
-            buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
         manager.wait_idle();

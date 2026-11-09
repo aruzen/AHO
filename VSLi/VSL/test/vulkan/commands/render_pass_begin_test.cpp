@@ -1,6 +1,11 @@
+#include <VSL/lifetime/command_access.hpp>
 #include "support/render_fixture.hpp"
 #include "support/read_image.hpp"
 #include "support/frame_buffer_metadata.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     using RenderPassBeginVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
 
@@ -52,7 +57,7 @@ namespace {
         }
         EXPECT_TRUE(completion.wait());
         EXPECT_TRUE(owner.expired());
-        EXPECT_TRUE(manager.get_buffer().data_);
+        EXPECT_TRUE(CommandAccess::Data(manager.get_buffer()));
         const auto invalid = static_cast<vsl::ResourceRetention>(99);
         EXPECT_THROW((vsl::command::RenderPassBegin(vsl::FrameBufferAccessor{nullptr}, {}, {}, 0, invalid)), std::invalid_argument);
     }
@@ -172,7 +177,7 @@ namespace {
             VSL_NAMESPACE::ComputePhase phase(manager);
             phase << begin << VSL_NAMESPACE::command::RenderPassEnd{};
             auto buffer = manager.get_buffer();
-            auto command = buffer.data_->command_buffers.at(buffer.get_current_buffer_idx());
+            auto command = CommandAccess::Data(buffer)->command_buffers.at(buffer.get_current_buffer_idx());
             // 形式の判定から独立したnativeコピーで、クリア後のpackedビット列を検証する。
             vk::ImageMemoryBarrier image_barrier{
                 .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,

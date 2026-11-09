@@ -1,6 +1,10 @@
+#include <VSL/lifetime/command_access.hpp>
 #include "support/image_transfer_fixture.hpp"
 #include <VSL/vulkan/post_definition.hpp>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     using ImageCopyDefinitionVulkanIntegrationTest = vsl_test::ImageTransferVulkanIntegrationTest;
     TEST_F(ImageCopyDefinitionVulkanIntegrationTest, CopyByBufferReturnsTrueAndUploadsEveryTexel) {
@@ -20,7 +24,7 @@ namespace {
             host_visibility.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
             host_visibility.dstAccessMask = vk::AccessFlagBits::eHostRead;
             auto commands = manager.get_buffer();
-            commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, host_visibility, {}, {});
         }
         device.data_->device.waitIdle();

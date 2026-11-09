@@ -1,5 +1,10 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include "support/render_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     using RenderPassVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
     TEST_F(RenderPassVulkanIntegrationTest, CreatesPublicRenderPassAndPickingImagesAtRequestedExtent) {
@@ -48,7 +53,7 @@ namespace {
         }
         vsl::SynchroManager sync(device);
         auto ready = sync.create_fence("picking read ready", true);
-        const auto buffers = manager.get_buffer().data_;
+        const auto buffers = CommandAccess::Data(manager.get_buffer());
         ASSERT_EQ(buffers->current_buffer_idx, 0u);
         // WSIの取得順に依存せず、別画像を取得したフレームの状態を再現する。
         buffers->recording_context->acquired_image_index = 1;

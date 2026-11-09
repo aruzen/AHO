@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/vulkan/commands/copy_image_to_buffer.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>
@@ -9,6 +10,9 @@
 #include <stdexcept>
 #include <utility>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(VSL_NAMESPACE::BufferAccessor* buffer, VSL_NAMESPACE::ImageAccessor image)
     : CopyImageToBuffer(buffer, std::move(image), ImageLayout::GENERAL) {}
 
@@ -78,9 +82,9 @@ VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer:
 void VSL_NAMESPACE::command::CopyImageToBuffer::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
     const auto info = description();
     const auto& destination = _destination;
-    if (!buffer.data_ || !buffer.data_->command_pool || !manager.data_ ||
-        manager.data_->device.get() != image.data_->device ||
-        buffer.data_->command_pool->device != image.data_->device)
+    if (!CommandAccess::Data(buffer) || !CommandAccess::Data(buffer)->command_pool || !CommandAccess::Data(manager) ||
+        CommandAccess::Data(manager)->device.get() != image.data_->device ||
+        CommandAccess::Data(buffer)->command_pool->device != image.data_->device)
         throw std::invalid_argument("Image copy requires a command buffer on the same device");
     image.resource_use().record(buffer);
     lifetime::resource_use_for_buffer(destination, {}).record(buffer);
@@ -90,7 +94,7 @@ void VSL_NAMESPACE::command::CopyImageToBuffer::invoke(CommandPool pool, Command
         .imageSubresource = {vk::ImageAspectFlagBits::eColor, 0, area.layer, 1},
         .imageOffset = {static_cast<std::int32_t>(area.x), static_cast<std::int32_t>(area.y), 0},
         .imageExtent = {area.width, area.height, 1}};
-    auto command = buffer.data_->command_buffers.at(buffer.get_current_buffer_idx());
+    auto command = CommandAccess::Data(buffer)->command_buffers.at(buffer.get_current_buffer_idx());
     command.copyImageToBuffer(image.data_->image, static_cast<vk::ImageLayout>(layout), destination->buffer, copy);
     if (host_read) {
         vk::BufferMemoryBarrier barrier{

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/vulkan/phase.hpp>
 #include <VSL/sync/submission_completion.hpp>
@@ -21,6 +22,9 @@
 #include <stdexcept>
 #include <algorithm>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace VSL_NAMESPACE {
     namespace {
         struct ReturningImage {
@@ -82,7 +86,7 @@ namespace VSL_NAMESPACE {
             (!returning_image && domain->context.frame_buffer_recording))
             throw std::logic_error("Command domain is unavailable for recording");
         const auto generation = domain->context.generation;
-        const auto manager_data = manager.data_;
+        const auto manager_data = CommandAccess::Data(manager);
         const auto inherited = returning_image ? submission : nullptr;
         const auto available = inherited ? synchronization_owner(*inherited, impl::SubmissionSource::WAIT_SEMAPHORE, inherited->wait_semaphore)
                                          : (next_image_available ? next_image_available->data_ : nullptr);
@@ -155,7 +159,7 @@ namespace VSL_NAMESPACE {
             next->fence = **next->owned_fence;
         }
         if (domain->context.closing || domain->context.recording || domain->context.submitting || domain->context.generation != generation ||
-            manager.data_ != manager_data || manager_data->command_buffer != buffers ||
+            CommandAccess::Data(manager) != manager_data || manager_data->command_buffer != buffers ||
             buffers->current_buffer_idx != frame_slot || domain->submissions.at(frame_slot) != previous)
             throw std::logic_error("Frame slot changed while preparing");
         next->result->work = next;
@@ -179,7 +183,7 @@ namespace VSL_NAMESPACE {
         state = State::ERROR_;
         if (!work)
             return;
-        const auto domain = buffer.data_ && buffer.data_->owner_context ? buffer.data_->owner_context->domain.lock() : nullptr;
+        const auto domain = CommandAccess::Data(buffer) && CommandAccess::Data(buffer)->owner_context ? CommandAccess::Data(buffer)->owner_context->domain.lock() : nullptr;
         if (domain)
             lifetime::fail_recording(*domain, *work, slot, failure, error_code);
         else {
@@ -200,7 +204,7 @@ namespace VSL_NAMESPACE {
             lifetime::fail_recording(*domain, *work, slot, failure, error);
         };
         try {
-            if (domain->context.closing || domain->context.recording || domain->context.submitting || manager.data_->command_buffer != buffers ||
+            if (domain->context.closing || domain->context.recording || domain->context.submitting || CommandAccess::Data(manager)->command_buffer != buffers ||
                 frame_slot != slot || buffers->current_buffer_idx != slot ||
                 (domain->submissions.at(slot) && sync::pending_use(*domain->submissions.at(slot)->result)))
                 throw std::logic_error("Frame slot is no longer available for recording");
@@ -234,7 +238,7 @@ namespace VSL_NAMESPACE {
     }
     void ComputePhase::setup() {
         lifetime::PhaseCall call(*this);
-        const lifetime::SurfaceRetirementCollection retirement(submission ? submission->device : (manager.data_ ? manager.data_->device : nullptr));
+        const lifetime::SurfaceRetirementCollection retirement(submission ? submission->device : (CommandAccess::Data(manager) ? CommandAccess::Data(manager)->device : nullptr));
         if (state != State::BEFORE_SETUP)
             return;
         try {
@@ -253,7 +257,7 @@ namespace VSL_NAMESPACE {
     }
     ComputePhase::SubmitResult ComputePhase::submit() {
         lifetime::PhaseCall call(*this);
-        const lifetime::SurfaceRetirementCollection retirement(submission ? submission->device : (manager.data_ ? manager.data_->device : nullptr));
+        const lifetime::SurfaceRetirementCollection retirement(submission ? submission->device : (CommandAccess::Data(manager) ? CommandAccess::Data(manager)->device : nullptr));
         if (state != State::WAIT_SUBMIT)
             return SubmitResult::FAILED;
         if (submission && submission->result->native.active) {
@@ -263,7 +267,7 @@ namespace VSL_NAMESPACE {
         const auto work = submission;
         const auto domain = lifetime::CommandAccess::Owner(recording_buffer);
         const auto buffers = domain->buffer;
-        const auto manager_data = manager.data_;
+        const auto manager_data = CommandAccess::Data(manager);
         const auto slot = work->frame_slot;
         const auto acquisition = synchronization_owner(*work, impl::SubmissionSource::ACQUISITION, work->acquisition);
         const auto signal_slot = signal_index;
@@ -383,7 +387,7 @@ namespace VSL_NAMESPACE {
         lifetime::PhaseCall call(*this);
         const auto buffer = recording_buffer;
         const auto work = submission;
-        const auto buffers = buffer.data_;
+        const auto buffers = CommandAccess::Data(buffer);
         auto* context = buffers ? buffers->recording_context : nullptr;
         Completion::Failure failure = Completion::Failure::NONE;
         if (work && context && context->work == work.get()) {
@@ -455,7 +459,7 @@ namespace VSL_NAMESPACE {
     }
     void DefaultPhase::setup() {
         lifetime::PhaseCall call(*this);
-        const lifetime::SurfaceRetirementCollection retirement(submission ? submission->device : (manager.data_ ? manager.data_->device : nullptr));
+        const lifetime::SurfaceRetirementCollection retirement(submission ? submission->device : (CommandAccess::Data(manager) ? CommandAccess::Data(manager)->device : nullptr));
         if (state != State::BEFORE_SETUP)
             return;
         if (_setting_up)
@@ -473,21 +477,21 @@ namespace VSL_NAMESPACE {
         std::shared_ptr<lifetime::CommandDomain> owner_domain;
         try {
             const auto chain = swapchain.data_;
-            if (!chain || !chain->swap_chain || !manager.data_ ||
-                chain->device != manager.data_->device.get())
+            if (!chain || !chain->swap_chain || !CommandAccess::Data(manager) ||
+                chain->device != CommandAccess::Data(manager)->device.get())
                 throw std::invalid_argument("A swapchain is required");
             lifetime::require_swapchain_owner(chain);
             const auto buffer = manager.get_buffer();
             owner_domain = lifetime::CommandAccess::Owner(buffer);
             const auto& domain = owner_domain;
             auto buffers = domain->buffer;
-            const auto initial_manager = manager.data_;
+            const auto initial_manager = CommandAccess::Data(manager);
             if (domain->context.closing || domain->context.recording || domain->context.submitting || domain->context.returning_image || domain->context.mutating || domain->context.frame_buffer_recording)
                 throw std::logic_error("A phase is already recording");
             const bool initially_ready = acquisition_ready();
             if (!call.alive() || state != State::BEFORE_SETUP)
                 return;
-            if (manager.data_ != initial_manager || initial_manager->command_buffer != buffers || domain->buffer != buffers || swapchain.data_ != chain ||
+            if (CommandAccess::Data(manager) != initial_manager || initial_manager->command_buffer != buffers || domain->buffer != buffers || swapchain.data_ != chain ||
                 domain->context.closing || domain->context.recording || domain->context.submitting || domain->context.returning_image || domain->context.mutating || domain->context.frame_buffer_recording)
                 throw std::logic_error("Command domain changed during acquisition readiness");
             if (!initially_ready) {
@@ -508,7 +512,7 @@ namespace VSL_NAMESPACE {
             if (submission->signal_semaphore && submission->signal_semaphore->semaphores.size() < count)
                 throw std::invalid_argument("Present semaphores must cover swapchain images");
             const auto work = submission;
-            const auto manager_data = manager.data_;
+            const auto manager_data = CommandAccess::Data(manager);
             const auto slot = frame_slot;
             const auto prepared_generation = domain->context.generation;
             const auto previous = domain->submissions.at(slot);
@@ -524,7 +528,7 @@ namespace VSL_NAMESPACE {
                     return false;
                 }
                 if (submission != work || work->result->status != Completion::Status::PENDING ||
-                    swapchain.data_ != chain || manager.data_ != manager_data || manager_data->command_buffer != buffers ||
+                    swapchain.data_ != chain || CommandAccess::Data(manager) != manager_data || manager_data->command_buffer != buffers ||
                     domain->buffer != buffers || buffers->current_buffer_idx != slot || frame_slot != slot ||
                     domain->submissions.at(slot) != previous || domain->context.generation != prepared_generation ||
                     domain->context.closing || domain->context.recording || domain->context.submitting || domain->context.returning_image ||
@@ -671,7 +675,7 @@ namespace VSL_NAMESPACE {
     }
     DefaultPhase::SubmitResult DefaultPhase::present() {
         lifetime::PhaseCall call(*this);
-        const lifetime::SurfaceRetirementCollection retirement(submission ? submission->device : (manager.data_ ? manager.data_->device : nullptr));
+        const lifetime::SurfaceRetirementCollection retirement(submission ? submission->device : (CommandAccess::Data(manager) ? CommandAccess::Data(manager)->device : nullptr));
         if (submission && (submission->result->native.active || (_presentation && _presentation->state.native_call_active))) {
             submission->abandon_requested = true;
             if (_presentation)
@@ -726,7 +730,7 @@ namespace VSL_NAMESPACE {
         }
         if (state == State::ERROR_ && recreate)
             return SubmitResult::WANT_RECREATE_SWAPCHAIN;
-        const auto domain = recording_buffer.data_ ? lifetime::CommandAccess::Owner(recording_buffer) : nullptr;
+        const auto domain = CommandAccess::Data(recording_buffer) ? lifetime::CommandAccess::Owner(recording_buffer) : nullptr;
         const auto slot = submission ? submission->frame_slot : frame_slot;
         const auto previous = domain && slot < domain->submissions.size() ? domain->submissions.at(slot) : nullptr;
         if (state == State::WAIT_SUBMIT) {
@@ -753,7 +757,7 @@ namespace VSL_NAMESPACE {
             if (presentation)
                 lifetime::request_acquire_abandon(*presentation);
             if (work->result->status == Completion::Status::PENDING && !sync::native_pending(*work->result)) {
-                if (recording_buffer.data_)
+                if (CommandAccess::Data(recording_buffer))
                     lifetime::detach_recording_cpu(*lifetime::CommandAccess::Owner(recording_buffer), *work);
                 state = State::ERROR_;
                 if (presentation && !presentation->state.acquired)

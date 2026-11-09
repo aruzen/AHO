@@ -37,7 +37,7 @@ namespace AHO_NAMESPACE::engine {
             {VSL_NAMESPACE::graphic_resource::Type::STORAGE_TEXEL_BUFFER, 100},
             {VSL_NAMESPACE::graphic_resource::Type::UNIFORM_BUFFER, 100},
             {VSL_NAMESPACE::graphic_resource::Type::STORAGE_BUFFER, 100}};
-        // 生成時の能力要求。presentでのFence使用と厳密回収は後続の10cで接続する。
+        // 起動時の能力要求と、生成するWindowの既定policyを明示する。
         VSL_NAMESPACE::PresentFencePolicy present_fences = VSL_NAMESPACE::PresentFencePolicy::LEGACY;
     };
 
@@ -48,6 +48,7 @@ namespace AHO_NAMESPACE::engine {
         VSL_NAMESPACE::CommandManager command_manager;
         std::shared_ptr<VSL_NAMESPACE::graphic_resource::ManagerInterface> graphic_resource_manager;
         VSL_NAMESPACE::SynchroManager synchro_manager;
+        VSL_NAMESPACE::PresentFencePolicy present_fences = VSL_NAMESPACE::PresentFencePolicy::LEGACY;
     };
 
     class EngineAccessor {

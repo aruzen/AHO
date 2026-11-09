@@ -2,9 +2,12 @@
 #include <VSL/vulkan/commands/render_pass_begin.hpp>
 #include <VSL/vulkan/commands/render_pass_end.hpp>
 #include <AHO/image_readback.hpp>
+#include <AHO/engine/standard_engine.hpp>
 #ifdef AHO_GPU_TESTS
 #include "../support/live_gpu.hpp"
 #include "../support/commands.hpp"
+#include <VSL/lifetime/command_domain.hpp>
+#include <VSL/sync/presentation_state.hpp>
 namespace phase_payload {
     struct Value {
         int* calls;
@@ -17,6 +20,15 @@ namespace phase_payload {
 } // namespace phase_payload
 namespace {
     using DrawPhaseVulkanIntegration = aho_test::LiveGPUTest;
+    struct SnapshotEngine : aho::engine::GraphicalEngine {
+        aho::Window selected;
+        unsigned calls = 0;
+        SnapshotEngine(aho::engine::EngineAccessor runtime, aho::Window window) : selected(std::move(window)) { reset_data(runtime.data()); }
+        aho::Window get_window() override {
+            ++calls;
+            return selected;
+        }
+    };
     struct NestedDrawEngine : aho::StandardEngine {
         NestedDrawEngine() : aho::StandardEngine("AHO nested phase test") {}
         ~NestedDrawEngine() override {
@@ -32,6 +44,32 @@ namespace {
         phase << aho::pack(phase_payload::Value{&calls, &received});
         EXPECT_EQ(calls, 1);
         EXPECT_EQ(received, &phase);
+    }
+    TEST_F(DrawPhaseVulkanIntegration, ConstructorUsesOneWindowSnapshotAndItsPlacedAcquisitionFence) {
+        ASSERT_NO_THROW(start_engine());
+        SnapshotEngine selected(*engine, *engine->boot_window);
+        auto manager = engine->data()->command_manager;
+        const auto domain = vsl::lifetime::CommandAccess::Owner(manager.get_buffer());
+        aho::DrawPhase phase(selected);
+        EXPECT_EQ(selected.calls, 1u);
+        EXPECT_FALSE(domain->acquire_fences);
+        const auto source = selected.selected.data2->acquire_fences.data_;
+        const auto proof = std::get<std::weak_ptr<vsl::sync::FenceProof>>(source->uses.at(phase.frame_slot).use).lock();
+        ASSERT_TRUE(proof);
+        EXPECT_EQ(proof->fence, source->fences.at(phase.frame_slot));
+        phase.cancel();
+        ASSERT_TRUE(phase.completion().wait());
+    }
+    TEST_F(DrawPhaseVulkanIntegration, CustomWindowDataWithoutAnAcquisitionSourceKeepsTheLazyFallback) {
+        ASSERT_NO_THROW(start_engine());
+        engine->boot_window->data2->acquire_fences = {};
+        const auto domain = vsl::lifetime::CommandAccess::Owner(engine->data()->command_manager.get_buffer());
+        EXPECT_FALSE(domain->acquire_fences);
+        aho::DrawPhase phase(*engine);
+        ASSERT_TRUE(domain->acquire_fences);
+        EXPECT_EQ(domain->acquire_fences->fences.size(), engine->data()->command_manager.get_buffer().get_size());
+        phase.cancel();
+        ASSERT_TRUE(phase.completion().wait());
     }
     TEST_F(DrawPhaseVulkanIntegration, NestedPhasesRestoreOuterTupleDispatchAfterNormalDestruction) {
         ASSERT_NO_THROW(start_engine());
@@ -447,6 +485,12 @@ namespace {
 namespace {
     TEST(DrawPhaseTest, CurrentPhasePointerIsInitiallyEmpty) {
         EXPECT_EQ(AHO_NAMESPACE::THREAD_LOCAL_DRAW_PHASE, nullptr);
+    }
+    TEST(DrawPhaseTest, NullOrUnbootedEngineIsRejectedBeforeAccessingAWindow) {
+        EXPECT_THROW((aho::DrawPhase(static_cast<aho::engine::GraphicalEngine*>(nullptr))), std::invalid_argument);
+        aho::StandardEngine engine("unbooted", false);
+        EXPECT_THROW((aho::DrawPhase(engine)), std::invalid_argument);
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
     }
 } // namespace
 #endif

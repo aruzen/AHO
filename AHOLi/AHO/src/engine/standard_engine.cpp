@@ -72,7 +72,8 @@ namespace {
                     .command_manager = CommandManager(device),
                     .graphic_resource_manager = std::make_shared<graphic_resource::OverAllocateManager>(
                         device, config.descriptor_budget, 0),
-                    .synchro_manager = SynchroManager(device)}),
+                    .synchro_manager = SynchroManager(device),
+                    .present_fences = config.present_fences}),
                 std::move(surface)};
     }
 } // namespace
@@ -101,7 +102,7 @@ namespace AHO_NAMESPACE::engine {
             if (native.data_ != native_data || !native_data->window_handle || native_data->window_handle != os.native_handle())
                 throw std::runtime_error("Window closed during engine creation");
             EngineAccessor handle(resources.engine);
-            auto drawing = window::detail::make_window_data(handle, std::move(resources.surface), title);
+            auto drawing = window::detail::make_window_data(handle, std::move(resources.surface));
             if (native.data_ != native_data || !native_data->window_handle || native_data->window_handle != os.native_handle())
                 throw std::runtime_error("Window closed during drawing resource creation");
             Window window(handle, native.data_, std::move(drawing));

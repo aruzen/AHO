@@ -13,6 +13,7 @@
 #include "core/vector.hpp"
 #include "engine.hpp"
 #include "render_context.hpp"
+#include <optional>
 
 namespace AHO_NAMESPACE::drawer::detail {
     struct StandardDrawState;
@@ -29,13 +30,15 @@ namespace AHO_NAMESPACE::window {
         VSL_NAMESPACE::SemaphoreHolder image_available, render_finished;
         VSL_NAMESPACE::FenceHolder in_flight;
         std::shared_ptr<drawer::detail::StandardDrawState> standard_draw;
+        VSL_NAMESPACE::FenceHolder acquire_fences;
 
         ~WindowData();
     };
 
     struct Window : public VSL_NAMESPACE::Window {
         Window(std::string name, int width = 800, int height = 600,
-               engine::EngineAccessor engine_ = DefaultEngine());
+               engine::EngineAccessor engine_ = DefaultEngine(),
+               std::optional<VSL_NAMESPACE::PresentFencePolicy> present_fences = std::nullopt);
 
         Window(engine::EngineAccessor engine,
                std::shared_ptr<VSL_NAMESPACE::Window::WindowData> vsl_data,

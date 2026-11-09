@@ -427,15 +427,73 @@ namespace {
         auto available = engine->data()->synchro_manager.get_semaphore(name + "ImageAvailable");
         auto finished = engine->data()->synchro_manager.get_semaphore(name + "RenderFinished");
         auto in_flight = engine->data()->synchro_manager.get_fence(name + "InFlight");
-        EXPECT_TRUE(available.has_value());
+        EXPECT_FALSE(available.has_value());
         EXPECT_FALSE(finished.has_value());
-        EXPECT_TRUE(in_flight.has_value());
-        if (available)
-            EXPECT_EQ(available->data_, second.data2->image_available.data_);
+        EXPECT_FALSE(in_flight.has_value());
+        EXPECT_EQ(second.data2->image_available.size(), engine->data()->command_manager.get_buffer().get_size());
+        EXPECT_EQ(second.data2->in_flight.size(), second.data2->image_available.size());
+        EXPECT_EQ(second.data2->acquire_fences.size(), second.data2->image_available.size());
         EXPECT_EQ(second.data2->render_finished.data_, second.data2->swapchain.finished_semaphores().data_);
-        if (in_flight)
-            EXPECT_EQ(in_flight->data_, second.data2->in_flight.data_);
         EXPECT_TRUE(second.close());
+    }
+    TEST_F(AHOWindowVulkanIntegration, WindowFrameSynchronizationSharesOneRootAndIsReleasedBeforeTheEngine) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        const auto& resources = *window.data2;
+        EXPECT_FALSE(resources.image_available.data_.owner_before(resources.in_flight.data_));
+        EXPECT_FALSE(resources.in_flight.data_.owner_before(resources.image_available.data_));
+        EXPECT_FALSE(resources.image_available.data_.owner_before(resources.acquire_fences.data_));
+        EXPECT_FALSE(resources.acquire_fences.data_.owner_before(resources.image_available.data_));
+        EXPECT_NE(resources.in_flight.data_, resources.acquire_fences.data_);
+        EXPECT_TRUE(resources.image_available.data_.owner_before(resources.render_finished.data_) ||
+                    resources.render_finished.data_.owner_before(resources.image_available.data_));
+        const std::weak_ptr<void> owner = resources.image_available.data_;
+        EXPECT_TRUE(window.close());
+        EXPECT_TRUE(engine->data());
+        EXPECT_TRUE(owner.expired());
+    }
+    TEST_F(AHOWindowVulkanIntegration, RecreationKeepsFrameSynchronizationAndReplacesTheGenerationSynchronization) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        const auto available = window.data2->image_available;
+        const auto in_flight = window.data2->in_flight;
+        const auto acquired = window.data2->acquire_fences;
+        const auto finished = window.data2->render_finished;
+        ASSERT_TRUE(window.recreate_swapchain());
+        EXPECT_EQ(window.data2->image_available.data_, available.data_);
+        EXPECT_EQ(window.data2->in_flight.data_, in_flight.data_);
+        EXPECT_EQ(window.data2->acquire_fences.data_, acquired.data_);
+        EXPECT_NE(window.data2->render_finished.data_, finished.data_);
+        EXPECT_EQ(window.data2->render_finished.size(), window.data2->swapchain.get_swap_image_size());
+    }
+    TEST_F(AHOWindowVulkanIntegration, EquallyNamedWindowsHaveIndependentFrameSynchronization) {
+        ASSERT_NO_THROW(start_engine());
+        aho::Window first("shared title", 64, 48, *engine);
+        aho::Window second("shared title", 64, 48, *engine);
+        const auto& a = first.data2->image_available.data_;
+        const auto& b = second.data2->image_available.data_;
+        EXPECT_TRUE(a.owner_before(b) || b.owner_before(a));
+        const std::weak_ptr<void> owner = a;
+        EXPECT_TRUE(first.close());
+        EXPECT_TRUE(owner.expired());
+        EXPECT_TRUE(second.data2->in_flight.wait(std::uint64_t{0}));
+        EXPECT_TRUE(second.close());
+    }
+    TEST_F(AHOWindowVulkanIntegration, WindowSynchronizationDoesNotRequireAnEngineNamedRegistry) {
+        ASSERT_NO_THROW(start_engine());
+        aho::engine::EngineAccessor runtime(std::make_shared<aho::engine::EngineData>(*engine->data()));
+        runtime.data()->synchro_manager.data_.reset();
+        aho::Window independent("without a name registry", 64, 48, runtime);
+        EXPECT_EQ(independent.data2->image_available.size(), runtime.data()->command_manager.get_buffer().get_size());
+        EXPECT_TRUE(independent.data2->acquire_fences.owner_ref().managed());
+        EXPECT_TRUE(independent.close());
+    }
+    TEST_F(AHOWindowVulkanIntegration, AnExplicitStrictWindowRequiresTheFeatureToHaveBeenEnabled) {
+        ASSERT_NO_THROW(start_engine());
+        EXPECT_EQ(engine->data()->present_fences, vsl::PresentFencePolicy::LEGACY);
+        const auto windows = vsl::PureWindow::WINDOWS.size();
+        EXPECT_THROW((aho::Window("requires feature", 64, 48, *engine, vsl::PresentFencePolicy::REQUIRE_FENCE)), std::invalid_argument);
+        EXPECT_EQ(vsl::PureWindow::WINDOWS.size(), windows);
     }
 } // namespace
 #else

@@ -168,8 +168,8 @@ if (VSL_TEST_SOURCES)
     set(typed_view_names Valid WrongVertexRecord WrongDescriptorKind WrongDescriptorPayload RawVertexBuffer NegativeSubpass TemporaryBackend ConstTemporaryBackend InvalidStoragePolicy
         RawBufferUse RawImageUse RawSamplerUse RawDescriptorUse RawDescriptorComparison
         RawBufferRefField RawBufferRefConstruction RawBufferViewConstruction LegacyBufferOwner TemporaryViewRef
-        TemporaryPlacedBackend TemporaryPlacedResourceBackend RawVertexBinding RawBindingSource TemporaryStorageRef)
-    foreach(case RANGE 0 23)
+        TemporaryPlacedBackend TemporaryPlacedResourceBackend RawVertexBinding RawBindingSource TemporaryStorageRef TemporaryNativeRecording RawNativeRecording)
+    foreach(case RANGE 0 25)
         list(GET typed_view_names ${case} name)
         add_test(NAME "VSL.TypedView.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
             "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"

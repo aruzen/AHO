@@ -160,6 +160,30 @@ vsl::command::ImageUpload upload(storage, image, current_layout, region, offset,
 
 GPUBufferBase.native()は具体的なStorage&を返す別の契約として維持する。TYPE／PROPERTYによる静的usage検査とCustom mappingは変更しない。CPU Impl配置とVulkan device memoryは引き続き別の確保であり、内部コンテナやowner境界の個別確保も残る。通常BufferAccessorのdata_を含む残りの公開入口は後続へ移行する。性能改善率は未測定である。
 
+## 順序12e: custom commandのNative記録
+
+opt-inのlifetime/native_recording.hppにNativeRecordingContextを追加する。記録中のCommandBufferを明示して構築し、保存したResult／slot／世代／Native CBと現在の記録先の一致を検査する。公開Implやprivateヘッダーを使わずにcustom commandのNative記録へ進める。
+
+```cpp
+const vsl::NativeRecordingContext recording(buffer); // Phaseの記録中だけ構築
+recording.use(storage.resource_use());                // 物理使用と明示ownerを登録
+recording.retain(external_owner);                     // 必要な外部所有境界
+const VkMemoryBarrier visible{
+    VK_STRUCTURE_TYPE_MEMORY_BARRIER, nullptr,
+    VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_HOST_READ_BIT};
+vkCmdPipelineBarrier(recording.native_command_buffer(),
+                     VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+                     0, 1, &visible, 0, nullptr, 0, nullptr);
+```
+
+use／retainの既定保持はCOMPLETIONで、SUBMISSIONも明示できる。ResourceUseの既存契約に従い、状態の追跡と明示ownerの保持を分ける。使用状態だけを渡せばその状態を一律に送信へ所有する、という契約へは変更しない。保存したcompletion()は取消・完了後の結果も観測できるが、古いcontextで再記録はできない。同じslotを再利用しても別Resultを拒否する。
+
+use／retainはcallback後に同じ記録先を再検査し、元のcontextが破棄されても局所保存した入力で処理する。copy／move構築はでき、代入はできない。保持するownerにはcontext／Phase／Managerを含めず、Domainへ戻る所有循環を作らない。既存のCommandBuffer／Domainを保持する値型であり、新しいowner wrapper／Work所有辺／arena slotや個別確保を追加しない。
+
+native_command_buffer()はlvalue contextから取得する借用値である。取得からvkCmd呼出しの終了まではpoll／Phase／ring操作へ再入せず、host側で直列化する。この段階ではNative呼出し全体の記録scopeは提供しない。GPUの可視性・layout・queue依存、渡すNative資源の同Device・usage・render pass scopeの妥当性はcustom command側で保証する。資源の使用登録だけでbarrierを代替しない。
+
+capture／保持／再検査はlifetime、解決済みImplとslotからNative CBを借りる処理はoperation、recordableと使用状態は既存sync、CPU配置は既存storageを使う。C SDK型は専用headerだけから公開し、command.hpp／pv.hpp／define.hppへ新たなSDK依存を追加しない。private operationヘッダーはインストールしない。
+
 2026-11-06。Bufferの4責務分離が統合されたmaster `6b1f0166`を基点とする。[Bufferの契約](buffer-generation-contracts.md)と[責務の配置](buffer-layer-layout.md)を維持する。
 
 ## 方針と段階

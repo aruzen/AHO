@@ -1,6 +1,7 @@
 #include <VSL/utils/typed_pipeline.hpp>
 #include <VSL/lifetime/typed_buffer_arena.hpp>
 #include <VSL/lifetime/typed_resource_buffer_view.hpp>
+#include <VSL/lifetime/native_recording.hpp>
 #ifndef VSL_TYPED_CASE
 #define VSL_TYPED_CASE 0
 #endif
@@ -20,6 +21,8 @@ namespace {
     using Placed = t::PlacedBufferView<std::uint32_t, vsl::MemoryType::TRANSFER_SOURCE>;
     using PlacedUniform = t::PlacedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>;
 #if VSL_TYPED_CASE == 0
+    static_assert(std::is_copy_constructible_v<vsl::NativeRecordingContext> && std::is_move_constructible_v<vsl::NativeRecordingContext>);
+    static_assert(!std::is_copy_assignable_v<vsl::NativeRecordingContext> && !std::is_move_assignable_v<vsl::NativeRecordingContext>);
     static_assert(!rvalue_backend<Placed> && !rvalue_backend<const Placed>);
     static_assert(!rvalue_backend<PlacedUniform> && !rvalue_backend<const PlacedUniform>);
     static_assert(!std::is_aggregate_v<vsl::BufferRef>);
@@ -133,6 +136,14 @@ namespace {
 #elif VSL_TYPED_CASE == 23
     void rejected(const t::TypedVertexBuffer<Vertex>& buffer) {
         buffer.storage_view().ref();
+    }
+#elif VSL_TYPED_CASE == 24
+    void rejected(vsl::CommandBuffer buffer) {
+        vsl::NativeRecordingContext(buffer).native_command_buffer();
+    }
+#elif VSL_TYPED_CASE == 25
+    void rejected(VkCommandBuffer commands) {
+        vsl::NativeRecordingContext recording(commands);
     }
 #endif
 } // namespace

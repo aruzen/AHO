@@ -43,8 +43,9 @@ namespace VSL_NAMESPACE::command {
         ResourceUse _use;
         std::size_t _source_offset = 0, _source_bytes = 0;
         ResourceRetention _retention = ResourceRetention::SUBMISSION;
-        ImageCopyInfo prepare(CommandBuffer buffer, const CommandManager& manager) const;
-        void record(const ImageCopyInfo& info, const CommandBuffer& buffer) const;
+        ImageCopyInfo prepare(const CommandBuffer& buffer, const CommandManager& manager) const;
+        void track(const NativeRecordingContext& recording) const;
+        void record(const ImageCopyInfo& info, const NativeRecordingContext& recording) const;
     };
 
     struct CopyBufferToArrayImage : public Command {
@@ -62,7 +63,7 @@ namespace VSL_NAMESPACE::command {
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
 
     private:
-        std::shared_ptr<impl::BufferImpl> _source;
+        lifetime::OwnedRef<impl::BufferImpl> _source;
     };
 
     template<VSL_NAMESPACE::ImageType img_type, VSL_NAMESPACE::MemoryProperty img_mem_prop, VSL_NAMESPACE::ImageLayout layout_,

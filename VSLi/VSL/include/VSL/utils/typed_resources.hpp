@@ -186,8 +186,6 @@ namespace VSL_NAMESPACE::typed {
 
     template<typename Payload_, graphic_resource::Type kind>
     TypedResourceBufferView<Payload_, kind> TypedResourceBufferView<Payload_, kind>::FromBuffer(const BufferAccessor& source, size_t count, size_t byte_offset, ResourceUse use) {
-        if (!source.data_)
-            throw std::invalid_argument("Typed buffer view requires a buffer");
         return FromView(BufferView::FromBuffer(source), count, byte_offset, std::move(use));
     }
     template<typename Payload_, graphic_resource::Type kind>

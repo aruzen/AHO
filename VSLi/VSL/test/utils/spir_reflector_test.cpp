@@ -1,3 +1,4 @@
+#include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <VSL/utils/spir_reflector.hpp>
@@ -8,6 +9,10 @@
 #include <limits>
 #include "support/compute_fixture.hpp"
 #include "support/image_transfer_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -768,9 +773,9 @@ namespace {
         vk::BufferViewCreateInfo view_info{};
         view_info.format = vk::Format::eR32Uint;
         view_info.range = sizeof(std::uint32_t);
-        view_info.buffer = source.data_->buffer;
+        view_info.buffer = BufferAccess::Owned(source)->buffer;
         auto source_view = device.data_->device.createBufferViewUnique(view_info);
-        view_info.buffer = destination.data_->buffer;
+        view_info.buffer = BufferAccess::Owned(destination)->buffer;
         auto destination_view = device.data_->device.createBufferViewUnique(view_info);
         // BufferView用の公開updateはないため、テスト内で反射したlayoutへnative viewを設定する。
         std::array<vk::WriteDescriptorSet, 2> writes{};

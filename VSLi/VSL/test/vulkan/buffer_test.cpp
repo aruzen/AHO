@@ -1,11 +1,19 @@
+#include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <array>
 #include <limits>
 #include "support/compile_probe.hpp"
 #include "support/render_fixture.hpp"
+#include "support/deferred_action.hpp"
 #include <VSL/vulkan/buffer.hpp>
 #include <VSL/vulkan/commands/image_readback.hpp>
+#include <VSL/lifetime/buffer_arena.hpp>
+#include <new>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -839,8 +847,8 @@ namespace {
         }
         // コヒーレントメモリしかない環境でも、キャッシュ無効化範囲のアラインメントを確かめる。
         // 実際の非コヒーレントメモリの動作を再現する検証ではない。
-        destination.data_->properties = vsl::MemoryProperty::HOST_VISIBLE;
-        destination.data_->atom_size = physical.data_->device.getProperties().limits.nonCoherentAtomSize;
+        BufferAccess::Owned(destination)->properties = vsl::MemoryProperty::HOST_VISIBLE;
+        BufferAccess::Owned(destination)->atom_size = physical.data_->device.getProperties().limits.nonCoherentAtomSize;
         auto partial = mapping.read(3, 1);
         EXPECT_EQ(partial[0], std::byte{0});
         EXPECT_EQ(partial[2], std::byte{255});
@@ -854,7 +862,7 @@ namespace {
             {
                 ReadbackBuffer destination(device, WIDTH * HEIGHT * 4);
                 auto mapping = destination.data();
-                weak = destination.data_;
+                weak = BufferAccess::Owned(destination).share();
                 phase << VSL_NAMESPACE::command::RenderPassBegin(*framebuffer) << VSL_NAMESPACE::command::RenderPassEnd{}
                       << VSL_NAMESPACE::command::ImageReadback(&destination, *color, VSL_NAMESPACE::ImageLayout::GENERAL);
             }
@@ -893,7 +901,7 @@ namespace {
         using Buffer = vsl::Buffer<vsl::MemoryType::TRANSFER_SOURCE, vsl::MemoryProperty::HOST_VISIBLE>;
         Buffer buffer(device, std::size_t{33});
         EXPECT_EQ(buffer.requested_size(), 33u);
-        EXPECT_FALSE(buffer.data_->mapped);
+        EXPECT_FALSE(BufferAccess::Owned(buffer)->mapped);
         auto first = buffer.data();
         auto alias = buffer;
         auto partial = alias.data(7, 1);
@@ -922,7 +930,7 @@ namespace {
         Buffer buffer(device, std::size_t{33});
         auto mapped = buffer.data();
         // 実際の非コヒーレントheapの可視性ではなく、範囲の整列を検証する。
-        buffer.data_->properties = vsl::MemoryProperty::HOST_VISIBLE;
+        BufferAccess::Owned(buffer)->properties = vsl::MemoryProperty::HOST_VISIBLE;
         auto partial = buffer.data(31, 1);
         const std::array payload{std::byte{71}, std::byte{73}};
         partial.write(payload, 29);
@@ -939,9 +947,9 @@ namespace {
         using Buffer = vsl::Buffer<vsl::MemoryType::TRANSFER_SOURCE, vsl::MemoryProperty::HOST_VISIBLE>;
         Buffer buffer(device, std::size_t{4});
         auto mapping = buffer.data();
-        const auto original = buffer.data_;
+        const auto original = BufferAccess::Owned(buffer);
         buffer = Buffer(device, std::size_t{8});
-        EXPECT_NE(buffer.data_, original);
+        EXPECT_NE(BufferAccess::Owned(buffer), original);
         const std::array payload{std::byte{101}};
         mapping.write(payload);
         EXPECT_EQ(mapping.read(1)[0], payload[0]);
@@ -976,9 +984,286 @@ namespace {
         EXPECT_THROW(mapping.write(payload, 30), std::out_of_range);
         EXPECT_THROW(mapping.write({}, SIZE_MAX), std::out_of_range);
         EXPECT_NO_THROW(mapping.write({}, 32));
-        source.data_->properties = vsl::MemoryProperty::HOST_VISIBLE;
-        source.data_->atom_size = physical.data_->device.getProperties().limits.nonCoherentAtomSize;
+        BufferAccess::Owned(source)->properties = vsl::MemoryProperty::HOST_VISIBLE;
+        BufferAccess::Owned(source)->atom_size = physical.data_->device.getProperties().limits.nonCoherentAtomSize;
         mapping.write(std::span(payload).first(1), 31);
         EXPECT_EQ(mapping.read(1, 31)[0], payload[0]);
+    }
+
+    TEST_F(BufferVulkanIntegrationTest, MappingUsesTheStorageSelectedBeforeCompletionCallbacksReassignItsBuffer) {
+        if (!host_coherent_available())
+            GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
+        const std::array<std::uint32_t, 4> original{17, 29, 43, 71};
+        const std::array<std::uint32_t, 2> replacement{101, 131};
+        HostBuffer target(device, original);
+        const auto original_view = vsl::BufferView::FromBuffer(target);
+        auto manager = make_manager().independent(1);
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        bool reassigned = false;
+        vsl_test::DeferredAction action([&] {
+            target = HostBuffer(device, replacement);
+            reassigned = true;
+        });
+        original_view.resource_use().record(manager.get_buffer(), vsl::ResourceRetention::COMPLETION);
+        manager.get_buffer().retain_until_complete(action.owner());
+        ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        device.data_->device.waitIdle();
+        const auto mapping = target.data(sizeof(std::uint32_t), sizeof(std::uint32_t));
+        ASSERT_TRUE(reassigned);
+        EXPECT_NE(target.identity(), original_view.identity());
+        EXPECT_EQ(mapping.size, sizeof(std::uint32_t));
+        EXPECT_EQ(mapping.offset, sizeof(std::uint32_t));
+        std::uint32_t actual = 0;
+        std::memcpy(&actual, mapping.data, sizeof(actual));
+        EXPECT_EQ(actual, original[1]);
+        std::array<std::uint32_t, 2> current{};
+        target.read_into(std::as_writable_bytes(std::span(current)));
+        EXPECT_EQ(current, replacement);
+    }
+
+    TEST_F(BufferVulkanIntegrationTest, BorrowedOperationsKeepTheirInitialStorageWhenCallbacksReassignTheReference) {
+        if (!host_coherent_available())
+            GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
+        const std::array<std::byte, 8> original{std::byte{17}, std::byte{29}, std::byte{43}, std::byte{71},
+                                                std::byte{83}, std::byte{97}, std::byte{109}, std::byte{127}};
+        const std::array<std::byte, 8> replacement{std::byte{131}, std::byte{137}, std::byte{139}, std::byte{149},
+                                                   std::byte{151}, std::byte{157}, std::byte{163}, std::byte{167}};
+        const std::array<std::byte, 4> payload{std::byte{2}, std::byte{3}, std::byte{5}, std::byte{7}};
+        for (const int operation : {0, 1, 2}) {
+            HostBuffer first(device, original), second(device, replacement);
+            const auto first_view = vsl::BufferView::FromBuffer(first);
+            const auto second_view = vsl::BufferView::FromBuffer(second);
+            auto reference = first_view.ref();
+            auto manager = make_manager().independent(1);
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            bool reassigned = false;
+            vsl_test::DeferredAction action([&] {
+                reference = second_view.ref();
+                reassigned = true;
+            });
+            first_view.resource_use().record(manager.get_buffer(), vsl::ResourceRetention::COMPLETION);
+            manager.get_buffer().retain_until_complete(action.owner());
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            device.data_->device.waitIdle();
+            auto expected = original;
+            if (operation == 0) {
+                reference.fill(std::byte{11});
+                expected.fill(std::byte{11});
+            } else if (operation == 1) {
+                reference.write(payload, 4);
+                std::copy(payload.begin(), payload.end(), expected.begin() + 4);
+            } else {
+                std::array<std::byte, 4> actual{};
+                reference.read_into(actual, 4);
+                EXPECT_EQ(actual, (std::array<std::byte, 4>{original[4], original[5], original[6], original[7]}));
+            }
+            ASSERT_TRUE(reassigned);
+            EXPECT_EQ(reference.identity(), second_view.identity());
+            std::array<std::byte, 8> first_result{}, second_result{};
+            first.read_into(first_result);
+            second.read_into(second_result);
+            EXPECT_EQ(first_result, expected);
+            EXPECT_EQ(second_result, replacement);
+        }
+    }
+
+    TEST_F(BufferVulkanIntegrationTest, MappingAndReadIntoRetainStorageWhenCompletionCallbacksDestroyTheAccessor) {
+        if (!host_coherent_available())
+            GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
+        const std::array<std::uint32_t, 4> original{17, 29, 43, 71};
+        for (const bool mapped : {false, true}) {
+            auto target = std::make_unique<HostBuffer>(device, original);
+            const std::weak_ptr<void> storage = vsl::BufferView::FromBuffer(*target).owner();
+            auto manager = make_manager().independent(1);
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            bool released = false;
+            vsl_test::DeferredAction action([&] {
+                target.reset();
+                released = true;
+            });
+            target->resource_use().record(manager.get_buffer(), vsl::ResourceRetention::COMPLETION);
+            manager.get_buffer().retain_until_complete(action.owner());
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            device.data_->device.waitIdle();
+            std::uint32_t actual = 0;
+            if (mapped) {
+                const auto mapping = target->data(sizeof(actual), sizeof(actual));
+                EXPECT_FALSE(storage.expired());
+                std::memcpy(&actual, mapping.data, sizeof(actual));
+            } else {
+                target->read_into(std::as_writable_bytes(std::span(&actual, 1)), sizeof(actual));
+            }
+            EXPECT_TRUE(released);
+            EXPECT_FALSE(target);
+            EXPECT_EQ(actual, original[1]);
+            EXPECT_TRUE(storage.expired());
+        }
+    }
+
+    TEST_F(BufferVulkanIntegrationTest, ViewOperationsRetainStorageWhenCompletionCallbacksDestroyTheView) {
+        const std::array<std::byte, 4> original{std::byte{17}, std::byte{29}, std::byte{43}, std::byte{71}};
+        const std::array<std::byte, 4> replacement{std::byte{2}, std::byte{3}, std::byte{5}, std::byte{7}};
+        for (const bool write : {false, true}) {
+            auto target = std::make_unique<vsl::BufferView>([&] {
+                const std::array<vsl::BufferCreateInfo, 1> inputs{{{4, vsl::MemoryType::TRANSFER_SOURCE}}};
+                vsl::lifetime::BufferArena arena(device, inputs);
+                auto view = arena.view(0);
+                view.write(original);
+                return view;
+            }());
+            const std::weak_ptr<void> storage = target->owner();
+            const auto reference = target->ref();
+            auto observer = write ? target->owner() : std::shared_ptr<void>{};
+            auto manager = make_manager().independent(1);
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            bool released = false;
+            vsl_test::DeferredAction action([&] {
+                target.reset();
+                released = true;
+            });
+            target->resource_use().record(manager.get_buffer(), vsl::ResourceRetention::COMPLETION);
+            manager.get_buffer().retain_until_complete(action.owner());
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            device.data_->device.waitIdle();
+            std::array<std::byte, 4> actual{};
+            if (write) {
+                target->write(replacement);
+                reference.read_into(actual);
+                EXPECT_EQ(actual, replacement);
+            } else {
+                target->read_into(actual);
+                EXPECT_EQ(actual, original);
+            }
+            EXPECT_TRUE(released);
+            EXPECT_FALSE(target);
+            observer.reset();
+            EXPECT_TRUE(storage.expired());
+        }
+    }
+
+    TEST_F(BufferVulkanIntegrationTest, HolderOperationsKeepTheirOwnerRangeAndDataWhenCallbacksReplaceTheMapping) {
+        if (!host_coherent_available())
+            GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
+        const std::array<std::byte, 8> original{std::byte{17}, std::byte{29}, std::byte{43}, std::byte{71},
+                                                std::byte{83}, std::byte{97}, std::byte{109}, std::byte{127}};
+        const std::array<std::byte, 4> payload{std::byte{2}, std::byte{3}, std::byte{5}, std::byte{7}};
+        const std::array<std::byte, 1> replacement{std::byte{131}};
+        std::uint32_t value;
+        std::memcpy(&value, payload.data(), sizeof(value));
+        for (const int operation : {0, 1, 2, 3, 4, 5, 6, 7}) {
+            HostBuffer first(device, original), second(device, replacement);
+            std::optional<vsl::BufferAccessor::LocalBufferHolder> holder(first.data(4, 4));
+            auto next = second.data(1);
+            auto manager = make_manager().independent(1);
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            bool replaced = false;
+            vsl_test::DeferredAction action([&] {
+                holder.emplace(std::move(next));
+                replaced = true;
+            });
+            first.resource_use().record(manager.get_buffer(), vsl::ResourceRetention::COMPLETION);
+            manager.get_buffer().retain_until_complete(action.owner());
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            device.data_->device.waitIdle();
+            auto expected = original;
+            if (operation == 0)
+                holder->write(payload);
+            else if (operation == 1) {
+                const auto result = holder->read(4);
+                EXPECT_TRUE(std::equal(result.begin(), result.end(), original.begin() + 4));
+            } else if (operation == 2)
+                holder->flush(4);
+            else if (operation == 3)
+                holder->invalidate(4);
+            else if (operation == 4)
+                EXPECT_TRUE(holder->copy(value));
+            else if (operation == 5)
+                EXPECT_TRUE(holder->copy(&value, std::size_t{1}));
+            else if (operation == 6)
+                holder->uncheck_copy(value);
+            else
+                holder->flush();
+            if (operation == 0 || operation == 4 || operation == 5 || operation == 6)
+                std::copy(payload.begin(), payload.end(), expected.begin() + 4);
+            EXPECT_TRUE(replaced);
+            EXPECT_EQ(holder->size, 1u);
+            std::array<std::byte, 8> first_result{};
+            std::array<std::byte, 1> second_result{};
+            first.read_into(first_result);
+            second.read_into(second_result);
+            EXPECT_EQ(first_result, expected);
+            EXPECT_EQ(second_result, replacement);
+        }
+    }
+
+    TEST_F(BufferVulkanIntegrationTest, RuntimeFactoriesReturnManagedAliasesAndMovedViewsRejectAccess) {
+        if (!host_coherent_available())
+            GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
+        const vsl::BufferCreateInfo buffer_info{4, vsl::MemoryType::TRANSFER_SOURCE,
+                                                vsl::MemoryProperty::HOST_VISIBLE | vsl::MemoryProperty::HOST_COHERENT};
+        auto buffer = vsl::BufferView::Create(device, buffer_info);
+        EXPECT_TRUE(buffer.owner_ref().managed());
+        EXPECT_EQ(buffer.ref().device(), device);
+        EXPECT_EQ(buffer.ref().usage(), buffer_info.usage);
+        EXPECT_TRUE(vsl::contain(buffer.ref().properties(), buffer_info.properties));
+        EXPECT_EQ(buffer.resource_use().state.get(), &buffer.ref().use());
+        const std::array<std::byte, 4> expected{std::byte{2}, std::byte{3}, std::byte{5}, std::byte{7}};
+        buffer.write(expected);
+        auto alias = buffer;
+        auto moved = std::move(buffer);
+        std::array<std::byte, 4> actual{};
+        alias.read_into(actual);
+        EXPECT_EQ(actual, expected);
+        EXPECT_EQ(alias.identity(), moved.identity());
+        EXPECT_THROW(buffer.ref(), std::logic_error);
+        EXPECT_THROW(buffer.resource_use(), std::logic_error);
+        EXPECT_THROW(buffer.write(expected), std::logic_error);
+        EXPECT_THROW(buffer.read_into(actual), std::logic_error);
+        const vsl::ImageCreateInfo image_info{vsl::ImageType::TRANSFER_SRC | vsl::ImageType::TRANSFER_DST, 2, 2};
+        const auto image = vsl::ImageAccessor::Create(device, image_info);
+        const auto image_alias = image;
+        EXPECT_TRUE(image);
+        EXPECT_TRUE(image.resource_use().owner.managed());
+        EXPECT_EQ(image.get_device(), device);
+        EXPECT_EQ(image.get_usage(), image_info.usage);
+        EXPECT_EQ(image.get_format(), image_info.format);
+        EXPECT_EQ(&image.use_state(), &image_alias.use_state());
+        EXPECT_FALSE(vsl::ImageAccessor{});
+        EXPECT_FALSE(vsl::SamplerAccessor{});
+    }
+
+    TEST_F(BufferVulkanIntegrationTest, ViewAssignmentPublishesEveryFieldBeforeReleasingTheOldArena) {
+        auto next = vsl::BufferView::Create(device, {32, vsl::MemoryType::TRANSFER_SOURCE});
+        const auto selected = next.view(8, 4);
+        std::unique_ptr<vsl::BufferView> target;
+        bool released = false;
+        std::size_t observed_size = 0, observed_offset = 0;
+        vsl::BufferIdentity observed_identity;
+        auto initial = [&] {
+            const auto bytes = vsl::storage::BufferLayout::Bytes(1);
+            const auto alignment = vsl::storage::BufferLayout::ALIGNMENT;
+            auto* data = static_cast<std::byte*>(::operator new(bytes, std::align_val_t(alignment)));
+            const std::shared_ptr<void> owner(data, [&, alignment](void* data) noexcept {
+                if (target) {
+                    released = true;
+                    observed_size = target->size();
+                    observed_offset = target->byte_offset();
+                    observed_identity = target->identity();
+                }
+                ::operator delete(data, std::align_val_t(alignment));
+            });
+            vsl::storage::ArenaMemory memory(std::span(data, bytes), alignment, owner);
+            const std::array<vsl::BufferCreateInfo, 1> inputs{{{16, vsl::MemoryType::TRANSFER_SOURCE}}};
+            vsl::lifetime::BufferArena arena(device, inputs, memory);
+            return arena.view(0);
+        }();
+        target = std::make_unique<vsl::BufferView>(std::move(initial));
+        // 元のviewを残さず、代入による最後のowner回収を観測する。
+        EXPECT_FALSE(released);
+        *target = selected;
+        EXPECT_TRUE(released);
+        EXPECT_EQ(observed_size, selected.size());
+        EXPECT_EQ(observed_offset, selected.byte_offset());
+        EXPECT_EQ(observed_identity, selected.identity());
     }
 } // namespace

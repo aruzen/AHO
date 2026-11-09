@@ -1,3 +1,4 @@
+#include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include "support/render_fixture.hpp"
@@ -9,6 +10,10 @@
 #include <VSL/utils/typed_pipeline.hpp>
 #include <functional>
 #include <ranges>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -110,7 +115,7 @@ namespace {
         EXPECT_EQ(first.frame_count(), 2u);
         EXPECT_EQ(second.frame_count(), 1u);
         EXPECT_NE(first.data_->swap_chain_framebuffers[0], first.data_->swap_chain_framebuffers[1]);
-        EXPECT_EQ(first.data_->attachments[1][0], arena.image({5}).data_.get());
+        EXPECT_EQ(first.data_->attachments[1][0], ImageAccess::Owned(arena.image({5})).get());
         EXPECT_EQ(first.get_render_pass().data_, arena.render_pass({3}).data_);
         EXPECT_TRUE(first.owner_ref().managed());
         EXPECT_FALSE(first.data_.owner_before(second.data_));
@@ -139,7 +144,7 @@ namespace {
         {
             vsl::RenderPass source(device, pass->description());
             ColorImage image(device, WIDTH, HEIGHT, color->get_format());
-            image_owner = image.data_;
+            image_owner = ImageAccess::Owned(image).share();
             pass_owner = source.data_;
             const std::array<l::ResourceInit, 1> inputs{l::FrameBufferInit{vsl::RenderPassAccessor{source}, WIDTH, HEIGHT, 1, {{vsl::ImageAccessor{image}}}}};
             l::ResourceArena arena(device, PLAN, inputs);
@@ -216,11 +221,11 @@ namespace {
         auto invalid = valid;
         invalid.attachments[1][0] = vsl::ImageAccessor{wrong};
         std::array<l::ResourceInit, 2> inputs{valid, invalid};
-        const auto pass_count = pass->data_.use_count(), image_count = color->data_.use_count();
+        const auto pass_count = pass->data_.use_count(), image_count = ImageAccess::Owned(*(color)).use_count();
         for (int attempt = 0; attempt < 3; ++attempt) {
             EXPECT_THROW((l::ResourceArena(device, plan, inputs, memory)), std::invalid_argument);
             EXPECT_EQ(pass->data_.use_count(), pass_count);
-            EXPECT_EQ(color->data_.use_count(), image_count);
+            EXPECT_EQ(ImageAccess::Owned(*(color)).use_count(), image_count);
         }
         inputs[1] = valid;
         EXPECT_NO_THROW((l::ResourceArena(device, plan, inputs, memory)));
@@ -234,7 +239,7 @@ namespace {
             NativeFailure failure(fail_at);
             const vsl::operation::FrameBufferNativeFactory factory{&failure, NativeFailure::Create, NativeFailure::Destroy};
             vsl::impl::FrameBufferImpl target;
-            const vsl::operation::FrameBufferInput definition{pass->data_.get(), WIDTH, HEIGHT, 1, {{color->data_.get()}, {color->data_.get()}, {color->data_.get()}, {color->data_.get()}}};
+            const vsl::operation::FrameBufferInput definition{pass->data_.get(), WIDTH, HEIGHT, 1, {{ImageAccess::Owned(*(color)).get()}, {ImageAccess::Owned(*(color)).get()}, {ImageAccess::Owned(*(color)).get()}, {ImageAccess::Owned(*(color)).get()}}};
             EXPECT_THROW(vsl::operation::initialize_frame_buffer(target, *device.data_, definition, factory), std::runtime_error);
             EXPECT_EQ(failure.created.size(), fail_at - 1);
             EXPECT_EQ(failure.destroyed.size(), fail_at - 1);
@@ -251,7 +256,7 @@ namespace {
         const std::array<l::ResourceInit, 1> pass_input{invalid};
         EXPECT_THROW((l::ResourceArena(device, PLAN, pass_input)), std::invalid_argument);
         invalid = input();
-        invalid.attachments[0][0] = vsl::ImageAccessor{std::shared_ptr<vsl::impl::ImageImpl>(std::shared_ptr<void>{}, color->data_.get())};
+        invalid.attachments[0][0] = ImageAccess::FromShared(std::shared_ptr<vsl::impl::ImageImpl>(std::shared_ptr<void>{}, ImageAccess::Owned(*(color)).get()));
         const std::array<l::ResourceInit, 1> image_input{invalid};
         EXPECT_THROW((l::ResourceArena(device, PLAN, image_input)), std::invalid_argument);
         constexpr std::array<t::ResourceRequest, 1> requests{{{{1}, s::ResourceKind::FRAME_BUFFER, true}}};

@@ -169,7 +169,11 @@
     <ClInclude Include="VSL\src\private\VSL\operation\native_recording.hpp" />
     <ClCompile Include="VSL\src\lifetime\native_recording.cpp" />
     <ClCompile Include="VSL\src\operation\native_recording.cpp" />
+    <ClInclude Include="VSL\src\private\VSL\operation\image_barrier.hpp" />
+    <ClCompile Include="VSL\src\operation\image_barrier.cpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\buffer_access.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\image_access.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\sampler_access.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\command_access.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\identity_access.hpp" />
     <ClCompile Include="VSL\src\lifetime\pipeline_recipe.cpp" />

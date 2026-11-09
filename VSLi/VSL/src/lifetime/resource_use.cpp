@@ -10,23 +10,20 @@
 #include <stdexcept>
 
 namespace VSL_NAMESPACE {
-    ResourceUse lifetime::resource_use_for_buffer(const std::shared_ptr<impl::BufferImpl>& buffer, ResourceUse constraint) {
+    ResourceUse lifetime::resource_use_for_buffer(const OwnedRef<impl::BufferImpl>& buffer, ResourceUse constraint) {
         if (!buffer || !buffer->use)
             throw std::invalid_argument("Buffer requires a constructed storage generation");
-        const auto owner = lifetime::detail::owned_ref(buffer, buffer->owner_node);
-        return ResourceUse{owner.alias(buffer->use), owner}.with_constraint(std::move(constraint));
+        return ResourceUse{buffer.alias(buffer->use), buffer}.with_constraint(std::move(constraint));
     }
-    ResourceUse lifetime::resource_use_for_image(const std::shared_ptr<impl::ImageImpl>& image) {
+    ResourceUse lifetime::resource_use_for_image(const OwnedRef<impl::ImageImpl>& image) {
         if (!image || !image->use)
             throw std::invalid_argument("Image requires a constructed storage generation");
-        const auto owner = lifetime::detail::owned_ref(image, image->owner_node);
-        return {owner.alias(image->use), owner};
+        return {image.alias(image->use), image};
     }
-    ResourceUse lifetime::resource_use_for_sampler(const std::shared_ptr<impl::SamplerImpl>& sampler) {
+    ResourceUse lifetime::resource_use_for_sampler(const OwnedRef<impl::SamplerImpl>& sampler) {
         if (!sampler || !sampler->use)
             throw std::invalid_argument("Sampler requires a constructed storage generation");
-        const auto owner = lifetime::detail::owned_ref(sampler, sampler->owner_node);
-        return {owner.alias(sampler->use), owner};
+        return {sampler.alias(sampler->use), sampler};
     }
     ResourceUse ResourceUse::ForBuffer(const BufferAccessor& buffer, ResourceUse constraint) {
         return buffer.resource_use(std::move(constraint));

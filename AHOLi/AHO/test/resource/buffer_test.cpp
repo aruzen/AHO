@@ -223,9 +223,9 @@ namespace {
         ObservedStorage(vsl::LogicalDeviceAccessor device, size_t bytes, std::shared_ptr<std::function<void()>> released)
             : NativeHost(device, bytes), released(std::move(released)) {}
         ObservedStorage(ObservedStorage&& other) noexcept
-            : NativeHost(std::move(other)), released(std::move(other.released)) { other.data_.reset(); }
+            : NativeHost(std::move(other)), released(std::move(other.released)) { VSL_NAMESPACE::lifetime::detail::BufferAccess::Owned(other).reset(); }
         ~ObservedStorage() override {
-            if (data_ && released && *released)
+            if (VSL_NAMESPACE::lifetime::detail::BufferAccess::Owned(*this) && released && *released)
                 (*released)();
         }
     };
@@ -389,7 +389,7 @@ namespace {
         const std::array<l::ResourceInit, 4> initializers{vsl::BufferCreateInfo{4, aho::resource::detail::STANDARD_BUFFER_USAGE}, layout, pool, l::DescriptorSetInit{{3}, {2}}};
         l::ResourceArena arena(device, plan, initializers, l::DependencyPolicy::DYNAMIC);
         auto storage = NativeHost(device, 4);
-        storage.data_ = vsl::lifetime::detail::BufferAccess::Owned(arena.buffer({1})).share();
+        VSL_NAMESPACE::lifetime::detail::BufferAccess::Owned(storage) = vsl::lifetime::detail::BufferAccess::Owned(arena.buffer({1}));
         auto buffer = aho::resource::make_custom_buffer(std::move(storage));
         const auto snapshot = buffer.binding().snapshot();
         EXPECT_TRUE(snapshot.constraints().owner.managed());
@@ -500,7 +500,7 @@ namespace {
             ContextStorage(ContextStorage&&) = default;
             ContextStorage(const ContextStorage&) = delete;
             ~ContextStorage() override {
-                if (data_ && context.expired())
+                if (VSL_NAMESPACE::lifetime::detail::BufferAccess::Owned(*this) && context.expired())
                     *destroyed_without_context = true;
             }
         };

@@ -207,6 +207,53 @@ Managerのidentityと、そのManagerが共有するring／poolのidentityは別
 
 最終成果物をmacOS arm64／Clang20 C++26、MoltenVK、Vulkan validation、ASan／UBSanで検証した。重点VSL209／AHO152、全VSL1,145成功（対応外format3 skip）／AHO GPU192・CPU1,071、compile契約231件が成功した。heap／arenaのPNG3枚は完全一致し、resize後のPipeline生成1回を維持する。strict82ファイル／74TUと補完検査、installed public consumer29種、新負例7種、Debug／Release／x86_64の寸法生成とartifact混在拒否、archive／生成header一致、source389件とMSBuild登録も確認した。Windows／Linux実機、device lost実機、並行CPUアクセスと性能比較は未検証である。
 
+## 順序12f: Buffer／Image／Samplerの所有入口
+
+3つのAccessorの公開`data_`と、Implを返す`MakeBuffer`／`MakeImage`を廃止する。通常Buffer／Imageテンプレートはprotectedの非template構築処理へInfoを渡し、Samplerも同じheap backendへ接続する。`TYPE`／`PROPERTY`／`MODE`、仮想`data()`／`flush()`とCustom Storageの意味は維持する。
+
+runtime設定から単独heap所有で生成する場合は、Implを公開しない次のfactoryを使う。Typedの明示HeapStorageも同じ入口へ委譲し、arena既定や保持policyとは分ける。
+
+```cpp
+auto buffer = vsl::BufferView::Create(device, {
+    16, vsl::MemoryType::TRANSFER_DESTINATION,
+    vsl::MemoryProperty::HOST_VISIBLE | vsl::MemoryProperty::HOST_COHERENT});
+auto image = vsl::ImageAccessor::Create(device, {
+    vsl::ImageType::TRANSFER_SRC | vsl::ImageType::TRANSFER_DST, 2, 2});
+```
+
+内部所有はAccessorごとの`OwnedRef`一つへ揃え、最初のheap境界だけでcanonical化する。descriptor更新、TypedのDescriptorValue、ResourceArenaのimport／getter、Framebuffer依存、Swapchain画像は元のnodeとcontrol blockを伝える。composite ownerの`R→A`を物理arena Aのownerへ取り直さない。同rootの内部依存は既存の正規化で借用とし、別rootには元の所有を残す。
+
+CPU操作はpoll前に必要なowner・Impl参照・data・範囲を保存する。GetDataは同じstorageからmappingとHolderを作り、完了callbackが元Accessorを破棄／差し替えしても別世代へ移らない。BufferRefは借用のまま開始時の実体を固定し、BufferView／read_into／Holderは呼出し中の所有も保持する。viewの代入は全値を交換してから旧ownerを回収する。
+
+仮想`data()`の後に派生実装の`flush()`を呼ぶlegacy copy／uncheck_copyでは、呼出し全体を通じてreceiverと派生状態を生存させる。自己破棄を検出して拒否する保証も追加しない。Holderの`read()`と公開dataポインタは借用であり、利用中のstorage所有とGPU競合回避は呼出側の責任である。内部MappingSnapshotは、その借用のGPUアクセス期間を管理するMappedAccessではない。CPUアクセスと記録／送信はhost側で直列化する。その条件の下で所有と同期を呼出し内で完結させる上位APIには`read_into()`を使う。
+
+画像の読み戻しは、raw Impl入力に代わってBufferViewの範囲と追加の論理制約・保持policyを受ける。次のimageは初期化済みで、現在のlayoutがTRANSFER_DST_OPTIMALの場合である。
+
+```cpp
+const std::array<vsl::BufferCreateInfo, 2> infos{{
+    {16, vsl::MemoryType::TRANSFER_DESTINATION},
+    {32, vsl::MemoryType::TRANSFER_DESTINATION}}};
+vsl::lifetime::BufferArena arena(device, infos);
+auto destination = arena.view(1).view(8, 16);
+auto phase = manager.start_phase<vsl::ComputePhase>();
+phase << vsl::command::ImageReadback(
+    destination, image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
+phase.submit();
+phase.completion().wait();
+std::array<std::byte, 16> pixels{};
+destination.read_into(pixels);
+```
+
+View入力の転送元／転送先はCOMPLETIONを既定とし、SUBMISSIONは明示選択できる。Accessor*入口と画像側の旧保持契約はSUBMISSIONを維持する。資源をどこへ配置するかで保持期間を変えない。保存したview／command自体の所有は、GPU完了だけでは解除しない。
+
+Upload／Readbackは自己snapshot、全入力の検証、使用登録と記録contextの再検査を最初のNative barrier前に済ませる。layout／rangeからbarrierを作る共通処理とNative記録はoperation、所有・使用登録との接続はlifetime側の既存処理を使う。複合操作の前後barrierでは再pollせず、取消後の別slot／peerへの誤記録を防ぐ。単独barrierも同じNative処理へ委譲する。
+
+今回の一括配置は引き続きCPUのImplと使用状態の本体だけを対象とする。内部コンテナ、生成scratch、個別のVulkan device memoryは別の確保である。追加のowner wrapperは作らず、host snapshotとResourceUse／Native contextで残る参照カウント操作や管理メモリは、後続の同条件測定で扱う。
+
+この単位はmacOS arm64／Clang20 C++26、MoltenVK、Vulkan validation、ASan／UBSanで検証した。新runtime11件、重点VSL132／AHO152、全VSL1,156成功（対応外format3 skip）／AHO GPU192・CPU1,071、compile契約245件が成功した。旧実装でsnapshotの2失敗を再現し、view代入の旧順序でも全値commitの回帰が失敗することを確認してから、最終実装へ復元した。heap／arenaのPNG3枚は一致し、resizeを含めPipeline生成1回を維持する。
+
+strict79ファイル／64TUと変更箇所の補完検査、installed public consumer30種、旧入力拒否14種、private bridgeの非install、archive／生成header一致、Debug／Release／x86_64の寸法生成とartifact混在拒否、source393件とMSBuild登録も確認した。Image backendは旧SDK1.3.296でも構文検査した。Windows／Linux実機、x86_64の全体実行、device lost実機、並行CPUアクセス、性能比較は未検証である。残るShader／起動資源／descriptor manager／recipe／WindowData等の公開入口とImpl実定義の責務分割は後続の単位で扱う。
+
 2026-11-06。Bufferの4責務分離が統合されたmaster `6b1f0166`を基点とする。[Bufferの契約](buffer-generation-contracts.md)と[責務の配置](buffer-layer-layout.md)を維持する。
 
 ## 方針と段階

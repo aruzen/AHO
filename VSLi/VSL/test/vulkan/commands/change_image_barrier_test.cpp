@@ -1,4 +1,9 @@
+#include <VSL/lifetime/image_access.hpp>
 #include "support/image_transfer_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+}
 namespace {
     TEST(ChangeImageBarrierTest, UnspecifiedAndExplicitShaderStagesPreserveTheirScopeAndLayers) {
         using namespace vsl;
@@ -35,7 +40,7 @@ namespace {
         vsl::command::ChangeImageBarrier typed(image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
         EXPECT_EQ(typed.old_layout, vsl::ImageLayout::UNDEFINED);
         EXPECT_EQ(typed.new_layout, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
-        EXPECT_EQ(typed.image.data_, image.data_);
+        EXPECT_EQ(ImageAccess::Owned(typed.image), ImageAccess::Owned(image));
         vsl::command::ChangeImageBarrier unsupported(image, vsl::ImageLayout::GENERAL,
                                                      vsl::ImageLayout::UNDEFINED);
         auto manager = make_manager();

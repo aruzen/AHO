@@ -5,6 +5,16 @@
 
 namespace VSL_NAMESPACE::operation {
     namespace {
+        constexpr VkImageUsageFlags IMAGE_VIEW_USAGES = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                                                        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+                                                        VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR |
+                                                        VK_IMAGE_USAGE_FRAGMENT_DENSITY_MAP_BIT_EXT | VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR |
+                                                        VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR | VK_IMAGE_USAGE_VIDEO_ENCODE_SRC_BIT_KHR | VK_IMAGE_USAGE_VIDEO_ENCODE_DPB_BIT_KHR |
+                                                        VK_IMAGE_USAGE_SAMPLE_WEIGHT_BIT_QCOM | VK_IMAGE_USAGE_SAMPLE_BLOCK_MATCH_BIT_QCOM
+#if defined(VK_KHR_video_encode_quantization_map)
+                                                        | VK_IMAGE_USAGE_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR | VK_IMAGE_USAGE_VIDEO_ENCODE_EMPHASIS_MAP_BIT_KHR
+#endif
+            ;
         std::uint32_t select_image_memory(impl::LogicalDeviceImpl& device, std::uint32_t types, vk::MemoryPropertyFlags required) {
             const auto properties = device.parent_device->device.getMemoryProperties();
             for (std::uint32_t i = 0; i < properties.memoryTypeCount; ++i)
@@ -29,6 +39,9 @@ namespace VSL_NAMESPACE::operation {
             target.format = static_cast<vk::Format>(info.format.type());
         }
         void create_image_view(impl::ImageImpl& target, const ImageViewNativeCalls& calls = {}) {
+            // 転送専用imageにはviewが不要で、view作成を許すusageもない。
+            if ((static_cast<VkImageUsageFlags>(target.usage) & IMAGE_VIEW_USAGES) == 0)
+                return;
             const vk::ImageViewCreateInfo info{
                 .image = target.image,
                 .viewType = target.count == 1 ? vk::ImageViewType::e2D : vk::ImageViewType::e2DArray,

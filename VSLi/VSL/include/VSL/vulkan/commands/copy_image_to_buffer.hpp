@@ -10,7 +10,11 @@
 
 #include "../image.hpp"
 #include "../buffer.hpp"
+#include "../../lifetime/buffer_view.hpp"
 
+namespace VSL_NAMESPACE {
+    class NativeRecordingContext;
+}
 namespace VSL_NAMESPACE::command {
     struct ImageCopyInfo {
         ImageRegion region;
@@ -24,11 +28,10 @@ namespace VSL_NAMESPACE::command {
         // hostReadはCPUへの可視性を確保する。読み取り前には別途GPUの完了待ちが必要。
         CopyImageToBuffer(BufferAccessor* buffer, ImageAccessor image, ImageLayout layout,
                           ImageRegion region = {}, bool host_read = false);
-        CopyImageToBuffer(std::shared_ptr<impl::BufferImpl> buffer, ImageAccessor image, ImageLayout layout,
-                          ImageRegion region = {}, bool host_read = false);
-        // コピー先を指定範囲に限定する。offsetは画像のtexelサイズの倍数にする。
-        CopyImageToBuffer(std::shared_ptr<impl::BufferImpl> buffer, ImageAccessor image, ImageLayout layout,
-                          ImageRegion region, bool host_read, std::size_t offset, std::size_t size);
+        // コピー先はviewの範囲に限定し、constraintは追加の論理的な更新制約とする。
+        CopyImageToBuffer(BufferView destination, ImageAccessor image, ImageLayout layout,
+                          ImageRegion region = {}, bool host_read = false, ResourceUse constraint = {},
+                          ResourceRetention retention = ResourceRetention::COMPLETION);
 
         template<MemoryType mem_type, MemoryProperty buf_mem_prop, SharingMode share_mode,
                  VSL_NAMESPACE::ImageType img_type, VSL_NAMESPACE::MemoryProperty img_mem_prop, VSL_NAMESPACE::ImageLayout layout_>
@@ -46,8 +49,14 @@ namespace VSL_NAMESPACE::command {
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager);
 
     private:
-        std::shared_ptr<impl::BufferImpl> _destination;
+        friend struct ImageReadback;
+        impl::BufferImpl* _destination;
+        ResourceUse _use;
         std::size_t _destination_offset = 0, _destination_size = 0;
+        ResourceRetention _retention = ResourceRetention::SUBMISSION;
+        ImageCopyInfo prepare(const CommandBuffer& buffer, const CommandManager& manager) const;
+        void track(const NativeRecordingContext& recording) const;
+        void record(const ImageCopyInfo& info, const NativeRecordingContext& recording) const;
     };
 
     template<MemoryType mem_type, MemoryProperty buf_mem_prop, SharingMode share_mode,

@@ -1,7 +1,12 @@
+#include <VSL/lifetime/buffer_access.hpp>
 #include "support/window_fixture.hpp"
 #include <VSL/lifetime/startup_arena.hpp>
 #include <VSL/utils/typed_buffer_arena.hpp>
 #include <limits>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+}
 
 namespace {
     namespace l = vsl::lifetime;
@@ -224,7 +229,7 @@ namespace {
         EXPECT_TRUE(os_root.expired());
         EXPECT_TRUE(saved.owner_ref().managed());
         Native buffer(saved, 16);
-        EXPECT_TRUE(buffer.data_->buffer);
+        EXPECT_TRUE(BufferAccess::Owned(buffer)->buffer);
     }
     TEST_F(StartupSurfaceVulkanIntegrationTest, PlacedSurfacePluginReusesNativeAndRejectsAnotherOrUnmanagedWindow) {
         const std::array requests{s::StartupRequest{{1}, s::StartupKind::SURFACE}};

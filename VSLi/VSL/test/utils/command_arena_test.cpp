@@ -1,3 +1,4 @@
+#include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include "support/deferred_action.hpp"
@@ -6,6 +7,10 @@
 #include <VSL/lifetime/command_storage.hpp>
 #include <VSL/utils/typed_buffer_arena.hpp>
 #include <VSL/sync/submission_completion.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -305,7 +310,7 @@ namespace {
         ASSERT_TRUE(source.copy(expected));
         auto native = CommandAccess::Data(buffer)->command_buffers.at(0);
         native.begin(vk::CommandBufferBeginInfo{});
-        native.copyBuffer(source.data_->buffer, target.data_->buffer, vk::BufferCopy{.size = 4});
+        native.copyBuffer(BufferAccess::Owned(source)->buffer, BufferAccess::Owned(target)->buffer, vk::BufferCopy{.size = 4});
         const vk::MemoryBarrier visible{.srcAccessMask = vk::AccessFlagBits::eTransferWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
         native.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, visible, {}, {});
         native.end();

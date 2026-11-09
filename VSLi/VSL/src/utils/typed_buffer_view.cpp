@@ -9,6 +9,10 @@
 #include <utility>
 
 namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+}
+
+namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
 namespace VSL_NAMESPACE::typed::detail {
@@ -35,8 +39,7 @@ namespace VSL_NAMESPACE::typed::detail {
         }
     } // namespace
     BufferView make_buffer_storage(LogicalDeviceAccessor device, const BufferCreateInfo& info, HeapStorage) {
-        const auto owner = lifetime::make_heap_buffer(device, info);
-        return lifetime::detail::BufferAccess::View(lifetime::detail::BufferAccess::Ref(owner.get()), owner, 0, info.bytes);
+        return BufferView::Create(std::move(device), info);
     }
     BufferView make_buffer_storage(LogicalDeviceAccessor device, const BufferCreateInfo& info, ArenaStorage<>) {
         const std::array inputs{info};
@@ -51,7 +54,7 @@ namespace VSL_NAMESPACE::typed::detail {
         return make_uploaded_storage(std::move(device), std::move(manager), info, bytes, policy);
     }
     void validate_buffer_view(const BufferAccessor& buffer, MemoryType usage, size_t offset, size_t count, size_t stride, size_t alignment) {
-        if (!buffer.data_)
+        if (!BufferAccess::Owned(buffer))
             throw std::invalid_argument("Typed buffer view requires a buffer");
         validate_buffer_view(BufferView::FromBuffer(buffer), usage, offset, count, stride, alignment);
     }

@@ -1,4 +1,6 @@
 #pragma once
+#include <VSL/lifetime/buffer_access.hpp>
+#include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "vulkan_fixture.hpp"
 #include <VSL/vulkan/commands/copy_buffer_to_image.hpp>
@@ -23,8 +25,8 @@ namespace vsl_test {
         barrier.dstAccessMask = destination;
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.image = image.data_->image;
-        barrier.subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, image.data_->count};
+        barrier.image = VSL_NAMESPACE::lifetime::detail::ImageAccess::Owned(image)->image;
+        barrier.subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, VSL_NAMESPACE::lifetime::detail::ImageAccess::Owned(image)->count};
         auto buffer = manager.get_buffer();
         VSL_NAMESPACE::lifetime::CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
             vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands, {}, {}, {},
@@ -53,7 +55,7 @@ namespace vsl_test {
                 region.imageExtent = {2, 2, 1};
                 auto buffer = manager.get_buffer();
                 VSL_NAMESPACE::lifetime::CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].copyImageToBuffer(
-                    image.data_->image, vk::ImageLayout::eGeneral, destination.data_->buffer, region);
+                    VSL_NAMESPACE::lifetime::detail::ImageAccess::Owned(image)->image, vk::ImageLayout::eGeneral, VSL_NAMESPACE::lifetime::detail::BufferAccess::Owned(destination)->buffer, region);
             } else if (typed)
                 phase << vsl::command::CopyImageToBuffer(destination, image);
             else

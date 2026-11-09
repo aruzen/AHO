@@ -1,5 +1,10 @@
+#include <VSL/lifetime/image_access.hpp>
 #include "support/window_fixture.hpp"
 #include "support/read_image.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+}
 namespace {
     class SwapchainWindowIntegrationTest : public vsl_test::WindowIntegrationTest {
         bool validate_vulkan() const override { return true; }
@@ -49,7 +54,7 @@ namespace {
         EXPECT_EQ(first.data_->swap_chain_extent.width, static_cast<unsigned>(framebuffer_width));
         EXPECT_EQ(first.data_->swap_chain_extent.height, static_cast<unsigned>(framebuffer_height));
         for (const auto& image : first.images)
-            EXPECT_TRUE(static_cast<bool>(image.data_->view));
+            EXPECT_TRUE(static_cast<bool>(ImageAccess::Owned(image)->view));
         device.data_->device.waitIdle();
         vsl::Swapchain recreated(device, surface, first, 64, 48);
         EXPECT_TRUE(static_cast<bool>(recreated.data_->swap_chain));
@@ -98,7 +103,7 @@ namespace {
             EXPECT_FALSE(owner.expired());
         }
         EXPECT_FALSE(owner.expired());
-        image.data_.reset();
+        ImageAccess::Owned(image).reset();
         EXPECT_TRUE(owner.expired());
     }
 } // namespace

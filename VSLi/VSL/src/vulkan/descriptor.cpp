@@ -1,6 +1,8 @@
 //
 // Created by morimoto_hibiki on 2025/06/09.
 //
+#include <VSL/lifetime/image_access.hpp>
+#include <VSL/lifetime/sampler_access.hpp>
 #include <VSL/define.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>
@@ -19,6 +21,12 @@
 
 #include <utility>
 #include <ranges>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+    using VSL_NAMESPACE::lifetime::detail::SamplerAccess;
+} // namespace
 
 namespace {
     void validate_pool(const std::shared_ptr<VSL_NAMESPACE::impl::GraphicResourcePoolImpl>& pool) {
@@ -149,8 +157,8 @@ void VSL_NAMESPACE::graphic_resource::Resource::update(const BufferView& buffer,
 
 void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::BufferAccessor* buffer, size_t binding, std::optional<Type> type,
                                                        size_t offset, std::optional<size_t> size) {
-    const auto data = buffer ? buffer->data_ : nullptr;
-    update_buffer(data_, lifetime::detail::owned_ref(data, data ? data->owner_node : nullptr), binding, type, offset, size);
+    const auto data = buffer ? BufferAccess::Owned(*(buffer)) : nullptr;
+    update_buffer(data_, data, binding, type, offset, size);
 }
 
 namespace VSL_NAMESPACE::graphic_resource {
@@ -203,10 +211,10 @@ namespace VSL_NAMESPACE::graphic_resource {
 void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::ImageAccessor image, size_t binding, std::optional<Type> type) {
     const auto target = data_;
     validate_resource(target);
-    if (!image.data_ || image.data_->device != target->pool->device)
+    if (!ImageAccess::Owned(image) || ImageAccess::Owned(image)->device != target->pool->device)
         throw std::invalid_argument("Descriptor image device mismatch");
     vk::DescriptorImageInfo image_info;
-    image_info.imageView = image.data_->view;
+    image_info.imageView = ImageAccess::Owned(image)->view;
     image_info.imageLayout = vk::ImageLayout::eGeneral;
 
     vk::WriteDescriptorSet descriptor_write;
@@ -237,22 +245,22 @@ found_type:
     descriptor_write.pImageInfo = &image_info;
     descriptor_write.pTexelBufferView = nullptr; // Optional
 
-    operation::validate_descriptor_image(*image.data_, descriptor_write.descriptorType);
-    lifetime::write_descriptor_binding(*target, descriptor_write, {{{lifetime::detail::owned_ref(image.data_, image.data_->owner_node)}, {image.data_->use}, {}}});
+    operation::validate_descriptor_image(*ImageAccess::Owned(image), descriptor_write.descriptorType);
+    lifetime::write_descriptor_binding(*target, descriptor_write, {{{ImageAccess::Owned(image)}, {ImageAccess::Owned(image)->use}, {}}});
 }
 
 void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::ImageAccessor image, SamplerAccessor sampler,
                                                        size_t binding, std::optional<Type> type) {
     const auto target = data_;
     validate_resource(target);
-    if (!image.data_ || image.data_->device != target->pool->device)
+    if (!ImageAccess::Owned(image) || ImageAccess::Owned(image)->device != target->pool->device)
         throw std::invalid_argument("Descriptor image device mismatch");
     vk::DescriptorImageInfo image_info;
-    image_info.imageView = image.data_->view;
+    image_info.imageView = ImageAccess::Owned(image)->view;
     image_info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-    if (!sampler.data_ || !sampler.data_->sampler || !sampler.data_->use || sampler.data_->device != target->pool->device)
+    if (!SamplerAccess::Owned(sampler) || !SamplerAccess::Owned(sampler)->sampler || !SamplerAccess::Owned(sampler)->use || SamplerAccess::Owned(sampler)->device != target->pool->device)
         throw std::invalid_argument("Descriptor sampler device mismatch");
-    image_info.sampler = sampler.data_->sampler;
+    image_info.sampler = SamplerAccess::Owned(sampler)->sampler;
 
     vk::WriteDescriptorSet descriptor_write;
     descriptor_write.dstSet = target->descriptor_set;
@@ -280,10 +288,10 @@ found_type:
     descriptor_write.pTexelBufferView = nullptr; // Optional
 
     if (descriptor_write.descriptorType == vk::DescriptorType::eSampler) {
-        lifetime::write_descriptor_binding(*target, descriptor_write, {{{lifetime::detail::owned_ref(sampler.data_, sampler.data_->owner_node)}, {sampler.data_->use}, {}}});
+        lifetime::write_descriptor_binding(*target, descriptor_write, {{{SamplerAccess::Owned(sampler)}, {SamplerAccess::Owned(sampler)->use}, {}}});
         return;
     }
-    operation::validate_descriptor_image(*image.data_, descriptor_write.descriptorType);
+    operation::validate_descriptor_image(*ImageAccess::Owned(image), descriptor_write.descriptorType);
     lifetime::write_descriptor_binding(*target, descriptor_write,
-                                       {{{lifetime::detail::owned_ref(image.data_, image.data_->owner_node), lifetime::detail::owned_ref(sampler.data_, sampler.data_->owner_node)}, {image.data_->use, sampler.data_->use}, {}}});
+                                       {{{ImageAccess::Owned(image), SamplerAccess::Owned(sampler)}, {ImageAccess::Owned(image)->use, SamplerAccess::Owned(sampler)->use}, {}}});
 }

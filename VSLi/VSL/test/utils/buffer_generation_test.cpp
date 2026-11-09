@@ -8,6 +8,10 @@
 #include <VSL/vulkan/commands/bind_index_buffers.hpp>
 
 namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+}
+
+namespace {
     namespace t = vsl::typed;
     constexpr auto USAGE = vsl::MemoryType::TRANSFER_SOURCE | vsl::MemoryType::TRANSFER_DESTINATION;
     constexpr t::ResourceId SOURCE{10}, DESTINATION{20};
@@ -32,7 +36,7 @@ namespace {
             cancelled = phase.completion();
             {
                 Buffer native(device, 16);
-                observed = native.data_;
+                observed = BufferAccess::Owned(native).share();
                 identity = native.identity();
                 EXPECT_EQ(*identity, vsl::BufferView::FromBuffer(native).identity());
                 EXPECT_EQ(*identity, vsl::command::BindVertexBufferAt(0, native).identity());
@@ -154,7 +158,7 @@ namespace {
         Native source(device, sizeof(VALUES));
         source.copy(VALUES);
         auto native = source;
-        native.data_ = vsl::lifetime::detail::BufferAccess::Owned(vertices.storage_view()).share();
+        BufferAccess::Owned(native) = vsl::lifetime::detail::BufferAccess::Owned(vertices.storage_view());
         EXPECT_EQ(vsl::ResourceUse::ForBuffer(native).state.get(), &vertices.backend().ref().use());
         auto mapping = native.data();
         auto view = vertices.storage_view();

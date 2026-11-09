@@ -1,5 +1,10 @@
+#include <VSL/lifetime/buffer_access.hpp>
 #include "support/render_fixture.hpp"
 #include <type_traits>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+}
 namespace {
     using BindIndexBufferVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
     TEST_F(BindIndexBufferVulkanIntegrationTest, RetainsCallerBufferInsteadOfTemporaryParameter) {
@@ -8,7 +13,7 @@ namespace {
         vsl::command::BindIndexBuffer command(buffer, 4);
         EXPECT_EQ(command.offset, 4u);
         ASSERT_EQ(command.buffer, &buffer);
-        EXPECT_EQ(command.buffer->data_, buffer.data_);
+        EXPECT_EQ(BufferAccess::Owned(*(command.buffer)), BufferAccess::Owned(buffer));
         const auto copy = command;
         EXPECT_EQ(copy.buffer, &buffer);
         EXPECT_EQ(copy.offset, 4u);

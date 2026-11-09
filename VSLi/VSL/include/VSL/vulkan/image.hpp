@@ -4,6 +4,7 @@
 #include "pv.hpp"
 
 #include "buffer_and_image_accessor.hpp"
+#include "../operation/image_create_info.hpp"
 #include "../format.hpp"
 #include "../utils/flags.hpp"
 
@@ -29,8 +30,7 @@ namespace VSL_NAMESPACE {
 
 template<VSL_NAMESPACE::ImageType usage, VSL_NAMESPACE::MemoryProperty mem_prop, VSL_NAMESPACE::ImageLayout layout>
 VSL_NAMESPACE::Image<usage, mem_prop, layout>::Image(VSL_NAMESPACE::LogicalDeviceAccessor device, std::uint32_t width, std::uint32_t height,
-                                                     data_format::Format format, std::uint32_t count, SampleCount samples) {
-    data_ = MakeImage(usage, mem_prop, layout, device, width, height, format, count, samples);
-}
+                                                     data_format::Format format, std::uint32_t count, SampleCount samples)
+    : ImageAccessor(device, {usage, width, height, format, count, samples, mem_prop, layout}) {}
 
 #endif

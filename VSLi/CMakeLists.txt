@@ -47,6 +47,8 @@ add_library(VSL STATIC
         VSL/src/lifetime/native_recording.cpp
         VSL/src/private/VSL/operation/native_recording.hpp
         VSL/src/operation/native_recording.cpp
+        VSL/src/private/VSL/operation/image_barrier.hpp
+        VSL/src/operation/image_barrier.cpp
         VSL/src/lifetime/descriptor_bindings.cpp
         VSL/src/lifetime/descriptor_storage.cpp
         VSL/src/lifetime/logical_use_state.cpp
@@ -55,6 +57,8 @@ add_library(VSL STATIC
         VSL/include/VSL/lifetime/resource_identity.hpp
         VSL/src/private/VSL/lifetime/resource_use_factory.hpp
         VSL/src/private/VSL/lifetime/buffer_access.hpp
+        VSL/src/private/VSL/lifetime/image_access.hpp
+        VSL/src/private/VSL/lifetime/sampler_access.hpp
         VSL/src/private/VSL/lifetime/command_access.hpp
         VSL/src/private/VSL/lifetime/identity_access.hpp
         VSL/include/VSL/lifetime/dependency_node.hpp

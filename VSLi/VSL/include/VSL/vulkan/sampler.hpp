@@ -9,10 +9,22 @@
 #include "../operation/sampler_create_info.hpp"
 
 namespace VSL_NAMESPACE {
+    namespace lifetime::detail {
+        struct SamplerAccess;
+    }
     struct SamplerAccessor {
-        std::shared_ptr<impl::SamplerImpl> data_;
+        SamplerAccessor() = default;
+        explicit operator bool() const { return bool(_owner); }
         ResourceUseState& use_state() const;
         ResourceUse resource_use() const;
+
+    protected:
+        SamplerAccessor(LogicalDeviceAccessor device, const SamplerCreateInfo& info);
+
+    private:
+        friend struct lifetime::detail::SamplerAccess;
+        lifetime::OwnedRef<impl::SamplerImpl> _owner;
+        explicit SamplerAccessor(lifetime::OwnedRef<impl::SamplerImpl> owner) : _owner(std::move(owner)) {}
     };
 
     struct Sampler : public SamplerAccessor {

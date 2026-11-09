@@ -35,7 +35,7 @@ namespace VSL_NAMESPACE::typed::detail {
         for (size_t index = 0; index < placements.size(); ++index) {
             const auto id = placements[index].resource;
             if (const auto* info = std::get_if<ImageCreateInfo>(&infos[index]))
-                result.images.emplace_back(id, ImageAccessor{ImageAccessor::MakeImage(info->usage, info->properties, info->initial_layout, device, info->width, info->height, info->format, info->layers, info->samples)});
+                result.images.emplace_back(id, ImageAccessor::Create(device, *info));
             else if (const auto* info = std::get_if<SamplerCreateInfo>(&infos[index]))
                 result.samplers.emplace_back(id, Sampler(device, info->sampling, info->edge));
         }

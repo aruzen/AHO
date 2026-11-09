@@ -3,6 +3,8 @@
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/descriptor_storage.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
+#include <VSL/lifetime/image_access.hpp>
+#include <VSL/lifetime/sampler_access.hpp>
 #include <VSL/lifetime/native_recording.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/vulkan/commands/image_upload.hpp>
@@ -548,6 +550,71 @@ namespace {
         EXPECT_TRUE(set.data_->bindings.empty());
         EXPECT_NO_THROW(set.update(arena.buffer({1}), 0));
         EXPECT_EQ(set.data_->bindings.at(0).size(), 1u);
+    }
+
+    TEST_F(DescriptorArenaVulkanIntegrationTest, ImageAndSamplerRoundTripsKeepCompositeProvenanceAndRejectOnlyTheOwningArenaCycle) {
+        struct Context {
+            l::DependencyNode node;
+            l::OwnerRef physical;
+            explicit Context(l::OwnerRef physical) : physical(std::move(physical)) {}
+            ~Context() { node.retire(); }
+            static void Visit(const void* context, l::DependencyNode::EdgeVisitor visitor, void* output) {
+                visitor(output, static_cast<const Context*>(context)->physical);
+            }
+        };
+        std::weak_ptr<Context> observed;
+        {
+            constexpr std::array<t::ResourceRequest, 5> requests{{{{1}, IMAGE}, {{2}, SAMPLER}, {{3}, DESCRIPTOR_LAYOUT}, {{4}, DESCRIPTOR_POOL}, {{5}, DESCRIPTOR_SET}}};
+            constexpr t::ResourcePlan<5> plan(requests);
+            const std::array<l::ResourceInit, 5> initializers{
+                vsl::ImageCreateInfo{vsl::ImageType::SAMPLED | vsl::ImageType::TRANSFER_DST, 1, 1},
+                vsl::SamplerCreateInfo{},
+                vsl::DescriptorLayoutCreateInfo{{{0, vsl::graphic_resource::Type::COMBINED_IMAGE_SAMPLER, vsl::ShaderFlag::FRAGMENT}}},
+                vsl::DescriptorPoolCreateInfo{{{vsl::graphic_resource::Type::COMBINED_IMAGE_SAMPLER, 1}}, 1},
+                l::DescriptorSetInit{{4}, {3}}};
+            l::ResourceArena first(device, plan, initializers, l::DependencyPolicy::DYNAMIC);
+            l::ResourceArena second(device, plan, initializers, l::DependencyPolicy::DYNAMIC);
+            auto context = std::make_shared<Context>(first.owner_ref());
+            observed = context;
+            context->node.publish(context, context.get(), Context::Visit);
+            const auto physical_image = first.image({1});
+            const auto physical_sampler = first.sampler({2});
+            const auto image = l::detail::ImageAccess::FromOwned(context->node.ref(context).alias(l::detail::ImageAccess::Owned(physical_image).get()));
+            const auto sampler = l::detail::SamplerAccess::FromOwned(context->node.ref(context).alias(l::detail::SamplerAccess::Owned(physical_sampler).get()));
+            const auto value = t::detail::DescriptorValue::FromTexture(image, sampler);
+            const auto check = [&](const auto& resource) {
+                const auto owner = resource.resource_use().owner;
+                EXPECT_TRUE(owner.managed());
+                EXPECT_FALSE(owner.owner_before(context));
+                EXPECT_FALSE(context.owner_before(owner.share()));
+            };
+            check(value.image());
+            check(value.sampler());
+            check(t::detail::DescriptorValue::FromImage(image).image());
+            check(t::detail::DescriptorValue::FromSampler(sampler).sampler());
+            EXPECT_EQ(&value.image().use_state(), &physical_image.use_state());
+            EXPECT_EQ(&value.sampler().use_state(), &physical_sampler.use_state());
+            constexpr std::array<t::ResourceRequest, 2> external_requests{{{{10}, IMAGE, true}, {{20}, SAMPLER, true}}};
+            constexpr t::ResourcePlan<2> external_plan(external_requests);
+            const std::array<l::ResourceInit, 2> external_inputs{value.image(), value.sampler()};
+            l::ResourceArena external(device, external_plan, external_inputs);
+            check(external.image({10}));
+            check(external.sampler({20}));
+            auto accepted = second.descriptor_set({5});
+            ASSERT_NO_THROW(accepted.update(external.image({10}), external.sampler({20}), 0));
+            const auto& owners = accepted.data_->bindings.at(0).front().owners;
+            ASSERT_FALSE(owners.empty());
+            for (const auto& owner : owners) {
+                EXPECT_TRUE(owner.managed());
+                EXPECT_FALSE(owner.owner_before(context));
+                EXPECT_FALSE(context.owner_before(owner.share()));
+            }
+            auto rejected = first.descriptor_set({5});
+            EXPECT_THROW(rejected.update(external.image({10}), external.sampler({20}), 0), std::invalid_argument);
+            EXPECT_TRUE(rejected.data_->bindings.empty());
+            EXPECT_NO_THROW(rejected.update(physical_image, physical_sampler, 0));
+        }
+        EXPECT_TRUE(observed.expired());
     }
 
     TEST_F(DescriptorArenaVulkanIntegrationTest, DynamicManagedCyclesRejectPhysicalAndLogicalUpdatesInBothDirections) {

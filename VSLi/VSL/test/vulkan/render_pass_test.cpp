@@ -1,6 +1,11 @@
+#include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include "support/render_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -13,12 +18,12 @@ namespace {
         EXPECT_EQ(normal.data_->device, device.data_.get());
         vsl::IDPickingRenderPass picking(description);
         ASSERT_EQ(picking.picking_buffer.size(), 1u);
-        EXPECT_EQ(picking.picking_buffer.front().data_->width, 8u);
-        EXPECT_EQ(picking.picking_buffer.front().data_->height, 8u);
+        EXPECT_EQ(ImageAccess::Owned(picking.picking_buffer.front())->width, 8u);
+        EXPECT_EQ(ImageAccess::Owned(picking.picking_buffer.front())->height, 8u);
         EXPECT_EQ(picking.picking_buffer.front().size(), 8u * 8u * 4u);
         picking.recreate_buffer(12, 6);
-        EXPECT_EQ(picking.picking_buffer.front().data_->width, 12u);
-        EXPECT_EQ(picking.picking_buffer.front().data_->height, 6u);
+        EXPECT_EQ(ImageAccess::Owned(picking.picking_buffer.front())->width, 12u);
+        EXPECT_EQ(ImageAccess::Owned(picking.picking_buffer.front())->height, 6u);
         EXPECT_EQ(picking.picking_buffer.front().size(), 12u * 6u * 4u);
     }
     TEST_F(RenderPassVulkanIntegrationTest, PickingPassProvidesInitializedBaseAccessor) {

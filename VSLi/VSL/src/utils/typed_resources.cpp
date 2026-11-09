@@ -7,6 +7,8 @@
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
+#include <VSL/lifetime/image_access.hpp>
+#include <VSL/lifetime/sampler_access.hpp>
 #include <VSL/operation/descriptor_ops.hpp>
 #include <algorithm>
 
@@ -23,12 +25,6 @@ namespace VSL_NAMESPACE::typed::detail {
         const std::array sets{data.get()};
         lifetime::freeze_descriptor_dependencies(*data->owner_context, sets);
     }
-    namespace {
-        template<typename Accessor>
-        auto descriptor_owner(const Accessor& source) {
-            return lifetime::detail::owned_ref(source.data_, source.data_ ? source.data_->owner_node : nullptr);
-        }
-    } // namespace
     DescriptorValue DescriptorValue::FromBuffer(BufferView source, ResourceUse use) {
         const auto owner = source.owner_ref();
         if (!owner.use_count())
@@ -42,20 +38,20 @@ namespace VSL_NAMESPACE::typed::detail {
     }
     DescriptorValue DescriptorValue::FromImage(ImageAccessor source, ResourceUse use) {
         DescriptorValue result;
-        result._image = descriptor_owner(source);
+        result._image = lifetime::detail::ImageAccess::Owned(source);
         result._use = std::move(use);
         return result;
     }
     DescriptorValue DescriptorValue::FromSampler(SamplerAccessor source, ResourceUse use) {
         DescriptorValue result;
-        result._sampler = descriptor_owner(source);
+        result._sampler = lifetime::detail::SamplerAccess::Owned(source);
         result._use = std::move(use);
         return result;
     }
     DescriptorValue DescriptorValue::FromTexture(ImageAccessor image, SamplerAccessor sampler, ResourceUse use) {
         DescriptorValue result;
-        result._image = descriptor_owner(image);
-        result._sampler = descriptor_owner(sampler);
+        result._image = lifetime::detail::ImageAccess::Owned(image);
+        result._sampler = lifetime::detail::SamplerAccess::Owned(sampler);
         result._use = std::move(use);
         return result;
     }
@@ -70,10 +66,10 @@ namespace VSL_NAMESPACE::typed::detail {
         return next;
     }
     ImageAccessor DescriptorValue::image() const {
-        return {_image.share()};
+        return lifetime::detail::ImageAccess::FromOwned(_image);
     }
     SamplerAccessor DescriptorValue::sampler() const {
-        return {_sampler.share()};
+        return lifetime::detail::SamplerAccess::FromOwned(_sampler);
     }
     ResourceUse descriptor_constraints(const DescriptorValue& value) {
         const auto matches = [&](const auto& owner) {

@@ -1,3 +1,5 @@
+#include <VSL/lifetime/buffer_access.hpp>
+#include <VSL/lifetime/image_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <VSL/vulkan/commands/image_upload.hpp>
 #include <VSL/vulkan/commands/image_readback.hpp>
@@ -5,6 +7,11 @@
 #include <VSL/lifetime/buffer_arena.hpp>
 #include <optional>
 #include <array>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+} // namespace
 
 namespace {
     class ImageUploadVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
@@ -22,7 +29,7 @@ namespace {
         vsl::Buffer<vsl::MemoryType::TRANSFER_DESTINATION, vsl::MemoryProperty::HOST_VISIBLE> destination(device, std::size_t{16});
         auto destination_mapping = destination.data();
         std::weak_ptr<vsl::impl::BufferImpl> weak_source;
-        std::weak_ptr<vsl::impl::ImageImpl> weak_image = image->data_;
+        std::weak_ptr<vsl::impl::ImageImpl> weak_image = ImageAccess::Owned(*(image)).share();
         {
             auto phase = manager.start_phase<vsl::ComputePhase>();
             {
@@ -30,7 +37,7 @@ namespace {
                 const std::array<std::uint8_t, 8> data{0, 0, 0, 0, 19, 37, 73, 255};
 
                 source.data().write(std::as_bytes(std::span(data)));
-                weak_source = source.data_;
+                weak_source = BufferAccess::Owned(source).share();
                 phase << vsl::command::ImageUpload(&source, *image, vsl::ImageLayout::UNDEFINED,
                                                    {.x = 1, .y = 1, .width = 1, .height = 1}, 4);
             }

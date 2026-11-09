@@ -218,3 +218,9 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 
 11b後半でTypedGraphics／ComputePipelineも先頭生成policyとDefaultStorageへ接続した。CPU draftの不変snapshotでTyped検証をNative生成前へ移し、schemaのDescriptorLayoutは一時寿命群でmaterializeする。共有Layout sourceと疎なsetの空Layoutを扱い、owner indexの再配置を共用する。heapとLayout＋Pipelineの2slot arenaは同じbackendを使い、構築後には生成用sourceを保持しない。新規4件と既存試験の両policy化、全VSL1,134／AHO190・1,071／compile202、PNG3枚一致、strict22ファイル／12TU、installed consumer28種、構成別／cross／artifact混在拒否が成功した。順序11の受入条件を満たし、公開raw入口・互換adapterと明示ManagerのAPI整理、4責務の実定義分割と実測を順序12へ続ける。
 
+## 順序12の分割
+
+12aでBuffer／Descriptor／Pipelineの非所有identityを追加し、TypedBatchの公開Implポインタ比較への依存を外した。Device／Completionは既存operator==へ移し、同じ実体のalias・同arena別slot・offset・index型によるbind省略を維持する。ownerは元command群が保持し、identityは永続世代IDにしない。既存回帰の拡張、全VSL1,134／AHO190・1,071／compile204、同一描画、strict22ファイル／12TU、public consumer28種とraw／mixed identity拒否、構成別／cross／artifact混在拒否が成功した。
+
+次はDescriptorValueのopaque化、ResourceUseの公開Impl入力廃止、BufferRef／BufferViewのraw入口とlegacy_ownerの廃止へ進む。custom commandのNative記録contextを用意してからCommand／起動資源／descriptor manager／Pipeline recipe／WindowDataを閉じる。実定義を4責務へ分けて寸法生成依存を更新し、最後に同条件のheap／arenaで残る確保・参照・保持量を測る。identity追加だけで順序12全体を完了とはしない。
+

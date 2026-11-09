@@ -327,14 +327,14 @@ namespace {
         const auto old = buffer.binding().snapshot();
         reenter = [&] {
             const auto current = buffer.binding().snapshot();
-            EXPECT_EQ(current.storage().ref().data, old.storage().ref().data);
+            EXPECT_EQ(current.storage().identity(), old.storage().identity());
             buffer.resize(0);
         };
         EXPECT_THROW(buffer.reserve(8), std::logic_error);
         EXPECT_EQ(buffer.size(), 4u);
         EXPECT_EQ(buffer.capacity(), 4u);
         const auto after = buffer.binding().snapshot();
-        EXPECT_EQ(after.storage().ref().data, old.storage().ref().data);
+        EXPECT_EQ(after.storage().identity(), old.storage().identity());
         reenter = [] {};
         EXPECT_NO_THROW(buffer.reserve(8));
         EXPECT_EQ(buffer.read(4)[0], std::as_bytes(std::span(&value, 1))[0]);
@@ -366,7 +366,7 @@ namespace {
         EXPECT_EQ(buffer.capacity(), 4u);
         EXPECT_EQ(buffer.size(), 4u);
         const auto after = buffer.binding().snapshot();
-        EXPECT_EQ(after.storage().ref().data, old.storage().ref().data);
+        EXPECT_EQ(after.storage().identity(), old.storage().identity());
         EXPECT_EQ(buffer.binding().owner_ref().get(), old.constraints().owner.get());
         *fail = false;
         std::uint32_t actual = 0;

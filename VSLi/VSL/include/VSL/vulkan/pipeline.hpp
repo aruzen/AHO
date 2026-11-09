@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../define.hpp"
+#include "../lifetime/resource_identity.hpp"
 #include "pv.hpp"
 
 #include "pipeline_layout.hpp"
@@ -11,6 +12,7 @@
 namespace VSL_NAMESPACE {
     struct PipelineAccessor {
         std::shared_ptr<impl::PipelineImpl> data_;
+        PipelineIdentity identity() const;
         LogicalDeviceAccessor get_device() const;
         lifetime::OwnerRef owner_ref() const;
     };

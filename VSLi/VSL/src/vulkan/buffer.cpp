@@ -1,4 +1,5 @@
 #include <VSL/lifetime/device_owner.hpp>
+#include <VSL/lifetime/identity_access.hpp>
 #include <VSL/lifetime/buffer_storage.hpp>
 
 #include <VSL/vulkan/buffer.hpp>
@@ -19,6 +20,10 @@ VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException::MemoryNotHostVisibleEx
 VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException::MemoryNotHostVisibleException(std::source_location sourece) : VSL_NAMESPACE::exceptions::RuntimeException("MemoryNotHostVisibleException",
                                                                                                                                                                     "This buffer's memory is not host-visible. Mapping is not allowed.",
                                                                                                                                                                     sourece) {}
+
+VSL_NAMESPACE::BufferIdentity VSL_NAMESPACE::BufferAccessor::identity() const {
+    return lifetime::detail::IdentityAccess::From<BufferIdentity>(data_.get());
+}
 
 static bool copy_buffer(const std::shared_ptr<VSL_NAMESPACE::impl::BufferImpl>& destination, VSL_NAMESPACE::CommandManager command_manager,
                         VSL_NAMESPACE::BufferAccessor* buf, std::size_t offset = 0, std::optional<std::size_t> size = std::nullopt) {

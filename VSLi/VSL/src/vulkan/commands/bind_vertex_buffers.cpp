@@ -1,9 +1,14 @@
 #include <VSL/vulkan/_pimpls.hpp>
 
 #include <VSL/vulkan/commands/bind_vertex_buffers.hpp>
+#include <VSL/lifetime/identity_access.hpp>
 
 #include <ranges>
 #include <stdexcept>
+
+VSL_NAMESPACE::BufferIdentity VSL_NAMESPACE::command::BindVertexBufferAt::identity() const {
+    return lifetime::detail::IdentityAccess::From<BufferIdentity>(_source.get());
+}
 
 VSL_NAMESPACE::command::BindVertexBufferAt::BindVertexBufferAt(std::uint32_t binding, const BufferAccessor& source, size_t offset, ResourceUse use)
     : BindVertexBufferAt(binding, source.data_, offset, std::move(use)) {}

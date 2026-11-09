@@ -6,6 +6,7 @@
 
 #include "../format.hpp"
 #include "../utils/flags.hpp"
+#include "../lifetime/resource_identity.hpp"
 
 #include "device.hpp"
 #include <memory>
@@ -191,6 +192,7 @@ namespace VSL_NAMESPACE {
     struct ResourceUse;
 
     struct BufferAccessor {
+        BufferIdentity identity() const;
         BufferAccessor() = default;
         BufferAccessor(const BufferAccessor&) = default;
         BufferAccessor& operator=(const BufferAccessor&) = default;

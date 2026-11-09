@@ -95,7 +95,7 @@ namespace VSL_NAMESPACE::typed {
     typename TypedFrameResources<Frame, retention>::Slot& TypedFrameResources<Frame, retention>::acquire(const ComputePhase& phase, bool update) {
         const auto access = _domain.access(phase);
         auto& slot = _slots.at(access.slot);
-        if (slot.completion.data_ == access.completion.data_) {
+        if (slot.completion == access.completion) {
             if (update || slot.updating || slot.failed)
                 throw std::logic_error("Typed frame resources are already in use by this phase");
             return slot;

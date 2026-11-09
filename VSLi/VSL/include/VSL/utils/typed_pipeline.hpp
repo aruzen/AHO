@@ -100,7 +100,7 @@ namespace VSL_NAMESPACE::typed {
                            std::index_sequence<indices...>, const Buffers&... buffers)
             : _pipeline(std::move(pipeline)), _device(device),
               _buffers{command::BindVertexBufferAt(Input::LAYOUT.binding[indices].binding, buffers.storage_view(), 0, buffers.resource_use())...}, _counts{buffers.size()...} {
-            if (((buffers.device().data_ != device.data_) || ...))
+            if (((buffers.device() != device) || ...))
                 throw std::invalid_argument("Typed pipeline and vertex buffers use different devices");
         }
 
@@ -172,7 +172,7 @@ namespace VSL_NAMESPACE::typed {
 
     template<typename Input, typename Resources, typename Pushes>
     void TypedDraw<Input, Resources, Pushes>::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
-        if (_device.data_ != manager.get_device().data_)
+        if (_device != manager.get_device())
             throw std::invalid_argument("Typed pipeline and command manager use different devices");
         _pipeline.invoke(pool, buffer, manager);
         for (auto& binding : _buffers)
@@ -203,7 +203,7 @@ namespace VSL_NAMESPACE::typed {
     template<typename... Sets>
     requires compatible_descriptor_sets<Resources, Sets...>
     TypedVertexBinding<Input, Resources, Pushes, true, pushed> TypedVertexBinding<Input, Resources, Pushes, bound, pushed>::bind_resources(const Sets&... sets) const {
-        if (((sets.device().data_ != _device.data_) || ...))
+        if (((sets.device() != _device) || ...))
             throw std::invalid_argument("Typed descriptor/pipeline device mismatch");
         (sets.require_complete(), ...);
         std::vector<command::BindGraphicResource> commands;
@@ -228,7 +228,7 @@ namespace VSL_NAMESPACE::typed {
 
     template<typename Input, typename Resources, typename Pushes>
     void TypedIndexedDraw<Input, Resources, Pushes>::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
-        if (_device.data_ != manager.get_device().data_)
+        if (_device != manager.get_device())
             throw std::invalid_argument("Typed pipeline and command manager use different devices");
         validate_indices();
         _pipeline.invoke(pool, buffer, manager);
@@ -249,7 +249,7 @@ namespace VSL_NAMESPACE::typed {
     requires(bound && pushed)
     {
         command::DrawIndexed command(index_count, instance_count, first_index, vertex_offset, first_instance);
-        if (indices.device().data_ != _device.data_)
+        if (indices.device() != _device)
             throw std::invalid_argument("Typed index buffer and pipeline use different devices");
         const auto [low, high] = indices.bounds(first_index, index_count);
         for (size_t i = 0; i < Input::BINDING_COUNT; ++i) {

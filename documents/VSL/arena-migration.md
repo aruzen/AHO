@@ -81,6 +81,20 @@ heapは共通make_heap_pipeline_layout／make_heap_pipeline、arenaは既存Reso
 
 記録後のPipeline保持契約は配置policyから独立し、従来のWork所有による保持を維持する。保存commandはPipelineと必要なBufferを所有する。CPU recipeのvector／snapshot、生成scratch、ResourceArena管理表、Vulkan PipelineCache等の個別確保は残る。CPU Implの2slot集約による構造変更と実測性能は区別し、測定は順序12で行う。
 
+## 順序12a: 物理実体の比較
+
+BufferIdentity／DescriptorIdentity／PipelineIdentityは、解決済み実体を比較する非所有の値型である。BufferRef／BufferView／通常Buffer、頂点・indexのbind command、PipelineAccessor、GraphicResourceのidentity()から取得できる。種類の違うidentity同士の比較、raw pointerからの構築／取り出し、Native handleへの変換は提供しない。
+
+```cpp
+auto whole = vertices.storage_view();
+auto first = whole.view(0, sizeof(Vertex));
+assert(whole.identity() == first.identity()); // 同じ物理storage、範囲は別
+```
+
+同じarena ownerの別slotは異なるidentityを持ち、同じ実体を指すaliasは同じidentityになる。比較はownerを保持せず、両方の実体が生存する間だけ行う。解放後のarena領域再利用をまたぐ世代ID／永続cache keyには使わない。schema ResourceId、配置slot、shader BindingKeyとも別の役割である。
+
+TypedBatchはcommand群のownerを保持してplanを作るため、このscopeを満たす。Pipeline／Buffer／Descriptorの比較にはidentity、viewのoffsetとindex型には従来の値を使い、bind省略の意味を維持する。DeviceとCompletionの比較は既存operator==へ移す。生成・記録時に新しいowner wrapperや管理表の探索を追加しない。raw source()／data_／legacy_ownerは後続の公開入口廃止へ接続する移行用として、この段階では残る。
+
 2026-11-06。Bufferの4責務分離が統合されたmaster `6b1f0166`を基点とする。[Bufferの契約](buffer-generation-contracts.md)と[責務の配置](buffer-layer-layout.md)を維持する。
 
 ## 方針と段階

@@ -13,6 +13,7 @@
 #include <VSL/operation/descriptor_ops.hpp>
 #include <VSL/lifetime/descriptor_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
+#include <VSL/lifetime/identity_access.hpp>
 #include <limits>
 
 #include <utility>
@@ -131,6 +132,10 @@ VSL_NAMESPACE::graphic_resource::Pool VSL_NAMESPACE::graphic_resource::Resource:
         throw std::logic_error("Descriptor pool owner is unavailable");
     return {{std::move(owner), resource->pool}};
 }
+VSL_NAMESPACE::DescriptorIdentity VSL_NAMESPACE::graphic_resource::Resource::identity() const {
+    return lifetime::detail::IdentityAccess::From<DescriptorIdentity>(data_.get());
+}
+
 VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::graphic_resource::Resource::owner_ref() const {
     return lifetime::detail::owned_ref(data_, data_ ? data_->owner_node : nullptr);
 }

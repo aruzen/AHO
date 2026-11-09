@@ -1,7 +1,12 @@
 #include <VSL/vulkan/_pimpls.hpp>
 
 #include <VSL/vulkan/commands/bind_index_buffers.hpp>
+#include <VSL/lifetime/identity_access.hpp>
 #include <stdexcept>
+
+VSL_NAMESPACE::BufferIdentity VSL_NAMESPACE::command::BindIndexBufferAt::identity() const {
+    return lifetime::detail::IdentityAccess::From<BufferIdentity>(_source.get());
+}
 
 VSL_NAMESPACE::command::BindIndexBufferAt::BindIndexBufferAt(const BufferView& source, IndexType type, size_t offset, ResourceUse use)
     : BindIndexBufferAt(source.legacy_owner(), type,

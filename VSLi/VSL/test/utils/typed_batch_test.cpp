@@ -40,12 +40,13 @@ namespace {
     TEST_F(TypedBatchVulkanIntegrationTest, DistinctPipelineInstancesOfTheSameTypeAreBoundAndTheLastIsReported) {
         auto first = make_typed("typed_batch_red.vert.spv");
         auto last = make_typed();
+        EXPECT_NE(first.backend().identity(), last.backend().identity());
         auto batch = t::TypedBatch(first.bind_vertices().draw(3), last.bind_vertices().draw(3));
         EXPECT_EQ(batch.statistics().pipeline_binds, 2u);
-        EXPECT_EQ(batch.get_pipeline().data_, last.backend().data_);
+        EXPECT_EQ(batch.get_pipeline().identity(), last.backend().identity());
         ExpectTriangleColor(render([&](auto& stream) {
             stream << batch;
-            EXPECT_EQ(stream.pipeline->data_, last.backend().data_);
+            EXPECT_EQ(stream.pipeline->identity(), last.backend().identity());
             stream << vsl::command::Draw(3);
         }));
     }
@@ -82,6 +83,7 @@ namespace {
         t::TypedUniformBuffer<Layout> first_buffer(device, red), last_buffer(device, half);
         vsl::GraphicResourceManager manager(device);
         t::TypedDescriptorSet<Set::Layout> first(device, manager), last(device, manager);
+        EXPECT_NE(first.backend().identity(), last.backend().identity());
         first.write<4>(first_buffer);
         last.write<4>(last_buffer);
         auto batch = t::TypedBatch(

@@ -48,6 +48,8 @@ add_library(VSL STATIC
         VSL/src/lifetime/logical_use_state.cpp
         VSL/src/lifetime/dependency_node.cpp
         VSL/include/VSL/lifetime/owner_ref.hpp
+        VSL/include/VSL/lifetime/resource_identity.hpp
+        VSL/src/private/VSL/lifetime/identity_access.hpp
         VSL/include/VSL/lifetime/dependency_node.hpp
         VSL/include/VSL/lifetime/logical_use_state.hpp
         VSL/src/operation/descriptor_ops.cpp

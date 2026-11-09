@@ -10,7 +10,8 @@
 namespace VSL_NAMESPACE {
     namespace lifetime {
         class PhaseCall;
-    }
+        struct AcquireTicket;
+    } // namespace lifetime
     template<typename PhaseStream, typename T>
     concept is_phase_stream = requires(PhaseStream pst) {
         { pst << std::declval<std::shared_ptr<T>>() } -> std::convertible_to<PhaseStream&>;
@@ -111,8 +112,7 @@ namespace VSL_NAMESPACE {
     private:
         bool _presented = false;
         std::optional<FenceHolder> _acquire_fences;
-        struct Presentation;
-        std::shared_ptr<Presentation> _presentation;
+        std::shared_ptr<lifetime::AcquireTicket> _presentation;
 
     public:
         ~DefaultPhase();

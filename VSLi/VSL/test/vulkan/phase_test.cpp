@@ -878,7 +878,7 @@ namespace {
             *image = UINT32_MAX - 1;
             result = probe.failure;
         }
-        if (auto callback = std::move(probe.after_native))
+        if (auto callback = std::exchange(probe.after_native, {}))
             callback();
         return result;
     }
@@ -939,6 +939,12 @@ namespace {
         for (auto error : {VK_ERROR_OUT_OF_DATE_KHR, VK_TIMEOUT, VK_ERROR_OUT_OF_HOST_MEMORY, VK_ERROR_OUT_OF_DEVICE_MEMORY}) {
             SCOPED_TRACE(error);
             probe.failure = error;
+            std::shared_ptr<vsl::lifetime::AcquireEvidence> evidence;
+            probe.after_native = [&] {
+                const auto registry = vsl::lifetime::presentation_domain(chain.data_);
+                ASSERT_FALSE(registry->acquisitions.empty());
+                evidence = registry->acquisitions.back();
+            };
             vsl::DefaultPhase phase(manager, chain, std::nullopt, std::nullopt, std::nullopt, true, source);
             if (error == VK_ERROR_OUT_OF_DATE_KHR)
                 EXPECT_NO_THROW(phase.setup());
@@ -946,9 +952,7 @@ namespace {
                 EXPECT_THROW(phase.setup(), std::runtime_error);
             EXPECT_EQ(phase.get_image_index(), UINT32_MAX);
             EXPECT_FALSE(domain->context.acquired_image_index);
-            const auto registry = vsl::lifetime::presentation_domain(chain.data_);
-            ASSERT_FALSE(registry->acquisitions.empty());
-            const auto& evidence = registry->acquisitions.back();
+            ASSERT_TRUE(evidence);
             EXPECT_EQ(evidence->image, UINT32_MAX);
             EXPECT_EQ(evidence->proof.status, vsl::sync::FenceProofStatus::NOT_ACQUIRED);
             EXPECT_TRUE(std::holds_alternative<std::monostate>(source.data_->uses[0].use));

@@ -1,5 +1,6 @@
 #include <VSL/lifetime/synchronization_use.hpp>
 #include <VSL/lifetime/synchronization_storage.hpp>
+#include <VSL/lifetime/submission_retention.hpp>
 #include <VSL/vulkan/synchronize.hpp>
 #include <VSL/operation/synchronization_ops.hpp>
 #include <VSL/sync/submission_completion.hpp>
@@ -17,7 +18,7 @@ namespace VSL_NAMESPACE::lifetime {
             std::vector<vk::Fence> handles;
             std::vector<FenceObservation> observations;
             size_t first = 0, end = 0;
-            bool active = false;
+            bool active = false, observing = false;
             FenceAccess(std::shared_ptr<impl::FenceImpl> data, std::optional<std::uint32_t> index);
             ~FenceAccess();
             void check() const;
@@ -25,6 +26,8 @@ namespace VSL_NAMESPACE::lifetime {
             void require_waitable(bool poll) const;
             std::vector<std::shared_ptr<impl::SubmissionWork>> submitted_work() const;
             void save_observations(vk::Result result) const noexcept;
+            void begin_observation() noexcept;
+            void finish_observation() noexcept;
         };
         struct SemaphoreAccess {
             sync::SemaphoreUseState& state;
@@ -38,6 +41,8 @@ namespace VSL_NAMESPACE::lifetime {
         bool idle_acquisition(sync::FenceProof& proof, bool wait) noexcept;
         bool idle_presentation(sync::PresentState& state, bool wait) noexcept;
         bool idle_acquisition(sync::FenceProof& proof, bool wait) noexcept {
+            if (proof.observing)
+                return false;
             if (proof.status == sync::FenceProofStatus::UNARMED)
                 return false;
             if (!sync::fence_proof_terminal(proof))
@@ -47,6 +52,8 @@ namespace VSL_NAMESPACE::lifetime {
             return sync::fence_proof_terminal(proof);
         }
         bool idle_presentation(sync::PresentState& state, bool wait) noexcept {
+            if (state.observing)
+                return false;
             if (state.status == sync::PresentStatus::PENDING)
                 return false;
             sync::poll_present(state);
@@ -102,6 +109,7 @@ namespace VSL_NAMESPACE::lifetime {
             active = true;
         }
         FenceAccess::~FenceAccess() {
+            finish_observation();
             if (active)
                 for (size_t i = first; i < end && i < data->uses.size(); ++i)
                     data->uses[i].accessing = false;
@@ -121,16 +129,20 @@ namespace VSL_NAMESPACE::lifetime {
                         if (!value)
                             return;
                         if constexpr (std::is_same_v<Value, std::shared_ptr<impl::SubmissionImpl>>) {
-                            if (value->native.active || value->status == Completion::Status::PENDING)
+                            if (value->native.active || value->native.observing || value->status == Completion::Status::PENDING)
                                 throw std::logic_error("Fence is reserved by an unsubmitted phase");
                             if (!poll && (value->native.enqueue == sync::SubmissionEnqueue::UNKNOWN ||
                                           value->native.enqueue == sync::SubmissionEnqueue::NOT_ENQUEUED ||
                                           value->status == Completion::Status::CANCELLED))
                                 throw std::logic_error("Fence enqueue has not been established; only polling is allowed");
                         } else if constexpr (std::is_same_v<Value, std::shared_ptr<sync::FenceProof>>) {
+                            if (value->observing)
+                                throw std::logic_error("Acquisition fence is being observed");
                             if (value->status == sync::FenceProofStatus::UNARMED || value->status == sync::FenceProofStatus::NOT_ACQUIRED)
                                 throw std::logic_error("Fence has no submitted acquisition");
-                        } else if (value->status == sync::PresentStatus::PENDING || (value->status == sync::PresentStatus::UNCERTAIN && !poll))
+                            if (!poll && value->status == sync::FenceProofStatus::UNCERTAIN)
+                                throw std::logic_error("Acquisition fence enqueue is uncertain; only polling is allowed");
+                        } else if (value->observing || value->status == sync::PresentStatus::PENDING || (value->status == sync::PresentStatus::UNCERTAIN && !poll))
                             throw std::logic_error("Present fence enqueue has not been established");
                     }
                 },
@@ -185,6 +197,30 @@ namespace VSL_NAMESPACE::lifetime {
                 },
                            observation);
         }
+        void FenceAccess::begin_observation() noexcept {
+            observing = true;
+            for (const auto& observation : observations)
+                std::visit([](const auto& value) {
+                    using Value = std::decay_t<decltype(value)>;
+                    if constexpr (std::is_same_v<Value, std::shared_ptr<sync::FenceProof>> || std::is_same_v<Value, std::shared_ptr<sync::PresentState>>)
+                        if (value)
+                            value->observing = true;
+                },
+                           observation);
+        }
+        void FenceAccess::finish_observation() noexcept {
+            if (!observing)
+                return;
+            for (const auto& observation : observations)
+                std::visit([](const auto& value) {
+                    using Value = std::decay_t<decltype(value)>;
+                    if constexpr (std::is_same_v<Value, std::shared_ptr<sync::FenceProof>> || std::is_same_v<Value, std::shared_ptr<sync::PresentState>>)
+                        if (value)
+                            value->observing = false;
+                },
+                           observation);
+            observing = false;
+        }
         SemaphoreAccess::SemaphoreAccess(sync::SemaphoreUseState& state) : state(state) {
             if (state.accessing)
                 throw std::logic_error("Semaphore is being accessed");
@@ -222,7 +258,7 @@ namespace VSL_NAMESPACE::lifetime {
         }
     }
     void release_acquire_fence(impl::FenceImpl& fence, std::uint32_t index, const std::shared_ptr<sync::FenceProof>& proof) noexcept {
-        if (!proof || !sync::fence_proof_terminal(*proof) || index >= fence.uses.size() || fence.uses[index].accessing)
+        if (!proof || proof->observing || !sync::fence_proof_terminal(*proof) || index >= fence.uses.size() || fence.uses[index].accessing)
             return;
         auto& use = fence.uses[index].use;
         const auto* source = std::get_if<std::weak_ptr<sync::FenceProof>>(&use);
@@ -250,9 +286,14 @@ namespace VSL_NAMESPACE::lifetime {
             throw std::logic_error("Phase no longer owns its fence reservation");
     }
     bool wait_fences(std::shared_ptr<impl::FenceImpl> fence, std::optional<std::uint32_t> index, std::uint64_t timeout) {
-        const FenceAccess access(std::move(fence), index);
+        FenceAccess access(std::move(fence), index);
         access.require_waitable(timeout == 0);
         const auto submitted = access.submitted_work();
+        std::vector<SubmissionObservation> observations;
+        observations.reserve(submitted.size());
+        for (const auto& work : submitted)
+            observations.emplace_back(*work);
+        access.begin_observation();
         auto result = access.data->device->lost ? vk::Result::eErrorDeviceLost : operation::wait_fences(access.data->native_device, access.handles, timeout);
         if (access.data->device->lost)
             result = vk::Result::eErrorDeviceLost;
@@ -265,6 +306,9 @@ namespace VSL_NAMESPACE::lifetime {
             access.save_observations(result);
             for (const auto& work : submitted)
                 sync::save_native_idle(*work, static_cast<std::int32_t>(result));
+            for (auto& observation : observations)
+                observation.finish();
+            access.finish_observation();
             for (const auto& work : submitted)
                 sync::finish_submission(*work);
         }

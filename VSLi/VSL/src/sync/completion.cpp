@@ -12,7 +12,7 @@ namespace VSL_NAMESPACE::sync {
     namespace {
         void release_terminal_resources(impl::SubmissionWork& work) noexcept;
         void release_terminal_resources(impl::SubmissionWork& work) noexcept {
-            if (work.result->native.active || native_pending(*work.result))
+            if (work.result->native.active || work.result->native.observing || native_pending(*work.result))
                 return;
             const auto pin = work.quarantined ? lifetime::unquarantine_submission(work) : nullptr;
             if (work.quarantined)
@@ -32,7 +32,7 @@ namespace VSL_NAMESPACE::sync {
         work.result->failure = failure;
         work.result->error_code = error_code;
         work.result->status = status;
-        if (!work.result->native.active && !native_pending(*work.result) && !work.quarantined)
+        if (!work.result->native.active && !work.result->native.observing && !native_pending(*work.result) && !work.quarantined)
             work.result->work.reset();
         return true;
     }
@@ -41,8 +41,17 @@ namespace VSL_NAMESPACE::sync {
             release_terminal_resources(work);
     }
     void observe_submission_result(impl::SubmissionWork& work, std::int32_t native_result) {
-        if (work.result->native.active || (work.result->status != Completion::Status::SUBMITTED && !native_pending(*work.result)))
+        if (work.result->native.active)
             return;
+        if (native_result == static_cast<std::int32_t>(vk::Result::eErrorDeviceLost) && work.device)
+            work.device->lost = true;
+        if (work.result->status != Completion::Status::SUBMITTED && !native_pending(*work.result)) {
+            if (work.device && work.device->lost)
+                save_native_idle(work, static_cast<std::int32_t>(vk::Result::eErrorDeviceLost));
+            if (terminal_status(work.result->status))
+                release_terminal_resources(work);
+            return;
+        }
         if (work.device && work.device->lost)
             native_result = static_cast<std::int32_t>(vk::Result::eErrorDeviceLost);
         const auto result = static_cast<vk::Result>(native_result);
@@ -53,18 +62,21 @@ namespace VSL_NAMESPACE::sync {
             throw std::runtime_error("Submission completion observation failed: " + vk::to_string(result));
     }
     void save_submit_result(impl::SubmissionImpl& result, std::int32_t native_result) noexcept {
+        save_submit_result(result.native, native_result);
+    }
+    void save_submit_result(SubmissionNativeState& state, std::int32_t native_result) noexcept {
         const auto native = static_cast<vk::Result>(native_result);
-        result.native.observation = native_result;
-        result.native.complete = native != vk::Result::eSuccess && native != vk::Result::eErrorUnknown;
+        state.observation = native_result;
+        state.complete = native != vk::Result::eSuccess && native != vk::Result::eErrorUnknown;
         if (native == vk::Result::eSuccess)
-            result.native.enqueue = SubmissionEnqueue::ENQUEUED;
+            state.enqueue = SubmissionEnqueue::ENQUEUED;
         else if (native == vk::Result::eErrorOutOfHostMemory || native == vk::Result::eErrorOutOfDeviceMemory)
-            result.native.enqueue = SubmissionEnqueue::NOT_ENQUEUED;
+            state.enqueue = SubmissionEnqueue::NOT_ENQUEUED;
         else if (native == vk::Result::eErrorDeviceLost)
-            result.native.enqueue = SubmissionEnqueue::DEVICE_LOST;
+            state.enqueue = SubmissionEnqueue::DEVICE_LOST;
         else {
-            result.native.enqueue = SubmissionEnqueue::UNKNOWN;
-            result.native.complete = false;
+            state.enqueue = SubmissionEnqueue::UNKNOWN;
+            state.complete = false;
         }
     }
     void save_native_idle(impl::SubmissionWork& work, std::int32_t native_result) noexcept {
@@ -81,16 +93,20 @@ namespace VSL_NAMESPACE::sync {
             save_terminal(work, result == vk::Result::eSuccess ? Completion::Status::COMPLETE : Completion::Status::FAILED,
                           result == vk::Result::eSuccess ? Completion::Failure::NONE : Completion::Failure::DEVICE_LOST,
                           result == vk::Result::eSuccess ? 0 : native_result);
-        else if (terminal_status(work.result->status) && !work.result->native.active && !work.quarantined)
+        else if (terminal_status(work.result->status) && !work.result->native.active && !work.result->native.observing && !work.quarantined)
             work.result->work.reset();
     }
     void finish_submission(impl::SubmissionWork& work) noexcept {
-        if (work.result->native.active) {
+        if (work.result->native.active || work.result->native.observing) {
             work.abandon_requested = true;
             return;
         }
         if (native_pending(*work.result) && work.result->native.enqueue == SubmissionEnqueue::UNKNOWN) {
+            lifetime::SubmissionObservation observation(work);
+            if (!observation.active())
+                return;
             const auto result = work.device->lost ? vk::Result::eErrorDeviceLost : operation::poll_fence(work.device->device, work.fence);
+            observation.finish();
             if (result == vk::Result::eSuccess || result == vk::Result::eErrorDeviceLost)
                 save_native_idle(work, static_cast<std::int32_t>(result));
             release_terminal_resources(work);
@@ -99,9 +115,13 @@ namespace VSL_NAMESPACE::sync {
         if (work.result->status == Completion::Status::PENDING)
             publish_terminal(work, Completion::Status::CANCELLED);
         while (work.result->status == Completion::Status::SUBMITTED) {
+            lifetime::SubmissionObservation observation(work);
+            if (!observation.active())
+                return;
             auto result = work.device->lost ? vk::Result::eErrorDeviceLost : operation::wait_fence(work.device->device, work.fence, UINT64_MAX);
             if (result != vk::Result::eSuccess && result != vk::Result::eErrorDeviceLost && result != vk::Result::eTimeout)
                 result = operation::wait_device_idle(work.device->device);
+            observation.finish();
             if (result == vk::Result::eSuccess)
                 observe_submission_result(work, static_cast<std::int32_t>(result));
             else if (result == vk::Result::eErrorDeviceLost)
@@ -119,12 +139,17 @@ namespace VSL_NAMESPACE {
         Completion::Status query_result(const std::shared_ptr<impl::SubmissionImpl>& result) {
             if (!result)
                 return Completion::Status::CANCELLED;
-            if (result->native.active)
+            if (result->native.active || result->native.observing)
                 return result->status;
             if (auto work = result->work.lock()) {
-                if (result->status == Completion::Status::SUBMITTED || sync::native_pending(*result))
-                    sync::observe_submission_result(*work, static_cast<std::int32_t>(work->device->lost ? vk::Result::eErrorDeviceLost : operation::poll_fence(work->device->device, work->fence)));
-                else if (work->quarantined && sync::terminal_status(result->status))
+                if (result->status == Completion::Status::SUBMITTED || sync::native_pending(*result)) {
+                    lifetime::SubmissionObservation observation(*work);
+                    if (!observation.active())
+                        return result->status;
+                    const auto native = work->device->lost ? vk::Result::eErrorDeviceLost : operation::poll_fence(work->device->device, work->fence);
+                    observation.finish();
+                    sync::observe_submission_result(*work, static_cast<std::int32_t>(native));
+                } else if (work->quarantined && sync::terminal_status(result->status))
                     sync::finish_submission(*work);
             }
             return result->status;
@@ -158,7 +183,7 @@ namespace VSL_NAMESPACE {
     }
     bool Completion::wait(std::uint64_t timeout) const {
         const auto result = data_;
-        if (result && result->native.active)
+        if (result && (result->native.active || result->native.observing))
             return false;
         const auto current = query_result(result);
         if (current == Status::COMPLETE)
@@ -168,7 +193,12 @@ namespace VSL_NAMESPACE {
         auto work = result->work.lock();
         if (!work)
             return result->status == Status::COMPLETE;
-        sync::observe_submission_result(*work, static_cast<std::int32_t>(operation::wait_fence(work->device->device, work->fence, timeout)));
+        lifetime::SubmissionObservation observation(*work);
+        if (!observation.active())
+            return false;
+        const auto native = operation::wait_fence(work->device->device, work->fence, timeout);
+        observation.finish();
+        sync::observe_submission_result(*work, static_cast<std::int32_t>(native));
         return result->status == Status::COMPLETE;
     }
 } // namespace VSL_NAMESPACE

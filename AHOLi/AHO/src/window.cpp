@@ -155,7 +155,8 @@ bool AHO_NAMESPACE::window::Window::recreate_swapchain(VSL_NAMESPACE::ImageType 
         return false;
     const auto usage = drawing->swapchain.images.at(0).get_usage() | additional_usage;
     std::optional<VSL_NAMESPACE::SwapchainAccessor> previous;
-    if (drawing->swapchain.state() == VSL_NAMESPACE::SwapchainState::ACTIVE)
+    if (drawing->swapchain.state() == VSL_NAMESPACE::SwapchainState::ACTIVE ||
+        drawing->swapchain.state() == VSL_NAMESPACE::SwapchainState::RECOVERY_REQUIRED)
         previous = drawing->swapchain;
     const VSL_NAMESPACE::SwapchainCreateInfo info{.usage = usage, .present_fences = drawing->swapchain.present_fences()};
     VSL_NAMESPACE::lifetime::SwapchainArena candidate(runtime->logical_device, *drawing->surface, info, std::move(previous));

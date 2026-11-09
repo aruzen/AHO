@@ -1,5 +1,7 @@
 #include <VSL/lifetime/presentation_retention.hpp>
 #include <VSL/lifetime/command_domain.hpp>
+#include <VSL/lifetime/acquire_ticket.hpp>
+#include <VSL/lifetime/phase_call.hpp>
 #include <VSL/lifetime/surface_storage.hpp>
 #include <VSL/lifetime/swapchain_storage.hpp>
 #include <VSL/lifetime/synchronization_use.hpp>
@@ -39,6 +41,11 @@ namespace VSL_NAMESPACE::lifetime {
         void apply_acquisitions(std::span<const std::shared_ptr<PresentRecord>> records, std::span<const std::shared_ptr<AcquireEvidence>> acquisitions) noexcept;
         ReleasedPresentOwners detach_present_owners(PresentRecord& record) noexcept;
         void retire_presentations(PresentationSnapshot& snapshot);
+        void observe_present_record(PresentRecord& record, vk::Result idle, bool wait) noexcept;
+        bool matches_presentation_scope(const PresentRecord& record, const std::shared_ptr<impl::SurfaceImpl>& surface,
+                                        std::span<const std::shared_ptr<SurfacePresentationDomain>> domains) noexcept;
+        void prepend_present_chain(std::shared_ptr<PresentRecord>& head, std::shared_ptr<PresentRecord>& chain) noexcept;
+        bool present_native_active(const PresentRecord& record) noexcept;
 
         PresentationQuarantine& presentation_quarantine() noexcept {
             static_assert(std::is_nothrow_default_constructible_v<PresentationQuarantine>);
@@ -94,30 +101,61 @@ namespace VSL_NAMESPACE::lifetime {
         }
         ReleasedPresentOwners detach_present_owners(PresentRecord& record) noexcept {
             record.semaphore_source = nullptr;
+            record.state.origin = nullptr;
             record.released = true;
             ReleasedPresentOwners owners;
             owners.generation.swap(record.generation);
             owners.semaphore.swap(record.semaphore);
             owners.marker.swap(record.marker);
-            if (owners.marker)
+            if (owners.marker && record.state.status != sync::PresentStatus::CANCELLED)
                 owners.marker->complete = true;
             return owners;
         }
         void retire_presentations(PresentationSnapshot& snapshot) {
-            std::vector<ReleasedPresentOwners> released;
-            released.reserve(snapshot.records.size());
-            for (const auto& record : snapshot.records)
-                if (!record->released && sync::present_terminal(record->state))
-                    released.push_back(detach_present_owners(*record));
-            auto& domain = *snapshot.domain;
-            std::erase_if(domain.records, [&](const auto& record) {
-                return record->released && std::ranges::find(snapshot.records, record) != snapshot.records.end();
-            });
-            std::erase_if(domain.acquisitions, [&](const auto& evidence) {
-                return evidence->finished && sync::fence_proof_terminal(evidence->proof) &&
-                       std::ranges::find(snapshot.acquisitions, evidence) != snapshot.acquisitions.end();
-            });
-            // 全Recordとregistryを確定してから、owner解放によるcallbackを許可する。
+            if (snapshot.domain->recovering)
+                return;
+            bookkeep_presentations(snapshot);
+            release_presentations(snapshot);
+        }
+        void observe_present_record(PresentRecord& record, vk::Result idle, bool wait) noexcept {
+            if (idle == vk::Result::eErrorDeviceLost) {
+                sync::fail_present(record.state, idle);
+                return;
+            }
+            if (record.released || sync::present_terminal(record.state) || record.state.status == sync::PresentStatus::PENDING)
+                return;
+            if (record.state.strict) {
+                if (wait)
+                    sync::wait_present(record.state);
+                else
+                    sync::poll_present(record.state);
+            } else if (!sync::poll_present(record.state) && wait && idle == vk::Result::eSuccess &&
+                       record.state.status == sync::PresentStatus::SUBMITTED)
+                record.state.status = sync::PresentStatus::LEGACY_RELEASED;
+        }
+        bool matches_presentation_scope(const PresentRecord& record, const std::shared_ptr<impl::SurfaceImpl>& surface,
+                                        std::span<const std::shared_ptr<SurfacePresentationDomain>> domains) noexcept {
+            if (!record.generation)
+                return false;
+            if (surface)
+                return record.generation->surface == surface.get();
+            for (const auto& domain : domains)
+                if (const auto parent = domain->surface.lock(); parent && parent.get() == record.generation->surface)
+                    return true;
+            return false;
+        }
+        void prepend_present_chain(std::shared_ptr<PresentRecord>& head, std::shared_ptr<PresentRecord>& chain) noexcept {
+            if (!chain)
+                return;
+            auto* tail = chain.get();
+            while (tail->quarantine_next)
+                tail = tail->quarantine_next.get();
+            tail->quarantine_next = std::move(head);
+            head = std::move(chain);
+        }
+        bool present_native_active(const PresentRecord& record) noexcept {
+            const auto* context = record.generation ? record.generation->presentation_context : nullptr;
+            return record.state.observing || (context && record.image < context->images.size() && context->images[record.image].accessing);
         }
     } // namespace
 
@@ -154,6 +192,7 @@ namespace VSL_NAMESPACE::lifetime {
         auto evidence = std::make_shared<AcquireEvidence>();
         evidence->generation = generation;
         evidence->generation_address = generation.get();
+        evidence->proof.origin = generation->device;
         evidence->proof.device = generation->native_device;
         evidence->proof.fence = fence;
         domain.acquisitions.push_back(evidence);
@@ -206,6 +245,7 @@ namespace VSL_NAMESPACE::lifetime {
         sync::require_semaphore_element(*semaphore, image);
         wait = semaphore->semaphores[image];
         record = std::make_shared<PresentRecord>();
+        record->state.origin = generation->device;
         record->state.device = generation->native_device;
         record->state.strict = generation->present_fences == PresentFencePolicy::REQUIRE_FENCE;
         record->queue = queue;
@@ -242,10 +282,19 @@ namespace VSL_NAMESPACE::lifetime {
             throw std::logic_error("Presentation image reservation changed");
         if (!record.semaphore_source)
             throw std::logic_error("Presentation semaphore has been released");
-        sync::require_semaphore_element(*record.semaphore_source, record.image);
+        if (record.marker)
+            sync::require_present_wait(*record.semaphore_source, record.image, *record.marker);
+        else
+            sync::require_semaphore_element(*record.semaphore_source, record.image);
         record.serial = next_present_serial();
-        const auto result = operation::queue_present(record.queue, record.generation->swap_chain, record.image,
-                                                     record.wait_semaphore, record.state.strict ? record.state.proof : vk::Fence{});
+        if (record.semaphore_source->use.accessing)
+            throw std::logic_error("Presentation semaphore source is being accessed");
+        const NativeCall semaphore_call(record.semaphore_source->use.accessing);
+        auto result = record.generation->device->lost ? vk::Result::eErrorDeviceLost
+                                                      : operation::queue_present(record.queue, record.generation->swap_chain, record.image,
+                                                                                 record.wait_semaphore, record.state.strict ? record.state.proof : vk::Fence{});
+        if (record.generation->device->lost)
+            result = vk::Result::eErrorDeviceLost;
         const auto outcome = sync::commit_present(record.state, result);
         if (outcome == sync::PresentEnqueue::ENQUEUED) {
             slot.present_serial = record.serial;
@@ -255,7 +304,7 @@ namespace VSL_NAMESPACE::lifetime {
         return outcome;
     }
     void collect_presentations(std::shared_ptr<SurfacePresentationDomain> domain) noexcept {
-        if (!domain || domain->closing)
+        if (!domain || domain->closing || domain->recovering)
             return;
         try {
             PresentationSnapshot snapshot{domain, domain->records, domain->acquisitions};
@@ -272,6 +321,92 @@ namespace VSL_NAMESPACE::lifetime {
         auto& registry = presentation_quarantine();
         const std::lock_guard lock(registry.mutex);
         return registry.count;
+    }
+    QuarantinedPresentations::QuarantinedPresentations(std::shared_ptr<impl::LogicalDeviceImpl> device,
+                                                       std::span<const std::shared_ptr<SurfacePresentationDomain>> domains,
+                                                       std::shared_ptr<impl::SurfaceImpl> surface)
+        : _device(std::move(device)), _surface(std::move(surface)), _domains(domains) {
+        auto& registry = presentation_quarantine();
+        const std::lock_guard lock(registry.mutex);
+        if (registry.collecting)
+            throw std::logic_error("Presentation quarantine is already being observed");
+        registry.collecting = true;
+        _collecting = true;
+        auto pending = std::move(registry.head);
+        while (pending) {
+            auto record = std::move(pending);
+            pending = std::move(record->quarantine_next);
+            auto& head = record->state.device == _device->device && matches_presentation_scope(*record, _surface, _domains) ? _selected : _foreign;
+            record->quarantine_next = std::move(head);
+            head = std::move(record);
+        }
+    }
+    QuarantinedPresentations::~QuarantinedPresentations() {
+        if (_collecting) {
+            auto& registry = presentation_quarantine();
+            const std::lock_guard lock(registry.mutex);
+            prepend_present_chain(registry.head, _selected);
+            prepend_present_chain(registry.head, _foreign);
+            registry.collecting = false;
+        }
+        release();
+    }
+    void QuarantinedPresentations::save_observations(vk::Result idle, bool wait) noexcept {
+        if (_device->lost)
+            idle = vk::Result::eErrorDeviceLost;
+        if (idle == vk::Result::eErrorDeviceLost) {
+            for (auto* head : {_selected.get(), _foreign.get()})
+                for (auto* record = head; record; record = record->quarantine_next.get())
+                    if (record->state.device == _device->device)
+                        sync::fail_present(record->state, idle);
+            return;
+        }
+        for (auto* record = _selected.get(); record; record = record->quarantine_next.get()) {
+            observe_present_record(*record, idle, wait);
+            if (_device->lost) {
+                save_observations(vk::Result::eErrorDeviceLost, false);
+                return;
+            }
+        }
+    }
+    void QuarantinedPresentations::bookkeep() noexcept {
+        if (!_collecting)
+            return;
+        std::shared_ptr<PresentRecord> pending;
+        while (_selected) {
+            auto record = std::move(_selected);
+            _selected = std::move(record->quarantine_next);
+            auto& head = sync::present_terminal(record->state) && !present_native_active(*record) ? _ready : pending;
+            record->quarantine_next = std::move(head);
+            head = std::move(record);
+        }
+        _pending = bool(pending);
+        auto& registry = presentation_quarantine();
+        const std::lock_guard lock(registry.mutex);
+        prepend_present_chain(registry.head, pending);
+        prepend_present_chain(registry.head, _foreign);
+        for (auto* record = _ready.get(); record; record = record->quarantine_next.get()) {
+            record->quarantined = false;
+            record->released = true;
+            --registry.count;
+        }
+        registry.collecting = false;
+        _collecting = false;
+    }
+    void QuarantinedPresentations::release() noexcept {
+        while (_ready) {
+            auto record = std::move(_ready);
+            _ready = std::move(record->quarantine_next);
+            const auto owners = detach_present_owners(*record);
+        }
+    }
+    bool QuarantinedPresentations::pending() const noexcept {
+        if (!_collecting)
+            return _pending;
+        for (auto* record = _selected.get(); record; record = record->quarantine_next.get())
+            if (!sync::present_terminal(record->state) || present_native_active(*record))
+                return true;
+        return false;
     }
     void collect_quarantined_presentations(const std::weak_ptr<impl::SurfaceImpl>& surface, vk::Device device, vk::Result known_idle) noexcept {
         const auto parent = surface.lock();
@@ -300,7 +435,7 @@ namespace VSL_NAMESPACE::lifetime {
                 record->state.status = sync::PresentStatus::FAILED;
             } else
                 sync::poll_present(record->state);
-            if (sync::present_terminal(record->state)) {
+            if (sync::present_terminal(record->state) && !present_native_active(*record)) {
                 record->quarantined = false;
                 const auto owners = detach_present_owners(*record);
                 const std::lock_guard lock(registry.mutex);
@@ -332,6 +467,8 @@ namespace VSL_NAMESPACE::lifetime {
         return snapshot;
     }
     void finish_presentations(PresentationSnapshot& snapshot, vk::Result idle_result) {
+        if (snapshot.domain->recovering)
+            return;
         if (idle_result == vk::Result::eErrorDeviceLost)
             for (const auto& record : snapshot.records)
                 sync::fail_present(record->state, idle_result);
@@ -357,8 +494,53 @@ namespace VSL_NAMESPACE::lifetime {
         }
         retire_presentations(snapshot);
     }
+    void observe_presentations(PresentationSnapshot& snapshot, vk::Result idle_result, bool wait) noexcept {
+        if (idle_result == vk::Result::eErrorDeviceLost) {
+            for (const auto& evidence : snapshot.acquisitions)
+                sync::save_fence_observation(evidence->proof, idle_result);
+            for (const auto& record : snapshot.records)
+                sync::fail_present(record->state, idle_result);
+            return;
+        }
+        apply_acquisitions(snapshot.records, snapshot.acquisitions);
+        for (const auto& record : snapshot.records) {
+            if (record->released || sync::present_terminal(record->state) || record->state.status == sync::PresentStatus::PENDING)
+                continue;
+            if (record->state.strict) {
+                if (wait)
+                    sync::wait_present(record->state);
+                else
+                    sync::poll_present(record->state);
+            } else if (!sync::poll_present(record->state) && wait && idle_result == vk::Result::eSuccess &&
+                       record->state.status == sync::PresentStatus::SUBMITTED)
+                record->state.status = sync::PresentStatus::LEGACY_RELEASED;
+        }
+    }
+    void bookkeep_presentations(PresentationSnapshot& snapshot) noexcept {
+        for (const auto& record : snapshot.records)
+            if (sync::present_terminal(record->state) && !present_native_active(*record)) {
+                record->released = true;
+                if (record->marker && record->state.status != sync::PresentStatus::CANCELLED)
+                    record->marker->complete = true;
+            }
+        auto& domain = *snapshot.domain;
+        std::erase_if(domain.records, [&](const auto& record) {
+            return record->released && std::ranges::find(snapshot.records, record) != snapshot.records.end();
+        });
+        std::erase_if(domain.acquisitions, [&](const auto& evidence) {
+            return evidence->finished && sync::fence_proof_terminal(evidence->proof) &&
+                   std::ranges::find(snapshot.acquisitions, evidence) != snapshot.acquisitions.end();
+        });
+    }
+    void release_presentations(PresentationSnapshot& snapshot) noexcept {
+        for (const auto& record : snapshot.records)
+            if (record->released && record->generation) {
+                const auto owners = detach_present_owners(*record);
+            }
+    }
     SurfacePresentationDomain::~SurfacePresentationDomain() {
         closing = true;
+        const auto tickets = quarantine_acquisitions(*this);
         const auto parent = surface.lock();
         auto* context = parent ? parent->owner_context : nullptr;
         auto pending = std::move(records);
@@ -367,6 +549,10 @@ namespace VSL_NAMESPACE::lifetime {
         for (const auto& record : pending) {
             if (record->released || sync::present_terminal(record->state))
                 continue;
+            if (record->state.origin && record->state.origin->lost) {
+                sync::fail_present(record->state, vk::Result::eErrorDeviceLost);
+                continue;
+            }
             if (record->state.status == sync::PresentStatus::PENDING) {
                 record->state.status = sync::PresentStatus::CANCELLED;
                 continue;
@@ -377,28 +563,50 @@ namespace VSL_NAMESPACE::lifetime {
                     if (operation::wait_device_idle(record->state.device) == vk::Result::eErrorDeviceLost) {
                         record->state.result = vk::Result::eErrorDeviceLost;
                         record->state.status = sync::PresentStatus::FAILED;
+                        if (record->state.origin)
+                            record->state.origin->lost = true;
                     } else
                         quarantine_presentation(record);
                 }
                 continue;
             }
             if (!record->state.strict) {
-                auto result = operation::wait_device_idle(record->state.device);
-                while (result != vk::Result::eSuccess && result != vk::Result::eErrorDeviceLost)
-                    result = operation::wait_device_idle(record->state.device);
-                record->state.status = result == vk::Result::eErrorDeviceLost ? sync::PresentStatus::FAILED : sync::PresentStatus::LEGACY_RELEASED;
+                const auto result = operation::wait_device_idle(record->state.device);
+                if (result == vk::Result::eErrorDeviceLost) {
+                    sync::fail_present(record->state, result);
+                    if (record->state.origin)
+                        record->state.origin->lost = true;
+                } else if (result == vk::Result::eSuccess)
+                    record->state.status = sync::PresentStatus::LEGACY_RELEASED;
+                else
+                    quarantine_presentation(record);
             } else {
-                while (!sync::present_terminal(record->state) && record->state.status == sync::PresentStatus::SUBMITTED) {
+                if (!sync::present_terminal(record->state) && record->state.status == sync::PresentStatus::SUBMITTED)
                     sync::wait_present(record->state);
-                    if (!sync::present_terminal(record->state))
-                        std::this_thread::yield();
-                }
                 if (!sync::present_terminal(record->state))
                     quarantine_presentation(record);
             }
         }
+        for (const auto& ticket : tickets)
+            if (ticket->device && ticket->device->lost)
+                recover_acquisition(*ticket);
+        for (const auto& record : pending) {
+            if (record->state.origin && record->state.origin->lost)
+                sync::fail_present(record->state, vk::Result::eErrorDeviceLost);
+            if (!record->quarantined) {
+                record->released = true;
+                if (record->marker && record->state.status != sync::PresentStatus::CANCELLED)
+                    record->marker->complete = true;
+            }
+        }
+        for (const auto& item : evidence)
+            if (item->proof.origin && item->proof.origin->lost)
+                sync::save_fence_observation(item->proof, vk::Result::eErrorDeviceLost);
+        for (const auto& ticket : tickets)
+            if (!ticket->quarantined)
+                release_acquire_owners(*ticket);
         for (const auto& record : pending)
-            if (!record->released && !record->quarantined) {
+            if (record->released && !record->quarantined && record->generation) {
                 const auto released = detach_present_owners(*record);
             }
         if (context && context->presentation_identity == this) {

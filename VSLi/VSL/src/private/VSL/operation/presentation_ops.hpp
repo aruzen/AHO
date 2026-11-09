@@ -10,6 +10,7 @@ namespace VSL_NAMESPACE::operation {
         VkResult (*poll)(void*, VkDevice, VkFence) noexcept = nullptr;
         VkResult (*wait)(void*, VkDevice, VkFence, std::uint64_t) noexcept = nullptr;
         VkResult (*acquire)(void*, VkDevice, VkSwapchainKHR, std::uint64_t, VkSemaphore, VkFence, std::uint32_t*) noexcept = nullptr;
+        VkResult (*release)(void*, VkDevice, const VkReleaseSwapchainImagesInfoEXT*) noexcept = nullptr;
     };
     // 故障注入は呼出しスレッドのscopeに限定し、Impl／Recordへ保存しない。
     class ScopedPresentationNativeCalls {
@@ -28,4 +29,5 @@ namespace VSL_NAMESPACE::operation {
                              vk::Semaphore finished, vk::Fence present_fence = {}) noexcept;
     vk::Result poll_present_fence(vk::Device device, vk::Fence fence) noexcept;
     vk::Result wait_present_fence(vk::Device device, vk::Fence fence, std::uint64_t timeout) noexcept;
+    vk::Result release_swapchain_image(vk::Device device, vk::SwapchainKHR swapchain, std::uint32_t image) noexcept;
 } // namespace VSL_NAMESPACE::operation

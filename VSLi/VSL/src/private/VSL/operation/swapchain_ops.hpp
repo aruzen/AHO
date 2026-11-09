@@ -34,4 +34,5 @@ namespace VSL_NAMESPACE::operation {
     void adopt_swapchain(impl::SwapchainImpl& target, PendingSwapchain& pending) noexcept;
     void destroy_swapchain(impl::SwapchainImpl& target) noexcept;
     void require_active_swapchain(const impl::SwapchainImpl& target);
+    void require_replaceable_swapchain(const impl::SwapchainImpl& target);
 } // namespace VSL_NAMESPACE::operation

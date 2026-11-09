@@ -44,7 +44,7 @@ UNKNOWNでwait／signalしたbinary Semaphoreの要素にはpoisonを残す。id
 
 ## 残る範囲
 
-AcquireTicket、取得済み画像の返却、known signalの一度だけのdrain、RECOVERY_REQUIRED、AHO resize／closeは後続で接続する。Completionと元Domainを両方失ったWSI Workを回収する明示Surface入口も、そのTicket／Window境界で完成させる。現時点でWSIの失敗復旧全体を完了とは扱わない。
+後続の[AcquireTicket／Surface回収](acquire-ticket-recovery.md)で、取得済み画像の返却、known signalの一度だけのdrain、RECOVERY_REQUIRED、元Domain／Completionを失った後の回収入口を接続した。AHO resize／closeは10eに残り、現時点でWindowの失敗復旧全体を完了とは扱わない。
 
 Work／Result、内部vector、同期観測scratch、Semaphore要素別poison配列には個別CPU確保が残る。strict validationの参照一覧も可変長である。通常操作は取得済みImpl／nativeへ直接届き、UNKNOWN退避一覧を毎回探索しない。性能改善率は未測定であり、追加metadata・CPU結果のstrong観測も最終計測の対象とする。
 

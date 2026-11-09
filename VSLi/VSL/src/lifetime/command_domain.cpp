@@ -4,6 +4,7 @@
 #include <VSL/lifetime/command_storage.hpp>
 #include <VSL/lifetime/dependency_node.hpp>
 #include <VSL/lifetime/presentation_retention.hpp>
+#include <VSL/lifetime/resource_arena.hpp>
 #include <stdexcept>
 #include <utility>
 
@@ -27,6 +28,29 @@ namespace VSL_NAMESPACE::lifetime {
     } // namespace
     CommandDomain::CommandDomain(std::shared_ptr<impl::CommandBufferImpl> buffer)
         : buffer(std::move(buffer)), submissions(this->buffer->command_buffers.size()) {}
+
+    std::shared_ptr<impl::FenceImpl> acquire_fences(CommandDomain& domain, LogicalDeviceAccessor device) {
+        if (domain.context.closing || domain.context.recording || domain.context.returning_image ||
+            domain.context.mutating || domain.context.frame_buffer_recording)
+            throw std::logic_error("Command domain cannot prepare acquisition fences");
+        if (!domain.acquire_fences) {
+            const auto buffer = domain.buffer;
+            const auto generation = domain.context.generation;
+            const auto count = buffer->command_buffers.size();
+            if (!count || count > std::numeric_limits<std::uint32_t>::max())
+                throw std::invalid_argument("Acquisition fences require a nonzero uint32 frame count");
+            static constexpr std::array<typed::ResourceRequest, 1> REQUESTS{{{{1}, storage::ResourceKind::FENCE}}};
+            static constexpr typed::ResourcePlan<1> PLAN(REQUESTS);
+            const std::array<ResourceInit, 1> inputs{FenceCreateInfo{count, false}};
+            ResourceArena arena(device, PLAN, inputs);
+            if (domain.acquire_fences || domain.buffer != buffer || domain.context.generation != generation ||
+                domain.context.closing || domain.context.recording || domain.context.returning_image || domain.context.mutating ||
+                domain.context.frame_buffer_recording || buffer->command_buffers.size() != count)
+                throw std::logic_error("Command domain changed while constructing acquisition fences");
+            domain.acquire_fences = arena.fence({1}).data_;
+        }
+        return domain.acquire_fences;
+    }
 
     CommandDomain::~CommandDomain() {
         context.closing = true;

@@ -186,11 +186,13 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 
 10cは[Presentの完了観測と世代保持](presentation-retention.md)で、Surface共通の外部Domain／PresentRecord、世代内のFence pool、enqueue結果の分類、snapshot回収とcallback再入を接続した。graphics完了とstrict present証明を分け、DeviceLostは全snapshotへ先に保存してから保持を解除する。不明結果の終了は退避し、同Surface／Deviceに限定して非blocking回収する。Swapchain内部からRecordを強所有しない。
 
-10dはframeごとのacquire FenceとAcquireTicket、取得後失敗・取消時のsignal消費／画像返却、present OOMのretryと破棄を扱う。[前半の準備中の借用寿命](phase-call-lifetime.md)で、stack guardによる自己破棄検知、局所ownerの解放・例外後の中断、共有Fence予約と既存peer-start契約を検証した。Ticket／Fence pool／取得後回復は未完了であり、10d全体は継続する。
+10dはframeごとのacquire FenceとAcquireTicket、取得後失敗・取消時のsignal消費／画像返却、present OOMのretryと破棄を扱う。[前半の準備中の借用寿命](phase-call-lifetime.md)で、stack guardによる自己破棄検知、局所ownerの解放・例外後の中断、共有Fence予約と既存peer-start契約を検証した。Ticket／取得後回復は未完了であり、10d全体は継続する。
 
 [Fenceの共通用途状態](fence-use-kinds.md)で、graphics／acquire／presentの物理要素を一つのweak variantへ整理した。strict poolの正規aliasも同じ予約・変更検査を使い、旧Proof保存後のreset、UNKNOWNのpoll限定、配列Lossの全結果保存後通知を検証した。Ticketへ別の物理使用表を追加しないための前提であり、F個の実acquire poolと取得後回復へ続く。
 
 [世代の描画完了Semaphore](generation-semaphores.md)で、既定経路のUniqueSemaphore vectorを共通backendと世代内のSemaphoreImpl slot（native実画像M個）へ接続する。AHOは同Mのresizeでも新sourceへ更新する。同期source３役はCOMPLETION保持へ統一し、送信履歴で旧世代を延命しない。F個のacquire FenceとTicketは次の単位であり、10d全体は未完了である。
+
+[取得Fence pool](acquire-fence-pool.md)でF個のnative Fenceを共通ResourceArenaへ配置し、Domainに正規source一つだけをlazy保持する。CPU-only proofの保存・予約identity・外部source・取得失敗・reset巻戻しとcallback中の自己破棄を検証した。次は実Ticketと取得後失敗の回収であり、graphicsの実enqueue・未確定native使用と論理結果を区別して接続する。
 
 10eはAHOのframe同期群とSwapchain世代群を分け、候補生成後のattachment失敗から復旧する。0 extentでは再生成・acquire・Fence resetを延期し、復元後に一括公開する。最後のpresent直後close、連続resize、marker保持量の有界化と互換Pipeline再利用を検証して順序10完了とする。
 

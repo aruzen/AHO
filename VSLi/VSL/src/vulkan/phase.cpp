@@ -11,6 +11,7 @@
 #include <VSL/sync/resource_use_access.hpp>
 #include <VSL/operation/submission_ops.hpp>
 #include <VSL/operation/command_ops.hpp>
+#include <VSL/operation/presentation_ops.hpp>
 #include <exception>
 #include <stdexcept>
 #include <algorithm>
@@ -56,7 +57,8 @@ namespace VSL_NAMESPACE {
         std::shared_ptr<lifetime::SurfacePresentationDomain> presentations;
         std::shared_ptr<lifetime::AcquireEvidence> evidence;
         std::shared_ptr<lifetime::PresentRecord> record;
-        vk::UniqueFence acquire_fence;
+        std::shared_ptr<impl::FenceImpl> acquire_fences;
+        std::uint32_t acquire_slot = 0;
         std::uint32_t acquired_index = UINT32_MAX;
         bool acquired = false;
         void reject_acquisition() noexcept;
@@ -67,6 +69,8 @@ namespace VSL_NAMESPACE {
         if (evidence) {
             evidence->proof.status = sync::FenceProofStatus::NOT_ACQUIRED;
             evidence->finished = true;
+            if (acquire_fences)
+                lifetime::release_acquire_fence(*acquire_fences, acquire_slot, {evidence, &evidence->proof});
         }
         if (available_use)
             available_use->complete = true;
@@ -79,6 +83,8 @@ namespace VSL_NAMESPACE {
                 sync::wait_fence_proof(evidence->proof);
         if (!acquired)
             reject_acquisition();
+        else if (acquire_fences && evidence)
+            lifetime::release_acquire_fence(*acquire_fences, acquire_slot, {evidence, &evidence->proof});
         if (available_use)
             available_use->complete = true;
         if (finished_use)
@@ -344,8 +350,8 @@ namespace VSL_NAMESPACE {
     DefaultPhase::DefaultPhase(CommandManager manager, SwapchainAccessor chain,
                                std::optional<SemaphoreHolder> available,
                                std::optional<SemaphoreHolder> finished,
-                               std::optional<FenceHolder> fence, bool postpone)
-        : ComputePhase(manager, available, finished, fence, true), swapchain(chain) {
+                               std::optional<FenceHolder> fence, bool postpone, std::optional<FenceHolder> acquire_fences)
+        : ComputePhase(manager, available, finished, fence, true), swapchain(chain), _acquire_fences(std::move(acquire_fences)) {
         if (!postpone)
             setup();
     }
@@ -376,54 +382,85 @@ namespace VSL_NAMESPACE {
             const auto count = chain->swap_chain_images.size();
             if (submission->signal_semaphore && submission->signal_semaphore->semaphores.size() < count)
                 throw std::invalid_argument("Present semaphores must cover swapchain images");
-            auto device = manager.data_->device->device;
+            const auto work = submission;
+            const auto manager_data = manager.data_;
+            const auto slot = frame_slot;
+            const auto prepared_generation = domain->context.generation;
+            const auto previous = domain->submissions.at(slot);
+            const auto require_prepared = [&, this] {
+                if (!call.alive())
+                    return false;
+                if (submission != work || work->result->status != Completion::Status::PENDING ||
+                    swapchain.data_ != chain || manager.data_ != manager_data || manager_data->command_buffer != buffers ||
+                    domain->buffer != buffers || buffers->current_buffer_idx != slot || frame_slot != slot ||
+                    domain->submissions.at(slot) != previous || domain->context.generation != prepared_generation ||
+                    domain->context.closing || domain->context.recording || domain->context.returning_image ||
+                    domain->context.mutating || domain->context.frame_buffer_recording)
+                    throw std::logic_error("Frame slot changed while preparing acquisition");
+                operation::require_active_swapchain(*chain);
+                return true;
+            };
             vk::Semaphore available;
-            _presentation = std::make_shared<Presentation>();
-            _presentation->device = manager.data_->device;
-            _presentation->swapchain = chain;
-            _presentation->presentations = lifetime::presentation_domain(chain);
-            lifetime::register_presentation_domain(*domain, _presentation->presentations);
-            _presentation->acquire_fence = device.createFenceUnique({});
-            _presentation->evidence = lifetime::prepare_acquire_evidence(*_presentation->presentations, chain, *_presentation->acquire_fence);
-            if (submission->wait_semaphore) {
-                _presentation->available = synchronization_owner(*submission, impl::SubmissionSource::WAIT_SEMAPHORE, submission->wait_semaphore);
-                _presentation->available_use = sync::track_semaphore_wsi(*_presentation->available, submission->result);
-                available = _presentation->available->semaphores.at(frame_slot);
+            const auto presentation = std::make_shared<Presentation>();
+            _presentation = presentation;
+            presentation->device = manager_data->device;
+            presentation->swapchain = chain;
+            presentation->presentations = lifetime::presentation_domain(chain);
+            lifetime::register_presentation_domain(*domain, presentation->presentations);
+            if (work->wait_semaphore) {
+                presentation->available = synchronization_owner(*work, impl::SubmissionSource::WAIT_SEMAPHORE, work->wait_semaphore);
+                presentation->available_use = sync::track_semaphore_wsi(*presentation->available, work->result);
+                available = presentation->available->semaphores.at(slot);
             }
-            if (submission->signal_semaphore) {
-                _presentation->finished = synchronization_owner(*submission, impl::SubmissionSource::SIGNAL_SEMAPHORE, submission->signal_semaphore);
-                _presentation->finished_use = sync::track_semaphore_wsi(*_presentation->finished);
+            if (work->signal_semaphore) {
+                presentation->finished = synchronization_owner(*work, impl::SubmissionSource::SIGNAL_SEMAPHORE, work->signal_semaphore);
+                presentation->finished_use = sync::track_semaphore_wsi(*presentation->finished);
             }
-            const auto acquired = *_presentation->acquire_fence;
-            lifetime::retain_until_complete(*submission, _presentation);
-            if (swapchain.data_ != chain || !chain->swap_chain || chain->state != SwapchainState::ACTIVE) {
-                _presentation->reject_acquisition();
-                throw std::logic_error("Swapchain changed before image acquisition");
-            }
+            presentation->acquire_slot = slot;
+            presentation->acquire_fences = _acquire_fences ? _acquire_fences->data_
+                                                           : lifetime::acquire_fences(*domain, LogicalDeviceAccessor{manager_data->device});
+            if (!require_prepared())
+                return;
+            const auto& source = presentation->acquire_fences;
+            (void)FenceHolder{source}.owner_ref();
+            if (source->device != manager_data->device.get() || source->fences.size() < buffers->command_buffers.size())
+                throw std::invalid_argument("Acquisition fences must cover frame slots on the same device");
+            const auto acquired = source->fences.at(slot);
+            if (acquired == work->fence)
+                throw std::invalid_argument("Acquisition and graphics cannot share a fence element");
+            presentation->evidence = lifetime::prepare_acquire_evidence(*presentation->presentations, chain, acquired);
+            lifetime::retain_until_complete(*work, presentation);
+            lifetime::reserve_acquire_fence(source, slot, {presentation->evidence, &presentation->evidence->proof});
+            if (!require_prepared())
+                return;
             std::uint32_t acquired_index = UINT32_MAX;
-            auto result = device.acquireNextImageKHR(chain->swap_chain, UINT64_MAX,
-                                                     available, acquired, &acquired_index);
+            const auto result = operation::acquire_next_image(chain->native_device, chain->swap_chain, UINT64_MAX, available, acquired, acquired_index);
+            if (result == vk::Result::eSuccess || result == vk::Result::eSuboptimalKHR) {
+                presentation->acquired = true;
+                presentation->acquired_index = acquired_index;
+                lifetime::commit_acquire_evidence(presentation->evidence, *chain, acquired_index);
+            } else
+                presentation->reject_acquisition();
+            if (!call.alive())
+                return;
             if (result == vk::Result::eErrorOutOfDateKHR) {
-                _presentation->reject_acquisition();
                 recreate = true;
                 ComputePhase::cancel();
                 return;
             }
             if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
-                _presentation->reject_acquisition();
                 fail(result == vk::Result::eErrorDeviceLost ? Completion::Failure::DEVICE_LOST : Completion::Failure::SUBMIT_FAILED, static_cast<std::int32_t>(result));
                 throw std::runtime_error("Swapchain acquire failed: " + vk::to_string(result));
             }
-            _presentation->acquired = true;
-            _presentation->acquired_index = acquired_index;
-            lifetime::commit_acquire_evidence(_presentation->evidence, *chain, acquired_index);
             image_index = acquired_index;
             recreate = result == vk::Result::eSuboptimalKHR;
-            if (!available && !sync::wait_fence_proof(_presentation->evidence->proof))
+            if (!available && !sync::wait_fence_proof(presentation->evidence->proof))
                 throw std::runtime_error("Swapchain acquire wait failed");
-            signal_index = _presentation->acquired_index;
+            if (!require_prepared())
+                return;
+            signal_index = presentation->acquired_index;
             begin();
-            domain->context.acquired_image_index = _presentation->acquired_index;
+            domain->context.acquired_image_index = presentation->acquired_index;
             domain->context.acquired_swapchain = chain;
         } catch (const vk::SystemError& error) {
             if (!call.alive())

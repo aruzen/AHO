@@ -93,7 +93,8 @@ namespace VSL_NAMESPACE {
                      std::optional<SemaphoreHolder> next_image_available = std::nullopt,
                      std::optional<SemaphoreHolder> calculation_finish = std::nullopt,
                      std::optional<FenceHolder> in_flight_fence = std::nullopt,
-                     bool postpone_setup = false);
+                     bool postpone_setup = false,
+                     std::optional<FenceHolder> acquire_fences = std::nullopt);
 
         SwapchainAccessor swapchain;
 
@@ -109,6 +110,7 @@ namespace VSL_NAMESPACE {
 
     private:
         bool _presented = false;
+        std::optional<FenceHolder> _acquire_fences;
         struct Presentation;
         std::shared_ptr<Presentation> _presentation;
 

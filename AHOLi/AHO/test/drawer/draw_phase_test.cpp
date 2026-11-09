@@ -222,7 +222,7 @@ namespace {
         const auto context = phase.context();
         aho::Window second("snapshot stays on the first window", 64, 48, *engine);
         selected.selected = second;
-        EXPECT_EQ(phase.context().render_pass().data_, context.render_pass().data_);
+        EXPECT_EQ(phase.context().render_pass().identity(), context.render_pass().identity());
         EXPECT_EQ(phase.target_window().data2, engine->boot_window->data2);
         EXPECT_EQ(selected.calls, 1u);
         phase.cancel();

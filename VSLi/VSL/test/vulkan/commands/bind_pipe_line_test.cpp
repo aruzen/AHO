@@ -1,5 +1,10 @@
+#include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/render_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -10,7 +15,7 @@ namespace {
     };
     TEST_F(BindPipelineVulkanIntegrationTest, RetainsAndBindsGraphicsPipeline) {
         vsl::command::BindPipeline binding(*pipeline);
-        EXPECT_EQ(binding.pipeline.data_, pipeline->data_);
+        EXPECT_EQ(GraphicsAccess::Owned(binding.pipeline), GraphicsAccess::Owned(*(pipeline)));
         ExpectTriangleColor(render([&](auto& stream) { stream << binding << vsl::command::Draw{3}; }));
     }
 } // namespace
@@ -103,7 +108,7 @@ namespace {
                 phase.cancel();
                 FAIL() << "BindPipeline did not expose its pipeline to the stream";
             }
-            ASSERT_EQ(stream.pipeline->data_, pipeline->data_);
+            ASSERT_EQ(GraphicsAccess::Owned(*(stream.pipeline)), GraphicsAccess::Owned(*(pipeline)));
             stream << vsl::command::BindGraphicResource(resource, vsl::graphic_resource::BindingDestination::COMPUTE)
                    << vsl::command::PushConstant(*layout, vsl::ShaderFlag::COMPUTE, base)
                    << vsl::command::Dispatch(COUNT, 1, 1);
@@ -125,7 +130,7 @@ namespace {
     void BindComputePipelineVulkanIntegrationTest::check_bind(bool erase_type) {
         vsl::PipelineAccessor accessor = *pipeline;
         auto binding = erase_type ? vsl::command::BindPipeline(accessor) : vsl::command::BindPipeline(*pipeline);
-        EXPECT_EQ(binding.pipeline.data_, pipeline->data_);
+        EXPECT_EQ(GraphicsAccess::Owned(binding.pipeline), GraphicsAccess::Owned(*(pipeline)));
         auto manager = make_manager();
         const std::uint32_t base = erase_type ? 137 : 83;
         {

@@ -1,9 +1,14 @@
+#include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/shader_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include "support/compute_fixture.hpp"
 #include <VSL/lifetime/resource_arena.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
@@ -42,34 +47,34 @@ namespace {
     TEST_F(PipelineLayoutVulkanIntegrationTest, EditingAnAliasPreservesTheExistingSnapshot) {
         vsl::PipelineLayout original(device);
         auto alias = original;
-        const auto handle = original.data_->pipeline_layout;
+        const auto handle = GraphicsAccess::Owned(original)->pipeline_layout;
         alias.add(vsl::pipeline_layout::Rasterization(vsl::pipeline_layout::CullingMode::FRONT));
-        EXPECT_NE(alias.data_, original.data_);
-        EXPECT_EQ(original.data_->pipeline_layout, handle);
+        EXPECT_NE(GraphicsAccess::Owned(alias), GraphicsAccess::Owned(original));
+        EXPECT_EQ(GraphicsAccess::Owned(original)->pipeline_layout, handle);
     }
     TEST_F(PipelineLayoutVulkanIntegrationTest, CreatesIndependentCopyAndFreezesEditableState) {
         vsl::PipelineLayout original(device);
         auto copy = original.copy();
-        EXPECT_NE(copy.data_->pipeline_layout, original.data_->pipeline_layout);
+        EXPECT_NE(GraphicsAccess::Owned(copy)->pipeline_layout, GraphicsAccess::Owned(original)->pipeline_layout);
         EXPECT_NE(&copy.recipe(), &original.recipe());
-        EXPECT_EQ(copy.data_->device, original.data_->device);
+        EXPECT_EQ(GraphicsAccess::Owned(copy)->device, GraphicsAccess::Owned(original)->device);
         auto shared = original;
-        EXPECT_EQ(shared.data_, original.data_);
-        const auto snapshot = copy.data_.get();
+        EXPECT_EQ(GraphicsAccess::Owned(shared), GraphicsAccess::Owned(original));
+        const auto snapshot = GraphicsAccess::Owned(copy).get();
         auto frozen = std::move(copy).freeze();
-        EXPECT_EQ(frozen.data_.get(), snapshot);
-        EXPECT_FALSE(copy.data_);
+        EXPECT_EQ(GraphicsAccess::Owned(frozen).get(), snapshot);
+        EXPECT_FALSE(GraphicsAccess::Owned(copy));
         EXPECT_TRUE(frozen.has_recipe());
         EXPECT_THROW(copy.copy(), std::logic_error);
         EXPECT_THROW(copy.add(), std::logic_error);
-        EXPECT_TRUE(frozen.data_->pipeline_layout);
+        EXPECT_TRUE(GraphicsAccess::Owned(frozen)->pipeline_layout);
         EXPECT_TRUE(original.has_recipe());
     }
     TEST_F(PipelineLayoutVulkanIntegrationTest, AddsStateAndCreatesUsableLayoutHandle) {
         vsl::PipelineLayout layout(device);
         auto added = layout.add(vsl::pipeline_layout::Rasterization(vsl::pipeline_layout::CullingMode::FRONT));
-        EXPECT_EQ(added.data_, layout.data_);
-        EXPECT_TRUE(layout.data_->pipeline_layout);
+        EXPECT_EQ(GraphicsAccess::Owned(added), GraphicsAccess::Owned(layout));
+        EXPECT_TRUE(GraphicsAccess::Owned(layout)->pipeline_layout);
         EXPECT_EQ(layout.recipe().graphics_state.rasterization.cullMode, vk::CullModeFlagBits::eFront);
     }
 } // namespace
@@ -94,15 +99,15 @@ namespace {
         const auto first = arena.pipeline_layout({1}), second = arena.pipeline_layout({2});
         EXPECT_FALSE(first.has_recipe());
         EXPECT_THROW(first.recipe(), std::logic_error);
-        EXPECT_NE(first.data_->pipeline_layout, second.data_->pipeline_layout);
-        const auto base = reinterpret_cast<std::uintptr_t>(first.data_.get());
-        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(second.data_.get()) - base, LAYOUT_PLAN.placement({2}).offset);
+        EXPECT_NE(GraphicsAccess::Owned(first)->pipeline_layout, GraphicsAccess::Owned(second)->pipeline_layout);
+        const auto base = reinterpret_cast<std::uintptr_t>(GraphicsAccess::Owned(first).get());
+        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(GraphicsAccess::Owned(second).get()) - base, LAYOUT_PLAN.placement({2}).offset);
         EXPECT_EQ(base % s::PIPELINE_LAYOUT_IMPL_ALIGNMENT, 0u);
-        EXPECT_FALSE(first.data_.owner_before(second.data_));
-        EXPECT_FALSE(second.data_.owner_before(first.data_));
+        EXPECT_FALSE(GraphicsAccess::Owned(first).owner_before(GraphicsAccess::Owned(second)));
+        EXPECT_FALSE(GraphicsAccess::Owned(second).owner_before(GraphicsAccess::Owned(first)));
         EXPECT_TRUE(first.owner_ref().managed());
         EXPECT_EQ(first.get_device().data_, device.data_);
-        EXPECT_EQ(first.data_->push_ranges.size(), 1u);
+        EXPECT_EQ(GraphicsAccess::Owned(first)->push_ranges.size(), 1u);
         EXPECT_THROW(arena.pipeline_layout({3}), std::invalid_argument);
         EXPECT_THROW(arena.pipeline_layout({404}), std::out_of_range);
         // Exact structural comparison accepts an independently allocated, identical layout.
@@ -111,9 +116,9 @@ namespace {
         vsl::graphic_resource::BindingLayout identical(device, points);
         auto composed = vsl::PipelineLayout::FromRuntime(first, pl::ResourceBinding{{identical}},
                                                          pl::PushConstants(vsl::ShaderFlag::COMPUTE, {{vsl::ShaderFlag::COMPUTE, 0, 4}}));
-        EXPECT_EQ(composed.data_, first.data_);
+        EXPECT_EQ(GraphicsAccess::Owned(composed), GraphicsAccess::Owned(first));
         auto frozen = std::move(composed).freeze();
-        EXPECT_EQ(frozen.data_, first.data_);
+        EXPECT_EQ(GraphicsAccess::Owned(frozen), GraphicsAccess::Owned(first));
         EXPECT_FALSE(frozen.runtime().has_recipe());
         EXPECT_THROW(vsl::PipelineLayout::FromRuntime(first, pl::ResourceBinding{{identical}}), std::invalid_argument);
         EXPECT_THROW(vsl::PipelineLayout::FromRuntime(second), std::invalid_argument);
@@ -137,8 +142,8 @@ namespace {
         inputs[1] = l::PipelineLayoutInit{{t::ResourceId{3}}, {{vsl::ShaderFlag::COMPUTE, 0, 4}}};
         {
             l::ResourceArena arena(device, LAYOUT_PLAN, inputs, memory);
-            EXPECT_TRUE(arena.pipeline_layout({1}).data_->pipeline_layout);
-            EXPECT_TRUE(arena.pipeline_layout({2}).data_->pipeline_layout);
+            EXPECT_TRUE(GraphicsAccess::Owned(arena.pipeline_layout({1}))->pipeline_layout);
+            EXPECT_TRUE(GraphicsAccess::Owned(arena.pipeline_layout({2}))->pipeline_layout);
         }
         auto invalid = inputs;
         invalid[0] = l::PipelineLayoutInit{{t::ResourceId{99}}, {}};
@@ -152,7 +157,7 @@ namespace {
             vsl::graphic_resource::BindingLayout binding(device, STORAGE_LAYOUT.bindings);
             recipe_binding = DescriptorAccess::Owned(binding).share();
             vsl::PipelineLayout source(device, pl::ResourceBinding{{binding}});
-            source_owner = source.data_;
+            source_owner = GraphicsAccess::Owned(source).share();
             constexpr std::array<t::ResourceRequest, 1> requests{{{{1}, s::ResourceKind::PIPELINE_LAYOUT, true}}};
             constexpr t::ResourcePlan<1> plan(requests);
             {
@@ -161,9 +166,9 @@ namespace {
                 importer_owner = importer.owner();
                 kept = importer.pipeline_layout({1});
                 EXPECT_FALSE(kept.has_recipe());
-                EXPECT_EQ(kept.data_, source.data_);
-                EXPECT_FALSE(kept.data_.owner_before(source.data_));
-                EXPECT_FALSE(source.data_.owner_before(kept.data_));
+                EXPECT_EQ(GraphicsAccess::Owned(kept), GraphicsAccess::Owned(source));
+                EXPECT_FALSE(GraphicsAccess::Owned(kept).owner_before(GraphicsAccess::Owned(source)));
+                EXPECT_FALSE(GraphicsAccess::Owned(source).owner_before(GraphicsAccess::Owned(kept)));
             }
             EXPECT_TRUE(importer_owner.expired());
         }
@@ -191,16 +196,16 @@ namespace {
             vsl::PipelineLayout original(device), replacement(device), next(device, pl::Rasterization(pl::CullingMode::FRONT));
             std::optional<vsl::PipelineLayout> current;
             bool callback = false;
-            auto alias = std::shared_ptr<vsl::impl::PipelineLayoutImpl>(original.data_.get(),
+            auto alias = std::shared_ptr<vsl::impl::PipelineLayoutImpl>(GraphicsAccess::Owned(original).get(),
                                                                         [owner = original.runtime(), &current, &next, &replacement, &callback](auto*) {
                                                                             callback = true;
                                                                             ASSERT_TRUE(current.has_value());
-                                                                            EXPECT_EQ(current->data_, next.data_);
+                                                                            EXPECT_EQ(GraphicsAccess::Owned(*(current)), GraphicsAccess::Owned(next));
                                                                             EXPECT_EQ(&current->recipe(), &next.recipe());
                                                                             EXPECT_EQ(&current->edit_recipe(), &current->recipe());
                                                                             *current = replacement;
                                                                         });
-            current.emplace(vsl::PipelineLayout::FromRuntime(vsl::PipelineLayoutAccessor(alias)));
+            current.emplace(vsl::PipelineLayout::FromRuntime(GraphicsAccess::FromShared(alias)));
             alias.reset();
             if (move) {
                 auto value = next;
@@ -209,7 +214,7 @@ namespace {
                 *current = next;
             }
             EXPECT_TRUE(callback);
-            EXPECT_EQ(current->data_, replacement.data_);
+            EXPECT_EQ(GraphicsAccess::Owned(*(current)), GraphicsAccess::Owned(replacement));
             EXPECT_EQ(&current->recipe(), &replacement.recipe());
             EXPECT_EQ(&current->edit_recipe(), &current->recipe());
         }
@@ -285,7 +290,7 @@ namespace {
             {
                 vsl::PipelineLayout recipe(device, pl::ShaderGroup("compute", {*shader}), pl::ResourceBinding{{*binding}},
                                            pl::PushConstants(vsl::ShaderFlag::COMPUTE, {{vsl::ShaderFlag::COMPUTE, 0, 4}}));
-                native_owner = recipe.data_;
+                native_owner = GraphicsAccess::Owned(recipe).share();
                 vsl::ComputePipeline selected(recipe);
                 phase << selected << vsl::command::PushConstant(recipe, vsl::ShaderFlag::COMPUTE, value);
                 shader.reset();
@@ -336,7 +341,7 @@ namespace {
         vsl::PipelineLayout original(device);
         auto alias = original;
         auto frozen = std::move(original).freeze();
-        EXPECT_EQ(frozen.data_, alias.data_);
+        EXPECT_EQ(GraphicsAccess::Owned(frozen), GraphicsAccess::Owned(alias));
         EXPECT_NE(&frozen.recipe(), &alias.recipe());
         vsl::pipeline_layout::Rasterization(vsl::pipeline_layout::CullingMode::FRONT).injection(alias);
         EXPECT_NE(frozen.recipe().graphics_state.rasterization.cullMode, alias.recipe().graphics_state.rasterization.cullMode);
@@ -346,9 +351,9 @@ namespace {
             void injection(vsl::PipelineLayoutEditAccessor) { throw std::runtime_error("stage failed"); }
         };
         vsl::PipelineLayout layout(device);
-        const auto snapshot = layout.data_;
+        const auto snapshot = GraphicsAccess::Owned(layout);
         EXPECT_THROW(layout.add(FailingStage{}), std::runtime_error);
-        EXPECT_EQ(layout.data_, snapshot);
+        EXPECT_EQ(GraphicsAccess::Owned(layout), snapshot);
     }
     TEST_F(PipelineLayoutVulkanIntegrationTest, CopyOwnsDescriptorLayoutsAndPushConstantRanges) {
         std::optional<vsl::PipelineLayout> copied;
@@ -364,8 +369,8 @@ namespace {
             EXPECT_NE(copied->recipe().push_ranges.data(), original.recipe().push_ranges.data());
         }
         EXPECT_FALSE(weak_binding.expired());
-        ASSERT_EQ(copied->data_->push_ranges.size(), 1u);
-        EXPECT_EQ(copied->data_->push_ranges[0].size, 4u);
+        ASSERT_EQ(GraphicsAccess::Owned(*(copied))->push_ranges.size(), 1u);
+        EXPECT_EQ(GraphicsAccess::Owned(*(copied))->push_ranges[0].size, 4u);
         copied.reset();
         EXPECT_TRUE(weak_binding.expired());
     }

@@ -78,7 +78,7 @@ namespace AHO_NAMESPACE {
         const auto context = phase.context();
         const auto& window = phase.target_window();
         auto& state = window.data2->standard_draw;
-        if (!state || state->pass.data_ != context.render_pass().data_)
+        if (!state || state->pass.identity() != context.render_pass().identity())
             state = std::make_shared<drawer::detail::StandardDrawState>(context);
         phase << context.viewport() << context.scissor()
               << state->pipeline.bind_vertices().push_constants(drawer::detail::TrianglePush::Values(values)).draw(3);

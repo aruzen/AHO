@@ -1,9 +1,14 @@
+#include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/render_fixture.hpp"
 #include "support/read_image.hpp"
 #include "support/frame_buffer_metadata.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::BufferAccess;
@@ -43,15 +48,15 @@ namespace {
 
     TEST_F(RenderPassBeginVulkanIntegrationTest, RetainsPassAndFramebufferAndClearsBlack) {
         VSL_NAMESPACE::command::RenderPassBegin begin(*pass, *framebuffer);
-        EXPECT_EQ(begin.render_pass.data_, pass->data_);
-        EXPECT_EQ(begin.frame_buffer.data_, framebuffer->data_);
+        EXPECT_EQ(GraphicsAccess::Owned(begin.render_pass), GraphicsAccess::Owned(*(pass)));
+        EXPECT_EQ(GraphicsAccess::Owned(begin.frame_buffer), GraphicsAccess::Owned(*(framebuffer)));
         EXPECT_FALSE(begin.clear_color.has_value());
         EXPECT_EQ(begin.retention, vsl::ResourceRetention::SUBMISSION);
         EXPECT_EQ(render([](auto&) {}), (std::array<std::uint8_t, 4>{0, 0, 0, 0}));
     }
     TEST_F(RenderPassBeginVulkanIntegrationTest, CompletionRetentionReleasesTheTargetWhileTheCompletedWorkAndCommandRingRemain) {
         auto manager = make_manager().independent(1);
-        const std::weak_ptr<void> owner = framebuffer->data_;
+        const std::weak_ptr<void> owner = GraphicsAccess::Owned(*(framebuffer)).share();
         vsl::Completion completion;
         {
             auto phase = manager.start_phase<vsl::ComputePhase>();
@@ -66,11 +71,11 @@ namespace {
         EXPECT_TRUE(owner.expired());
         EXPECT_TRUE(CommandAccess::Data(manager.get_buffer()));
         const auto invalid = static_cast<vsl::ResourceRetention>(99);
-        EXPECT_THROW((vsl::command::RenderPassBegin(vsl::FrameBufferAccessor{nullptr}, {}, {}, 0, invalid)), std::invalid_argument);
+        EXPECT_THROW((vsl::command::RenderPassBegin(vsl::FrameBufferAccessor{}, {}, {}, 0, invalid)), std::invalid_argument);
     }
     TEST_F(RenderPassBeginVulkanIntegrationTest, LegacyRetentionKeepsTheTargetUntilTheWorkIsReplaced) {
         auto manager = make_manager().independent(1);
-        const std::weak_ptr<void> owner = framebuffer->data_;
+        const std::weak_ptr<void> owner = GraphicsAccess::Owned(*(framebuffer)).share();
         vsl::Completion completion;
         {
             auto phase = manager.start_phase<vsl::ComputePhase>();
@@ -227,7 +232,7 @@ namespace {
 
 namespace {
     vsl::FrameBufferAccessor legacy_metadata_target(vsl::RenderPassAccessor pass) {
-        return vsl_test::metadata_frame_buffer(std::move(pass.data_), 2, 2);
+        return vsl_test::metadata_frame_buffer(std::move(GraphicsAccess::Owned(pass)), 2, 2);
     }
     TEST_P(LegacyClearFormatVulkanIntegrationTest, ExplicitRgbMustNotBypassIntegerOrDepthClearValidation) {
         const auto format = GetParam();

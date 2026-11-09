@@ -1,5 +1,10 @@
+#include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include "support/render_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::ImageAccess;
@@ -7,8 +12,8 @@ namespace {
 namespace {
     using FrameBufferVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
     TEST_F(FrameBufferVulkanIntegrationTest, CreatesFramebufferForEveryImageAndRendersToIt) {
-        ASSERT_EQ(framebuffer->data_->swap_chain_framebuffers.size(), 1u);
-        EXPECT_TRUE(static_cast<bool>(framebuffer->data_->swap_chain_framebuffers.front()));
+        ASSERT_EQ(GraphicsAccess::Owned(*(framebuffer))->swap_chain_framebuffers.size(), 1u);
+        EXPECT_TRUE(static_cast<bool>(GraphicsAccess::Owned(*(framebuffer))->swap_chain_framebuffers.front()));
         ExpectTriangleColor(render([](auto& stream) { stream << VSL_NAMESPACE::command::Draw{3}; }));
     }
 } // namespace
@@ -16,23 +21,23 @@ namespace {
     TEST_F(FrameBufferVulkanIntegrationTest, CreatesPickingFramebufferWithBothAttachments) {
         VSL_NAMESPACE::IDPickingRenderPass picking(description);
         VSL_NAMESPACE::FrameBuffer picked(description, picking);
-        ASSERT_EQ(picked.data_->swap_chain_framebuffers.size(), 1u);
-        EXPECT_TRUE(static_cast<bool>(picked.data_->swap_chain_framebuffers.front()));
+        ASSERT_EQ(GraphicsAccess::Owned(picked)->swap_chain_framebuffers.size(), 1u);
+        EXPECT_TRUE(static_cast<bool>(GraphicsAccess::Owned(picked)->swap_chain_framebuffers.front()));
     }
 } // namespace
 
 namespace {
     TEST_F(FrameBufferVulkanIntegrationTest, GenericTargetRetainsImagesAndPassAndRejectsMismatches) {
         VSL_NAMESPACE::FrameBuffer target(*pass, 8, 8, {*color});
-        EXPECT_EQ(target.data_->render_pass, pass->data_.get());
-        EXPECT_EQ(target.data_->attachments[0][0], ImageAccess::Owned(*(color)).get());
+        EXPECT_EQ(GraphicsAccess::Owned(target)->render_pass, GraphicsAccess::Owned(*(pass)).get());
+        EXPECT_EQ(GraphicsAccess::Owned(target)->attachments[0][0], ImageAccess::Owned(*(color)).get());
         EXPECT_THROW((VSL_NAMESPACE::FrameBuffer(*pass, 8, 8, {})), std::invalid_argument);
         EXPECT_THROW((VSL_NAMESPACE::FrameBuffer(*pass, 9, 8, {*color})), std::invalid_argument);
         ColorImage wrong(device, 8, 8, VSL_NAMESPACE::data_format::UNSIGNED_INT);
         EXPECT_THROW((VSL_NAMESPACE::FrameBuffer(*pass, 8, 8, {wrong})), std::invalid_argument);
         auto retained = ImageAccess::Owned(*(color));
         color.reset();
-        EXPECT_EQ(target.data_->attachments[0][0], retained.get());
+        EXPECT_EQ(GraphicsAccess::Owned(target)->attachments[0][0], retained.get());
     }
 } // namespace
 
@@ -47,8 +52,8 @@ namespace {
         auto object_id = description.add_color({.format = ids.get_format()});
         VSL_NAMESPACE::RenderPass pass(device, description);
         auto target = VSL_NAMESPACE::FrameBuffer::FromAttachments(pass, WIDTH, HEIGHT, {{object_id, ids}, {color_id, *color}});
-        EXPECT_EQ(target.data_->attachments[0][color_id], ImageAccess::Owned(*(color)).get());
-        EXPECT_EQ(target.data_->attachments[0][object_id], ImageAccess::Owned(ids).get());
+        EXPECT_EQ(GraphicsAccess::Owned(target)->attachments[0][color_id], ImageAccess::Owned(*(color)).get());
+        EXPECT_EQ(GraphicsAccess::Owned(target)->attachments[0][object_id], ImageAccess::Owned(ids).get());
         EXPECT_THROW((VSL_NAMESPACE::FrameBuffer::FromAttachments(pass, WIDTH, HEIGHT, {{color_id, *color}})), std::invalid_argument);
         EXPECT_THROW((VSL_NAMESPACE::FrameBuffer::FromAttachments(pass, WIDTH, HEIGHT, {{color_id, *color}, {color_id, *color}})), std::invalid_argument);
         EXPECT_THROW((VSL_NAMESPACE::FrameBuffer::FromAttachments(pass, WIDTH, HEIGHT, {{color_id, *color}, {999, ids}})), std::out_of_range);

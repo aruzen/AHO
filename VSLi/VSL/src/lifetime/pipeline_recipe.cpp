@@ -1,8 +1,13 @@
+#include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/pipeline_recipe.hpp>
 #include <VSL/lifetime/pipeline_layout_storage.hpp>
 #include <VSL/lifetime/pipeline_storage.hpp>
 #include <VSL/lifetime/shader_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
 
 VSL_NAMESPACE::ShaderAccessor VSL_NAMESPACE::lifetime::detail::ShaderAccess::FromRecipe(const impl::PipelineRecipe& recipe, size_t index) {
     return FromOwned(recipe.sources.at(recipe.shader_sources.at(index)).alias(recipe.shaders.at(index)));
@@ -36,7 +41,7 @@ namespace VSL_NAMESPACE::lifetime {
             return result;
         }
         void validate_target(LogicalDeviceAccessor device, const RenderPassAccessor& pass, std::uint32_t subpass) {
-            if (!pass.data_ || !pass.data_.use_count() || subpass >= pass.description().subpasses.size())
+            if (!GraphicsAccess::Owned(pass) || !GraphicsAccess::Owned(pass).use_count() || subpass >= pass.description().subpasses.size())
                 throw std::out_of_range("Pipeline subpass index");
             if (pass.get_device() != device)
                 throw std::invalid_argument("Pipeline render pass requires the pipeline device");
@@ -78,9 +83,9 @@ namespace VSL_NAMESPACE::lifetime {
         if (recipe.pending_layouts)
             throw std::logic_error("Pipeline descriptor layouts have not been materialized");
         auto owner = make_heap_pipeline_layout(snapshot.device(), recipe.binding_layouts, recipe.push_ranges);
-        const PipelineLayoutAccessor layout(owner);
-        const operation::GraphicsPipelineInput input{owner.get(), pass.data_.get(), &recipe.graphics_state, recipe.shaders, subpass};
-        return GraphicsPipeline(PipelineAccessor{make_heap_pipeline(snapshot.device(), layout.owner_ref(), input)});
+        const auto layout = detail::GraphicsAccess::FromShared(owner);
+        const operation::GraphicsPipelineInput input{owner.get(), GraphicsAccess::Owned(pass).get(), &recipe.graphics_state, recipe.shaders, subpass};
+        return GraphicsPipeline(detail::GraphicsAccess::FromShared(make_heap_pipeline(snapshot.device(), layout.owner_ref(), input)));
     }
     GraphicsPipeline make_graphics_pipeline(PipelineRecipeSnapshot snapshot, RenderPassAccessor pass, std::uint32_t subpass, typed::ArenaStorage<>) {
         validate_target(snapshot.device(), pass, subpass);
@@ -98,9 +103,9 @@ namespace VSL_NAMESPACE::lifetime {
         if (recipe.shaders.size() != 1)
             throw std::invalid_argument("Compute pipeline requires exactly one compute shader");
         auto owner = make_heap_pipeline_layout(snapshot.device(), recipe.binding_layouts, recipe.push_ranges);
-        const PipelineLayoutAccessor layout(owner);
+        const auto layout = detail::GraphicsAccess::FromShared(owner);
         const operation::ComputePipelineInput input{owner.get(), recipe.shaders.front()};
-        return ComputePipeline(PipelineAccessor{make_heap_pipeline(snapshot.device(), layout.owner_ref(), input)});
+        return ComputePipeline(detail::GraphicsAccess::FromShared(make_heap_pipeline(snapshot.device(), layout.owner_ref(), input)));
     }
     ComputePipeline make_compute_pipeline(PipelineRecipeSnapshot snapshot, typed::ArenaStorage<>) {
         auto shaders = shader_inputs(snapshot.definition());

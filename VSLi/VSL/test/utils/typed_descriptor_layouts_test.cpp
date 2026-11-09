@@ -1,3 +1,4 @@
+#include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/typed_descriptor_layouts.hpp>
@@ -5,6 +6,10 @@
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
 #include "support/vulkan_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
@@ -196,7 +201,7 @@ namespace {
                 pipeline.emplace(policy, device, layouts, shaders);
             }
             EXPECT_TRUE(owner.expired());
-            EXPECT_TRUE(pipeline->backend().data_->pipeline);
+            EXPECT_TRUE(GraphicsAccess::Owned(pipeline->backend())->pipeline);
         };
         verify(t::HeapStorage{});
         verify(t::ArenaStorage<>{});

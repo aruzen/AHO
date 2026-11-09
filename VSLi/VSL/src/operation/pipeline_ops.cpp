@@ -1,9 +1,11 @@
 #include <VSL/operation/pipeline_ops.hpp>
 #include <limits>
 #include <stdexcept>
+#include <utility>
 
 namespace VSL_NAMESPACE::operation {
     namespace {
+        thread_local const GraphicsPipelineNativeFactory* NATIVE_FACTORY = nullptr;
         void validate_layout(const impl::LogicalDeviceImpl& device, const impl::PipelineLayoutImpl* layout);
         vk::Pipeline checked_pipeline(vk::Device device, vk::Result result, vk::Pipeline pipeline);
         std::vector<vk::PipelineShaderStageCreateInfo> graphics_stages(const impl::LogicalDeviceImpl& device, std::span<impl::ShaderImpl* const> shaders);
@@ -64,6 +66,11 @@ namespace VSL_NAMESPACE::operation {
                 check_samples(*outputs.depth_stencil);
         }
     } // namespace
+    ScopedGraphicsPipelineNativeFactory::ScopedGraphicsPipelineNativeFactory(GraphicsPipelineNativeFactory factory) noexcept
+        : _factory(factory), _previous(std::exchange(NATIVE_FACTORY, &_factory)) {}
+    ScopedGraphicsPipelineNativeFactory::~ScopedGraphicsPipelineNativeFactory() {
+        NATIVE_FACTORY = _previous;
+    }
     void initialize_pipeline(impl::PipelineImpl& target, impl::LogicalDeviceImpl& device, const GraphicsPipelineInput& input) {
         validate_layout(device, input.layout);
         validate_pass(device, input);
@@ -84,9 +91,11 @@ namespace VSL_NAMESPACE::operation {
             .renderPass = input.pass->render_pass,
             .subpass = input.subpass,
             .basePipelineIndex = -1};
+        const auto factory = NATIVE_FACTORY ? *NATIVE_FACTORY : GraphicsPipelineNativeFactory{};
         const auto cache = device.device.createPipelineCacheUnique({});
         vk::Pipeline pipeline;
-        const auto result = device.device.createGraphicsPipelines(*cache, 1, &info, nullptr, &pipeline);
+        const auto result = factory.create ? factory.create(factory.context, device.device, *cache, info, &pipeline)
+                                           : device.device.createGraphicsPipelines(*cache, 1, &info, nullptr, &pipeline);
         target.pipeline = checked_pipeline(device.device, result, pipeline);
         target.native_device = device.device;
         target.device = &device;

@@ -50,7 +50,7 @@ ShaderAccessorの既存get_device()だけでは非所有aliasを拒否できな�
 
 ResourceKind::PIPELINEとImplLayout／ResourceSlotLayoutをcompile-only probe、private実定義とのstatic_assert、構成別生成header、artifact fingerprint、installへ接続する。USE_OFFSETはNO_SEPARATE_USEとする。GPU device memoryやdriver内部のPipeline確保はCPU slotのサイズに含めない。
 
-定義値、内部vector、native生成scratch／cache、heapの外側ownerは個別確保として残る。arenaの管理metadataと外部依存の保持も残る。配置APIと公開data_／shared_ptr入口は移行adapterであり、順序12の廃止対象である。性能率を改善したとは断定しない。
+定義値、内部vector、native生成scratch／cache、heapの外側ownerは個別確保として残る。arenaの管理metadataと外部依存の保持も残る。配置APIは存続し、公開data_／shared_ptr<Impl>入口は12fで閉じた。Graphics／ComputeはAccessorを値で持ち、値変換で既存commandへ接続する。通常Graphics生成はsnapshot後のNative生成中だけShader一覧とstateを独立保持し、完成Pipelineへ残さない。ResourceArenaの初期化値は引き続き生成中に変更しない。[現在の移行契約](arena-migration.md)を参照。性能率を改善したとは断定しない。
 
 private PipelineImplのdevice／layoutはshared_ptrから借用pointerへ変わる。private定義を読む利用側は`.get()`等を外し、保持が必要なら公開owning facadeを保存する。公開の既存生成引数は維持する。記録用に空／非所有／別Deviceの入力を渡すことと、誤ったbind pointへの接続は拒否する。
 

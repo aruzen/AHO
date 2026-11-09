@@ -66,7 +66,7 @@ freeze()は編集元を消費し、runtimeを再生成しない。編集可能�
 
 CMakeのtarget向けcompile-only probe、生成定数、private Impl／slotとのstatic_assert、構成別ABI fingerprint、installed public headerを拡張する。公開ヘッダーへImplの完全定義を公開しない。
 
-一括領域はPipelineLayoutImpl本体だけである。push ranges／signatureのvector、recipeとsource vector、native生成scratch、PipelineImpl、ShaderGroup、DeviceとVulkan内部の確保は別に残る。public data_／shared_ptr<Impl>、Device getterのshared_from_thisは後続の移行用入口である。編集facadeは読み取り用と編集用で同じrecipeへのshared参照を持つが、control blockを追加していない。これも公開入口の整理時に見直す。CPU参照段数とsourceの保持は整理したが、速度や確保数の改善率は未測定である。
+一括領域はPipelineLayoutImpl本体だけである。push ranges／signatureのvector、recipeとsource vector、native生成scratch、PipelineImpl、ShaderGroup、DeviceとVulkan内部の確保は別に残る。9d／12fでDeviceの正規ownerとpublic data_／shared_ptr<Impl>入口の閉鎖を実施した。編集／Frozen facadeはAccessorを値で持ち、部分代入を防ぐ。読み取り用と編集用のrecipe参照は共有するが、新しいcontrol blockを追加しない。runtimeとrecipeの一括公開、元OwnedRefの維持は[現在の移行契約](arena-migration.md)を参照。CPU参照段数とsourceの保持は整理したが、速度や確保数の改善率は未測定である。
 
 ## 検証
 

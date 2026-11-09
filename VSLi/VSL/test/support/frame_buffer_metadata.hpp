@@ -1,27 +1,28 @@
 #pragma once
 #include <VSL/lifetime/frame_buffer_storage.hpp>
+#include <VSL/lifetime/graphics_access.hpp>
 
 namespace vsl_test {
     // Native記録を行わないclear/area検証用。実体と元Passの所有を明示する。
     struct FrameBufferMetadata {
-        std::shared_ptr<vsl::impl::RenderPassImpl> pass;
+        vsl::lifetime::OwnedRef<vsl::impl::RenderPassImpl> pass;
         vsl::lifetime::FrameBufferOwnerContext context;
         vsl::impl::FrameBufferImpl target;
-        FrameBufferMetadata(std::shared_ptr<vsl::impl::RenderPassImpl> pass, std::uint32_t width, std::uint32_t height);
+        FrameBufferMetadata(vsl::lifetime::OwnedRef<vsl::impl::RenderPassImpl> pass, std::uint32_t width, std::uint32_t height);
     };
-    inline vsl::FrameBufferAccessor metadata_frame_buffer(std::shared_ptr<vsl::impl::RenderPassImpl> pass, std::uint32_t width = 1, std::uint32_t height = 1);
-    inline FrameBufferMetadata::FrameBufferMetadata(std::shared_ptr<vsl::impl::RenderPassImpl> pass, std::uint32_t width, std::uint32_t height)
+    inline vsl::FrameBufferAccessor metadata_frame_buffer(vsl::lifetime::OwnedRef<vsl::impl::RenderPassImpl> pass, std::uint32_t width = 1, std::uint32_t height = 1);
+    inline FrameBufferMetadata::FrameBufferMetadata(vsl::lifetime::OwnedRef<vsl::impl::RenderPassImpl> pass, std::uint32_t width, std::uint32_t height)
         : pass(std::move(pass)) {
         target.render_pass = this->pass.get();
         target.owner_context = &context;
         target.swap_chain_framebuffers.emplace_back();
         target.extent = vk::Extent2D{width, height};
-        const vsl::RenderPassAccessor source{this->pass};
+        const auto source = vsl::lifetime::detail::GraphicsAccess::FromOwned(this->pass);
         context.pass = source.owner_ref().alias(this->pass.get()).weak();
     }
-    inline vsl::FrameBufferAccessor metadata_frame_buffer(std::shared_ptr<vsl::impl::RenderPassImpl> pass, std::uint32_t width, std::uint32_t height) {
+    inline vsl::FrameBufferAccessor metadata_frame_buffer(vsl::lifetime::OwnedRef<vsl::impl::RenderPassImpl> pass, std::uint32_t width, std::uint32_t height) {
         auto owner = std::make_shared<FrameBufferMetadata>(std::move(pass), width, height);
         auto* value = &owner->target;
-        return {{std::move(owner), value}};
+        return vsl::lifetime::detail::GraphicsAccess::FromShared(std::shared_ptr<vsl::impl::FrameBufferImpl>(std::move(owner), value));
     }
 } // namespace vsl_test

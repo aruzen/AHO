@@ -3,6 +3,21 @@
 #include <VSL/operation/shader_ops.hpp>
 
 namespace VSL_NAMESPACE::operation {
+    // 生成呼出し中だけの置換境界。完成した実体には保存しない。
+    struct GraphicsPipelineNativeFactory {
+        void* context = nullptr;
+        vk::Result (*create)(void*, vk::Device, vk::PipelineCache, const vk::GraphicsPipelineCreateInfo&, vk::Pipeline*) = nullptr;
+    };
+    class ScopedGraphicsPipelineNativeFactory {
+        GraphicsPipelineNativeFactory _factory;
+        const GraphicsPipelineNativeFactory* _previous;
+
+    public:
+        explicit ScopedGraphicsPipelineNativeFactory(GraphicsPipelineNativeFactory factory) noexcept;
+        ScopedGraphicsPipelineNativeFactory(const ScopedGraphicsPipelineNativeFactory&) = delete;
+        ScopedGraphicsPipelineNativeFactory& operator=(const ScopedGraphicsPipelineNativeFactory&) = delete;
+        ~ScopedGraphicsPipelineNativeFactory();
+    };
     // 全参照は解決済みで、生成呼出し中だけ借用する。
     struct GraphicsPipelineInput {
         impl::PipelineLayoutImpl* layout = nullptr;

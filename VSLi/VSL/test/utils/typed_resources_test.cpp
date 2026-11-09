@@ -1,3 +1,4 @@
+#include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/sampler_access.hpp>
@@ -9,6 +10,10 @@
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/vulkan/commands/copy_buffer_to_image.hpp>
 #include <VSL/vulkan/commands/change_image_barrier.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
@@ -329,15 +334,15 @@ namespace {
         auto verify = [&](auto policy) {
             EXPECT_THROW((t::TypedComputePipeline<EmptySet>(policy, device, Capture{saved})), std::invalid_argument);
             ASSERT_TRUE(saved);
-            EXPECT_FALSE(saved->data_);
+            EXPECT_FALSE(GraphicsAccess::Owned(*(saved)));
             ASSERT_TRUE(saved->edit_recipe().pending_layouts);
             EXPECT_EQ(saved->edit_recipe().pending_layouts->size(), 1u);
             EXPECT_THROW((t::TypedComputePipeline<EmptySet>(policy, device, Capture{saved},
                                                             vsl::pipeline_layout::ShaderGroup("not compute", {vertex}))),
                          std::invalid_argument);
-            EXPECT_FALSE(saved->data_);
+            EXPECT_FALSE(GraphicsAccess::Owned(*(saved)));
             EXPECT_THROW((t::TypedComputePipeline<HugeSet>(policy, device, Capture{saved})), std::out_of_range);
-            EXPECT_FALSE(saved->data_);
+            EXPECT_FALSE(GraphicsAccess::Owned(*(saved)));
             EXPECT_FALSE(saved->edit_recipe().pending_layouts);
             saved.reset();
         };
@@ -372,7 +377,7 @@ namespace {
             }();
             EXPECT_TRUE(shader_owner.expired());
             EXPECT_TRUE(composite_owner.expired());
-            const auto& runtime = typed_pipeline.backend().data_;
+            const auto& runtime = GraphicsAccess::Owned(typed_pipeline.backend());
             EXPECT_EQ(runtime->owner_node == runtime->layout->owner_node, (std::same_as<decltype(policy), t::ArenaStorage<>>));
             vsl::GraphicResourceManager manager(device);
             t::TypedDescriptorSet<ParametersSet> input(device, manager);

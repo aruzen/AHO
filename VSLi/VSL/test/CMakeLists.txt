@@ -346,6 +346,18 @@ if (VSL_TEST_SOURCES)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
         set_tests_properties("VSL.Descriptor.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
     endforeach()
+    add_library(vsl-runtime-graphics-style-contract OBJECT EXCLUDE_FROM_ALL contracts/runtime_graphics.cpp)
+    target_link_libraries(vsl-runtime-graphics-style-contract PRIVATE VSL)
+    set(runtime_graphics_contract_names PublicFacade LayoutData LayoutOwner LayoutRaw PassData PassOwner PassRaw PipelineData PipelineOwner PipelineRaw FrameBufferData FrameBufferOwner FrameBufferRaw EditorBase BuilderBase EditorValue PickingBase PickingImages PickingTemporaryImages MixedIdentity GraphicsBase ComputeBase FrozenBase)
+    foreach(case RANGE 0 22)
+        list(GET runtime_graphics_contract_names ${case} name)
+        add_test(NAME "VSL.RuntimeGraphics.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/runtime_graphics.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=private|deleted|no member|conversion|reference|invalid|no matching"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.RuntimeGraphics.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
     set(shader_contract_names Valid ShaderData ShaderOwner ShaderRawConstructor ShaderGroupData ShaderGroupOwner TemporaryShaderCode ConstTemporaryShaderCode)
     foreach(case RANGE 1 7)
         list(GET shader_contract_names ${case} name)

@@ -1,5 +1,6 @@
 #include <VSL/operation/presentation_ops.hpp>
 #include <VSL/operation/submission_ops.hpp>
+#include <VSL/sync/device_call.hpp>
 
 namespace VSL_NAMESPACE::operation {
     namespace {
@@ -14,12 +15,14 @@ namespace VSL_NAMESPACE::operation {
     }
     vk::Result acquire_next_image(vk::Device device, vk::SwapchainKHR swapchain, std::uint64_t timeout,
                                   vk::Semaphore available, vk::Fence fence, std::uint32_t& image) noexcept {
+        const sync::NativeDeviceCall call(device);
         return static_cast<vk::Result>(NATIVE_CALLS && NATIVE_CALLS->acquire
                                            ? NATIVE_CALLS->acquire(NATIVE_CALLS->context, device, swapchain, timeout, available, fence, &image)
                                            : VULKAN_HPP_DEFAULT_DISPATCHER.vkAcquireNextImageKHR(device, swapchain, timeout, available, fence, &image));
     }
-    vk::Result queue_present(vk::Queue queue, vk::SwapchainKHR swapchain, std::uint32_t image,
+    vk::Result queue_present(vk::Device device, vk::Queue queue, vk::SwapchainKHR swapchain, std::uint32_t image,
                              vk::Semaphore finished, vk::Fence present_fence) noexcept {
+        const sync::NativeDeviceCall call(device);
         const VkSwapchainKHR native_chain = swapchain;
         const VkSemaphore native_finished = finished;
         const VkFence native_fence = present_fence;
@@ -43,12 +46,15 @@ namespace VSL_NAMESPACE::operation {
                                                                              : VULKAN_HPP_DEFAULT_DISPATCHER.vkQueuePresentKHR(queue, &info));
     }
     vk::Result poll_present_fence(vk::Device device, vk::Fence fence) noexcept {
+        const sync::NativeDeviceCall call(device);
         return NATIVE_CALLS && NATIVE_CALLS->poll ? static_cast<vk::Result>(NATIVE_CALLS->poll(NATIVE_CALLS->context, device, fence)) : poll_fence(device, fence);
     }
     vk::Result wait_present_fence(vk::Device device, vk::Fence fence, std::uint64_t timeout) noexcept {
+        const sync::NativeDeviceCall call(device);
         return NATIVE_CALLS && NATIVE_CALLS->wait ? static_cast<vk::Result>(NATIVE_CALLS->wait(NATIVE_CALLS->context, device, fence, timeout)) : wait_fence(device, fence, timeout);
     }
     vk::Result release_swapchain_image(vk::Device device, vk::SwapchainKHR swapchain, std::uint32_t image) noexcept {
+        const sync::NativeDeviceCall call(device);
         const VkReleaseSwapchainImagesInfoEXT info{
             .sType = VK_STRUCTURE_TYPE_RELEASE_SWAPCHAIN_IMAGES_INFO_EXT,
             .swapchain = swapchain,

@@ -1,5 +1,6 @@
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/sync/submission_completion.hpp>
+#include <VSL/sync/device_call.hpp>
 #include <VSL/operation/submission_ops.hpp>
 #include <VSL/lifetime/command_storage.hpp>
 #include <VSL/lifetime/dependency_node.hpp>
@@ -63,18 +64,27 @@ namespace VSL_NAMESPACE::lifetime {
         auto recording = std::move(recording_submission);
         auto submitted = std::move(submissions);
         auto presentation = std::move(presentation_domains);
+        const bool active = native->command_pool && native->command_pool->device && sync::NativeDeviceCall::Active(native->command_pool->device->device);
         if (context.recording) {
             try {
-                operation::reset_command_buffer(native->command_buffers.at(native->current_buffer_idx));
+                if (!active)
+                    operation::reset_command_buffer(native->command_buffers.at(native->current_buffer_idx));
             } catch (...) {
             }
             context.recording = false;
         }
-        if (recording)
-            sync::finish_submission(*recording);
+        const auto finish = [&](const std::shared_ptr<impl::SubmissionWork>& work) {
+            if (!work)
+                return;
+            if (active && (work->result->native.active || sync::native_pending(*work->result) || work->result->status == Completion::Status::SUBMITTED)) {
+                quarantine_submission(work, native);
+                return;
+            }
+            sync::finish_submission(*work);
+        };
+        finish(recording);
         for (const auto& work : submitted)
-            if (work)
-                sync::finish_submission(*work);
+            finish(work);
         presentation.clear();
         submitted.clear();
         recording.reset();

@@ -5,6 +5,7 @@
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/lifetime/swapchain_arena.hpp>
 #include <VSL/lifetime/surface_storage.hpp>
+#include <VSL/lifetime/startup_arena.hpp>
 #include <VSL/operation/command_ops.hpp>
 #include <VSL/operation/presentation_ops.hpp>
 #include <VSL/operation/submission_ops.hpp>
@@ -113,6 +114,73 @@ namespace {
         EXPECT_EQ(l::recover_surface(device, *surface), l::SurfaceRecoveryStatus::COMPLETE);
         EXPECT_FALSE(surface->data_->owner_context->presentations.lock());
         EXPECT_THROW(l::recover_surface(device, *surface, static_cast<l::SurfaceRecoveryMode>(99)), std::invalid_argument);
+    }
+    TEST_F(SurfaceRecoveryWindowIntegrationTest, RetirementRegistrationIsWeakAndRepeatedRegistrationUsesOneCollection) {
+        RecoveryProbe probe;
+        const o::ScopedSubmissionNativeCalls submissions(probe.submissions());
+        l::queue_surface_retirement(device, *surface);
+        l::queue_surface_retirement(device, *surface);
+        EXPECT_EQ(l::collect_surface_retirements(device, l::SurfaceRecoveryMode::WAIT), l::SurfaceRecoveryStatus::COMPLETE);
+        EXPECT_EQ(probe.idles, 1u);
+        EXPECT_FALSE(surface->data_->owner_context->presentations.lock());
+        EXPECT_EQ(l::collect_surface_retirements(device, l::SurfaceRecoveryMode::WAIT), l::SurfaceRecoveryStatus::COMPLETE);
+        EXPECT_EQ(probe.idles, 1u);
+        l::queue_surface_retirement(device, *surface);
+        const std::weak_ptr<void> owner = surface->data_;
+        window->data_->plugins.clear();
+        surface.reset();
+        EXPECT_TRUE(owner.expired());
+        EXPECT_EQ(l::collect_surface_retirements(device, l::SurfaceRecoveryMode::WAIT), l::SurfaceRecoveryStatus::COMPLETE);
+        EXPECT_EQ(probe.idles, 1u);
+    }
+    TEST_F(SurfaceRecoveryWindowIntegrationTest, RegistrationDuringCollectionIsDeferredWithoutLosingTheNewRequest) {
+        RecoveryProbe probe;
+        const o::ScopedSubmissionNativeCalls submissions(probe.submissions());
+        l::queue_surface_retirement(device, *surface);
+        probe.on_idle = [&] {
+            l::queue_surface_retirement(device, *surface);
+            EXPECT_EQ(l::collect_surface_retirements(device, l::SurfaceRecoveryMode::WAIT), l::SurfaceRecoveryStatus::PENDING);
+            EXPECT_EQ(probe.idles, 1u);
+        };
+        EXPECT_EQ(l::collect_surface_retirements(device, l::SurfaceRecoveryMode::WAIT), l::SurfaceRecoveryStatus::PENDING);
+        EXPECT_EQ(probe.idles, 1u);
+        EXPECT_EQ(l::collect_surface_retirements(device, l::SurfaceRecoveryMode::WAIT), l::SurfaceRecoveryStatus::COMPLETE);
+        EXPECT_EQ(probe.idles, 2u);
+        EXPECT_THROW(l::collect_surface_retirements(device, static_cast<l::SurfaceRecoveryMode>(99)), std::invalid_argument);
+    }
+    TEST_F(SurfaceRecoveryWindowIntegrationTest, FailedRetirementCollectionPreservesTheRequestForRetry) {
+        RecoveryProbe probe;
+        probe.fail_idle = 1;
+        const o::ScopedSubmissionNativeCalls submissions(probe.submissions());
+        l::queue_surface_retirement(device, *surface);
+        EXPECT_EQ(l::collect_surface_retirements(device, l::SurfaceRecoveryMode::WAIT), l::SurfaceRecoveryStatus::PENDING);
+        EXPECT_EQ(probe.idles, 1u);
+        EXPECT_EQ(l::collect_surface_retirements(device, l::SurfaceRecoveryMode::WAIT), l::SurfaceRecoveryStatus::COMPLETE);
+        EXPECT_EQ(probe.idles, 2u);
+    }
+    TEST_F(SurfaceRecoveryWindowIntegrationTest, DifferentSurfaceSlotsInOneArenaAreSeparateRetirementRequests) {
+        vsl::PureWindow a("same arena A", 64, 48), b("same arena B", 64, 48);
+        const std::array requests{vsl::storage::StartupRequest{{1}, vsl::storage::StartupKind::SURFACE},
+                                  vsl::storage::StartupRequest{{2}, vsl::storage::StartupKind::SURFACE}};
+        const vsl::storage::StartupPlan<2> plan(requests);
+        const std::array<l::StartupInit, 2> inputs{l::SurfaceInit{vsl::VulkanAccessor{instance}, a.window_owner()},
+                                                   l::SurfaceInit{vsl::VulkanAccessor{instance}, b.window_owner()}};
+        {
+            const l::StartupArena arena(plan, inputs);
+            const auto first = arena.surface({1}), second = arena.surface({2});
+            EXPECT_FALSE(first.data_.owner_before(second.data_));
+            EXPECT_FALSE(second.data_.owner_before(first.data_));
+            EXPECT_NE(first.data_, second.data_);
+            RecoveryProbe probe;
+            const o::ScopedSubmissionNativeCalls submissions(probe.submissions());
+            l::queue_surface_retirement(device, first);
+            l::queue_surface_retirement(device, second);
+            l::queue_surface_retirement(device, first);
+            EXPECT_EQ(l::collect_surface_retirements(device, l::SurfaceRecoveryMode::WAIT), l::SurfaceRecoveryStatus::COMPLETE);
+            EXPECT_EQ(probe.idles, 2u);
+        }
+        EXPECT_TRUE(a.close());
+        EXPECT_TRUE(b.close());
     }
     TEST_F(SurfaceRecoveryWindowIntegrationTest, BeginFailureKeepsAnUnconsumedAcquireUntilTheDrainCanBeRetried) {
         auto manager = make_manager().independent(1);

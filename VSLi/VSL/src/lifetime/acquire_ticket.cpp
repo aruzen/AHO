@@ -1,4 +1,5 @@
 #include <VSL/lifetime/acquire_ticket.hpp>
+#include <VSL/sync/device_call.hpp>
 #include <VSL/lifetime/swapchain_storage.hpp>
 #include <VSL/lifetime/synchronization_use.hpp>
 #include <VSL/lifetime/phase_call.hpp>
@@ -180,7 +181,7 @@ namespace VSL_NAMESPACE::lifetime {
                     .pWaitSemaphores = &semaphore,
                     .pWaitDstStageMask = &stage,
                 };
-                const auto result = operation::queue_submit(ticket.graphics_queue, info, {});
+                const auto result = operation::queue_submit(ticket.device->device, ticket.graphics_queue, info, {});
                 sync::save_submit_result(drain, static_cast<std::int32_t>(result));
                 if (drain.enqueue == sync::SubmissionEnqueue::UNKNOWN)
                     sync::poison_semaphore_element(source, index);
@@ -379,6 +380,8 @@ namespace VSL_NAMESPACE::lifetime {
         if (ticket.released || ticket.state.native_call_active || (ticket.graphics && ticket.graphics->native.active))
             return;
         if (acquisition_ready(ticket) && ticket.state.status != sync::AcquisitionStatus::DELEGATED)
+            return;
+        if (ticket.device && !ticket.device->lost && sync::NativeDeviceCall::Active(ticket.device->device))
             return;
         try {
             const NativeCall call(ticket.state.native_call_active);

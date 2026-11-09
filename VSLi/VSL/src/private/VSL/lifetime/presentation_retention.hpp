@@ -76,6 +76,7 @@ namespace VSL_NAMESPACE::lifetime {
         void bookkeep() noexcept;
         void release() noexcept;
         bool pending() const noexcept;
+        bool captured() const noexcept { return bool(_selected); }
     };
     std::shared_ptr<SurfacePresentationDomain> presentation_domain(const std::shared_ptr<impl::SwapchainImpl>& generation);
     void register_presentation_domain(CommandDomain& commands, const std::shared_ptr<SurfacePresentationDomain>& domain);

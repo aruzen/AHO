@@ -12,6 +12,7 @@
 #include <VSL/lifetime/synchronization_use.hpp>
 #include <VSL/sync/synchronization_state.hpp>
 #include <VSL/sync/resource_use_access.hpp>
+#include <VSL/sync/device_call.hpp>
 #include <VSL/operation/submission_ops.hpp>
 #include <VSL/operation/command_ops.hpp>
 #include <VSL/operation/presentation_ops.hpp>
@@ -233,6 +234,7 @@ namespace VSL_NAMESPACE {
     }
     void ComputePhase::setup() {
         lifetime::PhaseCall call(*this);
+        const lifetime::SurfaceRetirementCollection retirement(submission ? submission->device : (manager.data_ ? manager.data_->device : nullptr));
         if (state != State::BEFORE_SETUP)
             return;
         try {
@@ -251,6 +253,7 @@ namespace VSL_NAMESPACE {
     }
     ComputePhase::SubmitResult ComputePhase::submit() {
         lifetime::PhaseCall call(*this);
+        const lifetime::SurfaceRetirementCollection retirement(submission ? submission->device : (manager.data_ ? manager.data_->device : nullptr));
         if (state != State::WAIT_SUBMIT)
             return SubmitResult::FAILED;
         if (submission && submission->result->native.active) {
@@ -319,7 +322,7 @@ namespace VSL_NAMESPACE {
                 operation::reset_fences(work->device->device, {&work->fence, 1});
                 for (const auto* check : work->validity_checks)
                     sync::ResourceUseAccess::RequireKnown(*check);
-                result = work->device->lost ? vk::Result::eErrorDeviceLost : operation::queue_submit(manager_data->graphics_queue, info, work->fence);
+                result = work->device->lost ? vk::Result::eErrorDeviceLost : operation::queue_submit(work->device->device, manager_data->graphics_queue, info, work->fence);
                 if (work->device->lost)
                     result = vk::Result::eErrorDeviceLost;
                 sync::save_submit_result(*work->result, static_cast<std::int32_t>(result));
@@ -452,6 +455,7 @@ namespace VSL_NAMESPACE {
     }
     void DefaultPhase::setup() {
         lifetime::PhaseCall call(*this);
+        const lifetime::SurfaceRetirementCollection retirement(submission ? submission->device : (manager.data_ ? manager.data_->device : nullptr));
         if (state != State::BEFORE_SETUP)
             return;
         if (_setting_up)
@@ -508,9 +512,17 @@ namespace VSL_NAMESPACE {
             const auto slot = frame_slot;
             const auto prepared_generation = domain->context.generation;
             const auto previous = domain->submissions.at(slot);
+            bool cancelled = false;
             const auto require_prepared = [&, this] {
                 if (!call.alive())
                     return false;
+                if (work->abandon_requested) {
+                    cancelled = true;
+                    if (presentation)
+                        lifetime::request_acquire_abandon(*presentation);
+                    ComputePhase::cancel();
+                    return false;
+                }
                 if (submission != work || work->result->status != Completion::Status::PENDING ||
                     swapchain.data_ != chain || manager.data_ != manager_data || manager_data->command_buffer != buffers ||
                     domain->buffer != buffers || buffers->current_buffer_idx != slot || frame_slot != slot ||
@@ -528,6 +540,8 @@ namespace VSL_NAMESPACE {
                 return require_prepared() && result;
             };
             const auto suspend = [&] {
+                if (cancelled)
+                    return;
                 if (presentation)
                     presentation->reject_acquisition();
                 sync::save_terminal(*work, Completion::Status::CANCELLED);
@@ -615,8 +629,11 @@ namespace VSL_NAMESPACE {
             recreate = result == vk::Result::eSuboptimalKHR;
             if (!available && !sync::wait_fence_proof(presentation->evidence->proof))
                 throw std::runtime_error("Swapchain acquire wait failed");
-            if (!require_prepared())
+            if (!require_prepared()) {
+                lifetime::request_acquire_abandon(*presentation);
+                lifetime::collect_acquire_scope(*presentation, true);
                 return;
+            }
             signal_index = presentation->acquired_index;
             begin();
             if (!call.alive() || work->result->status != Completion::Status::PENDING || domain->context.work != work.get()) {
@@ -654,6 +671,7 @@ namespace VSL_NAMESPACE {
     }
     DefaultPhase::SubmitResult DefaultPhase::present() {
         lifetime::PhaseCall call(*this);
+        const lifetime::SurfaceRetirementCollection retirement(submission ? submission->device : (manager.data_ ? manager.data_->device : nullptr));
         if (submission && (submission->result->native.active || (_presentation && _presentation->state.native_call_active))) {
             submission->abandon_requested = true;
             if (_presentation)
@@ -726,6 +744,24 @@ namespace VSL_NAMESPACE {
             submission->abandon_requested = true;
             if (_presentation)
                 lifetime::request_acquire_abandon(*_presentation);
+            return;
+        }
+        const auto work = submission;
+        if (work && work->device && sync::NativeDeviceCall::Active(work->device->device)) {
+            work->abandon_requested = true;
+            const auto presentation = _presentation;
+            if (presentation)
+                lifetime::request_acquire_abandon(*presentation);
+            if (work->result->status == Completion::Status::PENDING && !sync::native_pending(*work->result)) {
+                if (recording_buffer.data_)
+                    lifetime::detach_recording_cpu(*lifetime::CommandAccess::Owner(recording_buffer), *work);
+                state = State::ERROR_;
+                if (presentation && !presentation->state.acquired)
+                    presentation->reject_acquisition();
+                sync::save_terminal(*work, Completion::Status::CANCELLED);
+                sync::finish_submission(*work);
+            } else
+                state = State::ERROR_;
             return;
         }
         if (!_presentation || !_presentation->state.acquired || _presented) {

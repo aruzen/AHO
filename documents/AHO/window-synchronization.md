@@ -76,6 +76,35 @@ Native reset自身のcallbackで初めて0になった場合、そのresetを取
 
 initialize／finishは実行中のclosureを局所値で保持する。公開`lifetime/phase_liveness.hpp`のstack guardにより、callbackでPhaseが破棄された後はthisへ触れない。Screenshotも前frame完了の観測後に現在の記録状態／Completion／targetを再検査し、cancel済みのPhaseへfinishを登録しない。ここでのstd::functionのcopyが確保するメモリは、今回のImpl配置領域には含まれない。
 
+## WindowのcloseとSurface退役
+
+10e4では共有WindowDataへ`closed`を持たせる。closeは先に退役要求を登録し、全コピーから新しい描画を拒否したうえで、世代・Surface・F/M同期・Framebuffer・RenderPass・描画cache・未公開候補を局所所有値へ移す。全fieldが空になってからplugin破棄・対象Phaseの取消・回収を行う。保存WindowやRenderContextはCPU上の閉じた共有状態だけを保持し、GPU資源を残さない。
+
+通常の`Window::close()`とtitlebarのcloseは同じ処理を使う。AHOのlistenerはnative WindowData・描画状態・元Device／Surfaceを弱く参照し、自身でWindowやarenaを延命しない。描画状態だけ先に失効した場合も、従来のQuietCloseと同じnative closeを行う。低位の`PureWindow::close()`を明示的に直接呼ぶ利用は、AHOの描画取消を経由しない。
+
+対象Phaseはnative WindowDataと描画状態の両方で識別する。取消要求を先に立て、callbackでPhaseが削除された場合もTLS先頭から再探索する。途中の取消が例外になっても残りを処理し、回収を試みた後に最初の例外を再送出する。plugin破棄中にPhase自身が削除されても、共有closed状態の検査によりユーザーfinishを呼ばない。
+
+AHOの既定RenderPassBeginは`ResourceRetention::COMPLETION`を指定する。FBOをgraphics完了まで保持し、presentation中の世代は別のPresentRecordが保持する。通常VSLのRenderPassBeginは従来の`SUBMISSION`を既定値として残す。custom initializeで選択したSUBMISSIONや、外部に保存されたcommand／view自身の所有は、明示的な外部保持として残る。
+
+Native処理中のcloseは論理closeだけを即時に完了し、同Deviceへの返却submit／idle／画像releaseを延期する。未送信WorkはNative resetを行わずCPU記録を取消し、元CompletionをCANCELLEDにする。既に送信済み／不明の結果やenqueue分類は書き換えない。Domainが消える場合も、未完了Workを元CB ownerごとquarantineへ移す。
+
+閉じたSurfaceだけを登録するVSLのcold queueは、元Device／Surfaceのcontrol blockとslotを弱く保存する。同じarenaの異なるslotを混同せず、weak失効後にraw pointerへ触れない。callbackからの新規登録を別chainへ受け、例外後も未処理・pendingを復元する。DeviceLostという状態と、実際に未回収であることは区別する。
+
+```cpp
+// closeの登録に失敗した場合は、Windowを閉じる前に例外になる。
+window.close();
+
+// 管理外のループでも、元Deviceを使って保留分を明示的に回収できる。
+const auto status = vsl::lifetime::collect_surface_retirements(
+    device, vsl::lifetime::SurfaceRecoveryMode::WAIT);
+```
+
+通常のPhase setup／submit／presentとCompletion観測／waitの外側scopeでも、Native結果のcommit後に登録済みSurfaceだけをPOLLする。Native guardのdestructorでは回収しない。明示的なFenceHolder wait／CommandDomain wait中に登録された要求は、次の対応境界か明示collectで処理する。queueとGLFW操作は従来同様に同じ管理スレッドで使う。
+
+CPU queue nodeはclose時の個別確保として残り、外側scopeのDevice保持にも参照カウント操作が残る。Impl配置領域やGPU device memoryとは別で、性能改善率は未測定である。
+
+Windowの公開呼出し方と通常VSLの保持既定値は維持する。RenderPassBeginの末尾引数とWindowDataの共有状態を追加したため、prebuilt利用側も対応するヘッダーとバイナリで再buildする。
+
 ## 10e1の検証
 
 新GPU7件／CPU1件と既存strict policyの拡張で、F群の同root／別Impl、Engine生存中の回収、同名Windowの独立、resizeでのF保持とM交換、初回／追加Window／overrideのpolicy、取得source省略の互換、Window一回取得、null／未起動Engine拒否を検証した。
@@ -103,3 +132,13 @@ macOS arm64／Clang20／MoltenVK1.4.2、validation／ASan／UBSanで重点14件�
 0はprivate framebuffer query seamで観測させ、Native取得／resetの回数と旧Fenceのsignaled状態を実driver上で確認した。実OSの最小化イベント、他OS実機、CPU並行、LSan、性能改善率は今回の検証に含めない。titlebarを含むclose統合は10e4へ続く。
 
 reset前gateだけを無効にした比較では、取得前の外側判定が有効なままでも、acquire Fence観測後に不要resetが1回起き、旧Fenceのsignaled状態が変わることを回帰1件の2期待値で検出した。byte一致で復元・全target再build後、重点14件と最終install consumer3種が成功した。
+
+## 10e4の検証
+
+新VSL7件／AHO8件と既存の取得中取消回帰で、同root別Surface slotの区別、weak登録・重複排除・再入追加・失敗後retry、SUBMISSION／COMPLETIONのFBO保持差、取消callbackが開始したpeerのslot保護を確認した。Windowコピー／保持Context／titlebar／描画状態失効／plugin破棄中Phase削除／facade自己破棄、Native reset・acquire・submit・present中closeも検証した。別SurfaceのNative submit／presentでは、対象Phaseの保持／その場での孤児化の4条件で、Native中の追加submit／idle／releaseが0であった。
+
+同じmacOS arm64／Clang20／MoltenVK1.4.2、ASan／UBSan／validation環境で、重点16件、全VSL1,124件（既知skip3）、AHO GPU190件／CPU1,071件、compile195件が成功した。heap／arenaのPNG3枚一致、3frame／12submission／2draw／238831更新画素、1720×1080→2000×1360、Pipeline生成1回を維持した。
+
+strictは初回30ファイル／19TUと最終Phase補完2ファイル／2TUを合わせて変更31 C++ファイル／20TUの違反0、source path378件もエラー0。installed public consumer28種と、最終archive一致確認後の4種でbuild／link／CPU実行を確認した。private Native guardはinstallしない。Impl定義と寸法生成入力は変更せず、生成fingerprintを維持している。今回の差分ではDebug／Release／cross寸法probeの再実行は行っていない。
+
+初回の通常close試験では旧FBO保持によるweak失効2期待値の失敗を検出し、独立retention指定へ修正した。全体試験で検出した既存の取得中取消の回収遅延も修正し、最終重点／全体を再実行した。実driver故障、他OS、CPU並行操作、LSan、性能測定は未実施である。

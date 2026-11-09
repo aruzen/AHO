@@ -35,7 +35,7 @@ AHO_NAMESPACE::DrawPhase::Init AHO_NAMESPACE::DrawPhase::Prepare(AHO_NAMESPACE::
     const auto manager = runtime->command_manager;
     const auto buffer = runtime->command_manager.get_buffer().data_.get();
     auto window = engine->get_window();
-    if (!window || !window.data2)
+    if (!window || !window.data2 || window.data2->closed)
         throw std::logic_error("DrawPhase requires a live drawing window");
     const auto target = window.data2;
     const auto size = window.frame_size();
@@ -44,7 +44,7 @@ AHO_NAMESPACE::DrawPhase::Init AHO_NAMESPACE::DrawPhase::Prepare(AHO_NAMESPACE::
     if (size.value.x.value > 0 && size.value.y.value > 0 &&
         (target->pending_generation || target->deferred_usage))
         window.recreate_swapchain();
-    if (!window || window.data2 != target || runtime->command_manager.data_ != manager.data_ ||
+    if (!window || window.data2 != target || target->closed || runtime->command_manager.data_ != manager.data_ ||
         runtime->command_manager.get_buffer().data_.get() != buffer)
         throw std::logic_error("Window closed while preparing a DrawPhase");
     return {engine, std::move(window), manager};
@@ -52,10 +52,10 @@ AHO_NAMESPACE::DrawPhase::Init AHO_NAMESPACE::DrawPhase::Prepare(AHO_NAMESPACE::
 
 bool AHO_NAMESPACE::DrawPhase::acquisition_ready() {
     VSL_NAMESPACE::lifetime::PhaseCall call(*this);
-    if (!_window || !_window.data2 || _window.data2->pending_generation || _window.data2->deferred_usage)
+    if (!_window || !_window.data2 || _window.data2->closed || _window.data2->pending_generation || _window.data2->deferred_usage)
         return false;
     const auto size = _window.frame_size();
-    if (!call.alive())
+    if (!call.alive() || !_window || !_window.data2 || _window.data2->closed)
         return false;
     if (size.value.x.value == 0 || size.value.y.value == 0)
         _window.data2->deferred_usage = _window.data2->deferred_usage.value_or(VSL_NAMESPACE::ImageType::NONE);
@@ -101,7 +101,8 @@ void AHO_NAMESPACE::DrawPhase::setup() {
         DrawStream<VSL_NAMESPACE::DefaultPhaseStream> stream{VSL_NAMESPACE::DefaultPhaseStream{this->manager}};
         callback(stream);
     } else {
-        *this << VSL_NAMESPACE::command::RenderPassBegin(_window.data2->render_pass, _window.data2->frame_buffer);
+        *this << VSL_NAMESPACE::command::RenderPassBegin(_window.data2->render_pass, _window.data2->frame_buffer,
+                                                         std::nullopt, VSL_NAMESPACE::ResourceRetention::COMPLETION);
     }
 }
 
@@ -146,6 +147,10 @@ AHO_NAMESPACE::DrawPhase* AHO_NAMESPACE::DrawPhase::CurrentForManager(const VSL_
 
 AHO_NAMESPACE::DrawPhase::SubmitResult AHO_NAMESPACE::DrawPhase::submit_commands() {
     VSL_NAMESPACE::lifetime::PhaseCall call(*this);
+    if (_close_requested || !_window || !_window.data2 || _window.data2->closed) {
+        VSL_NAMESPACE::DefaultPhase::cancel();
+        return SubmitResult::FAILED;
+    }
     if (state == State::WAIT_SUBMIT) {
         if (_finish_started)
             throw std::logic_error("DrawPhase completion is already in progress");

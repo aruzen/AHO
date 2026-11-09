@@ -9,9 +9,9 @@
 
 最初のPRだけで終了せず、下記の順で実装・検証・独立レビューを継続する。PRの公開前には最新masterとの差分を確認する。新しい製品ディレクトリが必要な場合は作成前に確認する。
 
-現在の到達点は順序1〜9と10a〜10dである。command／同期資源の配置とTyped frame再利用、起動資源の共通backend、OS windowの寿命分離、公開StartupArenaとAHO起動、maintenance1の能力照会／有効化、Swapchain世代のCPU配置、取得後失敗とpresent専用の完了観測・資源保持を接続した。順序10全体と11〜12は未完了であり、AHOの世代公開とresize／close、既定policy変更、旧入口廃止と最終監査まで継続する。
+現在の到達点は順序1〜10である。command／同期資源の配置とTyped frame再利用、起動資源の共通backend、OS windowの寿命分離、公開StartupArenaとAHO起動、maintenance1の能力照会／有効化、Swapchain世代のCPU配置、取得後失敗とpresent専用の完了観測・資源保持、AHOの世代公開・休止・resize／closeを接続した。11〜12は未完了であり、既定policy変更、旧入口廃止と最終監査まで継続する。
 
-10dはPhaseCall、共通Fence用途、M個のfinished semaphore、F個のacquire Fenceに、[送信結果とnative使用完了](native-submission-proof.md)と[AcquireTicket／Surface回収](acquire-ticket-recovery.md)を接続した。実enqueueに従うsignal drain／画像返却、OOM retry、Native中の取消、Domainを失った後の回収を検証した。次は10eであり、11、12も引き続き未完了である。
+10dはPhaseCall、共通Fence用途、M個のfinished semaphore、F個のacquire Fenceに、[送信結果とnative使用完了](native-submission-proof.md)と[AcquireTicket／Surface回収](acquire-ticket-recovery.md)を接続した。10eで候補保持と0 framebuffer休止、共有close、元Surface単位の退役を完了した。次は11のTyped既定配置であり、12の公開入口整理と最終監査も引き続き未完了である。
 
 ## 責務と保証
 
@@ -205,4 +205,6 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 10e2では同じWindowDataへ候補と検証済み要求を保持し、同要求のFramebuffer失敗からNative Swapchainを作り直さず再開する。共通backendの借用進行情報でpreflight失敗を区別し、旧ownerを保持した一括swapで世代を公開する。新6件と保持Context／描画cacheのreadback回帰、全VSL1,114／AHO172・1,071／compile195、install・配置情報・同一描画の検証が成功した。0 framebufferの取得前休止とclose統合は10e3／10e4へ続く。
 
 10e3では0 framebufferの再生成／取得延期、Native reset前gate、自己の準備状態だけのslot巻戻し、Window／manager snapshot、public PhaseCallによる派生callbackの寿命検査を接続した。延期NONEと検証済みusageを保持し、休止中の記録と同setup再入を拒否する。新VSL3／AHO10、全VSL1,117／AHO182・1,071／compile195、同一描画、install／構成別／cross／ABIと規約検査が成功した。titlebarを含むclose／共通Surface回収を10e4で仕上げ、順序11・12へ続ける。
+
+10e4で共有closed状態と全ownerの退避、titlebarを含む共通close、対象Phaseの取消、弱いSurface退役queueと結果commit後の回収を接続した。Native中は同Deviceへの返却操作を延期し、未完了Workは元CB owner付きで保持する。AHO既定FBO保持は独立したCOMPLETION指定とし、通常VSLのSUBMISSION互換を維持する。新VSL7／AHO8と既存回帰、全VSL1,124／AHO190・1,071／compile195、同一描画、strict・public installを検証し、順序10の受入条件を満たした。
 

@@ -184,6 +184,7 @@
     <ClCompile Include="VSL\src\operation\shader_ops.cpp" />
     <ClCompile Include="VSL\src\lifetime\shader_storage.cpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\submission_ops.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\sync\device_call.hpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\presentation_ops.hpp" />
     <ClInclude Include="VSL\src\private\VSL\sync\presentation_state.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\presentation_retention.hpp" />
@@ -201,6 +202,7 @@
     <ClCompile Include="VSL\src\operation\image_ops.cpp" />
     <ClCompile Include="VSL\src\operation\sampler_ops.cpp" />
     <ClCompile Include="VSL\src\operation\submission_ops.cpp" />
+    <ClCompile Include="VSL\src\sync\device_call.cpp" />
     <ClCompile Include="VSL\src\operation\presentation_ops.cpp" />
     <ClCompile Include="VSL\src\sync\presentation_state.cpp" />
     <ClCompile Include="VSL\src\lifetime\presentation_retention.cpp" />

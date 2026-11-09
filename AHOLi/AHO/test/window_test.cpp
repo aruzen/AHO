@@ -8,12 +8,306 @@
 #include <VSL/lifetime/swapchain_arena.hpp>
 #include <VSL/operation/frame_buffer_ops.hpp>
 #include <VSL/operation/swapchain_ops.hpp>
+#include <VSL/operation/submission_ops.hpp>
+#include <VSL/lifetime/surface_recovery.hpp>
+#include <VSL/vulkan/commands/render_pass_end.hpp>
 #ifdef __APPLE__
 #define GLFW_EXPOSE_NATIVE_COCOA
 #include <GLFW/glfw3native.h>
 #endif
 namespace {
     using AHOWindowVulkanIntegration = aho_test::LiveGPUTest;
+
+    struct CloseTargetEngine : aho::engine::GraphicalEngine {
+        aho::Window selected;
+        CloseTargetEngine(aho::engine::EngineAccessor runtime, aho::Window window);
+        aho::Window get_window() override { return selected; }
+    };
+    struct CloseNativeProbe {
+        unsigned nested = 0, drains = 0;
+        bool active = false;
+        std::function<void()> on_submit, on_present, on_acquire, on_reset;
+        static VkResult Submit(void*, VkQueue, const VkSubmitInfo*, VkFence) noexcept;
+        static VkResult Idle(void*, VkDevice) noexcept;
+        static VkResult Present(void*, VkQueue, const VkPresentInfoKHR*) noexcept;
+        static VkResult Release(void*, VkDevice, const VkReleaseSwapchainImagesInfoEXT*) noexcept;
+        static VkResult Acquire(void*, VkDevice, VkSwapchainKHR, std::uint64_t, VkSemaphore, VkFence, std::uint32_t*) noexcept;
+        static VkResult Reset(void*, VkDevice, std::uint32_t, const VkFence*) noexcept;
+        void callback(std::function<void()>& function);
+    };
+    struct CloseDestructorHook : vsl::PureWindow::Plugin {
+        std::function<void()> callback;
+        CloseDestructorHook(vsl::PureWindow*, std::function<void()> callback) : callback(std::move(callback)) {}
+        ~CloseDestructorHook() override { callback(); }
+    };
+    struct FixedIdResizeHook : aho::window::WindowResizeHookPlugin {
+        FixedIdResizeHook(vsl::PureWindow* window, unsigned char id, std::function<void(aho::Window*)> callback)
+            : WindowResizeHookPlugin(window, std::move(callback)) { this->id = id; }
+    };
+    struct GenerationProbe {
+        unsigned creates = 0, frames = 0, frame_destroys = 0;
+        bool fail_create = false, fail_frame = false;
+        VkSwapchainKHR previous = VK_NULL_HANDLE;
+        static VkResult Create(void* context, VkDevice device, const VkSwapchainCreateInfoKHR* info, VkSwapchainKHR* output);
+        static vk::Framebuffer Frame(void* context, vk::Device device, const vk::FramebufferCreateInfo& info);
+        static void DestroyFrame(void* context, vk::Device device, vk::Framebuffer frame) noexcept;
+    };
+    CloseTargetEngine::CloseTargetEngine(aho::engine::EngineAccessor runtime, aho::Window window)
+        : selected(std::move(window)) {
+        reset_data(std::make_shared<aho::engine::EngineData>(*runtime.data()));
+        data()->command_manager = runtime.data()->command_manager.independent(1);
+    }
+    void CloseNativeProbe::callback(std::function<void()>& function) {
+        if (auto call = std::exchange(function, {})) {
+            active = true;
+            call();
+            active = false;
+        }
+    }
+    VkResult CloseNativeProbe::Submit(void* context, VkQueue queue, const VkSubmitInfo* info, VkFence fence) noexcept {
+        auto& probe = *static_cast<CloseNativeProbe*>(context);
+        probe.nested += probe.active;
+        probe.drains += !info->commandBufferCount && info->waitSemaphoreCount;
+        const auto result = vkQueueSubmit(queue, 1, info, fence);
+        probe.callback(probe.on_submit);
+        return result;
+    }
+    VkResult CloseNativeProbe::Idle(void* context, VkDevice device) noexcept {
+        auto& probe = *static_cast<CloseNativeProbe*>(context);
+        probe.nested += probe.active;
+        return vkDeviceWaitIdle(device);
+    }
+    VkResult CloseNativeProbe::Present(void* context, VkQueue queue, const VkPresentInfoKHR* info) noexcept {
+        auto& probe = *static_cast<CloseNativeProbe*>(context);
+        probe.nested += probe.active;
+        const auto result = vkQueuePresentKHR(queue, info);
+        probe.callback(probe.on_present);
+        return result;
+    }
+    VkResult CloseNativeProbe::Release(void* context, VkDevice device, const VkReleaseSwapchainImagesInfoEXT* info) noexcept {
+        auto& probe = *static_cast<CloseNativeProbe*>(context);
+        probe.nested += probe.active;
+        const auto release = reinterpret_cast<PFN_vkReleaseSwapchainImagesEXT>(vkGetDeviceProcAddr(device, "vkReleaseSwapchainImagesEXT"));
+        return release ? release(device, info) : VK_ERROR_EXTENSION_NOT_PRESENT;
+    }
+    VkResult CloseNativeProbe::Acquire(void* context, VkDevice device, VkSwapchainKHR chain, std::uint64_t timeout,
+                                       VkSemaphore semaphore, VkFence fence, std::uint32_t* image) noexcept {
+        auto& probe = *static_cast<CloseNativeProbe*>(context);
+        probe.nested += probe.active;
+        const auto result = vkAcquireNextImageKHR(device, chain, timeout, semaphore, fence, image);
+        probe.callback(probe.on_acquire);
+        return result;
+    }
+    VkResult CloseNativeProbe::Reset(void* context, VkDevice device, std::uint32_t count, const VkFence* fences) noexcept {
+        auto& probe = *static_cast<CloseNativeProbe*>(context);
+        probe.nested += probe.active;
+        const auto result = vkResetFences(device, count, fences);
+        probe.callback(probe.on_reset);
+        return result;
+    }
+
+    void expect_closed_resources(const std::shared_ptr<aho::window::WindowData>& data) {
+        ASSERT_TRUE(data);
+        EXPECT_TRUE(data->closed);
+        EXPECT_FALSE(data->surface);
+        EXPECT_FALSE(data->swapchain.data_);
+        EXPECT_TRUE(data->swapchain.images.empty());
+        EXPECT_FALSE(data->render_pass.data_);
+        EXPECT_FALSE(data->frame_buffer.data_);
+        EXPECT_FALSE(data->image_available.data_);
+        EXPECT_FALSE(data->render_finished.data_);
+        EXPECT_FALSE(data->in_flight.data_);
+        EXPECT_FALSE(data->acquire_fences.data_);
+        EXPECT_FALSE(data->standard_draw);
+        EXPECT_FALSE(data->pending_generation);
+        EXPECT_FALSE(data->deferred_usage);
+    }
+    TEST_F(AHOWindowVulkanIntegration, ClosingAfterPresentationReleasesGraphicsEvenWhenWindowCopiesAndContextsRemain) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        const auto copy = window;
+        const auto context = window.render_context();
+        const auto drawing = window.data2;
+        const std::weak_ptr<void> generation = drawing->swapchain.data_;
+        const std::weak_ptr<void> frames = drawing->image_available.data_;
+        const std::weak_ptr<void> surface = drawing->surface->data_;
+        {
+            aho::DrawPhase phase(*engine);
+            EXPECT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        EXPECT_TRUE(window.close());
+        expect_closed_resources(drawing);
+        EXPECT_FALSE(static_cast<bool>(copy));
+        EXPECT_THROW(context.render_pass(), std::logic_error);
+        EXPECT_THROW(context.commands(), std::logic_error);
+        EXPECT_TRUE(generation.expired());
+        EXPECT_TRUE(frames.expired());
+        EXPECT_TRUE(surface.expired());
+        EXPECT_TRUE(engine->data());
+    }
+    TEST_F(AHOWindowVulkanIntegration, TitlebarCloseUsesTheGraphicsPathForSharedDataWindows) {
+        ASSERT_NO_THROW(start_engine());
+        auto& original = *engine->boot_window;
+        aho::Window copy(*engine, original.data_, original.data2);
+        const auto drawing = copy.data2;
+        const std::weak_ptr<void> owner = drawing->swapchain.data_;
+        glfwSetWindowShouldClose(static_cast<GLFWwindow*>(copy.data_->window_handle), GLFW_TRUE);
+        EXPECT_TRUE(vsl::PureWindow::Update());
+        expect_closed_resources(drawing);
+        EXPECT_FALSE(static_cast<bool>(copy));
+        EXPECT_FALSE(static_cast<bool>(original));
+        EXPECT_TRUE(owner.expired());
+        EXPECT_FALSE(copy.close());
+        EXPECT_FALSE(copy.data2);
+    }
+    TEST_F(AHOWindowVulkanIntegration, ClosingARecordingPhaseCancelsWithoutCallingItsFinishCallback) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        unsigned finishes = 0;
+        auto phase = std::make_unique<aho::DrawPhase>(*engine, nullptr, [&](auto&) { ++finishes; });
+        const auto completion = phase->completion();
+        const auto drawing = window.data2;
+        EXPECT_TRUE(window.close());
+        expect_closed_resources(drawing);
+        EXPECT_FALSE(phase->recording());
+        EXPECT_EQ(completion.status(), vsl::Completion::Status::CANCELLED);
+        EXPECT_EQ(phase->submit(), vsl::ComputePhase::SubmitResult::FAILED);
+        phase.reset();
+        EXPECT_EQ(finishes, 0u);
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
+    }
+    TEST_F(AHOWindowVulkanIntegration, TheWeakClosePluginStillClosesANativeWindowAfterItsDrawingMetadataExpires) {
+        ASSERT_NO_THROW(start_engine());
+        std::optional<vsl::PureWindow> native;
+        std::weak_ptr<aho::window::WindowData> drawing;
+        {
+            aho::Window secondary("abandoned facade", 64, 48, *engine);
+            native.emplace(secondary.data_);
+            drawing = secondary.data2;
+        }
+        EXPECT_TRUE(drawing.expired());
+        ASSERT_TRUE(static_cast<bool>(*native));
+        glfwSetWindowShouldClose(static_cast<GLFWwindow*>(native->data_->window_handle), GLFW_TRUE);
+        EXPECT_TRUE(vsl::PureWindow::Update());
+        EXPECT_FALSE(static_cast<bool>(*native));
+    }
+    TEST_F(AHOWindowVulkanIntegration, PluginDestructionCancelsADeletedPhaseBeforeTheTLSCancellationPass) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        unsigned finishes = 0;
+        auto phase = std::make_unique<aho::DrawPhase>(*engine, nullptr, [&](auto&) { ++finishes; });
+        const auto result = phase->completion();
+        window.add_plugin<CloseDestructorHook>([&] { phase.reset(); });
+        EXPECT_TRUE(window.close());
+        EXPECT_FALSE(phase);
+        EXPECT_EQ(finishes, 0u);
+        EXPECT_EQ(result.status(), vsl::Completion::Status::CANCELLED);
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
+    }
+    TEST_F(AHOWindowVulkanIntegration, ResourceDestructionCanDeleteTheClosingFacadeAfterEverySharedFieldIsDetached) {
+        ASSERT_NO_THROW(start_engine());
+        auto window = std::make_unique<aho::Window>("self deleting close", 64, 48, *engine);
+        const auto drawing = window->data2;
+        bool destroyed = false;
+        drawing->standard_draw = std::shared_ptr<aho::drawer::detail::StandardDrawState>(nullptr, [&](aho::drawer::detail::StandardDrawState*) {
+            expect_closed_resources(drawing);
+            destroyed = true;
+            window.reset();
+        });
+        EXPECT_TRUE(window->close());
+        EXPECT_TRUE(destroyed);
+        EXPECT_FALSE(window);
+    }
+    TEST_F(AHOWindowVulkanIntegration, ForeignSurfaceNativeCallsDeferCloseRecoveryUntilTheirResultsAreCommitted) {
+        ASSERT_NO_THROW(start_engine());
+        for (const bool presenting : {false, true}) {
+            for (const bool orphan : {false, true}) {
+                SCOPED_TRACE(testing::Message() << "present=" << presenting << " orphan=" << orphan);
+                aho::Window a("retiring A", 64, 48, *engine), b("active B", 64, 48, *engine);
+                auto runtime = std::make_unique<CloseTargetEngine>(*engine, a);
+                CloseTargetEngine other(*engine, b);
+                auto phase = std::make_unique<aho::DrawPhase>(*runtime);
+                const auto result = phase->completion();
+                const auto drawing = a.data2;
+                const std::weak_ptr<void> generation = drawing->swapchain.data_;
+                const std::weak_ptr<void> synchronization = drawing->image_available.data_;
+                aho::DrawPhase native(other);
+                CloseNativeProbe probe;
+                bool callback = false;
+                auto close = [&] {
+                    callback = true;
+                    EXPECT_TRUE(a.close());
+                    expect_closed_resources(drawing);
+                    EXPECT_EQ(result.status(), vsl::Completion::Status::CANCELLED);
+                    if (orphan) {
+                        phase.reset();
+                        runtime.reset();
+                    }
+                    EXPECT_FALSE(generation.expired());
+                    EXPECT_FALSE(synchronization.expired());
+                    EXPECT_EQ(probe.drains, 0u);
+                    EXPECT_EQ(probe.nested, 0u);
+                };
+                (presenting ? probe.on_present : probe.on_submit) = close;
+                const vsl::operation::ScopedSubmissionNativeCalls submissions({.context = &probe, .wait_idle = CloseNativeProbe::Idle, .queue_submit = CloseNativeProbe::Submit});
+                const vsl::operation::ScopedPresentationNativeCalls presentations({.context = &probe, .present = CloseNativeProbe::Present, .release = CloseNativeProbe::Release});
+                EXPECT_EQ(native.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+                EXPECT_TRUE(callback);
+                EXPECT_EQ(probe.nested, 0u);
+                phase.reset();
+                runtime.reset();
+                EXPECT_EQ(vsl::lifetime::collect_surface_retirements(engine->data()->logical_device, vsl::lifetime::SurfaceRecoveryMode::WAIT),
+                          vsl::lifetime::SurfaceRecoveryStatus::COMPLETE);
+                EXPECT_EQ(result.status(), vsl::Completion::Status::CANCELLED);
+                EXPECT_TRUE(generation.expired());
+                EXPECT_TRUE(synchronization.expired());
+                EXPECT_TRUE(b.close());
+            }
+        }
+    }
+    TEST_F(AHOWindowVulkanIntegration, CloseDuringAcquisitionResetSubmissionAndPresentationKeepsOriginalParentsUntilNativeReturn) {
+        ASSERT_NO_THROW(start_engine());
+        for (unsigned boundary = 0; boundary < 4; ++boundary) {
+            SCOPED_TRACE(boundary);
+            aho::Window window("closing during Native", 64, 48, *engine);
+            CloseTargetEngine runtime(*engine, window);
+            const auto drawing = window.data2;
+            const std::weak_ptr<void> generation = drawing->swapchain.data_;
+            const std::weak_ptr<void> frames = drawing->image_available.data_;
+            CloseNativeProbe probe;
+            bool called = false;
+            unsigned finishes = 0;
+            auto close = [&] {
+                called = true;
+                EXPECT_TRUE(window.close());
+                expect_closed_resources(drawing);
+                EXPECT_FALSE(generation.expired());
+                EXPECT_FALSE(frames.expired());
+                EXPECT_EQ(probe.nested, 0u);
+            };
+            const std::array callbacks{&probe.on_reset, &probe.on_acquire, &probe.on_submit, &probe.on_present};
+            *callbacks[boundary] = close;
+            const vsl::operation::ScopedSubmissionNativeCalls submissions({.context = &probe, .wait_idle = CloseNativeProbe::Idle, .queue_submit = CloseNativeProbe::Submit});
+            const vsl::operation::ScopedPresentationNativeCalls presentations({.context = &probe, .present = CloseNativeProbe::Present, .acquire = CloseNativeProbe::Acquire, .release = CloseNativeProbe::Release});
+            const vsl::operation::ScopedSynchronizationNativeCalls synchronization({.context = &probe, .reset_fences = CloseNativeProbe::Reset});
+            {
+                aho::DrawPhase phase(runtime, nullptr, [&](auto& stream) {
+                    ++finishes;
+                    stream << vsl::command::RenderPassEnd{};
+                });
+                if (phase.recording())
+                    (void)phase.submit();
+                EXPECT_TRUE(called);
+                EXPECT_FALSE(phase.recording());
+            }
+            EXPECT_EQ(probe.nested, 0u);
+            EXPECT_EQ(finishes, boundary < 2 ? 0u : 1u);
+            EXPECT_EQ(vsl::lifetime::collect_surface_retirements(engine->data()->logical_device, vsl::lifetime::SurfaceRecoveryMode::WAIT),
+                      vsl::lifetime::SurfaceRecoveryStatus::COMPLETE);
+            EXPECT_TRUE(generation.expired());
+            EXPECT_TRUE(frames.expired());
+        }
+    }
 
     TEST_F(AHOWindowVulkanIntegration, NonpositiveLogicalResizeIsRejectedBeforeAnyWindowOrGenerationChanges) {
         ASSERT_NO_THROW(start_engine());
@@ -70,18 +364,6 @@ namespace {
         EXPECT_EQ(native.creates, 0u);
     }
 
-    struct FixedIdResizeHook : aho::window::WindowResizeHookPlugin {
-        FixedIdResizeHook(vsl::PureWindow* window, unsigned char id, std::function<void(aho::Window*)> callback)
-            : WindowResizeHookPlugin(window, std::move(callback)) { this->id = id; }
-    };
-    struct GenerationProbe {
-        unsigned creates = 0, frames = 0, frame_destroys = 0;
-        bool fail_create = false, fail_frame = false;
-        VkSwapchainKHR previous = VK_NULL_HANDLE;
-        static VkResult Create(void* context, VkDevice device, const VkSwapchainCreateInfoKHR* info, VkSwapchainKHR* output);
-        static vk::Framebuffer Frame(void* context, vk::Device device, const vk::FramebufferCreateInfo& info);
-        static void DestroyFrame(void* context, vk::Device device, vk::Framebuffer frame) noexcept;
-    };
     VkResult GenerationProbe::Create(void* context, VkDevice device, const VkSwapchainCreateInfoKHR* info, VkSwapchainKHR* output) {
         auto& probe = *static_cast<GenerationProbe*>(context);
         ++probe.creates;

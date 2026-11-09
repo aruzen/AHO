@@ -64,6 +64,7 @@ namespace VSL_NAMESPACE::lifetime {
         void bookkeep() noexcept;
         void release() noexcept;
         bool pending() const noexcept;
+        bool captured() const noexcept { return !_entries.empty(); }
         bool native_active() const noexcept;
     };
     std::shared_ptr<AcquireTicket> prepare_acquire_ticket(const std::shared_ptr<SurfacePresentationDomain>& domain,

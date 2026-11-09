@@ -1,6 +1,7 @@
 #pragma once
 #include <VSL/vulkan/pv.hpp>
 #include <VSL/lifetime/resource_use.hpp>
+#include <VSL/sync/device_call.hpp>
 #include <memory>
 #include <vector>
 #include <span>
@@ -31,6 +32,7 @@ namespace VSL_NAMESPACE::lifetime {
         CommandDomain& _domain;
         impl::SubmissionWork& _work;
         bool _owns_context, _active = true;
+        sync::NativeDeviceCall _native_call;
 
     public:
         SubmissionTransaction(CommandDomain& domain, impl::SubmissionWork& work);
@@ -40,6 +42,7 @@ namespace VSL_NAMESPACE::lifetime {
         void finish() noexcept;
     };
     void abort_recording(CommandDomain& domain, impl::SubmissionWork& work, std::uint32_t slot) noexcept;
+    void detach_recording_cpu(CommandDomain& domain, impl::SubmissionWork& work) noexcept;
     void fail_recording(CommandDomain& domain, impl::SubmissionWork& work, std::uint32_t slot,
                         Completion::Failure failure, std::int32_t error_code) noexcept;
     class SubmissionSnapshot {
@@ -62,6 +65,7 @@ namespace VSL_NAMESPACE::lifetime {
         void bookkeep() noexcept;
         void release() noexcept;
         bool pending() const noexcept { return _pending; }
+        bool captured() const noexcept { return bool(_selected); }
         void finish() noexcept;
     };
     void quarantine_submission(const std::shared_ptr<impl::SubmissionWork>& work, const std::shared_ptr<impl::CommandBufferImpl>& buffer) noexcept;

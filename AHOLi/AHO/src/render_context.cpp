@@ -9,7 +9,7 @@ namespace AHO_NAMESPACE {
     }
 
     void RenderContext::require_live() const {
-        if (!_window || !_window->window_handle || !_target || !_engine ||
+        if (!_window || !_window->window_handle || !_target || _target->closed || !_engine ||
             !_engine->logical_device.data_ || !_engine->command_manager.data_ || !_engine->graphic_resource_manager)
             throw std::logic_error("RenderContext requires a live, booted AHO window");
     }

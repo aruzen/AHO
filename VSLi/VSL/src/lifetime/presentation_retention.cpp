@@ -1,4 +1,5 @@
 #include <VSL/lifetime/presentation_retention.hpp>
+#include <VSL/sync/device_call.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/lifetime/acquire_ticket.hpp>
 #include <VSL/lifetime/phase_call.hpp>
@@ -291,7 +292,7 @@ namespace VSL_NAMESPACE::lifetime {
             throw std::logic_error("Presentation semaphore source is being accessed");
         const NativeCall semaphore_call(record.semaphore_source->use.accessing);
         auto result = record.generation->device->lost ? vk::Result::eErrorDeviceLost
-                                                      : operation::queue_present(record.queue, record.generation->swap_chain, record.image,
+                                                      : operation::queue_present(record.state.device, record.queue, record.generation->swap_chain, record.image,
                                                                                  record.wait_semaphore, record.state.strict ? record.state.proof : vk::Fence{});
         if (record.generation->device->lost)
             result = vk::Result::eErrorDeviceLost;
@@ -554,7 +555,14 @@ namespace VSL_NAMESPACE::lifetime {
                 continue;
             }
             if (record->state.status == sync::PresentStatus::PENDING) {
-                record->state.status = sync::PresentStatus::CANCELLED;
+                if (!record->state.observing)
+                    record->state.status = sync::PresentStatus::CANCELLED;
+                else
+                    quarantine_presentation(record);
+                continue;
+            }
+            if (sync::NativeDeviceCall::Active(record->state.device)) {
+                quarantine_presentation(record);
                 continue;
             }
             if (record->state.status == sync::PresentStatus::UNCERTAIN) {

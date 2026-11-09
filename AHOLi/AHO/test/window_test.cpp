@@ -1,4 +1,5 @@
 #ifdef AHO_GPU_TESTS
+#include <VSL/lifetime/image_access.hpp>
 #include "support/live_gpu.hpp"
 #include "support/frame_buffer_query.hpp"
 #include <AHO/drawer/draw_phase.hpp>
@@ -417,7 +418,7 @@ namespace {
             EXPECT_EQ(current->data2->swapchain.data_, candidate.data_);
             EXPECT_EQ(current->data2->render_finished.data_, candidate.finished_semaphores().data_);
             EXPECT_EQ(current->data2->frame_buffer.data_->render_pass, pass.get());
-            EXPECT_EQ(current->data2->frame_buffer.data_->attachments.front().front(), candidate.images.front().data_.get());
+            EXPECT_EQ(current->data2->frame_buffer.data_->attachments.front().front(), VSL_NAMESPACE::lifetime::detail::ImageAccess::Owned(candidate.images.front()).get());
         });
         probe.fail_frame = false;
         EXPECT_TRUE(window.recreate_swapchain());

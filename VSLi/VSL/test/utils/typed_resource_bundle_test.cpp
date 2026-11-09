@@ -1,8 +1,15 @@
+#include <VSL/lifetime/image_access.hpp>
+#include <VSL/lifetime/sampler_access.hpp>
 #include <VSL/utils/typed_resource_bundle.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/native_recording.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include "support/vulkan_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+    using VSL_NAMESPACE::lifetime::detail::SamplerAccess;
+} // namespace
 
 namespace {
     namespace t = vsl::typed;
@@ -304,13 +311,13 @@ namespace {
         const auto uniform_input = t::external_resource<0, 0>(uniform);
         auto textures = t::external_resource<0, 2>(std::array{t::TypedTexture(valid, sampler), t::TypedTexture(invalid, sampler)});
         const auto uniform_refs = uniform.backend().owner_ref().use_count();
-        const auto image_refs = valid.data_.use_count();
-        const auto sampler_refs = sampler.data_.use_count();
+        const auto image_refs = ImageAccess::Owned(valid).use_count();
+        const auto sampler_refs = SamplerAccess::Owned(sampler).use_count();
         using Bundle = t::TypedResourceBundle<Allocation, t::ArenaStorage<>>;
         EXPECT_THROW((Bundle(manager, descriptors, uniform_input, textures)), std::invalid_argument);
         EXPECT_EQ(uniform.backend().owner_ref().use_count(), uniform_refs);
-        EXPECT_EQ(valid.data_.use_count(), image_refs);
-        EXPECT_EQ(sampler.data_.use_count(), sampler_refs);
+        EXPECT_EQ(ImageAccess::Owned(valid).use_count(), image_refs);
+        EXPECT_EQ(SamplerAccess::Owned(sampler).use_count(), sampler_refs);
         textures.values[1] = t::TypedTexture(valid, sampler);
         EXPECT_NO_THROW((Bundle(manager, descriptors, uniform_input, textures)));
         EXPECT_EQ(descriptors.allocations, 0u);
@@ -581,7 +588,7 @@ namespace {
             vsl::Image<vsl::ImageType::SAMPLED> first(device, 1, 1, vsl::data_format::UNSIGNED_NORMALIZED8_RGBA);
             vsl::Image<vsl::ImageType::SAMPLED> second(device, 1, 1, vsl::data_format::UNSIGNED_NORMALIZED8_RGBA);
             vsl::Sampler sampler(device, vsl::SamplingMode::NEAREST, vsl::EdgeMode::CLAMP_TO_EDGE);
-            owner = second.data_;
+            owner = ImageAccess::Owned(second).share();
             return t::TypedResourceBundle<External, t::HeapStorage>(manager, descriptors,
                                                                     t::external_resource<1, 2>(std::array{t::TypedTexture(first, sampler), t::TypedTexture(second, sampler)}));
         }();

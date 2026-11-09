@@ -1,4 +1,5 @@
 #ifdef AHO_GPU_TESTS
+#include <VSL/lifetime/buffer_access.hpp>
 #include <AHO/resource/typed_buffer.hpp>
 #include <AHO/resource/arena_buffer.hpp>
 #include <AHO/x/resource/typed_texture.hpp>
@@ -34,7 +35,7 @@ namespace {
             const auto next = binding.snapshot();
             EXPECT_EQ(next.storage().size(), 128u);
             EXPECT_NE(old->storage().identity(), next.storage().identity());
-            current = buffer.native().data_;
+            current = VSL_NAMESPACE::lifetime::detail::BufferAccess::Owned(buffer.native()).share();
         }
         EXPECT_TRUE(current.expired());
         std::uint32_t result = 0;

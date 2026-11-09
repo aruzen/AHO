@@ -1,9 +1,14 @@
+#include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/lifetime/command_storage.hpp>
 #include "support/deferred_action.hpp"
 #include <limits>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -191,19 +196,19 @@ namespace {
     TEST_F(CommandResourceVulkanIntegrationTest, VertexBindingAddsAnOwnerToTheRecordingSubmission) {
         auto manager = make_manager();
         vsl::StagingBuffer<vsl::MemoryType::VERTEX_BUFFER> vertex(device, 32);
-        const auto owners = vertex.data_.use_count();
+        const auto owners = BufferAccess::Owned(vertex).use_count();
         auto phase = manager.start_phase<vsl::ComputePhase>();
         phase << vsl::command::BindVertexBuffer(vertex);
-        EXPECT_GT(vertex.data_.use_count(), owners);
+        EXPECT_GT(BufferAccess::Owned(vertex).use_count(), owners);
         phase.cancel();
     }
     TEST_F(CommandResourceVulkanIntegrationTest, IndexBindingAddsAnOwnerToTheRecordingSubmission) {
         auto manager = make_manager();
         vsl::StagingBuffer<vsl::MemoryType::INDEX_BUFFER> indices(device, 12);
-        const auto owners = indices.data_.use_count();
+        const auto owners = BufferAccess::Owned(indices).use_count();
         auto phase = manager.start_phase<vsl::ComputePhase>();
         phase << vsl::command::BindIndexBuffer(indices);
-        EXPECT_GT(indices.data_.use_count(), owners);
+        EXPECT_GT(BufferAccess::Owned(indices).use_count(), owners);
         phase.cancel();
     }
 } // namespace
@@ -251,7 +256,7 @@ namespace {
             cancelled = phase.completion();
             {
                 vsl::StagingBuffer<vsl::MemoryType::VERTEX_BUFFER> vertex(device, 32);
-                weak = vertex.data_;
+                weak = BufferAccess::Owned(vertex).share();
                 phase << vsl::command::BindVertexBuffer(vertex);
             }
             EXPECT_FALSE(weak.expired());

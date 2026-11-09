@@ -7,6 +7,10 @@
 #include <stdexcept>
 
 namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+}
+
+namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
 VSL_NAMESPACE::BufferIdentity VSL_NAMESPACE::command::BindIndexBufferAt::identity() const {
@@ -35,5 +39,5 @@ void VSL_NAMESPACE::command::BindIndexBufferAt::invoke(CommandPool pool, Command
 
 void VSL_NAMESPACE::command::BindIndexBuffer::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
     this->buffer->resource_use().record(buffer);
-    CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].bindIndexBuffer(this->buffer->data_->buffer, offset, vk::IndexType::eUint32);
+    CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].bindIndexBuffer(BufferAccess::Owned(*(this->buffer))->buffer, offset, vk::IndexType::eUint32);
 }

@@ -1,9 +1,16 @@
+#include <VSL/lifetime/image_access.hpp>
+#include <VSL/lifetime/sampler_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <VSL/lifetime/resource_arena.hpp>
 #include <VSL/lifetime/arena_resource.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/vulkan/commands/image_upload.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+    using VSL_NAMESPACE::lifetime::detail::SamplerAccess;
+} // namespace
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -81,13 +88,13 @@ namespace {
         const auto sampler = arena.sampler({3});
         const auto base = reinterpret_cast<std::uintptr_t>(l::detail::BufferAccess::Impl(first));
         EXPECT_EQ(reinterpret_cast<std::uintptr_t>(l::detail::BufferAccess::Impl(second)) - base, PLAN.placement({4}).offset);
-        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(image.data_.get()) - base, PLAN.placement({2}).offset);
-        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(sampler.data_.get()) - base, PLAN.placement({3}).offset);
+        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(ImageAccess::Owned(image).get()) - base, PLAN.placement({2}).offset);
+        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(SamplerAccess::Owned(sampler).get()) - base, PLAN.placement({3}).offset);
         EXPECT_NE(&first.use(), &second.use());
         EXPECT_NE(&first.use(), &image.use_state());
         EXPECT_NE(&image.use_state(), &sampler.use_state());
-        EXPECT_FALSE(image.data_.owner_before(sampler.data_));
-        EXPECT_FALSE(sampler.data_.owner_before(image.data_));
+        EXPECT_FALSE(ImageAccess::Owned(image).owner_before(SamplerAccess::Owned(sampler)));
+        EXPECT_FALSE(SamplerAccess::Owned(sampler).owner_before(ImageAccess::Owned(image)));
         EXPECT_THROW(arena.image({1}), std::invalid_argument);
         EXPECT_THROW(arena.buffer({404}), std::out_of_range);
         const std::array<std::uint32_t, 4> values{3, 5, 7, 11};
@@ -163,8 +170,8 @@ namespace {
             EXPECT_EQ(imported.buffer({12}).resource_use().state, source.buffer({1}).resource_use().state);
             EXPECT_EQ(&imported.image({10}).use_state(), &source.image({2}).use_state());
             EXPECT_EQ(&imported.sampler({13}).use_state(), &source.sampler({3}).use_state());
-            EXPECT_FALSE(imported.image({10}).data_.owner_before(source_owner));
-            EXPECT_FALSE(source_owner.owner_before(imported.image({10}).data_));
+            EXPECT_FALSE(ImageAccess::Owned(imported.image({10})).share().owner_before(source_owner));
+            EXPECT_FALSE(source_owner.owner_before(ImageAccess::Owned(imported.image({10})).share()));
             retained.emplace(imported.buffer({12}));
         }
         EXPECT_TRUE(import_owner.expired());
@@ -183,19 +190,19 @@ namespace {
         std::array<l::ResourceInit, 1> inputs{vsl::ImageAccessor{}};
         EXPECT_THROW((l::ResourceArena(device, plan, inputs)), std::invalid_argument);
         vsl::Image<IMAGE_USAGE> image(device, 1, 1, IMAGE_INFO.format);
-        inputs[0] = vsl::ImageAccessor{std::shared_ptr<vsl::impl::ImageImpl>(std::shared_ptr<void>{}, image.data_.get())};
+        inputs[0] = ImageAccess::FromShared(std::shared_ptr<vsl::impl::ImageImpl>(std::shared_ptr<void>{}, ImageAccess::Owned(image).get()));
         EXPECT_THROW((l::ResourceArena(device, plan, inputs)), std::invalid_argument);
         inputs[0] = image;
         l::ResourceArena imported(device, plan, inputs);
         EXPECT_EQ(imported.slots(), 0u);
-        EXPECT_EQ(imported.image({1}).data_, image.data_);
+        EXPECT_EQ(ImageAccess::Owned(imported.image({1})), ImageAccess::Owned(image));
         EXPECT_THROW((l::ResourceArena({}, plan, inputs)), std::invalid_argument);
     }
     TEST_F(ResourceArenaVulkanIntegrationTest, UnconstructedExternalAccessorsAreRejectedBeforeDereferencingTheirDevice) {
         const std::array<t::ResourceRequest, 1> image_request{{{{1}, IMAGE, true}}}, sampler_request{{{{1}, SAMPLER, true}}};
         const t::ResourcePlan<1> image_plan(image_request), sampler_plan(sampler_request);
-        const std::array<l::ResourceInit, 1> image{vsl::ImageAccessor{std::make_shared<vsl::impl::ImageImpl>()}};
-        const std::array<l::ResourceInit, 1> sampler{vsl::SamplerAccessor{std::make_shared<vsl::impl::SamplerImpl>()}};
+        const std::array<l::ResourceInit, 1> image{ImageAccess::FromShared(std::make_shared<vsl::impl::ImageImpl>())};
+        const std::array<l::ResourceInit, 1> sampler{SamplerAccess::FromShared(std::make_shared<vsl::impl::SamplerImpl>())};
         EXPECT_THROW((l::ResourceArena(device, image_plan, image)), std::invalid_argument);
         EXPECT_THROW((l::ResourceArena(device, sampler_plan, sampler)), std::invalid_argument);
     }

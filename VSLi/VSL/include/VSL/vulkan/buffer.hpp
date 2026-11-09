@@ -2,6 +2,7 @@
 #include "../define.hpp"
 
 #include "buffer_and_image_accessor.hpp"
+#include "../operation/buffer_create_info.hpp"
 
 #include "../utils/flags.hpp"
 #include <optional>
@@ -160,9 +161,9 @@ namespace VSL_NAMESPACE {
 
     template<typename... Args>
     bool VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::copy(const Args&... args) {
-        require_idle();
+        const auto mapping = snapshot_idle();
         size_t offset = 0;
-        return helper::copy_with_shift_offset(this->data, this->size, offset, args...);
+        return helper::copy_with_shift_offset(mapping.data, mapping.size, offset, args...);
     }
 
     template<typename T, typename Count>
@@ -217,12 +218,12 @@ namespace VSL_NAMESPACE {
 
     template<typename T>
     bool BufferAccessor::LocalBufferHolder::copy(T* t, size_t size) {
-        require_idle();
-        if (size > this->size / sizeof(T))
+        const auto mapping = snapshot_idle();
+        if (size > mapping.size / sizeof(T))
             return false;
         if (size == 0)
             return true;
-        std::memmove(data, t, sizeof(T) * size);
+        std::memmove(mapping.data, t, sizeof(T) * size);
         return true;
     }
 
@@ -236,9 +237,9 @@ namespace VSL_NAMESPACE {
 
     template<typename... Args>
     void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::uncheck_copy(const Args&... args) {
-        require_idle();
+        const auto mapping = snapshot_idle();
         size_t offset = 0;
-        (helper::uncheck_copy_with_shift_offset(this->data, offset, args), ...);
+        (helper::uncheck_copy_with_shift_offset(mapping.data, offset, args), ...);
     }
 
     template<MemoryType mem_type, MemoryProperty mem_property, SharingMode share_mode>
@@ -279,23 +280,22 @@ namespace VSL_NAMESPACE {
     }
 
     template<VSL_NAMESPACE::MemoryType mem_type, VSL_NAMESPACE::MemoryProperty mem_property, VSL_NAMESPACE::SharingMode sharing_mode>
-    VSL_NAMESPACE::Buffer<mem_type, mem_property, sharing_mode>::Buffer(LogicalDeviceAccessor device, size_t size, std::optional<CommandManager> manager) {
-        data_ = this->MakeBuffer(device, size, mem_type, mem_property, sharing_mode);
-    }
+    VSL_NAMESPACE::Buffer<mem_type, mem_property, sharing_mode>::Buffer(LogicalDeviceAccessor device, size_t size, std::optional<CommandManager> manager)
+        : BufferAccessor(device, {size, mem_type, mem_property, sharing_mode}) {}
 
     template<MemoryType mem_type, MemoryProperty mem_property, SharingMode sharing_mode>
     template<typename T>
     requires(!std::is_integral_v<T>) && (VSL_NAMESPACE::contain<mem_property, MemoryProperty::HOST_VISIBLE>())
-    Buffer<mem_type, mem_property, sharing_mode>::Buffer(LogicalDeviceAccessor device, T t) {
-        data_ = this->MakeBuffer(device, sizeof(T), mem_type, mem_property, sharing_mode);
+    Buffer<mem_type, mem_property, sharing_mode>::Buffer(LogicalDeviceAccessor device, T t)
+        : BufferAccessor(device, {sizeof(T), mem_type, mem_property, sharing_mode}) {
         this->copy(t);
     }
 
     template<MemoryType mem_type, MemoryProperty mem_property, SharingMode sharing_mode>
     template<typename T>
     requires(!std::is_integral_v<T>) && (!VSL_NAMESPACE::contain<mem_property, MemoryProperty::HOST_VISIBLE>())
-    Buffer<mem_type, mem_property, sharing_mode>::Buffer(LogicalDeviceAccessor device, CommandManager manager, T t) {
-        data_ = this->MakeBuffer(device, sizeof(T), mem_type, mem_property, sharing_mode);
+    Buffer<mem_type, mem_property, sharing_mode>::Buffer(LogicalDeviceAccessor device, CommandManager manager, T t)
+        : BufferAccessor(device, {sizeof(T), mem_type, mem_property, sharing_mode}) {
         StagingBuffer<> staging_buffer(device, sizeof(T));
         staging_buffer.copy(t);
         this->copy_by_buffer(manager, &staging_buffer);
@@ -304,18 +304,17 @@ namespace VSL_NAMESPACE {
     template<MemoryType mem_type, MemoryProperty mem_property, SharingMode sharing_mode>
     template<typename T>
     requires(VSL_NAMESPACE::contain<mem_property, MemoryProperty::HOST_VISIBLE>())
-    Buffer<mem_type, mem_property, sharing_mode>::Buffer(LogicalDeviceAccessor device, T* t, size_t size) {
-        const auto bytes = helper::checked_buffer_array_size<T>(size);
-        data_ = this->MakeBuffer(device, bytes, mem_type, mem_property, sharing_mode);
+    Buffer<mem_type, mem_property, sharing_mode>::Buffer(LogicalDeviceAccessor device, T* t, size_t size)
+        : BufferAccessor(device, {helper::checked_buffer_array_size<T>(size), mem_type, mem_property, sharing_mode}) {
         this->copy(t, size);
     }
 
     template<MemoryType mem_type, MemoryProperty mem_property, SharingMode sharing_mode>
     template<typename T>
     requires(!VSL_NAMESPACE::contain<mem_property, MemoryProperty::HOST_VISIBLE>())
-    Buffer<mem_type, mem_property, sharing_mode>::Buffer(LogicalDeviceAccessor device, CommandManager manager, T* t, size_t size) {
-        const auto bytes = helper::checked_buffer_array_size<T>(size);
-        data_ = this->MakeBuffer(device, bytes, mem_type, mem_property, sharing_mode);
+    Buffer<mem_type, mem_property, sharing_mode>::Buffer(LogicalDeviceAccessor device, CommandManager manager, T* t, size_t size)
+        : BufferAccessor(device, {helper::checked_buffer_array_size<T>(size), mem_type, mem_property, sharing_mode}) {
+        const auto bytes = requested_size();
         StagingBuffer<> staging_buffer(device, bytes);
         {
             auto data = staging_buffer.data();

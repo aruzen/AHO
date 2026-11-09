@@ -1,4 +1,5 @@
 #ifdef AHO_GPU_TESTS
+#include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/render_fixture.hpp"
 #include <AHO/image_readback.hpp>
@@ -184,7 +185,7 @@ namespace {
         }
         // 描画側の参照を解放する前に完了を待ち、読み戻し側だけで画像の寿命を維持できるか確かめる。
         device.data_->device.waitIdle();
-        std::weak_ptr<VSL_NAMESPACE::impl::ImageImpl> source = color->data_;
+        std::weak_ptr<VSL_NAMESPACE::impl::ImageImpl> source = VSL_NAMESPACE::lifetime::detail::ImageAccess::Owned(*(color)).share();
         auto request = AHO_NAMESPACE::ImageReadback(manager, *color, VSL_NAMESPACE::ImageLayout::GENERAL);
         framebuffer.reset();
         description.images.clear();

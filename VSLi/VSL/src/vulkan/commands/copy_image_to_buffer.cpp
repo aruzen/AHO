@@ -1,4 +1,8 @@
+#include <VSL/lifetime/buffer_access.hpp>
+#include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
+#include <VSL/lifetime/native_recording.hpp>
 #include <VSL/vulkan/commands/copy_image_to_buffer.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>
@@ -11,6 +15,11 @@
 #include <utility>
 
 namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+} // namespace
+
+namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
 VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(VSL_NAMESPACE::BufferAccessor* buffer, VSL_NAMESPACE::ImageAccessor image)
@@ -18,25 +27,20 @@ VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(VSL_NAMESPACE::Buff
 
 VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(VSL_NAMESPACE::BufferAccessor* buffer, VSL_NAMESPACE::ImageAccessor image,
                                                              ImageLayout layout, ImageRegion region, bool host_read)
-    : CopyImageToBuffer(buffer ? buffer->data_ : nullptr, std::move(image), layout, region, host_read) {
-    this->buffer = buffer;
-}
+    : image(std::move(image)), buffer(buffer), layout(layout), region(region), host_read(host_read),
+      _destination(buffer ? BufferAccess::Owned(*buffer).get() : nullptr), _use(buffer ? buffer->resource_use() : ResourceUse{}),
+      _destination_size(buffer ? buffer->requested_size() : 0) {}
 
-VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(std::shared_ptr<impl::BufferImpl> buffer,
-                                                             VSL_NAMESPACE::ImageAccessor image, ImageLayout layout,
-                                                             ImageRegion region, bool host_read)
-    : CopyImageToBuffer(buffer, std::move(image), layout, region, host_read, 0, buffer ? buffer->requirement_size : 0) {}
-
-VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(std::shared_ptr<impl::BufferImpl> buffer,
-                                                             VSL_NAMESPACE::ImageAccessor image, ImageLayout layout,
-                                                             ImageRegion region, bool host_read, std::size_t offset, std::size_t size)
+VSL_NAMESPACE::command::CopyImageToBuffer::CopyImageToBuffer(BufferView destination, ImageAccessor image, ImageLayout layout,
+                                                             ImageRegion region, bool host_read, ResourceUse constraint, ResourceRetention retention)
     : image(std::move(image)), buffer(nullptr), layout(layout), region(region), host_read(host_read),
-      _destination(std::move(buffer)), _destination_offset(offset), _destination_size(size) {}
+      _destination(lifetime::detail::BufferAccess::Impl(destination.ref())), _use(destination.resource_use(std::move(constraint))),
+      _destination_offset(destination.byte_offset()), _destination_size(destination.size()), _retention(retention) {}
 
 VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer::Describe(ImageAccessor image, ImageRegion region) {
-    if (!image.data_ || !image.data_->image || !image.data_->device)
+    if (!ImageAccess::Owned(image) || !ImageAccess::Owned(image)->image || !ImageAccess::Owned(image)->device)
         throw std::invalid_argument("Image copy requires a valid image");
-    const auto& source = *image.data_;
+    const auto& source = *ImageAccess::Owned(image);
     if (!contain(source.usage, ImageType::TRANSFER_SRC) || source.samples != SampleCount::ONE ||
         impl::helper::image_aspects(source.format) != vk::ImageAspectFlagBits::eColor)
         throw std::invalid_argument("Image copy requires a single-sample color TransferSrc image");
@@ -63,7 +67,7 @@ VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer:
 VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer::description() const {
     const auto info = Describe(image, region);
     const auto& destination = _destination;
-    if (!destination || !destination->buffer || destination->device != image.data_->device)
+    if (!destination || !destination->buffer || destination->device != ImageAccess::Owned(image)->device)
         throw std::invalid_argument("Image copy requires a destination on the same device");
     if (!contain(destination->usage, MemoryType::TRANSFER_DESTINATION))
         throw std::invalid_argument("Image copy requires TransferDestination buffer usage");
@@ -79,23 +83,30 @@ VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer:
     return info;
 }
 
-void VSL_NAMESPACE::command::CopyImageToBuffer::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
+VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyImageToBuffer::prepare(const CommandBuffer& buffer, const CommandManager& manager) const {
     const auto info = description();
-    const auto& destination = _destination;
     if (!CommandAccess::Data(buffer) || !CommandAccess::Data(buffer)->command_pool || !CommandAccess::Data(manager) ||
-        CommandAccess::Data(manager)->device.get() != image.data_->device ||
-        CommandAccess::Data(buffer)->command_pool->device != image.data_->device)
+        CommandAccess::Data(manager)->device.get() != ImageAccess::Owned(image)->device ||
+        CommandAccess::Data(buffer)->command_pool->device != ImageAccess::Owned(image)->device)
         throw std::invalid_argument("Image copy requires a command buffer on the same device");
-    image.resource_use().record(buffer);
-    lifetime::resource_use_for_buffer(destination, {}).record(buffer);
+    return info;
+}
+
+void VSL_NAMESPACE::command::CopyImageToBuffer::track(const NativeRecordingContext& recording) const {
+    recording.use(image.resource_use(), ResourceRetention::SUBMISSION);
+    recording.use(_use, _retention);
+}
+
+void VSL_NAMESPACE::command::CopyImageToBuffer::record(const ImageCopyInfo& info, const NativeRecordingContext& recording) const {
+    const auto* destination = _destination;
     const auto& area = info.region;
     vk::BufferImageCopy copy{
         .bufferOffset = _destination_offset,
         .imageSubresource = {vk::ImageAspectFlagBits::eColor, 0, area.layer, 1},
         .imageOffset = {static_cast<std::int32_t>(area.x), static_cast<std::int32_t>(area.y), 0},
         .imageExtent = {area.width, area.height, 1}};
-    auto command = CommandAccess::Data(buffer)->command_buffers.at(buffer.get_current_buffer_idx());
-    command.copyImageToBuffer(image.data_->image, static_cast<vk::ImageLayout>(layout), destination->buffer, copy);
+    const vk::CommandBuffer command(recording.native_command_buffer());
+    command.copyImageToBuffer(ImageAccess::Owned(image)->image, static_cast<vk::ImageLayout>(layout), destination->buffer, copy);
     if (host_read) {
         vk::BufferMemoryBarrier barrier{
             .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
@@ -108,4 +119,12 @@ void VSL_NAMESPACE::command::CopyImageToBuffer::invoke(CommandPool pool, Command
         command.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost,
                                 {}, {}, barrier, {});
     }
+}
+
+void VSL_NAMESPACE::command::CopyImageToBuffer::invoke(CommandPool, CommandBuffer buffer, CommandManager manager) {
+    const auto copy = *this;
+    const auto info = copy.prepare(buffer, manager);
+    const NativeRecordingContext recording(buffer);
+    copy.track(recording);
+    copy.record(info, recording);
 }

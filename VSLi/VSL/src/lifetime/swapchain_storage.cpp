@@ -1,3 +1,4 @@
+#include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/swapchain_storage.hpp>
 #include <VSL/lifetime/swapchain_arena.hpp>
 #include <VSL/lifetime/device_owner.hpp>
@@ -9,6 +10,10 @@
 #include <VSL/lifetime/synchronization_storage.hpp>
 #include <VSL/storage/cpu_region.hpp>
 #include <new>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+}
 
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_standard_layout_v<SwapchainSlotStorage> && offsetof(SwapchainSlotStorage, value) == 0);
@@ -183,7 +188,7 @@ namespace VSL_NAMESPACE::lifetime {
         for (size_t i = 0; i < images.size(); ++i) {
             auto& image = image_at(root->image_slot(i));
             image.owner_node = &root->node;
-            images[i].data_ = {root, &image};
+            images[i] = ImageAccess::FromOwned(root->node.ref(root).alias(&image));
         }
         return {{root, &value}, std::move(images)};
     }

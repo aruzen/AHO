@@ -1,7 +1,12 @@
+#include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/vulkan/resource_use.hpp>
 #include <VSL/utils/typed_batch.hpp>
 #include "support/render_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -212,8 +217,8 @@ namespace {
         auto old_use = std::make_shared<vsl::ResourceUseState>();
         auto new_use = std::make_shared<vsl::ResourceUseState>();
         using View = t::TypedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>;
-        auto old_view = View::FromBuffer(first, 1, 0, {old_use, first.data_});
-        auto new_view = View::FromBuffer(second, 1, 0, {new_use, second.data_});
+        auto old_view = View::FromBuffer(first, 1, 0, {old_use, BufferAccess::Owned(first)});
+        auto new_view = View::FromBuffer(second, 1, 0, {new_use, BufferAccess::Owned(second)});
         t::TypedStorageBuffer<std::uint32_t> output(device, zero);
         set.write<0>(old_view);
         set.write<1>(output);
@@ -585,8 +590,8 @@ namespace {
         auto first = std::make_shared<vsl::ResourceUseState>();
         auto second = std::make_shared<vsl::ResourceUseState>();
         using View = t::TypedVertexBufferView<Vertex>;
-        const auto first_view = View::FromBuffer(native, 3, 0, {first, native.data_});
-        const auto second_view = View::FromBuffer(native, 3, 0, {second, native.data_});
+        const auto first_view = View::FromBuffer(native, 3, 0, {first, BufferAccess::Owned(native)});
+        const auto second_view = View::FromBuffer(native, 3, 0, {second, BufferAccess::Owned(native)});
         namespace pl = vsl::pipeline_layout;
         vsl::Shader<vsl::ShaderType::VERTEX> source(device, vsl_test::shader_path("vertices.vert.spv"));
         t::TypedGraphicsPipeline<Input> pipeline(device, *pass, pl::ShaderGroup("tracked vertices", {source, *fragment}),

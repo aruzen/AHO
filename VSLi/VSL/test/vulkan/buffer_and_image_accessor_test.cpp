@@ -1,5 +1,10 @@
+#include <VSL/lifetime/buffer_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <type_traits>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+}
 
 namespace {
     using Holder = vsl::BufferAccessor::LocalBufferHolder;
@@ -85,15 +90,15 @@ namespace {
         using Buffer = vsl::StagingBuffer<vsl::MemoryType::STORAGE_BUFFER>;
         const std::array<std::uint32_t, 4> values{3, 7, 11, 19};
         Buffer original(device, values);
-        const auto storage = original.data_;
+        const auto storage = BufferAccess::Owned(original);
         Buffer copied = original;
-        EXPECT_EQ(copied.data_, storage);
+        EXPECT_EQ(BufferAccess::Owned(copied), storage);
         Buffer moved = std::move(original);
-        EXPECT_FALSE(original.data_);
-        EXPECT_EQ(moved.data_, storage);
+        EXPECT_FALSE(BufferAccess::Owned(original));
+        EXPECT_EQ(BufferAccess::Owned(moved), storage);
         original = std::move(moved);
-        EXPECT_FALSE(moved.data_);
-        EXPECT_EQ(original.data_, storage);
+        EXPECT_FALSE(BufferAccess::Owned(moved));
+        EXPECT_EQ(BufferAccess::Owned(original), storage);
         copied = original;
         auto mapped = copied.data(sizeof(values));
         EXPECT_EQ(std::memcmp(mapped.data, values.data(), sizeof(values)), 0);
@@ -104,7 +109,7 @@ namespace {
         const std::array<std::uint32_t, 2> expected{17, 43};
         {
             vsl::StagingBuffer<> buffer(device, expected);
-            storage = buffer.data_;
+            storage = BufferAccess::Owned(buffer).share();
             mapping.emplace(buffer.data());
         }
         if (storage.expired())

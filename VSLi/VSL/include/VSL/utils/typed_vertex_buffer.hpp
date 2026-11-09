@@ -101,8 +101,6 @@ namespace VSL_NAMESPACE::typed {
 
     template<typename Vertex>
     TypedVertexBufferView<Vertex> TypedVertexBufferView<Vertex>::FromBuffer(const BufferAccessor& source, size_t count, size_t byte_offset, ResourceUse use) {
-        if (!source.data_)
-            throw std::invalid_argument("Typed buffer view requires a buffer");
         return FromView(BufferView::FromBuffer(source), count, byte_offset, std::move(use));
     }
     template<typename Vertex>

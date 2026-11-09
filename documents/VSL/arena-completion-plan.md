@@ -234,3 +234,5 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 
 12f前半でCommandPool／CommandBuffer／CommandManagerの公開data_／sharedImpl構築を閉じ、空値／bool／種類別identityへ移した。Managerと共有ringの同一性を分け、private bridge経由でも強いsnapshot、既存DomainのResolveと明示Attach、旧owner回収時の再入を維持する。AHOへprivate依存を追加しない。新runtime2件、全VSL1,145／AHO192・1,071／compile231、PNG3枚一致、strict82ファイル／74TUと補完検査、installed consumer29種と新負例7種、Debug／Release／x86_64の寸法生成、artifact混在拒否、archive／生成header一致が成功した。残るAccessor／起動資源／recipe／WindowData等の公開入口廃止、実定義の4責務分割と測定を継続する。
 
+12fの次の単位でBuffer／Image／Samplerの公開data_とImpl factoryを閉じ、元のOwnedRefをdescriptor／import／getterへ引き継いだ。runtimeのheap生成はBufferView::Create／ImageAccessor::Create、画像readbackは範囲付きBufferViewを使う。CPU操作のpoll前snapshot、viewの全値commit、転送の検証→使用登録→共通Native記録を揃え、純転送Imageには不要なviewを作らない。新runtime11件、全VSL1,156（対応外format3 skip）／AHO192・1,071／compile245、同一PNG、strict79ファイル／64TUと補完検査、installed consumer30種・新負例14種、Debug／Release／x86_64寸法生成、artifact混在拒否、archive／生成header一致を確認した。Shader／ShaderGroupから残りfacadeとrecipe／WindowDataの入口を順に閉じ、12gの実定義4責務分割と12hの測定へ続ける。
+

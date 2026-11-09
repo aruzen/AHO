@@ -1,5 +1,10 @@
+#include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/compute_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -104,7 +109,7 @@ namespace {
     TEST_F(DescriptorResourceLifetimeVulkanIntegrationTest, DispatchKeepsDescriptorBufferAndPipelineAliveUntilCompletion) {
         auto manager = make_manager();
         vsl::Completion completion;
-        std::weak_ptr<vsl::impl::BufferImpl> weak_output = output->data_;
+        std::weak_ptr<vsl::impl::BufferImpl> weak_output = BufferAccess::Owned(*(output)).share();
         std::weak_ptr<vsl::impl::GraphicResourceImpl> weak_resource = resource.data_;
         std::weak_ptr<vsl::impl::PipelineImpl> weak_pipeline = pipeline->data_;
         {

@@ -1,9 +1,16 @@
+#include <VSL/lifetime/image_access.hpp>
+#include <VSL/lifetime/sampler_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
 #include "support/render_fixture.hpp"
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/vulkan/commands/copy_buffer_to_image.hpp>
 #include <VSL/vulkan/commands/change_image_barrier.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+    using VSL_NAMESPACE::lifetime::detail::SamplerAccess;
+} // namespace
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -261,8 +268,8 @@ namespace {
             auto native = set.backend();
             EXPECT_THROW(native.update(image, 2), std::invalid_argument);
             EXPECT_THROW(set.require_complete(), std::logic_error);
-            weak_image = image.data_;
-            weak_sampler = local.data_;
+            weak_image = ImageAccess::Owned(image).share();
+            weak_sampler = SamplerAccess::Owned(local).share();
             set.write<2>(std::array{t::TypedTexture(image, sampler), t::TypedTexture(image, local)});
             EXPECT_THROW(native.update(image, 2), std::invalid_argument);
         }

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/image_access.hpp>
 #include "support/window_fixture.hpp"
 #include "support/fixed_parent.hpp"
 #include "support/deferred_action.hpp"
@@ -7,6 +8,10 @@
 #include <VSL/operation/synchronization_ops.hpp>
 #include <VSL/storage/cpu_region.hpp>
 #include <limits>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+}
 
 namespace {
     namespace l = vsl::lifetime;
@@ -188,13 +193,13 @@ namespace {
         EXPECT_TRUE(chain.owner_ref().managed());
         for (size_t i = 0; i < chain.images.size(); ++i) {
             const auto& image = chain.images[i];
-            EXPECT_FALSE(image.data_.owner_before(chain.data_));
-            EXPECT_FALSE(chain.data_.owner_before(image.data_));
-            EXPECT_EQ(&image.use_state(), image.data_->use);
-            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(image.data_.get()) - reinterpret_cast<std::uintptr_t>(chain.data_.get()), layout.image_offset(i));
+            EXPECT_FALSE(ImageAccess::Owned(image).owner_before(chain.data_));
+            EXPECT_FALSE(chain.data_.owner_before(ImageAccess::Owned(image).share()));
+            EXPECT_EQ(&image.use_state(), ImageAccess::Owned(image)->use);
+            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(ImageAccess::Owned(image).get()) - reinterpret_cast<std::uintptr_t>(chain.data_.get()), layout.image_offset(i));
             if (i) {
-                EXPECT_NE(image.data_, chain.images[i - 1].data_);
-                EXPECT_NE(image.data_->use, chain.images[i - 1].data_->use);
+                EXPECT_NE(ImageAccess::Owned(image), ImageAccess::Owned(chain.images[i - 1]));
+                EXPECT_NE(ImageAccess::Owned(image)->use, ImageAccess::Owned(chain.images[i - 1])->use);
             }
         }
         vsl_test::expect_fixed_parent(chain.owner_ref(), device.owner_ref());
@@ -219,8 +224,8 @@ namespace {
             saved = chain.images.front();
         }
         EXPECT_FALSE(generation.expired());
-        EXPECT_TRUE(saved.data_->view);
-        saved.data_.reset();
+        EXPECT_TRUE(ImageAccess::Owned(saved)->view);
+        ImageAccess::Owned(saved).reset();
         EXPECT_TRUE(generation.expired());
         EXPECT_TRUE(parent.owner_ref().managed());
     }
@@ -237,7 +242,7 @@ namespace {
         EXPECT_EQ(first->view().state(), vsl::SwapchainState::RETIRED);
         first.reset();
         EXPECT_THROW((l::SwapchainArena{device, *surface, create_info(), {}, allocate}), std::invalid_argument);
-        image.data_.reset();
+        ImageAccess::Owned(image).reset();
         EXPECT_NO_THROW((l::SwapchainArena{device, *surface, create_info(), {}, allocate}));
     }
     TEST_F(SwapchainArenaWindowIntegrationTest, ImageEnumerationFailureDestroysPendingAndNeverRevivesTheOldGeneration) {

@@ -2,6 +2,7 @@
 #include <VSL/lifetime/typed_buffer_arena.hpp>
 #include <VSL/lifetime/typed_resource_buffer_view.hpp>
 #include <VSL/lifetime/native_recording.hpp>
+#include <VSL/vulkan/commands/image_readback.hpp>
 #ifndef VSL_TYPED_CASE
 #define VSL_TYPED_CASE 0
 #endif
@@ -21,6 +22,16 @@ namespace {
     using Placed = t::PlacedBufferView<std::uint32_t, vsl::MemoryType::TRANSFER_SOURCE>;
     using PlacedUniform = t::PlacedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>;
 #if VSL_TYPED_CASE == 0
+    static_assert(std::is_default_constructible_v<vsl::ImageAccessor> && std::is_default_constructible_v<vsl::SamplerAccessor>);
+    static_assert(!std::is_aggregate_v<vsl::ImageAccessor> && !std::is_aggregate_v<vsl::SamplerAccessor>);
+    static_assert(!std::is_constructible_v<vsl::ImageAccessor, std::shared_ptr<vsl::impl::ImageImpl>>);
+    static_assert(!std::is_constructible_v<vsl::SamplerAccessor, std::shared_ptr<vsl::impl::SamplerImpl>>);
+    void use_runtime_storage(vsl::LogicalDeviceAccessor device, vsl::BufferCreateInfo buffer_info, vsl::ImageCreateInfo image_info) {
+        auto buffer = vsl::BufferView::Create(device, buffer_info);
+        auto image = vsl::ImageAccessor::Create(device, image_info);
+        vsl::command::CopyImageToBuffer copy(buffer, image, vsl::ImageLayout::GENERAL);
+        vsl::command::ImageReadback readback(buffer, image, vsl::ImageLayout::GENERAL);
+    }
     static_assert(std::is_default_constructible_v<vsl::CommandPool> && std::is_default_constructible_v<vsl::CommandBuffer> && std::is_default_constructible_v<vsl::CommandManager>);
     static_assert(!std::is_constructible_v<vsl::CommandPool, std::shared_ptr<vsl::impl::CommandPoolImpl>>);
     static_assert(!std::is_constructible_v<vsl::CommandBuffer, std::shared_ptr<vsl::impl::CommandBufferImpl>>);
@@ -178,6 +189,62 @@ namespace {
 #elif VSL_TYPED_CASE == 32
     bool rejected(vsl::CommandManagerIdentity manager, vsl::CommandBufferIdentity buffer) {
         return manager == buffer;
+    }
+#elif VSL_TYPED_CASE == 33
+    void rejected(const vsl::BufferAccessor& buffer) {
+        buffer.data_;
+    }
+#elif VSL_TYPED_CASE == 34
+    void rejected(const vsl::ImageAccessor& image) {
+        image.data_;
+    }
+#elif VSL_TYPED_CASE == 35
+    void rejected(const vsl::SamplerAccessor& sampler) {
+        sampler.data_;
+    }
+#elif VSL_TYPED_CASE == 36
+    void rejected(const vsl::BufferAccessor& buffer) {
+        buffer._owner;
+    }
+#elif VSL_TYPED_CASE == 37
+    void rejected(const vsl::ImageAccessor& image) {
+        image._owner;
+    }
+#elif VSL_TYPED_CASE == 38
+    void rejected(const vsl::SamplerAccessor& sampler) {
+        sampler._owner;
+    }
+#elif VSL_TYPED_CASE == 39
+    void rejected(vsl::LogicalDeviceAccessor device) {
+        vsl::BufferAccessor::MakeBuffer(device, 4, vsl::MemoryType::TRANSFER_SOURCE, vsl::MemoryProperty::HOST_VISIBLE, vsl::SharingMode::EXCLUSIVE);
+    }
+#elif VSL_TYPED_CASE == 40
+    void rejected(vsl::LogicalDeviceAccessor device) {
+        vsl::ImageAccessor::MakeImage(vsl::ImageType::TRANSFER_SRC, vsl::MemoryProperty::DEVICE_LOCAL, vsl::ImageLayout::UNDEFINED, device, 1, 1, vsl::data_format::SRGB8_RGBA, 1);
+    }
+#elif VSL_TYPED_CASE == 41
+    void rejected(std::shared_ptr<vsl::impl::ImageImpl> data) {
+        vsl::ImageAccessor image{data};
+    }
+#elif VSL_TYPED_CASE == 42
+    void rejected(std::shared_ptr<vsl::impl::SamplerImpl> data) {
+        vsl::SamplerAccessor sampler{data};
+    }
+#elif VSL_TYPED_CASE == 43
+    void rejected(vsl::CommandManager manager, std::shared_ptr<vsl::impl::ImageImpl> image) {
+        vsl::ImageAccessor::TransformLayout(manager, image, vsl::ImageLayout::UNDEFINED, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
+    }
+#elif VSL_TYPED_CASE == 44
+    void rejected(std::shared_ptr<vsl::impl::BufferImpl> data, vsl::ImageAccessor image) {
+        vsl::command::CopyImageToBuffer copy(data, image, vsl::ImageLayout::GENERAL);
+    }
+#elif VSL_TYPED_CASE == 45
+    void rejected(std::shared_ptr<vsl::impl::BufferImpl> data, vsl::ImageAccessor image) {
+        vsl::command::CopyImageToBuffer copy(data, image, vsl::ImageLayout::GENERAL, {}, true, 0, 4);
+    }
+#elif VSL_TYPED_CASE == 46
+    void rejected(std::shared_ptr<vsl::impl::BufferImpl> data, vsl::ImageAccessor image) {
+        vsl::command::ImageReadback copy(data, image, vsl::ImageLayout::GENERAL);
     }
 #endif
 } // namespace

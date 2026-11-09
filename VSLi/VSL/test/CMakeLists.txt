@@ -169,8 +169,10 @@ if (VSL_TEST_SOURCES)
         RawBufferUse RawImageUse RawSamplerUse RawDescriptorUse RawDescriptorComparison
         RawBufferRefField RawBufferRefConstruction RawBufferViewConstruction LegacyBufferOwner TemporaryViewRef
         TemporaryPlacedBackend TemporaryPlacedResourceBackend RawVertexBinding RawBindingSource TemporaryStorageRef TemporaryNativeRecording RawNativeRecording
-        PrivateCommandPool PrivateCommandBuffer PrivateCommandManager RawCommandPool RawCommandBuffer RawCommandManager MixedCommandIdentities)
-    foreach(case RANGE 0 32)
+        PrivateCommandPool PrivateCommandBuffer PrivateCommandManager RawCommandPool RawCommandBuffer RawCommandManager MixedCommandIdentities
+        RawBufferAccessor RawImageAccessor RawSamplerAccessor PrivateBufferOwner PrivateImageOwner PrivateSamplerOwner
+        RawBufferFactory RawImageFactory RawImageConstruction RawSamplerConstruction RawImageTransition RawImageCopyBuffer RawImageCopyBufferRange RawImageReadback)
+    foreach(case RANGE 0 46)
         list(GET typed_view_names ${case} name)
         add_test(NAME "VSL.TypedView.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
             "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"

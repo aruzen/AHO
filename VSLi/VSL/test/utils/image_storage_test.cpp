@@ -1,11 +1,20 @@
+#include <VSL/lifetime/image_access.hpp>
+#include <VSL/lifetime/sampler_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <VSL/lifetime/image_storage.hpp>
 #include <VSL/lifetime/sampler_storage.hpp>
+#include <VSL/lifetime/resource_arena.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/vulkan/commands/image_upload.hpp>
 #include <VSL/vulkan/commands/render_pass_begin.hpp>
 #include <VSL/vulkan/commands/render_pass_end.hpp>
+#include <VSL/vulkan/commands/image_readback.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+    using VSL_NAMESPACE::lifetime::detail::SamplerAccess;
+} // namespace
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -18,6 +27,44 @@ namespace {
     class ImageStorageVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
+    TEST_F(ImageStorageVulkanIntegrationTest, TransferOnlyImagesSkipViewsAndSupportHeapArenaImportAndReadback) {
+        const vsl::ImageCreateInfo info{vsl::ImageType::TRANSFER_SRC | vsl::ImageType::TRANSFER_DST, 1, 1, vsl::data_format::UNSIGNED_INT};
+        const std::array<std::uint32_t, 1> expected{0x10203040};
+        for (const bool arena : {false, true}) {
+            constexpr std::array<t::ResourceRequest, 1> requests{{{{1}, vsl::storage::ResourceKind::IMAGE}}};
+            constexpr t::ResourcePlan<1> plan(requests);
+            const auto image = [&] {
+                if (arena) {
+                    const std::array<vsl::lifetime::ResourceInit, 1> initializers{info};
+                    vsl::lifetime::ResourceArena storage(device, plan, initializers);
+                    return storage.image({1});
+                }
+                return vsl::ImageAccessor::Create(device, info);
+            }();
+            EXPECT_FALSE(ImageAccess::Owned(image)->view);
+            EXPECT_TRUE(image.resource_use().owner.managed());
+            constexpr std::array<t::ResourceRequest, 1> external_requests{{{{2}, vsl::storage::ResourceKind::IMAGE, true}}};
+            constexpr t::ResourcePlan<1> external_plan(external_requests);
+            const std::array<vsl::lifetime::ResourceInit, 1> external_inputs{image};
+            vsl::lifetime::ResourceArena external(device, external_plan, external_inputs);
+            const auto imported = external.image({2});
+            EXPECT_EQ(&imported.use_state(), &image.use_state());
+            EXPECT_FALSE(ImageAccess::Owned(imported)->view);
+            vsl::StagingBuffer<> source(device, expected);
+            vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION> destination(device, std::size_t{4});
+            auto manager = make_manager();
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << vsl::command::ChangeImageBarrier(imported, vsl::ImageLayout::UNDEFINED, vsl::ImageLayout::TRANSFER_DST_OPTIMAL)
+                  << vsl::command::CopyBufferToImage(imported, &source, vsl::ImageLayout::TRANSFER_DST_OPTIMAL)
+                  << vsl::command::ImageReadback(&destination, imported, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            ASSERT_TRUE(phase.completion().wait());
+            std::array<std::uint32_t, 1> actual{};
+            destination.read_into(std::as_writable_bytes(std::span(actual)));
+            EXPECT_EQ(actual, expected);
+        }
+    }
 
     TEST_F(ImageStorageVulkanIntegrationTest, PlacementConstructsDistinctImagesAndSamplerWithTheirOwnUseStates) {
         std::array<vsl::lifetime::ImageSlotStorage, 2> images;
@@ -56,8 +103,8 @@ namespace {
             auto context = std::make_shared<Composite>(Composite{image, sampler, std::make_shared<int>(17)});
             owner = context;
             token = context->token;
-            const vsl::ImageAccessor external_image{std::shared_ptr<vsl::impl::ImageImpl>(context, image.data_.get())};
-            const vsl::SamplerAccessor external_sampler{std::shared_ptr<vsl::impl::SamplerImpl>(context, sampler.data_.get())};
+            const vsl::ImageAccessor external_image = ImageAccess::FromShared(std::shared_ptr<vsl::impl::ImageImpl>(context, ImageAccess::Owned(image).get()));
+            const vsl::SamplerAccessor external_sampler = SamplerAccess::FromShared(std::shared_ptr<vsl::impl::SamplerImpl>(context, SamplerAccess::Owned(sampler).get()));
             const auto image_use = vsl::ResourceUse::ForImage(external_image);
             const auto sampler_use = vsl::ResourceUse::ForSampler(external_sampler);
             EXPECT_EQ(image_use.state.get(), &image.use_state());
@@ -76,13 +123,13 @@ namespace {
             }
             for (const auto index : {0u, 2u}) {
                 const auto retained = values[index].image();
-                EXPECT_FALSE(retained.data_.owner_before(context));
-                EXPECT_FALSE(context.owner_before(retained.data_));
+                EXPECT_FALSE(ImageAccess::Owned(retained).owner_before(context));
+                EXPECT_FALSE(context.owner_before(ImageAccess::Owned(retained).share()));
             }
             for (const auto index : {1u, 2u}) {
                 const auto retained = values[index].sampler();
-                EXPECT_FALSE(retained.data_.owner_before(context));
-                EXPECT_FALSE(context.owner_before(retained.data_));
+                EXPECT_FALSE(SamplerAccess::Owned(retained).owner_before(context));
+                EXPECT_FALSE(context.owner_before(SamplerAccess::Owned(retained).share()));
             }
         }
         EXPECT_FALSE(owner.expired());
@@ -90,9 +137,9 @@ namespace {
         auto sampler = values.back().sampler();
         values.clear();
         EXPECT_FALSE(token.expired());
-        image.data_.reset();
+        ImageAccess::Owned(image).reset();
         EXPECT_FALSE(token.expired());
-        sampler.data_.reset();
+        SamplerAccess::Owned(sampler).reset();
         EXPECT_TRUE(owner.expired());
         EXPECT_TRUE(token.expired());
     }
@@ -118,21 +165,21 @@ namespace {
     TEST_F(ImageStorageVulkanIntegrationTest, BorrowedNativeImageSurvivesTheDestructionOfItsAdditionalView) {
         vsl::Image<IMAGE_USAGE> image(device, 2, 2, IMAGE_INFO.format);
         vsl::lifetime::ImageSlotStorage borrowed;
-        vsl::lifetime::construct_image(&borrowed, device, IMAGE_INFO, image.data_->image);
+        vsl::lifetime::construct_image(&borrowed, device, IMAGE_INFO, ImageAccess::Owned(image)->image);
         const auto& ref = vsl::lifetime::image_at(&borrowed);
-        EXPECT_EQ(ref.image, image.data_->image);
-        EXPECT_NE(ref.view, image.data_->view);
+        EXPECT_EQ(ref.image, ImageAccess::Owned(image)->image);
+        EXPECT_NE(ref.view, ImageAccess::Owned(image)->view);
         EXPECT_FALSE(ref.owns_image);
         EXPECT_FALSE(ref.memory);
         vsl::lifetime::destroy_image(&borrowed);
-        EXPECT_GT(device.data_->device.getImageMemoryRequirements(image.data_->image).size, 0u);
+        EXPECT_GT(device.data_->device.getImageMemoryRequirements(ImageAccess::Owned(image)->image).size, 0u);
     }
     TEST_F(ImageStorageVulkanIntegrationTest, DeviceAccessorDoesNotKeepItsSourceImageAlive) {
         vsl::LogicalDeviceAccessor retained_device;
         std::weak_ptr<vsl::impl::ImageImpl> owner;
         {
             vsl::Image<IMAGE_USAGE> image(device, 2, 2, IMAGE_INFO.format);
-            owner = image.data_;
+            owner = ImageAccess::Owned(image).share();
             retained_device = image.get_device();
             EXPECT_EQ(&image.use_state(), image.resource_use().state.get());
         }
@@ -176,8 +223,8 @@ namespace {
         {
             vsl::Image<IMAGE_USAGE> image(device, 1, 1, IMAGE_INFO.format);
             vsl::Sampler sampler(device, SAMPLER_INFO.sampling, SAMPLER_INFO.edge);
-            image_owner = image.data_;
-            sampler_owner = sampler.data_;
+            image_owner = ImageAccess::Owned(image).share();
+            sampler_owner = SamplerAccess::Owned(sampler).share();
             {
                 const std::array<std::uint8_t, 4> color{37, 83, 0, 255};
                 vsl::StagingBuffer<> pixels(device, color);
@@ -228,7 +275,7 @@ namespace {
         std::weak_ptr<vsl::impl::ImageImpl> owner;
         {
             vsl::Image<IMAGE_USAGE> image(device, 2, 2, IMAGE_INFO.format);
-            owner = image.data_;
+            owner = ImageAccess::Owned(image).share();
             command.emplace(image, vsl::ImageLayout::UNDEFINED, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
         }
         EXPECT_FALSE(owner.expired());

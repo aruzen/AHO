@@ -1,3 +1,5 @@
+#include <VSL/lifetime/image_access.hpp>
+#include <VSL/lifetime/sampler_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <VSL/utils/typed_resource_bundle.hpp>
@@ -5,6 +7,11 @@
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/vulkan/commands/image_upload.hpp>
 #include <VSL/vulkan/commands/image_readback.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+    using VSL_NAMESPACE::lifetime::detail::SamplerAccess;
+} // namespace
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -98,13 +105,13 @@ namespace {
                     phase << vsl::command::ImageUpload(&pixels, frame.template image<0, 2>(), vsl::ImageLayout::UNDEFINED);
             });
             const auto& frame = bundle.get(phase);
-            generations[i] = frame.template image<0, 1>().data_;
+            generations[i] = ImageAccess::Owned(frame.template image<0, 1>()).share();
             if (!shared_sampler)
-                shared_sampler = frame.template sampler<0, 1>().data_;
-            EXPECT_EQ(shared_sampler, (frame.template sampler<0, 1>().data_));
+                shared_sampler = SamplerAccess::Owned(frame.template sampler<0, 1>()).share();
+            EXPECT_EQ(shared_sampler, (SamplerAccess::Owned(frame.template sampler<0, 1>()).share()));
             if constexpr (t::detail::BundlePolicy<Policy>::ARENA) {
-                EXPECT_EQ((frame.template image<0, 1>().data_), (frame.template image<0, 2>().data_));
-                EXPECT_EQ(shared_sampler, (frame.template sampler<0, 3>().data_));
+                EXPECT_EQ((ImageAccess::Owned(frame.template image<0, 1>()).share()), (ImageAccess::Owned(frame.template image<0, 2>()).share()));
+                EXPECT_EQ(shared_sampler, (SamplerAccess::Owned(frame.template sampler<0, 3>()).share()));
                 EXPECT_TRUE(same_owner(frame.template buffer<0, 0>().storage_view().owner(), generations[i]));
                 EXPECT_FALSE(same_owner(shared_sampler, generations[i]));
             }
@@ -143,8 +150,8 @@ namespace {
             bundle.initialize_shared([&](auto& values) { retained = values.template sampler<0, 1>(); });
             auto phase = manager.start_phase<vsl::ComputePhase>();
             const auto& frame = bundle.get(phase);
-            shared = retained->data_;
-            frame_owner = frame.image<0, 1>().data_;
+            shared = SamplerAccess::Owned(*(retained)).share();
+            frame_owner = ImageAccess::Owned(frame.image<0, 1>()).share();
             EXPECT_FALSE(same_owner(shared, frame_owner));
             phase.cancel();
         }
@@ -166,13 +173,13 @@ namespace {
         auto phase = manager.start_phase<vsl::ComputePhase>();
         const auto& frame = bundle.get(phase);
         const auto first = frame.image<0, 0, 0>(), second = frame.image<0, 0, 1>();
-        EXPECT_EQ(first.data_->width, 1u);
-        EXPECT_EQ(second.data_->width, 3u);
-        EXPECT_EQ(second.data_->height, 2u);
-        EXPECT_NE(first.data_, second.data_);
-        EXPECT_TRUE(same_owner(first.data_, second.data_));
+        EXPECT_EQ(ImageAccess::Owned(first)->width, 1u);
+        EXPECT_EQ(ImageAccess::Owned(second)->width, 3u);
+        EXPECT_EQ(ImageAccess::Owned(second)->height, 2u);
+        EXPECT_NE(ImageAccess::Owned(first), ImageAccess::Owned(second));
+        EXPECT_TRUE(same_owner(ImageAccess::Owned(first), ImageAccess::Owned(second)));
         EXPECT_NE(&first.use_state(), &second.use_state());
-        EXPECT_FALSE(same_owner(first.data_, frame.sampler<0, 0, 0>().data_));
+        EXPECT_FALSE(same_owner(ImageAccess::Owned(first), SamplerAccess::Owned(frame.sampler<0, 0, 0>())));
         EXPECT_NO_THROW(frame.set<0>().require_complete());
         phase.cancel();
     }
@@ -189,13 +196,13 @@ namespace {
             bundle.initialize_shared([&](auto& shared) { retained = shared.template image<0, 0>(); });
             auto phase = manager.start_phase<vsl::ComputePhase>();
             const auto& frame = bundle.get(phase);
-            EXPECT_EQ(retained->data_, (frame.image<0, 0>().data_));
-            frame_owner = frame.sampler<0, 0>().data_;
-            EXPECT_FALSE(same_owner(retained->data_, frame_owner));
+            EXPECT_EQ(ImageAccess::Owned(*(retained)), (ImageAccess::Owned(frame.image<0, 0>())));
+            frame_owner = SamplerAccess::Owned(frame.sampler<0, 0>()).share();
+            EXPECT_FALSE(same_owner(ImageAccess::Owned(*(retained)).share(), frame_owner));
             phase.cancel();
         }
         EXPECT_TRUE(frame_owner.expired());
-        EXPECT_EQ(retained->data_->width, 1u);
+        EXPECT_EQ(ImageAccess::Owned(*(retained))->width, 1u);
     }
     TEST_F(TypedOwnedResourcesVulkanIntegrationTest, DeferredCommandRetainsOwnersUntilCancellationAfterBundleDestruction) {
         auto manager = make_manager();
@@ -207,8 +214,8 @@ namespace {
             auto source = manager.start_phase<vsl::ComputePhase>();
             Bundle bundle(manager, descriptors, sizes());
             const auto& frame = bundle.get(source);
-            frame_owner = frame.image<0, 1>().data_;
-            shared_owner = frame.sampler<0, 1>().data_;
+            frame_owner = ImageAccess::Owned(frame.image<0, 1>()).share();
+            shared_owner = SamplerAccess::Owned(frame.sampler<0, 1>()).share();
             auto command = frame.bind_resources(pipeline).dispatch(1);
             source.cancel();
             return command;
@@ -262,7 +269,7 @@ namespace {
                     throw std::runtime_error("Shared initialization failed");
             });
             const auto& frame = bundle.get(phase);
-            owner = frame.image<0, 0>().data_;
+            owner = ImageAccess::Owned(frame.image<0, 0>()).share();
             frame.set<0>().resource_use()->record(manager.get_buffer());
             EXPECT_TRUE((frame.image<0, 0>().use_state().busy()));
         }

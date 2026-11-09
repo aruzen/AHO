@@ -1,7 +1,14 @@
+#include <VSL/lifetime/buffer_access.hpp>
+#include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/render_fixture.hpp"
 #include "support/read_image.hpp"
 #include "support/frame_buffer_metadata.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+} // namespace
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -186,15 +193,15 @@ namespace {
                 .newLayout = vk::ImageLayout::eTransferSrcOptimal,
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = image.data_->image,
+                .image = ImageAccess::Owned(image)->image,
                 .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
             command.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eTransfer,
                                     {}, {}, {}, image_barrier);
             vk::BufferImageCopy copy{.imageSubresource = {vk::ImageAspectFlagBits::eColor, 0, 0, 1},
                                      .imageExtent = {2, 2, 1}};
-            command.copyImageToBuffer(image.data_->image, vk::ImageLayout::eTransferSrcOptimal, destination.data_->buffer, copy);
+            command.copyImageToBuffer(ImageAccess::Owned(image)->image, vk::ImageLayout::eTransferSrcOptimal, BufferAccess::Owned(destination)->buffer, copy);
             vk::BufferMemoryBarrier host_visibility{
-                .srcAccessMask = vk::AccessFlagBits::eTransferWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead, .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .buffer = destination.data_->buffer, .offset = 0, .size = 16};
+                .srcAccessMask = vk::AccessFlagBits::eTransferWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead, .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .buffer = BufferAccess::Owned(destination)->buffer, .offset = 0, .size = 16};
             command.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost,
                                     {}, {}, host_visibility, {});
             completion = phase.completion();

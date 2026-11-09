@@ -1,3 +1,5 @@
+#include <VSL/lifetime/image_access.hpp>
+#include <VSL/lifetime/sampler_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include "support/fixed_parent.hpp"
 #include <VSL/lifetime/device_storage.hpp>
@@ -12,6 +14,12 @@
 #include <VSL/utils/typed_resources.hpp>
 #include <VSL/utils/spir_reflector.hpp>
 #include <limits>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+    using VSL_NAMESPACE::lifetime::detail::SamplerAccess;
+} // namespace
 
 namespace {
     namespace l = vsl::lifetime;
@@ -311,7 +319,7 @@ namespace {
         constexpr t::ResourcePlan<1> plan(requests);
         const std::array<l::ResourceInit, 1> initializers{vsl::BufferCreateInfo{16, USAGE}};
         l::ResourceArena resources(device, plan, initializers);
-        const std::array<std::pair<const char*, l::OwnerRef>, 13> owners{{{"Buffer", vsl_test::canonical_owner(buffer.data_)}, {"Image", vsl_test::canonical_owner(image.data_)}, {"Sampler", vsl_test::canonical_owner(sampler.data_)}, {"Shader", shader.owner_ref()}, {"DescriptorLayout", vsl_test::canonical_owner(layout.data_)}, {"DescriptorPool", vsl_test::canonical_owner(pool.data_)}, {"PipelineLayout", vsl_test::canonical_owner(pipeline_layout)}, {"RenderPass", pass.owner_ref()}, {"CommandPool", manager.get_pool().owner_ref()}, {"Fence", fence.owner_ref()}, {"Semaphore", semaphore.owner_ref()}, {"BufferArena", buffers.view<t::ResourceId{1}>().storage_view().owner_ref()}, {"ResourceArena", resources.owner_ref()}}};
+        const std::array<std::pair<const char*, l::OwnerRef>, 13> owners{{{"Buffer", vsl_test::canonical_owner(BufferAccess::Owned(buffer))}, {"Image", vsl_test::canonical_owner(ImageAccess::Owned(image))}, {"Sampler", vsl_test::canonical_owner(SamplerAccess::Owned(sampler))}, {"Shader", shader.owner_ref()}, {"DescriptorLayout", vsl_test::canonical_owner(layout.data_)}, {"DescriptorPool", vsl_test::canonical_owner(pool.data_)}, {"PipelineLayout", vsl_test::canonical_owner(pipeline_layout)}, {"RenderPass", pass.owner_ref()}, {"CommandPool", manager.get_pool().owner_ref()}, {"Fence", fence.owner_ref()}, {"Semaphore", semaphore.owner_ref()}, {"BufferArena", buffers.view<t::ResourceId{1}>().storage_view().owner_ref()}, {"ResourceArena", resources.owner_ref()}}};
         for (const auto& [name, owner] : owners) {
             SCOPED_TRACE(name);
             vsl_test::expect_fixed_parent(owner, device.owner_ref());
@@ -359,7 +367,7 @@ namespace {
         vsl::LogicalDeviceAccessor parent;
         {
             Native buffer(placed, 4);
-            child = buffer.data_;
+            child = BufferAccess::Owned(buffer).share();
             parent = buffer.get_device();
             EXPECT_EQ(parent.data_, placed.data_);
             EXPECT_FALSE(parent.data_.owner_before(placed.data_));

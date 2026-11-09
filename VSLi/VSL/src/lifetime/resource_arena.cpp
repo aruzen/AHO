@@ -1,3 +1,5 @@
+#include <VSL/lifetime/image_access.hpp>
+#include <VSL/lifetime/sampler_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/resource_arena.hpp>
 #include <VSL/lifetime/arena_resource.hpp>
@@ -17,6 +19,11 @@
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/storage/cpu_region.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+    using VSL_NAMESPACE::lifetime::detail::SamplerAccess;
+} // namespace
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -148,19 +155,19 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     resource.buffer_bytes = buffer->size();
                     resource.owner_index = retain_dependency(buffer->owner_ref());
                 } else if (const auto* image = std::get_if<ImageAccessor>(&value)) {
-                    if (!image->data_.use_count() || !image->data_ || !image->data_->image || !image->data_->view ||
-                        !image->data_->use || image->data_->device != device.data_.get())
+                    if (!ImageAccess::Owned(*(image)).use_count() || !ImageAccess::Owned(*(image)) || !ImageAccess::Owned(*(image))->image ||
+                        !ImageAccess::Owned(*(image))->use || ImageAccess::Owned(*(image))->device != device.data_.get())
                         throw std::invalid_argument("External image requires an owner on the arena device");
                     (void)image->use_state();
-                    resource.reference = image->data_.get();
-                    resource.owner_index = retain_dependency(owned_ref(image->data_, image->data_->owner_node));
+                    resource.reference = ImageAccess::Owned(*(image)).get();
+                    resource.owner_index = retain_dependency(ImageAccess::Owned(*(image)));
                 } else if (const auto* sampler = std::get_if<SamplerAccessor>(&value)) {
-                    if (!sampler->data_.use_count() || !sampler->data_ || !sampler->data_->sampler || !sampler->data_->use ||
-                        sampler->data_->device != device.data_.get())
+                    if (!SamplerAccess::Owned(*(sampler)).use_count() || !SamplerAccess::Owned(*(sampler)) || !SamplerAccess::Owned(*(sampler))->sampler || !SamplerAccess::Owned(*(sampler))->use ||
+                        SamplerAccess::Owned(*(sampler))->device != device.data_.get())
                         throw std::invalid_argument("External sampler requires an owner on the arena device");
                     (void)sampler->use_state();
-                    resource.reference = sampler->data_.get();
-                    resource.owner_index = retain_dependency(owned_ref(sampler->data_, sampler->data_->owner_node));
+                    resource.reference = SamplerAccess::Owned(*(sampler)).get();
+                    resource.owner_index = retain_dependency(SamplerAccess::Owned(*(sampler)));
                 } else if (const auto* layout = std::get_if<graphic_resource::BindingLayout>(&value)) {
                     if (!layout->data_.use_count() || !layout->data_ || !layout->data_->layout || layout->data_->device != device.data_.get())
                         throw std::invalid_argument("External descriptor layout requires an owner on the arena device");
@@ -305,17 +312,17 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     (void)find(*id, storage::ResourceKind::IMAGE);
                 } else {
                     const auto& image = std::get<ImageAccessor>(source);
-                    if (!image.data_ || !image.data_.use_count() || !image.data_->image || !image.data_->view ||
-                        !image.data_->use || image.data_->device != device.data_.get())
+                    if (!ImageAccess::Owned(image) || !ImageAccess::Owned(image).use_count() || !ImageAccess::Owned(image)->image || !ImageAccess::Owned(image)->view ||
+                        !ImageAccess::Owned(image)->use || ImageAccess::Owned(image)->device != device.data_.get())
                         throw std::invalid_argument("Framebuffer image requires an owner on the arena device");
-                    retain_dependency(owned_ref(image.data_, image.data_->owner_node));
+                    retain_dependency(ImageAccess::Owned(image));
                 }
             }
     }
     impl::ImageImpl* ResourceArenaOwner::resolve(const FrameBufferImageSource& source) const {
         if (const auto* id = std::get_if<typed::ResourceId>(&source))
             return find(*id, storage::ResourceKind::IMAGE).get<impl::ImageImpl>();
-        return std::get<ImageAccessor>(source).data_.get();
+        return ImageAccess::Owned(std::get<ImageAccessor>(source)).get();
     }
     impl::PipelineLayoutImpl* ResourceArenaOwner::resolve(const RuntimeLayoutSource& source) const {
         if (const auto* id = std::get_if<typed::ResourceId>(&source))
@@ -642,8 +649,8 @@ namespace VSL_NAMESPACE::lifetime {
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::IMAGE);
         if (resource.placement.external)
-            return {_owner->dependencies.at(resource.owner_index).alias(resource.get<impl::ImageImpl>()).share()};
-        return {{_owner, resource.get<impl::ImageImpl>()}};
+            return ImageAccess::FromOwned(_owner->dependencies.at(resource.owner_index).alias(resource.get<impl::ImageImpl>()));
+        return ImageAccess::FromOwned(_owner->descriptor_context.node.ref(_owner).alias(resource.get<impl::ImageImpl>()));
     }
     RenderPassAccessor ResourceArena::render_pass(typed::ResourceId id) const {
         if (!_owner)
@@ -704,8 +711,8 @@ namespace VSL_NAMESPACE::lifetime {
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::SAMPLER);
         if (resource.placement.external)
-            return {_owner->dependencies.at(resource.owner_index).alias(resource.get<impl::SamplerImpl>()).share()};
-        return {{_owner, resource.get<impl::SamplerImpl>()}};
+            return SamplerAccess::FromOwned(_owner->dependencies.at(resource.owner_index).alias(resource.get<impl::SamplerImpl>()));
+        return SamplerAccess::FromOwned(_owner->descriptor_context.node.ref(_owner).alias(resource.get<impl::SamplerImpl>()));
     }
     graphic_resource::BindingLayout ResourceArena::descriptor_layout(typed::ResourceId id) const {
         if (!_owner)

@@ -6,6 +6,12 @@
 
 namespace vsl_test {
     template<typename Impl>
+    vsl::lifetime::OwnerRef canonical_owner(const vsl::lifetime::OwnedRef<Impl>& value) {
+        if (!value.managed())
+            throw std::invalid_argument("Test resource has no canonical node");
+        return value;
+    }
+    template<typename Impl>
     vsl::lifetime::OwnerRef canonical_owner(const std::shared_ptr<Impl>& value) {
         if (!value || !value->owner_node)
             throw std::invalid_argument("Test resource has no canonical node");

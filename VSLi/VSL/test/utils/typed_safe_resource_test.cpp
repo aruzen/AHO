@@ -1,5 +1,10 @@
+#include <VSL/lifetime/image_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <VSL/utils/typed_safe_resource.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+}
 
 namespace {
     template<typename Point, typename Image>
@@ -69,7 +74,7 @@ namespace {
         EXPECT_EQ(compute.shader_read_stages(), TexturePoint::VALUE.shader_type);
         EXPECT_EQ(fragment.old_layout, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
         EXPECT_EQ(fragment.new_layout, vsl::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
-        EXPECT_EQ(fragment.image.data_, image.data_);
+        EXPECT_EQ(ImageAccess::Owned(fragment.image), ImageAccess::Owned(image));
         EXPECT_EQ(fragment.base_layer, 1u);
         EXPECT_EQ(fragment.layer_count, 2u);
         EXPECT_EQ(compute.base_layer, 0u);

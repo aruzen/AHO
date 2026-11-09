@@ -7,6 +7,7 @@
 #include "../format.hpp"
 #include "../utils/flags.hpp"
 #include "../lifetime/resource_identity.hpp"
+#include "../lifetime/owner_ref.hpp"
 
 #include "device.hpp"
 #include <memory>
@@ -190,8 +191,15 @@ namespace VSL_NAMESPACE {
     struct ImageAccessor;
     class ResourceUseState;
     struct ResourceUse;
+    struct BufferCreateInfo;
+    struct ImageCreateInfo;
+    namespace lifetime::detail {
+        struct BufferAccess;
+        struct ImageAccess;
+    } // namespace lifetime::detail
 
     struct BufferAccessor {
+        explicit operator bool() const { return bool(_owner); }
         BufferIdentity identity() const;
         BufferAccessor() = default;
         BufferAccessor(const BufferAccessor&) = default;
@@ -221,6 +229,7 @@ namespace VSL_NAMESPACE {
             void flush(std::size_t bytes, std::size_t offset = 0) const;
             void invalidate(std::size_t bytes, std::size_t offset = 0) const;
             // GPUの使用完了後に呼ぶ。範囲はこのholderの先頭から指定する。
+            // 戻り値は借用。参照中のowner保持とGPUアクセスとの競合回避は利用側が行う。
             std::span<const std::byte> read(std::size_t bytes, std::size_t offset = 0) const;
             void write(std::span<const std::byte> bytes, std::size_t offset = 0) const;
 
@@ -243,17 +252,25 @@ namespace VSL_NAMESPACE {
             bool copy_by_image(CommandManager command_manager, const ImageAccessor& image);
 
         private:
-            std::shared_ptr<impl::BufferImpl> _owner;
-            void require_idle() const;
-            void synchronize(std::size_t bytes, std::size_t offset, bool flush) const;
+            friend struct BufferAccessor;
+            struct MappingSnapshot {
+                lifetime::OwnedRef<impl::BufferImpl> owner;
+                void* data;
+                std::size_t size, offset;
+            };
+            lifetime::OwnedRef<impl::BufferImpl> _owner;
+            LocalBufferHolder(BufferAccessor* parent, std::size_t size, std::size_t offset, void* data,
+                              lifetime::OwnedRef<impl::BufferImpl> owner);
+            MappingSnapshot snapshot_idle() const;
+            static void ValidateRange(const MappingSnapshot& mapping, std::size_t bytes, std::size_t offset);
+            static void Synchronize(const MappingSnapshot& mapping, std::size_t bytes, std::size_t offset, bool flush);
         };
-
-        std::shared_ptr<impl::BufferImpl> data_;
 
         virtual LocalBufferHolder data(std::optional<size_t> size = std::nullopt, size_t offset = 0) = 0;
 
         virtual void flush(LocalBufferHolder& holder) = 0;
 
+        // 仮想data/flushの呼出し全体を通じ、receiverと派生実装の状態を保持する。
         template<typename... Args>
         bool copy(const Args&... args);
 
@@ -284,10 +301,6 @@ namespace VSL_NAMESPACE {
         ResourceUse resource_use(ResourceUse constraint) const;
         void read_into(std::span<std::byte> destination, size_t offset = 0) const;
 
-        static std::shared_ptr<impl::BufferImpl>
-        MakeBuffer(VSL_NAMESPACE::LogicalDeviceAccessor device, size_t size, MemoryType mem_type,
-                   MemoryProperty mem_property, SharingMode sharing_mode);
-
         static void
         FlushBuffer(LocalBufferHolder& holder, MemoryType mem_type, MemoryProperty mem_property, SharingMode sharing_mode);
 
@@ -295,12 +308,20 @@ namespace VSL_NAMESPACE {
         GetData(VSL_NAMESPACE::BufferAccessor* data, std::optional<size_t> size, size_t offset, MemoryType mem_type,
                 MemoryProperty mem_property, SharingMode sharing_mode);
 
+    protected:
+        BufferAccessor(LogicalDeviceAccessor device, const BufferCreateInfo& info);
+
     private:
+        friend struct lifetime::detail::BufferAccess;
+        lifetime::OwnedRef<impl::BufferImpl> _owner;
         void flush_copied(LocalBufferHolder& holder, std::size_t bytes);
     };
 
     struct ImageAccessor {
-        std::shared_ptr<impl::ImageImpl> data_;
+        ImageAccessor() = default;
+        explicit operator bool() const { return bool(_owner); }
+        // runtime設定から単独heap所有で生成する。
+        static ImageAccessor Create(LogicalDeviceAccessor device, const ImageCreateInfo& info);
         data_format::Format get_format() const;
         ImageType get_usage() const;
         LogicalDeviceAccessor get_device() const;
@@ -311,19 +332,18 @@ namespace VSL_NAMESPACE {
 
         size_t size();
 
-        static std::shared_ptr<impl::ImageImpl> MakeImage(VSL_NAMESPACE::ImageType type,
-                                                          VSL_NAMESPACE::MemoryProperty prop,
-                                                          VSL_NAMESPACE::ImageLayout layout,
-                                                          VSL_NAMESPACE::LogicalDeviceAccessor device,
-                                                          std::uint32_t width,
-                                                          std::uint32_t height,
-                                                          data_format::Format format,
-                                                          std::uint32_t count, SampleCount samples = SampleCount::ONE);
-
         static void TransformLayout(CommandManager manager,
-                                    std::shared_ptr<impl::ImageImpl> data,
+                                    ImageAccessor image,
                                     VSL_NAMESPACE::ImageLayout old_layout,
                                     VSL_NAMESPACE::ImageLayout new_layouts);
+
+    protected:
+        ImageAccessor(LogicalDeviceAccessor device, const ImageCreateInfo& info);
+
+    private:
+        friend struct lifetime::detail::ImageAccess;
+        lifetime::OwnedRef<impl::ImageImpl> _owner;
+        explicit ImageAccessor(lifetime::OwnedRef<impl::ImageImpl> owner) : _owner(std::move(owner)) {}
     };
 } // namespace VSL_NAMESPACE
 #endif

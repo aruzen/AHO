@@ -1,9 +1,18 @@
+#include <VSL/lifetime/buffer_access.hpp>
+#include <VSL/lifetime/image_access.hpp>
+#include <VSL/lifetime/sampler_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/compute_fixture.hpp"
 #include "support/scoped_environment.hpp"
 #include <VSL/utils/typed_safe_resource.hpp>
 #include <VSL/utils/typed_resources.hpp>
 #include <VSL/lifetime/descriptor_storage.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+    using VSL_NAMESPACE::lifetime::detail::SamplerAccess;
+} // namespace
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -285,7 +294,7 @@ namespace {
                 barrier.srcAccessMask = source;
                 barrier.dstAccessMask = destination;
                 barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-                barrier.image = image.data_->image;
+                barrier.image = ImageAccess::Owned(image)->image;
                 barrier.subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1};
                 auto buffer = manager.get_buffer();
                 CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
@@ -459,7 +468,7 @@ namespace {
         std::weak_ptr<vsl::impl::BufferImpl> weak;
         {
             vsl::StagingBuffer<vsl::MemoryType::STORAGE_BUFFER> buffer(device, 16);
-            weak = buffer.data_;
+            weak = BufferAccess::Owned(buffer).share();
             resource.update(&buffer);
         }
         EXPECT_FALSE(weak.expired());
@@ -503,8 +512,8 @@ namespace {
         {
             vsl::Image<vsl::ImageType::STORAGE | vsl::ImageType::SAMPLED> image(device, 1, 1, vsl::data_format::UNSIGNED_NORMALIZED8_RGBA);
             vsl::Sampler sampler(device, vsl::SamplingMode::NEAREST, vsl::EdgeMode::CLAMP_TO_EDGE);
-            weak_image = image.data_;
-            weak_sampler = sampler.data_;
+            weak_image = ImageAccess::Owned(image).share();
+            weak_sampler = SamplerAccess::Owned(sampler).share();
             allocated.front().update(image, 0);
             allocated.front().update(image, sampler, 1);
         }

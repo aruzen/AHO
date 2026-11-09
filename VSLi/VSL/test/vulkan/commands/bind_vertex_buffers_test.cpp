@@ -1,4 +1,9 @@
+#include <VSL/lifetime/buffer_access.hpp>
 #include "support/render_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+}
 namespace {
     using BindVertexBufferVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
     TEST_F(BindVertexBufferVulkanIntegrationTest, BindsSeparatePositionAndColorBuffers) {
@@ -93,9 +98,9 @@ namespace {
             const std::array<std::uint32_t, 3> indices{0, 1, 2};
             vsl::StagingBuffer<vsl::MemoryType::VERTEX_BUFFER> position(device, positions), color(device, colors);
             vsl::StagingBuffer<vsl::MemoryType::INDEX_BUFFER> index(device, indices);
-            weak_vertex = position.data_;
-            weak_color = color.data_;
-            weak_index = index.data_;
+            weak_vertex = BufferAccess::Owned(position).share();
+            weak_color = BufferAccess::Owned(color).share();
+            weak_index = BufferAccess::Owned(index).share();
             stream << vsl::command::BindVertexBuffer(position, color) << vsl::command::BindIndexBuffer(index)
                    << vsl::command::DrawIndexed{3};
             pipeline.reset();

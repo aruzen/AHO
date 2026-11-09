@@ -1,8 +1,13 @@
+#include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/vulkan/frame_buffer.hpp>
 #include <VSL/lifetime/frame_buffer_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <stdexcept>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+}
 
 namespace VSL_NAMESPACE {
     namespace {
@@ -20,10 +25,10 @@ namespace VSL_NAMESPACE {
                 std::vector<impl::ImageImpl*> images;
                 images.reserve(row.size());
                 for (const auto& image : row) {
-                    if (!image.data_ || !image.data_.use_count())
+                    if (!ImageAccess::Owned(image) || !ImageAccess::Owned(image).use_count())
                         throw std::invalid_argument("Framebuffer images require owning accessors");
-                    lifetime::detail::retain_owner(dependencies, lifetime::detail::owned_ref(image.data_, image.data_->owner_node));
-                    images.push_back(image.data_.get());
+                    lifetime::detail::retain_owner(dependencies, ImageAccess::Owned(image));
+                    images.push_back(ImageAccess::Owned(image).get());
                 }
                 input.attachments.push_back(std::move(images));
             }

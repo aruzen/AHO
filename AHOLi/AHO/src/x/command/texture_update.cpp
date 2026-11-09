@@ -12,7 +12,11 @@ namespace AHO_NAMESPACE::x::command {
         : _texture(std::move(texture)), _source(std::move(source)), _region(region), _offset(offset) {}
 
     void TextureUpdate::invoke(VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
-        auto& texture = *_texture._data;
+        const auto texture_owner = _texture._data;
+        auto& texture = *texture_owner;
+        const auto inputs = _source;
+        const auto region = _region;
+        const auto offset = _offset;
         auto completion = buffer.completion();
         if (!completion || completion.status() != VSL_NAMESPACE::Completion::Status::PENDING)
             throw std::logic_error("Texture update requires a recording phase");
@@ -28,20 +32,19 @@ namespace AHO_NAMESPACE::x::command {
                 } else
                     return value;
             },
-            _source);
+            inputs);
+        const auto snapshot = source.snapshot();
         source.check_available(completion);
         auto layout = texture.initialized || texture.update ? VSL_NAMESPACE::ImageLayout::SHADER_READ_ONLY_OPTIMAL : VSL_NAMESPACE::ImageLayout::UNDEFINED;
-        VSL_NAMESPACE::command::ImageUpload command(&source.native(), texture.image, layout, _region, _offset);
+        VSL_NAMESPACE::command::ImageUpload command(snapshot.storage(), texture.image, layout, region, offset, snapshot.constraints(), snapshot.retention());
         const auto info = command.copy.description();
-        if (_offset > source.size() || info.byte_size > source.size() - _offset)
+        if (offset > snapshot.size() || info.byte_size > snapshot.size() - offset)
             throw std::out_of_range("Texture update exceeds initialized upload data");
-        if (manager.get_device() != source.device() || texture.image.get_device() != source.device())
+        if (manager.get_device() != snapshot.device() || texture.image.get_device() != snapshot.device())
             throw std::invalid_argument("Texture update device mismatch");
-        buffer.retain(source.owner());
         command.invoke(pool, buffer, manager);
         texture.update = VSL_NAMESPACE::CompletionObservation(completion);
         texture.mark_used(completion);
-        source.mark_used(std::move(completion));
     }
 } // namespace AHO_NAMESPACE::x::command
 

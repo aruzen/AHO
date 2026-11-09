@@ -2,6 +2,7 @@
 #include <VSL/vulkan/commands/copy_buffer.hpp>
 #include <VSL/operation/buffer_ops.hpp>
 #include <VSL/sync/buffer_access.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
 
 namespace VSL_NAMESPACE::command {
     CopyBuffer::CopyBuffer(BufferAccessor* source, BufferAccessor* destination, size_t bytes,
@@ -12,7 +13,7 @@ namespace VSL_NAMESPACE::command {
 
     CopyBuffer::CopyBuffer(BufferView source, BufferView destination, size_t bytes,
                            size_t source_offset, size_t destination_offset, bool host_read)
-        : _source(source.ref().data), _destination(destination.ref().data),
+        : _source(lifetime::detail::BufferAccess::Impl(source.ref())), _destination(lifetime::detail::BufferAccess::Impl(destination.ref())),
           _source_owner(source.owner()), _destination_owner(destination.owner()),
           _release_on_completion(true),
           _bytes(bytes), _source_offset(source.byte_offset()), _destination_offset(destination.byte_offset()), _host_read(host_read) {

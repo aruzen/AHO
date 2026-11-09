@@ -29,11 +29,11 @@ namespace {
         vsl::impl::BufferImpl buffer;
         vsl::impl::ImageImpl image;
         record.reference = &buffer;
-        EXPECT_EQ(record.buffer().data, &buffer);
+        EXPECT_EQ(l::detail::BufferAccess::Impl(record.buffer()), &buffer);
         EXPECT_EQ(record.get<vsl::impl::ImageImpl>(), nullptr);
         record.reference = &image;
         EXPECT_EQ(record.get<vsl::impl::ImageImpl>(), &image);
-        EXPECT_EQ(record.buffer().data, nullptr);
+        EXPECT_EQ(l::detail::BufferAccess::Impl(record.buffer()), nullptr);
         EXPECT_LE(sizeof(Record), sizeof(t::ResourcePlacement) + 2 * sizeof(void*) + 3 * sizeof(size_t));
     }
     TEST_F(ResourceArenaVulkanIntegrationTest, ImportedShaderIsAFixedManagedParentWithoutAGpuUseState) {
@@ -75,8 +75,8 @@ namespace {
         const auto first = arena.borrow_buffer({1}), second = arena.borrow_buffer({4});
         const auto image = arena.image({2});
         const auto sampler = arena.sampler({3});
-        const auto base = reinterpret_cast<std::uintptr_t>(first.data);
-        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(second.data) - base, PLAN.placement({4}).offset);
+        const auto base = reinterpret_cast<std::uintptr_t>(l::detail::BufferAccess::Impl(first));
+        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(l::detail::BufferAccess::Impl(second)) - base, PLAN.placement({4}).offset);
         EXPECT_EQ(reinterpret_cast<std::uintptr_t>(image.data_.get()) - base, PLAN.placement({2}).offset);
         EXPECT_EQ(reinterpret_cast<std::uintptr_t>(sampler.data_.get()) - base, PLAN.placement({3}).offset);
         EXPECT_NE(&first.use(), &second.use());

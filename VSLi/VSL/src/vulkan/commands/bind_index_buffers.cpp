@@ -2,28 +2,24 @@
 
 #include <VSL/vulkan/commands/bind_index_buffers.hpp>
 #include <VSL/lifetime/identity_access.hpp>
-#include <VSL/lifetime/resource_use_factory.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
 #include <stdexcept>
 
 VSL_NAMESPACE::BufferIdentity VSL_NAMESPACE::command::BindIndexBufferAt::identity() const {
-    return lifetime::detail::IdentityAccess::From<BufferIdentity>(_source.get());
+    return lifetime::detail::IdentityAccess::From<BufferIdentity>(_source);
 }
 
 VSL_NAMESPACE::command::BindIndexBufferAt::BindIndexBufferAt(const BufferView& source, IndexType type, size_t offset, ResourceUse use)
-    : BindIndexBufferAt(source.legacy_owner(), type,
-                        source.view(offset, type == IndexType::UINT16 ? 2 : 4).byte_offset(), source.resource_use(std::move(use))) {}
-
-VSL_NAMESPACE::command::BindIndexBufferAt::BindIndexBufferAt(const BufferAccessor& source, IndexType type, size_t offset, ResourceUse use)
-    : BindIndexBufferAt(source.data_, type, offset, std::move(use)) {}
-
-VSL_NAMESPACE::command::BindIndexBufferAt::BindIndexBufferAt(std::shared_ptr<impl::BufferImpl> source, IndexType type, size_t offset, ResourceUse use)
-    : _source(std::move(source)), _offset(offset), _type(type), _use(std::move(use)) {
+    : _source(lifetime::detail::BufferAccess::Impl(source.ref())),
+      _offset(source.view(offset, type == IndexType::UINT16 ? 2 : 4).byte_offset()), _type(type), _use(source.resource_use(std::move(use))) {
     const size_t width = type == IndexType::UINT16 ? 2 : 4;
     if (!_source || !VSL_NAMESPACE::contain(_source->usage, MemoryType::INDEX_BUFFER) ||
-        offset >= _source->requirement_size || offset % width || (type != IndexType::UINT16 && type != IndexType::UINT32))
+        _offset % width || (type != IndexType::UINT16 && type != IndexType::UINT32))
         throw std::invalid_argument("BindIndexBufferAt requires an aligned index buffer range");
-    _use = lifetime::resource_use_for_buffer(_source, std::move(_use));
 }
+
+VSL_NAMESPACE::command::BindIndexBufferAt::BindIndexBufferAt(const BufferAccessor& source, IndexType type, size_t offset, ResourceUse use)
+    : BindIndexBufferAt(BufferView::FromBuffer(source), type, offset, std::move(use)) {}
 
 void VSL_NAMESPACE::command::BindIndexBufferAt::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
     if (_source->device != manager.data_->device.get())

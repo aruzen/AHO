@@ -2,6 +2,7 @@
 #include "support/fixed_parent.hpp"
 #include <VSL/lifetime/device_storage.hpp>
 #include <VSL/lifetime/buffer_storage.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/descriptor_storage.hpp>
 #include <VSL/lifetime/pipeline_layout_storage.hpp>
 #include <VSL/lifetime/resource_arena.hpp>
@@ -144,7 +145,7 @@ namespace {
     void DeviceAndBuffer::publish(const std::shared_ptr<DeviceAndBuffer>& owner) {
         node.publish(owner, this, VisitDependencies);
         l::device_at(device_memory).owner_node = &node;
-        l::buffer_at(buffer_memory).data->owner_node = &node;
+        l::detail::BufferAccess::Impl(l::buffer_at(buffer_memory))->owner_node = &node;
     }
     void DeviceAndBuffer::VisitDependencies(const void* root, l::DependencyNode::EdgeVisitor visitor, void* context) {
         visitor(context, static_cast<const DeviceAndBuffer*>(root)->physical);
@@ -310,7 +311,7 @@ namespace {
         constexpr t::ResourcePlan<1> plan(requests);
         const std::array<l::ResourceInit, 1> initializers{vsl::BufferCreateInfo{16, USAGE}};
         l::ResourceArena resources(device, plan, initializers);
-        const std::array<std::pair<const char*, l::OwnerRef>, 13> owners{{{"Buffer", vsl_test::canonical_owner(buffer.data_)}, {"Image", vsl_test::canonical_owner(image.data_)}, {"Sampler", vsl_test::canonical_owner(sampler.data_)}, {"Shader", shader.owner_ref()}, {"DescriptorLayout", vsl_test::canonical_owner(layout.data_)}, {"DescriptorPool", vsl_test::canonical_owner(pool.data_)}, {"PipelineLayout", vsl_test::canonical_owner(pipeline_layout)}, {"RenderPass", pass.owner_ref()}, {"CommandPool", manager.get_pool().owner_ref()}, {"Fence", fence.owner_ref()}, {"Semaphore", semaphore.owner_ref()}, {"BufferArena", buffers.view<t::ResourceId{1}>().backend().owner_ref()}, {"ResourceArena", resources.owner_ref()}}};
+        const std::array<std::pair<const char*, l::OwnerRef>, 13> owners{{{"Buffer", vsl_test::canonical_owner(buffer.data_)}, {"Image", vsl_test::canonical_owner(image.data_)}, {"Sampler", vsl_test::canonical_owner(sampler.data_)}, {"Shader", shader.owner_ref()}, {"DescriptorLayout", vsl_test::canonical_owner(layout.data_)}, {"DescriptorPool", vsl_test::canonical_owner(pool.data_)}, {"PipelineLayout", vsl_test::canonical_owner(pipeline_layout)}, {"RenderPass", pass.owner_ref()}, {"CommandPool", manager.get_pool().owner_ref()}, {"Fence", fence.owner_ref()}, {"Semaphore", semaphore.owner_ref()}, {"BufferArena", buffers.view<t::ResourceId{1}>().storage_view().owner_ref()}, {"ResourceArena", resources.owner_ref()}}};
         for (const auto& [name, owner] : owners) {
             SCOPED_TRACE(name);
             vsl_test::expect_fixed_parent(owner, device.owner_ref());
@@ -326,7 +327,7 @@ namespace {
             owner = root;
             vsl::LogicalDeviceAccessor placed{{root, &l::device_at(root->device_memory)}};
             std::optional<vsl::BufferView> buffer;
-            buffer.emplace(l::buffer_at(root->buffer_memory), root->node.ref(root), 0, 4);
+            buffer.emplace(l::detail::BufferAccess::View(l::buffer_at(root->buffer_memory), root->node.ref(root), 0, 4));
             constexpr std::array<t::ResourceRequest, 3> requests{{{{1}, s::ResourceKind::DESCRIPTOR_LAYOUT}, {{2}, s::ResourceKind::DESCRIPTOR_POOL}, {{3}, s::ResourceKind::DESCRIPTOR_SET}}};
             constexpr t::ResourcePlan<3> plan(requests);
             const std::array<l::ResourceInit, 3> initializers{

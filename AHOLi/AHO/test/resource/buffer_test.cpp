@@ -7,6 +7,7 @@
 
 #ifdef AHO_GPU_TESTS
 #include <VSL/lifetime/resource_arena.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/utils/typed_resources.hpp>
 #include <functional>
 #include "../support/buffer_customization.hpp"
@@ -292,13 +293,13 @@ namespace {
             const std::uint32_t value = 37;
             buffer.write(std::as_bytes(std::span(&value, 1)));
             const std::array<std::uint32_t, 2> assigned{41, 43};
-            const auto old = buffer.binding().native().data_.get();
+            const auto old = buffer.native().identity();
             auto weak = buffer.binding().owner_ref().weak();
             size_t calls = 0;
             *released = [&] {
                 ++calls;
                 const auto snapshot = buffer.binding().snapshot();
-                EXPECT_NE(snapshot.storage().ref().data, old);
+                EXPECT_NE(snapshot.storage().identity(), old);
                 EXPECT_TRUE(snapshot.constraints().owner.managed());
                 EXPECT_TRUE(buffer.binding().owner_ref().managed());
                 EXPECT_EQ(snapshot.size(), operation ? 8u : 4u);
@@ -388,7 +389,7 @@ namespace {
         const std::array<l::ResourceInit, 4> initializers{vsl::BufferCreateInfo{4, aho::resource::detail::STANDARD_BUFFER_USAGE}, layout, pool, l::DescriptorSetInit{{3}, {2}}};
         l::ResourceArena arena(device, plan, initializers, l::DependencyPolicy::DYNAMIC);
         auto storage = NativeHost(device, 4);
-        storage.data_ = arena.buffer({1}).legacy_owner();
+        storage.data_ = vsl::lifetime::detail::BufferAccess::Owned(arena.buffer({1})).share();
         auto buffer = aho::resource::make_custom_buffer(std::move(storage));
         const auto snapshot = buffer.binding().snapshot();
         EXPECT_TRUE(snapshot.constraints().owner.managed());

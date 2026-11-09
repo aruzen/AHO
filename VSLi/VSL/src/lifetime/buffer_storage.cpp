@@ -1,6 +1,7 @@
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/buffer_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
 #include <new>
 
 namespace VSL_NAMESPACE::lifetime {
@@ -46,19 +47,19 @@ namespace VSL_NAMESPACE::lifetime {
     }
     BufferRef buffer_at(void* storage) {
         auto* slot = static_cast<BufferSlotStorage*>(storage);
-        return {std::launder(reinterpret_cast<impl::BufferImpl*>(slot->buffer))};
+        return detail::BufferAccess::Ref(std::launder(reinterpret_cast<impl::BufferImpl*>(slot->buffer)));
     }
     void destroy_buffer(void* storage) noexcept {
-        auto ref = buffer_at(storage);
+        auto* buffer = detail::BufferAccess::Impl(buffer_at(storage));
         auto* slot = static_cast<BufferSlotStorage*>(storage);
-        operation::destroy_buffer(*ref.data);
-        std::destroy_at(ref.data->use);
-        std::destroy_at(ref.data);
+        operation::destroy_buffer(*buffer);
+        std::destroy_at(buffer->use);
+        std::destroy_at(buffer);
         std::destroy_at(slot);
     }
     std::shared_ptr<impl::BufferImpl> make_heap_buffer(LogicalDeviceAccessor device, const BufferCreateInfo& info) {
         auto owner = std::make_shared<HeapBufferOwner>(device, info);
-        auto* buffer = buffer_at(owner->storage).data;
+        auto* buffer = detail::BufferAccess::Impl(buffer_at(owner->storage));
         return detail::publish_device_leaf(std::move(owner), buffer);
     }
 } // namespace VSL_NAMESPACE::lifetime

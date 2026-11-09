@@ -2,6 +2,7 @@
 #include <VSL/lifetime/resource_arena.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/descriptor_storage.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/vulkan/commands/image_upload.hpp>
 #include <VSL/vulkan/commands/image_readback.hpp>
@@ -519,6 +520,36 @@ namespace {
         EXPECT_TRUE(external.expired());
         EXPECT_EQ(execute_set(pipeline, manager, second, arena.buffer({3})), 17u);
     }
+    TEST_F(DescriptorArenaVulkanIntegrationTest, NativeViewUpdatePreservesTheManagedCompositeOwnerWhenRejectingACycle) {
+        struct Context {
+            l::DependencyNode node;
+            vsl::BufferView storage;
+            explicit Context(vsl::BufferView storage) : storage(std::move(storage)) {}
+            ~Context() { node.retire(); }
+            static void Visit(const void* context, l::DependencyNode::EdgeVisitor visitor, void* output) {
+                visitor(output, static_cast<const Context*>(context)->storage.owner_ref());
+            }
+        };
+        const auto initializers = inputs();
+        l::ResourceArena arena(device, PLAN, initializers, l::DependencyPolicy::DYNAMIC);
+        auto context = std::make_shared<Context>(arena.buffer({1}));
+        context->node.publish(context, context.get(), Context::Visit);
+        const auto composite = l::detail::BufferAccess::View(context->storage.ref(), context->node.ref(context), 0, 4);
+        l::ResourceArena external(device, PLAN, initializers, l::DependencyPolicy::DYNAMIC);
+        auto external_set = external.descriptor_set({101});
+        ASSERT_NO_THROW(external_set.update(composite, 0));
+        const auto& owners = external_set.data_->bindings.at(0).front().owners;
+        ASSERT_EQ(owners.size(), 1u);
+        EXPECT_TRUE(owners.front().managed());
+        EXPECT_FALSE(owners.front().owner_before(context));
+        EXPECT_FALSE(context.owner_before(owners.front().share()));
+        auto set = arena.descriptor_set({101});
+        EXPECT_THROW(set.update(composite, 0), std::invalid_argument);
+        EXPECT_TRUE(set.data_->bindings.empty());
+        EXPECT_NO_THROW(set.update(arena.buffer({1}), 0));
+        EXPECT_EQ(set.data_->bindings.at(0).size(), 1u);
+    }
+
     TEST_F(DescriptorArenaVulkanIntegrationTest, DynamicManagedCyclesRejectPhysicalAndLogicalUpdatesInBothDirections) {
         const auto initializers = inputs();
         l::ResourceArena a(device, PLAN, initializers, l::DependencyPolicy::DYNAMIC);

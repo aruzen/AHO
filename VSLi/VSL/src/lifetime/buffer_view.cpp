@@ -3,54 +3,55 @@
 #include <VSL/operation/buffer_ops.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/lifetime/identity_access.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
 #include <cstring>
 
 namespace VSL_NAMESPACE {
     BufferIdentity BufferRef::identity() const {
-        return lifetime::detail::IdentityAccess::From<BufferIdentity>(data);
+        return lifetime::detail::IdentityAccess::From<BufferIdentity>(_data);
     }
     size_t BufferRef::size() const {
-        if (!data)
+        if (!_data)
             throw std::logic_error("Buffer reference is empty");
-        return data->requirement_size;
+        return _data->requirement_size;
     }
     MemoryType BufferRef::usage() const {
-        if (!data)
+        if (!_data)
             throw std::logic_error("Buffer reference is empty");
-        return data->usage;
+        return _data->usage;
     }
     ResourceUseState& BufferRef::use() const {
-        if (!data || !data->use)
+        if (!_data || !_data->use)
             throw std::logic_error("Buffer reference has no use state");
-        return *data->use;
+        return *_data->use;
     }
     MemoryProperty BufferRef::properties() const {
-        if (!data)
+        if (!_data)
             throw std::logic_error("Buffer reference is empty");
-        return data->properties;
+        return _data->properties;
     }
     LogicalDeviceAccessor BufferRef::device() const {
-        if (!data || !data->device)
+        if (!_data || !_data->device)
             throw std::logic_error("Buffer reference has no device");
-        return lifetime::device_from_impl(*data->device);
+        return lifetime::device_from_impl(*_data->device);
     }
     void BufferRef::fill(std::byte value) const {
         use().require_idle();
-        auto* destination = operation::map_buffer(*data, 0, size());
+        auto* destination = operation::map_buffer(*_data, 0, size());
         std::memset(destination, std::to_integer<int>(value), size());
-        operation::synchronize_buffer(*data, 0, size(), true);
+        operation::synchronize_buffer(*_data, 0, size(), true);
     }
     void BufferRef::write(std::span<const std::byte> bytes, size_t offset) const {
         use().require_idle();
-        auto* destination = operation::map_buffer(*data, offset, bytes.size());
+        auto* destination = operation::map_buffer(*_data, offset, bytes.size());
         if (!bytes.empty())
             std::memmove(destination, bytes.data(), bytes.size());
-        operation::synchronize_buffer(*data, offset, bytes.size(), true);
+        operation::synchronize_buffer(*_data, offset, bytes.size(), true);
     }
     void BufferRef::read_into(std::span<std::byte> destination, size_t offset) const {
         use().require_idle();
-        auto* source = operation::map_buffer(*data, offset, destination.size());
-        operation::synchronize_buffer(*data, offset, destination.size(), false);
+        auto* source = operation::map_buffer(*_data, offset, destination.size());
+        operation::synchronize_buffer(*_data, offset, destination.size(), false);
         if (!destination.empty())
             std::memmove(destination.data(), source, destination.size());
     }
@@ -61,10 +62,10 @@ namespace VSL_NAMESPACE {
         if (!bytes || offset > ref.size() || bytes > ref.size() - offset)
             throw std::out_of_range("Buffer view range");
         if (!_owner.managed())
-            _owner = lifetime::detail::owned_ref(_owner.share(), ref.data->owner_node);
+            _owner = lifetime::detail::owned_ref(_owner.share(), lifetime::detail::BufferAccess::Impl(ref)->owner_node);
     }
     BufferView BufferView::FromBuffer(const BufferAccessor& buffer) {
-        return {{buffer.data_.get()}, buffer.data_, 0, buffer.requested_size()};
+        return {lifetime::detail::BufferAccess::Ref(buffer.data_.get()), buffer.data_, 0, buffer.requested_size()};
     }
     BufferView BufferView::view(size_t offset, size_t bytes) const {
         if (!bytes || offset > _bytes || bytes > _bytes - offset)

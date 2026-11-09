@@ -1,4 +1,5 @@
 #include <VSL/utils/typed_resource_bundle.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include "support/vulkan_fixture.hpp"
 
@@ -127,26 +128,27 @@ namespace {
         for (size_t slot = 0; slot < 3; ++slot) {
             auto phase = manager.start_phase<vsl::ComputePhase>();
             const auto& frame = bundle.get(phase);
-            const auto& first = frame.buffer<2, 0>().backend();
-            const auto& second = frame.buffer<2, 3>().backend();
+            const auto& first = frame.buffer<2, 0>().storage_view();
+            const auto& second = frame.buffer<2, 3>().storage_view();
             local[slot] = first.owner().get();
-            shared[slot] = frame.buffer<2, 1>().backend().owner().get();
+            shared[slot] = frame.buffer<2, 1>().storage_view().owner().get();
             EXPECT_EQ(first.owner(), second.owner());
             EXPECT_NE(local[slot], shared[slot]);
-            EXPECT_EQ(reinterpret_cast<const std::byte*>(second.ref().data) - reinterpret_cast<const std::byte*>(first.ref().data), vsl::storage::BufferLayout::STRIDE);
+            EXPECT_EQ(reinterpret_cast<const std::byte*>(vsl::lifetime::detail::BufferAccess::Impl(second.ref())) - reinterpret_cast<const std::byte*>(vsl::lifetime::detail::BufferAccess::Impl(first.ref())), vsl::storage::BufferLayout::STRIDE);
             const auto& native = frame.set<2>().backend();
             const auto& shared_native = frame.set<5>().backend();
             const auto& plan = bundle.placement_plan();
             const auto physical = plan.arena_plan(t::ResourceScope::PER_FRAME, slot);
-            const auto base = reinterpret_cast<std::uintptr_t>(first.ref().data) - plan.placement({2, 0}).offset;
+            const auto base = reinterpret_cast<std::uintptr_t>(vsl::lifetime::detail::BufferAccess::Impl(first.ref())) - plan.placement({2, 0}).offset;
             EXPECT_EQ(reinterpret_cast<std::uintptr_t>(native.data_.get()) - base, physical.placement(plan.descriptor_set(2)).offset);
             EXPECT_EQ(reinterpret_cast<std::uintptr_t>(native.data_->pool) - base, physical.placement(*plan.descriptor_pool(t::ResourceScope::PER_FRAME)).offset);
-            const auto shared_base = reinterpret_cast<std::uintptr_t>(frame.buffer<2, 1>().backend().ref().data) - plan.placement({2, 1}).offset;
+            const auto shared_storage = frame.buffer<2, 1>().storage_view();
+            const auto shared_base = reinterpret_cast<std::uintptr_t>(vsl::lifetime::detail::BufferAccess::Impl(shared_storage.ref())) - plan.placement({2, 1}).offset;
             EXPECT_EQ(reinterpret_cast<std::uintptr_t>(native.data_->layout) - shared_base, plan.arena_plan(t::ResourceScope::SHARED).placement(plan.descriptor_layout(2)).offset);
             EXPECT_FALSE(native.owner_ref().owner_before(first.owner_ref()));
             EXPECT_FALSE(first.owner_ref().owner_before(native.owner_ref()));
-            EXPECT_FALSE(shared_native.owner_ref().owner_before(frame.buffer<2, 1>().backend().owner_ref()));
-            EXPECT_FALSE((frame.buffer<2, 1>().backend().owner_ref().owner_before(shared_native.owner_ref())));
+            EXPECT_FALSE(shared_native.owner_ref().owner_before(frame.buffer<2, 1>().storage_view().owner_ref()));
+            EXPECT_FALSE((frame.buffer<2, 1>().storage_view().owner_ref().owner_before(shared_native.owner_ref())));
             EXPECT_EQ(native.data_->pool->max_sets, 1u);
             EXPECT_EQ(native.data_->pool->allocated_sets, 1u);
             EXPECT_EQ(native.data_->pool->capacities.at(vk::DescriptorType::eUniformBuffer).limit, 2u);
@@ -222,12 +224,12 @@ namespace {
             auto first = manager.start_phase<vsl::ComputePhase>();
             const auto& value = bundle.get(first);
             kept.emplace(value.set<2>());
-            frame = value.buffer<2, 0>().backend().owner();
-            shared = value.buffer<2, 1>().backend().owner();
+            frame = value.buffer<2, 0>().storage_view().owner();
+            shared = value.buffer<2, 1>().storage_view().owner();
             first.cancel();
             manager.get_buffer().next();
             auto next = manager.start_phase<vsl::ComputePhase>();
-            other = bundle.get(next).buffer<2, 0>().backend().owner();
+            other = bundle.get(next).buffer<2, 0>().storage_view().owner();
             next.cancel();
         }
         EXPECT_TRUE(other.expired());
@@ -261,7 +263,7 @@ namespace {
             EXPECT_THROW(shared.write<0>(std::array{local, local}), std::invalid_argument);
             using External = t::detail::BundleExternalValue<SharedSet::Binding<0>>;
             for (const auto form : {0, 1, 2}) {
-                const auto& buffer = frame.buffer<5, 0>().backend();
+                const auto& buffer = frame.buffer<5, 0>().storage_view();
                 auto use = buffer.resource_use();
                 const auto owner = frame.set<2>().backend().owner_ref();
                 if (form == 2) {
@@ -350,7 +352,7 @@ namespace {
         EXPECT_EQ(bundle.placement_plan().buffers(t::ResourceScope::SHARED).size(), 2u);
         auto phase = manager.start_phase<vsl::ComputePhase>();
         const auto& frame = bundle.get(phase);
-        EXPECT_EQ((frame.buffer<5, 0, 0>().backend().ref().data), (frame.buffer<5, 0, 1>().backend().ref().data));
+        EXPECT_EQ((frame.buffer<5, 0, 0>().storage_view().identity()), (frame.buffer<5, 0, 1>().storage_view().identity()));
         std::array<std::uint32_t, 1> value{};
         frame.buffer<5, 0, 0>().read_into(value);
         EXPECT_EQ(value[0], 30u);
@@ -366,8 +368,8 @@ namespace {
         {
             ArenaBundle bundle(manager, descriptors, sizes());
             const auto& frame = bundle.get(phase);
-            local = frame.buffer<2, 0>().backend().owner();
-            shared = frame.buffer<2, 1>().backend().owner();
+            local = frame.buffer<2, 0>().storage_view().owner();
+            shared = frame.buffer<2, 1>().storage_view().owner();
             kept.emplace(frame.buffer<2, 1>());
             frame.set<2>().resource_use()->record(manager.get_buffer());
         }
@@ -391,7 +393,7 @@ namespace {
         {
             ArenaBundle bundle(manager, descriptors, sizes());
             const auto& frame = bundle.get(phase);
-            owner = frame.buffer<2, 3>().backend().owner();
+            owner = frame.buffer<2, 3>().storage_view().owner();
             phase << frame.bind_resources(pipeline).dispatch(4);
         }
         EXPECT_FALSE(owner.expired());
@@ -421,7 +423,7 @@ namespace {
                 auto phase = manager.start_phase<vsl::ComputePhase>();
                 ArenaBundle bundle(manager, descriptors, sizes());
                 const auto& frame = bundle.get(phase);
-                owner = frame.buffer<2, 3>().backend().owner();
+                owner = frame.buffer<2, 3>().storage_view().owner();
                 auto result = frame.bind_resources(pipeline).dispatch(4);
                 phase.cancel();
                 return result;

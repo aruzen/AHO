@@ -29,7 +29,7 @@ namespace AHO_NAMESPACE::resource {
         if (view.ref().device() != state.device || view.size() < bytes ||
             !VSL_NAMESPACE::contain(view.ref().properties(), VSL_NAMESPACE::MemoryProperty::HOST_VISIBLE) ||
             !VSL_NAMESPACE::contain(view.ref().usage(), detail::STANDARD_BUFFER_USAGE) ||
-            (state.current && view.ref().data == state.current->ref().data))
+            (state.current && view.identity() == state.current->identity()))
             throw std::invalid_argument("Arena buffer factory must return a new, sufficient host-visible generation on the same device");
         if (preserve && state.size) {
             std::vector<std::byte> content(state.size);
@@ -41,7 +41,7 @@ namespace AHO_NAMESPACE::resource {
     auto ArenaBuffer::Publish(detail::BufferState& state, VSL_NAMESPACE::BufferView storage) -> RetiredStorage {
         auto owner = storage.owner_ref().weak();
         state.require_idle();
-        RetiredStorage previous{std::move(state.current), std::move(state.compatibility)};
+        RetiredStorage previous = std::move(state.current);
         state.resource = std::move(owner);
         state.current = std::move(storage);
         return previous;

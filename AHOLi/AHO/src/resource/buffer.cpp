@@ -4,15 +4,6 @@
 #include <chrono>
 
 namespace AHO_NAMESPACE::resource {
-    namespace detail {
-        struct NativeBufferAdapter : VSL_NAMESPACE::BufferAccessor {
-            explicit NativeBufferAdapter(std::shared_ptr<VSL_NAMESPACE::impl::BufferImpl> owner) { data_ = std::move(owner); }
-            LocalBufferHolder data(std::optional<size_t> bytes = std::nullopt, size_t offset = 0) override {
-                return GetData(this, bytes, offset, get_usage(), get_memory_properties(), VSL_NAMESPACE::SharingMode::EXCLUSIVE);
-            }
-            void flush(LocalBufferHolder& holder) override { holder.flush(); }
-        };
-    } // namespace detail
     struct Buffer<BufferType::GENERAL>::Data {
         std::vector<std::byte> bytes;
     };
@@ -156,21 +147,6 @@ namespace AHO_NAMESPACE::resource {
         if (!_state)
             throw std::logic_error("Buffer binding is empty");
         return _state->device;
-    }
-
-    VSL_NAMESPACE::BufferAccessor& BufferBinding::native() const {
-        if (!_state)
-            throw std::logic_error("Buffer binding is empty");
-        if (_state->native)
-            return *_state->native;
-        if (!_state->current)
-            throw std::logic_error("Buffer has no GPU storage");
-        const auto& view = *_state->current;
-        if (view.byte_offset() || view.size() != view.ref().size())
-            throw std::logic_error("A partial buffer requires the snapshot API");
-        if (!_state->compatibility)
-            _state->compatibility = std::make_shared<detail::NativeBufferAdapter>(view.legacy_owner());
-        return *_state->compatibility;
     }
 
     std::shared_ptr<void> BufferBinding::owner() const {

@@ -19,7 +19,9 @@ namespace VSL_NAMESPACE::typed {
         explicit PlacedBufferView(BufferView view);
         static PlacedBufferView FromBuffer(const BufferAccessor& buffer) { return PlacedBufferView(BufferView::FromBuffer(buffer)); }
         size_t size() const { return _view.size() / sizeof(Payload); }
-        const BufferView& backend() const { return _view; }
+        const BufferView& backend() const& { return _view; }
+        const BufferView& backend() const&& = delete;
+        BufferView storage_view() const { return _view; }
         PlacedBufferView view(size_t first, size_t count) const;
         void copy(std::span<const Payload> values) const;
         void read_into(std::span<Payload> destination) const;

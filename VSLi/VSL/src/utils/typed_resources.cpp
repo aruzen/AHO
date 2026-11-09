@@ -6,6 +6,7 @@
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/owner_access.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/operation/descriptor_ops.hpp>
 #include <algorithm>
 
@@ -33,7 +34,7 @@ namespace VSL_NAMESPACE::typed::detail {
         if (!owner.use_count())
             throw std::invalid_argument("Descriptor buffer requires an owning view");
         DescriptorValue result;
-        result._buffer = owner.alias(source.ref().data);
+        result._buffer = lifetime::detail::BufferAccess::Owned(source);
         result._bytes = source.size();
         result._offset = source.byte_offset();
         result._use = source.resource_use(std::move(use));

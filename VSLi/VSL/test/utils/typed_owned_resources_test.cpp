@@ -101,7 +101,7 @@ namespace {
             if constexpr (t::detail::BundlePolicy<Policy>::ARENA) {
                 EXPECT_EQ((frame.template image<0, 1>().data_), (frame.template image<0, 2>().data_));
                 EXPECT_EQ(shared_sampler, (frame.template sampler<0, 3>().data_));
-                EXPECT_TRUE(same_owner(frame.template buffer<0, 0>().backend().owner(), generations[i]));
+                EXPECT_TRUE(same_owner(frame.template buffer<0, 0>().storage_view().owner(), generations[i]));
                 EXPECT_FALSE(same_owner(shared_sampler, generations[i]));
             }
             phase << frame.bind_resources(pipeline).dispatch(1);
@@ -114,7 +114,7 @@ namespace {
             if constexpr (t::detail::BundlePolicy<Policy>::ARENA)
                 frame.template buffer<0, 0>().read_into(actual);
             else
-                frame.template buffer<0, 0>().backend().read_into(std::as_writable_bytes(std::span(actual)));
+                frame.template buffer<0, 0>().storage_view().read_into(std::as_writable_bytes(std::span(actual)));
             EXPECT_EQ(actual, (std::array<std::uint32_t, 2>{37, 83}));
             std::array<std::uint8_t, 4> texel{};
             readback.read_into(std::as_writable_bytes(std::span(texel)));

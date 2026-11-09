@@ -17,14 +17,12 @@ namespace VSL_NAMESPACE::command {
         BindIndexBufferAt(const BufferView& source, IndexType type, size_t offset = 0, ResourceUse use = {});
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
         void track(const CommandBuffer& buffer) const { _use.record(buffer); }
-        const std::shared_ptr<impl::BufferImpl>& source() const { return _source; }
         BufferIdentity identity() const;
         size_t offset() const { return _offset; }
         IndexType type() const { return _type; }
 
     private:
-        BindIndexBufferAt(std::shared_ptr<impl::BufferImpl> source, IndexType type, size_t offset, ResourceUse use);
-        std::shared_ptr<impl::BufferImpl> _source;
+        impl::BufferImpl* _source;
         size_t _offset;
         IndexType _type;
         ResourceUse _use;

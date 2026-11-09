@@ -7,6 +7,10 @@ namespace VSL_NAMESPACE::command {
     struct ImageUpload : Command {
         ImageUpload(BufferAccessor* source, ImageAccessor image, ImageLayout current_layout,
                     ImageRegion region = {}, std::size_t offset = 0);
+        // retentionは転送元の保持期間。画像の既存保持契約は維持する。
+        ImageUpload(BufferView source, ImageAccessor image, ImageLayout current_layout,
+                    ImageRegion region = {}, std::size_t offset = 0, ResourceUse constraint = {},
+                    ResourceRetention retention = ResourceRetention::COMPLETION);
         CopyBufferToImage copy;
         ImageLayout current_layout;
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;

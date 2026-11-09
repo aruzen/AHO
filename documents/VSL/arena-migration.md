@@ -131,6 +131,35 @@ descriptorの使用状態と所有の一致は別々に判定する。同じSet�
 
 factory入力の変更に新しいowner wrapperや使用状態を追加せず、記録は解決済み実体を使う。BufferRef／BufferViewのraw構築、legacy_owner、他の公開data_は次の移行対象として残る。
 
+## 順序12d: Bufferの参照境界と転送入力
+
+BufferRefは非所有の操作用参照で、raw pointerの取得・指定とaggregate構築を閉じる。BufferViewは所有値で、元のowner／nodeと選択範囲を保持する。raw ref＋owner＋rangeからの公開構築とlegacy_ownerは廃止し、通常BufferからはFromBuffer、arenaからはview／bufferを使う。内部のraw接続は非installのBufferAccessだけへ置く。
+
+```cpp
+auto storage = vsl::BufferView::FromBuffer(native_buffer);
+auto selected = storage.view(4, 16); // 選択範囲を所有する
+auto borrowed = selected.ref();     // selected等の所有者が生存する間だけ有効
+phase << vsl::command::ImageUpload(selected, image, vsl::ImageLayout::UNDEFINED,
+                                  {.width = 1, .height = 1}, 8);
+```
+
+ref()はlvalueだけから取得できる。PlacedBufferView／PlacedResourceBufferViewのbackend()も同じ借用制限へ揃えた。一時viewから保存する場合はstorage_view()の所有値を使い、その値を変数へ置いてからref()を得る。頂点／index bindのraw source getterとshared_ptr入力も廃止し、Accessor／BufferView入力とidentity()を使う。bind内部は解決済みImpl*と一つのResourceUseで所有・物理状態・論理制約を保持する。
+
+CopyBufferToImage／ImageUploadはBufferView、追加のResourceUse constraint、source専用のResourceRetentionを受ける。offsetはview内の相対値で、Native offsetへview先頭を一度だけ加算する。view容量内を減算で検証してから、合計offsetのalignmentを確認する。旧BufferAccessor*入力は既存SUBMISSION、新view入力は既定COMPLETIONで、明示policyも選べる。画像とbarrierの既存SUBMISSION保持は維持するため、source policyを転送全体の保持期間とは扱わない。
+
+共通prepareはsourceのphysical＋logical useを最初の画像barrierより前に登録し、同じCompletion／slot／記録contextが有効か再確認する。Native copyは登録済みの解決済み実体を使う。単独copy、ImageUpload、array copyも同じ処理へ進む。command全体を局所保存するため、過去の使用完了callbackが元commandを破棄しても、保持した入力で継続できる。取消／別記録への切替はNative記録前に拒否する。
+
+AHOのBufferBinding.native()は廃止する。TextureUpdateはinvoke時に一度取得したBufferSnapshotからstorage／初期化済みsize／constraints／retentionを使い、使用可能性の観測中にlive Bufferが再確保されても同じsnapshotを使う。更新中の拒否は維持し、初期化済みsizeを容量とは別に検証する。NativeBufferAdapterの個別確保と世代ごとの互換参照は不要になった。旧世代は新しいsize公開とmutation終了後に回収する。
+
+```cpp
+const auto snapshot = aho_buffer.binding().snapshot();
+auto storage = snapshot.storage(); // BufferViewの所有値
+vsl::command::ImageUpload upload(storage, image, current_layout, region, offset,
+                                 snapshot.constraints(), snapshot.retention());
+```
+
+GPUBufferBase.native()は具体的なStorage&を返す別の契約として維持する。TYPE／PROPERTYによる静的usage検査とCustom mappingは変更しない。CPU Impl配置とVulkan device memoryは引き続き別の確保であり、内部コンテナやowner境界の個別確保も残る。通常BufferAccessorのdata_を含む残りの公開入口は後続へ移行する。性能改善率は未測定である。
+
 2026-11-06。Bufferの4責務分離が統合されたmaster `6b1f0166`を基点とする。[Bufferの契約](buffer-generation-contracts.md)と[責務の配置](buffer-layer-layout.md)を維持する。
 
 ## 方針と段階

@@ -1,3 +1,4 @@
+#include <VSL/operation/graphics_pipeline_state_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
@@ -23,6 +24,10 @@
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/storage/cpu_region.hpp>
+
+namespace {
+    using VSL_NAMESPACE::operation::detail::GraphicsPipelineStateAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SynchronizationAccess;
@@ -431,7 +436,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     for (const auto& source : graphics->shaders)
                         shaders.push_back(resolve(source));
                     const operation::GraphicsPipelineInput input{resolve(graphics->layout), resolve(graphics->pass),
-                                                                 &graphics->state.definition(), shaders, graphics->subpass};
+                                                                 &GraphicsPipelineStateAccess::Read(graphics->state), shaders, graphics->subpass};
                     construct_pipeline(slot, *device.data_, input);
                 } else {
                     const auto& compute = std::get<ComputePipelineInit>(initializer);

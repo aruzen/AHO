@@ -187,6 +187,7 @@
     <ClInclude Include="VSL\src\private\VSL\operation\pipeline_layout_ops.hpp" />
     <ClInclude Include="VSL\include\VSL\operation\render_pass_description.hpp" />
     <ClInclude Include="VSL\include\VSL\operation\graphics_pipeline_state.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\operation\graphics_pipeline_state_access.hpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\render_pass_ops.hpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\pipeline_ops.hpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\frame_buffer_ops.hpp" />

@@ -1,3 +1,4 @@
+#include <VSL/operation/graphics_pipeline_state_access.hpp>
 #include <VSL/vulkan/stages/vertex_input.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 
@@ -6,6 +7,10 @@
 #include <limits>
 #include <utility>
 #include <VSL/exceptions.hpp>
+
+namespace {
+    using VSL_NAMESPACE::operation::detail::GraphicsPipelineStateAccess;
+}
 
 namespace {
     std::uint32_t shape_stride(const VSL_NAMESPACE::pipeline_layout::VertexInputShapeDefinition& definition) {
@@ -78,7 +83,7 @@ void VSL_NAMESPACE::pipeline_layout::VertexInput::injection(VSL_NAMESPACE::Pipel
 }
 
 void VSL_NAMESPACE::pipeline_layout::VertexInput::injection(VSL_NAMESPACE::GraphicsPipelineStateEditRef state) {
-    auto& info = state.get();
+    auto& info = GraphicsPipelineStateAccess::Edit(state);
 
     using VIBDs = std::vector<vk::VertexInputBindingDescription>;
     using VIADs = std::vector<vk::VertexInputAttributeDescription>;

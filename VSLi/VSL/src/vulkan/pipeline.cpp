@@ -1,3 +1,4 @@
+#include <VSL/operation/graphics_pipeline_state_access.hpp>
 #include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/owner_validation.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
@@ -10,6 +11,10 @@
 #include <VSL/lifetime/identity_access.hpp>
 #include <VSL/lifetime/native_recording.hpp>
 #include <stdexcept>
+
+namespace {
+    using VSL_NAMESPACE::operation::detail::GraphicsPipelineStateAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
@@ -83,7 +88,7 @@ namespace VSL_NAMESPACE {
         const std::vector<ShaderAccessor> kept(shaders.begin(), shaders.end());
         const auto sources = shader_sources(kept);
         const GraphicsPipelineState snapshot(state);
-        const operation::GraphicsPipelineInput input{GraphicsAccess::Owned(layout).get(), GraphicsAccess::Owned(pass).get(), &snapshot.definition(), sources, subpass};
+        const operation::GraphicsPipelineInput input{GraphicsAccess::Owned(layout).get(), GraphicsAccess::Owned(pass).get(), &GraphicsPipelineStateAccess::Read(snapshot), sources, subpass};
         GraphicsAccess::Owned(*this) = GraphicsAccess::Owned(GraphicsAccess::FromShared(lifetime::make_heap_pipeline(layout.get_device(), layout.owner_ref(), input)));
     }
     GraphicsPipeline::GraphicsPipeline(PipelineAccessor source) : _value(std::move(source)) {

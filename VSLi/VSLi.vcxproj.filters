@@ -52,6 +52,7 @@
     <ClInclude Include="VSL\src\private\VSL\operation\pipeline_layout_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\operation\render_pass_description.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\operation\graphics_pipeline_state.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\src\private\VSL\operation\graphics_pipeline_state_access.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\src\private\VSL\operation\render_pass_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\src\private\VSL\operation\pipeline_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\src\private\VSL\operation\frame_buffer_ops.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>

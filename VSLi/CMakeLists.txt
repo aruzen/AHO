@@ -97,6 +97,7 @@ add_library(VSL STATIC
         VSL/src/private/VSL/operation/pipeline_layout_ops.hpp
         VSL/include/VSL/operation/render_pass_description.hpp
         VSL/include/VSL/operation/graphics_pipeline_state.hpp
+        VSL/src/private/VSL/operation/graphics_pipeline_state_access.hpp
         VSL/src/private/VSL/operation/render_pass_ops.hpp
         VSL/src/private/VSL/operation/pipeline_ops.hpp
         VSL/src/private/VSL/operation/frame_buffer_ops.hpp

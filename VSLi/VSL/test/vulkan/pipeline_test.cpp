@@ -1,3 +1,4 @@
+#include <VSL/operation/graphics_pipeline_state_access.hpp>
 #include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/shader_access.hpp>
@@ -30,6 +31,11 @@ namespace {
     }
 } // namespace
 #include "support/compute_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::operation::detail::GraphicsPipelineStateAccess;
+}
+
 namespace {
     using ComputePipelineVulkanIntegrationTest = vsl_test::ComputeVulkanIntegrationTest;
     TEST_F(ComputePipelineVulkanIntegrationTest, CreatesAndInvokesComputePipeline) {
@@ -52,7 +58,7 @@ namespace {
     TEST_F(PipelineSnapshotVulkanIntegrationTest, ExplicitCreationKeepsItsShaderOwnersAndStateUntilNativeCreationFinishes) {
         namespace pl = vsl::pipeline_layout;
         vsl::GraphicsPipelineState state;
-        state.edit().get() = PipelineRecipeAccess::Read(*(layout)).graphics_state;
+        GraphicsPipelineStateAccess::Edit(state.edit()) = PipelineRecipeAccess::Read(*(layout)).graphics_state;
         pl::Rasterization{pl::CullingMode::NONE}.injection(state.edit());
         const auto runtime = layout->runtime();
         std::vector<vsl::ShaderAccessor> sources{
@@ -63,7 +69,7 @@ namespace {
         bool called = false;
         GraphicsCreateAction action{[&](const vk::GraphicsPipelineCreateInfo& info) {
             called = true;
-            EXPECT_NE(info.pRasterizationState, &state.definition().rasterization);
+            EXPECT_NE(info.pRasterizationState, &GraphicsPipelineStateAccess::Read(state).rasterization);
             pl::Rasterization{pl::CullingMode::FRONT_AND_BACK}.injection(state.edit());
             sources.clear();
             EXPECT_FALSE(first.expired());
@@ -78,7 +84,7 @@ namespace {
         EXPECT_TRUE(called);
         EXPECT_TRUE(first.expired());
         EXPECT_TRUE(second.expired());
-        EXPECT_EQ(state.definition().rasterization.cullMode, vk::CullModeFlags(vk::CullModeFlagBits::eFrontAndBack));
+        EXPECT_EQ(GraphicsPipelineStateAccess::Read(state).rasterization.cullMode, vk::CullModeFlags(vk::CullModeFlagBits::eFrontAndBack));
         ExpectTriangleColor(render([](auto& stream) { stream << vsl::command::Draw{3}; }));
     }
     TEST_F(PipelineSnapshotVulkanIntegrationTest, RecipeCreationKeepsItsSelectedStateWhenASavedEditorChangesTheRecipe) {

@@ -1,4 +1,5 @@
 #include <VSL/lifetime/pipeline_recipe_access.hpp>
+#include <VSL/operation/graphics_pipeline_state_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/pipeline_recipe.hpp>
 #include <VSL/lifetime/pipeline_layout_storage.hpp>
@@ -8,7 +9,8 @@
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
-}
+    using VSL_NAMESPACE::operation::detail::GraphicsPipelineStateAccess;
+} // namespace
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
@@ -95,7 +97,7 @@ namespace VSL_NAMESPACE::lifetime {
     GraphicsPipeline make_graphics_pipeline(PipelineRecipeSnapshot snapshot, RenderPassAccessor pass, std::uint32_t subpass, typed::ArenaStorage<>) {
         validate_target(snapshot.device(), pass, subpass);
         GraphicsPipelineState state;
-        state.edit().get() = PipelineRecipeAccess::Read(snapshot).graphics_state;
+        GraphicsPipelineStateAccess::Edit(state.edit()) = PipelineRecipeAccess::Read(snapshot).graphics_state;
         const std::array<ResourceInit, 2> inputs{
             layout_input(snapshot), GraphicsPipelineInit{LAYOUT, std::move(pass), std::move(state), shader_inputs(PipelineRecipeAccess::Read(snapshot)), subpass}};
         ResourceArena arena(snapshot.device(), PLAN, inputs);

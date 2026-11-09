@@ -1,4 +1,5 @@
 #include <VSL/vulkan/swapchain.hpp>
+#include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/swapchain_arena.hpp>
 #include <VSL/lifetime/swapchain_storage.hpp>
 #include <VSL/lifetime/device_owner.hpp>
@@ -65,6 +66,6 @@ namespace VSL_NAMESPACE {
         return data_->present_fences;
     }
     SemaphoreHolder SwapchainAccessor::finished_semaphores() const {
-        return {lifetime::swapchain_finished(data_)};
+        return lifetime::detail::SynchronizationAccess::FromShared(lifetime::swapchain_finished(data_));
     }
 } // namespace VSL_NAMESPACE

@@ -1,4 +1,5 @@
 #ifdef AHO_GPU_TESTS
+#include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include "support/live_gpu.hpp"
@@ -116,10 +117,10 @@ namespace {
         EXPECT_TRUE(data->swapchain.images.empty());
         EXPECT_FALSE(data->render_pass);
         EXPECT_FALSE(data->frame_buffer);
-        EXPECT_FALSE(data->image_available.data_);
-        EXPECT_FALSE(data->render_finished.data_);
-        EXPECT_FALSE(data->in_flight.data_);
-        EXPECT_FALSE(data->acquire_fences.data_);
+        EXPECT_FALSE(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(data->image_available));
+        EXPECT_FALSE(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(data->render_finished));
+        EXPECT_FALSE(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(data->in_flight));
+        EXPECT_FALSE(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(data->acquire_fences));
         EXPECT_FALSE(data->standard_draw);
         EXPECT_FALSE(data->pending_generation);
         EXPECT_FALSE(data->deferred_usage);
@@ -131,7 +132,7 @@ namespace {
         const auto context = window.render_context();
         const auto drawing = window.data2;
         const std::weak_ptr<void> generation = drawing->swapchain.data_;
-        const std::weak_ptr<void> frames = drawing->image_available.data_;
+        const std::weak_ptr<void> frames = VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(drawing->image_available).share();
         const std::weak_ptr<void> surface = drawing->surface->data_;
         {
             aho::DrawPhase phase(*engine);
@@ -232,7 +233,7 @@ namespace {
                 const auto result = phase->completion();
                 const auto drawing = a.data2;
                 const std::weak_ptr<void> generation = drawing->swapchain.data_;
-                const std::weak_ptr<void> synchronization = drawing->image_available.data_;
+                const std::weak_ptr<void> synchronization = VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(drawing->image_available).share();
                 aho::DrawPhase native(other);
                 CloseNativeProbe probe;
                 bool callback = false;
@@ -275,7 +276,7 @@ namespace {
             CloseTargetEngine runtime(*engine, window);
             const auto drawing = window.data2;
             const std::weak_ptr<void> generation = drawing->swapchain.data_;
-            const std::weak_ptr<void> frames = drawing->image_available.data_;
+            const std::weak_ptr<void> frames = VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(drawing->image_available).share();
             CloseNativeProbe probe;
             bool called = false;
             unsigned finishes = 0;
@@ -396,9 +397,9 @@ namespace {
         const auto published = window.data2->swapchain;
         const auto pass = window.data2->render_pass;
         const auto frames = window.data2->frame_buffer;
-        const auto available = window.data2->image_available.data_;
-        const auto flight = window.data2->in_flight.data_;
-        const auto acquire = window.data2->acquire_fences.data_;
+        const auto available = VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(window.data2->image_available);
+        const auto flight = VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(window.data2->in_flight);
+        const auto acquire = VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(window.data2->acquire_fences);
         GenerationProbe probe;
         const vsl::operation::ScopedSwapchainNativeCalls calls({&probe, GenerationProbe::Create});
         const vsl::operation::ScopedFrameBufferNativeFactory factory({&probe, GenerationProbe::Frame, GenerationProbe::DestroyFrame});
@@ -417,7 +418,7 @@ namespace {
             ++notifications;
             EXPECT_FALSE(current->data2->pending_generation);
             EXPECT_EQ(current->data2->swapchain.data_, candidate.data_);
-            EXPECT_EQ(current->data2->render_finished.data_, candidate.finished_semaphores().data_);
+            EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(current->data2->render_finished), VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(candidate.finished_semaphores()));
             EXPECT_EQ(current->data2->frame_buffer.get_render_pass().identity(), pass.identity());
             EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::GraphicsAccess::Owned(current->data2->frame_buffer)->attachments.front().front(), VSL_NAMESPACE::lifetime::detail::ImageAccess::Owned(candidate.images.front()).get());
         });
@@ -426,9 +427,9 @@ namespace {
         EXPECT_EQ(probe.creates, 1u);
         EXPECT_EQ(notifications, 1u);
         EXPECT_EQ(window.data2->render_pass.identity(), pass.identity());
-        EXPECT_EQ(window.data2->image_available.data_, available);
-        EXPECT_EQ(window.data2->in_flight.data_, flight);
-        EXPECT_EQ(window.data2->acquire_fences.data_, acquire);
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(window.data2->image_available), available);
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(window.data2->in_flight), flight);
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(window.data2->acquire_fences), acquire);
         EXPECT_TRUE(vsl::contain(window.data2->swapchain.images.front().get_usage(), vsl::ImageType::TRANSFER_SRC));
     }
     TEST_F(AHOWindowVulkanIntegration, ChangedExtentRetiresThePendingCandidateAndPublishesANewOne) {
@@ -879,10 +880,10 @@ namespace {
         ASSERT_TRUE(window.resize(320, 240));
         const auto current = window.data2->render_finished;
         EXPECT_EQ(current.size(), count);
-        EXPECT_EQ(current.data_, window.data2->swapchain.finished_semaphores().data_);
-        EXPECT_NE(current.data_, old.data_);
-        EXPECT_TRUE(current.data_.owner_before(old.data_) || old.data_.owner_before(current.data_));
-        EXPECT_NE(current.data_->semaphores[0], old.data_->semaphores[0]);
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(current), VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(window.data2->swapchain.finished_semaphores()));
+        EXPECT_NE(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(current), VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(old));
+        EXPECT_TRUE(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(current).owner_before(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(old)) || VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(old).owner_before(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(current)));
+        EXPECT_NE(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(current)->semaphores[0], VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(old)->semaphores[0]);
     }
     TEST_F(AHOWindowVulkanIntegration, ExplicitEngineConstructorCreatesIndependentWindow) {
         ASSERT_NO_THROW(start_engine());
@@ -902,21 +903,21 @@ namespace {
         EXPECT_EQ(second.data2->image_available.size(), engine->data()->command_manager.get_buffer().get_size());
         EXPECT_EQ(second.data2->in_flight.size(), second.data2->image_available.size());
         EXPECT_EQ(second.data2->acquire_fences.size(), second.data2->image_available.size());
-        EXPECT_EQ(second.data2->render_finished.data_, second.data2->swapchain.finished_semaphores().data_);
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(second.data2->render_finished), VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(second.data2->swapchain.finished_semaphores()));
         EXPECT_TRUE(second.close());
     }
     TEST_F(AHOWindowVulkanIntegration, WindowFrameSynchronizationSharesOneRootAndIsReleasedBeforeTheEngine) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
         const auto& resources = *window.data2;
-        EXPECT_FALSE(resources.image_available.data_.owner_before(resources.in_flight.data_));
-        EXPECT_FALSE(resources.in_flight.data_.owner_before(resources.image_available.data_));
-        EXPECT_FALSE(resources.image_available.data_.owner_before(resources.acquire_fences.data_));
-        EXPECT_FALSE(resources.acquire_fences.data_.owner_before(resources.image_available.data_));
-        EXPECT_NE(resources.in_flight.data_, resources.acquire_fences.data_);
-        EXPECT_TRUE(resources.image_available.data_.owner_before(resources.render_finished.data_) ||
-                    resources.render_finished.data_.owner_before(resources.image_available.data_));
-        const std::weak_ptr<void> owner = resources.image_available.data_;
+        EXPECT_FALSE(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(resources.image_available).owner_before(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(resources.in_flight)));
+        EXPECT_FALSE(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(resources.in_flight).owner_before(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(resources.image_available)));
+        EXPECT_FALSE(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(resources.image_available).owner_before(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(resources.acquire_fences)));
+        EXPECT_FALSE(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(resources.acquire_fences).owner_before(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(resources.image_available)));
+        EXPECT_NE(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(resources.in_flight), VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(resources.acquire_fences));
+        EXPECT_TRUE(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(resources.image_available).owner_before(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(resources.render_finished)) ||
+                    VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(resources.render_finished).owner_before(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(resources.image_available)));
+        const std::weak_ptr<void> owner = VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(resources.image_available).share();
         EXPECT_TRUE(window.close());
         EXPECT_TRUE(engine->data());
         EXPECT_TRUE(owner.expired());
@@ -929,20 +930,20 @@ namespace {
         const auto acquired = window.data2->acquire_fences;
         const auto finished = window.data2->render_finished;
         ASSERT_TRUE(window.recreate_swapchain());
-        EXPECT_EQ(window.data2->image_available.data_, available.data_);
-        EXPECT_EQ(window.data2->in_flight.data_, in_flight.data_);
-        EXPECT_EQ(window.data2->acquire_fences.data_, acquired.data_);
-        EXPECT_NE(window.data2->render_finished.data_, finished.data_);
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(window.data2->image_available), VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(available));
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(window.data2->in_flight), VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(in_flight));
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(window.data2->acquire_fences), VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(acquired));
+        EXPECT_NE(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(window.data2->render_finished), VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(finished));
         EXPECT_EQ(window.data2->render_finished.size(), window.data2->swapchain.get_swap_image_size());
     }
     TEST_F(AHOWindowVulkanIntegration, EquallyNamedWindowsHaveIndependentFrameSynchronization) {
         ASSERT_NO_THROW(start_engine());
         aho::Window first("shared title", 64, 48, *engine);
         aho::Window second("shared title", 64, 48, *engine);
-        const auto& a = first.data2->image_available.data_;
-        const auto& b = second.data2->image_available.data_;
+        const auto& a = VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(first.data2->image_available);
+        const auto& b = VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(second.data2->image_available);
         EXPECT_TRUE(a.owner_before(b) || b.owner_before(a));
-        const std::weak_ptr<void> owner = a;
+        const std::weak_ptr<void> owner = a.share();
         EXPECT_TRUE(first.close());
         EXPECT_TRUE(owner.expired());
         EXPECT_TRUE(second.data2->in_flight.wait(std::uint64_t{0}));
@@ -951,7 +952,7 @@ namespace {
     TEST_F(AHOWindowVulkanIntegration, WindowSynchronizationDoesNotRequireAnEngineNamedRegistry) {
         ASSERT_NO_THROW(start_engine());
         aho::engine::EngineAccessor runtime(std::make_shared<aho::engine::EngineData>(*engine->data()));
-        runtime.data()->synchro_manager.data_.reset();
+        VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Registry(runtime.data()->synchro_manager).reset();
         aho::Window independent("without a name registry", 64, 48, runtime);
         EXPECT_EQ(independent.data2->image_available.size(), runtime.data()->command_manager.get_buffer().get_size());
         EXPECT_TRUE(independent.data2->acquire_fences.owner_ref().managed());

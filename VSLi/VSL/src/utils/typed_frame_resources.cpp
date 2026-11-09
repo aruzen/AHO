@@ -2,6 +2,7 @@
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/lifetime/resource_arena.hpp>
 #include <VSL/lifetime/synchronization_storage.hpp>
+#include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/dependency_node.hpp>
 #include <VSL/utils/typed_frame_resources.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
@@ -75,7 +76,7 @@ namespace VSL_NAMESPACE::typed {
             throw std::invalid_argument("Typed frame commands require a positive slot count");
         CommandPool pool(device);
         CommandBuffer buffer(pool, count);
-        return {CommandManager::FromBuffer(buffer), {lifetime::make_heap_fence(device, {count, false})}};
+        return {CommandManager::FromBuffer(buffer), lifetime::detail::SynchronizationAccess::FromShared(lifetime::make_heap_fence(device, {count, false}))};
     }
     TypedFrameCommands::TypedFrameCommands(Resources resources) : TypedFrameCommands(std::move(resources.manager), std::move(resources.fence)) {}
     TypedFrameCommands::TypedFrameCommands(LogicalDeviceAccessor device, std::uint32_t count) : TypedFrameCommands(std::move(device), count, DefaultStorage{}) {}

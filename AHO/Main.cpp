@@ -47,7 +47,7 @@ breakpoint disable swift_willThrow
         auto& swapchain = main_window.data2->swapchain;
         auto& render_pass = main_window.data2->render_pass;
         auto& in_flight = main_window.data2->in_flight;
-        if (!main_window.data2->image_available.data_)
+        if (!main_window.data2->image_available)
             loggingln("image not available ; ;");
         main_window.resize(500, 500);
 #ifdef _MSC_VER

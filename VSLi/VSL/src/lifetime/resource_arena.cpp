@@ -1,3 +1,4 @@
+#include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/shader_access.hpp>
@@ -22,6 +23,10 @@
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/storage/cpu_region.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SynchronizationAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
@@ -200,12 +205,12 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 } else if (const auto* semaphore = std::get_if<SemaphoreHolder>(&value)) {
                     if (semaphore->get_device().data_ != device.data_)
                         throw std::invalid_argument("External semaphore requires the arena device");
-                    resource.reference = semaphore->data_.get();
+                    resource.reference = SynchronizationAccess::Owned(*(semaphore)).get();
                     resource.owner_index = retain_dependency(semaphore->owner_ref());
                 } else if (const auto* fence = std::get_if<FenceHolder>(&value)) {
                     if (fence->get_device().data_ != device.data_)
                         throw std::invalid_argument("External fence requires the arena device");
-                    resource.reference = fence->data_.get();
+                    resource.reference = SynchronizationAccess::Owned(*(fence)).get();
                     resource.owner_index = retain_dependency(fence->owner_ref());
                 } else if (const auto* command_pool = std::get_if<CommandPool>(&value)) {
                     if (command_pool->get_device().data_ != device.data_)
@@ -698,13 +703,15 @@ namespace VSL_NAMESPACE::lifetime {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::SEMAPHORE);
-        return {{resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.get<impl::SemaphoreImpl>()}};
+        const auto owner = resource.placement.external ? _owner->dependencies.at(resource.owner_index) : _owner->descriptor_context.node.ref(_owner);
+        return SynchronizationAccess::FromOwned(owner.alias(resource.get<impl::SemaphoreImpl>()));
     }
     FenceHolder ResourceArena::fence(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::FENCE);
-        return {{resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.get<impl::FenceImpl>()}};
+        const auto owner = resource.placement.external ? _owner->dependencies.at(resource.owner_index) : _owner->descriptor_context.node.ref(_owner);
+        return SynchronizationAccess::FromOwned(owner.alias(resource.get<impl::FenceImpl>()));
     }
     CommandBuffer ResourceArena::command_buffer(typed::ResourceId id) const {
         if (!_owner)

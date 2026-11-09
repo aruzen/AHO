@@ -1,3 +1,4 @@
+#include <VSL/lifetime/synchronization_access.hpp>
 #include <AHO/x/screenshot.hpp>
 #include "../support/temp_directory.hpp"
 #include <gtest/gtest.h>
@@ -178,7 +179,7 @@ namespace {
         const vsl::operation::ScopedSubmissionNativeCalls native({.context = &gate, .fence_status = ScreenshotCompletionGate::Status});
         {
             aho::DrawPhase previous(*engine, clear(1, 0, 0));
-            gate.fence = engine->boot_window->data2->in_flight.data_->fences.at(previous.frame_slot);
+            gate.fence = VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(engine->boot_window->data2->in_flight)->fences.at(previous.frame_slot);
             manager.get_buffer().retain_until_complete(std::shared_ptr<int>(new int(0), [&, alive = std::weak_ptr<int>(live)](int* value) {
                 delete value;
                 if (alive.expired())

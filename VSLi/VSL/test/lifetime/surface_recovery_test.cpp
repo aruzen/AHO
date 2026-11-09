@@ -1,3 +1,4 @@
+#include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/window_fixture.hpp"
 #include "support/deferred_action.hpp"
@@ -12,6 +13,10 @@
 #include <VSL/operation/submission_ops.hpp>
 #include <VSL/sync/submission_completion.hpp>
 #include <functional>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SynchronizationAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -208,7 +213,7 @@ namespace {
         EXPECT_FALSE(ticket->released);
         EXPECT_EQ(chain.state(), vsl::SwapchainState::RECOVERY_REQUIRED);
         EXPECT_EQ(phase->completion().status(), vsl::Completion::Status::FAILED);
-        EXPECT_THROW(s::require_acquire_signal(*available.data_, 0), std::logic_error);
+        EXPECT_THROW(s::require_acquire_signal(*SynchronizationAccess::Owned(available), 0), std::logic_error);
         EXPECT_EQ(probe.drains, 1u);
         probe.drain_error = VK_SUCCESS;
         EXPECT_EQ(l::recover_surface(device, *surface), l::SurfaceRecoveryStatus::COMPLETE);
@@ -216,7 +221,7 @@ namespace {
         EXPECT_EQ(ticket->state.status, s::AcquisitionStatus::RETURNED);
         EXPECT_EQ(probe.drains, 2u);
         EXPECT_EQ(probe.releases, 1u);
-        EXPECT_NO_THROW(s::require_acquire_signal(*available.data_, 0));
+        EXPECT_NO_THROW(s::require_acquire_signal(*SynchronizationAccess::Owned(available), 0));
         EXPECT_EQ(l::recover_surface(device, *surface), l::SurfaceRecoveryStatus::COMPLETE);
         EXPECT_EQ(probe.releases, 1u);
         EXPECT_EQ(chain.state(), vsl::SwapchainState::RECOVERY_REQUIRED);
@@ -362,10 +367,10 @@ namespace {
         EXPECT_TRUE(registry->tickets.empty());
         EXPECT_EQ(probe.drains, 1u);
         EXPECT_EQ(probe.releases, 0u);
-        EXPECT_THROW(s::require_acquire_signal(*available.data_, 0), std::logic_error);
+        EXPECT_THROW(s::require_acquire_signal(*SynchronizationAccess::Owned(available), 0), std::logic_error);
         EXPECT_EQ(l::recover_surface(device, *surface), l::SurfaceRecoveryStatus::COMPLETE);
         EXPECT_EQ(probe.drains, 1u);
-        EXPECT_TRUE(available.data_->use.poisoned[0]);
+        EXPECT_TRUE(SynchronizationAccess::Owned(available)->use.poisoned[0]);
     }
     TEST_F(SurfaceRecoveryWindowIntegrationTest, PresentOutOfMemoryKeepsRetryRightsUntilThePhaseIsAbandoned) {
         auto manager = make_manager().independent(1);

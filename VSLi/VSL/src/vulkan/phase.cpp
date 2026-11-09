@@ -1,3 +1,4 @@
+#include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/vulkan/phase.hpp>
@@ -21,6 +22,10 @@
 #include <exception>
 #include <stdexcept>
 #include <algorithm>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SynchronizationAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -89,11 +94,11 @@ namespace VSL_NAMESPACE {
         const auto manager_data = CommandAccess::Data(manager);
         const auto inherited = returning_image ? submission : nullptr;
         const auto available = inherited ? synchronization_owner(*inherited, impl::SubmissionSource::WAIT_SEMAPHORE, inherited->wait_semaphore)
-                                         : (next_image_available ? next_image_available->data_ : nullptr);
+                                         : (next_image_available ? SynchronizationAccess::Owned(*next_image_available).share() : nullptr);
         const auto finished = inherited ? synchronization_owner(*inherited, impl::SubmissionSource::SIGNAL_SEMAPHORE, inherited->signal_semaphore)
-                                        : (calculation_finish ? calculation_finish->data_ : nullptr);
+                                        : (calculation_finish ? SynchronizationAccess::Owned(*calculation_finish).share() : nullptr);
         const auto external = inherited ? synchronization_owner(*inherited, impl::SubmissionSource::FENCE, inherited->external_fence)
-                                        : (in_flight_fence ? in_flight_fence->data_ : nullptr);
+                                        : (in_flight_fence ? SynchronizationAccess::Owned(*in_flight_fence).share() : nullptr);
         if ((!inherited && next_image_available && !available) || (available && available->device != manager_data->device.get()))
             throw std::invalid_argument("Acquire semaphore device mismatch");
         if ((!inherited && calculation_finish && !finished) || (finished && finished->device != manager_data->device.get()))
@@ -291,9 +296,9 @@ namespace VSL_NAMESPACE {
                 throw std::logic_error("Frame slot changed while recording");
             lifetime::require_fence_reservation(*work, slot);
             if (!domain->context.returning_image &&
-                ((next_image_available ? next_image_available->data_.get() : nullptr) != work->wait_semaphore ||
-                 (calculation_finish ? calculation_finish->data_.get() : nullptr) != work->signal_semaphore ||
-                 (in_flight_fence ? in_flight_fence->data_.get() : nullptr) != work->external_fence))
+                ((next_image_available ? SynchronizationAccess::Owned(*(next_image_available)).get() : nullptr) != work->wait_semaphore ||
+                 (calculation_finish ? SynchronizationAccess::Owned(*(calculation_finish)).get() : nullptr) != work->signal_semaphore ||
+                 (in_flight_fence ? SynchronizationAccess::Owned(*(in_flight_fence)).get() : nullptr) != work->external_fence))
                 throw std::logic_error("Phase synchronization owners changed after preparation");
             if (buffers->owner_context->unresolved_submissions == std::numeric_limits<size_t>::max())
                 throw std::overflow_error("Command ring uncertainty count overflow");
@@ -500,7 +505,7 @@ namespace VSL_NAMESPACE {
             }
             operation::require_active_swapchain(*chain);
             if (!calculation_finish)
-                calculation_finish = SemaphoreHolder{lifetime::swapchain_finished(chain)};
+                calculation_finish = SynchronizationAccess::FromShared(lifetime::swapchain_finished(chain));
             const auto previous_slot = buffers->current_buffer_idx;
             buffers->current_buffer_idx = (previous_slot + 1) % buffers->command_buffers.size();
             if (!prepare() || !call.alive())
@@ -579,11 +584,11 @@ namespace VSL_NAMESPACE {
             if (work->signal_semaphore)
                 for (std::uint32_t i = 0; i < count; ++i)
                     sync::require_semaphore_element(*work->signal_semaphore, i);
-            const auto source = _acquire_fences ? _acquire_fences->data_
+            const auto source = _acquire_fences ? SynchronizationAccess::Owned(*_acquire_fences).share()
                                                 : lifetime::acquire_fences(*domain, LogicalDeviceAccessor{manager_data->device});
             if (!require_prepared())
                 return;
-            (void)FenceHolder{source}.owner_ref();
+            SynchronizationAccess::RequireCanonical(source);
             if (source->device != manager_data->device.get() || source->fences.size() < buffers->command_buffers.size())
                 throw std::invalid_argument("Acquisition fences must cover frame slots on the same device");
             const auto acquired = source->fences.at(slot);

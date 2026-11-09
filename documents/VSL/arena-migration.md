@@ -488,3 +488,37 @@ D1〜D3で[AHOのsnapshot・固定import・可変arena世代](../AHO/arena-buffe
 4aではImage／Samplerのoperationとlifetimeを分離し、device／swapchain所有をImpl外へ置く。通常API・Typed／native descriptor・転送／barrier・framebufferの全経路で同じ物理使用状態を登録する。外部imageはviewだけを所有する。Image／Samplerを利用者向けarenaへ配置するAPI、公開寸法・offset生成、schemaの自動展開は4b以降の終了条件に残す。
 
 4bの[ResourceArena](resource-arena.md)と4cの[Typed owned Image／Sampler](typed-owned-resources.md)で、異種配置とcomponent単位のschema接続を実装した。現在の順序は[完了計画](arena-completion-plan.md)を参照。次は完了結果とin-flight保持の分離であり、descriptor以降の配置とDevice／Instanceは引き続き未完了。
+
+## 順序12f: Fence／Semaphore／同期registryの所有入口
+
+`FenceHolder`／`SemaphoreHolder` はprivateな `OwnedRef<Impl>` を一つ持つ値とし、`SynchroManager` は既存の共有CPU registryをprivateにする。通常生成とarena取得は同じbackendを引き続き使う。公開の `bool`／`size()`／`get_device()`／`owner_ref()` と、既存のcreate／get／wait／reset／destroyで利用する。新しいowner wrapperやcontrol blockは追加しない。
+
+```cpp
+vsl::SynchroManager synchronization(device);
+auto ready = synchronization.create_fence("ready", true);
+auto signal = synchronization.create_semaphore("signal");
+if (ready && ready.wait(std::uint64_t{0}))
+    ready.reset();
+```
+
+```cpp
+constexpr std::array<vsl::typed::ResourceRequest, 2> requests{{
+    {{1}, vsl::storage::ResourceKind::SEMAPHORE},
+    {{2}, vsl::storage::ResourceKind::FENCE}}};
+constexpr vsl::typed::ResourcePlan<2> plan(requests);
+const std::array<vsl::lifetime::ResourceInit, 2> inputs{
+    vsl::SemaphoreCreateInfo{1}, vsl::FenceCreateInfo{1, true}};
+vsl::lifetime::ResourceArena arena(device, plan, inputs);
+auto signal = arena.semaphore({1});
+auto ready = arena.fence({2});
+```
+
+Arena getterは元external ownerまたはself nodeから直接aliasする。同rootの資源もImplと要素indexで使用状態を区別し、control block一致は保持の重複排除にだけ使う。SourceとepochをHolder側に複製しない。private bridgeが解決した実体へ操作を渡し、低位のwait／reset／destroyは開始時のShared owner・native handles・観測結果を値保存する。GPU完了・取消による既存Workの回収、UNKNOWN／予約／WSI marker、空destroyのno-opを維持する。
+
+同期のcanonical契約は、Impl自身のowner_nodeと元control blockの一致を要求する。managedな別ownerで同じImplへaliasしても正規ownerとは扱わない。`OwnedRef` 入力では格納nodeも照合する。検証と所有取得を分け、Device getterの検証で一時ownerを作らない。
+
+copy／noexcept move／by-value代入／swapは全値を公開してから旧ownerを解放する。名前付き生成も候補と返却facadeを作り、registry entryへswapし、返却値確定後に旧entryを回収する。破棄callbackが元facadeを解放したり同名entryを削除・再作成したりしても、開始時のregistry以外を参照し直さない。
+
+互換性変更は公開 `data_` とraw shared_ptr／OwnedRef constructorの廃止である。利用側は通常生成またはarena getterを使い、有無判定は `bool(value)`、元Deviceは `get_device()`、外部寿命保持は `owner_ref()` へ移行する。AHO製品側は同期facadeのmoveとpublic boolへ接続し、privateヘッダーを使わない。private bridge、registryのshared所有、Work／Proofへ渡すShared境界、native配列と同期状態内のvector確保は残る。
+
+追加runtime6件はmanaged composite拒否、同名置換の再入、Holder／Manager代入時の自己解放、copy／move／swap、退役nodeの拒否とNative不変を確認する。既存の予約・配列先行検査・観測再入・外部import・同root保持・完了／取消の試験も再利用した。macOS arm64／Clang20／C++26／MoltenVK・validation・ASan／UBSanで、全VSL1,183成功（既知format3 skip）、AHO GPU192／CPU1,071、compile306、同一PNG3枚、strict23files／21TUと補完1／1・2／2、installed consumer30種・公開正例1＋負例11、構成別／cross寸法、混在拒否、archive／header一致を確認した。次は他のgeneric facadeに残る既知nodeの退役検査を共通境界へ復元し、その後Swapchainの所有値と画像一覧を閉じる。

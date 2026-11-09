@@ -10,9 +10,27 @@
 #include "../operation/synchronization_create_info.hpp"
 #include "../lifetime/owner_ref.hpp"
 
+namespace VSL_NAMESPACE::lifetime::detail {
+    struct SynchronizationAccess;
+}
+
 namespace VSL_NAMESPACE {
     struct SemaphoreHolder {
-        std::shared_ptr<impl::SemaphoreImpl> data_;
+    private:
+        friend struct lifetime::detail::SynchronizationAccess;
+        lifetime::OwnedRef<impl::SemaphoreImpl> _owner;
+        explicit SemaphoreHolder(lifetime::OwnedRef<impl::SemaphoreImpl> owner) : _owner(std::move(owner)) {}
+
+    public:
+        SemaphoreHolder() = default;
+        SemaphoreHolder(const SemaphoreHolder&) = default;
+        SemaphoreHolder(SemaphoreHolder&&) noexcept = default;
+        SemaphoreHolder& operator=(SemaphoreHolder replacement) noexcept {
+            swap(replacement);
+            return *this;
+        }
+        void swap(SemaphoreHolder& other) noexcept { _owner.swap(other._owner); }
+        explicit operator bool() const noexcept { return bool(_owner); }
 
         std::size_t size() const;
         LogicalDeviceAccessor get_device() const;
@@ -21,7 +39,21 @@ namespace VSL_NAMESPACE {
     };
 
     struct FenceHolder {
-        std::shared_ptr<impl::FenceImpl> data_;
+    private:
+        friend struct lifetime::detail::SynchronizationAccess;
+        lifetime::OwnedRef<impl::FenceImpl> _owner;
+        explicit FenceHolder(lifetime::OwnedRef<impl::FenceImpl> owner) : _owner(std::move(owner)) {}
+
+    public:
+        FenceHolder() = default;
+        FenceHolder(const FenceHolder&) = default;
+        FenceHolder(FenceHolder&&) noexcept = default;
+        FenceHolder& operator=(FenceHolder replacement) noexcept {
+            swap(replacement);
+            return *this;
+        }
+        void swap(FenceHolder& other) noexcept { _owner.swap(other._owner); }
+        explicit operator bool() const noexcept { return bool(_owner); }
 
         std::size_t size() const;
         LogicalDeviceAccessor get_device() const;
@@ -34,7 +66,21 @@ namespace VSL_NAMESPACE {
     };
 
     struct SynchroManager {
-        std::shared_ptr<impl::SynchroManagerImpl> data_;
+    private:
+        friend struct lifetime::detail::SynchronizationAccess;
+        std::shared_ptr<impl::SynchroManagerImpl> _registry;
+
+    public:
+        SynchroManager() = default;
+        SynchroManager(const SynchroManager&) = default;
+        SynchroManager(SynchroManager&&) noexcept = default;
+        SynchroManager& operator=(SynchroManager replacement) noexcept {
+            swap(replacement);
+            return *this;
+        }
+        void swap(SynchroManager& other) noexcept { _registry.swap(other._registry); }
+        explicit operator bool() const noexcept { return bool(_registry); }
+        LogicalDeviceAccessor get_device() const;
 
         SynchroManager(LogicalDeviceAccessor device);
 

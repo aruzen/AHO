@@ -15,6 +15,10 @@
 #include "image.hpp"
 #include "sampler.hpp"
 
+namespace VSL_NAMESPACE {
+    class BufferView;
+}
+
 namespace VSL_NAMESPACE::lifetime {
     class ResourceArena;
 }
@@ -110,6 +114,8 @@ namespace VSL_NAMESPACE::graphic_resource {
 
         // ここらへんのTもいつかtypename ...Argsに置き換えたいかも
         void update(VSL_NAMESPACE::BufferAccessor* buffer, size_t binding = 0, std::optional<Type> type = std::nullopt,
+                    size_t offset = 0, std::optional<size_t> size = std::nullopt);
+        void update(const VSL_NAMESPACE::BufferView& buffer, size_t binding = 0, std::optional<Type> type = std::nullopt,
                     size_t offset = 0, std::optional<size_t> size = std::nullopt);
 
         void update(VSL_NAMESPACE::ImageAccessor image, size_t binding = 0, std::optional<Type> type = std::nullopt);

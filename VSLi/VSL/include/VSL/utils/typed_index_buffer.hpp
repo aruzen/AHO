@@ -1,5 +1,6 @@
 #pragma once
 #include "../vulkan/buffer.hpp"
+#include "typed_buffer_view.hpp"
 #include "../vulkan/resource_use.hpp"
 #include "../vulkan/commands/bind_index_buffers.hpp"
 #include <algorithm>
@@ -31,51 +32,65 @@ namespace VSL_NAMESPACE::typed {
     private:
         template<typename, typename, typename, bool, bool>
         friend class TypedVertexBinding;
-        using Storage = Buffer<MemoryType::INDEX_BUFFER | MemoryType::TRANSFER_DESTINATION, property>;
-        LogicalDeviceAccessor _device;
-        Storage _buffer;
+        static constexpr auto USAGE = MemoryType::INDEX_BUFFER | MemoryType::TRANSFER_DESTINATION;
+        static std::shared_ptr<detail::IndexSnapshot<Index>> MakeSnapshot(std::span<const Index> values);
         std::shared_ptr<detail::IndexSnapshot<Index>> _values;
+        BufferView _buffer;
 
     public:
-        TypedIndexBuffer(LogicalDeviceAccessor device, std::span<const Index> values)
+        template<buffer_storage_policy Policy = DefaultStorage>
+        TypedIndexBuffer(LogicalDeviceAccessor device, std::span<const Index> values, Policy policy = {})
         requires(contain<property, MemoryProperty::HOST_VISIBLE>());
-        TypedIndexBuffer(LogicalDeviceAccessor device, CommandManager manager, std::span<const Index> values)
-        requires(!contain<property, MemoryProperty::HOST_VISIBLE>())
-            : _device(device), _buffer(device, manager, values.data(), values.size()), _values(std::make_shared<detail::IndexSnapshot<Index>>(values)) {}
+        template<buffer_storage_policy Policy = DefaultStorage>
+        TypedIndexBuffer(LogicalDeviceAccessor device, CommandManager manager, std::span<const Index> values, Policy policy = {})
+        requires(!contain<property, MemoryProperty::HOST_VISIBLE>());
         size_t size() const { return _values->values.size(); }
-        LogicalDeviceAccessor device() const { return _device; }
+        LogicalDeviceAccessor device() const { return _buffer.ref().device(); }
         ResourceUse resource_use() const { return _buffer.resource_use(); }
-        const Storage& backend() const { return _buffer; }
-        Storage& backend() { return _buffer; }
+        const BufferView& backend() const& { return _buffer; }
+        const BufferView& backend() const&& = delete;
+        BufferView storage_view() const { return _buffer; }
         void copy(std::span<const Index> values)
         requires(contain<property, MemoryProperty::HOST_VISIBLE>());
         std::pair<std::uint32_t, std::uint32_t> bounds(size_t first, size_t count) const;
     };
 
     template<index_element Index, MemoryProperty property>
-    TypedIndexBuffer<Index, property>::TypedIndexBuffer(LogicalDeviceAccessor device, std::span<const Index> values)
-    requires(contain<property, MemoryProperty::HOST_VISIBLE>())
-        : _device(device), _buffer(device, helper::checked_buffer_array_size<Index>(values.size())), _values(std::make_shared<detail::IndexSnapshot<Index>>(values)) {
-        if (!_buffer.copy(values.data(), values.size()))
-            throw std::runtime_error("Typed index upload failed");
+    std::shared_ptr<detail::IndexSnapshot<Index>> TypedIndexBuffer<Index, property>::MakeSnapshot(std::span<const Index> values) {
+        (void)helper::checked_buffer_array_size<Index>(values.size());
+        return std::make_shared<detail::IndexSnapshot<Index>>(values);
     }
+    template<index_element Index, MemoryProperty property>
+    template<buffer_storage_policy Policy>
+    TypedIndexBuffer<Index, property>::TypedIndexBuffer(LogicalDeviceAccessor device, std::span<const Index> values, Policy policy)
+    requires(contain<property, MemoryProperty::HOST_VISIBLE>())
+        : _values(MakeSnapshot(values)), _buffer(detail::make_buffer_storage(device, {helper::checked_buffer_array_size<Index>(_values->values.size()), USAGE, property}, policy)) {
+        _buffer.write(std::as_bytes(std::span<const Index>(_values->values)));
+    }
+    template<index_element Index, MemoryProperty property>
+    template<buffer_storage_policy Policy>
+    TypedIndexBuffer<Index, property>::TypedIndexBuffer(LogicalDeviceAccessor device, CommandManager manager, std::span<const Index> values, Policy policy)
+    requires(!contain<property, MemoryProperty::HOST_VISIBLE>())
+        : _values(MakeSnapshot(values)), _buffer(detail::make_buffer_storage(device, std::move(manager), {helper::checked_buffer_array_size<Index>(_values->values.size()), USAGE, property}, std::as_bytes(std::span<const Index>(_values->values)), policy)) {}
+
     template<index_element Index, MemoryProperty property>
     void TypedIndexBuffer<Index, property>::copy(std::span<const Index> values)
     requires(contain<property, MemoryProperty::HOST_VISIBLE>())
     {
-        _buffer.use_state().require_idle();
-        if (values.size() != size())
+        const auto buffer = _buffer;
+        const auto state = _values;
+        buffer.ref().use().require_idle();
+        if (values.size() != state->values.size())
             throw std::invalid_argument("Typed index update must preserve the element count");
-        if (_values->revision == std::numeric_limits<std::uint64_t>::max())
+        if (state->revision == std::numeric_limits<std::uint64_t>::max())
             throw std::overflow_error("Typed index revision exhausted");
         std::vector<Index> snapshot(values.begin(), values.end());
         // 書込み中の失敗でGPU内容が不明になった場合も、古い検証結果は利用しない。
-        ++_values->revision;
-        _values->valid = false;
-        if (!_buffer.copy(snapshot.data(), snapshot.size()))
-            throw std::runtime_error("Typed index upload failed");
-        _values->values.swap(snapshot);
-        _values->valid = true;
+        ++state->revision;
+        state->valid = false;
+        buffer.write(std::as_bytes(std::span<const Index>(snapshot)));
+        state->values.swap(snapshot);
+        state->valid = true;
     }
     template<index_element Index, MemoryProperty property>
     std::pair<std::uint32_t, std::uint32_t> TypedIndexBuffer<Index, property>::bounds(size_t first, size_t count) const {

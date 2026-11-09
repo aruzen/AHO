@@ -134,10 +134,10 @@ namespace {
         typed::TypedVertexBuffer<Position> positions(device, POSITIONS);
         typed::TypedVertexBuffer<Color> colors(device, COLORS);
         auto original_pipeline = make_typed<Input>();
-        const auto owner = positions.backend().data_;
+        const auto owner = positions.storage_view().owner();
         ExpectTriangleColor(render([&](auto& stream) { stream << original_pipeline.bind_vertices(positions, colors).draw(3); }));
         ExpectTriangleColor(render([&](auto& stream) { stream << typed_pipeline.bind_vertices(positions, colors).draw(3); }));
-        EXPECT_EQ(owner, positions.backend().data_) << "Binding changes must reuse the same GPU allocation";
+        EXPECT_EQ(owner, positions.storage_view().owner()) << "Binding changes must reuse the same GPU allocation";
     }
 
     TEST_F(TypedPipelineVulkanIntegrationTest, InstanceRateAndFirstVertexAndInstanceSelectTheCorrectRecords) {
@@ -169,14 +169,14 @@ namespace {
     }
 
     TEST_F(TypedPipelineVulkanIntegrationTest, CommandsOwnResourcesAndRebindTheirPipelineAfterDynamicCommands) {
-        std::weak_ptr<vsl::impl::BufferImpl> weak;
+        std::weak_ptr<void> weak;
         const auto pixel = render([&](auto& stream) {
             {
                 auto typed_pipeline = make_typed<Input>();
                 typed::TypedVertexBuffer<Position> positions(device, POSITIONS);
                 const std::array<Color, 3> tints{{{{.8f, .2f, .4f}}, {{.8f, .2f, .4f}}, {{.8f, .2f, .4f}}}};
                 typed::TypedVertexBuffer<Color> colors(device, tints);
-                weak = positions.backend().data_;
+                weak = positions.storage_view().owner();
                 auto command = typed_pipeline.bind_vertices(positions, colors).draw(3);
                 stream << *pipeline << command;
             }
@@ -222,7 +222,8 @@ namespace {
         typed::TypedVertexBuffer<Position> positions(device, POSITIONS);
         typed::TypedVertexBuffer<Color> colors(device, COLORS);
         ExpectTriangleColor(render([&](auto& stream) {
-            stream << typed_pipeline.backend() << vsl::command::BindVertexBuffer(positions.backend(), colors.backend())
+            stream << typed_pipeline.backend() << vsl::command::BindVertexBufferAt(0, positions.backend())
+                   << vsl::command::BindVertexBufferAt(1, colors.backend())
                    << vsl::command::Draw(3);
         }));
     }

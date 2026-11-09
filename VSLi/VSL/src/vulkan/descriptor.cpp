@@ -7,6 +7,7 @@
 #include <VSL/exceptions.hpp>
 
 #include <VSL/vulkan/descriptor.hpp>
+#include <VSL/lifetime/buffer_view.hpp>
 #include <VSL/vulkan/descriptor_set_manager.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/operation/descriptor_ops.hpp>
@@ -34,6 +35,13 @@ namespace {
         VSL_NAMESPACE::lifetime::require_descriptor_valid(*resource);
     }
 } // namespace
+
+namespace VSL_NAMESPACE::graphic_resource {
+    namespace {
+        void update_buffer(std::shared_ptr<impl::GraphicResourceImpl> target, std::shared_ptr<impl::BufferImpl> buffer,
+                           size_t binding, std::optional<Type> type, size_t offset, std::optional<size_t> size);
+    }
+} // namespace VSL_NAMESPACE::graphic_resource
 
 VSL_NAMESPACE::graphic_resource::BindingLayout::BindingLayout(VSL_NAMESPACE::LogicalDeviceAccessor device,
                                                               VSL_NAMESPACE::graphic_resource::Type binding_type,
@@ -127,49 +135,63 @@ VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::graphic_resource::Resource::own
     return lifetime::detail::owned_ref(data_, data_ ? data_->owner_node : nullptr);
 }
 
+void VSL_NAMESPACE::graphic_resource::Resource::update(const BufferView& buffer, size_t binding, std::optional<Type> type,
+                                                       size_t offset, std::optional<size_t> size) {
+    const auto range = buffer.view(offset, size.value_or(buffer.size() - offset));
+    update_buffer(data_, range.legacy_owner(), binding, type, range.byte_offset(), range.size());
+}
+
 void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::BufferAccessor* buffer, size_t binding, std::optional<Type> type,
                                                        size_t offset, std::optional<size_t> size) {
-    const auto target = data_;
-    validate_resource(target);
-    if (!buffer || !buffer->data_ || buffer->data_->device != target->pool->device)
-        throw std::invalid_argument("Descriptor buffer device mismatch");
-    const auto buffer_size = buffer->data_->requirement_size;
-    if (offset >= buffer_size)
-        throw VSL_NAMESPACE::exceptions::RuntimeException("BufferRange", "Buffer descriptor range starts outside the buffer");
-    const vk::DeviceSize range = size ? *size : buffer_size - offset;
-    if (range == 0 || (range != VK_WHOLE_SIZE && range > buffer_size - offset))
-        throw VSL_NAMESPACE::exceptions::RuntimeException("BufferRange", "Buffer descriptor range is empty or exceeds the buffer");
-
-    vk::DescriptorBufferInfo buffer_info;
-    buffer_info.buffer = buffer->data_->buffer;
-    buffer_info.offset = offset;
-    buffer_info.range = range;
-
-    vk::WriteDescriptorSet descriptor_write;
-    descriptor_write.dstSet = target->descriptor_set;
-    descriptor_write.dstBinding = binding;
-    descriptor_write.dstArrayElement = 0;
-    if (type)
-        descriptor_write.descriptorType = (vk::DescriptorType)type.value();
-    else {
-        const auto layout = target->layout;
-        if (!layout)
-            throw VSL_NAMESPACE::exceptions::RuntimeException("LayoutNotFound", "Layout not found!",
-                                                              std::source_location::current());
-        const auto found = std::ranges::find(layout->layout_bindings, binding,
-                                             &vk::DescriptorSetLayoutBinding::binding);
-        if (found == layout->layout_bindings.end())
-            throw VSL_NAMESPACE::exceptions::RuntimeException("BindingNotFound", "Descriptor binding not found!");
-        descriptor_write.descriptorType = found->descriptorType;
-    }
-    descriptor_write.descriptorCount = 1;
-    descriptor_write.pBufferInfo = &buffer_info;
-    descriptor_write.pImageInfo = nullptr;       // Optional
-    descriptor_write.pTexelBufferView = nullptr; // Optional
-
-    operation::validate_descriptor_buffer(*buffer->data_, descriptor_write.descriptorType, offset, range);
-    lifetime::write_descriptor_binding(*target, descriptor_write, {{{lifetime::detail::owned_ref(buffer->data_, buffer->data_->owner_node)}, {buffer->data_->use}, {}}});
+    update_buffer(data_, buffer ? buffer->data_ : nullptr, binding, type, offset, size);
 }
+
+namespace VSL_NAMESPACE::graphic_resource {
+    namespace {
+        void update_buffer(std::shared_ptr<impl::GraphicResourceImpl> target, std::shared_ptr<impl::BufferImpl> buffer,
+                           size_t binding, std::optional<Type> type, size_t offset, std::optional<size_t> size) {
+            validate_resource(target);
+            if (!buffer || buffer->device != target->pool->device)
+                throw std::invalid_argument("Descriptor buffer device mismatch");
+            const auto buffer_size = buffer->requirement_size;
+            if (offset >= buffer_size)
+                throw VSL_NAMESPACE::exceptions::RuntimeException("BufferRange", "Buffer descriptor range starts outside the buffer");
+            const vk::DeviceSize range = size ? *size : buffer_size - offset;
+            if (range == 0 || (range != VK_WHOLE_SIZE && range > buffer_size - offset))
+                throw VSL_NAMESPACE::exceptions::RuntimeException("BufferRange", "Buffer descriptor range is empty or exceeds the buffer");
+
+            vk::DescriptorBufferInfo buffer_info;
+            buffer_info.buffer = buffer->buffer;
+            buffer_info.offset = offset;
+            buffer_info.range = range;
+
+            vk::WriteDescriptorSet descriptor_write;
+            descriptor_write.dstSet = target->descriptor_set;
+            descriptor_write.dstBinding = binding;
+            descriptor_write.dstArrayElement = 0;
+            if (type)
+                descriptor_write.descriptorType = (vk::DescriptorType)type.value();
+            else {
+                const auto layout = target->layout;
+                if (!layout)
+                    throw VSL_NAMESPACE::exceptions::RuntimeException("LayoutNotFound", "Layout not found!",
+                                                                      std::source_location::current());
+                const auto found = std::ranges::find(layout->layout_bindings, binding,
+                                                     &vk::DescriptorSetLayoutBinding::binding);
+                if (found == layout->layout_bindings.end())
+                    throw VSL_NAMESPACE::exceptions::RuntimeException("BindingNotFound", "Descriptor binding not found!");
+                descriptor_write.descriptorType = found->descriptorType;
+            }
+            descriptor_write.descriptorCount = 1;
+            descriptor_write.pBufferInfo = &buffer_info;
+            descriptor_write.pImageInfo = nullptr;       // Optional
+            descriptor_write.pTexelBufferView = nullptr; // Optional
+
+            operation::validate_descriptor_buffer(*buffer, descriptor_write.descriptorType, offset, range);
+            lifetime::write_descriptor_binding(*target, descriptor_write, {{{lifetime::detail::owned_ref(buffer, buffer->owner_node)}, {buffer->use}, {}}});
+        }
+    } // namespace
+} // namespace VSL_NAMESPACE::graphic_resource
 
 void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::ImageAccessor image, size_t binding, std::optional<Type> type) {
     const auto target = data_;

@@ -8,6 +8,9 @@
 VSL_NAMESPACE::command::BindVertexBufferAt::BindVertexBufferAt(std::uint32_t binding, const BufferAccessor& source, size_t offset, ResourceUse use)
     : BindVertexBufferAt(binding, source.data_, offset, std::move(use)) {}
 
+VSL_NAMESPACE::command::BindVertexBufferAt::BindVertexBufferAt(std::uint32_t binding, const BufferView& source, size_t offset, ResourceUse use)
+    : BindVertexBufferAt(binding, source.legacy_owner(), source.view(offset, 1).byte_offset(), source.resource_use(std::move(use))) {}
+
 VSL_NAMESPACE::command::BindVertexBufferAt::BindVertexBufferAt(std::uint32_t binding, std::shared_ptr<impl::BufferImpl> source, size_t offset, ResourceUse use)
     : _binding(binding), _offset(offset), _source(std::move(source)), _use(std::move(use)) {
     if (_binding == UINT32_MAX || !_source || offset >= _source->requirement_size || !VSL_NAMESPACE::contain(_source->usage, MemoryType::VERTEX_BUFFER))

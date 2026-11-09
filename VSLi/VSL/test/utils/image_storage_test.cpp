@@ -143,9 +143,8 @@ namespace {
         ASSERT_TRUE(phase.completion().wait());
         EXPECT_TRUE(image_owner.expired());
         EXPECT_TRUE(sampler_owner.expired());
-        auto mapped = output.backend().data();
         std::array<std::uint32_t, 2> actual{};
-        std::memcpy(actual.data(), mapped.read(sizeof(actual)).data(), sizeof(actual));
+        output.read_into(actual);
         EXPECT_EQ(actual, (std::array<std::uint32_t, 2>{37, 83}));
     }
     TEST_F(ImageStorageVulkanIntegrationTest, RenderPassRegistersThePhysicalStateOfEveryAttachment) {

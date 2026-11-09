@@ -9,19 +9,18 @@
 #include <utility>
 
 namespace VSL_NAMESPACE::typed {
-    // Vertex storage and views are independent of a pipeline's binding numbers.
+    // 頂点storageとviewはPipelineのbinding番号から独立させる。
     template<typename Vertex_, MemoryProperty memory_property>
     class TypedVertexBuffer;
     template<typename Vertex_>
     class TypedVertexBufferView {
         template<typename, MemoryProperty>
         friend class TypedVertexBuffer;
-        LogicalDeviceAccessor _device;
-        std::shared_ptr<impl::BufferImpl> _buffer;
-        size_t _offset, _count;
+        BufferView _buffer;
+        size_t _count;
         ResourceUse _use;
-        TypedVertexBufferView(LogicalDeviceAccessor device, std::shared_ptr<impl::BufferImpl> buffer, size_t offset, size_t count, ResourceUse use = {})
-            : _device(device), _buffer(std::move(buffer)), _offset(offset), _count(count), _use(std::move(use)) {}
+        TypedVertexBufferView(BufferView buffer, size_t count, ResourceUse use)
+            : _buffer(std::move(buffer)), _count(count), _use(std::move(use)) {}
 
     public:
         using Vertex = Vertex_;
@@ -31,11 +30,13 @@ namespace VSL_NAMESPACE::typed {
         static TypedVertexBufferView FromView(const BufferView& source, size_t count, size_t byte_offset = 0, ResourceUse use = {});
         const ResourceUse& resource_use() const { return _use; }
         size_t size() const { return _count; }
-        size_t byte_offset() const { return _offset; }
-        LogicalDeviceAccessor device() const { return _device; }
-        const std::shared_ptr<impl::BufferImpl>& backend() const { return _buffer; }
+        size_t byte_offset() const { return _buffer.byte_offset(); }
+        LogicalDeviceAccessor device() const { return _buffer.ref().device(); }
+        const BufferView& backend() const& { return _buffer; }
+        const BufferView& backend() const&& = delete;
+        BufferView storage_view() const { return _buffer; }
         TypedVertexBufferView view(size_t first, size_t count) const {
-            return TypedVertexBufferView(_device, _buffer, detail::checked_view_offset(_offset, first, count, _count, sizeof(Vertex)), count, _use);
+            return TypedVertexBufferView(_buffer.view(detail::checked_view_offset(0, first, count, _count, sizeof(Vertex)), count * sizeof(Vertex)), count, _use);
         }
     };
 
@@ -46,45 +47,56 @@ namespace VSL_NAMESPACE::typed {
 
     private:
         static_assert(std::is_standard_layout_v<Vertex> && std::is_trivially_copyable_v<Vertex>);
-        using Storage = VSL_NAMESPACE::Buffer<MemoryType::VERTEX_BUFFER | MemoryType::TRANSFER_DESTINATION, memory_property>;
-        LogicalDeviceAccessor _device;
-        Storage _buffer;
+        static constexpr auto USAGE = MemoryType::VERTEX_BUFFER | MemoryType::TRANSFER_DESTINATION;
+        BufferView _buffer;
         size_t _count;
 
     public:
-        TypedVertexBuffer(LogicalDeviceAccessor device, std::span<const Vertex> vertices)
-        requires(contain<memory_property, MemoryProperty::HOST_VISIBLE>())
-            : _device(device), _buffer(device, VSL_NAMESPACE::helper::checked_buffer_array_size<Vertex>(vertices.size())), _count(vertices.size()) {
-            copy(vertices);
-        }
+        template<buffer_storage_policy Policy = DefaultStorage>
+        TypedVertexBuffer(LogicalDeviceAccessor device, std::span<const Vertex> vertices, Policy policy = {})
+        requires(contain<memory_property, MemoryProperty::HOST_VISIBLE>());
 
-        TypedVertexBuffer(LogicalDeviceAccessor device, CommandManager manager, std::span<const Vertex> vertices)
-        requires(!contain<memory_property, MemoryProperty::HOST_VISIBLE>())
-            : _device(device), _buffer(device, manager, vertices.data(), vertices.size()), _count(vertices.size()) {}
+        template<buffer_storage_policy Policy = DefaultStorage>
+        TypedVertexBuffer(LogicalDeviceAccessor device, CommandManager manager, std::span<const Vertex> vertices, Policy policy = {})
+        requires(!contain<memory_property, MemoryProperty::HOST_VISIBLE>());
 
         size_t size() const noexcept { return _count; }
-        size_t byte_offset() const { return 0; }
+        size_t byte_offset() const { return _buffer.byte_offset(); }
         TypedVertexBufferView<Vertex> view(size_t first, size_t count) const {
-            return TypedVertexBufferView<Vertex>(_device, _buffer.data_, detail::checked_view_offset(0, first, count, _count, sizeof(Vertex)), count, resource_use());
+            return TypedVertexBufferView<Vertex>(_buffer.view(detail::checked_view_offset(0, first, count, _count, sizeof(Vertex)), count * sizeof(Vertex)), count, resource_use());
         }
-        LogicalDeviceAccessor device() const { return _device; }
+        LogicalDeviceAccessor device() const { return _buffer.ref().device(); }
         ResourceUse resource_use() const { return _buffer.resource_use(); }
-        // Explicit escape to the existing dynamic API. Typed binding does not accept a raw BufferAccessor.
-        Storage& backend() { return _buffer; }
-        const Storage& backend() const { return _buffer; }
+        const BufferView& backend() const& { return _buffer; }
+        const BufferView& backend() const&& = delete;
+        BufferView storage_view() const { return _buffer; }
         void copy(std::span<const Vertex> vertices)
         requires(contain<memory_property, MemoryProperty::HOST_VISIBLE>());
     };
 
     template<typename Vertex, MemoryProperty memory_property>
+    template<buffer_storage_policy Policy>
+    TypedVertexBuffer<Vertex, memory_property>::TypedVertexBuffer(LogicalDeviceAccessor device, std::span<const Vertex> vertices, Policy policy)
+    requires(contain<memory_property, MemoryProperty::HOST_VISIBLE>())
+        : _buffer(detail::make_buffer_storage(device, {helper::checked_buffer_array_size<Vertex>(vertices.size()), USAGE, memory_property}, policy)), _count(vertices.size()) {
+        copy(vertices);
+    }
+    template<typename Vertex, MemoryProperty memory_property>
+    template<buffer_storage_policy Policy>
+    TypedVertexBuffer<Vertex, memory_property>::TypedVertexBuffer(LogicalDeviceAccessor device, CommandManager manager, std::span<const Vertex> vertices, Policy policy)
+    requires(!contain<memory_property, MemoryProperty::HOST_VISIBLE>())
+        : _buffer(detail::make_buffer_storage(device, std::move(manager), {helper::checked_buffer_array_size<Vertex>(vertices.size()), USAGE, memory_property}, std::as_bytes(vertices), policy)), _count(vertices.size()) {}
+
+    template<typename Vertex, MemoryProperty memory_property>
     void TypedVertexBuffer<Vertex, memory_property>::copy(std::span<const Vertex> vertices)
     requires(contain<memory_property, MemoryProperty::HOST_VISIBLE>())
     {
-        _buffer.use_state().require_idle();
-        if (vertices.size() != _count)
+        const auto buffer = _buffer;
+        const auto count = _count;
+        buffer.ref().use().require_idle();
+        if (vertices.size() != count)
             throw std::invalid_argument("Typed vertex update must preserve the record count");
-        if (!_buffer.copy(vertices.data(), vertices.size()))
-            throw std::runtime_error("Typed vertex upload failed");
+        buffer.write(std::as_bytes(vertices));
     }
 
     template<typename Vertex>
@@ -96,7 +108,7 @@ namespace VSL_NAMESPACE::typed {
     template<typename Vertex>
     TypedVertexBufferView<Vertex> TypedVertexBufferView<Vertex>::FromView(const BufferView& source, size_t count, size_t byte_offset, ResourceUse use) {
         detail::validate_buffer_view(source, MemoryType::VERTEX_BUFFER, byte_offset, count, sizeof(Vertex), alignof(Vertex));
-        return TypedVertexBufferView(source.ref().device(), source.legacy_owner(), source.byte_offset() + byte_offset, count, source.resource_use(std::move(use)));
+        return TypedVertexBufferView(source.view(byte_offset, count * sizeof(Vertex)), count, source.resource_use(std::move(use)));
     }
 
     namespace detail {

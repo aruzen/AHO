@@ -29,8 +29,6 @@ namespace VSL_NAMESPACE::lifetime {
             this->memory->claim(bytes, storage::BufferLayout::ALIGNMENT);
             try {
                 for (const auto& info : buffers) {
-                    if (!contain(info.properties, MemoryProperty::HOST_VISIBLE))
-                        throw std::invalid_argument("Placed buffers must be host-visible");
                     lifetime::construct_buffer(base + storage::BufferLayout::Offset(constructed), *device.data_, info);
                     ++constructed;
                 }

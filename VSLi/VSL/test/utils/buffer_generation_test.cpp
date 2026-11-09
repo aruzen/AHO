@@ -67,7 +67,7 @@ namespace {
         set.write<0>(first);
         set.write<1>(second);
         auto native = set.backend();
-        native.update(&second.backend(), 0);
+        native.update(second.backend(), 0);
         auto manager = make_manager();
         auto phase = manager.start_phase<vsl::ComputePhase>();
         vsl::command::BindGraphicResource command(native, vsl::graphic_resource::BindingDestination::COMPUTE,
@@ -75,8 +75,8 @@ namespace {
         command.track(manager.get_buffer());
         command.track(manager.get_buffer());
         EXPECT_EQ(phase.completion().data_->work.lock()->completion_resources.size(), 2u);
-        EXPECT_FALSE(first.backend().use_state().busy());
-        EXPECT_TRUE(second.backend().use_state().busy());
+        EXPECT_FALSE(first.backend().ref().use().busy());
+        EXPECT_TRUE(second.backend().ref().use().busy());
         EXPECT_THROW(set.write<0>(first), std::logic_error);
         phase.cancel();
         EXPECT_NO_THROW(set.write<0>(first));
@@ -88,7 +88,7 @@ namespace {
         auto manager = make_manager();
         auto phase = manager.start_phase<vsl::ComputePhase>();
         std::weak_ptr<vsl::impl::GraphicResourceImpl> first_set, second_set;
-        std::weak_ptr<vsl::impl::BufferImpl> first_buffer, second_buffer;
+        std::weak_ptr<vsl::ResourceUseState> first_buffer, second_buffer;
         {
             t::TypedDescriptorSet<Set> first(device, descriptors), second(device, descriptors);
             t::TypedUniformBuffer<std::uint32_t> a(device, 1u), b(device, 2u);
@@ -96,8 +96,8 @@ namespace {
             second.write<0>(b);
             first_set = first.backend().data_;
             second_set = second.backend().data_;
-            first_buffer = a.backend().data_;
-            second_buffer = b.backend().data_;
+            first_buffer = a.descriptor().use.state.share();
+            second_buffer = b.descriptor().use.state.share();
             vsl::command::BindGraphicResource command(std::vector<vsl::GraphicResource>{first.backend(), second.backend()},
                                                       vsl::graphic_resource::BindingDestination::COMPUTE,
                                                       std::nullopt, 0, first.resource_use());
@@ -109,8 +109,8 @@ namespace {
         ASSERT_FALSE(second_set.expired());
         ASSERT_FALSE(first_buffer.expired());
         ASSERT_FALSE(second_buffer.expired());
-        EXPECT_TRUE(first_buffer.lock()->use->busy());
-        EXPECT_TRUE(second_buffer.lock()->use->busy());
+        EXPECT_TRUE(first_buffer.lock()->busy());
+        EXPECT_TRUE(second_buffer.lock()->busy());
         phase.cancel();
         EXPECT_TRUE(first_set.expired());
         EXPECT_TRUE(first_buffer.expired());
@@ -123,15 +123,15 @@ namespace {
         t::TypedIndexBuffer<std::uint32_t> indices(device, VALUES);
         t::TypedUniformBuffer<std::uint32_t> uniform(device, VALUES);
         t::TypedStorageBuffer<std::uint32_t> storage(device, VALUES);
-        EXPECT_EQ(vertices.resource_use().state.get(), &vertices.backend().use_state());
-        EXPECT_EQ(vertices.view(0, 4).resource_use().state.get(), &vertices.backend().use_state());
-        EXPECT_EQ(indices.resource_use().state.get(), &indices.backend().use_state());
-        EXPECT_EQ(uniform.descriptor().use.state.get(), &uniform.backend().use_state());
-        EXPECT_EQ(storage.descriptor().use.state.get(), &storage.backend().use_state());
-        auto imported = t::TypedVertexBufferView<std::uint32_t>::FromBuffer(vertices.backend(), 4);
-        EXPECT_EQ(imported.resource_use().state.get(), &vertices.backend().use_state());
-        auto resource = t::TypedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>::FromBuffer(uniform.backend(), 4);
-        EXPECT_EQ(resource.descriptor().use.state.get(), &uniform.backend().use_state());
+        EXPECT_EQ(vertices.resource_use().state.get(), &vertices.backend().ref().use());
+        EXPECT_EQ(vertices.view(0, 4).resource_use().state.get(), &vertices.backend().ref().use());
+        EXPECT_EQ(indices.resource_use().state.get(), &indices.backend().ref().use());
+        EXPECT_EQ(uniform.descriptor().use.state.get(), &uniform.backend().ref().use());
+        EXPECT_EQ(storage.descriptor().use.state.get(), &storage.backend().ref().use());
+        auto imported = t::TypedVertexBufferView<std::uint32_t>::FromView(vertices.backend(), 4);
+        EXPECT_EQ(imported.resource_use().state.get(), &vertices.backend().ref().use());
+        auto resource = t::TypedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>::FromView(uniform.backend(), 4);
+        EXPECT_EQ(resource.descriptor().use.state.get(), &uniform.backend().ref().use());
     }
 
     TEST_F(BufferGenerationVulkanIntegrationTest, NativeCopyBlocksTypedUpdatesAndTypedBindingBlocksNativeUpdates) {
@@ -139,13 +139,15 @@ namespace {
         t::TypedVertexBuffer<std::uint32_t> vertices(device, VALUES);
         Native source(device, sizeof(VALUES));
         source.copy(VALUES);
-        auto mapping = vertices.backend().data();
-        auto view = vsl::BufferView::FromBuffer(vertices.backend());
+        auto native = source;
+        native.data_ = vertices.storage_view().legacy_owner();
+        auto mapping = native.data();
+        auto view = vertices.storage_view();
         {
             auto phase = manager.start_phase<vsl::ComputePhase>();
-            phase << vsl::command::CopyBuffer(&source, &vertices.backend(), sizeof(VALUES));
+            phase << vsl::command::CopyBuffer(&source, &native, sizeof(VALUES));
             EXPECT_THROW(vertices.copy(VALUES), std::logic_error);
-            EXPECT_THROW(vertices.backend().copy(VALUES), std::logic_error);
+            EXPECT_THROW(native.copy(VALUES), std::logic_error);
             EXPECT_THROW(mapping.copy(VALUES), std::logic_error);
             EXPECT_THROW(view.write(std::as_bytes(std::span(VALUES))), std::logic_error);
             phase.cancel();
@@ -153,10 +155,10 @@ namespace {
         EXPECT_NO_THROW(vertices.copy(VALUES));
         {
             auto phase = manager.start_phase<vsl::ComputePhase>();
-            phase << vsl::command::BindVertexBufferAt(0, vertices.view(0, 4).backend(), 0, vertices.resource_use());
+            phase << vsl::command::BindVertexBufferAt(0, vertices.view(0, 4).storage_view(), 0, vertices.resource_use());
             std::array<std::byte, sizeof(VALUES)> output{};
             EXPECT_THROW(view.read_into(output), std::logic_error);
-            EXPECT_THROW(vertices.backend().data(), std::logic_error);
+            EXPECT_THROW(native.data(), std::logic_error);
             phase.cancel();
         }
         EXPECT_NO_THROW(view.write(std::as_bytes(std::span(VALUES))));

@@ -59,6 +59,29 @@ namespace {
                                                                vsl::Viewport(description), vsl::Scissor(description));
     }
 
+    TEST_F(TypedDescriptorComputeVulkanIntegrationTest, BothStoragePoliciesKeepZeroInitializationFixedCountsAndTypedReads) {
+        auto verify = [&](auto policy) {
+            using Buffer = t::TypedStorageBuffer<std::uint32_t, vsl::MemoryProperty::HOST_VISIBLE>;
+            Buffer buffer(device, std::in_place, 4, policy);
+            std::array<std::uint32_t, 4> actual{99, 99, 99, 99};
+            buffer.read_into(actual);
+            EXPECT_EQ(actual, (std::array<std::uint32_t, 4>{0, 0, 0, 0}));
+            const std::array<std::uint32_t, 4> values{3, 5, 7, 11};
+            buffer.copy(values);
+            std::array<std::uint32_t, 2> selected{};
+            buffer.read_into(selected, 1);
+            EXPECT_EQ(selected, (std::array<std::uint32_t, 2>{5, 7}));
+            EXPECT_THROW(buffer.copy(std::span(values).first(3)), std::invalid_argument);
+            EXPECT_THROW(buffer.read_into(selected, 3), std::out_of_range);
+            buffer.read_into(actual);
+            EXPECT_EQ(actual, values);
+            EXPECT_EQ(buffer.backend().size(), sizeof(values));
+            EXPECT_TRUE(vsl::contain(buffer.backend().ref().properties(), vsl::MemoryProperty::HOST_VISIBLE));
+            EXPECT_THROW((Buffer(device, std::in_place, 0, policy)), vsl::exceptions::RuntimeException);
+        };
+        verify(t::HeapStorage{});
+        verify(t::ArenaStorage<>{});
+    }
     TEST_F(TypedDescriptorVulkanIntegrationTest, SparseSetsAndUniformArraysReachTheRealShader) {
         auto typed_pipeline = make_typed<Schema>();
         vsl::GraphicResourceManager manager(device);
@@ -111,26 +134,26 @@ namespace {
         t::TypedUniformBuffer<Tint> updated(device, replacement);
         t::TypedStorageBuffer<Tint> storage(device, zero);
         auto native_extra = extra.backend();
-        EXPECT_THROW(native.update(&storage.backend(), 3), std::invalid_argument);
+        EXPECT_THROW(native.update(storage.backend(), 3), std::invalid_argument);
         EXPECT_THROW(tints.require_complete(), std::logic_error);
         const auto alignment = physical.data_->props->limits.minUniformBufferOffsetAlignment;
         if (alignment > 1)
-            EXPECT_THROW(native.update(&updated.backend(), 3, std::nullopt, 1, sizeof(float)), std::invalid_argument);
-        native_extra.update(&storage.backend(), 5);
+            EXPECT_THROW(native.update(updated.backend(), 3, std::nullopt, 1, sizeof(float)), std::invalid_argument);
+        native_extra.update(storage.backend(), 5);
         EXPECT_NO_THROW(extra.require_complete());
-        native.update(&updated.backend(), 3);
+        native.update(updated.backend(), 3);
         EXPECT_THROW(tints.require_complete(), std::logic_error);
-        std::weak_ptr<vsl::impl::BufferImpl> first_owner, second_owner;
+        std::weak_ptr<void> first_owner, second_owner;
         {
             const Tint first{{.2f, .4f, .6f, 1}}, second{{.3f, .6f, .9f, 1}};
             t::TypedUniformBuffer<Tint> a(device, first), b(device, second);
-            first_owner = a.backend().data_;
-            second_owner = b.backend().data_;
+            first_owner = a.storage_view().owner();
+            second_owner = b.storage_view().owner();
             tints.write<3>(std::array{a, b});
         }
         EXPECT_FALSE(first_owner.expired());
         EXPECT_FALSE(second_owner.expired());
-        native.update(&updated.backend(), 3);
+        native.update(updated.backend(), 3);
         EXPECT_TRUE(first_owner.expired());
         EXPECT_FALSE(second_owner.expired());
         EXPECT_NO_THROW(tints.require_complete());
@@ -152,10 +175,10 @@ namespace {
         const Tint original{{.25f, .5f, .75f, 1}}, replacement{{1, 0, 0, 1}}, zero{};
         t::TypedStorageBuffer<Tint> storage(device, zero);
         extra.write<5>(storage);
-        std::weak_ptr<vsl::impl::BufferImpl> previous;
+        std::weak_ptr<void> previous;
         {
             t::TypedUniformBuffer<Tint> buffer(device, original);
-            previous = buffer.backend().data_;
+            previous = buffer.storage_view().owner();
             tints.write<3>(std::array{buffer, buffer});
         }
         t::TypedUniformBuffer<Tint> buffer(device, replacement);
@@ -195,7 +218,7 @@ namespace {
     }
 
     TEST_F(TypedDescriptorVulkanIntegrationTest, DrawOwnsDescriptorResourcesAndTheirBuffersUntilGpuCompletion) {
-        std::weak_ptr<vsl::impl::BufferImpl> weak_buffer;
+        std::weak_ptr<void> weak_buffer;
         std::weak_ptr<vsl::impl::GraphicResourceImpl> weak_set;
         ExpectTriangleColor(render([&](auto& stream) {
             {
@@ -206,7 +229,7 @@ namespace {
                 const Tint value{{.25f, .5f, .75f, 1}}, zero{};
                 t::TypedUniformBuffer<Tint> buffer(device, value);
                 t::TypedStorageBuffer<Tint> storage(device, zero);
-                weak_buffer = buffer.backend().data_;
+                weak_buffer = buffer.storage_view().owner();
                 weak_set = tints.backend().data_;
                 tints.write<3>(std::array{buffer, buffer});
                 extra.write<5>(storage);
@@ -307,8 +330,8 @@ namespace {
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
         device.data_->device.waitIdle();
-        auto mapped = storage.backend().data();
-        const auto* actual = static_cast<const std::uint32_t*>(mapped.data);
+        std::array<std::uint32_t, zero.size()> actual{};
+        storage.read_into(actual);
         for (size_t i = 0; i < zero.size(); ++i)
             EXPECT_EQ(actual[i], parameters.base + i);
     }

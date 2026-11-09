@@ -88,18 +88,17 @@ namespace {
         EXPECT_EQ(bundle.plan().totals().descriptors, 11u);
         EXPECT_EQ(bundle.plan().totals().payload_bytes, 72u);
         EXPECT_EQ(descriptors.allocations, bundle.plan().totals().descriptor_sets);
-        std::array<std::shared_ptr<vsl::impl::BufferImpl>, 3> local, shared;
+        std::array<std::shared_ptr<void>, 3> local, shared;
         std::array<std::shared_ptr<vsl::impl::GraphicResourceImpl>, 3> local_sets, shared_sets;
         for (size_t slot = 0; slot < 3; ++slot) {
             auto phase = manager.start_phase<vsl::ComputePhase>();
             const auto& frame = bundle.get(phase);
-            local[slot] = frame.buffer<2, 0>().backend().data_;
-            shared[slot] = frame.buffer<2, 1>().backend().data_;
+            local[slot] = frame.buffer<2, 0>().storage_view().owner();
+            shared[slot] = frame.buffer<2, 1>().storage_view().owner();
             local_sets[slot] = frame.set<2>().backend().data_;
             shared_sets[slot] = frame.set<5>().backend().data_;
-            auto buffer = frame.buffer<2, 3>().backend();
-            auto mapped = buffer.data();
-            const auto* values = static_cast<const std::uint32_t*>(mapped.data);
+            std::array<std::uint32_t, 4> values{};
+            frame.buffer<2, 3>().read_into(values);
             for (size_t i = 0; i < 4; ++i)
                 EXPECT_EQ(values[i], 0u);
             EXPECT_NO_THROW(frame.set<2>().require_complete());
@@ -294,12 +293,12 @@ namespace {
         vsl::Sampler sampler(device);
         const auto uniform_input = t::external_resource<0, 0>(uniform);
         auto textures = t::external_resource<0, 2>(std::array{t::TypedTexture(valid, sampler), t::TypedTexture(invalid, sampler)});
-        const auto uniform_refs = uniform.backend().data_.use_count();
+        const auto uniform_refs = uniform.backend().owner_ref().use_count();
         const auto image_refs = valid.data_.use_count();
         const auto sampler_refs = sampler.data_.use_count();
         using Bundle = t::TypedResourceBundle<Allocation, t::ArenaStorage<>>;
         EXPECT_THROW((Bundle(manager, descriptors, uniform_input, textures)), std::invalid_argument);
-        EXPECT_EQ(uniform.backend().data_.use_count(), uniform_refs);
+        EXPECT_EQ(uniform.backend().owner_ref().use_count(), uniform_refs);
         EXPECT_EQ(valid.data_.use_count(), image_refs);
         EXPECT_EQ(sampler.data_.use_count(), sampler_refs);
         textures.values[1] = t::TypedTexture(valid, sampler);
@@ -439,10 +438,10 @@ namespace {
         CountingManager descriptors(device);
         auto phase = manager.start_phase<vsl::ComputePhase>();
         const auto completion = phase.completion();
-        std::weak_ptr<vsl::impl::BufferImpl> owner;
+        std::weak_ptr<void> owner;
         {
             t::TypedUniformBuffer<std::uint32_t> external(device, 7u);
-            owner = external.backend().data_;
+            owner = external.storage_view().owner();
             t::TypedResourceBundle<External, t::ArenaStorage<>> bundle(manager, descriptors, t::external_resource<0, 0>(external));
             EXPECT_EQ(bundle.placement_plan().total_bytes(), 0u);
             bundle.get(phase).set<0>().resource_use()->record(manager.get_buffer());
@@ -476,8 +475,8 @@ namespace {
             auto phase = manager.start_phase<vsl::ComputePhase>();
             const auto slot = phase.frame_slot;
             bundle.update(phase, [&](Bundle::Frame& frame) {
-                auto mapped = frame.buffer<2, 3>().backend().data();
-                const auto* output = static_cast<const std::uint32_t*>(mapped.data);
+                std::array<std::uint32_t, 4> output{};
+                frame.buffer<2, 3>().read_into(output);
                 for (size_t index = 0; index < 4; ++index)
                     EXPECT_EQ(output[index], expected[slot] ? expected[slot] + index : 0);
                 const auto value = iteration + 100;
@@ -492,9 +491,8 @@ namespace {
         }
         for (size_t slot = 0; slot < 3; ++slot) {
             auto phase = manager.start_phase<vsl::ComputePhase>();
-            auto buffer = bundle.get(phase).buffer<2, 3>().backend();
-            auto mapped = buffer.data();
-            const auto* output = static_cast<const std::uint32_t*>(mapped.data);
+            std::array<std::uint32_t, 4> output{};
+            bundle.get(phase).buffer<2, 3>().read_into(output);
             for (size_t index = 0; index < 4; ++index)
                 EXPECT_EQ(output[index], expected[slot] + index);
             phase.cancel();
@@ -599,12 +597,12 @@ namespace {
     TEST_F(TypedBundleVulkanIntegrationTest, MoveAndContainerDestructionPreserveTheActiveFrameOwners) {
         auto manager = make_manager().independent(1);
         CountingManager descriptors(device);
-        std::weak_ptr<vsl::impl::BufferImpl> owner;
+        std::weak_ptr<void> owner;
         {
             auto phase = manager.start_phase<vsl::ComputePhase>();
             {
                 Bundle original(manager, descriptors, sizes());
-                owner = original.get(phase).buffer<2, 0>().backend().data_;
+                owner = original.get(phase).buffer<2, 0>().storage_view().owner();
                 auto moved = std::move(original);
                 EXPECT_THROW(original.get(phase), std::logic_error);
                 EXPECT_NO_THROW(moved.get(phase));

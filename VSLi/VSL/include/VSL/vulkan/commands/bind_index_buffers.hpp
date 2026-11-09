@@ -5,6 +5,7 @@
 #include "../resource_use.hpp"
 
 #include "../buffer.hpp"
+#include "../buffer_view.hpp"
 
 namespace VSL_NAMESPACE::command {
     enum class IndexType {
@@ -13,6 +14,7 @@ namespace VSL_NAMESPACE::command {
     };
     struct BindIndexBufferAt : Command {
         BindIndexBufferAt(const BufferAccessor& source, IndexType type, size_t offset = 0, ResourceUse use = {});
+        BindIndexBufferAt(const BufferView& source, IndexType type, size_t offset = 0, ResourceUse use = {});
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
         void track(const CommandBuffer& buffer) const { _use.record(buffer); }
         const std::shared_ptr<impl::BufferImpl>& source() const { return _source; }
@@ -20,6 +22,7 @@ namespace VSL_NAMESPACE::command {
         IndexType type() const { return _type; }
 
     private:
+        BindIndexBufferAt(std::shared_ptr<impl::BufferImpl> source, IndexType type, size_t offset, ResourceUse use);
         std::shared_ptr<impl::BufferImpl> _source;
         size_t _offset;
         IndexType _type;

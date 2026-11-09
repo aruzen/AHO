@@ -230,8 +230,9 @@ namespace {
         buffer.data_->command_buffers[0].pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         ASSERT_TRUE(phase.completion().wait());
-        auto mapped = output.backend().data();
-        EXPECT_EQ(*static_cast<const std::uint32_t*>(mapped.data), b);
+        std::array<std::uint32_t, 1> actual{};
+        output.read_into(actual);
+        EXPECT_EQ(actual.front(), b);
         EXPECT_NO_THROW(set.write<0>(old_view));
         EXPECT_FALSE(new_use->busy());
     }
@@ -252,16 +253,16 @@ namespace {
             auto phase = manager.start_phase<vsl::ComputePhase>();
             phase << vsl::command::BindGraphicResource(native, vsl::graphic_resource::BindingDestination::COMPUTE, pipeline.backend());
             EXPECT_THROW(set.write<0>(input), std::logic_error);
-            EXPECT_THROW(native.update(&input.backend()), std::logic_error);
+            EXPECT_THROW(native.update(input.backend()), std::logic_error);
             phase.cancel();
         }
         EXPECT_NO_THROW(set.write<0>(input));
         auto phase = manager.start_phase<vsl::ComputePhase>();
         phase << pipeline.bind_resources(set).dispatch(1);
-        EXPECT_THROW(native.update(&input.backend()), std::logic_error);
+        EXPECT_THROW(native.update(input.backend()), std::logic_error);
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         ASSERT_TRUE(phase.completion().wait());
-        EXPECT_NO_THROW(native.update(&input.backend()));
+        EXPECT_NO_THROW(native.update(input.backend()));
     }
 
     TEST_F(ResourceUseVulkanIntegrationTest, PartialNativeReplacementUpdatesLogicalConstraintsAndTracksEveryPhase) {
@@ -273,10 +274,10 @@ namespace {
         t::TypedUniformBuffer<std::uint32_t> a(device, value), b(device, value), replacement(device, value);
         auto first_constraint = std::make_shared<vsl::ResourceUseState>();
         auto second_constraint = std::make_shared<vsl::ResourceUseState>();
-        set.write<3>(std::array{View::FromBuffer(a.backend(), 1, 0, {first_constraint, {}}),
-                                View::FromBuffer(b.backend(), 1, 0, {second_constraint, {}})});
+        set.write<3>(std::array{View::FromView(a.backend(), 1, 0, {first_constraint, {}}),
+                                View::FromView(b.backend(), 1, 0, {second_constraint, {}})});
         auto native = set.backend();
-        native.update(&replacement.backend(), 3);
+        native.update(replacement.backend(), 3);
         const vsl::command::BindGraphicResource command(native, vsl::graphic_resource::BindingDestination::COMPUTE);
         auto manager = make_manager().independent(1), other = manager.independent(1);
         auto first = manager.start_phase<vsl::ComputePhase>();
@@ -286,15 +287,15 @@ namespace {
         set.resource_use()->record(other.get_buffer());
         EXPECT_FALSE(first_constraint->busy());
         EXPECT_TRUE(second_constraint->busy());
-        EXPECT_FALSE(a.backend().use_state().busy());
-        EXPECT_TRUE(b.backend().use_state().busy());
-        EXPECT_TRUE(replacement.backend().use_state().busy());
+        EXPECT_FALSE(a.backend().ref().use().busy());
+        EXPECT_TRUE(b.backend().ref().use().busy());
+        EXPECT_TRUE(replacement.backend().ref().use().busy());
         first.cancel();
-        EXPECT_THROW(native.update(&replacement.backend(), 3), std::logic_error);
+        EXPECT_THROW(native.update(replacement.backend(), 3), std::logic_error);
         ASSERT_EQ(second.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         ASSERT_TRUE(second.completion().wait());
         EXPECT_FALSE(second_constraint->busy());
-        EXPECT_NO_THROW(native.update(&replacement.backend(), 3));
+        EXPECT_NO_THROW(native.update(replacement.backend(), 3));
     }
 
     TEST_F(ResourceUseVulkanIntegrationTest, BusyPoolDestroyKeepsManagerOwnershipAndCancellingAllowsDestruction) {
@@ -344,7 +345,7 @@ namespace {
             auto owner = std::make_shared<int>(1);
             old_owner = owner;
             using View = t::TypedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>;
-            set.write<0>(View::FromBuffer(input.backend(), 1, 0, {old_state, owner}));
+            set.write<0>(View::FromView(input.backend(), 1, 0, {old_state, owner}));
         }
         set.write<1>(output);
         EXPECT_FALSE(old_owner.expired());
@@ -423,7 +424,7 @@ namespace {
                 if (retire) {
                     EXPECT_THROW(pool.bind(layout), std::logic_error);
                     EXPECT_THROW(set.resource_use()->record(other.get_buffer()), std::logic_error);
-                    EXPECT_THROW(native.update(&input.backend()), std::logic_error);
+                    EXPECT_THROW(native.update(input.backend()), std::logic_error);
                     EXPECT_THROW(descriptors.destroy(pool), std::logic_error);
                 } else
                     EXPECT_NO_THROW(descriptors.destroy(pool));
@@ -433,7 +434,7 @@ namespace {
             if (retire)
                 EXPECT_NO_THROW(descriptors.destroy(pool));
             else
-                EXPECT_THROW(native.update(&input.backend()), std::logic_error);
+                EXPECT_THROW(native.update(input.backend()), std::logic_error);
             EXPECT_TRUE(released);
             EXPECT_FALSE(pool.data_->descriptor_pool);
             EXPECT_FALSE(pool.data_->retiring);
@@ -483,7 +484,7 @@ namespace {
         allocated.clear();
         const std::uint32_t value = 1;
         t::TypedUniformBuffer<std::uint32_t> input(device, value);
-        native.update(&input.backend());
+        native.update(input.backend());
         auto manager = make_manager().independent(1);
         bool released = false;
         auto phase = manager.start_phase<vsl::ComputePhase>();
@@ -495,7 +496,7 @@ namespace {
         }));
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         device.data_->device.waitIdle();
-        EXPECT_NO_THROW(native.update(&input.backend()));
+        EXPECT_NO_THROW(native.update(input.backend()));
         EXPECT_TRUE(released);
         EXPECT_FALSE(native.data_);
         EXPECT_TRUE(target.expired());
@@ -508,7 +509,7 @@ namespace {
         const std::weak_ptr<vsl::impl::GraphicResourceImpl> target = allocated.front().data_;
         const std::uint32_t value = 1;
         t::TypedUniformBuffer<std::uint32_t> input(device, value);
-        allocated.front().update(&input.backend());
+        allocated.front().update(input.backend());
         auto group = vsl::ResourceUseGroup::ForDescriptor(1, allocated.front().data_, vsl::ResourceRetention::COMPLETION);
         allocated.clear();
         auto manager = make_manager().independent(1), other = manager.independent(1);

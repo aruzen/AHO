@@ -146,8 +146,8 @@ namespace {
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
         device.data_->device.waitIdle();
-        auto mapped = storage.backend().data();
-        const auto* actual = static_cast<const std::uint32_t*>(mapped.data);
+        std::array<std::uint32_t, zero.size()> actual{};
+        storage.read_into(actual);
         for (size_t i = 0; i < zero.size(); ++i)
             EXPECT_EQ(actual[i], 773u + i);
     }

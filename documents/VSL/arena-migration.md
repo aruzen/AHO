@@ -4,7 +4,7 @@
 
 ## 順序11aの生成既定と移行
 
-`storage/typed_storage_policy.hpp`の`DefaultStorage`は`ArenaStorage<>`を表す。TypedResourceBundle／TypedResourceFrame／TypedSharedResourcesの省略時policyと、TypedFrameCommandsの2引数生成はこの既定を使う。単体TypedBuffer／TypedPipelineの生成policyは後続11bで扱い、今回だけで全Typed生成をarenaへ移したとはしない。
+`storage/typed_storage_policy.hpp`の`DefaultStorage`は`ArenaStorage<>`を表す。TypedResourceBundle／TypedResourceFrame／TypedSharedResourcesの省略時policyと、TypedFrameCommandsの2引数生成はこの既定を使う。単体TypedBufferも以下の11b経路で既定化する。TypedPipelineの生成policyは後続11bで扱い、全Typed生成の移行完了とはしない。
 
 ```cpp
 using Bundle = t::TypedResourceBundle<Allocation>; // arena
@@ -26,6 +26,39 @@ frame.buffer<0, 1>().read_into(result);
 ```
 
 CPU arenaの配置単位とSHARED／PER_FRAMEの寿命群は変えず、Vulkan device memoryや内部vectorの確保も統合しない。公開APIと内部確保の残りは11b／12で扱い、性能向上率は未測定である。
+
+## 順序11b前半: 単体Typed Buffer
+
+TypedVertexBuffer／TypedIndexBuffer／TypedResourceBufferのコンストラクタは、末尾の配置policyを省略するとDefaultStorageを使う。HeapStorageと空のArenaStorage<>を選べる。binding map付きArenaStorageは単体生成へ適用しない。単体arenaは一つのBuffer slotを持ち、複数資源の集約にはTypedBufferArena／TypedResourceBundleを使う。
+
+```cpp
+t::TypedVertexBuffer<Vertex> vertices(device, vertex_span); // arena
+t::TypedIndexBuffer<std::uint16_t> indices(device, index_span, t::HeapStorage{});
+t::TypedStorageBuffer<std::uint32_t> values(device, std::in_place, 4);
+std::array<std::uint32_t, 4> result{};
+values.read_into(result);
+```
+
+heapはmake_heap_buffer、arenaはBufferArenaから、同じconstruct_buffer／operation::initialize_bufferへ進む。永続値はどちらもowning BufferViewで、物理storageの使用状態を共有する。BufferArenaのCPU配置はメモリ属性から独立させ、device-localも同じbackendで構築する。Vulkanのメモリ選択・確保とCPUのImpl配置は別である。
+
+device-local生成には従来どおり同Deviceの所有するCommandManagerを渡す。独立した一slot command ringへ共通CopyBufferを記録し、そのCompletionを待ってから返す。元managerの記録・slotは進めない。stagingも同じ配置policyを使う。既存のgraphics queue familyとEXCLUSIVEの前提を維持し、queue familyの所有移譲は追加しない。
+
+backend()の戻り値は、HeapStorageを選んだ場合もconst BufferView&へ変わる。一時オブジェクトからの借用は拒否し、保存したい場合はstorage_view()で所有値を取得する。旧backend().data_／data()依存は移行が必要である。Native descriptorにはBufferView更新入口を追加した。
+
+```cpp
+auto selected = vertices.view(2, 3);
+auto storage = selected.storage_view(); // wrapperが消えても選択済み範囲を保持
+phase << vsl::command::BindVertexBufferAt(0, storage); // offsetはview内の相対値
+native_descriptor.update(values.backend(), binding);
+```
+
+storage_view()には既に選択範囲の絶対offsetが入る。低位bindへbyte_offset()を重ねて渡さず、通常は相対offset 0を使う。Typed pipelineのbindはこれを処理する。読み取りはread_into(destination, first)を使い、GPU完了後に呼び出し内でCPUの値へコピーする。
+
+IndexのCPU snapshotはNative生成・転送より先に一度作り、その同じ値を転送する。Native callback中に元spanが変更されても、bounds検査とGPU内容を一致させる。固定個数・revisionによる古いdrawの拒否は維持する。このrevision保証はTypedIndexBuffer::copy経由の更新が対象で、低位のstorage_view().write／refへの書き込みはCPU snapshotを更新しない。
+
+構築・記録前の失敗は局所ownerで巻き戻す。既知の送信失敗は既存の取消経路で解放する。enqueue不明の転送はheadless Workのquarantineが保持し、元managerまたは同Deviceのmanager.wait_idle()による証明後に回収する。Fence観測が失敗した場合、独立Domainの終了はFence／Device idleを再試行するため、例外伝播まで待機する場合がある。logical FAILEDでも既知ENQUEUEDのnative使用が残れば、完了観測が済むまで保持を外さない。
+
+旧commandがshared_ptr<BufferImpl>を受ける箇所へのlegacy_owner aliasは順序12で除去する移行用である。新しいcontrol blockを作らず、元の所有境界を共有する。Index snapshotのvector、arenaの管理領域、独立command ring／Fence、Impl内部コンテナ、Vulkan device memoryの個別確保は残る。単体一slot arenaがheapより少ない確保になるとは主張しない。配置と独立したCOMPLETION保持を揃えた測定は順序12で行う。
 
 2026-11-06。Bufferの4責務分離が統合されたmaster `6b1f0166`を基点とする。[Bufferの契約](buffer-generation-contracts.md)と[責務の配置](buffer-layer-layout.md)を維持する。
 

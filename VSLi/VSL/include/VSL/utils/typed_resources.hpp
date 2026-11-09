@@ -64,27 +64,32 @@ namespace VSL_NAMESPACE::typed {
         static_assert(kind == graphic_resource::Type::UNIFORM_BUFFER || kind == graphic_resource::Type::STORAGE_BUFFER);
         static_assert(std::is_trivially_copyable_v<Payload> && std::is_standard_layout_v<Payload>);
         static constexpr MemoryType USAGE = kind == graphic_resource::Type::UNIFORM_BUFFER ? MemoryType::UNIFORM_BUFFER : MemoryType::STORAGE_BUFFER;
-        using Storage = Buffer<USAGE | MemoryType::TRANSFER_DESTINATION, property>;
-        Storage _buffer;
+        BufferView _buffer;
         size_t _count;
 
     public:
         static constexpr auto KIND = kind;
-        TypedResourceBuffer(LogicalDeviceAccessor device, std::in_place_t, size_t count)
+        template<buffer_storage_policy Policy = DefaultStorage>
+        TypedResourceBuffer(LogicalDeviceAccessor device, std::in_place_t, size_t count, Policy policy = {})
         requires(contain<property, MemoryProperty::HOST_VISIBLE>());
-        TypedResourceBuffer(LogicalDeviceAccessor device, std::span<const Payload> values)
+        template<buffer_storage_policy Policy = DefaultStorage>
+        TypedResourceBuffer(LogicalDeviceAccessor device, std::span<const Payload> values, Policy policy = {})
         requires(contain<property, MemoryProperty::HOST_VISIBLE>());
-        TypedResourceBuffer(LogicalDeviceAccessor device, const Payload& value)
+        template<buffer_storage_policy Policy = DefaultStorage>
+        TypedResourceBuffer(LogicalDeviceAccessor device, const Payload& value, Policy policy = {})
         requires(contain<property, MemoryProperty::HOST_VISIBLE>())
-            : TypedResourceBuffer(device, std::span<const Payload>(&value, 1)) {}
-        TypedResourceBuffer(LogicalDeviceAccessor device, CommandManager manager, std::span<const Payload> values)
-        requires(!contain<property, MemoryProperty::HOST_VISIBLE>())
-            : _buffer(device, manager, values.data(), values.size()), _count(values.size()) {}
-        Storage& backend() { return _buffer; }
-        const Storage& backend() const { return _buffer; }
+            : TypedResourceBuffer(device, std::span<const Payload>(&value, 1), policy) {}
+        template<buffer_storage_policy Policy = DefaultStorage>
+        TypedResourceBuffer(LogicalDeviceAccessor device, CommandManager manager, std::span<const Payload> values, Policy policy = {})
+        requires(!contain<property, MemoryProperty::HOST_VISIBLE>());
+        const BufferView& backend() const& { return _buffer; }
+        const BufferView& backend() const&& = delete;
+        BufferView storage_view() const { return _buffer; }
         size_t size() const { return _count; }
         TypedResourceBufferView<Payload_, kind> view(size_t first, size_t count) const;
         void copy(std::span<const Payload> values)
+        requires(contain<property, MemoryProperty::HOST_VISIBLE>());
+        void read_into(std::span<Payload> destination, size_t first = 0) const
         requires(contain<property, MemoryProperty::HOST_VISIBLE>());
         detail::DescriptorValue descriptor() const;
     };
@@ -187,8 +192,7 @@ namespace VSL_NAMESPACE::typed {
     }
     template<typename Payload_, graphic_resource::Type kind, MemoryProperty property>
     detail::DescriptorValue TypedResourceBuffer<Payload_, kind, property>::descriptor() const {
-        const auto use = _buffer.resource_use();
-        return {use.owner.template alias<impl::BufferImpl>(_buffer.data_.get()), {}, {}, _count * sizeof(Payload), 0, use};
+        return TypedResourceBufferView<Payload_, kind>::FromView(_buffer, _count).descriptor();
     }
     template<typename Payload_, graphic_resource::Type kind, MemoryProperty property>
     TypedResourceBufferView<Payload_, kind> TypedResourceBuffer<Payload_, kind, property>::view(size_t first, size_t count) const {
@@ -198,29 +202,45 @@ namespace VSL_NAMESPACE::typed {
         return TypedResourceBufferView<Payload_, kind>(value, count);
     }
     template<typename PayloadTag, graphic_resource::Type kind, MemoryProperty property>
-    TypedResourceBuffer<PayloadTag, kind, property>::TypedResourceBuffer(LogicalDeviceAccessor device, std::in_place_t, size_t count)
+    template<buffer_storage_policy Policy>
+    TypedResourceBuffer<PayloadTag, kind, property>::TypedResourceBuffer(LogicalDeviceAccessor device, std::in_place_t, size_t count, Policy policy)
     requires(contain<property, MemoryProperty::HOST_VISIBLE>())
-        : _buffer(device, helper::checked_buffer_array_size<Payload>(count)), _count(count) {
-        const auto bytes = helper::checked_buffer_array_size<Payload>(count);
-        auto mapped = _buffer.data(bytes);
-        std::memset(mapped.data, 0, bytes);
-        _buffer.flush(mapped);
+        : _buffer(detail::make_buffer_storage(device, {helper::checked_buffer_array_size<Payload>(count), USAGE | MemoryType::TRANSFER_DESTINATION, property}, policy)), _count(count) {
+        _buffer.ref().fill(std::byte{0});
     }
     template<typename PayloadTag, graphic_resource::Type kind, MemoryProperty property>
-    TypedResourceBuffer<PayloadTag, kind, property>::TypedResourceBuffer(LogicalDeviceAccessor device, std::span<const Payload> values)
+    template<buffer_storage_policy Policy>
+    TypedResourceBuffer<PayloadTag, kind, property>::TypedResourceBuffer(LogicalDeviceAccessor device, std::span<const Payload> values, Policy policy)
     requires(contain<property, MemoryProperty::HOST_VISIBLE>())
-        : _buffer(device, helper::checked_buffer_array_size<Payload>(values.size())), _count(values.size()) {
+        : _buffer(detail::make_buffer_storage(device, {helper::checked_buffer_array_size<Payload>(values.size()), USAGE | MemoryType::TRANSFER_DESTINATION, property}, policy)), _count(values.size()) {
         copy(values);
     }
+    template<typename PayloadTag, graphic_resource::Type kind, MemoryProperty property>
+    template<buffer_storage_policy Policy>
+    TypedResourceBuffer<PayloadTag, kind, property>::TypedResourceBuffer(LogicalDeviceAccessor device, CommandManager manager, std::span<const Payload> values, Policy policy)
+    requires(!contain<property, MemoryProperty::HOST_VISIBLE>())
+        : _buffer(detail::make_buffer_storage(device, std::move(manager), {helper::checked_buffer_array_size<Payload>(values.size()), USAGE | MemoryType::TRANSFER_DESTINATION, property}, std::as_bytes(values), policy)), _count(values.size()) {}
+
     template<typename PayloadTag, graphic_resource::Type kind, MemoryProperty property>
     void TypedResourceBuffer<PayloadTag, kind, property>::copy(std::span<const Payload> values)
     requires(contain<property, MemoryProperty::HOST_VISIBLE>())
     {
-        _buffer.use_state().require_idle();
-        if (values.size() != _count)
+        const auto buffer = _buffer;
+        const auto count = _count;
+        buffer.ref().use().require_idle();
+        if (values.size() != count)
             throw std::invalid_argument("Typed descriptor buffer update must preserve record count");
-        if (!_buffer.copy(values.data(), values.size()))
-            throw std::runtime_error("Typed descriptor buffer upload failed");
+        buffer.write(std::as_bytes(values));
+    }
+    template<typename PayloadTag, graphic_resource::Type kind, MemoryProperty property>
+    void TypedResourceBuffer<PayloadTag, kind, property>::read_into(std::span<Payload> destination, size_t first) const
+    requires(contain<property, MemoryProperty::HOST_VISIBLE>())
+    {
+        const auto buffer = _buffer;
+        const auto count = _count;
+        if (first > count || destination.size() > count - first)
+            throw std::out_of_range("Typed descriptor read exceeds its buffer");
+        buffer.read_into(std::as_writable_bytes(destination), first * sizeof(Payload));
     }
     template<typename Spec>
     TypedDescriptorSet<Spec>::TypedDescriptorSet(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, ResourceRetention retention)

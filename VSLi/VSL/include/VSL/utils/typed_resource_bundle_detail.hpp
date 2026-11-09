@@ -270,7 +270,7 @@ namespace VSL_NAMESPACE::typed {
                             if constexpr (BundlePolicy<Policy>::ARENA)
                                 return typename Value::Element(arena->buffer(shared.layout.placement(key).resource));
                             else
-                                return typename Value::Element(device, std::in_place, plan.template entry<Spec::SET, Spec::BINDING>().elements);
+                                return typename Value::Element(device, std::in_place, plan.template entry<Spec::SET, Spec::BINDING>().elements, HeapStorage{});
                         } else if constexpr (kind == graphic_resource::Type::COMBINED_IMAGE_SAMPLER)
                             return typename Value::Element(bundle_image(shared, arena, native, shared.layout.placement(key, ResourceComponent::IMAGE)), bundle_sampler(shared, arena, native, shared.layout.placement(key, ResourceComponent::SAMPLER)));
                         else if constexpr (kind == graphic_resource::Type::SAMPLER)

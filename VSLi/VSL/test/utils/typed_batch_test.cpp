@@ -100,14 +100,14 @@ namespace {
         using Set = t::DescriptorSet<1, t::UniformBinding<4, Layout, vsl::ShaderFlag::VERTEX>>;
         using Resources = t::ResourceSchema<Set>;
         using Push = t::PushSchema<t::PushRange<Layout, vsl::ShaderFlag::VERTEX, 16>>;
-        std::weak_ptr<vsl::impl::BufferImpl> owner;
+        std::weak_ptr<void> owner;
         auto batch = [&] {
             auto plain = make_typed();
             auto typed = make_typed<Empty, Resources, Push>("typed_push_resources.vert.spv");
             auto alternate = make_typed<Empty, Resources, Push>("typed_push_resources.vert.spv");
             const Tint half{{.125f, .25f, .375f, 0}};
             t::TypedUniformBuffer<Layout> uniform(device, half);
-            owner = uniform.backend().data_;
+            owner = uniform.storage_view().owner();
             vsl::GraphicResourceManager manager(device);
             t::TypedDescriptorSet<Set::Layout> set(device, manager);
             set.write<4>(uniform);
@@ -149,8 +149,8 @@ namespace {
             native.data_->command_buffers[native.get_current_buffer_idx()].pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
         device.data_->device.waitIdle();
-        auto mapped = output.backend().data();
-        const auto* actual = static_cast<const std::uint32_t*>(mapped.data);
+        std::array<std::uint32_t, 8> actual{};
+        output.read_into(actual);
         for (size_t i = 0; i < 4; ++i) {
             EXPECT_EQ(actual[i], 10u + i);
             EXPECT_EQ(actual[4 + i], 20u + i);

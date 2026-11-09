@@ -229,8 +229,9 @@ namespace {
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
         device.data_->device.waitIdle();
-        auto mapped = output.backend().data();
-        EXPECT_EQ(*static_cast<const std::uint32_t*>(mapped.data), 28u);
+        std::array<std::uint32_t, 1> actual{};
+        output.read_into(actual);
+        EXPECT_EQ(actual.front(), 28u);
     }
 
     TEST_F(TypedBlockVulkanIntegrationTest, WrongCpuLayoutsAreRejectedDuringPipelineCreation) {
@@ -268,7 +269,8 @@ namespace {
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
         device.data_->device.waitIdle();
-        auto mapped = buffer.backend().data();
-        EXPECT_EQ(*static_cast<const std::uint32_t*>(mapped.data), 41u);
+        std::array<Arrays, 1> actual{};
+        buffer.read_into(actual);
+        EXPECT_EQ(actual.front().count, 41u);
     }
 } // namespace

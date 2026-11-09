@@ -99,7 +99,7 @@ namespace VSL_NAMESPACE::typed {
         TypedVertexBinding(VSL_NAMESPACE::GraphicsPipeline pipeline, LogicalDeviceAccessor device,
                            std::index_sequence<indices...>, const Buffers&... buffers)
             : _pipeline(std::move(pipeline)), _device(device),
-              _buffers{command::BindVertexBufferAt(Input::LAYOUT.binding[indices].binding, buffers.backend(), buffers.byte_offset(), buffers.resource_use())...}, _counts{buffers.size()...} {
+              _buffers{command::BindVertexBufferAt(Input::LAYOUT.binding[indices].binding, buffers.storage_view(), 0, buffers.resource_use())...}, _counts{buffers.size()...} {
             if (((buffers.device().data_ != device.data_) || ...))
                 throw std::invalid_argument("Typed pipeline and vertex buffers use different devices");
         }
@@ -251,7 +251,7 @@ namespace VSL_NAMESPACE::typed {
                 throw std::out_of_range("Typed indexed draw exceeds its vertex buffer");
         }
         return TypedIndexedDraw<Input, Resources, Pushes>(_pipeline, _device, _buffers,
-                                                          command::BindIndexBufferAt(indices.backend(), TypedIndexBuffer<Index, property>::INDEX_TYPE, 0, indices.resource_use()), std::move(command), _resources, _pushes,
+                                                          command::BindIndexBufferAt(indices.storage_view(), TypedIndexBuffer<Index, property>::INDEX_TYPE, 0, indices.resource_use()), std::move(command), _resources, _pushes,
                                                           std::shared_ptr<const std::uint64_t>(indices._values, &indices._values->revision));
     }
 

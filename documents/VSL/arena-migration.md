@@ -594,3 +594,34 @@ copy／add／freeze／runtime／has_recipe、保存Editor、既存stageの注入
 全341翻訳単位の構文検査、公開正例1＋負例5、private bridgeの一時借用拒否、strict33files／29TU、source402／MSBuild登録が成功した。macOS arm64／Clang20／C++26／MoltenVK・validation・ASan／UBSanで全VSL1,193（既知format3 skip）、AHO GPU192／CPU1,071、compile323、heap／arenaの3PNG一致、glTF viewerの姿勢・resize・12frame後の同姿勢一致を確認した。既存のdeep copy、保存Editorの分離、Typed Input末尾注入、Native前のschema拒否、source回収、失敗時不変の試験を再利用し、同じ意味のruntime試験は追加していない。
 
 installed consumer30種と新公開正負6件、private非配布、archive／生成header一致、Debug／Release／x86_64寸法、構成混在と親ed84546d…headerのlink拒否が成功した。生成IDはbb2e8ca3…へ更新した。Windows／Linux実機、x86_64全体実行、device lost、並行CPU、性能率は未検証。次はstate編集借用の公開境界を整理する。
+
+## 順序12f: GraphicsPipelineStateの編集借用
+
+GraphicsPipelineStateEditRefの公開pointer／get()／raw構築と、Stateのdefinition()を閉じた。公開のedit()／edit_state()、Stateの値コピー、既存stageの注入は維持する。独自stageは公開stageを組み合わせる。
+
+```cpp
+struct StateStages {
+    void injection(vsl::GraphicsPipelineStateEditRef state) const {
+        vsl::pipeline_layout::Rasterization{
+            vsl::pipeline_layout::CullingMode::NONE}.injection(state);
+        vsl::pipeline_layout::DepthStencil{}.injection(state);
+    }
+    void injection(vsl::PipelineLayoutEditAccessor layout) const {
+        injection(layout.edit_state());
+    }
+};
+vsl::GraphicsPipelineState saved(StateStages{});
+auto copied = saved;
+StateStages{}.injection(copied.edit());
+vsl::PipelineLayout layout(device, copied);
+```
+
+EditRefはpointer一本の借用値で、所有者と注入中の実体の寿命は利用側が保つ。既存Stateのunique_ptr、recipe内のinline stateを維持し、新しいowner／control block／確保は加えない。private operation/GraphicsPipelineStateAccessがRead／Edit／Borrowを担当する。Readは一時Stateを拒否し、Editはlvalue Stateから返された一時EditRefをby-valueで受けられる。State{}.edit()は引き続き禁止する。空EditRefとmove後Stateの例外も維持する。
+
+copyは可変長配列まで独立し、copy代入は候補を作ってからswapする。State→Layout注入もdataのcopy成功後にswapする。固定stageの更新順、Typed Inputの末尾注入、Native生成中の局所snapshotを変えない。通常生成とarenaの両経路は同じprivate橋を使い、公開Typed templateにprivate includeを追加しない。
+
+旧definition()/get()でImplを直接変更していた利用はstage合成へ移す。任意のImpl変更を許す代替getterは追加しない。Stateとその配列の個別確保、CPU recipe、内部Shared境界は残る。借用期間を所有へ変える変更でも、性能改善率を示す変更でもない。起動資源とWindow／Completionの公開境界、実定義・処理の4層分離は後続で続ける。
+
+変更17翻訳単位の構文検査、strict19files／17TU、source403／MSBuild登録、compile327が成功した。新4件を含む公開契約は11件で、独自stageの両入口への合成、stateの一時値とEditRefの一時値の区別、旧4入口の拒否を確認する。既存deep copy／move／default／注入失敗不変／Typed Input末尾／Native中snapshotのruntime試験を再利用した。
+
+macOS arm64／Clang20／C++26／MoltenVK・validation・ASan／UBSanで全VSL1,193（既知format3 skip）、AHO GPU192／CPU1,071、heap／arenaの3PNG一致とglTF viewer verifyが成功した。installed consumer30種と公開11契約、private橋の非配布、archive／header一致、Debug／Release／x86_64寸法、混在と親bb2e8ca3…headerのlink拒否も成功した。生成IDは61c90256…へ更新した。Windows／Linux実機、x86_64全体実行、device lost、並行CPU、性能率は未検証。次はInstance／PhysicalDeviceの公開境界から起動資源を整理する。

@@ -1,8 +1,13 @@
+#include <VSL/operation/graphics_pipeline_state_access.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/vulkan/viewport.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>
+
+namespace {
+    using VSL_NAMESPACE::operation::detail::GraphicsPipelineStateAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
@@ -24,7 +29,7 @@ void VSL_NAMESPACE::Viewport::injection(VSL_NAMESPACE::PipelineLayoutEditAccesso
 }
 
 void VSL_NAMESPACE::Viewport::injection(VSL_NAMESPACE::GraphicsPipelineStateEditRef state) {
-    auto& info = state.get();
+    auto& info = GraphicsPipelineStateAccess::Edit(state);
 
     vk::Viewport viewport;
     viewport.x = x;

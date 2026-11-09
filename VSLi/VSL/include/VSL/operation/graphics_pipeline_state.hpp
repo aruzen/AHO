@@ -8,10 +8,17 @@ namespace VSL_NAMESPACE {
     namespace impl {
         struct GraphicsPipelineStateData;
     }
+    namespace operation::detail {
+        struct GraphicsPipelineStateAccess;
+    }
     // 注入呼出し中だけ使う借用。Device/native resource/ownerを保持しない。
-    struct GraphicsPipelineStateEditRef {
-        impl::GraphicsPipelineStateData* data = nullptr;
-        impl::GraphicsPipelineStateData& get() const;
+    class GraphicsPipelineStateEditRef {
+        impl::GraphicsPipelineStateData* _data = nullptr;
+        explicit GraphicsPipelineStateEditRef(impl::GraphicsPipelineStateData* data) noexcept : _data(data) {}
+        friend struct operation::detail::GraphicsPipelineStateAccess;
+
+    public:
+        GraphicsPipelineStateEditRef() = default;
     };
     template<typename T>
     concept graphics_pipeline_state_injecter = requires(T&& value, GraphicsPipelineStateEditRef state) {
@@ -20,6 +27,7 @@ namespace VSL_NAMESPACE {
     // native生成から独立した入力値。コピーは内部配列を含めて独立する。
     class GraphicsPipelineState {
         std::unique_ptr<impl::GraphicsPipelineStateData> _data;
+        friend struct operation::detail::GraphicsPipelineStateAccess;
 
     public:
         GraphicsPipelineState();
@@ -33,8 +41,6 @@ namespace VSL_NAMESPACE {
         ~GraphicsPipelineState();
         GraphicsPipelineStateEditRef edit() &;
         GraphicsPipelineStateEditRef edit() && = delete;
-        const impl::GraphicsPipelineStateData& definition() const&;
-        const impl::GraphicsPipelineStateData& definition() const&& = delete;
         void injection(PipelineLayoutEditAccessor layout) const;
     };
 

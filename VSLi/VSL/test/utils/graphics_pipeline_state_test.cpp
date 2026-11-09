@@ -1,9 +1,14 @@
+#include <VSL/operation/graphics_pipeline_state_access.hpp>
 #include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/operation/graphics_pipeline_state.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
 #include <VSL/vulkan/stages/id_picking.hpp>
 #include "support/render_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::operation::detail::GraphicsPipelineStateAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
@@ -21,7 +26,7 @@ namespace {
     };
     using Input = t::TypedVertexInput<t::VertexRecord<Position, VSL_VERTEX_MEMBER(Position, xy)>::Binding<4>>;
     template<typename T>
-    concept temporary_state_definition = requires(T&& value) { std::move(value).definition(); };
+    concept temporary_state_definition = requires(T&& value) { GraphicsPipelineStateAccess::Read(std::move(value)); };
     template<typename T>
     concept temporary_state_edit = requires(T&& value) { std::move(value).edit(); };
     static_assert(!temporary_state_definition<vsl::GraphicsPipelineState>);
@@ -34,7 +39,7 @@ namespace {
         vsl::GraphicsPipelineState state(Input{}, pl::InputAssembly{}, pl::Rasterization{pl::CullingMode::NONE},
                                          pl::Multisample{}, pl::ColorBlend{}, pl::IDPicking{}, pl::DepthStencil{}, pl::DynamicState{},
                                          vsl::Viewport(1, 2, 10, 20), vsl::Scissor(3, 4, 8, 16));
-        const auto& data = state.definition();
+        const auto& data = GraphicsPipelineStateAccess::Read(state);
         ASSERT_EQ(data.vertex_bindings.size(), 1u);
         EXPECT_EQ(data.vertex_bindings[0].binding, 4u);
         EXPECT_EQ(data.vertex_bindings[0].stride, sizeof(Position));
@@ -64,7 +69,7 @@ namespace {
     }
     TEST(GraphicsPipelineStateTest, DefaultInputDoesNotImplicitlyInjectAnyStage) {
         const vsl::GraphicsPipelineState state;
-        const auto& data = state.definition();
+        const auto& data = GraphicsPipelineStateAccess::Read(state);
         EXPECT_TRUE(data.vertex_bindings.empty());
         EXPECT_TRUE(data.vertex_attributes.empty());
         EXPECT_TRUE(data.blend_attachments.empty());
@@ -72,41 +77,41 @@ namespace {
         EXPECT_TRUE(data.scissors.empty());
         EXPECT_TRUE(data.enabled_dynamic_states.empty());
         EXPECT_FALSE(data.depth_stencil);
-        EXPECT_THROW((vsl::GraphicsPipelineStateEditRef{}.get()), std::logic_error);
+        EXPECT_THROW((GraphicsPipelineStateAccess::Edit(vsl::GraphicsPipelineStateEditRef{})), std::logic_error);
     }
     TEST(GraphicsPipelineStateTest, CopyAndAssignmentAreDeepAndMovesConsumeOnlyTheSource) {
         vsl::GraphicsPipelineState original(Input{}, pl::ColorBlend{}, vsl::Viewport{});
         vsl::GraphicsPipelineState copied(original), assigned;
         assigned = original;
-        EXPECT_NE(&copied.definition(), &original.definition());
-        EXPECT_NE(copied.definition().vertex_bindings.data(), original.definition().vertex_bindings.data());
-        EXPECT_NE(assigned.definition().blend_attachments.data(), original.definition().blend_attachments.data());
+        EXPECT_NE(&GraphicsPipelineStateAccess::Read(copied), &GraphicsPipelineStateAccess::Read(original));
+        EXPECT_NE(GraphicsPipelineStateAccess::Read(copied).vertex_bindings.data(), GraphicsPipelineStateAccess::Read(original).vertex_bindings.data());
+        EXPECT_NE(GraphicsPipelineStateAccess::Read(assigned).blend_attachments.data(), GraphicsPipelineStateAccess::Read(original).blend_attachments.data());
         pl::IDPicking{}.injection(copied.edit());
         vsl::Viewport(0, 0, 2, 2).injection(assigned.edit());
-        EXPECT_EQ(original.definition().blend_attachments.size(), 1u);
-        EXPECT_EQ(copied.definition().blend_attachments.size(), 2u);
-        EXPECT_EQ(original.definition().viewports.size(), 1u);
-        EXPECT_EQ(assigned.definition().viewports.size(), 2u);
-        const auto* identity = &copied.definition();
+        EXPECT_EQ(GraphicsPipelineStateAccess::Read(original).blend_attachments.size(), 1u);
+        EXPECT_EQ(GraphicsPipelineStateAccess::Read(copied).blend_attachments.size(), 2u);
+        EXPECT_EQ(GraphicsPipelineStateAccess::Read(original).viewports.size(), 1u);
+        EXPECT_EQ(GraphicsPipelineStateAccess::Read(assigned).viewports.size(), 2u);
+        const auto* identity = &GraphicsPipelineStateAccess::Read(copied);
         vsl::GraphicsPipelineState moved(std::move(copied));
-        EXPECT_EQ(&moved.definition(), identity);
-        EXPECT_THROW(copied.definition(), std::logic_error);
+        EXPECT_EQ(&GraphicsPipelineStateAccess::Read(moved), identity);
+        EXPECT_THROW(GraphicsPipelineStateAccess::Read(copied), std::logic_error);
         EXPECT_THROW(copied.edit(), std::logic_error);
         assigned = std::move(moved);
-        EXPECT_EQ(&assigned.definition(), identity);
-        EXPECT_THROW(moved.definition(), std::logic_error);
+        EXPECT_EQ(&GraphicsPipelineStateAccess::Read(assigned), identity);
+        EXPECT_THROW(GraphicsPipelineStateAccess::Read(moved), std::logic_error);
         copied = original;
-        EXPECT_EQ(copied.definition().blend_attachments.size(), 1u);
+        EXPECT_EQ(GraphicsPipelineStateAccess::Read(copied).blend_attachments.size(), 1u);
     }
     TEST(GraphicsPipelineStateTest, RejectedVertexInjectionPreservesThePreviousDefinitionWithoutADevice) {
         vsl::GraphicsPipelineState state(Input{});
-        const auto* bindings = state.definition().vertex_bindings.data();
-        const auto* attributes = state.definition().vertex_attributes.data();
+        const auto* bindings = GraphicsPipelineStateAccess::Read(state).vertex_bindings.data();
+        const auto* attributes = GraphicsPipelineStateAccess::Read(state).vertex_attributes.data();
         pl::VertexInput invalid({{.layouts = {{vsl::data_format::FLOAT_RG, 0, UINT32_MAX - 2}}}});
         EXPECT_THROW(invalid.injection(state.edit()), vsl::exceptions::RuntimeException);
-        EXPECT_EQ(state.definition().vertex_bindings.data(), bindings);
-        EXPECT_EQ(state.definition().vertex_attributes.data(), attributes);
-        EXPECT_EQ(state.definition().vertex_bindings[0].binding, 4u);
+        EXPECT_EQ(GraphicsPipelineStateAccess::Read(state).vertex_bindings.data(), bindings);
+        EXPECT_EQ(GraphicsPipelineStateAccess::Read(state).vertex_attributes.data(), attributes);
+        EXPECT_EQ(GraphicsPipelineStateAccess::Read(state).vertex_bindings[0].binding, 4u);
     }
     class GraphicsPipelineStateVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }

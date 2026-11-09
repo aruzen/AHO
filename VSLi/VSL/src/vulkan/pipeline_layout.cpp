@@ -1,4 +1,5 @@
 #include <VSL/lifetime/pipeline_recipe_access.hpp>
+#include <VSL/operation/graphics_pipeline_state_access.hpp>
 #include <VSL/lifetime/owner_validation.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
@@ -11,7 +12,8 @@
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
-}
+    using VSL_NAMESPACE::operation::detail::GraphicsPipelineStateAccess;
+} // namespace
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
@@ -19,8 +21,8 @@ namespace {
 
 void VSL_NAMESPACE::GraphicsPipelineState::injection(PipelineLayoutEditAccessor layout) const {
     static_assert(std::is_nothrow_swappable_v<impl::GraphicsPipelineStateData>);
-    auto next = definition();
-    std::swap(layout.edit_state().get(), next);
+    auto next = GraphicsPipelineStateAccess::Read(*this);
+    std::swap(GraphicsPipelineStateAccess::Edit(layout.edit_state()), next);
 }
 
 const VSL_NAMESPACE::impl::PipelineRecipe& VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess::Read(const PipelineLayoutAccessor& value) {
@@ -48,7 +50,7 @@ VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::PipelineLayoutEditAccessor::
     return _edit_device.data_ ? _edit_device : _value.get_device();
 }
 VSL_NAMESPACE::GraphicsPipelineStateEditRef VSL_NAMESPACE::PipelineLayoutEditAccessor::edit_state() const& {
-    return {&PipelineRecipeAccess::Edit(*this).graphics_state};
+    return GraphicsPipelineStateAccess::Borrow(PipelineRecipeAccess::Edit(*this).graphics_state);
 }
 void VSL_NAMESPACE::PipelineLayoutEditAccessor::init_start(LogicalDeviceAccessor device) {
     lifetime::require_device_owner(device);

@@ -1,8 +1,13 @@
+#include <VSL/operation/graphics_pipeline_state_access.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/vulkan/scissor.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>
+
+namespace {
+    using VSL_NAMESPACE::operation::detail::GraphicsPipelineStateAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
@@ -24,7 +29,7 @@ void VSL_NAMESPACE::Scissor::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor
 }
 
 void VSL_NAMESPACE::Scissor::injection(VSL_NAMESPACE::GraphicsPipelineStateEditRef state) {
-    auto& info = state.get();
+    auto& info = GraphicsPipelineStateAccess::Edit(state);
 
     vk::Rect2D scissor;
     scissor.offset = vk::Offset2D{x, y};

@@ -1,8 +1,13 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/shader_access.hpp>
 #include "support/render_fixture.hpp"
 #include <VSL/operation/pipeline_ops.hpp>
 #include <functional>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
@@ -47,7 +52,7 @@ namespace {
     TEST_F(PipelineSnapshotVulkanIntegrationTest, ExplicitCreationKeepsItsShaderOwnersAndStateUntilNativeCreationFinishes) {
         namespace pl = vsl::pipeline_layout;
         vsl::GraphicsPipelineState state;
-        state.edit().get() = layout->recipe().graphics_state;
+        state.edit().get() = PipelineRecipeAccess::Read(*(layout)).graphics_state;
         pl::Rasterization{pl::CullingMode::NONE}.injection(state.edit());
         const auto runtime = layout->runtime();
         std::vector<vsl::ShaderAccessor> sources{
@@ -83,7 +88,7 @@ namespace {
         bool called = false;
         GraphicsCreateAction action{[&](const vk::GraphicsPipelineCreateInfo& info) {
             called = true;
-            EXPECT_NE(info.pRasterizationState, &editor.recipe().graphics_state.rasterization);
+            EXPECT_NE(info.pRasterizationState, &PipelineRecipeAccess::Read(editor).graphics_state.rasterization);
             pl::Rasterization{pl::CullingMode::FRONT_AND_BACK}.injection(editor);
         }};
         {
@@ -91,7 +96,7 @@ namespace {
             pipeline.emplace(*layout, *pass);
         }
         EXPECT_TRUE(called);
-        EXPECT_EQ(layout->recipe().graphics_state.rasterization.cullMode, vk::CullModeFlags(vk::CullModeFlagBits::eFrontAndBack));
+        EXPECT_EQ(PipelineRecipeAccess::Read(*(layout)).graphics_state.rasterization.cullMode, vk::CullModeFlags(vk::CullModeFlagBits::eFrontAndBack));
         ExpectTriangleColor(render([](auto& stream) { stream << vsl::command::Draw{3}; }));
     }
     TEST_F(PipelineSnapshotVulkanIntegrationTest, ShaderOwnershipIsValidatedBeforeAMovedStateIsRead) {

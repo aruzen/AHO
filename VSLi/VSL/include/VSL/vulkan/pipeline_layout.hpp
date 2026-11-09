@@ -9,7 +9,8 @@
 
 namespace VSL_NAMESPACE::lifetime::detail {
     struct GraphicsAccess;
-}
+    struct PipelineRecipeAccess;
+} // namespace VSL_NAMESPACE::lifetime::detail
 
 namespace VSL_NAMESPACE {
     struct PipelineLayoutAccessor {
@@ -23,11 +24,10 @@ namespace VSL_NAMESPACE {
         LogicalDeviceAccessor get_device() const;
         lifetime::OwnerRef owner_ref() const;
         bool has_recipe() const { return bool(_recipe); }
-        const impl::PipelineRecipe& recipe() const&;
-        const impl::PipelineRecipe& recipe() const&& = delete;
 
     private:
         friend struct lifetime::detail::GraphicsAccess;
+        friend struct lifetime::detail::PipelineRecipeAccess;
         friend struct PipelineLayoutEditAccessor;
         lifetime::OwnedRef<impl::PipelineLayoutImpl> _owner;
         explicit PipelineLayoutAccessor(lifetime::OwnedRef<impl::PipelineLayoutImpl> owner) : _owner(std::move(owner)) {}
@@ -45,10 +45,6 @@ namespace VSL_NAMESPACE {
         PipelineLayoutAccessor runtime() const { return _value.runtime(); }
         lifetime::OwnerRef owner_ref() const { return _value.owner_ref(); }
         bool has_recipe() const { return _value.has_recipe(); }
-        const impl::PipelineRecipe& recipe() const& { return _value.recipe(); }
-        const impl::PipelineRecipe& recipe() const&& = delete;
-        impl::PipelineRecipe& edit_recipe() const&;
-        impl::PipelineRecipe& edit_recipe() const&& = delete;
         GraphicsPipelineStateEditRef edit_state() const&;
         GraphicsPipelineStateEditRef edit_state() const&& = delete;
         LogicalDeviceAccessor get_device() const;
@@ -61,6 +57,7 @@ namespace VSL_NAMESPACE {
 
     private:
         friend struct lifetime::detail::GraphicsAccess;
+        friend struct lifetime::detail::PipelineRecipeAccess;
         friend struct PipelineLayout;
         PipelineLayoutAccessor _value;
         std::shared_ptr<impl::PipelineRecipe> _edit_recipe;
@@ -75,6 +72,7 @@ namespace VSL_NAMESPACE {
     class FrozenPipelineLayout {
         friend struct PipelineLayout;
         friend struct lifetime::detail::GraphicsAccess;
+        friend struct lifetime::detail::PipelineRecipeAccess;
         PipelineLayoutAccessor _value;
         explicit FrozenPipelineLayout(PipelineLayoutAccessor value) : _value(std::move(value)) {}
 
@@ -92,8 +90,6 @@ namespace VSL_NAMESPACE {
         LogicalDeviceAccessor get_device() const { return _value.get_device(); }
         lifetime::OwnerRef owner_ref() const { return _value.owner_ref(); }
         bool has_recipe() const { return _value.has_recipe(); }
-        const impl::PipelineRecipe& recipe() const& { return _value.recipe(); }
-        const impl::PipelineRecipe& recipe() const&& = delete;
     };
 
     struct PipelineLayout : PipelineLayoutEditAccessor {

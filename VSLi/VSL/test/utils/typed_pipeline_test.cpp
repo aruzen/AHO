@@ -1,9 +1,14 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
 #include "support/render_fixture.hpp"
 #include <cstddef>
 #include <limits>
 #include "support/temporary_directory.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
@@ -154,18 +159,18 @@ namespace {
         EXPECT_FALSE(GraphicsAccess::Owned(*(saved)));
         ASSERT_TRUE(snapshot.pending_layouts());
         ASSERT_EQ(snapshot.pending_layouts()->size(), 4u);
-        EXPECT_TRUE(snapshot.definition().binding_layouts.empty());
+        EXPECT_TRUE(PipelineRecipeAccess::Read(snapshot).binding_layouts.empty());
         pl::ShaderGroup("later shader", {*vertex}).injection(*saved);
         pl::ResourceBinding({}).injection(*saved);
-        EXPECT_EQ(saved->edit_recipe().shaders.size(), 3u);
-        EXPECT_FALSE(saved->edit_recipe().pending_layouts);
-        EXPECT_EQ(snapshot.definition().shaders.size(), 2u);
+        EXPECT_EQ(PipelineRecipeAccess::Edit(*(saved)).shaders.size(), 3u);
+        EXPECT_FALSE(PipelineRecipeAccess::Edit(*(saved)).pending_layouts);
+        EXPECT_EQ(PipelineRecipeAccess::Read(snapshot).shaders.size(), 2u);
         ASSERT_TRUE(snapshot.pending_layouts());
         std::weak_ptr<void> temporary;
         {
             const auto materialized = l::materialize_recipe<1>(snapshot, typed::ArenaStorage<>{});
             EXPECT_FALSE(materialized.pending_layouts());
-            const auto& layouts = materialized.definition().binding_layouts;
+            const auto& layouts = PipelineRecipeAccess::Read(materialized).binding_layouts;
             ASSERT_EQ(layouts.size(), 4u);
             for (auto* layout : layouts)
                 EXPECT_EQ(layout, layouts.front());
@@ -173,7 +178,7 @@ namespace {
             EXPECT_FALSE(temporary.expired());
         }
         EXPECT_TRUE(temporary.expired());
-        EXPECT_TRUE(snapshot.definition().binding_layouts.empty());
+        EXPECT_TRUE(PipelineRecipeAccess::Read(snapshot).binding_layouts.empty());
     }
 
     TEST_F(TypedPipelineVulkanIntegrationTest, TypedSchemaValidationLeavesTheCapturedDraftWithoutNativeLayouts) {
@@ -191,9 +196,9 @@ namespace {
                          std::invalid_argument);
             ASSERT_TRUE(saved);
             EXPECT_FALSE(GraphicsAccess::Owned(*(saved)));
-            EXPECT_TRUE(saved->edit_recipe().binding_layouts.empty());
-            ASSERT_TRUE(saved->edit_recipe().pending_layouts);
-            EXPECT_EQ(saved->edit_recipe().pending_layouts->size(), 1u);
+            EXPECT_TRUE(PipelineRecipeAccess::Edit(*(saved)).binding_layouts.empty());
+            ASSERT_TRUE(PipelineRecipeAccess::Edit(*(saved)).pending_layouts);
+            EXPECT_EQ(PipelineRecipeAccess::Edit(*(saved)).pending_layouts->size(), 1u);
             saved.reset();
         };
         verify(typed::HeapStorage{});
@@ -206,9 +211,9 @@ namespace {
         draft.inject(vsl::pipeline_layout::ShaderGroup("owning sources", {*vertex, *fragment}));
         auto original = draft.snapshot();
         const auto snapshot = std::move(original);
-        EXPECT_THROW(original.definition(), std::logic_error);
+        EXPECT_THROW(PipelineRecipeAccess::Read(original), std::logic_error);
         EXPECT_THROW(original.pending_layouts(), std::logic_error);
-        EXPECT_EQ(snapshot.definition().shaders.size(), 2u);
+        EXPECT_EQ(PipelineRecipeAccess::Read(snapshot).shaders.size(), 2u);
         const auto borrowed = GraphicsAccess::FromShared(
             std::shared_ptr<vsl::impl::RenderPassImpl>(std::shared_ptr<void>{}, GraphicsAccess::Owned(*(pass)).get()));
         auto verify = [&](auto policy) {

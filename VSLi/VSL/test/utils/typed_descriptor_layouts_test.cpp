@@ -1,3 +1,4 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
@@ -6,6 +7,10 @@
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
 #include "support/vulkan_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
@@ -103,14 +108,14 @@ namespace {
         auto phase = manager.start_phase<vsl::ComputePhase>();
         const auto& frame = bundle.get(phase);
         vsl::PipelineLayout layout(device, t::detail::DescriptorLayoutInjection<Resources>{sources});
-        ASSERT_EQ(layout.recipe().binding_layouts.size(), Resources::SET_COUNT);
-        EXPECT_EQ(layout.recipe().binding_layouts[2], DescriptorAccess::Owned(frame.set<2>().backend())->layout);
-        EXPECT_EQ(layout.recipe().binding_layouts[5], DescriptorAccess::Owned(frame.set<5>().backend())->layout);
+        ASSERT_EQ(PipelineRecipeAccess::Read(layout).binding_layouts.size(), Resources::SET_COUNT);
+        EXPECT_EQ(PipelineRecipeAccess::Read(layout).binding_layouts[2], DescriptorAccess::Owned(frame.set<2>().backend())->layout);
+        EXPECT_EQ(PipelineRecipeAccess::Read(layout).binding_layouts[5], DescriptorAccess::Owned(frame.set<5>().backend())->layout);
         const auto empty = sources.hole_layout();
         ASSERT_TRUE(empty);
         for (const auto set : {0, 1, 3, 4})
-            EXPECT_EQ(layout.recipe().binding_layouts[set], DescriptorAccess::Owned(*(empty)).get());
-        EXPECT_EQ(layout.recipe().sources.size(), 1u);
+            EXPECT_EQ(PipelineRecipeAccess::Read(layout).binding_layouts[set], DescriptorAccess::Owned(*(empty)).get());
+        EXPECT_EQ(PipelineRecipeAccess::Read(layout).sources.size(), 1u);
         EXPECT_FALSE(DescriptorAccess::Owned(sources.layout<2>()).owner_before(DescriptorAccess::Owned(sources.layout<5>())));
         EXPECT_FALSE(DescriptorAccess::Owned(*(empty)).owner_before(DescriptorAccess::Owned(sources.layout<2>())));
         EXPECT_EQ(DescriptorManagerAccess::Data(descriptors)->pools.size(), 0u);
@@ -197,7 +202,7 @@ namespace {
                 t::TypedDescriptorLayouts<Resources> layouts(std::array{arena.descriptor_layout({1}), arena.descriptor_layout({2})}, arena.descriptor_layout({3}));
                 pl::ShaderGroup shaders("one owner", {arena.shader({4})});
                 vsl::PipelineLayout recipe(device, shaders, t::detail::DescriptorLayoutInjection<Resources>{layouts});
-                EXPECT_EQ(recipe.recipe().sources.size(), 1u);
+                EXPECT_EQ(PipelineRecipeAccess::Read(recipe).sources.size(), 1u);
                 pipeline.emplace(policy, device, layouts, shaders);
             }
             EXPECT_TRUE(owner.expired());

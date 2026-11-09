@@ -1,4 +1,9 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include "support/vulkan_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
 
 namespace {
     namespace pl = vsl::pipeline_layout;
@@ -210,8 +215,8 @@ namespace {
         pl::VertexInput invalid({{.layouts = {{vsl::data_format::FLOAT_RG, 0,
                                                std::numeric_limits<std::uint32_t>::max() - 2}}}});
         EXPECT_THROW(invalid.injection(layout), vsl::exceptions::RuntimeException);
-        const auto& bindings = layout.recipe().graphics_state.vertex_bindings;
-        const auto& attributes = layout.recipe().graphics_state.vertex_attributes;
+        const auto& bindings = PipelineRecipeAccess::Read(layout).graphics_state.vertex_bindings;
+        const auto& attributes = PipelineRecipeAccess::Read(layout).graphics_state.vertex_attributes;
         ASSERT_EQ(bindings.size(), 1u);
         ASSERT_EQ(attributes.size(), 1u);
         const auto& native = vsl_test::inspect_layout(layout).vertex_input;

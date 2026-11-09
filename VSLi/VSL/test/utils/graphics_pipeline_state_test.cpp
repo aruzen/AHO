@@ -1,8 +1,13 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/operation/graphics_pipeline_state.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
 #include <VSL/vulkan/stages/id_picking.hpp>
 #include "support/render_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
@@ -119,18 +124,18 @@ namespace {
     TEST_F(GraphicsPipelineStateVulkanIntegrationTest, SnapshotInjectionReplacesFixedStateWithoutReplacingLayoutSources) {
         vsl::GraphicsPipelineState state(pl::InputAssembly{}, pl::Rasterization{pl::CullingMode::FRONT});
         const auto runtime = GraphicsAccess::Owned(*(layout));
-        const auto shaders = layout->recipe().shaders;
-        const auto owner_count = layout->recipe().sources.size();
+        const auto shaders = PipelineRecipeAccess::Read(*(layout)).shaders;
+        const auto owner_count = PipelineRecipeAccess::Read(*(layout)).sources.size();
         state.injection(*layout);
         EXPECT_EQ(GraphicsAccess::Owned(*(layout)), runtime);
-        EXPECT_EQ(layout->recipe().shaders, shaders);
-        EXPECT_EQ(layout->recipe().sources.size(), owner_count);
-        EXPECT_EQ(layout->recipe().graphics_state.rasterization.cullMode, vk::CullModeFlagBits::eFront);
-        EXPECT_TRUE(layout->recipe().graphics_state.blend_attachments.empty());
+        EXPECT_EQ(PipelineRecipeAccess::Read(*(layout)).shaders, shaders);
+        EXPECT_EQ(PipelineRecipeAccess::Read(*(layout)).sources.size(), owner_count);
+        EXPECT_EQ(PipelineRecipeAccess::Read(*(layout)).graphics_state.rasterization.cullMode, vk::CullModeFlagBits::eFront);
+        EXPECT_TRUE(PipelineRecipeAccess::Read(*(layout)).graphics_state.blend_attachments.empty());
         pl::Rasterization{pl::CullingMode::BACK}.injection(state.edit());
-        EXPECT_EQ(layout->recipe().graphics_state.rasterization.cullMode, vk::CullModeFlagBits::eFront);
+        EXPECT_EQ(PipelineRecipeAccess::Read(*(layout)).graphics_state.rasterization.cullMode, vk::CullModeFlagBits::eFront);
         vsl::GraphicsPipelineState moved(std::move(state));
         EXPECT_THROW(state.injection(*layout), std::logic_error);
-        EXPECT_EQ(layout->recipe().graphics_state.rasterization.cullMode, vk::CullModeFlagBits::eFront);
+        EXPECT_EQ(PipelineRecipeAccess::Read(*(layout)).graphics_state.rasterization.cullMode, vk::CullModeFlagBits::eFront);
     }
 } // namespace

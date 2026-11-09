@@ -1,3 +1,4 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/utils/typed_block_validation.hpp>
 #include <VSL/utils/typed_resources.hpp>
@@ -12,6 +13,10 @@
 #include <VSL/lifetime/sampler_access.hpp>
 #include <VSL/operation/descriptor_ops.hpp>
 #include <algorithm>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
@@ -179,11 +184,11 @@ namespace VSL_NAMESPACE::typed::detail {
                     points.push_back(requirement.point);
             sets.push_back({std::move(points)});
         }
-        lifetime::replace_recipe_layouts(layout.edit_recipe(), layout.get_device(), {}, std::move(sets));
+        lifetime::replace_recipe_layouts(PipelineRecipeAccess::Edit(layout), layout.get_device(), {}, std::move(sets));
     }
 
     void validate_resource_schema(const lifetime::PipelineRecipeSnapshot& recipe, std::span<const DescriptorRequirement> requirements) {
-        for (const auto& shader : recipe.definition().shaders) {
+        for (const auto& shader : PipelineRecipeAccess::Read(recipe).shaders) {
             if (shader->device != recipe.device().data_.get())
                 throw std::invalid_argument("Typed shader/pipeline device mismatch");
             const auto stage = ShaderType(shader->stage);

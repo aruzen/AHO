@@ -1,3 +1,4 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/owner_validation.hpp>
 #include <VSL/vulkan/stages/shader_group.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
@@ -7,6 +8,10 @@
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/lifetime/pipeline_layout_storage.hpp>
 #include <VSL/lifetime/shader_access.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::ShaderAccess;
@@ -51,7 +56,7 @@ void VSL_NAMESPACE::pipeline_layout::ShaderGroup::remove_shader(ShaderAccessor s
 
 void VSL_NAMESPACE::pipeline_layout::ShaderGroup::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
     const auto data = checked_state();
-    auto& info = pl.edit_recipe();
+    auto& info = PipelineRecipeAccess::Edit(pl);
     auto shaders = info.shaders;
     auto shader_sources = info.shader_sources;
     auto sources = info.sources;

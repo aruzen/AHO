@@ -1,3 +1,4 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/owner_validation.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
@@ -9,6 +10,10 @@
 #include <type_traits>
 
 namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
+
+namespace {
     using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
 }
 
@@ -18,10 +23,10 @@ void VSL_NAMESPACE::GraphicsPipelineState::injection(PipelineLayoutEditAccessor 
     std::swap(layout.edit_state().get(), next);
 }
 
-const VSL_NAMESPACE::impl::PipelineRecipe& VSL_NAMESPACE::PipelineLayoutAccessor::recipe() const& {
-    if (!_recipe)
+const VSL_NAMESPACE::impl::PipelineRecipe& VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess::Read(const PipelineLayoutAccessor& value) {
+    if (!value._recipe)
         throw std::logic_error("Pipeline layout has no regeneration recipe");
-    return *_recipe;
+    return *value._recipe;
 }
 VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::PipelineLayoutAccessor::get_device() const {
     if (!_owner || !_owner.use_count() || !_owner->device || !_owner->pipeline_layout)
@@ -34,16 +39,16 @@ VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::PipelineLayoutAccessor::owner_r
     lifetime::detail::require_live_owner(_owner);
     return _owner;
 }
-VSL_NAMESPACE::impl::PipelineRecipe& VSL_NAMESPACE::PipelineLayoutEditAccessor::edit_recipe() const& {
-    if (!_edit_recipe)
+VSL_NAMESPACE::impl::PipelineRecipe& VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess::Edit(const PipelineLayoutEditAccessor& value) {
+    if (!value._edit_recipe)
         throw std::logic_error("Pipeline layout has been consumed");
-    return *_edit_recipe;
+    return *value._edit_recipe;
 }
 VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::PipelineLayoutEditAccessor::get_device() const {
     return _edit_device.data_ ? _edit_device : _value.get_device();
 }
 VSL_NAMESPACE::GraphicsPipelineStateEditRef VSL_NAMESPACE::PipelineLayoutEditAccessor::edit_state() const& {
-    return {&edit_recipe().graphics_state};
+    return {&PipelineRecipeAccess::Edit(*this).graphics_state};
 }
 void VSL_NAMESPACE::PipelineLayoutEditAccessor::init_start(LogicalDeviceAccessor device) {
     lifetime::require_device_owner(device);
@@ -53,14 +58,14 @@ void VSL_NAMESPACE::PipelineLayoutEditAccessor::init_start(LogicalDeviceAccessor
     _edit_device = std::move(device);
 }
 void VSL_NAMESPACE::PipelineLayoutEditAccessor::init_finish(PipelineLayoutAccessor runtime) {
-    if (const auto& pending = edit_recipe().pending_layouts) {
+    if (const auto& pending = PipelineRecipeAccess::Edit(*this).pending_layouts) {
         std::vector<graphic_resource::BindingLayout> layouts;
         layouts.reserve(pending->size());
         for (const auto& info : *pending)
             layouts.emplace_back(_edit_device, info.bindings);
-        lifetime::replace_recipe_layouts(edit_recipe(), _edit_device, layouts);
+        lifetime::replace_recipe_layouts(PipelineRecipeAccess::Edit(*this), _edit_device, layouts);
     }
-    const auto& info = edit_recipe();
+    const auto& info = PipelineRecipeAccess::Edit(*this);
     if (GraphicsAccess::Owned(runtime)) {
         (void)runtime.get_device();
         if (GraphicsAccess::Owned(runtime)->device != _edit_device.data_.get() ||

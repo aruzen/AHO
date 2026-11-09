@@ -37,6 +37,7 @@
     <ClInclude Include="VSL\src\private\VSL\lifetime\owner_access.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\src\private\VSL\lifetime\owner_validation.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\src\private\VSL\lifetime\swapchain_access.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\src\private\VSL\lifetime\pipeline_recipe_access.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\sync\resource_use_state.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\sync\completion.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\operation\buffer_create_info.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>

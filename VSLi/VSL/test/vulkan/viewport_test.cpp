@@ -1,4 +1,9 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include "support/render_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
 namespace {
     TEST(ViewportTest, ConstructorsPreserveRectangleCoordinates) {
         vsl::Viewport defaults;
@@ -25,8 +30,8 @@ namespace {
         EXPECT_EQ(viewport.height, 8);
         auto state = make_layout_state();
         viewport.injection(state);
-        ASSERT_EQ(state.recipe().graphics_state.viewports.size(), 1u);
-        const auto& actual = state.recipe().graphics_state.viewports[0];
+        ASSERT_EQ(PipelineRecipeAccess::Read(state).graphics_state.viewports.size(), 1u);
+        const auto& actual = PipelineRecipeAccess::Read(state).graphics_state.viewports[0];
         EXPECT_EQ(actual.width, 8);
         EXPECT_EQ(actual.height, 8);
         EXPECT_EQ(actual.minDepth, 0);

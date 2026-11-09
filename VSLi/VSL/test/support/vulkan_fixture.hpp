@@ -1,4 +1,5 @@
 #pragma once
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/operation/pipeline_layout_ops.hpp>
 #include <VSL/lifetime/instance_storage.hpp>
@@ -261,10 +262,10 @@ namespace vsl_test {
         return pool;
     }
 
-    inline LayoutInspection::LayoutInspection(vsl::PipelineLayoutAccessor layout) : PipelineScratch(layout.recipe().graphics_state) {
-        for (const auto* binding : layout.recipe().binding_layouts)
+    inline LayoutInspection::LayoutInspection(vsl::PipelineLayoutAccessor layout) : PipelineScratch(VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess::Read(layout).graphics_state) {
+        for (const auto* binding : VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess::Read(layout).binding_layouts)
             layouts.push_back(binding->layout);
-        for (const auto& range : layout.recipe().push_ranges)
+        for (const auto& range : VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess::Read(layout).push_ranges)
             ranges.push_back({.stageFlags = vk::ShaderStageFlags(static_cast<std::uint32_t>(range.target_shader)),
                               .offset = range.offset,
                               .size = range.size});

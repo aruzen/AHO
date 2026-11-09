@@ -1,3 +1,4 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include "support/fixed_parent.hpp"
@@ -12,6 +13,10 @@
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/vulkan/commands/image_upload.hpp>
 #include <VSL/vulkan/commands/image_readback.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
@@ -88,7 +93,7 @@ namespace {
             l::PipelineRecipeDraft draft(device);
             draft.inject(vsl::pipeline_layout::ResourceBinding{{composite}});
             const auto snapshot = draft.snapshot();
-            const auto& recipe = snapshot.definition();
+            const auto& recipe = PipelineRecipeAccess::Read(snapshot);
             ASSERT_EQ(recipe.binding_layouts.size(), 1u);
             EXPECT_EQ(Access::Node(recipe.sources.at(recipe.binding_sources.front())), &context->node);
             const auto layouts = snapshot.layout_sources();

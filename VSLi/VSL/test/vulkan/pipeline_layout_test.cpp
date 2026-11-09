@@ -1,3 +1,4 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/shader_access.hpp>
@@ -5,6 +6,10 @@
 #include "support/vulkan_fixture.hpp"
 #include "support/compute_fixture.hpp"
 #include <VSL/lifetime/resource_arena.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
@@ -56,7 +61,7 @@ namespace {
         vsl::PipelineLayout original(device);
         auto copy = original.copy();
         EXPECT_NE(GraphicsAccess::Owned(copy)->pipeline_layout, GraphicsAccess::Owned(original)->pipeline_layout);
-        EXPECT_NE(&copy.recipe(), &original.recipe());
+        EXPECT_NE(&PipelineRecipeAccess::Read(copy), &PipelineRecipeAccess::Read(original));
         EXPECT_EQ(GraphicsAccess::Owned(copy)->device, GraphicsAccess::Owned(original)->device);
         auto shared = original;
         EXPECT_EQ(GraphicsAccess::Owned(shared), GraphicsAccess::Owned(original));
@@ -75,7 +80,7 @@ namespace {
         auto added = layout.add(vsl::pipeline_layout::Rasterization(vsl::pipeline_layout::CullingMode::FRONT));
         EXPECT_EQ(GraphicsAccess::Owned(added), GraphicsAccess::Owned(layout));
         EXPECT_TRUE(GraphicsAccess::Owned(layout)->pipeline_layout);
-        EXPECT_EQ(layout.recipe().graphics_state.rasterization.cullMode, vk::CullModeFlagBits::eFront);
+        EXPECT_EQ(PipelineRecipeAccess::Read(layout).graphics_state.rasterization.cullMode, vk::CullModeFlagBits::eFront);
     }
 } // namespace
 
@@ -98,7 +103,7 @@ namespace {
         l::ResourceArena arena(device, LAYOUT_PLAN, inputs);
         const auto first = arena.pipeline_layout({1}), second = arena.pipeline_layout({2});
         EXPECT_FALSE(first.has_recipe());
-        EXPECT_THROW(first.recipe(), std::logic_error);
+        EXPECT_THROW(PipelineRecipeAccess::Read(first), std::logic_error);
         EXPECT_NE(GraphicsAccess::Owned(first)->pipeline_layout, GraphicsAccess::Owned(second)->pipeline_layout);
         const auto base = reinterpret_cast<std::uintptr_t>(GraphicsAccess::Owned(first).get());
         EXPECT_EQ(reinterpret_cast<std::uintptr_t>(GraphicsAccess::Owned(second).get()) - base, LAYOUT_PLAN.placement({2}).offset);
@@ -188,8 +193,8 @@ namespace {
         EXPECT_FALSE(previous.expired());
         pl::ResourceBinding{{}}.injection(layout);
         EXPECT_TRUE(previous.expired());
-        EXPECT_TRUE(layout.recipe().sources.empty());
-        EXPECT_TRUE(layout.recipe().binding_layouts.empty());
+        EXPECT_TRUE(PipelineRecipeAccess::Read(layout).sources.empty());
+        EXPECT_TRUE(PipelineRecipeAccess::Read(layout).binding_layouts.empty());
     }
     TEST_F(PipelineLayoutVulkanIntegrationTest, ReplacementPublishesAllOwnersBeforeAnOldOwnerCanReenter) {
         for (const bool move : {false, true}) {
@@ -201,8 +206,8 @@ namespace {
                                                                             callback = true;
                                                                             ASSERT_TRUE(current.has_value());
                                                                             EXPECT_EQ(GraphicsAccess::Owned(*(current)), GraphicsAccess::Owned(next));
-                                                                            EXPECT_EQ(&current->recipe(), &next.recipe());
-                                                                            EXPECT_EQ(&current->edit_recipe(), &current->recipe());
+                                                                            EXPECT_EQ(&PipelineRecipeAccess::Read(*(current)), &PipelineRecipeAccess::Read(next));
+                                                                            EXPECT_EQ(&PipelineRecipeAccess::Edit(*(current)), &PipelineRecipeAccess::Read(*(current)));
                                                                             *current = replacement;
                                                                         });
             current.emplace(vsl::PipelineLayout::FromRuntime(GraphicsAccess::FromShared(alias)));
@@ -215,8 +220,8 @@ namespace {
             }
             EXPECT_TRUE(callback);
             EXPECT_EQ(GraphicsAccess::Owned(*(current)), GraphicsAccess::Owned(replacement));
-            EXPECT_EQ(&current->recipe(), &replacement.recipe());
-            EXPECT_EQ(&current->edit_recipe(), &current->recipe());
+            EXPECT_EQ(&PipelineRecipeAccess::Read(*(current)), &PipelineRecipeAccess::Read(replacement));
+            EXPECT_EQ(&PipelineRecipeAccess::Edit(*(current)), &PipelineRecipeAccess::Read(*(current)));
         }
     }
     TEST_F(PipelineLayoutArenaComputeVulkanIntegrationTest, RuntimePipelineAndSavedPushDoNotKeepTheShaderRecipe) {
@@ -318,12 +323,13 @@ namespace {
     static_assert(!std::is_convertible_v<vsl::FrozenPipelineLayout, vsl::PipelineLayoutEditAccessor>);
     static_assert(std::same_as<decltype(std::declval<vsl::PipelineLayout&&>().freeze()), vsl::FrozenPipelineLayout>);
     template<typename T>
-    concept CanBorrowTemporaryRecipe = requires(T&& layout) { std::move(layout).recipe(); };
+    concept CanBorrowTemporaryRecipe = requires(T&& layout) { PipelineRecipeAccess::Read(std::move(layout)); };
     template<typename T>
-    concept CanEditTemporaryRecipe = requires(T&& layout) { std::move(layout).edit_recipe(); };
+    concept CanEditTemporaryRecipe = requires(T&& layout) { PipelineRecipeAccess::Edit(std::move(layout)); };
     static_assert(!CanBorrowTemporaryRecipe<vsl::PipelineLayout>);
     static_assert(!CanBorrowTemporaryRecipe<vsl::FrozenPipelineLayout>);
     static_assert(!CanEditTemporaryRecipe<vsl::PipelineLayout>);
+    static_assert(!CanBorrowTemporaryRecipe<vsl::lifetime::PipelineRecipeSnapshot>);
 
     TEST(PipelineLayoutTest, MissingDeviceAndRuntimeAreRejectedBeforeNativeUse) {
         vsl::LogicalDeviceAccessor missing;
@@ -333,7 +339,7 @@ namespace {
         const vsl::PipelineLayoutAccessor empty;
         EXPECT_THROW(empty.get_device(), std::invalid_argument);
         EXPECT_THROW(empty.owner_ref(), std::invalid_argument);
-        EXPECT_THROW(empty.recipe(), std::logic_error);
+        EXPECT_THROW(PipelineRecipeAccess::Read(empty), std::logic_error);
         EXPECT_THROW(vsl::PipelineLayout::FromRuntime(empty), std::invalid_argument);
     }
 
@@ -342,9 +348,9 @@ namespace {
         auto alias = original;
         auto frozen = std::move(original).freeze();
         EXPECT_EQ(GraphicsAccess::Owned(frozen), GraphicsAccess::Owned(alias));
-        EXPECT_NE(&frozen.recipe(), &alias.recipe());
+        EXPECT_NE(&PipelineRecipeAccess::Read(frozen), &PipelineRecipeAccess::Read(alias));
         vsl::pipeline_layout::Rasterization(vsl::pipeline_layout::CullingMode::FRONT).injection(alias);
-        EXPECT_NE(frozen.recipe().graphics_state.rasterization.cullMode, alias.recipe().graphics_state.rasterization.cullMode);
+        EXPECT_NE(PipelineRecipeAccess::Read(frozen).graphics_state.rasterization.cullMode, PipelineRecipeAccess::Read(alias).graphics_state.rasterization.cullMode);
     }
     TEST_F(PipelineLayoutVulkanIntegrationTest, FailedAdditionPreservesTheOriginalLayout) {
         struct FailingStage {
@@ -365,8 +371,8 @@ namespace {
             vsl::PipelineLayout original(device, pl::ResourceBinding{{binding}},
                                          pl::PushConstants(vsl::ShaderFlag::COMPUTE, {{vsl::ShaderFlag::COMPUTE, 0, 4}}));
             copied = original.copy();
-            EXPECT_NE(copied->recipe().binding_layouts.data(), original.recipe().binding_layouts.data());
-            EXPECT_NE(copied->recipe().push_ranges.data(), original.recipe().push_ranges.data());
+            EXPECT_NE(PipelineRecipeAccess::Read(*(copied)).binding_layouts.data(), PipelineRecipeAccess::Read(original).binding_layouts.data());
+            EXPECT_NE(PipelineRecipeAccess::Read(*(copied)).push_ranges.data(), PipelineRecipeAccess::Read(original).push_ranges.data());
         }
         EXPECT_FALSE(weak_binding.expired());
         ASSERT_EQ(GraphicsAccess::Owned(*(copied))->push_ranges.size(), 1u);

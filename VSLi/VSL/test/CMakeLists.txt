@@ -93,7 +93,9 @@ if (VSL_TEST_SOURCES)
     foreach(case RANGE 0 19)
         list(GET typed_contract_names ${case} name)
         set(typed_storage_expected)
-        if(case GREATER 15)
+        if(case EQUAL 18)
+            set(typed_storage_expected "-DTEST_EXPECTED=definition|no member")
+        elseif(case GREATER 15)
             set(typed_storage_expected "-DTEST_EXPECTED=constraints|constructor|no matching|deleted")
         endif()
         add_test(NAME "VSL.TypedPipeline.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
@@ -383,6 +385,19 @@ if (VSL_TEST_SOURCES)
             "-DTEST_CASE=${case}" "-DTEST_EXPECTED=private|deleted|no member|no matching|conversion|reference|call|viable|invalid"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
         set_tests_properties("VSL.Swapchain.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
+    add_library(vsl-recipe-style-contract OBJECT EXCLUDE_FROM_ALL contracts/recipe.cpp)
+    target_link_libraries(vsl-recipe-style-contract PRIVATE VSL)
+    target_compile_definitions(vsl-recipe-style-contract PRIVATE VSL_TYPED_CASE=0)
+    set(recipe_contract_names Valid LayoutRecipe EditorRecipe FrozenRecipe EditRecipe SnapshotDefinition)
+    foreach(case RANGE 0 5)
+        list(GET recipe_contract_names ${case} name)
+        add_test(NAME "VSL.Recipe.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/recipe.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=recipe|edit_recipe|definition|private|no member"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.Recipe.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
     endforeach()
     set(shader_contract_names Valid ShaderData ShaderOwner ShaderRawConstructor ShaderGroupData ShaderGroupOwner TemporaryShaderCode ConstTemporaryShaderCode)
     foreach(case RANGE 1 7)

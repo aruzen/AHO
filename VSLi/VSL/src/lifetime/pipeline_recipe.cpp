@@ -2,6 +2,7 @@
 #include <VSL/lifetime/pipeline_layout_storage.hpp>
 #include <VSL/lifetime/pipeline_storage.hpp>
 #include <VSL/lifetime/shader_access.hpp>
+#include <VSL/lifetime/descriptor_access.hpp>
 
 VSL_NAMESPACE::ShaderAccessor VSL_NAMESPACE::lifetime::detail::ShaderAccess::FromRecipe(const impl::PipelineRecipe& recipe, size_t index) {
     return FromOwned(recipe.sources.at(recipe.shader_sources.at(index)).alias(recipe.shaders.at(index)));
@@ -62,8 +63,7 @@ namespace VSL_NAMESPACE::lifetime {
         std::vector<graphic_resource::BindingLayout> result;
         result.reserve(recipe.binding_layouts.size());
         for (size_t i = 0; i < recipe.binding_layouts.size(); ++i)
-            result.push_back(graphic_resource::BindingLayout(std::shared_ptr<impl::ResourceBindingLayoutImpl>(
-                recipe.sources.at(recipe.binding_sources.at(i)).share(), recipe.binding_layouts[i])));
+            result.push_back(detail::DescriptorAccess::FromOwned(recipe.sources.at(recipe.binding_sources.at(i)).alias(recipe.binding_layouts[i])));
         return result;
     }
     PipelineRecipeDraft::PipelineRecipeDraft(LogicalDeviceAccessor device) {

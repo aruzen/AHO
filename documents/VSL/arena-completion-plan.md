@@ -238,3 +238,5 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 
 Shader／ShaderGroupの単位では、公開data_／raw構築を閉じ、Group→recipe→snapshot→生成入力の復元→external import／getterに元のOwnedRefを引き継いだ。共有編集とmove元の拒否、削除結果の公開後に旧ownerを回収する契約を明示し、完成PipelineのShader回収を維持する。新runtime3件と既存Typed computeの両policy拡張、全VSL1,159（対応外format3 skip）／AHO192・1,071／compile252、同一PNG、strict17ファイル／12TU、installed consumer30種・新負例7種、構成別／cross寸法生成、archive／header一致が成功した。寸法定数が同じ旧親headerも新バイナリとの混在を拒否する。次はdescriptor3型とManagerの境界を閉じ、Poolの通常bind／external import／canonical getterの契約を保つ。順序12全体は継続中である。
 
+Descriptor／Managerの単位でBindingLayout／Pool／Resourceをprivate OwnedRef、Managerを既存の共有CPU stateと観測identityへ閉じた。recipe・heap Set・external Layout・getterに元nodeを保ち、external Pool importとget_poolのcanonical契約を分けた。3 facade自身の値引数代入とManagerの全値公開後の旧owner回収、poll／Native callback前の入力snapshot、descriptor bindの記録先固定を接続した。新runtime10件、全VSL1,169（対応外format3 skip）／AHO192・1,071／compile271、同一PNG、strict34ファイル／27TUと変更2ファイルの再検査、installed consumer30種・新負例18種、構成別／cross寸法生成、artifact混在拒否、archive／header一致、source395件とMSBuild登録が成功した。次はruntime graphicsの4 facadeと生成入力・Pass getterを閉じる。起動資源／同期／Swapchain／recipe／WindowData／Completion、実定義の4責務分割と測定も継続する。
+

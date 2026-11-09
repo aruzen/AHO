@@ -1,3 +1,4 @@
+#include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/sampler_access.hpp>
 #include "support/vulkan_fixture.hpp"
@@ -14,6 +15,10 @@
 #include <VSL/utils/typed_resources.hpp>
 #include <VSL/utils/spir_reflector.hpp>
 #include <limits>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::BufferAccess;
@@ -305,7 +310,7 @@ namespace {
         vsl::Sampler sampler(device, vsl::SamplingMode::NEAREST);
         vsl::Shader<vsl::ShaderType::VERTEX> shader(device, vsl_test::shader_path("triangle.vert.spv"));
         vsl::graphic_resource::BindingLayout layout(device, vsl::graphic_resource::Type::UNIFORM_BUFFER, vsl::ShaderFlag::VERTEX);
-        vsl::graphic_resource::Pool pool{l::make_heap_descriptor_pool(device, {{{vsl::graphic_resource::Type::UNIFORM_BUFFER, 1}}, 1})};
+        auto pool = DescriptorAccess::FromShared(l::make_heap_descriptor_pool(device, {{{vsl::graphic_resource::Type::UNIFORM_BUFFER, 1}}, 1}));
         auto [allocated, set] = pool.bind(layout);
         ASSERT_TRUE(allocated);
         const auto pipeline_layout = l::make_heap_pipeline_layout(device, {}, {});
@@ -319,7 +324,7 @@ namespace {
         constexpr t::ResourcePlan<1> plan(requests);
         const std::array<l::ResourceInit, 1> initializers{vsl::BufferCreateInfo{16, USAGE}};
         l::ResourceArena resources(device, plan, initializers);
-        const std::array<std::pair<const char*, l::OwnerRef>, 13> owners{{{"Buffer", vsl_test::canonical_owner(BufferAccess::Owned(buffer))}, {"Image", vsl_test::canonical_owner(ImageAccess::Owned(image))}, {"Sampler", vsl_test::canonical_owner(SamplerAccess::Owned(sampler))}, {"Shader", shader.owner_ref()}, {"DescriptorLayout", vsl_test::canonical_owner(layout.data_)}, {"DescriptorPool", vsl_test::canonical_owner(pool.data_)}, {"PipelineLayout", vsl_test::canonical_owner(pipeline_layout)}, {"RenderPass", pass.owner_ref()}, {"CommandPool", manager.get_pool().owner_ref()}, {"Fence", fence.owner_ref()}, {"Semaphore", semaphore.owner_ref()}, {"BufferArena", buffers.view<t::ResourceId{1}>().storage_view().owner_ref()}, {"ResourceArena", resources.owner_ref()}}};
+        const std::array<std::pair<const char*, l::OwnerRef>, 13> owners{{{"Buffer", vsl_test::canonical_owner(BufferAccess::Owned(buffer))}, {"Image", vsl_test::canonical_owner(ImageAccess::Owned(image))}, {"Sampler", vsl_test::canonical_owner(SamplerAccess::Owned(sampler))}, {"Shader", shader.owner_ref()}, {"DescriptorLayout", vsl_test::canonical_owner(DescriptorAccess::Owned(layout))}, {"DescriptorPool", vsl_test::canonical_owner(DescriptorAccess::Owned(pool))}, {"PipelineLayout", vsl_test::canonical_owner(pipeline_layout)}, {"RenderPass", pass.owner_ref()}, {"CommandPool", manager.get_pool().owner_ref()}, {"Fence", fence.owner_ref()}, {"Semaphore", semaphore.owner_ref()}, {"BufferArena", buffers.view<t::ResourceId{1}>().storage_view().owner_ref()}, {"ResourceArena", resources.owner_ref()}}};
         for (const auto& [name, owner] : owners) {
             SCOPED_TRACE(name);
             vsl_test::expect_fixed_parent(owner, device.owner_ref());
@@ -349,9 +354,9 @@ namespace {
                 auto typed = t::TypedDescriptorSet<Spec>::FromResource(placed, set);
                 EXPECT_NO_THROW(typed.write<0>(Uniform::FromView(*buffer, 1)));
             }
-            ASSERT_TRUE(set.data_->bindings.at(0).front().initialized);
-            EXPECT_TRUE(set.data_->bindings.at(0).front().owners.empty());
-            EXPECT_TRUE(set.data_->bindings.at(0).front().constraint.owners.empty());
+            ASSERT_TRUE(DescriptorAccess::Owned(set)->bindings.at(0).front().initialized);
+            EXPECT_TRUE(DescriptorAccess::Owned(set)->bindings.at(0).front().owners.empty());
+            EXPECT_TRUE(DescriptorAccess::Owned(set)->bindings.at(0).front().constraint.owners.empty());
             buffer.reset();
             placed.data_.reset();
             root.reset();

@@ -2,6 +2,7 @@
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/lifetime/pipeline_layout_storage.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
+#include <VSL/lifetime/descriptor_access.hpp>
 #include <utility>
 
 VSL_NAMESPACE::pipeline_layout::ResourceBinding::ResourceBinding(std::vector<graphic_resource::BindingLayout> sets)
@@ -24,10 +25,11 @@ void VSL_NAMESPACE::lifetime::replace_recipe_layouts(impl::PipelineRecipe& info,
     layouts.reserve(definitions.size());
     binding_sources.reserve(definitions.size());
     for (const auto& layout : definitions) {
-        if (!layout.data_ || !layout.data_.use_count() || !layout.data_->layout || layout.data_->device != device.data_.get())
+        const auto& owner = lifetime::detail::DescriptorAccess::Owned(layout);
+        if (!owner || !owner.use_count() || !owner->layout || owner->device != device.data_.get())
             throw std::invalid_argument("Pipeline binding requires owning layouts on the same device");
-        binding_sources.push_back(lifetime::retain_recipe_owner(sources, lifetime::detail::owned_ref(layout.data_, layout.data_->owner_node)));
-        layouts.push_back(layout.data_.get());
+        binding_sources.push_back(lifetime::retain_recipe_owner(sources, owner));
+        layouts.push_back(owner.get());
     }
     info.binding_layouts.swap(layouts);
     info.binding_sources.swap(binding_sources);

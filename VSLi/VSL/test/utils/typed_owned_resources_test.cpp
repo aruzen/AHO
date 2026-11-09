@@ -1,3 +1,4 @@
+#include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/sampler_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
@@ -7,6 +8,10 @@
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/vulkan/commands/image_upload.hpp>
 #include <VSL/vulkan/commands/image_readback.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::ImageAccess;
@@ -76,7 +81,7 @@ namespace {
             throw std::runtime_error("Injected descriptor failure after the first mixed frame");
         }
         auto result = vsl::GraphicResourceManager::allocate(std::move(layouts));
-        _previous = std::get<1>(result).front().data_;
+        _previous = DescriptorAccess::Owned(std::get<1>(result).front()).share();
         return result;
     }
     void TypedOwnedResourcesVulkanIntegrationTest::host_visible(vsl::CommandManager manager) {

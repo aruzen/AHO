@@ -1,8 +1,15 @@
+#include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/vulkan/resource_use.hpp>
 #include <VSL/utils/typed_batch.hpp>
 #include "support/render_fixture.hpp"
+#include "support/deferred_action.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
+    using VSL_NAMESPACE::lifetime::detail::DescriptorManagerAccess;
+} // namespace
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::BufferAccess;
@@ -325,19 +332,19 @@ namespace {
             set.write<1>(output);
             auto native = set.backend();
             auto pool = native.get_pool();
-            const auto count = descriptors.data_->pools.size();
+            const auto count = DescriptorManagerAccess::Data(descriptors)->pools.size();
             auto manager = make_manager().independent(1);
             auto phase = manager.start_phase<vsl::ComputePhase>();
             set.resource_use()->record(manager.get_buffer());
             EXPECT_THROW(descriptors.destroy(pool), std::logic_error);
-            EXPECT_EQ(descriptors.data_->pools.size(), count);
+            EXPECT_EQ(DescriptorManagerAccess::Data(descriptors)->pools.size(), count);
             if (over)
-                EXPECT_EQ(over->pools.front().data_, pool.data_);
+                EXPECT_EQ(DescriptorAccess::Owned(over->pools.front()), DescriptorAccess::Owned(pool));
             EXPECT_NO_THROW(set.require_complete());
             phase.cancel();
             EXPECT_NO_THROW(descriptors.destroy(pool));
-            EXPECT_FALSE(native.data_->descriptor_set);
-            EXPECT_TRUE(native.data_->bindings.empty());
+            EXPECT_FALSE(DescriptorAccess::Owned(native)->descriptor_set);
+            EXPECT_TRUE(DescriptorAccess::Owned(native)->bindings.empty());
             EXPECT_THROW(set.require_complete(), std::logic_error);
         }
     }
@@ -372,10 +379,10 @@ namespace {
         EXPECT_TRUE(new_state->busy());
         phase.cancel();
         auto native = set.backend();
-        const auto layout = native.data_->layout;
-        native.data_->layout = nullptr;
+        const auto layout = DescriptorAccess::Owned(native)->layout;
+        DescriptorAccess::Owned(native)->layout = nullptr;
         EXPECT_THROW(set.resource_use()->replace(0, {{new_state, {}}}), std::logic_error);
-        native.data_->layout = layout;
+        DescriptorAccess::Owned(native)->layout = layout;
     }
 
     TEST_F(ResourceUseVulkanIntegrationTest, UseStatePollingAllowsReentryAndPreservesUsesAddedByCompletionCallbacks) {
@@ -445,11 +452,79 @@ namespace {
             else
                 EXPECT_THROW(native.update(input.backend()), std::logic_error);
             EXPECT_TRUE(released);
-            EXPECT_FALSE(pool.data_->descriptor_pool);
-            EXPECT_FALSE(pool.data_->retiring);
-            EXPECT_TRUE(native.data_->bindings.empty());
+            EXPECT_FALSE(DescriptorAccess::Owned(pool)->descriptor_pool);
+            EXPECT_FALSE(DescriptorAccess::Owned(pool)->retiring);
+            EXPECT_TRUE(DescriptorAccess::Owned(native)->bindings.empty());
             peer.cancel();
         }
+    }
+
+    TEST_F(ResourceUseVulkanIntegrationTest, PoolDestroyKeepsItsStartingManagerStateWhenPollingDestroysMovesOrReassignsTheFacade) {
+        auto verify = [&]<typename Manager>() {
+            for (int action = 0; action < 3; ++action) {
+                auto descriptors = std::make_unique<Manager>(device);
+                auto replacement = std::make_unique<Manager>(device);
+                std::unique_ptr<Manager> moved;
+                t::TypedDescriptorSet<Set> set(device, *descriptors, vsl::ResourceRetention::COMPLETION);
+                t::TypedDescriptorSet<Set> next(device, *replacement);
+                const std::uint32_t value = 7;
+                t::TypedUniformBuffer<std::uint32_t> input(device, value);
+                t::TypedStorageBuffer<std::uint32_t> output(device, value);
+                set.write<0>(input);
+                set.write<1>(output);
+                next.write<0>(input);
+                next.write<1>(output);
+                auto native = set.backend();
+                auto pool = native.get_pool();
+                auto next_native = next.backend();
+                auto next_pool = next_native.get_pool();
+                const auto previous_state = DescriptorManagerAccess::Data(*descriptors);
+                const auto next_state = DescriptorManagerAccess::Data(*replacement);
+                auto commands = make_manager().independent(1);
+                auto phase = commands.start_phase<vsl::ComputePhase>();
+                bool called = false;
+                vsl_test::DeferredAction release([&] {
+                    called = true;
+                    if (action == 0)
+                        descriptors.reset();
+                    else if (action == 1)
+                        moved = std::make_unique<Manager>(std::move(*descriptors));
+                    else
+                        *descriptors = std::move(*replacement);
+                });
+                set.resource_use()->record(commands.get_buffer());
+                commands.get_buffer().retain_until_complete(release.owner());
+                ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+                device.data_->device.waitIdle();
+                auto* receiver = descriptors.get();
+                EXPECT_NO_THROW(receiver->destroy(pool));
+                EXPECT_TRUE(called);
+                EXPECT_FALSE(DescriptorAccess::Owned(pool)->descriptor_pool);
+                EXPECT_FALSE(DescriptorAccess::Owned(pool)->retiring);
+                EXPECT_FALSE(DescriptorAccess::Owned(native)->descriptor_set);
+                EXPECT_TRUE(previous_state->pools.empty());
+                EXPECT_TRUE(DescriptorAccess::Owned(next_pool)->descriptor_pool);
+                EXPECT_EQ(next_state->pools.size(), 1u);
+                EXPECT_NO_THROW(next.write<0>(input));
+                if (action == 1) {
+                    ASSERT_TRUE(moved);
+                    EXPECT_EQ(pool.get_manager(), moved.get());
+                    if constexpr (std::is_same_v<Manager, vsl::graphic_resource::OverAllocateManager>)
+                        EXPECT_TRUE(moved->pools.empty());
+                } else {
+                    EXPECT_EQ(pool.get_manager(), nullptr);
+                    if (action == 2) {
+                        EXPECT_EQ(DescriptorManagerAccess::Data(*descriptors), next_state);
+                        if constexpr (std::is_same_v<Manager, vsl::graphic_resource::OverAllocateManager>) {
+                            ASSERT_EQ(descriptors->pools.size(), 1u);
+                            EXPECT_EQ(DescriptorAccess::Owned(descriptors->pools.front()), DescriptorAccess::Owned(next_pool));
+                        }
+                    }
+                }
+            }
+        };
+        verify.template operator()<vsl::graphic_resource::ExactAllocateManager>();
+        verify.template operator()<vsl::graphic_resource::OverAllocateManager>();
     }
 
     TEST_F(ResourceUseVulkanIntegrationTest, DescriptorTrackingRejectsCancellationInsidePhysicalUseObservation) {
@@ -480,7 +555,7 @@ namespace {
         recording.emplace(other);
         EXPECT_THROW(set.resource_use()->record(other.get_buffer()), std::logic_error);
         EXPECT_TRUE(released);
-        EXPECT_FALSE(set.backend().data_->recording);
+        EXPECT_FALSE(DescriptorAccess::Owned(set.backend())->recording);
         EXPECT_NO_THROW(set.write<0>(input));
     }
 
@@ -506,8 +581,7 @@ namespace {
                         const auto group = vsl::ResourceUseGroup::ForDescriptor(1, native, retention);
                         const auto context = std::make_shared<Composite>(Composite{native, std::make_shared<int>(3)});
                         token = context->token;
-                        const vsl::GraphicResource aliased{
-                            std::shared_ptr<vsl::impl::GraphicResourceImpl>(context, native.data_.get())};
+                        const auto aliased = DescriptorAccess::FromShared(std::shared_ptr<vsl::impl::GraphicResourceImpl>(context, DescriptorAccess::Owned(native).get()));
                         ASSERT_TRUE(group->tracks_descriptor(aliased));
                         vsl::command::BindGraphicResource command(aliased, vsl::graphic_resource::BindingDestination::COMPUTE,
                                                                   std::nullopt, 0, group);
@@ -532,7 +606,7 @@ namespace {
         vsl::graphic_resource::BindingLayout layout(device, vsl::graphic_resource::Type::UNIFORM_BUFFER, vsl::ShaderFlag::COMPUTE);
         auto [pool, allocated] = descriptors.make(std::vector{layout});
         auto native = allocated.front();
-        const std::weak_ptr<vsl::impl::GraphicResourceImpl> target = native.data_;
+        const std::weak_ptr<vsl::impl::GraphicResourceImpl> target = DescriptorAccess::Owned(native).share();
         allocated.clear();
         const std::uint32_t value = 1;
         t::TypedUniformBuffer<std::uint32_t> input(device, value);
@@ -550,7 +624,7 @@ namespace {
         device.data_->device.waitIdle();
         EXPECT_NO_THROW(native.update(input.backend()));
         EXPECT_TRUE(released);
-        EXPECT_FALSE(native.data_);
+        EXPECT_FALSE(DescriptorAccess::Owned(native));
         EXPECT_TRUE(target.expired());
     }
 
@@ -558,7 +632,7 @@ namespace {
         vsl::GraphicResourceManager descriptors(device);
         vsl::graphic_resource::BindingLayout layout(device, vsl::graphic_resource::Type::UNIFORM_BUFFER, vsl::ShaderFlag::COMPUTE);
         auto [pool, allocated] = descriptors.make(std::vector{layout});
-        const std::weak_ptr<vsl::impl::GraphicResourceImpl> target = allocated.front().data_;
+        const std::weak_ptr<vsl::impl::GraphicResourceImpl> target = DescriptorAccess::Owned(allocated.front()).share();
         const std::uint32_t value = 1;
         t::TypedUniformBuffer<std::uint32_t> input(device, value);
         allocated.front().update(input.backend());

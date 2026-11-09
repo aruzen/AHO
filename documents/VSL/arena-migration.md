@@ -292,6 +292,39 @@ macOS arm64／Clang20 C++26、MoltenVK、Vulkan validation、ASan／UBSanで、�
 
 strict17ファイル／12TU、installed public consumer30種と旧入口／一時借用7負例、private bridge非install、archive／生成header一致、Debug／Release／x86_64の寸法生成、構成混在拒否と同構成の旧親header拒否、source394件とMSBuild登録も確認した。Impl寸法定数が同じでも、公開型や内部所有型の異なるartifactは混在させない。Windows／Linux実機、x86_64全体実行、device lost実機、並行CPUアクセスと性能比較は未検証である。
 
+## 順序12f: Descriptor／Managerの所有入口
+
+BindingLayout／Pool／Resourceの公開`data_`とraw Impl構築を閉じ、各値がprivateなOwnedRefを一つ保存する。既存のDeviceからの生成、allocate／make／bind／update／get_poolを維持し、空判定にはbool、所有境界の受渡しにはowner_ref、Deviceの取得にはget_deviceを使う。
+
+3型のcopy／move代入もfacade自身が値引数を受け、swapして戻り参照を評価してから旧ownerを回収する。内側のOwnedRefへの代入だけで外側の戻り順序を決めない。旧ownerの解放callbackが代入先facadeを破棄する場合、呼出し側は戻り参照を使用しない。
+
+```cpp
+vsl::graphic_resource::ExactAllocateManager manager(device);
+auto [pool, resources] = manager.make(std::vector{layout});
+auto resource = resources.front();
+resource.update(buffer_view);
+if (resource) {
+    auto owner = resource.owner_ref();
+    auto source = resource.get_pool();
+}
+```
+
+通常bindはPoolとLayoutの元OwnedRefを固定依存へ渡す。recipe／不変snapshot／layout_sourcesの復元／arenaのexternal importとgetterでも同じnodeを保存する。Resource.get_poolはSetのcomposite ownerではなく、物理Poolのcanonical ownerへ戻る契約を維持する。external Pool importもcanonical ownerを要求する。この制約を通常bindへ広げない。
+
+ManagerInterfaceの共有CPU stateと観測identityはprivateにする。copyは別の観測先、moveは元の観測先の移動として扱う。Exact／Overの代入は新stateとidentity、Overの設定とcacheを先に一括公開し、旧identityを無効化してから旧ownerを回収する。Base参照からの部分代入はprotected化し、Overのcacheだけが旧値になる操作を禁止する。
+
+custom ManagerはprotectedなDevice constructorから初期化し、makeで共通生成、destroy_poolで共通の破棄検証を利用する。所有メンバーの解放callbackがget_managerを観測し得る派生型は、destructor冒頭でretire_identityを呼ぶ。独自の代入も、派生フィールドとswap_stateを公開した後に旧値を解放する。公開Implへのアクセスを代替するprotected raw getterは設けない。
+
+builtinのmake／allocate／destroyは、入口で既存のstate・identity・必要な設定とPoolを値として保持する。pollやNative呼出し後に元のthisを読み直さない。destroy中に生成元wrapperが消えても開始時stateを操作し、同じidentityとstateを持つ生存Overだけのcacheを更新する。cache候補の確保を先に済ませ、確保失敗では所属を変更しない。custom virtual allocateの派生固有フィールドまで自己破棄に耐える保証は追加しない。
+
+descriptor bindのinvoke／public trackは入力Resource群と必要なPipeline・設定を採取し、全Resourceの有効性を使用登録前に検査する。NativeRecordingContextで開始時の記録先を固定し、完了観測後も同じ記録か確認する。callbackがcommandを破棄・入力を変更・記録を取消・同じringで別の記録を開始しても、開始時の入力を使うか例外で停止する。取消後のpeerへ誤ってNative bindしない。
+
+追加のowner wrapper／control blockは作らない。局所的なownerのコピー、descriptor入力vectorのsnapshot、Manager cache候補、Impl内部コンテナ、既存の共有CPU stateとidentityの個別確保は残る。Native descriptor生成・更新・破棄は既存の共通backendで行う。CPU arenaとVulkanのdevice memoryの区別、host側の直列化、独立した保持policyは維持する。
+
+macOS arm64／Clang20 C++26、MoltenVK、Vulkan validation、ASan／UBSanで、新runtime10件（CPU1件を含む）と全VSL1,169成功（対応外format3 skip）／AHO GPU192・CPU1,071、compile契約271件を確認した。変更前には、recipeを経た元nodeの脱落とManager代入中の公開順序の不一致を実GPUで再現した。heap／arenaのPNG3枚は一致し、resize後もPipeline生成1回を維持する。
+
+strict34ファイル／27TUと、宣言位置を修正した2ファイル／2TUの再検査が成功した。installed public consumer30種・新負例18種、private bridge非install、archive／生成header一致、Debug／Release／x86_64寸法生成、構成混在拒否と直近親の旧header拒否、source395件とMSBuild登録も確認した。確保失敗の順序はcache候補の構築を所属変更前へ置いているが、bad_allocのfault injectionはしていない。Windows／Linux実機、x86_64全体実行、device lost実機、並行CPUアクセスと性能比較は未検証である。
+
 2026-11-06。Bufferの4責務分離が統合されたmaster `6b1f0166`を基点とする。[Bufferの契約](buffer-generation-contracts.md)と[責務の配置](buffer-layer-layout.md)を維持する。
 
 ## 方針と段階

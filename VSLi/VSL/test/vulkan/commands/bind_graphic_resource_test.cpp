@@ -1,6 +1,16 @@
+#include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/compute_fixture.hpp"
+#include "support/deferred_action.hpp"
+
+namespace {
+    void make_host_visible(vsl::CommandBuffer buffer);
+} // namespace
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::BufferAccess;
@@ -11,10 +21,141 @@ namespace {
 }
 namespace {
     using BindGraphicResourceVulkanIntegrationTest = vsl_test::ComputeVulkanIntegrationTest;
+    TEST_F(BindGraphicResourceVulkanIntegrationTest, PublicTrackRejectsAnEmptyResourceBeforeRecordingItsUnrelatedUseGroup) {
+        auto manager = make_manager();
+        auto phase = manager.start_phase<vsl::ComputePhase>();
+        auto use = vsl::ResourceUseGroup::ForDescriptor(1, resource);
+        vsl::command::BindGraphicResource direct(vsl::GraphicResource{}, vsl::graphic_resource::BindingDestination::COMPUTE);
+        vsl::command::BindGraphicResource grouped(vsl::GraphicResource{}, vsl::graphic_resource::BindingDestination::COMPUTE, std::nullopt, 0, use);
+        EXPECT_THROW(direct.track(manager.get_buffer()), std::logic_error);
+        EXPECT_THROW(grouped.track(manager.get_buffer()), std::logic_error);
+        EXPECT_FALSE(DescriptorAccess::Owned(resource)->use.busy());
+        phase.cancel();
+    }
+    TEST_F(BindGraphicResourceVulkanIntegrationTest, BothEntriesKeepTheirSnapshotsWhenPollingDestroysTheCommandAndContinuesCancelsOrStartsAPeer) {
+        for (const bool track_only : {false, true}) {
+            for (const bool tracked : {false, true}) {
+                for (int action = 0; action < 3; ++action) {
+                    SCOPED_TRACE(::testing::Message() << track_only << '/' << tracked << '/' << action);
+                    const std::array<std::uint32_t, COUNT> zero{};
+                    ASSERT_TRUE(output->copy(zero));
+                    StorageBuffer alternate(device, sizeof(zero));
+                    ASSERT_TRUE(alternate.copy(zero));
+                    auto [success, replacement] = pool.bind(*binding);
+                    ASSERT_TRUE(success);
+                    replacement.update(&alternate);
+                    auto use = tracked ? vsl::ResourceUseGroup::ForDescriptor(1, resource, vsl::ResourceRetention::COMPLETION) : nullptr;
+                    auto command = std::make_unique<vsl::command::BindGraphicResource>(resource, vsl::graphic_resource::BindingDestination::COMPUTE, *pipeline, 0, use);
+                    auto previous = make_manager().independent(1), current = previous.independent(1);
+                    auto submitted = previous.start_phase<vsl::ComputePhase>();
+                    std::optional<vsl::ComputePhase> phase, peer;
+                    const std::uint32_t base = 953;
+                    bool called = false;
+                    vsl_test::DeferredAction release([&] {
+                        called = true;
+                        command.reset();
+                        if (action) {
+                            phase->cancel();
+                            if (action == 2) {
+                                peer.emplace(current);
+                                *peer << *pipeline << vsl::command::BindGraphicResource(replacement, vsl::graphic_resource::BindingDestination::COMPUTE, *pipeline)
+                                      << vsl::command::PushConstant(*layout, vsl::ShaderFlag::COMPUTE, base);
+                            }
+                        }
+                    });
+                    vsl::ResourceUseGroup::ForDescriptor(1, resource, vsl::ResourceRetention::COMPLETION)->record(previous.get_buffer());
+                    previous.get_buffer().retain_until_complete(release.owner());
+                    ASSERT_EQ(submitted.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+                    device.data_->device.waitIdle();
+                    phase.emplace(current);
+                    *phase << *pipeline << vsl::command::PushConstant(*layout, vsl::ShaderFlag::COMPUTE, base);
+                    const auto record = [&] {
+                        if (track_only)
+                            command->track(current.get_buffer());
+                        else
+                            command->invoke(current.get_pool(), current.get_buffer(), current);
+                    };
+                    if (action)
+                        EXPECT_THROW(record(), std::logic_error);
+                    else
+                        EXPECT_NO_THROW(record());
+                    EXPECT_TRUE(called);
+                    EXPECT_FALSE(command);
+                    if (!action) {
+                        if (track_only)
+                            *phase << vsl::command::BindGraphicResource(resource, vsl::graphic_resource::BindingDestination::COMPUTE, *pipeline);
+                        *phase << vsl::command::Dispatch(COUNT);
+                        make_host_visible(current.get_buffer());
+                        ASSERT_EQ(phase->submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+                        ASSERT_TRUE(phase->completion().wait());
+                    } else if (peer) {
+                        *peer << vsl::command::Dispatch(COUNT);
+                        make_host_visible(current.get_buffer());
+                        ASSERT_EQ(peer->submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+                        ASSERT_TRUE(peer->completion().wait());
+                    }
+                    std::array<std::uint32_t, COUNT> actual{};
+                    auto mapped = output->data(sizeof(actual));
+                    std::memcpy(actual.data(), mapped.data, sizeof(actual));
+                    if (!action)
+                        ExpectSequence(actual, base);
+                    else
+                        EXPECT_EQ(actual, zero);
+                    auto other = alternate.data(sizeof(actual));
+                    std::memcpy(actual.data(), other.data, sizeof(actual));
+                    if (action == 2)
+                        ExpectSequence(actual, base);
+                    else
+                        EXPECT_EQ(actual, zero);
+                }
+            }
+        }
+    }
+    TEST_F(BindGraphicResourceVulkanIntegrationTest, BindKeepsItsStartingDescriptorsWhenPollingReplacesTheCommandInputs) {
+        for (const bool tracked : {false, true}) {
+            SCOPED_TRACE(tracked);
+            const std::array<std::uint32_t, COUNT> zero{};
+            ASSERT_TRUE(output->copy(zero));
+            StorageBuffer alternate(device, sizeof(zero));
+            ASSERT_TRUE(alternate.copy(zero));
+            auto [success, replacement] = pool.bind(*binding);
+            ASSERT_TRUE(success);
+            replacement.update(&alternate);
+            auto use = tracked ? vsl::ResourceUseGroup::ForDescriptor(1, resource, vsl::ResourceRetention::COMPLETION) : nullptr;
+            auto command = std::make_unique<vsl::command::BindGraphicResource>(resource, vsl::graphic_resource::BindingDestination::COMPUTE, *pipeline, 0, use);
+            auto previous = make_manager().independent(1), current = previous.independent(1);
+            auto submitted = previous.start_phase<vsl::ComputePhase>();
+            bool called = false;
+            vsl_test::DeferredAction release([&] {
+                called = true;
+                command->resources = {replacement};
+            });
+            vsl::ResourceUseGroup::ForDescriptor(1, resource, vsl::ResourceRetention::COMPLETION)->record(previous.get_buffer());
+            previous.get_buffer().retain_until_complete(release.owner());
+            ASSERT_EQ(submitted.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            device.data_->device.waitIdle();
+            const std::uint32_t base = 379;
+            auto phase = current.start_phase<vsl::ComputePhase>();
+            phase << *pipeline << vsl::command::PushConstant(*layout, vsl::ShaderFlag::COMPUTE, base);
+            command->invoke(current.get_pool(), current.get_buffer(), current);
+            EXPECT_TRUE(called);
+            phase << vsl::command::Dispatch(COUNT);
+            make_host_visible(current.get_buffer());
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            ASSERT_TRUE(phase.completion().wait());
+            std::array<std::uint32_t, COUNT> actual{};
+            auto mapped = output->data(sizeof(actual));
+            std::memcpy(actual.data(), mapped.data, sizeof(actual));
+            ExpectSequence(actual, base);
+            auto other = alternate.data(sizeof(actual));
+            std::memcpy(actual.data(), other.data, sizeof(actual));
+            EXPECT_EQ(actual, zero);
+        }
+    }
     TEST_F(BindGraphicResourceVulkanIntegrationTest, SingleAndVectorResourcesBindToComputeShader) {
         vsl::command::BindGraphicResource command(resource, vsl::graphic_resource::BindingDestination::COMPUTE);
         ASSERT_EQ(command.resources.size(), 1u);
-        EXPECT_EQ(command.resources.front().data_, resource.data_);
+        EXPECT_EQ(DescriptorAccess::Owned(command.resources.front()), DescriptorAccess::Owned(resource));
         EXPECT_EQ(command.destination, vsl::graphic_resource::BindingDestination::COMPUTE);
         EXPECT_EQ(command.first_binding, 0u);
         EXPECT_FALSE(command.pipeline.has_value());
@@ -30,6 +171,12 @@ namespace {
     class DescriptorResourceLifetimeVulkanIntegrationTest : public vsl_test::ComputeVulkanIntegrationTest {
         bool validate_vulkan() const override;
     };
+
+    void make_host_visible(vsl::CommandBuffer buffer) {
+        const vk::MemoryBarrier visible{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
+        const vsl::NativeRecordingContext recording(std::move(buffer));
+        vk::CommandBuffer(recording.native_command_buffer()).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, visible, {}, {});
+    }
 
     bool DescriptorResourceLifetimeVulkanIntegrationTest::validate_vulkan() const {
         return true;
@@ -110,7 +257,7 @@ namespace {
         auto manager = make_manager();
         vsl::Completion completion;
         std::weak_ptr<vsl::impl::BufferImpl> weak_output = BufferAccess::Owned(*(output)).share();
-        std::weak_ptr<vsl::impl::GraphicResourceImpl> weak_resource = resource.data_;
+        std::weak_ptr<vsl::impl::GraphicResourceImpl> weak_resource = DescriptorAccess::Owned(resource).share();
         std::weak_ptr<vsl::impl::PipelineImpl> weak_pipeline = pipeline->data_;
         {
             auto phase = manager.start_phase<vsl::ComputePhase>();
@@ -127,7 +274,7 @@ namespace {
             layout.reset();
             binding.reset();
             resources.reset();
-            pool.data_.reset();
+            DescriptorAccess::Owned(pool).reset();
             output.reset();
             EXPECT_FALSE(weak_resource.expired());
             EXPECT_FALSE(weak_pipeline.expired());

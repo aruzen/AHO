@@ -1,4 +1,7 @@
+#include <VSL/lifetime/descriptor_access.hpp>
 #include "support/vulkan_fixture.hpp"
+#include "support/fixed_parent.hpp"
+#include <VSL/lifetime/pipeline_recipe.hpp>
 #include <VSL/lifetime/resource_arena.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/descriptor_storage.hpp>
@@ -9,6 +12,10 @@
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/vulkan/commands/image_upload.hpp>
 #include <VSL/vulkan/commands/image_readback.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
+}
 
 namespace {
     namespace t = vsl::typed;
@@ -63,6 +70,57 @@ namespace {
         vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_frame.comp.spv"));
         return {device, vsl::pipeline_layout::ShaderGroup("arena descriptors", {shader})};
     }
+    TEST_F(DescriptorArenaVulkanIntegrationTest, RecipeLayoutImportsAndHeapSetsKeepCompositeProvenanceAndRejectOnlyTheirParentCycle) {
+        using Access = l::detail::OwnerAccess;
+        std::weak_ptr<void> observed_arena, observed_context;
+        std::optional<vsl::GraphicResource> kept;
+        {
+            constexpr std::array<t::ResourceRequest, 1> requests{{{{1}, DESCRIPTOR_LAYOUT}}};
+            constexpr t::ResourcePlan<1> plan(requests);
+            const vsl::DescriptorLayoutCreateInfo info{{{0, vsl::graphic_resource::Type::STORAGE_BUFFER, vsl::ShaderFlag::COMPUTE}}};
+            const std::array<l::ResourceInit, 1> inputs{info};
+            l::ResourceArena arena(device, plan, inputs);
+            observed_arena = arena.owner();
+            auto context = vsl_test::FixedParentOwner::Create(arena.owner_ref());
+            observed_context = context;
+            auto composite = arena.descriptor_layout({1});
+            composite = DescriptorAccess::FromOwned(context->node.ref(context).alias(DescriptorAccess::Owned(composite).get()));
+            l::PipelineRecipeDraft draft(device);
+            draft.inject(vsl::pipeline_layout::ResourceBinding{{composite}});
+            const auto snapshot = draft.snapshot();
+            const auto& recipe = snapshot.definition();
+            ASSERT_EQ(recipe.binding_layouts.size(), 1u);
+            EXPECT_EQ(Access::Node(recipe.sources.at(recipe.binding_sources.front())), &context->node);
+            const auto layouts = snapshot.layout_sources();
+            ASSERT_EQ(layouts.size(), 1u);
+            EXPECT_EQ(Access::Node(layouts.front().owner_ref()), &context->node);
+            EXPECT_FALSE(DescriptorAccess::Owned(layouts.front()).owner_before(context));
+            EXPECT_FALSE(context.owner_before(DescriptorAccess::Owned(layouts.front()).share()));
+            constexpr std::array<t::ResourceRequest, 1> imports{{{{2}, DESCRIPTOR_LAYOUT, true}}};
+            constexpr t::ResourcePlan<1> import_plan(imports);
+            const std::array<l::ResourceInit, 1> import_inputs{layouts.front()};
+            l::ResourceArena external(device, import_plan, import_inputs);
+            EXPECT_EQ(Access::Node(external.descriptor_layout({2}).owner_ref()), &context->node);
+            const auto parent = context->node.ref(context);
+            vsl_test::expect_fixed_parent(external.owner_ref(), parent);
+            vsl_test::expect_fixed_parent(external.owner_ref(), arena.owner_ref(), false);
+            vsl::GraphicResourceManager manager(device);
+            auto pool = manager.make({{vsl::graphic_resource::Type::STORAGE_BUFFER, 1}});
+            auto [success, set] = pool.bind(external.descriptor_layout({2}));
+            ASSERT_TRUE(success);
+            ASSERT_TRUE(DescriptorAccess::Owned(set)->descriptor_set);
+            vsl_test::expect_fixed_parent(set.owner_ref(), parent);
+            vsl_test::expect_fixed_parent(set.owner_ref(), arena.owner_ref(), false);
+            kept = std::move(set);
+        }
+        EXPECT_FALSE(observed_context.expired());
+        EXPECT_FALSE(observed_arena.expired());
+        ASSERT_TRUE(kept);
+        EXPECT_EQ(kept->get_pool().get_manager(), nullptr);
+        kept.reset();
+        EXPECT_TRUE(observed_context.expired());
+        EXPECT_TRUE(observed_arena.expired());
+    }
     std::uint32_t execute_set(Pipeline& pipeline, vsl::CommandManager manager, const TypedSet& set, const vsl::BufferView& output) {
         auto phase = manager.start_phase<vsl::ComputePhase>();
         phase << pipeline.bind_resources(set).dispatch(1);
@@ -75,11 +133,11 @@ namespace {
     TEST_F(DescriptorArenaVulkanIntegrationTest, FreezeRejectsASeparateControlBlockBeforePollingTheRealResource) {
         vsl::GraphicResourceManager descriptors(device);
         TypedSet source(device, descriptors);
-        vsl::GraphicResource forged{{std::make_shared<int>(0), source.backend().data_.get()}};
+        auto forged = DescriptorAccess::FromShared(std::shared_ptr<vsl::impl::GraphicResourceImpl>(std::make_shared<int>(0), DescriptorAccess::Owned(source.backend()).get()));
         auto imported = TypedSet::FromResource(device, forged);
         EXPECT_THROW(imported.freeze_dependencies(), std::invalid_argument);
-        EXPECT_EQ(source.backend().data_->owner_context->policy, l::DependencyPolicy::DYNAMIC);
-        EXPECT_FALSE(source.backend().data_->owner_context->node.updating());
+        EXPECT_EQ(DescriptorAccess::Owned(source.backend())->owner_context->policy, l::DependencyPolicy::DYNAMIC);
+        EXPECT_FALSE(DescriptorAccess::Owned(source.backend())->owner_context->node.updating());
     }
     TEST_F(DescriptorArenaVulkanIntegrationTest, FreezeFailureKeepsDynamicOwnersAndCanBeRetriedAfterCancellation) {
         const auto initializers = inputs();
@@ -96,13 +154,13 @@ namespace {
         auto phase = manager.start_phase<vsl::ComputePhase>();
         second.resource_use()->record(manager.get_buffer());
         EXPECT_THROW(arena.freeze_dependencies(), std::logic_error);
-        EXPECT_EQ(first.backend().data_->owner_context->policy, l::DependencyPolicy::DYNAMIC);
-        EXPECT_FALSE(first.backend().data_->owner_context->node.updating());
+        EXPECT_EQ(DescriptorAccess::Owned(first.backend())->owner_context->policy, l::DependencyPolicy::DYNAMIC);
+        EXPECT_FALSE(DescriptorAccess::Owned(first.backend())->owner_context->node.updating());
         phase.cancel();
         EXPECT_NO_THROW(arena.freeze_dependencies());
-        EXPECT_EQ(first.backend().data_->owner_context->policy, l::DependencyPolicy::FIXED);
-        EXPECT_TRUE(first.backend().data_->bindings.at(0).front().owners.empty());
-        EXPECT_TRUE(second.backend().data_->bindings.at(0).front().owners.empty());
+        EXPECT_EQ(DescriptorAccess::Owned(first.backend())->owner_context->policy, l::DependencyPolicy::FIXED);
+        EXPECT_TRUE(DescriptorAccess::Owned(first.backend())->bindings.at(0).front().owners.empty());
+        EXPECT_TRUE(DescriptorAccess::Owned(second.backend())->bindings.at(0).front().owners.empty());
         EXPECT_NO_THROW(first.write<0>(external));
         EXPECT_THROW(second.write<0>(other), std::invalid_argument);
     }
@@ -145,13 +203,13 @@ namespace {
         auto first = TypedSet::FromResource(device, arena.descriptor_set({101}), vsl::ResourceRetention::COMPLETION);
         auto second = TypedSet::FromResource(device, arena.descriptor_set({102}), vsl::ResourceRetention::COMPLETION);
         const auto root = arena.owner();
-        const auto base = reinterpret_cast<std::uintptr_t>(first.backend().data_.get()) - PLAN.placement({101}).offset;
-        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(second.backend().data_.get()) - base, PLAN.placement({102}).offset);
-        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(arena.descriptor_pool({202}).data_.get()) - base, PLAN.placement({202}).offset);
-        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(arena.descriptor_layout({201}).data_.get()) - base, PLAN.placement({201}).offset);
-        EXPECT_NE(&first.backend().data_->use, &second.backend().data_->use);
-        EXPECT_FALSE(first.backend().data_.owner_before(second.backend().data_));
-        EXPECT_FALSE(second.backend().data_.owner_before(first.backend().data_));
+        const auto base = reinterpret_cast<std::uintptr_t>(DescriptorAccess::Owned(first.backend()).get()) - PLAN.placement({101}).offset;
+        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(DescriptorAccess::Owned(second.backend()).get()) - base, PLAN.placement({102}).offset);
+        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(DescriptorAccess::Owned(arena.descriptor_pool({202})).get()) - base, PLAN.placement({202}).offset);
+        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(DescriptorAccess::Owned(arena.descriptor_layout({201})).get()) - base, PLAN.placement({201}).offset);
+        EXPECT_NE(&DescriptorAccess::Owned(first.backend())->use, &DescriptorAccess::Owned(second.backend())->use);
+        EXPECT_FALSE(DescriptorAccess::Owned(first.backend()).owner_before(DescriptorAccess::Owned(second.backend())));
+        EXPECT_FALSE(DescriptorAccess::Owned(second.backend()).owner_before(DescriptorAccess::Owned(first.backend())));
         const auto uniform = UniformView::FromView(arena.buffer({1}), 1);
         first.write<0>(uniform);
         first.write<1>(StorageView::FromView(arena.buffer({2}), 1));
@@ -171,9 +229,9 @@ namespace {
         EXPECT_EQ(read_value(arena.buffer({3})), 37u);
         const auto pool = arena.descriptor_pool({202});
         const auto from_set = arena.descriptor_set({101}).get_pool();
-        EXPECT_FALSE(pool.data_.owner_before(from_set.data_));
-        EXPECT_FALSE(from_set.data_.owner_before(pool.data_));
-        EXPECT_EQ(pool.data_->resources.size(), 2u);
+        EXPECT_FALSE(DescriptorAccess::Owned(pool).owner_before(DescriptorAccess::Owned(from_set)));
+        EXPECT_FALSE(DescriptorAccess::Owned(from_set).owner_before(DescriptorAccess::Owned(pool)));
+        EXPECT_EQ(DescriptorAccess::Owned(pool)->resources.size(), 2u);
         using Wrong = t::DescriptorSet<0, t::UniformBinding<9, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
         EXPECT_THROW(t::TypedDescriptorSet<Wrong>::FromResource(device, arena.descriptor_set({101})), std::invalid_argument);
         EXPECT_THROW(TypedSet::FromResource({}, arena.descriptor_set({101})), std::invalid_argument);
@@ -182,7 +240,7 @@ namespace {
         EXPECT_TRUE(group->tracks_descriptor(owned));
         EXPECT_TRUE(group->tracks_descriptor(arena.descriptor_set({101})));
         EXPECT_FALSE(group->tracks_descriptor(arena.descriptor_set({102})));
-        const vsl::GraphicResource borrowed{std::shared_ptr<vsl::impl::GraphicResourceImpl>(std::shared_ptr<void>{}, owned.data_.get())};
+        const auto borrowed = DescriptorAccess::FromShared(std::shared_ptr<vsl::impl::GraphicResourceImpl>(std::shared_ptr<void>{}, DescriptorAccess::Owned(owned).get()));
         EXPECT_THROW(TypedSet::FromResource(device, borrowed), std::invalid_argument);
         EXPECT_THROW(vsl::ResourceUseGroup::ForDescriptor(2, borrowed), std::invalid_argument);
         const vsl::LogicalDeviceAccessor borrowed_device{std::shared_ptr<vsl::impl::LogicalDeviceImpl>(std::shared_ptr<void>{}, device.data_.get())};
@@ -204,7 +262,7 @@ namespace {
                 auto set = TypedSet::FromResource(device, arena.descriptor_set({101}), vsl::ResourceRetention::COMPLETION);
                 set.write<0>(UniformView::FromView(arena.buffer({1}), 1, 0, arena.buffer({3}).resource_use()));
                 set.write<1>(StorageView::FromView(arena.buffer({2}), 1));
-                const auto& element = set.backend().data_->bindings.at(0).front();
+                const auto& element = DescriptorAccess::Owned(set.backend())->bindings.at(0).front();
                 EXPECT_TRUE(element.owners.empty());
                 EXPECT_TRUE(element.constraint.owners.empty());
                 EXPECT_EQ(element.constraint.states.size(), 1u);
@@ -312,11 +370,11 @@ namespace {
             set->write<0>(UniformView::FromView(arena.buffer({1}), 1));
             set->write<1>(StorageView::FromView(arena.buffer({2}), 1));
         }
-        EXPECT_EQ(pool.data_->resources.size(), 2u);
-        EXPECT_EQ(pool.data_->allocated_sets, 2u);
+        EXPECT_EQ(DescriptorAccess::Owned(pool)->resources.size(), 2u);
+        EXPECT_EQ(DescriptorAccess::Owned(pool)->allocated_sets, 2u);
         const auto imported_pool = arena.descriptor_pool({202});
-        EXPECT_FALSE(imported_pool.data_.owner_before(pool.data_));
-        EXPECT_FALSE(pool.data_.owner_before(imported_pool.data_));
+        EXPECT_FALSE(DescriptorAccess::Owned(imported_pool).owner_before(DescriptorAccess::Owned(pool)));
+        EXPECT_FALSE(DescriptorAccess::Owned(pool).owner_before(DescriptorAccess::Owned(imported_pool)));
         auto commands = make_manager().independent(1), other = commands.independent(1);
         auto pending = commands.start_phase<vsl::ComputePhase>();
         auto submitted = other.start_phase<vsl::ComputePhase>();
@@ -328,44 +386,44 @@ namespace {
         EXPECT_NO_THROW(first.require_complete());
         pending.cancel();
         EXPECT_NO_THROW(manager.destroy(pool));
-        EXPECT_EQ(pool.data_->allocated_sets, 0u);
-        EXPECT_FALSE(first.backend().data_->descriptor_set);
-        EXPECT_FALSE(second.backend().data_->descriptor_set);
-        EXPECT_TRUE(first.backend().data_->bindings.empty());
-        EXPECT_TRUE(second.backend().data_->bindings.empty());
+        EXPECT_EQ(DescriptorAccess::Owned(pool)->allocated_sets, 0u);
+        EXPECT_FALSE(DescriptorAccess::Owned(first.backend())->descriptor_set);
+        EXPECT_FALSE(DescriptorAccess::Owned(second.backend())->descriptor_set);
+        EXPECT_TRUE(DescriptorAccess::Owned(first.backend())->bindings.empty());
+        EXPECT_TRUE(DescriptorAccess::Owned(second.backend())->bindings.empty());
         EXPECT_THROW(first.require_complete(), std::logic_error);
         EXPECT_THROW(second.resource_use()->record(other.get_buffer()), std::logic_error);
     }
 
     TEST_F(DescriptorArenaVulkanIntegrationTest, LaterSetCapacityFailureRollsBackNativeAllocationAndRegionBeforeRetry) {
         auto info = POOL_INFO;
-        vsl::graphic_resource::Pool pool{l::make_heap_descriptor_pool(device, info)};
+        auto pool = DescriptorAccess::FromShared(l::make_heap_descriptor_pool(device, info));
         vsl::graphic_resource::BindingLayout layout(device, LAYOUT_INFO.bindings);
         auto [allocated, occupied] = pool.bind(layout);
         ASSERT_TRUE(allocated);
-        ASSERT_EQ(pool.data_->allocated_sets, 1u);
+        ASSERT_EQ(DescriptorAccess::Owned(pool)->allocated_sets, 1u);
         constexpr std::array<t::ResourceRequest, 4> requests{{{{101}, DESCRIPTOR_SET}, {{102}, DESCRIPTOR_SET}, {{201}, DESCRIPTOR_LAYOUT, true}, {{202}, DESCRIPTOR_POOL, true}}};
         const t::ResourcePlan<4> plan(requests);
         const std::array<l::ResourceInit, 4> initializers{l::DescriptorSetInit{{202}, {201}}, l::DescriptorSetInit{{202}, {201}}, layout, pool};
         s::ArenaMemory memory(plan.bytes(), plan.alignment());
         EXPECT_THROW((l::ResourceArena(device, plan, initializers, memory)), std::runtime_error);
-        EXPECT_EQ(pool.data_->allocated_sets, 1u);
-        EXPECT_EQ(pool.data_->resources.size(), 1u);
-        EXPECT_TRUE(occupied.data_->descriptor_set);
+        EXPECT_EQ(DescriptorAccess::Owned(pool)->allocated_sets, 1u);
+        EXPECT_EQ(DescriptorAccess::Owned(pool)->resources.size(), 1u);
+        EXPECT_TRUE(DescriptorAccess::Owned(occupied)->descriptor_set);
         occupied = {};
-        EXPECT_EQ(pool.data_->allocated_sets, 0u);
+        EXPECT_EQ(DescriptorAccess::Owned(pool)->allocated_sets, 0u);
         {
             l::ResourceArena retried(device, plan, initializers, memory);
-            EXPECT_EQ(pool.data_->allocated_sets, 2u);
-            EXPECT_EQ(pool.data_->resources.size(), 2u);
-            EXPECT_TRUE(retried.descriptor_set({101}).data_->descriptor_set);
-            EXPECT_TRUE(retried.descriptor_set({102}).data_->descriptor_set);
+            EXPECT_EQ(DescriptorAccess::Owned(pool)->allocated_sets, 2u);
+            EXPECT_EQ(DescriptorAccess::Owned(pool)->resources.size(), 2u);
+            EXPECT_TRUE(DescriptorAccess::Owned(retried.descriptor_set({101}))->descriptor_set);
+            EXPECT_TRUE(DescriptorAccess::Owned(retried.descriptor_set({102}))->descriptor_set);
         }
-        EXPECT_EQ(pool.data_->allocated_sets, 0u);
+        EXPECT_EQ(DescriptorAccess::Owned(pool)->allocated_sets, 0u);
         auto wrong = initializers;
         wrong[1] = l::DescriptorSetInit{{201}, {202}};
         EXPECT_THROW((l::ResourceArena(device, plan, wrong, memory)), std::invalid_argument);
-        EXPECT_EQ(pool.data_->allocated_sets, 0u);
+        EXPECT_EQ(DescriptorAccess::Owned(pool)->allocated_sets, 0u);
         EXPECT_NO_THROW((l::ResourceArena(device, plan, initializers, memory)));
     }
 
@@ -383,14 +441,14 @@ namespace {
             observed = arena.owner();
             auto set = arena.descriptor_set({101});
             retained = set.get_pool();
-            EXPECT_FALSE(retained.data_.owner_before(pool.data_));
-            EXPECT_FALSE(pool.data_.owner_before(retained.data_));
+            EXPECT_FALSE(DescriptorAccess::Owned(retained).owner_before(DescriptorAccess::Owned(pool)));
+            EXPECT_FALSE(DescriptorAccess::Owned(pool).owner_before(DescriptorAccess::Owned(retained)));
         }
         EXPECT_TRUE(observed.expired());
-        EXPECT_EQ(pool.data_->allocated_sets, 0u);
+        EXPECT_EQ(DescriptorAccess::Owned(pool)->allocated_sets, 0u);
         auto [success, resource] = retained.bind(layout);
         EXPECT_TRUE(success);
-        EXPECT_TRUE(resource.data_->descriptor_set);
+        EXPECT_TRUE(DescriptorAccess::Owned(resource)->descriptor_set);
     }
 
     TEST_F(DescriptorArenaVulkanIntegrationTest, SameRootImageAndSamplerBindingsDoNotKeepTheArenaAlive) {
@@ -410,7 +468,7 @@ namespace {
             observed = arena.owner();
             auto set = t::TypedDescriptorSet<Textures>::FromResource(device, arena.descriptor_set({1}), vsl::ResourceRetention::COMPLETION);
             set.write<2>(t::TypedTexture(arena.image({2}), arena.sampler({3})));
-            EXPECT_TRUE(set.backend().data_->bindings.at(2).front().owners.empty());
+            EXPECT_TRUE(DescriptorAccess::Owned(set.backend())->bindings.at(2).front().owners.empty());
             set.resource_use()->record(manager.get_buffer());
             EXPECT_TRUE(arena.image({2}).use_state().busy());
             EXPECT_TRUE(arena.sampler({3}).use_state().busy());
@@ -431,8 +489,8 @@ namespace {
         set.write<0>(UniformView::FromView(arena.buffer({1}), 1, 0, dependencies[0].resource_use()));
         set.write<1>(StorageView::FromView(arena.buffer({2}), 1, 0, dependencies[0].resource_use()));
         set.resource_use()->replace(0, {dependencies[1].resource_use()});
-        EXPECT_EQ(set.backend().data_->bindings.at(0).front().constraint.states.front(), dependencies[0].resource_use().state.get());
-        EXPECT_EQ(set.backend().data_->bindings.at(1).front().constraint.states.front(), dependencies[1].resource_use().state.get());
+        EXPECT_EQ(DescriptorAccess::Owned(set.backend())->bindings.at(0).front().constraint.states.front(), dependencies[0].resource_use().state.get());
+        EXPECT_EQ(DescriptorAccess::Owned(set.backend())->bindings.at(1).front().constraint.states.front(), dependencies[1].resource_use().state.get());
         write_value(arena.buffer({1}), 73);
         auto pipeline = make_pipeline();
         auto manager = make_manager().independent(1);
@@ -540,16 +598,16 @@ namespace {
         l::ResourceArena external(device, PLAN, initializers, l::DependencyPolicy::DYNAMIC);
         auto external_set = external.descriptor_set({101});
         ASSERT_NO_THROW(external_set.update(composite, 0));
-        const auto& owners = external_set.data_->bindings.at(0).front().owners;
+        const auto& owners = DescriptorAccess::Owned(external_set)->bindings.at(0).front().owners;
         ASSERT_EQ(owners.size(), 1u);
         EXPECT_TRUE(owners.front().managed());
         EXPECT_FALSE(owners.front().owner_before(context));
         EXPECT_FALSE(context.owner_before(owners.front().share()));
         auto set = arena.descriptor_set({101});
         EXPECT_THROW(set.update(composite, 0), std::invalid_argument);
-        EXPECT_TRUE(set.data_->bindings.empty());
+        EXPECT_TRUE(DescriptorAccess::Owned(set)->bindings.empty());
         EXPECT_NO_THROW(set.update(arena.buffer({1}), 0));
-        EXPECT_EQ(set.data_->bindings.at(0).size(), 1u);
+        EXPECT_EQ(DescriptorAccess::Owned(set)->bindings.at(0).size(), 1u);
     }
 
     TEST_F(DescriptorArenaVulkanIntegrationTest, ImageAndSamplerRoundTripsKeepCompositeProvenanceAndRejectOnlyTheOwningArenaCycle) {
@@ -602,7 +660,7 @@ namespace {
             check(external.sampler({20}));
             auto accepted = second.descriptor_set({5});
             ASSERT_NO_THROW(accepted.update(external.image({10}), external.sampler({20}), 0));
-            const auto& owners = accepted.data_->bindings.at(0).front().owners;
+            const auto& owners = DescriptorAccess::Owned(accepted)->bindings.at(0).front().owners;
             ASSERT_FALSE(owners.empty());
             for (const auto& owner : owners) {
                 EXPECT_TRUE(owner.managed());
@@ -611,7 +669,7 @@ namespace {
             }
             auto rejected = first.descriptor_set({5});
             EXPECT_THROW(rejected.update(external.image({10}), external.sampler({20}), 0), std::invalid_argument);
-            EXPECT_TRUE(rejected.data_->bindings.empty());
+            EXPECT_TRUE(DescriptorAccess::Owned(rejected)->bindings.empty());
             EXPECT_NO_THROW(rejected.update(physical_image, physical_sampler, 0));
         }
         EXPECT_TRUE(observed.expired());
@@ -633,7 +691,7 @@ namespace {
         const auto logical = std::make_shared<vsl::ResourceUseState>();
         EXPECT_THROW(second.write<0>(UniformView::FromView(b.buffer({1}), 1, 0, {logical, a.owner_ref()})), std::invalid_argument);
         EXPECT_THROW(second.resource_use()->replace(0, {{logical, first.backend().owner_ref()}}), std::invalid_argument);
-        EXPECT_TRUE(second.backend().data_->bindings.at(0).front().constraint.states.empty());
+        EXPECT_TRUE(DescriptorAccess::Owned(second.backend())->bindings.at(0).front().constraint.states.empty());
         auto pipeline = make_pipeline();
         auto manager = make_manager().independent(1);
         EXPECT_EQ(execute_set(pipeline, manager, second, b.buffer({2})), 83u);
@@ -665,7 +723,7 @@ namespace {
             EXPECT_THROW(source.write<0>(UniformView::FromView(arena.buffer({1}), 1, 0, {heap.owner_ref().alias(static_cast<vsl::ResourceUseState*>(nullptr)), {}})), std::invalid_argument);
             retained->write<0>(UniformView::FromView(arena.buffer({1}), 1));
             retained->write<1>(StorageView::FromView(arena.buffer({2}), 1));
-            EXPECT_TRUE(retained->backend().data_->bindings.at(0).front().owners.empty());
+            EXPECT_TRUE(DescriptorAccess::Owned(retained->backend())->bindings.at(0).front().owners.empty());
             write_value(arena.buffer({1}), 97);
             auto pipeline = make_pipeline();
             EXPECT_EQ(execute_set(pipeline, make_manager().independent(1), *retained, arena.buffer({2})), 97u);
@@ -686,7 +744,7 @@ namespace {
         auto previous = std::shared_ptr<int>(new int(1), [&](int* value) {
             delete value;
             ++callbacks;
-            EXPECT_TRUE(first.backend().data_->bindings.at(0).front().constraint.states.empty());
+            EXPECT_TRUE(DescriptorAccess::Owned(first.backend())->bindings.at(0).front().constraint.states.empty());
             EXPECT_NO_THROW(first.write<1>(StorageView::FromView(b.buffer({2}), 1)));
             EXPECT_THROW(second.write<0>(UniformView::FromView(a.buffer({1}), 1)), std::invalid_argument);
         });
@@ -719,7 +777,7 @@ namespace {
         t::TypedUniformBuffer<std::uint32_t> replacement(device, std::uint32_t{7});
         auto native = array.backend();
         native.update(replacement.backend(), 0);
-        EXPECT_EQ(native.data_->bindings.at(0).size(), 2u);
+        EXPECT_EQ(DescriptorAccess::Owned(native)->bindings.at(0).size(), 2u);
         EXPECT_THROW(second.write<0>(UniformView::FromView(b.buffer({1}), 1, 0, {logical, a.owner_ref()})), std::invalid_argument);
         const auto local = UniformView::FromView(a.buffer({1}), 1);
         array.write<0>(std::array{local, local});
@@ -741,7 +799,7 @@ namespace {
         auto second = TypedSet::FromResource(device, b.descriptor_set({101}), vsl::ResourceRetention::COMPLETION);
         second.write<0>(UniformView::FromView(a.buffer({1}), 1));
         second.write<1>(StorageView::FromView(b.buffer({2}), 1));
-        EXPECT_TRUE(second.backend().data_->bindings.at(0).front().owners.empty());
+        EXPECT_TRUE(DescriptorAccess::Owned(second.backend())->bindings.at(0).front().owners.empty());
         write_value(a.buffer({1}), 107);
         auto pipeline = make_pipeline();
         EXPECT_EQ(execute_set(pipeline, make_manager().independent(1), second, b.buffer({2})), 107u);

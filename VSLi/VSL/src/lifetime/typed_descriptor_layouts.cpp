@@ -1,24 +1,29 @@
+#include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/typed_descriptor_layouts.hpp>
 #include <VSL/operation/descriptor_ops.hpp>
 #include <VSL/vulkan/stages/resource_binding.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
+}
+
 namespace VSL_NAMESPACE::typed::detail {
     LogicalDeviceAccessor descriptor_layout_device(std::span<const graphic_resource::BindingLayout> layouts) {
         if (layouts.empty())
             return {};
         const auto& first = layouts.front();
-        if (!first.data_ || !first.data_.use_count() || !first.data_->layout || !first.data_->device)
+        if (!DescriptorAccess::Owned(first) || !DescriptorAccess::Owned(first).use_count() || !DescriptorAccess::Owned(first)->layout || !DescriptorAccess::Owned(first)->device)
             throw std::invalid_argument("Typed layout collection requires owning live sources");
-        return lifetime::device_from_child(first.data_);
+        return lifetime::device_from_child(DescriptorAccess::Owned(first));
     }
     void validate_descriptor_layout_source(LogicalDeviceAccessor device, const graphic_resource::BindingLayout& layout,
                                            std::span<const graphic_resource::BindingPoint> points) {
         lifetime::require_device_owner(device);
-        if (!device.data_ || !device.data_.use_count() || !device.data_->device || !layout.data_ || !layout.data_.use_count())
+        if (!device.data_ || !device.data_.use_count() || !device.data_->device || !DescriptorAccess::Owned(layout) || !DescriptorAccess::Owned(layout).use_count())
             throw std::invalid_argument("Typed layout collection requires device and source owners");
-        operation::validate_descriptor_layout(*layout.data_, *device.data_, points);
+        operation::validate_descriptor_layout(*DescriptorAccess::Owned(layout), *device.data_, points);
     }
     void inject_descriptor_layouts(PipelineLayoutEditAccessor layout, LogicalDeviceAccessor device,
                                    std::span<const graphic_resource::BindingLayout> sources, std::span<const std::uint32_t> numbers,

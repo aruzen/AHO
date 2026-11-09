@@ -1,9 +1,15 @@
+#include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/typed_descriptor_layouts.hpp>
 #include <VSL/utils/typed_resource_bundle.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
 #include "support/vulkan_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
+    using VSL_NAMESPACE::lifetime::detail::DescriptorManagerAccess;
+} // namespace
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -61,7 +67,7 @@ namespace {
         EXPECT_THROW((OneLayouts(std::array{source}, source)), std::invalid_argument);
         for (const bool borrowed : {false, true}) {
             auto invalid = source;
-            invalid.data_ = borrowed ? std::shared_ptr<vsl::impl::ResourceBindingLayoutImpl>(std::shared_ptr<void>{}, source.data_.get()) : nullptr;
+            DescriptorAccess::Owned(invalid) = borrowed ? std::shared_ptr<vsl::impl::ResourceBindingLayoutImpl>(std::shared_ptr<void>{}, DescriptorAccess::Owned(source).get()) : nullptr;
             EXPECT_THROW((OneLayouts(std::array{invalid}, empty)), std::invalid_argument);
         }
         for (int field = 0; field < 4; ++field) {
@@ -81,8 +87,8 @@ namespace {
         auto moved = std::move(layouts);
         EXPECT_THROW(layouts.layout<2>(), std::invalid_argument);
         EXPECT_THROW((vsl::PipelineLayout(device, t::detail::DescriptorLayoutInjection<One>{layouts})), std::invalid_argument);
-        EXPECT_EQ(moved.layout<2>().data_, source.data_);
-        EXPECT_EQ(moved.hole_layout()->data_, empty.data_);
+        EXPECT_EQ(DescriptorAccess::Owned(moved.layout<2>()), DescriptorAccess::Owned(source));
+        EXPECT_EQ(DescriptorAccess::Owned(*(moved.hole_layout())), DescriptorAccess::Owned(empty));
     }
     TEST_F(SharedLayoutsVulkanIntegrationTest, BundleSourcesShareHandlesAndFillEveryHoleWithOneLayout) {
         auto manager = make_manager();
@@ -93,16 +99,16 @@ namespace {
         const auto& frame = bundle.get(phase);
         vsl::PipelineLayout layout(device, t::detail::DescriptorLayoutInjection<Resources>{sources});
         ASSERT_EQ(layout.recipe().binding_layouts.size(), Resources::SET_COUNT);
-        EXPECT_EQ(layout.recipe().binding_layouts[2], frame.set<2>().backend().data_->layout);
-        EXPECT_EQ(layout.recipe().binding_layouts[5], frame.set<5>().backend().data_->layout);
+        EXPECT_EQ(layout.recipe().binding_layouts[2], DescriptorAccess::Owned(frame.set<2>().backend())->layout);
+        EXPECT_EQ(layout.recipe().binding_layouts[5], DescriptorAccess::Owned(frame.set<5>().backend())->layout);
         const auto empty = sources.hole_layout();
         ASSERT_TRUE(empty);
         for (const auto set : {0, 1, 3, 4})
-            EXPECT_EQ(layout.recipe().binding_layouts[set], empty->data_.get());
+            EXPECT_EQ(layout.recipe().binding_layouts[set], DescriptorAccess::Owned(*(empty)).get());
         EXPECT_EQ(layout.recipe().sources.size(), 1u);
-        EXPECT_FALSE(sources.layout<2>().data_.owner_before(sources.layout<5>().data_));
-        EXPECT_FALSE(empty->data_.owner_before(sources.layout<2>().data_));
-        EXPECT_EQ(descriptors.data_->pools.size(), 0u);
+        EXPECT_FALSE(DescriptorAccess::Owned(sources.layout<2>()).owner_before(DescriptorAccess::Owned(sources.layout<5>())));
+        EXPECT_FALSE(DescriptorAccess::Owned(*(empty)).owner_before(DescriptorAccess::Owned(sources.layout<2>())));
+        EXPECT_EQ(DescriptorManagerAccess::Data(descriptors)->pools.size(), 0u);
         phase.cancel();
     }
     TEST_F(SharedLayoutsVulkanIntegrationTest, SparseDeclaredEmptyLayoutIsReusedAndTheDeviceLimitIsCheckedBeforeExpansion) {
@@ -113,7 +119,7 @@ namespace {
         vsl::GraphicResourceManager descriptors(device);
         EmptyBundle bundle(manager, descriptors);
         const auto sources = bundle.descriptor_layouts();
-        EXPECT_EQ(sources.hole_layout()->data_, sources.layout<500>().data_);
+        EXPECT_EQ(DescriptorAccess::Owned(*(sources.hole_layout())), DescriptorAccess::Owned(sources.layout<500>()));
         EXPECT_THROW((vsl::PipelineLayout(device, t::detail::DescriptorLayoutInjection<Sparse>{sources})), std::out_of_range);
         using NoResources = t::ResourceAllocationSchema<t::ResourceSchema<>>;
         t::TypedResourceBundle<NoResources, t::ArenaStorage<>> empty(manager, descriptors);
@@ -128,7 +134,7 @@ namespace {
         {
             Bundle bundle(manager, descriptors, bundle_sizes());
             sources.emplace(bundle.descriptor_layouts());
-            shared = sources->layout<2>().data_;
+            shared = DescriptorAccess::Owned(sources->layout<2>()).share();
             auto phase = manager.start_phase<vsl::ComputePhase>();
             const auto& frame = bundle.get(phase);
             local = frame.buffer<2, 0>().storage_view().owner();

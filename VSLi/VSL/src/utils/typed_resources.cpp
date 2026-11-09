@@ -1,3 +1,4 @@
+#include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/utils/typed_block_validation.hpp>
 #include <VSL/utils/typed_resources.hpp>
 #include <VSL/lifetime/device_owner.hpp>
@@ -12,12 +13,16 @@
 #include <VSL/operation/descriptor_ops.hpp>
 #include <algorithm>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
+}
+
 namespace VSL_NAMESPACE::typed::detail {
     void freeze_descriptor_dependencies(const GraphicResource& resource) {
-        const auto data = resource.data_;
+        const auto data = DescriptorAccess::Owned(resource);
         if (!data || !data->owner_context)
             throw std::invalid_argument("Descriptor freeze requires a managed resource");
-        if (!data->owner_node || data->owner_node->retiring() || !data->owner_node->matches(data) ||
+        if (!data->owner_node || data->owner_node->retiring() || !data->owner_node->matches(lifetime::detail::OwnerAccess::Shared(data)) ||
             data->owner_node != &data->owner_context->node)
             throw std::invalid_argument("Descriptor freeze requires its canonical owner");
         if (!data->owner_context->single_resource)
@@ -83,16 +88,16 @@ namespace VSL_NAMESPACE::typed::detail {
         return value._use;
     }
     void require_descriptor_complete(const GraphicResource& resource) {
-        if (!resource.data_)
+        if (!DescriptorAccess::Owned(resource))
             throw std::logic_error("Typed descriptor resource has been destroyed");
-        lifetime::require_descriptor_complete(*resource.data_);
+        lifetime::require_descriptor_complete(*DescriptorAccess::Owned(resource));
     }
     void validate_descriptor_resource(const GraphicResource& resource, LogicalDeviceAccessor device, std::span<const graphic_resource::BindingPoint> points) {
         lifetime::require_device_owner(device);
-        if (!resource.data_ || !resource.data_.use_count())
+        if (!DescriptorAccess::Owned(resource) || !DescriptorAccess::Owned(resource).use_count())
             throw std::invalid_argument("Typed descriptor import requires a resource");
-        lifetime::require_descriptor_valid(*resource.data_);
-        const auto& target = *resource.data_;
+        lifetime::require_descriptor_valid(*DescriptorAccess::Owned(resource));
+        const auto& target = *DescriptorAccess::Owned(resource);
         if (!device.data_ || !device.data_.use_count() || target.pool->device != device.data_.get() || !target.layout)
             throw std::invalid_argument("Typed descriptor import device/layout mismatch");
         operation::validate_descriptor_layout(*target.layout, *device.data_, points);
@@ -106,7 +111,7 @@ namespace VSL_NAMESPACE::typed::detail {
         return std::move(resources.front());
     }
     void write_descriptor(GraphicResource resource, graphic_resource::BindingPoint point, std::span<const DescriptorValue> values) {
-        const auto& target = resource.data_;
+        const auto& target = DescriptorAccess::Owned(resource);
         if (!target || !target->pool || !target->pool->descriptor_pool || !target->descriptor_set)
             throw std::logic_error("Typed descriptor resource has been destroyed");
         if (values.size() != point.amount)

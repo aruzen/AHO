@@ -1,4 +1,9 @@
+#include <VSL/lifetime/descriptor_access.hpp>
 #include "support/vulkan_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
+}
 
 namespace {
     using ResourceBindingVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
@@ -13,7 +18,7 @@ namespace {
         binding.injection(layout);
         const auto& info = vsl_test::inspect_layout(layout).pipeline_layout;
         ASSERT_EQ(info.setLayoutCount, 2u);
-        EXPECT_EQ(info.pSetLayouts[0], first.data_->layout);
-        EXPECT_EQ(info.pSetLayouts[1], second.data_->layout);
+        EXPECT_EQ(info.pSetLayouts[0], DescriptorAccess::Owned(first)->layout);
+        EXPECT_EQ(info.pSetLayouts[1], DescriptorAccess::Owned(second)->layout);
     }
 } // namespace

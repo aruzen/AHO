@@ -254,6 +254,44 @@ Upload／Readbackは自己snapshot、全入力の検証、使用登録と記録c
 
 strict79ファイル／64TUと変更箇所の補完検査、installed public consumer30種、旧入力拒否14種、private bridgeの非install、archive／生成header一致、Debug／Release／x86_64の寸法生成とartifact混在拒否、source393件とMSBuild登録も確認した。Image backendは旧SDK1.3.296でも構文検査した。Windows／Linux実機、x86_64の全体実行、device lost実機、並行CPUアクセス、性能比較は未検証である。残るShader／起動資源／descriptor manager／recipe／WindowData等の公開入口とImpl実定義の責務分割は後続の単位で扱う。
 
+## 順序12f: Shader／ShaderGroupの所有入口
+
+ShaderAccessorとShaderGroupの公開`data_`、ShaderAccessorのraw Impl構築を廃止する。Shaderのfile／SPIR-V配列constructor、make_shader、name／type／code／get_deviceは維持する。空判定はbool、所有境界の受渡しはowner_refを使う。code()はlvalueの借用で、参照先を使う間は所有者を生存させる。
+
+```cpp
+vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, words);
+vsl::pipeline_layout::ShaderGroup group("compute", {shader});
+auto alias = group;
+auto moved = std::move(group);
+// aliasとmovedは同じ編集内容を共有する。move元のgroupはboolで空を確認できる。
+```
+
+ShaderGroupのcopyは同じCPU編集状態を共有する。move元のadd／remove／injectionはlogic_errorを返す。removeの両入口はCPU側の一覧をコピーして編集し、swapで新しい一覧を公開してから旧ownerを回収する。ownerの解放callbackが同Groupへ追加しても、公開済みの一覧を使う。この編集scratchのvector確保と参照カウント操作は残る。
+
+内部ではShaderAccessorとGroup内の各Shader参照に元のOwnedRefを保存する。Group→recipe→不変snapshot→生成入力の復元→ResourceArenaの外部import／getterでも、元のnodeとcontrol blockを引き継ぐ。heap factoryのshared Impl返却はprivate境界で一度だけ正規化し、以後の通常操作は保持済みImplへ直接届く。所有wrapperやcontrol blockは追加しない。
+
+```cpp
+namespace t = vsl::typed;
+namespace l = vsl::lifetime;
+constexpr std::array<t::ResourceRequest, 2> requests{{
+    {{1}, vsl::storage::ResourceKind::SHADER},
+    {{2}, vsl::storage::ResourceKind::SHADER}}};
+constexpr t::ResourcePlan<2> plan(requests);
+const std::array<l::ResourceInit, 2> inputs{
+    vsl::ShaderCreateInfo{vsl::ShaderType::VERTEX, vertex_words},
+    vsl::ShaderCreateInfo{vsl::ShaderType::FRAGMENT, fragment_words}};
+l::ResourceArena arena(device, plan, inputs);
+vsl::pipeline_layout::ShaderGroup graphics("arena", {arena.shader({1}), arena.shader({2})});
+```
+
+Shader moduleはPipeline構築呼出し中の依存であり、完成したPipelineはShader／Group／recipeを保持しない。生成用のsnapshotが残っている間は再構築用Shaderを保持する。CPU arenaに入るShaderImpl本体と、SPIR-V code／entry名の内部確保、Vulkan moduleの生成は別に扱う。OwnedRefのnode欄、Groupの共有編集状態、recipeのvector／snapshot、生成scratchの確保は後続の測定対象である。
+
+今回の閉鎖後も、descriptor／起動資源／runtime graphics／同期資源、recipe定義とWindowDataの公開Impl入口、実定義の4責務分割は残る。
+
+macOS arm64／Clang20 C++26、MoltenVK、Vulkan validation、ASan／UBSanで、新runtime3件と既存Typed computeのheap／arena拡張、関連130件、全VSL1,159成功（対応外format3 skip）／AHO GPU192・CPU1,071、compile契約252件を確認した。変更前のnode脱落・循環検査の見逃しと、旧in-place削除でのcallback公開順序の失敗を再現し、最終実装へbyte一致で復元している。heap／arenaのPNG3枚が一致し、resize後もPipeline生成1回を維持する。
+
+strict17ファイル／12TU、installed public consumer30種と旧入口／一時借用7負例、private bridge非install、archive／生成header一致、Debug／Release／x86_64の寸法生成、構成混在拒否と同構成の旧親header拒否、source394件とMSBuild登録も確認した。Impl寸法定数が同じでも、公開型や内部所有型の異なるartifactは混在させない。Windows／Linux実機、x86_64全体実行、device lost実機、並行CPUアクセスと性能比較は未検証である。
+
 2026-11-06。Bufferの4責務分離が統合されたmaster `6b1f0166`を基点とする。[Bufferの契約](buffer-generation-contracts.md)と[責務の配置](buffer-layer-layout.md)を維持する。
 
 ## 方針と段階

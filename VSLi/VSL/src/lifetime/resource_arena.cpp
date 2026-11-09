@@ -1,3 +1,4 @@
+#include <VSL/lifetime/shader_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/sampler_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
@@ -19,6 +20,10 @@
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/storage/cpu_region.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ShaderAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::ImageAccess;
@@ -226,9 +231,9 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     resource.reference = layout->data_.get();
                     resource.owner_index = retain_dependency(layout->owner_ref());
                 } else if (const auto* shader = std::get_if<ShaderAccessor>(&value)) {
-                    if (!shader->data_.use_count() || !shader->data_ || !shader->data_->shader_module || shader->data_->device != device.data_.get())
+                    if (!ShaderAccess::Owned(*(shader)).use_count() || !ShaderAccess::Owned(*(shader)) || !ShaderAccess::Owned(*(shader))->shader_module || ShaderAccess::Owned(*(shader))->device != device.data_.get())
                         throw std::invalid_argument("External shader requires an owner on the arena device");
-                    resource.reference = shader->data_.get();
+                    resource.reference = ShaderAccess::Owned(*(shader)).get();
                     resource.owner_index = retain_dependency(shader->owner_ref());
                 }
             }
@@ -298,7 +303,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
             (void)find(*id, storage::ResourceKind::SHADER);
         } else {
             const auto& shader = std::get<ShaderAccessor>(source);
-            if (!shader.data_ || !shader.data_.use_count() || !shader.data_->shader_module || shader.data_->device != device.data_.get())
+            if (!ShaderAccess::Owned(shader) || !ShaderAccess::Owned(shader).use_count() || !ShaderAccess::Owned(shader)->shader_module || ShaderAccess::Owned(shader)->device != device.data_.get())
                 throw std::invalid_argument("Pipeline shader source requires an owner on the arena device");
         }
     }
@@ -337,7 +342,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
     impl::ShaderImpl* ResourceArenaOwner::resolve(const PipelineShaderSource& source) const {
         if (const auto* id = std::get_if<typed::ResourceId>(&source))
             return find(*id, storage::ResourceKind::SHADER).get<impl::ShaderImpl>();
-        return std::get<ShaderAccessor>(source).data_.get();
+        return ShaderAccess::Owned(std::get<ShaderAccessor>(source)).get();
     }
     void ResourceArenaOwner::construct(size_t index, const ResourceInit& initializer) {
         auto& resource = resources[index];
@@ -704,7 +709,9 @@ namespace VSL_NAMESPACE::lifetime {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::SHADER);
-        return {{resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.get<impl::ShaderImpl>()}};
+        if (resource.placement.external)
+            return ShaderAccess::FromOwned(_owner->dependencies.at(resource.owner_index).alias(resource.get<impl::ShaderImpl>()));
+        return ShaderAccess::FromOwned(_owner->descriptor_context.node.ref(_owner).alias(resource.get<impl::ShaderImpl>()));
     }
     SamplerAccessor ResourceArena::sampler(typed::ResourceId id) const {
         if (!_owner)

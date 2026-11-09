@@ -5,6 +5,20 @@
 #include <vector>
 
 namespace vsl_test {
+    struct FixedParentOwner {
+        vsl::lifetime::DependencyNode node;
+        vsl::lifetime::OwnerRef parent;
+        explicit FixedParentOwner(vsl::lifetime::OwnerRef parent) : parent(std::move(parent)) {}
+        ~FixedParentOwner() { node.retire(); }
+        static std::shared_ptr<FixedParentOwner> Create(vsl::lifetime::OwnerRef parent) {
+            auto owner = std::make_shared<FixedParentOwner>(std::move(parent));
+            owner->node.publish(owner, owner.get(), Visit);
+            return owner;
+        }
+        static void Visit(const void* context, vsl::lifetime::DependencyNode::EdgeVisitor visitor, void* output) {
+            visitor(output, static_cast<const FixedParentOwner*>(context)->parent);
+        }
+    };
     template<typename Impl>
     vsl::lifetime::OwnerRef canonical_owner(const vsl::lifetime::OwnedRef<Impl>& value) {
         if (!value.managed())

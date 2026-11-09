@@ -1,3 +1,4 @@
+#include <VSL/lifetime/shader_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/vulkan/pipeline.hpp>
@@ -5,6 +6,10 @@
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/lifetime/identity_access.hpp>
 #include <stdexcept>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ShaderAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -29,9 +34,9 @@ namespace VSL_NAMESPACE {
             std::vector<impl::ShaderImpl*> result;
             result.reserve(shaders.size());
             for (const auto& shader : shaders) {
-                if (!shader.data_ || !shader.data_.use_count())
+                if (!ShaderAccess::Owned(shader) || !ShaderAccess::Owned(shader).use_count())
                     throw std::invalid_argument("Pipeline shader source requires an owner");
-                result.push_back(shader.data_.get());
+                result.push_back(ShaderAccess::Owned(shader).get());
             }
             return result;
         }

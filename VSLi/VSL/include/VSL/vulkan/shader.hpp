@@ -55,8 +55,22 @@ namespace VSL_NAMESPACE {
         //        All = 0x7FFFFFFF,
     };
 
+    struct ShaderCreateInfo;
+    namespace lifetime::detail {
+        struct ShaderAccess;
+    }
     struct ShaderAccessor {
-        std::shared_ptr<VSL_NAMESPACE::impl::ShaderImpl> data_;
+    private:
+        friend struct lifetime::detail::ShaderAccess;
+        lifetime::OwnedRef<impl::ShaderImpl> _owner;
+        explicit ShaderAccessor(lifetime::OwnedRef<impl::ShaderImpl> owner) : _owner(std::move(owner)) {}
+
+    protected:
+        ShaderAccessor(LogicalDeviceAccessor device, ShaderCreateInfo info);
+
+    public:
+        ShaderAccessor() = default;
+        explicit operator bool() const noexcept { return bool(_owner); }
         std::string name() const;
         ShaderType type() const;
         std::span<const std::uint32_t> code() const&;

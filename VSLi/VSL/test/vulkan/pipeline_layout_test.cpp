@@ -1,7 +1,12 @@
+#include <VSL/lifetime/shader_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include "support/compute_fixture.hpp"
 #include <VSL/lifetime/resource_arena.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ShaderAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -207,7 +212,7 @@ namespace {
     TEST_F(PipelineLayoutArenaComputeVulkanIntegrationTest, RuntimePipelineAndSavedPushDoNotKeepTheShaderRecipe) {
         pipeline.reset();
         layout.reset();
-        const std::weak_ptr<void> shader_owner = shader->data_;
+        const std::weak_ptr<void> shader_owner = ShaderAccess::Owned(*(shader)).share();
         std::weak_ptr<void> native_owner, unused_binding;
         std::optional<vsl::command::PushConstant> push;
         std::uint32_t value = 617;
@@ -267,7 +272,7 @@ namespace {
         auto manager = make_manager();
         pipeline.reset();
         layout.reset();
-        const std::weak_ptr<void> shader_owner = shader->data_;
+        const std::weak_ptr<void> shader_owner = ShaderAccess::Owned(*(shader)).share();
         std::weak_ptr<void> native_owner;
         std::uint32_t value = 271;
         {

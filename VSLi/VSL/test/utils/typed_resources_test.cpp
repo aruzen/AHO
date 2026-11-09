@@ -1,6 +1,8 @@
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/sampler_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
+#include <VSL/lifetime/shader_access.hpp>
+#include "support/fixed_parent.hpp"
 #include <VSL/utils/typed_pipeline.hpp>
 #include "support/render_fixture.hpp"
 #include <VSL/utils/typed_compute.hpp>
@@ -347,13 +349,24 @@ namespace {
         using OutputSet = t::DescriptorSet<1, t::StorageBinding<4, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
         using ComputeSchema = t::ResourceSchema<OutputSet, ParametersSet>;
         auto verify = [&](auto policy) {
-            std::weak_ptr<vsl::impl::ShaderImpl> shader_owner;
+            namespace l = vsl::lifetime;
+            using Access = l::detail::ShaderAccess;
+            std::weak_ptr<void> shader_owner, composite_owner;
             auto typed_pipeline = [&] {
                 vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_descriptors.comp.spv"));
-                shader_owner = shader.data_;
-                return t::TypedComputePipeline<ComputeSchema>(policy, device, vsl::pipeline_layout::ShaderGroup("typed compute", {shader}));
+                constexpr std::array<t::ResourceRequest, 1> requests{{{{1}, vsl::storage::ResourceKind::SHADER}}};
+                constexpr t::ResourcePlan<1> plan(requests);
+                const std::array<l::ResourceInit, 1> inputs{vsl::ShaderCreateInfo{shader.type(), {shader.code().begin(), shader.code().end()}}};
+                l::ResourceArena arena(device, plan, inputs);
+                shader_owner = arena.owner();
+                auto context = vsl_test::FixedParentOwner::Create(arena.owner_ref());
+                composite_owner = context;
+                const auto placed = arena.shader({1});
+                const auto source = Access::FromOwned(context->node.ref(context).alias(Access::Owned(placed).get()));
+                return t::TypedComputePipeline<ComputeSchema>(policy, device, vsl::pipeline_layout::ShaderGroup("typed compute", {source}));
             }();
             EXPECT_TRUE(shader_owner.expired());
+            EXPECT_TRUE(composite_owner.expired());
             const auto& runtime = typed_pipeline.backend().data_;
             EXPECT_EQ(runtime->owner_node == runtime->layout->owner_node, (std::same_as<decltype(policy), t::ArenaStorage<>>));
             vsl::GraphicResourceManager manager(device);

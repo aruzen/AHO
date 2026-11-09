@@ -1,4 +1,9 @@
+#include <VSL/lifetime/shader_access.hpp>
 #include "support/render_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ShaderAccess;
+}
 namespace {
     using GraphicsPipelineVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
     TEST_F(GraphicsPipelineVulkanIntegrationTest, CreatesPipelineAndInvokesItToProducePixels) {
@@ -23,7 +28,7 @@ namespace {
     };
     TEST_F(PipelineSnapshotVulkanIntegrationTest, FrozenCopyBuildsAfterOriginalShadersAndLayoutAreReleased) {
         auto frozen = layout->copy().freeze();
-        std::weak_ptr<vsl::impl::ShaderImpl> weak_vertex = vertex->data_;
+        std::weak_ptr<vsl::impl::ShaderImpl> weak_vertex = ShaderAccess::Owned(*(vertex)).share();
         vertex.reset();
         fragment.reset();
         layout.reset();

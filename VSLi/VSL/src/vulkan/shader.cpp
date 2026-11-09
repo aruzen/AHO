@@ -7,6 +7,7 @@
 #include <VSL/vulkan/shader.hpp>
 #include <VSL/lifetime/shader_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
+#include <VSL/lifetime/shader_access.hpp>
 
 #include <fstream>
 #include <cstdint>
@@ -41,11 +42,18 @@ VSL_NAMESPACE::Shader<type_>::Shader(VSL_NAMESPACE::LogicalDeviceAccessor device
 
 template<VSL_NAMESPACE::ShaderType type_>
 VSL_NAMESPACE::Shader<type_>::Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path, std::string name)
-    : ShaderAccessor{lifetime::make_heap_shader(device, {type_, read_shader_code(path), std::move(name)})} {}
+    : ShaderAccessor(device, {type_, read_shader_code(path), std::move(name)}) {}
 
 template<VSL_NAMESPACE::ShaderType type_>
-VSL_NAMESPACE::Shader<type_>::Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::span<const std::uint32_t> code, std::string name) {
-    data_ = lifetime::make_heap_shader(device, {type_, {code.begin(), code.end()}, std::move(name)});
+VSL_NAMESPACE::Shader<type_>::Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::span<const std::uint32_t> code, std::string name)
+    : ShaderAccessor(device, {type_, {code.begin(), code.end()}, std::move(name)}) {}
+
+VSL_NAMESPACE::ShaderAccessor::ShaderAccessor(LogicalDeviceAccessor device, ShaderCreateInfo info)
+    : ShaderAccessor(lifetime::detail::ShaderAccess::FromShared(lifetime::make_heap_shader(std::move(device), std::move(info)))) {}
+
+VSL_NAMESPACE::ShaderAccessor VSL_NAMESPACE::lifetime::detail::ShaderAccess::FromShared(std::shared_ptr<impl::ShaderImpl> owner) {
+    const auto* node = owner ? owner->owner_node : nullptr;
+    return FromOwned(owned_ref(std::move(owner), node));
 }
 
 template<VSL_NAMESPACE::ShaderType type_>
@@ -54,27 +62,27 @@ std::string VSL_NAMESPACE::Shader<type_>::name() const {
 }
 
 std::string VSL_NAMESPACE::ShaderAccessor::name() const {
-    if (!data_)
+    if (!_owner)
         throw std::logic_error("Shader is empty");
-    return data_->name;
+    return _owner->name;
 }
 VSL_NAMESPACE::ShaderType VSL_NAMESPACE::ShaderAccessor::type() const {
-    if (!data_)
+    if (!_owner)
         throw std::logic_error("Shader is empty");
-    return static_cast<ShaderType>(data_->stage);
+    return static_cast<ShaderType>(_owner->stage);
 }
 std::span<const std::uint32_t> VSL_NAMESPACE::ShaderAccessor::code() const& {
-    if (!data_)
+    if (!_owner)
         throw std::logic_error("Shader is empty");
-    return data_->code;
+    return _owner->code;
 }
 VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::ShaderAccessor::get_device() const {
-    if (!data_ || !data_->device || !data_->shader_module)
+    if (!_owner || !_owner->device || !_owner->shader_module)
         throw std::logic_error("Shader is empty");
-    return lifetime::device_from_child(data_);
+    return lifetime::device_from_child(_owner);
 }
 VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::ShaderAccessor::owner_ref() const {
-    return lifetime::detail::owned_ref(data_, data_ ? data_->owner_node : nullptr);
+    return _owner;
 }
 
 template struct VSL_NAMESPACE::Shader<VSL_NAMESPACE::ShaderType::ERROR_>;

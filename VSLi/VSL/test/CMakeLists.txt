@@ -334,6 +334,16 @@ if (VSL_TEST_SOURCES)
         "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/pipeline.cpp"
         "-DTEST_CASE=0" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
     set_tests_properties(VSL.Pipeline.Compile.ExplicitRuntime PROPERTIES LABELS compile TIMEOUT 60)
+    set(shader_contract_names Valid ShaderData ShaderOwner ShaderRawConstructor ShaderGroupData ShaderGroupOwner TemporaryShaderCode ConstTemporaryShaderCode)
+    foreach(case RANGE 1 7)
+        list(GET shader_contract_names ${case} name)
+        add_test(NAME "VSL.Pipeline.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/pipeline.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=ShaderAccessor|ShaderGroup|private|deleted"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.Pipeline.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
     add_library(vsl-frame-buffer-style-contract OBJECT EXCLUDE_FROM_ALL contracts/frame_buffer.cpp)
     target_link_libraries(vsl-frame-buffer-style-contract PRIVATE VSL)
     add_test(NAME VSL.FrameBuffer.Compile.PublicPlacement COMMAND "${CMAKE_COMMAND}"

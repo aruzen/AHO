@@ -6,6 +6,8 @@
 
 `SubmissionImpl`はStatus／Failure／native error codeと、未完了時のweak Workを持つ結果。CompletionとCompletionObservationはこの同じ結果を共有する。terminalではweak参照も切り、保存した結果がmake_sharedのWork用control blockを保ち続けないようにする。結果からDevice・fence・資源を強所有しない。
 
+10dの[送信結果とnative使用完了](native-submission-proof.md)で、UNKNOWNの論理FAILEDとnative使用を分離する。weak Workはnative完了・退避解除・実際の資源解放まで維持する。保存したFAILEDだけではidleと判断せず、再利用判定は`busy()`を用いる。結果からGPU ownerへの強い参照は増やさない。
+
 `SubmissionWork`は結果を強所有し、Device／fence／依存資源のpinを持つ。PENDING時はPhaseと外部Command Domainが保持し、送信成功後はDomainのslot一覧が保持する。[順序8a](command-domain.md)でnative CommandBufferImpl内の強い所有を取り除く。利用者が結果を保存しなくても、GPU使用中のWorkは失われない。最終所有者はdrainしてからnative資源を回収する。
 
 operationは解決済みのnative Device／Fenceを受けてpoll／wait／idleを実行する。syncは結果を分類し、terminalを確定する。lifetimeは登録済みcallbackでCOMPLETION保持を解除する。結果を先に公開するため、資源の解放中にも終端が観測できる。結果とWorkの間に強い所有循環はなく、Frame自身がCompletionを保存しても成立する。

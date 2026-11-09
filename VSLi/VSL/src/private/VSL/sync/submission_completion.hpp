@@ -11,5 +11,7 @@ namespace VSL_NAMESPACE::sync {
     void publish_terminal(impl::SubmissionWork& work, Completion::Status status,
                           Completion::Failure failure = Completion::Failure::NONE, std::int32_t error_code = 0) noexcept;
     void observe_submission_result(impl::SubmissionWork& work, std::int32_t native_result);
+    void save_submit_result(impl::SubmissionImpl& result, std::int32_t native_result) noexcept;
+    void save_native_idle(impl::SubmissionWork& work, std::int32_t native_result) noexcept;
     void finish_submission(impl::SubmissionWork& submission) noexcept;
 } // namespace VSL_NAMESPACE::sync

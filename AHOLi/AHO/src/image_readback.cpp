@@ -116,8 +116,7 @@ namespace AHO_NAMESPACE {
         for (auto& slot : slots) {
             if (!slot->request.expired())
                 continue;
-            auto status = slot->completion.status();
-            if (status == VSL_NAMESPACE::Completion::Status::PENDING || status == VSL_NAMESPACE::Completion::Status::SUBMITTED)
+            if (slot->completion.busy())
                 continue;
             if (slot->buffer && slot->buffer->requested_size() >= bytes)
                 return slot;

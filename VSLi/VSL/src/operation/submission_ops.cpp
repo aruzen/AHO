@@ -12,7 +12,9 @@ namespace VSL_NAMESPACE::operation {
         NATIVE_CALLS = _previous;
     }
     vk::Result poll_fence(vk::Device device, vk::Fence fence) noexcept {
-        return static_cast<vk::Result>(VULKAN_HPP_DEFAULT_DISPATCHER.vkGetFenceStatus(static_cast<VkDevice>(device), static_cast<VkFence>(fence)));
+        return static_cast<vk::Result>(NATIVE_CALLS && NATIVE_CALLS->fence_status
+                                           ? NATIVE_CALLS->fence_status(NATIVE_CALLS->context, device, fence)
+                                           : VULKAN_HPP_DEFAULT_DISPATCHER.vkGetFenceStatus(static_cast<VkDevice>(device), static_cast<VkFence>(fence)));
     }
     vk::Result wait_fence(vk::Device device, vk::Fence fence, std::uint64_t timeout) noexcept {
         return wait_fences(device, {&fence, 1}, timeout);
@@ -28,5 +30,11 @@ namespace VSL_NAMESPACE::operation {
         if (NATIVE_CALLS && NATIVE_CALLS->wait_idle)
             return static_cast<vk::Result>(NATIVE_CALLS->wait_idle(NATIVE_CALLS->context, device));
         return static_cast<vk::Result>(VULKAN_HPP_DEFAULT_DISPATCHER.vkDeviceWaitIdle(static_cast<VkDevice>(device)));
+    }
+    vk::Result queue_submit(vk::Queue queue, const vk::SubmitInfo& info, vk::Fence fence) noexcept {
+        const auto* native = &static_cast<const VkSubmitInfo&>(info);
+        return static_cast<vk::Result>(NATIVE_CALLS && NATIVE_CALLS->queue_submit
+                                           ? NATIVE_CALLS->queue_submit(NATIVE_CALLS->context, queue, native, fence)
+                                           : VULKAN_HPP_DEFAULT_DISPATCHER.vkQueueSubmit(queue, 1, native, fence));
     }
 } // namespace VSL_NAMESPACE::operation

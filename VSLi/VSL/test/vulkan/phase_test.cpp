@@ -8,6 +8,10 @@
 #include <VSL/operation/presentation_ops.hpp>
 #include <VSL/operation/synchronization_ops.hpp>
 #include <VSL/sync/presentation_state.hpp>
+#include <VSL/lifetime/submission_retention.hpp>
+#include <VSL/lifetime/command_storage.hpp>
+#include <VSL/operation/submission_ops.hpp>
+#include <VSL/operation/command_ops.hpp>
 #include <functional>
 namespace {
     struct RecordCommand : VSL_NAMESPACE::command::Command {
@@ -50,25 +54,50 @@ namespace {
         VkResult failure = VK_ERROR_OUT_OF_HOST_MEMORY;
         static VkResult Reset(void* context, VkDevice device, std::uint32_t count, const VkFence* fences) noexcept;
     };
-
+    struct SubmitProbe {
+        VkResult result = VK_SUCCESS, idle_result = VK_SUCCESS;
+        bool enqueue = true, defer_observation = false;
+        unsigned calls = 0;
+        std::function<void()> callback, idle_callback;
+        static VkResult Submit(void* context, VkQueue queue, const VkSubmitInfo* info, VkFence fence) noexcept;
+        static VkResult Status(void* context, VkDevice device, VkFence fence) noexcept;
+        static VkResult Wait(void* context, VkDevice device, std::uint32_t count, const VkFence* fences, VkBool32 all, std::uint64_t timeout) noexcept;
+        static VkResult Idle(void* context, VkDevice device) noexcept;
+        vsl::operation::SubmissionNativeCalls native_calls() { return {this, Idle, Wait, Submit, Status}; }
+    };
+    struct CommandProbe {
+        enum class Point {
+            RESET,
+            BEGIN,
+            END
+        };
+        Point point;
+        std::function<void()> callback;
+        void invoke(Point current);
+        static VkResult Reset(void* context, VkCommandBuffer buffer, VkCommandBufferResetFlags flags) noexcept;
+        static VkResult Begin(void* context, VkCommandBuffer buffer, const VkCommandBufferBeginInfo* info) noexcept;
+        static VkResult End(void* context, VkCommandBuffer buffer) noexcept;
+        vsl::operation::CommandNativeCalls native_calls() { return {this, Reset, Begin, End}; }
+    };
+    struct IndexedSignalPhase : vsl::ComputePhase {
+        using ComputePhase::ComputePhase;
+        void select_signal(std::uint32_t index) { signal_index = index; }
+    };
     struct VertexCountSource {
         std::size_t count;
         std::size_t get_vertex_size() { return count; }
         void invoke(VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) {}
     };
-
     struct VertexCountConsumer {
         std::shared_ptr<std::optional<std::size_t>> received;
         void set_vertex_size(std::optional<std::size_t> value) { *received = value; }
         void invoke(VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) {}
     };
-
     struct VertexCountDelegate : VSL_NAMESPACE::command::DelegateCommand, VSL_NAMESPACE::command::VertexSizeRequire {
         std::optional<std::size_t> received;
         void set_vertex_size(std::optional<std::size_t> value) override { received = value; }
         void invoke(VSL_NAMESPACE::DefaultPhaseStream&, VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) override {}
     };
-
     struct IncrementVertexCount : VSL_NAMESPACE::command::Command,
                                   VSL_NAMESPACE::command::VertexSizeRequire,
                                   VSL_NAMESPACE::command::VertexSizeHolder {
@@ -77,6 +106,57 @@ namespace {
         std::size_t get_vertex_size() override { return input.value_or(0) + 1; }
         void invoke(VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) override {}
     };
+    VkResult SubmitProbe::Submit(void* context, VkQueue queue, const VkSubmitInfo* info, VkFence fence) noexcept {
+        auto& probe = *static_cast<SubmitProbe*>(context);
+        ++probe.calls;
+        if (auto callback = std::exchange(probe.callback, {}))
+            callback();
+        if (probe.enqueue) {
+            const auto native = VULKAN_HPP_DEFAULT_DISPATCHER.vkQueueSubmit(queue, 1, info, fence);
+            if (native != VK_SUCCESS)
+                return native;
+            if (probe.result != VK_SUCCESS) {
+                // 故障注入の回帰時にも、使用中native資源を破棄しない。CPU観測だけを遅延させる。
+                const auto complete = VULKAN_HPP_DEFAULT_DISPATCHER.vkQueueWaitIdle(queue);
+                if (complete != VK_SUCCESS)
+                    return complete;
+            }
+        }
+        return probe.result;
+    }
+    VkResult SubmitProbe::Status(void* context, VkDevice device, VkFence fence) noexcept {
+        return static_cast<SubmitProbe*>(context)->defer_observation ? VK_NOT_READY : VULKAN_HPP_DEFAULT_DISPATCHER.vkGetFenceStatus(device, fence);
+    }
+    VkResult SubmitProbe::Wait(void* context, VkDevice device, std::uint32_t count, const VkFence* fences, VkBool32 all, std::uint64_t timeout) noexcept {
+        return static_cast<SubmitProbe*>(context)->defer_observation && !timeout ? VK_TIMEOUT : VULKAN_HPP_DEFAULT_DISPATCHER.vkWaitForFences(device, count, fences, all, timeout);
+    }
+    VkResult SubmitProbe::Idle(void* context, VkDevice device) noexcept {
+        auto& probe = *static_cast<SubmitProbe*>(context);
+        if (auto callback = std::exchange(probe.idle_callback, {}))
+            callback();
+        const auto native = VULKAN_HPP_DEFAULT_DISPATCHER.vkDeviceWaitIdle(device);
+        return native == VK_SUCCESS ? probe.idle_result : native;
+    }
+    void CommandProbe::invoke(Point current) {
+        if (current == point)
+            if (auto invoke = std::exchange(callback, {}))
+                invoke();
+    }
+    VkResult CommandProbe::Reset(void* context, VkCommandBuffer buffer, VkCommandBufferResetFlags flags) noexcept {
+        const auto result = VULKAN_HPP_DEFAULT_DISPATCHER.vkResetCommandBuffer(buffer, flags);
+        static_cast<CommandProbe*>(context)->invoke(Point::RESET);
+        return result;
+    }
+    VkResult CommandProbe::Begin(void* context, VkCommandBuffer buffer, const VkCommandBufferBeginInfo* info) noexcept {
+        const auto result = VULKAN_HPP_DEFAULT_DISPATCHER.vkBeginCommandBuffer(buffer, info);
+        static_cast<CommandProbe*>(context)->invoke(Point::BEGIN);
+        return result;
+    }
+    VkResult CommandProbe::End(void* context, VkCommandBuffer buffer) noexcept {
+        const auto result = VULKAN_HPP_DEFAULT_DISPATCHER.vkEndCommandBuffer(buffer);
+        static_cast<CommandProbe*>(context)->invoke(Point::END);
+        return result;
+    }
 
     RecordCommand::RecordCommand(std::shared_ptr<int> calls) : calls(std::move(calls)) {}
 
@@ -157,6 +237,312 @@ namespace {
         }
         ASSERT_TRUE(previous.wait());
         EXPECT_EQ(previous.status(), VSL_NAMESPACE::Completion::Status::COMPLETE);
+    }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, OomSubmitDoesNotEnqueueAndReleasesCompletionOwners) {
+        for (const auto failure : {VK_ERROR_OUT_OF_HOST_MEMORY, VK_ERROR_OUT_OF_DEVICE_MEMORY}) {
+            SCOPED_TRACE(failure);
+            auto commands = make_manager().independent(1);
+            auto phase = commands.start_phase<vsl::ComputePhase>();
+            const auto result = phase.completion();
+            std::weak_ptr<int> owner;
+            {
+                auto value = std::make_shared<int>(7);
+                owner = value;
+                commands.get_buffer().retain_until_complete(value);
+            }
+            SubmitProbe probe{.result = failure, .enqueue = false};
+            const vsl::operation::ScopedSubmissionNativeCalls native(probe.native_calls());
+            EXPECT_THROW(phase.submit(), vk::SystemError);
+            EXPECT_EQ(probe.calls, 1u);
+            EXPECT_EQ(result.status(), vsl::Completion::Status::FAILED);
+            EXPECT_EQ(result.error_code(), failure);
+            EXPECT_FALSE(result.busy());
+            EXPECT_FALSE(result.native_uncertain());
+            EXPECT_TRUE(owner.expired());
+            EXPECT_NO_THROW(commands.get_buffer().reset());
+        }
+    }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, NativeSubmitLossPreventsPeerFenceSuccessBeforeReleaseCallbacks) {
+        auto first = make_manager().independent(1), second = make_manager().independent(1);
+        SubmitProbe probe{.defer_observation = true};
+        const vsl::operation::ScopedSubmissionNativeCalls native(probe.native_calls());
+        auto peer = first.start_phase<vsl::ComputePhase>();
+        ASSERT_EQ(peer.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        // 損失結果を注入する前に、実GPUでpeerの使用完了を保証する。
+        ASSERT_EQ(VULKAN_HPP_DEFAULT_DISPATCHER.vkDeviceWaitIdle(device.data_->device), VK_SUCCESS);
+        auto failing = second.start_phase<vsl::ComputePhase>();
+        unsigned releases = 0;
+        const vsl_test::DeferredAction callback([&] {
+            ++releases;
+            EXPECT_EQ(peer.completion().status(), vsl::Completion::Status::FAILED);
+            EXPECT_EQ(peer.completion().failure(), vsl::Completion::Failure::DEVICE_LOST);
+            EXPECT_FALSE(peer.completion().busy());
+        });
+        second.get_buffer().retain_until_complete(callback.owner());
+        probe.result = VK_ERROR_DEVICE_LOST;
+        probe.enqueue = false;
+        EXPECT_THROW(failing.submit(), vk::DeviceLostError);
+        EXPECT_EQ(releases, 1u);
+        EXPECT_EQ(probe.calls, 2u);
+        EXPECT_EQ(failing.completion().failure(), vsl::Completion::Failure::DEVICE_LOST);
+        EXPECT_FALSE(failing.completion().busy());
+        EXPECT_FALSE(failing.completion().native_uncertain());
+    }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, UnknownSubmitStaysBusyUntilNativeIdleAndKeepsItsFailure) {
+        for (const bool enqueue : {false, true}) {
+            SCOPED_TRACE(enqueue);
+            const auto initial = vsl::lifetime::quarantined_submission_count();
+            auto commands = make_manager().independent(1);
+            vsl::SynchroManager synchronization(device);
+            auto fence = synchronization.create_fence("native", false);
+            auto phase = commands.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence);
+            const auto result = phase.completion();
+            vsl::Buffer<vsl::MemoryType::VERTEX_BUFFER, vsl::MemoryProperty::HOST_VISIBLE> storage(device, 16);
+            const auto view = vsl::BufferView::FromBuffer(storage);
+            view.resource_use().record(commands.get_buffer(), vsl::ResourceRetention::COMPLETION);
+            std::weak_ptr<int> owner;
+            {
+                auto value = std::make_shared<int>(7);
+                owner = value;
+                commands.get_buffer().retain_until_complete(value);
+            }
+            SubmitProbe probe{.result = VK_ERROR_UNKNOWN, .enqueue = enqueue, .defer_observation = true};
+            const vsl::operation::ScopedSubmissionNativeCalls native(probe.native_calls());
+            EXPECT_THROW(phase.submit(), vk::SystemError);
+            EXPECT_EQ(probe.calls, 1u);
+            EXPECT_EQ(result.status(), vsl::Completion::Status::FAILED);
+            EXPECT_TRUE(result.native_uncertain());
+            EXPECT_TRUE(result.busy());
+            EXPECT_FALSE(result.wait());
+            EXPECT_FALSE(owner.expired());
+            EXPECT_THROW(view.ref().fill(std::byte{1}), std::logic_error);
+            EXPECT_THROW(fence.reset(), std::logic_error);
+            EXPECT_THROW(fence.destroy(), std::logic_error);
+            EXPECT_FALSE(fence.wait(std::uint64_t{0}));
+            EXPECT_THROW(fence.wait(), std::logic_error);
+            EXPECT_THROW(commands.get_buffer().reset(), std::logic_error);
+            EXPECT_THROW((vsl::ComputePhase(commands)), std::logic_error);
+            EXPECT_EQ(vsl::lifetime::quarantined_submission_count(), initial + 1);
+            commands.wait_idle();
+            EXPECT_EQ(vsl::lifetime::quarantined_submission_count(), initial);
+            EXPECT_TRUE(owner.expired());
+            EXPECT_FALSE(result.busy());
+            EXPECT_EQ(result.status(), vsl::Completion::Status::FAILED);
+            EXPECT_EQ(result.error_code(), VK_ERROR_UNKNOWN);
+            EXPECT_TRUE(result.native_uncertain());
+            EXPECT_NO_THROW(view.ref().fill(std::byte{2}));
+            EXPECT_THROW(fence.wait(), std::logic_error);
+            EXPECT_NO_THROW(fence.reset());
+        }
+    }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, NativeSubmitRejectsReentrantRecordingAndCommitsAfterPhaseDestruction) {
+        auto commands = make_manager().independent(1);
+        auto phase = std::make_unique<vsl::ComputePhase>(commands);
+        const auto result = phase->completion();
+        auto calls = std::make_shared<int>(0);
+        vsl::DefaultPhaseStream stream{commands};
+        SubmitProbe probe;
+        probe.callback = [&] {
+            EXPECT_TRUE(result.busy());
+            EXPECT_FALSE(result.wait());
+            EXPECT_EQ(phase->submit(), vsl::ComputePhase::SubmitResult::FAILED);
+            phase->cancel();
+            EXPECT_THROW(stream << RecordCommand(calls), std::logic_error);
+            EXPECT_THROW(stream << RecordDelegate(calls), std::logic_error);
+            EXPECT_THROW(stream << std::shared_ptr<vsl::command::Command>(std::make_shared<RecordCommand>(calls)), std::logic_error);
+            EXPECT_THROW(stream << std::shared_ptr<vsl::command::DelegateCommand>(std::make_shared<RecordDelegate>(calls)), std::logic_error);
+            EXPECT_THROW(result.retain(calls), std::logic_error);
+            EXPECT_THROW(commands.get_buffer().retain_until_complete(calls), std::logic_error);
+            EXPECT_THROW(commands.get_buffer().reset(), std::logic_error);
+            EXPECT_THROW(commands.get_buffer().next(), std::logic_error);
+            EXPECT_THROW(commands.wait_idle(), std::logic_error);
+            phase.reset();
+        };
+        const vsl::operation::ScopedSubmissionNativeCalls native(probe.native_calls());
+        EXPECT_EQ(phase->submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        EXPECT_FALSE(phase);
+        EXPECT_EQ(probe.calls, 1u);
+        EXPECT_EQ(*calls, 0);
+        EXPECT_TRUE(result.wait());
+    }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, NativeBeginOrResetCanDestroyThePhaseWithoutStartingRecording) {
+        for (const auto point : {CommandProbe::Point::RESET, CommandProbe::Point::BEGIN}) {
+            auto commands = make_manager().independent(1);
+            auto phase = std::make_unique<vsl::ComputePhase>(commands, std::nullopt, std::nullopt, std::nullopt, true);
+            vsl::Completion result;
+            CommandProbe probe{point, [&] {
+                                   result = phase->completion();
+                                   phase.reset();
+                               }};
+            const vsl::operation::ScopedCommandNativeCalls native(probe.native_calls());
+            phase->setup();
+            EXPECT_FALSE(phase);
+            EXPECT_EQ(result.status(), vsl::Completion::Status::CANCELLED);
+            EXPECT_FALSE(result.busy());
+            EXPECT_NO_THROW(commands.get_buffer().reset());
+        }
+    }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, NativeEndTreatsCancelAsAbandonAndCompletesTheSubmitTransaction) {
+        auto commands = make_manager().independent(1);
+        auto phase = std::make_unique<vsl::ComputePhase>(commands);
+        const auto result = phase->completion();
+        CommandProbe probe{CommandProbe::Point::END, [&] {
+                               phase->cancel();
+                               phase.reset();
+                           }};
+        const vsl::operation::ScopedCommandNativeCalls recording(probe.native_calls());
+        SubmitProbe submit;
+        const vsl::operation::ScopedSubmissionNativeCalls native(submit.native_calls());
+        EXPECT_EQ(phase->submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        EXPECT_FALSE(phase);
+        EXPECT_EQ(submit.calls, 1u);
+        EXPECT_TRUE(result.wait());
+    }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, UnknownWorkSurvivesDomainDestructionAndIsInheritedByItsOriginalRing) {
+        const auto initial = vsl::lifetime::quarantined_submission_count();
+        auto commands = make_manager().independent(1);
+        const auto manager_data = commands.data_;
+        const auto ring = commands.get_buffer().data_;
+        std::weak_ptr<vsl::lifetime::CommandDomain> old_domain = vsl::lifetime::CommandAccess::Owner(commands.get_buffer());
+        vsl::Completion result;
+        std::weak_ptr<int> owner;
+        SubmitProbe probe{.result = VK_ERROR_UNKNOWN, .enqueue = false, .defer_observation = true};
+        const vsl::operation::ScopedSubmissionNativeCalls native(probe.native_calls());
+        {
+            auto phase = commands.start_phase<vsl::ComputePhase>();
+            result = phase.completion();
+            {
+                auto value = std::make_shared<int>(7);
+                owner = value;
+                commands.get_buffer().retain_until_complete(value);
+            }
+            EXPECT_THROW(phase.submit(), vk::SystemError);
+        }
+        commands = vsl::CommandManager(nullptr);
+        EXPECT_TRUE(old_domain.expired());
+        EXPECT_FALSE(owner.expired());
+        EXPECT_EQ(ring->owner_context->unresolved_submissions, 1u);
+        auto attached = vsl::lifetime::CommandAccess::Attach(ring);
+        const auto domain = vsl::lifetime::CommandAccess::Owner(attached);
+        EXPECT_EQ(domain->submissions[0]->result, result.data_);
+        EXPECT_THROW(attached.reset(), std::logic_error);
+        auto replacement = vsl::lifetime::CommandAccess::Manager(manager_data, domain);
+        replacement.wait_idle();
+        EXPECT_TRUE(owner.expired());
+        EXPECT_EQ(ring->owner_context->unresolved_submissions, 0u);
+        EXPECT_EQ(vsl::lifetime::quarantined_submission_count(), initial);
+        EXPECT_EQ(result.status(), vsl::Completion::Status::FAILED);
+    }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, DeviceIdleReclaimsOrphanedHeadlessWorkFromAnotherRing) {
+        const auto initial = vsl::lifetime::quarantined_submission_count();
+        auto collector = make_manager().independent(1);
+        std::weak_ptr<int> owner;
+        std::weak_ptr<vsl::impl::CommandBufferImpl> ring;
+        SubmitProbe probe{.result = VK_ERROR_UNKNOWN, .enqueue = false, .defer_observation = true};
+        const vsl::operation::ScopedSubmissionNativeCalls native(probe.native_calls());
+        {
+            auto commands = make_manager().independent(1);
+            ring = commands.get_buffer().data_;
+            auto phase = commands.start_phase<vsl::ComputePhase>();
+            auto value = std::make_shared<int>(7);
+            owner = value;
+            commands.get_buffer().retain_until_complete(value);
+            EXPECT_THROW(phase.submit(), vk::SystemError);
+        }
+        EXPECT_FALSE(owner.expired());
+        EXPECT_FALSE(ring.expired());
+        EXPECT_EQ(vsl::lifetime::quarantined_submission_count(), initial + 1);
+        collector.wait_idle();
+        EXPECT_TRUE(owner.expired());
+        EXPECT_TRUE(ring.expired());
+        EXPECT_EQ(vsl::lifetime::quarantined_submission_count(), initial);
+    }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, SnapshotRestoresUnknownWorkOnIdleFailureAndAllowsProvenReleaseRetry) {
+        for (const bool observe : {false, true}) {
+            SCOPED_TRACE(observe);
+            const auto initial = vsl::lifetime::quarantined_submission_count();
+            auto commands = make_manager().independent(1);
+            auto phase = commands.start_phase<vsl::ComputePhase>();
+            const auto result = phase.completion();
+            std::weak_ptr<int> owner;
+            {
+                auto value = std::make_shared<int>(7);
+                owner = value;
+                commands.get_buffer().retain_until_complete(value);
+            }
+            SubmitProbe probe{.result = VK_ERROR_UNKNOWN, .idle_result = VK_ERROR_OUT_OF_HOST_MEMORY, .enqueue = observe, .defer_observation = true};
+            const vsl::operation::ScopedSubmissionNativeCalls native(probe.native_calls());
+            EXPECT_THROW(phase.submit(), vk::SystemError);
+            if (observe)
+                probe.idle_callback = [&] {
+                    ASSERT_EQ(VULKAN_HPP_DEFAULT_DISPATCHER.vkDeviceWaitIdle(device.data_->device), VK_SUCCESS);
+                    probe.defer_observation = false;
+                    EXPECT_EQ(result.status(), vsl::Completion::Status::FAILED);
+                    EXPECT_FALSE(result.data_->work.expired());
+                    EXPECT_FALSE(owner.expired());
+                };
+            EXPECT_THROW(commands.wait_idle(), vk::OutOfHostMemoryError);
+            EXPECT_EQ(vsl::lifetime::quarantined_submission_count(), initial + 1);
+            EXPECT_FALSE(owner.expired());
+            if (observe) {
+                EXPECT_EQ(result.status(), vsl::Completion::Status::FAILED);
+                EXPECT_TRUE(owner.expired());
+            } else {
+                probe.idle_result = VK_SUCCESS;
+                commands.wait_idle();
+                EXPECT_TRUE(owner.expired());
+            }
+            EXPECT_EQ(vsl::lifetime::quarantined_submission_count(), initial);
+        }
+    }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, UnknownSubmitPoisonsOnlyItsActualWaitAndSignalElements) {
+        auto commands = make_manager().independent(2);
+        vsl::SynchroManager synchronization(device);
+        auto available = synchronization.create_semaphore("wait", std::size_t{2});
+        auto finished = synchronization.create_semaphore("signal", std::size_t{3});
+        auto phase = commands.start_phase<IndexedSignalPhase>(available, finished);
+        phase.select_signal(2);
+        SubmitProbe probe{.result = VK_ERROR_UNKNOWN, .enqueue = false, .defer_observation = true};
+        const vsl::operation::ScopedSubmissionNativeCalls native(probe.native_calls());
+        EXPECT_THROW(phase.submit(), vk::SystemError);
+        EXPECT_THROW(available.destroy(), std::logic_error);
+        EXPECT_THROW(finished.destroy(), std::logic_error);
+        commands.wait_idle();
+        EXPECT_THROW(vsl::sync::require_semaphore_element(*available.data_, 0), std::logic_error);
+        EXPECT_NO_THROW(vsl::sync::require_semaphore_element(*available.data_, 1));
+        EXPECT_NO_THROW(vsl::sync::require_semaphore_element(*finished.data_, 0));
+        EXPECT_NO_THROW(vsl::sync::require_semaphore_element(*finished.data_, 1));
+        EXPECT_THROW(vsl::sync::require_semaphore_element(*finished.data_, 2), std::logic_error);
+        auto next = commands.start_phase<vsl::ComputePhase>(available, finished);
+        EXPECT_THROW(next.submit(), std::logic_error);
+        EXPECT_EQ(probe.calls, 1u);
+        EXPECT_NO_THROW(available.destroy());
+        EXPECT_NO_THROW(finished.destroy());
+    }
+    TEST_F(PhaseCompletionVulkanIntegrationTest, SnapshotReleaseCallbackRegistersUnknownWorkForTheNextCollection) {
+        const auto initial = vsl::lifetime::quarantined_submission_count();
+        auto first = make_manager().independent(1), second = make_manager().independent(1);
+        std::unique_ptr<vsl::ComputePhase> peer;
+        SubmitProbe probe{.result = VK_ERROR_UNKNOWN, .enqueue = false, .defer_observation = true};
+        const vsl::operation::ScopedSubmissionNativeCalls native(probe.native_calls());
+        unsigned releases = 0;
+        const vsl_test::DeferredAction callback([&] {
+            ++releases;
+            peer = std::make_unique<vsl::ComputePhase>(second);
+            EXPECT_THROW(peer->submit(), vk::SystemError);
+        });
+        auto phase = first.start_phase<vsl::ComputePhase>();
+        first.get_buffer().retain_until_complete(callback.owner());
+        EXPECT_THROW(phase.submit(), vk::SystemError);
+        first.wait_idle();
+        EXPECT_EQ(releases, 1u);
+        EXPECT_EQ(probe.calls, 2u);
+        EXPECT_EQ(vsl::lifetime::quarantined_submission_count(), initial + 1);
+        ASSERT_TRUE(peer);
+        EXPECT_TRUE(peer->completion().busy());
+        second.wait_idle();
+        EXPECT_EQ(vsl::lifetime::quarantined_submission_count(), initial);
+        EXPECT_FALSE(peer->completion().busy());
     }
     TEST_F(PhaseCompletionVulkanIntegrationTest, CancellationAndNestedRecordingDoNotSubmitOrResetActiveBuffer) {
         auto manager = make_manager();
@@ -836,6 +1222,87 @@ namespace {
         }
         device.data_->device.waitIdle();
     }
+    TEST_F(PresentPhaseWindowIntegrationTest, PresentRejectsPoisonFromItsSavedSourceBeforeCallingNative) {
+        make_surface();
+        ASSERT_FALSE(HasFatalFailure());
+        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+            GTEST_SKIP() << "Graphics queue cannot present";
+        vsl::Swapchain chain(device, surface, std::nullopt, 64, 48);
+        vsl::RenderPass pass(chain);
+        vsl::FrameBuffer target(chain, pass);
+        auto commands = make_manager();
+        auto phase = commands.start_phase<vsl::DefaultPhase>(chain);
+        phase << vsl::command::RenderPassBegin(pass, target) << vsl::command::RenderPassEnd{};
+        ASSERT_EQ(phase.submit_commands(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        ASSERT_TRUE(phase.completion().wait());
+        auto source = chain.finished_semaphores();
+        const auto image = phase.get_image_index();
+        vsl::sync::poison_semaphore_element(*source.data_, image);
+        unsigned calls = 0;
+        const vsl::operation::ScopedPresentationNativeCalls native({.context = &calls,
+                                                                    .present = +[](void* context, VkQueue queue, const VkPresentInfoKHR* info) noexcept {
+                                                                        ++*static_cast<unsigned*>(context);
+                                                                        return VULKAN_HPP_DEFAULT_DISPATCHER.vkQueuePresentKHR(queue, info);
+                                                                    }});
+        EXPECT_THROW(phase.present(), std::logic_error);
+        EXPECT_EQ(calls, 0u);
+        // 注入したpoisonだけを戻し、実際にsignal済みの画像を正常に返却する。
+        source.data_->use.poisoned[image] = false;
+        EXPECT_EQ(phase.present(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        EXPECT_EQ(calls, 1u);
+        commands.wait_idle();
+    }
+    TEST_F(PresentPhaseWindowIntegrationTest, NativePresentCanDestroyThePhaseWithoutSubmittingOrPresentingTwice) {
+        make_surface();
+        ASSERT_FALSE(HasFatalFailure());
+        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+            GTEST_SKIP() << "Graphics queue cannot present";
+        vsl::Swapchain chain(device, surface, std::nullopt, 64, 48);
+        vsl::RenderPass pass(chain);
+        vsl::FrameBuffer target(chain, pass);
+        auto commands = make_manager();
+        auto phase = std::make_unique<vsl::DefaultPhase>(commands, chain);
+        *phase << vsl::command::RenderPassBegin(pass, target) << vsl::command::RenderPassEnd{};
+        ASSERT_EQ(phase->submit_commands(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        const auto result = phase->completion();
+        struct Context {
+            std::unique_ptr<vsl::DefaultPhase>& phase;
+            unsigned calls = 0;
+        } context{phase};
+        const vsl::operation::ScopedPresentationNativeCalls native({.context = &context,
+                                                                    .present = +[](void* opaque, VkQueue queue, const VkPresentInfoKHR* info) noexcept {
+                                                                        auto& context = *static_cast<Context*>(opaque);
+                                                                        ++context.calls;
+                                                                        EXPECT_EQ(context.phase->present(), vsl::ComputePhase::SubmitResult::FAILED);
+                                                                        EXPECT_EQ(context.phase->submit(), vsl::ComputePhase::SubmitResult::FAILED);
+                                                                        context.phase->cancel();
+                                                                        context.phase.reset();
+                                                                        return VULKAN_HPP_DEFAULT_DISPATCHER.vkQueuePresentKHR(queue, info);
+                                                                    }});
+        EXPECT_EQ(phase->present(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        EXPECT_FALSE(phase);
+        EXPECT_EQ(context.calls, 1u);
+        EXPECT_TRUE(result.wait());
+        commands.wait_idle();
+    }
+    TEST_F(PresentPhaseWindowIntegrationTest, NativeCancelRecordingCanDestroyThePhaseWithoutTouchingItsFacadeAgain) {
+        make_surface();
+        ASSERT_FALSE(HasFatalFailure());
+        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+            GTEST_SKIP() << "Graphics queue cannot present";
+        for (const auto point : {CommandProbe::Point::RESET, CommandProbe::Point::BEGIN, CommandProbe::Point::END}) {
+            vsl::Swapchain chain(device, surface, std::nullopt, 64, 48);
+            auto commands = make_manager().independent(1);
+            auto phase = std::make_unique<vsl::DefaultPhase>(commands, chain);
+            const auto original = phase->completion();
+            CommandProbe probe{point, [&] { phase.reset(); }};
+            const vsl::operation::ScopedCommandNativeCalls recording(probe.native_calls());
+            EXPECT_NO_THROW(phase->cancel());
+            EXPECT_FALSE(phase);
+            EXPECT_EQ(original.status(), vsl::Completion::Status::CANCELLED);
+            commands.wait_idle();
+        }
+    }
     TEST_F(PresentPhaseWindowIntegrationTest, CancelCallbacksCanDestroyThePhaseAfterItsImageIsReturned) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
@@ -1046,6 +1513,25 @@ namespace {
         EXPECT_EQ(*received, 17u);
         stream << VertexCountSource{0} << VertexCountConsumer{received};
         EXPECT_EQ(*received, 0u);
+    }
+    TEST_F(PhaseVulkanIntegrationTest, IdleStreamRejectsARecordingStartedByItsHolderCallback) {
+        auto commands = make_manager();
+        vsl::DefaultPhaseStream stream{commands};
+        std::unique_ptr<vsl::ComputePhase> phase;
+        bool invoked = false;
+        struct Command {
+            std::function<void()> resolve;
+            bool& invoked;
+            size_t get_vertex_size() {
+                resolve();
+                return 1;
+            }
+            void invoke(vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) { invoked = true; }
+        };
+        EXPECT_THROW(stream << (Command{[&] { phase = std::make_unique<vsl::ComputePhase>(commands); }, invoked}), std::logic_error);
+        ASSERT_TRUE(phase);
+        EXPECT_FALSE(invoked);
+        phase->cancel();
     }
     TEST_F(PhaseVulkanIntegrationTest, ValueAndSharedDelegatesReceiveTheSameVertexCount) {
         auto manager = make_manager();

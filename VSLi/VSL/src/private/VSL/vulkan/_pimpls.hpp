@@ -120,7 +120,7 @@ namespace VSL_NAMESPACE::impl {
         DeviceFeature enabled_features = DeviceFeature::NONE;
         uint32_t graphics_family = 0, present_family = 0;
         vk::Device device;
-        bool swapchain_enabled = false;
+        bool swapchain_enabled = false, lost = false;
         LogicalDeviceImpl() = default;
         LogicalDeviceImpl(const LogicalDeviceImpl&) = delete;
         LogicalDeviceImpl& operator=(const LogicalDeviceImpl&) = delete;
@@ -144,6 +144,7 @@ namespace VSL_NAMESPACE::impl {
         Completion::Status status = Completion::Status::PENDING;
         Completion::Failure failure = Completion::Failure::NONE;
         std::int32_t error_code = 0;
+        sync::SubmissionNativeState native;
         std::weak_ptr<SubmissionWork> work;
     };
     enum class SubmissionSource : size_t {
@@ -165,7 +166,15 @@ namespace VSL_NAMESPACE::impl {
         vk::Fence fence;
         std::vector<std::shared_ptr<void>> resources;
         std::vector<std::shared_ptr<void>> completion_resources;
+        std::vector<const ResourceUseState*> validity_checks;
         void (*release_resources)(SubmissionWork&) noexcept = nullptr;
+        CommandBufferImpl* native_buffer = nullptr;
+        std::shared_ptr<void> unresolved_buffer_owner;
+        std::weak_ptr<SurfaceImpl> surface;
+        SurfaceImpl* surface_address = nullptr;
+        std::uint32_t frame_slot = 0, wait_index = 0, signal_index = 0;
+        bool abandon_requested = false, quarantined = false;
+        std::shared_ptr<SubmissionWork> quarantine_next;
         ~SubmissionWork();
     };
 

@@ -6,6 +6,7 @@ namespace VSL_NAMESPACE::lifetime {
     struct CommandBufferOwnerContext {
         WeakOwnedRef<impl::CommandPoolImpl> pool;
         std::weak_ptr<CommandDomain> domain;
+        size_t unresolved_submissions = 0;
     };
     struct CommandPoolSlotStorage {
         alignas(impl::CommandPoolImpl) std::byte value[sizeof(impl::CommandPoolImpl)];

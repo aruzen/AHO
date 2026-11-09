@@ -5,6 +5,16 @@
 #include <stdexcept>
 
 namespace VSL_NAMESPACE::sync {
+    bool native_pending(const impl::SubmissionImpl& result) noexcept {
+        return !result.native.complete && (result.native.enqueue == SubmissionEnqueue::ENQUEUED || result.native.enqueue == SubmissionEnqueue::UNKNOWN);
+    }
+    bool pending_use(const impl::SubmissionImpl& result) noexcept {
+        return result.status == Completion::Status::PENDING || result.status == Completion::Status::SUBMITTED ||
+               result.native.active || native_pending(result);
+    }
+    bool recordable(const impl::SubmissionImpl& result) noexcept {
+        return result.status == Completion::Status::PENDING && !result.native.active && result.native.enqueue == SubmissionEnqueue::NOT_CALLED;
+    }
     std::shared_ptr<FenceReservation> current_fence_reservation(const FenceUseState& state) noexcept {
         const auto* reservation = std::get_if<std::weak_ptr<FenceReservation>>(&state.use);
         return reservation ? reservation->lock() : nullptr;
@@ -15,8 +25,18 @@ namespace VSL_NAMESPACE::sync {
     bool pending_or_submitted(const std::shared_ptr<impl::SubmissionImpl>& result) {
         if (!result)
             return false;
-        const auto status = Completion{result}.status();
-        return status == Completion::Status::PENDING || status == Completion::Status::SUBMITTED;
+        (void)Completion{result}.status();
+        return pending_use(*result);
+    }
+    void require_semaphore_element(const impl::SemaphoreImpl& semaphore, std::uint32_t index) {
+        if (index >= semaphore.semaphores.size() || semaphore.use.poisoned.size() != semaphore.semaphores.size())
+            throw std::out_of_range("Semaphore element is unavailable");
+        if (semaphore.use.poisoned[index])
+            throw std::logic_error("Semaphore state is uncertain; recreate its native group");
+    }
+    void poison_semaphore_element(impl::SemaphoreImpl& semaphore, std::uint32_t index) noexcept {
+        if (index < semaphore.use.poisoned.size())
+            semaphore.use.poisoned[index] = true;
     }
     void track_semaphore(impl::SemaphoreImpl& semaphore, const std::shared_ptr<impl::SubmissionImpl>& result) {
         if (!result || semaphore.semaphores.empty() || semaphore.use.accessing)
@@ -24,7 +44,7 @@ namespace VSL_NAMESPACE::sync {
         auto& uses = semaphore.use.graphics;
         std::erase_if(uses, [](const auto& weak) {
             const auto value = weak.lock();
-            return !value || terminal_status(value->status);
+            return !value || !pending_use(*value);
         });
         if (!std::ranges::any_of(uses, [&](const auto& weak) { return weak.lock() == result; }))
             uses.push_back(result);
@@ -63,7 +83,8 @@ namespace VSL_NAMESPACE::sync {
                 if (const auto result = marker->acquisition.lock()) {
                     const auto status = Completion{result}.status();
                     if (status == Completion::Status::COMPLETE ||
-                        (status == Completion::Status::FAILED && result->failure == Completion::Failure::DEVICE_LOST))
+                        (status == Completion::Status::FAILED && result->failure == Completion::Failure::DEVICE_LOST) ||
+                        (result->native.complete && result->native.observation == static_cast<std::int32_t>(vk::Result::eErrorDeviceLost)))
                         marker->complete = true; // graphicsのwait完了はacquire signal完了も証明する。
                 }
             if (!marker->complete)

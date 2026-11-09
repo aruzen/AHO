@@ -2,6 +2,7 @@
 #include <AHO/x/resource/texture.hpp>
 #include <AHO/x/command/texture_update.hpp>
 #include "support/vulkan_fixture.hpp"
+#include <VSL/operation/submission_ops.hpp>
 
 namespace {
     class ExperimentalTextureVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
@@ -65,6 +66,36 @@ namespace {
         EXPECT_FALSE(physical.expired());
         image.reset();
         EXPECT_TRUE(physical.expired());
+    }
+    TEST_F(ExperimentalTextureVulkanIntegrationTest, UnknownUpdateRejectsCachedBindingsAfterIdleAndBeforeAnotherNativeSubmit) {
+        aho::x::resource::Texture texture(device, 1, 1);
+        aho::resource::Buffer<aho::resource::BufferType::GENERAL> pixels(4);
+        auto commands = make_manager().independent(1), other = make_manager().independent(1);
+        auto cached = std::make_shared<vsl::ResourceUseGroup>(1);
+        cached->replace(0, {texture.resource_use()});
+        auto update = commands.start_phase<vsl::ComputePhase>();
+        update << texture.update(pixels);
+        auto already_recorded = other.start_phase<vsl::ComputePhase>();
+        cached->record(other.get_buffer());
+        unsigned calls = 0;
+        const vsl::operation::ScopedSubmissionNativeCalls native({.context = &calls,
+                                                                  .queue_submit = +[](void* context, VkQueue, const VkSubmitInfo*, VkFence) noexcept {
+                                                                    ++*static_cast<unsigned*>(context);
+                                                                    return VK_ERROR_UNKNOWN; },
+                                                                  .fence_status = +[](void*, VkDevice, VkFence) noexcept { return VK_NOT_READY; }});
+        EXPECT_THROW(update.submit(), vk::SystemError);
+        EXPECT_EQ(calls, 1u);
+        EXPECT_TRUE(update.completion().busy());
+        commands.wait_idle();
+        EXPECT_FALSE(update.completion().busy());
+        EXPECT_TRUE(update.completion().native_uncertain());
+        EXPECT_THROW(already_recorded.submit(), std::logic_error);
+        EXPECT_EQ(calls, 1u);
+        auto next = other.start_phase<vsl::ComputePhase>();
+        EXPECT_THROW(cached->record(other.get_buffer()), std::logic_error);
+        EXPECT_THROW(next << texture.update(pixels), std::runtime_error);
+        EXPECT_NO_THROW(texture.image().resource_use().record(other.get_buffer()));
+        next.cancel();
     }
 } // namespace
 #endif

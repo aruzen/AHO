@@ -3,6 +3,7 @@
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
+#include <VSL/sync/resource_use_access.hpp>
 #include <stdexcept>
 
 namespace VSL_NAMESPACE {
@@ -61,10 +62,17 @@ namespace VSL_NAMESPACE {
         };
         retain(owner);
         retain(constraint_owner);
+        const auto retain_validation = [&](const auto& state, const auto& owner) {
+            if (state && sync::ResourceUseAccess::RequiresKnown(*state) && state.use_count() &&
+                (!owner.use_count() || owner.owner_before(state) || state.owner_before(owner)))
+                retain(state);
+        };
+        retain_validation(state, owner);
+        retain_validation(constraint_state, constraint_owner);
         if (state)
-            state->mark_used(completion);
+            lifetime::record_resource_state(*state, buffer, completion);
         if (constraint_state)
-            constraint_state->mark_used(completion);
+            lifetime::record_resource_state(*constraint_state, buffer, completion);
     }
     ResourceUseGroup::ResourceUseGroup(size_t bindings, std::shared_ptr<void> owner)
         : _owner(std::move(owner)), _bindings(bindings) {}

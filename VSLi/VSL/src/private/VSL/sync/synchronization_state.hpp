@@ -6,6 +6,21 @@
 #include <cstdint>
 
 namespace VSL_NAMESPACE::sync {
+    enum class SubmissionEnqueue {
+        NOT_CALLED,
+        ENQUEUED,
+        NOT_ENQUEUED,
+        DEVICE_LOST,
+        UNKNOWN
+    };
+    struct SubmissionNativeState {
+        SubmissionEnqueue enqueue = SubmissionEnqueue::NOT_CALLED;
+        bool active = false, complete = false;
+        std::int32_t observation = 0;
+    };
+    bool native_pending(const impl::SubmissionImpl& result) noexcept;
+    bool pending_use(const impl::SubmissionImpl& result) noexcept;
+    bool recordable(const impl::SubmissionImpl& result) noexcept;
     struct FenceProof;
     struct PresentState;
     struct FenceReservation {
@@ -27,9 +42,12 @@ namespace VSL_NAMESPACE::sync {
     struct SemaphoreUseState {
         std::vector<std::weak_ptr<impl::SubmissionImpl>> graphics;
         std::vector<std::weak_ptr<SemaphoreWSIUse>> wsi;
+        std::vector<bool> poisoned;
         bool accessing = false;
     };
     bool pending_or_submitted(const std::shared_ptr<impl::SubmissionImpl>& result);
+    void require_semaphore_element(const impl::SemaphoreImpl& semaphore, std::uint32_t index);
+    void poison_semaphore_element(impl::SemaphoreImpl& semaphore, std::uint32_t index) noexcept;
     void track_semaphore(impl::SemaphoreImpl& semaphore, const std::shared_ptr<impl::SubmissionImpl>& result);
     std::shared_ptr<SemaphoreWSIUse> track_semaphore_wsi(impl::SemaphoreImpl& semaphore, const std::shared_ptr<impl::SubmissionImpl>& acquisition = {});
     void require_semaphore_idle(SemaphoreUseState& state);

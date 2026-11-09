@@ -14,6 +14,7 @@ namespace VSL_NAMESPACE::lifetime {
         bool frame_buffer_recording = false;
         bool closing = false;
         bool mutating = false;
+        bool submitting = false;
     };
     struct CommandDomain {
         std::shared_ptr<impl::CommandBufferImpl> buffer;

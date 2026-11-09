@@ -79,12 +79,10 @@ void VSL_NAMESPACE::typed::detail::validate_vertex_shader(const Reflector::Gener
     }
 }
 
-void VSL_NAMESPACE::typed::detail::validate_pipeline_vertex_shader(PipelineLayoutAccessor layout,
+void VSL_NAMESPACE::typed::detail::validate_pipeline_vertex_shader(const lifetime::PipelineRecipeSnapshot& recipe,
                                                                    std::span<const VertexAttributeLayout> attributes) {
-    if (!layout.data_ || !layout.has_recipe())
-        throw std::invalid_argument("Typed pipeline requires an initialized layout");
     const impl::ShaderImpl* vertex = nullptr;
-    for (const auto& shader : layout.recipe().shaders) {
+    for (const auto& shader : recipe.definition().shaders) {
         if (shader->stage != vk::ShaderStageFlagBits::eVertex)
             continue;
         if (vertex)
@@ -95,4 +93,10 @@ void VSL_NAMESPACE::typed::detail::validate_pipeline_vertex_shader(PipelineLayou
         throw std::invalid_argument("Typed pipeline requires exactly one vertex shader");
     Reflector reflection({}, std::span<const std::uint32_t>(vertex->code), vertex->name, ShaderType::VERTEX, Reflector::Scope::VERTEX_INPUT);
     validate_vertex_shader(reflection.generated, attributes);
+}
+
+void VSL_NAMESPACE::typed::detail::validate_compute_shader(const lifetime::PipelineRecipeSnapshot& recipe) {
+    const auto& shaders = recipe.definition().shaders;
+    if (shaders.size() != 1 || shaders.front()->stage != vk::ShaderStageFlagBits::eCompute)
+        throw std::invalid_argument("Compute pipeline requires exactly one compute shader");
 }

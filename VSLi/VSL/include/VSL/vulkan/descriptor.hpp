@@ -21,7 +21,8 @@ namespace VSL_NAMESPACE {
 
 namespace VSL_NAMESPACE::lifetime {
     class ResourceArena;
-}
+    class PipelineRecipeSnapshot;
+} // namespace VSL_NAMESPACE::lifetime
 
 namespace VSL_NAMESPACE::graphic_resource {
     constexpr size_t MAX_POOL_SIZE = 200;
@@ -89,6 +90,7 @@ namespace VSL_NAMESPACE::graphic_resource {
 
     private:
         friend class lifetime::ResourceArena;
+        friend class lifetime::PipelineRecipeSnapshot;
         explicit BindingLayout(std::shared_ptr<impl::ResourceBindingLayoutImpl> data) : data_(std::move(data)) {}
     };
 

@@ -9,7 +9,7 @@
 
 最初のPRだけで終了せず、下記の順で実装・検証・独立レビューを継続する。PRの公開前には最新masterとの差分を確認する。新しい製品ディレクトリが必要な場合は作成前に確認する。
 
-現在の到達点は順序1〜10である。command／同期資源の配置とTyped frame再利用、起動資源の共通backend、OS windowの寿命分離、公開StartupArenaとAHO起動、maintenance1の能力照会／有効化、Swapchain世代のCPU配置、取得後失敗とpresent専用の完了観測・資源保持、AHOの世代公開・休止・resize／closeを接続した。11〜12は未完了であり、既定policy変更、旧入口廃止と最終監査まで継続する。
+現在の到達点は順序1〜11である。command／同期資源の配置とTyped frame再利用、起動資源の共通backend、OS windowの寿命分離、公開StartupArenaとAHO起動、maintenance1の能力照会／有効化、Swapchain世代のCPU配置、取得後失敗とpresent専用の完了観測・資源保持、AHOの世代公開・休止・resize／close、Typedの生成policyとarena既定化を接続した。12の旧入口廃止・定義の4責務分割・測定と最終監査まで継続する。
 
 10dはPhaseCall、共通Fence用途、M個のfinished semaphore、F個のacquire Fenceに、[送信結果とnative使用完了](native-submission-proof.md)と[AcquireTicket／Surface回収](acquire-ticket-recovery.md)を接続した。10eで候補保持と0 framebuffer休止、共有close、元Surface単位の退役を完了した。次は11のTyped既定配置であり、12の公開入口整理と最終監査も引き続き未完了である。
 
@@ -215,4 +215,6 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 11bでは単体TypedVertex／Index／ResourceBufferとTypedGraphics／ComputePipelineの生成policyを接続する。Bufferは同じBufferViewへ正規化し、固定容量・Index snapshot・共有物理状態・AHOの論理制約を維持する。PipelineはCPU recipeの検証をNative Layout生成より先へ分け、共通backendでLayout／Pipelineを配置する。11aだけで全Typed生成のarena既定化を完了としない。公開Impl入口・adapter廃止と測定は12へ続く。
 
 11b前半で単体Typed Bufferの生成時policyと共通BufferViewを接続した。共通backendのdevice-local構築、独立ringによる転送、Index snapshotの一回採取、Typed／Native descriptorとbindのview入口を揃えた。backendはlvalue限定const BufferView&、所有値はstorage_view()とする。enqueue済みnative使用が残るlogical FAILEDの保持も修正した。新規6件、全VSL1,130／AHO190・1,071／compile198、heap／arenaの同一描画、public install28種、構成別／cross／ABI検証が成功した。Typed PipelineのCPU draft／2slot配置を11b後半として続ける。
+
+11b後半でTypedGraphics／ComputePipelineも先頭生成policyとDefaultStorageへ接続した。CPU draftの不変snapshotでTyped検証をNative生成前へ移し、schemaのDescriptorLayoutは一時寿命群でmaterializeする。共有Layout sourceと疎なsetの空Layoutを扱い、owner indexの再配置を共用する。heapとLayout＋Pipelineの2slot arenaは同じbackendを使い、構築後には生成用sourceを保持しない。新規4件と既存試験の両policy化、全VSL1,134／AHO190・1,071／compile202、PNG3枚一致、strict22ファイル／12TU、installed consumer28種、構成別／cross／artifact混在拒否が成功した。順序11の受入条件を満たし、公開raw入口・互換adapterと明示ManagerのAPI整理、4責務の実定義分割と実測を順序12へ続ける。
 

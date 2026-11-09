@@ -12,8 +12,8 @@ namespace VSL_NAMESPACE::typed::detail {
             pushes.definitions.push_back(requirement.range);
         pushes.injection(layout);
     }
-    void validate_push_schema(PipelineLayoutAccessor layout, std::span<const PushRequirement> requirements) {
-        for (const auto& shader : layout.recipe().shaders) {
+    void validate_push_schema(const lifetime::PipelineRecipeSnapshot& recipe, std::span<const PushRequirement> requirements) {
+        for (const auto& shader : recipe.definition().shaders) {
             utils::SPIRVReflector reflection({}, std::span<const std::uint32_t>(shader->code), shader->name, ShaderType(shader->stage));
             if (!reflection.generated.push_constants)
                 continue;

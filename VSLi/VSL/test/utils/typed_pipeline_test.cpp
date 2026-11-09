@@ -104,27 +104,114 @@ namespace {
         bool validate_vulkan() const override { return true; }
 
     protected:
-        template<typename Layout>
-        auto make_typed(const char* shader = "vertices.vert.spv");
+        template<typename Layout, typed::storage_policy Policy = typed::DefaultStorage>
+        auto make_typed(const char* shader = "vertices.vert.spv", Policy policy = {});
     };
 
-    template<typename Layout>
-    auto TypedPipelineVulkanIntegrationTest::make_typed(const char* shader) {
+    template<typename Layout, typed::storage_policy Policy>
+    auto TypedPipelineVulkanIntegrationTest::make_typed(const char* shader, Policy policy) {
         namespace pl = vsl::pipeline_layout;
         vsl::Shader<vsl::ShaderType::VERTEX> source(device, vsl_test::shader_path(shader));
-        return typed::TypedGraphicsPipeline<Layout>(device, *pass,
+        return typed::TypedGraphicsPipeline<Layout>(policy, device, *pass,
                                                     pl::ShaderGroup("typed pipeline", {source, *fragment}), pl::ColorBlend{}, pl::InputAssembly{},
                                                     pl::Rasterization{pl::CullingMode::NONE}, pl::Multisample{}, pl::DynamicState{},
                                                     vsl::Viewport(description), vsl::Scissor(description));
     }
 
     TEST_F(TypedPipelineVulkanIntegrationTest, TypedPipelineAndBuffersProduceTheExpectedPixel) {
-        auto typed_pipeline = make_typed<Input>();
-        typed::TypedVertexBuffer<Position> positions(device, POSITIONS);
-        typed::TypedVertexBuffer<Color> colors(device, COLORS);
-        auto bindings = typed_pipeline.bind_vertices(positions, colors);
-        static_assert(std::same_as<typename decltype(bindings)::VertexInput, Input>);
-        ExpectTriangleColor(render([&](auto& stream) { stream << bindings.draw(3); }));
+        auto verify = [&](auto policy) {
+            auto typed_pipeline = make_typed<Input>("vertices.vert.spv", policy);
+            typed::TypedVertexBuffer<Position> positions(device, POSITIONS, policy);
+            typed::TypedVertexBuffer<Color> colors(device, COLORS, policy);
+            const auto& runtime = typed_pipeline.backend().data_;
+            EXPECT_EQ(runtime->owner_node == runtime->layout->owner_node, (std::same_as<decltype(policy), typed::ArenaStorage<>>));
+            auto bindings = typed_pipeline.bind_vertices(positions, colors);
+            static_assert(std::same_as<typename decltype(bindings)::VertexInput, Input>);
+            ExpectTriangleColor(render([&](auto& stream) { stream << bindings.draw(3); }));
+        };
+        verify(typed::HeapStorage{});
+        verify(typed::ArenaStorage<>{});
+    }
+
+    TEST_F(TypedPipelineVulkanIntegrationTest, CpuDraftSnapshotsSeparateSavedEditorsAndShareOnlyTemporaryEmptyLayouts) {
+        namespace pl = vsl::pipeline_layout;
+        namespace l = vsl::lifetime;
+        std::optional<vsl::PipelineLayoutEditAccessor> saved;
+        struct Capture {
+            std::optional<vsl::PipelineLayoutEditAccessor>& saved;
+            void injection(vsl::PipelineLayoutEditAccessor layout) const { saved = std::move(layout); }
+        };
+        using EmptySets = typed::ResourceSchema<typed::DescriptorSet<3>>;
+        l::PipelineRecipeDraft draft(device);
+        draft.inject(Capture{saved}, pl::ShaderGroup("snapshot", {*vertex, *fragment}), EmptySets{});
+        const auto snapshot = draft.snapshot();
+        ASSERT_TRUE(saved);
+        EXPECT_FALSE(saved->data_);
+        ASSERT_TRUE(snapshot.pending_layouts());
+        ASSERT_EQ(snapshot.pending_layouts()->size(), 4u);
+        EXPECT_TRUE(snapshot.definition().binding_layouts.empty());
+        pl::ShaderGroup("later shader", {*vertex}).injection(*saved);
+        pl::ResourceBinding({}).injection(*saved);
+        EXPECT_EQ(saved->edit_recipe().shaders.size(), 3u);
+        EXPECT_FALSE(saved->edit_recipe().pending_layouts);
+        EXPECT_EQ(snapshot.definition().shaders.size(), 2u);
+        ASSERT_TRUE(snapshot.pending_layouts());
+        std::weak_ptr<void> temporary;
+        {
+            const auto materialized = l::materialize_recipe<1>(snapshot, typed::ArenaStorage<>{});
+            EXPECT_FALSE(materialized.pending_layouts());
+            const auto& layouts = materialized.definition().binding_layouts;
+            ASSERT_EQ(layouts.size(), 4u);
+            for (auto* layout : layouts)
+                EXPECT_EQ(layout, layouts.front());
+            temporary = layouts.front()->owner_node->owner_ref().share();
+            EXPECT_FALSE(temporary.expired());
+        }
+        EXPECT_TRUE(temporary.expired());
+        EXPECT_TRUE(snapshot.definition().binding_layouts.empty());
+    }
+
+    TEST_F(TypedPipelineVulkanIntegrationTest, TypedSchemaValidationLeavesTheCapturedDraftWithoutNativeLayouts) {
+        namespace pl = vsl::pipeline_layout;
+        std::optional<vsl::PipelineLayoutEditAccessor> saved;
+        struct Capture {
+            std::optional<vsl::PipelineLayoutEditAccessor>& saved;
+            void injection(vsl::PipelineLayoutEditAccessor layout) const { saved = std::move(layout); }
+        };
+        using Resources = typed::ResourceSchema<typed::DescriptorSet<0, typed::UniformBinding<0, float, vsl::ShaderFlag::VERTEX>>>;
+        using WrongInput = typed::TypedVertexInput<>;
+        auto verify = [&](auto policy) {
+            EXPECT_THROW((typed::TypedGraphicsPipeline<WrongInput, Resources>(policy, device, *pass, Capture{saved},
+                                                                              pl::ShaderGroup("invalid input", {*vertex, *fragment}))),
+                         std::invalid_argument);
+            ASSERT_TRUE(saved);
+            EXPECT_FALSE(saved->data_);
+            EXPECT_TRUE(saved->edit_recipe().binding_layouts.empty());
+            ASSERT_TRUE(saved->edit_recipe().pending_layouts);
+            EXPECT_EQ(saved->edit_recipe().pending_layouts->size(), 1u);
+            saved.reset();
+        };
+        verify(typed::HeapStorage{});
+        verify(typed::ArenaStorage<>{});
+    }
+
+    TEST_F(TypedPipelineVulkanIntegrationTest, PipelineStorageFactoriesRejectBorrowedPassesAndConsumedSnapshots) {
+        namespace l = vsl::lifetime;
+        l::PipelineRecipeDraft draft(device);
+        draft.inject(vsl::pipeline_layout::ShaderGroup("owning sources", {*vertex, *fragment}));
+        auto original = draft.snapshot();
+        const auto snapshot = std::move(original);
+        EXPECT_THROW(original.definition(), std::logic_error);
+        EXPECT_THROW(original.pending_layouts(), std::logic_error);
+        EXPECT_EQ(snapshot.definition().shaders.size(), 2u);
+        const vsl::RenderPassAccessor borrowed{
+            std::shared_ptr<vsl::impl::RenderPassImpl>(std::shared_ptr<void>{}, pass->data_.get())};
+        auto verify = [&](auto policy) {
+            EXPECT_THROW(l::make_graphics_pipeline(snapshot, borrowed, 0, policy), std::out_of_range);
+            EXPECT_THROW(l::make_graphics_pipeline(snapshot, *pass, UINT32_MAX, policy), std::out_of_range);
+        };
+        verify(typed::HeapStorage{});
+        verify(typed::ArenaStorage<>{});
     }
 
     TEST_F(TypedPipelineVulkanIntegrationTest, SparseBindingsAreNotRenumberedDuringRecording) {

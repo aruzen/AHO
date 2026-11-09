@@ -1,6 +1,7 @@
 #pragma once
 #include <VSL/define.hpp>
 #include <VSL/operation/pipeline_layout_create_info.hpp>
+#include <VSL/operation/descriptor_create_info.hpp>
 #include <VSL/operation/render_pass_description.hpp>
 #include <VSL/operation/device_create_info.hpp>
 #include <VSL/operation/swapchain_create_info.hpp>
@@ -258,6 +259,8 @@ namespace VSL_NAMESPACE::impl {
         std::vector<size_t> shader_sources;
         std::vector<ShaderImpl*> shaders;
         std::vector<ResourceBindingLayoutImpl*> binding_layouts;
+        std::vector<size_t> binding_sources;
+        std::optional<std::vector<DescriptorLayoutCreateInfo>> pending_layouts;
         std::vector<PushConstantRange> push_ranges;
         GraphicsPipelineStateData graphics_state;
     };

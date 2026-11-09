@@ -1,6 +1,7 @@
 #pragma once
 #include "../vulkan/stages/push_contents.hpp"
 #include "typed_block_layout.hpp"
+#include "../lifetime/pipeline_recipe.hpp"
 #include "../vulkan/pipeline.hpp"
 #include "../vulkan/command.hpp"
 #include <array>
@@ -20,7 +21,7 @@ namespace VSL_NAMESPACE::typed {
         };
         void validate_push_values(std::span<const PushRequirement> requirements, std::span<const std::byte> values);
         void inject_push_schema(PipelineLayoutEditAccessor layout, std::span<const PushRequirement> requirements);
-        void validate_push_schema(PipelineLayoutAccessor layout, std::span<const PushRequirement> requirements);
+        void validate_push_schema(const lifetime::PipelineRecipeSnapshot& recipe, std::span<const PushRequirement> requirements);
         void invoke_push_values(PipelineAccessor pipeline, CommandBuffer buffer, std::span<const PushRequirement> requirements, std::span<const std::byte> values);
         template<typename Schema, typename... Values, size_t... indices>
         consteval bool push_values_match(std::index_sequence<indices...>);

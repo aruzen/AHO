@@ -299,6 +299,34 @@ namespace {
         ExpectTriangleColor(render([&](auto& stream) { stream << typed_pipeline.bind_vertices().bind_resources(textures).draw(3); }));
     }
 
+    TEST_F(TypedDescriptorComputeVulkanIntegrationTest, ComputeDraftRejectsStageAndSparseSetErrorsBeforeMaterialization) {
+        std::optional<vsl::PipelineLayoutEditAccessor> saved;
+        struct Capture {
+            std::optional<vsl::PipelineLayoutEditAccessor>& saved;
+            void injection(vsl::PipelineLayoutEditAccessor layout) const { saved = std::move(layout); }
+        };
+        using EmptySet = t::ResourceSchema<t::DescriptorSet<0>>;
+        using HugeSet = t::ResourceSchema<t::DescriptorSet<0x10000000>>;
+        vsl::Shader<vsl::ShaderType::VERTEX> vertex(device, vsl_test::shader_path("vertices.vert.spv"));
+        auto verify = [&](auto policy) {
+            EXPECT_THROW((t::TypedComputePipeline<EmptySet>(policy, device, Capture{saved})), std::invalid_argument);
+            ASSERT_TRUE(saved);
+            EXPECT_FALSE(saved->data_);
+            ASSERT_TRUE(saved->edit_recipe().pending_layouts);
+            EXPECT_EQ(saved->edit_recipe().pending_layouts->size(), 1u);
+            EXPECT_THROW((t::TypedComputePipeline<EmptySet>(policy, device, Capture{saved},
+                                                            vsl::pipeline_layout::ShaderGroup("not compute", {vertex}))),
+                         std::invalid_argument);
+            EXPECT_FALSE(saved->data_);
+            EXPECT_THROW((t::TypedComputePipeline<HugeSet>(policy, device, Capture{saved})), std::out_of_range);
+            EXPECT_FALSE(saved->data_);
+            EXPECT_FALSE(saved->edit_recipe().pending_layouts);
+            saved.reset();
+        };
+        verify(t::HeapStorage{});
+        verify(t::ArenaStorage<>{});
+    }
+
     TEST_F(TypedDescriptorComputeVulkanIntegrationTest, TypedUniformAndStorageSchemasSurviveDispatchAndOwnTheirPayloads) {
         struct Parameters {
             std::uint32_t base;
@@ -307,33 +335,44 @@ namespace {
         using ParametersSet = t::DescriptorSet<0, t::UniformBinding<2, ParametersRecord, vsl::ShaderFlag::COMPUTE>>;
         using OutputSet = t::DescriptorSet<1, t::StorageBinding<4, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
         using ComputeSchema = t::ResourceSchema<OutputSet, ParametersSet>;
-        vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_descriptors.comp.spv"));
-        t::TypedComputePipeline<ComputeSchema> typed_pipeline(device, vsl::pipeline_layout::ShaderGroup("typed compute", {shader}));
-        vsl::GraphicResourceManager manager(device);
-        t::TypedDescriptorSet<ParametersSet> input(device, manager);
-        t::TypedDescriptorSet<OutputSet> output(device, manager);
-        const Parameters parameters{491};
-        const std::array<std::uint32_t, 16> zero{};
-        t::TypedUniformBuffer<Parameters> uniform(device, parameters);
-        t::TypedStorageBuffer<std::uint32_t> storage(device, zero);
-        input.write<2>(uniform);
-        output.write<4>(storage);
-        auto binding = typed_pipeline.bind_resources(output, input);
-        EXPECT_THROW(binding.dispatch(size_t{UINT32_MAX} + 1), std::out_of_range);
-        auto commands = make_manager();
-        {
-            auto phase = commands.start_phase<vsl::ComputePhase>();
-            phase << binding.dispatch(zero.size());
-            vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
-            auto buffer = commands.get_buffer();
-            buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
-                vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
-        }
-        device.data_->device.waitIdle();
-        std::array<std::uint32_t, zero.size()> actual{};
-        storage.read_into(actual);
-        for (size_t i = 0; i < zero.size(); ++i)
-            EXPECT_EQ(actual[i], parameters.base + i);
+        auto verify = [&](auto policy) {
+            std::weak_ptr<vsl::impl::ShaderImpl> shader_owner;
+            auto typed_pipeline = [&] {
+                vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_descriptors.comp.spv"));
+                shader_owner = shader.data_;
+                return t::TypedComputePipeline<ComputeSchema>(policy, device, vsl::pipeline_layout::ShaderGroup("typed compute", {shader}));
+            }();
+            EXPECT_TRUE(shader_owner.expired());
+            const auto& runtime = typed_pipeline.backend().data_;
+            EXPECT_EQ(runtime->owner_node == runtime->layout->owner_node, (std::same_as<decltype(policy), t::ArenaStorage<>>));
+            vsl::GraphicResourceManager manager(device);
+            t::TypedDescriptorSet<ParametersSet> input(device, manager);
+            t::TypedDescriptorSet<OutputSet> output(device, manager);
+            const Parameters parameters{491};
+            const std::array<std::uint32_t, 16> zero{};
+            t::TypedUniformBuffer<Parameters> uniform(device, parameters, policy);
+            t::TypedStorageBuffer<std::uint32_t> storage(device, zero, policy);
+            input.write<2>(uniform);
+            output.write<4>(storage);
+            auto binding = typed_pipeline.bind_resources(output, input);
+            EXPECT_THROW(binding.dispatch(size_t{UINT32_MAX} + 1), std::out_of_range);
+            auto commands = make_manager();
+            {
+                auto phase = commands.start_phase<vsl::ComputePhase>();
+                phase << binding.dispatch(zero.size());
+                vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
+                auto buffer = commands.get_buffer();
+                buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
+                    vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+            }
+            device.data_->device.waitIdle();
+            std::array<std::uint32_t, zero.size()> actual{};
+            storage.read_into(actual);
+            for (size_t i = 0; i < zero.size(); ++i)
+                EXPECT_EQ(actual[i], parameters.base + i);
+        };
+        verify(t::HeapStorage{});
+        verify(t::ArenaStorage<>{});
     }
 
 } // namespace

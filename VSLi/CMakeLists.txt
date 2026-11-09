@@ -40,6 +40,8 @@ add_library(VSL STATIC
         VSL/src/vulkan/stages/dynamic_state.cpp
         VSL/src/vulkan/stages/color_blend.cpp
         VSL/src/vulkan/pipeline_layout.cpp
+        VSL/src/lifetime/pipeline_recipe.cpp
+        VSL/include/VSL/lifetime/pipeline_recipe.hpp
         VSL/src/lifetime/resource_use.cpp
         VSL/src/lifetime/descriptor_bindings.cpp
         VSL/src/lifetime/descriptor_storage.cpp

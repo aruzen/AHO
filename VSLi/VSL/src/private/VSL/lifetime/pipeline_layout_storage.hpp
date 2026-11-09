@@ -6,6 +6,9 @@ namespace VSL_NAMESPACE::lifetime {
         alignas(impl::PipelineLayoutImpl) std::byte value[sizeof(impl::PipelineLayoutImpl)];
     };
     size_t retain_recipe_owner(std::vector<OwnerRef>& owners, OwnerRef owner);
+    void replace_recipe_layouts(impl::PipelineRecipe& recipe, LogicalDeviceAccessor device,
+                                std::span<const graphic_resource::BindingLayout> layouts,
+                                std::optional<std::vector<DescriptorLayoutCreateInfo>> pending = std::nullopt);
     // CPU領域・Deviceの所有は呼出側。DescriptorLayoutは構築呼出し中のみ必要。
     void construct_pipeline_layout(void* storage, LogicalDeviceAccessor device,
                                    std::span<impl::ResourceBindingLayoutImpl* const> layouts, std::span<const PushConstantRange> ranges);

@@ -48,7 +48,7 @@ namespace typed_example {
         if (_pipeline && _format == format)
             return;
         namespace pl = vsl::pipeline_layout;
-        _pipeline.emplace(_context.device(), _context.render_pass(),
+        _pipeline.emplace(Storage{}, _context.device(), _context.render_pass(),
 #ifdef AHO_TYPED_ARENA
                           _resources.descriptor_layouts(),
 #endif

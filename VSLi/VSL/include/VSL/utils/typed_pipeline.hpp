@@ -126,8 +126,8 @@ namespace VSL_NAMESPACE::typed {
         static_assert(subpass != UINT32_MAX, "Typed subpass index must not be narrowed to VK_SUBPASS_EXTERNAL");
         LogicalDeviceAccessor _device;
         VSL_NAMESPACE::GraphicsPipeline _pipeline;
-        template<pipeline_layout_injecter ResourceStage, pipeline_layout_injecter... Stages>
-        static VSL_NAMESPACE::GraphicsPipeline MakePipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, ResourceStage&& resources, Stages&&... stages);
+        template<storage_policy Policy, pipeline_layout_injecter ResourceStage, pipeline_layout_injecter... Stages>
+        static VSL_NAMESPACE::GraphicsPipeline MakePipeline(Policy policy, LogicalDeviceAccessor device, RenderPassAccessor pass, ResourceStage&& resources, Stages&&... stages);
 
     public:
         using VertexInput = Input;
@@ -136,10 +136,16 @@ namespace VSL_NAMESPACE::typed {
         static constexpr std::uint32_t SUBPASS = subpass;
         template<pipeline_layout_injecter... Stages>
         TypedGraphicsPipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, Stages&&... stages)
-            : _device(device), _pipeline(MakePipeline(device, std::move(pass), Resources{}, std::forward<Stages>(stages)...)) {}
+            : TypedGraphicsPipeline(DefaultStorage{}, device, std::move(pass), std::forward<Stages>(stages)...) {}
+        template<storage_policy Policy, pipeline_layout_injecter... Stages>
+        TypedGraphicsPipeline(Policy policy, LogicalDeviceAccessor device, RenderPassAccessor pass, Stages&&... stages)
+            : _device(device), _pipeline(MakePipeline(policy, device, std::move(pass), Resources{}, std::forward<Stages>(stages)...)) {}
         template<pipeline_layout_injecter... Stages>
         TypedGraphicsPipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, const TypedDescriptorLayouts<Resources>& layouts, Stages&&... stages)
-            : _device(device), _pipeline(MakePipeline(device, std::move(pass), detail::DescriptorLayoutInjection<Resources>{layouts}, std::forward<Stages>(stages)...)) {}
+            : TypedGraphicsPipeline(DefaultStorage{}, device, std::move(pass), layouts, std::forward<Stages>(stages)...) {}
+        template<storage_policy Policy, pipeline_layout_injecter... Stages>
+        TypedGraphicsPipeline(Policy policy, LogicalDeviceAccessor device, RenderPassAccessor pass, const TypedDescriptorLayouts<Resources>& layouts, Stages&&... stages)
+            : _device(device), _pipeline(MakePipeline(policy, device, std::move(pass), detail::DescriptorLayoutInjection<Resources>{layouts}, std::forward<Stages>(stages)...)) {}
 
         const VSL_NAMESPACE::GraphicsPipeline& backend() const { return _pipeline; }
 
@@ -151,14 +157,17 @@ namespace VSL_NAMESPACE::typed {
     };
 
     template<typename Input, typename Resources, typename Pushes, std::uint32_t subpass>
-    template<pipeline_layout_injecter ResourceStage, pipeline_layout_injecter... Stages>
-    VSL_NAMESPACE::GraphicsPipeline TypedGraphicsPipeline<Input, Resources, Pushes, subpass>::MakePipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, ResourceStage&& resources, Stages&&... stages) {
-        // Input is deliberately last: earlier stages cannot replace the typed vertex layout.
-        PipelineLayout layout(device, std::forward<Stages>(stages)..., Input{}, std::forward<ResourceStage>(resources), Pushes{});
-        detail::validate_pipeline_vertex_shader(layout, Input::LAYOUT.attribute);
-        detail::validate_resource_schema(layout, Resources::REQUIREMENTS);
-        detail::validate_push_schema(layout, Pushes::REQUIREMENTS);
-        return VSL_NAMESPACE::GraphicsPipeline(std::move(layout).freeze(), pass, subpass);
+    template<storage_policy Policy, pipeline_layout_injecter ResourceStage, pipeline_layout_injecter... Stages>
+    VSL_NAMESPACE::GraphicsPipeline TypedGraphicsPipeline<Input, Resources, Pushes, subpass>::MakePipeline(Policy policy, LogicalDeviceAccessor device, RenderPassAccessor pass, ResourceStage&& resources, Stages&&... stages) {
+        lifetime::PipelineRecipeDraft draft(device);
+        // Typed入力は利用側stageより後に確定する。
+        draft.inject(std::forward<Stages>(stages)..., Input{}, std::forward<ResourceStage>(resources), Pushes{});
+        const auto recipe = draft.snapshot();
+        detail::validate_pipeline_vertex_shader(recipe, Input::LAYOUT.attribute);
+        detail::validate_resource_schema(recipe, Resources::REQUIREMENTS);
+        detail::validate_push_schema(recipe, Pushes::REQUIREMENTS);
+        const auto materialized = lifetime::materialize_recipe<Resources::COUNT + 1>(recipe, policy);
+        return lifetime::make_graphics_pipeline(materialized, std::move(pass), subpass, policy);
     }
 
     template<typename Input, typename Resources, typename Pushes>

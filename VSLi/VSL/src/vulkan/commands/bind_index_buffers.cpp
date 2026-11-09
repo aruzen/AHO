@@ -2,6 +2,7 @@
 
 #include <VSL/vulkan/commands/bind_index_buffers.hpp>
 #include <VSL/lifetime/identity_access.hpp>
+#include <VSL/lifetime/resource_use_factory.hpp>
 #include <stdexcept>
 
 VSL_NAMESPACE::BufferIdentity VSL_NAMESPACE::command::BindIndexBufferAt::identity() const {
@@ -21,7 +22,7 @@ VSL_NAMESPACE::command::BindIndexBufferAt::BindIndexBufferAt(std::shared_ptr<imp
     if (!_source || !VSL_NAMESPACE::contain(_source->usage, MemoryType::INDEX_BUFFER) ||
         offset >= _source->requirement_size || offset % width || (type != IndexType::UINT16 && type != IndexType::UINT32))
         throw std::invalid_argument("BindIndexBufferAt requires an aligned index buffer range");
-    _use = ResourceUse::ForBuffer(_source, std::move(_use));
+    _use = lifetime::resource_use_for_buffer(_source, std::move(_use));
 }
 
 void VSL_NAMESPACE::command::BindIndexBufferAt::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {

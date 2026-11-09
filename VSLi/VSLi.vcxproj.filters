@@ -3,6 +3,7 @@
   <ItemGroup>
     <ClInclude Include="VSL\include\VSL\lifetime\pipeline_recipe.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\include\VSL\lifetime\resource_identity.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="VSL\src\private\VSL\lifetime\resource_use_factory.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="VSL\src\private\VSL\lifetime\identity_access.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClCompile Include="VSL\src\lifetime\pipeline_recipe.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClInclude Include="VSL\include\VSL\lifetime\buffer_arena.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>

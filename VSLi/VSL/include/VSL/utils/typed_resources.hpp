@@ -258,7 +258,7 @@ namespace VSL_NAMESPACE::typed {
     TypedDescriptorSet<Spec>::TypedDescriptorSet(LogicalDeviceAccessor device, GraphicResource resource, ResourceRetention retention)
         : _resource(std::move(resource)), _device(device) {
         detail::validate_descriptor_resource(_resource, device, Spec::POINTS);
-        _use = ResourceUseGroup::ForDescriptor(Spec::BINDING_COUNT, _resource.data_, retention);
+        _use = ResourceUseGroup::ForDescriptor(Spec::BINDING_COUNT, _resource, retention);
     }
     template<typename Spec>
     TypedDescriptorSet<Spec> TypedDescriptorSet<Spec>::FromResource(LogicalDeviceAccessor device, GraphicResource resource, ResourceRetention retention) {

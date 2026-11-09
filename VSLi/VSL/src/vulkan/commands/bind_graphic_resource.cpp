@@ -47,11 +47,14 @@ void VSL_NAMESPACE::command::BindGraphicResource::set_pipeline(std::optional<Pip
 }
 
 void VSL_NAMESPACE::command::BindGraphicResource::track(const CommandBuffer& buffer) const {
-    if (_use)
-        _use->record(buffer);
+    const auto use = _use;
+    if (use)
+        use->record(buffer);
     for (const auto& resource : resources) {
-        if (_use && _use->tracks_descriptor(resource.data_.get()))
+        if (use && use->tracks_descriptor(resource)) {
+            use->retain_descriptor_owner(resource, buffer);
             continue;
+        }
         buffer.retain(resource.data_);
         lifetime::record_descriptor_resources(*resource.data_, buffer);
     }

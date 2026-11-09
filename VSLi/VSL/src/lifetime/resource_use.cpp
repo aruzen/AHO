@@ -1,4 +1,7 @@
 #include <VSL/lifetime/resource_use.hpp>
+#include <VSL/lifetime/resource_use_factory.hpp>
+#include <VSL/lifetime/buffer_view.hpp>
+#include <VSL/vulkan/descriptor.hpp>
 #include <VSL/lifetime/submission_retention.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/owner_access.hpp>
@@ -7,23 +10,35 @@
 #include <stdexcept>
 
 namespace VSL_NAMESPACE {
-    ResourceUse ResourceUse::ForBuffer(const std::shared_ptr<impl::BufferImpl>& buffer, ResourceUse constraint) {
+    ResourceUse lifetime::resource_use_for_buffer(const std::shared_ptr<impl::BufferImpl>& buffer, ResourceUse constraint) {
         if (!buffer || !buffer->use)
             throw std::invalid_argument("Buffer requires a constructed storage generation");
         const auto owner = lifetime::detail::owned_ref(buffer, buffer->owner_node);
         return ResourceUse{owner.alias(buffer->use), owner}.with_constraint(std::move(constraint));
     }
-    ResourceUse ResourceUse::ForImage(const std::shared_ptr<impl::ImageImpl>& image) {
+    ResourceUse lifetime::resource_use_for_image(const std::shared_ptr<impl::ImageImpl>& image) {
         if (!image || !image->use)
             throw std::invalid_argument("Image requires a constructed storage generation");
         const auto owner = lifetime::detail::owned_ref(image, image->owner_node);
         return {owner.alias(image->use), owner};
     }
-    ResourceUse ResourceUse::ForSampler(const std::shared_ptr<impl::SamplerImpl>& sampler) {
+    ResourceUse lifetime::resource_use_for_sampler(const std::shared_ptr<impl::SamplerImpl>& sampler) {
         if (!sampler || !sampler->use)
             throw std::invalid_argument("Sampler requires a constructed storage generation");
         const auto owner = lifetime::detail::owned_ref(sampler, sampler->owner_node);
         return {owner.alias(sampler->use), owner};
+    }
+    ResourceUse ResourceUse::ForBuffer(const BufferAccessor& buffer, ResourceUse constraint) {
+        return buffer.resource_use(std::move(constraint));
+    }
+    ResourceUse ResourceUse::ForBuffer(const BufferView& buffer, ResourceUse constraint) {
+        return buffer.resource_use(std::move(constraint));
+    }
+    ResourceUse ResourceUse::ForImage(const ImageAccessor& image) {
+        return image.resource_use();
+    }
+    ResourceUse ResourceUse::ForSampler(const SamplerAccessor& sampler) {
+        return sampler.resource_use();
     }
     ResourceUse ResourceUse::with_constraint(ResourceUse constraint) const {
         const auto present = [](const auto& state) { return bool(state) || state.use_count(); };
@@ -76,15 +91,29 @@ namespace VSL_NAMESPACE {
     }
     ResourceUseGroup::ResourceUseGroup(size_t bindings, std::shared_ptr<void> owner)
         : _owner(std::move(owner)), _bindings(bindings) {}
-    std::shared_ptr<ResourceUseGroup> ResourceUseGroup::ForDescriptor(size_t bindings, const std::shared_ptr<impl::GraphicResourceImpl>& resource, ResourceRetention retention) {
-        if (!resource || !resource.use_count())
+    std::shared_ptr<ResourceUseGroup> ResourceUseGroup::ForDescriptor(size_t bindings, const graphic_resource::Resource& resource, ResourceRetention retention) {
+        const auto data = resource.data_;
+        if (!data || !data.use_count())
             throw std::invalid_argument("Descriptor use requires a resource");
-        if (!resource->layout || resource->layout->layout_bindings.size() != bindings)
+        if (!data->layout || data->layout->layout_bindings.size() != bindings)
             throw std::invalid_argument("Descriptor use binding count mismatch");
-        auto group = std::make_shared<ResourceUseGroup>(0, resource);
-        group->_resource = resource.get();
+        auto group = std::make_shared<ResourceUseGroup>(0, data);
+        group->_resource = data.get();
         group->_retention = retention;
         return group;
+    }
+    bool ResourceUseGroup::tracks_descriptor(const graphic_resource::Resource& resource) const {
+        return _resource && _resource == resource.data_.get();
+    }
+    void ResourceUseGroup::retain_descriptor_owner(const graphic_resource::Resource& resource, const CommandBuffer& buffer) const {
+        const auto owner = resource.data_;
+        const auto retention = _retention;
+        if (!owner.use_count() || (!_owner.owner_before(owner) && !owner.owner_before(_owner)))
+            return;
+        if (retention == ResourceRetention::COMPLETION)
+            buffer.retain_until_complete(owner);
+        else
+            buffer.completion().retain(owner);
     }
     void ResourceUseGroup::require_idle() const {
         const auto owner = _owner;

@@ -113,6 +113,24 @@ resource_use()は保存された入力useの値を返す。Bufferではfactory�
 
 Image／Samplerの元CB、外部composite owner、strong null aliasの意味を保持し、canonical nodeからownerを取り直さない。画像／sampler getterも同じCBを共有する。Bufferのrefへのアクセスはfactoryのcpp内へ下げ、次のBufferRef／ResourceUse公開入口廃止へ接続する。値の生成に新しい個別確保やowner wrapperは追加しない。旧aggregateへ依存する利用側はfactoryとmetadata/getterへ移して再buildする。
 
+## 順序12c: 使用登録の公開入力
+
+ResourceUseのfactoryはImplのshared_ptrを受けず、通常のBufferAccessor／ImageAccessor／SamplerAccessorとBufferViewを受ける。Typed descriptorのResourceUseGroupもGraphicResourceを渡す。既存のaccessor.resource_use()とview.resource_use()は維持する。
+
+```cpp
+auto physical = vsl::ResourceUse::ForBuffer(buffer.storage_view());
+auto constrained = vsl::ResourceUse::ForBuffer(buffer.storage_view(), logical_constraint);
+auto image_use = vsl::ResourceUse::ForImage(image);
+auto group = vsl::ResourceUseGroup::ForDescriptor(
+    binding_count, descriptor, vsl::ResourceRetention::COMPLETION);
+```
+
+旧ForBuffer(buffer.data_)等はForBuffer(buffer)へ、ForDescriptor(count, descriptor.data_)はForDescriptor(count, descriptor)へ移す。tracks_descriptorもraw pointerではなくGraphicResourceを受ける。同じ物理storageの状態と、入力が保持した元のcontrol blockを共通のprivate処理へ渡す。外部composite ownerをcanonical ownerへ置き換えず、Bufferの追加logical constraintも維持する。private factoryはインストールしない。
+
+descriptorの使用状態と所有の一致は別々に判定する。同じSetを記録済みのGroupでも、commandのGraphicResourceが異なるcontrol blockを持つ場合、その追加ownerをGroupと同じ保持契約で登録する。同じcontrol blockの二重保持と物理状態の二重記録は省く。COMPLETIONでは完了／取消後に追加ownerを回収し、SUBMISSIONではWorkの寿命まで保持する。物理一致の判定へcontrol block一致を混ぜて、保持policyを切り替えることはしない。
+
+factory入力の変更に新しいowner wrapperや使用状態を追加せず、記録は解決済み実体を使う。BufferRef／BufferViewのraw構築、legacy_owner、他の公開data_は次の移行対象として残る。
+
 2026-11-06。Bufferの4責務分離が統合されたmaster `6b1f0166`を基点とする。[Bufferの契約](buffer-generation-contracts.md)と[責務の配置](buffer-layer-layout.md)を維持する。
 
 ## 方針と段階

@@ -401,7 +401,7 @@ namespace {
         {
             auto previous = earlier.start_phase<vsl::ComputePhase>();
             for (const auto& image : chain.images)
-                vsl::ResourceUse::ForImage(image.data_).record(earlier.get_buffer(), vsl::ResourceRetention::COMPLETION);
+                vsl::ResourceUse::ForImage(image).record(earlier.get_buffer(), vsl::ResourceRetention::COMPLETION);
             earlier.get_buffer().retain_until_complete(callback.owner());
             completed = previous.completion();
             ASSERT_EQ(previous.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);

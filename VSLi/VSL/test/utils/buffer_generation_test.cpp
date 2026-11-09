@@ -138,6 +138,9 @@ namespace {
         EXPECT_EQ(indices.resource_use().state.get(), &indices.backend().ref().use());
         EXPECT_EQ(uniform.descriptor().resource_use().state.get(), &uniform.backend().ref().use());
         EXPECT_EQ(storage.descriptor().resource_use().state.get(), &storage.backend().ref().use());
+        EXPECT_EQ(vsl::ResourceUse::ForBuffer(uniform.backend()).state.get(), &uniform.backend().ref().use());
+        const auto subview = uniform.storage_view().view(sizeof(std::uint32_t), sizeof(std::uint32_t));
+        EXPECT_EQ(vsl::ResourceUse::ForBuffer(subview).state.get(), &uniform.backend().ref().use());
         auto imported = t::TypedVertexBufferView<std::uint32_t>::FromView(vertices.backend(), 4);
         EXPECT_EQ(imported.resource_use().state.get(), &vertices.backend().ref().use());
         auto resource = t::TypedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>::FromView(uniform.backend(), 4);
@@ -151,6 +154,7 @@ namespace {
         source.copy(VALUES);
         auto native = source;
         native.data_ = vertices.storage_view().legacy_owner();
+        EXPECT_EQ(vsl::ResourceUse::ForBuffer(native).state.get(), &vertices.backend().ref().use());
         auto mapping = native.data();
         auto view = vertices.storage_view();
         {

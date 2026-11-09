@@ -1,4 +1,5 @@
 #include <VSL/lifetime/device_owner.hpp>
+#include <VSL/lifetime/resource_use_factory.hpp>
 #include <VSL/define.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>
@@ -68,5 +69,5 @@ VSL_NAMESPACE::ResourceUseState& VSL_NAMESPACE::ImageAccessor::use_state() const
     return *data_->use;
 }
 VSL_NAMESPACE::ResourceUse VSL_NAMESPACE::ImageAccessor::resource_use() const {
-    return ResourceUse::ForImage(data_);
+    return lifetime::resource_use_for_image(data_);
 }

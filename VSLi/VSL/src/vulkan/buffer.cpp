@@ -1,4 +1,5 @@
 #include <VSL/lifetime/device_owner.hpp>
+#include <VSL/lifetime/resource_use_factory.hpp>
 #include <VSL/lifetime/identity_access.hpp>
 #include <VSL/lifetime/buffer_storage.hpp>
 
@@ -105,10 +106,10 @@ VSL_NAMESPACE::ResourceUseState& VSL_NAMESPACE::BufferAccessor::use_state() cons
     return BufferRef{data_.get()}.use();
 }
 VSL_NAMESPACE::ResourceUse VSL_NAMESPACE::BufferAccessor::resource_use() const {
-    return ResourceUse::ForBuffer(data_, {});
+    return lifetime::resource_use_for_buffer(data_, {});
 }
 VSL_NAMESPACE::ResourceUse VSL_NAMESPACE::BufferAccessor::resource_use(ResourceUse constraint) const {
-    return ResourceUse::ForBuffer(data_, std::move(constraint));
+    return lifetime::resource_use_for_buffer(data_, std::move(constraint));
 }
 void VSL_NAMESPACE::BufferAccessor::read_into(std::span<std::byte> destination, size_t offset) const {
     BufferRef{data_.get()}.read_into(destination, offset);

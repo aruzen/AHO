@@ -475,6 +475,49 @@ namespace {
         EXPECT_NO_THROW(set.write<0>(input));
     }
 
+    TEST_F(ResourceUseVulkanIntegrationTest, DescriptorAliasesKeepAdditionalOwnersForTheGroupsRetentionPolicy) {
+        vsl::GraphicResourceManager descriptors(device);
+        vsl::graphic_resource::BindingLayout layout(device, vsl::graphic_resource::Type::UNIFORM_BUFFER, vsl::ShaderFlag::COMPUTE);
+        auto [pools, allocated] = descriptors.allocate({layout});
+        const auto native = allocated.front();
+        t::TypedUniformBuffer<std::uint32_t> input(device, 17u);
+        auto initialized = native;
+        initialized.update(input.backend());
+        struct Composite {
+            vsl::GraphicResource native;
+            std::shared_ptr<int> token;
+        };
+        for (const auto retention : {vsl::ResourceRetention::COMPLETION, vsl::ResourceRetention::SUBMISSION}) {
+            for (const bool cancel : {false, true}) {
+                std::weak_ptr<int> token;
+                {
+                    auto manager = make_manager().independent(1);
+                    auto phase = manager.start_phase<vsl::ComputePhase>();
+                    {
+                        const auto group = vsl::ResourceUseGroup::ForDescriptor(1, native, retention);
+                        const auto context = std::make_shared<Composite>(Composite{native, std::make_shared<int>(3)});
+                        token = context->token;
+                        const vsl::GraphicResource aliased{
+                            std::shared_ptr<vsl::impl::GraphicResourceImpl>(context, native.data_.get())};
+                        ASSERT_TRUE(group->tracks_descriptor(aliased));
+                        vsl::command::BindGraphicResource command(aliased, vsl::graphic_resource::BindingDestination::COMPUTE,
+                                                                  std::nullopt, 0, group);
+                        command.track(manager.get_buffer());
+                    }
+                    EXPECT_FALSE(token.expired());
+                    if (cancel)
+                        phase.cancel();
+                    else {
+                        ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+                        ASSERT_TRUE(phase.completion().wait());
+                    }
+                    EXPECT_EQ(token.expired(), retention == vsl::ResourceRetention::COMPLETION);
+                }
+                EXPECT_TRUE(token.expired());
+            }
+        }
+    }
+
     TEST_F(ResourceUseVulkanIntegrationTest, NativeUpdateKeepsItsTargetWhenCompletionDestroysTheCallingWrapper) {
         vsl::GraphicResourceManager descriptors(device);
         vsl::graphic_resource::BindingLayout layout(device, vsl::graphic_resource::Type::UNIFORM_BUFFER, vsl::ShaderFlag::COMPUTE);
@@ -488,7 +531,7 @@ namespace {
         auto manager = make_manager().independent(1);
         bool released = false;
         auto phase = manager.start_phase<vsl::ComputePhase>();
-        vsl::ResourceUseGroup::ForDescriptor(1, native.data_, vsl::ResourceRetention::COMPLETION)->record(manager.get_buffer());
+        vsl::ResourceUseGroup::ForDescriptor(1, native, vsl::ResourceRetention::COMPLETION)->record(manager.get_buffer());
         manager.get_buffer().retain_until_complete(std::shared_ptr<int>(new int(1), [&](int* value) {
             delete value;
             released = true;
@@ -510,7 +553,7 @@ namespace {
         const std::uint32_t value = 1;
         t::TypedUniformBuffer<std::uint32_t> input(device, value);
         allocated.front().update(input.backend());
-        auto group = vsl::ResourceUseGroup::ForDescriptor(1, allocated.front().data_, vsl::ResourceRetention::COMPLETION);
+        auto group = vsl::ResourceUseGroup::ForDescriptor(1, allocated.front(), vsl::ResourceRetention::COMPLETION);
         allocated.clear();
         auto manager = make_manager().independent(1), other = manager.independent(1);
         std::optional<vsl::ComputePhase> recording;

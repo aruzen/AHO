@@ -121,7 +121,8 @@ namespace VSL_NAMESPACE::lifetime {
             result->native.observing = false;
     }
     SubmissionTransaction::SubmissionTransaction(CommandDomain& domain, impl::SubmissionWork& work)
-        : _domain(domain), _work(work), _owns_context(domain.context.work == &work) {
+        : _domain(domain), _work(work), _owns_context(domain.context.work == &work),
+          _native_call(work.device ? static_cast<VkDevice>(work.device->device) : VK_NULL_HANDLE) {
         if (work.result->native.active || (_owns_context && domain.context.submitting))
             throw std::logic_error("Submission transaction is already active");
         work.result->native.active = true;
@@ -140,6 +141,14 @@ namespace VSL_NAMESPACE::lifetime {
         if (_owns_context)
             _domain.context.submitting = false;
         _active = false;
+        _native_call.finish();
+    }
+    void detach_recording_cpu(CommandDomain& domain, impl::SubmissionWork& work) noexcept {
+        if (domain.context.work != &work)
+            return;
+        domain.context.recording = false;
+        domain.context.work = nullptr;
+        domain.recording_submission.reset();
     }
     void abort_recording(CommandDomain& domain, impl::SubmissionWork& work, std::uint32_t slot) noexcept {
         if (domain.context.work != &work)
@@ -150,9 +159,7 @@ namespace VSL_NAMESPACE::lifetime {
             } catch (...) {
             }
         }
-        domain.context.recording = false;
-        domain.context.work = nullptr;
-        domain.recording_submission.reset();
+        detach_recording_cpu(domain, work);
     }
     void fail_recording(CommandDomain& domain, impl::SubmissionWork& work, std::uint32_t slot,
                         Completion::Failure failure, std::int32_t error_code) noexcept {

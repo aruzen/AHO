@@ -34,7 +34,45 @@ namespace {
         EXPECT_EQ(begin.render_pass.data_, pass->data_);
         EXPECT_EQ(begin.frame_buffer.data_, framebuffer->data_);
         EXPECT_FALSE(begin.clear_color.has_value());
+        EXPECT_EQ(begin.retention, vsl::ResourceRetention::SUBMISSION);
         EXPECT_EQ(render([](auto&) {}), (std::array<std::uint8_t, 4>{0, 0, 0, 0}));
+    }
+    TEST_F(RenderPassBeginVulkanIntegrationTest, CompletionRetentionReleasesTheTargetWhileTheCompletedWorkAndCommandRingRemain) {
+        auto manager = make_manager().independent(1);
+        const std::weak_ptr<void> owner = framebuffer->data_;
+        vsl::Completion completion;
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << vsl::command::RenderPassBegin::WithClears(*framebuffer, {}, {}, 0, vsl::ResourceRetention::COMPLETION)
+                  << vsl::command::RenderPassEnd{};
+            framebuffer.reset();
+            EXPECT_FALSE(owner.expired());
+            completion = phase.completion();
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        EXPECT_TRUE(completion.wait());
+        EXPECT_TRUE(owner.expired());
+        EXPECT_TRUE(manager.get_buffer().data_);
+        const auto invalid = static_cast<vsl::ResourceRetention>(99);
+        EXPECT_THROW((vsl::command::RenderPassBegin(vsl::FrameBufferAccessor{nullptr}, {}, {}, 0, invalid)), std::invalid_argument);
+    }
+    TEST_F(RenderPassBeginVulkanIntegrationTest, LegacyRetentionKeepsTheTargetUntilTheWorkIsReplaced) {
+        auto manager = make_manager().independent(1);
+        const std::weak_ptr<void> owner = framebuffer->data_;
+        vsl::Completion completion;
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << vsl::command::RenderPassBegin(*pass, *framebuffer) << vsl::command::RenderPassEnd{};
+            framebuffer.reset();
+            completion = phase.completion();
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        EXPECT_TRUE(completion.wait());
+        EXPECT_FALSE(owner.expired());
+        auto replacement = manager.start_phase<vsl::ComputePhase>();
+        ASSERT_EQ(replacement.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        EXPECT_TRUE(owner.expired());
+        EXPECT_TRUE(replacement.completion().wait());
     }
 } // namespace
 

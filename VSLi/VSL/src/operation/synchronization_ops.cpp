@@ -1,4 +1,5 @@
 #include <VSL/operation/synchronization_ops.hpp>
+#include <VSL/sync/device_call.hpp>
 #include <limits>
 #include <stdexcept>
 
@@ -85,6 +86,7 @@ namespace VSL_NAMESPACE::operation {
                 device.destroyFence(*it);
     }
     void reset_fences(vk::Device device, std::span<const vk::Fence> fences) {
+        const sync::NativeDeviceCall call(device);
         const auto count = static_cast<std::uint32_t>(fences.size());
         const auto* handles = reinterpret_cast<const VkFence*>(fences.data());
         const auto result = static_cast<vk::Result>(NATIVE_CALLS && NATIVE_CALLS->reset_fences

@@ -18,6 +18,9 @@
 namespace AHO_NAMESPACE::drawer::detail {
     struct StandardDrawState;
 }
+namespace AHO_NAMESPACE::window::detail {
+    struct WindowClose;
+}
 
 namespace AHO_NAMESPACE::window {
     d2::VectorI get_monitor_size();
@@ -39,6 +42,7 @@ namespace AHO_NAMESPACE::window {
         // 完成済みSwapchainと、Native開始まで検証された再試行要求を保持する。
         std::optional<WindowGenerationCandidate> pending_generation;
         std::optional<VSL_NAMESPACE::ImageType> deferred_usage;
+        bool closed = false;
 
         ~WindowData();
     };

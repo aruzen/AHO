@@ -31,8 +31,10 @@ namespace VSL_NAMESPACE::command {
         }
     } // namespace
     RenderPassBegin::RenderPassBegin(FrameBufferAccessor target, std::vector<ClearValue> clears,
-                                     RenderArea render_area, std::uint32_t index)
-        : frame_buffer(std::move(target)), clear_values(std::move(clears)), area(render_area), target_index(index) {
+                                     RenderArea render_area, std::uint32_t index, ResourceRetention retention)
+        : frame_buffer(std::move(target)), clear_values(std::move(clears)), area(render_area), target_index(index), retention(retention) {
+        if (retention != ResourceRetention::SUBMISSION && retention != ResourceRetention::COMPLETION)
+            throw std::invalid_argument("Invalid framebuffer retention policy");
         render_pass = frame_buffer.get_render_pass();
         if (index >= frame_buffer.data_->swap_chain_framebuffers.size())
             throw std::out_of_range("Framebuffer index");
@@ -43,7 +45,7 @@ namespace VSL_NAMESPACE::command {
         area = {checked.offset.x, checked.offset.y, checked.extent.width, checked.extent.height};
     }
     RenderPassBegin RenderPassBegin::WithClears(FrameBufferAccessor target, std::vector<AttachmentClear> bindings,
-                                                RenderArea area, std::uint32_t index) {
+                                                RenderArea area, std::uint32_t index, ResourceRetention retention) {
         const auto pass = target.get_render_pass();
         auto values = operation::default_frame_buffer_clears(pass.description());
         std::vector<bool> bound(values.size());
@@ -55,11 +57,11 @@ namespace VSL_NAMESPACE::command {
             bound[binding.attachment] = true;
             values[binding.attachment] = std::move(binding.value);
         }
-        return RenderPassBegin(std::move(target), std::move(values), area, index);
+        return RenderPassBegin(std::move(target), std::move(values), area, index, retention);
     }
     RenderPassBegin::RenderPassBegin(RenderPass pass, FrameBufferAccessor target,
-                                     std::optional<VSLDRGBColorAccessor<float>> color)
-        : RenderPassBegin(target, legacy_clears(target, color)) {
+                                     std::optional<VSLDRGBColorAccessor<float>> color, ResourceRetention retention)
+        : RenderPassBegin(target, legacy_clears(target, color), {}, 0, retention) {
         if (pass.data_ != render_pass.data_)
             throw std::invalid_argument("RenderPass/Framebuffer mismatch");
         if (color)
@@ -67,8 +69,8 @@ namespace VSL_NAMESPACE::command {
         target_index.reset();
     }
     IDPickingRenderPassBegin::IDPickingRenderPassBegin(IDPickingRenderPass pass, FrameBufferAccessor target,
-                                                       std::optional<VSLDRGBColorAccessor<float>> color)
-        : RenderPassBegin(target, legacy_clears(target, color)) {
+                                                       std::optional<VSLDRGBColorAccessor<float>> color, ResourceRetention retention)
+        : RenderPassBegin(target, legacy_clears(target, color), {}, 0, retention) {
         if (pass.data_ != render_pass.data_)
             throw std::invalid_argument("RenderPass/Framebuffer mismatch");
         if (color)
@@ -78,6 +80,9 @@ namespace VSL_NAMESPACE::command {
     void RenderPassBegin::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
         // poll中のcallbackがcommandや元wrapperを破棄しても、このsnapshotだけを使う。
         const auto target = frame_buffer.data_;
+        const auto policy = retention;
+        if (policy != ResourceRetention::SUBMISSION && policy != ResourceRetention::COMPLETION)
+            throw std::invalid_argument("Invalid framebuffer retention policy");
         if (!target || !target.use_count() || !target->device || !target->render_pass || !target->render_pass->description ||
             !buffer.data_ || !buffer.data_->command_pool || buffer.data_->command_pool->device != target->device)
             throw std::invalid_argument("Render pass begin requires a target on the recording device");
@@ -88,7 +93,10 @@ namespace VSL_NAMESPACE::command {
         const auto native = buffer.data_->command_buffers.at(slot);
         const auto index = target_index.value_or(buffer.data_->recording_context->acquired_image_index.value_or(slot));
         const operation::FrameBufferBeginScratch scratch(*target, index, {{area.x, area.y}, {area.width, area.height}}, clear_values);
-        buffer.retain(target);
+        if (policy == ResourceRetention::COMPLETION)
+            buffer.retain_until_complete(target);
+        else
+            buffer.retain(target);
         for (const auto* image : target->attachments.at(index))
             image->use->mark_used(completion);
         lifetime::require_recording(buffer, completion);

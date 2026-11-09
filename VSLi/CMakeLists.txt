@@ -100,6 +100,7 @@ add_library(VSL STATIC
         VSL/src/private/VSL/operation/shader_ops.hpp
         VSL/include/VSL/operation/shader_create_info.hpp
         VSL/src/operation/submission_ops.cpp
+        VSL/src/sync/device_call.cpp
         VSL/src/sync/buffer_access.cpp
         VSL/src/lifetime/buffer_storage.cpp
         VSL/src/lifetime/image_storage.cpp

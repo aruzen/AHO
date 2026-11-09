@@ -52,6 +52,7 @@ namespace {
     struct ResetAcquireProbe {
         unsigned calls = 0;
         VkResult failure = VK_ERROR_OUT_OF_HOST_MEMORY;
+        std::function<void()> after_native;
         static VkResult Reset(void* context, VkDevice device, std::uint32_t count, const VkFence* fences) noexcept;
     };
     struct GatedPhase : vsl::DefaultPhase {
@@ -894,7 +895,41 @@ namespace {
     VkResult ResetAcquireProbe::Reset(void* context, VkDevice device, std::uint32_t count, const VkFence* fences) noexcept {
         auto& probe = *static_cast<ResetAcquireProbe*>(context);
         ++probe.calls;
-        return probe.failure == VK_SUCCESS ? vkResetFences(device, count, fences) : probe.failure;
+        const auto result = probe.failure == VK_SUCCESS ? vkResetFences(device, count, fences) : probe.failure;
+        if (auto callback = std::exchange(probe.after_native, {}))
+            callback();
+        return result;
+    }
+    TEST_F(AcquireFencePoolWindowIntegrationTest, CancellationDuringAcquireResetDoesNotRewindAPeerStartedByResourceRelease) {
+        auto manager = make_manager().independent(3);
+        vsl::Swapchain chain(device, surface, {}, 64, 48);
+        GatedPhase phase(manager, chain);
+        std::unique_ptr<vsl::ComputePhase> peer;
+        bool retained = false;
+        const vsl_test::DeferredAction release([&] { peer = std::make_unique<vsl::ComputePhase>(manager); });
+        phase.gate = [&] {
+            if (!retained && phase.completion()) {
+                retained = true;
+                const auto work = phase.completion().data_->work.lock();
+                vsl::lifetime::retain_until_complete(*work, release.owner());
+            }
+            return true;
+        };
+        AcquireProbe acquisition;
+        const vsl::operation::ScopedPresentationNativeCalls native(acquisition.native_calls());
+        ResetAcquireProbe reset;
+        reset.failure = VK_SUCCESS;
+        reset.after_native = [&] { phase.cancel(); };
+        const vsl::operation::ScopedSynchronizationNativeCalls resetting({.context = &reset, .reset_fences = ResetAcquireProbe::Reset});
+        EXPECT_NO_THROW(phase.setup());
+        ASSERT_TRUE(peer);
+        EXPECT_EQ(manager.get_buffer().get_current_buffer_idx(), 1u);
+        EXPECT_EQ(peer->completion().status(), vsl::Completion::Status::PENDING);
+        EXPECT_EQ(phase.state, vsl::ComputePhase::State::ERROR_);
+        EXPECT_EQ(phase.completion().status(), vsl::Completion::Status::CANCELLED);
+        EXPECT_EQ(acquisition.calls, 0u);
+        EXPECT_EQ(peer->submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        EXPECT_TRUE(peer->completion().wait());
     }
     TEST_F(AcquireFencePoolWindowIntegrationTest, PoolIsLazyAndReusesOnlyTheFrameElementsWithoutReobservingOldProofs) {
         auto manager = make_manager().independent(3);

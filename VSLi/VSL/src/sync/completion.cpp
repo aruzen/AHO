@@ -1,5 +1,7 @@
 #include <VSL/sync/completion.hpp>
 #include <VSL/sync/submission_completion.hpp>
+#include <VSL/sync/device_call.hpp>
+#include <VSL/lifetime/recovery_batch.hpp>
 #include <VSL/operation/submission_ops.hpp>
 #include <VSL/lifetime/submission_retention.hpp>
 #include <VSL/sync/synchronization_state.hpp>
@@ -101,6 +103,9 @@ namespace VSL_NAMESPACE::sync {
             work.abandon_requested = true;
             return;
         }
+        if (work.device && sync::NativeDeviceCall::Active(work.device->device) &&
+            (work.result->status == Completion::Status::SUBMITTED || native_pending(*work.result)))
+            return;
         if (native_pending(*work.result) && work.result->native.enqueue == SubmissionEnqueue::UNKNOWN) {
             lifetime::SubmissionObservation observation(work);
             if (!observation.active())
@@ -142,6 +147,7 @@ namespace VSL_NAMESPACE {
             if (result->native.active || result->native.observing)
                 return result->status;
             if (auto work = result->work.lock()) {
+                const lifetime::SurfaceRetirementCollection retirement(work->device);
                 if (result->status == Completion::Status::SUBMITTED || sync::native_pending(*result)) {
                     lifetime::SubmissionObservation observation(*work);
                     if (!observation.active())
@@ -193,6 +199,7 @@ namespace VSL_NAMESPACE {
         auto work = result->work.lock();
         if (!work)
             return result->status == Status::COMPLETE;
+        const lifetime::SurfaceRetirementCollection retirement(work->device);
         lifetime::SubmissionObservation observation(*work);
         if (!observation.active())
             return false;

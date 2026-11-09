@@ -26,5 +26,5 @@ namespace VSL_NAMESPACE::operation {
     vk::Result wait_fence(vk::Device device, vk::Fence fence, std::uint64_t timeout) noexcept;
     vk::Result wait_fences(vk::Device device, std::span<const vk::Fence> fences, std::uint64_t timeout) noexcept;
     vk::Result wait_device_idle(vk::Device device) noexcept;
-    vk::Result queue_submit(vk::Queue queue, const vk::SubmitInfo& info, vk::Fence fence) noexcept;
+    vk::Result queue_submit(vk::Device device, vk::Queue queue, const vk::SubmitInfo& info, vk::Fence fence) noexcept;
 } // namespace VSL_NAMESPACE::operation

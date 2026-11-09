@@ -25,7 +25,7 @@ namespace VSL_NAMESPACE::operation {
     };
     vk::Result acquire_next_image(vk::Device device, vk::SwapchainKHR swapchain, std::uint64_t timeout,
                                   vk::Semaphore available, vk::Fence fence, std::uint32_t& image) noexcept;
-    vk::Result queue_present(vk::Queue queue, vk::SwapchainKHR swapchain, std::uint32_t image,
+    vk::Result queue_present(vk::Device device, vk::Queue queue, vk::SwapchainKHR swapchain, std::uint32_t image,
                              vk::Semaphore finished, vk::Fence present_fence = {}) noexcept;
     vk::Result poll_present_fence(vk::Device device, vk::Fence fence) noexcept;
     vk::Result wait_present_fence(vk::Device device, vk::Fence fence, std::uint64_t timeout) noexcept;

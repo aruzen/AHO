@@ -57,7 +57,9 @@ Semaphoreの予約は物理Impl・配列要素・取得leaseを区別する。fi
 
 Ticket、Work／Result、marker、観測snapshotと内部vectorは個別のCPU確保として残る。世代のImpl配置とnative GPU確保とは別であり、確保削減率や性能改善率は未測定である。
 
-AHOの0 extent、attachment生成失敗後の候補保持、resize／closeへの公開回収接続は10eで扱う。Typed既定arena化と公開Impl入口の廃止は11／12に残る。旧privateの即時collect helperは移行中だけ保持し、通常PhaseとCommandDomain待機は共通の回収batchへ接続する。
+AHOの0 extent、attachment生成失敗後の候補保持、resize／closeへの公開回収接続は[Window同期と退役](../AHO/window-synchronization.md)へ接続した。Typed既定arena化と公開Impl入口の廃止は11／12に残る。旧privateの即時collect helperは移行中だけ保持し、通常PhaseとCommandDomain待機は共通の回収batchへ接続する。
+
+閉じるSurfaceは`queue_surface_retirement(device, surface)`で事前登録し、`collect_surface_retirements(device, mode)`で同Device分を回収できる。登録は元Device／Surfaceのweak control blockとslotを保存し、live Phaseを強制取消しない。登録後に新たな使用を始めないことは呼出し側の契約である。同DeviceのNative呼出し中はPOLL／WAITとも延期し、未回収nodeはDEVICE_LOSTでも残す。PhaseとCompletionの外側境界で結果commit後に自動POLLする。
 
 ## 検証
 

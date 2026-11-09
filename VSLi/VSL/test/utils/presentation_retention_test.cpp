@@ -1,3 +1,4 @@
+#include <VSL/lifetime/synchronization_access.hpp>
 #include "support/window_fixture.hpp"
 #include "support/deferred_action.hpp"
 #include <VSL/lifetime/swapchain_arena.hpp>
@@ -10,6 +11,10 @@
 #include <VSL/vulkan/commands/render_pass_begin.hpp>
 #include <VSL/vulkan/commands/render_pass_end.hpp>
 #include <new>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SynchronizationAccess;
+}
 
 namespace {
     namespace l = vsl::lifetime;
@@ -445,11 +450,11 @@ namespace {
         auto manager = make_manager().independent(1);
         auto chain = make_chain();
         auto registry = l::presentation_domain(chain.data_);
-        vsl::FenceHolder fences(std::shared_ptr<vsl::impl::FenceImpl>(chain.data_, chain.data_->presentation_context->fences));
+        auto fences = SynchronizationAccess::FromShared(std::shared_ptr<vsl::impl::FenceImpl>(chain.data_, chain.data_->presentation_context->fences));
         NativeProbe probe;
         auto phase = manager.start_phase<vsl::DefaultPhase>(chain);
         const auto index = phase.get_image_index();
-        probe.target = fences.data_->fences[index];
+        probe.target = SynchronizationAccess::Owned(fences)->fences[index];
         probe.forced = VK_ERROR_OUT_OF_HOST_MEMORY;
         phase.cancel();
         ASSERT_TRUE(phase.completion().wait());

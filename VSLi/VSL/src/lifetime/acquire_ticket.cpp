@@ -2,6 +2,7 @@
 #include <VSL/sync/device_call.hpp>
 #include <VSL/lifetime/swapchain_storage.hpp>
 #include <VSL/lifetime/synchronization_use.hpp>
+#include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/phase_call.hpp>
 #include <VSL/lifetime/submission_retention.hpp>
 #include <VSL/operation/presentation_ops.hpp>
@@ -259,7 +260,7 @@ namespace VSL_NAMESPACE::lifetime {
             if (previous->state.abandon_requested && !previous->state.native_call_active &&
                 previous->state.status == sync::AcquisitionStatus::UNARMED)
                 previous->reject_acquisition();
-        (void)FenceHolder{fences}.owner_ref();
+        detail::SynchronizationAccess::RequireCanonical(fences);
         if (available) {
             require_semaphore_owner(available);
             if (available->device != generation->device)

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/sync/submission_completion.hpp>
 #include <VSL/sync/device_call.hpp>
@@ -10,6 +11,10 @@
 #include <VSL/lifetime/resource_arena.hpp>
 #include <stdexcept>
 #include <utility>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SynchronizationAccess;
+}
 
 namespace VSL_NAMESPACE::lifetime {
     namespace {
@@ -52,7 +57,7 @@ namespace VSL_NAMESPACE::lifetime {
                 domain.context.closing || domain.context.recording || domain.context.submitting || domain.context.returning_image || domain.context.mutating ||
                 domain.context.frame_buffer_recording || buffer->command_buffers.size() != count)
                 throw std::logic_error("Command domain changed while constructing acquisition fences");
-            domain.acquire_fences = arena.fence({1}).data_;
+            domain.acquire_fences = SynchronizationAccess::Owned(arena.fence({1})).share();
         }
         return domain.acquire_fences;
     }

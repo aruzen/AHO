@@ -1,7 +1,7 @@
 #include <VSL/lifetime/synchronization_use.hpp>
 #include <VSL/lifetime/synchronization_storage.hpp>
 #include <VSL/lifetime/submission_retention.hpp>
-#include <VSL/vulkan/synchronize.hpp>
+#include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/operation/synchronization_ops.hpp>
 #include <VSL/sync/submission_completion.hpp>
 #include <VSL/sync/presentation_state.hpp>
@@ -91,7 +91,7 @@ namespace VSL_NAMESPACE::lifetime {
         FenceAccess::FenceAccess(std::shared_ptr<impl::FenceImpl> data, std::optional<std::uint32_t> index) : data(std::move(data)) {
             if (!this->data || this->data->fences.empty() || this->data->uses.size() != this->data->fences.size())
                 throw std::logic_error("Fence has been destroyed or its state is invalid");
-            (void)FenceHolder{this->data}.owner_ref();
+            detail::SynchronizationAccess::RequireCanonical(this->data);
             if (index && *index >= this->data->fences.size())
                 throw std::out_of_range("Fence index");
             first = index.value_or(0);
@@ -228,7 +228,7 @@ namespace VSL_NAMESPACE::lifetime {
         }
     } // namespace
     void require_semaphore_owner(const std::shared_ptr<impl::SemaphoreImpl>& semaphore) {
-        (void)SemaphoreHolder{semaphore}.owner_ref();
+        detail::SynchronizationAccess::RequireCanonical(semaphore);
     }
     std::shared_ptr<sync::FenceReservation> reserve_fence(std::shared_ptr<impl::FenceImpl> fence, std::uint32_t index,
                                                           const std::shared_ptr<impl::SubmissionImpl>& result) {

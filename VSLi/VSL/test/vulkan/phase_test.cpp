@@ -1,3 +1,4 @@
+#include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/lifetime/presentation_retention.hpp>
@@ -14,6 +15,10 @@
 #include <VSL/operation/submission_ops.hpp>
 #include <VSL/operation/command_ops.hpp>
 #include <functional>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SynchronizationAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -523,11 +528,11 @@ namespace {
         EXPECT_THROW(available.destroy(), std::logic_error);
         EXPECT_THROW(finished.destroy(), std::logic_error);
         commands.wait_idle();
-        EXPECT_THROW(vsl::sync::require_semaphore_element(*available.data_, 0), std::logic_error);
-        EXPECT_NO_THROW(vsl::sync::require_semaphore_element(*available.data_, 1));
-        EXPECT_NO_THROW(vsl::sync::require_semaphore_element(*finished.data_, 0));
-        EXPECT_NO_THROW(vsl::sync::require_semaphore_element(*finished.data_, 1));
-        EXPECT_THROW(vsl::sync::require_semaphore_element(*finished.data_, 2), std::logic_error);
+        EXPECT_THROW(vsl::sync::require_semaphore_element(*SynchronizationAccess::Owned(available), 0), std::logic_error);
+        EXPECT_NO_THROW(vsl::sync::require_semaphore_element(*SynchronizationAccess::Owned(available), 1));
+        EXPECT_NO_THROW(vsl::sync::require_semaphore_element(*SynchronizationAccess::Owned(finished), 0));
+        EXPECT_NO_THROW(vsl::sync::require_semaphore_element(*SynchronizationAccess::Owned(finished), 1));
+        EXPECT_THROW(vsl::sync::require_semaphore_element(*SynchronizationAccess::Owned(finished), 2), std::logic_error);
         auto next = commands.start_phase<vsl::ComputePhase>(available, finished);
         EXPECT_THROW(next.submit(), std::logic_error);
         EXPECT_EQ(probe.calls, 1u);
@@ -592,9 +597,9 @@ namespace {
             VSL_NAMESPACE::SynchroManager synchronization(device);
             auto available = synchronization.create_semaphore("available", manager.get_buffer().get_size());
             auto finished = synchronization.create_semaphore("finished", manager.get_buffer().get_size());
-            available_owner = available.data_;
-            finished_owner = finished.data_;
-            auto signal = available.data_->semaphores.at(manager.get_current_buffer_idx());
+            available_owner = SynchronizationAccess::Owned(available).share();
+            finished_owner = SynchronizationAccess::Owned(finished).share();
+            auto signal = SynchronizationAccess::Owned(available)->semaphores.at(manager.get_current_buffer_idx());
             CommandAccess::Data(manager)->graphics_queue.submit(vk::SubmitInfo{
                 .signalSemaphoreCount = 1, .pSignalSemaphores = &signal});
             VSL_NAMESPACE::ComputePhase phase(manager, available, finished);
@@ -617,8 +622,8 @@ namespace {
                 vsl::SynchroManager synchronization(device);
                 auto finished = synchronization.create_semaphore("terminal signal");
                 auto external = synchronization.create_fence("terminal fence", false);
-                signal = finished.data_;
-                fence = external.data_;
+                signal = SynchronizationAccess::Owned(finished).share();
+                fence = SynchronizationAccess::Owned(external).share();
                 phase = std::make_unique<vsl::ComputePhase>(commands, std::nullopt, finished, external);
             }
             const auto result = phase->completion();
@@ -662,13 +667,13 @@ namespace {
                 fence.reset();
             } else {
                 // 別のAPIで完了を待ってから公開APIでリセットする場合も確かめる。
-                ASSERT_EQ(device.data_->device.waitForFences(fence.data_->fences, true, UINT64_MAX), vk::Result::eSuccess);
+                ASSERT_EQ(device.data_->device.waitForFences(SynchronizationAccess::Owned(fence)->fences, true, UINT64_MAX), vk::Result::eSuccess);
                 fence.reset(first.frame_slot);
             }
             EXPECT_TRUE(original.ready());
             EXPECT_TRUE(original.wait(0));
             // 回帰時にも破棄時のフェンス待ちが停止しないよう、再度シグナルを送る。
-            CommandAccess::Data(manager)->graphics_queue.submit(vk::SubmitInfo{}, fence.data_->fences.at(first.frame_slot));
+            CommandAccess::Data(manager)->graphics_queue.submit(vk::SubmitInfo{}, SynchronizationAccess::Owned(fence)->fences.at(first.frame_slot));
             ASSERT_TRUE(fence.wait(first.frame_slot, UINT64_MAX));
             fence.destroy();
             EXPECT_TRUE(original.ready());
@@ -971,7 +976,7 @@ namespace {
         }
         EXPECT_EQ(probe.calls, 12u);
         ASSERT_TRUE(proof);
-        vsl::FenceHolder{source}.reset();
+        SynchronizationAccess::FromShared(source).reset();
         EXPECT_EQ(device.data_->device.getFenceStatus(proof->fence), vk::Result::eNotReady);
         EXPECT_TRUE(vsl::sync::poll_fence_proof(*proof));
         EXPECT_EQ(proof->status, vsl::sync::FenceProofStatus::COMPLETE);
@@ -1045,13 +1050,13 @@ namespace {
             ASSERT_TRUE(evidence);
             EXPECT_EQ(evidence->image, UINT32_MAX);
             EXPECT_EQ(evidence->proof.status, vsl::sync::FenceProofStatus::NOT_ACQUIRED);
-            EXPECT_TRUE(std::holds_alternative<std::monostate>(source.data_->uses[0].use));
+            EXPECT_TRUE(std::holds_alternative<std::monostate>(SynchronizationAccess::Owned(source)->uses[0].use));
             EXPECT_FALSE(domain->acquire_fences);
             EXPECT_NO_THROW(source.reset());
         }
         probe.failure = VK_SUCCESS;
         auto next = manager.start_phase<vsl::DefaultPhase>(chain, std::nullopt, std::nullopt, std::nullopt, false, source);
-        EXPECT_EQ(probe.fence, static_cast<VkFence>(source.data_->fences[0]));
+        EXPECT_EQ(probe.fence, static_cast<VkFence>(SynchronizationAccess::Owned(source)->fences[0]));
         next.cancel();
         EXPECT_TRUE(next.completion().wait());
         manager.wait_idle();
@@ -1135,9 +1140,9 @@ namespace {
             vsl::lifetime::ResourceArena arena(device, PLAN, inputs);
             owner = arena.owner();
             const auto graphics = arena.fence({1}), acquisition = arena.fence({2});
-            EXPECT_FALSE(graphics.data_.owner_before(acquisition.data_));
-            EXPECT_FALSE(acquisition.data_.owner_before(graphics.data_));
-            EXPECT_NE(graphics.data_->fences[0], acquisition.data_->fences[0]);
+            EXPECT_FALSE(SynchronizationAccess::Owned(graphics).owner_before(SynchronizationAccess::Owned(acquisition)));
+            EXPECT_FALSE(SynchronizationAccess::Owned(acquisition).owner_before(SynchronizationAccess::Owned(graphics)));
+            EXPECT_NE(SynchronizationAccess::Owned(graphics)->fences[0], SynchronizationAccess::Owned(acquisition)->fences[0]);
             phase = std::make_unique<vsl::DefaultPhase>(manager, chain, std::nullopt, std::nullopt, graphics, false, acquisition);
         }
         EXPECT_FALSE(owner.expired());
@@ -1212,7 +1217,7 @@ namespace {
         EXPECT_EQ(proof->status, vsl::sync::FenceProofStatus::COMPLETE);
         ASSERT_TRUE(domain->acquire_fences);
         EXPECT_TRUE(std::holds_alternative<std::monostate>(domain->acquire_fences->uses[0].use));
-        vsl::FenceHolder{domain->acquire_fences}.reset();
+        SynchronizationAccess::FromShared(domain->acquire_fences).reset();
         EXPECT_TRUE(vsl::sync::poll_fence_proof(*proof));
         manager.wait_idle();
     }
@@ -1331,7 +1336,7 @@ namespace {
         ASSERT_TRUE(phase.completion().wait());
         auto source = chain.finished_semaphores();
         const auto image = phase.get_image_index();
-        vsl::sync::poison_semaphore_element(*source.data_, image);
+        vsl::sync::poison_semaphore_element(*SynchronizationAccess::Owned(source), image);
         unsigned calls = 0;
         const vsl::operation::ScopedPresentationNativeCalls native({.context = &calls,
                                                                     .present = +[](void* context, VkQueue queue, const VkPresentInfoKHR* info) noexcept {
@@ -1341,7 +1346,7 @@ namespace {
         EXPECT_THROW(phase.present(), std::logic_error);
         EXPECT_EQ(calls, 0u);
         // 注入したpoisonだけを戻し、実際にsignal済みの画像を正常に返却する。
-        source.data_->use.poisoned[image] = false;
+        SynchronizationAccess::Owned(source)->use.poisoned[image] = false;
         EXPECT_EQ(phase.present(), vsl::ComputePhase::SubmitResult::SUCCESS);
         EXPECT_EQ(calls, 1u);
         commands.wait_idle();
@@ -1536,7 +1541,7 @@ namespace {
         auto fence = sync.create_fence("original fence", false);
         auto phase = std::make_unique<vsl::DefaultPhase>(commands, chain, available, finished, fence);
         const auto discarded = phase->completion();
-        const auto reservation = vsl::sync::current_fence_reservation(fence.data_->uses[0]);
+        const auto reservation = vsl::sync::current_fence_reservation(SynchronizationAccess::Owned(fence)->uses[0]);
         vsl::Completion returned;
         bool invoked = false;
         const vsl_test::DeferredAction callback([&] {
@@ -1547,9 +1552,9 @@ namespace {
             EXPECT_NE(reservation->result.lock(), discarded.data_);
             const auto& work = vsl::lifetime::CommandAccess::Owner(commands.get_buffer())->submissions.at(0);
             EXPECT_EQ(work->fence_reservation, reservation);
-            EXPECT_EQ(std::get<std::weak_ptr<vsl::impl::SubmissionImpl>>(fence.data_->uses[0].use).lock(), returned.data_);
-            EXPECT_EQ(work->wait_semaphore, available.data_.get());
-            EXPECT_EQ(work->signal_semaphore, finished.data_.get());
+            EXPECT_EQ(std::get<std::weak_ptr<vsl::impl::SubmissionImpl>>(SynchronizationAccess::Owned(fence)->uses[0].use).lock(), returned.data_);
+            EXPECT_EQ(work->wait_semaphore, SynchronizationAccess::Owned(available).get());
+            EXPECT_EQ(work->signal_semaphore, SynchronizationAccess::Owned(finished).get());
             phase.reset();
         });
         commands.get_buffer().retain_until_complete(callback.owner());

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <AHO/drawer/draw_phase.hpp>
 #include <VSL/vulkan/commands/render_pass_begin.hpp>
@@ -134,7 +135,7 @@ namespace {
                 EXPECT_EQ(native.resets, 0u);
                 EXPECT_EQ(native.creates, 0u);
                 EXPECT_EQ(window.data2->swapchain.state(), vsl::SwapchainState::ACTIVE);
-                EXPECT_EQ(source.data_->device->device.getFenceStatus(source.data_->fences.at(1)), vk::Result::eSuccess);
+                EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(source)->device->device.getFenceStatus(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(source)->fences.at(1)), vk::Result::eSuccess);
             }
             query.zero = false;
             {
@@ -215,7 +216,7 @@ namespace {
         aho::DrawPhase phase(selected);
         EXPECT_EQ(selected.calls, 1u);
         EXPECT_FALSE(domain->acquire_fences);
-        const auto source = selected.selected.data2->acquire_fences.data_;
+        const auto source = VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(selected.selected.data2->acquire_fences);
         const auto proof = std::get<std::weak_ptr<vsl::sync::FenceProof>>(source->uses.at(phase.frame_slot).use).lock();
         ASSERT_TRUE(proof);
         EXPECT_EQ(proof->fence, source->fences.at(phase.frame_slot));

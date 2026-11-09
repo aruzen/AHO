@@ -242,3 +242,5 @@ Descriptor／Managerの単位でBindingLayout／Pool／Resourceをprivate OwnedR
 
 runtime graphicsの単位でLayout／Pass／Pipeline／FrameBufferの公開data_をprivate OwnedRefへ閉じた。Editor／Frozen／Graphics／Compute／Pickingを値構成にし、型の契約を崩すmutable Base&を禁止する。元nodeを維持するgetter／arena接続、call-only生成入力、Pickingの待機snapshotと画像一括公開を接続した。新runtime8件、全VSL1,177（対応外format3 skip）／AHO192・1,071／compile294、同一PNG、strict48ファイル／46TUと最終4ファイル／2TU、installed consumer30種・新負例22種、構成別／cross寸法生成、artifact混在拒否、archive／header一致、source398件とMSBuild登録が成功した。次はFence／Semaphore／SynchroManager、続いてSwapchainの公開境界を閉じる。同期のcanonical owner検査と物理実体＋要素indexの区別を維持する。残るrecipe／起動資源／WindowData／Completion、12g実定義4層、12h同条件測定も継続する。
 
+
+同期3型の公開境界をprivate OwnedRef／共有registryへ閉じ、正規node／CBとretiringの拒否、元Sourceの使用状態、名前付き置換と値代入の公開後回収を維持した。AHO製品側はpublic boolとfacade moveで接続する。新runtime6件、全VSL1,183（既知format3 skip）／AHO192・1,071／compile306、同一PNG、strict23files／21TU＋補完1／1・2／2、installed consumer30種と新正負12件、構成別／cross寸法・混在拒否・archive／header一致、source399／MSBuild登録が成功した。次は他のgeneric所有境界で失われた既知nodeの退役検査を補修し、その後Swapchainへ進む。残るrecipe／起動資源／WindowData／Completion、12gの実定義・処理4層分割、12h同条件測定も継続する。

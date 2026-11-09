@@ -71,7 +71,7 @@ AHO_NAMESPACE::DrawPhase::DrawPhase(Init init,
                                   init.window.data2->render_finished,
                                   init.window.data2->in_flight,
                                   true,
-                                  init.window.data2->acquire_fences.data_
+                                  bool(init.window.data2->acquire_fences)
                                       ? std::optional<VSL_NAMESPACE::FenceHolder>{init.window.data2->acquire_fences}
                                       : std::nullopt),
       engine(init.engine),

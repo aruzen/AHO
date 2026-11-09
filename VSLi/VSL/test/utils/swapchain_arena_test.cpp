@@ -1,3 +1,4 @@
+#include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include "support/window_fixture.hpp"
 #include "support/fixed_parent.hpp"
@@ -8,6 +9,10 @@
 #include <VSL/operation/synchronization_ops.hpp>
 #include <VSL/storage/cpu_region.hpp>
 #include <limits>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SynchronizationAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::ImageAccess;
@@ -136,9 +141,9 @@ namespace {
             finished = chain.finished_semaphores();
             generation = chain.data_;
             EXPECT_EQ(finished->size(), chain.images.size());
-            EXPECT_FALSE(finished->data_.owner_before(chain.data_));
-            EXPECT_FALSE(chain.data_.owner_before(finished->data_));
-            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(finished->data_.get()) - reinterpret_cast<std::uintptr_t>(chain.data_.get()),
+            EXPECT_FALSE(SynchronizationAccess::Owned(*(finished)).owner_before(chain.data_));
+            EXPECT_FALSE(chain.data_.owner_before(SynchronizationAccess::Owned(*(finished)).share()));
+            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(SynchronizationAccess::Owned(*(finished)).get()) - reinterpret_cast<std::uintptr_t>(chain.data_.get()),
                       layout.finished_semaphore_offset());
             EXPECT_EQ(finished->get_device().data_, device.data_);
         }
@@ -156,7 +161,7 @@ namespace {
         auto phase = manager.start_phase<vsl::DefaultPhase>(chain);
         EXPECT_EQ(phase.frame_slot, count);
         ASSERT_TRUE(phase.calculation_finish);
-        EXPECT_EQ(phase.calculation_finish->data_, chain.finished_semaphores().data_);
+        EXPECT_EQ(SynchronizationAccess::Owned(*(phase.calculation_finish)), SynchronizationAccess::Owned(chain.finished_semaphores()));
         EXPECT_EQ(phase.calculation_finish->size(), count);
         EXPECT_THROW(phase.calculation_finish->destroy(), std::logic_error);
         phase.cancel();

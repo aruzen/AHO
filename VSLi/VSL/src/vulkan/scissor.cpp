@@ -1,7 +1,11 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/vulkan/scissor.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 VSL_NAMESPACE::Scissor::Scissor() {}
 
 VSL_NAMESPACE::Scissor::Scissor(float x, float y, float width, float height) : x(x), y(y), width(width), height(height) {}
@@ -28,6 +32,6 @@ void VSL_NAMESPACE::Scissor::invoke(CommandPool pool, CommandBuffer buffer, Comm
     scissor.offset = vk::Offset2D{x, y};
     scissor.extent = vk::Extent2D{width, height};
 
-    buffer.data_->command_buffers[buffer.get_current_buffer_idx()].setScissor(0, scissor);
+    CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].setScissor(0, scissor);
     // buffer.data_->command_buffers[buffer.get_current_buffer_idx()].setScissorWithCount({ scissor });
 }

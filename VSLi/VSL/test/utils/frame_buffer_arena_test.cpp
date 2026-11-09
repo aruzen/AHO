@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include "support/render_fixture.hpp"
 #include "support/fixed_parent.hpp"
@@ -9,6 +10,9 @@
 #include <functional>
 #include <ranges>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     namespace t = vsl::typed;
     namespace l = vsl::lifetime;
@@ -120,7 +124,7 @@ namespace {
                   << vsl::command::RenderPassBegin(first, {vsl::ClearColor{0, 1, 0, 1}}, {}, 1) << vsl::command::RenderPassEnd{};
             EXPECT_TRUE(arena.image({4}).use_state().busy());
             const auto root = arena.owner();
-            const auto& owners = manager.get_buffer().data_->recording_context->work->resources;
+            const auto& owners = CommandAccess::Data(manager.get_buffer())->recording_context->work->resources;
             EXPECT_EQ(std::ranges::count_if(owners, [&](const auto& owner) { return !owner.owner_before(root) && !root.owner_before(owner); }), 1);
             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
             ASSERT_TRUE(phase.completion().wait());
@@ -313,7 +317,7 @@ namespace {
         ASSERT_NO_FATAL_FAILURE(prime_callback(previous, callback));
         {
             auto phase = manager.start_phase<vsl::ComputePhase>();
-            begin->invoke(vsl::CommandPool{manager.data_->command_pool}, manager.get_buffer(), manager);
+            begin->invoke(vsl::CommandPool{CommandAccess::Pool(CommandAccess::Data(manager)->command_pool)}, manager.get_buffer(), manager);
             EXPECT_TRUE(called);
             EXPECT_FALSE(owner.expired());
             phase << vsl::command::RenderPassEnd{};
@@ -339,7 +343,7 @@ namespace {
             bool called = false;
             const DeferredAction callback([&] { called = true; begin.reset(); phase.cancel(); });
             ASSERT_NO_FATAL_FAILURE(prime_callback(previous, callback));
-            EXPECT_THROW(begin->invoke(vsl::CommandPool{manager.data_->command_pool}, manager.get_buffer(), manager), std::logic_error);
+            EXPECT_THROW(begin->invoke(vsl::CommandPool{CommandAccess::Pool(CommandAccess::Data(manager)->command_pool)}, manager.get_buffer(), manager), std::logic_error);
             EXPECT_TRUE(called);
             EXPECT_FALSE(owner.expired());
         }
@@ -353,13 +357,13 @@ namespace {
         const DeferredAction callback([&] {
             called = true;
             vsl::command::RenderPassBegin nested(*framebuffer);
-            EXPECT_THROW(nested.invoke(vsl::CommandPool{manager.data_->command_pool}, manager.get_buffer(), manager), std::logic_error);
-            EXPECT_THROW(vsl::command::RenderPassEnd{}.invoke(vsl::CommandPool{manager.data_->command_pool}, manager.get_buffer(), manager), std::logic_error);
-            EXPECT_THROW(vsl::command::NextSubpass{}.invoke(vsl::CommandPool{manager.data_->command_pool}, manager.get_buffer(), manager), std::logic_error);
+            EXPECT_THROW(nested.invoke(vsl::CommandPool{CommandAccess::Pool(CommandAccess::Data(manager)->command_pool)}, manager.get_buffer(), manager), std::logic_error);
+            EXPECT_THROW(vsl::command::RenderPassEnd{}.invoke(vsl::CommandPool{CommandAccess::Pool(CommandAccess::Data(manager)->command_pool)}, manager.get_buffer(), manager), std::logic_error);
+            EXPECT_THROW(vsl::command::NextSubpass{}.invoke(vsl::CommandPool{CommandAccess::Pool(CommandAccess::Data(manager)->command_pool)}, manager.get_buffer(), manager), std::logic_error);
         });
         ASSERT_NO_FATAL_FAILURE(prime_callback(previous, callback));
         auto phase = manager.start_phase<vsl::ComputePhase>();
-        begin.invoke(vsl::CommandPool{manager.data_->command_pool}, manager.get_buffer(), manager);
+        begin.invoke(vsl::CommandPool{CommandAccess::Pool(CommandAccess::Data(manager)->command_pool)}, manager.get_buffer(), manager);
         EXPECT_TRUE(called);
         phase << vsl::command::RenderPassEnd{} << vsl::command::RenderPassBegin(*framebuffer) << vsl::command::RenderPassEnd{};
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
@@ -402,12 +406,12 @@ namespace {
         vsl::command::RenderPassBegin begin(*framebuffer);
         const auto valid = begin.clear_values;
         begin.clear_values.clear();
-        EXPECT_THROW(begin.invoke(vsl::CommandPool{manager.data_->command_pool}, manager.get_buffer(), manager), std::invalid_argument);
+        EXPECT_THROW(begin.invoke(vsl::CommandPool{CommandAccess::Pool(CommandAccess::Data(manager)->command_pool)}, manager.get_buffer(), manager), std::invalid_argument);
         begin.clear_values = {vsl::ClearUint{}};
-        EXPECT_THROW(begin.invoke(vsl::CommandPool{manager.data_->command_pool}, manager.get_buffer(), manager), std::invalid_argument);
+        EXPECT_THROW(begin.invoke(vsl::CommandPool{CommandAccess::Pool(CommandAccess::Data(manager)->command_pool)}, manager.get_buffer(), manager), std::invalid_argument);
         begin.clear_values = valid;
         begin.area.width = WIDTH + 1;
-        EXPECT_THROW(begin.invoke(vsl::CommandPool{manager.data_->command_pool}, manager.get_buffer(), manager), std::out_of_range);
+        EXPECT_THROW(begin.invoke(vsl::CommandPool{CommandAccess::Pool(CommandAccess::Data(manager)->command_pool)}, manager.get_buffer(), manager), std::out_of_range);
         EXPECT_FALSE(color->use_state().busy());
         begin.area = {};
         phase << begin << vsl::command::RenderPassEnd{};

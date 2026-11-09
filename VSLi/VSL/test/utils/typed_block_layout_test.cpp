@@ -1,7 +1,11 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/utils/typed_block_validation.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include "support/vulkan_fixture.hpp"
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     namespace t = vsl::typed;
     using Reflector = vsl::utils::SPIRVReflector;
@@ -225,7 +229,7 @@ namespace {
             phase << pipeline.bind_resources(input_set, output_set).push_constants(Pushes::Values(push)).dispatch(1);
             vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
             auto buffer = commands.get_buffer();
-            buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
         device.data_->device.waitIdle();
@@ -265,7 +269,7 @@ namespace {
             phase << pipeline.bind_resources(set).dispatch(1);
             vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
             auto native = commands.get_buffer();
-            native.data_->command_buffers[native.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(native)->command_buffers[native.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
         device.data_->device.waitIdle();

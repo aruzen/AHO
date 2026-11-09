@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/resource_arena.hpp>
 #include <VSL/lifetime/arena_resource.hpp>
 #include <VSL/lifetime/device_owner.hpp>
@@ -17,6 +18,9 @@
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/storage/cpu_region.hpp>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace VSL_NAMESPACE::lifetime::detail {
     struct ResourceArenaOwner {
         LogicalDeviceAccessor device;
@@ -184,12 +188,12 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 } else if (const auto* command_pool = std::get_if<CommandPool>(&value)) {
                     if (command_pool->get_device().data_ != device.data_)
                         throw std::invalid_argument("External command pool requires the arena device");
-                    resource.reference = command_pool->data_.get();
+                    resource.reference = CommandAccess::Data(*(command_pool)).get();
                     resource.owner_index = retain_dependency(command_pool->owner_ref());
                 } else if (const auto* command_buffer = std::get_if<CommandBuffer>(&value)) {
                     if (command_buffer->get_pool().get_device().data_ != device.data_)
                         throw std::invalid_argument("External command ring requires the arena device");
-                    resource.reference = command_buffer->data_.get();
+                    resource.reference = CommandAccess::Data(*(command_buffer)).get();
                     resource.owner_index = retain_dependency(command_buffer->owner_ref());
                 } else if (const auto* frame_buffer = std::get_if<FrameBufferAccessor>(&value)) {
                     if (frame_buffer->get_device().data_ != device.data_)
@@ -273,7 +277,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
     impl::CommandPoolImpl* ResourceArenaOwner::resolve(const CommandPoolSource& source) const {
         if (const auto* id = std::get_if<typed::ResourceId>(&source))
             return find(*id, storage::ResourceKind::COMMAND_POOL).get<impl::CommandPoolImpl>();
-        return std::get<CommandPool>(source).data_.get();
+        return CommandAccess::Data(std::get<CommandPool>(source)).get();
     }
     void ResourceArenaOwner::preflight(const PipelinePassSource& source) {
         if (const auto* id = std::get_if<typed::ResourceId>(&source)) {
@@ -663,7 +667,7 @@ namespace VSL_NAMESPACE::lifetime {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::COMMAND_POOL);
-        return {{resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.get<impl::CommandPoolImpl>()}};
+        return {CommandAccess::Pool({resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.get<impl::CommandPoolImpl>()})};
     }
     SemaphoreHolder ResourceArena::semaphore(typed::ResourceId id) const {
         if (!_owner)

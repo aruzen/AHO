@@ -1,8 +1,13 @@
+#include <VSL/lifetime/command_access.hpp>
 #include "support/compute_fixture.hpp"
 #include "support/scoped_environment.hpp"
 #include <VSL/utils/typed_safe_resource.hpp>
 #include <VSL/utils/typed_resources.hpp>
 #include <VSL/lifetime/descriptor_storage.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     enum class ImageReadBarrierMode {
         AUTOMATIC,
@@ -237,6 +242,7 @@ namespace {
     }
 } // namespace
 #include "support/image_transfer_fixture.hpp"
+
 namespace {
     TEST_P(DescriptorImageBarrierVulkanIntegrationTest, ImageAndCombinedSamplerUpdatesReachComputeShader) {
         using namespace vsl::graphic_resource;
@@ -282,7 +288,7 @@ namespace {
                 barrier.image = image.data_->image;
                 barrier.subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1};
                 auto buffer = manager.get_buffer();
-                buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
+                CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
                     vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands, {}, {}, {},
                     barrier);
             };
@@ -301,7 +307,7 @@ namespace {
             barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
             barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
             auto buffer = manager.get_buffer();
-            buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
         device.data_->device.waitIdle();
@@ -338,7 +344,7 @@ namespace {
             barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
             barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
             auto commands = manager.get_buffer();
-            commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
         device.data_->device.waitIdle();
@@ -386,7 +392,7 @@ namespace {
                 barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
                 barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
                 auto commands = manager.get_buffer();
-                commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+                CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                     vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
             }
             device.data_->device.waitIdle();

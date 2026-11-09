@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <VSL/utils/typed_resource_bundle.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
@@ -5,6 +6,9 @@
 #include <VSL/vulkan/commands/image_upload.hpp>
 #include <VSL/vulkan/commands/image_readback.hpp>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     namespace t = vsl::typed;
     using Type = vsl::graphic_resource::Type;
@@ -71,7 +75,7 @@ namespace {
     void TypedOwnedResourcesVulkanIntegrationTest::host_visible(vsl::CommandManager manager) {
         const vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
         auto buffer = manager.get_buffer();
-        buffer.data_->command_buffers.at(buffer.get_current_buffer_idx()).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+        CommandAccess::Data(buffer)->command_buffers.at(buffer.get_current_buffer_idx()).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
     }
     template<typename Policy>
     void TypedOwnedResourcesVulkanIntegrationTest::compute_round_trip() {

@@ -1,8 +1,13 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <AHO/drawer/draw_phase.hpp>
 #include <VSL/vulkan/commands/render_pass_begin.hpp>
 #include <VSL/vulkan/commands/render_pass_end.hpp>
 #include <AHO/image_readback.hpp>
 #include <AHO/engine/standard_engine.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 #ifdef AHO_GPU_TESTS
 #include "../support/live_gpu.hpp"
 #include "../support/commands.hpp"
@@ -50,7 +55,7 @@ namespace {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
         auto manager = engine->data()->command_manager;
-        const auto slot = manager.get_buffer().data_->current_buffer_idx;
+        const auto slot = CommandAccess::Data(manager.get_buffer())->current_buffer_idx;
         const auto previous = window.data2->swapchain.data_;
         aho_test::FrameBufferQuery query;
         aho_test::AcquisitionCalls native;
@@ -60,7 +65,7 @@ namespace {
             aho::DrawPhase phase(*engine, [&](auto&) { ++begins; }, [&](auto&) { ++ends; });
             EXPECT_FALSE(phase.recording());
             EXPECT_EQ(phase.state, vsl::ComputePhase::State::SUSPENDED);
-            EXPECT_EQ(manager.get_buffer().data_->current_buffer_idx, slot);
+            EXPECT_EQ(CommandAccess::Data(manager.get_buffer())->current_buffer_idx, slot);
             EXPECT_EQ(native.acquisitions, 0u);
             EXPECT_EQ(native.resets, 0u);
             EXPECT_EQ(native.creates, 0u);
@@ -104,7 +109,7 @@ namespace {
             aho_test::AcquisitionCalls native;
             bool callback = false;
             const auto live = std::make_shared<int>(0);
-            producer.get_buffer().data_->current_buffer_idx = 1;
+            CommandAccess::Data(producer.get_buffer())->current_buffer_idx = 1;
             {
                 vsl::ComputePhase prior(producer, std::nullopt, std::nullopt, source);
                 producer.get_buffer().retain_until_complete(std::shared_ptr<int>(new int(0), [&, alive = std::weak_ptr<int>(live)](int* value) {
@@ -116,7 +121,7 @@ namespace {
                 }));
                 ASSERT_EQ(prior.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
             }
-            manager.get_buffer().data_->current_buffer_idx = 0;
+            CommandAccess::Data(manager.get_buffer())->current_buffer_idx = 0;
             native.resets = 0;
             {
                 aho::DrawPhase phase(*engine);
@@ -124,7 +129,7 @@ namespace {
                 EXPECT_FALSE(phase.recording());
                 EXPECT_EQ(phase.state, vsl::ComputePhase::State::SUSPENDED);
                 EXPECT_EQ(phase.completion().status(), vsl::Completion::Status::CANCELLED);
-                EXPECT_EQ(manager.get_buffer().data_->current_buffer_idx, 0u);
+                EXPECT_EQ(CommandAccess::Data(manager.get_buffer())->current_buffer_idx, 0u);
                 EXPECT_EQ(native.acquisitions, 0u);
                 EXPECT_EQ(native.resets, 0u);
                 EXPECT_EQ(native.creates, 0u);
@@ -146,7 +151,7 @@ namespace {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
         auto manager = engine->data()->command_manager;
-        const auto slot = manager.get_buffer().data_->current_buffer_idx;
+        const auto slot = CommandAccess::Data(manager.get_buffer())->current_buffer_idx;
         aho_test::FrameBufferQuery query;
         aho_test::AcquisitionCalls native;
         native.after_reset = [&] { query.zero = true; };
@@ -155,7 +160,7 @@ namespace {
             EXPECT_FALSE(phase.recording());
             EXPECT_EQ(native.resets, 1u);
             EXPECT_EQ(native.acquisitions, 0u);
-            EXPECT_EQ(manager.get_buffer().data_->current_buffer_idx, slot);
+            EXPECT_EQ(CommandAccess::Data(manager.get_buffer())->current_buffer_idx, slot);
             EXPECT_EQ(phase.completion().status(), vsl::Completion::Status::CANCELLED);
             EXPECT_EQ(window.data2->swapchain.state(), vsl::SwapchainState::ACTIVE);
         }
@@ -372,7 +377,7 @@ namespace {
         int commands = 0, tuples = 0;
         aho::DrawPhase* received = nullptr;
         auto check = [&](auto stream) {
-            EXPECT_EQ(stream.phase_stream.manager.data_, outer.manager.data_);
+            EXPECT_EQ(stream.phase_stream.manager.identity(), outer.manager.identity());
             stream << aho::pack(phase_payload::Value{&tuples, &received});
             EXPECT_EQ(received, &outer);
             EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &inner);
@@ -645,6 +650,7 @@ namespace {
 } // namespace
 #else
 #include <gtest/gtest.h>
+
 namespace {
     TEST(DrawPhaseTest, CurrentPhasePointerIsInitiallyEmpty) {
         EXPECT_EQ(AHO_NAMESPACE::THREAD_LOCAL_DRAW_PHASE, nullptr);

@@ -21,6 +21,12 @@ namespace {
     using Placed = t::PlacedBufferView<std::uint32_t, vsl::MemoryType::TRANSFER_SOURCE>;
     using PlacedUniform = t::PlacedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>;
 #if VSL_TYPED_CASE == 0
+    static_assert(std::is_default_constructible_v<vsl::CommandPool> && std::is_default_constructible_v<vsl::CommandBuffer> && std::is_default_constructible_v<vsl::CommandManager>);
+    static_assert(!std::is_constructible_v<vsl::CommandPool, std::shared_ptr<vsl::impl::CommandPoolImpl>>);
+    static_assert(!std::is_constructible_v<vsl::CommandBuffer, std::shared_ptr<vsl::impl::CommandBufferImpl>>);
+    static_assert(!std::is_constructible_v<vsl::CommandManager, std::shared_ptr<vsl::impl::CommandManagerImpl>>);
+    static_assert(!std::is_constructible_v<vsl::CommandPool, std::nullptr_t> && !std::is_constructible_v<vsl::CommandBuffer, std::nullptr_t> && !std::is_constructible_v<vsl::CommandManager, std::nullptr_t>);
+    static_assert(!std::is_constructible_v<vsl::CommandPool, VkCommandPool> && !std::is_constructible_v<vsl::CommandBuffer, VkCommandBuffer> && !std::is_constructible_v<vsl::CommandManager, VkDevice>);
     static_assert(std::is_copy_constructible_v<vsl::NativeRecordingContext> && std::is_move_constructible_v<vsl::NativeRecordingContext>);
     static_assert(!std::is_copy_assignable_v<vsl::NativeRecordingContext> && !std::is_move_assignable_v<vsl::NativeRecordingContext>);
     static_assert(!rvalue_backend<Placed> && !rvalue_backend<const Placed>);
@@ -144,6 +150,34 @@ namespace {
 #elif VSL_TYPED_CASE == 25
     void rejected(VkCommandBuffer commands) {
         vsl::NativeRecordingContext recording(commands);
+    }
+#elif VSL_TYPED_CASE == 26
+    void rejected(const vsl::CommandPool& pool) {
+        pool.data_;
+    }
+#elif VSL_TYPED_CASE == 27
+    void rejected(const vsl::CommandBuffer& buffer) {
+        buffer.data_;
+    }
+#elif VSL_TYPED_CASE == 28
+    void rejected(const vsl::CommandManager& manager) {
+        manager.data_;
+    }
+#elif VSL_TYPED_CASE == 29
+    void rejected(std::shared_ptr<vsl::impl::CommandPoolImpl> data) {
+        vsl::CommandPool pool(data);
+    }
+#elif VSL_TYPED_CASE == 30
+    void rejected(std::shared_ptr<vsl::impl::CommandBufferImpl> data) {
+        vsl::CommandBuffer buffer(data);
+    }
+#elif VSL_TYPED_CASE == 31
+    void rejected(std::shared_ptr<vsl::impl::CommandManagerImpl> data) {
+        vsl::CommandManager manager(data);
+    }
+#elif VSL_TYPED_CASE == 32
+    bool rejected(vsl::CommandManagerIdentity manager, vsl::CommandBufferIdentity buffer) {
+        return manager == buffer;
     }
 #endif
 } // namespace

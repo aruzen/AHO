@@ -1,6 +1,10 @@
+#include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <VSL/vulkan/commands/copy_buffer.hpp>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     class CopyBufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override;
@@ -50,7 +54,7 @@ namespace {
         EXPECT_THROW((vsl::command::CopyBuffer(&a, &wrong, 4).validate()), std::invalid_argument);
         EXPECT_THROW((vsl::command::CopyBuffer(nullptr, &b, 4).validate()), std::invalid_argument);
         auto manager = make_manager();
-        vsl::CommandBuffer empty(std::shared_ptr<vsl::impl::CommandBufferImpl>{});
+        vsl::CommandBuffer empty(CommandAccess::RawBuffer(std::shared_ptr<vsl::impl::CommandBufferImpl>{}));
         EXPECT_THROW(vsl::command::CopyBuffer(&a, &b, 4).invoke(manager.get_pool(), empty, manager), std::invalid_argument);
     }
 } // namespace

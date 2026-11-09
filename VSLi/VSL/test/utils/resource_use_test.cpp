@@ -1,7 +1,11 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/vulkan/resource_use.hpp>
 #include <VSL/utils/typed_batch.hpp>
 #include "support/render_fixture.hpp"
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     namespace t = vsl::typed;
     class ResourceUseVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
@@ -227,7 +231,7 @@ namespace {
         EXPECT_THROW(alias.write<0>(old_view), std::logic_error);
         auto buffer = manager.get_buffer();
         vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
-        buffer.data_->command_buffers[0].pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+        CommandAccess::Data(buffer)->command_buffers[0].pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         ASSERT_TRUE(phase.completion().wait());
         std::array<std::uint32_t, 1> actual{};

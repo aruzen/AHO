@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/lifetime/resource_use.hpp>
 
@@ -6,6 +7,9 @@
 #include <array>
 #include <utility>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace VSL_NAMESPACE::command {
     namespace {
         constexpr std::array<std::pair<ShaderFlag, vk::PipelineStageFlagBits>, 14> SHADER_READ_STAGES{{
@@ -72,9 +76,9 @@ void VSL_NAMESPACE::command::ChangeImageBarrier::invoke(VSL_NAMESPACE::CommandPo
     if (_shader_read_stages != ShaderFlag::ERROR_ &&
         (old_layout != ImageLayout::TRANSFER_DST_OPTIMAL || new_layout != ImageLayout::SHADER_READ_ONLY_OPTIMAL))
         throw std::invalid_argument("Shader read stages require a transfer-destination to shader-read transition");
-    if (!image.data_ || !image.data_->image || !buffer.data_ || !buffer.data_->command_pool || !manager.data_ ||
-        image.data_->device != manager.data_->device.get() ||
-        buffer.data_->command_pool->device != image.data_->device)
+    if (!image.data_ || !image.data_->image || !CommandAccess::Data(buffer) || !CommandAccess::Data(buffer)->command_pool || !CommandAccess::Data(manager) ||
+        image.data_->device != CommandAccess::Data(manager)->device.get() ||
+        CommandAccess::Data(buffer)->command_pool->device != image.data_->device)
         throw std::invalid_argument("Image barrier requires an image and command buffer on the same device");
     if (base_layer >= image.data_->count)
         throw std::out_of_range("Image barrier base layer exceeds image");
@@ -149,5 +153,5 @@ void VSL_NAMESPACE::command::ChangeImageBarrier::invoke(VSL_NAMESPACE::CommandPo
     }
 
     image.resource_use().record(buffer);
-    buffer.data_->command_buffers.at(buffer.get_current_buffer_idx()).pipelineBarrier(source_stage, destination_stage, {}, nullptr, nullptr, barrier);
+    CommandAccess::Data(buffer)->command_buffers.at(buffer.get_current_buffer_idx()).pipelineBarrier(source_stage, destination_stage, {}, nullptr, nullptr, barrier);
 }

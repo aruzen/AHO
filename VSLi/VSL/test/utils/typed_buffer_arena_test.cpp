@@ -1,9 +1,13 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <VSL/utils/typed_buffer_arena.hpp>
 #include <VSL/lifetime/buffer_storage.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     namespace t = vsl::typed;
     namespace s = vsl::storage;
@@ -155,7 +159,7 @@ namespace {
         first.copy(std::array<std::uint32_t, 4>{9, 8, 7, 6});
         auto phase = manager.start_phase<vsl::ComputePhase>();
         phase << first.copy_to(arena.view<t::ResourceId{1}>());
-        ASSERT_EQ(manager.get_buffer().data_->recording_context->work->completion_resources.size(), 1u);
+        ASSERT_EQ(CommandAccess::Data(manager.get_buffer())->recording_context->work->completion_resources.size(), 1u);
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         ASSERT_TRUE(phase.completion().wait());
         std::array<std::uint32_t, 4> readback{};

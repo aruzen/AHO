@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <VSL/utils/spir_reflector.hpp>
 #include <span>
@@ -8,6 +9,9 @@
 #include "support/compute_fixture.hpp"
 #include "support/image_transfer_fixture.hpp"
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     TEST(SpirvReflectorTest, ReflectsBindingsVertexInputsAndPushConstantMembersFromFile) {
         vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection.vert.spv"));
@@ -441,7 +445,7 @@ namespace {
             barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
             barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
             auto commands = manager.get_buffer();
-            commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
         device.data_->device.waitIdle();
@@ -700,7 +704,7 @@ namespace {
             barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
             barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
             auto commands = manager.get_buffer();
-            commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
         device.data_->device.waitIdle();
@@ -792,7 +796,7 @@ namespace {
             barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
             barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
             auto commands = manager.get_buffer();
-            commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
         device.data_->device.waitIdle();
@@ -879,7 +883,7 @@ namespace {
             barrier.srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
             barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
             auto commands = manager.get_buffer();
-            commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eTransfer, {}, barrier, {}, {});
             phase << vsl::command::CopyImageToBuffer(&readback, *color);
         }

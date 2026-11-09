@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/utils/typed_block_validation.hpp>
 #include <VSL/utils/typed_push_constants.hpp>
 #include <VSL/utils/spir_reflector.hpp>
@@ -5,6 +6,9 @@
 #include <stdexcept>
 #include <algorithm>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace VSL_NAMESPACE::typed::detail {
     void inject_push_schema(PipelineLayoutEditAccessor layout, std::span<const PushRequirement> requirements) {
         pipeline_layout::PushConstants pushes;
@@ -74,8 +78,8 @@ namespace VSL_NAMESPACE::typed::detail {
                 }
                 if (!stages)
                     throw std::logic_error("Typed push schema is not covered by its native layout");
-                buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pushConstants(layout->pipeline_layout,
-                                                                                             stages, cursor, next - cursor, values.data() + requirement.data_offset + cursor - range.offset);
+                CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pushConstants(layout->pipeline_layout,
+                                                                                                            stages, cursor, next - cursor, values.data() + requirement.data_offset + cursor - range.offset);
                 cursor = next;
             }
         }

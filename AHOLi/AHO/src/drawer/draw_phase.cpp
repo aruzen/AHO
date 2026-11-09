@@ -33,7 +33,7 @@ AHO_NAMESPACE::DrawPhase::Init AHO_NAMESPACE::DrawPhase::Prepare(AHO_NAMESPACE::
         throw std::invalid_argument("DrawPhase requires a booted engine");
     const auto runtime = engine->data();
     const auto manager = runtime->command_manager;
-    const auto buffer = runtime->command_manager.get_buffer().data_.get();
+    const auto buffer = runtime->command_manager.get_buffer().identity();
     auto window = engine->get_window();
     if (!window || !window.data2 || window.data2->closed)
         throw std::logic_error("DrawPhase requires a live drawing window");
@@ -44,8 +44,8 @@ AHO_NAMESPACE::DrawPhase::Init AHO_NAMESPACE::DrawPhase::Prepare(AHO_NAMESPACE::
     if (size.value.x.value > 0 && size.value.y.value > 0 &&
         (target->pending_generation || target->deferred_usage))
         window.recreate_swapchain();
-    if (!window || window.data2 != target || target->closed || runtime->command_manager.data_ != manager.data_ ||
-        runtime->command_manager.get_buffer().data_.get() != buffer)
+    if (!window || window.data2 != target || target->closed || runtime->command_manager.identity() != manager.identity() ||
+        runtime->command_manager.get_buffer().identity() != buffer)
         throw std::logic_error("Window closed while preparing a DrawPhase");
     return {engine, std::move(window), manager};
 }
@@ -140,7 +140,7 @@ void AHO_NAMESPACE::DrawPhase::restore_previous_phase() noexcept {
 
 AHO_NAMESPACE::DrawPhase* AHO_NAMESPACE::DrawPhase::CurrentForManager(const VSL_NAMESPACE::CommandManager& manager) noexcept {
     auto* phase = THREAD_LOCAL_DRAW_PHASE;
-    while (phase && phase->manager.data_ != manager.data_)
+    while (phase && phase->manager.identity() != manager.identity())
         phase = phase->_previous_phase;
     return phase;
 }

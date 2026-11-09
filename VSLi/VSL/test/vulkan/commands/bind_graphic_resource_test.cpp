@@ -1,4 +1,9 @@
+#include <VSL/lifetime/command_access.hpp>
 #include "support/compute_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     using BindGraphicResourceVulkanIntegrationTest = vsl_test::ComputeVulkanIntegrationTest;
     TEST_F(BindGraphicResourceVulkanIntegrationTest, SingleAndVectorResourcesBindToComputeShader) {
@@ -44,7 +49,7 @@ namespace {
                 vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite,
                                           .dstAccessMask = vk::AccessFlagBits::eHostRead};
                 auto buffer = manager.get_buffer();
-                buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
+                CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
                     vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
                 ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
                 ASSERT_TRUE(phase.completion().wait());
@@ -86,7 +91,7 @@ namespace {
             const auto buffer = manager.get_buffer();
             vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite,
                                       .dstAccessMask = vk::AccessFlagBits::eHostRead};
-            buffer.data_->command_buffers[buffer.data_->current_buffer_idx].pipelineBarrier(
+            CommandAccess::Data(buffer)->command_buffers[CommandAccess::Data(buffer)->current_buffer_idx].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
             ASSERT_TRUE(phase.completion().wait());
@@ -124,7 +129,7 @@ namespace {
             auto buffer = manager.get_buffer();
             vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite,
                                       .dstAccessMask = vk::AccessFlagBits::eHostRead};
-            buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
             EXPECT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         }

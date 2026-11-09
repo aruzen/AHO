@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/lifetime/command_storage.hpp>
@@ -5,17 +6,60 @@
 #include <limits>
 
 namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
+namespace {
     using CommandVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
     class CommandRangeVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+    TEST(CommandFacadeTest, EmptyValuesHaveNoIdentityAndRejectResourceOperations) {
+        vsl::CommandPool pool;
+        vsl::CommandBuffer buffer;
+        vsl::CommandManager manager;
+        EXPECT_FALSE(pool);
+        EXPECT_FALSE(buffer);
+        EXPECT_FALSE(manager);
+        EXPECT_EQ(pool.identity(), vsl::CommandPoolIdentity{});
+        EXPECT_EQ(buffer.identity(), vsl::CommandBufferIdentity{});
+        EXPECT_EQ(manager.identity(), vsl::CommandManagerIdentity{});
+        EXPECT_FALSE(buffer.completion());
+        EXPECT_THROW(pool.get_device(), std::invalid_argument);
+        EXPECT_THROW(buffer.get_pool(), std::invalid_argument);
+        EXPECT_THROW(buffer.get_size(), std::invalid_argument);
+        EXPECT_THROW(buffer.get_current_buffer_idx(), std::invalid_argument);
+        EXPECT_THROW(buffer.require_recording(), std::logic_error);
+        EXPECT_THROW(manager.get_device(), std::invalid_argument);
+        EXPECT_THROW(manager.get_pool(), std::invalid_argument);
+        EXPECT_THROW(manager.get_buffer(), std::invalid_argument);
+        EXPECT_THROW(manager.get_current_buffer_idx(), std::invalid_argument);
+        EXPECT_THROW(manager.make_exclusive_buffer(), std::invalid_argument);
+    }
+    TEST_F(CommandRangeVulkanIntegrationTest, ManagerIdentityIsSeparateFromTheSharedRingAndPool) {
+        auto pool = make_pool();
+        vsl::CommandBuffer buffer(pool, 1);
+        auto manager = vsl::CommandManager::FromBuffer(buffer);
+        const auto alias = manager;
+        auto other = vsl::CommandManager::FromBuffer(buffer);
+        EXPECT_EQ(manager.identity(), alias.identity());
+        EXPECT_NE(manager.identity(), other.identity());
+        EXPECT_EQ(manager.get_buffer().identity(), other.get_buffer().identity());
+        EXPECT_EQ(manager.get_pool().identity(), pool.identity());
+        EXPECT_EQ(other.get_pool().identity(), pool.identity());
+        const auto identity = manager.identity();
+        auto moved = std::move(manager);
+        EXPECT_FALSE(manager);
+        EXPECT_EQ(moved.identity(), identity);
+        EXPECT_THROW(manager.get_pool(), std::invalid_argument);
+        EXPECT_THROW(manager.get_current_buffer_idx(), std::invalid_argument);
+    }
     TEST_F(CommandRangeVulkanIntegrationTest, OutOfRangeResetIsRejectedAndValidBuffersRemainUsable) {
         auto pool = make_pool();
         vsl::CommandBuffer buffers(pool, 2);
-        const auto handles = buffers.data_->command_buffers;
+        const auto handles = CommandAccess::Data(buffers)->command_buffers;
         for (const auto index : {2u, std::numeric_limits<std::uint32_t>::max()})
             EXPECT_THROW(buffers.reset(index), std::out_of_range);
-        EXPECT_EQ(buffers.data_->command_buffers, handles);
+        EXPECT_EQ(CommandAccess::Data(buffers)->command_buffers, handles);
         EXPECT_EQ(buffers.get_current_buffer_idx(), 0u);
         EXPECT_NO_THROW(buffers.reset(0));
         EXPECT_NO_THROW(buffers.reset(1));
@@ -51,14 +95,14 @@ namespace {
     }
     TEST_F(CommandVulkanIntegrationTest, PoolAndBuffersShareExpectedOwnerAndCanReset) {
         auto pool = make_pool();
-        vsl::CommandPool borrowed(pool.data_);
-        EXPECT_EQ(borrowed.data_, pool.data_);
+        vsl::CommandPool borrowed(CommandAccess::Pool(CommandAccess::Data(pool)));
+        EXPECT_EQ(CommandAccess::Data(borrowed), CommandAccess::Data(pool));
         vsl::CommandBuffer buffers(pool, 2);
         EXPECT_EQ(buffers.get_size(), 2u);
         EXPECT_EQ(buffers.get_current_buffer_idx(), 0u);
-        EXPECT_EQ(buffers.data_->command_pool, pool.data_.get());
-        vsl::CommandBuffer shared(buffers.data_);
-        EXPECT_EQ(shared.data_, buffers.data_);
+        EXPECT_EQ(CommandAccess::Data(buffers)->command_pool, CommandAccess::Data(pool).get());
+        vsl::CommandBuffer shared(CommandAccess::RawBuffer(CommandAccess::Data(buffers)));
+        EXPECT_EQ(CommandAccess::Data(shared), CommandAccess::Data(buffers));
         buffers.reset(0);
         buffers.reset();
         EXPECT_EQ(shared.get_current_buffer_idx(), 0u);
@@ -66,7 +110,7 @@ namespace {
     TEST_F(CommandVulkanIntegrationTest, NextCyclesThroughEveryBufferAndSharedViewsObserveTheSameIndex) {
         auto pool = make_pool();
         vsl::CommandBuffer buffers(pool, 3);
-        vsl::CommandBuffer shared(buffers.data_);
+        vsl::CommandBuffer shared(CommandAccess::RawBuffer(CommandAccess::Data(buffers)));
         for (const auto expected : {1u, 2u, 0u, 1u}) {
             buffers.next();
             EXPECT_EQ(buffers.get_current_buffer_idx(), expected);
@@ -83,20 +127,20 @@ namespace {
         auto current = manager.get_buffer();
         current.next();
         EXPECT_EQ(manager.get_current_buffer_idx(), 1u);
-        EXPECT_EQ(manager.get_buffer().data_, current.data_);
+        EXPECT_EQ(CommandAccess::Data(manager.get_buffer()), CommandAccess::Data(current));
     }
     TEST_F(CommandVulkanIntegrationTest, ManagerAccessorsAndExclusiveBuffersPreserveOwnership) {
         auto manager = make_manager();
-        vsl::CommandManager shared(manager.data_);
-        EXPECT_EQ(shared.data_, manager.data_);
-        EXPECT_EQ(manager.get_pool().data_, manager.data_->command_pool);
-        EXPECT_EQ(manager.get_buffer().data_, manager.data_->command_buffer);
+        vsl::CommandManager shared(CommandAccess::RawManager(CommandAccess::Data(manager)));
+        EXPECT_EQ(CommandAccess::Data(shared), CommandAccess::Data(manager));
+        EXPECT_EQ(CommandAccess::Data(manager.get_pool()), CommandAccess::Data(manager)->command_pool);
+        EXPECT_EQ(CommandAccess::Data(manager.get_buffer()), CommandAccess::Data(manager)->command_buffer);
         EXPECT_EQ(manager.get_current_buffer_idx(), manager.get_buffer().get_current_buffer_idx());
         auto exclusive = manager.make_exclusive_buffer(2);
         EXPECT_EQ(exclusive.get_size(), 2u);
-        EXPECT_NE(exclusive.data_, manager.get_buffer().data_);
-        EXPECT_EQ(exclusive.data_->command_pool, manager.get_pool().data_.get());
-        EXPECT_NE(exclusive.data_->command_buffers[0], manager.get_buffer().data_->command_buffers[0]);
+        EXPECT_NE(CommandAccess::Data(exclusive), CommandAccess::Data(manager.get_buffer()));
+        EXPECT_EQ(CommandAccess::Data(exclusive)->command_pool, CommandAccess::Data(manager.get_pool()).get());
+        EXPECT_NE(CommandAccess::Data(exclusive)->command_buffers[0], CommandAccess::Data(manager.get_buffer())->command_buffers[0]);
     }
     struct CommandShape {
         void invoke(vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager);
@@ -192,7 +236,7 @@ namespace {
         {
             // 割当が失敗したconstructorの後処理と同じ、poolだけを保持した状態。
             auto storage = std::make_shared<vsl::impl::CommandBufferImpl>();
-            storage->command_pool = pool.data_.get();
+            storage->command_pool = CommandAccess::Data(pool).get();
         }
     }
 } // namespace
@@ -245,13 +289,13 @@ namespace {
         {
             auto manager = make_manager().independent(1);
             auto buffer = manager.get_buffer();
-            native = buffer.data_;
+            native = CommandAccess::Data(buffer);
             domain = vsl::lifetime::CommandAccess::Owner(buffer);
             auto phase = manager.start_phase<vsl::ComputePhase>();
             auto owner = std::make_shared<int>(42);
             retained = owner;
             buffer.retain(owner);
-            buffer.retain(buffer.data_);
+            buffer.retain(CommandAccess::Data(buffer));
             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
             result = phase.completion();
         }
@@ -263,13 +307,13 @@ namespace {
     }
 
     TEST_F(CommandResourceVulkanIntegrationTest, BufferFacadeKeepsCanonicalDomainAfterManagerDestruction) {
-        vsl::CommandBuffer saved(nullptr);
+        vsl::CommandBuffer saved(CommandAccess::RawBuffer(nullptr));
         std::weak_ptr<vsl::lifetime::CommandDomain> domain;
         std::weak_ptr<int> retained;
         {
             auto manager = make_manager().independent(1);
             saved = manager.get_buffer();
-            const auto shared = vsl::CommandBuffer(saved.data_);
+            const auto shared = vsl::CommandBuffer(CommandAccess::RawBuffer(CommandAccess::Data(saved)));
             domain = vsl::lifetime::CommandAccess::Owner(saved);
             EXPECT_EQ(domain.lock(), vsl::lifetime::CommandAccess::Owner(shared));
             auto phase = manager.start_phase<vsl::ComputePhase>();
@@ -280,7 +324,7 @@ namespace {
         }
         EXPECT_FALSE(domain.expired());
         EXPECT_FALSE(retained.expired());
-        saved = vsl::CommandBuffer(nullptr);
+        saved = vsl::CommandBuffer(CommandAccess::RawBuffer(nullptr));
         EXPECT_TRUE(domain.expired());
         EXPECT_TRUE(retained.expired());
     }
@@ -290,14 +334,14 @@ namespace {
         std::shared_ptr<vsl::impl::CommandManagerImpl> manager_data;
         {
             auto manager = make_manager().independent(1);
-            manager_data = manager.data_;
-            native = manager.get_buffer().data_;
+            manager_data = CommandAccess::Data(manager);
+            native = CommandAccess::Data(manager.get_buffer());
         }
         ASSERT_TRUE(native);
         EXPECT_TRUE(native->owner_context->domain.expired());
         EXPECT_EQ(native->recording_context, nullptr);
-        EXPECT_THROW(vsl::CommandBuffer{native}, std::logic_error);
-        EXPECT_THROW(vsl::CommandManager{manager_data}, std::logic_error);
+        EXPECT_THROW(vsl::CommandBuffer{CommandAccess::RawBuffer(native)}, std::logic_error);
+        EXPECT_THROW(vsl::CommandManager{CommandAccess::RawManager(manager_data)}, std::logic_error);
     }
 
     TEST_F(CommandResourceVulkanIntegrationTest, PhaseOwnsDomainWithoutTheOriginalManagerFacade) {
@@ -320,13 +364,13 @@ namespace {
         auto replacement = make_manager().independent(1);
         bool coherent = false;
         bool rejected_reconnection = false;
-        const auto old_native = manager.get_buffer().data_;
+        const auto old_native = CommandAccess::Data(manager.get_buffer());
         std::weak_ptr<vsl::lifetime::CommandDomain> old_domain = vsl::lifetime::CommandAccess::Owner(manager.get_buffer());
         const vsl_test::DeferredAction callback([&] {
-            coherent = manager.data_ == replacement.data_ &&
-                       vsl::lifetime::CommandAccess::Owner(manager.get_buffer())->buffer == manager.data_->command_buffer;
+            coherent = CommandAccess::Data(manager) == CommandAccess::Data(replacement) &&
+                       vsl::lifetime::CommandAccess::Owner(manager.get_buffer())->buffer == CommandAccess::Data(manager)->command_buffer;
             try {
-                vsl::CommandBuffer reconnect(old_native);
+                vsl::CommandBuffer reconnect(CommandAccess::RawBuffer(old_native));
             } catch (const std::logic_error&) {
                 rejected_reconnection = true;
             }

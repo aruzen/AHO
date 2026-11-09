@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
 #include <VSL/utils/typed_batch.hpp>
 #include "support/render_fixture.hpp"
@@ -6,6 +7,9 @@
 #include <VSL/lifetime/submission_retention.hpp>
 #include <algorithm>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     namespace t = vsl::typed;
     struct Position {
@@ -112,7 +116,7 @@ namespace {
             auto original = manager.start_phase<vsl::ComputePhase>();
             auto buffer = manager.get_buffer();
             const auto slot = buffer.get_current_buffer_idx();
-            const auto work = buffer.data_->recording_context->work;
+            const auto work = CommandAccess::Data(buffer)->recording_context->work;
             std::array<std::uint16_t, 3> values{0, 1, 2};
             UploadInputProbe probe{values};
             const vsl::operation::ScopedSubmissionNativeCalls native({.context = &probe, .queue_submit = UploadInputProbe::Submit});
@@ -121,8 +125,8 @@ namespace {
             EXPECT_EQ(values, (std::array<std::uint16_t, 3>{99, 99, 99}));
             EXPECT_EQ(indices.bounds(0, 3), (std::pair<std::uint32_t, std::uint32_t>{0, 2}));
             EXPECT_EQ(buffer.get_current_buffer_idx(), slot);
-            EXPECT_EQ(buffer.data_->recording_context->work, work);
-            EXPECT_TRUE(buffer.data_->recording_context->recording);
+            EXPECT_EQ(CommandAccess::Data(buffer)->recording_context->work, work);
+            EXPECT_TRUE(CommandAccess::Data(buffer)->recording_context->recording);
             EXPECT_EQ(original.completion().status(), vsl::Completion::Status::PENDING);
             ExpectTriangleColor(render([&](auto& stream) { stream << typed.bind_vertices(positions, colors).draw_indexed(indices, 3, 1, 0, 0, 1); }));
             original.cancel();

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 
 #include <VSL/vulkan/commands/bind_index_buffers.hpp>
@@ -5,6 +6,9 @@
 #include <VSL/lifetime/buffer_access.hpp>
 #include <stdexcept>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 VSL_NAMESPACE::BufferIdentity VSL_NAMESPACE::command::BindIndexBufferAt::identity() const {
     return lifetime::detail::IdentityAccess::From<BufferIdentity>(_source);
 }
@@ -22,15 +26,14 @@ VSL_NAMESPACE::command::BindIndexBufferAt::BindIndexBufferAt(const BufferAccesso
     : BindIndexBufferAt(BufferView::FromBuffer(source), type, offset, std::move(use)) {}
 
 void VSL_NAMESPACE::command::BindIndexBufferAt::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
-    if (_source->device != manager.data_->device.get())
+    if (_source->device != CommandAccess::Data(manager)->device.get())
         throw std::invalid_argument("Index buffer and command manager use different devices");
     track(buffer);
-    buffer.data_->command_buffers[buffer.get_current_buffer_idx()].bindIndexBuffer(
+    CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].bindIndexBuffer(
         _source->buffer, _offset, _type == IndexType::UINT16 ? vk::IndexType::eUint16 : vk::IndexType::eUint32);
 }
 
 void VSL_NAMESPACE::command::BindIndexBuffer::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
     this->buffer->resource_use().record(buffer);
-    buffer.data_->command_buffers[buffer.get_current_buffer_idx()]
-        .bindIndexBuffer(this->buffer->data_->buffer, offset, vk::IndexType::eUint32);
+    CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].bindIndexBuffer(this->buffer->data_->buffer, offset, vk::IndexType::eUint32);
 }

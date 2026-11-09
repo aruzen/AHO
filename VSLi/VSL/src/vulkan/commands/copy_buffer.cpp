@@ -1,9 +1,13 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/vulkan/commands/copy_buffer.hpp>
 #include <VSL/operation/buffer_ops.hpp>
 #include <VSL/sync/buffer_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace VSL_NAMESPACE::command {
     CopyBuffer::CopyBuffer(BufferAccessor* source, BufferAccessor* destination, size_t bytes,
                            size_t source_offset, size_t destination_offset, bool host_read)
@@ -30,8 +34,8 @@ namespace VSL_NAMESPACE::command {
     }
     void CopyBuffer::invoke(CommandPool, CommandBuffer buffer, CommandManager manager) {
         validate();
-        if (!buffer.data_ || !buffer.data_->command_pool || !manager.data_ ||
-            buffer.data_->command_pool->device != _source->device || manager.data_->device.get() != _source->device)
+        if (!CommandAccess::Data(buffer) || !CommandAccess::Data(buffer)->command_pool || !CommandAccess::Data(manager) ||
+            CommandAccess::Data(buffer)->command_pool->device != _source->device || CommandAccess::Data(manager)->device.get() != _source->device)
             throw std::invalid_argument("Buffer copy command device mismatch");
         const auto completion = buffer.completion();
         _source->use->check_available(completion);
@@ -40,14 +44,14 @@ namespace VSL_NAMESPACE::command {
             buffer.retain_until_complete(_source_owner);
             buffer.retain_until_complete(_destination_owner);
         } else {
-            if (auto submission = buffer.data_->recording_context->work)
+            if (auto submission = CommandAccess::Data(buffer)->recording_context->work)
                 submission->resources.reserve(submission->resources.size() + 2);
             buffer.retain(_source_owner);
             buffer.retain(_destination_owner);
         }
         _source->use->mark_used(completion);
         _destination->use->mark_used(completion);
-        operation::record_copy(buffer.data_->command_buffers.at(buffer.get_current_buffer_idx()),
+        operation::record_copy(CommandAccess::Data(buffer)->command_buffers.at(buffer.get_current_buffer_idx()),
                                *_source, *_destination, _bytes, _source_offset, _destination_offset, sync::buffer_copy_visibility(_host_read));
     }
 } // namespace VSL_NAMESPACE::command

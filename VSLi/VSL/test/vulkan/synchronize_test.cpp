@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include "support/deferred_action.hpp"
 #include <VSL/lifetime/synchronization_use.hpp>
@@ -7,6 +8,10 @@
 #include <VSL/sync/presentation_state.hpp>
 #include <VSL/operation/submission_ops.hpp>
 #include <limits>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     // queue未送信のunsignaled fenceでSUBMITTED判定を固定する。
     struct SubmittedFence {
@@ -210,7 +215,7 @@ namespace {
         auto a = std::make_unique<vsl::ComputePhase>(first, std::nullopt, std::nullopt, fence);
         auto b = second.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence);
         auto ca = a->completion(), cb = b.completion();
-        const std::weak_ptr<vsl::impl::CommandBufferImpl> ring = first.get_buffer().data_;
+        const std::weak_ptr<vsl::impl::CommandBufferImpl> ring = CommandAccess::Data(first.get_buffer());
         ASSERT_EQ(a->submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         ASSERT_EQ(b.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         struct Probe {
@@ -221,7 +226,7 @@ namespace {
         } probe{ca, cb, fence};
         probe.release_facades = [&] {
             a.reset();
-            first = vsl::CommandManager(nullptr);
+            first = vsl::CommandManager(CommandAccess::RawManager(nullptr));
             EXPECT_FALSE(ring.expired());
         };
         const vsl::operation::ScopedSubmissionNativeCalls native({.context = &probe, .wait_fences = +[](void* context, VkDevice device, std::uint32_t count, const VkFence* fences, VkBool32 all, std::uint64_t timeout) noexcept {
@@ -376,7 +381,7 @@ namespace {
         auto semaphore = manager->create_semaphore("two roles");
         auto commands = make_manager().independent(1);
         auto phase = commands.start_phase<vsl::ComputePhase>(semaphore, semaphore);
-        const auto* work = commands.get_buffer().data_->recording_context->work;
+        const auto* work = CommandAccess::Data(commands.get_buffer())->recording_context->work;
         ASSERT_TRUE(work);
         EXPECT_EQ(work->wait_semaphore, semaphore.data_.get());
         EXPECT_EQ(work->signal_semaphore, semaphore.data_.get());

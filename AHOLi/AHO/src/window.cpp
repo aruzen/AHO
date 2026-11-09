@@ -110,10 +110,10 @@ namespace {
     const std::string& checked_window_name(const std::string& name, const AHO_NAMESPACE::engine::EngineAccessor& engine) {
         const auto& data = engine.data();
         if (!data || !data->vulkan_instance.accessor || !data->logical_device.data_ ||
-            !data->command_manager.data_)
+            !data->command_manager)
             throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "A booted engine is required");
         auto buffers = data->command_manager.get_buffer();
-        if (!buffers.data_ || buffers.get_size() == 0)
+        if (!buffers || buffers.get_size() == 0)
             throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "A booted engine is required");
         return name;
     }

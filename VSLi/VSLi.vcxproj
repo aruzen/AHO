@@ -170,6 +170,7 @@
     <ClCompile Include="VSL\src\lifetime\native_recording.cpp" />
     <ClCompile Include="VSL\src\operation\native_recording.cpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\buffer_access.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\command_access.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\identity_access.hpp" />
     <ClCompile Include="VSL\src\lifetime\pipeline_recipe.cpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\pipeline_layout_ops.hpp" />

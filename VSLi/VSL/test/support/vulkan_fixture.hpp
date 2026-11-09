@@ -1,4 +1,5 @@
 #pragma once
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/operation/pipeline_layout_ops.hpp>
 #include <VSL/lifetime/instance_storage.hpp>
 #include <VSL/lifetime/physical_device_storage.hpp>
@@ -250,13 +251,13 @@ namespace vsl_test {
 
     inline vsl::CommandManager VulkanIntegrationTest::make_manager() {
         vsl::CommandManager manager(device);
-        _command_pools.push_back(manager.data_->command_pool);
+        _command_pools.push_back(VSL_NAMESPACE::lifetime::CommandAccess::Data(manager)->command_pool);
         return manager;
     }
 
     inline vsl::CommandPool VulkanIntegrationTest::make_pool() {
         vsl::CommandPool pool(device);
-        _command_pools.push_back(pool.data_);
+        _command_pools.push_back(VSL_NAMESPACE::lifetime::CommandAccess::Data(pool));
         return pool;
     }
 

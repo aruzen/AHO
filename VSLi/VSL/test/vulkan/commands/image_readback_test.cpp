@@ -1,8 +1,12 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include "support/image_transfer_fixture.hpp"
 #include <VSL/vulkan/commands/image_readback.hpp>
 #include <VSL/vulkan/commands/change_image_barrier.hpp>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     class ImageReadbackCommandVulkanIntegrationTest : public vsl_test::ImageTransferVulkanIntegrationTest {
         bool validate_vulkan() const override;
@@ -103,7 +107,7 @@ namespace {
         auto manager = make_manager();
         auto image = initialized_image(manager);
         vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION> destination(device, std::size_t{16});
-        const vsl::CommandBuffer empty(std::shared_ptr<vsl::impl::CommandBufferImpl>{});
+        const vsl::CommandBuffer empty(CommandAccess::RawBuffer(std::shared_ptr<vsl::impl::CommandBufferImpl>{}));
         vsl::command::ImageReadback command(&destination, image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
         EXPECT_THROW(command.invoke(manager.get_pool(), empty, manager), std::invalid_argument);
     }
@@ -111,14 +115,14 @@ namespace {
         auto manager = make_manager();
         auto image = initialized_image(manager);
         vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION> destination(device, std::size_t{16});
-        const vsl::CommandManager empty(std::shared_ptr<vsl::impl::CommandManagerImpl>{});
+        const vsl::CommandManager empty(CommandAccess::RawManager(std::shared_ptr<vsl::impl::CommandManagerImpl>{}));
         vsl::ComputePhase phase(manager);
         const auto buffer = manager.get_buffer();
-        ASSERT_TRUE(buffer.data_->recording_context->work);
-        const auto retained = buffer.data_->recording_context->work->resources;
+        ASSERT_TRUE(CommandAccess::Data(buffer)->recording_context->work);
+        const auto retained = CommandAccess::Data(buffer)->recording_context->work->resources;
         vsl::command::ImageReadback command(&destination, image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
         EXPECT_THROW(command.invoke(manager.get_pool(), buffer, empty), std::invalid_argument);
-        EXPECT_EQ(buffer.data_->recording_context->work->resources, retained);
+        EXPECT_EQ(CommandAccess::Data(buffer)->recording_context->work->resources, retained);
         phase.cancel();
     }
     TEST_F(ImageReadbackCommandVulkanIntegrationTest, CommandKeepsDestinationWhenOriginalHandleIsDestroyedBeforeRecording) {

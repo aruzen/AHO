@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/vulkan/commands/render_pass_begin.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
@@ -6,6 +7,9 @@
 #include <VSL/operation/frame_buffer_ops.hpp>
 #include <stdexcept>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace VSL_NAMESPACE::command {
     namespace {
         struct FrameBufferRecording {
@@ -84,14 +88,14 @@ namespace VSL_NAMESPACE::command {
         if (policy != ResourceRetention::SUBMISSION && policy != ResourceRetention::COMPLETION)
             throw std::invalid_argument("Invalid framebuffer retention policy");
         if (!target || !target.use_count() || !target->device || !target->render_pass || !target->render_pass->description ||
-            !buffer.data_ || !buffer.data_->command_pool || buffer.data_->command_pool->device != target->device)
+            !CommandAccess::Data(buffer) || !CommandAccess::Data(buffer)->command_pool || CommandAccess::Data(buffer)->command_pool->device != target->device)
             throw std::invalid_argument("Render pass begin requires a target on the recording device");
-        const FrameBufferRecording recording(*buffer.data_);
+        const FrameBufferRecording recording(*CommandAccess::Data(buffer));
         const auto completion = buffer.completion();
         lifetime::require_recording(buffer, completion);
         const auto slot = buffer.get_current_buffer_idx();
-        const auto native = buffer.data_->command_buffers.at(slot);
-        const auto index = target_index.value_or(buffer.data_->recording_context->acquired_image_index.value_or(slot));
+        const auto native = CommandAccess::Data(buffer)->command_buffers.at(slot);
+        const auto index = target_index.value_or(CommandAccess::Data(buffer)->recording_context->acquired_image_index.value_or(slot));
         const operation::FrameBufferBeginScratch scratch(*target, index, {{area.x, area.y}, {area.width, area.height}}, clear_values);
         if (policy == ResourceRetention::COMPLETION)
             buffer.retain_until_complete(target);
@@ -100,13 +104,13 @@ namespace VSL_NAMESPACE::command {
         for (const auto* image : target->attachments.at(index))
             image->use->mark_used(completion);
         lifetime::require_recording(buffer, completion);
-        if (buffer.get_current_buffer_idx() != slot || buffer.data_->command_buffers.at(slot) != native)
+        if (buffer.get_current_buffer_idx() != slot || CommandAccess::Data(buffer)->command_buffers.at(slot) != native)
             throw std::logic_error("Recording buffer changed while tracking framebuffer images");
         operation::record_frame_buffer_begin(native, scratch);
     }
     void NextSubpass::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
-        if (buffer.data_->recording_context->frame_buffer_recording)
+        if (CommandAccess::Data(buffer)->recording_context->frame_buffer_recording)
             throw std::logic_error("Subpass recording cannot reenter framebuffer tracking");
-        operation::record_next_subpass(buffer.data_->command_buffers.at(buffer.get_current_buffer_idx()));
+        operation::record_next_subpass(CommandAccess::Data(buffer)->command_buffers.at(buffer.get_current_buffer_idx()));
     }
 } // namespace VSL_NAMESPACE::command

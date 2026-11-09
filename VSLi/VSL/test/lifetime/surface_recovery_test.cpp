@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include "support/window_fixture.hpp"
 #include "support/deferred_action.hpp"
 #include <VSL/lifetime/surface_recovery.hpp>
@@ -12,6 +13,9 @@
 #include <VSL/sync/submission_completion.hpp>
 #include <functional>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     namespace l = vsl::lifetime;
     namespace s = vsl::sync;
@@ -262,7 +266,7 @@ namespace {
         phase.reset();
         const auto before = l::quarantined_acquisition_count();
         chain = {};
-        manager = vsl::CommandManager(nullptr);
+        manager = vsl::CommandManager(CommandAccess::RawManager(nullptr));
         EXPECT_TRUE(registry.expired());
         EXPECT_EQ(l::quarantined_acquisition_count(), before + 1);
         EXPECT_FALSE(ticket.expired());

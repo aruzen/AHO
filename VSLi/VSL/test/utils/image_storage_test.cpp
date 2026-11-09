@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <VSL/lifetime/image_storage.hpp>
 #include <VSL/lifetime/sampler_storage.hpp>
@@ -6,6 +7,9 @@
 #include <VSL/vulkan/commands/render_pass_begin.hpp>
 #include <VSL/vulkan/commands/render_pass_end.hpp>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     namespace t = vsl::typed;
     constexpr auto IMAGE_USAGE = vsl::ImageType::SAMPLED | vsl::ImageType::TRANSFER_DST;
@@ -196,7 +200,7 @@ namespace {
         EXPECT_FALSE(sampler_owner.expired());
         const vk::MemoryBarrier host_visible{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
         auto buffer = manager.get_buffer();
-        buffer.data_->command_buffers.at(buffer.get_current_buffer_idx()).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, host_visible, {}, {});
+        CommandAccess::Data(buffer)->command_buffers.at(buffer.get_current_buffer_idx()).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, host_visible, {}, {});
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         ASSERT_TRUE(phase.completion().wait());
         EXPECT_TRUE(image_owner.expired());

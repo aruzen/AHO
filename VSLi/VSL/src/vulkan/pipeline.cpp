@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/vulkan/pipeline.hpp>
 #include <VSL/lifetime/pipeline_storage.hpp>
@@ -5,6 +6,9 @@
 #include <VSL/lifetime/identity_access.hpp>
 #include <stdexcept>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace VSL_NAMESPACE {
     PipelineIdentity PipelineAccessor::identity() const {
         return lifetime::detail::IdentityAccess::From<PipelineIdentity>(data_.get());
@@ -65,7 +69,7 @@ namespace VSL_NAMESPACE {
     }
     void GraphicsPipeline::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
         buffer.retain(data_);
-        buffer.data_->command_buffers[buffer.get_current_buffer_idx()].bindPipeline(vk::PipelineBindPoint::eGraphics, data_->pipeline);
+        CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].bindPipeline(vk::PipelineBindPoint::eGraphics, data_->pipeline);
     }
     ComputePipeline::ComputePipeline(PipelineLayoutAccessor layout) {
         const auto& recipe = checked_recipe(layout);
@@ -88,6 +92,6 @@ namespace VSL_NAMESPACE {
     }
     void ComputePipeline::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
         buffer.retain(data_);
-        buffer.data_->command_buffers[buffer.get_current_buffer_idx()].bindPipeline(vk::PipelineBindPoint::eCompute, data_->pipeline);
+        CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].bindPipeline(vk::PipelineBindPoint::eCompute, data_->pipeline);
     }
 } // namespace VSL_NAMESPACE

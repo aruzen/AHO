@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/lifetime/submission_retention.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
@@ -16,6 +17,9 @@
 #include <mutex>
 #include <new>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace VSL_NAMESPACE::lifetime {
     namespace {
         struct SubmissionQuarantine {
@@ -379,16 +383,16 @@ namespace VSL_NAMESPACE::lifetime {
         }
     }
     void require_recording(const CommandBuffer& buffer, const Completion& completion) {
-        if (!buffer.data_ || !buffer.data_->recording_context || !buffer.data_->recording_context->work || !completion.data_ ||
-            !buffer.data_->recording_context->recording || buffer.data_->recording_context->submitting ||
-            buffer.data_->recording_context->work->result != completion.data_ || !sync::recordable(*completion.data_))
+        if (!CommandAccess::Data(buffer) || !CommandAccess::Data(buffer)->recording_context || !CommandAccess::Data(buffer)->recording_context->work || !completion.data_ ||
+            !CommandAccess::Data(buffer)->recording_context->recording || CommandAccess::Data(buffer)->recording_context->submitting ||
+            CommandAccess::Data(buffer)->recording_context->work->result != completion.data_ || !sync::recordable(*completion.data_))
             throw std::logic_error("Recording phase changed while tracking resources");
     }
     void record_resource_state(const ResourceUseState& state, const CommandBuffer& buffer, const Completion& completion) {
         state.mark_used(completion);
         require_recording(buffer, completion);
         if (sync::ResourceUseAccess::RequiresKnown(state)) {
-            auto& checks = buffer.data_->recording_context->work->validity_checks;
+            auto& checks = CommandAccess::Data(buffer)->recording_context->work->validity_checks;
             if (std::ranges::find(checks, &state) == checks.end())
                 checks.push_back(&state);
         }
@@ -448,34 +452,34 @@ namespace VSL_NAMESPACE {
         lifetime::retain_resource(work->resources, std::move(accepted));
     }
     void CommandBuffer::retain(const std::shared_ptr<void>& resource) const {
-        if (!data_ || !data_->recording_context)
+        if (!_data || !_data->recording_context)
             throw std::invalid_argument("CommandBuffer is empty");
-        if (resource.use_count() && data_->recording_context->work) {
-            if (data_->recording_context->submitting || !sync::recordable(*data_->recording_context->work->result))
+        if (resource.use_count() && _data->recording_context->work) {
+            if (_data->recording_context->submitting || !sync::recordable(*_data->recording_context->work->result))
                 throw std::logic_error("Resources must be retained before submission");
-            lifetime::retain_resource(data_->recording_context->work->resources, resource);
+            lifetime::retain_resource(_data->recording_context->work->resources, resource);
         }
     }
     void CommandBuffer::retain(std::shared_ptr<void>&& resource) const {
         auto accepted = std::move(resource);
-        if (!data_ || !data_->recording_context)
+        if (!_data || !_data->recording_context)
             throw std::invalid_argument("CommandBuffer is empty");
-        if (accepted.use_count() && data_->recording_context->work) {
-            if (data_->recording_context->submitting || !sync::recordable(*data_->recording_context->work->result))
+        if (accepted.use_count() && _data->recording_context->work) {
+            if (_data->recording_context->submitting || !sync::recordable(*_data->recording_context->work->result))
                 throw std::logic_error("Resources must be retained before submission");
-            lifetime::retain_resource(data_->recording_context->work->resources, std::move(accepted));
+            lifetime::retain_resource(_data->recording_context->work->resources, std::move(accepted));
         }
     }
     void CommandBuffer::retain_until_complete(const std::shared_ptr<void>& resource) const {
-        if (!data_ || !data_->recording_context || data_->recording_context->submitting || !data_->recording_context->work || !sync::recordable(*data_->recording_context->work->result))
+        if (!_data || !_data->recording_context || _data->recording_context->submitting || !_data->recording_context->work || !sync::recordable(*_data->recording_context->work->result))
             throw std::logic_error("Buffer retention requires a recording phase");
-        lifetime::retain_until_complete(*data_->recording_context->work, resource);
+        lifetime::retain_until_complete(*_data->recording_context->work, resource);
     }
     void CommandBuffer::retain_until_complete(std::shared_ptr<void>&& resource) const {
         auto accepted = std::move(resource);
-        if (!data_ || !data_->recording_context || data_->recording_context->submitting || !data_->recording_context->work || !sync::recordable(*data_->recording_context->work->result))
+        if (!_data || !_data->recording_context || _data->recording_context->submitting || !_data->recording_context->work || !sync::recordable(*_data->recording_context->work->result))
             throw std::logic_error("Buffer retention requires a recording phase");
-        lifetime::retain_until_complete(*data_->recording_context->work, std::move(accepted));
+        lifetime::retain_until_complete(*_data->recording_context->work, std::move(accepted));
     }
     impl::SubmissionWork::~SubmissionWork() {
         sync::finish_submission(*this);

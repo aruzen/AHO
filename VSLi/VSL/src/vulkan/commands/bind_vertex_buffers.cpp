@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 
 #include <VSL/vulkan/commands/bind_vertex_buffers.hpp>
@@ -7,6 +8,9 @@
 #include <ranges>
 #include <stdexcept>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 VSL_NAMESPACE::BufferIdentity VSL_NAMESPACE::command::BindVertexBufferAt::identity() const {
     return lifetime::detail::IdentityAccess::From<BufferIdentity>(_source);
 }
@@ -22,10 +26,10 @@ VSL_NAMESPACE::command::BindVertexBufferAt::BindVertexBufferAt(std::uint32_t bin
 }
 
 void VSL_NAMESPACE::command::BindVertexBufferAt::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
-    if (_source->device != manager.data_->device.get())
+    if (_source->device != CommandAccess::Data(manager)->device.get())
         throw std::invalid_argument("Vertex buffer and command manager use different devices");
     track(buffer);
-    buffer.data_->command_buffers[buffer.get_current_buffer_idx()].bindVertexBuffers(_binding, {_source->buffer}, {_offset});
+    CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].bindVertexBuffers(_binding, {_source->buffer}, {_offset});
 }
 
 void VSL_NAMESPACE::command::BindVertexBuffer::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
@@ -33,8 +37,7 @@ void VSL_NAMESPACE::command::BindVertexBuffer::invoke(CommandPool pool, CommandB
         return;
     for (auto* source : buffers)
         source->resource_use().record(buffer);
-    buffer.data_->command_buffers[buffer.get_current_buffer_idx()]
-        .bindVertexBuffers(0,
-                           this->buffers | std::views::transform([](auto& b) { return b->data_->buffer; }) | std::ranges::to<std::vector<vk::Buffer>>(),
-                           std::vector<vk::DeviceSize>(this->buffers.size(), 0));
+    CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].bindVertexBuffers(0,
+                                                                                                    this->buffers | std::views::transform([](auto& b) { return b->data_->buffer; }) | std::ranges::to<std::vector<vk::Buffer>>(),
+                                                                                                    std::vector<vk::DeviceSize>(this->buffers.size(), 0));
 }

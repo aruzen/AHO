@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/lifetime/resource_arena.hpp>
 #include <VSL/lifetime/synchronization_storage.hpp>
@@ -6,13 +7,16 @@
 #include <VSL/vulkan/_pimpls.hpp>
 #include <limits>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace VSL_NAMESPACE::typed::detail {
-    FrameResourceDomain::FrameResourceDomain(CommandManager manager) : manager(std::move(manager)), buffer(nullptr), count(0) {
-        if (!this->manager.data_ || !this->manager.data_.use_count())
+    FrameResourceDomain::FrameResourceDomain(CommandManager manager) : manager(std::move(manager)), count(0) {
+        if (!CommandAccess::Data(this->manager) || !CommandAccess::Data(this->manager).use_count())
             throw std::invalid_argument("Typed frame resources require a command manager owner");
         this->manager.get_device();
         buffer = this->manager.get_buffer();
-        if (!buffer.data_ || !buffer.get_size())
+        if (!CommandAccess::Data(buffer) || !buffer.get_size())
             throw std::invalid_argument("Typed frame resources require command buffer slots");
         (void)buffer.owner_ref();
         if (buffer.get_pool().get_device() != this->manager.get_device())
@@ -24,29 +28,29 @@ namespace VSL_NAMESPACE::typed::detail {
     }
 
     void FrameResourceDomain::require_current() const {
-        if (!manager.data_ || !manager.data_.use_count() || !buffer.data_ || manager.data_->command_buffer != buffer.data_ ||
-            manager.data_->command_buffer.owner_before(buffer.data_) || buffer.data_.owner_before(manager.data_->command_buffer) ||
-            manager.data_->command_pool.get() != buffer.data_->command_pool ||
-            buffer.data_->command_buffers.size() != count || buffer.data_->current_buffer_idx >= count)
+        if (!CommandAccess::Data(manager) || !CommandAccess::Data(manager).use_count() || !CommandAccess::Data(buffer) || CommandAccess::Data(manager)->command_buffer != CommandAccess::Data(buffer) ||
+            CommandAccess::Data(manager)->command_buffer.owner_before(CommandAccess::Data(buffer)) || CommandAccess::Data(buffer).owner_before(CommandAccess::Data(manager)->command_buffer) ||
+            CommandAccess::Data(manager)->command_pool.get() != CommandAccess::Data(buffer)->command_pool ||
+            CommandAccess::Data(buffer)->command_buffers.size() != count || CommandAccess::Data(buffer)->current_buffer_idx >= count)
             throw std::invalid_argument("Typed frame commands require their original buffer ring");
-        const auto& pool = manager.data_->command_pool;
-        const auto* ring_node = buffer.data_->owner_node;
+        const auto& pool = CommandAccess::Data(manager)->command_pool;
+        const auto* ring_node = CommandAccess::Data(buffer)->owner_node;
         const auto* pool_node = pool ? pool->owner_node : nullptr;
-        if (!ring_node || ring_node->retiring() || !ring_node->matches(buffer.data_) ||
+        if (!ring_node || ring_node->retiring() || !ring_node->matches(CommandAccess::Data(buffer)) ||
             !pool_node || pool_node->retiring() || !pool_node->matches(pool))
             throw std::invalid_argument("Typed frame commands require their canonical ring and pool owners");
     }
 
     FrameResourceAccess FrameResourceDomain::access(const ComputePhase& phase) const {
-        if (!manager.data_ || phase.manager.data_ != manager.data_ || manager.data_->command_buffer != buffer.data_)
+        if (!CommandAccess::Data(manager) || CommandAccess::Data(phase.manager) != CommandAccess::Data(manager) || CommandAccess::Data(manager)->command_buffer != CommandAccess::Data(buffer))
             throw std::invalid_argument("Typed frame resources belong to a different command manager or buffer ring");
         require_current();
         const auto completion = phase.completion();
         if (phase.state != ComputePhase::State::WAIT_SUBMIT || !completion ||
-            completion.status() != Completion::Status::PENDING || !buffer.data_->recording_context || !buffer.data_->recording_context->recording ||
-            (!buffer.data_->recording_context->work || buffer.data_->recording_context->work->result != completion.data_) ||
-            phase.frame_slot != buffer.data_->current_buffer_idx ||
-            phase.frame_slot >= count || buffer.data_->command_buffers.size() != count)
+            completion.status() != Completion::Status::PENDING || !CommandAccess::Data(buffer)->recording_context || !CommandAccess::Data(buffer)->recording_context->recording ||
+            (!CommandAccess::Data(buffer)->recording_context->work || CommandAccess::Data(buffer)->recording_context->work->result != completion.data_) ||
+            phase.frame_slot != CommandAccess::Data(buffer)->current_buffer_idx ||
+            phase.frame_slot >= count || CommandAccess::Data(buffer)->command_buffers.size() != count)
             throw std::logic_error("Typed frame resources require the currently recording phase");
         return {phase.frame_slot, completion};
     }

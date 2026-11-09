@@ -1,8 +1,13 @@
 #ifdef AHO_GPU_TESTS
+#include <VSL/lifetime/command_access.hpp>
 #include "support/render_fixture.hpp"
 #include <AHO/image_readback.hpp>
 #include <VSL/vulkan/commands/change_image_barrier.hpp>
 #include <cstring>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     class ImageReadbackVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override;
@@ -377,7 +382,7 @@ namespace {
         const std::uint64_t value = 1;
         vk::TimelineSemaphoreSubmitInfo timeline{.waitSemaphoreValueCount = 1, .pWaitSemaphoreValues = &value};
         const vk::PipelineStageFlags stage = vk::PipelineStageFlagBits::eAllCommands;
-        manager.data_->graphics_queue.submit(vk::SubmitInfo{
+        CommandAccess::Data(manager)->graphics_queue.submit(vk::SubmitInfo{
             .pNext = &timeline, .waitSemaphoreCount = 1, .pWaitSemaphores = &*semaphore, .pWaitDstStageMask = &stage});
         ASSERT_TRUE(reader.capture(*color, VSL_NAMESPACE::ImageLayout::GENERAL));
         EXPECT_FALSE(reader.ready());
@@ -589,7 +594,7 @@ namespace {
         const std::uint64_t value = 1;
         vk::TimelineSemaphoreSubmitInfo timeline{.waitSemaphoreValueCount = 1, .pWaitSemaphoreValues = &value};
         const vk::PipelineStageFlags stage = vk::PipelineStageFlagBits::eAllCommands;
-        manager.data_->graphics_queue.submit(vk::SubmitInfo{
+        CommandAccess::Data(manager)->graphics_queue.submit(vk::SubmitInfo{
             .pNext = &timeline, .waitSemaphoreCount = 1, .pWaitSemaphores = &*semaphore, .pWaitDstStageMask = &stage});
         auto first = reader.capture_ticket(*color, VSL_NAMESPACE::ImageLayout::GENERAL, {}, 10);
         auto second = reader.capture_ticket(*color, VSL_NAMESPACE::ImageLayout::GENERAL, {0, 0, 1, 1}, 11);

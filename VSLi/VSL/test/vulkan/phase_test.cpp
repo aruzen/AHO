@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/lifetime/presentation_retention.hpp>
 #include "support/deferred_action.hpp"
@@ -13,6 +14,10 @@
 #include <VSL/operation/submission_ops.hpp>
 #include <VSL/operation/command_ops.hpp>
 #include <functional>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     struct RecordCommand : VSL_NAMESPACE::command::Command {
         std::shared_ptr<int> calls;
@@ -178,7 +183,7 @@ namespace {
 
     void RecordDelegate::invoke(VSL_NAMESPACE::DefaultPhaseStream& stream, VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer,
                                 VSL_NAMESPACE::CommandManager manager) {
-        EXPECT_EQ(stream.manager.data_, manager.data_);
+        EXPECT_EQ(CommandAccess::Data(stream.manager), CommandAccess::Data(manager));
         ++*calls;
     }
 
@@ -411,8 +416,8 @@ namespace {
     TEST_F(PhaseCompletionVulkanIntegrationTest, UnknownWorkSurvivesDomainDestructionAndIsInheritedByItsOriginalRing) {
         const auto initial = vsl::lifetime::quarantined_submission_count();
         auto commands = make_manager().independent(1);
-        const auto manager_data = commands.data_;
-        const auto ring = commands.get_buffer().data_;
+        const auto manager_data = CommandAccess::Data(commands);
+        const auto ring = CommandAccess::Data(commands.get_buffer());
         std::weak_ptr<vsl::lifetime::CommandDomain> old_domain = vsl::lifetime::CommandAccess::Owner(commands.get_buffer());
         vsl::Completion result;
         std::weak_ptr<int> owner;
@@ -428,7 +433,7 @@ namespace {
             }
             EXPECT_THROW(phase.submit(), vk::SystemError);
         }
-        commands = vsl::CommandManager(nullptr);
+        commands = vsl::CommandManager(CommandAccess::RawManager(nullptr));
         EXPECT_TRUE(old_domain.expired());
         EXPECT_FALSE(owner.expired());
         EXPECT_EQ(ring->owner_context->unresolved_submissions, 1u);
@@ -452,7 +457,7 @@ namespace {
         const vsl::operation::ScopedSubmissionNativeCalls native(probe.native_calls());
         {
             auto commands = make_manager().independent(1);
-            ring = commands.get_buffer().data_;
+            ring = CommandAccess::Data(commands.get_buffer());
             auto phase = commands.start_phase<vsl::ComputePhase>();
             auto value = std::make_shared<int>(7);
             owner = value;
@@ -590,7 +595,7 @@ namespace {
             available_owner = available.data_;
             finished_owner = finished.data_;
             auto signal = available.data_->semaphores.at(manager.get_current_buffer_idx());
-            manager.data_->graphics_queue.submit(vk::SubmitInfo{
+            CommandAccess::Data(manager)->graphics_queue.submit(vk::SubmitInfo{
                 .signalSemaphoreCount = 1, .pSignalSemaphores = &signal});
             VSL_NAMESPACE::ComputePhase phase(manager, available, finished);
             completion = phase.completion();
@@ -663,7 +668,7 @@ namespace {
             EXPECT_TRUE(original.ready());
             EXPECT_TRUE(original.wait(0));
             // 回帰時にも破棄時のフェンス待ちが停止しないよう、再度シグナルを送る。
-            manager.data_->graphics_queue.submit(vk::SubmitInfo{}, fence.data_->fences.at(first.frame_slot));
+            CommandAccess::Data(manager)->graphics_queue.submit(vk::SubmitInfo{}, fence.data_->fences.at(first.frame_slot));
             ASSERT_TRUE(fence.wait(first.frame_slot, UINT64_MAX));
             fence.destroy();
             EXPECT_TRUE(original.ready());
@@ -851,7 +856,7 @@ namespace {
         EXPECT_EQ(result.status(), vsl::Completion::Status::FAILED);
         EXPECT_EQ(result.failure(), vsl::Completion::Failure::SUBMIT_FAILED);
         EXPECT_EQ(releases, 1u);
-        EXPECT_FALSE(manager.get_buffer().data_->recording_context->recording);
+        EXPECT_FALSE(CommandAccess::Data(manager.get_buffer())->recording_context->recording);
         phase.cancel();
         EXPECT_EQ(releases, 1u);
         auto next = manager.start_phase<vsl::ComputePhase>();
@@ -1296,7 +1301,7 @@ namespace {
         {
             VSL_NAMESPACE::DefaultPhase phase(manager, chain);
             auto discarded = phase.completion();
-            const auto owned = manager.get_buffer().data_->recording_context->work->owned_fence;
+            const auto owned = CommandAccess::Data(manager.get_buffer())->recording_context->work->owned_fence;
             phase << VSL_NAMESPACE::command::RenderPassBegin(pass, target); // 終了コマンドを省略し、記録途中のキャンセルを確かめる。
             phase.cancel();
             EXPECT_EQ(vsl::lifetime::CommandAccess::Owner(manager.get_buffer())->submissions.at(phase.frame_slot)->owned_fence, owned);

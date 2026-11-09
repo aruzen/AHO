@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/resource_use_factory.hpp>
 #include <VSL/lifetime/identity_access.hpp>
@@ -15,6 +16,9 @@
 #include <cstring>
 #include <utility>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException::MemoryNotHostVisibleException(std::string traceinfo) : VSL_NAMESPACE::exceptions::RuntimeException("MemoryNotHostVisibleException",
                                                                                                                                                              "This buffer's memory is not host-visible. Mapping is not allowed.",
                                                                                                                                                              traceinfo) {}
@@ -31,8 +35,8 @@ static bool copy_buffer(const std::shared_ptr<VSL_NAMESPACE::impl::BufferImpl>& 
                         VSL_NAMESPACE::BufferAccessor* buf, std::size_t offset = 0, std::optional<std::size_t> size = std::nullopt) {
     const auto source = buf ? buf->data_ : nullptr;
     if (!source || !destination || !source->buffer || !destination->buffer ||
-        !source->device || source->device != destination->device || !command_manager.data_ ||
-        command_manager.data_->device.get() != destination->device)
+        !source->device || source->device != destination->device || !CommandAccess::Data(command_manager) ||
+        CommandAccess::Data(command_manager)->device.get() != destination->device)
         throw std::invalid_argument("Buffer copy requires valid buffers and a command manager on the same device");
     if (!VSL_NAMESPACE::contain(source->usage, VSL_NAMESPACE::MemoryType::TRANSFER_SOURCE) ||
         !VSL_NAMESPACE::contain(destination->usage, VSL_NAMESPACE::MemoryType::TRANSFER_DESTINATION))
@@ -50,7 +54,7 @@ static bool copy_buffer(const std::shared_ptr<VSL_NAMESPACE::impl::BufferImpl>& 
 
     auto command_buf = command_manager.make_exclusive_buffer();
 
-    auto vk_command_buf = command_buf.data_->command_buffers[0];
+    auto vk_command_buf = CommandAccess::Data(command_buf)->command_buffers[0];
 
     vk::CommandBufferBeginInfo begin_info;
     vk_command_buf.begin(begin_info);
@@ -64,8 +68,8 @@ static bool copy_buffer(const std::shared_ptr<VSL_NAMESPACE::impl::BufferImpl>& 
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &vk_command_buf;
 
-    command_manager.data_->graphics_queue.submit({submit_info});
-    command_manager.data_->graphics_queue.waitIdle();
+    CommandAccess::Data(command_manager)->graphics_queue.submit({submit_info});
+    CommandAccess::Data(command_manager)->graphics_queue.waitIdle();
 
     return true;
 }

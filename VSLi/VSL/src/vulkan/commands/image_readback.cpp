@@ -1,9 +1,13 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/vulkan/commands/image_readback.hpp>
 #include <VSL/vulkan/commands/change_image_barrier.hpp>
 #include <stdexcept>
 #include <VSL/vulkan/_pimpls.hpp>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace VSL_NAMESPACE::command {
     ImageReadback::ImageReadback(BufferAccessor* destination, ImageAccessor image, ImageLayout current_layout,
                                  ImageRegion region)
@@ -32,11 +36,11 @@ namespace VSL_NAMESPACE::command {
         (void)copy.description(); // 遷移の記録前にコピー先を検証する。
         if (copy.layout != ImageLayout::TRANSFER_SRC_OPTIMAL || !copy.host_read)
             throw std::invalid_argument("Readback copy must use TransferSrcOptimal and host visibility");
-        if (!buffer.data_ || !buffer.data_->command_pool || !manager.data_ ||
-            manager.data_->device.get() != copy.image.data_->device ||
-            buffer.data_->command_pool->device != copy.image.data_->device)
+        if (!CommandAccess::Data(buffer) || !CommandAccess::Data(buffer)->command_pool || !CommandAccess::Data(manager) ||
+            CommandAccess::Data(manager)->device.get() != copy.image.data_->device ||
+            CommandAccess::Data(buffer)->command_pool->device != copy.image.data_->device)
             throw std::invalid_argument("Readback requires a command buffer and manager on the image device");
-        if (auto submission = buffer.data_->recording_context->work) {
+        if (auto submission = CommandAccess::Data(buffer)->recording_context->work) {
             submission->resources.reserve(submission->resources.size() + 4);
         }
         ChangeImageBarrier(copy.image, current_layout, ImageLayout::TRANSFER_SRC_OPTIMAL, info.region.layer, 1)

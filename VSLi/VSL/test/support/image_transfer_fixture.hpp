@@ -1,4 +1,5 @@
 #pragma once
+#include <VSL/lifetime/command_access.hpp>
 #include "vulkan_fixture.hpp"
 #include <VSL/vulkan/commands/copy_buffer_to_image.hpp>
 #include <VSL/vulkan/commands/copy_image_to_buffer.hpp>
@@ -25,7 +26,7 @@ namespace vsl_test {
         barrier.image = image.data_->image;
         barrier.subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, image.data_->count};
         auto buffer = manager.get_buffer();
-        buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
+        VSL_NAMESPACE::lifetime::CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
             vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands, {}, {}, {},
             barrier);
     }
@@ -51,7 +52,7 @@ namespace vsl_test {
                 region.imageSubresource = {vk::ImageAspectFlagBits::eColor, 0, 1, 1};
                 region.imageExtent = {2, 2, 1};
                 auto buffer = manager.get_buffer();
-                buffer.data_->command_buffers[buffer.get_current_buffer_idx()].copyImageToBuffer(
+                VSL_NAMESPACE::lifetime::CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].copyImageToBuffer(
                     image.data_->image, vk::ImageLayout::eGeneral, destination.data_->buffer, region);
             } else if (typed)
                 phase << vsl::command::CopyImageToBuffer(destination, image);

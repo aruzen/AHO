@@ -1,9 +1,13 @@
+#include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <VSL/lifetime/resource_arena.hpp>
 #include <VSL/lifetime/synchronization_storage.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/utils/typed_buffer_arena.hpp>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     namespace t = vsl::typed;
     namespace s = vsl::storage;
@@ -235,7 +239,7 @@ namespace {
             // producer失敗時に、未signalのwaitを持つconsumerを自動送信させない。
             const auto cancel = +[](vsl::ComputePhase* phase) { phase->cancel(); };
             std::unique_ptr<vsl::ComputePhase, decltype(cancel)> cancel_consumer(&second, cancel);
-            const auto* work = consumer->get_buffer().data_->recording_context->work;
+            const auto* work = CommandAccess::Data(consumer->get_buffer())->recording_context->work;
             EXPECT_NE(work->wait_semaphore, work->signal_semaphore);
             EXPECT_EQ(work->wait_semaphore, wait.data_.get());
             EXPECT_EQ(work->signal_semaphore, signal.data_.get());

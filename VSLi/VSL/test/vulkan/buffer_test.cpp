@@ -1,3 +1,4 @@
+#include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <array>
 #include <limits>
@@ -6,6 +7,9 @@
 #include <VSL/vulkan/buffer.hpp>
 #include <VSL/vulkan/commands/image_readback.hpp>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     class BufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override;
@@ -279,7 +283,7 @@ namespace {
             auto phase = manager.start_phase<vsl::ComputePhase>();
             vk::MemoryBarrier visible{.srcAccessMask = vk::AccessFlagBits::eTransferWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
             auto commands = manager.get_buffer();
-            commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, visible, {}, {});
             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
             ASSERT_TRUE(phase.completion().wait());
@@ -314,7 +318,7 @@ namespace {
             host_visibility.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
             host_visibility.dstAccessMask = vk::AccessFlagBits::eHostRead;
             auto commands = manager.get_buffer();
-            commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, host_visibility, {}, {});
         }
         device.data_->device.waitIdle();
@@ -336,7 +340,7 @@ namespace {
             host_visibility.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
             host_visibility.dstAccessMask = vk::AccessFlagBits::eHostRead;
             auto commands = manager.get_buffer();
-            commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, host_visibility, {}, {});
         }
         device.data_->device.waitIdle();
@@ -412,7 +416,7 @@ namespace {
             visible.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
             visible.dstAccessMask = vk::AccessFlagBits::eHostRead;
             auto commands = manager.get_buffer();
-            commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, visible, {}, {});
         }
         device.data_->device.waitIdle();
@@ -470,7 +474,7 @@ namespace {
             host_visibility.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
             host_visibility.dstAccessMask = vk::AccessFlagBits::eHostRead;
             auto commands = manager.get_buffer();
-            commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, host_visibility, {}, {});
         }
         device.data_->device.waitIdle();
@@ -517,7 +521,7 @@ namespace {
             visible.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
             visible.dstAccessMask = vk::AccessFlagBits::eHostRead;
             auto commands = manager.get_buffer();
-            commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, visible, {}, {});
         }
         device.data_->device.waitIdle();
@@ -571,7 +575,7 @@ namespace {
                 visible.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
                 visible.dstAccessMask = vk::AccessFlagBits::eHostRead;
                 auto commands = manager.get_buffer();
-                commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+                CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                     vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, visible, {}, {});
             }
             device.data_->device.waitIdle();
@@ -775,6 +779,7 @@ namespace {
     TEST(BufferCompilationTest, HostVisibleNonCoherentValueConstructorCanFlush) {
         const auto result = vsl_test::compile_probe(R"cpp(
 #include <VSL/vsl.hpp>
+
 void probe(vsl::LogicalDeviceAccessor device){
     vsl::Buffer<vsl::MemoryType::UNIFORM_BUFFER,vsl::MemoryProperty::HOST_VISIBLE> buffer(device,1.0f);
 }
@@ -868,9 +873,9 @@ namespace {
         auto producer = make_manager();
         auto transfer = producer.independent();
         EXPECT_EQ(transfer.get_device(), producer.get_device());
-        EXPECT_NE(transfer.get_pool().data_, producer.get_pool().data_);
+        EXPECT_NE(CommandAccess::Data(transfer.get_pool()), CommandAccess::Data(producer.get_pool()));
         EXPECT_EQ(transfer.get_buffer().get_size(), 1u);
-        EXPECT_EQ(transfer.data_->graphics_queue, producer.data_->graphics_queue);
+        EXPECT_EQ(CommandAccess::Data(transfer)->graphics_queue, CommandAccess::Data(producer)->graphics_queue);
         auto producer_phase = producer.start_phase<VSL_NAMESPACE::ComputePhase>();
         {
             auto transfer_phase = transfer.start_phase<VSL_NAMESPACE::ComputePhase>();

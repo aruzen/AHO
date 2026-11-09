@@ -1,9 +1,13 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/typed_descriptor_layouts.hpp>
 #include <VSL/utils/typed_resource_bundle.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
 #include "support/vulkan_fixture.hpp"
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 namespace {
     namespace t = vsl::typed;
     namespace pl = vsl::pipeline_layout;
@@ -149,7 +153,7 @@ namespace {
         phase << frame.bind_resources(pipeline).dispatch(4);
         const vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
         auto buffer = manager.get_buffer();
-        buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
+        CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
             vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         ASSERT_TRUE(phase.completion().wait());

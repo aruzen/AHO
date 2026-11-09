@@ -1,7 +1,11 @@
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/vulkan/viewport.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 VSL_NAMESPACE::Viewport::Viewport() {}
 
 VSL_NAMESPACE::Viewport::Viewport(float x, float y, float width, float height) : x(x), y(y), width(width), height(height) {}
@@ -36,5 +40,5 @@ void VSL_NAMESPACE::Viewport::invoke(CommandPool pool, CommandBuffer buffer, Com
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
-    buffer.data_->command_buffers[buffer.get_current_buffer_idx()].setViewport(0, viewport);
+    CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].setViewport(0, viewport);
 }

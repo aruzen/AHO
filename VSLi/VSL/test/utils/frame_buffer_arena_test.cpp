@@ -1,3 +1,4 @@
+#include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
@@ -10,6 +11,10 @@
 #include <VSL/utils/typed_pipeline.hpp>
 #include <functional>
 #include <ranges>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::ImageAccess;
@@ -76,6 +81,39 @@ namespace {
         for (size_t i = 0; i < bytes.size(); ++i)
             EXPECT_EQ(std::to_integer<std::uint8_t>(bytes[i]), expected[i % 4]);
     }
+    TEST_F(FrameBufferArenaVulkanIntegrationTest, PassGetterPreservesTheCompositeOwnersDependencyNodeAndLifetime) {
+        std::weak_ptr<void> weak_parent, weak_arena;
+        vsl::RenderPassAccessor kept;
+        {
+            constexpr std::array<t::ResourceRequest, 1> requests{{{{1}, s::ResourceKind::RENDER_PASS}}};
+            constexpr t::ResourcePlan<1> plan(requests);
+            const std::array<l::ResourceInit, 1> inputs{pass->description()};
+            l::ResourceArena source(device, plan, inputs);
+            weak_arena = source.owner();
+            const auto original = source.render_pass({1});
+            auto parent = vsl_test::FixedParentOwner::Create(original.owner_ref());
+            weak_parent = parent;
+            const auto owner = parent->node.ref(parent).alias(GraphicsAccess::Owned(original).get());
+            const vsl::operation::FrameBufferInput input{GraphicsAccess::Owned(original).get(), WIDTH, HEIGHT, 1, {{ImageAccess::Owned(*color).get()}}};
+            auto target = GraphicsAccess::FromShared(l::make_heap_frame_buffer(device, input, owner, {ImageAccess::Owned(*color)}));
+            kept = target.get_render_pass();
+            EXPECT_TRUE(kept.owner_ref().managed());
+            EXPECT_EQ(l::detail::OwnerAccess::Node(kept.owner_ref()), &parent->node);
+            EXPECT_FALSE(kept.owner_ref().owner_before(parent));
+            EXPECT_FALSE(parent.owner_before(kept.owner_ref().share()));
+            constexpr std::array<t::ResourceRequest, 1> external_requests{{{{1}, s::ResourceKind::RENDER_PASS, true}}};
+            constexpr t::ResourcePlan<1> external_plan(external_requests);
+            const std::array<l::ResourceInit, 1> external{kept};
+            l::ResourceArena imported(device, external_plan, external);
+            vsl_test::expect_fixed_parent(imported.owner_ref(), owner);
+            vsl_test::expect_fixed_parent(imported.owner_ref(), original.owner_ref(), false);
+        }
+        EXPECT_FALSE(weak_parent.expired());
+        EXPECT_FALSE(weak_arena.expired());
+        kept = {};
+        EXPECT_TRUE(weak_parent.expired());
+        EXPECT_TRUE(weak_arena.expired());
+    }
     TEST(FrameBufferPlacementTest, SlotIncludesLifetimeContextAndSatisfiesTheExactLayout) {
         static_assert(s::ResourceSlotLayout<vsl::impl::FrameBufferImpl>::USE_OFFSET == s::NO_SEPARATE_USE);
         static_assert(std::is_standard_layout_v<l::FrameBufferSlotStorage>);
@@ -107,19 +145,19 @@ namespace {
                                                     l::FrameBufferInit{t::ResourceId{3}, WIDTH, HEIGHT, 1, {{t::ResourceId{5}}}}, pass->description(), image, image};
         l::ResourceArena arena(device, plan, inputs);
         const auto first = arena.frame_buffer({1}), second = arena.frame_buffer({2});
-        const auto base = reinterpret_cast<std::uintptr_t>(first.data_.get());
-        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(second.data_.get()) - base, plan.placement({2}).offset);
-        const auto context = reinterpret_cast<std::uintptr_t>(first.data_->owner_context);
+        const auto base = reinterpret_cast<std::uintptr_t>(GraphicsAccess::Owned(first).get());
+        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(GraphicsAccess::Owned(second).get()) - base, plan.placement({2}).offset);
+        const auto context = reinterpret_cast<std::uintptr_t>(GraphicsAccess::Owned(first)->owner_context);
         EXPECT_GE(context, base + s::FRAME_BUFFER_IMPL_SIZE);
         EXPECT_LT(context, base + s::FRAME_BUFFER_SLOT_SIZE);
         EXPECT_EQ(first.frame_count(), 2u);
         EXPECT_EQ(second.frame_count(), 1u);
-        EXPECT_NE(first.data_->swap_chain_framebuffers[0], first.data_->swap_chain_framebuffers[1]);
-        EXPECT_EQ(first.data_->attachments[1][0], ImageAccess::Owned(arena.image({5})).get());
-        EXPECT_EQ(first.get_render_pass().data_, arena.render_pass({3}).data_);
+        EXPECT_NE(GraphicsAccess::Owned(first)->swap_chain_framebuffers[0], GraphicsAccess::Owned(first)->swap_chain_framebuffers[1]);
+        EXPECT_EQ(GraphicsAccess::Owned(first)->attachments[1][0], ImageAccess::Owned(arena.image({5})).get());
+        EXPECT_EQ(GraphicsAccess::Owned(first.get_render_pass()), GraphicsAccess::Owned(arena.render_pass({3})));
         EXPECT_TRUE(first.owner_ref().managed());
-        EXPECT_FALSE(first.data_.owner_before(second.data_));
-        EXPECT_FALSE(second.data_.owner_before(first.data_));
+        EXPECT_FALSE(GraphicsAccess::Owned(first).owner_before(GraphicsAccess::Owned(second)));
+        EXPECT_FALSE(GraphicsAccess::Owned(second).owner_before(GraphicsAccess::Owned(first)));
         EXPECT_THROW(arena.frame_buffer({3}), std::invalid_argument);
         EXPECT_THROW(arena.frame_buffer({99}), std::out_of_range);
         auto manager = make_manager();
@@ -145,15 +183,15 @@ namespace {
             vsl::RenderPass source(device, pass->description());
             ColorImage image(device, WIDTH, HEIGHT, color->get_format());
             image_owner = ImageAccess::Owned(image).share();
-            pass_owner = source.data_;
+            pass_owner = GraphicsAccess::Owned(source).share();
             const std::array<l::ResourceInit, 1> inputs{l::FrameBufferInit{vsl::RenderPassAccessor{source}, WIDTH, HEIGHT, 1, {{vsl::ImageAccessor{image}}}}};
             l::ResourceArena arena(device, PLAN, inputs);
             target_owner = arena.owner();
             auto target = arena.frame_buffer({1});
             kept = target.get_render_pass();
-            EXPECT_EQ(kept.data_, source.data_);
-            EXPECT_FALSE(kept.data_.owner_before(source.data_));
-            EXPECT_FALSE(source.data_.owner_before(kept.data_));
+            EXPECT_EQ(GraphicsAccess::Owned(kept), GraphicsAccess::Owned(source));
+            EXPECT_FALSE(GraphicsAccess::Owned(kept).owner_before(GraphicsAccess::Owned(source)));
+            EXPECT_FALSE(GraphicsAccess::Owned(source).owner_before(GraphicsAccess::Owned(kept)));
             device_only = target.get_device();
             EXPECT_EQ(device_only.data_, device.data_);
             EXPECT_FALSE(device_only.data_.owner_before(device.data_));
@@ -199,9 +237,9 @@ namespace {
                     l::ResourceArena importer(device, import_plan, imported);
                     c = importer.owner();
                     kept = importer.frame_buffer({1});
-                    EXPECT_EQ(kept.data_, target.frame_buffer({1}).data_);
-                    EXPECT_FALSE(kept.data_.owner_before(target.frame_buffer({1}).data_));
-                    EXPECT_FALSE(target.frame_buffer({1}).data_.owner_before(kept.data_));
+                    EXPECT_EQ(GraphicsAccess::Owned(kept), GraphicsAccess::Owned(target.frame_buffer({1})));
+                    EXPECT_FALSE(GraphicsAccess::Owned(kept).owner_before(GraphicsAccess::Owned(target.frame_buffer({1}))));
+                    EXPECT_FALSE(GraphicsAccess::Owned(target.frame_buffer({1})).owner_before(GraphicsAccess::Owned(kept)));
                     EXPECT_THROW(set.write<0>(View::FromView(importer.buffer({2}), 1)), std::invalid_argument);
                 }
                 EXPECT_TRUE(c.expired());
@@ -221,10 +259,10 @@ namespace {
         auto invalid = valid;
         invalid.attachments[1][0] = vsl::ImageAccessor{wrong};
         std::array<l::ResourceInit, 2> inputs{valid, invalid};
-        const auto pass_count = pass->data_.use_count(), image_count = ImageAccess::Owned(*(color)).use_count();
+        const auto pass_count = GraphicsAccess::Owned(*(pass)).use_count(), image_count = ImageAccess::Owned(*(color)).use_count();
         for (int attempt = 0; attempt < 3; ++attempt) {
             EXPECT_THROW((l::ResourceArena(device, plan, inputs, memory)), std::invalid_argument);
-            EXPECT_EQ(pass->data_.use_count(), pass_count);
+            EXPECT_EQ(GraphicsAccess::Owned(*(pass)).use_count(), pass_count);
             EXPECT_EQ(ImageAccess::Owned(*(color)).use_count(), image_count);
         }
         inputs[1] = valid;
@@ -239,7 +277,7 @@ namespace {
             NativeFailure failure(fail_at);
             const vsl::operation::FrameBufferNativeFactory factory{&failure, NativeFailure::Create, NativeFailure::Destroy};
             vsl::impl::FrameBufferImpl target;
-            const vsl::operation::FrameBufferInput definition{pass->data_.get(), WIDTH, HEIGHT, 1, {{ImageAccess::Owned(*(color)).get()}, {ImageAccess::Owned(*(color)).get()}, {ImageAccess::Owned(*(color)).get()}, {ImageAccess::Owned(*(color)).get()}}};
+            const vsl::operation::FrameBufferInput definition{GraphicsAccess::Owned(*(pass)).get(), WIDTH, HEIGHT, 1, {{ImageAccess::Owned(*(color)).get()}, {ImageAccess::Owned(*(color)).get()}, {ImageAccess::Owned(*(color)).get()}, {ImageAccess::Owned(*(color)).get()}}};
             EXPECT_THROW(vsl::operation::initialize_frame_buffer(target, *device.data_, definition, factory), std::runtime_error);
             EXPECT_EQ(failure.created.size(), fail_at - 1);
             EXPECT_EQ(failure.destroyed.size(), fail_at - 1);
@@ -252,7 +290,7 @@ namespace {
     }
     TEST_F(FrameBufferArenaVulkanIntegrationTest, DirectInputsAndImportsRejectNonowningAccessors) {
         auto invalid = input();
-        invalid.pass = vsl::RenderPassAccessor{std::shared_ptr<vsl::impl::RenderPassImpl>(std::shared_ptr<void>{}, pass->data_.get())};
+        invalid.pass = GraphicsAccess::FromShared(std::shared_ptr<vsl::impl::RenderPassImpl>(std::shared_ptr<void>{}, GraphicsAccess::Owned(*(pass)).get()));
         const std::array<l::ResourceInit, 1> pass_input{invalid};
         EXPECT_THROW((l::ResourceArena(device, PLAN, pass_input)), std::invalid_argument);
         invalid = input();
@@ -261,7 +299,7 @@ namespace {
         EXPECT_THROW((l::ResourceArena(device, PLAN, image_input)), std::invalid_argument);
         constexpr std::array<t::ResourceRequest, 1> requests{{{{1}, s::ResourceKind::FRAME_BUFFER, true}}};
         constexpr t::ResourcePlan<1> plan(requests);
-        const vsl::FrameBufferAccessor borrowed{std::shared_ptr<vsl::impl::FrameBufferImpl>(std::shared_ptr<void>{}, framebuffer->data_.get())};
+        const auto borrowed = GraphicsAccess::FromShared(std::shared_ptr<vsl::impl::FrameBufferImpl>(std::shared_ptr<void>{}, GraphicsAccess::Owned(*(framebuffer)).get()));
         const std::array<l::ResourceInit, 1> imported{borrowed};
         EXPECT_THROW((l::ResourceArena(device, plan, imported)), std::invalid_argument);
         EXPECT_THROW((vsl::FrameBuffer(*pass, WIDTH, HEIGHT, {std::get<vsl::ImageAccessor>(invalid.attachments[0][0])})), std::invalid_argument);
@@ -438,15 +476,15 @@ namespace {
         t::TypedGraphicsPipeline<t::TypedVertexInput<>> shared(device, current.render_pass({2}), pl::ShaderGroup("resize framebuffer", {*vertex, *fragment}),
                                                                pl::ColorBlend{}, pl::InputAssembly{}, pl::Rasterization{pl::CullingMode::NONE}, pl::Multisample{}, pl::DynamicState{},
                                                                vsl::Viewport(description), vsl::Scissor(description));
-        const auto native_pipeline = shared.backend().data_->pipeline;
-        const auto original = current.frame_buffer({1}).data_.get();
+        const auto native_pipeline = GraphicsAccess::Owned(shared.backend())->pipeline;
+        const auto original = GraphicsAccess::Owned(current.frame_buffer({1})).get();
         auto invalid = make_inputs(WIDTH * 2);
         std::get<l::FrameBufferInit>(invalid[0]).width += 1;
         EXPECT_THROW((l::ResourceArena(device, plan, invalid)), std::invalid_argument);
-        EXPECT_EQ(current.frame_buffer({1}).data_.get(), original);
+        EXPECT_EQ(GraphicsAccess::Owned(current.frame_buffer({1})).get(), original);
         inputs = make_inputs(WIDTH * 2);
         current = l::ResourceArena(device, plan, inputs);
-        EXPECT_NE(current.frame_buffer({1}).data_.get(), original);
+        EXPECT_NE(GraphicsAccess::Owned(current.frame_buffer({1})).get(), original);
         EXPECT_FALSE(old_owner.expired());
         auto manager = make_manager();
         {
@@ -470,7 +508,7 @@ namespace {
             ASSERT_TRUE(phase.completion().wait());
         }
         EXPECT_TRUE(old_owner.expired());
-        EXPECT_EQ(shared.backend().data_->pipeline, native_pipeline);
+        EXPECT_EQ(GraphicsAccess::Owned(shared.backend())->pipeline, native_pipeline);
         const auto resized = vsl_test::read_image(manager, current.image({3}), vsl::ImageLayout::GENERAL);
         ASSERT_EQ(resized.size(), WIDTH * 2 * HEIGHT * 4);
         std::memcpy(pixel.data(), resized.data() + ((HEIGHT / 2) * WIDTH * 2 + WIDTH) * 4, 4);

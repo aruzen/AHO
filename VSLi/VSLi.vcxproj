@@ -175,6 +175,7 @@
     <ClInclude Include="VSL\src\private\VSL\lifetime\image_access.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\shader_access.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\descriptor_access.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\graphics_access.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\sampler_access.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\command_access.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\identity_access.hpp" />
@@ -210,6 +211,7 @@
     <ClInclude Include="VSL\src\private\VSL\lifetime\recovery_batch.hpp" />
     <ClInclude Include="VSL\src\private\VSL\sync\acquisition_state.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\phase_call.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\facade_call.hpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\descriptor_ops.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\descriptor_bindings.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\descriptor_storage.hpp" />
@@ -226,6 +228,7 @@
     <ClCompile Include="VSL\src\lifetime\acquire_ticket.cpp" />
     <ClCompile Include="VSL\src\lifetime\surface_recovery.cpp" />
     <ClCompile Include="VSL\src\lifetime\phase_call.cpp" />
+    <ClCompile Include="VSL\src\lifetime\facade_call.cpp" />
     <ClCompile Include="VSL\src\operation\descriptor_ops.cpp" />
     <ClCompile Include="VSL\src\lifetime\descriptor_bindings.cpp" />
     <ClCompile Include="VSL\src\lifetime\descriptor_storage.cpp" />

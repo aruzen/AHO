@@ -1,8 +1,13 @@
+#include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/compute_fixture.hpp"
 #include "support/deferred_action.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
 
 namespace {
     void make_host_visible(vsl::CommandBuffer buffer);
@@ -161,7 +166,7 @@ namespace {
         EXPECT_FALSE(command.pipeline.has_value());
         command.set_pipeline(*pipeline);
         ASSERT_TRUE(command.pipeline.has_value());
-        EXPECT_EQ(command.pipeline->data_, pipeline->data_);
+        EXPECT_EQ(GraphicsAccess::Owned(*(command.pipeline)), GraphicsAccess::Owned(*(pipeline)));
         ExpectSequence(execute(13), 13);
         ExpectSequence(execute(29, true), 29);
     }
@@ -217,14 +222,14 @@ namespace {
         vsl::command::BindGraphicResource explicit_command(resource, vsl::graphic_resource::BindingDestination::COMPUTE, *pipeline);
         explicit_command.set_pipeline(other);
         ASSERT_TRUE(explicit_command.pipeline);
-        EXPECT_EQ(explicit_command.pipeline->data_, other.data_);
+        EXPECT_EQ(GraphicsAccess::Owned(*(explicit_command.pipeline)), GraphicsAccess::Owned(other));
         explicit_command.set_pipeline(std::nullopt);
         ASSERT_TRUE(explicit_command.pipeline);
-        EXPECT_EQ(explicit_command.pipeline->data_, pipeline->data_);
+        EXPECT_EQ(GraphicsAccess::Owned(*(explicit_command.pipeline)), GraphicsAccess::Owned(*(pipeline)));
         vsl::command::BindGraphicResource implicit_command(resource, vsl::graphic_resource::BindingDestination::COMPUTE);
         implicit_command.set_pipeline(other);
         ASSERT_TRUE(implicit_command.pipeline);
-        EXPECT_EQ(implicit_command.pipeline->data_, other.data_);
+        EXPECT_EQ(GraphicsAccess::Owned(*(implicit_command.pipeline)), GraphicsAccess::Owned(other));
         implicit_command.set_pipeline(std::nullopt);
         EXPECT_FALSE(implicit_command.pipeline);
     }
@@ -258,7 +263,7 @@ namespace {
         vsl::Completion completion;
         std::weak_ptr<vsl::impl::BufferImpl> weak_output = BufferAccess::Owned(*(output)).share();
         std::weak_ptr<vsl::impl::GraphicResourceImpl> weak_resource = DescriptorAccess::Owned(resource).share();
-        std::weak_ptr<vsl::impl::PipelineImpl> weak_pipeline = pipeline->data_;
+        std::weak_ptr<vsl::impl::PipelineImpl> weak_pipeline = GraphicsAccess::Owned(*(pipeline)).share();
         {
             auto phase = manager.start_phase<vsl::ComputePhase>();
             completion = phase.completion();

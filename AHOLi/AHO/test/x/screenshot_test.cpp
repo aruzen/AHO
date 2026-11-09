@@ -207,11 +207,11 @@ namespace {
             return;
         auto window = engine->get_window();
         ASSERT_FALSE(vsl::contain(window.data2->swapchain.images.front().get_usage(), vsl::ImageType::TRANSFER_SRC));
-        const auto previous = window.data2->frame_buffer.data_;
+        const auto previous = window.data2->frame_buffer;
         int calls = 0;
         window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
             ++calls;
-            EXPECT_NE(current->data2->frame_buffer.data_, previous);
+            EXPECT_NE(current->data2->frame_buffer.identity(), previous.identity());
             EXPECT_TRUE(vsl::contain(current->data2->swapchain.images.front().get_usage(), vsl::ImageType::TRANSFER_SRC));
         });
         aho::x::Screenshot screenshot(window);

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/shader_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
@@ -21,6 +22,10 @@
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/storage/cpu_region.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
@@ -215,25 +220,25 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 } else if (const auto* frame_buffer = std::get_if<FrameBufferAccessor>(&value)) {
                     if (frame_buffer->get_device().data_ != device.data_)
                         throw std::invalid_argument("External framebuffer requires the arena device");
-                    resource.reference = frame_buffer->data_.get();
+                    resource.reference = GraphicsAccess::Owned(*(frame_buffer)).get();
                     resource.owner_index = retain_dependency(frame_buffer->owner_ref());
                 } else if (const auto* pipeline = std::get_if<PipelineAccessor>(&value)) {
                     (void)pipeline->get_device();
-                    if (pipeline->data_->device != device.data_.get())
+                    if (GraphicsAccess::Owned(*(pipeline))->device != device.data_.get())
                         throw std::invalid_argument("External pipeline requires the arena device");
-                    resource.reference = pipeline->data_.get();
+                    resource.reference = GraphicsAccess::Owned(*(pipeline)).get();
                     resource.owner_index = retain_dependency(pipeline->owner_ref());
                 } else if (const auto* pass = std::get_if<RenderPassAccessor>(&value)) {
                     (void)pass->get_device();
-                    if (pass->data_->device != device.data_.get())
+                    if (GraphicsAccess::Owned(*(pass))->device != device.data_.get())
                         throw std::invalid_argument("External render pass requires the arena device");
-                    resource.reference = pass->data_.get();
+                    resource.reference = GraphicsAccess::Owned(*(pass)).get();
                     resource.owner_index = retain_dependency(pass->owner_ref());
                 } else if (const auto* layout = std::get_if<PipelineLayoutAccessor>(&value)) {
                     (void)layout->get_device();
-                    if (layout->data_->device != device.data_.get())
+                    if (GraphicsAccess::Owned(*(layout))->device != device.data_.get())
                         throw std::invalid_argument("External pipeline layout requires the arena device");
-                    resource.reference = layout->data_.get();
+                    resource.reference = GraphicsAccess::Owned(*(layout)).get();
                     resource.owner_index = retain_dependency(layout->owner_ref());
                 } else if (const auto* shader = std::get_if<ShaderAccessor>(&value)) {
                     if (!ShaderAccess::Owned(*(shader)).use_count() || !ShaderAccess::Owned(*(shader)) || !ShaderAccess::Owned(*(shader))->shader_module || ShaderAccess::Owned(*(shader))->device != device.data_.get())
@@ -337,12 +342,12 @@ namespace VSL_NAMESPACE::lifetime::detail {
     impl::PipelineLayoutImpl* ResourceArenaOwner::resolve(const RuntimeLayoutSource& source) const {
         if (const auto* id = std::get_if<typed::ResourceId>(&source))
             return find(*id, storage::ResourceKind::PIPELINE_LAYOUT).get<impl::PipelineLayoutImpl>();
-        return std::get<PipelineLayoutAccessor>(source).data_.get();
+        return GraphicsAccess::Owned(std::get<PipelineLayoutAccessor>(source)).get();
     }
     impl::RenderPassImpl* ResourceArenaOwner::resolve(const PipelinePassSource& source) const {
         if (const auto* id = std::get_if<typed::ResourceId>(&source))
             return find(*id, storage::ResourceKind::RENDER_PASS).get<impl::RenderPassImpl>();
-        return std::get<RenderPassAccessor>(source).data_.get();
+        return GraphicsAccess::Owned(std::get<RenderPassAccessor>(source)).get();
     }
     impl::ShaderImpl* ResourceArenaOwner::resolve(const PipelineShaderSource& source) const {
         if (const auto* id = std::get_if<typed::ResourceId>(&source))
@@ -666,19 +671,22 @@ namespace VSL_NAMESPACE::lifetime {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::RENDER_PASS);
-        return {{resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.get<impl::RenderPassImpl>()}};
+        const auto owner = resource.placement.external ? _owner->dependencies.at(resource.owner_index) : _owner->descriptor_context.node.ref(_owner);
+        return GraphicsAccess::FromOwned(owner.alias(resource.get<impl::RenderPassImpl>()));
     }
     PipelineAccessor ResourceArena::pipeline(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::PIPELINE);
-        return {{resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.get<impl::PipelineImpl>()}};
+        const auto owner = resource.placement.external ? _owner->dependencies.at(resource.owner_index) : _owner->descriptor_context.node.ref(_owner);
+        return GraphicsAccess::FromOwned(owner.alias(resource.get<impl::PipelineImpl>()));
     }
     FrameBufferAccessor ResourceArena::frame_buffer(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::FRAME_BUFFER);
-        return {{resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.get<impl::FrameBufferImpl>()}};
+        const auto owner = resource.placement.external ? _owner->dependencies.at(resource.owner_index) : _owner->descriptor_context.node.ref(_owner);
+        return GraphicsAccess::FromOwned(owner.alias(resource.get<impl::FrameBufferImpl>()));
     }
     CommandPool ResourceArena::command_pool(typed::ResourceId id) const {
         if (!_owner)
@@ -708,7 +716,8 @@ namespace VSL_NAMESPACE::lifetime {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::PIPELINE_LAYOUT);
-        return PipelineLayoutAccessor({resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.get<impl::PipelineLayoutImpl>()});
+        const auto owner = resource.placement.external ? _owner->dependencies.at(resource.owner_index) : _owner->descriptor_context.node.ref(_owner);
+        return GraphicsAccess::FromOwned(owner.alias(resource.get<impl::PipelineLayoutImpl>()));
     }
     ShaderAccessor ResourceArena::shader(typed::ResourceId id) const {
         if (!_owner)

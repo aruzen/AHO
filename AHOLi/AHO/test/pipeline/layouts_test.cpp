@@ -7,9 +7,8 @@ namespace {
         ASSERT_NO_THROW(start_engine());
         ASSERT_NE(aho::pipeline::GET_BASE_LAYOUT, nullptr);
         const auto layout = aho::pipeline::GET_BASE_LAYOUT(engine.get());
-        ASSERT_NE(layout.data_, nullptr);
-        EXPECT_EQ(layout.data_->device, engine->data()->logical_device.data_.get());
-        EXPECT_TRUE(static_cast<bool>(layout.data_->pipeline_layout));
+        ASSERT_TRUE(layout);
+        EXPECT_EQ(layout.get_device(), engine->data()->logical_device);
         ASSERT_TRUE(layout.has_recipe());
         EXPECT_EQ(layout.recipe().graphics_state.rasterization.cullMode, vk::CullModeFlags(vk::CullModeFlagBits::eBack));
         EXPECT_EQ(layout.recipe().graphics_state.input_assembly.topology, vk::PrimitiveTopology::eTriangleList);

@@ -21,7 +21,7 @@ namespace {
         aho::DrawPhase phase(*engine);
         const auto drawing = phase.context();
         EXPECT_EQ(drawing.device().data_, context.device().data_);
-        EXPECT_EQ(drawing.render_pass().data_, context.render_pass().data_);
+        EXPECT_EQ(drawing.render_pass().identity(), context.render_pass().identity());
         EXPECT_EQ(drawing.scissor().width, context.scissor().width);
         EXPECT_EQ(drawing.scissor().height, context.scissor().height);
     }
@@ -35,14 +35,14 @@ namespace {
         const auto old_size = context.scissor();
         ASSERT_TRUE(window.resize(420, 320));
         const auto current = window.render_context();
-        EXPECT_EQ(context.render_pass().data_, current.render_pass().data_);
+        EXPECT_EQ(context.render_pass().identity(), current.render_pass().identity());
         EXPECT_EQ(context.scissor().width, current.scissor().width);
         EXPECT_EQ(context.scissor().height, current.scissor().height);
         EXPECT_EQ(context.viewport().width, float(current.scissor().width));
         EXPECT_EQ(context.viewport().height, float(current.scissor().height));
         EXPECT_TRUE(context.scissor().width != old_size.width || context.scissor().height != old_size.height);
         if (context.format() == old_format)
-            EXPECT_EQ(context.render_pass().data_, old_pass.data_);
+            EXPECT_EQ(context.render_pass().identity(), old_pass.identity());
     }
 
     TEST_F(RenderContextVulkanIntegration, ClosedWindowInvalidatesRetainedContextsAndRejectsNewOnes) {

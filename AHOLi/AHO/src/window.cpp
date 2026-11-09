@@ -72,7 +72,7 @@ namespace {
 
     RetiredWindowResources::RetiredWindowResources(AHO_NAMESPACE::window::WindowData& data) noexcept
         : surface(std::exchange(data.surface, {})), swapchain(std::move(data.swapchain)),
-          pass{std::exchange(data.render_pass.data_, {})}, frames{std::exchange(data.frame_buffer.data_, {})},
+          pass(std::move(data.render_pass)), frames(std::move(data.frame_buffer)),
           available{std::exchange(data.image_available.data_, {})}, finished{std::exchange(data.render_finished.data_, {})},
           flight{std::exchange(data.in_flight.data_, {})}, acquired{std::exchange(data.acquire_fences.data_, {})},
           cache(std::exchange(data.standard_draw, {})), pending(std::exchange(data.pending_generation, std::nullopt)) {

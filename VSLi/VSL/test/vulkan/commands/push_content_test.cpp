@@ -1,5 +1,10 @@
+#include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/compute_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -9,7 +14,7 @@ namespace {
     TEST_F(PushConstantVulkanIntegrationTest, TypedAndExplicitSizeOverloadsReachShader) {
         std::uint32_t base = 37;
         vsl::command::PushConstant command(*layout, vsl::ShaderFlag::COMPUTE, base);
-        EXPECT_EQ(command.layout.data_, layout->data_);
+        EXPECT_EQ(GraphicsAccess::Owned(command.layout), GraphicsAccess::Owned(*(layout)));
         EXPECT_EQ(command.value, &base);
         EXPECT_EQ(command.size, 4u);
         EXPECT_EQ(command.offset, 0u);

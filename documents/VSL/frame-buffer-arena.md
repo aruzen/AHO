@@ -47,7 +47,7 @@ auto original_pass = target.get_render_pass();
 
 `frame_count()`は行数、`owner_ref()`は正規ownerを返す。get_device()は実Deviceのownerを返し、Framebuffer rootを延命するaliasを返さない。get_render_pass()はcontext内のWeakOwnedRefから元のPass ownerを取得する。外部Passだけを残しても不要なFramebuffer／Imageを保持しない。同rootのPass weakは、全実体とnodeをpublishした後に設定する。
 
-外部Framebuffer importのgetterも元のFramebuffer ownerを返し、importerへ包み直さない。公開data_／shared_ptr入口とDeviceのshared_from_thisは順序9／12の移行対象として残る。private Implのdevice／render_pass／attachmentsを読んでいた利用側は借用pointerへ移行し、保持にはowning accessorを保存する。
+外部Framebuffer importのgetterも元のFramebuffer ownerを返し、importerへ包み直さない。9d／12fでDeviceの正規owner取得と公開data_／shared_ptr入口の閉鎖を実施した。get_render_passは元のOwnedRefを返す。内部操作は解決済みImpl参照を使い、公開利用側はget_device／get_render_pass／identityとcommandへ移行する。保持にはowning accessorを保存する。[現在の移行契約](arena-migration.md)を参照。
 
 ## 記録・完了・取消と再入
 
@@ -87,4 +87,4 @@ installed public consumer15targetのbuild／link／CPU実行、Debug／Release�
 
 heap／arenaサンプルはいずれも3frame・12submission・2draw、238831更新画素、resize 1720×1080→2000×1360、pipeline生成1回を維持し、PNG3枚が一致した。VUID／sanitizer errorはない。実driverのOOM／DeviceLost、Windows／Linux実機、LSan、CPU並行と性能率は未検証である。
 
-順序8ではWork registryをnative CommandBufferImplの外へ移し、command pool／buffer／fence／semaphoreの配置へ進む。現在のDevice shared_from_this、公開data_／shared_ptr入口、Impl内部vectorとnative driver／GPUメモリの個別確保は別の移行・監査対象として残る。
+順序8以降でWork registryをnative CommandBufferImplの外へ移し、command pool／buffer／fence／semaphoreの配置とDevice正規owner、公開所有入口の整理を進めた。現在もImpl内部vectorとnative driver／GPUメモリの個別確保は別の監査・測定対象として残る。最新の到達段階は[完了計画](arena-completion-plan.md)を参照。

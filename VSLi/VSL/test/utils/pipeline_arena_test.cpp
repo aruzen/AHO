@@ -1,8 +1,13 @@
+#include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/shader_access.hpp>
 #include "support/render_fixture.hpp"
 #include "support/compute_fixture.hpp"
 #include <VSL/lifetime/resource_arena.hpp>
 #include <VSL/utils/typed_resources.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::ShaderAccess;
@@ -66,13 +71,13 @@ namespace {
             l::ResourceArena arena(device, MIXED_PLAN, inputs);
             owner = arena.owner();
             const auto first = arena.pipeline({1}), second = arena.pipeline({2});
-            const auto base = reinterpret_cast<std::uintptr_t>(first.data_.get());
-            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(second.data_.get()) - base, MIXED_PLAN.placement({2}).offset);
-            EXPECT_NE(first.data_->pipeline, second.data_->pipeline);
-            EXPECT_EQ(first.data_->layout, arena.pipeline_layout({3}).data_.get());
-            EXPECT_EQ(first.data_->layout, second.data_->layout);
-            EXPECT_FALSE(first.data_.owner_before(second.data_));
-            EXPECT_FALSE(second.data_.owner_before(first.data_));
+            const auto base = reinterpret_cast<std::uintptr_t>(GraphicsAccess::Owned(first).get());
+            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(GraphicsAccess::Owned(second).get()) - base, MIXED_PLAN.placement({2}).offset);
+            EXPECT_NE(GraphicsAccess::Owned(first)->pipeline, GraphicsAccess::Owned(second)->pipeline);
+            EXPECT_EQ(GraphicsAccess::Owned(first)->layout, GraphicsAccess::Owned(arena.pipeline_layout({3})).get());
+            EXPECT_EQ(GraphicsAccess::Owned(first)->layout, GraphicsAccess::Owned(second)->layout);
+            EXPECT_FALSE(GraphicsAccess::Owned(first).owner_before(GraphicsAccess::Owned(second)));
+            EXPECT_FALSE(GraphicsAccess::Owned(second).owner_before(GraphicsAccess::Owned(first)));
             EXPECT_TRUE(first.owner_ref().managed());
             EXPECT_THROW(arena.pipeline({3}), std::invalid_argument);
             EXPECT_THROW(arena.pipeline({99}), std::out_of_range);
@@ -147,7 +152,7 @@ namespace {
             source_owner = source.owner();
             const std::array<vsl::ShaderAccessor, 2> shaders{*vertex, *fragment};
             vsl::GraphicsPipeline selected(source.pipeline_layout({1}), *pass, make_state(), shaders);
-            heap_owner = selected.data_;
+            heap_owner = GraphicsAccess::Owned(selected).share();
             auto set = t::TypedDescriptorSet<Set>::FromResource(device, source.descriptor_set({5}));
             set.write<0>(View::FromView(source.buffer({2}), 1));
             EXPECT_THROW(set.write<0>(View::FromView(source.buffer({2}), 1, 0, {{}, selected.owner_ref()})), std::invalid_argument);
@@ -159,9 +164,9 @@ namespace {
                 l::ResourceArena target(device, import_plan, imported, l::DependencyPolicy::DYNAMIC);
                 importer = target.owner();
                 kept = target.pipeline({1});
-                EXPECT_EQ(kept.data_, selected.data_);
-                EXPECT_FALSE(kept.data_.owner_before(selected.data_));
-                EXPECT_FALSE(selected.data_.owner_before(kept.data_));
+                EXPECT_EQ(GraphicsAccess::Owned(kept), GraphicsAccess::Owned(selected));
+                EXPECT_FALSE(GraphicsAccess::Owned(kept).owner_before(GraphicsAccess::Owned(selected)));
+                EXPECT_FALSE(GraphicsAccess::Owned(selected).owner_before(GraphicsAccess::Owned(kept)));
                 EXPECT_TRUE(kept.owner_ref().managed());
                 EXPECT_THROW(set.write<0>(View::FromView(target.buffer({2}), 1)), std::invalid_argument);
             }

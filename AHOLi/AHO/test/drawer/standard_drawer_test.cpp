@@ -164,7 +164,7 @@ namespace {
         const auto candidate = window.data2->pending_generation->swapchain->data_;
         EXPECT_EQ(context.scissor().width, previous_extent.width);
         EXPECT_EQ(context.scissor().height, previous_extent.height);
-        EXPECT_EQ(context.render_pass().data_, pass.data_);
+        EXPECT_EQ(context.render_pass().identity(), pass.identity());
         fail = false;
         ASSERT_TRUE(window.recreate_swapchain());
         EXPECT_EQ(window.data2->swapchain.data_, candidate);
@@ -175,7 +175,7 @@ namespace {
         EXPECT_EQ(context.scissor().width, extent.width);
         EXPECT_EQ(context.scissor().height, extent.height);
         EXPECT_EQ(pixel_at(pixels, .95f, .95f), (std::array<unsigned, 4>{0, 255, 0, 255}));
-        if (pass.data_ == window.render_context().render_pass().data_)
+        if (pass.identity() == window.render_context().render_pass().identity())
             EXPECT_EQ(state, window.data2->standard_draw);
     }
 

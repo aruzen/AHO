@@ -1,5 +1,6 @@
 #ifdef AHO_GPU_TESTS
 #include <VSL/lifetime/image_access.hpp>
+#include <VSL/lifetime/graphics_access.hpp>
 #include "support/live_gpu.hpp"
 #include "support/frame_buffer_query.hpp"
 #include <AHO/drawer/draw_phase.hpp>
@@ -113,8 +114,8 @@ namespace {
         EXPECT_FALSE(data->surface);
         EXPECT_FALSE(data->swapchain.data_);
         EXPECT_TRUE(data->swapchain.images.empty());
-        EXPECT_FALSE(data->render_pass.data_);
-        EXPECT_FALSE(data->frame_buffer.data_);
+        EXPECT_FALSE(data->render_pass);
+        EXPECT_FALSE(data->frame_buffer);
         EXPECT_FALSE(data->image_available.data_);
         EXPECT_FALSE(data->render_finished.data_);
         EXPECT_FALSE(data->in_flight.data_);
@@ -393,8 +394,8 @@ namespace {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
         const auto published = window.data2->swapchain;
-        const auto pass = window.data2->render_pass.data_;
-        const auto frames = window.data2->frame_buffer.data_;
+        const auto pass = window.data2->render_pass;
+        const auto frames = window.data2->frame_buffer;
         const auto available = window.data2->image_available.data_;
         const auto flight = window.data2->in_flight.data_;
         const auto acquire = window.data2->acquire_fences.data_;
@@ -409,7 +410,7 @@ namespace {
         EXPECT_EQ(candidate.state(), vsl::SwapchainState::ACTIVE);
         EXPECT_EQ(published.state(), vsl::SwapchainState::RETIRED);
         EXPECT_EQ(window.data2->swapchain.data_, published.data_);
-        EXPECT_EQ(window.data2->frame_buffer.data_, frames);
+        EXPECT_EQ(window.data2->frame_buffer.identity(), frames.identity());
         EXPECT_EQ(probe.creates, 1u);
         unsigned notifications = 0;
         window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
@@ -417,14 +418,14 @@ namespace {
             EXPECT_FALSE(current->data2->pending_generation);
             EXPECT_EQ(current->data2->swapchain.data_, candidate.data_);
             EXPECT_EQ(current->data2->render_finished.data_, candidate.finished_semaphores().data_);
-            EXPECT_EQ(current->data2->frame_buffer.data_->render_pass, pass.get());
-            EXPECT_EQ(current->data2->frame_buffer.data_->attachments.front().front(), VSL_NAMESPACE::lifetime::detail::ImageAccess::Owned(candidate.images.front()).get());
+            EXPECT_EQ(current->data2->frame_buffer.get_render_pass().identity(), pass.identity());
+            EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::GraphicsAccess::Owned(current->data2->frame_buffer)->attachments.front().front(), VSL_NAMESPACE::lifetime::detail::ImageAccess::Owned(candidate.images.front()).get());
         });
         probe.fail_frame = false;
         EXPECT_TRUE(window.recreate_swapchain());
         EXPECT_EQ(probe.creates, 1u);
         EXPECT_EQ(notifications, 1u);
-        EXPECT_EQ(window.data2->render_pass.data_, pass);
+        EXPECT_EQ(window.data2->render_pass.identity(), pass.identity());
         EXPECT_EQ(window.data2->image_available.data_, available);
         EXPECT_EQ(window.data2->in_flight.data_, flight);
         EXPECT_EQ(window.data2->acquire_fences.data_, acquire);
@@ -570,16 +571,16 @@ namespace {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
         const auto previous_swapchain = window.data2->swapchain.data_;
-        const auto previous_frames = window.data2->frame_buffer.data_;
-        const auto previous_pass = window.data2->render_pass.data_;
+        const auto previous_frames = window.data2->frame_buffer;
+        const auto previous_pass = window.data2->render_pass;
         const auto previous_usage = window.data2->swapchain.images.front().get_usage();
         const auto size = window.window_size();
         int calls = 0;
         window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
             ++calls;
             EXPECT_NE(current->data2->swapchain.data_, previous_swapchain);
-            EXPECT_NE(current->data2->frame_buffer.data_, previous_frames);
-            EXPECT_EQ(current->data2->render_pass.data_, previous_pass);
+            EXPECT_NE(current->data2->frame_buffer.identity(), previous_frames.identity());
+            EXPECT_EQ(current->data2->render_pass.identity(), previous_pass.identity());
             EXPECT_EQ(current->data2->swapchain.images.front().get_usage(), previous_usage);
             EXPECT_EQ(current->data2->render_finished.size(), current->data2->swapchain.get_swap_image_size());
         });

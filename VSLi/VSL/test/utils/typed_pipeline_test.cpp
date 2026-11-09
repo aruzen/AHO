@@ -1,8 +1,13 @@
+#include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
 #include "support/render_fixture.hpp"
 #include <cstddef>
 #include <limits>
 #include "support/temporary_directory.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
 
 namespace {
     namespace typed = vsl::typed;
@@ -123,7 +128,7 @@ namespace {
             auto typed_pipeline = make_typed<Input>("vertices.vert.spv", policy);
             typed::TypedVertexBuffer<Position> positions(device, POSITIONS, policy);
             typed::TypedVertexBuffer<Color> colors(device, COLORS, policy);
-            const auto& runtime = typed_pipeline.backend().data_;
+            const auto& runtime = GraphicsAccess::Owned(typed_pipeline.backend());
             EXPECT_EQ(runtime->owner_node == runtime->layout->owner_node, (std::same_as<decltype(policy), typed::ArenaStorage<>>));
             auto bindings = typed_pipeline.bind_vertices(positions, colors);
             static_assert(std::same_as<typename decltype(bindings)::VertexInput, Input>);
@@ -146,7 +151,7 @@ namespace {
         draft.inject(Capture{saved}, pl::ShaderGroup("snapshot", {*vertex, *fragment}), EmptySets{});
         const auto snapshot = draft.snapshot();
         ASSERT_TRUE(saved);
-        EXPECT_FALSE(saved->data_);
+        EXPECT_FALSE(GraphicsAccess::Owned(*(saved)));
         ASSERT_TRUE(snapshot.pending_layouts());
         ASSERT_EQ(snapshot.pending_layouts()->size(), 4u);
         EXPECT_TRUE(snapshot.definition().binding_layouts.empty());
@@ -185,7 +190,7 @@ namespace {
                                                                               pl::ShaderGroup("invalid input", {*vertex, *fragment}))),
                          std::invalid_argument);
             ASSERT_TRUE(saved);
-            EXPECT_FALSE(saved->data_);
+            EXPECT_FALSE(GraphicsAccess::Owned(*(saved)));
             EXPECT_TRUE(saved->edit_recipe().binding_layouts.empty());
             ASSERT_TRUE(saved->edit_recipe().pending_layouts);
             EXPECT_EQ(saved->edit_recipe().pending_layouts->size(), 1u);
@@ -204,8 +209,8 @@ namespace {
         EXPECT_THROW(original.definition(), std::logic_error);
         EXPECT_THROW(original.pending_layouts(), std::logic_error);
         EXPECT_EQ(snapshot.definition().shaders.size(), 2u);
-        const vsl::RenderPassAccessor borrowed{
-            std::shared_ptr<vsl::impl::RenderPassImpl>(std::shared_ptr<void>{}, pass->data_.get())};
+        const auto borrowed = GraphicsAccess::FromShared(
+            std::shared_ptr<vsl::impl::RenderPassImpl>(std::shared_ptr<void>{}, GraphicsAccess::Owned(*(pass)).get()));
         auto verify = [&](auto policy) {
             EXPECT_THROW(l::make_graphics_pipeline(snapshot, borrowed, 0, policy), std::out_of_range);
             EXPECT_THROW(l::make_graphics_pipeline(snapshot, *pass, UINT32_MAX, policy), std::out_of_range);

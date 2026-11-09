@@ -1,8 +1,13 @@
+#include <VSL/lifetime/graphics_access.hpp>
 #include "support/render_fixture.hpp"
 #include "support/read_image.hpp"
 #include "support/frame_buffer_metadata.hpp"
 #include <VSL/lifetime/resource_arena.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
 
 namespace {
     namespace t = vsl::typed;
@@ -60,15 +65,15 @@ namespace {
             l::ResourceArena arena(device, PLAN, inputs);
             owner = arena.owner();
             const auto first = arena.render_pass({1}), second = arena.render_pass({2});
-            EXPECT_NE(first.data_->render_pass, second.data_->render_pass);
+            EXPECT_NE(GraphicsAccess::Owned(first)->render_pass, GraphicsAccess::Owned(second)->render_pass);
             EXPECT_NE(&first.description(), &second.description());
-            const auto base = reinterpret_cast<std::uintptr_t>(first.data_.get());
-            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(second.data_.get()) - base, PLAN.placement({2}).offset);
+            const auto base = reinterpret_cast<std::uintptr_t>(GraphicsAccess::Owned(first).get());
+            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(GraphicsAccess::Owned(second).get()) - base, PLAN.placement({2}).offset);
             const auto metadata = reinterpret_cast<std::uintptr_t>(&first.description());
             EXPECT_GE(metadata, base);
             EXPECT_LT(metadata, base + s::RENDER_PASS_IMPL_SIZE);
-            EXPECT_FALSE(first.data_.owner_before(second.data_));
-            EXPECT_FALSE(second.data_.owner_before(first.data_));
+            EXPECT_FALSE(GraphicsAccess::Owned(first).owner_before(GraphicsAccess::Owned(second)));
+            EXPECT_FALSE(GraphicsAccess::Owned(second).owner_before(GraphicsAccess::Owned(first)));
             EXPECT_TRUE(first.owner_ref().managed());
             std::get<vsl::RenderPassDescription>(inputs[0]).attachments.clear();
             info.attachments.clear();
@@ -95,21 +100,21 @@ namespace {
         vsl::RenderPassAccessor kept;
         {
             vsl::RenderPass source(device, pass->description());
-            original = source.data_;
+            original = GraphicsAccess::Owned(source).share();
             const std::array<l::ResourceInit, 2> inputs{vsl::RenderPassAccessor{source}, vsl::BufferCreateInfo{4, vsl::MemoryType::TRANSFER_SOURCE}};
             {
                 l::ResourceArena arena(device, plan, inputs);
                 importer = arena.owner();
                 kept = arena.render_pass({1});
-                EXPECT_EQ(kept.data_, source.data_);
-                EXPECT_FALSE(kept.data_.owner_before(source.data_));
-                EXPECT_FALSE(source.data_.owner_before(kept.data_));
+                EXPECT_EQ(GraphicsAccess::Owned(kept), GraphicsAccess::Owned(source));
+                EXPECT_FALSE(GraphicsAccess::Owned(kept).owner_before(GraphicsAccess::Owned(source)));
+                EXPECT_FALSE(GraphicsAccess::Owned(source).owner_before(GraphicsAccess::Owned(kept)));
             }
             EXPECT_TRUE(importer.expired());
             const auto other = another_device(physical, queue_family);
             EXPECT_THROW((l::ResourceArena(other, plan, inputs)), std::invalid_argument);
             for (const bool borrowed : {false, true}) {
-                const vsl::RenderPassAccessor invalid{borrowed ? std::shared_ptr<vsl::impl::RenderPassImpl>(std::shared_ptr<void>{}, source.data_.get()) : nullptr};
+                const auto invalid = GraphicsAccess::FromShared(borrowed ? std::shared_ptr<vsl::impl::RenderPassImpl>(std::shared_ptr<void>{}, GraphicsAccess::Owned(source).get()) : nullptr);
                 const std::array<l::ResourceInit, 2> rejected{invalid, vsl::BufferCreateInfo{4, vsl::MemoryType::TRANSFER_SOURCE}};
                 EXPECT_THROW((l::ResourceArena(device, plan, rejected)), std::invalid_argument);
             }
@@ -126,11 +131,11 @@ namespace {
         auto invalid = valid;
         invalid.subpasses[0].colors[0].attachment = 99;
         std::array<l::ResourceInit, 3> inputs{valid, invalid, vsl::RenderPassAccessor{*pass}};
-        const auto before = pass->data_.use_count();
+        const auto before = GraphicsAccess::Owned(*(pass)).use_count();
         for (int attempt = 0; attempt < 3; ++attempt) {
             EXPECT_THROW((l::ResourceArena(device, plan, inputs, memory)), std::out_of_range);
-            EXPECT_EQ(pass->data_.use_count(), before);
-            EXPECT_TRUE(pass->data_->render_pass);
+            EXPECT_EQ(GraphicsAccess::Owned(*(pass)).use_count(), before);
+            EXPECT_TRUE(GraphicsAccess::Owned(*(pass))->render_pass);
         }
         inputs[1] = valid;
         EXPECT_NO_THROW((l::ResourceArena(device, plan, inputs, memory)));

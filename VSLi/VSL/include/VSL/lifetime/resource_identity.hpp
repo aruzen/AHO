@@ -7,6 +7,8 @@ namespace VSL_NAMESPACE::lifetime {
         struct BufferIdentityTag;
         struct DescriptorIdentityTag;
         struct PipelineIdentityTag;
+        struct RenderPassIdentityTag;
+        struct FrameBufferIdentityTag;
         struct CommandPoolIdentityTag;
         struct CommandBufferIdentityTag;
         struct CommandManagerIdentityTag;
@@ -30,6 +32,8 @@ namespace VSL_NAMESPACE {
     using BufferIdentity = lifetime::ResourceIdentity<lifetime::detail::BufferIdentityTag>;
     using DescriptorIdentity = lifetime::ResourceIdentity<lifetime::detail::DescriptorIdentityTag>;
     using PipelineIdentity = lifetime::ResourceIdentity<lifetime::detail::PipelineIdentityTag>;
+    using RenderPassIdentity = lifetime::ResourceIdentity<lifetime::detail::RenderPassIdentityTag>;
+    using FrameBufferIdentity = lifetime::ResourceIdentity<lifetime::detail::FrameBufferIdentityTag>;
     using CommandPoolIdentity = lifetime::ResourceIdentity<lifetime::detail::CommandPoolIdentityTag>;
     using CommandBufferIdentity = lifetime::ResourceIdentity<lifetime::detail::CommandBufferIdentityTag>;
     using CommandManagerIdentity = lifetime::ResourceIdentity<lifetime::detail::CommandManagerIdentityTag>;

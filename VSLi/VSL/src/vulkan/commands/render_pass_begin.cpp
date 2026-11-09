@@ -1,3 +1,5 @@
+#include <VSL/lifetime/graphics_access.hpp>
+#include <VSL/lifetime/owner_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/vulkan/commands/render_pass_begin.hpp>
@@ -6,6 +8,10 @@
 #include <VSL/lifetime/submission_retention.hpp>
 #include <VSL/operation/frame_buffer_ops.hpp>
 #include <stdexcept>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -40,12 +46,12 @@ namespace VSL_NAMESPACE::command {
         if (retention != ResourceRetention::SUBMISSION && retention != ResourceRetention::COMPLETION)
             throw std::invalid_argument("Invalid framebuffer retention policy");
         render_pass = frame_buffer.get_render_pass();
-        if (index >= frame_buffer.data_->swap_chain_framebuffers.size())
+        if (index >= GraphicsAccess::Owned(frame_buffer)->swap_chain_framebuffers.size())
             throw std::out_of_range("Framebuffer index");
         if (clear_values.empty())
             clear_values = operation::default_frame_buffer_clears(render_pass.description());
         operation::validate_frame_buffer_clears(render_pass.description(), clear_values);
-        const auto checked = operation::frame_buffer_area(*frame_buffer.data_, {{area.x, area.y}, {area.width, area.height}});
+        const auto checked = operation::frame_buffer_area(*GraphicsAccess::Owned(frame_buffer), {{area.x, area.y}, {area.width, area.height}});
         area = {checked.offset.x, checked.offset.y, checked.extent.width, checked.extent.height};
     }
     RenderPassBegin RenderPassBegin::WithClears(FrameBufferAccessor target, std::vector<AttachmentClear> bindings,
@@ -66,7 +72,7 @@ namespace VSL_NAMESPACE::command {
     RenderPassBegin::RenderPassBegin(RenderPass pass, FrameBufferAccessor target,
                                      std::optional<VSLDRGBColorAccessor<float>> color, ResourceRetention retention)
         : RenderPassBegin(target, legacy_clears(target, color), {}, 0, retention) {
-        if (pass.data_ != render_pass.data_)
+        if (GraphicsAccess::Owned(pass) != GraphicsAccess::Owned(render_pass))
             throw std::invalid_argument("RenderPass/Framebuffer mismatch");
         if (color)
             clear_color.emplace(*color);
@@ -75,7 +81,7 @@ namespace VSL_NAMESPACE::command {
     IDPickingRenderPassBegin::IDPickingRenderPassBegin(IDPickingRenderPass pass, FrameBufferAccessor target,
                                                        std::optional<VSLDRGBColorAccessor<float>> color, ResourceRetention retention)
         : RenderPassBegin(target, legacy_clears(target, color), {}, 0, retention) {
-        if (pass.data_ != render_pass.data_)
+        if (GraphicsAccess::Owned(pass) != GraphicsAccess::Owned(render_pass))
             throw std::invalid_argument("RenderPass/Framebuffer mismatch");
         if (color)
             clear_color.emplace(*color);
@@ -83,7 +89,7 @@ namespace VSL_NAMESPACE::command {
     }
     void RenderPassBegin::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
         // poll中のcallbackがcommandや元wrapperを破棄しても、このsnapshotだけを使う。
-        const auto target = frame_buffer.data_;
+        const auto target = GraphicsAccess::Owned(frame_buffer);
         const auto policy = retention;
         if (policy != ResourceRetention::SUBMISSION && policy != ResourceRetention::COMPLETION)
             throw std::invalid_argument("Invalid framebuffer retention policy");
@@ -98,9 +104,9 @@ namespace VSL_NAMESPACE::command {
         const auto index = target_index.value_or(CommandAccess::Data(buffer)->recording_context->acquired_image_index.value_or(slot));
         const operation::FrameBufferBeginScratch scratch(*target, index, {{area.x, area.y}, {area.width, area.height}}, clear_values);
         if (policy == ResourceRetention::COMPLETION)
-            buffer.retain_until_complete(target);
+            buffer.retain_until_complete(lifetime::detail::OwnerAccess::Shared(target));
         else
-            buffer.retain(target);
+            buffer.retain(lifetime::detail::OwnerAccess::Shared(target));
         for (const auto* image : target->attachments.at(index))
             image->use->mark_used(completion);
         lifetime::require_recording(buffer, completion);

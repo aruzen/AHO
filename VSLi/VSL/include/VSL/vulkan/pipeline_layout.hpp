@@ -7,15 +7,19 @@
 #include "device.hpp"
 #include "shader.hpp"
 
+namespace VSL_NAMESPACE::lifetime::detail {
+    struct GraphicsAccess;
+}
+
 namespace VSL_NAMESPACE {
     struct PipelineLayoutAccessor {
-        std::shared_ptr<impl::PipelineLayoutImpl> data_;
         PipelineLayoutAccessor() = default;
         PipelineLayoutAccessor(const PipelineLayoutAccessor&) = default;
         PipelineLayoutAccessor(PipelineLayoutAccessor&&) noexcept = default;
-        explicit PipelineLayoutAccessor(std::shared_ptr<impl::PipelineLayoutImpl> data) : data_(std::move(data)) {}
         PipelineLayoutAccessor& operator=(PipelineLayoutAccessor other) noexcept;
-        PipelineLayoutAccessor runtime() const { return PipelineLayoutAccessor(data_); }
+        PipelineLayoutAccessor runtime() const { return PipelineLayoutAccessor(_owner); }
+        explicit operator bool() const noexcept { return bool(_owner); }
+        void swap(PipelineLayoutAccessor& other) noexcept { swap_state(other); }
         LogicalDeviceAccessor get_device() const;
         lifetime::OwnerRef owner_ref() const;
         bool has_recipe() const { return bool(_recipe); }
@@ -23,16 +27,26 @@ namespace VSL_NAMESPACE {
         const impl::PipelineRecipe& recipe() const&& = delete;
 
     private:
+        friend struct lifetime::detail::GraphicsAccess;
         friend struct PipelineLayoutEditAccessor;
+        lifetime::OwnedRef<impl::PipelineLayoutImpl> _owner;
+        explicit PipelineLayoutAccessor(lifetime::OwnedRef<impl::PipelineLayoutImpl> owner) : _owner(std::move(owner)) {}
         friend struct PipelineLayout;
         std::shared_ptr<const impl::PipelineRecipe> _recipe;
         void swap_state(PipelineLayoutAccessor& other) noexcept;
     };
 
-    struct PipelineLayoutEditAccessor : PipelineLayoutAccessor {
+    struct PipelineLayoutEditAccessor {
         PipelineLayoutEditAccessor(const PipelineLayoutEditAccessor&) = default;
         PipelineLayoutEditAccessor(PipelineLayoutEditAccessor&&) noexcept = default;
         PipelineLayoutEditAccessor& operator=(PipelineLayoutEditAccessor other) noexcept;
+        operator PipelineLayoutAccessor() const { return _value; }
+        explicit operator bool() const noexcept { return bool(_value); }
+        PipelineLayoutAccessor runtime() const { return _value.runtime(); }
+        lifetime::OwnerRef owner_ref() const { return _value.owner_ref(); }
+        bool has_recipe() const { return _value.has_recipe(); }
+        const impl::PipelineRecipe& recipe() const& { return _value.recipe(); }
+        const impl::PipelineRecipe& recipe() const&& = delete;
         impl::PipelineRecipe& edit_recipe() const&;
         impl::PipelineRecipe& edit_recipe() const&& = delete;
         GraphicsPipelineStateEditRef edit_state() const&;
@@ -46,7 +60,9 @@ namespace VSL_NAMESPACE {
         void swap_state(PipelineLayoutEditAccessor& other) noexcept;
 
     private:
+        friend struct lifetime::detail::GraphicsAccess;
         friend struct PipelineLayout;
+        PipelineLayoutAccessor _value;
         std::shared_ptr<impl::PipelineRecipe> _edit_recipe;
         LogicalDeviceAccessor _edit_device;
     };
@@ -56,12 +72,37 @@ namespace VSL_NAMESPACE {
         std::forward<T>(t).injection(std::declval<PipelineLayoutEditAccessor>());
     };
 
-    class FrozenPipelineLayout : public PipelineLayoutAccessor {
+    class FrozenPipelineLayout {
         friend struct PipelineLayout;
-        explicit FrozenPipelineLayout(PipelineLayoutAccessor value) : PipelineLayoutAccessor(std::move(value)) {}
+        friend struct lifetime::detail::GraphicsAccess;
+        PipelineLayoutAccessor _value;
+        explicit FrozenPipelineLayout(PipelineLayoutAccessor value) : _value(std::move(value)) {}
+
+    public:
+        FrozenPipelineLayout(const FrozenPipelineLayout&) = default;
+        FrozenPipelineLayout(FrozenPipelineLayout&&) noexcept = default;
+        FrozenPipelineLayout& operator=(FrozenPipelineLayout replacement) noexcept {
+            swap(replacement);
+            return *this;
+        }
+        void swap(FrozenPipelineLayout& other) noexcept { _value.swap(other._value); }
+        operator PipelineLayoutAccessor() const { return _value; }
+        explicit operator bool() const noexcept { return bool(_value); }
+        PipelineLayoutAccessor runtime() const { return _value.runtime(); }
+        LogicalDeviceAccessor get_device() const { return _value.get_device(); }
+        lifetime::OwnerRef owner_ref() const { return _value.owner_ref(); }
+        bool has_recipe() const { return _value.has_recipe(); }
+        const impl::PipelineRecipe& recipe() const& { return _value.recipe(); }
+        const impl::PipelineRecipe& recipe() const&& = delete;
     };
 
     struct PipelineLayout : PipelineLayoutEditAccessor {
+        PipelineLayout(const PipelineLayout&) = default;
+        PipelineLayout(PipelineLayout&&) noexcept = default;
+        PipelineLayout& operator=(PipelineLayout replacement) noexcept {
+            swap_state(replacement);
+            return *this;
+        }
         template<pipeline_layout_injecter... Args>
         PipelineLayout(LogicalDeviceAccessor device, Args&&... args);
         template<pipeline_layout_injecter... Args>
@@ -93,7 +134,7 @@ namespace VSL_NAMESPACE {
         return *this;
     }
     inline void PipelineLayoutAccessor::swap_state(PipelineLayoutAccessor& other) noexcept {
-        data_.swap(other.data_);
+        _owner.swap(other._owner);
         _recipe.swap(other._recipe);
     }
     inline PipelineLayoutEditAccessor& PipelineLayoutEditAccessor::operator=(PipelineLayoutEditAccessor other) noexcept {

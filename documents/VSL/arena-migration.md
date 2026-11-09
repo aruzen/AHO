@@ -325,6 +325,57 @@ macOS arm64／Clang20 C++26、MoltenVK、Vulkan validation、ASan／UBSanで、�
 
 strict34ファイル／27TUと、宣言位置を修正した2ファイル／2TUの再検査が成功した。installed public consumer30種・新負例18種、private bridge非install、archive／生成header一致、Debug／Release／x86_64寸法生成、構成混在拒否と直近親の旧header拒否、source395件とMSBuild登録も確認した。確保失敗の順序はcache候補の構築を所属変更前へ置いているが、bad_allocのfault injectionはしていない。Windows／Linux実機、x86_64全体実行、device lost実機、並行CPUアクセスと性能比較は未検証である。
 
+## 順序12f: runtime graphicsの所有入口
+
+PipelineLayoutAccessor／RenderPassAccessor／PipelineAccessor／FrameBufferAccessorの公開data_とraw Impl構築を閉じ、元のOwnedRefをprivateに保存する。空判定はbool、所有境界はowner_ref、Deviceはget_deviceを使う。RenderPassとFrameBufferの物理実体の比較には、それぞれ異なる型のidentityを使う。比較する間は元の所有者を保持する。
+
+```cpp
+vsl::RenderPass pass(device, description);
+vsl::FrameBuffer target(pass, width, height, {image});
+auto kept = target.get_render_pass();
+assert(kept.identity() == pass.identity());
+```
+
+FrameBufferのPass getterは、contextからlockした元のOwnedRefをそのまま返す。heap生成、arenaの内部slot／外部入力、getter、runtime Layoutの取り出しでも元nodeとcontrol blockを維持する。getter用のowner wrapperは追加しない。
+
+```cpp
+namespace t = vsl::typed;
+namespace l = vsl::lifetime;
+namespace s = vsl::storage;
+constexpr std::array<t::ResourceRequest, 3> requests{{
+    {{1}, s::ResourceKind::RENDER_PASS},
+    {{2}, s::ResourceKind::IMAGE},
+    {{3}, s::ResourceKind::FRAME_BUFFER}}};
+constexpr t::ResourcePlan<3> plan(requests);
+const std::array<l::ResourceInit, 3> inputs{
+    description,
+    vsl::ImageCreateInfo{vsl::ImageType::COLOR_ATTACHMENT | vsl::ImageType::TRANSFER_SRC, width, height, format},
+    l::FrameBufferInit{t::ResourceId{1}, width, height, 1, {{t::ResourceId{2}}}}};
+l::ResourceArena arena(device, plan, inputs);
+auto placed = arena.frame_buffer({3});
+```
+
+Editor／Frozen Layout、Graphics／Compute Pipeline、IDPickingRenderPassは、Accessorを値memberとして持つ。Accessorを値で返す変換で既存のconstructor／command／injecterへ接続し、mutable Base&への変換を廃止する。部分代入によるruntimeとrecipeの不整合、bind point検査の迂回、freezeを経ない可変recipeの取り込みを防ぐ。
+
+```cpp
+auto frozen = layout.copy().freeze();
+vsl::PipelineLayoutAccessor selected = frozen;
+auto runtime = selected.runtime();
+assert(!runtime.has_recipe());
+```
+
+copy()はNative Layoutを再生成する従来の意味を保つ。FromRuntimeは元runtime ownerを引き継ぎ、今回組み立てたrecipeを保存する。freezeは保存済みEditorから分離し、runtime()はrecipeを保持しない。facadeと組込み具象型の代入は全値swap後に戻り値を評価してから旧ownerを回収する。解放callbackが代入先を破棄した場合、戻り参照は使えない。任意の利用者定義派生型に同じ代入順序を自動適用する保証はない。
+
+通常recipe版と明示入力版のGraphics生成は、Shaderのowning一覧と独立したstateを呼出し中だけ保持する。snapshot後のcache／Pipeline生成中に元の一覧やstateが変わっても、選択済み入力を使う。snapshot前の整合性照合は従来どおり入力を変更しない。完成Pipelineの永続親はDeviceとruntime Layoutであり、Shader／Pass／descriptor Layout／recipeの保持を追加しない。独立したPipelineRecipeSnapshot factoryとResourceArenaの初期化spanは、生成中に変更しない既存契約を維持する。
+
+Pickingの公開mutable picking_bufferは、owning値を返すpicking_image(index)、image_count()、lvalue限定のconst spanであるpicking_images()へ移す。再生成は候補一覧を作って一括交換し、旧画像は公開後に回収する。stack上のFacadeCallは、同一スレッドの同期callbackによる破棄・移動・swap・再生成を検知する。対象の共有ownerや新control blockを作らず、host操作の直列化は引き続き利用側の責務とする。read()は選択Image・Device・indexをwait前に保存し、その後に元facadeを読まない。空Managerと記録context不在は例外で拒否する。
+
+一括領域の対象は引き続きCPUのImpl／使用状態／配置contextである。内部コンテナ、生成scratch、呼出し中のShader一覧とstateコピー、Vulkan device memoryの確保は別に残る。保持一覧では元control blockを使い、通常の操作は解決済みImpl／native handleへ直接届く。性能改善率は測定していない。
+
+macOS arm64／Clang20 C++26、MoltenVK、Vulkan validation、ASan／UBSanで、新runtime8件、全VSL1,177成功（対応外format3 skip）／AHO GPU192・CPU1,071、compile契約294件が成功した。元のgetterがnodeを失い循環検査を見逃す失敗も、変更前に実GPUで再現した。生成入力の試験は実Nativeへの転送直前にstateを変更しShader一覧を解放し、保持期間と元stateでの描画を確認する。cache生成中の保持は、snapshotが先に完成するコード構造で確認した。
+
+heap／arenaのPNG3枚が一致し、resize後もPipeline生成1回を維持した。strict48ファイル／46TUと最終4ファイル／2TU、installed public consumer30種・新負例22種、private bridge非配布、archive／生成header一致、Debug／Release／x86_64寸法生成、構成混在と直近親headerの拒否、source398件とMSBuild登録も確認した。Windows／Linux実機、x86_64全体実行、device lost実機、並行CPUアクセス、性能比較は未検証である。
+
 2026-11-06。Bufferの4責務分離が統合されたmaster `6b1f0166`を基点とする。[Bufferの契約](buffer-generation-contracts.md)と[責務の配置](buffer-layer-layout.md)を維持する。
 
 ## 方針と段階

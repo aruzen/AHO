@@ -31,7 +31,7 @@ vsl::FrameBuffer target(first, width, height, {color});
 
 各IDから異なるslotのImplへ直接到達する。owned Accessorは正規arena ownerへaliasし、externalには元のAccessorを渡す。importのgetterは元ownerを返し、importerの無関係なslotを保持しない。RenderPass importも固定親として依存graphへ登録するため、descriptorの逆向き更新で既知rootの循環を作れない。
 
-`description()`の参照はlvalueのAccessorが所有を続ける間の借用とする。constを含む一時Accessorからの取得はコンパイル時に拒否する。保存する場合は値をコピーする。`get_device()`は実Deviceの正規ownerを返し、子RenderPassを保持するaliasを返さない。shared_from_thisと公開data_は順序9／12の移行用入口として残る。
+`description()`の参照はlvalueのAccessorが所有を続ける間の借用とする。constを含む一時Accessorからの取得はコンパイル時に拒否する。保存する場合は値をコピーする。`get_device()`は実Deviceの正規ownerを返し、子RenderPassを保持するaliasを返さない。9d／12fでshared_from_thisに依存する取得と公開data_を移行し、private OwnedRefで元nodeとcontrol blockを維持する。比較はidentity、保持はowner_refを使う。[現在の移行契約](arena-migration.md)を参照。
 
 ## 記録・完了・取消
 

@@ -1,7 +1,12 @@
+#include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/operation/graphics_pipeline_state.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
 #include <VSL/vulkan/stages/id_picking.hpp>
 #include "support/render_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
 
 namespace {
     namespace pl = vsl::pipeline_layout;
@@ -113,11 +118,11 @@ namespace {
     }
     TEST_F(GraphicsPipelineStateVulkanIntegrationTest, SnapshotInjectionReplacesFixedStateWithoutReplacingLayoutSources) {
         vsl::GraphicsPipelineState state(pl::InputAssembly{}, pl::Rasterization{pl::CullingMode::FRONT});
-        const auto runtime = layout->data_;
+        const auto runtime = GraphicsAccess::Owned(*(layout));
         const auto shaders = layout->recipe().shaders;
         const auto owner_count = layout->recipe().sources.size();
         state.injection(*layout);
-        EXPECT_EQ(layout->data_, runtime);
+        EXPECT_EQ(GraphicsAccess::Owned(*(layout)), runtime);
         EXPECT_EQ(layout->recipe().shaders, shaders);
         EXPECT_EQ(layout->recipe().sources.size(), owner_count);
         EXPECT_EQ(layout->recipe().graphics_state.rasterization.cullMode, vk::CullModeFlagBits::eFront);

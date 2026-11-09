@@ -1,5 +1,10 @@
+#include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include "support/render_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::BufferAccess;
@@ -91,7 +96,7 @@ namespace {
     TEST_F(DrawResourceLifetimeVulkanIntegrationTest, DrawSurvivesDroppingBuffersAndPipelineBeforeSubmission) {
         configure_pipeline(true);
         std::weak_ptr<vsl::impl::BufferImpl> weak_vertex, weak_color, weak_index;
-        std::weak_ptr<vsl::impl::PipelineImpl> weak_pipeline = pipeline->data_;
+        std::weak_ptr<vsl::impl::PipelineImpl> weak_pipeline = GraphicsAccess::Owned(*(pipeline)).share();
         ExpectTriangleColor(render([&](auto& stream) {
             const std::array<float, 6> positions{-1, -1, 3, -1, -1, 3};
             const std::array<float, 9> colors{.25f, .5f, .75f, .25f, .5f, .75f, .25f, .5f, .75f};

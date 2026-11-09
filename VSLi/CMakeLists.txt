@@ -79,6 +79,8 @@ add_library(VSL STATIC
         VSL/src/lifetime/surface_recovery.cpp
         VSL/src/private/VSL/lifetime/phase_call.hpp
         VSL/src/lifetime/phase_call.cpp
+        VSL/src/private/VSL/lifetime/facade_call.hpp
+        VSL/src/lifetime/facade_call.cpp
         VSL/src/private/VSL/operation/presentation_ops.hpp
         VSL/src/utils/typed_buffer_view.cpp
         VSL/src/vulkan/command.cpp
@@ -124,6 +126,7 @@ add_library(VSL STATIC
         VSL/src/private/VSL/lifetime/shader_storage.hpp
         VSL/src/private/VSL/lifetime/shader_access.hpp
         VSL/src/private/VSL/lifetime/descriptor_access.hpp
+        VSL/src/private/VSL/lifetime/graphics_access.hpp
         VSL/src/lifetime/submission_retention.cpp
         VSL/src/lifetime/command_domain.cpp
         VSL/include/VSL/operation/command_create_info.hpp

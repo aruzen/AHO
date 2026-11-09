@@ -2,6 +2,7 @@
 // Created by morimoto_hibiki on 2025/07/30.
 //
 
+#include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/native_recording.hpp>
@@ -12,6 +13,10 @@
 
 #include <ranges>
 #include <utility>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
@@ -38,10 +43,10 @@ void VSL_NAMESPACE::command::BindGraphicResource::invoke(CommandPool pool, Comma
     const auto first_binding = this->first_binding;
     const auto use = _use;
     Validate(resources);
-    if (!pipeline.data_ || !pipeline.data_->pipeline || !pipeline.data_->layout)
+    if (!GraphicsAccess::Owned(pipeline) || !GraphicsAccess::Owned(pipeline)->pipeline || !GraphicsAccess::Owned(pipeline)->layout)
         throw std::logic_error("Descriptor bind requires a pipeline");
     const auto native_sets = resources | std::views::transform([](const auto& resource) { return DescriptorAccess::Owned(resource)->descriptor_set; }) | std::ranges::to<std::vector<vk::DescriptorSet>>();
-    const auto layout = pipeline.data_->layout->pipeline_layout;
+    const auto layout = GraphicsAccess::Owned(pipeline)->layout->pipeline_layout;
     const NativeRecordingContext recording(buffer);
     Track(resources, use, buffer, recording);
     recording.retain(pipeline.owner_ref(), ResourceRetention::SUBMISSION);

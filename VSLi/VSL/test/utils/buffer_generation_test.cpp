@@ -106,8 +106,8 @@ namespace {
             second.write<0>(b);
             first_set = first.backend().data_;
             second_set = second.backend().data_;
-            first_buffer = a.descriptor().use.state.share();
-            second_buffer = b.descriptor().use.state.share();
+            first_buffer = a.descriptor().resource_use().state.share();
+            second_buffer = b.descriptor().resource_use().state.share();
             vsl::command::BindGraphicResource command(std::vector<vsl::GraphicResource>{first.backend(), second.backend()},
                                                       vsl::graphic_resource::BindingDestination::COMPUTE,
                                                       std::nullopt, 0, first.resource_use());
@@ -136,12 +136,12 @@ namespace {
         EXPECT_EQ(vertices.resource_use().state.get(), &vertices.backend().ref().use());
         EXPECT_EQ(vertices.view(0, 4).resource_use().state.get(), &vertices.backend().ref().use());
         EXPECT_EQ(indices.resource_use().state.get(), &indices.backend().ref().use());
-        EXPECT_EQ(uniform.descriptor().use.state.get(), &uniform.backend().ref().use());
-        EXPECT_EQ(storage.descriptor().use.state.get(), &storage.backend().ref().use());
+        EXPECT_EQ(uniform.descriptor().resource_use().state.get(), &uniform.backend().ref().use());
+        EXPECT_EQ(storage.descriptor().resource_use().state.get(), &storage.backend().ref().use());
         auto imported = t::TypedVertexBufferView<std::uint32_t>::FromView(vertices.backend(), 4);
         EXPECT_EQ(imported.resource_use().state.get(), &vertices.backend().ref().use());
         auto resource = t::TypedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>::FromView(uniform.backend(), 4);
-        EXPECT_EQ(resource.descriptor().use.state.get(), &uniform.backend().ref().use());
+        EXPECT_EQ(resource.descriptor().resource_use().state.get(), &uniform.backend().ref().use());
     }
 
     TEST_F(BufferGenerationVulkanIntegrationTest, NativeCopyBlocksTypedUpdatesAndTypedBindingBlocksNativeUpdates) {

@@ -19,6 +19,17 @@ namespace {
     using Pipeline = t::TypedGraphicsPipeline<t::TypedVertexInput<>, Schema>;
 
 #if VSL_TYPED_CASE == 0
+    using Value = t::detail::DescriptorValue;
+    static_assert(!std::is_aggregate_v<Value>);
+    static_assert(std::is_default_constructible_v<Value> && std::is_copy_constructible_v<Value> && std::is_move_constructible_v<Value>);
+    static_assert(!std::is_constructible_v<Value, vsl::lifetime::OwnedRef<vsl::impl::BufferImpl>>);
+    void factories(vsl::BufferView buffer, vsl::ImageAccessor image, vsl::SamplerAccessor sampler, vsl::ResourceUse use) {
+        auto value = Value::FromBuffer(buffer, use);
+        value.buffer_subview(0, sizeof(Payload));
+        Value::FromImage(image, use).image();
+        Value::FromSampler(sampler, use).sampler();
+        Value::FromTexture(image, sampler, use).resource_use();
+    }
     void accepted(Pipeline& pipeline, t::TypedDescriptorSet<Set>& set, t::TypedUniformBuffer<Payload>& buffer) {
         set.write<3>(std::array{buffer, buffer});
         auto draw = pipeline.bind_vertices().bind_resources(set).draw(3);
@@ -67,6 +78,14 @@ namespace {
 #elif VSL_TYPED_CASE == 12
     void rejected(t::TypedDescriptorSet<Set>& set, vsl::StagingBuffer<vsl::MemoryType::UNIFORM_BUFFER>& buffer) {
         set.write<3>(std::array{buffer, buffer});
+    }
+#elif VSL_TYPED_CASE == 13
+    void rejected(t::detail::DescriptorValue value) {
+        value._buffer.reset();
+    }
+#elif VSL_TYPED_CASE == 14
+    void rejected(vsl::lifetime::OwnedRef<vsl::impl::BufferImpl> buffer) {
+        t::detail::DescriptorValue value{buffer, {}, {}, sizeof(Payload), 0, {}};
     }
 #endif
 } // namespace

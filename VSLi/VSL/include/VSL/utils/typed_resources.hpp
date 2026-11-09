@@ -11,13 +11,28 @@
 
 namespace VSL_NAMESPACE::typed {
     namespace detail {
-        struct DescriptorValue {
-            lifetime::OwnedRef<impl::BufferImpl> buffer;
-            lifetime::OwnedRef<impl::ImageImpl> image;
-            lifetime::OwnedRef<impl::SamplerImpl> sampler;
-            size_t bytes = 0;
-            size_t offset = 0;
-            ResourceUse use;
+        class DescriptorValue {
+            lifetime::OwnedRef<impl::BufferImpl> _buffer;
+            lifetime::OwnedRef<impl::ImageImpl> _image;
+            lifetime::OwnedRef<impl::SamplerImpl> _sampler;
+            size_t _bytes = 0;
+            size_t _offset = 0;
+            ResourceUse _use;
+            friend ResourceUse descriptor_constraints(const DescriptorValue& value);
+            friend void write_descriptor(GraphicResource resource, graphic_resource::BindingPoint point, std::span<const DescriptorValue> values);
+
+        public:
+            DescriptorValue() = default;
+            static DescriptorValue FromBuffer(BufferView source, ResourceUse use = {});
+            static DescriptorValue FromImage(ImageAccessor source, ResourceUse use = {});
+            static DescriptorValue FromSampler(SamplerAccessor source, ResourceUse use = {});
+            static DescriptorValue FromTexture(ImageAccessor image, SamplerAccessor sampler, ResourceUse use = {});
+            size_t byte_offset() const { return _offset; }
+            size_t size() const { return _bytes; }
+            DescriptorValue buffer_subview(size_t offset, size_t bytes) const;
+            ImageAccessor image() const;
+            SamplerAccessor sampler() const;
+            ResourceUse resource_use() const { return _use; }
         };
         ResourceUse descriptor_constraints(const DescriptorValue& value);
         void require_descriptor_complete(const GraphicResource& resource);
@@ -26,8 +41,6 @@ namespace VSL_NAMESPACE::typed {
         GraphicResource allocate_descriptor_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager,
                                                 std::span<const graphic_resource::BindingPoint> points);
         void write_descriptor(GraphicResource resource, graphic_resource::BindingPoint point, std::span<const DescriptorValue> values);
-        lifetime::OwnedRef<impl::ImageImpl> descriptor_owner(const ImageAccessor& image);
-        lifetime::OwnedRef<impl::SamplerImpl> descriptor_owner(const SamplerAccessor& sampler);
         template<typename Binding, typename Value>
         consteval bool descriptor_matches();
     } // namespace detail
@@ -50,7 +63,7 @@ namespace VSL_NAMESPACE::typed {
         static TypedResourceBufferView FromBuffer(const BufferAccessor& source, size_t count, size_t byte_offset = 0, ResourceUse use = {});
         static TypedResourceBufferView FromView(const BufferView& source, size_t count, size_t byte_offset = 0, ResourceUse use = {});
         size_t size() const { return _count; }
-        size_t byte_offset() const { return _value.offset; }
+        size_t byte_offset() const { return _value.byte_offset(); }
         detail::DescriptorValue descriptor() const { return _value; }
         TypedResourceBufferView view(size_t first, size_t count) const;
     };
@@ -107,13 +120,13 @@ namespace VSL_NAMESPACE::typed {
         static constexpr auto KIND = kind;
         TypedImageResource(ImageAccessor image, SamplerAccessor sampler, ResourceUse use = {})
         requires(kind == graphic_resource::Type::COMBINED_IMAGE_SAMPLER)
-            : _value{{}, detail::descriptor_owner(image), detail::descriptor_owner(sampler), 0, 0, std::move(use)} {}
+            : _value(detail::DescriptorValue::FromTexture(std::move(image), std::move(sampler), std::move(use))) {}
         explicit TypedImageResource(ImageAccessor image, ResourceUse use = {})
         requires(kind == graphic_resource::Type::SAMPLED_IMAGE || kind == graphic_resource::Type::STORAGE_IMAGE)
-            : _value{{}, detail::descriptor_owner(image), {}, 0, 0, std::move(use)} {}
+            : _value(detail::DescriptorValue::FromImage(std::move(image), std::move(use))) {}
         explicit TypedImageResource(SamplerAccessor sampler, ResourceUse use = {})
         requires(kind == graphic_resource::Type::SAMPLER)
-            : _value{{}, {}, detail::descriptor_owner(sampler), 0, 0, std::move(use)} {}
+            : _value(detail::DescriptorValue::FromSampler(std::move(sampler), std::move(use))) {}
         detail::DescriptorValue descriptor() const { return _value; }
     };
     using TypedTexture = TypedImageResource<graphic_resource::Type::COMBINED_IMAGE_SAMPLER>;
@@ -181,14 +194,12 @@ namespace VSL_NAMESPACE::typed {
     TypedResourceBufferView<Payload_, kind> TypedResourceBufferView<Payload_, kind>::FromView(const BufferView& source, size_t count, size_t byte_offset, ResourceUse use) {
         constexpr auto usage = kind == graphic_resource::Type::UNIFORM_BUFFER ? MemoryType::UNIFORM_BUFFER : MemoryType::STORAGE_BUFFER;
         detail::validate_buffer_view(source, usage, byte_offset, count, sizeof(Payload), alignof(Payload));
-        return TypedResourceBufferView({source.owner_ref().alias(source.ref().data), {}, {}, count * sizeof(Payload), source.byte_offset() + byte_offset, source.resource_use(std::move(use))}, count);
+        return TypedResourceBufferView(detail::DescriptorValue::FromBuffer(source.view(byte_offset, count * sizeof(Payload)), std::move(use)), count);
     }
     template<typename Payload_, graphic_resource::Type kind>
     TypedResourceBufferView<Payload_, kind> TypedResourceBufferView<Payload_, kind>::view(size_t first, size_t count) const {
-        auto value = _value;
-        value.offset = detail::checked_view_offset(value.offset, first, count, _count, sizeof(Payload));
-        value.bytes = count * sizeof(Payload);
-        return TypedResourceBufferView(value, count);
+        const auto offset = detail::checked_view_offset(0, first, count, _count, sizeof(Payload));
+        return TypedResourceBufferView(_value.buffer_subview(offset, count * sizeof(Payload)), count);
     }
     template<typename Payload_, graphic_resource::Type kind, MemoryProperty property>
     detail::DescriptorValue TypedResourceBuffer<Payload_, kind, property>::descriptor() const {
@@ -196,10 +207,8 @@ namespace VSL_NAMESPACE::typed {
     }
     template<typename Payload_, graphic_resource::Type kind, MemoryProperty property>
     TypedResourceBufferView<Payload_, kind> TypedResourceBuffer<Payload_, kind, property>::view(size_t first, size_t count) const {
-        auto value = descriptor();
-        value.offset = detail::checked_view_offset(0, first, count, _count, sizeof(Payload));
-        value.bytes = count * sizeof(Payload);
-        return TypedResourceBufferView<Payload_, kind>(value, count);
+        const auto offset = detail::checked_view_offset(0, first, count, _count, sizeof(Payload));
+        return TypedResourceBufferView<Payload_, kind>(descriptor().buffer_subview(offset, count * sizeof(Payload)), count);
     }
     template<typename PayloadTag, graphic_resource::Type kind, MemoryProperty property>
     template<buffer_storage_policy Policy>

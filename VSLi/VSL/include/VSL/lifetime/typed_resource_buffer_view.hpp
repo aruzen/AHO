@@ -18,7 +18,7 @@ namespace VSL_NAMESPACE::typed {
         void copy(std::span<const Payload> values);
         void read_into(std::span<Payload> values) const;
         PlacedResourceBufferView view(size_t first, size_t count) const;
-        detail::DescriptorValue descriptor() const { return {_view.owner_ref().alias(_view.ref().data), {}, {}, _view.size(), _view.byte_offset(), _view.resource_use()}; }
+        detail::DescriptorValue descriptor() const { return detail::DescriptorValue::FromBuffer(_view); }
     };
 
     template<typename Payload_, graphic_resource::Type kind>

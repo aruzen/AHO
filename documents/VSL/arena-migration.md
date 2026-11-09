@@ -95,6 +95,24 @@ assert(whole.identity() == first.identity()); // 同じ物理storage、範囲は
 
 TypedBatchはcommand群のownerを保持してplanを作るため、このscopeを満たす。Pipeline／Buffer／Descriptorの比較にはidentity、viewのoffsetとindex型には従来の値を使い、bind省略の意味を維持する。DeviceとCompletionの比較は既存operator==へ移す。生成・記録時に新しいowner wrapperや管理表の探索を追加しない。raw source()／data_／legacy_ownerは後続の公開入口廃止へ接続する移行用として、この段階では残る。
 
+## 順序12b: descriptor入力値
+
+typed::detail::DescriptorValueはprivate fieldを持つ値型となり、ImplのOwnedRefを直接渡すaggregate構築を閉じる。通常のTypedBuffer／TypedImageResource／bundleのdescriptor()と書込みAPIは維持する。独自のdescriptor入力を作る場合は、FromBuffer(BufferView,ResourceUse)／FromImage(ImageAccessor,ResourceUse)／FromSampler(SamplerAccessor,ResourceUse)／FromTexture(ImageAccessor,SamplerAccessor,ResourceUse)へ移す。
+
+```cpp
+using Value = t::detail::DescriptorValue;
+auto value = Value::FromBuffer(buffer.storage_view());
+auto selected = value.buffer_subview(relative_offset, bytes);
+auto texture = Value::FromTexture(image, sampler, logical_constraint);
+auto retained_image = texture.image(); // 元のCBを共有するowning accessor
+```
+
+byte_offset()は絶対byte offset、size()は選択済みのbyte数で、buffer_subviewは現在の範囲内の相対指定である。Typed viewのcountは従来どおりPayload要素数。二段Subviewでもoffsetを一度ずつ加算する。default empty／copy／moveを維持し、空値の書込み検証や配列全体の失敗保証も変えない。
+
+resource_use()は保存された入力useの値を返す。Bufferではfactoryがphysical＋logicalを合成し、Image／Sampler／Textureでは渡されたuseを保存する。後者のphysical stateとownerはdescriptor書込み時に双方を登録するため、この値だけを記録してImage／Samplerの完全な使用登録とみなさない。通常はTypedDescriptorSetへの書込みとbindを使う。
+
+Image／Samplerの元CB、外部composite owner、strong null aliasの意味を保持し、canonical nodeからownerを取り直さない。画像／sampler getterも同じCBを共有する。Bufferのrefへのアクセスはfactoryのcpp内へ下げ、次のBufferRef／ResourceUse公開入口廃止へ接続する。値の生成に新しい個別確保やowner wrapperは追加しない。旧aggregateへ依存する利用側はfactoryとmetadata/getterへ移して再buildする。
+
 2026-11-06。Bufferの4責務分離が統合されたmaster `6b1f0166`を基点とする。[Bufferの契約](buffer-generation-contracts.md)と[責務の配置](buffer-layer-layout.md)を維持する。
 
 ## 方針と段階

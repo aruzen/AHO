@@ -407,7 +407,7 @@ namespace VSL_NAMESPACE::typed {
                 bundle_for_each<typename Schema::Allocations>([&]<typename Spec>() {
                     if constexpr (!Spec::EXTERNAL && Spec::SCOPE == ResourceScope::SHARED && buffer_descriptor(Schema::template Binding<Spec::SET, Spec::BINDING>::POINT.binding_type))
                         for (const auto& value : std::get<Schema::Index(Spec::SET, Spec::BINDING)>(shared.resources).value())
-                            value.descriptor().use.state->require_idle();
+                            value.descriptor().resource_use().state->require_idle();
                 });
             }
             bundle_for_each<typename Schema::Resources::Sets>([&]<typename Set>() {

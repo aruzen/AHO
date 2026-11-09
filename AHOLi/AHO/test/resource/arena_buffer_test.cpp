@@ -43,7 +43,7 @@ namespace {
         EXPECT_EQ(result, changed);
         auto manager = make_manager();
         auto phase = manager.start_phase<vsl::ComputePhase>();
-        old_typed.descriptor().use.record(manager.get_buffer());
+        old_typed.descriptor().resource_use().record(manager.get_buffer());
         EXPECT_FALSE(current.storage().ref().use().busy());
         EXPECT_TRUE(buffer.busy());
         EXPECT_FALSE(buffer.wait(0));
@@ -310,14 +310,14 @@ namespace {
         EXPECT_FALSE(b.owner_before(a));
         const auto first_view = r::uniform_view<std::uint32_t>(first);
         const auto second_view = r::storage_view<std::uint32_t>(second);
-        EXPECT_NE(first_view.descriptor().use.state, second_view.descriptor().use.state);
+        EXPECT_NE(first_view.descriptor().resource_use().state, second_view.descriptor().resource_use().state);
         auto manager = make_manager();
         auto phase = manager.start_phase<vsl::ComputePhase>();
         const auto baseline = owner.use_count();
         phase << second.upload(first);
         EXPECT_EQ(owner.use_count(), baseline + 1);
-        first_view.descriptor().use.record(manager.get_buffer(), vsl::ResourceRetention::COMPLETION);
-        second_view.descriptor().use.record(manager.get_buffer(), vsl::ResourceRetention::COMPLETION);
+        first_view.descriptor().resource_use().record(manager.get_buffer(), vsl::ResourceRetention::COMPLETION);
+        second_view.descriptor().resource_use().record(manager.get_buffer(), vsl::ResourceRetention::COMPLETION);
         EXPECT_EQ(owner.use_count(), baseline + 1);
         EXPECT_TRUE(first.busy());
         EXPECT_TRUE(second.busy());

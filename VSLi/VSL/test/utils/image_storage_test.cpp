@@ -35,6 +35,56 @@ namespace {
         EXPECT_EQ(reinterpret_cast<std::uintptr_t>(&a) % alignof(vsl::impl::ImageImpl), 0u);
         EXPECT_EQ(reinterpret_cast<std::uintptr_t>(c.use) % alignof(vsl::ResourceUseState), 0u);
     }
+    TEST_F(ImageStorageVulkanIntegrationTest, DescriptorFactoriesAndGettersKeepExternalCompositeOwnersAndSuppliedUses) {
+        using Value = t::detail::DescriptorValue;
+        struct Composite {
+            vsl::ImageAccessor image;
+            vsl::SamplerAccessor sampler;
+            std::shared_ptr<int> token;
+        };
+        std::vector<Value> values;
+        std::weak_ptr<Composite> owner;
+        std::weak_ptr<int> token;
+        const vsl::ResourceUse supplied{std::make_shared<vsl::ResourceUseState>(), std::make_shared<int>(3)};
+        {
+            vsl::Image<IMAGE_USAGE> image(device, 1, 1);
+            vsl::Sampler sampler(device);
+            auto context = std::make_shared<Composite>(Composite{image, sampler, std::make_shared<int>(17)});
+            owner = context;
+            token = context->token;
+            const vsl::ImageAccessor external_image{std::shared_ptr<vsl::impl::ImageImpl>(context, image.data_.get())};
+            const vsl::SamplerAccessor external_sampler{std::shared_ptr<vsl::impl::SamplerImpl>(context, sampler.data_.get())};
+            values.push_back(Value::FromImage(external_image, supplied));
+            values.push_back(Value::FromSampler(external_sampler, supplied));
+            values.push_back(Value::FromTexture(external_image, external_sampler, supplied));
+            for (const auto& value : values) {
+                EXPECT_EQ(value.resource_use().state, supplied.state);
+                EXPECT_FALSE(value.resource_use().owner.owner_before(supplied.owner));
+                EXPECT_FALSE(supplied.owner.owner_before(value.resource_use().owner));
+            }
+            for (const auto index : {0u, 2u}) {
+                const auto retained = values[index].image();
+                EXPECT_FALSE(retained.data_.owner_before(context));
+                EXPECT_FALSE(context.owner_before(retained.data_));
+            }
+            for (const auto index : {1u, 2u}) {
+                const auto retained = values[index].sampler();
+                EXPECT_FALSE(retained.data_.owner_before(context));
+                EXPECT_FALSE(context.owner_before(retained.data_));
+            }
+        }
+        EXPECT_FALSE(owner.expired());
+        auto image = values.back().image();
+        auto sampler = values.back().sampler();
+        values.clear();
+        EXPECT_FALSE(token.expired());
+        image.data_.reset();
+        EXPECT_FALSE(token.expired());
+        sampler.data_.reset();
+        EXPECT_TRUE(owner.expired());
+        EXPECT_TRUE(token.expired());
+    }
+
     TEST_F(ImageStorageVulkanIntegrationTest, FailedConstructionReturnsTheSlotToAnUnconstructedReusableState) {
         vsl::lifetime::ImageSlotStorage image;
         auto invalid = IMAGE_INFO;

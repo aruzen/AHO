@@ -244,3 +244,5 @@ runtime graphicsの単位でLayout／Pass／Pipeline／FrameBufferの公開data_
 
 
 同期3型の公開境界をprivate OwnedRef／共有registryへ閉じ、正規node／CBとretiringの拒否、元Sourceの使用状態、名前付き置換と値代入の公開後回収を維持した。AHO製品側はpublic boolとfacade moveで接続する。新runtime6件、全VSL1,183（既知format3 skip）／AHO192・1,071／compile306、同一PNG、strict23files／21TU＋補完1／1・2／2、installed consumer30種と新正負12件、構成別／cross寸法・混在拒否・archive／header一致、source399／MSBuild登録が成功した。次は他のgeneric所有境界で失われた既知nodeの退役検査を補修し、その後Swapchainへ進む。残るrecipe／起動資源／WindowData／Completion、12gの実定義・処理4層分割、12h同条件測定も継続する。
+
+既知owner nodeの退役検査をgeneric公開境界へ復元した。Shader/Graphics/Resource owner_ref、Accessor使用factory3種、ShaderGroup injectionをconst OwnedRef参照で検査し、composite/opaqueと既存ownerの移動/回収を保つ。新6件は同ABIの親libraryで6件失敗を再現し、修正後は全成功。全VSL1,189（既知format3 skip）／AHO192・1,071、同一PNG、strict14files/13TU＋補強1/1、consumer30と配布一致、source400/MSBuild登録が成功した。公開headerと寸法入力は不変で、親のcompile306と構成別/cross/ABI検証を適用する。以前から独立したBufferView/ResourceUseGroup入口の意味は変えていない。次はSwapchainの公開所有境界であり、その後のrecipe/起動資源/WindowData/Completion、12g実定義と処理の4層分割、12h測定を継続する。

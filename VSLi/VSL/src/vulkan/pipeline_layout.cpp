@@ -1,3 +1,4 @@
+#include <VSL/lifetime/owner_validation.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/vulkan/pipeline_layout.hpp>
@@ -30,6 +31,7 @@ VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::PipelineLayoutAccessor::get_
 VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::PipelineLayoutAccessor::owner_ref() const {
     if (!_owner || !_owner.use_count())
         throw std::invalid_argument("Pipeline layout requires an owner");
+    lifetime::detail::require_live_owner(_owner);
     return _owner;
 }
 VSL_NAMESPACE::impl::PipelineRecipe& VSL_NAMESPACE::PipelineLayoutEditAccessor::edit_recipe() const& {

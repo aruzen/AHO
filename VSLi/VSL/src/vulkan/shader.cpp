@@ -1,3 +1,4 @@
+#include <VSL/lifetime/owner_validation.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/define.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
@@ -82,6 +83,7 @@ VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::ShaderAccessor::get_device()
     return lifetime::device_from_child(_owner);
 }
 VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::ShaderAccessor::owner_ref() const {
+    lifetime::detail::require_live_owner(_owner);
     return _owner;
 }
 

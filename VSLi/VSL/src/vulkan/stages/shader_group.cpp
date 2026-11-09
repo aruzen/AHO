@@ -1,3 +1,4 @@
+#include <VSL/lifetime/owner_validation.hpp>
 #include <VSL/vulkan/stages/shader_group.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/vulkan/pipeline_layout.hpp>
@@ -59,6 +60,7 @@ void VSL_NAMESPACE::pipeline_layout::ShaderGroup::injection(VSL_NAMESPACE::Pipel
         if (!itr || !itr.use_count() || itr->device != pl.get_device().data_.get())
             throw std::invalid_argument("Shader group requires modules on the pipeline device");
         (void)VSL_NAMESPACE::operation::shader_stage(*itr);
+        lifetime::detail::require_live_owner(itr);
         shader_sources.push_back(lifetime::retain_recipe_owner(sources, itr));
         shaders.push_back(itr.get());
     }

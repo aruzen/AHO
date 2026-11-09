@@ -4,6 +4,7 @@
 #include "support/vulkan_fixture.hpp"
 #include <VSL/lifetime/resource_arena.hpp>
 #include <VSL/lifetime/arena_resource.hpp>
+#include <VSL/vulkan/buffer.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/vulkan/commands/image_upload.hpp>
 
@@ -294,5 +295,28 @@ namespace {
         EXPECT_FALSE(owner.expired());
         phase.cancel();
         EXPECT_TRUE(owner.expired());
+    }
+} // namespace
+
+namespace {
+    TEST_F(ResourceArenaVulkanIntegrationTest, RetiredOwnersRejectAccessorResourceUseFactories) {
+        const std::array<l::ResourceInit, 4> initializers{BUFFER_INFO, IMAGE_INFO, SAMPLER_INFO, BUFFER_INFO};
+        l::ResourceArena arena(device, PLAN, initializers);
+        vsl::Buffer<BUFFER_USAGE, vsl::MemoryProperty::HOST_VISIBLE> buffer(device, BUFFER_INFO.bytes);
+        l::detail::BufferAccess::Owned(buffer) = l::detail::BufferAccess::Owned(arena.buffer({1}));
+        const auto image = arena.image({2});
+        const auto sampler = arena.sampler({3});
+        const auto native_buffer = l::detail::BufferAccess::Owned(buffer)->buffer;
+        const auto native_image = ImageAccess::Owned(image)->image;
+        const auto native_sampler = SamplerAccess::Owned(sampler)->sampler;
+        const auto existing = buffer.resource_use();
+        const_cast<l::DependencyNode*>(l::detail::BufferAccess::Owned(buffer)->owner_node)->retire();
+        EXPECT_THROW(vsl::ResourceUse::ForBuffer(buffer), std::invalid_argument);
+        EXPECT_THROW(vsl::ResourceUse::ForImage(image), std::invalid_argument);
+        EXPECT_THROW(vsl::ResourceUse::ForSampler(sampler), std::invalid_argument);
+        EXPECT_NO_THROW(existing.state->require_idle());
+        EXPECT_EQ(l::detail::BufferAccess::Owned(buffer)->buffer, native_buffer);
+        EXPECT_EQ(ImageAccess::Owned(image)->image, native_image);
+        EXPECT_EQ(SamplerAccess::Owned(sampler)->sampler, native_sampler);
     }
 } // namespace

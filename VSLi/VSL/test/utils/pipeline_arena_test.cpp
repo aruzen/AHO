@@ -256,3 +256,27 @@ namespace {
         EXPECT_THROW((vsl::ComputePipeline(layout->runtime(), vertex_shader)), std::invalid_argument);
     }
 } // namespace
+
+namespace {
+    TEST_F(PipelineArenaVulkanIntegrationTest, RetiredOwnersCannotPublishShaderOrGraphicsOwnership) {
+        const auto initializers = mixed_inputs();
+        l::ResourceArena arena(device, MIXED_PLAN, initializers);
+        const auto pipeline = arena.pipeline({1});
+        const auto layout = arena.pipeline_layout({3});
+        const auto pass = arena.render_pass({4});
+        const auto shader = arena.shader({5});
+        const auto native_pipeline = GraphicsAccess::Owned(pipeline)->pipeline;
+        const auto native_layout = GraphicsAccess::Owned(layout)->pipeline_layout;
+        const auto native_pass = GraphicsAccess::Owned(pass)->render_pass;
+        const auto native_shader = ShaderAccess::Owned(shader)->shader_module;
+        const_cast<l::DependencyNode*>(GraphicsAccess::Owned(pipeline)->owner_node)->retire();
+        EXPECT_THROW(pipeline.owner_ref(), std::invalid_argument);
+        EXPECT_THROW(layout.owner_ref(), std::invalid_argument);
+        EXPECT_THROW(pass.owner_ref(), std::invalid_argument);
+        EXPECT_THROW(shader.owner_ref(), std::invalid_argument);
+        EXPECT_EQ(GraphicsAccess::Owned(pipeline)->pipeline, native_pipeline);
+        EXPECT_EQ(GraphicsAccess::Owned(layout)->pipeline_layout, native_layout);
+        EXPECT_EQ(GraphicsAccess::Owned(pass)->render_pass, native_pass);
+        EXPECT_EQ(ShaderAccess::Owned(shader)->shader_module, native_shader);
+    }
+} // namespace

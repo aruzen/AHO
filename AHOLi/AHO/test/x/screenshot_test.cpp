@@ -11,6 +11,7 @@
 #include <AHO/drawer/draw_phase.hpp>
 #include <VSL/vulkan/commands/render_pass_begin.hpp>
 #include <VSL/vulkan/commands/render_pass_end.hpp>
+#include <VSL/operation/submission_ops.hpp>
 #endif
 
 namespace {
@@ -23,6 +24,14 @@ namespace {
     protected:
         void require_readback();
         auto clear(float red, float green, float blue);
+    };
+    struct ScreenshotCompletionGate {
+        VkFence fence = VK_NULL_HANDLE;
+        bool ready = false;
+        static VkResult Status(void* context, VkDevice device, VkFence fence) noexcept {
+            const auto& gate = *static_cast<ScreenshotCompletionGate*>(context);
+            return fence == gate.fence && !gate.ready ? VK_NOT_READY : vkGetFenceStatus(device, fence);
+        }
     };
 #endif
 
@@ -135,6 +144,63 @@ namespace {
         };
     }
 
+    TEST_F(ScreenshotWindowIntegration, AComposedFinishCanDestroyThePhaseWithoutAccessingItsDestroyedCallbackOrRecordingReadback) {
+        ASSERT_NO_FATAL_FAILURE(require_readback());
+        if (IsSkipped())
+            return;
+        aho::x::Screenshot screenshot(engine->get_window());
+        std::unique_ptr<aho::DrawPhase> phase;
+        bool returned = false;
+        phase = std::make_unique<aho::DrawPhase>(*engine, nullptr, [&, value = std::make_shared<int>(7)](auto&) {
+            phase.reset();
+            EXPECT_EQ(*value, 7);
+            returned = true;
+        });
+        ASSERT_TRUE(screenshot.capture(*phase));
+        EXPECT_EQ(phase->submit(), vsl::ComputePhase::SubmitResult::FAILED);
+        EXPECT_TRUE(returned);
+        EXPECT_FALSE(phase);
+        EXPECT_FALSE(screenshot.ready());
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
+        engine->data()->command_manager.wait_idle();
+    }
+    TEST_F(ScreenshotWindowIntegration, CompletionCallbackCancellingTheCurrentFramePreventsAttachingANewReadback) {
+        ASSERT_NO_FATAL_FAILURE(require_readback());
+        if (IsSkipped())
+            return;
+        aho::x::Screenshot screenshot(engine->get_window());
+        auto manager = engine->data()->command_manager;
+        ASSERT_GT(manager.get_buffer().get_size(), 1u);
+        std::unique_ptr<aho::DrawPhase> current;
+        bool callback = false;
+        const auto live = std::make_shared<int>(0);
+        ScreenshotCompletionGate gate;
+        const vsl::operation::ScopedSubmissionNativeCalls native({.context = &gate, .fence_status = ScreenshotCompletionGate::Status});
+        {
+            aho::DrawPhase previous(*engine, clear(1, 0, 0));
+            gate.fence = engine->boot_window->data2->in_flight.data_->fences.at(previous.frame_slot);
+            manager.get_buffer().retain_until_complete(std::shared_ptr<int>(new int(0), [&, alive = std::weak_ptr<int>(live)](int* value) {
+                delete value;
+                if (alive.expired())
+                    return;
+                callback = true;
+                if (current)
+                    current->cancel();
+            }));
+            ASSERT_TRUE(screenshot.capture(previous));
+            ASSERT_EQ(previous.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        current = std::make_unique<aho::DrawPhase>(*engine, clear(0, 1, 0));
+        ASSERT_FALSE(callback);
+        ASSERT_TRUE(current->recording());
+        engine->data()->logical_device.data_->device.waitIdle();
+        gate.ready = true;
+        EXPECT_FALSE(screenshot.capture(*current));
+        EXPECT_TRUE(callback);
+        EXPECT_FALSE(current->recording());
+        current.reset();
+        manager.wait_idle();
+    }
     TEST_F(ScreenshotWindowIntegration, AddingReadbackUsageNotifiesWindowHooksOnceAndStillCaptures) {
         ASSERT_NO_FATAL_FAILURE(require_readback());
         if (IsSkipped())

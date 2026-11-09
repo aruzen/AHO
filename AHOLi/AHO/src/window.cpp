@@ -42,6 +42,7 @@ AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::get_monitor_size() {
 namespace {
     thread_local std::vector<std::shared_ptr<AHO_NAMESPACE::window::WindowData>> RECREATING_WINDOWS;
     thread_local std::vector<std::shared_ptr<AHO_NAMESPACE::window::WindowData>> CLOSING_WINDOWS;
+    thread_local const AHO_NAMESPACE::window::detail::FrameBufferQuery* ACTIVE_FRAME_QUERY = nullptr;
     constexpr std::array<VSL_NAMESPACE::typed::ResourceRequest, 3> WINDOW_SYNC_REQUESTS{{{{0}, VSL_NAMESPACE::storage::ResourceKind::SEMAPHORE},
                                                                                          {{1}, VSL_NAMESPACE::storage::ResourceKind::FENCE},
                                                                                          {{2}, VSL_NAMESPACE::storage::ResourceKind::FENCE}}};
@@ -69,7 +70,35 @@ namespace {
         static_assert(std::is_nothrow_swappable_v<decltype(current)>);
         current.swap(replacement);
     }
+    VSL_NAMESPACE::ImageType requested_usage(const AHO_NAMESPACE::window::WindowData& drawing, VSL_NAMESPACE::ImageType additional) {
+        return (drawing.pending_generation ? drawing.pending_generation->request.usage : drawing.swapchain.images.at(0).get_usage()) |
+               drawing.deferred_usage.value_or(VSL_NAMESPACE::ImageType::NONE) | additional;
+    }
+    void defer_recreation(AHO_NAMESPACE::window::WindowData& drawing, VSL_NAMESPACE::ImageType additional) {
+        const auto usage = requested_usage(drawing, additional);
+        drawing.swapchain.require_image_usage(usage);
+        drawing.deferred_usage = usage;
+    }
 } // namespace
+
+AHO_NAMESPACE::window::detail::ScopedFrameBufferQuery::ScopedFrameBufferQuery(FrameBufferQuery query) noexcept
+    : _query(query), _previous(std::exchange(ACTIVE_FRAME_QUERY, &_query)) {}
+
+AHO_NAMESPACE::window::detail::ScopedFrameBufferQuery::~ScopedFrameBufferQuery() {
+    ACTIVE_FRAME_QUERY = _previous;
+}
+
+AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::detail::frame_buffer_size(void* native) {
+    const auto query = ACTIVE_FRAME_QUERY ? *ACTIVE_FRAME_QUERY : FrameBufferQuery{};
+    d2::VectorI size;
+    if (query.get_size)
+        query.get_size(query.context, native, &size.value.x.value, &size.value.y.value);
+    else
+        glfwGetFramebufferSize(static_cast<GLFWwindow*>(native), &size.value.x.value, &size.value.y.value);
+    if (size.value.x.value < 0 || size.value.y.value < 0)
+        throw std::runtime_error("Window framebuffer extent is negative");
+    return size;
+}
 
 std::shared_ptr<VSL_NAMESPACE::Surface> AHO_NAMESPACE::window::detail::make_window_surface(
     VSL_NAMESPACE::Window& window, VSL_NAMESPACE::VulkanAccessor instance) {
@@ -143,6 +172,8 @@ AHO_NAMESPACE::window::Window::Window(engine::EngineAccessor engine, std::shared
 }
 
 bool AHO_NAMESPACE::window::Window::resize(int width, int height) {
+    if (width <= 0 || height <= 0)
+        throw std::invalid_argument("Window size must be positive");
     VSL_NAMESPACE::lifetime::GLFWCallScope scope;
     check_recreation_allowed();
     const auto data = data_;
@@ -177,14 +208,25 @@ bool AHO_NAMESPACE::window::Window::recreate_swapchain(VSL_NAMESPACE::ImageType 
     struct RecreationGuard {
         ~RecreationGuard() { RECREATING_WINDOWS.pop_back(); }
     } guard;
+    const auto before = detail::frame_buffer_size(os.native_handle());
+    if (!data->window_handle || data_ != data || data2 != drawing)
+        return false;
+    if (before.value.x.value == 0 || before.value.y.value == 0) {
+        defer_recreation(*drawing, additional_usage);
+        return false;
+    }
     manager.wait_idle();
     if (!data->window_handle || data_ != data || data2 != drawing)
         return false;
-    int width = 0, height = 0;
-    glfwGetFramebufferSize(static_cast<GLFWwindow*>(os.native_handle()), &width, &height);
-    if (width < 0 || height < 0)
-        throw std::runtime_error("Swapchain framebuffer extent is negative");
-    const auto usage = (drawing->pending_generation ? drawing->pending_generation->request.usage : drawing->swapchain.images.at(0).get_usage()) | additional_usage;
+    const auto size = detail::frame_buffer_size(os.native_handle());
+    if (!data->window_handle || data_ != data || data2 != drawing)
+        return false;
+    if (size.value.x.value == 0 || size.value.y.value == 0) {
+        defer_recreation(*drawing, additional_usage);
+        return false;
+    }
+    const auto width = size.value.x.value, height = size.value.y.value;
+    const auto usage = requested_usage(*drawing, additional_usage);
     const VSL_NAMESPACE::SwapchainCreateInfo info{.width = static_cast<std::uint32_t>(width), .height = static_cast<std::uint32_t>(height), .usage = usage, .present_fences = drawing->swapchain.present_fences()};
     auto& pending = drawing->pending_generation;
     if (!pending || !pending->swapchain || pending->swapchain->state() != VSL_NAMESPACE::SwapchainState::ACTIVE || !matches_request(pending->request, info)) {
@@ -198,11 +240,14 @@ bool AHO_NAMESPACE::window::Window::recreate_swapchain(VSL_NAMESPACE::ImageType 
             VSL_NAMESPACE::lifetime::SwapchainArena candidate(runtime->logical_device, *drawing->surface, info, std::move(previous), {}, &progress);
             replace_candidate(pending, WindowGenerationCandidate{info, std::move(candidate).view()});
         } catch (...) {
-            if (progress.native_started)
+            if (progress.native_started) {
                 replace_candidate(pending, WindowGenerationCandidate{info, std::nullopt});
+                drawing->deferred_usage.reset();
+            }
             throw;
         }
     }
+    drawing->deferred_usage.reset();
     auto next = *pending->swapchain;
     if (!data->window_handle || data_ != data || data2 != drawing)
         return false;
@@ -266,12 +311,10 @@ AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::Window::window_size() {
     return v;
 }
 
-AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::Window::frame_size() {
+AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::Window::frame_size() const {
     VSL_NAMESPACE::lifetime::GLFWCallScope scope;
     const auto os = window_owner();
-    d2::VectorI v;
-    glfwGetFramebufferSize(static_cast<GLFWwindow*>(os.native_handle()), &v.value.x.value, &v.value.y.value);
-    return v;
+    return detail::frame_buffer_size(os.native_handle());
 }
 
 AHO_NAMESPACE::window::WindowResizeHookPlugin::WindowResizeHookPlugin(VSL_NAMESPACE::PureWindow* w,

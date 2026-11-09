@@ -54,6 +54,15 @@ namespace {
         VkResult failure = VK_ERROR_OUT_OF_HOST_MEMORY;
         static VkResult Reset(void* context, VkDevice device, std::uint32_t count, const VkFence* fences) noexcept;
     };
+    struct GatedPhase : vsl::DefaultPhase {
+        std::function<bool()> gate;
+        GatedPhase(vsl::CommandManager manager, vsl::SwapchainAccessor chain)
+            : DefaultPhase(std::move(manager), std::move(chain), std::nullopt, std::nullopt, std::nullopt, true) {}
+        bool acquisition_ready() override {
+            const auto callback = gate;
+            return !callback || callback();
+        }
+    };
     struct SubmitProbe {
         VkResult result = VK_SUCCESS, idle_result = VK_SUCCESS;
         bool enqueue = true, defer_observation = false;
@@ -927,6 +936,47 @@ namespace {
         EXPECT_TRUE(vsl::sync::poll_fence_proof(*proof));
         EXPECT_EQ(proof->status, vsl::sync::FenceProofStatus::COMPLETE);
         manager.wait_idle();
+    }
+    TEST_F(AcquireFencePoolWindowIntegrationTest, ReadinessCannotMaskAnActiveDomainOrRestartCancelledOrReentrantSetup) {
+        auto manager = make_manager();
+        vsl::Swapchain chain(device, surface, {}, 64, 48);
+        AcquireProbe probe;
+        const vsl::operation::ScopedPresentationNativeCalls native(probe.native_calls());
+        {
+            auto active = manager.start_phase<vsl::ComputePhase>();
+            GatedPhase nested(manager, chain);
+            nested.gate = [] { return false; };
+            EXPECT_THROW(nested.setup(), std::logic_error);
+            EXPECT_EQ(active.state, vsl::ComputePhase::State::WAIT_SUBMIT);
+            active.cancel();
+        }
+        {
+            GatedPhase cancelled(manager, chain);
+            cancelled.gate = [&] { cancelled.cancel(); return true; };
+            cancelled.setup();
+            EXPECT_EQ(cancelled.state, vsl::ComputePhase::State::ERROR_);
+        }
+        {
+            GatedPhase reentrant(manager, chain);
+            reentrant.gate = [&] { EXPECT_THROW(reentrant.setup(), std::logic_error); return false; };
+            reentrant.setup();
+            EXPECT_EQ(reentrant.state, vsl::ComputePhase::State::SUSPENDED);
+        }
+        EXPECT_EQ(probe.calls, 0u);
+    }
+    TEST_F(AcquireFencePoolWindowIntegrationTest, ReadinessMayDestroyThePhaseWithoutAcquiringOrTouchingTheDestroyedSetupGuard) {
+        auto manager = make_manager();
+        vsl::Swapchain chain(device, surface, {}, 64, 48);
+        AcquireProbe probe;
+        const vsl::operation::ScopedPresentationNativeCalls native(probe.native_calls());
+        auto phase = std::make_unique<GatedPhase>(manager, chain);
+        phase->gate = [&] { phase.reset(); return true; };
+        EXPECT_NO_THROW(phase->setup());
+        EXPECT_FALSE(phase);
+        EXPECT_EQ(probe.calls, 0u);
+        auto next = manager.start_phase<vsl::ComputePhase>();
+        EXPECT_EQ(next.state, vsl::ComputePhase::State::WAIT_SUBMIT);
+        next.cancel();
     }
     TEST_F(AcquireFencePoolWindowIntegrationTest, FailedAcquisitionRejectsItsOutputAndReleasesTheReservationForReuse) {
         auto manager = make_manager().independent(1);

@@ -348,6 +348,8 @@ breakpoint disable swift_willThrow
 
             {
                 auto phase = DrawPhase(&engine);
+                if (!phase.recording())
+                    continue;
                 ubo_buffers[phase.get_current_index()].copy(ubo);
 
                 //ubo_resource[phase.get_current_index()].update(ubo_buffers[phase.get_current_index()], 0);

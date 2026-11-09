@@ -204,3 +204,5 @@ AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in
 
 10e2では同じWindowDataへ候補と検証済み要求を保持し、同要求のFramebuffer失敗からNative Swapchainを作り直さず再開する。共通backendの借用進行情報でpreflight失敗を区別し、旧ownerを保持した一括swapで世代を公開する。新6件と保持Context／描画cacheのreadback回帰、全VSL1,114／AHO172・1,071／compile195、install・配置情報・同一描画の検証が成功した。0 framebufferの取得前休止とclose統合は10e3／10e4へ続く。
 
+10e3では0 framebufferの再生成／取得延期、Native reset前gate、自己の準備状態だけのslot巻戻し、Window／manager snapshot、public PhaseCallによる派生callbackの寿命検査を接続した。延期NONEと検証済みusageを保持し、休止中の記録と同setup再入を拒否する。新VSL3／AHO10、全VSL1,117／AHO182・1,071／compile195、同一描画、install／構成別／cross／ABIと規約検査が成功した。titlebarを含むclose／共通Surface回収を10e4で仕上げ、順序11・12へ続ける。
+

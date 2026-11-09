@@ -6,7 +6,7 @@
 
 ComputePhaseのprepareは前slotのCompletionをwaitする。COMPLETION保持を外したときのdeleterは、現在のpostponed Phaseを破棄できる。別ringの外部Fenceを予約する場合も、旧Workの完了観測から同じcallbackが起きる。Domain／Workのownerをpinしても、借用thisの寿命は保証できない。
 
-private lifetime::PhaseCallは、呼出しstackに置くguardである。Phaseはactive guardの先頭だけを借用し、guardは前guardとPhaseの借用を保存する。Compute／Default destructorは最初に全active guardを失効する。失効済みguardのdestructorはPhaseへ触れない。新しいshared owner、control block、guard用のheap確保は追加しない。
+lifetime::PhaseCallは、呼出しstackに置くguardである。Phaseはactive guardの先頭だけを借用し、guardは前guardとPhaseの借用を保存する。Compute／Default destructorは最初に全active guardを失効する。失効済みguardのdestructorはPhaseへ触れない。新しいshared owner、control block、guard用のheap確保は追加しない。
 
 このguardは同期的なcallback後の生存検査であり、Phaseを延命しない。外部直列化の契約を維持し、並行deleteを許可するものではない。通常Vulkan操作に所有解決やregistry探索を加えない。
 
@@ -19,6 +19,14 @@ guardは局所ownerより先に宣言し、ownerの破棄が終わるまで存�
 既存の「完了callbackがpeer Phaseを開始し、外側prepareだけが変更を検知して失敗する」動作を維持する。callbackを準備終了まで遅延させたり、新しい所有層へPhaseを包んだりしない。今回の対象は標準Compute／Defaultのprepare・setupと取消の呼出境界である。
 
 ## APIとABI
+
+10e3から定義を公開`VSL/lifetime/phase_liveness.hpp`へ置き、AHOや独自派生Phaseから利用できるようにした。旧privateヘッダーは転送includeと内部NativeCallだけを残す。派生処理は基底setupやcallbackの後に`alive()`を確認してからthisを参照し、派生destructorの冒頭で`PhaseCall::Invalidate(*this)`を呼ぶ。
+
+guardは実行中のcallback functor自体を保持しない。callbackがPhaseを破棄できる場合、member std::functionを局所値へcopyして実行中のclosureも保持する。AHOのinitialize／finishとScreenshotの合成callbackは両方の契約を使う。
+
+DefaultPhaseのprotected `acquisition_ready()`は既定trueである。falseではSUSPENDEDにし、新しいPhaseによる再開を基本とする。Domain可用性、判定後の生存／state／identityを検査し、同setupの再入を拒否する。取得準備の途中で休止する場合も未取得のCPU状態を先に確定してから保持を外す。具体的なWindow接続とreset境界は[Window同期群](../AHO/window-synchronization.md)を参照。
+
+DefaultPhaseのclass layout／vtable、PureWindowのconst bool、AHOのtarget snapshot等のABI変更を含むため、prebuilt利用側は再buildする。phase.hppと公開guardを構成別layout fingerprintへ含め、installへ公開guardを配布する。
 
 通常のconstructor／setup／submit／cancelの呼出形式は維持する。protected prepareは`[[nodiscard]] bool`へ変更するため、独自派生クラスで直接使う場合は中断を検査する。
 

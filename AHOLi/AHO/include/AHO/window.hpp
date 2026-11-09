@@ -38,6 +38,7 @@ namespace AHO_NAMESPACE::window {
         VSL_NAMESPACE::FenceHolder acquire_fences;
         // 完成済みSwapchainと、Native開始まで検証された再試行要求を保持する。
         std::optional<WindowGenerationCandidate> pending_generation;
+        std::optional<VSL_NAMESPACE::ImageType> deferred_usage;
 
         ~WindowData();
     };
@@ -66,7 +67,7 @@ namespace AHO_NAMESPACE::window {
 
         d2::VectorI window_size();
 
-        d2::VectorI frame_size();
+        d2::VectorI frame_size() const;
 
         bool set_title(const std::string& title);
 

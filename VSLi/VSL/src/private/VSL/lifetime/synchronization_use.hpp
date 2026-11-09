@@ -6,7 +6,12 @@ namespace VSL_NAMESPACE::lifetime {
     std::shared_ptr<sync::FenceReservation> reserve_fence(std::shared_ptr<impl::FenceImpl> fence, std::uint32_t index,
                                                           const std::shared_ptr<impl::SubmissionImpl>& result);
     void require_fence_reservation(const impl::SubmissionWork& work, std::uint32_t index);
-    void reserve_acquire_fence(std::shared_ptr<impl::FenceImpl> fence, std::uint32_t index, const std::shared_ptr<sync::FenceProof>& proof);
+    struct AcquireFenceGate {
+        void* context = nullptr;
+        bool (*ready)(void*) = nullptr;
+    };
+    bool reserve_acquire_fence(std::shared_ptr<impl::FenceImpl> fence, std::uint32_t index, const std::shared_ptr<sync::FenceProof>& proof,
+                               AcquireFenceGate gate = {});
     void release_acquire_fence(impl::FenceImpl& fence, std::uint32_t index, const std::shared_ptr<sync::FenceProof>& proof) noexcept;
     void reserve_present_fence(std::shared_ptr<impl::FenceImpl> fence, std::uint32_t index, const std::shared_ptr<sync::PresentState>& state);
     bool wait_fences(std::shared_ptr<impl::FenceImpl> fence, std::optional<std::uint32_t> index, std::uint64_t timeout);

@@ -2,6 +2,21 @@
 #include <AHO/window.hpp>
 
 namespace AHO_NAMESPACE::window::detail {
+    struct FrameBufferQuery {
+        void* context = nullptr;
+        void (*get_size)(void*, void*, int*, int*) = nullptr;
+    };
+    class ScopedFrameBufferQuery {
+        FrameBufferQuery _query;
+        const FrameBufferQuery* _previous;
+
+    public:
+        explicit ScopedFrameBufferQuery(FrameBufferQuery query) noexcept;
+        ScopedFrameBufferQuery(const ScopedFrameBufferQuery&) = delete;
+        ScopedFrameBufferQuery& operator=(const ScopedFrameBufferQuery&) = delete;
+        ~ScopedFrameBufferQuery();
+    };
+    d2::VectorI frame_buffer_size(void* native);
     std::shared_ptr<VSL_NAMESPACE::Surface> make_window_surface(VSL_NAMESPACE::Window& window, VSL_NAMESPACE::VulkanAccessor instance);
     std::shared_ptr<WindowData> make_window_data(const engine::EngineAccessor& engine,
                                                  std::shared_ptr<VSL_NAMESPACE::Surface> surface,

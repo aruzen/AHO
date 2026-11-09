@@ -70,7 +70,7 @@ namespace VSL_NAMESPACE {
         virtual bool close();
         lifetime::OSWindowOwner window_owner() const;
 
-        operator bool();
+        operator bool() const;
         bool operator==(const PureWindow& o);
         bool operator==(const PureWindow::WindowData* o);
 

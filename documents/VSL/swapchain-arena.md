@@ -20,6 +20,8 @@ try {
 
 既存の省略引数による生成は共通処理を使い続ける。公開constructorのリンク先変更を含むため、prebuilt利用側は再buildする。
 
+`SwapchainAccessor::require_image_usage(usage)`は、Native Swapchainを作らずSurfaceの現在のsupportedUsageを検証する。退役世代でもその正規Device／Surface所有を借用できる。AHOが0 framebuffer中の延期要求を保存する際に使い、生成時と同じoperationの検証処理を共有する。COLOR_ATTACHMENTの欠落や未対応bitは例外で拒否し、検証成功は将来のSurface能力や生成成功の保証にはしない。
+
 - operation：raw Device／Surfaceと生成入力を検証し、native Swapchain／ImageViewを生成・破棄する。成功したnonnull handleだけを採用する。
 - storage：実画像数MからSwapchain slotとImage slot×Mのoffset・全体サイズ・alignmentを計算し、領域を提供する。
 - lifetime：native生成中のPending、構築と巻き戻し、Device／Surfaceの固定親、世代ownerと公開aliasを管理する。

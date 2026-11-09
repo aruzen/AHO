@@ -6,6 +6,11 @@
 #include <stdexcept>
 
 namespace VSL_NAMESPACE {
+    void SwapchainAccessor::require_image_usage(ImageType usage) const {
+        const auto source = data_;
+        lifetime::require_swapchain_owner(source);
+        operation::require_swapchain_image_usage(*source, usage);
+    }
     Swapchain::Swapchain(LogicalDeviceAccessor device, std::shared_ptr<Surface> surface, std::optional<SwapchainAccessor> old,
                          std::optional<int> width, std::optional<int> height, ImageType usage) {
         if (!surface)

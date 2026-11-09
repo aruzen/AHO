@@ -76,7 +76,7 @@ namespace AHO_NAMESPACE {
             throw std::logic_error("Triangle draw requires a recording DrawPhase");
         const auto values = drawer::detail::triangle_values(triangle, rgba);
         const auto context = phase.context();
-        auto window = phase.engine->get_window();
+        const auto& window = phase.target_window();
         auto& state = window.data2->standard_draw;
         if (!state || state->pass.data_ != context.render_pass().data_)
             state = std::make_shared<drawer::detail::StandardDrawState>(context);

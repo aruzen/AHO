@@ -22,6 +22,7 @@ namespace VSL_NAMESPACE {
         SwapchainState state() const;
         PresentFencePolicy present_fences() const;
         SemaphoreHolder finished_semaphores() const;
+        void require_image_usage(ImageType usage) const;
     };
 
     struct Swapchain : public SwapchainAccessor {

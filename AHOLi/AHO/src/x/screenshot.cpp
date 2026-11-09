@@ -2,6 +2,7 @@
 #include <AHO/drawer/draw_phase.hpp>
 #include <AHO/window.hpp>
 #include <VSL/vulkan/commands/render_pass_end.hpp>
+#include <VSL/lifetime/phase_liveness.hpp>
 #include <cstdlib>
 #include <fstream>
 #include <limits>
@@ -107,30 +108,39 @@ namespace AHO_NAMESPACE::x {
     }
 
     bool Screenshot::capture(DrawPhase& phase) {
-        if (!_data || phase.state != VSL_NAMESPACE::ComputePhase::State::WAIT_SUBMIT)
+        VSL_NAMESPACE::lifetime::PhaseCall call(phase);
+        const auto data = _data;
+        if (!data || !phase.recording())
             throw std::logic_error("Screenshot requires a recording DrawPhase");
-        const auto window = _data->window.lock();
-        if (!window || !phase.engine || phase.engine->get_window().data2 != window ||
+        const auto window = data->window.lock();
+        if (!window || !phase.target_window() || phase.target_window().data2 != window ||
             phase.swapchain.data_ != window->swapchain.data_)
             throw std::invalid_argument("DrawPhase belongs to a different or closed window");
         const auto image = phase.swapchain.images.at(phase.get_image_index());
         if (!VSL_NAMESPACE::contain(image.get_usage(), VSL_NAMESPACE::ImageType::TRANSFER_SRC))
             throw std::logic_error("Window no longer supports screenshot readback");
-        const auto status = _data->completion.status();
+        const auto current = phase.completion();
+        const auto status = data->completion.status();
+        if (!call.alive() || !phase.recording() || phase.completion() != current || !phase.target_window() ||
+            phase.target_window().data2 != window || phase.swapchain.data_ != window->swapchain.data_)
+            return false;
         if (status == VSL_NAMESPACE::Completion::Status::PENDING || status == VSL_NAMESPACE::Completion::Status::SUBMITTED)
             return false;
-        auto finish = [previous = phase.finish, state = _data, &phase, image](auto& stream) {
+        auto finish = [previous = phase.finish, state = data, &phase, image](auto& stream) {
+            VSL_NAMESPACE::lifetime::PhaseCall call(phase);
             if (previous)
                 previous(stream);
             else
                 stream << VSL_NAMESPACE::command::RenderPassEnd{};
+            if (!call.alive())
+                return;
             state->ticket = state->reader.record(phase, image, VSL_NAMESPACE::ImageLayout::PRESENT);
             if (!state->ticket)
                 throw std::logic_error("Screenshot readback slot is unavailable");
         };
         phase.finish = std::move(finish);
-        _data->ticket.reset();
-        _data->completion = phase.completion();
+        data->ticket.reset();
+        data->completion = phase.completion();
         return true;
     }
 

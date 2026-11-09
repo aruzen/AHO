@@ -70,7 +70,7 @@ namespace VSL_NAMESPACE::operation {
         if (info.present_fences == PresentFencePolicy::REQUIRE_FENCE && !has_device_features(device.enabled_features, DeviceFeature::SWAPCHAIN_MAINTENANCE1))
             throw std::invalid_argument("Swapchain requires enabled maintenance1 for present fences");
         if (old) {
-            require_active_swapchain(*old);
+            require_replaceable_swapchain(*old);
             if (old->device != &device || old->surface != &surface)
                 throw std::invalid_argument("Old swapchain must use the same Device and Surface");
         }
@@ -122,7 +122,7 @@ namespace VSL_NAMESPACE::operation {
         VkSwapchainKHR created = VK_NULL_HANDLE;
         // native呼出し後は成功／失敗によらず旧世代を現役へ戻せない。
         if (old) {
-            require_active_swapchain(*old);
+            require_replaceable_swapchain(*old);
             old->state = SwapchainState::RETIRED;
         }
         const auto result = calls.create ? calls.create(calls.context, device.device, &static_cast<const VkSwapchainCreateInfoKHR&>(native), &created)
@@ -159,6 +159,10 @@ namespace VSL_NAMESPACE::operation {
     void require_active_swapchain(const impl::SwapchainImpl& target) {
         if (!target.swap_chain || target.state != SwapchainState::ACTIVE)
             throw std::logic_error("Swapchain generation is not active");
+    }
+    void require_replaceable_swapchain(const impl::SwapchainImpl& target) {
+        if (!target.swap_chain || (target.state != SwapchainState::ACTIVE && target.state != SwapchainState::RECOVERY_REQUIRED))
+            throw std::logic_error("Swapchain generation cannot be replaced");
     }
 } // namespace VSL_NAMESPACE::operation
 

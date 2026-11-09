@@ -5,6 +5,7 @@
 #include <VSL/lifetime/dependency_node.hpp>
 #include <VSL/lifetime/presentation_retention.hpp>
 #include <VSL/lifetime/submission_retention.hpp>
+#include <VSL/lifetime/recovery_batch.hpp>
 #include <VSL/lifetime/resource_arena.hpp>
 #include <stdexcept>
 #include <utility>
@@ -83,44 +84,9 @@ namespace VSL_NAMESPACE::lifetime {
 
     void CommandDomain::wait_idle() {
         if (context.closing || context.submitting || (recording_submission && recording_submission->result->native.active) ||
-            std::ranges::any_of(submissions, [](const auto& work) { return work && work->result->native.active; }))
+            std::ranges::any_of(submissions, [](const auto& work) { return work && (work->result->native.active || work->result->native.observing); }))
             throw std::logic_error("Command domain is closing");
-        const auto native = buffer;
-        std::vector<std::shared_ptr<impl::SubmissionWork>> submitted;
-        for (const auto& work : submissions)
-            if (work && (work->result->status == Completion::Status::SUBMITTED || sync::native_pending(*work->result)))
-                submitted.push_back(work);
-        std::vector<PresentationSnapshot> presentation;
-        presentation.reserve(presentation_domains.size());
-        for (const auto& domain : presentation_domains)
-            presentation.push_back(snapshot_presentations(domain, native->command_pool->device->device));
-        SubmissionSnapshot quarantine(native, presentation_domains);
-        auto idle = native->command_pool->device->lost ? vk::Result::eErrorDeviceLost : operation::wait_device_idle(native->command_pool->device->device);
-        if (native->command_pool->device->lost)
-            idle = vk::Result::eErrorDeviceLost;
-        if (idle != vk::Result::eSuccess && idle != vk::Result::eErrorDeviceLost)
-            vk::detail::throwResultException(idle, "Device idle failed");
-        quarantine.save_observations(static_cast<std::int32_t>(idle));
-        for (const auto& work : submitted)
-            sync::save_native_idle(*work, static_cast<std::int32_t>(idle));
-        if (idle == vk::Result::eErrorDeviceLost) {
-            native->command_pool->device->lost = true;
-            // 全snapshotへ損失を保存してからownerを外す。callbackからpeerのFenceを成功観測させない。
-            for (const auto& work : submitted)
-                sync::save_terminal(*work, Completion::Status::FAILED, Completion::Failure::DEVICE_LOST, static_cast<std::int32_t>(idle));
-            for (const auto& snapshot : presentation)
-                for (const auto& record : snapshot.records)
-                    sync::fail_present(record->state, idle);
-        }
-        quarantine.finish();
-        for (const auto& snapshot : presentation)
-            collect_quarantined_presentations(snapshot.domain->surface, native->command_pool->device->device, idle);
-        for (const auto& work : submitted)
-            sync::finish_submission(*work);
-        for (auto& snapshot : presentation)
-            finish_presentations(snapshot, idle);
-        if (idle == vk::Result::eErrorDeviceLost)
-            vk::detail::throwResultException(idle, "Device lost while waiting idle");
+        recover_command_domain(*this);
     }
 
     const std::shared_ptr<CommandDomain>& CommandAccess::Owner(const CommandBuffer& buffer) {

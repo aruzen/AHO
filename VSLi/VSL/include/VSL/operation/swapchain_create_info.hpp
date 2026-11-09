@@ -8,7 +8,8 @@ namespace VSL_NAMESPACE {
         UNINITIALIZED,
         ACTIVE,
         RETIRED,
-        UNUSABLE
+        UNUSABLE,
+        RECOVERY_REQUIRED
     };
     struct SwapchainCreateInfo {
         // 省略した成分はmanaged OS windowのframebufferから取得する。

@@ -2,6 +2,7 @@
 #include "support/deferred_action.hpp"
 #include <VSL/lifetime/swapchain_arena.hpp>
 #include <VSL/lifetime/presentation_retention.hpp>
+#include <VSL/lifetime/acquire_ticket.hpp>
 #include <VSL/lifetime/synchronization_use.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/operation/presentation_ops.hpp>
@@ -157,6 +158,41 @@ namespace {
         EXPECT_EQ(record->state.result, vk::Result::eErrorDeviceLost);
         EXPECT_TRUE(record->released);
         EXPECT_TRUE(registry->records.empty());
+    }
+    TEST(PresentationStateTest, DomainLossSavesEveryPresentBeforeReleasingATicketOwner) {
+        const auto device = std::make_shared<vsl::impl::LogicalDeviceImpl>();
+        device->lost = true;
+        const auto record = std::make_shared<l::PresentRecord>();
+        record->generation = std::make_shared<vsl::impl::SwapchainImpl>();
+        record->state.origin = device.get();
+        record->state.status = s::PresentStatus::SUBMITTED;
+        const auto ticket = std::make_shared<l::AcquireTicket>();
+        ticket->device = device.get();
+        ticket->swapchain = record->generation.get();
+        ticket->state.acquired = true;
+        ticket->state.status = s::AcquisitionStatus::ACQUIRED;
+        ticket->evidence = std::make_shared<l::AcquireEvidence>();
+        ticket->graphics = std::make_shared<vsl::impl::SubmissionImpl>();
+        ticket->graphics->status = vsl::Completion::Status::CANCELLED;
+        ticket->registered = true;
+        unsigned releases = 0;
+        const vsl_test::DeferredAction notify([&] {
+            ++releases;
+            EXPECT_EQ(record->state.status, s::PresentStatus::FAILED);
+            EXPECT_EQ(record->state.result, vk::Result::eErrorDeviceLost);
+            EXPECT_TRUE(record->released);
+            EXPECT_EQ(ticket->evidence->proof.status, s::FenceProofStatus::DEVICE_LOST);
+        });
+        ticket->owners[0] = notify.owner();
+        ticket->owner_count = 1;
+        {
+            auto domain = std::make_shared<l::SurfacePresentationDomain>();
+            domain->tickets.push_back(ticket);
+            domain->records.push_back(record);
+            domain->acquisitions.push_back(ticket->evidence);
+        }
+        EXPECT_EQ(releases, 1u);
+        EXPECT_TRUE(ticket->released);
     }
     TEST_F(PresentationRetentionWindowIntegrationTest, KnownDeviceLossIsSavedForAllSnapshotsBeforeAnyReleaseCallback) {
         auto manager = make_manager().independent(3);

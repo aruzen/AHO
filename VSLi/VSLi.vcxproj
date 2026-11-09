@@ -187,6 +187,10 @@
     <ClInclude Include="VSL\src\private\VSL\operation\presentation_ops.hpp" />
     <ClInclude Include="VSL\src\private\VSL\sync\presentation_state.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\presentation_retention.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\acquire_ticket.hpp" />
+    <ClInclude Include="VSL\include\VSL\lifetime\surface_recovery.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\recovery_batch.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\sync\acquisition_state.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\phase_call.hpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\descriptor_ops.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\descriptor_bindings.hpp" />
@@ -200,6 +204,8 @@
     <ClCompile Include="VSL\src\operation\presentation_ops.cpp" />
     <ClCompile Include="VSL\src\sync\presentation_state.cpp" />
     <ClCompile Include="VSL\src\lifetime\presentation_retention.cpp" />
+    <ClCompile Include="VSL\src\lifetime\acquire_ticket.cpp" />
+    <ClCompile Include="VSL\src\lifetime\surface_recovery.cpp" />
     <ClCompile Include="VSL\src\lifetime\phase_call.cpp" />
     <ClCompile Include="VSL\src\operation\descriptor_ops.cpp" />
     <ClCompile Include="VSL\src\lifetime\descriptor_bindings.cpp" />

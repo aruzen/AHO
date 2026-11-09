@@ -56,6 +56,12 @@ add_library(VSL STATIC
         VSL/src/private/VSL/sync/presentation_state.hpp
         VSL/src/private/VSL/lifetime/presentation_retention.hpp
         VSL/src/lifetime/presentation_retention.cpp
+        VSL/src/private/VSL/lifetime/acquire_ticket.hpp
+        VSL/src/lifetime/acquire_ticket.cpp
+        VSL/src/private/VSL/sync/acquisition_state.hpp
+        VSL/include/VSL/lifetime/surface_recovery.hpp
+        VSL/src/private/VSL/lifetime/recovery_batch.hpp
+        VSL/src/lifetime/surface_recovery.cpp
         VSL/src/private/VSL/lifetime/phase_call.hpp
         VSL/src/lifetime/phase_call.cpp
         VSL/src/private/VSL/operation/presentation_ops.hpp

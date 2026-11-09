@@ -50,6 +50,6 @@ installed public consumer26targetのbuild／link／CPU実行、末尾optional入
 
 heap／arena両サンプルのPNG3枚が一致した。3frame・12submission・2draw・238831更新画素、1720×1080→2000×1360のresizeとpipeline生成1回を維持する。Windows／Linux実機、実DeviceLost、LSan、CPU並行、全native失敗位置は未検証である。
 
-ここでは成功取得後にbegin／submit／cancelが失敗した際の画像返却を実装しない。Native取得直後のPhase自己破棄テストも、Fenceの寿命とproof保存だけを確認する。同じ世代を継続利用できる保証は、次のAcquireTicket、signal消費、画像返却、RECOVERY_REQUIREDへ接続して成立させる。
+この単位では、成功取得後のbegin／submit／cancel失敗の画像返却を対象外とした。後続の[AcquireTicket／Surface回収](acquire-ticket-recovery.md)で、実signalの消費、画像releaseとRECOVERY_REQUIREDへ接続している。中断した世代を無条件に継続利用する契約にはしない。
 
 PresentationのCPU確保、EvidenceのCPU確保、可変vector、Work／結果、既定graphics Fenceの所有は残る。Domain poolにより取得ごとのnative Fence生成はなくなるが、全体の性能率は未測定である。

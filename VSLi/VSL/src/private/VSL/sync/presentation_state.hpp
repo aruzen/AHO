@@ -4,6 +4,10 @@
 #include <cstdint>
 #include <memory>
 
+namespace VSL_NAMESPACE::impl {
+    struct LogicalDeviceImpl;
+}
+
 namespace VSL_NAMESPACE::sync {
     enum class PresentStatus {
         PENDING,
@@ -34,6 +38,8 @@ namespace VSL_NAMESPACE::sync {
         vk::Fence fence;
         FenceProofStatus status = FenceProofStatus::UNARMED;
         vk::Result result = vk::Result::eNotReady;
+        impl::LogicalDeviceImpl* origin = nullptr;
+        bool observing = false;
     };
     // ownerは外側のlifetimeが保持する。terminal保存後は再利用済みFenceを観測しない。
     struct PresentState {
@@ -43,6 +49,8 @@ namespace VSL_NAMESPACE::sync {
         vk::Fence proof;
         std::shared_ptr<FenceProof> reacquire;
         bool strict = false;
+        impl::LogicalDeviceImpl* origin = nullptr;
+        bool observing = false;
     };
     PresentEnqueue classify_present_result(vk::Result result) noexcept;
     bool fence_proof_terminal(const FenceProof& proof) noexcept;

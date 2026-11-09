@@ -1,0 +1,72 @@
+# 取得画像の責任とSurface単位の回収
+
+順序10dの取得後失敗を扱う。CPU配置は既存の世代／frame同期arenaを使い、ここでは取得画像・binary signal・完了証明の保持と回収を接続する。GPUのdevice memoryをCPU arenaへ移す変更ではない。
+
+## 責務と所有
+
+`sync::AcquisitionState`は取得、描画、drainの結果を区別する。元の取消結果を書き換えず、画像返却用Workへのconsumer移譲を別に記録する。acquire Fenceの証明は実際のFence観測で保存し、描画やDevice idleの完了で代用しない。
+
+`lifetime::AcquireTicket`は解決済みの世代・Semaphore・acquire Fence参照と、所有境界で取得したownerを持つ。元control blockで重複排除するため、同一arenaのsourceを新しいownerへ包み直さない。通常操作はraw Implと保存したqueue/indexを使用する。Deviceは世代の固定親から借用する。
+
+CommandDomainからSurfacePresentationDomainを保持し、SurfacePresentationDomainとWorkがTicketを保持する。TicketからDomainはweakで、TicketからWorkへの強い所有は作らない。WorkはCPU結果とnative使用完了を分離し、Ticketの保持には既存のCOMPLETION owner indexを使う。
+
+Domain終了時に回収できないTicket／Work／PresentRecordは、それぞれ追加確保のない退避一覧へ移す。Ticket destructorが未消費signalを完了扱いにすることはない。退避した資源も元SurfaceとDeviceから到達できる。
+
+## 取得から回収まで
+
+1. native acquireの前にTicket、CPU proof、要素別leaseを準備し、DomainとWorkへ登録する。準備失敗では取得は発生していない。
+2. native呼出しの局所ownerを保ち、実際に返った取得結果と画像indexを採用する。呼出し中にPhaseが破棄・取消されても、成功結果を未取得へ戻さない。
+3. 通常の取消は、元の取消結果を残して返却用のgraphics Workへconsumerを移す。描画送信の成否はnative enqueue結果で判断する。
+4. presentのOOMは未enqueueであり、生きているPhaseが再試行できる。回収側が勝手にsignalを消費しない。破棄・失敗によってabandonを要求した後に回収へ移る。
+5. abandonされた既知の取得では、graphicsが未enqueueならavailable、既知enqueue済みならfinishedをwait-only submitで消費する。drain自体のenqueueと完了を独立して保存する。
+6. drainがenqueue済み／不明になった後にidle観測が失敗しても、同じwaitを再送しない。不明な消費はsource要素をpoisonし、完了後も再利用を許可しない。
+7. Deviceでmaintenance1が有効で、必要な使用完了とsignal消費が確定した場合は、画像releaseを一度試みる。成功だけをRETURNEDとし、未対応／不明結果はABANDONEDとして世代を閉じる。present policyとrelease能力は独立である。
+
+取得結果そのものが不明な場合、Device idleだけから取得画像やbinary signalを推測しない。証明不足のownerは隔離して残す。これは未知のdriver結果に対する保守的な保持であり、すべてのエラーで即時回収できる契約ではない。
+
+取得後に通常継続できない世代は`RECOVERY_REQUIRED`となる。新しいacquireは拒否し、次のSwapchain生成のoldとして利用できる。native createに渡した後の`RETIRED`は、後続の回収でも復活しない。
+
+## 公開Surface回収
+
+```cpp
+#include <VSL/lifetime/surface_recovery.hpp>
+
+const auto status = vsl::lifetime::recover_surface(
+    device, surface, vsl::lifetime::SurfaceRecoveryMode::WAIT);
+```
+
+`POLL`はCPU／Fenceの観測で可能な範囲を進める。`WAIT`は新たにDevice idleを観測する。呼出し側から過去のidle成功値を渡せない。対象のnative呼出しや外側の完了観測中は、通常はPENDINGを返して再入を延期する。既知DeviceLostはCPU状態へ保存できる。
+
+戻り値COMPLETEは今回captureした対象の回収完了、PENDINGは生存中の取得／再試行可能present／証明不足、DEVICE_LOSTはDeviceの既知の喪失を表す。live Phaseの取得を強制取消するAPIではない。callbackで追加された仕事は次回のcaptureに属する。
+
+DeviceとSurfaceは元の正規ownerを検証する。既存Domainが失効済みなら新Domainを作らず、対応する退避一覧を回収する。別Surfaceの資源ownerは回収しない。DeviceLostのCPU状態保存は同Deviceの退避結果へ伝達するが、foreign Surfaceの所有を解放する理由にはしない。
+
+## 観測・一覧更新・解放
+
+全対象を先にcaptureし、必要なscratchをnative呼出しより前に確保する。全Work／Ticket／Present／acquire proofのCPU観測を保存し、全一覧とcounterを更新してから、lock外でownerを解放する。途中の確保・idle失敗では一覧を復元し、新規登録を失わない。Domain終了も同じ順序で処理する。
+
+通常のpresent後に行う自動回収は、描画Completionを新たに確定して通知順を変えない。明示的なCompletion／Surface回収／frame再利用と、abandon後の回収で描画完了を観測する。表示と描画のCPU結果を別々に観測できる契約を維持する。
+
+完了済みacquire proofへの弱いFence行は、次の予約まで残せる。native ownerを保持せず、保存済みterminalを読むだけなので再利用済みFenceを再pollしない。未取得結果の予約は、native acquireのguardを解除した後にidentity付きで解放する。失敗したCPU証拠をDomain一覧へ永久保存せず、必要な診断は外部のCPU参照から読める。
+
+SubmissionObservationは再poll／再waitのgateと、元CommandDomain／CommandBufferの寿命を守る。Fence配列の待機は全Workを先に保護し、全結果保存後にcallbackを通知する。acquire／presentのCPU proofにも観測gateを置き、native呼出しが戻る前のFence reset／再利用と、保存済みterminalの上書きを防ぐ。
+
+Semaphoreの予約は物理Impl・配列要素・取得leaseを区別する。finishedの再signalでは、同じ画像の再取得による同source／elementの祖先だけを認める。未束縛finished予約で全画像を排他しない。管理外で直接行うVulkanのbinary signal／waitは引き続き呼出し側の同期契約に属する。
+
+## 残る移行範囲
+
+Ticket、Work／Result、marker、観測snapshotと内部vectorは個別のCPU確保として残る。世代のImpl配置とnative GPU確保とは別であり、確保削減率や性能改善率は未測定である。
+
+AHOの0 extent、attachment生成失敗後の候補保持、resize／closeへの公開回収接続は10eで扱う。Typed既定arena化と公開Impl入口の廃止は11／12に残る。旧privateの即時collect helperは移行中だけ保持し、通常PhaseとCommandDomain待機は共通の回収batchへ接続する。
+
+## 検証
+
+新16件で、取得後のbegin失敗、drain OOM再試行、drain成功後のidle失敗、不明drainのpoison、present OOMのretry権、LEGACY policyでのmaintenance1 release、Native中cancel／自己破棄、観測再入、Domain喪失後の回収、要素別leaseと再取得祖先、全状態保存後の解放を確認した。
+
+macOS arm64／Apple M1／Clang20／C++26／MoltenVK1.4.2、ASan・UBSan・Vulkan validationで、全VSL1,112成功・既知packed format skip3、AHO GPU161／CPU1,070、compile契約195が成功した。heap／arenaのPNG3枚は一致し、3frame／12submission／2draw／238831更新画素、1720×1080→2000×1360のresize後もPipeline生成1回を維持した。
+
+installed public consumer27種と最終Surface API補完、Debug／Releaseの実寸法、x86_64 cross archive、異artifact／一時借用の拒否を検証した。新privateヘッダーはinstallしない。変更31 C++ファイル／17TUを初回検査と修正後の補完で確認し、最終違反0。source path376件もエラー0である。生成fingerprintを更新したため、prebuilt利用側は対応ヘッダーとバイナリで再buildする。
+
+Domain終了時の早期owner解放を一時的に戻したCPU比較では、回帰1件が3期待値で失敗した。正しいsourceへbyte一致で復元し、全targetを再buildした後に関連CPU3件が成功した。
+
+故障注入では、疑似DeviceLostより前に実graphicsと実present Fenceの完了を確保し、実driverの使用中資源を破棄しない。実driverのOOM／DeviceLost、Windows／Linux実機、複数queue family、CPU並行操作、LSan、性能は未検証である。

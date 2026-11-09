@@ -88,6 +88,38 @@ namespace VSL_NAMESPACE::lifetime {
             return false;
         }
     } // namespace
+    std::shared_ptr<void> pin_submission_owner(const impl::SubmissionWork& work) noexcept {
+        auto* const buffer = work.native_buffer;
+        if (!buffer)
+            return {};
+        if (buffer->owner_context)
+            if (const auto domain = buffer->owner_context->domain.lock(); domain && domain->buffer.get() == buffer)
+                return domain;
+        try {
+            if (buffer->owner_node)
+                return buffer->owner_node->owner_ref().share();
+        } catch (...) {
+        }
+        return {};
+    }
+    SubmissionObservation::SubmissionObservation(impl::SubmissionWork& work) noexcept {
+        _owner = pin_submission_owner(work);
+        if (work.result->native.active || work.result->native.observing)
+            return;
+        if (work.result->status != Completion::Status::SUBMITTED && !sync::native_pending(*work.result))
+            return;
+        _result = work.result.get();
+        _result->native.observing = true;
+    }
+    SubmissionObservation::~SubmissionObservation() {
+        finish();
+    }
+    SubmissionObservation::SubmissionObservation(SubmissionObservation&& other) noexcept
+        : _owner(std::move(other._owner)), _result(std::exchange(other._result, nullptr)) {}
+    void SubmissionObservation::finish() noexcept {
+        if (auto* result = std::exchange(_result, nullptr))
+            result->native.observing = false;
+    }
     SubmissionTransaction::SubmissionTransaction(CommandDomain& domain, impl::SubmissionWork& work)
         : _domain(domain), _work(work), _owns_context(domain.context.work == &work) {
         if (work.result->native.active || (_owns_context && domain.context.submitting))
@@ -204,30 +236,60 @@ namespace VSL_NAMESPACE::lifetime {
     SubmissionSnapshot::SubmissionSnapshot(const std::shared_ptr<impl::CommandBufferImpl>& ring,
                                            std::span<const std::shared_ptr<SurfacePresentationDomain>> presentations)
         : _device(device_from_impl(*ring->command_pool->device).data_) {
+        capture(ring, presentations);
+    }
+    SubmissionSnapshot::SubmissionSnapshot(std::shared_ptr<impl::LogicalDeviceImpl> device, std::shared_ptr<impl::SurfaceImpl> surface)
+        : _device(std::move(device)), _surface(std::move(surface)) {
+        require_device_owner(LogicalDeviceAccessor{_device});
+        if (!_surface || !_surface->owner_node || !_surface->owner_node->matches(_surface) ||
+            _device->parent_device->vulkan != _surface->vulkan)
+            throw std::invalid_argument("Surface recovery requires its canonical Surface and Device");
+        capture({}, {});
+    }
+    void SubmissionSnapshot::capture(const std::shared_ptr<impl::CommandBufferImpl>& ring,
+                                     std::span<const std::shared_ptr<SurfacePresentationDomain>> presentations) {
         auto& registry = submission_quarantine();
         const std::lock_guard lock(registry.mutex);
         if (registry.collecting)
             throw std::logic_error("Submission quarantine is already being observed");
+        const auto selected = [&](const impl::SubmissionWork& work) {
+            const bool same_surface = _surface && work.surface_address == _surface.get() &&
+                                      !_surface.owner_before(work.surface) && !work.surface.owner_before(_surface);
+            return work.device == _device && (same_surface || (ring && matches_scope(work, ring, presentations)));
+        };
+        _observations.reserve(registry.count);
+        for (auto* work = registry.head.get(); work; work = work->quarantine_next.get()) {
+            if (selected(*work))
+                _observations.emplace_back(*work);
+        }
         registry.collecting = true;
         _collecting = true;
         auto pending = std::move(registry.head);
         while (pending) {
             auto work = std::move(pending);
             pending = std::move(work->quarantine_next);
-            if (work->device == _device && matches_scope(*work, ring, presentations))
+            if (selected(*work))
                 prepend_submission(_selected, std::move(work));
             else
                 prepend_submission(_foreign, std::move(work));
         }
     }
     SubmissionSnapshot::~SubmissionSnapshot() {
-        if (!_collecting)
+        if (!_collecting) {
+            release();
             return;
+        }
         auto& registry = submission_quarantine();
-        const std::lock_guard lock(registry.mutex);
-        prepend_chain(registry.head, _selected);
-        prepend_chain(registry.head, _foreign);
-        registry.collecting = false;
+        {
+            const std::lock_guard lock(registry.mutex);
+            prepend_chain(registry.head, _selected);
+            prepend_chain(registry.head, _foreign);
+            registry.collecting = false;
+            _collecting = false;
+        }
+        for (auto& observation : _observations)
+            observation.finish();
+        release();
     }
     void SubmissionSnapshot::save_observations(std::int32_t idle_result) noexcept {
         const auto idle = _device->lost ? vk::Result::eErrorDeviceLost : static_cast<vk::Result>(idle_result);
@@ -242,6 +304,9 @@ namespace VSL_NAMESPACE::lifetime {
         for (auto* work = _selected.get(); work; work = work->quarantine_next.get()) {
             if (work->result->native.active || !sync::native_pending(*work->result))
                 continue;
+            if (idle != vk::Result::eSuccess &&
+                !std::ranges::any_of(_observations, [&](const auto& observation) { return observation.owns(*work->result); }))
+                continue;
             const auto result = idle == vk::Result::eSuccess ? idle : operation::poll_fence(work->device->device, work->fence);
             if (result == vk::Result::eErrorDeviceLost) {
                 save_observations(static_cast<std::int32_t>(result));
@@ -251,33 +316,43 @@ namespace VSL_NAMESPACE::lifetime {
                 sync::save_native_idle(*work, static_cast<std::int32_t>(result));
         }
     }
-    void SubmissionSnapshot::finish() noexcept {
+    void SubmissionSnapshot::bookkeep() noexcept {
         if (!_collecting)
             return;
-        std::shared_ptr<impl::SubmissionWork> complete, pending;
+        for (auto& observation : _observations)
+            observation.finish();
+        std::shared_ptr<impl::SubmissionWork> pending;
         while (_selected) {
             auto work = std::move(_selected);
             _selected = std::move(work->quarantine_next);
             if (!work->result->native.active && !sync::native_pending(*work->result) && sync::terminal_status(work->result->status))
-                prepend_submission(complete, std::move(work));
+                prepend_submission(_ready, std::move(work));
             else
                 prepend_submission(pending, std::move(work));
         }
         auto& registry = submission_quarantine();
         {
             const std::lock_guard lock(registry.mutex);
+            _pending = bool(pending);
             prepend_chain(registry.head, pending);
             prepend_chain(registry.head, _foreign);
-            for (auto* work = complete.get(); work; work = work->quarantine_next.get())
+            for (auto* work = _ready.get(); work; work = work->quarantine_next.get())
                 unregister_submission(*work, registry);
             registry.collecting = false;
             _collecting = false;
         }
-        while (complete) {
-            auto work = std::move(complete);
-            complete = std::move(work->quarantine_next);
+    }
+    void SubmissionSnapshot::release() noexcept {
+        while (_ready) {
+            auto work = std::move(_ready);
+            _ready = std::move(work->quarantine_next);
             sync::finish_submission(*work);
         }
+        _observations.clear();
+    }
+    void SubmissionSnapshot::finish() noexcept {
+        bookkeep();
+        release();
     }
     void retain_resource(std::vector<std::shared_ptr<void>>& resources, const std::shared_ptr<void>& resource) {
         if (resource.use_count() && !contains_owner(resources, resource))
@@ -344,6 +419,7 @@ namespace VSL_NAMESPACE::lifetime {
         submission.signal_semaphore = nullptr;
         submission.synchronization_owners.fill(impl::SubmissionWork::NO_OWNER);
         submission.native_buffer = nullptr;
+        submission.acquisition = nullptr;
         submission.validity_checks.clear();
         auto buffer_owner = std::move(submission.unresolved_buffer_owner);
         submission.completion_resources.clear();

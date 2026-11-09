@@ -12,6 +12,21 @@ namespace VSL_NAMESPACE {
 namespace VSL_NAMESPACE::lifetime {
     struct SurfacePresentationDomain;
     struct CommandDomain;
+    std::shared_ptr<void> pin_submission_owner(const impl::SubmissionWork& work) noexcept;
+    class SubmissionObservation {
+        std::shared_ptr<void> _owner;
+        impl::SubmissionImpl* _result = nullptr;
+
+    public:
+        explicit SubmissionObservation(impl::SubmissionWork& work) noexcept;
+        ~SubmissionObservation();
+        SubmissionObservation(const SubmissionObservation&) = delete;
+        SubmissionObservation& operator=(const SubmissionObservation&) = delete;
+        SubmissionObservation(SubmissionObservation&& other) noexcept;
+        bool active() const noexcept { return _result != nullptr; }
+        bool owns(const impl::SubmissionImpl& result) const noexcept { return _result == &result; }
+        void finish() noexcept;
+    };
     class SubmissionTransaction {
         CommandDomain& _domain;
         impl::SubmissionWork& _work;
@@ -29,16 +44,24 @@ namespace VSL_NAMESPACE::lifetime {
                         Completion::Failure failure, std::int32_t error_code) noexcept;
     class SubmissionSnapshot {
         std::shared_ptr<impl::LogicalDeviceImpl> _device;
-        std::shared_ptr<impl::SubmissionWork> _selected, _foreign;
-        bool _collecting = false;
+        std::shared_ptr<impl::SurfaceImpl> _surface;
+        std::shared_ptr<impl::SubmissionWork> _selected, _foreign, _ready;
+        std::vector<SubmissionObservation> _observations;
+        bool _collecting = false, _pending = false;
+        void capture(const std::shared_ptr<impl::CommandBufferImpl>& ring,
+                     std::span<const std::shared_ptr<SurfacePresentationDomain>> presentations);
 
     public:
         explicit SubmissionSnapshot(const std::shared_ptr<impl::CommandBufferImpl>& ring,
                                     std::span<const std::shared_ptr<SurfacePresentationDomain>> presentations = {});
+        SubmissionSnapshot(std::shared_ptr<impl::LogicalDeviceImpl> device, std::shared_ptr<impl::SurfaceImpl> surface);
         ~SubmissionSnapshot();
         SubmissionSnapshot(const SubmissionSnapshot&) = delete;
         SubmissionSnapshot& operator=(const SubmissionSnapshot&) = delete;
         void save_observations(std::int32_t idle_result) noexcept;
+        void bookkeep() noexcept;
+        void release() noexcept;
+        bool pending() const noexcept { return _pending; }
         void finish() noexcept;
     };
     void quarantine_submission(const std::shared_ptr<impl::SubmissionWork>& work, const std::shared_ptr<impl::CommandBufferImpl>& buffer) noexcept;

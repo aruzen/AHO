@@ -203,6 +203,106 @@ namespace {
         EXPECT_EQ(a.error_code(), VK_ERROR_DEVICE_LOST);
         EXPECT_EQ(b.error_code(), VK_ERROR_DEVICE_LOST);
     }
+    TEST_F(SynchronizeVulkanIntegrationTest, FenceArrayObservationPinsAllWorkAndBlocksRecursiveQueries) {
+        auto fence = manager->create_fence("observed", std::size_t{2});
+        auto first = make_manager().independent(1), second = make_manager().independent(2);
+        second.get_buffer().next();
+        auto a = std::make_unique<vsl::ComputePhase>(first, std::nullopt, std::nullopt, fence);
+        auto b = second.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence);
+        auto ca = a->completion(), cb = b.completion();
+        const std::weak_ptr<vsl::impl::CommandBufferImpl> ring = first.get_buffer().data_;
+        ASSERT_EQ(a->submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        ASSERT_EQ(b.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        struct Probe {
+            vsl::Completion first, second;
+            vsl::FenceHolder fence;
+            unsigned calls = 0;
+            std::function<void()> release_facades;
+        } probe{ca, cb, fence};
+        probe.release_facades = [&] {
+            a.reset();
+            first = vsl::CommandManager(nullptr);
+            EXPECT_FALSE(ring.expired());
+        };
+        const vsl::operation::ScopedSubmissionNativeCalls native({.context = &probe, .wait_fences = +[](void* context, VkDevice device, std::uint32_t count, const VkFence* fences, VkBool32 all, std::uint64_t timeout) noexcept {
+                                                                      auto& probe = *static_cast<Probe*>(context);
+                                                                      ++probe.calls;
+                                                                      probe.release_facades();
+                                                                      EXPECT_EQ(probe.first.status(), vsl::Completion::Status::SUBMITTED);
+                                                                      EXPECT_EQ(probe.second.status(), vsl::Completion::Status::SUBMITTED);
+                                                                      EXPECT_FALSE(probe.first.wait(0));
+                                                                      EXPECT_THROW(probe.fence.wait(std::uint64_t{0}), std::logic_error);
+                                                                      EXPECT_THROW(probe.fence.reset(), std::logic_error);
+                                                                      return vkWaitForFences(device, count, fences, all, timeout);
+                                                                  }});
+        EXPECT_TRUE(fence.wait());
+        EXPECT_EQ(probe.calls, 1u);
+        EXPECT_EQ(ca.status(), vsl::Completion::Status::COMPLETE);
+        EXPECT_EQ(cb.status(), vsl::Completion::Status::COMPLETE);
+        EXPECT_TRUE(ring.expired());
+    }
+    TEST_F(SynchronizeVulkanIntegrationTest, AcquisitionObservationBlocksFenceReuseAndKeepsASavedTerminalProof) {
+        auto fence = manager->create_fence("proof", true);
+        auto proof = std::make_shared<vsl::sync::FenceProof>();
+        proof->device = device.data_->device;
+        proof->fence = fence.data_->fences[0];
+        proof->status = vsl::sync::FenceProofStatus::PENDING;
+        fence.data_->uses[0].use = std::weak_ptr<vsl::sync::FenceProof>(proof);
+        proof->status = vsl::sync::FenceProofStatus::UNCERTAIN;
+        EXPECT_THROW(fence.wait(), std::logic_error);
+        proof->status = vsl::sync::FenceProofStatus::PENDING;
+        struct Probe {
+            vsl::FenceHolder fence;
+            std::shared_ptr<vsl::sync::FenceProof> proof;
+            unsigned calls = 0;
+        } probe{fence, proof};
+        const vsl::operation::ScopedSubmissionNativeCalls native({.context = &probe, .fence_status = +[](void* context, VkDevice, VkFence) noexcept {
+                                                                      auto& probe = *static_cast<Probe*>(context);
+                                                                      if (++probe.calls > 1)
+                                                                          return VK_NOT_READY;
+                                                                      EXPECT_FALSE(vsl::sync::poll_fence_proof(*probe.proof));
+                                                                      EXPECT_THROW(probe.fence.reset(), std::logic_error);
+                                                                      EXPECT_THROW(probe.fence.wait(std::uint64_t{0}), std::logic_error);
+                                                                      vsl::sync::save_fence_observation(*probe.proof, vk::Result::eSuccess);
+                                                                      vsl::lifetime::release_acquire_fence(*probe.fence.data_, 0, probe.proof);
+                                                                      EXPECT_TRUE(std::holds_alternative<std::weak_ptr<vsl::sync::FenceProof>>(probe.fence.data_->uses[0].use));
+                                                                      return VK_ERROR_UNKNOWN;
+                                                                  }});
+        EXPECT_TRUE(vsl::sync::poll_fence_proof(*proof));
+        EXPECT_EQ(proof->status, vsl::sync::FenceProofStatus::COMPLETE);
+        EXPECT_EQ(probe.calls, 1u);
+        EXPECT_NO_THROW(fence.reset());
+    }
+    TEST_F(SynchronizeVulkanIntegrationTest, WSISemaphoreLeasesSeparateElementsAndPreserveTheReacquireAncestry) {
+        auto source = manager->create_semaphore("leased", 2);
+        const auto result = std::make_shared<vsl::impl::SubmissionImpl>();
+        const auto lease = std::make_shared<int>(1);
+        auto acquire = vsl::sync::track_semaphore_wsi(*source.data_, result, 0);
+        acquire->lease = lease;
+        EXPECT_THROW(vsl::sync::require_acquire_signal(*source.data_, 0), std::logic_error);
+        EXPECT_NO_THROW(vsl::sync::require_acquire_signal(*source.data_, 1));
+        EXPECT_NO_THROW(vsl::sync::require_graphics_wait(*source.data_, 0, result, acquire.get()));
+        EXPECT_THROW(vsl::sync::require_graphics_wait(*source.data_, 0, std::make_shared<vsl::impl::SubmissionImpl>()), std::logic_error);
+        result->status = vsl::Completion::Status::FAILED;
+        result->native.enqueue = vsl::sync::SubmissionEnqueue::NOT_ENQUEUED;
+        result->native.complete = true;
+        EXPECT_THROW(vsl::sync::require_acquire_signal(*source.data_, 0), std::logic_error);
+        result->native.enqueue = vsl::sync::SubmissionEnqueue::ENQUEUED;
+        EXPECT_NO_THROW(vsl::sync::require_acquire_signal(*source.data_, 0));
+        auto first = vsl::sync::track_semaphore_wsi(*source.data_, {}, 1);
+        auto second = vsl::sync::track_semaphore_wsi(*source.data_, {}, 1);
+        auto third = vsl::sync::track_semaphore_wsi(*source.data_, {}, 1);
+        first->lease = std::make_shared<int>(2);
+        second->predecessor = first;
+        third->predecessor = second;
+        third->lease = lease;
+        third->acquisition = result;
+        EXPECT_NO_THROW(vsl::sync::require_graphics_signal(*source.data_, 1, result, third.get()));
+        EXPECT_NO_THROW(vsl::sync::require_present_wait(*source.data_, 1, *third));
+        auto unrelated = vsl::sync::track_semaphore_wsi(*source.data_, {}, 1);
+        EXPECT_THROW(vsl::sync::require_graphics_signal(*source.data_, 1, result, third.get()), std::logic_error);
+        first->complete = second->complete = third->complete = unrelated->complete = true;
+    }
     TEST_F(SynchronizeVulkanIntegrationTest, AllFenceMutationsCheckEveryElementBeforeNativeChanges) {
         auto fence = manager->create_fence("array", std::size_t{2}, true);
         fence.reset(1);

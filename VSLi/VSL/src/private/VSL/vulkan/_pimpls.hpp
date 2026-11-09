@@ -48,6 +48,7 @@ namespace VSL_NAMESPACE {
         struct SurfaceOwnerContext;
         struct DeviceOwnerContext;
         struct SwapchainPresentationContext;
+        struct AcquireTicket;
     } // namespace lifetime
     namespace graphic_resource {
         struct ManagerInterface;
@@ -151,6 +152,7 @@ namespace VSL_NAMESPACE::impl {
         WAIT_SEMAPHORE,
         SIGNAL_SEMAPHORE,
         FENCE,
+        ACQUISITION,
         COUNT
     };
     struct SubmissionWork {
@@ -162,11 +164,12 @@ namespace VSL_NAMESPACE::impl {
         std::shared_ptr<sync::FenceReservation> fence_reservation;
         SemaphoreImpl* wait_semaphore = nullptr;
         SemaphoreImpl* signal_semaphore = nullptr;
-        std::array<size_t, static_cast<size_t>(SubmissionSource::COUNT)> synchronization_owners{NO_OWNER, NO_OWNER, NO_OWNER};
+        std::array<size_t, static_cast<size_t>(SubmissionSource::COUNT)> synchronization_owners{NO_OWNER, NO_OWNER, NO_OWNER, NO_OWNER};
         vk::Fence fence;
         std::vector<std::shared_ptr<void>> resources;
         std::vector<std::shared_ptr<void>> completion_resources;
         std::vector<const ResourceUseState*> validity_checks;
+        lifetime::AcquireTicket* acquisition = nullptr;
         void (*release_resources)(SubmissionWork&) noexcept = nullptr;
         CommandBufferImpl* native_buffer = nullptr;
         std::shared_ptr<void> unresolved_buffer_owner;

@@ -1,8 +1,10 @@
 #pragma once
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/sync/presentation_state.hpp>
+#include <span>
 
 namespace VSL_NAMESPACE::lifetime {
+    struct AcquireTicket;
     struct PresentRecord;
     struct ImagePresentSlot {
         std::weak_ptr<PresentRecord> record;
@@ -47,13 +49,33 @@ namespace VSL_NAMESPACE::lifetime {
         std::weak_ptr<impl::SurfaceImpl> surface;
         std::vector<std::shared_ptr<PresentRecord>> records;
         std::vector<std::shared_ptr<AcquireEvidence>> acquisitions;
-        bool closing = false;
+        std::vector<std::shared_ptr<AcquireTicket>> tickets;
+        bool closing = false, recovering = false;
         ~SurfacePresentationDomain();
     };
     struct PresentationSnapshot {
         std::shared_ptr<SurfacePresentationDomain> domain;
         std::vector<std::shared_ptr<PresentRecord>> records;
         std::vector<std::shared_ptr<AcquireEvidence>> acquisitions;
+    };
+    class QuarantinedPresentations {
+        std::shared_ptr<impl::LogicalDeviceImpl> _device;
+        std::shared_ptr<impl::SurfaceImpl> _surface;
+        std::span<const std::shared_ptr<SurfacePresentationDomain>> _domains;
+        std::shared_ptr<PresentRecord> _selected, _foreign, _ready;
+        bool _collecting = false, _pending = false;
+
+    public:
+        QuarantinedPresentations(std::shared_ptr<impl::LogicalDeviceImpl> device,
+                                 std::span<const std::shared_ptr<SurfacePresentationDomain>> domains,
+                                 std::shared_ptr<impl::SurfaceImpl> surface = {});
+        ~QuarantinedPresentations();
+        QuarantinedPresentations(const QuarantinedPresentations&) = delete;
+        QuarantinedPresentations& operator=(const QuarantinedPresentations&) = delete;
+        void save_observations(vk::Result idle, bool wait) noexcept;
+        void bookkeep() noexcept;
+        void release() noexcept;
+        bool pending() const noexcept;
     };
     std::shared_ptr<SurfacePresentationDomain> presentation_domain(const std::shared_ptr<impl::SwapchainImpl>& generation);
     void register_presentation_domain(CommandDomain& commands, const std::shared_ptr<SurfacePresentationDomain>& domain);
@@ -69,4 +91,7 @@ namespace VSL_NAMESPACE::lifetime {
     size_t quarantined_presentation_count() noexcept;
     PresentationSnapshot snapshot_presentations(const std::shared_ptr<SurfacePresentationDomain>& domain, vk::Device device);
     void finish_presentations(PresentationSnapshot& snapshot, vk::Result idle_result);
+    void observe_presentations(PresentationSnapshot& snapshot, vk::Result idle_result, bool wait) noexcept;
+    void bookkeep_presentations(PresentationSnapshot& snapshot) noexcept;
+    void release_presentations(PresentationSnapshot& snapshot) noexcept;
 } // namespace VSL_NAMESPACE::lifetime

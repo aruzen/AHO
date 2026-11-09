@@ -48,4 +48,16 @@ namespace VSL_NAMESPACE::operation {
     vk::Result wait_present_fence(vk::Device device, vk::Fence fence, std::uint64_t timeout) noexcept {
         return NATIVE_CALLS && NATIVE_CALLS->wait ? static_cast<vk::Result>(NATIVE_CALLS->wait(NATIVE_CALLS->context, device, fence, timeout)) : wait_fence(device, fence, timeout);
     }
+    vk::Result release_swapchain_image(vk::Device device, vk::SwapchainKHR swapchain, std::uint32_t image) noexcept {
+        const VkReleaseSwapchainImagesInfoEXT info{
+            .sType = VK_STRUCTURE_TYPE_RELEASE_SWAPCHAIN_IMAGES_INFO_EXT,
+            .swapchain = swapchain,
+            .imageIndexCount = 1,
+            .pImageIndices = &image,
+        };
+        if (NATIVE_CALLS && NATIVE_CALLS->release)
+            return static_cast<vk::Result>(NATIVE_CALLS->release(NATIVE_CALLS->context, device, &info));
+        const auto release = reinterpret_cast<PFN_vkReleaseSwapchainImagesEXT>(VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceProcAddr(device, "vkReleaseSwapchainImagesEXT"));
+        return release ? static_cast<vk::Result>(release(device, &info)) : vk::Result::eErrorExtensionNotPresent;
+    }
 } // namespace VSL_NAMESPACE::operation

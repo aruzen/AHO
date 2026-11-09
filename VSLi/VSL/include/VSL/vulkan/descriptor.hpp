@@ -92,6 +92,12 @@ namespace VSL_NAMESPACE::graphic_resource {
 
         [[nodiscard]] std::vector<BindingPoint> get_binding_points() const;
 
+        BindingLayout(const BindingLayout&) = default;
+        BindingLayout(BindingLayout&&) noexcept = default;
+        BindingLayout& operator=(BindingLayout replacement) noexcept {
+            swap(replacement);
+            return *this;
+        }
         explicit operator bool() const noexcept { return bool(_owner); }
         lifetime::OwnerRef owner_ref() const;
         LogicalDeviceAccessor get_device() const;
@@ -113,6 +119,12 @@ namespace VSL_NAMESPACE::graphic_resource {
 
     public:
         Pool() = default;
+        Pool(const Pool&) = default;
+        Pool(Pool&&) noexcept = default;
+        Pool& operator=(Pool replacement) noexcept {
+            swap(replacement);
+            return *this;
+        }
         explicit operator bool() const noexcept { return bool(_owner); }
         lifetime::OwnerRef owner_ref() const;
         LogicalDeviceAccessor get_device() const;
@@ -135,6 +147,12 @@ namespace VSL_NAMESPACE::graphic_resource {
 
     public:
         Resource() = default;
+        Resource(const Resource&) = default;
+        Resource(Resource&&) noexcept = default;
+        Resource& operator=(Resource replacement) noexcept {
+            swap(replacement);
+            return *this;
+        }
         explicit operator bool() const noexcept { return bool(_owner); }
         LogicalDeviceAccessor get_device() const;
         void swap(Resource& other) noexcept { _owner.swap(other._owner); }

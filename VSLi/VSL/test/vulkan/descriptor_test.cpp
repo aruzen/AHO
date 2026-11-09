@@ -5,6 +5,7 @@
 #include <VSL/lifetime/command_access.hpp>
 #include "support/compute_fixture.hpp"
 #include "support/scoped_environment.hpp"
+#include "support/deferred_action.hpp"
 #include <VSL/utils/typed_safe_resource.hpp>
 #include <VSL/utils/typed_resources.hpp>
 #include <VSL/lifetime/descriptor_storage.hpp>
@@ -240,6 +241,38 @@ namespace {
         allocated.back().update(&*output);
         resource = allocated.back();
         ExpectSequence(execute(37), 37);
+    }
+    TEST(DescriptorOwnershipTest, CopyAndMoveReplacementPublishesItsOwnerBeforeOldOwnerCanDestroyTheFacade) {
+        const auto exercise = []<typename Impl>() {
+            using Facade = decltype(DescriptorAccess::FromShared(std::shared_ptr<Impl>{}));
+            for (const bool move : {false, true}) {
+                SCOPED_TRACE(move);
+                auto source = DescriptorAccess::FromShared(std::shared_ptr<Impl>(std::make_shared<int>(1), nullptr));
+                std::weak_ptr<void> incoming = source.owner_ref().share();
+                std::unique_ptr<Facade> current;
+                bool called = false;
+                const vsl_test::DeferredAction action([&] {
+                    called = true;
+                    const auto owner = incoming.lock();
+                    ASSERT_GT(owner.use_count(), 0);
+                    ASSERT_TRUE(current);
+                    EXPECT_FALSE(current->owner_ref().owner_before(owner));
+                    EXPECT_FALSE(owner.owner_before(current->owner_ref().share()));
+                    current.reset();
+                });
+                current = std::make_unique<Facade>(DescriptorAccess::FromShared(std::shared_ptr<Impl>(action.owner(), nullptr)));
+                if (move)
+                    *current = std::move(source);
+                else
+                    *current = source;
+                EXPECT_TRUE(called);
+                EXPECT_FALSE(current);
+                EXPECT_EQ(incoming.expired(), move);
+            }
+        };
+        exercise.operator()<vsl::impl::ResourceBindingLayoutImpl>();
+        exercise.operator()<vsl::impl::GraphicResourcePoolImpl>();
+        exercise.operator()<vsl::impl::GraphicResourceImpl>();
     }
     TEST_F(DescriptorVulkanIntegrationTest, NativeAllocationRegistersTheStartingPoolWhenItsCallerReplacesThePoolFacade) {
         using namespace vsl::graphic_resource;

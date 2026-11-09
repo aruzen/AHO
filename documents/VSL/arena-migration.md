@@ -296,6 +296,8 @@ strict17ファイル／12TU、installed public consumer30種と旧入口／一�
 
 BindingLayout／Pool／Resourceの公開`data_`とraw Impl構築を閉じ、各値がprivateなOwnedRefを一つ保存する。既存のDeviceからの生成、allocate／make／bind／update／get_poolを維持し、空判定にはbool、所有境界の受渡しにはowner_ref、Deviceの取得にはget_deviceを使う。
 
+3型のcopy／move代入もfacade自身が値引数を受け、swapして戻り参照を評価してから旧ownerを回収する。内側のOwnedRefへの代入だけで外側の戻り順序を決めない。旧ownerの解放callbackが代入先facadeを破棄する場合、呼出し側は戻り参照を使用しない。
+
 ```cpp
 vsl::graphic_resource::ExactAllocateManager manager(device);
 auto [pool, resources] = manager.make(std::vector{layout});
@@ -319,7 +321,7 @@ descriptor bindのinvoke／public trackは入力Resource群と必要なPipeline�
 
 追加のowner wrapper／control blockは作らない。局所的なownerのコピー、descriptor入力vectorのsnapshot、Manager cache候補、Impl内部コンテナ、既存の共有CPU stateとidentityの個別確保は残る。Native descriptor生成・更新・破棄は既存の共通backendで行う。CPU arenaとVulkanのdevice memoryの区別、host側の直列化、独立した保持policyは維持する。
 
-macOS arm64／Clang20 C++26、MoltenVK、Vulkan validation、ASan／UBSanで、新runtime9件と全VSL1,168成功（対応外format3 skip）／AHO GPU192・CPU1,071、compile契約271件を確認した。変更前には、recipeを経た元nodeの脱落とManager代入中の公開順序の不一致を実GPUで再現した。heap／arenaのPNG3枚は一致し、resize後もPipeline生成1回を維持する。
+macOS arm64／Clang20 C++26、MoltenVK、Vulkan validation、ASan／UBSanで、新runtime10件（CPU1件を含む）と全VSL1,169成功（対応外format3 skip）／AHO GPU192・CPU1,071、compile契約271件を確認した。変更前には、recipeを経た元nodeの脱落とManager代入中の公開順序の不一致を実GPUで再現した。heap／arenaのPNG3枚は一致し、resize後もPipeline生成1回を維持する。
 
 strict34ファイル／27TUと、宣言位置を修正した2ファイル／2TUの再検査が成功した。installed public consumer30種・新負例18種、private bridge非install、archive／生成header一致、Debug／Release／x86_64寸法生成、構成混在拒否と直近親の旧header拒否、source395件とMSBuild登録も確認した。確保失敗の順序はcache候補の構築を所属変更前へ置いているが、bad_allocのfault injectionはしていない。Windows／Linux実機、x86_64全体実行、device lost実機、並行CPUアクセスと性能比較は未検証である。
 

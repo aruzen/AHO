@@ -10,12 +10,11 @@ namespace VSL_NAMESPACE::lifetime {
         LogicalDeviceAccessor _device;
         std::shared_ptr<const impl::PipelineRecipe> _recipe;
         friend class PipelineRecipeDraft;
+        friend struct detail::PipelineRecipeAccess;
         PipelineRecipeSnapshot(LogicalDeviceAccessor device, std::shared_ptr<const impl::PipelineRecipe> recipe);
 
     public:
         LogicalDeviceAccessor device() const { return _device; }
-        const impl::PipelineRecipe& definition() const&;
-        const impl::PipelineRecipe& definition() const&& = delete;
         const std::optional<std::vector<DescriptorLayoutCreateInfo>>& pending_layouts() const&;
         const std::optional<std::vector<DescriptorLayoutCreateInfo>>& pending_layouts() const&& = delete;
         PipelineRecipeSnapshot with_layouts(std::span<const graphic_resource::BindingLayout> layouts) const;

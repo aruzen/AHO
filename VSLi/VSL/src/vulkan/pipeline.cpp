@@ -1,3 +1,4 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/owner_validation.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/shader_access.hpp>
@@ -9,6 +10,10 @@
 #include <VSL/lifetime/identity_access.hpp>
 #include <VSL/lifetime/native_recording.hpp>
 #include <stdexcept>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
@@ -32,7 +37,7 @@ namespace VSL_NAMESPACE {
             (void)layout.get_device();
             if (!layout.has_recipe())
                 throw std::invalid_argument("Pipeline requires a layout recipe or explicit state and shaders");
-            const auto& recipe = layout.recipe();
+            const auto& recipe = PipelineRecipeAccess::Read(layout);
             if (!operation::pipeline_layout_matches(*GraphicsAccess::Owned(layout), recipe.binding_layouts, recipe.push_ranges))
                 throw std::invalid_argument("Pipeline recipe has changed since native layout construction");
             return recipe;

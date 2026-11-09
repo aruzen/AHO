@@ -1,4 +1,9 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include "support/vulkan_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
 
 namespace {
     namespace pl = vsl::pipeline_layout;
@@ -19,6 +24,6 @@ namespace {
         EXPECT_EQ(attachment.colorBlendOp, vk::BlendOp::eAdd);
         EXPECT_FALSE(state.logicOpEnable);
         pl::ColorBlend{}.injection(layout);
-        EXPECT_EQ(layout.recipe().graphics_state.blend_attachments.size(), 2u);
+        EXPECT_EQ(PipelineRecipeAccess::Read(layout).graphics_state.blend_attachments.size(), 2u);
     }
 } // namespace

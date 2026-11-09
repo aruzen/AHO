@@ -563,3 +563,34 @@ Native入口は元CB／Impl node／生存handleと保存nodeを検査する。me
 macOS arm64／Clang20／C++26／MoltenVK・validation・ASan／UBSanで新4件と全VSL1,193（既知format3 skip）、AHO GPU192／CPU1,071、compile317を確認した。CPU回帰はmetadataと画像を別CBにして、一括公開前の旧owner回収を画像保持が隠さない構成とした。GPU回帰は元CB／node／presentation状態と最後の画像までのgeneration保持を確認する。heap／arenaの3PNGはバイト一致し、glTF viewerも姿勢・resize・12frame後の同姿勢一致を検証した。
 
 strict28files／23TU、gltf viewerの別整形・構文確認、installed consumer30種・公開正例1＋負例10、private非配布、archive／header一致、構成別／x86_64寸法、mixed構成と親dbf headerのlink拒否、source401／MSBuild登録が成功した。生成IDはed84546d…へ更新した。Windows／Linux実機、x86_64全体実行、device lost、並行CPU、性能率は未検証。次はrecipe参照、続いてstate編集借用の公開入口を閉じる。
+
+## 順序12f: Pipelineレシピの公開境界
+
+Layout／Editor／Frozenのrecipe()、Editorのedit_recipe()、Snapshotのdefinition()を公開APIから外した。CPUレシピの実定義は引き続きprivateに置き、内部のPipelineRecipeAccess::Read／Editだけが借用参照を解決する。通常のTyped templateはprivateヘッダーを必要としない。Native生成、検証、sourceの元node／control blockと重複排除、freezeの共有判定、snapshotのdeep copyは変更しない。
+
+利用側の独自stageは公開stageを合成し、構築手順はDraft／Snapshotで表す。
+
+```cpp
+struct Stages {
+    void injection(vsl::PipelineLayoutEditAccessor layout) const {
+        vsl::pipeline_layout::ColorBlend{}.injection(layout);
+        vsl::pipeline_layout::Rasterization{
+            vsl::pipeline_layout::CullingMode::NONE}.injection(layout);
+    }
+};
+vsl::PipelineLayout layout(device, Stages{});
+auto frozen = std::move(layout).freeze();
+auto runtime = frozen.runtime();
+
+vsl::lifetime::PipelineRecipeDraft draft(device);
+draft.inject(Stages{}, shaders);
+auto snapshot = draft.snapshot();
+```
+
+copy／add／freeze／runtime／has_recipe、保存Editor、既存stageの注入、pending_layouts／layout_sources等の値APIは維持する。Snapshotは保存Editorから独立した不変所有値である。private Read／Editの一時値入力はdeleteし、内部でも借用参照を一時Facadeから取り出さない。参照解決のためのownerコピー、管理表探索、新しいcontrol blockは追加しない。
+
+旧Impl参照を利用する独自stageは、公開stageの合成またはGraphicsPipelineStateの編集APIへ移行する。任意のImpl変更を可能にする代替getterは設けない。GraphicsPipelineStateEditRefとstateのdefinitionの公開境界は次の単位で整理する。CPU recipe／配列の個別確保、内部Shared境界、private bridgeは残り、この単位は配置サイズや性能率を改善する変更ではない。
+
+全341翻訳単位の構文検査、公開正例1＋負例5、private bridgeの一時借用拒否、strict33files／29TU、source402／MSBuild登録が成功した。macOS arm64／Clang20／C++26／MoltenVK・validation・ASan／UBSanで全VSL1,193（既知format3 skip）、AHO GPU192／CPU1,071、compile323、heap／arenaの3PNG一致、glTF viewerの姿勢・resize・12frame後の同姿勢一致を確認した。既存のdeep copy、保存Editorの分離、Typed Input末尾注入、Native前のschema拒否、source回収、失敗時不変の試験を再利用し、同じ意味のruntime試験は追加していない。
+
+installed consumer30種と新公開正負6件、private非配布、archive／生成header一致、Debug／Release／x86_64寸法、構成混在と親ed84546d…headerのlink拒否が成功した。生成IDはbb2e8ca3…へ更新した。Windows／Linux実機、x86_64全体実行、device lost、並行CPU、性能率は未検証。次はstate編集借用の公開境界を整理する。

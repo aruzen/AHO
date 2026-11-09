@@ -1,5 +1,10 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <array>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
 
 namespace {
     namespace pl = vsl::pipeline_layout;
@@ -127,8 +132,8 @@ namespace {
         pl::PushConstants valid;
         valid.definitions = {{vsl::ShaderFlag::COMPUTE, 8, 8}};
         valid.injection(layout);
-        const auto* previous = layout.recipe().push_ranges.data();
-        const auto old_count = layout.recipe().push_ranges.size();
+        const auto* previous = PipelineRecipeAccess::Read(layout).push_ranges.data();
+        const auto old_count = PipelineRecipeAccess::Read(layout).push_ranges.size();
         const auto limit = physical.data_->device.getProperties().limits.maxPushConstantsSize;
         for (const pl::PushContentDefinition definition : {
                  pl::PushContentDefinition{vsl::ShaderFlag::COMPUTE, 2, 4},
@@ -142,7 +147,7 @@ namespace {
             EXPECT_THROW(invalid.injection(layout), std::invalid_argument);
             const auto& current = vsl_test::inspect_layout(layout).pipeline_layout;
             EXPECT_EQ(current.pushConstantRangeCount, old_count);
-            EXPECT_EQ(layout.recipe().push_ranges.data(), previous);
+            EXPECT_EQ(PipelineRecipeAccess::Read(layout).push_ranges.data(), previous);
             if (current.pushConstantRangeCount == 1) {
                 EXPECT_EQ(current.pPushConstantRanges[0].offset, 8u);
                 EXPECT_EQ(current.pPushConstantRanges[0].size, 8u);

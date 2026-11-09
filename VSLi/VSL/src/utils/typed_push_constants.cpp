@@ -1,3 +1,4 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
@@ -7,6 +8,10 @@
 #include <VSL/vulkan/_pimpls.hpp>
 #include <stdexcept>
 #include <algorithm>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
@@ -23,7 +28,7 @@ namespace VSL_NAMESPACE::typed::detail {
         pushes.injection(layout);
     }
     void validate_push_schema(const lifetime::PipelineRecipeSnapshot& recipe, std::span<const PushRequirement> requirements) {
-        for (const auto& shader : recipe.definition().shaders) {
+        for (const auto& shader : PipelineRecipeAccess::Read(recipe).shaders) {
             utils::SPIRVReflector reflection({}, std::span<const std::uint32_t>(shader->code), shader->name, ShaderType(shader->stage));
             if (!reflection.generated.push_constants)
                 continue;

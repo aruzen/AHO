@@ -1,4 +1,5 @@
 #ifdef AHO_GPU_TESTS
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include "../support/live_gpu.hpp"
 #include <AHO/pipeline/layouts.hpp>
 namespace {
@@ -10,8 +11,8 @@ namespace {
         ASSERT_TRUE(layout);
         EXPECT_EQ(layout.get_device(), engine->data()->logical_device);
         ASSERT_TRUE(layout.has_recipe());
-        EXPECT_EQ(layout.recipe().graphics_state.rasterization.cullMode, vk::CullModeFlags(vk::CullModeFlagBits::eBack));
-        EXPECT_EQ(layout.recipe().graphics_state.input_assembly.topology, vk::PrimitiveTopology::eTriangleList);
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess::Read(layout).graphics_state.rasterization.cullMode, vk::CullModeFlags(vk::CullModeFlagBits::eBack));
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess::Read(layout).graphics_state.input_assembly.topology, vk::PrimitiveTopology::eTriangleList);
     }
 } // namespace
 #else

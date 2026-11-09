@@ -1,9 +1,14 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/pipeline_recipe.hpp>
 #include <VSL/lifetime/pipeline_layout_storage.hpp>
 #include <VSL/lifetime/pipeline_storage.hpp>
 #include <VSL/lifetime/shader_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
@@ -24,7 +29,7 @@ namespace VSL_NAMESPACE::lifetime {
         void validate_target(LogicalDeviceAccessor device, const RenderPassAccessor& pass, std::uint32_t subpass);
         std::vector<PipelineShaderSource> shader_inputs(const impl::PipelineRecipe& recipe);
         PipelineLayoutInit layout_input(const PipelineRecipeSnapshot& snapshot) {
-            const auto& recipe = snapshot.definition();
+            const auto& recipe = PipelineRecipeAccess::Read(snapshot);
             if (recipe.pending_layouts)
                 throw std::logic_error("Pipeline descriptor layouts have not been materialized");
             PipelineLayoutInit result;
@@ -50,21 +55,21 @@ namespace VSL_NAMESPACE::lifetime {
 
     PipelineRecipeSnapshot::PipelineRecipeSnapshot(LogicalDeviceAccessor device, std::shared_ptr<const impl::PipelineRecipe> recipe)
         : _device(std::move(device)), _recipe(std::move(recipe)) {}
-    const impl::PipelineRecipe& PipelineRecipeSnapshot::definition() const& {
-        if (!_recipe)
+    const impl::PipelineRecipe& detail::PipelineRecipeAccess::Read(const PipelineRecipeSnapshot& value) {
+        if (!value._recipe)
             throw std::logic_error("Pipeline recipe snapshot is empty");
-        return *_recipe;
+        return *value._recipe;
     }
     const std::optional<std::vector<DescriptorLayoutCreateInfo>>& PipelineRecipeSnapshot::pending_layouts() const& {
-        return definition().pending_layouts;
+        return PipelineRecipeAccess::Read(*this).pending_layouts;
     }
     PipelineRecipeSnapshot PipelineRecipeSnapshot::with_layouts(std::span<const graphic_resource::BindingLayout> layouts) const {
-        auto next = std::make_shared<impl::PipelineRecipe>(definition());
+        auto next = std::make_shared<impl::PipelineRecipe>(PipelineRecipeAccess::Read(*this));
         replace_recipe_layouts(*next, _device, layouts);
         return {_device, std::move(next)};
     }
     std::vector<graphic_resource::BindingLayout> PipelineRecipeSnapshot::layout_sources() const {
-        const auto& recipe = definition();
+        const auto& recipe = PipelineRecipeAccess::Read(*this);
         std::vector<graphic_resource::BindingLayout> result;
         result.reserve(recipe.binding_layouts.size());
         for (size_t i = 0; i < recipe.binding_layouts.size(); ++i)
@@ -75,11 +80,11 @@ namespace VSL_NAMESPACE::lifetime {
         init_start(std::move(device));
     }
     PipelineRecipeSnapshot PipelineRecipeDraft::snapshot() const {
-        return {get_device(), std::make_shared<impl::PipelineRecipe>(edit_recipe())};
+        return {get_device(), std::make_shared<impl::PipelineRecipe>(PipelineRecipeAccess::Edit(*this))};
     }
     GraphicsPipeline make_graphics_pipeline(PipelineRecipeSnapshot snapshot, RenderPassAccessor pass, std::uint32_t subpass, typed::HeapStorage) {
         validate_target(snapshot.device(), pass, subpass);
-        const auto& recipe = snapshot.definition();
+        const auto& recipe = PipelineRecipeAccess::Read(snapshot);
         if (recipe.pending_layouts)
             throw std::logic_error("Pipeline descriptor layouts have not been materialized");
         auto owner = make_heap_pipeline_layout(snapshot.device(), recipe.binding_layouts, recipe.push_ranges);
@@ -90,14 +95,14 @@ namespace VSL_NAMESPACE::lifetime {
     GraphicsPipeline make_graphics_pipeline(PipelineRecipeSnapshot snapshot, RenderPassAccessor pass, std::uint32_t subpass, typed::ArenaStorage<>) {
         validate_target(snapshot.device(), pass, subpass);
         GraphicsPipelineState state;
-        state.edit().get() = snapshot.definition().graphics_state;
+        state.edit().get() = PipelineRecipeAccess::Read(snapshot).graphics_state;
         const std::array<ResourceInit, 2> inputs{
-            layout_input(snapshot), GraphicsPipelineInit{LAYOUT, std::move(pass), std::move(state), shader_inputs(snapshot.definition()), subpass}};
+            layout_input(snapshot), GraphicsPipelineInit{LAYOUT, std::move(pass), std::move(state), shader_inputs(PipelineRecipeAccess::Read(snapshot)), subpass}};
         ResourceArena arena(snapshot.device(), PLAN, inputs);
         return GraphicsPipeline(arena.pipeline(PIPELINE));
     }
     ComputePipeline make_compute_pipeline(PipelineRecipeSnapshot snapshot, typed::HeapStorage) {
-        const auto& recipe = snapshot.definition();
+        const auto& recipe = PipelineRecipeAccess::Read(snapshot);
         if (recipe.pending_layouts)
             throw std::logic_error("Pipeline descriptor layouts have not been materialized");
         if (recipe.shaders.size() != 1)
@@ -108,7 +113,7 @@ namespace VSL_NAMESPACE::lifetime {
         return ComputePipeline(detail::GraphicsAccess::FromShared(make_heap_pipeline(snapshot.device(), layout.owner_ref(), input)));
     }
     ComputePipeline make_compute_pipeline(PipelineRecipeSnapshot snapshot, typed::ArenaStorage<>) {
-        auto shaders = shader_inputs(snapshot.definition());
+        auto shaders = shader_inputs(PipelineRecipeAccess::Read(snapshot));
         if (shaders.size() != 1)
             throw std::invalid_argument("Compute pipeline requires exactly one compute shader");
         const std::array<ResourceInit, 2> inputs{layout_input(snapshot), ComputePipelineInit{LAYOUT, std::move(shaders.front())}};

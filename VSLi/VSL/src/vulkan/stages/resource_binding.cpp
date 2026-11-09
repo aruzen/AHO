@@ -1,3 +1,4 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/vulkan/stages/resource_binding.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/lifetime/pipeline_layout_storage.hpp>
@@ -5,11 +6,15 @@
 #include <VSL/lifetime/descriptor_access.hpp>
 #include <utility>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
+
 VSL_NAMESPACE::pipeline_layout::ResourceBinding::ResourceBinding(std::vector<graphic_resource::BindingLayout> sets)
     : resource_binding_sets(std::move(sets)) {}
 
 void VSL_NAMESPACE::pipeline_layout::ResourceBinding::injection(PipelineLayoutEditAccessor pl) {
-    lifetime::replace_recipe_layouts(pl.edit_recipe(), pl.get_device(), resource_binding_sets);
+    lifetime::replace_recipe_layouts(PipelineRecipeAccess::Edit(pl), pl.get_device(), resource_binding_sets);
 }
 
 void VSL_NAMESPACE::lifetime::replace_recipe_layouts(impl::PipelineRecipe& info, LogicalDeviceAccessor device,

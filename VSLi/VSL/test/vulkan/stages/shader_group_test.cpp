@@ -1,8 +1,13 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include "support/fixed_parent.hpp"
 #include "support/deferred_action.hpp"
 #include <VSL/lifetime/shader_access.hpp>
 #include <VSL/lifetime/pipeline_recipe.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::ShaderAccess;
@@ -26,8 +31,8 @@ namespace {
         EXPECT_THROW(original.injection(layout), std::logic_error);
         alias.add_shader(vertex);
         moved.injection(layout);
-        ASSERT_EQ(layout.recipe().shaders.size(), 1u);
-        EXPECT_EQ(layout.recipe().shaders.front(), ShaderAccess::Owned(vertex).get());
+        ASSERT_EQ(PipelineRecipeAccess::Read(layout).shaders.size(), 1u);
+        EXPECT_EQ(PipelineRecipeAccess::Read(layout).shaders.front(), ShaderAccess::Owned(vertex).get());
         moved.remove_shader(vertex);
         EXPECT_TRUE(ShaderGroupAccess::Data(alias)->shaders.empty());
     }
@@ -91,7 +96,7 @@ namespace {
             l::PipelineRecipeDraft draft(device);
             draft.inject(group);
             const auto snapshot = draft.snapshot();
-            const auto& recipe = snapshot.definition();
+            const auto& recipe = PipelineRecipeAccess::Read(snapshot);
             ASSERT_EQ(recipe.shaders.size(), 2u);
             EXPECT_EQ(recipe.shader_sources[0], recipe.shader_sources[1]);
             constexpr std::array<t::ResourceRequest, 1> external_requests{{{{2}, vsl::storage::ResourceKind::SHADER, true}}};
@@ -119,9 +124,9 @@ namespace {
         EXPECT_EQ(ShaderGroupAccess::Data(group)->name, "triangle");
         auto layout = make_layout_state();
         group.injection(layout);
-        ASSERT_EQ(layout.recipe().shaders.size(), 2u);
-        EXPECT_EQ(layout.recipe().shaders[0]->shader_module, ShaderAccess::Owned(vertex)->shader_module);
-        EXPECT_EQ(layout.recipe().shaders[1]->shader_module, ShaderAccess::Owned(fragment)->shader_module);
+        ASSERT_EQ(PipelineRecipeAccess::Read(layout).shaders.size(), 2u);
+        EXPECT_EQ(PipelineRecipeAccess::Read(layout).shaders[0]->shader_module, ShaderAccess::Owned(vertex)->shader_module);
+        EXPECT_EQ(PipelineRecipeAccess::Read(layout).shaders[1]->shader_module, ShaderAccess::Owned(fragment)->shader_module);
     }
     TEST_F(ShaderGroupVulkanIntegrationTest, RemovesMatchingShaderByNameAndHandle) {
         vsl::Shader<vsl::ShaderType::VERTEX> vertex(device, vsl_test::shader_path("triangle.vert.spv"),
@@ -178,9 +183,9 @@ namespace {
         EXPECT_EQ(ShaderGroupAccess::Data(group)->shaders[1], ShaderAccess::Owned(fragment));
         auto layout = make_layout_state();
         group.injection(layout);
-        ASSERT_EQ(layout.recipe().shaders.size(), 2u);
-        EXPECT_EQ(layout.recipe().shaders[0]->shader_module, ShaderAccess::Owned(vertex)->shader_module);
-        EXPECT_EQ(layout.recipe().shaders[1]->shader_module, ShaderAccess::Owned(fragment)->shader_module);
+        ASSERT_EQ(PipelineRecipeAccess::Read(layout).shaders.size(), 2u);
+        EXPECT_EQ(PipelineRecipeAccess::Read(layout).shaders[0]->shader_module, ShaderAccess::Owned(vertex)->shader_module);
+        EXPECT_EQ(PipelineRecipeAccess::Read(layout).shaders[1]->shader_module, ShaderAccess::Owned(fragment)->shader_module);
     }
 } // namespace
 
@@ -190,15 +195,15 @@ namespace {
         const vsl::Shader<vsl::ShaderType::VERTEX> shader(device, vsl_test::shader_path("triangle.vert.spv"));
         vsl::pipeline_layout::ShaderGroup group("retiring", {ready, shader});
         auto layout = make_layout_state();
-        const auto shaders = layout.recipe().shaders;
-        const auto sources = layout.recipe().sources;
-        const auto indices = layout.recipe().shader_sources;
+        const auto shaders = PipelineRecipeAccess::Read(layout).shaders;
+        const auto sources = PipelineRecipeAccess::Read(layout).sources;
+        const auto indices = PipelineRecipeAccess::Read(layout).shader_sources;
         const auto native = ShaderAccess::Owned(shader)->shader_module;
         const_cast<vsl::lifetime::DependencyNode*>(ShaderAccess::Owned(shader)->owner_node)->retire();
         EXPECT_THROW(group.injection(layout), std::invalid_argument);
-        EXPECT_EQ(layout.recipe().shaders, shaders);
-        EXPECT_EQ(layout.recipe().sources, sources);
-        EXPECT_EQ(layout.recipe().shader_sources, indices);
+        EXPECT_EQ(PipelineRecipeAccess::Read(layout).shaders, shaders);
+        EXPECT_EQ(PipelineRecipeAccess::Read(layout).sources, sources);
+        EXPECT_EQ(PipelineRecipeAccess::Read(layout).shader_sources, indices);
         EXPECT_EQ(ShaderAccess::Owned(shader)->shader_module, native);
         EXPECT_NO_THROW(group.remove_shader(shader));
         ASSERT_EQ(ShaderGroupAccess::Data(group)->shaders.size(), 1u);

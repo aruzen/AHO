@@ -1,8 +1,13 @@
+#include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/shader_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include "support/compute_fixture.hpp"
 #include <VSL/lifetime/resource_arena.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::ShaderAccess;
@@ -118,7 +123,7 @@ namespace {
         constexpr t::ResourcePlan<1> direct_plan(direct_requests);
         for (const bool borrowed : {false, true}) {
             auto invalid = identical;
-            invalid.data_ = borrowed ? std::shared_ptr<vsl::impl::ResourceBindingLayoutImpl>(std::shared_ptr<void>{}, identical.data_.get()) : nullptr;
+            DescriptorAccess::Owned(invalid) = borrowed ? std::shared_ptr<vsl::impl::ResourceBindingLayoutImpl>(std::shared_ptr<void>{}, DescriptorAccess::Owned(identical).get()) : nullptr;
             const std::array<l::ResourceInit, 1> invalid_inputs{l::PipelineLayoutInit{{invalid}, {}}};
             EXPECT_THROW(l::ResourceArena(device, direct_plan, invalid_inputs), std::invalid_argument);
         }
@@ -145,7 +150,7 @@ namespace {
         vsl::PipelineLayoutAccessor kept;
         {
             vsl::graphic_resource::BindingLayout binding(device, STORAGE_LAYOUT.bindings);
-            recipe_binding = binding.data_;
+            recipe_binding = DescriptorAccess::Owned(binding).share();
             vsl::PipelineLayout source(device, pl::ResourceBinding{{binding}});
             source_owner = source.data_;
             constexpr std::array<t::ResourceRequest, 1> requests{{{{1}, s::ResourceKind::PIPELINE_LAYOUT, true}}};
@@ -172,7 +177,7 @@ namespace {
         std::weak_ptr<void> previous;
         {
             vsl::graphic_resource::BindingLayout binding(device, STORAGE_LAYOUT.bindings);
-            previous = binding.data_;
+            previous = DescriptorAccess::Owned(binding).share();
             pl::ResourceBinding{{binding}}.injection(layout);
         }
         EXPECT_FALSE(previous.expired());
@@ -220,7 +225,7 @@ namespace {
             constexpr std::array<t::ResourceRequest, 1> requests{{{{1}, s::ResourceKind::PIPELINE_LAYOUT}}};
             constexpr t::ResourcePlan<1> plan(requests);
             vsl::graphic_resource::BindingLayout extra(device, std::vector<vsl::graphic_resource::BindingPoint>{});
-            unused_binding = extra.data_;
+            unused_binding = DescriptorAccess::Owned(extra).share();
             const std::array<l::ResourceInit, 1> inputs{l::PipelineLayoutInit{{*binding, extra}, {{vsl::ShaderFlag::COMPUTE, 0, 4}}}};
             l::ResourceArena arena(device, plan, inputs);
             native_owner = arena.owner();
@@ -350,7 +355,7 @@ namespace {
         std::weak_ptr<vsl::impl::ResourceBindingLayoutImpl> weak_binding;
         {
             vsl::graphic_resource::BindingLayout binding(device, vsl::graphic_resource::Type::STORAGE_BUFFER, vsl::ShaderFlag::COMPUTE);
-            weak_binding = binding.data_;
+            weak_binding = DescriptorAccess::Owned(binding).share();
             namespace pl = vsl::pipeline_layout;
             vsl::PipelineLayout original(device, pl::ResourceBinding{{binding}},
                                          pl::PushConstants(vsl::ShaderFlag::COMPUTE, {{vsl::ShaderFlag::COMPUTE, 0, 4}}));

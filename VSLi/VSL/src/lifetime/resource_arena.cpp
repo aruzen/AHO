@@ -1,3 +1,4 @@
+#include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/shader_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/sampler_access.hpp>
@@ -20,6 +21,10 @@
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/storage/cpu_region.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::ShaderAccess;
@@ -174,19 +179,19 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     resource.reference = SamplerAccess::Owned(*(sampler)).get();
                     resource.owner_index = retain_dependency(SamplerAccess::Owned(*(sampler)));
                 } else if (const auto* layout = std::get_if<graphic_resource::BindingLayout>(&value)) {
-                    if (!layout->data_.use_count() || !layout->data_ || !layout->data_->layout || layout->data_->device != device.data_.get())
+                    if (!DescriptorAccess::Owned(*(layout)).use_count() || !DescriptorAccess::Owned(*(layout)) || !DescriptorAccess::Owned(*(layout))->layout || DescriptorAccess::Owned(*(layout))->device != device.data_.get())
                         throw std::invalid_argument("External descriptor layout requires an owner on the arena device");
-                    resource.reference = layout->data_.get();
-                    resource.owner_index = retain_dependency(owned_ref(layout->data_, layout->data_->owner_node));
+                    resource.reference = DescriptorAccess::Owned(*(layout)).get();
+                    resource.owner_index = retain_dependency(DescriptorAccess::Owned(*(layout)));
                 } else if (const auto* pool = std::get_if<graphic_resource::Pool>(&value)) {
-                    if (!pool->data_.use_count() || !pool->data_ || !pool->data_->descriptor_pool || pool->data_->retiring ||
-                        pool->data_->device != device.data_.get())
+                    if (!DescriptorAccess::Owned(*(pool)).use_count() || !DescriptorAccess::Owned(*(pool)) || !DescriptorAccess::Owned(*(pool))->descriptor_pool || DescriptorAccess::Owned(*(pool))->retiring ||
+                        DescriptorAccess::Owned(*(pool))->device != device.data_.get())
                         throw std::invalid_argument("External descriptor pool requires a live owner on the arena device");
-                    const auto owner = pool->data_->owner.lock();
-                    if (!owner.use_count() || pool->data_.owner_before(owner) || owner.owner_before(pool->data_))
+                    const auto owner = DescriptorAccess::Owned(*(pool))->owner.lock();
+                    if (!owner.use_count() || DescriptorAccess::Owned(*(pool)).owner_before(owner) || owner.owner_before(OwnerAccess::Shared(DescriptorAccess::Owned(*(pool)))))
                         throw std::invalid_argument("External descriptor pool requires its canonical owner");
-                    resource.reference = pool->data_.get();
-                    resource.owner_index = retain_dependency(owned_ref(owner, pool->data_->owner_node));
+                    resource.reference = DescriptorAccess::Owned(*(pool)).get();
+                    resource.owner_index = retain_dependency(owned_ref(owner, DescriptorAccess::Owned(*(pool))->owner_node));
                 } else if (const auto* semaphore = std::get_if<SemaphoreHolder>(&value)) {
                     if (semaphore->get_device().data_ != device.data_)
                         throw std::invalid_argument("External semaphore requires the arena device");
@@ -261,7 +266,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
                         (void)find(*id, storage::ResourceKind::DESCRIPTOR_LAYOUT);
                     } else {
                         const auto& binding = std::get<graphic_resource::BindingLayout>(source);
-                        if (!binding.data_ || !binding.data_.use_count() || !binding.data_->layout || binding.data_->device != device.data_.get())
+                        if (!DescriptorAccess::Owned(binding) || !DescriptorAccess::Owned(binding).use_count() || !DescriptorAccess::Owned(binding)->layout || DescriptorAccess::Owned(binding)->device != device.data_.get())
                             throw std::invalid_argument("Pipeline layout source requires an owning layout on the arena device");
                     }
             }
@@ -457,7 +462,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     if (const auto* id = std::get_if<typed::ResourceId>(&source))
                         layouts.push_back(find(*id, storage::ResourceKind::DESCRIPTOR_LAYOUT).get<impl::ResourceBindingLayoutImpl>());
                     else
-                        layouts.push_back(std::get<graphic_resource::BindingLayout>(source).data_.get());
+                        layouts.push_back(DescriptorAccess::Owned(std::get<graphic_resource::BindingLayout>(source)).get());
                 construct_pipeline_layout(slot, *device.data_, layouts, info.push_ranges);
                 resource.reference = &pipeline_layout_at(slot);
                 break;
@@ -725,20 +730,23 @@ namespace VSL_NAMESPACE::lifetime {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::DESCRIPTOR_LAYOUT);
-        return graphic_resource::BindingLayout(std::shared_ptr<impl::ResourceBindingLayoutImpl>{
-            resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.get<impl::ResourceBindingLayoutImpl>()});
+        if (resource.placement.external)
+            return DescriptorAccess::FromOwned(_owner->dependencies.at(resource.owner_index).alias(resource.get<impl::ResourceBindingLayoutImpl>()));
+        return DescriptorAccess::FromOwned(_owner->descriptor_context.node.ref(_owner).alias(resource.get<impl::ResourceBindingLayoutImpl>()));
     }
     graphic_resource::Pool ResourceArena::descriptor_pool(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::DESCRIPTOR_POOL);
-        return {{resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.get<impl::GraphicResourcePoolImpl>()}};
+        if (resource.placement.external)
+            return DescriptorAccess::FromOwned(_owner->dependencies.at(resource.owner_index).alias(resource.get<impl::GraphicResourcePoolImpl>()));
+        return DescriptorAccess::FromOwned(_owner->descriptor_context.node.ref(_owner).alias(resource.get<impl::GraphicResourcePoolImpl>()));
     }
     GraphicResource ResourceArena::descriptor_set(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::DESCRIPTOR_SET);
-        return {{_owner, resource.get<impl::GraphicResourceImpl>()}};
+        return DescriptorAccess::FromOwned(_owner->descriptor_context.node.ref(_owner).alias(resource.get<impl::GraphicResourceImpl>()));
     }
     BufferRef ResourceArena::borrow_buffer(typed::ResourceId id) const& {
         if (!_owner)

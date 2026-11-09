@@ -1,4 +1,5 @@
 #pragma once
+#include <VSL/lifetime/descriptor_access.hpp>
 #include "vulkan_fixture.hpp"
 #include <VSL/vulkan/commands/dispatch.hpp>
 #include <VSL/vulkan/commands/push_content.hpp>
@@ -93,12 +94,12 @@ namespace vsl_test {
         pipeline.reset();
         layout.reset();
         shader.reset();
-        resource.data_.reset();
+        VSL_NAMESPACE::lifetime::detail::DescriptorAccess::Owned(resource).reset();
         // Pool and Resource hold each other strongly (I23). Break fixture-owned cycles.
         if (resources)
-            for (auto& owned_pool : resources->data_->pools)
+            for (auto& owned_pool : VSL_NAMESPACE::lifetime::detail::DescriptorManagerAccess::Data(*(resources))->pools)
                 owned_pool->resources.clear();
-        pool.data_.reset();
+        VSL_NAMESPACE::lifetime::detail::DescriptorAccess::Owned(pool).reset();
         resources.reset();
         binding.reset();
         output.reset();

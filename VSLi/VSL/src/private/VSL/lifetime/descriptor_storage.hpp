@@ -32,6 +32,6 @@ namespace VSL_NAMESPACE::lifetime {
     using DescriptorSetAllocator = decltype(&operation::allocate_descriptor_sets);
     // allocateは成功時に全targetを初期化し、失敗時にnativeを残さない。所有・rollbackはこの層で扱う。
     std::pair<vk::Result, std::vector<std::shared_ptr<impl::GraphicResourceImpl>>> make_heap_descriptor_sets(
-        const std::shared_ptr<impl::GraphicResourcePoolImpl>& pool, std::span<const std::shared_ptr<impl::ResourceBindingLayoutImpl>> layouts,
+        OwnedRef<impl::GraphicResourcePoolImpl> pool, std::span<const OwnedRef<impl::ResourceBindingLayoutImpl>> layouts,
         DescriptorSetAllocator allocate = operation::allocate_descriptor_sets);
 } // namespace VSL_NAMESPACE::lifetime

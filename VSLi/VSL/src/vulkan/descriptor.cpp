@@ -1,6 +1,8 @@
 //
 // Created by morimoto_hibiki on 2025/06/09.
 //
+#include <VSL/lifetime/descriptor_access.hpp>
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/sampler_access.hpp>
 #include <VSL/define.hpp>
@@ -23,23 +25,27 @@
 #include <ranges>
 
 namespace {
+    using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
+}
+
+namespace {
     using VSL_NAMESPACE::lifetime::detail::BufferAccess;
     using VSL_NAMESPACE::lifetime::detail::ImageAccess;
     using VSL_NAMESPACE::lifetime::detail::SamplerAccess;
 } // namespace
 
 namespace {
-    void validate_pool(const std::shared_ptr<VSL_NAMESPACE::impl::GraphicResourcePoolImpl>& pool) {
+    void validate_pool(const VSL_NAMESPACE::lifetime::OwnedRef<VSL_NAMESPACE::impl::GraphicResourcePoolImpl>& pool) {
         if (!pool || !pool->descriptor_pool || pool->retiring)
             throw std::logic_error("Descriptor pool has been destroyed");
         std::erase_if(pool->resources, [](const auto& resource) { return resource.expired(); });
     }
-    void validate_layout(const std::shared_ptr<VSL_NAMESPACE::impl::GraphicResourcePoolImpl>& pool,
+    void validate_layout(const VSL_NAMESPACE::lifetime::OwnedRef<VSL_NAMESPACE::impl::GraphicResourcePoolImpl>& pool,
                          const VSL_NAMESPACE::graphic_resource::BindingLayout& layout) {
-        if (!layout.data_ || layout.data_->device != pool->device)
+        if (!DescriptorAccess::Owned(layout) || DescriptorAccess::Owned(layout)->device != pool->device)
             throw std::invalid_argument("Descriptor layout device mismatch");
     }
-    void validate_resource(const std::shared_ptr<VSL_NAMESPACE::impl::GraphicResourceImpl>& resource) {
+    void validate_resource(const VSL_NAMESPACE::lifetime::OwnedRef<VSL_NAMESPACE::impl::GraphicResourceImpl>& resource) {
         if (!resource)
             throw std::logic_error("Descriptor resource has been destroyed");
         VSL_NAMESPACE::lifetime::require_descriptor_valid(*resource);
@@ -48,7 +54,7 @@ namespace {
 
 namespace VSL_NAMESPACE::graphic_resource {
     namespace {
-        void update_buffer(std::shared_ptr<impl::GraphicResourceImpl> target, lifetime::OwnedRef<impl::BufferImpl> buffer,
+        void update_buffer(lifetime::OwnedRef<impl::GraphicResourceImpl> target, lifetime::OwnedRef<impl::BufferImpl> buffer,
                            size_t binding, std::optional<Type> type, size_t offset, std::optional<size_t> size);
     }
 } // namespace VSL_NAMESPACE::graphic_resource
@@ -64,12 +70,12 @@ VSL_NAMESPACE::graphic_resource::BindingLayout::BindingLayout(LogicalDeviceAcces
         throw std::out_of_range("Descriptor binding/count exceeds uint32_t");
     const BindingPoint point{binding == size_t(-1) ? UINT32_MAX : static_cast<std::uint32_t>(binding), binding_type,
                              shader_type, static_cast<std::uint32_t>(amount)};
-    data_ = lifetime::make_heap_descriptor_layout(device, {{point}});
+    _owner = DescriptorAccess::Owned(DescriptorAccess::FromShared(lifetime::make_heap_descriptor_layout(device, {{point}})));
 }
 
 VSL_NAMESPACE::graphic_resource::BindingLayout::BindingLayout(VSL_NAMESPACE::LogicalDeviceAccessor device,
                                                               const std::vector<BindingPoint>& points) {
-    data_ = lifetime::make_heap_descriptor_layout(device, {points});
+    _owner = DescriptorAccess::Owned(DescriptorAccess::FromShared(lifetime::make_heap_descriptor_layout(device, {points})));
 }
 
 VSL_NAMESPACE::graphic_resource::BindingLayout::BindingLayout(LogicalDeviceAccessor device,
@@ -77,13 +83,13 @@ VSL_NAMESPACE::graphic_resource::BindingLayout::BindingLayout(LogicalDeviceAcces
     : BindingLayout(device, std::vector<BindingPoint>(points.begin(), points.end())) {}
 
 std::vector<VSL_NAMESPACE::graphic_resource::BindingPoint> VSL_NAMESPACE::graphic_resource::BindingLayout::get_binding_points() const {
-    if (!data_ || !data_->layout)
+    if (!_owner || !_owner->layout)
         throw std::logic_error("Descriptor layout has been destroyed");
     std::vector<BindingPoint> result;
 
-    result.resize(this->data_->layout_bindings.size());
+    result.resize(this->_owner->layout_bindings.size());
     for (size_t i = 0; i < result.size(); i++) {
-        auto& binding = this->data_->layout_bindings[i];
+        auto& binding = this->_owner->layout_bindings[i];
         result[i].binding = binding.binding == (std::uint32_t)-1 ? (std::uint32_t)i : binding.binding;
         result[i].binding_type = (Type)binding.descriptorType;
         result[i].shader_type = (ShaderFlag)((uint32_t)binding.stageFlags);
@@ -93,25 +99,27 @@ std::vector<VSL_NAMESPACE::graphic_resource::BindingPoint> VSL_NAMESPACE::graphi
 }
 
 VSL_NAMESPACE::graphic_resource::ManagerInterface* VSL_NAMESPACE::graphic_resource::Pool::get_manager() {
-    auto identity = data_ ? data_->manager.lock() : nullptr;
+    const auto owner = _owner;
+    auto identity = owner ? owner->manager.lock() : nullptr;
     return identity ? identity->manager : nullptr;
 }
 
 std::tuple<bool, VSL_NAMESPACE::graphic_resource::Resource>
 VSL_NAMESPACE::graphic_resource::Pool::bind(VSL_NAMESPACE::graphic_resource::BindingLayout layout) {
-    validate_pool(data_);
-    validate_layout(data_, layout);
-    const std::array layouts{layout.data_};
-    auto [result, resources] = lifetime::make_heap_descriptor_sets(data_, layouts);
+    auto pool = _owner;
+    validate_pool(pool);
+    validate_layout(pool, layout);
+    const std::array layouts{DescriptorAccess::Owned(layout)};
+    auto [result, resources] = lifetime::make_heap_descriptor_sets(std::move(pool), layouts);
     if (result != vk::Result::eSuccess)
         return {false, {}};
-    return {true, {std::move(resources.front())}};
+    return {true, DescriptorAccess::FromShared(std::move(resources.front()))};
 }
 
 std::tuple<bool, std::vector<VSL_NAMESPACE::graphic_resource::Resource>>
 VSL_NAMESPACE::graphic_resource::Pool::bind(size_t n, VSL_NAMESPACE::graphic_resource::BindingLayout layout) {
-    validate_pool(data_);
-    validate_layout(data_, layout);
+    validate_pool(_owner);
+    validate_layout(_owner, layout);
     if (n > UINT32_MAX)
         throw std::length_error("Descriptor allocation count exceeds uint32_t");
     return bind(std::vector<BindingLayout>(n, layout));
@@ -119,51 +127,87 @@ VSL_NAMESPACE::graphic_resource::Pool::bind(size_t n, VSL_NAMESPACE::graphic_res
 
 std::tuple<bool, std::vector<VSL_NAMESPACE::graphic_resource::Resource>>
 VSL_NAMESPACE::graphic_resource::Pool::bind(std::vector<VSL_NAMESPACE::graphic_resource::BindingLayout> layouts) {
-    validate_pool(data_);
+    auto pool = _owner;
+    validate_pool(pool);
     for (const auto& layout : layouts)
-        validate_layout(data_, layout);
+        validate_layout(pool, layout);
     std::vector<Resource> resources(layouts.size());
-    const auto refs = layouts | std::views::transform([](const auto& layout) { return layout.data_; }) | std::ranges::to<std::vector>();
-    auto [result, allocated] = lifetime::make_heap_descriptor_sets(data_, refs);
+    const auto refs = layouts | std::views::transform([](const auto& layout) { return DescriptorAccess::Owned(layout); }) | std::ranges::to<std::vector>();
+    auto [result, allocated] = lifetime::make_heap_descriptor_sets(std::move(pool), refs);
     if (result != vk::Result::eSuccess)
         return {false, {}};
     for (size_t i = 0; i < resources.size(); ++i)
-        resources[i].data_ = std::move(allocated[i]);
+        resources[i] = DescriptorAccess::FromShared(std::move(allocated[i]));
     return {true, std::move(resources)};
 }
 
 VSL_NAMESPACE::graphic_resource::Pool VSL_NAMESPACE::graphic_resource::Resource::get_pool() {
-    const auto resource = data_;
+    const auto resource = _owner;
     if (!resource || !resource->pool)
         throw std::logic_error("Descriptor resource is empty");
     auto owner = resource->pool->owner.lock();
     if (!owner.use_count())
         throw std::logic_error("Descriptor pool owner is unavailable");
-    return {{std::move(owner), resource->pool}};
+    return DescriptorAccess::FromShared(std::shared_ptr<impl::GraphicResourcePoolImpl>(std::move(owner), resource->pool));
 }
 VSL_NAMESPACE::DescriptorIdentity VSL_NAMESPACE::graphic_resource::Resource::identity() const {
-    return lifetime::detail::IdentityAccess::From<DescriptorIdentity>(data_.get());
+    return lifetime::detail::IdentityAccess::From<DescriptorIdentity>(_owner.get());
 }
 
 VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::graphic_resource::Resource::owner_ref() const {
-    return lifetime::detail::owned_ref(data_, data_ ? data_->owner_node : nullptr);
+    return _owner;
 }
+
+VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::graphic_resource::BindingLayout::owner_ref() const {
+    return _owner;
+}
+VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::graphic_resource::Pool::owner_ref() const {
+    return _owner;
+}
+VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::graphic_resource::BindingLayout::get_device() const {
+    if (!_owner || !_owner->layout)
+        throw std::logic_error("Descriptor layout has been destroyed");
+    return lifetime::device_from_child(_owner);
+}
+VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::graphic_resource::Pool::get_device() const {
+    validate_pool(_owner);
+    return lifetime::device_from_child(_owner);
+}
+VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::graphic_resource::Resource::get_device() const {
+    validate_resource(_owner);
+    return lifetime::device_from_impl(*_owner->pool->device);
+}
+
+namespace VSL_NAMESPACE::lifetime::detail {
+    graphic_resource::BindingLayout DescriptorAccess::FromShared(std::shared_ptr<impl::ResourceBindingLayoutImpl> owner) {
+        const auto* node = owner ? owner->owner_node : nullptr;
+        return FromOwned(owned_ref(std::move(owner), node));
+    }
+    graphic_resource::Pool DescriptorAccess::FromShared(std::shared_ptr<impl::GraphicResourcePoolImpl> owner) {
+        const auto* node = owner ? owner->owner_node : nullptr;
+        return FromOwned(owned_ref(std::move(owner), node));
+    }
+    graphic_resource::Resource DescriptorAccess::FromShared(std::shared_ptr<impl::GraphicResourceImpl> owner) {
+        const auto* node = owner ? owner->owner_node : nullptr;
+        return FromOwned(owned_ref(std::move(owner), node));
+    }
+} // namespace VSL_NAMESPACE::lifetime::detail
 
 void VSL_NAMESPACE::graphic_resource::Resource::update(const BufferView& buffer, size_t binding, std::optional<Type> type,
                                                        size_t offset, std::optional<size_t> size) {
     const auto range = buffer.view(offset, size.value_or(buffer.size() - offset));
-    update_buffer(data_, lifetime::detail::BufferAccess::Owned(range), binding, type, range.byte_offset(), range.size());
+    update_buffer(_owner, lifetime::detail::BufferAccess::Owned(range), binding, type, range.byte_offset(), range.size());
 }
 
 void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::BufferAccessor* buffer, size_t binding, std::optional<Type> type,
                                                        size_t offset, std::optional<size_t> size) {
     const auto data = buffer ? BufferAccess::Owned(*(buffer)) : nullptr;
-    update_buffer(data_, data, binding, type, offset, size);
+    update_buffer(_owner, data, binding, type, offset, size);
 }
 
 namespace VSL_NAMESPACE::graphic_resource {
     namespace {
-        void update_buffer(std::shared_ptr<impl::GraphicResourceImpl> target, lifetime::OwnedRef<impl::BufferImpl> buffer,
+        void update_buffer(lifetime::OwnedRef<impl::GraphicResourceImpl> target, lifetime::OwnedRef<impl::BufferImpl> buffer,
                            size_t binding, std::optional<Type> type, size_t offset, std::optional<size_t> size) {
             validate_resource(target);
             if (!buffer || buffer->device != target->pool->device)
@@ -209,7 +253,7 @@ namespace VSL_NAMESPACE::graphic_resource {
 } // namespace VSL_NAMESPACE::graphic_resource
 
 void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::ImageAccessor image, size_t binding, std::optional<Type> type) {
-    const auto target = data_;
+    const auto target = _owner;
     validate_resource(target);
     if (!ImageAccess::Owned(image) || ImageAccess::Owned(image)->device != target->pool->device)
         throw std::invalid_argument("Descriptor image device mismatch");
@@ -251,7 +295,7 @@ found_type:
 
 void VSL_NAMESPACE::graphic_resource::Resource::update(VSL_NAMESPACE::ImageAccessor image, SamplerAccessor sampler,
                                                        size_t binding, std::optional<Type> type) {
-    const auto target = data_;
+    const auto target = _owner;
     validate_resource(target);
     if (!ImageAccess::Owned(image) || ImageAccess::Owned(image)->device != target->pool->device)
         throw std::invalid_argument("Descriptor image device mismatch");

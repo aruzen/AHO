@@ -37,14 +37,14 @@ namespace VSL_NAMESPACE {
     class ResourceUseGroup {
         friend struct command::BindGraphicResource;
         ResourceUseState _state;
-        std::shared_ptr<void> _owner;
+        lifetime::OwnerRef _owner;
         impl::GraphicResourceImpl* _resource = nullptr;
         ResourceRetention _retention = ResourceRetention::SUBMISSION;
         std::vector<std::vector<ResourceUse>> _bindings;
         void retain_descriptor_owner(const graphic_resource::Resource& resource, const CommandBuffer& buffer) const;
 
     public:
-        explicit ResourceUseGroup(size_t bindings, std::shared_ptr<void> owner = {});
+        explicit ResourceUseGroup(size_t bindings, lifetime::OwnerRef owner = {});
         static std::shared_ptr<ResourceUseGroup> ForDescriptor(size_t bindings, const graphic_resource::Resource& resource, ResourceRetention retention = ResourceRetention::SUBMISSION);
         bool tracks_descriptor(const graphic_resource::Resource& resource) const;
         void require_idle() const;

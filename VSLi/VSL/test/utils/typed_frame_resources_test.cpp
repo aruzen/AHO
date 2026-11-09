@@ -1,8 +1,13 @@
+#include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/utils/typed_frame_resources.hpp>
 #include <VSL/lifetime/native_recording.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include "support/vulkan_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -194,8 +199,8 @@ namespace {
                 });
                 const auto& current = frames.get(phase);
                 if (iteration < 3)
-                    sets[slot] = current.set.backend().data_;
-                EXPECT_EQ(current.set.backend().data_, sets[slot]);
+                    sets[slot] = DescriptorAccess::Owned(current.set.backend()).share();
+                EXPECT_EQ(DescriptorAccess::Owned(current.set.backend()), sets[slot]);
                 phase << pipeline.bind_resources(current.set).dispatch(1);
                 const vsl::NativeRecordingContext recording(manager.get_buffer());
                 vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};

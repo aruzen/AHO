@@ -1,3 +1,4 @@
+#include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/sampler_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
@@ -8,6 +9,10 @@
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/vulkan/commands/copy_buffer_to_image.hpp>
 #include <VSL/vulkan/commands/change_image_barrier.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::ImageAccess;
@@ -109,9 +114,9 @@ namespace {
         ExpectTriangleColor(render([&](auto& stream) { stream << bound.draw(3); }));
         using Relocated = t::ResourceSchema<t::DescriptorSetBinding<3, Tints::Layout>, t::DescriptorSetBinding<1, Extra::Layout>>;
         auto relocated = make_typed<Relocated>("typed_descriptors_relocated.vert.spv");
-        const auto native_set = tints.backend().data_;
+        const auto native_set = DescriptorAccess::Owned(tints.backend());
         ExpectTriangleColor(render([&](auto& stream) { stream << relocated.bind_vertices().bind_resources(tints, extra).draw(3); }));
-        EXPECT_EQ(native_set, tints.backend().data_);
+        EXPECT_EQ(native_set, DescriptorAccess::Owned(tints.backend()));
         const Tint update{{.7f, .1f, .3f, 1}};
         first_buffer.copy(std::span(&update, 1));
         auto pixel = render([&](auto& stream) { stream << bound.draw(3); });
@@ -209,7 +214,7 @@ namespace {
         set.write<3>(std::array{buffer, buffer});
         auto native = set.backend();
         manager.destroy(native.get_pool());
-        EXPECT_TRUE(native.data_->bindings.empty());
+        EXPECT_TRUE(DescriptorAccess::Owned(native)->bindings.empty());
         EXPECT_THROW(set.require_complete(), std::logic_error);
         EXPECT_THROW(set.write<3>(std::array{buffer, buffer}), std::logic_error);
         t::TypedDescriptorSet<t::DescriptorSet<0>> empty(device, manager);
@@ -243,7 +248,7 @@ namespace {
                 t::TypedUniformBuffer<Tint> buffer(device, value);
                 t::TypedStorageBuffer<Tint> storage(device, zero);
                 weak_buffer = buffer.storage_view().owner();
-                weak_set = tints.backend().data_;
+                weak_set = DescriptorAccess::Owned(tints.backend()).share();
                 tints.write<3>(std::array{buffer, buffer});
                 extra.write<5>(storage);
                 stream << typed_pipeline.bind_vertices().bind_resources(tints, extra).draw(3);

@@ -334,6 +334,18 @@ if (VSL_TEST_SOURCES)
         "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/pipeline.cpp"
         "-DTEST_CASE=0" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
     set_tests_properties(VSL.Pipeline.Compile.ExplicitRuntime PROPERTIES LABELS compile TIMEOUT 60)
+    add_library(vsl-descriptor-facade-style-contract OBJECT EXCLUDE_FROM_ALL contracts/descriptor.cpp)
+    target_link_libraries(vsl-descriptor-facade-style-contract PRIVATE VSL)
+    set(descriptor_contract_names PublicFacade LayoutData LayoutOwner LayoutRaw PoolData PoolOwner PoolRaw ResourceData ResourceOwner ResourceRaw ManagerData ManagerState ManagerIdentity BaseCopyAssignment BaseMoveAssignment BaseSwap BaseRetire DerivedState RawResourceAlias)
+    foreach(case RANGE 0 18)
+        list(GET descriptor_contract_names ${case} name)
+        add_test(NAME "VSL.Descriptor.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/descriptor.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=private|protected|BindingLayout|Pool|Resource|ManagerInterface"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.Descriptor.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
     set(shader_contract_names Valid ShaderData ShaderOwner ShaderRawConstructor ShaderGroupData ShaderGroupOwner TemporaryShaderCode ConstTemporaryShaderCode)
     foreach(case RANGE 1 7)
         list(GET shader_contract_names ${case} name)

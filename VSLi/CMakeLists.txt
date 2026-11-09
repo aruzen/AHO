@@ -123,6 +123,7 @@ add_library(VSL STATIC
         VSL/src/lifetime/shader_storage.cpp
         VSL/src/private/VSL/lifetime/shader_storage.hpp
         VSL/src/private/VSL/lifetime/shader_access.hpp
+        VSL/src/private/VSL/lifetime/descriptor_access.hpp
         VSL/src/lifetime/submission_retention.cpp
         VSL/src/lifetime/command_domain.cpp
         VSL/include/VSL/operation/command_create_info.hpp

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/descriptor_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <VSL/utils/typed_buffer_arena.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
@@ -6,6 +7,10 @@
 #include <VSL/utils/typed_resources.hpp>
 #include <VSL/vulkan/commands/bind_vertex_buffers.hpp>
 #include <VSL/vulkan/commands/bind_index_buffers.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::BufferAccess;
@@ -109,8 +114,8 @@ namespace {
             t::TypedUniformBuffer<std::uint32_t> a(device, 1u), b(device, 2u);
             first.write<0>(a);
             second.write<0>(b);
-            first_set = first.backend().data_;
-            second_set = second.backend().data_;
+            first_set = DescriptorAccess::Owned(first.backend()).share();
+            second_set = DescriptorAccess::Owned(second.backend()).share();
             first_buffer = a.descriptor().resource_use().state.share();
             second_buffer = b.descriptor().resource_use().state.share();
             vsl::command::BindGraphicResource command(std::vector<vsl::GraphicResource>{first.backend(), second.backend()},

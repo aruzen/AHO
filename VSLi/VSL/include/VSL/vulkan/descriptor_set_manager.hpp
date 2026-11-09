@@ -18,12 +18,28 @@ namespace VSL_NAMESPACE::graphic_resource {
      */
 
     struct ManagerInterface {
+    private:
+        friend struct lifetime::detail::DescriptorManagerAccess;
+        std::shared_ptr<impl::GraphicResourceManagerImpl> _state;
+        std::shared_ptr<impl::GraphicResourceManagerIdentity> _identity;
+
+    protected:
         ManagerInterface();
+        explicit ManagerInterface(LogicalDeviceAccessor device);
         ManagerInterface(const ManagerInterface& other);
         ManagerInterface& operator=(const ManagerInterface& other);
         ManagerInterface(ManagerInterface&& other) noexcept;
         ManagerInterface& operator=(ManagerInterface&& other) noexcept;
+        // 派生型の所有フィールドも公開してから旧値を回収する。
+        void swap_state(ManagerInterface& other) noexcept;
+        // 所有メンバーを持つ派生型はdestructor冒頭でも呼ぶ。
+        void retire_identity() noexcept;
+        void destroy_pool(const Pool& pool);
+
+    public:
         virtual ~ManagerInterface();
+        explicit operator bool() const noexcept { return bool(_state); }
+        LogicalDeviceAccessor get_device() const;
         // 戻り値のvectorのサイズが同じになることを保証します
         virtual std::tuple<std::vector<Pool>, std::vector<Resource>>
         allocate(std::vector<BindingLayout> layouts) = 0;
@@ -49,12 +65,7 @@ namespace VSL_NAMESPACE::graphic_resource {
         std::tuple<Pool, std::vector<Resource>>
         make(std::vector<BindingLayout> layouts, std::vector<T> buffers, std::vector<size_t> bindings);
 
-        std::shared_ptr<impl::GraphicResourceManagerImpl> data_;
-
         virtual void destroy(const Pool& pool) = 0;
-
-    private:
-        std::shared_ptr<impl::GraphicResourceManagerIdentity> _identity;
     };
 
     /*
@@ -64,6 +75,7 @@ namespace VSL_NAMESPACE::graphic_resource {
      */
     struct ExactAllocateManager : public ManagerInterface {
         ExactAllocateManager(LogicalDeviceAccessor device);
+        void swap(ExactAllocateManager& other) noexcept { swap_state(other); }
 
         std::tuple<std::vector<Pool>, std::vector<Resource>> allocate(std::vector<BindingLayout> layouts) override;
 
@@ -81,6 +93,12 @@ namespace VSL_NAMESPACE::graphic_resource {
 
         OverAllocateManager(LogicalDeviceAccessor device);
         OverAllocateManager(LogicalDeviceAccessor device, std::map<Type, size_t> size, size_t other = 0);
+        OverAllocateManager(const OverAllocateManager& other);
+        OverAllocateManager(OverAllocateManager&& other) noexcept;
+        OverAllocateManager& operator=(const OverAllocateManager& other);
+        OverAllocateManager& operator=(OverAllocateManager&& other) noexcept;
+        ~OverAllocateManager() override;
+        void swap(OverAllocateManager& other) noexcept;
 
         std::tuple<std::vector<Pool>, std::vector<Resource>> allocate(std::vector<BindingLayout> layouts) override;
 

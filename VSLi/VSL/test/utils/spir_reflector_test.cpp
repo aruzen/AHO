@@ -1,3 +1,4 @@
+#include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
@@ -9,6 +10,10 @@
 #include <limits>
 #include "support/compute_fixture.hpp"
 #include "support/image_transfer_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::BufferAccess;
@@ -388,7 +393,7 @@ namespace {
         vsl::pipeline_layout::ResourceBinding(layouts).injection(layout);
         ASSERT_EQ(vsl_test::inspect_layout(layout).pipeline_layout.setLayoutCount, 3u);
         for (std::size_t set = 0; set < layouts.size(); ++set)
-            EXPECT_EQ(vsl_test::inspect_layout(layout).pipeline_layout.pSetLayouts[set], layouts[set].data_->layout);
+            EXPECT_EQ(vsl_test::inspect_layout(layout).pipeline_layout.pSetLayouts[set], DescriptorAccess::Owned(layouts[set])->layout);
     }
     TEST_F(ReflectedSetSlotsVulkanIntegrationTest, RepeatedSparseSetsKeepTheFullSequenceAndIndependentOwners) {
         vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_sparse_sets.comp.spv"));
@@ -399,7 +404,7 @@ namespace {
             EXPECT_TRUE(layouts[block * 3 + 1].get_binding_points().empty());
             EXPECT_EQ(layouts[block * 3 + 2].get_binding_points(), reflector.generated.binding_points.at(2));
             if (block)
-                EXPECT_NE(layouts[block * 3 + 2].data_, layouts[2].data_);
+                EXPECT_NE(DescriptorAccess::Owned(layouts[block * 3 + 2]), DescriptorAccess::Owned(layouts[2]));
         }
     }
     TEST_F(ReflectedSetSlotsVulkanIntegrationTest, MultipleSparseSetsKeepTheirSetNumbers) {
@@ -681,7 +686,7 @@ namespace {
         auto [pool, allocated] = resources.make(sets);
         struct ReclaimCycle {
             vsl::GraphicResourcePool pool;
-            ~ReclaimCycle() { pool.data_->resources.clear(); }
+            ~ReclaimCycle() { DescriptorAccess::Owned(pool)->resources.clear(); }
         } reclaim{pool};
         ASSERT_EQ(allocated.size(), 1u);
         vsl::StagingBuffer<vsl::MemoryType::STORAGE_BUFFER> output(device, std::array<std::uint32_t, 2>{0, 0});
@@ -765,7 +770,7 @@ namespace {
         auto [pool, allocated] = resources.make(sets);
         struct ReclaimCycle {
             vsl::GraphicResourcePool pool;
-            ~ReclaimCycle() { pool.data_->resources.clear(); }
+            ~ReclaimCycle() { DescriptorAccess::Owned(pool)->resources.clear(); }
         } reclaim{pool};
         ASSERT_EQ(allocated.size(), 1u);
         vsl::StagingBuffer<vsl::MemoryType::UNIFORM_TEXEL_BUFFER> source(device, std::array<std::uint32_t, 1>{37});
@@ -780,7 +785,7 @@ namespace {
         // BufferView用の公開updateはないため、テスト内で反射したlayoutへnative viewを設定する。
         std::array<vk::WriteDescriptorSet, 2> writes{};
         for (std::uint32_t i = 0; i < writes.size(); ++i) {
-            writes[i].dstSet = allocated[0].data_->descriptor_set;
+            writes[i].dstSet = DescriptorAccess::Owned(allocated[0])->descriptor_set;
             writes[i].dstBinding = i;
             writes[i].descriptorCount = 1;
             writes[i].descriptorType = i == 0 ? vk::DescriptorType::eUniformTexelBuffer : vk::DescriptorType::eStorageTexelBuffer;
@@ -846,7 +851,7 @@ namespace {
         auto [pool, allocated] = resources.make(sets);
         struct ReclaimCycle {
             vsl::GraphicResourcePool pool;
-            ~ReclaimCycle() { pool.data_->resources.clear(); }
+            ~ReclaimCycle() { DescriptorAccess::Owned(pool)->resources.clear(); }
         } reclaim{pool};
         ASSERT_EQ(allocated.size(), 1u);
         vsl::Image<vsl::ImageType::COLOR_ATTACHMENT | vsl::ImageType::INPUT_ATTACHMENT> source(

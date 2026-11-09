@@ -30,7 +30,7 @@ namespace VSL_NAMESPACE::lifetime {
             std::vector<OwnerRef> dependencies;
             DescriptorOwnerContext context;
             alignas(DescriptorSetSlotStorage) std::byte storage[sizeof(DescriptorSetSlotStorage)];
-            HeapDescriptorSetOwner(std::shared_ptr<impl::GraphicResourcePoolImpl> pool, std::shared_ptr<impl::ResourceBindingLayoutImpl> layout);
+            HeapDescriptorSetOwner(OwnedRef<impl::GraphicResourcePoolImpl> pool, OwnedRef<impl::ResourceBindingLayoutImpl> layout);
             ~HeapDescriptorSetOwner();
             void publish(const std::shared_ptr<HeapDescriptorSetOwner>& owner);
             static void VisitDependencies(const void* input, DependencyNode::EdgeVisitor visitor, void* context);
@@ -51,13 +51,13 @@ namespace VSL_NAMESPACE::lifetime {
             node.retire();
             destroy_descriptor_pool(storage);
         }
-        HeapDescriptorSetOwner::HeapDescriptorSetOwner(std::shared_ptr<impl::GraphicResourcePoolImpl> pool,
-                                                       std::shared_ptr<impl::ResourceBindingLayoutImpl> layout) {
+        HeapDescriptorSetOwner::HeapDescriptorSetOwner(OwnedRef<impl::GraphicResourcePoolImpl> pool,
+                                                       OwnedRef<impl::ResourceBindingLayoutImpl> layout) {
             if (!pool || !pool.use_count() || !layout || !layout.use_count())
                 throw std::invalid_argument("Descriptor allocation requires owning pool and layout");
             dependencies.reserve(2);
-            detail::retain_owner(dependencies, detail::owned_ref(pool, pool->owner_node));
-            detail::retain_owner(dependencies, detail::owned_ref(layout, layout->owner_node));
+            detail::retain_owner(dependencies, pool);
+            detail::retain_owner(dependencies, layout);
             context.dependencies = dependencies;
             context.dependency_storage = &dependencies;
             context.policy = DependencyPolicy::DYNAMIC;
@@ -177,7 +177,7 @@ namespace VSL_NAMESPACE::lifetime {
         return detail::publish_device_leaf(std::move(owner), pool);
     }
     std::pair<vk::Result, std::vector<std::shared_ptr<impl::GraphicResourceImpl>>> make_heap_descriptor_sets(
-        const std::shared_ptr<impl::GraphicResourcePoolImpl>& pool, std::span<const std::shared_ptr<impl::ResourceBindingLayoutImpl>> layouts,
+        OwnedRef<impl::GraphicResourcePoolImpl> pool, std::span<const OwnedRef<impl::ResourceBindingLayoutImpl>> layouts,
         DescriptorSetAllocator allocate) {
         if (!allocate)
             throw std::invalid_argument("Descriptor allocation operation is empty");

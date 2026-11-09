@@ -25,6 +25,11 @@ namespace VSL_NAMESPACE::lifetime {
     class PipelineRecipeSnapshot;
 } // namespace VSL_NAMESPACE::lifetime
 
+namespace VSL_NAMESPACE::lifetime::detail {
+    struct DescriptorAccess;
+    struct DescriptorManagerAccess;
+} // namespace VSL_NAMESPACE::lifetime::detail
+
 namespace VSL_NAMESPACE::graphic_resource {
     constexpr size_t MAX_POOL_SIZE = 200;
 
@@ -87,18 +92,31 @@ namespace VSL_NAMESPACE::graphic_resource {
 
         [[nodiscard]] std::vector<BindingPoint> get_binding_points() const;
 
-        std::shared_ptr<impl::ResourceBindingLayoutImpl> data_;
+        explicit operator bool() const noexcept { return bool(_owner); }
+        lifetime::OwnerRef owner_ref() const;
+        LogicalDeviceAccessor get_device() const;
+        void swap(BindingLayout& other) noexcept { _owner.swap(other._owner); }
 
     private:
-        friend class lifetime::ResourceArena;
-        friend class lifetime::PipelineRecipeSnapshot;
-        explicit BindingLayout(std::shared_ptr<impl::ResourceBindingLayoutImpl> data) : data_(std::move(data)) {}
+        friend struct lifetime::detail::DescriptorAccess;
+        lifetime::OwnedRef<impl::ResourceBindingLayoutImpl> _owner;
+        explicit BindingLayout(lifetime::OwnedRef<impl::ResourceBindingLayoutImpl> owner) : _owner(std::move(owner)) {}
     };
 
     struct ManagerInterface;
     struct Resource;
     struct Pool {
-        std::shared_ptr<impl::GraphicResourcePoolImpl> data_;
+    private:
+        friend struct lifetime::detail::DescriptorAccess;
+        lifetime::OwnedRef<impl::GraphicResourcePoolImpl> _owner;
+        explicit Pool(lifetime::OwnedRef<impl::GraphicResourcePoolImpl> owner) : _owner(std::move(owner)) {}
+
+    public:
+        Pool() = default;
+        explicit operator bool() const noexcept { return bool(_owner); }
+        lifetime::OwnerRef owner_ref() const;
+        LogicalDeviceAccessor get_device() const;
+        void swap(Pool& other) noexcept { _owner.swap(other._owner); }
 
         std::tuple<bool, Resource> bind(BindingLayout layout);
 
@@ -110,7 +128,16 @@ namespace VSL_NAMESPACE::graphic_resource {
     };
 
     struct Resource {
-        std::shared_ptr<impl::GraphicResourceImpl> data_;
+    private:
+        friend struct lifetime::detail::DescriptorAccess;
+        lifetime::OwnedRef<impl::GraphicResourceImpl> _owner;
+        explicit Resource(lifetime::OwnedRef<impl::GraphicResourceImpl> owner) : _owner(std::move(owner)) {}
+
+    public:
+        Resource() = default;
+        explicit operator bool() const noexcept { return bool(_owner); }
+        LogicalDeviceAccessor get_device() const;
+        void swap(Resource& other) noexcept { _owner.swap(other._owner); }
         DescriptorIdentity identity() const;
         lifetime::OwnerRef owner_ref() const;
 

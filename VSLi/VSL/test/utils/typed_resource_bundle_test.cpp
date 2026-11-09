@@ -1,3 +1,4 @@
+#include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/sampler_access.hpp>
 #include <VSL/utils/typed_resource_bundle.hpp>
@@ -5,6 +6,11 @@
 #include <VSL/lifetime/native_recording.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include "support/vulkan_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
+    using VSL_NAMESPACE::lifetime::detail::DescriptorManagerAccess;
+} // namespace
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::ImageAccess;
@@ -64,7 +70,7 @@ namespace {
         auto result = vsl::GraphicResourceManager::allocate(std::move(layouts));
         for (const auto& resource : std::get<1>(result)) {
             ++allocations;
-            records.push_back(resource.data_);
+            records.push_back(DescriptorAccess::Owned(resource).share());
         }
         return result;
     }
@@ -106,8 +112,8 @@ namespace {
             const auto& frame = bundle.get(phase);
             local[slot] = frame.buffer<2, 0>().storage_view().owner();
             shared[slot] = frame.buffer<2, 1>().storage_view().owner();
-            local_sets[slot] = frame.set<2>().backend().data_;
-            shared_sets[slot] = frame.set<5>().backend().data_;
+            local_sets[slot] = DescriptorAccess::Owned(frame.set<2>().backend()).share();
+            shared_sets[slot] = DescriptorAccess::Owned(frame.set<5>().backend()).share();
             std::array<std::uint32_t, 4> values{};
             frame.buffer<2, 3>().read_into(values);
             for (size_t i = 0; i < 4; ++i)
@@ -150,25 +156,25 @@ namespace {
             const auto& plan = bundle.placement_plan();
             const auto physical = plan.arena_plan(t::ResourceScope::PER_FRAME, slot);
             const auto base = reinterpret_cast<std::uintptr_t>(vsl::lifetime::detail::BufferAccess::Impl(first.ref())) - plan.placement({2, 0}).offset;
-            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(native.data_.get()) - base, physical.placement(plan.descriptor_set(2)).offset);
-            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(native.data_->pool) - base, physical.placement(*plan.descriptor_pool(t::ResourceScope::PER_FRAME)).offset);
+            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(DescriptorAccess::Owned(native).get()) - base, physical.placement(plan.descriptor_set(2)).offset);
+            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(DescriptorAccess::Owned(native)->pool) - base, physical.placement(*plan.descriptor_pool(t::ResourceScope::PER_FRAME)).offset);
             const auto shared_storage = frame.buffer<2, 1>().storage_view();
             const auto shared_base = reinterpret_cast<std::uintptr_t>(vsl::lifetime::detail::BufferAccess::Impl(shared_storage.ref())) - plan.placement({2, 1}).offset;
-            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(native.data_->layout) - shared_base, plan.arena_plan(t::ResourceScope::SHARED).placement(plan.descriptor_layout(2)).offset);
+            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(DescriptorAccess::Owned(native)->layout) - shared_base, plan.arena_plan(t::ResourceScope::SHARED).placement(plan.descriptor_layout(2)).offset);
             EXPECT_FALSE(native.owner_ref().owner_before(first.owner_ref()));
             EXPECT_FALSE(first.owner_ref().owner_before(native.owner_ref()));
             EXPECT_FALSE(shared_native.owner_ref().owner_before(frame.buffer<2, 1>().storage_view().owner_ref()));
             EXPECT_FALSE((frame.buffer<2, 1>().storage_view().owner_ref().owner_before(shared_native.owner_ref())));
-            EXPECT_EQ(native.data_->pool->max_sets, 1u);
-            EXPECT_EQ(native.data_->pool->allocated_sets, 1u);
-            EXPECT_EQ(native.data_->pool->capacities.at(vk::DescriptorType::eUniformBuffer).limit, 2u);
-            EXPECT_EQ(native.data_->pool->capacities.at(vk::DescriptorType::eStorageBuffer).limit, 1u);
-            for (const auto& [binding, elements] : native.data_->bindings)
+            EXPECT_EQ(DescriptorAccess::Owned(native)->pool->max_sets, 1u);
+            EXPECT_EQ(DescriptorAccess::Owned(native)->pool->allocated_sets, 1u);
+            EXPECT_EQ(DescriptorAccess::Owned(native)->pool->capacities.at(vk::DescriptorType::eUniformBuffer).limit, 2u);
+            EXPECT_EQ(DescriptorAccess::Owned(native)->pool->capacities.at(vk::DescriptorType::eStorageBuffer).limit, 1u);
+            for (const auto& [binding, elements] : DescriptorAccess::Owned(native)->bindings)
                 for (const auto& element : elements)
                     EXPECT_TRUE(element.owners.empty());
-            layouts[slot] = native.data_->layout;
-            pools[slot] = native.data_->pool;
-            sets[slot] = native.data_.get();
+            layouts[slot] = DescriptorAccess::Owned(native)->layout;
+            pools[slot] = DescriptorAccess::Owned(native)->pool;
+            sets[slot] = DescriptorAccess::Owned(native).get();
             std::array<std::uint32_t, 4> zero{1, 1, 1, 1};
             frame.buffer<2, 3>().read_into(zero);
             EXPECT_EQ(zero, (std::array<std::uint32_t, 4>{}));
@@ -212,9 +218,9 @@ namespace {
             EXPECT_GT(bundle.placement_plan().total_arena_bytes(), 0u);
             const auto& set = bundle.get(phase).set<500>();
             const auto& native = set.backend();
-            root = native.data_;
-            EXPECT_EQ(native.data_->pool->max_sets, 1u);
-            EXPECT_TRUE(native.data_->pool->capacities.empty());
+            root = DescriptorAccess::Owned(native).share();
+            EXPECT_EQ(DescriptorAccess::Owned(native)->pool->max_sets, 1u);
+            EXPECT_TRUE(DescriptorAccess::Owned(native)->pool->capacities.empty());
             EXPECT_NO_THROW(set.require_complete());
             set.resource_use()->record(manager.get_buffer());
         }
@@ -268,7 +274,7 @@ namespace {
             auto shared = frame.set<5>();
             const auto local = frame.buffer<2, 0>();
             local_owner = local.backend().owner();
-            shared_owner = shared.backend().data_;
+            shared_owner = DescriptorAccess::Owned(shared.backend()).share();
             EXPECT_TRUE(local.backend().owner_ref().managed());
             EXPECT_THROW(shared.write<0>(std::array{local, local}), std::invalid_argument);
             using External = t::detail::BundleExternalValue<SharedSet::Binding<0>>;
@@ -290,7 +296,7 @@ namespace {
             const auto logical = std::make_shared<vsl::ResourceUseState>();
             EXPECT_THROW(shared.resource_use()->replace(0, {{logical, frame.set<2>().backend().owner_ref()}, {}}), std::invalid_argument);
             EXPECT_NO_THROW(shared.require_complete());
-            EXPECT_TRUE(shared.backend().data_->bindings.at(0).front().constraint.states.empty());
+            EXPECT_TRUE(DescriptorAccess::Owned(shared.backend())->bindings.at(0).front().constraint.states.empty());
             phase.cancel();
         }
         EXPECT_TRUE(local_owner.expired());
@@ -558,10 +564,10 @@ namespace {
         capacity.set<0, 0>(size_t(device.data_->parent_device->device.getProperties().limits.maxUniformBufferRange) / 4 + 1);
         EXPECT_THROW((t::TypedResourceBundle<Limited>(manager, descriptors, capacity)), std::out_of_range);
         EXPECT_EQ(descriptors.allocations, 0u);
-        const auto identity = descriptors.data_;
-        descriptors.data_.reset();
+        const auto identity = DescriptorManagerAccess::Data(descriptors);
+        DescriptorManagerAccess::Data(descriptors).reset();
         EXPECT_THROW((Bundle(manager, descriptors, sizes())), std::invalid_argument);
-        descriptors.data_ = identity;
+        DescriptorManagerAccess::Data(descriptors) = identity;
     }
 
     TEST_F(TypedBundleVulkanIntegrationTest, PartialConstructionReleasesPreviouslyAllocatedSets) {
@@ -652,8 +658,8 @@ namespace {
             {
                 B bundle(manager, descriptors, sizes());
                 const auto& frame = bundle.get(phase);
-                owner = frame.template set<2>().backend().data_;
-                shared = frame.template set<5>().backend().data_;
+                owner = DescriptorAccess::Owned(frame.template set<2>().backend()).share();
+                shared = DescriptorAccess::Owned(frame.template set<5>().backend()).share();
                 phase << frame.bind_resources(pipeline).dispatch(4);
             }
             EXPECT_FALSE(owner.expired());
@@ -681,8 +687,8 @@ namespace {
             {
                 B bundle(manager, descriptors, sizes());
                 const auto& frame = bundle.get(phase);
-                owner = frame.template set<2>().backend().data_;
-                shared = frame.template set<5>().backend().data_;
+                owner = DescriptorAccess::Owned(frame.template set<2>().backend()).share();
+                shared = DescriptorAccess::Owned(frame.template set<5>().backend()).share();
                 frame.template set<2>().resource_use()->record(manager.get_buffer());
                 frame.template set<5>().resource_use()->record(manager.get_buffer());
             }
@@ -709,7 +715,7 @@ namespace {
                 auto phase = manager.template start_phase<vsl::ComputePhase>();
                 B bundle(manager, descriptors, sizes());
                 const auto& frame = bundle.get(phase);
-                owner = frame.template set<2>().backend().data_;
+                owner = DescriptorAccess::Owned(frame.template set<2>().backend()).share();
                 auto result = frame.bind_resources(pipeline).dispatch(4);
                 phase.cancel();
                 return result;

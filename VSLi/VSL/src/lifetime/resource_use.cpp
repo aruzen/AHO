@@ -1,3 +1,4 @@
+#include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/resource_use.hpp>
 #include <VSL/lifetime/resource_use_factory.hpp>
 #include <VSL/lifetime/buffer_view.hpp>
@@ -8,6 +9,10 @@
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/sync/resource_use_access.hpp>
 #include <stdexcept>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
+}
 
 namespace VSL_NAMESPACE {
     ResourceUse lifetime::resource_use_for_buffer(const OwnedRef<impl::BufferImpl>& buffer, ResourceUse constraint) {
@@ -86,10 +91,10 @@ namespace VSL_NAMESPACE {
         if (constraint_state)
             lifetime::record_resource_state(*constraint_state, buffer, completion);
     }
-    ResourceUseGroup::ResourceUseGroup(size_t bindings, std::shared_ptr<void> owner)
+    ResourceUseGroup::ResourceUseGroup(size_t bindings, lifetime::OwnerRef owner)
         : _owner(std::move(owner)), _bindings(bindings) {}
     std::shared_ptr<ResourceUseGroup> ResourceUseGroup::ForDescriptor(size_t bindings, const graphic_resource::Resource& resource, ResourceRetention retention) {
-        const auto data = resource.data_;
+        const auto data = DescriptorAccess::Owned(resource);
         if (!data || !data.use_count())
             throw std::invalid_argument("Descriptor use requires a resource");
         if (!data->layout || data->layout->layout_bindings.size() != bindings)
@@ -100,17 +105,17 @@ namespace VSL_NAMESPACE {
         return group;
     }
     bool ResourceUseGroup::tracks_descriptor(const graphic_resource::Resource& resource) const {
-        return _resource && _resource == resource.data_.get();
+        return _resource && _resource == DescriptorAccess::Owned(resource).get();
     }
     void ResourceUseGroup::retain_descriptor_owner(const graphic_resource::Resource& resource, const CommandBuffer& buffer) const {
-        const auto owner = resource.data_;
+        const auto owner = DescriptorAccess::Owned(resource);
         const auto retention = _retention;
         if (!owner.use_count() || (!_owner.owner_before(owner) && !owner.owner_before(_owner)))
             return;
         if (retention == ResourceRetention::COMPLETION)
-            buffer.retain_until_complete(owner);
+            buffer.retain_until_complete(lifetime::detail::OwnerAccess::Shared(owner));
         else
-            buffer.completion().retain(owner);
+            buffer.completion().retain(lifetime::detail::OwnerAccess::Shared(owner));
     }
     void ResourceUseGroup::require_idle() const {
         const auto owner = _owner;
@@ -139,9 +144,9 @@ namespace VSL_NAMESPACE {
             throw std::logic_error("Tracked descriptor sets require a recording phase");
         if (owner.use_count()) {
             if (retention == ResourceRetention::COMPLETION)
-                buffer.retain_until_complete(owner);
+                buffer.retain_until_complete(lifetime::detail::OwnerAccess::Shared(owner));
             else
-                completion.retain(owner);
+                completion.retain(lifetime::detail::OwnerAccess::Shared(owner));
         }
         if (resource) {
             lifetime::record_descriptor_resources(*resource, buffer, retention);

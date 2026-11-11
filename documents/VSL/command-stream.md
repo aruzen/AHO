@@ -2,6 +2,8 @@
 
 `DefaultPhaseStream` は、後続のcommandへ渡すためにPipelineと頂点数を保持します。value／shared_ptrのcommandとdelegateで同じ引き渡し規則を使用します。
 
+空のshared_ptrは `invalid_argument` で拒否します。この入力検証はmanagerへのアクセスと記録の開始前に行うため、既存streamの推測状態やPhaseの記録状態を変更しません。基底／派生のcommand pointerとdelegate pointerで同じ規則です。
+
 requirementsの解決またはcommandのinvokeが例外になった場合、そのstreamの `pipeline` と `vertex_size` は未確定の状態へ戻し、元の例外を再送出します。失敗したcommandがまだbindしていなかった場合も、途中までnative命令を記録した場合も同じ規則です。
 
 同じPhaseで記録を続ける場合は、必要なPipeline・頂点Buffer・descriptor等を明示的にbindし直してください。失敗時に古い推測状態を戻しても、実際のGPU状態と一致する保証はないため、以前の値へのrollbackは行いません。

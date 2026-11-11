@@ -12,7 +12,6 @@ option(AHO_ENABLE_MSDF "Build CPU MSDF font, atlas and text layout resources" OF
 
 add_library(AHOLi
         AHO/src/pipeline/layouts.cpp
-        AHO/src/pipeline/pipeline.cpp
         AHO/src/window.cpp
         AHO/src/window_impl.hpp
         AHO/src/render_context.cpp

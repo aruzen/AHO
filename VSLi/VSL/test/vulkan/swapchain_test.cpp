@@ -1,9 +1,14 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include "support/window_fixture.hpp"
 #include "support/deferred_action.hpp"
 #include <VSL/lifetime/dependency_node.hpp>
 #include "support/read_image.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
@@ -26,7 +31,7 @@ namespace {
         expect_validation_abort("");
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Selected graphics queue cannot present to this surface";
         vsl::Swapchain original(device, surface, std::nullopt, 64, 48);
         vsl::PureWindow other("other swapchain surface", 64, 48);
@@ -37,8 +42,8 @@ namespace {
                 window.close();
             }
         } close{other};
-        auto other_surface = other.add_plugin<vsl::Surface>(vsl::VulkanAccessor{instance});
-        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, other_surface->data_->surface))
+        auto other_surface = other.add_plugin<vsl::Surface>(vsl::lifetime::detail::StartupAccess::FromShared(instance));
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, other_surface->data_->surface))
             GTEST_SKIP() << "Selected graphics queue cannot present to the second surface";
         EXPECT_THROW((vsl::Swapchain(device, other_surface, original, 64, 48)), std::invalid_argument);
         auto acquired = device.data_->device.createFenceUnique({});
@@ -50,7 +55,7 @@ namespace {
     TEST_F(SwapchainWindowIntegrationTest, CreatesImagesAndRecreatesUsingOldSwapchain) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Selected graphics queue cannot present to this surface";
         vsl::Swapchain first(device, surface, std::nullopt, 64, 48);
         ASSERT_GT(first.get_swap_image_size(), 0u);
@@ -76,9 +81,9 @@ namespace {
     TEST_F(SwapchainReadbackWindowIntegrationTest, ReadsAcquiredSwapchainImageAndRetainsBorrowedImageOwner) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        const auto caps = physical.data_->device.getSurfaceCapabilitiesKHR(surface->data_->surface);
+        const auto caps = StartupAccess::Owned(physical)->device.getSurfaceCapabilitiesKHR(surface->data_->surface);
         if (!(caps.supportedUsageFlags & vk::ImageUsageFlagBits::eTransferSrc) ||
-            !physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+            !StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Surface cannot provide presentable transfer-source images on selected queue";
         auto chain = std::make_optional<vsl::Swapchain>(device, surface, std::nullopt, 64, 48,
                                                         vsl::ImageType::COLOR_ATTACHMENT | vsl::ImageType::TRANSFER_SRC);
@@ -167,7 +172,7 @@ namespace {
     TEST_F(SwapchainWindowIntegrationTest, RetiredOldSwapchainIsRejectedBeforeNativeCreationAndLeavesCurrentUsable) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Selected graphics queue cannot present to this surface";
         vsl::Swapchain first(device, surface, std::nullopt, 64, 48);
         vsl::Swapchain current(device, surface, first, 64, 48);
@@ -216,10 +221,10 @@ namespace {
     TEST_F(SwapchainWindowIntegrationTest, NativeSurfaceSupportsTheSelectedCompositeAlpha) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        const auto caps = physical.data_->device.getSurfaceCapabilitiesKHR(surface->data_->surface);
+        const auto caps = StartupAccess::Owned(physical)->device.getSurfaceCapabilitiesKHR(surface->data_->surface);
         const auto selected = vsl::impl::helper::choose_swapchain_composite_alpha(caps.supportedCompositeAlpha);
         ASSERT_TRUE(static_cast<bool>(caps.supportedCompositeAlpha & selected));
-        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Selected graphics queue cannot present to this surface";
         vsl::Swapchain chain(device, surface, std::nullopt, 64, 48);
         EXPECT_TRUE(static_cast<bool>(SwapchainAccess::Owned(chain)->swap_chain));

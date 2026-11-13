@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
@@ -11,6 +12,10 @@
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/vulkan/commands/copy_buffer_to_image.hpp>
 #include <VSL/vulkan/commands/change_image_barrier.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
@@ -164,7 +169,7 @@ namespace {
         auto native_extra = extra.backend();
         EXPECT_THROW(native.update(storage.backend(), 3), std::invalid_argument);
         EXPECT_THROW(tints.require_complete(), std::logic_error);
-        const auto alignment = physical.data_->props->limits.minUniformBufferOffsetAlignment;
+        const auto alignment = StartupAccess::Owned(physical)->props->limits.minUniformBufferOffsetAlignment;
         if (alignment > 1)
             EXPECT_THROW(native.update(updated.backend(), 3, std::nullopt, 1, sizeof(float)), std::invalid_argument);
         native_extra.update(storage.backend(), 5);

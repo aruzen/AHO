@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
@@ -10,6 +11,10 @@
 #include <VSL/utils/typed_resources.hpp>
 #include <VSL/lifetime/descriptor_storage.hpp>
 #include <functional>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     thread_local std::function<void()> ALLOCATION_ACTION;
@@ -410,7 +415,7 @@ namespace {
 
 namespace {
     TEST_F(DescriptorVulkanIntegrationTest, HolderValueUpdateUsesItsOffsetAndSizeForTheComputeOutput) {
-        const std::size_t offset = std::max<std::size_t>(16, physical.data_->props->limits.minStorageBufferOffsetAlignment);
+        const std::size_t offset = std::max<std::size_t>(16, StartupAccess::Owned(physical)->props->limits.minStorageBufferOffsetAlignment);
         std::vector<std::uint32_t> initial(offset / sizeof(std::uint32_t) + COUNT, 0xa5a5a5a5u);
         StorageBuffer buffer(device, initial.data(), initial.size());
         {
@@ -451,12 +456,12 @@ namespace {
         EXPECT_THROW(resource.update(&*output, 0, std::nullopt, 0, bytes + 1), vsl::exceptions::RuntimeException);
     }
     TEST_F(DescriptorVulkanIntegrationTest, DefaultBufferRangeAtAnOffsetDoesNotExceedTheRequestedStorage) {
-        const auto offset = std::max<std::size_t>(16, physical.data_->props->limits.minStorageBufferOffsetAlignment);
+        const auto offset = std::max<std::size_t>(16, StartupAccess::Owned(physical)->props->limits.minStorageBufferOffsetAlignment);
         StorageBuffer buffer(device, std::size_t{offset + COUNT * sizeof(std::uint32_t)});
         resource.update(&buffer, 0, std::nullopt, offset);
     }
     TEST_F(DescriptorVulkanIntegrationTest, DefaultExplicitAndWholeBufferRangesWriteOnlyTheSelectedTailOnGPU) {
-        const auto offset = std::max<std::size_t>(16, physical.data_->props->limits.minStorageBufferOffsetAlignment);
+        const auto offset = std::max<std::size_t>(16, StartupAccess::Owned(physical)->props->limits.minStorageBufferOffsetAlignment);
         const std::vector<std::uint32_t> initial(offset / sizeof(std::uint32_t) + COUNT, 0xa5a5a5a5u);
         StorageBuffer buffer(device, initial.data(), initial.size());
         std::vector<std::optional<std::size_t>> ranges{std::nullopt, COUNT * sizeof(std::uint32_t)};

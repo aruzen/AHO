@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #pragma once
 #include "vulkan_fixture.hpp"
 #define GLFW_INCLUDE_NONE
@@ -12,7 +13,7 @@ namespace vsl_test {
         std::shared_ptr<vsl::Surface> surface;
         void SetUp() override;
         void make_surface() {
-            surface = window->add_plugin<vsl::Surface>(vsl::VulkanAccessor{instance});
+            surface = window->add_plugin<vsl::Surface>(vsl::lifetime::detail::StartupAccess::FromShared(instance));
             ASSERT_TRUE(surface->data_->surface) << "GLFW surface creation failed";
         }
         void TearDown() override;

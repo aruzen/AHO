@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
@@ -14,6 +15,10 @@
 #include <VSL/operation/submission_ops.hpp>
 #include <VSL/sync/submission_completion.hpp>
 #include <functional>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
@@ -58,7 +63,7 @@ namespace {
         if (HasFatalFailure() || IsSkipped())
             return;
         make_surface();
-        if (!HasFatalFailure() && !physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!HasFatalFailure() && !StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Selected queue cannot present";
     }
     vsl::SwapchainAccessor SurfaceRecoveryWindowIntegrationTest::make_chain(vsl::PresentFencePolicy policy) {
@@ -177,8 +182,8 @@ namespace {
         const std::array requests{vsl::storage::StartupRequest{{1}, vsl::storage::StartupKind::SURFACE},
                                   vsl::storage::StartupRequest{{2}, vsl::storage::StartupKind::SURFACE}};
         const vsl::storage::StartupPlan<2> plan(requests);
-        const std::array<l::StartupInit, 2> inputs{l::SurfaceInit{vsl::VulkanAccessor{instance}, a.window_owner()},
-                                                   l::SurfaceInit{vsl::VulkanAccessor{instance}, b.window_owner()}};
+        const std::array<l::StartupInit, 2> inputs{l::SurfaceInit{vsl::lifetime::detail::StartupAccess::FromShared(instance), a.window_owner()},
+                                                   l::SurfaceInit{vsl::lifetime::detail::StartupAccess::FromShared(instance), b.window_owner()}};
         {
             const l::StartupArena arena(plan, inputs);
             const auto first = arena.surface({1}), second = arena.surface({2});

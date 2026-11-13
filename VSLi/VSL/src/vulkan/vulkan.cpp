@@ -1,17 +1,18 @@
 #include <VSL/vulkan/vulkan.hpp>
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/instance_storage.hpp>
 #include <VSL/lifetime/dependency_node.hpp>
 #include <VSL/lifetime/glfw_lease.hpp>
 #include <stdexcept>
 
 namespace VSL_NAMESPACE {
+    using lifetime::detail::StartupAccess;
     VulkanAccessor VulkanAccessor::Create(InstanceCreateInfo info) {
-        return {lifetime::make_heap_instance(std::move(info))};
+        return StartupAccess::FromShared(lifetime::make_heap_instance(std::move(info)));
     }
     lifetime::OwnerRef VulkanAccessor::owner_ref() const {
-        if (!accessor || !accessor.use_count() || !accessor->owner_node || !accessor->owner_node->matches(accessor))
-            throw std::invalid_argument("Instance requires its canonical owner");
-        return accessor->owner_node->ref(accessor);
+        StartupAccess::RequireCanonical(_owner);
+        return _owner;
     }
     template<bool validation>
     bool Vulkan<validation>::check_validation_layer_support() {
@@ -37,16 +38,14 @@ namespace VSL_NAMESPACE {
                 throw std::invalid_argument("Instance extension is null");
             info.extensions.emplace_back(extension);
         }
-        accessor = lifetime::make_heap_instance(lifetime::glfw_instance_info(std::move(info)));
-        data_ = accessor;
+        _value = StartupAccess::FromShared(lifetime::make_heap_instance(lifetime::glfw_instance_info(std::move(info))));
     }
     template<bool validation>
     Vulkan<validation>::Vulkan(VulkanAccessor instance) {
-        const auto owner = instance.owner_ref();
-        if (!instance.accessor->instance || instance.accessor->owner_node->retiring())
+        StartupAccess::RequireCanonical(StartupAccess::Owned(instance));
+        if (!StartupAccess::Owned(instance)->instance)
             throw std::invalid_argument("Vulkan facade requires a live canonical Instance");
-        accessor = std::move(instance.accessor);
-        data_ = accessor;
+        _value = std::move(instance);
     }
     template<bool validation>
     Vulkan<validation>::~Vulkan() = default;
@@ -54,7 +53,8 @@ namespace VSL_NAMESPACE {
 #ifdef VSL_NAMESPACE_TEST
     template<bool validation>
     void Vulkan<validation>::test() {
-        for (const auto device : data_->instance.enumeratePhysicalDevices())
+        const auto owner = StartupAccess::Owned(*this);
+        for (const auto device : owner->instance.enumeratePhysicalDevices())
             logging(device.getProperties().deviceName);
     }
 #endif

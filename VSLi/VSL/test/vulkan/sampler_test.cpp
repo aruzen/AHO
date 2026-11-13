@@ -1,5 +1,10 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/sampler_access.hpp>
 #include "support/vulkan_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SamplerAccess;
@@ -13,7 +18,7 @@ namespace {
         EXPECT_EQ(SamplerAccess::Owned(sampler)->device, device.data_.get());
     }
     TEST_F(SamplerVulkanIntegrationTest, CreatesDefaultLinearSamplerWhenFeatureIsAvailable) {
-        if (!physical.data_->features->samplerAnisotropy)
+        if (!StartupAccess::Owned(physical)->features->samplerAnisotropy)
             GTEST_SKIP() << "samplerAnisotropy is not supported";
         vsl::Sampler sampler(device);
         EXPECT_TRUE(SamplerAccess::Owned(sampler)->sampler);

@@ -1,9 +1,14 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include "support/render_fixture.hpp"
 #include "support/read_image.hpp"
 #include "support/frame_buffer_metadata.hpp"
 #include <VSL/lifetime/resource_arena.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
@@ -140,7 +145,7 @@ namespace {
         inputs[1] = valid;
         EXPECT_NO_THROW((l::ResourceArena(device, plan, inputs, memory)));
         vsl::RenderPassDescription too_many;
-        const auto limit = physical.data_->device.getProperties().limits.maxColorAttachments;
+        const auto limit = StartupAccess::Owned(physical)->device.getProperties().limits.maxColorAttachments;
         too_many.subpasses[0].colors.assign(limit + 1, {vsl::UNUSED_ATTACHMENT});
         inputs[1] = too_many;
         EXPECT_THROW((l::ResourceArena(device, plan, inputs, memory)), std::out_of_range);

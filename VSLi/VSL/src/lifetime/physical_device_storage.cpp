@@ -1,7 +1,12 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/physical_device_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <new>
 #include <stdexcept>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_standard_layout_v<PhysicalDeviceSlotStorage> && offsetof(PhysicalDeviceSlotStorage, value) == 0);
@@ -17,9 +22,9 @@ namespace VSL_NAMESPACE::lifetime {
             static void VisitDependencies(const void* owner, DependencyNode::EdgeVisitor visitor, void* context);
         };
         HeapPhysicalDeviceOwner::HeapPhysicalDeviceOwner(VulkanAccessor instance, const operation::PhysicalDeviceCandidate& candidate) : instance(instance.owner_ref()) {
-            construct_physical_device(storage, *instance.accessor, candidate);
+            construct_physical_device(storage, *StartupAccess::Owned(instance), candidate);
             try {
-                set_physical_device_instance_owner(physical_device_at(storage), this->instance.alias(instance.accessor.get()));
+                set_physical_device_instance_owner(physical_device_at(storage), this->instance.alias(StartupAccess::Owned(instance).get()));
             } catch (...) {
                 destroy_physical_device(storage);
                 throw;
@@ -58,7 +63,7 @@ namespace VSL_NAMESPACE::lifetime {
     }
     void set_physical_device_instance_owner(impl::PhysicalDeviceImpl& target, OwnedRef<impl::VulkanImplAccessor> instance) {
         if (!target.owner_context || !target.vulkan || !instance.use_count() || instance.get() != target.vulkan || !target.vulkan->owner_node || target.vulkan->owner_node->retiring() ||
-            !target.vulkan->owner_node->matches(instance.share()))
+            !target.vulkan->owner_node->matches(detail::OwnerAccess::Shared(instance)))
             throw std::invalid_argument("Physical device getter requires its canonical Instance owner");
         target.owner_context->instance = instance.weak();
     }

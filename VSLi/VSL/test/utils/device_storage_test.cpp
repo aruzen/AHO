@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/sampler_access.hpp>
@@ -15,6 +16,10 @@
 #include <VSL/utils/typed_resources.hpp>
 #include <VSL/utils/spir_reflector.hpp>
 #include <limits>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
@@ -111,9 +116,9 @@ namespace {
         try {
             while (constructed < 2) {
                 const auto index = constructed;
-                l::construct_device(slot(index), *source.data_, {}, calls);
+                l::construct_device(slot(index), *StartupAccess::Owned(source), {}, calls);
                 ++constructed;
-                l::set_device_physical_owner(l::device_at(slot(index)), physical.alias(source.data_.get()));
+                l::set_device_physical_owner(l::device_at(slot(index)), physical.alias(StartupAccess::Owned(source).get()));
             }
         } catch (...) {
             clear();
@@ -140,10 +145,10 @@ namespace {
         visitor(context, static_cast<const DevicePair*>(root)->physical);
     }
     DeviceAndBuffer::DeviceAndBuffer(vsl::PhysicalDevice source) : physical(source.owner_ref()) {
-        l::construct_device(device_memory, *source.data_, {});
+        l::construct_device(device_memory, *StartupAccess::Owned(source), {});
         try {
             auto& device = l::device_at(device_memory);
-            l::set_device_physical_owner(device, physical.alias(source.data_.get()));
+            l::set_device_physical_owner(device, physical.alias(StartupAccess::Owned(source).get()));
             l::construct_buffer(buffer_memory, device, vsl::BufferCreateInfo{4, vsl::MemoryType::UNIFORM_BUFFER});
         } catch (...) {
             l::destroy_device(device_memory);
@@ -174,8 +179,8 @@ namespace {
         EXPECT_THROW(empty.owner_ref(), std::invalid_argument);
         EXPECT_THROW(empty.get_physical_device(), std::invalid_argument);
         EXPECT_THROW(empty.enabled_features(), std::invalid_argument);
-        EXPECT_THROW(vsl::LogicalDeviceAccessor::Create(vsl::PhysicalDevice(nullptr)), std::invalid_argument);
-        EXPECT_THROW(vsl::LogicalDevice<>(vsl::PhysicalDevice(nullptr), std::shared_ptr<vsl::Surface>{}), std::invalid_argument);
+        EXPECT_THROW(vsl::LogicalDeviceAccessor::Create(vsl::PhysicalDevice{}), std::invalid_argument);
+        EXPECT_THROW(vsl::LogicalDevice<>(vsl::PhysicalDevice{}, std::shared_ptr<vsl::Surface>{}), std::invalid_argument);
     }
     TEST_F(DeviceStorageVulkanIntegrationTest, DistinctDeviceSlotsShareOneOwnerAndReturnTheOriginalPhysicalParent) {
         auto root = std::make_shared<DevicePair>(physical);
@@ -188,9 +193,9 @@ namespace {
         EXPECT_FALSE(second.data_.owner_before(first.data_));
         const auto original = first.get_physical_device();
         vsl_test::expect_fixed_parent(first.owner_ref(), physical.owner_ref());
-        EXPECT_EQ(original.data_, physical.data_);
-        EXPECT_FALSE(original.data_.owner_before(physical.data_));
-        EXPECT_FALSE(physical.data_.owner_before(original.data_));
+        EXPECT_EQ(StartupAccess::Owned(original), StartupAccess::Owned(physical));
+        EXPECT_FALSE(StartupAccess::Owned(original).owner_before(StartupAccess::Owned(physical)));
+        EXPECT_FALSE(StartupAccess::Owned(physical).owner_before(StartupAccess::Owned(original)));
         std::weak_ptr<void> owner = root;
         root.reset();
         first.data_.reset();
@@ -203,14 +208,14 @@ namespace {
         DeviceProbe probe;
         DeviceSlot slot;
         slot.calls = probe.calls();
-        EXPECT_THROW(slot.construct(*physical.data_, {}), vk::OutOfHostMemoryError);
+        EXPECT_THROW(slot.construct(*StartupAccess::Owned(physical), {}), vk::OutOfHostMemoryError);
         EXPECT_EQ(probe.creates, 1u);
         EXPECT_EQ(probe.destroys, 0u);
         probe.fail = false;
-        slot.construct(*physical.data_, {});
+        slot.construct(*StartupAccess::Owned(physical), {});
         EXPECT_TRUE(slot.value().device);
-        EXPECT_THROW(slot.construct(*physical.data_, {}), std::logic_error);
-        EXPECT_THROW(o::initialize_device(slot.value(), *physical.data_, {}), std::logic_error);
+        EXPECT_THROW(slot.construct(*StartupAccess::Owned(physical), {}), std::logic_error);
+        EXPECT_THROW(o::initialize_device(slot.value(), *StartupAccess::Owned(physical), {}), std::logic_error);
         o::destroy_device(slot.value(), slot.calls);
         o::destroy_device(slot.value(), slot.calls);
         EXPECT_EQ(probe.creates, 2u);
@@ -229,12 +234,12 @@ namespace {
         probe.empty = true;
         DeviceSlot slot;
         slot.calls = probe.calls();
-        EXPECT_THROW(slot.construct(*physical.data_, {}), std::runtime_error);
+        EXPECT_THROW(slot.construct(*StartupAccess::Owned(physical), {}), std::runtime_error);
         EXPECT_FALSE(slot.constructed);
         EXPECT_EQ(probe.creates, 1u);
         EXPECT_EQ(probe.destroys, 0u);
         probe.empty = probe.fail = false;
-        EXPECT_NO_THROW(slot.construct(*physical.data_, {}));
+        EXPECT_NO_THROW(slot.construct(*StartupAccess::Owned(physical), {}));
     }
     TEST_F(DeviceStorageVulkanIntegrationTest, InvalidQueuesExtensionsAndFeatureBitsFailBeforeNativeCreation) {
         DeviceProbe probe;
@@ -242,24 +247,24 @@ namespace {
         slot.calls = probe.calls();
         vsl::DeviceCreateInfo info;
         info.graphics_family = std::numeric_limits<std::uint32_t>::max();
-        EXPECT_THROW(slot.construct(*physical.data_, info), std::invalid_argument);
+        EXPECT_THROW(slot.construct(*StartupAccess::Owned(physical), info), std::invalid_argument);
         info.graphics_family = queue_family;
         info.queues = {{queue_family, {std::numeric_limits<float>::quiet_NaN()}}};
-        EXPECT_THROW(slot.construct(*physical.data_, info), std::invalid_argument);
+        EXPECT_THROW(slot.construct(*StartupAccess::Owned(physical), info), std::invalid_argument);
         info.queues = {{queue_family}, {queue_family}};
-        EXPECT_THROW(slot.construct(*physical.data_, info), std::invalid_argument);
+        EXPECT_THROW(slot.construct(*StartupAccess::Owned(physical), info), std::invalid_argument);
         info.queues = {{queue_family, {}}};
-        EXPECT_THROW(slot.construct(*physical.data_, info), std::invalid_argument);
+        EXPECT_THROW(slot.construct(*StartupAccess::Owned(physical), info), std::invalid_argument);
         info.queues.clear();
         info.extensions = {"VK_VSL_missing_extension"};
-        EXPECT_THROW(slot.construct(*physical.data_, info), std::invalid_argument);
+        EXPECT_THROW(slot.construct(*StartupAccess::Owned(physical), info), std::invalid_argument);
         info.extensions.clear();
         info.features = static_cast<vsl::DeviceFeature>(std::uint64_t{1} << 63);
-        EXPECT_THROW(slot.construct(*physical.data_, info), std::invalid_argument);
+        EXPECT_THROW(slot.construct(*StartupAccess::Owned(physical), info), std::invalid_argument);
         const auto unsupported = ~static_cast<std::uint64_t>(physical.supported_features()) & ((std::uint64_t{1} << 55) - 1);
         if (unsupported) {
             info.features = static_cast<vsl::DeviceFeature>(unsupported & (~unsupported + 1));
-            EXPECT_THROW(slot.construct(*physical.data_, info), std::invalid_argument);
+            EXPECT_THROW(slot.construct(*StartupAccess::Owned(physical), info), std::invalid_argument);
         }
         EXPECT_EQ(probe.creates, 0u);
         EXPECT_EQ(probe.destroys, 0u);
@@ -275,7 +280,7 @@ namespace {
     }
     TEST_F(DeviceStorageVulkanIntegrationTest, ChildPlacementCanUseAnUnpublishedDeviceWithoutAnOwnerAdapter) {
         DeviceSlot slot;
-        slot.construct(*physical.data_, {});
+        slot.construct(*StartupAccess::Owned(physical), {});
         ASSERT_EQ(slot.value().owner_node, nullptr);
         alignas(l::BufferSlotStorage) std::byte memory[sizeof(l::BufferSlotStorage)];
         l::construct_buffer(memory, slot.value(), vsl::BufferCreateInfo{16, USAGE});

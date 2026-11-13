@@ -1,8 +1,13 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
 #include "support/window_fixture.hpp"
 #include <VSL/lifetime/surface_storage.hpp>
 #include <VSL/storage/resource_layout.hpp>
 #include <VSL/vulkan/swapchain.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
@@ -61,9 +66,9 @@ namespace {
         try {
             while (constructed < 2) {
                 const auto index = constructed;
-                l::construct_surface(slot(index), *source.accessor, *l::detail::WindowOwnerAccess::Ref(this->windows[index]), this->calls);
+                l::construct_surface(slot(index), *StartupAccess::Owned(source), *l::detail::WindowOwnerAccess::Ref(this->windows[index]), this->calls);
                 ++constructed;
-                l::set_surface_owners(l::surface_at(slot(index)), instance.alias(source.accessor.get()), this->windows[index]);
+                l::set_surface_owners(l::surface_at(slot(index)), instance.alias(StartupAccess::Owned(source).get()), this->windows[index]);
             }
         } catch (...) {
             clear();
@@ -112,7 +117,7 @@ namespace {
     }
     TEST_F(SurfaceStorageVulkanIntegrationTest, SameTypeSlotsUseDirectOffsetsAndOneOwnerWithOriginalParents) {
         ScopedSurfaceWindow peer;
-        auto owner = std::make_shared<SurfacePair>(vsl::VulkanAccessor{instance}, std::array{window->window_owner(), peer.window.window_owner()});
+        auto owner = std::make_shared<SurfacePair>(vsl::lifetime::detail::StartupAccess::FromShared(instance), std::array{window->window_owner(), peer.window.window_owner()});
         owner->node.publish(owner, owner.get(), SurfacePair::VisitDependencies);
         auto* first = &l::surface_at(owner->slot(0));
         auto* second = &l::surface_at(owner->slot(1));
@@ -122,13 +127,13 @@ namespace {
         EXPECT_EQ(reinterpret_cast<std::uintptr_t>(first) % s::SURFACE_SLOT_ALIGNMENT, 0u);
         EXPECT_FALSE(a.data_.owner_before(b.data_));
         EXPECT_FALSE(b.data_.owner_before(a.data_));
-        EXPECT_EQ(a.get_instance().accessor, instance);
+        EXPECT_EQ(StartupAccess::Owned(a.get_instance()), instance);
         EXPECT_EQ(a.get_window_owner().owner_ref(), window->window_owner().owner_ref());
         std::weak_ptr<void> root = owner;
         owner.reset();
         ASSERT_TRUE(window->close());
         ASSERT_TRUE(peer.window.close());
-        EXPECT_FALSE(physical.data_->device.getSurfaceFormatsKHR(a.data_->surface).empty());
+        EXPECT_FALSE(StartupAccess::Owned(physical)->device.getSurfaceFormatsKHR(a.data_->surface).empty());
         a.data_.reset();
         EXPECT_FALSE(root.expired());
         b.data_.reset();
@@ -156,9 +161,9 @@ namespace {
         const auto child = std::weak_ptr<void>(surface->data_);
         auto os = surface->get_window_owner();
         auto original = surface->get_instance();
-        EXPECT_EQ(original.accessor, instance);
-        EXPECT_FALSE(original.accessor.owner_before(instance));
-        EXPECT_FALSE(instance.owner_before(original.accessor));
+        EXPECT_EQ(StartupAccess::Owned(original), instance);
+        EXPECT_FALSE(StartupAccess::Owned(original).owner_before(instance));
+        EXPECT_FALSE(instance.owner_before(StartupAccess::Shared(original)));
         const auto parent = os.owner_ref(), expected = window->window_owner().owner_ref();
         EXPECT_FALSE(parent.owner_before(expected));
         EXPECT_FALSE(expected.owner_before(parent));
@@ -179,7 +184,7 @@ namespace {
         SurfaceProbe probe;
         probe.fail_on = 2;
         const o::SurfaceNativeCalls calls{&probe, SurfaceProbe::Create, SurfaceProbe::Destroy};
-        EXPECT_THROW((SurfacePair(vsl::VulkanAccessor{instance}, std::array{window->window_owner(), peer.window.window_owner()}, calls)), vsl::exceptions::RuntimeException);
+        EXPECT_THROW((SurfacePair(vsl::lifetime::detail::StartupAccess::FromShared(instance), std::array{window->window_owner(), peer.window.window_owner()}, calls)), vsl::exceptions::RuntimeException);
         EXPECT_EQ(probe.creates, 2u);
         EXPECT_EQ(probe.destroys, 1u);
         make_surface();
@@ -206,7 +211,7 @@ namespace {
         surface.reset();
         EXPECT_FALSE(child.expired());
         EXPECT_FALSE(os.expired());
-        EXPECT_FALSE(physical.data_->device.getSurfaceFormatsKHR(native_surface->surface).empty());
+        EXPECT_FALSE(StartupAccess::Owned(physical)->device.getSurfaceFormatsKHR(native_surface->surface).empty());
         auto source = std::make_shared<vsl::Surface>(saved.get_surface());
         vsl::Swapchain next(device, source, saved);
         EXPECT_GT(SwapchainAccess::Owned(next)->swap_chain_extent.width, 0u);

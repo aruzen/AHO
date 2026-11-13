@@ -1,11 +1,17 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include "support/vulkan_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 namespace {
     using VulkanInstanceVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
     TEST_F(VulkanInstanceVulkanIntegrationTest, AccessorSharesInstanceAndEnumeratesPhysicalDevices) {
-        vsl::VulkanAccessor first{instance}, second = first;
-        EXPECT_EQ(first.accessor, second.accessor);
-        EXPECT_TRUE(static_cast<bool>(first.accessor->instance));
-        EXPECT_FALSE(first.accessor->instance.enumeratePhysicalDevices().empty());
+        auto first = StartupAccess::FromShared(instance);
+        auto second = first;
+        EXPECT_EQ(StartupAccess::Owned(first), StartupAccess::Owned(second));
+        EXPECT_TRUE(static_cast<bool>(StartupAccess::Owned(first)->instance));
+        EXPECT_FALSE(StartupAccess::Owned(first)->instance.enumeratePhysicalDevices().empty());
     }
 } // namespace
 
@@ -25,8 +31,11 @@ namespace {
 #endif
         {
             vsl::Vulkan<false> vulkan("release host streams", required);
-            EXPECT_EQ(vulkan.data_, vulkan.accessor);
-            EXPECT_FALSE(vulkan.data_->debug_messenger);
+            EXPECT_EQ(StartupAccess::Owned(vulkan).use_count(), 1);
+            const vsl::VulkanAccessor runtime = vulkan;
+            EXPECT_EQ(StartupAccess::Owned(vulkan), StartupAccess::Owned(runtime));
+            EXPECT_EQ(StartupAccess::Owned(vulkan).use_count(), 2);
+            EXPECT_FALSE(StartupAccess::Owned(vulkan)->debug_messenger);
             EXPECT_TRUE(vulkan.owner_ref().managed());
             EXPECT_FALSE(vulkan.devices().get().empty());
         }
@@ -55,8 +64,9 @@ namespace {
                 required.push_back(name);
         vsl::Vulkan<true> vulkan("debug messenger default allocator test", required);
         EXPECT_TRUE(vulkan.check_validation_layer_support());
-        EXPECT_TRUE(static_cast<bool>(vulkan.data_->debug_messenger));
-        EXPECT_EQ(vulkan.accessor, vulkan.data_);
+        EXPECT_TRUE(static_cast<bool>(StartupAccess::Owned(vulkan)->debug_messenger));
+        const vsl::VulkanAccessor runtime = vulkan;
+        EXPECT_EQ(StartupAccess::Owned(vulkan), StartupAccess::Owned(runtime));
         EXPECT_FALSE(vulkan.devices().get().empty());
     }
 } // namespace

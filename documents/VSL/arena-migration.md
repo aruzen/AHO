@@ -625,3 +625,44 @@ copyは可変長配列まで独立し、copy代入は候補を作ってからswa
 変更17翻訳単位の構文検査、strict19files／17TU、source403／MSBuild登録、compile327が成功した。新4件を含む公開契約は11件で、独自stageの両入口への合成、stateの一時値とEditRefの一時値の区別、旧4入口の拒否を確認する。既存deep copy／move／default／注入失敗不変／Typed Input末尾／Native中snapshotのruntime試験を再利用した。
 
 macOS arm64／Clang20／C++26／MoltenVK・validation・ASan／UBSanで全VSL1,193（既知format3 skip）、AHO GPU192／CPU1,071、heap／arenaの3PNG一致とglTF viewer verifyが成功した。installed consumer30種と公開11契約、private橋の非配布、archive／header一致、Debug／Release／x86_64寸法、混在と親bb2e8ca3…headerのlink拒否も成功した。生成IDは61c90256…へ更新した。Windows／Linux実機、x86_64全体実行、device lost、並行CPU、性能率は未検証。次はInstance／PhysicalDeviceの公開境界から起動資源を整理する。
+
+## 順序12f: Instance／PhysicalDeviceの公開所有境界
+
+VulkanAccessorとPhysicalDeviceをprivate OwnedRef一本の値にし、公開shared Impl field／raw構築を閉じた。VulkanはAccessor値の構成と所有値変換を使い、accessor／data_の二重保持と可変な基底参照を撤去した。既存のCreate／Select／devices／properties／owner_ref、copy／move／swapを使える。
+
+通常の生成は既存のInstanceCreateInfoを渡す。必要な拡張とAPI版は対象環境に合わせる。
+
+```cpp
+auto instance = vsl::VulkanAccessor::Create(info);
+auto physical = vsl::PhysicalDevice::Select(instance);
+auto parent = physical.get_instance();
+vsl::Vulkan<false> facade(instance);
+vsl::VulkanAccessor owning_copy = facade;
+```
+
+同じ寿命のPhysicalDevice実体を別slotへまとめる場合も、同じ構築backendを使う。Instanceの寿命群はこの例でも独立している。
+
+```cpp
+constexpr std::array<vsl::storage::StartupRequest, 2> requests{{
+    {{2}, vsl::storage::StartupKind::PHYSICAL_DEVICE},
+    {{3}, vsl::storage::StartupKind::PHYSICAL_DEVICE}}};
+constexpr vsl::storage::StartupPlan<2> plan(requests);
+const std::array<vsl::lifetime::StartupInit, 2> inputs{
+    vsl::lifetime::PhysicalDeviceInit{instance, {}},
+    vsl::lifetime::PhysicalDeviceInit{instance, {}}};
+vsl::lifetime::StartupArena arena(plan, inputs);
+auto first = arena.physical_device({2});
+auto second = arena.physical_device({3});
+```
+
+private StartupAccessは元のImpl参照／control block／保存nodeを扱い、FromOwnedで別ownerへ包み直さない。Instance／PhysicalDeviceでは正規CB、保存nodeとImpl nodeの一致、退役状態を検査する。別CBのaliasや、同じCBに別nodeを付けた入力は拒否する。子の親getterは元親のOwnedRefへ戻し、Device側とSurface／OS Window側の寿命を結合しない。
+
+PhysicalDevices<S>の共有CPU stateはprivateな非template collectionへ移した。custom searchはconstructor前にcollectionを保持し、旧constructor→列挙→benchmark順を維持する。列挙へsnapshotをmoveし、候補と選択結果をPhysicalDevice値で保持する。callbackが元facadeを破棄しても、その後に元thisを読まない。最高の非負scoreと先着tieの意味は維持する。同じハードウェアでもget／searchが作るImplは別なので、slotの同一性とハードウェアの同一性を混同しない。
+
+旧helper::enumerate_physical_devices／physical_devices／select_physical_deviceは公開から撤去した。利用側はPhysicalDevices<S>(instance).get()／search()またはPhysicalDevice::Selectへ移す。Vulkan(Accessor)は配置済みInstanceを既存Vulkan APIへ接続する互換入口として残す。内部Shared境界はprivate adapterだけを使い、rvalueはTakeSharedで所有を移す。通常操作はOwnedRefから解決済みImplへ直接届く。collectionの共有state、Root／可変長配列、Vulkanのデバイスメモリ等の確保は残る。
+
+関連36翻訳単位の構文検査、公開18契約、source406／MSBuild登録が成功した。規約検査の43files／34TUに残った新2CPPの旧DB未登録は、新DBでの2files／2TU検査により補完し、コード違反はない。compile345は339件が初回成功、timeoutの6件も単独再検査ですべて成功した。
+
+新runtime1件はsearcher constructor中に元collectionを破棄し、選択完了とcollection回収を確認する。既存foreign試験にはCB／別保存node／retireの独立した拒否とNative不変を追加した。macOS arm64／Clang20／C++26／MoltenVK・validation・ASan／UBSanで全VSL1,194（既知format3 skip）、AHO GPU192／CPU1,071、同じ3PNGとglTF viewer verifyが成功した。
+
+一時consumerの消失に伴い、配布検査はrepo内の公開契約を用いて再構成した。installed headersだけで25種類をcompileし、7 consumerのlink／実行と公開18契約を確認した。private非配布、archive／header一致、Debug／Release／x86_64寸法、構成混在と親61c90256…headerのlink拒否も成功した。生成IDは6f5ad8d7…へ更新した。Windows／Linux実機、x86_64全体実行、device lost、並行CPU、性能率は未検証。次はDevice／SurfaceとAHOの弱いclose回収を整理する。

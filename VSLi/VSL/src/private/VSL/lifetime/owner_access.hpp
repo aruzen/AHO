@@ -8,6 +8,11 @@ namespace VSL_NAMESPACE::lifetime::detail {
         static const DependencyNode* Node(const OwnedRef<T>& owner) noexcept { return owner.use_count() ? owner._node : nullptr; }
         template<typename T>
         static const std::shared_ptr<T>& Shared(const OwnedRef<T>& owner) noexcept { return owner._value; }
+        template<typename T>
+        static std::shared_ptr<T> TakeShared(OwnedRef<T> owner) noexcept {
+            owner._node = nullptr;
+            return std::move(owner._value);
+        }
     };
     void retain_owner(std::vector<OwnerRef>& owners, OwnerRef owner);
     void retain_owner(std::span<OwnerRef> slots, size_t& count, OwnerRef owner);

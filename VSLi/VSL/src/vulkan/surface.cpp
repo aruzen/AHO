@@ -1,5 +1,10 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/surface_storage.hpp>
 #include <VSL/exceptions.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace VSL_NAMESPACE {
     namespace {
@@ -12,7 +17,7 @@ namespace VSL_NAMESPACE {
     Surface::Surface(PureWindow* window, VulkanAccessor instance) {
         if (!window || !window->data_ || !window->data_->window_handle)
             throw exceptions::RuntimeException("Surface", "A live window is required");
-        if (!instance.accessor || !instance.accessor->instance)
+        if (!StartupAccess::Owned(instance) || !StartupAccess::Owned(instance)->instance)
             throw exceptions::RuntimeException("Surface", "A Vulkan instance is required");
         data_ = lifetime::make_heap_surface(std::move(instance), window->window_owner());
     }
@@ -37,7 +42,7 @@ namespace VSL_NAMESPACE {
         const auto parent = source->owner_context ? source->owner_context->instance.lock() : lifetime::OwnedRef<impl::VulkanImplAccessor>{};
         if (!parent.use_count() || parent.get() != source->vulkan)
             throw std::logic_error("Surface has no Instance owner");
-        return {parent.share()};
+        return StartupAccess::FromOwned(parent);
     }
     lifetime::OSWindowOwner Surface::get_window_owner() const {
         const auto source = surface_owner(data_);

@@ -155,6 +155,9 @@ add_library(VSL STATIC
         VSL/src/operation/physical_device_ops.cpp
         VSL/src/private/VSL/lifetime/physical_device_storage.hpp
         VSL/src/lifetime/physical_device_storage.cpp
+        VSL/src/private/VSL/lifetime/startup_access.hpp
+        VSL/src/lifetime/startup_access.cpp
+        VSL/src/lifetime/physical_device_collection.cpp
         VSL/include/VSL/lifetime/glfw_lease.hpp
         VSL/include/VSL/lifetime/window_owner.hpp
         VSL/src/private/VSL/lifetime/window_runtime.hpp

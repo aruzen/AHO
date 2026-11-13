@@ -1,4 +1,5 @@
 #ifdef AHO_GPU_TESTS
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/render_fixture.hpp"
@@ -73,7 +74,7 @@ namespace {
         EXPECT_EQ(shared_request.read().bytes, pixels.bytes);
     }
     TEST_F(ImageReadbackVulkanIntegrationTest, PickingUsesTwoGenericColorOutputsWithoutSpecialPassOrCommand) {
-        if (!physical.data_->features->independentBlend)
+        if (!VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(physical)->features->independentBlend)
             GTEST_SKIP() << "independentBlend required for mixed outputs";
         VSL_NAMESPACE::Image<VSL_NAMESPACE::ImageType::COLOR_ATTACHMENT | VSL_NAMESPACE::ImageType::TRANSFER_SRC> ids(
             device, 8, 8, VSL_NAMESPACE::data_format::UNSIGNED_INT);
@@ -135,7 +136,7 @@ namespace {
         }
     }
     TEST_F(ImageReadbackVulkanIntegrationTest, DepthAttachmentCanRejectFragmentsThroughPublicPipelineState) {
-        const auto props = physical.data_->device.getFormatProperties(vk::Format::eD32Sfloat);
+        const auto props = VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(physical)->device.getFormatProperties(vk::Format::eD32Sfloat);
         if (!(props.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment))
             GTEST_SKIP() << "D32 depth unsupported";
         VSL_NAMESPACE::Image<VSL_NAMESPACE::ImageType::DEPTH_STENCIL_ATTACHMENT> depth(device, 8, 8, VSL_NAMESPACE::data_format::DEPTH32_FLOAT);
@@ -220,7 +221,7 @@ namespace {
 
 namespace {
     TEST_F(ImageReadbackVulkanIntegrationTest, MultisampleResolveIsConfiguredByAttachmentReferences) {
-        if (!(physical.data_->props->limits.framebufferColorSampleCounts & vk::SampleCountFlagBits::e4))
+        if (!(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(physical)->props->limits.framebufferColorSampleCounts & vk::SampleCountFlagBits::e4))
             GTEST_SKIP() << "Four-sample color attachments unsupported";
         VSL_NAMESPACE::Image<VSL_NAMESPACE::ImageType::COLOR_ATTACHMENT> multisampled(
             device, 8, 8, VSL_NAMESPACE::data_format::UNSIGNED_NORMALIZED8_RGBA, 1, VSL_NAMESPACE::SampleCount::FOUR);

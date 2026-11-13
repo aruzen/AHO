@@ -1,8 +1,13 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include "support/window_fixture.hpp"
 #include <VSL/lifetime/startup_arena.hpp>
 #include <VSL/lifetime/device_storage.hpp>
 #include <VSL/operation/instance_ops.hpp>
 #include <optional>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     namespace l = vsl::lifetime;
@@ -52,7 +57,7 @@ namespace {
             l::destroy_device(memory);
     }
     void DeviceSlot::construct(vsl::PhysicalDevice physical, vsl::DeviceCreateInfo info, FeatureProbe& probe) {
-        l::construct_device(memory, *physical.data_, std::move(info), {&probe, FeatureProbe::Create});
+        l::construct_device(memory, *StartupAccess::Owned(physical), std::move(info), {&probe, FeatureProbe::Create});
         constructed = true;
     }
     std::optional<vsl::VulkanAccessor> strict_instance(std::uint32_t api) {
@@ -114,8 +119,8 @@ namespace {
         const auto selected = vsl::PhysicalDevice::Select(*owner);
         if (!vsl::has_device_features(selected.supported_features(), MAINTENANCE | TIMELINE))
             GTEST_SKIP() << "Maintenance1 and timeline features unavailable";
-        EXPECT_TRUE(owner->accessor->surface_capabilities2);
-        EXPECT_TRUE(owner->accessor->surface_maintenance1);
+        EXPECT_TRUE(StartupAccess::Owned(*(owner))->surface_capabilities2);
+        EXPECT_TRUE(StartupAccess::Owned(*(owner))->surface_maintenance1);
         for (const auto features : {vsl::DeviceFeature::NONE, TIMELINE, MAINTENANCE, MAINTENANCE | TIMELINE}) {
             FeatureProbe probe;
             DeviceSlot slot;
@@ -134,7 +139,7 @@ namespace {
         auto owner = strict_instance(VK_API_VERSION_1_0);
         if (!owner)
             GTEST_SKIP() << "Surface maintenance Instance extensions unavailable";
-        EXPECT_TRUE(owner->accessor->physical_device_properties2);
+        EXPECT_TRUE(StartupAccess::Owned(*(owner))->physical_device_properties2);
         const auto selected = vsl::PhysicalDevice::Select(*owner);
         if (!vsl::has_device_features(selected.supported_features(), MAINTENANCE))
             GTEST_SKIP() << "Maintenance1 feature unavailable";

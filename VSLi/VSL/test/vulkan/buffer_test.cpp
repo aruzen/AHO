@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
@@ -10,6 +11,10 @@
 #include <VSL/vulkan/commands/image_readback.hpp>
 #include <VSL/lifetime/buffer_arena.hpp>
 #include <new>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::BufferAccess;
@@ -372,7 +377,7 @@ namespace {
         std::array<unsigned char, 256> initial{};
         initial.fill(0xa5);
         HostBuffer buffer(device, initial);
-        const auto alignment = physical.data_->props->limits.minMemoryMapAlignment;
+        const auto alignment = StartupAccess::Owned(physical)->props->limits.minMemoryMapAlignment;
         const auto map_offset = static_cast<std::size_t>(alignment);
         ASSERT_GT(map_offset, 0u);
         ASSERT_LE(map_offset + 8, initial.size());
@@ -494,7 +499,7 @@ namespace {
 namespace {
     TEST_F(BufferVulkanIntegrationTest, RequestedHostVisibleSubrangesFlushAndSurviveGPUCopy) {
         using Buffer = vsl::Buffer<vsl::MemoryType::TRANSFER_SOURCE, vsl::MemoryProperty::HOST_VISIBLE>;
-        const auto atom = std::max<std::size_t>(4, physical.data_->props->limits.nonCoherentAtomSize);
+        const auto atom = std::max<std::size_t>(4, StartupAccess::Owned(physical)->props->limits.nonCoherentAtomSize);
         const std::size_t bytes = 2 * atom + 4;
         Buffer buffer(device, bytes);
         std::vector<unsigned char> expected(bytes, 0xa5);
@@ -547,7 +552,7 @@ namespace {
         EXPECT_THROW(buffer.data(1, 19), vsl::exceptions::RuntimeException);
     }
     TEST_F(BufferVulkanIntegrationTest, DefaultMappingSizeExcludesTheRequestedOffset) {
-        const auto offset = physical.data_->props->limits.minMemoryMapAlignment;
+        const auto offset = StartupAccess::Owned(physical)->props->limits.minMemoryMapAlignment;
         HostBuffer buffer(device, std::size_t{offset * 2 + 1});
         auto mapped = buffer.data(std::nullopt, offset);
         EXPECT_EQ(mapped.offset, offset);
@@ -760,7 +765,7 @@ namespace {
 namespace {
     TEST_F(BufferVulkanIntegrationTest, UnavailableMemoryPropertiesReportTheMissingTypeInsteadOfUsingIndexZero) {
         const auto requested = vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eLazilyAllocated;
-        const auto& properties = *physical.data_->mem_props;
+        const auto& properties = *StartupAccess::Owned(physical)->mem_props;
         for (std::uint32_t i = 0; i < properties.memoryTypeCount; ++i)
             ASSERT_NE(properties.memoryTypes[i].propertyFlags & requested, requested);
         using Buffer = vsl::Buffer<vsl::MemoryType::TRANSFER_SOURCE,
@@ -848,7 +853,7 @@ namespace {
         // コヒーレントメモリしかない環境でも、キャッシュ無効化範囲のアラインメントを確かめる。
         // 実際の非コヒーレントメモリの動作を再現する検証ではない。
         BufferAccess::Owned(destination)->properties = vsl::MemoryProperty::HOST_VISIBLE;
-        BufferAccess::Owned(destination)->atom_size = physical.data_->device.getProperties().limits.nonCoherentAtomSize;
+        BufferAccess::Owned(destination)->atom_size = StartupAccess::Owned(physical)->device.getProperties().limits.nonCoherentAtomSize;
         auto partial = mapping.read(3, 1);
         EXPECT_EQ(partial[0], std::byte{0});
         EXPECT_EQ(partial[2], std::byte{255});
@@ -956,7 +961,7 @@ namespace {
         EXPECT_EQ(mapping.data, original->mapped);
     }
     TEST_F(BufferVulkanIntegrationTest, RejectsUnavailableRequiredMemoryInsteadOfSelectingAnUnrelatedType) {
-        const auto properties = physical.data_->device.getMemoryProperties();
+        const auto properties = StartupAccess::Owned(physical)->device.getMemoryProperties();
         auto selected = vk::MemoryPropertyFlags{};
         for (std::uint32_t i = 0; i < properties.memoryTypeCount; ++i)
             selected |= properties.memoryTypes[i].propertyFlags;
@@ -985,7 +990,7 @@ namespace {
         EXPECT_THROW(mapping.write({}, SIZE_MAX), std::out_of_range);
         EXPECT_NO_THROW(mapping.write({}, 32));
         BufferAccess::Owned(source)->properties = vsl::MemoryProperty::HOST_VISIBLE;
-        BufferAccess::Owned(source)->atom_size = physical.data_->device.getProperties().limits.nonCoherentAtomSize;
+        BufferAccess::Owned(source)->atom_size = StartupAccess::Owned(physical)->device.getProperties().limits.nonCoherentAtomSize;
         mapping.write(std::span(payload).first(1), 31);
         EXPECT_EQ(mapping.read(1, 31)[0], payload[0]);
     }

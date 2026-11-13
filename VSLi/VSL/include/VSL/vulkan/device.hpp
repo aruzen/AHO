@@ -8,6 +8,7 @@
 #include "../concepts.hpp"
 
 #include <any>
+#include <optional>
 #include <utility>
 #include "../exceptions.hpp"
 
@@ -37,23 +38,22 @@ namespace VSL_NAMESPACE {
         std::shared_ptr<impl::LogicalDeviceImpl> create(PhysicalDevice device, Surface surface);
     };
 
-    template<typename S>
-    struct PhysicalDevices {
-        using BenchMarcker = S;
-
-        PhysicalDevices(VulkanAccessor vulkan);
-        ~PhysicalDevices();
-
-        std::vector<PhysicalDevice> get();
-        PhysicalDevice search();
-#ifdef VSL_NAMESPACE_TEST
-        void test();
-#endif
-        std::shared_ptr<impl::PhysicalDevicesImpl> data_ = nullptr;
-    };
-
     struct PhysicalDevice {
-        PhysicalDevice(std::shared_ptr<impl::PhysicalDeviceImpl> data_);
+    private:
+        lifetime::OwnedRef<impl::PhysicalDeviceImpl> _owner;
+        explicit PhysicalDevice(lifetime::OwnedRef<impl::PhysicalDeviceImpl> owner) noexcept : _owner(std::move(owner)) {}
+        friend struct lifetime::detail::StartupAccess;
+
+    public:
+        PhysicalDevice() = default;
+        PhysicalDevice(const PhysicalDevice&) = default;
+        PhysicalDevice(PhysicalDevice&&) noexcept = default;
+        PhysicalDevice& operator=(PhysicalDevice value) noexcept {
+            swap(value);
+            return *this;
+        }
+        void swap(PhysicalDevice& other) noexcept { _owner.swap(other._owner); }
+        explicit operator bool() const noexcept { return bool(_owner); }
         ~PhysicalDevice();
 
         static PhysicalDevice Select(VulkanAccessor instance);
@@ -66,7 +66,52 @@ namespace VSL_NAMESPACE {
         uint32_t device_id();
         physical_device_type::PhysicalDeviceType type();
         std::string name();
-        std::shared_ptr<impl::PhysicalDeviceImpl> data_;
+    };
+
+    namespace lifetime::detail {
+        class PhysicalDeviceCollection {
+            std::shared_ptr<impl::PhysicalDevicesImpl> _state;
+            explicit PhysicalDeviceCollection(VulkanAccessor instance);
+            std::vector<PhysicalDevice> get() const&;
+            std::vector<PhysicalDevice> get() &&;
+            PhysicalDevice select() const;
+            template<typename>
+            friend struct ::VSL_NAMESPACE::PhysicalDevices;
+            friend struct StartupAccess;
+
+        public:
+            PhysicalDeviceCollection(const PhysicalDeviceCollection&) = default;
+            PhysicalDeviceCollection(PhysicalDeviceCollection&&) noexcept = default;
+            PhysicalDeviceCollection& operator=(PhysicalDeviceCollection value) noexcept {
+                swap(value);
+                return *this;
+            }
+            void swap(PhysicalDeviceCollection& other) noexcept { _state.swap(other._state); }
+        };
+    } // namespace lifetime::detail
+
+    template<typename S>
+    struct PhysicalDevices {
+    private:
+        lifetime::detail::PhysicalDeviceCollection _collection;
+        friend struct lifetime::detail::StartupAccess;
+
+    public:
+        using BenchMarcker = S;
+        PhysicalDevices(VulkanAccessor vulkan);
+        PhysicalDevices(const PhysicalDevices&) = default;
+        PhysicalDevices(PhysicalDevices&&) noexcept = default;
+        PhysicalDevices& operator=(PhysicalDevices value) noexcept {
+            swap(value);
+            return *this;
+        }
+        void swap(PhysicalDevices& other) noexcept { _collection.swap(other._collection); }
+        ~PhysicalDevices();
+        std::vector<PhysicalDevice> get();
+        PhysicalDevice search();
+#ifdef VSL_NAMESPACE_TEST
+        void test();
+#endif
     };
 
     struct LogicalDeviceAccessor {
@@ -103,39 +148,37 @@ template<typename S>
 VSL_NAMESPACE::PhysicalDevices<S> VSL_NAMESPACE::Vulkan<validation>::devices() {
     return VSL_NAMESPACE::PhysicalDevices<S>(*this);
 }
-namespace VSL_NAMESPACE::helper {
-    std::shared_ptr<impl::PhysicalDevicesImpl> enumerate_physical_devices(VulkanAccessor vulkan);
-    std::vector<PhysicalDevice> physical_devices(const std::shared_ptr<impl::PhysicalDevicesImpl>& data);
-    PhysicalDevice select_physical_device(const std::shared_ptr<impl::PhysicalDevicesImpl>& data);
-} // namespace VSL_NAMESPACE::helper
-
 template<typename S>
 VSL_NAMESPACE::PhysicalDevices<S>::PhysicalDevices(VulkanAccessor vulkan)
-    : data_(helper::enumerate_physical_devices(std::move(vulkan))) {}
+    : _collection(std::move(vulkan)) {}
 
 template<typename S>
 VSL_NAMESPACE::PhysicalDevices<S>::~PhysicalDevices() = default;
 
 template<typename S>
 std::vector<VSL_NAMESPACE::PhysicalDevice> VSL_NAMESPACE::PhysicalDevices<S>::get() {
-    return helper::physical_devices(data_);
+    return _collection.get();
 }
 
 template<typename S>
 VSL_NAMESPACE::PhysicalDevice VSL_NAMESPACE::PhysicalDevices<S>::search() {
-    if constexpr (std::same_as<S, PhysicalDevicesSercher>)
-        return helper::select_physical_device(data_);
-    S searcher;
-    int max_score = -1;
-    std::shared_ptr<impl::PhysicalDeviceImpl> selected;
-    for (auto device : get()) {
-        const int score = searcher.benchmark(device);
-        if (max_score < score) {
-            max_score = score;
-            selected = device.data_;
+    if constexpr (std::same_as<S, PhysicalDevicesSercher>) {
+        return _collection.select();
+    } else {
+        auto snapshot = _collection;
+        S searcher;
+        const auto candidates = std::move(snapshot).get();
+        int max_score = -1;
+        std::optional<PhysicalDevice> selected;
+        for (auto device : candidates) {
+            const int score = searcher.benchmark(device);
+            if (max_score < score) {
+                max_score = score;
+                selected = std::move(device);
+            }
         }
+        if (!selected)
+            throw exceptions::RuntimeException("PhysicalDevices", "PhysicalDevices is not suitable.");
+        return std::move(*selected);
     }
-    if (!selected)
-        throw exceptions::RuntimeException("PhysicalDevices", "PhysicalDevices is not suitable.");
-    return PhysicalDevice(selected);
 }

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
@@ -16,6 +17,10 @@
 #include <VSL/operation/submission_ops.hpp>
 #include <VSL/operation/command_ops.hpp>
 #include <functional>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
@@ -888,7 +893,7 @@ namespace {
         make_surface();
         if (HasFatalFailure())
             return;
-        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Graphics queue cannot present";
     }
     VkResult AcquireProbe::Acquire(void* context, VkDevice device, VkSwapchainKHR chain, std::uint64_t timeout,
@@ -1230,7 +1235,7 @@ namespace {
     TEST_F(PresentPhaseWindowIntegrationTest, PreparationCanReleaseTheCurrentPostponedPhaseBeforeAcquisition) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Graphics queue cannot present";
         auto manager = make_manager().independent(1);
         vsl::Swapchain chain(device, surface, {}, 64, 48);
@@ -1256,9 +1261,9 @@ namespace {
     TEST_F(PresentPhaseWindowIntegrationTest, UsesAcquiredImageForFramebufferReadbackAndPresentAcrossFrames) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Graphics queue cannot present";
-        if (!(physical.data_->device.getSurfaceCapabilitiesKHR(surface->data_->surface).supportedUsageFlags & vk::ImageUsageFlagBits::eTransferSrc))
+        if (!(StartupAccess::Owned(physical)->device.getSurfaceCapabilitiesKHR(surface->data_->surface).supportedUsageFlags & vk::ImageUsageFlagBits::eTransferSrc))
             GTEST_SKIP() << "Surface images cannot be read back";
         VSL_NAMESPACE::Swapchain chain(device, surface, std::nullopt, 64, 48,
                                        VSL_NAMESPACE::ImageType::COLOR_ATTACHMENT | VSL_NAMESPACE::ImageType::TRANSFER_SRC);
@@ -1302,7 +1307,7 @@ namespace {
     TEST_F(PresentPhaseWindowIntegrationTest, CancelledAcquiredFrameCanBeFollowedByAnotherFrame) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Graphics queue cannot present";
         VSL_NAMESPACE::Swapchain chain(device, surface, std::nullopt, 64, 48);
         VSL_NAMESPACE::RenderPass pass(chain);
@@ -1329,7 +1334,7 @@ namespace {
     TEST_F(PresentPhaseWindowIntegrationTest, PresentRejectsPoisonFromItsSavedSourceBeforeCallingNative) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Graphics queue cannot present";
         vsl::Swapchain chain(device, surface, std::nullopt, 64, 48);
         vsl::RenderPass pass(chain);
@@ -1359,7 +1364,7 @@ namespace {
     TEST_F(PresentPhaseWindowIntegrationTest, NativePresentCanDestroyThePhaseWithoutSubmittingOrPresentingTwice) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Graphics queue cannot present";
         vsl::Swapchain chain(device, surface, std::nullopt, 64, 48);
         vsl::RenderPass pass(chain);
@@ -1392,7 +1397,7 @@ namespace {
     TEST_F(PresentPhaseWindowIntegrationTest, NativeCancelRecordingCanDestroyThePhaseWithoutTouchingItsFacadeAgain) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Graphics queue cannot present";
         for (const auto point : {CommandProbe::Point::RESET, CommandProbe::Point::BEGIN, CommandProbe::Point::END}) {
             vsl::Swapchain chain(device, surface, std::nullopt, 64, 48);
@@ -1410,7 +1415,7 @@ namespace {
     TEST_F(PresentPhaseWindowIntegrationTest, CancelCallbacksCanDestroyThePhaseAfterItsImageIsReturned) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Graphics queue cannot present";
         vsl::Swapchain chain(device, surface, std::nullopt, 64, 48);
         for (const bool previous_slot : {false, true}) {
@@ -1451,7 +1456,7 @@ namespace {
     TEST_F(PresentPhaseWindowIntegrationTest, PreviousSlotReleaseCanDestroyThePhaseAfterNormalPresentation) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Graphics queue cannot present";
         vsl::Swapchain chain(device, surface, std::nullopt, 64, 48);
         auto manager = make_manager().independent(1);
@@ -1481,7 +1486,7 @@ namespace {
     TEST_F(PresentPhaseWindowIntegrationTest, PresentDoesNotWaitForUnrelatedUnsignaledFrameFences) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Graphics queue cannot present";
         VSL_NAMESPACE::Swapchain chain(device, surface, std::nullopt, 64, 48);
         VSL_NAMESPACE::RenderPass pass(chain);
@@ -1503,7 +1508,7 @@ namespace {
     TEST_F(PresentPhaseWindowIntegrationTest, WSIMarkersProtectPendingAcquireAndPlannedPresentAcrossWaitIdle) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Graphics queue cannot present";
         vsl::Swapchain chain(device, surface, std::nullopt, 64, 48);
         vsl::RenderPass pass(chain);
@@ -1536,7 +1541,7 @@ namespace {
     TEST_F(PresentPhaseWindowIntegrationTest, CancelTransfersReservationAndOriginalSemaphoresBeforeNotifyingTheOldResult) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Graphics queue cannot present";
         vsl::Swapchain chain(device, surface, std::nullopt, 64, 48);
         auto commands = make_manager().independent(1);
@@ -1586,7 +1591,7 @@ namespace {
     TEST_F(PresentPhaseWindowIntegrationTest, FailedSetupLeavesNoFenceReservationOrWSIMarker) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Graphics queue cannot present";
         vsl::Swapchain chain(device, surface, std::nullopt, 64, 48);
         if (SwapchainAccess::Owned(chain)->swap_chain_images.size() < 2)

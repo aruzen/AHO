@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <limits>
 #include <algorithm>
 #ifdef AHO_GPU_TESTS
@@ -24,23 +25,22 @@ namespace {
         ASSERT_NO_THROW(start_engine());
         const auto& data = *engine->data();
         const auto& surface = engine->boot_window->data2->surface;
-        EXPECT_FALSE(data.logical_device.data_.owner_before(data.physical_device.data_));
-        EXPECT_FALSE(data.physical_device.data_.owner_before(data.logical_device.data_));
-        EXPECT_TRUE(data.logical_device.data_.owner_before(data.vulkan_instance.accessor) ||
-                    data.vulkan_instance.accessor.owner_before(data.logical_device.data_));
+        EXPECT_FALSE(data.logical_device.data_.owner_before(VSL_NAMESPACE::lifetime::detail::StartupAccess::Shared(data.physical_device)));
+        EXPECT_FALSE(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.physical_device).owner_before(data.logical_device.data_));
+        EXPECT_TRUE(data.logical_device.data_.owner_before(VSL_NAMESPACE::lifetime::detail::StartupAccess::Shared(data.vulkan_instance)) ||
+                    VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.vulkan_instance).owner_before(data.logical_device.data_));
         EXPECT_TRUE(surface->data_.owner_before(data.logical_device.data_) || data.logical_device.data_.owner_before(surface->data_));
-        EXPECT_TRUE(surface->data_.owner_before(data.vulkan_instance.accessor) || data.vulkan_instance.accessor.owner_before(surface->data_));
-        EXPECT_EQ(data.logical_device.get_physical_device().data_, data.physical_device.data_);
-        EXPECT_EQ(data.physical_device.get_instance().accessor, data.vulkan_instance.accessor);
-        EXPECT_EQ(surface->get_instance().accessor, data.vulkan_instance.accessor);
-        EXPECT_EQ(data.vulkan_instance.data_, data.vulkan_instance.accessor);
+        EXPECT_TRUE(surface->data_.owner_before(VSL_NAMESPACE::lifetime::detail::StartupAccess::Shared(data.vulkan_instance)) || VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.vulkan_instance).owner_before(surface->data_));
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.logical_device.get_physical_device()), VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.physical_device));
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.physical_device.get_instance()), VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.vulkan_instance));
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(surface->get_instance()), VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.vulkan_instance));
     }
     TEST_F(StandardEngineVulkanIntegration, SavedDeviceDoesNotKeepClosedSurfaceOrWindowAlive) {
         ASSERT_NO_THROW(start_engine());
         auto saved = engine->data()->logical_device;
         const std::weak_ptr<vsl::impl::SurfaceImpl> surface = engine->boot_window->data2->surface->data_;
         const auto os = engine->boot_window->window_owner().owner_ref().weak();
-        const std::weak_ptr<vsl::impl::VulkanImplAccessor> instance = engine->data()->vulkan_instance.accessor;
+        const std::weak_ptr<vsl::impl::VulkanImplAccessor> instance = VSL_NAMESPACE::lifetime::detail::StartupAccess::Shared(engine->data()->vulkan_instance);
         EXPECT_TRUE(engine->boot_window->close());
         engine.reset();
         EXPECT_TRUE(surface.expired());
@@ -79,8 +79,8 @@ namespace {
         aho::engine::StandardEngineConfig config;
         config.engine.present_fences = vsl::PresentFencePolicy::REQUIRE_FENCE;
         engine = std::make_unique<aho::StandardEngine>(config);
-        EXPECT_TRUE(engine->data()->vulkan_instance.accessor->surface_capabilities2);
-        EXPECT_TRUE(engine->data()->vulkan_instance.accessor->surface_maintenance1);
+        EXPECT_TRUE(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(engine->data()->vulkan_instance)->surface_capabilities2);
+        EXPECT_TRUE(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(engine->data()->vulkan_instance)->surface_maintenance1);
         EXPECT_TRUE(vsl::has_device_features(engine->data()->logical_device.enabled_features(), vsl::DeviceFeature::SWAPCHAIN_MAINTENANCE1));
         EXPECT_TRUE(static_cast<bool>(engine->get_window()));
         auto& window = *engine->boot_window;

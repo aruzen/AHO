@@ -400,6 +400,21 @@ if (VSL_TEST_SOURCES)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
         set_tests_properties("VSL.Recipe.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
     endforeach()
+    add_library(vsl-startup-instance-style-contract OBJECT EXCLUDE_FROM_ALL contracts/startup_instance.cpp)
+    target_link_libraries(vsl-startup-instance-style-contract PRIVATE VSL)
+    target_compile_definitions(vsl-startup-instance-style-contract PRIVATE VSL_TYPED_CASE=0)
+    set(startup_instance_contract_names Valid AccessorData VulkanData VulkanAccessor PhysicalData CollectionData
+        RawInstanceShared RawPhysicalShared RawInstanceOwned RawPhysicalOwned EnumerateHelper EnumeratedHelper SelectHelper
+        MutableVulkanBase PrivateInstanceOwner PrivatePhysicalOwner PrivateCollection PrivateVulkanValue)
+    foreach(case RANGE 0 17)
+        list(GET startup_instance_contract_names ${case} name)
+        add_test(NAME "VSL.StartupInstance.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/startup_instance.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=private|no member|no matching|constructor|reference|conversion|bind|VulkanAccessor"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.StartupInstance.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
     set(shader_contract_names Valid ShaderData ShaderOwner ShaderRawConstructor ShaderGroupData ShaderGroupOwner TemporaryShaderCode ConstTemporaryShaderCode)
     foreach(case RANGE 1 7)
         list(GET shader_contract_names ${case} name)

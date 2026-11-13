@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/startup_arena.hpp>
 #include <VSL/lifetime/instance_storage.hpp>
 #include <VSL/lifetime/physical_device_storage.hpp>
@@ -7,6 +8,10 @@
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/storage/cpu_region.hpp>
 #include <algorithm>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace VSL_NAMESPACE::lifetime::detail {
     using StartupReference = std::variant<impl::VulkanImplAccessor*, impl::PhysicalDeviceImpl*, impl::SurfaceImpl*, impl::LogicalDeviceImpl*>;
@@ -63,13 +68,13 @@ namespace VSL_NAMESPACE::lifetime::detail {
     }
     OwnerRef checked_owner(const VulkanAccessor& value) {
         auto owner = value.owner_ref();
-        if (!value.accessor->instance || OwnerAccess::Node(owner)->retiring())
+        if (!StartupAccess::Owned(value)->instance || OwnerAccess::Node(owner)->retiring())
             throw std::invalid_argument("Startup input requires a live Instance");
         return owner;
     }
     OwnerRef checked_owner(const PhysicalDevice& value) {
         auto owner = value.owner_ref();
-        if (!value.data_->device || OwnerAccess::Node(owner)->retiring())
+        if (!StartupAccess::Owned(value)->device || OwnerAccess::Node(owner)->retiring())
             throw std::invalid_argument("Startup input requires a live PhysicalDevice");
         return owner;
     }
@@ -139,10 +144,10 @@ namespace VSL_NAMESPACE::lifetime::detail {
             if (resource.placement.external) {
                 std::visit([&](const auto& value) {
                     using Value = std::decay_t<decltype(value)>;
-                    if constexpr (std::same_as<Value, VulkanAccessor>) {
+                    if constexpr (std::same_as<Value, VulkanAccessor> || std::same_as<Value, PhysicalDevice>) {
                         resource.owner_index = retain(checked_owner(value));
-                        resource.reference = value.accessor.get();
-                    } else if constexpr (std::same_as<Value, PhysicalDevice> || std::same_as<Value, Surface> || std::same_as<Value, LogicalDeviceAccessor>) {
+                        resource.reference = StartupAccess::Owned(value).get();
+                    } else if constexpr (std::same_as<Value, Surface> || std::same_as<Value, LogicalDeviceAccessor>) {
                         resource.owner_index = retain(checked_owner(value));
                         resource.reference = value.data_.get();
                     }
@@ -184,12 +189,12 @@ namespace VSL_NAMESPACE::lifetime::detail {
     impl::VulkanImplAccessor& StartupArenaOwner::resolve(const InstanceSource& source) const {
         if (const auto* id = std::get_if<typed::ResourceId>(&source))
             return *std::get<impl::VulkanImplAccessor*>(find(*id, storage::StartupKind::INSTANCE).reference);
-        return *std::get<VulkanAccessor>(source).accessor;
+        return *StartupAccess::Owned(std::get<VulkanAccessor>(source));
     }
     impl::PhysicalDeviceImpl& StartupArenaOwner::resolve(const PhysicalDeviceSource& source) const {
         if (const auto* id = std::get_if<typed::ResourceId>(&source))
             return *std::get<impl::PhysicalDeviceImpl*>(find(*id, storage::StartupKind::PHYSICAL_DEVICE).reference);
-        return *std::get<PhysicalDevice>(source).data_;
+        return *StartupAccess::Owned(std::get<PhysicalDevice>(source));
     }
     impl::SurfaceImpl& StartupArenaOwner::resolve(const SurfaceSource& source) const {
         if (const auto* id = std::get_if<typed::ResourceId>(&source))
@@ -308,13 +313,13 @@ namespace VSL_NAMESPACE::lifetime {
         if (!_owner)
             throw std::logic_error("Startup arena has no owner");
         const auto& resource = _owner->find(id, storage::StartupKind::INSTANCE);
-        return {_owner->resource_owner(resource).alias(std::get<impl::VulkanImplAccessor*>(resource.reference)).share()};
+        return StartupAccess::FromOwned(_owner->resource_owner(resource).alias(std::get<impl::VulkanImplAccessor*>(resource.reference)));
     }
     PhysicalDevice StartupArena::physical_device(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Startup arena has no owner");
         const auto& resource = _owner->find(id, storage::StartupKind::PHYSICAL_DEVICE);
-        return {_owner->resource_owner(resource).alias(std::get<impl::PhysicalDeviceImpl*>(resource.reference)).share()};
+        return StartupAccess::FromOwned(_owner->resource_owner(resource).alias(std::get<impl::PhysicalDeviceImpl*>(resource.reference)));
     }
     Surface StartupArena::surface(typed::ResourceId id) const {
         if (!_owner)

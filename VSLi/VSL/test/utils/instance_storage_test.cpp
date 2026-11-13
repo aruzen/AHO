@@ -1,3 +1,5 @@
+#include <VSL/lifetime/startup_access.hpp>
+#include "support/startup_test_access.hpp"
 #include <VSL/lifetime/instance_storage.hpp>
 #include <VSL/lifetime/dependency_node.hpp>
 #include <VSL/storage/resource_layout.hpp>
@@ -7,6 +9,10 @@
 #include <cstring>
 #include <atomic>
 #include <cstdio>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     namespace l = vsl::lifetime;
@@ -174,15 +180,15 @@ namespace {
         {
             auto configuration = info();
             auto original = vsl::VulkanAccessor::Create(configuration);
-            owner = original.accessor;
+            owner = StartupAccess::Shared(original);
             saved = original;
             configuration.application_name.clear();
             configuration.extensions.clear();
             EXPECT_TRUE(original.owner_ref().managed());
-            EXPECT_FALSE(original.accessor->debug_messenger);
+            EXPECT_FALSE(StartupAccess::Owned(original)->debug_messenger);
         }
         EXPECT_FALSE(owner.expired());
-        EXPECT_NO_THROW((void)saved.accessor->instance.enumeratePhysicalDevices());
+        EXPECT_NO_THROW((void)StartupAccess::Owned(saved)->instance.enumeratePhysicalDevices());
         saved = {};
         EXPECT_TRUE(owner.expired());
     }
@@ -192,19 +198,20 @@ namespace {
         auto& first = l::instance_at(owner->slot(0));
         auto& second = l::instance_at(owner->slot(1));
         first.owner_node = second.owner_node = &owner->node;
-        vsl::VulkanAccessor a{{owner, &first}}, b{{owner, &second}};
+        auto a = StartupAccess::FromShared(std::shared_ptr<vsl::impl::VulkanImplAccessor>{owner, &first});
+        auto b = StartupAccess::FromShared(std::shared_ptr<vsl::impl::VulkanImplAccessor>{owner, &second});
         EXPECT_EQ(reinterpret_cast<std::uintptr_t>(&second) - reinterpret_cast<std::uintptr_t>(&first), s::INSTANCE_SLOT_SIZE);
         EXPECT_EQ(reinterpret_cast<std::uintptr_t>(&first) % s::INSTANCE_SLOT_ALIGNMENT, 0u);
         EXPECT_NE(first.instance, second.instance);
-        EXPECT_FALSE(a.accessor.owner_before(b.accessor));
-        EXPECT_FALSE(b.accessor.owner_before(a.accessor));
+        EXPECT_FALSE(StartupAccess::Owned(a).owner_before(StartupAccess::Owned(b)));
+        EXPECT_FALSE(StartupAccess::Owned(b).owner_before(StartupAccess::Owned(a)));
         EXPECT_TRUE(a.owner_ref().managed());
         EXPECT_TRUE(b.owner_ref().managed());
         std::weak_ptr<void> weak = owner;
         owner.reset();
         a = {};
         EXPECT_FALSE(weak.expired());
-        EXPECT_NO_THROW((void)b.accessor->instance.enumeratePhysicalDevices());
+        EXPECT_NO_THROW((void)StartupAccess::Owned(b)->instance.enumeratePhysicalDevices());
         b = {};
         EXPECT_TRUE(weak.expired());
     }
@@ -283,20 +290,30 @@ namespace {
         configuration.extensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
         configuration.layers = {"VK_LAYER_KHRONOS_validation", "VK_LAYER_KHRONOS_validation"};
         auto accessor = vsl::VulkanAccessor::Create(configuration);
-        EXPECT_TRUE(accessor.accessor->debug_messenger);
+        EXPECT_TRUE(StartupAccess::Owned(accessor)->debug_messenger);
         configuration = {};
-        EXPECT_NO_THROW((void)accessor.accessor->instance.enumeratePhysicalDevices());
+        EXPECT_NO_THROW((void)StartupAccess::Owned(accessor)->instance.enumeratePhysicalDevices());
     }
     TEST_F(InstanceStorageVulkanIntegrationTest, ReinitializationAndForeignControlBlocksCannotReplaceALiveInstance) {
         auto accessor = vsl::VulkanAccessor::Create(info());
-        const auto handle = accessor.accessor->instance;
+        const auto handle = StartupAccess::Owned(accessor)->instance;
         NativeProbe probe;
-        EXPECT_THROW(o::initialize_instance(*accessor.accessor, info(), probe.calls()), std::logic_error);
+        EXPECT_THROW(o::initialize_instance(*StartupAccess::Owned(accessor), info(), probe.calls()), std::logic_error);
         EXPECT_TRUE(probe.events.empty());
-        EXPECT_EQ(accessor.accessor->instance, handle);
-        const vsl::VulkanAccessor forged{{std::make_shared<int>(0), accessor.accessor.get()}};
-        const vsl::VulkanAccessor borrowed{{std::shared_ptr<void>{}, accessor.accessor.get()}};
+        EXPECT_EQ(StartupAccess::Owned(accessor)->instance, handle);
+        const auto forged = vsl_test::unchecked_startup(std::shared_ptr<vsl::impl::VulkanImplAccessor>{std::make_shared<int>(0), StartupAccess::Owned(accessor).get()});
+        const auto borrowed = vsl_test::unchecked_startup(std::shared_ptr<vsl::impl::VulkanImplAccessor>{std::shared_ptr<void>{}, StartupAccess::Owned(accessor).get()});
         EXPECT_THROW(forged.owner_ref(), std::invalid_argument);
         EXPECT_THROW(borrowed.owner_ref(), std::invalid_argument);
+        EXPECT_THROW(StartupAccess::FromShared(StartupAccess::Shared(forged)), std::invalid_argument);
+        EXPECT_THROW(StartupAccess::FromShared(StartupAccess::Shared(borrowed)), std::invalid_argument);
+        l::DependencyNode different_node;
+        different_node.publish(StartupAccess::Shared(accessor));
+        EXPECT_THROW(StartupAccess::FromOwned(different_node.ref(StartupAccess::Shared(accessor))), std::invalid_argument);
+        StartupAccess::Owned(accessor)->owner_node->retire();
+        EXPECT_THROW(accessor.owner_ref(), std::invalid_argument);
+        EXPECT_THROW(StartupAccess::FromOwned(StartupAccess::Owned(accessor)), std::invalid_argument);
+        EXPECT_THROW(StartupAccess::FromShared(StartupAccess::Shared(accessor)), std::invalid_argument);
+        EXPECT_EQ(StartupAccess::Owned(accessor)->instance, handle);
     }
 } // namespace

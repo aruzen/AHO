@@ -265,6 +265,9 @@
     <ClCompile Include="VSL\src\operation\physical_device_ops.cpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\physical_device_storage.hpp" />
     <ClCompile Include="VSL\src\lifetime\physical_device_storage.cpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\startup_access.hpp" />
+    <ClCompile Include="VSL\src\lifetime\startup_access.cpp" />
+    <ClCompile Include="VSL\src\lifetime\physical_device_collection.cpp" />
     <ClInclude Include="VSL\include\VSL\lifetime\glfw_lease.hpp" />
     <ClInclude Include="VSL\include\VSL\lifetime\window_owner.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\window_runtime.hpp" />

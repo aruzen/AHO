@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include "support/window_fixture.hpp"
@@ -12,6 +13,10 @@
 #include <VSL/vulkan/commands/render_pass_begin.hpp>
 #include <VSL/vulkan/commands/render_pass_end.hpp>
 #include <new>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
@@ -108,7 +113,7 @@ namespace {
         if (HasFatalFailure() || IsSkipped())
             return;
         make_surface();
-        if (!HasFatalFailure() && !physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!HasFatalFailure() && !StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Selected queue cannot present";
     }
     vsl::SwapchainAccessor PresentationRetentionWindowIntegrationTest::make_chain() {
@@ -580,7 +585,7 @@ namespace {
     }
     TEST_F(PresentationRetentionWindowIntegrationTest, PresentAndIdleOnlyCollectQuarantineForTheirCanonicalSurface) {
         ClosingWindow peer("Other presentation scope", 64, 48);
-        auto peer_surface = peer.add_plugin<vsl::Surface>(vsl::VulkanAccessor{instance});
+        auto peer_surface = peer.add_plugin<vsl::Surface>(vsl::lifetime::detail::StartupAccess::FromShared(instance));
         auto manager = make_manager().independent(1);
         NativeProbe probe;
         const auto before = l::quarantined_presentation_count();

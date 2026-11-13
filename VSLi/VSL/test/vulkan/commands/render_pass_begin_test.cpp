@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
@@ -6,6 +7,10 @@
 #include "support/render_fixture.hpp"
 #include "support/read_image.hpp"
 #include "support/frame_buffer_metadata.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
@@ -173,7 +178,7 @@ namespace {
 namespace {
     TEST_P(PackedIntegerClearVulkanIntegrationTest, IntegerClearReachesEveryPackedPixel) {
         const auto [format, is_signed] = GetParam();
-        const auto flags = physical.data_->device.getFormatProperties(format).optimalTilingFeatures;
+        const auto flags = StartupAccess::Owned(physical)->device.getFormatProperties(format).optimalTilingFeatures;
         if (!(flags & vk::FormatFeatureFlagBits::eColorAttachment))
             GTEST_SKIP() << "Packed format is not a color attachment on this GPU: " << vk::to_string(format);
         if (!host_coherent_available())

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
@@ -10,6 +11,10 @@
 #include <VSL/operation/synchronization_ops.hpp>
 #include <VSL/storage/cpu_region.hpp>
 #include <limits>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
@@ -63,7 +68,7 @@ namespace {
         make_surface();
         if (HasFatalFailure())
             return;
-        if (!physical.data_->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
             GTEST_SKIP() << "Selected queue cannot present to the Surface";
     }
     template<typename Handle>
@@ -295,7 +300,7 @@ namespace {
         EXPECT_EQ(retry.state(), vsl::SwapchainState::ACTIVE);
     }
     TEST_F(SwapchainArenaWindowIntegrationTest, LaterImageViewFailureRollsBackSlotsAndReleasesTheCPUClaim) {
-        const auto caps = physical.data_->device.getSurfaceCapabilitiesKHR(surface->data_->surface);
+        const auto caps = StartupAccess::Owned(physical)->device.getSurfaceCapabilitiesKHR(surface->data_->surface);
         if (caps.maxImageCount == 1)
             GTEST_SKIP() << "Surface supports only one image";
         NativeProbe probe;

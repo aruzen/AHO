@@ -1,4 +1,6 @@
 #pragma once
+#include "startup_test_access.hpp"
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/operation/pipeline_layout_ops.hpp>
@@ -44,7 +46,7 @@ namespace vsl_test {
         virtual bool require_timeline_semaphore() const;
         virtual vsl::PresentFencePolicy present_fence_policy() const;
         std::shared_ptr<vsl::impl::VulkanImpl<false>> instance;
-        vsl::PhysicalDevice physical{std::shared_ptr<vsl::impl::PhysicalDeviceImpl>{}};
+        vsl::PhysicalDevice physical;
         vsl::LogicalDeviceAccessor device;
         std::uint32_t queue_family = 0;
         bool require_validation = false;
@@ -189,8 +191,9 @@ namespace vsl_test {
             GTEST_SKIP() << "No device has a graphics and compute queue";
 
         const auto candidate = vsl::operation::inspect_physical_device(*instance, selected);
-        physical.data_ = vsl::lifetime::make_heap_physical_device(vsl::VulkanAccessor{instance}, candidate);
-        physical.data_->make_mem_props();
+        physical = VSL_NAMESPACE::lifetime::detail::StartupAccess::FromShared(vsl::lifetime::make_heap_physical_device(
+            VSL_NAMESPACE::lifetime::detail::StartupAccess::FromShared(instance), candidate));
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(physical)->make_mem_props();
 
         std::vector<const char*> device_extensions;
         for (const auto& extension : selected.enumerateDeviceExtensionProperties())
@@ -217,9 +220,9 @@ namespace vsl_test {
         vsl::DeviceCreateInfo device_info;
         device_info.graphics_family = queue_family;
         device_info.extensions.assign(device_extensions.begin(), device_extensions.end());
-        if (physical.data_->features->samplerAnisotropy)
+        if (VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(physical)->features->samplerAnisotropy)
             device_info.features = device_info.features | vsl::DeviceFeature::SAMPLER_ANISOTROPY;
-        if (physical.data_->features->independentBlend)
+        if (VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(physical)->features->independentBlend)
             device_info.features = device_info.features | vsl::DeviceFeature::INDEPENDENT_BLEND;
         if (require_timeline_semaphore())
             device_info.features = device_info.features | vsl::DeviceFeature::TIMELINE_SEMAPHORE;
@@ -242,7 +245,7 @@ namespace vsl_test {
         }
         _command_pools.clear();
         device.data_.reset();
-        physical.data_.reset();
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(physical).reset();
         instance.reset();
         for (const auto& error : _validation_errors)
             ADD_FAILURE() << error;
@@ -285,7 +288,7 @@ namespace vsl_test {
     }
 
     inline bool VulkanIntegrationTest::host_coherent_available() const {
-        const auto& properties = *physical.data_->mem_props;
+        const auto& properties = *VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(physical)->mem_props;
         for (std::uint32_t i = 0; i < properties.memoryTypeCount; ++i)
             if ((properties.memoryTypes[i].propertyFlags &
                  (vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)) ==

@@ -1,6 +1,11 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <array>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
@@ -134,7 +139,7 @@ namespace {
         valid.injection(layout);
         const auto* previous = PipelineRecipeAccess::Read(layout).push_ranges.data();
         const auto old_count = PipelineRecipeAccess::Read(layout).push_ranges.size();
-        const auto limit = physical.data_->device.getProperties().limits.maxPushConstantsSize;
+        const auto limit = StartupAccess::Owned(physical)->device.getProperties().limits.maxPushConstantsSize;
         for (const pl::PushContentDefinition definition : {
                  pl::PushContentDefinition{vsl::ShaderFlag::COMPUTE, 2, 4},
                  {vsl::ShaderFlag::COMPUTE, 0, 0},
@@ -189,7 +194,7 @@ TEST_F(PushRangeVulkanIntegrationTest, SubwordDefinitionsCanFormAnAlignedSharedR
 
 TEST_F(PushRangeVulkanIntegrationTest, RangeMayEndExactlyAtThePhysicalDeviceLimit) {
     auto layout = make_layout_state();
-    const auto limit = physical.data_->device.getProperties().limits.maxPushConstantsSize;
+    const auto limit = StartupAccess::Owned(physical)->device.getProperties().limits.maxPushConstantsSize;
     ASSERT_GE(limit, 4u);
     pl::PushConstants constants;
     constants.definitions = {{vsl::ShaderFlag::COMPUTE, limit - 4, 4}};

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
@@ -10,6 +11,10 @@
 #include <limits>
 #include "support/compute_fixture.hpp"
 #include "support/image_transfer_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
@@ -417,7 +422,7 @@ namespace {
         EXPECT_EQ(layouts[2].get_binding_points(), reflector.generated.binding_points.at(2));
     }
     TEST_F(ReflectedSetSlotsVulkanIntegrationTest, InvalidSetNumbersAreRejectedBeforeAllocatingNativeLayouts) {
-        const auto limit = physical.data_->props->limits.maxBoundDescriptorSets;
+        const auto limit = StartupAccess::Owned(physical)->props->limits.maxBoundDescriptorSets;
         for (const auto set : {std::numeric_limits<std::size_t>::max(), std::size_t{limit}}) {
             SCOPED_TRACE(set);
             vsl::utils::SPIRVReflector::GenerateData data{.logical_device = device};
@@ -753,7 +758,7 @@ namespace {
         using namespace vsl::graphic_resource;
         if (!host_coherent_available())
             GTEST_SKIP() << "Host coherent memory unavailable";
-        const auto properties = physical.data_->device.getFormatProperties(vk::Format::eR32Uint);
+        const auto properties = StartupAccess::Owned(physical)->device.getFormatProperties(vk::Format::eR32Uint);
         const auto required = vk::FormatFeatureFlagBits::eUniformTexelBuffer | vk::FormatFeatureFlagBits::eStorageTexelBuffer;
         if ((properties.bufferFeatures & required) != required)
             GTEST_SKIP() << "R32Uint uniform/storage texel buffer support unavailable";

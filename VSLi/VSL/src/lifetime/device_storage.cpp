@@ -1,7 +1,12 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/device_storage.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <new>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_standard_layout_v<DeviceSlotStorage> && offsetof(DeviceSlotStorage, value) == 0);
@@ -17,9 +22,9 @@ namespace VSL_NAMESPACE::lifetime {
             static void VisitDependencies(const void* owner, DependencyNode::EdgeVisitor visitor, void* context);
         };
         HeapDeviceOwner::HeapDeviceOwner(PhysicalDevice physical, DeviceCreateInfo info) : physical(physical.owner_ref()) {
-            construct_device(storage, *physical.data_, std::move(info));
+            construct_device(storage, *StartupAccess::Owned(physical), std::move(info));
             try {
-                set_device_physical_owner(device_at(storage), this->physical.alias(physical.data_.get()));
+                set_device_physical_owner(device_at(storage), this->physical.alias(StartupAccess::Owned(physical).get()));
             } catch (...) {
                 destroy_device(storage);
                 throw;

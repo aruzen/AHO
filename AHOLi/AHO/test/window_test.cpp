@@ -1,4 +1,5 @@
 #ifdef AHO_GPU_TESTS
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
@@ -795,8 +796,8 @@ namespace {
         info.extensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
 #endif
         const auto unsupported = vsl::VulkanAccessor::Create(std::move(info));
-        failing.data()->vulkan_instance.accessor = unsupported.accessor;
-        failing.data()->vulkan_instance.data_ = unsupported.accessor;
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(failing.data()->vulkan_instance) = VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(unsupported);
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(failing.data()->vulkan_instance) = VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(unsupported);
         const auto previous = vsl::PureWindow::WINDOWS;
         const auto previous_default = aho::engine::DefaultEngineRegistration::Current().data();
         EXPECT_THROW((aho::Window("cannot create graphics", 48, 32, failing)), vsl::exceptions::RuntimeException);

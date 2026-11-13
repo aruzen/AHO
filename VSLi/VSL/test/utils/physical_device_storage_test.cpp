@@ -1,8 +1,13 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <VSL/lifetime/physical_device_storage.hpp>
 #include <VSL/lifetime/dependency_node.hpp>
 #include <VSL/storage/resource_layout.hpp>
 #include <limits>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     namespace l = vsl::lifetime;
@@ -52,9 +57,9 @@ namespace {
         try {
             while (constructed < 2) {
                 auto* storage = slot(constructed);
-                l::construct_physical_device(storage, *source.accessor, candidate);
+                l::construct_physical_device(storage, *StartupAccess::Owned(source), candidate);
                 ++constructed;
-                l::set_physical_device_instance_owner(l::physical_device_at(storage), instance.alias(source.accessor.get()));
+                l::set_physical_device_instance_owner(l::physical_device_at(storage), instance.alias(StartupAccess::Owned(source).get()));
             }
         } catch (...) {
             clear();
@@ -94,7 +99,7 @@ namespace {
         static_assert(!std::is_copy_constructible_v<vsl::impl::PhysicalDeviceImpl> && !std::is_move_constructible_v<vsl::impl::PhysicalDeviceImpl>);
         static_assert(s::ResourceSlotLayout<vsl::impl::PhysicalDeviceImpl>::USE_OFFSET == s::NO_SEPARATE_USE);
         EXPECT_GT(s::PHYSICAL_DEVICE_SLOT_SIZE, s::PHYSICAL_DEVICE_IMPL_SIZE);
-        vsl::PhysicalDevice empty(nullptr);
+        vsl::PhysicalDevice empty;
         EXPECT_THROW(empty.owner_ref(), std::invalid_argument);
         EXPECT_THROW(empty.get_instance(), std::invalid_argument);
         EXPECT_THROW(empty.name(), std::invalid_argument);
@@ -115,34 +120,34 @@ namespace {
         EXPECT_EQ(o::score_physical_device(properties, features), std::numeric_limits<int>::max());
     }
     TEST_F(PhysicalDeviceStorageVulkanIntegrationTest, SelectedHeapDeviceRetainsTheOriginalInstanceAndItsCapabilitySnapshot) {
-        auto selected = vsl::PhysicalDevice::Select(vsl::VulkanAccessor{instance});
+        auto selected = vsl::PhysicalDevice::Select(vsl::lifetime::detail::StartupAccess::FromShared(instance));
         EXPECT_TRUE(selected.owner_ref().managed());
-        EXPECT_EQ(selected.get_instance().accessor, instance);
-        EXPECT_EQ(selected.data_->vulkan, instance.get());
-        EXPECT_FALSE(selected.get_instance().accessor.owner_before(instance));
-        EXPECT_FALSE(instance.owner_before(selected.get_instance().accessor));
-        ASSERT_TRUE(selected.data_->props);
-        ASSERT_TRUE(selected.data_->features);
-        EXPECT_FALSE(selected.data_->mem_props);
-        const auto expected = selected.data_->device.getProperties();
+        EXPECT_EQ(StartupAccess::Owned(selected.get_instance()), instance);
+        EXPECT_EQ(StartupAccess::Owned(selected)->vulkan, instance.get());
+        EXPECT_FALSE(StartupAccess::Owned(selected.get_instance()).owner_before(instance));
+        EXPECT_FALSE(instance.owner_before(StartupAccess::Shared(selected.get_instance())));
+        ASSERT_TRUE(StartupAccess::Owned(selected)->props);
+        ASSERT_TRUE(StartupAccess::Owned(selected)->features);
+        EXPECT_FALSE(StartupAccess::Owned(selected)->mem_props);
+        const auto expected = StartupAccess::Owned(selected)->device.getProperties();
         EXPECT_EQ(selected.api_version(), expected.apiVersion);
         EXPECT_EQ(selected.name(), std::string(expected.deviceName));
-        selected.data_->props.reset();
+        StartupAccess::Owned(selected)->props.reset();
         EXPECT_EQ(selected.device_id(), expected.deviceID);
-        EXPECT_TRUE(selected.data_->props);
-        selected.data_->make_mem_props();
-        ASSERT_TRUE(selected.data_->mem_props);
-        EXPECT_EQ(selected.data_->mem_props->memoryTypeCount, selected.data_->device.getMemoryProperties().memoryTypeCount);
+        EXPECT_TRUE(StartupAccess::Owned(selected)->props);
+        StartupAccess::Owned(selected)->make_mem_props();
+        ASSERT_TRUE(StartupAccess::Owned(selected)->mem_props);
+        EXPECT_EQ(StartupAccess::Owned(selected)->mem_props->memoryTypeCount, StartupAccess::Owned(selected)->device.getMemoryProperties().memoryTypeCount);
     }
     TEST_F(PhysicalDeviceStorageVulkanIntegrationTest, DefaultSnapshotSelectionRejectsEmptyListsAndUsesTheFirstNonnegativeCandidate) {
-        vsl::PhysicalDevices<vsl::PhysicalDevicesSercher> listed(vsl::VulkanAccessor{instance});
-        listed.data_->devices.assign(3, physical.data_->device);
+        vsl::PhysicalDevices<vsl::PhysicalDevicesSercher> listed(vsl::lifetime::detail::StartupAccess::FromShared(instance));
+        StartupAccess::Collection(listed)->devices.assign(3, StartupAccess::Owned(physical)->device);
         auto selected = listed.search();
-        EXPECT_EQ(selected.data_->device, physical.data_->device);
-        listed.data_->devices.clear();
+        EXPECT_EQ(StartupAccess::Owned(selected)->device, StartupAccess::Owned(physical)->device);
+        StartupAccess::Collection(listed)->devices.clear();
         EXPECT_TRUE(listed.get().empty());
         EXPECT_THROW(listed.search(), vsl::exceptions::RuntimeException);
-        listed.data_.reset();
+        StartupAccess::Collection(listed).reset();
         EXPECT_THROW(listed.get(), std::invalid_argument);
         EXPECT_THROW(listed.search(), std::invalid_argument);
     }
@@ -152,14 +157,14 @@ namespace {
         std::weak_ptr<void> parent;
         {
             auto source = make_instance();
-            parent = source.accessor;
+            parent = StartupAccess::Shared(source);
             vsl::PhysicalDevices<RetainingSearcher> listed(source);
-            ASSERT_FALSE(listed.data_->devices.empty());
-            const auto handle = listed.data_->devices.front();
-            listed.data_->devices.assign(3, handle);
+            ASSERT_FALSE(StartupAccess::Collection(listed)->devices.empty());
+            const auto handle = StartupAccess::Collection(listed)->devices.front();
+            StartupAccess::Collection(listed)->devices.assign(3, handle);
             selected = listed.search();
             ASSERT_EQ(RetainingSearcher::SAVED.size(), 3u);
-            EXPECT_EQ(selected->data_, RetainingSearcher::SAVED.back().data_);
+            EXPECT_EQ(StartupAccess::Owned(*(selected)), StartupAccess::Owned(RetainingSearcher::SAVED.back()));
         }
         EXPECT_FALSE(parent.expired());
         EXPECT_TRUE(selected->get_instance().owner_ref().managed());
@@ -172,31 +177,32 @@ namespace {
     TEST_F(PhysicalDeviceStorageVulkanIntegrationTest, InstanceGetterKeepsTheParentWithoutKeepingTheChildAlive) {
         auto source = make_instance();
         auto selected = vsl::PhysicalDevice::Select(source);
-        std::weak_ptr<void> child = selected.data_, parent = source.accessor;
+        std::weak_ptr<void> child = StartupAccess::Shared(selected), parent = StartupAccess::Shared(source);
         auto saved = selected.get_instance();
-        EXPECT_EQ(saved.accessor, source.accessor);
+        EXPECT_EQ(StartupAccess::Owned(saved), StartupAccess::Owned(source));
         source = {};
-        selected.data_.reset();
+        StartupAccess::Owned(selected).reset();
         EXPECT_TRUE(child.expired());
         EXPECT_FALSE(parent.expired());
-        EXPECT_NO_THROW((void)saved.accessor->instance.enumeratePhysicalDevices());
+        EXPECT_NO_THROW((void)StartupAccess::Owned(saved)->instance.enumeratePhysicalDevices());
         saved = {};
         EXPECT_TRUE(parent.expired());
     }
     TEST_F(PhysicalDeviceStorageVulkanIntegrationTest, SameTypeSlotsAreDirectAndBorrowOneFixedParentOwner) {
-        const auto candidate = o::inspect_physical_device(*instance, physical.data_->device);
-        auto owner = std::make_shared<PairOwner>(vsl::VulkanAccessor{instance}, candidate);
+        const auto candidate = o::inspect_physical_device(*instance, StartupAccess::Owned(physical)->device);
+        auto owner = std::make_shared<PairOwner>(vsl::lifetime::detail::StartupAccess::FromShared(instance), candidate);
         owner->node.publish(owner, owner.get(), PairOwner::VisitDependencies);
         auto& first = l::physical_device_at(owner->slot(0));
         auto& second = l::physical_device_at(owner->slot(1));
         first.owner_node = second.owner_node = &owner->node;
-        vsl::PhysicalDevice a({owner, &first}), b({owner, &second});
+        auto a = StartupAccess::FromShared(std::shared_ptr<vsl::impl::PhysicalDeviceImpl>{owner, &first});
+        auto b = StartupAccess::FromShared(std::shared_ptr<vsl::impl::PhysicalDeviceImpl>{owner, &second});
         EXPECT_EQ(reinterpret_cast<std::uintptr_t>(&second) - reinterpret_cast<std::uintptr_t>(&first), s::PHYSICAL_DEVICE_SLOT_SIZE);
         EXPECT_EQ(reinterpret_cast<std::uintptr_t>(&first) % s::PHYSICAL_DEVICE_SLOT_ALIGNMENT, 0u);
-        EXPECT_EQ(a.get_instance().accessor, instance);
-        EXPECT_EQ(b.get_instance().accessor, instance);
-        EXPECT_FALSE(a.data_.owner_before(b.data_));
-        EXPECT_FALSE(b.data_.owner_before(a.data_));
+        EXPECT_EQ(StartupAccess::Owned(a.get_instance()), instance);
+        EXPECT_EQ(StartupAccess::Owned(b.get_instance()), instance);
+        EXPECT_FALSE(StartupAccess::Owned(a).owner_before(StartupAccess::Owned(b)));
+        EXPECT_FALSE(StartupAccess::Owned(b).owner_before(StartupAccess::Owned(a)));
         EXPECT_TRUE(a.owner_ref().managed());
         EXPECT_TRUE(b.owner_ref().managed());
         std::vector<l::OwnerRef> parents;
@@ -207,38 +213,49 @@ namespace {
         EXPECT_FALSE(instance.owner_before(parents[0].share()));
         std::weak_ptr<void> root = owner;
         owner.reset();
-        a.data_.reset();
+        StartupAccess::Owned(a).reset();
         EXPECT_FALSE(root.expired());
         EXPECT_EQ(b.device_id(), physical.device_id());
-        b.data_.reset();
+        StartupAccess::Owned(b).reset();
         EXPECT_TRUE(root.expired());
     }
     TEST_F(PhysicalDeviceStorageVulkanIntegrationTest, OriginMismatchRollsBackTheSlotAndAValidCandidateCanReuseIt) {
         auto other = make_instance();
-        const auto candidate = o::inspect_physical_device(*instance, physical.data_->device);
+        const auto candidate = o::inspect_physical_device(*instance, StartupAccess::Owned(physical)->device);
         SlotOwner slot;
-        EXPECT_THROW(slot.construct(*other.accessor, candidate), std::invalid_argument);
+        EXPECT_THROW(slot.construct(*StartupAccess::Owned(other), candidate), std::invalid_argument);
         EXPECT_FALSE(slot.constructed);
         slot.construct(*instance, candidate);
-        EXPECT_EQ(slot.value().device, physical.data_->device);
+        EXPECT_EQ(slot.value().device, StartupAccess::Owned(physical)->device);
         EXPECT_EQ(slot.value().vulkan, instance.get());
         EXPECT_THROW(o::initialize_physical_device(slot.value(), *instance, candidate), std::logic_error);
-        EXPECT_EQ(slot.value().device, physical.data_->device);
+        EXPECT_EQ(slot.value().device, StartupAccess::Owned(physical)->device);
         EXPECT_EQ(slot.value().props->deviceID, physical.device_id());
     }
     TEST_F(PhysicalDeviceStorageVulkanIntegrationTest, ForeignOwnersAndNullNativeCandidatesAreRejectedBeforeQueryingTheDriver) {
-        const auto candidate = o::inspect_physical_device(*instance, physical.data_->device);
-        const vsl::VulkanAccessor forged{{std::make_shared<int>(0), instance.get()}};
+        const auto candidate = o::inspect_physical_device(*instance, StartupAccess::Owned(physical)->device);
+        const auto forged = vsl_test::unchecked_startup(std::shared_ptr<vsl::impl::VulkanImplAccessor>{std::make_shared<int>(0), instance.get()});
         EXPECT_THROW(vsl::PhysicalDevice::Select(forged), std::invalid_argument);
         EXPECT_THROW(l::make_heap_physical_device(forged, candidate), std::invalid_argument);
-        vsl::PhysicalDevice fake({std::make_shared<int>(0), physical.data_.get()});
-        vsl::PhysicalDevice borrowed({std::shared_ptr<void>{}, physical.data_.get()});
+        const auto fake = vsl_test::unchecked_startup(std::shared_ptr<vsl::impl::PhysicalDeviceImpl>{std::make_shared<int>(0), StartupAccess::Owned(physical).get()});
+        auto borrowed = vsl_test::unchecked_startup(std::shared_ptr<vsl::impl::PhysicalDeviceImpl>{std::shared_ptr<void>{}, StartupAccess::Owned(physical).get()});
         EXPECT_THROW(fake.owner_ref(), std::invalid_argument);
         EXPECT_THROW(fake.get_instance(), std::invalid_argument);
         EXPECT_THROW(borrowed.name(), std::invalid_argument);
+        EXPECT_THROW(StartupAccess::FromShared(StartupAccess::Shared(fake)), std::invalid_argument);
+        EXPECT_THROW(StartupAccess::FromShared(StartupAccess::Shared(borrowed)), std::invalid_argument);
+        l::DependencyNode different_node;
+        different_node.publish(StartupAccess::Shared(physical));
+        EXPECT_THROW(StartupAccess::FromOwned(different_node.ref(StartupAccess::Shared(physical))), std::invalid_argument);
         EXPECT_THROW(o::inspect_physical_device(*instance, {}), std::invalid_argument);
         const vk::PhysicalDevice invalid{reinterpret_cast<VkPhysicalDevice>(std::uintptr_t{1})};
         EXPECT_THROW(o::inspect_physical_device(*instance, invalid), std::invalid_argument);
+        const auto handle = StartupAccess::Owned(physical)->device;
+        StartupAccess::Owned(physical)->owner_node->retire();
+        EXPECT_THROW(physical.owner_ref(), std::invalid_argument);
+        EXPECT_THROW(StartupAccess::FromOwned(StartupAccess::Owned(physical)), std::invalid_argument);
+        EXPECT_THROW(StartupAccess::FromShared(StartupAccess::Shared(physical)), std::invalid_argument);
+        EXPECT_EQ(StartupAccess::Owned(physical)->device, handle);
     }
     TEST_F(PhysicalDeviceStorageVulkanIntegrationTest, LogicalDeviceRetainsTheSelectedPhysicalDeviceAndInstanceAfterTheirFacadesAreGone) {
         std::weak_ptr<void> parent, selected_owner;
@@ -246,9 +263,9 @@ namespace {
         {
             auto source = make_instance();
             auto selected = vsl::PhysicalDevice::Select(source);
-            parent = source.accessor;
-            selected_owner = selected.data_;
-            const auto queues = selected.data_->device.getQueueFamilyProperties();
+            parent = StartupAccess::Shared(source);
+            selected_owner = StartupAccess::Shared(selected);
+            const auto queues = StartupAccess::Owned(selected)->device.getQueueFamilyProperties();
             const auto found = std::ranges::find_if(queues, [](const auto& queue) { return bool(queue.queueFlags & vk::QueueFlagBits::eGraphics); });
             if (found == queues.end())
                 GTEST_SKIP() << "Selected physical device has no graphics queue";

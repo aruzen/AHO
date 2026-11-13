@@ -1,6 +1,11 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/surface_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <new>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_standard_layout_v<SurfaceSlotStorage> && offsetof(SurfaceSlotStorage, value) == 0);
@@ -20,9 +25,9 @@ namespace VSL_NAMESPACE::lifetime {
             const auto& os = detail::WindowOwnerAccess::Ref(this->window);
             if (!os || !os->node.matches(detail::OwnerAccess::Shared(os)) || os->node.retiring())
                 throw std::invalid_argument("Surface requires its canonical OS window owner");
-            construct_surface(storage, *instance.accessor, *os);
+            construct_surface(storage, *StartupAccess::Owned(instance), *os);
             try {
-                set_surface_owners(surface_at(storage), this->instance.alias(instance.accessor.get()), this->window);
+                set_surface_owners(surface_at(storage), this->instance.alias(StartupAccess::Owned(instance).get()), this->window);
             } catch (...) {
                 destroy_surface(storage);
                 throw;

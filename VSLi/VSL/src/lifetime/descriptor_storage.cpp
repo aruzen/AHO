@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/descriptor_storage.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
@@ -6,6 +7,10 @@
 #include <algorithm>
 #include <array>
 #include <limits>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_nothrow_default_constructible_v<impl::ResourceBindingLayoutImpl>);
@@ -37,7 +42,7 @@ namespace VSL_NAMESPACE::lifetime {
         };
         HeapDescriptorLayoutOwner::HeapDescriptorLayoutOwner(LogicalDeviceAccessor device, const DescriptorLayoutCreateInfo& info) : device(device) {
             require_device_owner(device);
-            construct_descriptor_layout(storage, *device.data_, info);
+            construct_descriptor_layout(storage, *StartupAccess::Owned(device), info);
         }
         HeapDescriptorLayoutOwner::~HeapDescriptorLayoutOwner() {
             node.retire();
@@ -45,7 +50,7 @@ namespace VSL_NAMESPACE::lifetime {
         }
         HeapDescriptorPoolOwner::HeapDescriptorPoolOwner(LogicalDeviceAccessor device, const DescriptorPoolCreateInfo& info) : device(device) {
             require_device_owner(device);
-            construct_descriptor_pool(storage, *device.data_, info);
+            construct_descriptor_pool(storage, *StartupAccess::Owned(device), info);
         }
         HeapDescriptorPoolOwner::~HeapDescriptorPoolOwner() {
             node.retire();
@@ -85,7 +90,7 @@ namespace VSL_NAMESPACE::lifetime {
 
     void construct_descriptor_layout(void* storage, LogicalDeviceAccessor device, const DescriptorLayoutCreateInfo& info) {
         require_device_owner(device);
-        construct_descriptor_layout(storage, *device.data_, info);
+        construct_descriptor_layout(storage, *StartupAccess::Owned(device), info);
     }
     void construct_descriptor_layout(void* storage, impl::LogicalDeviceImpl& device, const DescriptorLayoutCreateInfo& info) {
         if (!device.device)
@@ -109,7 +114,7 @@ namespace VSL_NAMESPACE::lifetime {
     }
     void construct_descriptor_pool(void* storage, LogicalDeviceAccessor device, const DescriptorPoolCreateInfo& info) {
         require_device_owner(device);
-        construct_descriptor_pool(storage, *device.data_, info);
+        construct_descriptor_pool(storage, *StartupAccess::Owned(device), info);
     }
     void construct_descriptor_pool(void* storage, impl::LogicalDeviceImpl& device, const DescriptorPoolCreateInfo& info) {
         if (!device.device)

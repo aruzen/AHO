@@ -302,8 +302,8 @@ namespace {
     TEST_F(DescriptorVulkanIntegrationTest, SingleBindingConstructorsRetainDeviceOwner) {
         using namespace vsl::graphic_resource;
         auto imported = vsl::LogicalDeviceAccessor::Create(physical);
-        const std::weak_ptr<vsl::impl::LogicalDeviceImpl> observed = imported.data_;
-        const auto* native_owner = imported.data_.get();
+        const std::weak_ptr<vsl::impl::LogicalDeviceImpl> observed = StartupAccess::Shared(imported);
+        const auto* native_owner = StartupAccess::Owned(imported).get();
         BindingLayout explicit_binding(imported, 2, Type::UNIFORM_BUFFER, vsl::ShaderFlag::VERTEX, 1);
         EXPECT_EQ(DescriptorAccess::Owned(explicit_binding)->device, native_owner);
         EXPECT_EQ(explicit_binding.get_binding_points(),
@@ -312,7 +312,7 @@ namespace {
         EXPECT_EQ(DescriptorAccess::Owned(automatic)->device, native_owner);
         EXPECT_EQ(automatic.get_binding_points().front().binding, 0u);
         EXPECT_EQ(DescriptorAccess::Owned(automatic)->layout_bindings.front().binding, 0u);
-        imported.data_.reset();
+        StartupAccess::Owned(imported).reset();
         EXPECT_FALSE(observed.expired());
         DescriptorAccess::Owned(explicit_binding).reset();
         EXPECT_FALSE(observed.expired());
@@ -323,7 +323,7 @@ namespace {
         using namespace vsl::graphic_resource;
         for (const auto sentinel : {std::size_t{UINT32_MAX}, std::size_t(-1)}) {
             BindingLayout automatic(device, sentinel, Type::STORAGE_BUFFER, vsl::ShaderFlag::COMPUTE, 3);
-            EXPECT_EQ(DescriptorAccess::Owned(automatic)->device, device.data_.get());
+            EXPECT_EQ(DescriptorAccess::Owned(automatic)->device, StartupAccess::Owned(device).get());
             ASSERT_EQ(DescriptorAccess::Owned(automatic)->layout_bindings.size(), 1u);
             EXPECT_EQ(DescriptorAccess::Owned(automatic)->layout_bindings[0].binding, 0u);
             EXPECT_EQ(automatic.get_binding_points(),
@@ -400,7 +400,7 @@ namespace {
             CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         auto mapped = output->data(2 * sizeof(std::uint32_t));
         std::array<std::uint32_t, 2> actual{};
         std::memcpy(actual.data(), mapped.data, sizeof(actual));
@@ -437,7 +437,7 @@ namespace {
             CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         auto mapped = buffer.data(initial.size() * sizeof(std::uint32_t));
         const auto* actual = static_cast<const std::uint32_t*>(mapped.data);
         for (std::size_t i = 0; i < offset / sizeof(std::uint32_t); ++i)
@@ -485,7 +485,7 @@ namespace {
                 CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                     vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
             }
-            device.data_->device.waitIdle();
+            StartupAccess::Owned(device)->device.waitIdle();
             auto mapped = buffer.data(initial.size() * sizeof(std::uint32_t));
             const auto* actual = static_cast<const std::uint32_t*>(mapped.data);
             for (std::size_t i = 0; i < offset / sizeof(std::uint32_t); ++i)

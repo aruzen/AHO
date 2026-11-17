@@ -21,6 +21,22 @@ namespace VSL_NAMESPACE::lifetime::detail {
         static OwnedRef<impl::PhysicalDeviceImpl>& Owned(PhysicalDevice& value) { return value._owner; }
         static OwnedRef<impl::PhysicalDeviceImpl> Owned(PhysicalDevice&& value) { return std::move(value._owner); }
         static OwnedRef<impl::PhysicalDeviceImpl> Owned(const PhysicalDevice&& value) { return value._owner; }
+        static const OwnedRef<impl::LogicalDeviceImpl>& Owned(const LogicalDeviceAccessor& value) { return value._owner; }
+        static OwnedRef<impl::LogicalDeviceImpl>& Owned(LogicalDeviceAccessor& value) { return value._owner; }
+        static OwnedRef<impl::LogicalDeviceImpl> Owned(LogicalDeviceAccessor&& value) { return std::move(value._owner); }
+        static OwnedRef<impl::LogicalDeviceImpl> Owned(const LogicalDeviceAccessor&& value) { return value._owner; }
+        static const OwnedRef<impl::SurfaceImpl>& Owned(const Surface& value) { return value._owner; }
+        static OwnedRef<impl::SurfaceImpl>& Owned(Surface& value) { return value._owner; }
+        static OwnedRef<impl::SurfaceImpl> Owned(Surface&& value) { return std::move(value._owner); }
+        static OwnedRef<impl::SurfaceImpl> Owned(const Surface&& value) { return value._owner; }
+        template<typename C>
+        static const OwnedRef<impl::LogicalDeviceImpl>& Owned(const LogicalDevice<C>& value) { return value._value._owner; }
+        template<typename C>
+        static OwnedRef<impl::LogicalDeviceImpl>& Owned(LogicalDevice<C>& value) { return value._value._owner; }
+        template<typename C>
+        static OwnedRef<impl::LogicalDeviceImpl> Owned(LogicalDevice<C>&& value) { return std::move(value._value._owner); }
+        template<typename C>
+        static OwnedRef<impl::LogicalDeviceImpl> Owned(const LogicalDevice<C>&& value) { return value._value._owner; }
         template<typename S>
         static const std::shared_ptr<impl::PhysicalDevicesImpl>& Collection(const PhysicalDevices<S>& value) { return value._collection._state; }
         template<typename S>
@@ -35,6 +51,12 @@ namespace VSL_NAMESPACE::lifetime::detail {
         static PhysicalDevice FromShared(std::shared_ptr<impl::PhysicalDeviceImpl> owner);
         static void RequireCanonical(const OwnedRef<impl::VulkanImplAccessor>& owner);
         static void RequireCanonical(const OwnedRef<impl::PhysicalDeviceImpl>& owner);
+        static LogicalDeviceAccessor FromOwned(OwnedRef<impl::LogicalDeviceImpl> owner);
+        static LogicalDeviceAccessor FromShared(std::shared_ptr<impl::LogicalDeviceImpl> owner);
+        static void RequireCanonical(const OwnedRef<impl::LogicalDeviceImpl>& owner);
+        static Surface FromOwned(OwnedRef<impl::SurfaceImpl> owner);
+        static Surface FromShared(std::shared_ptr<impl::SurfaceImpl> owner);
+        static void RequireCanonical(const OwnedRef<impl::SurfaceImpl>& owner);
         template<typename T>
         static decltype(auto) Shared(T&& value);
     };

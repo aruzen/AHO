@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/lifetime/submission_retention.hpp>
@@ -16,6 +17,10 @@
 #include <stdexcept>
 #include <mutex>
 #include <new>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -246,12 +251,12 @@ namespace VSL_NAMESPACE::lifetime {
     }
     SubmissionSnapshot::SubmissionSnapshot(const std::shared_ptr<impl::CommandBufferImpl>& ring,
                                            std::span<const std::shared_ptr<SurfacePresentationDomain>> presentations)
-        : _device(device_from_impl(*ring->command_pool->device).data_) {
+        : _device(StartupAccess::Shared(device_from_impl(*ring->command_pool->device))) {
         capture(ring, presentations);
     }
     SubmissionSnapshot::SubmissionSnapshot(std::shared_ptr<impl::LogicalDeviceImpl> device, std::shared_ptr<impl::SurfaceImpl> surface)
         : _device(std::move(device)), _surface(std::move(surface)) {
-        require_device_owner(LogicalDeviceAccessor{_device});
+        require_device_owner(StartupAccess::FromShared(_device));
         if (!_surface || !_surface->owner_node || !_surface->owner_node->matches(_surface) ||
             _device->parent_device->vulkan != _surface->vulkan)
             throw std::invalid_argument("Surface recovery requires its canonical Surface and Device");

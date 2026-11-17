@@ -72,10 +72,11 @@ namespace VSL_NAMESPACE::lifetime {
         std::destroy_at(static_cast<SurfaceSlotStorage*>(storage));
     }
     void set_surface_owners(impl::SurfaceImpl& target, OwnedRef<impl::VulkanImplAccessor> instance, const OSWindowOwner& window) {
+        StartupAccess::RequireCanonical(instance);
         const auto& os = detail::WindowOwnerAccess::Ref(window);
-        if (!target.owner_context || !instance.use_count() || instance.get() != target.vulkan || !instance->owner_node ||
-            instance->owner_node->retiring() || !instance->owner_node->matches(detail::OwnerAccess::Shared(instance)) ||
-            !os || os.get() != target.os_window || os->node.retiring() || !os->node.matches(detail::OwnerAccess::Shared(os)))
+        if (!target.owner_context || instance.get() != target.vulkan ||
+            !os || os.get() != target.os_window || detail::OwnerAccess::Node(os) != &os->node ||
+            os->node.retiring() || !os->node.matches(detail::OwnerAccess::Shared(os)))
             throw std::invalid_argument("Surface getters require their canonical parents");
         target.owner_context->instance = instance.weak();
         target.owner_context->window = os.weak();
@@ -88,7 +89,7 @@ namespace VSL_NAMESPACE::lifetime {
         return {std::move(owner), surface};
     }
     void require_surface_owner(const Surface& source) {
-        require_surface_owner(source.data_);
+        StartupAccess::RequireCanonical(StartupAccess::Owned(source));
     }
     void require_surface_owner(const std::shared_ptr<impl::SurfaceImpl>& value) {
         if (!value || !value.use_count() || !value->surface || !value->owner_node || value->owner_node->retiring() || !value->owner_node->matches(value))

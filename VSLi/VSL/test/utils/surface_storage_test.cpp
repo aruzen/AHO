@@ -122,21 +122,22 @@ namespace {
         auto* first = &l::surface_at(owner->slot(0));
         auto* second = &l::surface_at(owner->slot(1));
         first->owner_node = second->owner_node = &owner->node;
-        vsl::Surface a({owner, first}), b({owner, second});
+        auto a = StartupAccess::FromShared(std::shared_ptr<vsl::impl::SurfaceImpl>{owner, first});
+        auto b = StartupAccess::FromShared(std::shared_ptr<vsl::impl::SurfaceImpl>{owner, second});
         EXPECT_EQ(reinterpret_cast<std::uintptr_t>(second) - reinterpret_cast<std::uintptr_t>(first), sizeof(l::SurfaceSlotStorage));
         EXPECT_EQ(reinterpret_cast<std::uintptr_t>(first) % s::SURFACE_SLOT_ALIGNMENT, 0u);
-        EXPECT_FALSE(a.data_.owner_before(b.data_));
-        EXPECT_FALSE(b.data_.owner_before(a.data_));
+        EXPECT_FALSE(StartupAccess::Owned(a).owner_before(StartupAccess::Owned(b)));
+        EXPECT_FALSE(StartupAccess::Owned(b).owner_before(StartupAccess::Owned(a)));
         EXPECT_EQ(StartupAccess::Owned(a.get_instance()), instance);
         EXPECT_EQ(a.get_window_owner().owner_ref(), window->window_owner().owner_ref());
         std::weak_ptr<void> root = owner;
         owner.reset();
         ASSERT_TRUE(window->close());
         ASSERT_TRUE(peer.window.close());
-        EXPECT_FALSE(StartupAccess::Owned(physical)->device.getSurfaceFormatsKHR(a.data_->surface).empty());
-        a.data_.reset();
+        EXPECT_FALSE(StartupAccess::Owned(physical)->device.getSurfaceFormatsKHR(StartupAccess::Owned(a)->surface).empty());
+        StartupAccess::Owned(a).reset();
         EXPECT_FALSE(root.expired());
-        b.data_.reset();
+        StartupAccess::Owned(b).reset();
         EXPECT_TRUE(root.expired());
     }
     TEST_F(SurfaceStorageVulkanIntegrationTest, FailedNativeOutputIsNotAdoptedAndTheSameSlotCanBeRetried) {
@@ -158,7 +159,7 @@ namespace {
     }
     TEST_F(SurfaceStorageVulkanIntegrationTest, GettersKeepTheOriginalParentsWithoutKeepingTheChildAlive) {
         make_surface();
-        const auto child = std::weak_ptr<void>(surface->data_);
+        const auto child = std::weak_ptr<void>(StartupAccess::Shared(*(surface)));
         auto os = surface->get_window_owner();
         auto original = surface->get_instance();
         EXPECT_EQ(StartupAccess::Owned(original), instance);
@@ -188,24 +189,68 @@ namespace {
         EXPECT_EQ(probe.creates, 2u);
         EXPECT_EQ(probe.destroys, 1u);
         make_surface();
-        EXPECT_TRUE(surface->data_->surface);
+        EXPECT_TRUE(StartupAccess::Owned(*(surface))->surface);
     }
     TEST_F(SurfaceStorageVulkanIntegrationTest, DeviceCreationDoesNotPermanentlyRetainTheSurfaceOrItsWindow) {
         make_surface();
         vsl::LogicalDevice logical(physical, surface);
-        std::weak_ptr<void> child = surface->data_;
+        std::weak_ptr<void> child = StartupAccess::Shared(*(surface));
         std::weak_ptr<void> os = window->window_owner().owner_ref().share();
         ASSERT_TRUE(window->close());
         surface.reset();
         EXPECT_TRUE(child.expired());
         EXPECT_TRUE(os.expired());
-        EXPECT_TRUE(logical.data_->device.getQueue(logical.data_->graphics_family, 0));
+        EXPECT_TRUE(StartupAccess::Owned(logical)->device.getQueue(StartupAccess::Owned(logical)->graphics_family, 0));
+    }
+    TEST_F(SurfaceStorageVulkanIntegrationTest, CanonicalSurfaceRejectsMissingOrForeignNodesAndPreservesItsParents) {
+        make_surface();
+        const auto missing_node = vsl_test::unchecked_startup(StartupAccess::Shared(*surface));
+        EXPECT_THROW(missing_node.owner_ref(), std::invalid_argument);
+        const auto foreign = vsl_test::unchecked_startup(std::shared_ptr<vsl::impl::SurfaceImpl>(std::make_shared<int>(0), StartupAccess::Owned(*surface).get()));
+        EXPECT_THROW(foreign.get_instance(), std::invalid_argument);
+        EXPECT_THROW(StartupAccess::FromShared(StartupAccess::Shared(foreign)), std::invalid_argument);
+        l::DependencyNode different_node;
+        different_node.publish(StartupAccess::Shared(*surface));
+        EXPECT_THROW(StartupAccess::FromOwned(different_node.ref(StartupAccess::Shared(*surface))), std::invalid_argument);
+        l::DependencyNode different_parent_node;
+        different_parent_node.publish(instance);
+        EXPECT_THROW(l::set_surface_owners(*StartupAccess::Owned(*surface), different_parent_node.ref(instance), window->window_owner()), std::invalid_argument);
+        EXPECT_EQ(StartupAccess::Owned(surface->get_instance()), instance);
+        const auto actual_window = surface->get_window_owner(), expected_window = window->window_owner();
+        EXPECT_EQ(actual_window.native_handle(), expected_window.native_handle());
+    }
+    TEST_F(SurfaceStorageVulkanIntegrationTest, WeakSurfaceObservesStorageAfterLogicalCloseAndRejectsRetiredOperations) {
+        vsl::WeakSurface weak;
+        EXPECT_TRUE(weak.expired());
+        EXPECT_FALSE(weak.lock());
+        make_surface();
+        weak = surface->weak();
+        auto locked = weak.lock();
+        EXPECT_EQ(StartupAccess::Owned(locked), StartupAccess::Owned(*surface));
+        EXPECT_FALSE(StartupAccess::Owned(locked).owner_before(StartupAccess::Owned(*surface)));
+        const auto native = StartupAccess::Owned(locked)->surface;
+        ASSERT_TRUE(window->close());
+        surface.reset();
+        EXPECT_FALSE(weak.expired());
+        EXPECT_TRUE(locked.get_window_owner());
+        StartupAccess::Owned(locked)->owner_node->retire();
+        auto retired = weak.lock();
+        EXPECT_EQ(StartupAccess::Owned(retired), StartupAccess::Owned(locked));
+        EXPECT_THROW(retired.owner_ref(), std::invalid_argument);
+        EXPECT_THROW(retired.get_instance(), std::invalid_argument);
+        EXPECT_THROW(StartupAccess::FromOwned(StartupAccess::Owned(retired)), std::invalid_argument);
+        EXPECT_EQ(StartupAccess::Owned(retired)->surface, native);
+        locked = {};
+        EXPECT_FALSE(weak.expired());
+        retired = {};
+        EXPECT_TRUE(weak.expired());
+        EXPECT_FALSE(weak.lock());
     }
     TEST_F(SurfaceStorageVulkanIntegrationTest, SurfaceAndSavedSwapchainKeepTheNativeWindowAfterLogicalClose) {
         make_surface();
         auto saved = vsl::Swapchain(device, surface);
         std::weak_ptr<void> os = window->window_owner().owner_ref().share();
-        std::weak_ptr<void> child = surface->data_;
+        std::weak_ptr<void> child = StartupAccess::Shared(*(surface));
         const auto native_surface = SwapchainAccess::Owned(saved)->surface;
         ASSERT_TRUE(window->close());
         surface.reset();

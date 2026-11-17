@@ -9,13 +9,28 @@ namespace {
     TEST_F(SurfaceWindowIntegrationTest, CreatesSurfaceForWindowAndRetainsInstance) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        EXPECT_EQ(surface->data_->vulkan, instance.get());
+        EXPECT_EQ(StartupAccess::Owned(*(surface))->vulkan, instance.get());
         EXPECT_EQ(StartupAccess::Owned(surface->get_instance()), instance);
-        EXPECT_EQ(surface->data_->window, window->data_->window_handle);
-        const auto capabilities = StartupAccess::Owned(physical)->device.getSurfaceCapabilitiesKHR(surface->data_->surface);
+        EXPECT_EQ(StartupAccess::Owned(*(surface))->window, window->data_->window_handle);
+        const auto capabilities = StartupAccess::Owned(physical)->device.getSurfaceCapabilitiesKHR(StartupAccess::Owned(*(surface))->surface);
         EXPECT_GE(capabilities.maxImageExtent.width, 64u);
         EXPECT_GE(capabilities.maxImageExtent.height, 48u);
-        EXPECT_FALSE(StartupAccess::Owned(physical)->device.getSurfaceFormatsKHR(surface->data_->surface).empty());
+        EXPECT_FALSE(StartupAccess::Owned(physical)->device.getSurfaceFormatsKHR(StartupAccess::Owned(*(surface))->surface).empty());
+    }
+    TEST_F(SurfaceWindowIntegrationTest, OwnerAssignmentPreservesTheDestinationPluginRegistration) {
+        make_surface();
+        auto peer = window->add_plugin<vsl::Surface>(StartupAccess::FromShared(instance));
+        const auto id = surface->id, peer_id = peer->id;
+        ASSERT_NE(id, peer_id);
+        const auto source = StartupAccess::Owned(*peer);
+        *surface = *peer;
+        EXPECT_EQ(surface->id, id);
+        EXPECT_EQ(peer->id, peer_id);
+        EXPECT_EQ(StartupAccess::Owned(*surface), source);
+        EXPECT_EQ(window->data_->plugins.at(id).get(), surface.get());
+        EXPECT_TRUE(window->remove_plugin(surface));
+        EXPECT_FALSE(window->data_->plugins.contains(id));
+        EXPECT_EQ(window->data_->plugins.at(peer_id).get(), peer.get());
     }
 } // namespace
 
@@ -65,6 +80,6 @@ namespace {
         EXPECT_EQ(window->data_->plugins_next_id, previous_id);
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        EXPECT_TRUE(static_cast<bool>(surface->data_->surface));
+        EXPECT_TRUE(static_cast<bool>(StartupAccess::Owned(*(surface))->surface));
     }
 } // namespace

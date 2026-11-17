@@ -1,4 +1,5 @@
 #ifdef AHO_GPU_TESTS
+#include <VSL/lifetime/startup_access.hpp>
 #include <AHO/command/buffer_upload.hpp>
 #include <AHO/resource/arena_buffer.hpp>
 #include <AHO/resource/imported_buffer.hpp>
@@ -352,7 +353,7 @@ namespace {
             source.write(green);
         }));
         ASSERT_EQ(submitted.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-        device.data_->device.waitIdle();
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.waitIdle();
         {
             auto phase = other.start_phase<vsl::ComputePhase>();
             phase << command;

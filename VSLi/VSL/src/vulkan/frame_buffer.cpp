@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/owner_validation.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
@@ -8,6 +9,10 @@
 #include <VSL/lifetime/frame_buffer_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <stdexcept>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
@@ -50,7 +55,7 @@ namespace VSL_NAMESPACE {
             return GraphicsAccess::FromShared(lifetime::make_heap_frame_buffer(device, std::move(input), pass.owner_ref(), std::move(dependencies)));
         }
         lifetime::OwnerRef swapchain_owner(const SwapchainAccessor& swapchain, const RenderPassAccessor& pass) {
-            if (!SwapchainAccess::Owned(swapchain) || !SwapchainAccess::Owned(swapchain).use_count() || SwapchainAccess::Owned(swapchain)->device != pass.get_device().data_.get())
+            if (!SwapchainAccess::Owned(swapchain) || !SwapchainAccess::Owned(swapchain).use_count() || SwapchainAccess::Owned(swapchain)->device != StartupAccess::Owned(pass.get_device()).get())
                 throw std::invalid_argument("Framebuffer swapchain requires an owner on the pass device");
             return swapchain.owner_ref();
         }

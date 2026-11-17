@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/vulkan/stages/resource_binding.hpp>
 #include <VSL/lifetime/owner_access.hpp>
@@ -5,6 +6,10 @@
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include <utility>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
@@ -31,7 +36,7 @@ void VSL_NAMESPACE::lifetime::replace_recipe_layouts(impl::PipelineRecipe& info,
     binding_sources.reserve(definitions.size());
     for (const auto& layout : definitions) {
         const auto& owner = lifetime::detail::DescriptorAccess::Owned(layout);
-        if (!owner || !owner.use_count() || !owner->layout || owner->device != device.data_.get())
+        if (!owner || !owner.use_count() || !owner->layout || owner->device != StartupAccess::Owned(device).get())
             throw std::invalid_argument("Pipeline binding requires owning layouts on the same device");
         binding_sources.push_back(lifetime::retain_recipe_owner(sources, owner));
         layouts.push_back(owner.get());

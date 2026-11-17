@@ -113,7 +113,7 @@ namespace {
         if (HasFatalFailure() || IsSkipped())
             return;
         make_surface();
-        if (!HasFatalFailure() && !StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!HasFatalFailure() && !StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, StartupAccess::Owned(*(surface))->surface))
             GTEST_SKIP() << "Selected queue cannot present";
     }
     vsl::SwapchainAccessor PresentationRetentionWindowIntegrationTest::make_chain() {
@@ -244,7 +244,7 @@ namespace {
             EXPECT_EQ(pending.completion().status(), vsl::Completion::Status::PENDING);
         });
         first_work->completion_resources.push_back(callback.owner());
-        const VkDevice native_device = device.data_->device;
+        const VkDevice native_device = StartupAccess::Owned(device)->device;
         ASSERT_EQ(vkWaitForFences(native_device, 1, &probe.target, VK_TRUE, UINT64_MAX), VK_SUCCESS);
         const o::ScopedSubmissionNativeCalls idle({nullptr, +[](void*, VkDevice device) noexcept {
                                                        const auto result = vkDeviceWaitIdle(device);
@@ -416,7 +416,7 @@ namespace {
                 previous.cancel();
                 ASSERT_TRUE(previous.completion().wait());
             }
-            ASSERT_EQ(device.data_->device.waitForFences(vk::Fence(probe.target), true, UINT64_MAX), vk::Result::eSuccess);
+            ASSERT_EQ(StartupAccess::Owned(device)->device.waitForFences(vk::Fence(probe.target), true, UINT64_MAX), vk::Result::eSuccess);
             next = l::SwapchainArena(device, *surface, info, old).view();
         }
         ASSERT_FALSE(invoked);
@@ -445,7 +445,7 @@ namespace {
             ASSERT_EQ(registry->records.size(), 1u);
             record = registry->records[0];
         }
-        ASSERT_EQ(device.data_->device.waitForFences(vk::Fence(probe.target), true, UINT64_MAX), vk::Result::eSuccess);
+        ASSERT_EQ(StartupAccess::Owned(device)->device.waitForFences(vk::Fence(probe.target), true, UINT64_MAX), vk::Result::eSuccess);
         probe.hold = false;
         ASSERT_TRUE(s::poll_present(record->state));
         ASSERT_FALSE(record->released);
@@ -481,7 +481,7 @@ namespace {
             // 旧実装との比較でもnative poolを破棄せず、実presentと待機を済ませる。
             probe.forced = VK_SUCCESS;
             ASSERT_EQ(phase.present(), vsl::ComputePhase::SubmitResult::SUCCESS);
-            ASSERT_EQ(device.data_->device.waitForFences(vk::Fence(probe.target), true, UINT64_MAX), vk::Result::eSuccess);
+            ASSERT_EQ(StartupAccess::Owned(device)->device.waitForFences(vk::Fence(probe.target), true, UINT64_MAX), vk::Result::eSuccess);
             s::save_present_observation(record->state, vk::Result::eSuccess);
             manager.wait_idle();
             return;
@@ -492,7 +492,7 @@ namespace {
         ASSERT_EQ(phase.present(), vsl::ComputePhase::SubmitResult::SUCCESS);
         EXPECT_THROW(fences.reset(index), std::logic_error);
         EXPECT_THROW(fences.destroy(), std::logic_error);
-        ASSERT_EQ(device.data_->device.waitForFences(vk::Fence(probe.target), true, UINT64_MAX), vk::Result::eSuccess);
+        ASSERT_EQ(StartupAccess::Owned(device)->device.waitForFences(vk::Fence(probe.target), true, UINT64_MAX), vk::Result::eSuccess);
         probe.hold = false;
         EXPECT_NO_THROW(fences.reset(index));
         EXPECT_EQ(record->state.status, s::PresentStatus::COMPLETE);
@@ -616,7 +616,7 @@ namespace {
         EXPECT_EQ(probe.target_polls, polls);
         EXPECT_FALSE(peer_owner.expired());
         EXPECT_EQ(l::quarantined_presentation_count(), before + 1);
-        l::collect_quarantined_presentations(peer_surface->data_, device.data_->device);
+        l::collect_quarantined_presentations(StartupAccess::Shared(*peer_surface), StartupAccess::Owned(device)->device);
         EXPECT_EQ(l::quarantined_presentation_count(), before);
         EXPECT_TRUE(peer_owner.expired());
     }
@@ -643,9 +643,9 @@ namespace {
             if (before_enqueue)
                 probe.device_lost = true; // 未送信Fenceをsignalせず、別の終端情報で回収する。
             else
-                ASSERT_EQ(device.data_->device.waitForFences(vk::Fence(probe.target), true, UINT64_MAX), vk::Result::eSuccess);
+                ASSERT_EQ(StartupAccess::Owned(device)->device.waitForFences(vk::Fence(probe.target), true, UINT64_MAX), vk::Result::eSuccess);
             probe.hold = false;
-            l::collect_quarantined_presentations(surface->data_, device.data_->device);
+            l::collect_quarantined_presentations(StartupAccess::Shared(*surface), StartupAccess::Owned(device)->device);
             EXPECT_EQ(l::quarantined_presentation_count(), before);
             EXPECT_TRUE(owner.expired());
         }

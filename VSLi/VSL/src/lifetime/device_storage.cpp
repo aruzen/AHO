@@ -62,20 +62,18 @@ namespace VSL_NAMESPACE::lifetime {
         std::destroy_at(static_cast<DeviceSlotStorage*>(storage));
     }
     void set_device_physical_owner(impl::LogicalDeviceImpl& target, OwnedRef<impl::PhysicalDeviceImpl> physical) {
-        if (!target.owner_context || !physical.use_count() || physical.get() != target.parent_device || !physical->owner_node ||
-            physical->owner_node->retiring() || !physical->owner_node->matches(detail::OwnerAccess::Shared(physical)))
+        StartupAccess::RequireCanonical(physical);
+        if (!target.owner_context || physical.get() != target.parent_device)
             throw std::invalid_argument("Device getter requires its canonical PhysicalDevice parent");
         target.owner_context->physical = physical.weak();
     }
     void require_device_owner(const LogicalDeviceAccessor& device) {
-        const auto& source = device.data_;
-        if (!source || !source.use_count() || !source->device || !source->owner_node || source->owner_node->retiring() || !source->owner_node->matches(source))
-            throw std::invalid_argument("Device requires its live canonical owner");
+        StartupAccess::RequireCanonical(StartupAccess::Owned(device));
     }
     LogicalDeviceAccessor device_from_impl(impl::LogicalDeviceImpl& device) {
         if (!device.device || !device.owner_node || device.owner_node->retiring())
             throw std::invalid_argument("Device getter requires a live canonical Device");
-        return {device.owner_node->owner_ref().alias(&device).share()};
+        return StartupAccess::FromOwned(device.owner_node->owner_ref().alias(&device));
     }
     std::shared_ptr<impl::LogicalDeviceImpl> make_heap_device(PhysicalDevice physical, DeviceCreateInfo info) {
         auto owner = std::make_shared<HeapDeviceOwner>(std::move(physical), std::move(info));

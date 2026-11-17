@@ -334,7 +334,7 @@ namespace {
             CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, host_visibility, {}, {});
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         auto mapped = destination.data(sizeof(expected));
         EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
         EXPECT_TRUE(mapped.copy_by_buffer(manager, &source));
@@ -356,7 +356,7 @@ namespace {
             CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, host_visibility, {}, {});
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         auto mapped = readback.data(sizeof(expected));
         EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
     }
@@ -432,7 +432,7 @@ namespace {
             CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, visible, {}, {});
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         auto mapped = readback.data(sizeof(expected));
         EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
     }
@@ -462,8 +462,8 @@ namespace {
     TEST_F(BufferSharingVulkanIntegrationTest, ConcurrentRequestWorksWithOneQueueFamilyAndPreservesMappedPayload) {
         if (!host_coherent_available())
             GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
-        ASSERT_EQ(device.data_->graphics_family, queue_family);
-        ASSERT_EQ(device.data_->present_family, queue_family);
+        ASSERT_EQ(StartupAccess::Owned(device)->graphics_family, queue_family);
+        ASSERT_EQ(StartupAccess::Owned(device)->present_family, queue_family);
         const std::array<std::uint32_t, 4> expected{0, 17, 0xffffffffu, 101};
         ConcurrentHostBuffer buffer(device, expected);
         ASSERT_FALSE(has_validation_errors()) << "Buffer creation must pass validation before mapping";
@@ -490,7 +490,7 @@ namespace {
             CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, host_visibility, {}, {});
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         auto mapped = readback.data(sizeof(expected));
         EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
     }
@@ -537,7 +537,7 @@ namespace {
             CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, visible, {}, {});
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         auto mapped = readback.data();
         EXPECT_EQ(std::memcmp(mapped.data, expected.data(), expected.size()), 0);
     }
@@ -591,7 +591,7 @@ namespace {
                 CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                     vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, visible, {}, {});
             }
-            device.data_->device.waitIdle();
+            StartupAccess::Owned(device)->device.waitIdle();
             auto mapped = readback.data();
             EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
         }
@@ -1012,7 +1012,7 @@ namespace {
         original_view.resource_use().record(manager.get_buffer(), vsl::ResourceRetention::COMPLETION);
         manager.get_buffer().retain_until_complete(action.owner());
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         const auto mapping = target.data(sizeof(std::uint32_t), sizeof(std::uint32_t));
         ASSERT_TRUE(reassigned);
         EXPECT_NE(target.identity(), original_view.identity());
@@ -1049,7 +1049,7 @@ namespace {
             first_view.resource_use().record(manager.get_buffer(), vsl::ResourceRetention::COMPLETION);
             manager.get_buffer().retain_until_complete(action.owner());
             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-            device.data_->device.waitIdle();
+            StartupAccess::Owned(device)->device.waitIdle();
             auto expected = original;
             if (operation == 0) {
                 reference.fill(std::byte{11});
@@ -1089,7 +1089,7 @@ namespace {
             target->resource_use().record(manager.get_buffer(), vsl::ResourceRetention::COMPLETION);
             manager.get_buffer().retain_until_complete(action.owner());
             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-            device.data_->device.waitIdle();
+            StartupAccess::Owned(device)->device.waitIdle();
             std::uint32_t actual = 0;
             if (mapped) {
                 const auto mapping = target->data(sizeof(actual), sizeof(actual));
@@ -1129,7 +1129,7 @@ namespace {
             target->resource_use().record(manager.get_buffer(), vsl::ResourceRetention::COMPLETION);
             manager.get_buffer().retain_until_complete(action.owner());
             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-            device.data_->device.waitIdle();
+            StartupAccess::Owned(device)->device.waitIdle();
             std::array<std::byte, 4> actual{};
             if (write) {
                 target->write(replacement);
@@ -1169,7 +1169,7 @@ namespace {
             first.resource_use().record(manager.get_buffer(), vsl::ResourceRetention::COMPLETION);
             manager.get_buffer().retain_until_complete(action.owner());
             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-            device.data_->device.waitIdle();
+            StartupAccess::Owned(device)->device.waitIdle();
             auto expected = original;
             if (operation == 0)
                 holder->write(payload);

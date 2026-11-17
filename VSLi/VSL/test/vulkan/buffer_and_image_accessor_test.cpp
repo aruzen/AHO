@@ -1,6 +1,11 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <type_traits>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::BufferAccess;
@@ -46,23 +51,23 @@ namespace {
             transition(manager, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, {},
                        vk::AccessFlagBits::eTransferWrite);
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         EXPECT_TRUE(static_cast<vsl::ImageAccessor&>(image).copy_by_buffer(manager, &upload,
                                                                            vsl::ImageLayout::GENERAL, 0));
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         {
             auto phase = manager.start_phase<vsl::ComputePhase>();
             transition(manager, image, vk::ImageLayout::eGeneral, vk::ImageLayout::eGeneral,
                        vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eTransferRead);
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         EXPECT_TRUE(readback.copy_by_image(manager, image));
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         {
             auto mapped = readback.data(sizeof(expected));
             EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
             EXPECT_TRUE(mapped.copy_by_image(manager, image));
-            device.data_->device.waitIdle();
+            StartupAccess::Owned(device)->device.waitIdle();
             EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
         }
     }

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
@@ -5,6 +6,10 @@
 #include <VSL/utils/typed_batch.hpp>
 #include "support/render_fixture.hpp"
 #include "support/deferred_action.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
@@ -402,7 +407,7 @@ namespace {
                 EXPECT_THROW(state.require_idle(), std::logic_error);
             }));
             ASSERT_EQ(submitted.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-            device.data_->device.waitIdle();
+            StartupAccess::Owned(device)->device.waitIdle();
             auto recording = other.start_phase<vsl::ComputePhase>();
             if (wait)
                 EXPECT_FALSE(state.wait());
@@ -446,7 +451,7 @@ namespace {
                     EXPECT_NO_THROW(descriptors.destroy(pool));
             }));
             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-            device.data_->device.waitIdle();
+            StartupAccess::Owned(device)->device.waitIdle();
             if (retire)
                 EXPECT_NO_THROW(descriptors.destroy(pool));
             else
@@ -495,7 +500,7 @@ namespace {
                 set.resource_use()->record(commands.get_buffer());
                 commands.get_buffer().retain_until_complete(release.owner());
                 ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-                device.data_->device.waitIdle();
+                StartupAccess::Owned(device)->device.waitIdle();
                 auto* receiver = descriptors.get();
                 EXPECT_NO_THROW(receiver->destroy(pool));
                 EXPECT_TRUE(called);
@@ -551,7 +556,7 @@ namespace {
             EXPECT_THROW(descriptors.destroy(pool), std::logic_error);
         }));
         ASSERT_EQ(submitted.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         recording.emplace(other);
         EXPECT_THROW(set.resource_use()->record(other.get_buffer()), std::logic_error);
         EXPECT_TRUE(released);
@@ -621,7 +626,7 @@ namespace {
             native = {};
         }));
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         EXPECT_NO_THROW(native.update(input.backend()));
         EXPECT_TRUE(released);
         EXPECT_FALSE(DescriptorAccess::Owned(native));
@@ -651,7 +656,7 @@ namespace {
                 recording->cancel();
         }));
         ASSERT_EQ(submitted.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         recording.emplace(other);
         EXPECT_THROW(group->record(other.get_buffer()), std::logic_error);
         EXPECT_TRUE(released);

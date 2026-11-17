@@ -17,23 +17,22 @@
 namespace VSL_NAMESPACE {
     using lifetime::detail::StartupAccess;
     namespace {
+        lifetime::OwnedRef<impl::PhysicalDeviceImpl> physical_device_owner(const PhysicalDevice& device);
+        DeviceCreateInfo graphics_info(const PhysicalDevice& physical, const Surface& surface, bool validation, PresentFencePolicy present_fences);
         lifetime::OwnedRef<impl::PhysicalDeviceImpl> physical_device_owner(const PhysicalDevice& device) {
             const auto& owner = StartupAccess::Owned(device);
             StartupAccess::RequireCanonical(owner);
             return owner;
         }
+        DeviceCreateInfo graphics_info(const PhysicalDevice& physical, const Surface& surface, bool validation, PresentFencePolicy present_fences) {
+            StartupAccess::RequireCanonical(StartupAccess::Owned(physical));
+            StartupAccess::RequireCanonical(StartupAccess::Owned(surface));
+            if (StartupAccess::Owned(surface)->vulkan != StartupAccess::Owned(physical)->vulkan)
+                throw std::invalid_argument("Logical device requires a surface on the physical device Instance");
+            return operation::graphics_device_info(*StartupAccess::Owned(physical), *StartupAccess::Owned(surface), validation, present_fences);
+        }
     } // namespace
 } // namespace VSL_NAMESPACE
-
-template<bool v>
-std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl> VSL_NAMESPACE::LogicalDeviceGraphicCreator<v>::create(VSL_NAMESPACE::PhysicalDevice device, VSL_NAMESPACE::Surface surface) {
-    (void)device.owner_ref();
-    (void)surface.owner_ref();
-    if (!surface.data_->surface || surface.data_->vulkan != lifetime::detail::StartupAccess::Owned(device)->vulkan)
-        throw std::invalid_argument("Logical device requires a surface on the physical device Instance");
-    auto info = operation::graphics_device_info(*lifetime::detail::StartupAccess::Owned(device), *surface.data_, v);
-    return lifetime::make_heap_device(std::move(device), std::move(info));
-}
 
 VSL_NAMESPACE::PhysicalDevice::~PhysicalDevice() = default;
 VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::PhysicalDevice::owner_ref() const {
@@ -111,38 +110,55 @@ int VSL_NAMESPACE::PhysicalDevicesSercher::benchmark(VSL_NAMESPACE::PhysicalDevi
     return operation::rate_physical_device(StartupAccess::Owned(device)->device);
 }
 
-void VSL_NAMESPACE::helper::retain_physical_device_owner(
-    const std::shared_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl>& logical,
-    const VSL_NAMESPACE::PhysicalDevice& physical) {
-    (void)physical.owner_ref();
-    lifetime::require_device_owner({logical});
-    if (logical->parent_device != StartupAccess::Owned(physical).get())
-        throw std::invalid_argument("Logical device creator returned a different PhysicalDevice parent");
+VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::LogicalDeviceAccessor::CheckRuntime(LogicalDeviceAccessor value) {
+    StartupAccess::RequireCanonical(StartupAccess::Owned(value));
+    return value;
 }
-VSL_NAMESPACE::Surface VSL_NAMESPACE::helper::checked_surface(const std::shared_ptr<Surface>& surface) {
+VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::LogicalDeviceAccessor::CheckCreatorResult(const PhysicalDevice& physical, LogicalDeviceAccessor value) {
+    StartupAccess::RequireCanonical(StartupAccess::Owned(physical));
+    StartupAccess::RequireCanonical(StartupAccess::Owned(value));
+    if (StartupAccess::Owned(value)->parent_device != StartupAccess::Owned(physical).get())
+        throw std::invalid_argument("Logical device creator returned a different PhysicalDevice parent");
+    return value;
+}
+VSL_NAMESPACE::Surface VSL_NAMESPACE::LogicalDeviceAccessor::ReadSurface(std::shared_ptr<Surface> surface) {
     if (!surface || !surface.use_count())
         throw std::invalid_argument("Logical Device requires a Surface owner");
-    (void)surface->owner_ref();
+    StartupAccess::RequireCanonical(StartupAccess::Owned(*surface));
     return *surface;
 }
 
 VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::LogicalDeviceAccessor::Create(PhysicalDevice physical, DeviceCreateInfo info) {
-    return {lifetime::make_heap_device(std::move(physical), std::move(info))};
+    return StartupAccess::FromShared(lifetime::make_heap_device(std::move(physical), std::move(info)));
 }
 VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::LogicalDeviceAccessor::owner_ref() const {
-    lifetime::require_device_owner(*this);
-    return data_->owner_node->ref(data_);
+    StartupAccess::RequireCanonical(_owner);
+    return _owner;
 }
 VSL_NAMESPACE::PhysicalDevice VSL_NAMESPACE::LogicalDeviceAccessor::get_physical_device() const {
-    lifetime::require_device_owner(*this);
-    const auto parent = data_->owner_context ? data_->owner_context->physical.lock() : lifetime::OwnedRef<impl::PhysicalDeviceImpl>{};
-    if (!parent.use_count() || parent.get() != data_->parent_device)
+    const auto owner = _owner;
+    StartupAccess::RequireCanonical(owner);
+    const auto parent = owner->owner_context ? owner->owner_context->physical.lock() : lifetime::OwnedRef<impl::PhysicalDeviceImpl>{};
+    if (!parent.use_count() || parent.get() != owner->parent_device)
         throw std::logic_error("Device has no PhysicalDevice owner");
     return StartupAccess::FromOwned(parent);
 }
 VSL_NAMESPACE::DeviceFeature VSL_NAMESPACE::LogicalDeviceAccessor::enabled_features() const {
-    lifetime::require_device_owner(*this);
-    return data_->enabled_features;
+    StartupAccess::RequireCanonical(_owner);
+    return _owner->enabled_features;
+}
+VSL_NAMESPACE::DeviceCreateInfo VSL_NAMESPACE::LogicalDeviceAccessor::GraphicsInfo(PhysicalDevice physical, Surface surface, bool validation, PresentFencePolicy present_fences) {
+    return graphics_info(physical, surface, validation, present_fences);
+}
+VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::LogicalDeviceAccessor::CreateGraphics(PhysicalDevice physical, Surface surface, bool validation, PresentFencePolicy present_fences) {
+    auto info = graphics_info(physical, surface, validation, present_fences);
+    return Create(std::move(physical), std::move(info));
+}
+VSL_NAMESPACE::WeakLogicalDevice VSL_NAMESPACE::LogicalDeviceAccessor::weak() const noexcept {
+    return WeakLogicalDevice(_owner.weak());
+}
+VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::WeakLogicalDevice::lock() const noexcept {
+    return LogicalDeviceAccessor(_owner.lock());
 }
 VSL_NAMESPACE::DeviceFeature VSL_NAMESPACE::PhysicalDevice::supported_features() const {
     const auto source = physical_device_owner(*this);
@@ -150,7 +166,7 @@ VSL_NAMESPACE::DeviceFeature VSL_NAMESPACE::PhysicalDevice::supported_features()
 }
 
 template struct VSL_NAMESPACE::PhysicalDevices<VSL_NAMESPACE::PhysicalDevicesSercher>;
-template struct VSL_NAMESPACE::LogicalDeviceGraphicCreator<true>;
-template struct VSL_NAMESPACE::LogicalDeviceGraphicCreator<false>;
-template struct VSL_NAMESPACE::LogicalDevice<VSL_NAMESPACE::LogicalDeviceGraphicCreator<true>>;
-template struct VSL_NAMESPACE::LogicalDevice<VSL_NAMESPACE::LogicalDeviceGraphicCreator<false>>;
+template struct VSL_NAMESPACE::GraphicsDeviceCreator<true>;
+template struct VSL_NAMESPACE::GraphicsDeviceCreator<false>;
+template struct VSL_NAMESPACE::LogicalDevice<VSL_NAMESPACE::GraphicsDeviceCreator<true>>;
+template struct VSL_NAMESPACE::LogicalDevice<VSL_NAMESPACE::GraphicsDeviceCreator<false>>;

@@ -63,7 +63,7 @@ namespace {
         if (HasFatalFailure() || IsSkipped())
             return;
         make_surface();
-        if (!HasFatalFailure() && !StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!HasFatalFailure() && !StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, StartupAccess::Owned(*(surface))->surface))
             GTEST_SKIP() << "Selected queue cannot present";
     }
     vsl::SwapchainAccessor SurfaceRecoveryWindowIntegrationTest::make_chain(vsl::PresentFencePolicy policy) {
@@ -131,7 +131,7 @@ namespace {
     TEST_F(SurfaceRecoveryWindowIntegrationTest, AnUnusedSurfaceRecoversWithoutCreatingAPresentationDomain) {
         EXPECT_EQ(l::recover_surface(device, *surface, l::SurfaceRecoveryMode::POLL), l::SurfaceRecoveryStatus::COMPLETE);
         EXPECT_EQ(l::recover_surface(device, *surface), l::SurfaceRecoveryStatus::COMPLETE);
-        EXPECT_FALSE(surface->data_->owner_context->presentations.lock());
+        EXPECT_FALSE(StartupAccess::Owned(*(surface))->owner_context->presentations.lock());
         EXPECT_THROW(l::recover_surface(device, *surface, static_cast<l::SurfaceRecoveryMode>(99)), std::invalid_argument);
     }
     TEST_F(SurfaceRecoveryWindowIntegrationTest, RetirementRegistrationIsWeakAndRepeatedRegistrationUsesOneCollection) {
@@ -141,11 +141,11 @@ namespace {
         l::queue_surface_retirement(device, *surface);
         EXPECT_EQ(l::collect_surface_retirements(device, l::SurfaceRecoveryMode::WAIT), l::SurfaceRecoveryStatus::COMPLETE);
         EXPECT_EQ(probe.idles, 1u);
-        EXPECT_FALSE(surface->data_->owner_context->presentations.lock());
+        EXPECT_FALSE(StartupAccess::Owned(*(surface))->owner_context->presentations.lock());
         EXPECT_EQ(l::collect_surface_retirements(device, l::SurfaceRecoveryMode::WAIT), l::SurfaceRecoveryStatus::COMPLETE);
         EXPECT_EQ(probe.idles, 1u);
         l::queue_surface_retirement(device, *surface);
-        const std::weak_ptr<void> owner = surface->data_;
+        const std::weak_ptr<void> owner = StartupAccess::Shared(*(surface));
         window->data_->plugins.clear();
         surface.reset();
         EXPECT_TRUE(owner.expired());
@@ -187,9 +187,9 @@ namespace {
         {
             const l::StartupArena arena(plan, inputs);
             const auto first = arena.surface({1}), second = arena.surface({2});
-            EXPECT_FALSE(first.data_.owner_before(second.data_));
-            EXPECT_FALSE(second.data_.owner_before(first.data_));
-            EXPECT_NE(first.data_, second.data_);
+            EXPECT_FALSE(StartupAccess::Owned(first).owner_before(StartupAccess::Owned(second)));
+            EXPECT_FALSE(StartupAccess::Owned(second).owner_before(StartupAccess::Owned(first)));
+            EXPECT_NE(StartupAccess::Owned(first), StartupAccess::Owned(second));
             RecoveryProbe probe;
             const o::ScopedSubmissionNativeCalls submissions(probe.submissions());
             l::queue_surface_retirement(device, first);
@@ -293,7 +293,7 @@ namespace {
         EXPECT_TRUE(fences.expired());
         EXPECT_TRUE(generation.expired());
         EXPECT_EQ(l::quarantined_acquisition_count(), before);
-        EXPECT_TRUE(surface->data_->owner_context->presentations.expired());
+        EXPECT_TRUE(StartupAccess::Owned(*(surface))->owner_context->presentations.expired());
     }
     TEST_F(SurfaceRecoveryWindowIntegrationTest, CancelDuringNativeGraphicsDoesNotPresentAnAlreadyRecoveredImage) {
         auto manager = make_manager().independent(1);
@@ -450,9 +450,9 @@ namespace {
             ASSERT_FALSE(registry->records.empty());
             const VkFence proof = registry->records.back()->state.proof;
             ASSERT_NE(proof, VK_NULL_HANDLE);
-            ASSERT_EQ(vkWaitForFences(device.data_->device, 1, &proof, VK_TRUE, UINT64_MAX), VK_SUCCESS);
-            ASSERT_EQ(vkDeviceWaitIdle(device.data_->device), VK_SUCCESS);
-            device.data_->lost = true;
+            ASSERT_EQ(vkWaitForFences(StartupAccess::Owned(device)->device, 1, &proof, VK_TRUE, UINT64_MAX), VK_SUCCESS);
+            ASSERT_EQ(vkDeviceWaitIdle(StartupAccess::Owned(device)->device), VK_SUCCESS);
+            StartupAccess::Owned(device)->lost = true;
             EXPECT_EQ(l::recover_surface(device, *surface), l::SurfaceRecoveryStatus::DEVICE_LOST);
             ASSERT_FALSE(registry->records.empty());
             EXPECT_TRUE(registry->records.back()->generation);

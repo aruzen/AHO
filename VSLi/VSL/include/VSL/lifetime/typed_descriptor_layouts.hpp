@@ -87,7 +87,7 @@ namespace VSL_NAMESPACE::typed {
     }
     template<typename Resources>
     void TypedDescriptorLayouts<Resources>::swap_state(TypedDescriptorLayouts& other) noexcept {
-        _device.data_.swap(other._device.data_);
+        _device.swap(other._device);
         _layouts.swap(other._layouts);
         _empty.swap(other._empty);
     }

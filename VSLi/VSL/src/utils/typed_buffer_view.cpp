@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/utils/typed_buffer_view.hpp>
 #include <VSL/lifetime/buffer_arena.hpp>
@@ -7,6 +8,10 @@
 #include <VSL/vulkan/phase.hpp>
 #include <array>
 #include <utility>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::BufferAccess;
@@ -23,7 +28,7 @@ namespace VSL_NAMESPACE::typed::detail {
         template<buffer_storage_policy Policy>
         BufferView make_uploaded_storage(LogicalDeviceAccessor device, CommandManager manager, const BufferCreateInfo& info,
                                          std::span<const std::byte> bytes, Policy policy) {
-            if (!device.data_ || !CommandAccess::Data(manager) || !CommandAccess::Data(manager).use_count() || manager.get_device() != device)
+            if (!StartupAccess::Owned(device) || !CommandAccess::Data(manager) || !CommandAccess::Data(manager).use_count() || manager.get_device() != device)
                 throw std::invalid_argument("Typed upload requires a command manager on the buffer Device");
             if (bytes.empty() || bytes.size() != info.bytes)
                 throw std::invalid_argument("Typed upload requires the complete buffer contents");

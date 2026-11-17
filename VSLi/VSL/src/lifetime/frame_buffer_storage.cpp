@@ -1,7 +1,12 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/frame_buffer_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <new>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_standard_layout_v<FrameBufferSlotStorage>);
@@ -24,7 +29,7 @@ namespace VSL_NAMESPACE::lifetime {
                 throw std::invalid_argument("Framebuffer root requires its pass owner");
             detail::retain_owner(this->dependencies, pass);
             require_device_owner(device);
-            construct_frame_buffer(storage, *device.data_, std::move(input));
+            construct_frame_buffer(storage, *StartupAccess::Owned(device), std::move(input));
             try {
                 set_frame_buffer_pass_owner(frame_buffer_at(storage), pass.alias(frame_buffer_at(storage).render_pass));
             } catch (...) {
@@ -45,7 +50,7 @@ namespace VSL_NAMESPACE::lifetime {
     } // namespace
     void construct_frame_buffer(void* storage, LogicalDeviceAccessor device, operation::FrameBufferInput input) {
         require_device_owner(device);
-        construct_frame_buffer(storage, *device.data_, std::move(input));
+        construct_frame_buffer(storage, *StartupAccess::Owned(device), std::move(input));
     }
     void construct_frame_buffer(void* storage, impl::LogicalDeviceImpl& device, operation::FrameBufferInput input) {
         if (!device.device)

@@ -68,7 +68,7 @@ namespace {
         make_surface();
         if (HasFatalFailure())
             return;
-        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, StartupAccess::Owned(*(surface))->surface))
             GTEST_SKIP() << "Selected queue cannot present to the Surface";
     }
     template<typename Handle>
@@ -155,7 +155,7 @@ namespace {
             EXPECT_FALSE(SwapchainAccess::Owned(chain).owner_before(SynchronizationAccess::Owned(*(finished)).share()));
             EXPECT_EQ(reinterpret_cast<std::uintptr_t>(SynchronizationAccess::Owned(*(finished)).get()) - reinterpret_cast<std::uintptr_t>(SwapchainAccess::Owned(chain).get()),
                       layout.finished_semaphore_offset());
-            EXPECT_EQ(finished->get_device().data_, device.data_);
+            EXPECT_EQ(StartupAccess::Owned(finished->get_device()), StartupAccess::Owned(device));
         }
         EXPECT_FALSE(generation.expired());
         finished.reset();
@@ -229,13 +229,13 @@ namespace {
             generation = arena.owner_ref().weak();
             auto chain = arena.view();
             parent = chain.get_device();
-            EXPECT_EQ(parent.data_, device.data_);
-            EXPECT_FALSE(parent.data_.owner_before(device.data_));
-            EXPECT_FALSE(device.data_.owner_before(parent.data_));
+            EXPECT_EQ(StartupAccess::Owned(parent), StartupAccess::Owned(device));
+            EXPECT_FALSE(StartupAccess::Owned(parent).owner_before(StartupAccess::Owned(device)));
+            EXPECT_FALSE(StartupAccess::Owned(device).owner_before(StartupAccess::Owned(parent)));
             auto original = chain.get_surface();
-            EXPECT_EQ(original.data_, surface->data_);
-            EXPECT_FALSE(original.data_.owner_before(surface->data_));
-            EXPECT_FALSE(surface->data_.owner_before(original.data_));
+            EXPECT_EQ(StartupAccess::Owned(original), StartupAccess::Owned(*(surface)));
+            EXPECT_FALSE(StartupAccess::Owned(original).owner_before(StartupAccess::Owned(*(surface))));
+            EXPECT_FALSE(StartupAccess::Owned(*(surface)).owner_before(StartupAccess::Owned(original)));
             saved = chain.image(0);
         }
         EXPECT_FALSE(generation.expired());
@@ -300,7 +300,7 @@ namespace {
         EXPECT_EQ(retry.state(), vsl::SwapchainState::ACTIVE);
     }
     TEST_F(SwapchainArenaWindowIntegrationTest, LaterImageViewFailureRollsBackSlotsAndReleasesTheCPUClaim) {
-        const auto caps = StartupAccess::Owned(physical)->device.getSurfaceCapabilitiesKHR(surface->data_->surface);
+        const auto caps = StartupAccess::Owned(physical)->device.getSurfaceCapabilitiesKHR(StartupAccess::Owned(*(surface))->surface);
         if (caps.maxImageCount == 1)
             GTEST_SKIP() << "Surface supports only one image";
         NativeProbe probe;
@@ -328,9 +328,9 @@ namespace {
         info.present_fences = vsl::PresentFencePolicy::REQUIRE_FENCE;
         EXPECT_THROW((l::SwapchainArena{device, *surface, info, old}), std::invalid_argument);
         EXPECT_EQ(old.state(), vsl::SwapchainState::ACTIVE);
-        auto acquired = device.data_->device.createFenceUnique({});
-        const auto index = device.data_->device.acquireNextImageKHR(SwapchainAccess::Owned(old)->swap_chain, UINT64_MAX, nullptr, *acquired).value;
-        ASSERT_EQ(device.data_->device.waitForFences(*acquired, true, UINT64_MAX), vk::Result::eSuccess);
+        auto acquired = StartupAccess::Owned(device)->device.createFenceUnique({});
+        const auto index = StartupAccess::Owned(device)->device.acquireNextImageKHR(SwapchainAccess::Owned(old)->swap_chain, UINT64_MAX, nullptr, *acquired).value;
+        ASSERT_EQ(StartupAccess::Owned(device)->device.waitForFences(*acquired, true, UINT64_MAX), vk::Result::eSuccess);
         EXPECT_LT(index, old.get_swap_image_size());
     }
     TEST_F(SwapchainArenaWindowIntegrationTest, CreationProgressDistinguishesPreflightFromNativeFailureWithAndWithoutAnOldGeneration) {
@@ -426,7 +426,7 @@ namespace {
             completed = previous.completion();
             ASSERT_EQ(previous.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         }
-        device.data_->device.waitIdle(); // native完了だけを待ち、過去Workのcallbackは未観測にする。
+        StartupAccess::Owned(device)->device.waitIdle(); // native完了だけを待ち、過去Workのcallbackは未観測にする。
         phase = std::make_unique<vsl::DefaultPhase>(returning, chain);
         EXPECT_NO_THROW(phase->cancel());
         ASSERT_FALSE(invoked);

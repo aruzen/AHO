@@ -463,7 +463,7 @@ namespace {
             CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         auto mapped = output->data(COUNT * sizeof(std::uint32_t));
         std::array<std::uint32_t, COUNT> actual{};
         std::memcpy(actual.data(), mapped.data, sizeof(actual));
@@ -722,7 +722,7 @@ namespace {
             CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         auto mapped = output.data(2 * sizeof(std::uint32_t));
         std::array<std::uint32_t, 2> actual{};
         std::memcpy(actual.data(), mapped.data, sizeof(actual));
@@ -784,9 +784,9 @@ namespace {
         view_info.format = vk::Format::eR32Uint;
         view_info.range = sizeof(std::uint32_t);
         view_info.buffer = BufferAccess::Owned(source)->buffer;
-        auto source_view = device.data_->device.createBufferViewUnique(view_info);
+        auto source_view = StartupAccess::Owned(device)->device.createBufferViewUnique(view_info);
         view_info.buffer = BufferAccess::Owned(destination)->buffer;
-        auto destination_view = device.data_->device.createBufferViewUnique(view_info);
+        auto destination_view = StartupAccess::Owned(device)->device.createBufferViewUnique(view_info);
         // BufferView用の公開updateはないため、テスト内で反射したlayoutへnative viewを設定する。
         std::array<vk::WriteDescriptorSet, 2> writes{};
         for (std::uint32_t i = 0; i < writes.size(); ++i) {
@@ -797,7 +797,7 @@ namespace {
         }
         writes[0].pTexelBufferView = &*source_view;
         writes[1].pTexelBufferView = &*destination_view;
-        device.data_->device.updateDescriptorSets(writes, {});
+        StartupAccess::Owned(device)->device.updateDescriptorSets(writes, {});
         vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("reflection_texel_buffers.comp.spv"));
         vsl::PipelineLayout layout(device, vsl::pipeline_layout::ShaderGroup("reflected texel buffers", {shader}),
                                    vsl::pipeline_layout::ResourceBinding(sets));
@@ -814,7 +814,7 @@ namespace {
             CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         auto mapped = destination.data(sizeof(std::uint32_t));
         std::uint32_t actual = 0;
         std::memcpy(&actual, mapped.data, sizeof(actual));
@@ -902,7 +902,7 @@ namespace {
                 vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eTransfer, {}, barrier, {}, {});
             phase << vsl::command::CopyImageToBuffer(&readback, *color);
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         auto mapped = readback.data(WIDTH * HEIGHT * 4);
         std::array<std::uint8_t, 4> pixel{};
         std::memcpy(pixel.data(), static_cast<const std::uint8_t*>(mapped.data) + ((HEIGHT / 2) * WIDTH + WIDTH / 2) * 4, 4);

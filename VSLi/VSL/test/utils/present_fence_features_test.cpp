@@ -147,7 +147,7 @@ namespace {
         info.features = MAINTENANCE;
         auto created = vsl::LogicalDeviceAccessor::Create(selected, info);
         EXPECT_TRUE(vsl::has_device_features(created.enabled_features(), MAINTENANCE));
-        EXPECT_TRUE(created.data_->swapchain_enabled);
+        EXPECT_TRUE(StartupAccess::Owned(created)->swapchain_enabled);
     }
     TEST_F(PresentFenceFeaturesVulkanIntegrationTest, ExtensionNameDoesNotEnableItsFeature) {
         auto owner = strict_instance();

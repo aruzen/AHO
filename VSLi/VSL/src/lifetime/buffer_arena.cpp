@@ -1,9 +1,14 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/buffer_arena.hpp>
 #include <VSL/lifetime/buffer_storage.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/storage/cpu_region.hpp>
 #include <VSL/lifetime/dependency_node.hpp>
 #include <VSL/lifetime/device_owner.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace VSL_NAMESPACE::lifetime {
     namespace {
@@ -30,7 +35,7 @@ namespace VSL_NAMESPACE::lifetime {
             this->memory->claim(bytes, storage::BufferLayout::ALIGNMENT);
             try {
                 for (const auto& info : buffers) {
-                    lifetime::construct_buffer(base + storage::BufferLayout::Offset(constructed), *device.data_, info);
+                    lifetime::construct_buffer(base + storage::BufferLayout::Offset(constructed), *StartupAccess::Owned(device), info);
                     ++constructed;
                 }
             } catch (...) {

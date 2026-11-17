@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
@@ -562,7 +563,7 @@ namespace {
         auto window = engine->get_window();
         auto manager = engine->data()->command_manager;
         auto device = engine->data()->logical_device;
-        const auto capabilities = device.data_->parent_device->device.getSurfaceCapabilitiesKHR(window.data2->surface->data_->surface);
+        const auto capabilities = VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->parent_device->device.getSurfaceCapabilitiesKHR(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(*(window.data2->surface))->surface);
         if (!(capabilities.supportedUsageFlags & vk::ImageUsageFlagBits::eTransferSrc))
             GTEST_SKIP() << "Swapchain does not support TransferSrc";
         auto chain = VSL_NAMESPACE::Swapchain(device, window.data2->surface, window.data2->swapchain,

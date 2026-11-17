@@ -129,7 +129,7 @@ namespace {
         for (unsigned i = 0; i < info.pushConstantRangeCount; ++i)
             for (unsigned j = i + 1; j < info.pushConstantRangeCount; ++j)
                 ASSERT_FALSE(static_cast<bool>(info.pPushConstantRanges[i].stageFlags & info.pPushConstantRanges[j].stageFlags));
-        const auto handle = device.data_->device.createPipelineLayoutUnique(vsl_test::inspect_layout(layout).pipeline_layout);
+        const auto handle = StartupAccess::Owned(device)->device.createPipelineLayoutUnique(vsl_test::inspect_layout(layout).pipeline_layout);
         EXPECT_TRUE(static_cast<bool>(handle));
     }
     TEST_F(PushRangeVulkanIntegrationTest, InvalidDefinitionsLeavePreviouslyInjectedRangesUnchanged) {
@@ -202,6 +202,6 @@ TEST_F(PushRangeVulkanIntegrationTest, RangeMayEndExactlyAtThePhysicalDeviceLimi
     const auto range = range_for(layout, vk::ShaderStageFlagBits::eCompute);
     EXPECT_EQ(range.offset, limit - 4);
     EXPECT_EQ(range.size, 4u);
-    const auto native = device.data_->device.createPipelineLayoutUnique(vsl_test::inspect_layout(layout).pipeline_layout);
+    const auto native = StartupAccess::Owned(device)->device.createPipelineLayoutUnique(vsl_test::inspect_layout(layout).pipeline_layout);
     EXPECT_TRUE(static_cast<bool>(native));
 }

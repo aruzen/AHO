@@ -1,7 +1,12 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/sampler_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <new>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_nothrow_default_constructible_v<impl::SamplerImpl>);
@@ -15,7 +20,7 @@ namespace VSL_NAMESPACE::lifetime {
         };
         HeapSamplerOwner::HeapSamplerOwner(LogicalDeviceAccessor device, const SamplerCreateInfo& info) : device(device) {
             require_device_owner(device);
-            construct_sampler(storage, *device.data_, info);
+            construct_sampler(storage, *StartupAccess::Owned(device), info);
         }
         HeapSamplerOwner::~HeapSamplerOwner() {
             node.retire();
@@ -25,7 +30,7 @@ namespace VSL_NAMESPACE::lifetime {
 
     void construct_sampler(void* storage, LogicalDeviceAccessor device, const SamplerCreateInfo& info) {
         require_device_owner(device);
-        construct_sampler(storage, *device.data_, info);
+        construct_sampler(storage, *StartupAccess::Owned(device), info);
     }
     void construct_sampler(void* storage, impl::LogicalDeviceImpl& device, const SamplerCreateInfo& info) {
         if (!device.device)

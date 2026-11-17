@@ -1,8 +1,13 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/shader_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/exceptions.hpp>
 #include <new>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_nothrow_default_constructible_v<impl::ShaderImpl>);
@@ -16,7 +21,7 @@ namespace VSL_NAMESPACE::lifetime {
         };
         HeapShaderOwner::HeapShaderOwner(LogicalDeviceAccessor device, ShaderCreateInfo info) : device(device) {
             require_device_owner(device);
-            construct_shader(storage, *device.data_, std::move(info));
+            construct_shader(storage, *StartupAccess::Owned(device), std::move(info));
         }
         HeapShaderOwner::~HeapShaderOwner() {
             node.retire();
@@ -25,7 +30,7 @@ namespace VSL_NAMESPACE::lifetime {
     } // namespace
     void construct_shader(void* storage, LogicalDeviceAccessor device, ShaderCreateInfo info) {
         require_device_owner(device);
-        construct_shader(storage, *device.data_, std::move(info));
+        construct_shader(storage, *StartupAccess::Owned(device), std::move(info));
     }
     void construct_shader(void* storage, impl::LogicalDeviceImpl& device, ShaderCreateInfo info) {
         if (!device.device)
@@ -48,7 +53,7 @@ namespace VSL_NAMESPACE::lifetime {
         std::destroy_at(static_cast<ShaderSlotStorage*>(storage));
     }
     std::shared_ptr<impl::ShaderImpl> make_heap_shader(LogicalDeviceAccessor device, ShaderCreateInfo info) {
-        if (!device.data_ || !device.data_->device)
+        if (!StartupAccess::Owned(device) || !StartupAccess::Owned(device)->device)
             throw exceptions::RuntimeException("Shader", "A live logical device is required");
         auto owner = std::make_shared<HeapShaderOwner>(device, std::move(info));
         auto* shader = &shader_at(owner->storage);

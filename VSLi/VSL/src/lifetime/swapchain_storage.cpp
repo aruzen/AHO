@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/swapchain_storage.hpp>
@@ -11,6 +12,10 @@
 #include <VSL/lifetime/synchronization_storage.hpp>
 #include <VSL/storage/cpu_region.hpp>
 #include <new>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
@@ -157,8 +162,8 @@ namespace VSL_NAMESPACE::lifetime {
         require_surface_owner(surface);
         if (!memory)
             throw std::invalid_argument("Swapchain requires a CPU storage factory");
-        const auto device_owner = device.data_->owner_node->ref(std::move(device.data_));
-        const auto surface_owner = surface.data_->owner_node->ref(std::move(surface.data_));
+        const auto device_owner = std::move(StartupAccess::Owned(device));
+        const auto surface_owner = std::move(StartupAccess::Owned(surface));
         std::shared_ptr<impl::SwapchainImpl> previous;
         if (old) {
             require_swapchain_owner(*old);

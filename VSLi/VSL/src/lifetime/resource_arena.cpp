@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/operation/graphics_pipeline_state_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
@@ -24,6 +25,10 @@
 #include <VSL/lifetime/descriptor_bindings.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/storage/cpu_region.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::operation::detail::GraphicsPipelineStateAccess;
@@ -129,12 +134,12 @@ namespace VSL_NAMESPACE::lifetime::detail {
                                            std::span<const LogicalUseState> owners, DependencyPolicy policy)
         : device(device), memory(std::move(memory)), group(group) {
         require_device_owner(device);
-        if (!device.data_.use_count() || !device.data_ || !device.data_->device || !this->memory)
+        if (!StartupAccess::Owned(device).use_count() || !StartupAccess::Owned(device) || !StartupAccess::Owned(device)->device || !this->memory)
             throw std::invalid_argument("Resource arena requires a live device and CPU region");
         if (policy != DependencyPolicy::FIXED && policy != DependencyPolicy::DYNAMIC)
             throw std::invalid_argument("Unknown resource dependency policy");
         descriptor_context.policy = policy;
-        descriptor_context.device_parent = device.data_->owner_node;
+        descriptor_context.device_parent = StartupAccess::Owned(device)->owner_node;
         preflight(placements, initializers);
         for (const auto& owner : owners)
             retain_dependency(owner.resource_use().state);
@@ -173,7 +178,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
             if (resource.placement.external) {
                 if (const auto* buffer = std::get_if<BufferView>(&value)) {
                     const auto* ref = detail::BufferAccess::Impl(buffer->ref());
-                    if (!buffer->owner().use_count() || !ref || !ref->buffer || !ref->use || ref->device != device.data_.get())
+                    if (!buffer->owner().use_count() || !ref || !ref->buffer || !ref->use || ref->device != StartupAccess::Owned(device).get())
                         throw std::invalid_argument("External buffer requires an owner on the arena device");
                     resource.reference = detail::BufferAccess::Impl(buffer->ref());
                     resource.buffer_offset = buffer->byte_offset();
@@ -181,26 +186,26 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     resource.owner_index = retain_dependency(buffer->owner_ref());
                 } else if (const auto* image = std::get_if<ImageAccessor>(&value)) {
                     if (!ImageAccess::Owned(*(image)).use_count() || !ImageAccess::Owned(*(image)) || !ImageAccess::Owned(*(image))->image ||
-                        !ImageAccess::Owned(*(image))->use || ImageAccess::Owned(*(image))->device != device.data_.get())
+                        !ImageAccess::Owned(*(image))->use || ImageAccess::Owned(*(image))->device != StartupAccess::Owned(device).get())
                         throw std::invalid_argument("External image requires an owner on the arena device");
                     (void)image->use_state();
                     resource.reference = ImageAccess::Owned(*(image)).get();
                     resource.owner_index = retain_dependency(ImageAccess::Owned(*(image)));
                 } else if (const auto* sampler = std::get_if<SamplerAccessor>(&value)) {
                     if (!SamplerAccess::Owned(*(sampler)).use_count() || !SamplerAccess::Owned(*(sampler)) || !SamplerAccess::Owned(*(sampler))->sampler || !SamplerAccess::Owned(*(sampler))->use ||
-                        SamplerAccess::Owned(*(sampler))->device != device.data_.get())
+                        SamplerAccess::Owned(*(sampler))->device != StartupAccess::Owned(device).get())
                         throw std::invalid_argument("External sampler requires an owner on the arena device");
                     (void)sampler->use_state();
                     resource.reference = SamplerAccess::Owned(*(sampler)).get();
                     resource.owner_index = retain_dependency(SamplerAccess::Owned(*(sampler)));
                 } else if (const auto* layout = std::get_if<graphic_resource::BindingLayout>(&value)) {
-                    if (!DescriptorAccess::Owned(*(layout)).use_count() || !DescriptorAccess::Owned(*(layout)) || !DescriptorAccess::Owned(*(layout))->layout || DescriptorAccess::Owned(*(layout))->device != device.data_.get())
+                    if (!DescriptorAccess::Owned(*(layout)).use_count() || !DescriptorAccess::Owned(*(layout)) || !DescriptorAccess::Owned(*(layout))->layout || DescriptorAccess::Owned(*(layout))->device != StartupAccess::Owned(device).get())
                         throw std::invalid_argument("External descriptor layout requires an owner on the arena device");
                     resource.reference = DescriptorAccess::Owned(*(layout)).get();
                     resource.owner_index = retain_dependency(DescriptorAccess::Owned(*(layout)));
                 } else if (const auto* pool = std::get_if<graphic_resource::Pool>(&value)) {
                     if (!DescriptorAccess::Owned(*(pool)).use_count() || !DescriptorAccess::Owned(*(pool)) || !DescriptorAccess::Owned(*(pool))->descriptor_pool || DescriptorAccess::Owned(*(pool))->retiring ||
-                        DescriptorAccess::Owned(*(pool))->device != device.data_.get())
+                        DescriptorAccess::Owned(*(pool))->device != StartupAccess::Owned(device).get())
                         throw std::invalid_argument("External descriptor pool requires a live owner on the arena device");
                     const auto owner = DescriptorAccess::Owned(*(pool))->owner.lock();
                     if (!owner.use_count() || DescriptorAccess::Owned(*(pool)).owner_before(owner) || owner.owner_before(OwnerAccess::Shared(DescriptorAccess::Owned(*(pool)))))
@@ -208,50 +213,50 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     resource.reference = DescriptorAccess::Owned(*(pool)).get();
                     resource.owner_index = retain_dependency(owned_ref(owner, DescriptorAccess::Owned(*(pool))->owner_node));
                 } else if (const auto* semaphore = std::get_if<SemaphoreHolder>(&value)) {
-                    if (semaphore->get_device().data_ != device.data_)
+                    if (StartupAccess::Owned(semaphore->get_device()) != StartupAccess::Owned(device))
                         throw std::invalid_argument("External semaphore requires the arena device");
                     resource.reference = SynchronizationAccess::Owned(*(semaphore)).get();
                     resource.owner_index = retain_dependency(semaphore->owner_ref());
                 } else if (const auto* fence = std::get_if<FenceHolder>(&value)) {
-                    if (fence->get_device().data_ != device.data_)
+                    if (StartupAccess::Owned(fence->get_device()) != StartupAccess::Owned(device))
                         throw std::invalid_argument("External fence requires the arena device");
                     resource.reference = SynchronizationAccess::Owned(*(fence)).get();
                     resource.owner_index = retain_dependency(fence->owner_ref());
                 } else if (const auto* command_pool = std::get_if<CommandPool>(&value)) {
-                    if (command_pool->get_device().data_ != device.data_)
+                    if (StartupAccess::Owned(command_pool->get_device()) != StartupAccess::Owned(device))
                         throw std::invalid_argument("External command pool requires the arena device");
                     resource.reference = CommandAccess::Data(*(command_pool)).get();
                     resource.owner_index = retain_dependency(command_pool->owner_ref());
                 } else if (const auto* command_buffer = std::get_if<CommandBuffer>(&value)) {
-                    if (command_buffer->get_pool().get_device().data_ != device.data_)
+                    if (StartupAccess::Owned(command_buffer->get_pool().get_device()) != StartupAccess::Owned(device))
                         throw std::invalid_argument("External command ring requires the arena device");
                     resource.reference = CommandAccess::Data(*(command_buffer)).get();
                     resource.owner_index = retain_dependency(command_buffer->owner_ref());
                 } else if (const auto* frame_buffer = std::get_if<FrameBufferAccessor>(&value)) {
-                    if (frame_buffer->get_device().data_ != device.data_)
+                    if (StartupAccess::Owned(frame_buffer->get_device()) != StartupAccess::Owned(device))
                         throw std::invalid_argument("External framebuffer requires the arena device");
                     resource.reference = GraphicsAccess::Owned(*(frame_buffer)).get();
                     resource.owner_index = retain_dependency(frame_buffer->owner_ref());
                 } else if (const auto* pipeline = std::get_if<PipelineAccessor>(&value)) {
                     (void)pipeline->get_device();
-                    if (GraphicsAccess::Owned(*(pipeline))->device != device.data_.get())
+                    if (GraphicsAccess::Owned(*(pipeline))->device != StartupAccess::Owned(device).get())
                         throw std::invalid_argument("External pipeline requires the arena device");
                     resource.reference = GraphicsAccess::Owned(*(pipeline)).get();
                     resource.owner_index = retain_dependency(pipeline->owner_ref());
                 } else if (const auto* pass = std::get_if<RenderPassAccessor>(&value)) {
                     (void)pass->get_device();
-                    if (GraphicsAccess::Owned(*(pass))->device != device.data_.get())
+                    if (GraphicsAccess::Owned(*(pass))->device != StartupAccess::Owned(device).get())
                         throw std::invalid_argument("External render pass requires the arena device");
                     resource.reference = GraphicsAccess::Owned(*(pass)).get();
                     resource.owner_index = retain_dependency(pass->owner_ref());
                 } else if (const auto* layout = std::get_if<PipelineLayoutAccessor>(&value)) {
                     (void)layout->get_device();
-                    if (GraphicsAccess::Owned(*(layout))->device != device.data_.get())
+                    if (GraphicsAccess::Owned(*(layout))->device != StartupAccess::Owned(device).get())
                         throw std::invalid_argument("External pipeline layout requires the arena device");
                     resource.reference = GraphicsAccess::Owned(*(layout)).get();
                     resource.owner_index = retain_dependency(layout->owner_ref());
                 } else if (const auto* shader = std::get_if<ShaderAccessor>(&value)) {
-                    if (!ShaderAccess::Owned(*(shader)).use_count() || !ShaderAccess::Owned(*(shader)) || !ShaderAccess::Owned(*(shader))->shader_module || ShaderAccess::Owned(*(shader))->device != device.data_.get())
+                    if (!ShaderAccess::Owned(*(shader)).use_count() || !ShaderAccess::Owned(*(shader)) || !ShaderAccess::Owned(*(shader))->shader_module || ShaderAccess::Owned(*(shader))->device != StartupAccess::Owned(device).get())
                         throw std::invalid_argument("External shader requires an owner on the arena device");
                     resource.reference = ShaderAccess::Owned(*(shader)).get();
                     resource.owner_index = retain_dependency(shader->owner_ref());
@@ -281,7 +286,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
                         (void)find(*id, storage::ResourceKind::DESCRIPTOR_LAYOUT);
                     } else {
                         const auto& binding = std::get<graphic_resource::BindingLayout>(source);
-                        if (!DescriptorAccess::Owned(binding) || !DescriptorAccess::Owned(binding).use_count() || !DescriptorAccess::Owned(binding)->layout || DescriptorAccess::Owned(binding)->device != device.data_.get())
+                        if (!DescriptorAccess::Owned(binding) || !DescriptorAccess::Owned(binding).use_count() || !DescriptorAccess::Owned(binding)->layout || DescriptorAccess::Owned(binding)->device != StartupAccess::Owned(device).get())
                             throw std::invalid_argument("Pipeline layout source requires an owning layout on the arena device");
                     }
             }
@@ -291,7 +296,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
             (void)find(*id, storage::ResourceKind::PIPELINE_LAYOUT);
         } else {
             const auto& layout = std::get<PipelineLayoutAccessor>(source);
-            if (layout.get_device().data_ != device.data_)
+            if (StartupAccess::Owned(layout.get_device()) != StartupAccess::Owned(device))
                 throw std::invalid_argument("Pipeline runtime layout requires the arena device");
             retain_dependency(layout.owner_ref());
         }
@@ -301,7 +306,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
             (void)find(*id, storage::ResourceKind::COMMAND_POOL);
         } else {
             const auto& pool = std::get<CommandPool>(input.pool);
-            if (pool.get_device().data_ != device.data_)
+            if (StartupAccess::Owned(pool.get_device()) != StartupAccess::Owned(device))
                 throw std::invalid_argument("Command ring source requires the arena device");
             retain_dependency(pool.owner_ref());
         }
@@ -314,7 +319,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
     void ResourceArenaOwner::preflight(const PipelinePassSource& source) {
         if (const auto* id = std::get_if<typed::ResourceId>(&source)) {
             (void)find(*id, storage::ResourceKind::RENDER_PASS);
-        } else if (std::get<RenderPassAccessor>(source).get_device().data_ != device.data_) {
+        } else if (StartupAccess::Owned(std::get<RenderPassAccessor>(source).get_device()) != StartupAccess::Owned(device)) {
             throw std::invalid_argument("Pipeline pass source requires the arena device");
         }
     }
@@ -323,7 +328,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
             (void)find(*id, storage::ResourceKind::SHADER);
         } else {
             const auto& shader = std::get<ShaderAccessor>(source);
-            if (!ShaderAccess::Owned(shader) || !ShaderAccess::Owned(shader).use_count() || !ShaderAccess::Owned(shader)->shader_module || ShaderAccess::Owned(shader)->device != device.data_.get())
+            if (!ShaderAccess::Owned(shader) || !ShaderAccess::Owned(shader).use_count() || !ShaderAccess::Owned(shader)->shader_module || ShaderAccess::Owned(shader)->device != StartupAccess::Owned(device).get())
                 throw std::invalid_argument("Pipeline shader source requires an owner on the arena device");
         }
     }
@@ -338,7 +343,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 } else {
                     const auto& image = std::get<ImageAccessor>(source);
                     if (!ImageAccess::Owned(image) || !ImageAccess::Owned(image).use_count() || !ImageAccess::Owned(image)->image || !ImageAccess::Owned(image)->view ||
-                        !ImageAccess::Owned(image)->use || ImageAccess::Owned(image)->device != device.data_.get())
+                        !ImageAccess::Owned(image)->use || ImageAccess::Owned(image)->device != StartupAccess::Owned(device).get())
                         throw std::invalid_argument("Framebuffer image requires an owner on the arena device");
                     retain_dependency(ImageAccess::Owned(image));
                 }
@@ -369,15 +374,15 @@ namespace VSL_NAMESPACE::lifetime::detail {
         auto* slot = memory->base + resource.placement.offset;
         switch (resource.placement.kind) {
             case storage::ResourceKind::COMMAND_POOL:
-                construct_command_pool(slot, *device.data_, std::get<CommandPoolCreateInfo>(initializer));
+                construct_command_pool(slot, *StartupAccess::Owned(device), std::get<CommandPoolCreateInfo>(initializer));
                 resource.reference = &command_pool_at(slot);
                 break;
             case storage::ResourceKind::SEMAPHORE:
-                construct_semaphore(slot, *device.data_, std::get<SemaphoreCreateInfo>(initializer));
+                construct_semaphore(slot, *StartupAccess::Owned(device), std::get<SemaphoreCreateInfo>(initializer));
                 resource.reference = &semaphore_at(slot);
                 break;
             case storage::ResourceKind::FENCE:
-                construct_fence(slot, *device.data_, std::get<FenceCreateInfo>(initializer));
+                construct_fence(slot, *StartupAccess::Owned(device), std::get<FenceCreateInfo>(initializer));
                 resource.reference = &fence_at(slot);
                 break;
             case storage::ResourceKind::COMMAND_BUFFER: {
@@ -397,24 +402,24 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 break;
             }
             case storage::ResourceKind::BUFFER:
-                construct_buffer(slot, *device.data_, std::get<BufferCreateInfo>(initializer));
+                construct_buffer(slot, *StartupAccess::Owned(device), std::get<BufferCreateInfo>(initializer));
                 resource.reference = detail::BufferAccess::Impl(buffer_at(slot));
                 resource.buffer_bytes = resource.buffer().size();
                 break;
             case storage::ResourceKind::IMAGE:
-                construct_image(slot, *device.data_, std::get<ImageCreateInfo>(initializer));
+                construct_image(slot, *StartupAccess::Owned(device), std::get<ImageCreateInfo>(initializer));
                 resource.reference = &image_at(slot);
                 break;
             case storage::ResourceKind::SAMPLER:
-                construct_sampler(slot, *device.data_, std::get<SamplerCreateInfo>(initializer));
+                construct_sampler(slot, *StartupAccess::Owned(device), std::get<SamplerCreateInfo>(initializer));
                 resource.reference = &sampler_at(slot);
                 break;
             case storage::ResourceKind::DESCRIPTOR_LAYOUT:
-                construct_descriptor_layout(slot, *device.data_, std::get<DescriptorLayoutCreateInfo>(initializer));
+                construct_descriptor_layout(slot, *StartupAccess::Owned(device), std::get<DescriptorLayoutCreateInfo>(initializer));
                 resource.reference = &descriptor_layout_at(slot);
                 break;
             case storage::ResourceKind::DESCRIPTOR_POOL:
-                construct_descriptor_pool(slot, *device.data_, std::get<DescriptorPoolCreateInfo>(initializer));
+                construct_descriptor_pool(slot, *StartupAccess::Owned(device), std::get<DescriptorPoolCreateInfo>(initializer));
                 resource.reference = &descriptor_pool_at(slot);
                 break;
             case storage::ResourceKind::DESCRIPTOR_SET: {
@@ -426,7 +431,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 break;
             }
             case storage::ResourceKind::RENDER_PASS:
-                construct_render_pass(slot, *device.data_, std::get<RenderPassDescription>(initializer));
+                construct_render_pass(slot, *StartupAccess::Owned(device), std::get<RenderPassDescription>(initializer));
                 resource.reference = &render_pass_at(slot);
                 break;
             case storage::ResourceKind::PIPELINE:
@@ -437,11 +442,11 @@ namespace VSL_NAMESPACE::lifetime::detail {
                         shaders.push_back(resolve(source));
                     const operation::GraphicsPipelineInput input{resolve(graphics->layout), resolve(graphics->pass),
                                                                  &GraphicsPipelineStateAccess::Read(graphics->state), shaders, graphics->subpass};
-                    construct_pipeline(slot, *device.data_, input);
+                    construct_pipeline(slot, *StartupAccess::Owned(device), input);
                 } else {
                     const auto& compute = std::get<ComputePipelineInit>(initializer);
                     const operation::ComputePipelineInput input{resolve(compute.layout), resolve(compute.shader)};
-                    construct_pipeline(slot, *device.data_, input);
+                    construct_pipeline(slot, *StartupAccess::Owned(device), input);
                 }
                 resource.reference = &pipeline_at(slot);
                 break;
@@ -464,7 +469,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 } else {
                     pass_owner = std::get<RenderPassAccessor>(info.pass).owner_ref().alias(input.pass).weak();
                 }
-                construct_frame_buffer(slot, *device.data_, std::move(input));
+                construct_frame_buffer(slot, *StartupAccess::Owned(device), std::move(input));
                 resource.reference = &frame_buffer_at(slot);
                 resource.get<impl::FrameBufferImpl>()->owner_context->pass = std::move(pass_owner);
                 break;
@@ -478,12 +483,12 @@ namespace VSL_NAMESPACE::lifetime::detail {
                         layouts.push_back(find(*id, storage::ResourceKind::DESCRIPTOR_LAYOUT).get<impl::ResourceBindingLayoutImpl>());
                     else
                         layouts.push_back(DescriptorAccess::Owned(std::get<graphic_resource::BindingLayout>(source)).get());
-                construct_pipeline_layout(slot, *device.data_, layouts, info.push_ranges);
+                construct_pipeline_layout(slot, *StartupAccess::Owned(device), layouts, info.push_ranges);
                 resource.reference = &pipeline_layout_at(slot);
                 break;
             }
             case storage::ResourceKind::SHADER:
-                construct_shader(slot, *device.data_, std::get<ShaderCreateInfo>(initializer));
+                construct_shader(slot, *StartupAccess::Owned(device), std::get<ShaderCreateInfo>(initializer));
                 resource.reference = &shader_at(slot);
                 break;
         }

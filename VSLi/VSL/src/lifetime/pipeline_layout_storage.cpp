@@ -1,7 +1,12 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/pipeline_layout_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <new>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_nothrow_default_constructible_v<impl::PipelineLayoutImpl>);
@@ -17,7 +22,7 @@ namespace VSL_NAMESPACE::lifetime {
         HeapPipelineLayoutOwner::HeapPipelineLayoutOwner(LogicalDeviceAccessor device, std::span<impl::ResourceBindingLayoutImpl* const> layouts,
                                                          std::span<const PushConstantRange> ranges) : device(device) {
             require_device_owner(device);
-            construct_pipeline_layout(storage, *device.data_, layouts, ranges);
+            construct_pipeline_layout(storage, *StartupAccess::Owned(device), layouts, ranges);
         }
         HeapPipelineLayoutOwner::~HeapPipelineLayoutOwner() {
             node.retire();
@@ -34,7 +39,7 @@ namespace VSL_NAMESPACE::lifetime {
     void construct_pipeline_layout(void* storage, LogicalDeviceAccessor device,
                                    std::span<impl::ResourceBindingLayoutImpl* const> layouts, std::span<const PushConstantRange> ranges) {
         require_device_owner(device);
-        construct_pipeline_layout(storage, *device.data_, layouts, ranges);
+        construct_pipeline_layout(storage, *StartupAccess::Owned(device), layouts, ranges);
     }
     void construct_pipeline_layout(void* storage, impl::LogicalDeviceImpl& device,
                                    std::span<impl::ResourceBindingLayoutImpl* const> layouts, std::span<const PushConstantRange> ranges) {

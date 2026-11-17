@@ -1,9 +1,14 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/shader_access.hpp>
 #include "support/render_fixture.hpp"
 #include "support/compute_fixture.hpp"
 #include <VSL/lifetime/resource_arena.hpp>
 #include <VSL/utils/typed_resources.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
@@ -83,16 +88,16 @@ namespace {
             EXPECT_THROW(arena.pipeline({99}), std::out_of_range);
             EXPECT_THROW((vsl::ComputePipeline(first)), std::invalid_argument);
             device_only = first.get_device();
-            EXPECT_EQ(device_only.data_, device.data_);
-            EXPECT_FALSE(device_only.data_.owner_before(device.data_));
-            EXPECT_FALSE(device.data_.owner_before(device_only.data_));
+            EXPECT_EQ(StartupAccess::Owned(device_only), StartupAccess::Owned(device));
+            EXPECT_FALSE(StartupAccess::Owned(device_only).owner_before(StartupAccess::Owned(device)));
+            EXPECT_FALSE(StartupAccess::Owned(device).owner_before(StartupAccess::Owned(device_only)));
             kept.emplace(first);
         }
         EXPECT_FALSE(owner.expired());
         ExpectTriangleColor(render([&](vsl::DefaultPhaseStream& stream) { stream << *kept << vsl::command::Draw{3}; }));
         kept.reset();
         EXPECT_TRUE(owner.expired());
-        EXPECT_EQ(device_only.data_, device.data_);
+        EXPECT_EQ(StartupAccess::Owned(device_only), StartupAccess::Owned(device));
     }
     TEST_F(PipelineArenaVulkanIntegrationTest, DirectSourcesAreReleasedAfterCreationWhileTheRuntimeLayoutStaysAlive) {
         std::optional<vsl::GraphicsPipeline> kept;
@@ -179,7 +184,7 @@ namespace {
     TEST_F(PipelineArenaVulkanIntegrationTest, GraphicsSourcesRejectEmptyAndNonowningShaderAccessors) {
         const auto borrowed = ShaderAccess::FromShared(std::shared_ptr<vsl::impl::ShaderImpl>(std::shared_ptr<void>{}, ShaderAccess::Owned(*(vertex)).get()));
         const auto missing_module = ShaderAccess::FromShared(std::make_shared<vsl::impl::ShaderImpl>());
-        ShaderAccess::Owned(missing_module)->device = device.data_.get();
+        ShaderAccess::Owned(missing_module)->device = StartupAccess::Owned(device).get();
         for (const auto& invalid : {vsl::ShaderAccessor{}, borrowed, missing_module}) {
             auto input = direct_input();
             input.shaders[0] = invalid;
@@ -244,7 +249,7 @@ namespace {
     TEST_F(ComputePipelineArenaVulkanIntegrationTest, ComputeSourcesRejectNonownersAndWrongShaderStages) {
         const auto borrowed = ShaderAccess::FromShared(std::shared_ptr<vsl::impl::ShaderImpl>(std::shared_ptr<void>{}, ShaderAccess::Owned(*(shader)).get()));
         const auto missing_module = ShaderAccess::FromShared(std::make_shared<vsl::impl::ShaderImpl>());
-        ShaderAccess::Owned(missing_module)->device = device.data_.get();
+        ShaderAccess::Owned(missing_module)->device = StartupAccess::Owned(device).get();
         for (const auto& invalid : {vsl::ShaderAccessor{}, borrowed, missing_module}) {
             const std::array<l::ResourceInit, 1> inputs{l::ComputePipelineInit{layout->runtime(), invalid}};
             EXPECT_THROW((l::ResourceArena(device, PIPELINE_PLAN, inputs)), std::invalid_argument);

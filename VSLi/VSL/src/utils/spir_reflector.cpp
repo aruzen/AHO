@@ -2,6 +2,7 @@
 // Created by morimoto_hibiki on 2025/10/17.
 //
 
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/utils/spir_reflector.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
@@ -13,6 +14,10 @@
 #include <limits>
 #include <cstring>
 #include <algorithm>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using ReflectedBlock = VSL_NAMESPACE::utils::SPIRVReflector;
@@ -177,14 +182,14 @@ VSL_NAMESPACE::graphic_resource::Type spir_type_to_graphic_type(const spirv_cros
 
 VSL_NAMESPACE::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device, std::filesystem::path path, std::string_view entry_point, ShaderType stage, Scope scope)
     : generated{std::move(logical_device)} {
-    if (generated.logical_device.data_)
+    if (StartupAccess::Owned(generated.logical_device))
         lifetime::require_device_owner(generated.logical_device);
     init(read_spirv_words(path), entry_point, stage, scope);
 }
 
 VSL_NAMESPACE::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device, const std::vector<char>& binary, std::string_view entry_point, ShaderType stage, Scope scope)
     : generated{std::move(logical_device)} {
-    if (generated.logical_device.data_)
+    if (StartupAccess::Owned(generated.logical_device))
         lifetime::require_device_owner(generated.logical_device);
     validate_spirv_size(binary.size());
     std::vector<std::uint32_t> words(binary.size() / sizeof(std::uint32_t));
@@ -194,7 +199,7 @@ VSL_NAMESPACE::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logic
 
 VSL_NAMESPACE::utils::SPIRVReflector::SPIRVReflector(LogicalDeviceAccessor logical_device, std::span<const std::uint32_t> words,
                                                      std::string_view entry_point, ShaderType stage, Scope scope) : generated{std::move(logical_device)} {
-    if (generated.logical_device.data_)
+    if (StartupAccess::Owned(generated.logical_device))
         lifetime::require_device_owner(generated.logical_device);
     validate_spirv_size(words.size_bytes());
     init({words.begin(), words.end()}, entry_point, stage, scope);
@@ -449,10 +454,10 @@ std::vector<VSL_NAMESPACE::graphic_resource::BindingLayout> VSL_NAMESPACE::utils
     const auto slots = last_set + 1;
     if (repeat >= result.max_size() / slots)
         throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "Binding layout repeat count exceeds vector capacity");
-    if (!logical_device.data_ || !logical_device.data_->device || !logical_device.data_->parent_device)
+    if (!StartupAccess::Owned(logical_device) || !StartupAccess::Owned(logical_device)->device || !StartupAccess::Owned(logical_device)->parent_device)
         throw VSL_NAMESPACE::exceptions::RuntimeException("SPIRVReflector", "A valid logical device is required for binding layouts");
     lifetime::require_device_owner(logical_device);
-    const auto& physical = logical_device.data_->parent_device;
+    const auto& physical = StartupAccess::Owned(logical_device)->parent_device;
     const auto max_sets = physical->props ? physical->props->limits.maxBoundDescriptorSets
                                           : physical->device.getProperties().limits.maxBoundDescriptorSets;
     if (slots > max_sets)

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
@@ -6,6 +7,10 @@
 #include "support/vulkan_fixture.hpp"
 #include "support/compute_fixture.hpp"
 #include <VSL/lifetime/resource_arena.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
@@ -111,7 +116,7 @@ namespace {
         EXPECT_FALSE(GraphicsAccess::Owned(first).owner_before(GraphicsAccess::Owned(second)));
         EXPECT_FALSE(GraphicsAccess::Owned(second).owner_before(GraphicsAccess::Owned(first)));
         EXPECT_TRUE(first.owner_ref().managed());
-        EXPECT_EQ(first.get_device().data_, device.data_);
+        EXPECT_EQ(StartupAccess::Owned(first.get_device()), StartupAccess::Owned(device));
         EXPECT_EQ(GraphicsAccess::Owned(first)->push_ranges.size(), 1u);
         EXPECT_THROW(arena.pipeline_layout({3}), std::invalid_argument);
         EXPECT_THROW(arena.pipeline_layout({404}), std::out_of_range);
@@ -334,7 +339,7 @@ namespace {
     TEST(PipelineLayoutTest, MissingDeviceAndRuntimeAreRejectedBeforeNativeUse) {
         vsl::LogicalDeviceAccessor missing;
         EXPECT_THROW((vsl::PipelineLayout{missing}), std::invalid_argument);
-        missing.data_ = std::make_shared<vsl::impl::LogicalDeviceImpl>();
+        StartupAccess::Owned(missing) = std::make_shared<vsl::impl::LogicalDeviceImpl>();
         EXPECT_THROW((vsl::PipelineLayout{missing}), std::invalid_argument);
         const vsl::PipelineLayoutAccessor empty;
         EXPECT_THROW(empty.get_device(), std::invalid_argument);

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/vulkan/synchronize.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
@@ -6,6 +7,10 @@
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include <stdexcept>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace VSL_NAMESPACE::lifetime::detail {
     namespace {
@@ -98,13 +103,13 @@ namespace VSL_NAMESPACE {
     SynchroManager::SynchroManager(LogicalDeviceAccessor device)
         : _registry(std::make_shared<impl::SynchroManagerImpl>()) {
         lifetime::require_device_owner(device);
-        _registry->device = device.data_;
+        _registry->device = StartupAccess::Shared(device);
     }
     LogicalDeviceAccessor SynchroManager::get_device() const {
         const auto registry = _registry;
         if (!registry || !registry->device)
             throw std::invalid_argument("Synchronization manager is empty");
-        return {registry->device};
+        return StartupAccess::FromShared(registry->device);
     }
     SemaphoreHolder SynchroManager::create_semaphore(std::string name) {
         return create_semaphore(std::move(name), 1);
@@ -113,7 +118,7 @@ namespace VSL_NAMESPACE {
         const auto registry = _registry;
         if (!registry || !registry->device)
             throw std::invalid_argument("Synchronization manager is empty");
-        auto data = lifetime::make_heap_semaphore({registry->device}, {amount});
+        auto data = lifetime::make_heap_semaphore(StartupAccess::FromShared(registry->device), {amount});
         data->owner_context->registry = registry;
         auto result = SynchronizationAccess::FromShared(data);
         registry->semaphores[std::move(name)].swap(data);
@@ -126,7 +131,7 @@ namespace VSL_NAMESPACE {
         const auto registry = _registry;
         if (!registry || !registry->device)
             throw std::invalid_argument("Synchronization manager is empty");
-        auto data = lifetime::make_heap_fence({registry->device}, {amount, signal});
+        auto data = lifetime::make_heap_fence(StartupAccess::FromShared(registry->device), {amount, signal});
         data->owner_context->registry = registry;
         auto result = SynchronizationAccess::FromShared(data);
         registry->fences[std::move(name)].swap(data);

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include <AHO/x/screenshot.hpp>
 #include "../support/temp_directory.hpp"
@@ -131,8 +132,8 @@ namespace {
     void ScreenshotWindowIntegration::require_readback() {
         start_engine();
         const auto window = engine->get_window();
-        const auto device = engine->data()->logical_device.data_;
-        const auto caps = device->parent_device->device.getSurfaceCapabilitiesKHR(window.data2->surface->data_->surface);
+        const auto device = VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(engine->data()->logical_device);
+        const auto caps = device->parent_device->device.getSurfaceCapabilitiesKHR(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(*(window.data2->surface))->surface);
         if (!(caps.supportedUsageFlags & vk::ImageUsageFlagBits::eTransferSrc))
             GTEST_SKIP() << "Surface does not support TransferSrc";
     }
@@ -194,7 +195,7 @@ namespace {
         current = std::make_unique<aho::DrawPhase>(*engine, clear(0, 1, 0));
         ASSERT_FALSE(callback);
         ASSERT_TRUE(current->recording());
-        engine->data()->logical_device.data_->device.waitIdle();
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(engine->data()->logical_device)->device.waitIdle();
         gate.ready = true;
         EXPECT_FALSE(screenshot.capture(*current));
         EXPECT_TRUE(callback);

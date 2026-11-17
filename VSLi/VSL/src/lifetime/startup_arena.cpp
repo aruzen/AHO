@@ -80,7 +80,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
     }
     OwnerRef checked_owner(const Surface& value) {
         auto owner = value.owner_ref();
-        if (!value.data_->surface || OwnerAccess::Node(owner)->retiring())
+        if (!StartupAccess::Owned(value)->surface || OwnerAccess::Node(owner)->retiring())
             throw std::invalid_argument("Startup input requires a live Surface");
         return owner;
     }
@@ -144,12 +144,9 @@ namespace VSL_NAMESPACE::lifetime::detail {
             if (resource.placement.external) {
                 std::visit([&](const auto& value) {
                     using Value = std::decay_t<decltype(value)>;
-                    if constexpr (std::same_as<Value, VulkanAccessor> || std::same_as<Value, PhysicalDevice>) {
+                    if constexpr (std::same_as<Value, VulkanAccessor> || std::same_as<Value, PhysicalDevice> || std::same_as<Value, Surface> || std::same_as<Value, LogicalDeviceAccessor>) {
                         resource.owner_index = retain(checked_owner(value));
                         resource.reference = StartupAccess::Owned(value).get();
-                    } else if constexpr (std::same_as<Value, Surface> || std::same_as<Value, LogicalDeviceAccessor>) {
-                        resource.owner_index = retain(checked_owner(value));
-                        resource.reference = value.data_.get();
                     }
                 },
                            input);
@@ -199,7 +196,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
     impl::SurfaceImpl& StartupArenaOwner::resolve(const SurfaceSource& source) const {
         if (const auto* id = std::get_if<typed::ResourceId>(&source))
             return *std::get<impl::SurfaceImpl*>(find(*id, storage::StartupKind::SURFACE).reference);
-        return *std::get<Surface>(source).data_;
+        return *StartupAccess::Owned(std::get<Surface>(source));
     }
     template<typename Facade>
     OwnerRef StartupArenaOwner::source_owner(const std::variant<typed::ResourceId, Facade>& source, storage::StartupKind kind) const {
@@ -325,12 +322,12 @@ namespace VSL_NAMESPACE::lifetime {
         if (!_owner)
             throw std::logic_error("Startup arena has no owner");
         const auto& resource = _owner->find(id, storage::StartupKind::SURFACE);
-        return Surface(_owner->resource_owner(resource).alias(std::get<impl::SurfaceImpl*>(resource.reference)).share());
+        return StartupAccess::FromOwned(_owner->resource_owner(resource).alias(std::get<impl::SurfaceImpl*>(resource.reference)));
     }
     LogicalDeviceAccessor StartupArena::device(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Startup arena has no owner");
         const auto& resource = _owner->find(id, storage::StartupKind::DEVICE);
-        return {_owner->resource_owner(resource).alias(std::get<impl::LogicalDeviceImpl*>(resource.reference)).share()};
+        return StartupAccess::FromOwned(_owner->resource_owner(resource).alias(std::get<impl::LogicalDeviceImpl*>(resource.reference)));
     }
 } // namespace VSL_NAMESPACE::lifetime

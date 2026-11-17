@@ -317,7 +317,7 @@ namespace {
             for (auto image : {vsl::ImageAccessor(first), vsl::ImageAccessor(second)})
                 phase << vsl::command::ChangeImageBarrier(image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL, vsl::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         vsl::Sampler sampler(device, vsl::SamplingMode::NEAREST, vsl::EdgeMode::CLAMP_TO_EDGE);
         vsl::GraphicResourceManager manager(device);
         t::TypedDescriptorSet<Textures> textures(device, manager);
@@ -409,7 +409,7 @@ namespace {
                 CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
                     vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
             }
-            device.data_->device.waitIdle();
+            StartupAccess::Owned(device)->device.waitIdle();
             std::array<std::uint32_t, zero.size()> actual{};
             storage.read_into(actual);
             for (size_t i = 0; i < zero.size(); ++i)

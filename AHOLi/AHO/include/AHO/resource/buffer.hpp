@@ -401,7 +401,7 @@ namespace AHO_NAMESPACE::resource {
         template<typename Storage, typename Customization>
         void GPUBufferBase<Storage, Customization>::initialize(VSL_NAMESPACE::LogicalDeviceAccessor device, std::optional<Storage> storage,
                                                                Customization customization, std::size_t size) {
-            if (!device.data_)
+            if (!device)
                 throw std::invalid_argument("Buffer requires a device");
             auto owner = Resource::Make(std::move(storage), std::move(customization));
             _state = std::make_shared<State>();

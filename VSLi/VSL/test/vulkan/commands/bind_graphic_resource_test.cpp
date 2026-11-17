@@ -1,9 +1,14 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/compute_fixture.hpp"
 #include "support/deferred_action.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
@@ -71,7 +76,7 @@ namespace {
                     vsl::ResourceUseGroup::ForDescriptor(1, resource, vsl::ResourceRetention::COMPLETION)->record(previous.get_buffer());
                     previous.get_buffer().retain_until_complete(release.owner());
                     ASSERT_EQ(submitted.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-                    device.data_->device.waitIdle();
+                    StartupAccess::Owned(device)->device.waitIdle();
                     phase.emplace(current);
                     *phase << *pipeline << vsl::command::PushConstant(*layout, vsl::ShaderFlag::COMPUTE, base);
                     const auto record = [&] {
@@ -138,7 +143,7 @@ namespace {
             vsl::ResourceUseGroup::ForDescriptor(1, resource, vsl::ResourceRetention::COMPLETION)->record(previous.get_buffer());
             previous.get_buffer().retain_until_complete(release.owner());
             ASSERT_EQ(submitted.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-            device.data_->device.waitIdle();
+            StartupAccess::Owned(device)->device.waitIdle();
             const std::uint32_t base = 379;
             auto phase = current.start_phase<vsl::ComputePhase>();
             phase << *pipeline << vsl::command::PushConstant(*layout, vsl::ShaderFlag::COMPUTE, base);

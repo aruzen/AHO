@@ -3,7 +3,7 @@
 
 namespace AHO_NAMESPACE::resource::detail {
     ViewBufferBase::ViewBufferBase(std::shared_ptr<BufferState> state) : _state(std::move(state)) {
-        if (!_state || !_state->device.data_)
+        if (!_state || !_state->device)
             throw std::invalid_argument("Buffer requires a device");
         _state->retention = VSL_NAMESPACE::ResourceRetention::COMPLETION;
     }

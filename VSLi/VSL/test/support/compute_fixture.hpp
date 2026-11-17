@@ -1,4 +1,5 @@
 #pragma once
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include "vulkan_fixture.hpp"
 #include <VSL/vulkan/commands/dispatch.hpp>
@@ -81,7 +82,7 @@ namespace vsl_test {
             const vsl::NativeRecordingContext recording(manager.get_buffer());
             vk::CommandBuffer(recording.native_command_buffer()).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
-        device.data_->device.waitIdle();
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.waitIdle();
         auto mapped = output->data(COUNT * sizeof(std::uint32_t));
         std::array<std::uint32_t, COUNT> actual{};
         std::memcpy(actual.data(), mapped.data, sizeof(actual));
@@ -89,8 +90,8 @@ namespace vsl_test {
     }
 
     inline void ComputeVulkanIntegrationTest::TearDown() {
-        if (device.data_)
-            device.data_->device.waitIdle();
+        if (VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device))
+            VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.waitIdle();
         pipeline.reset();
         layout.reset();
         shader.reset();

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/sampler_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
@@ -10,6 +11,10 @@
 #include <VSL/vulkan/commands/render_pass_begin.hpp>
 #include <VSL/vulkan/commands/render_pass_end.hpp>
 #include <VSL/vulkan/commands/image_readback.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::ImageAccess;
@@ -81,7 +86,7 @@ namespace {
         EXPECT_NE(a.image, b.image);
         EXPECT_NE(a.use, b.use);
         EXPECT_NE(a.use, c.use);
-        EXPECT_EQ(a.device, device.data_.get());
+        EXPECT_EQ(a.device, StartupAccess::Owned(device).get());
         EXPECT_TRUE(a.image && a.memory && a.view && c.sampler);
         EXPECT_EQ(reinterpret_cast<std::uintptr_t>(&a) % alignof(vsl::impl::ImageImpl), 0u);
         EXPECT_EQ(reinterpret_cast<std::uintptr_t>(c.use) % alignof(vsl::ResourceUseState), 0u);
@@ -172,7 +177,7 @@ namespace {
         EXPECT_FALSE(ref.owns_image);
         EXPECT_FALSE(ref.memory);
         vsl::lifetime::destroy_image(&borrowed);
-        EXPECT_GT(device.data_->device.getImageMemoryRequirements(ImageAccess::Owned(image)->image).size, 0u);
+        EXPECT_GT(StartupAccess::Owned(device)->device.getImageMemoryRequirements(ImageAccess::Owned(image)->image).size, 0u);
     }
     TEST_F(ImageStorageVulkanIntegrationTest, DeviceAccessorDoesNotKeepItsSourceImageAlive) {
         vsl::LogicalDeviceAccessor retained_device;

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/vulkan/swapchain.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/owner_validation.hpp>
@@ -8,6 +9,9 @@
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <stdexcept>
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace VSL_NAMESPACE {
     SwapchainAccessor lifetime::detail::SwapchainAccess::FromShared(std::shared_ptr<impl::SwapchainImpl> owner, std::vector<ImageAccessor> images) {
@@ -61,7 +65,7 @@ namespace VSL_NAMESPACE {
         auto* parent = _owner->surface;
         if (!parent || !parent->surface || !parent->owner_node || parent->owner_node->retiring())
             throw std::logic_error("Swapchain has no Surface owner");
-        return Surface(parent->owner_node->owner_ref().alias(parent).share());
+        return StartupAccess::FromOwned(parent->owner_node->owner_ref().alias(parent));
     }
     SwapchainState SwapchainAccessor::state() const {
         return _owner ? _owner->state : SwapchainState::UNINITIALIZED;

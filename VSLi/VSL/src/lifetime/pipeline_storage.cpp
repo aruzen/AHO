@@ -1,7 +1,12 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/pipeline_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <new>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_nothrow_default_constructible_v<impl::PipelineImpl>);
@@ -27,7 +32,7 @@ namespace VSL_NAMESPACE::lifetime {
             if (!this->layout.use_count() || this->layout.get() != input.layout)
                 throw std::invalid_argument("Pipeline root requires its runtime layout owner");
             require_device_owner(device);
-            construct_pipeline(storage, *device.data_, input);
+            construct_pipeline(storage, *StartupAccess::Owned(device), input);
         }
         HeapPipelineOwner::~HeapPipelineOwner() {
             node.retire();
@@ -63,14 +68,14 @@ namespace VSL_NAMESPACE::lifetime {
     } // namespace
     void construct_pipeline(void* storage, LogicalDeviceAccessor device, const operation::GraphicsPipelineInput& input) {
         require_device_owner(device);
-        construct_pipeline(storage, *device.data_, input);
+        construct_pipeline(storage, *StartupAccess::Owned(device), input);
     }
     void construct_pipeline(void* storage, impl::LogicalDeviceImpl& device, const operation::GraphicsPipelineInput& input) {
         construct(storage, device, input);
     }
     void construct_pipeline(void* storage, LogicalDeviceAccessor device, const operation::ComputePipelineInput& input) {
         require_device_owner(device);
-        construct_pipeline(storage, *device.data_, input);
+        construct_pipeline(storage, *StartupAccess::Owned(device), input);
     }
     void construct_pipeline(void* storage, impl::LogicalDeviceImpl& device, const operation::ComputePipelineInput& input) {
         construct(storage, device, input);

@@ -9,7 +9,7 @@ namespace {
     TEST_F(StandardEngineVulkanIntegration, ConstructorCreatesDeviceWindowAndFrameResources) {
         ASSERT_NO_THROW(start_engine());
         ASSERT_NE(engine->data(), nullptr);
-        ASSERT_NE(engine->data()->logical_device.data_, nullptr);
+        ASSERT_NE(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(engine->data()->logical_device), nullptr);
         EXPECT_FALSE(engine->data()->physical_device.name().empty());
         ASSERT_TRUE(engine->boot_window.has_value());
         auto window = engine->get_window();
@@ -25,12 +25,12 @@ namespace {
         ASSERT_NO_THROW(start_engine());
         const auto& data = *engine->data();
         const auto& surface = engine->boot_window->data2->surface;
-        EXPECT_FALSE(data.logical_device.data_.owner_before(VSL_NAMESPACE::lifetime::detail::StartupAccess::Shared(data.physical_device)));
-        EXPECT_FALSE(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.physical_device).owner_before(data.logical_device.data_));
-        EXPECT_TRUE(data.logical_device.data_.owner_before(VSL_NAMESPACE::lifetime::detail::StartupAccess::Shared(data.vulkan_instance)) ||
-                    VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.vulkan_instance).owner_before(data.logical_device.data_));
-        EXPECT_TRUE(surface->data_.owner_before(data.logical_device.data_) || data.logical_device.data_.owner_before(surface->data_));
-        EXPECT_TRUE(surface->data_.owner_before(VSL_NAMESPACE::lifetime::detail::StartupAccess::Shared(data.vulkan_instance)) || VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.vulkan_instance).owner_before(surface->data_));
+        EXPECT_FALSE(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.logical_device).owner_before(VSL_NAMESPACE::lifetime::detail::StartupAccess::Shared(data.physical_device)));
+        EXPECT_FALSE(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.physical_device).owner_before(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.logical_device)));
+        EXPECT_TRUE(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.logical_device).owner_before(VSL_NAMESPACE::lifetime::detail::StartupAccess::Shared(data.vulkan_instance)) ||
+                    VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.vulkan_instance).owner_before(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.logical_device)));
+        EXPECT_TRUE(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(*(surface)).owner_before(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.logical_device)) || VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.logical_device).owner_before(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(*(surface))));
+        EXPECT_TRUE(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(*(surface)).owner_before(VSL_NAMESPACE::lifetime::detail::StartupAccess::Shared(data.vulkan_instance)) || VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.vulkan_instance).owner_before(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(*(surface))));
         EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.logical_device.get_physical_device()), VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.physical_device));
         EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.physical_device.get_instance()), VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.vulkan_instance));
         EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(surface->get_instance()), VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(data.vulkan_instance));
@@ -38,7 +38,7 @@ namespace {
     TEST_F(StandardEngineVulkanIntegration, SavedDeviceDoesNotKeepClosedSurfaceOrWindowAlive) {
         ASSERT_NO_THROW(start_engine());
         auto saved = engine->data()->logical_device;
-        const std::weak_ptr<vsl::impl::SurfaceImpl> surface = engine->boot_window->data2->surface->data_;
+        const std::weak_ptr<vsl::impl::SurfaceImpl> surface = VSL_NAMESPACE::lifetime::detail::StartupAccess::Shared(*(engine->boot_window->data2->surface));
         const auto os = engine->boot_window->window_owner().owner_ref().weak();
         const std::weak_ptr<vsl::impl::VulkanImplAccessor> instance = VSL_NAMESPACE::lifetime::detail::StartupAccess::Shared(engine->data()->vulkan_instance);
         EXPECT_TRUE(engine->boot_window->close());
@@ -47,15 +47,15 @@ namespace {
         EXPECT_TRUE(os.expired());
         EXPECT_FALSE(instance.expired());
         EXPECT_TRUE(saved.get_physical_device().owner_ref().managed());
-        saved.data_.reset();
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(saved).reset();
         EXPECT_TRUE(instance.expired());
     }
     TEST_F(StandardEngineVulkanIntegration, ClosingTheInitialWindowLeavesAnIndependentSurfaceUsable) {
         ASSERT_NO_THROW(start_engine());
         auto& first = *engine->boot_window;
         aho::Window second("independent startup Surface", 64, 48, *engine);
-        const std::weak_ptr<vsl::impl::SurfaceImpl> previous = first.data2->surface->data_;
-        EXPECT_NE(second.data2->surface->data_, first.data2->surface->data_);
+        const std::weak_ptr<vsl::impl::SurfaceImpl> previous = VSL_NAMESPACE::lifetime::detail::StartupAccess::Shared(*(first.data2->surface));
+        EXPECT_NE(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(*(second.data2->surface)), VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(*(first.data2->surface)));
         EXPECT_TRUE(first.close());
         EXPECT_TRUE(previous.expired());
         EXPECT_TRUE(static_cast<bool>(second));
@@ -100,7 +100,7 @@ namespace {
         ASSERT_TRUE(engine->boot_window.has_value());
         const std::weak_ptr<aho::engine::EngineData> engine_data = engine->data();
         const std::weak_ptr<vsl::PureWindow::WindowData> window_data = engine->boot_window->data_;
-        engine->data()->logical_device.data_->device.waitIdle();
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(engine->data()->logical_device)->device.waitIdle();
         ASSERT_TRUE(engine->boot_window->close());
         std::unique_ptr<aho::engine::GraphicalEngine> base = std::move(engine);
         EXPECT_FALSE(engine_data.expired());

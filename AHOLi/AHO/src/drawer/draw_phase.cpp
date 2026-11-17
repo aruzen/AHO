@@ -1,3 +1,7 @@
+#include "../engine/engine_access.hpp"
+namespace {
+    using AHO_NAMESPACE::engine::detail::EngineAccess;
+}
 #include <AHO/drawer/draw_phase.hpp>
 #include <VSL/vulkan/commands/render_pass_begin.hpp>
 #include <VSL/vulkan/commands/render_pass_end.hpp>
@@ -29,9 +33,9 @@ AHO_NAMESPACE::DrawPhase::DrawPhase(AHO_NAMESPACE::engine::GraphicalEngine* engi
     : DrawPhase(Prepare(engine), std::move(initialize), std::move(finit)) {}
 
 AHO_NAMESPACE::DrawPhase::Init AHO_NAMESPACE::DrawPhase::Prepare(AHO_NAMESPACE::engine::GraphicalEngine* engine) {
-    if (!engine || !engine->data())
+    if (!engine || !EngineAccess::State(*(engine)))
         throw std::invalid_argument("DrawPhase requires a booted engine");
-    const auto runtime = engine->data();
+    const auto runtime = EngineAccess::State(*(engine));
     const auto manager = runtime->command_manager;
     const auto buffer = runtime->command_manager.get_buffer().identity();
     auto window = engine->get_window();

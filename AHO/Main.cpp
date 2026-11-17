@@ -40,9 +40,10 @@ breakpoint disable swift_willThrow
         using namespace vsl;
         aho::engine::StandardEngine engine("test");
 
-        auto& device = engine.data()->logical_device;
-        auto& command_manager = engine.data()->command_manager;
-        auto& graphic_resource_manager = engine.data()->graphic_resource_manager;
+        const auto runtime = engine.runtime();
+        auto device = runtime.device();
+        auto command_manager = runtime.commands();
+        auto graphic_resource_manager = runtime.descriptor_manager();
         auto& main_window = engine.boot_window.value();
         auto& swapchain = main_window.data2->swapchain;
         auto& render_pass = main_window.data2->render_pass;

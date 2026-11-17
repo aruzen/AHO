@@ -111,6 +111,21 @@ if (AHO_TEST_SOURCES)
             PROPERTIES LABELS gpu RESOURCE_LOCK aho_graphics TIMEOUT 45)
     include(cmake/CompileContracts.cmake)
     aho_register_header_tests()
+    add_library(aho-engine-style-contract OBJECT EXCLUDE_FROM_ALL contracts/engine.cpp)
+    target_link_libraries(aho-engine-style-contract PRIVATE AHOLi)
+    target_compile_definitions(aho-engine-style-contract PRIVATE VSL_TYPED_CASE=0)
+    set(aho_engine_contract_names Valid PublicData RawConstruction IncompleteState PrivateState MutableBase PrivateRuntime
+        OldSetter ProtectedSetter BootScope RawLayoutPointer BorrowedDevice BorrowedCommands BorrowedDescriptorManager InstanceOverride)
+    foreach(case RANGE 0 14)
+        list(GET aho_engine_contract_names ${case} name)
+        add_test(NAME "AHO.Compile.Engine.${name}"
+                COMMAND "${CMAKE_COMMAND}"
+                "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/compile-environment-$<CONFIG>.cmake"
+                "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/engine.cpp"
+                "-DTEST_CASE=${case}" "-DTEST_EXPECTED=private|protected|incomplete|no member|undeclared|no matching|conversion|reference|bind|viable"
+                -P "${VSL_HOME}/test/cmake/RunTypedContract.cmake")
+        set_tests_properties("AHO.Compile.Engine.${name}" PROPERTIES LABELS "AHO;compile" TIMEOUT 60)
+    endforeach()
     set(aho_typed_buffer_names Valid UniformUsage VertexUsage CpuBuffer DescriptorKind DescriptorPayload VertexType NontrivialVertex FixedArenaReserve TemporarySnapshot ImportedPayload ConstTemporarySnapshot ArenaImportConversion ArenaImportReference BindingNativeAdapter)
     set(aho_typed_buffer_expected unused uniform_view vertex_view vertex_view write write bind_vertices trivially_copyable reserve deleted write deleted conversion reference native)
     foreach(case RANGE 0 14)

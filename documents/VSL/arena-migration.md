@@ -691,3 +691,30 @@ arena getter／子の親getterは元のOwnedRefを直接引き継ぐ。親の設
 macOS arm64／Clang20／C++26／MoltenVK・validation・ASan／UBSanで新runtime4件と全VSL1,198（既知format3 skip）、AHO GPU192／CPU1,071、compile361を確認した。新試験はDevice／Surface weakの同じ実体への復帰・退役後操作拒否・最後の所有解除、Surfaceの異なるnode拒否と親不変、代入後のplugin登録維持を検証する。既存試験にもCreatorの異親／空結果拒否と親setterの別node拒否を追加した。heap／arenaの3PNG、resize時のPipeline生成1回、glTF viewerの姿勢・resize・12frame後の同姿勢を維持した。
 
 source406、strict110files／97TUと宣言順修正後の1file／1TUが成功した。最後の修正は関数本体を変更せず宣言だけを整理したことを比較し、再buildと配布archive一致を確認した。installed public consumer26種類compile、3種類link／実行、新しい公開正負16契約、private非配布、生成／公開header・archive一致、Debug／Release／x86_64の実寸法、配置consumerによる構成混在と親6f5ad8d7…headerのlink拒否も成功した。生成IDは80b75e39…である。Windows／Linux実機、x86_64全体実行、device lost、並行CPU、性能率は未検証。次はEngine／Window／Completionの公開境界、12gの実定義・metadata・処理の4層分割、12hの同条件測定へ進む。
+
+## 順序12f: AHO Engineの公開状態とboot
+
+EngineDataの完全定義をAHOの既存src/engineへ移し、公開raw shared構築／data()／reset_dataを閉じた。EngineAccessorは共有CPU状態一本の所有値で、公開EngineCreateInfo／CreateはDevice、commands、descriptor manager、任意の同期registry、presentation policyを受け取る。空の必須service、別Deviceのservice、不明なpolicy、未有効のpresentation fenceを拒否してから新状態を作る。同期registryは空を許し、Window固有の同期arenaを使える。
+
+```cpp
+auto runtime = aho::engine::EngineAccessor::Create({
+    .device = device,
+    .commands = vsl::CommandManager(device),
+    .descriptor_manager = std::make_shared<vsl::GraphicResourceManager>(device)});
+aho::Window window("custom runtime", 800, 600, runtime);
+auto commands = runtime.commands();
+```
+
+通常のStandardEngine構築は維持する。従来のengine.data()->logical_device等はengine.runtime().device()／commands()／descriptor_manager()へ移す。Instance／PhysicalDeviceはDeviceの元親から取得し、Engine内の重複した親facadeを保持しない。各getterは所有値を返し、内部の検証には借用stateを使う。必要な共有所有を返す処理と、存在の検証を区別する。
+
+GraphicalEngineはEngineAccessorの値compositionへ移し、runtime()と所有値への変換、派生型用のprotected set_runtimeを提供する。可変な基底参照によるruntime単独交換を禁止する。独自Engineもpublic facadeを受け取ってset_runtimeへ渡せる。GET_BASE_LAYOUTのcallbackはEngineAccessor*から所有するEngineAccessor値へ変わり、GET_BASE_LAYOUT(engine.runtime())と呼ぶ。callback中の元facade破棄からも状態を保持するための変更である。
+
+bootはNative操作前にconfigを値で保存し、stackのBootScopeを登録する。destructorはmemberを解放する前にscopeを失効させる。Native操作後はscopeから生存を確認し、消滅したreceiverを再参照しない。候補Window／runtime／default登録をnoexcept swapで全て公開した後、旧値を局所から回収する。旧値の解放callbackがreceiverを破棄しても、保存済みのNative Windowからrollbackする。pluginを先にclearせず、閉鎖・登録解除・一覧切り離し後に解放する既存Window closeへ委ねる。
+
+RenderContextはEngineAccessorを強保持する。既に返したdescriptor manager参照はContextが生存する間有効で、参照を返す際の一時shared_ptr取得も不要である。Engineの状態からWindow／Surfaceへの逆所有は追加しない。Windowの公開data_／data2、plugin／Inputの境界は後続単位へ残す。
+
+macOS arm64／Clang20／MoltenVK・validation・ASan／UBSanでAHO GPU198／CPU1,071が成功した。新6件はFactoryの元所有者保持／不正serviceと失敗不変、Native中の自己破棄とcloseへの再入、全値公開後の旧Window回収中の自己破棄、再帰boot拒否、Contextの借用service保持である。既存の同期registryなしWindowも公開Factoryから構成した。Graphics初期化失敗試験は、不整合Instanceの注入から実際のSwapchain生成失敗へ移し、Window登録とdefaultのrollbackを維持した。
+
+main、source408／MSBuild登録、strict24files／16TU、公開15契約＋include順2＋Typed Buffer15の32契約が成功した。通常Windowの構築失敗も同じcloseへ統一し、plugin解放中の再入を追加した後、補完strict2files／2TU＋test整形1file／1TU、再build、全AHO198／1,071、描画・配布を再確認した。heap／arenaの3PNGとPipeline生成1回、glTF verifyを維持した。installed公開27種類compile／3種類link・実行／新15正負契約、公開5headerとarchiveの一致、private状態の非配布も確認した。VSLのコード・生成情報ID80b75e39…・archiveは#390と同一で、実寸法と構成混在の契約は変更していない。
+
+CPU EngineData／default登録の共有確保、可変長service、bootのconfig snapshotに伴うstring／vector／mapの確保は残る。BootScope自身に追加のheapやcontrol blockはない。Windows／Linux実機、並行CPU、性能比較は未検証。次はVSL logical Window／plugin、AHO Window／Context／Input、その後Completion、12gの実定義・metadata・処理分離と12hの同条件測定へ進む。

@@ -190,6 +190,8 @@
     <ClInclude Include="AHO\include\AHO\x\core\mesh.hpp" />
     <ClInclude Include="AHO\include\AHO\x\core\mesh_attributes.hpp" />
     <ClInclude Include="AHO\include\AHO\engine.hpp" />
+    <ClInclude Include="AHO\src\engine\engine_state.hpp" />
+    <ClInclude Include="AHO\src\engine\engine_access.hpp" />
     <ClInclude Include="AHO\include\AHO\engine\graphical_engine.hpp" />
     <ClInclude Include="AHO\include\AHO\engine\standard_engine.hpp" />
     <ClInclude Include="AHO\include\AHO\io\input.hpp" />

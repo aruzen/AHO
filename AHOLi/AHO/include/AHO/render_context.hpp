@@ -13,7 +13,7 @@ namespace AHO_NAMESPACE::window {
 namespace AHO_NAMESPACE {
     // 生存中のWindowの描画機能を公開する。描画先の取得はswapchainの再生成に追従する。
     class RenderContext {
-        std::shared_ptr<engine::EngineData> _engine;
+        engine::EngineAccessor _engine;
         std::shared_ptr<window::WindowData> _target;
         std::shared_ptr<VSL_NAMESPACE::PureWindow::WindowData> _window;
         friend struct window::Window;

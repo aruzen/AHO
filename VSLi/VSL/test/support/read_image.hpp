@@ -11,7 +11,7 @@ namespace vsl_test {
                                              vsl::ImageLayout layout, vsl::ImageRegion region = {}) {
         const auto info = vsl::command::ImageReadback::Describe(image, layout, region);
         vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION> destination(
-            vsl::LogicalDeviceAccessor{VSL_NAMESPACE::lifetime::CommandAccess::Data(manager)->device}, info.byte_size);
+            manager.get_device(), info.byte_size);
         auto transfer = manager.independent(1);
         auto phase = transfer.start_phase<vsl::ComputePhase>();
         phase << vsl::command::ImageReadback(&destination, image, layout, info.region);

@@ -1,7 +1,12 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/render_pass_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <new>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_nothrow_default_constructible_v<impl::RenderPassImpl>);
@@ -15,7 +20,7 @@ namespace VSL_NAMESPACE::lifetime {
         };
         HeapRenderPassOwner::HeapRenderPassOwner(LogicalDeviceAccessor device, RenderPassDescription description) : device(device) {
             require_device_owner(device);
-            construct_render_pass(storage, *device.data_, std::move(description));
+            construct_render_pass(storage, *StartupAccess::Owned(device), std::move(description));
         }
         HeapRenderPassOwner::~HeapRenderPassOwner() {
             node.retire();
@@ -24,7 +29,7 @@ namespace VSL_NAMESPACE::lifetime {
     } // namespace
     void construct_render_pass(void* storage, LogicalDeviceAccessor device, RenderPassDescription description) {
         require_device_owner(device);
-        construct_render_pass(storage, *device.data_, std::move(description));
+        construct_render_pass(storage, *StartupAccess::Owned(device), std::move(description));
     }
     void construct_render_pass(void* storage, impl::LogicalDeviceImpl& device, RenderPassDescription description) {
         if (!device.device)

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
@@ -5,6 +6,10 @@
 #include <VSL/lifetime/synchronization_storage.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/utils/typed_buffer_arena.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SynchronizationAccess;
@@ -102,8 +107,8 @@ namespace {
         auto fence = arena.fence({4});
         const auto semaphores = SynchronizationAccess::Owned(semaphore)->semaphores;
         const auto fences = SynchronizationAccess::Owned(fence)->fences;
-        EXPECT_THROW(vsl::operation::initialize_semaphore(*SynchronizationAccess::Owned(semaphore), *device.data_, {3}), std::logic_error);
-        EXPECT_THROW(vsl::operation::initialize_fence(*SynchronizationAccess::Owned(fence), *device.data_, {3, false}), std::logic_error);
+        EXPECT_THROW(vsl::operation::initialize_semaphore(*SynchronizationAccess::Owned(semaphore), *StartupAccess::Owned(device), {3}), std::logic_error);
+        EXPECT_THROW(vsl::operation::initialize_fence(*SynchronizationAccess::Owned(fence), *StartupAccess::Owned(device), {3, false}), std::logic_error);
         EXPECT_EQ(SynchronizationAccess::Owned(semaphore)->semaphores, semaphores);
         EXPECT_EQ(SynchronizationAccess::Owned(fence)->fences, fences);
         EXPECT_EQ(SynchronizationAccess::Owned(fence)->uses.size(), 2u);
@@ -180,15 +185,15 @@ namespace {
                 std::vector<l::OwnerRef> parents;
                 node->visit_edges(+[](void* context, const l::OwnerRef& parent) { static_cast<std::vector<l::OwnerRef>*>(context)->push_back(parent); }, &parents);
                 ASSERT_EQ(parents.size(), 1u);
-                EXPECT_FALSE(parents[0].share().owner_before(device.data_));
-                EXPECT_FALSE(device.data_.owner_before(parents[0].share()));
+                EXPECT_FALSE(parents[0].share().owner_before(StartupAccess::Shared(device)));
+                EXPECT_FALSE(StartupAccess::Owned(device).owner_before(parents[0].share()));
             }
         }
         EXPECT_TRUE(semaphore_owner.expired());
         EXPECT_TRUE(fence_owner.expired());
         EXPECT_EQ(saved, device);
-        EXPECT_FALSE(saved.data_.owner_before(device.data_));
-        EXPECT_FALSE(device.data_.owner_before(saved.data_));
+        EXPECT_FALSE(StartupAccess::Owned(saved).owner_before(StartupAccess::Owned(device)));
+        EXPECT_FALSE(StartupAccess::Owned(device).owner_before(StartupAccess::Owned(saved)));
     }
     TEST_F(SynchronizationArenaVulkanIntegrationTest, ExplicitDestroyDisarmsNativeResourcesButKeepsConstructedSlotsUntilRootRelease) {
         std::weak_ptr<void> root;

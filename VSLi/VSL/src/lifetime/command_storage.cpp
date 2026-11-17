@@ -1,9 +1,14 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/command_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <new>
 #include <stdexcept>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -33,7 +38,7 @@ namespace VSL_NAMESPACE::lifetime {
         };
         HeapCommandPoolOwner::HeapCommandPoolOwner(LogicalDeviceAccessor device, CommandPoolCreateInfo info) : device(device) {
             require_device_owner(device);
-            construct_command_pool(storage, *device.data_, info);
+            construct_command_pool(storage, *StartupAccess::Owned(device), info);
         }
         HeapCommandPoolOwner::~HeapCommandPoolOwner() {
             node.retire();
@@ -61,7 +66,7 @@ namespace VSL_NAMESPACE::lifetime {
     } // namespace
     void construct_command_pool(void* storage, LogicalDeviceAccessor device, CommandPoolCreateInfo info) {
         require_device_owner(device);
-        construct_command_pool(storage, *device.data_, info);
+        construct_command_pool(storage, *StartupAccess::Owned(device), info);
     }
     void construct_command_pool(void* storage, impl::LogicalDeviceImpl& device, CommandPoolCreateInfo info) {
         if (!device.device)

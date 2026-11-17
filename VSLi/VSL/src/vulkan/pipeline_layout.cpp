@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/operation/graphics_pipeline_state_access.hpp>
 #include <VSL/lifetime/owner_validation.hpp>
@@ -9,6 +10,10 @@
 #include <stdexcept>
 #include <utility>
 #include <type_traits>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
@@ -47,14 +52,14 @@ VSL_NAMESPACE::impl::PipelineRecipe& VSL_NAMESPACE::lifetime::detail::PipelineRe
     return *value._edit_recipe;
 }
 VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::PipelineLayoutEditAccessor::get_device() const {
-    return _edit_device.data_ ? _edit_device : _value.get_device();
+    return StartupAccess::Owned(_edit_device) ? _edit_device : _value.get_device();
 }
 VSL_NAMESPACE::GraphicsPipelineStateEditRef VSL_NAMESPACE::PipelineLayoutEditAccessor::edit_state() const& {
     return GraphicsPipelineStateAccess::Borrow(PipelineRecipeAccess::Edit(*this).graphics_state);
 }
 void VSL_NAMESPACE::PipelineLayoutEditAccessor::init_start(LogicalDeviceAccessor device) {
     lifetime::require_device_owner(device);
-    operation::validate_pipeline_device(*device.data_);
+    operation::validate_pipeline_device(*StartupAccess::Owned(device));
     _edit_recipe = std::make_shared<impl::PipelineRecipe>();
     _value._recipe = _edit_recipe;
     _edit_device = std::move(device);
@@ -70,19 +75,19 @@ void VSL_NAMESPACE::PipelineLayoutEditAccessor::init_finish(PipelineLayoutAccess
     const auto& info = PipelineRecipeAccess::Edit(*this);
     if (GraphicsAccess::Owned(runtime)) {
         (void)runtime.get_device();
-        if (GraphicsAccess::Owned(runtime)->device != _edit_device.data_.get() ||
+        if (GraphicsAccess::Owned(runtime)->device != StartupAccess::Owned(_edit_device).get() ||
             !operation::pipeline_layout_matches(*GraphicsAccess::Owned(runtime), info.binding_layouts, info.push_ranges))
             throw std::invalid_argument("Pipeline recipe does not match the runtime layout");
         GraphicsAccess::Owned(*this) = std::move(GraphicsAccess::Owned(runtime));
     } else {
         GraphicsAccess::Owned(*this) = GraphicsAccess::Owned(GraphicsAccess::FromShared(lifetime::make_heap_pipeline_layout(_edit_device, info.binding_layouts, info.push_ranges)));
     }
-    _edit_device.data_.reset();
+    StartupAccess::Owned(_edit_device).reset();
 }
 void VSL_NAMESPACE::PipelineLayoutEditAccessor::swap_state(PipelineLayoutEditAccessor& other) noexcept {
     _value.swap(other._value);
     _edit_recipe.swap(other._edit_recipe);
-    _edit_device.data_.swap(other._edit_device.data_);
+    StartupAccess::Owned(_edit_device).swap(StartupAccess::Owned(other._edit_device));
 }
 VSL_NAMESPACE::PipelineLayout VSL_NAMESPACE::PipelineLayout::clone_state() const {
     if (!GraphicsAccess::Owned(*this) || !_value._recipe || !_edit_recipe)

@@ -1,8 +1,13 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/image_transfer_fixture.hpp"
 #include <VSL/vulkan/commands/image_readback.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::BufferAccess;
@@ -171,7 +176,7 @@ namespace {
             CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, host_visibility, {}, {});
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         auto mapped = readback.data(sizeof(expected));
         EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
     }

@@ -135,7 +135,7 @@ namespace {
         const auto drawing = window.data2;
         const std::weak_ptr<void> generation = VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(drawing->swapchain).share();
         const std::weak_ptr<void> frames = VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(drawing->image_available).share();
-        const std::weak_ptr<void> surface = drawing->surface->data_;
+        const std::weak_ptr<void> surface = VSL_NAMESPACE::lifetime::detail::StartupAccess::Shared(*(drawing->surface));
         {
             aho::DrawPhase phase(*engine);
             EXPECT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);

@@ -1,6 +1,11 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/compute_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
@@ -46,7 +51,7 @@ namespace {
                 CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
                     vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
             }
-            device.data_->device.waitIdle();
+            StartupAccess::Owned(device)->device.waitIdle();
             auto mapped = output->data(COUNT * sizeof(std::uint32_t));
             std::array<std::uint32_t, COUNT> actual{};
             std::memcpy(actual.data(), mapped.data, sizeof(actual));

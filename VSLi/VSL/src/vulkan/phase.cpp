@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
@@ -24,6 +25,9 @@
 #include <exception>
 #include <stdexcept>
 #include <algorithm>
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
@@ -591,7 +595,7 @@ namespace VSL_NAMESPACE {
                 for (std::uint32_t i = 0; i < count; ++i)
                     sync::require_semaphore_element(*work->signal_semaphore, i);
             const auto source = _acquire_fences ? SynchronizationAccess::Owned(*_acquire_fences).share()
-                                                : lifetime::acquire_fences(*domain, LogicalDeviceAccessor{manager_data->device});
+                                                : lifetime::acquire_fences(*domain, StartupAccess::FromShared(manager_data->device));
             if (!require_prepared())
                 return;
             SynchronizationAccess::RequireCanonical(source);

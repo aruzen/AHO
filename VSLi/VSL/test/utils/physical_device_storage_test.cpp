@@ -273,12 +273,12 @@ namespace {
             vsl::DeviceCreateInfo info;
             info.graphics_family = family;
             info.require_compute = false;
-            logical = vsl::LogicalDeviceAccessor::Create(selected, std::move(info)).data_;
+            logical = StartupAccess::Shared(vsl::LogicalDeviceAccessor::Create(selected, std::move(info)));
         }
         EXPECT_FALSE(parent.expired());
         EXPECT_FALSE(selected_owner.expired());
         EXPECT_TRUE(logical->device.getQueue(logical->graphics_family, 0));
-        EXPECT_TRUE(vsl::LogicalDeviceAccessor{logical}.get_physical_device().get_instance().owner_ref().managed());
+        EXPECT_TRUE(StartupAccess::FromShared(logical).get_physical_device().get_instance().owner_ref().managed());
         logical.reset();
         EXPECT_TRUE(parent.expired());
         EXPECT_TRUE(selected_owner.expired());

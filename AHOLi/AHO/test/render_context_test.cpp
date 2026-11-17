@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <AHO/render_context.hpp>
 
@@ -14,13 +15,13 @@ namespace {
     TEST_F(RenderContextVulkanIntegration, WindowAndPhaseExposeTheSameDrawingServices) {
         ASSERT_NO_THROW(start_engine());
         const auto context = engine->get_window().render_context();
-        EXPECT_EQ(context.device().data_, engine->data()->logical_device.data_);
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(context.device()), VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(engine->data()->logical_device));
         EXPECT_EQ(CommandAccess::Data(context.commands()), CommandAccess::Data(engine->data()->command_manager));
         EXPECT_EQ(&context.descriptor_manager(), engine->data()->graphic_resource_manager.get());
         EXPECT_EQ(context.frame_count(), engine->data()->command_manager.get_buffer().get_size());
         aho::DrawPhase phase(*engine);
         const auto drawing = phase.context();
-        EXPECT_EQ(drawing.device().data_, context.device().data_);
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(drawing.device()), VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(context.device()));
         EXPECT_EQ(drawing.render_pass().identity(), context.render_pass().identity());
         EXPECT_EQ(drawing.scissor().width, context.scissor().width);
         EXPECT_EQ(drawing.scissor().height, context.scissor().height);

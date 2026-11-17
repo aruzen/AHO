@@ -415,6 +415,20 @@ if (VSL_TEST_SOURCES)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
         set_tests_properties("VSL.StartupInstance.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
     endforeach()
+    add_library(vsl-device-surface-style-contract OBJECT EXCLUDE_FROM_ALL contracts/device_surface.cpp)
+    target_link_libraries(vsl-device-surface-style-contract PRIVATE VSL)
+    target_compile_definitions(vsl-device-surface-style-contract PRIVATE VSL_TYPED_CASE=0)
+    set(device_surface_contract_names Valid DeviceData SurfaceData DeviceShared SurfaceShared DeviceOwned SurfaceOwned
+        MutableDeviceBase PrivateDeviceOwner PrivateSurfaceOwner PrivateDeviceValue PrivateWeakDevice PrivateWeakSurface WeakDeviceRaw WeakSurfaceRaw MutatingCreator)
+    foreach(case RANGE 0 15)
+        list(GET device_surface_contract_names ${case} name)
+        add_test(NAME "VSL.DeviceSurface.Compile.${name}" COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/typed-environment-$<CONFIG>.cmake"
+            "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/device_surface.cpp"
+            "-DTEST_CASE=${case}" "-DTEST_EXPECTED=private|no member|no matching|constructor|reference|conversion|bind|viable"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunTypedContract.cmake")
+        set_tests_properties("VSL.DeviceSurface.Compile.${name}" PROPERTIES LABELS compile TIMEOUT 60)
+    endforeach()
     set(shader_contract_names Valid ShaderData ShaderOwner ShaderRawConstructor ShaderGroupData ShaderGroupOwner TemporaryShaderCode ConstTemporaryShaderCode)
     foreach(case RANGE 1 7)
         list(GET shader_contract_names ${case} name)

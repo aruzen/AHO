@@ -35,7 +35,7 @@ namespace {
                   << VSL_NAMESPACE::command::CopyImageToBuffer(destination, *color, VSL_NAMESPACE::ImageLayout::TRANSFER_SRC_OPTIMAL, {1, 2, 3, 2}, true)
                   << VSL_NAMESPACE::command::ChangeImageBarrier(*color, VSL_NAMESPACE::ImageLayout::TRANSFER_SRC_OPTIMAL, VSL_NAMESPACE::ImageLayout::GENERAL);
         }
-        device.data_->device.waitIdle();
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.waitIdle();
         auto expected = AHO_NAMESPACE::ImageReadback(manager, *color, VSL_NAMESPACE::ImageLayout::GENERAL, {1, 2, 3, 2}).read();
         auto mapped = destination.data(expected.bytes.size());
         EXPECT_EQ(std::memcmp(mapped.data, expected.bytes.data(), expected.bytes.size()), 0);
@@ -185,7 +185,7 @@ namespace {
                   << VSL_NAMESPACE::command::RenderPassEnd{};
         }
         // 描画側の参照を解放する前に完了を待ち、読み戻し側だけで画像の寿命を維持できるか確かめる。
-        device.data_->device.waitIdle();
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.waitIdle();
         std::weak_ptr<VSL_NAMESPACE::impl::ImageImpl> source = VSL_NAMESPACE::lifetime::detail::ImageAccess::Owned(*(color)).share();
         auto request = AHO_NAMESPACE::ImageReadback(manager, *color, VSL_NAMESPACE::ImageLayout::GENERAL);
         framebuffer.reset();
@@ -264,7 +264,7 @@ namespace {
                   << VSL_NAMESPACE::command::RenderPassEnd{};
         }
         // 同じコマンドバッファを再利用するため、前の送信の完了を待つ。
-        device.data_->device.waitIdle();
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.waitIdle();
         desc.attachments[0].load = VSL_NAMESPACE::LoadOp::LOAD;
         desc.attachments[0].initial_layout = VSL_NAMESPACE::ImageLayout::GENERAL;
         VSL_NAMESPACE::RenderPass load_pass(device, desc);
@@ -355,12 +355,12 @@ namespace {
             phase << VSL_NAMESPACE::command::RenderPassBegin(*framebuffer, {VSL_NAMESPACE::ClearColor{1, 0, 0, 1}})
                   << VSL_NAMESPACE::command::RenderPassEnd{};
         }
-        device.data_->device.waitIdle();
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.waitIdle();
         AHO_NAMESPACE::ImageReadback reader(manager, 256);
         vk::SemaphoreTypeCreateInfo type{.semaphoreType = vk::SemaphoreType::eTimeline};
-        auto semaphore = device.data_->device.createSemaphoreUnique({.pNext = &type});
+        auto semaphore = VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.createSemaphoreUnique({.pNext = &type});
         const auto signal = reinterpret_cast<PFN_vkSignalSemaphoreKHR>(
-            vkGetDeviceProcAddr(device.data_->device, "vkSignalSemaphoreKHR"));
+            vkGetDeviceProcAddr(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device, "vkSignalSemaphoreKHR"));
         ASSERT_NE(signal, nullptr);
         struct Unblock {
             vk::Device device;
@@ -380,7 +380,7 @@ namespace {
                 release();
                 device.waitIdle();
             }
-        } unblock{device.data_->device, *semaphore, signal};
+        } unblock{VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device, *semaphore, signal};
         const std::uint64_t value = 1;
         vk::TimelineSemaphoreSubmitInfo timeline{.waitSemaphoreValueCount = 1, .pWaitSemaphoreValues = &value};
         const vk::PipelineStageFlags stage = vk::PipelineStageFlagBits::eAllCommands;
@@ -567,12 +567,12 @@ namespace {
             phase << VSL_NAMESPACE::command::RenderPassBegin(*framebuffer, {VSL_NAMESPACE::ClearColor{1, 0, 0, 1}})
                   << VSL_NAMESPACE::command::RenderPassEnd{};
         }
-        device.data_->device.waitIdle();
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.waitIdle();
         AHO_NAMESPACE::ImageReadback reader(manager, 256, 2);
         vk::SemaphoreTypeCreateInfo type{.semaphoreType = vk::SemaphoreType::eTimeline};
-        auto semaphore = device.data_->device.createSemaphoreUnique({.pNext = &type});
+        auto semaphore = VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.createSemaphoreUnique({.pNext = &type});
         const auto signal = reinterpret_cast<PFN_vkSignalSemaphoreKHR>(
-            vkGetDeviceProcAddr(device.data_->device, "vkSignalSemaphoreKHR"));
+            vkGetDeviceProcAddr(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device, "vkSignalSemaphoreKHR"));
         ASSERT_NE(signal, nullptr);
         struct Unblock {
             vk::Device device;
@@ -592,7 +592,7 @@ namespace {
                 release();
                 device.waitIdle();
             }
-        } unblock{device.data_->device, *semaphore, signal};
+        } unblock{VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device, *semaphore, signal};
         const std::uint64_t value = 1;
         vk::TimelineSemaphoreSubmitInfo timeline{.waitSemaphoreValueCount = 1, .pWaitSemaphoreValues = &value};
         const vk::PipelineStageFlags stage = vk::PipelineStageFlagBits::eAllCommands;

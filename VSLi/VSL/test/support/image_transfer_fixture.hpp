@@ -1,4 +1,5 @@
 #pragma once
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
@@ -61,7 +62,7 @@ namespace vsl_test {
             else
                 phase << vsl::command::CopyImageToBuffer(&destination, image);
         }
-        device.data_->device.waitIdle();
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.waitIdle();
         std::array<std::uint32_t, 4> actual{};
         auto mapped = destination.data(sizeof(actual));
         std::memcpy(actual.data(), mapped.data, sizeof(actual));

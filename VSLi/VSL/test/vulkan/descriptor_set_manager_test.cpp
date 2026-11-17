@@ -1,6 +1,11 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include "support/compute_fixture.hpp"
 #include "support/deferred_action.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
@@ -125,7 +130,7 @@ namespace {
     }
     TEST_F(DescriptorManagerVulkanIntegrationTest, DefaultOverAllocatorStartsWithoutPools) {
         vsl::graphic_resource::OverAllocateManager manager(device);
-        EXPECT_EQ(DescriptorManagerAccess::Data(manager)->device, device.data_);
+        EXPECT_EQ(DescriptorManagerAccess::Data(manager)->device, StartupAccess::Owned(device));
         EXPECT_TRUE(manager.pools.empty());
         EXPECT_EQ(manager.other, 0u);
     }

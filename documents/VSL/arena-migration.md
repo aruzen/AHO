@@ -666,3 +666,28 @@ PhysicalDevices<S>の共有CPU stateはprivateな非template collectionへ移し
 新runtime1件はsearcher constructor中に元collectionを破棄し、選択完了とcollection回収を確認する。既存foreign試験にはCB／別保存node／retireの独立した拒否とNative不変を追加した。macOS arm64／Clang20／C++26／MoltenVK・validation・ASan／UBSanで全VSL1,194（既知format3 skip）、AHO GPU192／CPU1,071、同じ3PNGとglTF viewer verifyが成功した。
 
 一時consumerの消失に伴い、配布検査はrepo内の公開契約を用いて再構成した。installed headersだけで25種類をcompileし、7 consumerのlink／実行と公開18契約を確認した。private非配布、archive／header一致、Debug／Release／x86_64寸法、構成混在と親61c90256…headerのlink拒否も成功した。生成IDは6f5ad8d7…へ更新した。Windows／Linux実機、x86_64全体実行、device lost、並行CPU、性能率は未検証。次はDevice／SurfaceとAHOの弱いclose回収を整理する。
+
+## 順序12f: Device／Surfaceの公開所有境界
+
+LogicalDeviceAccessor／Surfaceの公開shared Impl fieldとraw構築を閉じ、元のImpl／control block／保存nodeを持つprivate OwnedRefへ移した。通常のDevice生成もStartupArenaからの取得も、この値を返す。コピーは所有値を共有し、代入は全値の公開後に旧ownerを回収する。Surfaceは既存のWindow plugin adapterを保ち、代入／swapでは登録先オブジェクトのplugin IDを変えない。Window自体の公開境界は後続単位に残る。
+
+LogicalDevice<C>はAccessorを値で保持する。Accessorへの変換は所有する値を返すため、可変な基底参照から内部ownerを交換できない。custom Creatorは公開のPhysicalDevice／Surfaceを値で受け、LogicalDeviceAccessorを返す。生成後の正規ownerと元のPhysicalDevice実体の一致検査は非templateの共通処理で行う。Creatorは既存Deviceを返してもよい。同じハードウェアを指していても別のPhysicalDevice実体なら、元の親とは扱わない。
+
+旧LogicalDeviceGraphicCreatorのshared Impl返却を使っていた利用側は、GraphicsDeviceCreatorまたは公開CreateGraphicsへ移す。追加feature等を指定したい場合はGraphicsInfoで通常のDeviceCreateInfoを作り、Createへ渡せる。
+
+```cpp
+auto info = vsl::LogicalDeviceAccessor::GraphicsInfo(physical, surface, false);
+info.features = info.features | vsl::DeviceFeature::SAMPLER_ANISOTROPY;
+auto device = vsl::LogicalDeviceAccessor::Create(physical, std::move(info));
+vsl::LogicalDevice<> existing(device);
+```
+
+WeakLogicalDevice／WeakSurfaceはstorageの弱い所有を観測する。lockは先に元control blockを保持し、元の保存nodeを持つ所有値を返す。新しいownerやcontrol blockを作らない。空または解放済みなら空値を返す。退役済みでもstorageが保持中ならlockできるが、Native操作は正規owner／保存node一致／退役／Native handleを検査する。storage消滅と操作可能性を同一視しない。
+
+AHO GraphicsCloseは両weak値を使い、Engine消滅後でもWork等が親を保持していれば、局所的なDevice／Surface値へlockして既存のSurface回収へ進む。close中にplugin自身が破棄されても、その後の回収は局所値で完了する。DeviceはSurfaceやOS Windowの永久親所有を追加しない。
+
+arena getter／子の親getterは元のOwnedRefを直接引き継ぐ。親の設定も正規ownerと保存nodeを検査し、同じcontrol blockに別nodeを付けた入力を拒否する。内部の古いShared境界はprivateなStartupAccess::Shared／FromSharedで接続する移行用adapterとして残る。通常の操作はOwnedRefから解決済みImplへ直接届く。CPU Root／可変長コンテナ／Vulkan device memoryの個別確保は、この公開境界変更では削減していない。
+
+macOS arm64／Clang20／C++26／MoltenVK・validation・ASan／UBSanで新runtime4件と全VSL1,198（既知format3 skip）、AHO GPU192／CPU1,071、compile361を確認した。新試験はDevice／Surface weakの同じ実体への復帰・退役後操作拒否・最後の所有解除、Surfaceの異なるnode拒否と親不変、代入後のplugin登録維持を検証する。既存試験にもCreatorの異親／空結果拒否と親setterの別node拒否を追加した。heap／arenaの3PNG、resize時のPipeline生成1回、glTF viewerの姿勢・resize・12frame後の同姿勢を維持した。
+
+source406、strict110files／97TUと宣言順修正後の1file／1TUが成功した。最後の修正は関数本体を変更せず宣言だけを整理したことを比較し、再buildと配布archive一致を確認した。installed public consumer26種類compile、3種類link／実行、新しい公開正負16契約、private非配布、生成／公開header・archive一致、Debug／Release／x86_64の実寸法、配置consumerによる構成混在と親6f5ad8d7…headerのlink拒否も成功した。生成IDは80b75e39…である。Windows／Linux実機、x86_64全体実行、device lost、並行CPU、性能率は未検証。次はEngine／Window／Completionの公開境界、12gの実定義・metadata・処理の4層分割、12hの同条件測定へ進む。

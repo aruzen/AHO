@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
@@ -7,6 +8,10 @@
 #include <VSL/lifetime/command_storage.hpp>
 #include <VSL/utils/typed_buffer_arena.hpp>
 #include <VSL/sync/submission_completion.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::BufferAccess;
@@ -39,8 +44,8 @@ namespace {
         return {l::CommandBufferInit{t::ResourceId{3}, 2}, l::CommandBufferInit{t::ResourceId{3}, 3}, vsl::CommandPoolCreateInfo{true}};
     }
     UnsignaledWork::UnsignaledWork(vsl::LogicalDeviceAccessor device) : work(std::make_shared<vsl::impl::SubmissionWork>()) {
-        work->device = device.data_;
-        work->owned_fence = std::make_shared<vk::UniqueFence>(device.data_->device.createFenceUnique({}));
+        work->device = StartupAccess::Shared(device);
+        work->owned_fence = std::make_shared<vk::UniqueFence>(StartupAccess::Owned(device)->device.createFenceUnique({}));
         work->fence = **work->owned_fence;
         work->result->status = vsl::Completion::Status::SUBMITTED;
         work->result->work = work;
@@ -243,7 +248,7 @@ namespace {
             buffer_root = CommandAccess::Data(buffer);
             saved = buffer.get_pool();
             device_only = saved->get_device();
-            EXPECT_EQ(device_only.data_, device.data_);
+            EXPECT_EQ(StartupAccess::Owned(device_only), StartupAccess::Owned(device));
             EXPECT_FALSE(CommandAccess::Data(*saved).owner_before(CommandAccess::Data(pool)));
             EXPECT_FALSE(CommandAccess::Data(pool).owner_before(CommandAccess::Data(*saved)));
             const std::array<l::OwnerRef, 1> reverse{buffer.owner_ref()};
@@ -253,7 +258,7 @@ namespace {
         EXPECT_FALSE(pool_root.expired());
         saved.reset();
         EXPECT_TRUE(pool_root.expired());
-        EXPECT_EQ(device_only.data_, device.data_);
+        EXPECT_EQ(StartupAccess::Owned(device_only), StartupAccess::Owned(device));
     }
     TEST_F(CommandArenaVulkanIntegrationTest, ForeignControlBlocksCannotImpersonateTheSameRingOrPool) {
         l::ResourceArena arena(device, PLAN, inputs());
@@ -316,10 +321,10 @@ namespace {
         native.end();
         EXPECT_THROW(buffer.reset(), std::logic_error);
         EXPECT_THROW(buffer.reset(1), std::logic_error);
-        auto fence = device.data_->device.createFenceUnique({});
+        auto fence = StartupAccess::Owned(device)->device.createFenceUnique({});
         const vk::SubmitInfo submit{.commandBufferCount = 1, .pCommandBuffers = &native};
-        device.data_->device.getQueue(queue_family, 0).submit(submit, *fence);
-        ASSERT_EQ(device.data_->device.waitForFences(*fence, true, UINT64_MAX), vk::Result::eSuccess);
+        StartupAccess::Owned(device)->device.getQueue(queue_family, 0).submit(submit, *fence);
+        ASSERT_EQ(StartupAccess::Owned(device)->device.waitForFences(*fence, true, UINT64_MAX), vk::Result::eSuccess);
         std::uint32_t actual = 0;
         target.read_into(std::as_writable_bytes(std::span(&actual, 1)));
         EXPECT_EQ(actual, expected);
@@ -345,7 +350,7 @@ namespace {
             buffer->retain_until_complete(callback.owner());
             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         buffer->reset(0);
         EXPECT_TRUE(invoked);
         EXPECT_FALSE(buffer);
@@ -365,7 +370,7 @@ namespace {
             manager.get_buffer().retain_until_complete(callback.owner());
             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         EXPECT_THROW(manager.start_phase<vsl::ComputePhase>(), std::logic_error);
         EXPECT_EQ(manager.get_current_buffer_idx(), 0u);
         auto next = manager.start_phase<vsl::ComputePhase>();

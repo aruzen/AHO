@@ -1,8 +1,13 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/synchronization_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <new>
 #include <stdexcept>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_standard_layout_v<SemaphoreSlotStorage> && offsetof(SemaphoreSlotStorage, value) == 0);
@@ -23,7 +28,7 @@ namespace VSL_NAMESPACE::lifetime {
         template<typename Slot, typename Info, void (*Construct)(void*, impl::LogicalDeviceImpl&, Info), void (*Destroy)(void*) noexcept>
         HeapSynchronizationOwner<Slot, Info, Construct, Destroy>::HeapSynchronizationOwner(LogicalDeviceAccessor device, Info info) : device(device) {
             require_device_owner(device);
-            Construct(storage, *device.data_, info);
+            Construct(storage, *StartupAccess::Owned(device), info);
         }
         template<typename Slot, typename Info, void (*Construct)(void*, impl::LogicalDeviceImpl&, Info), void (*Destroy)(void*) noexcept>
         HeapSynchronizationOwner<Slot, Info, Construct, Destroy>::~HeapSynchronizationOwner() {
@@ -54,14 +59,14 @@ namespace VSL_NAMESPACE::lifetime {
     } // namespace
     void construct_semaphore(void* storage, LogicalDeviceAccessor device, SemaphoreCreateInfo info) {
         require_device_owner(device);
-        construct_semaphore(storage, *device.data_, info);
+        construct_semaphore(storage, *StartupAccess::Owned(device), info);
     }
     void construct_semaphore(void* storage, impl::LogicalDeviceImpl& device, SemaphoreCreateInfo info) {
         construct<SemaphoreSlotStorage, impl::SemaphoreImpl, SemaphoreCreateInfo, operation::initialize_semaphore>(storage, device, info);
     }
     void construct_fence(void* storage, LogicalDeviceAccessor device, FenceCreateInfo info) {
         require_device_owner(device);
-        construct_fence(storage, *device.data_, info);
+        construct_fence(storage, *StartupAccess::Owned(device), info);
     }
     void construct_fence(void* storage, impl::LogicalDeviceImpl& device, FenceCreateInfo info) {
         construct<FenceSlotStorage, impl::FenceImpl, FenceCreateInfo, operation::initialize_fence>(storage, device, info);

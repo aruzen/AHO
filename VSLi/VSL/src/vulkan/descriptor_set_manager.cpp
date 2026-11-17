@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/define.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/exceptions.hpp>
@@ -10,15 +11,19 @@
 #include <limits>
 #include <algorithm>
 
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
+
 namespace VSL_NAMESPACE::graphic_resource {
     ManagerInterface::ManagerInterface() : _identity(std::make_shared<impl::GraphicResourceManagerIdentity>()) {
         _identity->manager = this;
     }
     ManagerInterface::ManagerInterface(LogicalDeviceAccessor device) : ManagerInterface() {
-        if (device.data_)
+        if (StartupAccess::Owned(device))
             lifetime::require_device_owner(device);
         _state = std::make_shared<impl::GraphicResourceManagerImpl>();
-        _state->device = device.data_;
+        _state->device = StartupAccess::Shared(device);
     }
     ManagerInterface::~ManagerInterface() {
         retire_identity();
@@ -72,7 +77,7 @@ namespace VSL_NAMESPACE::graphic_resource {
         const auto state = _state;
         if (!state)
             throw std::logic_error("Descriptor manager is empty");
-        return LogicalDeviceAccessor{state->device};
+        return StartupAccess::FromShared(state->device);
     }
 } // namespace VSL_NAMESPACE::graphic_resource
 
@@ -147,7 +152,7 @@ namespace {
         }
         if (!context.state)
             throw std::logic_error("Descriptor manager is empty");
-        auto pool = DescriptorAccess::FromShared(lifetime::make_heap_descriptor_pool(LogicalDeviceAccessor{context.state->device}, info));
+        auto pool = DescriptorAccess::FromShared(lifetime::make_heap_descriptor_pool(StartupAccess::FromShared(context.state->device), info));
         DescriptorAccess::Owned(pool)->manager = context.identity;
         context.state->pools.push_back(lifetime::detail::OwnerAccess::Shared(DescriptorAccess::Owned(pool)));
         return pool;

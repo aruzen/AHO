@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
@@ -6,6 +7,10 @@
 #include <VSL/vulkan/commands/change_image_barrier.hpp>
 #include <VSL/lifetime/buffer_arena.hpp>
 #include "support/deferred_action.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::BufferAccess;
@@ -54,7 +59,7 @@ namespace {
                   << vsl::command::ImageReadback(vsl::BufferView::FromBuffer(full), image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL, {}, {}, vsl::ResourceRetention::SUBMISSION);
             EXPECT_EQ(phase.state, vsl::ComputePhase::State::WAIT_SUBMIT);
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         auto mapped_pixel = pixel.data(sizeof(std::uint32_t));
         std::uint32_t actual_pixel;
         std::memcpy(&actual_pixel, mapped_pixel.data, sizeof(actual_pixel));
@@ -81,7 +86,7 @@ namespace {
                   << vsl::command::CopyBufferToArrayImage(image, &source, vsl::ImageLayout::TRANSFER_DST_OPTIMAL, 1)
                   << vsl::command::ImageReadback(&full, image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL, {0, 0, 2, 2, 0});
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         auto mapped = pixel.data(sizeof(std::uint32_t));
         std::uint32_t actual;
         std::memcpy(&actual, mapped.data, sizeof(actual));
@@ -202,7 +207,7 @@ namespace {
                         EXPECT_FALSE(constraint_owner.expired());
                         if (!cancel) {
                             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-                            device.data_->device.waitIdle();
+                            StartupAccess::Owned(device)->device.waitIdle();
                         }
                         auto observer = storage.lock();
                         ASSERT_TRUE(observer);
@@ -246,7 +251,7 @@ namespace {
             destination.resource_use().record(manager.get_buffer(), vsl::ResourceRetention::COMPLETION);
             manager.get_buffer().retain_until_complete(deferred.owner());
             ASSERT_EQ(submitted.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-            device.data_->device.waitIdle();
+            StartupAccess::Owned(device)->device.waitIdle();
             command = std::make_unique<vsl::command::ImageReadback>(vsl::BufferView::FromBuffer(destination), image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
             recording.emplace(other);
             if (action)

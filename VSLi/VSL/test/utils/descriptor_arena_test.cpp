@@ -1,7 +1,9 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include "support/fixed_parent.hpp"
+#include "support/startup_test_access.hpp"
 #include <VSL/lifetime/pipeline_recipe.hpp>
 #include <VSL/lifetime/resource_arena.hpp>
 #include <VSL/lifetime/descriptor_bindings.hpp>
@@ -13,6 +15,10 @@
 #include <VSL/utils/typed_compute.hpp>
 #include <VSL/vulkan/commands/image_upload.hpp>
 #include <VSL/vulkan/commands/image_readback.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
@@ -195,7 +201,7 @@ namespace {
             EXPECT_FALSE(root.expired());
         }));
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         EXPECT_NO_THROW(arena->freeze_dependencies());
         EXPECT_TRUE(callback);
         EXPECT_FALSE(arena);
@@ -248,7 +254,7 @@ namespace {
         const auto borrowed = DescriptorAccess::FromShared(std::shared_ptr<vsl::impl::GraphicResourceImpl>(std::shared_ptr<void>{}, DescriptorAccess::Owned(owned).get()));
         EXPECT_THROW(TypedSet::FromResource(device, borrowed), std::invalid_argument);
         EXPECT_THROW(vsl::ResourceUseGroup::ForDescriptor(2, borrowed), std::invalid_argument);
-        const vsl::LogicalDeviceAccessor borrowed_device{std::shared_ptr<vsl::impl::LogicalDeviceImpl>(std::shared_ptr<void>{}, device.data_.get())};
+        const auto borrowed_device = vsl_test::unchecked_startup(std::shared_ptr<vsl::impl::LogicalDeviceImpl>(std::shared_ptr<void>{}, StartupAccess::Owned(device).get()));
         EXPECT_THROW(TypedSet::FromResource(borrowed_device, owned), std::invalid_argument);
         EXPECT_THROW(l::ResourceArena(borrowed_device, PLAN, initializers), std::invalid_argument);
     }

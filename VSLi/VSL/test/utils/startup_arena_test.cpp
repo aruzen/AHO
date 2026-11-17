@@ -96,10 +96,10 @@ namespace {
             EXPECT_EQ(arena.size(), 4u);
             EXPECT_EQ(arena.slots(), 4u);
             auto first = arena.device({3}), second = arena.device({4});
-            EXPECT_NE(first.data_, second.data_);
-            EXPECT_NE(first.data_->device, second.data_->device);
-            EXPECT_FALSE(first.data_.owner_before(second.data_));
-            EXPECT_FALSE(second.data_.owner_before(first.data_));
+            EXPECT_NE(StartupAccess::Owned(first), StartupAccess::Owned(second));
+            EXPECT_NE(StartupAccess::Owned(first)->device, StartupAccess::Owned(second)->device);
+            EXPECT_FALSE(StartupAccess::Owned(first).owner_before(StartupAccess::Owned(second)));
+            EXPECT_FALSE(StartupAccess::Owned(second).owner_before(StartupAccess::Owned(first)));
             EXPECT_EQ(StartupAccess::Owned(first.get_physical_device()), StartupAccess::Owned(arena.physical_device({2})));
             EXPECT_EQ(StartupAccess::Owned(first.get_physical_device().get_instance()), StartupAccess::Owned(arena.instance({1})));
             EXPECT_THROW(arena.instance({3}), std::invalid_argument);
@@ -107,7 +107,7 @@ namespace {
         }
         EXPECT_FALSE(root.expired());
         EXPECT_TRUE(saved.get_physical_device().get_instance().owner_ref().managed());
-        saved.data_.reset();
+        StartupAccess::Owned(saved).reset();
         EXPECT_TRUE(root.expired());
     }
     TEST_F(StartupArenaVulkanIntegrationTest, ExternalGetterReturnsOriginalOwnerAndDoesNotRetainImporter) {
@@ -126,11 +126,11 @@ namespace {
             EXPECT_EQ(StartupAccess::Owned(arena.instance({1})), instance);
             EXPECT_EQ(StartupAccess::Owned(arena.physical_device({2})), StartupAccess::Owned(physical));
             saved = arena.device({3});
-            EXPECT_FALSE(saved.data_.owner_before(device.data_));
-            EXPECT_FALSE(device.data_.owner_before(saved.data_));
+            EXPECT_FALSE(StartupAccess::Owned(saved).owner_before(StartupAccess::Owned(device)));
+            EXPECT_FALSE(StartupAccess::Owned(device).owner_before(StartupAccess::Owned(saved)));
         }
         EXPECT_TRUE(importer.expired());
-        EXPECT_EQ(saved.data_, device.data_);
+        EXPECT_EQ(StartupAccess::Owned(saved), StartupAccess::Owned(device));
     }
     TEST_F(StartupArenaVulkanIntegrationTest, LaterDeviceFailureRollsBackAndAllowsTheSameMemoryToBeReused) {
         const std::array requests{s::StartupRequest{{1}, s::StartupKind::INSTANCE},
@@ -152,7 +152,7 @@ namespace {
             saved = retry.device({3});
         }
         EXPECT_THROW((l::StartupArena{plan, inputs, memory}), std::invalid_argument);
-        saved.data_.reset();
+        StartupAccess::Owned(saved).reset();
         EXPECT_NO_THROW((l::StartupArena{plan, inputs, memory}));
     }
     TEST_F(StartupArenaVulkanIntegrationTest, ExternalInstanceIsACommonFixedParentRatherThanAnArenaSelfOwner) {
@@ -196,7 +196,7 @@ namespace {
                 source.copy(std::array<std::uint32_t, 4>{3, 6, 9, 12});
                 command.emplace(source.copy_to(result));
             }
-            placed.data_.reset();
+            StartupAccess::Owned(placed).reset();
             auto phase = manager.start_phase<vsl::ComputePhase>();
             phase << *command;
             command.reset();
@@ -243,8 +243,8 @@ namespace {
         l::StartupArena arena(plan, inputs);
         auto original = arena.surface({1});
         auto plugin = window->add_plugin<vsl::Surface>(original);
-        EXPECT_EQ(plugin->data_, original.data_);
-        EXPECT_EQ(plugin->data_->surface, original.data_->surface);
+        EXPECT_EQ(StartupAccess::Owned(*(plugin)), StartupAccess::Owned(original));
+        EXPECT_EQ(StartupAccess::Owned(*(plugin))->surface, StartupAccess::Owned(original)->surface);
         auto fake_data = std::make_shared<vsl::PureWindow::WindowData>();
         fake_data->window_handle = window->data_->window_handle;
         vsl::PureWindow fake(fake_data);

@@ -1,4 +1,5 @@
 #pragma once
+#include <VSL/lifetime/startup_access.hpp>
 #include <gtest/gtest.h>
 #include <AHO/engine/standard_engine.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
@@ -71,8 +72,8 @@ namespace aho_test {
     }
 
     inline void LiveGPUTest::TearDown() {
-        if (engine && engine->data() && engine->data()->logical_device.data_)
-            engine->data()->logical_device.data_->device.waitIdle();
+        if (engine && engine->data() && VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(engine->data()->logical_device))
+            VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(engine->data()->logical_device)->device.waitIdle();
         if (engine && engine->boot_window && engine->boot_window->data_ && engine->boot_window->data_->window_handle)
             engine->boot_window->close();
         engine.reset();

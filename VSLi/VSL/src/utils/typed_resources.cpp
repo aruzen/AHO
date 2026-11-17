@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/utils/typed_block_validation.hpp>
@@ -13,6 +14,10 @@
 #include <VSL/lifetime/sampler_access.hpp>
 #include <VSL/operation/descriptor_ops.hpp>
 #include <algorithm>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
@@ -103,9 +108,9 @@ namespace VSL_NAMESPACE::typed::detail {
             throw std::invalid_argument("Typed descriptor import requires a resource");
         lifetime::require_descriptor_valid(*DescriptorAccess::Owned(resource));
         const auto& target = *DescriptorAccess::Owned(resource);
-        if (!device.data_ || !device.data_.use_count() || target.pool->device != device.data_.get() || !target.layout)
+        if (!StartupAccess::Owned(device) || !StartupAccess::Owned(device).use_count() || target.pool->device != StartupAccess::Owned(device).get() || !target.layout)
             throw std::invalid_argument("Typed descriptor import device/layout mismatch");
-        operation::validate_descriptor_layout(*target.layout, *device.data_, points);
+        operation::validate_descriptor_layout(*target.layout, *StartupAccess::Owned(device), points);
     }
     GraphicResource allocate_descriptor_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager,
                                             std::span<const graphic_resource::BindingPoint> points) {
@@ -172,7 +177,7 @@ namespace VSL_NAMESPACE::typed::detail {
     }
 
     void inject_resource_schema(PipelineLayoutEditAccessor layout, std::span<const DescriptorRequirement> requirements, std::uint32_t set_count) {
-        const auto device = layout.get_device().data_;
+        const auto device = StartupAccess::Owned(layout.get_device());
         if (set_count > device->parent_device->device.getProperties().limits.maxBoundDescriptorSets)
             throw std::out_of_range("Typed descriptor set exceeds the device limit");
         std::vector<DescriptorLayoutCreateInfo> sets;
@@ -189,7 +194,7 @@ namespace VSL_NAMESPACE::typed::detail {
 
     void validate_resource_schema(const lifetime::PipelineRecipeSnapshot& recipe, std::span<const DescriptorRequirement> requirements) {
         for (const auto& shader : PipelineRecipeAccess::Read(recipe).shaders) {
-            if (shader->device != recipe.device().data_.get())
+            if (shader->device != StartupAccess::Owned(recipe.device()).get())
                 throw std::invalid_argument("Typed shader/pipeline device mismatch");
             const auto stage = ShaderType(shader->stage);
             utils::SPIRVReflector reflection({}, std::span<const std::uint32_t>(shader->code), shader->name, stage);
@@ -208,7 +213,7 @@ namespace VSL_NAMESPACE::typed::detail {
         }
     }
     void validate_dispatch(LogicalDeviceAccessor device, size_t x, size_t y, size_t z) {
-        const auto limits = device.data_->parent_device->device.getProperties().limits;
+        const auto limits = StartupAccess::Owned(device)->parent_device->device.getProperties().limits;
         const std::array<size_t, 3> counts{x, y, z};
         for (size_t i = 0; i < counts.size(); ++i)
             if (counts[i] > limits.maxComputeWorkGroupCount[i])

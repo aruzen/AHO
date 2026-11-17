@@ -58,8 +58,8 @@ namespace {
     struct GraphicsClose : VSL_NAMESPACE::PureWindow::Plugin, VSL_NAMESPACE::PureWindow::OnUpdate {
         std::weak_ptr<VSL_NAMESPACE::PureWindow::WindowData> native;
         std::weak_ptr<AHO_NAMESPACE::window::WindowData> drawing;
-        std::weak_ptr<VSL_NAMESPACE::impl::LogicalDeviceImpl> device;
-        std::weak_ptr<VSL_NAMESPACE::impl::SurfaceImpl> surface;
+        VSL_NAMESPACE::WeakLogicalDevice device;
+        VSL_NAMESPACE::WeakSurface surface;
         GraphicsClose(VSL_NAMESPACE::PureWindow* window, std::shared_ptr<AHO_NAMESPACE::window::WindowData> drawing,
                       VSL_NAMESPACE::LogicalDeviceAccessor device, VSL_NAMESPACE::Surface surface);
         bool on_update(VSL_NAMESPACE::PureWindow window) override;
@@ -81,7 +81,7 @@ namespace {
     }
     GraphicsClose::GraphicsClose(VSL_NAMESPACE::PureWindow* window, std::shared_ptr<AHO_NAMESPACE::window::WindowData> drawing,
                                  VSL_NAMESPACE::LogicalDeviceAccessor device, VSL_NAMESPACE::Surface surface)
-        : native(window->data_), drawing(drawing), device(device.data_), surface(surface.data_) {}
+        : native(window->data_), drawing(drawing), device(device.weak()), surface(surface.weak()) {}
     bool GraphicsClose::on_update(VSL_NAMESPACE::PureWindow window) {
         VSL_NAMESPACE::lifetime::GLFWCallScope scope;
         const auto data = native.lock();
@@ -95,21 +95,21 @@ namespace {
         const auto parent_surface = surface.lock();
         if (!target) {
             if (parent_device && parent_surface)
-                VSL_NAMESPACE::lifetime::queue_surface_retirement({parent_device}, VSL_NAMESPACE::Surface(parent_surface));
+                VSL_NAMESPACE::lifetime::queue_surface_retirement(parent_device, parent_surface);
             window.close();
             if (parent_device)
-                (void)VSL_NAMESPACE::lifetime::collect_surface_retirements({parent_device}, VSL_NAMESPACE::lifetime::SurfaceRecoveryMode::WAIT);
+                (void)VSL_NAMESPACE::lifetime::collect_surface_retirements(parent_device, VSL_NAMESPACE::lifetime::SurfaceRecoveryMode::WAIT);
             return true;
         }
         if (!parent_device || !parent_surface)
             throw std::logic_error("Window close lost its original parents");
-        AHO_NAMESPACE::window::detail::WindowClose::Run(data, target, {parent_device}, VSL_NAMESPACE::Surface(parent_surface));
+        AHO_NAMESPACE::window::detail::WindowClose::Run(data, target, parent_device, parent_surface);
         return true;
     }
 
     const std::string& checked_window_name(const std::string& name, const AHO_NAMESPACE::engine::EngineAccessor& engine) {
         const auto& data = engine.data();
-        if (!data || !data->vulkan_instance || !data->logical_device.data_ ||
+        if (!data || !data->vulkan_instance || !data->logical_device ||
             !data->command_manager)
             throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "A booted engine is required");
         auto buffers = data->command_manager.get_buffer();

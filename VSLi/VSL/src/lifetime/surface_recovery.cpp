@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/surface_recovery.hpp>
 #include <VSL/lifetime/recovery_batch.hpp>
 #include <VSL/lifetime/acquire_ticket.hpp>
@@ -11,6 +12,10 @@
 #include <algorithm>
 #include <stdexcept>
 #include <utility>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace VSL_NAMESPACE::lifetime {
     namespace {
@@ -202,8 +207,8 @@ namespace VSL_NAMESPACE::lifetime {
         RecoveryResult recover_surface_scope(LogicalDeviceAccessor device, const Surface& surface, SurfaceRecoveryMode mode, bool observe_graphics) {
             require_device_owner(device);
             (void)surface.owner_ref();
-            const auto native_device = device.data_;
-            const auto parent = surface.data_;
+            const auto native_device = StartupAccess::Shared(device);
+            const auto parent = StartupAccess::Shared(surface);
             if (!parent || !parent->surface || !parent->owner_context || native_device->parent_device->vulkan != parent->vulkan)
                 throw std::invalid_argument("Surface recovery requires a Surface on the Device Instance");
             if (mode != SurfaceRecoveryMode::POLL && mode != SurfaceRecoveryMode::WAIT)
@@ -224,10 +229,10 @@ namespace VSL_NAMESPACE::lifetime {
     void queue_surface_retirement(LogicalDeviceAccessor device, const Surface& surface) {
         require_device_owner(device);
         (void)surface.owner_ref();
-        if (!surface.data_ || !surface.data_->surface || !surface.data_->owner_context || device.data_->parent_device->vulkan != surface.data_->vulkan)
+        if (!StartupAccess::Shared(surface) || !StartupAccess::Shared(surface)->surface || !StartupAccess::Shared(surface)->owner_context || StartupAccess::Shared(device)->parent_device->vulkan != StartupAccess::Shared(surface)->vulkan)
             throw std::invalid_argument("Surface retirement requires its Device Instance");
         auto& queue = retirement_queue();
-        RetirementNode key{device.data_, surface.data_, device.data_.get(), surface.data_.get(), {}};
+        RetirementNode key{StartupAccess::Shared(device), StartupAccess::Shared(surface), StartupAccess::Shared(device).get(), StartupAccess::Shared(surface).get(), {}};
         for (auto* node = queue.head.get(); node; node = node->next.get())
             if (same_retirement(*node, key))
                 return;
@@ -238,10 +243,10 @@ namespace VSL_NAMESPACE::lifetime {
         if (mode != SurfaceRecoveryMode::POLL && mode != SurfaceRecoveryMode::WAIT)
             throw std::invalid_argument("Unknown Surface recovery mode");
         auto& queue = retirement_queue();
-        if (queue.collecting || sync::NativeDeviceCall::Active(device.data_->device))
-            return device.data_->lost ? SurfaceRecoveryStatus::DEVICE_LOST : SurfaceRecoveryStatus::PENDING;
+        if (queue.collecting || sync::NativeDeviceCall::Active(StartupAccess::Shared(device)->device))
+            return StartupAccess::Shared(device)->lost ? SurfaceRecoveryStatus::DEVICE_LOST : SurfaceRecoveryStatus::PENDING;
         RetirementBatch batch(queue);
-        auto status = device.data_->lost ? SurfaceRecoveryStatus::DEVICE_LOST : SurfaceRecoveryStatus::COMPLETE;
+        auto status = StartupAccess::Shared(device)->lost ? SurfaceRecoveryStatus::DEVICE_LOST : SurfaceRecoveryStatus::COMPLETE;
         while (batch.selected) {
             auto node = std::move(batch.selected);
             batch.selected = std::move(node->next);
@@ -250,11 +255,11 @@ namespace VSL_NAMESPACE::lifetime {
             if (!parent_device || !parent_surface)
                 continue;
             bool keep = true;
-            if (parent_device == device.data_ && !parent_device.owner_before(device.data_) && !device.data_.owner_before(parent_device)) {
+            if (parent_device == StartupAccess::Shared(device) && !parent_device.owner_before(StartupAccess::Shared(device)) && !StartupAccess::Shared(device).owner_before(parent_device)) {
                 try {
-                    auto result = recover_surface_scope(device, Surface(parent_surface), mode, true);
+                    auto result = recover_surface_scope(device, StartupAccess::FromShared(parent_surface), mode, true);
                     if (!result.pending && result.captured)
-                        result = recover_surface_scope(device, Surface(parent_surface), SurfaceRecoveryMode::POLL, true);
+                        result = recover_surface_scope(device, StartupAccess::FromShared(parent_surface), SurfaceRecoveryMode::POLL, true);
                     keep = result.pending || result.captured;
                     if (result.status == SurfaceRecoveryStatus::DEVICE_LOST)
                         status = SurfaceRecoveryStatus::DEVICE_LOST;
@@ -270,7 +275,7 @@ namespace VSL_NAMESPACE::lifetime {
         }
         if (status == SurfaceRecoveryStatus::COMPLETE)
             for (auto* node = queue.head.get(); node; node = node->next.get())
-                if (node->device_slot == device.data_.get() && !node->device.owner_before(device.data_) && !device.data_.owner_before(node->device))
+                if (node->device_slot == StartupAccess::Shared(device).get() && !node->device.owner_before(StartupAccess::Shared(device)) && !StartupAccess::Shared(device).owner_before(node->device))
                     status = SurfaceRecoveryStatus::PENDING;
         return status;
     }
@@ -280,13 +285,13 @@ namespace VSL_NAMESPACE::lifetime {
         if (!_device || !retirement_queue().head)
             return;
         try {
-            (void)collect_surface_retirements(LogicalDeviceAccessor{_device});
+            (void)collect_surface_retirements(StartupAccess::FromShared(_device));
         } catch (...) {
         }
     }
     void recover_command_domain(CommandDomain& domain) {
         const auto buffer = domain.buffer;
-        const auto device = device_from_impl(*buffer->command_pool->device).data_;
+        const auto device = StartupAccess::Shared(device_from_impl(*buffer->command_pool->device));
         const auto domains = domain.presentation_domains;
         std::vector<std::shared_ptr<impl::SubmissionWork>> work;
         work.reserve(domain.submissions.size());
@@ -310,7 +315,7 @@ namespace VSL_NAMESPACE::lifetime {
             auto* const surface = ticket.swapchain->surface;
             if (!surface || !surface->owner_node)
                 return;
-            const Surface parent(surface->owner_node->owner_ref().alias(surface).share());
+            const auto parent = StartupAccess::FromOwned(surface->owner_node->owner_ref().alias(surface));
             (void)recover_surface_scope(device, parent, wait ? SurfaceRecoveryMode::WAIT : SurfaceRecoveryMode::POLL, wait);
         } catch (...) {
             // 保留資源はDomain／退避一覧へ残し、次の回収で再試行する。

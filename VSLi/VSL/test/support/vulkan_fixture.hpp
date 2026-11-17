@@ -235,16 +235,16 @@ namespace vsl_test {
     }
 
     inline void VulkanIntegrationTest::TearDown() {
-        if (device.data_ && device.data_->device) {
-            device.data_->device.waitIdle();
+        if (VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device) && VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device) {
+            VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.waitIdle();
             // GPUの完了後に、テストで保持していたコマンドプールを回収する。
             for (auto& pool : _command_pools) {
-                device.data_->device.destroyCommandPool(pool->command_pool);
+                VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.destroyCommandPool(pool->command_pool);
                 pool->command_pool = nullptr;
             }
         }
         _command_pools.clear();
-        device.data_.reset();
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device).reset();
         VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(physical).reset();
         instance.reset();
         for (const auto& error : _validation_errors)

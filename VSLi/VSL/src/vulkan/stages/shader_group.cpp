@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/lifetime/owner_validation.hpp>
 #include <VSL/vulkan/stages/shader_group.hpp>
@@ -8,6 +9,10 @@
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/lifetime/pipeline_layout_storage.hpp>
 #include <VSL/lifetime/shader_access.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
@@ -62,7 +67,7 @@ void VSL_NAMESPACE::pipeline_layout::ShaderGroup::injection(VSL_NAMESPACE::Pipel
     auto sources = info.sources;
 
     for (const auto& itr : data->shaders) {
-        if (!itr || !itr.use_count() || itr->device != pl.get_device().data_.get())
+        if (!itr || !itr.use_count() || itr->device != StartupAccess::Owned(pl.get_device()).get())
             throw std::invalid_argument("Shader group requires modules on the pipeline device");
         (void)VSL_NAMESPACE::operation::shader_stage(*itr);
         lifetime::detail::require_live_owner(itr);

@@ -1,7 +1,12 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/utils/typed_resource_bundle.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::DescriptorManagerAccess;
@@ -51,9 +56,9 @@ namespace VSL_NAMESPACE::typed::detail {
     }
     void validate_bundle_plan(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, std::span<const ResourceAllocationRecord> entries) {
         lifetime::require_device_owner(device);
-        if (!device.data_ || !manager || manager.get_device() != device)
+        if (!StartupAccess::Owned(device) || !manager || manager.get_device() != device)
             throw std::invalid_argument("Typed bundle descriptor manager device mismatch");
-        const auto limits = device.data_->parent_device->device.getProperties().limits;
+        const auto limits = StartupAccess::Owned(device)->parent_device->device.getProperties().limits;
         for (const auto& entry : entries) {
             if (entry.declaration.external || !buffer_descriptor(entry.declaration.kind))
                 continue;

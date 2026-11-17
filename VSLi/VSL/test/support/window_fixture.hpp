@@ -14,7 +14,7 @@ namespace vsl_test {
         void SetUp() override;
         void make_surface() {
             surface = window->add_plugin<vsl::Surface>(vsl::lifetime::detail::StartupAccess::FromShared(instance));
-            ASSERT_TRUE(surface->data_->surface) << "GLFW surface creation failed";
+            ASSERT_TRUE(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(*(surface))->surface) << "GLFW surface creation failed";
         }
         void TearDown() override;
     };
@@ -42,8 +42,8 @@ namespace vsl_test {
     }
 
     inline void WindowIntegrationTest::TearDown() {
-        if (device.data_)
-            device.data_->device.waitIdle();
+        if (VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device))
+            VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.waitIdle();
         if (window)
             window->data_->plugins.clear();
         surface.reset();

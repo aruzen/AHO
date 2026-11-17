@@ -1,8 +1,13 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/buffer_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include <new>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_nothrow_default_constructible_v<impl::BufferImpl>);
@@ -17,7 +22,7 @@ namespace VSL_NAMESPACE::lifetime {
         };
         HeapBufferOwner::HeapBufferOwner(LogicalDeviceAccessor device, const BufferCreateInfo& info) : device(device) {
             require_device_owner(device);
-            construct_buffer(storage, *device.data_, info);
+            construct_buffer(storage, *StartupAccess::Owned(device), info);
         }
         HeapBufferOwner::~HeapBufferOwner() {
             node.retire();
@@ -27,7 +32,7 @@ namespace VSL_NAMESPACE::lifetime {
 
     void construct_buffer(void* storage, LogicalDeviceAccessor device, const BufferCreateInfo& info) {
         require_device_owner(device);
-        construct_buffer(storage, *device.data_, info);
+        construct_buffer(storage, *StartupAccess::Owned(device), info);
     }
     void construct_buffer(void* storage, impl::LogicalDeviceImpl& device, const BufferCreateInfo& info) {
         if (!device.device)

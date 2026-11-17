@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <AHO/resource/arena_buffer.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include <AHO/resource/typed_buffer.hpp>
@@ -148,7 +149,7 @@ namespace {
                 released = true;
             }));
             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-            device.data_->device.waitIdle();
+            VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.waitIdle();
             if (operation == 0)
                 EXPECT_FALSE(buffer->busy());
             else if (operation == 1)

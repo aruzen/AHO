@@ -1,7 +1,12 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/lifetime/image_storage.hpp>
 #include <VSL/lifetime/owner_access.hpp>
 #include <new>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_nothrow_default_constructible_v<impl::ImageImpl>);
@@ -20,7 +25,7 @@ namespace VSL_NAMESPACE::lifetime {
                                        std::shared_ptr<impl::SwapchainImpl> swapchain, vk::Image borrowed)
             : device(device), swapchain(std::move(swapchain)) {
             require_device_owner(device);
-            construct_image(storage, *device.data_, info, borrowed);
+            construct_image(storage, *StartupAccess::Owned(device), info, borrowed);
         }
         HeapImageOwner::~HeapImageOwner() {
             node.retire();
@@ -36,7 +41,7 @@ namespace VSL_NAMESPACE::lifetime {
 
     void construct_image(void* storage, LogicalDeviceAccessor device, const ImageCreateInfo& info, vk::Image borrowed) {
         require_device_owner(device);
-        construct_image(storage, *device.data_, info, borrowed);
+        construct_image(storage, *StartupAccess::Owned(device), info, borrowed);
     }
     void construct_image(void* storage, impl::LogicalDeviceImpl& device, const ImageCreateInfo& info, vk::Image borrowed,
                          const operation::ImageViewNativeCalls& calls) {
@@ -77,7 +82,7 @@ namespace VSL_NAMESPACE::lifetime {
     }
     std::shared_ptr<impl::ImageImpl> make_swapchain_image(LogicalDeviceAccessor device, const ImageCreateInfo& info,
                                                           std::shared_ptr<impl::SwapchainImpl> swapchain, vk::Image image) {
-        if (!swapchain || !image || swapchain->device != device.data_.get())
+        if (!swapchain || !image || swapchain->device != StartupAccess::Owned(device).get())
             throw std::invalid_argument("Borrowed swapchain image requires its owning swapchain and device");
         auto owner = std::make_shared<HeapImageOwner>(device, info, std::move(swapchain), image);
         auto* result = &image_at(owner->storage);

@@ -44,4 +44,28 @@ namespace VSL_NAMESPACE::lifetime::detail {
     PhysicalDevice StartupAccess::FromShared(std::shared_ptr<impl::PhysicalDeviceImpl> owner) {
         return FromOwned(canonical_shared(std::move(owner)));
     }
+    void StartupAccess::RequireCanonical(const OwnedRef<impl::LogicalDeviceImpl>& owner) {
+        require_canonical(owner);
+        if (!owner->device)
+            throw std::invalid_argument("LogicalDeviceAccessor requires a live native handle");
+    }
+    LogicalDeviceAccessor StartupAccess::FromOwned(OwnedRef<impl::LogicalDeviceImpl> owner) {
+        RequireCanonical(owner);
+        return LogicalDeviceAccessor(std::move(owner));
+    }
+    LogicalDeviceAccessor StartupAccess::FromShared(std::shared_ptr<impl::LogicalDeviceImpl> owner) {
+        return FromOwned(canonical_shared(std::move(owner)));
+    }
+    void StartupAccess::RequireCanonical(const OwnedRef<impl::SurfaceImpl>& owner) {
+        require_canonical(owner);
+        if (!owner->surface)
+            throw std::invalid_argument("Surface requires a live native handle");
+    }
+    Surface StartupAccess::FromOwned(OwnedRef<impl::SurfaceImpl> owner) {
+        RequireCanonical(owner);
+        return Surface(std::move(owner));
+    }
+    Surface StartupAccess::FromShared(std::shared_ptr<impl::SurfaceImpl> owner) {
+        return FromOwned(canonical_shared(std::move(owner)));
+    }
 } // namespace VSL_NAMESPACE::lifetime::detail

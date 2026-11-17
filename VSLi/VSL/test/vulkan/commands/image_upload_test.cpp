@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include "support/vulkan_fixture.hpp"
@@ -7,6 +8,10 @@
 #include <VSL/lifetime/buffer_arena.hpp>
 #include <optional>
 #include <array>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::BufferAccess;
@@ -158,7 +163,7 @@ namespace {
                     }
                 }));
                 ASSERT_EQ(submitted.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-                device.data_->device.waitIdle();
+                StartupAccess::Owned(device)->device.waitIdle();
                 recording.emplace(other);
                 if (array && !cancel)
                     *recording << vsl::command::ChangeImageBarrier(image, vsl::ImageLayout::UNDEFINED, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);

@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/device_owner.hpp>
 #include <VSL/define.hpp>
@@ -16,6 +17,10 @@
 #include <VSL/lifetime/identity_access.hpp>
 #include <limits>
 #include <stdexcept>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
@@ -134,11 +139,11 @@ VSL_NAMESPACE::CommandManager VSL_NAMESPACE::CommandManager::FromBuffer(CommandB
     const auto pool = buffer.get_pool();
     const auto device = pool.get_device();
     auto data = std::make_shared<impl::CommandManagerImpl>();
-    data->device = device.data_;
+    data->device = StartupAccess::Shared(device);
     data->command_pool = CommandAccess::Data(pool);
     data->command_buffer = CommandAccess::Data(buffer);
-    data->graphics_queue = device.data_->device.getQueue(device.data_->graphics_family, 0);
-    data->present_queue = device.data_->device.getQueue(device.data_->present_family, 0);
+    data->graphics_queue = StartupAccess::Owned(device)->device.getQueue(StartupAccess::Owned(device)->graphics_family, 0);
+    data->present_queue = StartupAccess::Owned(device)->device.getQueue(StartupAccess::Owned(device)->present_family, 0);
     return lifetime::CommandAccess::Manager(std::move(data), domain);
 }
 
@@ -180,7 +185,7 @@ void VSL_NAMESPACE::CommandManager::wait_idle() {
 VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::CommandManager::get_device() const {
     if (!_data || !_data->device || !_data->device->device)
         throw std::invalid_argument("Command manager is empty");
-    return {_data->device};
+    return StartupAccess::FromShared(_data->device);
 }
 VSL_NAMESPACE::CommandManager VSL_NAMESPACE::CommandManager::independent(std::uint32_t count) const {
     if (!count)

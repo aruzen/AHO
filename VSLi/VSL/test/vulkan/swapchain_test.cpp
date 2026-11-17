@@ -31,7 +31,7 @@ namespace {
         expect_validation_abort("");
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, StartupAccess::Owned(*(surface))->surface))
             GTEST_SKIP() << "Selected graphics queue cannot present to this surface";
         vsl::Swapchain original(device, surface, std::nullopt, 64, 48);
         vsl::PureWindow other("other swapchain surface", 64, 48);
@@ -43,19 +43,19 @@ namespace {
             }
         } close{other};
         auto other_surface = other.add_plugin<vsl::Surface>(vsl::lifetime::detail::StartupAccess::FromShared(instance));
-        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, other_surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, StartupAccess::Owned(*(other_surface))->surface))
             GTEST_SKIP() << "Selected graphics queue cannot present to the second surface";
         EXPECT_THROW((vsl::Swapchain(device, other_surface, original, 64, 48)), std::invalid_argument);
-        auto acquired = device.data_->device.createFenceUnique({});
-        const auto index = device.data_->device.acquireNextImageKHR(SwapchainAccess::Owned(original)->swap_chain, UINT64_MAX, nullptr, *acquired).value;
-        ASSERT_EQ(device.data_->device.waitForFences(*acquired, true, UINT64_MAX), vk::Result::eSuccess);
+        auto acquired = StartupAccess::Owned(device)->device.createFenceUnique({});
+        const auto index = StartupAccess::Owned(device)->device.acquireNextImageKHR(SwapchainAccess::Owned(original)->swap_chain, UINT64_MAX, nullptr, *acquired).value;
+        ASSERT_EQ(StartupAccess::Owned(device)->device.waitForFences(*acquired, true, UINT64_MAX), vk::Result::eSuccess);
         EXPECT_LT(index, original.get_swap_image_size());
     }
 
     TEST_F(SwapchainWindowIntegrationTest, CreatesImagesAndRecreatesUsingOldSwapchain) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, StartupAccess::Owned(*(surface))->surface))
             GTEST_SKIP() << "Selected graphics queue cannot present to this surface";
         vsl::Swapchain first(device, surface, std::nullopt, 64, 48);
         ASSERT_GT(first.get_swap_image_size(), 0u);
@@ -67,7 +67,7 @@ namespace {
         EXPECT_EQ(SwapchainAccess::Owned(first)->swap_chain_extent.height, static_cast<unsigned>(framebuffer_height));
         for (const auto& image : first.images())
             EXPECT_TRUE(static_cast<bool>(ImageAccess::Owned(image)->view));
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         vsl::Swapchain recreated(device, surface, first, 64, 48);
         EXPECT_TRUE(static_cast<bool>(SwapchainAccess::Owned(recreated)->swap_chain));
         EXPECT_EQ(recreated.get_swap_image_size(), recreated.images().size());
@@ -81,16 +81,16 @@ namespace {
     TEST_F(SwapchainReadbackWindowIntegrationTest, ReadsAcquiredSwapchainImageAndRetainsBorrowedImageOwner) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        const auto caps = StartupAccess::Owned(physical)->device.getSurfaceCapabilitiesKHR(surface->data_->surface);
+        const auto caps = StartupAccess::Owned(physical)->device.getSurfaceCapabilitiesKHR(StartupAccess::Owned(*(surface))->surface);
         if (!(caps.supportedUsageFlags & vk::ImageUsageFlagBits::eTransferSrc) ||
-            !StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+            !StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, StartupAccess::Owned(*(surface))->surface))
             GTEST_SKIP() << "Surface cannot provide presentable transfer-source images on selected queue";
         auto chain = std::make_optional<vsl::Swapchain>(device, surface, std::nullopt, 64, 48,
                                                         vsl::ImageType::COLOR_ATTACHMENT | vsl::ImageType::TRANSFER_SRC);
         EXPECT_EQ(chain->get_format(), chain->images().front().get_format());
-        auto acquired = device.data_->device.createFenceUnique({});
-        const auto index = device.data_->device.acquireNextImageKHR(SwapchainAccess::Owned(*(chain))->swap_chain, UINT64_MAX, nullptr, *acquired).value;
-        ASSERT_EQ(device.data_->device.waitForFences(*acquired, true, UINT64_MAX), vk::Result::eSuccess);
+        auto acquired = StartupAccess::Owned(device)->device.createFenceUnique({});
+        const auto index = StartupAccess::Owned(device)->device.acquireNextImageKHR(SwapchainAccess::Owned(*(chain))->swap_chain, UINT64_MAX, nullptr, *acquired).value;
+        ASSERT_EQ(StartupAccess::Owned(device)->device.waitForFences(*acquired, true, UINT64_MAX), vk::Result::eSuccess);
         auto image = chain->images()[index];
         const auto extent = SwapchainAccess::Owned(*(chain))->extent;
         std::weak_ptr<vsl::impl::SwapchainImpl> owner = SwapchainAccess::Owned(*(chain)).share();
@@ -172,7 +172,7 @@ namespace {
     TEST_F(SwapchainWindowIntegrationTest, RetiredOldSwapchainIsRejectedBeforeNativeCreationAndLeavesCurrentUsable) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, StartupAccess::Owned(*(surface))->surface))
             GTEST_SKIP() << "Selected graphics queue cannot present to this surface";
         vsl::Swapchain first(device, surface, std::nullopt, 64, 48);
         vsl::Swapchain current(device, surface, first, 64, 48);
@@ -181,9 +181,9 @@ namespace {
         EXPECT_THROW((vsl::Swapchain(device, surface, first, 64, 48)), std::logic_error);
         EXPECT_EQ(validation_abort_count(), 0u);
         EXPECT_EQ(SwapchainAccess::Owned(current)->swap_chain, active);
-        auto acquired = device.data_->device.createFenceUnique({});
-        const auto index = device.data_->device.acquireNextImageKHR(active, UINT64_MAX, nullptr, *acquired).value;
-        ASSERT_EQ(device.data_->device.waitForFences(*acquired, true, UINT64_MAX), vk::Result::eSuccess);
+        auto acquired = StartupAccess::Owned(device)->device.createFenceUnique({});
+        const auto index = StartupAccess::Owned(device)->device.acquireNextImageKHR(active, UINT64_MAX, nullptr, *acquired).value;
+        ASSERT_EQ(StartupAccess::Owned(device)->device.waitForFences(*acquired, true, UINT64_MAX), vk::Result::eSuccess);
         EXPECT_LT(index, current.get_swap_image_size());
         vsl::Swapchain retry(device, surface, current, 64, 48);
         EXPECT_TRUE(static_cast<bool>(SwapchainAccess::Owned(retry)->swap_chain));
@@ -221,10 +221,10 @@ namespace {
     TEST_F(SwapchainWindowIntegrationTest, NativeSurfaceSupportsTheSelectedCompositeAlpha) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
-        const auto caps = StartupAccess::Owned(physical)->device.getSurfaceCapabilitiesKHR(surface->data_->surface);
+        const auto caps = StartupAccess::Owned(physical)->device.getSurfaceCapabilitiesKHR(StartupAccess::Owned(*(surface))->surface);
         const auto selected = vsl::impl::helper::choose_swapchain_composite_alpha(caps.supportedCompositeAlpha);
         ASSERT_TRUE(static_cast<bool>(caps.supportedCompositeAlpha & selected));
-        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, surface->data_->surface))
+        if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, StartupAccess::Owned(*(surface))->surface))
             GTEST_SKIP() << "Selected graphics queue cannot present to this surface";
         vsl::Swapchain chain(device, surface, std::nullopt, 64, 48);
         EXPECT_TRUE(static_cast<bool>(SwapchainAccess::Owned(chain)->swap_chain));

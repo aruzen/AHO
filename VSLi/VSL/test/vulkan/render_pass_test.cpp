@@ -1,9 +1,14 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <VSL/lifetime/command_domain.hpp>
 #include "support/render_fixture.hpp"
 #include <VSL/lifetime/swapchain_access.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
@@ -26,7 +31,7 @@ namespace {
     TEST_F(RenderPassVulkanIntegrationTest, CreatesPublicRenderPassAndPickingImagesAtRequestedExtent) {
         vsl::RenderPass normal(description);
         EXPECT_TRUE(static_cast<bool>(GraphicsAccess::Owned(normal)->render_pass));
-        EXPECT_EQ(GraphicsAccess::Owned(normal)->device, device.data_.get());
+        EXPECT_EQ(GraphicsAccess::Owned(normal)->device, StartupAccess::Owned(device).get());
         vsl::IDPickingRenderPass picking(description);
         ASSERT_EQ(picking.image_count(), 1u);
         EXPECT_EQ(ImageAccess::Owned(picking.picking_image(0))->width, 8u);
@@ -113,7 +118,7 @@ namespace {
                 owner.reset();
                 ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
             }
-            device.data_->device.waitIdle();
+            StartupAccess::Owned(device)->device.waitIdle();
             buffers->recording_context->acquired_image_index = 1;
             EXPECT_EQ(picking->read(manager, ready, 0, 0), 102u);
             EXPECT_TRUE(called);

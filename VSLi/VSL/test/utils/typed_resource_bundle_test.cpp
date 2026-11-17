@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/descriptor_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/sampler_access.hpp>
@@ -6,6 +7,10 @@
 #include <VSL/lifetime/native_recording.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include "support/vulkan_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
@@ -561,7 +566,7 @@ namespace {
         EXPECT_EQ(descriptors.allocations, 0u);
         using Limited = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>>>, t::BufferAllocation<0, 0, t::RuntimeElements>>;
         t::ResourceAllocationSizes<Limited> capacity;
-        capacity.set<0, 0>(size_t(device.data_->parent_device->device.getProperties().limits.maxUniformBufferRange) / 4 + 1);
+        capacity.set<0, 0>(size_t(StartupAccess::Owned(device)->parent_device->device.getProperties().limits.maxUniformBufferRange) / 4 + 1);
         EXPECT_THROW((t::TypedResourceBundle<Limited>(manager, descriptors, capacity)), std::out_of_range);
         EXPECT_EQ(descriptors.allocations, 0u);
         const auto identity = DescriptorManagerAccess::Data(descriptors);

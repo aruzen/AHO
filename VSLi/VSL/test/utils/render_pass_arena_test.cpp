@@ -52,7 +52,7 @@ namespace {
         EXPECT_THROW(empty.get_device(), std::invalid_argument);
         vsl::LogicalDeviceAccessor missing;
         EXPECT_THROW((vsl::RenderPass(missing, vsl::RenderPassDescription{})), std::invalid_argument);
-        missing.data_ = std::make_shared<vsl::impl::LogicalDeviceImpl>();
+        StartupAccess::Owned(missing) = std::make_shared<vsl::impl::LogicalDeviceImpl>();
         EXPECT_THROW((vsl::RenderPass(missing, vsl::RenderPassDescription{})), std::invalid_argument);
     }
     TEST(RenderPassPlacementTest, MissingDescriptionIsRejectedByBothClearConstructors) {
@@ -85,9 +85,9 @@ namespace {
             EXPECT_EQ(first.description().attachments.size(), 1u);
             EXPECT_EQ(second.description().attachments.size(), 1u);
             device_only = first.get_device();
-            EXPECT_EQ(device_only.data_, device.data_);
-            EXPECT_FALSE(device_only.data_.owner_before(device.data_));
-            EXPECT_FALSE(device.data_.owner_before(device_only.data_));
+            EXPECT_EQ(StartupAccess::Owned(device_only), StartupAccess::Owned(device));
+            EXPECT_FALSE(StartupAccess::Owned(device_only).owner_before(StartupAccess::Owned(device)));
+            EXPECT_FALSE(StartupAccess::Owned(device).owner_before(StartupAccess::Owned(device_only)));
             EXPECT_THROW(arena.render_pass({99}), std::out_of_range);
             EXPECT_THROW(arena.buffer({1}), std::invalid_argument);
             kept = first;
@@ -96,7 +96,7 @@ namespace {
         EXPECT_EQ(kept->description().attachments.size(), 1u);
         kept.reset();
         EXPECT_TRUE(owner.expired());
-        EXPECT_EQ(device_only.data_, device.data_);
+        EXPECT_EQ(StartupAccess::Owned(device_only), StartupAccess::Owned(device));
     }
     TEST_F(RenderPassArenaVulkanIntegrationTest, ImportsKeepTheOriginalOwnerAndRejectNonownersOrAnotherDevice) {
         constexpr std::array<t::ResourceRequest, 2> requests{{{{1}, s::ResourceKind::RENDER_PASS, true}, {{2}, s::ResourceKind::BUFFER}}};

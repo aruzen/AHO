@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/graphics_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
@@ -11,6 +12,10 @@
 #include <VSL/utils/typed_pipeline.hpp>
 #include <functional>
 #include <ranges>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
@@ -73,7 +78,7 @@ namespace {
         hook.reset();
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         // 結果をpollせず、次のImage使用登録で完了callbackを実行させる。
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
     }
     void FrameBufferArenaVulkanIntegrationTest::expect_clear(vsl::CommandManager manager, vsl::ImageAccessor image, std::array<std::uint8_t, 4> expected) {
         const auto bytes = vsl_test::read_image(manager, image, vsl::ImageLayout::GENERAL);
@@ -193,16 +198,16 @@ namespace {
             EXPECT_FALSE(GraphicsAccess::Owned(kept).owner_before(GraphicsAccess::Owned(source)));
             EXPECT_FALSE(GraphicsAccess::Owned(source).owner_before(GraphicsAccess::Owned(kept)));
             device_only = target.get_device();
-            EXPECT_EQ(device_only.data_, device.data_);
-            EXPECT_FALSE(device_only.data_.owner_before(device.data_));
-            EXPECT_FALSE(device.data_.owner_before(device_only.data_));
+            EXPECT_EQ(StartupAccess::Owned(device_only), StartupAccess::Owned(device));
+            EXPECT_FALSE(StartupAccess::Owned(device_only).owner_before(StartupAccess::Owned(device)));
+            EXPECT_FALSE(StartupAccess::Owned(device).owner_before(StartupAccess::Owned(device_only)));
         }
         EXPECT_TRUE(target_owner.expired());
         EXPECT_TRUE(image_owner.expired());
         EXPECT_FALSE(pass_owner.expired());
         kept = {};
         EXPECT_TRUE(pass_owner.expired());
-        EXPECT_EQ(device_only.data_, device.data_);
+        EXPECT_EQ(StartupAccess::Owned(device_only), StartupAccess::Owned(device));
     }
     TEST_F(FrameBufferArenaVulkanIntegrationTest, DirectPassAndImageEdgesAndFramebufferImportsRejectReverseDependencies) {
         using Set = t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::FRAGMENT>>;
@@ -278,14 +283,14 @@ namespace {
             const vsl::operation::FrameBufferNativeFactory factory{&failure, NativeFailure::Create, NativeFailure::Destroy};
             vsl::impl::FrameBufferImpl target;
             const vsl::operation::FrameBufferInput definition{GraphicsAccess::Owned(*(pass)).get(), WIDTH, HEIGHT, 1, {{ImageAccess::Owned(*(color)).get()}, {ImageAccess::Owned(*(color)).get()}, {ImageAccess::Owned(*(color)).get()}, {ImageAccess::Owned(*(color)).get()}}};
-            EXPECT_THROW(vsl::operation::initialize_frame_buffer(target, *device.data_, definition, factory), std::runtime_error);
+            EXPECT_THROW(vsl::operation::initialize_frame_buffer(target, *StartupAccess::Owned(device), definition, factory), std::runtime_error);
             EXPECT_EQ(failure.created.size(), fail_at - 1);
             EXPECT_EQ(failure.destroyed.size(), fail_at - 1);
             EXPECT_TRUE(std::ranges::equal(failure.created | std::views::reverse, failure.destroyed));
             EXPECT_TRUE(std::ranges::all_of(target.swap_chain_framebuffers, [](const auto value) { return !value; }));
-            EXPECT_NO_THROW(vsl::operation::initialize_frame_buffer(target, *device.data_, definition));
+            EXPECT_NO_THROW(vsl::operation::initialize_frame_buffer(target, *StartupAccess::Owned(device), definition));
             EXPECT_TRUE(std::ranges::all_of(target.swap_chain_framebuffers, [](const auto value) { return bool(value); }));
-            EXPECT_THROW(vsl::operation::initialize_frame_buffer(target, *device.data_, definition), std::logic_error);
+            EXPECT_THROW(vsl::operation::initialize_frame_buffer(target, *StartupAccess::Owned(device), definition), std::logic_error);
         }
     }
     TEST_F(FrameBufferArenaVulkanIntegrationTest, DirectInputsAndImportsRejectNonowningAccessors) {

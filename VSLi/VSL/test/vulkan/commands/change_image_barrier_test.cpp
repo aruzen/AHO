@@ -1,5 +1,10 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
 #include "support/image_transfer_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::ImageAccess;
@@ -57,7 +62,7 @@ namespace {
                                                       vsl::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
             EXPECT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         }
-        EXPECT_NO_THROW(device.data_->device.waitIdle());
+        EXPECT_NO_THROW(StartupAccess::Owned(device)->device.waitIdle());
     }
 
     TEST_F(ChangeImageBarrierVulkanIntegrationTest, RejectsLayerRangesOutsideTheImageBeforeRecording) {

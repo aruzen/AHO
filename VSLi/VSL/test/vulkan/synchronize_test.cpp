@@ -1,3 +1,4 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
@@ -12,6 +13,10 @@
 #include <exception>
 #include <functional>
 #include <limits>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SynchronizationAccess;
@@ -44,7 +49,7 @@ namespace {
         void TearDown() override;
     };
     SubmittedFence::SubmittedFence(vsl::FenceHolder fence, std::uint32_t index) : work(std::make_shared<vsl::impl::SubmissionWork>()) {
-        work->device = fence.get_device().data_;
+        work->device = StartupAccess::Shared(fence.get_device());
         work->external_fence = SynchronizationAccess::Owned(fence).get();
         vsl::lifetime::retain_until_complete(*work, SynchronizationAccess::Owned(fence).share());
         work->synchronization_owners[static_cast<size_t>(vsl::impl::SubmissionSource::FENCE)] = 0;
@@ -83,7 +88,7 @@ namespace {
         many.reset(1);
         EXPECT_FALSE(single.wait(std::uint64_t{0}));
         EXPECT_FALSE(many.wait(1, std::uint64_t{0}));
-        auto queue = device.data_->device.getQueue(queue_family, 0);
+        auto queue = StartupAccess::Owned(device)->device.getQueue(queue_family, 0);
         queue.submit(vk::SubmitInfo{}, SynchronizationAccess::Owned(single)->fences[0]);
         queue.submit(vk::SubmitInfo{}, SynchronizationAccess::Owned(many)->fences[1]);
         EXPECT_TRUE(single.wait());
@@ -135,9 +140,9 @@ namespace {
         vsl::lifetime::reserve_acquire_fence(SynchronizationAccess::Owned(fence).share(), 0, next);
         vsl::lifetime::release_acquire_fence(*SynchronizationAccess::Owned(fence), 0, first);
         EXPECT_THROW(fence.reset(0), std::logic_error);
-        device.data_->device.getQueue(queue_family, 0).submit(vk::SubmitInfo{}, SynchronizationAccess::Owned(fence)->fences[0]);
+        StartupAccess::Owned(device)->device.getQueue(queue_family, 0).submit(vk::SubmitInfo{}, SynchronizationAccess::Owned(fence)->fences[0]);
         next->status = vsl::sync::FenceProofStatus::PENDING;
-        ASSERT_EQ(device.data_->device.waitForFences(SynchronizationAccess::Owned(fence)->fences[0], true, UINT64_MAX), vk::Result::eSuccess);
+        ASSERT_EQ(StartupAccess::Owned(device)->device.waitForFences(SynchronizationAccess::Owned(fence)->fences[0], true, UINT64_MAX), vk::Result::eSuccess);
         EXPECT_NO_THROW(fence.reset(0));
         EXPECT_EQ(next->status, vsl::sync::FenceProofStatus::COMPLETE);
         EXPECT_FALSE(fence.wait(0, 0));
@@ -147,7 +152,7 @@ namespace {
     TEST_F(SynchronizeVulkanIntegrationTest, UnknownPresentEnqueueAllowsOnlyPollingAndRejectsReuse) {
         auto fence = manager->create_fence("unknown present", std::size_t{2});
         auto state = std::make_shared<vsl::sync::PresentState>();
-        state->device = device.data_->device;
+        state->device = StartupAccess::Owned(device)->device;
         state->strict = true;
         vsl::lifetime::reserve_present_fence(SynchronizationAccess::Owned(fence).share(), 0, state);
         EXPECT_THROW(vsl::lifetime::reserve_present_fence(SynchronizationAccess::Owned(fence).share(), 1, state), std::invalid_argument);
@@ -178,7 +183,7 @@ namespace {
             commands.get_buffer().retain_until_complete(callback.owner());
             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         }
-        ASSERT_EQ(device.data_->device.waitForFences(SynchronizationAccess::Owned(fence)->fences[0], true, UINT64_MAX), vk::Result::eSuccess);
+        ASSERT_EQ(StartupAccess::Owned(device)->device.waitForFences(SynchronizationAccess::Owned(fence)->fences[0], true, UINT64_MAX), vk::Result::eSuccess);
         vsl::lifetime::reserve_acquire_fence(SynchronizationAccess::Owned(fence).share(), 0, requested);
         EXPECT_TRUE(invoked);
         EXPECT_FALSE(requested);
@@ -212,7 +217,7 @@ namespace {
             b = phase.completion();
             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         }
-        ASSERT_EQ(device.data_->device.waitForFences(SynchronizationAccess::Owned(fence)->fences, true, UINT64_MAX), vk::Result::eSuccess);
+        ASSERT_EQ(StartupAccess::Owned(device)->device.waitForFences(SynchronizationAccess::Owned(fence)->fences, true, UINT64_MAX), vk::Result::eSuccess);
         const vsl::operation::ScopedSubmissionNativeCalls native({.wait_fences = +[](void*, VkDevice, std::uint32_t, const VkFence*, VkBool32, std::uint64_t) noexcept {
             return VK_ERROR_DEVICE_LOST;
         }});
@@ -262,7 +267,7 @@ namespace {
     TEST_F(SynchronizeVulkanIntegrationTest, AcquisitionObservationBlocksFenceReuseAndKeepsASavedTerminalProof) {
         auto fence = manager->create_fence("proof", true);
         auto proof = std::make_shared<vsl::sync::FenceProof>();
-        proof->device = device.data_->device;
+        proof->device = StartupAccess::Owned(device)->device;
         proof->fence = SynchronizationAccess::Owned(fence)->fences[0];
         proof->status = vsl::sync::FenceProofStatus::PENDING;
         SynchronizationAccess::Owned(fence)->uses[0].use = std::weak_ptr<vsl::sync::FenceProof>(proof);
@@ -355,7 +360,7 @@ namespace {
                 result = phase.completion();
                 ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
             }
-            device.data_->device.waitIdle();
+            StartupAccess::Owned(device)->device.waitIdle();
             if (operation == 0)
                 EXPECT_TRUE(holder.wait());
             else if (operation == 1)
@@ -439,7 +444,7 @@ namespace {
             commands.get_buffer().retain_until_complete(callback.owner());
             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         holder.destroy();
         EXPECT_TRUE(invoked);
         EXPECT_TRUE(registry.expired());
@@ -490,7 +495,7 @@ namespace {
             first.get_buffer().retain_until_complete(callback.owner());
             ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         auto phase = next.start_phase<vsl::ComputePhase>(std::nullopt, std::nullopt, fence);
         EXPECT_TRUE(invoked);
         EXPECT_EQ(phase.completion().status(), vsl::Completion::Status::PENDING);
@@ -604,7 +609,7 @@ namespace {
 
     void SynchronizeVulkanIntegrationTest::TearDown() {
         if (manager) {
-            device.data_->device.waitIdle();
+            StartupAccess::Owned(device)->device.waitIdle();
             manager.reset();
         }
         VulkanIntegrationTest::TearDown();

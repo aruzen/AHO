@@ -53,7 +53,7 @@ namespace {
                 info.extensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
         auto other = vsl::VulkanAccessor::Create(std::move(info));
         auto selected = vsl::PhysicalDevice::Select(other);
-        using Device = vsl::LogicalDevice<vsl::LogicalDeviceGraphicCreator<false>>;
+        using Device = vsl::LogicalDevice<vsl::GraphicsDeviceCreator<false>>;
         EXPECT_THROW((Device(selected, *surface)), std::invalid_argument);
     }
     TEST_F(LogicalDeviceWindowIntegrationTest, BothSurfaceOverloadsCreateUsableQueuesAndRetainPhysicalOwner) {
@@ -71,14 +71,14 @@ namespace {
             GTEST_SKIP()
                 << "Public logical-device constructor requires VK_KHR_portability_subset on non-MSVC platforms";
 #endif
-        using Device = vsl::LogicalDevice<vsl::LogicalDeviceGraphicCreator<false>>;
+        using Device = vsl::LogicalDevice<vsl::GraphicsDeviceCreator<false>>;
         Device by_pointer(physical, surface), by_value(physical, *surface);
         EXPECT_EQ(StartupAccess::Owned(by_pointer.get_physical_device()), StartupAccess::Owned(physical));
         EXPECT_EQ(StartupAccess::Owned(by_value.get_physical_device()), StartupAccess::Owned(physical));
-        EXPECT_TRUE(static_cast<bool>(by_pointer.data_->device.getQueue(by_pointer.data_->graphics_family, 0)));
-        EXPECT_TRUE(static_cast<bool>(by_value.data_->device.getQueue(by_value.data_->present_family, 0)));
-        by_pointer.data_->device.waitIdle();
-        by_value.data_->device.waitIdle();
+        EXPECT_TRUE(static_cast<bool>(StartupAccess::Owned(by_pointer)->device.getQueue(StartupAccess::Owned(by_pointer)->graphics_family, 0)));
+        EXPECT_TRUE(static_cast<bool>(StartupAccess::Owned(by_value)->device.getQueue(StartupAccess::Owned(by_value)->present_family, 0)));
+        StartupAccess::Owned(by_pointer)->device.waitIdle();
+        StartupAccess::Owned(by_value)->device.waitIdle();
     }
     TEST_F(DeviceVulkanIntegrationTest, SearchReturnsAnEnumeratedDeviceAndBenchmarkMatchesHardwareClass) {
         vsl::PhysicalDevices<vsl::PhysicalDevicesSercher> candidates(vsl::lifetime::detail::StartupAccess::FromShared(instance));
@@ -99,12 +99,12 @@ namespace {
 
 namespace {
     struct SuppliedLogicalDeviceCreator {
-        static inline std::shared_ptr<vsl::impl::LogicalDeviceImpl> SUPPLIED;
+        static inline vsl::LogicalDeviceAccessor SUPPLIED;
         static inline std::shared_ptr<vsl::impl::PhysicalDeviceImpl> RECEIVED_PHYSICAL;
         static inline std::shared_ptr<vsl::impl::SurfaceImpl> RECEIVED_SURFACE;
-        std::shared_ptr<vsl::impl::LogicalDeviceImpl> create(vsl::PhysicalDevice physical, vsl::Surface surface) {
+        vsl::LogicalDeviceAccessor create(vsl::PhysicalDevice physical, vsl::Surface surface) {
             RECEIVED_PHYSICAL = StartupAccess::Shared(physical);
-            RECEIVED_SURFACE = surface.data_;
+            RECEIVED_SURFACE = StartupAccess::Shared(surface);
             return SUPPLIED;
         }
     };
@@ -113,22 +113,26 @@ namespace {
         ASSERT_FALSE(HasFatalFailure());
         struct ResetCreator {
             ~ResetCreator() {
-                SuppliedLogicalDeviceCreator::SUPPLIED.reset();
+                SuppliedLogicalDeviceCreator::SUPPLIED = {};
                 SuppliedLogicalDeviceCreator::RECEIVED_PHYSICAL.reset();
                 SuppliedLogicalDeviceCreator::RECEIVED_SURFACE.reset();
             }
         } cleanup;
-        SuppliedLogicalDeviceCreator::SUPPLIED = device.data_;
+        SuppliedLogicalDeviceCreator::SUPPLIED = device;
         using Device = vsl::LogicalDevice<SuppliedLogicalDeviceCreator>;
         Device by_value(physical, *surface);
-        EXPECT_EQ(by_value.data_, device.data_);
+        EXPECT_EQ(StartupAccess::Owned(by_value), StartupAccess::Owned(device));
         EXPECT_EQ(StartupAccess::Owned(by_value.get_physical_device()), StartupAccess::Owned(physical));
         EXPECT_EQ(SuppliedLogicalDeviceCreator::RECEIVED_PHYSICAL, StartupAccess::Owned(physical));
-        EXPECT_EQ(SuppliedLogicalDeviceCreator::RECEIVED_SURFACE, surface->data_);
+        EXPECT_EQ(SuppliedLogicalDeviceCreator::RECEIVED_SURFACE, StartupAccess::Owned(*(surface)));
         Device by_pointer(physical, surface);
-        EXPECT_EQ(by_pointer.data_, device.data_);
+        EXPECT_EQ(StartupAccess::Owned(by_pointer), StartupAccess::Owned(device));
         EXPECT_EQ(StartupAccess::Owned(by_pointer.get_physical_device()), StartupAccess::Owned(physical));
-        EXPECT_TRUE(static_cast<bool>(by_pointer.data_->device.getQueue(queue_family, 0)));
+        EXPECT_TRUE(static_cast<bool>(StartupAccess::Owned(by_pointer)->device.getQueue(queue_family, 0)));
+        const auto another = vsl::PhysicalDevice::Select(StartupAccess::FromShared(instance));
+        EXPECT_THROW((Device(another, *surface)), std::invalid_argument);
+        SuppliedLogicalDeviceCreator::SUPPLIED = {};
+        EXPECT_THROW((Device(physical, *surface)), std::invalid_argument);
     }
 } // namespace
 

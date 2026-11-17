@@ -172,6 +172,12 @@
     <ClInclude Include="AHO\include\AHO\engine.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="AHO\src\engine\engine_state.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="AHO\src\engine\engine_access.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClInclude Include="AHO\include\AHO\render_context.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="AHO\include\AHO\window.hpp">
       <Filter>ヘッダー ファイル</Filter>

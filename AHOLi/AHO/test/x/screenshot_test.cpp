@@ -1,3 +1,7 @@
+#include "../../src/engine/engine_access.hpp"
+namespace {
+    using AHO_NAMESPACE::engine::detail::EngineAccess;
+}
 #include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include <AHO/x/screenshot.hpp>
@@ -132,7 +136,7 @@ namespace {
     void ScreenshotWindowIntegration::require_readback() {
         start_engine();
         const auto window = engine->get_window();
-        const auto device = VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(engine->data()->logical_device);
+        const auto device = VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(EngineAccess::State(*(engine))->logical_device);
         const auto caps = device->parent_device->device.getSurfaceCapabilitiesKHR(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(*(window.data2->surface))->surface);
         if (!(caps.supportedUsageFlags & vk::ImageUsageFlagBits::eTransferSrc))
             GTEST_SKIP() << "Surface does not support TransferSrc";
@@ -164,14 +168,14 @@ namespace {
         EXPECT_FALSE(phase);
         EXPECT_FALSE(screenshot.ready());
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
-        engine->data()->command_manager.wait_idle();
+        EngineAccess::State(*(engine))->command_manager.wait_idle();
     }
     TEST_F(ScreenshotWindowIntegration, CompletionCallbackCancellingTheCurrentFramePreventsAttachingANewReadback) {
         ASSERT_NO_FATAL_FAILURE(require_readback());
         if (IsSkipped())
             return;
         aho::x::Screenshot screenshot(engine->get_window());
-        auto manager = engine->data()->command_manager;
+        auto manager = EngineAccess::State(*(engine))->command_manager;
         ASSERT_GT(manager.get_buffer().get_size(), 1u);
         std::unique_ptr<aho::DrawPhase> current;
         bool callback = false;
@@ -195,7 +199,7 @@ namespace {
         current = std::make_unique<aho::DrawPhase>(*engine, clear(0, 1, 0));
         ASSERT_FALSE(callback);
         ASSERT_TRUE(current->recording());
-        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(engine->data()->logical_device)->device.waitIdle();
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(EngineAccess::State(*(engine))->logical_device)->device.waitIdle();
         gate.ready = true;
         EXPECT_FALSE(screenshot.capture(*current));
         EXPECT_TRUE(callback);

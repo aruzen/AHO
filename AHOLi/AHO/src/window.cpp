@@ -1,3 +1,7 @@
+#include "engine/engine_access.hpp"
+namespace {
+    using AHO_NAMESPACE::engine::detail::EngineAccess;
+}
 #include <AHO/window.hpp>
 #include "window_impl.hpp"
 #include <VSL/lifetime/startup_arena.hpp>
@@ -108,8 +112,8 @@ namespace {
     }
 
     const std::string& checked_window_name(const std::string& name, const AHO_NAMESPACE::engine::EngineAccessor& engine) {
-        const auto& data = engine.data();
-        if (!data || !data->vulkan_instance || !data->logical_device ||
+        const auto& data = EngineAccess::State(engine);
+        if (!data || !data->logical_device ||
             !data->command_manager)
             throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "A booted engine is required");
         auto buffers = data->command_manager.get_buffer();
@@ -176,7 +180,7 @@ std::shared_ptr<VSL_NAMESPACE::Surface> AHO_NAMESPACE::window::detail::make_wind
 std::shared_ptr<AHO_NAMESPACE::window::WindowData> AHO_NAMESPACE::window::detail::make_window_data(
     const engine::EngineAccessor& engine, std::shared_ptr<VSL_NAMESPACE::Surface> surface,
     std::optional<VSL_NAMESPACE::PresentFencePolicy> present_fences) {
-    const auto engine_data = engine.data();
+    const auto engine_data = EngineAccess::State(engine);
     auto& data = *engine_data;
     const VSL_NAMESPACE::SwapchainCreateInfo info{.present_fences = present_fences.value_or(data.present_fences)};
     auto swapchain = VSL_NAMESPACE::lifetime::SwapchainArena(data.logical_device, *surface, info).view();
@@ -200,7 +204,7 @@ std::shared_ptr<AHO_NAMESPACE::window::WindowData> AHO_NAMESPACE::window::detail
 
 AHO_NAMESPACE::engine::EngineAccessor AHO_NAMESPACE::window::Window::DefaultEngine() {
     auto current = AHO_NAMESPACE::engine::DefaultEngineRegistration::Current();
-    if (!current.data())
+    if (!EngineAccess::State(current))
         throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "A booted engine is required");
     return current;
 }
@@ -212,15 +216,14 @@ AHO_NAMESPACE::window::Window::Window(std::string name, int width, int height, A
     const auto os = window_owner();
     try {
         engine = engine_;
-        auto surface = detail::make_window_surface(*this, engine_.data()->vulkan_instance);
+        auto surface = detail::make_window_surface(*this, engine_.instance());
         auto drawing = detail::make_window_data(engine, std::move(surface), present_fences);
         if (data_ != data || !data->window_handle || data->window_handle != os.native_handle())
             throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "Window closed during drawing resource creation");
         data2 = std::move(drawing);
         detail::WindowClose::Install(*this);
     } catch (...) {
-        data_->plugins.clear();
-        VSL_NAMESPACE::PureWindow::close();
+        VSL_NAMESPACE::PureWindow(data).close();
         throw;
     }
 }
@@ -247,11 +250,11 @@ bool AHO_NAMESPACE::window::Window::resize(int width, int height) {
 }
 
 void AHO_NAMESPACE::window::Window::check_recreation_allowed() {
-    if (!*this || !data2 || data2->closed || !engine.data())
+    if (!*this || !data2 || data2->closed || !EngineAccess::State(engine))
         throw std::logic_error("Swapchain recreation requires a live AHO window");
     if (std::find(RECREATING_WINDOWS.begin(), RECREATING_WINDOWS.end(), data2) != RECREATING_WINDOWS.end())
         throw std::logic_error("Swapchain recreation is already in progress");
-    if (auto* phase = AHO_NAMESPACE::DrawPhase::CurrentForManager(engine.data()->command_manager);
+    if (auto* phase = AHO_NAMESPACE::DrawPhase::CurrentForManager(EngineAccess::State(engine)->command_manager);
         phase && phase->state == VSL_NAMESPACE::ComputePhase::State::WAIT_SUBMIT)
         throw std::logic_error("Cannot recreate a swapchain while recording a DrawPhase");
 }
@@ -261,7 +264,7 @@ bool AHO_NAMESPACE::window::Window::recreate_swapchain(VSL_NAMESPACE::ImageType 
     check_recreation_allowed();
     const auto data = data_;
     const auto drawing = data2;
-    const auto runtime = engine.data();
+    const auto runtime = EngineAccess::State(engine);
     auto manager = runtime->command_manager;
     const auto os = window_owner();
     // callbackがwindowを閉じても、共有状態を生存させて確実にガードを解除する。

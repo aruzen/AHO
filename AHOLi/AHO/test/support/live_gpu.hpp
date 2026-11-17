@@ -1,3 +1,7 @@
+#include "../../src/engine/engine_access.hpp"
+namespace {
+    using AHO_NAMESPACE::engine::detail::EngineAccess;
+}
 #pragma once
 #include <VSL/lifetime/startup_access.hpp>
 #include <gtest/gtest.h>
@@ -72,8 +76,8 @@ namespace aho_test {
     }
 
     inline void LiveGPUTest::TearDown() {
-        if (engine && engine->data() && VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(engine->data()->logical_device))
-            VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(engine->data()->logical_device)->device.waitIdle();
+        if (engine && EngineAccess::State(*(engine)) && VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(EngineAccess::State(*(engine))->logical_device))
+            VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(EngineAccess::State(*(engine))->logical_device)->device.waitIdle();
         if (engine && engine->boot_window && engine->boot_window->data_ && engine->boot_window->data_->window_handle)
             engine->boot_window->close();
         engine.reset();

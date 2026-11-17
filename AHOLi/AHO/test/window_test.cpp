@@ -1,3 +1,7 @@
+#include "../src/engine/engine_access.hpp"
+namespace {
+    using AHO_NAMESPACE::engine::detail::EngineAccess;
+}
 #ifdef AHO_GPU_TESTS
 #include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
@@ -59,8 +63,11 @@ namespace {
     };
     CloseTargetEngine::CloseTargetEngine(aho::engine::EngineAccessor runtime, aho::Window window)
         : selected(std::move(window)) {
-        reset_data(std::make_shared<aho::engine::EngineData>(*runtime.data()));
-        data()->command_manager = runtime.data()->command_manager.independent(1);
+        set_runtime(aho::engine::EngineAccessor::Create({.device = runtime.device(),
+                                                         .commands = runtime.commands().independent(1),
+                                                         .descriptor_manager = runtime.descriptor_manager(),
+                                                         .synchronization = runtime.synchronization(),
+                                                         .present_fences = runtime.present_fences()}));
     }
     void CloseNativeProbe::callback(std::function<void()>& function) {
         if (auto call = std::exchange(function, {})) {
@@ -148,7 +155,7 @@ namespace {
         EXPECT_TRUE(generation.expired());
         EXPECT_TRUE(frames.expired());
         EXPECT_TRUE(surface.expired());
-        EXPECT_TRUE(engine->data());
+        EXPECT_TRUE(EngineAccess::State(*(engine)));
     }
     TEST_F(AHOWindowVulkanIntegration, TitlebarCloseUsesTheGraphicsPathForSharedDataWindows) {
         ASSERT_NO_THROW(start_engine());
@@ -261,7 +268,7 @@ namespace {
                 EXPECT_EQ(probe.nested, 0u);
                 phase.reset();
                 runtime.reset();
-                EXPECT_EQ(vsl::lifetime::collect_surface_retirements(engine->data()->logical_device, vsl::lifetime::SurfaceRecoveryMode::WAIT),
+                EXPECT_EQ(vsl::lifetime::collect_surface_retirements(EngineAccess::State(*(engine))->logical_device, vsl::lifetime::SurfaceRecoveryMode::WAIT),
                           vsl::lifetime::SurfaceRecoveryStatus::COMPLETE);
                 EXPECT_EQ(result.status(), vsl::Completion::Status::CANCELLED);
                 EXPECT_TRUE(generation.expired());
@@ -307,7 +314,7 @@ namespace {
             }
             EXPECT_EQ(probe.nested, 0u);
             EXPECT_EQ(finishes, boundary < 2 ? 0u : 1u);
-            EXPECT_EQ(vsl::lifetime::collect_surface_retirements(engine->data()->logical_device, vsl::lifetime::SurfaceRecoveryMode::WAIT),
+            EXPECT_EQ(vsl::lifetime::collect_surface_retirements(EngineAccess::State(*(engine))->logical_device, vsl::lifetime::SurfaceRecoveryMode::WAIT),
                       vsl::lifetime::SurfaceRecoveryStatus::COMPLETE);
             EXPECT_TRUE(generation.expired());
             EXPECT_TRUE(frames.expired());
@@ -505,7 +512,7 @@ namespace {
     TEST_F(AHOWindowVulkanIntegration, CompletionCallbackCanCloseTheWindowWhileRecreationWaits) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
-        auto manager = engine->data()->command_manager;
+        auto manager = EngineAccess::State(*(engine))->command_manager;
         auto phase = manager.start_phase<vsl::ComputePhase>();
         bool callback = false;
         manager.get_buffer().retain_until_complete(std::shared_ptr<int>(new int(0), [&](int* value) {
@@ -609,7 +616,7 @@ namespace {
     TEST_F(AHOWindowVulkanIntegration, RecordingGuardFindsTheOuterPhaseOfAnotherEngine) {
         ASSERT_NO_THROW(start_engine());
         auto close_engine = [](aho::StandardEngine* other) {
-            other->data()->command_manager.wait_idle();
+            EngineAccess::State(*(other))->command_manager.wait_idle();
             other->boot_window->close();
             delete other;
         };
@@ -779,7 +786,7 @@ namespace {
         const vsl::lifetime::SwapchainMemoryFactory fail = [](const vsl::storage::SwapchainLayout&) -> vsl::storage::ArenaMemory {
             throw std::bad_alloc{};
         };
-        EXPECT_THROW((vsl::lifetime::SwapchainArena{engine->data()->logical_device, *window.data2->surface, {}, previous, fail}), std::bad_alloc);
+        EXPECT_THROW((vsl::lifetime::SwapchainArena{EngineAccess::State(*(engine))->logical_device, *window.data2->surface, {}, previous, fail}), std::bad_alloc);
         EXPECT_EQ(window.data2->swapchain.state(), vsl::SwapchainState::RETIRED);
         EXPECT_TRUE(static_cast<bool>(window));
         EXPECT_TRUE(window.recreate_swapchain());
@@ -789,20 +796,41 @@ namespace {
     }
     TEST_F(AHOWindowVulkanIntegration, GraphicsInitializationFailureUnregistersTheNewNativeWindow) {
         ASSERT_NO_THROW(start_engine());
-        aho::engine::EngineAccessor failing(std::make_shared<aho::engine::EngineData>(*engine->data()));
-        vsl::InstanceCreateInfo info;
-        info.extensions.emplace_back(VK_KHR_SURFACE_EXTENSION_NAME);
-#ifdef __APPLE__
-        info.extensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-#endif
-        const auto unsupported = vsl::VulkanAccessor::Create(std::move(info));
-        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(failing.data()->vulkan_instance) = VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(unsupported);
-        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(failing.data()->vulkan_instance) = VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(unsupported);
         const auto previous = vsl::PureWindow::WINDOWS;
-        const auto previous_default = aho::engine::DefaultEngineRegistration::Current().data();
-        EXPECT_THROW((aho::Window("cannot create graphics", 48, 32, failing)), vsl::exceptions::RuntimeException);
+        const auto previous_default = EngineAccess::State(aho::engine::DefaultEngineRegistration::Current());
+        struct FailureState {
+            unsigned creates = 0, closes = 0;
+        } state;
+        const auto create = [](void* context, VkDevice device, const VkSwapchainCreateInfoKHR* info, VkSwapchainKHR* output) {
+            auto& state = *static_cast<FailureState*>(context);
+            ++state.creates;
+            vsl::PureWindow candidate(vsl::PureWindow::WINDOWS.back());
+            const std::weak_ptr<vsl::PureWindow::WindowData> native = candidate.data_;
+            candidate.add_plugin<CloseDestructorHook>([&state, native] {
+                ++state.closes;
+                const auto data = native.lock();
+                ASSERT_TRUE(data);
+                EXPECT_FALSE(data->window_handle);
+                EXPECT_TRUE(data->plugins.empty());
+                EXPECT_TRUE(data->update.empty());
+                EXPECT_EQ(std::ranges::find(vsl::PureWindow::WINDOWS, data), vsl::PureWindow::WINDOWS.end());
+                EXPECT_FALSE(vsl::PureWindow(data).close());
+            });
+            const auto result = vkCreateSwapchainKHR(device, info, nullptr, output);
+            if (result != VK_SUCCESS)
+                return result;
+            vkDestroySwapchainKHR(device, *output, nullptr);
+            *output = VK_NULL_HANDLE;
+            return VK_ERROR_OUT_OF_HOST_MEMORY;
+        };
+        {
+            const vsl::operation::ScopedSwapchainNativeCalls calls({&state, create});
+            EXPECT_THROW((aho::Window("cannot create graphics", 48, 32, *engine)), vsl::exceptions::RuntimeException);
+        }
+        EXPECT_EQ(state.creates, 1u);
+        EXPECT_EQ(state.closes, 1u);
         EXPECT_EQ(vsl::PureWindow::WINDOWS, previous);
-        EXPECT_EQ(aho::engine::DefaultEngineRegistration::Current().data(), previous_default);
+        EXPECT_EQ(EngineAccess::State(aho::engine::DefaultEngineRegistration::Current()), previous_default);
         EXPECT_TRUE(static_cast<bool>(*engine->boot_window));
         aho::Window retry("valid construction after failure", 48, 32, *engine);
         EXPECT_TRUE(static_cast<bool>(retry));
@@ -813,7 +841,7 @@ namespace {
         ASSERT_NO_THROW(start_engine());
         const auto previous = vsl::PureWindow::WINDOWS.size();
         aho::Window second("default engine construction", 48, 32);
-        EXPECT_EQ(second.engine.data(), engine->data());
+        EXPECT_EQ(EngineAccess::State(second.engine), EngineAccess::State(*(engine)));
         EXPECT_EQ(vsl::PureWindow::WINDOWS.size(), previous + 1);
         EXPECT_TRUE(second.close());
         EXPECT_EQ(vsl::PureWindow::WINDOWS.size(), previous);
@@ -892,17 +920,17 @@ namespace {
         const std::string name = "AHO secondary synchronization resources";
         aho::Window second(name, 240, 160, *engine);
         EXPECT_NE(second.data_, engine->boot_window->data_);
-        EXPECT_EQ(second.engine.data(), engine->data());
+        EXPECT_EQ(EngineAccess::State(second.engine), EngineAccess::State(*(engine)));
         EXPECT_EQ(second.window_size().value.x.value, 240);
         EXPECT_EQ(second.window_size().value.y.value, 160);
         EXPECT_EQ(second.name(), name);
-        auto available = engine->data()->synchro_manager.get_semaphore(name + "ImageAvailable");
-        auto finished = engine->data()->synchro_manager.get_semaphore(name + "RenderFinished");
-        auto in_flight = engine->data()->synchro_manager.get_fence(name + "InFlight");
+        auto available = EngineAccess::State(*(engine))->synchro_manager.get_semaphore(name + "ImageAvailable");
+        auto finished = EngineAccess::State(*(engine))->synchro_manager.get_semaphore(name + "RenderFinished");
+        auto in_flight = EngineAccess::State(*(engine))->synchro_manager.get_fence(name + "InFlight");
         EXPECT_FALSE(available.has_value());
         EXPECT_FALSE(finished.has_value());
         EXPECT_FALSE(in_flight.has_value());
-        EXPECT_EQ(second.data2->image_available.size(), engine->data()->command_manager.get_buffer().get_size());
+        EXPECT_EQ(second.data2->image_available.size(), EngineAccess::State(*(engine))->command_manager.get_buffer().get_size());
         EXPECT_EQ(second.data2->in_flight.size(), second.data2->image_available.size());
         EXPECT_EQ(second.data2->acquire_fences.size(), second.data2->image_available.size());
         EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(second.data2->render_finished), VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(second.data2->swapchain.finished_semaphores()));
@@ -921,7 +949,7 @@ namespace {
                     VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(resources.render_finished).owner_before(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(resources.image_available)));
         const std::weak_ptr<void> owner = VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(resources.image_available).share();
         EXPECT_TRUE(window.close());
-        EXPECT_TRUE(engine->data());
+        EXPECT_TRUE(EngineAccess::State(*(engine)));
         EXPECT_TRUE(owner.expired());
     }
     TEST_F(AHOWindowVulkanIntegration, RecreationKeepsFrameSynchronizationAndReplacesTheGenerationSynchronization) {
@@ -953,16 +981,17 @@ namespace {
     }
     TEST_F(AHOWindowVulkanIntegration, WindowSynchronizationDoesNotRequireAnEngineNamedRegistry) {
         ASSERT_NO_THROW(start_engine());
-        aho::engine::EngineAccessor runtime(std::make_shared<aho::engine::EngineData>(*engine->data()));
-        VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Registry(runtime.data()->synchro_manager).reset();
+        const auto source = engine->runtime();
+        const auto runtime = aho::engine::EngineAccessor::Create({.device = source.device(), .commands = source.commands(), .descriptor_manager = source.descriptor_manager()});
+        EXPECT_FALSE(runtime.synchronization());
         aho::Window independent("without a name registry", 64, 48, runtime);
-        EXPECT_EQ(independent.data2->image_available.size(), runtime.data()->command_manager.get_buffer().get_size());
+        EXPECT_EQ(independent.data2->image_available.size(), EngineAccess::State(runtime)->command_manager.get_buffer().get_size());
         EXPECT_TRUE(independent.data2->acquire_fences.owner_ref().managed());
         EXPECT_TRUE(independent.close());
     }
     TEST_F(AHOWindowVulkanIntegration, AnExplicitStrictWindowRequiresTheFeatureToHaveBeenEnabled) {
         ASSERT_NO_THROW(start_engine());
-        EXPECT_EQ(engine->data()->present_fences, vsl::PresentFencePolicy::LEGACY);
+        EXPECT_EQ(EngineAccess::State(*(engine))->present_fences, vsl::PresentFencePolicy::LEGACY);
         const auto windows = vsl::PureWindow::WINDOWS.size();
         EXPECT_THROW((aho::Window("requires feature", 64, 48, *engine, vsl::PresentFencePolicy::REQUIRE_FENCE)), std::invalid_argument);
         EXPECT_EQ(vsl::PureWindow::WINDOWS.size(), windows);
@@ -974,25 +1003,25 @@ namespace {
 #include <AHO/engine/standard_engine.hpp>
 namespace {
     TEST(AHOWindowConstructionTest, MissingDefaultEngineThrowsBeforeWindowRegistration) {
-        ASSERT_EQ(aho::engine::DefaultEngineRegistration::Current().data(), nullptr);
+        ASSERT_EQ(EngineAccess::State(aho::engine::DefaultEngineRegistration::Current()), nullptr);
         ASSERT_TRUE(vsl::PureWindow::WINDOWS.empty());
         EXPECT_THROW((aho::Window("no default engine")), vsl::exceptions::RuntimeException);
         EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
-        EXPECT_EQ(aho::engine::DefaultEngineRegistration::Current().data(), nullptr);
+        EXPECT_EQ(EngineAccess::State(aho::engine::DefaultEngineRegistration::Current()), nullptr);
     }
     TEST(AHOWindowConstructionTest, UnbootedDefaultEngineThrowsBeforeWindowRegistration) {
         aho::StandardEngine engine("not booted", false);
-        ASSERT_FALSE(engine.data());
+        ASSERT_FALSE(EngineAccess::State(engine));
         EXPECT_THROW((aho::Window("unbooted default engine")), vsl::exceptions::RuntimeException);
         EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
-        EXPECT_EQ(aho::engine::DefaultEngineRegistration::Current().data(), nullptr);
+        EXPECT_EQ(EngineAccess::State(aho::engine::DefaultEngineRegistration::Current()), nullptr);
     }
     TEST(AHOWindowConstructionTest, UnbootedExplicitEngineThrowsBeforeWindowRegistration) {
         aho::StandardEngine engine("not booted", false);
-        ASSERT_FALSE(engine.data());
+        ASSERT_FALSE(EngineAccess::State(engine));
         EXPECT_THROW((aho::Window("unbooted explicit engine", 48, 32, engine)), vsl::exceptions::RuntimeException);
         EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
-        EXPECT_EQ(aho::engine::DefaultEngineRegistration::Current().data(), nullptr);
+        EXPECT_EQ(EngineAccess::State(aho::engine::DefaultEngineRegistration::Current()), nullptr);
     }
     TEST(AHOWindowTest, SharedDataConstructorKeepsNativeOwnershipAndEmptyDrawingData) {
         aho::engine::EngineAccessor engine;
@@ -1001,7 +1030,7 @@ namespace {
         aho::Window window(engine, native, drawing);
         EXPECT_EQ(window.data_, native);
         EXPECT_EQ(window.data2, drawing);
-        EXPECT_EQ(window.engine.data(), engine.data());
+        EXPECT_EQ(EngineAccess::State(window.engine), EngineAccess::State(engine));
     }
     TEST(WindowResizeHookTest, ConstructorStoresCallableAndPassesWindowPointer) {
         aho::Window* received = nullptr;

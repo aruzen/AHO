@@ -1,3 +1,7 @@
+#include "../../src/private/VSL/lifetime/window_access.hpp"
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::WindowAccess;
+}
 #include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
@@ -146,7 +150,7 @@ namespace {
         EXPECT_EQ(probe.idles, 1u);
         l::queue_surface_retirement(device, *surface);
         const std::weak_ptr<void> owner = StartupAccess::Shared(*(surface));
-        window->data_->plugins.clear();
+        WindowAccess::State(*(window))->plugins.clear();
         surface.reset();
         EXPECT_TRUE(owner.expired());
         EXPECT_EQ(l::collect_surface_retirements(device, l::SurfaceRecoveryMode::WAIT), l::SurfaceRecoveryStatus::COMPLETE);

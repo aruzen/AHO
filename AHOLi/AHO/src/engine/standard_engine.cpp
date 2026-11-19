@@ -116,7 +116,7 @@ namespace AHO_NAMESPACE::engine {
         const auto& initial = config.initial_window;
         const auto& title = initial.title.empty() ? config.engine.application_name : initial.title;
         VSL_NAMESPACE::Window native(title, initial.width, initial.height);
-        const auto native_data = native.data_;
+        VSL_NAMESPACE::PureWindow native_snapshot = native;
         const auto os = native.window_owner();
         try {
             if (!scope.target)
@@ -124,15 +124,15 @@ namespace AHO_NAMESPACE::engine {
             auto resources = create_engine_resources(config.engine, native);
             if (!scope.target)
                 throw std::logic_error("StandardEngine was destroyed during resource creation");
-            if (native.data_ != native_data || !native_data->window_handle || native_data->window_handle != os.native_handle())
+            if (native != native_snapshot || !native_snapshot)
                 throw std::runtime_error("Window closed during engine creation");
             auto handle = std::move(resources.engine);
             auto drawing = window::detail::make_window_data(handle, std::move(resources.surface));
             if (!scope.target)
                 throw std::logic_error("StandardEngine was destroyed during drawing resource creation");
-            if (native.data_ != native_data || !native_data->window_handle || native_data->window_handle != os.native_handle())
+            if (native != native_snapshot || !native_snapshot)
                 throw std::runtime_error("Window closed during drawing resource creation");
-            std::optional<Window> window(std::in_place, handle, native.data_, std::move(drawing));
+            std::optional<Window> window(std::in_place, handle, native, std::move(drawing));
             std::optional<DefaultEngineRegistration> registration;
             if (config.register_as_default)
                 registration.emplace(handle);
@@ -148,7 +148,7 @@ namespace AHO_NAMESPACE::engine {
             if (!scope.target)
                 throw std::logic_error("StandardEngine was destroyed during previous resource release");
         } catch (...) {
-            VSL_NAMESPACE::PureWindow(native_data).close();
+            native_snapshot.close();
             throw;
         }
     }

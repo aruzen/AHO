@@ -15,19 +15,23 @@ namespace VSL_NAMESPACE {
         }
     } // namespace
     Surface::Surface(PureWindow* window, VulkanAccessor instance) {
-        if (!window || !window->data_ || !window->data_->window_handle)
+        if (!window || !*window)
             throw exceptions::RuntimeException("Surface", "A live window is required");
         if (!StartupAccess::Owned(instance) || !StartupAccess::Owned(instance)->instance)
             throw exceptions::RuntimeException("Surface", "A Vulkan instance is required");
-        _owner = StartupAccess::Owned(StartupAccess::FromShared(lifetime::make_heap_surface(std::move(instance), window->window_owner())));
+        const auto os = window->window_owner();
+        _owner = StartupAccess::Owned(StartupAccess::FromShared(lifetime::make_heap_surface(std::move(instance), os)));
     }
     Surface::Surface(PureWindow* window, Surface source) {
         StartupAccess::RequireCanonical(source._owner);
         const auto os = source.get_window_owner();
-        if (!window || !window->data_ || !window->data_->window_handle || !source._owner->surface || source._owner->owner_node->retiring() ||
-            source._owner->window != window->data_->window_handle || os.native_handle() != window->data_->window_handle)
+        if (!window || !*window)
+            throw std::invalid_argument("Surface plugin requires a live window");
+        const auto target_window = window->window_owner();
+        if (!source._owner->surface || source._owner->owner_node->retiring() ||
+            source._owner->window != target_window.native_handle() || os.native_handle() != target_window.native_handle())
             throw std::invalid_argument("Surface plugin requires its original live OS window");
-        const auto target = window->window_owner().owner_ref();
+        const auto target = target_window.owner_ref();
         const auto original = os.owner_ref();
         if (target.owner_before(original) || original.owner_before(target))
             throw std::invalid_argument("Surface plugin requires its original OS window owner");

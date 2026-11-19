@@ -502,7 +502,8 @@ namespace {
                 bool paused = opt.time.has_value(), was_space = false;
                 unsigned rendered = 0;
                 while (aho::Window::Update() && window) {
-                    auto* handle = static_cast<GLFWwindow*>(window.data_->window_handle);
+                    const auto os = window.window_owner();
+                    auto* handle = static_cast<GLFWwindow*>(os.native_handle());
                     if (glfwGetKey(handle, GLFW_KEY_ESCAPE) == GLFW_PRESS)
                         break;
                     bool space = glfwGetKey(handle, GLFW_KEY_SPACE) == GLFW_PRESS;

@@ -1,8 +1,10 @@
+#include "../../../../VSLi/VSL/src/private/VSL/lifetime/window_access.hpp"
 #include <AHO/io/input_manager.hpp>
 #include <functional>
 #include "../support/input_backend.hpp"
 
 namespace {
+    using VSL_NAMESPACE::lifetime::detail::WindowAccess;
     struct Counter : aho::input::abstract::Input<int>, aho::input::abstract::Updatable {
         void* context;
         int updates;
@@ -48,13 +50,12 @@ namespace {
             : UpdatingGroup(context, manager, initial) {}
     };
     using InputManagerTest = aho_test::InputBackendTest;
-    TEST_F(InputManagerTest, ConstructorsPreserveRawAndVSLWindowHandles) {
+    TEST_F(InputManagerTest, RawConstructorPreservesTheHandleAndFacadeConstructorRejectsAnUnmanagedWindow) {
         aho::InputManager raw(window.handle());
         EXPECT_EQ(raw.context, window.handle());
         auto data = std::make_shared<vsl::PureWindow::WindowData>();
         data->window_handle = window.handle();
-        aho::InputManager wrapped{vsl::PureWindow(data)};
-        EXPECT_EQ(wrapped.context, window.handle());
+        EXPECT_THROW((void)aho::InputManager{WindowAccess::FromState(data)}, vsl::exceptions::RuntimeException);
     }
     TEST_F(InputManagerTest, GetForwardsArgumentsAndUpdatesLiveInputs) {
         aho::InputManager manager(window.handle());

@@ -1,3 +1,7 @@
+#include "../../../VSLi/VSL/src/private/VSL/lifetime/window_access.hpp"
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::WindowAccess;
+}
 #include "../src/engine/engine_access.hpp"
 namespace {
     using AHO_NAMESPACE::engine::detail::EngineAccess;
@@ -51,11 +55,12 @@ namespace {
     };
     struct FixedIdResizeHook : aho::window::WindowResizeHookPlugin {
         FixedIdResizeHook(vsl::PureWindow* window, unsigned char id, std::function<void(aho::Window*)> callback)
-            : WindowResizeHookPlugin(window, std::move(callback)) { this->id = id; }
+            : WindowResizeHookPlugin(window, std::move(callback), id) {}
     };
     struct GenerationProbe {
         unsigned creates = 0, frames = 0, frame_destroys = 0;
         bool fail_create = false, fail_frame = false;
+        std::function<void()> after_create;
         VkSwapchainKHR previous = VK_NULL_HANDLE;
         static VkResult Create(void* context, VkDevice device, const VkSwapchainCreateInfoKHR* info, VkSwapchainKHR* output);
         static vk::Framebuffer Frame(void* context, vk::Device device, const vk::FramebufferCreateInfo& info);
@@ -160,10 +165,10 @@ namespace {
     TEST_F(AHOWindowVulkanIntegration, TitlebarCloseUsesTheGraphicsPathForSharedDataWindows) {
         ASSERT_NO_THROW(start_engine());
         auto& original = *engine->boot_window;
-        aho::Window copy(*engine, original.data_, original.data2);
+        aho::Window copy(*engine, original, original.data2);
         const auto drawing = copy.data2;
         const std::weak_ptr<void> owner = VSL_NAMESPACE::lifetime::detail::SwapchainAccess::Owned(drawing->swapchain).share();
-        glfwSetWindowShouldClose(static_cast<GLFWwindow*>(copy.data_->window_handle), GLFW_TRUE);
+        glfwSetWindowShouldClose(static_cast<GLFWwindow*>(WindowAccess::State(copy)->window_handle), GLFW_TRUE);
         EXPECT_TRUE(vsl::PureWindow::Update());
         expect_closed_resources(drawing);
         EXPECT_FALSE(static_cast<bool>(copy));
@@ -194,12 +199,12 @@ namespace {
         std::weak_ptr<aho::window::WindowData> drawing;
         {
             aho::Window secondary("abandoned facade", 64, 48, *engine);
-            native.emplace(secondary.data_);
+            native.emplace(secondary);
             drawing = secondary.data2;
         }
         EXPECT_TRUE(drawing.expired());
         ASSERT_TRUE(static_cast<bool>(*native));
-        glfwSetWindowShouldClose(static_cast<GLFWwindow*>(native->data_->window_handle), GLFW_TRUE);
+        glfwSetWindowShouldClose(static_cast<GLFWwindow*>(WindowAccess::State(*(native))->window_handle), GLFW_TRUE);
         EXPECT_TRUE(vsl::PureWindow::Update());
         EXPECT_FALSE(static_cast<bool>(*native));
     }
@@ -375,12 +380,41 @@ namespace {
         EXPECT_EQ(query.calls, 2u);
         EXPECT_EQ(native.creates, 0u);
     }
+    TEST_F(AHOWindowVulkanIntegration, DeletingTheFacadeDuringFramebufferQueryStopsBeforeNativeCreation) {
+        ASSERT_NO_THROW(start_engine());
+        std::optional<aho::Window> candidate = *engine->boot_window;
+        aho_test::FrameBufferQuery query;
+        aho_test::AcquisitionCalls native;
+        query.after_read = [&] { candidate.reset(); };
+        EXPECT_FALSE(candidate->recreate_swapchain());
+        EXPECT_FALSE(candidate);
+        EXPECT_EQ(query.calls, 1u);
+        EXPECT_EQ(native.creates, 0u);
+        EXPECT_TRUE(*engine->boot_window);
+    }
+    TEST_F(AHOWindowVulkanIntegration, ReplacingTheFacadeDuringFramebufferQueryLeavesItsOriginalGenerationUntouched) {
+        ASSERT_NO_THROW(start_engine());
+        aho::Window candidate = *engine->boot_window;
+        const auto original = candidate.data2->swapchain;
+        aho::Window other("replacement target", 32, 24, engine->runtime());
+        aho_test::FrameBufferQuery query;
+        aho_test::AcquisitionCalls native;
+        query.after_read = [&] { candidate = other; };
+        EXPECT_FALSE(candidate.recreate_swapchain());
+        EXPECT_EQ(candidate, other);
+        EXPECT_EQ(engine->boot_window->data2->swapchain.identity(), original.identity());
+        EXPECT_EQ(native.creates, 0u);
+        EXPECT_TRUE(other.close());
+    }
 
     VkResult GenerationProbe::Create(void* context, VkDevice device, const VkSwapchainCreateInfoKHR* info, VkSwapchainKHR* output) {
         auto& probe = *static_cast<GenerationProbe*>(context);
         ++probe.creates;
         probe.previous = info->oldSwapchain;
         const auto result = vkCreateSwapchainKHR(device, info, nullptr, output);
+        if (result == VK_SUCCESS)
+            if (auto callback = std::exchange(probe.after_create, {}))
+                callback();
         if (!probe.fail_create || result != VK_SUCCESS)
             return result;
         // driver側でもoldを退役させてから、生成境界の失敗を再現する。
@@ -440,6 +474,66 @@ namespace {
         EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(window.data2->in_flight), flight);
         EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(window.data2->acquire_fences), acquire);
         EXPECT_TRUE(vsl::contain(window.data2->swapchain.image(0).get_usage(), vsl::ImageType::TRANSFER_SRC));
+    }
+
+    TEST_F(AHOWindowVulkanIntegration, CloseDuringNativeChainCreationDoesNotRepublishACandidate) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        const auto drawing = window.data2;
+        GenerationProbe probe;
+        probe.after_create = [&] { EXPECT_TRUE(window.close()); };
+        const vsl::operation::ScopedSwapchainNativeCalls calls({&probe, GenerationProbe::Create});
+        EXPECT_FALSE(window.recreate_swapchain());
+        EXPECT_EQ(probe.creates, 1u);
+        EXPECT_TRUE(drawing->closed);
+        EXPECT_FALSE(drawing->pending_generation);
+        EXPECT_FALSE(drawing->deferred_usage);
+    }
+    TEST_F(AHOWindowVulkanIntegration, NativeFailureAfterCloseDoesNotRestoreTheRetryRequest) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        const auto drawing = window.data2;
+        GenerationProbe probe;
+        probe.fail_create = true;
+        probe.after_create = [&] { EXPECT_TRUE(window.close()); };
+        const vsl::operation::ScopedSwapchainNativeCalls calls({&probe, GenerationProbe::Create});
+        EXPECT_THROW(window.recreate_swapchain(), vsl::exceptions::RuntimeException);
+        EXPECT_TRUE(drawing->closed);
+        EXPECT_FALSE(drawing->pending_generation);
+        EXPECT_FALSE(drawing->deferred_usage);
+    }
+    TEST_F(AHOWindowVulkanIntegration, RetiredCandidateDestructorCanCloseBeforeTheNewCandidateIsRead) {
+        ASSERT_NO_THROW(start_engine());
+        auto& window = *engine->boot_window;
+        const auto drawing = window.data2;
+        const auto after_release = std::make_shared<std::function<void()>>();
+        struct CallbackReset {
+            std::shared_ptr<std::function<void()>> callback;
+            ~CallbackReset() { *callback = {}; }
+        } reset{after_release};
+        const vsl::lifetime::SwapchainMemoryFactory memory = [after_release](const vsl::storage::SwapchainLayout& layout) {
+            const auto alignment = std::align_val_t(layout.alignment());
+            auto* region = static_cast<std::byte*>(::operator new(layout.bytes(), alignment));
+            std::shared_ptr<void> owner(region, [after_release, alignment](void* pointer) {
+                ::operator delete(pointer, alignment);
+                if (auto callback = std::exchange(*after_release, {}))
+                    callback();
+            });
+            return vsl::storage::ArenaMemory({region, layout.bytes()}, layout.alignment(), std::move(owner));
+        };
+        {
+            const vsl::SwapchainCreateInfo info{.present_fences = drawing->swapchain.present_fences()};
+            vsl::lifetime::SwapchainArena candidate(engine->runtime().device(), *drawing->surface, info, drawing->swapchain, memory);
+            drawing->pending_generation = aho::window::WindowGenerationCandidate{info, std::move(candidate).view()};
+        }
+        ASSERT_TRUE(drawing->pending_generation);
+        *after_release = [&] { EXPECT_TRUE(window.close()); };
+        EXPECT_FALSE(window.recreate_swapchain(vsl::ImageType::TRANSFER_SRC));
+        EXPECT_TRUE(drawing->closed);
+        EXPECT_FALSE(drawing->pending_generation);
+        EXPECT_FALSE(*after_release);
+        if (window)
+            window.close();
     }
     TEST_F(AHOWindowVulkanIntegration, ChangedExtentRetiresThePendingCandidateAndPublishesANewOne) {
         ASSERT_NO_THROW(start_engine());
@@ -531,7 +625,7 @@ namespace {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
         window.add_plugin<vsl::window_plugin::HookResize>([&](vsl::PureWindow, int, int) { EXPECT_TRUE(window.close()); });
-        auto* native = static_cast<GLFWwindow*>(window.data_->window_handle);
+        auto* native = static_cast<GLFWwindow*>(WindowAccess::State(window)->window_handle);
         const auto callback = glfwSetFramebufferSizeCallback(native, nullptr);
         ASSERT_NE(callback, nullptr);
         callback(native, 80, 64);
@@ -748,7 +842,7 @@ namespace {
         int stale_calls = 0;
         std::weak_ptr<aho::window::WindowResizeHookPlugin> weak;
         auto current_hook = window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
-            current->data_->plugins.clear();
+            WindowAccess::State(*(current))->plugins.clear();
             EXPECT_FALSE(weak.expired());
         });
         weak = current_hook;
@@ -757,7 +851,7 @@ namespace {
         EXPECT_TRUE(window.resize(420, 300));
         EXPECT_TRUE(weak.expired());
         EXPECT_EQ(stale_calls, 0);
-        EXPECT_TRUE(window.data_->plugins.empty());
+        EXPECT_TRUE(WindowAccess::State(window)->plugins.empty());
         EXPECT_TRUE(window.resize(400, 400));
     }
     TEST_F(AHOWindowVulkanIntegration, ReplacementAtTheSameIdWaitsUntilTheNextResize) {
@@ -768,10 +862,10 @@ namespace {
         std::shared_ptr<FixedIdResizeHook> replacement;
         window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
             if (!replacement)
-                replacement = current->add_plugin<FixedIdResizeHook>(old->id, [&](aho::Window*) { ++replacement_calls; });
+                replacement = current->add_plugin<FixedIdResizeHook>(*window.plugin_id(old), [&](aho::Window*) { ++replacement_calls; });
         });
         old = window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window*) { ++old_calls; });
-        ASSERT_NE(old->id, 0u);
+        ASSERT_NE(*window.plugin_id(old), 0u);
         EXPECT_TRUE(window.resize(420, 300));
         EXPECT_EQ(old_calls, 0);
         EXPECT_EQ(replacement_calls, 0);
@@ -796,7 +890,7 @@ namespace {
     }
     TEST_F(AHOWindowVulkanIntegration, GraphicsInitializationFailureUnregistersTheNewNativeWindow) {
         ASSERT_NO_THROW(start_engine());
-        const auto previous = vsl::PureWindow::WINDOWS;
+        const auto previous = WindowAccess::Registry();
         const auto previous_default = EngineAccess::State(aho::engine::DefaultEngineRegistration::Current());
         struct FailureState {
             unsigned creates = 0, closes = 0;
@@ -804,8 +898,8 @@ namespace {
         const auto create = [](void* context, VkDevice device, const VkSwapchainCreateInfoKHR* info, VkSwapchainKHR* output) {
             auto& state = *static_cast<FailureState*>(context);
             ++state.creates;
-            vsl::PureWindow candidate(vsl::PureWindow::WINDOWS.back());
-            const std::weak_ptr<vsl::PureWindow::WindowData> native = candidate.data_;
+            vsl::PureWindow candidate(WindowAccess::FromState(WindowAccess::Registry().back()));
+            const std::weak_ptr<vsl::PureWindow::WindowData> native = WindowAccess::State(candidate);
             candidate.add_plugin<CloseDestructorHook>([&state, native] {
                 ++state.closes;
                 const auto data = native.lock();
@@ -813,8 +907,8 @@ namespace {
                 EXPECT_FALSE(data->window_handle);
                 EXPECT_TRUE(data->plugins.empty());
                 EXPECT_TRUE(data->update.empty());
-                EXPECT_EQ(std::ranges::find(vsl::PureWindow::WINDOWS, data), vsl::PureWindow::WINDOWS.end());
-                EXPECT_FALSE(vsl::PureWindow(data).close());
+                EXPECT_EQ(std::ranges::find(WindowAccess::Registry(), data), WindowAccess::Registry().end());
+                EXPECT_FALSE(vsl::PureWindow(WindowAccess::FromState(data)).close());
             });
             const auto result = vkCreateSwapchainKHR(device, info, nullptr, output);
             if (result != VK_SUCCESS)
@@ -829,28 +923,28 @@ namespace {
         }
         EXPECT_EQ(state.creates, 1u);
         EXPECT_EQ(state.closes, 1u);
-        EXPECT_EQ(vsl::PureWindow::WINDOWS, previous);
+        EXPECT_EQ(WindowAccess::Registry(), previous);
         EXPECT_EQ(EngineAccess::State(aho::engine::DefaultEngineRegistration::Current()), previous_default);
         EXPECT_TRUE(static_cast<bool>(*engine->boot_window));
         aho::Window retry("valid construction after failure", 48, 32, *engine);
         EXPECT_TRUE(static_cast<bool>(retry));
-        EXPECT_EQ(vsl::PureWindow::WINDOWS.size(), previous.size() + 1);
+        EXPECT_EQ(WindowAccess::Registry().size(), previous.size() + 1);
         EXPECT_TRUE(retry.close());
     }
     TEST_F(AHOWindowVulkanIntegration, BootedDefaultEngineCreatesAndClosesAnIndependentWindow) {
         ASSERT_NO_THROW(start_engine());
-        const auto previous = vsl::PureWindow::WINDOWS.size();
+        const auto previous = WindowAccess::Registry().size();
         aho::Window second("default engine construction", 48, 32);
         EXPECT_EQ(EngineAccess::State(second.engine), EngineAccess::State(*(engine)));
-        EXPECT_EQ(vsl::PureWindow::WINDOWS.size(), previous + 1);
+        EXPECT_EQ(WindowAccess::Registry().size(), previous + 1);
         EXPECT_TRUE(second.close());
-        EXPECT_EQ(vsl::PureWindow::WINDOWS.size(), previous);
+        EXPECT_EQ(WindowAccess::Registry().size(), previous);
     }
     TEST_F(AHOWindowVulkanIntegration, ExistingWindowSupportsSizeTitleAndClose) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
         EXPECT_TRUE(window.set_title("AHO changed title"));
-        auto* native = static_cast<GLFWwindow*>(window.data_->window_handle);
+        auto* native = static_cast<GLFWwindow*>(WindowAccess::State(window)->window_handle);
         EXPECT_STREQ(glfwGetWindowTitle(native), "AHO changed title");
         window.maximize();
         glfwPollEvents();
@@ -860,7 +954,7 @@ namespace {
         EXPECT_EQ(glfwGetWindowAttrib(native, GLFW_MAXIMIZED), GLFW_FALSE);
         EXPECT_TRUE(window.close());
         EXPECT_EQ(window.data2, nullptr);
-        EXPECT_EQ(window.data_->window_handle, nullptr);
+        EXPECT_EQ(WindowAccess::State(window)->window_handle, nullptr);
     }
     TEST_F(AHOWindowVulkanIntegration, MonitorSizeRequiresAvailablePrimaryDisplayMode) {
         auto* monitor = glfwGetPrimaryMonitor();
@@ -919,7 +1013,7 @@ namespace {
         ASSERT_NO_THROW(start_engine());
         const std::string name = "AHO secondary synchronization resources";
         aho::Window second(name, 240, 160, *engine);
-        EXPECT_NE(second.data_, engine->boot_window->data_);
+        EXPECT_NE(WindowAccess::State(second), WindowAccess::State(*(engine->boot_window)));
         EXPECT_EQ(EngineAccess::State(second.engine), EngineAccess::State(*(engine)));
         EXPECT_EQ(second.window_size().value.x.value, 240);
         EXPECT_EQ(second.window_size().value.y.value, 160);
@@ -992,9 +1086,9 @@ namespace {
     TEST_F(AHOWindowVulkanIntegration, AnExplicitStrictWindowRequiresTheFeatureToHaveBeenEnabled) {
         ASSERT_NO_THROW(start_engine());
         EXPECT_EQ(EngineAccess::State(*(engine))->present_fences, vsl::PresentFencePolicy::LEGACY);
-        const auto windows = vsl::PureWindow::WINDOWS.size();
+        const auto windows = WindowAccess::Registry().size();
         EXPECT_THROW((aho::Window("requires feature", 64, 48, *engine, vsl::PresentFencePolicy::REQUIRE_FENCE)), std::invalid_argument);
-        EXPECT_EQ(vsl::PureWindow::WINDOWS.size(), windows);
+        EXPECT_EQ(WindowAccess::Registry().size(), windows);
     }
 } // namespace
 #else
@@ -1004,31 +1098,31 @@ namespace {
 namespace {
     TEST(AHOWindowConstructionTest, MissingDefaultEngineThrowsBeforeWindowRegistration) {
         ASSERT_EQ(EngineAccess::State(aho::engine::DefaultEngineRegistration::Current()), nullptr);
-        ASSERT_TRUE(vsl::PureWindow::WINDOWS.empty());
+        ASSERT_TRUE(WindowAccess::Registry().empty());
         EXPECT_THROW((aho::Window("no default engine")), vsl::exceptions::RuntimeException);
-        EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
+        EXPECT_TRUE(WindowAccess::Registry().empty());
         EXPECT_EQ(EngineAccess::State(aho::engine::DefaultEngineRegistration::Current()), nullptr);
     }
     TEST(AHOWindowConstructionTest, UnbootedDefaultEngineThrowsBeforeWindowRegistration) {
         aho::StandardEngine engine("not booted", false);
         ASSERT_FALSE(EngineAccess::State(engine));
         EXPECT_THROW((aho::Window("unbooted default engine")), vsl::exceptions::RuntimeException);
-        EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
+        EXPECT_TRUE(WindowAccess::Registry().empty());
         EXPECT_EQ(EngineAccess::State(aho::engine::DefaultEngineRegistration::Current()), nullptr);
     }
     TEST(AHOWindowConstructionTest, UnbootedExplicitEngineThrowsBeforeWindowRegistration) {
         aho::StandardEngine engine("not booted", false);
         ASSERT_FALSE(EngineAccess::State(engine));
         EXPECT_THROW((aho::Window("unbooted explicit engine", 48, 32, engine)), vsl::exceptions::RuntimeException);
-        EXPECT_TRUE(vsl::PureWindow::WINDOWS.empty());
+        EXPECT_TRUE(WindowAccess::Registry().empty());
         EXPECT_EQ(EngineAccess::State(aho::engine::DefaultEngineRegistration::Current()), nullptr);
     }
     TEST(AHOWindowTest, SharedDataConstructorKeepsNativeOwnershipAndEmptyDrawingData) {
         aho::engine::EngineAccessor engine;
         auto native = std::make_shared<vsl::Window::WindowData>();
         std::shared_ptr<aho::window::WindowData> drawing;
-        aho::Window window(engine, native, drawing);
-        EXPECT_EQ(window.data_, native);
+        aho::Window window(engine, WindowAccess::FromState(native), drawing);
+        EXPECT_EQ(WindowAccess::State(window), native);
         EXPECT_EQ(window.data2, drawing);
         EXPECT_EQ(EngineAccess::State(window.engine), EngineAccess::State(engine));
     }
@@ -1049,7 +1143,7 @@ namespace {
 #include <GLFW/glfw3.h>
 namespace {
     TEST(MonitorSizeTest, UninitializedGlfwThrowsInsteadOfDereferencingANullMode) {
-        ASSERT_TRUE(vsl::PureWindow::WINDOWS.empty());
+        ASSERT_TRUE(WindowAccess::Registry().empty());
         vsl::lifetime::GLFWLease::Drain();
         glfwTerminate();
         try {
@@ -1062,7 +1156,7 @@ namespace {
     }
 #if defined(GLFW_PLATFORM_NULL)
     TEST(MonitorSizeTest, InitializedNullPlatformReturnsItsVirtualMonitorSize) {
-        ASSERT_TRUE(vsl::PureWindow::WINDOWS.empty());
+        ASSERT_TRUE(WindowAccess::Registry().empty());
         vsl::lifetime::GLFWLease::Drain();
         struct RestorePlatform {
             ~RestorePlatform() {

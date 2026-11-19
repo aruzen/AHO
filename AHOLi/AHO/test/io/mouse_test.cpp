@@ -1,3 +1,7 @@
+#include "../../../../VSLi/VSL/src/private/VSL/lifetime/window_access.hpp"
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::WindowAccess;
+}
 #include <AHO/io/mouse.hpp>
 #ifdef AHO_GPU_TESTS
 #include "../support/live_gpu.hpp"
@@ -9,7 +13,7 @@ namespace {
         aho::InputManager manager(window);
         const auto first = manager.get<aho::input::Cursor>();
         const auto second = manager.get<aho::input::Cursor>();
-        auto* native = static_cast<GLFWwindow*>(window.data_->window_handle);
+        auto* native = static_cast<GLFWwindow*>(WindowAccess::State(window)->window_handle);
         EXPECT_FALSE(first->captured());
         EXPECT_EQ(first->focused(), glfwGetWindowAttrib(native, GLFW_FOCUSED) == GLFW_TRUE);
         first->set_captured(true);

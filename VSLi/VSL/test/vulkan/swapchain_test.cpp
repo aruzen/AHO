@@ -1,3 +1,7 @@
+#include "../../src/private/VSL/lifetime/window_access.hpp"
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::WindowAccess;
+}
 #include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
@@ -38,7 +42,7 @@ namespace {
         struct CloseWindow {
             vsl::PureWindow& window;
             ~CloseWindow() {
-                window.data_->plugins.clear();
+                WindowAccess::State(window)->plugins.clear();
                 window.close();
             }
         } close{other};
@@ -61,7 +65,7 @@ namespace {
         ASSERT_GT(first.get_swap_image_size(), 0u);
         EXPECT_EQ(first.get_swap_image_size(), first.images().size());
         int framebuffer_width = 0, framebuffer_height = 0;
-        glfwGetFramebufferSize(static_cast<GLFWwindow*>(window->data_->window_handle), &framebuffer_width,
+        glfwGetFramebufferSize(static_cast<GLFWwindow*>(WindowAccess::State(*(window))->window_handle), &framebuffer_width,
                                &framebuffer_height);
         EXPECT_EQ(SwapchainAccess::Owned(first)->swap_chain_extent.width, static_cast<unsigned>(framebuffer_width));
         EXPECT_EQ(SwapchainAccess::Owned(first)->swap_chain_extent.height, static_cast<unsigned>(framebuffer_height));

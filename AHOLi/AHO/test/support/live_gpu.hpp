@@ -1,3 +1,7 @@
+#include "../../../../VSLi/VSL/src/private/VSL/lifetime/window_access.hpp"
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::WindowAccess;
+}
 #include "../../src/engine/engine_access.hpp"
 namespace {
     using AHO_NAMESPACE::engine::detail::EngineAccess;
@@ -78,15 +82,15 @@ namespace aho_test {
     inline void LiveGPUTest::TearDown() {
         if (engine && EngineAccess::State(*(engine)) && VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(EngineAccess::State(*(engine))->logical_device))
             VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(EngineAccess::State(*(engine))->logical_device)->device.waitIdle();
-        if (engine && engine->boot_window && engine->boot_window->data_ && engine->boot_window->data_->window_handle)
+        if (engine && engine->boot_window && WindowAccess::State(*(engine->boot_window)) && WindowAccess::State(*(engine->boot_window))->window_handle)
             engine->boot_window->close();
         engine.reset();
         // The library closes its GLFW windows explicitly; never leave a failed case's window open.
         {
-            const auto windows = vsl::PureWindow::WINDOWS;
+            const auto windows = WindowAccess::Registry();
             for (const auto& window : windows)
                 if (window->window_handle)
-                    vsl::PureWindow(window).close();
+                    vsl::PureWindow(WindowAccess::FromState(window)).close();
         }
         _glfw = {};
         vsl::lifetime::GLFWLease::Drain();

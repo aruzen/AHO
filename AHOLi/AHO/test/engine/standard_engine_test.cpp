@@ -1,3 +1,7 @@
+#include "../../../../VSLi/VSL/src/private/VSL/lifetime/window_access.hpp"
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::WindowAccess;
+}
 #include "../../src/engine/engine_access.hpp"
 namespace {
     using AHO_NAMESPACE::engine::detail::EngineAccess;
@@ -42,7 +46,7 @@ namespace {
         EXPECT_FALSE(EngineAccess::State(*(engine))->logical_device.get_physical_device().name().empty());
         ASSERT_TRUE(engine->boot_window.has_value());
         auto window = engine->get_window();
-        ASSERT_NE(window.data_->window_handle, nullptr);
+        ASSERT_NE(WindowAccess::State(window)->window_handle, nullptr);
         ASSERT_NE(window.data2, nullptr);
         EXPECT_EQ(window.window_size().value.x.value, 400);
         EXPECT_EQ(window.window_size().value.y.value, 400);
@@ -90,7 +94,7 @@ namespace {
         ASSERT_NO_THROW(start_engine());
         const auto original = engine->runtime();
         const auto previous = aho::engine::DefaultEngineRegistration::Current();
-        const auto windows = vsl::PureWindow::WINDOWS;
+        const auto windows = WindowAccess::Registry();
         const auto other = vsl::LogicalDeviceAccessor::Create(original.physical_device());
         const auto good = aho::engine::EngineCreateInfo{
             .device = original.device(), .commands = original.commands(), .descriptor_manager = original.descriptor_manager(), .synchronization = original.synchronization()};
@@ -128,18 +132,18 @@ namespace {
             EXPECT_THROW(aho::engine::EngineAccessor::Create(std::move(info)), std::invalid_argument);
             EXPECT_EQ(engine->runtime(), original);
             EXPECT_EQ(aho::engine::DefaultEngineRegistration::Current(), previous);
-            EXPECT_EQ(vsl::PureWindow::WINDOWS, windows);
+            EXPECT_EQ(WindowAccess::Registry(), windows);
         }
     }
     TEST_F(StandardEngineVulkanIntegration, DestructionDuringNativeBootClosesTheCandidateAndRestoresTheDefault) {
-        const auto windows = vsl::PureWindow::WINDOWS;
+        const auto windows = WindowAccess::Registry();
         const auto previous = aho::engine::DefaultEngineRegistration::Current();
         auto source = std::make_unique<aho::StandardEngine>("deleted during boot", false);
         BootNativeProbe probe;
         unsigned closes = 0;
         probe.callback = [&] {
-            vsl::PureWindow candidate(vsl::PureWindow::WINDOWS.back());
-            const std::weak_ptr<vsl::PureWindow::WindowData> native = candidate.data_;
+            vsl::PureWindow candidate(WindowAccess::FromState(WindowAccess::Registry().back()));
+            const std::weak_ptr<vsl::PureWindow::WindowData> native = WindowAccess::State(candidate);
             candidate.add_plugin<BootCloseObserver>([&, native] {
                 ++closes;
                 const auto state = native.lock();
@@ -147,8 +151,8 @@ namespace {
                 EXPECT_FALSE(state->window_handle);
                 EXPECT_TRUE(state->plugins.empty());
                 EXPECT_TRUE(state->update.empty());
-                EXPECT_EQ(std::ranges::find(vsl::PureWindow::WINDOWS, state), vsl::PureWindow::WINDOWS.end());
-                EXPECT_FALSE(vsl::PureWindow(state).close());
+                EXPECT_EQ(std::ranges::find(WindowAccess::Registry(), state), WindowAccess::Registry().end());
+                EXPECT_FALSE(vsl::PureWindow(WindowAccess::FromState(state)).close());
             });
             source.reset();
         };
@@ -157,13 +161,13 @@ namespace {
         EXPECT_FALSE(source);
         EXPECT_EQ(probe.calls, 1u);
         EXPECT_EQ(closes, 1u);
-        EXPECT_EQ(vsl::PureWindow::WINDOWS, windows);
+        EXPECT_EQ(WindowAccess::Registry(), windows);
         EXPECT_EQ(aho::engine::DefaultEngineRegistration::Current(), previous);
     }
     TEST_F(StandardEngineVulkanIntegration, PreviousWindowReleaseSeesTheCompleteRuntimeAndMayDestroyTheReceiver) {
         ASSERT_NO_THROW(start_engine());
         const auto previous = aho::engine::DefaultEngineRegistration::Current();
-        const auto windows = vsl::PureWindow::WINDOWS;
+        const auto windows = WindowAccess::Registry();
         auto source = std::make_unique<aho::StandardEngine>("published before release", false);
         unsigned callbacks = 0;
         const vsl_test::DeferredAction action([&] {
@@ -188,7 +192,7 @@ namespace {
         EXPECT_EQ(callbacks, 1u);
         EXPECT_FALSE(source);
         EXPECT_EQ(aho::engine::DefaultEngineRegistration::Current(), previous);
-        EXPECT_EQ(vsl::PureWindow::WINDOWS, windows);
+        EXPECT_EQ(WindowAccess::Registry(), windows);
     }
     TEST_F(StandardEngineVulkanIntegration, NativeCallbackCannotRecursivelyBootTheSameReceiver) {
         ASSERT_NO_THROW(start_engine(false));
@@ -265,7 +269,7 @@ namespace {
         ASSERT_NO_THROW(start_engine());
         ASSERT_TRUE(engine->boot_window.has_value());
         const std::weak_ptr<aho::engine::EngineData> engine_data = EngineAccess::State(*(engine));
-        const std::weak_ptr<vsl::PureWindow::WindowData> window_data = engine->boot_window->data_;
+        const std::weak_ptr<vsl::PureWindow::WindowData> window_data = WindowAccess::State(*(engine->boot_window));
         VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(EngineAccess::State(*(engine))->logical_device)->device.waitIdle();
         ASSERT_TRUE(engine->boot_window->close());
         std::unique_ptr<aho::engine::GraphicalEngine> base = std::move(engine);
@@ -362,12 +366,12 @@ namespace {
     TEST_F(StandardEngineVulkanIntegration, RepeatedBootPreservesTheExistingResourcesAndDefault) {
         ASSERT_NO_THROW(start_engine());
         const auto data = EngineAccess::State(*(engine));
-        const auto windows = vsl::PureWindow::WINDOWS;
+        const auto windows = WindowAccess::Registry();
         EXPECT_THROW(engine->boot(), std::logic_error);
         EXPECT_THROW(engine->boot("replacement"), std::logic_error);
         EXPECT_EQ(EngineAccess::State(*(engine)), data);
         EXPECT_EQ(EngineAccess::State(aho::engine::DefaultEngineRegistration::Current()), data);
-        EXPECT_EQ(vsl::PureWindow::WINDOWS, windows);
+        EXPECT_EQ(WindowAccess::Registry(), windows);
         EXPECT_EQ(engine->config().engine.application_name, "AHO integration test");
     }
 
@@ -376,11 +380,11 @@ namespace {
         aho::engine::StandardEngineConfig config;
         config.engine.physical_device_index = std::numeric_limits<std::size_t>::max();
         aho::StandardEngine failing(config, false);
-        const auto windows = vsl::PureWindow::WINDOWS;
+        const auto windows = WindowAccess::Registry();
         EXPECT_THROW(failing.boot(), std::out_of_range);
         EXPECT_FALSE(EngineAccess::State(failing));
         EXPECT_FALSE(failing.boot_window);
-        EXPECT_EQ(vsl::PureWindow::WINDOWS, windows);
+        EXPECT_EQ(WindowAccess::Registry(), windows);
         EXPECT_EQ(EngineAccess::State(aho::engine::DefaultEngineRegistration::Current()), EngineAccess::State(*(engine)));
     }
 } // namespace
@@ -415,7 +419,7 @@ namespace {
     }
 
     TEST(StandardEngineTest, InvalidConfigurationIsRejectedBeforeAllocatingAWindow) {
-        const auto windows = vsl::PureWindow::WINDOWS;
+        const auto windows = WindowAccess::Registry();
         aho::engine::StandardEngineConfig config;
         config.initial_window.width = 0;
         EXPECT_THROW((aho::StandardEngine{config, false}), std::invalid_argument);
@@ -433,7 +437,7 @@ namespace {
         config.engine.descriptor_budget = {{vsl::graphic_resource::Type::UNIFORM_BUFFER, 1}};
         config.engine.present_fences = static_cast<vsl::PresentFencePolicy>(99);
         EXPECT_THROW((aho::StandardEngine{config, false}), std::invalid_argument);
-        EXPECT_EQ(vsl::PureWindow::WINDOWS, windows);
+        EXPECT_EQ(WindowAccess::Registry(), windows);
     }
 } // namespace
 #endif

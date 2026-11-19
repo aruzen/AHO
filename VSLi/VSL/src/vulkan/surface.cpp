@@ -3,15 +3,8 @@
 
 #include <VSL/vulkan/surface.hpp>
 
-#ifdef _MSC_VER
-#define GLFW_EXPOSE_NATIVE_WIN32
-#elif defined(__APPLE_CC__)
-#define GLFW_EXPOSE_NATIVE_MACOS
-#endif
-
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
-#include <GLFW/glfw3native.h>
 
 #include <memory>
 

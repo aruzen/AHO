@@ -7,22 +7,11 @@ add_executable(AHO
 )
 aho_target_build_options(AHO)
 
-# ライブラリをリンク
-link_directories(lib)
-
-target_include_directories(AHO PRIVATE ${Boost_INCLUDE_DIRS} ${AHO_HOME}/include ${VSL_HOME}/include)
-target_link_libraries(AHO PRIVATE ${Boost_LIBRARIES} VSL AHOLi)
-
-target_include_directories(AHO PRIVATE ${GLFW_INCLUDE_DIRS})
-target_link_directories(AHO PRIVATE ${GLFW_LIBRARY_DIRS})
-target_link_libraries(AHO PRIVATE ${GLFW_LIBRARIES})
-
-if(NOT TARGET glm::glm)
-    find_package(glm CONFIG REQUIRED)
-endif()
-target_link_libraries(AHO PRIVATE glm::glm)
-
-target_include_directories(AHO PRIVATE ../thirdparty/)
+target_link_libraries(AHO PRIVATE AHO::AHOLi)
+target_include_directories(AHO SYSTEM PRIVATE "${AHO_STB_INCLUDE_DIR}")
+target_compile_definitions(AHO PRIVATE
+        AHO_SAMPLE_SHADER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders"
+        AHO_SAMPLE_RESOURCE_DIR="${AHO_HOME}/built-in-resource")
 
 if(WIN32)
     set_target_properties(AHO PROPERTIES

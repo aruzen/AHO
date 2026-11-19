@@ -6,7 +6,7 @@
 
 ## ビルドと実行
 
-リポジトリルートで実行します。通常のAHO依存に加え、`glslc`が必要です。`thirdparty/stb_image.h` / `thirdparty/stb_image_write.h`は[thirdparty/setup.md](../../../../thirdparty/setup.md)に従って配置してください。git管理外なので別worktreeにも配置が必要です。CMakeは不足時にconfigureで案内します。
+リポジトリルートで実行します。通常のAHO依存に加え、`glslc`が必要です。stbはシステムのインストール先（Linuxでは`libstb-dev`）または`thirdparty/`から検出します。手動配置は[thirdparty/setup.md](../../../../thirdparty/setup.md)を参照してください。
 
 ```sh
 cmake -S . -B build/typed-example \

@@ -148,7 +148,7 @@ namespace {
                        vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eTransferRead);
             vk::BufferImageCopy region{};
             region.imageSubresource = {vk::ImageAspectFlagBits::eColor, 0, 1, 1};
-            region.imageExtent = {2, 2, 1};
+            region.imageExtent = vk::Extent3D{2, 2, 1};
             auto buffer = manager.get_buffer();
             buffer.data_->command_buffers[buffer.get_current_buffer_idx()].copyImageToBuffer(
                 image.data_->image, vk::ImageLayout::eGeneral, readback.data_->buffer, region);

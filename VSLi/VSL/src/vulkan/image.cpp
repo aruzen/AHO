@@ -97,7 +97,7 @@ VSL_NAMESPACE::impl::ImageImpl::~ImageImpl() {
     if (!device)
         return;
     device->device.destroy(view);
-    if (memory != VK_NULL_HANDLE) {
+    if (memory) {
         device->device.destroy(image);
         device->device.free(memory);
     }

@@ -128,7 +128,7 @@ namespace VSL_NAMESPACE::operation {
                 .size = bytes,
             },
         };
-        command.pipelineBarrier(visibility.before_source, visibility.before_destination, {}, {}, before, {});
+        command.pipelineBarrier(visibility.before_source, visibility.before_destination, {}, {}, vk::ArrayProxy<const vk::BufferMemoryBarrier>{2, before}, {});
         command.copyBuffer(source.buffer, destination.buffer, vk::BufferCopy{source_offset, destination_offset, bytes});
 
         const vk::BufferMemoryBarrier after{

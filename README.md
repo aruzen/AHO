@@ -19,7 +19,15 @@ AHOはC++の描画・リソースライブラリです。Vulkanを扱うVSLの�
 
 ## CMakeでのビルド
 
-CMake 3.30以上、Ninja等の生成ツール、C++26対応コンパイラー、Vulkan SDK/loader、GLFW、SPIRV-Cross core、Boostを用意します。通常アプリはGLM、テストはGTestも必要です。saitekikuukanとtinygltfは固定リビジョンを取得します。MSDFを有効にする場合はFreeType等も必要です。
+CMake 3.30以上、Ninja等の生成ツール、C++26対応コンパイラー、Vulkan SDK/loader（ヘッダー1.3.239以上）、GLFW 3.3以上、SPIRV-Cross core（1.3.239相当以上）、stbを用意します。テストはGTest・glslc・spirv-toolsも必要です。saitekikuukanとtinygltfは固定リビジョンを取得します。MSDFを有効にする場合はFreeType等も必要です。
+
+Linuxでは通常のVulkan loaderとGLFWを使用します。Ubuntu 24.04ではGCC 14と配布パッケージでビルドできます。依存の導入とCMakeの更新は[Linuxでのビルド](documents/development/linux.md)を参照してください。
+
+```sh
+cmake --preset linux-debug
+cmake --build --preset linux-debug --parallel 2
+ctest --preset linux-debug
+```
 
 macOSで自動reflectionを利用する場合はGCC 16を使います。C++依存ライブラリ、とくにGTest・SPIRV-Crossは同じ標準ライブラリのABIでビルドし、その配置先を`CMAKE_PREFIX_PATH`で指定してください。SDK指定を含む詳細は[C++標準とツールチェーン](documents/development/cxx-standard.md)を参照してください。
 
@@ -43,7 +51,7 @@ cmake --build build/gcc16 --target AHOLi VSL --parallel 2
 | `AHO_BUILD_GLTF_EXAMPLE=ON` | glTFのCPU側検査サンプル |
 | `AHO_ENABLE_MSDF=ON` | 実験的なCPU MSDF機能 |
 
-従来アプリ・Typedサンプルで使うstbヘッダーは[thirdparty/setup.md](thirdparty/setup.md)に従って配置します。コンパイラーを変える場合はbuildディレクトリを分けてください。
+stbヘッダーはシステムのインストール先（Linuxでは`libstb-dev`）または`thirdparty/`から検出します。手動配置は[thirdparty/setup.md](thirdparty/setup.md)を参照してください。任意の配置先は`-DAHO_STB_INCLUDE_DIR=/path/to/stb`で指定できます。コンパイラーを変える場合はbuildディレクトリを分けてください。
 
 `cmake --build build/gcc16 --target build-tests`でテストをビルドし、`ctest --test-dir build/gcc16 --output-on-failure`で実行します。GPUテストには利用可能なGPUとウィンドウ環境が必要です。
 

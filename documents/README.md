@@ -3,6 +3,7 @@
 開発の入口とビルド手順は[ルートREADME](../README.md)に記載します。公開文書は`documents/`へまとめます。
 
 - [C++標準・reflection・ツールチェーン](development/cxx-standard.md)
+- [Linuxでのビルド](development/linux.md)
 - [コーディング規約](development/style-decisions.md)と[規約検査](development/style-checks.md)
 - [ビルドオプション](build-options.md)と[インストールpackage](installed-package.md)
 - [Buffer](AHO/resource-buffer.md)・[Polygon](AHO/polygon.md)・[数学規約](AHO/math-conventions.md)

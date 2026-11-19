@@ -57,7 +57,7 @@ void populate_debug_messenger_create_info(vk::DebugUtilsMessengerCreateInfoEXT& 
     create_info.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
                               vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
                               vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
-    create_info.pfnUserCallback = (vk::PFN_DebugUtilsMessengerCallbackEXT)debug_callback;
+    create_info.pfnUserCallback = reinterpret_cast<decltype(create_info.pfnUserCallback)>(debug_callback);
 }
 
 vk::Result create_debug_utils_messenger_ext(vk::Instance instance, const vk::DebugUtilsMessengerCreateInfoEXT& p_create_info, const vk::AllocationCallbacks* p_allocator, vk::DebugUtilsMessengerEXT& p_debug_messenger) {
@@ -163,10 +163,6 @@ VSL_NAMESPACE::Vulkan<validation>::Vulkan(const char* app_name, const std::vecto
         // Keep CRT streams valid for hosts with redirected output, including CTest.
         // Detaching the console is enough to hide a release application's console.
         FreeConsole();
-#else
-        fclose(stdin);
-        fclose(stdout);
-        fclose(stderr);
 #endif
     }
 }

@@ -1,6 +1,7 @@
 #include <VSL/define.hpp>
 #include <VSL/window.hpp>
 #include <algorithm>
+#include <chrono>
 
 #include <VSL/exceptions.hpp>
 #include <utility>
@@ -115,8 +116,26 @@ bool VSL_NAMESPACE::PureWindow::operator==(const PureWindow::WindowData* o) {
 }
 
 bool VSL_NAMESPACE::PureWindow::resize(int width, int height) {
-    glfwSetWindowSize((GLFWwindow*)data_->window_handle, width, height);
-    return true;
+    const auto data = data_;
+    if (!data || !data->window_handle || width <= 0 || height <= 0)
+        return false;
+    auto* native = static_cast<GLFWwindow*>(data->window_handle);
+    glfwSetWindowSize(native, width, height);
+    // Wait for the window manager before callers rebuild framebuffer resources.
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (data->window_handle == native) {
+        glfwPollEvents();
+        if (data->window_handle != native)
+            return false;
+        int actual_width, actual_height;
+        glfwGetWindowSize(native, &actual_width, &actual_height);
+        if (actual_width == width && actual_height == height)
+            return true;
+        if (std::chrono::steady_clock::now() >= deadline)
+            return false;
+        glfwWaitEventsTimeout(0.01);
+    }
+    return false;
 }
 
 void VSL_NAMESPACE::PureWindow::WindowData::destroy() {

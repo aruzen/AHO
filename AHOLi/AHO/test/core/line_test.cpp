@@ -1,4 +1,5 @@
 #include <AHO/core/triangle.hpp>
+#include <AHO/core/polygon.hpp>
 #if defined(AHO_CONTRACT_LINE_POINTER_POINTS)
 void verify() {
     aho::Line<double, vsl::D2> line;

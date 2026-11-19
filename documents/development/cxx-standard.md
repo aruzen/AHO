@@ -3,6 +3,7 @@
 AHO・AHOLi・VSLと関連テストはC++26の言語モードでビルドする。CMakeは3.30以上を使用し、`CMAKE_CXX_STANDARD=26`と`CMAKE_CXX_STANDARD_REQUIRED=ON`で古い標準へのfallbackを禁止する。
 
 Windowsの依存設定・ビルド・テスト手順は[Windowsでのビルド](windows.md)を参照。
+LinuxではGCC 14以上と通常のVulkan loader・GLFWを使用する。[Linuxでのビルド](linux.md)を参照。
 
 AHOLi・VSL・AHO::ExperimentalMeshは`cxx_std_26`を利用側へ伝える。これらをtarget_link_librariesで使用するtargetもC++26以上のモードとなる。
 

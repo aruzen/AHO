@@ -1,0 +1,50 @@
+name: Linux build
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install build and graphics dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-14 g++-14 ninja-build python3-venv \
+            libvulkan-dev libglfw3-dev libspirv-cross-c-shared-dev libstb-dev \
+            libgtest-dev glslc spirv-tools mesa-vulkan-drivers vulkan-validationlayers xvfb xauth openbox x11-utils
+          python3 -m venv "$RUNNER_TEMP/aho-build-tools"
+          "$RUNNER_TEMP/aho-build-tools/bin/python" -m pip install 'cmake>=3.30,<4'
+          echo "$RUNNER_TEMP/aho-build-tools/bin" >> "$GITHUB_PATH"
+      - name: Check source paths
+        run: python3 tools/cmake/check_source_paths.py
+      - name: Configure
+        run: cmake --preset linux-debug -DAHO_BUILD_TYPED_EXAMPLE=ON -DAHO_BUILD_TRIANGLE_EXAMPLE=ON -DAHO_BUILD_GLTF_EXAMPLE=ON
+      - name: Build libraries, samples and tests
+        run: cmake --build --preset linux-debug --parallel 2
+      - name: Test with a virtual display and software Vulkan
+        env:
+          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+        run: >-
+          xvfb-run -a -s '-screen 0 1280x1024x24 -noreset'
+          bash tools/cmake/with_window_manager.sh ctest --preset linux-debug --parallel 2
+      - name: Check installed package
+        run: python3 tools/cmake/check_installed_package.py --build-dir build/linux-debug
+      - name: Configure Release without tests
+        run: cmake --preset linux-release -DBUILD_TESTING=OFF
+      - name: Build Release
+        run: cmake --build --preset linux-release --parallel 2

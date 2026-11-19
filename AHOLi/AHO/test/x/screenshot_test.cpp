@@ -5,7 +5,7 @@
 #include <fstream>
 #include <iterator>
 #include <limits>
-#include "../../../../thirdparty/stb_image.h"
+#include <stb_image.h>
 #ifdef AHO_GPU_TESTS
 #include "../support/live_gpu.hpp"
 #include <AHO/drawer/draw_phase.hpp>

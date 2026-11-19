@@ -2,6 +2,31 @@
   "version": 3,
   "configurePresets": [
     {
+      "name": "linux-debug",
+      "displayName": "Linux GCC 14 Debug",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/linux-debug",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "gcc-14",
+        "CMAKE_CXX_COMPILER": "g++-14"
+      }
+    },
+    {
+      "name": "linux-release",
+      "displayName": "Linux GCC 14 Release",
+      "inherits": "linux-debug",
+      "binaryDir": "${sourceDir}/build/linux-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
       "name": "windows-vs2026-debug",
       "displayName": "Windows VS 2026 Debug",
       "generator": "Visual Studio 18 2026",
@@ -16,6 +41,19 @@
     }
   ],
   "buildPresets": [
+    {
+      "name": "linux-debug",
+      "configurePreset": "linux-debug"
+    },
+    {
+      "name": "linux-release",
+      "configurePreset": "linux-release"
+    },
+    {
+      "name": "linux-tests",
+      "configurePreset": "linux-debug",
+      "targets": ["build-tests"]
+    },
     {
       "name": "windows-vs2026-debug",
       "configurePreset": "windows-vs2026-debug",
@@ -37,6 +75,20 @@
     }
   ],
   "testPresets": [
+    {
+      "name": "linux-debug",
+      "configurePreset": "linux-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "linux-release",
+      "configurePreset": "linux-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
     {
       "name": "windows-vs2026-debug",
       "configurePreset": "windows-vs2026-debug",

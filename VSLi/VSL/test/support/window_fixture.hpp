@@ -1,5 +1,9 @@
-#include <VSL/lifetime/startup_access.hpp>
 #pragma once
+#include "../../src/private/VSL/lifetime/window_access.hpp"
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::WindowAccess;
+}
+#include <VSL/lifetime/startup_access.hpp>
 #include "vulkan_fixture.hpp"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -45,7 +49,7 @@ namespace vsl_test {
         if (VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device))
             VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.waitIdle();
         if (window)
-            window->data_->plugins.clear();
+            WindowAccess::State(*(window))->plugins.clear();
         surface.reset();
         if (window && static_cast<bool>(*window))
             window->close();

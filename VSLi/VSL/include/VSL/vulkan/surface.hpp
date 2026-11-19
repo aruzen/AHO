@@ -23,7 +23,7 @@ namespace VSL_NAMESPACE {
             swap(value);
             return *this;
         }
-        // 登録IDはpluginオブジェクトに属し、Native ownerの交換では移動しない。
+        // 登録IDはWindowの登録表に属し、Native ownerの交換では移動しない。
         void swap(Surface& other) noexcept { _owner.swap(other._owner); }
         explicit operator bool() const noexcept { return bool(_owner); }
         Surface(VSL_NAMESPACE::PureWindow* data, VSL_NAMESPACE::VulkanAccessor instance);

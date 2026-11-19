@@ -15,7 +15,7 @@ namespace AHO_NAMESPACE {
     class RenderContext {
         engine::EngineAccessor _engine;
         std::shared_ptr<window::WindowData> _target;
-        std::shared_ptr<VSL_NAMESPACE::PureWindow::WindowData> _window;
+        VSL_NAMESPACE::WeakWindow _window;
         friend struct window::Window;
         RenderContext(const window::Window& window);
         void require_live() const;

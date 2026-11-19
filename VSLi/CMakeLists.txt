@@ -9,6 +9,9 @@ find_package(spirv_cross_core CONFIG REQUIRED)
 add_library(VSL STATIC
         ./VSL/src/exceptions.cpp
         VSL/src/window.cpp
+        VSL/src/lifetime/window_state.cpp
+        VSL/src/private/VSL/lifetime/window_state.hpp
+        VSL/src/private/VSL/lifetime/window_access.hpp
         ./VSL/src/window_plugin.cpp
         ./VSL/src/utils/spir_reflector.cpp
         VSL/src/utils/typed_shader.cpp

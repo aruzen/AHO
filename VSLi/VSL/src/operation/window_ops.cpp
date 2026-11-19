@@ -39,4 +39,19 @@ namespace VSL_NAMESPACE::operation {
         glfwSetFramebufferSizeCallback(static_cast<GLFWwindow*>(window), nullptr);
         glfwHideWindow(static_cast<GLFWwindow*>(window));
     }
+    void poll_os_windows() {
+        glfwPollEvents();
+    }
+    void resize_os_window(void* window, int width, int height) {
+        glfwSetWindowSize(static_cast<GLFWwindow*>(window), width, height);
+    }
+    bool os_window_should_close(void* window) {
+        return glfwWindowShouldClose(static_cast<GLFWwindow*>(window)) != 0;
+    }
+    void set_os_window_should_close(void* window, bool value) {
+        glfwSetWindowShouldClose(static_cast<GLFWwindow*>(window), value);
+    }
+    void set_os_window_resize_callback(void* window, void (*callback)(GLFWwindow*, int, int)) {
+        glfwSetFramebufferSizeCallback(static_cast<GLFWwindow*>(window), callback);
+    }
 } // namespace VSL_NAMESPACE::operation

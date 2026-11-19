@@ -1,129 +1,148 @@
 #pragma once
 #include "define.hpp"
-
-#include "concepts.hpp"
 #include "exceptions.hpp"
 #include "lifetime/window_owner.hpp"
 
+#include <concepts>
 #include <memory>
-#include <vector>
-#include <functional>
-#include <map>
+#include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace VSL_NAMESPACE {
-    namespace window_plugin {
-        struct QuietClose;
+    namespace lifetime::detail {
+        struct WindowAccess;
     }
+    class WeakWindow;
+    class WindowIdentity;
 
     class PureWindow {
     public:
+        using PluginId = unsigned char;
         struct Plugin {
-            unsigned char id = 0;
-            virtual ~Plugin() {};
-        };
+        private:
+            const std::optional<PluginId> _requested_id;
 
+        public:
+            explicit Plugin(std::optional<PluginId> requested_id = std::nullopt) noexcept : _requested_id(requested_id) {}
+            virtual ~Plugin() = default;
+            std::optional<PluginId> requested_id() const noexcept { return _requested_id; }
+        };
         struct WindowData;
         struct OnUpdate {
             virtual ~OnUpdate() = default;
-            virtual bool on_update(VSL_NAMESPACE::PureWindow) = 0;
+            virtual bool on_update(PureWindow) = 0;
+        };
+        struct PluginSnapshot {
+            PluginId id;
+            std::weak_ptr<Plugin> plugin;
         };
 
-        struct WindowData {
-            unsigned char plugins_next_id = 0;
-            std::map<unsigned char, std::shared_ptr<Plugin>> plugins;
-            std::vector<std::shared_ptr<OnUpdate>> update;
+    protected:
+        class Call;
 
-            // void* plugdata = nullptr;
-            void* window_handle = nullptr;
-            lifetime::OSWindowOwner os_window;
-            std::string name;
-            int width, height;
-
-            void destroy();
-        };
-
-        static std::vector<std::shared_ptr<WindowData>> WINDOWS;
+    private:
+        std::shared_ptr<WindowData> _state;
+        mutable Call* _calls = nullptr;
+        explicit PureWindow(std::shared_ptr<WindowData> state) noexcept;
+        void invalidate_calls() noexcept;
+        static void RequirePluginTarget(const std::shared_ptr<WindowData>& state);
+        static void PublishPlugin(const std::shared_ptr<WindowData>& state, std::shared_ptr<Plugin> plugin);
+        friend struct lifetime::detail::WindowAccess;
+        friend class WeakWindow;
+        friend class WindowIdentity;
 
     public:
+        PureWindow() noexcept = default;
         PureWindow(std::string name, int width = 800, int height = 600);
-        PureWindow(std::shared_ptr<WindowData> data_);
-        PureWindow(const PureWindow&) = default;
-        PureWindow& operator=(const PureWindow&) = default;
-        PureWindow(PureWindow&&) = default;
-        PureWindow& operator=(PureWindow&&) = default;
-        virtual ~PureWindow() = default;
+        PureWindow(const PureWindow& other) noexcept;
+        PureWindow(PureWindow&& other) noexcept;
+        PureWindow& operator=(PureWindow other) noexcept;
+        virtual ~PureWindow();
+        void swap(PureWindow& other) noexcept;
+        friend void swap(PureWindow& left, PureWindow& right) noexcept { left.swap(right); }
 
         static bool Update();
         static bool NoCheckUpdate();
+        static std::vector<PureWindow> Snapshot();
 
         template<typename T, typename... Args>
-        //	requires vsl::concepts::initializer<T, VSL_NAMESPACE::PureWindow::WindowData*, Args&&...>&& std::derived_from<T, VSL_NAMESPACE::PureWindow::Plugin>
         std::shared_ptr<T> add_plugin(Args&&... args);
-
-        template<typename T, typename... Args>
-        bool remove_plugin(std::shared_ptr<T> t);
+        bool remove_plugin(std::shared_ptr<Plugin> plugin);
+        std::shared_ptr<Plugin> plugin(PluginId id) const;
+        template<typename T>
+        std::shared_ptr<T> plugin_as(PluginId id) const { return std::dynamic_pointer_cast<T>(plugin(id)); }
+        std::optional<PluginId> plugin_id(const std::shared_ptr<Plugin>& plugin) const noexcept;
+        std::vector<PluginSnapshot> plugin_snapshot() const;
+        bool contains_plugin(PluginId id, const std::shared_ptr<Plugin>& plugin) const noexcept;
 
         virtual bool resize(int width, int height);
-
-        std::string name();
+        std::string name() const;
         virtual bool close();
         lifetime::OSWindowOwner window_owner() const;
+        bool should_close() const;
+        void set_should_close(bool value);
+        WeakWindow weak() const noexcept;
+        WindowIdentity identity() const noexcept;
+        explicit operator bool() const noexcept;
+        bool operator==(const PureWindow& other) const noexcept;
+    };
 
-        operator bool() const;
-        bool operator==(const PureWindow& o);
-        bool operator==(const PureWindow::WindowData* o);
+    // facadeの破棄・差し替えを検出する。状態の所有は呼出側の値snapshotが担う。
+    class PureWindow::Call {
+        const PureWindow* _target;
+        Call* _previous;
+        friend class PureWindow;
 
-        std::shared_ptr<WindowData> data_;
+    public:
+        explicit Call(const PureWindow& target) noexcept;
+        Call(const Call&) = delete;
+        Call& operator=(const Call&) = delete;
+        ~Call();
+        bool active() const noexcept { return _target != nullptr; }
+    };
+
+    class WindowIdentity {
+        const PureWindow::WindowData* _pointer = nullptr;
+        std::weak_ptr<PureWindow::WindowData> _owner;
+        explicit WindowIdentity(const std::shared_ptr<PureWindow::WindowData>& state) noexcept;
+        friend class PureWindow;
+
+    public:
+        WindowIdentity() noexcept = default;
+        explicit operator bool() const noexcept { return _pointer != nullptr; }
+        bool operator==(const WindowIdentity& other) const noexcept;
+    };
+
+    // OSWindowOwnerがNativeを保持していても、logical close後はlockできない。
+    class WeakWindow {
+        std::weak_ptr<PureWindow::WindowData> _state;
+        explicit WeakWindow(const std::shared_ptr<PureWindow::WindowData>& state) noexcept : _state(state) {}
+        friend class PureWindow;
+
+    public:
+        WeakWindow() noexcept = default;
+        PureWindow lock() const noexcept;
+        bool expired() const noexcept { return !lock(); }
     };
 
     class Window : public PureWindow {
     public:
         Window(std::string name, int width = 800, int height = 600);
-        Window(std::shared_ptr<WindowData> data);
+        explicit Window(PureWindow source);
     };
 
     template<typename T, typename... Args>
-    // requires vsl::concepts::initializer<T, VSL_NAMESPACE::PureWindow::WindowData*, Args&&...>&& std::derived_from<T, VSL_NAMESPACE::PureWindow::Plugin>
-    inline std::shared_ptr<T> VSL_NAMESPACE::PureWindow::add_plugin(Args&&... args) {
-        if (!data_)
-            throw exceptions::RuntimeException("window", "Window data is required");
-        auto t = std::shared_ptr<T>(new T(this, std::forward<Args>(args)...));
-        std::shared_ptr<Plugin> p = std::static_pointer_cast<Plugin>(t);
-
-        if (t->id == 0) {
-            auto candidate = data_->plugins_next_id;
-            while (data_->plugins.contains(candidate)) {
-                candidate = static_cast<unsigned char>(candidate + 1);
-                if (candidate == data_->plugins_next_id)
-                    throw exceptions::RuntimeException("window", "No free window plugin IDs available");
-            }
-            p->id = candidate;
-            data_->plugins_next_id = static_cast<unsigned char>(candidate + 1);
-        }
-
-        if (const auto previous = data_->plugins.find(p->id); previous != data_->plugins.end())
-            if (auto listener = std::dynamic_pointer_cast<OnUpdate>(previous->second))
-                std::erase(data_->update, listener);
-
-        data_->plugins[t->id] = p;
-        if (auto listener = std::dynamic_pointer_cast<OnUpdate>(p))
-            data_->update.push_back(listener);
-
-        return t;
-    }
-
-    template<typename T, typename... Args>
-    inline bool VSL_NAMESPACE::PureWindow::remove_plugin(std::shared_ptr<T> t) {
-        std::shared_ptr<Plugin> p = std::static_pointer_cast<Plugin>(t);
-        if (!p)
-            return false;
-        const auto entry = this->data_->plugins.find(p->id);
-        if (entry == this->data_->plugins.end() || entry->second != p)
-            return false;
-        if (auto listener = std::dynamic_pointer_cast<OnUpdate>(p))
-            std::erase(this->data_->update, listener);
-        this->data_->plugins.erase(entry);
-        return true;
+    std::shared_ptr<T> PureWindow::add_plugin(Args&&... args) {
+        static_assert(std::derived_from<T, Plugin>);
+        Call call(*this);
+        const auto state = _state;
+        RequirePluginTarget(state);
+        auto result = std::shared_ptr<T>(new T(this, std::forward<Args>(args)...));
+        if (!call.active())
+            throw exceptions::RuntimeException("window", "Window receiver changed during plugin construction");
+        PublishPlugin(state, result);
+        return result;
     }
 } // namespace VSL_NAMESPACE

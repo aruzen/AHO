@@ -1,3 +1,7 @@
+#include "../../src/private/VSL/lifetime/window_access.hpp"
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::WindowAccess;
+}
 #include "support/window_fixture.hpp"
 #include <VSL/lifetime/window_runtime.hpp>
 #include <VSL/window_plugin.hpp>
@@ -133,7 +137,7 @@ namespace {
             EXPECT_FALSE(os.expired());
             EXPECT_THROW(vsl::PureWindow::NoCheckUpdate(), std::logic_error);
         });
-        auto* native = static_cast<GLFWwindow*>(window->data_->window_handle);
+        auto* native = static_cast<GLFWwindow*>(WindowAccess::State(*(window))->window_handle);
         const auto callback = glfwSetFramebufferSizeCallback(native, nullptr);
         ASSERT_NE(callback, nullptr);
         callback(native, 80, 64);

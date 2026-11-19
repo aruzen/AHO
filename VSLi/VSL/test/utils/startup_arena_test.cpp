@@ -1,3 +1,7 @@
+#include "../../src/private/VSL/lifetime/window_access.hpp"
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::WindowAccess;
+}
 #include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include "support/window_fixture.hpp"
@@ -246,8 +250,8 @@ namespace {
         EXPECT_EQ(StartupAccess::Owned(*(plugin)), StartupAccess::Owned(original));
         EXPECT_EQ(StartupAccess::Owned(*(plugin))->surface, StartupAccess::Owned(original)->surface);
         auto fake_data = std::make_shared<vsl::PureWindow::WindowData>();
-        fake_data->window_handle = window->data_->window_handle;
-        vsl::PureWindow fake(fake_data);
+        fake_data->window_handle = WindowAccess::State(*(window))->window_handle;
+        vsl::PureWindow fake(WindowAccess::FromState(fake_data));
         EXPECT_THROW(fake.add_plugin<vsl::Surface>(original), vsl::exceptions::RuntimeException);
         fake_data->window_handle = nullptr;
         EXPECT_TRUE(window->close());

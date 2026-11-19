@@ -53,7 +53,7 @@ namespace AHO_NAMESPACE::window {
                std::optional<VSL_NAMESPACE::PresentFencePolicy> present_fences = std::nullopt);
 
         Window(engine::EngineAccessor engine,
-               std::shared_ptr<VSL_NAMESPACE::Window::WindowData> vsl_data,
+               VSL_NAMESPACE::PureWindow vsl_window,
                std::shared_ptr<AHO_NAMESPACE::window::WindowData> aho_data);
 
         engine::EngineAccessor engine;
@@ -91,7 +91,8 @@ namespace AHO_NAMESPACE::window {
         // 同じwindowの再作成やGPU処理の送信は行わない。
         std::function<void(AHO_NAMESPACE::window::Window*)> hook;
 
-        WindowResizeHookPlugin(VSL_NAMESPACE::PureWindow*, std::function<void(AHO_NAMESPACE::window::Window*)> hook);
+        WindowResizeHookPlugin(VSL_NAMESPACE::PureWindow*, std::function<void(AHO_NAMESPACE::window::Window*)> hook,
+                               std::optional<unsigned char> requested_id = std::nullopt);
     };
 } // namespace AHO_NAMESPACE::window
 

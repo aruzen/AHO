@@ -3,9 +3,9 @@
 
 namespace AHO_NAMESPACE::window::detail {
     struct WindowClose {
-        static bool Run(std::shared_ptr<VSL_NAMESPACE::PureWindow::WindowData> native, std::shared_ptr<WindowData> drawing,
+        static bool Run(VSL_NAMESPACE::PureWindow native, std::shared_ptr<WindowData> drawing,
                         VSL_NAMESPACE::LogicalDeviceAccessor device, VSL_NAMESPACE::Surface surface);
-        static void CancelPhases(const std::shared_ptr<VSL_NAMESPACE::PureWindow::WindowData>& native, const std::shared_ptr<WindowData>& drawing);
+        static void CancelPhases(const VSL_NAMESPACE::PureWindow& native, const std::shared_ptr<WindowData>& drawing);
         static void Install(Window& window);
     };
     struct FrameBufferQuery {
@@ -23,7 +23,7 @@ namespace AHO_NAMESPACE::window::detail {
         ~ScopedFrameBufferQuery();
     };
     d2::VectorI frame_buffer_size(void* native);
-    std::shared_ptr<VSL_NAMESPACE::Surface> make_window_surface(VSL_NAMESPACE::Window& window, VSL_NAMESPACE::VulkanAccessor instance);
+    std::shared_ptr<VSL_NAMESPACE::Surface> make_window_surface(VSL_NAMESPACE::PureWindow window, VSL_NAMESPACE::VulkanAccessor instance);
     std::shared_ptr<WindowData> make_window_data(const engine::EngineAccessor& engine,
                                                  std::shared_ptr<VSL_NAMESPACE::Surface> surface,
                                                  std::optional<VSL_NAMESPACE::PresentFencePolicy> present_fences = std::nullopt);

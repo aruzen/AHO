@@ -272,6 +272,9 @@
     <ClInclude Include="VSL\include\VSL\lifetime\window_owner.hpp" />
     <ClInclude Include="VSL\src\private\VSL\lifetime\window_runtime.hpp" />
     <ClCompile Include="VSL\src\lifetime\window_runtime.cpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\window_state.hpp" />
+    <ClInclude Include="VSL\src\private\VSL\lifetime\window_access.hpp" />
+    <ClCompile Include="VSL\src\lifetime\window_state.cpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\window_ops.hpp" />
     <ClCompile Include="VSL\src\operation\window_ops.cpp" />
     <ClInclude Include="VSL\src\private\VSL\operation\surface_ops.hpp" />

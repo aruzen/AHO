@@ -70,13 +70,13 @@ namespace {
         if (!features.independentBlend || !features.samplerAnisotropy ||
             (vsl::VALIDATION && (!features.vertexPipelineStoresAndAtomics || !features.fragmentStoresAndAtomics)))
             GTEST_SKIP() << "Public logical-device constructor requires unsupported fixed features";
-#ifndef _MSC_VER
+#ifdef __APPLE__
         const auto extensions = StartupAccess::Owned(physical)->device.enumerateDeviceExtensionProperties();
         if (!std::ranges::any_of(extensions, [](const auto& extension) {
                 return std::strcmp(extension.extensionName, "VK_KHR_portability_subset") == 0;
             }))
             GTEST_SKIP()
-                << "Public logical-device constructor requires VK_KHR_portability_subset on non-MSVC platforms";
+                << "Public logical-device constructor requires VK_KHR_portability_subset on macOS";
 #endif
         using Device = vsl::LogicalDevice<vsl::GraphicsDeviceCreator<false>>;
         Device by_pointer(physical, surface), by_value(physical, *surface);

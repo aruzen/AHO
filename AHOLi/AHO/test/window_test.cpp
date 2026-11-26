@@ -1000,13 +1000,20 @@ namespace {
         auto& window = *engine->boot_window;
         EXPECT_TRUE(window.set_title("AHO changed title"));
         auto* native = static_cast<GLFWwindow*>(WindowAccess::State(window)->window_handle);
+#if GLFW_VERSION_MAJOR > 3 || (GLFW_VERSION_MAJOR == 3 && GLFW_VERSION_MINOR >= 4)
         EXPECT_STREQ(glfwGetWindowTitle(native), "AHO changed title");
+#endif
+        const auto wait_for_maximized = [&](int expected) {
+            const double deadline = glfwGetTime() + 2.0;
+            while (glfwGetWindowAttrib(native, GLFW_MAXIMIZED) != expected && glfwGetTime() < deadline)
+                glfwWaitEventsTimeout(0.01);
+            return glfwGetWindowAttrib(native, GLFW_MAXIMIZED);
+        };
+        glfwShowWindow(native);
         window.maximize();
-        glfwPollEvents();
-        EXPECT_EQ(glfwGetWindowAttrib(native, GLFW_MAXIMIZED), GLFW_TRUE);
+        EXPECT_EQ(wait_for_maximized(GLFW_TRUE), GLFW_TRUE);
         window.restore();
-        glfwPollEvents();
-        EXPECT_EQ(glfwGetWindowAttrib(native, GLFW_MAXIMIZED), GLFW_FALSE);
+        EXPECT_EQ(wait_for_maximized(GLFW_FALSE), GLFW_FALSE);
         EXPECT_TRUE(window.close());
         EXPECT_EQ(window.data2, nullptr);
         EXPECT_EQ(WindowAccess::State(window)->window_handle, nullptr);

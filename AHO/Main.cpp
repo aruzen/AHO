@@ -4,19 +4,27 @@
 #include <VSL/utils/spir_reflector.hpp>
 
 // #define AHO_POOP_PUBLIC_SECURITY
+#ifdef _MSC_VER
 #pragma warning(disable : 4455)
+#endif
 
 #include <AHO/aho.hpp>
 
 #include <chrono>
-#include <print>
 #include <cstdlib>
 
 /*
 * https://vulkan-tutorial.com/en/Vertex_buffers/Staging_buffer
 */
 
-#include "../thirdparty/stb_image.h"
+#include <stb_image.h>
+
+#ifndef AHO_SAMPLE_SHADER_DIR
+#define AHO_SAMPLE_SHADER_DIR "shaders"
+#endif
+#ifndef AHO_SAMPLE_RESOURCE_DIR
+#define AHO_SAMPLE_RESOURCE_DIR "${AHO_HOME}/built-in-resource"
+#endif
 
 int main() {
     using namespace aho;
@@ -51,43 +59,30 @@ breakpoint disable swift_willThrow
         if (!main_window.data2->image_available)
             loggingln("image not available ; ;");
         main_window.resize(500, 500);
-#ifdef _MSC_VER
-        vsl::utils::ShaderCompiler shader_compiler("glslc", {"shaders/", "${AHO_HOME}/built-in-resource/shaders/"});
-#elif defined(__APPLE_CC__)
         vsl::utils::ShaderCompiler shader_compiler("glslc",
-                                                   {"../../AHO/shaders/", "${AHO_HOME}/built-in-resource/shaders/"});
-#endif
+                                                   {AHO_SAMPLE_SHADER_DIR, AHO_SAMPLE_RESOURCE_DIR "/shaders"});
         shader_compiler.load();
         shader_compiler.compile();
 
         // Window main_window("vsl", 800, 800);
         // auto surface = main_window.add_plugin<Surface>(vulkan_instance);
         pl::ShaderGroup input_d3_shaders("3d_color_input",
-                                         {make_shader<"${AHO_HOME}/built-in-resource/shaders/vd2p_fc_umpv.vert.spv">(
+                                         {make_shader<AHO_SAMPLE_RESOURCE_DIR "/shaders/vd2p_fc_umpv.vert.spv">(
                                               device),
-                                          make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device)}),
+                                          make_shader<AHO_SAMPLE_RESOURCE_DIR "/shaders/fc.frag.spv">(device)}),
             input_d2_shaders("2d_color_input",
-                             {make_shader<"${AHO_HOME}/built-in-resource/shaders/vd2p_fc.vert.spv">(device),
-                              make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device)}),
+                             {make_shader<AHO_SAMPLE_RESOURCE_DIR "/shaders/vd2p_fc.vert.spv">(device),
+                              make_shader<AHO_SAMPLE_RESOURCE_DIR "/shaders/fc.frag.spv">(device)}),
             push_d2_shaders("2d_color_push",
-                            {make_shader<"${AHO_HOME}/built-in-resource/shaders/2dtriangle_single_color.vert.spv">(
+                            {make_shader<AHO_SAMPLE_RESOURCE_DIR "/shaders/2dtriangle_single_color.vert.spv">(
                                  device),
-                             make_shader<"${AHO_HOME}/built-in-resource/shaders/fc.frag.spv">(device)});
-#ifdef _MSC_VER
+                             make_shader<AHO_SAMPLE_RESOURCE_DIR "/shaders/fc.frag.spv">(device)});
         pl::ShaderGroup input_texture_shaders("input_texture",
-                                              {make_shader<"shaders/texture.vert.spv">(device),
-                                               make_shader<"shaders/texture.frag.spv">(device)}),
+                                              {make_shader<AHO_SAMPLE_SHADER_DIR "/texture.vert.spv">(device),
+                                               make_shader<AHO_SAMPLE_SHADER_DIR "/texture.frag.spv">(device)}),
             push_texture_shaders("push_texture",
-                                 {make_shader<"shaders/push_texture.vert.spv">(device),
-                                  make_shader<"shaders/push_texture.frag.spv">(device)});
-#elif defined(__APPLE_CC__)
-        pl::ShaderGroup input_texture_shaders("input_texture",
-                                              {make_shader<"../../AHO/shaders/texture.vert.spv">(device),
-                                               make_shader<"../../AHO/shaders/texture.frag.spv">(device)}),
-            push_texture_shaders("push_texture",
-                                 {make_shader<"../../AHO/shaders/push_texture.vert.spv">(device),
-                                  make_shader<"../../AHO/shaders/push_texture.frag.spv">(device)});
-#endif
+                                 {make_shader<AHO_SAMPLE_SHADER_DIR "/push_texture.vert.spv">(device),
+                                  make_shader<AHO_SAMPLE_SHADER_DIR "/push_texture.frag.spv">(device)});
 
         // utils::SPIRVReflector reflector(device, std::filesystem::path(expand_environments("${AHO_HOME}/built-in-resource/shaders/all-types.vert.spv")));
 
@@ -116,7 +111,7 @@ breakpoint disable swift_willThrow
         auto [input_vertices_resource_layout, input_vertices] = [&]() {
             auto vd2p_fc_umpv_reflect = vsl::utils::SPIRVReflector(device, std::filesystem::path(
                                                                                expand_environments(
-                                                                                   "${AHO_HOME}/built-in-resource/shaders/vd2p_fc_umpv.vert.spv")))
+                                                                                   AHO_SAMPLE_RESOURCE_DIR "/shaders/vd2p_fc_umpv.vert.spv")))
                                             .generated;
             auto input_vertices_resource_layout = layout.copy().add(
                 pl::ResourceBinding(vd2p_fc_umpv_reflect.make_binding_layout()),
@@ -130,7 +125,7 @@ breakpoint disable swift_willThrow
         auto [push_triangle_layout, push_triangle] = [&]() {
             auto d2triangle_single_color = vsl::utils::SPIRVReflector(device, std::filesystem::path(
                                                                                   expand_environments(
-                                                                                      "${AHO_HOME}/built-in-resource/shaders/2dtriangle_single_color.vert.spv")))
+                                                                                      AHO_SAMPLE_RESOURCE_DIR "/shaders/2dtriangle_single_color.vert.spv")))
                                                .generated;
             auto push_triangle_layout = layout.copy().add(
                 *d2triangle_single_color.push_constants,
@@ -140,21 +135,12 @@ breakpoint disable swift_willThrow
         }();
 
         auto [push_texture_layout, push_texture] = [&]() {
-#ifndef _MSC_VER
             auto push_texture_vert = vsl::utils::SPIRVReflector(device, std::filesystem::path(
-                                                                            expand_environments("../../AHO/shaders/push_texture.vert.spv")))
+                                                                            expand_environments(AHO_SAMPLE_SHADER_DIR "/push_texture.vert.spv")))
                                          .generated;
             auto push_texture_frag = vsl::utils::SPIRVReflector(device, std::filesystem::path(
-                                                                            expand_environments("../../AHO/shaders/push_texture.frag.spv")))
+                                                                            expand_environments(AHO_SAMPLE_SHADER_DIR "/push_texture.frag.spv")))
                                          .generated;
-#else
-            auto push_texture_vert = vsl::utils::SPIRVReflector(device, std::filesystem::path(
-                                                                            expand_environments("shaders/push_texture.vert.spv")))
-                                         .generated;
-            auto push_texture_frag = vsl::utils::SPIRVReflector(device, std::filesystem::path(
-                                                                            expand_environments("shaders/push_texture.frag.spv")))
-                                         .generated;
-#endif
             const auto push_texture_layout = layout.copy().add(
                 *push_texture_vert.push_constants,
                 pl::ResourceBinding(push_texture_frag.make_binding_layout()),
@@ -164,21 +150,12 @@ breakpoint disable swift_willThrow
         }();
 
         auto [texture_resource_layout, input_texture] = [&]() {
-#ifndef _MSC_VER
             auto texture_vert = vsl::utils::SPIRVReflector(device, std::filesystem::path(
-                                                                       expand_environments("../../AHO/shaders/texture.vert.spv")))
+                                                                       expand_environments(AHO_SAMPLE_SHADER_DIR "/texture.vert.spv")))
                                     .generated;
             auto texture_frag = vsl::utils::SPIRVReflector(device, std::filesystem::path(
-                                                                       expand_environments("../../AHO/shaders/texture.frag.spv")))
+                                                                       expand_environments(AHO_SAMPLE_SHADER_DIR "/texture.frag.spv")))
                                     .generated;
-#else
-            auto texture_vert = vsl::utils::SPIRVReflector(device, std::filesystem::path(
-                                                                       expand_environments("shaders/texture.vert.spv")))
-                                    .generated;
-            auto texture_frag = vsl::utils::SPIRVReflector(device, std::filesystem::path(
-                                                                       expand_environments("shaders/texture.frag.spv")))
-                                    .generated;
-#endif
             const auto vert_layout = texture_vert.make_binding_layout()[0];
             const auto frag_layout = texture_frag.make_binding_layout().at(1);
             std::vector layouts = {vert_layout,
@@ -243,7 +220,7 @@ breakpoint disable swift_willThrow
         DeviceLocalBuffer<vsl::MemoryType::VERTEX_BUFFER> tex_coord_buffer(device, command_manager, texcoords);
 
         int tex_width, tex_height, tex_channels;
-        stbi_uc* pixels = stbi_load(expand_environments("${AHO_HOME}/built-in-resource/images/ahahacraft.png").c_str(),
+        stbi_uc* pixels = stbi_load(expand_environments(AHO_SAMPLE_RESOURCE_DIR "/images/ahahacraft.png").c_str(),
                                     &tex_width, &tex_height, &tex_channels, STBI_rgb_alpha);
 
         if (!pixels) {

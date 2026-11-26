@@ -96,7 +96,9 @@ namespace {
         if (type.basetype == spirv_cross::SPIRType::Struct) {
             result.kind = ReflectedBlock::BlockKind::STRUCTURE;
             for (std::uint32_t i = 0; i < type.member_types.size(); ++i) {
-                const auto stride = compiler.get_member_decoration(type.self, i, spv::DecorationMatrixStride);
+                const auto stride = compiler.has_member_decoration(type.self, i, spv::DecorationMatrixStride)
+                                        ? compiler.type_struct_member_matrix_stride(type, i)
+                                        : 0;
                 const auto major = compiler.has_member_decoration(type.self, i, spv::DecorationRowMajor);
                 auto member = reflect_block_type(compiler, type.member_types[i], stride, major);
                 const auto offset = compiler.type_struct_member_offset(type, i);

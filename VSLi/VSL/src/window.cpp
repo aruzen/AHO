@@ -3,6 +3,7 @@
 #include <VSL/lifetime/window_access.hpp>
 #include <VSL/lifetime/window_runtime.hpp>
 #include <VSL/operation/window_ops.hpp>
+#include <chrono>
 #include <stdexcept>
 
 namespace VSL_NAMESPACE {
@@ -113,8 +114,22 @@ namespace VSL_NAMESPACE {
         lifetime::GLFWCallScope scope;
         if (!call.active() || state->closed)
             return false;
-        operation::resize_os_window(owner.native_handle(), width, height);
-        return call.active() && !state->closed;
+        const auto native = owner.native_handle();
+        operation::resize_os_window(native, width, height);
+
+        // Window managerが新しいサイズを反映してから描画資源の再構築へ進む。
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (call.active() && !state->closed) {
+            operation::poll_os_windows();
+            if (!call.active() || state->closed)
+                return false;
+            if (operation::os_window_has_size(native, width, height))
+                return true;
+            if (std::chrono::steady_clock::now() >= deadline)
+                return false;
+            operation::wait_os_window_events(0.01);
+        }
+        return false;
     }
 
     lifetime::OSWindowOwner PureWindow::window_owner() const {

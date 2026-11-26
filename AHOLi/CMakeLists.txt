@@ -103,6 +103,7 @@ target_compile_features(AHOLi PUBLIC cxx_std_26)
 add_library(AHO::AHOLi ALIAS AHOLi)
 aho_target_build_options(AHOLi)
 target_include_directories(AHOLi SYSTEM PRIVATE "${AHO_TINYGLTF_INCLUDE_DIR}")
+target_include_directories(AHOLi SYSTEM PRIVATE "${AHO_STB_INCLUDE_DIR}")
 
 target_include_directories(AHOLi
         PUBLIC

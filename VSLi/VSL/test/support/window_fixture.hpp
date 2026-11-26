@@ -36,7 +36,11 @@ namespace vsl_test {
             glfw_lease = vsl::lifetime::GLFWLease::Acquire();
         } catch (const vsl::exceptions::RuntimeException& error) {
             const std::string reason = error.what();
-            if (reason.find(std::to_string(GLFW_PLATFORM_UNAVAILABLE)) != std::string::npos || reason.find("DISPLAY") != std::string::npos ||
+            if (
+#ifdef GLFW_PLATFORM_UNAVAILABLE
+                reason.find(std::to_string(GLFW_PLATFORM_UNAVAILABLE)) != std::string::npos ||
+#endif
+                reason.find("DISPLAY") != std::string::npos ||
                 reason.find("display connection") != std::string::npos)
                 GTEST_SKIP() << "Window/display unavailable: " << reason;
             FAIL() << "GLFW initialization failed: " << reason;

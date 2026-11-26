@@ -1,4 +1,5 @@
 #include <AHO/core/triangle.hpp>
+#include <AHO/core/polygon.hpp>
 #if defined(AHO_CONTRACT_TRIANGLE_TRIANGLES)
 void verify() {
     const auto result = aho::Triangle<double, vsl::D2>{}.triangles();

@@ -53,6 +53,16 @@ namespace VSL_NAMESPACE::operation {
         glfwSetWindowSize(static_cast<GLFWwindow*>(window), width, height);
     }
 
+    bool os_window_has_size(void* window, int width, int height) {
+        int actual_width, actual_height;
+        glfwGetWindowSize(static_cast<GLFWwindow*>(window), &actual_width, &actual_height);
+        return actual_width == width && actual_height == height;
+    }
+
+    void wait_os_window_events(double seconds) {
+        glfwWaitEventsTimeout(seconds);
+    }
+
     bool os_window_should_close(void* window) {
         return glfwWindowShouldClose(static_cast<GLFWwindow*>(window)) != 0;
     }

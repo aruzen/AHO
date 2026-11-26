@@ -12,6 +12,8 @@ namespace VSL_NAMESPACE::operation {
     void detach_os_window(void* window) noexcept;
     void poll_os_windows();
     void resize_os_window(void* window, int width, int height);
+    bool os_window_has_size(void* window, int width, int height);
+    void wait_os_window_events(double seconds);
     bool os_window_should_close(void* window);
     void set_os_window_should_close(void* window, bool value);
     void set_os_window_resize_callback(void* window, void (*callback)(GLFWwindow*, int, int));

@@ -1,42 +1,32 @@
-//
-// Created by morimoto_hibiki on 2025/10/21.
-//
-
+#include <VSL/lifetime/sampler_access.hpp>
 #include <VSL/vulkan/sampler.hpp>
+#include <VSL/lifetime/resource_use_factory.hpp>
+#include <VSL/lifetime/sampler_storage.hpp>
+#include <VSL/lifetime/owner_access.hpp>
 
-#include <VSL/vulkan/_pimpls.hpp>
-
-VSL_NAMESPACE::Sampler::Sampler(LogicalDeviceAccessor device, VSL_NAMESPACE::SamplingMode sampling, VSL_NAMESPACE::EdgeMode edge) {
-    data_ = std::shared_ptr<impl::SamplerImpl>(new impl::SamplerImpl);
-    data_->device = device.data_;
-
-    vk::SamplerCreateInfo sampler_info;
-    sampler_info.magFilter = (vk::Filter)sampling;
-    sampler_info.minFilter = (vk::Filter)sampling;
-    sampler_info.addressModeU = (vk::SamplerAddressMode)edge;
-    sampler_info.addressModeV = (vk::SamplerAddressMode)edge;
-    sampler_info.addressModeW = (vk::SamplerAddressMode)edge;
-
-    sampler_info.anisotropyEnable = sampling != SamplingMode::NEAREST;
-    if (not device.data_->parent_device->props)
-        device.data_->parent_device->make_props();
-    sampler_info.maxAnisotropy = device.data_->parent_device->props->limits.maxSamplerAnisotropy;
-
-    // FIXME: Formatで変えないと
-    sampler_info.borderColor = vk::BorderColor::eFloatTransparentBlack;
-    sampler_info.unnormalizedCoordinates = false;
-
-    sampler_info.compareEnable = false;
-    sampler_info.compareOp = vk::CompareOp::eAlways;
-
-    sampler_info.mipmapMode = vk::SamplerMipmapMode::eLinear;
-    sampler_info.mipLodBias = 0.0f;
-    sampler_info.minLod = 0.0f;
-    sampler_info.maxLod = 0.0f;
-
-    data_->sampler = device.data_->device.createSampler(sampler_info);
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SamplerAccess;
 }
 
-VSL_NAMESPACE::impl::SamplerImpl::~SamplerImpl() {
-    device->device.destroy(sampler);
-}
+namespace VSL_NAMESPACE {
+    Sampler::Sampler(LogicalDeviceAccessor device, SamplingMode sampling, EdgeMode edge)
+        : SamplerAccessor(std::move(device), {sampling, edge}) {}
+
+    SamplerAccessor::SamplerAccessor(LogicalDeviceAccessor device, const SamplerCreateInfo& info)
+        : SamplerAccessor(SamplerAccess::FromShared(lifetime::make_heap_sampler(std::move(device), info))) {}
+
+    SamplerAccessor lifetime::detail::SamplerAccess::FromShared(std::shared_ptr<impl::SamplerImpl> owner) {
+        const auto* node = owner ? owner->owner_node : nullptr;
+        return FromOwned(owned_ref(std::move(owner), node));
+    }
+
+    ResourceUseState& SamplerAccessor::use_state() const {
+        if (!_owner || !_owner->use)
+            throw std::invalid_argument("Sampler is empty");
+        return *_owner->use;
+    }
+
+    ResourceUse SamplerAccessor::resource_use() const {
+        return lifetime::resource_use_for_sampler(_owner);
+    }
+} // namespace VSL_NAMESPACE

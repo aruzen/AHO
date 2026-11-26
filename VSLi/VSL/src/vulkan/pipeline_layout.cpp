@@ -1,57 +1,111 @@
+#include <VSL/lifetime/startup_access.hpp>
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
+#include <VSL/operation/graphics_pipeline_state_access.hpp>
+#include <VSL/lifetime/owner_validation.hpp>
+#include <VSL/lifetime/graphics_access.hpp>
+#include <VSL/lifetime/device_owner.hpp>
 #include <VSL/vulkan/pipeline_layout.hpp>
-#include <VSL/vulkan/_pimpls.hpp>
+#include <VSL/lifetime/pipeline_layout_storage.hpp>
+#include <VSL/lifetime/owner_access.hpp>
 #include <stdexcept>
 #include <utility>
+#include <type_traits>
 
 namespace {
-    template<typename T>
-    void rebind(const VSL_NAMESPACE::impl::CreateInfo& info, const char* key, const T*& pointer, std::uint32_t& count) {
-        if (auto it = info.pool.find(key); it != info.pool.end()) {
-            const auto& values = std::any_cast<const std::vector<T>&>(it->second);
-            pointer = values.empty() ? nullptr : values.data();
-            count = static_cast<std::uint32_t>(values.size());
-        }
-    }
-    void rebind_storage(VSL_NAMESPACE::impl::CreateInfo& info) {
-        info.viewport.viewportCount = static_cast<std::uint32_t>(info.viewports.size());
-        info.viewport.pViewports = info.viewports.empty() ? nullptr : info.viewports.data();
-        info.viewport.scissorCount = static_cast<std::uint32_t>(info.scissors.size());
-        info.viewport.pScissors = info.scissors.empty() ? nullptr : info.scissors.data();
-        info.dynamic_state.dynamicStateCount = static_cast<std::uint32_t>(info.enabled_dynamic_states.size());
-        info.dynamic_state.pDynamicStates = info.enabled_dynamic_states.empty() ? nullptr : info.enabled_dynamic_states.data();
-        rebind(info, "DescriptorSetLayouts", info.pipeline_layout.pSetLayouts, info.pipeline_layout.setLayoutCount);
-        rebind(info, "colorBlendAttachment", info.pipeline_layout.pPushConstantRanges, info.pipeline_layout.pushConstantRangeCount);
-        rebind(info, "vertexBindingDescriptions", info.vertex_input.pVertexBindingDescriptions, info.vertex_input.vertexBindingDescriptionCount);
-        rebind(info, "vertexAttributeDescriptions", info.vertex_input.pVertexAttributeDescriptions, info.vertex_input.vertexAttributeDescriptionCount);
-        rebind(info, "colorBlendAttachments", info.color_blend.pAttachments, info.color_blend.attachmentCount);
-    }
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+    using VSL_NAMESPACE::operation::detail::GraphicsPipelineStateAccess;
 } // namespace
 
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
+
+void VSL_NAMESPACE::GraphicsPipelineState::injection(PipelineLayoutEditAccessor layout) const {
+    static_assert(std::is_nothrow_swappable_v<impl::GraphicsPipelineStateData>);
+    auto next = GraphicsPipelineStateAccess::Read(*this);
+    std::swap(GraphicsPipelineStateAccess::Edit(layout.edit_state()), next);
+}
+
+const VSL_NAMESPACE::impl::PipelineRecipe& VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess::Read(const PipelineLayoutAccessor& value) {
+    if (!value._recipe)
+        throw std::logic_error("Pipeline layout has no regeneration recipe");
+    return *value._recipe;
+}
+
+VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::PipelineLayoutAccessor::get_device() const {
+    if (!_owner || !_owner.use_count() || !_owner->device || !_owner->pipeline_layout)
+        throw std::invalid_argument("Pipeline layout requires a live runtime owner");
+    return lifetime::device_from_child(_owner);
+}
+
+VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::PipelineLayoutAccessor::owner_ref() const {
+    if (!_owner || !_owner.use_count())
+        throw std::invalid_argument("Pipeline layout requires an owner");
+    lifetime::detail::require_live_owner(_owner);
+    return _owner;
+}
+
+VSL_NAMESPACE::impl::PipelineRecipe& VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess::Edit(const PipelineLayoutEditAccessor& value) {
+    if (!value._edit_recipe)
+        throw std::logic_error("Pipeline layout has been consumed");
+    return *value._edit_recipe;
+}
+
+VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::PipelineLayoutEditAccessor::get_device() const {
+    return StartupAccess::Owned(_edit_device) ? _edit_device : _value.get_device();
+}
+
+VSL_NAMESPACE::GraphicsPipelineStateEditRef VSL_NAMESPACE::PipelineLayoutEditAccessor::edit_state() const& {
+    return GraphicsPipelineStateAccess::Borrow(PipelineRecipeAccess::Edit(*this).graphics_state);
+}
+
 void VSL_NAMESPACE::PipelineLayoutEditAccessor::init_start(LogicalDeviceAccessor device) {
-    if (!device.data_)
-        throw std::invalid_argument("PipelineLayout requires a device");
-    data_ = std::make_shared<impl::PipelineLayoutImpl>();
-    data_->device = device.data_;
-    data_->info = std::make_shared<impl::CreateInfo>();
+    lifetime::require_device_owner(device);
+    operation::validate_pipeline_device(*StartupAccess::Owned(device));
+    _edit_recipe = std::make_shared<impl::PipelineRecipe>();
+    _value._recipe = _edit_recipe;
+    _edit_device = std::move(device);
 }
 
-void VSL_NAMESPACE::PipelineLayoutEditAccessor::init_finish() {
-    rebind_storage(*data_->info);
-    auto handle = data_->device->device.createPipelineLayout(data_->info->pipeline_layout);
-    data_->device->device.destroyPipelineLayout(data_->pipeline_layout);
-    data_->pipeline_layout = handle;
+void VSL_NAMESPACE::PipelineLayoutEditAccessor::init_finish(PipelineLayoutAccessor runtime) {
+    if (const auto& pending = PipelineRecipeAccess::Edit(*this).pending_layouts) {
+        std::vector<graphic_resource::BindingLayout> layouts;
+        layouts.reserve(pending->size());
+        for (const auto& info : *pending)
+            layouts.emplace_back(_edit_device, info.bindings);
+        lifetime::replace_recipe_layouts(PipelineRecipeAccess::Edit(*this), _edit_device, layouts);
+    }
+    const auto& info = PipelineRecipeAccess::Edit(*this);
+    if (GraphicsAccess::Owned(runtime)) {
+        (void)runtime.get_device();
+        if (GraphicsAccess::Owned(runtime)->device != StartupAccess::Owned(_edit_device).get() ||
+            !operation::pipeline_layout_matches(*GraphicsAccess::Owned(runtime), info.binding_layouts, info.push_ranges))
+            throw std::invalid_argument("Pipeline recipe does not match the runtime layout");
+        GraphicsAccess::Owned(*this) = std::move(GraphicsAccess::Owned(runtime));
+    } else {
+        GraphicsAccess::Owned(*this) = GraphicsAccess::Owned(GraphicsAccess::FromShared(lifetime::make_heap_pipeline_layout(_edit_device, info.binding_layouts, info.push_ranges)));
+    }
+    StartupAccess::Owned(_edit_device).reset();
 }
 
-VSL_NAMESPACE::PipelineLayout::PipelineLayout(std::shared_ptr<impl::PipelineLayoutImpl> data)
-    : PipelineLayoutEditAccessor{{std::move(data)}} {}
+void VSL_NAMESPACE::PipelineLayoutEditAccessor::swap_state(PipelineLayoutEditAccessor& other) noexcept {
+    _value.swap(other._value);
+    _edit_recipe.swap(other._edit_recipe);
+    StartupAccess::Owned(_edit_device).swap(StartupAccess::Owned(other._edit_device));
+}
 
 VSL_NAMESPACE::PipelineLayout VSL_NAMESPACE::PipelineLayout::clone_state() const {
-    if (!data_ || !data_->info)
+    if (!GraphicsAccess::Owned(*this) || !_value._recipe || !_edit_recipe)
         throw std::logic_error("PipelineLayout has been consumed");
-    auto data = std::make_shared<impl::PipelineLayoutImpl>();
-    data->device = data_->device;
-    data->info = std::make_shared<impl::CreateInfo>(*data_->info);
-    return PipelineLayout(std::move(data));
+    PipelineLayout result;
+    result._edit_device = get_device();
+    result._edit_recipe = std::make_shared<impl::PipelineRecipe>(*_edit_recipe);
+    result._value._recipe = result._edit_recipe;
+    return result;
 }
 
 VSL_NAMESPACE::PipelineLayout VSL_NAMESPACE::PipelineLayout::copy() const {
@@ -61,18 +115,16 @@ VSL_NAMESPACE::PipelineLayout VSL_NAMESPACE::PipelineLayout::copy() const {
 }
 
 VSL_NAMESPACE::FrozenPipelineLayout VSL_NAMESPACE::PipelineLayout::freeze() && {
-    if (!data_ || !data_->info)
+    if (!GraphicsAccess::Owned(*this) || !_value._recipe || !_edit_recipe)
         throw std::logic_error("PipelineLayout has been consumed");
-    // 編集用の別名が残る場合も、構築済みの状態を共有編集させない。
-    if (data_.use_count() != 1) {
-        auto snapshot = copy();
-        data_.reset();
-        return FrozenPipelineLayout(std::move(snapshot.data_));
-    }
-    return FrozenPipelineLayout(std::exchange(data_, {}));
+    PipelineLayoutAccessor result(GraphicsAccess::Owned(*this));
+    result._recipe = _edit_recipe.use_count() == 2 ? _value._recipe : std::make_shared<impl::PipelineRecipe>(*_edit_recipe);
+    PipelineLayout previous;
+    swap_state(previous);
+    return FrozenPipelineLayout(std::move(result));
 }
 
-VSL_NAMESPACE::impl::PipelineLayoutImpl::~PipelineLayoutImpl() {
-    if (device)
-        device->device.destroyPipelineLayout(pipeline_layout);
+VSL_NAMESPACE::PipelineLayoutAccessor VSL_NAMESPACE::lifetime::detail::GraphicsAccess::FromShared(std::shared_ptr<impl::PipelineLayoutImpl> owner) {
+    const auto* node = owner ? owner->owner_node : nullptr;
+    return FromOwned(owned_ref(std::move(owner), node));
 }

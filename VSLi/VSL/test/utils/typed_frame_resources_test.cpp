@@ -1,13 +1,26 @@
+#include <VSL/lifetime/descriptor_access.hpp>
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/utils/typed_frame_resources.hpp>
+#include <VSL/lifetime/native_recording.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include "support/vulkan_fixture.hpp"
 
 namespace {
+    using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
+}
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
+
+namespace {
     namespace t = vsl::typed;
+
     struct FrameValue {
         size_t index;
         int value = 0;
     };
+
     class TypedFrameVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
@@ -85,17 +98,18 @@ namespace {
     }
 
     TEST_F(TypedFrameVulkanIntegrationTest, RejectsReplacedCommandBufferRingsAndEmptyManagers) {
-        EXPECT_THROW((t::TypedFrameResources<FrameValue>(vsl::CommandManager(nullptr), [](size_t index) { return FrameValue{index}; })), std::invalid_argument);
+        EXPECT_THROW((t::TypedFrameResources<FrameValue>(vsl::CommandManager(CommandAccess::RawManager(nullptr)), [](size_t index) { return FrameValue{index}; })), std::invalid_argument);
         auto manager = make_manager();
         const auto original = manager.get_buffer();
         t::TypedFrameResources<FrameValue> frames(manager, [](size_t index) { return FrameValue{index}; });
-        manager.data_->command_buffer = manager.make_exclusive_buffer().data_;
+        const auto replacement = manager.make_exclusive_buffer();
+        CommandAccess::Data(manager)->command_buffer = CommandAccess::Data(replacement);
         {
             auto phase = manager.start_phase<vsl::ComputePhase>();
             EXPECT_THROW(frames.get(phase), std::invalid_argument);
             phase.cancel();
         }
-        manager.data_->command_buffer = original.data_;
+        CommandAccess::Data(manager)->command_buffer = CommandAccess::Data(original);
         auto phase = manager.start_phase<vsl::ComputePhase>();
         EXPECT_NO_THROW(frames.get(phase));
     }
@@ -124,12 +138,13 @@ namespace {
         struct Owners {
             std::shared_ptr<int> owner;
         };
+
         auto manager = make_manager().independent(1);
         std::weak_ptr<int> owner;
         {
             auto phase = manager.start_phase<vsl::ComputePhase>();
             {
-                t::TypedFrameResources<Owners> original(manager, [&](size_t) {
+                t::TypedFrameResources<Owners, vsl::ResourceRetention::SUBMISSION> original(manager, [&](size_t) {
                     auto value = std::make_shared<int>(9);
                     owner = value;
                     return Owners{std::move(value)};
@@ -151,6 +166,7 @@ namespace {
 
     using FrameSet = t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>,
                                       t::StorageBinding<1, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
+
     struct ComputeResources {
         t::TypedUniformBuffer<std::uint32_t> uniform;
         t::TypedStorageBuffer<std::uint32_t> output;
@@ -158,6 +174,7 @@ namespace {
         std::uint32_t expected = 0;
         ComputeResources(vsl::LogicalDeviceAccessor device, vsl::graphic_resource::ManagerInterface& manager);
     };
+
     ComputeResources::ComputeResources(vsl::LogicalDeviceAccessor device, vsl::graphic_resource::ManagerInterface& manager)
         : uniform(device, std::uint32_t{0}), output(device, std::uint32_t{0}), set(device, manager) {
         set.write<0>(uniform);
@@ -165,47 +182,52 @@ namespace {
     }
 
     TEST_F(TypedFrameVulkanIntegrationTest, PerSlotUniformsAndDescriptorsReachTheGpuAcrossRepeatedReuse) {
-        auto manager = make_manager().independent(3);
-        vsl::GraphicResourceManager descriptors(device);
-        t::TypedFrameResources<ComputeResources> frames(manager, [&](size_t) { return ComputeResources(device, descriptors); });
-        vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_frame.comp.spv"));
-        t::TypedComputePipeline<t::ResourceSchema<FrameSet>> pipeline(device, vsl::pipeline_layout::ShaderGroup("typed frames", {shader}));
-        std::array<vsl::Completion, 3> previous;
-        std::array<std::shared_ptr<vsl::impl::GraphicResourceImpl>, 3> sets;
-        for (std::uint32_t iteration = 0; iteration < 12; ++iteration) {
-            auto phase = manager.start_phase<vsl::ComputePhase>();
-            const auto slot = phase.frame_slot;
-            if (previous[slot])
-                EXPECT_EQ(previous[slot].status(), vsl::Completion::Status::COMPLETE);
-            frames.update(phase, [&](ComputeResources& resources) {
-                auto mapped = resources.output.backend().data();
-                EXPECT_EQ(*static_cast<const std::uint32_t*>(mapped.data), resources.expected);
-                resources.expected = iteration + 100;
-                resources.uniform.copy(std::span(&resources.expected, 1));
-            });
-            const auto& current = frames.get(phase);
-            if (iteration < 3)
-                sets[slot] = current.set.backend().data_;
-            EXPECT_EQ(current.set.backend().data_, sets[slot]);
-            phase << pipeline.bind_resources(current.set).dispatch(1);
-            auto buffer = manager.get_buffer();
-            vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
-            buffer.data_->command_buffers.at(slot).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
-            previous[slot] = phase.completion();
-            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
-            manager.get_buffer().next();
-        }
-        EXPECT_NE(sets[0], sets[1]);
-        EXPECT_NE(sets[1], sets[2]);
-        EXPECT_NE(sets[0], sets[2]);
-        for (size_t index = 0; index < frames.frame_count(); ++index) {
-            auto phase = manager.start_phase<vsl::ComputePhase>();
-            const auto& current = frames.get(phase);
-            auto buffer = current.output.backend();
-            auto mapped = buffer.data();
-            EXPECT_EQ(*static_cast<const std::uint32_t*>(mapped.data), current.expected);
-            phase.cancel();
-            manager.get_buffer().next();
+        for (const bool arena : {false, true}) {
+            auto commands = arena ? t::TypedFrameCommands(device, 3, t::ArenaStorage<>{}) : t::TypedFrameCommands(device, 3, t::HeapStorage{});
+            auto manager = commands.manager();
+            vsl::GraphicResourceManager descriptors(device);
+            t::TypedFrameResources<ComputeResources> frames(manager, [&](size_t) { return ComputeResources(device, descriptors); });
+            vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_frame.comp.spv"));
+            t::TypedComputePipeline<t::ResourceSchema<FrameSet>> pipeline(device, vsl::pipeline_layout::ShaderGroup("typed frames", {shader}));
+            std::array<vsl::Completion, 3> previous;
+            std::array<std::shared_ptr<vsl::impl::GraphicResourceImpl>, 3> sets;
+            for (std::uint32_t iteration = 0; iteration < 12; ++iteration) {
+                auto phase = commands.start_compute();
+                const auto slot = phase.frame_slot;
+                if (previous[slot])
+                    EXPECT_EQ(previous[slot].status(), vsl::Completion::Status::COMPLETE);
+                frames.update(phase, [&](ComputeResources& resources) {
+                    std::array<std::uint32_t, 1> actual{};
+                    resources.output.read_into(actual);
+                    EXPECT_EQ(actual.front(), resources.expected);
+                    resources.expected = iteration + 100;
+                    resources.uniform.copy(std::span(&resources.expected, 1));
+                });
+                const auto& current = frames.get(phase);
+                if (iteration < 3)
+                    sets[slot] = DescriptorAccess::Owned(current.set.backend()).share();
+                EXPECT_EQ(DescriptorAccess::Owned(current.set.backend()), sets[slot]);
+                phase << pipeline.bind_resources(current.set).dispatch(1);
+                const vsl::NativeRecordingContext recording(manager.get_buffer());
+                vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
+                ASSERT_EQ(recording.slot(), slot);
+                vk::CommandBuffer(recording.native_command_buffer()).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+                previous[slot] = phase.completion();
+                ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+                commands.next();
+            }
+            EXPECT_NE(sets[0], sets[1]);
+            EXPECT_NE(sets[1], sets[2]);
+            EXPECT_NE(sets[0], sets[2]);
+            for (size_t index = 0; index < frames.frame_count(); ++index) {
+                auto phase = commands.start_compute();
+                const auto& current = frames.get(phase);
+                std::array<std::uint32_t, 1> actual{};
+                current.output.read_into(actual);
+                EXPECT_EQ(actual.front(), current.expected);
+                phase.cancel();
+                commands.next();
+            }
         }
     }
 } // namespace

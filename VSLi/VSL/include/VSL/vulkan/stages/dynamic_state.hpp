@@ -5,6 +5,7 @@
 
 namespace VSL_NAMESPACE::pipeline_layout {
     struct DynamicState {
-        void injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl);
+        void injection(GraphicsPipelineStateEditRef state);
+        void injection(PipelineLayoutEditAccessor pl);
     };
 } // namespace VSL_NAMESPACE::pipeline_layout

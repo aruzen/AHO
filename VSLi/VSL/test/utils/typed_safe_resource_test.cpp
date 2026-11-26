@@ -1,5 +1,10 @@
+#include <VSL/lifetime/image_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <VSL/utils/typed_safe_resource.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+}
 
 namespace {
     template<typename Point, typename Image>
@@ -28,6 +33,7 @@ namespace {
                                                     vsl::ShaderFlag::COMPUTE, 3>;
     using Points = vsl::typed::ResourceBindingPoints<First, Second>;
     static_assert(Points::Size() == 2 && Points::Get<1>().binding == 5);
+
     TEST(TypedResourceTest, BindingDefinitionsRetainIndexTypeStageAndArrayCount) {
         const auto point = Points::Get<1>();
         EXPECT_EQ(point.binding, 5u);
@@ -35,6 +41,7 @@ namespace {
         EXPECT_EQ(point.shader_type, vsl::ShaderFlag::COMPUTE);
         EXPECT_EQ(point.amount, 3u);
     }
+
     TEST(TypedResourceTest, VertexAndPushDefinitionsRetainExplicitLayout) {
         using Attribute = vsl::typed::VertexInputDefinition<vsl::data_format::FLOAT_RG, 3, 8>;
         using Shape = vsl::typed::VertexShapeDefinition<
@@ -52,7 +59,9 @@ namespace {
         EXPECT_EQ(vsl::typed::ResourceBindingPoints<>::Size(), 0u);
         EXPECT_EQ(vsl::typed::PushContentDefinitions<>::Size(), 0u);
     }
+
     using TypedResourceVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
     TEST_F(TypedResourceVulkanIntegrationTest, MakesBindingLayoutFromTypedPoints) {
         const auto layout = Points{}.make(device);
         const auto actual = layout.get_binding_points();
@@ -69,13 +78,14 @@ namespace {
         EXPECT_EQ(compute.shader_read_stages(), TexturePoint::VALUE.shader_type);
         EXPECT_EQ(fragment.old_layout, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
         EXPECT_EQ(fragment.new_layout, vsl::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
-        EXPECT_EQ(fragment.image.data_, image.data_);
+        EXPECT_EQ(ImageAccess::Owned(fragment.image), ImageAccess::Owned(image));
         EXPECT_EQ(fragment.base_layer, 1u);
         EXPECT_EQ(fragment.layer_count, 2u);
         EXPECT_EQ(compute.base_layer, 0u);
         EXPECT_EQ(compute.layer_count, 0u);
     }
 } // namespace
+
 namespace {
     TEST_F(TypedResourceVulkanIntegrationTest, TypedVertexInputInjectsItsDeclaredAttribute) {
         using Attribute = vsl::typed::VertexInputDefinition<vsl::data_format::FLOAT_RG, 3, 8>;
@@ -83,7 +93,7 @@ namespace {
             4, 16, vsl::pipeline_layout::VertexInputShapeDefinition::UpdateTiming::NEXT_INSTANCE, Attribute>;
         auto layout = make_layout_state();
         vsl::typed::TypedVertexInput<Shape>{}.injection(layout);
-        const auto& state = layout.data_->info->vertex_input;
+        const auto& state = vsl_test::inspect_layout(layout).vertex_input;
         ASSERT_EQ(state.vertexBindingDescriptionCount, 1u);
         ASSERT_EQ(state.vertexAttributeDescriptionCount, 1u);
         EXPECT_EQ(state.pVertexBindingDescriptions[0].binding, 4u);

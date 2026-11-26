@@ -1,4 +1,15 @@
+#include <VSL/lifetime/startup_access.hpp>
+#include <VSL/lifetime/image_access.hpp>
 #include "support/image_transfer_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+}
+
 namespace {
     TEST(ChangeImageBarrierTest, UnspecifiedAndExplicitShaderStagesPreserveTheirScopeAndLayers) {
         using namespace vsl;
@@ -30,17 +41,19 @@ namespace {
     class ChangeImageBarrierVulkanIntegrationTest : public vsl_test::ImageTransferVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     TEST_F(ChangeImageBarrierVulkanIntegrationTest, RetainsExplicitAndTypedLayoutsAndRejectsUnsupportedPair) {
         TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT);
         vsl::command::ChangeImageBarrier typed(image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
         EXPECT_EQ(typed.old_layout, vsl::ImageLayout::UNDEFINED);
         EXPECT_EQ(typed.new_layout, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
-        EXPECT_EQ(typed.image.data_, image.data_);
+        EXPECT_EQ(ImageAccess::Owned(typed.image), ImageAccess::Owned(image));
         vsl::command::ChangeImageBarrier unsupported(image, vsl::ImageLayout::GENERAL,
                                                      vsl::ImageLayout::UNDEFINED);
         auto manager = make_manager();
         EXPECT_THROW(unsupported.invoke(manager.get_pool(), manager.get_buffer(), manager), std::invalid_argument);
     }
+
     TEST_F(ChangeImageBarrierVulkanIntegrationTest, TransitionsTransferDestinationToShaderRead) {
         TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT);
         auto manager = make_manager();
@@ -52,7 +65,7 @@ namespace {
                                                       vsl::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
             EXPECT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         }
-        EXPECT_NO_THROW(device.data_->device.waitIdle());
+        EXPECT_NO_THROW(StartupAccess::Owned(device)->device.waitIdle());
     }
 
     TEST_F(ChangeImageBarrierVulkanIntegrationTest, RejectsLayerRangesOutsideTheImageBeforeRecording) {

@@ -1,0 +1,720 @@
+# 4責務とTyped arenaの移行
+
+2026-11-08追記: 以後の最終範囲と実装順序は[完了計画](arena-completion-plan.md)を参照。Instance／Deviceの配置、Typedのarena既定化、旧公開入口の廃止まで対象とする。以下は既存の実装経緯を含む。
+
+## 順序11aの生成既定と移行
+
+`storage/typed_storage_policy.hpp`の`DefaultStorage`は`ArenaStorage<>`を表す。TypedResourceBundle／TypedResourceFrame／TypedSharedResourcesの省略時policyと、TypedFrameCommandsの2引数生成はこの既定を使う。単体TypedBufferも以下の11b経路で既定化する。TypedPipelineの生成policyは後続11bで扱い、全Typed生成の移行完了とはしない。
+
+```cpp
+using Bundle = t::TypedResourceBundle<Allocation>; // arena
+using HeapBundle = t::TypedResourceBundle<Allocation, t::HeapStorage>;
+t::TypedFrameCommands commands(device, 3); // arena
+t::TypedFrameCommands heap_commands(device, 3, t::HeapStorage{});
+```
+
+保持の既定COMPLETIONと固定依存FIXEDは配置と独立して維持する。heap／arena比較には同じ保持契約を使い、`aho-typed-example`は明示HeapStorage、arena版は明示ArenaStorageを選ぶ。
+
+既定Bundleの`buffer()`はPlacedResourceBufferViewを返し、`backend()`はBufferViewとなる。旧BufferAccessorの`.data_`や直接mappingへ依存する場合は明示HeapStorageで移行を分けられる。通常の読み取りは`buffer.read_into(destination)`へ、所有境界の観測は`buffer.backend().owner_ref()`へ移す。callbackの具体型は`Bundle::Frame`／`Bundle::Shared`を使うと、選択したpolicyと型を揃えられる。
+
+arena生成は渡されたdescriptor Managerの`allocate()` overrideを使わない。元Managerの所有とDeviceの検査は維持するが、独自allocatorやその失敗hookが必要な利用は明示HeapStorageを選ぶ。既定templateの具体型が変わるため、その型を公開する利用側ライブラリも含めて再buildする。
+
+```cpp
+std::array<std::uint32_t, 1> result{};
+// GPU完了を観測した後に結果をCPU側の値へコピーする。
+frame.buffer<0, 1>().read_into(result);
+```
+
+CPU arenaの配置単位とSHARED／PER_FRAMEの寿命群は変えず、Vulkan device memoryや内部vectorの確保も統合しない。公開APIと内部確保の残りは11b／12で扱い、性能向上率は未測定である。
+
+## 順序11b前半: 単体Typed Buffer
+
+TypedVertexBuffer／TypedIndexBuffer／TypedResourceBufferのコンストラクタは、末尾の配置policyを省略するとDefaultStorageを使う。HeapStorageと空のArenaStorage<>を選べる。binding map付きArenaStorageは単体生成へ適用しない。単体arenaは一つのBuffer slotを持ち、複数資源の集約にはTypedBufferArena／TypedResourceBundleを使う。
+
+```cpp
+t::TypedVertexBuffer<Vertex> vertices(device, vertex_span); // arena
+t::TypedIndexBuffer<std::uint16_t> indices(device, index_span, t::HeapStorage{});
+t::TypedStorageBuffer<std::uint32_t> values(device, std::in_place, 4);
+std::array<std::uint32_t, 4> result{};
+values.read_into(result);
+```
+
+heapはmake_heap_buffer、arenaはBufferArenaから、同じconstruct_buffer／operation::initialize_bufferへ進む。永続値はどちらもowning BufferViewで、物理storageの使用状態を共有する。BufferArenaのCPU配置はメモリ属性から独立させ、device-localも同じbackendで構築する。Vulkanのメモリ選択・確保とCPUのImpl配置は別である。
+
+device-local生成には従来どおり同Deviceの所有するCommandManagerを渡す。独立した一slot command ringへ共通CopyBufferを記録し、そのCompletionを待ってから返す。元managerの記録・slotは進めない。stagingも同じ配置policyを使う。既存のgraphics queue familyとEXCLUSIVEの前提を維持し、queue familyの所有移譲は追加しない。
+
+backend()の戻り値は、HeapStorageを選んだ場合もconst BufferView&へ変わる。一時オブジェクトからの借用は拒否し、保存したい場合はstorage_view()で所有値を取得する。旧backend().data_／data()依存は移行が必要である。Native descriptorにはBufferView更新入口を追加した。
+
+```cpp
+auto selected = vertices.view(2, 3);
+auto storage = selected.storage_view(); // wrapperが消えても選択済み範囲を保持
+phase << vsl::command::BindVertexBufferAt(0, storage); // offsetはview内の相対値
+native_descriptor.update(values.backend(), binding);
+```
+
+storage_view()には既に選択範囲の絶対offsetが入る。低位bindへbyte_offset()を重ねて渡さず、通常は相対offset 0を使う。Typed pipelineのbindはこれを処理する。読み取りはread_into(destination, first)を使い、GPU完了後に呼び出し内でCPUの値へコピーする。
+
+IndexのCPU snapshotはNative生成・転送より先に一度作り、その同じ値を転送する。Native callback中に元spanが変更されても、bounds検査とGPU内容を一致させる。固定個数・revisionによる古いdrawの拒否は維持する。このrevision保証はTypedIndexBuffer::copy経由の更新が対象で、低位のstorage_view().write／refへの書き込みはCPU snapshotを更新しない。
+
+構築・記録前の失敗は局所ownerで巻き戻す。既知の送信失敗は既存の取消経路で解放する。enqueue不明の転送はheadless Workのquarantineが保持し、元managerまたは同Deviceのmanager.wait_idle()による証明後に回収する。Fence観測が失敗した場合、独立Domainの終了はFence／Device idleを再試行するため、例外伝播まで待機する場合がある。logical FAILEDでも既知ENQUEUEDのnative使用が残れば、完了観測が済むまで保持を外さない。
+
+旧commandがshared_ptr<BufferImpl>を受ける箇所へのlegacy_owner aliasは順序12で除去する移行用である。新しいcontrol blockを作らず、元の所有境界を共有する。Index snapshotのvector、arenaの管理領域、独立command ring／Fence、Impl内部コンテナ、Vulkan device memoryの個別確保は残る。単体一slot arenaがheapより少ない確保になるとは主張しない。配置と独立したCOMPLETION保持を揃えた測定は順序12で行う。
+
+## 順序11b後半: Typed Pipeline
+
+TypedGraphicsPipeline／TypedComputePipelineは省略時にDefaultStorageを使い、先頭のpolicy引数でheap／arenaを選択する。class templateの型引数と返すPipeline facadeは共通である。shared TypedDescriptorLayoutsを渡す既存形にも同じ先頭引数を使える。
+
+```cpp
+t::TypedGraphicsPipeline<Input, Resources, Pushes> graphics(
+    device, pass, shader_group, state, viewport, scissor); // arena
+t::TypedComputePipeline<Resources> compute(
+    t::HeapStorage{}, device, shared_layouts, compute_shader_group);
+```
+
+lifetime::PipelineRecipeDraftは既存の編集accessorを内部で使い、CPU側でstageを注入する。snapshot()は別の不変recipeを作り、stageが保存したEditorから独立させる。Graphicsのstages→Input→Resources→Pushes、Computeのstages→Resources→Pushesの順を維持する。Vertex shader、descriptor、push、Compute shaderの種類／個数をsnapshotに対して検証し、成功後にNative Layoutを生成する。
+
+schemaによるdescriptor layout定義はDevice limit検査の後に遅延保存する。明示ResourceBindingとschemaは最後の注入が勝ち、両者はshader／bindingのowner index再配置と重複排除を共用する。通常のPipelineLayout constructor／copy／add／FromRuntimeはinit_finishで遅延定義を構築し、従来のNative Layoutを持つ結果を維持する。
+
+構築に必要なDescriptorLayoutは一時寿命群に置き、heap／arenaとも空set／holeのLayoutを共有する。arena planのcompile時容量はResources::COUNT+1であり、最大set番号SET_COUNTを固定領域の容量に使わない。確保するCPU領域は実際のslot数から求める。shared TypedDescriptorLayoutsを渡す場合は既存SetLayoutを構築中だけ保持する。
+
+heapは共通make_heap_pipeline_layout／make_heap_pipeline、arenaは既存ResourceArenaのLayout＋Pipelineの2 slotを使う。runtime PipelineはLayoutを保持し、生成用recipe・Shader・RenderPass・DescriptorLayoutは構築呼出しの後に保持しない。Native構築関数はsnapshotを値で保持し、callbackで呼出元が破棄されても入力を生存させる。arenaの構築失敗は既存の逆順rollbackに従う。
+
+記録後のPipeline保持契約は配置policyから独立し、従来のWork所有による保持を維持する。保存commandはPipelineと必要なBufferを所有する。CPU recipeのvector／snapshot、生成scratch、ResourceArena管理表、Vulkan PipelineCache等の個別確保は残る。CPU Implの2slot集約による構造変更と実測性能は区別し、測定は順序12で行う。
+
+## 順序12a: 物理実体の比較
+
+BufferIdentity／DescriptorIdentity／PipelineIdentityは、解決済み実体を比較する非所有の値型である。BufferRef／BufferView／通常Buffer、頂点・indexのbind command、PipelineAccessor、GraphicResourceのidentity()から取得できる。種類の違うidentity同士の比較、raw pointerからの構築／取り出し、Native handleへの変換は提供しない。
+
+```cpp
+auto whole = vertices.storage_view();
+auto first = whole.view(0, sizeof(Vertex));
+assert(whole.identity() == first.identity()); // 同じ物理storage、範囲は別
+```
+
+同じarena ownerの別slotは異なるidentityを持ち、同じ実体を指すaliasは同じidentityになる。比較はownerを保持せず、両方の実体が生存する間だけ行う。解放後のarena領域再利用をまたぐ世代ID／永続cache keyには使わない。schema ResourceId、配置slot、shader BindingKeyとも別の役割である。
+
+TypedBatchはcommand群のownerを保持してplanを作るため、このscopeを満たす。Pipeline／Buffer／Descriptorの比較にはidentity、viewのoffsetとindex型には従来の値を使い、bind省略の意味を維持する。DeviceとCompletionの比較は既存operator==へ移す。生成・記録時に新しいowner wrapperや管理表の探索を追加しない。raw source()／data_／legacy_ownerは後続の公開入口廃止へ接続する移行用として、この段階では残る。
+
+## 順序12b: descriptor入力値
+
+typed::detail::DescriptorValueはprivate fieldを持つ値型となり、ImplのOwnedRefを直接渡すaggregate構築を閉じる。通常のTypedBuffer／TypedImageResource／bundleのdescriptor()と書込みAPIは維持する。独自のdescriptor入力を作る場合は、FromBuffer(BufferView,ResourceUse)／FromImage(ImageAccessor,ResourceUse)／FromSampler(SamplerAccessor,ResourceUse)／FromTexture(ImageAccessor,SamplerAccessor,ResourceUse)へ移す。
+
+```cpp
+using Value = t::detail::DescriptorValue;
+auto value = Value::FromBuffer(buffer.storage_view());
+auto selected = value.buffer_subview(relative_offset, bytes);
+auto texture = Value::FromTexture(image, sampler, logical_constraint);
+auto retained_image = texture.image(); // 元のCBを共有するowning accessor
+```
+
+byte_offset()は絶対byte offset、size()は選択済みのbyte数で、buffer_subviewは現在の範囲内の相対指定である。Typed viewのcountは従来どおりPayload要素数。二段Subviewでもoffsetを一度ずつ加算する。default empty／copy／moveを維持し、空値の書込み検証や配列全体の失敗保証も変えない。
+
+resource_use()は保存された入力useの値を返す。Bufferではfactoryがphysical＋logicalを合成し、Image／Sampler／Textureでは渡されたuseを保存する。後者のphysical stateとownerはdescriptor書込み時に双方を登録するため、この値だけを記録してImage／Samplerの完全な使用登録とみなさない。通常はTypedDescriptorSetへの書込みとbindを使う。
+
+Image／Samplerの元CB、外部composite owner、strong null aliasの意味を保持し、canonical nodeからownerを取り直さない。画像／sampler getterも同じCBを共有する。Bufferのrefへのアクセスはfactoryのcpp内へ下げ、次のBufferRef／ResourceUse公開入口廃止へ接続する。値の生成に新しい個別確保やowner wrapperは追加しない。旧aggregateへ依存する利用側はfactoryとmetadata/getterへ移して再buildする。
+
+## 順序12c: 使用登録の公開入力
+
+ResourceUseのfactoryはImplのshared_ptrを受けず、通常のBufferAccessor／ImageAccessor／SamplerAccessorとBufferViewを受ける。Typed descriptorのResourceUseGroupもGraphicResourceを渡す。既存のaccessor.resource_use()とview.resource_use()は維持する。
+
+```cpp
+auto physical = vsl::ResourceUse::ForBuffer(buffer.storage_view());
+auto constrained = vsl::ResourceUse::ForBuffer(buffer.storage_view(), logical_constraint);
+auto image_use = vsl::ResourceUse::ForImage(image);
+auto group = vsl::ResourceUseGroup::ForDescriptor(
+    binding_count, descriptor, vsl::ResourceRetention::COMPLETION);
+```
+
+旧ForBuffer(buffer.data_)等はForBuffer(buffer)へ、ForDescriptor(count, descriptor.data_)はForDescriptor(count, descriptor)へ移す。tracks_descriptorもraw pointerではなくGraphicResourceを受ける。同じ物理storageの状態と、入力が保持した元のcontrol blockを共通のprivate処理へ渡す。外部composite ownerをcanonical ownerへ置き換えず、Bufferの追加logical constraintも維持する。private factoryはインストールしない。
+
+descriptorの使用状態と所有の一致は別々に判定する。同じSetを記録済みのGroupでも、commandのGraphicResourceが異なるcontrol blockを持つ場合、その追加ownerをGroupと同じ保持契約で登録する。同じcontrol blockの二重保持と物理状態の二重記録は省く。COMPLETIONでは完了／取消後に追加ownerを回収し、SUBMISSIONではWorkの寿命まで保持する。物理一致の判定へcontrol block一致を混ぜて、保持policyを切り替えることはしない。
+
+factory入力の変更に新しいowner wrapperや使用状態を追加せず、記録は解決済み実体を使う。BufferRef／BufferViewのraw構築、legacy_owner、他の公開data_は次の移行対象として残る。
+
+## 順序12d: Bufferの参照境界と転送入力
+
+BufferRefは非所有の操作用参照で、raw pointerの取得・指定とaggregate構築を閉じる。BufferViewは所有値で、元のowner／nodeと選択範囲を保持する。raw ref＋owner＋rangeからの公開構築とlegacy_ownerは廃止し、通常BufferからはFromBuffer、arenaからはview／bufferを使う。内部のraw接続は非installのBufferAccessだけへ置く。
+
+```cpp
+auto storage = vsl::BufferView::FromBuffer(native_buffer);
+auto selected = storage.view(4, 16); // 選択範囲を所有する
+auto borrowed = selected.ref();     // selected等の所有者が生存する間だけ有効
+phase << vsl::command::ImageUpload(selected, image, vsl::ImageLayout::UNDEFINED,
+                                  {.width = 1, .height = 1}, 8);
+```
+
+ref()はlvalueだけから取得できる。PlacedBufferView／PlacedResourceBufferViewのbackend()も同じ借用制限へ揃えた。一時viewから保存する場合はstorage_view()の所有値を使い、その値を変数へ置いてからref()を得る。頂点／index bindのraw source getterとshared_ptr入力も廃止し、Accessor／BufferView入力とidentity()を使う。bind内部は解決済みImpl*と一つのResourceUseで所有・物理状態・論理制約を保持する。
+
+CopyBufferToImage／ImageUploadはBufferView、追加のResourceUse constraint、source専用のResourceRetentionを受ける。offsetはview内の相対値で、Native offsetへview先頭を一度だけ加算する。view容量内を減算で検証してから、合計offsetのalignmentを確認する。旧BufferAccessor*入力は既存SUBMISSION、新view入力は既定COMPLETIONで、明示policyも選べる。画像とbarrierの既存SUBMISSION保持は維持するため、source policyを転送全体の保持期間とは扱わない。
+
+共通prepareはsourceのphysical＋logical useを最初の画像barrierより前に登録し、同じCompletion／slot／記録contextが有効か再確認する。Native copyは登録済みの解決済み実体を使う。単独copy、ImageUpload、array copyも同じ処理へ進む。command全体を局所保存するため、過去の使用完了callbackが元commandを破棄しても、保持した入力で継続できる。取消／別記録への切替はNative記録前に拒否する。
+
+AHOのBufferBinding.native()は廃止する。TextureUpdateはinvoke時に一度取得したBufferSnapshotからstorage／初期化済みsize／constraints／retentionを使い、使用可能性の観測中にlive Bufferが再確保されても同じsnapshotを使う。更新中の拒否は維持し、初期化済みsizeを容量とは別に検証する。NativeBufferAdapterの個別確保と世代ごとの互換参照は不要になった。旧世代は新しいsize公開とmutation終了後に回収する。
+
+```cpp
+const auto snapshot = aho_buffer.binding().snapshot();
+auto storage = snapshot.storage(); // BufferViewの所有値
+vsl::command::ImageUpload upload(storage, image, current_layout, region, offset,
+                                 snapshot.constraints(), snapshot.retention());
+```
+
+GPUBufferBase.native()は具体的なStorage&を返す別の契約として維持する。TYPE／PROPERTYによる静的usage検査とCustom mappingは変更しない。CPU Impl配置とVulkan device memoryは引き続き別の確保であり、内部コンテナやowner境界の個別確保も残る。通常BufferAccessorのdata_を含む残りの公開入口は後続へ移行する。性能改善率は未測定である。
+
+## 順序12e: custom commandのNative記録
+
+opt-inのlifetime/native_recording.hppにNativeRecordingContextを追加する。記録中のCommandBufferを明示して構築し、保存したResult／slot／世代／Native CBと現在の記録先の一致を検査する。公開Implやprivateヘッダーを使わずにcustom commandのNative記録へ進める。
+
+```cpp
+const vsl::NativeRecordingContext recording(buffer); // Phaseの記録中だけ構築
+recording.use(storage.resource_use());                // 物理使用と明示ownerを登録
+recording.retain(external_owner);                     // 必要な外部所有境界
+const VkMemoryBarrier visible{
+    VK_STRUCTURE_TYPE_MEMORY_BARRIER, nullptr,
+    VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_HOST_READ_BIT};
+vkCmdPipelineBarrier(recording.native_command_buffer(),
+                     VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+                     0, 1, &visible, 0, nullptr, 0, nullptr);
+```
+
+use／retainの既定保持はCOMPLETIONで、SUBMISSIONも明示できる。ResourceUseの既存契約に従い、状態の追跡と明示ownerの保持を分ける。使用状態だけを渡せばその状態を一律に送信へ所有する、という契約へは変更しない。保存したcompletion()は取消・完了後の結果も観測できるが、古いcontextで再記録はできない。同じslotを再利用しても別Resultを拒否する。
+
+use／retainはcallback後に同じ記録先を再検査し、元のcontextが破棄されても局所保存した入力で処理する。copy／move構築はでき、代入はできない。保持するownerにはcontext／Phase／Managerを含めず、Domainへ戻る所有循環を作らない。既存のCommandBuffer／Domainを保持する値型であり、新しいowner wrapper／Work所有辺／arena slotや個別確保を追加しない。
+
+native_command_buffer()はlvalue contextから取得する借用値である。取得からvkCmd呼出しの終了まではpoll／Phase／ring操作へ再入せず、host側で直列化する。この段階ではNative呼出し全体の記録scopeは提供しない。GPUの可視性・layout・queue依存、渡すNative資源の同Device・usage・render pass scopeの妥当性はcustom command側で保証する。資源の使用登録だけでbarrierを代替しない。
+
+capture／保持／再検査はlifetime、解決済みImplとslotからNative CBを借りる処理はoperation、recordableと使用状態は既存sync、CPU配置は既存storageを使う。C SDK型は専用headerだけから公開し、command.hpp／pv.hpp／define.hppへ新たなSDK依存を追加しない。private operationヘッダーはインストールしない。
+
+## 順序12f: Commandの公開所有境界
+
+CommandPool／CommandBuffer／CommandManagerの`data_`と`shared_ptr<Impl>`構築を非公開にした。空値は既定構築、存在検査は`explicit operator bool()`、同一性比較は種類別の`identity()`を使う。空値は操作可能な資源ではなく、device／pool／buffer／slot等の取得は例外で拒否する。通常構築、`FromBuffer()`、独立ring、arena配置とNativeRecordingContextは共通backendのままである。
+
+```cpp
+vsl::CommandManager empty;
+vsl::CommandManager manager(device);
+auto alias = manager;
+auto other = vsl::CommandManager::FromBuffer(manager.get_buffer());
+assert(!empty);
+assert(alias.identity() == manager.identity());
+assert(other.identity() != manager.identity());
+assert(other.get_buffer().identity() == manager.get_buffer().identity());
+```
+
+Managerのidentityと、そのManagerが共有するring／poolのidentityは別である。identityは比較中に元の所有者を必要とする非所有値であり、保持や世代管理を代替しない。旧`CommandBuffer(nullptr)`等は既定構築へ移し、Native記録にはNativeRecordingContextを使う。
+
+内部のCommandAccessはprivate lifetimeヘッダーだけへ配置し、解決済みImplの借用と、callbackを跨ぐ強い所有snapshotを区別する。通常のNative操作にDomainの再探索や新しい所有wrapperを追加しない。既存DomainのResolveと明示的なAttachも分離したまま、copy-and-swapと旧owner回収時の再入保証を維持する。AHOはbool／種類別identityへ移行し、VSLのprivate bridgeへ依存しない。
+
+この単位は12fの前半である。Buffer／Image／SamplerのAccessor、起動資源、descriptor manager、Pipeline recipe、WindowDataの公開Impl入口と、実定義の4責務分割・同条件測定は引き続き残る。
+
+最終成果物をmacOS arm64／Clang20 C++26、MoltenVK、Vulkan validation、ASan／UBSanで検証した。重点VSL209／AHO152、全VSL1,145成功（対応外format3 skip）／AHO GPU192・CPU1,071、compile契約231件が成功した。heap／arenaのPNG3枚は完全一致し、resize後のPipeline生成1回を維持する。strict82ファイル／74TUと補完検査、installed public consumer29種、新負例7種、Debug／Release／x86_64の寸法生成とartifact混在拒否、archive／生成header一致、source389件とMSBuild登録も確認した。Windows／Linux実機、device lost実機、並行CPUアクセスと性能比較は未検証である。
+
+## 順序12f: Buffer／Image／Samplerの所有入口
+
+3つのAccessorの公開`data_`と、Implを返す`MakeBuffer`／`MakeImage`を廃止する。通常Buffer／Imageテンプレートはprotectedの非template構築処理へInfoを渡し、Samplerも同じheap backendへ接続する。`TYPE`／`PROPERTY`／`MODE`、仮想`data()`／`flush()`とCustom Storageの意味は維持する。
+
+runtime設定から単独heap所有で生成する場合は、Implを公開しない次のfactoryを使う。Typedの明示HeapStorageも同じ入口へ委譲し、arena既定や保持policyとは分ける。
+
+```cpp
+auto buffer = vsl::BufferView::Create(device, {
+    16, vsl::MemoryType::TRANSFER_DESTINATION,
+    vsl::MemoryProperty::HOST_VISIBLE | vsl::MemoryProperty::HOST_COHERENT});
+auto image = vsl::ImageAccessor::Create(device, {
+    vsl::ImageType::TRANSFER_SRC | vsl::ImageType::TRANSFER_DST, 2, 2});
+```
+
+内部所有はAccessorごとの`OwnedRef`一つへ揃え、最初のheap境界だけでcanonical化する。descriptor更新、TypedのDescriptorValue、ResourceArenaのimport／getter、Framebuffer依存、Swapchain画像は元のnodeとcontrol blockを伝える。composite ownerの`R→A`を物理arena Aのownerへ取り直さない。同rootの内部依存は既存の正規化で借用とし、別rootには元の所有を残す。
+
+CPU操作はpoll前に必要なowner・Impl参照・data・範囲を保存する。GetDataは同じstorageからmappingとHolderを作り、完了callbackが元Accessorを破棄／差し替えしても別世代へ移らない。BufferRefは借用のまま開始時の実体を固定し、BufferView／read_into／Holderは呼出し中の所有も保持する。viewの代入は全値を交換してから旧ownerを回収する。
+
+仮想`data()`の後に派生実装の`flush()`を呼ぶlegacy copy／uncheck_copyでは、呼出し全体を通じてreceiverと派生状態を生存させる。自己破棄を検出して拒否する保証も追加しない。Holderの`read()`と公開dataポインタは借用であり、利用中のstorage所有とGPU競合回避は呼出側の責任である。内部MappingSnapshotは、その借用のGPUアクセス期間を管理するMappedAccessではない。CPUアクセスと記録／送信はhost側で直列化する。その条件の下で所有と同期を呼出し内で完結させる上位APIには`read_into()`を使う。
+
+画像の読み戻しは、raw Impl入力に代わってBufferViewの範囲と追加の論理制約・保持policyを受ける。次のimageは初期化済みで、現在のlayoutがTRANSFER_DST_OPTIMALの場合である。
+
+```cpp
+const std::array<vsl::BufferCreateInfo, 2> infos{{
+    {16, vsl::MemoryType::TRANSFER_DESTINATION},
+    {32, vsl::MemoryType::TRANSFER_DESTINATION}}};
+vsl::lifetime::BufferArena arena(device, infos);
+auto destination = arena.view(1).view(8, 16);
+auto phase = manager.start_phase<vsl::ComputePhase>();
+phase << vsl::command::ImageReadback(
+    destination, image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
+phase.submit();
+phase.completion().wait();
+std::array<std::byte, 16> pixels{};
+destination.read_into(pixels);
+```
+
+View入力の転送元／転送先はCOMPLETIONを既定とし、SUBMISSIONは明示選択できる。Accessor*入口と画像側の旧保持契約はSUBMISSIONを維持する。資源をどこへ配置するかで保持期間を変えない。保存したview／command自体の所有は、GPU完了だけでは解除しない。
+
+Upload／Readbackは自己snapshot、全入力の検証、使用登録と記録contextの再検査を最初のNative barrier前に済ませる。layout／rangeからbarrierを作る共通処理とNative記録はoperation、所有・使用登録との接続はlifetime側の既存処理を使う。複合操作の前後barrierでは再pollせず、取消後の別slot／peerへの誤記録を防ぐ。単独barrierも同じNative処理へ委譲する。
+
+今回の一括配置は引き続きCPUのImplと使用状態の本体だけを対象とする。内部コンテナ、生成scratch、個別のVulkan device memoryは別の確保である。追加のowner wrapperは作らず、host snapshotとResourceUse／Native contextで残る参照カウント操作や管理メモリは、後続の同条件測定で扱う。
+
+この単位はmacOS arm64／Clang20 C++26、MoltenVK、Vulkan validation、ASan／UBSanで検証した。新runtime11件、重点VSL132／AHO152、全VSL1,156成功（対応外format3 skip）／AHO GPU192・CPU1,071、compile契約245件が成功した。旧実装でsnapshotの2失敗を再現し、view代入の旧順序でも全値commitの回帰が失敗することを確認してから、最終実装へ復元した。heap／arenaのPNG3枚は一致し、resizeを含めPipeline生成1回を維持する。
+
+strict79ファイル／64TUと変更箇所の補完検査、installed public consumer30種、旧入力拒否14種、private bridgeの非install、archive／生成header一致、Debug／Release／x86_64の寸法生成とartifact混在拒否、source393件とMSBuild登録も確認した。Image backendは旧SDK1.3.296でも構文検査した。Windows／Linux実機、x86_64の全体実行、device lost実機、並行CPUアクセス、性能比較は未検証である。残るShader／起動資源／descriptor manager／recipe／WindowData等の公開入口とImpl実定義の責務分割は後続の単位で扱う。
+
+## 順序12f: Shader／ShaderGroupの所有入口
+
+ShaderAccessorとShaderGroupの公開`data_`、ShaderAccessorのraw Impl構築を廃止する。Shaderのfile／SPIR-V配列constructor、make_shader、name／type／code／get_deviceは維持する。空判定はbool、所有境界の受渡しはowner_refを使う。code()はlvalueの借用で、参照先を使う間は所有者を生存させる。
+
+```cpp
+vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, words);
+vsl::pipeline_layout::ShaderGroup group("compute", {shader});
+auto alias = group;
+auto moved = std::move(group);
+// aliasとmovedは同じ編集内容を共有する。move元のgroupはboolで空を確認できる。
+```
+
+ShaderGroupのcopyは同じCPU編集状態を共有する。move元のadd／remove／injectionはlogic_errorを返す。removeの両入口はCPU側の一覧をコピーして編集し、swapで新しい一覧を公開してから旧ownerを回収する。ownerの解放callbackが同Groupへ追加しても、公開済みの一覧を使う。この編集scratchのvector確保と参照カウント操作は残る。
+
+内部ではShaderAccessorとGroup内の各Shader参照に元のOwnedRefを保存する。Group→recipe→不変snapshot→生成入力の復元→ResourceArenaの外部import／getterでも、元のnodeとcontrol blockを引き継ぐ。heap factoryのshared Impl返却はprivate境界で一度だけ正規化し、以後の通常操作は保持済みImplへ直接届く。所有wrapperやcontrol blockは追加しない。
+
+```cpp
+namespace t = vsl::typed;
+namespace l = vsl::lifetime;
+constexpr std::array<t::ResourceRequest, 2> requests{{
+    {{1}, vsl::storage::ResourceKind::SHADER},
+    {{2}, vsl::storage::ResourceKind::SHADER}}};
+constexpr t::ResourcePlan<2> plan(requests);
+const std::array<l::ResourceInit, 2> inputs{
+    vsl::ShaderCreateInfo{vsl::ShaderType::VERTEX, vertex_words},
+    vsl::ShaderCreateInfo{vsl::ShaderType::FRAGMENT, fragment_words}};
+l::ResourceArena arena(device, plan, inputs);
+vsl::pipeline_layout::ShaderGroup graphics("arena", {arena.shader({1}), arena.shader({2})});
+```
+
+Shader moduleはPipeline構築呼出し中の依存であり、完成したPipelineはShader／Group／recipeを保持しない。生成用のsnapshotが残っている間は再構築用Shaderを保持する。CPU arenaに入るShaderImpl本体と、SPIR-V code／entry名の内部確保、Vulkan moduleの生成は別に扱う。OwnedRefのnode欄、Groupの共有編集状態、recipeのvector／snapshot、生成scratchの確保は後続の測定対象である。
+
+今回の閉鎖後も、descriptor／起動資源／runtime graphics／同期資源、recipe定義とWindowDataの公開Impl入口、実定義の4責務分割は残る。
+
+macOS arm64／Clang20 C++26、MoltenVK、Vulkan validation、ASan／UBSanで、新runtime3件と既存Typed computeのheap／arena拡張、関連130件、全VSL1,159成功（対応外format3 skip）／AHO GPU192・CPU1,071、compile契約252件を確認した。変更前のnode脱落・循環検査の見逃しと、旧in-place削除でのcallback公開順序の失敗を再現し、最終実装へbyte一致で復元している。heap／arenaのPNG3枚が一致し、resize後もPipeline生成1回を維持する。
+
+strict17ファイル／12TU、installed public consumer30種と旧入口／一時借用7負例、private bridge非install、archive／生成header一致、Debug／Release／x86_64の寸法生成、構成混在拒否と同構成の旧親header拒否、source394件とMSBuild登録も確認した。Impl寸法定数が同じでも、公開型や内部所有型の異なるartifactは混在させない。Windows／Linux実機、x86_64全体実行、device lost実機、並行CPUアクセスと性能比較は未検証である。
+
+## 順序12f: Descriptor／Managerの所有入口
+
+BindingLayout／Pool／Resourceの公開`data_`とraw Impl構築を閉じ、各値がprivateなOwnedRefを一つ保存する。既存のDeviceからの生成、allocate／make／bind／update／get_poolを維持し、空判定にはbool、所有境界の受渡しにはowner_ref、Deviceの取得にはget_deviceを使う。
+
+3型のcopy／move代入もfacade自身が値引数を受け、swapして戻り参照を評価してから旧ownerを回収する。内側のOwnedRefへの代入だけで外側の戻り順序を決めない。旧ownerの解放callbackが代入先facadeを破棄する場合、呼出し側は戻り参照を使用しない。
+
+```cpp
+vsl::graphic_resource::ExactAllocateManager manager(device);
+auto [pool, resources] = manager.make(std::vector{layout});
+auto resource = resources.front();
+resource.update(buffer_view);
+if (resource) {
+    auto owner = resource.owner_ref();
+    auto source = resource.get_pool();
+}
+```
+
+通常bindはPoolとLayoutの元OwnedRefを固定依存へ渡す。recipe／不変snapshot／layout_sourcesの復元／arenaのexternal importとgetterでも同じnodeを保存する。Resource.get_poolはSetのcomposite ownerではなく、物理Poolのcanonical ownerへ戻る契約を維持する。external Pool importもcanonical ownerを要求する。この制約を通常bindへ広げない。
+
+ManagerInterfaceの共有CPU stateと観測identityはprivateにする。copyは別の観測先、moveは元の観測先の移動として扱う。Exact／Overの代入は新stateとidentity、Overの設定とcacheを先に一括公開し、旧identityを無効化してから旧ownerを回収する。Base参照からの部分代入はprotected化し、Overのcacheだけが旧値になる操作を禁止する。
+
+custom ManagerはprotectedなDevice constructorから初期化し、makeで共通生成、destroy_poolで共通の破棄検証を利用する。所有メンバーの解放callbackがget_managerを観測し得る派生型は、destructor冒頭でretire_identityを呼ぶ。独自の代入も、派生フィールドとswap_stateを公開した後に旧値を解放する。公開Implへのアクセスを代替するprotected raw getterは設けない。
+
+builtinのmake／allocate／destroyは、入口で既存のstate・identity・必要な設定とPoolを値として保持する。pollやNative呼出し後に元のthisを読み直さない。destroy中に生成元wrapperが消えても開始時stateを操作し、同じidentityとstateを持つ生存Overだけのcacheを更新する。cache候補の確保を先に済ませ、確保失敗では所属を変更しない。custom virtual allocateの派生固有フィールドまで自己破棄に耐える保証は追加しない。
+
+descriptor bindのinvoke／public trackは入力Resource群と必要なPipeline・設定を採取し、全Resourceの有効性を使用登録前に検査する。NativeRecordingContextで開始時の記録先を固定し、完了観測後も同じ記録か確認する。callbackがcommandを破棄・入力を変更・記録を取消・同じringで別の記録を開始しても、開始時の入力を使うか例外で停止する。取消後のpeerへ誤ってNative bindしない。
+
+追加のowner wrapper／control blockは作らない。局所的なownerのコピー、descriptor入力vectorのsnapshot、Manager cache候補、Impl内部コンテナ、既存の共有CPU stateとidentityの個別確保は残る。Native descriptor生成・更新・破棄は既存の共通backendで行う。CPU arenaとVulkanのdevice memoryの区別、host側の直列化、独立した保持policyは維持する。
+
+macOS arm64／Clang20 C++26、MoltenVK、Vulkan validation、ASan／UBSanで、新runtime10件（CPU1件を含む）と全VSL1,169成功（対応外format3 skip）／AHO GPU192・CPU1,071、compile契約271件を確認した。変更前には、recipeを経た元nodeの脱落とManager代入中の公開順序の不一致を実GPUで再現した。heap／arenaのPNG3枚は一致し、resize後もPipeline生成1回を維持する。
+
+strict34ファイル／27TUと、宣言位置を修正した2ファイル／2TUの再検査が成功した。installed public consumer30種・新負例18種、private bridge非install、archive／生成header一致、Debug／Release／x86_64寸法生成、構成混在拒否と直近親の旧header拒否、source395件とMSBuild登録も確認した。確保失敗の順序はcache候補の構築を所属変更前へ置いているが、bad_allocのfault injectionはしていない。Windows／Linux実機、x86_64全体実行、device lost実機、並行CPUアクセスと性能比較は未検証である。
+
+## 順序12f: runtime graphicsの所有入口
+
+PipelineLayoutAccessor／RenderPassAccessor／PipelineAccessor／FrameBufferAccessorの公開data_とraw Impl構築を閉じ、元のOwnedRefをprivateに保存する。空判定はbool、所有境界はowner_ref、Deviceはget_deviceを使う。RenderPassとFrameBufferの物理実体の比較には、それぞれ異なる型のidentityを使う。比較する間は元の所有者を保持する。
+
+```cpp
+vsl::RenderPass pass(device, description);
+vsl::FrameBuffer target(pass, width, height, {image});
+auto kept = target.get_render_pass();
+assert(kept.identity() == pass.identity());
+```
+
+FrameBufferのPass getterは、contextからlockした元のOwnedRefをそのまま返す。heap生成、arenaの内部slot／外部入力、getter、runtime Layoutの取り出しでも元nodeとcontrol blockを維持する。getter用のowner wrapperは追加しない。
+
+```cpp
+namespace t = vsl::typed;
+namespace l = vsl::lifetime;
+namespace s = vsl::storage;
+constexpr std::array<t::ResourceRequest, 3> requests{{
+    {{1}, s::ResourceKind::RENDER_PASS},
+    {{2}, s::ResourceKind::IMAGE},
+    {{3}, s::ResourceKind::FRAME_BUFFER}}};
+constexpr t::ResourcePlan<3> plan(requests);
+const std::array<l::ResourceInit, 3> inputs{
+    description,
+    vsl::ImageCreateInfo{vsl::ImageType::COLOR_ATTACHMENT | vsl::ImageType::TRANSFER_SRC, width, height, format},
+    l::FrameBufferInit{t::ResourceId{1}, width, height, 1, {{t::ResourceId{2}}}}};
+l::ResourceArena arena(device, plan, inputs);
+auto placed = arena.frame_buffer({3});
+```
+
+Editor／Frozen Layout、Graphics／Compute Pipeline、IDPickingRenderPassは、Accessorを値memberとして持つ。Accessorを値で返す変換で既存のconstructor／command／injecterへ接続し、mutable Base&への変換を廃止する。部分代入によるruntimeとrecipeの不整合、bind point検査の迂回、freezeを経ない可変recipeの取り込みを防ぐ。
+
+```cpp
+auto frozen = layout.copy().freeze();
+vsl::PipelineLayoutAccessor selected = frozen;
+auto runtime = selected.runtime();
+assert(!runtime.has_recipe());
+```
+
+copy()はNative Layoutを再生成する従来の意味を保つ。FromRuntimeは元runtime ownerを引き継ぎ、今回組み立てたrecipeを保存する。freezeは保存済みEditorから分離し、runtime()はrecipeを保持しない。facadeと組込み具象型の代入は全値swap後に戻り値を評価してから旧ownerを回収する。解放callbackが代入先を破棄した場合、戻り参照は使えない。任意の利用者定義派生型に同じ代入順序を自動適用する保証はない。
+
+通常recipe版と明示入力版のGraphics生成は、Shaderのowning一覧と独立したstateを呼出し中だけ保持する。snapshot後のcache／Pipeline生成中に元の一覧やstateが変わっても、選択済み入力を使う。snapshot前の整合性照合は従来どおり入力を変更しない。完成Pipelineの永続親はDeviceとruntime Layoutであり、Shader／Pass／descriptor Layout／recipeの保持を追加しない。独立したPipelineRecipeSnapshot factoryとResourceArenaの初期化spanは、生成中に変更しない既存契約を維持する。
+
+Pickingの公開mutable picking_bufferは、owning値を返すpicking_image(index)、image_count()、lvalue限定のconst spanであるpicking_images()へ移す。再生成は候補一覧を作って一括交換し、旧画像は公開後に回収する。stack上のFacadeCallは、同一スレッドの同期callbackによる破棄・移動・swap・再生成を検知する。対象の共有ownerや新control blockを作らず、host操作の直列化は引き続き利用側の責務とする。read()は選択Image・Device・indexをwait前に保存し、その後に元facadeを読まない。空Managerと記録context不在は例外で拒否する。
+
+一括領域の対象は引き続きCPUのImpl／使用状態／配置contextである。内部コンテナ、生成scratch、呼出し中のShader一覧とstateコピー、Vulkan device memoryの確保は別に残る。保持一覧では元control blockを使い、通常の操作は解決済みImpl／native handleへ直接届く。性能改善率は測定していない。
+
+macOS arm64／Clang20 C++26、MoltenVK、Vulkan validation、ASan／UBSanで、新runtime8件、全VSL1,177成功（対応外format3 skip）／AHO GPU192・CPU1,071、compile契約294件が成功した。元のgetterがnodeを失い循環検査を見逃す失敗も、変更前に実GPUで再現した。生成入力の試験は実Nativeへの転送直前にstateを変更しShader一覧を解放し、保持期間と元stateでの描画を確認する。cache生成中の保持は、snapshotが先に完成するコード構造で確認した。
+
+heap／arenaのPNG3枚が一致し、resize後もPipeline生成1回を維持した。strict48ファイル／46TUと最終4ファイル／2TU、installed public consumer30種・新負例22種、private bridge非配布、archive／生成header一致、Debug／Release／x86_64寸法生成、構成混在と直近親headerの拒否、source398件とMSBuild登録も確認した。Windows／Linux実機、x86_64全体実行、device lost実機、並行CPUアクセス、性能比較は未検証である。
+
+2026-11-06。Bufferの4責務分離が統合されたmaster `6b1f0166`を基点とする。[Bufferの契約](buffer-generation-contracts.md)と[責務の配置](buffer-layer-layout.md)を維持する。
+
+## 方針と段階
+
+既存APIとheap経路を併設し、arenaは明示選択する。Impl寸法生成はVSL全体で必須を継続する。通常VSLと配置経路は同じoperationを使い、内部借用と外部所有を区別する。性能向上率は未測定。
+
+| 段階 | 実装単位と終了条件 |
+| --- | --- |
+| 1 | schemaからResourceId・binding map・寿命群別Buffer planを生成。型・scope・容量の矛盾を確保前に拒否 |
+| 2 | bundleのarena policyとTyped viewを接続。通常descriptor／commandから使用でき、完了・取消で回収 |
+| 3 | AHOの生成へ明示選択で接続。再確保後の旧view・共有alias・失敗時の旧世代維持を保証 |
+| 4 | Image／Samplerの共通operation・所有・同期を分離し、異種Impl配置へ拡張。swapchain imageは外部借用 |
+| 5 | descriptor layout／pool／setを配置。内部refと外部owner依存を分離し、記録時binding・更新制限・bind省略を維持 |
+| 6 | shader、pipeline layout、render pass／pipeline、framebufferの順で展開。生成scratchと永続実体、互換resizeを区別 |
+| 7 | 完了結果とin-flight保持を分離し、command・frame・swapchain世代へ展開。presentation側の完了をgraphics fenceと同一視しない |
+| 8 | 内部vector／map・control block・保持表の確保数、保持メモリ、時間を計測し、容量指定と再利用を必要箇所へ追加 |
+
+Device／Instanceは当面、外部の所有境界として保持する。CPU arenaにはImplと使用状態の本体を含め、内部コンテナやVulkan device memoryは別に確保する。資源の生存中にarenaを移動・拡張しない。新しい製品ディレクトリは作成前に利用者へ確認する。
+
+## A: schemaのBuffer配置計画
+
+`TypedBundlePlan<Allocation, BindingMap>`は既存`ResourceAllocationPlan`から次を計算する。
+
+- bindingごとのResourceId、scope、外部資源かどうか、寿命群内のslot。
+- shared群と一つのframe群それぞれのBufferCreateInfo、CPU bytes・alignment。
+- shared一つと全frame群のCPU領域合計。frame数・payloadのruntime要素数は入力planからコピーする。
+
+descriptor配列の各要素は、既定で異なる資源となる。自動IDは宣言順の空き番号で、明示IDとの衝突を避ける。IDは永続化用の番号ではない。`ResourceBinding<BindingKey, ResourceId>`の明示mapを渡すと、複数bindingを一つのowned Bufferへ接続できる。
+
+同じIDには同じPayload型、descriptor kind、scope、要素数が必要。違う型が同じsizeofでも共有を認めない。外部資源はslotを使わず、外部資源をowned資源と同じIDへまとめる指定も拒否する。外部資源の共有は同じowning viewを複数のexternal inputへ渡して表す。
+
+```cpp
+using Map = t::BufferBindingMap<
+    t::ResourceBinding<t::BindingKey{0, 0}, t::ResourceId{42}>,
+    t::ResourceBinding<t::BindingKey{1, 2}, t::ResourceId{42}>>;
+t::ResourceAllocationPlan<Allocation> logical(3, sizes);
+t::TypedBundlePlan<Allocation, Map> placement(logical);
+auto shared_bytes = placement.bytes(t::ResourceScope::SHARED);
+```
+
+`ResourceAllocationPlan::totals()`は従来の宣言数の意味を維持する。共有IDによって削減された実体数は`TypedBundlePlan::buffers(scope).size()`、CPU領域は`total_bytes()`から確認する。payload bytesとCPU Impl bytesを混同しない。
+
+空schema・外部資源だけの群は0 byte・alignment 1。runtime payload数はImplの個数ではない。SHAREDとPER_FRAMEは独立したarenaへ配置する。TRANSIENTのbundle自動生成は今回追加せず、既存の明示TypedBufferArenaで扱う。
+
+## B: bundleと保持の接続
+
+```cpp
+using HeapBundle = t::TypedResourceBundle<Allocation, t::HeapStorage>;
+using ArenaBundle = t::TypedResourceBundle<Allocation, t::ArenaStorage<Map>>;
+ArenaBundle bundle(manager, descriptors, sizes);
+bundle.initialize_shared([](ArenaBundle::Shared& shared) {
+    shared.buffer<0, 0>().copy(values);
+});
+auto phase = manager.start_phase<vsl::ComputePhase>();
+bundle.update(phase, [&](ArenaBundle::Frame& frame) {
+    frame.buffer<2, 1>().copy(frame_values);
+});
+phase << bundle.get(phase).bind_resources(pipeline).dispatch(4);
+phase.submit();
+phase.completion().wait();
+```
+
+上のbinding番号とpayloadは利用側のAllocationに合わせる。heapとarenaで共通のbundle構築・共有初期化・frame更新・descriptor接続を使用する。arena版の`buffer()`は`PlacedResourceBufferView`を返す。`copy`、`read_into`、部分`view`、`size`、`descriptor`を持ち、backendは解決済みBufferRefとownerを持つBufferViewである。旧backendの`.data_`や直接mappingが必要な利用側は、新policyへの移行時にview APIへ切り替える。共有Bufferとconst frameから直接copyできない型契約は維持する。
+
+各非空群は一度だけCPU領域を確保する。群内の各slotをゼロ初期化し、同じIDの別bindingもその初期値を共有する。宣言・device limitを検証してから構築し、後続のdescriptor／frame構築に失敗した場合も、構築済みのownerを通して巻き戻す。
+
+公開viewとbundle中のviewはarenaを保持するが、CPU領域内のImplはarenaを所有しない。frameからsharedへ所有が向く一方、sharedからframeへの参照は作らない。一つのshared viewはframe arenaを保持しない。
+
+`ResourceRetention::SUBMISSION`はSubmission所有者の寿命まで保持する。`COMPLETION`はGPU完了観測／記録取消でlifetime側のpinを解放する。現在は[保持期間の独立指定](typed-lifetime-boundaries.md)により、heap／arenaともframeの保持、Typed descriptor、外部資源の追加論理制約を同じ既定COMPLETIONへ接続し、旧SUBMISSIONは明示選択する。資源自体が持つ使用状態はどちらのpolicyでも共通で、同期の新しい状態を増設しない。
+
+commandを生存させている場合はcommand自身の保持も残る。GPU完了だけで、利用者が保存したviewやcommandまで無効化しない。native descriptorへの接続にはaliasing shared_ptrを使う移行adapterが残り、descriptor本体のarena化は段階5で扱う。
+
+## C: 実利用
+
+`aho-typed-example`はheapのまま、同じscene／shader／verifyを使う`aho-typed-arena-example`を併設する。両方とも3 frame slot、shared／frame UBO、TypedBatchの2 drawとbind省略、resize時のpipeline再利用を検証する。
+
+```sh
+cmake --build build --target aho-typed-example aho-typed-arena-example
+./build/bin/aho-typed-example --verify ./build/typed-heap-verification
+./build/bin/aho-typed-arena-example --verify ./build/typed-arena-verification
+```
+
+残る個別確保はframe wrapper、descriptor／layout／pool、shared所有境界、使用状態内のvector等。VulkanのBufferとdevice memoryもBufferごとに確保する。新しい一括領域がこれらを全て含むとは扱わない。
+
+## 今回の検証と次の境界
+
+Clang20／C++26、macOS arm64／Apple M1、ASan／UBSan、MoltenVK／Vulkan validationで検証した。
+
+- VSL712件中709成功、対応外packed format3件skip。新規はCPU配置契約5件とarena bundleのGPU／寿命契約9件。
+- AHO GPU121件成功。Typed compile137件＋AHO TypedBuffer8件の145件成功。heap／arena両方のbundle正常・負例15件ずつと、非trivialな新viewの拒否も含む。
+- 変更C++16ファイル／13TUのstrict規約検査と、新viewヘッダー1ファイル／1TUの補完検査が違反0。
+- heap／arena両サンプルで3 frame slot／12 submission／2 draw／238831 UBO変更画素／resize 1720×1080→2000×1360／pipeline生成1回。保存した3枚のPNGは両経路でバイト単位に一致。
+- installed consumerで公開ヘッダーからbundleの構築・更新経路をbuild／linkし、CPU上の配置計算も実行。異なるartifact IDを持つ同寸法headerとの混在はlink guardで拒否。private Implはinstallしない。
+- CMakeの関連targetとMSBuildのXML／新規path／重複登録を確認。生成済み寸法情報とABI定義はCMake targetから受け取る。手書きvcxprojだけで生成処理が完結する対応は追加していない。
+
+Windows／Linux実機、device lost、並行CPUアクセス、性能比較は未検証。CPUアクセスは直列化する。LeakSanitizerは無効化し、weak_ptrの失効と既存の破棄検査を併用した。
+
+今回の到達点は段階1・2と、その実利用検証A〜C。次は段階3のAHO storage世代への接続である。Image／descriptor／pipelineのarena化、Impl集合ヘッダーの資源別分割、全Completionの結果／保持分離はまだ完了していない。
+
+## 段階3の追記
+
+D1〜D3で[AHOのsnapshot・固定import・可変arena世代](../AHO/arena-buffer.md)を接続した。live bindingと世代snapshotを分け、固定importは容量内だけ、可変Bufferは新世代を別arenaへ作る。旧snapshotが新世代を保持し続けないよう、論理UseStateも現在値の所有から分離した。次は段階4のImage／Samplerである。既定heap API、寸法生成の必須方針、CPU ImplとGPUメモリの区別は維持している。
+
+11月7日のレビュー修正で固定importと可変Bufferの公開継承を除去し、snapshotのviewからだけ明示的にimportする契約へ揃えた。factory返却viewのarena ownerもそのまま保存し、Bufferごとのgeneration wrapperによる保持重複を除去した。factory設定は論理状態に同居させ、実体の破棄依存は返却ownerが保持する。Image等へ展開する前提として、物理世代・論理状態・arena ownerの識別を混ぜない。
+
+## 段階4の分割
+
+段階4を、4a: Image／Samplerの共通backendと物理UseState、4b: 実寸法生成と異種arena、4c: Typed schema／bundle接続の順へ分ける。先に[通常APIと指定領域構築の共通処理](image-sampler-backend.md)を確定し、後の配置計画がnative生成や検証を複製せず利用できるようにする。
+
+4aではImage／Samplerのoperationとlifetimeを分離し、device／swapchain所有をImpl外へ置く。通常API・Typed／native descriptor・転送／barrier・framebufferの全経路で同じ物理使用状態を登録する。外部imageはviewだけを所有する。Image／Samplerを利用者向けarenaへ配置するAPI、公開寸法・offset生成、schemaの自動展開は4b以降の終了条件に残す。
+
+4bの[ResourceArena](resource-arena.md)と4cの[Typed owned Image／Sampler](typed-owned-resources.md)で、異種配置とcomponent単位のschema接続を実装した。現在の順序は[完了計画](arena-completion-plan.md)を参照。次は完了結果とin-flight保持の分離であり、descriptor以降の配置とDevice／Instanceは引き続き未完了。
+
+## 順序12f: Fence／Semaphore／同期registryの所有入口
+
+`FenceHolder`／`SemaphoreHolder` はprivateな `OwnedRef<Impl>` を一つ持つ値とし、`SynchroManager` は既存の共有CPU registryをprivateにする。通常生成とarena取得は同じbackendを引き続き使う。公開の `bool`／`size()`／`get_device()`／`owner_ref()` と、既存のcreate／get／wait／reset／destroyで利用する。新しいowner wrapperやcontrol blockは追加しない。
+
+```cpp
+vsl::SynchroManager synchronization(device);
+auto ready = synchronization.create_fence("ready", true);
+auto signal = synchronization.create_semaphore("signal");
+if (ready && ready.wait(std::uint64_t{0}))
+    ready.reset();
+```
+
+```cpp
+constexpr std::array<vsl::typed::ResourceRequest, 2> requests{{
+    {{1}, vsl::storage::ResourceKind::SEMAPHORE},
+    {{2}, vsl::storage::ResourceKind::FENCE}}};
+constexpr vsl::typed::ResourcePlan<2> plan(requests);
+const std::array<vsl::lifetime::ResourceInit, 2> inputs{
+    vsl::SemaphoreCreateInfo{1}, vsl::FenceCreateInfo{1, true}};
+vsl::lifetime::ResourceArena arena(device, plan, inputs);
+auto signal = arena.semaphore({1});
+auto ready = arena.fence({2});
+```
+
+Arena getterは元external ownerまたはself nodeから直接aliasする。同rootの資源もImplと要素indexで使用状態を区別し、control block一致は保持の重複排除にだけ使う。SourceとepochをHolder側に複製しない。private bridgeが解決した実体へ操作を渡し、低位のwait／reset／destroyは開始時のShared owner・native handles・観測結果を値保存する。GPU完了・取消による既存Workの回収、UNKNOWN／予約／WSI marker、空destroyのno-opを維持する。
+
+同期のcanonical契約は、Impl自身のowner_nodeと元control blockの一致を要求する。managedな別ownerで同じImplへaliasしても正規ownerとは扱わない。`OwnedRef` 入力では格納nodeも照合する。検証と所有取得を分け、Device getterの検証で一時ownerを作らない。
+
+copy／noexcept move／by-value代入／swapは全値を公開してから旧ownerを解放する。名前付き生成も候補と返却facadeを作り、registry entryへswapし、返却値確定後に旧entryを回収する。破棄callbackが元facadeを解放したり同名entryを削除・再作成したりしても、開始時のregistry以外を参照し直さない。
+
+互換性変更は公開 `data_` とraw shared_ptr／OwnedRef constructorの廃止である。利用側は通常生成またはarena getterを使い、有無判定は `bool(value)`、元Deviceは `get_device()`、外部寿命保持は `owner_ref()` へ移行する。AHO製品側は同期facadeのmoveとpublic boolへ接続し、privateヘッダーを使わない。private bridge、registryのshared所有、Work／Proofへ渡すShared境界、native配列と同期状態内のvector確保は残る。
+
+追加runtime6件はmanaged composite拒否、同名置換の再入、Holder／Manager代入時の自己解放、copy／move／swap、退役nodeの拒否とNative不変を確認する。既存の予約・配列先行検査・観測再入・外部import・同root保持・完了／取消の試験も再利用した。macOS arm64／Clang20／C++26／MoltenVK・validation・ASan／UBSanで、全VSL1,183成功（既知format3 skip）、AHO GPU192／CPU1,071、compile306、同一PNG3枚、strict23files／21TUと補完1／1・2／2、installed consumer30種・公開正例1＋負例11、構成別／cross寸法、混在拒否、archive／header一致を確認した。次は他のgeneric facadeに残る既知nodeの退役検査を共通境界へ復元し、その後Swapchainの所有値と画像一覧を閉じる。
+
+## 退役済みownerの公開・登録の検査
+
+private `lifetime/owner_validation.hpp` の `require_live_owner` は、保持済みOwnedRefの既知nodeだけをconst参照で検査する。Shader／RenderPass／PipelineLayout／Pipeline／FrameBuffer／Resourceのowner_ref、BufferAccessor／Image／SamplerのResourceUse factory、ShaderGroupのrecipe依存登録へ、旧owned_ref→node.refが行っていた退役拒否を復元した。
+
+元nodeとcontrol blockを保存し、検証のためのOwnerRefコピーや新しいowner wrapperを作らない。generic資源にSyncのcanonical条件を強制せず、opaque ownerを許容する。managed compositeではその既知nodeの退役を検査する。updating拒否は追加しない。
+
+既存ownerのcopy／move／swap／解放、既に取得済みの使用状態の観測、ShaderGroupからの削除を一律に禁止しない。ShaderGroupは従来のDevice／stage検証後に退役を検査し、scratch内で全Shaderを準備してからrecipeの3vectorを交換する。後半のShaderで失敗しても元recipeを変更しない。
+
+この補修は旧検査の消失を復元する範囲である。以前から独立していたBufferView::resource_useとResourceUseGroup::ForDescriptorの入口は今回変更しないため、全ResourceUseの一律の退役拒否という保証ではない。既存viewの保持契約や取消・回収を、この補修だけで厳格化しない。
+
+有効なNative資源を保持したままnodeを退役させる新6件は、同じABIの親libraryでは6件とも失敗し、修正版では全成功した。比較時もvalidation／ASan／UBSanエラーはない。型・slot・公開headerは変更せず、生成IDは親と同じdbfを維持した。規約検査は14files／13TUと補強1file／1TUが違反0、installed consumer30種、private非配布とarchive／生成header一致も確認した。全体はVSL1,189成功（既知format3 skip）、AHO GPU192／CPU1,071、heap／arenaの3PNG一致を確認した。公開headerと配置入力が不変のため、親のcompile306・構成別／cross寸法とABI検証は再実行していない。
+
+## 順序12f: Swapchainの所有値と画像一覧
+
+SwapchainAccessorの公開data_／mutable imagesを、privateなOwnedRefと画像vectorへ閉じた。copy／noexcept move／値引数代入とswapは両fieldを公開してから旧値を回収する。新owner wrapperやcontrol blockを追加せず、通常SwapchainとSwapchainArenaは同じgeneration factoryを使う。
+
+```cpp
+vsl::Swapchain chain(device, surface);
+auto image = chain.image(0);          // 所有値。元の世代を保持する。
+auto generation = chain.identity();   // 比較中は元の所有者を保持する。
+for (const auto& current : chain.images()) {
+    // chainが生存する間だけ使う読み取り専用一覧。
+}
+```
+
+```cpp
+vsl::lifetime::SwapchainArena arena(device, *surface, {.width = 640, .height = 480});
+auto image = std::move(arena).view().image(0);
+// 一時Facadeの消滅後も、imageが元generationのCPU領域とNative資源を保持する。
+```
+
+images()はlvalue限定のconst spanで、一時値からの取得はdeleteする。image(index)はatからowning値を返す。get_swap_image_size()はconst/noexcept、boolは存在、state()はNative世代の状態を表す。比較は種類別のSwapchainIdentityを使う。退役世代からの画像取得は維持する。
+
+Native入口は元CB／Impl node／生存handleと保存nodeを検査する。metadata用のoffscreen fixtureはprivate factoryでだけ構築し、従来のformat／Device／Viewport／Picking利用を維持する。Phaseは開始時の元ownerを値保存して既存Work／Proofへ渡す。Root内のimage_storage／stride／finished／fences／contextは借用のままで、Sourceとepochを再生成しない。Device側とWindow／Surface側の寿命群も分けたまま保持する。
+
+利用側はimages.at(i)をimage(i)、一覧の走査をimages()、data_の世代比較をidentity()へ移す。AHO製品とglTF viewerは公開APIだけを使う。private SwapchainAccess、offscreen metadata構築、Work／Proofへ渡すShared境界は内部に残る。Facadeの画像vector、CPU管理データ、Native配列／GPUメモリ等の個別確保も残り、この変更で全メモリを一括領域へ含めたとは扱わない。
+
+macOS arm64／Clang20／C++26／MoltenVK・validation・ASan／UBSanで新4件と全VSL1,193（既知format3 skip）、AHO GPU192／CPU1,071、compile317を確認した。CPU回帰はmetadataと画像を別CBにして、一括公開前の旧owner回収を画像保持が隠さない構成とした。GPU回帰は元CB／node／presentation状態と最後の画像までのgeneration保持を確認する。heap／arenaの3PNGはバイト一致し、glTF viewerも姿勢・resize・12frame後の同姿勢一致を検証した。
+
+strict28files／23TU、gltf viewerの別整形・構文確認、installed consumer30種・公開正例1＋負例10、private非配布、archive／header一致、構成別／x86_64寸法、mixed構成と親dbf headerのlink拒否、source401／MSBuild登録が成功した。生成IDはed84546d…へ更新した。Windows／Linux実機、x86_64全体実行、device lost、並行CPU、性能率は未検証。次はrecipe参照、続いてstate編集借用の公開入口を閉じる。
+
+## 順序12f: Pipelineレシピの公開境界
+
+Layout／Editor／Frozenのrecipe()、Editorのedit_recipe()、Snapshotのdefinition()を公開APIから外した。CPUレシピの実定義は引き続きprivateに置き、内部のPipelineRecipeAccess::Read／Editだけが借用参照を解決する。通常のTyped templateはprivateヘッダーを必要としない。Native生成、検証、sourceの元node／control blockと重複排除、freezeの共有判定、snapshotのdeep copyは変更しない。
+
+利用側の独自stageは公開stageを合成し、構築手順はDraft／Snapshotで表す。
+
+```cpp
+struct Stages {
+    void injection(vsl::PipelineLayoutEditAccessor layout) const {
+        vsl::pipeline_layout::ColorBlend{}.injection(layout);
+        vsl::pipeline_layout::Rasterization{
+            vsl::pipeline_layout::CullingMode::NONE}.injection(layout);
+    }
+};
+vsl::PipelineLayout layout(device, Stages{});
+auto frozen = std::move(layout).freeze();
+auto runtime = frozen.runtime();
+
+vsl::lifetime::PipelineRecipeDraft draft(device);
+draft.inject(Stages{}, shaders);
+auto snapshot = draft.snapshot();
+```
+
+copy／add／freeze／runtime／has_recipe、保存Editor、既存stageの注入、pending_layouts／layout_sources等の値APIは維持する。Snapshotは保存Editorから独立した不変所有値である。private Read／Editの一時値入力はdeleteし、内部でも借用参照を一時Facadeから取り出さない。参照解決のためのownerコピー、管理表探索、新しいcontrol blockは追加しない。
+
+旧Impl参照を利用する独自stageは、公開stageの合成またはGraphicsPipelineStateの編集APIへ移行する。任意のImpl変更を可能にする代替getterは設けない。GraphicsPipelineStateEditRefとstateのdefinitionの公開境界は次の単位で整理する。CPU recipe／配列の個別確保、内部Shared境界、private bridgeは残り、この単位は配置サイズや性能率を改善する変更ではない。
+
+全341翻訳単位の構文検査、公開正例1＋負例5、private bridgeの一時借用拒否、strict33files／29TU、source402／MSBuild登録が成功した。macOS arm64／Clang20／C++26／MoltenVK・validation・ASan／UBSanで全VSL1,193（既知format3 skip）、AHO GPU192／CPU1,071、compile323、heap／arenaの3PNG一致、glTF viewerの姿勢・resize・12frame後の同姿勢一致を確認した。既存のdeep copy、保存Editorの分離、Typed Input末尾注入、Native前のschema拒否、source回収、失敗時不変の試験を再利用し、同じ意味のruntime試験は追加していない。
+
+installed consumer30種と新公開正負6件、private非配布、archive／生成header一致、Debug／Release／x86_64寸法、構成混在と親ed84546d…headerのlink拒否が成功した。生成IDはbb2e8ca3…へ更新した。Windows／Linux実機、x86_64全体実行、device lost、並行CPU、性能率は未検証。次はstate編集借用の公開境界を整理する。
+
+## 順序12f: GraphicsPipelineStateの編集借用
+
+GraphicsPipelineStateEditRefの公開pointer／get()／raw構築と、Stateのdefinition()を閉じた。公開のedit()／edit_state()、Stateの値コピー、既存stageの注入は維持する。独自stageは公開stageを組み合わせる。
+
+```cpp
+struct StateStages {
+    void injection(vsl::GraphicsPipelineStateEditRef state) const {
+        vsl::pipeline_layout::Rasterization{
+            vsl::pipeline_layout::CullingMode::NONE}.injection(state);
+        vsl::pipeline_layout::DepthStencil{}.injection(state);
+    }
+    void injection(vsl::PipelineLayoutEditAccessor layout) const {
+        injection(layout.edit_state());
+    }
+};
+vsl::GraphicsPipelineState saved(StateStages{});
+auto copied = saved;
+StateStages{}.injection(copied.edit());
+vsl::PipelineLayout layout(device, copied);
+```
+
+EditRefはpointer一本の借用値で、所有者と注入中の実体の寿命は利用側が保つ。既存Stateのunique_ptr、recipe内のinline stateを維持し、新しいowner／control block／確保は加えない。private operation/GraphicsPipelineStateAccessがRead／Edit／Borrowを担当する。Readは一時Stateを拒否し、Editはlvalue Stateから返された一時EditRefをby-valueで受けられる。State{}.edit()は引き続き禁止する。空EditRefとmove後Stateの例外も維持する。
+
+copyは可変長配列まで独立し、copy代入は候補を作ってからswapする。State→Layout注入もdataのcopy成功後にswapする。固定stageの更新順、Typed Inputの末尾注入、Native生成中の局所snapshotを変えない。通常生成とarenaの両経路は同じprivate橋を使い、公開Typed templateにprivate includeを追加しない。
+
+旧definition()/get()でImplを直接変更していた利用はstage合成へ移す。任意のImpl変更を許す代替getterは追加しない。Stateとその配列の個別確保、CPU recipe、内部Shared境界は残る。借用期間を所有へ変える変更でも、性能改善率を示す変更でもない。起動資源とWindow／Completionの公開境界、実定義・処理の4層分離は後続で続ける。
+
+変更17翻訳単位の構文検査、strict19files／17TU、source403／MSBuild登録、compile327が成功した。新4件を含む公開契約は11件で、独自stageの両入口への合成、stateの一時値とEditRefの一時値の区別、旧4入口の拒否を確認する。既存deep copy／move／default／注入失敗不変／Typed Input末尾／Native中snapshotのruntime試験を再利用した。
+
+macOS arm64／Clang20／C++26／MoltenVK・validation・ASan／UBSanで全VSL1,193（既知format3 skip）、AHO GPU192／CPU1,071、heap／arenaの3PNG一致とglTF viewer verifyが成功した。installed consumer30種と公開11契約、private橋の非配布、archive／header一致、Debug／Release／x86_64寸法、混在と親bb2e8ca3…headerのlink拒否も成功した。生成IDは61c90256…へ更新した。Windows／Linux実機、x86_64全体実行、device lost、並行CPU、性能率は未検証。次はInstance／PhysicalDeviceの公開境界から起動資源を整理する。
+
+## 順序12f: Instance／PhysicalDeviceの公開所有境界
+
+VulkanAccessorとPhysicalDeviceをprivate OwnedRef一本の値にし、公開shared Impl field／raw構築を閉じた。VulkanはAccessor値の構成と所有値変換を使い、accessor／data_の二重保持と可変な基底参照を撤去した。既存のCreate／Select／devices／properties／owner_ref、copy／move／swapを使える。
+
+通常の生成は既存のInstanceCreateInfoを渡す。必要な拡張とAPI版は対象環境に合わせる。
+
+```cpp
+auto instance = vsl::VulkanAccessor::Create(info);
+auto physical = vsl::PhysicalDevice::Select(instance);
+auto parent = physical.get_instance();
+vsl::Vulkan<false> facade(instance);
+vsl::VulkanAccessor owning_copy = facade;
+```
+
+同じ寿命のPhysicalDevice実体を別slotへまとめる場合も、同じ構築backendを使う。Instanceの寿命群はこの例でも独立している。
+
+```cpp
+constexpr std::array<vsl::storage::StartupRequest, 2> requests{{
+    {{2}, vsl::storage::StartupKind::PHYSICAL_DEVICE},
+    {{3}, vsl::storage::StartupKind::PHYSICAL_DEVICE}}};
+constexpr vsl::storage::StartupPlan<2> plan(requests);
+const std::array<vsl::lifetime::StartupInit, 2> inputs{
+    vsl::lifetime::PhysicalDeviceInit{instance, {}},
+    vsl::lifetime::PhysicalDeviceInit{instance, {}}};
+vsl::lifetime::StartupArena arena(plan, inputs);
+auto first = arena.physical_device({2});
+auto second = arena.physical_device({3});
+```
+
+private StartupAccessは元のImpl参照／control block／保存nodeを扱い、FromOwnedで別ownerへ包み直さない。Instance／PhysicalDeviceでは正規CB、保存nodeとImpl nodeの一致、退役状態を検査する。別CBのaliasや、同じCBに別nodeを付けた入力は拒否する。子の親getterは元親のOwnedRefへ戻し、Device側とSurface／OS Window側の寿命を結合しない。
+
+PhysicalDevices<S>の共有CPU stateはprivateな非template collectionへ移した。custom searchはconstructor前にcollectionを保持し、旧constructor→列挙→benchmark順を維持する。列挙へsnapshotをmoveし、候補と選択結果をPhysicalDevice値で保持する。callbackが元facadeを破棄しても、その後に元thisを読まない。最高の非負scoreと先着tieの意味は維持する。同じハードウェアでもget／searchが作るImplは別なので、slotの同一性とハードウェアの同一性を混同しない。
+
+旧helper::enumerate_physical_devices／physical_devices／select_physical_deviceは公開から撤去した。利用側はPhysicalDevices<S>(instance).get()／search()またはPhysicalDevice::Selectへ移す。Vulkan(Accessor)は配置済みInstanceを既存Vulkan APIへ接続する互換入口として残す。内部Shared境界はprivate adapterだけを使い、rvalueはTakeSharedで所有を移す。通常操作はOwnedRefから解決済みImplへ直接届く。collectionの共有state、Root／可変長配列、Vulkanのデバイスメモリ等の確保は残る。
+
+関連36翻訳単位の構文検査、公開18契約、source406／MSBuild登録が成功した。規約検査の43files／34TUに残った新2CPPの旧DB未登録は、新DBでの2files／2TU検査により補完し、コード違反はない。compile345は339件が初回成功、timeoutの6件も単独再検査ですべて成功した。
+
+新runtime1件はsearcher constructor中に元collectionを破棄し、選択完了とcollection回収を確認する。既存foreign試験にはCB／別保存node／retireの独立した拒否とNative不変を追加した。macOS arm64／Clang20／C++26／MoltenVK・validation・ASan／UBSanで全VSL1,194（既知format3 skip）、AHO GPU192／CPU1,071、同じ3PNGとglTF viewer verifyが成功した。
+
+一時consumerの消失に伴い、配布検査はrepo内の公開契約を用いて再構成した。installed headersだけで25種類をcompileし、7 consumerのlink／実行と公開18契約を確認した。private非配布、archive／header一致、Debug／Release／x86_64寸法、構成混在と親61c90256…headerのlink拒否も成功した。生成IDは6f5ad8d7…へ更新した。Windows／Linux実機、x86_64全体実行、device lost、並行CPU、性能率は未検証。次はDevice／SurfaceとAHOの弱いclose回収を整理する。
+
+## 順序12f: Device／Surfaceの公開所有境界
+
+LogicalDeviceAccessor／Surfaceの公開shared Impl fieldとraw構築を閉じ、元のImpl／control block／保存nodeを持つprivate OwnedRefへ移した。通常のDevice生成もStartupArenaからの取得も、この値を返す。コピーは所有値を共有し、代入は全値の公開後に旧ownerを回収する。Surfaceは既存のWindow plugin adapterを保ち、代入／swapでは登録先オブジェクトのplugin IDを変えない。Window自体の公開境界は後続単位に残る。
+
+LogicalDevice<C>はAccessorを値で保持する。Accessorへの変換は所有する値を返すため、可変な基底参照から内部ownerを交換できない。custom Creatorは公開のPhysicalDevice／Surfaceを値で受け、LogicalDeviceAccessorを返す。生成後の正規ownerと元のPhysicalDevice実体の一致検査は非templateの共通処理で行う。Creatorは既存Deviceを返してもよい。同じハードウェアを指していても別のPhysicalDevice実体なら、元の親とは扱わない。
+
+旧LogicalDeviceGraphicCreatorのshared Impl返却を使っていた利用側は、GraphicsDeviceCreatorまたは公開CreateGraphicsへ移す。追加feature等を指定したい場合はGraphicsInfoで通常のDeviceCreateInfoを作り、Createへ渡せる。
+
+```cpp
+auto info = vsl::LogicalDeviceAccessor::GraphicsInfo(physical, surface, false);
+info.features = info.features | vsl::DeviceFeature::SAMPLER_ANISOTROPY;
+auto device = vsl::LogicalDeviceAccessor::Create(physical, std::move(info));
+vsl::LogicalDevice<> existing(device);
+```
+
+WeakLogicalDevice／WeakSurfaceはstorageの弱い所有を観測する。lockは先に元control blockを保持し、元の保存nodeを持つ所有値を返す。新しいownerやcontrol blockを作らない。空または解放済みなら空値を返す。退役済みでもstorageが保持中ならlockできるが、Native操作は正規owner／保存node一致／退役／Native handleを検査する。storage消滅と操作可能性を同一視しない。
+
+AHO GraphicsCloseは両weak値を使い、Engine消滅後でもWork等が親を保持していれば、局所的なDevice／Surface値へlockして既存のSurface回収へ進む。close中にplugin自身が破棄されても、その後の回収は局所値で完了する。DeviceはSurfaceやOS Windowの永久親所有を追加しない。
+
+arena getter／子の親getterは元のOwnedRefを直接引き継ぐ。親の設定も正規ownerと保存nodeを検査し、同じcontrol blockに別nodeを付けた入力を拒否する。内部の古いShared境界はprivateなStartupAccess::Shared／FromSharedで接続する移行用adapterとして残る。通常の操作はOwnedRefから解決済みImplへ直接届く。CPU Root／可変長コンテナ／Vulkan device memoryの個別確保は、この公開境界変更では削減していない。
+
+macOS arm64／Clang20／C++26／MoltenVK・validation・ASan／UBSanで新runtime4件と全VSL1,198（既知format3 skip）、AHO GPU192／CPU1,071、compile361を確認した。新試験はDevice／Surface weakの同じ実体への復帰・退役後操作拒否・最後の所有解除、Surfaceの異なるnode拒否と親不変、代入後のplugin登録維持を検証する。既存試験にもCreatorの異親／空結果拒否と親setterの別node拒否を追加した。heap／arenaの3PNG、resize時のPipeline生成1回、glTF viewerの姿勢・resize・12frame後の同姿勢を維持した。
+
+source406、strict110files／97TUと宣言順修正後の1file／1TUが成功した。最後の修正は関数本体を変更せず宣言だけを整理したことを比較し、再buildと配布archive一致を確認した。installed public consumer26種類compile、3種類link／実行、新しい公開正負16契約、private非配布、生成／公開header・archive一致、Debug／Release／x86_64の実寸法、配置consumerによる構成混在と親6f5ad8d7…headerのlink拒否も成功した。生成IDは80b75e39…である。Windows／Linux実機、x86_64全体実行、device lost、並行CPU、性能率は未検証。次はEngine／Window／Completionの公開境界、12gの実定義・metadata・処理の4層分割、12hの同条件測定へ進む。
+
+## 順序12f: AHO Engineの公開状態とboot
+
+EngineDataの完全定義をAHOの既存src/engineへ移し、公開raw shared構築／data()／reset_dataを閉じた。EngineAccessorは共有CPU状態一本の所有値で、公開EngineCreateInfo／CreateはDevice、commands、descriptor manager、任意の同期registry、presentation policyを受け取る。空の必須service、別Deviceのservice、不明なpolicy、未有効のpresentation fenceを拒否してから新状態を作る。同期registryは空を許し、Window固有の同期arenaを使える。
+
+```cpp
+auto runtime = aho::engine::EngineAccessor::Create({
+    .device = device,
+    .commands = vsl::CommandManager(device),
+    .descriptor_manager = std::make_shared<vsl::GraphicResourceManager>(device)});
+aho::Window window("custom runtime", 800, 600, runtime);
+auto commands = runtime.commands();
+```
+
+通常のStandardEngine構築は維持する。従来のengine.data()->logical_device等はengine.runtime().device()／commands()／descriptor_manager()へ移す。Instance／PhysicalDeviceはDeviceの元親から取得し、Engine内の重複した親facadeを保持しない。各getterは所有値を返し、内部の検証には借用stateを使う。必要な共有所有を返す処理と、存在の検証を区別する。
+
+GraphicalEngineはEngineAccessorの値compositionへ移し、runtime()と所有値への変換、派生型用のprotected set_runtimeを提供する。可変な基底参照によるruntime単独交換を禁止する。独自Engineもpublic facadeを受け取ってset_runtimeへ渡せる。GET_BASE_LAYOUTのcallbackはEngineAccessor*から所有するEngineAccessor値へ変わり、GET_BASE_LAYOUT(engine.runtime())と呼ぶ。callback中の元facade破棄からも状態を保持するための変更である。
+
+bootはNative操作前にconfigを値で保存し、stackのBootScopeを登録する。destructorはmemberを解放する前にscopeを失効させる。Native操作後はscopeから生存を確認し、消滅したreceiverを再参照しない。候補Window／runtime／default登録をnoexcept swapで全て公開した後、旧値を局所から回収する。旧値の解放callbackがreceiverを破棄しても、保存済みのNative Windowからrollbackする。pluginを先にclearせず、閉鎖・登録解除・一覧切り離し後に解放する既存Window closeへ委ねる。
+
+RenderContextはEngineAccessorを強保持する。既に返したdescriptor manager参照はContextが生存する間有効で、参照を返す際の一時shared_ptr取得も不要である。Engineの状態からWindow／Surfaceへの逆所有は追加しない。Windowの公開data_／data2、plugin／Inputの境界は後続単位へ残す。
+
+macOS arm64／Clang20／MoltenVK・validation・ASan／UBSanでAHO GPU198／CPU1,071が成功した。新6件はFactoryの元所有者保持／不正serviceと失敗不変、Native中の自己破棄とcloseへの再入、全値公開後の旧Window回収中の自己破棄、再帰boot拒否、Contextの借用service保持である。既存の同期registryなしWindowも公開Factoryから構成した。Graphics初期化失敗試験は、不整合Instanceの注入から実際のSwapchain生成失敗へ移し、Window登録とdefaultのrollbackを維持した。
+
+main、source408／MSBuild登録、strict24files／16TU、公開15契約＋include順2＋Typed Buffer15の32契約が成功した。通常Windowの構築失敗も同じcloseへ統一し、plugin解放中の再入を追加した後、補完strict2files／2TU＋test整形1file／1TU、再build、全AHO198／1,071、描画・配布を再確認した。heap／arenaの3PNGとPipeline生成1回、glTF verifyを維持した。installed公開27種類compile／3種類link・実行／新15正負契約、公開5headerとarchiveの一致、private状態の非配布も確認した。VSLのコード・生成情報ID80b75e39…・archiveは#390と同一で、実寸法と構成混在の契約は変更していない。
+
+CPU EngineData／default登録の共有確保、可変長service、bootのconfig snapshotに伴うstring／vector／mapの確保は残る。BootScope自身に追加のheapやcontrol blockはない。Windows／Linux実機、並行CPU、性能比較は未検証。次はVSL logical Window／plugin、AHO Window／Context／Input、その後Completion、12gの実定義・metadata・処理分離と12hの同条件測定へ進む。

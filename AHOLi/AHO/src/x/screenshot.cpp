@@ -1,7 +1,14 @@
+#include "../engine/engine_access.hpp"
+
+namespace {
+    using AHO_NAMESPACE::engine::detail::EngineAccess;
+}
+
 #include <AHO/x/screenshot.hpp>
 #include <AHO/drawer/draw_phase.hpp>
 #include <AHO/window.hpp>
 #include <VSL/vulkan/commands/render_pass_end.hpp>
+#include <VSL/lifetime/phase_liveness.hpp>
 #include <cstdlib>
 #include <fstream>
 #include <limits>
@@ -92,45 +99,54 @@ namespace AHO_NAMESPACE::x {
     }
 
     Screenshot::Screenshot(window::Window window) {
-        if (!window || !window.data2 || !window.engine.data())
+        if (!window || !window.data2 || !EngineAccess::State(window.engine))
             throw std::invalid_argument("Screenshot requires a live AHO window");
         if (THREAD_LOCAL_DRAW_PHASE)
             throw std::logic_error("Create Screenshot outside a DrawPhase");
         auto& resources = *window.data2;
-        auto manager = window.engine.data()->command_manager;
+        auto manager = EngineAccess::State(window.engine)->command_manager;
         (void)is_bgra(resources.swapchain.get_format());
         auto data = std::make_shared<Data>(window.data2, manager);
-        const auto usage = resources.swapchain.images.at(0).get_usage();
+        const auto usage = resources.swapchain.image(0).get_usage();
         if (!VSL_NAMESPACE::contain(usage, VSL_NAMESPACE::ImageType::TRANSFER_SRC))
             window.recreate_swapchain(VSL_NAMESPACE::ImageType::TRANSFER_SRC);
         _data = std::move(data);
     }
 
     bool Screenshot::capture(DrawPhase& phase) {
-        if (!_data || phase.state != VSL_NAMESPACE::ComputePhase::State::WAIT_SUBMIT)
+        VSL_NAMESPACE::lifetime::PhaseCall call(phase);
+        const auto data = _data;
+        if (!data || !phase.recording())
             throw std::logic_error("Screenshot requires a recording DrawPhase");
-        const auto window = _data->window.lock();
-        if (!window || !phase.engine || phase.engine->get_window().data2 != window ||
-            phase.swapchain.data_ != window->swapchain.data_)
+        const auto window = data->window.lock();
+        if (!window || !phase.target_window() || phase.target_window().data2 != window ||
+            phase.swapchain.identity() != window->swapchain.identity())
             throw std::invalid_argument("DrawPhase belongs to a different or closed window");
-        const auto image = phase.swapchain.images.at(phase.get_image_index());
+        const auto image = phase.swapchain.image(phase.get_image_index());
         if (!VSL_NAMESPACE::contain(image.get_usage(), VSL_NAMESPACE::ImageType::TRANSFER_SRC))
             throw std::logic_error("Window no longer supports screenshot readback");
-        const auto status = _data->completion.status();
+        const auto current = phase.completion();
+        const auto status = data->completion.status();
+        if (!call.alive() || !phase.recording() || phase.completion() != current || !phase.target_window() ||
+            phase.target_window().data2 != window || phase.swapchain.identity() != window->swapchain.identity())
+            return false;
         if (status == VSL_NAMESPACE::Completion::Status::PENDING || status == VSL_NAMESPACE::Completion::Status::SUBMITTED)
             return false;
-        auto finish = [previous = phase.finish, state = _data, &phase, image](auto& stream) {
+        auto finish = [previous = phase.finish, state = data, &phase, image](auto& stream) {
+            VSL_NAMESPACE::lifetime::PhaseCall call(phase);
             if (previous)
                 previous(stream);
             else
                 stream << VSL_NAMESPACE::command::RenderPassEnd{};
+            if (!call.alive())
+                return;
             state->ticket = state->reader.record(phase, image, VSL_NAMESPACE::ImageLayout::PRESENT);
             if (!state->ticket)
                 throw std::logic_error("Screenshot readback slot is unavailable");
         };
         phase.finish = std::move(finish);
-        _data->ticket.reset();
-        _data->completion = phase.completion();
+        data->ticket.reset();
+        data->completion = phase.completion();
         return true;
     }
 

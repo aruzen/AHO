@@ -1,6 +1,14 @@
 #include <AHO/drawer/standard_drawer.hpp>
 #include <AHO/drawer/draw_phase.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
+#include <VSL/vulkan/stages/color_blend.hpp>
+#include <VSL/vulkan/stages/shader_group.hpp>
+#include <VSL/vulkan/stages/input_assembly.hpp>
+#include <VSL/vulkan/stages/rasterization.hpp>
+#include <VSL/vulkan/stages/multisample.hpp>
+#include <VSL/vulkan/stages/dynamic_state.hpp>
+#include <VSL/vulkan/viewport.hpp>
+#include <VSL/vulkan/scissor.hpp>
 #include "standard_shaders.hpp"
 #include <cmath>
 #include <stdexcept>
@@ -9,6 +17,7 @@ namespace AHO_NAMESPACE::drawer::detail {
     struct TriangleValues {
         float position1[4], position2[4], position3[4], color[4];
     };
+
     using TriangleLayout = VSL_NAMESPACE::typed::BlockRecord<TriangleValues,
                                                              VSL_BLOCK_MEMBER(TriangleValues, position1), VSL_BLOCK_MEMBER(TriangleValues, position2),
                                                              VSL_BLOCK_MEMBER(TriangleValues, position3), VSL_BLOCK_MEMBER(TriangleValues, color)>;
@@ -22,6 +31,7 @@ namespace AHO_NAMESPACE::drawer::detail {
         explicit StandardDrawState(const RenderContext& context);
         static TrianglePipeline MakePipeline(const RenderContext& context, const VSL_NAMESPACE::RenderPass& pass);
     };
+
     TriangleValues triangle_values(const Triangle<float, VSL_NAMESPACE::D2>& triangle, const RGBA& color);
 
     StandardDrawState::StandardDrawState(const RenderContext& context)
@@ -68,9 +78,9 @@ namespace AHO_NAMESPACE {
             throw std::logic_error("Triangle draw requires a recording DrawPhase");
         const auto values = drawer::detail::triangle_values(triangle, rgba);
         const auto context = phase.context();
-        auto window = phase.engine->get_window();
+        const auto& window = phase.target_window();
         auto& state = window.data2->standard_draw;
-        if (!state || state->pass.data_ != context.render_pass().data_)
+        if (!state || state->pass.identity() != context.render_pass().identity())
             state = std::make_shared<drawer::detail::StandardDrawState>(context);
         phase << context.viewport() << context.scissor()
               << state->pipeline.bind_vertices().push_constants(drawer::detail::TrianglePush::Values(values)).draw(3);

@@ -1,12 +1,19 @@
+#include <VSL/operation/graphics_pipeline_state_access.hpp>
 #include <VSL/vulkan/stages/color_blend.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
+
+namespace {
+    using VSL_NAMESPACE::operation::detail::GraphicsPipelineStateAccess;
+}
+
 namespace VSL_NAMESPACE::pipeline_layout {
-    void ColorBlend::injection(PipelineLayoutEditAccessor pl) {
-        auto& info = *pl.data_->info;
-        if (!info.pool.contains("colorBlendAttachments"))
-            info.pool["colorBlendAttachments"] = std::vector<vk::PipelineColorBlendAttachmentState>{};
-        auto& states = std::any_cast<std::vector<vk::PipelineColorBlendAttachmentState>&>(
-            info.pool["colorBlendAttachments"]);
+    void ColorBlend::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
+        injection(pl.edit_state());
+    }
+
+    void ColorBlend::injection(VSL_NAMESPACE::GraphicsPipelineStateEditRef state) {
+        auto& info = GraphicsPipelineStateAccess::Edit(state);
+        auto& states = info.blend_attachments;
         for (const auto& a : attachments)
             states.push_back(
                 {.blendEnable = a.enabled,
@@ -18,7 +25,5 @@ namespace VSL_NAMESPACE::pipeline_layout {
                  .alphaBlendOp = static_cast<vk::BlendOp>(a.alpha_op),
                  .colorWriteMask = vk::ColorComponentFlags(static_cast<std::uint32_t>(a.write_mask))});
         info.color_blend.logicOpEnable = false;
-        info.color_blend.attachmentCount = static_cast<std::uint32_t>(states.size());
-        info.color_blend.pAttachments = states.data();
     }
 } // namespace VSL_NAMESPACE::pipeline_layout

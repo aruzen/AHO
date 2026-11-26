@@ -7,12 +7,28 @@
 #include <utility>
 
 #include "../define.hpp"
+#include "../lifetime/owner_ref.hpp"
+#include "../lifetime/resource_identity.hpp"
 
 #include "device.hpp"
 #include "shader.hpp"
 #include "buffer.hpp"
 #include "image.hpp"
 #include "sampler.hpp"
+
+namespace VSL_NAMESPACE {
+    class BufferView;
+}
+
+namespace VSL_NAMESPACE::lifetime {
+    class ResourceArena;
+    class PipelineRecipeSnapshot;
+} // namespace VSL_NAMESPACE::lifetime
+
+namespace VSL_NAMESPACE::lifetime::detail {
+    struct DescriptorAccess;
+    struct DescriptorManagerAccess;
+} // namespace VSL_NAMESPACE::lifetime::detail
 
 namespace VSL_NAMESPACE::graphic_resource {
     constexpr size_t MAX_POOL_SIZE = 200;
@@ -76,13 +92,54 @@ namespace VSL_NAMESPACE::graphic_resource {
 
         [[nodiscard]] std::vector<BindingPoint> get_binding_points() const;
 
-        std::shared_ptr<impl::ResourceBindingLayoutImpl> data_;
+        BindingLayout(const BindingLayout&) = default;
+        BindingLayout(BindingLayout&&) noexcept = default;
+
+        BindingLayout& operator=(BindingLayout replacement) noexcept {
+            swap(replacement);
+            return *this;
+        }
+
+        explicit operator bool() const noexcept { return bool(_owner); }
+
+        lifetime::OwnerRef owner_ref() const;
+        LogicalDeviceAccessor get_device() const;
+
+        void swap(BindingLayout& other) noexcept { _owner.swap(other._owner); }
+
+    private:
+        friend struct lifetime::detail::DescriptorAccess;
+        lifetime::OwnedRef<impl::ResourceBindingLayoutImpl> _owner;
+
+        explicit BindingLayout(lifetime::OwnedRef<impl::ResourceBindingLayoutImpl> owner) : _owner(std::move(owner)) {}
     };
 
     struct ManagerInterface;
     struct Resource;
+
     struct Pool {
-        std::shared_ptr<impl::GraphicResourcePoolImpl> data_;
+    private:
+        friend struct lifetime::detail::DescriptorAccess;
+        lifetime::OwnedRef<impl::GraphicResourcePoolImpl> _owner;
+
+        explicit Pool(lifetime::OwnedRef<impl::GraphicResourcePoolImpl> owner) : _owner(std::move(owner)) {}
+
+    public:
+        Pool() = default;
+        Pool(const Pool&) = default;
+        Pool(Pool&&) noexcept = default;
+
+        Pool& operator=(Pool replacement) noexcept {
+            swap(replacement);
+            return *this;
+        }
+
+        explicit operator bool() const noexcept { return bool(_owner); }
+
+        lifetime::OwnerRef owner_ref() const;
+        LogicalDeviceAccessor get_device() const;
+
+        void swap(Pool& other) noexcept { _owner.swap(other._owner); }
 
         std::tuple<bool, Resource> bind(BindingLayout layout);
 
@@ -94,12 +151,37 @@ namespace VSL_NAMESPACE::graphic_resource {
     };
 
     struct Resource {
-        std::shared_ptr<impl::GraphicResourceImpl> data_;
+    private:
+        friend struct lifetime::detail::DescriptorAccess;
+        lifetime::OwnedRef<impl::GraphicResourceImpl> _owner;
+
+        explicit Resource(lifetime::OwnedRef<impl::GraphicResourceImpl> owner) : _owner(std::move(owner)) {}
+
+    public:
+        Resource() = default;
+        Resource(const Resource&) = default;
+        Resource(Resource&&) noexcept = default;
+
+        Resource& operator=(Resource replacement) noexcept {
+            swap(replacement);
+            return *this;
+        }
+
+        explicit operator bool() const noexcept { return bool(_owner); }
+
+        LogicalDeviceAccessor get_device() const;
+
+        void swap(Resource& other) noexcept { _owner.swap(other._owner); }
+
+        DescriptorIdentity identity() const;
+        lifetime::OwnerRef owner_ref() const;
 
         Pool get_pool();
 
         // ここらへんのTもいつかtypename ...Argsに置き換えたいかも
         void update(VSL_NAMESPACE::BufferAccessor* buffer, size_t binding = 0, std::optional<Type> type = std::nullopt,
+                    size_t offset = 0, std::optional<size_t> size = std::nullopt);
+        void update(const VSL_NAMESPACE::BufferView& buffer, size_t binding = 0, std::optional<Type> type = std::nullopt,
                     size_t offset = 0, std::optional<size_t> size = std::nullopt);
 
         void update(VSL_NAMESPACE::ImageAccessor image, size_t binding = 0, std::optional<Type> type = std::nullopt);

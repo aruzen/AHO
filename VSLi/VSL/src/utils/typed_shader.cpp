@@ -1,6 +1,11 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include <VSL/utils/typed_shader.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 #include <stdexcept>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
 
 namespace {
     using Reflector = VSL_NAMESPACE::utils::SPIRVReflector;
@@ -79,20 +84,24 @@ void VSL_NAMESPACE::typed::detail::validate_vertex_shader(const Reflector::Gener
     }
 }
 
-void VSL_NAMESPACE::typed::detail::validate_pipeline_vertex_shader(PipelineLayoutAccessor layout,
+void VSL_NAMESPACE::typed::detail::validate_pipeline_vertex_shader(const lifetime::PipelineRecipeSnapshot& recipe,
                                                                    std::span<const VertexAttributeLayout> attributes) {
-    if (!layout.data_ || !layout.data_->info)
-        throw std::invalid_argument("Typed pipeline requires an initialized layout");
     const impl::ShaderImpl* vertex = nullptr;
-    for (const auto& shader : layout.data_->info->shaders) {
-        if (shader->shader_stage_create_info.stage != vk::ShaderStageFlagBits::eVertex)
+    for (const auto& shader : PipelineRecipeAccess::Read(recipe).shaders) {
+        if (shader->stage != vk::ShaderStageFlagBits::eVertex)
             continue;
         if (vertex)
             throw std::invalid_argument("Typed pipeline requires exactly one vertex shader");
-        vertex = shader.get();
+        vertex = shader;
     }
     if (!vertex)
         throw std::invalid_argument("Typed pipeline requires exactly one vertex shader");
     Reflector reflection({}, std::span<const std::uint32_t>(vertex->code), vertex->name, ShaderType::VERTEX, Reflector::Scope::VERTEX_INPUT);
     validate_vertex_shader(reflection.generated, attributes);
+}
+
+void VSL_NAMESPACE::typed::detail::validate_compute_shader(const lifetime::PipelineRecipeSnapshot& recipe) {
+    const auto& shaders = PipelineRecipeAccess::Read(recipe).shaders;
+    if (shaders.size() != 1 || shaders.front()->stage != vk::ShaderStageFlagBits::eCompute)
+        throw std::invalid_argument("Compute pipeline requires exactly one compute shader");
 }

@@ -4,6 +4,7 @@
 #include "typed_vertex_buffer.hpp"
 #include "../vulkan/commands/draw_indexed.hpp"
 #include "typed_resources.hpp"
+#include "../lifetime/typed_descriptor_layouts.hpp"
 #include "typed_push_constants.hpp"
 #include "../vulkan/commands/bind_graphic_resource.hpp"
 #include "../vulkan/pipeline.hpp"
@@ -35,6 +36,7 @@ namespace VSL_NAMESPACE::typed {
         command::Draw _draw;
         std::vector<command::BindGraphicResource> _resources;
         std::optional<typename Pushes::Values> _pushes;
+
         TypedDraw(VSL_NAMESPACE::GraphicsPipeline pipeline, LogicalDeviceAccessor device,
                   std::array<command::BindVertexBufferAt, Input::BINDING_COUNT> buffers, command::Draw draw, std::vector<command::BindGraphicResource> resources, std::optional<typename Pushes::Values> pushes)
             : _pipeline(std::move(pipeline)), _device(device), _buffers(std::move(buffers)), _draw(std::move(draw)), _resources(std::move(resources)), _pushes(std::move(pushes)) {}
@@ -43,7 +45,9 @@ namespace VSL_NAMESPACE::typed {
         using VertexInput = Input;
         using ResourceLayout = Resources;
         using PushLayout = Pushes;
+
         PipelineAccessor get_pipeline() override { return _pipeline; }
+
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
     };
 
@@ -63,6 +67,7 @@ namespace VSL_NAMESPACE::typed {
         std::shared_ptr<const std::uint64_t> _index_revision;
         std::uint64_t _expected_index_revision;
         void validate_indices() const;
+
         TypedIndexedDraw(VSL_NAMESPACE::GraphicsPipeline pipeline, LogicalDeviceAccessor device,
                          std::array<command::BindVertexBufferAt, Input::BINDING_COUNT> buffers, command::BindIndexBufferAt indices,
                          command::DrawIndexed draw, std::vector<command::BindGraphicResource> resources, std::optional<typename Pushes::Values> pushes,
@@ -75,7 +80,9 @@ namespace VSL_NAMESPACE::typed {
         using VertexInput = Input;
         using ResourceLayout = Resources;
         using PushLayout = Pushes;
+
         PipelineAccessor get_pipeline() override { return _pipeline; }
+
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
     };
 
@@ -91,15 +98,17 @@ namespace VSL_NAMESPACE::typed {
         std::array<size_t, Input::BINDING_COUNT> _counts;
         std::vector<command::BindGraphicResource> _resources;
         std::optional<typename Pushes::Values> _pushes;
+
         template<bool other_bound, bool other_pushed>
         TypedVertexBinding(const TypedVertexBinding<Input, Resources, Pushes, other_bound, other_pushed>& source, std::vector<command::BindGraphicResource> resources, std::optional<typename Pushes::Values> pushes)
             : _pipeline(source._pipeline), _device(source._device), _buffers(source._buffers), _counts(source._counts), _resources(std::move(resources)), _pushes(std::move(pushes)) {}
+
         template<typename... Buffers, size_t... indices>
         TypedVertexBinding(VSL_NAMESPACE::GraphicsPipeline pipeline, LogicalDeviceAccessor device,
                            std::index_sequence<indices...>, const Buffers&... buffers)
             : _pipeline(std::move(pipeline)), _device(device),
-              _buffers{command::BindVertexBufferAt(Input::LAYOUT.binding[indices].binding, buffers.backend(), buffers.byte_offset(), buffers.resource_use())...}, _counts{buffers.size()...} {
-            if (((buffers.device().data_ != device.data_) || ...))
+              _buffers{command::BindVertexBufferAt(Input::LAYOUT.binding[indices].binding, buffers.storage_view(), 0, buffers.resource_use())...}, _counts{buffers.size()...} {
+            if (((buffers.device() != device) || ...))
                 throw std::invalid_argument("Typed pipeline and vertex buffers use different devices");
         }
 
@@ -125,17 +134,30 @@ namespace VSL_NAMESPACE::typed {
         static_assert(subpass != UINT32_MAX, "Typed subpass index must not be narrowed to VK_SUBPASS_EXTERNAL");
         LogicalDeviceAccessor _device;
         VSL_NAMESPACE::GraphicsPipeline _pipeline;
-        template<pipeline_layout_injecter... Stages>
-        static VSL_NAMESPACE::GraphicsPipeline MakePipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, Stages&&... stages);
+        template<storage_policy Policy, pipeline_layout_injecter ResourceStage, pipeline_layout_injecter... Stages>
+        static VSL_NAMESPACE::GraphicsPipeline MakePipeline(Policy policy, LogicalDeviceAccessor device, RenderPassAccessor pass, ResourceStage&& resources, Stages&&... stages);
 
     public:
         using VertexInput = Input;
         using ResourceLayout = Resources;
         using PushLayout = Pushes;
         static constexpr std::uint32_t SUBPASS = subpass;
+
         template<pipeline_layout_injecter... Stages>
         TypedGraphicsPipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, Stages&&... stages)
-            : _device(device), _pipeline(MakePipeline(device, std::move(pass), std::forward<Stages>(stages)...)) {}
+            : TypedGraphicsPipeline(DefaultStorage{}, device, std::move(pass), std::forward<Stages>(stages)...) {}
+
+        template<storage_policy Policy, pipeline_layout_injecter... Stages>
+        TypedGraphicsPipeline(Policy policy, LogicalDeviceAccessor device, RenderPassAccessor pass, Stages&&... stages)
+            : _device(device), _pipeline(MakePipeline(policy, device, std::move(pass), Resources{}, std::forward<Stages>(stages)...)) {}
+
+        template<pipeline_layout_injecter... Stages>
+        TypedGraphicsPipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, const TypedDescriptorLayouts<Resources>& layouts, Stages&&... stages)
+            : TypedGraphicsPipeline(DefaultStorage{}, device, std::move(pass), layouts, std::forward<Stages>(stages)...) {}
+
+        template<storage_policy Policy, pipeline_layout_injecter... Stages>
+        TypedGraphicsPipeline(Policy policy, LogicalDeviceAccessor device, RenderPassAccessor pass, const TypedDescriptorLayouts<Resources>& layouts, Stages&&... stages)
+            : _device(device), _pipeline(MakePipeline(policy, device, std::move(pass), detail::DescriptorLayoutInjection<Resources>{layouts}, std::forward<Stages>(stages)...)) {}
 
         const VSL_NAMESPACE::GraphicsPipeline& backend() const { return _pipeline; }
 
@@ -147,19 +169,22 @@ namespace VSL_NAMESPACE::typed {
     };
 
     template<typename Input, typename Resources, typename Pushes, std::uint32_t subpass>
-    template<pipeline_layout_injecter... Stages>
-    VSL_NAMESPACE::GraphicsPipeline TypedGraphicsPipeline<Input, Resources, Pushes, subpass>::MakePipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, Stages&&... stages) {
-        // Input is deliberately last: earlier stages cannot replace the typed vertex layout.
-        PipelineLayout layout(device, std::forward<Stages>(stages)..., Input{}, Resources{}, Pushes{});
-        detail::validate_pipeline_vertex_shader(layout, Input::LAYOUT.attribute);
-        detail::validate_resource_schema(layout, Resources::REQUIREMENTS);
-        detail::validate_push_schema(layout, Pushes::REQUIREMENTS);
-        return VSL_NAMESPACE::GraphicsPipeline(std::move(layout).freeze(), pass, subpass);
+    template<storage_policy Policy, pipeline_layout_injecter ResourceStage, pipeline_layout_injecter... Stages>
+    VSL_NAMESPACE::GraphicsPipeline TypedGraphicsPipeline<Input, Resources, Pushes, subpass>::MakePipeline(Policy policy, LogicalDeviceAccessor device, RenderPassAccessor pass, ResourceStage&& resources, Stages&&... stages) {
+        lifetime::PipelineRecipeDraft draft(device);
+        // Typed入力は利用側stageより後に確定する。
+        draft.inject(std::forward<Stages>(stages)..., Input{}, std::forward<ResourceStage>(resources), Pushes{});
+        const auto recipe = draft.snapshot();
+        detail::validate_pipeline_vertex_shader(recipe, Input::LAYOUT.attribute);
+        detail::validate_resource_schema(recipe, Resources::REQUIREMENTS);
+        detail::validate_push_schema(recipe, Pushes::REQUIREMENTS);
+        const auto materialized = lifetime::materialize_recipe<Resources::COUNT + 1>(recipe, policy);
+        return lifetime::make_graphics_pipeline(materialized, std::move(pass), subpass, policy);
     }
 
     template<typename Input, typename Resources, typename Pushes>
     void TypedDraw<Input, Resources, Pushes>::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
-        if (_device.data_ != manager.get_device().data_)
+        if (_device != manager.get_device())
             throw std::invalid_argument("Typed pipeline and command manager use different devices");
         _pipeline.invoke(pool, buffer, manager);
         for (auto& binding : _buffers)
@@ -190,7 +215,7 @@ namespace VSL_NAMESPACE::typed {
     template<typename... Sets>
     requires compatible_descriptor_sets<Resources, Sets...>
     TypedVertexBinding<Input, Resources, Pushes, true, pushed> TypedVertexBinding<Input, Resources, Pushes, bound, pushed>::bind_resources(const Sets&... sets) const {
-        if (((sets.device().data_ != _device.data_) || ...))
+        if (((sets.device() != _device) || ...))
             throw std::invalid_argument("Typed descriptor/pipeline device mismatch");
         (sets.require_complete(), ...);
         std::vector<command::BindGraphicResource> commands;
@@ -215,7 +240,7 @@ namespace VSL_NAMESPACE::typed {
 
     template<typename Input, typename Resources, typename Pushes>
     void TypedIndexedDraw<Input, Resources, Pushes>::invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) {
-        if (_device.data_ != manager.get_device().data_)
+        if (_device != manager.get_device())
             throw std::invalid_argument("Typed pipeline and command manager use different devices");
         validate_indices();
         _pipeline.invoke(pool, buffer, manager);
@@ -236,7 +261,7 @@ namespace VSL_NAMESPACE::typed {
     requires(bound && pushed)
     {
         command::DrawIndexed command(index_count, instance_count, first_index, vertex_offset, first_instance);
-        if (indices.device().data_ != _device.data_)
+        if (indices.device() != _device)
             throw std::invalid_argument("Typed index buffer and pipeline use different devices");
         const auto [low, high] = indices.bounds(first_index, index_count);
         for (size_t i = 0; i < Input::BINDING_COUNT; ++i) {
@@ -247,7 +272,7 @@ namespace VSL_NAMESPACE::typed {
                 throw std::out_of_range("Typed indexed draw exceeds its vertex buffer");
         }
         return TypedIndexedDraw<Input, Resources, Pushes>(_pipeline, _device, _buffers,
-                                                          command::BindIndexBufferAt(indices.backend(), TypedIndexBuffer<Index, property>::INDEX_TYPE, 0, indices.resource_use()), std::move(command), _resources, _pushes,
+                                                          command::BindIndexBufferAt(indices.storage_view(), TypedIndexBuffer<Index, property>::INDEX_TYPE, 0, indices.resource_use()), std::move(command), _resources, _pushes,
                                                           std::shared_ptr<const std::uint64_t>(indices._values, &indices._values->revision));
     }
 

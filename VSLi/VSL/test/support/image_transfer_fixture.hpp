@@ -1,8 +1,13 @@
 #pragma once
+#include <VSL/lifetime/startup_access.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
+#include <VSL/lifetime/image_access.hpp>
+#include <VSL/lifetime/command_access.hpp>
 #include "vulkan_fixture.hpp"
 #include <VSL/vulkan/commands/copy_buffer_to_image.hpp>
 #include <VSL/vulkan/commands/copy_image_to_buffer.hpp>
 #include <array>
+
 namespace vsl_test {
     class ImageTransferVulkanIntegrationTest : public VulkanIntegrationTest {
     protected:
@@ -22,10 +27,10 @@ namespace vsl_test {
         barrier.dstAccessMask = destination;
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.image = image.data_->image;
-        barrier.subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, image.data_->count};
+        barrier.image = VSL_NAMESPACE::lifetime::detail::ImageAccess::Owned(image)->image;
+        barrier.subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, VSL_NAMESPACE::lifetime::detail::ImageAccess::Owned(image)->count};
         auto buffer = manager.get_buffer();
-        buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
+        VSL_NAMESPACE::lifetime::CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
             vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands, {}, {}, {},
             barrier);
     }
@@ -51,14 +56,14 @@ namespace vsl_test {
                 region.imageSubresource = {vk::ImageAspectFlagBits::eColor, 0, 1, 1};
                 region.imageExtent = vk::Extent3D{2, 2, 1};
                 auto buffer = manager.get_buffer();
-                buffer.data_->command_buffers[buffer.get_current_buffer_idx()].copyImageToBuffer(
-                    image.data_->image, vk::ImageLayout::eGeneral, destination.data_->buffer, region);
+                VSL_NAMESPACE::lifetime::CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].copyImageToBuffer(
+                    VSL_NAMESPACE::lifetime::detail::ImageAccess::Owned(image)->image, vk::ImageLayout::eGeneral, VSL_NAMESPACE::lifetime::detail::BufferAccess::Owned(destination)->buffer, region);
             } else if (typed)
                 phase << vsl::command::CopyImageToBuffer(destination, image);
             else
                 phase << vsl::command::CopyImageToBuffer(&destination, image);
         }
-        device.data_->device.waitIdle();
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.waitIdle();
         std::array<std::uint32_t, 4> actual{};
         auto mapped = destination.data(sizeof(actual));
         std::memcpy(actual.data(), mapped.data, sizeof(actual));

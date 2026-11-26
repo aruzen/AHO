@@ -53,9 +53,9 @@ phase << frame.bind_resources(pipeline.bind_vertices(vertices)).draw(3);
 
 ### 同期と所有の契約
 
-update／initialize_sharedの参照や可変bufferのaliasを保存し、後から書き換えてはならない。callback内では記録・submit・cancelを行わず、資源の更新に限る。getの参照と、それを使うcommandは取得したPhase内で使用する。共有初期化後のCPU書き換えは行わない。C++側の外部aliasやbackend escapeを封じるものではない。
+update／initialize_sharedの参照や可変bufferのaliasを保存し、後から書き換えてはならない。update内では対象Phaseへ更新commandを記録できるが、そのPhaseをsubmit／cancelしない。initialize_sharedでGPU初期化する場合は独立Phaseでsubmit／waitを終えて返す。getの参照は取得したPhase内で使用する。作成済みcommandは必要なownerを保持し、別Phaseへの記録も可能。共有初期化後のCPU書き換えは行わない。C++側の外部aliasやbackend escapeを封じるものではない。
 
-SHAREDは共有の宣言であり、GPUのbarrier挿入ではない。共有storage bufferや外部画像へのGPU書き込み、画像layout遷移は既存の同期APIで管理する。画像の寸法・upload・device-local bufferへの転送は今回は自動化せず、ExternalAllocationで接続できる。
+SHAREDは共有の宣言であり、GPUのbarrier挿入ではない。共有storage bufferや外部画像へのGPU書き込み、画像layout遷移は既存の同期APIで管理する。[owned Image／Sampler](VSL/typed-owned-resources.md)はImageAllocation／SamplerAllocation／TextureAllocationで宣言し、作成infoを明示する。既存画像のExternalAllocationも維持する。uploadとdevice-local buffer転送は自動化しない。
 
 ### ファイル構成
 

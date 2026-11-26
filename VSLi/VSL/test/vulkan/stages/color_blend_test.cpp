@@ -1,13 +1,19 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include "support/vulkan_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
 
 namespace {
     namespace pl = vsl::pipeline_layout;
     using ColorBlendVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
     TEST_F(ColorBlendVulkanIntegrationTest, InjectsExpectedPipelineState) {
         auto layout = make_layout_state();
 
         pl::ColorBlend{}.injection(layout);
-        const auto& state = layout.data_->info->color_blend;
+        const auto& state = vsl_test::inspect_layout(layout).color_blend;
         ASSERT_EQ(state.attachmentCount, 1u);
         ASSERT_NE(state.pAttachments, nullptr);
         const auto& attachment = state.pAttachments[0];
@@ -19,6 +25,6 @@ namespace {
         EXPECT_EQ(attachment.colorBlendOp, vk::BlendOp::eAdd);
         EXPECT_FALSE(state.logicOpEnable);
         pl::ColorBlend{}.injection(layout);
-        EXPECT_EQ(layout.data_->info->color_blend.attachmentCount, 2u);
+        EXPECT_EQ(PipelineRecipeAccess::Read(layout).graphics_state.blend_attachments.size(), 2u);
     }
 } // namespace

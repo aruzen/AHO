@@ -3,12 +3,13 @@
 namespace {
     namespace pl = vsl::pipeline_layout;
     using IdPickingVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
     TEST_F(IdPickingVulkanIntegrationTest, InjectsExpectedPipelineState) {
         auto layout = make_layout_state();
 
         pl::ColorBlend{}.injection(layout);
         pl::IDPicking{}.injection(layout);
-        const auto& state = layout.data_->info->color_blend;
+        const auto& state = vsl_test::inspect_layout(layout).color_blend;
         ASSERT_EQ(state.attachmentCount, 2u);
         EXPECT_TRUE(state.pAttachments[0].blendEnable);
         EXPECT_FALSE(state.pAttachments[1].blendEnable);

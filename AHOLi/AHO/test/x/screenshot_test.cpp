@@ -1,3 +1,11 @@
+#include "../../src/engine/engine_access.hpp"
+
+namespace {
+    using AHO_NAMESPACE::engine::detail::EngineAccess;
+}
+
+#include <VSL/lifetime/startup_access.hpp>
+#include <VSL/lifetime/synchronization_access.hpp>
 #include <AHO/x/screenshot.hpp>
 #include "../support/temp_directory.hpp"
 #include <gtest/gtest.h>
@@ -11,6 +19,7 @@
 #include <AHO/drawer/draw_phase.hpp>
 #include <VSL/vulkan/commands/render_pass_begin.hpp>
 #include <VSL/vulkan/commands/render_pass_end.hpp>
+#include <VSL/operation/submission_ops.hpp>
 #endif
 
 namespace {
@@ -23,6 +32,16 @@ namespace {
     protected:
         void require_readback();
         auto clear(float red, float green, float blue);
+    };
+
+    struct ScreenshotCompletionGate {
+        VkFence fence = VK_NULL_HANDLE;
+        bool ready = false;
+
+        static VkResult Status(void* context, VkDevice device, VkFence fence) noexcept {
+            const auto& gate = *static_cast<ScreenshotCompletionGate*>(context);
+            return fence == gate.fence && !gate.ready ? VK_NOT_READY : vkGetFenceStatus(device, fence);
+        }
     };
 #endif
 
@@ -121,11 +140,12 @@ namespace {
     void ScreenshotWindowIntegration::require_readback() {
         start_engine();
         const auto window = engine->get_window();
-        const auto device = engine->data()->logical_device.data_;
-        const auto caps = device->parent_device->device.getSurfaceCapabilitiesKHR(window.data2->surface->data_->surface);
+        const auto device = VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(EngineAccess::State(*(engine))->logical_device);
+        const auto caps = device->parent_device->device.getSurfaceCapabilitiesKHR(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(*(window.data2->surface))->surface);
         if (!(caps.supportedUsageFlags & vk::ImageUsageFlagBits::eTransferSrc))
             GTEST_SKIP() << "Surface does not support TransferSrc";
     }
+
     auto ScreenshotWindowIntegration::clear(float red, float green, float blue) {
         return [=, this](auto& stream) {
             auto window = engine->get_window();
@@ -135,18 +155,77 @@ namespace {
         };
     }
 
+    TEST_F(ScreenshotWindowIntegration, AComposedFinishCanDestroyThePhaseWithoutAccessingItsDestroyedCallbackOrRecordingReadback) {
+        ASSERT_NO_FATAL_FAILURE(require_readback());
+        if (IsSkipped())
+            return;
+        aho::x::Screenshot screenshot(engine->get_window());
+        std::unique_ptr<aho::DrawPhase> phase;
+        bool returned = false;
+        phase = std::make_unique<aho::DrawPhase>(*engine, nullptr, [&, value = std::make_shared<int>(7)](auto&) {
+            phase.reset();
+            EXPECT_EQ(*value, 7);
+            returned = true;
+        });
+        ASSERT_TRUE(screenshot.capture(*phase));
+        EXPECT_EQ(phase->submit(), vsl::ComputePhase::SubmitResult::FAILED);
+        EXPECT_TRUE(returned);
+        EXPECT_FALSE(phase);
+        EXPECT_FALSE(screenshot.ready());
+        EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
+        EngineAccess::State(*(engine))->command_manager.wait_idle();
+    }
+
+    TEST_F(ScreenshotWindowIntegration, CompletionCallbackCancellingTheCurrentFramePreventsAttachingANewReadback) {
+        ASSERT_NO_FATAL_FAILURE(require_readback());
+        if (IsSkipped())
+            return;
+        aho::x::Screenshot screenshot(engine->get_window());
+        auto manager = EngineAccess::State(*(engine))->command_manager;
+        ASSERT_GT(manager.get_buffer().get_size(), 1u);
+        std::unique_ptr<aho::DrawPhase> current;
+        bool callback = false;
+        const auto live = std::make_shared<int>(0);
+        ScreenshotCompletionGate gate;
+        const vsl::operation::ScopedSubmissionNativeCalls native({.context = &gate, .fence_status = ScreenshotCompletionGate::Status});
+        {
+            aho::DrawPhase previous(*engine, clear(1, 0, 0));
+            gate.fence = VSL_NAMESPACE::lifetime::detail::SynchronizationAccess::Owned(engine->boot_window->data2->in_flight)->fences.at(previous.frame_slot);
+            manager.get_buffer().retain_until_complete(std::shared_ptr<int>(new int(0), [&, alive = std::weak_ptr<int>(live)](int* value) {
+                delete value;
+                if (alive.expired())
+                    return;
+                callback = true;
+                if (current)
+                    current->cancel();
+            }));
+            ASSERT_TRUE(screenshot.capture(previous));
+            ASSERT_EQ(previous.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        current = std::make_unique<aho::DrawPhase>(*engine, clear(0, 1, 0));
+        ASSERT_FALSE(callback);
+        ASSERT_TRUE(current->recording());
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(EngineAccess::State(*(engine))->logical_device)->device.waitIdle();
+        gate.ready = true;
+        EXPECT_FALSE(screenshot.capture(*current));
+        EXPECT_TRUE(callback);
+        EXPECT_FALSE(current->recording());
+        current.reset();
+        manager.wait_idle();
+    }
+
     TEST_F(ScreenshotWindowIntegration, AddingReadbackUsageNotifiesWindowHooksOnceAndStillCaptures) {
         ASSERT_NO_FATAL_FAILURE(require_readback());
         if (IsSkipped())
             return;
         auto window = engine->get_window();
-        ASSERT_FALSE(vsl::contain(window.data2->swapchain.images.front().get_usage(), vsl::ImageType::TRANSFER_SRC));
-        const auto previous = window.data2->frame_buffer.data_;
+        ASSERT_FALSE(vsl::contain(window.data2->swapchain.image(0).get_usage(), vsl::ImageType::TRANSFER_SRC));
+        const auto previous = window.data2->frame_buffer;
         int calls = 0;
         window.add_plugin<aho::window::WindowResizeHookPlugin>([&](aho::Window* current) {
             ++calls;
-            EXPECT_NE(current->data2->frame_buffer.data_, previous);
-            EXPECT_TRUE(vsl::contain(current->data2->swapchain.images.front().get_usage(), vsl::ImageType::TRANSFER_SRC));
+            EXPECT_NE(current->data2->frame_buffer.identity(), previous.identity());
+            EXPECT_TRUE(vsl::contain(current->data2->swapchain.image(0).get_usage(), vsl::ImageType::TRANSFER_SRC));
         });
         aho::x::Screenshot screenshot(window);
         EXPECT_EQ(calls, 1);
@@ -228,7 +307,7 @@ namespace {
         aho::x::Screenshot screenshot(window);
         for (const auto size : {48, 80}) {
             ASSERT_TRUE(window.resize(size, size / 2));
-            EXPECT_TRUE(vsl::contain(window.data2->swapchain.images.front().get_usage(), vsl::ImageType::TRANSFER_SRC));
+            EXPECT_TRUE(vsl::contain(window.data2->swapchain.image(0).get_usage(), vsl::ImageType::TRANSFER_SRC));
             {
                 aho::DrawPhase phase(*engine, clear(0, 0, 1));
                 ASSERT_TRUE(screenshot.capture(phase));

@@ -1,10 +1,27 @@
+#include <VSL/lifetime/startup_access.hpp>
+#include <VSL/lifetime/graphics_access.hpp>
+#include <VSL/lifetime/command_access.hpp>
 #include "support/compute_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
+
 namespace {
     using PushConstantVulkanIntegrationTest = vsl_test::ComputeVulkanIntegrationTest;
+
     TEST_F(PushConstantVulkanIntegrationTest, TypedAndExplicitSizeOverloadsReachShader) {
         std::uint32_t base = 37;
         vsl::command::PushConstant command(*layout, vsl::ShaderFlag::COMPUTE, base);
-        EXPECT_EQ(command.layout.data_, layout->data_);
+        EXPECT_EQ(GraphicsAccess::Owned(command.layout), GraphicsAccess::Owned(*(layout)));
         EXPECT_EQ(command.value, &base);
         EXPECT_EQ(command.size, 4u);
         EXPECT_EQ(command.offset, 0u);
@@ -33,10 +50,10 @@ namespace {
                 barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
                 barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
                 auto buffer = manager.get_buffer();
-                buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
+                CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
                     vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
             }
-            device.data_->device.waitIdle();
+            StartupAccess::Owned(device)->device.waitIdle();
             auto mapped = output->data(COUNT * sizeof(std::uint32_t));
             std::array<std::uint32_t, COUNT> actual{};
             std::memcpy(actual.data(), mapped.data, sizeof(actual));
@@ -52,7 +69,7 @@ namespace {
         constants.definitions = {{vsl::ShaderFlag::VERTEX, 0, 4}, {vsl::ShaderFlag::COMPUTE, 0, 4}};
         vsl::PipelineLayout edited(device, pl::ShaderGroup("shared-push", {*shader}),
                                    pl::ResourceBinding{{*binding}}, constants);
-        const auto& info = edited.data_->info->pipeline_layout;
+        const auto& info = vsl_test::inspect_layout(edited).pipeline_layout;
         bool found = false;
         for (unsigned i = 0; i < info.pushConstantRangeCount; ++i)
             if (info.pPushConstantRanges[i].stageFlags & vk::ShaderStageFlagBits::eCompute) {
@@ -72,7 +89,7 @@ namespace {
                    << vsl::command::Dispatch(COUNT);
             vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
             auto buffer = manager.get_buffer();
-            buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
         manager.wait_idle();

@@ -22,9 +22,12 @@ namespace VSL_NAMESPACE::typed {
         static constexpr std::uint32_t BINDING = binding, STRIDE = size;
         static constexpr VertexTiming TIMING = timing;
         static constexpr std::array<pipeline_layout::VertexInputLayoutDefinition, sizeof...(Attributes)> ATTRIBUTES{Attributes::VALUE...};
+
         static constexpr size_t Size() { return sizeof...(Attributes); }
+
         template<size_t index>
         static constexpr auto Get() { return std::get<index>(ATTRIBUTES); }
+
         static pipeline_layout::VertexInputShapeDefinition Make() {
             return {.layouts = {ATTRIBUTES.begin(), ATTRIBUTES.end()}, .binding = binding, .size = size, .update_timing = timing};
         }
@@ -45,6 +48,7 @@ namespace VSL_NAMESPACE::typed {
         std::uint32_t binding, stride;
         VertexTiming timing;
     };
+
     struct VertexAttributeLayout {
         data_format::Format format = data_format::UNDEFINED;
         std::uint32_t location, offset, binding, locations;
@@ -165,6 +169,7 @@ namespace VSL_NAMESPACE::typed {
         using Shape = std::tuple_element_t<index, Shapes>;
 
         void injection(VSL_NAMESPACE::PipelineLayoutEditAccessor layout) const;
+        void injection(GraphicsPipelineStateEditRef state) const;
     };
 
     // Keep the member's actual type and offsetof together; a format override expresses e.g. UNORM storage.
@@ -189,6 +194,11 @@ namespace VSL_NAMESPACE::typed {
 
     template<typename... Shapes_>
     void TypedVertexInput<Shapes_...>::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor layout) const {
+        injection(layout.edit_state());
+    }
+
+    template<typename... Shapes_>
+    void TypedVertexInput<Shapes_...>::injection(GraphicsPipelineStateEditRef state) const {
         // All automatic values are already resolved. Reuse the backend's owned Vulkan metadata.
         pipeline_layout::VertexInput input;
         input.definitions.reserve(BINDING_COUNT);
@@ -202,7 +212,7 @@ namespace VSL_NAMESPACE::typed {
                     shape.layouts.push_back({attribute.format, attribute.location, attribute.offset});
             input.definitions.push_back(std::move(shape));
         }
-        input.injection(layout);
+        input.injection(state);
     }
 
 } // namespace VSL_NAMESPACE::typed

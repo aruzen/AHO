@@ -13,13 +13,23 @@
 #include "core/vector.hpp"
 #include "engine.hpp"
 #include "render_context.hpp"
+#include <optional>
 
 namespace AHO_NAMESPACE::drawer::detail {
     struct StandardDrawState;
 }
 
+namespace AHO_NAMESPACE::window::detail {
+    struct WindowClose;
+}
+
 namespace AHO_NAMESPACE::window {
     d2::VectorI get_monitor_size();
+
+    struct WindowGenerationCandidate {
+        VSL_NAMESPACE::SwapchainCreateInfo request;
+        std::optional<VSL_NAMESPACE::SwapchainAccessor> swapchain;
+    };
 
     struct WindowData {
         std::shared_ptr<VSL_NAMESPACE::Surface> surface;
@@ -29,16 +39,22 @@ namespace AHO_NAMESPACE::window {
         VSL_NAMESPACE::SemaphoreHolder image_available, render_finished;
         VSL_NAMESPACE::FenceHolder in_flight;
         std::shared_ptr<drawer::detail::StandardDrawState> standard_draw;
+        VSL_NAMESPACE::FenceHolder acquire_fences;
+        // 完成済みSwapchainと、Native開始まで検証された再試行要求を保持する。
+        std::optional<WindowGenerationCandidate> pending_generation;
+        std::optional<VSL_NAMESPACE::ImageType> deferred_usage;
+        bool closed = false;
 
         ~WindowData();
     };
 
     struct Window : public VSL_NAMESPACE::Window {
         Window(std::string name, int width = 800, int height = 600,
-               engine::EngineAccessor engine_ = DefaultEngine());
+               engine::EngineAccessor engine_ = DefaultEngine(),
+               std::optional<VSL_NAMESPACE::PresentFencePolicy> present_fences = std::nullopt);
 
         Window(engine::EngineAccessor engine,
-               std::shared_ptr<VSL_NAMESPACE::Window::WindowData> vsl_data,
+               VSL_NAMESPACE::PureWindow vsl_window,
                std::shared_ptr<AHO_NAMESPACE::window::WindowData> aho_data);
 
         engine::EngineAccessor engine;
@@ -56,7 +72,7 @@ namespace AHO_NAMESPACE::window {
 
         d2::VectorI window_size();
 
-        d2::VectorI frame_size();
+        d2::VectorI frame_size() const;
 
         bool set_title(const std::string& title);
 
@@ -76,7 +92,8 @@ namespace AHO_NAMESPACE::window {
         // 同じwindowの再作成やGPU処理の送信は行わない。
         std::function<void(AHO_NAMESPACE::window::Window*)> hook;
 
-        WindowResizeHookPlugin(VSL_NAMESPACE::PureWindow*, std::function<void(AHO_NAMESPACE::window::Window*)> hook);
+        WindowResizeHookPlugin(VSL_NAMESPACE::PureWindow*, std::function<void(AHO_NAMESPACE::window::Window*)> hook,
+                               std::optional<unsigned char> requested_id = std::nullopt);
     };
 } // namespace AHO_NAMESPACE::window
 

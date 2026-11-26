@@ -143,6 +143,8 @@
     <ClInclude Include="AHO\include\AHO\resource\buffer.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="AHO\include\AHO\resource\imported_buffer.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
+    <ClInclude Include="AHO\include\AHO\resource\arena_buffer.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <ClInclude Include="AHO\include\AHO\resource\image.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -168,6 +170,12 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="AHO\include\AHO\engine.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="AHO\src\engine\engine_state.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="AHO\src\engine\engine_access.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="AHO\include\AHO\render_context.hpp"><Filter>ヘッダー ファイル</Filter></ClInclude>
@@ -215,6 +223,8 @@
     <ClCompile Include="AHO\src\resource\buffer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="AHO\src\resource\imported_buffer.cpp"><Filter>ソース ファイル</Filter></ClCompile>
+    <ClCompile Include="AHO\src\resource\arena_buffer.cpp"><Filter>ソース ファイル</Filter></ClCompile>
     <ClCompile Include="AHO\src\resource\image.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>

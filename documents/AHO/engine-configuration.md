@@ -19,6 +19,8 @@ aho::Window second("second", 800, 600, engine);
 
 物理デバイスは既定のVSL検索、または`physical_device_index`で列挙順の添字を選びます。`instance_extensions`は追加の拡張名です。Windowに必要な拡張はVSLが追加します。descriptor_budgetは標準descriptor種別ごとのpool予算で、OverAllocateManagerへ渡します。省略した種別の予算は0です。拡張固有のdescriptor設定はVSLを直接使用します。種別・ゼロ予算・合計の32bit超過はGPU資源の作成前に検証します。
 
+`present_fences`はInstance／Deviceの要求と、初回・追加Windowの既定policyへ伝わります。Window constructor末尾のoptional値で上書きでき、resizeはWindowの選択を維持します。方針と同期資源の寿命は[Windowのframe同期群](window-synchronization.md)を参照してください。
+
 bootは初期Window、デバイス資源、Window描画資源を順に作り、完了後に所有者と既定登録へ反映します。失敗時は仮Windowを閉じ、既存の登録を保持します。起動済みのbootは例外にし、共有ハンドルやWindowの参照先を途中で置き換えません。初期Windowと追加Windowの描画資源生成は同じ実装を使用します。
 
 未使用だったEnginePrespecificationはEngineConfigへ置き換えました。shaderの検索ディレクトリはこのエンジンの起動処理では扱いません。

@@ -22,8 +22,9 @@ if(AHO_ENABLE_EXPERIMENTAL_MESH)
     target_compile_definitions(aho-mesh-gpu-test PRIVATE AHO_MESH_GPU_TESTS=1
         VSL_TEST_SHADER_DIR="${CMAKE_BINARY_DIR}/VSLi/VSL/test/shaders")
     target_include_directories(aho-mesh-gpu-test PRIVATE "${VSL_HOME}/test"
-        "${Vulkan_INCLUDE_DIRS}" "$<TARGET_PROPERTY:VSL,INCLUDE_DIRECTORIES>")
+        "${Vulkan_INCLUDE_DIRS}" "${VSL_HOME}/src/private")
     target_link_libraries(aho-mesh-gpu-test PRIVATE AHO::ExperimentalMesh VSL GTest::gtest_main)
+    target_include_directories(aho-mesh-gpu-test SYSTEM BEFORE PRIVATE ${Vulkan_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS})
     target_link_directories(aho-mesh-gpu-test PRIVATE ${GLFW_LIBRARY_DIRS})
     add_dependencies(aho-tests aho-mesh-gpu-test)
     if(AHO_TEST_SANITIZERS AND CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
@@ -41,10 +42,11 @@ if (AHO_TEST_SOURCES)
             ${Vulkan_INCLUDE_DIRS}
             "${AHO_STB_INCLUDE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/../include"
-            "$<TARGET_PROPERTY:AHOLi,INCLUDE_DIRECTORIES>"
-            "$<TARGET_PROPERTY:VSL,INCLUDE_DIRECTORIES>"
+            "${VSL_HOME}/src/private"
+            "${AHO_TINYGLTF_INCLUDE_DIR}"
     )
     target_link_libraries(aho-test PRIVATE AHOLi VSL GTest::gtest_main)
+    target_include_directories(aho-test SYSTEM BEFORE PRIVATE ${Vulkan_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS})
     if(AHO_ENABLE_EXPERIMENTAL_MESH)
         target_link_libraries(aho-test PRIVATE AHO::ExperimentalMesh)
     endif()
@@ -86,6 +88,8 @@ if (AHO_TEST_SOURCES)
             drawer/standard_drawer_test.cpp
             image_readback_test.cpp
             resource/buffer_test.cpp
+            resource/imported_buffer_test.cpp
+            resource/arena_buffer_test.cpp
             resource/typed_buffer_test.cpp
             command/buffer_upload_test.cpp
             x/command/texture_update_test.cpp
@@ -98,6 +102,7 @@ if (AHO_TEST_SOURCES)
     add_dependencies(aho-gpu-test vsl-test-shaders)
     target_include_directories(aho-gpu-test PRIVATE "$<TARGET_PROPERTY:aho-test,INCLUDE_DIRECTORIES>")
     target_link_libraries(aho-gpu-test PRIVATE AHOLi VSL GTest::gtest_main)
+    target_include_directories(aho-gpu-test SYSTEM BEFORE PRIVATE ${Vulkan_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS})
     target_link_directories(aho-gpu-test PRIVATE ${GLFW_LIBRARY_DIRS})
     if(APPLE)
         target_link_libraries(aho-gpu-test PRIVATE "-framework CoreGraphics")
@@ -107,9 +112,24 @@ if (AHO_TEST_SOURCES)
             PROPERTIES LABELS gpu RESOURCE_LOCK aho_graphics TIMEOUT 45)
     include(cmake/CompileContracts.cmake)
     aho_register_header_tests()
-    set(aho_typed_buffer_names Valid UniformUsage VertexUsage CpuBuffer DescriptorKind DescriptorPayload VertexType NontrivialVertex)
-    set(aho_typed_buffer_expected unused uniform_view vertex_view vertex_view write write bind_vertices trivially_copyable)
-    foreach(case RANGE 0 7)
+    add_library(aho-engine-style-contract OBJECT EXCLUDE_FROM_ALL contracts/engine.cpp)
+    target_link_libraries(aho-engine-style-contract PRIVATE AHOLi)
+    target_compile_definitions(aho-engine-style-contract PRIVATE VSL_TYPED_CASE=0)
+    set(aho_engine_contract_names Valid PublicData RawConstruction IncompleteState PrivateState MutableBase PrivateRuntime
+        OldSetter ProtectedSetter BootScope RawLayoutPointer BorrowedDevice BorrowedCommands BorrowedDescriptorManager InstanceOverride)
+    foreach(case RANGE 0 14)
+        list(GET aho_engine_contract_names ${case} name)
+        add_test(NAME "AHO.Compile.Engine.${name}"
+                COMMAND "${CMAKE_COMMAND}"
+                "-DTEST_ENVIRONMENT=${CMAKE_CURRENT_BINARY_DIR}/compile-environment-$<CONFIG>.cmake"
+                "-DTEST_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/contracts/engine.cpp"
+                "-DTEST_CASE=${case}" "-DTEST_EXPECTED=private|protected|incomplete|no member|undeclared|no matching|conversion|reference|bind|viable"
+                -P "${VSL_HOME}/test/cmake/RunTypedContract.cmake")
+        set_tests_properties("AHO.Compile.Engine.${name}" PROPERTIES LABELS "AHO;compile" TIMEOUT 60)
+    endforeach()
+    set(aho_typed_buffer_names Valid UniformUsage VertexUsage CpuBuffer DescriptorKind DescriptorPayload VertexType NontrivialVertex FixedArenaReserve TemporarySnapshot ImportedPayload ConstTemporarySnapshot ArenaImportConversion ArenaImportReference BindingNativeAdapter)
+    set(aho_typed_buffer_expected unused uniform_view vertex_view vertex_view write write bind_vertices trivially_copyable reserve deleted write deleted conversion reference native)
+    foreach(case RANGE 0 14)
         list(GET aho_typed_buffer_names ${case} name)
         list(GET aho_typed_buffer_expected ${case} expected)
         add_test(NAME "AHO.Compile.TypedBuffer.${name}"

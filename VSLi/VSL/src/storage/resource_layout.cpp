@@ -1,0 +1,128 @@
+#include <VSL/storage/resource_layout.hpp>
+#include <VSL/lifetime/buffer_storage.hpp>
+#include <VSL/lifetime/image_storage.hpp>
+#include <VSL/lifetime/sampler_storage.hpp>
+#include <VSL/lifetime/descriptor_storage.hpp>
+#include <VSL/lifetime/shader_storage.hpp>
+#include <VSL/lifetime/pipeline_layout_storage.hpp>
+#include <VSL/lifetime/render_pass_storage.hpp>
+#include <VSL/lifetime/pipeline_storage.hpp>
+#include <VSL/lifetime/frame_buffer_storage.hpp>
+#include <VSL/lifetime/command_storage.hpp>
+#include <VSL/lifetime/synchronization_storage.hpp>
+#include <VSL/lifetime/instance_storage.hpp>
+#include <VSL/lifetime/physical_device_storage.hpp>
+#include <VSL/lifetime/surface_storage.hpp>
+#include <VSL/lifetime/device_storage.hpp>
+#include <VSL/lifetime/swapchain_storage.hpp>
+
+namespace VSL_NAMESPACE::storage {
+    static_assert(sizeof(impl::SwapchainImpl) == ImplLayout<impl::SwapchainImpl>::SIZE);
+    static_assert(alignof(impl::SwapchainImpl) == ImplLayout<impl::SwapchainImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::SwapchainSlotStorage) == ResourceSlotLayout<impl::SwapchainImpl>::SIZE);
+    static_assert(alignof(lifetime::SwapchainSlotStorage) == ResourceSlotLayout<impl::SwapchainImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::SwapchainImpl>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(sizeof(impl::LogicalDeviceImpl) == ImplLayout<impl::LogicalDeviceImpl>::SIZE);
+    static_assert(alignof(impl::LogicalDeviceImpl) == ImplLayout<impl::LogicalDeviceImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::DeviceSlotStorage) == ResourceSlotLayout<impl::LogicalDeviceImpl>::SIZE);
+    static_assert(alignof(lifetime::DeviceSlotStorage) == ResourceSlotLayout<impl::LogicalDeviceImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::LogicalDeviceImpl>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(sizeof(impl::SurfaceImpl) == ImplLayout<impl::SurfaceImpl>::SIZE);
+    static_assert(alignof(impl::SurfaceImpl) == ImplLayout<impl::SurfaceImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::SurfaceSlotStorage) == ResourceSlotLayout<impl::SurfaceImpl>::SIZE);
+    static_assert(alignof(lifetime::SurfaceSlotStorage) == ResourceSlotLayout<impl::SurfaceImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::SurfaceImpl>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(sizeof(impl::PhysicalDeviceImpl) == ImplLayout<impl::PhysicalDeviceImpl>::SIZE);
+    static_assert(alignof(impl::PhysicalDeviceImpl) == ImplLayout<impl::PhysicalDeviceImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::PhysicalDeviceSlotStorage) == ResourceSlotLayout<impl::PhysicalDeviceImpl>::SIZE);
+    static_assert(alignof(lifetime::PhysicalDeviceSlotStorage) == ResourceSlotLayout<impl::PhysicalDeviceImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::PhysicalDeviceImpl>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(sizeof(impl::VulkanImplAccessor) == ImplLayout<impl::VulkanImplAccessor>::SIZE);
+    static_assert(alignof(impl::VulkanImplAccessor) == ImplLayout<impl::VulkanImplAccessor>::ALIGNMENT);
+    static_assert(sizeof(lifetime::InstanceSlotStorage) == ResourceSlotLayout<impl::VulkanImplAccessor>::SIZE);
+    static_assert(alignof(lifetime::InstanceSlotStorage) == ResourceSlotLayout<impl::VulkanImplAccessor>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::VulkanImplAccessor>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(sizeof(impl::SemaphoreImpl) == ImplLayout<impl::SemaphoreImpl>::SIZE);
+    static_assert(alignof(impl::SemaphoreImpl) == ImplLayout<impl::SemaphoreImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::SemaphoreSlotStorage) == ResourceSlotLayout<impl::SemaphoreImpl>::SIZE);
+    static_assert(alignof(lifetime::SemaphoreSlotStorage) == ResourceSlotLayout<impl::SemaphoreImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::SemaphoreImpl>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(sizeof(impl::FenceImpl) == ImplLayout<impl::FenceImpl>::SIZE);
+    static_assert(alignof(impl::FenceImpl) == ImplLayout<impl::FenceImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::FenceSlotStorage) == ResourceSlotLayout<impl::FenceImpl>::SIZE);
+    static_assert(alignof(lifetime::FenceSlotStorage) == ResourceSlotLayout<impl::FenceImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::FenceImpl>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(sizeof(impl::CommandPoolImpl) == ImplLayout<impl::CommandPoolImpl>::SIZE);
+    static_assert(alignof(impl::CommandPoolImpl) == ImplLayout<impl::CommandPoolImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::CommandPoolSlotStorage) == ResourceSlotLayout<impl::CommandPoolImpl>::SIZE);
+    static_assert(alignof(lifetime::CommandPoolSlotStorage) == ResourceSlotLayout<impl::CommandPoolImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::CommandPoolImpl>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(sizeof(impl::CommandBufferImpl) == ImplLayout<impl::CommandBufferImpl>::SIZE);
+    static_assert(alignof(impl::CommandBufferImpl) == ImplLayout<impl::CommandBufferImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::CommandBufferSlotStorage) == ResourceSlotLayout<impl::CommandBufferImpl>::SIZE);
+    static_assert(alignof(lifetime::CommandBufferSlotStorage) == ResourceSlotLayout<impl::CommandBufferImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::CommandBufferImpl>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(sizeof(impl::FrameBufferImpl) == ImplLayout<impl::FrameBufferImpl>::SIZE);
+    static_assert(alignof(impl::FrameBufferImpl) == ImplLayout<impl::FrameBufferImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::FrameBufferSlotStorage) == ResourceSlotLayout<impl::FrameBufferImpl>::SIZE);
+    static_assert(alignof(lifetime::FrameBufferSlotStorage) == ResourceSlotLayout<impl::FrameBufferImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::FrameBufferImpl>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(sizeof(impl::PipelineImpl) == ImplLayout<impl::PipelineImpl>::SIZE);
+    static_assert(alignof(impl::PipelineImpl) == ImplLayout<impl::PipelineImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::PipelineSlotStorage) == ResourceSlotLayout<impl::PipelineImpl>::SIZE);
+    static_assert(alignof(lifetime::PipelineSlotStorage) == ResourceSlotLayout<impl::PipelineImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::PipelineImpl>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(sizeof(impl::RenderPassImpl) == ImplLayout<impl::RenderPassImpl>::SIZE);
+    static_assert(alignof(impl::RenderPassImpl) == ImplLayout<impl::RenderPassImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::RenderPassSlotStorage) == ResourceSlotLayout<impl::RenderPassImpl>::SIZE);
+    static_assert(alignof(lifetime::RenderPassSlotStorage) == ResourceSlotLayout<impl::RenderPassImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::RenderPassImpl>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(sizeof(impl::PipelineLayoutImpl) == ImplLayout<impl::PipelineLayoutImpl>::SIZE);
+    static_assert(alignof(impl::PipelineLayoutImpl) == ImplLayout<impl::PipelineLayoutImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::PipelineLayoutSlotStorage) == ResourceSlotLayout<impl::PipelineLayoutImpl>::SIZE);
+    static_assert(alignof(lifetime::PipelineLayoutSlotStorage) == ResourceSlotLayout<impl::PipelineLayoutImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::PipelineLayoutImpl>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(sizeof(impl::ShaderImpl) == ImplLayout<impl::ShaderImpl>::SIZE);
+    static_assert(alignof(impl::ShaderImpl) == ImplLayout<impl::ShaderImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::ShaderSlotStorage) == ResourceSlotLayout<impl::ShaderImpl>::SIZE);
+    static_assert(alignof(lifetime::ShaderSlotStorage) == ResourceSlotLayout<impl::ShaderImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::ShaderImpl>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(sizeof(impl::BufferImpl) == ImplLayout<impl::BufferImpl>::SIZE);
+    static_assert(alignof(impl::BufferImpl) == ImplLayout<impl::BufferImpl>::ALIGNMENT);
+    static_assert(sizeof(impl::ImageImpl) == ImplLayout<impl::ImageImpl>::SIZE);
+    static_assert(alignof(impl::ImageImpl) == ImplLayout<impl::ImageImpl>::ALIGNMENT);
+    static_assert(sizeof(impl::SamplerImpl) == ImplLayout<impl::SamplerImpl>::SIZE);
+    static_assert(alignof(impl::SamplerImpl) == ImplLayout<impl::SamplerImpl>::ALIGNMENT);
+    static_assert(sizeof(impl::ResourceBindingLayoutImpl) == ImplLayout<impl::ResourceBindingLayoutImpl>::SIZE);
+    static_assert(alignof(impl::ResourceBindingLayoutImpl) == ImplLayout<impl::ResourceBindingLayoutImpl>::ALIGNMENT);
+    static_assert(sizeof(impl::GraphicResourcePoolImpl) == ImplLayout<impl::GraphicResourcePoolImpl>::SIZE);
+    static_assert(alignof(impl::GraphicResourcePoolImpl) == ImplLayout<impl::GraphicResourcePoolImpl>::ALIGNMENT);
+    static_assert(sizeof(impl::GraphicResourceImpl) == ImplLayout<impl::GraphicResourceImpl>::SIZE);
+    static_assert(alignof(impl::GraphicResourceImpl) == ImplLayout<impl::GraphicResourceImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::DescriptorLayoutSlotStorage) == ResourceSlotLayout<impl::ResourceBindingLayoutImpl>::SIZE);
+    static_assert(alignof(lifetime::DescriptorLayoutSlotStorage) == ResourceSlotLayout<impl::ResourceBindingLayoutImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::DescriptorPoolSlotStorage) == ResourceSlotLayout<impl::GraphicResourcePoolImpl>::SIZE);
+    static_assert(alignof(lifetime::DescriptorPoolSlotStorage) == ResourceSlotLayout<impl::GraphicResourcePoolImpl>::ALIGNMENT);
+    static_assert(sizeof(lifetime::DescriptorSetSlotStorage) == ResourceSlotLayout<impl::GraphicResourceImpl>::SIZE);
+    static_assert(alignof(lifetime::DescriptorSetSlotStorage) == ResourceSlotLayout<impl::GraphicResourceImpl>::ALIGNMENT);
+    static_assert(ResourceSlotLayout<impl::ResourceBindingLayoutImpl>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(ResourceSlotLayout<impl::GraphicResourcePoolImpl>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(ResourceSlotLayout<impl::GraphicResourceImpl>::USE_OFFSET == NO_SEPARATE_USE);
+    static_assert(sizeof(lifetime::BufferSlotStorage) == ResourceSlotLayout<impl::BufferImpl>::SIZE);
+    static_assert(alignof(lifetime::BufferSlotStorage) == ResourceSlotLayout<impl::BufferImpl>::ALIGNMENT);
+    static_assert(offsetof(lifetime::BufferSlotStorage, use) == ResourceSlotLayout<impl::BufferImpl>::USE_OFFSET);
+    static_assert(offsetof(lifetime::BufferSlotStorage, buffer) == 0);
+    static_assert(sizeof(lifetime::ImageSlotStorage) == ResourceSlotLayout<impl::ImageImpl>::SIZE);
+    static_assert(alignof(lifetime::ImageSlotStorage) == ResourceSlotLayout<impl::ImageImpl>::ALIGNMENT);
+    static_assert(offsetof(lifetime::ImageSlotStorage, use) == ResourceSlotLayout<impl::ImageImpl>::USE_OFFSET);
+    static_assert(offsetof(lifetime::ImageSlotStorage, image) == 0);
+    static_assert(sizeof(lifetime::SamplerSlotStorage) == ResourceSlotLayout<impl::SamplerImpl>::SIZE);
+    static_assert(alignof(lifetime::SamplerSlotStorage) == ResourceSlotLayout<impl::SamplerImpl>::ALIGNMENT);
+    static_assert(offsetof(lifetime::SamplerSlotStorage, use) == ResourceSlotLayout<impl::SamplerImpl>::USE_OFFSET);
+    static_assert(offsetof(lifetime::SamplerSlotStorage, sampler) == 0);
+    static_assert(BufferLayout::STRIDE == ResourceSlotLayout<impl::BufferImpl>::SIZE);
+
+    namespace detail {
+        void require_resource_layout(std::integral_constant<std::uint64_t, RESOURCE_LAYOUT_ABI>) {}
+    } // namespace detail
+} // namespace VSL_NAMESPACE::storage

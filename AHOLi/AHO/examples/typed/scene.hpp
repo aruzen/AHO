@@ -6,19 +6,23 @@
 
 namespace typed_example {
     namespace t = vsl::typed;
+
     struct Vertex {
         float position[2];
         float color[3];
     };
+
     struct SceneUniform {
         float tint[4];
         // カメラの平行移動xy、framebufferの縦横比、アニメーション時刻。
         float camera[4];
     };
+
     struct DrawTransform {
         // 平行移動xy、倍率、角速度。
         float transform[4];
     };
+
     struct PaletteUniform {
         float gain[4];
     };
@@ -33,7 +37,12 @@ namespace typed_example {
     using Resources = t::ResourceSchema<Set, PaletteSet>;
     using Allocation = t::ResourceAllocationSchema<Resources, t::BufferAllocation<0, 0>,
                                                    t::BufferAllocation<1, 0, t::FixedElements<1>, t::ResourceScope::SHARED>>;
-    using Bundle = t::TypedResourceBundle<Allocation>;
+#ifdef AHO_TYPED_ARENA
+    using Storage = t::ArenaStorage<>;
+#else
+    using Storage = t::HeapStorage;
+#endif
+    using Bundle = t::TypedResourceBundle<Allocation, Storage>;
     using Pushes = t::PushSchema<t::PushRange<TransformLayout, vsl::ShaderFlag::VERTEX>>;
     using Pipeline = t::TypedGraphicsPipeline<Input, Resources, Pushes>;
 
@@ -58,8 +67,10 @@ namespace typed_example {
         ~Scene();
         Scene(const Scene&) = delete;
         Scene& operator=(const Scene&) = delete;
+
         size_t pipeline_builds() const { return _pipeline_builds; }
         size_t frame_count() const { return _resources.frame_count(); }
+
         void record(aho::DrawPhase& phase, float time);
     };
 } // namespace typed_example

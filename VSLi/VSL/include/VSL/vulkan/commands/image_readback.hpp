@@ -8,8 +8,8 @@ namespace VSL_NAMESPACE::command {
     struct ImageReadback : public Command {
         ImageReadback(BufferAccessor* destination, ImageAccessor image, ImageLayout current_layout,
                       ImageRegion region = {});
-        ImageReadback(std::shared_ptr<impl::BufferImpl> destination, ImageAccessor image,
-                      ImageLayout current_layout, ImageRegion region = {});
+        ImageReadback(BufferView destination, ImageAccessor image, ImageLayout current_layout,
+                      ImageRegion region = {}, ResourceUse constraint = {}, ResourceRetention retention = ResourceRetention::COMPLETION);
 
         CopyImageToBuffer copy;
         ImageLayout current_layout;

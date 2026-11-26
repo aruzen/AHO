@@ -109,3 +109,7 @@ custom.reserve(128);
 - native()は保持するVSL Bufferを元の型で返す。基礎となるVSLハンドル自体の差し替えは、AHOのマップと状態を無効にするため行わない。
 
 BufferBindingは転送に必要な参照と使用状態を共有する。AHOの各処理はGPUBuffer conceptとこのbindingを利用し、Custom専用の転送実装を追加しない。SubmissionはStorage・Customization・マップを含むResourceを保持する。Completionを持つ管理状態はSubmissionへ保持せず、循環を避ける。
+
+Resourceの世代Rと物理storage Pは[所有依存graph](../VSL/owner-dependencies.md)で接続する。`binding().owner_ref()`とsnapshotは出所を維持し、従来の`owner()`はraw shared_ptrへ渡す移行入口とする。独立した論理状態Lは世代切替後も共有する。arenaを取り込む場合はviewの正規ownerをそのまま使い、世代ownerを追加しない。
+
+再確保は候補へのmapping・copy／writeを完了してから公開し、最終sizeとownerが揃った後に旧世代を解放する。解放callbackは更新後のsnapshotを参照できる。準備中の同じBufferへの変更やAHO経由の記録再入は拒否する。完了poll／候補生成中に元facadeが破棄されても、進行中の処理は局所のstate／storage保持で完了する。Customization内部の任意の強所有や低水準native操作は呼出側の寿命・非循環・host直列化契約に残る。

@@ -22,7 +22,7 @@ namespace typed_example {
 
     Scene::Scene(aho::Window window, const std::filesystem::path& shaders)
         : _window(std::move(window)), _context(_window.render_context()),
-          _vertices(_context.device(), VERTICES), _indices(_context.device(), INDICES),
+          _vertices(_context.device(), VERTICES, Storage{}), _indices(_context.device(), INDICES, Storage{}),
           _resources(_context.commands(), _context.descriptor_manager()),
           _vertex_shader(_context.device(), shaders / "scene.vert.spv"), _fragment_shader(_context.device(), shaders / "scene.frag.spv") {
         _resources.initialize_shared([](Bundle::Shared& shared) {
@@ -32,6 +32,9 @@ namespace typed_example {
         const auto& totals = _resources.plan().totals();
         std::cout << "Typed allocation: " << totals.buffers << " buffers, " << totals.descriptor_sets
                   << " sets, " << totals.descriptors << " descriptors, " << totals.payload_bytes << " payload bytes\n";
+#ifdef AHO_TYPED_ARENA
+        std::cout << "Typed arena: " << _resources.placement_plan().total_arena_bytes() << " CPU bytes in shared/frame groups\n";
+#endif
         rebuild_pipeline();
         _resize_hook = _window.add_plugin<aho::window::WindowResizeHookPlugin>([this](aho::Window*) { rebuild_pipeline(); });
     }
@@ -45,7 +48,10 @@ namespace typed_example {
         if (_pipeline && _format == format)
             return;
         namespace pl = vsl::pipeline_layout;
-        _pipeline.emplace(_context.device(), _context.render_pass(),
+        _pipeline.emplace(Storage{}, _context.device(), _context.render_pass(),
+#ifdef AHO_TYPED_ARENA
+                          _resources.descriptor_layouts(),
+#endif
                           pl::ShaderGroup("Typed example", {_vertex_shader, _fragment_shader}),
                           pl::ColorBlend{}, pl::InputAssembly{}, pl::Rasterization{pl::CullingMode::NONE},
                           pl::Multisample{}, pl::DynamicState{}, vsl::Viewport{}, vsl::Scissor{});
@@ -54,6 +60,8 @@ namespace typed_example {
     }
 
     void Scene::record(aho::DrawPhase& phase, float time) {
+        if (!phase.recording())
+            return;
         const auto extent = _context.scissor();
         if (!extent.width || !extent.height)
             throw std::logic_error("Typed scene requires a nonzero framebuffer extent");

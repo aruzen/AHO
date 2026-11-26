@@ -1,6 +1,7 @@
 #pragma once
 
 #include <utility>
+#include <functional>
 
 #include "window.hpp"
 
@@ -14,9 +15,8 @@ namespace VSL_NAMESPACE::window_plugin {
     };
 
     struct HookShouldClose : public VSL_NAMESPACE::PureWindow::Plugin, public VSL_NAMESPACE::PureWindow::OnUpdate {
-        HookShouldClose(VSL_NAMESPACE::PureWindow::WindowData*, std::function<void(PureWindow)> callback) : callback(std::move(callback)) {};
-        template<std::same_as<PureWindow> WindowType>
-        HookShouldClose(WindowType*, std::function<void(PureWindow)> callback) : callback(std::move(callback)){};
+        HookShouldClose(PureWindow*, std::function<void(PureWindow)> callback) : callback(std::move(callback)) {}
+
         // OnUpdate
         bool on_update(VSL_NAMESPACE::PureWindow data) override;
 

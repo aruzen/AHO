@@ -1,5 +1,6 @@
 #pragma once
 #include "typed_block_layout.hpp"
+#include "../lifetime/pipeline_recipe.hpp"
 #include "../vulkan/stages/resource_binding.hpp"
 #include <algorithm>
 #include <array>
@@ -17,14 +18,17 @@ namespace VSL_NAMESPACE::typed {
             const BlockType* memory_layout = nullptr;
             size_t payload_size = 0;
         };
+
         void inject_resource_schema(PipelineLayoutEditAccessor layout, std::span<const DescriptorRequirement> requirements, std::uint32_t set_count);
-        void validate_resource_schema(PipelineLayoutAccessor layout, std::span<const DescriptorRequirement> requirements);
+        void validate_resource_schema(const lifetime::PipelineRecipeSnapshot& recipe, std::span<const DescriptorRequirement> requirements);
         template<std::uint32_t binding, typename... Bindings>
         struct FindDescriptor;
+
         template<std::uint32_t binding>
         struct FindDescriptor<binding> {
             using Type = void;
         };
+
         template<std::uint32_t binding, typename First, typename... Rest>
         struct FindDescriptor<binding, First, Rest...> {
             using Type = std::conditional_t<First::POINT.binding == binding, First, typename FindDescriptor<binding, Rest...>::Type>;
@@ -55,6 +59,7 @@ namespace VSL_NAMESPACE::typed {
         static_assert((kind == graphic_resource::Type::UNIFORM_BUFFER || kind == graphic_resource::Type::STORAGE_BUFFER) != std::is_void_v<Payload>,
                       "Typed buffer descriptors require a payload; image descriptors use void");
     };
+
     template<std::uint32_t binding, typename Payload, ShaderFlag stages, std::uint32_t count = 1>
     using UniformBinding = DescriptorBinding<binding, graphic_resource::Type::UNIFORM_BUFFER, stages, Payload, count>;
     template<std::uint32_t binding, typename Payload, ShaderFlag stages, std::uint32_t count = 1>
@@ -83,6 +88,7 @@ namespace VSL_NAMESPACE::typed {
         static constexpr std::uint32_t SET = set;
         static_assert(set < UINT32_MAX, "Invalid typed descriptor set index");
     };
+
     template<std::uint32_t set, typename... Bindings>
     using DescriptorSet = DescriptorSetBinding<set, DescriptorLayout<Bindings...>>;
 
@@ -99,6 +105,7 @@ namespace VSL_NAMESPACE::typed {
         static_assert(IsValid(), "Duplicate typed descriptor set");
         template<size_t index>
         using Set = std::tuple_element_t<index, Sets>;
+
         void injection(PipelineLayoutEditAccessor layout) const { detail::inject_resource_schema(layout, REQUIREMENTS, SET_COUNT); }
     };
 
@@ -110,6 +117,7 @@ namespace VSL_NAMESPACE::typed {
                     return false;
         return true;
     }
+
     template<typename... BindingTypes>
     constexpr size_t DescriptorLayout<BindingTypes...>::BindingIndex(std::uint32_t binding) {
         for (size_t i = 0; i < POINTS.size(); ++i)
@@ -117,6 +125,7 @@ namespace VSL_NAMESPACE::typed {
                 return i;
         throw std::invalid_argument("Typed descriptor binding not found");
     }
+
     template<typename... SetTypes>
     consteval auto ResourceSchema<SetTypes...>::MakeRequirements() {
         std::array<detail::DescriptorRequirement, (SetTypes::BINDING_COUNT + ... + 0)> result{};
@@ -128,6 +137,7 @@ namespace VSL_NAMESPACE::typed {
         (add.template operator()<SetTypes>(), ...);
         return result;
     }
+
     template<typename... SetTypes>
     consteval bool ResourceSchema<SetTypes...>::IsValid() {
         constexpr std::array<std::uint32_t, sizeof...(SetTypes)> sets{SetTypes::SET...};

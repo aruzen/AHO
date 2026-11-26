@@ -27,7 +27,7 @@ swapchain/標準pass/framebufferはAHOのWindowに任せる。GPU完了後のWin
 
 型付き資源の所有、callbackとaliasの契約は[typed-frame-resources.md](typed-frame-resources.md)、割当宣言と自動生成は[typed-resource-allocation.md](typed-resource-allocation.md)を参照。
 
-入力イベント、起動、swapchain、画像保存は動的APIを使用する。一括arena確保、CPU object配置とGPU実メモリ要件を含む計画は今後の課題。
+入力イベント、起動、swapchain、画像保存は動的APIを使用する。`aho-typed-arena-example`では同じsceneのbundleを`ArenaStorage<>`へ切り替え、共有UBOと各frameのUBOを別々のCPU arenaへ配置する。通常の`aho-typed-example`はheapのまま維持する。ビルド・契約は[arena移行文書](VSL/arena-migration.md)を参照。GPU実メモリ要件を含めた一括確保は今後の課題。
 
 ## 画像検証
 

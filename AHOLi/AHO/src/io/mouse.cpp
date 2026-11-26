@@ -3,6 +3,7 @@
 //
 
 #include <AHO/io/mouse.hpp>
+#include <VSL/lifetime/glfw_lease.hpp>
 
 #define GLFW_INCLUDE_VULKAN
 
@@ -26,6 +27,7 @@ std::shared_ptr<AHO_NAMESPACE::input::Cursor::CaptureState> AHO_NAMESPACE::input
 
 AHO_NAMESPACE::input::Cursor::Cursor(void* context)
     : _context(context), _capture_state(GetCaptureState(context)), _capture_generation(_capture_state->generation) {
+    VSL_NAMESPACE::lifetime::GLFWCallScope scope;
     glfwGetCursorPos((GLFWwindow*)context, &_state.value.x.value, &_state.value.y.value);
     _previous_focus = focused();
 }
@@ -41,6 +43,7 @@ AHO_NAMESPACE::d2::VectorD AHO_NAMESPACE::input::Cursor::delta() {
 }
 
 void AHO_NAMESPACE::input::Cursor::update() {
+    VSL_NAMESPACE::lifetime::GLFWCallScope scope;
     _delta.value = _state.value;
     glfwGetCursorPos((GLFWwindow*)_context, &_state.value.x.value, &_state.value.y.value);
     _delta.value.x = _state.value.x - _delta.value.x;
@@ -53,6 +56,7 @@ void AHO_NAMESPACE::input::Cursor::update() {
 }
 
 void AHO_NAMESPACE::input::Cursor::set_captured(bool capture) {
+    VSL_NAMESPACE::lifetime::GLFWCallScope scope;
     auto* window = static_cast<GLFWwindow*>(_context);
     const int mode = capture ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL;
     if (glfwGetInputMode(window, GLFW_CURSOR) == mode)
@@ -65,10 +69,12 @@ void AHO_NAMESPACE::input::Cursor::set_captured(bool capture) {
 }
 
 bool AHO_NAMESPACE::input::Cursor::captured() const {
+    VSL_NAMESPACE::lifetime::GLFWCallScope scope;
     return glfwGetInputMode(static_cast<GLFWwindow*>(_context), GLFW_CURSOR) == GLFW_CURSOR_DISABLED;
 }
 
 bool AHO_NAMESPACE::input::Cursor::focused() const {
+    VSL_NAMESPACE::lifetime::GLFWCallScope scope;
     return glfwGetWindowAttrib(static_cast<GLFWwindow*>(_context), GLFW_FOCUSED) == GLFW_TRUE;
 }
 
@@ -89,6 +95,7 @@ bool AHO_NAMESPACE::input::MouseButton::pressed() {
 }
 
 void AHO_NAMESPACE::input::MouseButton::update() {
+    VSL_NAMESPACE::lifetime::GLFWCallScope scope;
     switch (glfwGetMouseButton((GLFWwindow*)_context, (int)_code.code())) {
         default:
         case GLFW_RELEASE:
@@ -116,11 +123,13 @@ size_t AHO_NAMESPACE::input::MouseWheel::GENERATION = 0;
 AHO_NAMESPACE::d2::VectorD AHO_NAMESPACE::input::MouseWheel::STATE = AHO_NAMESPACE::d2::VectorD(0.0, 0.0);
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    VSL_NAMESPACE::lifetime::GLFWCallbackScope scope;
     AHO_NAMESPACE::input::MouseWheel::STATE = AHO_NAMESPACE::d2::VectorD(xoffset, yoffset);
     AHO_NAMESPACE::input::MouseWheel::GENERATION++;
 }
 
 AHO_NAMESPACE::input::MouseWheel::MouseWheel(void* context) : _context(context) {
+    VSL_NAMESPACE::lifetime::GLFWCallScope scope;
     _gen = GENERATION;
     _read = GENERATION;
     if (SUBSCRIBED == 0)
@@ -128,12 +137,13 @@ AHO_NAMESPACE::input::MouseWheel::MouseWheel(void* context) : _context(context) 
     SUBSCRIBED++;
 }
 
-AHO_NAMESPACE::input::MouseWheel::MouseWheel(const MouseWheel& other) noexcept : MouseWheel(other._context) {
-    _gen = other._gen;
-    _read = other._read;
+AHO_NAMESPACE::input::MouseWheel::MouseWheel(const MouseWheel& other) noexcept
+    : abstract::Input<d2::VectorD>(other), _context(other._context), _gen(other._gen), _read(other._read) {
+    ++SUBSCRIBED;
 }
 
 AHO_NAMESPACE::input::MouseWheel::~MouseWheel() {
+    VSL_NAMESPACE::lifetime::GLFWCallScope scope(std::nothrow);
     SUBSCRIBED--;
     if (SUBSCRIBED == 0)
         glfwSetScrollCallback((GLFWwindow*)_context, NULL);

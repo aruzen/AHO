@@ -44,6 +44,7 @@ namespace {
             PREVIOUS_LOGGER = vsl::LOGGER;
             vsl::LOGGER = capture_validation;
         }
+
         ~ValidationLog() { vsl::LOGGER = PREVIOUS_LOGGER; }
     };
 
@@ -117,15 +118,18 @@ namespace {
                     out[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
         return out;
     }
+
     Vec3 point(const Matrix& m, const Vec3& v) {
         Vec3 out{};
         for (int r = 0; r < 3; ++r)
             out[r] = m[12 + r] + m[r] * v[0] + m[4 + r] * v[1] + m[8 + r] * v[2];
         return out;
     }
+
     float dot(Vec3 a, Vec3 b) {
         return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
     }
+
     Vec3 normalized(Vec3 v) {
         const auto d = std::sqrt(dot(v, v));
         if (d <= 0)
@@ -134,6 +138,7 @@ namespace {
             x /= d;
         return v;
     }
+
     Vec3 cross(Vec3 a, Vec3 b) {
         return {a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]};
     }
@@ -156,6 +161,7 @@ namespace {
         Matrix view{side[0], up[0], -forward[0], 0, side[1], up[1], -forward[1], 0, side[2], up[2], -forward[2], 0, -dot(side, eye), -dot(up, eye), dot(forward, eye), 1};
         return multiply(p, view);
     }
+
     std::vector<int> visible_nodes(const asset::GltfModel& model) {
         std::vector<int> nodes;
         if (model.default_scene() >= 0)
@@ -169,6 +175,7 @@ namespace {
                 nodes.push_back(child);
         return nodes;
     }
+
     Camera frame_model(const asset::GltfModel& model, const std::vector<int>& nodes) {
         auto pose = model.rest_pose();
         Vec3 min, max;
@@ -328,7 +335,7 @@ namespace {
         auto size = window.frame_size();
         width = size.value.x.value;
         height = size.value.y.value;
-        for (auto image : swapchain.images) {
+        for (auto image : swapchain.images()) {
             depths.emplace_back(context.device(), width, height, vsl::data_format::DEPTH32_FLOAT);
             frames.emplace_back(pass, width, height, std::vector<vsl::ImageAccessor>{image, depths.back()});
         }
@@ -365,6 +372,7 @@ namespace {
             throw std::invalid_argument("Time must be finite");
         return out;
     }
+
     void verify_frames(const aho::ImagePixels& first, const aho::ImagePixels& second) {
         if (first.width != second.width || first.height != second.height)
             throw std::runtime_error("Verification capture dimensions changed unexpectedly");
@@ -386,6 +394,7 @@ namespace {
             throw std::runtime_error("GPU verification failed: model, texture or animation is missing");
         std::cout << "GPU verified: foreground=" << foreground << " changed=" << changed << " colors=" << colors.size() << '\n';
     }
+
     int run(const Options& opt) {
         auto model = asset::GltfModel::Load(opt.model);
         auto nodes = visible_nodes(model);
@@ -443,7 +452,7 @@ namespace {
             };
             rebuild();
             auto draw = [&](double time, bool capture) {
-                if (targets->swapchain.data_ != window.data2->swapchain.data_)
+                if (targets->swapchain.identity() != window.data2->swapchain.identity())
                     rebuild();
                 auto pose = model.sample(animation, time);
                 aho::DrawPhase phase(engine, [](auto&) {});
@@ -502,7 +511,8 @@ namespace {
                 bool paused = opt.time.has_value(), was_space = false;
                 unsigned rendered = 0;
                 while (aho::Window::Update() && window) {
-                    auto* handle = static_cast<GLFWwindow*>(window.data_->window_handle);
+                    const auto os = window.window_owner();
+                    auto* handle = static_cast<GLFWwindow*>(os.native_handle());
                     if (glfwGetKey(handle, GLFW_KEY_ESCAPE) == GLFW_PRESS)
                         break;
                     bool space = glfwGetKey(handle, GLFW_KEY_SPACE) == GLFW_PRESS;
@@ -530,6 +540,7 @@ namespace {
         return 0;
     }
 } // namespace
+
 int main(int argc, char** argv) {
     try {
         ValidationLog validation;

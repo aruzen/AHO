@@ -2,7 +2,13 @@
 // Created by morimoto_hibiki on 2025/10/22.
 //
 
+#include <VSL/lifetime/image_access.hpp>
+#include <VSL/lifetime/command_access.hpp>
+#include <VSL/lifetime/native_recording.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
+#include <VSL/lifetime/resource_use_factory.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
+#include <VSL/vulkan/resource_use.hpp>
 
 #include <VSL/vulkan/commands/copy_buffer_to_image.hpp>
 
@@ -12,10 +18,20 @@
 #include <utility>
 
 namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+} // namespace
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
+
+namespace {
     VSL_NAMESPACE::command::ImageCopyInfo describe_upload(
-        const VSL_NAMESPACE::ImageAccessor& image, const std::shared_ptr<VSL_NAMESPACE::impl::BufferImpl>& source,
-        VSL_NAMESPACE::ImageLayout layout, VSL_NAMESPACE::ImageRegion region, std::size_t offset) {
-        const auto& destination = image.data_;
+        const VSL_NAMESPACE::ImageAccessor& image, const VSL_NAMESPACE::impl::BufferImpl* source,
+        VSL_NAMESPACE::ImageLayout layout, VSL_NAMESPACE::ImageRegion region, std::size_t offset,
+        std::size_t source_offset, std::size_t source_bytes) {
+        const auto& destination = ImageAccess::Owned(image);
         if (!source || !source->buffer || !destination || !destination->image || !destination->device ||
             source->device != destination->device)
             throw std::invalid_argument("Image upload requires valid resources on the same device");
@@ -45,26 +61,26 @@ namespace {
         if (row_size > std::numeric_limits<std::size_t>::max() / region.height)
             throw std::length_error("Image upload byte count overflow");
         const auto byte_size = static_cast<std::size_t>(row_size * region.height);
-        if (offset % 4 || offset % texel_size)
+        if (source_offset > source->requirement_size || source_bytes > source->requirement_size - source_offset ||
+            offset > source_bytes || byte_size > source_bytes - offset)
+            throw std::out_of_range("Image upload exceeds source buffer view");
+        const auto native_offset = source_offset + offset;
+        if (native_offset % 4 || native_offset % texel_size)
             throw std::invalid_argument("Image upload offset must align to four bytes and a texel");
-        if (offset > source->requirement_size || byte_size > source->requirement_size - offset)
-            throw std::out_of_range("Image upload exceeds source buffer");
         return {region, image.get_format(), static_cast<std::size_t>(row_size), byte_size};
     }
 
     void validate_commands(const VSL_NAMESPACE::ImageAccessor& image, const VSL_NAMESPACE::CommandBuffer& commands,
                            const VSL_NAMESPACE::CommandManager& manager) {
-        const auto& device = image.data_->device;
-        if (!commands.data_ || !commands.data_->command_pool || !manager.data_ ||
-            commands.data_->command_pool->device != device || manager.data_->device != device)
+        const auto& device = ImageAccess::Owned(image)->device;
+        if (!CommandAccess::Data(commands) || !CommandAccess::Data(commands)->command_pool || !CommandAccess::Data(manager) ||
+            CommandAccess::Data(commands)->command_pool->device != device || CommandAccess::Data(manager)->device.get() != device)
             throw std::invalid_argument("Image upload requires commands on the same device");
     }
 
-    void record_upload(const VSL_NAMESPACE::ImageAccessor& image, const std::shared_ptr<VSL_NAMESPACE::impl::BufferImpl>& source,
+    void record_upload(const VSL_NAMESPACE::ImageAccessor& image, const VSL_NAMESPACE::impl::BufferImpl& source,
                        VSL_NAMESPACE::ImageLayout layout, const VSL_NAMESPACE::command::ImageCopyInfo& info,
-                       std::size_t offset, VSL_NAMESPACE::CommandBuffer buffer) {
-        buffer.retain(image.data_);
-        buffer.retain(source);
+                       std::size_t offset, vk::CommandBuffer commands) {
         vk::BufferImageCopy region;
         region.bufferOffset = offset;
         region.bufferRowLength = 0;
@@ -75,7 +91,7 @@ namespace {
         region.imageSubresource.layerCount = 1;
         region.imageOffset = vk::Offset3D{static_cast<std::int32_t>(info.region.x), static_cast<std::int32_t>(info.region.y), 0};
         region.imageExtent = vk::Extent3D{info.region.width, info.region.height, 1};
-        buffer.data_->command_buffers.at(buffer.get_current_buffer_idx()).copyBufferToImage(source->buffer, image.data_->image, static_cast<vk::ImageLayout>(layout), region);
+        commands.copyBufferToImage(source.buffer, ImageAccess::Owned(image)->image, static_cast<vk::ImageLayout>(layout), region);
     }
 } // namespace
 
@@ -86,26 +102,55 @@ VSL_NAMESPACE::command::CopyBufferToImage::CopyBufferToImage(VSL_NAMESPACE::Imag
 VSL_NAMESPACE::command::CopyBufferToImage::CopyBufferToImage(ImageAccessor image, BufferAccessor* buffer,
                                                              ImageLayout layout, ImageRegion region, std::size_t offset)
     : layout(layout), image(std::move(image)), buffer(buffer), region(region), offset(offset),
-      _source(buffer ? buffer->data_ : nullptr) {}
+      _source(buffer ? BufferAccess::Owned(*(buffer)).get() : nullptr), _use(buffer ? buffer->resource_use() : ResourceUse{}),
+      _source_bytes(buffer ? buffer->requested_size() : 0) {}
+
+VSL_NAMESPACE::command::CopyBufferToImage::CopyBufferToImage(ImageAccessor image, BufferView source,
+                                                             ImageLayout layout, ImageRegion region, std::size_t offset,
+                                                             ResourceUse constraint, ResourceRetention retention)
+    : layout(layout), image(std::move(image)), buffer(nullptr), region(region), offset(offset),
+      _source(lifetime::detail::BufferAccess::Impl(source.ref())), _use(source.resource_use(std::move(constraint))),
+      _source_offset(source.byte_offset()), _source_bytes(source.size()), _retention(retention) {}
 
 VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyBufferToImage::description() const {
-    return describe_upload(image, _source, layout, region, offset);
+    return describe_upload(image, _source, layout, region, offset, _source_offset, _source_bytes);
+}
+
+VSL_NAMESPACE::command::ImageCopyInfo VSL_NAMESPACE::command::CopyBufferToImage::prepare(const CommandBuffer& buffer, const CommandManager& manager) const {
+    const auto info = description();
+    validate_commands(image, buffer, manager);
+    return info;
+}
+
+void VSL_NAMESPACE::command::CopyBufferToImage::track(const NativeRecordingContext& recording) const {
+    recording.use(_use, _retention);
+    recording.use(image.resource_use(), ResourceRetention::SUBMISSION);
+}
+
+void VSL_NAMESPACE::command::CopyBufferToImage::record(const ImageCopyInfo& info, const NativeRecordingContext& recording) const {
+    record_upload(image, *_source, layout, info, _source_offset + offset, vk::CommandBuffer(recording.native_command_buffer()));
 }
 
 void VSL_NAMESPACE::command::CopyBufferToImage::invoke(
     VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
-    const auto info = description();
-    validate_commands(image, buffer, manager);
-    record_upload(image, _source, layout, info, offset, buffer);
+    const auto copy = *this;
+    const auto info = copy.prepare(buffer, manager);
+    const NativeRecordingContext recording(buffer);
+    copy.track(recording);
+    copy.record(info, recording);
 }
 
 VSL_NAMESPACE::command::CopyBufferToArrayImage::CopyBufferToArrayImage(VSL_NAMESPACE::ImageAccessor image, VSL_NAMESPACE::BufferAccessor* buffer,
                                                                        VSL_NAMESPACE::ImageLayout layout, std::uint32_t target_idx)
-    : image(std::move(image)), buffer(buffer), layout(layout), target_idx(target_idx), _source(buffer ? buffer->data_ : nullptr) {}
+    : image(std::move(image)), buffer(buffer), layout(layout), target_idx(target_idx), _source(buffer ? BufferAccess::Owned(*(buffer)) : nullptr) {}
 
 void VSL_NAMESPACE::command::CopyBufferToArrayImage::invoke(
     VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
-    const auto info = describe_upload(image, _source, layout, ImageRegion{.layer = target_idx}, 0);
-    validate_commands(image, buffer, manager);
-    record_upload(image, _source, layout, info, 0, buffer);
+    const auto copy = *this;
+    if (!copy._source)
+        throw std::invalid_argument("Image upload requires a source buffer");
+    const auto source = lifetime::detail::BufferAccess::View(lifetime::detail::BufferAccess::Ref(copy._source.get()),
+                                                             copy._source, 0, copy._source->requirement_size);
+    CopyBufferToImage(copy.image, source, copy.layout, ImageRegion{.layer = copy.target_idx}, 0, {}, ResourceRetention::SUBMISSION)
+        .invoke(pool, buffer, manager);
 }

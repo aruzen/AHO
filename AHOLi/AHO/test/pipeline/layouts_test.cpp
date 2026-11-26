@@ -1,23 +1,31 @@
+#include "../../src/engine/engine_access.hpp"
+
+namespace {
+    using AHO_NAMESPACE::engine::detail::EngineAccess;
+}
 #ifdef AHO_GPU_TESTS
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include "../support/live_gpu.hpp"
 #include <AHO/pipeline/layouts.hpp>
+
 namespace {
     using AHOLayoutsVulkanIntegration = aho_test::LiveGPUTest;
+
     TEST_F(AHOLayoutsVulkanIntegration, BaseLayoutFactoryCreatesLayoutUsingEngineDevice) {
         ASSERT_NO_THROW(start_engine());
         ASSERT_NE(aho::pipeline::GET_BASE_LAYOUT, nullptr);
-        const auto layout = aho::pipeline::GET_BASE_LAYOUT(engine.get());
-        ASSERT_NE(layout.data_, nullptr);
-        EXPECT_EQ(layout.data_->device, engine->data()->logical_device.data_);
-        EXPECT_TRUE(static_cast<bool>(layout.data_->pipeline_layout));
-        ASSERT_NE(layout.data_->info, nullptr);
-        EXPECT_EQ(layout.data_->info->rasterization.cullMode, vk::CullModeFlags(vk::CullModeFlagBits::eBack));
-        EXPECT_EQ(layout.data_->info->input_assembly.topology, vk::PrimitiveTopology::eTriangleList);
+        const auto layout = aho::pipeline::GET_BASE_LAYOUT(engine->runtime());
+        ASSERT_TRUE(layout);
+        EXPECT_EQ(layout.get_device(), EngineAccess::State(*(engine))->logical_device);
+        ASSERT_TRUE(layout.has_recipe());
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess::Read(layout).graphics_state.rasterization.cullMode, vk::CullModeFlags(vk::CullModeFlagBits::eBack));
+        EXPECT_EQ(VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess::Read(layout).graphics_state.input_assembly.topology, vk::PrimitiveTopology::eTriangleList);
     }
 } // namespace
 #else
 #include <gtest/gtest.h>
 #include <AHO/pipeline/layouts.hpp>
+
 namespace {
     TEST(AHOLayoutsTest, RuntimeAndTemplateBindingLookupsAgreeOnResourceContracts) {
         using namespace aho::pipeline;

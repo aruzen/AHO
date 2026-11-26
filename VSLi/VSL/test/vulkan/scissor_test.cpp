@@ -1,4 +1,10 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include "support/render_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
+
 namespace {
     TEST(ScissorTest, ConstructorsPreserveRectangleCoordinates) {
         vsl::Scissor defaults;
@@ -18,13 +24,15 @@ namespace {
         EXPECT_EQ(adapted.width, 4u);
         EXPECT_EQ(adapted.height, 5u);
     }
+
     using ScissorVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
+
     TEST_F(ScissorVulkanIntegrationTest, ScissorExcludesCenterPixel) {
         vsl::Scissor scissor(0, 0, 1, 1);
         auto state = make_layout_state();
         scissor.injection(state);
-        ASSERT_EQ(state.data_->info->scissors.size(), 1u);
-        EXPECT_EQ(state.data_->info->scissors[0].extent, (vk::Extent2D{1, 1}));
+        ASSERT_EQ(PipelineRecipeAccess::Read(state).graphics_state.scissors.size(), 1u);
+        EXPECT_EQ(PipelineRecipeAccess::Read(state).graphics_state.scissors[0].extent, (vk::Extent2D{1, 1}));
         vsl::Scissor all(description);
         EXPECT_EQ(all.width, 8u);
         EXPECT_EQ(all.height, 8u);

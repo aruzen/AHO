@@ -27,7 +27,7 @@ namespace VSL_NAMESPACE::command {
 
         PushConstant(PipelineLayoutAccessor layout, VSL_NAMESPACE::ShaderFlag target_type, std::uint32_t size,
                      std::uint32_t offset, const void* value)
-            : layout(std::move(layout)), target_type(target_type), size(size), offset(offset), value(value) {};
+            : layout(layout.runtime()), target_type(target_type), size(size), offset(offset), value(value) {};
 
         template<typename T>
         PushConstant(PipelineLayoutAccessor layout, VSL_NAMESPACE::ShaderFlag target_type, T& t, std::uint32_t offset = 0);

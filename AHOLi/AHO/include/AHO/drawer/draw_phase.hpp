@@ -3,6 +3,7 @@
 
 #include <VSL/vulkan/phase.hpp>
 #include <concepts>
+#include <stdexcept>
 #include "../engine/graphical_engine.hpp"
 #include "../drawer.hpp"
 
@@ -28,6 +29,11 @@ namespace AHO_NAMESPACE {
 
         RenderContext context() const;
 
+        bool recording() const noexcept { return state == State::WAIT_SUBMIT && !_close_requested && _window && _window.data2 && !_window.data2->closed; }
+        const AHO_NAMESPACE::Window& target_window() const& { return _window; }
+        const AHO_NAMESPACE::Window& target_window() const&& = delete;
+        void setup() override;
+
         DrawStream<VSL_NAMESPACE::DefaultPhaseStream> operator<<(AHO_NAMESPACE::concepts::is_std_tuple auto&&);
 
         DrawStream<VSL_NAMESPACE::DefaultPhaseStream> operator<<(std::shared_ptr<VSL_NAMESPACE::command::Command> cmd);
@@ -38,17 +44,35 @@ namespace AHO_NAMESPACE {
 
         DrawStream<VSL_NAMESPACE::DefaultPhaseStream> operator<<(VSL_NAMESPACE::command::is_delegate_command auto cmd);
 
+    protected:
+        bool acquisition_ready() override;
+
     private:
+        struct Init;
+        DrawPhase(Init init,
+                  std::function<void(DrawStream<VSL_NAMESPACE::DefaultPhaseStream>&)> initialize,
+                  std::function<void(DrawStream<VSL_NAMESPACE::DefaultPhaseStream>&)> finit);
+        static Init Prepare(AHO_NAMESPACE::engine::GraphicalEngine* engine);
+        AHO_NAMESPACE::Window _window;
+
+        void require_recording() const {
+            if (!recording())
+                throw std::logic_error("DrawPhase is not recording");
+        }
+
         bool _finish_started = false;
+        bool _close_requested = false;
         DrawPhase* _previous_phase = nullptr;
         void restore_previous_phase() noexcept;
         static DrawPhase* CurrentForManager(const VSL_NAMESPACE::CommandManager& manager) noexcept;
         template<typename>
         friend struct DrawStream;
         friend struct AHO_NAMESPACE::window::Window;
+        friend struct AHO_NAMESPACE::window::detail::WindowClose;
     };
 
     AHO_NAMESPACE::DrawStream<VSL_NAMESPACE::DefaultPhaseStream> AHO_NAMESPACE::DrawPhase::operator<<(AHO_NAMESPACE::concepts::is_std_tuple auto&& t) {
+        require_recording();
         AHO_NAMESPACE::DrawStream<VSL_NAMESPACE::DefaultPhaseStream> phase{
             .phase_stream = VSL_NAMESPACE::DefaultPhaseStream{this->manager}};
         phase << std::forward<decltype(t)>(t);
@@ -56,11 +80,13 @@ namespace AHO_NAMESPACE {
     }
 
     AHO_NAMESPACE::DrawStream<VSL_NAMESPACE::DefaultPhaseStream> AHO_NAMESPACE::DrawPhase::operator<<(VSL_NAMESPACE::command::is_command auto cmd) {
+        require_recording();
         return {
             .phase_stream = (VSL_NAMESPACE::DefaultPhaseStream{this->manager} << std::move(cmd))};
     }
 
     AHO_NAMESPACE::DrawStream<VSL_NAMESPACE::DefaultPhaseStream> AHO_NAMESPACE::DrawPhase::operator<<(VSL_NAMESPACE::command::is_delegate_command auto cmd) {
+        require_recording();
         return {
             .phase_stream = (VSL_NAMESPACE::DefaultPhaseStream{this->manager} << std::move(cmd))};
     }

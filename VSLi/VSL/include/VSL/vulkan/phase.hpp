@@ -8,6 +8,11 @@
 #include "pipeline.hpp"
 
 namespace VSL_NAMESPACE {
+    namespace lifetime {
+        class PhaseCall;
+        struct AcquireTicket;
+    } // namespace lifetime
+
     template<typename PhaseStream, typename T>
     concept is_phase_stream = requires(PhaseStream pst) {
         { pst << std::declval<std::shared_ptr<T>>() } -> std::convertible_to<PhaseStream&>;
@@ -32,7 +37,8 @@ namespace VSL_NAMESPACE {
             ERROR_,
             BEFORE_SETUP,
             WAIT_SUBMIT,
-            FINISH_SUBMIT
+            FINISH_SUBMIT,
+            SUSPENDED
         } state = State::BEFORE_SETUP;
 
         enum class SubmitResult {
@@ -69,12 +75,20 @@ namespace VSL_NAMESPACE {
 
     protected:
         Completion completion_;
+        std::shared_ptr<impl::SubmissionWork> submission;
+        CommandBuffer recording_buffer{};
         std::uint32_t signal_index = 0;
         bool recreate = false;
         int initial_exceptions = 0;
-        void prepare();
+        [[nodiscard]] bool prepare(bool returning_image = false);
         void begin();
+        void fail(Completion::Failure failure, std::int32_t error_code = 0) noexcept;
+        Completion::Failure cancel_recording(std::int32_t& error_code);
         void finish_noexcept() noexcept;
+
+    private:
+        lifetime::PhaseCall* _active_call = nullptr;
+        friend class lifetime::PhaseCall;
     };
 
     struct DefaultPhase : public ComputePhase {
@@ -82,7 +96,8 @@ namespace VSL_NAMESPACE {
                      std::optional<SemaphoreHolder> next_image_available = std::nullopt,
                      std::optional<SemaphoreHolder> calculation_finish = std::nullopt,
                      std::optional<FenceHolder> in_flight_fence = std::nullopt,
-                     bool postpone_setup = false);
+                     bool postpone_setup = false,
+                     std::optional<FenceHolder> acquire_fences = std::nullopt);
 
         SwapchainAccessor swapchain;
 
@@ -96,10 +111,15 @@ namespace VSL_NAMESPACE {
         SubmitResult present();
         void cancel() override;
 
+    protected:
+        // 判定中に取得や世代変更を行わない。falseなら新しいPhaseで再開する。
+        virtual bool acquisition_ready() { return true; }
+
     private:
         bool _presented = false;
-        struct Presentation;
-        std::shared_ptr<Presentation> _presentation;
+        bool _setting_up = false;
+        std::optional<FenceHolder> _acquire_fences;
+        std::shared_ptr<lifetime::AcquireTicket> _presentation;
 
     public:
         ~DefaultPhase();
@@ -144,14 +164,24 @@ namespace VSL_NAMESPACE {
     }
 
     DefaultPhaseStream& DefaultPhaseStream::operator<<(command::is_command auto cmd) {
+        auto current = manager;
+        const auto buffer = current.get_buffer();
+        const auto expected = buffer.completion();
+        buffer.require_recording(expected);
         resolve_holder_require(cmd);
-        (&cmd)->invoke(manager.get_pool(), manager.get_buffer(), manager);
+        buffer.require_recording(expected);
+        (&cmd)->invoke(current.get_pool(), buffer, current);
         return *this;
     }
 
     DefaultPhaseStream& DefaultPhaseStream::operator<<(command::is_delegate_command auto cmd) {
+        auto current = manager;
+        const auto buffer = current.get_buffer();
+        const auto expected = buffer.completion();
+        buffer.require_recording(expected);
         resolve_holder_require(cmd);
-        (&cmd)->invoke(*this, manager.get_pool(), manager.get_buffer(), manager);
+        buffer.require_recording(expected);
+        (&cmd)->invoke(*this, current.get_pool(), buffer, current);
         return *this;
     }
 } // namespace VSL_NAMESPACE

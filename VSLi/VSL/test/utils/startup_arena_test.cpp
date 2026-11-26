@@ -1,0 +1,273 @@
+#include "../../src/private/VSL/lifetime/window_access.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::WindowAccess;
+}
+
+#include <VSL/lifetime/startup_access.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
+#include "support/window_fixture.hpp"
+#include <VSL/lifetime/startup_arena.hpp>
+#include <VSL/utils/typed_buffer_arena.hpp>
+#include <limits>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+}
+
+namespace {
+    namespace l = vsl::lifetime;
+    namespace s = vsl::storage;
+    namespace t = vsl::typed;
+    using StartupArenaVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+    using StartupSurfaceVulkanIntegrationTest = vsl_test::WindowIntegrationTest;
+    constexpr auto USAGE = vsl::MemoryType::TRANSFER_SOURCE | vsl::MemoryType::TRANSFER_DESTINATION;
+    using Buffers = t::TypedBufferArena<t::BufferResource<t::ResourceId{1}, std::uint32_t, USAGE>>;
+    using Native = vsl::Buffer<USAGE, vsl::MemoryProperty::HOST_VISIBLE>;
+    using View = t::PlacedBufferView<std::uint32_t, USAGE>;
+    vsl::InstanceCreateInfo headless_info();
+
+    vsl::InstanceCreateInfo headless_info() {
+        vsl::InstanceCreateInfo info;
+        info.application_name = "startup arena";
+#ifdef __APPLE__
+        info.extensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+#endif
+        return info;
+    }
+
+    TEST(StartupPlanTest, SameKindSlotsAreDistinctAndExternalEntriesHaveNoPlacement) {
+        constexpr std::array requests{s::StartupRequest{{1}, s::StartupKind::DEVICE},
+                                      s::StartupRequest{{2}, s::StartupKind::DEVICE},
+                                      s::StartupRequest{{3}, s::StartupKind::INSTANCE, true}};
+        constexpr s::StartupPlan<4> plan(requests);
+        static_assert(plan.size() == 3 && plan.slots() == 2);
+        static_assert(plan.placement({1}).offset == 0);
+        static_assert(plan.placement({2}).offset >= s::DEVICE_SLOT_SIZE);
+        static_assert(plan.placement({2}).offset % s::DEVICE_SLOT_ALIGNMENT == 0);
+        static_assert(plan.bytes() % plan.alignment() == 0);
+        static_assert(plan.placement({3}).offset == s::StartupPlacement::NO_SLOT);
+        EXPECT_THROW(plan.require_region(plan.bytes() - 1, plan.alignment()), std::invalid_argument);
+        EXPECT_THROW(plan.require_region(plan.bytes(), 3), std::invalid_argument);
+        EXPECT_THROW(plan.placement({9}), std::out_of_range);
+        EXPECT_THROW((s::StartupPlan<1>{requests}), std::length_error);
+        const std::array duplicate{s::StartupRequest{{1}, s::StartupKind::DEVICE}, s::StartupRequest{{1}, s::StartupKind::INSTANCE}};
+        EXPECT_THROW((s::StartupPlan<2>{duplicate}), std::invalid_argument);
+        const std::array invalid{s::StartupRequest{{1}, static_cast<s::StartupKind>(99)}};
+        EXPECT_THROW((s::StartupPlan<1>{invalid}), std::invalid_argument);
+    }
+
+    TEST(StartupArenaTest, EmptyPlanClaimsMemoryExclusivelyAndReleasesOnlyItsOwnClaim) {
+        const std::array<s::StartupRequest, 0> requests{};
+        const s::StartupPlan<0> plan(requests);
+        const std::array<l::StartupInit, 0> inputs{};
+        s::ArenaMemory memory(0, 1);
+        {
+            l::StartupArena first(plan, inputs, memory);
+            EXPECT_EQ(first.size(), 0u);
+            EXPECT_EQ(first.slots(), 0u);
+            EXPECT_THROW((l::StartupArena{plan, inputs, memory}), std::invalid_argument);
+            EXPECT_THROW((l::StartupArena{plan, inputs, memory}), std::invalid_argument);
+            EXPECT_TRUE(first.owner_ref().managed());
+        }
+        EXPECT_NO_THROW((l::StartupArena{plan, inputs, memory}));
+    }
+
+    TEST(StartupArenaTest, InvalidInputKindAndReferencesAreRejectedBeforeNativeConstruction) {
+        const std::array requests{s::StartupRequest{{1}, s::StartupKind::PHYSICAL_DEVICE}};
+        const s::StartupPlan<1> plan(requests);
+        const std::array<l::StartupInit, 1> wrong_kind{headless_info()};
+        const std::array<l::StartupInit, 1> missing_parent{l::PhysicalDeviceInit{t::ResourceId{99}, {}}};
+        const std::array<l::StartupInit, 1> wrong_parent{l::PhysicalDeviceInit{t::ResourceId{1}, {}}};
+        const std::array<l::StartupInit, 0> missing_entry{};
+        EXPECT_THROW((l::StartupArena{plan, wrong_kind}), std::invalid_argument);
+        EXPECT_THROW((l::StartupArena{plan, missing_parent}), std::out_of_range);
+        EXPECT_THROW((l::StartupArena{plan, wrong_parent}), std::invalid_argument);
+        EXPECT_THROW((l::StartupArena{plan, missing_entry}), std::invalid_argument);
+    }
+
+    TEST_F(StartupArenaVulkanIntegrationTest, ReverseDeclarationBuildsParentsFirstAndSharesOneOwnerForTwoDevices) {
+        const std::array requests{s::StartupRequest{{3}, s::StartupKind::DEVICE},
+                                  s::StartupRequest{{4}, s::StartupKind::DEVICE},
+                                  s::StartupRequest{{2}, s::StartupKind::PHYSICAL_DEVICE},
+                                  s::StartupRequest{{1}, s::StartupKind::INSTANCE}};
+        const s::StartupPlan<4> plan(requests);
+        const std::array<l::StartupInit, 4> inputs{l::DeviceInit{t::ResourceId{2}, {}}, l::DeviceInit{t::ResourceId{2}, {}},
+                                                   l::PhysicalDeviceInit{t::ResourceId{1}, {}}, headless_info()};
+        l::WeakOwnerRef root;
+        vsl::LogicalDeviceAccessor saved;
+        {
+            l::StartupArena arena(plan, inputs);
+            root = arena.owner_ref().weak();
+            EXPECT_EQ(arena.size(), 4u);
+            EXPECT_EQ(arena.slots(), 4u);
+            auto first = arena.device({3}), second = arena.device({4});
+            EXPECT_NE(StartupAccess::Owned(first), StartupAccess::Owned(second));
+            EXPECT_NE(StartupAccess::Owned(first)->device, StartupAccess::Owned(second)->device);
+            EXPECT_FALSE(StartupAccess::Owned(first).owner_before(StartupAccess::Owned(second)));
+            EXPECT_FALSE(StartupAccess::Owned(second).owner_before(StartupAccess::Owned(first)));
+            EXPECT_EQ(StartupAccess::Owned(first.get_physical_device()), StartupAccess::Owned(arena.physical_device({2})));
+            EXPECT_EQ(StartupAccess::Owned(first.get_physical_device().get_instance()), StartupAccess::Owned(arena.instance({1})));
+            EXPECT_THROW(arena.instance({3}), std::invalid_argument);
+            saved = first;
+        }
+        EXPECT_FALSE(root.expired());
+        EXPECT_TRUE(saved.get_physical_device().get_instance().owner_ref().managed());
+        StartupAccess::Owned(saved).reset();
+        EXPECT_TRUE(root.expired());
+    }
+
+    TEST_F(StartupArenaVulkanIntegrationTest, ExternalGetterReturnsOriginalOwnerAndDoesNotRetainImporter) {
+        const std::array requests{s::StartupRequest{{1}, s::StartupKind::INSTANCE, true},
+                                  s::StartupRequest{{2}, s::StartupKind::PHYSICAL_DEVICE, true},
+                                  s::StartupRequest{{3}, s::StartupKind::DEVICE, true}};
+        const s::StartupPlan<3> plan(requests);
+        const std::array<l::StartupInit, 3> inputs{vsl::lifetime::detail::StartupAccess::FromShared(instance), physical, device};
+        vsl::LogicalDeviceAccessor saved;
+        l::WeakOwnerRef importer;
+        {
+            l::StartupArena arena(plan, inputs);
+            importer = arena.owner_ref().weak();
+            EXPECT_EQ(arena.slots(), 0u);
+            EXPECT_EQ(arena.size(), 3u);
+            EXPECT_EQ(StartupAccess::Owned(arena.instance({1})), instance);
+            EXPECT_EQ(StartupAccess::Owned(arena.physical_device({2})), StartupAccess::Owned(physical));
+            saved = arena.device({3});
+            EXPECT_FALSE(StartupAccess::Owned(saved).owner_before(StartupAccess::Owned(device)));
+            EXPECT_FALSE(StartupAccess::Owned(device).owner_before(StartupAccess::Owned(saved)));
+        }
+        EXPECT_TRUE(importer.expired());
+        EXPECT_EQ(StartupAccess::Owned(saved), StartupAccess::Owned(device));
+    }
+
+    TEST_F(StartupArenaVulkanIntegrationTest, LaterDeviceFailureRollsBackAndAllowsTheSameMemoryToBeReused) {
+        const std::array requests{s::StartupRequest{{1}, s::StartupKind::INSTANCE},
+                                  s::StartupRequest{{2}, s::StartupKind::PHYSICAL_DEVICE},
+                                  s::StartupRequest{{3}, s::StartupKind::DEVICE},
+                                  s::StartupRequest{{4}, s::StartupKind::DEVICE}};
+        const s::StartupPlan<4> plan(requests);
+        s::ArenaMemory memory(plan.bytes() + 64, plan.alignment());
+        vsl::DeviceCreateInfo bad;
+        bad.features = static_cast<vsl::DeviceFeature>(1ull << 63);
+        std::array<l::StartupInit, 4> inputs{headless_info(), l::PhysicalDeviceInit{t::ResourceId{1}, {}},
+                                             l::DeviceInit{t::ResourceId{2}, {}}, l::DeviceInit{t::ResourceId{2}, bad}};
+        EXPECT_THROW((l::StartupArena{plan, inputs, memory}), std::invalid_argument);
+        inputs[3] = l::DeviceInit{t::ResourceId{2}, {}};
+        vsl::LogicalDeviceAccessor saved;
+        {
+            l::StartupArena retry(plan, inputs, memory);
+            EXPECT_EQ(retry.size(), plan.size());
+            saved = retry.device({3});
+        }
+        EXPECT_THROW((l::StartupArena{plan, inputs, memory}), std::invalid_argument);
+        StartupAccess::Owned(saved).reset();
+        EXPECT_NO_THROW((l::StartupArena{plan, inputs, memory}));
+    }
+
+    TEST_F(StartupArenaVulkanIntegrationTest, ExternalInstanceIsACommonFixedParentRatherThanAnArenaSelfOwner) {
+        const std::array requests{s::StartupRequest{{1}, s::StartupKind::PHYSICAL_DEVICE},
+                                  s::StartupRequest{{2}, s::StartupKind::DEVICE}};
+        const s::StartupPlan<2> plan(requests);
+        const std::array<l::StartupInit, 2> inputs{l::PhysicalDeviceInit{vsl::lifetime::detail::StartupAccess::FromShared(instance), {}}, l::DeviceInit{t::ResourceId{1}, {}}};
+        l::WeakOwnerRef root;
+        {
+            l::StartupArena arena(plan, inputs);
+            root = arena.owner_ref().weak();
+            const auto parent = arena.device({2}).get_physical_device().get_instance();
+            EXPECT_EQ(StartupAccess::Owned(parent), instance);
+            EXPECT_FALSE(StartupAccess::Owned(parent).owner_before(instance));
+            EXPECT_FALSE(instance.owner_before(StartupAccess::Shared(parent)));
+            EXPECT_TRUE(arena.owner_ref().owner_before(StartupAccess::Owned(parent)) || StartupAccess::Owned(parent).owner_before(arena.owner_ref().share()));
+        }
+        EXPECT_TRUE(root.expired());
+    }
+
+    TEST_F(StartupArenaVulkanIntegrationTest, PublicStartupDeviceSupportsTypedCommandAfterArenaFacadeDestruction) {
+        std::weak_ptr<void> startup_owner;
+        {
+            const std::array requests{s::StartupRequest{{1}, s::StartupKind::DEVICE}};
+            const s::StartupPlan<1> plan(requests);
+            const std::array<l::StartupInit, 1> inputs{l::DeviceInit{physical, {}}};
+            vsl::LogicalDeviceAccessor placed;
+            {
+                l::StartupArena arena(plan, inputs);
+                startup_owner = arena.owner_ref().share();
+                placed = arena.device({1});
+            }
+            vsl::CommandManager manager(placed);
+            Native destination(placed, 16);
+            auto result = View::FromBuffer(destination);
+            std::optional<vsl::command::CopyBuffer> command;
+            std::weak_ptr<void> source_owner;
+            {
+                Buffers buffers(placed, Buffers::Plan({4}));
+                source_owner = buffers.storage().owner();
+                auto source = buffers.view<t::ResourceId{1}>();
+                source.copy(std::array<std::uint32_t, 4>{3, 6, 9, 12});
+                command.emplace(source.copy_to(result));
+            }
+            StartupAccess::Owned(placed).reset();
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << *command;
+            command.reset();
+            auto completion = phase.completion();
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+            ASSERT_TRUE(completion.wait());
+            EXPECT_TRUE(source_owner.expired());
+            std::array<std::uint32_t, 4> actual{};
+            result.read_into(actual);
+            EXPECT_EQ(actual, (std::array<std::uint32_t, 4>{3, 6, 9, 12}));
+            EXPECT_FALSE(startup_owner.expired());
+        }
+        EXPECT_TRUE(startup_owner.expired());
+    }
+
+    TEST_F(StartupSurfaceVulkanIntegrationTest, GraphicsDeviceDoesNotRetainItsCallOnlySurfaceOrOSWindow) {
+        vsl::LogicalDeviceAccessor saved;
+        l::WeakOwnerRef surface_root, os_root;
+        {
+            const std::array surface_requests{s::StartupRequest{{1}, s::StartupKind::SURFACE}};
+            const s::StartupPlan<1> surface_plan(surface_requests);
+            const std::array<l::StartupInit, 1> surface_inputs{l::SurfaceInit{vsl::lifetime::detail::StartupAccess::FromShared(instance), window->window_owner()}};
+            l::StartupArena surfaces(surface_plan, surface_inputs);
+            surface_root = surfaces.owner_ref().weak();
+            os_root = window->window_owner().owner_ref().weak();
+            const std::array device_requests{s::StartupRequest{{2}, s::StartupKind::PHYSICAL_DEVICE}, s::StartupRequest{{3}, s::StartupKind::DEVICE}};
+            const s::StartupPlan<2> device_plan(device_requests);
+            const std::array<l::StartupInit, 2> device_inputs{l::PhysicalDeviceInit{vsl::lifetime::detail::StartupAccess::FromShared(instance), {}},
+                                                              l::GraphicsDeviceInit{t::ResourceId{2}, surfaces.surface({1}), false}};
+            l::StartupArena devices(device_plan, device_inputs);
+            saved = devices.device({3});
+            EXPECT_EQ(StartupAccess::Owned(saved.get_physical_device().get_instance()), instance);
+        }
+        EXPECT_TRUE(surface_root.expired());
+        EXPECT_TRUE(window->close());
+        EXPECT_TRUE(os_root.expired());
+        EXPECT_TRUE(saved.owner_ref().managed());
+        Native buffer(saved, 16);
+        EXPECT_TRUE(BufferAccess::Owned(buffer)->buffer);
+    }
+
+    TEST_F(StartupSurfaceVulkanIntegrationTest, PlacedSurfacePluginReusesNativeAndRejectsAnotherOrUnmanagedWindow) {
+        const std::array requests{s::StartupRequest{{1}, s::StartupKind::SURFACE}};
+        const s::StartupPlan<1> plan(requests);
+        const std::array<l::StartupInit, 1> inputs{l::SurfaceInit{vsl::lifetime::detail::StartupAccess::FromShared(instance), window->window_owner()}};
+        l::StartupArena arena(plan, inputs);
+        auto original = arena.surface({1});
+        auto plugin = window->add_plugin<vsl::Surface>(original);
+        EXPECT_EQ(StartupAccess::Owned(*(plugin)), StartupAccess::Owned(original));
+        EXPECT_EQ(StartupAccess::Owned(*(plugin))->surface, StartupAccess::Owned(original)->surface);
+        auto fake_data = std::make_shared<vsl::PureWindow::WindowData>();
+        fake_data->window_handle = WindowAccess::State(*(window))->window_handle;
+        vsl::PureWindow fake(WindowAccess::FromState(fake_data));
+        EXPECT_THROW(fake.add_plugin<vsl::Surface>(original), vsl::exceptions::RuntimeException);
+        fake_data->window_handle = nullptr;
+        EXPECT_TRUE(window->close());
+        EXPECT_THROW(window->add_plugin<vsl::Surface>(original), std::invalid_argument);
+        EXPECT_TRUE(original.get_window_owner());
+    }
+} // namespace

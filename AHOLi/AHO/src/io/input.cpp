@@ -3,12 +3,14 @@
 //
 
 #include <AHO/io/input.hpp>
+#include <VSL/lifetime/glfw_lease.hpp>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
 template<>
 std::string AHO_NAMESPACE::input::CodeID<AHO_NAMESPACE::input::KeyCode>::name() const {
+    VSL_NAMESPACE::lifetime::GLFWCallScope scope;
     const char* name = glfwGetKeyName(static_cast<int>(_code), 0);
     return name ? name : "";
 }

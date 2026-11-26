@@ -9,6 +9,9 @@ find_package(spirv_cross_core CONFIG REQUIRED)
 add_library(VSL STATIC
         ./VSL/src/exceptions.cpp
         VSL/src/window.cpp
+        VSL/src/lifetime/window_state.cpp
+        VSL/src/private/VSL/lifetime/window_state.hpp
+        VSL/src/private/VSL/lifetime/window_access.hpp
         ./VSL/src/window_plugin.cpp
         ./VSL/src/utils/spir_reflector.cpp
         VSL/src/utils/typed_shader.cpp
@@ -40,7 +43,48 @@ add_library(VSL STATIC
         VSL/src/vulkan/stages/dynamic_state.cpp
         VSL/src/vulkan/stages/color_blend.cpp
         VSL/src/vulkan/pipeline_layout.cpp
-        VSL/src/vulkan/resource_use.cpp
+        VSL/src/lifetime/pipeline_recipe.cpp
+        VSL/include/VSL/lifetime/pipeline_recipe.hpp
+        VSL/src/lifetime/resource_use.cpp
+        VSL/include/VSL/lifetime/native_recording.hpp
+        VSL/src/lifetime/native_recording.cpp
+        VSL/src/private/VSL/operation/native_recording.hpp
+        VSL/src/operation/native_recording.cpp
+        VSL/src/private/VSL/operation/image_barrier.hpp
+        VSL/src/operation/image_barrier.cpp
+        VSL/src/lifetime/descriptor_bindings.cpp
+        VSL/src/lifetime/descriptor_storage.cpp
+        VSL/src/lifetime/logical_use_state.cpp
+        VSL/src/lifetime/dependency_node.cpp
+        VSL/include/VSL/lifetime/owner_ref.hpp
+        VSL/include/VSL/lifetime/resource_identity.hpp
+        VSL/src/private/VSL/lifetime/resource_use_factory.hpp
+        VSL/src/private/VSL/lifetime/buffer_access.hpp
+        VSL/src/private/VSL/lifetime/image_access.hpp
+        VSL/src/private/VSL/lifetime/sampler_access.hpp
+        VSL/src/private/VSL/lifetime/command_access.hpp
+        VSL/src/private/VSL/lifetime/identity_access.hpp
+        VSL/include/VSL/lifetime/dependency_node.hpp
+        VSL/include/VSL/lifetime/logical_use_state.hpp
+        VSL/src/operation/descriptor_ops.cpp
+        VSL/src/sync/resource_use_state.cpp
+        VSL/src/sync/completion.cpp
+        VSL/src/sync/presentation_state.cpp
+        VSL/src/operation/presentation_ops.cpp
+        VSL/src/private/VSL/sync/presentation_state.hpp
+        VSL/src/private/VSL/lifetime/presentation_retention.hpp
+        VSL/src/lifetime/presentation_retention.cpp
+        VSL/src/private/VSL/lifetime/acquire_ticket.hpp
+        VSL/src/lifetime/acquire_ticket.cpp
+        VSL/src/private/VSL/sync/acquisition_state.hpp
+        VSL/include/VSL/lifetime/surface_recovery.hpp
+        VSL/src/private/VSL/lifetime/recovery_batch.hpp
+        VSL/src/lifetime/surface_recovery.cpp
+        VSL/src/private/VSL/lifetime/phase_call.hpp
+        VSL/src/lifetime/phase_call.cpp
+        VSL/src/private/VSL/lifetime/facade_call.hpp
+        VSL/src/lifetime/facade_call.cpp
+        VSL/src/private/VSL/operation/presentation_ops.hpp
         VSL/src/utils/typed_buffer_view.cpp
         VSL/src/vulkan/command.cpp
         VSL/src/vulkan/device.cpp
@@ -49,6 +93,140 @@ add_library(VSL STATIC
         VSL/src/vulkan/synchronize.cpp
         VSL/src/vulkan/shader.cpp
         VSL/src/vulkan/buffer.cpp
+        VSL/src/operation/buffer_ops.cpp
+        VSL/src/operation/image_ops.cpp
+        VSL/src/operation/sampler_ops.cpp
+        VSL/include/VSL/operation/pipeline_layout_create_info.hpp
+        VSL/src/private/VSL/operation/pipeline_layout_ops.hpp
+        VSL/include/VSL/operation/render_pass_description.hpp
+        VSL/include/VSL/operation/graphics_pipeline_state.hpp
+        VSL/src/private/VSL/operation/graphics_pipeline_state_access.hpp
+        VSL/src/private/VSL/operation/render_pass_ops.hpp
+        VSL/src/private/VSL/operation/pipeline_ops.hpp
+        VSL/src/private/VSL/operation/frame_buffer_ops.hpp
+        VSL/src/operation/render_pass_ops.cpp
+        VSL/src/operation/pipeline_ops.cpp
+        VSL/src/operation/frame_buffer_ops.cpp
+        VSL/src/operation/graphics_pipeline_state.cpp
+        VSL/src/private/VSL/lifetime/render_pass_storage.hpp
+        VSL/src/private/VSL/lifetime/pipeline_storage.hpp
+        VSL/src/private/VSL/lifetime/frame_buffer_storage.hpp
+        VSL/src/lifetime/render_pass_storage.cpp
+        VSL/src/lifetime/pipeline_storage.cpp
+        VSL/src/lifetime/frame_buffer_storage.cpp
+        VSL/src/operation/pipeline_layout_ops.cpp
+        VSL/src/private/VSL/lifetime/pipeline_layout_storage.hpp
+        VSL/src/lifetime/pipeline_layout_storage.cpp
+        VSL/src/operation/shader_ops.cpp
+        VSL/src/private/VSL/operation/shader_ops.hpp
+        VSL/include/VSL/operation/shader_create_info.hpp
+        VSL/src/operation/submission_ops.cpp
+        VSL/src/sync/device_call.cpp
+        VSL/src/sync/buffer_access.cpp
+        VSL/src/lifetime/buffer_storage.cpp
+        VSL/src/lifetime/image_storage.cpp
+        VSL/src/lifetime/sampler_storage.cpp
+        VSL/src/lifetime/shader_storage.cpp
+        VSL/src/private/VSL/lifetime/shader_storage.hpp
+        VSL/src/private/VSL/lifetime/shader_access.hpp
+        VSL/src/private/VSL/lifetime/descriptor_access.hpp
+        VSL/src/private/VSL/lifetime/graphics_access.hpp
+        VSL/src/private/VSL/lifetime/synchronization_access.hpp
+        VSL/src/private/VSL/lifetime/owner_validation.hpp
+        VSL/src/private/VSL/lifetime/swapchain_access.hpp
+        VSL/src/private/VSL/lifetime/pipeline_recipe_access.hpp
+        VSL/src/lifetime/submission_retention.cpp
+        VSL/src/lifetime/command_domain.cpp
+        VSL/include/VSL/operation/command_create_info.hpp
+        VSL/src/private/VSL/operation/command_ops.hpp
+        VSL/src/operation/command_ops.cpp
+        VSL/src/private/VSL/lifetime/command_storage.hpp
+        VSL/src/lifetime/command_storage.cpp
+        VSL/src/private/VSL/sync/synchronization_state.hpp
+        VSL/src/private/VSL/sync/resource_use_access.hpp
+        VSL/src/sync/synchronization_state.cpp
+        VSL/src/private/VSL/lifetime/synchronization_use.hpp
+        VSL/src/lifetime/synchronization_use.cpp
+        VSL/include/VSL/operation/synchronization_create_info.hpp
+        VSL/include/VSL/storage/typed_storage_policy.hpp
+        VSL/include/VSL/operation/instance_create_info.hpp
+        VSL/src/private/VSL/operation/instance_ops.hpp
+        VSL/src/operation/instance_ops.cpp
+        VSL/src/private/VSL/lifetime/instance_storage.hpp
+        VSL/src/lifetime/instance_storage.cpp
+        VSL/src/private/VSL/operation/physical_device_ops.hpp
+        VSL/src/operation/physical_device_ops.cpp
+        VSL/src/private/VSL/lifetime/physical_device_storage.hpp
+        VSL/src/lifetime/physical_device_storage.cpp
+        VSL/src/private/VSL/lifetime/startup_access.hpp
+        VSL/src/lifetime/startup_access.cpp
+        VSL/src/lifetime/physical_device_collection.cpp
+        VSL/include/VSL/lifetime/glfw_lease.hpp
+        VSL/include/VSL/lifetime/window_owner.hpp
+        VSL/src/private/VSL/lifetime/window_runtime.hpp
+        VSL/src/lifetime/window_runtime.cpp
+        VSL/src/private/VSL/operation/window_ops.hpp
+        VSL/src/operation/window_ops.cpp
+        VSL/src/private/VSL/operation/surface_ops.hpp
+        VSL/src/operation/surface_ops.cpp
+        VSL/src/private/VSL/lifetime/surface_storage.hpp
+        VSL/src/lifetime/surface_storage.cpp
+        VSL/include/VSL/operation/device_create_info.hpp
+        VSL/src/private/VSL/operation/device_ops.hpp
+        VSL/src/operation/device_ops.cpp
+        VSL/src/private/VSL/lifetime/device_storage.hpp
+        VSL/src/private/VSL/lifetime/device_owner.hpp
+        VSL/src/lifetime/device_storage.cpp
+        VSL/include/VSL/storage/startup_plan.hpp
+        VSL/include/VSL/lifetime/startup_arena.hpp
+        VSL/src/lifetime/startup_arena.cpp
+        VSL/include/VSL/operation/swapchain_create_info.hpp
+        VSL/include/VSL/storage/swapchain_layout.hpp
+        VSL/include/VSL/lifetime/swapchain_arena.hpp
+        VSL/include/VSL/lifetime/phase_liveness.hpp
+        VSL/src/private/VSL/operation/swapchain_ops.hpp
+        VSL/src/operation/swapchain_ops.cpp
+        VSL/src/private/VSL/lifetime/swapchain_storage.hpp
+        VSL/src/lifetime/swapchain_storage.cpp
+        VSL/src/lifetime/glfw_instance.cpp
+        VSL/src/private/VSL/lifetime/synchronization_storage.hpp
+        VSL/src/lifetime/synchronization_storage.cpp
+        VSL/src/private/VSL/operation/synchronization_ops.hpp
+        VSL/src/operation/synchronization_ops.cpp
+        VSL/src/private/VSL/lifetime/command_domain.hpp
+        VSL/src/lifetime/buffer_arena.cpp
+        VSL/src/lifetime/resource_arena.cpp
+        VSL/src/private/VSL/lifetime/arena_resource.hpp
+        VSL/include/VSL/lifetime/resource_arena.hpp
+        VSL/src/storage/arena_memory.cpp
+        VSL/include/VSL/storage/arena_memory.hpp
+        VSL/include/VSL/lifetime/buffer_arena.hpp
+        VSL/include/VSL/lifetime/buffer_view.hpp
+        VSL/include/VSL/lifetime/typed_buffer_arena.hpp
+        VSL/include/VSL/lifetime/typed_bundle_plan.hpp
+        VSL/include/VSL/lifetime/typed_descriptor_layouts.hpp
+        VSL/src/lifetime/typed_descriptor_layouts.cpp
+        VSL/include/VSL/lifetime/typed_descriptor_plan.hpp
+        VSL/include/VSL/lifetime/typed_resource_buffer_view.hpp
+        VSL/include/VSL/lifetime/resource_use.hpp
+        VSL/include/VSL/sync/resource_use_state.hpp
+        VSL/include/VSL/sync/completion.hpp
+        VSL/include/VSL/operation/buffer_create_info.hpp
+        VSL/include/VSL/operation/image_create_info.hpp
+        VSL/include/VSL/operation/sampler_create_info.hpp
+        VSL/include/VSL/operation/descriptor_create_info.hpp
+        VSL/src/storage/buffer_layout.cpp
+        VSL/src/storage/resource_layout.cpp
+        VSL/include/VSL/storage/resource_layout.hpp
+        VSL/include/VSL/lifetime/resource_id.hpp
+        VSL/include/VSL/lifetime/resource_plan.hpp
+        VSL/src/lifetime/buffer_view.cpp
+        VSL/include/VSL/vulkan/buffer_view.hpp
+        VSL/include/VSL/vulkan/buffer_create_info.hpp
+        VSL/include/VSL/storage/buffer_abi.hpp
+        VSL/include/VSL/storage/buffer_layout.hpp
+        VSL/include/VSL/storage/buffer_arena.hpp
+        VSL/include/VSL/utils/typed_buffer_arena.hpp
         VSL/src/vulkan/swapchain.cpp
         VSL/src/vulkan/commands/copy_image_to_buffer.cpp
         VSL/src/vulkan/commands/render_pass_end.cpp
@@ -105,7 +283,7 @@ add_library(VSL STATIC
         VSL/include/VSL/vulkan/viewport.hpp
         VSL/include/VSL/vulkan/vulkan.hpp
         VSL/include/VSL/vulkan/window_plugin/hook_window_resize.hpp
-        VSL/include/VSL/vulkan/_pimpls.hpp
+        VSL/src/private/VSL/vulkan/_pimpls.hpp
         VSL/include/VSL/vulkan/post_definition.hpp
         VSL/include/VSL/vulkan/stages/input_assembly.hpp
         VSL/include/VSL/vulkan/stages/dynamic_state.hpp
@@ -160,6 +338,9 @@ add_library(VSL STATIC
 target_compile_features(VSL PUBLIC cxx_std_26)
 add_library(VSL::VSL ALIAS VSL)
 aho_target_build_options(VSL)
+target_include_directories(VSL PRIVATE "${VSL_HOME}/src/private")
+include(cmake/BufferLayout.cmake)
+vsl_generate_buffer_layout()
 target_include_directories(VSL PUBLIC
         "$<BUILD_INTERFACE:${VSL_HOME}/include>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")

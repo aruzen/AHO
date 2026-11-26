@@ -1,4 +1,6 @@
 #pragma once
+#include <VSL/lifetime/startup_access.hpp>
+#include <VSL/lifetime/swapchain_access.hpp>
 #include "vulkan_fixture.hpp"
 #include <VSL/vulkan/commands/copy_image_to_buffer.hpp>
 #include <array>
@@ -34,12 +36,12 @@ namespace vsl_test {
         if (!host_coherent_available())
             GTEST_SKIP() << "Host coherent memory unavailable";
         color.emplace(device, WIDTH, HEIGHT, vsl::data_format::UNSIGNED_NORMALIZED8_RGBA);
-        description.data_ = std::make_shared<vsl::impl::SwapchainImpl>();
-        description.data_->device = device.data_;
-        description.data_->extent = description.data_->swap_chain_extent = vk::Extent2D{WIDTH, HEIGHT};
-        description.data_->image_count = 1;
-        description.data_->swap_chain_image_format = vk::Format::eR8G8B8A8Unorm;
-        description.images = {*color};
+        auto metadata = std::make_shared<vsl::impl::SwapchainImpl>();
+        metadata->device = VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device).get();
+        metadata->extent = metadata->swap_chain_extent = vk::Extent2D{WIDTH, HEIGHT};
+        metadata->image_count = 1;
+        metadata->swap_chain_image_format = vk::Format::eR8G8B8A8Unorm;
+        description = VSL_NAMESPACE::lifetime::detail::SwapchainAccess::FromShared(std::move(metadata), {*color});
         vsl::RenderPassDescription pass_description;
         pass_description.add_color({.format = vsl::data_format::UNSIGNED_NORMALIZED8_RGBA,
                                     .final_layout = vsl::ImageLayout::GENERAL});
@@ -72,13 +74,13 @@ namespace vsl_test {
             commands(stream);
             stream << vsl::command::RenderPassEnd{};
         }
-        device.data_->device.waitIdle();
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.waitIdle();
         vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION> readback(device, WIDTH * HEIGHT * 4);
         {
             auto phase = manager.start_phase<vsl::ComputePhase>();
             phase << vsl::command::CopyImageToBuffer(&readback, *color);
         }
-        device.data_->device.waitIdle();
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.waitIdle();
         auto mapped = readback.data(WIDTH * HEIGHT * 4);
         std::array<std::uint8_t, 4> result{};
         // 中央ピクセルを読み、端のラスタライズ規則から独立した検証にする。
@@ -96,16 +98,15 @@ namespace vsl_test {
     }
 
     inline void RenderVulkanIntegrationTest::TearDown() {
-        if (device.data_)
-            device.data_->device.waitIdle();
+        if (VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device))
+            VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.waitIdle();
         pipeline.reset();
         layout.reset();
         vertex.reset();
         fragment.reset();
         framebuffer.reset();
         pass.reset();
-        description.images.clear();
-        description.data_.reset();
+        description = {};
         color.reset();
         VulkanIntegrationTest::TearDown();
     }

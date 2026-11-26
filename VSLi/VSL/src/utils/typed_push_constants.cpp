@@ -1,9 +1,25 @@
+#include <VSL/lifetime/pipeline_recipe_access.hpp>
+#include <VSL/lifetime/graphics_access.hpp>
+#include <VSL/lifetime/owner_access.hpp>
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/utils/typed_block_validation.hpp>
 #include <VSL/utils/typed_push_constants.hpp>
 #include <VSL/utils/spir_reflector.hpp>
 #include <VSL/vulkan/_pimpls.hpp>
 #include <stdexcept>
 #include <algorithm>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
+}
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 
 namespace VSL_NAMESPACE::typed::detail {
     void inject_push_schema(PipelineLayoutEditAccessor layout, std::span<const PushRequirement> requirements) {
@@ -12,9 +28,10 @@ namespace VSL_NAMESPACE::typed::detail {
             pushes.definitions.push_back(requirement.range);
         pushes.injection(layout);
     }
-    void validate_push_schema(PipelineLayoutAccessor layout, std::span<const PushRequirement> requirements) {
-        for (const auto& shader : layout.data_->info->shaders) {
-            utils::SPIRVReflector reflection({}, std::span<const std::uint32_t>(shader->code), shader->name, ShaderType(shader->shader_stage_create_info.stage));
+
+    void validate_push_schema(const lifetime::PipelineRecipeSnapshot& recipe, std::span<const PushRequirement> requirements) {
+        for (const auto& shader : PipelineRecipeAccess::Read(recipe).shaders) {
+            utils::SPIRVReflector reflection({}, std::span<const std::uint32_t>(shader->code), shader->name, ShaderType(shader->stage));
             if (!reflection.generated.push_constants)
                 continue;
             for (const auto& member : reflection.generated.push_constants->definitions) {
@@ -35,6 +52,7 @@ namespace VSL_NAMESPACE::typed::detail {
             validate_push_blocks(reflection.generated, requirements);
         }
     }
+
     void validate_push_values(std::span<const PushRequirement> requirements, std::span<const std::byte> values) {
         for (const auto& requirement : requirements)
             if (requirement.data_offset > values.size() || requirement.range.size > values.size() - requirement.data_offset)
@@ -51,12 +69,12 @@ namespace VSL_NAMESPACE::typed::detail {
             }
         }
     }
+
     void invoke_push_values(PipelineAccessor pipeline, CommandBuffer buffer, std::span<const PushRequirement> requirements, std::span<const std::byte> values) {
         validate_push_values(requirements, values);
-        buffer.retain(pipeline.data_);
-        const auto& layout = pipeline.data_->layout;
-        const auto& info = layout->info->pipeline_layout;
-        const std::span native_ranges(info.pPushConstantRanges, info.pushConstantRangeCount);
+        buffer.retain(lifetime::detail::OwnerAccess::Shared(GraphicsAccess::Owned(pipeline)));
+        const auto& layout = GraphicsAccess::Owned(pipeline)->layout;
+        const std::span native_ranges(layout->push_ranges);
         for (const auto& requirement : requirements) {
             const auto& range = requirement.range;
             auto cursor = range.offset;
@@ -75,8 +93,8 @@ namespace VSL_NAMESPACE::typed::detail {
                 }
                 if (!stages)
                     throw std::logic_error("Typed push schema is not covered by its native layout");
-                buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pushConstants(layout->pipeline_layout,
-                                                                                             stages, cursor, next - cursor, values.data() + requirement.data_offset + cursor - range.offset);
+                CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pushConstants(layout->pipeline_layout,
+                                                                                                            stages, cursor, next - cursor, values.data() + requirement.data_offset + cursor - range.offset);
                 cursor = next;
             }
         }

@@ -1,19 +1,33 @@
+#include <VSL/lifetime/startup_access.hpp>
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/utils/typed_batch.hpp>
 #include "support/render_fixture.hpp"
 
 namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
+
+namespace {
     namespace t = vsl::typed;
     using Empty = t::TypedVertexInput<>;
+
     struct Position {
         float xy[2];
     };
+
     struct Color {
         float rgb[3];
     };
+
     using Positions = t::VertexRecord<Position, VSL_VERTEX_MEMBER(Position, xy)>;
     using Colors = t::VertexRecord<Color, VSL_VERTEX_MEMBER(Color, rgb)>;
     using Input = t::TypedVertexInput<Positions::Binding<0>, Colors::Binding<1, t::VertexTiming::NEXT_VERTEX, 1>>;
     const std::array<Position, 3> POSITIONS{{{{-1, -1}}, {{3, -1}}, {{-1, 3}}}};
+
     class TypedBatchVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
 
@@ -21,6 +35,7 @@ namespace {
         template<typename Layout = Empty, typename Resources = t::ResourceSchema<>, typename Pushes = t::PushSchema<>>
         t::TypedGraphicsPipeline<Layout, Resources, Pushes> make_typed(const char* path = "triangle.vert.spv");
     };
+
     template<typename Layout, typename Resources, typename Pushes>
     t::TypedGraphicsPipeline<Layout, Resources, Pushes> TypedBatchVulkanIntegrationTest::make_typed(const char* path) {
         namespace pl = vsl::pipeline_layout;
@@ -28,6 +43,7 @@ namespace {
         return {device, *pass, pl::ShaderGroup("batch", {shader, *fragment}), pl::ColorBlend{}, pl::InputAssembly{},
                 pl::Rasterization{pl::CullingMode::NONE}, pl::Multisample{}, pl::DynamicState{}, vsl::Viewport(description), vsl::Scissor(description)};
     }
+
     TEST_F(TypedBatchVulkanIntegrationTest, RepeatedDrawsBindOnceAndBatchReuseStartsFromFreshState) {
         auto typed = make_typed();
         auto other = make_typed("typed_batch_red.vert.spv");
@@ -37,18 +53,21 @@ namespace {
         for (int iteration = 0; iteration < 2; ++iteration)
             ExpectTriangleColor(render([&](auto& stream) { stream << other.backend() << batch; }));
     }
+
     TEST_F(TypedBatchVulkanIntegrationTest, DistinctPipelineInstancesOfTheSameTypeAreBoundAndTheLastIsReported) {
         auto first = make_typed("typed_batch_red.vert.spv");
         auto last = make_typed();
+        EXPECT_NE(first.backend().identity(), last.backend().identity());
         auto batch = t::TypedBatch(first.bind_vertices().draw(3), last.bind_vertices().draw(3));
         EXPECT_EQ(batch.statistics().pipeline_binds, 2u);
-        EXPECT_EQ(batch.get_pipeline().data_, last.backend().data_);
+        EXPECT_EQ(batch.get_pipeline().identity(), last.backend().identity());
         ExpectTriangleColor(render([&](auto& stream) {
             stream << batch;
-            EXPECT_EQ(stream.pipeline->data_, last.backend().data_);
+            EXPECT_EQ(stream.pipeline->identity(), last.backend().identity());
             stream << vsl::command::Draw(3);
         }));
     }
+
     TEST_F(TypedBatchVulkanIntegrationTest, VertexBufferIdentityViewOffsetsAndIndexTypesArePartOfThePlan) {
         auto typed = make_typed<Input>("vertices.vert.spv");
         t::TypedVertexBuffer<Position> positions(device, POSITIONS);
@@ -69,10 +88,12 @@ namespace {
         EXPECT_EQ(batch.statistics().draws, 5u);
         ExpectTriangleColor(render([&](auto& stream) { stream << batch; }));
     }
+
     TEST_F(TypedBatchVulkanIntegrationTest, DescriptorIdentityAndEveryPushSnapshotArePreserved) {
         struct Tint {
             float rgba[4];
         };
+
         using Layout = t::BlockRecord<Tint, VSL_BLOCK_MEMBER(Tint, rgba)>;
         using Set = t::DescriptorSet<1, t::UniformBinding<4, Layout, vsl::ShaderFlag::VERTEX>>;
         using Resources = t::ResourceSchema<Set>;
@@ -82,6 +103,7 @@ namespace {
         t::TypedUniformBuffer<Layout> first_buffer(device, red), last_buffer(device, half);
         vsl::GraphicResourceManager manager(device);
         t::TypedDescriptorSet<Set::Layout> first(device, manager), last(device, manager);
+        EXPECT_NE(first.backend().identity(), last.backend().identity());
         first.write<4>(first_buffer);
         last.write<4>(last_buffer);
         auto batch = t::TypedBatch(
@@ -92,22 +114,24 @@ namespace {
         EXPECT_EQ(batch.statistics().descriptor_binds, 2u);
         ExpectTriangleColor(render([&](auto& stream) { stream << batch; }));
     }
+
     TEST_F(TypedBatchVulkanIntegrationTest, HeterogeneousCommandsRebindDescriptorsAcrossPipelineChangesAndKeepOwners) {
         struct Tint {
             float rgba[4];
         };
+
         using Layout = t::BlockRecord<Tint, VSL_BLOCK_MEMBER(Tint, rgba)>;
         using Set = t::DescriptorSet<1, t::UniformBinding<4, Layout, vsl::ShaderFlag::VERTEX>>;
         using Resources = t::ResourceSchema<Set>;
         using Push = t::PushSchema<t::PushRange<Layout, vsl::ShaderFlag::VERTEX, 16>>;
-        std::weak_ptr<vsl::impl::BufferImpl> owner;
+        std::weak_ptr<void> owner;
         auto batch = [&] {
             auto plain = make_typed();
             auto typed = make_typed<Empty, Resources, Push>("typed_push_resources.vert.spv");
             auto alternate = make_typed<Empty, Resources, Push>("typed_push_resources.vert.spv");
             const Tint half{{.125f, .25f, .375f, 0}};
             t::TypedUniformBuffer<Layout> uniform(device, half);
-            owner = uniform.backend().data_;
+            owner = uniform.storage_view().owner();
             vsl::GraphicResourceManager manager(device);
             t::TypedDescriptorSet<Set::Layout> set(device, manager);
             set.write<4>(uniform);
@@ -120,10 +144,12 @@ namespace {
         std::optional owned(std::move(batch));
         ExpectTriangleColor(render([&](auto& stream) { stream << *owned; owned.reset(); EXPECT_FALSE(owner.expired()); }));
     }
+
     TEST_F(TypedBatchVulkanIntegrationTest, ComputeBatchDeduplicatesBindingsAndPreservesDistinctPushValues) {
         struct PushData {
             std::uint32_t first, value;
         };
+
         using Layout = t::BlockRecord<PushData, VSL_BLOCK_MEMBER(PushData, first), VSL_BLOCK_MEMBER(PushData, value)>;
         using Push = t::PushSchema<t::PushRange<Layout, vsl::ShaderFlag::COMPUTE>>;
         using Set = t::DescriptorSet<0, t::StorageBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
@@ -146,11 +172,11 @@ namespace {
             phase << batch;
             auto native = manager.get_buffer();
             vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
-            native.data_->command_buffers[native.get_current_buffer_idx()].pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
+            CommandAccess::Data(native)->command_buffers[native.get_current_buffer_idx()].pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
-        device.data_->device.waitIdle();
-        auto mapped = output.backend().data();
-        const auto* actual = static_cast<const std::uint32_t*>(mapped.data);
+        StartupAccess::Owned(device)->device.waitIdle();
+        std::array<std::uint32_t, 8> actual{};
+        output.read_into(actual);
         for (size_t i = 0; i < 4; ++i) {
             EXPECT_EQ(actual[i], 10u + i);
             EXPECT_EQ(actual[4 + i], 20u + i);

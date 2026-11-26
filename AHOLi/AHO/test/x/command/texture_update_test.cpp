@@ -1,7 +1,12 @@
 #ifdef AHO_GPU_TESTS
+#include <VSL/lifetime/startup_access.hpp>
 #include <AHO/command/buffer_upload.hpp>
+#include <AHO/resource/arena_buffer.hpp>
+#include <AHO/resource/imported_buffer.hpp>
+#include <VSL/lifetime/buffer_arena.hpp>
 #include <AHO/x/command/texture_update.hpp>
 #include <VSL/vulkan/phase.hpp>
+#include <VSL/sync/submission_completion.hpp>
 #include <AHO/image_readback.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <array>
@@ -9,6 +14,7 @@
 
 namespace {
     namespace resource = aho::x::resource;
+
     class TextureUpdateVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override;
 
@@ -145,6 +151,49 @@ namespace {
             EXPECT_EQ(pixels.bytes[i], i < 12 ? std::byte{} : red[i - 12]);
     }
 
+    TEST_F(TextureUpdateVulkanIntegrationTest, FailedFirstSubmissionCanBeRetriedWithoutAssumingAnImageLayout) {
+        auto manager = make_manager();
+        resource::Texture texture(device, 2, 2);
+        aho::resource::Buffer<aho::resource::BufferType::GPU_FRIENDLY> upload(device);
+        const std::array<std::byte, 4> red{std::byte{255}, {}, {}, std::byte{255}};
+        upload.assign(red);
+        vsl::SynchroManager sync(device);
+        auto available = sync.create_semaphore("unused");
+        {
+            vsl::ComputePhase phase(manager, available, std::nullopt, std::nullopt, false, static_cast<vsl::PipelineStage>(0));
+            phase << texture.update(upload, {.width = 1, .height = 1});
+            EXPECT_THROW(phase.submit(), std::invalid_argument);
+            EXPECT_EQ(phase.completion().status(), vsl::Completion::Status::FAILED);
+        }
+        EXPECT_FALSE(upload.busy());
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << texture.update(upload, {.x = 1, .y = 1, .width = 1, .height = 1});
+            submit(phase);
+        }
+        const auto pixels = read(manager, texture);
+        for (std::size_t i = 0; i < 16; ++i)
+            EXPECT_EQ(pixels.bytes[i], i < 12 ? std::byte{} : red[i - 12]);
+    }
+
+    TEST_F(TextureUpdateVulkanIntegrationTest, DeviceLostObservationRejectsAnotherUpdateUntilTextureRecreation) {
+        auto manager = make_manager();
+        resource::Texture texture(device, 1, 1);
+        aho::resource::Buffer<aho::resource::BufferType::GPU_FRIENDLY> upload(device);
+        const std::array<std::byte, 4> red{std::byte{255}, {}, {}, std::byte{255}};
+        upload.assign(red);
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << texture.update(upload);
+            auto work = phase.completion().data_->work.lock();
+            vsl::sync::publish_terminal(*work, vsl::Completion::Status::FAILED, vsl::Completion::Failure::DEVICE_LOST, VK_ERROR_DEVICE_LOST);
+            phase.cancel();
+        }
+        auto fresh = manager.start_phase<vsl::ComputePhase>();
+        EXPECT_THROW(fresh << texture.update(upload), std::runtime_error);
+        fresh.cancel();
+    }
+
     TEST_F(TextureUpdateVulkanIntegrationTest, InvalidRequestsDoNotClaimTheBufferOrChangeTheTextureState) {
         auto manager = make_manager();
         resource::Texture texture(device, 2, 2);
@@ -156,7 +205,7 @@ namespace {
             auto phase = manager.start_phase<vsl::ComputePhase>();
             EXPECT_THROW(phase << texture.update(upload), std::out_of_range);
             EXPECT_THROW(phase << texture.update(upload, {.x = 2, .width = 1, .height = 1}), std::out_of_range);
-            EXPECT_THROW(phase << texture.update(upload, {.width = 1, .height = 1}, SIZE_MAX), std::invalid_argument);
+            EXPECT_THROW(phase << texture.update(upload, {.width = 1, .height = 1}, SIZE_MAX), std::out_of_range);
             EXPECT_FALSE(upload.busy());
             phase << texture.update(upload, {.width = 1, .height = 1});
             auto other = manager.independent();
@@ -263,6 +312,64 @@ namespace {
             submit(phase);
         }
         EXPECT_EQ(read(manager, texture).bytes, (std::vector<std::byte>(pixel.begin(), pixel.end())));
+    }
+
+    TEST_F(TextureUpdateVulkanIntegrationTest, PartialImportHonorsBothViewOffsetAndInitializedLogicalSize) {
+        const vsl::BufferCreateInfo info{24, aho::resource::detail::STANDARD_BUFFER_USAGE};
+        vsl::lifetime::BufferArena arena(device, std::span(&info, 1));
+        auto source = aho::resource::import_buffer(arena.view(0).view(4, 12));
+        const std::array<std::byte, 8> colors{std::byte{17}, {}, {}, std::byte{255}, {}, std::byte{73}, {}, std::byte{255}};
+        source.assign(std::span(colors).first(4));
+        resource::Texture texture(device, 1, 1);
+        auto manager = make_manager();
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            EXPECT_THROW(phase << texture.update(source, {}, 4), std::out_of_range);
+            EXPECT_FALSE(source.busy());
+            source.assign(colors);
+            phase << texture.update(source, {}, 4);
+            EXPECT_TRUE(source.busy());
+            EXPECT_THROW(source.write({}), std::logic_error);
+            submit(phase);
+        }
+        EXPECT_EQ(read(manager, texture).bytes, (std::vector<std::byte>(colors.begin() + 4, colors.end())));
+    }
+
+    TEST_F(TextureUpdateVulkanIntegrationTest, AvailabilityCallbackChangesTheLiveGenerationWithoutChangingTheCapturedUpload) {
+        auto source = aho::resource::make_arena_buffer(device, 4);
+        const std::array<std::byte, 4> red{std::byte{91}, {}, {}, std::byte{255}};
+        const std::array<std::byte, 4> green{std::byte{}, std::byte{137}, {}, std::byte{255}};
+        source.write(red);
+        resource::Texture texture(device, 1, 1);
+        auto command = texture.update(source);
+        auto manager = make_manager().independent(1), other = manager.independent(1);
+        auto submitted = manager.start_phase<vsl::ComputePhase>();
+        {
+            const auto snapshot = source.binding().snapshot();
+            snapshot.storage().resource_use().record(manager.get_buffer());
+        }
+        bool released = false;
+        manager.get_buffer().retain_until_complete(std::shared_ptr<int>(new int, [&](int* value) {
+            delete value;
+            released = true;
+            source.reserve(8);
+            source.write(green);
+        }));
+        ASSERT_EQ(submitted.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.waitIdle();
+        {
+            auto phase = other.start_phase<vsl::ComputePhase>();
+            phase << command;
+            EXPECT_TRUE(released);
+            EXPECT_EQ(source.capacity(), 8u);
+            EXPECT_TRUE(source.busy());
+            EXPECT_THROW(source.write({}), std::logic_error);
+            submit(phase);
+        }
+        EXPECT_EQ(read(other, texture).bytes, (std::vector<std::byte>(red.begin(), red.end())));
+        std::array<std::byte, 4> current{};
+        source.read_into(current);
+        EXPECT_EQ(current, green);
     }
 } // namespace
 #endif

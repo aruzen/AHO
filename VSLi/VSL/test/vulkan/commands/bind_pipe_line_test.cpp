@@ -1,22 +1,42 @@
+#include <VSL/lifetime/startup_access.hpp>
+#include <VSL/lifetime/graphics_access.hpp>
+#include <VSL/lifetime/command_access.hpp>
 #include "support/render_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
+
 namespace {
     class BindPipelineVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     TEST_F(BindPipelineVulkanIntegrationTest, RetainsAndBindsGraphicsPipeline) {
         vsl::command::BindPipeline binding(*pipeline);
-        EXPECT_EQ(binding.pipeline.data_, pipeline->data_);
+        EXPECT_EQ(GraphicsAccess::Owned(binding.pipeline), GraphicsAccess::Owned(*(pipeline)));
         ExpectTriangleColor(render([&](auto& stream) { stream << binding << vsl::command::Draw{3}; }));
     }
 } // namespace
 
 #include "support/compute_fixture.hpp"
 #include <atomic>
+
 namespace {
     class BindComputePipelineVulkanIntegrationTest : public vsl_test::ComputeVulkanIntegrationTest {
         VkDebugUtilsMessengerEXT _abort_messenger = VK_NULL_HANDLE;
         std::atomic<unsigned> _aborted_errors{0};
+
         bool validate_vulkan() const override { return true; }
+
         static VKAPI_ATTR VkBool32 VKAPI_CALL AbortInvalidCall(
             VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT,
             const VkDebugUtilsMessengerCallbackDataEXT*, void* user);
@@ -27,18 +47,23 @@ namespace {
         void check_pipeline_holder(bool shared_command);
         void check_bind(bool erase_type);
     };
+
     TEST_F(BindComputePipelineVulkanIntegrationTest, TypedComputePipelineBindsAtTheComputeBindPoint) {
         check_bind(false);
     }
+
     TEST_F(BindComputePipelineVulkanIntegrationTest, ErasedAccessorKeepsTheComputeBindPoint) {
         check_bind(true);
     }
+
     TEST_F(BindComputePipelineVulkanIntegrationTest, ValueCommandExposesThePipelineForImplicitDescriptorBinding) {
         check_pipeline_holder(false);
     }
+
     TEST_F(BindComputePipelineVulkanIntegrationTest, SharedCommandExposesThePipelineForImplicitDescriptorBinding) {
         check_pipeline_holder(true);
     }
+
     TEST_F(BindPipelineVulkanIntegrationTest, ErasedAccessorKeepsTheGraphicsBindPoint) {
         vsl::PipelineAccessor accessor = *pipeline;
         vsl::command::BindPipeline binding(accessor);
@@ -97,7 +122,7 @@ namespace {
                 phase.cancel();
                 FAIL() << "BindPipeline did not expose its pipeline to the stream";
             }
-            ASSERT_EQ(stream.pipeline->data_, pipeline->data_);
+            ASSERT_EQ(GraphicsAccess::Owned(*(stream.pipeline)), GraphicsAccess::Owned(*(pipeline)));
             stream << vsl::command::BindGraphicResource(resource, vsl::graphic_resource::BindingDestination::COMPUTE)
                    << vsl::command::PushConstant(*layout, vsl::ShaderFlag::COMPUTE, base)
                    << vsl::command::Dispatch(COUNT, 1, 1);
@@ -105,10 +130,10 @@ namespace {
             barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
             barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
             auto commands = manager.get_buffer();
-            commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         auto mapped = output->data(COUNT * sizeof(std::uint32_t));
         std::array<std::uint32_t, COUNT> actual{};
         std::memcpy(actual.data(), mapped.data, sizeof(actual));
@@ -119,7 +144,7 @@ namespace {
     void BindComputePipelineVulkanIntegrationTest::check_bind(bool erase_type) {
         vsl::PipelineAccessor accessor = *pipeline;
         auto binding = erase_type ? vsl::command::BindPipeline(accessor) : vsl::command::BindPipeline(*pipeline);
-        EXPECT_EQ(binding.pipeline.data_, pipeline->data_);
+        EXPECT_EQ(GraphicsAccess::Owned(binding.pipeline), GraphicsAccess::Owned(*(pipeline)));
         auto manager = make_manager();
         const std::uint32_t base = erase_type ? 137 : 83;
         {
@@ -138,10 +163,10 @@ namespace {
             barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
             barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
             auto commands = manager.get_buffer();
-            commands.data_->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(commands)->command_buffers[commands.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         auto mapped = output->data(COUNT * sizeof(std::uint32_t));
         std::array<std::uint32_t, COUNT> actual{};
         std::memcpy(actual.data(), mapped.data, sizeof(actual));

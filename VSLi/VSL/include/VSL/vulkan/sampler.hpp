@@ -6,23 +6,29 @@
 #define AHO_ALL_SAMPLER_H
 
 #include "image.hpp"
+#include "../operation/sampler_create_info.hpp"
 
 namespace VSL_NAMESPACE {
-    enum class SamplingMode {
-        NEAREST = 0,
-        LINEAR = 1,
-    };
-
-    enum class EdgeMode {
-        REPEAT = 0,
-        MIRRORED_REPEAT = 1,
-        CLAMP_TO_EDGE = 2,
-        CLAMP_TO_BORDER = 3,
-        MIRROR_CLAMP_TO_EDGE = 4,
-    };
+    namespace lifetime::detail {
+        struct SamplerAccess;
+    }
 
     struct SamplerAccessor {
-        std::shared_ptr<impl::SamplerImpl> data_;
+        SamplerAccessor() = default;
+
+        explicit operator bool() const { return bool(_owner); }
+
+        ResourceUseState& use_state() const;
+        ResourceUse resource_use() const;
+
+    protected:
+        SamplerAccessor(LogicalDeviceAccessor device, const SamplerCreateInfo& info);
+
+    private:
+        friend struct lifetime::detail::SamplerAccess;
+        lifetime::OwnedRef<impl::SamplerImpl> _owner;
+
+        explicit SamplerAccessor(lifetime::OwnedRef<impl::SamplerImpl> owner) : _owner(std::move(owner)) {}
     };
 
     struct Sampler : public SamplerAccessor {

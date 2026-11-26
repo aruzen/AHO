@@ -33,16 +33,41 @@ namespace {
     static_assert(sizeof(Invalid) > 0);
 #elif VSL_TYPED_CASE == 8
     using Schema = t::ResourceAllocationSchema<Resources, t::BufferAllocation<2, 3>>;
+
     void rejected(t::ResourceAllocationSizes<Schema>& sizes) {
         sizes.set<2, 3>(4);
     }
 #elif VSL_TYPED_CASE == 9
     using Schema = t::ResourceAllocationSchema<Resources, t::BufferAllocation<2, 3, t::RuntimeElements>>;
+
     void rejected(t::ResourceAllocationSizes<Schema>& sizes) {
         sizes.set<2, 4>(4);
     }
 #elif VSL_TYPED_CASE == 10
     using Invalid = t::BufferAllocation<2, 3, int>;
     static_assert(sizeof(Invalid) > 0);
+#elif VSL_TYPED_CASE == 11
+    using Invalid = t::ResourceAllocationSchema<Resources, t::ImageAllocation<2, 3>>;
+    static_assert(sizeof(Invalid) > 0);
+#elif VSL_TYPED_CASE == 12
+    using Images = t::ResourceSchema<t::DescriptorSet<2, t::TextureBinding<3, vsl::ShaderFlag::FRAGMENT>>>;
+    using Invalid = t::ResourceAllocationSchema<Images, t::SamplerAllocation<2, 3>>;
+    static_assert(sizeof(Invalid) > 0);
+#elif VSL_TYPED_CASE == 13
+    using Images = t::ResourceSchema<t::DescriptorSet<2, t::TextureBinding<3, vsl::ShaderFlag::FRAGMENT>>>;
+    using Invalid = t::ResourceAllocationSchema<Images, t::TextureAllocation<2, 3, t::ResourceScope::SHARED, static_cast<t::ResourceScope>(7)>>;
+    static_assert(sizeof(Invalid) > 0);
+#elif VSL_TYPED_CASE == 14
+    using Images = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<2, t::TextureBinding<3, vsl::ShaderFlag::FRAGMENT, 2>>>, t::TextureAllocation<2, 3>>;
+
+    void rejected(t::ResourceAllocationSizes<Images>& sizes, vsl::ImageCreateInfo info) {
+        sizes.image<2, 3>(std::array{info});
+    }
+#elif VSL_TYPED_CASE == 15
+    using Images = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<2, t::TextureBinding<3, vsl::ShaderFlag::FRAGMENT>>>, t::ExternalAllocation<2, 3>>;
+
+    void rejected(t::ResourceAllocationSizes<Images>& sizes, vsl::ImageCreateInfo info) {
+        sizes.image<2, 3>(info);
+    }
 #endif
 } // namespace

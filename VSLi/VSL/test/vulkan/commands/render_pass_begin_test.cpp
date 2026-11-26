@@ -1,5 +1,34 @@
+#include <VSL/lifetime/startup_access.hpp>
+#include <VSL/lifetime/swapchain_access.hpp>
+#include <VSL/lifetime/graphics_access.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
+#include <VSL/lifetime/image_access.hpp>
+#include <VSL/lifetime/command_access.hpp>
 #include "support/render_fixture.hpp"
 #include "support/read_image.hpp"
+#include "support/frame_buffer_metadata.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
+}
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+    using VSL_NAMESPACE::lifetime::detail::ImageAccess;
+} // namespace
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
+
 namespace {
     using RenderPassBeginVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
 
@@ -30,10 +59,50 @@ namespace {
 
     TEST_F(RenderPassBeginVulkanIntegrationTest, RetainsPassAndFramebufferAndClearsBlack) {
         VSL_NAMESPACE::command::RenderPassBegin begin(*pass, *framebuffer);
-        EXPECT_EQ(begin.render_pass.data_, pass->data_);
-        EXPECT_EQ(begin.frame_buffer.data_, framebuffer->data_);
+        EXPECT_EQ(GraphicsAccess::Owned(begin.render_pass), GraphicsAccess::Owned(*(pass)));
+        EXPECT_EQ(GraphicsAccess::Owned(begin.frame_buffer), GraphicsAccess::Owned(*(framebuffer)));
         EXPECT_FALSE(begin.clear_color.has_value());
+        EXPECT_EQ(begin.retention, vsl::ResourceRetention::SUBMISSION);
         EXPECT_EQ(render([](auto&) {}), (std::array<std::uint8_t, 4>{0, 0, 0, 0}));
+    }
+
+    TEST_F(RenderPassBeginVulkanIntegrationTest, CompletionRetentionReleasesTheTargetWhileTheCompletedWorkAndCommandRingRemain) {
+        auto manager = make_manager().independent(1);
+        const std::weak_ptr<void> owner = GraphicsAccess::Owned(*(framebuffer)).share();
+        vsl::Completion completion;
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << vsl::command::RenderPassBegin::WithClears(*framebuffer, {}, {}, 0, vsl::ResourceRetention::COMPLETION)
+                  << vsl::command::RenderPassEnd{};
+            framebuffer.reset();
+            EXPECT_FALSE(owner.expired());
+            completion = phase.completion();
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        EXPECT_TRUE(completion.wait());
+        EXPECT_TRUE(owner.expired());
+        EXPECT_TRUE(CommandAccess::Data(manager.get_buffer()));
+        const auto invalid = static_cast<vsl::ResourceRetention>(99);
+        EXPECT_THROW((vsl::command::RenderPassBegin(vsl::FrameBufferAccessor{}, {}, {}, 0, invalid)), std::invalid_argument);
+    }
+
+    TEST_F(RenderPassBeginVulkanIntegrationTest, LegacyRetentionKeepsTheTargetUntilTheWorkIsReplaced) {
+        auto manager = make_manager().independent(1);
+        const std::weak_ptr<void> owner = GraphicsAccess::Owned(*(framebuffer)).share();
+        vsl::Completion completion;
+        {
+            auto phase = manager.start_phase<vsl::ComputePhase>();
+            phase << vsl::command::RenderPassBegin(*pass, *framebuffer) << vsl::command::RenderPassEnd{};
+            framebuffer.reset();
+            completion = phase.completion();
+            ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        }
+        EXPECT_TRUE(completion.wait());
+        EXPECT_FALSE(owner.expired());
+        auto replacement = manager.start_phase<vsl::ComputePhase>();
+        ASSERT_EQ(replacement.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+        EXPECT_TRUE(owner.expired());
+        EXPECT_TRUE(replacement.completion().wait());
     }
 } // namespace
 
@@ -82,17 +151,15 @@ namespace {
     void PrintTo(const PackedIntegerClearCase& value, std::ostream* stream) {
         *stream << vk::to_string(value.format);
     }
+
     VSL_NAMESPACE::FrameBufferAccessor metadata_framebuffer(vk::Format format) {
         auto description = std::make_shared<VSL_NAMESPACE::RenderPassDescription>();
         description->add_color({.format = {static_cast<VSL_NAMESPACE::data_format::FormatTypes>(format), 4}});
         auto pass = std::make_shared<VSL_NAMESPACE::impl::RenderPassImpl>();
-        pass->description = std::move(description);
-        auto target = std::make_shared<VSL_NAMESPACE::impl::FrameBufferImpl>();
-        target->render_pass = std::move(pass);
-        target->swap_chain_framebuffers.emplace_back();
-        target->extent = vk::Extent2D{1, 1};
-        return {std::move(target)};
+        pass->description.emplace(std::move(*description));
+        return vsl_test::metadata_frame_buffer(std::move(pass));
     }
+
     TEST_P(PackedIntegerClearTest, DefaultsAndExplicitClearsUseTheIntegerNumericType) {
         const auto [format, is_signed] = GetParam();
         auto target = metadata_framebuffer(format);
@@ -109,6 +176,7 @@ namespace {
         EXPECT_THROW((VSL_NAMESPACE::command::RenderPassBegin(target, {VSL_NAMESPACE::ClearColor{}})), std::invalid_argument);
         EXPECT_THROW((VSL_NAMESPACE::command::RenderPassBegin(target, {opposite})), std::invalid_argument);
     }
+
     INSTANTIATE_TEST_SUITE_P(PackedFormats, PackedIntegerClearTest, testing::Values(PackedIntegerClearCase{vk::Format::eA2R10G10B10SintPack32, true}, PackedIntegerClearCase{vk::Format::eA2B10G10R10SintPack32, true}, PackedIntegerClearCase{vk::Format::eA2R10G10B10UintPack32, false}, PackedIntegerClearCase{vk::Format::eA2B10G10R10UintPack32, false}),
                              [](const testing::TestParamInfo<PackedIntegerClearCase>& info) { return vk::to_string(info.param.format); });
 } // namespace
@@ -116,7 +184,7 @@ namespace {
 namespace {
     TEST_P(PackedIntegerClearVulkanIntegrationTest, IntegerClearReachesEveryPackedPixel) {
         const auto [format, is_signed] = GetParam();
-        const auto flags = physical.data_->device.getFormatProperties(format).optimalTilingFeatures;
+        const auto flags = StartupAccess::Owned(physical)->device.getFormatProperties(format).optimalTilingFeatures;
         if (!(flags & vk::FormatFeatureFlagBits::eColorAttachment))
             GTEST_SKIP() << "Packed format is not a color attachment on this GPU: " << vk::to_string(format);
         if (!host_coherent_available())
@@ -137,7 +205,7 @@ namespace {
             VSL_NAMESPACE::ComputePhase phase(manager);
             phase << begin << VSL_NAMESPACE::command::RenderPassEnd{};
             auto buffer = manager.get_buffer();
-            auto command = buffer.data_->command_buffers.at(buffer.get_current_buffer_idx());
+            auto command = CommandAccess::Data(buffer)->command_buffers.at(buffer.get_current_buffer_idx());
             // 形式の判定から独立したnativeコピーで、クリア後のpackedビット列を検証する。
             vk::ImageMemoryBarrier image_barrier{
                 .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,
@@ -146,15 +214,15 @@ namespace {
                 .newLayout = vk::ImageLayout::eTransferSrcOptimal,
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = image.data_->image,
+                .image = ImageAccess::Owned(image)->image,
                 .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
             command.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eTransfer,
                                     {}, {}, {}, image_barrier);
             vk::BufferImageCopy copy{.imageSubresource = {vk::ImageAspectFlagBits::eColor, 0, 0, 1},
                                      .imageExtent = {2, 2, 1}};
-            command.copyImageToBuffer(image.data_->image, vk::ImageLayout::eTransferSrcOptimal, destination.data_->buffer, copy);
+            command.copyImageToBuffer(ImageAccess::Owned(image)->image, vk::ImageLayout::eTransferSrcOptimal, BufferAccess::Owned(destination)->buffer, copy);
             vk::BufferMemoryBarrier host_visibility{
-                .srcAccessMask = vk::AccessFlagBits::eTransferWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead, .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .buffer = destination.data_->buffer, .offset = 0, .size = 16};
+                .srcAccessMask = vk::AccessFlagBits::eTransferWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead, .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .buffer = BufferAccess::Owned(destination)->buffer, .offset = 0, .size = 16};
             command.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost,
                                     {}, {}, host_visibility, {});
             completion = phase.completion();
@@ -174,18 +242,16 @@ namespace {
             EXPECT_EQ(pixel, expected) << "pixel " << i;
         }
     }
+
     INSTANTIATE_TEST_SUITE_P(PackedFormats, PackedIntegerClearVulkanIntegrationTest, testing::Values(PackedIntegerClearCase{vk::Format::eA2R10G10B10SintPack32, true}, PackedIntegerClearCase{vk::Format::eA2B10G10R10SintPack32, true}, PackedIntegerClearCase{vk::Format::eA2R10G10B10UintPack32, false}, PackedIntegerClearCase{vk::Format::eA2B10G10R10UintPack32, false}),
                              [](const testing::TestParamInfo<PackedIntegerClearCase>& info) { return vk::to_string(info.param.format); });
 } // namespace
 
 namespace {
     vsl::FrameBufferAccessor legacy_metadata_target(vsl::RenderPassAccessor pass) {
-        auto target = std::make_shared<vsl::impl::FrameBufferImpl>();
-        target->render_pass = std::move(pass.data_);
-        target->swap_chain_framebuffers.emplace_back();
-        target->extent = vk::Extent2D{2, 2};
-        return {std::move(target)};
+        return vsl_test::metadata_frame_buffer(std::move(GraphicsAccess::Owned(pass)), 2, 2);
     }
+
     TEST_P(LegacyClearFormatVulkanIntegrationTest, ExplicitRgbMustNotBypassIntegerOrDepthClearValidation) {
         const auto format = GetParam();
         const bool depth = format == vk::Format::eD32Sfloat;
@@ -209,9 +275,11 @@ namespace {
         EXPECT_THROW((vsl::command::RenderPassBegin(pass, target, color)), std::invalid_argument);
         EXPECT_EQ(vsl::command::RenderPassBegin(pass, target).clear_values[0].index(), kind);
     }
+
     INSTANTIATE_TEST_SUITE_P(NumericFormats, LegacyClearFormatVulkanIntegrationTest,
                              testing::Values(vk::Format::eR32Sint, vk::Format::eR32Uint, vk::Format::eD32Sfloat),
                              [](const testing::TestParamInfo<vk::Format>& info) { return vk::to_string(info.param); });
+
     TEST_F(LegacyClearVulkanIntegrationTest, ExplicitRgbIsRejectedWhenThereAreNoAttachments) {
         vsl::RenderPass pass(device, vsl::RenderPassDescription{});
         auto target = legacy_metadata_target(pass);
@@ -220,14 +288,15 @@ namespace {
         const vsl::VSLDRGBColorAccessor<float> color{red, green, blue};
         EXPECT_THROW((vsl::command::RenderPassBegin(pass, target, color)), std::invalid_argument);
     }
+
     TEST_F(LegacyClearVulkanIntegrationTest, PickingOverloadAlsoRejectsIntegerRgbClearsAndPreservesTypedDefaults) {
         for (const auto format : {vk::Format::eR32Sint, vk::Format::eR32Uint}) {
             SCOPED_TRACE(vk::to_string(format));
             vsl::SwapchainAccessor chain;
-            chain.data_ = std::make_shared<vsl::impl::SwapchainImpl>();
-            chain.data_->device = device.data_;
-            chain.data_->extent = chain.data_->swap_chain_extent = vk::Extent2D{2, 2};
-            chain.data_->swap_chain_image_format = format;
+            SwapchainAccess::Owned(chain) = std::make_shared<vsl::impl::SwapchainImpl>();
+            SwapchainAccess::Owned(chain)->device = StartupAccess::Owned(device).get();
+            SwapchainAccess::Owned(chain)->extent = SwapchainAccess::Owned(chain)->swap_chain_extent = vk::Extent2D{2, 2};
+            SwapchainAccess::Owned(chain)->swap_chain_image_format = format;
             vsl::IDPickingRenderPass pass(chain);
             auto target = legacy_metadata_target(pass);
             const vsl::command::IDPickingRenderPassBegin defaults(pass, target);
@@ -239,12 +308,13 @@ namespace {
             EXPECT_THROW((vsl::command::IDPickingRenderPassBegin(pass, target, color)), std::invalid_argument);
         }
     }
+
     TEST_F(LegacyClearVulkanIntegrationTest, PickingRgbPreservesTheIdAttachmentDefaultAndZeroAlpha) {
         vsl::SwapchainAccessor chain;
-        chain.data_ = std::make_shared<vsl::impl::SwapchainImpl>();
-        chain.data_->device = device.data_;
-        chain.data_->extent = chain.data_->swap_chain_extent = vk::Extent2D{2, 2};
-        chain.data_->swap_chain_image_format = vk::Format::eR8G8B8A8Unorm;
+        SwapchainAccess::Owned(chain) = std::make_shared<vsl::impl::SwapchainImpl>();
+        SwapchainAccess::Owned(chain)->device = StartupAccess::Owned(device).get();
+        SwapchainAccess::Owned(chain)->extent = SwapchainAccess::Owned(chain)->swap_chain_extent = vk::Extent2D{2, 2};
+        SwapchainAccess::Owned(chain)->swap_chain_image_format = vk::Format::eR8G8B8A8Unorm;
         vsl::IDPickingRenderPass pass(chain);
         auto target = legacy_metadata_target(pass);
         float red = 0.25f, green = 0.5f, blue = 0.75f;
@@ -267,6 +337,7 @@ namespace {
         EXPECT_EQ(begin.clear_color->r, red);
         EXPECT_FALSE(begin.target_index);
     }
+
     TEST_F(LegacyClearVulkanIntegrationTest, ClearColorForAnUnclearedAttachmentKeepsTheCommonConstructorsIgnoredValueSemantics) {
         vsl::RenderPassDescription description;
         description.add_color({.format = vsl::data_format::UNSIGNED_INT, .load = vsl::LoadOp::DONT_CARE});
@@ -277,6 +348,7 @@ namespace {
         EXPECT_NO_THROW((vsl::command::RenderPassBegin(target, {vsl::ClearColor{red, green, blue, 0}})));
         EXPECT_NO_THROW((vsl::command::RenderPassBegin(pass, target, color)));
     }
+
     TEST_F(RenderPassBeginVulkanIntegrationTest, LegacyRgbClearPreservesZeroAlphaAndReachesEveryPixel) {
         float red = 0.25f, green = 0.5f, blue = 0.75f;
         const vsl::VSLDRGBColorAccessor<float> color_value{red, green, blue};

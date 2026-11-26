@@ -1,6 +1,21 @@
+#include <VSL/operation/graphics_pipeline_state_access.hpp>
+#include <VSL/lifetime/swapchain_access.hpp>
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/vulkan/viewport.hpp>
 
 #include <VSL/vulkan/_pimpls.hpp>
+
+namespace {
+    using VSL_NAMESPACE::operation::detail::GraphicsPipelineStateAccess;
+}
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
+}
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 
 VSL_NAMESPACE::Viewport::Viewport() {}
 
@@ -8,10 +23,14 @@ VSL_NAMESPACE::Viewport::Viewport(float x, float y, float width, float height) :
 
 VSL_NAMESPACE::Viewport::Viewport(VSLD2RectangleAccessor<float> rect) : x(rect.x), y(rect.y), width(rect.width), height(rect.height) {}
 
-VSL_NAMESPACE::Viewport::Viewport(SwapchainAccessor swapchain) : x(0), y(0), height(swapchain.data_->swap_chain_extent.height), width(swapchain.data_->swap_chain_extent.width) {}
+VSL_NAMESPACE::Viewport::Viewport(SwapchainAccessor swapchain) : x(0), y(0), height(SwapchainAccess::Owned(swapchain)->swap_chain_extent.height), width(SwapchainAccess::Owned(swapchain)->swap_chain_extent.width) {}
 
 void VSL_NAMESPACE::Viewport::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
-    auto& info = *pl.data_->info;
+    injection(pl.edit_state());
+}
+
+void VSL_NAMESPACE::Viewport::injection(VSL_NAMESPACE::GraphicsPipelineStateEditRef state) {
+    auto& info = GraphicsPipelineStateAccess::Edit(state);
 
     vk::Viewport viewport;
     viewport.x = x;
@@ -32,5 +51,5 @@ void VSL_NAMESPACE::Viewport::invoke(CommandPool pool, CommandBuffer buffer, Com
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
-    buffer.data_->command_buffers[buffer.get_current_buffer_idx()].setViewport(0, viewport);
+    CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].setViewport(0, viewport);
 }

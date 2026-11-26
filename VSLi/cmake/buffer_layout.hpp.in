@@ -1,0 +1,54 @@
+#pragma once
+#include <cstddef>
+#include <cstdint>
+@compiler_guard@
+namespace vsl::storage {
+    inline constexpr std::size_t SWAPCHAIN_IMPL_SIZE = @SWAPCHAIN_IMPL_SIZE@, SWAPCHAIN_IMPL_ALIGNMENT = @SWAPCHAIN_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t SWAPCHAIN_SLOT_SIZE = @SWAPCHAIN_SLOT_SIZE@, SWAPCHAIN_SLOT_ALIGNMENT = @SWAPCHAIN_SLOT_ALIGNMENT@;
+    inline constexpr std::size_t DEVICE_IMPL_SIZE = @DEVICE_IMPL_SIZE@, DEVICE_IMPL_ALIGNMENT = @DEVICE_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t DEVICE_SLOT_SIZE = @DEVICE_SLOT_SIZE@, DEVICE_SLOT_ALIGNMENT = @DEVICE_SLOT_ALIGNMENT@;
+    inline constexpr std::size_t SURFACE_IMPL_SIZE = @SURFACE_IMPL_SIZE@, SURFACE_IMPL_ALIGNMENT = @SURFACE_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t SURFACE_SLOT_SIZE = @SURFACE_SLOT_SIZE@, SURFACE_SLOT_ALIGNMENT = @SURFACE_SLOT_ALIGNMENT@;
+    inline constexpr std::size_t PHYSICAL_DEVICE_IMPL_SIZE = @PHYSICAL_DEVICE_IMPL_SIZE@, PHYSICAL_DEVICE_IMPL_ALIGNMENT = @PHYSICAL_DEVICE_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t PHYSICAL_DEVICE_SLOT_SIZE = @PHYSICAL_DEVICE_SLOT_SIZE@, PHYSICAL_DEVICE_SLOT_ALIGNMENT = @PHYSICAL_DEVICE_SLOT_ALIGNMENT@;
+    inline constexpr std::size_t INSTANCE_IMPL_SIZE = @INSTANCE_IMPL_SIZE@, INSTANCE_IMPL_ALIGNMENT = @INSTANCE_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t INSTANCE_SLOT_SIZE = @INSTANCE_SLOT_SIZE@, INSTANCE_SLOT_ALIGNMENT = @INSTANCE_SLOT_ALIGNMENT@;
+    inline constexpr std::size_t BUFFER_IMPL_SIZE = @BUFFER_IMPL_SIZE@;
+    inline constexpr std::size_t BUFFER_IMPL_ALIGNMENT = @BUFFER_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t IMAGE_IMPL_SIZE = @IMAGE_IMPL_SIZE@;
+    inline constexpr std::size_t IMAGE_IMPL_ALIGNMENT = @IMAGE_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t SAMPLER_IMPL_SIZE = @SAMPLER_IMPL_SIZE@;
+    inline constexpr std::size_t SAMPLER_IMPL_ALIGNMENT = @SAMPLER_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t DESCRIPTOR_LAYOUT_IMPL_SIZE = @DESCRIPTOR_LAYOUT_IMPL_SIZE@;
+    inline constexpr std::size_t DESCRIPTOR_LAYOUT_IMPL_ALIGNMENT = @DESCRIPTOR_LAYOUT_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t DESCRIPTOR_POOL_IMPL_SIZE = @DESCRIPTOR_POOL_IMPL_SIZE@;
+    inline constexpr std::size_t DESCRIPTOR_POOL_IMPL_ALIGNMENT = @DESCRIPTOR_POOL_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t DESCRIPTOR_SET_IMPL_SIZE = @DESCRIPTOR_SET_IMPL_SIZE@;
+    inline constexpr std::size_t DESCRIPTOR_SET_IMPL_ALIGNMENT = @DESCRIPTOR_SET_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t SHADER_IMPL_SIZE = @SHADER_IMPL_SIZE@;
+    inline constexpr std::size_t SHADER_IMPL_ALIGNMENT = @SHADER_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t PIPELINE_LAYOUT_IMPL_SIZE = @PIPELINE_LAYOUT_IMPL_SIZE@;
+    inline constexpr std::size_t PIPELINE_LAYOUT_IMPL_ALIGNMENT = @PIPELINE_LAYOUT_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t RENDER_PASS_IMPL_SIZE = @RENDER_PASS_IMPL_SIZE@;
+    inline constexpr std::size_t RENDER_PASS_IMPL_ALIGNMENT = @RENDER_PASS_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t PIPELINE_IMPL_SIZE = @PIPELINE_IMPL_SIZE@;
+    inline constexpr std::size_t PIPELINE_IMPL_ALIGNMENT = @PIPELINE_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t FRAME_BUFFER_IMPL_SIZE = @FRAME_BUFFER_IMPL_SIZE@;
+    inline constexpr std::size_t FRAME_BUFFER_IMPL_ALIGNMENT = @FRAME_BUFFER_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t FRAME_BUFFER_SLOT_SIZE = @FRAME_BUFFER_SLOT_SIZE@;
+    inline constexpr std::size_t FRAME_BUFFER_SLOT_ALIGNMENT = @FRAME_BUFFER_SLOT_ALIGNMENT@;
+    inline constexpr std::size_t COMMAND_POOL_IMPL_SIZE = @COMMAND_POOL_IMPL_SIZE@, COMMAND_POOL_IMPL_ALIGNMENT = @COMMAND_POOL_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t COMMAND_POOL_SLOT_SIZE = @COMMAND_POOL_SLOT_SIZE@, COMMAND_POOL_SLOT_ALIGNMENT = @COMMAND_POOL_SLOT_ALIGNMENT@;
+    inline constexpr std::size_t COMMAND_BUFFER_IMPL_SIZE = @COMMAND_BUFFER_IMPL_SIZE@, COMMAND_BUFFER_IMPL_ALIGNMENT = @COMMAND_BUFFER_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t COMMAND_BUFFER_SLOT_SIZE = @COMMAND_BUFFER_SLOT_SIZE@, COMMAND_BUFFER_SLOT_ALIGNMENT = @COMMAND_BUFFER_SLOT_ALIGNMENT@;
+    inline constexpr std::size_t BUFFER_USE_SIZE = @BUFFER_USE_SIZE@;
+    inline constexpr std::size_t SEMAPHORE_IMPL_SIZE = @SEMAPHORE_IMPL_SIZE@, SEMAPHORE_IMPL_ALIGNMENT = @SEMAPHORE_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t SEMAPHORE_SLOT_SIZE = @SEMAPHORE_SLOT_SIZE@, SEMAPHORE_SLOT_ALIGNMENT = @SEMAPHORE_SLOT_ALIGNMENT@;
+    inline constexpr std::size_t FENCE_IMPL_SIZE = @FENCE_IMPL_SIZE@, FENCE_IMPL_ALIGNMENT = @FENCE_IMPL_ALIGNMENT@;
+    inline constexpr std::size_t FENCE_SLOT_SIZE = @FENCE_SLOT_SIZE@, FENCE_SLOT_ALIGNMENT = @FENCE_SLOT_ALIGNMENT@;
+    inline constexpr std::size_t BUFFER_USE_ALIGNMENT = @BUFFER_USE_ALIGNMENT@;
+    inline constexpr std::size_t BUFFER_EXPECTED_CPP_ABI_MODE = @cpp_mode@;
+    inline constexpr std::uint64_t BUFFER_LAYOUT_ABI = 0x@abi@ULL;
+    inline constexpr std::uint64_t RESOURCE_LAYOUT_ABI = BUFFER_LAYOUT_ABI;
+    static_assert(sizeof(void*) == @CMAKE_SIZEOF_VOID_P@, "Buffer target pointer ABI mismatch");
+} // namespace vsl::storage

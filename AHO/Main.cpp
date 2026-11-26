@@ -48,13 +48,15 @@ breakpoint disable swift_willThrow
         using namespace vsl;
         aho::engine::StandardEngine engine("test");
 
-        auto& [vulkan_instance, physical_device, device, command_manager, graphic_resource_manager, synchro_manager] = *engine.data();
+        const auto runtime = engine.runtime();
+        auto device = runtime.device();
+        auto command_manager = runtime.commands();
+        auto graphic_resource_manager = runtime.descriptor_manager();
         auto& main_window = engine.boot_window.value();
         auto& swapchain = main_window.data2->swapchain;
         auto& render_pass = main_window.data2->render_pass;
-        auto& image_available = main_window.data2->image_available;
         auto& in_flight = main_window.data2->in_flight;
-        if (!image_available.data_)
+        if (!main_window.data2->image_available)
             loggingln("image not available ; ;");
         main_window.resize(500, 500);
         vsl::utils::ShaderCompiler shader_compiler("glslc",
@@ -324,6 +326,8 @@ breakpoint disable swift_willThrow
 
             {
                 auto phase = DrawPhase(&engine);
+                if (!phase.recording())
+                    continue;
                 ubo_buffers[phase.get_current_index()].copy(ubo);
 
                 //ubo_resource[phase.get_current_index()].update(ubo_buffers[phase.get_current_index()], 0);
@@ -392,6 +396,7 @@ breakpoint disable swift_willThrow
 #endif
     /**/
 }
+
 /* AHO/shaders/raw/vd2p_fc_umpv.vert AHOLi/AHO/object/Object.hpp AHOLi/AHO/resource/Audio.hpp AHOLi/AHO/resource/image.hpp AHOLi/AHO/resource/ObjectHitbox.hpp AHOLi/AHO/resource/ObjectModel.hpp VSLi/VSL/Vulkan/commands/bind_graphic_resource.cpp VSLi/VSL/Vulkan/commands/bind_graphic_resource.hpp VSLi/VSL/Vulkan/descriptor.cpp VSLi/VSL/Vulkan/descriptor.hpp VSLi/VSL/Vulkan/phase.cpp VSLi/VSL/Vulkan/phase.hpp VSLi/VSL/Vulkan/stages/resource_binding.cpp VSLi/VSL/Vulkan/stages/resource_binding.h
  */
 // #endif

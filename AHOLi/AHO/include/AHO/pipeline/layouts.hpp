@@ -36,7 +36,7 @@ namespace AHO_NAMESPACE::pipeline {
             .amount = 1};
     }; // namespace standard_resources
 
-    typedef VSL_NAMESPACE::PipelineLayout (*GetBaseLayoutFunc)(engine::EngineAccessor* engine);
+    typedef VSL_NAMESPACE::PipelineLayout (*GetBaseLayoutFunc)(engine::EngineAccessor engine);
 
     extern GetBaseLayoutFunc GET_BASE_LAYOUT;
 

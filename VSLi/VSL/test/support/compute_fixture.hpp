@@ -1,7 +1,10 @@
 #pragma once
+#include <VSL/lifetime/startup_access.hpp>
+#include <VSL/lifetime/descriptor_access.hpp>
 #include "vulkan_fixture.hpp"
 #include <VSL/vulkan/commands/dispatch.hpp>
 #include <VSL/vulkan/commands/push_content.hpp>
+#include <VSL/lifetime/native_recording.hpp>
 #include <optional>
 
 namespace vsl_test {
@@ -20,10 +23,12 @@ namespace vsl_test {
         void SetUp() override;
         std::array<std::uint32_t, COUNT> execute(std::uint32_t base, bool explicit_binding = false,
                                                  bool explicit_push = false);
+
         static void ExpectSequence(const std::array<std::uint32_t, COUNT>& actual, std::uint32_t base) {
             for (std::size_t i = 0; i < COUNT; ++i)
                 EXPECT_EQ(actual[i], base + i) << "index=" << i;
         }
+
         void TearDown() override;
     };
 
@@ -76,12 +81,10 @@ namespace vsl_test {
             vk::MemoryBarrier barrier{};
             barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
             barrier.dstAccessMask = vk::AccessFlagBits::eHostRead;
-            auto buffer = manager.get_buffer();
-            buffer.data_->command_buffers[buffer.get_current_buffer_idx()].pipelineBarrier(
-                vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {},
-                {});
+            const vsl::NativeRecordingContext recording(manager.get_buffer());
+            vk::CommandBuffer(recording.native_command_buffer()).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
-        device.data_->device.waitIdle();
+        VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.waitIdle();
         auto mapped = output->data(COUNT * sizeof(std::uint32_t));
         std::array<std::uint32_t, COUNT> actual{};
         std::memcpy(actual.data(), mapped.data, sizeof(actual));
@@ -89,17 +92,17 @@ namespace vsl_test {
     }
 
     inline void ComputeVulkanIntegrationTest::TearDown() {
-        if (device.data_)
-            device.data_->device.waitIdle();
+        if (VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device))
+            VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device.waitIdle();
         pipeline.reset();
         layout.reset();
         shader.reset();
-        resource.data_.reset();
+        VSL_NAMESPACE::lifetime::detail::DescriptorAccess::Owned(resource).reset();
         // Pool and Resource hold each other strongly (I23). Break fixture-owned cycles.
         if (resources)
-            for (auto& owned_pool : resources->data_->pools)
+            for (auto& owned_pool : VSL_NAMESPACE::lifetime::detail::DescriptorManagerAccess::Data(*(resources))->pools)
                 owned_pool->resources.clear();
-        pool.data_.reset();
+        VSL_NAMESPACE::lifetime::detail::DescriptorAccess::Owned(pool).reset();
         resources.reset();
         binding.reset();
         output.reset();

@@ -1,0 +1,262 @@
+# VSLの4責務分離とTyped arena化の完了計画
+
+2026-11-08。#325（Image／Samplerの共通backend）を基点とする最新の移行方針。従来の[段階的移行](arena-migration.md)に対し、利用者が次を選択した。
+
+- Instance／DeviceもCPU配置の対象にする。
+- 最終的にTypedの既定をarenaへ変更し、heapは明示選択として残す。
+- 公開 `.data_`／`shared_ptr<Impl>` 入口も最終的に廃止し、利用側を移行する。
+- 内部コンテナとGPUメモリの確保は計測し、別課題として残す。
+
+最初のPRだけで終了せず、下記の順で実装・検証・独立レビューを継続する。PRの公開前には最新masterとの差分を確認する。新しい製品ディレクトリが必要な場合は作成前に確認する。
+
+現在の到達点は順序1〜11である。command／同期資源の配置とTyped frame再利用、起動資源の共通backend、OS windowの寿命分離、公開StartupArenaとAHO起動、maintenance1の能力照会／有効化、Swapchain世代のCPU配置、取得後失敗とpresent専用の完了観測・資源保持、AHOの世代公開・休止・resize／close、Typedの生成policyとarena既定化を接続した。12の旧入口廃止・定義の4責務分割・測定と最終監査まで継続する。
+
+10dはPhaseCall、共通Fence用途、M個のfinished semaphore、F個のacquire Fenceに、[送信結果とnative使用完了](native-submission-proof.md)と[AcquireTicket／Surface回収](acquire-ticket-recovery.md)を接続した。10eで候補保持と0 framebuffer休止、共有close、元Surface単位の退役、11でTypedの既定配置を完了した。現在は12の公開入口整理を進めており、実定義の4責務分割と最終監査は引き続き未完了である。
+
+## 責務と保証
+
+storageはCPU領域と配置、operationは解決済み実体へのVulkan操作、lifetimeは構築・所有・回収、syncは使用状態と完了観測を担当する。通常VSLとTypedでbackendを共用する。操作中にownerを何段も解決せず、公開view／command／外部依存の境界で所有を取得する。
+
+CPU arenaにはImplと使用状態の本体を含める。内部vector／map、生成scratch、Vulkan device memoryは別の確保として明示する。同型の複数資源はResourceIdとslotで区別し、BindingKeyはResourceIdへの接続情報とする。shared／frame／transient／起動／swapchain世代等の寿命群を別ownerに分け、生存中のarenaは移動・拡張しない。
+
+同じarena内は借用だけ、別arenaの依存はownerを保持する。依存は非循環とし、構築前に検査する。外部入力は元のImpl・物理UseState・ownerを使い、新しい使用状態へ包み直さない。構築失敗は成功済みの実体だけを依存の逆順で回収する。
+
+## 実装単位と完了条件
+
+| 順序 | PR単位 | 完了条件 |
+| --- | --- | --- |
+| 1 | 異種Implの寸法と配置計画 | Buffer／Image／Samplerの実寸法生成、private定義との一致、ResourceIdとslotの分離、runtime個数、外部入力、公開ヘッダーだけのconstexpr配置計算 |
+| 2 | 異種ResourceArena | 共通backendを指定領域から使用し、直接参照・所有・失敗時rollback・完了後破棄を通す |
+| 3 | Typed image／sampler | 寿命群ごとのplanとbundleでbuffer／image／samplerを混在させ、upload・sampling・readback・完了解放を通す |
+| 4 | 完了結果と資源保持 | 結果を保存してもin-flight資源を保持し続けない。取消・送信失敗・device lostの終端処理とreadback所有を整理 |
+| 5 | descriptor layout／pool／set | 共通backendと配置へ接続し、runtime容量・記録時binding・更新制限・bind省略を維持 |
+| 6 | shader／pipeline layout | 生成scratchと永続実体を分離し、共有layout・外部shaderを利用可能にする |
+| 7 | render pass／pipeline／framebuffer | 依存資源を借用して配置し、resizeのattachment世代更新と互換pipelineの再利用を維持 |
+| 8 | command／同期資源／frame | command pool・command buffer・fence・semaphoreを分離／配置し、記録→送信→frame再利用を接続 |
+| 9 | Instance／PhysicalDevice／Surface／Device | 起動資源を寿命群別arenaへ配置し、子Implの強い所有とshared_from_this依存を除去 |
+| 10 | swapchain／presentation／AHO | 取得画像・世代・presentation完了まで保持し、Engineの起動・resize・終了を新経路で通す |
+| 11 | Typedのarena既定化 | 標準policy変更、heapの明示指定、AHO／サンプル／テストの既定経路を移行 |
+| 12 | 旧入口の廃止と監査 | 公開data_／shared_ptr<Impl>と移行adapterを除去し、残る確保・参照・保持量を測定 |
+
+完了管理は主要資源を配置した後、descriptor等の展開より前に分離する。後続資源が旧Completion所有構造へ依存し続けないようにする。
+
+## 起動と所有境界
+
+起動時の生成順と破棄単位を分ける。既定は共通Instance rootを先に完成し、Device群（選択したPhysicalDevice／Device）と、WindowごとのSurface群を別ownerに置き、それぞれ元Instanceをimportする。Device生成中だけSurfaceを保持し、Deviceの固定親にしない。SwapchainはDevice群とSurface群の両方を保持する。Deviceを必要とするBufferが残っているだけで、無関係なSurface／OS windowを延命しない構成を基本にする。
+
+Instance／Device／Surface等を単一ownerに同居させる配置は、寿命を揃えたい場合の明示選択に限る。依存辺を外しても同一owner内の破棄単位は分かれないため、複数Window／Window再作成の既定にしない。候補列挙はscratchで行い、選択後の能力情報で後続のarenaを計画する。PhysicalDeviceのnative handleはInstanceに属する借用として扱う。
+
+Deviceの正規ownerは起動側に置く。内部はdevice refを借用し、公開getter等で所有が必要な場合だけ借用contextと弱いowner参照から取得する。getterで子image／bufferを保持するaliasを返さない。通常のVulkan操作ではこの所有解決を行わない。
+
+OS windowは外部依存とする。Surfaceが保持するOS window ownerと、Runtimeを参照するAHO Window facadeを分離する。起動owner→OS owner→起動ownerという循環を作らない。graphics fenceの完了とpresentation完了は区別する。
+
+## 公開APIの切替
+
+移行中は旧入口をadapterで併設し、削除する段階を明記する。最終的には通常VSLもowning handle／viewと借用refを使用する。現在のbuffer.data_等は、操作ではbuffer.ref()、保持が必要な境界ではbuffer.view()を渡す形式へ移行する（名称は仮案）。heapとarenaで生成・検証処理は共用する。
+
+Typedの既定変更は、主要資源と起動・終了の経路が揃ってから行う。旧公開入口の廃止時に利用例・破壊的変更の一覧を用意する。
+
+arena既定化より先に、[Typedの配置・保持期間・固定依存](typed-lifetime-boundaries.md)を分離する。heap／arenaの記録保持はCOMPLETIONを共通既定とし、旧SUBMISSIONは明示選択とする。管理recordは資源種ごとの参照欄を増やさず、固定schemaの依存を公開前にfreezeする。通常操作での管理表再探索や所有graph DFSは追加しない。
+
+## 検証と進捗の扱い
+
+各単位で配置・alignment・overflow・未構築参照・二重構築・外部所有・途中失敗・逆順破棄を確認する。元wrapper破棄後の利用、入口をまたぐ共通状態、循環不在、取消／送信失敗／完了後の回収を検証する。
+
+GPUでは転送・sampling・compute・描画・readback、descriptor更新、旧世代、resize、pipeline再利用、取得画像の取消とpresentation終了を確認する。install consumer、異なるartifactの拒否、構成別生成、クロスコンパイル、compile契約、規約検査を併用する。実行できない環境を明記する。
+
+最終比較は同じ処理・結果のheap／arena経路で行い、CPU確保数・owner操作数・保持メモリ・時間を計測する。性能改善は計測前に断定しない。
+
+各PRの実装・検証結果を関連文書へ追記し、この一覧の終了条件を満たした単位だけを完了とする。Instance／Device、既定変更、旧入口廃止まで終えるまでは、全体完了と扱わない。
+
+順序1の実装と受入検証は[異種資源のCPU配置計画](resource-placement-plan.md)を参照。次は順序2のResourceArenaである。
+
+順序2は[ResourceArena](resource-arena.md)へ接続する。通常operation、外部owner／物理状態の共有、逆順rollback、GPU完了／取消回収を検証した後、順序3のschema／bundle拡張へ進む。
+
+順序3は[Typedのowned Image／Sampler](typed-owned-resources.md)へ接続する。component単位のID共有、寿命群の分離、heap互換、upload／sampling／readbackを扱う。
+
+順序4は[結果とin-flight所有の分離](completion-ownership.md)で、保存結果による資源延命、terminal、取消／失敗、readbackを整理した。次は順序5のdescriptorである。WSIの厳密な完了証明と失敗からの復旧は順序10に残す。
+
+## 順序5の分割
+
+descriptorは配置を始める前に、既存の使用状態と更新metadataを揃える。
+
+1. Setの物理UseStateをnative／Typedで共有し、bindingを配列要素単位で管理する。native scalar updateが要素0だけを書いたとき、未更新要素のownerを解放しない。logical constraintと初期化状態も同じ表へ集約する。
+2. Layout／Pool／Setの共通backendと配置へ接続する。LayoutにはGPU UseStateを持たせず、Poolはhost側の排他と各Setのidleを管理する。依存順構築・逆順rollbackと正確な容量を検証する。
+3. Typed schemaへ接続する。同rootの物理／logical aliasは内部borrowへ正規化し、可変の外部依存をcommit前に検査する。既知の管理root間の循環と、opaque owner内に隠れた循環に対する保証を区別する。
+
+Layout数は宣言set数のResources::COUNT、Set数はshared／frameの実数、Poolはdescriptorを持つ寿命群ごととする。最大set番号＋1のSET_COUNTをSet実体数へ混ぜない。pipelineのhole用empty layoutは順序6で扱う。
+
+5aの実装契約は[Descriptorの共通使用状態](descriptor-state.md)を参照。
+
+5bは[共通backendとheap所有の移行](descriptor-backend.md)と[寸法生成・ResourceArenaへの配置](descriptor-arena.md)を実装した。同rootの物理／論理ownerを借用へ正規化し、既定FIXEDでは構築時に固定した依存以外のowner追加を拒否する。
+
+5cは[constexpr descriptor論理計画](typed-descriptor-plan.md)を先に分離する。Layout宣言、shared／frame別のSet実数とPool容量を固定配列で計算し、生成用scratchと資源ID／slot割当は後続接続へ分ける。descriptor実体のbundle内配置、可変依存graphと追加logical constraintの接続までは5c全体を完了としない。
+
+[所有参照とroot依存graph](owner-dependencies.md)で、既知ownerの出所、固定親、更新のcycle検査とcommitを接続した。AHOのBuffer generation R→physical storage PとTexture Data D→Image Pも同じgraphへ接続し、弱参照の出所、世代切替のcommitと失敗rollbackを維持する。
+
+[Typed bundleのdescriptor配置](typed-descriptor-placement.md)で、schemaからshared／frameのLayout・Pool・SetをResourceArenaへ展開した。data-only配置との互換、正確な群別容量、固定親、DYNAMICな外部入力、記録時binding、更新制約、完了／取消回収を実装・検証した。これで順序5a／5b／5cの受入条件を満たす。Manager引数等の互換入口は順序12の廃止対象として残し、次は順序6のshader／pipeline layoutへ進む。
+
+## 順序6の着手単位
+
+6aは[Shaderのoperation／lifetime backend、heap所有、寸法生成、ResourceArena配置](shader-arena.md)を実装した。native実体へGPU UseStateを持たせず、stage create-infoとpNameを生成scratchへ分け、entry／codeの永続値と外部Shaderの正規ownerを維持する。配置・失敗・import固定親・Frozen再生成・実描画／compute・install／artifactを検証した。
+
+6bは[PipelineLayoutのruntime／recipe／scratchとCPU配置](pipeline-layout-arena.md)を実装した。runtimeとrecipeのcontrol blockを分け、Pipeline／保存PushConstantはruntimeだけを保持する。Typed pushはruntime内のcanonical rangesから記録する。recipeのShader／DescriptorLayoutは借用と外部source所有へ正規化し、ownerを重複排除する。DescriptorLayout→PipelineLayout、Pool／Layout→Setの構築順と実構築の逆順rollbackを保証する。明示ID／importはarena全寿命、直接のBindingLayout sourceは構築呼出し中だけ保持する。FromRuntimeは構造を照合し、freezeはnativeを再生成せず編集aliasのrecipeだけを分離する。
+
+6cは[schema付き共有Layout集合](typed-shared-layouts.md)をbundleからTyped pipelineへ接続した。Resources注入が既存Layoutをheap再生成する経路を置き換え、set番号のholeは空Layout一つで埋める。必要時の追加slot／IDをshared計画の末尾へ置き、宣言emptyを優先して再利用する。frame facadeを保持せず、元bundle／source回収後にも利用できる。通常／共有constructorのshader検証、既存配置、Set／Pool容量、実compute／描画／resize／installを確認し、順序6の受入条件を満たした。次は順序7へ進む。
+
+## 順序7／8の前提調査と次の実装
+
+6c時点の独立レビューにより、次を順に扱う。
+
+1. RenderPassの共通operation／lifetime backendと配置。不変descriptionは記録・Framebuffer検証にも必要な値として保持し、不要なrecipe所有層を追加しない。Deviceの強い所有はrootへ移す。descriptionの借用はlvalue所有者に限定する。
+2. Pipelineの共通backendと配置。native Layoutを生成しないstate定義を用意し、arenaのGraphics入力はLayout ID・Pass ID・subpass・state・Shader IDまたは構築時sourceへ分ける。既存Frozen constructorも同backendへ接続する。定義取得のための余分なheap Layout生成を恒久化しない。
+3. Framebufferの共通backendと配置。まず一つのImplに複数native framebufferとattachment行列を持つ既存の意味を維持し、Pass／Image／swapchain所有を外側rootへ移す。同rootの参照は借用とし、getterは本来の正規ownerを返す。
+
+7aは[RenderPassの共通backendとCPU配置](render-pass-arena.md)を実装した。不変descriptionをImpl内へ置き、通常／arenaの生成、外部importの正規owner、失敗時rollback、lvalueの借用制約とGPU完了／取消までの保持を検証した。Pipeline／Framebufferの配置は未実装であり、順序7全体は未完了である。次は7bへ進む。
+
+7bのstate入力は、Device／native／source ownerを含まない`GraphicsPipelineState`の深い値型にする。公開値は不完全な内部データをunique_ptrで所有し、既存Recipeは同じデータ型をinlineで持つ。これにより既存Layoutにはstate用の追加確保を増やさない。固定stageの注入本体を借用EditRefへ移し、旧Layout注入は委譲する。生成入力のCPU確保はnative資源配置と区別して監査する。Shader／Pass／Layoutを必要とするstageをstate-only入力へ混ぜない。Typedの入口では実Shaderを検証し、型名だけを付ける無検査の変換を追加しない。
+
+[7b前半のstate分離](graphics-pipeline-state.md)を独立した変更として実装・検証した。
+
+7b後半のImplはDevice／Layoutへの借用とnative handleだけを持ち、heap rootはLayout ownerを保持して依存graphへ列挙する。native生成はResultを明示検査し、失敗時の非null handleを未公開のまま回収する。明示入力のShader／Passはnative生成呼出し中だけ所有を借り、Layoutはruntime ownerだけを固定親とする。Shaderの既存get_device()だけでは非所有aliasを拒否できないため、source境界でowner／live module／Deviceを検査する。構築とrollback、importの正規control block、逆向きdescriptor依存拒否を受入項目にする。
+
+[7b後半のPipeline backendと配置](pipeline-arena.md)を通常VSL／Typedの既存生成とResourceArenaへ接続した。直接source回収後の描画／compute／push、Layout固定親の循環拒否、元ownerのimport、途中失敗・同region再利用、GPU完了／取消回収を検証し、7bの受入条件を満たした。
+
+7cのPass getter用weak metadataはlifetime contextへ分け、Implと同じslotの隣接byte領域へ構築する。Implはcontextを借用し、通常のVulkan操作はraw Pass／Imageへ直接届く。slot本体はstandard-layoutなaligned byte配列だけとし、Impl先頭offset0とactual slot寸法を検査する。CPU配置計画にはcontext込みのslot寸法を公開する。direct Pass／Imageは固定親として永続保持し、同rootのPass weakはpublish後に設定する。getterは外部Passの元control blockを返す。
+
+Pipelineが記録時に使うLayoutは保持し、Shader／Pass／再生成recipeは生成時依存へ分ける。Framebufferから既定Passとclear descriptionを参照するVSLの契約は、native生成時だけの依存と区別する。attachment Imageの既存物理UseStateを使い、RenderPass／Pipeline／Framebufferへ独立したGPU UseStateは追加しない。
+
+[7cのFramebuffer backendと配置](frame-buffer-arena.md)で、native生成前の全行検証と配列確保、途中失敗の逆順rollback、元のPass ownerを返すgetter、共通Image状態での記録を実装した。保存command／旧view、CPU世代の失敗保証、互換Pipeline再利用、記録中poll callbackの取消・自己破棄・再入を検証し、順序7の受入条件を満たした。WSIのretired swapchainからの復旧とpresentation完了は順序10に残す。
+
+順序8の配置前に、CommandBufferImplのsubmissions／recording_submission／presentation_resourcesを外部domainへ移す。現在のImpl→Work→Device/resourcesのまま同arenaへ入れるとroot→Work→rootの循環になる。外部Registry→Work→起動／資源root、Impl→contextの借用／weak、Completion→結果だけという向きを確定する。通常invokeは解決済みcontextへ直接届き、Registryの探索はphase境界に限る。shutdown時の新規登録拒否・snapshot終端処理と、DefaultPhase cancelの取得画像返却用の内部送信も検証する。presentation完了の証明は順序10へ残す。
+
+## 順序8の分割
+
+8aは[Command Domain](command-domain.md)でWork registryを外へ移す。nativeのheap生成はこの単位で維持し、元facade破棄、同native ownerのWork保持、完了callbackからの再送信、準備中のpeer保護、wait_idle中のPENDING維持、取消時の旧SUBMISSION保持を検証する。
+
+8b前半はCommandPool／CommandBufferの共通operation・placement構築・寸法生成とResourceArenaへの配置。Buffer→Pool→Deviceの固定親を正規化し、明示的な配置入口でだけDomainをattachする。Domainをarena rootへ強所有させない。attach用配列確保はpublish前に終え、終了callback中の再attachは拒否する。reset／nextは記録・取消・対象slotのGPU使用を検査し、全resetは事前に全slotを検査する。
+
+[8b前半の実装](command-arena.md)で、通常VSL／arenaの共通backend、同rootの複数ring、Domain再接続、元Poolのgetterと固定辺、Typed copyと自己root保持、逆rollback、resetの全slot事前検査・再入・世代照合を検証した。nextはnativeを変更せずhost巡回だけなので、送信済みslotへも進める。GPU待機は次Phaseのprepareが行う。
+
+8b後半はFence／Semaphoreの共通backendと配置、明示destroy／resetの使用制約、名前付き登録と古いHolderの同名置換を扱う。Fenceは未送信予約から保護し、SemaphoreのWSI待ちはgraphics結果と分離する。native配列のCPU容量を生成前に確保し、部分失敗を逆順で巻き戻す。
+
+[同期資源の共通使用状態](synchronization-state.md)で、Fence要素別のPENDING予約／公開wait拒否／全対象先行検査、Semaphoreの複数graphics結果とWSI marker、cleanupへの予約・元sourceの移譲、named replacement保護を実装した。native配列生成・破棄・待機／resetも共通operationへ移した。次はそのbackendを指定領域から使うFence／SemaphoreのCPU配置である。
+
+8cでTyped frameの配置・再利用へ接続する。8aの所有分離だけでは順序8全体の完了と扱わない。
+
+[8b後半の同期資源配置](synchronization-arena.md)で、通常の名前付き生成とarenaのbackendを共通化した。Implはraw Deviceと保存native Deviceを使い、隣接contextはweak registryだけを保持する。同Rootの異なるSemaphore／FenceをWorkの1所有要素で保持しつつ、各実体の使用状態を維持する。nativeの明示破棄、CPU slot寿命、importの正規owner、途中失敗・同region再利用、Typed転送と完了／取消回収を検証する。
+
+8cは実行用資源とper-frameのデータ資源を別ownerに分ける。独立ComputeではPool×1、ring Impl×1（native CB×F）、Fence Impl×1（native×F）を実行群へ配置し、同じManagerを既存FrameResources／Bundleへ渡す。外部FenceをPhaseへ明示して内部heap Fence生成を回避する。Manager／DomainをFrame値やarena rootへ強所有させず、Domain→Work→Frame→Domainの循環を作らない。Computeの巡回は明示、DefaultPhaseの巡回は既存のsetupへ残す。
+
+AHOではEngineのcommand群、Windowのframe同期群（image-available×F／in-flight Fence×F）、swapchain世代のrender-finished×Mを分ける。Fと画像数Mを混同しない。DefaultPhaseが別途生成するacquire Fenceはgraphics Fenceと兼用せず、WSI予約・取消返却・厳密完了とともに順序10で扱う。
+
+[8cのTyped frame実行arena](typed-frame-command-arena.md)で、明示heap／arenaの共通facade、元Managerとringの固定、外部FenceによるPhase生成、明示巡回を接続した。3slot反復・取消・Frame値の完了解放・Facade破棄後の使用・組全体の移動代入を検証し、両policyのuniform／descriptor実computeとarena版bundleの配列／readbackを確認した。これで順序8の受入条件を満たす。AHOの生成移行とWSI acquire Fenceは順序9／10へ残す。
+
+## 順序9の着手単位
+
+9aはInstance単体の共通operation／lifetime backendと指定領域構築。validation有無の実体をruntimeデータへ揃え、旧Vulkan facadeはadapterとする。所有値の生成入力とGLFW拡張収集を分け、Instance→debug messengerの途中失敗を巻き戻す。プロセス全体のstdio／console変更をlibrary backendへ持ち込まない。
+
+[9aのInstance backendと指定領域構築](instance-arena.md)を実装した。通常heap／配置の共通化、runtime型の統一、所有入力、正規owner、失敗出力未採用・逆回収・同slot retry、releaseのhost descriptor維持、構成別／cross／install／artifactを検証した。ResourceArenaへDevice以前の資源を混ぜず、Instanceのlayout traitを公開した。公開StartupArenaとPhysicalDevice以降は未実装であり、順序9全体の完了とはしない。
+
+[9bのPhysicalDevice backendと指定領域構築](physical-device-arena.md)で、候補scratch／選択済み実体と旧custom searcherのowning候補を分けた。heap／配置の共通構築、Instance固定親と元ownerのgetter、同型slotの直接参照、能力cache、失敗rollbackを接続した。Device前提のResourceArenaへstartup kindを混ぜず、PhysicalDeviceのlayout traitを生成・配布する。
+
+9cはSurfaceのOS owner／GLFW leaseと共通backend／指定領域構築である。WindowDataの論理的closeとnative windowの最終破棄を分ける。OS ownerはplugins／Engineを持たず、Surfaceの外側ownerがInstanceとOS ownerを固定保持する。GLFW callback内ではnative破棄を延期し、管理側のmain-thread境界で回収する。leaseの共有範囲と外部GLFW利用の契約を明記し、Surface／Swapchainだけが残る場合にもGLFWを終了しない。
+
+[9cのOS window／Surface実装](surface-arena.md)で、独立OS leafとGLFW lease、main thread退役queue、Surfaceの共通backend／指定領域／元親getterを接続した。GPU／CPU／compile／配布構成と同一画像の回帰を検証し、9cの受入条件を満たした。次は9dへ進む。
+
+9dはLogicalDeviceの固定親と正規owner、共通backendと指定領域構築を対象にする。子のDevice getter等に残るshared_from_thisを置換する。Deviceを依存graphへ公開する時は、既存heap leaf／ResourceArena／visitorにも正規Deviceの固定辺を列挙する。
+
+[9dのDevice backendと正規owner](device-arena.md)で、通常heap／配置の共通生成、所有するqueue／feature入力、元PhysicalDeviceの固定親、子の元Device getter、全Device辺の公開、未公開Deviceからのraw子構築を実装・検証した。Device自身の正規ownerと既存のopaqueな子ownerは区別する。生成境界でownerを検査し、通常操作ではraw実体参照を利用する。
+
+当初9dへまとめていた公開起動arenaとAHO起動は9eへ分割する。Deviceの共通backendと、その利用者である配置ownerの変更を独立に検証するためであり、順序9の完了条件は減らさない。
+
+9eではDevice引数不要の公開StartupArenaを作る。共通Instance root、選択PhysicalDevice／Deviceの群、各WindowのSurface群を別ownerとして構築し、既存の生成処理と寸法情報を使う。同型slot、外部Instance、失敗rollback、元ownerのgetter、Deviceだけを残したWindow回収を検証し、AHOの起動／終了と複数Windowへ接続する。候補列挙scratchと実体の永続配置は分け、公開前の同群依存はraw参照にする。
+
+[9eの公開StartupArenaとAHO起動](startup-arena.md)で、生成済み寸法からのconstexpr計画、入力snapshot、親順構築と成功逆順rollback、元owner getter、AHOの三寿命群を接続した。Device生成中だけSurfaceを保持し、Deviceだけが残る場合のSurface／OS独立回収、複数Window、同領域retry、Typed転送を検証した。これで順序9の受入条件を満たす。
+
+順序10ではSwapchainの共通backend／配置、graphicsとpresentationの完了の区別、取消・退役世代の保持と再生成失敗からの復旧、acquire Fenceを扱う。9cで確認した無効resize引数のnative前拒否と、最小化で0になったframebufferの再生成延期も必須の検証項目とする。
+
+## 順序10の分割
+
+10aはmaintenance1の能力照会・Instance依存・Device feature chainを接続する。厳密な資源回収を要求する入口では未対応を生成前に拒否し、互換fallbackは独立policyとする。現SDKのEXT型と実driverの能力を照合し、device idleをpresentation完了の証明へ昇格させない。
+
+[10aのPresent Fence能力と有効化](present-fence-features.md)で、独立した生成要求、実Instance設定、core／KHR queryとtimeline併用、supportedとenabledの分離を実装・検証した。拡張名だけやLEGACYでfeatureを暗黙に有効化しない。実際のFence付きpresent／厳密回収は10cで接続し、この段階では保証しない。
+
+10bはSwapchainの共通backend／指定領域構築と、全aliasで共有する現役／退役状態。nativeへoldSwapchainを渡した後は、生成失敗でも退役を取り消さない。実画像数に従うImage／世代同期群の計画を、native pending状態から構築する。
+
+[10bのSwapchain世代とCPU配置](swapchain-arena.md)で、native Pending→実画像M→CPU領域→Image slots→世代公開を接続した。全aliasの退役状態、元親owner、途中失敗の逆順rollbackと同領域再利用、準備callbackの世代変更拒否、実取得世代／indexによる取消を検証した。取消の使用登録は同じ物理ImageUseStateへ非pollで接続し、取得情報はGPU完了まで保持する。世代同期群の実present証明とacquire Fenceの再利用は10c／10dへ続く。
+
+10cは[Presentの完了観測と世代保持](presentation-retention.md)で、Surface共通の外部Domain／PresentRecord、世代内のFence pool、enqueue結果の分類、snapshot回収とcallback再入を接続した。graphics完了とstrict present証明を分け、DeviceLostは全snapshotへ先に保存してから保持を解除する。不明結果の終了は退避し、同Surface／Deviceに限定して非blocking回収する。Swapchain内部からRecordを強所有しない。
+
+10dはframeごとのacquire FenceとAcquireTicket、取得後失敗・取消時のsignal消費／画像返却、present OOMのretryと破棄を扱う。[前半の準備中の借用寿命](phase-call-lifetime.md)で、stack guardによる自己破棄検知、局所ownerの解放・例外後の中断、共有Fence予約と既存peer-start契約を検証し、後続のTicketと共通回収へ接続した。
+
+[Fenceの共通用途状態](fence-use-kinds.md)で、graphics／acquire／presentの物理要素を一つのweak variantへ整理した。strict poolの正規aliasも同じ予約・変更検査を使い、旧Proof保存後のreset、UNKNOWNのpoll限定、配列Lossの全結果保存後通知を検証した。Ticketへ別の物理使用表を追加しないための前提であり、F個の実acquire poolと取得後回復へ続く。
+
+[世代の描画完了Semaphore](generation-semaphores.md)で、既定経路のUniqueSemaphore vectorを共通backendと世代内のSemaphoreImpl slot（native実画像M個）へ接続する。AHOは同Mのresizeでも新sourceへ更新する。同期source３役はCOMPLETION保持へ統一し、送信履歴で旧世代を延命しない。
+
+[取得Fence pool](acquire-fence-pool.md)でF個のnative Fenceを共通ResourceArenaへ配置し、Domainに正規source一つだけをlazy保持する。CPU-only proofの保存・予約identity・外部source・取得失敗・reset巻戻しとcallback中の自己破棄を検証した。
+
+[取得画像の責任とSurface回収](acquire-ticket-recovery.md)で、実Ticket／graphics／drain／presentの結果を分離し、同じ物理Semaphore要素のlease、独立した取得Fence証明、画像release、RECOVERY_REQUIREDを接続した。全CPU状態保存→全bookkeeping→owner解放の共通batchを、公開Surface APIとCommandDomain待機へ適用する。自動present回収は従来の描画Completion通知順を維持する。新16件と全VSL1,112件、AHO161／1,070、compile195、install27、構成別／cross／ABI、同一描画の検証が成功した。
+
+10eはAHOのframe同期群とSwapchain世代群を分け、候補生成後のattachment失敗から復旧する。0 extentでは再生成・acquire・Fence resetを延期し、復元後に一括公開する。最後のpresent直後close、連続resize、marker保持量の有界化と互換Pipeline再利用を検証して順序10完了とする。
+
+[10e1のWindow frame同期群](../AHO/window-synchronization.md)で、available／graphics Fence／acquire FenceをWindowの同rootへ配置し、M finishedと分離した。Engineの明示policyを初回・追加Windowへ伝達し、Window個別override、旧custom source省略、Ctorの一回snapshotを接続した。AHO GPU168／CPU1,071、compile195、public consumerと同一描画が成功。candidate保持、0 framebuffer、close統合を次の単位で続ける。
+
+10e2では同じWindowDataへ候補と検証済み要求を保持し、同要求のFramebuffer失敗からNative Swapchainを作り直さず再開する。共通backendの借用進行情報でpreflight失敗を区別し、旧ownerを保持した一括swapで世代を公開する。新6件と保持Context／描画cacheのreadback回帰、全VSL1,114／AHO172・1,071／compile195、install・配置情報・同一描画の検証が成功した。0 framebufferの取得前休止とclose統合は10e3／10e4へ続く。
+
+10e3では0 framebufferの再生成／取得延期、Native reset前gate、自己の準備状態だけのslot巻戻し、Window／manager snapshot、public PhaseCallによる派生callbackの寿命検査を接続した。延期NONEと検証済みusageを保持し、休止中の記録と同setup再入を拒否する。新VSL3／AHO10、全VSL1,117／AHO182・1,071／compile195、同一描画、install／構成別／cross／ABIと規約検査が成功した。titlebarを含むclose／共通Surface回収を10e4で仕上げ、順序11・12へ続ける。
+
+10e4で共有closed状態と全ownerの退避、titlebarを含む共通close、対象Phaseの取消、弱いSurface退役queueと結果commit後の回収を接続した。Native中は同Deviceへの返却操作を延期し、未完了Workは元CB owner付きで保持する。AHO既定FBO保持は独立したCOMPLETION指定とし、通常VSLのSUBMISSION互換を維持する。新VSL7／AHO8と既存回帰、全VSL1,124／AHO190・1,071／compile195、同一描画、strict・public installを検証し、順序10の受入条件を満たした。
+
+## 順序11の分割
+
+11aでBundle／Frame／Sharedの省略時policyを`DefaultStorage = ArenaStorage<>`へ揃え、TypedFrameCommandsに2引数の既定arena生成を追加した。保持COMPLETIONと固定依存FIXEDは独立して維持する。旧backend型やcustom Managerのallocateに依存する利用は明示HeapStorageへ移し、通常の読み取りはread_intoへ接続する。既存のarena寿命／GPU試験を既定policyで再利用し、全VSL1,124／AHO190・1,071／compile195、heap／arenaのPNG一致、strict9ファイル／8TU、installed public consumer28種が成功した。
+
+11bでは単体TypedVertex／Index／ResourceBufferとTypedGraphics／ComputePipelineの生成policyを接続する。Bufferは同じBufferViewへ正規化し、固定容量・Index snapshot・共有物理状態・AHOの論理制約を維持する。PipelineはCPU recipeの検証をNative Layout生成より先へ分け、共通backendでLayout／Pipelineを配置する。11aだけで全Typed生成のarena既定化を完了としない。公開Impl入口・adapter廃止と測定は12へ続く。
+
+11b前半で単体Typed Bufferの生成時policyと共通BufferViewを接続した。共通backendのdevice-local構築、独立ringによる転送、Index snapshotの一回採取、Typed／Native descriptorとbindのview入口を揃えた。backendはlvalue限定const BufferView&、所有値はstorage_view()とする。enqueue済みnative使用が残るlogical FAILEDの保持も修正した。新規6件、全VSL1,130／AHO190・1,071／compile198、heap／arenaの同一描画、public install28種、構成別／cross／ABI検証が成功した。Typed PipelineのCPU draft／2slot配置を11b後半として続ける。
+
+11b後半でTypedGraphics／ComputePipelineも先頭生成policyとDefaultStorageへ接続した。CPU draftの不変snapshotでTyped検証をNative生成前へ移し、schemaのDescriptorLayoutは一時寿命群でmaterializeする。共有Layout sourceと疎なsetの空Layoutを扱い、owner indexの再配置を共用する。heapとLayout＋Pipelineの2slot arenaは同じbackendを使い、構築後には生成用sourceを保持しない。新規4件と既存試験の両policy化、全VSL1,134／AHO190・1,071／compile202、PNG3枚一致、strict22ファイル／12TU、installed consumer28種、構成別／cross／artifact混在拒否が成功した。順序11の受入条件を満たし、公開raw入口・互換adapterと明示ManagerのAPI整理、4責務の実定義分割と実測を順序12へ続ける。
+
+## 順序12の分割
+
+12aでBuffer／Descriptor／Pipelineの非所有identityを追加し、TypedBatchの公開Implポインタ比較への依存を外した。Device／Completionは既存operator==へ移し、同じ実体のalias・同arena別slot・offset・index型によるbind省略を維持する。ownerは元command群が保持し、identityは永続世代IDにしない。既存回帰の拡張、全VSL1,134／AHO190・1,071／compile204、同一描画、strict22ファイル／12TU、public consumer28種とraw／mixed identity拒否、構成別／cross／artifact混在拒否が成功した。
+
+次はDescriptorValueのopaque化、ResourceUseの公開Impl入力廃止、BufferRef／BufferViewのraw入口とlegacy_ownerの廃止へ進む。custom commandのNative記録contextを用意してからCommand／起動資源／descriptor manager／Pipeline recipe／WindowDataを閉じる。実定義を4責務へ分けて寸法生成依存を更新し、最後に同条件のheap／arenaで残る確保・参照・保持量を測る。identity追加だけで順序12全体を完了とはしない。
+
+12bでDescriptorValueをprivate fieldと4つの非template factoryへ移した。Bufferの相対Subviewとphysical＋logical使用、Image／Samplerの外部composite CBとsupplied useを保持し、元ownerを作り直さない。空default値と配列更新の失敗保証を維持し、公開Implを組み立てるaggregateを閉じた。新composite回帰1件と既存二段Subview、全VSL1,135／AHO190・1,071／compile206、同一描画、strict13ファイル／12TU、public consumer28種とprivate／aggregate拒否、archive／生成header一致が成功した。寸法入力とfingerprintは12aから不変である。次はResourceUseの公開Impl入力を閉じ、BufferRef／BufferViewのraw入口廃止へ接続する。
+
+12cでResourceUseを通常facade／BufferView入力、ResourceUseGroupをGraphicResource入力へ移した。内部の共通kernelと元のphysical state／control blockを維持し、旧Impl入力5種を拒否する。同じdescriptor実体に別composite ownerが付く場合の保持漏れも修正した。物理状態の登録とowner一致を別々に判定し、追加ownerを同じCOMPLETION／SUBMISSION契約で保持する。修正前の早期解放を再現し、完了／取消の4経路を確認した。全VSL1,136／AHO190・1,071／compile211、同一描画、strict19ファイル／16TU、public consumer28種と旧入力拒否、Debug／Release／x86_64の寸法生成、artifact混在拒否が成功した。次の12dでBufferRef／BufferViewのraw入口とAHOのNativeBufferAdapterを閉じる。公開API全体の廃止、実定義の4責務分割と測定は未完了である。
+
+12dでBufferRefのraw field／構築、BufferViewのraw構築／legacy_owner、bindのraw入力／source getterと、一時Placed viewからの借用迂回を閉じた。頂点／index bindはImpl*と一つのResourceUseで所有・状態を持ち、native descriptor更新も元のmanaged composite nodeを保存する。転送元BufferViewを共通CopyBufferToImageへ接続し、source登録を画像barrier前へ移した。AHOは一度取得したsnapshotを使い、NativeBufferAdapterとcompatibilityを除去した。source専用retentionと具体StorageのTYPE／PROPERTY／Custom mappingは維持する。新VSL3件／AHO2件、全VSL1,139／AHO192・1,071／compile222、PNG3枚一致、strict43ファイル／32TU（補完を含む）、public consumer28種と旧入力拒否16種、Debug／Release／x86_64の寸法生成、artifact混在拒否が成功した。次はNative記録contextを用意し、残りの公開facadeと実定義の責務境界、同条件測定へ進む。
+
+12eでNativeRecordingContextを追加し、custom commandの記録を公開Implなしで検証できるようにした。既存CommandBuffer／Domainをpinし、Result／slot／世代／Native CBを保存して使用登録の前後に同じ記録か確かめる。Native借用区間のhost直列化とbarrier責務を明記し、新owner wrapperやWorkへの強所有は増やさない。既存compute／Typed barrierを移行し、新GPU4件、全VSL1,143／AHO192・1,071／compile224、同一描画、strict11ファイル／9TU、installed public consumer4種と新負例2種、archive／生成header一致が成功した。Implの定義とfingerprintは12dから不変で、同構成のmulti／crossとartifact guard検証を再利用する。次はCommand／起動資源等の残りの公開入口廃止へ進む。
+
+12f前半でCommandPool／CommandBuffer／CommandManagerの公開data_／sharedImpl構築を閉じ、空値／bool／種類別identityへ移した。Managerと共有ringの同一性を分け、private bridge経由でも強いsnapshot、既存DomainのResolveと明示Attach、旧owner回収時の再入を維持する。AHOへprivate依存を追加しない。新runtime2件、全VSL1,145／AHO192・1,071／compile231、PNG3枚一致、strict82ファイル／74TUと補完検査、installed consumer29種と新負例7種、Debug／Release／x86_64の寸法生成、artifact混在拒否、archive／生成header一致が成功した。残るAccessor／起動資源／recipe／WindowData等の公開入口廃止、実定義の4責務分割と測定を継続する。
+
+12fの次の単位でBuffer／Image／Samplerの公開data_とImpl factoryを閉じ、元のOwnedRefをdescriptor／import／getterへ引き継いだ。runtimeのheap生成はBufferView::Create／ImageAccessor::Create、画像readbackは範囲付きBufferViewを使う。CPU操作のpoll前snapshot、viewの全値commit、転送の検証→使用登録→共通Native記録を揃え、純転送Imageには不要なviewを作らない。新runtime11件、全VSL1,156（対応外format3 skip）／AHO192・1,071／compile245、同一PNG、strict79ファイル／64TUと補完検査、installed consumer30種・新負例14種、Debug／Release／x86_64寸法生成、artifact混在拒否、archive／生成header一致を確認した。Shader／ShaderGroupから残りfacadeとrecipe／WindowDataの入口を順に閉じ、12gの実定義4責務分割と12hの測定へ続ける。
+
+Shader／ShaderGroupの単位では、公開data_／raw構築を閉じ、Group→recipe→snapshot→生成入力の復元→external import／getterに元のOwnedRefを引き継いだ。共有編集とmove元の拒否、削除結果の公開後に旧ownerを回収する契約を明示し、完成PipelineのShader回収を維持する。新runtime3件と既存Typed computeの両policy拡張、全VSL1,159（対応外format3 skip）／AHO192・1,071／compile252、同一PNG、strict17ファイル／12TU、installed consumer30種・新負例7種、構成別／cross寸法生成、archive／header一致が成功した。寸法定数が同じ旧親headerも新バイナリとの混在を拒否する。次はdescriptor3型とManagerの境界を閉じ、Poolの通常bind／external import／canonical getterの契約を保つ。順序12全体は継続中である。
+
+Descriptor／Managerの単位でBindingLayout／Pool／Resourceをprivate OwnedRef、Managerを既存の共有CPU stateと観測identityへ閉じた。recipe・heap Set・external Layout・getterに元nodeを保ち、external Pool importとget_poolのcanonical契約を分けた。3 facade自身の値引数代入とManagerの全値公開後の旧owner回収、poll／Native callback前の入力snapshot、descriptor bindの記録先固定を接続した。新runtime10件、全VSL1,169（対応外format3 skip）／AHO192・1,071／compile271、同一PNG、strict34ファイル／27TUと変更2ファイルの再検査、installed consumer30種・新負例18種、構成別／cross寸法生成、artifact混在拒否、archive／header一致、source395件とMSBuild登録が成功した。次はruntime graphicsの4 facadeと生成入力・Pass getterを閉じる。起動資源／同期／Swapchain／recipe／WindowData／Completion、実定義の4責務分割と測定も継続する。
+
+runtime graphicsの単位でLayout／Pass／Pipeline／FrameBufferの公開data_をprivate OwnedRefへ閉じた。Editor／Frozen／Graphics／Compute／Pickingを値構成にし、型の契約を崩すmutable Base&を禁止する。元nodeを維持するgetter／arena接続、call-only生成入力、Pickingの待機snapshotと画像一括公開を接続した。新runtime8件、全VSL1,177（対応外format3 skip）／AHO192・1,071／compile294、同一PNG、strict48ファイル／46TUと最終4ファイル／2TU、installed consumer30種・新負例22種、構成別／cross寸法生成、artifact混在拒否、archive／header一致、source398件とMSBuild登録が成功した。次はFence／Semaphore／SynchroManager、続いてSwapchainの公開境界を閉じる。同期のcanonical owner検査と物理実体＋要素indexの区別を維持する。残るrecipe／起動資源／WindowData／Completion、12g実定義4層、12h同条件測定も継続する。
+
+
+同期3型の公開境界をprivate OwnedRef／共有registryへ閉じ、正規node／CBとretiringの拒否、元Sourceの使用状態、名前付き置換と値代入の公開後回収を維持した。AHO製品側はpublic boolとfacade moveで接続する。新runtime6件、全VSL1,183（既知format3 skip）／AHO192・1,071／compile306、同一PNG、strict23files／21TU＋補完1／1・2／2、installed consumer30種と新正負12件、構成別／cross寸法・混在拒否・archive／header一致、source399／MSBuild登録が成功した。次は他のgeneric所有境界で失われた既知nodeの退役検査を補修し、その後Swapchainへ進む。残るrecipe／起動資源／WindowData／Completion、12gの実定義・処理4層分割、12h同条件測定も継続する。
+
+既知owner nodeの退役検査をgeneric公開境界へ復元した。Shader/Graphics/Resource owner_ref、Accessor使用factory3種、ShaderGroup injectionをconst OwnedRef参照で検査し、composite/opaqueと既存ownerの移動/回収を保つ。新6件は同ABIの親libraryで6件失敗を再現し、修正後は全成功。全VSL1,189（既知format3 skip）／AHO192・1,071、同一PNG、strict14files/13TU＋補強1/1、consumer30と配布一致、source400/MSBuild登録が成功した。公開headerと寸法入力は不変で、親のcompile306と構成別/cross/ABI検証を適用する。以前から独立したBufferView/ResourceUseGroup入口の意味は変えていない。次はSwapchainの公開所有境界であり、その後のrecipe/起動資源/WindowData/Completion、12g実定義と処理の4層分割、12h測定を継続する。
+
+Swapchainのownerと全画像をprivateな一体の値へ閉じ、公開bool/identity/owning image/const spanを接続した。全値公開後に旧ownerを回収し、Phase/Work/Proofの元CBとRootの借用構成、Source/epoch、Device/Surface寿命群を保つ。新4件、全VSL1,193（既知format3 skip）/AHO192・1,071/compile317、同PNGとglTF viewer verify、strict28files/23TU、consumer30/新公開正負11/配布一致/構成別・cross/ABI混在拒否/source401が成功。次はrecipe Read/Edit参照とstate EditRef/definitionを2単位で閉じる。起動資源/WindowData/Completionの公開境界、12g実定義・metadata・手順の4層分割、12h同条件測定も継続する。
+
+recipe単位でLayout/Editor/Frozen/Snapshotの公開Impl参照を閉じ、private Read/Editの一時値借用を禁止した。Draft/Snapshotと公開stage合成、元source/node/CB、deep copy/共有判定、Typed両policyの同じbackendを維持する。全341TU/新公開正負6/strict33files29TU/main/compile323、全VSL1,193（既知format3 skip）/AHO192・1,071、同PNG/glTF verify、consumer30/配布一致/probes/混在と親ed拒否/source402が成功。生成IDはbb2e8ca3…へ更新。次はstate EditRef/definition、起動資源、Window/Engineの境界、Completionへ進める。その後12gで実定義・inline metadata・観測と回収手順の4層分割、12hで同条件測定を続ける。
+
+state単位でEditRefの公開pointer/get/raw構築とState.definitionを閉じた。追加ownerなしのprivate Read/Edit/Borrow、recipe内inline state、copy独立/失敗不変と公開stage合成を維持した。変更17TU/strict19files17TU/main/compile327、全VSL1,193（既知format3 skip）/AHO192・1,071、同PNG/glTF verify、consumer30/公開11契約/配布一致/構成別・cross/混在と親bb2e拒否/source403が成功。生成IDは61c90256…へ更新した。次はInstance/PhysicalDevice、Device/SurfaceとAHOの弱いclose回収、Engine/Window/Completionの公開境界へ進める。12gの実定義・metadata・処理4層分離と12hの同条件測定は引き続き未完了である。
+
+Instance/PhysicalDevice単位でprivateな正規OwnedRef、Vulkanの値composition、collectionの非template実装へ移した。親getterは元CB/nodeを保ち、custom searcherのctor中自己破棄にもsnapshotを維持する。関連36TU/公開18/規約43files34TU＋新2CPP補完2TU/main/source406が成功。compile345は初回339とtimeout6の単独再成功で全件を確認した。新runtime1と全VSL1,194（既知format3 skip）/AHO192・1,071、同PNG/glTF verify、installed公開25compile・7link/実行・18正負契約、配布一致/probes/混在と親61c9拒否が成功した。生成IDは6f5ad8d7…。次はDevice/Surface/旧CreatorとAHO weak close、続いてEngine/Window/Completion、12g実定義と手順の4層分離、12h測定へ進める。
+
+Device/Surface単位でprivate正規OwnedRef、LogicalDeviceの値composition、公開GraphicsDeviceCreator/CreateGraphics/GraphicsInfo、opaqueな弱参照へ移した。親getterとarena getterは元CB/node、AHO weak closeはEngineと独立した親pinを保つ。親setterも保存node一致を検査し、Creatorへ渡す値を検証基準と分離した。新4件/全VSL1,198（既知format3 skip）/AHO192・1,071/compile361、同PNG/glTF verify、strict110files97TU＋宣言順修正1file1TU/main/source406、installed26compile・3link・16契約/配布一致/probes/構成と親6f5a混在拒否が成功した。最後の宣言順修正は関数本体不変を比較し、再build/配布一致を確認した。生成IDは80b75e39…。Engine/Window/Completionの公開境界、12gの実定義・metadata・手順分離、12hの同条件測定を継続する。
+
+Engine単位でAHOのprivate状態／公開service factory／所有値getter、GraphicalEngineの値composition、RenderContextの強いEngine保持へ移した。Instance/Physicalの重複保持を除き、stack BootScope/config snapshot/全candidate公開後の旧値回収と元Window closeへのrollbackを実装した。新6件/全AHO198・1,071/関連compile32/main/source408/strict24files16TU、同PNG/glTF、installed27compile・3link・15契約/配布一致が成功。VSL archiveと生成80b75e39は不変である。次はlogical Window/pluginとAHO Window/Context/Input、その後Completion、12gと12hへ続ける。
+
+logical Window単位で状態・登録表・更新順序をprivate lifetimeへ、Native操作をoperationへ移した。[Windowの寿命境界](window-lifetime-boundaries.md)に公開値／weak／identityとplugin登録の契約を記載した。登録表のみがpluginを所有し、更新順序はIDだけを保持する。stack Callと状態snapshotで構築中のreceiver破棄／差し替え、候補生成・旧owner回収後のclose再入を検出する。VSL1,207（既知3skip）/AHO GPU203・CPU1,071・入力46、compile388/公開10、同PNG/glTF、strict/main/source411、installed28compile・1link実行・正負10/配布一致/probes/構成と親80b混在拒否が成功した。生成IDは3a183c33…。次はAHO WindowData／composition／Context／Inputの全値寿命、続いてCompletionへ進める。12g実定義・metadata・手順の4層分割と12h同条件測定は引き続き未完了である。

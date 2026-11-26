@@ -6,7 +6,10 @@
 
 AHO_NAMESPACE::InputManager::InputManager(void* context) : context(context) {}
 
-AHO_NAMESPACE::InputManager::InputManager(VSL_NAMESPACE::PureWindow window) : context(window.data_->window_handle) {}
+AHO_NAMESPACE::InputManager::InputManager(VSL_NAMESPACE::PureWindow window) {
+    _window_owner = window.window_owner();
+    context = _window_owner.native_handle();
+}
 
 void AHO_NAMESPACE::InputManager::update() {
     const auto targets = update_targets;

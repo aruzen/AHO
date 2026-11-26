@@ -1,32 +1,34 @@
 #include <AHO/render_context.hpp>
 #include <AHO/window.hpp>
+#include "engine/engine_access.hpp"
 #include <stdexcept>
 
 namespace AHO_NAMESPACE {
     RenderContext::RenderContext(const window::Window& window)
-        : _engine(window.engine.data()), _target(window.data2), _window(window.data_) {
+        : _engine(window.engine), _target(window.data2), _window(window.weak()) {
         require_live();
     }
 
     void RenderContext::require_live() const {
-        if (!_window || !_window->window_handle || !_target || !_engine ||
-            !_engine->logical_device.data_ || !_engine->command_manager.data_ || !_engine->graphic_resource_manager)
+        const auto& services = engine::detail::EngineAccess::State(_engine);
+        if (!_window.lock() || !_target || _target->closed || !services ||
+            !services->logical_device || !services->command_manager || !services->graphic_resource_manager)
             throw std::logic_error("RenderContext requires a live, booted AHO window");
     }
 
     VSL_NAMESPACE::LogicalDeviceAccessor RenderContext::device() const {
         require_live();
-        return _engine->logical_device;
+        return _engine.device();
     }
 
     VSL_NAMESPACE::graphic_resource::ManagerInterface& RenderContext::descriptor_manager() const {
         require_live();
-        return *_engine->graphic_resource_manager;
+        return *engine::detail::EngineAccess::Require(_engine).graphic_resource_manager;
     }
 
     VSL_NAMESPACE::CommandManager RenderContext::commands() const {
         require_live();
-        return _engine->command_manager;
+        return _engine.commands();
     }
 
     size_t RenderContext::frame_count() const {

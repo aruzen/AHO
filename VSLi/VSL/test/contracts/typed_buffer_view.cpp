@@ -1,21 +1,73 @@
 #include <VSL/utils/typed_pipeline.hpp>
+#include <VSL/lifetime/typed_buffer_arena.hpp>
+#include <VSL/lifetime/typed_resource_buffer_view.hpp>
+#include <VSL/lifetime/native_recording.hpp>
+#include <VSL/vulkan/commands/image_readback.hpp>
 #ifndef VSL_TYPED_CASE
 #define VSL_TYPED_CASE 0
 #endif
 namespace {
     namespace t = vsl::typed;
+
     struct Vertex {
         float xy[2];
     };
+
     struct Wrong {
         float xy[2];
     };
+
     using Input = t::TypedVertexInput<t::VertexRecord<Vertex, VSL_VERTEX_MEMBER(Vertex, xy)>::Binding<0>>;
     using Pipeline = t::TypedGraphicsPipeline<Input>;
     using Set = t::DescriptorLayout<t::UniformBinding<0, float, vsl::ShaderFlag::VERTEX>>;
+    template<typename Buffer>
+    concept rvalue_backend = requires(Buffer&& buffer) { std::move(buffer).backend(); };
+    using Placed = t::PlacedBufferView<std::uint32_t, vsl::MemoryType::TRANSFER_SOURCE>;
+    using PlacedUniform = t::PlacedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>;
 #if VSL_TYPED_CASE == 0
+    static_assert(std::is_default_constructible_v<vsl::ImageAccessor> && std::is_default_constructible_v<vsl::SamplerAccessor>);
+    static_assert(!std::is_aggregate_v<vsl::ImageAccessor> && !std::is_aggregate_v<vsl::SamplerAccessor>);
+    static_assert(!std::is_constructible_v<vsl::ImageAccessor, std::shared_ptr<vsl::impl::ImageImpl>>);
+    static_assert(!std::is_constructible_v<vsl::SamplerAccessor, std::shared_ptr<vsl::impl::SamplerImpl>>);
+
+    void use_runtime_storage(vsl::LogicalDeviceAccessor device, vsl::BufferCreateInfo buffer_info, vsl::ImageCreateInfo image_info) {
+        auto buffer = vsl::BufferView::Create(device, buffer_info);
+        auto image = vsl::ImageAccessor::Create(device, image_info);
+        vsl::command::CopyImageToBuffer copy(buffer, image, vsl::ImageLayout::GENERAL);
+        vsl::command::ImageReadback readback(buffer, image, vsl::ImageLayout::GENERAL);
+    }
+
+    static_assert(std::is_default_constructible_v<vsl::CommandPool> && std::is_default_constructible_v<vsl::CommandBuffer> && std::is_default_constructible_v<vsl::CommandManager>);
+    static_assert(!std::is_constructible_v<vsl::CommandPool, std::shared_ptr<vsl::impl::CommandPoolImpl>>);
+    static_assert(!std::is_constructible_v<vsl::CommandBuffer, std::shared_ptr<vsl::impl::CommandBufferImpl>>);
+    static_assert(!std::is_constructible_v<vsl::CommandManager, std::shared_ptr<vsl::impl::CommandManagerImpl>>);
+    static_assert(!std::is_constructible_v<vsl::CommandPool, std::nullptr_t> && !std::is_constructible_v<vsl::CommandBuffer, std::nullptr_t> && !std::is_constructible_v<vsl::CommandManager, std::nullptr_t>);
+    static_assert(!std::is_constructible_v<vsl::CommandPool, VkCommandPool> && !std::is_constructible_v<vsl::CommandBuffer, VkCommandBuffer> && !std::is_constructible_v<vsl::CommandManager, VkDevice>);
+    static_assert(std::is_copy_constructible_v<vsl::NativeRecordingContext> && std::is_move_constructible_v<vsl::NativeRecordingContext>);
+    static_assert(!std::is_copy_assignable_v<vsl::NativeRecordingContext> && !std::is_move_assignable_v<vsl::NativeRecordingContext>);
+    static_assert(!rvalue_backend<Placed> && !rvalue_backend<const Placed>);
+    static_assert(!rvalue_backend<PlacedUniform> && !rvalue_backend<const PlacedUniform>);
+    static_assert(!std::is_aggregate_v<vsl::BufferRef>);
+
+    void use_facades(const vsl::BufferAccessor& buffer, const vsl::BufferView& view,
+                     const vsl::ImageAccessor& image, const vsl::SamplerAccessor& sampler, const vsl::GraphicResource& set) {
+        vsl::ResourceUse::ForBuffer(buffer);
+        vsl::ResourceUse::ForBuffer(view);
+        vsl::ResourceUse::ForImage(image);
+        vsl::ResourceUse::ForSampler(sampler);
+        vsl::ResourceUseGroup::ForDescriptor(1, set)->tracks_descriptor(set);
+    }
+
+    static_assert(!rvalue_backend<t::TypedVertexBuffer<Vertex>> && !rvalue_backend<const t::TypedVertexBuffer<Vertex>>);
+    static_assert(!rvalue_backend<t::TypedVertexBufferView<Vertex>> && !rvalue_backend<const t::TypedVertexBufferView<Vertex>>);
+    static_assert(!rvalue_backend<t::TypedIndexBuffer<std::uint32_t>> && !rvalue_backend<const t::TypedIndexBuffer<std::uint32_t>>);
+    static_assert(!rvalue_backend<t::TypedUniformBuffer<float>> && !rvalue_backend<const t::TypedUniformBuffer<float>>);
+    static_assert(std::is_constructible_v<t::TypedVertexBuffer<Vertex>, vsl::LogicalDeviceAccessor, std::span<const Vertex>, t::HeapStorage>);
+    static_assert(std::is_constructible_v<t::TypedVertexBuffer<Vertex>, vsl::LogicalDeviceAccessor, std::span<const Vertex>, t::ArenaStorage<>>);
+    static_assert(!std::is_constructible_v<t::TypedVertexBuffer<Vertex>, vsl::LogicalDeviceAccessor, std::span<const Vertex>, t::ArenaStorage<int>>);
     static_assert(t::compatible_vertex_buffers<Input, t::TypedVertexBufferView<Vertex>>);
     static_assert(t::TypedGraphicsPipeline<Input, t::ResourceSchema<>, t::PushSchema<>, 1>::SUBPASS == 1);
+
     void accepted(Pipeline& pipeline, const t::TypedVertexBuffer<Vertex>& buffer, t::TypedDescriptorSet<Set>& set, const t::TypedUniformBuffer<float>& uniform) {
         pipeline.bind_vertices(buffer.view(1, 3)).draw(3);
         set.write<0>(uniform.view(1, 1));
@@ -38,5 +90,169 @@ namespace {
     }
 #elif VSL_TYPED_CASE == 5
     static_assert(sizeof(t::TypedGraphicsPipeline<Input, t::ResourceSchema<>, t::PushSchema<>, -1>) > 0);
+#elif VSL_TYPED_CASE == 6
+    void rejected(t::TypedVertexBuffer<Vertex>& buffer) {
+        std::move(buffer).backend();
+    }
+#elif VSL_TYPED_CASE == 7
+    void rejected(const t::TypedUniformBuffer<float>& buffer) {
+        std::move(buffer).backend();
+    }
+#elif VSL_TYPED_CASE == 8
+    void rejected(vsl::LogicalDeviceAccessor device, std::span<const Vertex> values) {
+        t::TypedVertexBuffer<Vertex> buffer(device, values, t::ArenaStorage<int>{});
+    }
+#elif VSL_TYPED_CASE == 9
+    void rejected(const std::shared_ptr<vsl::impl::BufferImpl>& buffer) {
+        vsl::ResourceUse::ForBuffer(buffer);
+    }
+#elif VSL_TYPED_CASE == 10
+    void rejected(const std::shared_ptr<vsl::impl::ImageImpl>& image) {
+        vsl::ResourceUse::ForImage(image);
+    }
+#elif VSL_TYPED_CASE == 11
+    void rejected(const std::shared_ptr<vsl::impl::SamplerImpl>& sampler) {
+        vsl::ResourceUse::ForSampler(sampler);
+    }
+#elif VSL_TYPED_CASE == 12
+    void rejected(const std::shared_ptr<vsl::impl::GraphicResourceImpl>& resource) {
+        vsl::ResourceUseGroup::ForDescriptor(1, resource);
+    }
+#elif VSL_TYPED_CASE == 13
+    void rejected(const vsl::ResourceUseGroup& group, const vsl::impl::GraphicResourceImpl* resource) {
+        group.tracks_descriptor(resource);
+    }
+#elif VSL_TYPED_CASE == 14
+    void rejected(vsl::BufferRef ref) {
+        ref.data;
+    }
+#elif VSL_TYPED_CASE == 15
+    void rejected(vsl::impl::BufferImpl* data) {
+        vsl::BufferRef ref{data};
+    }
+#elif VSL_TYPED_CASE == 16
+    void rejected(vsl::BufferRef ref, vsl::lifetime::OwnerRef owner) {
+        vsl::BufferView view(ref, owner, 0, 4);
+    }
+#elif VSL_TYPED_CASE == 17
+    void rejected(const vsl::BufferView& view) {
+        view.legacy_owner();
+    }
+#elif VSL_TYPED_CASE == 18
+    void rejected(vsl::BufferView view) {
+        std::move(view).ref();
+    }
+#elif VSL_TYPED_CASE == 19
+    void rejected(Placed view) {
+        std::move(view).backend().ref();
+    }
+#elif VSL_TYPED_CASE == 20
+    void rejected(PlacedUniform view) {
+        std::move(view).backend().ref();
+    }
+#elif VSL_TYPED_CASE == 21
+    void rejected(std::shared_ptr<vsl::impl::BufferImpl> data) {
+        vsl::command::BindVertexBufferAt command(0, data);
+    }
+#elif VSL_TYPED_CASE == 22
+    void rejected(const vsl::command::BindVertexBufferAt& command) {
+        command.source();
+    }
+#elif VSL_TYPED_CASE == 23
+    void rejected(const t::TypedVertexBuffer<Vertex>& buffer) {
+        buffer.storage_view().ref();
+    }
+#elif VSL_TYPED_CASE == 24
+    void rejected(vsl::CommandBuffer buffer) {
+        vsl::NativeRecordingContext(buffer).native_command_buffer();
+    }
+#elif VSL_TYPED_CASE == 25
+    void rejected(VkCommandBuffer commands) {
+        vsl::NativeRecordingContext recording(commands);
+    }
+#elif VSL_TYPED_CASE == 26
+    void rejected(const vsl::CommandPool& pool) {
+        pool.data_;
+    }
+#elif VSL_TYPED_CASE == 27
+    void rejected(const vsl::CommandBuffer& buffer) {
+        buffer.data_;
+    }
+#elif VSL_TYPED_CASE == 28
+    void rejected(const vsl::CommandManager& manager) {
+        manager.data_;
+    }
+#elif VSL_TYPED_CASE == 29
+    void rejected(std::shared_ptr<vsl::impl::CommandPoolImpl> data) {
+        vsl::CommandPool pool(data);
+    }
+#elif VSL_TYPED_CASE == 30
+    void rejected(std::shared_ptr<vsl::impl::CommandBufferImpl> data) {
+        vsl::CommandBuffer buffer(data);
+    }
+#elif VSL_TYPED_CASE == 31
+    void rejected(std::shared_ptr<vsl::impl::CommandManagerImpl> data) {
+        vsl::CommandManager manager(data);
+    }
+#elif VSL_TYPED_CASE == 32
+    bool rejected(vsl::CommandManagerIdentity manager, vsl::CommandBufferIdentity buffer) {
+        return manager == buffer;
+    }
+#elif VSL_TYPED_CASE == 33
+    void rejected(const vsl::BufferAccessor& buffer) {
+        buffer.data_;
+    }
+#elif VSL_TYPED_CASE == 34
+    void rejected(const vsl::ImageAccessor& image) {
+        image.data_;
+    }
+#elif VSL_TYPED_CASE == 35
+    void rejected(const vsl::SamplerAccessor& sampler) {
+        sampler.data_;
+    }
+#elif VSL_TYPED_CASE == 36
+    void rejected(const vsl::BufferAccessor& buffer) {
+        buffer._owner;
+    }
+#elif VSL_TYPED_CASE == 37
+    void rejected(const vsl::ImageAccessor& image) {
+        image._owner;
+    }
+#elif VSL_TYPED_CASE == 38
+    void rejected(const vsl::SamplerAccessor& sampler) {
+        sampler._owner;
+    }
+#elif VSL_TYPED_CASE == 39
+    void rejected(vsl::LogicalDeviceAccessor device) {
+        vsl::BufferAccessor::MakeBuffer(device, 4, vsl::MemoryType::TRANSFER_SOURCE, vsl::MemoryProperty::HOST_VISIBLE, vsl::SharingMode::EXCLUSIVE);
+    }
+#elif VSL_TYPED_CASE == 40
+    void rejected(vsl::LogicalDeviceAccessor device) {
+        vsl::ImageAccessor::MakeImage(vsl::ImageType::TRANSFER_SRC, vsl::MemoryProperty::DEVICE_LOCAL, vsl::ImageLayout::UNDEFINED, device, 1, 1, vsl::data_format::SRGB8_RGBA, 1);
+    }
+#elif VSL_TYPED_CASE == 41
+    void rejected(std::shared_ptr<vsl::impl::ImageImpl> data) {
+        vsl::ImageAccessor image{data};
+    }
+#elif VSL_TYPED_CASE == 42
+    void rejected(std::shared_ptr<vsl::impl::SamplerImpl> data) {
+        vsl::SamplerAccessor sampler{data};
+    }
+#elif VSL_TYPED_CASE == 43
+    void rejected(vsl::CommandManager manager, std::shared_ptr<vsl::impl::ImageImpl> image) {
+        vsl::ImageAccessor::TransformLayout(manager, image, vsl::ImageLayout::UNDEFINED, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
+    }
+#elif VSL_TYPED_CASE == 44
+    void rejected(std::shared_ptr<vsl::impl::BufferImpl> data, vsl::ImageAccessor image) {
+        vsl::command::CopyImageToBuffer copy(data, image, vsl::ImageLayout::GENERAL);
+    }
+#elif VSL_TYPED_CASE == 45
+    void rejected(std::shared_ptr<vsl::impl::BufferImpl> data, vsl::ImageAccessor image) {
+        vsl::command::CopyImageToBuffer copy(data, image, vsl::ImageLayout::GENERAL, {}, true, 0, 4);
+    }
+#elif VSL_TYPED_CASE == 46
+    void rejected(std::shared_ptr<vsl::impl::BufferImpl> data, vsl::ImageAccessor image) {
+        vsl::command::ImageReadback copy(data, image, vsl::ImageLayout::GENERAL);
+    }
 #endif
 } // namespace

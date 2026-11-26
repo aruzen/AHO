@@ -1,5 +1,11 @@
+#include <VSL/lifetime/startup_access.hpp>
 #include "support/image_transfer_fixture.hpp"
 #include <VSL/vulkan/commands/change_image_barrier.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
+
 namespace {
     class CopyImageToBufferVulkanIntegrationTest : public vsl_test::ImageTransferVulkanIntegrationTest {
         bool validate_vulkan() const override;
@@ -8,6 +14,7 @@ namespace {
     bool CopyImageToBufferVulkanIntegrationTest::validate_vulkan() const {
         return true;
     }
+
     TEST_F(CopyImageToBufferVulkanIntegrationTest, TypedAndAccessorOverloadsPreserveEveryTexel) {
         const std::array<std::uint32_t, 4> expected{0x12345678, 0x90abcdef, 0, 0xffffffff};
         EXPECT_EQ(round_trip(false, false), expected);
@@ -33,7 +40,7 @@ namespace {
             EXPECT_EQ(phase.state, vsl::ComputePhase::State::WAIT_SUBMIT);
             EXPECT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         auto mapped_pixel = pixel.data(sizeof(std::uint32_t));
         std::uint32_t actual_pixel;
         std::memcpy(&actual_pixel, mapped_pixel.data, sizeof(actual_pixel));
@@ -63,7 +70,7 @@ namespace {
                   << vsl::command::CopyImageToBuffer(&second_result, image, vsl::ImageLayout::TRANSFER_SRC_OPTIMAL, {1, 1, 1, 1, 1}, true)
                   << vsl::command::ChangeImageBarrier(image, vsl::ImageLayout::TRANSFER_SRC_OPTIMAL, vsl::ImageLayout::GENERAL, 1, 1);
         }
-        device.data_->device.waitIdle();
+        StartupAccess::Owned(device)->device.waitIdle();
         auto mapped_first = first_result.data(sizeof(first));
         std::array<std::uint32_t, 4> actual;
         std::memcpy(actual.data(), mapped_first.data, sizeof(actual));

@@ -5,26 +5,33 @@
 #include "../resource_use.hpp"
 
 #include "../buffer.hpp"
+#include "../buffer_view.hpp"
 
 namespace VSL_NAMESPACE::command {
     enum class IndexType {
         UINT16,
         UINT32
     };
+
     struct BindIndexBufferAt : Command {
         BindIndexBufferAt(const BufferAccessor& source, IndexType type, size_t offset = 0, ResourceUse use = {});
+        BindIndexBufferAt(const BufferView& source, IndexType type, size_t offset = 0, ResourceUse use = {});
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
+
         void track(const CommandBuffer& buffer) const { _use.record(buffer); }
-        const std::shared_ptr<impl::BufferImpl>& source() const { return _source; }
+
+        BufferIdentity identity() const;
+
         size_t offset() const { return _offset; }
         IndexType type() const { return _type; }
 
     private:
-        std::shared_ptr<impl::BufferImpl> _source;
+        impl::BufferImpl* _source;
         size_t _offset;
         IndexType _type;
         ResourceUse _use;
     };
+
     struct BindIndexBuffer : Command {
         template<MemoryType mem_type, MemoryProperty mem_property, SharingMode sharing_mode = SharingMode::EXCLUSIVE>
         requires((unsigned int)(mem_type & MemoryType::INDEX_BUFFER) != 0)

@@ -1,6 +1,18 @@
+#include <VSL/lifetime/graphics_access.hpp>
+#include <VSL/lifetime/buffer_access.hpp>
 #include "support/render_fixture.hpp"
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::GraphicsAccess;
+}
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+}
+
 namespace {
     using BindVertexBufferVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
+
     TEST_F(BindVertexBufferVulkanIntegrationTest, BindsSeparatePositionAndColorBuffers) {
         configure_pipeline(true);
         std::array<float, 6> positions{-1, -1, 3, -1, -1, 3};
@@ -17,6 +29,7 @@ namespace {
         }));
     }
 } // namespace
+
 namespace {
     TEST(BindVertexBufferTest, EmptyCommandsCanBeCopiedAssignedAndMoved) {
         vsl::command::BindVertexBuffer empty;
@@ -29,6 +42,7 @@ namespace {
         EXPECT_TRUE(copy.buffers.empty());
         EXPECT_TRUE(moved.buffers.empty());
     }
+
     TEST_F(BindVertexBufferVulkanIntegrationTest, CopiesKeepIndependentListsAndTheOriginalBufferReferences) {
         configure_pipeline(true);
         std::array<float, 6> positions{-1, -1, 3, -1, -1, 3};
@@ -69,6 +83,7 @@ namespace {
     class DrawResourceLifetimeVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     TEST_F(DrawResourceLifetimeVulkanIntegrationTest, EmptyBindingPreservesThePreviouslyBoundVertexBuffers) {
         // 検証エラーはテストを失敗させ、不正なコマンドをdriverへ渡さない。
         expect_validation_abort("");
@@ -86,16 +101,16 @@ namespace {
     TEST_F(DrawResourceLifetimeVulkanIntegrationTest, DrawSurvivesDroppingBuffersAndPipelineBeforeSubmission) {
         configure_pipeline(true);
         std::weak_ptr<vsl::impl::BufferImpl> weak_vertex, weak_color, weak_index;
-        std::weak_ptr<vsl::impl::PipelineImpl> weak_pipeline = pipeline->data_;
+        std::weak_ptr<vsl::impl::PipelineImpl> weak_pipeline = GraphicsAccess::Owned(*(pipeline)).share();
         ExpectTriangleColor(render([&](auto& stream) {
             const std::array<float, 6> positions{-1, -1, 3, -1, -1, 3};
             const std::array<float, 9> colors{.25f, .5f, .75f, .25f, .5f, .75f, .25f, .5f, .75f};
             const std::array<std::uint32_t, 3> indices{0, 1, 2};
             vsl::StagingBuffer<vsl::MemoryType::VERTEX_BUFFER> position(device, positions), color(device, colors);
             vsl::StagingBuffer<vsl::MemoryType::INDEX_BUFFER> index(device, indices);
-            weak_vertex = position.data_;
-            weak_color = color.data_;
-            weak_index = index.data_;
+            weak_vertex = BufferAccess::Owned(position).share();
+            weak_color = BufferAccess::Owned(color).share();
+            weak_index = BufferAccess::Owned(index).share();
             stream << vsl::command::BindVertexBuffer(position, color) << vsl::command::BindIndexBuffer(index)
                    << vsl::command::DrawIndexed{3};
             pipeline.reset();

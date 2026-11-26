@@ -2,6 +2,7 @@
 #include "../define.hpp"
 #include "../consteval_string.hpp"
 #include "../utils/string.hpp"
+#include "../lifetime/owner_ref.hpp"
 #include "pv.hpp"
 
 #include <filesystem>
@@ -54,13 +55,38 @@ namespace VSL_NAMESPACE {
         //        All = 0x7FFFFFFF,
     };
 
+    struct ShaderCreateInfo;
+
+    namespace lifetime::detail {
+        struct ShaderAccess;
+    }
+
     struct ShaderAccessor {
-        std::shared_ptr<VSL_NAMESPACE::impl::ShaderImpl> data_;
+    private:
+        friend struct lifetime::detail::ShaderAccess;
+        lifetime::OwnedRef<impl::ShaderImpl> _owner;
+
+        explicit ShaderAccessor(lifetime::OwnedRef<impl::ShaderImpl> owner) : _owner(std::move(owner)) {}
+
+    protected:
+        ShaderAccessor(LogicalDeviceAccessor device, ShaderCreateInfo info);
+
+    public:
+        ShaderAccessor() = default;
+
+        explicit operator bool() const noexcept { return bool(_owner); }
+
+        std::string name() const;
+        ShaderType type() const;
+        std::span<const std::uint32_t> code() const&;
+        std::span<const std::uint32_t> code() const&& = delete;
+        LogicalDeviceAccessor get_device() const;
+        lifetime::OwnerRef owner_ref() const;
     };
 
-    template<VSL_NAMESPACE::ShaderType type = ShaderType::VERTEX>
+    template<VSL_NAMESPACE::ShaderType type_ = ShaderType::VERTEX>
     struct Shader : public ShaderAccessor {
-        constexpr static ShaderType TYPE = type;
+        constexpr static ShaderType TYPE = type_;
 
         Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path);
         Shader(VSL_NAMESPACE::LogicalDeviceAccessor device, std::filesystem::path path, std::string name);

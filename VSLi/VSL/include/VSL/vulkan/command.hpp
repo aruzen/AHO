@@ -1,10 +1,18 @@
 #pragma once
 #include "../define.hpp"
+#include "../sync/completion.hpp"
 #include "synchronize.hpp"
 #include "device.hpp"
 #include "swapchain.hpp"
+#include "../operation/command_create_info.hpp"
+#include "../lifetime/owner_ref.hpp"
+#include "../lifetime/resource_identity.hpp"
 
 namespace VSL_NAMESPACE {
+    namespace lifetime {
+        struct CommandDomain;
+        struct CommandAccess;
+    } // namespace lifetime
     struct CommandManager;
     struct Completion;
     struct DefaultPhase;
@@ -13,17 +21,37 @@ namespace VSL_NAMESPACE {
     inline std::uint32_t DEFAULT_BUFFER_SIZE = 3;
 
     struct CommandPool {
-        CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor device);
+        CommandPool() = default;
 
+        explicit operator bool() const { return bool(_data); }
+
+        CommandPoolIdentity identity() const;
+        CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor device, CommandPoolCreateInfo info = {});
+
+    private:
+        friend struct lifetime::CommandAccess;
         CommandPool(std::shared_ptr<VSL_NAMESPACE::impl::CommandPoolImpl> data);
+        std::shared_ptr<VSL_NAMESPACE::impl::CommandPoolImpl> _data;
 
-        std::shared_ptr<VSL_NAMESPACE::impl::CommandPoolImpl> data_;
+    public:
+        LogicalDeviceAccessor get_device() const;
+        lifetime::OwnerRef owner_ref() const;
     };
 
     struct CommandBuffer {
+        CommandBuffer() = default;
+
+        explicit operator bool() const { return bool(_data); }
+
+        CommandBufferIdentity identity() const;
         CommandBuffer(VSL_NAMESPACE::CommandPool pool, std::uint32_t size = DEFAULT_BUFFER_SIZE);
 
-        CommandBuffer(std::shared_ptr<VSL_NAMESPACE::impl::CommandBufferImpl> data);
+        CommandBuffer(const CommandBuffer&) = default;
+        CommandBuffer(CommandBuffer&&) noexcept = default;
+        CommandBuffer& operator=(CommandBuffer other) noexcept;
+        void swap(CommandBuffer& other) noexcept;
+        CommandPool get_pool() const;
+        lifetime::OwnerRef owner_ref() const;
 
         std::uint32_t get_current_buffer_idx();
 
@@ -31,6 +59,8 @@ namespace VSL_NAMESPACE {
 
         // Phaseの記録中だけ、その送信の完了状態を返す。
         Completion completion() const;
+        void require_recording() const;
+        void require_recording(const Completion& expected) const;
 
         void next();
 
@@ -39,29 +69,21 @@ namespace VSL_NAMESPACE {
         void reset(std::uint32_t idx);
 
         // Phaseの記録中は、送信完了まで使用する所有者を保持する。
-        void retain(std::shared_ptr<void> resource) const;
+        void retain(const std::shared_ptr<void>& resource) const;
+        void retain(std::shared_ptr<void>&& resource) const;
+        // 新しい保持契約。完了結果の観測とは別に、完了/取消時に解放する。
+        void retain_until_complete(const std::shared_ptr<void>& resource) const;
+        void retain_until_complete(std::shared_ptr<void>&& resource) const;
 
-        std::shared_ptr<VSL_NAMESPACE::impl::CommandBufferImpl> data_;
-    };
-
-    // フェンスが再利用されても、個々の送信の完了状態を維持する。
-    struct Completion {
-        enum class Status {
-            PENDING,
-            SUBMITTED,
-            COMPLETE,
-            CANCELLED
-        };
-        std::shared_ptr<impl::SubmissionImpl> data_;
-        Status status() const;
-        bool ready() const;
-        bool wait(std::uint64_t timeout_ns = UINT64_MAX) const;
-        void retain(std::shared_ptr<void> resource) const;
-        explicit operator bool() const;
-        bool operator==(const Completion&) const = default;
+    private:
+        CommandBuffer(std::shared_ptr<VSL_NAMESPACE::impl::CommandBufferImpl> data);
+        std::shared_ptr<VSL_NAMESPACE::impl::CommandBufferImpl> _data;
+        std::shared_ptr<lifetime::CommandDomain> _domain;
+        friend struct lifetime::CommandAccess;
     };
 
     struct PipelineAccessor;
+
     namespace command {
         struct Command {
             virtual ~Command() = default;
@@ -125,11 +147,17 @@ namespace VSL_NAMESPACE {
     } // namespace command
 
     struct CommandManager {
-        CommandManager(std::shared_ptr<VSL_NAMESPACE::impl::CommandManagerImpl> data);
+        CommandManager() = default;
 
+        explicit operator bool() const { return bool(_data); }
+
+        CommandManagerIdentity identity() const;
         CommandManager(VSL_NAMESPACE::LogicalDeviceAccessor device);
-
-        std::shared_ptr<VSL_NAMESPACE::impl::CommandManagerImpl> data_;
+        static CommandManager FromBuffer(CommandBuffer buffer);
+        CommandManager(const CommandManager&) = default;
+        CommandManager(CommandManager&&) noexcept = default;
+        CommandManager& operator=(CommandManager other) noexcept;
+        void swap(CommandManager& other) noexcept;
 
         template<class P = DefaultPhase, typename... Args>
         P start_phase(Args&&... args);
@@ -146,11 +174,14 @@ namespace VSL_NAMESPACE {
         std::uint32_t get_current_buffer_idx();
 
         CommandBuffer make_exclusive_buffer(size_t size = 1);
+
+    private:
+        CommandManager(std::shared_ptr<VSL_NAMESPACE::impl::CommandManagerImpl> data);
+        std::shared_ptr<VSL_NAMESPACE::impl::CommandManagerImpl> _data;
+        std::shared_ptr<lifetime::CommandDomain> _domain;
+        friend struct lifetime::CommandAccess;
     };
 
-    inline Completion::operator bool() const {
-        return bool(data_);
-    }
 } // namespace VSL_NAMESPACE
 
 template<class P, typename... Args>

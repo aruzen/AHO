@@ -1,9 +1,20 @@
+#include <VSL/lifetime/startup_access.hpp>
+#include <VSL/lifetime/command_access.hpp>
 #include <VSL/utils/typed_pipeline.hpp>
 #include <VSL/utils/typed_compute.hpp>
 #include "support/render_fixture.hpp"
 
 namespace {
+    using VSL_NAMESPACE::lifetime::detail::StartupAccess;
+}
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
+
+namespace {
     namespace t = vsl::typed;
+
     struct Tint {
         float rgba[4];
     };
@@ -19,6 +30,7 @@ namespace {
         template<typename Pushes, typename Resources = t::ResourceSchema<>>
         auto make_typed(const char* source = "typed_push.vert.spv", const char* frag = "triangle.frag.spv");
     };
+
     class TypedPushComputeVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
@@ -82,6 +94,7 @@ namespace {
         struct Partial {
             float xy[2];
         };
+
         using PartialRecord = t::BlockRecord<Partial, VSL_BLOCK_MEMBER(Partial, xy)>;
         using Pushes = t::PushSchema<t::PushRange<TintRecord, vsl::ShaderFlag::VERTEX>, t::PushRange<PartialRecord, vsl::ShaderFlag::FRAGMENT, 8>>;
         auto typed_pipeline = make_typed<Pushes>("typed_push_overlap.vert.spv", "typed_push_partial.frag.spv");
@@ -121,6 +134,7 @@ namespace {
         struct Base {
             std::uint32_t value;
         };
+
         using BaseRecord = t::BlockRecord<Base, VSL_BLOCK_MEMBER(Base, value)>;
         using Pushes = t::PushSchema<t::PushRange<BaseRecord, vsl::ShaderFlag::COMPUTE>>;
         using Output = t::DescriptorSet<0, t::StorageBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
@@ -142,12 +156,12 @@ namespace {
             phase << command;
             vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
             auto native = manager_commands.get_buffer();
-            native.data_->command_buffers[native.get_current_buffer_idx()].pipelineBarrier(
+            CommandAccess::Data(native)->command_buffers[native.get_current_buffer_idx()].pipelineBarrier(
                 vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
         }
-        device.data_->device.waitIdle();
-        auto mapped = storage.backend().data();
-        const auto* actual = static_cast<const std::uint32_t*>(mapped.data);
+        StartupAccess::Owned(device)->device.waitIdle();
+        std::array<std::uint32_t, zero.size()> actual{};
+        storage.read_into(actual);
         for (size_t i = 0; i < zero.size(); ++i)
             EXPECT_EQ(actual[i], 773u + i);
     }

@@ -190,6 +190,8 @@
     <ClInclude Include="AHO\include\AHO\x\core\mesh.hpp" />
     <ClInclude Include="AHO\include\AHO\x\core\mesh_attributes.hpp" />
     <ClInclude Include="AHO\include\AHO\engine.hpp" />
+    <ClInclude Include="AHO\src\engine\engine_state.hpp" />
+    <ClInclude Include="AHO\src\engine\engine_access.hpp" />
     <ClInclude Include="AHO\include\AHO\engine\graphical_engine.hpp" />
     <ClInclude Include="AHO\include\AHO\engine\standard_engine.hpp" />
     <ClInclude Include="AHO\include\AHO\io\input.hpp" />
@@ -202,6 +204,8 @@
     <ClInclude Include="AHO\include\AHO\pipeline\pipeline.hpp" />
     <ClInclude Include="AHO\include\AHO\resource\audio.hpp" />
     <ClInclude Include="AHO\include\AHO\resource\buffer.hpp" />
+    <ClInclude Include="AHO\include\AHO\resource\imported_buffer.hpp" />
+    <ClInclude Include="AHO\include\AHO\resource\arena_buffer.hpp" />
     <ClInclude Include="AHO\include\AHO\resource\typed_buffer.hpp" />
     <ClInclude Include="AHO\include\AHO\x\resource\typed_texture.hpp" />
     <ClInclude Include="AHO\include\AHO\resource\image.hpp" />
@@ -233,6 +237,8 @@
     <ClCompile Include="AHO\src\pipeline\layouts.cpp" />
     <ClCompile Include="AHO\src\pipeline\pipeline.cpp" />
     <ClCompile Include="AHO\src\resource\buffer.cpp" />
+    <ClCompile Include="AHO\src\resource\imported_buffer.cpp" />
+    <ClCompile Include="AHO\src\resource\arena_buffer.cpp" />
     <ClCompile Include="AHO\src\resource\image.cpp" />
     <ClCompile Include="AHO\src\window.cpp" />
     <ClInclude Include="AHO\src\window_impl.hpp" />

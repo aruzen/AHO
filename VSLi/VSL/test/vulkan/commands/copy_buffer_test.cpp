@@ -1,5 +1,15 @@
+#include <VSL/lifetime/buffer_access.hpp>
+#include <VSL/lifetime/command_access.hpp>
 #include "support/vulkan_fixture.hpp"
 #include <VSL/vulkan/commands/copy_buffer.hpp>
+
+namespace {
+    using VSL_NAMESPACE::lifetime::detail::BufferAccess;
+}
+
+namespace {
+    using VSL_NAMESPACE::lifetime::CommandAccess;
+}
 
 namespace {
     class CopyBufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
@@ -21,7 +31,7 @@ namespace {
         std::weak_ptr<vsl::impl::BufferImpl> source_weak;
         {
             Native source(device, 8);
-            source_weak = source.data_;
+            source_weak = BufferAccess::Owned(source).share();
             source.data().write(std::array<std::byte, 8>{std::byte{11}, std::byte{22}, std::byte{33}, std::byte{44}, std::byte{55}, std::byte{66}, std::byte{77}, std::byte{88}});
             copy.emplace(&source, &destination, 3, 1, 2, true);
         }
@@ -50,7 +60,7 @@ namespace {
         EXPECT_THROW((vsl::command::CopyBuffer(&a, &wrong, 4).validate()), std::invalid_argument);
         EXPECT_THROW((vsl::command::CopyBuffer(nullptr, &b, 4).validate()), std::invalid_argument);
         auto manager = make_manager();
-        vsl::CommandBuffer empty(std::shared_ptr<vsl::impl::CommandBufferImpl>{});
+        vsl::CommandBuffer empty(CommandAccess::RawBuffer(std::shared_ptr<vsl::impl::CommandBufferImpl>{}));
         EXPECT_THROW(vsl::command::CopyBuffer(&a, &b, 4).invoke(manager.get_pool(), empty, manager), std::invalid_argument);
     }
 } // namespace

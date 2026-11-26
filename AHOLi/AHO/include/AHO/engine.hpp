@@ -24,6 +24,11 @@ namespace AHO_NAMESPACE::window {
 }
 
 namespace AHO_NAMESPACE::engine {
+    namespace detail {
+        struct EngineAccess;
+    }
+    struct EngineData;
+
     struct EngineConfig {
         std::string application_name = "AHO";
         std::vector<std::string> instance_extensions;
@@ -37,34 +42,48 @@ namespace AHO_NAMESPACE::engine {
             {VSL_NAMESPACE::graphic_resource::Type::STORAGE_TEXEL_BUFFER, 100},
             {VSL_NAMESPACE::graphic_resource::Type::UNIFORM_BUFFER, 100},
             {VSL_NAMESPACE::graphic_resource::Type::STORAGE_BUFFER, 100}};
+        // 起動時の能力要求と、生成するWindowの既定policyを明示する。
+        VSL_NAMESPACE::PresentFencePolicy present_fences = VSL_NAMESPACE::PresentFencePolicy::LEGACY;
     };
 
-    struct EngineData {
-        VSL_NAMESPACE::Vulkan<> vulkan_instance;
-        VSL_NAMESPACE::PhysicalDevice physical_device;
-        VSL_NAMESPACE::LogicalDeviceAccessor logical_device;
-        VSL_NAMESPACE::CommandManager command_manager;
-        std::shared_ptr<VSL_NAMESPACE::graphic_resource::ManagerInterface> graphic_resource_manager;
-        VSL_NAMESPACE::SynchroManager synchro_manager;
+    struct EngineCreateInfo {
+        VSL_NAMESPACE::LogicalDeviceAccessor device;
+        VSL_NAMESPACE::CommandManager commands;
+        std::shared_ptr<VSL_NAMESPACE::graphic_resource::ManagerInterface> descriptor_manager;
+        VSL_NAMESPACE::SynchroManager synchronization;
+        VSL_NAMESPACE::PresentFencePolicy present_fences = VSL_NAMESPACE::PresentFencePolicy::LEGACY;
     };
 
     class EngineAccessor {
         std::shared_ptr<EngineData> _data;
 
-    protected:
-        void reset_data(std::shared_ptr<EngineData> data);
+        friend struct detail::EngineAccess;
+        explicit EngineAccessor(std::shared_ptr<EngineData> data);
 
     public:
         EngineAccessor() = default;
-        explicit EngineAccessor(std::shared_ptr<EngineData> data);
         ~EngineAccessor() = default;
 
         EngineAccessor(const EngineAccessor&) = default;
-        EngineAccessor& operator=(const EngineAccessor&) = default;
         EngineAccessor(EngineAccessor&&) noexcept = default;
-        EngineAccessor& operator=(EngineAccessor&&) noexcept = default;
 
-        const std::shared_ptr<EngineData>& data() const;
+        EngineAccessor& operator=(EngineAccessor value) noexcept {
+            swap(value);
+            return *this;
+        }
+
+        void swap(EngineAccessor& other) noexcept { _data.swap(other._data); }
+        explicit operator bool() const noexcept { return bool(_data); }
+
+        bool operator==(const EngineAccessor&) const = default;
+        static EngineAccessor Create(EngineCreateInfo info);
+        VSL_NAMESPACE::LogicalDeviceAccessor device() const;
+        VSL_NAMESPACE::PhysicalDevice physical_device() const;
+        VSL_NAMESPACE::VulkanAccessor instance() const;
+        VSL_NAMESPACE::CommandManager commands() const;
+        std::shared_ptr<VSL_NAMESPACE::graphic_resource::ManagerInterface> descriptor_manager() const;
+        VSL_NAMESPACE::SynchroManager synchronization() const;
+        VSL_NAMESPACE::PresentFencePolicy present_fences() const;
     };
 
     // 登録の寿命だけ既定エンジンを保持する。新しい登録の終了後は前の登録へ戻る。

@@ -26,6 +26,7 @@ namespace AHO_NAMESPACE::engine {
 
         StandardEngine(std::string application_name, bool boot_on = true);
         explicit StandardEngine(StandardEngineConfig config, bool boot_on = true);
+        ~StandardEngine() override;
 
         void boot();
         void boot(const std::string& application_name);
@@ -34,8 +35,10 @@ namespace AHO_NAMESPACE::engine {
         Window get_window() override;
 
     private:
+        struct BootScope;
         StandardEngineConfig _config;
         std::optional<DefaultEngineRegistration> _default_registration;
+        BootScope* _boot_scope = nullptr;
     };
 } // namespace AHO_NAMESPACE::engine
 

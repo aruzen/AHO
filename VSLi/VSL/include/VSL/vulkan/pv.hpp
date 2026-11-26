@@ -4,7 +4,7 @@
 namespace VSL_NAMESPACE::impl {
     struct VulkanImplAccessor;
     template<bool v>
-    struct VulkanImpl;
+    using VulkanImpl = VulkanImplAccessor;
     struct PhysicalDeviceImpl;
     struct PhysicalDevicesImpl;
     struct LogicalDeviceImpl;
@@ -13,10 +13,12 @@ namespace VSL_NAMESPACE::impl {
     struct CommandImpl;
     struct CommandManagerImpl;
     struct SubmissionImpl;
+    struct SubmissionWork;
     struct SurfaceImpl;
+    struct OSWindowImpl;
     struct SwapchainImpl;
     struct ViewImpl;
-    struct CreateInfo;
+    struct PipelineRecipe;
     struct PipelineLayoutImpl;
     struct ShaderImpl;
     struct RenderPassImpl;
@@ -33,6 +35,7 @@ namespace VSL_NAMESPACE::impl {
     struct GraphicResourceImpl;
     struct ImageImpl;
     struct SamplerImpl;
+
     namespace pipeline_layout {
         struct ShaderGroupImpl;
     }

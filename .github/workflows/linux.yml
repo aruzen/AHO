@@ -37,11 +37,18 @@ jobs:
       - name: Build libraries, samples and tests
         run: cmake --build --preset linux-debug --parallel 2
       - name: Test with a virtual display and software Vulkan
-        env:
-          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
-        run: >-
-          xvfb-run -a -s '-screen 0 1280x1024x24 -noreset'
-          bash tools/cmake/with_window_manager.sh ctest --preset linux-debug --parallel 2
+        shell: bash
+        run: |
+          shopt -s nullglob
+          lavapipe_manifests=(/usr/share/vulkan/icd.d/lvp_icd*.json)
+          if (( ${#lavapipe_manifests[@]} != 1 )) || [[ ! -r "${lavapipe_manifests[0]}" ]]; then
+            echo 'Expected one readable Mesa lavapipe manifest in /usr/share/vulkan/icd.d' >&2
+            exit 1
+          fi
+          export VK_ICD_FILENAMES="${lavapipe_manifests[0]}"
+          echo "Using Vulkan driver manifest: $VK_ICD_FILENAMES"
+          xvfb-run -a -s '-screen 0 1280x1024x24 -noreset' \
+            bash tools/cmake/with_window_manager.sh ctest --preset linux-debug --parallel 2
       - name: Check installed package
         run: python3 tools/cmake/check_installed_package.py --build-dir build/linux-debug
       - name: Configure Release without tests

@@ -233,8 +233,13 @@ namespace AHO_NAMESPACE::matrix {
                     // 微小な非ゼロ係数でも、ピボット行の大きい要素との積は無視できない。
                     if (factor == R{})
                         continue;
-                    for (size_t j = 0; j < size * 2; ++j)
-                        aug[r][j] -= factor * aug[i][j];
+                    for (size_t j = 0; j < size * 2; ++j) {
+                        // 積和の丸めを1回に揃え、CPUの命令セットに依存する残差を避ける。
+                        if constexpr (std::is_floating_point_v<R>)
+                            aug[r][j] = std::fma(-factor, aug[i][j], aug[r][j]);
+                        else
+                            aug[r][j] -= factor * aug[i][j];
+                    }
                 }
             }
 

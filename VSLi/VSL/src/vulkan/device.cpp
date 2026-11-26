@@ -36,11 +36,11 @@ using namespace VSL_NAMESPACE::impl::helper;
 
 const std::vector<const char*> DEVICE_EXTENSIONS = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-#ifndef _MSC_VER
+#ifdef __APPLE__
     "VK_KHR_portability_subset",
-#else
+#elif defined(_WIN32)
     "VK_KHR_shader_non_semantic_info"
-#endif // _MSC_VER
+#endif
 
     // VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
     // VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,

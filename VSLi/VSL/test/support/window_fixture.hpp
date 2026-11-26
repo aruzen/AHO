@@ -24,7 +24,11 @@ namespace vsl_test {
             const char* description = nullptr;
             const int error = glfwGetError(&description);
             const std::string reason = description ? description : "unknown GLFW error";
-            if (error == GLFW_PLATFORM_UNAVAILABLE || reason.find("DISPLAY") != std::string::npos ||
+            if (
+#ifdef GLFW_PLATFORM_UNAVAILABLE
+                error == GLFW_PLATFORM_UNAVAILABLE ||
+#endif
+                reason.find("DISPLAY") != std::string::npos ||
                 reason.find("display connection") != std::string::npos)
                 GTEST_SKIP() << "Window/display unavailable: " << reason;
             FAIL() << "GLFW initialization failed: " << error << " " << reason;

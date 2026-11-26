@@ -39,6 +39,7 @@ if (AHO_TEST_SOURCES)
     add_executable(aho-test ${AHO_TEST_SOURCES})
     target_include_directories(aho-test PRIVATE
             ${Vulkan_INCLUDE_DIRS}
+            "${AHO_STB_INCLUDE_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/../include"
             "$<TARGET_PROPERTY:AHOLi,INCLUDE_DIRECTORIES>"
             "$<TARGET_PROPERTY:VSL,INCLUDE_DIRECTORIES>"

@@ -58,7 +58,7 @@ namespace VSL_NAMESPACE::command {
                 .size = _bytes,
             },
         };
-        command.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eTransfer, {}, {}, before, {});
+        command.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eTransfer, {}, {}, vk::ArrayProxy<const vk::BufferMemoryBarrier>{2, before}, {});
         command.copyBuffer(_source->buffer, _destination->buffer, vk::BufferCopy{_source_offset, _destination_offset, _bytes});
 
         vk::PipelineStageFlags stages = vk::PipelineStageFlagBits::eAllCommands;

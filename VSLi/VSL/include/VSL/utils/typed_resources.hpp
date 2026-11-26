@@ -19,7 +19,6 @@ namespace VSL_NAMESPACE::typed {
             size_t offset = 0;
             ResourceUse use;
         };
-        ResourceUse descriptor_constraints(const DescriptorValue& value);
         void write_descriptor(GraphicResource resource, graphic_resource::BindingPoint point, std::span<const DescriptorValue> values);
         template<typename Binding, typename Value>
         consteval bool descriptor_matches();
@@ -59,6 +58,7 @@ namespace VSL_NAMESPACE::typed {
         using Storage = Buffer<USAGE | MemoryType::TRANSFER_DESTINATION, property>;
         Storage _buffer;
         size_t _count;
+        std::shared_ptr<ResourceUseState> _use = std::make_shared<ResourceUseState>();
 
     public:
         static constexpr auto KIND = kind;
@@ -78,7 +78,7 @@ namespace VSL_NAMESPACE::typed {
         TypedResourceBufferView<Payload_, kind> view(size_t first, size_t count) const;
         void copy(std::span<const Payload> values)
         requires(contain<property, MemoryProperty::HOST_VISIBLE>());
-        detail::DescriptorValue descriptor() const { return {_buffer.data_, {}, {}, _count * sizeof(Payload), 0, _buffer.resource_use()}; }
+        detail::DescriptorValue descriptor() const { return {_buffer.data_, {}, {}, _count * sizeof(Payload), 0, {_use, _buffer.data_}}; }
     };
     template<typename Payload, MemoryProperty property = MemoryProperty::HOST_VISIBLE | MemoryProperty::HOST_COHERENT>
     using TypedUniformBuffer = TypedResourceBuffer<Payload, graphic_resource::Type::UNIFORM_BUFFER, property>;
@@ -160,7 +160,7 @@ namespace VSL_NAMESPACE::typed {
     TypedResourceBufferView<Payload_, kind> TypedResourceBufferView<Payload_, kind>::FromBuffer(const BufferAccessor& source, size_t count, size_t byte_offset, ResourceUse use) {
         constexpr auto usage = kind == graphic_resource::Type::UNIFORM_BUFFER ? MemoryType::UNIFORM_BUFFER : MemoryType::STORAGE_BUFFER;
         detail::validate_buffer_view(source, usage, byte_offset, count, sizeof(Payload), alignof(Payload));
-        return TypedResourceBufferView({source.data_, {}, {}, count * sizeof(Payload), byte_offset, source.resource_use(std::move(use))}, count);
+        return TypedResourceBufferView({source.data_, {}, {}, count * sizeof(Payload), byte_offset, std::move(use)}, count);
     }
     template<typename Payload_, graphic_resource::Type kind>
     TypedResourceBufferView<Payload_, kind> TypedResourceBufferView<Payload_, kind>::view(size_t first, size_t count) const {
@@ -195,7 +195,7 @@ namespace VSL_NAMESPACE::typed {
     void TypedResourceBuffer<PayloadTag, kind, property>::copy(std::span<const Payload> values)
     requires(contain<property, MemoryProperty::HOST_VISIBLE>())
     {
-        _buffer.use_state().require_idle();
+        _use->require_idle();
         if (values.size() != _count)
             throw std::invalid_argument("Typed descriptor buffer update must preserve record count");
         if (!_buffer.copy(values.data(), values.size()))
@@ -209,7 +209,7 @@ namespace VSL_NAMESPACE::typed {
         if (resources.size() != 1)
             throw std::runtime_error("Typed descriptor allocation failed");
         _resource = resources.front();
-        _use = ResourceUseGroup::ForDescriptor(Spec::BINDING_COUNT, _resource.data_);
+        _use = std::make_shared<ResourceUseGroup>(Spec::BINDING_COUNT, _resource.data_);
     }
     template<typename Spec>
     void TypedDescriptorSet<Spec>::require_complete() const {
@@ -222,7 +222,7 @@ namespace VSL_NAMESPACE::typed {
     void TypedDescriptorSet<Spec_>::write(const Value& value) {
         _use->require_idle();
         const auto descriptor = value.descriptor();
-        std::vector<ResourceUse> uses{detail::descriptor_constraints(descriptor)};
+        std::vector<ResourceUse> uses{descriptor.use};
         detail::write_descriptor(_resource, Spec::template Binding<binding>::POINT, std::span(&descriptor, 1));
         _use->replace(Spec::BindingIndex(binding), std::move(uses));
         (*_initialized)[Spec::BindingIndex(binding)] = true;
@@ -237,7 +237,7 @@ namespace VSL_NAMESPACE::typed {
         uses.reserve(count);
         for (size_t i = 0; i < count; ++i) {
             descriptors[i] = values[i].descriptor();
-            uses.push_back(detail::descriptor_constraints(descriptors[i]));
+            uses.push_back(descriptors[i].use);
         }
         detail::write_descriptor(_resource, Spec::template Binding<binding>::POINT, descriptors);
         _use->replace(Spec::BindingIndex(binding), std::move(uses));

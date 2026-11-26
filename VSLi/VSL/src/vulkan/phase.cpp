@@ -8,6 +8,42 @@ namespace VSL_NAMESPACE {
         vk::UniqueFence acquire_fence;
     };
 
+    Completion::Status Completion::status() const {
+        if (!data_)
+            return Status::CANCELLED;
+        if (data_->status == Status::SUBMITTED &&
+            data_->device->device.getFenceStatus(data_->fence) == vk::Result::eSuccess)
+            data_->status = Status::COMPLETE;
+        return data_->status;
+    }
+    bool Completion::ready() const {
+        return status() == Status::COMPLETE;
+    }
+    bool Completion::wait(std::uint64_t timeout) const {
+        auto current = status();
+        if (current == Status::COMPLETE)
+            return true;
+        if (current != Status::SUBMITTED)
+            return false;
+        if (data_->device->device.waitForFences(data_->fence, true, timeout) != vk::Result::eSuccess)
+            return false;
+        data_->status = Status::COMPLETE;
+        return true;
+    }
+    void Completion::retain(std::shared_ptr<void> resource) const {
+        if (!data_ || data_->status != Status::PENDING)
+            throw std::logic_error("Resources must be retained before submission");
+        data_->resources.push_back(std::move(resource));
+    }
+    impl::SubmissionImpl::~SubmissionImpl() {
+        if (status == Completion::Status::SUBMITTED) {
+            const auto result = device->device.waitForFences(1, &fence, true, UINT64_MAX);
+            status = result == vk::Result::eSuccess ? Completion::Status::COMPLETE : Completion::Status::CANCELLED;
+        }
+        if (observed_status)
+            *observed_status = status == Completion::Status::PENDING ? Completion::Status::CANCELLED : status;
+    }
+
     ComputePhase::ComputePhase(CommandManager manager,
                                std::optional<SemaphoreHolder> available,
                                std::optional<SemaphoreHolder> finished,
@@ -124,13 +160,9 @@ namespace VSL_NAMESPACE {
     void ComputePhase::cancel() {
         if (state != State::WAIT_SUBMIT && state != State::BEFORE_SETUP)
             return;
-        auto buffers = manager.data_->command_buffer;
-        if (completion_ && completion_.data_->release_resources) {
-            buffers->command_buffers.at(frame_slot).reset();
-            completion_.data_->release_resources(*completion_.data_);
-        }
         if (completion_)
             completion_.data_->status = Completion::Status::CANCELLED;
+        auto buffers = manager.data_->command_buffer;
         if (buffers->recording_submission == completion_.data_) {
             buffers->recording = false;
             buffers->recording_submission.reset();

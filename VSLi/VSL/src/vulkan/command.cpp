@@ -130,6 +130,13 @@ VSL_NAMESPACE::CommandManager VSL_NAMESPACE::CommandManager::independent(std::ui
     return CommandManager(next);
 }
 
+void VSL_NAMESPACE::CommandBuffer::retain(std::shared_ptr<void> resource) const {
+    if (!data_)
+        throw std::invalid_argument("CommandBuffer is empty");
+    if (resource && data_->recording_submission)
+        Completion{data_->recording_submission}.retain(std::move(resource));
+}
+
 VSL_NAMESPACE::Completion VSL_NAMESPACE::CommandBuffer::completion() const {
     return {data_ ? data_->recording_submission : nullptr};
 }

@@ -1,6 +1,5 @@
 #pragma once
 #include "../define.hpp"
-#include "../sync/completion.hpp"
 #include "synchronize.hpp"
 #include "device.hpp"
 #include "swapchain.hpp"
@@ -40,13 +39,26 @@ namespace VSL_NAMESPACE {
         void reset(std::uint32_t idx);
 
         // Phaseの記録中は、送信完了まで使用する所有者を保持する。
-        void retain(const std::shared_ptr<void>& resource) const;
-        void retain(std::shared_ptr<void>&& resource) const;
-        // 新しい保持契約。完了結果の観測とは別に、完了/取消時に解放する。
-        void retain_until_complete(const std::shared_ptr<void>& resource) const;
-        void retain_until_complete(std::shared_ptr<void>&& resource) const;
+        void retain(std::shared_ptr<void> resource) const;
 
         std::shared_ptr<VSL_NAMESPACE::impl::CommandBufferImpl> data_;
+    };
+
+    // フェンスが再利用されても、個々の送信の完了状態を維持する。
+    struct Completion {
+        enum class Status {
+            PENDING,
+            SUBMITTED,
+            COMPLETE,
+            CANCELLED
+        };
+        std::shared_ptr<impl::SubmissionImpl> data_;
+        Status status() const;
+        bool ready() const;
+        bool wait(std::uint64_t timeout_ns = UINT64_MAX) const;
+        void retain(std::shared_ptr<void> resource) const;
+        explicit operator bool() const;
+        bool operator==(const Completion&) const = default;
     };
 
     struct PipelineAccessor;
@@ -136,6 +148,9 @@ namespace VSL_NAMESPACE {
         CommandBuffer make_exclusive_buffer(size_t size = 1);
     };
 
+    inline Completion::operator bool() const {
+        return bool(data_);
+    }
 } // namespace VSL_NAMESPACE
 
 template<class P, typename... Args>

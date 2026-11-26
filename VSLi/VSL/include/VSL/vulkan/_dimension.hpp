@@ -1,8 +1,7 @@
 #pragma once
 #include "../define.hpp"
 
-#define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
-#include <vulkan/vulkan.hpp>
+#include "_pimpls.hpp"
 
 #include "../dimension.hpp"
 

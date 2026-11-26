@@ -36,7 +36,6 @@ namespace {
 #endif
 
 #ifdef AHO_GPU_TESTS
-#include <VSL/vulkan/commands/render_pass_end.hpp>
 #include "../support/live_gpu.hpp"
 #include <AHO/image_readback.hpp>
 
@@ -137,7 +136,7 @@ namespace {
             ASSERT_NE(phase.submit(), vsl::ComputePhase::SubmitResult::FAILED);
             EXPECT_THROW(aho::draw(triangle_at(0), aho::RGBA(1, 0, 0, 1), phase), std::logic_error);
         }
-        engine->get_window().render_context().commands().wait_idle();
+        engine->data_->command_manager.wait_idle();
     }
 
     TEST_F(StandardDrawerVulkanIntegration, ResizeRefreshesViewportAndKeepsTheWindowCache) {
@@ -171,7 +170,7 @@ namespace {
                 aho::draw(triangle_at(0), aho::RGBA(0, 1, 0, 1));
                 EXPECT_NE(window.data2->standard_draw, other.get_window().data2->standard_draw);
             }
-            other.get_window().render_context().commands().wait_idle();
+            other.data_->command_manager.wait_idle();
             other.get_window().close();
         });
         EXPECT_EQ(pixel_at(pixels, .2f, .5f), (std::array<unsigned, 4>{255, 0, 0, 255}));

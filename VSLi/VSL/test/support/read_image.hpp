@@ -1,7 +1,6 @@
 #pragma once
 #include <VSL/vulkan/_pimpls.hpp>
 #include <VSL/vulkan/commands/image_readback.hpp>
-#include <VSL/vulkan/phase.hpp>
 #include <cstring>
 
 namespace vsl_test {
@@ -11,13 +10,21 @@ namespace vsl_test {
         const auto info = vsl::command::ImageReadback::Describe(image, layout, region);
         vsl::StagingBuffer<vsl::MemoryType::TRANSFER_DESTINATION> destination(
             vsl::LogicalDeviceAccessor{manager.data_->device}, info.byte_size);
-        auto transfer = manager.independent(1);
-        auto phase = transfer.start_phase<vsl::ComputePhase>();
-        phase << vsl::command::ImageReadback(&destination, image, layout, info.region);
-        if (phase.submit() != vsl::ComputePhase::SubmitResult::SUCCESS || !phase.completion().wait())
+        auto buffer = manager.make_exclusive_buffer(1);
+        auto command = buffer.data_->command_buffers.front();
+        auto device = manager.data_->device->device;
+        auto fence = device.createFenceUnique({});
+        command.begin(vk::CommandBufferBeginInfo{});
+        vsl::command::ImageReadback(&destination, image, layout, info.region)
+            .invoke(manager.get_pool(), buffer, manager);
+        command.end();
+        manager.data_->graphics_queue.submit(
+            vk::SubmitInfo{.commandBufferCount = 1, .pCommandBuffers = &command}, *fence);
+        if (device.waitForFences(*fence, true, UINT64_MAX) != vk::Result::eSuccess)
             throw std::runtime_error("Test image transfer did not complete");
+        auto mapped = destination.data(info.byte_size);
         std::vector<std::byte> result(info.byte_size);
-        destination.read_into(result);
+        std::memcpy(result.data(), mapped.data, result.size());
         return result;
     }
 } // namespace vsl_test

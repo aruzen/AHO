@@ -1,7 +1,6 @@
-#include <VSL/lifetime/buffer_storage.hpp>
+#include <VSL/vulkan/_pimpls.hpp>
 
 #include <VSL/vulkan/buffer.hpp>
-#include <VSL/lifetime/buffer_view.hpp>
 #include <VSL/vulkan/buffer_and_image_accessor.hpp>
 #include <VSL/vulkan/phase.hpp>
 #include <VSL/vulkan/commands/copy_image_to_buffer.hpp>
@@ -37,7 +36,7 @@ static bool copy_buffer(const std::shared_ptr<VSL_NAMESPACE::impl::BufferImpl>& 
     const auto source = buf ? buf->data_ : nullptr;
     if (!source || !destination || !source->buffer || !destination->buffer ||
         !source->device || source->device != destination->device || !command_manager.data_ ||
-        command_manager.data_->device.get() != destination->device)
+        command_manager.data_->device != destination->device)
         throw std::invalid_argument("Buffer copy requires valid buffers and a command manager on the same device");
     if (!VSL_NAMESPACE::contain(source->usage, VSL_NAMESPACE::MemoryType::TRANSFER_SOURCE) ||
         !VSL_NAMESPACE::contain(destination->usage, VSL_NAMESPACE::MemoryType::TRANSFER_DESTINATION))
@@ -50,8 +49,6 @@ static bool copy_buffer(const std::shared_ptr<VSL_NAMESPACE::impl::BufferImpl>& 
     const auto capacity = size.value_or(remaining);
     if (capacity > remaining || source->requirement_size > capacity)
         throw std::out_of_range("Buffer copy exceeds destination range");
-    source->use->require_idle();
-    destination->use->require_idle();
 
     auto command_buf = command_manager.make_exclusive_buffer();
 
@@ -96,8 +93,7 @@ std::size_t VSL_NAMESPACE::BufferAccessor::requested_size() const {
 VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::BufferAccessor::get_device() const {
     if (!data_ || !data_->device)
         throw std::logic_error("Buffer is empty");
-    // 既存の所有するAccessorへの移行用adapter。通常のbackend操作では呼ばない。
-    return LogicalDeviceAccessor{data_->device->shared_from_this()};
+    return LogicalDeviceAccessor{data_->device};
 }
 
 VSL_NAMESPACE::MemoryType VSL_NAMESPACE::BufferAccessor::get_usage() const {
@@ -106,19 +102,6 @@ VSL_NAMESPACE::MemoryType VSL_NAMESPACE::BufferAccessor::get_usage() const {
 
 VSL_NAMESPACE::MemoryProperty VSL_NAMESPACE::BufferAccessor::get_memory_properties() const {
     return data_ ? data_->properties : MemoryProperty::NONE;
-}
-
-VSL_NAMESPACE::ResourceUseState& VSL_NAMESPACE::BufferAccessor::use_state() const {
-    return BufferRef{data_.get()}.use();
-}
-VSL_NAMESPACE::ResourceUse VSL_NAMESPACE::BufferAccessor::resource_use() const {
-    return ResourceUse::ForBuffer(data_, {});
-}
-VSL_NAMESPACE::ResourceUse VSL_NAMESPACE::BufferAccessor::resource_use(ResourceUse constraint) const {
-    return ResourceUse::ForBuffer(data_, std::move(constraint));
-}
-void VSL_NAMESPACE::BufferAccessor::read_into(std::span<std::byte> destination, size_t offset) const {
-    BufferRef{data_.get()}.read_into(destination, offset);
 }
 
 void VSL_NAMESPACE::BufferAccessor::flush_copied(LocalBufferHolder& holder, std::size_t bytes) {
@@ -132,22 +115,25 @@ void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::flush() {
     flush(size);
 }
 
-void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::require_idle() const {
-    // 互換用にCPU領域だけを渡したholderには、GPU storageの状態はない。
-    if (_owner)
-        _owner->use->require_idle();
-}
-
 void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::synchronize(std::size_t bytes, std::size_t relative_offset, bool flush) const {
     if (!_owner || !data || !_owner->mapped)
         throw std::logic_error("Buffer mapping is empty");
-    _owner->use->require_idle();
     if (relative_offset > size || bytes > size - relative_offset ||
         offset > _owner->requirement_size || size > _owner->requirement_size - offset)
         throw std::out_of_range("Buffer mapping range");
     if (!bytes || contain(_owner->properties, MemoryProperty::HOST_COHERENT))
         return;
-    operation::synchronize_buffer(*_owner, offset + relative_offset, bytes, flush);
+    const auto atom = _owner->atom_size;
+    const vk::DeviceSize first = offset + relative_offset;
+    const vk::DeviceSize begin = first - first % atom;
+    const vk::DeviceSize end = first + bytes;
+    const auto padding = (atom - end % atom) % atom;
+    const auto length = _owner->allocated_size - end < padding ? VK_WHOLE_SIZE : end + padding - begin;
+    const vk::MappedMemoryRange range{.memory = _owner->device_mem, .offset = begin, .size = length};
+    if (flush)
+        _owner->device->device.flushMappedMemoryRanges(range);
+    else
+        _owner->device->device.invalidateMappedMemoryRanges(range);
 }
 
 void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::flush(std::size_t bytes, std::size_t offset) const {
@@ -166,7 +152,6 @@ std::span<const std::byte> VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::rea
 void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::write(std::span<const std::byte> bytes, std::size_t relative_offset) const {
     if (!_owner || !data)
         throw std::logic_error("Buffer mapping is empty");
-    _owner->use->require_idle();
     if (relative_offset > size || bytes.size() > size - relative_offset ||
         offset > _owner->requirement_size || size > _owner->requirement_size - offset)
         throw std::out_of_range("Buffer mapping write range");
@@ -178,7 +163,46 @@ void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::write(std::span<const std
 std::shared_ptr<VSL_NAMESPACE::impl::BufferImpl>
 VSL_NAMESPACE::BufferAccessor::MakeBuffer(LogicalDeviceAccessor device, size_t size, MemoryType mem_type,
                                           MemoryProperty mem_property, SharingMode sharing_mode) {
-    return lifetime::make_heap_buffer(std::move(device), {size, mem_type, mem_property, sharing_mode});
+    if (!device.data_ || !device.data_->device || !size || mem_type == MemoryType::NONE)
+        throw std::invalid_argument("Buffer requires a device, positive size and usage");
+    auto data = std::make_shared<impl::BufferImpl>();
+    data->device = device.data_;
+    data->usage = mem_type;
+    data->requirement_size = size;
+    vk::BufferCreateInfo info{.size = size, .usage = vk::BufferUsageFlags{static_cast<unsigned int>(mem_type)}, .sharingMode = static_cast<vk::SharingMode>(sharing_mode)};
+    const std::uint32_t families[] = {device.data_->graphics_family, device.data_->present_family};
+    if (sharing_mode == SharingMode::CONCURRENT) {
+        if (families[0] == families[1])
+            info.sharingMode = vk::SharingMode::eExclusive;
+        else {
+            info.queueFamilyIndexCount = 2;
+            info.pQueueFamilyIndices = families;
+        }
+    }
+    data->buffer = data->device->device.createBuffer(info);
+    const auto requirements = data->device->device.getBufferMemoryRequirements(data->buffer);
+    const auto properties = device.data_->parent_device->device.getMemoryProperties();
+    const auto required = vk::MemoryPropertyFlags{static_cast<unsigned int>(mem_property)};
+    std::optional<std::uint32_t> selected;
+    for (std::uint32_t i = 0; i < properties.memoryTypeCount; ++i) {
+        const auto flags = properties.memoryTypes[i].propertyFlags;
+        if (!(requirements.memoryTypeBits & (1u << i)) || (flags & required) != required)
+            continue;
+        if (!selected)
+            selected = i;
+        if (contain(mem_property, MemoryProperty::HOST_VISIBLE) && (flags & vk::MemoryPropertyFlagBits::eHostCoherent)) {
+            selected = i;
+            break;
+        }
+    }
+    if (!selected)
+        throw exceptions::RuntimeException("MemoryTypeNotFound", "No memory type satisfies the buffer requirements");
+    data->properties = static_cast<MemoryProperty>(static_cast<unsigned int>(properties.memoryTypes[*selected].propertyFlags));
+    data->allocated_size = requirements.size;
+    data->atom_size = device.data_->parent_device->device.getProperties().limits.nonCoherentAtomSize;
+    data->device_mem = data->device->device.allocateMemory({.allocationSize = requirements.size, .memoryTypeIndex = *selected});
+    data->device->device.bindBufferMemory(data->buffer, data->device_mem, 0);
+    return data;
 }
 
 void VSL_NAMESPACE::BufferAccessor::FlushBuffer(LocalBufferHolder& holder, MemoryType, MemoryProperty mem_property, SharingMode) {
@@ -194,14 +218,14 @@ VSL_NAMESPACE::BufferAccessor::LocalBufferHolder VSL_NAMESPACE::BufferAccessor::
     if (!buffer || !buffer->data_)
         throw std::logic_error("Buffer is empty");
     const auto& storage = buffer->data_;
-    storage->use->require_idle();
     if (offset > storage->requirement_size)
         throw exceptions::RuntimeException("buffer", "mapped offset is outside requested storage");
     const auto length = bytes.value_or(storage->requirement_size - offset);
     if (length > storage->requirement_size - offset)
         throw exceptions::RuntimeException("buffer", "mapped range is outside requested storage");
-    auto* mapped = operation::map_buffer(*storage, offset, length);
-    LocalBufferHolder holder(buffer, length, offset, mapped);
+    if (!storage->mapped)
+        storage->mapped = storage->device->device.mapMemory(storage->device_mem, 0, VK_WHOLE_SIZE);
+    LocalBufferHolder holder(buffer, length, offset, static_cast<std::byte*>(storage->mapped) + offset);
     holder.invalidate(length);
     return holder;
 }
@@ -218,6 +242,13 @@ bool VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::copy_by_buffer(CommandMan
     if (!_owner)
         throw std::logic_error("Buffer mapping is empty");
     return copy_buffer(_owner, std::move(manager), buffer, offset, size);
+}
+
+VSL_NAMESPACE::impl::BufferImpl::~BufferImpl() {
+    if (mapped)
+        device->device.unmapMemory(device_mem);
+    device->device.destroyBuffer(buffer);
+    device->device.freeMemory(device_mem);
 }
 
 VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::~LocalBufferHolder() = default;

@@ -15,6 +15,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 void VSL_NAMESPACE::command::PushConstant::invoke(VSL_NAMESPACE::CommandPool pool, VSL_NAMESPACE::CommandBuffer buffer, VSL_NAMESPACE::CommandManager manager) {
     buffer.retain(lifetime::detail::OwnerAccess::Shared(GraphicsAccess::Owned(layout)));
     CommandAccess::Data(buffer)->command_buffers[buffer.get_current_buffer_idx()].pushConstants(GraphicsAccess::Owned(layout)->pipeline_layout, (vk::ShaderStageFlagBits)target_type, offset, size, value);

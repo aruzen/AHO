@@ -13,6 +13,7 @@
 namespace VSL_NAMESPACE::sync {
     namespace {
         void release_terminal_resources(impl::SubmissionWork& work) noexcept;
+
         void release_terminal_resources(impl::SubmissionWork& work) noexcept {
             if (work.result->native.active || work.result->native.observing || native_pending(*work.result))
                 return;
@@ -25,9 +26,11 @@ namespace VSL_NAMESPACE::sync {
                 release(work);
         }
     } // namespace
+
     bool terminal_status(Completion::Status status) noexcept {
         return status == Completion::Status::COMPLETE || status == Completion::Status::CANCELLED || status == Completion::Status::FAILED;
     }
+
     bool save_terminal(impl::SubmissionWork& work, Completion::Status status, Completion::Failure failure, std::int32_t error_code) noexcept {
         if (terminal_status(work.result->status))
             return false;
@@ -38,10 +41,12 @@ namespace VSL_NAMESPACE::sync {
             work.result->work.reset();
         return true;
     }
+
     void publish_terminal(impl::SubmissionWork& work, Completion::Status status, Completion::Failure failure, std::int32_t error_code) noexcept {
         if (save_terminal(work, status, failure, error_code))
             release_terminal_resources(work);
     }
+
     void observe_submission_result(impl::SubmissionWork& work, std::int32_t native_result) {
         if (work.result->native.active)
             return;
@@ -63,9 +68,11 @@ namespace VSL_NAMESPACE::sync {
         } else if (result != vk::Result::eNotReady && result != vk::Result::eTimeout)
             throw std::runtime_error("Submission completion observation failed: " + vk::to_string(result));
     }
+
     void save_submit_result(impl::SubmissionImpl& result, std::int32_t native_result) noexcept {
         save_submit_result(result.native, native_result);
     }
+
     void save_submit_result(SubmissionNativeState& state, std::int32_t native_result) noexcept {
         const auto native = static_cast<vk::Result>(native_result);
         state.observation = native_result;
@@ -81,6 +88,7 @@ namespace VSL_NAMESPACE::sync {
             state.complete = false;
         }
     }
+
     void save_native_idle(impl::SubmissionWork& work, std::int32_t native_result) noexcept {
         if (work.device && work.device->lost)
             native_result = static_cast<std::int32_t>(vk::Result::eErrorDeviceLost);
@@ -98,6 +106,7 @@ namespace VSL_NAMESPACE::sync {
         else if (terminal_status(work.result->status) && !work.result->native.active && !work.result->native.observing && !work.quarantined)
             work.result->work.reset();
     }
+
     void finish_submission(impl::SubmissionWork& work) noexcept {
         if (work.result->native.active || work.result->native.observing) {
             work.abandon_requested = true;
@@ -142,6 +151,7 @@ namespace VSL_NAMESPACE::sync {
 namespace VSL_NAMESPACE {
     namespace {
         Completion::Status query_result(const std::shared_ptr<impl::SubmissionImpl>& result);
+
         Completion::Status query_result(const std::shared_ptr<impl::SubmissionImpl>& result) {
             if (!result)
                 return Completion::Status::CANCELLED;
@@ -162,32 +172,39 @@ namespace VSL_NAMESPACE {
             return result->status;
         }
     } // namespace
+
     Completion::Status Completion::status() const {
         const auto result = data_;
         return query_result(result);
     }
+
     Completion::Failure Completion::failure() const {
         const auto result = data_;
         static_cast<void>(query_result(result));
         return result ? result->failure : Failure::NONE;
     }
+
     std::int32_t Completion::error_code() const {
         const auto result = data_;
         static_cast<void>(query_result(result));
         return result ? result->error_code : 0;
     }
+
     bool Completion::ready() const {
         return status() == Status::COMPLETE;
     }
+
     bool Completion::busy() const {
         const auto result = data_;
         (void)query_result(result);
         return result && sync::pending_use(*result);
     }
+
     bool Completion::native_uncertain() const {
         const auto result = data_;
         return result && result->native.enqueue == sync::SubmissionEnqueue::UNKNOWN;
     }
+
     bool Completion::wait(std::uint64_t timeout) const {
         const auto result = data_;
         if (result && (result->native.active || result->native.observing))

@@ -14,12 +14,15 @@ namespace VSL_NAMESPACE::operation {
         void validate_image(const impl::ImageImpl* image, const impl::LogicalDeviceImpl& device,
                             const FrameBufferInput& input, AttachmentId attachment);
         vk::ClearValue convert_clear(const ClearValue& value);
+
         vk::Framebuffer create_native(void*, vk::Device device, const vk::FramebufferCreateInfo& info) {
             return device.createFramebuffer(info);
         }
+
         void destroy_native(void*, vk::Device device, vk::Framebuffer framebuffer) noexcept {
             device.destroyFramebuffer(framebuffer);
         }
+
         vk::ClearValue convert_clear(const ClearValue& value) {
             vk::ClearValue result{};
             std::visit([&](auto clear) {
@@ -36,6 +39,7 @@ namespace VSL_NAMESPACE::operation {
                        value);
             return result;
         }
+
         void validate_image(const impl::ImageImpl* image, const impl::LogicalDeviceImpl& device,
                             const FrameBufferInput& input, AttachmentId attachment) {
             const auto& description = *input.pass->description;
@@ -63,11 +67,14 @@ namespace VSL_NAMESPACE::operation {
             }
         }
     } // namespace
+
     ScopedFrameBufferNativeFactory::ScopedFrameBufferNativeFactory(FrameBufferNativeFactory factory) noexcept
         : _factory(factory), _previous(std::exchange(ACTIVE_FACTORY, &_factory)) {}
+
     ScopedFrameBufferNativeFactory::~ScopedFrameBufferNativeFactory() {
         ACTIVE_FACTORY = _previous;
     }
+
     std::vector<ClearValue> default_frame_buffer_clears(const RenderPassDescription& description) {
         std::vector<ClearValue> values;
         values.reserve(description.attachments.size());
@@ -89,6 +96,7 @@ namespace VSL_NAMESPACE::operation {
         }
         return values;
     }
+
     void validate_frame_buffer_clears(const RenderPassDescription& description, std::span<const ClearValue> values) {
         if (values.size() != description.attachments.size() || values.size() > UINT32_MAX)
             throw std::invalid_argument("Clear count must match attachments");
@@ -99,6 +107,7 @@ namespace VSL_NAMESPACE::operation {
                 throw std::invalid_argument("Clear type does not match attachment format");
         }
     }
+
     vk::Rect2D frame_buffer_area(const impl::FrameBufferImpl& target, vk::Rect2D area) {
         if (!area.extent.width && !area.extent.height)
             area.extent = target.extent;
@@ -108,6 +117,7 @@ namespace VSL_NAMESPACE::operation {
             throw std::out_of_range("Render area exceeds framebuffer");
         return area;
     }
+
     FrameBufferBeginScratch::FrameBufferBeginScratch(const impl::FrameBufferImpl& target, std::uint32_t index, vk::Rect2D requested, std::span<const ClearValue> values)
         : pass(target.render_pass ? target.render_pass->render_pass : nullptr), framebuffer(target.swap_chain_framebuffers.at(index)), area(frame_buffer_area(target, requested)) {
         if (!pass || !framebuffer || !target.render_pass->description)
@@ -117,20 +127,25 @@ namespace VSL_NAMESPACE::operation {
         for (const auto& value : values)
             clears.push_back(convert_clear(value));
     }
+
     void record_frame_buffer_begin(vk::CommandBuffer buffer, const FrameBufferBeginScratch& scratch) {
         const vk::RenderPassBeginInfo info{.renderPass = scratch.pass, .framebuffer = scratch.framebuffer, .renderArea = scratch.area, .clearValueCount = static_cast<std::uint32_t>(scratch.clears.size()), .pClearValues = scratch.clears.data()};
         buffer.beginRenderPass(info, vk::SubpassContents::eInline);
     }
+
     void record_frame_buffer_end(vk::CommandBuffer buffer) {
         buffer.endRenderPass();
     }
+
     void record_next_subpass(vk::CommandBuffer buffer) {
         buffer.nextSubpass(vk::SubpassContents::eInline);
     }
+
     void initialize_frame_buffer(impl::FrameBufferImpl& target, impl::LogicalDeviceImpl& device, FrameBufferInput input) {
         const auto factory = ACTIVE_FACTORY ? *ACTIVE_FACTORY : NATIVE_FACTORY;
         initialize_frame_buffer(target, device, std::move(input), factory);
     }
+
     void initialize_frame_buffer(impl::FrameBufferImpl& target, impl::LogicalDeviceImpl& device, FrameBufferInput input, const FrameBufferNativeFactory& factory) {
         if (std::ranges::any_of(target.swap_chain_framebuffers, [](const auto framebuffer) { return bool(framebuffer); }))
             throw std::logic_error("Framebuffer target is already initialized");
@@ -186,6 +201,7 @@ namespace VSL_NAMESPACE::operation {
             throw;
         }
     }
+
     void destroy_frame_buffer(impl::FrameBufferImpl& target) noexcept {
         for (size_t i = target.swap_chain_framebuffers.size(); i > 0; --i) {
             auto& framebuffer = target.swap_chain_framebuffers[i - 1];

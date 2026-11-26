@@ -16,6 +16,7 @@ namespace {
 
 namespace {
     using ShaderGroupVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
     TEST_F(ShaderGroupVulkanIntegrationTest, MovedGroupsKeepSharedEditingAndRejectEveryEmptyEntry) {
         const vsl::Shader<vsl::ShaderType::VERTEX> vertex(device, vsl_test::shader_path("triangle.vert.spv"));
         vsl::pipeline_layout::ShaderGroup original("shared", {});
@@ -36,14 +37,17 @@ namespace {
         moved.remove_shader(vertex);
         EXPECT_TRUE(ShaderGroupAccess::Data(alias)->shaders.empty());
     }
+
     TEST_F(ShaderGroupVulkanIntegrationTest, BothRemovalOverloadsPublishBeforeTheReleasedOwnerReentersTheGroup) {
         const vsl::Shader<vsl::ShaderType::VERTEX> first(device, vsl_test::shader_path("triangle.vert.spv"), "first");
         const vsl::Shader<vsl::ShaderType::FRAGMENT> second(device, vsl_test::shader_path("triangle.frag.spv"), "second");
         const vsl::Shader<vsl::ShaderType::VERTEX> third(device, vsl_test::shader_path("triangle.vert.spv"), "third");
+
         struct Context {
             vsl::ShaderAccessor source;
             std::shared_ptr<void> action;
         };
+
         for (const bool by_name : {true, false}) {
             std::optional<vsl::pipeline_layout::ShaderGroup> group;
             size_t observed = 0;
@@ -75,6 +79,7 @@ namespace {
             }
         }
     }
+
     TEST_F(ShaderGroupVulkanIntegrationTest, RecipeAndImportedShadersKeepCompositeProvenanceAndRejectTheOriginalArenaCycle) {
         namespace l = vsl::lifetime;
         namespace t = vsl::typed;
@@ -115,6 +120,7 @@ namespace {
         EXPECT_TRUE(observed_context.expired());
         EXPECT_TRUE(observed_arena.expired());
     }
+
     TEST_F(ShaderGroupVulkanIntegrationTest, InjectsInitialAndAppendedShadersInOrder) {
         vsl::Shader<vsl::ShaderType::VERTEX> vertex(device, vsl_test::shader_path("triangle.vert.spv"));
         vsl::Shader<vsl::ShaderType::FRAGMENT> fragment(device, vsl_test::shader_path("triangle.frag.spv"));
@@ -128,6 +134,7 @@ namespace {
         EXPECT_EQ(PipelineRecipeAccess::Read(layout).shaders[0]->shader_module, ShaderAccess::Owned(vertex)->shader_module);
         EXPECT_EQ(PipelineRecipeAccess::Read(layout).shaders[1]->shader_module, ShaderAccess::Owned(fragment)->shader_module);
     }
+
     TEST_F(ShaderGroupVulkanIntegrationTest, RemovesMatchingShaderByNameAndHandle) {
         vsl::Shader<vsl::ShaderType::VERTEX> vertex(device, vsl_test::shader_path("triangle.vert.spv"),
                                                     "vertex_entry");
@@ -139,6 +146,7 @@ namespace {
         group.remove_shader(fragment);
         EXPECT_TRUE(ShaderGroupAccess::Data(group)->shaders.empty());
     }
+
     TEST_F(ShaderGroupVulkanIntegrationTest, EmptyGroupsAllowBothRemovalOverloads) {
         vsl::Shader<vsl::ShaderType::VERTEX> vertex(device, vsl_test::shader_path("triangle.vert.spv"));
         vsl::pipeline_layout::ShaderGroup group("empty", {});
@@ -146,6 +154,7 @@ namespace {
         group.remove_shader(vertex);
         EXPECT_TRUE(ShaderGroupAccess::Data(group)->shaders.empty());
     }
+
     TEST_F(ShaderGroupVulkanIntegrationTest, NameRemovalErasesEveryMatchAndKeepsOtherEntriesInOrder) {
         vsl::Shader<vsl::ShaderType::VERTEX> vertex(device, vsl_test::shader_path("triangle.vert.spv"), "shared");
         vsl::Shader<vsl::ShaderType::FRAGMENT> fragment(device, vsl_test::shader_path("triangle.frag.spv"), "shared");
@@ -159,6 +168,7 @@ namespace {
         EXPECT_TRUE(ShaderGroupAccess::Data(group)->shaders.empty());
         group.remove_shader("other");
     }
+
     TEST_F(ShaderGroupVulkanIntegrationTest, HandleRemovalKeepsDifferentModulesWithTheSameName) {
         vsl::Shader<vsl::ShaderType::VERTEX> first(device, vsl_test::shader_path("triangle.vert.spv"), "same");
         vsl::Shader<vsl::ShaderType::VERTEX> second(device, vsl_test::shader_path("triangle.vert.spv"), "same");
@@ -171,6 +181,7 @@ namespace {
         EXPECT_TRUE(ShaderGroupAccess::Data(group)->shaders.empty());
         group.remove_shader(second);
     }
+
     TEST_F(ShaderGroupVulkanIntegrationTest, MissingMatchesPreserveOrderAndInjectedStages) {
         vsl::Shader<vsl::ShaderType::VERTEX> vertex(device, vsl_test::shader_path("triangle.vert.spv"));
         vsl::Shader<vsl::ShaderType::FRAGMENT> fragment(device, vsl_test::shader_path("triangle.frag.spv"));

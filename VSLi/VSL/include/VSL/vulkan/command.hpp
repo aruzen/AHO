@@ -22,7 +22,9 @@ namespace VSL_NAMESPACE {
 
     struct CommandPool {
         CommandPool() = default;
+
         explicit operator bool() const { return bool(_data); }
+
         CommandPoolIdentity identity() const;
         CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor device, CommandPoolCreateInfo info = {});
 
@@ -38,7 +40,9 @@ namespace VSL_NAMESPACE {
 
     struct CommandBuffer {
         CommandBuffer() = default;
+
         explicit operator bool() const { return bool(_data); }
+
         CommandBufferIdentity identity() const;
         CommandBuffer(VSL_NAMESPACE::CommandPool pool, std::uint32_t size = DEFAULT_BUFFER_SIZE);
 
@@ -79,6 +83,7 @@ namespace VSL_NAMESPACE {
     };
 
     struct PipelineAccessor;
+
     namespace command {
         struct Command {
             virtual ~Command() = default;
@@ -143,7 +148,9 @@ namespace VSL_NAMESPACE {
 
     struct CommandManager {
         CommandManager() = default;
+
         explicit operator bool() const { return bool(_data); }
+
         CommandManagerIdentity identity() const;
         CommandManager(VSL_NAMESPACE::LogicalDeviceAccessor device);
         static CommandManager FromBuffer(CommandBuffer buffer);

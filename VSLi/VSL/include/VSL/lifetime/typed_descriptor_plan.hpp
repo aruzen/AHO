@@ -7,14 +7,17 @@ namespace VSL_NAMESPACE::typed {
         std::uint32_t set;
         std::span<const graphic_resource::BindingPoint> bindings;
     };
+
     struct DescriptorSetPlan {
         std::uint32_t set;
         size_t layout;
     };
+
     struct DescriptorTypeCapacity {
         graphic_resource::Type type;
         std::uint32_t count;
     };
+
     struct DescriptorPoolPlan {
         std::uint32_t max_sets;
         std::span<const DescriptorTypeCapacity> descriptors;
@@ -36,12 +39,14 @@ namespace VSL_NAMESPACE::typed {
     public:
         using Schema = Schema_;
         constexpr explicit TypedDescriptorPlan(size_t frames);
+
         constexpr explicit TypedDescriptorPlan(const ResourceAllocationPlan<Schema>& plan) : TypedDescriptorPlan(plan.frame_count()) {}
         static constexpr std::span<const DescriptorLayoutPlan> Layouts() { return LAYOUTS; }
         constexpr size_t frame_count() const { return _frames; }
         constexpr size_t total_sets() const { return _total_sets; }
         constexpr size_t total_pools() const { return _total_pools; }
         constexpr size_t total_descriptors() const { return _total_descriptors; }
+
         constexpr std::span<const DescriptorSetPlan> sets(ResourceScope scope) const&;
         constexpr std::span<const DescriptorSetPlan> sets(ResourceScope scope) const&& = delete;
         constexpr DescriptorPoolPlan pool(ResourceScope scope) const&;
@@ -54,6 +59,7 @@ namespace VSL_NAMESPACE::typed {
             return std::array<DescriptorLayoutPlan, Resources::COUNT>{{{Resources::template Set<indices>::SET, Resources::template Set<indices>::POINTS}...}};
         }(std::make_index_sequence<Resources::COUNT>{});
     }
+
     template<typename Schema>
     constexpr size_t TypedDescriptorPlan<Schema>::ScopeIndex(ResourceScope scope) {
         if (scope == ResourceScope::SHARED)
@@ -62,6 +68,7 @@ namespace VSL_NAMESPACE::typed {
             return 1;
         throw std::invalid_argument("Unknown descriptor lifetime scope");
     }
+
     template<typename Schema>
     constexpr void TypedDescriptorPlan<Schema>::add_capacity(size_t group, graphic_resource::Type type, std::uint32_t count) {
         size_t index = 0;
@@ -74,6 +81,7 @@ namespace VSL_NAMESPACE::typed {
             throw std::out_of_range("Descriptor pool type capacity exceeds uint32_t");
         capacity += count;
     }
+
     template<typename Schema>
     constexpr TypedDescriptorPlan<Schema>::TypedDescriptorPlan(size_t frames) : _frames(frames) {
         if (!frames)
@@ -96,11 +104,13 @@ namespace VSL_NAMESPACE::typed {
                 _total_descriptors = detail::allocation_add(_total_descriptors, detail::allocation_multiply(_capacities[group][type].count, instances));
         }
     }
+
     template<typename Schema>
     constexpr std::span<const DescriptorSetPlan> TypedDescriptorPlan<Schema>::sets(ResourceScope scope) const& {
         const auto group = ScopeIndex(scope);
         return {_sets[group].data(), _set_counts[group]};
     }
+
     template<typename Schema>
     constexpr DescriptorPoolPlan TypedDescriptorPlan<Schema>::pool(ResourceScope scope) const& {
         const auto group = ScopeIndex(scope);

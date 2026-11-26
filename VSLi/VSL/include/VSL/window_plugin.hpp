@@ -16,6 +16,7 @@ namespace VSL_NAMESPACE::window_plugin {
 
     struct HookShouldClose : public VSL_NAMESPACE::PureWindow::Plugin, public VSL_NAMESPACE::PureWindow::OnUpdate {
         HookShouldClose(PureWindow*, std::function<void(PureWindow)> callback) : callback(std::move(callback)) {}
+
         // OnUpdate
         bool on_update(VSL_NAMESPACE::PureWindow data) override;
 

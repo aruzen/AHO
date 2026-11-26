@@ -10,6 +10,7 @@ namespace {
 
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_nothrow_default_constructible_v<impl::RenderPassImpl>);
+
     namespace {
         struct HeapRenderPassOwner {
             DependencyNode node;
@@ -18,19 +19,23 @@ namespace VSL_NAMESPACE::lifetime {
             HeapRenderPassOwner(LogicalDeviceAccessor device, RenderPassDescription description);
             ~HeapRenderPassOwner();
         };
+
         HeapRenderPassOwner::HeapRenderPassOwner(LogicalDeviceAccessor device, RenderPassDescription description) : device(device) {
             require_device_owner(device);
             construct_render_pass(storage, *StartupAccess::Owned(device), std::move(description));
         }
+
         HeapRenderPassOwner::~HeapRenderPassOwner() {
             node.retire();
             destroy_render_pass(storage);
         }
     } // namespace
+
     void construct_render_pass(void* storage, LogicalDeviceAccessor device, RenderPassDescription description) {
         require_device_owner(device);
         construct_render_pass(storage, *StartupAccess::Owned(device), std::move(description));
     }
+
     void construct_render_pass(void* storage, impl::LogicalDeviceImpl& device, RenderPassDescription description) {
         if (!device.device)
             throw std::invalid_argument("Render pass requires a device owner");
@@ -44,13 +49,16 @@ namespace VSL_NAMESPACE::lifetime {
             throw;
         }
     }
+
     impl::RenderPassImpl& render_pass_at(void* storage) {
         return *std::launder(reinterpret_cast<impl::RenderPassImpl*>(static_cast<RenderPassSlotStorage*>(storage)->value));
     }
+
     void destroy_render_pass(void* storage) noexcept {
         std::destroy_at(&render_pass_at(storage));
         std::destroy_at(static_cast<RenderPassSlotStorage*>(storage));
     }
+
     std::shared_ptr<impl::RenderPassImpl> make_heap_render_pass(LogicalDeviceAccessor device, RenderPassDescription description) {
         auto owner = std::make_shared<HeapRenderPassOwner>(device, std::move(description));
         auto* pass = &render_pass_at(owner->storage);

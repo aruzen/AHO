@@ -13,6 +13,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace VSL_NAMESPACE::command {
     CopyBuffer::CopyBuffer(BufferAccessor* source, BufferAccessor* destination, size_t bytes,
                            size_t source_offset, size_t destination_offset, bool host_read)
@@ -32,11 +33,13 @@ namespace VSL_NAMESPACE::command {
         _source_offset += source_offset;
         _destination_offset += destination_offset;
     }
+
     void CopyBuffer::validate() const {
         if (!_source || !_destination)
             throw std::invalid_argument("Buffer copy requires valid buffers");
         operation::validate_copy(*_source, *_destination, _bytes, _source_offset, _destination_offset, _host_read);
     }
+
     void CopyBuffer::invoke(CommandPool, CommandBuffer buffer, CommandManager manager) {
         const auto copy = *this;
         copy.validate();

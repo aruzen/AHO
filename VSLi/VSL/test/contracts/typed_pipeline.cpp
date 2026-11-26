@@ -9,12 +9,15 @@
 namespace {
     namespace t = vsl::typed;
     using Timing = t::VertexTiming;
+
     struct Vertex {
         float xy[2];
     };
+
     struct OtherVertex {
         std::uint32_t xy[2];
     };
+
     using Attribute = t::VertexInputDefinition<vsl::data_format::FLOAT_RG, 0, offsetof(Vertex, xy)>;
     using Schema = t::VertexRecord<Vertex, VSL_VERTEX_MEMBER(Vertex, xy)>;
     using Binding = Schema::Binding<0>;
@@ -31,6 +34,7 @@ namespace {
     static_assert(t::compatible_vertex_buffers<Input, t::TypedVertexBuffer<Vertex>>);
     static_assert(!std::convertible_to<t::TypedVertexBuffer<Vertex>, vsl::BufferAccessor&>);
     static_assert(!std::convertible_to<Pipeline, vsl::PipelineAccessor>);
+
     void accepted(Pipeline& pipeline, t::TypedVertexBuffer<Vertex>& buffer) {
         auto command = pipeline.bind_vertices(buffer).draw(3);
         static_assert(std::same_as<typename decltype(command)::VertexInput, Input>);
@@ -87,12 +91,14 @@ namespace {
     struct Unsupported {
         void* member;
     };
+
     using Bad = t::VertexRecord<Unsupported, VSL_VERTEX_MEMBER(Unsupported, member)>;
     static_assert(Bad::LAYOUT.valid);
 #elif VSL_TYPED_CASE == 15
     struct Matrix {
         float values[3][3];
     };
+
     using Bad = t::VertexRecord<Matrix, VSL_VERTEX_MEMBER(Matrix, values)>;
     static_assert(Bad::LAYOUT.valid);
 #elif VSL_TYPED_CASE == 16

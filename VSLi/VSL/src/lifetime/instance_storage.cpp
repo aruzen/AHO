@@ -5,6 +5,7 @@
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_standard_layout_v<InstanceSlotStorage> && offsetof(InstanceSlotStorage, value) == 0);
     static_assert(std::is_nothrow_default_constructible_v<impl::VulkanImplAccessor>);
+
     namespace {
         struct HeapInstanceOwner {
             DependencyNode node;
@@ -12,14 +13,17 @@ namespace VSL_NAMESPACE::lifetime {
             HeapInstanceOwner(InstanceCreateInfo info, const operation::InstanceNativeCalls& calls);
             ~HeapInstanceOwner();
         };
+
         HeapInstanceOwner::HeapInstanceOwner(InstanceCreateInfo info, const operation::InstanceNativeCalls& calls) {
             construct_instance(storage, std::move(info), calls);
         }
+
         HeapInstanceOwner::~HeapInstanceOwner() {
             node.retire();
             destroy_instance(storage);
         }
     } // namespace
+
     void construct_instance(void* storage, InstanceCreateInfo info, const operation::InstanceNativeCalls& calls) {
         auto* slot = std::construct_at(static_cast<InstanceSlotStorage*>(storage));
         auto* instance = std::construct_at(reinterpret_cast<impl::VulkanImplAccessor*>(slot->value));
@@ -31,13 +35,16 @@ namespace VSL_NAMESPACE::lifetime {
             throw;
         }
     }
+
     impl::VulkanImplAccessor& instance_at(void* storage) {
         return *std::launder(reinterpret_cast<impl::VulkanImplAccessor*>(static_cast<InstanceSlotStorage*>(storage)->value));
     }
+
     void destroy_instance(void* storage) noexcept {
         std::destroy_at(&instance_at(storage));
         std::destroy_at(static_cast<InstanceSlotStorage*>(storage));
     }
+
     std::shared_ptr<impl::VulkanImplAccessor> make_heap_instance(InstanceCreateInfo info, const operation::InstanceNativeCalls& calls) {
         auto owner = std::make_shared<HeapInstanceOwner>(std::move(info), calls);
         auto* instance = &instance_at(owner->storage);

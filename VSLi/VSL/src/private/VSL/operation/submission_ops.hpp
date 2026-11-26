@@ -12,6 +12,7 @@ namespace VSL_NAMESPACE::operation {
         VkResult (*queue_submit)(void*, VkQueue, const VkSubmitInfo*, VkFence) noexcept = nullptr;
         VkResult (*fence_status)(void*, VkDevice, VkFence) noexcept = nullptr;
     };
+
     class ScopedSubmissionNativeCalls {
         SubmissionNativeCalls _calls;
         const SubmissionNativeCalls* _previous;
@@ -22,6 +23,7 @@ namespace VSL_NAMESPACE::operation {
         ScopedSubmissionNativeCalls(const ScopedSubmissionNativeCalls&) = delete;
         ScopedSubmissionNativeCalls& operator=(const ScopedSubmissionNativeCalls&) = delete;
     };
+
     vk::Result poll_fence(vk::Device device, vk::Fence fence) noexcept;
     vk::Result wait_fence(vk::Device device, vk::Fence fence, std::uint64_t timeout) noexcept;
     vk::Result wait_fences(vk::Device device, std::span<const vk::Fence> fences, std::uint64_t timeout) noexcept;

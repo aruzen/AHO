@@ -1,7 +1,9 @@
 #include "../engine/engine_access.hpp"
+
 namespace {
     using AHO_NAMESPACE::engine::detail::EngineAccess;
 }
+
 #include <AHO/drawer/draw_phase.hpp>
 #include <VSL/vulkan/commands/render_pass_begin.hpp>
 #include <VSL/vulkan/commands/render_pass_end.hpp>

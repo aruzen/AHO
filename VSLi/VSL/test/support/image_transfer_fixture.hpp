@@ -7,6 +7,7 @@
 #include <VSL/vulkan/commands/copy_buffer_to_image.hpp>
 #include <VSL/vulkan/commands/copy_image_to_buffer.hpp>
 #include <array>
+
 namespace vsl_test {
     class ImageTransferVulkanIntegrationTest : public VulkanIntegrationTest {
     protected:

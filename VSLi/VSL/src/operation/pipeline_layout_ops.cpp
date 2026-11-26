@@ -10,11 +10,13 @@ namespace VSL_NAMESPACE::operation {
         std::vector<std::vector<vk::DescriptorSetLayoutBinding>> signatures(
             const impl::LogicalDeviceImpl& device, std::span<impl::ResourceBindingLayoutImpl* const> layouts);
         std::vector<vk::PushConstantRange> native_ranges(const impl::LogicalDeviceImpl& device, std::span<const PushConstantRange> ranges);
+
         std::uint32_t count(size_t size) {
             if (size > UINT32_MAX)
                 throw std::length_error("Pipeline layout count exceeds uint32_t");
             return static_cast<std::uint32_t>(size);
         }
+
         std::vector<std::vector<vk::DescriptorSetLayoutBinding>> signatures(
             const impl::LogicalDeviceImpl& device, std::span<impl::ResourceBindingLayoutImpl* const> layouts) {
             if (layouts.size() > device.parent_device->device.getProperties().limits.maxBoundDescriptorSets)
@@ -29,6 +31,7 @@ namespace VSL_NAMESPACE::operation {
             }
             return result;
         }
+
         std::vector<vk::PushConstantRange> native_ranges(const impl::LogicalDeviceImpl& device, std::span<const PushConstantRange> ranges) {
             const auto normalized = normalize_push_ranges(device, ranges);
             std::vector<vk::PushConstantRange> result;
@@ -40,10 +43,12 @@ namespace VSL_NAMESPACE::operation {
             return result;
         }
     } // namespace
+
     void validate_pipeline_device(const impl::LogicalDeviceImpl& device) {
         if (!device.device || !device.parent_device || !device.parent_device->device)
             throw std::invalid_argument("Pipeline layout requires a live logical and physical device");
     }
+
     std::vector<PushConstantRange> normalize_push_ranges(const impl::LogicalDeviceImpl& device, std::span<const PushConstantRange> definitions) {
         validate_pipeline_device(device);
         const auto limit = device.parent_device->device.getProperties().limits.maxPushConstantsSize;
@@ -69,6 +74,7 @@ namespace VSL_NAMESPACE::operation {
         }
         return result;
     }
+
     void initialize_pipeline_layout(impl::PipelineLayoutImpl& target, impl::LogicalDeviceImpl& device,
                                     std::span<impl::ResourceBindingLayoutImpl* const> layouts, std::span<const PushConstantRange> ranges) {
         target.device = &device;
@@ -83,15 +89,18 @@ namespace VSL_NAMESPACE::operation {
         const vk::PipelineLayoutCreateInfo info{.setLayoutCount = count(handles.size()), .pSetLayouts = handles.data(), .pushConstantRangeCount = count(target.push_ranges.size()), .pPushConstantRanges = target.push_ranges.data()};
         target.pipeline_layout = device.device.createPipelineLayout(info);
     }
+
     bool pipeline_layout_matches(const impl::PipelineLayoutImpl& target, std::span<impl::ResourceBindingLayoutImpl* const> layouts,
                                  std::span<const PushConstantRange> ranges) {
         return target.binding_signatures == signatures(*target.device, layouts) && target.push_ranges == native_ranges(*target.device, ranges);
     }
+
     void destroy_pipeline_layout(impl::PipelineLayoutImpl& target) noexcept {
         if (target.pipeline_layout)
             target.native_device.destroyPipelineLayout(target.pipeline_layout);
         target.pipeline_layout = nullptr;
     }
+
     PipelineScratch::PipelineScratch(const impl::GraphicsPipelineStateData& state) : color_blend(state.color_blend) {
         dynamic_state.dynamicStateCount = count(state.enabled_dynamic_states.size());
         dynamic_state.pDynamicStates = state.enabled_dynamic_states.data();

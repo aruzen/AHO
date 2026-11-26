@@ -29,6 +29,7 @@ namespace VSL_NAMESPACE::operation {
             throw;
         }
     }
+
     void destroy_sampler(impl::SamplerImpl& target) noexcept {
         if (!target.native_device)
             return;

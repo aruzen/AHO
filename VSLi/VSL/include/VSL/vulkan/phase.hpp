@@ -12,6 +12,7 @@ namespace VSL_NAMESPACE {
         class PhaseCall;
         struct AcquireTicket;
     } // namespace lifetime
+
     template<typename PhaseStream, typename T>
     concept is_phase_stream = requires(PhaseStream pst) {
         { pst << std::declval<std::shared_ptr<T>>() } -> std::convertible_to<PhaseStream&>;

@@ -37,22 +37,28 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     namespace t = vsl::typed;
+
     struct Tint {
         float rgba[4];
     };
 
     using TintRecord = t::BlockRecord<Tint, VSL_BLOCK_MEMBER(Tint, rgba)>;
+
     struct WrongTint {
         float rgba[4];
     };
+
     struct DescriptorTestValue {
         using Payload = Tint;
         static constexpr auto KIND = vsl::graphic_resource::Type::UNIFORM_BUFFER;
         t::detail::DescriptorValue value;
+
         t::detail::DescriptorValue descriptor() const { return value; }
     };
+
     using Tints = t::DescriptorSet<2, t::UniformBinding<3, TintRecord, vsl::ShaderFlag::VERTEX, 2>>;
     using Extra = t::DescriptorSet<0, t::StorageBinding<5, TintRecord, vsl::ShaderFlag::VERTEX>>;
     using Schema = t::ResourceSchema<Tints, Extra>;
@@ -79,9 +85,11 @@ namespace {
         template<typename Resources>
         auto make_typed(const char* shader = "typed_descriptors.vert.spv");
     };
+
     class TypedDescriptorComputeVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     template<typename Resources>
     auto TypedDescriptorVulkanIntegrationTest::make_typed(const char* shader) {
         namespace pl = vsl::pipeline_layout;
@@ -115,6 +123,7 @@ namespace {
         verify(t::HeapStorage{});
         verify(t::ArenaStorage<>{});
     }
+
     TEST_F(TypedDescriptorVulkanIntegrationTest, SparseSetsAndUniformArraysReachTheRealShader) {
         auto typed_pipeline = make_typed<Schema>();
         vsl::GraphicResourceManager manager(device);
@@ -299,6 +308,7 @@ namespace {
         EXPECT_FALSE(weak_sampler.expired());
         EXPECT_NO_THROW(set.require_complete());
     }
+
     TEST_F(TypedDescriptorVulkanIntegrationTest, TextureArraysSupplyBothImagesToTheFragmentShader) {
         using Textures = t::DescriptorSet<1, t::TextureBinding<2, vsl::ShaderFlag::FRAGMENT, 2>>;
         using TextureSchema = t::ResourceSchema<Textures>;
@@ -334,10 +344,13 @@ namespace {
 
     TEST_F(TypedDescriptorComputeVulkanIntegrationTest, ComputeDraftRejectsStageAndSparseSetErrorsBeforeMaterialization) {
         std::optional<vsl::PipelineLayoutEditAccessor> saved;
+
         struct Capture {
             std::optional<vsl::PipelineLayoutEditAccessor>& saved;
+
             void injection(vsl::PipelineLayoutEditAccessor layout) const { saved = std::move(layout); }
         };
+
         using EmptySet = t::ResourceSchema<t::DescriptorSet<0>>;
         using HugeSet = t::ResourceSchema<t::DescriptorSet<0x10000000>>;
         vsl::Shader<vsl::ShaderType::VERTEX> vertex(device, vsl_test::shader_path("vertices.vert.spv"));
@@ -364,6 +377,7 @@ namespace {
         struct Parameters {
             std::uint32_t base;
         };
+
         using ParametersRecord = t::BlockRecord<Parameters, VSL_BLOCK_MEMBER(Parameters, base)>;
         using ParametersSet = t::DescriptorSet<0, t::UniformBinding<2, ParametersRecord, vsl::ShaderFlag::COMPUTE>>;
         using OutputSet = t::DescriptorSet<1, t::StorageBinding<4, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;

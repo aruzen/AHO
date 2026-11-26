@@ -58,6 +58,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace VSL_NAMESPACE::lifetime::detail {
     struct ResourceArenaOwner {
         LogicalDeviceAccessor device;
@@ -91,6 +92,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
         static void VisitDependencies(const void* input, DependencyNode::EdgeVisitor visitor, void* context);
         const ArenaResource& find(typed::ResourceId id, storage::ResourceKind kind) const;
     };
+
     bool initializer_matches(const ResourceInit& value, storage::ResourceKind kind, bool external);
 
     bool initializer_matches(const ResourceInit& value, storage::ResourceKind kind, bool external) {
@@ -128,6 +130,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
         }
         return false;
     }
+
     ResourceArenaOwner::ResourceArenaOwner(LogicalDeviceAccessor device, typed::LifetimeGroup group,
                                            std::span<const typed::ResourcePlacement> placements, std::span<const ResourceInit> initializers,
                                            std::shared_ptr<storage::detail::CPURegion> memory, size_t bytes, size_t alignment,
@@ -138,14 +141,17 @@ namespace VSL_NAMESPACE::lifetime::detail {
             throw std::invalid_argument("Resource arena requires a live device and CPU region");
         if (policy != DependencyPolicy::FIXED && policy != DependencyPolicy::DYNAMIC)
             throw std::invalid_argument("Unknown resource dependency policy");
+
         descriptor_context.policy = policy;
         descriptor_context.device_parent = StartupAccess::Owned(device)->owner_node;
         preflight(placements, initializers);
         for (const auto& owner : owners)
             retain_dependency(owner.resource_use().state);
+
         constructed.reserve(resources.size());
         this->memory->claim(bytes, alignment);
         claimed = true;
+
         try {
             // 配置順と独立して、借用先を先に構築する。
             const auto stage = [](storage::ResourceKind kind) {
@@ -166,6 +172,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
             throw;
         }
     }
+
     void ResourceArenaOwner::preflight(std::span<const typed::ResourcePlacement> placements, std::span<const ResourceInit> initializers) {
         if (placements.size() != initializers.size())
             throw std::invalid_argument("Resource initializers must match every plan entry, including external resources");
@@ -291,6 +298,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     }
             }
     }
+
     void ResourceArenaOwner::preflight(const RuntimeLayoutSource& source) {
         if (const auto* id = std::get_if<typed::ResourceId>(&source)) {
             (void)find(*id, storage::ResourceKind::PIPELINE_LAYOUT);
@@ -301,6 +309,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
             retain_dependency(layout.owner_ref());
         }
     }
+
     void ResourceArenaOwner::preflight(const CommandBufferInit& input) {
         if (const auto* id = std::get_if<typed::ResourceId>(&input.pool)) {
             (void)find(*id, storage::ResourceKind::COMMAND_POOL);
@@ -311,11 +320,13 @@ namespace VSL_NAMESPACE::lifetime::detail {
             retain_dependency(pool.owner_ref());
         }
     }
+
     impl::CommandPoolImpl* ResourceArenaOwner::resolve(const CommandPoolSource& source) const {
         if (const auto* id = std::get_if<typed::ResourceId>(&source))
             return find(*id, storage::ResourceKind::COMMAND_POOL).get<impl::CommandPoolImpl>();
         return CommandAccess::Data(std::get<CommandPool>(source)).get();
     }
+
     void ResourceArenaOwner::preflight(const PipelinePassSource& source) {
         if (const auto* id = std::get_if<typed::ResourceId>(&source)) {
             (void)find(*id, storage::ResourceKind::RENDER_PASS);
@@ -323,6 +334,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
             throw std::invalid_argument("Pipeline pass source requires the arena device");
         }
     }
+
     void ResourceArenaOwner::preflight(const PipelineShaderSource& source) {
         if (const auto* id = std::get_if<typed::ResourceId>(&source)) {
             (void)find(*id, storage::ResourceKind::SHADER);
@@ -332,6 +344,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 throw std::invalid_argument("Pipeline shader source requires an owner on the arena device");
         }
     }
+
     void ResourceArenaOwner::preflight(const FrameBufferInit& input) {
         preflight(input.pass);
         if (const auto* pass = std::get_if<RenderPassAccessor>(&input.pass))
@@ -349,26 +362,31 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 }
             }
     }
+
     impl::ImageImpl* ResourceArenaOwner::resolve(const FrameBufferImageSource& source) const {
         if (const auto* id = std::get_if<typed::ResourceId>(&source))
             return find(*id, storage::ResourceKind::IMAGE).get<impl::ImageImpl>();
         return ImageAccess::Owned(std::get<ImageAccessor>(source)).get();
     }
+
     impl::PipelineLayoutImpl* ResourceArenaOwner::resolve(const RuntimeLayoutSource& source) const {
         if (const auto* id = std::get_if<typed::ResourceId>(&source))
             return find(*id, storage::ResourceKind::PIPELINE_LAYOUT).get<impl::PipelineLayoutImpl>();
         return GraphicsAccess::Owned(std::get<PipelineLayoutAccessor>(source)).get();
     }
+
     impl::RenderPassImpl* ResourceArenaOwner::resolve(const PipelinePassSource& source) const {
         if (const auto* id = std::get_if<typed::ResourceId>(&source))
             return find(*id, storage::ResourceKind::RENDER_PASS).get<impl::RenderPassImpl>();
         return GraphicsAccess::Owned(std::get<RenderPassAccessor>(source)).get();
     }
+
     impl::ShaderImpl* ResourceArenaOwner::resolve(const PipelineShaderSource& source) const {
         if (const auto* id = std::get_if<typed::ResourceId>(&source))
             return find(*id, storage::ResourceKind::SHADER).get<impl::ShaderImpl>();
         return ShaderAccess::Owned(std::get<ShaderAccessor>(source)).get();
     }
+
     void ResourceArenaOwner::construct(size_t index, const ResourceInit& initializer) {
         auto& resource = resources[index];
         auto* slot = memory->base + resource.placement.offset;
@@ -493,6 +511,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 break;
         }
     }
+
     void ResourceArenaOwner::publish(const std::shared_ptr<ResourceArenaOwner>& owner) {
         // 登録に必要な確保を全部終えてからweak aliasを公開する。
         for (const auto& resource : resources)
@@ -507,9 +526,11 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     throw std::length_error("Descriptor resource registry capacity exceeded");
                 pool->resources.reserve(pool->resources.size() + count);
             }
+
         descriptor_context.dependencies = dependencies;
         descriptor_context.dependency_storage = &dependencies;
         descriptor_context.node.publish(owner, this, VisitDependencies);
+
         for (auto& resource : resources) {
             if (!resource.placement.external) {
                 auto* node = &descriptor_context.node;
@@ -522,6 +543,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 resource.get<impl::GraphicResourceImpl>()->pool->resources.emplace_back(std::shared_ptr<impl::GraphicResourceImpl>{owner, resource.get<impl::GraphicResourceImpl>()});
             }
         }
+
         for (const auto& resource : resources)
             if (!resource.placement.external && resource.get<impl::FrameBufferImpl>() && !resource.get<impl::FrameBufferImpl>()->owner_context->pass.use_count()) {
                 auto* pass = resource.get<impl::FrameBufferImpl>()->render_pass;
@@ -529,6 +551,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
                     throw std::logic_error("Framebuffer pass owner was not retained");
                 set_frame_buffer_pass_owner(*resource.get<impl::FrameBufferImpl>(), descriptor_context.node.ref(owner).alias(pass));
             }
+
         for (const auto& resource : resources)
             if (!resource.placement.external && resource.get<impl::CommandBufferImpl>() && !resource.get<impl::CommandBufferImpl>()->owner_context->pool.use_count()) {
                 auto* pool = resource.get<impl::CommandBufferImpl>()->command_pool;
@@ -537,6 +560,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 set_command_buffer_pool_owner(*resource.get<impl::CommandBufferImpl>(), descriptor_context.node.ref(owner).alias(pool));
             }
     }
+
     void ResourceArenaOwner::clear() noexcept {
         while (!constructed.empty()) {
             const auto& placement = resources[constructed.back()].placement;
@@ -595,10 +619,12 @@ namespace VSL_NAMESPACE::lifetime::detail {
             claimed = false;
         }
     }
+
     ResourceArenaOwner::~ResourceArenaOwner() {
         descriptor_context.node.retire();
         clear();
     }
+
     size_t ResourceArenaOwner::retain_dependency(OwnerRef owner) {
         if (!owner.use_count())
             throw std::invalid_argument("Resource arena dependency requires an owner");
@@ -608,6 +634,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
                 return i;
         throw std::logic_error("Resource arena dependency was not retained");
     }
+
     void ResourceArenaOwner::VisitDependencies(const void* input, DependencyNode::EdgeVisitor visitor, void* context) {
         const auto& root = *static_cast<const ResourceArenaOwner*>(input);
         visitor(context, root.device.owner_ref());
@@ -617,6 +644,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
             if (resource.get<impl::GraphicResourceImpl>())
                 visit_descriptor_edges(*resource.get<impl::GraphicResourceImpl>(), visitor, context);
     }
+
     const ArenaResource& ResourceArenaOwner::find(typed::ResourceId id, storage::ResourceKind kind) const {
         for (const auto& resource : resources)
             if (resource.placement.resource == id) {
@@ -637,14 +665,17 @@ namespace VSL_NAMESPACE::lifetime {
         _owner = std::make_shared<detail::ResourceArenaOwner>(device, group, placements, initializers, std::move(memory), bytes, alignment, dependencies, policy);
         _owner->publish(_owner);
     }
+
     std::shared_ptr<void> ResourceArena::owner() const {
         return _owner;
     }
+
     OwnerRef ResourceArena::owner_ref() const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
         return _owner->descriptor_context.node.ref(_owner);
     }
+
     void ResourceArena::freeze_dependencies() const {
         const auto owner = _owner;
         if (!owner)
@@ -655,17 +686,21 @@ namespace VSL_NAMESPACE::lifetime {
                 sets.push_back(set);
         freeze_descriptor_dependencies(owner->descriptor_context, sets);
     }
+
     size_t ResourceArena::size() const {
         return _owner ? _owner->resources.size() : 0;
     }
+
     size_t ResourceArena::slots() const {
         return _owner ? _owner->constructed.size() : 0;
     }
+
     typed::LifetimeGroup ResourceArena::lifetime() const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
         return _owner->group;
     }
+
     BufferView ResourceArena::buffer(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
@@ -674,6 +709,7 @@ namespace VSL_NAMESPACE::lifetime {
             return detail::BufferAccess::View(resource.buffer(), _owner->dependencies.at(resource.owner_index), resource.buffer_offset, resource.buffer_bytes);
         return detail::BufferAccess::View(resource.buffer(), _owner, resource.buffer_offset, resource.buffer_bytes);
     }
+
     ImageAccessor ResourceArena::image(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
@@ -682,6 +718,7 @@ namespace VSL_NAMESPACE::lifetime {
             return ImageAccess::FromOwned(_owner->dependencies.at(resource.owner_index).alias(resource.get<impl::ImageImpl>()));
         return ImageAccess::FromOwned(_owner->descriptor_context.node.ref(_owner).alias(resource.get<impl::ImageImpl>()));
     }
+
     RenderPassAccessor ResourceArena::render_pass(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
@@ -689,6 +726,7 @@ namespace VSL_NAMESPACE::lifetime {
         const auto owner = resource.placement.external ? _owner->dependencies.at(resource.owner_index) : _owner->descriptor_context.node.ref(_owner);
         return GraphicsAccess::FromOwned(owner.alias(resource.get<impl::RenderPassImpl>()));
     }
+
     PipelineAccessor ResourceArena::pipeline(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
@@ -696,6 +734,7 @@ namespace VSL_NAMESPACE::lifetime {
         const auto owner = resource.placement.external ? _owner->dependencies.at(resource.owner_index) : _owner->descriptor_context.node.ref(_owner);
         return GraphicsAccess::FromOwned(owner.alias(resource.get<impl::PipelineImpl>()));
     }
+
     FrameBufferAccessor ResourceArena::frame_buffer(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
@@ -703,12 +742,14 @@ namespace VSL_NAMESPACE::lifetime {
         const auto owner = resource.placement.external ? _owner->dependencies.at(resource.owner_index) : _owner->descriptor_context.node.ref(_owner);
         return GraphicsAccess::FromOwned(owner.alias(resource.get<impl::FrameBufferImpl>()));
     }
+
     CommandPool ResourceArena::command_pool(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::COMMAND_POOL);
         return {CommandAccess::Pool({resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.get<impl::CommandPoolImpl>()})};
     }
+
     SemaphoreHolder ResourceArena::semaphore(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
@@ -716,6 +757,7 @@ namespace VSL_NAMESPACE::lifetime {
         const auto owner = resource.placement.external ? _owner->dependencies.at(resource.owner_index) : _owner->descriptor_context.node.ref(_owner);
         return SynchronizationAccess::FromOwned(owner.alias(resource.get<impl::SemaphoreImpl>()));
     }
+
     FenceHolder ResourceArena::fence(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
@@ -723,12 +765,14 @@ namespace VSL_NAMESPACE::lifetime {
         const auto owner = resource.placement.external ? _owner->dependencies.at(resource.owner_index) : _owner->descriptor_context.node.ref(_owner);
         return SynchronizationAccess::FromOwned(owner.alias(resource.get<impl::FenceImpl>()));
     }
+
     CommandBuffer ResourceArena::command_buffer(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::COMMAND_BUFFER);
         return CommandAccess::Attach({resource.placement.external ? _owner->dependencies.at(resource.owner_index).share() : _owner, resource.get<impl::CommandBufferImpl>()});
     }
+
     PipelineLayoutAccessor ResourceArena::pipeline_layout(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
@@ -736,6 +780,7 @@ namespace VSL_NAMESPACE::lifetime {
         const auto owner = resource.placement.external ? _owner->dependencies.at(resource.owner_index) : _owner->descriptor_context.node.ref(_owner);
         return GraphicsAccess::FromOwned(owner.alias(resource.get<impl::PipelineLayoutImpl>()));
     }
+
     ShaderAccessor ResourceArena::shader(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
@@ -744,6 +789,7 @@ namespace VSL_NAMESPACE::lifetime {
             return ShaderAccess::FromOwned(_owner->dependencies.at(resource.owner_index).alias(resource.get<impl::ShaderImpl>()));
         return ShaderAccess::FromOwned(_owner->descriptor_context.node.ref(_owner).alias(resource.get<impl::ShaderImpl>()));
     }
+
     SamplerAccessor ResourceArena::sampler(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
@@ -752,6 +798,7 @@ namespace VSL_NAMESPACE::lifetime {
             return SamplerAccess::FromOwned(_owner->dependencies.at(resource.owner_index).alias(resource.get<impl::SamplerImpl>()));
         return SamplerAccess::FromOwned(_owner->descriptor_context.node.ref(_owner).alias(resource.get<impl::SamplerImpl>()));
     }
+
     graphic_resource::BindingLayout ResourceArena::descriptor_layout(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
@@ -760,6 +807,7 @@ namespace VSL_NAMESPACE::lifetime {
             return DescriptorAccess::FromOwned(_owner->dependencies.at(resource.owner_index).alias(resource.get<impl::ResourceBindingLayoutImpl>()));
         return DescriptorAccess::FromOwned(_owner->descriptor_context.node.ref(_owner).alias(resource.get<impl::ResourceBindingLayoutImpl>()));
     }
+
     graphic_resource::Pool ResourceArena::descriptor_pool(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
@@ -768,12 +816,14 @@ namespace VSL_NAMESPACE::lifetime {
             return DescriptorAccess::FromOwned(_owner->dependencies.at(resource.owner_index).alias(resource.get<impl::GraphicResourcePoolImpl>()));
         return DescriptorAccess::FromOwned(_owner->descriptor_context.node.ref(_owner).alias(resource.get<impl::GraphicResourcePoolImpl>()));
     }
+
     GraphicResource ResourceArena::descriptor_set(typed::ResourceId id) const {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");
         const auto& resource = _owner->find(id, storage::ResourceKind::DESCRIPTOR_SET);
         return DescriptorAccess::FromOwned(_owner->descriptor_context.node.ref(_owner).alias(resource.get<impl::GraphicResourceImpl>()));
     }
+
     BufferRef ResourceArena::borrow_buffer(typed::ResourceId id) const& {
         if (!_owner)
             throw std::logic_error("Resource arena is empty");

@@ -6,11 +6,13 @@
 
 namespace VSL_NAMESPACE::typed {
     static_assert(sizeof(LifetimeScope) == sizeof(std::uint32_t), "Resource plan lifetime ABI mismatch");
+
     struct ResourceRequest {
         ResourceId resource;
         storage::ResourceKind kind;
         bool external = false;
     };
+
     struct ResourcePlacement {
         ResourceId resource;
         storage::ResourceKind kind;
@@ -18,6 +20,7 @@ namespace VSL_NAMESPACE::typed {
         size_t slot, offset;
         static constexpr size_t NO_SLOT = std::numeric_limits<size_t>::max();
     };
+
     // capacityは宣言数の上限。runtimeの実数はrequests.size()、payload容量とは独立する。
     template<size_t capacity>
     class ResourcePlan {
@@ -27,11 +30,13 @@ namespace VSL_NAMESPACE::typed {
 
     public:
         constexpr explicit ResourcePlan(std::span<const ResourceRequest> requests, LifetimeGroup lifetime = {LifetimeScope::SHARED, 0});
+
         constexpr size_t size() const { return _count; }
         constexpr size_t slots() const { return _slots; }
         constexpr size_t bytes() const { return _bytes; }
         constexpr size_t alignment() const { return _alignment; }
         constexpr LifetimeGroup lifetime() const { return _lifetime; }
+
         constexpr std::span<const ResourcePlacement> placements() const& { return {_placements.data(), _count}; }
         constexpr std::span<const ResourcePlacement> placements() const&& = delete;
         constexpr ResourcePlacement placement(ResourceId resource) const;
@@ -64,6 +69,7 @@ namespace VSL_NAMESPACE::typed {
         if (!std::is_constant_evaluated())
             storage::detail::require_resource_layout(std::integral_constant<std::uint64_t, storage::RESOURCE_LAYOUT_ABI>{});
     }
+
     template<size_t capacity>
     constexpr ResourcePlacement ResourcePlan<capacity>::placement(ResourceId resource) const {
         for (size_t i = 0; i < _count; ++i)
@@ -71,6 +77,7 @@ namespace VSL_NAMESPACE::typed {
                 return _placements[i];
         throw std::out_of_range("Unknown resource ID in placement plan");
     }
+
     template<size_t capacity>
     constexpr void ResourcePlan<capacity>::require_region(size_t bytes, size_t alignment) const {
         if (!std::is_constant_evaluated())

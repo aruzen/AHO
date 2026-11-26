@@ -18,6 +18,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     namespace t = vsl::typed;
     namespace s = vsl::storage;
@@ -27,11 +28,14 @@ namespace {
     constexpr auto USAGE = vsl::MemoryType::TRANSFER_SOURCE | vsl::MemoryType::TRANSFER_DESTINATION;
     using View = t::PlacedBufferView<std::uint32_t, USAGE>;
     constexpr vsl::BufferCreateInfo BUFFER_INFO{.bytes = 16, .usage = USAGE, .properties = vsl::MemoryProperty::HOST_VISIBLE};
+
     class SynchronizationArenaVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
     protected:
         bool validate_vulkan() const override { return true; }
+
         std::array<l::ResourceInit, 4> inputs() const { return {vsl::SemaphoreCreateInfo{1}, vsl::SemaphoreCreateInfo{2}, vsl::FenceCreateInfo{1, false}, vsl::FenceCreateInfo{2, true}}; }
     };
+
     TEST(SynchronizationPlacementTest, ExactLayoutsIncludeContextsAndRejectInsufficientRegions) {
         static_assert(!std::is_copy_constructible_v<vsl::impl::SemaphoreImpl> && !std::is_move_constructible_v<vsl::impl::SemaphoreImpl>);
         static_assert(!std::is_copy_constructible_v<vsl::impl::FenceImpl> && !std::is_move_constructible_v<vsl::impl::FenceImpl>);
@@ -46,6 +50,7 @@ namespace {
         EXPECT_THROW(PLAN.require_region(PLAN.bytes(), PLAN.alignment() / 2), std::invalid_argument);
         EXPECT_THROW(s::checked_add(std::numeric_limits<size_t>::max(), s::FENCE_SLOT_SIZE), std::overflow_error);
     }
+
     TEST(SynchronizationPlacementTest, EmptyHoldersRejectOwningGetters) {
         vsl::SemaphoreHolder semaphore;
         vsl::FenceHolder fence;
@@ -58,6 +63,7 @@ namespace {
         EXPECT_NO_THROW(semaphore.destroy());
         EXPECT_NO_THROW(fence.destroy());
     }
+
     TEST_F(SynchronizationArenaVulkanIntegrationTest, SameTypeSlotsAreDirectDistinctAndShareCanonicalOwnership) {
         l::ResourceArena arena(device, PLAN, inputs());
         auto first = arena.semaphore({1}), second = arena.semaphore({2});
@@ -87,6 +93,7 @@ namespace {
         EXPECT_THROW(arena.fence({1}), std::invalid_argument);
         EXPECT_THROW(arena.semaphore({99}), std::out_of_range);
     }
+
     TEST_F(SynchronizationArenaVulkanIntegrationTest, LaterConstructionFailureRollsBackAndAllowsTheSameRegionToBeReused) {
         s::ArenaMemory memory(PLAN.bytes(), PLAN.alignment());
         for (const size_t index : {size_t{1}, size_t{3}}) {
@@ -101,6 +108,7 @@ namespace {
             EXPECT_TRUE(retry.fence({4}).wait(std::uint64_t{0}));
         }
     }
+
     TEST_F(SynchronizationArenaVulkanIntegrationTest, BackendRejectsReinitializationBeforeChangingHandlesOrFenceState) {
         l::ResourceArena arena(device, PLAN, inputs());
         const auto semaphore = arena.semaphore({1});
@@ -114,6 +122,7 @@ namespace {
         EXPECT_EQ(SynchronizationAccess::Owned(fence)->uses.size(), 2u);
         EXPECT_TRUE(fence.wait(std::uint64_t{0}));
     }
+
     TEST_F(SynchronizationArenaVulkanIntegrationTest, ImportedHoldersKeepTheOriginalOwnerAndPhysicalUseState) {
         constexpr std::array<t::ResourceRequest, 2> requests{{{{10}, s::ResourceKind::SEMAPHORE, true}, {{20}, s::ResourceKind::FENCE, true}}};
         constexpr t::ResourcePlan<2> plan(requests);
@@ -148,6 +157,7 @@ namespace {
         semaphore = {};
         EXPECT_TRUE(original.expired());
     }
+
     TEST_F(SynchronizationArenaVulkanIntegrationTest, ImportsRejectForeignOwnersAndDestroyedNativeResources) {
         constexpr std::array<t::ResourceRequest, 2> requests{{{{10}, s::ResourceKind::SEMAPHORE, true}, {{20}, s::ResourceKind::FENCE, true}}};
         constexpr t::ResourcePlan<2> plan(requests);
@@ -168,6 +178,7 @@ namespace {
         const std::array<l::ResourceInit, 2> invalid{semaphore, destroyed};
         EXPECT_THROW((l::ResourceArena(device, plan, invalid)), std::invalid_argument);
     }
+
     TEST_F(SynchronizationArenaVulkanIntegrationTest, HeapHoldersPublishOnlyTheOriginalDeviceDependency) {
         vsl::LogicalDeviceAccessor saved;
         std::weak_ptr<void> semaphore_owner, fence_owner;
@@ -195,6 +206,7 @@ namespace {
         EXPECT_FALSE(StartupAccess::Owned(saved).owner_before(StartupAccess::Owned(device)));
         EXPECT_FALSE(StartupAccess::Owned(device).owner_before(StartupAccess::Owned(saved)));
     }
+
     TEST_F(SynchronizationArenaVulkanIntegrationTest, ExplicitDestroyDisarmsNativeResourcesButKeepsConstructedSlotsUntilRootRelease) {
         std::weak_ptr<void> root;
         vsl::FenceHolder survivor;
@@ -220,6 +232,7 @@ namespace {
         survivor = {};
         EXPECT_TRUE(root.expired());
     }
+
     TEST_F(SynchronizationArenaVulkanIntegrationTest, DistinctSynchronizationSlotsUseOneWorkOwnerAndSurviveWrappersThroughTypedCopy) {
         constexpr std::array<t::ResourceRequest, 8> requests{{{{1}, s::ResourceKind::SEMAPHORE}, {{2}, s::ResourceKind::SEMAPHORE}, {{3}, s::ResourceKind::FENCE}, {{4}, s::ResourceKind::COMMAND_POOL}, {{5}, s::ResourceKind::COMMAND_BUFFER}, {{6}, s::ResourceKind::COMMAND_BUFFER}, {{7}, s::ResourceKind::BUFFER}, {{8}, s::ResourceKind::BUFFER}}};
         constexpr t::ResourcePlan<8> plan(requests);
@@ -284,6 +297,7 @@ namespace {
         EXPECT_TRUE(root.expired());
         EXPECT_EQ(result.status(), vsl::Completion::Status::COMPLETE);
     }
+
     TEST_F(SynchronizationArenaVulkanIntegrationTest, CancelledWorkReleasesItsArenaWithoutResultOwnershipCycles) {
         std::weak_ptr<void> root;
         vsl::Completion cancelled;
@@ -308,12 +322,15 @@ namespace {
         struct Composite {
             l::DependencyNode node;
             l::OwnerRef source;
+
             explicit Composite(l::OwnerRef source) : source(std::move(source)) {}
             ~Composite() { node.retire(); }
+
             static void Visit(const void* context, l::DependencyNode::EdgeVisitor visitor, void* output) {
                 visitor(output, static_cast<const Composite*>(context)->source);
             }
         };
+
         l::ResourceArena arena(device, PLAN, inputs());
         auto semaphore = arena.semaphore({1});
         auto fence = arena.fence({4});

@@ -16,21 +16,26 @@ namespace {
     namespace t = vsl::typed;
     constexpr auto MAINTENANCE = vsl::DeviceFeature::SWAPCHAIN_MAINTENANCE1;
     constexpr auto TIMELINE = vsl::DeviceFeature::TIMELINE_SEMAPHORE;
+
     class PresentFenceFeaturesVulkanIntegrationTest : public vsl_test::WindowIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     struct FeatureProbe {
         unsigned creates = 0, timelines = 0, maintenance = 0;
         bool swapchain_extension = false, maintenance_extension = false;
         static VkResult Create(void* context, VkPhysicalDevice physical, const VkDeviceCreateInfo* info, VkDevice* output);
     };
+
     struct DeviceSlot {
         alignas(l::DeviceSlotStorage) std::byte memory[sizeof(l::DeviceSlotStorage)];
         bool constructed = false;
         ~DeviceSlot();
         void construct(vsl::PhysicalDevice physical, vsl::DeviceCreateInfo info, FeatureProbe& probe);
+
         vsl::impl::LogicalDeviceImpl& value() { return l::device_at(memory); }
     };
+
     std::optional<vsl::VulkanAccessor> strict_instance(std::uint32_t api = VK_API_VERSION_1_3);
 
     VkResult FeatureProbe::Create(void* context, VkPhysicalDevice physical, const VkDeviceCreateInfo* info, VkDevice* output) {
@@ -52,14 +57,17 @@ namespace {
         }
         return vkCreateDevice(physical, info, nullptr, output);
     }
+
     DeviceSlot::~DeviceSlot() {
         if (constructed)
             l::destroy_device(memory);
     }
+
     void DeviceSlot::construct(vsl::PhysicalDevice physical, vsl::DeviceCreateInfo info, FeatureProbe& probe) {
         l::construct_device(memory, *StartupAccess::Owned(physical), std::move(info), {&probe, FeatureProbe::Create});
         constructed = true;
     }
+
     std::optional<vsl::VulkanAccessor> strict_instance(std::uint32_t api) {
         const auto available = vk::enumerateInstanceExtensionProperties();
         for (const auto* name : {VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
@@ -76,9 +84,11 @@ namespace {
 #endif
         return vsl::VulkanAccessor::Create(l::glfw_instance_info(std::move(info), vsl::PresentFencePolicy::REQUIRE_FENCE));
     }
+
     TEST(PresentFencePolicyTest, UnknownPolicyIsRejectedBeforeGLFWInitialization) {
         EXPECT_THROW(l::glfw_instance_info({}, static_cast<vsl::PresentFencePolicy>(99)), std::invalid_argument);
     }
+
     TEST(PresentFencePolicyTest, MissingInstanceDependenciesAreRejectedBeforeNativeCreation) {
         unsigned creates = 0;
         o::InstanceNativeCalls calls;
@@ -100,6 +110,7 @@ namespace {
         }
         EXPECT_EQ(creates, 0u);
     }
+
     TEST_F(PresentFenceFeaturesVulkanIntegrationTest, MissingInstanceCapabilityRejectsDeviceFeatureBeforeNativeCreation) {
         ASSERT_FALSE(instance->surface_maintenance1);
         FeatureProbe probe;
@@ -112,6 +123,7 @@ namespace {
         EXPECT_THROW(slot.construct(physical, info, probe), std::invalid_argument);
         EXPECT_EQ(probe.creates, 0u);
     }
+
     TEST_F(PresentFenceFeaturesVulkanIntegrationTest, CoreFeatures2SupportsAllFourRequestedChains) {
         auto owner = strict_instance();
         if (!owner)
@@ -135,6 +147,7 @@ namespace {
             EXPECT_EQ(probe.swapchain_extension, vsl::has_device_features(features, MAINTENANCE));
         }
     }
+
     TEST_F(PresentFenceFeaturesVulkanIntegrationTest, Vulkan10UsesTheEnabledKHRFeatures2Query) {
         auto owner = strict_instance(VK_API_VERSION_1_0);
         if (!owner)
@@ -149,6 +162,7 @@ namespace {
         EXPECT_TRUE(vsl::has_device_features(created.enabled_features(), MAINTENANCE));
         EXPECT_TRUE(StartupAccess::Owned(created)->swapchain_enabled);
     }
+
     TEST_F(PresentFenceFeaturesVulkanIntegrationTest, ExtensionNameDoesNotEnableItsFeature) {
         auto owner = strict_instance();
         if (!owner)
@@ -166,6 +180,7 @@ namespace {
         EXPECT_EQ(probe.maintenance, 0u);
         EXPECT_EQ(slot.value().enabled_features, vsl::DeviceFeature::NONE);
     }
+
     TEST_F(PresentFenceFeaturesVulkanIntegrationTest, StartupPolicyEnablesOnlyTheExplicitGraphicsDevice) {
         auto owner = strict_instance();
         if (!owner)

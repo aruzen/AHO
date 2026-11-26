@@ -12,6 +12,7 @@ namespace VSL_NAMESPACE::typed {
     // 頂点storageとviewはPipelineのbinding番号から独立させる。
     template<typename Vertex_, MemoryProperty memory_property>
     class TypedVertexBuffer;
+
     template<typename Vertex_>
     class TypedVertexBufferView {
         template<typename, MemoryProperty>
@@ -19,6 +20,7 @@ namespace VSL_NAMESPACE::typed {
         BufferView _buffer;
         size_t _count;
         ResourceUse _use;
+
         TypedVertexBufferView(BufferView buffer, size_t count, ResourceUse use)
             : _buffer(std::move(buffer)), _count(count), _use(std::move(use)) {}
 
@@ -28,13 +30,16 @@ namespace VSL_NAMESPACE::typed {
                       "Typed vertex records must be standard-layout and trivially_copyable");
         static TypedVertexBufferView FromBuffer(const BufferAccessor& source, size_t count, size_t byte_offset = 0, ResourceUse use = {});
         static TypedVertexBufferView FromView(const BufferView& source, size_t count, size_t byte_offset = 0, ResourceUse use = {});
+
         const ResourceUse& resource_use() const { return _use; }
         size_t size() const { return _count; }
         size_t byte_offset() const { return _buffer.byte_offset(); }
         LogicalDeviceAccessor device() const { return _buffer.ref().device(); }
         const BufferView& backend() const& { return _buffer; }
         const BufferView& backend() const&& = delete;
+
         BufferView storage_view() const { return _buffer; }
+
         TypedVertexBufferView view(size_t first, size_t count) const {
             return TypedVertexBufferView(_buffer.view(detail::checked_view_offset(0, first, count, _count, sizeof(Vertex)), count * sizeof(Vertex)), count, _use);
         }
@@ -62,14 +67,18 @@ namespace VSL_NAMESPACE::typed {
 
         size_t size() const noexcept { return _count; }
         size_t byte_offset() const { return _buffer.byte_offset(); }
+
         TypedVertexBufferView<Vertex> view(size_t first, size_t count) const {
             return TypedVertexBufferView<Vertex>(_buffer.view(detail::checked_view_offset(0, first, count, _count, sizeof(Vertex)), count * sizeof(Vertex)), count, resource_use());
         }
+
         LogicalDeviceAccessor device() const { return _buffer.ref().device(); }
         ResourceUse resource_use() const { return _buffer.resource_use(); }
         const BufferView& backend() const& { return _buffer; }
         const BufferView& backend() const&& = delete;
+
         BufferView storage_view() const { return _buffer; }
+
         void copy(std::span<const Vertex> vertices)
         requires(contain<memory_property, MemoryProperty::HOST_VISIBLE>());
     };
@@ -81,6 +90,7 @@ namespace VSL_NAMESPACE::typed {
         : _buffer(detail::make_buffer_storage(device, {helper::checked_buffer_array_size<Vertex>(vertices.size()), USAGE, memory_property}, policy)), _count(vertices.size()) {
         copy(vertices);
     }
+
     template<typename Vertex, MemoryProperty memory_property>
     template<buffer_storage_policy Policy>
     TypedVertexBuffer<Vertex, memory_property>::TypedVertexBuffer(LogicalDeviceAccessor device, CommandManager manager, std::span<const Vertex> vertices, Policy policy)
@@ -103,6 +113,7 @@ namespace VSL_NAMESPACE::typed {
     TypedVertexBufferView<Vertex> TypedVertexBufferView<Vertex>::FromBuffer(const BufferAccessor& source, size_t count, size_t byte_offset, ResourceUse use) {
         return FromView(BufferView::FromBuffer(source), count, byte_offset, std::move(use));
     }
+
     template<typename Vertex>
     TypedVertexBufferView<Vertex> TypedVertexBufferView<Vertex>::FromView(const BufferView& source, size_t count, size_t byte_offset, ResourceUse use) {
         detail::validate_buffer_view(source, MemoryType::VERTEX_BUFFER, byte_offset, count, sizeof(Vertex), alignof(Vertex));
@@ -112,6 +123,7 @@ namespace VSL_NAMESPACE::typed {
     namespace detail {
         template<typename T>
         struct IsVertexBuffer : std::false_type {};
+
         template<typename Vertex, MemoryProperty property>
         struct IsVertexBuffer<TypedVertexBuffer<Vertex, property>> : std::true_type {};
 

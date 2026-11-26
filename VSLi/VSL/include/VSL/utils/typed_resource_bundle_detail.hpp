@@ -15,6 +15,7 @@ namespace VSL_NAMESPACE::typed {
         static constexpr size_t COUNT = count;
         std::array<Value, count> values;
     };
+
     template<std::uint32_t set, std::uint32_t binding, typename Value>
     auto external_resource(const Value& value);
     template<std::uint32_t set, std::uint32_t binding, typename Value, size_t count>
@@ -23,22 +24,26 @@ namespace VSL_NAMESPACE::typed {
     namespace detail {
         template<typename Policy>
         struct BundlePolicy;
+
         template<>
         struct BundlePolicy<HeapStorage> {
             static constexpr bool ARENA = false;
             using Bindings = BufferBindingMap<>;
         };
+
         template<typename Map>
         struct BundlePolicy<ArenaStorage<Map>> {
             static constexpr bool ARENA = true;
             using Bindings = Map;
         };
+
         template<typename Schema, typename Policy>
         using BundlePlacementPlan = TypedBundlePlan<Schema, typename BundlePolicy<Policy>::Bindings>;
         template<ResourceScope scope, typename Schema, typename Policy>
         std::optional<lifetime::ResourceArena> make_bundle_arena(LogicalDeviceAccessor device, const ResourceAllocationPlan<Schema>& plan, size_t instance = 0, const lifetime::ResourceArena* shared = nullptr);
         DescriptorLayoutCreateInfo make_bundle_layout(const DescriptorLayoutPlan& plan);
         DescriptorPoolCreateInfo make_bundle_pool(DescriptorPoolPlan plan);
+
         struct BundleNativeResources {
             std::vector<std::pair<ResourceId, ImageAccessor>> images;
             std::vector<std::pair<ResourceId, SamplerAccessor>> samplers;
@@ -46,15 +51,19 @@ namespace VSL_NAMESPACE::typed {
             SamplerAccessor sampler(ResourceId id) const;
             void require_idle() const;
         };
+
         BundleNativeResources make_bundle_native(LogicalDeviceAccessor device, std::span<const ResourcePlacement> placements, std::span<const BundleResourceInit> infos);
         template<ResourceScope scope, typename Schema, typename Policy>
         BundleNativeResources make_bundle_native(LogicalDeviceAccessor device, const ResourceAllocationPlan<Schema>& plan);
         size_t bundle_frame_count(CommandManager manager);
         void validate_bundle_plan(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, std::span<const ResourceAllocationRecord> entries);
+
         template<typename T>
         struct IsResourceInput : std::false_type {};
+
         template<std::uint32_t set, std::uint32_t binding, typename Value, size_t count>
         struct IsResourceInput<ResourceInput<set, binding, Value, count>> : std::true_type {};
+
         template<typename Schema, typename... Inputs>
         consteval bool bundle_inputs_match();
         template<typename Tuple, typename Function>
@@ -67,22 +76,27 @@ namespace VSL_NAMESPACE::typed {
             using Payload = typename Binding::Payload;
             static constexpr auto KIND = Binding::POINT.binding_type;
             DescriptorValue value;
+
             DescriptorValue descriptor() const { return value; }
         };
+
         template<typename Binding, typename Policy, bool buffer = buffer_descriptor(Binding::POINT.binding_type)>
         struct BundleOwnedValue {
             using Type = TypedImageResource<Binding::POINT.binding_type>;
         };
+
         template<typename Binding, typename Policy>
         struct BundleOwnedValue<Binding, Policy, true> {
             using Type = std::conditional_t<BundlePolicy<Policy>::ARENA, PlacedResourceBufferView<typename Binding::Payload, Binding::POINT.binding_type>, TypedResourceBuffer<typename Binding::Payload, Binding::POINT.binding_type>>;
         };
+
         template<typename Schema, typename Spec, typename Policy, bool external = Spec::EXTERNAL>
         struct BundleValue {
             using Binding = typename Schema::template Binding<Spec::SET, Spec::BINDING>;
             using Element = typename BundleOwnedValue<Binding, Policy>::Type;
             using Type = std::array<Element, Binding::POINT.amount>;
         };
+
         template<typename Schema, typename Spec, typename Policy>
         struct BundleValue<Schema, Spec, Policy, true> {
             using Binding = typename Schema::template Binding<Spec::SET, Spec::BINDING>;
@@ -91,19 +105,23 @@ namespace VSL_NAMESPACE::typed {
         };
         template<typename Schema, typename Policy, typename Tuple>
         struct BundleStorage;
+
         template<typename Schema, typename Policy, typename... Specs>
         struct BundleStorage<Schema, Policy, std::tuple<Specs...>> {
             using Type = std::tuple<std::optional<typename BundleValue<Schema, Specs, Policy>::Type>...>;
         };
+
         template<typename Schema, typename Policy>
         using BundleStorageType = typename BundleStorage<Schema, Policy, typename Schema::Allocations>::Type;
         template<typename Tuple>
         struct BundleSets;
+
         template<typename... Sets>
         struct BundleSets<std::tuple<Sets...>> {
             using Type = std::tuple<TypedDescriptorSet<typename Sets::Layout>...>;
             using Optional = std::tuple<std::optional<TypedDescriptorSet<typename Sets::Layout>>...>;
         };
+
         template<typename Schema, typename Policy>
         struct BundleSharedState {
             BundlePlacementPlan<Schema, Policy> layout;
@@ -113,9 +131,11 @@ namespace VSL_NAMESPACE::typed {
             BundleNativeResources native;
             BundleStorageType<Schema, Policy> resources;
             typename BundleSets<typename Schema::Resources::Sets>::Optional sets;
+
             BundleSharedState(const ResourceAllocationPlan<Schema>& plan, ResourceRetention retention, lifetime::DependencyPolicy dependencies)
                 : layout(plan), retention(retention), dependency_policy(dependencies) {}
         };
+
         template<typename Schema, typename Spec, typename Policy, typename Inputs>
         auto make_bundle_values(LogicalDeviceAccessor device, const ResourceAllocationPlan<Schema>& plan, const Inputs& inputs, const lifetime::ResourceArena* arena, const BundleNativeResources& native, const BundleSharedState<Schema, Policy>& shared);
         template<ResourceScope scope, typename Schema, typename Policy, typename Inputs>
@@ -146,6 +166,7 @@ namespace VSL_NAMESPACE::typed {
     auto external_resource(const Value& value) {
         return ResourceInput<set, binding, Value, 1>{{value}};
     }
+
     template<std::uint32_t set, std::uint32_t binding, typename Value, size_t count>
     auto external_resource(const std::array<Value, count>& values) {
         return ResourceInput<set, binding, Value, count>{values};
@@ -188,6 +209,7 @@ namespace VSL_NAMESPACE::typed {
             }
             return std::nullopt;
         }
+
         template<ResourceScope scope, typename Schema, typename Policy>
         BundleNativeResources make_bundle_native(LogicalDeviceAccessor device, const ResourceAllocationPlan<Schema>& plan) {
             if constexpr (!BundlePolicy<Policy>::ARENA) {
@@ -197,6 +219,7 @@ namespace VSL_NAMESPACE::typed {
             }
             return {};
         }
+
         template<typename Schema, typename Policy>
         ImageAccessor bundle_image(const BundleSharedState<Schema, Policy>& shared, const lifetime::ResourceArena* arena, const BundleNativeResources& native, const BundleResourcePlacement& placement) {
             const bool is_shared = placement.scope == ResourceScope::SHARED;
@@ -205,6 +228,7 @@ namespace VSL_NAMESPACE::typed {
             else
                 return (is_shared ? shared.native : native).image(placement.resource);
         }
+
         template<typename Schema, typename Policy>
         SamplerAccessor bundle_sampler(const BundleSharedState<Schema, Policy>& shared, const lifetime::ResourceArena* arena, const BundleNativeResources& native, const BundleResourcePlacement& placement) {
             const bool is_shared = placement.scope == ResourceScope::SHARED;
@@ -213,6 +237,7 @@ namespace VSL_NAMESPACE::typed {
             else
                 return (is_shared ? shared.native : native).sampler(placement.resource);
         }
+
         template<typename Schema, typename... Inputs>
         consteval bool bundle_inputs_match() {
             if constexpr (!(IsResourceInput<Inputs>::value && ...))
@@ -239,12 +264,14 @@ namespace VSL_NAMESPACE::typed {
                         ...);
             }
         }
+
         template<typename Tuple, typename Function>
         void bundle_for_each(Function&& function) {
             [&]<size_t... indices>(std::index_sequence<indices...>) {
                 (function.template operator()<std::tuple_element_t<indices, Tuple>>(), ...);
             }(std::make_index_sequence<std::tuple_size_v<Tuple>>{});
         }
+
         template<typename Tuple>
         consteval size_t bundle_input_index(std::uint32_t set, std::uint32_t binding) {
             return [&]<size_t... indices>(std::index_sequence<indices...>) {
@@ -255,6 +282,7 @@ namespace VSL_NAMESPACE::typed {
                 throw "Missing typed allocation input";
             }(std::make_index_sequence<std::tuple_size_v<Tuple>>{});
         }
+
         template<typename Schema, typename Spec, typename Policy, typename Inputs>
         auto make_bundle_values(LogicalDeviceAccessor device, const ResourceAllocationPlan<Schema>& plan, const Inputs& inputs, const lifetime::ResourceArena* arena, const BundleNativeResources& native, const BundleSharedState<Schema, Policy>& shared) {
             using Value = BundleValue<Schema, Spec, Policy>;
@@ -282,6 +310,7 @@ namespace VSL_NAMESPACE::typed {
                 }
             }(std::make_index_sequence<Value::Binding::POINT.amount>{});
         }
+
         template<ResourceScope scope, typename Schema, typename Policy, typename Inputs>
         auto make_bundle_storage(LogicalDeviceAccessor device, const ResourceAllocationPlan<Schema>& plan, const Inputs& inputs, const lifetime::ResourceArena* arena, const BundleNativeResources& native, const BundleSharedState<Schema, Policy>& shared) {
             BundleStorageType<Schema, Policy> storage;
@@ -291,6 +320,7 @@ namespace VSL_NAMESPACE::typed {
             });
             return storage;
         }
+
         template<typename Schema, typename Spec, typename Policy>
         const auto& bundle_values(const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared) {
             if constexpr (Spec::SCOPE == ResourceScope::PER_FRAME)
@@ -298,6 +328,7 @@ namespace VSL_NAMESPACE::typed {
             else
                 return std::get<Schema::Index(Spec::SET, Spec::BINDING)>(shared.resources).value();
         }
+
         template<typename Schema, typename Set, typename Policy>
         void connect_bundle_set(TypedDescriptorSet<typename Set::Layout>& set, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared) {
             bundle_for_each<typename Set::Bindings>([&]<typename Binding>() {
@@ -309,6 +340,7 @@ namespace VSL_NAMESPACE::typed {
                     set.template write<Binding::POINT.binding>(values);
             });
         }
+
         template<typename Schema, typename Set, typename Policy>
         auto allocate_bundle_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundlePlacementPlan<Schema, Policy>& layout, const lifetime::ResourceArena* arena, ResourceRetention retention) {
             using Result = TypedDescriptorSet<typename Set::Layout>;
@@ -319,6 +351,7 @@ namespace VSL_NAMESPACE::typed {
             } else
                 return Result(device, manager, retention);
         }
+
         template<typename Schema, typename Set, typename Policy>
         auto make_bundle_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared, const lifetime::ResourceArena* arena) {
             if constexpr (Schema::SetIsPerFrame(Set::SET)) {
@@ -328,12 +361,14 @@ namespace VSL_NAMESPACE::typed {
             } else
                 return std::get<Schema::SetIndex(Set::SET)>(shared.sets).value();
         }
+
         template<typename Schema, typename Policy>
         auto make_bundle_sets(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const BundleStorageType<Schema, Policy>& frame, const BundleSharedState<Schema, Policy>& shared, const lifetime::ResourceArena* arena) {
             return [&]<size_t... indices>(std::index_sequence<indices...>) {
                 return typename BundleSets<typename Schema::Resources::Sets>::Type{make_bundle_set<Schema, typename Schema::Resources::template Set<indices>, Policy>(device, manager, frame, shared, arena)...};
             }(std::make_index_sequence<Schema::Resources::COUNT>{});
         }
+
         template<typename Schema, typename Policy, typename Inputs>
         auto make_bundle_shared(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, const ResourceAllocationPlan<Schema>& plan, const Inputs& inputs, ResourceRetention retention, lifetime::DependencyPolicy dependencies) {
             validate_bundle_plan(device, manager, plan.entries());
@@ -351,6 +386,7 @@ namespace VSL_NAMESPACE::typed {
             freeze_bundle_dependencies<Policy>(shared->arena, shared->sets, shared->dependency_policy);
             return shared;
         }
+
         template<typename Policy, typename Sets>
         void freeze_bundle_dependencies(const std::optional<lifetime::ResourceArena>& arena, const Sets& sets, lifetime::DependencyPolicy policy) {
             if (policy != lifetime::DependencyPolicy::FIXED)
@@ -372,6 +408,7 @@ namespace VSL_NAMESPACE::typed {
                            sets);
             }
         }
+
         template<typename Schema, typename Policy>
         void require_bundle_shared_idle(const BundleSharedState<Schema, Policy>& shared) {
             if constexpr (BundlePolicy<Policy>::ARENA) {

@@ -20,9 +20,11 @@ namespace {
     namespace l = vsl::lifetime;
     constexpr std::array<t::ResourceRequest, 2> REQUESTS{{{{1}, s::ResourceKind::RENDER_PASS}, {{2}, s::ResourceKind::RENDER_PASS}}};
     constexpr t::ResourcePlan<2> PLAN(REQUESTS);
+
     class RenderPassArenaVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     vsl::LogicalDeviceAccessor another_device(vsl::PhysicalDevice physical, std::uint32_t family);
     template<typename T>
     concept temporary_pass_description = requires(T&& value) { std::move(value).description(); };
@@ -31,11 +33,13 @@ namespace {
     static_assert(!temporary_pass_description<vsl::IDPickingRenderPass>);
     static_assert(!std::is_copy_constructible_v<vsl::impl::RenderPassImpl>);
     static_assert(!std::is_move_constructible_v<vsl::impl::RenderPassImpl>);
+
     vsl::LogicalDeviceAccessor another_device(vsl::PhysicalDevice physical, std::uint32_t family) {
         vsl::DeviceCreateInfo info;
         info.graphics_family = family;
         return vsl::LogicalDeviceAccessor::Create(std::move(physical), std::move(info));
     }
+
     TEST(RenderPassPlacementTest, ExactSizeAndAlignmentIdentifyDistinctSlotsWithoutGpuUseState) {
         static_assert(s::ResourceSlotLayout<vsl::impl::RenderPassImpl>::USE_OFFSET == s::NO_SEPARATE_USE);
         static_assert(s::ResourceSlotLayout<vsl::impl::RenderPassImpl>::SIZE == s::RENDER_PASS_IMPL_SIZE);
@@ -45,6 +49,7 @@ namespace {
         EXPECT_EQ(PLAN.bytes(), 2 * s::RENDER_PASS_IMPL_SIZE);
         EXPECT_EQ(PLAN.placement({2}).offset % s::RENDER_PASS_IMPL_ALIGNMENT, 0u);
     }
+
     TEST(RenderPassPlacementTest, EmptyFacadeAndMissingDeviceAreRejected) {
         const vsl::RenderPassAccessor empty;
         EXPECT_EQ(empty.owner_ref().use_count(), 0);
@@ -55,11 +60,13 @@ namespace {
         StartupAccess::Owned(missing) = std::make_shared<vsl::impl::LogicalDeviceImpl>();
         EXPECT_THROW((vsl::RenderPass(missing, vsl::RenderPassDescription{})), std::invalid_argument);
     }
+
     TEST(RenderPassPlacementTest, MissingDescriptionIsRejectedByBothClearConstructors) {
         const auto target = vsl_test::metadata_frame_buffer(std::make_shared<vsl::impl::RenderPassImpl>());
         EXPECT_THROW((vsl::command::RenderPassBegin(target, std::vector<vsl::ClearValue>{})), std::logic_error);
         EXPECT_THROW((vsl::command::RenderPassBegin::WithClears(target, {})), std::logic_error);
     }
+
     TEST_F(RenderPassArenaVulkanIntegrationTest, SlotsOwnIndependentDescriptionsAndTheDeviceGetterKeepsOnlyTheDevice) {
         std::weak_ptr<void> owner;
         std::optional<vsl::RenderPassAccessor> kept;
@@ -98,6 +105,7 @@ namespace {
         EXPECT_TRUE(owner.expired());
         EXPECT_EQ(StartupAccess::Owned(device_only), StartupAccess::Owned(device));
     }
+
     TEST_F(RenderPassArenaVulkanIntegrationTest, ImportsKeepTheOriginalOwnerAndRejectNonownersOrAnotherDevice) {
         constexpr std::array<t::ResourceRequest, 2> requests{{{{1}, s::ResourceKind::RENDER_PASS, true}, {{2}, s::ResourceKind::BUFFER}}};
         constexpr t::ResourcePlan<2> plan(requests);
@@ -128,6 +136,7 @@ namespace {
         kept = {};
         EXPECT_TRUE(original.expired());
     }
+
     TEST_F(RenderPassArenaVulkanIntegrationTest, LaterFailureRollsBackTheSameRegionWithoutDestroyingImports) {
         constexpr std::array<t::ResourceRequest, 3> requests{{{{1}, s::ResourceKind::RENDER_PASS}, {{2}, s::ResourceKind::RENDER_PASS}, {{3}, s::ResourceKind::RENDER_PASS, true}}};
         constexpr t::ResourcePlan<3> plan(requests);
@@ -152,6 +161,7 @@ namespace {
         inputs[1] = valid;
         EXPECT_NO_THROW((l::ResourceArena(device, plan, inputs, memory)));
     }
+
     TEST_F(RenderPassArenaVulkanIntegrationTest, SavedTypedDrawUsesThePlacedPassUntilGpuCompletionAndSlotReplacement) {
         using Input = t::TypedVertexInput<>;
         using Draw = t::TypedDraw<Input, t::ResourceSchema<>, t::PushSchema<>>;
@@ -201,6 +211,7 @@ namespace {
         EXPECT_TRUE(owner.expired());
         EXPECT_EQ(completion.status(), vsl::Completion::Status::COMPLETE);
     }
+
     TEST_F(RenderPassArenaVulkanIntegrationTest, CancelReleasesThePassAfterTheRecordedWorkOwnerIsGone) {
         constexpr std::array<t::ResourceRequest, 1> requests{{{{1}, s::ResourceKind::RENDER_PASS}}};
         constexpr t::ResourcePlan<1> plan(requests);
@@ -225,6 +236,7 @@ namespace {
         EXPECT_TRUE(owner.expired());
         EXPECT_EQ(completion.status(), vsl::Completion::Status::CANCELLED);
     }
+
     TEST_F(RenderPassArenaVulkanIntegrationTest, ImportIsAFixedManagedParentEvenWithoutAGpuUseState) {
         using Set = t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
         using View = t::TypedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>;

@@ -8,6 +8,7 @@
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     namespace t = vsl::typed;
     namespace s = vsl::storage;

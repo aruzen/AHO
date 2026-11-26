@@ -7,6 +7,7 @@
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 VSL_NAMESPACE::command::DrawIndexedManip VSL_NAMESPACE::command::DRAW_INDEXED;
 
 VSL_NAMESPACE::command::DrawIndexed::DrawIndexed(size_t size) : DrawIndexed(size, 1) {}

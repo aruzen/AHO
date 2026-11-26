@@ -13,11 +13,15 @@ namespace VSL_NAMESPACE::lifetime {
             impl::GraphicResourceImpl& resource;
             bool active = true;
             explicit DescriptorMutation(impl::GraphicResourceImpl& resource);
+
             ~DescriptorMutation() { finish(); }
+
             void check(std::span<const impl::GraphicResourceImpl::BindingElement> elements) const;
             void finish() noexcept;
         };
+
         void visit_elements(std::span<const impl::GraphicResourceImpl::BindingElement> elements, DependencyNode::EdgeVisitor visitor, void* context);
+
         void visit_elements(std::span<const impl::GraphicResourceImpl::BindingElement> elements, DependencyNode::EdgeVisitor visitor, void* context) {
             for (const auto& element : elements) {
                 for (const auto& owner : element.owners)
@@ -26,6 +30,7 @@ namespace VSL_NAMESPACE::lifetime {
                     visitor(context, owner);
             }
         }
+
         DescriptorMutation::DescriptorMutation(impl::GraphicResourceImpl& resource) : resource(resource) {
             if (resource.recording)
                 throw std::logic_error("Descriptor resource is already being changed");
@@ -33,6 +38,7 @@ namespace VSL_NAMESPACE::lifetime {
                 resource.owner_context->node.begin_update();
             resource.recording = true;
         }
+
         void DescriptorMutation::check(std::span<const impl::GraphicResourceImpl::BindingElement> elements) const {
             resource.use.require_idle();
             require_descriptor_valid(resource);
@@ -41,6 +47,7 @@ namespace VSL_NAMESPACE::lifetime {
                     visit_elements(*static_cast<const std::span<const impl::GraphicResourceImpl::BindingElement>*>(input), visitor, context);
                 });
         }
+
         void DescriptorMutation::finish() noexcept {
             if (!active)
                 return;
@@ -50,6 +57,7 @@ namespace VSL_NAMESPACE::lifetime {
                 resource.owner_context->node.end_update();
         }
     } // namespace
+
     void DescriptorOwnerContext::normalize(std::vector<OwnerRef>& owners) const {
         const auto borrowed = [&](const auto& owner) {
             const auto same = [&](const auto& known) { return !known.owner_before(owner) && !owner.owner_before(known); };
@@ -62,20 +70,25 @@ namespace VSL_NAMESPACE::lifetime {
         }
         std::erase_if(owners, borrowed);
     }
+
     void visit_descriptor_edges(const impl::GraphicResourceImpl& resource, DependencyNode::EdgeVisitor visitor, void* context) {
         for (const auto& [binding, elements] : resource.bindings)
             visit_elements(elements, visitor, context);
     }
+
     void freeze_descriptor_dependencies(DescriptorOwnerContext& context, std::span<impl::GraphicResourceImpl* const> resources) {
         if (context.policy == DependencyPolicy::FIXED)
             return;
         if (!context.dependency_storage)
             throw std::logic_error("Descriptor owner cannot freeze dependencies");
         context.node.begin_update();
+
         struct Guard {
             DependencyNode& node;
+
             ~Guard() { node.end_update(); }
         } guard{context.node};
+
         for (auto* resource : resources) {
             if (!resource || resource->owner_context != &context)
                 throw std::invalid_argument("Descriptor freeze requires one ownership root");
@@ -100,6 +113,7 @@ namespace VSL_NAMESPACE::lifetime {
                     context.normalize(element.constraint.owners);
                 }
     }
+
     impl::GraphicResourceImpl::BindingConstraint descriptor_constraint(const ResourceUse& use, const DescriptorOwnerContext* context) {
         impl::GraphicResourceImpl::BindingConstraint result;
         for (const auto& state : {use.state, use.constraint_state}) {
@@ -117,12 +131,14 @@ namespace VSL_NAMESPACE::lifetime {
             context->normalize(result.owners);
         return result;
     }
+
     void require_descriptor_valid(const impl::GraphicResourceImpl& resource) {
         if (resource.owner_context && resource.owner_context->node.retiring())
             throw std::logic_error("Descriptor ownership root has been retired");
         if (!resource.pool || !resource.pool->descriptor_pool || !resource.descriptor_set || resource.pool->retiring)
             throw std::logic_error("Descriptor resource has been destroyed");
     }
+
     void require_descriptor_idle(const impl::GraphicResourceImpl& resource) {
         require_descriptor_valid(resource);
         if (resource.owner_context && resource.owner_context->node.updating())
@@ -134,6 +150,7 @@ namespace VSL_NAMESPACE::lifetime {
         if (resource.recording)
             throw std::logic_error("Descriptor resource is being recorded");
     }
+
     void require_descriptor_complete(const impl::GraphicResourceImpl& resource) {
         require_descriptor_valid(resource);
         if (!resource.layout)
@@ -147,6 +164,7 @@ namespace VSL_NAMESPACE::lifetime {
                 throw std::logic_error("Typed descriptor set has uninitialized bindings");
         }
     }
+
     void write_descriptor_binding(impl::GraphicResourceImpl& resource, vk::WriteDescriptorSet write,
                                   std::vector<impl::GraphicResourceImpl::BindingElement> elements) {
         require_descriptor_idle(resource);
@@ -189,6 +207,7 @@ namespace VSL_NAMESPACE::lifetime {
         target.swap(prepared);
         mutation.finish();
     }
+
     void replace_descriptor_constraints(impl::GraphicResourceImpl& resource, size_t binding, std::span<const ResourceUse> uses) {
         require_descriptor_idle(resource);
         if (!resource.layout)

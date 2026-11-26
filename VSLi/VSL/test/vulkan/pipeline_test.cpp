@@ -17,19 +17,23 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::detail::ShaderAccess;
 }
+
 namespace {
     struct GraphicsCreateAction {
         std::function<void(const vk::GraphicsPipelineCreateInfo&)> action;
         static vk::Result Create(void* context, vk::Device device, vk::PipelineCache cache,
                                  const vk::GraphicsPipelineCreateInfo& info, vk::Pipeline* output);
     };
+
     using GraphicsPipelineVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
+
     TEST_F(GraphicsPipelineVulkanIntegrationTest, CreatesPipelineAndInvokesItToProducePixels) {
         ASSERT_TRUE(static_cast<bool>(GraphicsAccess::Owned(*(pipeline))->pipeline));
         EXPECT_EQ(GraphicsAccess::Owned(*(pipeline))->layout, GraphicsAccess::Owned(*(layout)).get());
         ExpectTriangleColor(render([](auto& stream) { stream << vsl::command::Draw{3}; }));
     }
 } // namespace
+
 #include "support/compute_fixture.hpp"
 
 namespace {
@@ -38,6 +42,7 @@ namespace {
 
 namespace {
     using ComputePipelineVulkanIntegrationTest = vsl_test::ComputeVulkanIntegrationTest;
+
     TEST_F(ComputePipelineVulkanIntegrationTest, CreatesAndInvokesComputePipeline) {
         ASSERT_TRUE(static_cast<bool>(GraphicsAccess::Owned(*(pipeline))->pipeline));
         EXPECT_EQ(GraphicsAccess::Owned(*(pipeline))->layout, GraphicsAccess::Owned(*(layout)).get());
@@ -49,12 +54,14 @@ namespace {
     class PipelineSnapshotVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     vk::Result GraphicsCreateAction::Create(void* context, vk::Device device, vk::PipelineCache cache,
                                             const vk::GraphicsPipelineCreateInfo& info, vk::Pipeline* output) {
         const auto action = static_cast<GraphicsCreateAction*>(context)->action;
         action(info);
         return device.createGraphicsPipelines(cache, 1, &info, nullptr, output);
     }
+
     TEST_F(PipelineSnapshotVulkanIntegrationTest, ExplicitCreationKeepsItsShaderOwnersAndStateUntilNativeCreationFinishes) {
         namespace pl = vsl::pipeline_layout;
         vsl::GraphicsPipelineState state;
@@ -87,6 +94,7 @@ namespace {
         EXPECT_EQ(GraphicsPipelineStateAccess::Read(state).rasterization.cullMode, vk::CullModeFlags(vk::CullModeFlagBits::eFrontAndBack));
         ExpectTriangleColor(render([](auto& stream) { stream << vsl::command::Draw{3}; }));
     }
+
     TEST_F(PipelineSnapshotVulkanIntegrationTest, RecipeCreationKeepsItsSelectedStateWhenASavedEditorChangesTheRecipe) {
         namespace pl = vsl::pipeline_layout;
         layout->add(pl::Rasterization{pl::CullingMode::NONE});
@@ -105,6 +113,7 @@ namespace {
         EXPECT_EQ(PipelineRecipeAccess::Read(*(layout)).graphics_state.rasterization.cullMode, vk::CullModeFlags(vk::CullModeFlagBits::eFrontAndBack));
         ExpectTriangleColor(render([](auto& stream) { stream << vsl::command::Draw{3}; }));
     }
+
     TEST_F(PipelineSnapshotVulkanIntegrationTest, ShaderOwnershipIsValidatedBeforeAMovedStateIsRead) {
         vsl::GraphicsPipelineState moved;
         const auto kept = std::move(moved);
@@ -114,6 +123,7 @@ namespace {
         const std::array<vsl::ShaderAccessor, 2> valid{*vertex, *fragment};
         EXPECT_THROW((vsl::GraphicsPipeline(runtime, *pass, moved, valid)), std::logic_error);
     }
+
     TEST_F(PipelineSnapshotVulkanIntegrationTest, FrozenCopyBuildsAfterOriginalShadersAndLayoutAreReleased) {
         auto frozen = layout->copy().freeze();
         std::weak_ptr<vsl::impl::ShaderImpl> weak_vertex = ShaderAccess::Owned(*(vertex)).share();
@@ -124,6 +134,7 @@ namespace {
         pipeline.emplace(frozen, *pass);
         ExpectTriangleColor(render([](auto& stream) { stream << vsl::command::Draw{3}; }));
     }
+
     TEST_F(PipelineSnapshotVulkanIntegrationTest, EditingLayoutKeepsExistingPipelineSnapshotAlive) {
         const auto snapshot = GraphicsAccess::Owned(*(pipeline))->layout;
         layout->add(vsl::pipeline_layout::Rasterization(vsl::pipeline_layout::CullingMode::FRONT));
@@ -131,6 +142,7 @@ namespace {
         EXPECT_EQ(GraphicsAccess::Owned(*(pipeline))->layout, snapshot);
         ExpectTriangleColor(render([](auto& stream) { stream << vsl::command::Draw{3}; }));
     }
+
     TEST_F(ComputePipelineVulkanIntegrationTest, FrozenLayoutBuildsComputePipelineAndEmptyStagesAreRejected) {
         auto frozen = layout->copy().freeze();
         pipeline.emplace(frozen);

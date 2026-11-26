@@ -8,12 +8,15 @@
 #endif
 namespace {
     namespace t = vsl::typed;
+
     struct Vertex {
         float xy[2];
     };
+
     struct Wrong {
         float xy[2];
     };
+
     using Input = t::TypedVertexInput<t::VertexRecord<Vertex, VSL_VERTEX_MEMBER(Vertex, xy)>::Binding<0>>;
     using Pipeline = t::TypedGraphicsPipeline<Input>;
     using Set = t::DescriptorLayout<t::UniformBinding<0, float, vsl::ShaderFlag::VERTEX>>;
@@ -26,12 +29,14 @@ namespace {
     static_assert(!std::is_aggregate_v<vsl::ImageAccessor> && !std::is_aggregate_v<vsl::SamplerAccessor>);
     static_assert(!std::is_constructible_v<vsl::ImageAccessor, std::shared_ptr<vsl::impl::ImageImpl>>);
     static_assert(!std::is_constructible_v<vsl::SamplerAccessor, std::shared_ptr<vsl::impl::SamplerImpl>>);
+
     void use_runtime_storage(vsl::LogicalDeviceAccessor device, vsl::BufferCreateInfo buffer_info, vsl::ImageCreateInfo image_info) {
         auto buffer = vsl::BufferView::Create(device, buffer_info);
         auto image = vsl::ImageAccessor::Create(device, image_info);
         vsl::command::CopyImageToBuffer copy(buffer, image, vsl::ImageLayout::GENERAL);
         vsl::command::ImageReadback readback(buffer, image, vsl::ImageLayout::GENERAL);
     }
+
     static_assert(std::is_default_constructible_v<vsl::CommandPool> && std::is_default_constructible_v<vsl::CommandBuffer> && std::is_default_constructible_v<vsl::CommandManager>);
     static_assert(!std::is_constructible_v<vsl::CommandPool, std::shared_ptr<vsl::impl::CommandPoolImpl>>);
     static_assert(!std::is_constructible_v<vsl::CommandBuffer, std::shared_ptr<vsl::impl::CommandBufferImpl>>);
@@ -43,6 +48,7 @@ namespace {
     static_assert(!rvalue_backend<Placed> && !rvalue_backend<const Placed>);
     static_assert(!rvalue_backend<PlacedUniform> && !rvalue_backend<const PlacedUniform>);
     static_assert(!std::is_aggregate_v<vsl::BufferRef>);
+
     void use_facades(const vsl::BufferAccessor& buffer, const vsl::BufferView& view,
                      const vsl::ImageAccessor& image, const vsl::SamplerAccessor& sampler, const vsl::GraphicResource& set) {
         vsl::ResourceUse::ForBuffer(buffer);
@@ -51,6 +57,7 @@ namespace {
         vsl::ResourceUse::ForSampler(sampler);
         vsl::ResourceUseGroup::ForDescriptor(1, set)->tracks_descriptor(set);
     }
+
     static_assert(!rvalue_backend<t::TypedVertexBuffer<Vertex>> && !rvalue_backend<const t::TypedVertexBuffer<Vertex>>);
     static_assert(!rvalue_backend<t::TypedVertexBufferView<Vertex>> && !rvalue_backend<const t::TypedVertexBufferView<Vertex>>);
     static_assert(!rvalue_backend<t::TypedIndexBuffer<std::uint32_t>> && !rvalue_backend<const t::TypedIndexBuffer<std::uint32_t>>);
@@ -60,6 +67,7 @@ namespace {
     static_assert(!std::is_constructible_v<t::TypedVertexBuffer<Vertex>, vsl::LogicalDeviceAccessor, std::span<const Vertex>, t::ArenaStorage<int>>);
     static_assert(t::compatible_vertex_buffers<Input, t::TypedVertexBufferView<Vertex>>);
     static_assert(t::TypedGraphicsPipeline<Input, t::ResourceSchema<>, t::PushSchema<>, 1>::SUBPASS == 1);
+
     void accepted(Pipeline& pipeline, const t::TypedVertexBuffer<Vertex>& buffer, t::TypedDescriptorSet<Set>& set, const t::TypedUniformBuffer<float>& uniform) {
         pipeline.bind_vertices(buffer.view(1, 3)).draw(3);
         set.write<0>(uniform.view(1, 1));

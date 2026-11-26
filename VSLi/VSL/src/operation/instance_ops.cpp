@@ -18,6 +18,7 @@ namespace VSL_NAMESPACE::operation {
             if ((!allow_empty && value.empty()) || value.find('\0') != std::string::npos)
                 throw std::invalid_argument("Instance names must be valid C strings");
         }
+
         void normalize(std::vector<std::string>& names) {
             if (names.size() > std::numeric_limits<std::uint32_t>::max())
                 throw std::length_error("Instance name count exceeds uint32");
@@ -32,10 +33,12 @@ namespace VSL_NAMESPACE::operation {
             }
             names.resize(count);
         }
+
         void append_name(std::vector<std::string>& names, const char* name) {
             if (std::ranges::find(names, name) == names.end())
                 names.emplace_back(name);
         }
+
         std::vector<const char*> native_names(const std::vector<std::string>& names) {
             if (names.size() > std::numeric_limits<std::uint32_t>::max())
                 throw std::length_error("Instance name count exceeds uint32");
@@ -45,6 +48,7 @@ namespace VSL_NAMESPACE::operation {
                 result.push_back(name.c_str());
             return result;
         }
+
         VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT,
                                                       const VkDebugUtilsMessengerCallbackDataEXT* data, void*) noexcept {
             try {
@@ -56,6 +60,7 @@ namespace VSL_NAMESPACE::operation {
             return VK_FALSE;
         }
     } // namespace
+
     bool instance_layers_supported(std::span<const std::string> layers) {
         if (layers.empty())
             return true;
@@ -64,6 +69,7 @@ namespace VSL_NAMESPACE::operation {
             return !name.empty() && name.find('\0') == std::string::npos && std::ranges::any_of(available, [&](const auto& layer) { return name == layer.layerName.data(); });
         });
     }
+
     void initialize_instance(impl::VulkanImplAccessor& instance, InstanceCreateInfo info, const InstanceNativeCalls& calls) {
         if (instance.instance || instance.debug_messenger)
             throw std::logic_error("Instance is already initialized");
@@ -143,6 +149,7 @@ namespace VSL_NAMESPACE::operation {
         instance.surface_capabilities2 = capabilities2;
         instance.surface_maintenance1 = maintenance1;
     }
+
     void destroy_instance(impl::VulkanImplAccessor& instance, const InstanceNativeCalls& calls) noexcept {
         if (instance.debug_messenger) {
             const auto destroy = instance.destroy_debug_messenger ? instance.destroy_debug_messenger : !instance.owner_node ? reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(instance.instance, "vkDestroyDebugUtilsMessengerEXT"))

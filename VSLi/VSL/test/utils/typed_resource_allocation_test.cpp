@@ -113,6 +113,7 @@ namespace {
         constexpr t::TypedBundlePlan<Empty> empty(t::ResourceAllocationPlan<Empty>(1));
         static_assert(empty.total_bytes() == 0 && empty.alignment(t::ResourceScope::SHARED) == 1);
     }
+
     TEST(TypedAllocationPlanTest, DescriptorArenaPlanPreservesDataOffsetsAndCountsDeclaredSets) {
         constexpr t::TypedBundlePlan<Fixed> plan(FIXED_PLAN);
         constexpr auto shared = plan.arena_plan(t::ResourceScope::SHARED);
@@ -146,6 +147,7 @@ namespace {
         EXPECT_THROW(plan.arena_plan(t::ResourceScope::SHARED, 1), std::invalid_argument);
         EXPECT_THROW(plan.descriptor_pool(static_cast<t::ResourceScope>(99)), std::invalid_argument);
     }
+
     TEST(TypedAllocationPlanTest, DescriptorIdsAvoidExplicitExternalAndMaximumResourceIds) {
         using Map = t::ResourceBindingMap<t::ResourceBinding<t::BindingKey{0, 0, 0}, t::ResourceId{UINT64_MAX}>,
                                           t::ResourceBinding<t::BindingKey{7, 0, 0}, t::ResourceId{0}>,
@@ -172,6 +174,7 @@ namespace {
         EXPECT_TRUE(frame.placement(plan.descriptor_layout(0)).external);
         EXPECT_FALSE(shared.placement(plan.descriptor_layout(0)).external);
     }
+
     TEST(TypedAllocationPlanTest, EmptySchemaAndDeclaredEmptySetNeedDifferentArenaStorage) {
         using Empty = t::ResourceAllocationSchema<t::ResourceSchema<>>;
         constexpr t::TypedBundlePlan<Empty> empty(t::ResourceAllocationPlan<Empty>(3));
@@ -203,6 +206,7 @@ namespace {
         EXPECT_EQ(logical.totals().payload_bytes, SIZE_MAX);
         EXPECT_THROW((t::TypedBundlePlan<Bytes>(logical)), std::overflow_error);
     }
+
     using Type = vsl::graphic_resource::Type;
     constexpr auto COMPUTE = vsl::ShaderFlag::COMPUTE;
     constexpr auto IMAGE = t::ResourceComponent::IMAGE, SAMPLER = t::ResourceComponent::SAMPLER;
@@ -213,6 +217,7 @@ namespace {
     constexpr auto MIXED_SIZES = [] { t::ResourceAllocationSizes<Mixed> sizes; sizes.image<0, 0>(IMAGE_INFO).image<0, 1>(IMAGE_INFO); return sizes; }();
     using SharedComponents = t::ResourceBindingMap<t::ResourceBinding<t::BindingKey{0, 0}, t::ResourceId{12}, IMAGE>, t::ResourceBinding<t::BindingKey{0, 1}, t::ResourceId{12}>,
                                                    t::ResourceBinding<t::BindingKey{0, 0}, t::ResourceId{13}, SAMPLER>, t::ResourceBinding<t::BindingKey{0, 2}, t::ResourceId{13}>>;
+
     TEST(TypedAllocationPlanTest, MixedComponentsHaveIndependentCountsScopesAndPhysicalPlacements) {
         constexpr t::ResourceAllocationPlan<Mixed> logical(3, MIXED_SIZES);
         constexpr t::TypedBundlePlan<Mixed, SharedComponents> plan(logical);
@@ -229,6 +234,7 @@ namespace {
         EXPECT_EQ(plan.bytes(t::ResourceScope::PER_FRAME), physical.bytes());
         EXPECT_EQ(plan.total_bytes(), plan.bytes(t::ResourceScope::SHARED) + 3 * plan.bytes(t::ResourceScope::PER_FRAME));
     }
+
     TEST(TypedAllocationPlanTest, ImageCreationInputsAreRequiredAndDescriptorArraysKeepTheirOwnInfos) {
         EXPECT_THROW((t::ResourceAllocationPlan<Mixed>(2)), std::invalid_argument);
         auto invalid = MIXED_SIZES;
@@ -248,6 +254,7 @@ namespace {
         EXPECT_EQ(logical.totals().images, 4u);
         EXPECT_EQ(logical.totals().samplers, 2u);
     }
+
     TEST(TypedAllocationPlanTest, SharedIdsRejectDifferentCreationInfosAndPhysicalKinds) {
         auto sizes = MIXED_SIZES;
         auto info = IMAGE_INFO;
@@ -260,6 +267,7 @@ namespace {
         using WrongKind = t::ResourceBindingMap<t::ResourceBinding<t::BindingKey{0, 0}, t::ResourceId{0}, IMAGE>, t::ResourceBinding<t::BindingKey{0, 0}, t::ResourceId{0}, SAMPLER>>;
         EXPECT_THROW((t::TypedBundlePlan<Mixed, WrongKind>(t::ResourceAllocationPlan<Mixed>(2, MIXED_SIZES))), std::invalid_argument);
     }
+
     TEST(TypedAllocationPlanTest, SharingSampledAndStorageImagesRequiresAnExplicitLayoutPolicy) {
         using Images = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<0, t::DescriptorBinding<0, Type::SAMPLED_IMAGE, COMPUTE>, t::DescriptorBinding<1, Type::STORAGE_IMAGE, COMPUTE>>>, t::ImageAllocation<0, 0>, t::ImageAllocation<0, 1>>;
         t::ResourceAllocationSizes<Images> sizes;
@@ -269,6 +277,7 @@ namespace {
         using Map = t::ResourceBindingMap<t::ResourceBinding<t::BindingKey{0, 0}, t::ResourceId{1}>, t::ResourceBinding<t::BindingKey{0, 1}, t::ResourceId{1}>>;
         EXPECT_THROW((t::TypedBundlePlan<Images, Map>(t::ResourceAllocationPlan<Images>(1, sizes))), std::invalid_argument);
     }
+
     TEST(TypedAllocationPlanTest, ExternalImageAndSamplerMetadataNeverAllocateOwnedSlots) {
         using External = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<0, t::DescriptorBinding<0, Type::SAMPLED_IMAGE, COMPUTE>, t::DescriptorBinding<1, Type::SAMPLER, COMPUTE>>>, t::ExternalAllocation<0, 0>, t::ExternalAllocation<0, 1>>;
         constexpr t::TypedBundlePlan<External> plan(t::ResourceAllocationPlan<External>(3));

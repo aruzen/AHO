@@ -20,20 +20,25 @@ namespace VSL_NAMESPACE {
     class PureWindow {
     public:
         using PluginId = unsigned char;
+
         struct Plugin {
         private:
             const std::optional<PluginId> _requested_id;
 
         public:
             explicit Plugin(std::optional<PluginId> requested_id = std::nullopt) noexcept : _requested_id(requested_id) {}
+
             virtual ~Plugin() = default;
+
             std::optional<PluginId> requested_id() const noexcept { return _requested_id; }
         };
         struct WindowData;
+
         struct OnUpdate {
             virtual ~OnUpdate() = default;
             virtual bool on_update(PureWindow) = 0;
         };
+
         struct PluginSnapshot {
             PluginId id;
             std::weak_ptr<Plugin> plugin;
@@ -61,6 +66,7 @@ namespace VSL_NAMESPACE {
         PureWindow& operator=(PureWindow other) noexcept;
         virtual ~PureWindow();
         void swap(PureWindow& other) noexcept;
+
         friend void swap(PureWindow& left, PureWindow& right) noexcept { left.swap(right); }
 
         static bool Update();
@@ -71,8 +77,10 @@ namespace VSL_NAMESPACE {
         std::shared_ptr<T> add_plugin(Args&&... args);
         bool remove_plugin(std::shared_ptr<Plugin> plugin);
         std::shared_ptr<Plugin> plugin(PluginId id) const;
+
         template<typename T>
         std::shared_ptr<T> plugin_as(PluginId id) const { return std::dynamic_pointer_cast<T>(plugin(id)); }
+
         std::optional<PluginId> plugin_id(const std::shared_ptr<Plugin>& plugin) const noexcept;
         std::vector<PluginSnapshot> plugin_snapshot() const;
         bool contains_plugin(PluginId id, const std::shared_ptr<Plugin>& plugin) const noexcept;
@@ -100,6 +108,7 @@ namespace VSL_NAMESPACE {
         Call(const Call&) = delete;
         Call& operator=(const Call&) = delete;
         ~Call();
+
         bool active() const noexcept { return _target != nullptr; }
     };
 
@@ -111,19 +120,23 @@ namespace VSL_NAMESPACE {
 
     public:
         WindowIdentity() noexcept = default;
+
         explicit operator bool() const noexcept { return _pointer != nullptr; }
+
         bool operator==(const WindowIdentity& other) const noexcept;
     };
 
     // OSWindowOwnerがNativeを保持していても、logical close後はlockできない。
     class WeakWindow {
         std::weak_ptr<PureWindow::WindowData> _state;
+
         explicit WeakWindow(const std::shared_ptr<PureWindow::WindowData>& state) noexcept : _state(state) {}
         friend class PureWindow;
 
     public:
         WeakWindow() noexcept = default;
         PureWindow lock() const noexcept;
+
         bool expired() const noexcept { return !lock(); }
     };
 

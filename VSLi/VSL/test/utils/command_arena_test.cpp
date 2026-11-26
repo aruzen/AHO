@@ -20,6 +20,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     namespace t = vsl::typed;
     namespace s = vsl::storage;
@@ -29,20 +30,25 @@ namespace {
     constexpr auto USAGE = vsl::MemoryType::TRANSFER_SOURCE | vsl::MemoryType::TRANSFER_DESTINATION;
     using View = t::PlacedBufferView<std::uint32_t, USAGE>;
     constexpr vsl::BufferCreateInfo BUFFER_INFO{.bytes = 16, .usage = USAGE, .properties = vsl::MemoryProperty::HOST_VISIBLE};
+
     class CommandArenaVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
     protected:
         bool validate_vulkan() const override { return true; }
+
         std::array<l::ResourceInit, 3> inputs() const;
     };
+
     // queueへ送信せず、未完了判定をunsignaled native fenceで決定的に検査する。
     struct UnsignaledWork {
         std::shared_ptr<vsl::impl::SubmissionWork> work;
         explicit UnsignaledWork(vsl::LogicalDeviceAccessor device);
         ~UnsignaledWork();
     };
+
     std::array<l::ResourceInit, 3> CommandArenaVulkanIntegrationTest::inputs() const {
         return {l::CommandBufferInit{t::ResourceId{3}, 2}, l::CommandBufferInit{t::ResourceId{3}, 3}, vsl::CommandPoolCreateInfo{true}};
     }
+
     UnsignaledWork::UnsignaledWork(vsl::LogicalDeviceAccessor device) : work(std::make_shared<vsl::impl::SubmissionWork>()) {
         work->device = StartupAccess::Shared(device);
         work->owned_fence = std::make_shared<vk::UniqueFence>(StartupAccess::Owned(device)->device.createFenceUnique({}));
@@ -50,6 +56,7 @@ namespace {
         work->result->status = vsl::Completion::Status::SUBMITTED;
         work->result->work = work;
     }
+
     UnsignaledWork::~UnsignaledWork() {
         vsl::sync::publish_terminal(*work, vsl::Completion::Status::COMPLETE);
     }
@@ -68,6 +75,7 @@ namespace {
         EXPECT_THROW(PLAN.require_region(PLAN.bytes() - 1, PLAN.alignment()), std::invalid_argument);
         EXPECT_THROW(PLAN.require_region(PLAN.bytes(), PLAN.alignment() / 2), std::invalid_argument);
     }
+
     TEST(CommandPlacementTest, EmptyFacadesRejectOwningGettersAndManagerAttachment) {
         vsl::CommandPool pool(CommandAccess::Pool(nullptr));
         vsl::CommandBuffer buffer(CommandAccess::RawBuffer(nullptr));
@@ -77,6 +85,7 @@ namespace {
         EXPECT_THROW(buffer.owner_ref(), std::invalid_argument);
         EXPECT_THROW(vsl::CommandManager::FromBuffer(buffer), std::logic_error);
     }
+
     TEST_F(CommandArenaVulkanIntegrationTest, TwoRingsShareStorageAndKeepIndependentCanonicalDomains) {
         l::ResourceArena arena(device, PLAN, inputs());
         auto first = arena.command_buffer({1}), second = arena.command_buffer({2});
@@ -108,6 +117,7 @@ namespace {
         EXPECT_THROW(arena.command_pool({1}), std::invalid_argument);
         EXPECT_THROW(arena.command_buffer({9}), std::out_of_range);
     }
+
     TEST_F(CommandArenaVulkanIntegrationTest, TypedCopySurvivesWrappersAndDoesNotCycleThroughItsOwnArena) {
         constexpr std::array<t::ResourceRequest, 4> requests{{{{1}, s::ResourceKind::COMMAND_BUFFER}, {{2}, s::ResourceKind::COMMAND_POOL}, {{3}, s::ResourceKind::BUFFER}, {{4}, s::ResourceKind::BUFFER}}};
         constexpr t::ResourcePlan<4> plan(requests);
@@ -146,6 +156,7 @@ namespace {
         EXPECT_TRUE(root.expired());
         EXPECT_EQ(result.status(), vsl::Completion::Status::COMPLETE);
     }
+
     TEST_F(CommandArenaVulkanIntegrationTest, CancelledResultDoesNotOwnTheArenaThatWasRetainedByItsWork) {
         std::weak_ptr<void> root;
         vsl::Completion cancelled;
@@ -162,6 +173,7 @@ namespace {
         EXPECT_EQ(cancelled.status(), vsl::Completion::Status::CANCELLED);
         EXPECT_TRUE(cancelled.data_->work.expired());
     }
+
     TEST_F(CommandArenaVulkanIntegrationTest, LaterRingFailureRollsBackThePoolAndAllowsRegionReuse) {
         s::ArenaMemory memory(PLAN.bytes(), PLAN.alignment());
         auto invalid = inputs();
@@ -175,6 +187,7 @@ namespace {
         EXPECT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         EXPECT_TRUE(phase.completion().wait());
     }
+
     TEST_F(CommandArenaVulkanIntegrationTest, FailedAttachmentAndRetirementDoNotPublishOrReplaceAnotherDomain) {
         l::ResourceArena arena(device, PLAN, inputs());
         const auto native = CommandAccess::Data(arena.command_buffer({1}));
@@ -206,6 +219,7 @@ namespace {
         EXPECT_EQ(l::CommandAccess::Owner(peer), peer_domain);
         EXPECT_NO_THROW(reattached.reset());
     }
+
     TEST_F(CommandArenaVulkanIntegrationTest, ImportsKeepOriginalOwnersAndOnlyFacadesKeepTheirDomains) {
         constexpr std::array<t::ResourceRequest, 2> requests{{{{10}, s::ResourceKind::COMMAND_BUFFER, true}, {{20}, s::ResourceKind::COMMAND_POOL, true}}};
         constexpr t::ResourcePlan<2> plan(requests);
@@ -237,6 +251,7 @@ namespace {
         EXPECT_TRUE(importer_root.expired());
         EXPECT_FALSE(original_root.expired());
     }
+
     TEST_F(CommandArenaVulkanIntegrationTest, HeapPoolGettersKeepTheOriginalParentAndPublishFixedEdges) {
         std::optional<vsl::CommandPool> saved;
         vsl::LogicalDeviceAccessor device_only;
@@ -260,6 +275,7 @@ namespace {
         EXPECT_TRUE(pool_root.expired());
         EXPECT_EQ(StartupAccess::Owned(device_only), StartupAccess::Owned(device));
     }
+
     TEST_F(CommandArenaVulkanIntegrationTest, ForeignControlBlocksCannotImpersonateTheSameRingOrPool) {
         l::ResourceArena arena(device, PLAN, inputs());
         auto buffer = arena.command_buffer({1});
@@ -278,6 +294,7 @@ namespace {
         EXPECT_THROW(forged_pool.get_device(), std::invalid_argument);
         EXPECT_THROW((vsl::CommandBuffer(forged_pool)), std::invalid_argument);
     }
+
     TEST_F(CommandArenaVulkanIntegrationTest, RecordingRejectsMutationAndResetKeepsSubmissionPinsUntilReplacement) {
         l::ResourceArena arena(device, PLAN, inputs());
         auto manager = vsl::CommandManager::FromBuffer(arena.command_buffer({1}));
@@ -304,6 +321,7 @@ namespace {
         }
         EXPECT_TRUE(retained.expired());
     }
+
     TEST_F(CommandArenaVulkanIntegrationTest, ResetAllChecksEverySlotBeforeTouchingExecutableCommands) {
         l::ResourceArena arena(device, PLAN, inputs());
         auto buffer = arena.command_buffer({1});
@@ -331,6 +349,7 @@ namespace {
         EXPECT_NO_THROW(buffer.next());
         EXPECT_EQ(buffer.get_current_buffer_idx(), 1u);
     }
+
     TEST_F(CommandArenaVulkanIntegrationTest, ResetCallbackCannotReenterAndCanDestroyItsOriginalFacades) {
         l::ResourceArena arena(device, PLAN, inputs());
         std::optional<vsl::CommandManager> manager(vsl::CommandManager::FromBuffer(arena.command_buffer({1})));
@@ -358,6 +377,7 @@ namespace {
         EXPECT_TRUE(domain.expired());
         EXPECT_NO_THROW(arena.command_buffer({1}));
     }
+
     TEST_F(CommandArenaVulkanIntegrationTest, PrepareDetectsACompleteRotationBackToTheSameSlot) {
         l::ResourceArena arena(device, PLAN, inputs());
         auto manager = vsl::CommandManager::FromBuffer(arena.command_buffer({1}));

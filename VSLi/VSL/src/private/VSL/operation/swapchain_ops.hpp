@@ -9,6 +9,7 @@ namespace VSL_NAMESPACE::operation {
         VkResult (*images)(void*, VkDevice, VkSwapchainKHR, std::uint32_t*, VkImage*) = nullptr;
         void (*destroy)(void*, VkDevice, VkSwapchainKHR) noexcept = nullptr;
     };
+
     class ScopedSwapchainNativeCalls {
         SwapchainNativeCalls _calls;
         const SwapchainNativeCalls* _previous;
@@ -19,6 +20,7 @@ namespace VSL_NAMESPACE::operation {
         ScopedSwapchainNativeCalls& operator=(const ScopedSwapchainNativeCalls&) = delete;
         ~ScopedSwapchainNativeCalls();
     };
+
     // 呼出し中だけのnative所有。親の寿命は外側lifetimeが保証する。
     struct PendingSwapchain {
         impl::LogicalDeviceImpl* device = nullptr;
@@ -39,6 +41,7 @@ namespace VSL_NAMESPACE::operation {
         PendingSwapchain(PendingSwapchain&& other) noexcept;
         ~PendingSwapchain();
     };
+
     PendingSwapchain prepare_swapchain(impl::LogicalDeviceImpl& device, impl::SurfaceImpl& surface, const SwapchainCreateInfo& info,
                                        impl::SwapchainImpl* old = nullptr, const SwapchainNativeCalls& calls = {}, SwapchainCreateProgress* progress = nullptr);
     void adopt_swapchain(impl::SwapchainImpl& target, PendingSwapchain& pending) noexcept;

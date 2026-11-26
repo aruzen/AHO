@@ -35,6 +35,7 @@ namespace VSL_NAMESPACE::impl {
     struct GraphicResourceImpl;
     struct ImageImpl;
     struct SamplerImpl;
+
     namespace pipeline_layout {
         struct ShaderGroupImpl;
     }

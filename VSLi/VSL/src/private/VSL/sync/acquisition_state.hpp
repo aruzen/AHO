@@ -12,6 +12,7 @@ namespace VSL_NAMESPACE::sync {
         NOT_ACQUIRED,
         UNCERTAIN
     };
+
     struct AcquisitionState {
         AcquisitionStatus status = AcquisitionStatus::UNARMED;
         SubmissionNativeState drain;

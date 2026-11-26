@@ -13,13 +13,16 @@ namespace {
     namespace l = vsl::lifetime;
     namespace s = vsl::storage;
     namespace o = vsl::operation;
+
     struct SlotOwner {
         alignas(l::PhysicalDeviceSlotStorage) std::byte memory[sizeof(l::PhysicalDeviceSlotStorage)];
         bool constructed = false;
         ~SlotOwner();
         void construct(vsl::impl::VulkanImplAccessor& instance, const o::PhysicalDeviceCandidate& candidate);
+
         vsl::impl::PhysicalDeviceImpl& value() { return l::physical_device_at(memory); }
     };
+
     struct PairOwner {
         l::DependencyNode node;
         l::OwnerRef instance;
@@ -28,31 +31,40 @@ namespace {
         PairOwner(vsl::VulkanAccessor source, const o::PhysicalDeviceCandidate& candidate);
         ~PairOwner();
         void clear() noexcept;
+
         void* slot(size_t index) { return memory + index * sizeof(l::PhysicalDeviceSlotStorage); }
+
         static void VisitDependencies(const void* owner, l::DependencyNode::EdgeVisitor visitor, void* context);
     };
+
     struct RetainingSearcher {
         static inline std::vector<vsl::PhysicalDevice> SAVED;
         int benchmark(vsl::PhysicalDevice device);
     };
+
     struct ResetSearcher {
         ~ResetSearcher() { RetainingSearcher::SAVED.clear(); }
     };
+
     class PhysicalDeviceStorageVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
     protected:
         bool validate_vulkan() const override { return true; }
+
         vsl::VulkanAccessor make_instance() const;
     };
+
     SlotOwner::~SlotOwner() {
         if (constructed)
             l::destroy_physical_device(memory);
     }
+
     void SlotOwner::construct(vsl::impl::VulkanImplAccessor& instance, const o::PhysicalDeviceCandidate& candidate) {
         if (constructed)
             throw std::logic_error("Test slot is already constructed");
         l::construct_physical_device(memory, instance, candidate);
         constructed = true;
     }
+
     PairOwner::PairOwner(vsl::VulkanAccessor source, const o::PhysicalDeviceCandidate& candidate) : instance(source.owner_ref()) {
         try {
             while (constructed < 2) {
@@ -66,21 +78,26 @@ namespace {
             throw;
         }
     }
+
     PairOwner::~PairOwner() {
         node.retire();
         clear();
     }
+
     void PairOwner::clear() noexcept {
         while (constructed)
             l::destroy_physical_device(slot(--constructed));
     }
+
     void PairOwner::VisitDependencies(const void* owner, l::DependencyNode::EdgeVisitor visitor, void* context) {
         visitor(context, static_cast<const PairOwner*>(owner)->instance);
     }
+
     int RetainingSearcher::benchmark(vsl::PhysicalDevice device) {
         SAVED.push_back(std::move(device));
         return static_cast<int>(SAVED.size());
     }
+
     vsl::VulkanAccessor PhysicalDeviceStorageVulkanIntegrationTest::make_instance() const {
         vsl::InstanceCreateInfo info;
         info.application_name = "physical device storage test";
@@ -91,6 +108,7 @@ namespace {
                 info.extensions.emplace_back(extension.extensionName);
         return vsl::VulkanAccessor::Create(std::move(info));
     }
+
     TEST(PhysicalDevicePlacementTest, ExactLayoutIncludesWeakOwnerContextAndDisallowsMovingImpls) {
         static_assert(sizeof(vsl::impl::PhysicalDeviceImpl) == s::PHYSICAL_DEVICE_IMPL_SIZE);
         static_assert(alignof(vsl::impl::PhysicalDeviceImpl) == s::PHYSICAL_DEVICE_IMPL_ALIGNMENT);
@@ -105,6 +123,7 @@ namespace {
         EXPECT_THROW(empty.name(), std::invalid_argument);
         EXPECT_THROW(vsl::PhysicalDevice::Select({}), std::invalid_argument);
     }
+
     TEST(PhysicalDevicePlacementTest, DefaultScorePreservesGeometryRuleDiscreteBonusAndSaturatesIntegerRange) {
         vk::PhysicalDeviceProperties properties{};
         vk::PhysicalDeviceFeatures features{};
@@ -119,6 +138,7 @@ namespace {
         properties.limits.maxImageDimension2D = std::numeric_limits<std::uint32_t>::max();
         EXPECT_EQ(o::score_physical_device(properties, features), std::numeric_limits<int>::max());
     }
+
     TEST_F(PhysicalDeviceStorageVulkanIntegrationTest, SelectedHeapDeviceRetainsTheOriginalInstanceAndItsCapabilitySnapshot) {
         auto selected = vsl::PhysicalDevice::Select(vsl::lifetime::detail::StartupAccess::FromShared(instance));
         EXPECT_TRUE(selected.owner_ref().managed());
@@ -139,6 +159,7 @@ namespace {
         ASSERT_TRUE(StartupAccess::Owned(selected)->mem_props);
         EXPECT_EQ(StartupAccess::Owned(selected)->mem_props->memoryTypeCount, StartupAccess::Owned(selected)->device.getMemoryProperties().memoryTypeCount);
     }
+
     TEST_F(PhysicalDeviceStorageVulkanIntegrationTest, DefaultSnapshotSelectionRejectsEmptyListsAndUsesTheFirstNonnegativeCandidate) {
         vsl::PhysicalDevices<vsl::PhysicalDevicesSercher> listed(vsl::lifetime::detail::StartupAccess::FromShared(instance));
         StartupAccess::Collection(listed)->devices.assign(3, StartupAccess::Owned(physical)->device);
@@ -151,6 +172,7 @@ namespace {
         EXPECT_THROW(listed.get(), std::invalid_argument);
         EXPECT_THROW(listed.search(), std::invalid_argument);
     }
+
     TEST_F(PhysicalDeviceStorageVulkanIntegrationTest, CustomSearcherSavedCandidatesKeepTheirIdentityAfterEnumerationAndFacadeDestruction) {
         ResetSearcher cleanup;
         std::optional<vsl::PhysicalDevice> selected;
@@ -174,6 +196,7 @@ namespace {
         selected.reset();
         EXPECT_TRUE(parent.expired());
     }
+
     TEST_F(PhysicalDeviceStorageVulkanIntegrationTest, InstanceGetterKeepsTheParentWithoutKeepingTheChildAlive) {
         auto source = make_instance();
         auto selected = vsl::PhysicalDevice::Select(source);
@@ -188,6 +211,7 @@ namespace {
         saved = {};
         EXPECT_TRUE(parent.expired());
     }
+
     TEST_F(PhysicalDeviceStorageVulkanIntegrationTest, SameTypeSlotsAreDirectAndBorrowOneFixedParentOwner) {
         const auto candidate = o::inspect_physical_device(*instance, StartupAccess::Owned(physical)->device);
         auto owner = std::make_shared<PairOwner>(vsl::lifetime::detail::StartupAccess::FromShared(instance), candidate);
@@ -219,6 +243,7 @@ namespace {
         StartupAccess::Owned(b).reset();
         EXPECT_TRUE(root.expired());
     }
+
     TEST_F(PhysicalDeviceStorageVulkanIntegrationTest, OriginMismatchRollsBackTheSlotAndAValidCandidateCanReuseIt) {
         auto other = make_instance();
         const auto candidate = o::inspect_physical_device(*instance, StartupAccess::Owned(physical)->device);
@@ -232,6 +257,7 @@ namespace {
         EXPECT_EQ(slot.value().device, StartupAccess::Owned(physical)->device);
         EXPECT_EQ(slot.value().props->deviceID, physical.device_id());
     }
+
     TEST_F(PhysicalDeviceStorageVulkanIntegrationTest, ForeignOwnersAndNullNativeCandidatesAreRejectedBeforeQueryingTheDriver) {
         const auto candidate = o::inspect_physical_device(*instance, StartupAccess::Owned(physical)->device);
         const auto forged = vsl_test::unchecked_startup(std::shared_ptr<vsl::impl::VulkanImplAccessor>{std::make_shared<int>(0), instance.get()});
@@ -257,6 +283,7 @@ namespace {
         EXPECT_THROW(StartupAccess::FromShared(StartupAccess::Shared(physical)), std::invalid_argument);
         EXPECT_EQ(StartupAccess::Owned(physical)->device, handle);
     }
+
     TEST_F(PhysicalDeviceStorageVulkanIntegrationTest, LogicalDeviceRetainsTheSelectedPhysicalDeviceAndInstanceAfterTheirFacadesAreGone) {
         std::weak_ptr<void> parent, selected_owner;
         std::shared_ptr<vsl::impl::LogicalDeviceImpl> logical;

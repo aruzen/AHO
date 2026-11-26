@@ -20,6 +20,7 @@ namespace VSL_NAMESPACE {
         public:
             consteval PhysicalDeviceType(const char* name, char index) : Type_(name, index) {}
         };
+
         constexpr PhysicalDeviceType OTHER = PhysicalDeviceType("OTHER", 0);
         constexpr PhysicalDeviceType INTEGRATED_GPU = PhysicalDeviceType("INTEGRATED_GPU", 1);
         constexpr PhysicalDeviceType DISCRETE_GPU = PhysicalDeviceType("DISCRETE_GPU", 2);
@@ -36,6 +37,7 @@ namespace VSL_NAMESPACE {
     struct PhysicalDevice {
     private:
         lifetime::OwnedRef<impl::PhysicalDeviceImpl> _owner;
+
         explicit PhysicalDevice(lifetime::OwnedRef<impl::PhysicalDeviceImpl> owner) noexcept : _owner(std::move(owner)) {}
         friend struct lifetime::detail::StartupAccess;
 
@@ -43,12 +45,15 @@ namespace VSL_NAMESPACE {
         PhysicalDevice() = default;
         PhysicalDevice(const PhysicalDevice&) = default;
         PhysicalDevice(PhysicalDevice&&) noexcept = default;
+
         PhysicalDevice& operator=(PhysicalDevice value) noexcept {
             swap(value);
             return *this;
         }
+
         void swap(PhysicalDevice& other) noexcept { _owner.swap(other._owner); }
         explicit operator bool() const noexcept { return bool(_owner); }
+
         ~PhysicalDevice();
 
         static PhysicalDevice Select(VulkanAccessor instance);
@@ -77,10 +82,12 @@ namespace VSL_NAMESPACE {
         public:
             PhysicalDeviceCollection(const PhysicalDeviceCollection&) = default;
             PhysicalDeviceCollection(PhysicalDeviceCollection&&) noexcept = default;
+
             PhysicalDeviceCollection& operator=(PhysicalDeviceCollection value) noexcept {
                 swap(value);
                 return *this;
             }
+
             void swap(PhysicalDeviceCollection& other) noexcept { _state.swap(other._state); }
         };
     } // namespace lifetime::detail
@@ -96,11 +103,14 @@ namespace VSL_NAMESPACE {
         PhysicalDevices(VulkanAccessor vulkan);
         PhysicalDevices(const PhysicalDevices&) = default;
         PhysicalDevices(PhysicalDevices&&) noexcept = default;
+
         PhysicalDevices& operator=(PhysicalDevices value) noexcept {
             swap(value);
             return *this;
         }
+
         void swap(PhysicalDevices& other) noexcept { _collection.swap(other._collection); }
+
         ~PhysicalDevices();
         std::vector<PhysicalDevice> get();
         PhysicalDevice search();
@@ -110,10 +120,13 @@ namespace VSL_NAMESPACE {
     };
 
     class WeakLogicalDevice;
+
     struct LogicalDeviceAccessor {
     private:
         lifetime::OwnedRef<impl::LogicalDeviceImpl> _owner;
+
         explicit LogicalDeviceAccessor(lifetime::OwnedRef<impl::LogicalDeviceImpl> owner) noexcept : _owner(std::move(owner)) {}
+
         static LogicalDeviceAccessor CheckRuntime(LogicalDeviceAccessor value);
         static LogicalDeviceAccessor CheckCreatorResult(const PhysicalDevice& physical, LogicalDeviceAccessor value);
         static Surface ReadSurface(std::shared_ptr<Surface> surface);
@@ -126,12 +139,15 @@ namespace VSL_NAMESPACE {
         LogicalDeviceAccessor() = default;
         LogicalDeviceAccessor(const LogicalDeviceAccessor&) = default;
         LogicalDeviceAccessor(LogicalDeviceAccessor&&) noexcept = default;
+
         LogicalDeviceAccessor& operator=(LogicalDeviceAccessor value) noexcept {
             swap(value);
             return *this;
         }
+
         void swap(LogicalDeviceAccessor& other) noexcept { _owner.swap(other._owner); }
         explicit operator bool() const noexcept { return bool(_owner); }
+
         bool operator==(const LogicalDeviceAccessor&) const = default;
         static LogicalDeviceAccessor Create(PhysicalDevice physical, DeviceCreateInfo info = {});
         static DeviceCreateInfo GraphicsInfo(PhysicalDevice physical, Surface surface, bool validation = VALIDATION,
@@ -147,6 +163,7 @@ namespace VSL_NAMESPACE {
     // lockは元のstorageを保持する。Native操作の可否は各操作で検証する。
     class WeakLogicalDevice {
         lifetime::WeakOwnedRef<impl::LogicalDeviceImpl> _owner;
+
         explicit WeakLogicalDevice(lifetime::WeakOwnedRef<impl::LogicalDeviceImpl> owner) noexcept : _owner(std::move(owner)) {}
         friend struct LogicalDeviceAccessor;
 
@@ -154,13 +171,16 @@ namespace VSL_NAMESPACE {
         WeakLogicalDevice() = default;
         WeakLogicalDevice(const WeakLogicalDevice&) = default;
         WeakLogicalDevice(WeakLogicalDevice&&) noexcept = default;
+
         WeakLogicalDevice& operator=(WeakLogicalDevice value) noexcept {
             swap(value);
             return *this;
         }
+
         void swap(WeakLogicalDevice& other) noexcept { _owner.swap(other._owner); }
         void reset() noexcept { _owner.reset(); }
         bool expired() const noexcept { return _owner.expired(); }
+
         LogicalDeviceAccessor lock() const noexcept;
     };
 
@@ -182,19 +202,26 @@ namespace VSL_NAMESPACE {
     public:
         LogicalDevice(PhysicalDevice physical, Surface surface);
         LogicalDevice(PhysicalDevice physical, std::shared_ptr<Surface> surface);
+
         explicit LogicalDevice(LogicalDeviceAccessor source) : _value(LogicalDeviceAccessor::CheckRuntime(std::move(source))) {}
+
         LogicalDevice(const LogicalDevice&) = default;
         LogicalDevice(LogicalDevice&&) noexcept = default;
+
         LogicalDevice& operator=(LogicalDevice value) noexcept {
             swap(value);
             return *this;
         }
+
         void swap(LogicalDevice& other) noexcept { _value.swap(other._value); }
         operator LogicalDeviceAccessor() const& { return _value; }
         operator LogicalDeviceAccessor() && { return std::move(_value); }
         explicit operator bool() const noexcept { return bool(_value); }
+
         bool operator==(const LogicalDevice&) const = default;
+
         bool operator==(const LogicalDeviceAccessor& other) const noexcept { return _value == other; }
+
         template<typename Other>
         bool operator==(const LogicalDevice<Other>& other) const noexcept { return _value == other._value; }
         lifetime::OwnerRef owner_ref() const { return _value.owner_ref(); }
@@ -202,11 +229,13 @@ namespace VSL_NAMESPACE {
         DeviceFeature enabled_features() const { return _value.enabled_features(); }
         WeakLogicalDevice weak() const noexcept { return _value.weak(); }
     };
+
     template<typename C>
     LogicalDevice<C>::LogicalDevice(PhysicalDevice physical, Surface surface) {
         C creator;
         _value = LogicalDeviceAccessor::CheckCreatorResult(physical, creator.create(PhysicalDevice(physical), Surface(surface)));
     }
+
     template<typename C>
     LogicalDevice<C>::LogicalDevice(PhysicalDevice physical, std::shared_ptr<Surface> surface)
         : LogicalDevice(std::move(physical), LogicalDeviceAccessor::ReadSurface(std::move(surface))) {}
@@ -217,6 +246,7 @@ template<typename S>
 VSL_NAMESPACE::PhysicalDevices<S> VSL_NAMESPACE::Vulkan<validation>::devices() {
     return VSL_NAMESPACE::PhysicalDevices<S>(*this);
 }
+
 template<typename S>
 VSL_NAMESPACE::PhysicalDevices<S>::PhysicalDevices(VulkanAccessor vulkan)
     : _collection(std::move(vulkan)) {}

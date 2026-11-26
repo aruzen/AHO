@@ -24,6 +24,7 @@ namespace {
     static_assert(std::same_as<DefaultBundle::Shared, t::TypedSharedResources<Allocation>>);
     static_assert(!std::is_copy_constructible_v<Bundle> && std::is_nothrow_move_constructible_v<Bundle>);
     static_assert(!std::is_copy_constructible_v<Bundle::Frame>);
+
     void accepted(vsl::CommandManager manager, vsl::graphic_resource::ManagerInterface& descriptors, const vsl::ComputePhase& phase, const t::TypedTexture& texture) {
         Bundle bundle(manager, descriptors);
         bundle.initialize_shared([](Bundle::Shared& shared) {
@@ -50,6 +51,7 @@ namespace {
     }
 #elif VSL_TYPED_CASE == 2
     using One = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<0, t::UniformBinding<0, float, vsl::ShaderFlag::VERTEX>>>, t::ExternalAllocation<0, 0>>;
+
     void rejected(vsl::CommandManager manager, vsl::graphic_resource::ManagerInterface& descriptors, const t::TypedUniformBuffer<std::uint32_t>& buffer) {
         t::TypedResourceBundle<One, Storage> bundle(manager, descriptors, t::external_resource<0, 0>(buffer));
     }
@@ -91,6 +93,7 @@ namespace {
     }
 #elif VSL_TYPED_CASE == 12
     using Two = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<1, t::TextureBinding<2, vsl::ShaderFlag::FRAGMENT>, t::TextureBinding<3, vsl::ShaderFlag::FRAGMENT>>>, t::ExternalAllocation<1, 2>, t::ExternalAllocation<1, 3>>;
+
     void rejected(vsl::CommandManager manager, vsl::graphic_resource::ManagerInterface& descriptors, const t::TypedTexture& texture) {
         t::TypedResourceBundle<Two, Storage> bundle(manager, descriptors, t::external_resource<1, 2>(texture), t::external_resource<1, 2>(texture));
     }

@@ -14,6 +14,7 @@ namespace VSL_NAMESPACE::lifetime {
     struct SurfacePresentationDomain;
     struct CommandDomain;
     std::shared_ptr<void> pin_submission_owner(const impl::SubmissionWork& work) noexcept;
+
     class SubmissionObservation {
         std::shared_ptr<void> _owner;
         impl::SubmissionImpl* _result = nullptr;
@@ -24,10 +25,13 @@ namespace VSL_NAMESPACE::lifetime {
         SubmissionObservation(const SubmissionObservation&) = delete;
         SubmissionObservation& operator=(const SubmissionObservation&) = delete;
         SubmissionObservation(SubmissionObservation&& other) noexcept;
+
         bool active() const noexcept { return _result != nullptr; }
         bool owns(const impl::SubmissionImpl& result) const noexcept { return _result == &result; }
+
         void finish() noexcept;
     };
+
     class SubmissionTransaction {
         CommandDomain& _domain;
         impl::SubmissionWork& _work;
@@ -41,10 +45,12 @@ namespace VSL_NAMESPACE::lifetime {
         SubmissionTransaction& operator=(const SubmissionTransaction&) = delete;
         void finish() noexcept;
     };
+
     void abort_recording(CommandDomain& domain, impl::SubmissionWork& work, std::uint32_t slot) noexcept;
     void detach_recording_cpu(CommandDomain& domain, impl::SubmissionWork& work) noexcept;
     void fail_recording(CommandDomain& domain, impl::SubmissionWork& work, std::uint32_t slot,
                         Completion::Failure failure, std::int32_t error_code) noexcept;
+
     class SubmissionSnapshot {
         std::shared_ptr<impl::LogicalDeviceImpl> _device;
         std::shared_ptr<impl::SurfaceImpl> _surface;
@@ -64,10 +70,13 @@ namespace VSL_NAMESPACE::lifetime {
         void save_observations(std::int32_t idle_result) noexcept;
         void bookkeep() noexcept;
         void release() noexcept;
+
         bool pending() const noexcept { return _pending; }
         bool captured() const noexcept { return bool(_selected); }
+
         void finish() noexcept;
     };
+
     void quarantine_submission(const std::shared_ptr<impl::SubmissionWork>& work, const std::shared_ptr<impl::CommandBufferImpl>& buffer) noexcept;
     std::shared_ptr<impl::SubmissionWork> unquarantine_submission(impl::SubmissionWork& work) noexcept;
     size_t quarantined_submission_count() noexcept;

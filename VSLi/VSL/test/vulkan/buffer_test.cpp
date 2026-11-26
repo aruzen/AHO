@@ -23,6 +23,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     class BufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override;
@@ -58,6 +59,7 @@ namespace {
     bool BufferVulkanIntegrationTest::validate_vulkan() const {
         return true;
     }
+
     TEST_F(BufferVulkanIntegrationTest, MapsCopiesAndReadsBackSingleValues) {
         if (!host_coherent_available())
             GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
@@ -77,6 +79,7 @@ namespace {
         EXPECT_EQ(mapped.offset, 0u);
         mapped.flush();
     }
+
     TEST_F(BufferVulkanIntegrationTest, MappedPointerCopiesPreserveOverlappingSourceRanges) {
         if (!host_coherent_available())
             GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
@@ -112,6 +115,7 @@ namespace {
         EXPECT_TRUE(mapped.copy(replacement.data(), replacement.size()));
         EXPECT_EQ(std::memcmp(mapped.data, replacement.data(), sizeof(replacement)), 0);
     }
+
     TEST_F(BufferVulkanIntegrationTest, PointerCopyPreservesOverlappingSourceAndRejectsInvalidCounts) {
         if (!host_coherent_available())
             GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
@@ -126,6 +130,7 @@ namespace {
         EXPECT_FALSE(buffer.copy(source, std::numeric_limits<std::size_t>::max()));
         EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
     }
+
     TEST_F(BufferVulkanIntegrationTest, CopiesThroughDeviceLocalBufferOnGPU) {
         if (!host_coherent_available())
             GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
@@ -139,6 +144,7 @@ namespace {
         auto data = destination.data(sizeof(expected));
         EXPECT_EQ(std::memcmp(data.data, expected.data(), sizeof(expected)), 0);
     }
+
     TEST_F(BufferVulkanIntegrationTest, ValueConstructorAndFactoryPreservePayload) {
         const std::array<std::uint32_t, 2> expected{71, 73};
         HostBuffer constructed(device, expected);
@@ -149,6 +155,7 @@ namespace {
         EXPECT_EQ(std::memcmp(first.data, expected.data(), sizeof(expected)), 0);
         EXPECT_EQ(std::memcmp(second.data, expected.data(), sizeof(expected)), 0);
     }
+
     TEST_F(BufferVulkanIntegrationTest, VariadicCopyStoresValuesConsecutively) {
         HostBuffer buffer(device, std::size_t{8});
         const std::uint32_t first = 17, second = 29;
@@ -158,6 +165,7 @@ namespace {
         std::memcpy(actual.data(), mapped.data, sizeof(actual));
         EXPECT_EQ(actual, (std::array<std::uint32_t, 2>{first, second}));
     }
+
     TEST(BufferCopyHelperTest, CheckedCopyAdvancesFromTheGivenOffsetAndStopsAtCapacity) {
         std::array<unsigned char, 12> storage{};
         storage.fill(0xa5);
@@ -172,6 +180,7 @@ namespace {
         EXPECT_FALSE(vsl::helper::copy_with_shift_offset(storage.data(), storage.size(), offset, first));
         EXPECT_EQ(offset, 12u);
     }
+
     TEST(BufferCopyHelperTest, CheckedCapacityTestDoesNotWrapAtTheSizeLimit) {
         std::array<unsigned char, 4> storage{};
         const auto before = storage;
@@ -181,11 +190,13 @@ namespace {
         EXPECT_EQ(offset, std::numeric_limits<std::size_t>::max() - 1);
         EXPECT_EQ(storage, before);
     }
+
     void expect_overlapping_value_copy(bool checked) {
         struct Payload {
             std::uint32_t values[4];
             std::uint32_t tail;
         } payload{{1, 2, 3, 4}, 5};
+
         vsl::BufferAccessor::LocalBufferHolder mapped(nullptr, sizeof(payload.values), sizeof(std::uint32_t),
                                                       reinterpret_cast<std::byte*>(&payload) + sizeof(std::uint32_t));
         if (checked)
@@ -218,6 +229,7 @@ namespace {
         for (std::size_t i = 0; i < 4; ++i)
             EXPECT_EQ(storage[i], 0);
     }
+
     TEST_F(BufferVulkanIntegrationTest, UncheckedVariadicCopyStoresValuesConsecutively) {
         HostBuffer buffer(device, std::size_t{8});
         const std::uint32_t first = 37, second = 41;
@@ -226,6 +238,7 @@ namespace {
         const std::array<std::uint32_t, 2> expected{first, second};
         EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
     }
+
     TEST(BufferExceptionTest, MappingExceptionIncludesItsCause) {
         vsl::exceptions::MemoryNotHostVisibleException error("test trace");
         EXPECT_NE(error.reason.find("not host-visible"), std::string::npos);
@@ -235,6 +248,7 @@ namespace {
         EXPECT_NE(located.reason.find(std::to_string(location.line())), std::string::npos);
     }
 } // namespace
+
 namespace {
     TEST_F(BufferVulkanIntegrationTest, DeviceLocalValueAndPointerConstructorsUploadTheirPayloads) {
         const std::array<std::uint32_t, 4> expected{2, 7, 19, 43};
@@ -251,6 +265,7 @@ namespace {
         }
         EXPECT_THROW(value.data(), vsl::exceptions::MemoryNotHostVisibleException);
     }
+
     TEST_F(BufferVulkanIntegrationTest, UncheckedSingleValueAndMappedHolderCopiesRetainData) {
         HostBuffer buffer(device, std::size_t{16});
         const std::uint32_t first = 101, second = 103;
@@ -269,6 +284,7 @@ namespace {
             buffer.flush(mapped);
         }
     }
+
     TEST_F(BufferVulkanIntegrationTest, BufferTransferRejectsSourceLargerThanDestinationBeforeRecording) {
         const std::array<std::uint32_t, 4> values{1, 2, 3, 4};
         HostBuffer source(device, values), destination(device, std::size_t{4});
@@ -278,6 +294,7 @@ namespace {
         EXPECT_THROW(destination.copy_by_buffer(manager, &source), std::out_of_range);
         EXPECT_FALSE(has_validation_errors());
     }
+
     TEST_F(BufferVulkanIntegrationTest, MappedBufferTransferRejectsSourceLargerThanMapping) {
         const std::array<std::uint32_t, 4> values{1, 2, 3, 4};
         HostBuffer source(device, values), destination(device, std::size_t{32});
@@ -285,6 +302,7 @@ namespace {
         auto manager = make_manager();
         EXPECT_THROW(mapping.copy_by_buffer(manager, &source), std::out_of_range);
     }
+
     TEST_F(BufferVulkanIntegrationTest, MappedBufferTransferWritesOnlyAtTheMappingOffset) {
         const std::array<std::uint32_t, 8> initial{10, 20, 30, 40, 50, 60, 70, 80};
         const std::array<std::uint32_t, 2> payload{101, 102};
@@ -306,6 +324,7 @@ namespace {
         contents.invalidate(sizeof(expected));
         EXPECT_EQ(std::memcmp(contents.data, expected.data(), sizeof(expected)), 0);
     }
+
     TEST_F(BufferVulkanIntegrationTest, BufferTransferRejectsNullSourceAndOverlappingStorage) {
         HostBuffer buffer(device, std::size_t{16});
         auto alias = buffer;
@@ -313,6 +332,7 @@ namespace {
         EXPECT_THROW(buffer.copy_by_buffer(manager, nullptr), std::invalid_argument);
         EXPECT_THROW(buffer.copy_by_buffer(manager, &alias), std::invalid_argument);
     }
+
     TEST_F(BufferVulkanIntegrationTest, BufferTransferRejectsBuffersWithoutTransferUsage) {
         vsl::Buffer<vsl::MemoryType::UNIFORM_BUFFER, vsl::MemoryProperty::HOST_VISIBLE> uniform(device, std::size_t{16});
         HostBuffer transfer(device, std::size_t{16});
@@ -320,6 +340,7 @@ namespace {
         EXPECT_THROW(transfer.copy_by_buffer(manager, &uniform), std::invalid_argument);
         EXPECT_THROW(uniform.copy_by_buffer(manager, &transfer), std::invalid_argument);
     }
+
     TEST_F(BufferVulkanIntegrationTest, SuccessfulBufferTransferReturnsTrue) {
         std::array<std::uint32_t, 2> expected{47, 53};
         HostBuffer source(device, expected), destination(device, sizeof(expected));
@@ -340,6 +361,7 @@ namespace {
         EXPECT_TRUE(mapped.copy_by_buffer(manager, &source));
         EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
     }
+
     TEST_F(BufferVulkanIntegrationTest, DeviceLocalFactoryUploadsThePayloadWithThePublicConstructorOrder) {
         auto manager = make_manager();
         std::array<std::uint32_t, 4> expected{7, 31, 0xffffffffu, 0};
@@ -373,6 +395,7 @@ namespace {
         auto mapped = buffer.data(sizeof(initial));
         EXPECT_EQ(std::memcmp(mapped.data, initial.data(), sizeof(initial)), 0);
     }
+
     TEST_F(BufferVulkanIntegrationTest, MappedHolderCopiesStartAtItsPointerAndStayWithinItsRange) {
         std::array<unsigned char, 256> initial{};
         initial.fill(0xa5);
@@ -402,6 +425,7 @@ namespace {
             if (i < map_offset || i >= map_offset + 8)
                 EXPECT_EQ(static_cast<const unsigned char*>(all.data)[i], 0xa5) << i;
     }
+
     TEST(BufferCopyHelperTest, CheckedFailureKeepsTheSuccessfullyWrittenPrefix) {
         std::array<unsigned char, 6> storage{};
         const std::uint32_t first = 17, second = 29;
@@ -436,6 +460,7 @@ namespace {
         auto mapped = readback.data(sizeof(expected));
         EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
     }
+
     TEST_F(BufferVulkanIntegrationTest, OptionalManagerFactoryReportsMissingManagerBeforeDeviceLocalMapping) {
         std::array<std::uint32_t, 2> payload{7, 11};
         try {
@@ -445,6 +470,7 @@ namespace {
             EXPECT_NE(error.reason.find("command manager"), std::string::npos);
         }
     }
+
     TEST_F(BufferVulkanIntegrationTest, OptionalManagerFactoryKeepsTheHostVisiblePathUsable) {
         std::array<std::uint32_t, 2> payload{19, 23};
         auto manager = make_manager();
@@ -459,6 +485,7 @@ namespace {
     bool BufferSharingVulkanIntegrationTest::validate_vulkan() const {
         return true;
     }
+
     TEST_F(BufferSharingVulkanIntegrationTest, ConcurrentRequestWorksWithOneQueueFamilyAndPreservesMappedPayload) {
         if (!host_coherent_available())
             GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
@@ -471,6 +498,7 @@ namespace {
         auto mapped = buffer.data(sizeof(expected));
         EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
     }
+
     TEST_F(BufferSharingVulkanIntegrationTest, ConcurrentDeviceLocalBufferTransfersPayloadUsingTheCreatedGraphicsQueue) {
         if (!host_coherent_available())
             GTEST_SKIP() << "HostVisible|HostCoherent memory unavailable";
@@ -541,6 +569,7 @@ namespace {
         auto mapped = readback.data();
         EXPECT_EQ(std::memcmp(mapped.data, expected.data(), expected.size()), 0);
     }
+
     TEST_F(BufferVulkanIntegrationTest, MappingRejectsRangesOutsideRequestedStorage) {
         HostBuffer buffer(device, std::size_t{19});
         EXPECT_EQ(buffer.size(), 19u);
@@ -551,6 +580,7 @@ namespace {
         EXPECT_THROW(buffer.data(20), vsl::exceptions::RuntimeException);
         EXPECT_THROW(buffer.data(1, 19), vsl::exceptions::RuntimeException);
     }
+
     TEST_F(BufferVulkanIntegrationTest, DefaultMappingSizeExcludesTheRequestedOffset) {
         const auto offset = StartupAccess::Owned(physical)->props->limits.minMemoryMapAlignment;
         HostBuffer buffer(device, std::size_t{offset * 2 + 1});
@@ -571,6 +601,7 @@ namespace {
         std::memcpy(&actual, mapped.data, sizeof(actual));
         EXPECT_FLOAT_EQ(actual, expected);
     }
+
     TEST_F(BufferVulkanIntegrationTest, HostVisibleValuePointerAndFactoryPayloadsReachGPUTransfers) {
         using Buffer = vsl::Buffer<vsl::MemoryType::TRANSFER_SOURCE, vsl::MemoryProperty::HOST_VISIBLE>;
         const std::array<std::uint32_t, 4> expected{17, 23, 0xffffffffu, 0};
@@ -605,6 +636,7 @@ namespace {
         ++flush_calls;
         Base::flush(holder);
     }
+
     TEST_F(BufferVulkanIntegrationTest, ScopedCopiesFlushWhileTheMappingIsAlive) {
         FlushTrackingBuffer buffer(device, std::size_t{16});
         const std::uint32_t first = 17, second = 29;
@@ -618,6 +650,7 @@ namespace {
         auto mapped = buffer.data(sizeof(values));
         EXPECT_EQ(std::memcmp(mapped.data, (std::array<std::uint32_t, 2>{second, first}).data(), sizeof(values)), 0);
     }
+
     TEST_F(BufferVulkanIntegrationTest, FailedCopiesFlushWrittenPrefixesButRejectedAndEmptyCopiesDoNotFlush) {
         FlushTrackingBuffer buffer(device, std::size_t{6});
         {
@@ -643,6 +676,7 @@ namespace {
         buffer.uncheck_copy();
         EXPECT_EQ(buffer.flush_calls, 1);
     }
+
     TEST_F(BufferVulkanIntegrationTest, MappedHolderCopiesKeepExplicitFlushControl) {
         FlushTrackingBuffer buffer(device, std::size_t{16});
         auto mapped = buffer.data();
@@ -682,6 +716,7 @@ namespace {
         auto mapped = buffer.data(sizeof(raw));
         EXPECT_EQ(std::memcmp(mapped.data, raw, sizeof(raw)), 0);
     }
+
     TEST_F(BufferVulkanIntegrationTest, NegativeAndOversizedCountsLeaveStorageUntouchedAndNullEmptyCopiesSucceed) {
         const std::array<std::uint32_t, 4> initial{17, 23, 29, 31};
         HostBuffer buffer(device, initial);
@@ -714,6 +749,7 @@ namespace {
         EXPECT_TRUE(mapped.copy(raw, THREE_ELEMENTS));
         EXPECT_EQ(std::memcmp(mapped.data, expected.data(), sizeof(expected)), 0);
     }
+
     TEST_F(BufferVulkanIntegrationTest, NegativeAndEmptyEnumCountsKeepExistingStorageIntact) {
         const std::array<std::uint32_t, 4> initial{17, 23, 29, 31};
         HostBuffer buffer(device, initial);
@@ -746,6 +782,7 @@ namespace {
         // 旧実装では乗算が1要素分へ折り返す値で、実際の確保とコピーを有効な範囲に保つ。
         EXPECT_THROW((HostBuffer(device, &source, overflowing_count)), vsl::exceptions::RuntimeException);
     }
+
     TEST_F(BufferVulkanIntegrationTest, DeviceLocalArrayConstructionRejectsByteCountOverflowInsteadOfWrapping) {
         const std::uint32_t source = 23;
         const auto overflowing_count = std::numeric_limits<std::size_t>::max() / sizeof(source) + 2;
@@ -753,6 +790,7 @@ namespace {
         using Buffer = vsl::DeviceLocalBuffer<vsl::MemoryType::TRANSFER_SOURCE>;
         EXPECT_THROW((Buffer(device, manager, &source, overflowing_count)), vsl::exceptions::RuntimeException);
     }
+
     TEST_F(BufferVulkanIntegrationTest, ArrayConstructionRejectsZeroElementsBeforeCreatingNativeBuffers) {
         const std::uint32_t source = 29;
         EXPECT_THROW((HostBuffer(device, &source, std::size_t{0})), vsl::exceptions::RuntimeException);
@@ -777,6 +815,7 @@ namespace {
             EXPECT_NE(error.reason.find("memory type"), std::string::npos) << error.reason;
         }
     }
+
     TEST_F(BufferVulkanIntegrationTest, FailedMemorySelectionDoesNotPreventLaterValidAllocations) {
         using Unsupported = vsl::Buffer<vsl::MemoryType::TRANSFER_SOURCE,
                                         vsl::MemoryProperty::HOST_VISIBLE | vsl::MemoryProperty::LAZILY_ALLOCATED>;
@@ -838,6 +877,7 @@ namespace {
         vsl::Buffer<vsl::MemoryType::STORAGE_BUFFER, vsl::MemoryProperty::HOST_VISIBLE> storage(device, WIDTH * HEIGHT * 4);
         EXPECT_THROW((VSL_NAMESPACE::command::ImageReadback(&storage, *color, VSL_NAMESPACE::ImageLayout::GENERAL).copy.description()), std::invalid_argument);
     }
+
     TEST_F(PersistentBufferVulkanIntegrationTest, InvalidationPathAlignsPartialRangesAndKeepsMapping) {
         auto manager = make_manager();
         ReadbackBuffer destination(device, WIDTH * HEIGHT * 4);
@@ -859,6 +899,7 @@ namespace {
         EXPECT_EQ(partial[2], std::byte{255});
         EXPECT_EQ(mapping.read(1, destination.requested_size() - 1)[0], std::byte{255});
     }
+
     TEST_F(PersistentBufferVulkanIntegrationTest, RecordedCommandKeepsBufferAliveUntilCompletionOwnerReleasesIt) {
         auto manager = make_manager();
         std::weak_ptr<VSL_NAMESPACE::impl::BufferImpl> weak;
@@ -882,6 +923,7 @@ namespace {
         }
         EXPECT_TRUE(weak.expired());
     }
+
     TEST_F(PersistentBufferVulkanIntegrationTest, IndependentManagerHasOwnBuffersOnSameDeviceAndQueue) {
         auto producer = make_manager();
         auto transfer = producer.independent();
@@ -930,6 +972,7 @@ namespace {
         EXPECT_THROW(partial.write({}), std::logic_error);
         EXPECT_EQ(moved.read(1, 2)[0], payload[0]);
     }
+
     TEST_F(BufferVulkanIntegrationTest, FlushAndInvalidateAlignPartialViewsAndAllocationTail) {
         using Buffer = vsl::Buffer<vsl::MemoryType::TRANSFER_SOURCE, vsl::MemoryProperty::HOST_VISIBLE>;
         Buffer buffer(device, std::size_t{33});
@@ -948,6 +991,7 @@ namespace {
         EXPECT_NO_THROW(mapped.write({}, 33));
         EXPECT_NO_THROW(mapped.flush(0, 33));
     }
+
     TEST_F(BufferVulkanIntegrationTest, MappingKeepsItsOriginalStorageWhenBufferIsReassigned) {
         using Buffer = vsl::Buffer<vsl::MemoryType::TRANSFER_SOURCE, vsl::MemoryProperty::HOST_VISIBLE>;
         Buffer buffer(device, std::size_t{4});
@@ -960,6 +1004,7 @@ namespace {
         EXPECT_EQ(mapping.read(1)[0], payload[0]);
         EXPECT_EQ(mapping.data, original->mapped);
     }
+
     TEST_F(BufferVulkanIntegrationTest, RejectsUnavailableRequiredMemoryInsteadOfSelectingAnUnrelatedType) {
         const auto properties = StartupAccess::Owned(physical)->device.getMemoryProperties();
         auto selected = vk::MemoryPropertyFlags{};

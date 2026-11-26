@@ -5,6 +5,7 @@
 namespace {
     using VSL_NAMESPACE::lifetime::detail::StartupAccess;
 }
+
 namespace {
     class CopyImageToBufferVulkanIntegrationTest : public vsl_test::ImageTransferVulkanIntegrationTest {
         bool validate_vulkan() const override;
@@ -13,6 +14,7 @@ namespace {
     bool CopyImageToBufferVulkanIntegrationTest::validate_vulkan() const {
         return true;
     }
+
     TEST_F(CopyImageToBufferVulkanIntegrationTest, TypedAndAccessorOverloadsPreserveEveryTexel) {
         const std::array<std::uint32_t, 4> expected{0x12345678, 0x90abcdef, 0, 0xffffffff};
         EXPECT_EQ(round_trip(false, false), expected);

@@ -40,6 +40,7 @@ namespace VSL_NAMESPACE::typed::detail {
         const std::array sets{data.get()};
         lifetime::freeze_descriptor_dependencies(*data->owner_context, sets);
     }
+
     DescriptorValue DescriptorValue::FromBuffer(BufferView source, ResourceUse use) {
         const auto owner = source.owner_ref();
         if (!owner.use_count())
@@ -51,18 +52,21 @@ namespace VSL_NAMESPACE::typed::detail {
         result._use = source.resource_use(std::move(use));
         return result;
     }
+
     DescriptorValue DescriptorValue::FromImage(ImageAccessor source, ResourceUse use) {
         DescriptorValue result;
         result._image = lifetime::detail::ImageAccess::Owned(source);
         result._use = std::move(use);
         return result;
     }
+
     DescriptorValue DescriptorValue::FromSampler(SamplerAccessor source, ResourceUse use) {
         DescriptorValue result;
         result._sampler = lifetime::detail::SamplerAccess::Owned(source);
         result._use = std::move(use);
         return result;
     }
+
     DescriptorValue DescriptorValue::FromTexture(ImageAccessor image, SamplerAccessor sampler, ResourceUse use) {
         DescriptorValue result;
         result._image = lifetime::detail::ImageAccess::Owned(image);
@@ -70,6 +74,7 @@ namespace VSL_NAMESPACE::typed::detail {
         result._use = std::move(use);
         return result;
     }
+
     DescriptorValue DescriptorValue::buffer_subview(size_t offset, size_t bytes) const {
         if (!_buffer)
             throw std::logic_error("Descriptor value has no buffer");
@@ -80,12 +85,15 @@ namespace VSL_NAMESPACE::typed::detail {
         next._bytes = bytes;
         return next;
     }
+
     ImageAccessor DescriptorValue::image() const {
         return lifetime::detail::ImageAccess::FromOwned(_image);
     }
+
     SamplerAccessor DescriptorValue::sampler() const {
         return lifetime::detail::SamplerAccess::FromOwned(_sampler);
     }
+
     ResourceUse descriptor_constraints(const DescriptorValue& value) {
         const auto matches = [&](const auto& owner) {
             if (!owner || !value._use.state.use_count() || value._use.state.get() != owner->use)
@@ -97,11 +105,13 @@ namespace VSL_NAMESPACE::typed::detail {
             return {value._use.constraint_state, value._use.constraint_owner};
         return value._use;
     }
+
     void require_descriptor_complete(const GraphicResource& resource) {
         if (!DescriptorAccess::Owned(resource))
             throw std::logic_error("Typed descriptor resource has been destroyed");
         lifetime::require_descriptor_complete(*DescriptorAccess::Owned(resource));
     }
+
     void validate_descriptor_resource(const GraphicResource& resource, LogicalDeviceAccessor device, std::span<const graphic_resource::BindingPoint> points) {
         lifetime::require_device_owner(device);
         if (!DescriptorAccess::Owned(resource) || !DescriptorAccess::Owned(resource).use_count())
@@ -112,6 +122,7 @@ namespace VSL_NAMESPACE::typed::detail {
             throw std::invalid_argument("Typed descriptor import device/layout mismatch");
         operation::validate_descriptor_layout(*target.layout, *StartupAccess::Owned(device), points);
     }
+
     GraphicResource allocate_descriptor_set(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager,
                                             std::span<const graphic_resource::BindingPoint> points) {
         graphic_resource::BindingLayout layout(device, std::vector<graphic_resource::BindingPoint>(points.begin(), points.end()));
@@ -120,6 +131,7 @@ namespace VSL_NAMESPACE::typed::detail {
             throw std::runtime_error("Typed descriptor allocation failed");
         return std::move(resources.front());
     }
+
     void write_descriptor(GraphicResource resource, graphic_resource::BindingPoint point, std::span<const DescriptorValue> values) {
         const auto& target = DescriptorAccess::Owned(resource);
         if (!target || !target->pool || !target->pool->descriptor_pool || !target->descriptor_set)
@@ -212,6 +224,7 @@ namespace VSL_NAMESPACE::typed::detail {
             validate_descriptor_blocks(reflection.generated, requirements);
         }
     }
+
     void validate_dispatch(LogicalDeviceAccessor device, size_t x, size_t y, size_t z) {
         const auto limits = StartupAccess::Owned(device)->parent_device->device.getProperties().limits;
         const std::array<size_t, 3> counts{x, y, z};

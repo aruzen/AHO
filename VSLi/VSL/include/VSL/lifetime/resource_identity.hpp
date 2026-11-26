@@ -21,6 +21,7 @@ namespace VSL_NAMESPACE::lifetime {
     class ResourceIdentity {
         const void* _value = nullptr;
         friend struct detail::IdentityAccess;
+
         explicit ResourceIdentity(const void* value) : _value(value) {}
 
     public:

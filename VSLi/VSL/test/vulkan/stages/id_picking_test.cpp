@@ -3,6 +3,7 @@
 namespace {
     namespace pl = vsl::pipeline_layout;
     using IdPickingVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
     TEST_F(IdPickingVulkanIntegrationTest, InjectsExpectedPipelineState) {
         auto layout = make_layout_state();
 

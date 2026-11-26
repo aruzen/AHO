@@ -10,6 +10,7 @@ namespace {
 
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_nothrow_default_constructible_v<impl::SamplerImpl>);
+
     namespace {
         struct HeapSamplerOwner {
             DependencyNode node;
@@ -18,10 +19,12 @@ namespace VSL_NAMESPACE::lifetime {
             HeapSamplerOwner(LogicalDeviceAccessor device, const SamplerCreateInfo& info);
             ~HeapSamplerOwner();
         };
+
         HeapSamplerOwner::HeapSamplerOwner(LogicalDeviceAccessor device, const SamplerCreateInfo& info) : device(device) {
             require_device_owner(device);
             construct_sampler(storage, *StartupAccess::Owned(device), info);
         }
+
         HeapSamplerOwner::~HeapSamplerOwner() {
             node.retire();
             destroy_sampler(storage);
@@ -32,6 +35,7 @@ namespace VSL_NAMESPACE::lifetime {
         require_device_owner(device);
         construct_sampler(storage, *StartupAccess::Owned(device), info);
     }
+
     void construct_sampler(void* storage, impl::LogicalDeviceImpl& device, const SamplerCreateInfo& info) {
         if (!device.device)
             throw std::invalid_argument("Sampler requires a live device");
@@ -47,10 +51,12 @@ namespace VSL_NAMESPACE::lifetime {
             throw;
         }
     }
+
     impl::SamplerImpl& sampler_at(void* storage) {
         auto* slot = static_cast<SamplerSlotStorage*>(storage);
         return *std::launder(reinterpret_cast<impl::SamplerImpl*>(slot->sampler));
     }
+
     void destroy_sampler(void* storage) noexcept {
         auto& sampler = sampler_at(storage);
         operation::destroy_sampler(sampler);
@@ -58,6 +64,7 @@ namespace VSL_NAMESPACE::lifetime {
         std::destroy_at(&sampler);
         std::destroy_at(static_cast<SamplerSlotStorage*>(storage));
     }
+
     std::shared_ptr<impl::SamplerImpl> make_heap_sampler(LogicalDeviceAccessor device, const SamplerCreateInfo& info) {
         auto owner = std::make_shared<HeapSamplerOwner>(device, info);
         auto* sampler = &sampler_at(owner->storage);

@@ -19,11 +19,13 @@ namespace VSL_NAMESPACE::operation {
         const vk::ShaderModuleCreateInfo create{.codeSize = target.code.size() * sizeof(std::uint32_t), .pCode = target.code.data()};
         target.shader_module = device.device.createShaderModule(create);
     }
+
     void destroy_shader(impl::ShaderImpl& target) noexcept {
         if (target.shader_module)
             target.native_device.destroyShaderModule(target.shader_module);
         target.shader_module = nullptr;
     }
+
     vk::PipelineShaderStageCreateInfo shader_stage(const impl::ShaderImpl& shader) {
         if (!shader.shader_module || shader.name.empty())
             throw std::invalid_argument("Shader stage requires a live module and entry point");

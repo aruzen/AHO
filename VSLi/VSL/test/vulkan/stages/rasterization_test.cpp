@@ -8,6 +8,7 @@ namespace {
 namespace {
     namespace pl = vsl::pipeline_layout;
     using RasterizationVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
     TEST_F(RasterizationVulkanIntegrationTest, InjectsExpectedPipelineState) {
         auto layout = make_layout_state();
 

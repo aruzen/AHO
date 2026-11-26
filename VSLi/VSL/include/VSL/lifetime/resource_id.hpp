@@ -14,6 +14,7 @@ namespace VSL_NAMESPACE::typed {
         FRAME,
         TRANSIENT
     };
+
     struct LifetimeGroup {
         LifetimeScope scope;
         size_t instance;

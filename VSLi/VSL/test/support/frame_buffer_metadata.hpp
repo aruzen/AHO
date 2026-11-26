@@ -10,7 +10,9 @@ namespace vsl_test {
         vsl::impl::FrameBufferImpl target;
         FrameBufferMetadata(vsl::lifetime::OwnedRef<vsl::impl::RenderPassImpl> pass, std::uint32_t width, std::uint32_t height);
     };
+
     inline vsl::FrameBufferAccessor metadata_frame_buffer(vsl::lifetime::OwnedRef<vsl::impl::RenderPassImpl> pass, std::uint32_t width = 1, std::uint32_t height = 1);
+
     inline FrameBufferMetadata::FrameBufferMetadata(vsl::lifetime::OwnedRef<vsl::impl::RenderPassImpl> pass, std::uint32_t width, std::uint32_t height)
         : pass(std::move(pass)) {
         target.render_pass = this->pass.get();
@@ -20,6 +22,7 @@ namespace vsl_test {
         const auto source = vsl::lifetime::detail::GraphicsAccess::FromOwned(this->pass);
         context.pass = source.owner_ref().alias(this->pass.get()).weak();
     }
+
     inline vsl::FrameBufferAccessor metadata_frame_buffer(vsl::lifetime::OwnedRef<vsl::impl::RenderPassImpl> pass, std::uint32_t width, std::uint32_t height) {
         auto owner = std::make_shared<FrameBufferMetadata>(std::move(pass), width, height);
         auto* value = &owner->target;

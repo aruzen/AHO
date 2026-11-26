@@ -22,6 +22,7 @@ namespace VSL_NAMESPACE::operation {
         target.window = window;
         target.surface = vk::SurfaceKHR(native);
     }
+
     void destroy_surface(impl::SurfaceImpl& target, const SurfaceNativeCalls& calls) noexcept {
         const auto native = std::exchange(target.surface, {});
         if (!native || !target.native_instance)

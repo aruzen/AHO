@@ -8,6 +8,7 @@ namespace VSL_NAMESPACE::operation {
         VkResult (*create)(void*, VkPhysicalDevice, const VkDeviceCreateInfo*, VkDevice*) = nullptr;
         void (*destroy)(void*, VkDevice) noexcept = nullptr;
     };
+
     DeviceFeature supported_device_features(impl::PhysicalDeviceImpl& physical);
     DeviceCreateInfo graphics_device_info(impl::PhysicalDeviceImpl& physical, impl::SurfaceImpl& surface, bool validation,
                                           PresentFencePolicy present_fences = PresentFencePolicy::LEGACY);

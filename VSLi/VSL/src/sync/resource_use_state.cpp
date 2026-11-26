@@ -7,6 +7,7 @@
 
 namespace VSL_NAMESPACE {
     CompletionObservation::CompletionObservation(const Completion& completion) : _result(completion) {}
+
     Completion::Status CompletionObservation::status() const {
         return _result.status();
     }
@@ -23,15 +24,18 @@ namespace VSL_NAMESPACE {
                                (_uncertain != UncertainUsePolicy::REQUIRE_RECREATION || result->native.enqueue != sync::SubmissionEnqueue::UNKNOWN));
         });
     }
+
     void ResourceUseState::require_known_use() const {
         if (_uncertain == UncertainUsePolicy::REQUIRE_RECREATION &&
             std::ranges::any_of(_uses, [](const auto& result) { return result && result->native.enqueue == sync::SubmissionEnqueue::UNKNOWN; }))
             throw std::logic_error("Resource state is uncertain; recreate the resource");
     }
+
     bool ResourceUseState::busy() const {
         discard_finished();
         return std::ranges::any_of(_uses, [](const auto& result) { return result && sync::pending_use(*result); });
     }
+
     bool ResourceUseState::wait(std::uint64_t timeout) const {
         discard_finished();
         if (std::ranges::any_of(_uses, [](const auto& result) { return result && (result->status == Completion::Status::PENDING || result->native.active); }))
@@ -48,10 +52,12 @@ namespace VSL_NAMESPACE {
         discard_finished();
         return !std::ranges::any_of(_uses, [](const auto& result) { return result && sync::pending_use(*result); });
     }
+
     void ResourceUseState::require_idle() const {
         if (busy())
             throw std::logic_error("Resource is still in use");
     }
+
     void ResourceUseState::check_available(const Completion& completion) const {
         const auto pending = completion;
         if (!pending || pending.status() != Completion::Status::PENDING || !sync::recordable(*pending.data_))
@@ -63,6 +69,7 @@ namespace VSL_NAMESPACE {
         if (std::ranges::any_of(_uses, [&](const auto& result) { return result != pending.data_ && sync::pending_use(*result); }))
             throw std::logic_error("Resource is in use by another phase");
     }
+
     void ResourceUseState::track_pending(const Completion& completion) const {
         if (!completion || !sync::recordable(*completion.data_))
             throw std::logic_error("Resource use requires a recording phase");
@@ -74,6 +81,7 @@ namespace VSL_NAMESPACE {
         if (!std::ranges::any_of(_uses, [&](const auto& result) { return result == completion.data_; }))
             _uses.push_back(completion.data_);
     }
+
     void ResourceUseState::mark_used(Completion completion) const {
         track_pending(completion);
         // callback中も新しい記録が先に見えるようにする。観測失敗時も取消まで保持する。

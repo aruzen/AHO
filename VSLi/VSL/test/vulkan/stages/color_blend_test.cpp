@@ -8,6 +8,7 @@ namespace {
 namespace {
     namespace pl = vsl::pipeline_layout;
     using ColorBlendVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
     TEST_F(ColorBlendVulkanIntegrationTest, InjectsExpectedPipelineState) {
         auto layout = make_layout_state();
 

@@ -10,22 +10,26 @@ namespace VSL_NAMESPACE {
             return left.get() == right.get() && !left.owner_before(right) && !right.owner_before(left);
         }
     } // namespace
+
     std::vector<std::shared_ptr<PureWindow::WindowData>>& lifetime::detail::WindowAccess::Registry() noexcept {
         static std::vector<std::shared_ptr<PureWindow::WindowData>> WINDOWS;
         return WINDOWS;
     }
+
     PureWindow lifetime::detail::WindowAccess::FindNative(void* native) noexcept {
         for (const auto& state : Registry())
             if (state->window_handle == native && !state->closed)
                 return FromState(state);
         return {};
     }
+
     void PureWindow::RequirePluginTarget(const std::shared_ptr<WindowData>& state) {
         if (!state)
             throw exceptions::RuntimeException("window", "Window data is required");
         if (state->closed)
             throw std::invalid_argument("Cannot register a plugin on a closed window");
     }
+
     void PureWindow::PublishPlugin(const std::shared_ptr<WindowData>& state, std::shared_ptr<Plugin> plugin) {
         RequirePluginTarget(state);
         auto candidate = plugin->requested_id().value_or(state->plugins_next_id);
@@ -55,6 +59,7 @@ namespace VSL_NAMESPACE {
             state->plugins_next_id = static_cast<PluginId>(candidate + 1);
         // 旧pluginのdestructorは、登録表と購読順序のcommit後にのみ実行する。
     }
+
     bool PureWindow::remove_plugin(std::shared_ptr<Plugin> plugin) {
         const auto state = _state;
         if (!state || !plugin)
@@ -66,12 +71,14 @@ namespace VSL_NAMESPACE {
         state->plugins.erase(entry);
         return true;
     }
+
     std::shared_ptr<PureWindow::Plugin> PureWindow::plugin(PluginId id) const {
         if (!_state)
             return {};
         const auto entry = _state->plugins.find(id);
         return entry == _state->plugins.end() ? std::shared_ptr<Plugin>{} : entry->second;
     }
+
     std::optional<PureWindow::PluginId> PureWindow::plugin_id(const std::shared_ptr<Plugin>& plugin) const noexcept {
         if (_state)
             for (const auto& [id, entry] : _state->plugins)
@@ -79,12 +86,14 @@ namespace VSL_NAMESPACE {
                     return id;
         return std::nullopt;
     }
+
     bool PureWindow::contains_plugin(PluginId id, const std::shared_ptr<Plugin>& plugin) const noexcept {
         if (!_state || !plugin)
             return false;
         const auto entry = _state->plugins.find(id);
         return entry != _state->plugins.end() && same_plugin(entry->second, plugin);
     }
+
     std::vector<PureWindow::PluginSnapshot> PureWindow::plugin_snapshot() const {
         std::vector<PluginSnapshot> result;
         if (_state) {
@@ -94,6 +103,7 @@ namespace VSL_NAMESPACE {
         }
         return result;
     }
+
     std::vector<PureWindow> PureWindow::Snapshot() {
         std::vector<PureWindow> result;
         const auto& windows = lifetime::detail::WindowAccess::Registry();
@@ -102,6 +112,7 @@ namespace VSL_NAMESPACE {
             result.push_back(PureWindow(state));
         return result;
     }
+
     bool PureWindow::NoCheckUpdate() {
         lifetime::GLFWCallScope scope;
         if (lifetime::in_glfw_callback())
@@ -110,6 +121,7 @@ namespace VSL_NAMESPACE {
             operation::poll_os_windows();
         return true;
     }
+
     bool PureWindow::Update() {
         lifetime::GLFWCallScope scope;
         NoCheckUpdate();
@@ -137,6 +149,7 @@ namespace VSL_NAMESPACE {
         }
         return result;
     }
+
     void PureWindow::WindowData::destroy() {
         if (!window_handle)
             return;

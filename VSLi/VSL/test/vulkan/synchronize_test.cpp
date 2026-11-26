@@ -25,29 +25,36 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     struct SynchronizationDestructionProbe {
         std::function<void()> action;
         std::exception_ptr failure;
         static void Destroy(void* context, VkDevice device, VkSemaphore semaphore) noexcept;
     };
+
     // queue未送信のunsignaled fenceでSUBMITTED判定を固定する。
     struct SubmittedFence {
         std::shared_ptr<vsl::impl::SubmissionWork> work;
         SubmittedFence(vsl::FenceHolder fence, std::uint32_t index);
         ~SubmittedFence();
     };
+
     class SynchronizeVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
     protected:
         bool validate_vulkan() const override { return true; }
+
         std::optional<VSL_NAMESPACE::SynchroManager> manager;
+
         void SetUp() override {
             VulkanIntegrationTest::SetUp();
             if (!HasFatalFailure() && !IsSkipped())
                 manager.emplace(device);
         }
+
         void TearDown() override;
     };
+
     SubmittedFence::SubmittedFence(vsl::FenceHolder fence, std::uint32_t index) : work(std::make_shared<vsl::impl::SubmissionWork>()) {
         work->device = StartupAccess::Shared(fence.get_device());
         work->external_fence = SynchronizationAccess::Owned(fence).get();
@@ -59,9 +66,11 @@ namespace {
         work->result->status = vsl::Completion::Status::SUBMITTED;
         vsl::sync::mark_fence_submitted(*SynchronizationAccess::Owned(fence), index, work->result);
     }
+
     SubmittedFence::~SubmittedFence() {
         vsl::sync::publish_terminal(*work, vsl::Completion::Status::COMPLETE);
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, NamedLookupAndSemaphoreCounts) {
         EXPECT_FALSE(manager->get_fence("missing"));
         EXPECT_FALSE(manager->get_semaphore("missing"));
@@ -75,6 +84,7 @@ namespace {
         EXPECT_EQ(SynchronizationAccess::Owned(*(manager->get_semaphore("many"))), SynchronizationAccess::Owned(many));
         EXPECT_NE(SynchronizationAccess::Owned(many)->semaphores[0], SynchronizationAccess::Owned(many)->semaphores[1]);
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, FenceWaitResetAndQueueSignalHaveObservableStates) {
         auto single = manager->create_fence("single", true);
         auto many = manager->create_fence("many", std::size_t{2}, true);
@@ -122,6 +132,7 @@ namespace {
         EXPECT_NO_THROW(fence.reset(1));
         EXPECT_EQ(b.completion().status(), vsl::Completion::Status::COMPLETE);
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, AcquireReservationsProtectOnlyTheirElementAndSaveProofBeforeReset) {
         auto fence = manager->create_fence("acquisition", std::size_t{2}, true);
         auto first = std::make_shared<vsl::sync::FenceProof>();
@@ -149,6 +160,7 @@ namespace {
         EXPECT_TRUE(vsl::sync::poll_fence_proof(*next));
         EXPECT_EQ(first->status, vsl::sync::FenceProofStatus::NOT_ACQUIRED);
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, UnknownPresentEnqueueAllowsOnlyPollingAndRejectsReuse) {
         auto fence = manager->create_fence("unknown present", std::size_t{2});
         auto state = std::make_shared<vsl::sync::PresentState>();
@@ -168,6 +180,7 @@ namespace {
         state->status = vsl::sync::PresentStatus::CANCELLED;
         EXPECT_NO_THROW(fence.destroy());
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, AcquireReservationPinsTheOriginalProofAcrossGraphicsRelease) {
         auto fence = manager->create_fence("proof replacement");
         auto commands = make_manager().independent(1);
@@ -193,6 +206,7 @@ namespace {
         vsl::lifetime::release_acquire_fence(*SynchronizationAccess::Owned(fence), 0, original);
         EXPECT_NO_THROW(fence.reset());
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, FenceArrayLossIsSavedForEveryWorkBeforeReleaseCallbacks) {
         auto fence = manager->create_fence("batch", std::size_t{2});
         auto first = make_manager().independent(1), second = make_manager().independent(2);
@@ -226,6 +240,7 @@ namespace {
         EXPECT_EQ(a.error_code(), VK_ERROR_DEVICE_LOST);
         EXPECT_EQ(b.error_code(), VK_ERROR_DEVICE_LOST);
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, FenceArrayObservationPinsAllWorkAndBlocksRecursiveQueries) {
         auto fence = manager->create_fence("observed", std::size_t{2});
         auto first = make_manager().independent(1), second = make_manager().independent(2);
@@ -236,12 +251,14 @@ namespace {
         const std::weak_ptr<vsl::impl::CommandBufferImpl> ring = CommandAccess::Data(first.get_buffer());
         ASSERT_EQ(a->submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         ASSERT_EQ(b.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
+
         struct Probe {
             vsl::Completion first, second;
             vsl::FenceHolder fence;
             unsigned calls = 0;
             std::function<void()> release_facades;
         } probe{ca, cb, fence};
+
         probe.release_facades = [&] {
             a.reset();
             first = vsl::CommandManager(CommandAccess::RawManager(nullptr));
@@ -264,6 +281,7 @@ namespace {
         EXPECT_EQ(cb.status(), vsl::Completion::Status::COMPLETE);
         EXPECT_TRUE(ring.expired());
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, AcquisitionObservationBlocksFenceReuseAndKeepsASavedTerminalProof) {
         auto fence = manager->create_fence("proof", true);
         auto proof = std::make_shared<vsl::sync::FenceProof>();
@@ -274,11 +292,13 @@ namespace {
         proof->status = vsl::sync::FenceProofStatus::UNCERTAIN;
         EXPECT_THROW(fence.wait(), std::logic_error);
         proof->status = vsl::sync::FenceProofStatus::PENDING;
+
         struct Probe {
             vsl::FenceHolder fence;
             std::shared_ptr<vsl::sync::FenceProof> proof;
             unsigned calls = 0;
         } probe{fence, proof};
+
         const vsl::operation::ScopedSubmissionNativeCalls native({.context = &probe, .fence_status = +[](void* context, VkDevice, VkFence) noexcept {
                                                                       auto& probe = *static_cast<Probe*>(context);
                                                                       if (++probe.calls > 1)
@@ -296,6 +316,7 @@ namespace {
         EXPECT_EQ(probe.calls, 1u);
         EXPECT_NO_THROW(fence.reset());
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, WSISemaphoreLeasesSeparateElementsAndPreserveTheReacquireAncestry) {
         auto source = manager->create_semaphore("leased", 2);
         const auto result = std::make_shared<vsl::impl::SubmissionImpl>();
@@ -326,6 +347,7 @@ namespace {
         EXPECT_THROW(vsl::sync::require_graphics_signal(*SynchronizationAccess::Owned(source), 1, result, third.get()), std::logic_error);
         first->complete = second->complete = third->complete = unrelated->complete = true;
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, AllFenceMutationsCheckEveryElementBeforeNativeChanges) {
         auto fence = manager->create_fence("array", std::size_t{2}, true);
         fence.reset(1);
@@ -339,6 +361,7 @@ namespace {
         EXPECT_NO_THROW(fence.reset(0));
         EXPECT_FALSE(fence.wait(0, 0));
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, FenceCallbacksUseTheOriginalOwnerAndPreserveNamedReplacements) {
         for (const int operation : {0, 1, 2}) {
             auto commands = make_manager().independent(1);
@@ -381,6 +404,7 @@ namespace {
                 EXPECT_TRUE(SynchronizationAccess::Owned(alias)->fences.empty());
         }
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, SemaphoreTracksEveryPendingUseAndReleasesTerminalUsesWithoutOwnerCountHeuristics) {
         auto semaphore = manager->create_semaphore("shared");
         auto producer = make_manager().independent(1), consumer = make_manager().independent(1);
@@ -395,6 +419,7 @@ namespace {
         EXPECT_NO_THROW(semaphore.destroy());
         EXPECT_EQ(semaphore.size(), 0u);
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, SharedWaitAndSignalSourceRetainsOneOwnerAndOneUse) {
         auto semaphore = manager->create_semaphore("two roles");
         auto commands = make_manager().independent(1);
@@ -413,6 +438,7 @@ namespace {
         phase.cancel();
         EXPECT_NO_THROW(semaphore.destroy());
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, SemaphoreSubmittedUseAndBusyNamedReplacementAreIndependent) {
         auto old = manager->create_semaphore("same");
         auto fence = manager->create_fence("probe", false);
@@ -426,6 +452,7 @@ namespace {
         EXPECT_NO_THROW(old.destroy());
         EXPECT_EQ(SynchronizationAccess::Owned(*(manager->get_semaphore("same"))), SynchronizationAccess::Owned(replacement));
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, SemaphoreDestroyCanReplaceItsHolderAndReleaseItsRegistryDuringCompletion) {
         auto holder = manager->create_semaphore("snapshot");
         const auto alias = holder;
@@ -451,6 +478,7 @@ namespace {
         EXPECT_TRUE(SynchronizationAccess::Owned(alias)->semaphores.empty());
         EXPECT_EQ(holder.size(), 1u);
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, CreationValidationLeavesExistingNamesAndHandlesIntact) {
         auto fence = manager->create_fence("fence", true);
         auto semaphore = manager->create_semaphore("semaphore");
@@ -463,6 +491,7 @@ namespace {
         EXPECT_TRUE(fence.wait(std::uint64_t{0}));
         EXPECT_EQ(semaphore.size(), 1u);
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, ForeignControlBlocksCannotBorrowOrDestroyTheSameNativeObjects) {
         auto fence = manager->create_fence("canonical", true);
         auto semaphore = manager->create_semaphore("canonical");
@@ -479,6 +508,7 @@ namespace {
         EXPECT_TRUE(fence.wait(std::uint64_t{0}));
         EXPECT_EQ(semaphore.size(), 1u);
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, ReservationWaitCallbackCannotResetDestroyOrStealTheElement) {
         auto fence = manager->create_fence("gate", std::size_t{2}, true);
         auto first = make_manager().independent(1), next = make_manager().independent(1), thief = make_manager().independent(1);
@@ -501,6 +531,7 @@ namespace {
         EXPECT_EQ(phase.completion().status(), vsl::Completion::Status::PENDING);
         phase.cancel();
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, FailedPreparationAndChangedFieldsDoNotLeavePendingUses) {
         auto commands = make_manager().independent(1);
         auto fence = manager->create_fence("failure", false);
@@ -543,6 +574,7 @@ namespace {
         EXPECT_EQ(alias.size(), 0u);
         EXPECT_FALSE(manager->get_semaphore("signal"));
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, HoldersOutliveManagerWithoutOwningIt) {
         auto fence = manager->create_fence("survivor", true);
         auto semaphore = manager->create_semaphore("survivor");
@@ -574,6 +606,7 @@ namespace {
         SynchronizationAccess::Owned(retained)->semaphores.clear();
         EXPECT_FALSE(manager->destroy_semaphore("b"));
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, FenceDestroyRemovesOnlyItsNameAndDisarmsAllAliases) {
         auto value = manager->create_fence("a", std::size_t{2}, true);
         auto alias = value;
@@ -591,6 +624,7 @@ namespace {
         SynchronizationAccess::Owned(retained)->fences.clear();
         EXPECT_FALSE(manager->destroy_fence("b"));
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, DestroyingReplacedHoldersKeepsTheCurrentNamedObjectsAlive) {
         auto old_semaphore = manager->create_semaphore("same");
         auto old_fence = manager->create_fence("same", true);
@@ -628,6 +662,7 @@ namespace {
             probe.failure = std::current_exception();
         }
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, NamedReplacementPublishesBeforeOldDestructionRecreatesTheSameName) {
         manager->create_semaphore("same");
         SynchronizationDestructionProbe probe;
@@ -648,6 +683,7 @@ namespace {
         EXPECT_NE(SynchronizationAccess::Owned(replaced).get(), SynchronizationAccess::Owned(recreated).get());
         EXPECT_EQ(recreated.size(), 1u);
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, HolderAssignmentPublishesBeforeOldDestructionReleasesTheFacade) {
         std::optional<vsl::SemaphoreHolder> target(manager->create_semaphore("old"));
         manager.reset();
@@ -669,6 +705,7 @@ namespace {
         EXPECT_FALSE(target);
         EXPECT_EQ(replacement.size(), 1u);
     }
+
     TEST_F(SynchronizeVulkanIntegrationTest, ManagerAssignmentPublishesBeforeOldDestructionReleasesTheFacade) {
         manager->create_semaphore("old");
         vsl::SynchroManager replacement(device);

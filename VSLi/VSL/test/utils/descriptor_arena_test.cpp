@@ -51,6 +51,7 @@ namespace {
     std::uint32_t read_value(const vsl::BufferView& buffer);
     void make_host_visible(vsl::CommandManager manager);
     std::uint32_t execute_set(Pipeline& pipeline, vsl::CommandManager manager, const TypedSet& set, const vsl::BufferView& output);
+
     class DescriptorArenaVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
 
@@ -64,23 +65,28 @@ namespace {
                 vsl::BufferCreateInfo{4, vsl::MemoryType::STORAGE_BUFFER},
                 vsl::BufferCreateInfo{4, vsl::MemoryType::STORAGE_BUFFER}, LAYOUT_INFO, POOL_INFO};
     }
+
     void write_value(const vsl::BufferView& buffer, std::uint32_t value) {
         buffer.write(std::as_bytes(std::span(&value, 1)));
     }
+
     std::uint32_t read_value(const vsl::BufferView& buffer) {
         std::uint32_t value = 0;
         buffer.read_into(std::as_writable_bytes(std::span(&value, 1)));
         return value;
     }
+
     void make_host_visible(vsl::CommandManager manager) {
         const vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
         const vsl::NativeRecordingContext recording(manager.get_buffer());
         vk::CommandBuffer(recording.native_command_buffer()).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
     }
+
     Pipeline DescriptorArenaVulkanIntegrationTest::make_pipeline() {
         vsl::Shader<vsl::ShaderType::COMPUTE> shader(device, vsl_test::shader_path("typed_frame.comp.spv"));
         return {device, vsl::pipeline_layout::ShaderGroup("arena descriptors", {shader})};
     }
+
     TEST_F(DescriptorArenaVulkanIntegrationTest, RecipeLayoutImportsAndHeapSetsKeepCompositeProvenanceAndRejectOnlyTheirParentCycle) {
         using Access = l::detail::OwnerAccess;
         std::weak_ptr<void> observed_arena, observed_context;
@@ -132,6 +138,7 @@ namespace {
         EXPECT_TRUE(observed_context.expired());
         EXPECT_TRUE(observed_arena.expired());
     }
+
     std::uint32_t execute_set(Pipeline& pipeline, vsl::CommandManager manager, const TypedSet& set, const vsl::BufferView& output) {
         auto phase = manager.start_phase<vsl::ComputePhase>();
         phase << pipeline.bind_resources(set).dispatch(1);
@@ -150,6 +157,7 @@ namespace {
         EXPECT_EQ(DescriptorAccess::Owned(source.backend())->owner_context->policy, l::DependencyPolicy::DYNAMIC);
         EXPECT_FALSE(DescriptorAccess::Owned(source.backend())->owner_context->node.updating());
     }
+
     TEST_F(DescriptorArenaVulkanIntegrationTest, FreezeFailureKeepsDynamicOwnersAndCanBeRetriedAfterCancellation) {
         const auto initializers = inputs();
         l::ResourceArena arena(device, PLAN, initializers, l::DependencyPolicy::DYNAMIC);
@@ -175,6 +183,7 @@ namespace {
         EXPECT_NO_THROW(first.write<0>(external));
         EXPECT_THROW(second.write<0>(other), std::invalid_argument);
     }
+
     TEST_F(DescriptorArenaVulkanIntegrationTest, FreezeGatesPollCallbacksAndPinsTheRootWhenItsFacadeIsDestroyed) {
         const auto initializers = inputs();
         std::optional<l::ResourceArena> arena(std::in_place, device, PLAN, initializers, l::DependencyPolicy::DYNAMIC);
@@ -208,6 +217,7 @@ namespace {
         recording.cancel();
         EXPECT_TRUE(root.expired());
     }
+
     TEST_F(DescriptorArenaVulkanIntegrationTest, ReorderedDependenciesAndTwoSetSlotsUseTypedCommandsAndOneOwner) {
         const auto initializers = inputs();
         l::ResourceArena arena(device, PLAN, initializers);
@@ -563,6 +573,7 @@ namespace {
         }
         EXPECT_TRUE(observed.expired());
     }
+
     TEST_F(DescriptorArenaVulkanIntegrationTest, DynamicExternalStorageIsReleasedOnlyAfterItsLastBindingIsReplaced) {
         const auto initializers = inputs();
         l::ResourceArena arena(device, PLAN, initializers, l::DependencyPolicy::DYNAMIC);
@@ -591,16 +602,20 @@ namespace {
         EXPECT_TRUE(external.expired());
         EXPECT_EQ(execute_set(pipeline, manager, second, arena.buffer({3})), 17u);
     }
+
     TEST_F(DescriptorArenaVulkanIntegrationTest, NativeViewUpdatePreservesTheManagedCompositeOwnerWhenRejectingACycle) {
         struct Context {
             l::DependencyNode node;
             vsl::BufferView storage;
+
             explicit Context(vsl::BufferView storage) : storage(std::move(storage)) {}
             ~Context() { node.retire(); }
+
             static void Visit(const void* context, l::DependencyNode::EdgeVisitor visitor, void* output) {
                 visitor(output, static_cast<const Context*>(context)->storage.owner_ref());
             }
         };
+
         const auto initializers = inputs();
         l::ResourceArena arena(device, PLAN, initializers, l::DependencyPolicy::DYNAMIC);
         auto context = std::make_shared<Context>(arena.buffer({1}));
@@ -625,12 +640,15 @@ namespace {
         struct Context {
             l::DependencyNode node;
             l::OwnerRef physical;
+
             explicit Context(l::OwnerRef physical) : physical(std::move(physical)) {}
             ~Context() { node.retire(); }
+
             static void Visit(const void* context, l::DependencyNode::EdgeVisitor visitor, void* output) {
                 visitor(output, static_cast<const Context*>(context)->physical);
             }
         };
+
         std::weak_ptr<Context> observed;
         {
             constexpr std::array<t::ResourceRequest, 5> requests{{{{1}, IMAGE}, {{2}, SAMPLER}, {{3}, DESCRIPTOR_LAYOUT}, {{4}, DESCRIPTOR_POOL}, {{5}, DESCRIPTOR_SET}}};
@@ -712,6 +730,7 @@ namespace {
         EXPECT_THROW(first.write<1>(StorageView::FromView(b.buffer({2}), 1)), std::invalid_argument);
         EXPECT_EQ(execute_set(pipeline, manager, second, b.buffer({2})), 37u);
     }
+
     TEST_F(DescriptorArenaVulkanIntegrationTest, HeapSetPoolAndLayoutParentsPreventAnArenaCycleAndKeepTheNativeStorageAlive) {
         const std::array<t::ResourceRequest, 6> requests{{{{101}, DESCRIPTOR_SET}, {{1}, BUFFER}, {{2}, BUFFER}, {{3}, BUFFER}, {{201}, DESCRIPTOR_LAYOUT}, {{202}, DESCRIPTOR_POOL}}};
         const t::ResourcePlan<6> plan(requests);
@@ -743,6 +762,7 @@ namespace {
         retained.reset();
         EXPECT_TRUE(observed.expired());
     }
+
     TEST_F(DescriptorArenaVulkanIntegrationTest, ReplacedOwnerCallbacksSeeCommittedMetadataAndCanUpdateTheSameRoot) {
         const auto initializers = inputs();
         l::ResourceArena a(device, PLAN, initializers, l::DependencyPolicy::DYNAMIC);
@@ -768,6 +788,7 @@ namespace {
         auto pipeline = make_pipeline();
         EXPECT_EQ(execute_set(pipeline, make_manager().independent(1), first, b.buffer({2})), 61u);
     }
+
     TEST_F(DescriptorArenaVulkanIntegrationTest, NativePartialArrayUpdatesKeepTheUntouchedManagedEdgeUntilTheLastElementChanges) {
         using ArraySpec = t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE, 2>>;
         const std::array<t::ResourceRequest, 4> requests{{{{101}, DESCRIPTOR_SET}, {{1}, BUFFER}, {{201}, DESCRIPTOR_LAYOUT}, {{202}, DESCRIPTOR_POOL}}};
@@ -795,6 +816,7 @@ namespace {
         EXPECT_NO_THROW(second.write<0>(UniformView::FromView(b.buffer({1}), 1, 0, {logical, a.owner_ref()})));
         EXPECT_THROW(array.write<0>(std::array{foreign, local}), std::invalid_argument);
     }
+
     TEST_F(DescriptorArenaVulkanIntegrationTest, ImportedLayoutIsAFixedManagedParentEvenBeforeItsSetsHaveBindings) {
         const auto initializers = inputs();
         l::ResourceArena a(device, PLAN, initializers, l::DependencyPolicy::DYNAMIC);
@@ -827,16 +849,20 @@ namespace {
         EXPECT_THROW(resource.owner_ref(), std::invalid_argument);
         EXPECT_EQ(DescriptorAccess::Owned(resource)->descriptor_set, native);
     }
+
     TEST_F(DescriptorArenaVulkanIntegrationTest, KnownCompositeNodesAreValidatedWithoutRestrictingOpaqueOwners) {
         struct Composite {
             l::DependencyNode node;
             l::OwnerRef source;
+
             explicit Composite(l::OwnerRef source) : source(std::move(source)) {}
             ~Composite() { node.retire(); }
+
             static void Visit(const void* context, l::DependencyNode::EdgeVisitor visitor, void* output) {
                 visitor(output, static_cast<const Composite*>(context)->source);
             }
         };
+
         const auto initializers = inputs();
         l::ResourceArena arena(device, PLAN, initializers);
         const auto original = arena.descriptor_set({101});

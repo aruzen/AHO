@@ -13,6 +13,7 @@ static_assert(std::is_nothrow_move_assignable_v<vsl::PureWindow>);
 static_assert(noexcept(vsl::WeakWindow{}.lock()));
 static_assert(!std::is_aggregate_v<vsl::PureWindow>);
 void use_window(vsl::PureWindow window);
+
 void use_window(vsl::PureWindow window) {
     const auto identity = window.identity();
     const auto weak = window.weak();

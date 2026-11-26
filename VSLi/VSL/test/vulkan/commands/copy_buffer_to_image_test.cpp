@@ -17,6 +17,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     class ImageUploadRangeVulkanIntegrationTest : public vsl_test::ImageTransferVulkanIntegrationTest {
         bool validate_vulkan() const override;
@@ -27,6 +28,7 @@ namespace {
     bool ImageUploadRangeVulkanIntegrationTest::validate_vulkan() const {
         return true;
     }
+
     TEST_F(ImageUploadRangeVulkanIntegrationTest, AccessorRejectsAnEmptyImageBeforeRecording) {
         vsl::ImageAccessor image;
         vsl::StagingBuffer<> source(device, std::array<std::uint32_t, 1>{99});
@@ -35,6 +37,7 @@ namespace {
         EXPECT_THROW(image.copy_by_buffer(manager, &source, vsl::ImageLayout::GENERAL, 0), std::invalid_argument);
         EXPECT_FALSE(has_validation_errors());
     }
+
     TEST_F(ImageUploadRangeVulkanIntegrationTest, AccessorRejectsNonexistentLayerWithoutOverwritingTheImage) {
         TransferImage image(device, 1, 1, vsl::data_format::UNSIGNED_INT);
         vsl::ImageAccessor accessor = image;
@@ -68,6 +71,7 @@ namespace {
         EXPECT_EQ(read_pixel(), 99u);
         EXPECT_FALSE(has_validation_errors());
     }
+
     TEST_F(ImageUploadRangeVulkanIntegrationTest, RejectsSourceSmallerThanOneImageLayerBeforeRecording) {
         TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT);
         vsl::StagingBuffer<> source(device, std::size_t{4});
@@ -80,6 +84,7 @@ namespace {
         EXPECT_THROW(phase << command, std::out_of_range);
         EXPECT_FALSE(has_validation_errors());
     }
+
     TEST_F(ImageUploadRangeVulkanIntegrationTest, RejectsArrayUploadSourceSmallerThanOneImageLayer) {
         TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT, 2);
         vsl::StagingBuffer<> source(device, std::size_t{4});
@@ -91,6 +96,7 @@ namespace {
         EXPECT_THROW(phase << command, std::out_of_range);
         EXPECT_FALSE(has_validation_errors());
     }
+
     TEST_F(ImageUploadRangeVulkanIntegrationTest, RejectsArrayLayerEqualToTheLayerCountBeforeRecording) {
         TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT, 2);
         vsl::StagingBuffer<> source(device, std::size_t{16});
@@ -102,6 +108,7 @@ namespace {
         EXPECT_THROW(phase << command, std::out_of_range);
         EXPECT_FALSE(has_validation_errors());
     }
+
     TEST_F(ImageUploadRangeVulkanIntegrationTest, RejectsLayoutsThatCannotReceiveTransfers) {
         TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT, 2);
         vsl::StagingBuffer<> source(device, std::size_t{16});
@@ -114,6 +121,7 @@ namespace {
         EXPECT_THROW(phase << array, std::invalid_argument);
         EXPECT_FALSE(has_validation_errors());
     }
+
     TEST_F(ImageUploadRangeVulkanIntegrationTest, RejectsNullSourceAndImagesWithoutTransferDestinationUsage) {
         vsl::Image<vsl::ImageType::SAMPLED> image(device, 2, 2, vsl::data_format::UNSIGNED_INT);
         vsl::StagingBuffer<> source(device, std::size_t{16});
@@ -126,11 +134,13 @@ namespace {
         EXPECT_THROW(phase << wrong_usage, std::invalid_argument);
         EXPECT_FALSE(has_validation_errors());
     }
+
     TEST_F(CopyBufferToImageVulkanIntegrationTest, CopiesEveryTexelAndSelectedArrayLayer) {
         const std::array<std::uint32_t, 4> expected{0x12345678, 0x90abcdef, 0, 0xffffffff};
         EXPECT_EQ(round_trip(false, false), expected);
         EXPECT_EQ(round_trip(false, true), expected);
     }
+
     TEST_F(CopyBufferToImageVulkanIntegrationTest, TypedConstructorRetainsImageBufferAndDeclaredLayout) {
         TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT);
         vsl::StagingBuffer<vsl::MemoryType::TRANSFER_SOURCE> source(device, std::size_t{16});

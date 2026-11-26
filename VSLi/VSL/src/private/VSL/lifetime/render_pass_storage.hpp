@@ -5,6 +5,7 @@ namespace VSL_NAMESPACE::lifetime {
     struct RenderPassSlotStorage {
         alignas(impl::RenderPassImpl) std::byte value[sizeof(impl::RenderPassImpl)];
     };
+
     void construct_render_pass(void* storage, LogicalDeviceAccessor device, RenderPassDescription description);
     void construct_render_pass(void* storage, impl::LogicalDeviceImpl& device, RenderPassDescription description);
     void destroy_render_pass(void* storage) noexcept;

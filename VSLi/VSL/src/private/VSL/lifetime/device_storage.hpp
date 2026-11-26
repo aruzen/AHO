@@ -7,10 +7,12 @@ namespace VSL_NAMESPACE::lifetime {
     struct DeviceOwnerContext {
         WeakOwnedRef<impl::PhysicalDeviceImpl> physical;
     };
+
     struct DeviceSlotStorage {
         alignas(impl::LogicalDeviceImpl) std::byte value[sizeof(impl::LogicalDeviceImpl)];
         alignas(DeviceOwnerContext) std::byte context[sizeof(DeviceOwnerContext)];
     };
+
     void construct_device(void* storage, impl::PhysicalDeviceImpl& physical, DeviceCreateInfo info, const operation::DeviceNativeCalls& calls = {});
     void destroy_device(void* storage) noexcept;
     impl::LogicalDeviceImpl& device_at(void* storage);

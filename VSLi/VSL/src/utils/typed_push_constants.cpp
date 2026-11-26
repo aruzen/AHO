@@ -20,6 +20,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace VSL_NAMESPACE::typed::detail {
     void inject_push_schema(PipelineLayoutEditAccessor layout, std::span<const PushRequirement> requirements) {
         pipeline_layout::PushConstants pushes;
@@ -27,6 +28,7 @@ namespace VSL_NAMESPACE::typed::detail {
             pushes.definitions.push_back(requirement.range);
         pushes.injection(layout);
     }
+
     void validate_push_schema(const lifetime::PipelineRecipeSnapshot& recipe, std::span<const PushRequirement> requirements) {
         for (const auto& shader : PipelineRecipeAccess::Read(recipe).shaders) {
             utils::SPIRVReflector reflection({}, std::span<const std::uint32_t>(shader->code), shader->name, ShaderType(shader->stage));
@@ -50,6 +52,7 @@ namespace VSL_NAMESPACE::typed::detail {
             validate_push_blocks(reflection.generated, requirements);
         }
     }
+
     void validate_push_values(std::span<const PushRequirement> requirements, std::span<const std::byte> values) {
         for (const auto& requirement : requirements)
             if (requirement.data_offset > values.size() || requirement.range.size > values.size() - requirement.data_offset)
@@ -66,6 +69,7 @@ namespace VSL_NAMESPACE::typed::detail {
             }
         }
     }
+
     void invoke_push_values(PipelineAccessor pipeline, CommandBuffer buffer, std::span<const PushRequirement> requirements, std::span<const std::byte> values) {
         validate_push_values(requirements, values);
         buffer.retain(lifetime::detail::OwnerAccess::Shared(GraphicsAccess::Owned(pipeline)));

@@ -23,19 +23,24 @@ namespace VSL_NAMESPACE::lifetime {
     namespace detail {
         struct ResourceArenaOwner;
     }
+
     struct DescriptorSetInit {
         typed::ResourceId pool, layout;
     };
+
     using PipelineLayoutSource = std::variant<typed::ResourceId, graphic_resource::BindingLayout>;
+
     struct PipelineLayoutInit {
         // indexはnative set番号。同じIDを複数回参照でき、holeも明示した空Layoutで埋める。
         // IDはarenaの明示資源。直接のLayoutはnative構築呼出し中だけ保持する。
         std::vector<PipelineLayoutSource> layouts;
         std::vector<PushConstantRange> push_ranges;
     };
+
     using RuntimeLayoutSource = std::variant<typed::ResourceId, PipelineLayoutAccessor>;
     using PipelinePassSource = std::variant<typed::ResourceId, RenderPassAccessor>;
     using PipelineShaderSource = std::variant<typed::ResourceId, ShaderAccessor>;
+
     struct GraphicsPipelineInit {
         RuntimeLayoutSource layout;
         PipelinePassSource pass;
@@ -43,28 +48,35 @@ namespace VSL_NAMESPACE::lifetime {
         std::vector<PipelineShaderSource> shaders;
         std::uint32_t subpass = 0;
     };
+
     struct ComputePipelineInit {
         RuntimeLayoutSource layout;
         PipelineShaderSource shader;
     };
+
     using FrameBufferImageSource = std::variant<typed::ResourceId, ImageAccessor>;
+
     struct FrameBufferInit {
         PipelinePassSource pass;
         std::uint32_t width = 0, height = 0, layers = 1;
         // 全sourceを永続依存とする。行=native framebuffer、列=AttachmentId。
         std::vector<std::vector<FrameBufferImageSource>> attachments;
     };
+
     using CommandPoolSource = std::variant<typed::ResourceId, CommandPool>;
+
     struct CommandBufferInit {
         CommandPoolSource pool;
         std::uint32_t count = DEFAULT_BUFFER_SIZE;
     };
+
     using ResourceInit = std::variant<BufferCreateInfo, ImageCreateInfo, SamplerCreateInfo, BufferView, ImageAccessor, SamplerAccessor,
                                       DescriptorLayoutCreateInfo, DescriptorPoolCreateInfo, DescriptorSetInit,
                                       graphic_resource::BindingLayout, graphic_resource::Pool, ShaderCreateInfo, ShaderAccessor, PipelineLayoutInit, PipelineLayoutAccessor, RenderPassDescription, RenderPassAccessor,
                                       GraphicsPipelineInit, ComputePipelineInit, PipelineAccessor, FrameBufferInit, FrameBufferAccessor,
                                       CommandPoolCreateInfo, CommandBufferInit, CommandPool, CommandBuffer,
                                       SemaphoreCreateInfo, FenceCreateInfo, SemaphoreHolder, FenceHolder>;
+
     class ResourceArena {
         std::shared_ptr<detail::ResourceArenaOwner> _owner;
         ResourceArena(LogicalDeviceAccessor device, typed::LifetimeGroup group,
@@ -109,9 +121,11 @@ namespace VSL_NAMESPACE::lifetime {
     template<size_t capacity>
     ResourceArena::ResourceArena(LogicalDeviceAccessor device, const typed::ResourcePlan<capacity>& plan, std::span<const ResourceInit> initializers)
         : ResourceArena(device, plan, initializers, storage::ArenaMemory(plan.bytes(), plan.alignment())) {}
+
     template<size_t capacity>
     ResourceArena::ResourceArena(LogicalDeviceAccessor device, const typed::ResourcePlan<capacity>& plan, std::span<const ResourceInit> initializers, DependencyPolicy policy)
         : ResourceArena(device, plan, initializers, storage::ArenaMemory(plan.bytes(), plan.alignment()), {}, policy) {}
+
     template<size_t capacity>
     ResourceArena::ResourceArena(LogicalDeviceAccessor device, const typed::ResourcePlan<capacity>& plan, std::span<const ResourceInit> initializers, storage::ArenaMemory memory,
                                  std::span<const LogicalUseState> dependencies, DependencyPolicy policy)

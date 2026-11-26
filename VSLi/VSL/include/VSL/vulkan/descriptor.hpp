@@ -94,40 +94,51 @@ namespace VSL_NAMESPACE::graphic_resource {
 
         BindingLayout(const BindingLayout&) = default;
         BindingLayout(BindingLayout&&) noexcept = default;
+
         BindingLayout& operator=(BindingLayout replacement) noexcept {
             swap(replacement);
             return *this;
         }
+
         explicit operator bool() const noexcept { return bool(_owner); }
+
         lifetime::OwnerRef owner_ref() const;
         LogicalDeviceAccessor get_device() const;
+
         void swap(BindingLayout& other) noexcept { _owner.swap(other._owner); }
 
     private:
         friend struct lifetime::detail::DescriptorAccess;
         lifetime::OwnedRef<impl::ResourceBindingLayoutImpl> _owner;
+
         explicit BindingLayout(lifetime::OwnedRef<impl::ResourceBindingLayoutImpl> owner) : _owner(std::move(owner)) {}
     };
 
     struct ManagerInterface;
     struct Resource;
+
     struct Pool {
     private:
         friend struct lifetime::detail::DescriptorAccess;
         lifetime::OwnedRef<impl::GraphicResourcePoolImpl> _owner;
+
         explicit Pool(lifetime::OwnedRef<impl::GraphicResourcePoolImpl> owner) : _owner(std::move(owner)) {}
 
     public:
         Pool() = default;
         Pool(const Pool&) = default;
         Pool(Pool&&) noexcept = default;
+
         Pool& operator=(Pool replacement) noexcept {
             swap(replacement);
             return *this;
         }
+
         explicit operator bool() const noexcept { return bool(_owner); }
+
         lifetime::OwnerRef owner_ref() const;
         LogicalDeviceAccessor get_device() const;
+
         void swap(Pool& other) noexcept { _owner.swap(other._owner); }
 
         std::tuple<bool, Resource> bind(BindingLayout layout);
@@ -143,19 +154,25 @@ namespace VSL_NAMESPACE::graphic_resource {
     private:
         friend struct lifetime::detail::DescriptorAccess;
         lifetime::OwnedRef<impl::GraphicResourceImpl> _owner;
+
         explicit Resource(lifetime::OwnedRef<impl::GraphicResourceImpl> owner) : _owner(std::move(owner)) {}
 
     public:
         Resource() = default;
         Resource(const Resource&) = default;
         Resource(Resource&&) noexcept = default;
+
         Resource& operator=(Resource replacement) noexcept {
             swap(replacement);
             return *this;
         }
+
         explicit operator bool() const noexcept { return bool(_owner); }
+
         LogicalDeviceAccessor get_device() const;
+
         void swap(Resource& other) noexcept { _owner.swap(other._owner); }
+
         DescriptorIdentity identity() const;
         lifetime::OwnerRef owner_ref() const;
 

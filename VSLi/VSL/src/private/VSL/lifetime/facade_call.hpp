@@ -14,7 +14,9 @@ namespace VSL_NAMESPACE::lifetime {
         ~FacadeCall();
         FacadeCall(const FacadeCall&) = delete;
         FacadeCall& operator=(const FacadeCall&) = delete;
+
         bool alive() const noexcept { return _alive; }
+
         static void Invalidate(const void* subject) noexcept;
     };
 } // namespace VSL_NAMESPACE::lifetime

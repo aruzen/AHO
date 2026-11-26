@@ -22,6 +22,7 @@ namespace VSL_NAMESPACE::lifetime {
             size_t count = 0;
             bool collecting = false;
         };
+
         AcquisitionQuarantine& acquisition_quarantine() noexcept;
         void store_source(AcquireTicket& ticket, size_t source, const std::shared_ptr<void>& owner);
         bool acquisition_ready(const AcquireTicket& ticket) noexcept;
@@ -41,6 +42,7 @@ namespace VSL_NAMESPACE::lifetime {
             static auto* const REGISTRY = std::construct_at(reinterpret_cast<AcquisitionQuarantine*>(STORAGE));
             return *REGISTRY;
         }
+
         void store_source(AcquireTicket& ticket, size_t source, const std::shared_ptr<void>& owner) {
             if (!owner.use_count())
                 return;
@@ -54,6 +56,7 @@ namespace VSL_NAMESPACE::lifetime {
             ticket.source_owners[source] = ticket.owner_count;
             ticket.owners[ticket.owner_count++] = owner;
         }
+
         bool matches_acquisition_scope(const AcquireTicket& ticket, const std::shared_ptr<impl::SurfaceImpl>& surface,
                                        std::span<const std::shared_ptr<SurfacePresentationDomain>> domains) noexcept {
             if (!ticket.swapchain)
@@ -65,6 +68,7 @@ namespace VSL_NAMESPACE::lifetime {
                     return true;
             return false;
         }
+
         void prepend_acquisition_chain(std::shared_ptr<AcquireTicket>& head, std::shared_ptr<AcquireTicket>& chain) noexcept {
             if (!chain)
                 return;
@@ -74,21 +78,25 @@ namespace VSL_NAMESPACE::lifetime {
             tail->quarantine_next = std::move(head);
             head = std::move(chain);
         }
+
         bool acquisition_ready(const AcquireTicket& ticket) noexcept {
             using Status = sync::AcquisitionStatus;
             return ticket.state.status == Status::DELEGATED || ticket.state.status == Status::RETURNED ||
                    ticket.state.status == Status::ABANDONED || ticket.state.status == Status::DEVICE_LOST ||
                    ticket.state.status == Status::NOT_ACQUIRED;
         }
+
         bool acquisition_releasable(const AcquireTicket& ticket) noexcept {
             return acquisition_ready(ticket) && !ticket.state.native_call_active &&
                    (!ticket.graphics || !sync::pending_use(*ticket.graphics)) &&
                    (!ticket.evidence || (!ticket.evidence->proof.observing && sync::fence_proof_terminal(ticket.evidence->proof)));
         }
+
         void require_recovery(impl::SwapchainImpl& generation) noexcept {
             if (generation.state == SwapchainState::ACTIVE)
                 generation.state = SwapchainState::RECOVERY_REQUIRED;
         }
+
         void save_acquisition_loss(AcquireTicket& ticket) noexcept {
             ticket.device->lost = true;
             if (acquisition_ready(ticket) && ticket.state.status != sync::AcquisitionStatus::DELEGATED)
@@ -110,6 +118,7 @@ namespace VSL_NAMESPACE::lifetime {
             if (ticket.record)
                 sync::fail_present(ticket.record->state, vk::Result::eErrorDeviceLost);
         }
+
         bool observe_graphics(AcquireTicket& ticket, AcquisitionObservation observation) noexcept {
             const auto result = ticket.graphics;
             if (!result || result->native.active || result->status == Completion::Status::PENDING)
@@ -143,6 +152,7 @@ namespace VSL_NAMESPACE::lifetime {
             sync::save_native_idle(*work, static_cast<std::int32_t>(native));
             return !sync::native_pending(*result);
         }
+
         bool observe_acquisition(AcquireTicket& ticket, bool wait) noexcept {
             if (!ticket.evidence)
                 return !ticket.state.acquired;
@@ -161,6 +171,7 @@ namespace VSL_NAMESPACE::lifetime {
                 save_acquisition_loss(ticket);
             return sync::fence_proof_terminal(proof);
         }
+
         bool drain_signal(AcquireTicket& ticket, impl::SemaphoreImpl& source, std::uint32_t index, bool wait) noexcept {
             if (source.use.accessing)
                 return false;
@@ -215,15 +226,19 @@ namespace VSL_NAMESPACE::lifetime {
     std::shared_ptr<impl::SwapchainImpl> AcquireTicket::generation() const {
         return swapchain ? std::shared_ptr<impl::SwapchainImpl>(owners[source_owners[0]], swapchain) : nullptr;
     }
+
     std::shared_ptr<impl::SemaphoreImpl> AcquireTicket::available_owner() const {
         return available ? std::shared_ptr<impl::SemaphoreImpl>(owners[source_owners[1]], available) : nullptr;
     }
+
     std::shared_ptr<impl::SemaphoreImpl> AcquireTicket::finished_owner() const {
         return finished ? std::shared_ptr<impl::SemaphoreImpl>(owners[source_owners[2]], finished) : nullptr;
     }
+
     std::shared_ptr<impl::FenceImpl> AcquireTicket::acquire_fence_owner() const {
         return acquire_fences ? std::shared_ptr<impl::FenceImpl>(owners[source_owners[3]], acquire_fences) : nullptr;
     }
+
     void AcquireTicket::reject_acquisition() noexcept {
         if (state.acquired || state.status == sync::AcquisitionStatus::UNCERTAIN)
             return;
@@ -239,10 +254,12 @@ namespace VSL_NAMESPACE::lifetime {
         if (finished_use)
             finished_use->complete = true;
     }
+
     AcquireTicket::~AcquireTicket() {
         if (!registered && !state.acquired)
             reject_acquisition();
     }
+
     std::shared_ptr<AcquireTicket> prepare_acquire_ticket(const std::shared_ptr<SurfacePresentationDomain>& domain,
                                                           const std::shared_ptr<impl::SwapchainImpl>& generation,
                                                           const std::shared_ptr<impl::SemaphoreImpl>& available,
@@ -301,6 +318,7 @@ namespace VSL_NAMESPACE::lifetime {
         ticket->registered = true;
         return ticket;
     }
+
     void transfer_acquire_graphics(AcquireTicket& ticket, const std::shared_ptr<impl::SubmissionImpl>& graphics) {
         if (!graphics || !sync::recordable(*graphics) || ticket.state.abandon_requested || ticket.state.native_call_active || ticket.state.drain.enqueue != sync::SubmissionEnqueue::NOT_CALLED ||
             !ticket.graphics || ticket.graphics->native.active || ticket.graphics->native.observing || sync::native_pending(*ticket.graphics) ||
@@ -315,6 +333,7 @@ namespace VSL_NAMESPACE::lifetime {
         if (ticket.finished_use)
             ticket.finished_use->acquisition = graphics;
     }
+
     void adopt_acquisition(AcquireTicket& ticket, vk::Result result, std::uint32_t image) noexcept {
         if (ticket.device->lost || result == vk::Result::eErrorDeviceLost) {
             save_acquisition_loss(ticket);
@@ -356,6 +375,7 @@ namespace VSL_NAMESPACE::lifetime {
             require_recovery(*ticket.swapchain);
         }
     }
+
     void require_presentable_acquisition(const AcquireTicket& ticket) {
         if (ticket.released || ticket.state.abandon_requested || ticket.state.native_call_active ||
             ticket.state.drain.enqueue != sync::SubmissionEnqueue::NOT_CALLED || !ticket.state.acquired ||
@@ -363,6 +383,7 @@ namespace VSL_NAMESPACE::lifetime {
             ticket.graphics->native.enqueue != sync::SubmissionEnqueue::ENQUEUED)
             throw std::logic_error("Acquisition cannot enter presentation");
     }
+
     void delegate_acquisition(AcquireTicket& ticket, const std::shared_ptr<PresentRecord>& record) noexcept {
         ticket.record = record;
         if (record->state.status != sync::PresentStatus::PENDING && record->state.status != sync::PresentStatus::CANCELLED)
@@ -370,6 +391,7 @@ namespace VSL_NAMESPACE::lifetime {
         if (record->state.status == sync::PresentStatus::UNCERTAIN)
             require_recovery(*ticket.swapchain);
     }
+
     void request_acquire_abandon(AcquireTicket& ticket) noexcept {
         if (ticket.state.status == sync::AcquisitionStatus::DELEGATED)
             return;
@@ -377,6 +399,7 @@ namespace VSL_NAMESPACE::lifetime {
         if (ticket.swapchain && ticket.state.acquired && ticket.state.status != sync::AcquisitionStatus::DELEGATED)
             require_recovery(*ticket.swapchain);
     }
+
     void recover_acquisition(AcquireTicket& ticket, AcquisitionObservation observation) noexcept {
         if (ticket.released || ticket.state.native_call_active || (ticket.graphics && ticket.graphics->native.active))
             return;
@@ -457,6 +480,7 @@ namespace VSL_NAMESPACE::lifetime {
             // 証明や検証が未完なら予約とownerを残し、次の明示回収で再試行する。
         }
     }
+
     void release_acquire_owners(AcquireTicket& ticket) noexcept {
         if (ticket.released || !acquisition_ready(ticket) || ticket.state.native_call_active)
             return;
@@ -479,6 +503,7 @@ namespace VSL_NAMESPACE::lifetime {
         ticket.finished_use.reset();
         ticket.owners = {};
     }
+
     void quarantine_acquisition(const std::shared_ptr<AcquireTicket>& ticket) noexcept {
         if (ticket->quarantined || ticket->released)
             return;
@@ -490,11 +515,13 @@ namespace VSL_NAMESPACE::lifetime {
         registry.head = ticket;
         ++registry.count;
     }
+
     size_t quarantined_acquisition_count() noexcept {
         auto& registry = acquisition_quarantine();
         const std::lock_guard lock(registry.mutex);
         return registry.count;
     }
+
     AcquisitionSnapshot::AcquisitionSnapshot(std::shared_ptr<impl::LogicalDeviceImpl> device,
                                              std::span<const std::shared_ptr<SurfacePresentationDomain>> domains,
                                              std::shared_ptr<impl::SurfaceImpl> surface)
@@ -533,6 +560,7 @@ namespace VSL_NAMESPACE::lifetime {
             head = std::move(ticket);
         }
     }
+
     void AcquisitionSnapshot::capture_ticket(const std::shared_ptr<AcquireTicket>& ticket) {
         if (std::ranges::any_of(_entries, [&](const auto& entry) { return entry.ticket == ticket; }))
             return;
@@ -544,6 +572,7 @@ namespace VSL_NAMESPACE::lifetime {
             _observations.emplace_back(*work);
         }
     }
+
     AcquisitionSnapshot::~AcquisitionSnapshot() {
         if (_collecting) {
             auto& registry = acquisition_quarantine();
@@ -556,6 +585,7 @@ namespace VSL_NAMESPACE::lifetime {
             observation.finish();
         release();
     }
+
     void AcquisitionSnapshot::save_observations(vk::Result idle, bool wait, bool observe_graphics) noexcept {
         if (_device->lost)
             idle = vk::Result::eErrorDeviceLost;
@@ -603,6 +633,7 @@ namespace VSL_NAMESPACE::lifetime {
             }
         }
     }
+
     void AcquisitionSnapshot::bookkeep() noexcept {
         if (!_collecting)
             return;
@@ -639,6 +670,7 @@ namespace VSL_NAMESPACE::lifetime {
         registry.collecting = false;
         _collecting = false;
     }
+
     void AcquisitionSnapshot::release() noexcept {
         if (!_collecting) {
             for (const auto& work : _work)
@@ -654,6 +686,7 @@ namespace VSL_NAMESPACE::lifetime {
         _observations.clear();
         _work.clear();
     }
+
     bool AcquisitionSnapshot::pending() const noexcept {
         if (!_collecting)
             return _pending;
@@ -661,6 +694,7 @@ namespace VSL_NAMESPACE::lifetime {
             return !entry.ticket->released && !acquisition_releasable(*entry.ticket);
         });
     }
+
     bool AcquisitionSnapshot::native_active() const noexcept {
         return std::ranges::any_of(_entries, [&](const auto& entry) {
             const bool external_observer = entry.graphics && entry.graphics->native.observing &&
@@ -669,6 +703,7 @@ namespace VSL_NAMESPACE::lifetime {
                    (entry.ticket->evidence && entry.ticket->evidence->proof.observing) || external_observer;
         });
     }
+
     std::vector<std::shared_ptr<AcquireTicket>> quarantine_acquisitions(SurfacePresentationDomain& domain) noexcept {
         auto pending = std::move(domain.tickets);
         for (const auto& ticket : pending) {

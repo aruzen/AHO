@@ -7,27 +7,33 @@
 namespace {
     using Status = vsl::Completion::Status;
     using Failure = vsl::Completion::Failure;
+
     struct CPUWorkScope {
         std::shared_ptr<vsl::impl::SubmissionWork> work;
         ~CPUWorkScope();
     };
+
     struct WaitObservation {
         std::weak_ptr<int> owner;
         unsigned waits = 0;
     };
+
     std::shared_ptr<vsl::impl::SubmissionWork> pending_work();
+
     CPUWorkScope::~CPUWorkScope() {
         work->result->native.active = false;
         work->result->native.complete = true;
         vsl::sync::save_terminal(*work, Status::CANCELLED);
         vsl::sync::finish_submission(*work);
     }
+
     std::shared_ptr<vsl::impl::SubmissionWork> pending_work() {
         auto work = std::make_shared<vsl::impl::SubmissionWork>();
         work->result->work = work;
         work->release_resources = vsl::lifetime::release_completed_resources;
         return work;
     }
+
     TEST(SubmissionResultTest, EmptyCompletionHasNoSuccessfulResultOrRetentionBoundary) {
         const vsl::Completion empty;
         EXPECT_FALSE(empty);
@@ -38,6 +44,7 @@ namespace {
         EXPECT_FALSE(empty.wait(0));
         EXPECT_THROW(empty.retain(std::make_shared<int>(7)), std::logic_error);
     }
+
     TEST(SubmissionResultTest, LogicalFailureStillWaitsForAKnownEnqueuedNativeUseBeforeReleasingOwners) {
         auto work = pending_work();
         const CPUWorkScope cleanup{work};
@@ -67,6 +74,7 @@ namespace {
         vsl::sync::finish_submission(*work);
         EXPECT_EQ(observed.waits, 1u);
     }
+
     TEST(SubmissionResultTest, SubmitClassificationSeparatesLogicalFailureFromNativeUse) {
         for (const auto native : {VK_SUCCESS, VK_ERROR_OUT_OF_HOST_MEMORY, VK_ERROR_OUT_OF_DEVICE_MEMORY, VK_ERROR_DEVICE_LOST, VK_ERROR_UNKNOWN, VK_ERROR_VALIDATION_FAILED_EXT}) {
             SCOPED_TRACE(native);
@@ -92,6 +100,7 @@ namespace {
             EXPECT_EQ(result.native_uncertain(), uncertain);
         }
     }
+
     TEST(SubmissionResultTest, UncertainHistoryKeepsOnlyCpuResultsAfterNativeCompletion) {
         auto work = pending_work();
         vsl::Completion result{work->result};
@@ -130,6 +139,7 @@ namespace {
         EXPECT_FALSE(logical.busy());
         EXPECT_EQ(vsl::Completion{observation.lock()}.status(), Status::FAILED);
     }
+
     TEST(SubmissionResultTest, CompletionCallbackCannotInvalidateTheCurrentAvailabilityCheck) {
         auto previous = pending_work(), current = pending_work();
         previous->device = std::make_shared<vsl::impl::LogicalDeviceImpl>();
@@ -145,6 +155,7 @@ namespace {
         EXPECT_THROW(use.check_available({current->result}), std::logic_error);
         EXPECT_EQ(current->result->status, Status::CANCELLED);
     }
+
     TEST(SubmissionResultTest, CompletionCallbackCannotInsertUnknownHistoryDuringMarkUsed) {
         auto previous = pending_work(), current = pending_work(), peer = pending_work();
         previous->device = std::make_shared<vsl::impl::LogicalDeviceImpl>();
@@ -164,6 +175,7 @@ namespace {
         EXPECT_EQ(current->result->status, Status::PENDING);
         vsl::sync::publish_terminal(*current, Status::CANCELLED);
     }
+
     TEST(SubmissionResultTest, AvailabilityCheckKeepsItsOriginalCompletionAcrossCallbacks) {
         auto previous = pending_work(), current = pending_work();
         previous->device = std::make_shared<vsl::impl::LogicalDeviceImpl>();
@@ -182,6 +194,7 @@ namespace {
         EXPECT_EQ(current->result->status, Status::PENDING);
         vsl::sync::publish_terminal(*current, Status::CANCELLED);
     }
+
     TEST(SubmissionResultTest, TerminalResultIsVisibleDuringReleaseAndCannotBeOverwritten) {
         vsl::Completion result;
         size_t releases = 0;
@@ -211,6 +224,7 @@ namespace {
         EXPECT_EQ(result.status(), Status::FAILED);
         EXPECT_FALSE(result.wait(0));
     }
+
     TEST(SubmissionResultTest, TimeoutNotReadyAndUnknownErrorsPreserveTheResourcesUntilAnActualTerminalResult) {
         auto work = pending_work();
         const vsl::Completion result{work->result};
@@ -234,6 +248,7 @@ namespace {
         EXPECT_EQ(result.failure(), Failure::DEVICE_LOST);
         EXPECT_EQ(result.error_code(), VK_ERROR_DEVICE_LOST);
     }
+
     TEST(SubmissionResultTest, SavedCompletionAndObservationDoNotOwnTheLegacySubmissionResources) {
         auto work = pending_work();
         const vsl::Completion result{work->result};
@@ -256,6 +271,7 @@ namespace {
         EXPECT_EQ(result.failure(), Failure::NONE);
         EXPECT_EQ(observation.status(), Status::COMPLETE);
     }
+
     TEST(SubmissionResultTest, BatchTerminalResultsPrecedeEveryReleaseAndAreReleasedOnce) {
         auto first = pending_work(), second = pending_work();
         first->result->status = second->result->status = Status::SUBMITTED;

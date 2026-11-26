@@ -67,21 +67,25 @@ std::string VSL_NAMESPACE::ShaderAccessor::name() const {
         throw std::logic_error("Shader is empty");
     return _owner->name;
 }
+
 VSL_NAMESPACE::ShaderType VSL_NAMESPACE::ShaderAccessor::type() const {
     if (!_owner)
         throw std::logic_error("Shader is empty");
     return static_cast<ShaderType>(_owner->stage);
 }
+
 std::span<const std::uint32_t> VSL_NAMESPACE::ShaderAccessor::code() const& {
     if (!_owner)
         throw std::logic_error("Shader is empty");
     return _owner->code;
 }
+
 VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::ShaderAccessor::get_device() const {
     if (!_owner || !_owner->device || !_owner->shader_module)
         throw std::logic_error("Shader is empty");
     return lifetime::device_from_child(_owner);
 }
+
 VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::ShaderAccessor::owner_ref() const {
     lifetime::detail::require_live_owner(_owner);
     return _owner;

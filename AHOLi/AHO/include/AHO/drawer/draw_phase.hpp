@@ -28,6 +28,7 @@ namespace AHO_NAMESPACE {
         SubmitResult submit_commands() override;
 
         RenderContext context() const;
+
         bool recording() const noexcept { return state == State::WAIT_SUBMIT && !_close_requested && _window && _window.data2 && !_window.data2->closed; }
         const AHO_NAMESPACE::Window& target_window() const& { return _window; }
         const AHO_NAMESPACE::Window& target_window() const&& = delete;
@@ -53,10 +54,12 @@ namespace AHO_NAMESPACE {
                   std::function<void(DrawStream<VSL_NAMESPACE::DefaultPhaseStream>&)> finit);
         static Init Prepare(AHO_NAMESPACE::engine::GraphicalEngine* engine);
         AHO_NAMESPACE::Window _window;
+
         void require_recording() const {
             if (!recording())
                 throw std::logic_error("DrawPhase is not recording");
         }
+
         bool _finish_started = false;
         bool _close_requested = false;
         DrawPhase* _previous_phase = nullptr;

@@ -12,12 +12,16 @@ namespace VSL_NAMESPACE::command {
         UINT16,
         UINT32
     };
+
     struct BindIndexBufferAt : Command {
         BindIndexBufferAt(const BufferAccessor& source, IndexType type, size_t offset = 0, ResourceUse use = {});
         BindIndexBufferAt(const BufferView& source, IndexType type, size_t offset = 0, ResourceUse use = {});
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
+
         void track(const CommandBuffer& buffer) const { _use.record(buffer); }
+
         BufferIdentity identity() const;
+
         size_t offset() const { return _offset; }
         IndexType type() const { return _type; }
 
@@ -27,6 +31,7 @@ namespace VSL_NAMESPACE::command {
         IndexType _type;
         ResourceUse _use;
     };
+
     struct BindIndexBuffer : Command {
         template<MemoryType mem_type, MemoryProperty mem_property, SharingMode sharing_mode = SharingMode::EXCLUSIVE>
         requires((unsigned int)(mem_type & MemoryType::INDEX_BUFFER) != 0)

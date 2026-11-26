@@ -43,16 +43,19 @@ namespace VSL_NAMESPACE::lifetime {
                 throw;
             }
         }
+
         void ArenaOwner::clear() noexcept {
             while (constructed)
                 lifetime::destroy_buffer(base + storage::BufferLayout::Offset(--constructed));
             memory->release();
             base = nullptr;
         }
+
         ArenaOwner::~ArenaOwner() {
             node.retire();
             clear();
         }
+
         void ArenaOwner::VisitDependencies(const void* owner, DependencyNode::EdgeVisitor visitor, void* context) {
             visitor(context, static_cast<const ArenaOwner*>(owner)->device.owner_ref());
         }
@@ -69,11 +72,13 @@ namespace VSL_NAMESPACE::lifetime {
         _count = owner->constructed;
         _owner = std::move(owner);
     }
+
     BufferRef BufferArena::borrow(size_t slot) const& {
         if (!_owner || slot >= _count)
             throw std::out_of_range("Buffer arena slot is not constructed");
         return lifetime::buffer_at(_base + storage::BufferLayout::Offset(slot));
     }
+
     BufferView BufferArena::view(size_t slot) const {
         const auto ref = borrow(slot);
         return detail::BufferAccess::View(ref, _owner, 0, ref.size());

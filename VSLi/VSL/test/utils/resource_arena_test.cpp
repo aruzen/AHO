@@ -16,6 +16,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     namespace t = vsl::typed;
     namespace s = vsl::storage;
@@ -28,9 +29,11 @@ namespace {
     const vsl::BufferCreateInfo BUFFER_INFO{16, BUFFER_USAGE};
     const vsl::ImageCreateInfo IMAGE_INFO{IMAGE_USAGE, 1, 1, vsl::data_format::UNSIGNED_NORMALIZED8_RGBA};
     const vsl::SamplerCreateInfo SAMPLER_INFO{vsl::SamplingMode::NEAREST, vsl::EdgeMode::CLAMP_TO_EDGE};
+
     class ResourceArenaVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     TEST(ResourceArenaMetadataTest, StoresOnlyOneTypedReferenceRegardlessOfResourceKindCount) {
         using Record = l::detail::ArenaResource;
         static_assert(sizeof(Record::Reference) <= 2 * sizeof(void*));
@@ -48,6 +51,7 @@ namespace {
         EXPECT_EQ(l::detail::BufferAccess::Impl(record.buffer()), nullptr);
         EXPECT_LE(sizeof(Record), sizeof(t::ResourcePlacement) + 2 * sizeof(void*) + 3 * sizeof(size_t));
     }
+
     TEST_F(ResourceArenaVulkanIntegrationTest, ImportedShaderIsAFixedManagedParentWithoutAGpuUseState) {
         using Set = t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
         using View = t::TypedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>;
@@ -78,6 +82,7 @@ namespace {
         EXPECT_TRUE(a.expired());
         EXPECT_TRUE(b.expired());
     }
+
     TEST_F(ResourceArenaVulkanIntegrationTest, MixedObjectsFollowThePlanAndShareOneOwnerWithoutSharingUseStates) {
         const std::array<l::ResourceInit, 4> inputs{BUFFER_INFO, IMAGE_INFO, SAMPLER_INFO, BUFFER_INFO};
         l::ResourceArena arena(device, PLAN, inputs);
@@ -110,6 +115,7 @@ namespace {
         output.read_into(std::as_writable_bytes(std::span(result)));
         EXPECT_EQ(result, values);
     }
+
     TEST_F(ResourceArenaVulkanIntegrationTest, FailureRollsBackMixedSlotsAndAllowsTheSameRegionToBeReused) {
         s::ArenaMemory memory(PLAN.bytes(), PLAN.alignment());
         const std::array<l::ResourceInit, 4> valid{BUFFER_INFO, IMAGE_INFO, SAMPLER_INFO, BUFFER_INFO};
@@ -131,6 +137,7 @@ namespace {
         EXPECT_THROW((l::ResourceArena(device, PLAN, bad, memory)), std::invalid_argument);
         EXPECT_NO_THROW((l::ResourceArena(device, PLAN, valid, memory)));
     }
+
     TEST_F(ResourceArenaVulkanIntegrationTest, FailedClaimDoesNotReleaseAnotherArenaAndViewsDelayReuse) {
         const std::array<l::ResourceInit, 4> inputs{BUFFER_INFO, IMAGE_INFO, SAMPLER_INFO, BUFFER_INFO};
         s::ArenaMemory memory(PLAN.bytes(), PLAN.alignment());
@@ -151,6 +158,7 @@ namespace {
         EXPECT_THROW((l::ResourceArena(device, PLAN, inputs, memory)), std::invalid_argument);
         EXPECT_NO_THROW((l::ResourceArena(device, PLAN, inputs, destination)));
     }
+
     TEST_F(ResourceArenaVulkanIntegrationTest, ExternalViewsPreserveRangesOwnersAndStatesWithoutPinningTheImportArena) {
         const std::array<l::ResourceInit, 4> source_inputs{BUFFER_INFO, IMAGE_INFO, SAMPLER_INFO, BUFFER_INFO};
         l::ResourceArena source(device, PLAN, source_inputs);
@@ -178,6 +186,7 @@ namespace {
         EXPECT_TRUE(import_owner.expired());
         EXPECT_NO_THROW(retained->write(std::array<std::byte, 8>{}));
     }
+
     TEST_F(ResourceArenaVulkanIntegrationTest, EmptyExternalOnlyAndMovedFromArenasHaveDefinedBehavior) {
         const t::ResourcePlan<0> empty(std::span<const t::ResourceRequest>{});
         l::ResourceArena original(device, empty, {});
@@ -199,6 +208,7 @@ namespace {
         EXPECT_EQ(ImageAccess::Owned(imported.image({1})), ImageAccess::Owned(image));
         EXPECT_THROW((l::ResourceArena({}, plan, inputs)), std::invalid_argument);
     }
+
     TEST_F(ResourceArenaVulkanIntegrationTest, UnconstructedExternalAccessorsAreRejectedBeforeDereferencingTheirDevice) {
         const std::array<t::ResourceRequest, 1> image_request{{{{1}, IMAGE, true}}}, sampler_request{{{{1}, SAMPLER, true}}};
         const t::ResourcePlan<1> image_plan(image_request), sampler_plan(sampler_request);
@@ -207,6 +217,7 @@ namespace {
         EXPECT_THROW((l::ResourceArena(device, image_plan, image)), std::invalid_argument);
         EXPECT_THROW((l::ResourceArena(device, sampler_plan, sampler)), std::invalid_argument);
     }
+
     TEST_F(ResourceArenaVulkanIntegrationTest, DeviceLocalBufferUsesTheSameTransferBackendAsOrdinaryBuffers) {
         const std::array<t::ResourceRequest, 1> requests{{{{1}, BUFFER}}};
         const t::ResourcePlan<1> plan(requests);
@@ -227,6 +238,7 @@ namespace {
         output.read_into(std::as_writable_bytes(std::span(result)));
         EXPECT_EQ(result, values);
     }
+
     TEST_F(ResourceArenaVulkanIntegrationTest, TypedComputeUsesPlacedAssetsAfterWrappersDieAndReclaimsThemOnCompletion) {
         using Set = t::DescriptorSet<0, t::StorageBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>,
                                      t::DescriptorBinding<1, vsl::graphic_resource::Type::SAMPLED_IMAGE, vsl::ShaderFlag::COMPUTE>,
@@ -274,6 +286,7 @@ namespace {
         output.backend().read_into(std::as_writable_bytes(std::span(actual)));
         EXPECT_EQ(actual, (std::array<std::uint32_t, 2>{37, 83}));
     }
+
     TEST_F(ResourceArenaVulkanIntegrationTest, CancellationReleasesOneArenaPinButRegistersEveryPhysicalResource) {
         using Set = t::DescriptorSet<0, t::TextureBinding<0, vsl::ShaderFlag::COMPUTE>>;
         vsl::GraphicResourceManager descriptors(device);

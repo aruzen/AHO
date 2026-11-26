@@ -18,6 +18,7 @@
 namespace AHO_NAMESPACE::drawer::detail {
     struct StandardDrawState;
 }
+
 namespace AHO_NAMESPACE::window::detail {
     struct WindowClose;
 }

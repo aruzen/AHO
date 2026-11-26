@@ -10,15 +10,18 @@
 static_assert(sizeof(vsl::utils::SPIRVReflector) > 0);
 #else
 #include "../src/engine/engine_access.hpp"
+
 namespace {
     using AHO_NAMESPACE::engine::detail::EngineAccess;
 }
+
 #include <gtest/gtest.h>
 #include <memory>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
 #include <AHO/engine.hpp>
+
 namespace {
     TEST(EngineAccessorTest, EmptyHandlesDoNotRegisterADefaultEngine) {
         const auto previous = EngineAccess::State(aho::engine::DefaultEngineRegistration::Current());
@@ -37,6 +40,7 @@ namespace {
         EXPECT_THROW(first.physical_device(), std::logic_error);
         EXPECT_THROW(first.present_fences(), std::logic_error);
     }
+
     TEST(EngineAccessorLifetimeTest, CopiesShareDataAndMovesKeepTransferringOwnership) {
         using Accessor = aho::engine::EngineAccessor;
         static_assert(std::is_nothrow_move_constructible_v<Accessor>);

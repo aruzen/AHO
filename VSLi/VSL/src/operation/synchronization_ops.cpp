@@ -7,13 +7,16 @@ namespace VSL_NAMESPACE::operation {
     namespace {
         thread_local const SynchronizationNativeCalls* NATIVE_CALLS = nullptr;
     }
+
     ScopedSynchronizationNativeCalls::ScopedSynchronizationNativeCalls(SynchronizationNativeCalls calls) noexcept
         : _calls(calls), _previous(NATIVE_CALLS) {
         NATIVE_CALLS = &_calls;
     }
+
     ScopedSynchronizationNativeCalls::~ScopedSynchronizationNativeCalls() {
         NATIVE_CALLS = _previous;
     }
+
     void initialize_semaphore(impl::SemaphoreImpl& semaphore, impl::LogicalDeviceImpl& device, SemaphoreCreateInfo info) {
         if (!semaphore.semaphores.empty())
             throw std::logic_error("Semaphore is already initialized");
@@ -23,6 +26,7 @@ namespace VSL_NAMESPACE::operation {
         semaphore.native_device = device.device;
         semaphore.semaphores = create_semaphores(device.device, info.count);
     }
+
     void initialize_fence(impl::FenceImpl& fence, impl::LogicalDeviceImpl& device, FenceCreateInfo info) {
         if (!fence.fences.empty())
             throw std::logic_error("Fence is already initialized");
@@ -32,10 +36,12 @@ namespace VSL_NAMESPACE::operation {
         fence.uses.resize(info.count);
         fence.fences = create_fences(device.device, info.count, info.signaled);
     }
+
     void validate_synchronization_count(vk::Device device, size_t count) {
         if (!device || !count || count > std::numeric_limits<std::uint32_t>::max())
             throw std::invalid_argument("Synchronization array requires a device and a positive uint32 count");
     }
+
     std::vector<vk::Semaphore> create_semaphores(vk::Device device, size_t count) {
         validate_synchronization_count(device, count);
         std::vector<vk::Semaphore> handles(count);
@@ -58,6 +64,7 @@ namespace VSL_NAMESPACE::operation {
         }
         return handles;
     }
+
     std::vector<vk::Fence> create_fences(vk::Device device, size_t count, bool signaled) {
         validate_synchronization_count(device, count);
         std::vector<vk::Fence> handles(count);
@@ -71,6 +78,7 @@ namespace VSL_NAMESPACE::operation {
         }
         return handles;
     }
+
     void destroy_semaphores(vk::Device device, std::span<const vk::Semaphore> semaphores) noexcept {
         for (auto it = semaphores.rbegin(); it != semaphores.rend(); ++it)
             if (*it) {
@@ -80,11 +88,13 @@ namespace VSL_NAMESPACE::operation {
                     device.destroySemaphore(*it);
             }
     }
+
     void destroy_fences(vk::Device device, std::span<const vk::Fence> fences) noexcept {
         for (auto it = fences.rbegin(); it != fences.rend(); ++it)
             if (*it)
                 device.destroyFence(*it);
     }
+
     void reset_fences(vk::Device device, std::span<const vk::Fence> fences) {
         const sync::NativeDeviceCall call(device);
         const auto count = static_cast<std::uint32_t>(fences.size());

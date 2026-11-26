@@ -41,11 +41,13 @@ namespace {
             throw std::logic_error("Descriptor pool has been destroyed");
         std::erase_if(pool->resources, [](const auto& resource) { return resource.expired(); });
     }
+
     void validate_layout(const VSL_NAMESPACE::lifetime::OwnedRef<VSL_NAMESPACE::impl::GraphicResourcePoolImpl>& pool,
                          const VSL_NAMESPACE::graphic_resource::BindingLayout& layout) {
         if (!DescriptorAccess::Owned(layout) || DescriptorAccess::Owned(layout)->device != pool->device)
             throw std::invalid_argument("Descriptor layout device mismatch");
     }
+
     void validate_resource(const VSL_NAMESPACE::lifetime::OwnedRef<VSL_NAMESPACE::impl::GraphicResourceImpl>& resource) {
         if (!resource)
             throw std::logic_error("Descriptor resource has been destroyed");
@@ -151,6 +153,7 @@ VSL_NAMESPACE::graphic_resource::Pool VSL_NAMESPACE::graphic_resource::Resource:
         throw std::logic_error("Descriptor pool owner is unavailable");
     return DescriptorAccess::FromShared(std::shared_ptr<impl::GraphicResourcePoolImpl>(std::move(owner), resource->pool));
 }
+
 VSL_NAMESPACE::DescriptorIdentity VSL_NAMESPACE::graphic_resource::Resource::identity() const {
     return lifetime::detail::IdentityAccess::From<DescriptorIdentity>(_owner.get());
 }
@@ -163,18 +166,22 @@ VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::graphic_resource::Resource::own
 VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::graphic_resource::BindingLayout::owner_ref() const {
     return _owner;
 }
+
 VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::graphic_resource::Pool::owner_ref() const {
     return _owner;
 }
+
 VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::graphic_resource::BindingLayout::get_device() const {
     if (!_owner || !_owner->layout)
         throw std::logic_error("Descriptor layout has been destroyed");
     return lifetime::device_from_child(_owner);
 }
+
 VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::graphic_resource::Pool::get_device() const {
     validate_pool(_owner);
     return lifetime::device_from_child(_owner);
 }
+
 VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::graphic_resource::Resource::get_device() const {
     validate_resource(_owner);
     return lifetime::device_from_impl(*_owner->pool->device);
@@ -185,10 +192,12 @@ namespace VSL_NAMESPACE::lifetime::detail {
         const auto* node = owner ? owner->owner_node : nullptr;
         return FromOwned(owned_ref(std::move(owner), node));
     }
+
     graphic_resource::Pool DescriptorAccess::FromShared(std::shared_ptr<impl::GraphicResourcePoolImpl> owner) {
         const auto* node = owner ? owner->owner_node : nullptr;
         return FromOwned(owned_ref(std::move(owner), node));
     }
+
     graphic_resource::Resource DescriptorAccess::FromShared(std::shared_ptr<impl::GraphicResourceImpl> owner) {
         const auto* node = owner ? owner->owner_node : nullptr;
         return FromOwned(owned_ref(std::move(owner), node));

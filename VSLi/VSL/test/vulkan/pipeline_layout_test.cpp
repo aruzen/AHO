@@ -31,6 +31,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     class PipelineLayoutVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override;
@@ -43,6 +44,7 @@ namespace {
     bool PipelineLayoutVulkanIntegrationTest::validate_vulkan() const {
         return true;
     }
+
     TEST_F(PipelineLayoutVulkanIntegrationTest, CopyOwnsItsVertexAndBlendStorage) {
         vsl::pipeline_layout::VertexInput input;
         input.add(vsl::data_format::FLOAT_RG);
@@ -54,6 +56,7 @@ namespace {
                   vsl_test::inspect_layout(original).vertex_input.pVertexAttributeDescriptions);
         EXPECT_NE(vsl_test::inspect_layout(copy).color_blend.pAttachments, vsl_test::inspect_layout(original).color_blend.pAttachments);
     }
+
     TEST_F(PipelineLayoutVulkanIntegrationTest, EditingAnAliasPreservesTheExistingSnapshot) {
         vsl::PipelineLayout original(device);
         auto alias = original;
@@ -62,6 +65,7 @@ namespace {
         EXPECT_NE(GraphicsAccess::Owned(alias), GraphicsAccess::Owned(original));
         EXPECT_EQ(GraphicsAccess::Owned(original)->pipeline_layout, handle);
     }
+
     TEST_F(PipelineLayoutVulkanIntegrationTest, CreatesIndependentCopyAndFreezesEditableState) {
         vsl::PipelineLayout original(device);
         auto copy = original.copy();
@@ -80,6 +84,7 @@ namespace {
         EXPECT_TRUE(GraphicsAccess::Owned(frozen)->pipeline_layout);
         EXPECT_TRUE(original.has_recipe());
     }
+
     TEST_F(PipelineLayoutVulkanIntegrationTest, AddsStateAndCreatesUsableLayoutHandle) {
         vsl::PipelineLayout layout(device);
         auto added = layout.add(vsl::pipeline_layout::Rasterization(vsl::pipeline_layout::CullingMode::FRONT));
@@ -143,6 +148,7 @@ namespace {
             EXPECT_THROW(l::ResourceArena(device, direct_plan, invalid_inputs), std::invalid_argument);
         }
     }
+
     TEST_F(PipelineLayoutVulkanIntegrationTest, FailedDependentConstructionReleasesTheRegionAndPreservesImports) {
         vsl::storage::ArenaMemory memory(LAYOUT_PLAN.bytes(), LAYOUT_PLAN.alignment());
         auto inputs = std::array<l::ResourceInit, 3>{l::PipelineLayoutInit{{t::ResourceId{3}}, {}},
@@ -160,6 +166,7 @@ namespace {
         EXPECT_THROW(l::ResourceArena(device, LAYOUT_PLAN, invalid, memory), std::out_of_range);
         EXPECT_NO_THROW(l::ResourceArena(device, LAYOUT_PLAN, inputs, memory));
     }
+
     TEST_F(PipelineLayoutVulkanIntegrationTest, RuntimeImportDoesNotRetainTheImportersOrTheSourceRecipe) {
         std::weak_ptr<void> source_owner, importer_owner, recipe_binding;
         vsl::PipelineLayoutAccessor kept;
@@ -187,6 +194,7 @@ namespace {
         kept = {};
         EXPECT_TRUE(source_owner.expired());
     }
+
     TEST_F(PipelineLayoutVulkanIntegrationTest, ReplacingBindingsDropsUnusedRecipeOwners) {
         vsl::PipelineLayout layout(device);
         std::weak_ptr<void> previous;
@@ -201,6 +209,7 @@ namespace {
         EXPECT_TRUE(PipelineRecipeAccess::Read(layout).sources.empty());
         EXPECT_TRUE(PipelineRecipeAccess::Read(layout).binding_layouts.empty());
     }
+
     TEST_F(PipelineLayoutVulkanIntegrationTest, ReplacementPublishesAllOwnersBeforeAnOldOwnerCanReenter) {
         for (const bool move : {false, true}) {
             vsl::PipelineLayout original(device), replacement(device), next(device, pl::Rasterization(pl::CullingMode::FRONT));
@@ -229,6 +238,7 @@ namespace {
             EXPECT_EQ(&PipelineRecipeAccess::Edit(*(current)), &PipelineRecipeAccess::Read(*(current)));
         }
     }
+
     TEST_F(PipelineLayoutArenaComputeVulkanIntegrationTest, RuntimePipelineAndSavedPushDoNotKeepTheShaderRecipe) {
         pipeline.reset();
         layout.reset();
@@ -288,6 +298,7 @@ namespace {
         output->read_into(std::as_writable_bytes(std::span(actual)));
         ExpectSequence(actual, value);
     }
+
     TEST_F(PipelineLayoutArenaComputeVulkanIntegrationTest, CancellationReleasesRuntimeLayoutWithoutKeepingRecipeSources) {
         auto manager = make_manager();
         pipeline.reset();
@@ -357,15 +368,18 @@ namespace {
         vsl::pipeline_layout::Rasterization(vsl::pipeline_layout::CullingMode::FRONT).injection(alias);
         EXPECT_NE(PipelineRecipeAccess::Read(frozen).graphics_state.rasterization.cullMode, PipelineRecipeAccess::Read(alias).graphics_state.rasterization.cullMode);
     }
+
     TEST_F(PipelineLayoutVulkanIntegrationTest, FailedAdditionPreservesTheOriginalLayout) {
         struct FailingStage {
             void injection(vsl::PipelineLayoutEditAccessor) { throw std::runtime_error("stage failed"); }
         };
+
         vsl::PipelineLayout layout(device);
         const auto snapshot = GraphicsAccess::Owned(layout);
         EXPECT_THROW(layout.add(FailingStage{}), std::runtime_error);
         EXPECT_EQ(GraphicsAccess::Owned(layout), snapshot);
     }
+
     TEST_F(PipelineLayoutVulkanIntegrationTest, CopyOwnsDescriptorLayoutsAndPushConstantRanges) {
         std::optional<vsl::PipelineLayout> copied;
         std::weak_ptr<vsl::impl::ResourceBindingLayoutImpl> weak_binding;

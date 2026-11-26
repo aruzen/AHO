@@ -13,6 +13,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::detail::SwapchainAccess;
 }
+
 #include "support/deferred_action.hpp"
 
 namespace {
@@ -26,8 +27,10 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     using RenderPassVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
+
     TEST_F(RenderPassVulkanIntegrationTest, CreatesPublicRenderPassAndPickingImagesAtRequestedExtent) {
         vsl::RenderPass normal(description);
         EXPECT_TRUE(static_cast<bool>(GraphicsAccess::Owned(normal)->render_pass));
@@ -42,6 +45,7 @@ namespace {
         EXPECT_EQ(ImageAccess::Owned(picking.picking_image(0))->height, 6u);
         EXPECT_EQ(picking.picking_image(0).size(), 12u * 6u * 4u);
     }
+
     TEST_F(RenderPassVulkanIntegrationTest, PickingPassProvidesInitializedBaseAccessor) {
         vsl::IDPickingRenderPass picking(description);
         const vsl::RenderPassAccessor base = picking;
@@ -73,6 +77,7 @@ namespace {
             ASSERT_TRUE(phase.completion().wait());
         }
     }
+
     TEST_F(PickingReadVulkanIntegrationTest, ReadsAcquiredImageRatherThanTheCommandBufferSlot) {
         description = SwapchainAccess::FromOwned(SwapchainAccess::Owned(description), std::vector<vsl::ImageAccessor>(2, *color));
         vsl::IDPickingRenderPass picking(description);
@@ -88,6 +93,7 @@ namespace {
         buffers->recording_context->acquired_image_index.reset();
         EXPECT_EQ(picking.read(manager, ready, WIDTH - 1, HEIGHT - 1), 101u);
     }
+
     TEST_F(PickingReadVulkanIntegrationTest, ReadKeepsItsSelectedImageWhenFenceCompletionDestroysMovesOrRecreatesTheFacade) {
         description = SwapchainAccess::FromOwned(SwapchainAccess::Owned(description), std::vector<vsl::ImageAccessor>(2, *color));
         for (int action = 0; action < 3; ++action) {
@@ -124,6 +130,7 @@ namespace {
             EXPECT_TRUE(called);
         }
     }
+
     TEST_F(PickingReadVulkanIntegrationTest, ReadRejectsAnEmptyManagerOrMissingRecordingContextBeforeWaiting) {
         vsl::IDPickingRenderPass picking(description);
         vsl::SynchroManager sync(device);
@@ -153,6 +160,7 @@ namespace {
         EXPECT_NO_THROW(desc.validate());
         EXPECT_THROW(desc.set_depth_stencil({.format = vsl::data_format::DEPTH32_FLOAT}), std::invalid_argument);
     }
+
     TEST(RenderPassDescriptionTest, RejectsInvalidReferencesFormatsAndLoadContracts) {
         vsl::RenderPassDescription desc;
         desc.add_color({.format = vsl::data_format::UNSIGNED_NORMALIZED8_RGBA});

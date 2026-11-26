@@ -8,16 +8,19 @@ namespace vsl_test {
         vsl::lifetime::detail::StartupAccess::Owned(value) = std::move(source);
         return value;
     }
+
     inline vsl::PhysicalDevice unchecked_startup(std::shared_ptr<vsl::impl::PhysicalDeviceImpl> source) {
         vsl::PhysicalDevice value;
         vsl::lifetime::detail::StartupAccess::Owned(value) = std::move(source);
         return value;
     }
+
     inline vsl::LogicalDeviceAccessor unchecked_startup(std::shared_ptr<vsl::impl::LogicalDeviceImpl> source) {
         vsl::LogicalDeviceAccessor value;
         vsl::lifetime::detail::StartupAccess::Owned(value) = std::move(source);
         return value;
     }
+
     inline vsl::Surface unchecked_startup(std::shared_ptr<vsl::impl::SurfaceImpl> source) {
         vsl::Surface value;
         vsl::lifetime::detail::StartupAccess::Owned(value) = std::move(source);

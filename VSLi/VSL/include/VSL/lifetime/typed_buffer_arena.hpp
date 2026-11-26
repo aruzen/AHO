@@ -17,11 +17,14 @@ namespace VSL_NAMESPACE::typed {
         static_assert(std::is_trivially_copyable_v<Payload> && std::is_standard_layout_v<Payload>);
         static constexpr auto USAGE = usage_;
         explicit PlacedBufferView(BufferView view);
+
         static PlacedBufferView FromBuffer(const BufferAccessor& buffer) { return PlacedBufferView(BufferView::FromBuffer(buffer)); }
         size_t size() const { return _view.size() / sizeof(Payload); }
         const BufferView& backend() const& { return _view; }
         const BufferView& backend() const&& = delete;
+
         BufferView storage_view() const { return _view; }
+
         PlacedBufferView view(size_t first, size_t count) const;
         void copy(std::span<const Payload> values) const;
         void read_into(std::span<Payload> destination) const;
@@ -35,6 +38,7 @@ namespace VSL_NAMESPACE::typed {
         size_t element = 0;
         constexpr auto operator<=>(const BindingKey&) const = default;
     };
+
     struct BufferPlacement {
         ResourceId resource;
         size_t slot, offset;
@@ -44,12 +48,14 @@ namespace VSL_NAMESPACE::typed {
         IMAGE,
         SAMPLER
     };
+
     template<BindingKey key, ResourceId resource, ResourceComponent component = ResourceComponent::PRIMARY>
     struct ResourceBinding {
         static constexpr auto KEY = key;
         static constexpr auto RESOURCE = resource;
         static constexpr auto COMPONENT = component;
     };
+
     template<typename... Bindings>
     struct ResourceBindingMap {
         static constexpr std::array<BindingKey, sizeof...(Bindings)> KEYS{Bindings::KEY...};
@@ -66,6 +72,7 @@ namespace VSL_NAMESPACE::typed {
         template<BindingKey key, ResourceComponent component = ResourceComponent::PRIMARY>
         static consteval ResourceId Resolve();
     };
+
     template<typename... Bindings>
     using BufferBindingMap = ResourceBindingMap<Bindings...>;
 
@@ -105,7 +112,9 @@ namespace VSL_NAMESPACE::typed {
         }();
         std::array<BufferCreateInfo, COUNT> buffers;
         constexpr explicit BufferArenaPlan(const std::array<size_t, COUNT>& counts, size_t lifetime_instance = 0);
+
         constexpr LifetimeGroup lifetime() const { return _lifetime; }
+
         static constexpr size_t Offset(size_t index);
         template<ResourceId id>
         static consteval size_t Index();
@@ -121,14 +130,19 @@ namespace VSL_NAMESPACE::typed {
 
     public:
         using Plan = BufferArenaPlan<Slots...>;
+
         explicit TypedBufferArena(LogicalDeviceAccessor device, const Plan& plan) : _storage(device, plan.buffers), _lifetime(plan.lifetime()) {}
+
         TypedBufferArena(LogicalDeviceAccessor device, const Plan& plan, storage::ArenaMemory memory)
             : _storage(device, plan.buffers, std::move(memory)), _lifetime(plan.lifetime()) {}
         const lifetime::BufferArena& storage() const& { return _storage; }
         const lifetime::BufferArena& storage() const&& = delete;
+
         LifetimeGroup lifetime() const { return _lifetime; }
+
         template<ResourceId id>
         auto view() const;
+
         template<typename Bindings, BindingKey key>
         auto binding_view() const { return view<Bindings::template Resolve<key>()>(); }
     };
@@ -140,23 +154,27 @@ namespace VSL_NAMESPACE::typed {
         if (_view.size() % sizeof(Payload) || _view.byte_offset() % alignof(Payload))
             throw std::invalid_argument("Typed placed buffer requires aligned whole payloads");
     }
+
     template<typename Payload_, MemoryType usage>
     PlacedBufferView<Payload_, usage> PlacedBufferView<Payload_, usage>::view(size_t first, size_t count) const {
         const auto offset = detail::checked_view_offset(0, first, count, size(), sizeof(Payload));
         return PlacedBufferView(_view.view(offset, count * sizeof(Payload)));
     }
+
     template<typename Payload_, MemoryType usage>
     void PlacedBufferView<Payload_, usage>::copy(std::span<const Payload> values) const {
         if (values.size() != size())
             throw std::invalid_argument("Typed placed buffer copy must preserve record count");
         _view.write(std::as_bytes(values));
     }
+
     template<typename Payload_, MemoryType usage>
     void PlacedBufferView<Payload_, usage>::read_into(std::span<Payload> destination) const {
         if (destination.size() != size())
             throw std::invalid_argument("Typed placed buffer read must preserve record count");
         _view.read_into(std::as_writable_bytes(destination));
     }
+
     template<typename... Bindings>
     template<BindingKey key, ResourceComponent component>
     consteval ResourceId ResourceBindingMap<Bindings...>::Resolve() {
@@ -165,6 +183,7 @@ namespace VSL_NAMESPACE::typed {
                 return RESOURCES[i];
         throw "Unknown buffer binding key";
     }
+
     template<typename Payload_, MemoryType usage>
     template<MemoryType destination_usage>
     requires(contain<usage, MemoryType::TRANSFER_SOURCE>() && contain<destination_usage, MemoryType::TRANSFER_DESTINATION>())
@@ -173,6 +192,7 @@ namespace VSL_NAMESPACE::typed {
             throw std::invalid_argument("Typed buffer copy requires equal record counts");
         return command::CopyBuffer(_view, destination.backend(), _view.size(), 0, 0, host_read);
     }
+
     template<typename... Slots>
     constexpr BufferArenaPlan<Slots...>::BufferArenaPlan(const std::array<size_t, COUNT>& counts, size_t lifetime_instance)
         : _lifetime{SCOPE, lifetime_instance} {
@@ -181,12 +201,14 @@ namespace VSL_NAMESPACE::typed {
         size_t index = 0;
         buffers = {BufferCreateInfo{helper::checked_buffer_array_size<typename Slots::Payload>(counts[index++]), Slots::USAGE}...};
     }
+
     template<typename... Slots>
     constexpr size_t BufferArenaPlan<Slots...>::Offset(size_t index) {
         if (index >= COUNT)
             throw std::out_of_range("Typed buffer slot index");
         return storage::BufferLayout::Offset(index);
     }
+
     template<typename... Slots>
     template<ResourceId id>
     consteval size_t BufferArenaPlan<Slots...>::Index() {
@@ -195,6 +217,7 @@ namespace VSL_NAMESPACE::typed {
                 return i;
         throw "Unknown buffer resource ID";
     }
+
     template<typename... Slots>
     template<ResourceId id>
     auto TypedBufferArena<Slots...>::view() const {

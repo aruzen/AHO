@@ -1,4 +1,5 @@
 #include "../../src/engine/engine_access.hpp"
+
 namespace {
     using AHO_NAMESPACE::engine::detail::EngineAccess;
 }
@@ -6,8 +7,10 @@ namespace {
 #include <VSL/lifetime/pipeline_recipe_access.hpp>
 #include "../support/live_gpu.hpp"
 #include <AHO/pipeline/layouts.hpp>
+
 namespace {
     using AHOLayoutsVulkanIntegration = aho_test::LiveGPUTest;
+
     TEST_F(AHOLayoutsVulkanIntegration, BaseLayoutFactoryCreatesLayoutUsingEngineDevice) {
         ASSERT_NO_THROW(start_engine());
         ASSERT_NE(aho::pipeline::GET_BASE_LAYOUT, nullptr);
@@ -22,6 +25,7 @@ namespace {
 #else
 #include <gtest/gtest.h>
 #include <AHO/pipeline/layouts.hpp>
+
 namespace {
     TEST(AHOLayoutsTest, RuntimeAndTemplateBindingLookupsAgreeOnResourceContracts) {
         using namespace aho::pipeline;

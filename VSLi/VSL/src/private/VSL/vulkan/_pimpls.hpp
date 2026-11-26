@@ -38,6 +38,7 @@
 
 namespace VSL_NAMESPACE {
     class ResourceUseState;
+
     namespace lifetime {
         struct DescriptorOwnerContext;
         struct FrameBufferOwnerContext;
@@ -51,6 +52,7 @@ namespace VSL_NAMESPACE {
         struct SwapchainPresentationContext;
         struct AcquireTicket;
     } // namespace lifetime
+
     namespace graphic_resource {
         struct ManagerInterface;
     }
@@ -156,6 +158,7 @@ namespace VSL_NAMESPACE::impl {
         ACQUISITION,
         COUNT
     };
+
     struct SubmissionWork {
         static constexpr size_t NO_OWNER = std::numeric_limits<size_t>::max();
         std::shared_ptr<SubmissionImpl> result = std::make_shared<SubmissionImpl>();
@@ -342,6 +345,7 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct SynchroManagerImpl;
+
     struct SemaphoreImpl {
         lifetime::DependencyNode* owner_node = nullptr;
         LogicalDeviceImpl* device = nullptr;
@@ -414,6 +418,7 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct GraphicResourcePoolImpl;
+
     struct GraphicResourceManagerImpl {
         std::shared_ptr<LogicalDeviceImpl> device;
 
@@ -423,11 +428,14 @@ namespace VSL_NAMESPACE::impl {
     };
 
     struct GraphicResourceImpl;
+
     struct GraphicResourcePoolImpl {
         lifetime::DependencyNode* owner_node = nullptr;
+
         struct Capacity {
             std::uint32_t limit = 0, allocated = 0;
         };
+
         std::weak_ptr<GraphicResourceManagerIdentity> manager;
         LogicalDeviceImpl* device = nullptr;
         vk::Device native_device;
@@ -448,6 +456,7 @@ namespace VSL_NAMESPACE::impl {
             std::vector<lifetime::OwnerRef> owners;
             std::vector<ResourceUseState*> states;
         };
+
         struct BindingElement {
             std::vector<lifetime::OwnerRef> owners;
             // ownersに属する物理実体を借用する。論理制約も同じ要素で管理する。
@@ -455,6 +464,7 @@ namespace VSL_NAMESPACE::impl {
             BindingConstraint constraint;
             bool initialized = false;
         };
+
         impl::GraphicResourcePoolImpl* pool = nullptr;
         lifetime::DependencyNode* owner_node = nullptr;
         impl::ResourceBindingLayoutImpl* layout = nullptr;

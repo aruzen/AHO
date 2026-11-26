@@ -12,12 +12,15 @@ namespace VSL_NAMESPACE {
     struct ImageAccessor;
     struct SamplerAccessor;
     class BufferView;
+
     namespace graphic_resource {
         struct Resource;
     }
+
     namespace command {
         struct BindGraphicResource;
     }
+
     struct ResourceUse {
         lifetime::OwnedRef<ResourceUseState> state;
         // stateやCompletionを含めず、使用する資源の世代を保持する。

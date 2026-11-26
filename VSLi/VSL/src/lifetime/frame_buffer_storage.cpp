@@ -13,6 +13,7 @@ namespace VSL_NAMESPACE::lifetime {
     static_assert(offsetof(FrameBufferSlotStorage, value) == 0);
     static_assert(std::is_nothrow_default_constructible_v<FrameBufferOwnerContext>);
     static_assert(std::is_nothrow_default_constructible_v<impl::FrameBufferImpl>);
+
     namespace {
         struct HeapFrameBufferOwner {
             DependencyNode node;
@@ -23,6 +24,7 @@ namespace VSL_NAMESPACE::lifetime {
             ~HeapFrameBufferOwner();
             static void VisitDependencies(const void* owner, DependencyNode::EdgeVisitor visitor, void* context);
         };
+
         HeapFrameBufferOwner::HeapFrameBufferOwner(LogicalDeviceAccessor device, operation::FrameBufferInput input, OwnerRef pass, std::vector<OwnerRef> dependencies)
             : device(device), dependencies(std::move(dependencies)) {
             if (!pass.use_count() || pass.get() != input.pass)
@@ -37,10 +39,12 @@ namespace VSL_NAMESPACE::lifetime {
                 throw;
             }
         }
+
         HeapFrameBufferOwner::~HeapFrameBufferOwner() {
             node.retire();
             destroy_frame_buffer(storage);
         }
+
         void HeapFrameBufferOwner::VisitDependencies(const void* owner, DependencyNode::EdgeVisitor visitor, void* context) {
             const auto& value = *static_cast<const HeapFrameBufferOwner*>(owner);
             for (const auto& dependency : value.dependencies)
@@ -48,10 +52,12 @@ namespace VSL_NAMESPACE::lifetime {
             visitor(context, value.device.owner_ref());
         }
     } // namespace
+
     void construct_frame_buffer(void* storage, LogicalDeviceAccessor device, operation::FrameBufferInput input) {
         require_device_owner(device);
         construct_frame_buffer(storage, *StartupAccess::Owned(device), std::move(input));
     }
+
     void construct_frame_buffer(void* storage, impl::LogicalDeviceImpl& device, operation::FrameBufferInput input) {
         if (!device.device)
             throw std::invalid_argument("Framebuffer requires a logical device owner");
@@ -68,20 +74,24 @@ namespace VSL_NAMESPACE::lifetime {
             throw;
         }
     }
+
     impl::FrameBufferImpl& frame_buffer_at(void* storage) {
         return *std::launder(reinterpret_cast<impl::FrameBufferImpl*>(static_cast<FrameBufferSlotStorage*>(storage)->value));
     }
+
     void destroy_frame_buffer(void* storage) noexcept {
         auto* context = frame_buffer_at(storage).owner_context;
         std::destroy_at(&frame_buffer_at(storage));
         std::destroy_at(context);
         std::destroy_at(static_cast<FrameBufferSlotStorage*>(storage));
     }
+
     void set_frame_buffer_pass_owner(impl::FrameBufferImpl& target, OwnedRef<impl::RenderPassImpl> owner) {
         if (!target.owner_context || !owner.use_count() || owner.get() != target.render_pass)
             throw std::invalid_argument("Framebuffer getter requires the original pass owner");
         target.owner_context->pass = owner.weak();
     }
+
     std::shared_ptr<impl::FrameBufferImpl> make_heap_frame_buffer(LogicalDeviceAccessor device, operation::FrameBufferInput input,
                                                                   OwnerRef pass, std::vector<OwnerRef> dependencies) {
         auto owner = std::make_shared<HeapFrameBufferOwner>(device, std::move(input), std::move(pass), std::move(dependencies));

@@ -17,12 +17,15 @@ namespace {
 namespace {
     namespace typed = vsl::typed;
     using Timing = typed::VertexTiming;
+
     struct Position {
         float xy[2];
     };
+
     struct Color {
         float rgb[3];
     };
+
     using PositionAttribute = typed::VertexInputDefinition<vsl::data_format::FLOAT_RG, 0, offsetof(Position, xy)>;
     using ColorAttribute = typed::VertexInputDefinition<vsl::data_format::FLOAT_RGB, 1, offsetof(Color, rgb)>;
     using PositionRecord = typed::VertexRecord<Position, VSL_VERTEX_MEMBER(Position, xy)>;
@@ -65,6 +68,7 @@ namespace {
             double vector[3];
             float scalar;
         };
+
         using Binding = typed::VertexBinding<Wide, 0, Timing::NEXT_VERTEX,
                                              typed::VertexInputDefinition<vsl::data_format::FLOAT64_RGB, 2, offsetof(Wide, vector)>,
                                              typed::VertexInputDefinition<vsl::data_format::FLOAT, typed::AUTO, offsetof(Wide, scalar)>>;
@@ -80,6 +84,7 @@ namespace {
             float xy[2];
             std::array<double, 3> normal;
         };
+
         using Schema = typed::VertexRecord<Vertex, VSL_VERTEX_MEMBER(Vertex, xy), VSL_VERTEX_MEMBER(Vertex, normal)>;
         using Binding = Schema::Binding<7, Timing::NEXT_INSTANCE, 3>;
         constexpr auto layout = typed::TypedVertexInput<Binding>::LAYOUT;
@@ -96,12 +101,14 @@ namespace {
         float xy[2];
         static constexpr auto GRAPHIC_TYPE = vsl::data_format::FLOAT_RG;
     };
+
     TEST(TypedVertexLayoutTest, SignedByteAndCustomGraphicTypesInferTheirStorageFormats) {
         struct Vertex {
             std::int8_t signed_values[3];
             std::array<std::uint8_t, 4> unsigned_values;
             GraphicVector vector;
         };
+
         using Schema = typed::VertexRecord<Vertex, VSL_VERTEX_MEMBER(Vertex, signed_values),
                                            VSL_VERTEX_MEMBER(Vertex, unsigned_values), VSL_VERTEX_MEMBER(Vertex, vector)>;
         static_assert(Schema::ATTRIBUTES[0].format == vsl::data_format::INT8_RGB);
@@ -147,10 +154,13 @@ namespace {
         namespace pl = vsl::pipeline_layout;
         namespace l = vsl::lifetime;
         std::optional<vsl::PipelineLayoutEditAccessor> saved;
+
         struct Capture {
             std::optional<vsl::PipelineLayoutEditAccessor>& saved;
+
             void injection(vsl::PipelineLayoutEditAccessor layout) const { saved = std::move(layout); }
         };
+
         using EmptySets = typed::ResourceSchema<typed::DescriptorSet<3>>;
         l::PipelineRecipeDraft draft(device);
         draft.inject(Capture{saved}, pl::ShaderGroup("snapshot", {*vertex, *fragment}), EmptySets{});
@@ -184,10 +194,13 @@ namespace {
     TEST_F(TypedPipelineVulkanIntegrationTest, TypedSchemaValidationLeavesTheCapturedDraftWithoutNativeLayouts) {
         namespace pl = vsl::pipeline_layout;
         std::optional<vsl::PipelineLayoutEditAccessor> saved;
+
         struct Capture {
             std::optional<vsl::PipelineLayoutEditAccessor>& saved;
+
             void injection(vsl::PipelineLayoutEditAccessor layout) const { saved = std::move(layout); }
         };
+
         using Resources = typed::ResourceSchema<typed::DescriptorSet<0, typed::UniformBinding<0, float, vsl::ShaderFlag::VERTEX>>>;
         using WrongInput = typed::TypedVertexInput<>;
         auto verify = [&](auto policy) {
@@ -301,6 +314,7 @@ namespace {
             std::uint8_t rgba[4];
             float padding;
         };
+
         using Schema = typed::VertexRecord<Vertex, VSL_VERTEX_MEMBER(Vertex, xy),
                                            VSL_VERTEX_MEMBER(Vertex, rgba, typed::AUTO, vsl::data_format::UNSIGNED_NORMALIZED8_RGBA)>;
         using Record = Schema::Binding<3>;
@@ -324,12 +338,15 @@ namespace {
                    << vsl::command::Draw(3);
         }));
     }
+
     TEST_F(TypedPipelineVulkanIntegrationTest, ShaderMismatchIsRejectedBeforeNativeGraphicsPipelineCreation) {
         using Empty = typed::TypedVertexInput<>;
         EXPECT_THROW(make_typed<Empty>(), std::invalid_argument);
+
         struct UnsignedPosition {
             std::uint32_t xy[2];
         };
+
         using Schema = typed::VertexRecord<UnsignedPosition, VSL_VERTEX_MEMBER(UnsignedPosition, xy)>;
         using Wrong = typed::TypedVertexInput<Schema::Binding<0>, Colors>;
         EXPECT_THROW(make_typed<Wrong>(), std::invalid_argument);

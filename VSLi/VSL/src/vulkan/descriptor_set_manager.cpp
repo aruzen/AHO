@@ -19,23 +19,28 @@ namespace VSL_NAMESPACE::graphic_resource {
     ManagerInterface::ManagerInterface() : _identity(std::make_shared<impl::GraphicResourceManagerIdentity>()) {
         _identity->manager = this;
     }
+
     ManagerInterface::ManagerInterface(LogicalDeviceAccessor device) : ManagerInterface() {
         if (StartupAccess::Owned(device))
             lifetime::require_device_owner(device);
         _state = std::make_shared<impl::GraphicResourceManagerImpl>();
         _state->device = StartupAccess::Shared(device);
     }
+
     ManagerInterface::~ManagerInterface() {
         retire_identity();
     }
+
     ManagerInterface::ManagerInterface(const ManagerInterface& other) : ManagerInterface() {
         _state = other._state;
     }
+
     ManagerInterface::ManagerInterface(ManagerInterface&& other) noexcept
         : _state(std::move(other._state)), _identity(std::move(other._identity)) {
         if (_identity)
             _identity->manager = this;
     }
+
     ManagerInterface& ManagerInterface::operator=(const ManagerInterface& other) {
         if (this == &other)
             return *this;
@@ -48,6 +53,7 @@ namespace VSL_NAMESPACE::graphic_resource {
             identity->manager = nullptr;
         return *this;
     }
+
     ManagerInterface& ManagerInterface::operator=(ManagerInterface&& other) noexcept {
         if (this == &other)
             return *this;
@@ -61,6 +67,7 @@ namespace VSL_NAMESPACE::graphic_resource {
             identity->manager = nullptr;
         return *this;
     }
+
     void ManagerInterface::swap_state(ManagerInterface& other) noexcept {
         _state.swap(other._state);
         _identity.swap(other._identity);
@@ -69,10 +76,12 @@ namespace VSL_NAMESPACE::graphic_resource {
         if (other._identity)
             other._identity->manager = &other;
     }
+
     void ManagerInterface::retire_identity() noexcept {
         if (_identity)
             _identity->manager = nullptr;
     }
+
     LogicalDeviceAccessor ManagerInterface::get_device() const {
         const auto state = _state;
         if (!state)
@@ -88,16 +97,20 @@ namespace {
     using lifetime::detail::DescriptorManagerAccess;
     using lifetime::detail::DescriptorManagerContext;
     using PoolOwner = lifetime::OwnedRef<impl::GraphicResourcePoolImpl>;
+
     struct PoolRetirement {
         impl::GraphicResourcePoolImpl& pool;
         explicit PoolRetirement(impl::GraphicResourcePoolImpl& pool);
+
         ~PoolRetirement() { pool.retiring = false; }
     };
+
     PoolRetirement::PoolRetirement(impl::GraphicResourcePoolImpl& pool) : pool(pool) {
         if (pool.retiring)
             throw std::logic_error("Descriptor pool is being destroyed");
         pool.retiring = true;
     }
+
     void require_pool_idle(const PoolOwner& data) {
         std::vector<std::shared_ptr<impl::GraphicResourceImpl>> resources;
         for (const auto& entry : data->resources)
@@ -109,6 +122,7 @@ namespace {
             resource->use.require_idle();
         }
     }
+
     template<typename Detach>
     void release_descriptor_pool(const PoolOwner& data, Detach&& detach) {
         std::vector<std::shared_ptr<impl::GraphicResourceImpl>> resources;
@@ -126,12 +140,14 @@ namespace {
         }
         data->resources.clear();
     }
+
     OverAllocateManager* current_over_allocator(const DescriptorManagerContext& context) {
         if (!context.identity || !context.identity->manager)
             return nullptr;
         auto* manager = dynamic_cast<OverAllocateManager*>(context.identity->manager);
         return manager && DescriptorManagerAccess::Data(*manager) == context.state ? manager : nullptr;
     }
+
     Pool make_pool(const DescriptorManagerContext& context, std::map<Type, size_t> count, size_t other) {
         constexpr auto maximum = std::numeric_limits<std::uint32_t>::max();
         if (other > maximum)
@@ -157,6 +173,7 @@ namespace {
         context.state->pools.push_back(lifetime::detail::OwnerAccess::Shared(DescriptorAccess::Owned(pool)));
         return pool;
     }
+
     std::tuple<Pool, std::vector<Resource>> make_resources(const DescriptorManagerContext& context,
                                                            std::vector<BindingLayout> layouts, std::map<Type, size_t> count = {}, size_t other = 0) {
         for (const auto& layout : layouts)
@@ -180,11 +197,14 @@ namespace VSL_NAMESPACE::graphic_resource {
         const auto context = DescriptorManagerAccess::Snapshot(*this);
         return make_pool(context, std::move(count), other);
     }
+
     std::tuple<Pool, std::vector<Resource>> ManagerInterface::make(std::vector<BindingLayout> layouts, std::map<Type, size_t> count, size_t other) {
         const auto context = DescriptorManagerAccess::Snapshot(*this);
         return make_resources(context, std::move(layouts), std::move(count), other);
     }
+
     ExactAllocateManager::ExactAllocateManager(LogicalDeviceAccessor device) : ManagerInterface(std::move(device)) {}
+
     std::tuple<std::vector<Pool>, std::vector<Resource>> ExactAllocateManager::allocate(std::vector<BindingLayout> layouts) {
         const auto context = DescriptorManagerAccess::Snapshot(*this);
         std::vector<Pool> pools;
@@ -198,6 +218,7 @@ namespace VSL_NAMESPACE::graphic_resource {
         }
         return {std::move(pools), std::move(resources)};
     }
+
     void ManagerInterface::destroy_pool(const Pool& pool) {
         const auto data = DescriptorAccess::Owned(pool);
         const auto context = DescriptorManagerAccess::Snapshot(*this);
@@ -207,18 +228,24 @@ namespace VSL_NAMESPACE::graphic_resource {
         require_pool_idle(data);
         release_descriptor_pool(data, [&] { return std::erase(context.state->pools, lifetime::detail::OwnerAccess::Shared(data)) != 0; });
     }
+
     void ExactAllocateManager::destroy(const Pool& pool) {
         destroy_pool(pool);
     }
+
     OverAllocateManager::OverAllocateManager(LogicalDeviceAccessor device, std::map<Type, size_t> count, size_t other)
         : ManagerInterface(std::move(device)), size(std::move(count)), other(other) {
         pools.push_back(make(size, other));
     }
+
     OverAllocateManager::OverAllocateManager(LogicalDeviceAccessor device) : ManagerInterface(std::move(device)) {}
+
     OverAllocateManager::OverAllocateManager(const OverAllocateManager& source)
         : ManagerInterface(source), size(source.size), other(source.other), pools(source.pools) {}
+
     OverAllocateManager::OverAllocateManager(OverAllocateManager&& source) noexcept
         : ManagerInterface(std::move(source)), size(std::move(source.size)), other(std::exchange(source.other, 0)), pools(std::move(source.pools)) {}
+
     OverAllocateManager& OverAllocateManager::operator=(const OverAllocateManager& source) {
         if (this == &source)
             return *this;
@@ -226,6 +253,7 @@ namespace VSL_NAMESPACE::graphic_resource {
         swap(replacement);
         return *this;
     }
+
     OverAllocateManager& OverAllocateManager::operator=(OverAllocateManager&& source) noexcept {
         if (this == &source)
             return *this;
@@ -233,15 +261,18 @@ namespace VSL_NAMESPACE::graphic_resource {
         swap(replacement);
         return *this;
     }
+
     OverAllocateManager::~OverAllocateManager() {
         retire_identity();
     }
+
     void OverAllocateManager::swap(OverAllocateManager& other) noexcept {
         size.swap(other.size);
         std::swap(this->other, other.other);
         pools.swap(other.pools);
         swap_state(other);
     }
+
     std::tuple<std::vector<Pool>, std::vector<Resource>> OverAllocateManager::allocate(std::vector<BindingLayout> layouts) {
         const auto context = DescriptorManagerAccess::Snapshot(*this);
         const auto count = size;
@@ -273,6 +304,7 @@ namespace VSL_NAMESPACE::graphic_resource {
         }
         return {std::move(selected), std::move(resources)};
     }
+
     void OverAllocateManager::destroy(const Pool& pool) {
         const auto data = DescriptorAccess::Owned(pool);
         const auto context = DescriptorManagerAccess::Snapshot(*this);

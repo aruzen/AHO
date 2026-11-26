@@ -9,10 +9,12 @@
 namespace VSL_NAMESPACE::storage {
     class SwapchainLayout;
 }
+
 namespace VSL_NAMESPACE::lifetime {
     struct SwapchainSlotStorage {
         alignas(impl::SwapchainImpl) std::byte value[sizeof(impl::SwapchainImpl)];
     };
+
     using SwapchainRegionFactory = std::function<std::shared_ptr<storage::detail::CPURegion>(const storage::SwapchainLayout&)>;
     void construct_swapchain(void* storage, operation::PendingSwapchain& pending) noexcept;
     impl::SwapchainImpl& swapchain_at(void* storage);

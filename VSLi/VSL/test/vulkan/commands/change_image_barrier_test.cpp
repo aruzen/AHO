@@ -9,6 +9,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::detail::ImageAccess;
 }
+
 namespace {
     TEST(ChangeImageBarrierTest, UnspecifiedAndExplicitShaderStagesPreserveTheirScopeAndLayers) {
         using namespace vsl;
@@ -40,6 +41,7 @@ namespace {
     class ChangeImageBarrierVulkanIntegrationTest : public vsl_test::ImageTransferVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     TEST_F(ChangeImageBarrierVulkanIntegrationTest, RetainsExplicitAndTypedLayoutsAndRejectsUnsupportedPair) {
         TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT);
         vsl::command::ChangeImageBarrier typed(image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
@@ -51,6 +53,7 @@ namespace {
         auto manager = make_manager();
         EXPECT_THROW(unsupported.invoke(manager.get_pool(), manager.get_buffer(), manager), std::invalid_argument);
     }
+
     TEST_F(ChangeImageBarrierVulkanIntegrationTest, TransitionsTransferDestinationToShaderRead) {
         TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT);
         auto manager = make_manager();

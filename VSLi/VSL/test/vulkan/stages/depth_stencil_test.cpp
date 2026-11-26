@@ -7,6 +7,7 @@ namespace {
 
 namespace {
     using DepthStencilVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
     TEST_F(DepthStencilVulkanIntegrationTest, ProvidesDepthStencilStateWhenInjected) {
         auto layout = make_layout_state();
         vsl::pipeline_layout::DepthStencil{}.injection(layout);

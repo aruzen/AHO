@@ -29,27 +29,33 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace VSL_NAMESPACE {
     RenderPassIdentity RenderPassAccessor::identity() const {
         return lifetime::detail::IdentityAccess::From<RenderPassIdentity>(_owner.get());
     }
+
     const RenderPassDescription& RenderPassAccessor::description() const& {
         if (!_owner || !_owner->description)
             throw std::logic_error("RenderPass has no description");
         return *_owner->description;
     }
+
     LogicalDeviceAccessor RenderPassAccessor::get_device() const {
         if (!_owner || !_owner.use_count() || !_owner->render_pass || !_owner->device || !_owner->description)
             throw std::invalid_argument("Render pass requires a live owner");
         return lifetime::device_from_child(_owner);
     }
+
     lifetime::OwnerRef RenderPassAccessor::owner_ref() const {
         lifetime::detail::require_live_owner(_owner);
         return _owner;
     }
+
     RenderPass::RenderPass(LogicalDeviceAccessor device, RenderPassDescription desc) {
         GraphicsAccess::Owned(*this) = GraphicsAccess::Owned(GraphicsAccess::FromShared(lifetime::make_heap_render_pass(std::move(device), std::move(desc))));
     }
+
     namespace {
         RenderPassDescription present_description(SwapchainAccessor swapchain, bool picking) {
             if (!SwapchainAccess::Owned(swapchain))
@@ -62,9 +68,11 @@ namespace VSL_NAMESPACE {
             return desc;
         }
     } // namespace
+
     RenderPass::RenderPass(SwapchainAccessor swapchain)
         : RenderPass(swapchain.get_device(),
                      present_description(swapchain, false)) {}
+
     IDPickingRenderPass::IDPickingRenderPass(SwapchainAccessor swapchain) {
         RenderPass pass(swapchain.get_device(),
                         present_description(swapchain, true));
@@ -72,24 +80,29 @@ namespace VSL_NAMESPACE {
         _picking_buffer.resize(swapchain.get_swap_image_size());
         recreate_buffer(SwapchainAccess::Owned(swapchain)->extent.width, SwapchainAccess::Owned(swapchain)->extent.height);
     }
+
     IDPickingRenderPass::IDPickingRenderPass(IDPickingRenderPass&& other) noexcept {
         lifetime::FacadeCall::Invalidate(&other);
         _pass.swap(other._pass);
         _picking_buffer.swap(other._picking_buffer);
     }
+
     IDPickingRenderPass& IDPickingRenderPass::operator=(IDPickingRenderPass replacement) noexcept {
         swap(replacement);
         return *this;
     }
+
     IDPickingRenderPass::~IDPickingRenderPass() {
         lifetime::FacadeCall::Invalidate(this);
     }
+
     void IDPickingRenderPass::swap(IDPickingRenderPass& other) noexcept {
         lifetime::FacadeCall::Invalidate(this);
         lifetime::FacadeCall::Invalidate(&other);
         _pass.swap(other._pass);
         _picking_buffer.swap(other._picking_buffer);
     }
+
     void IDPickingRenderPass::recreate_buffer(std::uint32_t width, std::uint32_t height) {
         lifetime::FacadeCall::Invalidate(this);
         lifetime::FacadeCall call(this);
@@ -104,6 +117,7 @@ namespace VSL_NAMESPACE {
         }
         _picking_buffer.swap(next);
     }
+
     std::uint32_t IDPickingRenderPass::read(CommandManager manager, FenceHolder in_flight, std::uint32_t x,
                                             std::uint32_t y) {
         auto buffer = manager.get_buffer();

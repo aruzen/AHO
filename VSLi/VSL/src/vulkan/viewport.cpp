@@ -16,6 +16,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 VSL_NAMESPACE::Viewport::Viewport() {}
 
 VSL_NAMESPACE::Viewport::Viewport(float x, float y, float width, float height) : x(x), y(y), width(width), height(height) {}

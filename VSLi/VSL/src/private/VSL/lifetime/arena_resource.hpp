@@ -18,13 +18,16 @@ namespace VSL_NAMESPACE::lifetime::detail {
         size_t owner_index = 0;
         template<typename Impl>
         Impl* get() const noexcept;
+
         BufferRef buffer() const { return BufferAccess::Ref(get<impl::BufferImpl>()); }
     };
+
     template<typename Impl>
     Impl* ArenaResource::get() const noexcept {
         const auto* value = std::get_if<Impl*>(&reference);
         return value ? *value : nullptr;
     }
+
     static_assert(sizeof(ArenaResource::Reference) <= 2 * sizeof(void*));
     static_assert(std::is_nothrow_copy_assignable_v<ArenaResource::Reference>);
 } // namespace VSL_NAMESPACE::lifetime::detail

@@ -19,6 +19,7 @@ namespace {
     static_assert(!std::is_constructible_v<vsl::BufferIdentity, const void*>);
     static_assert(!std::is_convertible_v<vsl::BufferIdentity, const void*>);
     static_assert(!std::default_initializable<t::TypedBatch<Draw>>);
+
     void accepted(Draw draw, Indexed indexed, Dispatch dispatch) {
         t::TypedBatch graphics(draw, indexed);
         t::TypedBatch compute(dispatch, dispatch);

@@ -28,6 +28,7 @@ namespace {
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_standard_layout_v<SwapchainSlotStorage> && offsetof(SwapchainSlotStorage, value) == 0);
     static_assert(std::is_nothrow_default_constructible_v<impl::SwapchainImpl>);
+
     namespace {
         struct SwapchainGenerationOwner {
             DependencyNode node;
@@ -46,6 +47,7 @@ namespace VSL_NAMESPACE::lifetime {
             void clear() noexcept;
             static void VisitDependencies(const void* owner, DependencyNode::EdgeVisitor visitor, void* context);
         };
+
         SwapchainGenerationOwner::SwapchainGenerationOwner(operation::PendingSwapchain& pending, storage::SwapchainLayout layout,
                                                            std::shared_ptr<storage::detail::CPURegion> memory, std::array<OwnerRef, 2> parents,
                                                            size_t parent_count, const operation::ImageViewNativeCalls& image_calls)
@@ -81,13 +83,16 @@ namespace VSL_NAMESPACE::lifetime {
                 throw;
             }
         }
+
         SwapchainGenerationOwner::~SwapchainGenerationOwner() {
             node.retire();
             clear();
         }
+
         void* SwapchainGenerationOwner::image_slot(size_t index) const {
             return memory->base + layout.image_offset(index);
         }
+
         void SwapchainGenerationOwner::clear() noexcept {
             if (semaphores_constructed) {
                 destroy_semaphore(memory->base + layout.finished_semaphore_offset());
@@ -108,37 +113,45 @@ namespace VSL_NAMESPACE::lifetime {
                 claimed = false;
             }
         }
+
         void SwapchainGenerationOwner::VisitDependencies(const void* owner, DependencyNode::EdgeVisitor visitor, void* context) {
             const auto& root = *static_cast<const SwapchainGenerationOwner*>(owner);
             for (size_t i = 0; i < root.parent_count; ++i)
                 visitor(context, root.parents[i]);
         }
     } // namespace
+
     void construct_swapchain(void* storage, operation::PendingSwapchain& pending) noexcept {
         auto* slot = std::construct_at(static_cast<SwapchainSlotStorage*>(storage));
         auto* value = std::construct_at(reinterpret_cast<impl::SwapchainImpl*>(slot->value));
         operation::adopt_swapchain(*value, pending);
     }
+
     impl::SwapchainImpl& swapchain_at(void* storage) {
         return *std::launder(reinterpret_cast<impl::SwapchainImpl*>(static_cast<SwapchainSlotStorage*>(storage)->value));
     }
+
     void destroy_swapchain(void* storage) noexcept {
         auto& value = swapchain_at(storage);
         std::destroy_at(&value);
         std::destroy_at(static_cast<SwapchainSlotStorage*>(storage));
     }
+
     void require_swapchain_owner(const SwapchainAccessor& source) {
         require_swapchain_owner(SwapchainAccess::Owned(source));
     }
+
     void require_swapchain_owner(const OwnedRef<impl::SwapchainImpl>& value) {
         require_swapchain_owner(detail::OwnerAccess::Shared(value));
         if (detail::OwnerAccess::Node(value) != value->owner_node)
             throw std::invalid_argument("Swapchain requires its canonical dependency node");
     }
+
     void require_swapchain_owner(const std::shared_ptr<impl::SwapchainImpl>& value) {
         if (!value || !value.use_count() || !value->swap_chain || !value->owner_node || value->owner_node->retiring() || !value->owner_node->matches(value))
             throw std::invalid_argument("Swapchain requires its live canonical owner");
     }
+
     std::shared_ptr<impl::ImageImpl> swapchain_image(const std::shared_ptr<impl::SwapchainImpl>& source, size_t index) {
         require_swapchain_owner(source);
         if (!source->image_storage || !source->image_stride || index >= source->swap_chain_images.size())
@@ -146,6 +159,7 @@ namespace VSL_NAMESPACE::lifetime {
         auto* image = std::launder(reinterpret_cast<impl::ImageImpl*>(source->image_storage + index * source->image_stride));
         return {source, image};
     }
+
     std::shared_ptr<impl::SemaphoreImpl> swapchain_finished(const std::shared_ptr<impl::SwapchainImpl>& source) {
         require_swapchain_owner(source);
         const auto* context = source->presentation_context;
@@ -153,6 +167,7 @@ namespace VSL_NAMESPACE::lifetime {
             throw std::logic_error("Swapchain has no finished semaphore group");
         return {source, context->finished};
     }
+
     SwapchainAccessor make_swapchain(LogicalDeviceAccessor device, Surface surface, SwapchainCreateInfo info,
                                      const std::optional<SwapchainAccessor>& old, const SwapchainRegionFactory& memory,
                                      const operation::SwapchainNativeCalls& calls, const operation::ImageViewNativeCalls& image_calls, SwapchainCreateProgress* progress) {
@@ -207,6 +222,7 @@ namespace VSL_NAMESPACE::lifetime {
         }
         return SwapchainAccess::FromOwned(root->node.ref(root).alias(&value), std::move(images));
     }
+
     SwapchainArena::SwapchainArena(LogicalDeviceAccessor device, Surface surface, SwapchainCreateInfo info,
                                    std::optional<SwapchainAccessor> old, SwapchainMemoryFactory memory, SwapchainCreateProgress* progress, ValidatedStorage) {
         _view = make_swapchain(std::move(device), std::move(surface), std::move(info), old, [&](const auto& layout) {
@@ -214,9 +230,11 @@ namespace VSL_NAMESPACE::lifetime {
             layout.require_region(region.size(), region.alignment());
             return region._region; }, {}, {}, progress);
     }
+
     OwnerRef SwapchainArena::owner_ref() const {
         return _view.owner_ref();
     }
+
     size_t SwapchainArena::image_count() const {
         return _view.get_swap_image_size();
     }

@@ -22,9 +22,12 @@ namespace VSL_NAMESPACE::typed {
         static constexpr std::uint32_t BINDING = binding, STRIDE = size;
         static constexpr VertexTiming TIMING = timing;
         static constexpr std::array<pipeline_layout::VertexInputLayoutDefinition, sizeof...(Attributes)> ATTRIBUTES{Attributes::VALUE...};
+
         static constexpr size_t Size() { return sizeof...(Attributes); }
+
         template<size_t index>
         static constexpr auto Get() { return std::get<index>(ATTRIBUTES); }
+
         static pipeline_layout::VertexInputShapeDefinition Make() {
             return {.layouts = {ATTRIBUTES.begin(), ATTRIBUTES.end()}, .binding = binding, .size = size, .update_timing = timing};
         }
@@ -45,6 +48,7 @@ namespace VSL_NAMESPACE::typed {
         std::uint32_t binding, stride;
         VertexTiming timing;
     };
+
     struct VertexAttributeLayout {
         data_format::Format format = data_format::UNDEFINED;
         std::uint32_t location, offset, binding, locations;

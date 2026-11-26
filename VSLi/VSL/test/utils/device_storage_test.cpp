@@ -42,25 +42,31 @@ namespace {
                                         t::BufferResource<t::ResourceId{2}, std::uint32_t, USAGE>>;
     using Native = vsl::Buffer<USAGE, vsl::MemoryProperty::HOST_VISIBLE>;
     using View = t::PlacedBufferView<std::uint32_t, USAGE>;
+
     class DeviceStorageVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     struct DeviceProbe {
         unsigned creates = 0, destroys = 0, fail_on = 1;
         bool fail = true;
         bool empty = false;
         static VkResult Create(void* context, VkPhysicalDevice physical, const VkDeviceCreateInfo* info, VkDevice* device);
         static void Destroy(void* context, VkDevice device) noexcept;
+
         o::DeviceNativeCalls calls() { return {this, Create, Destroy}; }
     };
+
     struct DeviceSlot {
         alignas(l::DeviceSlotStorage) std::byte memory[sizeof(l::DeviceSlotStorage)];
         bool constructed = false;
         o::DeviceNativeCalls calls;
         ~DeviceSlot();
         void construct(vsl::impl::PhysicalDeviceImpl& physical, vsl::DeviceCreateInfo info);
+
         vsl::impl::LogicalDeviceImpl& value() { return l::device_at(memory); }
     };
+
     struct DevicePair {
         l::DependencyNode node;
         l::OwnerRef physical;
@@ -70,10 +76,13 @@ namespace {
         DevicePair(vsl::PhysicalDevice physical, const o::DeviceNativeCalls& calls = {});
         ~DevicePair();
         void clear() noexcept;
+
         void* slot(size_t index) { return memory + index * sizeof(l::DeviceSlotStorage); }
+
         void publish(const std::shared_ptr<DevicePair>& owner);
         static void VisitDependencies(const void* root, l::DependencyNode::EdgeVisitor visitor, void* context);
     };
+
     struct DeviceAndBuffer {
         l::DependencyNode node;
         l::OwnerRef physical;
@@ -84,6 +93,7 @@ namespace {
         void publish(const std::shared_ptr<DeviceAndBuffer>& owner);
         static void VisitDependencies(const void* root, l::DependencyNode::EdgeVisitor visitor, void* context);
     };
+
     VkResult DeviceProbe::Create(void* context, VkPhysicalDevice physical, const VkDeviceCreateInfo* info, VkDevice* device) {
         auto& probe = *static_cast<DeviceProbe*>(context);
         ++probe.creates;
@@ -97,22 +107,26 @@ namespace {
         }
         return vkCreateDevice(physical, info, nullptr, device);
     }
+
     void DeviceProbe::Destroy(void* context, VkDevice device) noexcept {
         ++static_cast<DeviceProbe*>(context)->destroys;
         vkDestroyDevice(device, nullptr);
     }
+
     DeviceSlot::~DeviceSlot() {
         if (constructed) {
             o::destroy_device(value(), calls);
             l::destroy_device(memory);
         }
     }
+
     void DeviceSlot::construct(vsl::impl::PhysicalDeviceImpl& physical, vsl::DeviceCreateInfo info) {
         if (constructed)
             throw std::logic_error("Test Device slot is already constructed");
         l::construct_device(memory, physical, std::move(info), calls);
         constructed = true;
     }
+
     DevicePair::DevicePair(vsl::PhysicalDevice source, const o::DeviceNativeCalls& calls) : physical(source.owner_ref()), calls(calls) {
         try {
             while (constructed < 2) {
@@ -126,10 +140,12 @@ namespace {
             throw;
         }
     }
+
     DevicePair::~DevicePair() {
         node.retire();
         clear();
     }
+
     void DevicePair::clear() noexcept {
         while (constructed) {
             auto* memory = slot(--constructed);
@@ -137,14 +153,17 @@ namespace {
             l::destroy_device(memory);
         }
     }
+
     void DevicePair::publish(const std::shared_ptr<DevicePair>& owner) {
         node.publish(owner, this, VisitDependencies);
         for (size_t i = 0; i < constructed; ++i)
             l::device_at(slot(i)).owner_node = &node;
     }
+
     void DevicePair::VisitDependencies(const void* root, l::DependencyNode::EdgeVisitor visitor, void* context) {
         visitor(context, static_cast<const DevicePair*>(root)->physical);
     }
+
     DeviceAndBuffer::DeviceAndBuffer(vsl::PhysicalDevice source) : physical(source.owner_ref()) {
         l::construct_device(device_memory, *StartupAccess::Owned(source), {});
         try {
@@ -156,19 +175,23 @@ namespace {
             throw;
         }
     }
+
     DeviceAndBuffer::~DeviceAndBuffer() {
         node.retire();
         l::destroy_buffer(buffer_memory);
         l::destroy_device(device_memory);
     }
+
     void DeviceAndBuffer::publish(const std::shared_ptr<DeviceAndBuffer>& owner) {
         node.publish(owner, this, VisitDependencies);
         l::device_at(device_memory).owner_node = &node;
         l::detail::BufferAccess::Impl(l::buffer_at(buffer_memory))->owner_node = &node;
     }
+
     void DeviceAndBuffer::VisitDependencies(const void* root, l::DependencyNode::EdgeVisitor visitor, void* context) {
         visitor(context, static_cast<const DeviceAndBuffer*>(root)->physical);
     }
+
     TEST(DeviceStorageTest, ActualLayoutSeparatesWeakParentContextAndHasNoGpuUseState) {
         static_assert(sizeof(vsl::impl::LogicalDeviceImpl) == s::DEVICE_IMPL_SIZE);
         static_assert(sizeof(l::DeviceSlotStorage) == s::DEVICE_SLOT_SIZE);
@@ -183,6 +206,7 @@ namespace {
         EXPECT_THROW(vsl::LogicalDeviceAccessor::Create(vsl::PhysicalDevice{}), std::invalid_argument);
         EXPECT_THROW(vsl::LogicalDevice<>(vsl::PhysicalDevice{}, std::shared_ptr<vsl::Surface>{}), std::invalid_argument);
     }
+
     TEST_F(DeviceStorageVulkanIntegrationTest, DistinctDeviceSlotsShareOneOwnerAndReturnTheOriginalPhysicalParent) {
         auto root = std::make_shared<DevicePair>(physical);
         root->publish(root);
@@ -206,6 +230,7 @@ namespace {
         EXPECT_TRUE(owner.expired());
         EXPECT_TRUE(original.owner_ref().managed());
     }
+
     TEST_F(DeviceStorageVulkanIntegrationTest, FailedNativeOutputIsNotOwnedAndTheSameSlotCanBeRetried) {
         DeviceProbe probe;
         DeviceSlot slot;
@@ -223,6 +248,7 @@ namespace {
         EXPECT_EQ(probe.creates, 2u);
         EXPECT_EQ(probe.destroys, 1u);
     }
+
     TEST_F(DeviceStorageVulkanIntegrationTest, LaterFailureRollsBackOnlyTheSuccessfullyCreatedDevice) {
         DeviceProbe probe;
         probe.fail_on = 2;
@@ -231,6 +257,7 @@ namespace {
         EXPECT_EQ(probe.destroys, 1u);
         EXPECT_NO_THROW(vsl::LogicalDeviceAccessor::Create(physical));
     }
+
     TEST_F(DeviceStorageVulkanIntegrationTest, EmptySuccessfulOutputDoesNotConstructTheSlotAndAllowsRetry) {
         DeviceProbe probe;
         probe.empty = true;
@@ -243,6 +270,7 @@ namespace {
         probe.empty = probe.fail = false;
         EXPECT_NO_THROW(slot.construct(*StartupAccess::Owned(physical), {}));
     }
+
     TEST_F(DeviceStorageVulkanIntegrationTest, InvalidQueuesExtensionsAndFeatureBitsFailBeforeNativeCreation) {
         DeviceProbe probe;
         DeviceSlot slot;
@@ -271,6 +299,7 @@ namespace {
         EXPECT_EQ(probe.creates, 0u);
         EXPECT_EQ(probe.destroys, 0u);
     }
+
     TEST_F(DeviceStorageVulkanIntegrationTest, SupportedFeaturesDoNotImplicitlyBecomeEnabled) {
         auto minimal = vsl::LogicalDeviceAccessor::Create(physical);
         EXPECT_EQ(minimal.enabled_features(), vsl::DeviceFeature::NONE);
@@ -280,6 +309,7 @@ namespace {
         EXPECT_NO_THROW((vsl::Sampler(minimal, vsl::SamplingMode::NEAREST)));
         EXPECT_TRUE(vsl::has_device_features(physical.supported_features(), minimal.enabled_features()));
     }
+
     TEST_F(DeviceStorageVulkanIntegrationTest, ChildPlacementCanUseAnUnpublishedDeviceWithoutAnOwnerAdapter) {
         DeviceSlot slot;
         slot.construct(*StartupAccess::Owned(physical), {});
@@ -294,6 +324,7 @@ namespace {
         buffer.read_into(std::as_writable_bytes(std::span(actual)));
         EXPECT_EQ(actual, values);
     }
+
     TEST_F(DeviceStorageVulkanIntegrationTest, ForgedOrBorrowedDeviceOwnersAreRejectedBeforeCreatingChildren) {
         const auto borrowed = vsl_test::unchecked_startup(std::shared_ptr<vsl::impl::LogicalDeviceImpl>(std::shared_ptr<void>{}, StartupAccess::Owned(device).get()));
         const auto forged = vsl_test::unchecked_startup(std::shared_ptr<vsl::impl::LogicalDeviceImpl>(std::make_shared<int>(0), StartupAccess::Owned(device).get()));
@@ -321,6 +352,7 @@ namespace {
         EXPECT_THROW(l::set_device_physical_owner(*StartupAccess::Owned(device), different_parent_node.ref(StartupAccess::Shared(physical))), std::invalid_argument);
         EXPECT_EQ(StartupAccess::Owned(device.get_physical_device()), StartupAccess::Owned(physical));
     }
+
     TEST_F(DeviceStorageVulkanIntegrationTest, WeakDeviceObservesStorageWithoutExtendingItsLifetimeOrBypassingRetirement) {
         vsl::WeakLogicalDevice weak;
         EXPECT_TRUE(weak.expired());
@@ -346,6 +378,7 @@ namespace {
         EXPECT_TRUE(weak.expired());
         EXPECT_FALSE(weak.lock());
     }
+
     TEST_F(DeviceStorageVulkanIntegrationTest, NativeLeavesAndBothArenasExposeTheirActualFixedDeviceParent) {
         Native buffer(device, 16);
         vsl::Image<vsl::ImageType::SAMPLED> image(device, 2, 2);
@@ -374,6 +407,7 @@ namespace {
         vsl_test::expect_fixed_parent(set.owner_ref(), device.owner_ref(), false);
         vsl_test::expect_fixed_parent(manager.get_buffer().owner_ref(), device.owner_ref(), false);
     }
+
     TEST_F(DeviceStorageVulkanIntegrationTest, FixedDescriptorBorrowsAResourceAlreadyKeptByItsDeviceRoot) {
         std::weak_ptr<void> owner;
         {
@@ -406,6 +440,7 @@ namespace {
         }
         EXPECT_TRUE(owner.expired());
     }
+
     TEST_F(DeviceStorageVulkanIntegrationTest, ChildGetterKeepsTheOriginalDeviceWithoutKeepingTheChildRootAlive) {
         auto root = std::make_shared<DevicePair>(physical);
         root->publish(root);
@@ -423,6 +458,7 @@ namespace {
         EXPECT_TRUE(child.expired());
         EXPECT_TRUE(parent.owner_ref().managed());
     }
+
     TEST_F(DeviceStorageVulkanIntegrationTest, PlacedDeviceSupportsTypedTransferAndOutlivesItsOriginalFacade) {
         std::weak_ptr<void> device_owner;
         {
@@ -458,6 +494,7 @@ namespace {
         }
         EXPECT_TRUE(device_owner.expired());
     }
+
     TEST_F(DeviceStorageVulkanIntegrationTest, CancelReleasesTypedSourceWhileItsPlacedDeviceRemainsUsable) {
         auto root = std::make_shared<DevicePair>(physical);
         root->publish(root);

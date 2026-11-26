@@ -8,10 +8,12 @@ namespace AHO_NAMESPACE::window::detail {
         static void CancelPhases(const VSL_NAMESPACE::PureWindow& native, const std::shared_ptr<WindowData>& drawing);
         static void Install(Window& window);
     };
+
     struct FrameBufferQuery {
         void* context = nullptr;
         void (*get_size)(void*, void*, int*, int*) = nullptr;
     };
+
     class ScopedFrameBufferQuery {
         FrameBufferQuery _query;
         const FrameBufferQuery* _previous;
@@ -22,6 +24,7 @@ namespace AHO_NAMESPACE::window::detail {
         ScopedFrameBufferQuery& operator=(const ScopedFrameBufferQuery&) = delete;
         ~ScopedFrameBufferQuery();
     };
+
     d2::VectorI frame_buffer_size(void* native);
     std::shared_ptr<VSL_NAMESPACE::Surface> make_window_surface(VSL_NAMESPACE::PureWindow window, VSL_NAMESPACE::VulkanAccessor instance);
     std::shared_ptr<WindowData> make_window_data(const engine::EngineAccessor& engine,

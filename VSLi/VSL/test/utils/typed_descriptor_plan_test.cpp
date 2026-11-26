@@ -37,6 +37,7 @@ namespace {
     static_assert(!temporary_descriptors<t::TypedBundlePlan<Schema>>);
     static_assert(!temporary_placement<t::TypedResourceBundle<Schema, t::ArenaStorage<>>>);
     std::uint32_t capacity(t::DescriptorPoolPlan pool, Type type);
+
     std::uint32_t capacity(t::DescriptorPoolPlan pool, Type type) {
         for (const auto& entry : pool.descriptors)
             if (entry.type == type)
@@ -61,6 +62,7 @@ namespace {
         EXPECT_EQ(shared[1].layout, 2u);
         EXPECT_EQ(shared[2].layout, 3u);
     }
+
     TEST(TypedDescriptorPlanTest, PoolCapacityCountsEveryBindingOfTheSetIncludingSharedAndExternalValues) {
         const auto local = PLAN.pool(Scope::PER_FRAME);
         EXPECT_EQ(capacity(local, Type::UNIFORM_BUFFER), 2u);
@@ -74,6 +76,7 @@ namespace {
         EXPECT_EQ(shared.descriptors.size(), 2u);
         EXPECT_EQ(PLAN.frame_count(), 3u);
     }
+
     TEST(TypedDescriptorPlanTest, BundleKeepsTheConstexprDescriptorPlanAlongsideItsDataPlacement) {
         constexpr t::TypedBundlePlan<Schema> bundle(ALLOCATION);
         static_assert(bundle.descriptors().total_sets() == ALLOCATION.totals().descriptor_sets);
@@ -88,6 +91,7 @@ namespace {
         EXPECT_EQ(shared_storage.descriptors().total_descriptors(), PLAN.total_descriptors());
         EXPECT_EQ(capacity(shared_storage.descriptors().pool(Scope::PER_FRAME), Type::UNIFORM_BUFFER), 2u);
     }
+
     TEST(TypedDescriptorPlanTest, EmptySchemaAndDeclaredEmptySetHaveDifferentNativeBudgets) {
         using None = t::ResourceAllocationSchema<t::ResourceSchema<>>;
         constexpr t::TypedDescriptorPlan<None> none(3);
@@ -103,6 +107,7 @@ namespace {
         EXPECT_TRUE(declared.pool(Scope::SHARED).descriptors.empty());
         EXPECT_EQ(declared.pool(Scope::PER_FRAME).max_sets, 0u);
     }
+
     TEST(TypedDescriptorPlanTest, RuntimeFramesScaleTotalsWithoutMultiplyingPerPoolCapacity) {
         const t::TypedDescriptorPlan<Schema> many(1000000);
         EXPECT_EQ(many.total_sets(), 1000003u);
@@ -112,6 +117,7 @@ namespace {
         EXPECT_EQ(many.pool(Scope::PER_FRAME).max_sets, 1u);
         EXPECT_EQ(many.sets(Scope::PER_FRAME).size(), 1u);
     }
+
     TEST(TypedDescriptorPlanTest, RejectsInvalidFramesScopeAndNativeOrTotalOverflow) {
         EXPECT_THROW(t::TypedDescriptorPlan<Schema>(0), std::invalid_argument);
         EXPECT_THROW(PLAN.sets(static_cast<Scope>(99)), std::invalid_argument);

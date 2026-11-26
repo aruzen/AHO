@@ -8,11 +8,13 @@ namespace VSL_NAMESPACE {
     namespace lifetime::detail {
         struct BufferAccess;
     }
+
     // 非所有。所有者または構築scopeが有効な間だけ利用する。
     struct BufferRef {
     private:
         friend struct lifetime::detail::BufferAccess;
         impl::BufferImpl* _data = nullptr;
+
         explicit BufferRef(impl::BufferImpl* data) : _data(data) {}
 
     public:
@@ -45,17 +47,20 @@ namespace VSL_NAMESPACE {
         // 単独heap所有で生成する。CPU arenaの配置計画は使用しない。
         static BufferView Create(LogicalDeviceAccessor device, const BufferCreateInfo& info);
         static BufferView FromBuffer(const BufferAccessor& buffer);
+
         BufferRef ref() const& {
             if (!_owner.use_count())
                 throw std::logic_error("Buffer view is empty");
             return _ref;
         }
         BufferRef ref() const&& = delete;
+
         BufferIdentity identity() const { return _ref.identity(); }
         std::shared_ptr<void> owner() const { return _owner.share(); }
         lifetime::OwnerRef owner_ref() const { return _owner; }
         size_t byte_offset() const { return _offset; }
         size_t size() const { return _bytes; }
+
         BufferView view(size_t offset, size_t bytes) const;
         void write(std::span<const std::byte> bytes, size_t offset = 0) const;
         void read_into(std::span<std::byte> destination, size_t offset = 0) const;

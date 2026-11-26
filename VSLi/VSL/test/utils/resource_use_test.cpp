@@ -23,18 +23,23 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     namespace t = vsl::typed;
+
     class ResourceUseVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     class TrackedDrawVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     struct Vertex {
         float xy[2];
         float rgb[3];
     };
+
     using Record = t::VertexRecord<Vertex, VSL_VERTEX_MEMBER(Vertex, xy), VSL_VERTEX_MEMBER(Vertex, rgb)>;
     using Input = t::TypedVertexInput<Record::Binding<0>>;
     const std::array<Vertex, 3> VERTICES{{{{-1, -1}, {.25f, .5f, .75f}}, {{3, -1}, {.25f, .5f, .75f}}, {{-1, 3}, {.25f, .5f, .75f}}}};
@@ -88,6 +93,7 @@ namespace {
         ASSERT_TRUE(phase.completion().wait());
         EXPECT_TRUE(owner.expired());
     }
+
     TEST_F(ResourceUseVulkanIntegrationTest, SubmitValidationKeepsAnIndependentUncertainStateAliveUntilCompletion) {
         auto commands = make_manager().independent(1);
         auto phase = commands.start_phase<vsl::ComputePhase>();
@@ -157,6 +163,7 @@ namespace {
             vsl::ResourceUseState use;
             vsl::CompletionObservation update;
         };
+
         std::weak_ptr<Frame> owner;
         {
             auto manager = make_manager().independent(1);
@@ -190,11 +197,13 @@ namespace {
         }
         EXPECT_EQ(cancelled.status(), vsl::Completion::Status::CANCELLED);
     }
+
     TEST_F(ResourceUseVulkanIntegrationTest, RetainedFrameCanStoreItsOwnCompletionWithoutAWorkOwnershipCycle) {
         struct Frame {
             vsl::ResourceUseState use;
             vsl::Completion completion;
         };
+
         for (const bool cancel : {false, true}) {
             auto manager = make_manager();
             auto phase = manager.start_phase<vsl::ComputePhase>();
@@ -572,10 +581,12 @@ namespace {
         t::TypedUniformBuffer<std::uint32_t> input(device, 17u);
         auto initialized = native;
         initialized.update(input.backend());
+
         struct Composite {
             vsl::GraphicResource native;
             std::shared_ptr<int> token;
         };
+
         for (const auto retention : {vsl::ResourceRetention::COMPLETION, vsl::ResourceRetention::SUBMISSION}) {
             for (const bool cancel : {false, true}) {
                 std::weak_ptr<int> token;

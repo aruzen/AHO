@@ -16,6 +16,7 @@
 namespace VSL_NAMESPACE {
     class NativeRecordingContext;
 }
+
 namespace VSL_NAMESPACE::command {
     struct BindGraphicResource : public Command, public PipelineRequire {
         BindGraphicResource(GraphicResource resource, graphic_resource::BindingDestination dst, std::optional<PipelineAccessor> pipeline = std::nullopt, std::uint32_t first_binding = 0, std::shared_ptr<ResourceUseGroup> use = {});

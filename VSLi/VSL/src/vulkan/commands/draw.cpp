@@ -7,6 +7,7 @@
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 VSL_NAMESPACE::command::DrawManip VSL_NAMESPACE::command::DRAW;
 
 VSL_NAMESPACE::command::Draw::Draw(size_t size) : Draw(size, 1) {}

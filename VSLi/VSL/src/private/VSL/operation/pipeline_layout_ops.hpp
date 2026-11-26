@@ -10,6 +10,7 @@ namespace VSL_NAMESPACE::operation {
     bool pipeline_layout_matches(const impl::PipelineLayoutImpl& target, std::span<impl::ResourceBindingLayoutImpl* const> layouts,
                                  std::span<const PushConstantRange> ranges);
     void destroy_pipeline_layout(impl::PipelineLayoutImpl& target) noexcept;
+
     // 借用するrecipeはnative呼出しが終わるまで生存し、不変でなければならない。
     struct PipelineScratch {
         vk::PipelineDynamicStateCreateInfo dynamic_state;

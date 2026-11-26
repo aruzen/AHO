@@ -10,19 +10,24 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     namespace t = vsl::typed;
     using Empty = t::TypedVertexInput<>;
+
     struct Position {
         float xy[2];
     };
+
     struct Color {
         float rgb[3];
     };
+
     using Positions = t::VertexRecord<Position, VSL_VERTEX_MEMBER(Position, xy)>;
     using Colors = t::VertexRecord<Color, VSL_VERTEX_MEMBER(Color, rgb)>;
     using Input = t::TypedVertexInput<Positions::Binding<0>, Colors::Binding<1, t::VertexTiming::NEXT_VERTEX, 1>>;
     const std::array<Position, 3> POSITIONS{{{{-1, -1}}, {{3, -1}}, {{-1, 3}}}};
+
     class TypedBatchVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
 
@@ -30,6 +35,7 @@ namespace {
         template<typename Layout = Empty, typename Resources = t::ResourceSchema<>, typename Pushes = t::PushSchema<>>
         t::TypedGraphicsPipeline<Layout, Resources, Pushes> make_typed(const char* path = "triangle.vert.spv");
     };
+
     template<typename Layout, typename Resources, typename Pushes>
     t::TypedGraphicsPipeline<Layout, Resources, Pushes> TypedBatchVulkanIntegrationTest::make_typed(const char* path) {
         namespace pl = vsl::pipeline_layout;
@@ -37,6 +43,7 @@ namespace {
         return {device, *pass, pl::ShaderGroup("batch", {shader, *fragment}), pl::ColorBlend{}, pl::InputAssembly{},
                 pl::Rasterization{pl::CullingMode::NONE}, pl::Multisample{}, pl::DynamicState{}, vsl::Viewport(description), vsl::Scissor(description)};
     }
+
     TEST_F(TypedBatchVulkanIntegrationTest, RepeatedDrawsBindOnceAndBatchReuseStartsFromFreshState) {
         auto typed = make_typed();
         auto other = make_typed("typed_batch_red.vert.spv");
@@ -46,6 +53,7 @@ namespace {
         for (int iteration = 0; iteration < 2; ++iteration)
             ExpectTriangleColor(render([&](auto& stream) { stream << other.backend() << batch; }));
     }
+
     TEST_F(TypedBatchVulkanIntegrationTest, DistinctPipelineInstancesOfTheSameTypeAreBoundAndTheLastIsReported) {
         auto first = make_typed("typed_batch_red.vert.spv");
         auto last = make_typed();
@@ -59,6 +67,7 @@ namespace {
             stream << vsl::command::Draw(3);
         }));
     }
+
     TEST_F(TypedBatchVulkanIntegrationTest, VertexBufferIdentityViewOffsetsAndIndexTypesArePartOfThePlan) {
         auto typed = make_typed<Input>("vertices.vert.spv");
         t::TypedVertexBuffer<Position> positions(device, POSITIONS);
@@ -79,10 +88,12 @@ namespace {
         EXPECT_EQ(batch.statistics().draws, 5u);
         ExpectTriangleColor(render([&](auto& stream) { stream << batch; }));
     }
+
     TEST_F(TypedBatchVulkanIntegrationTest, DescriptorIdentityAndEveryPushSnapshotArePreserved) {
         struct Tint {
             float rgba[4];
         };
+
         using Layout = t::BlockRecord<Tint, VSL_BLOCK_MEMBER(Tint, rgba)>;
         using Set = t::DescriptorSet<1, t::UniformBinding<4, Layout, vsl::ShaderFlag::VERTEX>>;
         using Resources = t::ResourceSchema<Set>;
@@ -103,10 +114,12 @@ namespace {
         EXPECT_EQ(batch.statistics().descriptor_binds, 2u);
         ExpectTriangleColor(render([&](auto& stream) { stream << batch; }));
     }
+
     TEST_F(TypedBatchVulkanIntegrationTest, HeterogeneousCommandsRebindDescriptorsAcrossPipelineChangesAndKeepOwners) {
         struct Tint {
             float rgba[4];
         };
+
         using Layout = t::BlockRecord<Tint, VSL_BLOCK_MEMBER(Tint, rgba)>;
         using Set = t::DescriptorSet<1, t::UniformBinding<4, Layout, vsl::ShaderFlag::VERTEX>>;
         using Resources = t::ResourceSchema<Set>;
@@ -131,10 +144,12 @@ namespace {
         std::optional owned(std::move(batch));
         ExpectTriangleColor(render([&](auto& stream) { stream << *owned; owned.reset(); EXPECT_FALSE(owner.expired()); }));
     }
+
     TEST_F(TypedBatchVulkanIntegrationTest, ComputeBatchDeduplicatesBindingsAndPreservesDistinctPushValues) {
         struct PushData {
             std::uint32_t first, value;
         };
+
         using Layout = t::BlockRecord<PushData, VSL_BLOCK_MEMBER(PushData, first), VSL_BLOCK_MEMBER(PushData, value)>;
         using Push = t::PushSchema<t::PushRange<Layout, vsl::ShaderFlag::COMPUTE>>;
         using Set = t::DescriptorSet<0, t::StorageBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;

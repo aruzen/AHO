@@ -1,7 +1,9 @@
 #include "../../src/private/VSL/lifetime/window_access.hpp"
+
 namespace {
     using VSL_NAMESPACE::lifetime::detail::WindowAccess;
 }
+
 #include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/buffer_access.hpp>
 #include "support/window_fixture.hpp"
@@ -37,6 +39,7 @@ namespace {
 #endif
         return info;
     }
+
     TEST(StartupPlanTest, SameKindSlotsAreDistinctAndExternalEntriesHaveNoPlacement) {
         constexpr std::array requests{s::StartupRequest{{1}, s::StartupKind::DEVICE},
                                       s::StartupRequest{{2}, s::StartupKind::DEVICE},
@@ -57,6 +60,7 @@ namespace {
         const std::array invalid{s::StartupRequest{{1}, static_cast<s::StartupKind>(99)}};
         EXPECT_THROW((s::StartupPlan<1>{invalid}), std::invalid_argument);
     }
+
     TEST(StartupArenaTest, EmptyPlanClaimsMemoryExclusivelyAndReleasesOnlyItsOwnClaim) {
         const std::array<s::StartupRequest, 0> requests{};
         const s::StartupPlan<0> plan(requests);
@@ -72,6 +76,7 @@ namespace {
         }
         EXPECT_NO_THROW((l::StartupArena{plan, inputs, memory}));
     }
+
     TEST(StartupArenaTest, InvalidInputKindAndReferencesAreRejectedBeforeNativeConstruction) {
         const std::array requests{s::StartupRequest{{1}, s::StartupKind::PHYSICAL_DEVICE}};
         const s::StartupPlan<1> plan(requests);
@@ -84,6 +89,7 @@ namespace {
         EXPECT_THROW((l::StartupArena{plan, wrong_parent}), std::invalid_argument);
         EXPECT_THROW((l::StartupArena{plan, missing_entry}), std::invalid_argument);
     }
+
     TEST_F(StartupArenaVulkanIntegrationTest, ReverseDeclarationBuildsParentsFirstAndSharesOneOwnerForTwoDevices) {
         const std::array requests{s::StartupRequest{{3}, s::StartupKind::DEVICE},
                                   s::StartupRequest{{4}, s::StartupKind::DEVICE},
@@ -114,6 +120,7 @@ namespace {
         StartupAccess::Owned(saved).reset();
         EXPECT_TRUE(root.expired());
     }
+
     TEST_F(StartupArenaVulkanIntegrationTest, ExternalGetterReturnsOriginalOwnerAndDoesNotRetainImporter) {
         const std::array requests{s::StartupRequest{{1}, s::StartupKind::INSTANCE, true},
                                   s::StartupRequest{{2}, s::StartupKind::PHYSICAL_DEVICE, true},
@@ -136,6 +143,7 @@ namespace {
         EXPECT_TRUE(importer.expired());
         EXPECT_EQ(StartupAccess::Owned(saved), StartupAccess::Owned(device));
     }
+
     TEST_F(StartupArenaVulkanIntegrationTest, LaterDeviceFailureRollsBackAndAllowsTheSameMemoryToBeReused) {
         const std::array requests{s::StartupRequest{{1}, s::StartupKind::INSTANCE},
                                   s::StartupRequest{{2}, s::StartupKind::PHYSICAL_DEVICE},
@@ -159,6 +167,7 @@ namespace {
         StartupAccess::Owned(saved).reset();
         EXPECT_NO_THROW((l::StartupArena{plan, inputs, memory}));
     }
+
     TEST_F(StartupArenaVulkanIntegrationTest, ExternalInstanceIsACommonFixedParentRatherThanAnArenaSelfOwner) {
         const std::array requests{s::StartupRequest{{1}, s::StartupKind::PHYSICAL_DEVICE},
                                   s::StartupRequest{{2}, s::StartupKind::DEVICE}};
@@ -176,6 +185,7 @@ namespace {
         }
         EXPECT_TRUE(root.expired());
     }
+
     TEST_F(StartupArenaVulkanIntegrationTest, PublicStartupDeviceSupportsTypedCommandAfterArenaFacadeDestruction) {
         std::weak_ptr<void> startup_owner;
         {
@@ -215,6 +225,7 @@ namespace {
         }
         EXPECT_TRUE(startup_owner.expired());
     }
+
     TEST_F(StartupSurfaceVulkanIntegrationTest, GraphicsDeviceDoesNotRetainItsCallOnlySurfaceOrOSWindow) {
         vsl::LogicalDeviceAccessor saved;
         l::WeakOwnerRef surface_root, os_root;
@@ -240,6 +251,7 @@ namespace {
         Native buffer(saved, 16);
         EXPECT_TRUE(BufferAccess::Owned(buffer)->buffer);
     }
+
     TEST_F(StartupSurfaceVulkanIntegrationTest, PlacedSurfacePluginReusesNativeAndRejectsAnotherOrUnmanagedWindow) {
         const std::array requests{s::StartupRequest{{1}, s::StartupKind::SURFACE}};
         const s::StartupPlan<1> plan(requests);

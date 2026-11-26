@@ -27,29 +27,36 @@ namespace {
     constexpr t::ResourcePlan<1> PIPELINE_PLAN(PIPELINE_REQUESTS);
     constexpr std::array<t::ResourceRequest, 6> MIXED_REQUESTS{{{{1}, s::ResourceKind::PIPELINE}, {{2}, s::ResourceKind::PIPELINE}, {{3}, s::ResourceKind::PIPELINE_LAYOUT}, {{4}, s::ResourceKind::RENDER_PASS}, {{5}, s::ResourceKind::SHADER}, {{6}, s::ResourceKind::SHADER}}};
     constexpr t::ResourcePlan<6> MIXED_PLAN(MIXED_REQUESTS);
+
     class PipelineArenaVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
     protected:
         vsl::GraphicsPipelineState make_state() const;
         l::GraphicsPipelineInit direct_input() const;
         std::array<l::ResourceInit, 6> mixed_inputs() const;
+
         bool validate_vulkan() const override { return true; }
     };
+
     class ComputePipelineArenaVulkanIntegrationTest : public vsl_test::ComputeVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     vsl::GraphicsPipelineState PipelineArenaVulkanIntegrationTest::make_state() const {
         return vsl::GraphicsPipelineState(pl::VertexInput{}, pl::ColorBlend{}, pl::InputAssembly{},
                                           pl::Rasterization{pl::CullingMode::NONE}, pl::Multisample{}, pl::DynamicState{}, vsl::Viewport(description), vsl::Scissor(description));
     }
+
     l::GraphicsPipelineInit PipelineArenaVulkanIntegrationTest::direct_input() const {
         return {layout->runtime(), vsl::RenderPassAccessor{*pass}, make_state(), {vsl::ShaderAccessor{*vertex}, vsl::ShaderAccessor{*fragment}}};
     }
+
     std::array<l::ResourceInit, 6> PipelineArenaVulkanIntegrationTest::mixed_inputs() const {
         const l::GraphicsPipelineInit input{t::ResourceId{3}, t::ResourceId{4}, make_state(), {t::ResourceId{5}, t::ResourceId{6}}};
         return {input, input, l::PipelineLayoutInit{}, pass->description(),
                 vsl::ShaderCreateInfo{vsl::ShaderType::VERTEX, {vertex->code().begin(), vertex->code().end()}},
                 vsl::ShaderCreateInfo{vsl::ShaderType::FRAGMENT, {fragment->code().begin(), fragment->code().end()}}};
     }
+
     TEST(PipelinePlacementTest, ExactSlotsHaveNoSeparateUseStateAndRejectInsufficientRegions) {
         static_assert(s::ResourceSlotLayout<vsl::impl::PipelineImpl>::USE_OFFSET == s::NO_SEPARATE_USE);
         static_assert(MIXED_PLAN.placement({2}).offset == s::PIPELINE_IMPL_SIZE);
@@ -60,6 +67,7 @@ namespace {
         static_assert(!std::is_copy_constructible_v<vsl::impl::PipelineImpl>);
         static_assert(!std::is_move_constructible_v<vsl::impl::PipelineImpl>);
     }
+
     TEST(PipelinePlacementTest, EmptyFacadesCannotBecomeGraphicsOrComputeCommands) {
         const vsl::PipelineAccessor empty;
         EXPECT_EQ(empty.owner_ref().use_count(), 0);
@@ -67,6 +75,7 @@ namespace {
         EXPECT_THROW((vsl::GraphicsPipeline(empty)), std::invalid_argument);
         EXPECT_THROW((vsl::ComputePipeline(empty)), std::invalid_argument);
     }
+
     TEST_F(PipelineArenaVulkanIntegrationTest, ReverseDependenciesConstructDistinctSlotsAndSavedCommandsKeepOneOwner) {
         std::weak_ptr<void> owner;
         std::optional<vsl::GraphicsPipeline> kept;
@@ -99,6 +108,7 @@ namespace {
         EXPECT_TRUE(owner.expired());
         EXPECT_EQ(StartupAccess::Owned(device_only), StartupAccess::Owned(device));
     }
+
     TEST_F(PipelineArenaVulkanIntegrationTest, DirectSourcesAreReleasedAfterCreationWhileTheRuntimeLayoutStaysAlive) {
         std::optional<vsl::GraphicsPipeline> kept;
         std::weak_ptr<void> sources, runtime, output_owner;
@@ -128,6 +138,7 @@ namespace {
         EXPECT_TRUE(output_owner.expired());
         EXPECT_TRUE(runtime.expired());
     }
+
     TEST_F(PipelineArenaVulkanIntegrationTest, LaterFailureDestroysEarlierPipelinesAndAllowsTheSameRegionToBeReused) {
         s::ArenaMemory memory(MIXED_PLAN.bytes(), MIXED_PLAN.alignment());
         auto inputs = mixed_inputs();
@@ -142,6 +153,7 @@ namespace {
         inputs[1] = inputs[0];
         EXPECT_NO_THROW((l::ResourceArena(device, MIXED_PLAN, inputs, memory)));
     }
+
     TEST_F(PipelineArenaVulkanIntegrationTest, HeapLayoutEdgesAndPipelineImportsRejectAReverseDescriptorDependency) {
         using Set = t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::FRAGMENT>>;
         using View = t::TypedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>;
@@ -181,6 +193,7 @@ namespace {
         EXPECT_TRUE(source_owner.expired());
         EXPECT_TRUE(heap_owner.expired());
     }
+
     TEST_F(PipelineArenaVulkanIntegrationTest, GraphicsSourcesRejectEmptyAndNonowningShaderAccessors) {
         const auto borrowed = ShaderAccess::FromShared(std::shared_ptr<vsl::impl::ShaderImpl>(std::shared_ptr<void>{}, ShaderAccess::Owned(*(vertex)).get()));
         const auto missing_module = ShaderAccess::FromShared(std::make_shared<vsl::impl::ShaderImpl>());
@@ -194,6 +207,7 @@ namespace {
             EXPECT_THROW((vsl::GraphicsPipeline(layout->runtime(), *pass, input.state, shaders)), std::invalid_argument);
         }
     }
+
     TEST_F(PipelineArenaVulkanIntegrationTest, CompletionAndCancelKeepRecordedPipelinesUntilWorkOwnersReleaseThem) {
         auto manager = make_manager();
         for (const bool submit : {false, true}) {
@@ -229,6 +243,7 @@ namespace {
             EXPECT_EQ(completion.status(), submit ? vsl::Completion::Status::COMPLETE : vsl::Completion::Status::CANCELLED);
         }
     }
+
     TEST_F(ComputePipelineArenaVulkanIntegrationTest, DirectComputeSourceCanBeReleasedBeforeDispatchAndPushRecording) {
         std::weak_ptr<void> source, owner;
         {
@@ -246,6 +261,7 @@ namespace {
         pipeline.reset();
         EXPECT_TRUE(owner.expired());
     }
+
     TEST_F(ComputePipelineArenaVulkanIntegrationTest, ComputeSourcesRejectNonownersAndWrongShaderStages) {
         const auto borrowed = ShaderAccess::FromShared(std::shared_ptr<vsl::impl::ShaderImpl>(std::shared_ptr<void>{}, ShaderAccess::Owned(*(shader)).get()));
         const auto missing_module = ShaderAccess::FromShared(std::make_shared<vsl::impl::ShaderImpl>());

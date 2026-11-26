@@ -56,13 +56,16 @@ namespace VSL_NAMESPACE {
     };
 
     struct ShaderCreateInfo;
+
     namespace lifetime::detail {
         struct ShaderAccess;
     }
+
     struct ShaderAccessor {
     private:
         friend struct lifetime::detail::ShaderAccess;
         lifetime::OwnedRef<impl::ShaderImpl> _owner;
+
         explicit ShaderAccessor(lifetime::OwnedRef<impl::ShaderImpl> owner) : _owner(std::move(owner)) {}
 
     protected:
@@ -70,7 +73,9 @@ namespace VSL_NAMESPACE {
 
     public:
         ShaderAccessor() = default;
+
         explicit operator bool() const noexcept { return bool(_owner); }
+
         std::string name() const;
         ShaderType type() const;
         std::span<const std::uint32_t> code() const&;

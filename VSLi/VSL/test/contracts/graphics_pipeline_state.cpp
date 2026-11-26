@@ -11,14 +11,18 @@ static_assert(std::is_nothrow_move_constructible_v<vsl::GraphicsPipelineState>);
 static_assert(std::is_nothrow_move_assignable_v<vsl::GraphicsPipelineState>);
 static_assert(!std::is_aggregate_v<vsl::GraphicsPipelineStateEditRef>);
 static_assert(std::is_trivially_copyable_v<vsl::GraphicsPipelineStateEditRef>);
+
 struct ComposedState {
     void injection(vsl::GraphicsPipelineStateEditRef state) const {
         vsl::pipeline_layout::Rasterization{vsl::pipeline_layout::CullingMode::NONE}.injection(state);
         vsl::pipeline_layout::DepthStencil{}.injection(state);
     }
+
     void injection(vsl::PipelineLayoutEditAccessor layout) const { injection(layout.edit_state()); }
 };
+
 void accept_state(vsl::GraphicsPipelineState state, vsl::PipelineLayoutEditAccessor layout);
+
 void accept_state(vsl::GraphicsPipelineState state, vsl::PipelineLayoutEditAccessor layout) {
     auto copied = state;
     copied = state;
@@ -30,18 +34,21 @@ void accept_state(vsl::GraphicsPipelineState state, vsl::PipelineLayoutEditAcces
 #elif VSL_TYPED_CASE == 1
 #include <VSL/vulkan/stages/shader_group.hpp>
 void reject_shader(vsl::pipeline_layout::ShaderGroup group);
+
 void reject_shader(vsl::pipeline_layout::ShaderGroup group) {
     vsl::GraphicsPipelineState invalid(group);
 }
 #elif VSL_TYPED_CASE == 2
 #include <VSL/vulkan/stages/resource_binding.hpp>
 void reject_binding(vsl::pipeline_layout::ResourceBinding binding);
+
 void reject_binding(vsl::pipeline_layout::ResourceBinding binding) {
     vsl::GraphicsPipelineState invalid(binding);
 }
 #elif VSL_TYPED_CASE == 3
 #include <VSL/vulkan/stages/push_contents.hpp>
 void reject_push(vsl::pipeline_layout::PushConstants push);
+
 void reject_push(vsl::pipeline_layout::PushConstants push) {
     vsl::GraphicsPipelineState invalid(push);
 }
@@ -55,11 +62,13 @@ vsl::PipelineLayoutEditAccessor make_layout();
 auto invalid = make_layout().edit_state();
 #elif VSL_TYPED_CASE == 7
 void reject_data(vsl::GraphicsPipelineStateEditRef state);
+
 void reject_data(vsl::GraphicsPipelineStateEditRef state) {
     (void)state.data;
 }
 #elif VSL_TYPED_CASE == 8
 void reject_get(vsl::GraphicsPipelineStateEditRef state);
+
 void reject_get(vsl::GraphicsPipelineStateEditRef state) {
     (void)state.get();
 }
@@ -67,6 +76,7 @@ void reject_get(vsl::GraphicsPipelineStateEditRef state) {
 vsl::GraphicsPipelineStateEditRef invalid(static_cast<vsl::impl::GraphicsPipelineStateData*>(nullptr));
 #elif VSL_TYPED_CASE == 10
 void reject_definition(const vsl::GraphicsPipelineState& state);
+
 void reject_definition(const vsl::GraphicsPipelineState& state) {
     (void)state.definition();
 }

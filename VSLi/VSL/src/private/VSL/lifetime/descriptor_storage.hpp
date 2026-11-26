@@ -8,6 +8,7 @@ namespace VSL_NAMESPACE::lifetime {
     struct DescriptorSlotStorage {
         alignas(Impl) std::byte value[sizeof(Impl)];
     };
+
     using DescriptorLayoutSlotStorage = DescriptorSlotStorage<impl::ResourceBindingLayoutImpl>;
     using DescriptorPoolSlotStorage = DescriptorSlotStorage<impl::GraphicResourcePoolImpl>;
     using DescriptorSetSlotStorage = DescriptorSlotStorage<impl::GraphicResourceImpl>;

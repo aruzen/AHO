@@ -36,6 +36,7 @@ namespace VSL_NAMESPACE::typed {
         command::Draw _draw;
         std::vector<command::BindGraphicResource> _resources;
         std::optional<typename Pushes::Values> _pushes;
+
         TypedDraw(VSL_NAMESPACE::GraphicsPipeline pipeline, LogicalDeviceAccessor device,
                   std::array<command::BindVertexBufferAt, Input::BINDING_COUNT> buffers, command::Draw draw, std::vector<command::BindGraphicResource> resources, std::optional<typename Pushes::Values> pushes)
             : _pipeline(std::move(pipeline)), _device(device), _buffers(std::move(buffers)), _draw(std::move(draw)), _resources(std::move(resources)), _pushes(std::move(pushes)) {}
@@ -44,7 +45,9 @@ namespace VSL_NAMESPACE::typed {
         using VertexInput = Input;
         using ResourceLayout = Resources;
         using PushLayout = Pushes;
+
         PipelineAccessor get_pipeline() override { return _pipeline; }
+
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
     };
 
@@ -64,6 +67,7 @@ namespace VSL_NAMESPACE::typed {
         std::shared_ptr<const std::uint64_t> _index_revision;
         std::uint64_t _expected_index_revision;
         void validate_indices() const;
+
         TypedIndexedDraw(VSL_NAMESPACE::GraphicsPipeline pipeline, LogicalDeviceAccessor device,
                          std::array<command::BindVertexBufferAt, Input::BINDING_COUNT> buffers, command::BindIndexBufferAt indices,
                          command::DrawIndexed draw, std::vector<command::BindGraphicResource> resources, std::optional<typename Pushes::Values> pushes,
@@ -76,7 +80,9 @@ namespace VSL_NAMESPACE::typed {
         using VertexInput = Input;
         using ResourceLayout = Resources;
         using PushLayout = Pushes;
+
         PipelineAccessor get_pipeline() override { return _pipeline; }
+
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
     };
 
@@ -92,9 +98,11 @@ namespace VSL_NAMESPACE::typed {
         std::array<size_t, Input::BINDING_COUNT> _counts;
         std::vector<command::BindGraphicResource> _resources;
         std::optional<typename Pushes::Values> _pushes;
+
         template<bool other_bound, bool other_pushed>
         TypedVertexBinding(const TypedVertexBinding<Input, Resources, Pushes, other_bound, other_pushed>& source, std::vector<command::BindGraphicResource> resources, std::optional<typename Pushes::Values> pushes)
             : _pipeline(source._pipeline), _device(source._device), _buffers(source._buffers), _counts(source._counts), _resources(std::move(resources)), _pushes(std::move(pushes)) {}
+
         template<typename... Buffers, size_t... indices>
         TypedVertexBinding(VSL_NAMESPACE::GraphicsPipeline pipeline, LogicalDeviceAccessor device,
                            std::index_sequence<indices...>, const Buffers&... buffers)
@@ -134,15 +142,19 @@ namespace VSL_NAMESPACE::typed {
         using ResourceLayout = Resources;
         using PushLayout = Pushes;
         static constexpr std::uint32_t SUBPASS = subpass;
+
         template<pipeline_layout_injecter... Stages>
         TypedGraphicsPipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, Stages&&... stages)
             : TypedGraphicsPipeline(DefaultStorage{}, device, std::move(pass), std::forward<Stages>(stages)...) {}
+
         template<storage_policy Policy, pipeline_layout_injecter... Stages>
         TypedGraphicsPipeline(Policy policy, LogicalDeviceAccessor device, RenderPassAccessor pass, Stages&&... stages)
             : _device(device), _pipeline(MakePipeline(policy, device, std::move(pass), Resources{}, std::forward<Stages>(stages)...)) {}
+
         template<pipeline_layout_injecter... Stages>
         TypedGraphicsPipeline(LogicalDeviceAccessor device, RenderPassAccessor pass, const TypedDescriptorLayouts<Resources>& layouts, Stages&&... stages)
             : TypedGraphicsPipeline(DefaultStorage{}, device, std::move(pass), layouts, std::forward<Stages>(stages)...) {}
+
         template<storage_policy Policy, pipeline_layout_injecter... Stages>
         TypedGraphicsPipeline(Policy policy, LogicalDeviceAccessor device, RenderPassAccessor pass, const TypedDescriptorLayouts<Resources>& layouts, Stages&&... stages)
             : _device(device), _pipeline(MakePipeline(policy, device, std::move(pass), detail::DescriptorLayoutInjection<Resources>{layouts}, std::forward<Stages>(stages)...)) {}

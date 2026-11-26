@@ -7,6 +7,7 @@
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 VSL_NAMESPACE::command::DrawInstance::DrawInstance(size_t index_size, size_t instance_size)
     : _index_size(impl::helper::checked_draw_count(index_size)), _instance_size(impl::helper::checked_draw_count(instance_size)) {}
 

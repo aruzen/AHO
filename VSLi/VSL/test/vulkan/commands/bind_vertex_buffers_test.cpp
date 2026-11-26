@@ -9,8 +9,10 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::detail::BufferAccess;
 }
+
 namespace {
     using BindVertexBufferVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
+
     TEST_F(BindVertexBufferVulkanIntegrationTest, BindsSeparatePositionAndColorBuffers) {
         configure_pipeline(true);
         std::array<float, 6> positions{-1, -1, 3, -1, -1, 3};
@@ -27,6 +29,7 @@ namespace {
         }));
     }
 } // namespace
+
 namespace {
     TEST(BindVertexBufferTest, EmptyCommandsCanBeCopiedAssignedAndMoved) {
         vsl::command::BindVertexBuffer empty;
@@ -39,6 +42,7 @@ namespace {
         EXPECT_TRUE(copy.buffers.empty());
         EXPECT_TRUE(moved.buffers.empty());
     }
+
     TEST_F(BindVertexBufferVulkanIntegrationTest, CopiesKeepIndependentListsAndTheOriginalBufferReferences) {
         configure_pipeline(true);
         std::array<float, 6> positions{-1, -1, 3, -1, -1, 3};
@@ -79,6 +83,7 @@ namespace {
     class DrawResourceLifetimeVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     TEST_F(DrawResourceLifetimeVulkanIntegrationTest, EmptyBindingPreservesThePreviouslyBoundVertexBuffers) {
         // 検証エラーはテストを失敗させ、不正なコマンドをdriverへ渡さない。
         expect_validation_abort("");

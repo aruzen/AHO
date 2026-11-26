@@ -9,6 +9,7 @@ namespace VSL_NAMESPACE::operation {
         VkResult (*begin)(void*, VkCommandBuffer, const VkCommandBufferBeginInfo*) noexcept = nullptr;
         VkResult (*end)(void*, VkCommandBuffer) noexcept = nullptr;
     };
+
     class ScopedCommandNativeCalls {
         CommandNativeCalls _calls;
         const CommandNativeCalls* _previous;
@@ -19,6 +20,7 @@ namespace VSL_NAMESPACE::operation {
         ScopedCommandNativeCalls(const ScopedCommandNativeCalls&) = delete;
         ScopedCommandNativeCalls& operator=(const ScopedCommandNativeCalls&) = delete;
     };
+
     void initialize_command_pool(impl::CommandPoolImpl& pool, impl::LogicalDeviceImpl& device, CommandPoolCreateInfo info);
     void destroy_command_pool(impl::CommandPoolImpl& pool) noexcept;
     void initialize_command_buffer(impl::CommandBufferImpl& buffer, impl::CommandPoolImpl& pool, std::uint32_t count);

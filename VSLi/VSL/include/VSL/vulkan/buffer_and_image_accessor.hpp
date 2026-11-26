@@ -193,6 +193,7 @@ namespace VSL_NAMESPACE {
     struct ResourceUse;
     struct BufferCreateInfo;
     struct ImageCreateInfo;
+
     namespace lifetime::detail {
         struct BufferAccess;
         struct ImageAccess;
@@ -200,6 +201,7 @@ namespace VSL_NAMESPACE {
 
     struct BufferAccessor {
         explicit operator bool() const { return bool(_owner); }
+
         BufferIdentity identity() const;
         BufferAccessor() = default;
         BufferAccessor(const BufferAccessor&) = default;
@@ -253,11 +255,13 @@ namespace VSL_NAMESPACE {
 
         private:
             friend struct BufferAccessor;
+
             struct MappingSnapshot {
                 lifetime::OwnedRef<impl::BufferImpl> owner;
                 void* data;
                 std::size_t size, offset;
             };
+
             lifetime::OwnedRef<impl::BufferImpl> _owner;
             LocalBufferHolder(BufferAccessor* parent, std::size_t size, std::size_t offset, void* data,
                               lifetime::OwnedRef<impl::BufferImpl> owner);
@@ -319,7 +323,9 @@ namespace VSL_NAMESPACE {
 
     struct ImageAccessor {
         ImageAccessor() = default;
+
         explicit operator bool() const { return bool(_owner); }
+
         // runtime設定から単独heap所有で生成する。
         static ImageAccessor Create(LogicalDeviceAccessor device, const ImageCreateInfo& info);
         data_format::Format get_format() const;
@@ -343,6 +349,7 @@ namespace VSL_NAMESPACE {
     private:
         friend struct lifetime::detail::ImageAccess;
         lifetime::OwnedRef<impl::ImageImpl> _owner;
+
         explicit ImageAccessor(lifetime::OwnedRef<impl::ImageImpl> owner) : _owner(std::move(owner)) {}
     };
 } // namespace VSL_NAMESPACE

@@ -7,23 +7,27 @@ namespace AHO_NAMESPACE::resource {
     struct Buffer<BufferType::GENERAL>::Data {
         std::vector<std::byte> bytes;
     };
+
     detail::BufferMutation::BufferMutation(std::shared_ptr<BufferState> state) : _state(std::move(state)) {
         if (!_state || _state->updating)
             throw std::logic_error("Buffer is already being changed");
         _state->updating = true;
     }
+
     void detail::BufferMutation::finish() noexcept {
         if (_state) {
             _state->updating = false;
             _state.reset();
         }
     }
+
     BufferSnapshot::BufferSnapshot(VSL_NAMESPACE::BufferView storage, VSL_NAMESPACE::LogicalDeviceAccessor device,
                                    std::size_t size, VSL_NAMESPACE::ResourceUse constraints, VSL_NAMESPACE::ResourceRetention retention, bool host_readable)
         : _storage(std::move(storage)), _device(std::move(device)), _size(size), _constraints(std::move(constraints)), _retention(retention), _host_readable(host_readable) {
         if (_size > _storage.size())
             throw std::out_of_range("Buffer snapshot exceeds its storage generation");
     }
+
     void BufferSnapshot::read_into(std::span<std::byte> destination, std::size_t offset) const {
         const auto source = storage();
         const auto constraints = _constraints;
@@ -40,11 +44,13 @@ namespace AHO_NAMESPACE::resource {
             return &native->use_state();
         return current ? &current->ref().use() : nullptr;
     }
+
     bool detail::BufferState::busy() const {
         const auto owner = resource.lock();
         auto* const storage = physical();
         return logical->busy() || (storage && storage->busy());
     }
+
     bool detail::BufferState::wait(std::uint64_t timeout) const {
         const auto owner = resource.lock();
         auto* const storage = physical();
@@ -55,6 +61,7 @@ namespace AHO_NAMESPACE::resource {
         const auto remaining = timeout == UINT64_MAX ? timeout : (std::uint64_t(elapsed) < timeout ? timeout - std::uint64_t(elapsed) : 0);
         return !storage || storage->wait(remaining);
     }
+
     void detail::BufferState::require_idle() const {
         const auto owner = resource.lock();
         auto* const storage = physical();
@@ -62,6 +69,7 @@ namespace AHO_NAMESPACE::resource {
         if (storage)
             storage->require_idle();
     }
+
     void detail::BufferState::check_available(const VSL_NAMESPACE::Completion& completion) const {
         if (updating)
             throw std::logic_error("Buffer is being changed");
@@ -71,6 +79,7 @@ namespace AHO_NAMESPACE::resource {
         if (storage)
             storage->check_available(completion);
     }
+
     void detail::BufferState::mark_used(VSL_NAMESPACE::Completion completion) const {
         const auto owner = resource.lock();
         auto* const storage = physical();
@@ -152,6 +161,7 @@ namespace AHO_NAMESPACE::resource {
     std::shared_ptr<void> BufferBinding::owner() const {
         return owner_ref().share();
     }
+
     VSL_NAMESPACE::lifetime::OwnerRef BufferBinding::owner_ref() const {
         if (!_state)
             throw std::logic_error("Buffer binding is empty");
@@ -179,11 +189,13 @@ namespace AHO_NAMESPACE::resource {
             throw std::logic_error("Buffer binding is empty");
         state->mark_used(std::move(completion));
     }
+
     VSL_NAMESPACE::ResourceUse BufferBinding::resource_use() const {
         if (!_state)
             throw std::logic_error("Buffer binding is empty");
         return snapshot().resource_use();
     }
+
     BufferSnapshot BufferBinding::snapshot() const {
         if (!_state || (!_state->native && !_state->current))
             throw std::logic_error("Buffer has no GPU storage");

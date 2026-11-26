@@ -37,6 +37,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
         static OwnedRef<impl::LogicalDeviceImpl> Owned(LogicalDevice<C>&& value) { return std::move(value._value._owner); }
         template<typename C>
         static OwnedRef<impl::LogicalDeviceImpl> Owned(const LogicalDevice<C>&& value) { return value._value._owner; }
+
         template<typename S>
         static const std::shared_ptr<impl::PhysicalDevicesImpl>& Collection(const PhysicalDevices<S>& value) { return value._collection._state; }
         template<typename S>
@@ -45,6 +46,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
         static std::shared_ptr<impl::PhysicalDevicesImpl> Collection(PhysicalDevices<S>&& value) { return std::move(value._collection._state); }
         template<typename S>
         static std::shared_ptr<impl::PhysicalDevicesImpl> Collection(const PhysicalDevices<S>&& value) { return value._collection._state; }
+
         static VulkanAccessor FromOwned(OwnedRef<impl::VulkanImplAccessor> owner);
         static PhysicalDevice FromOwned(OwnedRef<impl::PhysicalDeviceImpl> owner);
         static VulkanAccessor FromShared(std::shared_ptr<impl::VulkanImplAccessor> owner);
@@ -60,6 +62,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
         template<typename T>
         static decltype(auto) Shared(T&& value);
     };
+
     // 既存Shared境界への接続。通常操作はOwnedから実体を直接参照する。
     template<typename T>
     decltype(auto) StartupAccess::Shared(T&& value) {

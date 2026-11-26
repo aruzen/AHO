@@ -1,5 +1,6 @@
 #include <VSL/vulkan/stages/id_picking.hpp>
 #include <VSL/vulkan/stages/color_blend.hpp>
+
 void VSL_NAMESPACE::pipeline_layout::IDPicking::injection(VSL_NAMESPACE::PipelineLayoutEditAccessor pl) {
     injection(pl.edit_state());
 }

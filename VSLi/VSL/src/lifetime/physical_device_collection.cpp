@@ -5,6 +5,7 @@
 namespace VSL_NAMESPACE::lifetime::detail {
     namespace {
         std::vector<PhysicalDevice> enumerate_snapshot(std::shared_ptr<impl::PhysicalDevicesImpl> snapshot);
+
         std::vector<PhysicalDevice> enumerate_snapshot(std::shared_ptr<impl::PhysicalDevicesImpl> snapshot) {
             if (!snapshot || !snapshot.use_count())
                 throw std::invalid_argument("Physical devices snapshot is empty");
@@ -19,6 +20,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
             return devices;
         }
     } // namespace
+
     PhysicalDeviceCollection::PhysicalDeviceCollection(VulkanAccessor instance) {
         StartupAccess::RequireCanonical(StartupAccess::Owned(instance));
         auto state = std::make_shared<impl::PhysicalDevicesImpl>();
@@ -26,12 +28,15 @@ namespace VSL_NAMESPACE::lifetime::detail {
         state->vulkan = OwnerAccess::Shared(StartupAccess::Owned(instance));
         _state = std::move(state);
     }
+
     std::vector<PhysicalDevice> PhysicalDeviceCollection::get() const& {
         return enumerate_snapshot(_state);
     }
+
     std::vector<PhysicalDevice> PhysicalDeviceCollection::get() && {
         return enumerate_snapshot(std::move(_state));
     }
+
     PhysicalDevice PhysicalDeviceCollection::select() const {
         const auto snapshot = _state;
         if (!snapshot || !snapshot.use_count())

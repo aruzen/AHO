@@ -15,6 +15,7 @@ namespace VSL_NAMESPACE::typed {
             size_t slot;
             Completion completion;
         };
+
         struct FrameResourceDomain {
             CommandManager manager;
             CommandBuffer buffer;
@@ -55,12 +56,14 @@ namespace VSL_NAMESPACE::typed {
     template<typename Frame_, ResourceRetention retention = ResourceRetention::COMPLETION>
     class TypedFrameResources {
         static_assert(std::is_object_v<Frame_> && !std::is_const_v<Frame_> && !std::is_volatile_v<Frame_>);
+
         struct Slot {
             std::shared_ptr<Frame_> value;
             Completion completion;
             bool updating = false;
             bool failed = false;
         };
+
         detail::FrameResourceDomain _domain;
         std::vector<Slot> _slots;
         Slot& acquire(const ComputePhase& phase, bool update);
@@ -74,7 +77,9 @@ namespace VSL_NAMESPACE::typed {
         TypedFrameResources& operator=(const TypedFrameResources&) = delete;
         TypedFrameResources(TypedFrameResources&&) noexcept = default;
         TypedFrameResources& operator=(TypedFrameResources&&) noexcept = default;
+
         size_t frame_count() const { return _slots.size(); }
+
         template<typename Update>
         requires std::invocable<Update&, Frame_&> && std::same_as<std::invoke_result_t<Update&, Frame_&>, void>
         void update(const ComputePhase& phase, Update&& update);

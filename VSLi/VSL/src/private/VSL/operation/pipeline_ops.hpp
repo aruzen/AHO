@@ -8,6 +8,7 @@ namespace VSL_NAMESPACE::operation {
         void* context = nullptr;
         vk::Result (*create)(void*, vk::Device, vk::PipelineCache, const vk::GraphicsPipelineCreateInfo&, vk::Pipeline*) = nullptr;
     };
+
     class ScopedGraphicsPipelineNativeFactory {
         GraphicsPipelineNativeFactory _factory;
         const GraphicsPipelineNativeFactory* _previous;
@@ -18,6 +19,7 @@ namespace VSL_NAMESPACE::operation {
         ScopedGraphicsPipelineNativeFactory& operator=(const ScopedGraphicsPipelineNativeFactory&) = delete;
         ~ScopedGraphicsPipelineNativeFactory();
     };
+
     // 全参照は解決済みで、生成呼出し中だけ借用する。
     struct GraphicsPipelineInput {
         impl::PipelineLayoutImpl* layout = nullptr;
@@ -26,10 +28,12 @@ namespace VSL_NAMESPACE::operation {
         std::span<impl::ShaderImpl* const> shaders;
         std::uint32_t subpass = 0;
     };
+
     struct ComputePipelineInput {
         impl::PipelineLayoutImpl* layout = nullptr;
         impl::ShaderImpl* shader = nullptr;
     };
+
     void initialize_pipeline(impl::PipelineImpl& target, impl::LogicalDeviceImpl& device, const GraphicsPipelineInput& input);
     void initialize_pipeline(impl::PipelineImpl& target, impl::LogicalDeviceImpl& device, const ComputePipelineInput& input);
     void destroy_pipeline(impl::PipelineImpl& target) noexcept;

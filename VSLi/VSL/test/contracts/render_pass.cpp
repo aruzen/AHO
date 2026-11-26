@@ -2,6 +2,7 @@
 #include <VSL/operation/render_pass_description.hpp>
 
 void accept_description(vsl::RenderPassDescription& description);
+
 void accept_description(vsl::RenderPassDescription& description) {
     description.add_color({.format = vsl::data_format::UNSIGNED_NORMALIZED8_RGBA});
     description.validate();
@@ -11,6 +12,7 @@ void accept_description(vsl::RenderPassDescription& description) {
 #include <utility>
 
 void accept_pass(const vsl::RenderPassAccessor& pass);
+
 void accept_pass(const vsl::RenderPassAccessor& pass) {
     (void)pass.description();
     (void)pass.owner_ref();

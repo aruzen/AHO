@@ -6,6 +6,7 @@ namespace VSL_NAMESPACE {
     namespace sync {
         struct ResourceUseAccess;
     }
+
     // submissionや保持中のframeを所有せず、最終的な完了状態を観測する。
     class CompletionObservation {
         Completion _result;
@@ -14,6 +15,7 @@ namespace VSL_NAMESPACE {
         CompletionObservation() = default;
         explicit CompletionObservation(const Completion& completion);
         Completion::Status status() const;
+
         bool busy() const { return _result.busy(); }
         bool native_uncertain() const { return _result.native_uncertain(); }
         Completion::Failure failure() const { return _result.failure(); }
@@ -25,6 +27,7 @@ namespace VSL_NAMESPACE {
         ALLOW_REUSE,
         REQUIRE_RECREATION
     };
+
     // CPU結果だけを保持する。結果からWorkへの参照はweakであり、資源を所有しない。
     class ResourceUseState {
         friend struct sync::ResourceUseAccess;
@@ -36,7 +39,9 @@ namespace VSL_NAMESPACE {
 
     public:
         ResourceUseState() = default;
+
         explicit ResourceUseState(UncertainUsePolicy policy) noexcept : _uncertain(policy) {}
+
         ResourceUseState(const ResourceUseState&) = delete;
         ResourceUseState& operator=(const ResourceUseState&) = delete;
         bool busy() const;

@@ -8,6 +8,7 @@
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     TEST(PhaseLivenessTest, NestedGuardsSurviveUnwindingAndObserveDestructionWithoutOwningThePhase) {
         auto phase = std::make_unique<vsl::DefaultPhase>(vsl::CommandManager{CommandAccess::RawManager(nullptr)}, vsl::SwapchainAccessor{},

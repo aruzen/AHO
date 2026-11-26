@@ -12,25 +12,32 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     namespace t = vsl::typed;
+
     struct FrameValue {
         size_t slot;
         int updates = 0;
     };
+
     struct TrackedFrame {
         std::shared_ptr<int> value;
     };
+
     class TypedFrameCommandsVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest, public testing::WithParamInterface<bool> {
     protected:
         bool validate_vulkan() const override { return true; }
+
         t::TypedFrameCommands make_commands(std::uint32_t count);
     };
+
     t::TypedFrameCommands TypedFrameCommandsVulkanIntegrationTest::make_commands(std::uint32_t count) {
         if (GetParam())
             return t::TypedFrameCommands(device, count);
         return t::TypedFrameCommands(device, count, t::HeapStorage{});
     }
+
     TEST(TypedFrameCommandsTest, DefaultsToArenaAndFacadeIsMovableButNotCopyable) {
         static_assert(std::same_as<t::DefaultStorage, t::ArenaStorage<>>);
         static_assert(std::is_constructible_v<t::TypedFrameCommands, vsl::LogicalDeviceAccessor, std::uint32_t>);
@@ -40,6 +47,7 @@ namespace {
         static_assert(std::is_nothrow_move_constructible_v<t::TypedFrameCommands> && std::is_nothrow_move_assignable_v<t::TypedFrameCommands>);
         static_assert(std::same_as<decltype(std::declval<const t::TypedFrameCommands&>().start_compute()), vsl::ComputePhase>);
     }
+
     TEST_P(TypedFrameCommandsVulkanIntegrationTest, ThreeSlotsReuseTheirPlacedFencesAndTheSameTypedFrameIdentities) {
         auto commands = make_commands(3);
         auto manager = commands.manager();
@@ -75,6 +83,7 @@ namespace {
         EXPECT_TRUE(fence.wait());
         EXPECT_EQ(SynchronizationAccess::Owned(fence)->fences, handles);
     }
+
     TEST_P(TypedFrameCommandsVulkanIntegrationTest, FailedUpdatesAndCancellationAllowTheSameSlotToBeUsedAgain) {
         auto commands = make_commands(2);
         t::TypedFrameResources<FrameValue> frames(commands.manager(), [](size_t slot) { return FrameValue{slot}; });
@@ -96,6 +105,7 @@ namespace {
         commands.next();
         EXPECT_EQ(commands.manager().get_buffer().get_current_buffer_idx(), 1u);
     }
+
     TEST_P(TypedFrameCommandsVulkanIntegrationTest, ImportPreservesTheManagerAndFenceOwnersUsedByExistingFrameResources) {
         auto original = make_commands(2);
         t::TypedFrameResources<FrameValue> frames(original.manager(), [](size_t slot) { return FrameValue{slot}; });
@@ -110,6 +120,7 @@ namespace {
         EXPECT_THROW(frames.get(other), std::invalid_argument);
         other.cancel();
     }
+
     TEST_P(TypedFrameCommandsVulkanIntegrationTest, APhaseKeepsResourcesAfterFacadeDestructionAndCompletionReleasesFrameData) {
         std::weak_ptr<void> root;
         std::weak_ptr<int> value;
@@ -139,6 +150,7 @@ namespace {
         EXPECT_TRUE(root.expired());
         EXPECT_EQ(result.status(), vsl::Completion::Status::COMPLETE);
     }
+
     TEST_P(TypedFrameCommandsVulkanIntegrationTest, CancelledResultsDoNotRetainTheExecutionArena) {
         std::weak_ptr<void> root;
         vsl::Completion result;
@@ -155,6 +167,7 @@ namespace {
         EXPECT_TRUE(result.data_->work.expired());
         EXPECT_EQ(result.status(), vsl::Completion::Status::CANCELLED);
     }
+
     TEST_P(TypedFrameCommandsVulkanIntegrationTest, MoveAssignmentPublishesTheWholeReplacementBeforeOldDomainCallbacks) {
         auto commands = make_commands(1);
         auto replacement = make_commands(2);
@@ -179,6 +192,7 @@ namespace {
         EXPECT_THROW(replacement.manager(), std::invalid_argument);
         EXPECT_THROW(replacement.start_compute(), std::invalid_argument);
     }
+
     TEST_P(TypedFrameCommandsVulkanIntegrationTest, InvalidCountsOwnersAndRingReplacementAreRejectedWithoutMutation) {
         EXPECT_THROW(make_commands(0), std::invalid_argument);
         auto commands = make_commands(3);
@@ -215,5 +229,6 @@ namespace {
         EXPECT_EQ(phase.frame_slot, 0u);
         phase.cancel();
     }
+
     INSTANTIATE_TEST_SUITE_P(StoragePolicies, TypedFrameCommandsVulkanIntegrationTest, testing::Bool());
 } // namespace

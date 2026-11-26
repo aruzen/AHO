@@ -17,6 +17,7 @@ static_assert(std::is_nothrow_swappable_v<vsl::SemaphoreHolder>);
 static_assert(std::is_nothrow_swappable_v<vsl::SynchroManager>);
 
 void connect_synchronization(vsl::LogicalDeviceAccessor device, vsl::FenceHolder fence, vsl::SemaphoreHolder semaphore);
+
 void connect_synchronization(vsl::LogicalDeviceAccessor device, vsl::FenceHolder fence, vsl::SemaphoreHolder semaphore) {
     vsl::SynchroManager manager(device), copied(manager);
     manager.swap(copied);
@@ -37,56 +38,67 @@ void connect_synchronization(vsl::LogicalDeviceAccessor device, vsl::FenceHolder
 }
 #if VSL_TYPED_CASE == 1
 void rejected(vsl::FenceHolder value);
+
 void rejected(vsl::FenceHolder value) {
     (void)value.data_;
 }
 #elif VSL_TYPED_CASE == 2
 void rejected(vsl::FenceHolder value);
+
 void rejected(vsl::FenceHolder value) {
     (void)value._owner;
 }
 #elif VSL_TYPED_CASE == 3
 void rejected(std::shared_ptr<vsl::impl::FenceImpl> value);
+
 void rejected(std::shared_ptr<vsl::impl::FenceImpl> value) {
     (void)vsl::FenceHolder(std::move(value));
 }
 #elif VSL_TYPED_CASE == 4
 void rejected(vsl::lifetime::OwnedRef<vsl::impl::FenceImpl> value);
+
 void rejected(vsl::lifetime::OwnedRef<vsl::impl::FenceImpl> value) {
     (void)vsl::FenceHolder(std::move(value));
 }
 #elif VSL_TYPED_CASE == 5
 void rejected(vsl::SemaphoreHolder value);
+
 void rejected(vsl::SemaphoreHolder value) {
     (void)value.data_;
 }
 #elif VSL_TYPED_CASE == 6
 void rejected(vsl::SemaphoreHolder value);
+
 void rejected(vsl::SemaphoreHolder value) {
     (void)value._owner;
 }
 #elif VSL_TYPED_CASE == 7
 void rejected(std::shared_ptr<vsl::impl::SemaphoreImpl> value);
+
 void rejected(std::shared_ptr<vsl::impl::SemaphoreImpl> value) {
     (void)vsl::SemaphoreHolder(std::move(value));
 }
 #elif VSL_TYPED_CASE == 8
 void rejected(vsl::lifetime::OwnedRef<vsl::impl::SemaphoreImpl> value);
+
 void rejected(vsl::lifetime::OwnedRef<vsl::impl::SemaphoreImpl> value) {
     (void)vsl::SemaphoreHolder(std::move(value));
 }
 #elif VSL_TYPED_CASE == 9
 void rejected(vsl::SynchroManager value);
+
 void rejected(vsl::SynchroManager value) {
     (void)value.data_;
 }
 #elif VSL_TYPED_CASE == 10
 void rejected(vsl::SynchroManager value);
+
 void rejected(vsl::SynchroManager value) {
     (void)value._registry;
 }
 #elif VSL_TYPED_CASE == 11
 void rejected(std::shared_ptr<vsl::impl::SynchroManagerImpl> value);
+
 void rejected(std::shared_ptr<vsl::impl::SynchroManagerImpl> value) {
     (void)vsl::SynchroManager(std::move(value));
 }

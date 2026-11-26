@@ -10,6 +10,7 @@ namespace VSL_NAMESPACE::command {
         // 幅と高さがともに0ならフレームバッファ全体を対象にする。
         std::uint32_t width = 0, height = 0;
     };
+
     struct RenderPassBegin : Command {
         RenderPassBegin(FrameBufferAccessor target, std::vector<ClearValue> clear_values = {},
                         RenderArea area = {}, std::uint32_t target_index = 0,
@@ -31,11 +32,13 @@ namespace VSL_NAMESPACE::command {
         ResourceRetention retention;
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
     };
+
     struct IDPickingRenderPassBegin : RenderPassBegin {
         IDPickingRenderPassBegin(IDPickingRenderPass pass, FrameBufferAccessor target,
                                  std::optional<VSLDRGBColorAccessor<float>> color = std::nullopt,
                                  ResourceRetention retention = ResourceRetention::SUBMISSION);
     };
+
     struct NextSubpass : Command {
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
     };

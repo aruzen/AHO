@@ -1,7 +1,9 @@
 #include "../../src/engine/engine_access.hpp"
+
 namespace {
     using AHO_NAMESPACE::engine::detail::EngineAccess;
 }
+
 #include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
 #include <AHO/x/screenshot.hpp>
@@ -31,9 +33,11 @@ namespace {
         void require_readback();
         auto clear(float red, float green, float blue);
     };
+
     struct ScreenshotCompletionGate {
         VkFence fence = VK_NULL_HANDLE;
         bool ready = false;
+
         static VkResult Status(void* context, VkDevice device, VkFence fence) noexcept {
             const auto& gate = *static_cast<ScreenshotCompletionGate*>(context);
             return fence == gate.fence && !gate.ready ? VK_NOT_READY : vkGetFenceStatus(device, fence);
@@ -141,6 +145,7 @@ namespace {
         if (!(caps.supportedUsageFlags & vk::ImageUsageFlagBits::eTransferSrc))
             GTEST_SKIP() << "Surface does not support TransferSrc";
     }
+
     auto ScreenshotWindowIntegration::clear(float red, float green, float blue) {
         return [=, this](auto& stream) {
             auto window = engine->get_window();
@@ -170,6 +175,7 @@ namespace {
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
         EngineAccess::State(*(engine))->command_manager.wait_idle();
     }
+
     TEST_F(ScreenshotWindowIntegration, CompletionCallbackCancellingTheCurrentFramePreventsAttachingANewReadback) {
         ASSERT_NO_FATAL_FAILURE(require_readback());
         if (IsSkipped())
@@ -207,6 +213,7 @@ namespace {
         current.reset();
         manager.wait_idle();
     }
+
     TEST_F(ScreenshotWindowIntegration, AddingReadbackUsageNotifiesWindowHooksOnceAndStillCaptures) {
         ASSERT_NO_FATAL_FAILURE(require_readback());
         if (IsSkipped())

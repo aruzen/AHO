@@ -24,6 +24,7 @@ static_assert(s::ResourceSlotLayout<vsl::impl::PipelineImpl>::USE_OFFSET == s::N
 void connect_pipeline(vsl::LogicalDeviceAccessor device, vsl::PipelineLayoutAccessor layout,
                       vsl::RenderPassAccessor pass, const vsl::GraphicsPipelineState& state,
                       std::span<const vsl::ShaderAccessor> shaders, vsl::ShaderAccessor compute);
+
 void connect_pipeline(vsl::LogicalDeviceAccessor device, vsl::PipelineLayoutAccessor layout,
                       vsl::RenderPassAccessor pass, const vsl::GraphicsPipelineState& state,
                       std::span<const vsl::ShaderAccessor> shaders, vsl::ShaderAccessor compute) {
@@ -41,36 +42,43 @@ void connect_pipeline(vsl::LogicalDeviceAccessor device, vsl::PipelineLayoutAcce
 
 #if VSL_TYPED_CASE == 1
 void reject_shader(vsl::ShaderAccessor shader);
+
 void reject_shader(vsl::ShaderAccessor shader) {
     (void)shader.data_;
 }
 #elif VSL_TYPED_CASE == 2
 void reject_shader(vsl::ShaderAccessor shader);
+
 void reject_shader(vsl::ShaderAccessor shader) {
     (void)shader._owner;
 }
 #elif VSL_TYPED_CASE == 3
 void reject_shader(std::shared_ptr<vsl::impl::ShaderImpl> shader);
+
 void reject_shader(std::shared_ptr<vsl::impl::ShaderImpl> shader) {
     (void)vsl::ShaderAccessor(std::move(shader));
 }
 #elif VSL_TYPED_CASE == 4
 void reject_shader(vsl::pipeline_layout::ShaderGroup group);
+
 void reject_shader(vsl::pipeline_layout::ShaderGroup group) {
     (void)group.data_;
 }
 #elif VSL_TYPED_CASE == 5
 void reject_shader(vsl::pipeline_layout::ShaderGroup group);
+
 void reject_shader(vsl::pipeline_layout::ShaderGroup group) {
     (void)group._data;
 }
 #elif VSL_TYPED_CASE == 6
 void reject_shader(vsl::ShaderAccessor shader);
+
 void reject_shader(vsl::ShaderAccessor shader) {
     (void)std::move(shader).code();
 }
 #elif VSL_TYPED_CASE == 7
 void reject_shader(vsl::ShaderAccessor shader);
+
 void reject_shader(vsl::ShaderAccessor shader) {
     (void)std::move(std::as_const(shader)).code();
 }

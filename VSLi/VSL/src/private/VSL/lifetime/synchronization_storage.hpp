@@ -5,14 +5,17 @@ namespace VSL_NAMESPACE::lifetime {
     struct SynchronizationOwnerContext {
         std::weak_ptr<impl::SynchroManagerImpl> registry;
     };
+
     struct SemaphoreSlotStorage {
         alignas(impl::SemaphoreImpl) std::byte value[sizeof(impl::SemaphoreImpl)];
         alignas(SynchronizationOwnerContext) std::byte context[sizeof(SynchronizationOwnerContext)];
     };
+
     struct FenceSlotStorage {
         alignas(impl::FenceImpl) std::byte value[sizeof(impl::FenceImpl)];
         alignas(SynchronizationOwnerContext) std::byte context[sizeof(SynchronizationOwnerContext)];
     };
+
     void construct_semaphore(void* storage, LogicalDeviceAccessor device, SemaphoreCreateInfo info);
     void construct_semaphore(void* storage, impl::LogicalDeviceImpl& device, SemaphoreCreateInfo info);
     void destroy_semaphore(void* storage) noexcept;

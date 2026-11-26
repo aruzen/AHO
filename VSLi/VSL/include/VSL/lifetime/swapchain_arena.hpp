@@ -7,8 +7,10 @@
 namespace VSL_NAMESPACE::lifetime {
     // native生成後の実数Mに対応する。呼出し中だけ使い、ownerへ保存しない。
     using SwapchainMemoryFactory = std::function<storage::ArenaMemory(const storage::SwapchainLayout&)>;
+
     class SwapchainArena {
         struct ValidatedStorage {};
+
         SwapchainAccessor _view;
         SwapchainArena(LogicalDeviceAccessor device, Surface surface, SwapchainCreateInfo info,
                        std::optional<SwapchainAccessor> old, SwapchainMemoryFactory memory, SwapchainCreateProgress* progress, ValidatedStorage);
@@ -16,8 +18,10 @@ namespace VSL_NAMESPACE::lifetime {
     public:
         SwapchainArena(LogicalDeviceAccessor device, Surface surface, SwapchainCreateInfo info = {},
                        std::optional<SwapchainAccessor> old = {}, SwapchainMemoryFactory memory = {}, SwapchainCreateProgress* progress = nullptr);
+
         SwapchainAccessor view() const& { return _view; }
         SwapchainAccessor view() && { return std::move(_view); }
+
         OwnerRef owner_ref() const;
         size_t image_count() const;
     };

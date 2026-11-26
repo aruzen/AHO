@@ -16,9 +16,11 @@ namespace {
 
 namespace {
     namespace r = aho::resource;
+
     class ImportedBufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     TEST_F(ImportedBufferVulkanIntegrationTest, PartialImportOwnsItsRangeAndHasOnePhysicalUseState) {
         std::weak_ptr<void> owner;
         auto imported = [&] {
@@ -44,6 +46,7 @@ namespace {
         imported.resize(0);
         EXPECT_THROW(r::vertex_view<std::uint32_t>(imported), std::out_of_range);
     }
+
     TEST_F(ImportedBufferVulkanIntegrationTest, PartialArenaAndHeapTransfersPreserveOffsetsAndCancellationReleasesOwners) {
         auto manager = make_manager();
         std::weak_ptr<void> owner;
@@ -71,6 +74,7 @@ namespace {
         }
         EXPECT_EQ(completion.status(), vsl::Completion::Status::CANCELLED);
     }
+
     TEST_F(ImportedBufferVulkanIntegrationTest, HeapToArenaToHeapGpuCopyReturnsTheOriginalData) {
         auto manager = make_manager();
         const vsl::BufferCreateInfo info{32, r::detail::STANDARD_BUFFER_USAGE};
@@ -117,10 +121,13 @@ namespace {
                 return pipeline.bind_resources(set).dispatch(1);
             }();
             auto phase = manager.start_phase<vsl::ComputePhase>();
+
             struct Source {
                 r::BufferBinding value;
+
                 r::BufferBinding binding() const { return value; }
             };
+
             phase << command << readback.upload(Source{*output});
             output.reset();
             EXPECT_FALSE(owner.expired());

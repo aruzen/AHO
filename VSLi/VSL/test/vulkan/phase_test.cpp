@@ -33,6 +33,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     struct RecordCommand : VSL_NAMESPACE::command::Command {
         std::shared_ptr<int> calls;
@@ -56,10 +57,13 @@ namespace {
     class PresentPhaseWindowIntegrationTest : public vsl_test::WindowIntegrationTest {
         bool validate_vulkan() const override;
     };
+
     class AcquireFencePoolWindowIntegrationTest : public vsl_test::WindowIntegrationTest {
         bool validate_vulkan() const override { return true; }
+
         void SetUp() override;
     };
+
     struct AcquireProbe {
         unsigned calls = 0;
         VkFence fence = VK_NULL_HANDLE;
@@ -67,23 +71,29 @@ namespace {
         std::function<void()> after_native;
         static VkResult Acquire(void* context, VkDevice device, VkSwapchainKHR chain, std::uint64_t timeout,
                                 VkSemaphore available, VkFence fence, std::uint32_t* image) noexcept;
+
         vsl::operation::PresentationNativeCalls native_calls() { return {.context = this, .acquire = Acquire}; }
     };
+
     struct ResetAcquireProbe {
         unsigned calls = 0;
         VkResult failure = VK_ERROR_OUT_OF_HOST_MEMORY;
         std::function<void()> after_native;
         static VkResult Reset(void* context, VkDevice device, std::uint32_t count, const VkFence* fences) noexcept;
     };
+
     struct GatedPhase : vsl::DefaultPhase {
         std::function<bool()> gate;
+
         GatedPhase(vsl::CommandManager manager, vsl::SwapchainAccessor chain)
             : DefaultPhase(std::move(manager), std::move(chain), std::nullopt, std::nullopt, std::nullopt, true) {}
+
         bool acquisition_ready() override {
             const auto callback = gate;
             return !callback || callback();
         }
     };
+
     struct SubmitProbe {
         VkResult result = VK_SUCCESS, idle_result = VK_SUCCESS;
         bool enqueue = true, defer_observation = false;
@@ -93,8 +103,10 @@ namespace {
         static VkResult Status(void* context, VkDevice device, VkFence fence) noexcept;
         static VkResult Wait(void* context, VkDevice device, std::uint32_t count, const VkFence* fences, VkBool32 all, std::uint64_t timeout) noexcept;
         static VkResult Idle(void* context, VkDevice device) noexcept;
+
         vsl::operation::SubmissionNativeCalls native_calls() { return {this, Idle, Wait, Submit, Status}; }
     };
+
     struct CommandProbe {
         enum class Point {
             RESET,
@@ -107,35 +119,47 @@ namespace {
         static VkResult Reset(void* context, VkCommandBuffer buffer, VkCommandBufferResetFlags flags) noexcept;
         static VkResult Begin(void* context, VkCommandBuffer buffer, const VkCommandBufferBeginInfo* info) noexcept;
         static VkResult End(void* context, VkCommandBuffer buffer) noexcept;
+
         vsl::operation::CommandNativeCalls native_calls() { return {this, Reset, Begin, End}; }
     };
+
     struct IndexedSignalPhase : vsl::ComputePhase {
         using ComputePhase::ComputePhase;
+
         void select_signal(std::uint32_t index) { signal_index = index; }
     };
+
     struct VertexCountSource {
         std::size_t count;
+
         std::size_t get_vertex_size() { return count; }
         void invoke(VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) {}
     };
+
     struct VertexCountConsumer {
         std::shared_ptr<std::optional<std::size_t>> received;
+
         void set_vertex_size(std::optional<std::size_t> value) { *received = value; }
         void invoke(VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) {}
     };
+
     struct VertexCountDelegate : VSL_NAMESPACE::command::DelegateCommand, VSL_NAMESPACE::command::VertexSizeRequire {
         std::optional<std::size_t> received;
+
         void set_vertex_size(std::optional<std::size_t> value) override { received = value; }
         void invoke(VSL_NAMESPACE::DefaultPhaseStream&, VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) override {}
     };
+
     struct IncrementVertexCount : VSL_NAMESPACE::command::Command,
                                   VSL_NAMESPACE::command::VertexSizeRequire,
                                   VSL_NAMESPACE::command::VertexSizeHolder {
         std::optional<std::size_t> input;
+
         void set_vertex_size(std::optional<std::size_t> count) override { input = count; }
         std::size_t get_vertex_size() override { return input.value_or(0) + 1; }
         void invoke(VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) override {}
     };
+
     VkResult SubmitProbe::Submit(void* context, VkQueue queue, const VkSubmitInfo* info, VkFence fence) noexcept {
         auto& probe = *static_cast<SubmitProbe*>(context);
         ++probe.calls;
@@ -154,12 +178,15 @@ namespace {
         }
         return probe.result;
     }
+
     VkResult SubmitProbe::Status(void* context, VkDevice device, VkFence fence) noexcept {
         return static_cast<SubmitProbe*>(context)->defer_observation ? VK_NOT_READY : VULKAN_HPP_DEFAULT_DISPATCHER.vkGetFenceStatus(device, fence);
     }
+
     VkResult SubmitProbe::Wait(void* context, VkDevice device, std::uint32_t count, const VkFence* fences, VkBool32 all, std::uint64_t timeout) noexcept {
         return static_cast<SubmitProbe*>(context)->defer_observation && !timeout ? VK_TIMEOUT : VULKAN_HPP_DEFAULT_DISPATCHER.vkWaitForFences(device, count, fences, all, timeout);
     }
+
     VkResult SubmitProbe::Idle(void* context, VkDevice device) noexcept {
         auto& probe = *static_cast<SubmitProbe*>(context);
         if (auto callback = std::exchange(probe.idle_callback, {}))
@@ -167,21 +194,25 @@ namespace {
         const auto native = VULKAN_HPP_DEFAULT_DISPATCHER.vkDeviceWaitIdle(device);
         return native == VK_SUCCESS ? probe.idle_result : native;
     }
+
     void CommandProbe::invoke(Point current) {
         if (current == point)
             if (auto invoke = std::exchange(callback, {}))
                 invoke();
     }
+
     VkResult CommandProbe::Reset(void* context, VkCommandBuffer buffer, VkCommandBufferResetFlags flags) noexcept {
         const auto result = VULKAN_HPP_DEFAULT_DISPATCHER.vkResetCommandBuffer(buffer, flags);
         static_cast<CommandProbe*>(context)->invoke(Point::RESET);
         return result;
     }
+
     VkResult CommandProbe::Begin(void* context, VkCommandBuffer buffer, const VkCommandBufferBeginInfo* info) noexcept {
         const auto result = VULKAN_HPP_DEFAULT_DISPATCHER.vkBeginCommandBuffer(buffer, info);
         static_cast<CommandProbe*>(context)->invoke(Point::BEGIN);
         return result;
     }
+
     VkResult CommandProbe::End(void* context, VkCommandBuffer buffer) noexcept {
         const auto result = VULKAN_HPP_DEFAULT_DISPATCHER.vkEndCommandBuffer(buffer);
         static_cast<CommandProbe*>(context)->invoke(Point::END);
@@ -216,6 +247,7 @@ namespace {
         EXPECT_EQ(phase.submit(), VSL_NAMESPACE::ComputePhase::SubmitResult::FAILED);
         StartupAccess::Owned(device)->device.waitIdle();
     }
+
     TEST_F(PhaseVulkanIntegrationTest, StreamsInvokeValueAndSharedCommandsAndDelegates) {
         auto calls = std::make_shared<int>(0);
         auto manager = make_manager();
@@ -235,6 +267,7 @@ namespace {
         }
         StartupAccess::Owned(device)->device.waitIdle();
     }
+
     TEST_F(PhaseVulkanIntegrationTest, PostponedDefaultPhaseCanBeInspectedWithoutAcquiringAnImage) {
         auto manager = make_manager();
         VSL_NAMESPACE::DefaultPhase phase(manager, VSL_NAMESPACE::SwapchainAccessor{}, std::nullopt, std::nullopt, std::nullopt,
@@ -268,6 +301,7 @@ namespace {
         ASSERT_TRUE(previous.wait());
         EXPECT_EQ(previous.status(), VSL_NAMESPACE::Completion::Status::COMPLETE);
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, OomSubmitDoesNotEnqueueAndReleasesCompletionOwners) {
         for (const auto failure : {VK_ERROR_OUT_OF_HOST_MEMORY, VK_ERROR_OUT_OF_DEVICE_MEMORY}) {
             SCOPED_TRACE(failure);
@@ -292,6 +326,7 @@ namespace {
             EXPECT_NO_THROW(commands.get_buffer().reset());
         }
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, NativeSubmitLossPreventsPeerFenceSuccessBeforeReleaseCallbacks) {
         auto first = make_manager().independent(1), second = make_manager().independent(1);
         SubmitProbe probe{.defer_observation = true};
@@ -318,6 +353,7 @@ namespace {
         EXPECT_FALSE(failing.completion().busy());
         EXPECT_FALSE(failing.completion().native_uncertain());
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, UnknownSubmitStaysBusyUntilNativeIdleAndKeepsItsFailure) {
         for (const bool enqueue : {false, true}) {
             SCOPED_TRACE(enqueue);
@@ -365,6 +401,7 @@ namespace {
             EXPECT_NO_THROW(fence.reset());
         }
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, NativeSubmitRejectsReentrantRecordingAndCommitsAfterPhaseDestruction) {
         auto commands = make_manager().independent(1);
         auto phase = std::make_unique<vsl::ComputePhase>(commands);
@@ -395,6 +432,7 @@ namespace {
         EXPECT_EQ(*calls, 0);
         EXPECT_TRUE(result.wait());
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, NativeBeginOrResetCanDestroyThePhaseWithoutStartingRecording) {
         for (const auto point : {CommandProbe::Point::RESET, CommandProbe::Point::BEGIN}) {
             auto commands = make_manager().independent(1);
@@ -412,6 +450,7 @@ namespace {
             EXPECT_NO_THROW(commands.get_buffer().reset());
         }
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, NativeEndTreatsCancelAsAbandonAndCompletesTheSubmitTransaction) {
         auto commands = make_manager().independent(1);
         auto phase = std::make_unique<vsl::ComputePhase>(commands);
@@ -428,6 +467,7 @@ namespace {
         EXPECT_EQ(submit.calls, 1u);
         EXPECT_TRUE(result.wait());
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, UnknownWorkSurvivesDomainDestructionAndIsInheritedByItsOriginalRing) {
         const auto initial = vsl::lifetime::quarantined_submission_count();
         auto commands = make_manager().independent(1);
@@ -463,6 +503,7 @@ namespace {
         EXPECT_EQ(vsl::lifetime::quarantined_submission_count(), initial);
         EXPECT_EQ(result.status(), vsl::Completion::Status::FAILED);
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, DeviceIdleReclaimsOrphanedHeadlessWorkFromAnotherRing) {
         const auto initial = vsl::lifetime::quarantined_submission_count();
         auto collector = make_manager().independent(1);
@@ -487,6 +528,7 @@ namespace {
         EXPECT_TRUE(ring.expired());
         EXPECT_EQ(vsl::lifetime::quarantined_submission_count(), initial);
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, SnapshotRestoresUnknownWorkOnIdleFailureAndAllowsProvenReleaseRetry) {
         for (const bool observe : {false, true}) {
             SCOPED_TRACE(observe);
@@ -525,6 +567,7 @@ namespace {
             EXPECT_EQ(vsl::lifetime::quarantined_submission_count(), initial);
         }
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, UnknownSubmitPoisonsOnlyItsActualWaitAndSignalElements) {
         auto commands = make_manager().independent(2);
         vsl::SynchroManager synchronization(device);
@@ -549,6 +592,7 @@ namespace {
         EXPECT_NO_THROW(available.destroy());
         EXPECT_NO_THROW(finished.destroy());
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, SnapshotReleaseCallbackRegistersUnknownWorkForTheNextCollection) {
         const auto initial = vsl::lifetime::quarantined_submission_count();
         auto first = make_manager().independent(1), second = make_manager().independent(1);
@@ -574,6 +618,7 @@ namespace {
         EXPECT_EQ(vsl::lifetime::quarantined_submission_count(), initial);
         EXPECT_FALSE(peer->completion().busy());
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, CancellationAndNestedRecordingDoNotSubmitOrResetActiveBuffer) {
         auto manager = make_manager();
         VSL_NAMESPACE::ComputePhase first(manager);
@@ -587,6 +632,7 @@ namespace {
         EXPECT_EQ(next.submit(), VSL_NAMESPACE::ComputePhase::SubmitResult::SUCCESS);
         EXPECT_TRUE(next.completion().wait());
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, OldCompletionRemainsCompleteWhenNativeFenceIsReused) {
         auto manager = make_manager();
         VSL_NAMESPACE::ComputePhase first(manager);
@@ -598,6 +644,7 @@ namespace {
         EXPECT_TRUE(original.wait(0));
         EXPECT_TRUE(second.completion().wait());
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, SubmittedWorkRetainsItsWaitAndSignalSemaphores) {
         auto manager = make_manager();
         // 寿命の検証に失敗しても使用中のハンドルを破棄しないよう、別の参照を保持する。
@@ -621,6 +668,7 @@ namespace {
         ASSERT_TRUE(completion.wait());
         manager.wait_idle();
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, TerminalWorkReleasesSynchronizationOwnersBeforeItsSlotIsReplaced) {
         for (bool cancel : {false, true}) {
             SCOPED_TRACE(cancel);
@@ -660,6 +708,7 @@ namespace {
             }));
         }
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, ExternalFenceWaitAndResetPreserveTheOriginalCompletion) {
         for (unsigned mode = 0; mode < 3; ++mode) {
             SCOPED_TRACE(mode);
@@ -721,6 +770,7 @@ namespace {
         EXPECT_TRUE(work.expired());
         EXPECT_TRUE(result.ready());
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, SavedResultDoesNotKeepNativeWorkAndFenceAliveAfterManagerDestruction) {
         vsl::Completion result;
         vsl::CompletionObservation observation;
@@ -745,6 +795,7 @@ namespace {
         EXPECT_TRUE(result.ready());
         EXPECT_EQ(observation.status(), vsl::Completion::Status::COMPLETE);
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, SubmittedWorkKeepsTheOwnerWithoutASavedCompletionUntilObservedIdle) {
         auto manager = make_manager();
         vsl::ResourceUseState use;
@@ -762,6 +813,7 @@ namespace {
         EXPECT_TRUE(owner.expired());
         EXPECT_FALSE(use.busy());
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, TerminalReleaseMayResetTheObservingCompletionHandle) {
         auto manager = make_manager();
         auto phase = manager.start_phase<vsl::ComputePhase>();
@@ -782,6 +834,7 @@ namespace {
         EXPECT_EQ(releases, 1u);
         EXPECT_TRUE(phase.completion().ready());
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, IdleReleaseCanSubmitAnotherJobWithoutDestroyingTheWorkBeingReleased) {
         auto manager = make_manager();
         vsl::Completion first, next;
@@ -805,6 +858,7 @@ namespace {
         ASSERT_TRUE(next);
         EXPECT_TRUE(next.wait());
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, PreparationDoesNotResetAJobStartedByAReleaseCallback) {
         for (const bool submit_peer : {false, true}) {
             auto manager = make_manager();
@@ -829,6 +883,7 @@ namespace {
             ASSERT_TRUE(peer->completion().wait());
         }
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, PreparationCanReleaseTheCurrentPostponedPhase) {
         for (const bool through_shared_fence : {false, true}) {
             SCOPED_TRACE(through_shared_fence);
@@ -856,6 +911,7 @@ namespace {
             EXPECT_TRUE(next.completion().wait());
         }
     }
+
     TEST_F(PhaseCompletionVulkanIntegrationTest, SubmitPreflightFailurePublishesFailureAndReleasesCompletionPinsOnce) {
         auto manager = make_manager();
         vsl::SynchroManager sync(device);
@@ -896,6 +952,7 @@ namespace {
         if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, StartupAccess::Owned(*(surface))->surface))
             GTEST_SKIP() << "Graphics queue cannot present";
     }
+
     VkResult AcquireProbe::Acquire(void* context, VkDevice device, VkSwapchainKHR chain, std::uint64_t timeout,
                                    VkSemaphore available, VkFence fence, std::uint32_t* image) noexcept {
         auto& probe = *static_cast<AcquireProbe*>(context);
@@ -912,6 +969,7 @@ namespace {
             callback();
         return result;
     }
+
     VkResult ResetAcquireProbe::Reset(void* context, VkDevice device, std::uint32_t count, const VkFence* fences) noexcept {
         auto& probe = *static_cast<ResetAcquireProbe*>(context);
         ++probe.calls;
@@ -920,6 +978,7 @@ namespace {
             callback();
         return result;
     }
+
     TEST_F(AcquireFencePoolWindowIntegrationTest, CancellationDuringAcquireResetDoesNotRewindAPeerStartedByResourceRelease) {
         auto manager = make_manager().independent(3);
         vsl::Swapchain chain(device, surface, {}, 64, 48);
@@ -951,6 +1010,7 @@ namespace {
         EXPECT_EQ(peer->submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         EXPECT_TRUE(peer->completion().wait());
     }
+
     TEST_F(AcquireFencePoolWindowIntegrationTest, PoolIsLazyAndReusesOnlyTheFrameElementsWithoutReobservingOldProofs) {
         auto manager = make_manager().independent(3);
         const auto domain = vsl::lifetime::CommandAccess::Owner(manager.get_buffer());
@@ -992,6 +1052,7 @@ namespace {
         EXPECT_EQ(proof->status, vsl::sync::FenceProofStatus::COMPLETE);
         manager.wait_idle();
     }
+
     TEST_F(AcquireFencePoolWindowIntegrationTest, ReadinessCannotMaskAnActiveDomainOrRestartCancelledOrReentrantSetup) {
         auto manager = make_manager();
         vsl::Swapchain chain(device, surface, {}, 64, 48);
@@ -1019,6 +1080,7 @@ namespace {
         }
         EXPECT_EQ(probe.calls, 0u);
     }
+
     TEST_F(AcquireFencePoolWindowIntegrationTest, ReadinessMayDestroyThePhaseWithoutAcquiringOrTouchingTheDestroyedSetupGuard) {
         auto manager = make_manager();
         vsl::Swapchain chain(device, surface, {}, 64, 48);
@@ -1033,6 +1095,7 @@ namespace {
         EXPECT_EQ(next.state, vsl::ComputePhase::State::WAIT_SUBMIT);
         next.cancel();
     }
+
     TEST_F(AcquireFencePoolWindowIntegrationTest, FailedAcquisitionRejectsItsOutputAndReleasesTheReservationForReuse) {
         auto manager = make_manager().independent(1);
         const auto domain = vsl::lifetime::CommandAccess::Owner(manager.get_buffer());
@@ -1071,6 +1134,7 @@ namespace {
         EXPECT_TRUE(next.completion().wait());
         manager.wait_idle();
     }
+
     TEST_F(AcquireFencePoolWindowIntegrationTest, AnOlderPresentationCannotReleaseTheReusedFenceReservation) {
         auto manager = make_manager().independent(1);
         const auto domain = vsl::lifetime::CommandAccess::Owner(manager.get_buffer());
@@ -1093,6 +1157,7 @@ namespace {
         EXPECT_TRUE(next.completion().wait());
         manager.wait_idle();
     }
+
     TEST_F(AcquireFencePoolWindowIntegrationTest, FailedPoolResetRestoresTheOldProofAndAllowsTheNextReservation) {
         auto manager = make_manager().independent(1);
         const auto domain = vsl::lifetime::CommandAccess::Owner(manager.get_buffer());
@@ -1120,6 +1185,7 @@ namespace {
         EXPECT_TRUE(next.completion().wait());
         manager.wait_idle();
     }
+
     TEST_F(AcquireFencePoolWindowIntegrationTest, ExternalSourcesAreValidatedBeforeAcquisitionOrFenceReset) {
         auto manager = make_manager().independent(2);
         vsl::Swapchain chain(device, surface, {}, 64, 48);
@@ -1138,6 +1204,7 @@ namespace {
         EXPECT_TRUE(same.wait(std::uint64_t{0}));
         EXPECT_FALSE(vsl::lifetime::CommandAccess::Owner(manager.get_buffer())->acquire_fences);
     }
+
     TEST_F(AcquireFencePoolWindowIntegrationTest, DistinctFenceGroupsShareAnArenaOwnerAndOutliveTheirOriginalWrappers) {
         auto manager = make_manager().independent(1);
         vsl::Swapchain chain(device, surface, {}, 64, 48);
@@ -1162,6 +1229,7 @@ namespace {
         EXPECT_TRUE(owner.expired());
         manager.wait_idle();
     }
+
     TEST_F(AcquireFencePoolWindowIntegrationTest, ReservingAUsedFenceCanReleaseThePreparingPhaseOrStartAPeer) {
         vsl::Swapchain chain(device, surface, {}, 64, 48);
         for (bool start_peer : {false, true}) {
@@ -1206,6 +1274,7 @@ namespace {
             producer.wait_idle();
         }
     }
+
     TEST_F(AcquireFencePoolWindowIntegrationTest, NativeAcquisitionSavesItsProofBeforeTheDeletedPhaseReleasesTheSource) {
         auto manager = make_manager().independent(1);
         const auto domain = vsl::lifetime::CommandAccess::Owner(manager.get_buffer());
@@ -1258,6 +1327,7 @@ namespace {
         next.cancel();
         EXPECT_TRUE(next.completion().wait());
     }
+
     TEST_F(PresentPhaseWindowIntegrationTest, UsesAcquiredImageForFramebufferReadbackAndPresentAcrossFrames) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
@@ -1304,6 +1374,7 @@ namespace {
         (void)different_index;
         StartupAccess::Owned(device)->device.waitIdle();
     }
+
     TEST_F(PresentPhaseWindowIntegrationTest, CancelledAcquiredFrameCanBeFollowedByAnotherFrame) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
@@ -1331,6 +1402,7 @@ namespace {
         }
         StartupAccess::Owned(device)->device.waitIdle();
     }
+
     TEST_F(PresentPhaseWindowIntegrationTest, PresentRejectsPoisonFromItsSavedSourceBeforeCallingNative) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
@@ -1361,6 +1433,7 @@ namespace {
         EXPECT_EQ(calls, 1u);
         commands.wait_idle();
     }
+
     TEST_F(PresentPhaseWindowIntegrationTest, NativePresentCanDestroyThePhaseWithoutSubmittingOrPresentingTwice) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
@@ -1374,10 +1447,12 @@ namespace {
         *phase << vsl::command::RenderPassBegin(pass, target) << vsl::command::RenderPassEnd{};
         ASSERT_EQ(phase->submit_commands(), vsl::ComputePhase::SubmitResult::SUCCESS);
         const auto result = phase->completion();
+
         struct Context {
             std::unique_ptr<vsl::DefaultPhase>& phase;
             unsigned calls = 0;
         } context{phase};
+
         const vsl::operation::ScopedPresentationNativeCalls native({.context = &context,
                                                                     .present = +[](void* opaque, VkQueue queue, const VkPresentInfoKHR* info) noexcept {
                                                                         auto& context = *static_cast<Context*>(opaque);
@@ -1394,6 +1469,7 @@ namespace {
         EXPECT_TRUE(result.wait());
         commands.wait_idle();
     }
+
     TEST_F(PresentPhaseWindowIntegrationTest, NativeCancelRecordingCanDestroyThePhaseWithoutTouchingItsFacadeAgain) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
@@ -1412,6 +1488,7 @@ namespace {
             commands.wait_idle();
         }
     }
+
     TEST_F(PresentPhaseWindowIntegrationTest, CancelCallbacksCanDestroyThePhaseAfterItsImageIsReturned) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
@@ -1453,6 +1530,7 @@ namespace {
             EXPECT_TRUE(next.completion().wait());
         }
     }
+
     TEST_F(PresentPhaseWindowIntegrationTest, PreviousSlotReleaseCanDestroyThePhaseAfterNormalPresentation) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
@@ -1483,6 +1561,7 @@ namespace {
         next.cancel();
         EXPECT_TRUE(next.completion().wait());
     }
+
     TEST_F(PresentPhaseWindowIntegrationTest, PresentDoesNotWaitForUnrelatedUnsignaledFrameFences) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
@@ -1505,6 +1584,7 @@ namespace {
         EXPECT_FALSE(fences.wait(static_cast<std::uint32_t>(unrelated), 0));
         StartupAccess::Owned(device)->device.waitIdle();
     }
+
     TEST_F(PresentPhaseWindowIntegrationTest, WSIMarkersProtectPendingAcquireAndPlannedPresentAcrossWaitIdle) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
@@ -1538,6 +1618,7 @@ namespace {
         commands.wait_idle();
         EXPECT_NO_THROW(finished.destroy());
     }
+
     TEST_F(PresentPhaseWindowIntegrationTest, CancelTransfersReservationAndOriginalSemaphoresBeforeNotifyingTheOldResult) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
@@ -1588,6 +1669,7 @@ namespace {
         EXPECT_NO_THROW(finished.destroy());
         EXPECT_NO_THROW(fence.destroy());
     }
+
     TEST_F(PresentPhaseWindowIntegrationTest, FailedSetupLeavesNoFenceReservationOrWSIMarker) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
@@ -1623,33 +1705,42 @@ namespace {
         stream << VertexCountSource{0} << VertexCountConsumer{received};
         EXPECT_EQ(*received, 0u);
     }
+
     TEST_F(PhaseVulkanIntegrationTest, IdleStreamRejectsARecordingStartedByItsHolderCallback) {
         auto commands = make_manager();
         vsl::DefaultPhaseStream stream{commands};
         std::unique_ptr<vsl::ComputePhase> phase;
         bool invoked = false;
+
         struct Command {
             std::function<void()> resolve;
             bool& invoked;
+
             size_t get_vertex_size() {
                 resolve();
                 return 1;
             }
+
             void invoke(vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) { invoked = true; }
         };
+
         EXPECT_THROW(stream << (Command{[&] { phase = std::make_unique<vsl::ComputePhase>(commands); }, invoked}), std::logic_error);
         ASSERT_TRUE(phase);
         EXPECT_FALSE(invoked);
         phase->cancel();
     }
+
     TEST_F(PhaseVulkanIntegrationTest, ValueAndSharedDelegatesReceiveTheSameVertexCount) {
         auto manager = make_manager();
         VSL_NAMESPACE::DefaultPhaseStream stream{manager, 23};
+
         struct ValueDelegate {
             std::shared_ptr<std::optional<std::size_t>> received;
+
             void set_vertex_size(std::optional<std::size_t> value) { *received = value; }
             void invoke(VSL_NAMESPACE::DefaultPhaseStream&, VSL_NAMESPACE::CommandPool, VSL_NAMESPACE::CommandBuffer, VSL_NAMESPACE::CommandManager) {}
         };
+
         auto received = std::make_shared<std::optional<std::size_t>>();
         stream << ValueDelegate{received};
         EXPECT_EQ(*received, 23u);

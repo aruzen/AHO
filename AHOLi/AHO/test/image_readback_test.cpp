@@ -10,6 +10,7 @@
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     class ImageReadbackVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override;
@@ -73,6 +74,7 @@ namespace {
         auto shared_request = screenshot;
         EXPECT_EQ(shared_request.read().bytes, pixels.bytes);
     }
+
     TEST_F(ImageReadbackVulkanIntegrationTest, PickingUsesTwoGenericColorOutputsWithoutSpecialPassOrCommand) {
         if (!VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(physical)->features->independentBlend)
             GTEST_SKIP() << "independentBlend required for mixed outputs";
@@ -110,6 +112,7 @@ namespace {
         EXPECT_EQ(screen.format, VSL_NAMESPACE::data_format::UNSIGNED_NORMALIZED8_RGBA);
         EXPECT_NEAR(std::to_integer<int>(screen.bytes[0]), 64, 1);
     }
+
     TEST_F(ImageReadbackVulkanIntegrationTest, SignedAndUnsignedClearsHaveNativePixelRepresentation) {
         auto manager = make_manager();
         AHO_NAMESPACE::ImageReadback reader(manager);
@@ -135,6 +138,7 @@ namespace {
             }
         }
     }
+
     TEST_F(ImageReadbackVulkanIntegrationTest, DepthAttachmentCanRejectFragmentsThroughPublicPipelineState) {
         const auto props = VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(physical)->device.getFormatProperties(vk::Format::eD32Sfloat);
         if (!(props.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment))
@@ -164,6 +168,7 @@ namespace {
         EXPECT_EQ(pixels.bytes[0], std::byte{255});
         EXPECT_EQ(pixels.bytes[1], std::byte{0});
     }
+
     TEST_F(ImageReadbackVulkanIntegrationTest, RejectsInvalidRegionsAndUnsupportedSourceContracts) {
         auto manager = make_manager();
         EXPECT_THROW((AHO_NAMESPACE::ImageReadback(manager, *color, VSL_NAMESPACE::ImageLayout::GENERAL, {7, 0, 2, 1})),
@@ -177,6 +182,7 @@ namespace {
         EXPECT_THROW((AHO_NAMESPACE::ImageReadback(manager, no_transfer, VSL_NAMESPACE::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)),
                      std::invalid_argument);
     }
+
     TEST_F(ImageReadbackVulkanIntegrationTest, RequestKeepsSourceAliveAfterCallerReleasesImage) {
         auto manager = make_manager();
         {
@@ -194,6 +200,7 @@ namespace {
         EXPECT_FALSE(source.expired());
         EXPECT_EQ(request.read().bytes[1], std::byte{255});
     }
+
     TEST_F(ImageReadbackVulkanIntegrationTest, MultipleSubpassesShareGenericBeginAndNextCommands) {
         ColorImage second(device, 8, 8, VSL_NAMESPACE::data_format::UNSIGNED_NORMALIZED8_RGBA);
         VSL_NAMESPACE::RenderPassDescription desc;
@@ -250,6 +257,7 @@ namespace {
         EXPECT_THROW((AHO_NAMESPACE::ImageReadback(manager, multisampled, VSL_NAMESPACE::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)),
                      std::invalid_argument);
     }
+
     TEST_F(ImageReadbackVulkanIntegrationTest, ArrayLayerReadbackAndLoadPassPreserveTexels) {
         ColorImage array(device, 8, 8, VSL_NAMESPACE::data_format::UNSIGNED_NORMALIZED8_RGBA, 2);
         VSL_NAMESPACE::RenderPassDescription desc;
@@ -362,11 +370,13 @@ namespace {
         const auto signal = reinterpret_cast<PFN_vkSignalSemaphoreKHR>(
             vkGetDeviceProcAddr(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device, "vkSignalSemaphoreKHR"));
         ASSERT_NE(signal, nullptr);
+
         struct Unblock {
             vk::Device device;
             vk::Semaphore semaphore;
             PFN_vkSignalSemaphoreKHR signal;
             bool released = false;
+
             void release() {
                 if (released)
                     return;
@@ -376,11 +386,13 @@ namespace {
                 (void)signal(device, &info);
                 released = true;
             }
+
             ~Unblock() {
                 release();
                 device.waitIdle();
             }
         } unblock{VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device, *semaphore, signal};
+
         const std::uint64_t value = 1;
         vk::TimelineSemaphoreSubmitInfo timeline{.waitSemaphoreValueCount = 1, .pWaitSemaphoreValues = &value};
         const vk::PipelineStageFlags stage = vk::PipelineStageFlagBits::eAllCommands;
@@ -397,6 +409,7 @@ namespace {
         EXPECT_EQ(pixels.bytes.size(), 256u);
         EXPECT_EQ(pixels.bytes[0], std::byte{255});
     }
+
     TEST_F(ImageReadbackVulkanIntegrationTest, RecordsColorAndIdWithAttachmentKeysInOneSubmission) {
         auto manager = make_manager();
         ColorImage ids(device, WIDTH, HEIGHT, VSL_NAMESPACE::data_format::UNSIGNED_INT);
@@ -435,6 +448,7 @@ namespace {
         EXPECT_EQ(color_ticket->read().bytes[0], std::byte{255});
         EXPECT_THROW(reader.record(phase, ids, VSL_NAMESPACE::ImageLayout::GENERAL), std::logic_error);
     }
+
     TEST_F(ImageReadbackVulkanIntegrationTest, CompletedTicketsRetainIndependentResultsAndOccupyTheirSlots) {
         auto manager = make_manager();
         AHO_NAMESPACE::ImageReadback reader(manager, 0, 2);
@@ -467,6 +481,7 @@ namespace {
         EXPECT_EQ(next->read().bytes[2], std::byte{255});
         EXPECT_EQ(blue->info().frame_id, 8u);
     }
+
     TEST_F(ImageReadbackVulkanIntegrationTest, TicketRemainsReadableAfterWorkerAndProducerAreReleased) {
         std::optional<AHO_NAMESPACE::ImageReadbackTicket> ticket;
         {
@@ -482,6 +497,7 @@ namespace {
         EXPECT_EQ(ticket->info().frame_id, 42u);
         EXPECT_EQ(ticket->read().bytes[1], std::byte{255});
     }
+
     TEST_F(ImageReadbackVulkanIntegrationTest, CancelledAndUnwoundRecordingsCanReleaseAndReuseTheirSlot) {
         auto manager = make_manager();
         AHO_NAMESPACE::ImageReadback reader(manager);
@@ -510,6 +526,7 @@ namespace {
         phase.submit();
         EXPECT_EQ(ticket->read().bytes[2], std::byte{255});
     }
+
     TEST_F(ImageReadbackVulkanIntegrationTest, FailedSubmissionReportsFailureInsteadOfTimeoutAndReleasesTheSlot) {
         auto manager = make_manager();
         AHO_NAMESPACE::ImageReadback reader(manager);
@@ -539,6 +556,7 @@ namespace {
         ASSERT_EQ(phase.submit(), VSL_NAMESPACE::ComputePhase::SubmitResult::SUCCESS);
         EXPECT_EQ(ticket->read().bytes[2], std::byte{255});
     }
+
     TEST_F(ImageReadbackVulkanIntegrationTest, ReusesReleasedTicketSlotAcrossRecordedFrames) {
         auto manager = make_manager();
         AHO_NAMESPACE::ImageReadback reader(manager);
@@ -560,6 +578,7 @@ namespace {
         }
         EXPECT_THROW((AHO_NAMESPACE::ImageReadback(manager, 0, 0)), std::invalid_argument);
     }
+
     TEST_F(ImageReadbackBusyVulkanIntegrationTest, MultipleTicketSlotsSubmitWithoutWaitingAndRejectExcessRequests) {
         auto manager = make_manager();
         {
@@ -574,11 +593,13 @@ namespace {
         const auto signal = reinterpret_cast<PFN_vkSignalSemaphoreKHR>(
             vkGetDeviceProcAddr(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device, "vkSignalSemaphoreKHR"));
         ASSERT_NE(signal, nullptr);
+
         struct Unblock {
             vk::Device device;
             vk::Semaphore semaphore;
             PFN_vkSignalSemaphoreKHR signal;
             bool released = false;
+
             void release() {
                 if (released)
                     return;
@@ -588,11 +609,13 @@ namespace {
                 (void)signal(device, &info);
                 released = true;
             }
+
             ~Unblock() {
                 release();
                 device.waitIdle();
             }
         } unblock{VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(device)->device, *semaphore, signal};
+
         const std::uint64_t value = 1;
         vk::TimelineSemaphoreSubmitInfo timeline{.waitSemaphoreValueCount = 1, .pWaitSemaphoreValues = &value};
         const vk::PipelineStageFlags stage = vk::PipelineStageFlagBits::eAllCommands;
@@ -618,6 +641,7 @@ namespace {
         EXPECT_EQ(second->read().bytes.size(), 4u);
         EXPECT_EQ(second->info().frame_id, 11u);
     }
+
     TEST_F(ImageReadbackVulkanIntegrationTest, DiscardLatestSwitchesFromConvenienceCaptureToTicketWithoutRebuildingWorker) {
         auto manager = make_manager();
         {

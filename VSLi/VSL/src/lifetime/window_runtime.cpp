@@ -18,17 +18,20 @@ namespace VSL_NAMESPACE::lifetime {
             GLFWRetirement* first = nullptr;
             GLFWRetirement* last = nullptr;
         };
+
         GLFWState& glfw_state();
         thread_local size_t CALL_DEPTH = 0, CALLBACK_DEPTH = 0;
         thread_local bool DRAINING = false;
         void require_main_thread();
         void drain_retirements() noexcept;
+
         GLFWState& glfw_state() {
             // metadataだけをprocess寿命に置き、native終了は明示Drainで行う。
             alignas(GLFWState) static std::byte STORAGE[sizeof(GLFWState)];
             static auto* const STATE = std::construct_at(reinterpret_cast<GLFWState*>(STORAGE));
             return *STATE;
         }
+
         void require_main_thread() {
 #ifdef __APPLE__
             if (!pthread_main_np())
@@ -40,6 +43,7 @@ namespace VSL_NAMESPACE::lifetime {
             if (glfw_state().main_thread != std::this_thread::get_id())
                 throw std::logic_error("GLFW operation requires its original main thread");
         }
+
         void drain_retirements() noexcept {
             if (CALL_DEPTH || CALLBACK_DEPTH || DRAINING)
                 return;
@@ -60,6 +64,7 @@ namespace VSL_NAMESPACE::lifetime {
             DRAINING = false;
         }
     } // namespace
+
     void retire_glfw(GLFWRetirement& retirement) noexcept {
         std::lock_guard lock(glfw_state().mutex);
         retirement.next = nullptr;
@@ -69,13 +74,16 @@ namespace VSL_NAMESPACE::lifetime {
             glfw_state().first = &retirement;
         glfw_state().last = &retirement;
     }
+
     bool glfw_runtime_active() {
         std::lock_guard lock(glfw_state().mutex);
         return glfw_state().native_runtime != nullptr;
     }
+
     bool in_glfw_callback() noexcept {
         return CALLBACK_DEPTH != 0;
     }
+
     size_t pending_glfw_retirements() {
         std::lock_guard lock(glfw_state().mutex);
         size_t count = 0;
@@ -83,6 +91,7 @@ namespace VSL_NAMESPACE::lifetime {
             ++count;
         return count;
     }
+
     GLFWLease GLFWLease::Acquire() {
         GLFWCallScope scope;
         if (DRAINING)
@@ -113,12 +122,14 @@ namespace VSL_NAMESPACE::lifetime {
         }
         return GLFWLease(runtime->node.ref(std::move(runtime)));
     }
+
     void GLFWLease::Drain() {
         require_main_thread();
         if (CALL_DEPTH || CALLBACK_DEPTH || DRAINING)
             throw std::logic_error("GLFW drain requires a boundary outside native calls and callbacks");
         drain_retirements();
     }
+
     GLFWCallScope::GLFWCallScope() {
         require_main_thread();
         if (DRAINING)
@@ -127,19 +138,24 @@ namespace VSL_NAMESPACE::lifetime {
             drain_retirements();
         ++CALL_DEPTH;
     }
+
     GLFWCallScope::~GLFWCallScope() {
         if (!--CALL_DEPTH && _drain_on_exit)
             drain_retirements();
     }
+
     GLFWCallScope::GLFWCallScope(std::nothrow_t) noexcept : _drain_on_exit(false) {
         ++CALL_DEPTH;
     }
+
     GLFWCallbackScope::GLFWCallbackScope() noexcept {
         ++CALLBACK_DEPTH;
     }
+
     GLFWCallbackScope::~GLFWCallbackScope() {
         --CALLBACK_DEPTH;
     }
+
     OSWindowOwner OSWindowOwner::Create(std::string_view name, int width, int height) {
         GLFWCallScope scope;
         auto owner = std::shared_ptr<impl::OSWindowImpl>(new impl::OSWindowImpl(GLFWLease::Acquire()), [](auto* value) noexcept {
@@ -150,6 +166,7 @@ namespace VSL_NAMESPACE::lifetime {
         owner->node.publish(owner, owner.get(), impl::OSWindowImpl::VisitDependencies);
         return OSWindowOwner(owner->node.ref(std::move(owner)));
     }
+
     void* OSWindowOwner::native_handle() const& noexcept {
         return _window ? _window->window : nullptr;
     }
@@ -173,11 +190,13 @@ void VSL_NAMESPACE::impl::GLFWRuntimeImpl::Dispose(lifetime::GLFWRetirement* ret
     }
     delete runtime;
 }
+
 void VSL_NAMESPACE::impl::OSWindowImpl::Dispose(lifetime::GLFWRetirement* retirement) noexcept {
     auto* owner = static_cast<OSWindowImpl*>(retirement);
     operation::destroy_os_window(owner->window);
     delete owner;
 }
+
 void VSL_NAMESPACE::impl::OSWindowImpl::VisitDependencies(const void* owner, lifetime::DependencyNode::EdgeVisitor visitor, void* context) {
     const auto lease = static_cast<const OSWindowImpl*>(owner)->glfw.owner_ref();
     visitor(context, lease);

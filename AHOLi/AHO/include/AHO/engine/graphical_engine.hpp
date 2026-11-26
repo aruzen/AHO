@@ -30,6 +30,7 @@ namespace AHO_NAMESPACE::engine {
         EngineAccessor runtime() const { return _runtime; }
         operator EngineAccessor() const { return _runtime; }
         explicit operator bool() const noexcept { return bool(_runtime); }
+
         virtual AHO_NAMESPACE::Window get_window() = 0;
     };
 } // namespace AHO_NAMESPACE::engine

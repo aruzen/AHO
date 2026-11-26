@@ -28,6 +28,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     using RenderPassBeginVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
 
@@ -64,6 +65,7 @@ namespace {
         EXPECT_EQ(begin.retention, vsl::ResourceRetention::SUBMISSION);
         EXPECT_EQ(render([](auto&) {}), (std::array<std::uint8_t, 4>{0, 0, 0, 0}));
     }
+
     TEST_F(RenderPassBeginVulkanIntegrationTest, CompletionRetentionReleasesTheTargetWhileTheCompletedWorkAndCommandRingRemain) {
         auto manager = make_manager().independent(1);
         const std::weak_ptr<void> owner = GraphicsAccess::Owned(*(framebuffer)).share();
@@ -83,6 +85,7 @@ namespace {
         const auto invalid = static_cast<vsl::ResourceRetention>(99);
         EXPECT_THROW((vsl::command::RenderPassBegin(vsl::FrameBufferAccessor{}, {}, {}, 0, invalid)), std::invalid_argument);
     }
+
     TEST_F(RenderPassBeginVulkanIntegrationTest, LegacyRetentionKeepsTheTargetUntilTheWorkIsReplaced) {
         auto manager = make_manager().independent(1);
         const std::weak_ptr<void> owner = GraphicsAccess::Owned(*(framebuffer)).share();
@@ -148,6 +151,7 @@ namespace {
     void PrintTo(const PackedIntegerClearCase& value, std::ostream* stream) {
         *stream << vk::to_string(value.format);
     }
+
     VSL_NAMESPACE::FrameBufferAccessor metadata_framebuffer(vk::Format format) {
         auto description = std::make_shared<VSL_NAMESPACE::RenderPassDescription>();
         description->add_color({.format = {static_cast<VSL_NAMESPACE::data_format::FormatTypes>(format), 4}});
@@ -155,6 +159,7 @@ namespace {
         pass->description.emplace(std::move(*description));
         return vsl_test::metadata_frame_buffer(std::move(pass));
     }
+
     TEST_P(PackedIntegerClearTest, DefaultsAndExplicitClearsUseTheIntegerNumericType) {
         const auto [format, is_signed] = GetParam();
         auto target = metadata_framebuffer(format);
@@ -171,6 +176,7 @@ namespace {
         EXPECT_THROW((VSL_NAMESPACE::command::RenderPassBegin(target, {VSL_NAMESPACE::ClearColor{}})), std::invalid_argument);
         EXPECT_THROW((VSL_NAMESPACE::command::RenderPassBegin(target, {opposite})), std::invalid_argument);
     }
+
     INSTANTIATE_TEST_SUITE_P(PackedFormats, PackedIntegerClearTest, testing::Values(PackedIntegerClearCase{vk::Format::eA2R10G10B10SintPack32, true}, PackedIntegerClearCase{vk::Format::eA2B10G10R10SintPack32, true}, PackedIntegerClearCase{vk::Format::eA2R10G10B10UintPack32, false}, PackedIntegerClearCase{vk::Format::eA2B10G10R10UintPack32, false}),
                              [](const testing::TestParamInfo<PackedIntegerClearCase>& info) { return vk::to_string(info.param.format); });
 } // namespace
@@ -236,6 +242,7 @@ namespace {
             EXPECT_EQ(pixel, expected) << "pixel " << i;
         }
     }
+
     INSTANTIATE_TEST_SUITE_P(PackedFormats, PackedIntegerClearVulkanIntegrationTest, testing::Values(PackedIntegerClearCase{vk::Format::eA2R10G10B10SintPack32, true}, PackedIntegerClearCase{vk::Format::eA2B10G10R10SintPack32, true}, PackedIntegerClearCase{vk::Format::eA2R10G10B10UintPack32, false}, PackedIntegerClearCase{vk::Format::eA2B10G10R10UintPack32, false}),
                              [](const testing::TestParamInfo<PackedIntegerClearCase>& info) { return vk::to_string(info.param.format); });
 } // namespace
@@ -244,6 +251,7 @@ namespace {
     vsl::FrameBufferAccessor legacy_metadata_target(vsl::RenderPassAccessor pass) {
         return vsl_test::metadata_frame_buffer(std::move(GraphicsAccess::Owned(pass)), 2, 2);
     }
+
     TEST_P(LegacyClearFormatVulkanIntegrationTest, ExplicitRgbMustNotBypassIntegerOrDepthClearValidation) {
         const auto format = GetParam();
         const bool depth = format == vk::Format::eD32Sfloat;
@@ -267,9 +275,11 @@ namespace {
         EXPECT_THROW((vsl::command::RenderPassBegin(pass, target, color)), std::invalid_argument);
         EXPECT_EQ(vsl::command::RenderPassBegin(pass, target).clear_values[0].index(), kind);
     }
+
     INSTANTIATE_TEST_SUITE_P(NumericFormats, LegacyClearFormatVulkanIntegrationTest,
                              testing::Values(vk::Format::eR32Sint, vk::Format::eR32Uint, vk::Format::eD32Sfloat),
                              [](const testing::TestParamInfo<vk::Format>& info) { return vk::to_string(info.param); });
+
     TEST_F(LegacyClearVulkanIntegrationTest, ExplicitRgbIsRejectedWhenThereAreNoAttachments) {
         vsl::RenderPass pass(device, vsl::RenderPassDescription{});
         auto target = legacy_metadata_target(pass);
@@ -278,6 +288,7 @@ namespace {
         const vsl::VSLDRGBColorAccessor<float> color{red, green, blue};
         EXPECT_THROW((vsl::command::RenderPassBegin(pass, target, color)), std::invalid_argument);
     }
+
     TEST_F(LegacyClearVulkanIntegrationTest, PickingOverloadAlsoRejectsIntegerRgbClearsAndPreservesTypedDefaults) {
         for (const auto format : {vk::Format::eR32Sint, vk::Format::eR32Uint}) {
             SCOPED_TRACE(vk::to_string(format));
@@ -297,6 +308,7 @@ namespace {
             EXPECT_THROW((vsl::command::IDPickingRenderPassBegin(pass, target, color)), std::invalid_argument);
         }
     }
+
     TEST_F(LegacyClearVulkanIntegrationTest, PickingRgbPreservesTheIdAttachmentDefaultAndZeroAlpha) {
         vsl::SwapchainAccessor chain;
         SwapchainAccess::Owned(chain) = std::make_shared<vsl::impl::SwapchainImpl>();
@@ -325,6 +337,7 @@ namespace {
         EXPECT_EQ(begin.clear_color->r, red);
         EXPECT_FALSE(begin.target_index);
     }
+
     TEST_F(LegacyClearVulkanIntegrationTest, ClearColorForAnUnclearedAttachmentKeepsTheCommonConstructorsIgnoredValueSemantics) {
         vsl::RenderPassDescription description;
         description.add_color({.format = vsl::data_format::UNSIGNED_INT, .load = vsl::LoadOp::DONT_CARE});
@@ -335,6 +348,7 @@ namespace {
         EXPECT_NO_THROW((vsl::command::RenderPassBegin(target, {vsl::ClearColor{red, green, blue, 0}})));
         EXPECT_NO_THROW((vsl::command::RenderPassBegin(pass, target, color)));
     }
+
     TEST_F(RenderPassBeginVulkanIntegrationTest, LegacyRgbClearPreservesZeroAlphaAndReachesEveryPixel) {
         float red = 0.25f, green = 0.5f, blue = 0.75f;
         const vsl::VSLDRGBColorAccessor<float> color_value{red, green, blue};

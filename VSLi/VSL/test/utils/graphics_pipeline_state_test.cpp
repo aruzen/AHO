@@ -21,9 +21,11 @@ namespace {
 namespace {
     namespace pl = vsl::pipeline_layout;
     namespace t = vsl::typed;
+
     struct Position {
         float xy[2];
     };
+
     using Input = t::TypedVertexInput<t::VertexRecord<Position, VSL_VERTEX_MEMBER(Position, xy)>::Binding<4>>;
     template<typename T>
     concept temporary_state_definition = requires(T&& value) { GraphicsPipelineStateAccess::Read(std::move(value)); };
@@ -35,6 +37,7 @@ namespace {
     static_assert(!vsl::graphics_pipeline_state_injecter<pl::ShaderGroup>);
     static_assert(!vsl::graphics_pipeline_state_injecter<pl::ResourceBinding>);
     static_assert(!vsl::graphics_pipeline_state_injecter<pl::PushConstants>);
+
     TEST(GraphicsPipelineStateTest, DeviceIndependentDefinitionKeepsResolvedTypedMetadataAndOrderedStages) {
         vsl::GraphicsPipelineState state(Input{}, pl::InputAssembly{}, pl::Rasterization{pl::CullingMode::NONE},
                                          pl::Multisample{}, pl::ColorBlend{}, pl::IDPicking{}, pl::DepthStencil{}, pl::DynamicState{},
@@ -67,6 +70,7 @@ namespace {
         EXPECT_FLOAT_EQ(scratch.viewport.pViewports[0].width, 10.f);
         EXPECT_EQ(scratch.viewport.pScissors[0].extent, (vk::Extent2D{8, 16}));
     }
+
     TEST(GraphicsPipelineStateTest, DefaultInputDoesNotImplicitlyInjectAnyStage) {
         const vsl::GraphicsPipelineState state;
         const auto& data = GraphicsPipelineStateAccess::Read(state);
@@ -79,6 +83,7 @@ namespace {
         EXPECT_FALSE(data.depth_stencil);
         EXPECT_THROW((GraphicsPipelineStateAccess::Edit(vsl::GraphicsPipelineStateEditRef{})), std::logic_error);
     }
+
     TEST(GraphicsPipelineStateTest, CopyAndAssignmentAreDeepAndMovesConsumeOnlyTheSource) {
         vsl::GraphicsPipelineState original(Input{}, pl::ColorBlend{}, vsl::Viewport{});
         vsl::GraphicsPipelineState copied(original), assigned;
@@ -103,6 +108,7 @@ namespace {
         copied = original;
         EXPECT_EQ(GraphicsPipelineStateAccess::Read(copied).blend_attachments.size(), 1u);
     }
+
     TEST(GraphicsPipelineStateTest, RejectedVertexInjectionPreservesThePreviousDefinitionWithoutADevice) {
         vsl::GraphicsPipelineState state(Input{});
         const auto* bindings = GraphicsPipelineStateAccess::Read(state).vertex_bindings.data();
@@ -113,9 +119,11 @@ namespace {
         EXPECT_EQ(GraphicsPipelineStateAccess::Read(state).vertex_attributes.data(), attributes);
         EXPECT_EQ(GraphicsPipelineStateAccess::Read(state).vertex_bindings[0].binding, 4u);
     }
+
     class GraphicsPipelineStateVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     TEST_F(GraphicsPipelineStateVulkanIntegrationTest, SavedStateBuildsATypedPipelineAndInputIsInjectedLast) {
         std::optional<t::TypedGraphicsPipeline<t::TypedVertexInput<>>> selected;
         {
@@ -126,6 +134,7 @@ namespace {
         }
         ExpectTriangleColor(render([&](vsl::DefaultPhaseStream& stream) { stream << selected->bind_vertices().draw(3); }));
     }
+
     TEST_F(GraphicsPipelineStateVulkanIntegrationTest, SnapshotInjectionReplacesFixedStateWithoutReplacingLayoutSources) {
         vsl::GraphicsPipelineState state(pl::InputAssembly{}, pl::Rasterization{pl::CullingMode::FRONT});
         const auto runtime = GraphicsAccess::Owned(*(layout));

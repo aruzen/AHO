@@ -14,6 +14,7 @@ namespace VSL_NAMESPACE {
             return owner;
         }
     } // namespace
+
     Surface::Surface(PureWindow* window, VulkanAccessor instance) {
         if (!window || !*window)
             throw exceptions::RuntimeException("Surface", "A live window is required");
@@ -22,6 +23,7 @@ namespace VSL_NAMESPACE {
         const auto os = window->window_owner();
         _owner = StartupAccess::Owned(StartupAccess::FromShared(lifetime::make_heap_surface(std::move(instance), os)));
     }
+
     Surface::Surface(PureWindow* window, Surface source) {
         StartupAccess::RequireCanonical(source._owner);
         const auto os = source.get_window_owner();
@@ -37,9 +39,11 @@ namespace VSL_NAMESPACE {
             throw std::invalid_argument("Surface plugin requires its original OS window owner");
         _owner = std::move(source._owner);
     }
+
     lifetime::OwnerRef Surface::owner_ref() const {
         return surface_owner(*this);
     }
+
     VulkanAccessor Surface::get_instance() const {
         const auto source = surface_owner(*this);
         const auto parent = source->owner_context ? source->owner_context->instance.lock() : lifetime::OwnedRef<impl::VulkanImplAccessor>{};
@@ -47,6 +51,7 @@ namespace VSL_NAMESPACE {
             throw std::logic_error("Surface has no Instance owner");
         return StartupAccess::FromOwned(parent);
     }
+
     lifetime::OSWindowOwner Surface::get_window_owner() const {
         const auto source = surface_owner(*this);
         const auto parent = source->owner_context ? source->owner_context->window.lock() : lifetime::OwnedRef<impl::OSWindowImpl>{};
@@ -54,9 +59,11 @@ namespace VSL_NAMESPACE {
             throw std::logic_error("Surface has no OS window owner");
         return lifetime::detail::WindowOwnerAccess::From(parent);
     }
+
     WeakSurface Surface::weak() const noexcept {
         return WeakSurface(_owner.weak());
     }
+
     Surface WeakSurface::lock() const noexcept {
         return Surface(_owner.lock());
     }

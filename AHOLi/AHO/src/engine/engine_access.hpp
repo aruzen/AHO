@@ -15,6 +15,7 @@ namespace AHO_NAMESPACE::engine::detail {
         static std::shared_ptr<EngineData> State(GraphicalEngine&& value) noexcept { return std::move(value._runtime._data); }
         static std::shared_ptr<EngineData> State(const GraphicalEngine&& value) noexcept { return value._runtime._data; }
         static EngineAccessor FromState(std::shared_ptr<EngineData> value) { return EngineAccessor(std::move(value)); }
+
         static const EngineData& Require(const EngineAccessor& value) {
             if (!value._data)
                 throw std::logic_error("Engine requires initialized services");

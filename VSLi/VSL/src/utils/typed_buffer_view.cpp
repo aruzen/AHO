@@ -20,11 +20,13 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace VSL_NAMESPACE::typed::detail {
     namespace {
         template<buffer_storage_policy Policy>
         BufferView make_uploaded_storage(LogicalDeviceAccessor device, CommandManager manager, const BufferCreateInfo& info,
                                          std::span<const std::byte> bytes, Policy policy);
+
         template<buffer_storage_policy Policy>
         BufferView make_uploaded_storage(LogicalDeviceAccessor device, CommandManager manager, const BufferCreateInfo& info,
                                          std::span<const std::byte> bytes, Policy policy) {
@@ -43,26 +45,32 @@ namespace VSL_NAMESPACE::typed::detail {
             return target;
         }
     } // namespace
+
     BufferView make_buffer_storage(LogicalDeviceAccessor device, const BufferCreateInfo& info, HeapStorage) {
         return BufferView::Create(std::move(device), info);
     }
+
     BufferView make_buffer_storage(LogicalDeviceAccessor device, const BufferCreateInfo& info, ArenaStorage<>) {
         const std::array inputs{info};
         return lifetime::BufferArena(device, inputs).view(0);
     }
+
     BufferView make_buffer_storage(LogicalDeviceAccessor device, CommandManager manager, const BufferCreateInfo& info,
                                    std::span<const std::byte> bytes, HeapStorage policy) {
         return make_uploaded_storage(std::move(device), std::move(manager), info, bytes, policy);
     }
+
     BufferView make_buffer_storage(LogicalDeviceAccessor device, CommandManager manager, const BufferCreateInfo& info,
                                    std::span<const std::byte> bytes, ArenaStorage<> policy) {
         return make_uploaded_storage(std::move(device), std::move(manager), info, bytes, policy);
     }
+
     void validate_buffer_view(const BufferAccessor& buffer, MemoryType usage, size_t offset, size_t count, size_t stride, size_t alignment) {
         if (!BufferAccess::Owned(buffer))
             throw std::invalid_argument("Typed buffer view requires a buffer");
         validate_buffer_view(BufferView::FromBuffer(buffer), usage, offset, count, stride, alignment);
     }
+
     void validate_buffer_view(const BufferView& buffer, MemoryType usage, size_t offset, size_t count, size_t stride, size_t alignment) {
         if (!contain(buffer.ref().usage(), usage))
             throw std::invalid_argument("Typed buffer view requires matching buffer usage");

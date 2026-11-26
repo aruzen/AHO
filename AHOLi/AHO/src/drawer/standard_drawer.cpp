@@ -17,6 +17,7 @@ namespace AHO_NAMESPACE::drawer::detail {
     struct TriangleValues {
         float position1[4], position2[4], position3[4], color[4];
     };
+
     using TriangleLayout = VSL_NAMESPACE::typed::BlockRecord<TriangleValues,
                                                              VSL_BLOCK_MEMBER(TriangleValues, position1), VSL_BLOCK_MEMBER(TriangleValues, position2),
                                                              VSL_BLOCK_MEMBER(TriangleValues, position3), VSL_BLOCK_MEMBER(TriangleValues, color)>;
@@ -30,6 +31,7 @@ namespace AHO_NAMESPACE::drawer::detail {
         explicit StandardDrawState(const RenderContext& context);
         static TrianglePipeline MakePipeline(const RenderContext& context, const VSL_NAMESPACE::RenderPass& pass);
     };
+
     TriangleValues triangle_values(const Triangle<float, VSL_NAMESPACE::D2>& triangle, const RGBA& color);
 
     StandardDrawState::StandardDrawState(const RenderContext& context)

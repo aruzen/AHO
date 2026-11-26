@@ -10,30 +10,37 @@
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     namespace t = vsl::typed;
+
     struct Position {
         float xy[2];
     };
+
     struct Color {
         float rgb[3];
     };
+
     using Positions = t::VertexRecord<Position, VSL_VERTEX_MEMBER(Position, xy)>;
     using Colors = t::VertexRecord<Color, VSL_VERTEX_MEMBER(Color, rgb)>;
     using Input = t::TypedVertexInput<Positions::Binding<0>, Colors::Binding<1, t::VertexTiming::NEXT_INSTANCE, 1>>;
     const std::array<Position, 3> POSITIONS{{{{-1, -1}}, {{3, -1}}, {{-1, 3}}}};
     const std::array<Color, 2> COLORS{{{{1, 0, 0}}, {{.25f, .5f, .75f}}}};
+
     class TypedIndexVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
 
     protected:
         t::TypedGraphicsPipeline<Input> make_typed();
     };
+
     struct UploadInputProbe {
         std::span<std::uint16_t> values;
         unsigned calls = 0;
         static VkResult Submit(void* context, VkQueue queue, const VkSubmitInfo* info, VkFence fence) noexcept;
     };
+
     struct UploadFailureProbe {
         VkResult submit_result = VK_SUCCESS;
         bool fence_error = false;
@@ -42,8 +49,10 @@ namespace {
         static VkResult Status(void*, VkDevice, VkFence) noexcept;
         static VkResult Wait(void*, VkDevice, std::uint32_t, const VkFence*, VkBool32, std::uint64_t) noexcept;
         static VkResult Idle(void*, VkDevice) noexcept;
+
         vsl::operation::SubmissionNativeCalls calls() { return {this, Idle, Wait, Submit, Status}; }
     };
+
     VkResult UploadInputProbe::Submit(void* context, VkQueue queue, const VkSubmitInfo* info, VkFence fence) noexcept {
         auto& probe = *static_cast<UploadInputProbe*>(context);
         const auto result = vkQueueSubmit(queue, 1, info, fence);
@@ -51,24 +60,29 @@ namespace {
             std::ranges::fill(probe.values, std::uint16_t{99});
         return result;
     }
+
     VkResult UploadFailureProbe::Submit(void* context, VkQueue queue, const VkSubmitInfo* info, VkFence fence) noexcept {
         auto& probe = *static_cast<UploadFailureProbe*>(context);
         ++probe.submissions;
         return probe.submit_result == VK_SUCCESS ? vkQueueSubmit(queue, 1, info, fence) : probe.submit_result;
     }
+
     VkResult UploadFailureProbe::Status(void* context, VkDevice device, VkFence fence) noexcept {
         const auto& probe = *static_cast<UploadFailureProbe*>(context);
         return probe.fence_error || probe.submit_result != VK_SUCCESS ? VK_NOT_READY : vkGetFenceStatus(device, fence);
     }
+
     VkResult UploadFailureProbe::Wait(void* context, VkDevice device, std::uint32_t count, const VkFence* fences, VkBool32 all, std::uint64_t timeout) noexcept {
         auto& probe = *static_cast<UploadFailureProbe*>(context);
         ++probe.waits;
         return probe.fence_error ? VK_ERROR_OUT_OF_HOST_MEMORY : vkWaitForFences(device, count, fences, all, timeout);
     }
+
     VkResult UploadFailureProbe::Idle(void* context, VkDevice device) noexcept {
         ++static_cast<UploadFailureProbe*>(context)->idles;
         return vkDeviceWaitIdle(device);
     }
+
     t::TypedGraphicsPipeline<Input> TypedIndexVulkanIntegrationTest::make_typed() {
         namespace pl = vsl::pipeline_layout;
         vsl::Shader<vsl::ShaderType::VERTEX> shader(device, vsl_test::shader_path("vertices.vert.spv"));
@@ -76,6 +90,7 @@ namespace {
                                                pl::ColorBlend{}, pl::InputAssembly{}, pl::Rasterization{pl::CullingMode::NONE}, pl::Multisample{},
                                                pl::DynamicState{}, vsl::Viewport(description), vsl::Scissor(description));
     }
+
     TEST(TypedIndexTest, NativeDrawRejectsNarrowingInEveryArgument) {
         using Draw = vsl::command::DrawIndexed;
         const auto overflow = size_t(UINT32_MAX) + 1;
@@ -86,6 +101,7 @@ namespace {
         EXPECT_THROW(Draw(3, 1, 0, std::int64_t(INT32_MIN) - 1), vsl::exceptions::RuntimeException);
         EXPECT_THROW(Draw(3, 1, 0, 0, overflow), vsl::exceptions::RuntimeException);
     }
+
     TEST_F(TypedIndexVulkanIntegrationTest, Uint16DrawUsesFirstIndexNegativeBaseVertexAndFirstInstance) {
         auto typed = make_typed();
         t::TypedVertexBuffer<Position> positions(device, POSITIONS);
@@ -94,6 +110,7 @@ namespace {
         t::TypedIndexBuffer<std::uint16_t> indices(device, values);
         ExpectTriangleColor(render([&](auto& stream) { stream << typed.bind_vertices(positions, colors).draw_indexed(indices, 3, 1, 1, -1, 1); }));
     }
+
     TEST_F(TypedIndexVulkanIntegrationTest, Uint32DeviceLocalIndicesAboveUint16RangeArePreserved) {
         auto typed = make_typed();
         auto verify = [&](auto policy) {
@@ -107,6 +124,7 @@ namespace {
         verify(t::HeapStorage{});
         verify(t::ArenaStorage<>{});
     }
+
     TEST_F(TypedIndexVulkanIntegrationTest, OddUint16UploadUsesOneSnapshotAndPreservesTheSourceManagersRecording) {
         auto typed = make_typed();
         t::TypedVertexBuffer<Position> positions(device, POSITIONS);
@@ -134,6 +152,7 @@ namespace {
         verify(t::HeapStorage{});
         verify(t::ArenaStorage<>{});
     }
+
     TEST_F(TypedIndexVulkanIntegrationTest, InvalidIndexVertexAndInstanceRangesAreRejectedBeforeRecording) {
         auto typed = make_typed();
         t::TypedVertexBuffer<Position> positions(device, POSITIONS);
@@ -155,6 +174,7 @@ namespace {
         EXPECT_THROW(vsl::command::BindIndexBufferAt(indices.backend(), vsl::command::IndexType::UINT16, 1), std::invalid_argument);
         EXPECT_FALSE(has_validation_errors());
     }
+
     TEST_F(TypedIndexVulkanIntegrationTest, UploadSubmissionFailuresRollBackOrRemainOwnedUntilTheOriginalManagersIdleProof) {
         const std::array<std::uint32_t, 2> values{3, 7};
         auto verify = [&](auto policy, VkResult error) {
@@ -179,6 +199,7 @@ namespace {
             verify(t::ArenaStorage<>{}, error);
         }
     }
+
     TEST_F(TypedIndexVulkanIntegrationTest, UploadFenceObservationFailureWaitsForIdleBeforePropagatingTheError) {
         const std::array<std::uint32_t, 2> values{3, 7};
         auto verify = [&](auto policy) {
@@ -197,6 +218,7 @@ namespace {
         verify(t::HeapStorage{});
         verify(t::ArenaStorage<>{});
     }
+
     TEST_F(TypedIndexVulkanIntegrationTest, CapturedCommandRejectsIndexUpdatesBeforeRecording) {
         auto typed = make_typed();
         t::TypedVertexBuffer<Position> positions(device, POSITIONS);
@@ -215,6 +237,7 @@ namespace {
             stream << binding.draw_indexed(indices, 3, 1, 0, 0, 1);
         }));
     }
+
     TEST_F(TypedIndexVulkanIntegrationTest, BatchRejectsUpdatedIndicesBeforeAnyResourceIsUsed) {
         auto typed = make_typed();
         t::TypedVertexBuffer<Position> positions(device, POSITIONS);
@@ -231,6 +254,7 @@ namespace {
             stream << binding.draw_indexed(second, 3, 1, 0, 0, 1);
         }));
     }
+
     TEST_F(TypedIndexVulkanIntegrationTest, UnchangedAndFailedIndexCopiesKeepCapturedCommandsUsable) {
         auto typed = make_typed();
         t::TypedVertexBuffer<Position> positions(device, POSITIONS);
@@ -242,6 +266,7 @@ namespace {
         EXPECT_THROW(indices.copy(std::span(values).first(2)), std::invalid_argument);
         ExpectTriangleColor(render([&](auto& stream) { stream << command; }));
     }
+
     TEST_F(TypedIndexVulkanIntegrationTest, CommandsKeepIndexAndVertexOwnersAfterAllWrappersAreDestroyed) {
         std::weak_ptr<void> owner;
         auto command = [&] {
@@ -256,10 +281,12 @@ namespace {
         std::optional owned(std::move(command));
         ExpectTriangleColor(render([&](auto& stream) { stream << *owned; owned.reset(); EXPECT_FALSE(owner.expired()); }));
     }
+
     TEST_F(TypedIndexVulkanIntegrationTest, IndexedDrawKeepsDescriptorAndPushContracts) {
         struct Tint {
             float rgba[4];
         };
+
         using TintLayout = t::BlockRecord<Tint, VSL_BLOCK_MEMBER(Tint, rgba)>;
         using Set = t::DescriptorSet<1, t::UniformBinding<4, TintLayout, vsl::ShaderFlag::VERTEX>>;
         using Resources = t::ResourceSchema<Set>;

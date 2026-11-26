@@ -22,30 +22,37 @@ namespace VSL_NAMESPACE {
         lifetime::detail::require_live_owner(buffer);
         return ResourceUse{buffer.alias(buffer->use), buffer}.with_constraint(std::move(constraint));
     }
+
     ResourceUse lifetime::resource_use_for_image(const OwnedRef<impl::ImageImpl>& image) {
         if (!image || !image->use)
             throw std::invalid_argument("Image requires a constructed storage generation");
         lifetime::detail::require_live_owner(image);
         return {image.alias(image->use), image};
     }
+
     ResourceUse lifetime::resource_use_for_sampler(const OwnedRef<impl::SamplerImpl>& sampler) {
         if (!sampler || !sampler->use)
             throw std::invalid_argument("Sampler requires a constructed storage generation");
         lifetime::detail::require_live_owner(sampler);
         return {sampler.alias(sampler->use), sampler};
     }
+
     ResourceUse ResourceUse::ForBuffer(const BufferAccessor& buffer, ResourceUse constraint) {
         return buffer.resource_use(std::move(constraint));
     }
+
     ResourceUse ResourceUse::ForBuffer(const BufferView& buffer, ResourceUse constraint) {
         return buffer.resource_use(std::move(constraint));
     }
+
     ResourceUse ResourceUse::ForImage(const ImageAccessor& image) {
         return image.resource_use();
     }
+
     ResourceUse ResourceUse::ForSampler(const SamplerAccessor& sampler) {
         return sampler.resource_use();
     }
+
     ResourceUse ResourceUse::with_constraint(ResourceUse constraint) const {
         const auto present = [](const auto& state) { return bool(state) || state.use_count(); };
         if (present(constraint_state) || constraint_owner.use_count()) {
@@ -67,6 +74,7 @@ namespace VSL_NAMESPACE {
         }
         return use;
     }
+
     void ResourceUse::record(const CommandBuffer& buffer, ResourceRetention retention) const {
         if (!state && !owner.use_count() && !constraint_state && !constraint_owner.use_count())
             return;
@@ -95,8 +103,10 @@ namespace VSL_NAMESPACE {
         if (constraint_state)
             lifetime::record_resource_state(*constraint_state, buffer, completion);
     }
+
     ResourceUseGroup::ResourceUseGroup(size_t bindings, lifetime::OwnerRef owner)
         : _owner(std::move(owner)), _bindings(bindings) {}
+
     std::shared_ptr<ResourceUseGroup> ResourceUseGroup::ForDescriptor(size_t bindings, const graphic_resource::Resource& resource, ResourceRetention retention) {
         const auto data = DescriptorAccess::Owned(resource);
         if (!data || !data.use_count())
@@ -108,9 +118,11 @@ namespace VSL_NAMESPACE {
         group->_retention = retention;
         return group;
     }
+
     bool ResourceUseGroup::tracks_descriptor(const graphic_resource::Resource& resource) const {
         return _resource && _resource == DescriptorAccess::Owned(resource).get();
     }
+
     void ResourceUseGroup::retain_descriptor_owner(const graphic_resource::Resource& resource, const CommandBuffer& buffer) const {
         const auto owner = DescriptorAccess::Owned(resource);
         const auto retention = _retention;
@@ -121,6 +133,7 @@ namespace VSL_NAMESPACE {
         else
             buffer.completion().retain(lifetime::detail::OwnerAccess::Shared(owner));
     }
+
     void ResourceUseGroup::require_idle() const {
         const auto owner = _owner;
         auto* const resource = _resource;
@@ -129,6 +142,7 @@ namespace VSL_NAMESPACE {
         } else
             _state.require_idle();
     }
+
     void ResourceUseGroup::replace(size_t binding, std::vector<ResourceUse> resources) {
         const auto owner = _owner;
         auto* const resource = _resource;
@@ -139,6 +153,7 @@ namespace VSL_NAMESPACE {
         _state.require_idle();
         _bindings.at(binding) = std::move(resources);
     }
+
     void ResourceUseGroup::record(const CommandBuffer& buffer) const {
         const auto owner = _owner;
         auto* const resource = _resource;

@@ -19,6 +19,7 @@
 namespace AHO_NAMESPACE {
     struct InputManager;
 }
+
 namespace AHO_NAMESPACE::input {
     enum class KeyCode {
         SPACE = 32,
@@ -330,6 +331,7 @@ namespace AHO_NAMESPACE::input {
             friend AHO_NAMESPACE::InputManager;
             VSL_NAMESPACE::lifetime::OSWindowOwner _window_owner;
         };
+
         template<typename T>
         struct Input : WindowBound {
             virtual ~Input() = default;

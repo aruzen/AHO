@@ -16,15 +16,19 @@ namespace {
     using Device = r::Buffer<r::BufferType::ON_GPU>;
     using Native = vsl::Buffer<vsl::MemoryType::TRANSFER_SOURCE, vsl::MemoryProperty::HOST_VISIBLE>;
     using Transfer = r::Buffer<r::BufferType::CUSTOM, Native>;
+
     struct Vertex {
         float xy[2];
     };
+
     struct OtherVertex {
         float xy[2];
     };
+
     struct Nontrivial {
         std::string text;
     };
+
     using Record = t::VertexRecord<Vertex, VSL_VERTEX_MEMBER(Vertex, xy)>;
     using Pipeline = t::TypedGraphicsPipeline<t::TypedVertexInput<Record::Binding<0>>>;
     using Set = t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::VERTEX>>;

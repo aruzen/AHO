@@ -121,6 +121,7 @@ namespace VSL_NAMESPACE::storage {
     static_assert(offsetof(lifetime::SamplerSlotStorage, use) == ResourceSlotLayout<impl::SamplerImpl>::USE_OFFSET);
     static_assert(offsetof(lifetime::SamplerSlotStorage, sampler) == 0);
     static_assert(BufferLayout::STRIDE == ResourceSlotLayout<impl::BufferImpl>::SIZE);
+
     namespace detail {
         void require_resource_layout(std::integral_constant<std::uint64_t, RESOURCE_LAYOUT_ABI>) {}
     } // namespace detail

@@ -25,6 +25,7 @@ namespace AHO_NAMESPACE::resource {
     AHO_NAMESPACE::command::BufferUpload detail::ViewBufferBase::upload(const Source& source, size_t destination_offset, size_t source_offset, std::optional<size_t> bytes) const {
         return AHO_NAMESPACE::command::BufferUpload(binding(), source.binding(), destination_offset, source_offset, bytes);
     }
+
     template<typename Storage, typename Customization>
     AHO_NAMESPACE::command::BufferUpload detail::GPUBufferBase<Storage, Customization>::upload(const Buffer<BufferType::GENERAL>& source, std::size_t offset) const {
         return AHO_NAMESPACE::command::BufferUpload(binding(), source, offset);

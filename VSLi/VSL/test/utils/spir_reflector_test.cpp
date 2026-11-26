@@ -27,6 +27,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     TEST(SpirvReflectorTest, ReflectsBindingsVertexInputsAndPushConstantMembersFromFile) {
         vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection.vert.spv"));
@@ -48,6 +49,7 @@ namespace {
         EXPECT_EQ(result.push_constants->definitions[0].size, 16u);
         EXPECT_EQ(result.push_constants->definitions[0].target_shader, vsl::ShaderFlag::VERTEX);
     }
+
     TEST(SpirvReflectorTest, BinaryConstructorRecognizesComputeResourcesAndStage) {
         const auto bytes = vsl_test::read_binary(vsl_test::shader_path("fill.comp.spv"));
         vsl::utils::SPIRVReflector reflector({}, bytes);
@@ -57,10 +59,12 @@ namespace {
         ASSERT_TRUE(reflector.generated.push_constants);
         EXPECT_EQ(reflector.generated.push_constants->definitions[0].size, 4u);
     }
+
     TEST(SpirvReflectorTest, MissingFileReportsPathLoadingFailure) {
         EXPECT_THROW(vsl::utils::SPIRVReflector({}, vsl_test::shader_path("absent.spv")),
                      vsl::exceptions::RuntimeException);
     }
+
     class SpirvReflectorVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
@@ -125,6 +129,7 @@ namespace {
             EXPECT_EQ(found->amount, amount);
         }
     }
+
     TEST(SpirvReflectorTest, MultidimensionalDescriptorArrayCountsMultiplyAllExtents) {
         vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("descriptor_multidimensional.comp.spv"));
         const auto& points = reflector.generated.binding_points.at(0);
@@ -132,6 +137,7 @@ namespace {
         ASSERT_NE(found, points.end());
         EXPECT_EQ(found->amount, 6u);
     }
+
     TEST(SpirvReflectorTest, UnresolvedAndOverflowingDescriptorCountsReportTheirCause) {
         for (const auto& [file, reason] : {
                  std::pair{"descriptor_runtime.comp.spv", "runtime"},
@@ -144,6 +150,7 @@ namespace {
             }
         }
     }
+
     TEST_F(SpirvReflectorVulkanIntegrationTest, FixedArrayCountsSurviveGeneratedNativeBindingLayouts) {
         vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("descriptor_arrays.comp.spv"));
         auto layouts = reflector.generated.make_binding_layout();
@@ -183,6 +190,7 @@ namespace {
             }
         }
     }
+
     TEST(SpirvReflectorTest, BinaryRejectsEmptyOrTruncatedHeadersWithVSLRuntimeException) {
         const auto valid = vsl_test::read_binary(vsl_test::shader_path("fill.comp.spv"));
         for (std::size_t length = 0; length < 20; length += 4) {
@@ -191,6 +199,7 @@ namespace {
             EXPECT_THROW(vsl::utils::SPIRVReflector({}, bytes), vsl::exceptions::RuntimeException);
         }
     }
+
     TEST(SpirvReflectorTest, FileRejectsTrailingPartialWordsInsteadOfSilentlyIgnoringThem) {
         vsl_test::TemporaryDirectory directory;
         const auto path = directory.path() / "partial.spv";
@@ -206,6 +215,7 @@ namespace {
             EXPECT_THROW(vsl::utils::SPIRVReflector({}, path), vsl::exceptions::RuntimeException);
         }
     }
+
     TEST(SpirvReflectorTest, FileRejectsEmptyOrTruncatedHeadersWithVSLRuntimeException) {
         vsl_test::TemporaryDirectory directory;
         const auto path = directory.path() / "short.spv";
@@ -219,6 +229,7 @@ namespace {
             EXPECT_THROW(vsl::utils::SPIRVReflector({}, path), vsl::exceptions::RuntimeException);
         }
     }
+
     TEST(SpirvReflectorTest, FileAndBinaryConstructorsPreserveValidReflectionFromTemporaryPath) {
         vsl_test::TemporaryDirectory directory;
         const auto path = directory.path() / "反射 shader.spv";
@@ -233,6 +244,7 @@ namespace {
         EXPECT_EQ(from_file.generated.push_constants->definitions.at(0).size, 4u);
         EXPECT_EQ(from_file.generated.push_constants->definitions.at(0).target_shader, vsl::ShaderFlag::COMPUTE);
     }
+
     TEST(SpirvReflectorTest, BinaryPreservesSupportForSwappedWordByteOrder) {
         auto bytes = vsl_test::read_binary(vsl_test::shader_path("fill.comp.spv"));
         ASSERT_EQ(bytes.size() % 4, 0u);
@@ -245,6 +257,7 @@ namespace {
         ASSERT_TRUE(reflector.generated.push_constants);
         EXPECT_EQ(reflector.generated.push_constants->definitions.at(0).size, 4u);
     }
+
     TEST(SpirvReflectorTest, MissingFileFailureIncludesTheRequestedPath) {
         vsl_test::TemporaryDirectory directory;
         const auto path = directory.path() / "missing shader.spv";
@@ -266,6 +279,7 @@ namespace {
         EXPECT_EQ(definitions[0].layouts.at(0).location, 0u);
         EXPECT_EQ(definitions[1].layouts.at(0).location, 1u);
     }
+
     TEST(SpirvReflectorTest, SparseVertexInputsRetainLocationsWithoutRenumbering) {
         vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection_sparse.vert.spv"));
         ASSERT_TRUE(reflector.generated.vertex_input);
@@ -278,6 +292,7 @@ namespace {
         EXPECT_EQ(definitions[1].layouts[0].location, 7u);
         EXPECT_EQ(definitions[1].layouts[0].format, vsl::data_format::FLOAT_RGB);
     }
+
     TEST(SpirvReflectorTest, MatrixColumnsStartAtTheDeclaredLocation) {
         vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection_matrix.vert.spv"));
         ASSERT_TRUE(reflector.generated.vertex_input);
@@ -294,6 +309,7 @@ namespace {
         EXPECT_EQ(position->layouts[0].location, 1u);
         EXPECT_EQ(position->layouts[0].format, vsl::data_format::FLOAT_RG);
     }
+
     TEST_F(ReflectedLocationsVulkanIntegrationTest, InjectionPreservesSparseLocationsAndMatrixColumnOffsets) {
         for (const auto& [file, expected_locations] : {
                  std::pair{"reflection_sparse.vert.spv", std::vector<std::uint32_t>{3, 7}},
@@ -366,6 +382,7 @@ namespace {
             EXPECT_EQ(reflector.generated.binding_points, before);
         }
     }
+
     TEST(SpirvReflectorTest, EmptyBindingDefinitionsNeedNoNativeAllocationRegardlessOfRepeatCount) {
         vsl::utils::SPIRVReflector::GenerateData data{};
         EXPECT_TRUE(data.make_binding_layout().empty());
@@ -385,6 +402,7 @@ namespace {
         EXPECT_EQ(points[0].binding_type, vsl::graphic_resource::Type::STORAGE_BUFFER);
         EXPECT_EQ(points[0].shader_type, vsl::ShaderFlag::COMPUTE);
     }
+
     TEST_F(ReflectedSetSlotsVulkanIntegrationTest, MissingSetsProduceEmptyLayoutsAtTheirOriginalIndices) {
         vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_sparse_sets.comp.spv"));
         const auto before = reflector.generated.binding_points;
@@ -400,6 +418,7 @@ namespace {
         for (std::size_t set = 0; set < layouts.size(); ++set)
             EXPECT_EQ(vsl_test::inspect_layout(layout).pipeline_layout.pSetLayouts[set], DescriptorAccess::Owned(layouts[set])->layout);
     }
+
     TEST_F(ReflectedSetSlotsVulkanIntegrationTest, RepeatedSparseSetsKeepTheFullSequenceAndIndependentOwners) {
         vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_sparse_sets.comp.spv"));
         const auto layouts = reflector.generated.make_binding_layout(2);
@@ -412,6 +431,7 @@ namespace {
                 EXPECT_NE(DescriptorAccess::Owned(layouts[block * 3 + 2]), DescriptorAccess::Owned(layouts[2]));
         }
     }
+
     TEST_F(ReflectedSetSlotsVulkanIntegrationTest, MultipleSparseSetsKeepTheirSetNumbers) {
         vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_sparse_sets.comp.spv"));
         reflector.generated.binding_points[0] = reflector.generated.binding_points.at(2);
@@ -421,6 +441,7 @@ namespace {
         EXPECT_TRUE(layouts[1].get_binding_points().empty());
         EXPECT_EQ(layouts[2].get_binding_points(), reflector.generated.binding_points.at(2));
     }
+
     TEST_F(ReflectedSetSlotsVulkanIntegrationTest, InvalidSetNumbersAreRejectedBeforeAllocatingNativeLayouts) {
         const auto limit = StartupAccess::Owned(physical)->props->limits.maxBoundDescriptorSets;
         for (const auto set : {std::numeric_limits<std::size_t>::max(), std::size_t{limit}}) {
@@ -494,6 +515,7 @@ namespace {
             EXPECT_EQ(found->layouts[0].format.size(), bytes);
         }
     }
+
     TEST(SpirvReflectorTest, DoubleMatrixColumnsUseTheLocationsRequiredByTheirVectorWidth) {
         vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection_numeric_widths.vert.spv"));
         ASSERT_TRUE(reflector.generated.vertex_input);
@@ -512,12 +534,14 @@ namespace {
             EXPECT_EQ(compact->layouts[column].format, vsl::data_format::SIGNED_FLOAT64_RG);
         }
     }
+
     TEST(SpirvReflectorTest, ReflectedNumericWidthRequirementsIncludeEveryMatrixColumn) {
         vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection_numeric_widths.vert.spv"));
         ASSERT_TRUE(reflector.generated.vertex_input);
         // Separate bindings: half/short vectors, dvec3/4, dmat3/2 and signed/unsigned int64 vectors.
         EXPECT_EQ(reflector.generated.vertex_input->requirements_size(), 4u + 6u + 8u + 24u + 72u + 16u + 16u + 32u + 32u);
     }
+
     TEST_F(ReflectedNumericFormatsVulkanIntegrationTest, NativeInputMetadataKeepsFormatsWidthsAndMatrixColumnOffsets) {
         vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_numeric_widths.vert.spv"));
         ASSERT_TRUE(reflector.generated.vertex_input);
@@ -569,6 +593,7 @@ namespace {
         vsl::utils::SPIRVReflector reflector({}, binary);
         EXPECT_FALSE(reflector.generated.vertex_input);
     }
+
     TEST(SpirvReflectorTest, FragmentDescriptorsAndPushConstantsRemainAvailableWithoutVertexInputs) {
         vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection_fragment_inputs.frag.spv"));
         EXPECT_FALSE(reflector.generated.vertex_input);
@@ -585,6 +610,7 @@ namespace {
         EXPECT_EQ(constants[0].offset, 0u);
         EXPECT_EQ(constants[0].size, 16u);
     }
+
     TEST(SpirvReflectorTest, ComputeReflectionKeepsResourcesWithoutProducingVertexInputs) {
         vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("fill.comp.spv"));
         EXPECT_FALSE(reflector.generated.vertex_input);
@@ -613,6 +639,7 @@ namespace {
         EXPECT_EQ(definitions[0].size, 16u);
         EXPECT_FALSE(reflector.generated.vertex_input);
     }
+
     TEST(SpirvReflectorTest, GeometryAndTessellationKeepTheirDeclaredStageFlags) {
         for (const auto& [file, stage] : {
                  std::pair{"reflection_stage.geom.spv", vsl::ShaderFlag::GEOMETRY},
@@ -620,6 +647,7 @@ namespace {
                  std::pair{"reflection_stage.tese.spv", vsl::ShaderFlag::TESSELLATION_EVALUATION}})
             expect_reflected_stage(file, stage);
     }
+
     TEST(SpirvReflectorTest, RayTracingExecutionModelsKeepTheirDeclaredStageFlags) {
         for (const auto& [file, stage] : {
                  std::pair{"reflection_stage.rgen.spv", vsl::ShaderFlag::RAYGEN},
@@ -630,6 +658,7 @@ namespace {
                  std::pair{"reflection_stage.rcall.spv", vsl::ShaderFlag::CALLABLE}})
             expect_reflected_stage(file, stage);
     }
+
     TEST(SpirvReflectorTest, ExtAndNvTaskMeshExecutionModelsUseTheMatchingStageBits) {
         for (const auto& [file, stage] : {
                  std::pair{"reflection_ext.task.spv", vsl::ShaderFlag::TASK},
@@ -661,6 +690,7 @@ namespace {
             }
         }
     }
+
     TEST(SpirvReflectorTest, SeparateBufferImagesUseUniformTexelBufferDescriptors) {
         using namespace vsl::graphic_resource;
         vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection_separate_texel.comp.spv"));
@@ -679,6 +709,7 @@ namespace {
     bool ReflectedSeparateImageVulkanIntegrationTest::validate_vulkan() const {
         return true;
     }
+
     TEST_F(ReflectedSeparateImageVulkanIntegrationTest, GeneratedLayoutSamplesTheUploadedTexelWithASeparateSampler) {
         using namespace vsl::graphic_resource;
         if (!host_coherent_available())
@@ -689,10 +720,13 @@ namespace {
         ASSERT_EQ(sets[0].get_binding_points().size(), 3u) << "Do not use a pipeline with an incomplete reflected layout";
         vsl::GraphicResourceManager resources(device);
         auto [pool, allocated] = resources.make(sets);
+
         struct ReclaimCycle {
             vsl::GraphicResourcePool pool;
+
             ~ReclaimCycle() { DescriptorAccess::Owned(pool)->resources.clear(); }
         } reclaim{pool};
+
         ASSERT_EQ(allocated.size(), 1u);
         vsl::StagingBuffer<vsl::MemoryType::STORAGE_BUFFER> output(device, std::array<std::uint32_t, 2>{0, 0});
         TransferImage image(device, 1, 1, vsl::data_format::UNSIGNED_NORMALIZED8_RGBA);
@@ -754,6 +788,7 @@ namespace {
     bool ReflectedTexelBufferVulkanIntegrationTest::validate_vulkan() const {
         return true;
     }
+
     TEST_F(ReflectedTexelBufferVulkanIntegrationTest, GeneratedLayoutSupportsReadingAndWritingNativeBufferViews) {
         using namespace vsl::graphic_resource;
         if (!host_coherent_available())
@@ -773,10 +808,13 @@ namespace {
         const auto sets = reflector.generated.make_binding_layout();
         vsl::GraphicResourceManager resources(device);
         auto [pool, allocated] = resources.make(sets);
+
         struct ReclaimCycle {
             vsl::GraphicResourcePool pool;
+
             ~ReclaimCycle() { DescriptorAccess::Owned(pool)->resources.clear(); }
         } reclaim{pool};
+
         ASSERT_EQ(allocated.size(), 1u);
         vsl::StagingBuffer<vsl::MemoryType::UNIFORM_TEXEL_BUFFER> source(device, std::array<std::uint32_t, 1>{37});
         vsl::StagingBuffer<vsl::MemoryType::STORAGE_TEXEL_BUFFER> destination(device, std::array<std::uint32_t, 1>{0});
@@ -844,6 +882,7 @@ namespace {
     bool ReflectedInputAttachmentVulkanIntegrationTest::validate_vulkan() const {
         return true;
     }
+
     TEST_F(ReflectedInputAttachmentVulkanIntegrationTest, GeneratedLayoutReadsTheClearedInputAttachmentOnGPU) {
         using namespace vsl::graphic_resource;
         vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_input_attachment.frag.spv"));
@@ -854,10 +893,13 @@ namespace {
         ASSERT_EQ(points[0].binding_type, Type::INPUT_ATTACHMENT);
         vsl::GraphicResourceManager resources(device);
         auto [pool, allocated] = resources.make(sets);
+
         struct ReclaimCycle {
             vsl::GraphicResourcePool pool;
+
             ~ReclaimCycle() { DescriptorAccess::Owned(pool)->resources.clear(); }
         } reclaim{pool};
+
         ASSERT_EQ(allocated.size(), 1u);
         vsl::Image<vsl::ImageType::COLOR_ATTACHMENT | vsl::ImageType::INPUT_ATTACHMENT> source(
             device, WIDTH, HEIGHT, vsl::data_format::UNSIGNED_NORMALIZED8_RGBA);
@@ -928,6 +970,7 @@ namespace {
         for (const auto& attribute : found->layouts)
             EXPECT_EQ(attribute.format, vsl::data_format::FLOAT_RGB);
     }
+
     TEST(SpirvReflectorTest, MatrixAndMultidimensionalArraysExpandAllColumnsIncludingWideLocations) {
         vsl::utils::SPIRVReflector reflector({}, vsl_test::shader_path("reflection_vertex_array_shapes.vert.spv"));
         ASSERT_TRUE(reflector.generated.vertex_input);
@@ -948,6 +991,7 @@ namespace {
             }
         }
     }
+
     TEST_F(ReflectedLocationsVulkanIntegrationTest, VertexArrayInjectionUsesFullStrideAndElementOffsets) {
         vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_vertex_array_shapes.vert.spv"));
         ASSERT_TRUE(reflector.generated.vertex_input);
@@ -968,6 +1012,7 @@ namespace {
             }
         }
     }
+
     TEST_F(ReflectedLocationsRenderVulkanIntegrationTest, ReflectedVertexArraysCombineBothElementsIntoTheGPUColor) {
         vsl::utils::SPIRVReflector reflector(device, vsl_test::shader_path("reflection_vertex_arrays.vert.spv"));
         ASSERT_TRUE(reflector.generated.vertex_input);

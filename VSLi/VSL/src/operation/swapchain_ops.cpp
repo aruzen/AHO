@@ -11,20 +11,24 @@ namespace VSL_NAMESPACE::operation {
         vk::SurfaceFormatKHR select_format(const std::vector<vk::SurfaceFormatKHR>& formats);
         vk::PresentModeKHR select_mode(const std::vector<vk::PresentModeKHR>& modes);
         std::vector<vk::Image> enumerate_images(PendingSwapchain& pending);
+
         void validate_image_usage(const vk::SurfaceCapabilitiesKHR& capabilities, ImageType usage) {
             const auto flags = vk::ImageUsageFlags(static_cast<std::uint32_t>(usage));
             if (!contain(usage, ImageType::COLOR_ATTACHMENT) || (capabilities.supportedUsageFlags & flags) != flags)
                 throw std::invalid_argument("Surface does not support requested swapchain image usage");
         }
+
         vk::SurfaceFormatKHR select_format(const std::vector<vk::SurfaceFormatKHR>& formats) {
             for (const auto& format : formats)
                 if (format.format == vk::Format::eB8G8R8A8Srgb && format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
                     return format;
             return formats.front();
         }
+
         vk::PresentModeKHR select_mode(const std::vector<vk::PresentModeKHR>& modes) {
             return std::ranges::find(modes, vk::PresentModeKHR::eMailbox) != modes.end() ? vk::PresentModeKHR::eMailbox : vk::PresentModeKHR::eFifo;
         }
+
         std::vector<vk::Image> enumerate_images(PendingSwapchain& pending) {
             const auto call = [&](std::uint32_t* count, VkImage* images) {
                 return pending.calls.images ? pending.calls.images(pending.calls.context, pending.native_device, pending.chain, count, images)
@@ -56,10 +60,12 @@ namespace VSL_NAMESPACE::operation {
             }
         }
     } // namespace
+
     PendingSwapchain::PendingSwapchain(PendingSwapchain&& other) noexcept
         : device(other.device), surface(other.surface), native_device(other.native_device), chain(std::exchange(other.chain, {})),
           format(other.format), mode(other.mode), extent(other.extent), transform(other.transform), usage(other.usage),
           present_fences(other.present_fences), images(std::move(other.images)), calls(other.calls) {}
+
     PendingSwapchain::~PendingSwapchain() {
         if (chain) {
             if (calls.destroy)
@@ -68,11 +74,14 @@ namespace VSL_NAMESPACE::operation {
                 vkDestroySwapchainKHR(native_device, chain, nullptr);
         }
     }
+
     ScopedSwapchainNativeCalls::ScopedSwapchainNativeCalls(SwapchainNativeCalls calls) noexcept
         : _calls(calls), _previous(std::exchange(ACTIVE_CALLS, &_calls)) {}
+
     ScopedSwapchainNativeCalls::~ScopedSwapchainNativeCalls() {
         ACTIVE_CALLS = _previous;
     }
+
     PendingSwapchain prepare_swapchain(impl::LogicalDeviceImpl& device, impl::SurfaceImpl& surface, const SwapchainCreateInfo& info,
                                        impl::SwapchainImpl* old, const SwapchainNativeCalls& calls, SwapchainCreateProgress* progress) {
         if (progress)
@@ -150,6 +159,7 @@ namespace VSL_NAMESPACE::operation {
         pending.images = enumerate_images(pending);
         return pending;
     }
+
     void adopt_swapchain(impl::SwapchainImpl& target, PendingSwapchain& pending) noexcept {
         target.device = pending.device;
         target.surface = pending.surface;
@@ -165,20 +175,24 @@ namespace VSL_NAMESPACE::operation {
         target.present_fences = pending.present_fences;
         target.state = SwapchainState::ACTIVE;
     }
+
     void destroy_swapchain(impl::SwapchainImpl& target) noexcept {
         const auto chain = std::exchange(target.swap_chain, {});
         if (chain && target.native_device)
             vkDestroySwapchainKHR(target.native_device, chain, nullptr);
         target.state = SwapchainState::UNUSABLE;
     }
+
     void require_active_swapchain(const impl::SwapchainImpl& target) {
         if (!target.swap_chain || target.state != SwapchainState::ACTIVE)
             throw std::logic_error("Swapchain generation is not active");
     }
+
     void require_replaceable_swapchain(const impl::SwapchainImpl& target) {
         if (!target.swap_chain || (target.state != SwapchainState::ACTIVE && target.state != SwapchainState::RECOVERY_REQUIRED))
             throw std::logic_error("Swapchain generation cannot be replaced");
     }
+
     void require_swapchain_image_usage(const impl::SwapchainImpl& target, ImageType usage) {
         if (!target.device || !target.device->parent_device || !target.surface || !target.surface->surface)
             throw std::invalid_argument("Swapchain requires a live Device and Surface");

@@ -11,6 +11,7 @@
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace VSL_NAMESPACE::typed::detail {
     FrameResourceDomain::FrameResourceDomain(CommandManager manager) : manager(std::move(manager)), count(0) {
         if (!CommandAccess::Data(this->manager) || !CommandAccess::Data(this->manager).use_count())
@@ -62,6 +63,7 @@ namespace VSL_NAMESPACE::typed {
         CommandManager manager;
         FenceHolder fence;
     };
+
     TypedFrameCommands::Resources TypedFrameCommands::MakeArena(LogicalDeviceAccessor device, std::uint32_t count) {
         if (!count)
             throw std::invalid_argument("Typed frame commands require a positive slot count");
@@ -71,6 +73,7 @@ namespace VSL_NAMESPACE::typed {
         lifetime::ResourceArena arena(device, PLAN, inputs);
         return {CommandManager::FromBuffer(arena.command_buffer({2})), arena.fence({3})};
     }
+
     TypedFrameCommands::Resources TypedFrameCommands::MakeHeap(LogicalDeviceAccessor device, std::uint32_t count) {
         if (!count)
             throw std::invalid_argument("Typed frame commands require a positive slot count");
@@ -78,38 +81,49 @@ namespace VSL_NAMESPACE::typed {
         CommandBuffer buffer(pool, count);
         return {CommandManager::FromBuffer(buffer), lifetime::detail::SynchronizationAccess::FromShared(lifetime::make_heap_fence(device, {count, false}))};
     }
+
     TypedFrameCommands::TypedFrameCommands(Resources resources) : TypedFrameCommands(std::move(resources.manager), std::move(resources.fence)) {}
+
     TypedFrameCommands::TypedFrameCommands(LogicalDeviceAccessor device, std::uint32_t count) : TypedFrameCommands(std::move(device), count, DefaultStorage{}) {}
+
     TypedFrameCommands::TypedFrameCommands(LogicalDeviceAccessor device, std::uint32_t count, ArenaStorage<>) : TypedFrameCommands(MakeArena(device, count)) {}
     TypedFrameCommands::TypedFrameCommands(LogicalDeviceAccessor device, std::uint32_t count, HeapStorage) : TypedFrameCommands(MakeHeap(device, count)) {}
+
     TypedFrameCommands::TypedFrameCommands(CommandManager manager, FenceHolder fence) : _domain(std::move(manager)), _fence(std::move(fence)) {
         if (_fence.size() < _domain.count || _fence.get_device() != _domain.manager.get_device())
             throw std::invalid_argument("Typed frame commands require a fence for every slot on the same device");
     }
+
     TypedFrameCommands& TypedFrameCommands::operator=(TypedFrameCommands other) noexcept {
         swap(other);
         return *this;
     }
+
     void TypedFrameCommands::swap(TypedFrameCommands& other) noexcept {
         std::swap(_domain, other._domain);
         std::swap(_fence, other._fence);
     }
+
     size_t TypedFrameCommands::frame_count() const {
         _domain.require_current();
         return _domain.count;
     }
+
     CommandManager TypedFrameCommands::manager() const {
         _domain.require_current();
         return _domain.manager;
     }
+
     FenceHolder TypedFrameCommands::fence() const {
         _domain.require_current();
         return _fence;
     }
+
     ComputePhase TypedFrameCommands::start_compute() const {
         _domain.require_current();
         return ComputePhase(_domain.manager, std::nullopt, std::nullopt, _fence);
     }
+
     void TypedFrameCommands::next() {
         _domain.require_current();
         _domain.buffer.next();

@@ -11,10 +11,13 @@ static_assert(!std::is_aggregate_v<vsl::PhysicalDevice>);
 static_assert(std::is_nothrow_move_constructible_v<vsl::Vulkan<false>>);
 static_assert(std::is_nothrow_move_assignable_v<vsl::PhysicalDevice>);
 static_assert(!std::is_convertible_v<vsl::Vulkan<false>&, vsl::VulkanAccessor&>);
+
 struct Searcher {
     int benchmark(vsl::PhysicalDevice device) const { return device.api_version() ? 1 : -1; }
 };
+
 void connect_instance(vsl::InstanceCreateInfo info);
+
 void connect_instance(vsl::InstanceCreateInfo info) {
     auto instance = vsl::VulkanAccessor::Create(info);
     auto physical = vsl::PhysicalDevice::Select(instance);
@@ -40,87 +43,104 @@ void connect_instance(vsl::InstanceCreateInfo info) {
 }
 #elif VSL_TYPED_CASE == 1
 void reject(vsl::VulkanAccessor value);
+
 void reject(vsl::VulkanAccessor value) {
     (void)value.accessor;
 }
 #elif VSL_TYPED_CASE == 2
 void reject(vsl::Vulkan<false>& value);
+
 void reject(vsl::Vulkan<false>& value) {
     (void)value.data_;
 }
 #elif VSL_TYPED_CASE == 3
 void reject(vsl::Vulkan<false>& value);
+
 void reject(vsl::Vulkan<false>& value) {
     (void)value.accessor;
 }
 #elif VSL_TYPED_CASE == 4
 void reject(vsl::PhysicalDevice value);
+
 void reject(vsl::PhysicalDevice value) {
     (void)value.data_;
 }
 #elif VSL_TYPED_CASE == 5
 void reject(vsl::PhysicalDevices<>& value);
+
 void reject(vsl::PhysicalDevices<>& value) {
     (void)value.data_;
 }
 #elif VSL_TYPED_CASE == 6
 void reject(std::shared_ptr<vsl::impl::VulkanImplAccessor> value);
+
 void reject(std::shared_ptr<vsl::impl::VulkanImplAccessor> value) {
     (void)vsl::VulkanAccessor(value);
 }
 #elif VSL_TYPED_CASE == 7
 void reject(std::shared_ptr<vsl::impl::PhysicalDeviceImpl> value);
+
 void reject(std::shared_ptr<vsl::impl::PhysicalDeviceImpl> value) {
     (void)vsl::PhysicalDevice(value);
 }
 #elif VSL_TYPED_CASE == 8
 void reject(vsl::lifetime::OwnedRef<vsl::impl::VulkanImplAccessor> value);
+
 void reject(vsl::lifetime::OwnedRef<vsl::impl::VulkanImplAccessor> value) {
     (void)vsl::VulkanAccessor(value);
 }
 #elif VSL_TYPED_CASE == 9
 void reject(vsl::lifetime::OwnedRef<vsl::impl::PhysicalDeviceImpl> value);
+
 void reject(vsl::lifetime::OwnedRef<vsl::impl::PhysicalDeviceImpl> value) {
     (void)vsl::PhysicalDevice(value);
 }
 #elif VSL_TYPED_CASE == 10
 void reject(vsl::VulkanAccessor value);
+
 void reject(vsl::VulkanAccessor value) {
     (void)vsl::helper::enumerate_physical_devices(value);
 }
 #elif VSL_TYPED_CASE == 11
 void reject(std::shared_ptr<vsl::impl::PhysicalDevicesImpl> value);
+
 void reject(std::shared_ptr<vsl::impl::PhysicalDevicesImpl> value) {
     (void)vsl::helper::physical_devices(value);
 }
 #elif VSL_TYPED_CASE == 12
 void reject(std::shared_ptr<vsl::impl::PhysicalDevicesImpl> value);
+
 void reject(std::shared_ptr<vsl::impl::PhysicalDevicesImpl> value) {
     (void)vsl::helper::select_physical_device(value);
 }
 #elif VSL_TYPED_CASE == 13
 void reject(vsl::Vulkan<false>& value);
+
 void reject(vsl::Vulkan<false>& value) {
     vsl::VulkanAccessor& borrowed = value;
     (void)borrowed;
 }
 #elif VSL_TYPED_CASE == 14
 void reject(vsl::VulkanAccessor value);
+
 void reject(vsl::VulkanAccessor value) {
     (void)value._owner;
 }
 #elif VSL_TYPED_CASE == 15
 void reject(vsl::PhysicalDevice value);
+
 void reject(vsl::PhysicalDevice value) {
     (void)value._owner;
 }
 #elif VSL_TYPED_CASE == 16
 void reject(vsl::PhysicalDevices<>& value);
+
 void reject(vsl::PhysicalDevices<>& value) {
     (void)value._collection;
 }
 #elif VSL_TYPED_CASE == 17
 void reject(vsl::Vulkan<false>& value);
+
 void reject(vsl::Vulkan<false>& value) {
     (void)value._value;
 }

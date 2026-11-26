@@ -24,6 +24,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     namespace t = vsl::typed;
     namespace pl = vsl::pipeline_layout;
@@ -45,10 +46,13 @@ namespace {
     static_assert(std::constructible_from<t::TypedComputePipeline<One>, vsl::LogicalDeviceAccessor, const OneLayouts&, pl::ShaderGroup>);
     static_assert(!std::constructible_from<t::TypedComputePipeline<Other>, vsl::LogicalDeviceAccessor, const OneLayouts&, pl::ShaderGroup>);
     static_assert(!std::constructible_from<t::TypedGraphicsPipeline<Inputs, Other>, vsl::LogicalDeviceAccessor, vsl::RenderPassAccessor, const OneLayouts&, pl::ShaderGroup>);
+
     class SharedLayoutsVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     t::ResourceAllocationSizes<Allocation> bundle_sizes();
+
     t::ResourceAllocationSizes<Allocation> bundle_sizes() {
         t::ResourceAllocationSizes<Allocation> result;
         result.set<2, 3>(4);
@@ -69,6 +73,7 @@ namespace {
         EXPECT_EQ(plan.descriptors().total_sets(), 1u);
         EXPECT_EQ(plan.descriptors().total_pools(), 1u);
     }
+
     TEST_F(SharedLayoutsVulkanIntegrationTest, CollectionValidatesRealSourcesAndRejectsMissingOrMovedOwners) {
         const auto points = One::Set<0>::POINTS;
         vsl::graphic_resource::BindingLayout source(device, std::vector<vsl::graphic_resource::BindingPoint>(points.begin(), points.end()));
@@ -100,6 +105,7 @@ namespace {
         EXPECT_EQ(DescriptorAccess::Owned(moved.layout<2>()), DescriptorAccess::Owned(source));
         EXPECT_EQ(DescriptorAccess::Owned(*(moved.hole_layout())), DescriptorAccess::Owned(empty));
     }
+
     TEST_F(SharedLayoutsVulkanIntegrationTest, BundleSourcesShareHandlesAndFillEveryHoleWithOneLayout) {
         auto manager = make_manager();
         vsl::GraphicResourceManager descriptors(device);
@@ -121,6 +127,7 @@ namespace {
         EXPECT_EQ(DescriptorManagerAccess::Data(descriptors)->pools.size(), 0u);
         phase.cancel();
     }
+
     TEST_F(SharedLayoutsVulkanIntegrationTest, SparseDeclaredEmptyLayoutIsReusedAndTheDeviceLimitIsCheckedBeforeExpansion) {
         using Sparse = t::ResourceSchema<t::DescriptorSet<500>>;
         using Schema = t::ResourceAllocationSchema<Sparse>;
@@ -136,6 +143,7 @@ namespace {
         const auto empty_sources = empty.descriptor_layouts();
         EXPECT_NO_THROW((vsl::PipelineLayout(device, t::detail::DescriptorLayoutInjection<t::ResourceSchema<>>{empty_sources})));
     }
+
     TEST_F(SharedLayoutsVulkanIntegrationTest, CollectionOutlivesTheBundleWithoutKeepingItsFrameArenas) {
         auto manager = make_manager();
         vsl::GraphicResourceManager descriptors(device);
@@ -178,6 +186,7 @@ namespace {
         for (size_t i = 0; i < actual.size(); ++i)
             EXPECT_EQ(actual[i], 73u + i);
     }
+
     TEST_F(SharedLayoutsVulkanIntegrationTest, ShaderAndLayoutsFromOneArenaKeepOneRecipeSourceWithoutRetainingItInThePipeline) {
         auto verify = [&](auto policy) {
             namespace s = vsl::storage;

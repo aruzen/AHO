@@ -18,11 +18,14 @@ namespace VSL_NAMESPACE {
         PipelineLayoutAccessor(const PipelineLayoutAccessor&) = default;
         PipelineLayoutAccessor(PipelineLayoutAccessor&&) noexcept = default;
         PipelineLayoutAccessor& operator=(PipelineLayoutAccessor other) noexcept;
+
         PipelineLayoutAccessor runtime() const { return PipelineLayoutAccessor(_owner); }
         explicit operator bool() const noexcept { return bool(_owner); }
         void swap(PipelineLayoutAccessor& other) noexcept { swap_state(other); }
+
         LogicalDeviceAccessor get_device() const;
         lifetime::OwnerRef owner_ref() const;
+
         bool has_recipe() const { return bool(_recipe); }
 
     private:
@@ -30,6 +33,7 @@ namespace VSL_NAMESPACE {
         friend struct lifetime::detail::PipelineRecipeAccess;
         friend struct PipelineLayoutEditAccessor;
         lifetime::OwnedRef<impl::PipelineLayoutImpl> _owner;
+
         explicit PipelineLayoutAccessor(lifetime::OwnedRef<impl::PipelineLayoutImpl> owner) : _owner(std::move(owner)) {}
         friend struct PipelineLayout;
         std::shared_ptr<const impl::PipelineRecipe> _recipe;
@@ -40,11 +44,13 @@ namespace VSL_NAMESPACE {
         PipelineLayoutEditAccessor(const PipelineLayoutEditAccessor&) = default;
         PipelineLayoutEditAccessor(PipelineLayoutEditAccessor&&) noexcept = default;
         PipelineLayoutEditAccessor& operator=(PipelineLayoutEditAccessor other) noexcept;
+
         operator PipelineLayoutAccessor() const { return _value; }
         explicit operator bool() const noexcept { return bool(_value); }
         PipelineLayoutAccessor runtime() const { return _value.runtime(); }
         lifetime::OwnerRef owner_ref() const { return _value.owner_ref(); }
         bool has_recipe() const { return _value.has_recipe(); }
+
         GraphicsPipelineStateEditRef edit_state() const&;
         GraphicsPipelineStateEditRef edit_state() const&& = delete;
         LogicalDeviceAccessor get_device() const;
@@ -74,15 +80,18 @@ namespace VSL_NAMESPACE {
         friend struct lifetime::detail::GraphicsAccess;
         friend struct lifetime::detail::PipelineRecipeAccess;
         PipelineLayoutAccessor _value;
+
         explicit FrozenPipelineLayout(PipelineLayoutAccessor value) : _value(std::move(value)) {}
 
     public:
         FrozenPipelineLayout(const FrozenPipelineLayout&) = default;
         FrozenPipelineLayout(FrozenPipelineLayout&&) noexcept = default;
+
         FrozenPipelineLayout& operator=(FrozenPipelineLayout replacement) noexcept {
             swap(replacement);
             return *this;
         }
+
         void swap(FrozenPipelineLayout& other) noexcept { _value.swap(other._value); }
         operator PipelineLayoutAccessor() const { return _value; }
         explicit operator bool() const noexcept { return bool(_value); }
@@ -95,10 +104,12 @@ namespace VSL_NAMESPACE {
     struct PipelineLayout : PipelineLayoutEditAccessor {
         PipelineLayout(const PipelineLayout&) = default;
         PipelineLayout(PipelineLayout&&) noexcept = default;
+
         PipelineLayout& operator=(PipelineLayout replacement) noexcept {
             swap_state(replacement);
             return *this;
         }
+
         template<pipeline_layout_injecter... Args>
         PipelineLayout(LogicalDeviceAccessor device, Args&&... args);
         template<pipeline_layout_injecter... Args>
@@ -117,7 +128,9 @@ namespace VSL_NAMESPACE {
         void expansion_pipeline_layout_args(PipelineLayoutEditAccessor&);
         template<pipeline_layout_injecter T, typename... Args>
         void expansion_pipeline_layout_args(PipelineLayoutEditAccessor& layout, T&& stage, Args&&... args);
+
         inline void expansion_pipeline_layout_args(PipelineLayoutEditAccessor&) {}
+
         template<pipeline_layout_injecter T, typename... Args>
         void expansion_pipeline_layout_args(PipelineLayoutEditAccessor& layout, T&& stage, Args&&... args) {
             std::forward<T>(stage).injection(layout);
@@ -129,10 +142,12 @@ namespace VSL_NAMESPACE {
         swap_state(other);
         return *this;
     }
+
     inline void PipelineLayoutAccessor::swap_state(PipelineLayoutAccessor& other) noexcept {
         _owner.swap(other._owner);
         _recipe.swap(other._recipe);
     }
+
     inline PipelineLayoutEditAccessor& PipelineLayoutEditAccessor::operator=(PipelineLayoutEditAccessor other) noexcept {
         swap_state(other);
         return *this;
@@ -144,6 +159,7 @@ namespace VSL_NAMESPACE {
         helper::expansion_pipeline_layout_args(*this, std::forward<Args>(args)...);
         init_finish();
     }
+
     template<pipeline_layout_injecter... Args>
     PipelineLayout PipelineLayout::FromRuntime(PipelineLayoutAccessor runtime, Args&&... args) {
         PipelineLayout result;
@@ -152,6 +168,7 @@ namespace VSL_NAMESPACE {
         result.init_finish(std::move(runtime));
         return result;
     }
+
     template<pipeline_layout_injecter... Additions>
     PipelineLayout PipelineLayout::add(Additions&&... additions) {
         auto next = clone_state();

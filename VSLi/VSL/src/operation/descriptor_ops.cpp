@@ -18,6 +18,7 @@ namespace VSL_NAMESPACE::operation {
                 throw std::invalid_argument("Typed descriptor binding mismatch");
         }
     }
+
     void initialize_descriptor_layout(impl::ResourceBindingLayoutImpl& layout, impl::LogicalDeviceImpl& device, const DescriptorLayoutCreateInfo& info) {
         layout.device = &device;
         layout.native_device = device.device;
@@ -35,11 +36,13 @@ namespace VSL_NAMESPACE::operation {
                                                        .pBindings = layout.layout_bindings.data()};
         layout.layout = device.device.createDescriptorSetLayout(create);
     }
+
     void destroy_descriptor_layout(impl::ResourceBindingLayoutImpl& layout) noexcept {
         if (layout.layout)
             layout.native_device.destroyDescriptorSetLayout(layout.layout);
         layout.layout = nullptr;
     }
+
     void initialize_descriptor_pool(impl::GraphicResourcePoolImpl& pool, impl::LogicalDeviceImpl& device, const DescriptorPoolCreateInfo& info) {
         if (!info.max_sets || info.max_sets > std::numeric_limits<std::uint32_t>::max())
             throw std::out_of_range("Descriptor pool maxSets must fit nonzero uint32_t");
@@ -62,6 +65,7 @@ namespace VSL_NAMESPACE::operation {
                                                   .pPoolSizes = sizes.data()};
         pool.descriptor_pool = device.device.createDescriptorPool(create);
     }
+
     void destroy_descriptor_pool(impl::GraphicResourcePoolImpl& pool) noexcept {
         if (pool.descriptor_pool)
             pool.native_device.destroyDescriptorPool(pool.descriptor_pool);
@@ -70,6 +74,7 @@ namespace VSL_NAMESPACE::operation {
         for (auto& [type, capacity] : pool.capacities)
             capacity.allocated = 0;
     }
+
     vk::Result allocate_descriptor_sets(impl::GraphicResourcePoolImpl& pool, std::span<impl::GraphicResourceImpl* const> sets) {
         if (!pool.descriptor_pool || pool.retiring)
             throw std::logic_error("Descriptor pool has been destroyed");
@@ -117,6 +122,7 @@ namespace VSL_NAMESPACE::operation {
         }
         return result;
     }
+
     void destroy_descriptor_set(impl::GraphicResourceImpl& resource) noexcept {
         if (resource.descriptor_set && resource.pool && resource.pool->descriptor_pool) {
             const auto result = resource.native_device.freeDescriptorSets(resource.pool->descriptor_pool, 1, &resource.descriptor_set);
@@ -133,9 +139,11 @@ namespace VSL_NAMESPACE::operation {
         }
         resource.descriptor_set = nullptr;
     }
+
     void write_descriptor(vk::Device device, const vk::WriteDescriptorSet& write) {
         device.updateDescriptorSets(write, {});
     }
+
     void validate_descriptor_buffer(const impl::BufferImpl& buffer, vk::DescriptorType type, size_t offset, size_t bytes) {
         const bool uniform = type == vk::DescriptorType::eUniformBuffer || type == vk::DescriptorType::eUniformBufferDynamic;
         const bool storage = type == vk::DescriptorType::eStorageBuffer || type == vk::DescriptorType::eStorageBufferDynamic;
@@ -153,6 +161,7 @@ namespace VSL_NAMESPACE::operation {
         if (alignment && offset % alignment)
             throw std::invalid_argument("Descriptor buffer offset violates device alignment");
     }
+
     void validate_descriptor_image(const impl::ImageImpl& image, vk::DescriptorType type) {
         auto usage = ImageType::SAMPLED;
         if (type == vk::DescriptorType::eStorageImage)

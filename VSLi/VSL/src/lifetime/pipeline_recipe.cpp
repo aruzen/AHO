@@ -30,6 +30,7 @@ namespace VSL_NAMESPACE::lifetime {
         PipelineLayoutInit layout_input(const PipelineRecipeSnapshot& snapshot);
         void validate_target(LogicalDeviceAccessor device, const RenderPassAccessor& pass, std::uint32_t subpass);
         std::vector<PipelineShaderSource> shader_inputs(const impl::PipelineRecipe& recipe);
+
         PipelineLayoutInit layout_input(const PipelineRecipeSnapshot& snapshot) {
             const auto& recipe = PipelineRecipeAccess::Read(snapshot);
             if (recipe.pending_layouts)
@@ -40,6 +41,7 @@ namespace VSL_NAMESPACE::lifetime {
                 result.layouts.emplace_back(std::move(layout));
             return result;
         }
+
         std::vector<PipelineShaderSource> shader_inputs(const impl::PipelineRecipe& recipe) {
             std::vector<PipelineShaderSource> result;
             result.reserve(recipe.shaders.size());
@@ -47,6 +49,7 @@ namespace VSL_NAMESPACE::lifetime {
                 result.emplace_back(detail::ShaderAccess::FromRecipe(recipe, i));
             return result;
         }
+
         void validate_target(LogicalDeviceAccessor device, const RenderPassAccessor& pass, std::uint32_t subpass) {
             if (!GraphicsAccess::Owned(pass) || !GraphicsAccess::Owned(pass).use_count() || subpass >= pass.description().subpasses.size())
                 throw std::out_of_range("Pipeline subpass index");
@@ -57,19 +60,23 @@ namespace VSL_NAMESPACE::lifetime {
 
     PipelineRecipeSnapshot::PipelineRecipeSnapshot(LogicalDeviceAccessor device, std::shared_ptr<const impl::PipelineRecipe> recipe)
         : _device(std::move(device)), _recipe(std::move(recipe)) {}
+
     const impl::PipelineRecipe& detail::PipelineRecipeAccess::Read(const PipelineRecipeSnapshot& value) {
         if (!value._recipe)
             throw std::logic_error("Pipeline recipe snapshot is empty");
         return *value._recipe;
     }
+
     const std::optional<std::vector<DescriptorLayoutCreateInfo>>& PipelineRecipeSnapshot::pending_layouts() const& {
         return PipelineRecipeAccess::Read(*this).pending_layouts;
     }
+
     PipelineRecipeSnapshot PipelineRecipeSnapshot::with_layouts(std::span<const graphic_resource::BindingLayout> layouts) const {
         auto next = std::make_shared<impl::PipelineRecipe>(PipelineRecipeAccess::Read(*this));
         replace_recipe_layouts(*next, _device, layouts);
         return {_device, std::move(next)};
     }
+
     std::vector<graphic_resource::BindingLayout> PipelineRecipeSnapshot::layout_sources() const {
         const auto& recipe = PipelineRecipeAccess::Read(*this);
         std::vector<graphic_resource::BindingLayout> result;
@@ -78,12 +85,15 @@ namespace VSL_NAMESPACE::lifetime {
             result.push_back(detail::DescriptorAccess::FromOwned(recipe.sources.at(recipe.binding_sources.at(i)).alias(recipe.binding_layouts[i])));
         return result;
     }
+
     PipelineRecipeDraft::PipelineRecipeDraft(LogicalDeviceAccessor device) {
         init_start(std::move(device));
     }
+
     PipelineRecipeSnapshot PipelineRecipeDraft::snapshot() const {
         return {get_device(), std::make_shared<impl::PipelineRecipe>(PipelineRecipeAccess::Edit(*this))};
     }
+
     GraphicsPipeline make_graphics_pipeline(PipelineRecipeSnapshot snapshot, RenderPassAccessor pass, std::uint32_t subpass, typed::HeapStorage) {
         validate_target(snapshot.device(), pass, subpass);
         const auto& recipe = PipelineRecipeAccess::Read(snapshot);
@@ -94,6 +104,7 @@ namespace VSL_NAMESPACE::lifetime {
         const operation::GraphicsPipelineInput input{owner.get(), GraphicsAccess::Owned(pass).get(), &recipe.graphics_state, recipe.shaders, subpass};
         return GraphicsPipeline(detail::GraphicsAccess::FromShared(make_heap_pipeline(snapshot.device(), layout.owner_ref(), input)));
     }
+
     GraphicsPipeline make_graphics_pipeline(PipelineRecipeSnapshot snapshot, RenderPassAccessor pass, std::uint32_t subpass, typed::ArenaStorage<>) {
         validate_target(snapshot.device(), pass, subpass);
         GraphicsPipelineState state;
@@ -103,6 +114,7 @@ namespace VSL_NAMESPACE::lifetime {
         ResourceArena arena(snapshot.device(), PLAN, inputs);
         return GraphicsPipeline(arena.pipeline(PIPELINE));
     }
+
     ComputePipeline make_compute_pipeline(PipelineRecipeSnapshot snapshot, typed::HeapStorage) {
         const auto& recipe = PipelineRecipeAccess::Read(snapshot);
         if (recipe.pending_layouts)
@@ -114,6 +126,7 @@ namespace VSL_NAMESPACE::lifetime {
         const operation::ComputePipelineInput input{owner.get(), recipe.shaders.front()};
         return ComputePipeline(detail::GraphicsAccess::FromShared(make_heap_pipeline(snapshot.device(), layout.owner_ref(), input)));
     }
+
     ComputePipeline make_compute_pipeline(PipelineRecipeSnapshot snapshot, typed::ArenaStorage<>) {
         auto shaders = shader_inputs(PipelineRecipeAccess::Read(snapshot));
         if (shaders.size() != 1)

@@ -10,6 +10,7 @@ namespace VSL_NAMESPACE {
         attachments.push_back(attachment);
         return static_cast<AttachmentId>(attachments.size() - 1);
     }
+
     AttachmentId RenderPassDescription::add_color(AttachmentDescription attachment) {
         if (subpasses.empty())
             subpasses.emplace_back();
@@ -17,6 +18,7 @@ namespace VSL_NAMESPACE {
         subpasses.front().colors.push_back({id, ImageLayout::COLOR_ATTACHMENT_OPTIMAL});
         return id;
     }
+
     AttachmentId RenderPassDescription::set_depth_stencil(AttachmentDescription attachment) {
         if (subpasses.empty())
             subpasses.emplace_back();
@@ -26,6 +28,7 @@ namespace VSL_NAMESPACE {
         subpasses.front().depth_stencil = {id, ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
         return id;
     }
+
     void RenderPassDescription::validate() const {
         if (subpasses.empty())
             throw std::invalid_argument("RenderPass needs at least one subpass");
@@ -123,12 +126,14 @@ namespace VSL_NAMESPACE {
 namespace VSL_NAMESPACE::operation {
     namespace {
         std::uint32_t count(size_t size);
+
         std::uint32_t count(size_t size) {
             if (size > UINT32_MAX)
                 throw std::length_error("Render pass count exceeds uint32_t");
             return static_cast<std::uint32_t>(size);
         }
     } // namespace
+
     void initialize_render_pass(impl::RenderPassImpl& target, impl::LogicalDeviceImpl& device, RenderPassDescription description) {
         description.validate();
         if (!device.device || !device.parent_device || !device.parent_device->device)
@@ -157,10 +162,12 @@ namespace VSL_NAMESPACE::operation {
                                    .stencilStoreOp = static_cast<vk::AttachmentStoreOp>(a.stencil_store),
                                    .initialLayout = static_cast<vk::ImageLayout>(a.initial_layout),
                                    .finalLayout = static_cast<vk::ImageLayout>(a.final_layout)});
+
         struct References {
             std::vector<vk::AttachmentReference> colors, inputs, resolves;
             vk::AttachmentReference depth;
         };
+
         std::vector<References> refs(target.description->subpasses.size());
         std::vector<vk::SubpassDescription> subpasses;
         for (std::size_t i = 0; i < refs.size(); ++i) {
@@ -205,6 +212,7 @@ namespace VSL_NAMESPACE::operation {
                                       .pDependencies = dependencies.data()};
         target.render_pass = device.device.createRenderPass(info);
     }
+
     void destroy_render_pass(impl::RenderPassImpl& target) noexcept {
         if (target.render_pass)
             target.native_device.destroyRenderPass(target.render_pass);

@@ -5,13 +5,16 @@ namespace VSL_NAMESPACE::operation {
     namespace {
         thread_local const CommandNativeCalls* NATIVE_CALLS = nullptr;
     }
+
     ScopedCommandNativeCalls::ScopedCommandNativeCalls(CommandNativeCalls calls) noexcept
         : _calls(calls), _previous(NATIVE_CALLS) {
         NATIVE_CALLS = &_calls;
     }
+
     ScopedCommandNativeCalls::~ScopedCommandNativeCalls() {
         NATIVE_CALLS = _previous;
     }
+
     void initialize_command_pool(impl::CommandPoolImpl& pool, impl::LogicalDeviceImpl& device, CommandPoolCreateInfo info) {
         if (pool.command_pool)
             throw std::logic_error("Command pool is already initialized");
@@ -27,12 +30,14 @@ namespace VSL_NAMESPACE::operation {
         pool.native_device = device.device;
         pool.command_pool = device.device.createCommandPool(native);
     }
+
     void destroy_command_pool(impl::CommandPoolImpl& pool) noexcept {
         if (pool.command_pool) {
             pool.native_device.destroyCommandPool(pool.command_pool);
             pool.command_pool = nullptr;
         }
     }
+
     void initialize_command_buffer(impl::CommandBufferImpl& buffer, impl::CommandPoolImpl& pool, std::uint32_t count) {
         if (!buffer.command_buffers.empty())
             throw std::logic_error("Command buffer ring is already initialized");
@@ -51,12 +56,14 @@ namespace VSL_NAMESPACE::operation {
         buffer.native_pool = pool.command_pool;
         buffer.current_buffer_idx = 0;
     }
+
     void destroy_command_buffer(impl::CommandBufferImpl& buffer) noexcept {
         if (!buffer.command_buffers.empty()) {
             buffer.native_device.freeCommandBuffers(buffer.native_pool, buffer.command_buffers);
             buffer.command_buffers.clear();
         }
     }
+
     void reset_command_buffer(vk::CommandBuffer buffer) {
         const auto result = static_cast<vk::Result>(NATIVE_CALLS && NATIVE_CALLS->reset
                                                         ? NATIVE_CALLS->reset(NATIVE_CALLS->context, buffer, 0)
@@ -64,6 +71,7 @@ namespace VSL_NAMESPACE::operation {
         if (result != vk::Result::eSuccess)
             vk::detail::throwResultException(result, "Command buffer reset failed");
     }
+
     void begin_command_buffer(vk::CommandBuffer buffer) {
         const VkCommandBufferBeginInfo info{.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
         const auto result = static_cast<vk::Result>(NATIVE_CALLS && NATIVE_CALLS->begin
@@ -72,6 +80,7 @@ namespace VSL_NAMESPACE::operation {
         if (result != vk::Result::eSuccess)
             vk::detail::throwResultException(result, "Command buffer begin failed");
     }
+
     void end_command_buffer(vk::CommandBuffer buffer) {
         const auto result = static_cast<vk::Result>(NATIVE_CALLS && NATIVE_CALLS->end
                                                         ? NATIVE_CALLS->end(NATIVE_CALLS->context, buffer)

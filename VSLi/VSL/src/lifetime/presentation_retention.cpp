@@ -19,22 +19,27 @@
 namespace VSL_NAMESPACE::lifetime {
     namespace {
         std::atomic<std::uint64_t> PRESENT_SERIAL{0};
+
         struct ImagePresentAccess {
             ImagePresentSlot& slot;
             explicit ImagePresentAccess(ImagePresentSlot& slot);
+
             ~ImagePresentAccess() { slot.accessing = false; }
         };
+
         struct ReleasedPresentOwners {
             std::shared_ptr<impl::SwapchainImpl> generation;
             std::shared_ptr<impl::SemaphoreImpl> semaphore;
             std::shared_ptr<sync::SemaphoreWSIUse> marker;
         };
+
         struct PresentationQuarantine {
             std::mutex mutex;
             std::shared_ptr<PresentRecord> head;
             size_t count = 0;
             bool collecting = false;
         };
+
         PresentationQuarantine& presentation_quarantine() noexcept;
         void quarantine_presentation(std::shared_ptr<PresentRecord> record) noexcept;
         std::uint64_t next_present_serial();
@@ -55,6 +60,7 @@ namespace VSL_NAMESPACE::lifetime {
             static auto* const REGISTRY = std::construct_at(reinterpret_cast<PresentationQuarantine*>(STORAGE));
             return *REGISTRY;
         }
+
         void quarantine_presentation(std::shared_ptr<PresentRecord> record) noexcept {
             auto& registry = presentation_quarantine();
             const std::lock_guard lock(registry.mutex);
@@ -65,11 +71,13 @@ namespace VSL_NAMESPACE::lifetime {
             registry.head = std::move(record);
             ++registry.count;
         }
+
         ImagePresentAccess::ImagePresentAccess(ImagePresentSlot& slot) : slot(slot) {
             if (slot.accessing)
                 throw std::logic_error("Swapchain image presentation is already being changed");
             slot.accessing = true;
         }
+
         std::uint64_t next_present_serial() {
             auto current = PRESENT_SERIAL.load(std::memory_order_relaxed);
             for (;;) {
@@ -79,10 +87,12 @@ namespace VSL_NAMESPACE::lifetime {
                     return current + 1;
             }
         }
+
         bool same_generation(const AcquireEvidence& evidence, const std::shared_ptr<impl::SwapchainImpl>& generation) noexcept {
             return evidence.generation_address == generation.get() &&
                    !evidence.generation.owner_before(generation) && !generation.owner_before(evidence.generation);
         }
+
         void apply_acquisitions(std::span<const std::shared_ptr<PresentRecord>> records, std::span<const std::shared_ptr<AcquireEvidence>> acquisitions) noexcept {
             for (const auto& evidence : acquisitions) {
                 if (!evidence->finished || !sync::poll_fence_proof(evidence->proof) || !evidence->present_serial)
@@ -100,6 +110,7 @@ namespace VSL_NAMESPACE::lifetime {
                 }
             }
         }
+
         ReleasedPresentOwners detach_present_owners(PresentRecord& record) noexcept {
             record.semaphore_source = nullptr;
             record.state.origin = nullptr;
@@ -112,12 +123,14 @@ namespace VSL_NAMESPACE::lifetime {
                 owners.marker->complete = true;
             return owners;
         }
+
         void retire_presentations(PresentationSnapshot& snapshot) {
             if (snapshot.domain->recovering)
                 return;
             bookkeep_presentations(snapshot);
             release_presentations(snapshot);
         }
+
         void observe_present_record(PresentRecord& record, vk::Result idle, bool wait) noexcept {
             if (idle == vk::Result::eErrorDeviceLost) {
                 sync::fail_present(record.state, idle);
@@ -134,6 +147,7 @@ namespace VSL_NAMESPACE::lifetime {
                        record.state.status == sync::PresentStatus::SUBMITTED)
                 record.state.status = sync::PresentStatus::LEGACY_RELEASED;
         }
+
         bool matches_presentation_scope(const PresentRecord& record, const std::shared_ptr<impl::SurfaceImpl>& surface,
                                         std::span<const std::shared_ptr<SurfacePresentationDomain>> domains) noexcept {
             if (!record.generation)
@@ -145,6 +159,7 @@ namespace VSL_NAMESPACE::lifetime {
                     return true;
             return false;
         }
+
         void prepend_present_chain(std::shared_ptr<PresentRecord>& head, std::shared_ptr<PresentRecord>& chain) noexcept {
             if (!chain)
                 return;
@@ -154,6 +169,7 @@ namespace VSL_NAMESPACE::lifetime {
             tail->quarantine_next = std::move(head);
             head = std::move(chain);
         }
+
         bool present_native_active(const PresentRecord& record) noexcept {
             const auto* context = record.generation ? record.generation->presentation_context : nullptr;
             return record.state.observing || (context && record.image < context->images.size() && context->images[record.image].accessing);
@@ -181,12 +197,14 @@ namespace VSL_NAMESPACE::lifetime {
         context.presentation_identity = domain.get();
         return domain;
     }
+
     void register_presentation_domain(CommandDomain& commands, const std::shared_ptr<SurfacePresentationDomain>& domain) {
         if (commands.context.closing || !domain || domain->closing)
             throw std::logic_error("Presentation domain is unavailable");
         if (std::ranges::find(commands.presentation_domains, domain) == commands.presentation_domains.end())
             commands.presentation_domains.push_back(domain);
     }
+
     std::shared_ptr<AcquireEvidence> prepare_acquire_evidence(SurfacePresentationDomain& domain, const std::shared_ptr<impl::SwapchainImpl>& generation, vk::Fence fence) {
         if (domain.closing || !generation || !fence)
             throw std::logic_error("Acquire evidence requires a live generation and fence");
@@ -199,6 +217,7 @@ namespace VSL_NAMESPACE::lifetime {
         domain.acquisitions.push_back(evidence);
         return evidence;
     }
+
     void commit_acquire_evidence(const std::shared_ptr<AcquireEvidence>& source, impl::SwapchainImpl& generation, std::uint32_t image) {
         auto& evidence = *source;
         evidence.proof.status = sync::FenceProofStatus::PENDING;
@@ -214,6 +233,7 @@ namespace VSL_NAMESPACE::lifetime {
         if (auto previous = slot.record.lock(); previous && !previous->state.strict && !previous->released)
             previous->state.reacquire = std::shared_ptr<sync::FenceProof>(source, &evidence.proof);
     }
+
     std::shared_ptr<PresentRecord> prepare_present_record(SurfacePresentationDomain& domain, std::shared_ptr<impl::SwapchainImpl> generation,
                                                           std::shared_ptr<impl::SemaphoreImpl> semaphore, std::shared_ptr<sync::SemaphoreWSIUse> marker,
                                                           vk::Queue queue, std::uint32_t image) {
@@ -274,6 +294,7 @@ namespace VSL_NAMESPACE::lifetime {
         }
         return record;
     }
+
     sync::PresentEnqueue enqueue_present_record(PresentRecord& record) {
         if (record.released || !record.generation || record.state.status != sync::PresentStatus::PENDING)
             throw std::logic_error("Presentation is not pending");
@@ -304,6 +325,7 @@ namespace VSL_NAMESPACE::lifetime {
         }
         return outcome;
     }
+
     void collect_presentations(std::shared_ptr<SurfacePresentationDomain> domain) noexcept {
         if (!domain || domain->closing || domain->recovering)
             return;
@@ -318,11 +340,13 @@ namespace VSL_NAMESPACE::lifetime {
             // snapshot／回収一覧を確保できない間も、資源の保持を維持する。
         }
     }
+
     size_t quarantined_presentation_count() noexcept {
         auto& registry = presentation_quarantine();
         const std::lock_guard lock(registry.mutex);
         return registry.count;
     }
+
     QuarantinedPresentations::QuarantinedPresentations(std::shared_ptr<impl::LogicalDeviceImpl> device,
                                                        std::span<const std::shared_ptr<SurfacePresentationDomain>> domains,
                                                        std::shared_ptr<impl::SurfaceImpl> surface)
@@ -342,6 +366,7 @@ namespace VSL_NAMESPACE::lifetime {
             head = std::move(record);
         }
     }
+
     QuarantinedPresentations::~QuarantinedPresentations() {
         if (_collecting) {
             auto& registry = presentation_quarantine();
@@ -352,6 +377,7 @@ namespace VSL_NAMESPACE::lifetime {
         }
         release();
     }
+
     void QuarantinedPresentations::save_observations(vk::Result idle, bool wait) noexcept {
         if (_device->lost)
             idle = vk::Result::eErrorDeviceLost;
@@ -370,6 +396,7 @@ namespace VSL_NAMESPACE::lifetime {
             }
         }
     }
+
     void QuarantinedPresentations::bookkeep() noexcept {
         if (!_collecting)
             return;
@@ -394,6 +421,7 @@ namespace VSL_NAMESPACE::lifetime {
         registry.collecting = false;
         _collecting = false;
     }
+
     void QuarantinedPresentations::release() noexcept {
         while (_ready) {
             auto record = std::move(_ready);
@@ -401,6 +429,7 @@ namespace VSL_NAMESPACE::lifetime {
             const auto owners = detach_present_owners(*record);
         }
     }
+
     bool QuarantinedPresentations::pending() const noexcept {
         if (!_collecting)
             return _pending;
@@ -409,6 +438,7 @@ namespace VSL_NAMESPACE::lifetime {
                 return true;
         return false;
     }
+
     void collect_quarantined_presentations(const std::weak_ptr<impl::SurfaceImpl>& surface, vk::Device device, vk::Result known_idle) noexcept {
         const auto parent = surface.lock();
         if (!parent)
@@ -456,6 +486,7 @@ namespace VSL_NAMESPACE::lifetime {
         }
         registry.collecting = false;
     }
+
     PresentationSnapshot snapshot_presentations(const std::shared_ptr<SurfacePresentationDomain>& domain, vk::Device device) {
         PresentationSnapshot snapshot;
         snapshot.domain = domain;
@@ -467,6 +498,7 @@ namespace VSL_NAMESPACE::lifetime {
                 snapshot.records.push_back(record);
         return snapshot;
     }
+
     void finish_presentations(PresentationSnapshot& snapshot, vk::Result idle_result) {
         if (snapshot.domain->recovering)
             return;
@@ -495,6 +527,7 @@ namespace VSL_NAMESPACE::lifetime {
         }
         retire_presentations(snapshot);
     }
+
     void observe_presentations(PresentationSnapshot& snapshot, vk::Result idle_result, bool wait) noexcept {
         if (idle_result == vk::Result::eErrorDeviceLost) {
             for (const auto& evidence : snapshot.acquisitions)
@@ -517,6 +550,7 @@ namespace VSL_NAMESPACE::lifetime {
                 record->state.status = sync::PresentStatus::LEGACY_RELEASED;
         }
     }
+
     void bookkeep_presentations(PresentationSnapshot& snapshot) noexcept {
         for (const auto& record : snapshot.records)
             if (sync::present_terminal(record->state) && !present_native_active(*record)) {
@@ -533,12 +567,14 @@ namespace VSL_NAMESPACE::lifetime {
                    std::ranges::find(snapshot.acquisitions, evidence) != snapshot.acquisitions.end();
         });
     }
+
     void release_presentations(PresentationSnapshot& snapshot) noexcept {
         for (const auto& record : snapshot.records)
             if (record->released && record->generation) {
                 const auto owners = detach_present_owners(*record);
             }
     }
+
     SurfacePresentationDomain::~SurfacePresentationDomain() {
         closing = true;
         const auto tickets = quarantine_acquisitions(*this);

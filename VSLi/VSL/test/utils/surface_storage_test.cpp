@@ -17,17 +17,22 @@ namespace {
     namespace l = vsl::lifetime;
     namespace o = vsl::operation;
     namespace s = vsl::storage;
+
     struct SurfaceSlot {
         alignas(l::SurfaceSlotStorage) std::byte memory[sizeof(l::SurfaceSlotStorage)];
         bool constructed = false;
         ~SurfaceSlot();
         void construct(vsl::impl::VulkanImplAccessor& instance, vsl::impl::OSWindowImpl& window, const o::SurfaceNativeCalls& calls = {});
+
         vsl::impl::SurfaceImpl& value() { return l::surface_at(memory); }
     };
+
     struct ScopedSurfaceWindow {
         vsl::PureWindow window{"surface peer", 64, 48};
+
         ~ScopedSurfaceWindow() { window.close(); }
     };
+
     struct SurfacePair {
         l::DependencyNode node;
         l::OwnerRef instance;
@@ -38,9 +43,12 @@ namespace {
         SurfacePair(vsl::VulkanAccessor instance, std::array<l::OSWindowOwner, 2> windows, const o::SurfaceNativeCalls& calls = {});
         ~SurfacePair();
         void clear() noexcept;
+
         void* slot(size_t index) { return memory + index * sizeof(l::SurfaceSlotStorage); }
+
         static void VisitDependencies(const void* owner, l::DependencyNode::EdgeVisitor visitor, void* context);
     };
+
     struct SurfaceProbe {
         unsigned creates = 0, destroys = 0;
         unsigned fail_on = 1;
@@ -48,19 +56,23 @@ namespace {
         static VkResult Create(void* context, VkInstance instance, void* window, VkSurfaceKHR* surface);
         static void Destroy(void* context, VkInstance instance, VkSurfaceKHR surface) noexcept;
     };
+
     class SurfaceStorageVulkanIntegrationTest : public vsl_test::WindowIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     SurfaceSlot::~SurfaceSlot() {
         if (constructed)
             l::destroy_surface(memory);
     }
+
     void SurfaceSlot::construct(vsl::impl::VulkanImplAccessor& instance, vsl::impl::OSWindowImpl& window, const o::SurfaceNativeCalls& calls) {
         if (constructed)
             throw std::logic_error("Test surface slot is already constructed");
         l::construct_surface(memory, instance, window, calls);
         constructed = true;
     }
+
     SurfacePair::SurfacePair(vsl::VulkanAccessor source, std::array<l::OSWindowOwner, 2> windows, const o::SurfaceNativeCalls& calls)
         : instance(source.owner_ref()), windows(std::move(windows)), calls(calls) {
         try {
@@ -75,10 +87,12 @@ namespace {
             throw;
         }
     }
+
     SurfacePair::~SurfacePair() {
         node.retire();
         clear();
     }
+
     void SurfacePair::clear() noexcept {
         while (constructed) {
             auto* memory = slot(--constructed);
@@ -86,6 +100,7 @@ namespace {
             l::destroy_surface(memory);
         }
     }
+
     void SurfacePair::VisitDependencies(const void* owner, l::DependencyNode::EdgeVisitor visitor, void* context) {
         const auto& root = *static_cast<const SurfacePair*>(owner);
         visitor(context, root.instance);
@@ -94,6 +109,7 @@ namespace {
             visitor(context, parent);
         }
     }
+
     VkResult SurfaceProbe::Create(void* context, VkInstance instance, void* window, VkSurfaceKHR* surface) {
         auto& probe = *static_cast<SurfaceProbe*>(context);
         ++probe.creates;
@@ -103,10 +119,12 @@ namespace {
         }
         return glfwCreateWindowSurface(instance, static_cast<GLFWwindow*>(window), nullptr, surface);
     }
+
     void SurfaceProbe::Destroy(void* context, VkInstance instance, VkSurfaceKHR surface) noexcept {
         ++static_cast<SurfaceProbe*>(context)->destroys;
         vkDestroySurfaceKHR(instance, surface, nullptr);
     }
+
     TEST(SurfaceStorageTest, ExactLayoutIncludesBothWeakParentContextsAndDisallowsMovingImpls) {
         static_assert(sizeof(vsl::impl::SurfaceImpl) == s::ImplLayout<vsl::impl::SurfaceImpl>::SIZE);
         static_assert(sizeof(l::SurfaceSlotStorage) == s::ResourceSlotLayout<vsl::impl::SurfaceImpl>::SIZE);
@@ -115,6 +133,7 @@ namespace {
         static_assert(!std::is_copy_constructible_v<vsl::impl::SurfaceImpl> && !std::is_move_constructible_v<vsl::impl::SurfaceImpl>);
         EXPECT_GT(sizeof(l::SurfaceSlotStorage), sizeof(vsl::impl::SurfaceImpl));
     }
+
     TEST_F(SurfaceStorageVulkanIntegrationTest, SameTypeSlotsUseDirectOffsetsAndOneOwnerWithOriginalParents) {
         ScopedSurfaceWindow peer;
         auto owner = std::make_shared<SurfacePair>(vsl::lifetime::detail::StartupAccess::FromShared(instance), std::array{window->window_owner(), peer.window.window_owner()});
@@ -140,6 +159,7 @@ namespace {
         StartupAccess::Owned(b).reset();
         EXPECT_TRUE(root.expired());
     }
+
     TEST_F(SurfaceStorageVulkanIntegrationTest, FailedNativeOutputIsNotAdoptedAndTheSameSlotCanBeRetried) {
         const auto os = window->window_owner();
         SurfaceSlot slot;
@@ -157,6 +177,7 @@ namespace {
         o::destroy_surface(slot.value(), calls);
         EXPECT_EQ(probe.destroys, 1u);
     }
+
     TEST_F(SurfaceStorageVulkanIntegrationTest, GettersKeepTheOriginalParentsWithoutKeepingTheChildAlive) {
         make_surface();
         const auto child = std::weak_ptr<void>(StartupAccess::Shared(*(surface)));
@@ -180,6 +201,7 @@ namespace {
         EXPECT_GT(height, 0);
         EXPECT_TRUE(original.owner_ref().managed());
     }
+
     TEST_F(SurfaceStorageVulkanIntegrationTest, LaterConstructionFailureDestroysOnlySuccessfullyCreatedNativeSurfaces) {
         ScopedSurfaceWindow peer;
         SurfaceProbe probe;
@@ -191,6 +213,7 @@ namespace {
         make_surface();
         EXPECT_TRUE(StartupAccess::Owned(*(surface))->surface);
     }
+
     TEST_F(SurfaceStorageVulkanIntegrationTest, DeviceCreationDoesNotPermanentlyRetainTheSurfaceOrItsWindow) {
         make_surface();
         vsl::LogicalDevice logical(physical, surface);
@@ -202,6 +225,7 @@ namespace {
         EXPECT_TRUE(os.expired());
         EXPECT_TRUE(StartupAccess::Owned(logical)->device.getQueue(StartupAccess::Owned(logical)->graphics_family, 0));
     }
+
     TEST_F(SurfaceStorageVulkanIntegrationTest, CanonicalSurfaceRejectsMissingOrForeignNodesAndPreservesItsParents) {
         make_surface();
         const auto missing_node = vsl_test::unchecked_startup(StartupAccess::Shared(*surface));
@@ -219,6 +243,7 @@ namespace {
         const auto actual_window = surface->get_window_owner(), expected_window = window->window_owner();
         EXPECT_EQ(actual_window.native_handle(), expected_window.native_handle());
     }
+
     TEST_F(SurfaceStorageVulkanIntegrationTest, WeakSurfaceObservesStorageAfterLogicalCloseAndRejectsRetiredOperations) {
         vsl::WeakSurface weak;
         EXPECT_TRUE(weak.expired());
@@ -246,6 +271,7 @@ namespace {
         EXPECT_TRUE(weak.expired());
         EXPECT_FALSE(weak.lock());
     }
+
     TEST_F(SurfaceStorageVulkanIntegrationTest, SurfaceAndSavedSwapchainKeepTheNativeWindowAfterLogicalClose) {
         make_surface();
         auto saved = vsl::Swapchain(device, surface);

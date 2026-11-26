@@ -6,6 +6,7 @@ namespace VSL_NAMESPACE::lifetime {
     struct PipelineSlotStorage {
         alignas(impl::PipelineImpl) std::byte value[sizeof(impl::PipelineImpl)];
     };
+
     // Layoutは呼出側rootが永続保持し、生成入力のState/Shader/Passは呼出中だけ借用する。
     void construct_pipeline(void* storage, LogicalDeviceAccessor device, const operation::GraphicsPipelineInput& input);
     void construct_pipeline(void* storage, impl::LogicalDeviceImpl& device, const operation::GraphicsPipelineInput& input);

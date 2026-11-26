@@ -71,10 +71,12 @@ namespace VSL_NAMESPACE {
         TIMELINE_SEMAPHORE = 1ull << 55,
         SWAPCHAIN_MAINTENANCE1 = 1ull << 56
     };
+
     struct DeviceQueueRequest {
         std::uint32_t family = 0;
         std::vector<float> priorities{1.0f};
     };
+
     struct DeviceCreateInfo {
         // 空ならgraphics roleを選択し、必要なroleのqueue0を作る。
         std::vector<DeviceQueueRequest> queues;
@@ -83,9 +85,11 @@ namespace VSL_NAMESPACE {
         DeviceFeature features = DeviceFeature::NONE;
         bool require_compute = true;
     };
+
     constexpr DeviceFeature operator|(DeviceFeature a, DeviceFeature b) noexcept {
         return static_cast<DeviceFeature>(static_cast<std::uint64_t>(a) | static_cast<std::uint64_t>(b));
     }
+
     constexpr bool has_device_features(DeviceFeature features, DeviceFeature required) noexcept {
         return (static_cast<std::uint64_t>(features) & static_cast<std::uint64_t>(required)) == static_cast<std::uint64_t>(required);
     }

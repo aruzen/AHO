@@ -47,6 +47,7 @@ namespace {
         EXPECT_NE(plan.placement({1}).offset, plan.placement({4}).offset);
         EXPECT_EQ(plan.lifetime(), (t::LifetimeGroup{t::LifetimeScope::SHARED, 0}));
     }
+
     TEST(ResourcePlanTest, RuntimeCountsAreBoundedAndThePlanOwnsItsMetadata) {
         auto requests = REQUESTS;
         const t::ResourcePlan<8> plan(std::span(requests).first(3), {t::LifetimeScope::FRAME, 9});
@@ -59,6 +60,7 @@ namespace {
         EXPECT_THROW(plan.placement({999}), std::out_of_range);
         EXPECT_THROW((t::ResourcePlan<2>(REQUESTS)), std::length_error);
     }
+
     TEST(ResourcePlanTest, DescriptorSlotsUseExactImplSizesWithoutTrailingUseStates) {
         constexpr std::array<t::ResourceRequest, 7> requests{{{{1}, DESCRIPTOR_SET}, {{2}, BUFFER}, {{3}, DESCRIPTOR_LAYOUT}, {{4}, IMAGE}, {{5}, DESCRIPTOR_POOL}, {{6}, DESCRIPTOR_SET}, {{7}, SAMPLER}}};
         constexpr t::ResourcePlan<7> plan(requests);
@@ -81,6 +83,7 @@ namespace {
         EXPECT_EQ(s::resource_slot_layout(DESCRIPTOR_POOL).size, s::DESCRIPTOR_POOL_IMPL_SIZE);
         EXPECT_EQ(s::resource_slot_layout(DESCRIPTOR_SET).size, s::DESCRIPTOR_SET_IMPL_SIZE);
     }
+
     TEST(LogicalUseStateTest, IndependentOwnersMoveSafelyAndExportOwningValuesOnly) {
         namespace l = vsl::lifetime;
         static_assert(!std::constructible_from<l::LogicalUseState, std::shared_ptr<void>>);
@@ -108,6 +111,7 @@ namespace {
         EXPECT_TRUE(observed.expired());
         EXPECT_FALSE(l::LogicalUseState{}.resource_use().state->busy());
     }
+
     TEST(ResourcePlanTest, ExternalEntriesHaveNoSlotOrOffsetAndNeedNoCpuRegion) {
         const std::array<t::ResourceRequest, 2> requests{{{{1}, IMAGE, true}, {{2}, SAMPLER, true}}};
         const t::ResourcePlan<2> plan(requests, {t::LifetimeScope::TRANSIENT, 7});
@@ -122,6 +126,7 @@ namespace {
         EXPECT_NO_THROW(plan.require_region(0, 1));
         EXPECT_EQ(PLAN.placement({20}).slot, 1u);
     }
+
     TEST(ResourcePlanTest, DuplicateIdsUnknownKindsAndInvalidLifetimeGroupsAreRejected) {
         auto requests = REQUESTS;
         requests[1].resource = requests[0].resource;
@@ -133,6 +138,7 @@ namespace {
         EXPECT_THROW((t::ResourcePlan<8>(REQUESTS, {static_cast<t::LifetimeScope>(99), 0})), std::invalid_argument);
         EXPECT_THROW(PLAN.placement({404}), std::out_of_range);
     }
+
     TEST(ResourcePlanTest, CapacityAlignmentAndArithmeticOverflowAreChecked) {
         EXPECT_NO_THROW(PLAN.require_region(PLAN.bytes(), PLAN.alignment()));
         EXPECT_THROW(PLAN.require_region(PLAN.bytes() - 1, PLAN.alignment()), std::invalid_argument);

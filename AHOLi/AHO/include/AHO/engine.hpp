@@ -28,6 +28,7 @@ namespace AHO_NAMESPACE::engine {
         struct EngineAccess;
     }
     struct EngineData;
+
     struct EngineConfig {
         std::string application_name = "AHO";
         std::vector<std::string> instance_extensions;
@@ -65,12 +66,15 @@ namespace AHO_NAMESPACE::engine {
 
         EngineAccessor(const EngineAccessor&) = default;
         EngineAccessor(EngineAccessor&&) noexcept = default;
+
         EngineAccessor& operator=(EngineAccessor value) noexcept {
             swap(value);
             return *this;
         }
+
         void swap(EngineAccessor& other) noexcept { _data.swap(other._data); }
         explicit operator bool() const noexcept { return bool(_data); }
+
         bool operator==(const EngineAccessor&) const = default;
         static EngineAccessor Create(EngineCreateInfo info);
         VSL_NAMESPACE::LogicalDeviceAccessor device() const;

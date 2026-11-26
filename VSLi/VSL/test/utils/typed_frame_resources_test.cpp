@@ -12,12 +12,15 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     namespace t = vsl::typed;
+
     struct FrameValue {
         size_t index;
         int value = 0;
     };
+
     class TypedFrameVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
@@ -135,6 +138,7 @@ namespace {
         struct Owners {
             std::shared_ptr<int> owner;
         };
+
         auto manager = make_manager().independent(1);
         std::weak_ptr<int> owner;
         {
@@ -162,6 +166,7 @@ namespace {
 
     using FrameSet = t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>,
                                       t::StorageBinding<1, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
+
     struct ComputeResources {
         t::TypedUniformBuffer<std::uint32_t> uniform;
         t::TypedStorageBuffer<std::uint32_t> output;
@@ -169,6 +174,7 @@ namespace {
         std::uint32_t expected = 0;
         ComputeResources(vsl::LogicalDeviceAccessor device, vsl::graphic_resource::ManagerInterface& manager);
     };
+
     ComputeResources::ComputeResources(vsl::LogicalDeviceAccessor device, vsl::graphic_resource::ManagerInterface& manager)
         : uniform(device, std::uint32_t{0}), output(device, std::uint32_t{0}), set(device, manager) {
         set.write<0>(uniform);

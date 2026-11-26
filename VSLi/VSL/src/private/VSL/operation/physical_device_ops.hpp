@@ -10,6 +10,7 @@ namespace VSL_NAMESPACE::operation {
         vk::PhysicalDeviceProperties properties;
         vk::PhysicalDeviceFeatures features;
     };
+
     std::vector<vk::PhysicalDevice> enumerate_physical_devices(impl::VulkanImplAccessor& instance);
     PhysicalDeviceCandidate inspect_physical_device(impl::VulkanImplAccessor& instance, vk::PhysicalDevice device);
     PhysicalDeviceCandidate select_physical_device(impl::VulkanImplAccessor& instance);

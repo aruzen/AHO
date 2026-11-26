@@ -14,10 +14,12 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     class BindPipelineVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     TEST_F(BindPipelineVulkanIntegrationTest, RetainsAndBindsGraphicsPipeline) {
         vsl::command::BindPipeline binding(*pipeline);
         EXPECT_EQ(GraphicsAccess::Owned(binding.pipeline), GraphicsAccess::Owned(*(pipeline)));
@@ -32,7 +34,9 @@ namespace {
     class BindComputePipelineVulkanIntegrationTest : public vsl_test::ComputeVulkanIntegrationTest {
         VkDebugUtilsMessengerEXT _abort_messenger = VK_NULL_HANDLE;
         std::atomic<unsigned> _aborted_errors{0};
+
         bool validate_vulkan() const override { return true; }
+
         static VKAPI_ATTR VkBool32 VKAPI_CALL AbortInvalidCall(
             VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT,
             const VkDebugUtilsMessengerCallbackDataEXT*, void* user);
@@ -43,18 +47,23 @@ namespace {
         void check_pipeline_holder(bool shared_command);
         void check_bind(bool erase_type);
     };
+
     TEST_F(BindComputePipelineVulkanIntegrationTest, TypedComputePipelineBindsAtTheComputeBindPoint) {
         check_bind(false);
     }
+
     TEST_F(BindComputePipelineVulkanIntegrationTest, ErasedAccessorKeepsTheComputeBindPoint) {
         check_bind(true);
     }
+
     TEST_F(BindComputePipelineVulkanIntegrationTest, ValueCommandExposesThePipelineForImplicitDescriptorBinding) {
         check_pipeline_holder(false);
     }
+
     TEST_F(BindComputePipelineVulkanIntegrationTest, SharedCommandExposesThePipelineForImplicitDescriptorBinding) {
         check_pipeline_holder(true);
     }
+
     TEST_F(BindPipelineVulkanIntegrationTest, ErasedAccessorKeepsTheGraphicsBindPoint) {
         vsl::PipelineAccessor accessor = *pipeline;
         vsl::command::BindPipeline binding(accessor);

@@ -7,13 +7,16 @@
 
 namespace VSL_NAMESPACE {
     using lifetime::detail::StartupAccess;
+
     VulkanAccessor VulkanAccessor::Create(InstanceCreateInfo info) {
         return StartupAccess::FromShared(lifetime::make_heap_instance(std::move(info)));
     }
+
     lifetime::OwnerRef VulkanAccessor::owner_ref() const {
         StartupAccess::RequireCanonical(_owner);
         return _owner;
     }
+
     template<bool validation>
     bool Vulkan<validation>::check_validation_layer_support() {
         std::vector<std::string> layers;
@@ -25,6 +28,7 @@ namespace VSL_NAMESPACE {
         }
         return operation::instance_layers_supported(layers);
     }
+
     template<bool validation>
     Vulkan<validation>::Vulkan(const char* app_name, const std::vector<const char*>& require_extensions) {
         if (!app_name)
@@ -40,6 +44,7 @@ namespace VSL_NAMESPACE {
         }
         _value = StartupAccess::FromShared(lifetime::make_heap_instance(lifetime::glfw_instance_info(std::move(info))));
     }
+
     template<bool validation>
     Vulkan<validation>::Vulkan(VulkanAccessor instance) {
         StartupAccess::RequireCanonical(StartupAccess::Owned(instance));
@@ -47,6 +52,7 @@ namespace VSL_NAMESPACE {
             throw std::invalid_argument("Vulkan facade requires a live canonical Instance");
         _value = std::move(instance);
     }
+
     template<bool validation>
     Vulkan<validation>::~Vulkan() = default;
 

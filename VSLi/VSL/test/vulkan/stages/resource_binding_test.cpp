@@ -7,6 +7,7 @@ namespace {
 
 namespace {
     using ResourceBindingVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
     TEST_F(ResourceBindingVulkanIntegrationTest, InjectsLayoutsInDescriptorSetOrder) {
         vsl::graphic_resource::BindingLayout first(
             device, {{0, vsl::graphic_resource::Type::UNIFORM_BUFFER, vsl::ShaderFlag::VERTEX, 1}});

@@ -5,6 +5,7 @@ namespace AHO_NAMESPACE::command {
     BufferUpload::BufferUpload(resource::BufferBinding destination, resource::Buffer<resource::BufferType::GENERAL> source, std::size_t offset)
         : _destination(std::move(destination)), _source(std::move(source)), _destination_offset(offset), _source_offset(0) {
     }
+
     BufferUpload::BufferUpload(resource::BufferBinding destination, resource::BufferBinding source, std::size_t destination_offset,
                                std::size_t source_offset, std::optional<std::size_t> bytes)
         : _destination(std::move(destination)), _source(std::move(source)), _destination_offset(destination_offset), _source_offset(source_offset), _bytes(bytes) {

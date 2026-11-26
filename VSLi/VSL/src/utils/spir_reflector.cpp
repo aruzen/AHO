@@ -21,6 +21,7 @@ namespace {
 
 namespace {
     using ReflectedBlock = VSL_NAMESPACE::utils::SPIRVReflector;
+
     struct ReflectionCompiler : spirv_cross::Compiler {
         using Compiler::Compiler;
         using Compiler::evaluate_constant_u32;
@@ -441,6 +442,7 @@ void VSL_NAMESPACE::utils::SPIRVReflector::init(std::vector<std::uint32_t> words
 }
 
 catch (const spirv_cross::CompilerError& error) {
+
     throw exceptions::RuntimeException("SPIRVReflector", error.what());
 }
 

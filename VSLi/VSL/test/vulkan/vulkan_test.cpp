@@ -4,8 +4,10 @@
 namespace {
     using VSL_NAMESPACE::lifetime::detail::StartupAccess;
 }
+
 namespace {
     using VulkanInstanceVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
     TEST_F(VulkanInstanceVulkanIntegrationTest, AccessorSharesInstanceAndEnumeratesPhysicalDevices) {
         auto first = StartupAccess::FromShared(instance);
         auto second = first;
@@ -21,6 +23,7 @@ namespace {
 #endif
 namespace {
     using VulkanConstructorWindowIntegrationTest = vsl_test::WindowIntegrationTest;
+
     TEST_F(VulkanConstructorWindowIntegrationTest, ReleaseFacadeUsesTheSameRuntimeWithoutClosingHostDescriptors) {
         std::vector<const char*> required;
         for (const auto& extension : vk::enumerateInstanceExtensionProperties())
@@ -44,6 +47,7 @@ namespace {
             EXPECT_EQ(fcntl(descriptor, F_GETFD), flags[descriptor]);
 #endif
     }
+
     TEST_F(VulkanConstructorWindowIntegrationTest, ValidationEnabledConstructorCreatesADebugMessengerWithDefaultAllocator) {
         const auto extensions = vk::enumerateInstanceExtensionProperties();
         const auto has_extension = [&](const char* name) {

@@ -13,11 +13,14 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     using CommandVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
     class CommandRangeVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     TEST(CommandFacadeTest, EmptyValuesHaveNoIdentityAndRejectResourceOperations) {
         vsl::CommandPool pool;
         vsl::CommandBuffer buffer;
@@ -40,6 +43,7 @@ namespace {
         EXPECT_THROW(manager.get_current_buffer_idx(), std::invalid_argument);
         EXPECT_THROW(manager.make_exclusive_buffer(), std::invalid_argument);
     }
+
     TEST_F(CommandRangeVulkanIntegrationTest, ManagerIdentityIsSeparateFromTheSharedRingAndPool) {
         auto pool = make_pool();
         vsl::CommandBuffer buffer(pool, 1);
@@ -58,6 +62,7 @@ namespace {
         EXPECT_THROW(manager.get_pool(), std::invalid_argument);
         EXPECT_THROW(manager.get_current_buffer_idx(), std::invalid_argument);
     }
+
     TEST_F(CommandRangeVulkanIntegrationTest, OutOfRangeResetIsRejectedAndValidBuffersRemainUsable) {
         auto pool = make_pool();
         vsl::CommandBuffer buffers(pool, 2);
@@ -70,6 +75,7 @@ namespace {
         EXPECT_NO_THROW(buffers.reset(1));
         EXPECT_NO_THROW(buffers.reset());
     }
+
     TEST_F(CommandRangeVulkanIntegrationTest, ExclusiveBufferCountCannotBeTruncatedToOne) {
         if constexpr (sizeof(std::size_t) <= sizeof(std::uint32_t)) {
             GTEST_SKIP() << "size_t has no values above uint32_t";
@@ -82,11 +88,14 @@ namespace {
             EXPECT_NO_THROW(valid.reset(0));
         }
     }
+
     TEST_F(CommandVulkanIntegrationTest, DefaultBufferCountAgreesAcrossTheCallerAndLibrary) {
         struct RestoreCount {
             std::uint32_t previous = vsl::DEFAULT_BUFFER_SIZE;
+
             ~RestoreCount() { vsl::DEFAULT_BUFFER_SIZE = previous; }
         } restore;
+
         auto pool = make_pool();
         for (const auto count : {1u, 2u}) {
             vsl::DEFAULT_BUFFER_SIZE = count;
@@ -98,6 +107,7 @@ namespace {
             EXPECT_EQ(explicit_count.get_size(), 4u);
         }
     }
+
     TEST_F(CommandVulkanIntegrationTest, PoolAndBuffersShareExpectedOwnerAndCanReset) {
         auto pool = make_pool();
         vsl::CommandPool borrowed(CommandAccess::Pool(CommandAccess::Data(pool)));
@@ -112,6 +122,7 @@ namespace {
         buffers.reset();
         EXPECT_EQ(shared.get_current_buffer_idx(), 0u);
     }
+
     TEST_F(CommandVulkanIntegrationTest, NextCyclesThroughEveryBufferAndSharedViewsObserveTheSameIndex) {
         auto pool = make_pool();
         vsl::CommandBuffer buffers(pool, 3);
@@ -123,6 +134,7 @@ namespace {
             EXPECT_EQ(buffers.get_size(), 3u);
         }
     }
+
     TEST_F(CommandVulkanIntegrationTest, NextOnASingleBufferAndManagerViewsPreservesOwnership) {
         auto manager = make_manager();
         auto single = manager.make_exclusive_buffer();
@@ -134,6 +146,7 @@ namespace {
         EXPECT_EQ(manager.get_current_buffer_idx(), 1u);
         EXPECT_EQ(CommandAccess::Data(manager.get_buffer()), CommandAccess::Data(current));
     }
+
     TEST_F(CommandVulkanIntegrationTest, ManagerAccessorsAndExclusiveBuffersPreserveOwnership) {
         auto manager = make_manager();
         vsl::CommandManager shared(CommandAccess::RawManager(CommandAccess::Data(manager)));
@@ -147,12 +160,15 @@ namespace {
         EXPECT_EQ(CommandAccess::Data(exclusive)->command_pool, CommandAccess::Data(manager.get_pool()).get());
         EXPECT_NE(CommandAccess::Data(exclusive)->command_buffers[0], CommandAccess::Data(manager.get_buffer())->command_buffers[0]);
     }
+
     struct CommandShape {
         void invoke(vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager);
     };
+
     struct DelegateShape {
         void invoke(vsl::DefaultPhaseStream&, vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager);
     };
+
     static_assert(vsl::command::is_command<CommandShape>);
     static_assert(!vsl::command::is_command<DelegateShape>);
     static_assert(vsl::command::is_delegate_command<DelegateShape>);
@@ -162,22 +178,29 @@ namespace {
 namespace {
     struct DestructionProbe : vsl::command::Command, vsl::command::DelegateCommand, vsl::command::PipelineHolder, vsl::command::PipelineRequire, vsl::command::VertexSizeHolder, vsl::command::VertexSizeRequire {
         int& destroyed;
+
         explicit DestructionProbe(int& destroyed) : destroyed(destroyed) {}
         ~DestructionProbe() { ++destroyed; }
         void invoke(vsl::CommandPool, vsl::CommandBuffer, vsl::CommandManager) override {}
+
         void invoke(vsl::DefaultPhaseStream&, vsl::CommandPool, vsl::CommandBuffer,
                     vsl::CommandManager) override {}
+
         vsl::PipelineAccessor get_pipeline() override { return {}; }
+
         void set_pipeline(std::optional<vsl::PipelineAccessor>) override {}
         std::size_t get_vertex_size() override { return 0; }
         void set_vertex_size(std::optional<std::size_t>) override {}
     };
+
     template<class T>
     class CommandInterfaceLifetimeTest : public testing::Test {};
+
     using CommandInterfaces = testing::Types<vsl::command::Command, vsl::command::DelegateCommand,
                                              vsl::command::PipelineHolder, vsl::command::PipelineRequire,
                                              vsl::command::VertexSizeHolder, vsl::command::VertexSizeRequire>;
     TYPED_TEST_SUITE(CommandInterfaceLifetimeTest, CommandInterfaces);
+
     TYPED_TEST(CommandInterfaceLifetimeTest, UniqueOwnershipThroughTheBaseDestroysTheCompleteCommandOnce) {
         static_assert(std::has_virtual_destructor_v<TypeParam>);
         static_assert(std::is_copy_constructible_v<DestructionProbe>);
@@ -193,6 +216,7 @@ namespace {
 
 namespace {
     using CommandResourceVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
     TEST_F(CommandResourceVulkanIntegrationTest, VertexBindingAddsAnOwnerToTheRecordingSubmission) {
         auto manager = make_manager();
         vsl::StagingBuffer<vsl::MemoryType::VERTEX_BUFFER> vertex(device, 32);
@@ -202,6 +226,7 @@ namespace {
         EXPECT_GT(BufferAccess::Owned(vertex).use_count(), owners);
         phase.cancel();
     }
+
     TEST_F(CommandResourceVulkanIntegrationTest, IndexBindingAddsAnOwnerToTheRecordingSubmission) {
         auto manager = make_manager();
         vsl::StagingBuffer<vsl::MemoryType::INDEX_BUFFER> indices(device, 12);
@@ -227,10 +252,13 @@ namespace {
         expect_validation_abort("");
         auto pool = make_pool();
         EXPECT_THROW((vsl::CommandBuffer(pool, 0)), std::invalid_argument);
+
         struct RestoreCount {
             std::uint32_t previous = vsl::DEFAULT_BUFFER_SIZE;
+
             ~RestoreCount() { vsl::DEFAULT_BUFFER_SIZE = previous; }
         } restore;
+
         vsl::DEFAULT_BUFFER_SIZE = 0;
         EXPECT_THROW((vsl::CommandBuffer(pool)), std::invalid_argument);
     }
@@ -266,6 +294,7 @@ namespace {
         EXPECT_TRUE(weak.expired());
         EXPECT_TRUE(cancelled.data_->work.expired());
     }
+
     TEST_F(CommandResourceVulkanIntegrationTest, CustomCommandsCanRetainOwnersUntilFrameSlotReuse) {
         auto manager = make_manager();
         std::weak_ptr<int> weak;

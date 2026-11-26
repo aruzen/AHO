@@ -14,8 +14,10 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     using PushConstantVulkanIntegrationTest = vsl_test::ComputeVulkanIntegrationTest;
+
     TEST_F(PushConstantVulkanIntegrationTest, TypedAndExplicitSizeOverloadsReachShader) {
         std::uint32_t base = 37;
         vsl::command::PushConstant command(*layout, vsl::ShaderFlag::COMPUTE, base);

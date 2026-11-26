@@ -13,6 +13,7 @@ namespace VSL_NAMESPACE::lifetime {
         bool single_resource = false;
         void normalize(std::vector<OwnerRef>& owners) const;
     };
+
     void visit_descriptor_edges(const impl::GraphicResourceImpl& resource, DependencyNode::EdgeVisitor visitor, void* context);
     void freeze_descriptor_dependencies(DescriptorOwnerContext& context, std::span<impl::GraphicResourceImpl* const> resources);
     void replace_descriptor_constraints(impl::GraphicResourceImpl& resource, size_t binding, std::span<const ResourceUse> uses);

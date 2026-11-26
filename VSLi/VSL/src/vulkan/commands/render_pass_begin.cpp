@@ -16,18 +16,22 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace VSL_NAMESPACE::command {
     namespace {
         struct FrameBufferRecording {
             impl::CommandBufferImpl& buffer;
             explicit FrameBufferRecording(impl::CommandBufferImpl& buffer);
+
             ~FrameBufferRecording() { buffer.recording_context->frame_buffer_recording = false; }
         };
+
         FrameBufferRecording::FrameBufferRecording(impl::CommandBufferImpl& buffer) : buffer(buffer) {
             if (buffer.recording_context->frame_buffer_recording)
                 throw std::logic_error("Framebuffer recording cannot reenter the same command buffer");
             buffer.recording_context->frame_buffer_recording = true;
         }
+
         std::vector<ClearValue> legacy_clears(FrameBufferAccessor target,
                                               std::optional<VSLDRGBColorAccessor<float>> color) {
             if (!color)
@@ -40,6 +44,7 @@ namespace VSL_NAMESPACE::command {
             return values;
         }
     } // namespace
+
     RenderPassBegin::RenderPassBegin(FrameBufferAccessor target, std::vector<ClearValue> clears,
                                      RenderArea render_area, std::uint32_t index, ResourceRetention retention)
         : frame_buffer(std::move(target)), clear_values(std::move(clears)), area(render_area), target_index(index), retention(retention) {
@@ -54,6 +59,7 @@ namespace VSL_NAMESPACE::command {
         const auto checked = operation::frame_buffer_area(*GraphicsAccess::Owned(frame_buffer), {{area.x, area.y}, {area.width, area.height}});
         area = {checked.offset.x, checked.offset.y, checked.extent.width, checked.extent.height};
     }
+
     RenderPassBegin RenderPassBegin::WithClears(FrameBufferAccessor target, std::vector<AttachmentClear> bindings,
                                                 RenderArea area, std::uint32_t index, ResourceRetention retention) {
         const auto pass = target.get_render_pass();
@@ -69,6 +75,7 @@ namespace VSL_NAMESPACE::command {
         }
         return RenderPassBegin(std::move(target), std::move(values), area, index, retention);
     }
+
     RenderPassBegin::RenderPassBegin(RenderPass pass, FrameBufferAccessor target,
                                      std::optional<VSLDRGBColorAccessor<float>> color, ResourceRetention retention)
         : RenderPassBegin(target, legacy_clears(target, color), {}, 0, retention) {
@@ -78,6 +85,7 @@ namespace VSL_NAMESPACE::command {
             clear_color.emplace(*color);
         target_index.reset();
     }
+
     IDPickingRenderPassBegin::IDPickingRenderPassBegin(IDPickingRenderPass pass, FrameBufferAccessor target,
                                                        std::optional<VSLDRGBColorAccessor<float>> color, ResourceRetention retention)
         : RenderPassBegin(target, legacy_clears(target, color), {}, 0, retention) {
@@ -87,6 +95,7 @@ namespace VSL_NAMESPACE::command {
             clear_color.emplace(*color);
         target_index.reset();
     }
+
     void RenderPassBegin::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
         // poll中のcallbackがcommandや元wrapperを破棄しても、このsnapshotだけを使う。
         const auto target = GraphicsAccess::Owned(frame_buffer);
@@ -114,6 +123,7 @@ namespace VSL_NAMESPACE::command {
             throw std::logic_error("Recording buffer changed while tracking framebuffer images");
         operation::record_frame_buffer_begin(native, scratch);
     }
+
     void NextSubpass::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
         if (CommandAccess::Data(buffer)->recording_context->frame_buffer_recording)
             throw std::logic_error("Subpass recording cannot reenter framebuffer tracking");

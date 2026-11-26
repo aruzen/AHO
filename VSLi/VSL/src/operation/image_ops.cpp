@@ -22,6 +22,7 @@ namespace VSL_NAMESPACE::operation {
                     return i;
             throw exceptions::RuntimeException("MemoryTypeNotFound", "No compatible memory type satisfies the requested properties");
         }
+
         void describe_image(impl::ImageImpl& target, impl::LogicalDeviceImpl& device, const ImageCreateInfo& info) {
             if (!device.device || !info.width || !info.height || !info.layers || info.usage == ImageType::NONE ||
                 info.format.type() == data_format::FormatTypes::UNDEFINED)
@@ -38,6 +39,7 @@ namespace VSL_NAMESPACE::operation {
             target.samples = info.samples;
             target.format = static_cast<vk::Format>(info.format.type());
         }
+
         void create_image_view(impl::ImageImpl& target, const ImageViewNativeCalls& calls = {}) {
             // 転送専用imageにはviewが不要で、view作成を許すusageもない。
             if ((static_cast<VkImageUsageFlags>(target.usage) & IMAGE_VIEW_USAGES) == 0)
@@ -88,6 +90,7 @@ namespace VSL_NAMESPACE::operation {
             throw;
         }
     }
+
     void initialize_borrowed_image(impl::ImageImpl& target, impl::LogicalDeviceImpl& device,
                                    const ImageCreateInfo& info, vk::Image image, const ImageViewNativeCalls& calls) {
         try {
@@ -101,6 +104,7 @@ namespace VSL_NAMESPACE::operation {
             throw;
         }
     }
+
     void destroy_image(impl::ImageImpl& target) noexcept {
         if (!target.native_device)
             return;

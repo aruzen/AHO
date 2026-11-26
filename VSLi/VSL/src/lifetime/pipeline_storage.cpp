@@ -10,6 +10,7 @@ namespace {
 
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_nothrow_default_constructible_v<impl::PipelineImpl>);
+
     namespace {
         struct HeapPipelineOwner {
             DependencyNode node;
@@ -21,6 +22,7 @@ namespace VSL_NAMESPACE::lifetime {
             ~HeapPipelineOwner();
             static void VisitDependencies(const void* owner, DependencyNode::EdgeVisitor visitor, void* context);
         };
+
         template<typename Input>
         void construct(void* storage, impl::LogicalDeviceImpl& device, const Input& input);
         template<typename Input>
@@ -34,15 +36,18 @@ namespace VSL_NAMESPACE::lifetime {
             require_device_owner(device);
             construct_pipeline(storage, *StartupAccess::Owned(device), input);
         }
+
         HeapPipelineOwner::~HeapPipelineOwner() {
             node.retire();
             destroy_pipeline(storage);
         }
+
         void HeapPipelineOwner::VisitDependencies(const void* owner, DependencyNode::EdgeVisitor visitor, void* context) {
             const auto& value = *static_cast<const HeapPipelineOwner*>(owner);
             visitor(context, value.layout);
             visitor(context, value.device.owner_ref());
         }
+
         template<typename Input>
         void construct(void* storage, impl::LogicalDeviceImpl& device, const Input& input) {
             if (!device.device)
@@ -57,6 +62,7 @@ namespace VSL_NAMESPACE::lifetime {
                 throw;
             }
         }
+
         template<typename Input>
         std::shared_ptr<impl::PipelineImpl> make_heap(LogicalDeviceAccessor device, OwnerRef layout, const Input& input) {
             auto owner = std::make_shared<HeapPipelineOwner>(device, std::move(layout), input);
@@ -66,30 +72,38 @@ namespace VSL_NAMESPACE::lifetime {
             return {std::move(owner), pipeline};
         }
     } // namespace
+
     void construct_pipeline(void* storage, LogicalDeviceAccessor device, const operation::GraphicsPipelineInput& input) {
         require_device_owner(device);
         construct_pipeline(storage, *StartupAccess::Owned(device), input);
     }
+
     void construct_pipeline(void* storage, impl::LogicalDeviceImpl& device, const operation::GraphicsPipelineInput& input) {
         construct(storage, device, input);
     }
+
     void construct_pipeline(void* storage, LogicalDeviceAccessor device, const operation::ComputePipelineInput& input) {
         require_device_owner(device);
         construct_pipeline(storage, *StartupAccess::Owned(device), input);
     }
+
     void construct_pipeline(void* storage, impl::LogicalDeviceImpl& device, const operation::ComputePipelineInput& input) {
         construct(storage, device, input);
     }
+
     impl::PipelineImpl& pipeline_at(void* storage) {
         return *std::launder(reinterpret_cast<impl::PipelineImpl*>(static_cast<PipelineSlotStorage*>(storage)->value));
     }
+
     void destroy_pipeline(void* storage) noexcept {
         std::destroy_at(&pipeline_at(storage));
         std::destroy_at(static_cast<PipelineSlotStorage*>(storage));
     }
+
     std::shared_ptr<impl::PipelineImpl> make_heap_pipeline(LogicalDeviceAccessor device, OwnerRef layout, const operation::GraphicsPipelineInput& input) {
         return make_heap(device, std::move(layout), input);
     }
+
     std::shared_ptr<impl::PipelineImpl> make_heap_pipeline(LogicalDeviceAccessor device, OwnerRef layout, const operation::ComputePipelineInput& input) {
         return make_heap(device, std::move(layout), input);
     }

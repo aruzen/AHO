@@ -8,22 +8,27 @@ namespace VSL_NAMESPACE::lifetime {
     namespace detail {
         struct StartupArenaOwner;
     }
+
     using InstanceSource = std::variant<typed::ResourceId, VulkanAccessor>;
     using PhysicalDeviceSource = std::variant<typed::ResourceId, PhysicalDevice>;
     using SurfaceSource = std::variant<typed::ResourceId, Surface>;
+
     struct PhysicalDeviceInit {
         InstanceSource instance;
         // 省略時は既存VSLの採点規則で選ぶ。候補配列は生成中だけのscratch。
         std::optional<size_t> index;
     };
+
     struct SurfaceInit {
         InstanceSource instance;
         OSWindowOwner window;
     };
+
     struct DeviceInit {
         PhysicalDeviceSource physical;
         DeviceCreateInfo info;
     };
+
     struct GraphicsDeviceInit {
         PhysicalDeviceSource physical;
         // 直接渡すSurfaceは生成中だけ保持する。永続依存へ追加しない。
@@ -31,8 +36,10 @@ namespace VSL_NAMESPACE::lifetime {
         bool validation = VALIDATION;
         PresentFencePolicy present_fences = PresentFencePolicy::LEGACY;
     };
+
     using StartupInit = std::variant<InstanceCreateInfo, PhysicalDeviceInit, SurfaceInit, DeviceInit, GraphicsDeviceInit,
                                      VulkanAccessor, PhysicalDevice, Surface, LogicalDeviceAccessor>;
+
     class StartupArena {
         std::shared_ptr<detail::StartupArenaOwner> _owner;
         StartupArena(std::span<const storage::StartupPlacement> placements, std::span<const StartupInit> initializers,
@@ -55,6 +62,7 @@ namespace VSL_NAMESPACE::lifetime {
     template<size_t capacity>
     StartupArena::StartupArena(const storage::StartupPlan<capacity>& plan, std::span<const StartupInit> initializers)
         : StartupArena(plan, initializers, storage::ArenaMemory(plan.bytes(), plan.alignment())) {}
+
     template<size_t capacity>
     StartupArena::StartupArena(const storage::StartupPlan<capacity>& plan, std::span<const StartupInit> initializers, storage::ArenaMemory memory)
         : StartupArena((plan.require_region(memory.size(), memory.alignment()), plan.placements()), initializers,

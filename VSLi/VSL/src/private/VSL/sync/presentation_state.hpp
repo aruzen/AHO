@@ -32,6 +32,7 @@ namespace VSL_NAMESPACE::sync {
         DEVICE_LOST,
         UNCERTAIN
     };
+
     // native Fenceの所有者は、破棄／再利用より先にterminalを保存する。
     struct FenceProof {
         vk::Device device;
@@ -41,6 +42,7 @@ namespace VSL_NAMESPACE::sync {
         impl::LogicalDeviceImpl* origin = nullptr;
         bool observing = false;
     };
+
     // ownerは外側のlifetimeが保持する。terminal保存後は再利用済みFenceを観測しない。
     struct PresentState {
         PresentStatus status = PresentStatus::PENDING;
@@ -52,6 +54,7 @@ namespace VSL_NAMESPACE::sync {
         impl::LogicalDeviceImpl* origin = nullptr;
         bool observing = false;
     };
+
     PresentEnqueue classify_present_result(vk::Result result) noexcept;
     bool fence_proof_terminal(const FenceProof& proof) noexcept;
     void save_fence_observation(FenceProof& proof, vk::Result result) noexcept;

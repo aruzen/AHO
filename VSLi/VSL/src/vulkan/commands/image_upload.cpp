@@ -15,6 +15,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace VSL_NAMESPACE::command {
     ImageUpload::ImageUpload(BufferAccessor* source, ImageAccessor image, ImageLayout layout, ImageRegion region, std::size_t offset)
         : copy(image, source, ImageLayout::TRANSFER_DST_OPTIMAL, region, offset), current_layout(layout) {

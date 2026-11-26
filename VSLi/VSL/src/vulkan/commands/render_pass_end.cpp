@@ -8,6 +8,7 @@
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 void VSL_NAMESPACE::command::RenderPassEnd::invoke(CommandPool, CommandBuffer buffer, CommandManager) {
     if (CommandAccess::Data(buffer)->recording_context->frame_buffer_recording)
         throw std::logic_error("Render pass end cannot reenter framebuffer tracking");

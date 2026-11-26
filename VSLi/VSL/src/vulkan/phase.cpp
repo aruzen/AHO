@@ -25,6 +25,7 @@
 #include <exception>
 #include <stdexcept>
 #include <algorithm>
+
 namespace {
     using VSL_NAMESPACE::lifetime::detail::StartupAccess;
 }
@@ -40,20 +41,25 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace VSL_NAMESPACE {
     namespace {
         struct ReturningImage {
             lifetime::CommandRecordingContext& context;
             explicit ReturningImage(lifetime::CommandRecordingContext& context);
+
             ~ReturningImage() { context.returning_image = false; }
         };
+
         struct AbandonedAcquisitionRecovery {
             lifetime::AcquireTicket& ticket;
+
             ~AbandonedAcquisitionRecovery() {
                 if (ticket.state.abandon_requested)
                     lifetime::collect_acquire_scope(ticket, true);
             }
         };
+
         template<typename T>
         std::shared_ptr<T> synchronization_owner(const impl::SubmissionWork& work, impl::SubmissionSource source, T* value);
         size_t retain_synchronization_owner(impl::SubmissionWork& work, const std::shared_ptr<void>& owner);
@@ -64,6 +70,7 @@ namespace VSL_NAMESPACE {
                 return {};
             return {work.completion_resources.at(work.synchronization_owners.at(static_cast<size_t>(source))), value};
         }
+
         size_t retain_synchronization_owner(impl::SubmissionWork& work, const std::shared_ptr<void>& owner) {
             if (!owner.use_count())
                 return impl::SubmissionWork::NO_OWNER;
@@ -73,12 +80,14 @@ namespace VSL_NAMESPACE {
             });
             return static_cast<size_t>(found - work.completion_resources.begin());
         }
+
         ReturningImage::ReturningImage(lifetime::CommandRecordingContext& context) : context(context) {
             if (context.returning_image)
                 throw std::logic_error("Acquired image is already being returned");
             context.returning_image = true;
         }
     } // namespace
+
     ComputePhase::ComputePhase(CommandManager manager,
                                std::optional<SemaphoreHolder> available,
                                std::optional<SemaphoreHolder> finished,
@@ -207,6 +216,7 @@ namespace VSL_NAMESPACE {
             sync::publish_terminal(*work, Completion::Status::FAILED, failure, error_code);
         }
     }
+
     void ComputePhase::begin() {
         lifetime::PhaseCall call(*this);
         const auto domain = lifetime::CommandAccess::Owner(recording_buffer);
@@ -251,6 +261,7 @@ namespace VSL_NAMESPACE {
             throw;
         }
     }
+
     void ComputePhase::setup() {
         lifetime::PhaseCall call(*this);
         const lifetime::SurfaceRetirementCollection retirement(submission ? submission->device : (CommandAccess::Data(manager) ? CommandAccess::Data(manager)->device : nullptr));
@@ -270,6 +281,7 @@ namespace VSL_NAMESPACE {
             throw;
         }
     }
+
     ComputePhase::SubmitResult ComputePhase::submit() {
         lifetime::PhaseCall call(*this);
         const lifetime::SurfaceRetirementCollection retirement(submission ? submission->device : (CommandAccess::Data(manager) ? CommandAccess::Data(manager)->device : nullptr));
@@ -279,6 +291,7 @@ namespace VSL_NAMESPACE {
             submission->abandon_requested = true;
             return SubmitResult::FAILED;
         }
+
         const auto work = submission;
         const auto domain = lifetime::CommandAccess::Owner(recording_buffer);
         const auto buffers = domain->buffer;
@@ -288,6 +301,7 @@ namespace VSL_NAMESPACE {
         const auto signal_slot = signal_index;
         const auto stage = wait_stage;
         std::shared_ptr<impl::SubmissionWork> previous;
+
         const auto fail_local = [&](Completion::Failure failure, std::int32_t error_code = 0) {
             if (work->result->status != Completion::Status::PENDING)
                 return;
@@ -312,6 +326,7 @@ namespace VSL_NAMESPACE {
                 throw std::logic_error("Phase synchronization owners changed after preparation");
             if (buffers->owner_context->unresolved_submissions == std::numeric_limits<size_t>::max())
                 throw std::overflow_error("Command ring uncertainty count overflow");
+
             std::vector<vk::Semaphore> waits, signals;
             if (work->wait_semaphore) {
                 sync::require_graphics_wait(*work->wait_semaphore, slot, work->result,
@@ -326,12 +341,14 @@ namespace VSL_NAMESPACE {
             auto stages = vk::PipelineStageFlags(static_cast<std::uint32_t>(stage));
             if (!stages && !waits.empty())
                 throw std::invalid_argument("Semaphore wait stage cannot be empty");
+
             for (const auto* check : work->validity_checks)
                 sync::ResourceUseAccess::RequireKnown(*check);
             const auto command = buffers->command_buffers.at(slot);
             previous = domain->submissions.at(slot);
             work->wait_index = slot;
             work->signal_index = signal_slot;
+
             vk::SubmitInfo info{
                 .waitSemaphoreCount = static_cast<std::uint32_t>(waits.size()), .pWaitSemaphores = waits.data(), .pWaitDstStageMask = &stages, .commandBufferCount = 1, .pCommandBuffers = &command, .signalSemaphoreCount = static_cast<std::uint32_t>(signals.size()), .pSignalSemaphores = signals.data()};
             vk::Result result;
@@ -344,6 +361,7 @@ namespace VSL_NAMESPACE {
                 result = work->device->lost ? vk::Result::eErrorDeviceLost : operation::queue_submit(work->device->device, manager_data->graphics_queue, info, work->fence);
                 if (work->device->lost)
                     result = vk::Result::eErrorDeviceLost;
+
                 sync::save_submit_result(*work->result, static_cast<std::int32_t>(result));
                 if (result == vk::Result::eSuccess)
                     work->result->status = Completion::Status::SUBMITTED;
@@ -354,6 +372,7 @@ namespace VSL_NAMESPACE {
                                         result == vk::Result::eErrorDeviceLost ? Completion::Failure::DEVICE_LOST : Completion::Failure::SUBMIT_FAILED,
                                         static_cast<std::int32_t>(result));
                 }
+
                 if (work->result->native.enqueue == sync::SubmissionEnqueue::UNKNOWN) {
                     if (work->wait_semaphore)
                         sync::poison_semaphore_element(*work->wait_semaphore, slot);
@@ -361,6 +380,7 @@ namespace VSL_NAMESPACE {
                         sync::poison_semaphore_element(*work->signal_semaphore, signal_slot);
                     lifetime::quarantine_submission(work, buffers);
                 }
+
                 if (result == vk::Result::eSuccess || work->result->native.enqueue == sync::SubmissionEnqueue::UNKNOWN) {
                     domain->submissions.at(slot) = work;
                     domain->context.recording = false;
@@ -374,6 +394,7 @@ namespace VSL_NAMESPACE {
                     state = result == vk::Result::eSuccess ? State::FINISH_SUBMIT : State::ERROR_;
                 transaction.finish();
             }
+
             if (result != vk::Result::eSuccess) {
                 if (acquisition) {
                     lifetime::request_acquire_abandon(*acquisition);
@@ -398,6 +419,7 @@ namespace VSL_NAMESPACE {
         }
         return SubmitResult::SUCCESS;
     }
+
     Completion::Failure ComputePhase::cancel_recording(std::int32_t& error_code) {
         lifetime::PhaseCall call(*this);
         const auto buffer = recording_buffer;
@@ -427,6 +449,7 @@ namespace VSL_NAMESPACE {
             state = State::ERROR_;
         return failure;
     }
+
     void ComputePhase::cancel() {
         if (submission && submission->result->native.active) {
             submission->abandon_requested = true;
@@ -441,6 +464,7 @@ namespace VSL_NAMESPACE {
         if (work)
             sync::publish_terminal(*work, failure == Completion::Failure::NONE ? Completion::Status::CANCELLED : Completion::Status::FAILED, failure, error_code);
     }
+
     void ComputePhase::finish_noexcept() noexcept {
         if (submission && submission->result->native.active) {
             submission->abandon_requested = true;
@@ -456,10 +480,12 @@ namespace VSL_NAMESPACE {
             loggingln("Phase submission failed during destruction");
         }
     }
+
     ComputePhase::~ComputePhase() {
         lifetime::PhaseCall::Invalidate(*this);
         finish_noexcept();
     }
+
     std::uint32_t ComputePhase::get_image_index() {
         return image_index;
     }
@@ -472,6 +498,7 @@ namespace VSL_NAMESPACE {
         if (!postpone)
             setup();
     }
+
     void DefaultPhase::setup() {
         lifetime::PhaseCall call(*this);
         const lifetime::SurfaceRetirementCollection retirement(submission ? submission->device : (CommandAccess::Data(manager) ? CommandAccess::Data(manager)->device : nullptr));
@@ -480,14 +507,17 @@ namespace VSL_NAMESPACE {
         if (_setting_up)
             throw std::logic_error("Phase setup is already in progress");
         _setting_up = true;
+
         struct SetupGuard {
             lifetime::PhaseCall& call;
             bool& active;
+
             ~SetupGuard() {
                 if (call.alive())
                     active = false;
             }
         } guard{call, _setting_up};
+
         std::shared_ptr<lifetime::AcquireTicket> presentation;
         std::shared_ptr<lifetime::CommandDomain> owner_domain;
         try {
@@ -680,14 +710,17 @@ namespace VSL_NAMESPACE {
             throw;
         }
     }
+
     std::uint32_t DefaultPhase::get_current_index() {
         return manager.get_current_buffer_idx();
     }
+
     DefaultPhase::SubmitResult DefaultPhase::submit_commands() {
         if (state == State::ERROR_ && recreate)
             return SubmitResult::WANT_RECREATE_SWAPCHAIN;
         return ComputePhase::submit();
     }
+
     DefaultPhase::SubmitResult DefaultPhase::present() {
         lifetime::PhaseCall call(*this);
         const lifetime::SurfaceRetirementCollection retirement(submission ? submission->device : (CommandAccess::Data(manager) ? CommandAccess::Data(manager)->device : nullptr));
@@ -735,6 +768,7 @@ namespace VSL_NAMESPACE {
         lifetime::collect_acquire_scope(*presentation);
         return result; // callbackがPhaseを破棄しても、以降thisを参照しない。
     }
+
     DefaultPhase::SubmitResult DefaultPhase::submit() {
         lifetime::PhaseCall call(*this);
         if (submission && (submission->result->native.active || (_presentation && _presentation->state.native_call_active))) {
@@ -757,6 +791,7 @@ namespace VSL_NAMESPACE {
         }
         return present();
     }
+
     void DefaultPhase::cancel() {
         lifetime::PhaseCall call(*this);
         if (submission && (submission->result->native.active || (_presentation && _presentation->state.native_call_active))) {
@@ -860,6 +895,7 @@ namespace VSL_NAMESPACE {
         else if (state == State::ERROR_)
             lifetime::request_acquire_abandon(*presentation);
     }
+
     DefaultPhase::~DefaultPhase() {
         lifetime::PhaseCall::Invalidate(*this);
         const auto presentation = _presentation;

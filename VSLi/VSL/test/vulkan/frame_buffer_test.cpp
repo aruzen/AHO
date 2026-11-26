@@ -9,14 +9,17 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::detail::ImageAccess;
 }
+
 namespace {
     using FrameBufferVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
+
     TEST_F(FrameBufferVulkanIntegrationTest, CreatesFramebufferForEveryImageAndRendersToIt) {
         ASSERT_EQ(GraphicsAccess::Owned(*(framebuffer))->swap_chain_framebuffers.size(), 1u);
         EXPECT_TRUE(static_cast<bool>(GraphicsAccess::Owned(*(framebuffer))->swap_chain_framebuffers.front()));
         ExpectTriangleColor(render([](auto& stream) { stream << VSL_NAMESPACE::command::Draw{3}; }));
     }
 } // namespace
+
 namespace {
     TEST_F(FrameBufferVulkanIntegrationTest, CreatesPickingFramebufferWithBothAttachments) {
         VSL_NAMESPACE::IDPickingRenderPass picking(description);
@@ -45,6 +48,7 @@ namespace {
     class AttachmentBindingVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     TEST_F(AttachmentBindingVulkanIntegrationTest, FramebufferBindingsRejectMissingDuplicateAndInvalidIds) {
         ColorImage ids(device, WIDTH, HEIGHT, VSL_NAMESPACE::data_format::UNSIGNED_INT);
         VSL_NAMESPACE::RenderPassDescription description;

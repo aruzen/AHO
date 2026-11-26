@@ -19,6 +19,7 @@ namespace VSL_NAMESPACE::typed {
             std::vector<Index> values;
             std::uint64_t revision = 0;
             bool valid = true;
+
             explicit IndexSnapshot(std::span<const Index> values) : values(values.begin(), values.end()) {}
         };
     } // namespace detail
@@ -44,12 +45,15 @@ namespace VSL_NAMESPACE::typed {
         template<buffer_storage_policy Policy = DefaultStorage>
         TypedIndexBuffer(LogicalDeviceAccessor device, CommandManager manager, std::span<const Index> values, Policy policy = {})
         requires(!contain<property, MemoryProperty::HOST_VISIBLE>());
+
         size_t size() const { return _values->values.size(); }
         LogicalDeviceAccessor device() const { return _buffer.ref().device(); }
         ResourceUse resource_use() const { return _buffer.resource_use(); }
         const BufferView& backend() const& { return _buffer; }
         const BufferView& backend() const&& = delete;
+
         BufferView storage_view() const { return _buffer; }
+
         void copy(std::span<const Index> values)
         requires(contain<property, MemoryProperty::HOST_VISIBLE>());
         std::pair<std::uint32_t, std::uint32_t> bounds(size_t first, size_t count) const;
@@ -60,6 +64,7 @@ namespace VSL_NAMESPACE::typed {
         (void)helper::checked_buffer_array_size<Index>(values.size());
         return std::make_shared<detail::IndexSnapshot<Index>>(values);
     }
+
     template<index_element Index, MemoryProperty property>
     template<buffer_storage_policy Policy>
     TypedIndexBuffer<Index, property>::TypedIndexBuffer(LogicalDeviceAccessor device, std::span<const Index> values, Policy policy)
@@ -67,6 +72,7 @@ namespace VSL_NAMESPACE::typed {
         : _values(MakeSnapshot(values)), _buffer(detail::make_buffer_storage(device, {helper::checked_buffer_array_size<Index>(_values->values.size()), USAGE, property}, policy)) {
         _buffer.write(std::as_bytes(std::span<const Index>(_values->values)));
     }
+
     template<index_element Index, MemoryProperty property>
     template<buffer_storage_policy Policy>
     TypedIndexBuffer<Index, property>::TypedIndexBuffer(LogicalDeviceAccessor device, CommandManager manager, std::span<const Index> values, Policy policy)
@@ -92,6 +98,7 @@ namespace VSL_NAMESPACE::typed {
         state->values.swap(snapshot);
         state->valid = true;
     }
+
     template<index_element Index, MemoryProperty property>
     std::pair<std::uint32_t, std::uint32_t> TypedIndexBuffer<Index, property>::bounds(size_t first, size_t count) const {
         if (!_values->valid)

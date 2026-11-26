@@ -16,30 +16,35 @@ namespace VSL_NAMESPACE::typed::detail {
     DescriptorLayoutCreateInfo make_bundle_layout(const DescriptorLayoutPlan& plan) {
         return {{plan.bindings.begin(), plan.bindings.end()}};
     }
+
     DescriptorPoolCreateInfo make_bundle_pool(DescriptorPoolPlan plan) {
         DescriptorPoolCreateInfo result{{}, plan.max_sets};
         for (const auto& entry : plan.descriptors)
             result.descriptors.emplace(entry.type, entry.count);
         return result;
     }
+
     ImageAccessor BundleNativeResources::image(ResourceId id) const {
         for (const auto& [resource, value] : images)
             if (resource == id)
                 return value;
         throw std::out_of_range("Unknown heap bundle image");
     }
+
     SamplerAccessor BundleNativeResources::sampler(ResourceId id) const {
         for (const auto& [resource, value] : samplers)
             if (resource == id)
                 return value;
         throw std::out_of_range("Unknown heap bundle sampler");
     }
+
     void BundleNativeResources::require_idle() const {
         for (const auto& [id, value] : images)
             value.use_state().require_idle();
         for (const auto& [id, value] : samplers)
             value.use_state().require_idle();
     }
+
     BundleNativeResources make_bundle_native(LogicalDeviceAccessor device, std::span<const ResourcePlacement> placements, std::span<const BundleResourceInit> infos) {
         BundleNativeResources result;
         for (size_t index = 0; index < placements.size(); ++index) {
@@ -51,9 +56,11 @@ namespace VSL_NAMESPACE::typed::detail {
         }
         return result;
     }
+
     size_t bundle_frame_count(CommandManager manager) {
         return FrameResourceDomain(std::move(manager)).count;
     }
+
     void validate_bundle_plan(LogicalDeviceAccessor device, graphic_resource::ManagerInterface& manager, std::span<const ResourceAllocationRecord> entries) {
         lifetime::require_device_owner(device);
         if (!StartupAccess::Owned(device) || !manager || manager.get_device() != device)

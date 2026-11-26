@@ -10,11 +10,14 @@ namespace VSL_NAMESPACE::lifetime {
     class StartupArena;
     class SwapchainArena;
 } // namespace VSL_NAMESPACE::lifetime
+
 namespace VSL_NAMESPACE::storage {
     using BufferArena = lifetime::BufferArena;
+
     namespace detail {
         struct CPURegion;
     }
+
     // CPU領域だけを管理する。コピーは同じ領域と使用権を共有する。
     class ArenaMemory {
         std::shared_ptr<detail::CPURegion> _region;

@@ -11,6 +11,7 @@ namespace VSL_NAMESPACE::operation {
         void (*destroy_semaphore)(void*, VkDevice, VkSemaphore) noexcept = nullptr;
         VkResult (*reset_fences)(void*, VkDevice, std::uint32_t, const VkFence*) noexcept = nullptr;
     };
+
     class ScopedSynchronizationNativeCalls {
         SynchronizationNativeCalls _calls;
         const SynchronizationNativeCalls* _previous;
@@ -21,6 +22,7 @@ namespace VSL_NAMESPACE::operation {
         ScopedSynchronizationNativeCalls(const ScopedSynchronizationNativeCalls&) = delete;
         ScopedSynchronizationNativeCalls& operator=(const ScopedSynchronizationNativeCalls&) = delete;
     };
+
     void initialize_semaphore(impl::SemaphoreImpl& semaphore, impl::LogicalDeviceImpl& device, SemaphoreCreateInfo info);
     void initialize_fence(impl::FenceImpl& fence, impl::LogicalDeviceImpl& device, FenceCreateInfo info);
     void validate_synchronization_count(vk::Device device, size_t count);

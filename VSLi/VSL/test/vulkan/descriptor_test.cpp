@@ -18,11 +18,14 @@ namespace {
 
 namespace {
     thread_local std::function<void()> ALLOCATION_ACTION;
+
     struct AllocationAction {
         std::function<void()> previous;
+
         explicit AllocationAction(std::function<void()> action) : previous(std::exchange(ALLOCATION_ACTION, std::move(action))) {}
         ~AllocationAction() { ALLOCATION_ACTION = std::move(previous); }
     };
+
     vk::Result allocate_after_action(vsl::impl::GraphicResourcePoolImpl& pool, std::span<vsl::impl::GraphicResourceImpl* const> targets);
 } // namespace
 
@@ -39,6 +42,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     enum class ImageReadBarrierMode {
         AUTOMATIC,
@@ -52,6 +56,7 @@ namespace {
     vsl::command::ChangeImageBarrier make_shader_read_barrier(ImageReadBarrierMode mode, const SampledImage& image);
 
     using DescriptorVulkanIntegrationTest = vsl_test::ComputeVulkanIntegrationTest;
+
     class DescriptorImageBarrierVulkanIntegrationTest : public vsl_test::ComputeVulkanIntegrationTest,
                                                         public testing::WithParamInterface<ImageReadBarrierMode> {
         vsl_test::ScopedEnvironment _synchronization{"VK_LAYER_VALIDATE_SYNC", "1"};
@@ -96,6 +101,7 @@ namespace {
     bool DescriptorOwnershipVulkanIntegrationTest::validate_vulkan() const {
         return true;
     }
+
     TEST_F(DescriptorOwnershipVulkanIntegrationTest, OrdinaryScopeExitReleasesPoolAndResourceWithoutDestroy) {
         std::weak_ptr<vsl::impl::GraphicResourcePoolImpl> weak_pool;
         std::weak_ptr<vsl::impl::GraphicResourceImpl> weak_resource;
@@ -109,6 +115,7 @@ namespace {
         EXPECT_TRUE(weak_resource.expired());
         EXPECT_TRUE(weak_pool.expired());
     }
+
     TEST_F(DescriptorOwnershipVulkanIntegrationTest, ResourceKeepsItsLayoutUntilTheLastAliasIsReleased) {
         vsl::GraphicResourceManager manager(device);
         vsl::GraphicResource retained;
@@ -123,6 +130,7 @@ namespace {
         retained = {};
         EXPECT_TRUE(weak_layout.expired());
     }
+
     TEST_F(DescriptorOwnershipVulkanIntegrationTest, PlacedDescriptorBackendReusesFailedStorageAndConstructsDistinctSetSlots) {
         namespace l = vsl::lifetime;
         namespace op = vsl::operation;
@@ -161,6 +169,7 @@ namespace {
         EXPECT_FALSE(first.use.busy());
         EXPECT_FALSE(second.use.busy());
     }
+
     TEST(BindingPointTest, ComparisonIncludesBindingTypeStageAndAmount) {
         using namespace vsl::graphic_resource;
         BindingPoint first{2, Type::STORAGE_BUFFER, vsl::ShaderFlag::COMPUTE, 1};
@@ -171,6 +180,7 @@ namespace {
         EXPECT_EQ(static_cast<unsigned>(BindingDestination::COMPUTE),
                   static_cast<unsigned>(vk::PipelineBindPoint::eCompute));
     }
+
     TEST_F(DescriptorVulkanIntegrationTest, VectorAndInitializerLayoutsPreservePointsAndAutomaticNumbers) {
         using namespace vsl::graphic_resource;
         const std::vector<BindingPoint> points{{7, Type::UNIFORM_BUFFER, vsl::ShaderFlag::VERTEX, 2},
@@ -182,11 +192,13 @@ namespace {
         EXPECT_EQ(binding->get_binding_points(),
                   (std::vector<BindingPoint>{{0, Type::STORAGE_BUFFER, vsl::ShaderFlag::COMPUTE, 1}}));
     }
+
     TEST_F(DescriptorVulkanIntegrationTest, ResourcePoolAndManagerIdentityArePreserved) {
         EXPECT_EQ(pool.get_manager(), &*resources);
         EXPECT_EQ(DescriptorAccess::Owned(resource.get_pool()), DescriptorAccess::Owned(pool));
         ExpectSequence(execute(17), 17);
     }
+
     TEST_F(DescriptorVulkanIntegrationTest, PoolGetterUsesTheCanonicalOwnerAndDoesNotRetainItsSourceSet) {
         auto [created, allocated] = resources->make(std::vector{*binding});
         auto retained = allocated.front().get_pool();
@@ -201,6 +213,7 @@ namespace {
         resource = rebound;
         ExpectSequence(execute(19), 19);
     }
+
     TEST_F(DescriptorVulkanIntegrationTest, BindsSingleAndRepeatedLayoutsWithExplicitTypeUpdates) {
         using namespace vsl::graphic_resource;
         auto [single_ok, single] = pool.bind(*binding);
@@ -221,10 +234,12 @@ namespace {
         resource = single;
         ExpectSequence(execute(23), 23);
     }
+
     TEST_F(DescriptorVulkanIntegrationTest, ValueUpdatePreservesBufferDataAndRange) {
         resource.update(*output, 0, vsl::graphic_resource::Type::STORAGE_BUFFER, 0, COUNT * sizeof(std::uint32_t));
         ExpectSequence(execute(31), 31);
     }
+
     TEST_F(DescriptorVulkanIntegrationTest, BulkNativeAllocationFailureRollsBackPreparedOwnersAndAllowsRetry) {
         const auto before = DescriptorAccess::Owned(pool)->resources.size();
         const auto owners_before = DescriptorAccess::Owned(pool).use_count();
@@ -247,6 +262,7 @@ namespace {
         resource = allocated.back();
         ExpectSequence(execute(37), 37);
     }
+
     TEST(DescriptorOwnershipTest, CopyAndMoveReplacementPublishesItsOwnerBeforeOldOwnerCanDestroyTheFacade) {
         const auto exercise = []<typename Impl>() {
             using Facade = decltype(DescriptorAccess::FromShared(std::shared_ptr<Impl>{}));
@@ -279,6 +295,7 @@ namespace {
         exercise.operator()<vsl::impl::GraphicResourcePoolImpl>();
         exercise.operator()<vsl::impl::GraphicResourceImpl>();
     }
+
     TEST_F(DescriptorVulkanIntegrationTest, NativeAllocationRegistersTheStartingPoolWhenItsCallerReplacesThePoolFacade) {
         using namespace vsl::graphic_resource;
         auto source = resources->make({{Type::STORAGE_BUFFER, 1}});
@@ -299,6 +316,7 @@ namespace {
         resource = std::move(retained);
         ExpectSequence(execute(907), 907);
     }
+
     TEST_F(DescriptorVulkanIntegrationTest, SingleBindingConstructorsRetainDeviceOwner) {
         using namespace vsl::graphic_resource;
         auto imported = vsl::LogicalDeviceAccessor::Create(physical);
@@ -319,6 +337,7 @@ namespace {
         DescriptorAccess::Owned(automatic).reset();
         EXPECT_TRUE(observed.expired());
     }
+
     TEST_F(DescriptorVulkanIntegrationTest, ExplicitSentinelsUseTheSameAutomaticBindingAsTheVectorConstructor) {
         using namespace vsl::graphic_resource;
         for (const auto sentinel : {std::size_t{UINT32_MAX}, std::size_t(-1)}) {
@@ -331,6 +350,7 @@ namespace {
         }
     }
 } // namespace
+
 #include "support/image_transfer_fixture.hpp"
 
 namespace {
@@ -343,12 +363,15 @@ namespace {
                                     {1, Type::STORAGE_IMAGE, vsl::ShaderFlag::COMPUTE, 1},
                                     SampledTexture::VALUE});
         auto [image_pool, allocated] = resources->make(std::vector{*binding});
+
         struct ReclaimCycle {
             vsl::GraphicResourcePool pool;
+
             ~ReclaimCycle() {
                 DescriptorAccess::Owned(pool)->resources.clear();
             }
         } reclaim{image_pool};
+
         ASSERT_EQ(allocated.size(), 1u);
         resource = allocated.front();
         using StorageImage = vsl::Image<vsl::ImageType::STORAGE | vsl::ImageType::TRANSFER_DST>;
@@ -455,11 +478,13 @@ namespace {
         EXPECT_THROW(resource.update(&*output, 0, std::nullopt, 0, 0), vsl::exceptions::RuntimeException);
         EXPECT_THROW(resource.update(&*output, 0, std::nullopt, 0, bytes + 1), vsl::exceptions::RuntimeException);
     }
+
     TEST_F(DescriptorVulkanIntegrationTest, DefaultBufferRangeAtAnOffsetDoesNotExceedTheRequestedStorage) {
         const auto offset = std::max<std::size_t>(16, StartupAccess::Owned(physical)->props->limits.minStorageBufferOffsetAlignment);
         StorageBuffer buffer(device, std::size_t{offset + COUNT * sizeof(std::uint32_t)});
         resource.update(&buffer, 0, std::nullopt, offset);
     }
+
     TEST_F(DescriptorVulkanIntegrationTest, DefaultExplicitAndWholeBufferRangesWriteOnlyTheSelectedTailOnGPU) {
         const auto offset = std::max<std::size_t>(16, StartupAccess::Owned(physical)->props->limits.minStorageBufferOffsetAlignment);
         const std::vector<std::uint32_t> initial(offset / sizeof(std::uint32_t) + COUNT, 0xa5a5a5a5u);
@@ -522,6 +547,7 @@ namespace {
         ASSERT_EQ(extra.size(), 2u);
         EXPECT_NO_THROW(extra.front().update(&buffer));
     }
+
     TEST_F(DescriptorOwnershipVulkanIntegrationTest, ManagerCopyAndAssignmentDoNotLeaveDanglingPoolObservers) {
         using namespace vsl::graphic_resource;
         vsl::GraphicResourceManager manager(device);
@@ -540,6 +566,7 @@ namespace {
         EXPECT_THROW(pool.bind(1, layout), std::logic_error);
         EXPECT_THROW(pool.bind(std::vector{layout}), std::logic_error);
     }
+
     TEST_F(DescriptorOwnershipVulkanIntegrationTest, UpdatedBuffersAreOwnedPerBindingAndReplacementReleasesTheOldBuffer) {
         using namespace vsl::graphic_resource;
         vsl::GraphicResourceManager manager(device);
@@ -557,6 +584,7 @@ namespace {
         resource.update(&replacement);
         EXPECT_TRUE(weak.expired());
     }
+
     TEST_F(DescriptorOwnershipVulkanIntegrationTest, DroppingTheLastResourceAliasReleasesItsNativeSetAndOwners) {
         using namespace vsl::graphic_resource;
         vsl::GraphicResourceManager manager(device);
@@ -619,6 +647,7 @@ namespace {
         resource.update(&*output);
         ExpectSequence(execute(149), 149);
     }
+
     TEST_F(DescriptorVulkanIntegrationTest, ExplicitBufferTypeWorksWithoutLayoutMetadataWhileInferenceReportsTheMissingLayout) {
         DescriptorAccess::Owned(resource)->layout = nullptr;
         try {
@@ -638,6 +667,7 @@ namespace {
         resource.update(&*output);
         ExpectSequence(execute(151), 151);
     }
+
     TEST_F(DescriptorVulkanIntegrationTest, DescriptorTypeCapacityRejectsOverflowWithoutChangingLiveSetsAndRecoversAfterFree) {
         auto [success, extra] = pool.bind(3, *binding);
         ASSERT_TRUE(success);
@@ -656,6 +686,7 @@ namespace {
         EXPECT_TRUE(retried);
         EXPECT_EQ(replacement.size(), 3u);
     }
+
     TEST_F(DescriptorVulkanIntegrationTest, ReservedZeroCountBindingsDoNotConsumeDescriptorCapacity) {
         using namespace vsl::graphic_resource;
         BindingLayout reserved(device, {{7, Type::STORAGE_BUFFER, static_cast<vsl::ShaderFlag>(0), 0}});

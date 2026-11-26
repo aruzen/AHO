@@ -5,6 +5,7 @@ namespace VSL_NAMESPACE::lifetime {
     struct InstanceSlotStorage {
         alignas(impl::VulkanImplAccessor) std::byte value[sizeof(impl::VulkanImplAccessor)];
     };
+
     void construct_instance(void* storage, InstanceCreateInfo info, const operation::InstanceNativeCalls& calls = {});
     void destroy_instance(void* storage) noexcept;
     impl::VulkanImplAccessor& instance_at(void* storage);

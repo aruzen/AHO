@@ -6,6 +6,7 @@ namespace VSL_NAMESPACE {
     struct SemaphoreCreateInfo {
         size_t count = 1;
     };
+
     struct FenceCreateInfo {
         size_t count = 1;
         bool signaled = false;

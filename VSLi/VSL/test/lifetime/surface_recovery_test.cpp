@@ -1,7 +1,9 @@
 #include "../../src/private/VSL/lifetime/window_access.hpp"
+
 namespace {
     using VSL_NAMESPACE::lifetime::detail::WindowAccess;
 }
+
 #include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
@@ -35,18 +37,22 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     namespace l = vsl::lifetime;
     namespace s = vsl::sync;
     namespace o = vsl::operation;
+
     class SurfaceRecoveryWindowIntegrationTest : public vsl_test::WindowIntegrationTest {
         bool validate_vulkan() const override { return true; }
         vsl::PresentFencePolicy present_fence_policy() const override { return vsl::PresentFencePolicy::REQUIRE_FENCE; }
+
         void SetUp() override;
 
     protected:
         vsl::SwapchainAccessor make_chain(vsl::PresentFencePolicy policy = vsl::PresentFencePolicy::REQUIRE_FENCE);
     };
+
     struct RecoveryProbe {
         VkResult graphics_error = VK_SUCCESS, drain_error = VK_SUCCESS, present_error = VK_SUCCESS;
         unsigned graphics = 0, drains = 0, idles = 0, releases = 0, fail_idle = 0;
@@ -59,9 +65,12 @@ namespace {
         static VkResult Acquire(void*, VkDevice, VkSwapchainKHR, std::uint64_t, VkSemaphore, VkFence, std::uint32_t*) noexcept;
         static VkResult Wait(void*, VkDevice, std::uint32_t, const VkFence*, VkBool32, std::uint64_t) noexcept;
         static VkResult Status(void*, VkDevice, VkFence) noexcept;
+
         o::SubmissionNativeCalls submissions() { return {.context = this, .wait_idle = Idle, .wait_fences = Wait, .queue_submit = Submit, .fence_status = Status}; }
+
         o::PresentationNativeCalls presentations() { return {.context = this, .present = Present, .acquire = Acquire, .release = Release}; }
     };
+
     void SurfaceRecoveryWindowIntegrationTest::SetUp() {
         WindowIntegrationTest::SetUp();
         if (HasFatalFailure() || IsSkipped())
@@ -70,12 +79,15 @@ namespace {
         if (!HasFatalFailure() && !StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, StartupAccess::Owned(*(surface))->surface))
             GTEST_SKIP() << "Selected queue cannot present";
     }
+
     vsl::SwapchainAccessor SurfaceRecoveryWindowIntegrationTest::make_chain(vsl::PresentFencePolicy policy) {
         return l::SwapchainArena(device, *surface, {.width = 64, .height = 48, .present_fences = policy}).view();
     }
+
     VkResult RecoveryProbe::BeginFailure(void*, VkCommandBuffer, const VkCommandBufferBeginInfo*) noexcept {
         return VK_ERROR_OUT_OF_HOST_MEMORY;
     }
+
     VkResult RecoveryProbe::Submit(void* context, VkQueue queue, const VkSubmitInfo* info, VkFence fence) noexcept {
         auto& probe = *static_cast<RecoveryProbe*>(context);
         const bool drain = !info->commandBufferCount && info->waitSemaphoreCount;
@@ -93,6 +105,7 @@ namespace {
         const auto idle = vkQueueWaitIdle(queue);
         return idle == VK_SUCCESS ? error : idle;
     }
+
     VkResult RecoveryProbe::Idle(void* context, VkDevice device) noexcept {
         auto& probe = *static_cast<RecoveryProbe*>(context);
         ++probe.idles;
@@ -101,6 +114,7 @@ namespace {
         const auto result = vkDeviceWaitIdle(device);
         return result == VK_SUCCESS && probe.idles == probe.fail_idle ? VK_ERROR_OUT_OF_HOST_MEMORY : result;
     }
+
     VkResult RecoveryProbe::Present(void* context, VkQueue queue, const VkPresentInfoKHR* info) noexcept {
         auto& probe = *static_cast<RecoveryProbe*>(context);
         if (probe.present_error != VK_SUCCESS)
@@ -110,11 +124,13 @@ namespace {
             callback();
         return result;
     }
+
     VkResult RecoveryProbe::Release(void* context, VkDevice device, const VkReleaseSwapchainImagesInfoEXT* info) noexcept {
         ++static_cast<RecoveryProbe*>(context)->releases;
         const auto release = reinterpret_cast<PFN_vkReleaseSwapchainImagesEXT>(vkGetDeviceProcAddr(device, "vkReleaseSwapchainImagesEXT"));
         return release ? release(device, info) : VK_ERROR_EXTENSION_NOT_PRESENT;
     }
+
     VkResult RecoveryProbe::Acquire(void* context, VkDevice device, VkSwapchainKHR chain, std::uint64_t timeout, VkSemaphore available,
                                     VkFence fence, std::uint32_t* image) noexcept {
         const auto result = vkAcquireNextImageKHR(device, chain, timeout, available, fence, image);
@@ -123,21 +139,25 @@ namespace {
             callback();
         return result;
     }
+
     VkResult RecoveryProbe::Wait(void* context, VkDevice device, std::uint32_t count, const VkFence* fences, VkBool32 all, std::uint64_t timeout) noexcept {
         auto& probe = *static_cast<RecoveryProbe*>(context);
         if (auto callback = std::exchange(probe.on_wait, {}))
             callback();
         return vkWaitForFences(device, count, fences, all, timeout);
     }
+
     VkResult RecoveryProbe::Status(void* context, VkDevice device, VkFence fence) noexcept {
         return static_cast<RecoveryProbe*>(context)->on_wait ? VK_NOT_READY : vkGetFenceStatus(device, fence);
     }
+
     TEST_F(SurfaceRecoveryWindowIntegrationTest, AnUnusedSurfaceRecoversWithoutCreatingAPresentationDomain) {
         EXPECT_EQ(l::recover_surface(device, *surface, l::SurfaceRecoveryMode::POLL), l::SurfaceRecoveryStatus::COMPLETE);
         EXPECT_EQ(l::recover_surface(device, *surface), l::SurfaceRecoveryStatus::COMPLETE);
         EXPECT_FALSE(StartupAccess::Owned(*(surface))->owner_context->presentations.lock());
         EXPECT_THROW(l::recover_surface(device, *surface, static_cast<l::SurfaceRecoveryMode>(99)), std::invalid_argument);
     }
+
     TEST_F(SurfaceRecoveryWindowIntegrationTest, RetirementRegistrationIsWeakAndRepeatedRegistrationUsesOneCollection) {
         RecoveryProbe probe;
         const o::ScopedSubmissionNativeCalls submissions(probe.submissions());
@@ -156,6 +176,7 @@ namespace {
         EXPECT_EQ(l::collect_surface_retirements(device, l::SurfaceRecoveryMode::WAIT), l::SurfaceRecoveryStatus::COMPLETE);
         EXPECT_EQ(probe.idles, 1u);
     }
+
     TEST_F(SurfaceRecoveryWindowIntegrationTest, RegistrationDuringCollectionIsDeferredWithoutLosingTheNewRequest) {
         RecoveryProbe probe;
         const o::ScopedSubmissionNativeCalls submissions(probe.submissions());
@@ -171,6 +192,7 @@ namespace {
         EXPECT_EQ(probe.idles, 2u);
         EXPECT_THROW(l::collect_surface_retirements(device, static_cast<l::SurfaceRecoveryMode>(99)), std::invalid_argument);
     }
+
     TEST_F(SurfaceRecoveryWindowIntegrationTest, FailedRetirementCollectionPreservesTheRequestForRetry) {
         RecoveryProbe probe;
         probe.fail_idle = 1;
@@ -181,6 +203,7 @@ namespace {
         EXPECT_EQ(l::collect_surface_retirements(device, l::SurfaceRecoveryMode::WAIT), l::SurfaceRecoveryStatus::COMPLETE);
         EXPECT_EQ(probe.idles, 2u);
     }
+
     TEST_F(SurfaceRecoveryWindowIntegrationTest, DifferentSurfaceSlotsInOneArenaAreSeparateRetirementRequests) {
         vsl::PureWindow a("same arena A", 64, 48), b("same arena B", 64, 48);
         const std::array requests{vsl::storage::StartupRequest{{1}, vsl::storage::StartupKind::SURFACE},
@@ -205,6 +228,7 @@ namespace {
         EXPECT_TRUE(a.close());
         EXPECT_TRUE(b.close());
     }
+
     TEST_F(SurfaceRecoveryWindowIntegrationTest, BeginFailureKeepsAnUnconsumedAcquireUntilTheDrainCanBeRetried) {
         auto manager = make_manager().independent(1);
         auto chain = make_chain();
@@ -240,6 +264,7 @@ namespace {
         EXPECT_EQ(probe.releases, 1u);
         EXPECT_EQ(chain.state(), vsl::SwapchainState::RECOVERY_REQUIRED);
     }
+
     TEST_F(SurfaceRecoveryWindowIntegrationTest, CancelDuringNativeAcquireAdoptsTheImageBeforeRecoveringIt) {
         auto manager = make_manager().independent(1);
         auto chain = make_chain();
@@ -259,6 +284,7 @@ namespace {
         EXPECT_EQ(probe.releases, 1u);
         EXPECT_EQ(chain.state(), vsl::SwapchainState::RECOVERY_REQUIRED);
     }
+
     TEST_F(SurfaceRecoveryWindowIntegrationTest, SurfaceRecoveryReclaimsAnOrphanWithoutCreatingANewDomain) {
         auto manager = make_manager().independent(1);
         auto chain = make_chain();
@@ -299,6 +325,7 @@ namespace {
         EXPECT_EQ(l::quarantined_acquisition_count(), before);
         EXPECT_TRUE(StartupAccess::Owned(*(surface))->owner_context->presentations.expired());
     }
+
     TEST_F(SurfaceRecoveryWindowIntegrationTest, CancelDuringNativeGraphicsDoesNotPresentAnAlreadyRecoveredImage) {
         auto manager = make_manager().independent(1);
         auto chain = make_chain();
@@ -319,6 +346,7 @@ namespace {
         EXPECT_EQ(probe.drains, 1u);
         EXPECT_EQ(probe.releases, 1u);
     }
+
     TEST_F(SurfaceRecoveryWindowIntegrationTest, AnExistingGraphicsObserverPreventsNestedDeviceIdle) {
         auto manager = make_manager().independent(1);
         auto chain = make_chain();
@@ -339,6 +367,7 @@ namespace {
         EXPECT_EQ(probe.idles, 0u);
         EXPECT_EQ(observations, 1u);
     }
+
     TEST_F(SurfaceRecoveryWindowIntegrationTest, SuccessfulDrainIsNotSubmittedAgainWhenItsIdleObservationFails) {
         auto manager = make_manager().independent(1);
         auto chain = make_chain();
@@ -365,6 +394,7 @@ namespace {
         EXPECT_EQ(probe.drains, 1u);
         EXPECT_EQ(probe.releases, 1u);
     }
+
     TEST_F(SurfaceRecoveryWindowIntegrationTest, UnknownDrainPoisonsItsElementAndDoesNotClaimTheImageWasReturned) {
         auto manager = make_manager().independent(1);
         auto chain = make_chain();
@@ -386,6 +416,7 @@ namespace {
         EXPECT_EQ(probe.drains, 1u);
         EXPECT_TRUE(SynchronizationAccess::Owned(available)->use.poisoned[0]);
     }
+
     TEST_F(SurfaceRecoveryWindowIntegrationTest, PresentOutOfMemoryKeepsRetryRightsUntilThePhaseIsAbandoned) {
         auto manager = make_manager().independent(1);
         auto chain = make_chain();
@@ -408,6 +439,7 @@ namespace {
         EXPECT_EQ(probe.releases, 1u);
         EXPECT_TRUE(registry->records.empty());
     }
+
     TEST_F(SurfaceRecoveryWindowIntegrationTest, LegacyPresentationPolicyDoesNotDisableAnEnabledImageReleaseFeature) {
         auto manager = make_manager().independent(1);
         auto chain = make_chain(vsl::PresentFencePolicy::LEGACY);
@@ -424,6 +456,7 @@ namespace {
         EXPECT_EQ(probe.graphics, 1u);
         EXPECT_EQ(probe.releases, 1u);
     }
+
     TEST_F(SurfaceRecoveryWindowIntegrationTest, RecoveryDefersNestedCollectionUntilEveryCapturedStateHasBeenSaved) {
         auto manager = make_manager().independent(1);
         auto chain = make_chain();
@@ -444,6 +477,7 @@ namespace {
         EXPECT_FALSE(registry->recovering);
         EXPECT_TRUE(registry->records.empty());
     }
+
     TEST_F(SurfaceRecoveryWindowIntegrationTest, DeviceLossObservedInsideNativePresentDoesNotDetachTheActiveRecord) {
         auto manager = make_manager().independent(1);
         auto chain = make_chain();

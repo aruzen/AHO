@@ -1,14 +1,20 @@
 #include "../src/private/VSL/lifetime/window_access.hpp"
+
 namespace {
     using VSL_NAMESPACE::lifetime::detail::WindowAccess;
 }
+
 #include "support/window_fixture.hpp"
+
 namespace {
     using WindowIntegrationTest = vsl_test::WindowIntegrationTest;
+
     struct TestPlugin : vsl::PureWindow::Plugin {
         int value;
+
         TestPlugin(vsl::PureWindow*, int value) : value(value) {}
     };
+
     TEST_F(WindowIntegrationTest, NamesSharedConstructorsComparisonsResizeAndClose) {
         EXPECT_EQ(window->name(), "VSL hidden integration test");
         EXPECT_TRUE(static_cast<bool>(*window));
@@ -26,6 +32,7 @@ namespace {
         EXPECT_FALSE(static_cast<bool>(*window));
         EXPECT_TRUE(WindowAccess::Registry().empty());
     }
+
     TEST_F(WindowIntegrationTest, AddsAndRemovesPluginByIdentity) {
         auto plugin = window->add_plugin<TestPlugin>(17);
         EXPECT_EQ(plugin->value, 17);
@@ -33,6 +40,7 @@ namespace {
         EXPECT_TRUE(window->remove_plugin(plugin));
         EXPECT_FALSE(window->remove_plugin(plugin));
     }
+
     TEST_F(WindowIntegrationTest, WindowConstructorsInstallQuietCloseOnce) {
         vsl::Window shared(WindowAccess::FromState(WindowAccess::State(*(window))));
         EXPECT_EQ(WindowAccess::State(shared), WindowAccess::State(*(window)));
@@ -49,12 +57,15 @@ namespace {
 namespace {
     struct CountingUpdatePlugin : vsl::PureWindow::Plugin, vsl::PureWindow::OnUpdate {
         int& calls;
+
         CountingUpdatePlugin(vsl::PureWindow*, int& calls, std::optional<unsigned char> id = std::nullopt) : Plugin(id), calls(calls) {}
+
         bool on_update(vsl::PureWindow) override {
             ++calls;
             return true;
         }
     };
+
     TEST(WindowPluginRemovalTest, RemovesTheUpdateSubscriptionAndReleasesItsOwnership) {
         vsl::PureWindow window(WindowAccess::FromState(std::make_shared<vsl::PureWindow::WindowData>()));
         int removed_calls = 0, remaining_calls = 0;
@@ -76,6 +87,7 @@ namespace {
         EXPECT_TRUE(WindowAccess::State(window)->update.empty());
         EXPECT_TRUE(WindowAccess::State(window)->plugins.empty());
     }
+
     TEST(WindowPluginRemovalTest, RejectsADifferentObjectWithTheSameId) {
         vsl::PureWindow window(WindowAccess::FromState(std::make_shared<vsl::PureWindow::WindowData>()));
         int actual_calls = 0, impostor_calls = 0;
@@ -87,6 +99,7 @@ namespace {
         ASSERT_EQ(WindowAccess::State(window)->update.size(), 1u);
         EXPECT_EQ(WindowAccess::State(window)->update.front(), window.plugin_id(actual));
     }
+
     TEST(WindowPluginRemovalTest, RemovesPluginsWithoutAnUpdateSubscription) {
         vsl::PureWindow window(WindowAccess::FromState(std::make_shared<vsl::PureWindow::WindowData>()));
         auto plugin = window.add_plugin<TestPlugin>(23);
@@ -108,17 +121,21 @@ TEST(WindowPluginRemovalTest, NullPluginDoesNotChangeRegistrations) {
 namespace {
     struct UpdateActionPlugin : vsl::PureWindow::Plugin, vsl::PureWindow::OnUpdate {
         std::function<bool(vsl::PureWindow)> action;
+
         UpdateActionPlugin(vsl::PureWindow*, std::function<bool(vsl::PureWindow)> action)
             : action(std::move(action)) {}
         bool on_update(vsl::PureWindow window) override { return action(std::move(window)); }
     };
+
     struct ScopedUpdateWindow {
         vsl::PureWindow window{"VSL update mutation test", 32, 24};
+
         ~ScopedUpdateWindow() {
             if (WindowAccess::State(window) && WindowAccess::State(window)->window_handle)
                 window.close();
         }
     };
+
     TEST_F(WindowIntegrationTest, UpdateSkipsRemovedListenersAndDefersNewListenersOnTheCurrentWindow) {
         int first_calls = 0, removed_calls = 0, added_calls = 0;
         bool changed = false;
@@ -142,6 +159,7 @@ namespace {
         EXPECT_EQ(removed_calls, 0);
         EXPECT_EQ(added_calls, 1);
     }
+
     TEST_F(WindowIntegrationTest, UpdatingListenerStaysAliveUntilItsSelfRemovalCallbackReturns) {
         int follower_calls = 0;
         bool alive_during_callback = false;
@@ -160,6 +178,7 @@ namespace {
         EXPECT_TRUE(weak.expired());
         EXPECT_EQ(follower_calls, 1);
     }
+
     TEST_F(WindowIntegrationTest, ClosingTheCurrentWindowSkipsItsOtherCallbacksAndStillUpdatesAnotherWindow) {
         int stale_calls = 0, other_calls = 0;
         ScopedUpdateWindow other;
@@ -172,6 +191,7 @@ namespace {
         EXPECT_EQ(other_calls, 1);
         EXPECT_FALSE(static_cast<bool>(*window));
     }
+
     TEST_F(WindowIntegrationTest, WindowsAddedDuringUpdateStartReceivingCallbacksOnTheNextTick) {
         int first_calls = 0, other_calls = 0, created_calls = 0;
         ScopedUpdateWindow other;
@@ -224,6 +244,7 @@ namespace {
         EXPECT_FALSE(static_cast<bool>(window));
         EXPECT_FALSE(window.close());
     }
+
     TEST(WindowValidityTest, MovedFromWrappersRemainInvalidAndReusable) {
         auto data = std::make_shared<vsl::PureWindow::WindowData>();
         vsl::PureWindow source(WindowAccess::FromState(data));
@@ -244,6 +265,7 @@ namespace {
 } // namespace
 
 #include <VSL/exceptions.hpp>
+
 namespace {
     TEST_F(WindowIntegrationTest, FailedCreationLeavesExistingWindowUsable) {
         const auto before = WindowAccess::Registry();
@@ -266,6 +288,7 @@ namespace {
         EXPECT_EQ(height, 60);
         EXPECT_TRUE(vsl::PureWindow::NoCheckUpdate());
     }
+
     TEST_F(WindowIntegrationTest, FailedFirstCreationLeavesNoRegistrationAndAllowsRetry) {
         ASSERT_TRUE(window->close());
         ASSERT_TRUE(WindowAccess::Registry().empty());
@@ -292,6 +315,7 @@ TEST(WindowInitializationTest, FailedGlfwInitializationThrowsWithoutRegisteringA
             glfwInitHint(GLFW_PLATFORM, GLFW_ANY_PLATFORM);
         }
     } restore;
+
     ASSERT_TRUE(WindowAccess::Registry().empty());
     vsl::lifetime::GLFWLease::Drain();
     glfwInitHint(GLFW_PLATFORM, -1); // GLFW rejects an unsupported platform ID during initialization.
@@ -309,20 +333,26 @@ TEST(WindowInitializationTest, FailedGlfwInitializationThrowsWithoutRegisteringA
 #endif
 
 #include <type_traits>
+
 namespace {
     static_assert(std::has_virtual_destructor_v<vsl::PureWindow>);
     static_assert(std::has_virtual_destructor_v<vsl::PureWindow::OnUpdate>);
+
     struct TrackedWindow : vsl::PureWindow {
         bool& destroyed;
+
         TrackedWindow(std::shared_ptr<WindowData> data, bool& flag) : PureWindow(WindowAccess::FromState(std::move(data))), destroyed(flag) {}
         ~TrackedWindow() { destroyed = true; }
     };
+
     struct TrackedUpdate : vsl::PureWindow::OnUpdate {
         bool& destroyed;
+
         explicit TrackedUpdate(bool& flag) : destroyed(flag) {}
         ~TrackedUpdate() { destroyed = true; }
         bool on_update(vsl::PureWindow) override { return true; }
     };
+
     TEST(WindowInterfaceLifetimeTest, BaseOwnersRunBothDerivedDestructors) {
         bool window_destroyed = false, update_destroyed = false;
         std::unique_ptr<vsl::PureWindow> window =
@@ -333,6 +363,7 @@ namespace {
         EXPECT_TRUE(window_destroyed);
         EXPECT_TRUE(update_destroyed);
     }
+
     TEST(WindowInterfaceLifetimeTest, CopiesShareDataAndMovesTransferIt) {
         static_assert(std::is_nothrow_move_constructible_v<vsl::PureWindow>);
         static_assert(std::is_nothrow_move_assignable_v<vsl::PureWindow>);
@@ -349,6 +380,7 @@ namespace {
         EXPECT_EQ(WindowAccess::State(assigned), data);
         EXPECT_EQ(WindowAccess::State(original), data);
     }
+
     TEST_F(WindowIntegrationTest, DeletingADerivedWrapperRetainsTheSharedNativeWindow) {
         bool destroyed = false;
         std::unique_ptr<vsl::PureWindow> owner = std::make_unique<TrackedWindow>(WindowAccess::State(*(window)), destroyed);
@@ -362,12 +394,15 @@ namespace {
     struct WindowCloseErrorCapture {
         inline static unsigned CALLS = 0;
         GLFWerrorfun previous;
+
         WindowCloseErrorCapture() : previous(glfwSetErrorCallback([](int, const char*) { ++CALLS; })) { CALLS = 0; }
+
         ~WindowCloseErrorCapture() {
             glfwSetErrorCallback(previous);
             glfwGetError(nullptr);
         }
     };
+
     TEST(WindowValidityTest, EmptyNativeDataCloseAndDestroyDoNotCallUninitializedGlfw) {
         ASSERT_TRUE(WindowAccess::Registry().empty());
         glfwTerminate();
@@ -380,6 +415,7 @@ namespace {
         EXPECT_EQ(WindowCloseErrorCapture::CALLS, 0u);
         EXPECT_TRUE(WindowAccess::Registry().empty());
     }
+
     TEST_F(WindowIntegrationTest, RepeatedCloseThroughAliasesAndDataDoesNotReenterTerminatedGlfw) {
         auto data = WindowAccess::State(*(window));
         vsl::PureWindow alias(WindowAccess::FromState(data));
@@ -393,6 +429,7 @@ namespace {
         data->destroy();
         EXPECT_EQ(WindowCloseErrorCapture::CALLS, 0u);
     }
+
     TEST_F(WindowIntegrationTest, RepeatedCloseLeavesAnotherRegisteredWindowUsable) {
         ScopedUpdateWindow other;
         int calls = 0;
@@ -409,6 +446,7 @@ namespace {
         EXPECT_EQ(calls, 1);
         EXPECT_EQ(WindowCloseErrorCapture::CALLS, 0u);
     }
+
     TEST_F(WindowIntegrationTest, ClosingAnOldAliasAfterRestartKeepsTheNewWindowRegistered) {
         vsl::PureWindow old(WindowAccess::FromState(WindowAccess::State(*(window))));
         ASSERT_TRUE(window->close());
@@ -427,18 +465,23 @@ namespace {
 } // namespace
 
 #include <limits>
+
 namespace {
     struct RegistrationListener : vsl::PureWindow::Plugin, vsl::PureWindow::OnUpdate {
         int& calls;
+
         RegistrationListener(vsl::PureWindow*, int& calls, std::optional<unsigned char> fixed_id = std::nullopt) : Plugin(fixed_id), calls(calls) {}
+
         bool on_update(vsl::PureWindow) override {
             ++calls;
             return true;
         }
     };
+
     struct RegistrationPlugin : vsl::PureWindow::Plugin {
         explicit RegistrationPlugin(vsl::PureWindow*, std::optional<unsigned char> fixed_id = std::nullopt) : Plugin(fixed_id) {}
     };
+
     TEST(WindowPluginRegistrationTest, AutomaticIdsSkipRegisteredFixedIds) {
         vsl::PureWindow window(WindowAccess::FromState(std::make_shared<vsl::PureWindow::WindowData>()));
         int fixed_calls = 0, automatic_calls = 0;
@@ -457,6 +500,7 @@ namespace {
         EXPECT_EQ(fixed_calls, 1);
         EXPECT_EQ(automatic_calls, 2);
     }
+
     TEST(WindowPluginRegistrationTest, WrappingAutomaticIdsReuseTheVacantSlotWithoutReplacingSurvivors) {
         vsl::PureWindow window(WindowAccess::FromState(std::make_shared<vsl::PureWindow::WindowData>()));
         const auto capacity = static_cast<unsigned int>(std::numeric_limits<unsigned char>::max()) + 1u;
@@ -473,6 +517,7 @@ namespace {
                 EXPECT_EQ(WindowAccess::State(window)->plugins.at(*window.plugin_id(plugin)), plugin);
         EXPECT_EQ(WindowAccess::State(window)->plugins.at(vacant_id), replacement);
     }
+
     TEST(WindowPluginRegistrationTest, ExhaustionReportsAnErrorAndPreservesRegistrationsAndSubscriptions) {
         vsl::PureWindow window(WindowAccess::FromState(std::make_shared<vsl::PureWindow::WindowData>()));
         int calls = 0;
@@ -492,6 +537,7 @@ namespace {
         EXPECT_EQ(WindowAccess::State(window)->update, subscriptions);
         EXPECT_EQ(WindowAccess::State(window)->plugins_next_id, next_id);
     }
+
     TEST(WindowPluginRegistrationTest, ReplacingAFixedIdAlsoReplacesItsUpdateSubscription) {
         vsl::PureWindow window(WindowAccess::FromState(std::make_shared<vsl::PureWindow::WindowData>()));
         int previous_calls = 0, replacement_calls = 0;
@@ -513,14 +559,18 @@ namespace {
 namespace {
     struct ConstructActionPlugin : vsl::PureWindow::Plugin {
         bool& destroyed;
+
         ConstructActionPlugin(vsl::PureWindow*, bool& destroyed, std::function<void()> action) : destroyed(destroyed) { action(); }
         ~ConstructActionPlugin() override { destroyed = true; }
     };
+
     struct ReleaseActionPlugin : vsl::PureWindow::Plugin {
         std::function<void()> action;
+
         ReleaseActionPlugin(vsl::PureWindow*, unsigned char id, std::function<void()> action) : Plugin(id), action(std::move(action)) {}
         ~ReleaseActionPlugin() override { action(); }
     };
+
     TEST(WindowPluginRegistrationTest, ExplicitZeroIsAFixedRegistrationAndAutomaticIdsSkipIt) {
         auto window = WindowAccess::FromState(std::make_shared<vsl::PureWindow::WindowData>());
         const auto fixed = window.add_plugin<RegistrationPlugin>(0);
@@ -531,6 +581,7 @@ namespace {
         EXPECT_FALSE(window.plugin_id(fixed));
         EXPECT_EQ(window.plugin_id(replacement), 0);
     }
+
     TEST(WindowPluginRegistrationTest, ConstructorDeletingTheReceiverDoesNotPublishAndRollsBackItsPlugin) {
         const auto state = std::make_shared<vsl::PureWindow::WindowData>();
         auto window = std::make_unique<vsl::PureWindow>(WindowAccess::FromState(state));
@@ -540,6 +591,7 @@ namespace {
         EXPECT_TRUE(state->plugins.empty());
         EXPECT_TRUE(state->update.empty());
     }
+
     TEST(WindowPluginRegistrationTest, ConstructorReplacingTheReceiverDoesNotPublishIntoEitherWindow) {
         const auto state = std::make_shared<vsl::PureWindow::WindowData>();
         auto window = WindowAccess::FromState(state);
@@ -551,6 +603,7 @@ namespace {
         EXPECT_TRUE(state->plugins.empty());
         EXPECT_TRUE(next.plugin_snapshot().empty());
     }
+
     TEST(WindowPluginRegistrationTest, ReplacedPluginDestructorCanReplaceTheCommittedRegistrationAgain) {
         auto window = WindowAccess::FromState(std::make_shared<vsl::PureWindow::WindowData>());
         std::shared_ptr<RegistrationPlugin> reentrant;
@@ -561,6 +614,7 @@ namespace {
         EXPECT_FALSE(window.plugin_id(outer));
         EXPECT_TRUE(WindowAccess::State(window)->update.empty());
     }
+
     TEST(WindowIdentityTest, DifferentSlotsWithTheSameOwnerHaveDifferentIdentities) {
         const auto states = std::make_shared<std::array<vsl::PureWindow::WindowData, 2>>();
         const auto first = WindowAccess::FromState({states, &(*states)[0]});
@@ -568,6 +622,7 @@ namespace {
         EXPECT_NE(first.identity(), second.identity());
         EXPECT_EQ(first.identity(), vsl::PureWindow(first).identity());
     }
+
     TEST_F(WindowIntegrationTest, ClosedLogicalWindowCannotBeLockedWhileItsStateAndNativeOwnerSurvive) {
         const auto weak = window->weak();
         const auto identity = window->identity();
@@ -581,6 +636,7 @@ namespace {
         EXPECT_EQ(window->identity(), identity);
         EXPECT_TRUE(state->plugins.empty());
     }
+
     TEST_F(WindowIntegrationTest, ClosingDuringPluginConstructionRejectsPublication) {
         bool destroyed = false;
         EXPECT_THROW(window->add_plugin<ConstructActionPlugin>(destroyed, [&] { window->close(); }), std::invalid_argument);
@@ -609,6 +665,7 @@ namespace {
         EXPECT_TRUE(window.remove_plugin(replacement));
         EXPECT_TRUE(WindowAccess::State(window)->update.empty());
     }
+
     TEST(WindowPluginRegistrationTest, AFullRegistryStillAllowsExplicitFixedIdReplacement) {
         vsl::PureWindow window(WindowAccess::FromState(std::make_shared<vsl::PureWindow::WindowData>()));
         int calls = 0;

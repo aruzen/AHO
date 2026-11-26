@@ -25,6 +25,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     VSL_NAMESPACE::command::ImageCopyInfo describe_upload(
         const VSL_NAMESPACE::ImageAccessor& image, const VSL_NAMESPACE::impl::BufferImpl* source,

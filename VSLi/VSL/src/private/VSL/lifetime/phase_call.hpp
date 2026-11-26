@@ -1,5 +1,6 @@
 #pragma once
 #include <VSL/lifetime/phase_liveness.hpp>
+
 namespace VSL_NAMESPACE::lifetime {
     class NativeCall {
         bool& _active;

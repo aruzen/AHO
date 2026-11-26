@@ -22,6 +22,7 @@ namespace VSL_NAMESPACE::typed {
         static_assert(count > 0, "Typed allocation element count must be positive");
         static constexpr size_t COUNT = count;
     };
+
     struct RuntimeElements {};
 
     namespace detail {
@@ -30,11 +31,13 @@ namespace VSL_NAMESPACE::typed {
             static constexpr bool VALID = false, DYNAMIC = false;
             static constexpr size_t COUNT = 0;
         };
+
         template<size_t count>
         struct AllocationElements<FixedElements<count>> {
             static constexpr bool VALID = count > 0, DYNAMIC = false;
             static constexpr size_t COUNT = count;
         };
+
         template<>
         struct AllocationElements<RuntimeElements> {
             static constexpr bool VALID = true, DYNAMIC = true;
@@ -42,30 +45,37 @@ namespace VSL_NAMESPACE::typed {
         };
         template<std::uint32_t set, std::uint32_t binding, typename... Sets>
         struct AllocationBinding;
+
         template<std::uint32_t set, std::uint32_t binding>
         struct AllocationBinding<set, binding> {
             using Type = void;
         };
+
         template<std::uint32_t set, std::uint32_t binding, typename First, typename... Rest>
         struct AllocationBinding<set, binding, First, Rest...> {
             using Type = std::conditional_t<First::SET == set, typename First::template Binding<binding>, typename AllocationBinding<set, binding, Rest...>::Type>;
         };
         template<typename Tuple, std::uint32_t set, std::uint32_t binding>
         struct SchemaAllocationBinding;
+
         template<typename... Sets, std::uint32_t set, std::uint32_t binding>
         struct SchemaAllocationBinding<std::tuple<Sets...>, set, binding> : AllocationBinding<set, binding, Sets...> {};
         template<std::uint32_t set, std::uint32_t binding, typename... Specs>
         struct FindAllocation;
+
         template<std::uint32_t set, std::uint32_t binding>
         struct FindAllocation<set, binding> {
             using Type = void;
         };
+
         template<std::uint32_t set, std::uint32_t binding, typename First, typename... Rest>
         struct FindAllocation<set, binding, First, Rest...> {
             using Type = std::conditional_t<First::SET == set && First::BINDING == binding, First, typename FindAllocation<set, binding, Rest...>::Type>;
         };
+
         constexpr size_t allocation_add(size_t first, size_t second);
         constexpr size_t allocation_multiply(size_t first, size_t second);
+
         constexpr bool buffer_descriptor(graphic_resource::Type kind) {
             return kind == graphic_resource::Type::UNIFORM_BUFFER || kind == graphic_resource::Type::STORAGE_BUFFER;
         }
@@ -80,6 +90,7 @@ namespace VSL_NAMESPACE::typed {
         static constexpr size_t ELEMENTS = detail::AllocationElements<Elements>::COUNT;
         static constexpr auto ALLOCATION = AllocationKind::BUFFER;
     };
+
     template<std::uint32_t set, std::uint32_t binding, ResourceScope scope = ResourceScope::PER_FRAME>
     struct ImageAllocation {
         static constexpr std::uint32_t SET = set, BINDING = binding;
@@ -88,16 +99,19 @@ namespace VSL_NAMESPACE::typed {
         static constexpr bool EXTERNAL = false, DYNAMIC = false;
         static constexpr size_t ELEMENTS = 0;
     };
+
     template<std::uint32_t set, std::uint32_t binding, ResourceScope scope = ResourceScope::SHARED>
     struct SamplerAllocation : ImageAllocation<set, binding, scope> {
         static constexpr auto ALLOCATION = AllocationKind::SAMPLER;
     };
+
     template<std::uint32_t set, std::uint32_t binding, ResourceScope image_scope = ResourceScope::PER_FRAME, ResourceScope sampler_scope = ResourceScope::SHARED>
     struct TextureAllocation : ImageAllocation<set, binding, image_scope> {
         static constexpr auto ALLOCATION = AllocationKind::TEXTURE;
         static constexpr ResourceScope IMAGE_SCOPE = image_scope, SAMPLER_SCOPE = sampler_scope;
         static constexpr ResourceScope SCOPE = image_scope == ResourceScope::PER_FRAME || sampler_scope == ResourceScope::PER_FRAME ? ResourceScope::PER_FRAME : ResourceScope::SHARED;
     };
+
     template<std::uint32_t set, std::uint32_t binding>
     struct ExternalAllocation {
         static constexpr std::uint32_t SET = set, BINDING = binding;
@@ -156,19 +170,25 @@ namespace VSL_NAMESPACE::typed {
         template<std::uint32_t set_number, std::uint32_t binding>
         requires(Schema::template IsDynamic<set_number, binding>())
         constexpr ResourceAllocationSizes& set(size_t elements);
+
         constexpr const auto& values() const { return _values; }
+
         template<std::uint32_t set, std::uint32_t binding, size_t count>
         requires(Schema::template HasImage<set, binding>() && count == Schema::template Binding<set, binding>::POINT.amount)
         constexpr ResourceAllocationSizes& image(const std::array<ImageCreateInfo, count>& infos);
+
         template<std::uint32_t set, std::uint32_t binding>
         requires(Schema::template HasImage<set, binding>() && Schema::template Binding<set, binding>::POINT.amount == 1)
         constexpr ResourceAllocationSizes& image(ImageCreateInfo info) { return image<set, binding>(std::array{info}); }
+
         template<std::uint32_t set, std::uint32_t binding, size_t count>
         requires(Schema::template HasSampler<set, binding>() && count == Schema::template Binding<set, binding>::POINT.amount)
         constexpr ResourceAllocationSizes& sampler(const std::array<SamplerCreateInfo, count>& infos);
+
         template<std::uint32_t set, std::uint32_t binding>
         requires(Schema::template HasSampler<set, binding>() && Schema::template Binding<set, binding>::POINT.amount == 1)
         constexpr ResourceAllocationSizes& sampler(SamplerCreateInfo info) { return sampler<set, binding>(std::array{info}); }
+
         constexpr ImageCreateInfo image_info(size_t entry, size_t element) const { return _images[Schema::DescriptorIndex(entry, element)]; }
         constexpr SamplerCreateInfo sampler_info(size_t entry, size_t element) const { return _samplers[Schema::DescriptorIndex(entry, element)]; }
     };
@@ -178,10 +198,12 @@ namespace VSL_NAMESPACE::typed {
         size_t elements, instances, buffers, payload_bytes;
         size_t images, samplers;
     };
+
     struct ResourceAllocationTotals {
         size_t buffers = 0, descriptor_sets = 0, descriptors = 0, payload_bytes = 0;
         size_t images = 0, samplers = 0;
     };
+
     template<typename Schema_>
     class ResourceAllocationPlan {
         std::array<ResourceAllocationRecord, Schema_::COUNT> _entries{};
@@ -192,11 +214,13 @@ namespace VSL_NAMESPACE::typed {
     public:
         using Schema = Schema_;
         constexpr explicit ResourceAllocationPlan(size_t frames, const ResourceAllocationSizes<Schema>& sizes = {});
+
         constexpr size_t frame_count() const { return _frames; }
         constexpr const auto& entries() const { return _entries; }
         constexpr const auto& totals() const { return _totals; }
         constexpr const auto& sizes() const& { return _sizes; }
         constexpr const auto& sizes() const&& = delete;
+
         template<std::uint32_t set, std::uint32_t binding>
         requires(!std::is_void_v<typename Schema::template Spec<set, binding>>)
         constexpr const ResourceAllocationRecord& entry() const { return _entries[Schema::Index(set, binding)]; }
@@ -208,6 +232,7 @@ namespace VSL_NAMESPACE::typed {
                 throw std::overflow_error("Typed allocation total overflow");
             return first + second;
         }
+
         constexpr size_t allocation_multiply(size_t first, size_t second) {
             if (first && second > std::numeric_limits<size_t>::max() / first)
                 throw std::overflow_error("Typed allocation size overflow");
@@ -277,6 +302,7 @@ namespace VSL_NAMESPACE::typed {
                 return index;
         throw std::invalid_argument("Unknown typed allocation binding");
     }
+
     template<typename Resources, typename... Specs>
     constexpr size_t ResourceAllocationSchema<Resources, Specs...>::SetIndex(std::uint32_t set) {
         for (size_t index = 0; index < Resources::COUNT; ++index)
@@ -284,6 +310,7 @@ namespace VSL_NAMESPACE::typed {
                 return index;
         throw std::invalid_argument("Unknown typed allocation set");
     }
+
     template<typename Resources, typename... Specs>
     constexpr bool ResourceAllocationSchema<Resources, Specs...>::SetIsPerFrame(std::uint32_t set) {
         for (const auto& entry : ENTRIES)
@@ -291,6 +318,7 @@ namespace VSL_NAMESPACE::typed {
                 return true;
         return false;
     }
+
     template<typename Resources, typename... Specs>
     template<std::uint32_t set, std::uint32_t binding>
     consteval bool ResourceAllocationSchema<Resources, Specs...>::IsDynamic() {
@@ -300,6 +328,7 @@ namespace VSL_NAMESPACE::typed {
         else
             return Allocation::DYNAMIC;
     }
+
     template<typename Resources, typename... Specs>
     template<std::uint32_t set, std::uint32_t binding>
     consteval bool ResourceAllocationSchema<Resources, Specs...>::HasImage() {
@@ -309,6 +338,7 @@ namespace VSL_NAMESPACE::typed {
         else
             return Allocation::ALLOCATION == AllocationKind::IMAGE || Allocation::ALLOCATION == AllocationKind::TEXTURE;
     }
+
     template<typename Resources, typename... Specs>
     template<std::uint32_t set, std::uint32_t binding>
     consteval bool ResourceAllocationSchema<Resources, Specs...>::HasSampler() {
@@ -318,6 +348,7 @@ namespace VSL_NAMESPACE::typed {
         else
             return Allocation::ALLOCATION == AllocationKind::SAMPLER || Allocation::ALLOCATION == AllocationKind::TEXTURE;
     }
+
     template<typename Resources, typename... Specs>
     constexpr size_t ResourceAllocationSchema<Resources, Specs...>::DescriptorIndex(size_t entry, size_t element) {
         if (entry >= COUNT || element >= ENTRIES[entry].descriptors)
@@ -332,6 +363,7 @@ namespace VSL_NAMESPACE::typed {
         for (size_t index = 0; index < Schema::COUNT; ++index)
             _values[index] = Schema::ENTRIES[index].elements;
     }
+
     template<typename Schema>
     template<std::uint32_t set_number, std::uint32_t binding>
     requires(Schema::template IsDynamic<set_number, binding>())
@@ -341,6 +373,7 @@ namespace VSL_NAMESPACE::typed {
         _values[Schema::Index(set_number, binding)] = elements;
         return *this;
     }
+
     template<typename Schema>
     template<std::uint32_t set, std::uint32_t binding, size_t count>
     requires(Schema::template HasImage<set, binding>() && count == Schema::template Binding<set, binding>::POINT.amount)
@@ -350,6 +383,7 @@ namespace VSL_NAMESPACE::typed {
             _images[Schema::DescriptorIndex(entry, i)] = infos[i];
         return *this;
     }
+
     template<typename Schema>
     template<std::uint32_t set, std::uint32_t binding, size_t count>
     requires(Schema::template HasSampler<set, binding>() && count == Schema::template Binding<set, binding>::POINT.amount)
@@ -359,6 +393,7 @@ namespace VSL_NAMESPACE::typed {
             _samplers[Schema::DescriptorIndex(entry, i)] = infos[i];
         return *this;
     }
+
     template<typename Schema>
     constexpr ResourceAllocationPlan<Schema>::ResourceAllocationPlan(size_t frames, const ResourceAllocationSizes<Schema>& sizes)
         : _frames(frames), _sizes(sizes) {

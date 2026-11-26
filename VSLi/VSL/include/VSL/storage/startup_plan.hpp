@@ -12,11 +12,13 @@ namespace VSL_NAMESPACE::storage {
         SURFACE,
         DEVICE
     };
+
     struct StartupRequest {
         typed::ResourceId resource;
         StartupKind kind;
         bool external = false;
     };
+
     struct StartupPlacement {
         typed::ResourceId resource;
         StartupKind kind;
@@ -24,7 +26,9 @@ namespace VSL_NAMESPACE::storage {
         size_t slot, offset;
         static constexpr size_t NO_SLOT = std::numeric_limits<size_t>::max();
     };
+
     constexpr SlotLayout startup_slot_layout(StartupKind kind);
+
     // 一つのplanは一つの破棄単位。同時に起動する資源でも別寿命なら別planにする。
     template<size_t capacity>
     class StartupPlan {
@@ -33,10 +37,12 @@ namespace VSL_NAMESPACE::storage {
 
     public:
         constexpr explicit StartupPlan(std::span<const StartupRequest> requests);
+
         constexpr size_t size() const { return _count; }
         constexpr size_t slots() const { return _slots; }
         constexpr size_t bytes() const { return _bytes; }
         constexpr size_t alignment() const { return _alignment; }
+
         constexpr std::span<const StartupPlacement> placements() const& { return {_placements.data(), _count}; }
         constexpr std::span<const StartupPlacement> placements() const&& = delete;
         constexpr StartupPlacement placement(typed::ResourceId resource) const;
@@ -56,6 +62,7 @@ namespace VSL_NAMESPACE::storage {
         }
         throw std::invalid_argument("Unknown startup implementation kind");
     }
+
     template<size_t capacity>
     constexpr StartupPlan<capacity>::StartupPlan(std::span<const StartupRequest> requests) {
         if (requests.size() > capacity)
@@ -78,6 +85,7 @@ namespace VSL_NAMESPACE::storage {
         if (!std::is_constant_evaluated())
             detail::require_resource_layout(std::integral_constant<std::uint64_t, RESOURCE_LAYOUT_ABI>{});
     }
+
     template<size_t capacity>
     constexpr StartupPlacement StartupPlan<capacity>::placement(typed::ResourceId resource) const {
         for (size_t i = 0; i < _count; ++i)
@@ -85,6 +93,7 @@ namespace VSL_NAMESPACE::storage {
                 return _placements[i];
         throw std::out_of_range("Unknown startup resource ID");
     }
+
     template<size_t capacity>
     constexpr void StartupPlan<capacity>::require_region(size_t bytes, size_t alignment) const {
         if (!std::is_constant_evaluated())

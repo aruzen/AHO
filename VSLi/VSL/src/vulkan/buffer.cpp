@@ -24,6 +24,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 VSL_NAMESPACE::exceptions::MemoryNotHostVisibleException::MemoryNotHostVisibleException(std::string traceinfo) : VSL_NAMESPACE::exceptions::RuntimeException("MemoryNotHostVisibleException",
                                                                                                                                                              "This buffer's memory is not host-visible. Mapping is not allowed.",
                                                                                                                                                              traceinfo) {}
@@ -127,12 +128,15 @@ VSL_NAMESPACE::MemoryProperty VSL_NAMESPACE::BufferAccessor::get_memory_properti
 VSL_NAMESPACE::ResourceUseState& VSL_NAMESPACE::BufferAccessor::use_state() const {
     return lifetime::detail::BufferAccess::Ref(_owner.get()).use();
 }
+
 VSL_NAMESPACE::ResourceUse VSL_NAMESPACE::BufferAccessor::resource_use() const {
     return lifetime::resource_use_for_buffer(_owner, {});
 }
+
 VSL_NAMESPACE::ResourceUse VSL_NAMESPACE::BufferAccessor::resource_use(ResourceUse constraint) const {
     return lifetime::resource_use_for_buffer(_owner, std::move(constraint));
 }
+
 void VSL_NAMESPACE::BufferAccessor::read_into(std::span<std::byte> destination, size_t offset) const {
     const auto owner = _owner;
     lifetime::detail::BufferAccess::Ref(owner.get()).read_into(destination, offset);

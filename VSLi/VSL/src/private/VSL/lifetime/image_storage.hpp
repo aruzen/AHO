@@ -7,6 +7,7 @@ namespace VSL_NAMESPACE::lifetime {
         alignas(impl::ImageImpl) std::byte image[sizeof(impl::ImageImpl)];
         alignas(ResourceUseState) std::byte use[sizeof(ResourceUseState)];
     };
+
     // 未構築かつsizeof/alignof(ImageSlotStorage)を満たす領域を渡す。deviceは呼出側が保持する。
     void construct_image(void* storage, LogicalDeviceAccessor device, const ImageCreateInfo& info, vk::Image borrowed = {});
     void construct_image(void* storage, impl::LogicalDeviceImpl& device, const ImageCreateInfo& info, vk::Image borrowed = {},

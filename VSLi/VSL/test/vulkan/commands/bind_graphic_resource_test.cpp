@@ -29,8 +29,10 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     using BindGraphicResourceVulkanIntegrationTest = vsl_test::ComputeVulkanIntegrationTest;
+
     TEST_F(BindGraphicResourceVulkanIntegrationTest, PublicTrackRejectsAnEmptyResourceBeforeRecordingItsUnrelatedUseGroup) {
         auto manager = make_manager();
         auto phase = manager.start_phase<vsl::ComputePhase>();
@@ -42,6 +44,7 @@ namespace {
         EXPECT_FALSE(DescriptorAccess::Owned(resource)->use.busy());
         phase.cancel();
     }
+
     TEST_F(BindGraphicResourceVulkanIntegrationTest, BothEntriesKeepTheirSnapshotsWhenPollingDestroysTheCommandAndContinuesCancelsOrStartsAPeer) {
         for (const bool track_only : {false, true}) {
             for (const bool tracked : {false, true}) {
@@ -121,6 +124,7 @@ namespace {
             }
         }
     }
+
     TEST_F(BindGraphicResourceVulkanIntegrationTest, BindKeepsItsStartingDescriptorsWhenPollingReplacesTheCommandInputs) {
         for (const bool tracked : {false, true}) {
             SCOPED_TRACE(tracked);
@@ -162,6 +166,7 @@ namespace {
             EXPECT_EQ(actual, zero);
         }
     }
+
     TEST_F(BindGraphicResourceVulkanIntegrationTest, SingleAndVectorResourcesBindToComputeShader) {
         vsl::command::BindGraphicResource command(resource, vsl::graphic_resource::BindingDestination::COMPUTE);
         ASSERT_EQ(command.resources.size(), 1u);
@@ -191,6 +196,7 @@ namespace {
     bool DescriptorResourceLifetimeVulkanIntegrationTest::validate_vulkan() const {
         return true;
     }
+
     TEST_F(DescriptorResourceLifetimeVulkanIntegrationTest, ExplicitPipelineBindsAcrossSeparateStreamExpressions) {
         expect_validation_abort("");
         for (const bool vector_resources : {false, true}) {
@@ -222,6 +228,7 @@ namespace {
             }
         }
     }
+
     TEST_F(DescriptorResourceLifetimeVulkanIntegrationTest, MissingContextRestoresTheConstructorPipelineWithoutKeepingImplicitState) {
         vsl::ComputePipeline other(*layout);
         vsl::command::BindGraphicResource explicit_command(resource, vsl::graphic_resource::BindingDestination::COMPUTE, *pipeline);
@@ -238,6 +245,7 @@ namespace {
         implicit_command.set_pipeline(std::nullopt);
         EXPECT_FALSE(implicit_command.pipeline);
     }
+
     TEST_F(DescriptorResourceLifetimeVulkanIntegrationTest, EmptyBindingPreservesThePreviouslyBoundDescriptorSets) {
         // 検証エラーはテストを失敗させ、不正なコマンドをdriverへ渡さない。
         expect_validation_abort("");
@@ -263,6 +271,7 @@ namespace {
         std::memcpy(actual.data(), mapped.data, sizeof(actual));
         ExpectSequence(actual, base);
     }
+
     TEST_F(DescriptorResourceLifetimeVulkanIntegrationTest, DispatchKeepsDescriptorBufferAndPipelineAliveUntilCompletion) {
         auto manager = make_manager();
         vsl::Completion completion;

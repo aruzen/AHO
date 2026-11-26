@@ -1,11 +1,15 @@
 #include "../../../../VSLi/VSL/src/private/VSL/lifetime/window_access.hpp"
+
 namespace {
     using VSL_NAMESPACE::lifetime::detail::WindowAccess;
 }
+
 #include "../../src/engine/engine_access.hpp"
+
 namespace {
     using AHO_NAMESPACE::engine::detail::EngineAccess;
 }
+
 #pragma once
 #include <VSL/lifetime/startup_access.hpp>
 #include <gtest/gtest.h>
@@ -29,9 +33,11 @@ namespace aho_test {
     protected:
         std::unique_ptr<aho::StandardEngine> engine;
         void SetUp() override;
+
         void start_engine(bool boot_on = true) {
             engine = std::make_unique<aho::StandardEngine>("AHO integration test", boot_on);
         }
+
         void TearDown() override;
     };
 

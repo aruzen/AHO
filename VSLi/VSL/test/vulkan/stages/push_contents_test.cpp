@@ -14,6 +14,7 @@ namespace {
 namespace {
     namespace pl = vsl::pipeline_layout;
     using PushContentsVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
     TEST(PushContentsTest, DefaultAndSingleDefinitionRetainStageSizeAndOffset) {
         pl::PushConstants empty;
         EXPECT_TRUE(empty.definitions.empty());
@@ -27,6 +28,7 @@ namespace {
         ASSERT_EQ(constants.definitions.size(), 1u);
         EXPECT_EQ(constants.definitions[0].size, sizeof(value));
     }
+
     TEST_F(PushContentsVulkanIntegrationTest, InjectsOneContiguousRange) {
         auto layout = make_layout_state();
         pl::PushConstants constants;
@@ -38,6 +40,7 @@ namespace {
         EXPECT_EQ(info.pPushConstantRanges[0].offset, 0u);
         EXPECT_EQ(info.pPushConstantRanges[0].size, 20u);
     }
+
     TEST(PushContentsTest, MultipleDefinitionsHaveConsecutiveOffsets) {
         std::uint32_t first = 0;
         std::array<std::uint32_t, 2> second{};
@@ -48,6 +51,7 @@ namespace {
         for (const auto& definition : definitions)
             EXPECT_EQ(definition.target_shader, vsl::ShaderFlag::COMPUTE);
     }
+
     TEST(PushContentsTest, MixedSizesAccumulateOffsetsInArgumentOrder) {
         const std::array<std::uint32_t, 3> first{1, 2, 3};
         const float second = 4.0f;
@@ -67,6 +71,7 @@ namespace {
         EXPECT_FLOAT_EQ(second, 4.0f);
         EXPECT_EQ(third, (std::array<std::uint32_t, 2>{5, 6}));
     }
+
     TEST(PushContentsTest, EmptyArgumentsProduceAnEmptyDefinitionArray) {
         constexpr auto definitions = pl::PushConstants::MakeDefinitions<vsl::ShaderFlag::COMPUTE>();
         static_assert(definitions.empty());
@@ -81,6 +86,7 @@ namespace {
             VulkanIntegrationTest::SetUp();
         }
     };
+
     vk::PushConstantRange range_for(vsl::PipelineLayoutEditAccessor layout, vk::ShaderStageFlagBits stage) {
         const auto& info = vsl_test::inspect_layout(layout).pipeline_layout;
         unsigned found = 0;
@@ -93,6 +99,7 @@ namespace {
         EXPECT_EQ(found, 1u);
         return result;
     }
+
     TEST_F(PushRangeVulkanIntegrationTest, DifferentStagesCanUseTheSameByteOffsets) {
         auto layout = make_layout_state();
         pl::PushConstants constants;
@@ -104,6 +111,7 @@ namespace {
             EXPECT_EQ(range.size, 8u);
         }
     }
+
     TEST_F(PushRangeVulkanIntegrationTest, OverlappingAndUnorderedDefinitionsCoverTheirUnionOnlyOnce) {
         auto layout = make_layout_state();
         pl::PushConstants constants;
@@ -113,6 +121,7 @@ namespace {
         EXPECT_EQ(range.offset, 8u);
         EXPECT_EQ(range.size, 28u);
     }
+
     TEST_F(PushRangeVulkanIntegrationTest, OverlappingStageMasksDoNotDuplicateAStage) {
         auto layout = make_layout_state();
         pl::PushConstants constants;
@@ -132,6 +141,7 @@ namespace {
         const auto handle = StartupAccess::Owned(device)->device.createPipelineLayoutUnique(vsl_test::inspect_layout(layout).pipeline_layout);
         EXPECT_TRUE(static_cast<bool>(handle));
     }
+
     TEST_F(PushRangeVulkanIntegrationTest, InvalidDefinitionsLeavePreviouslyInjectedRangesUnchanged) {
         auto layout = make_layout_state();
         pl::PushConstants valid;
@@ -159,6 +169,7 @@ namespace {
             }
         }
     }
+
     TEST_F(PushRangeVulkanIntegrationTest, EmptyAndRepeatedInjectionReplaceRangesWithoutChangingOtherStages) {
         auto layout = make_layout_state();
         pl::ColorBlend blend;

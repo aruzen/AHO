@@ -12,6 +12,7 @@ namespace {
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_nothrow_default_constructible_v<impl::BufferImpl>);
     static_assert(std::is_nothrow_default_constructible_v<ResourceUseState>);
+
     namespace {
         struct HeapBufferOwner {
             DependencyNode node;
@@ -20,10 +21,12 @@ namespace VSL_NAMESPACE::lifetime {
             HeapBufferOwner(LogicalDeviceAccessor device, const BufferCreateInfo& info);
             ~HeapBufferOwner();
         };
+
         HeapBufferOwner::HeapBufferOwner(LogicalDeviceAccessor device, const BufferCreateInfo& info) : device(device) {
             require_device_owner(device);
             construct_buffer(storage, *StartupAccess::Owned(device), info);
         }
+
         HeapBufferOwner::~HeapBufferOwner() {
             node.retire();
             destroy_buffer(storage);
@@ -34,6 +37,7 @@ namespace VSL_NAMESPACE::lifetime {
         require_device_owner(device);
         construct_buffer(storage, *StartupAccess::Owned(device), info);
     }
+
     void construct_buffer(void* storage, impl::LogicalDeviceImpl& device, const BufferCreateInfo& info) {
         if (!device.device)
             throw std::invalid_argument("Buffer requires a live device");
@@ -50,10 +54,12 @@ namespace VSL_NAMESPACE::lifetime {
             throw;
         }
     }
+
     BufferRef buffer_at(void* storage) {
         auto* slot = static_cast<BufferSlotStorage*>(storage);
         return detail::BufferAccess::Ref(std::launder(reinterpret_cast<impl::BufferImpl*>(slot->buffer)));
     }
+
     void destroy_buffer(void* storage) noexcept {
         auto* buffer = detail::BufferAccess::Impl(buffer_at(storage));
         auto* slot = static_cast<BufferSlotStorage*>(storage);
@@ -62,6 +68,7 @@ namespace VSL_NAMESPACE::lifetime {
         std::destroy_at(buffer);
         std::destroy_at(slot);
     }
+
     std::shared_ptr<impl::BufferImpl> make_heap_buffer(LogicalDeviceAccessor device, const BufferCreateInfo& info) {
         auto owner = std::make_shared<HeapBufferOwner>(device, info);
         auto* buffer = detail::BufferAccess::Impl(buffer_at(owner->storage));

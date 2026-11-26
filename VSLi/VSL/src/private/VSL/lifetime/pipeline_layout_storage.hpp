@@ -5,6 +5,7 @@ namespace VSL_NAMESPACE::lifetime {
     struct PipelineLayoutSlotStorage {
         alignas(impl::PipelineLayoutImpl) std::byte value[sizeof(impl::PipelineLayoutImpl)];
     };
+
     size_t retain_recipe_owner(std::vector<OwnerRef>& owners, OwnerRef owner);
     void replace_recipe_layouts(impl::PipelineRecipe& recipe, LogicalDeviceAccessor device,
                                 std::span<const graphic_resource::BindingLayout> layouts,

@@ -11,8 +11,10 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     namespace t = vsl::typed;
+
     struct Tint {
         float rgba[4];
     };
@@ -28,6 +30,7 @@ namespace {
         template<typename Pushes, typename Resources = t::ResourceSchema<>>
         auto make_typed(const char* source = "typed_push.vert.spv", const char* frag = "triangle.frag.spv");
     };
+
     class TypedPushComputeVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
@@ -91,6 +94,7 @@ namespace {
         struct Partial {
             float xy[2];
         };
+
         using PartialRecord = t::BlockRecord<Partial, VSL_BLOCK_MEMBER(Partial, xy)>;
         using Pushes = t::PushSchema<t::PushRange<TintRecord, vsl::ShaderFlag::VERTEX>, t::PushRange<PartialRecord, vsl::ShaderFlag::FRAGMENT, 8>>;
         auto typed_pipeline = make_typed<Pushes>("typed_push_overlap.vert.spv", "typed_push_partial.frag.spv");
@@ -130,6 +134,7 @@ namespace {
         struct Base {
             std::uint32_t value;
         };
+
         using BaseRecord = t::BlockRecord<Base, VSL_BLOCK_MEMBER(Base, value)>;
         using Pushes = t::PushSchema<t::PushRange<BaseRecord, vsl::ShaderFlag::COMPUTE>>;
         using Output = t::DescriptorSet<0, t::StorageBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;

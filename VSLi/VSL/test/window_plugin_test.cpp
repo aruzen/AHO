@@ -1,11 +1,14 @@
 #include "../src/private/VSL/lifetime/window_access.hpp"
+
 namespace {
     using VSL_NAMESPACE::lifetime::detail::WindowAccess;
 }
+
 #include "support/window_fixture.hpp"
 
 namespace {
     using WindowPluginWindowIntegrationTest = vsl_test::WindowIntegrationTest;
+
     TEST_F(WindowPluginWindowIntegrationTest, QuietCloseHonorsNativeShouldCloseFlag) {
         vsl::window_plugin::QuietClose plugin(&*window);
         EXPECT_EQ(plugin.requested_id(), vsl::window_plugin::QuietClose::QUIET_CLOSE_USED_ID);
@@ -15,6 +18,7 @@ namespace {
         EXPECT_TRUE(plugin.on_update(*window));
         EXPECT_FALSE(static_cast<bool>(*window));
     }
+
     TEST_F(WindowPluginWindowIntegrationTest, CloseHookInvokesCallbackOnlyWhenRequested) {
         int called = 0;
         vsl::window_plugin::HookShouldClose hook(&*window, [&](auto copy) {
@@ -27,6 +31,7 @@ namespace {
         EXPECT_TRUE(hook.on_update(*window));
         EXPECT_EQ(called, 1);
     }
+
     TEST_F(WindowPluginWindowIntegrationTest, ResizeHookRoutesFramebufferDimensionsToCallback) {
         int called = 0, width = 0, height = 0;
         auto plugin = window->add_plugin<vsl::window_plugin::HookResize>([&](auto copy, int w, int h) {
@@ -45,6 +50,7 @@ namespace {
         EXPECT_EQ(width, 128);
         EXPECT_EQ(height, 96);
     }
+
     TEST_F(WindowPluginWindowIntegrationTest, ResizeHookCanCreateWindowsWithoutInvalidatingDispatch) {
         vsl::PureWindow other("resize hook neighbor", 32, 24);
         std::vector<vsl::PureWindow> created;
@@ -71,6 +77,7 @@ namespace {
             added.close();
         other.close();
     }
+
     TEST_F(WindowPluginWindowIntegrationTest, CloseHookCanBeAddedWithPublicPluginHelper) {
         int called = 0;
         auto hook = window->add_plugin<vsl::window_plugin::HookShouldClose>([&](vsl::PureWindow copy) {
@@ -103,6 +110,7 @@ namespace {
         EXPECT_TRUE(vsl::PureWindow::Update());
         EXPECT_EQ(calls, 1);
     }
+
     TEST_F(WindowPluginWindowIntegrationTest, ResizeCallbackCanReplaceItsOwnRegistrationAndContinue) {
         int calls = 0;
         std::shared_ptr<vsl::window_plugin::HookResize> replacement;

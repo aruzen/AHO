@@ -1,7 +1,9 @@
 #include "../../src/private/VSL/lifetime/window_access.hpp"
+
 namespace {
     using VSL_NAMESPACE::lifetime::detail::WindowAccess;
 }
+
 #include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/image_access.hpp>
@@ -21,10 +23,12 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::detail::ImageAccess;
 }
+
 namespace {
     class SwapchainWindowIntegrationTest : public vsl_test::WindowIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     TEST_F(SwapchainWindowIntegrationTest, EmptyOldAccessorIsRejectedBeforeNativeCreation) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
@@ -39,13 +43,16 @@ namespace {
             GTEST_SKIP() << "Selected graphics queue cannot present to this surface";
         vsl::Swapchain original(device, surface, std::nullopt, 64, 48);
         vsl::PureWindow other("other swapchain surface", 64, 48);
+
         struct CloseWindow {
             vsl::PureWindow& window;
+
             ~CloseWindow() {
                 WindowAccess::State(window)->plugins.clear();
                 window.close();
             }
         } close{other};
+
         auto other_surface = other.add_plugin<vsl::Surface>(vsl::lifetime::detail::StartupAccess::FromShared(instance));
         if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, StartupAccess::Owned(*(other_surface))->surface))
             GTEST_SKIP() << "Selected graphics queue cannot present to the second surface";
@@ -82,6 +89,7 @@ namespace {
     class SwapchainReadbackWindowIntegrationTest : public vsl_test::WindowIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     TEST_F(SwapchainReadbackWindowIntegrationTest, ReadsAcquiredSwapchainImageAndRetainsBorrowedImageOwner) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
@@ -125,6 +133,7 @@ namespace {
 } // namespace
 
 #include "../../src/vulkan/swapchain_sharing.hpp"
+
 namespace {
     TEST(SwapchainSharingTest, ConcurrentImagesKeepEverySelectedSurfaceTransform) {
         const std::uint32_t families[]{2, 7};
@@ -141,6 +150,7 @@ namespace {
             EXPECT_EQ(info.pQueueFamilyIndices[1], 7u);
         }
     }
+
     TEST(SwapchainSharingTest, ExclusiveImagesKeepTransformAndNeedNoFamilyList) {
         const std::uint32_t families[]{4, 4};
         vk::SwapchainCreateInfoKHR info{};
@@ -150,6 +160,7 @@ namespace {
         EXPECT_EQ(info.queueFamilyIndexCount, 0u);
         EXPECT_EQ(info.pQueueFamilyIndices, nullptr);
     }
+
     TEST(SwapchainSharingTest, ReconfiguringForOneFamilyClearsThePreviousFamilyList) {
         const std::uint32_t different[]{1, 3}, same[]{1, 1};
         vk::SwapchainCreateInfoKHR info{};
@@ -160,6 +171,7 @@ namespace {
         EXPECT_EQ(info.queueFamilyIndexCount, 0u);
         EXPECT_EQ(info.pQueueFamilyIndices, nullptr);
     }
+
     TEST(SwapchainSharingTest, ReconfiguringForTwoFamiliesUpdatesTransformAndFamilyList) {
         const std::uint32_t same[]{1, 1}, different[]{1, 3};
         vk::SwapchainCreateInfoKHR info{};
@@ -201,6 +213,7 @@ namespace {
                                vk::CompositeAlphaFlagBitsKHR::ePostMultiplied | vk::CompositeAlphaFlagBitsKHR::eInherit;
         EXPECT_EQ(vsl::impl::helper::choose_swapchain_composite_alpha(supported), vk::CompositeAlphaFlagBitsKHR::eOpaque);
     }
+
     TEST(SwapchainCompositeAlphaTest, EverySingleSupportedModeIsSelected) {
         for (const auto mode : {vk::CompositeAlphaFlagBitsKHR::eOpaque, vk::CompositeAlphaFlagBitsKHR::ePreMultiplied,
                                 vk::CompositeAlphaFlagBitsKHR::ePostMultiplied, vk::CompositeAlphaFlagBitsKHR::eInherit}) {
@@ -208,6 +221,7 @@ namespace {
             EXPECT_EQ(vsl::impl::helper::choose_swapchain_composite_alpha(mode), mode);
         }
     }
+
     TEST(SwapchainCompositeAlphaTest, CombinedFallbackModesNeverSelectAnUnsupportedFlag) {
         for (const auto supported : {
                  vk::CompositeAlphaFlagBitsKHR::ePreMultiplied | vk::CompositeAlphaFlagBitsKHR::ePostMultiplied,
@@ -219,9 +233,11 @@ namespace {
             EXPECT_NE(selected, vk::CompositeAlphaFlagBitsKHR::eOpaque);
         }
     }
+
     TEST(SwapchainCompositeAlphaTest, EmptySupportIsRejectedBeforeNativeCreation) {
         EXPECT_THROW(vsl::impl::helper::choose_swapchain_composite_alpha({}), vsl::exceptions::RuntimeException);
     }
+
     TEST_F(SwapchainWindowIntegrationTest, NativeSurfaceSupportsTheSelectedCompositeAlpha) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
@@ -241,9 +257,12 @@ namespace swapchain_value_test {
         vsl::lifetime::DependencyNode node;
         std::shared_ptr<void> release;
         vsl::impl::SwapchainImpl value;
+
         ~Metadata() { node.retire(); }
     };
+
     vsl::SwapchainAccessor make_metadata(size_t images, std::shared_ptr<void> release = {});
+
     vsl::SwapchainAccessor make_metadata(size_t images, std::shared_ptr<void> release) {
         auto owner = std::make_shared<Metadata>();
         owner->release = std::move(release);
@@ -259,6 +278,7 @@ namespace swapchain_value_test {
         auto* value = &owner->value;
         return SwapchainAccess::FromOwned(owner->node.ref(owner).alias(value), std::move(values));
     }
+
     TEST(SwapchainValueTest, AssignmentPublishesTheOwnerAndEveryImageBeforeReentrantRelease) {
         for (const bool destroy : {false, true}) {
             SCOPED_TRACE(destroy);
@@ -289,6 +309,7 @@ namespace swapchain_value_test {
             }
         }
     }
+
     TEST(SwapchainValueTest, CopiesMovesAndOwningImageValuesPreserveTheirIndependentLifetimes) {
         auto original = make_metadata(2);
         auto copied = original;
@@ -312,6 +333,7 @@ namespace swapchain_value_test {
         EXPECT_TRUE(image_owner.expired());
         EXPECT_THROW(moved.image(0), std::out_of_range);
     }
+
     TEST(SwapchainValueTest, RetiredMetadataRejectsOwnerPublicationWithoutPreventingExistingValueCleanup) {
         auto value = make_metadata(1);
         const auto owner = SwapchainAccess::Owned(value);

@@ -55,6 +55,7 @@ namespace {
 #ifndef AHO_GPU_TESTS
 namespace {
     using GeneralBuffer = aho::resource::Buffer<aho::resource::BufferType::GENERAL>;
+
     class GeneralBufferTest : public testing::TestWithParam<std::size_t> {};
 
     TEST_P(GeneralBufferTest, ConstructorReportsRequestedSizeAndWritableStorage) {
@@ -72,6 +73,7 @@ namespace {
     }
 
     INSTANTIATE_TEST_SUITE_P(AllocationBoundaries, GeneralBufferTest, testing::Values(std::size_t{0}, std::size_t{1}, std::size_t{7}, std::size_t{257}));
+
     TEST(GeneralBufferOwnershipTest, OwningAllocationRequiresNontrivialDestruction) {
         EXPECT_FALSE(std::is_trivially_destructible_v<GeneralBuffer>);
     }
@@ -124,8 +126,10 @@ namespace {
         EXPECT_EQ(static_cast<unsigned char*>(assigned.data())[7], 0x6b);
     }
 } // namespace
+
 namespace {
     namespace resource = aho::resource;
+
     TEST(GeneralBufferCapacityTest, ReserveResizeAndAliasesShareStorageWithoutGrowingWithinCapacity) {
         resource::Buffer<resource::BufferType::GENERAL> buffer(4);
         EXPECT_EQ(buffer.size(), 4u);
@@ -167,6 +171,7 @@ namespace {
         EXPECT_GE(buffer.capacity(), 4u);
     }
 } // namespace
+
 namespace {
     TEST(GeneralBufferCapacityTest, AssignmentFromOwnSubrangeAndConstAccessKeepSharedMetadata) {
         General buffer(8);
@@ -202,6 +207,7 @@ TEST(GeneralBufferOwnershipTest, LastOwnerDestructionReleasesTheArray) {
     }
     EXPECT_NE(__asan_address_is_poisoned(storage), 0);
 }
+
 #undef AHO_BUFFER_TEST_ASAN
 #endif
 
@@ -220,19 +226,24 @@ namespace {
 
     struct ObservedStorage : NativeHost {
         std::shared_ptr<std::function<void()>> released;
+
         ObservedStorage(vsl::LogicalDeviceAccessor device, size_t bytes, std::shared_ptr<std::function<void()>> released)
             : NativeHost(device, bytes), released(std::move(released)) {}
+
         ObservedStorage(ObservedStorage&& other) noexcept
             : NativeHost(std::move(other)), released(std::move(other.released)) { VSL_NAMESPACE::lifetime::detail::BufferAccess::Owned(other).reset(); }
+
         ~ObservedStorage() override {
             if (VSL_NAMESPACE::lifetime::detail::BufferAccess::Owned(*this) && released && *released)
                 (*released)();
         }
     };
+
     struct ObservedCustomization {
         vsl::LogicalDeviceAccessor device;
         std::shared_ptr<std::function<void()>> released;
         std::function<void()> preparing;
+
         ObservedStorage reallocate(const ObservedStorage&, size_t bytes) {
             if (preparing)
                 preparing();
@@ -285,6 +296,7 @@ namespace {
         EXPECT_THROW((aho::resource::Buffer<aho::resource::BufferType::GPU_FRIENDLY>(vsl::LogicalDeviceAccessor{})), std::invalid_argument);
     }
 } // namespace
+
 namespace {
     TEST_F(GPUFriendlyBufferVulkanIntegrationTest, OldGenerationCallbacksSeeTheCommittedOwnerSizeAndContents) {
         for (const auto operation : {0, 1, 2}) {
@@ -318,6 +330,7 @@ namespace {
             *released = {};
         }
     }
+
     TEST_F(GPUFriendlyBufferVulkanIntegrationTest, CustomPreparationCannotReenterTheSameLogicalBufferMutation) {
         auto released = std::make_shared<std::function<void()>>();
         std::function<void()> reenter;
@@ -340,23 +353,30 @@ namespace {
         EXPECT_NO_THROW(buffer.reserve(8));
         EXPECT_EQ(buffer.read(4)[0], std::as_bytes(std::span(&value, 1))[0]);
     }
+
     TEST_F(GPUFriendlyBufferVulkanIntegrationTest, FailedCandidateAssignmentKeepsTheOriginalGenerationAndData) {
         struct Customization {
             vsl::LogicalDeviceAccessor device;
             std::shared_ptr<bool> fail;
+
             struct Mapping {
                 NativeHost::LocalBufferHolder mapped;
                 std::shared_ptr<bool> fail;
+
                 auto read(size_t bytes, size_t offset = 0) { return mapped.read(bytes, offset); }
+
                 void write(std::span<const std::byte> bytes, size_t offset) {
                     if (*fail)
                         throw std::runtime_error("Injected candidate write failure");
                     mapped.write(bytes, offset);
                 }
             };
+
             Mapping map(NativeHost& storage) { return {storage.data(), fail}; }
+
             NativeHost reallocate(const NativeHost&, size_t bytes) { return {device, bytes}; }
         };
+
         auto fail = std::make_shared<bool>(false);
         auto buffer = aho::resource::make_custom_buffer(NativeHost(device, 4), Customization{device, fail});
         const std::array<std::uint32_t, 2> values{17, 31};
@@ -376,6 +396,7 @@ namespace {
         EXPECT_NO_THROW(buffer.assign(std::as_bytes(std::span(values))));
         EXPECT_EQ(buffer.size(), 8u);
     }
+
     TEST_F(GPUFriendlyBufferVulkanIntegrationTest, GenerationStorageDependencyRejectsAnIndirectDescriptorCycle) {
         namespace t = vsl::typed;
         namespace l = vsl::lifetime;
@@ -401,6 +422,7 @@ namespace {
         EXPECT_THROW(set.write<0>(View::FromView(vsl::BufferView::FromBuffer(independent.native()), 1, 0, snapshot.constraints())), std::invalid_argument);
         EXPECT_NO_THROW(set.write<0>(View::FromView(vsl::BufferView::FromBuffer(independent.native()), 1)));
     }
+
     TEST_F(GPUFriendlyBufferVulkanIntegrationTest, PreparationMayReleaseTheFacadeWhileTheTransactionKeepsItsStateAlive) {
         for (const auto operation : {0, 1, 2}) {
             auto released = std::make_shared<std::function<void()>>();
@@ -477,6 +499,7 @@ namespace {
     TEST_F(GPUFriendlyBufferVulkanIntegrationTest, InvalidCustomReallocationLeavesTheOriginalStorageIntact) {
         struct TooSmallAllocation {
             vsl::LogicalDeviceAccessor device;
+
             NativeHost reallocate(const NativeHost&, std::size_t) { return NativeHost(device, 1); }
         };
 
@@ -495,10 +518,13 @@ namespace {
         struct ContextStorage : NativeHost {
             std::weak_ptr<int> context;
             std::shared_ptr<bool> destroyed_without_context;
+
             ContextStorage(vsl::LogicalDeviceAccessor device, const std::shared_ptr<int>& context, std::shared_ptr<bool> result)
                 : NativeHost(device, 4), context(context), destroyed_without_context(std::move(result)) {}
+
             ContextStorage(ContextStorage&&) = default;
             ContextStorage(const ContextStorage&) = delete;
+
             ~ContextStorage() override {
                 if (VSL_NAMESPACE::lifetime::detail::BufferAccess::Owned(*this) && context.expired())
                     *destroyed_without_context = true;

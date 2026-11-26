@@ -15,6 +15,7 @@ namespace VSL_NAMESPACE::lifetime {
 
     public:
         LogicalDeviceAccessor device() const { return _device; }
+
         const std::optional<std::vector<DescriptorLayoutCreateInfo>>& pending_layouts() const&;
         const std::optional<std::vector<DescriptorLayoutCreateInfo>>& pending_layouts() const&& = delete;
         PipelineRecipeSnapshot with_layouts(std::span<const graphic_resource::BindingLayout> layouts) const;
@@ -27,12 +28,15 @@ namespace VSL_NAMESPACE::lifetime {
         explicit PipelineRecipeDraft(LogicalDeviceAccessor device);
         PipelineRecipeDraft(const PipelineRecipeDraft&) = delete;
         PipelineRecipeDraft& operator=(const PipelineRecipeDraft&) = delete;
+
         template<pipeline_layout_injecter... Stages>
         void inject(Stages&&... stages) {
             helper::expansion_pipeline_layout_args(*this, std::forward<Stages>(stages)...);
         }
+
         PipelineRecipeSnapshot snapshot() const;
     };
+
     GraphicsPipeline make_graphics_pipeline(PipelineRecipeSnapshot recipe, RenderPassAccessor pass, std::uint32_t subpass, typed::HeapStorage);
     GraphicsPipeline make_graphics_pipeline(PipelineRecipeSnapshot recipe, RenderPassAccessor pass, std::uint32_t subpass, typed::ArenaStorage<>);
     ComputePipeline make_compute_pipeline(PipelineRecipeSnapshot recipe, typed::HeapStorage);
@@ -63,6 +67,7 @@ namespace VSL_NAMESPACE::lifetime {
         }
         return recipe.with_layouts(layouts);
     }
+
     template<size_t capacity>
     PipelineRecipeSnapshot materialize_recipe(PipelineRecipeSnapshot recipe, typed::ArenaStorage<>) {
         if (!recipe.pending_layouts() || recipe.pending_layouts()->empty())

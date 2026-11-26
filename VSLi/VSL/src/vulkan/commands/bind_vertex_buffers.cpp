@@ -12,6 +12,7 @@ namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
     using VSL_NAMESPACE::lifetime::detail::BufferAccess;
 } // namespace
+
 VSL_NAMESPACE::BufferIdentity VSL_NAMESPACE::command::BindVertexBufferAt::identity() const {
     return lifetime::detail::IdentityAccess::From<BufferIdentity>(_source);
 }

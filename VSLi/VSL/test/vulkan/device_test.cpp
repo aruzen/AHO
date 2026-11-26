@@ -7,6 +7,7 @@ namespace {
 
 namespace {
     using DeviceVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
     TEST(PhysicalDeviceTypeTest, NumericTypesMapToNamedCategoriesAndUnknownFallsBack) {
         using namespace vsl::physical_device_type;
         EXPECT_STREQ(get_type(0).name(), "OTHER");
@@ -16,6 +17,7 @@ namespace {
         EXPECT_STREQ(get_type(4).name(), "CPU");
         EXPECT_STREQ(get_type(99).name(), "OTHER");
     }
+
     TEST_F(DeviceVulkanIntegrationTest, ReportsHardwarePropertiesAndLoadsEmptyCaches) {
         const auto expected = StartupAccess::Owned(physical)->device.getProperties();
         StartupAccess::Owned(physical)->props.reset();
@@ -29,6 +31,7 @@ namespace {
         EXPECT_EQ(type.index(), static_cast<char>(expected.deviceType));
         EXPECT_TRUE(StartupAccess::Owned(physical)->props.has_value());
     }
+
     TEST_F(DeviceVulkanIntegrationTest, EnumeratesDevicesFromAnExistingVulkanAccessor) {
         vsl::PhysicalDevices<vsl::PhysicalDevicesSercher> devices(vsl::lifetime::detail::StartupAccess::FromShared(instance));
         const auto found = devices.get();
@@ -39,9 +42,12 @@ namespace {
             EXPECT_FALSE(item.name().empty());
     }
 } // namespace
+
 #include "support/window_fixture.hpp"
+
 namespace {
     using LogicalDeviceWindowIntegrationTest = vsl_test::WindowIntegrationTest;
+
     TEST_F(LogicalDeviceWindowIntegrationTest, ForeignInstanceSurfaceIsRejectedBeforeLogicalDeviceCreation) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
@@ -56,6 +62,7 @@ namespace {
         using Device = vsl::LogicalDevice<vsl::GraphicsDeviceCreator<false>>;
         EXPECT_THROW((Device(selected, *surface)), std::invalid_argument);
     }
+
     TEST_F(LogicalDeviceWindowIntegrationTest, BothSurfaceOverloadsCreateUsableQueuesAndRetainPhysicalOwner) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
@@ -80,6 +87,7 @@ namespace {
         StartupAccess::Owned(by_pointer)->device.waitIdle();
         StartupAccess::Owned(by_value)->device.waitIdle();
     }
+
     TEST_F(DeviceVulkanIntegrationTest, SearchReturnsAnEnumeratedDeviceAndBenchmarkMatchesHardwareClass) {
         vsl::PhysicalDevices<vsl::PhysicalDevicesSercher> candidates(vsl::lifetime::detail::StartupAccess::FromShared(instance));
         auto selected = candidates.search();
@@ -102,15 +110,18 @@ namespace {
         static inline vsl::LogicalDeviceAccessor SUPPLIED;
         static inline std::shared_ptr<vsl::impl::PhysicalDeviceImpl> RECEIVED_PHYSICAL;
         static inline std::shared_ptr<vsl::impl::SurfaceImpl> RECEIVED_SURFACE;
+
         vsl::LogicalDeviceAccessor create(vsl::PhysicalDevice physical, vsl::Surface surface) {
             RECEIVED_PHYSICAL = StartupAccess::Shared(physical);
             RECEIVED_SURFACE = StartupAccess::Shared(surface);
             return SUPPLIED;
         }
     };
+
     TEST_F(LogicalDeviceWindowIntegrationTest, CustomCreatorLinksForBothSurfaceOverloadsAndPinsThePhysicalOwner) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
+
         struct ResetCreator {
             ~ResetCreator() {
                 SuppliedLogicalDeviceCreator::SUPPLIED = {};
@@ -118,6 +129,7 @@ namespace {
                 SuppliedLogicalDeviceCreator::RECEIVED_SURFACE.reset();
             }
         } cleanup;
+
         SuppliedLogicalDeviceCreator::SUPPLIED = device;
         using Device = vsl::LogicalDevice<SuppliedLogicalDeviceCreator>;
         Device by_value(physical, *surface);
@@ -137,23 +149,28 @@ namespace {
 } // namespace
 
 #include <functional>
+
 namespace {
     struct ConfiguredDeviceBenchmark {
         static inline std::function<void()> CONSTRUCT;
         static inline std::function<int(vsl::PhysicalDevice)> EVALUATE;
+
         ConfiguredDeviceBenchmark() {
             const auto callback = CONSTRUCT;
             if (callback)
                 callback();
         }
+
         int benchmark(vsl::PhysicalDevice device) { return EVALUATE(std::move(device)); }
     };
+
     struct ClearDeviceBenchmark {
         ~ClearDeviceBenchmark() {
             ConfiguredDeviceBenchmark::CONSTRUCT = {};
             ConfiguredDeviceBenchmark::EVALUATE = {};
         }
     };
+
     TEST_F(DeviceVulkanIntegrationTest, CustomSearcherKeepsTheHighestNonnegativeScoreAndFirstTie) {
         ClearDeviceBenchmark cleanup;
         vsl::PhysicalDevices<ConfiguredDeviceBenchmark> devices(vsl::lifetime::detail::StartupAccess::FromShared(instance));
@@ -180,6 +197,7 @@ namespace {
             EXPECT_EQ(StartupAccess::Owned(selected), visited[expected]);
         }
     }
+
     TEST_F(DeviceVulkanIntegrationTest, CustomSearcherSurvivesSourceDestructionDuringItsConstructorAndBenchmark) {
         ClearDeviceBenchmark cleanup;
         using Devices = vsl::PhysicalDevices<ConfiguredDeviceBenchmark>;
@@ -203,6 +221,7 @@ namespace {
         EXPECT_EQ(StartupAccess::Owned(selected), StartupAccess::Owned(visited.back()));
         EXPECT_FALSE(selected.get_instance().owner_ref().weak().expired());
     }
+
     TEST_F(DeviceVulkanIntegrationTest, CustomSearcherRejectsNegativeScoresAndEmptyEnumerations) {
         ClearDeviceBenchmark cleanup;
         vsl::PhysicalDevices<ConfiguredDeviceBenchmark> devices(vsl::lifetime::detail::StartupAccess::FromShared(instance));

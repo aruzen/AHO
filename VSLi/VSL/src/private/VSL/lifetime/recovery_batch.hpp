@@ -11,6 +11,7 @@ namespace VSL_NAMESPACE::lifetime {
     struct AcquireTicket;
     void recover_command_domain(CommandDomain& domain);
     void collect_acquire_scope(AcquireTicket& ticket, bool wait = false) noexcept;
+
     // Native結果と取消状態をcommitする外側scopeに置く。Native guard自身からは回収しない。
     class SurfaceRetirementCollection {
         std::shared_ptr<impl::LogicalDeviceImpl> _device;

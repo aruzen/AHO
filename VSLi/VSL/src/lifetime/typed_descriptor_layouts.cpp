@@ -23,6 +23,7 @@ namespace VSL_NAMESPACE::typed::detail {
             throw std::invalid_argument("Typed layout collection requires owning live sources");
         return lifetime::device_from_child(DescriptorAccess::Owned(first));
     }
+
     void validate_descriptor_layout_source(LogicalDeviceAccessor device, const graphic_resource::BindingLayout& layout,
                                            std::span<const graphic_resource::BindingPoint> points) {
         lifetime::require_device_owner(device);
@@ -30,6 +31,7 @@ namespace VSL_NAMESPACE::typed::detail {
             throw std::invalid_argument("Typed layout collection requires device and source owners");
         operation::validate_descriptor_layout(*DescriptorAccess::Owned(layout), *StartupAccess::Owned(device), points);
     }
+
     void inject_descriptor_layouts(PipelineLayoutEditAccessor layout, LogicalDeviceAccessor device,
                                    std::span<const graphic_resource::BindingLayout> sources, std::span<const std::uint32_t> numbers,
                                    const std::optional<graphic_resource::BindingLayout>& empty, std::uint32_t set_count) {

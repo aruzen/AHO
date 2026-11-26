@@ -24,12 +24,15 @@ namespace {
         DESTROY_MESSENGER,
         DESTROY_INSTANCE
     };
+
     struct NativeProbe {
         std::vector<Event> events;
         std::atomic<size_t> validation_errors = 0;
         bool fail_instance = false, fail_messenger = false;
+
         NativeProbe() { events.reserve(8); }
         ~NativeProbe() { EXPECT_EQ(validation_errors.load(), 0u); }
+
         o::InstanceNativeCalls calls();
         static VkResult CreateInstance(void* context, const VkInstanceCreateInfo* info, VkInstance* instance);
         static VkResult CreateMessenger(void* context, VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* info, VkDebugUtilsMessengerEXT* messenger);
@@ -38,13 +41,16 @@ namespace {
         static VKAPI_ATTR VkBool32 VKAPI_CALL ValidationCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT,
                                                                  const VkDebugUtilsMessengerCallbackDataEXT* data, void* context) noexcept;
     };
+
     struct SlotOwner {
         alignas(l::InstanceSlotStorage) std::byte memory[sizeof(l::InstanceSlotStorage)];
         bool constructed = false;
         ~SlotOwner();
         void construct(vsl::InstanceCreateInfo info, const o::InstanceNativeCalls& calls = {});
+
         vsl::impl::VulkanImplAccessor& value() { return l::instance_at(memory); }
     };
+
     struct PairOwner {
         l::DependencyNode node;
         alignas(l::InstanceSlotStorage) std::byte memory[2 * sizeof(l::InstanceSlotStorage)];
@@ -52,8 +58,10 @@ namespace {
         explicit PairOwner(vsl::InstanceCreateInfo info);
         ~PairOwner();
         void clear() noexcept;
+
         void* slot(size_t index) { return memory + index * sizeof(l::InstanceSlotStorage); }
     };
+
     class InstanceStorageVulkanIntegrationTest : public testing::Test {
     protected:
         void SetUp() override;
@@ -64,6 +72,7 @@ namespace {
     o::InstanceNativeCalls NativeProbe::calls() {
         return {this, CreateInstance, CreateMessenger, DestroyInstance, DestroyMessenger};
     }
+
     VkResult NativeProbe::CreateInstance(void* context, const VkInstanceCreateInfo* info, VkInstance* instance) {
         auto& probe = *static_cast<NativeProbe*>(context);
         probe.events.push_back(Event::CREATE_INSTANCE);
@@ -81,6 +90,7 @@ namespace {
         }
         return vkCreateInstance(&actual, nullptr, instance);
     }
+
     VkResult NativeProbe::CreateMessenger(void* context, VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* info, VkDebugUtilsMessengerEXT* messenger) {
         auto& probe = *static_cast<NativeProbe*>(context);
         probe.events.push_back(Event::CREATE_MESSENGER);
@@ -94,15 +104,18 @@ namespace {
         actual.pUserData = context;
         return create(instance, &actual, nullptr, messenger);
     }
+
     void NativeProbe::DestroyInstance(void* context, VkInstance instance) noexcept {
         static_cast<NativeProbe*>(context)->events.push_back(Event::DESTROY_INSTANCE);
         vkDestroyInstance(instance, nullptr);
     }
+
     void NativeProbe::DestroyMessenger(void* context, VkInstance instance, VkDebugUtilsMessengerEXT messenger) noexcept {
         static_cast<NativeProbe*>(context)->events.push_back(Event::DESTROY_MESSENGER);
         const auto destroy = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
         destroy(instance, messenger, nullptr);
     }
+
     VKAPI_ATTR VkBool32 VKAPI_CALL NativeProbe::ValidationCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT,
                                                                    const VkDebugUtilsMessengerCallbackDataEXT* data, void* context) noexcept {
         if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
@@ -111,16 +124,19 @@ namespace {
         }
         return VK_FALSE;
     }
+
     SlotOwner::~SlotOwner() {
         if (constructed)
             l::destroy_instance(memory);
     }
+
     void SlotOwner::construct(vsl::InstanceCreateInfo info, const o::InstanceNativeCalls& calls) {
         if (constructed)
             throw std::logic_error("Test slot is already constructed");
         l::construct_instance(memory, std::move(info), calls);
         constructed = true;
     }
+
     PairOwner::PairOwner(vsl::InstanceCreateInfo info) {
         try {
             for (; constructed < 2; ++constructed)
@@ -130,14 +146,17 @@ namespace {
             throw;
         }
     }
+
     PairOwner::~PairOwner() {
         node.retire();
         clear();
     }
+
     void PairOwner::clear() noexcept {
         while (constructed)
             l::destroy_instance(slot(--constructed));
     }
+
     vsl::InstanceCreateInfo InstanceStorageVulkanIntegrationTest::info(bool validation) const {
         vsl::InstanceCreateInfo result;
         result.application_name = "instance placement test";
@@ -148,6 +167,7 @@ namespace {
                 result.extensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
         return result;
     }
+
     bool InstanceStorageVulkanIntegrationTest::validation_available() const {
         const std::array<std::string, 1> layers{"VK_LAYER_KHRONOS_validation"};
         if (!o::instance_layers_supported(layers))
@@ -157,6 +177,7 @@ namespace {
         extensions.insert(extensions.end(), extra.begin(), extra.end());
         return std::ranges::any_of(extensions, [](const auto& extension) { return std::strcmp(extension.extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0; });
     }
+
     void InstanceStorageVulkanIntegrationTest::SetUp() {
         try {
             (void)vsl::VulkanAccessor::Create(info());
@@ -164,6 +185,7 @@ namespace {
             GTEST_SKIP() << "Vulkan driver unavailable: " << error.what();
         }
     }
+
     TEST(InstancePlacementTest, RuntimeAliasesShareOneExactNonPolymorphicSlotLayout) {
         static_assert(std::same_as<vsl::impl::VulkanImpl<true>, vsl::impl::VulkanImpl<false>>);
         static_assert(!std::is_polymorphic_v<vsl::impl::VulkanImplAccessor>);
@@ -174,6 +196,7 @@ namespace {
         EXPECT_EQ(s::INSTANCE_SLOT_SIZE, s::checked_align(s::INSTANCE_IMPL_SIZE, s::INSTANCE_SLOT_ALIGNMENT));
         EXPECT_THROW(vsl::VulkanAccessor{}.owner_ref(), std::invalid_argument);
     }
+
     TEST_F(InstanceStorageVulkanIntegrationTest, HeadlessHeapCreationKeepsItsCanonicalOwnerAfterTheOriginalFacadeIsGone) {
         std::weak_ptr<void> owner;
         vsl::VulkanAccessor saved;
@@ -192,6 +215,7 @@ namespace {
         saved = {};
         EXPECT_TRUE(owner.expired());
     }
+
     TEST_F(InstanceStorageVulkanIntegrationTest, TwoSameTypeSlotsUseDirectOffsetsAndOneExternalOwner) {
         auto owner = std::make_shared<PairOwner>(info());
         owner->node.publish(owner);
@@ -215,6 +239,7 @@ namespace {
         b = {};
         EXPECT_TRUE(weak.expired());
     }
+
     TEST_F(InstanceStorageVulkanIntegrationTest, ValidationCreationAndExplicitDestructionUseNativeDependencyOrderExactlyOnce) {
         if (!validation_available())
             GTEST_SKIP() << "VK_LAYER_KHRONOS_validation is unavailable";
@@ -232,6 +257,7 @@ namespace {
         }
         EXPECT_EQ(probe.events, (std::vector<Event>{Event::CREATE_INSTANCE, Event::CREATE_MESSENGER, Event::DESTROY_MESSENGER, Event::DESTROY_INSTANCE}));
     }
+
     TEST_F(InstanceStorageVulkanIntegrationTest, FailedInstanceOutputIsNotPublishedAndTheSameCpuSlotCanBeRetried) {
         NativeProbe probe;
         probe.fail_instance = true;
@@ -245,6 +271,7 @@ namespace {
         o::destroy_instance(slot.value(), probe.calls());
         EXPECT_EQ(probe.events, (std::vector<Event>{Event::CREATE_INSTANCE, Event::CREATE_INSTANCE, Event::DESTROY_INSTANCE}));
     }
+
     TEST_F(InstanceStorageVulkanIntegrationTest, FailedMessengerOutputIsIgnoredAndRollsBackTheRealInstanceBeforeRetry) {
         if (!validation_available())
             GTEST_SKIP() << "VK_LAYER_KHRONOS_validation is unavailable";
@@ -260,6 +287,7 @@ namespace {
         o::destroy_instance(slot.value(), probe.calls());
         EXPECT_EQ(probe.events, (std::vector<Event>{Event::CREATE_INSTANCE, Event::CREATE_MESSENGER, Event::DESTROY_INSTANCE, Event::CREATE_INSTANCE, Event::CREATE_MESSENGER, Event::DESTROY_MESSENGER, Event::DESTROY_INSTANCE}));
     }
+
     TEST_F(InstanceStorageVulkanIntegrationTest, InvalidInputIsRejectedBeforeNativeCreationWithoutClaimingTheCpuSlot) {
         std::vector<vsl::InstanceCreateInfo> invalid;
         for (const auto& name : {std::string{}, std::string("bad\0extension", 13), std::string("VK_AHO_extension_that_does_not_exist")}) {
@@ -282,6 +310,7 @@ namespace {
         EXPECT_TRUE(probe.events.empty());
         EXPECT_NO_THROW(slot.construct(info(), probe.calls()));
     }
+
     TEST_F(InstanceStorageVulkanIntegrationTest, DuplicateExtensionsAndLayersAreNormalizedAndOwnedDuringCreation) {
         if (!validation_available())
             GTEST_SKIP() << "VK_LAYER_KHRONOS_validation is unavailable";
@@ -294,6 +323,7 @@ namespace {
         configuration = {};
         EXPECT_NO_THROW((void)StartupAccess::Owned(accessor)->instance.enumeratePhysicalDevices());
     }
+
     TEST_F(InstanceStorageVulkanIntegrationTest, ReinitializationAndForeignControlBlocksCannotReplaceALiveInstance) {
         auto accessor = vsl::VulkanAccessor::Create(info());
         const auto handle = StartupAccess::Owned(accessor)->instance;

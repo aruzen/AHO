@@ -1,14 +1,17 @@
 #pragma once
 #include "../../src/private/VSL/lifetime/window_access.hpp"
+
 namespace {
     using VSL_NAMESPACE::lifetime::detail::WindowAccess;
 }
+
 #include <VSL/lifetime/startup_access.hpp>
 #include "vulkan_fixture.hpp"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <optional>
 #include <VSL/lifetime/glfw_lease.hpp>
+
 namespace vsl_test {
     class WindowIntegrationTest : public VulkanIntegrationTest {
     protected:
@@ -16,10 +19,12 @@ namespace vsl_test {
         std::optional<vsl::PureWindow> window;
         std::shared_ptr<vsl::Surface> surface;
         void SetUp() override;
+
         void make_surface() {
             surface = window->add_plugin<vsl::Surface>(vsl::lifetime::detail::StartupAccess::FromShared(instance));
             ASSERT_TRUE(VSL_NAMESPACE::lifetime::detail::StartupAccess::Owned(*(surface))->surface) << "GLFW surface creation failed";
         }
+
         void TearDown() override;
     };
 

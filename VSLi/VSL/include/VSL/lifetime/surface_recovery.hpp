@@ -5,6 +5,7 @@ namespace VSL_NAMESPACE {
     struct LogicalDeviceAccessor;
     struct Surface;
 } // namespace VSL_NAMESPACE
+
 namespace VSL_NAMESPACE::lifetime {
     enum class SurfaceRecoveryMode {
         POLL,

@@ -37,24 +37,31 @@ namespace AHO_NAMESPACE::engine {
             .synchro_manager = std::move(info.synchronization),
             .present_fences = info.present_fences}));
     }
+
     VSL_NAMESPACE::LogicalDeviceAccessor EngineAccessor::device() const {
         return detail::EngineAccess::Require(*this).logical_device;
     }
+
     VSL_NAMESPACE::PhysicalDevice EngineAccessor::physical_device() const {
         return device().get_physical_device();
     }
+
     VSL_NAMESPACE::VulkanAccessor EngineAccessor::instance() const {
         return physical_device().get_instance();
     }
+
     VSL_NAMESPACE::CommandManager EngineAccessor::commands() const {
         return detail::EngineAccess::Require(*this).command_manager;
     }
+
     std::shared_ptr<VSL_NAMESPACE::graphic_resource::ManagerInterface> EngineAccessor::descriptor_manager() const {
         return detail::EngineAccess::Require(*this).graphic_resource_manager;
     }
+
     VSL_NAMESPACE::SynchroManager EngineAccessor::synchronization() const {
         return detail::EngineAccess::Require(*this).synchro_manager;
     }
+
     VSL_NAMESPACE::PresentFencePolicy EngineAccessor::present_fences() const {
         return detail::EngineAccess::Require(*this).present_fences;
     }

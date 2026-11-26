@@ -8,13 +8,16 @@ namespace VSL_NAMESPACE::lifetime {
         std::weak_ptr<CommandDomain> domain;
         size_t unresolved_submissions = 0;
     };
+
     struct CommandPoolSlotStorage {
         alignas(impl::CommandPoolImpl) std::byte value[sizeof(impl::CommandPoolImpl)];
     };
+
     struct CommandBufferSlotStorage {
         alignas(impl::CommandBufferImpl) std::byte value[sizeof(impl::CommandBufferImpl)];
         alignas(CommandBufferOwnerContext) std::byte context[sizeof(CommandBufferOwnerContext)];
     };
+
     void construct_command_pool(void* storage, LogicalDeviceAccessor device, CommandPoolCreateInfo info);
     void construct_command_pool(void* storage, impl::LogicalDeviceImpl& device, CommandPoolCreateInfo info);
     void destroy_command_pool(void* storage) noexcept;

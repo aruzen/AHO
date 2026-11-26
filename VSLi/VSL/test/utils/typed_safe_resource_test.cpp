@@ -33,6 +33,7 @@ namespace {
                                                     vsl::ShaderFlag::COMPUTE, 3>;
     using Points = vsl::typed::ResourceBindingPoints<First, Second>;
     static_assert(Points::Size() == 2 && Points::Get<1>().binding == 5);
+
     TEST(TypedResourceTest, BindingDefinitionsRetainIndexTypeStageAndArrayCount) {
         const auto point = Points::Get<1>();
         EXPECT_EQ(point.binding, 5u);
@@ -40,6 +41,7 @@ namespace {
         EXPECT_EQ(point.shader_type, vsl::ShaderFlag::COMPUTE);
         EXPECT_EQ(point.amount, 3u);
     }
+
     TEST(TypedResourceTest, VertexAndPushDefinitionsRetainExplicitLayout) {
         using Attribute = vsl::typed::VertexInputDefinition<vsl::data_format::FLOAT_RG, 3, 8>;
         using Shape = vsl::typed::VertexShapeDefinition<
@@ -57,7 +59,9 @@ namespace {
         EXPECT_EQ(vsl::typed::ResourceBindingPoints<>::Size(), 0u);
         EXPECT_EQ(vsl::typed::PushContentDefinitions<>::Size(), 0u);
     }
+
     using TypedResourceVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
     TEST_F(TypedResourceVulkanIntegrationTest, MakesBindingLayoutFromTypedPoints) {
         const auto layout = Points{}.make(device);
         const auto actual = layout.get_binding_points();
@@ -81,6 +85,7 @@ namespace {
         EXPECT_EQ(compute.layer_count, 0u);
     }
 } // namespace
+
 namespace {
     TEST_F(TypedResourceVulkanIntegrationTest, TypedVertexInputInjectsItsDeclaredAttribute) {
         using Attribute = vsl::typed::VertexInputDefinition<vsl::data_format::FLOAT_RG, 3, 8>;

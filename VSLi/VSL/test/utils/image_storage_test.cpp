@@ -24,11 +24,13 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     namespace t = vsl::typed;
     constexpr auto IMAGE_USAGE = vsl::ImageType::SAMPLED | vsl::ImageType::TRANSFER_DST;
     const vsl::ImageCreateInfo IMAGE_INFO{IMAGE_USAGE, 2, 2, vsl::data_format::UNSIGNED_NORMALIZED8_RGBA};
     const vsl::SamplerCreateInfo SAMPLER_INFO{vsl::SamplingMode::NEAREST, vsl::EdgeMode::CLAMP_TO_EDGE};
+
     class ImageStorageVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
@@ -91,13 +93,16 @@ namespace {
         EXPECT_EQ(reinterpret_cast<std::uintptr_t>(&a) % alignof(vsl::impl::ImageImpl), 0u);
         EXPECT_EQ(reinterpret_cast<std::uintptr_t>(c.use) % alignof(vsl::ResourceUseState), 0u);
     }
+
     TEST_F(ImageStorageVulkanIntegrationTest, DescriptorFactoriesAndGettersKeepExternalCompositeOwnersAndSuppliedUses) {
         using Value = t::detail::DescriptorValue;
+
         struct Composite {
             vsl::ImageAccessor image;
             vsl::SamplerAccessor sampler;
             std::shared_ptr<int> token;
         };
+
         std::vector<Value> values;
         std::weak_ptr<Composite> owner;
         std::weak_ptr<int> token;
@@ -167,6 +172,7 @@ namespace {
         const auto owned_sampler = std::unique_ptr<void, decltype(&vsl::lifetime::destroy_sampler)>(&sampler, vsl::lifetime::destroy_sampler);
         EXPECT_TRUE(vsl::lifetime::sampler_at(&sampler).sampler);
     }
+
     TEST_F(ImageStorageVulkanIntegrationTest, BorrowedNativeImageSurvivesTheDestructionOfItsAdditionalView) {
         vsl::Image<IMAGE_USAGE> image(device, 2, 2, IMAGE_INFO.format);
         vsl::lifetime::ImageSlotStorage borrowed;
@@ -179,6 +185,7 @@ namespace {
         vsl::lifetime::destroy_image(&borrowed);
         EXPECT_GT(StartupAccess::Owned(device)->device.getImageMemoryRequirements(ImageAccess::Owned(image)->image).size, 0u);
     }
+
     TEST_F(ImageStorageVulkanIntegrationTest, DeviceAccessorDoesNotKeepItsSourceImageAlive) {
         vsl::LogicalDeviceAccessor retained_device;
         std::weak_ptr<vsl::impl::ImageImpl> owner;
@@ -191,6 +198,7 @@ namespace {
         EXPECT_TRUE(owner.expired());
         EXPECT_EQ(retained_device, device);
     }
+
     TEST_F(ImageStorageVulkanIntegrationTest, NativeDescriptorReplacementTracksTheCurrentImageAndSamplerStates) {
         using Set = t::DescriptorSet<0, t::TextureBinding<0, vsl::ShaderFlag::COMPUTE>>;
         vsl::GraphicResourceManager descriptors(device);
@@ -213,6 +221,7 @@ namespace {
         EXPECT_FALSE(second.use_state().busy());
         EXPECT_FALSE(sampler.use_state().busy());
     }
+
     TEST_F(ImageStorageVulkanIntegrationTest, TypedComputeKeepsImagesAndSamplersUntilCompletionWithoutKeepingWrappers) {
         using Set = t::DescriptorSet<0, t::StorageBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>,
                                      t::DescriptorBinding<1, vsl::graphic_resource::Type::SAMPLED_IMAGE, vsl::ShaderFlag::COMPUTE>,
@@ -261,6 +270,7 @@ namespace {
         output.read_into(actual);
         EXPECT_EQ(actual, (std::array<std::uint32_t, 2>{37, 83}));
     }
+
     TEST_F(ImageStorageVulkanIntegrationTest, RenderPassRegistersThePhysicalStateOfEveryAttachment) {
         vsl::RenderPassDescription description;
         description.add_color({.format = IMAGE_INFO.format});
@@ -275,6 +285,7 @@ namespace {
         phase.cancel();
         EXPECT_FALSE(image.use_state().busy());
     }
+
     TEST_F(ImageStorageVulkanIntegrationTest, SavedBarrierKeepsItsImageThroughRecordingAndCancellation) {
         std::optional<vsl::command::ChangeImageBarrier> command;
         std::weak_ptr<vsl::impl::ImageImpl> owner;

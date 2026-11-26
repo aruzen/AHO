@@ -65,6 +65,7 @@ namespace vsl_test {
         vk::PipelineLayoutCreateInfo pipeline_layout;
         explicit LayoutInspection(vsl::PipelineLayoutAccessor layout);
     };
+
     inline std::filesystem::path shader_path(const char* name) {
         return std::filesystem::path(VSL_TEST_SHADER_DIR) / name;
     }
@@ -105,6 +106,7 @@ namespace vsl_test {
         }
         return vkCreateInstance(&actual, nullptr, output);
     }
+
     inline VkResult VulkanIntegrationTest::CreateMessenger(void* context, VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* info, VkDebugUtilsMessengerEXT* output) {
         auto actual = *info;
         actual.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
@@ -119,22 +121,27 @@ namespace vsl_test {
         std::lock_guard lock(_validation_mutex);
         return !_validation_errors.empty();
     }
+
     inline void VulkanIntegrationTest::expect_validation_abort(const char* vuid) {
         std::lock_guard lock(_validation_mutex);
         _expected_abort_vuid = vuid;
         _expected_abort_count = 0;
         _abort_validation_errors = true;
     }
+
     inline std::size_t VulkanIntegrationTest::validation_abort_count() {
         std::lock_guard lock(_validation_mutex);
         return _expected_abort_count;
     }
+
     inline bool VulkanIntegrationTest::validate_vulkan() const {
         return false;
     }
+
     inline bool VulkanIntegrationTest::require_timeline_semaphore() const {
         return false;
     }
+
     inline vsl::PresentFencePolicy VulkanIntegrationTest::present_fence_policy() const {
         return vsl::PresentFencePolicy::LEGACY;
     }
@@ -277,13 +284,16 @@ namespace vsl_test {
         pipeline_layout.pushConstantRangeCount = static_cast<std::uint32_t>(ranges.size());
         pipeline_layout.pPushConstantRanges = ranges.empty() ? nullptr : ranges.data();
     }
+
     inline LayoutInspection inspect_layout(vsl::PipelineLayoutAccessor layout) {
         return LayoutInspection(std::move(layout));
     }
+
     inline vsl::PipelineLayoutEditAccessor VulkanIntegrationTest::make_layout_state() {
         struct LayoutState : vsl::PipelineLayoutEditAccessor {
             explicit LayoutState(vsl::LogicalDeviceAccessor device) { init_start(device); }
         };
+
         return LayoutState(device);
     }
 

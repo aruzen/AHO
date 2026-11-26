@@ -9,6 +9,7 @@ namespace VSL_NAMESPACE::lifetime {
         vk::Result idle = vk::Result::eNotReady;
         bool wait = true, graphics_guarded = false;
     };
+
     struct AcquireTicket {
         static constexpr std::uint8_t NO_OWNER = UINT8_MAX;
         std::array<std::shared_ptr<void>, 4> owners;
@@ -37,12 +38,14 @@ namespace VSL_NAMESPACE::lifetime {
         void reject_acquisition() noexcept;
         ~AcquireTicket();
     };
+
     class AcquisitionSnapshot {
         struct Entry {
             std::shared_ptr<AcquireTicket> ticket;
             std::shared_ptr<impl::SubmissionImpl> graphics;
             bool submitted = false;
         };
+
         std::shared_ptr<impl::LogicalDeviceImpl> _device;
         std::shared_ptr<impl::SurfaceImpl> _surface;
         std::span<const std::shared_ptr<SurfacePresentationDomain>> _domains;
@@ -64,9 +67,12 @@ namespace VSL_NAMESPACE::lifetime {
         void bookkeep() noexcept;
         void release() noexcept;
         bool pending() const noexcept;
+
         bool captured() const noexcept { return !_entries.empty(); }
+
         bool native_active() const noexcept;
     };
+
     std::shared_ptr<AcquireTicket> prepare_acquire_ticket(const std::shared_ptr<SurfacePresentationDomain>& domain,
                                                           const std::shared_ptr<impl::SwapchainImpl>& generation,
                                                           const std::shared_ptr<impl::SemaphoreImpl>& available,

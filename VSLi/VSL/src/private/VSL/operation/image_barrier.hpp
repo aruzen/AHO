@@ -7,6 +7,7 @@ namespace VSL_NAMESPACE::operation {
         vk::ImageMemoryBarrier barrier;
         vk::PipelineStageFlags source, destination;
     };
+
     ImageBarrier prepare_image_barrier(const impl::ImageImpl& image, ImageLayout old_layout, ImageLayout new_layout,
                                        std::uint32_t base_layer = 0, std::uint32_t layer_count = 0,
                                        std::uint32_t shader_stages = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);

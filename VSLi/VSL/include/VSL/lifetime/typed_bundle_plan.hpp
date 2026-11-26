@@ -11,6 +11,7 @@
 
 namespace VSL_NAMESPACE::typed {
     using BundleResourceInit = std::variant<BufferCreateInfo, ImageCreateInfo, SamplerCreateInfo>;
+
     struct BundleResourcePlacement {
         BindingKey binding;
         ResourceId resource;
@@ -21,13 +22,16 @@ namespace VSL_NAMESPACE::typed {
         storage::ResourceKind kind;
         size_t offset;
     };
+
     using BundleBufferPlacement = BundleResourcePlacement;
+
     namespace detail {
         struct BundleBindingKey {
             BindingKey binding;
             ResourceComponent component;
             constexpr bool operator==(const BundleBindingKey&) const = default;
         };
+
         constexpr bool bundle_info_equal(const BundleResourceInit& a, const BundleResourceInit& b);
     } // namespace detail
 
@@ -36,6 +40,7 @@ namespace VSL_NAMESPACE::typed {
     class TypedBundlePlan {
         using Resources = typename Schema::Resources;
         using LayoutShape = detail::DescriptorLayoutShape<Resources>;
+
         static consteval size_t BindingCount();
         template<size_t first, size_t second>
         static consteval bool SamePayload();
@@ -55,6 +60,7 @@ namespace VSL_NAMESPACE::typed {
             return keys;
         }();
         static constexpr auto DESCRIPTOR_IDS = MakeDescriptorIds();
+
         std::array<BundleResourcePlacement, BindingCount()> _placements{};
         std::array<std::array<ResourceRequest, BindingCount()>, 2> _requests{};
         std::array<std::array<BundleResourceInit, BindingCount()>, 2> _infos{};
@@ -69,11 +75,15 @@ namespace VSL_NAMESPACE::typed {
         static constexpr size_t CAPACITY = BindingCount();
         static constexpr bool NEEDS_EMPTY_LAYOUT = LayoutShape::NEEDS_EMPTY;
         static constexpr size_t ARENA_CAPACITY = detail::allocation_add(CAPACITY, detail::allocation_add(detail::allocation_multiply(Resources::COUNT, 2), 1 + NEEDS_EMPTY_LAYOUT));
+
         constexpr explicit TypedBundlePlan(const ResourceAllocationPlan<Schema>& plan);
+
         constexpr const TypedDescriptorPlan<Schema>& descriptors() const& { return _descriptors; }
         constexpr const TypedDescriptorPlan<Schema>& descriptors() const&& = delete;
+
         constexpr const auto& placements() const& { return _placements; }
         constexpr const auto& placements() const&& = delete;
+
         constexpr std::span<const BundleResourceInit> resources(ResourceScope scope) const& {
             const auto i = ScopeIndex(scope);
             return {_infos[i].data(), _counts[i]};
@@ -81,20 +91,24 @@ namespace VSL_NAMESPACE::typed {
         constexpr std::span<const BundleResourceInit> resources(ResourceScope scope) const&& = delete;
         constexpr ResourcePlan<CAPACITY> resource_plan(ResourceScope scope, size_t instance = 0) const;
         constexpr ResourcePlan<ARENA_CAPACITY> arena_plan(ResourceScope scope, size_t instance = 0) const;
+
         constexpr ResourceId descriptor_layout(std::uint32_t set) const;
         constexpr ResourceId descriptor_set(std::uint32_t set) const;
         constexpr std::optional<ResourceId> empty_descriptor_layout() const;
         constexpr std::optional<ResourceId> descriptor_pool(ResourceScope scope) const;
+
         constexpr std::span<const BufferCreateInfo> buffers(ResourceScope scope) const& {
             const auto i = ScopeIndex(scope);
             return {_buffers[i].data(), _buffer_counts[i]};
         }
         constexpr std::span<const BufferCreateInfo> buffers(ResourceScope scope) const&& = delete;
+
         constexpr size_t bytes(ResourceScope scope) const { return resource_plan(scope).bytes(); }
         constexpr size_t alignment(ResourceScope scope) const { return resource_plan(scope).alignment(); }
         constexpr size_t total_bytes() const { return detail::allocation_add(bytes(ResourceScope::SHARED), detail::allocation_multiply(bytes(ResourceScope::PER_FRAME), _frames)); }
         constexpr size_t arena_bytes(ResourceScope scope) const { return arena_plan(scope).bytes(); }
         constexpr size_t total_arena_bytes() const { return detail::allocation_add(arena_bytes(ResourceScope::SHARED), detail::allocation_multiply(arena_bytes(ResourceScope::PER_FRAME), _frames)); }
+
         constexpr BundleResourcePlacement placement(BindingKey key, ResourceComponent component = ResourceComponent::PRIMARY) const;
     };
 
@@ -115,6 +129,7 @@ namespace VSL_NAMESPACE::typed {
             return x.sampling == y.sampling && x.edge == y.edge;
         }
     } // namespace detail
+
     template<typename Schema, typename Bindings>
     constexpr size_t TypedBundlePlan<Schema, Bindings>::ScopeIndex(ResourceScope scope) {
         if (scope == ResourceScope::SHARED)
@@ -123,6 +138,7 @@ namespace VSL_NAMESPACE::typed {
             return 1;
         throw std::invalid_argument("Unknown resource scope");
     }
+
     template<typename Schema, typename Bindings>
     consteval size_t TypedBundlePlan<Schema, Bindings>::BindingCount() {
         size_t count = 0;
@@ -130,6 +146,7 @@ namespace VSL_NAMESPACE::typed {
             count = detail::allocation_add(count, detail::allocation_multiply(entry.descriptors, entry.allocation == AllocationKind::TEXTURE ? 2 : 1));
         return count;
     }
+
     template<typename Schema, typename Bindings>
     template<size_t first, size_t second>
     consteval bool TypedBundlePlan<Schema, Bindings>::SamePayload() {
@@ -137,6 +154,7 @@ namespace VSL_NAMESPACE::typed {
         using B = std::tuple_element_t<second, typename Schema::Allocations>;
         return std::is_same_v<typename Schema::template Binding<A::SET, A::BINDING>::Payload, typename Schema::template Binding<B::SET, B::BINDING>::Payload>;
     }
+
     template<typename Schema, typename Bindings>
     constexpr ResourceId TypedBundlePlan<Schema, Bindings>::Identity(size_t index) {
         auto mapped = [](size_t i, size_t j) { return Bindings::KEYS[i] == KEYS[j].binding && Bindings::COMPONENTS[i] == KEYS[j].component; };
@@ -163,6 +181,7 @@ namespace VSL_NAMESPACE::typed {
         }
         throw std::logic_error("Missing resource identity");
     }
+
     template<typename Schema, typename Bindings>
     consteval auto TypedBundlePlan<Schema, Bindings>::MakeDescriptorIds() {
         std::array<ResourceId, BindingCount()> reserved{};
@@ -185,6 +204,7 @@ namespace VSL_NAMESPACE::typed {
         }
         return result;
     }
+
     template<typename Schema, typename Bindings>
     constexpr TypedBundlePlan<Schema, Bindings>::TypedBundlePlan(const ResourceAllocationPlan<Schema>& plan) : _descriptors(plan), _frames(plan.frame_count()) {
         constexpr auto payloads = [] {
@@ -250,11 +270,13 @@ namespace VSL_NAMESPACE::typed {
         static_cast<void>(total_bytes());
         static_cast<void>(total_arena_bytes());
     }
+
     template<typename Schema, typename Bindings>
     constexpr ResourcePlan<TypedBundlePlan<Schema, Bindings>::CAPACITY> TypedBundlePlan<Schema, Bindings>::resource_plan(ResourceScope scope, size_t instance) const {
         const auto group = ScopeIndex(scope);
         return ResourcePlan<CAPACITY>(std::span(_requests[group].data(), _counts[group]), {scope == ResourceScope::SHARED ? LifetimeScope::SHARED : LifetimeScope::FRAME, instance});
     }
+
     template<typename Schema, typename Bindings>
     constexpr ResourceId TypedBundlePlan<Schema, Bindings>::descriptor_layout(std::uint32_t set) const {
         const auto layouts = TypedDescriptorPlan<Schema>::Layouts();
@@ -263,6 +285,7 @@ namespace VSL_NAMESPACE::typed {
                 return DESCRIPTOR_IDS[i];
         throw std::out_of_range("Unknown bundle descriptor layout");
     }
+
     template<typename Schema, typename Bindings>
     constexpr ResourceId TypedBundlePlan<Schema, Bindings>::descriptor_set(std::uint32_t set) const {
         const auto layouts = TypedDescriptorPlan<Schema>::Layouts();
@@ -271,6 +294,7 @@ namespace VSL_NAMESPACE::typed {
                 return DESCRIPTOR_IDS[Resources::COUNT + i];
         throw std::out_of_range("Unknown bundle descriptor set");
     }
+
     template<typename Schema, typename Bindings>
     constexpr std::optional<ResourceId> TypedBundlePlan<Schema, Bindings>::empty_descriptor_layout() const {
         if constexpr (NEEDS_EMPTY_LAYOUT)
@@ -279,6 +303,7 @@ namespace VSL_NAMESPACE::typed {
             return DESCRIPTOR_IDS[LayoutShape::EMPTY_INDEX];
         return std::nullopt;
     }
+
     template<typename Schema, typename Bindings>
     constexpr std::optional<ResourceId> TypedBundlePlan<Schema, Bindings>::descriptor_pool(ResourceScope scope) const {
         const auto group = ScopeIndex(scope);
@@ -286,6 +311,7 @@ namespace VSL_NAMESPACE::typed {
             return std::nullopt;
         return DESCRIPTOR_IDS[Resources::COUNT * 2 + group];
     }
+
     template<typename Schema, typename Bindings>
     constexpr ResourcePlan<TypedBundlePlan<Schema, Bindings>::ARENA_CAPACITY> TypedBundlePlan<Schema, Bindings>::arena_plan(ResourceScope scope, size_t instance) const {
         const auto group = ScopeIndex(scope);
@@ -309,6 +335,7 @@ namespace VSL_NAMESPACE::typed {
                 requests[count++] = {*empty_descriptor_layout(), storage::ResourceKind::DESCRIPTOR_LAYOUT};
         return ResourcePlan<ARENA_CAPACITY>(std::span(requests.data(), count), {scope == ResourceScope::SHARED ? LifetimeScope::SHARED : LifetimeScope::FRAME, instance});
     }
+
     template<typename Schema, typename Bindings>
     constexpr BundleResourcePlacement TypedBundlePlan<Schema, Bindings>::placement(BindingKey key, ResourceComponent component) const {
         for (const auto& entry : _placements)

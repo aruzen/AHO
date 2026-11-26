@@ -17,6 +17,7 @@ namespace VSL_NAMESPACE::typed {
             }(std::make_index_sequence<Resources::COUNT>{});
             static constexpr bool NEEDS_EMPTY = HAS_HOLES && EMPTY_INDEX == Resources::COUNT;
         };
+
         LogicalDeviceAccessor descriptor_layout_device(std::span<const graphic_resource::BindingLayout> layouts);
         void validate_descriptor_layout_source(LogicalDeviceAccessor device, const graphic_resource::BindingLayout& layout,
                                                std::span<const graphic_resource::BindingPoint> points);
@@ -50,10 +51,12 @@ namespace VSL_NAMESPACE::typed {
         graphic_resource::BindingLayout layout() const;
         std::optional<graphic_resource::BindingLayout> hole_layout() const;
     };
+
     namespace detail {
         template<typename Resources>
         struct DescriptorLayoutInjection {
             const TypedDescriptorLayouts<Resources>& source;
+
             void injection(PipelineLayoutEditAccessor layout) const { source.inject(std::move(layout)); }
         };
     } // namespace detail
@@ -65,6 +68,7 @@ namespace VSL_NAMESPACE::typed {
                 return i;
         return Resources::COUNT;
     }
+
     template<typename Resources>
     TypedDescriptorLayouts<Resources>::TypedDescriptorLayouts(std::array<graphic_resource::BindingLayout, Resources::COUNT> layouts,
                                                               std::optional<graphic_resource::BindingLayout> empty)
@@ -80,17 +84,20 @@ namespace VSL_NAMESPACE::typed {
             throw std::invalid_argument("Typed layouts do not require an additional empty source");
         }
     }
+
     template<typename Resources>
     TypedDescriptorLayouts<Resources>& TypedDescriptorLayouts<Resources>::operator=(TypedDescriptorLayouts other) noexcept {
         swap_state(other);
         return *this;
     }
+
     template<typename Resources>
     void TypedDescriptorLayouts<Resources>::swap_state(TypedDescriptorLayouts& other) noexcept {
         _device.swap(other._device);
         _layouts.swap(other._layouts);
         _empty.swap(other._empty);
     }
+
     template<typename Resources>
     template<std::uint32_t set>
     requires(detail::DescriptorLayoutShape<Resources>::SetIndex(set) < Resources::COUNT)
@@ -99,6 +106,7 @@ namespace VSL_NAMESPACE::typed {
         detail::validate_descriptor_layout_source(_device, _layouts[index], Resources::template Set<index>::POINTS);
         return _layouts[index];
     }
+
     template<typename Resources>
     std::optional<graphic_resource::BindingLayout> TypedDescriptorLayouts<Resources>::hole_layout() const {
         if constexpr (Shape::HAS_HOLES) {
@@ -115,6 +123,7 @@ namespace VSL_NAMESPACE::typed {
         }
         return std::nullopt;
     }
+
     template<typename Resources>
     void TypedDescriptorLayouts<Resources>::inject(PipelineLayoutEditAccessor layout) const {
         detail::inject_descriptor_layouts(std::move(layout), _device, _layouts, Resources::SET_NUMBERS, hole_layout(), Resources::SET_COUNT);

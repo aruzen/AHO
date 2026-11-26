@@ -4,6 +4,7 @@
 namespace {
     using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
 }
+
 namespace {
     TEST(ScissorTest, ConstructorsPreserveRectangleCoordinates) {
         vsl::Scissor defaults;
@@ -23,7 +24,9 @@ namespace {
         EXPECT_EQ(adapted.width, 4u);
         EXPECT_EQ(adapted.height, 5u);
     }
+
     using ScissorVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
+
     TEST_F(ScissorVulkanIntegrationTest, ScissorExcludesCenterPixel) {
         vsl::Scissor scissor(0, 0, 1, 1);
         auto state = make_layout_state();

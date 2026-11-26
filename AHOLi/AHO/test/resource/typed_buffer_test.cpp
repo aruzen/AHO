@@ -17,6 +17,7 @@ namespace {
     namespace t = vsl::typed;
     using Host = r::Buffer<r::BufferType::GPU_FRIENDLY>;
     using Device = r::Buffer<r::BufferType::ON_GPU>;
+
     class TypedAHOBufferVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
@@ -91,10 +92,12 @@ namespace {
         EXPECT_FALSE(buffer.busy());
         EXPECT_NO_THROW(buffer.resize(0));
     }
+
     struct Vertex {
         float xy[2];
         float rgb[3];
     };
+
     using Record = t::VertexRecord<Vertex, VSL_VERTEX_MEMBER(Vertex, xy), VSL_VERTEX_MEMBER(Vertex, rgb)>;
     using Input = t::TypedVertexInput<Record::Binding<0>>;
     using Set = t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>, t::StorageBinding<1, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
@@ -126,8 +129,10 @@ namespace {
     TEST_F(TypedAHOBufferVulkanIntegrationTest, BindingOnlySourcesStillValidateNativeUsageAtRuntime) {
         struct BindingOnly {
             r::BufferBinding value;
+
             r::BufferBinding binding() const { return value; }
         };
+
         using Native = vsl::Buffer<vsl::MemoryType::TRANSFER_SOURCE, vsl::MemoryProperty::HOST_VISIBLE>;
         auto custom = r::make_custom_buffer(Native(device, 16));
         BindingOnly source{custom.binding()};
@@ -195,6 +200,7 @@ namespace {
         EXPECT_FALSE(input.busy());
         EXPECT_NO_THROW(input.write({}));
     }
+
     TEST_F(TypedAHOBufferVulkanIntegrationTest, ArenaDescriptorBundleKeepsOldAHOStorageAndItsLogicalUpdateConstraint) {
         using Allocation = t::ResourceAllocationSchema<Schema, t::ExternalAllocation<0, 0>, t::BufferAllocation<0, 1>>;
         auto verify = [&](auto input) {
@@ -262,6 +268,7 @@ namespace {
         struct Customization {
             std::shared_ptr<int> owner;
         };
+
         using Native = vsl::Buffer<vsl::MemoryType::VERTEX_BUFFER, vsl::MemoryProperty::HOST_VISIBLE>;
         std::weak_ptr<int> owner;
         vsl::Shader<vsl::ShaderType::VERTEX> source(device, vsl_test::shader_path("vertices.vert.spv"));

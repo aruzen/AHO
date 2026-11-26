@@ -12,15 +12,19 @@ namespace {
 
 namespace {
     using ShaderVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
     class ShaderArenaVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     class ShaderArenaRenderVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     class ShaderArenaComputeVulkanIntegrationTest : public vsl_test::ComputeVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     std::vector<std::uint32_t> shader_words(const char* file);
     vsl::LogicalDeviceAccessor another_device(vsl::PhysicalDevice physical, std::uint32_t queue);
     template<typename T>
@@ -31,17 +35,20 @@ namespace {
     static_assert(vsl::get_shader_type<"fixture.frag.spv">() == vsl::ShaderType::FRAGMENT);
     static_assert(vsl::get_shader_type<"fixture.comp.spv">() == vsl::ShaderType::COMPUTE);
     static_assert(vsl::get_shader_type<"fixture.unknown">() == vsl::ShaderType::ERROR_);
+
     std::vector<std::uint32_t> shader_words(const char* file) {
         const auto bytes = vsl_test::read_binary(vsl_test::shader_path(file));
         std::vector<std::uint32_t> words(bytes.size() / sizeof(std::uint32_t));
         std::memcpy(words.data(), bytes.data(), bytes.size());
         return words;
     }
+
     vsl::LogicalDeviceAccessor another_device(vsl::PhysicalDevice physical, std::uint32_t queue) {
         vsl::DeviceCreateInfo info;
         info.graphics_family = queue;
         return vsl::LogicalDeviceAccessor::Create(std::move(physical), std::move(info));
     }
+
     TEST(ShaderAccessorTest, EmptyAccessorRejectsOperationsAndHasNoOwner) {
         const vsl::ShaderAccessor empty;
         EXPECT_FALSE(empty);
@@ -51,6 +58,7 @@ namespace {
         EXPECT_THROW(empty.code(), std::logic_error);
         EXPECT_THROW(empty.get_device(), std::logic_error);
     }
+
     TEST(ShaderPlacementTest, SameTypeSlotsUseActualImplAlignmentWithoutGpuUseState) {
         namespace t = vsl::typed;
         namespace s = vsl::storage;
@@ -64,6 +72,7 @@ namespace {
         EXPECT_EQ(plan.bytes(), 2 * sizeof(vsl::impl::ShaderImpl));
         EXPECT_EQ(plan.placement({13}).slot, t::ResourcePlacement::NO_SLOT);
     }
+
     TEST_F(ShaderArenaVulkanIntegrationTest, PlacedModulesOwnInputsAndShareOneCanonicalOwner) {
         namespace t = vsl::typed;
         namespace l = vsl::lifetime;
@@ -98,6 +107,7 @@ namespace {
         kept.reset();
         EXPECT_TRUE(owner.expired());
     }
+
     TEST_F(ShaderArenaVulkanIntegrationTest, LaterShaderFailureRollsBackTheRegionAndLeavesImportedModuleAlive) {
         namespace t = vsl::typed;
         namespace l = vsl::lifetime;
@@ -127,6 +137,7 @@ namespace {
             EXPECT_EQ(ShaderAccess::Owned(imported).use_count(), references);
         }
     }
+
     TEST_F(ShaderArenaVulkanIntegrationTest, ImportAndShaderGroupsRejectMissingOwnersAndOtherDevices) {
         namespace t = vsl::typed;
         namespace l = vsl::lifetime;
@@ -146,6 +157,7 @@ namespace {
         vsl::Shader<vsl::ShaderType::ALL_GRAPHICS> aggregate(device, vsl_test::shader_path("triangle.vert.spv"));
         EXPECT_THROW((vsl::PipelineLayout(device, vsl::pipeline_layout::ShaderGroup("aggregate stage", {aggregate}))), std::invalid_argument);
     }
+
     TEST_F(ShaderArenaRenderVulkanIntegrationTest, FrozenRecipeRebuildsAndDrawsAfterTheShaderArenaFacadeIsGone) {
         namespace t = vsl::typed;
         namespace l = vsl::lifetime;
@@ -176,6 +188,7 @@ namespace {
         }
         EXPECT_TRUE(owner.expired());
     }
+
     TEST_F(ShaderArenaComputeVulkanIntegrationTest, ImportedShaderKeepsItsOriginalOwnerAndBuildsComputeAfterImportArenaDestruction) {
         namespace t = vsl::typed;
         namespace l = vsl::lifetime;
@@ -212,11 +225,13 @@ namespace {
         kept = {};
         EXPECT_TRUE(original.expired());
     }
+
     TEST(ShaderPathTest, DirectoryNamesDoNotChooseTheShaderStage) {
         EXPECT_EQ(vsl::get_shader_type<"cache.vert.data/lighting.frag.spv">(), vsl::ShaderType::FRAGMENT);
         EXPECT_EQ(vsl::get_shader_type<"cache.frag.data\\simulation.comp.spv">(), vsl::ShaderType::COMPUTE);
         EXPECT_EQ(vsl::get_shader_type<"cache.vert.data/unknown.spv">(), vsl::ShaderType::ERROR_);
     }
+
     TEST_F(ShaderVulkanIntegrationTest, LoadsVertexAndFragmentModulesWithEntryPointNames) {
         const vsl::Shader<vsl::ShaderType::VERTEX> vertex(device, vsl_test::shader_path("triangle.vert.spv"));
         const vsl::Shader<vsl::ShaderType::FRAGMENT> fragment(device, vsl_test::shader_path("triangle.frag.spv"),
@@ -236,10 +251,12 @@ namespace {
         EXPECT_EQ(moved.owner_ref(), vertex.owner_ref());
         EXPECT_THROW(original.get_device(), std::logic_error);
     }
+
     TEST_F(ShaderVulkanIntegrationTest, RejectsMissingShaderFiles) {
         EXPECT_THROW((vsl::Shader<vsl::ShaderType::COMPUTE>(device, vsl_test::shader_path("missing.comp.spv"))),
                      vsl::exceptions::RuntimeException);
     }
+
     TEST_F(ShaderVulkanIntegrationTest, MemoryModulesOwnCodeAndEntryPointAfterSourceChanges) {
         const auto bytes = vsl_test::read_binary(vsl_test::shader_path("triangle.vert.spv"));
         std::vector<std::uint32_t> code(bytes.size() / sizeof(std::uint32_t));
@@ -260,6 +277,7 @@ namespace {
         EXPECT_THROW((vsl::Shader<vsl::ShaderType::VERTEX>(device, std::span(original), "")), vsl::exceptions::RuntimeException);
         EXPECT_THROW((vsl::Shader<vsl::ShaderType::VERTEX>(device, std::span(original), std::string("ma\0in", 5))), vsl::exceptions::RuntimeException);
     }
+
     TEST(ShaderMemoryTest, InvalidHeadersAndMissingDeviceAreRejectedBeforeModuleCreation) {
         const vsl::LogicalDeviceAccessor empty;
         const std::array<std::uint32_t, 5> invalid{};
@@ -269,6 +287,7 @@ namespace {
         const std::array<std::uint32_t, 5> header{0x07230203, 0x10000, 0, 1, 0};
         EXPECT_THROW((vsl::Shader<>(empty, std::span(header))), vsl::exceptions::RuntimeException);
     }
+
     TEST(ShaderFlagsTest, BitwiseStageCombinationsPreserveMembership) {
         using namespace vsl;
         const auto stages = ShaderType::VERTEX | ShaderType::FRAGMENT;
@@ -278,6 +297,7 @@ namespace {
         EXPECT_EQ(convert(ShaderType::COMPUTE), ShaderFlag::COMPUTE);
     }
 } // namespace
+
 namespace {
     TEST_F(ShaderVulkanIntegrationTest, FactoriesInferStageAndHonorExplicitEntryName) {
         const auto vertex = vsl::make_shader<VSL_TEST_SHADER_DIR "/triangle.vert.spv">(device);

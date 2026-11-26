@@ -38,7 +38,9 @@ namespace VSL_NAMESPACE::graphic_resource {
 
     public:
         virtual ~ManagerInterface();
+
         explicit operator bool() const noexcept { return bool(_state); }
+
         LogicalDeviceAccessor get_device() const;
         // 戻り値のvectorのサイズが同じになることを保証します
         virtual std::tuple<std::vector<Pool>, std::vector<Resource>>
@@ -75,6 +77,7 @@ namespace VSL_NAMESPACE::graphic_resource {
      */
     struct ExactAllocateManager : public ManagerInterface {
         ExactAllocateManager(LogicalDeviceAccessor device);
+
         void swap(ExactAllocateManager& other) noexcept { swap_state(other); }
 
         std::tuple<std::vector<Pool>, std::vector<Resource>> allocate(std::vector<BindingLayout> layouts) override;

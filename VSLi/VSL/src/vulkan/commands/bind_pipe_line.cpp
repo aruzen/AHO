@@ -11,6 +11,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 VSL_NAMESPACE::command::BindPipeline::BindPipeline(PipelineAccessor pipeline) : pipeline(pipeline) {}
 
 VSL_NAMESPACE::PipelineAccessor VSL_NAMESPACE::command::BindPipeline::get_pipeline() {

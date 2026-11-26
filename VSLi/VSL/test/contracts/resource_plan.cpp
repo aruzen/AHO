@@ -37,6 +37,7 @@ namespace {
     static_assert(PLAN.placement({1}).offset == 0);
     static_assert(PLAN.bytes() == vsl::storage::BufferLayout::STRIDE);
     static_assert(sizeof(vsl::impl::ImageImpl*) == sizeof(void*));
+
     [[maybe_unused]] void valid(vsl::LogicalDeviceAccessor device) {
         const std::array<vsl::lifetime::ResourceInit, 1> inputs{vsl::BufferCreateInfo{16, vsl::MemoryType::TRANSFER_SOURCE}};
         vsl::lifetime::ResourceArena arena(device, PLAN, inputs);

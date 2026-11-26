@@ -1,7 +1,9 @@
 #include "../../src/engine/engine_access.hpp"
+
 namespace {
     using AHO_NAMESPACE::engine::detail::EngineAccess;
 }
+
 #include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/swapchain_access.hpp>
 #include <VSL/lifetime/synchronization_access.hpp>
@@ -21,29 +23,37 @@ namespace {
 #include "../support/frame_buffer_query.hpp"
 #include <VSL/lifetime/command_domain.hpp>
 #include <VSL/sync/presentation_state.hpp>
+
 namespace phase_payload {
     struct Value {
         int* calls;
         AHO_NAMESPACE::DrawPhase** received;
     };
+
     void draw(Value value, AHO_NAMESPACE::DrawPhase* phase) {
         ++*value.calls;
         *value.received = phase;
     }
 } // namespace phase_payload
+
 namespace {
     using DrawPhaseVulkanIntegration = aho_test::LiveGPUTest;
+
     struct SnapshotEngine : aho::engine::GraphicalEngine {
         aho::Window selected;
         unsigned calls = 0;
+
         SnapshotEngine(aho::engine::EngineAccessor runtime, aho::Window window) : selected(std::move(window)) { set_runtime(std::move(runtime)); }
+
         aho::Window get_window() override {
             ++calls;
             return selected;
         }
     };
+
     struct NestedDrawEngine : aho::StandardEngine {
         NestedDrawEngine() : aho::StandardEngine("AHO nested phase test") {}
+
         ~NestedDrawEngine() override {
             if (EngineAccess::State(*this))
                 EngineAccess::State(*this)->command_manager.wait_idle();
@@ -51,6 +61,7 @@ namespace {
                 boot_window->close();
         }
     };
+
     void expect_tuple_phase(aho::DrawPhase& phase) {
         int calls = 0;
         aho::DrawPhase* received = nullptr;
@@ -58,6 +69,7 @@ namespace {
         EXPECT_EQ(calls, 1);
         EXPECT_EQ(received, &phase);
     }
+
     TEST_F(DrawPhaseVulkanIntegration, ZeroFramebufferSuspendsWithoutAcquisitionResetOrCallbacksAndResumesWithANewPhase) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
@@ -103,6 +115,7 @@ namespace {
         resumed.cancel();
         EXPECT_TRUE(resumed.completion().wait());
     }
+
     TEST_F(DrawPhaseVulkanIntegration, CompletionCallbacksCanSuspendAtEachPreparationBoundaryWithoutResettingTheFenceOrAdvancingTheSlot) {
         ASSERT_NO_THROW(start_engine());
         for (unsigned boundary = 0; boundary < 3; ++boundary) {
@@ -154,6 +167,7 @@ namespace {
             manager.wait_idle();
         }
     }
+
     TEST_F(DrawPhaseVulkanIntegration, ZeroDetectedInsideNativeResetStopsAcquisitionAndDoesNotRestoreAnOldProof) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
@@ -177,6 +191,7 @@ namespace {
         resumed.cancel();
         EXPECT_TRUE(resumed.completion().wait());
     }
+
     TEST_F(DrawPhaseVulkanIntegration, FramebufferQueryCannotReenterSetupAndInitializationRunsOnce) {
         ASSERT_NO_THROW(start_engine());
         aho_test::FrameBufferQuery query;
@@ -198,6 +213,7 @@ namespace {
         phase.setup();
         EXPECT_EQ(begins, 1u);
     }
+
     TEST_F(DrawPhaseVulkanIntegration, ClosingFromAutomaticResumeNotificationStopsBeforeAcquisition) {
         ASSERT_NO_THROW(start_engine());
         auto& window = *engine->boot_window;
@@ -214,6 +230,7 @@ namespace {
         EXPECT_EQ(native.resets, 0u);
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
     }
+
     TEST_F(DrawPhaseVulkanIntegration, ConstructorUsesOneWindowSnapshotAndItsPlacedAcquisitionFence) {
         ASSERT_NO_THROW(start_engine());
         SnapshotEngine selected(*engine, *engine->boot_window);
@@ -235,6 +252,7 @@ namespace {
         phase.cancel();
         ASSERT_TRUE(phase.completion().wait());
     }
+
     TEST_F(DrawPhaseVulkanIntegration, CustomWindowDataWithoutAnAcquisitionSourceKeepsTheLazyFallback) {
         ASSERT_NO_THROW(start_engine());
         engine->boot_window->data2->acquire_fences = {};
@@ -246,6 +264,7 @@ namespace {
         phase.cancel();
         ASSERT_TRUE(phase.completion().wait());
     }
+
     TEST_F(DrawPhaseVulkanIntegration, NestedPhasesRestoreOuterTupleDispatchAfterNormalDestruction) {
         ASSERT_NO_THROW(start_engine());
         NestedDrawEngine other;
@@ -261,6 +280,7 @@ namespace {
         }
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
     }
+
     TEST_F(DrawPhaseVulkanIntegration, NestedStackUnwindingRestoresOuterPhaseWithoutFinishingInner) {
         ASSERT_NO_THROW(start_engine());
         NestedDrawEngine other;
@@ -278,6 +298,7 @@ namespace {
         }
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
     }
+
     TEST_F(DrawPhaseVulkanIntegration, NestedFinishFailureRestoresOuterPhaseAndAllowsAnotherInnerFrame) {
         ASSERT_NO_THROW(start_engine());
         NestedDrawEngine other;
@@ -301,6 +322,7 @@ namespace {
         }
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
     }
+
     TEST_F(DrawPhaseVulkanIntegration, NestedInitializerFailureRestoresOuterPhaseAndAllowsAnotherInnerFrame) {
         ASSERT_NO_THROW(start_engine());
         NestedDrawEngine other;
@@ -316,6 +338,7 @@ namespace {
         }
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
     }
+
     TEST_F(DrawPhaseVulkanIntegration, RejectedSameManagerNestingLeavesOuterRecordingAndContextIntact) {
         ASSERT_NO_THROW(start_engine());
         {
@@ -326,6 +349,7 @@ namespace {
         }
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
     }
+
     TEST_F(DrawPhaseVulkanIntegration, DestroyingOuterFirstKeepsInnerCurrentAndNeverRestoresDestroyedOuter) {
         ASSERT_NO_THROW(start_engine());
         NestedDrawEngine other;
@@ -337,6 +361,7 @@ namespace {
         inner.reset();
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
     }
+
     TEST_F(DrawPhaseVulkanIntegration, FailingInitializerPreservesASurvivingInnerPhaseWithoutKeepingTheFailedOuter) {
         ASSERT_NO_THROW(start_engine());
         NestedDrawEngine other;
@@ -352,6 +377,7 @@ namespace {
         inner.reset();
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, nullptr);
     }
+
     TEST_F(DrawPhaseVulkanIntegration, ExplicitOuterTupleUsesOuterManagerWhileInnerRemainsCurrent) {
         ASSERT_NO_THROW(start_engine());
         NestedDrawEngine other;
@@ -361,6 +387,7 @@ namespace {
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &inner);
         expect_tuple_phase(inner);
     }
+
     TEST_F(DrawPhaseVulkanIntegration, ContinuingAnOuterTupleStreamKeepsItsPhaseDuringInnerRecording) {
         ASSERT_NO_THROW(start_engine());
         NestedDrawEngine other;
@@ -376,6 +403,7 @@ namespace {
         EXPECT_EQ(received, &outer);
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &inner);
     }
+
     TEST_F(DrawPhaseVulkanIntegration, AllOuterCommandStreamsKeepTheirManagerForFollowingTuples) {
         ASSERT_NO_THROW(start_engine());
         NestedDrawEngine other;
@@ -398,6 +426,7 @@ namespace {
         EXPECT_EQ(commands, 4);
         EXPECT_EQ(tuples, 4);
     }
+
     TEST_F(DrawPhaseVulkanIntegration, SavedInitializerStreamFindsItsOuterPhaseDuringInnerRecording) {
         ASSERT_NO_THROW(start_engine());
         NestedDrawEngine other;
@@ -416,6 +445,7 @@ namespace {
         EXPECT_EQ(received, &outer);
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &inner);
     }
+
     TEST_F(DrawPhaseVulkanIntegration, OuterFinishTupleUsesOuterPhaseWhileInnerIsStillAlive) {
         ASSERT_NO_THROW(start_engine());
         NestedDrawEngine other;
@@ -433,6 +463,7 @@ namespace {
         EXPECT_EQ(calls, 1);
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &inner);
     }
+
     TEST_F(DrawPhaseVulkanIntegration, StreamWithoutAMatchingDrawPhaseDoesNotBorrowAnotherManagersContext) {
         ASSERT_NO_THROW(start_engine());
         NestedDrawEngine other;
@@ -445,6 +476,7 @@ namespace {
         EXPECT_EQ(received, nullptr);
         EXPECT_EQ(aho::THREAD_LOCAL_DRAW_PHASE, &outer);
     }
+
     TEST_F(DrawPhaseVulkanIntegration, GenericStreamsWithoutManagersKeepTheCurrentPhaseFallback) {
         ASSERT_NO_THROW(start_engine());
         aho::DrawPhase outer(*engine);
@@ -455,6 +487,7 @@ namespace {
         EXPECT_EQ(calls, 1);
         EXPECT_EQ(received, &outer);
     }
+
     TEST_F(DrawPhaseVulkanIntegration, PointerAndReferenceConstructorsSubmitFramesAndResetThreadLocal) {
         ASSERT_NO_THROW(start_engine());
         EXPECT_EQ(AHO_NAMESPACE::THREAD_LOCAL_DRAW_PHASE, nullptr);
@@ -469,6 +502,7 @@ namespace {
         }
         EXPECT_EQ(AHO_NAMESPACE::THREAD_LOCAL_DRAW_PHASE, nullptr);
     }
+
     TEST_F(DrawPhaseVulkanIntegration, CustomCallbacksAndAllCommandOverloadsAreInvokedOnce) {
         ASSERT_NO_THROW(start_engine());
         int initialized = 0, finished = 0, commands = 0, delegates = 0, tuple_calls = 0;
@@ -496,6 +530,7 @@ namespace {
         EXPECT_EQ(finished, 1);
         EXPECT_EQ(AHO_NAMESPACE::THREAD_LOCAL_DRAW_PHASE, nullptr);
     }
+
     TEST_F(DrawPhaseVulkanIntegration, RepeatedFramesWorkAcrossCommandBufferWraparound) {
         ASSERT_NO_THROW(start_engine());
         const auto frames = EngineAccess::State(*(engine))->command_manager.get_buffer().get_size() + 2;
@@ -506,6 +541,7 @@ namespace {
         }
         EXPECT_EQ(AHO_NAMESPACE::THREAD_LOCAL_DRAW_PHASE, nullptr);
     }
+
     TEST_F(DrawPhaseVulkanIntegration, ExplicitSubmissionRunsFinishOnceThroughBaseReferences) {
         ASSERT_NO_THROW(start_engine());
         for (unsigned split = 0; split < 2; ++split) {
@@ -531,6 +567,7 @@ namespace {
         }
         EngineAccess::State(*(engine))->command_manager.wait_idle();
     }
+
     TEST_F(DrawPhaseVulkanIntegration, ExplicitSubmissionClosesTheDefaultRenderPass) {
         ASSERT_NO_THROW(start_engine());
         for (unsigned split = 0; split < 2; ++split) {
@@ -545,6 +582,7 @@ namespace {
         }
         EngineAccess::State(*(engine))->command_manager.wait_idle();
     }
+
     TEST_F(DrawPhaseVulkanIntegration, ExplicitThrowingFinishCancelsAndDoesNotRetryDuringDestruction) {
         ASSERT_NO_THROW(start_engine());
         unsigned calls = 0;
@@ -562,6 +600,7 @@ namespace {
         }
         EngineAccess::State(*(engine))->command_manager.wait_idle();
     }
+
     TEST_F(DrawPhaseVulkanIntegration, FinishCallbackRecordsReadbackBeforeSubmitAndPresent) {
         ASSERT_NO_THROW(start_engine());
         auto window = engine->get_window();
@@ -629,6 +668,7 @@ namespace {
         }
         manager.wait_idle();
     }
+
     TEST_F(DrawPhaseVulkanIntegration, ThrowingInitializerRestoresCurrentPhaseAndAllowsNextFrame) {
         ASSERT_NO_THROW(start_engine());
         EXPECT_THROW((AHO_NAMESPACE::DrawPhase(*engine, [&](auto&) { throw std::runtime_error("initialization failed"); })), std::runtime_error);
@@ -638,6 +678,7 @@ namespace {
         }
         EngineAccess::State(*(engine))->command_manager.wait_idle();
     }
+
     TEST_F(DrawPhaseVulkanIntegration, StackUnwindingCancelsFrameWithoutInvokingFinishCallback) {
         ASSERT_NO_THROW(start_engine());
         unsigned calls = 0;
@@ -662,6 +703,7 @@ namespace {
     TEST(DrawPhaseTest, CurrentPhasePointerIsInitiallyEmpty) {
         EXPECT_EQ(AHO_NAMESPACE::THREAD_LOCAL_DRAW_PHASE, nullptr);
     }
+
     TEST(DrawPhaseTest, NullOrUnbootedEngineIsRejectedBeforeAccessingAWindow) {
         EXPECT_THROW((aho::DrawPhase(static_cast<aho::engine::GraphicalEngine*>(nullptr))), std::invalid_argument);
         aho::StandardEngine engine("unbooted", false);

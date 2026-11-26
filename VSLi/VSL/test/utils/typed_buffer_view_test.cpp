@@ -11,17 +11,22 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     namespace t = vsl::typed;
+
     struct Position {
         float xy[2];
     };
+
     struct Color {
         float rgb[3];
     };
+
     using Positions = t::VertexRecord<Position, VSL_VERTEX_MEMBER(Position, xy)>;
     using Colors = t::VertexRecord<Color, VSL_VERTEX_MEMBER(Color, rgb)>;
     using Input = t::TypedVertexInput<Positions::Binding<0>, Colors::Binding<1, t::VertexTiming::NEXT_VERTEX, 1>>;
+
     class TypedViewVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
 
@@ -29,6 +34,7 @@ namespace {
         template<typename Layout, std::uint32_t subpass = 0>
         t::TypedGraphicsPipeline<Layout, t::ResourceSchema<>, t::PushSchema<>, subpass> make_typed(vsl::RenderPassAccessor target);
     };
+
     template<typename Layout, std::uint32_t subpass>
     t::TypedGraphicsPipeline<Layout, t::ResourceSchema<>, t::PushSchema<>, subpass> TypedViewVulkanIntegrationTest::make_typed(vsl::RenderPassAccessor target) {
         namespace pl = vsl::pipeline_layout;
@@ -36,11 +42,13 @@ namespace {
         return {device, target, pl::ShaderGroup("view", {shader, *fragment}), pl::ColorBlend{}, pl::InputAssembly{},
                 pl::Rasterization{pl::CullingMode::NONE}, pl::Multisample{}, pl::DynamicState{}, vsl::Viewport(description), vsl::Scissor(description)};
     }
+
     TEST(TypedViewTest, OffsetArithmeticRejectsEmptyOutOfBoundsAndOverflow) {
         EXPECT_THROW(t::detail::checked_view_offset(0, 0, 0, 3, 8), std::out_of_range);
         EXPECT_THROW(t::detail::checked_view_offset(0, 2, 2, 3, 8), std::out_of_range);
         EXPECT_THROW(t::detail::checked_view_offset(SIZE_MAX, 1, 1, 2, 8), std::overflow_error);
     }
+
     TEST_F(TypedViewVulkanIntegrationTest, VertexSubviewsKeepTheirOffsetsCapacityAndOwners) {
         const std::array<Position, 5> positions{{{{99, 99}}, {{99, 99}}, {{-1, -1}}, {{3, -1}}, {{-1, 3}}}};
         const std::array<Color, 5> colors{{{{1, 0, 0}}, {{1, 0, 0}}, {{.25f, .5f, .75f}}, {{.25f, .5f, .75f}}, {{.25f, .5f, .75f}}}};
@@ -55,6 +63,7 @@ namespace {
         EXPECT_THROW(typed.bind_vertices(position_view, color_view).draw(4), std::out_of_range);
         EXPECT_THROW(position_view.view(3, 1), std::out_of_range);
     }
+
     TEST_F(TypedViewVulkanIntegrationTest, DeviceLocalVertexViewsKeepTheirSelectedRangesAfterTheirWrappersAreDestroyed) {
         const std::array<Position, 5> positions{{{{99, 99}}, {{99, 99}}, {{-1, -1}}, {{3, -1}}, {{-1, 3}}}};
         const std::array<Color, 5> colors{{{{1, 0, 0}}, {{1, 0, 0}}, {{.25f, .5f, .75f}}, {{.25f, .5f, .75f}}, {{.25f, .5f, .75f}}}};
@@ -76,6 +85,7 @@ namespace {
         verify(t::HeapStorage{});
         verify(t::ArenaStorage<>{});
     }
+
     TEST_F(TypedViewVulkanIntegrationTest, StorageDescriptorViewWritesOnlyTheSelectedBufferRange) {
         using Set = t::DescriptorSet<0, t::StorageBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>>;
         using Resources = t::ResourceSchema<Set>;
@@ -113,6 +123,7 @@ namespace {
         EXPECT_THROW(view.descriptor().buffer_subview(0, 0), std::out_of_range);
         EXPECT_THROW(view.descriptor().buffer_subview(4 * sizeof(std::uint32_t), 1), std::out_of_range);
     }
+
     TEST_F(TypedViewVulkanIntegrationTest, MisalignedUniformViewsAreRejectedAndAlignedViewsRetainTheirOwners) {
         using Set = t::DescriptorLayout<t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::VERTEX>>;
         const auto alignment = StartupAccess::Owned(device)->parent_device->device.getProperties().limits.minUniformBufferOffsetAlignment;
@@ -131,6 +142,7 @@ namespace {
         EXPECT_FALSE(owner.expired());
         EXPECT_FALSE(has_validation_errors());
     }
+
     TEST_F(TypedViewVulkanIntegrationTest, TypedPipelineSelectsTheSecondSubpassAndRejectsInvalidIndices) {
         vsl::RenderPassDescription desc;
         desc.add_color({.format = vsl::data_format::UNSIGNED_NORMALIZED8_RGBA, .final_layout = vsl::ImageLayout::GENERAL});

@@ -21,6 +21,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     namespace t = vsl::typed;
     using Type = vsl::graphic_resource::Type;
@@ -36,6 +37,7 @@ namespace {
                                       t::ResourceBinding<t::BindingKey{0, 1}, t::ResourceId{42}, SAMPLER>, t::ResourceBinding<t::BindingKey{0, 3}, t::ResourceId{42}>>;
     using Arena = t::ArenaStorage<Map>;
     using Bundle = t::TypedResourceBundle<Schema, Arena>;
+
     class FailingDescriptorManager : public vsl::GraphicResourceManager {
         std::weak_ptr<vsl::impl::GraphicResourceImpl> _previous;
 
@@ -45,9 +47,11 @@ namespace {
         std::vector<std::weak_ptr<void>> observed;
         std::tuple<std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>> allocate(std::vector<vsl::graphic_resource::BindingLayout> layouts) override;
     };
+
     t::ResourceAllocationSizes<Schema> sizes();
     template<typename A, typename B>
     bool same_owner(const A& a, const B& b);
+
     class TypedOwnedResourcesVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
 
@@ -61,11 +65,13 @@ namespace {
     bool same_owner(const A& a, const B& b) {
         return !a.owner_before(b) && !b.owner_before(a);
     }
+
     t::ResourceAllocationSizes<Schema> sizes() {
         t::ResourceAllocationSizes<Schema> result;
         result.image<0, 1>(IMAGE_INFO).image<0, 2>(IMAGE_INFO);
         return result;
     }
+
     auto FailingDescriptorManager::allocate(std::vector<vsl::graphic_resource::BindingLayout> layouts) -> std::tuple<std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>> {
         if (auto previous = _previous.lock(); fail && previous) {
             for (const auto& owner : previous->owner_context->dependencies) {
@@ -84,11 +90,13 @@ namespace {
         _previous = DescriptorAccess::Owned(std::get<1>(result).front()).share();
         return result;
     }
+
     void TypedOwnedResourcesVulkanIntegrationTest::host_visible(vsl::CommandManager manager) {
         const vk::MemoryBarrier barrier{.srcAccessMask = vk::AccessFlagBits::eShaderWrite, .dstAccessMask = vk::AccessFlagBits::eHostRead};
         auto buffer = manager.get_buffer();
         CommandAccess::Data(buffer)->command_buffers.at(buffer.get_current_buffer_idx()).pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost, {}, barrier, {}, {});
     }
+
     template<typename Policy>
     void TypedOwnedResourcesVulkanIntegrationTest::compute_round_trip() {
         auto manager = make_manager().independent(2);
@@ -139,12 +147,15 @@ namespace {
         }
         EXPECT_NE(generations[0], generations[1]);
     }
+
     TEST_F(TypedOwnedResourcesVulkanIntegrationTest, ArenaComponentsSharePhysicalStorageAcrossBindingsAndComputeCorrectly) {
         compute_round_trip<Arena>();
     }
+
     TEST_F(TypedOwnedResourcesVulkanIntegrationTest, HeapPolicyUsesTheSameImageAndSamplerBackend) {
         compute_round_trip<t::HeapStorage>();
     }
+
     TEST_F(TypedOwnedResourcesVulkanIntegrationTest, SharedSamplerViewDoesNotKeepFrameImagesAlive) {
         auto manager = make_manager().independent(2);
         vsl::GraphicResourceManager descriptors(device);
@@ -165,6 +176,7 @@ namespace {
         retained.reset();
         EXPECT_TRUE(shared.expired());
     }
+
     TEST_F(TypedOwnedResourcesVulkanIntegrationTest, ImageArraysKeepDistinctExtentsAndStorageInOneLifetimeGroup) {
         using Arrays = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<0, t::TextureBinding<0, COMPUTE, 2>>>, t::TextureAllocation<0, 0>>;
         t::ResourceAllocationSizes<Arrays> infos;
@@ -188,6 +200,7 @@ namespace {
         EXPECT_NO_THROW(frame.set<0>().require_complete());
         phase.cancel();
     }
+
     TEST_F(TypedOwnedResourcesVulkanIntegrationTest, SharedImageAndFrameSamplerAreComposedOnlyInTheFrame) {
         using Reverse = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<0, t::TextureBinding<0, COMPUTE>>>, t::TextureAllocation<0, 0, SHARED, FRAME>>;
         t::ResourceAllocationSizes<Reverse> infos;
@@ -209,6 +222,7 @@ namespace {
         EXPECT_TRUE(frame_owner.expired());
         EXPECT_EQ(ImageAccess::Owned(*(retained))->width, 1u);
     }
+
     TEST_F(TypedOwnedResourcesVulkanIntegrationTest, DeferredCommandRetainsOwnersUntilCancellationAfterBundleDestruction) {
         auto manager = make_manager();
         vsl::GraphicResourceManager descriptors(device);
@@ -236,6 +250,7 @@ namespace {
         EXPECT_TRUE(frame_owner.expired());
         EXPECT_TRUE(shared_owner.expired());
     }
+
     TEST_F(TypedOwnedResourcesVulkanIntegrationTest, SharedInitializationRejectsAnUnfinishedUploadAndPoisonsTheBundle) {
         using SharedImage = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<0, t::DescriptorBinding<0, Type::SAMPLED_IMAGE, COMPUTE>>>, t::ImageAllocation<0, 0, SHARED>>;
         t::ResourceAllocationSizes<SharedImage> infos;
@@ -253,6 +268,7 @@ namespace {
         EXPECT_THROW(bundle.update(fresh, [](auto&) {}), std::logic_error);
         fresh.cancel();
     }
+
     TEST_F(TypedOwnedResourcesVulkanIntegrationTest, CompletedSharedUploadAllowsFrameUseAndReleasesOwnersAfterGpuCompletion) {
         using SharedImage = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<0, t::TextureBinding<0, COMPUTE>>>, t::TextureAllocation<0, 0, SHARED, SHARED>>;
         t::ResourceAllocationSizes<SharedImage> infos;
@@ -283,6 +299,7 @@ namespace {
         ASSERT_TRUE(completion.wait());
         EXPECT_TRUE(owner.expired());
     }
+
     TEST_F(TypedOwnedResourcesVulkanIntegrationTest, ExternalTexturePreservesItsAdditionalLogicalUpdateConstraint) {
         using External = t::ResourceAllocationSchema<t::ResourceSchema<t::DescriptorSet<0, t::TextureBinding<0, COMPUTE>>>, t::ExternalAllocation<0, 0>>;
         auto manager = make_manager();
@@ -302,6 +319,7 @@ namespace {
         EXPECT_FALSE(logical->busy());
         EXPECT_FALSE(image.use_state().busy());
     }
+
     TEST_F(TypedOwnedResourcesVulkanIntegrationTest, DescriptorManagerFailureRollsBackMixedHeapOwnersAndAllowsRetry) {
         auto manager = make_manager().independent(2);
         auto verify = [&]<typename Policy>() {

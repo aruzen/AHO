@@ -1,15 +1,19 @@
 #include "../../src/private/VSL/lifetime/window_access.hpp"
+
 namespace {
     using VSL_NAMESPACE::lifetime::detail::WindowAccess;
 }
+
 #include <VSL/lifetime/startup_access.hpp>
 #include "support/window_fixture.hpp"
 
 namespace {
     using VSL_NAMESPACE::lifetime::detail::StartupAccess;
 }
+
 namespace {
     using SurfaceWindowIntegrationTest = vsl_test::WindowIntegrationTest;
+
     TEST_F(SurfaceWindowIntegrationTest, CreatesSurfaceForWindowAndRetainsInstance) {
         make_surface();
         ASSERT_FALSE(HasFatalFailure());
@@ -21,6 +25,7 @@ namespace {
         EXPECT_GE(capabilities.maxImageExtent.height, 48u);
         EXPECT_FALSE(StartupAccess::Owned(physical)->device.getSurfaceFormatsKHR(StartupAccess::Owned(*(surface))->surface).empty());
     }
+
     TEST_F(SurfaceWindowIntegrationTest, OwnerAssignmentPreservesTheDestinationPluginRegistration) {
         make_surface();
         auto peer = window->add_plugin<vsl::Surface>(StartupAccess::FromShared(instance));
@@ -43,24 +48,30 @@ namespace {
         auto empty = std::make_shared<vsl::impl::SurfaceImpl>();
         EXPECT_NO_THROW(empty.reset());
     }
+
     TEST_F(SurfaceWindowIntegrationTest, NullWindowIsRejectedBeforeNativeAccess) {
         EXPECT_THROW((vsl::Surface(nullptr, vsl::lifetime::detail::StartupAccess::FromShared(instance))), vsl::exceptions::RuntimeException);
     }
+
     TEST_F(SurfaceWindowIntegrationTest, EmptyWindowDataIsRejectedBeforeGlfwAccess) {
         vsl::PureWindow empty(WindowAccess::FromState(std::shared_ptr<vsl::PureWindow::WindowData>{}));
         EXPECT_THROW((vsl::Surface(&empty, vsl::lifetime::detail::StartupAccess::FromShared(instance))), vsl::exceptions::RuntimeException);
     }
+
     TEST_F(SurfaceWindowIntegrationTest, ClosedWindowIsRejectedBeforeGlfwAccess) {
         ASSERT_TRUE(window->close());
         EXPECT_THROW((vsl::Surface(&*window, vsl::lifetime::detail::StartupAccess::FromShared(instance))), vsl::exceptions::RuntimeException);
     }
+
     TEST_F(SurfaceWindowIntegrationTest, EmptyInstanceIsRejectedBeforeNativeAccess) {
         EXPECT_THROW((vsl::Surface(&*window, vsl::VulkanAccessor{})), vsl::exceptions::RuntimeException);
     }
+
     TEST_F(SurfaceWindowIntegrationTest, NullNativeInstanceIsRejectedBeforeGlfwAccess) {
         auto empty = std::make_shared<vsl::impl::VulkanImpl<false>>();
         EXPECT_THROW((vsl::Surface(&*window, vsl_test::unchecked_startup(empty))), vsl::exceptions::RuntimeException);
     }
+
     TEST_F(SurfaceWindowIntegrationTest, MissingPlatformExtensionThrowsWithReasonAndDoesNotRegisterAPlugin) {
         vsl::InstanceCreateInfo info;
         info.extensions.emplace_back(VK_KHR_SURFACE_EXTENSION_NAME);

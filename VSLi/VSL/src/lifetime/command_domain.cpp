@@ -19,14 +19,18 @@ namespace {
 namespace VSL_NAMESPACE::lifetime {
     namespace {
         bool same_buffer(const std::shared_ptr<impl::CommandBufferImpl>& first, const std::shared_ptr<impl::CommandBufferImpl>& second);
+
         struct CommandMutation {
             CommandRecordingContext& context;
             explicit CommandMutation(CommandRecordingContext& context);
+
             ~CommandMutation() { context.mutating = false; }
         };
+
         bool same_buffer(const std::shared_ptr<impl::CommandBufferImpl>& first, const std::shared_ptr<impl::CommandBufferImpl>& second) {
             return first && first == second && !first.owner_before(second) && !second.owner_before(first);
         }
+
         CommandMutation::CommandMutation(CommandRecordingContext& context) : context(context) {
             if (context.closing || context.mutating || context.recording || context.submitting || context.returning_image || context.frame_buffer_recording)
                 throw std::logic_error("Command ring cannot change during recording or mutation");
@@ -34,6 +38,7 @@ namespace VSL_NAMESPACE::lifetime {
             ++context.generation;
         }
     } // namespace
+
     CommandDomain::CommandDomain(std::shared_ptr<impl::CommandBufferImpl> buffer)
         : buffer(std::move(buffer)), submissions(this->buffer->command_buffers.size()) {
         inherit_quarantined_submissions(*this);
@@ -109,15 +114,18 @@ namespace VSL_NAMESPACE::lifetime {
             throw std::logic_error("Command buffer has no live lifetime domain");
         return buffer._domain;
     }
+
     std::shared_ptr<CommandDomain> CommandAccess::Resolve(const std::shared_ptr<impl::CommandBufferImpl>& buffer) {
         auto domain = buffer && buffer->owner_context ? buffer->owner_context->domain.lock() : nullptr;
         if (!domain || !same_buffer(domain->buffer, buffer) || domain->context.closing)
             throw std::logic_error("Command buffer lifetime domain has expired");
         return domain;
     }
+
     std::shared_ptr<CommandDomain> CommandAccess::CreateDomain(std::shared_ptr<impl::CommandBufferImpl> buffer) {
         return std::make_shared<CommandDomain>(std::move(buffer));
     }
+
     CommandBuffer CommandAccess::Attach(std::shared_ptr<impl::CommandBufferImpl> buffer, Factory factory) {
         if (!buffer || !buffer.use_count() || !buffer->owner_node || !buffer->owner_node->matches(buffer) ||
             !buffer->owner_context || buffer->command_buffers.empty() || !factory)
@@ -138,6 +146,7 @@ namespace VSL_NAMESPACE::lifetime {
         buffer->recording_context = &domain->context;
         return Buffer(domain);
     }
+
     CommandBuffer CommandAccess::Buffer(const std::shared_ptr<CommandDomain>& domain) {
         if (!domain || domain->context.closing)
             throw std::logic_error("Command buffer lifetime domain has expired");
@@ -146,6 +155,7 @@ namespace VSL_NAMESPACE::lifetime {
         result._domain = domain;
         return result;
     }
+
     CommandManager CommandAccess::Manager(std::shared_ptr<impl::CommandManagerImpl> data, std::shared_ptr<CommandDomain> domain) {
         if (!data || !domain || !same_buffer(data->command_buffer, domain->buffer) || domain->context.closing)
             throw std::logic_error("Command manager requires the canonical buffer domain");
@@ -154,6 +164,7 @@ namespace VSL_NAMESPACE::lifetime {
         result._domain = std::move(domain);
         return result;
     }
+
     void next_command_buffer(const CommandBuffer& buffer) {
         const auto domain = CommandAccess::Owner(buffer);
         const CommandMutation mutation(domain->context);
@@ -162,6 +173,7 @@ namespace VSL_NAMESPACE::lifetime {
             throw std::logic_error("Command ring slot is invalid");
         native->current_buffer_idx = (native->current_buffer_idx + 1) % native->command_buffers.size();
     }
+
     void reset_command_buffers(const CommandBuffer& buffer, std::optional<std::uint32_t> index) {
         const auto domain = CommandAccess::Owner(buffer);
         const CommandMutation mutation(domain->context);

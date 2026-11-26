@@ -70,12 +70,15 @@ namespace VSL_NAMESPACE::operation {
         bool has_extension(std::span<const vk::ExtensionProperties> extensions, std::string_view name);
         std::uint32_t effective_api(impl::PhysicalDeviceImpl& physical);
         DeviceFeature query_features(impl::PhysicalDeviceImpl& physical, std::span<const vk::ExtensionProperties> extensions);
+
         bool has_extension(std::span<const vk::ExtensionProperties> extensions, std::string_view name) {
             return std::ranges::any_of(extensions, [&](const auto& extension) { return name == extension.extensionName.data(); });
         }
+
         std::uint32_t effective_api(impl::PhysicalDeviceImpl& physical) {
             return std::min(physical.vulkan->api_version, physical_device_properties(physical).apiVersion);
         }
+
         DeviceFeature query_features(impl::PhysicalDeviceImpl& physical, std::span<const vk::ExtensionProperties> extensions) {
             if (!physical.device || !physical.vulkan || !physical.vulkan->instance)
                 throw std::invalid_argument("Device features require a live PhysicalDevice and Instance");
@@ -110,12 +113,14 @@ namespace VSL_NAMESPACE::operation {
             return static_cast<DeviceFeature>(mask);
         }
     } // namespace
+
     DeviceFeature supported_device_features(impl::PhysicalDeviceImpl& physical) {
         if (!physical.device)
             throw std::invalid_argument("Device features require a live PhysicalDevice");
         const auto extensions = physical.device.enumerateDeviceExtensionProperties();
         return query_features(physical, extensions);
     }
+
     DeviceCreateInfo graphics_device_info(impl::PhysicalDeviceImpl& physical, impl::SurfaceImpl& surface, bool validation, PresentFencePolicy present_fences) {
         if (present_fences != PresentFencePolicy::LEGACY && present_fences != PresentFencePolicy::REQUIRE_FENCE)
             throw std::invalid_argument("Unknown presentation fence policy");
@@ -145,6 +150,7 @@ namespace VSL_NAMESPACE::operation {
             info.features = info.features | DeviceFeature::SWAPCHAIN_MAINTENANCE1;
         return info;
     }
+
     void initialize_device(impl::LogicalDeviceImpl& target, impl::PhysicalDeviceImpl& physical, DeviceCreateInfo info, const DeviceNativeCalls& calls) {
         if (target.device || target.parent_device)
             throw std::logic_error("Device is already initialized");
@@ -239,6 +245,7 @@ namespace VSL_NAMESPACE::operation {
         target.enabled_features = info.features;
         target.swapchain_enabled = std::ranges::find(info.extensions, VK_KHR_SWAPCHAIN_EXTENSION_NAME) != info.extensions.end();
     }
+
     void destroy_device(impl::LogicalDeviceImpl& target, const DeviceNativeCalls& calls) noexcept {
         const auto native = std::exchange(target.device, {});
         if (!native)

@@ -7,6 +7,7 @@ namespace VSL_NAMESPACE::operation {
         void* context = nullptr;
         VkResult (*create)(void*, VkDevice, const VkImageViewCreateInfo*, VkImageView*) = nullptr;
     };
+
     // deviceと外部imageの寿命は呼出側が保証する。native資源の所有だけを区別する。
     void initialize_image(impl::ImageImpl& target, impl::LogicalDeviceImpl& device, const ImageCreateInfo& info);
     void initialize_borrowed_image(impl::ImageImpl& target, impl::LogicalDeviceImpl& device,

@@ -15,6 +15,7 @@
 namespace VSL_NAMESPACE {
     class NativeRecordingContext;
 }
+
 namespace VSL_NAMESPACE::command {
     struct ImageCopyInfo {
         ImageRegion region;

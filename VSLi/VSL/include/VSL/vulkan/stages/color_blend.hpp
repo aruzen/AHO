@@ -2,6 +2,7 @@
 #include "../pipeline_layout.hpp"
 #include <vector>
 #include <utility>
+
 namespace VSL_NAMESPACE::pipeline_layout {
     enum class ColorWriteMask : std::uint32_t {
         NONE = 0,
@@ -31,6 +32,7 @@ namespace VSL_NAMESPACE::pipeline_layout {
         MIN_ = 3,
         MAX_ = 4
     };
+
     struct ColorBlendAttachment {
         bool enabled = true;
         ColorWriteMask write_mask = ColorWriteMask::RGBA;
@@ -39,11 +41,15 @@ namespace VSL_NAMESPACE::pipeline_layout {
         BlendFactor source_alpha = BlendFactor::ONE, destination_alpha = BlendFactor::ZERO;
         BlendOp alpha_op = BlendOp::ADD;
     };
+
     struct ColorBlend {
         std::vector<ColorBlendAttachment> attachments{1};
         ColorBlend() = default;
+
         explicit ColorBlend(ColorBlendAttachment attachment) : attachments{attachment} {}
+
         explicit ColorBlend(std::vector<ColorBlendAttachment> values) : attachments(std::move(values)) {}
+
         void injection(GraphicsPipelineStateEditRef state);
         void injection(PipelineLayoutEditAccessor pl);
     };

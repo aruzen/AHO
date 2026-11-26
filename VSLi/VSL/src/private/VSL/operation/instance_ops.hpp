@@ -12,6 +12,7 @@ namespace VSL_NAMESPACE::operation {
         void (*destroy_instance)(void*, VkInstance) noexcept = nullptr;
         void (*destroy_messenger)(void*, VkInstance, VkDebugUtilsMessengerEXT) noexcept = nullptr;
     };
+
     bool instance_layers_supported(std::span<const std::string> layers);
     void initialize_instance(impl::VulkanImplAccessor& instance, InstanceCreateInfo info, const InstanceNativeCalls& calls = {});
     void destroy_instance(impl::VulkanImplAccessor& instance, const InstanceNativeCalls& calls = {}) noexcept;

@@ -63,10 +63,12 @@ namespace VSL_NAMESPACE {
         ImageLayout initial_layout = ImageLayout::UNDEFINED;
         ImageLayout final_layout = ImageLayout::COLOR_ATTACHMENT_OPTIMAL;
     };
+
     struct AttachmentReference {
         AttachmentId attachment;
         ImageLayout layout = ImageLayout::COLOR_ATTACHMENT_OPTIMAL;
     };
+
     struct SubpassDescription {
         // 配列内の位置がフラグメント出力のlocation、入力アタッチメントのインデックスに対応する。
         std::vector<AttachmentReference> colors;
@@ -75,6 +77,7 @@ namespace VSL_NAMESPACE {
         std::optional<AttachmentReference> depth_stencil;
         std::vector<AttachmentId> preserve;
     };
+
     struct SubpassDependency {
         std::uint32_t source = EXTERNAL_SUBPASS;
         std::uint32_t destination = 0;
@@ -84,6 +87,7 @@ namespace VSL_NAMESPACE {
         AccessMask destination_access = AccessMask::MEMORY_READ | AccessMask::MEMORY_WRITE;
         bool by_region = false;
     };
+
     struct RenderPassDescription {
         std::vector<AttachmentDescription> attachments;
         std::vector<SubpassDescription> subpasses{1};
@@ -99,17 +103,22 @@ namespace VSL_NAMESPACE {
     struct ClearColor {
         float r = 0, g = 0, b = 0, a = 0;
     };
+
     struct ClearInt {
         std::int32_t r = 0, g = 0, b = 0, a = 0;
     };
+
     struct ClearUint {
         std::uint32_t r = 0, g = 0, b = 0, a = 0;
     };
+
     struct ClearDepthStencil {
         float depth = 1;
         std::uint32_t stencil = 0;
     };
+
     using ClearValue = std::variant<ClearColor, ClearInt, ClearUint, ClearDepthStencil>;
+
     struct AttachmentClear {
         AttachmentId attachment;
         ClearValue value;

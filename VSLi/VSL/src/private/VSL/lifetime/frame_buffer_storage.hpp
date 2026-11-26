@@ -6,10 +6,12 @@ namespace VSL_NAMESPACE::lifetime {
     struct FrameBufferOwnerContext {
         WeakOwnedRef<impl::RenderPassImpl> pass;
     };
+
     struct FrameBufferSlotStorage {
         alignas(impl::FrameBufferImpl) std::byte value[sizeof(impl::FrameBufferImpl)];
         alignas(FrameBufferOwnerContext) std::byte context[sizeof(FrameBufferOwnerContext)];
     };
+
     void construct_frame_buffer(void* storage, LogicalDeviceAccessor device, operation::FrameBufferInput input);
     void construct_frame_buffer(void* storage, impl::LogicalDeviceImpl& device, operation::FrameBufferInput input);
     impl::FrameBufferImpl& frame_buffer_at(void* storage);

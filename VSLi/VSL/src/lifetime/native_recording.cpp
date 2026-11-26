@@ -17,6 +17,7 @@ namespace VSL_NAMESPACE {
         _commands = operation::native_command_buffer(*domain->buffer, _slot);
         require_current();
     }
+
     void NativeRecordingContext::require_current() const {
         const auto& domain = lifetime::CommandAccess::Owner(_buffer);
         const auto& buffer = *domain->buffer;
@@ -28,12 +29,14 @@ namespace VSL_NAMESPACE {
             buffer.current_buffer_idx != _slot || operation::native_command_buffer(buffer, _slot) != _commands)
             throw std::logic_error("Native recording context is no longer current");
     }
+
     void NativeRecordingContext::use(ResourceUse resource, ResourceRetention retention) const {
         const auto context = *this;
         context.require_current();
         resource.record(context._buffer, retention);
         context.require_current();
     }
+
     void NativeRecordingContext::retain(lifetime::OwnerRef owner, ResourceRetention retention) const {
         const auto context = *this;
         context.require_current();
@@ -43,6 +46,7 @@ namespace VSL_NAMESPACE {
             context._completion.retain(owner.share());
         context.require_current();
     }
+
     VkCommandBuffer NativeRecordingContext::native_command_buffer() const& {
         require_current();
         return _commands;

@@ -13,6 +13,7 @@ namespace VSL_NAMESPACE::lifetime {
     namespace {
         using FenceObservation = std::variant<std::monostate, std::shared_ptr<impl::SubmissionImpl>,
                                               std::shared_ptr<sync::FenceProof>, std::shared_ptr<sync::PresentState>>;
+
         struct FenceAccess {
             std::shared_ptr<impl::FenceImpl> data;
             std::vector<vk::Fence> handles;
@@ -29,9 +30,11 @@ namespace VSL_NAMESPACE::lifetime {
             void begin_observation() noexcept;
             void finish_observation() noexcept;
         };
+
         struct SemaphoreAccess {
             sync::SemaphoreUseState& state;
             explicit SemaphoreAccess(sync::SemaphoreUseState& state);
+
             ~SemaphoreAccess() { state.accessing = false; }
         };
         template<class Map, class T>
@@ -40,6 +43,7 @@ namespace VSL_NAMESPACE::lifetime {
         void reset_reserved_fence(const FenceAccess& access, std::uint32_t index, sync::FenceUseState::Use use);
         bool idle_acquisition(sync::FenceProof& proof, bool wait) noexcept;
         bool idle_presentation(sync::PresentState& state, bool wait) noexcept;
+
         bool idle_acquisition(sync::FenceProof& proof, bool wait) noexcept {
             if (proof.observing)
                 return false;
@@ -51,6 +55,7 @@ namespace VSL_NAMESPACE::lifetime {
                 sync::wait_fence_proof(proof);
             return sync::fence_proof_terminal(proof);
         }
+
         bool idle_presentation(sync::PresentState& state, bool wait) noexcept {
             if (state.observing)
                 return false;
@@ -61,6 +66,7 @@ namespace VSL_NAMESPACE::lifetime {
                 sync::wait_present(state);
             return sync::present_terminal(state);
         }
+
         FenceObservation snapshot_use(const sync::FenceUseState& use) {
             return std::visit([](const auto& source) -> FenceObservation {
                 using Source = std::decay_t<decltype(source)>;
@@ -74,6 +80,7 @@ namespace VSL_NAMESPACE::lifetime {
             },
                               use.use);
         }
+
         void reset_reserved_fence(const FenceAccess& access, std::uint32_t index, sync::FenceUseState::Use use) {
             auto& target = access.data->uses.at(index).use;
             auto previous = std::exchange(target, std::move(use));
@@ -84,10 +91,12 @@ namespace VSL_NAMESPACE::lifetime {
                 throw;
             }
         }
+
         template<class Map, class T>
         void erase_target(Map& map, const std::shared_ptr<T>& data) {
             std::erase_if(map, [&](const auto& item) { return item.second == data; });
         }
+
         FenceAccess::FenceAccess(std::shared_ptr<impl::FenceImpl> data, std::optional<std::uint32_t> index) : data(std::move(data)) {
             if (!this->data || this->data->fences.empty() || this->data->uses.size() != this->data->fences.size())
                 throw std::logic_error("Fence has been destroyed or its state is invalid");
@@ -108,12 +117,14 @@ namespace VSL_NAMESPACE::lifetime {
                 this->data->uses[i].accessing = true;
             active = true;
         }
+
         FenceAccess::~FenceAccess() {
             finish_observation();
             if (active)
                 for (size_t i = first; i < end && i < data->uses.size(); ++i)
                     data->uses[i].accessing = false;
         }
+
         void FenceAccess::check() const {
             if (end > data->fences.size() || end > data->uses.size())
                 throw std::logic_error("Fence storage changed while observing completion");
@@ -121,6 +132,7 @@ namespace VSL_NAMESPACE::lifetime {
                 if (!data->uses[i].accessing || data->fences[i] != handles[i - first])
                     throw std::logic_error("Fence element changed while observing completion");
         }
+
         void FenceAccess::require_waitable(bool poll) const {
             for (const auto& observation : observations)
                 std::visit([poll](const auto& value) {
@@ -148,6 +160,7 @@ namespace VSL_NAMESPACE::lifetime {
                 },
                            observation);
         }
+
         void FenceAccess::require_idle(bool wait, bool poll_graphics) const {
             for (const auto& observation : observations)
                 std::visit([&](const auto& value) {
@@ -176,6 +189,7 @@ namespace VSL_NAMESPACE::lifetime {
                            observation);
             check();
         }
+
         std::vector<std::shared_ptr<impl::SubmissionWork>> FenceAccess::submitted_work() const {
             std::vector<std::shared_ptr<impl::SubmissionWork>> result;
             for (const auto& observation : observations)
@@ -184,6 +198,7 @@ namespace VSL_NAMESPACE::lifetime {
                         result.push_back(std::move(work));
             return result;
         }
+
         void FenceAccess::save_observations(vk::Result result) const noexcept {
             for (const auto& observation : observations)
                 std::visit([&](const auto& value) {
@@ -197,6 +212,7 @@ namespace VSL_NAMESPACE::lifetime {
                 },
                            observation);
         }
+
         void FenceAccess::begin_observation() noexcept {
             observing = true;
             for (const auto& observation : observations)
@@ -208,6 +224,7 @@ namespace VSL_NAMESPACE::lifetime {
                 },
                            observation);
         }
+
         void FenceAccess::finish_observation() noexcept {
             if (!observing)
                 return;
@@ -221,15 +238,18 @@ namespace VSL_NAMESPACE::lifetime {
                            observation);
             observing = false;
         }
+
         SemaphoreAccess::SemaphoreAccess(sync::SemaphoreUseState& state) : state(state) {
             if (state.accessing)
                 throw std::logic_error("Semaphore is being accessed");
             state.accessing = true;
         }
     } // namespace
+
     void require_semaphore_owner(const std::shared_ptr<impl::SemaphoreImpl>& semaphore) {
         detail::SynchronizationAccess::RequireCanonical(semaphore);
     }
+
     std::shared_ptr<sync::FenceReservation> reserve_fence(std::shared_ptr<impl::FenceImpl> fence, std::uint32_t index,
                                                           const std::shared_ptr<impl::SubmissionImpl>& result) {
         const FenceAccess access(std::move(fence), index);
@@ -241,6 +261,7 @@ namespace VSL_NAMESPACE::lifetime {
         access.data->uses.at(index).use = std::weak_ptr<sync::FenceReservation>(reservation);
         return reservation;
     }
+
     bool reserve_acquire_fence(std::shared_ptr<impl::FenceImpl> fence, std::uint32_t index, const std::shared_ptr<sync::FenceProof>& proof,
                                AcquireFenceGate gate) {
         const auto pending = proof;
@@ -261,6 +282,7 @@ namespace VSL_NAMESPACE::lifetime {
         }
         return true;
     }
+
     void release_acquire_fence(impl::FenceImpl& fence, std::uint32_t index, const std::shared_ptr<sync::FenceProof>& proof) noexcept {
         if (!proof || proof->observing || !sync::fence_proof_terminal(*proof) || index >= fence.uses.size() || fence.uses[index].accessing)
             return;
@@ -270,6 +292,7 @@ namespace VSL_NAMESPACE::lifetime {
         if (current && current == proof && !current.owner_before(proof) && !proof.owner_before(current))
             use = std::monostate{};
     }
+
     void reserve_present_fence(std::shared_ptr<impl::FenceImpl> fence, std::uint32_t index, const std::shared_ptr<sync::PresentState>& state) {
         const FenceAccess access(std::move(fence), index);
         if (!state || !state->strict || state->status != sync::PresentStatus::PENDING || state->device != access.data->native_device ||
@@ -280,6 +303,7 @@ namespace VSL_NAMESPACE::lifetime {
         state->proof = access.handles[0];
         reset_reserved_fence(access, index, std::weak_ptr<sync::PresentState>(state));
     }
+
     void require_fence_reservation(const impl::SubmissionWork& work, std::uint32_t index) {
         if (!work.external_fence)
             return;
@@ -289,6 +313,7 @@ namespace VSL_NAMESPACE::lifetime {
             work.fence_reservation->result.lock() != work.result || work.fence != fence.fences[index])
             throw std::logic_error("Phase no longer owns its fence reservation");
     }
+
     bool wait_fences(std::shared_ptr<impl::FenceImpl> fence, std::optional<std::uint32_t> index, std::uint64_t timeout) {
         FenceAccess access(std::move(fence), index);
         access.require_waitable(timeout == 0);
@@ -321,6 +346,7 @@ namespace VSL_NAMESPACE::lifetime {
         access.check();
         return true;
     }
+
     void reset_fences(std::shared_ptr<impl::FenceImpl> fence, std::optional<std::uint32_t> index) {
         const FenceAccess access(std::move(fence), index);
         access.require_idle(false);
@@ -328,6 +354,7 @@ namespace VSL_NAMESPACE::lifetime {
         for (size_t i = access.first; i < access.end; ++i)
             access.data->uses[i].use = std::monostate{};
     }
+
     void destroy_fences(std::shared_ptr<impl::FenceImpl> fence) {
         if (!fence || fence->fences.empty())
             return;
@@ -342,6 +369,7 @@ namespace VSL_NAMESPACE::lifetime {
         if (registry)
             erase_target(registry->fences, fence);
     }
+
     void destroy_semaphores(std::shared_ptr<impl::SemaphoreImpl> semaphore) {
         if (!semaphore || semaphore->semaphores.empty())
             return;

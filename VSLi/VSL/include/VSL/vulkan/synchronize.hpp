@@ -19,16 +19,19 @@ namespace VSL_NAMESPACE {
     private:
         friend struct lifetime::detail::SynchronizationAccess;
         lifetime::OwnedRef<impl::SemaphoreImpl> _owner;
+
         explicit SemaphoreHolder(lifetime::OwnedRef<impl::SemaphoreImpl> owner) : _owner(std::move(owner)) {}
 
     public:
         SemaphoreHolder() = default;
         SemaphoreHolder(const SemaphoreHolder&) = default;
         SemaphoreHolder(SemaphoreHolder&&) noexcept = default;
+
         SemaphoreHolder& operator=(SemaphoreHolder replacement) noexcept {
             swap(replacement);
             return *this;
         }
+
         void swap(SemaphoreHolder& other) noexcept { _owner.swap(other._owner); }
         explicit operator bool() const noexcept { return bool(_owner); }
 
@@ -42,16 +45,19 @@ namespace VSL_NAMESPACE {
     private:
         friend struct lifetime::detail::SynchronizationAccess;
         lifetime::OwnedRef<impl::FenceImpl> _owner;
+
         explicit FenceHolder(lifetime::OwnedRef<impl::FenceImpl> owner) : _owner(std::move(owner)) {}
 
     public:
         FenceHolder() = default;
         FenceHolder(const FenceHolder&) = default;
         FenceHolder(FenceHolder&&) noexcept = default;
+
         FenceHolder& operator=(FenceHolder replacement) noexcept {
             swap(replacement);
             return *this;
         }
+
         void swap(FenceHolder& other) noexcept { _owner.swap(other._owner); }
         explicit operator bool() const noexcept { return bool(_owner); }
 
@@ -74,12 +80,15 @@ namespace VSL_NAMESPACE {
         SynchroManager() = default;
         SynchroManager(const SynchroManager&) = default;
         SynchroManager(SynchroManager&&) noexcept = default;
+
         SynchroManager& operator=(SynchroManager replacement) noexcept {
             swap(replacement);
             return *this;
         }
+
         void swap(SynchroManager& other) noexcept { _registry.swap(other._registry); }
         explicit operator bool() const noexcept { return bool(_registry); }
+
         LogicalDeviceAccessor get_device() const;
 
         SynchroManager(LogicalDeviceAccessor device);

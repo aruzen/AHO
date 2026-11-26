@@ -88,6 +88,7 @@ namespace AHO_NAMESPACE::engine {
             throw std::logic_error("StandardEngine boot is already active");
         source._boot_scope = this;
     }
+
     StandardEngine::BootScope::~BootScope() {
         if (target)
             target->_boot_scope = nullptr;
@@ -113,6 +114,7 @@ namespace AHO_NAMESPACE::engine {
         BootScope scope(*this);
         const auto config = _config;
         validate_config(config);
+
         const auto& initial = config.initial_window;
         const auto& title = initial.title.empty() ? config.engine.application_name : initial.title;
         VSL_NAMESPACE::Window native(title, initial.width, initial.height);
@@ -126,22 +128,26 @@ namespace AHO_NAMESPACE::engine {
                 throw std::logic_error("StandardEngine was destroyed during resource creation");
             if (native != native_snapshot || !native_snapshot)
                 throw std::runtime_error("Window closed during engine creation");
+
             auto handle = std::move(resources.engine);
             auto drawing = window::detail::make_window_data(handle, std::move(resources.surface));
             if (!scope.target)
                 throw std::logic_error("StandardEngine was destroyed during drawing resource creation");
             if (native != native_snapshot || !native_snapshot)
                 throw std::runtime_error("Window closed during drawing resource creation");
+
             std::optional<Window> window(std::in_place, handle, native, std::move(drawing));
             std::optional<DefaultEngineRegistration> registration;
             if (config.register_as_default)
                 registration.emplace(handle);
             if (!scope.target)
                 throw std::logic_error("StandardEngine was destroyed before publication");
+
             static_assert(std::is_nothrow_swappable_v<decltype(window)> && std::is_nothrow_swappable_v<decltype(registration)>);
             scope.target->boot_window.swap(window);
             scope.target->swap_runtime(handle);
             scope.target->_default_registration.swap(registration);
+
             window.reset();
             handle = {};
             registration.reset();

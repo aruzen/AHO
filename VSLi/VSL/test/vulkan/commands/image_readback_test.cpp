@@ -19,6 +19,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     class ImageReadbackCommandVulkanIntegrationTest : public vsl_test::ImageTransferVulkanIntegrationTest {
         bool validate_vulkan() const override;
@@ -123,6 +124,7 @@ namespace {
         vsl::command::ImageReadback command(&destination, image, vsl::ImageLayout::TRANSFER_DST_OPTIMAL);
         EXPECT_THROW(command.invoke(manager.get_pool(), empty, manager), std::invalid_argument);
     }
+
     TEST_F(ImageReadbackCommandVulkanIntegrationTest, EmptyManagerIsRejectedBeforeRetainingResourcesOrRecordingBarriers) {
         auto manager = make_manager();
         auto image = initialized_image(manager);
@@ -137,6 +139,7 @@ namespace {
         EXPECT_EQ(CommandAccess::Data(buffer)->recording_context->work->resources, retained);
         phase.cancel();
     }
+
     TEST_F(ImageReadbackCommandVulkanIntegrationTest, CommandKeepsDestinationWhenOriginalHandleIsDestroyedBeforeRecording) {
         auto manager = make_manager();
         auto image = initialized_image(manager);

@@ -10,6 +10,7 @@
 namespace VSL_NAMESPACE::typed {
     template<typename...>
     class TypedBatch;
+
     namespace detail {
         void validate_dispatch(LogicalDeviceAccessor device, size_t x, size_t y, size_t z);
     }
@@ -27,6 +28,7 @@ namespace VSL_NAMESPACE::typed {
         std::vector<command::BindGraphicResource> _resources;
         std::optional<typename Pushes::Values> _pushes;
         command::Dispatch _dispatch;
+
         TypedDispatch(VSL_NAMESPACE::ComputePipeline pipeline, LogicalDeviceAccessor device, std::vector<command::BindGraphicResource> resources,
                       std::uint32_t x, std::uint32_t y, std::uint32_t z, std::optional<typename Pushes::Values> pushes)
             : _pipeline(std::move(pipeline)), _device(device), _resources(std::move(resources)), _pushes(std::move(pushes)), _dispatch(x, y, z) {}
@@ -34,7 +36,9 @@ namespace VSL_NAMESPACE::typed {
     public:
         using ResourceLayout = Resources;
         using PushLayout = Pushes;
+
         PipelineAccessor get_pipeline() override { return _pipeline; }
+
         void invoke(CommandPool pool, CommandBuffer buffer, CommandManager manager) override;
     };
     template<typename Resources = ResourceSchema<>, typename Pushes = PushSchema<>>
@@ -49,6 +53,7 @@ namespace VSL_NAMESPACE::typed {
         LogicalDeviceAccessor _device;
         std::vector<command::BindGraphicResource> _resources;
         std::optional<typename Pushes::Values> _pushes;
+
         TypedComputeBinding(VSL_NAMESPACE::ComputePipeline pipeline, LogicalDeviceAccessor device, std::vector<command::BindGraphicResource> resources, std::optional<typename Pushes::Values> pushes = std::nullopt)
             : _pipeline(std::move(pipeline)), _device(device), _resources(std::move(resources)), _pushes(std::move(pushes)) {}
 
@@ -70,19 +75,25 @@ namespace VSL_NAMESPACE::typed {
     public:
         using ResourceLayout = Resources;
         using PushLayout = Pushes;
+
         template<pipeline_layout_injecter... Stages>
         TypedComputePipeline(LogicalDeviceAccessor device, Stages&&... stages)
             : TypedComputePipeline(DefaultStorage{}, device, std::forward<Stages>(stages)...) {}
+
         template<storage_policy Policy, pipeline_layout_injecter... Stages>
         TypedComputePipeline(Policy policy, LogicalDeviceAccessor device, Stages&&... stages)
             : _device(device), _pipeline(MakePipeline(policy, device, Resources{}, std::forward<Stages>(stages)...)) {}
+
         template<pipeline_layout_injecter... Stages>
         TypedComputePipeline(LogicalDeviceAccessor device, const TypedDescriptorLayouts<Resources>& layouts, Stages&&... stages)
             : TypedComputePipeline(DefaultStorage{}, device, layouts, std::forward<Stages>(stages)...) {}
+
         template<storage_policy Policy, pipeline_layout_injecter... Stages>
         TypedComputePipeline(Policy policy, LogicalDeviceAccessor device, const TypedDescriptorLayouts<Resources>& layouts, Stages&&... stages)
             : _device(device), _pipeline(MakePipeline(policy, device, detail::DescriptorLayoutInjection<Resources>{layouts}, std::forward<Stages>(stages)...)) {}
+
         const VSL_NAMESPACE::ComputePipeline& backend() const { return _pipeline; }
+
         template<typename... Sets>
         requires compatible_descriptor_sets<Resources, Sets...>
         TypedComputeBinding<Resources, Pushes> bind_resources(const Sets&... sets) const;
@@ -99,6 +110,7 @@ namespace VSL_NAMESPACE::typed {
             detail::invoke_push_values(_pipeline, buffer, Pushes::REQUIREMENTS, _pushes->bytes());
         _dispatch.invoke(pool, buffer, manager);
     }
+
     template<typename Resources, typename Pushes, bool pushed>
     TypedDispatch<Resources, Pushes> TypedComputeBinding<Resources, Pushes, pushed>::dispatch(size_t x, size_t y, size_t z) const
     requires(pushed)
@@ -106,6 +118,7 @@ namespace VSL_NAMESPACE::typed {
         detail::validate_dispatch(_device, x, y, z);
         return TypedDispatch<Resources, Pushes>(_pipeline, _device, _resources, std::uint32_t(x), std::uint32_t(y), std::uint32_t(z), _pushes);
     }
+
     template<typename Resources, typename Pushes>
     template<storage_policy Policy, pipeline_layout_injecter ResourceStage, pipeline_layout_injecter... Stages>
     VSL_NAMESPACE::ComputePipeline TypedComputePipeline<Resources, Pushes>::MakePipeline(Policy policy, LogicalDeviceAccessor device, ResourceStage&& resources, Stages&&... stages) {
@@ -118,6 +131,7 @@ namespace VSL_NAMESPACE::typed {
         const auto materialized = lifetime::materialize_recipe<Resources::COUNT + 1>(recipe, policy);
         return lifetime::make_compute_pipeline(materialized, policy);
     }
+
     template<typename Resources, typename Pushes>
     template<typename... Sets>
     requires compatible_descriptor_sets<Resources, Sets...>
@@ -133,6 +147,7 @@ namespace VSL_NAMESPACE::typed {
          ...);
         return TypedComputeBinding<Resources, Pushes>(_pipeline, _device, std::move(resources));
     }
+
     template<typename Resources, typename Pushes, bool pushed>
     TypedComputeBinding<Resources, Pushes, true> TypedComputeBinding<Resources, Pushes, pushed>::push_constants(const typename Pushes::Values& values) const {
         return TypedComputeBinding<Resources, Pushes, true>(_pipeline, _device, _resources, std::optional<typename Pushes::Values>(values));

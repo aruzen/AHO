@@ -1,5 +1,6 @@
 #pragma once
 #include "../pipeline_layout.hpp"
+
 namespace VSL_NAMESPACE::pipeline_layout {
     enum class CompareOp {
         NEVER = 0,
@@ -21,11 +22,13 @@ namespace VSL_NAMESPACE::pipeline_layout {
         INCREMENT_WRAP = 6,
         DECREMENT_WRAP = 7
     };
+
     struct StencilFace {
         StencilOp fail = StencilOp::KEEP, pass = StencilOp::KEEP, depth_fail = StencilOp::KEEP;
         CompareOp compare = CompareOp::ALWAYS;
         std::uint32_t compare_mask = UINT32_MAX, write_mask = UINT32_MAX, reference = 0;
     };
+
     struct DepthStencil {
         bool depth_test = true, depth_write = true;
         CompareOp depth_compare = CompareOp::LESS;

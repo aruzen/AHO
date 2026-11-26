@@ -6,6 +6,7 @@
 namespace VSL_NAMESPACE::lifetime {
     struct AcquireTicket;
     struct PresentRecord;
+
     struct ImagePresentSlot {
         std::weak_ptr<PresentRecord> record;
         std::uint64_t epoch = 0;
@@ -14,14 +15,17 @@ namespace VSL_NAMESPACE::lifetime {
         vk::Queue queue;
         bool accessing = false;
     };
+
     // 世代内は借用と弱参照だけ。レコードの強い保持は外部Domainへ置く。
     struct SwapchainPresentationContext {
         impl::SwapchainImpl* generation = nullptr;
         impl::FenceImpl* fences = nullptr;
         impl::SemaphoreImpl* finished = nullptr;
         std::vector<ImagePresentSlot> images;
+
         explicit SwapchainPresentationContext(size_t count) : images(count) {}
     };
+
     struct PresentRecord {
         sync::PresentState state;
         std::shared_ptr<impl::SwapchainImpl> generation;
@@ -36,6 +40,7 @@ namespace VSL_NAMESPACE::lifetime {
         std::shared_ptr<PresentRecord> quarantine_next;
         bool quarantined = false;
     };
+
     struct AcquireEvidence {
         sync::FenceProof proof;
         std::weak_ptr<impl::SwapchainImpl> generation;
@@ -45,6 +50,7 @@ namespace VSL_NAMESPACE::lifetime {
         std::uint32_t image = UINT32_MAX;
         bool finished = false;
     };
+
     struct SurfacePresentationDomain {
         std::weak_ptr<impl::SurfaceImpl> surface;
         std::vector<std::shared_ptr<PresentRecord>> records;
@@ -53,11 +59,13 @@ namespace VSL_NAMESPACE::lifetime {
         bool closing = false, recovering = false;
         ~SurfacePresentationDomain();
     };
+
     struct PresentationSnapshot {
         std::shared_ptr<SurfacePresentationDomain> domain;
         std::vector<std::shared_ptr<PresentRecord>> records;
         std::vector<std::shared_ptr<AcquireEvidence>> acquisitions;
     };
+
     class QuarantinedPresentations {
         std::shared_ptr<impl::LogicalDeviceImpl> _device;
         std::shared_ptr<impl::SurfaceImpl> _surface;
@@ -76,8 +84,10 @@ namespace VSL_NAMESPACE::lifetime {
         void bookkeep() noexcept;
         void release() noexcept;
         bool pending() const noexcept;
+
         bool captured() const noexcept { return bool(_selected); }
     };
+
     std::shared_ptr<SurfacePresentationDomain> presentation_domain(const std::shared_ptr<impl::SwapchainImpl>& generation);
     void register_presentation_domain(CommandDomain& commands, const std::shared_ptr<SurfacePresentationDomain>& domain);
     std::shared_ptr<AcquireEvidence> prepare_acquire_evidence(SurfacePresentationDomain& domain, const std::shared_ptr<impl::SwapchainImpl>& generation, vk::Fence fence);

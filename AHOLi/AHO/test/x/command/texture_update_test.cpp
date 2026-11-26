@@ -14,6 +14,7 @@
 
 namespace {
     namespace resource = aho::x::resource;
+
     class TextureUpdateVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override;
 
@@ -174,6 +175,7 @@ namespace {
         for (std::size_t i = 0; i < 16; ++i)
             EXPECT_EQ(pixels.bytes[i], i < 12 ? std::byte{} : red[i - 12]);
     }
+
     TEST_F(TextureUpdateVulkanIntegrationTest, DeviceLostObservationRejectsAnotherUpdateUntilTextureRecreation) {
         auto manager = make_manager();
         resource::Texture texture(device, 1, 1);
@@ -191,6 +193,7 @@ namespace {
         EXPECT_THROW(fresh << texture.update(upload), std::runtime_error);
         fresh.cancel();
     }
+
     TEST_F(TextureUpdateVulkanIntegrationTest, InvalidRequestsDoNotClaimTheBufferOrChangeTheTextureState) {
         auto manager = make_manager();
         resource::Texture texture(device, 2, 2);

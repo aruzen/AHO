@@ -16,6 +16,7 @@ namespace VSL_NAMESPACE::operation {
             if (!layout || !layout->pipeline_layout || layout->device != &device)
                 throw std::invalid_argument("Pipeline requires a live layout on its device");
         }
+
         vk::Pipeline checked_pipeline(vk::Device device, vk::Result result, vk::Pipeline pipeline) {
             if (result != vk::Result::eSuccess || !pipeline) {
                 if (pipeline)
@@ -24,6 +25,7 @@ namespace VSL_NAMESPACE::operation {
             }
             return pipeline;
         }
+
         std::vector<vk::PipelineShaderStageCreateInfo> graphics_stages(const impl::LogicalDeviceImpl& device, std::span<impl::ShaderImpl* const> shaders) {
             if (shaders.empty() || shaders.size() > UINT32_MAX)
                 throw std::invalid_argument("Graphics pipeline needs a representable nonempty shader sequence");
@@ -46,6 +48,7 @@ namespace VSL_NAMESPACE::operation {
                 throw std::invalid_argument("Graphics pipeline requires a vertex or mesh shader");
             return stages;
         }
+
         void validate_pass(const impl::LogicalDeviceImpl& device, const GraphicsPipelineInput& input) {
             if (!input.pass || !input.pass->render_pass || input.pass->device != &device || !input.pass->description || !input.state)
                 throw std::invalid_argument("Graphics pipeline requires a live pass and state on its device");
@@ -66,11 +69,14 @@ namespace VSL_NAMESPACE::operation {
                 check_samples(*outputs.depth_stencil);
         }
     } // namespace
+
     ScopedGraphicsPipelineNativeFactory::ScopedGraphicsPipelineNativeFactory(GraphicsPipelineNativeFactory factory) noexcept
         : _factory(factory), _previous(std::exchange(NATIVE_FACTORY, &_factory)) {}
+
     ScopedGraphicsPipelineNativeFactory::~ScopedGraphicsPipelineNativeFactory() {
         NATIVE_FACTORY = _previous;
     }
+
     void initialize_pipeline(impl::PipelineImpl& target, impl::LogicalDeviceImpl& device, const GraphicsPipelineInput& input) {
         validate_layout(device, input.layout);
         validate_pass(device, input);
@@ -102,6 +108,7 @@ namespace VSL_NAMESPACE::operation {
         target.layout = input.layout;
         target.bind_point = vk::PipelineBindPoint::eGraphics;
     }
+
     void initialize_pipeline(impl::PipelineImpl& target, impl::LogicalDeviceImpl& device, const ComputePipelineInput& input) {
         validate_layout(device, input.layout);
         if (!input.shader || input.shader->device != &device)
@@ -119,6 +126,7 @@ namespace VSL_NAMESPACE::operation {
         target.layout = input.layout;
         target.bind_point = vk::PipelineBindPoint::eCompute;
     }
+
     void destroy_pipeline(impl::PipelineImpl& target) noexcept {
         if (target.pipeline)
             target.native_device.destroyPipeline(target.pipeline);

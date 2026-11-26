@@ -12,11 +12,13 @@ namespace {
 
 namespace {
     using SamplerVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
     TEST_F(SamplerVulkanIntegrationTest, CreatesNearestSamplerWithoutAnisotropyRequirement) {
         vsl::Sampler sampler(device, vsl::SamplingMode::NEAREST, vsl::EdgeMode::CLAMP_TO_EDGE);
         EXPECT_TRUE(SamplerAccess::Owned(sampler)->sampler);
         EXPECT_EQ(SamplerAccess::Owned(sampler)->device, StartupAccess::Owned(device).get());
     }
+
     TEST_F(SamplerVulkanIntegrationTest, CreatesDefaultLinearSamplerWhenFeatureIsAvailable) {
         if (!StartupAccess::Owned(physical)->features->samplerAnisotropy)
             GTEST_SKIP() << "samplerAnisotropy is not supported";

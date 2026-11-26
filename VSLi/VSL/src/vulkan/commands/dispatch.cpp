@@ -9,6 +9,7 @@
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 VSL_NAMESPACE::command::Dispatch::Dispatch(std::uint32_t x, std::uint32_t y, std::uint32_t z)
     : x(x), y(y), z(z) {}
 

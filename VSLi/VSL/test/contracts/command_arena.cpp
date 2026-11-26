@@ -10,6 +10,7 @@ static_assert(PLAN.placement({2}).offset == s::COMMAND_BUFFER_SLOT_SIZE);
 static_assert(s::COMMAND_BUFFER_SLOT_SIZE > s::COMMAND_BUFFER_IMPL_SIZE);
 static_assert(s::ResourceSlotLayout<vsl::impl::CommandBufferImpl>::USE_OFFSET == s::NO_SEPARATE_USE);
 void connect_commands(vsl::LogicalDeviceAccessor device);
+
 void connect_commands(vsl::LogicalDeviceAccessor device) {
     const std::array<l::ResourceInit, 3> initializers{l::CommandBufferInit{t::ResourceId{3}, 2},
                                                       l::CommandBufferInit{t::ResourceId{3}, 3}, vsl::CommandPoolCreateInfo{true}};

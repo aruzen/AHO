@@ -10,8 +10,10 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     using ImageCopyDefinitionVulkanIntegrationTest = vsl_test::ImageTransferVulkanIntegrationTest;
+
     TEST_F(ImageCopyDefinitionVulkanIntegrationTest, CopyByBufferReturnsTrueAndUploadsEveryTexel) {
         const std::array<std::uint32_t, 4> expected{17, 0, 0xffffffffu, 73};
         TransferImage image(device, 2, 2, vsl::data_format::UNSIGNED_INT);

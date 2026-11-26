@@ -19,6 +19,7 @@ namespace VSL_NAMESPACE::typed {
             size_t data_offset;
             const BlockType* memory_layout = nullptr;
         };
+
         void validate_push_values(std::span<const PushRequirement> requirements, std::span<const std::byte> values);
         void inject_push_schema(PipelineLayoutEditAccessor layout, std::span<const PushRequirement> requirements);
         void validate_push_schema(const lifetime::PipelineRecipeSnapshot& recipe, std::span<const PushRequirement> requirements);
@@ -41,6 +42,7 @@ namespace VSL_NAMESPACE::typed {
         static_assert(stages != ShaderFlag::ERROR_, "Typed push stages must not be empty");
         static constexpr pipeline_layout::PushContentDefinition RANGE{stages, offset, sizeof(Payload)};
     };
+
     template<typename... Ranges_>
     struct PushSchema {
         using Ranges = std::tuple<Ranges_...>;
@@ -54,8 +56,10 @@ namespace VSL_NAMESPACE::typed {
         static constexpr auto REQUIREMENTS = MakeRequirements();
         static consteval bool IsValid();
         static_assert(IsValid(), "Overlapping typed push ranges for the same shader stage");
+
         void injection(PipelineLayoutEditAccessor layout) const { detail::inject_push_schema(layout, REQUIREMENTS); }
     };
+
     template<typename Schema>
     class PushValues {
         alignas(4) std::array<std::byte, Schema::DATA_SIZE> _bytes{};
@@ -64,8 +68,10 @@ namespace VSL_NAMESPACE::typed {
         template<typename... Values>
         requires(detail::push_values_match<Schema, Values...>(std::index_sequence_for<Values...>{}))
         explicit PushValues(const Values&... values);
+
         std::span<const std::byte> bytes() const { return _bytes; }
     };
+
     namespace detail {
         template<typename Schema, typename... Values, size_t... indices>
         consteval bool push_values_match(std::index_sequence<indices...>) {
@@ -88,6 +94,7 @@ namespace VSL_NAMESPACE::typed {
         (add.template operator()<RangeTypes>(), ...);
         return result;
     }
+
     template<typename... RangeTypes>
     consteval bool PushSchema<RangeTypes...>::IsValid() {
         for (size_t i = 0; i < REQUIREMENTS.size(); ++i) {
@@ -103,6 +110,7 @@ namespace VSL_NAMESPACE::typed {
         }
         return true;
     }
+
     template<typename Schema>
     template<typename... Values>
     requires(detail::push_values_match<Schema, Values...>(std::index_sequence_for<Values...>{}))

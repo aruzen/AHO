@@ -25,6 +25,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace VSL_NAMESPACE::lifetime {
     namespace {
         struct SubmissionQuarantine {
@@ -33,18 +34,23 @@ namespace VSL_NAMESPACE::lifetime {
             size_t count = 0;
             bool collecting = false;
         };
+
         SubmissionQuarantine& submission_quarantine() noexcept;
         void prepend_submission(std::shared_ptr<impl::SubmissionWork>& head, std::shared_ptr<impl::SubmissionWork> work) noexcept;
         void prepend_chain(std::shared_ptr<impl::SubmissionWork>& head, std::shared_ptr<impl::SubmissionWork>& chain) noexcept;
         void unregister_submission(impl::SubmissionWork& work, SubmissionQuarantine& registry) noexcept;
         bool matches_scope(const impl::SubmissionWork& work, const std::shared_ptr<impl::CommandBufferImpl>& ring,
                            std::span<const std::shared_ptr<SurfacePresentationDomain>> presentations) noexcept;
+
         struct DescriptorRecording {
             impl::GraphicResourceImpl& resource;
             explicit DescriptorRecording(impl::GraphicResourceImpl& resource);
+
             ~DescriptorRecording() { resource.recording = false; }
         };
+
         bool contains_owner(const std::vector<std::shared_ptr<void>>& resources, const std::shared_ptr<void>& resource);
+
         DescriptorRecording::DescriptorRecording(impl::GraphicResourceImpl& resource) : resource(resource) {
             require_descriptor_valid(resource);
             if (resource.recording)
@@ -53,21 +59,25 @@ namespace VSL_NAMESPACE::lifetime {
                 throw std::logic_error("Ownership root is being updated");
             resource.recording = true;
         }
+
         bool contains_owner(const std::vector<std::shared_ptr<void>>& resources, const std::shared_ptr<void>& resource) {
             return std::ranges::any_of(resources, [&](const auto& existing) {
                 return !existing.owner_before(resource) && !resource.owner_before(existing);
             });
         }
+
         SubmissionQuarantine& submission_quarantine() noexcept {
             static_assert(std::is_nothrow_default_constructible_v<SubmissionQuarantine>);
             alignas(SubmissionQuarantine) static std::byte STORAGE[sizeof(SubmissionQuarantine)];
             static auto* const REGISTRY = std::construct_at(reinterpret_cast<SubmissionQuarantine*>(STORAGE));
             return *REGISTRY;
         }
+
         void prepend_submission(std::shared_ptr<impl::SubmissionWork>& head, std::shared_ptr<impl::SubmissionWork> work) noexcept {
             work->quarantine_next = std::move(head);
             head = std::move(work);
         }
+
         void prepend_chain(std::shared_ptr<impl::SubmissionWork>& head, std::shared_ptr<impl::SubmissionWork>& chain) noexcept {
             if (!chain)
                 return;
@@ -77,12 +87,14 @@ namespace VSL_NAMESPACE::lifetime {
             tail->quarantine_next = std::move(head);
             head = std::move(chain);
         }
+
         void unregister_submission(impl::SubmissionWork& work, SubmissionQuarantine& registry) noexcept {
             work.quarantined = false;
             --registry.count;
             if (work.native_buffer && work.native_buffer->owner_context)
                 --work.native_buffer->owner_context->unresolved_submissions;
         }
+
         bool matches_scope(const impl::SubmissionWork& work, const std::shared_ptr<impl::CommandBufferImpl>& ring,
                            std::span<const std::shared_ptr<SurfacePresentationDomain>> presentations) noexcept {
             if (work.native_buffer == ring.get() && ring->owner_node && ring->owner_node->matches(ring))
@@ -97,6 +109,7 @@ namespace VSL_NAMESPACE::lifetime {
             return false;
         }
     } // namespace
+
     std::shared_ptr<void> pin_submission_owner(const impl::SubmissionWork& work) noexcept {
         auto* const buffer = work.native_buffer;
         if (!buffer)
@@ -111,6 +124,7 @@ namespace VSL_NAMESPACE::lifetime {
         }
         return {};
     }
+
     SubmissionObservation::SubmissionObservation(impl::SubmissionWork& work) noexcept {
         _owner = pin_submission_owner(work);
         if (work.result->native.active || work.result->native.observing)
@@ -120,15 +134,19 @@ namespace VSL_NAMESPACE::lifetime {
         _result = work.result.get();
         _result->native.observing = true;
     }
+
     SubmissionObservation::~SubmissionObservation() {
         finish();
     }
+
     SubmissionObservation::SubmissionObservation(SubmissionObservation&& other) noexcept
         : _owner(std::move(other._owner)), _result(std::exchange(other._result, nullptr)) {}
+
     void SubmissionObservation::finish() noexcept {
         if (auto* result = std::exchange(_result, nullptr))
             result->native.observing = false;
     }
+
     SubmissionTransaction::SubmissionTransaction(CommandDomain& domain, impl::SubmissionWork& work)
         : _domain(domain), _work(work), _owns_context(domain.context.work == &work),
           _native_call(work.device ? static_cast<VkDevice>(work.device->device) : VK_NULL_HANDLE) {
@@ -140,9 +158,11 @@ namespace VSL_NAMESPACE::lifetime {
             domain.context.recording = false;
         }
     }
+
     SubmissionTransaction::~SubmissionTransaction() {
         finish();
     }
+
     void SubmissionTransaction::finish() noexcept {
         if (!_active)
             return;
@@ -152,6 +172,7 @@ namespace VSL_NAMESPACE::lifetime {
         _active = false;
         _native_call.finish();
     }
+
     void detach_recording_cpu(CommandDomain& domain, impl::SubmissionWork& work) noexcept {
         if (domain.context.work != &work)
             return;
@@ -159,6 +180,7 @@ namespace VSL_NAMESPACE::lifetime {
         domain.context.work = nullptr;
         domain.recording_submission.reset();
     }
+
     void abort_recording(CommandDomain& domain, impl::SubmissionWork& work, std::uint32_t slot) noexcept {
         if (domain.context.work != &work)
             return;
@@ -170,6 +192,7 @@ namespace VSL_NAMESPACE::lifetime {
         }
         detach_recording_cpu(domain, work);
     }
+
     void fail_recording(CommandDomain& domain, impl::SubmissionWork& work, std::uint32_t slot,
                         Completion::Failure failure, std::int32_t error_code) noexcept {
         {
@@ -186,6 +209,7 @@ namespace VSL_NAMESPACE::lifetime {
         }
         sync::finish_submission(work);
     }
+
     void quarantine_submission(const std::shared_ptr<impl::SubmissionWork>& work, const std::shared_ptr<impl::CommandBufferImpl>& buffer) noexcept {
         if (work->quarantined)
             return;
@@ -201,6 +225,7 @@ namespace VSL_NAMESPACE::lifetime {
         ++registry.count;
         prepend_submission(registry.head, work);
     }
+
     std::shared_ptr<impl::SubmissionWork> unquarantine_submission(impl::SubmissionWork& work) noexcept {
         if (work.result->native.active || sync::native_pending(*work.result))
             return {};
@@ -219,11 +244,13 @@ namespace VSL_NAMESPACE::lifetime {
         }
         return removed;
     }
+
     size_t quarantined_submission_count() noexcept {
         auto& registry = submission_quarantine();
         const std::lock_guard lock(registry.mutex);
         return registry.count;
     }
+
     void inherit_quarantined_submissions(CommandDomain& domain) {
         if (!domain.buffer->owner_context->unresolved_submissions)
             return;
@@ -249,11 +276,13 @@ namespace VSL_NAMESPACE::lifetime {
                         register_presentation_domain(domain, presentation);
             }
     }
+
     SubmissionSnapshot::SubmissionSnapshot(const std::shared_ptr<impl::CommandBufferImpl>& ring,
                                            std::span<const std::shared_ptr<SurfacePresentationDomain>> presentations)
         : _device(StartupAccess::Shared(device_from_impl(*ring->command_pool->device))) {
         capture(ring, presentations);
     }
+
     SubmissionSnapshot::SubmissionSnapshot(std::shared_ptr<impl::LogicalDeviceImpl> device, std::shared_ptr<impl::SurfaceImpl> surface)
         : _device(std::move(device)), _surface(std::move(surface)) {
         require_device_owner(StartupAccess::FromShared(_device));
@@ -262,22 +291,26 @@ namespace VSL_NAMESPACE::lifetime {
             throw std::invalid_argument("Surface recovery requires its canonical Surface and Device");
         capture({}, {});
     }
+
     void SubmissionSnapshot::capture(const std::shared_ptr<impl::CommandBufferImpl>& ring,
                                      std::span<const std::shared_ptr<SurfacePresentationDomain>> presentations) {
         auto& registry = submission_quarantine();
         const std::lock_guard lock(registry.mutex);
         if (registry.collecting)
             throw std::logic_error("Submission quarantine is already being observed");
+
         const auto selected = [&](const impl::SubmissionWork& work) {
             const bool same_surface = _surface && work.surface_address == _surface.get() &&
                                       !_surface.owner_before(work.surface) && !work.surface.owner_before(_surface);
             return work.device == _device && (same_surface || (ring && matches_scope(work, ring, presentations)));
         };
+
         _observations.reserve(registry.count);
         for (auto* work = registry.head.get(); work; work = work->quarantine_next.get()) {
             if (selected(*work))
                 _observations.emplace_back(*work);
         }
+
         registry.collecting = true;
         _collecting = true;
         auto pending = std::move(registry.head);
@@ -290,6 +323,7 @@ namespace VSL_NAMESPACE::lifetime {
                 prepend_submission(_foreign, std::move(work));
         }
     }
+
     SubmissionSnapshot::~SubmissionSnapshot() {
         if (!_collecting) {
             release();
@@ -307,6 +341,7 @@ namespace VSL_NAMESPACE::lifetime {
             observation.finish();
         release();
     }
+
     void SubmissionSnapshot::save_observations(std::int32_t idle_result) noexcept {
         const auto idle = _device->lost ? vk::Result::eErrorDeviceLost : static_cast<vk::Result>(idle_result);
         if (idle == vk::Result::eErrorDeviceLost) {
@@ -332,11 +367,13 @@ namespace VSL_NAMESPACE::lifetime {
                 sync::save_native_idle(*work, static_cast<std::int32_t>(result));
         }
     }
+
     void SubmissionSnapshot::bookkeep() noexcept {
         if (!_collecting)
             return;
         for (auto& observation : _observations)
             observation.finish();
+
         std::shared_ptr<impl::SubmissionWork> pending;
         while (_selected) {
             auto work = std::move(_selected);
@@ -346,6 +383,7 @@ namespace VSL_NAMESPACE::lifetime {
             else
                 prepend_submission(pending, std::move(work));
         }
+
         auto& registry = submission_quarantine();
         {
             const std::lock_guard lock(registry.mutex);
@@ -358,6 +396,7 @@ namespace VSL_NAMESPACE::lifetime {
             _collecting = false;
         }
     }
+
     void SubmissionSnapshot::release() noexcept {
         while (_ready) {
             auto work = std::move(_ready);
@@ -366,19 +405,23 @@ namespace VSL_NAMESPACE::lifetime {
         }
         _observations.clear();
     }
+
     void SubmissionSnapshot::finish() noexcept {
         bookkeep();
         release();
     }
+
     void retain_resource(std::vector<std::shared_ptr<void>>& resources, const std::shared_ptr<void>& resource) {
         if (resource.use_count() && !contains_owner(resources, resource))
             resources.push_back(resource);
     }
+
     void retain_resource(std::vector<std::shared_ptr<void>>& resources, std::shared_ptr<void>&& resource) {
         auto accepted = std::move(resource);
         if (accepted.use_count() && !contains_owner(resources, accepted))
             resources.push_back(std::move(accepted));
     }
+
     void retain_until_complete(impl::SubmissionWork& submission, std::shared_ptr<void> resource) {
         if (!submission.result || !sync::recordable(*submission.result))
             throw std::logic_error("Resource retention requires a pending submission");
@@ -387,12 +430,14 @@ namespace VSL_NAMESPACE::lifetime {
             submission.release_resources = release_completed_resources;
         }
     }
+
     void require_recording(const CommandBuffer& buffer, const Completion& completion) {
         if (!CommandAccess::Data(buffer) || !CommandAccess::Data(buffer)->recording_context || !CommandAccess::Data(buffer)->recording_context->work || !completion.data_ ||
             !CommandAccess::Data(buffer)->recording_context->recording || CommandAccess::Data(buffer)->recording_context->submitting ||
             CommandAccess::Data(buffer)->recording_context->work->result != completion.data_ || !sync::recordable(*completion.data_))
             throw std::logic_error("Recording phase changed while tracking resources");
     }
+
     void record_resource_state(const ResourceUseState& state, const CommandBuffer& buffer, const Completion& completion) {
         state.mark_used(completion);
         require_recording(buffer, completion);
@@ -402,6 +447,7 @@ namespace VSL_NAMESPACE::lifetime {
                 checks.push_back(&state);
         }
     }
+
     void record_descriptor_resources(impl::GraphicResourceImpl& resource, const CommandBuffer& buffer, ResourceRetention retention) {
         const DescriptorRecording recording(resource);
         const auto completion = buffer.completion();
@@ -426,6 +472,7 @@ namespace VSL_NAMESPACE::lifetime {
         require_recording(buffer, completion);
         require_descriptor_valid(resource);
     }
+
     void release_completed_resources(impl::SubmissionWork& submission) noexcept {
         submission.release_resources = nullptr;
         if (submission.external_fence)
@@ -449,6 +496,7 @@ namespace VSL_NAMESPACE {
             throw std::logic_error("Resources must be retained before submission");
         lifetime::retain_resource(work->resources, resource);
     }
+
     void Completion::retain(std::shared_ptr<void>&& resource) const {
         auto accepted = std::move(resource);
         auto work = data_ ? data_->work.lock() : nullptr;
@@ -456,6 +504,7 @@ namespace VSL_NAMESPACE {
             throw std::logic_error("Resources must be retained before submission");
         lifetime::retain_resource(work->resources, std::move(accepted));
     }
+
     void CommandBuffer::retain(const std::shared_ptr<void>& resource) const {
         if (!_data || !_data->recording_context)
             throw std::invalid_argument("CommandBuffer is empty");
@@ -465,6 +514,7 @@ namespace VSL_NAMESPACE {
             lifetime::retain_resource(_data->recording_context->work->resources, resource);
         }
     }
+
     void CommandBuffer::retain(std::shared_ptr<void>&& resource) const {
         auto accepted = std::move(resource);
         if (!_data || !_data->recording_context)
@@ -475,17 +525,20 @@ namespace VSL_NAMESPACE {
             lifetime::retain_resource(_data->recording_context->work->resources, std::move(accepted));
         }
     }
+
     void CommandBuffer::retain_until_complete(const std::shared_ptr<void>& resource) const {
         if (!_data || !_data->recording_context || _data->recording_context->submitting || !_data->recording_context->work || !sync::recordable(*_data->recording_context->work->result))
             throw std::logic_error("Buffer retention requires a recording phase");
         lifetime::retain_until_complete(*_data->recording_context->work, resource);
     }
+
     void CommandBuffer::retain_until_complete(std::shared_ptr<void>&& resource) const {
         auto accepted = std::move(resource);
         if (!_data || !_data->recording_context || _data->recording_context->submitting || !_data->recording_context->work || !sync::recordable(*_data->recording_context->work->result))
             throw std::logic_error("Buffer retention requires a recording phase");
         lifetime::retain_until_complete(*_data->recording_context->work, std::move(accepted));
     }
+
     impl::SubmissionWork::~SubmissionWork() {
         sync::finish_submission(*this);
     }

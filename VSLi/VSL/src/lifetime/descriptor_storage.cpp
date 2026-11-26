@@ -16,6 +16,7 @@ namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_nothrow_default_constructible_v<impl::ResourceBindingLayoutImpl>);
     static_assert(std::is_nothrow_default_constructible_v<impl::GraphicResourcePoolImpl>);
     static_assert(std::is_nothrow_default_constructible_v<impl::GraphicResourceImpl>);
+
     namespace {
         struct HeapDescriptorLayoutOwner {
             DependencyNode node;
@@ -24,6 +25,7 @@ namespace VSL_NAMESPACE::lifetime {
             HeapDescriptorLayoutOwner(LogicalDeviceAccessor device, const DescriptorLayoutCreateInfo& info);
             ~HeapDescriptorLayoutOwner();
         };
+
         struct HeapDescriptorPoolOwner {
             DependencyNode node;
             LogicalDeviceAccessor device;
@@ -31,6 +33,7 @@ namespace VSL_NAMESPACE::lifetime {
             HeapDescriptorPoolOwner(LogicalDeviceAccessor device, const DescriptorPoolCreateInfo& info);
             ~HeapDescriptorPoolOwner();
         };
+
         struct HeapDescriptorSetOwner {
             std::vector<OwnerRef> dependencies;
             DescriptorOwnerContext context;
@@ -40,22 +43,27 @@ namespace VSL_NAMESPACE::lifetime {
             void publish(const std::shared_ptr<HeapDescriptorSetOwner>& owner);
             static void VisitDependencies(const void* input, DependencyNode::EdgeVisitor visitor, void* context);
         };
+
         HeapDescriptorLayoutOwner::HeapDescriptorLayoutOwner(LogicalDeviceAccessor device, const DescriptorLayoutCreateInfo& info) : device(device) {
             require_device_owner(device);
             construct_descriptor_layout(storage, *StartupAccess::Owned(device), info);
         }
+
         HeapDescriptorLayoutOwner::~HeapDescriptorLayoutOwner() {
             node.retire();
             destroy_descriptor_layout(storage);
         }
+
         HeapDescriptorPoolOwner::HeapDescriptorPoolOwner(LogicalDeviceAccessor device, const DescriptorPoolCreateInfo& info) : device(device) {
             require_device_owner(device);
             construct_descriptor_pool(storage, *StartupAccess::Owned(device), info);
         }
+
         HeapDescriptorPoolOwner::~HeapDescriptorPoolOwner() {
             node.retire();
             destroy_descriptor_pool(storage);
         }
+
         HeapDescriptorSetOwner::HeapDescriptorSetOwner(OwnedRef<impl::GraphicResourcePoolImpl> pool,
                                                        OwnedRef<impl::ResourceBindingLayoutImpl> layout) {
             if (!pool || !pool.use_count() || !layout || !layout.use_count())
@@ -70,16 +78,19 @@ namespace VSL_NAMESPACE::lifetime {
             context.device_parent = pool->device->owner_node;
             prepare_descriptor_set(storage, *pool, *layout);
         }
+
         HeapDescriptorSetOwner::~HeapDescriptorSetOwner() {
             context.node.retire();
             destroy_descriptor_set(storage);
         }
+
         void HeapDescriptorSetOwner::publish(const std::shared_ptr<HeapDescriptorSetOwner>& owner) {
             context.node.publish(owner, this, VisitDependencies);
             auto& resource = descriptor_set_at(storage);
             resource.owner_context = &context;
             resource.owner_node = &context.node;
         }
+
         void HeapDescriptorSetOwner::VisitDependencies(const void* input, DependencyNode::EdgeVisitor visitor, void* output) {
             const auto& root = *static_cast<const HeapDescriptorSetOwner*>(input);
             for (const auto& owner : root.context.dependencies)
@@ -92,6 +103,7 @@ namespace VSL_NAMESPACE::lifetime {
         require_device_owner(device);
         construct_descriptor_layout(storage, *StartupAccess::Owned(device), info);
     }
+
     void construct_descriptor_layout(void* storage, impl::LogicalDeviceImpl& device, const DescriptorLayoutCreateInfo& info) {
         if (!device.device)
             throw std::invalid_argument("Descriptor layout requires a live device");
@@ -105,17 +117,21 @@ namespace VSL_NAMESPACE::lifetime {
             throw;
         }
     }
+
     impl::ResourceBindingLayoutImpl& descriptor_layout_at(void* storage) {
         return *std::launder(reinterpret_cast<impl::ResourceBindingLayoutImpl*>(static_cast<DescriptorLayoutSlotStorage*>(storage)->value));
     }
+
     void destroy_descriptor_layout(void* storage) noexcept {
         std::destroy_at(&descriptor_layout_at(storage));
         std::destroy_at(static_cast<DescriptorLayoutSlotStorage*>(storage));
     }
+
     void construct_descriptor_pool(void* storage, LogicalDeviceAccessor device, const DescriptorPoolCreateInfo& info) {
         require_device_owner(device);
         construct_descriptor_pool(storage, *StartupAccess::Owned(device), info);
     }
+
     void construct_descriptor_pool(void* storage, impl::LogicalDeviceImpl& device, const DescriptorPoolCreateInfo& info) {
         if (!device.device)
             throw std::invalid_argument("Descriptor pool requires a live device");
@@ -129,13 +145,16 @@ namespace VSL_NAMESPACE::lifetime {
             throw;
         }
     }
+
     impl::GraphicResourcePoolImpl& descriptor_pool_at(void* storage) {
         return *std::launder(reinterpret_cast<impl::GraphicResourcePoolImpl*>(static_cast<DescriptorPoolSlotStorage*>(storage)->value));
     }
+
     void destroy_descriptor_pool(void* storage) noexcept {
         std::destroy_at(&descriptor_pool_at(storage));
         std::destroy_at(static_cast<DescriptorPoolSlotStorage*>(storage));
     }
+
     void prepare_descriptor_set(void* storage, impl::GraphicResourcePoolImpl& pool, impl::ResourceBindingLayoutImpl& layout) {
         if (!pool.descriptor_pool || pool.retiring)
             throw std::logic_error("Descriptor pool has been destroyed");
@@ -148,6 +167,7 @@ namespace VSL_NAMESPACE::lifetime {
         resource->allocation_layout = &layout;
         resource->native_device = pool.native_device;
     }
+
     void construct_descriptor_set(void* storage, impl::GraphicResourcePoolImpl& pool, impl::ResourceBindingLayoutImpl& layout) {
         prepare_descriptor_set(storage, pool, layout);
         try {
@@ -160,27 +180,33 @@ namespace VSL_NAMESPACE::lifetime {
             throw;
         }
     }
+
     impl::GraphicResourceImpl& descriptor_set_at(void* storage) {
         return *std::launder(reinterpret_cast<impl::GraphicResourceImpl*>(static_cast<DescriptorSetSlotStorage*>(storage)->value));
     }
+
     const impl::GraphicResourceImpl& descriptor_set_at(const void* storage) {
         return *std::launder(reinterpret_cast<const impl::GraphicResourceImpl*>(static_cast<const DescriptorSetSlotStorage*>(storage)->value));
     }
+
     void destroy_descriptor_set(void* storage) noexcept {
         std::destroy_at(&descriptor_set_at(storage));
         std::destroy_at(static_cast<DescriptorSetSlotStorage*>(storage));
     }
+
     std::shared_ptr<impl::ResourceBindingLayoutImpl> make_heap_descriptor_layout(LogicalDeviceAccessor device, const DescriptorLayoutCreateInfo& info) {
         auto owner = std::make_shared<HeapDescriptorLayoutOwner>(device, info);
         auto* layout = &descriptor_layout_at(owner->storage);
         return detail::publish_device_leaf(std::move(owner), layout);
     }
+
     std::shared_ptr<impl::GraphicResourcePoolImpl> make_heap_descriptor_pool(LogicalDeviceAccessor device, const DescriptorPoolCreateInfo& info) {
         auto owner = std::make_shared<HeapDescriptorPoolOwner>(device, info);
         auto* pool = &descriptor_pool_at(owner->storage);
         pool->owner = owner;
         return detail::publish_device_leaf(std::move(owner), pool);
     }
+
     std::pair<vk::Result, std::vector<std::shared_ptr<impl::GraphicResourceImpl>>> make_heap_descriptor_sets(
         OwnedRef<impl::GraphicResourcePoolImpl> pool, std::span<const OwnedRef<impl::ResourceBindingLayoutImpl>> layouts,
         DescriptorSetAllocator allocate) {
@@ -218,9 +244,11 @@ namespace VSL_NAMESPACE::impl {
     ResourceBindingLayoutImpl::~ResourceBindingLayoutImpl() {
         operation::destroy_descriptor_layout(*this);
     }
+
     GraphicResourcePoolImpl::~GraphicResourcePoolImpl() {
         operation::destroy_descriptor_pool(*this);
     }
+
     GraphicResourceImpl::~GraphicResourceImpl() {
         operation::destroy_descriptor_set(*this);
     }

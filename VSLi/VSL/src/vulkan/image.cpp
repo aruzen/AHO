@@ -75,6 +75,7 @@ VSL_NAMESPACE::ResourceUseState& VSL_NAMESPACE::ImageAccessor::use_state() const
         throw std::invalid_argument("Image is empty");
     return *_owner->use;
 }
+
 VSL_NAMESPACE::ResourceUse VSL_NAMESPACE::ImageAccessor::resource_use() const {
     return lifetime::resource_use_for_image(_owner);
 }

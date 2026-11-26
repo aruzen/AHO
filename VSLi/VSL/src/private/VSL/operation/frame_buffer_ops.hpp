@@ -8,12 +8,14 @@ namespace VSL_NAMESPACE::operation {
         // 行=native framebuffer、列=AttachmentId。所有は呼出側root。
         std::vector<std::vector<impl::ImageImpl*>> attachments;
     };
+
     // 構築呼出し中だけのnative境界。Implや記録経路には保存しない。
     struct FrameBufferNativeFactory {
         void* context = nullptr;
         vk::Framebuffer (*create)(void*, vk::Device, const vk::FramebufferCreateInfo&) = nullptr;
         void (*destroy)(void*, vk::Device, vk::Framebuffer) noexcept = nullptr;
     };
+
     class ScopedFrameBufferNativeFactory {
         FrameBufferNativeFactory _factory;
         const FrameBufferNativeFactory* _previous;
@@ -24,6 +26,7 @@ namespace VSL_NAMESPACE::operation {
         ScopedFrameBufferNativeFactory& operator=(const ScopedFrameBufferNativeFactory&) = delete;
         ~ScopedFrameBufferNativeFactory();
     };
+
     struct FrameBufferBeginScratch {
         vk::RenderPass pass;
         vk::Framebuffer framebuffer;
@@ -31,6 +34,7 @@ namespace VSL_NAMESPACE::operation {
         std::vector<vk::ClearValue> clears;
         FrameBufferBeginScratch(const impl::FrameBufferImpl& target, std::uint32_t index, vk::Rect2D area, std::span<const ClearValue> values);
     };
+
     std::vector<ClearValue> default_frame_buffer_clears(const RenderPassDescription& description);
     void validate_frame_buffer_clears(const RenderPassDescription& description, std::span<const ClearValue> values);
     vk::Rect2D frame_buffer_area(const impl::FrameBufferImpl& target, vk::Rect2D area);

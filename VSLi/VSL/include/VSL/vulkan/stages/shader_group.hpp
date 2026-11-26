@@ -10,6 +10,7 @@
 namespace VSL_NAMESPACE::lifetime::detail {
     struct ShaderGroupAccess;
 }
+
 namespace VSL_NAMESPACE::pipeline_layout {
     struct ShaderGroup {
     private:
@@ -19,6 +20,7 @@ namespace VSL_NAMESPACE::pipeline_layout {
 
     public:
         ShaderGroup(std::string name, std::initializer_list<ShaderAccessor> shaders);
+
         explicit operator bool() const noexcept { return bool(_data); }
 
         void add_shader(ShaderAccessor shader);

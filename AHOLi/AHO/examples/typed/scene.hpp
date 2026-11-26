@@ -6,19 +6,23 @@
 
 namespace typed_example {
     namespace t = vsl::typed;
+
     struct Vertex {
         float position[2];
         float color[3];
     };
+
     struct SceneUniform {
         float tint[4];
         // カメラの平行移動xy、framebufferの縦横比、アニメーション時刻。
         float camera[4];
     };
+
     struct DrawTransform {
         // 平行移動xy、倍率、角速度。
         float transform[4];
     };
+
     struct PaletteUniform {
         float gain[4];
     };
@@ -63,8 +67,10 @@ namespace typed_example {
         ~Scene();
         Scene(const Scene&) = delete;
         Scene& operator=(const Scene&) = delete;
+
         size_t pipeline_builds() const { return _pipeline_builds; }
         size_t frame_count() const { return _resources.frame_count(); }
+
         void record(aho::DrawPhase& phase, float time);
     };
 } // namespace typed_example

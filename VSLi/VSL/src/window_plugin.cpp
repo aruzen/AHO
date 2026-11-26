@@ -28,6 +28,7 @@ bool VSL_NAMESPACE::window_plugin::QuietClose::on_update(PureWindow window) {
     }
     return true;
 }
+
 VSL_NAMESPACE::window_plugin::QuietClose::QuietClose(PureWindow*) : Plugin(QUIET_CLOSE_USED_ID) {}
 
 bool VSL_NAMESPACE::window_plugin::HookShouldClose::on_update(PureWindow window) {

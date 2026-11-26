@@ -7,6 +7,7 @@ namespace {
 
 namespace {
     namespace pl = vsl::pipeline_layout;
+
     TEST(VertexInputTest, AddsFormatsShapesAndExplicitDefinitionsWithExpectedSizes) {
         pl::VertexInput input;
         EXPECT_EQ(input.requirements_size(), 0u);
@@ -21,6 +22,7 @@ namespace {
         input.add(pl::VertexInputShapeDefinition{.layouts = {{vsl::data_format::FLOAT}}, .size = 16});
         EXPECT_EQ(input.requirements_size(), 60u);
     }
+
     TEST(VertexInputTest, InitializesAndPrependsShapeDefinitions) {
         const pl::VertexInputShapeDefinition first{.layouts = {{vsl::data_format::FLOAT_RG}}, .binding = 2};
         const pl::VertexInputShapeDefinition second{.layouts = {{vsl::data_format::FLOAT_RGB}}, .binding = 5};
@@ -30,7 +32,9 @@ namespace {
         EXPECT_EQ(input.definitions[0].binding, 5u);
         EXPECT_EQ(input.definitions[1].binding, 2u);
     }
+
     using VertexInputVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
     TEST_F(VertexInputVulkanIntegrationTest, WideAttributesReserveBothLocationsWithinAndAcrossBindings) {
         using enum vsl::data_format::FormatTypes;
         for (const auto type : {SIGNED_FLOAT64_RGB, SIGNED_FLOAT64_RGBA, SIGNED_INT64_RGB, SIGNED_INT64_RGBA, UNSIGNED_INT64_RGB, UNSIGNED_INT64_RGBA}) {
@@ -59,6 +63,7 @@ namespace {
                 EXPECT_EQ(explicit_info.pVertexAttributeDescriptions[i].location, (std::array{3u, 5u, 9u, 11u})[i]);
         }
     }
+
     TEST_F(VertexInputVulkanIntegrationTest, ScalarAndPair64BitAndFourComponent32BitFormatsKeepOneLocation) {
         using enum vsl::data_format::FormatTypes;
         for (const auto type : {SIGNED_FLOAT64_R, SIGNED_FLOAT64_RG, SIGNED_INT64_R, SIGNED_INT64_RG, UNSIGNED_INT64_R, UNSIGNED_INT64_RG,
@@ -74,6 +79,7 @@ namespace {
             EXPECT_EQ(info.pVertexAttributeDescriptions[1].location, 1u);
         }
     }
+
     TEST_F(VertexInputVulkanIntegrationTest, LocationExtentOverflowPreservesPreviouslyInjectedDescriptions) {
         auto layout = make_layout_state();
         pl::VertexInput valid;
@@ -88,6 +94,7 @@ namespace {
         EXPECT_EQ(vsl_test::inspect_layout(layout).vertex_input.pVertexBindingDescriptions, previous.pVertexBindingDescriptions);
         EXPECT_EQ(vsl_test::inspect_layout(layout).vertex_input.vertexAttributeDescriptionCount, 1u);
     }
+
     TEST_F(VertexInputVulkanIntegrationTest, InjectsExplicitAndAutomaticLocationsStridesAndOffsets) {
         pl::VertexInput input({{.layouts = {{vsl::data_format::FLOAT_RG, 3, 4}, {vsl::data_format::FLOAT_RGB}},
                                 .binding = 2,
@@ -108,6 +115,7 @@ namespace {
         EXPECT_EQ(info.pVertexAttributeDescriptions[1].format, vk::Format::eR32G32B32Sfloat);
     }
 } // namespace
+
 namespace {
     TEST(VertexInputTest, SingleTypeAdditionSelectsAnUnambiguousOverload) {
         pl::VertexInput input;
@@ -118,6 +126,7 @@ namespace {
         EXPECT_EQ(result.definitions[0].layouts[0].format, vsl::data_format::FLOAT);
         EXPECT_EQ(input.requirements_size(), 4u);
     }
+
     TEST(VertexInputTest, TypePacksPreserveArgumentOrderAndPreviouslyAddedShapes) {
         pl::VertexInput input;
         input.add(vsl::data_format::FLOAT_RG);
@@ -141,6 +150,7 @@ TEST(VertexInputTest, EmptyTypePacksLeaveExistingShapesUnchanged) {
 }
 
 #include <limits>
+
 namespace {
     TEST(VertexInputTest, InferredRequirementsIncludeExplicitGapsAndTheLargestAttributeEnd) {
         pl::VertexInput input({{.layouts = {{vsl::data_format::FLOAT_RG, 0, 24},
@@ -150,7 +160,9 @@ namespace {
         input.add(pl::VertexInputShapeDefinition{.layouts = {{vsl::data_format::FLOAT, 3, 12}}});
         EXPECT_EQ(input.requirements_size(), 48u);
     }
+
     using VertexStrideVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
     TEST_F(VertexStrideVulkanIntegrationTest, NativeStridesUseTheLargestEndAndPreserveExplicitSize) {
         pl::VertexInput input({{.layouts = {{vsl::data_format::FLOAT_RG, 0, 24},
                                             {vsl::data_format::FLOAT, 1, 0},
@@ -169,6 +181,7 @@ namespace {
         EXPECT_EQ(info.pVertexAttributeDescriptions[2].offset, 4u);
         EXPECT_EQ(info.pVertexAttributeDescriptions[3].offset, 4u);
     }
+
     TEST_F(VertexStrideVulkanIntegrationTest, AttributeExtentOverflowIsRejectedInsteadOfWrapping) {
         pl::VertexInput input({{.layouts = {{vsl::data_format::FLOAT_RG, 0,
                                              std::numeric_limits<std::uint32_t>::max() - 2}}}});
@@ -177,15 +190,19 @@ namespace {
         EXPECT_THROW(input.injection(layout), vsl::exceptions::RuntimeException);
     }
 } // namespace
+
 #include "support/render_fixture.hpp"
+
 namespace {
     using VertexStrideRenderVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
+
     TEST_F(VertexStrideRenderVulkanIntegrationTest, PaddedInterleavedVerticesProduceTheExpectedGPUColor) {
         struct Vertex {
             float padding;
             float position[2];
             float color[3];
         };
+
         const std::array<Vertex, 3> vertices{{{0, {-0.75f, -0.75f}, {0.25f, 0.5f, 0.75f}},
                                               {0, {0.75f, -0.75f}, {0.25f, 0.5f, 0.75f}},
                                               {0, {0, 0.75f}, {0.25f, 0.5f, 0.75f}}}};

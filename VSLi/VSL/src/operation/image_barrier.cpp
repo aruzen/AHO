@@ -81,6 +81,7 @@ namespace VSL_NAMESPACE::operation {
 
         return {barrier, source_stage, destination_stage};
     }
+
     void record_image_barrier(vk::CommandBuffer commands, const ImageBarrier& barrier) {
         commands.pipelineBarrier(barrier.source, barrier.destination, {}, nullptr, nullptr, barrier.barrier);
     }

@@ -34,14 +34,18 @@ namespace VSL_NAMESPACE::typed {
         template<std::uint32_t set, std::uint32_t binding, size_t element = 0>
         requires(!std::is_void_v<typename Schema::template Spec<set, binding>> && !Schema::template Spec<set, binding>::EXTERNAL && element < Schema::template Binding<set, binding>::POINT.amount)
         const auto& resource() const;
+
         template<std::uint32_t set, std::uint32_t binding, size_t element = 0>
         requires(Schema::template HasImage<set, binding>() && element < Schema::template Binding<set, binding>::POINT.amount)
         ImageAccessor image() const { return resource<set, binding, element>().descriptor().image(); }
+
         template<std::uint32_t set, std::uint32_t binding, size_t element = 0>
         requires(Schema::template HasSampler<set, binding>() && element < Schema::template Binding<set, binding>::POINT.amount)
         SamplerAccessor sampler() const { return resource<set, binding, element>().descriptor().sampler(); }
+
         template<std::uint32_t set_number>
         const auto& set() const { return std::get<Schema::SetIndex(set_number)>(_sets); }
+
         template<typename Binding>
         auto bind_resources(const Binding& binding) const;
     };
@@ -51,6 +55,7 @@ namespace VSL_NAMESPACE::typed {
         std::shared_ptr<detail::BundleSharedState<Schema, StoragePolicy>> _shared;
         template<typename, typename, ResourceRetention, lifetime::DependencyPolicy>
         friend class TypedResourceBundle;
+
         explicit TypedSharedResources(std::shared_ptr<detail::BundleSharedState<Schema, StoragePolicy>> shared) : _shared(std::move(shared)) {}
 
     public:
@@ -59,6 +64,7 @@ namespace VSL_NAMESPACE::typed {
                  !Schema::template Spec<set, binding>::EXTERNAL && Schema::template Spec<set, binding>::SCOPE == ResourceScope::SHARED &&
                  detail::buffer_descriptor(Schema::template Binding<set, binding>::POINT.binding_type) && element < Schema::template Binding<set, binding>::POINT.amount)
         auto& buffer() { return std::get<Schema::Index(set, binding)>(_shared->resources).value()[element]; }
+
         template<std::uint32_t set, std::uint32_t binding, size_t element = 0>
         requires(Schema::template HasImage<set, binding>() && Schema::template Spec<set, binding>::IMAGE_SCOPE == ResourceScope::SHARED && element < Schema::template Binding<set, binding>::POINT.amount)
         ImageAccessor image() const;
@@ -88,22 +94,29 @@ namespace VSL_NAMESPACE::typed {
         template<typename... Inputs>
         requires(detail::bundle_inputs_match<Schema, Inputs...>())
         TypedResourceBundle(CommandManager manager, graphic_resource::ManagerInterface& descriptors, const ResourceAllocationSizes<Schema>& sizes, const Inputs&... inputs);
+
         template<typename... Inputs>
         requires(detail::bundle_inputs_match<Schema, Inputs...>())
         TypedResourceBundle(CommandManager manager, graphic_resource::ManagerInterface& descriptors, const Inputs&... inputs)
             : TypedResourceBundle(std::move(manager), descriptors, ResourceAllocationSizes<Schema>{}, inputs...) {}
+
         TypedResourceBundle(const TypedResourceBundle&) = delete;
         TypedResourceBundle& operator=(const TypedResourceBundle&) = delete;
         TypedResourceBundle(TypedResourceBundle&&) noexcept = default;
         TypedResourceBundle& operator=(TypedResourceBundle&&) noexcept = default;
+
         const ResourceAllocationPlan<Schema>& plan() const { return _plan; }
+
         const auto& placement_plan() const&
         requires(detail::BundlePolicy<StoragePolicy>::ARENA)
         { return _placement.value(); }
+
         const auto& placement_plan() const&&
         requires(detail::BundlePolicy<StoragePolicy>::ARENA)
         = delete;
+
         size_t frame_count() const { return _frames.frame_count(); }
+
         TypedDescriptorLayouts<Resources> descriptor_layouts() const
         requires(detail::BundlePolicy<StoragePolicy>::ARENA);
         template<typename Initialize>
@@ -132,6 +145,7 @@ namespace VSL_NAMESPACE::typed {
     const auto& TypedResourceFrame<Schema, StoragePolicy>::buffer() const {
         return resource<set, binding, element>();
     }
+
     template<typename Schema, typename StoragePolicy>
     template<std::uint32_t set, std::uint32_t binding, size_t element>
     requires(!std::is_void_v<typename Schema::template Spec<set, binding>> && !Schema::template Spec<set, binding>::EXTERNAL && element < Schema::template Binding<set, binding>::POINT.amount)
@@ -139,6 +153,7 @@ namespace VSL_NAMESPACE::typed {
         using Spec = typename Schema::template Spec<set, binding>;
         return detail::bundle_values<Schema, Spec, StoragePolicy>(_resources, *_shared)[element];
     }
+
     template<typename Schema, typename StoragePolicy>
     template<std::uint32_t set, std::uint32_t binding, size_t element>
     requires(!std::is_void_v<typename Schema::template Spec<set, binding>> &&
@@ -147,6 +162,7 @@ namespace VSL_NAMESPACE::typed {
     auto& TypedResourceFrame<Schema, StoragePolicy>::buffer() {
         return std::get<Schema::Index(set, binding)>(_resources).value()[element];
     }
+
     template<typename Schema, typename StoragePolicy>
     template<std::uint32_t set, std::uint32_t binding, size_t element>
     requires(Schema::template HasImage<set, binding>() && Schema::template Spec<set, binding>::IMAGE_SCOPE == ResourceScope::SHARED && element < Schema::template Binding<set, binding>::POINT.amount)
@@ -154,6 +170,7 @@ namespace VSL_NAMESPACE::typed {
         constexpr auto component = Schema::template Spec<set, binding>::ALLOCATION == AllocationKind::TEXTURE ? ResourceComponent::IMAGE : ResourceComponent::PRIMARY;
         return detail::bundle_image(*_shared, nullptr, _shared->native, _shared->layout.placement({set, binding, element}, component));
     }
+
     template<typename Schema, typename StoragePolicy>
     template<std::uint32_t set, std::uint32_t binding, size_t element>
     requires(Schema::template HasSampler<set, binding>() && Schema::template Spec<set, binding>::SAMPLER_SCOPE == ResourceScope::SHARED && element < Schema::template Binding<set, binding>::POINT.amount)
@@ -161,6 +178,7 @@ namespace VSL_NAMESPACE::typed {
         constexpr auto component = Schema::template Spec<set, binding>::ALLOCATION == AllocationKind::TEXTURE ? ResourceComponent::SAMPLER : ResourceComponent::PRIMARY;
         return detail::bundle_sampler(*_shared, nullptr, _shared->native, _shared->layout.placement({set, binding, element}, component));
     }
+
     template<typename Schema, typename StoragePolicy>
     template<typename Binding>
     auto TypedResourceFrame<Schema, StoragePolicy>::bind_resources(const Binding& binding) const {
@@ -195,11 +213,13 @@ namespace VSL_NAMESPACE::typed {
             empty = _shared->arena.value().descriptor_layout(*_shared->layout.empty_descriptor_layout());
         return TypedDescriptorLayouts<Resources>(std::move(layouts), std::move(empty));
     }
+
     template<typename Schema, typename StoragePolicy, ResourceRetention retention, lifetime::DependencyPolicy dependencies>
     void TypedResourceBundle<Schema, StoragePolicy, retention, dependencies>::require_available() const {
         if (!_shared || _initializing || _initialization_failed)
             throw std::logic_error("Typed resource bundle is moved, initializing, or has a failed shared initialization");
     }
+
     template<typename Schema, typename StoragePolicy, ResourceRetention retention, lifetime::DependencyPolicy dependencies>
     template<typename Initialize>
     requires std::invocable<Initialize&, TypedSharedResources<Schema, StoragePolicy>&> && std::same_as<std::invoke_result_t<Initialize&, TypedSharedResources<Schema, StoragePolicy>&>, void>
@@ -220,6 +240,7 @@ namespace VSL_NAMESPACE::typed {
         _initializing = false;
         _shared_initialized = true;
     }
+
     template<typename Schema, typename StoragePolicy, ResourceRetention retention, lifetime::DependencyPolicy dependencies>
     template<typename Update>
     requires std::invocable<Update&, TypedResourceFrame<Schema, StoragePolicy>&> && std::same_as<std::invoke_result_t<Update&, TypedResourceFrame<Schema, StoragePolicy>&>, void>
@@ -230,6 +251,7 @@ namespace VSL_NAMESPACE::typed {
             std::invoke(update, frame);
         });
     }
+
     template<typename Schema, typename StoragePolicy, ResourceRetention retention, lifetime::DependencyPolicy dependencies>
     const TypedResourceFrame<Schema, StoragePolicy>& TypedResourceBundle<Schema, StoragePolicy, retention, dependencies>::get(const ComputePhase& phase) {
         require_available();

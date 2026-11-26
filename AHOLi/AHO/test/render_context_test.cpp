@@ -1,7 +1,9 @@
 #include "../src/engine/engine_access.hpp"
+
 namespace {
     using AHO_NAMESPACE::engine::detail::EngineAccess;
 }
+
 #include <VSL/lifetime/startup_access.hpp>
 #include <VSL/lifetime/command_access.hpp>
 #include <AHO/render_context.hpp>

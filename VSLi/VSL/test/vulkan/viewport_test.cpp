@@ -4,6 +4,7 @@
 namespace {
     using VSL_NAMESPACE::lifetime::detail::PipelineRecipeAccess;
 }
+
 namespace {
     TEST(ViewportTest, ConstructorsPreserveRectangleCoordinates) {
         vsl::Viewport defaults;
@@ -23,7 +24,9 @@ namespace {
         EXPECT_EQ(adapted.width, 4);
         EXPECT_EQ(adapted.height, 5);
     }
+
     using ViewportVulkanIntegrationTest = vsl_test::RenderVulkanIntegrationTest;
+
     TEST_F(ViewportVulkanIntegrationTest, SwapchainInjectionAndDynamicViewportProducePixels) {
         vsl::Viewport viewport(description);
         EXPECT_EQ(viewport.width, 8);

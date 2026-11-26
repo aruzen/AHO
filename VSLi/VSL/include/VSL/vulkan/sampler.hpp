@@ -12,9 +12,12 @@ namespace VSL_NAMESPACE {
     namespace lifetime::detail {
         struct SamplerAccess;
     }
+
     struct SamplerAccessor {
         SamplerAccessor() = default;
+
         explicit operator bool() const { return bool(_owner); }
+
         ResourceUseState& use_state() const;
         ResourceUse resource_use() const;
 
@@ -24,6 +27,7 @@ namespace VSL_NAMESPACE {
     private:
         friend struct lifetime::detail::SamplerAccess;
         lifetime::OwnedRef<impl::SamplerImpl> _owner;
+
         explicit SamplerAccessor(lifetime::OwnedRef<impl::SamplerImpl> owner) : _owner(std::move(owner)) {}
     };
 

@@ -11,14 +11,18 @@ namespace {
     using VSL_NAMESPACE::lifetime::detail::DescriptorAccess;
     using VSL_NAMESPACE::lifetime::detail::DescriptorManagerAccess;
 } // namespace
+
 namespace {
     using DescriptorManagerVulkanIntegrationTest = vsl_test::ComputeVulkanIntegrationTest;
+
     TEST_F(DescriptorManagerVulkanIntegrationTest, OverAssignmentPublishesConfigurationAndBothCachedPoolsBeforeReleasingOldOwners) {
         using namespace vsl::graphic_resource;
+
         struct Context {
             Pool source;
             std::shared_ptr<void> action;
         };
+
         for (const bool moving : {false, true}) {
             OverAllocateManager target(device, {{Type::STORAGE_BUFFER, 1}});
             OverAllocateManager source(device, {{Type::STORAGE_BUFFER, 3}});
@@ -53,12 +57,15 @@ namespace {
             EXPECT_EQ(DescriptorAccess::Owned(target.pools.front()), DescriptorAccess::Owned(expected_pools.front()));
         }
     }
+
     TEST_F(DescriptorManagerVulkanIntegrationTest, OverDestructionInvalidatesItsIdentityBeforeCachedOwnersRunTheirCallbacks) {
         using namespace vsl::graphic_resource;
+
         struct Context {
             Pool source;
             std::shared_ptr<void> action;
         };
+
         auto target = std::make_unique<OverAllocateManager>(device, std::map<Type, size_t>{{Type::STORAGE_BUFFER, 1}});
         auto previous = target->pools.front();
         bool called = false;
@@ -74,12 +81,15 @@ namespace {
         EXPECT_TRUE(called);
         EXPECT_EQ(previous.get_manager(), nullptr);
     }
+
     TEST_F(DescriptorManagerVulkanIntegrationTest, AssignmentPublishesStateAndIdentityBeforeTheOldOwnerReentersTheManager) {
         using namespace vsl::graphic_resource;
+
         struct Context {
             std::shared_ptr<vsl::impl::GraphicResourceManagerImpl> state;
             std::shared_ptr<void> action;
         };
+
         for (const bool moving : {false, true}) {
             ExactAllocateManager target(device), source(device);
             auto previous = target.make({{Type::STORAGE_BUFFER, 1}});
@@ -106,6 +116,7 @@ namespace {
             EXPECT_TRUE(released.expired());
         }
     }
+
     TEST_F(DescriptorManagerVulkanIntegrationTest, MakeAndExactAllocateReturnUsableResources) {
         auto [allocated_pool, allocated] = resources->make(std::vector{*binding});
         ASSERT_EQ(allocated.size(), 1u);
@@ -128,23 +139,28 @@ namespace {
         for (auto& entry : pools)
             DescriptorAccess::Owned(entry)->resources.clear();
     }
+
     TEST_F(DescriptorManagerVulkanIntegrationTest, DefaultOverAllocatorStartsWithoutPools) {
         vsl::graphic_resource::OverAllocateManager manager(device);
         EXPECT_EQ(DescriptorManagerAccess::Data(manager)->device, StartupAccess::Owned(device));
         EXPECT_TRUE(manager.pools.empty());
         EXPECT_EQ(manager.other, 0u);
     }
+
     TEST_F(DescriptorManagerVulkanIntegrationTest,
            OverAllocateReturnsOnePoolPerResourceAndReusesCapacity) {
         using namespace vsl::graphic_resource;
         OverAllocateManager manager(device, {{Type::STORAGE_BUFFER, 4}}, 0);
+
         struct ClearCycles {
             std::shared_ptr<vsl::impl::GraphicResourceManagerImpl> data;
+
             ~ClearCycles() {
                 for (auto& owned : data->pools)
                     owned->resources.clear();
             }
         } cleanup{DescriptorManagerAccess::Data(manager)};
+
         auto [pools, allocated] = manager.allocate(std::vector{*binding});
         EXPECT_EQ(pools.size(), allocated.size());
         ASSERT_EQ(allocated.size(), 1u);
@@ -163,6 +179,7 @@ namespace {
             entry->resources.clear();
     }
 } // namespace
+
 namespace {
     TEST_F(DescriptorManagerVulkanIntegrationTest, TemplateMakeAndAllocateOverloadsUpdateTheirBuffers) {
         auto& manager = static_cast<vsl::graphic_resource::ManagerInterface&>(*resources);
@@ -184,6 +201,7 @@ namespace {
         EXPECT_EQ(explicit_pools.size(), 1u);
         use(explicit_resources, 71);
     }
+
     TEST_F(DescriptorManagerVulkanIntegrationTest, OverAllocatorDestroyReleasesItsOwnedPool) {
         using namespace vsl::graphic_resource;
         OverAllocateManager manager(device, {{Type::STORAGE_BUFFER, 1}}, 0);
@@ -216,6 +234,7 @@ namespace {
         EXPECT_TRUE(weak_pool.expired());
         ExpectSequence(execute(131), 131);
     }
+
     TEST_F(DescriptorManagerVulkanIntegrationTest, DestroyAcceptsCacheAliasesAndEmptyPoolsWithoutDanglingReferences) {
         using namespace vsl::graphic_resource;
         OverAllocateManager manager(device, {{Type::STORAGE_BUFFER, 1}});
@@ -227,6 +246,7 @@ namespace {
         manager.destroy(Pool{});
         resources->destroy(Pool{});
     }
+
     TEST_F(DescriptorManagerVulkanIntegrationTest, DestroyLeavesAnotherManagersPoolIntact) {
         using namespace vsl::graphic_resource;
         OverAllocateManager manager(device, {{Type::STORAGE_BUFFER, 1}});
@@ -235,13 +255,16 @@ namespace {
         EXPECT_TRUE(static_cast<bool>(DescriptorAccess::Owned(foreign)->descriptor_pool));
         EXPECT_EQ(DescriptorAccess::Owned(manager.pools.front()), DescriptorAccess::Owned(foreign));
         EXPECT_EQ(DescriptorManagerAccess::Data(manager)->pools.size(), 1u);
+
         struct ClearCycles {
             std::shared_ptr<vsl::impl::GraphicResourceManagerImpl> data;
+
             ~ClearCycles() {
                 for (auto& owned : data->pools)
                     owned->resources.clear();
             }
         } cleanup{DescriptorManagerAccess::Data(manager)};
+
         auto [success, allocated] = foreign.bind(*binding);
         ASSERT_TRUE(success);
         allocated.update(&*output, 0, Type::STORAGE_BUFFER);
@@ -251,26 +274,33 @@ namespace {
 } // namespace
 
 #include <type_traits>
+
 namespace {
     using ResourceManagerInterface = vsl::graphic_resource::ManagerInterface;
     static_assert(std::has_virtual_destructor_v<ResourceManagerInterface>);
+
     struct StubResourceManager : ResourceManagerInterface {
         std::tuple<std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>>
         allocate(std::vector<vsl::graphic_resource::BindingLayout>) override { return {}; }
+
         void destroy(const vsl::graphic_resource::Pool&) override {}
     };
+
     TEST(ResourceManagerLifetimeTest, BaseOwnerRunsTheDerivedDestructor) {
         struct TrackedManager : StubResourceManager {
             bool& destroyed;
+
             explicit TrackedManager(bool& destroyed) : destroyed(destroyed) {}
             ~TrackedManager() { destroyed = true; }
         };
+
         bool destroyed = false;
         std::unique_ptr<ResourceManagerInterface> manager = std::make_unique<TrackedManager>(destroyed);
         EXPECT_FALSE(destroyed);
         manager.reset();
         EXPECT_TRUE(destroyed);
     }
+
     TEST(ResourceManagerLifetimeTest, MovesTransferOwnershipAndCopiesShareIt) {
         StubResourceManager original;
         DescriptorManagerAccess::Data(original) = std::make_shared<vsl::impl::GraphicResourceManagerImpl>();
@@ -293,13 +323,16 @@ namespace {
     TEST_F(DescriptorManagerVulkanIntegrationTest, LazyOverAllocatorReturnsItsNewPoolAndCachesItForReuse) {
         using namespace vsl::graphic_resource;
         OverAllocateManager manager(device);
+
         struct ClearCycles {
             std::shared_ptr<vsl::impl::GraphicResourceManagerImpl> data;
+
             ~ClearCycles() {
                 for (auto& owned : data->pools)
                     owned->resources.clear();
             }
         } cleanup{DescriptorManagerAccess::Data(manager)};
+
         auto [pools, allocated] = manager.allocate(std::vector{*binding});
         ASSERT_EQ(pools.size(), 1u);
         ASSERT_EQ(allocated.size(), 1u);
@@ -319,6 +352,7 @@ namespace {
 #include <atomic>
 #include <iostream>
 #include <limits>
+
 namespace {
     class DescriptorPoolValidationVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         VkDebugUtilsMessengerEXT _messenger = VK_NULL_HANDLE;
@@ -327,6 +361,7 @@ namespace {
         static VKAPI_ATTR VkBool32 VKAPI_CALL RecordError(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
                                                           VkDebugUtilsMessageTypeFlagsEXT, const VkDebugUtilsMessengerCallbackDataEXT* message, void* user);
         void SetUp() override;
+
         void TearDown() override {
             EXPECT_EQ(_validation_errors.load(), 0u) << "Descriptor pool operations emitted validation errors";
             if (_messenger)
@@ -334,6 +369,7 @@ namespace {
             VulkanIntegrationTest::TearDown();
         }
     };
+
     TEST_F(DescriptorPoolValidationVulkanIntegrationTest, MakeAllocatesAllArrayElementsAcrossLayoutsAndBindings) {
         using namespace vsl::graphic_resource;
         ExactAllocateManager manager(device);
@@ -342,10 +378,13 @@ namespace {
         BindingLayout second(device, {{1, Type::STORAGE_BUFFER, vsl::ShaderFlag::COMPUTE, 3}});
         auto [array_pool, allocated] = manager.make(std::vector{first, second},
                                                     std::map<Type, std::size_t>{{Type::STORAGE_BUFFER, 2}, {Type::UNIFORM_BUFFER, 1}});
+
         struct ClearResources {
             vsl::GraphicResourcePool pool;
+
             ~ClearResources() { DescriptorAccess::Owned(pool)->resources.clear(); }
         } cleanup{array_pool};
+
         ASSERT_EQ(allocated.size(), 2u);
         EXPECT_EQ(DescriptorAccess::Owned(allocated[0].get_pool()), DescriptorAccess::Owned(array_pool));
         EXPECT_EQ(DescriptorAccess::Owned(allocated[1].get_pool()), DescriptorAccess::Owned(array_pool));

@@ -25,6 +25,7 @@ namespace VSL_NAMESPACE::lifetime {
             bool pending = false;
             bool captured = false;
         };
+
         struct RetirementNode {
             std::weak_ptr<impl::LogicalDeviceImpl> device;
             std::weak_ptr<impl::SurfaceImpl> surface;
@@ -32,27 +33,32 @@ namespace VSL_NAMESPACE::lifetime {
             impl::SurfaceImpl* surface_slot = nullptr;
             std::unique_ptr<RetirementNode> next;
         };
+
         struct RetirementQueue {
             std::unique_ptr<RetirementNode> head;
             bool collecting = false;
             ~RetirementQueue();
         };
+
         RetirementQueue& retirement_queue();
         bool same_retirement(const RetirementNode& a, const RetirementNode& b) noexcept;
         void push_retirement(std::unique_ptr<RetirementNode>& head, std::unique_ptr<RetirementNode> node) noexcept;
         void restore_retirements(RetirementQueue& queue, std::unique_ptr<RetirementNode> source) noexcept;
+
         struct RetirementBatch {
             RetirementQueue& queue;
             std::unique_ptr<RetirementNode> selected, pending;
             explicit RetirementBatch(RetirementQueue& queue);
             ~RetirementBatch();
         };
+
         struct RecoveryDomains {
             std::span<const std::shared_ptr<SurfacePresentationDomain>> domains;
             explicit RecoveryDomains(std::span<const std::shared_ptr<SurfacePresentationDomain>> domains);
             ~RecoveryDomains();
             void finish() noexcept;
         };
+
         RecoveryResult recover_batch(const std::shared_ptr<impl::LogicalDeviceImpl>& device,
                                      const std::shared_ptr<impl::SurfaceImpl>& surface,
                                      const std::shared_ptr<impl::CommandBufferImpl>& ring,
@@ -60,25 +66,30 @@ namespace VSL_NAMESPACE::lifetime {
                                      std::span<const std::shared_ptr<impl::SubmissionWork>> known,
                                      bool wait, bool observe_graphics);
         RecoveryResult recover_surface_scope(LogicalDeviceAccessor device, const Surface& surface, SurfaceRecoveryMode mode, bool observe_graphics);
+
         RetirementQueue::~RetirementQueue() {
             while (head) {
                 auto node = std::move(head);
                 head = std::move(node->next);
             }
         }
+
         RetirementQueue& retirement_queue() {
             static thread_local RetirementQueue QUEUE;
             return QUEUE;
         }
+
         bool same_retirement(const RetirementNode& a, const RetirementNode& b) noexcept {
             return a.device_slot == b.device_slot && a.surface_slot == b.surface_slot &&
                    !a.device.owner_before(b.device) && !b.device.owner_before(a.device) &&
                    !a.surface.owner_before(b.surface) && !b.surface.owner_before(a.surface);
         }
+
         void push_retirement(std::unique_ptr<RetirementNode>& head, std::unique_ptr<RetirementNode> node) noexcept {
             node->next = std::move(head);
             head = std::move(node);
         }
+
         void restore_retirements(RetirementQueue& queue, std::unique_ptr<RetirementNode> source) noexcept {
             while (source) {
                 auto node = std::move(source);
@@ -90,26 +101,32 @@ namespace VSL_NAMESPACE::lifetime {
                     push_retirement(queue.head, std::move(node));
             }
         }
+
         RetirementBatch::RetirementBatch(RetirementQueue& queue) : queue(queue), selected(std::move(queue.head)) {
             queue.collecting = true;
         }
+
         RetirementBatch::~RetirementBatch() {
             restore_retirements(queue, std::move(selected));
             restore_retirements(queue, std::move(pending));
             queue.collecting = false;
         }
+
         RecoveryDomains::RecoveryDomains(std::span<const std::shared_ptr<SurfacePresentationDomain>> domains) : domains(domains) {
             for (const auto& domain : domains)
                 domain->recovering = true;
         }
+
         RecoveryDomains::~RecoveryDomains() {
             finish();
         }
+
         void RecoveryDomains::finish() noexcept {
             for (const auto& domain : domains)
                 domain->recovering = false;
             domains = {};
         }
+
         RecoveryResult recover_batch(const std::shared_ptr<impl::LogicalDeviceImpl>& device,
                                      const std::shared_ptr<impl::SurfaceImpl>& surface,
                                      const std::shared_ptr<impl::CommandBufferImpl>& ring,
@@ -120,6 +137,7 @@ namespace VSL_NAMESPACE::lifetime {
                 return {device->lost ? SurfaceRecoveryStatus::DEVICE_LOST : SurfaceRecoveryStatus::PENDING, true, true};
             if (std::ranges::any_of(domains, [](const auto& domain) { return domain->recovering; }))
                 return {SurfaceRecoveryStatus::PENDING, true, true};
+
             RecoveryDomains recovering(domains);
             std::vector<PresentationSnapshot> presentation;
             presentation.reserve(domains.size());
@@ -139,6 +157,7 @@ namespace VSL_NAMESPACE::lifetime {
             });
             if (!device->lost && (acquisitions.native_active() || observing_present))
                 return {SurfaceRecoveryStatus::PENDING, true, true};
+
             std::optional<SubmissionSnapshot> work;
             if (ring)
                 work.emplace(ring, domains);
@@ -151,12 +170,14 @@ namespace VSL_NAMESPACE::lifetime {
             QuarantinedPresentations orphan_present(device, domains, surface);
             const bool captured = acquisitions.captured() || work->captured() || orphan_present.captured() || !known.empty() ||
                                   std::ranges::any_of(presentation, [](const auto& snapshot) { return !snapshot.records.empty() || !snapshot.acquisitions.empty(); });
+
             auto idle = device->lost ? vk::Result::eErrorDeviceLost
                                      : (wait ? operation::wait_device_idle(device->device) : vk::Result::eNotReady);
             if (device->lost)
                 idle = vk::Result::eErrorDeviceLost;
             if (wait && idle != vk::Result::eSuccess && idle != vk::Result::eErrorDeviceLost)
                 vk::detail::throwResultException(idle, "Surface recovery could not observe Device idle");
+
             if (observe_graphics || idle == vk::Result::eErrorDeviceLost)
                 work->save_observations(static_cast<std::int32_t>(idle));
             for (const auto& item : known)
@@ -166,6 +187,7 @@ namespace VSL_NAMESPACE::lifetime {
             for (auto& snapshot : presentation)
                 observe_presentations(snapshot, device->lost ? vk::Result::eErrorDeviceLost : idle, wait);
             orphan_present.save_observations(device->lost ? vk::Result::eErrorDeviceLost : idle, wait);
+
             if (device->lost) {
                 work->save_observations(static_cast<std::int32_t>(vk::Result::eErrorDeviceLost));
                 for (const auto& item : known)
@@ -176,6 +198,7 @@ namespace VSL_NAMESPACE::lifetime {
                     observe_presentations(snapshot, vk::Result::eErrorDeviceLost, false);
                 orphan_present.save_observations(vk::Result::eErrorDeviceLost, false);
             }
+
             for (auto& observation : observations)
                 observation.finish();
             work->bookkeep();
@@ -183,6 +206,7 @@ namespace VSL_NAMESPACE::lifetime {
             orphan_present.bookkeep();
             for (auto& snapshot : presentation)
                 bookkeep_presentations(snapshot);
+
             bool pending = work->pending() || acquisitions.pending() || orphan_present.pending();
             bool presentation_pending = orphan_present.pending();
             for (const auto& snapshot : presentation)
@@ -192,6 +216,7 @@ namespace VSL_NAMESPACE::lifetime {
                         if (record->state.status != sync::PresentStatus::PENDING)
                             presentation_pending = true;
                     }
+
             recovering.finish();
             work->release();
             for (const auto& item : known)
@@ -201,9 +226,11 @@ namespace VSL_NAMESPACE::lifetime {
             for (auto& snapshot : presentation)
                 release_presentations(snapshot);
             orphan_present.release();
+
             return {device->lost ? SurfaceRecoveryStatus::DEVICE_LOST : (pending ? SurfaceRecoveryStatus::PENDING : SurfaceRecoveryStatus::COMPLETE),
                     presentation_pending, pending, captured};
         }
+
         RecoveryResult recover_surface_scope(LogicalDeviceAccessor device, const Surface& surface, SurfaceRecoveryMode mode, bool observe_graphics) {
             require_device_owner(device);
             (void)surface.owner_ref();
@@ -223,9 +250,11 @@ namespace VSL_NAMESPACE::lifetime {
             return recover_batch(native_device, parent, {}, domains, {}, mode == SurfaceRecoveryMode::WAIT, observe_graphics);
         }
     } // namespace
+
     SurfaceRecoveryStatus recover_surface(LogicalDeviceAccessor device, const Surface& surface, SurfaceRecoveryMode mode) {
         return recover_surface_scope(device, surface, mode, true).status;
     }
+
     void queue_surface_retirement(LogicalDeviceAccessor device, const Surface& surface) {
         require_device_owner(device);
         (void)surface.owner_ref();
@@ -238,6 +267,7 @@ namespace VSL_NAMESPACE::lifetime {
                 return;
         push_retirement(queue.head, std::make_unique<RetirementNode>(std::move(key)));
     }
+
     SurfaceRecoveryStatus collect_surface_retirements(LogicalDeviceAccessor device, SurfaceRecoveryMode mode) {
         require_device_owner(device);
         if (mode != SurfaceRecoveryMode::POLL && mode != SurfaceRecoveryMode::WAIT)
@@ -279,8 +309,10 @@ namespace VSL_NAMESPACE::lifetime {
                     status = SurfaceRecoveryStatus::PENDING;
         return status;
     }
+
     SurfaceRetirementCollection::SurfaceRetirementCollection(std::shared_ptr<impl::LogicalDeviceImpl> device) noexcept
         : _device(std::move(device)) {}
+
     SurfaceRetirementCollection::~SurfaceRetirementCollection() {
         if (!_device || !retirement_queue().head)
             return;
@@ -289,6 +321,7 @@ namespace VSL_NAMESPACE::lifetime {
         } catch (...) {
         }
     }
+
     void recover_command_domain(CommandDomain& domain) {
         const auto buffer = domain.buffer;
         const auto device = StartupAccess::Shared(device_from_impl(*buffer->command_pool->device));
@@ -304,6 +337,7 @@ namespace VSL_NAMESPACE::lifetime {
         if (result.presentation_pending)
             throw std::runtime_error("Presentation completion could not be established");
     }
+
     void collect_acquire_scope(AcquireTicket& ticket, bool wait) noexcept {
         if (ticket.released || ticket.state.native_call_active || !ticket.device || !ticket.swapchain ||
             (ticket.graphics && (ticket.graphics->native.active || ticket.graphics->native.observing)))

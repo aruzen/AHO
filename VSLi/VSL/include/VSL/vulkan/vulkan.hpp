@@ -17,6 +17,7 @@
 namespace VSL_NAMESPACE {
     struct PhysicalDevice;
     struct PhysicalDevicesSercher;
+
     namespace lifetime::detail {
         struct StartupAccess;
     }
@@ -35,6 +36,7 @@ namespace VSL_NAMESPACE {
     struct VulkanAccessor {
     private:
         lifetime::OwnedRef<impl::VulkanImplAccessor> _owner;
+
         explicit VulkanAccessor(lifetime::OwnedRef<impl::VulkanImplAccessor> owner) noexcept : _owner(std::move(owner)) {}
         friend struct lifetime::detail::StartupAccess;
 
@@ -42,12 +44,15 @@ namespace VSL_NAMESPACE {
         VulkanAccessor() = default;
         VulkanAccessor(const VulkanAccessor&) = default;
         VulkanAccessor(VulkanAccessor&&) noexcept = default;
+
         VulkanAccessor& operator=(VulkanAccessor value) noexcept {
             swap(value);
             return *this;
         }
+
         void swap(VulkanAccessor& other) noexcept { _owner.swap(other._owner); }
         explicit operator bool() const noexcept { return bool(_owner); }
+
         static VulkanAccessor Create(InstanceCreateInfo info);
         lifetime::OwnerRef owner_ref() const;
     };
@@ -66,15 +71,18 @@ namespace VSL_NAMESPACE {
         explicit Vulkan(VulkanAccessor instance);
         Vulkan(const Vulkan&) = default;
         Vulkan(Vulkan&&) noexcept = default;
+
         Vulkan& operator=(Vulkan value) noexcept {
             swap(value);
             return *this;
         }
+
         void swap(Vulkan& other) noexcept { _value.swap(other._value); }
         operator VulkanAccessor() const& { return _value; }
         operator VulkanAccessor() && { return std::move(_value); }
         explicit operator bool() const noexcept { return bool(_value); }
         lifetime::OwnerRef owner_ref() const { return _value.owner_ref(); }
+
         ~Vulkan();
 
         template<typename S = VSL_NAMESPACE::PhysicalDevicesSercher>

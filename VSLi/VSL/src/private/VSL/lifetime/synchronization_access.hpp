@@ -15,6 +15,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
         static std::shared_ptr<impl::SynchroManagerImpl>& Registry(SynchroManager& value) { return value._registry; }
         static std::shared_ptr<impl::SynchroManagerImpl> Registry(SynchroManager&& value) { return std::move(value._registry); }
         static std::shared_ptr<impl::SynchroManagerImpl> Registry(const SynchroManager&& value) { return value._registry; }
+
         static FenceHolder FromOwned(OwnedRef<impl::FenceImpl> owner);
         static SemaphoreHolder FromOwned(OwnedRef<impl::SemaphoreImpl> owner);
         static FenceHolder FromShared(std::shared_ptr<impl::FenceImpl> owner);

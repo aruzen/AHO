@@ -7,6 +7,7 @@ namespace {
 
 namespace {
     using ImageVulkanIntegrationTest = vsl_test::VulkanIntegrationTest;
+
     TEST_F(ImageVulkanIntegrationTest, CreatesTwoDimensionalImageAndViewWithExpectedSize) {
         vsl::Image<vsl::ImageType::TRANSFER_DST | vsl::ImageType::SAMPLED> image(
             device, 7, 5, vsl::data_format::UNSIGNED_INT8_RGBA);
@@ -18,12 +19,14 @@ namespace {
         EXPECT_EQ(ImageAccess::Owned(image)->count, 1u);
         EXPECT_EQ(image.size(), 7u * 5u * 4u);
     }
+
     TEST_F(ImageVulkanIntegrationTest, CreatesArrayImageWithRequestedLayerCount) {
         vsl::Image<vsl::ImageType::TRANSFER_DST | vsl::ImageType::SAMPLED> image(
             device, 4, 4, vsl::data_format::UNSIGNED_INT8_RGBA, 3);
         EXPECT_EQ(ImageAccess::Owned(image)->count, 3u);
         EXPECT_TRUE(ImageAccess::Owned(image)->view);
     }
+
     TEST_F(ImageVulkanIntegrationTest, ArraySizeIncludesAllLayers) {
         vsl::Image<vsl::ImageType::TRANSFER_DST | vsl::ImageType::SAMPLED> image(
             device, 4, 4, vsl::data_format::UNSIGNED_INT8_RGBA, 3);

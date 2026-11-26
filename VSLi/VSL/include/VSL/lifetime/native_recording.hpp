@@ -7,6 +7,7 @@ namespace VSL_NAMESPACE {
     namespace lifetime {
         struct CommandRecordingContext;
     }
+
     // Phase内の一つの記録先を保存する値。Workへの新しい所有辺は作らない。
     class NativeRecordingContext {
         CommandBuffer _buffer;
@@ -23,8 +24,10 @@ namespace VSL_NAMESPACE {
         NativeRecordingContext(NativeRecordingContext&&) noexcept = default;
         NativeRecordingContext& operator=(const NativeRecordingContext&) = delete;
         NativeRecordingContext& operator=(NativeRecordingContext&&) = delete;
+
         Completion completion() const { return _completion; }
         std::uint32_t slot() const { return _slot; }
+
         void require_current() const;
         // useの全ownerとretainのownerは、このcontextやPhase/Managerを強く所有しない資源境界とする。
         void use(ResourceUse resource, ResourceRetention retention = ResourceRetention::COMPLETION) const;

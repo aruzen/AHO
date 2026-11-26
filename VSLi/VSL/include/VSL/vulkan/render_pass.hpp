@@ -27,31 +27,38 @@ namespace VSL_NAMESPACE {
     private:
         friend struct lifetime::detail::GraphicsAccess;
         lifetime::OwnedRef<impl::RenderPassImpl> _owner;
+
         explicit RenderPassAccessor(lifetime::OwnedRef<impl::RenderPassImpl> owner) : _owner(std::move(owner)) {}
 
     public:
         RenderPassAccessor() = default;
         RenderPassAccessor(const RenderPassAccessor&) = default;
         RenderPassAccessor(RenderPassAccessor&&) noexcept = default;
+
         RenderPassAccessor& operator=(RenderPassAccessor replacement) noexcept {
             swap(replacement);
             return *this;
         }
+
         explicit operator bool() const noexcept { return bool(_owner); }
         void swap(RenderPassAccessor& other) noexcept { _owner.swap(other._owner); }
+
         RenderPassIdentity identity() const;
         const RenderPassDescription& description() const&;
         const RenderPassDescription& description() const&& = delete;
         LogicalDeviceAccessor get_device() const;
         lifetime::OwnerRef owner_ref() const;
     };
+
     struct RenderPass : RenderPassAccessor {
         RenderPass(const RenderPass&) = default;
         RenderPass(RenderPass&&) noexcept = default;
+
         RenderPass& operator=(RenderPass replacement) noexcept {
             swap(replacement);
             return *this;
         }
+
         RenderPass(LogicalDeviceAccessor device, RenderPassDescription description);
         // 従来の画面表示用アタッチメント1つを持つ構成との互換性を保つ。
         RenderPass(SwapchainAccessor swapchain);
@@ -71,6 +78,7 @@ namespace VSL_NAMESPACE {
         IDPickingRenderPass& operator=(IDPickingRenderPass replacement) noexcept;
         ~IDPickingRenderPass();
         void swap(IDPickingRenderPass& other) noexcept;
+
         operator RenderPassAccessor() const { return _pass; }
         explicit operator bool() const noexcept { return bool(_pass); }
         RenderPassIdentity identity() const { return _pass.identity(); }
@@ -78,6 +86,7 @@ namespace VSL_NAMESPACE {
         lifetime::OwnerRef owner_ref() const { return _pass.owner_ref(); }
         const RenderPassDescription& description() const& { return _pass.description(); }
         const RenderPassDescription& description() const&& = delete;
+
         size_t image_count() const noexcept { return _picking_buffer.size(); }
         ImageAccessor picking_image(size_t index) const { return _picking_buffer.at(index); }
         std::span<const ImageAccessor> picking_images() const& { return _picking_buffer; }

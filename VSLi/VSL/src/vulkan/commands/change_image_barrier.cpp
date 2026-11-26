@@ -17,6 +17,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace VSL_NAMESPACE::command {
     namespace {
         constexpr std::array<std::pair<ShaderFlag, vk::PipelineStageFlagBits>, 14> SHADER_READ_STAGES{{

@@ -11,7 +11,9 @@ namespace AHO_NAMESPACE::x::resource {
         bool initialized = false;
         VSL_NAMESPACE::CompletionObservation update;
         Data(VSL_NAMESPACE::LogicalDeviceAccessor device, std::uint32_t width, std::uint32_t height, VSL_NAMESPACE::data_format::Format format);
+
         ~Data() { node.retire(); }
+
         static void Visit(const void* context, VSL_NAMESPACE::lifetime::DependencyNode::EdgeVisitor visitor, void* output);
         void settle();
     };

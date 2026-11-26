@@ -7,6 +7,7 @@
 namespace VSL_NAMESPACE {
     struct DescriptorLayoutCreateInfo;
     struct DescriptorPoolCreateInfo;
+
     namespace graphic_resource {
         struct BindingPoint;
     }

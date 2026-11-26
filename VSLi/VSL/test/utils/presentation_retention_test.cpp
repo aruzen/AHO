@@ -30,21 +30,27 @@ namespace {
     namespace l = vsl::lifetime;
     namespace s = vsl::sync;
     namespace o = vsl::operation;
+
     class PresentationRetentionWindowIntegrationTest : public vsl_test::WindowIntegrationTest {
         bool validate_vulkan() const override { return true; }
         vsl::PresentFencePolicy present_fence_policy() const override { return vsl::PresentFencePolicy::REQUIRE_FENCE; }
+
         void SetUp() override;
 
     protected:
         vsl::SwapchainAccessor make_chain();
     };
+
     class LegacyPresentationRetentionWindowIntegrationTest : public PresentationRetentionWindowIntegrationTest {
         vsl::PresentFencePolicy present_fence_policy() const override { return vsl::PresentFencePolicy::LEGACY; }
     };
+
     struct ClosingWindow : vsl::PureWindow {
         using PureWindow::PureWindow;
+
         ~ClosingWindow() override { close(); }
     };
+
     struct NativeProbe {
         VkFence target = VK_NULL_HANDLE;
         VkResult forced = VK_SUCCESS;
@@ -59,6 +65,7 @@ namespace {
     private:
         o::ScopedPresentationNativeCalls _scope;
     };
+
     vsl::storage::ArenaMemory callback_memory(const vsl::storage::SwapchainLayout& layout, std::shared_ptr<void> notify);
 
     vsl::storage::ArenaMemory callback_memory(const vsl::storage::SwapchainLayout& layout, std::shared_ptr<void> notify) {
@@ -69,7 +76,9 @@ namespace {
         });
         return vsl::storage::ArenaMemory({bytes, layout.bytes()}, layout.alignment(), std::move(owner));
     }
+
     NativeProbe::NativeProbe() : _scope({this, Present, Poll, Wait}) {}
+
     VkResult NativeProbe::Present(void* context, VkQueue queue, const VkPresentInfoKHR* info) noexcept {
         auto& probe = *static_cast<NativeProbe*>(context);
         VkFence fence = VK_NULL_HANDLE;
@@ -88,6 +97,7 @@ namespace {
         const auto result = vkQueuePresentKHR(queue, info);
         return result == VK_SUCCESS ? probe.forced : result;
     }
+
     VkResult NativeProbe::Poll(void* context, VkDevice device, VkFence fence) noexcept {
         auto& probe = *static_cast<NativeProbe*>(context);
         if (fence == probe.target && fence) {
@@ -99,6 +109,7 @@ namespace {
         }
         return vkGetFenceStatus(device, fence);
     }
+
     VkResult NativeProbe::Wait(void* context, VkDevice device, VkFence fence, std::uint64_t timeout) noexcept {
         auto& probe = *static_cast<NativeProbe*>(context);
         if (fence == probe.target && fence) {
@@ -108,6 +119,7 @@ namespace {
         }
         return vkWaitForFences(device, 1, &fence, VK_TRUE, timeout);
     }
+
     void PresentationRetentionWindowIntegrationTest::SetUp() {
         vsl_test::WindowIntegrationTest::SetUp();
         if (HasFatalFailure() || IsSkipped())
@@ -116,10 +128,12 @@ namespace {
         if (!HasFatalFailure() && !StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, StartupAccess::Owned(*(surface))->surface))
             GTEST_SKIP() << "Selected queue cannot present";
     }
+
     vsl::SwapchainAccessor PresentationRetentionWindowIntegrationTest::make_chain() {
         const vsl::SwapchainCreateInfo info{.width = 64, .height = 48, .present_fences = present_fence_policy()};
         return l::SwapchainArena(device, *surface, info).view();
     }
+
     TEST(PresentationLayoutTest, StrictPolicyAddsOneAlignedFenceSlotForTheRuntimeImageCount) {
         constexpr vsl::storage::SwapchainLayout legacy(3);
         constexpr vsl::storage::SwapchainLayout strict(3, vsl::PresentFencePolicy::REQUIRE_FENCE);
@@ -130,6 +144,7 @@ namespace {
         EXPECT_THROW(legacy.present_fence_offset(), std::logic_error);
         EXPECT_THROW((vsl::storage::SwapchainLayout{3, static_cast<vsl::PresentFencePolicy>(99)}), std::invalid_argument);
     }
+
     TEST(PresentationStateTest, PendingAndSavedTerminalStatesNeverWaitForAnUnsubmittedOrReusedFence) {
         NativeProbe probe;
         s::PresentState state;
@@ -151,6 +166,7 @@ namespace {
         EXPECT_TRUE(s::fence_proof_terminal(failed));
         EXPECT_FALSE(s::wait_fence_proof(failed));
     }
+
     TEST(PresentationStateTest, KnownDeviceLossPrecedesEvenAnAlreadySignaledLegacyReacquireProof) {
         auto registry = std::make_shared<l::SurfacePresentationDomain>();
         auto record = std::make_shared<l::PresentRecord>();
@@ -174,6 +190,7 @@ namespace {
         EXPECT_TRUE(record->released);
         EXPECT_TRUE(registry->records.empty());
     }
+
     TEST(PresentationStateTest, DomainLossSavesEveryPresentBeforeReleasingATicketOwner) {
         const auto device = std::make_shared<vsl::impl::LogicalDeviceImpl>();
         device->lost = true;
@@ -209,6 +226,7 @@ namespace {
         EXPECT_EQ(releases, 1u);
         EXPECT_TRUE(ticket->released);
     }
+
     TEST_F(PresentationRetentionWindowIntegrationTest, KnownDeviceLossIsSavedForAllSnapshotsBeforeAnyReleaseCallback) {
         auto manager = make_manager().independent(3);
         NativeProbe probe;
@@ -261,6 +279,7 @@ namespace {
         EXPECT_EQ(pending.completion().status(), vsl::Completion::Status::PENDING);
         pending.cancel();
     }
+
     TEST_F(PresentationRetentionWindowIntegrationTest, GraphicsCompletionAndDeviceIdleDoNotReleaseAnUnobservedPresentFence) {
         auto manager = make_manager().independent(1);
         NativeProbe probe;
@@ -292,6 +311,7 @@ namespace {
         EXPECT_TRUE(registry->records.empty());
         EXPECT_TRUE(owner.expired());
     }
+
     TEST_F(PresentationRetentionWindowIntegrationTest, OutOfMemoryKeepsThePendingReservationWithoutWaitingAndCanRetryTheSamePresent) {
         auto manager = make_manager().independent(1);
         NativeProbe probe;
@@ -322,6 +342,7 @@ namespace {
         EXPECT_TRUE(record->released);
         EXPECT_NO_THROW(finished.destroy());
     }
+
     TEST_F(PresentationRetentionWindowIntegrationTest, RejectedPresentationRequestsStillRetainTheirEnqueuedFence) {
         for (const auto error : {VK_ERROR_OUT_OF_DATE_KHR, VK_ERROR_SURFACE_LOST_KHR}) {
             auto manager = make_manager().independent(1);
@@ -346,6 +367,7 @@ namespace {
             EXPECT_TRUE(record->released);
         }
     }
+
     TEST_F(PresentationRetentionWindowIntegrationTest, RepeatedPresentationsReuseOnlyTheGenerationFencePoolAndBoundTheRegistry) {
         auto manager = make_manager().independent(1);
         NativeProbe probe;
@@ -365,6 +387,7 @@ namespace {
         manager.wait_idle();
         EXPECT_TRUE(registry->records.empty());
     }
+
     TEST_F(LegacyPresentationRetentionWindowIntegrationTest, AnotherCommandDomainReacquiresTheNewGenerationAndReclaimsTheRetiredOne) {
         auto first = make_manager().independent(1);
         auto second = make_manager().independent(1);
@@ -390,6 +413,7 @@ namespace {
         first.wait_idle();
         second.wait_idle();
     }
+
     TEST_F(PresentationRetentionWindowIntegrationTest, CompletedGenerationReleaseCanDestroyTheCurrentCancellingPhase) {
         auto first = make_manager().independent(1);
         auto second = make_manager().independent(1);
@@ -429,6 +453,7 @@ namespace {
         first.wait_idle();
         second.wait_idle();
     }
+
     TEST_F(PresentationRetentionWindowIntegrationTest, SavedTerminalRecordsAreReclaimedByTheNextWaitIdleWithoutRewaitingTheFence) {
         auto manager = make_manager().independent(1);
         NativeProbe probe;
@@ -456,6 +481,7 @@ namespace {
         EXPECT_TRUE(record->released);
         EXPECT_TRUE(owner.expired());
     }
+
     TEST_F(PresentationRetentionWindowIntegrationTest, PresentPoolAliasesProtectPendingUseAndSaveCompletionBeforeNativeReset) {
         auto manager = make_manager().independent(1);
         auto chain = make_chain();
@@ -503,6 +529,7 @@ namespace {
         manager.wait_idle();
         EXPECT_TRUE(record->released);
     }
+
     TEST_F(PresentationRetentionWindowIntegrationTest, ShutdownCallbacksCannotReattachUntilTheSameSurfaceDomainFinishesRetiring) {
         vsl::SwapchainAccessor next;
         bool rejected = false;
@@ -536,6 +563,7 @@ namespace {
         EXPECT_TRUE(old_domain.expired());
         EXPECT_TRUE(l::presentation_domain(SwapchainAccess::Owned(next).share()));
     }
+
     TEST_F(PresentationRetentionWindowIntegrationTest, WaitIdleKeepsNewPendingAndSubmittedWorkRegisteredByRetirementCallbacks) {
         for (const bool submit : {false, true}) {
             auto manager = make_manager().independent(1);
@@ -583,6 +611,7 @@ namespace {
             manager.wait_idle();
         }
     }
+
     TEST_F(PresentationRetentionWindowIntegrationTest, PresentAndIdleOnlyCollectQuarantineForTheirCanonicalSurface) {
         ClosingWindow peer("Other presentation scope", 64, 48);
         auto peer_surface = peer.add_plugin<vsl::Surface>(vsl::lifetime::detail::StartupAccess::FromShared(instance));
@@ -620,6 +649,7 @@ namespace {
         EXPECT_EQ(l::quarantined_presentation_count(), before);
         EXPECT_TRUE(peer_owner.expired());
     }
+
     TEST_F(PresentationRetentionWindowIntegrationTest, UnknownEnqueueIsQuarantinedWithoutWaitingForAnUnsubmittedFence) {
         const auto before = l::quarantined_presentation_count();
         for (const bool before_enqueue : {false, true}) {

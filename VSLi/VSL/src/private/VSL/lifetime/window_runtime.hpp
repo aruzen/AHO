@@ -8,10 +8,12 @@ namespace VSL_NAMESPACE::lifetime {
         GLFWRetirement* next = nullptr;
         void (*dispose)(GLFWRetirement*) noexcept = nullptr;
     };
+
     void retire_glfw(GLFWRetirement& retirement) noexcept;
     bool glfw_runtime_active();
     bool in_glfw_callback() noexcept;
     size_t pending_glfw_retirements();
+
     namespace detail {
         struct WindowOwnerAccess {
             static const OwnedRef<impl::OSWindowImpl>& Ref(const OSWindowOwner& owner) { return owner._window; }
@@ -25,13 +27,17 @@ namespace VSL_NAMESPACE::impl {
         lifetime::DependencyNode node;
         bool initialized = false;
         static void Dispose(lifetime::GLFWRetirement* retirement) noexcept;
+
         GLFWRuntimeImpl() { dispose = Dispose; }
     };
+
     struct OSWindowImpl : lifetime::GLFWRetirement {
         lifetime::DependencyNode node;
         lifetime::GLFWLease glfw;
         void* window = nullptr;
+
         explicit OSWindowImpl(lifetime::GLFWLease glfw) : glfw(std::move(glfw)) { dispose = Dispose; }
+
         static void Dispose(lifetime::GLFWRetirement* retirement) noexcept;
         static void VisitDependencies(const void* owner, lifetime::DependencyNode::EdgeVisitor visitor, void* context);
     };

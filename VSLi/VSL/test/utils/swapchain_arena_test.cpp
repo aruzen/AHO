@@ -32,8 +32,10 @@ namespace {
     namespace l = vsl::lifetime;
     namespace o = vsl::operation;
     namespace s = vsl::storage;
+
     class SwapchainArenaWindowIntegrationTest : public vsl_test::WindowIntegrationTest {
         bool validate_vulkan() const override { return true; }
+
         void SetUp() override;
     };
     enum class Failure {
@@ -42,6 +44,7 @@ namespace {
         IMAGES,
         VIEW
     };
+
     struct NativeProbe {
         Failure failure = Failure::NONE;
         unsigned creates = 0, queries = 0, destroys = 0, temporary_destroys = 0, views = 0;
@@ -49,14 +52,18 @@ namespace {
         static VkResult Images(void* context, VkDevice device, VkSwapchainKHR chain, std::uint32_t* count, VkImage* images);
         static void Destroy(void* context, VkDevice device, VkSwapchainKHR chain) noexcept;
         static VkResult View(void* context, VkDevice device, const VkImageViewCreateInfo* info, VkImageView* output);
+
         o::SwapchainNativeCalls calls() { return {this, Create, Images, Destroy}; }
+
         o::ImageViewNativeCalls image_calls() { return {this, View}; }
     };
+
     struct SemaphoreProbe {
         unsigned attempts = 0, created = 0, destroyed = 0, fail_at = 2;
         static VkResult Create(void* context, VkDevice device, const VkSemaphoreCreateInfo* info, VkSemaphore* output) noexcept;
         static void Destroy(void* context, VkDevice device, VkSemaphore semaphore) noexcept;
     };
+
     template<typename Handle>
     Handle sentinel();
     vsl::SwapchainCreateInfo create_info();
@@ -71,6 +78,7 @@ namespace {
         if (!StartupAccess::Owned(physical)->device.getSurfaceSupportKHR(queue_family, StartupAccess::Owned(*(surface))->surface))
             GTEST_SKIP() << "Selected queue cannot present to the Surface";
     }
+
     template<typename Handle>
     Handle sentinel() {
         if constexpr (std::is_pointer_v<Handle>)
@@ -78,9 +86,11 @@ namespace {
         else
             return static_cast<Handle>(1);
     }
+
     vsl::SwapchainCreateInfo create_info() {
         return {.width = 64, .height = 48};
     }
+
     VkResult NativeProbe::Create(void* context, VkDevice device, const VkSwapchainCreateInfoKHR* info, VkSwapchainKHR* output) {
         auto& probe = *static_cast<NativeProbe*>(context);
         ++probe.creates;
@@ -94,15 +104,18 @@ namespace {
         }
         return result;
     }
+
     VkResult NativeProbe::Images(void* context, VkDevice device, VkSwapchainKHR chain, std::uint32_t* count, VkImage* images) {
         auto& probe = *static_cast<NativeProbe*>(context);
         ++probe.queries;
         return probe.failure == Failure::IMAGES ? VK_ERROR_OUT_OF_HOST_MEMORY : vkGetSwapchainImagesKHR(device, chain, count, images);
     }
+
     void NativeProbe::Destroy(void* context, VkDevice device, VkSwapchainKHR chain) noexcept {
         ++static_cast<NativeProbe*>(context)->destroys;
         vkDestroySwapchainKHR(device, chain, nullptr);
     }
+
     VkResult NativeProbe::View(void* context, VkDevice device, const VkImageViewCreateInfo* info, VkImageView* output) {
         auto& probe = *static_cast<NativeProbe*>(context);
         if (++probe.views == 2 && probe.failure == Failure::VIEW) {
@@ -111,6 +124,7 @@ namespace {
         }
         return vkCreateImageView(device, info, nullptr, output);
     }
+
     VkResult SemaphoreProbe::Create(void* context, VkDevice device, const VkSemaphoreCreateInfo* info, VkSemaphore* output) noexcept {
         auto& probe = *static_cast<SemaphoreProbe*>(context);
         if (++probe.attempts == probe.fail_at)
@@ -120,10 +134,12 @@ namespace {
             ++probe.created;
         return result;
     }
+
     void SemaphoreProbe::Destroy(void* context, VkDevice device, VkSemaphore semaphore) noexcept {
         ++static_cast<SemaphoreProbe*>(context)->destroyed;
         vkDestroySemaphore(device, semaphore, nullptr);
     }
+
     TEST(SwapchainLayoutTest, RuntimeCountProducesAlignedDistinctSlotsAndChecksBounds) {
         constexpr s::SwapchainLayout layout(3);
         static_assert(layout.images() == 3);
@@ -141,6 +157,7 @@ namespace {
         if constexpr (sizeof(size_t) > sizeof(std::uint32_t))
             EXPECT_THROW((s::SwapchainLayout{size_t{std::numeric_limits<std::uint32_t>::max()} + 1}), std::invalid_argument);
     }
+
     TEST_F(SwapchainArenaWindowIntegrationTest, FinishedSemaphoreIsPlacedInTheGenerationAndRetainsTheOriginalOwner) {
         std::optional<vsl::SemaphoreHolder> finished;
         std::weak_ptr<vsl::impl::SwapchainImpl> generation;
@@ -161,6 +178,7 @@ namespace {
         finished.reset();
         EXPECT_TRUE(generation.expired());
     }
+
     TEST_F(SwapchainArenaWindowIntegrationTest, DefaultFinishedSelectsTheAcquiredImageWhenFramesOutnumberImages) {
         l::SwapchainArena arena(device, *surface, create_info());
         const auto chain = arena.view();
@@ -178,6 +196,7 @@ namespace {
         EXPECT_TRUE(phase.completion().wait());
         manager.wait_idle();
     }
+
     TEST_F(SwapchainArenaWindowIntegrationTest, SemaphoreConstructionFailureRollsBackTheGenerationAndReusesTheCPURegion) {
         SemaphoreProbe probe;
         const o::ScopedSynchronizationNativeCalls native({&probe, SemaphoreProbe::Create, SemaphoreProbe::Destroy});
@@ -200,6 +219,7 @@ namespace {
         }
         EXPECT_EQ(probe.destroyed, probe.created);
     }
+
     TEST_F(SwapchainArenaWindowIntegrationTest, NormalConstructorPlacesEveryImageWithItsOwnStateUnderOneOwner) {
         vsl::Swapchain chain(device, surface, {}, 64, 48);
         const s::SwapchainLayout layout(chain.get_swap_image_size());
@@ -220,6 +240,7 @@ namespace {
         vsl_test::expect_fixed_parent(chain.owner_ref(), device.owner_ref());
         vsl_test::expect_fixed_parent(chain.owner_ref(), surface->owner_ref());
     }
+
     TEST_F(SwapchainArenaWindowIntegrationTest, SavedImageRetainsItsGenerationWhileParentGettersReturnOriginalOwners) {
         vsl::ImageAccessor saved;
         l::WeakOwnerRef generation;
@@ -244,6 +265,7 @@ namespace {
         EXPECT_TRUE(generation.expired());
         EXPECT_TRUE(parent.owner_ref().managed());
     }
+
     TEST_F(SwapchainArenaWindowIntegrationTest, MemoryCannotBeReusedUntilTheLastImageIsReleased) {
         std::optional<s::ArenaMemory> memory;
         const l::SwapchainMemoryFactory allocate = [&](const auto& layout) {
@@ -260,6 +282,7 @@ namespace {
         ImageAccess::Owned(image).reset();
         EXPECT_NO_THROW((l::SwapchainArena{device, *surface, create_info(), {}, allocate}));
     }
+
     TEST_F(SwapchainArenaWindowIntegrationTest, ImageEnumerationFailureDestroysPendingAndNeverRevivesTheOldGeneration) {
         vsl::Swapchain old(device, surface, {}, 64, 48);
         const auto alias = static_cast<vsl::SwapchainAccessor>(old);
@@ -283,6 +306,7 @@ namespace {
         EXPECT_THROW((vsl::DefaultPhase{manager, old}), std::logic_error);
         EXPECT_NO_THROW((vsl::Swapchain{device, surface, {}, 64, 48}));
     }
+
     TEST_F(SwapchainArenaWindowIntegrationTest, FailedNativeOutputIsNotAdoptedAndRetryOmitsTheRetiredHandle) {
         vsl::Swapchain old(device, surface, {}, 64, 48);
         NativeProbe probe;
@@ -299,6 +323,7 @@ namespace {
         vsl::Swapchain retry(device, surface, {}, 64, 48);
         EXPECT_EQ(retry.state(), vsl::SwapchainState::ACTIVE);
     }
+
     TEST_F(SwapchainArenaWindowIntegrationTest, LaterImageViewFailureRollsBackSlotsAndReleasesTheCPUClaim) {
         const auto caps = StartupAccess::Owned(physical)->device.getSurfaceCapabilitiesKHR(StartupAccess::Owned(*(surface))->surface);
         if (caps.maxImageCount == 1)
@@ -321,6 +346,7 @@ namespace {
         retry = {};
         EXPECT_FALSE(region->claimed);
     }
+
     TEST_F(SwapchainArenaWindowIntegrationTest, UnsupportedPresentFencePolicyIsRejectedWithoutRetiringTheOldGeneration) {
         ASSERT_FALSE(vsl::has_device_features(device.enabled_features(), vsl::DeviceFeature::SWAPCHAIN_MAINTENANCE1));
         vsl::Swapchain old(device, surface, {}, 64, 48);
@@ -333,6 +359,7 @@ namespace {
         ASSERT_EQ(StartupAccess::Owned(device)->device.waitForFences(*acquired, true, UINT64_MAX), vk::Result::eSuccess);
         EXPECT_LT(index, old.get_swap_image_size());
     }
+
     TEST_F(SwapchainArenaWindowIntegrationTest, CreationProgressDistinguishesPreflightFromNativeFailureWithAndWithoutAnOldGeneration) {
         NativeProbe probe;
         const o::ScopedSwapchainNativeCalls calls(probe.calls());
@@ -358,6 +385,7 @@ namespace {
                 EXPECT_EQ(old.state(), vsl::SwapchainState::RETIRED);
         }
     }
+
     TEST_F(SwapchainArenaWindowIntegrationTest, CreationProgressSurvivesImageAndCPUMemoryFailureAndIsResetBeforeTheNextAttempt) {
         NativeProbe probe;
         const o::ScopedSwapchainNativeCalls calls(probe.calls());
@@ -377,6 +405,7 @@ namespace {
         EXPECT_TRUE(progress.native_started);
         EXPECT_EQ(retry.view().state(), vsl::SwapchainState::ACTIVE);
     }
+
     TEST_F(SwapchainArenaWindowIntegrationTest, PreparationCallbackCannotAcquireARetiredOrReplacedGeneration) {
         for (const bool replace : {false, true}) {
             vsl::Swapchain old(device, surface, {}, 64, 48);
@@ -407,6 +436,7 @@ namespace {
             EXPECT_NO_THROW(finished.destroy());
         }
     }
+
     TEST_F(SwapchainArenaWindowIntegrationTest, ReturningImageDoesNotPollEarlierImageUseBeforeTheReturnIsSubmitted) {
         vsl::Swapchain chain(device, surface, {}, 64, 48);
         auto earlier = make_manager().independent(1);
@@ -436,6 +466,7 @@ namespace {
         EXPECT_FALSE(phase);
         returning.wait_idle();
     }
+
     TEST_F(SwapchainArenaWindowIntegrationTest, CancelUsesTheAcquiredGenerationAndIndexAfterPublicFieldsChange) {
         auto original = std::make_optional<vsl::Swapchain>(device, surface, std::nullopt, 64, 48);
         const std::weak_ptr<vsl::impl::SwapchainImpl> owner = SwapchainAccess::Owned(*(original)).share();

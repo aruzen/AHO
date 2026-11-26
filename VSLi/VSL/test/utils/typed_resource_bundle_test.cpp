@@ -39,23 +39,28 @@ namespace {
     static_assert(Bundle::RETENTION == vsl::ResourceRetention::COMPLETION);
     static_assert(ArenaBundle::RETENTION == Bundle::RETENTION);
     static_assert(Bundle::DEPENDENCIES == vsl::lifetime::DependencyPolicy::FIXED);
+
     class TypedBundleVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     template<typename Storage_, vsl::ResourceRetention retention>
     struct BundleLifetimeCase {
         using Storage = Storage_;
         static constexpr auto RETENTION = retention;
     };
+
     using BundleLifetimeCases = ::testing::Types<
         BundleLifetimeCase<t::HeapStorage, vsl::ResourceRetention::COMPLETION>,
         BundleLifetimeCase<t::ArenaStorage<>, vsl::ResourceRetention::COMPLETION>,
         BundleLifetimeCase<t::HeapStorage, vsl::ResourceRetention::SUBMISSION>,
         BundleLifetimeCase<t::ArenaStorage<>, vsl::ResourceRetention::SUBMISSION>>;
+
     template<typename Case>
     class TypedBundleLifetimeVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     class CountingManager : public vsl::GraphicResourceManager {
     public:
         using vsl::GraphicResourceManager::GraphicResourceManager;
@@ -63,6 +68,7 @@ namespace {
         std::vector<std::weak_ptr<vsl::impl::GraphicResourceImpl>> records;
         std::tuple<std::vector<vsl::graphic_resource::Pool>, std::vector<vsl::graphic_resource::Resource>> allocate(std::vector<vsl::graphic_resource::BindingLayout> layouts) override;
     };
+
     t::ResourceAllocationSizes<Allocation> sizes();
     template<typename B>
     void initialize_shared(B& bundle);
@@ -79,11 +85,13 @@ namespace {
         }
         return result;
     }
+
     t::ResourceAllocationSizes<Allocation> sizes() {
         t::ResourceAllocationSizes<Allocation> result;
         result.set<2, 3>(4);
         return result;
     }
+
     template<typename B>
     void initialize_shared(B& bundle) {
         bundle.initialize_shared([](typename B::Shared& shared) {
@@ -93,6 +101,7 @@ namespace {
             shared.template buffer<5, 0, 1>().copy(std::span(&second, 1));
         });
     }
+
     void host_read_barrier(vsl::CommandManager manager, std::uint32_t slot) {
         const vsl::NativeRecordingContext recording(manager.get_buffer());
         if (recording.slot() != slot)
@@ -205,6 +214,7 @@ namespace {
         EXPECT_NE(sets[1], sets[2]);
         EXPECT_EQ(descriptors.allocations, 0u);
     }
+
     TEST_F(TypedBundleVulkanIntegrationTest, DeclaredEmptySetUsesAnArenaAndEmptySchemaUsesNone) {
         auto manager = make_manager().independent(3);
         CountingManager descriptors(device);
@@ -235,6 +245,7 @@ namespace {
         EXPECT_EQ(completion.status(), vsl::Completion::Status::CANCELLED);
         EXPECT_EQ(descriptors.allocations, 0u);
     }
+
     TEST_F(TypedBundleVulkanIntegrationTest, FrameSetAloneRetainsSharedLayoutsWithoutRetainingOtherFramesOrTheFacade) {
         auto manager = make_manager().independent(2);
         CountingManager descriptors(device);
@@ -268,6 +279,7 @@ namespace {
         EXPECT_TRUE(shared.expired());
         EXPECT_EQ(completion.status(), vsl::Completion::Status::CANCELLED);
     }
+
     TEST_F(TypedBundleVulkanIntegrationTest, SharedSetRejectsAReverseDependencyIntoItsFrameArena) {
         auto manager = make_manager();
         CountingManager descriptors(device);
@@ -307,6 +319,7 @@ namespace {
         EXPECT_TRUE(local_owner.expired());
         EXPECT_TRUE(shared_owner.expired());
     }
+
     TEST_F(TypedBundleVulkanIntegrationTest, FailedInitialArrayBindingUnwindsTheArenaAndExternalOwnersBeforeRetry) {
         using Layout = t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::COMPUTE>,
                                         t::StorageBinding<1, std::uint32_t, vsl::ShaderFlag::COMPUTE>,
@@ -680,6 +693,7 @@ namespace {
         EXPECT_TRUE(owner.expired());
         EXPECT_TRUE(shared.expired());
     }
+
     TYPED_TEST(TypedBundleLifetimeVulkanIntegrationTest, CancellationUsesTheSameRetentionContractForBothPlacements) {
         using B = t::TypedResourceBundle<Allocation, typename TypeParam::Storage, TypeParam::RETENTION>;
         auto manager = this->make_manager();
@@ -707,6 +721,7 @@ namespace {
         EXPECT_TRUE(owner.expired());
         EXPECT_TRUE(shared.expired());
     }
+
     TYPED_TEST(TypedBundleLifetimeVulkanIntegrationTest, SavedCommandRetainsResourcesAndCanBeRecordedAgain) {
         using B = t::TypedResourceBundle<Allocation, typename TypeParam::Storage, TypeParam::RETENTION>;
         auto manager = this->make_manager();
@@ -740,6 +755,7 @@ namespace {
         ASSERT_TRUE(next.completion().wait());
         EXPECT_TRUE(owner.expired());
     }
+
     TYPED_TEST(TypedBundleLifetimeVulkanIntegrationTest, FixedDependenciesRejectNewOwnersAndDynamicIsExplicit) {
         using B = t::TypedResourceBundle<Allocation, typename TypeParam::Storage, TypeParam::RETENTION>;
         using Dynamic = t::TypedResourceBundle<Allocation, typename TypeParam::Storage, TypeParam::RETENTION, vsl::lifetime::DependencyPolicy::DYNAMIC>;

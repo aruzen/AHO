@@ -10,20 +10,25 @@
 
 namespace recipe_contract {
     namespace t = vsl::typed;
+
     struct Vertex {
         float xy[2];
     };
+
     using Record = t::VertexRecord<Vertex, VSL_VERTEX_MEMBER(Vertex, xy)>;
     using Input = t::TypedVertexInput<Record::Binding<0>>;
     using Graphics = t::TypedGraphicsPipeline<Input>;
+
     struct ComposedStages {
         void injection(vsl::PipelineLayoutEditAccessor layout) const {
             vsl::pipeline_layout::ColorBlend{}.injection(layout);
             vsl::pipeline_layout::Rasterization{vsl::pipeline_layout::CullingMode::NONE}.injection(layout);
         }
     };
+
     void connect_recipe(vsl::LogicalDeviceAccessor device, vsl::RenderPassAccessor pass,
                         vsl::ShaderAccessor vertex, vsl::ShaderAccessor fragment, vsl::ShaderAccessor compute);
+
     void connect_recipe(vsl::LogicalDeviceAccessor device, vsl::RenderPassAccessor pass,
                         vsl::ShaderAccessor vertex, vsl::ShaderAccessor fragment, vsl::ShaderAccessor compute) {
         vsl::lifetime::PipelineRecipeDraft draft(device);
@@ -50,26 +55,31 @@ namespace recipe_contract {
 
 #if VSL_TYPED_CASE == 1
 void rejected(const vsl::PipelineLayoutAccessor& value);
+
 void rejected(const vsl::PipelineLayoutAccessor& value) {
     (void)value.recipe();
 }
 #elif VSL_TYPED_CASE == 2
 void rejected(const vsl::PipelineLayoutEditAccessor& value);
+
 void rejected(const vsl::PipelineLayoutEditAccessor& value) {
     (void)value.recipe();
 }
 #elif VSL_TYPED_CASE == 3
 void rejected(const vsl::FrozenPipelineLayout& value);
+
 void rejected(const vsl::FrozenPipelineLayout& value) {
     (void)value.recipe();
 }
 #elif VSL_TYPED_CASE == 4
 void rejected(const vsl::PipelineLayoutEditAccessor& value);
+
 void rejected(const vsl::PipelineLayoutEditAccessor& value) {
     (void)value.edit_recipe();
 }
 #elif VSL_TYPED_CASE == 5
 void rejected(const vsl::lifetime::PipelineRecipeSnapshot& value);
+
 void rejected(const vsl::lifetime::PipelineRecipeSnapshot& value) {
     (void)value.definition();
 }

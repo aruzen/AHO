@@ -7,11 +7,14 @@ namespace VSL_NAMESPACE::sync {
     namespace {
         struct ProofObservation {
             bool& observing;
+
             explicit ProofObservation(bool& observing) : observing(observing) { observing = true; }
             ~ProofObservation() { observing = false; }
         };
+
         void observe_fence_proof(FenceProof& proof, vk::Result result) noexcept;
         void observe_present_proof(PresentState& state, vk::Result result) noexcept;
+
         void observe_fence_proof(FenceProof& proof, vk::Result result) noexcept {
             if (proof.origin && proof.origin->lost)
                 result = vk::Result::eErrorDeviceLost;
@@ -29,6 +32,7 @@ namespace VSL_NAMESPACE::sync {
             } else if (result != vk::Result::eNotReady && result != vk::Result::eTimeout)
                 proof.status = FenceProofStatus::UNCERTAIN;
         }
+
         void observe_present_proof(PresentState& state, vk::Result result) noexcept {
             if (state.origin && state.origin->lost)
                 result = vk::Result::eErrorDeviceLost;
@@ -49,17 +53,21 @@ namespace VSL_NAMESPACE::sync {
             }
         }
     } // namespace
+
     bool fence_proof_terminal(const FenceProof& proof) noexcept {
         return proof.status == FenceProofStatus::COMPLETE || proof.status == FenceProofStatus::DEVICE_LOST || proof.status == FenceProofStatus::NOT_ACQUIRED;
     }
+
     void save_fence_observation(FenceProof& proof, vk::Result result) noexcept {
         if (proof.status == FenceProofStatus::PENDING || proof.status == FenceProofStatus::UNCERTAIN)
             observe_fence_proof(proof, result);
     }
+
     void save_present_observation(PresentState& state, vk::Result result) noexcept {
         if (state.status == PresentStatus::SUBMITTED || state.status == PresentStatus::UNCERTAIN)
             observe_present_proof(state, result);
     }
+
     bool poll_fence_proof(FenceProof& proof) noexcept {
         if (proof.observing)
             return proof.status == FenceProofStatus::COMPLETE;
@@ -70,6 +78,7 @@ namespace VSL_NAMESPACE::sync {
             observe_fence_proof(proof, operation::poll_fence(proof.device, proof.fence));
         return proof.status == FenceProofStatus::COMPLETE;
     }
+
     bool wait_fence_proof(FenceProof& proof, std::uint64_t timeout) noexcept {
         if (proof.status == FenceProofStatus::UNCERTAIN)
             return poll_fence_proof(proof);
@@ -82,6 +91,7 @@ namespace VSL_NAMESPACE::sync {
             observe_fence_proof(proof, operation::wait_fence(proof.device, proof.fence, timeout));
         return proof.status == FenceProofStatus::COMPLETE;
     }
+
     PresentEnqueue classify_present_result(vk::Result result) noexcept {
         if (result == static_cast<vk::Result>(VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT))
             return PresentEnqueue::ENQUEUED;
@@ -100,6 +110,7 @@ namespace VSL_NAMESPACE::sync {
                 return PresentEnqueue::UNKNOWN;
         }
     }
+
     PresentEnqueue commit_present(PresentState& state, vk::Result result) noexcept {
         state.result = result;
         const auto outcome = classify_present_result(result);
@@ -121,15 +132,18 @@ namespace VSL_NAMESPACE::sync {
         }
         return outcome;
     }
+
     bool present_terminal(const PresentState& state) noexcept {
         return state.status == PresentStatus::COMPLETE || state.status == PresentStatus::FAILED || state.status == PresentStatus::CANCELLED || state.status == PresentStatus::LEGACY_RELEASED;
     }
+
     void fail_present(PresentState& state, vk::Result result) noexcept {
         if (present_terminal(state))
             return;
         state.result = result;
         state.status = PresentStatus::FAILED;
     }
+
     bool poll_present(PresentState& state) noexcept {
         if (state.observing)
             return state.status == PresentStatus::COMPLETE;
@@ -146,6 +160,7 @@ namespace VSL_NAMESPACE::sync {
         }
         return state.status == PresentStatus::COMPLETE;
     }
+
     bool wait_present(PresentState& state, std::uint64_t timeout) noexcept {
         if (state.status == PresentStatus::UNCERTAIN)
             return poll_present(state); // enqueue不明のFenceは無限待機しない。

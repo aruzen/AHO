@@ -4,6 +4,7 @@
 
 namespace VSL_NAMESPACE::lifetime {
     struct SurfacePresentationDomain;
+
     // Domain内で住所が安定する。通常の記録は所有を探索せず解決済みWorkへ届く。
     struct CommandRecordingContext {
         impl::SubmissionWork* work = nullptr;
@@ -17,6 +18,7 @@ namespace VSL_NAMESPACE::lifetime {
         bool mutating = false;
         bool submitting = false;
     };
+
     struct CommandDomain {
         std::shared_ptr<impl::CommandBufferImpl> buffer;
         std::vector<std::shared_ptr<impl::SubmissionWork>> submissions;
@@ -31,6 +33,7 @@ namespace VSL_NAMESPACE::lifetime {
         ~CommandDomain();
         void wait_idle();
     };
+
     std::shared_ptr<impl::FenceImpl> acquire_fences(CommandDomain& domain, LogicalDeviceAccessor device);
 
     void reset_command_buffers(const CommandBuffer& buffer, std::optional<std::uint32_t> index);

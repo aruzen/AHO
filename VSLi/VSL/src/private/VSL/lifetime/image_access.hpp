@@ -9,6 +9,7 @@ namespace VSL_NAMESPACE::lifetime::detail {
         static OwnedRef<impl::ImageImpl> Owned(ImageAccessor&& image) { return std::move(image._owner); }
         static OwnedRef<impl::ImageImpl> Owned(const ImageAccessor&& image) { return image._owner; }
         static ImageAccessor FromOwned(OwnedRef<impl::ImageImpl> owner) { return ImageAccessor(std::move(owner)); }
+
         static ImageAccessor FromShared(std::shared_ptr<impl::ImageImpl> owner);
     };
 } // namespace VSL_NAMESPACE::lifetime::detail

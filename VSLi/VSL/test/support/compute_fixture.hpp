@@ -23,10 +23,12 @@ namespace vsl_test {
         void SetUp() override;
         std::array<std::uint32_t, COUNT> execute(std::uint32_t base, bool explicit_binding = false,
                                                  bool explicit_push = false);
+
         static void ExpectSequence(const std::array<std::uint32_t, COUNT>& actual, std::uint32_t base) {
             for (std::size_t i = 0; i < COUNT; ++i)
                 EXPECT_EQ(actual[i], base + i) << "index=" << i;
         }
+
         void TearDown() override;
     };
 

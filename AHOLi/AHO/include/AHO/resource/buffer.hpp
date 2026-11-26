@@ -85,7 +85,9 @@ namespace AHO_NAMESPACE::resource {
             explicit BufferMutation(std::shared_ptr<BufferState> state);
             BufferMutation(const BufferMutation&) = delete;
             BufferMutation& operator=(const BufferMutation&) = delete;
+
             ~BufferMutation() { finish(); }
+
             void finish() noexcept;
         };
 
@@ -112,12 +114,14 @@ namespace AHO_NAMESPACE::resource {
             return _storage;
         }
         const VSL_NAMESPACE::BufferView& storage() const&& = delete;
+
         std::size_t size() const { return _size; }
         VSL_NAMESPACE::LogicalDeviceAccessor device() const { return _device; }
         VSL_NAMESPACE::ResourceUse constraints() const { return _constraints; }
         VSL_NAMESPACE::ResourceUse resource_use() const { return storage().resource_use(_constraints); }
         VSL_NAMESPACE::ResourceRetention retention() const { return _retention; }
         bool host_readable() const { return _host_readable; }
+
         void read_into(std::span<std::byte> destination, std::size_t offset = 0) const;
     };
 
@@ -189,7 +193,9 @@ namespace AHO_NAMESPACE::resource {
             std::optional<Mapping> mapping;
 
             BufferResource(std::optional<Storage> storage, Customization customization);
+
             ~BufferResource() { node.retire(); }
+
             static std::shared_ptr<BufferResource> Make(std::optional<Storage> storage, Customization customization);
             static void Visit(const void* context, VSL_NAMESPACE::lifetime::DependencyNode::EdgeVisitor visitor, void* output);
         };

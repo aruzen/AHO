@@ -25,15 +25,18 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 VSL_NAMESPACE::CommandPool::CommandPool(VSL_NAMESPACE::LogicalDeviceAccessor device, CommandPoolCreateInfo info)
     : _data(lifetime::make_heap_command_pool(device, info)) {}
 
 VSL_NAMESPACE::CommandPoolIdentity VSL_NAMESPACE::CommandPool::identity() const {
     return lifetime::detail::IdentityAccess::From<CommandPoolIdentity>(_data.get());
 }
+
 VSL_NAMESPACE::CommandBufferIdentity VSL_NAMESPACE::CommandBuffer::identity() const {
     return lifetime::detail::IdentityAccess::From<CommandBufferIdentity>(_data.get());
 }
+
 VSL_NAMESPACE::CommandManagerIdentity VSL_NAMESPACE::CommandManager::identity() const {
     return lifetime::detail::IdentityAccess::From<CommandManagerIdentity>(_data.get());
 }
@@ -44,6 +47,7 @@ VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::CommandPool::get_device() co
         throw std::invalid_argument("Command pool is empty");
     return lifetime::device_from_child(_data);
 }
+
 VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::CommandPool::owner_ref() const {
     if (!_data || !_data.use_count() || !_data->owner_node || !_data->owner_node->matches(_data))
         throw std::invalid_argument("Command pool requires its canonical owner");
@@ -63,10 +67,12 @@ VSL_NAMESPACE::CommandBuffer& VSL_NAMESPACE::CommandBuffer::operator=(CommandBuf
     swap(other);
     return *this;
 }
+
 void VSL_NAMESPACE::CommandBuffer::swap(CommandBuffer& other) noexcept {
     _data.swap(other._data);
     _domain.swap(other._domain);
 }
+
 VSL_NAMESPACE::CommandPool VSL_NAMESPACE::CommandBuffer::get_pool() const {
     (void)owner_ref();
     if (!_data->owner_context || !_data->command_pool)
@@ -76,6 +82,7 @@ VSL_NAMESPACE::CommandPool VSL_NAMESPACE::CommandBuffer::get_pool() const {
         throw std::logic_error("Command ring pool owner has expired");
     return {CommandAccess::Pool(pool.share())};
 }
+
 VSL_NAMESPACE::lifetime::OwnerRef VSL_NAMESPACE::CommandBuffer::owner_ref() const {
     if (!_data || !_data.use_count() || !_data->owner_node || !_data->owner_node->matches(_data))
         throw std::invalid_argument("Command ring requires its canonical owner");
@@ -101,9 +108,11 @@ void VSL_NAMESPACE::CommandBuffer::next() {
 void VSL_NAMESPACE::CommandBuffer::reset() {
     lifetime::reset_command_buffers(*this, std::nullopt);
 }
+
 void VSL_NAMESPACE::CommandBuffer::require_recording() const {
     lifetime::require_recording(*this, completion());
 }
+
 void VSL_NAMESPACE::CommandBuffer::require_recording(const Completion& expected) const {
     if (!expected) {
         const auto* context = _data ? _data->recording_context : nullptr;
@@ -126,6 +135,7 @@ VSL_NAMESPACE::CommandManager& VSL_NAMESPACE::CommandManager::operator=(CommandM
     swap(other);
     return *this;
 }
+
 void VSL_NAMESPACE::CommandManager::swap(CommandManager& other) noexcept {
     _data.swap(other._data);
     _domain.swap(other._domain);
@@ -134,6 +144,7 @@ void VSL_NAMESPACE::CommandManager::swap(CommandManager& other) noexcept {
 VSL_NAMESPACE::CommandManager::CommandManager(VSL_NAMESPACE::LogicalDeviceAccessor device) {
     *this = FromBuffer(CommandBuffer(CommandPool(device)));
 }
+
 VSL_NAMESPACE::CommandManager VSL_NAMESPACE::CommandManager::FromBuffer(CommandBuffer buffer) {
     const auto domain = lifetime::CommandAccess::Owner(buffer);
     const auto pool = buffer.get_pool();
@@ -177,6 +188,7 @@ VSL_NAMESPACE::CommandBuffer VSL_NAMESPACE::CommandManager::make_exclusive_buffe
         throw std::length_error("Command buffer count exceeds uint32_t");
     return CommandBuffer(CommandPool{CommandAccess::Pool(_data->command_pool)}, static_cast<std::uint32_t>(size));
 }
+
 void VSL_NAMESPACE::CommandManager::wait_idle() {
     const auto domain = lifetime::CommandAccess::Owner(get_buffer());
     domain->wait_idle();
@@ -187,6 +199,7 @@ VSL_NAMESPACE::LogicalDeviceAccessor VSL_NAMESPACE::CommandManager::get_device()
         throw std::invalid_argument("Command manager is empty");
     return StartupAccess::FromShared(_data->device);
 }
+
 VSL_NAMESPACE::CommandManager VSL_NAMESPACE::CommandManager::independent(std::uint32_t count) const {
     if (!count)
         throw std::invalid_argument("Command buffer count must be positive");

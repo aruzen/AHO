@@ -18,9 +18,11 @@ namespace {
 
 namespace {
     namespace r = aho::resource;
+
     class ArenaBufferVulkanIntegrationTest : public vsl_test::VulkanIntegrationTest {
         bool validate_vulkan() const override { return true; }
     };
+
     TEST_F(ArenaBufferVulkanIntegrationTest, AliasesFollowTheNewGenerationWhileOldSnapshotsKeepTheirContents) {
         auto buffer = r::make_arena_buffer(device);
         EXPECT_EQ(buffer.capacity(), 0u);
@@ -57,16 +59,19 @@ namespace {
         EXPECT_EQ(alias.size(), 128u);
         EXPECT_EQ(alias.capacity(), 128u);
     }
+
     TEST_F(ArenaBufferVulkanIntegrationTest, GenerationReleaseCallbacksObserveTheCompleteCommitAndCanRead) {
         for (const auto operation : {0, 1, 2}) {
             struct Storage {
                 vsl::lifetime::BufferArena arena;
                 std::shared_ptr<std::function<void()>> released;
+
                 ~Storage() {
                     if (*released)
                         (*released)();
                 }
             };
+
             auto released = std::make_shared<std::function<void()>>();
             r::ArenaBuffer buffer(device, 4, [released](auto logical_device, size_t bytes) {
                 const vsl::BufferCreateInfo info{bytes, r::detail::STANDARD_BUFFER_USAGE};
@@ -102,6 +107,7 @@ namespace {
             *released = {};
         }
     }
+
     TEST_F(ArenaBufferVulkanIntegrationTest, FactoryReentryCannotReplaceOrResizeTheGenerationBeingPrepared) {
         std::function<void()> preparing;
         r::ArenaBuffer buffer(device, 4, [&](auto logical_device, size_t bytes) {
@@ -128,6 +134,7 @@ namespace {
         EXPECT_NO_THROW(buffer.resize(8));
         EXPECT_TRUE(buffer.binding().owner_ref().managed());
     }
+
     TEST_F(ArenaBufferVulkanIntegrationTest, CompletionCallbacksMayReleaseFacadesBindingsAndSnapshotsDuringObservation) {
         auto verify = [&]<typename Buffer>(Buffer value, int operation) {
             std::optional<Buffer> buffer(std::move(value));
@@ -175,6 +182,7 @@ namespace {
             verify(r::Buffer<r::BufferType::GPU_FRIENDLY>(device, 4), operation);
         }
     }
+
     TEST_F(ArenaBufferVulkanIntegrationTest, AllocationFailureAndInvalidFactoryLeaveTheOldGenerationUnchanged) {
         bool fail = false, undersized = false;
         r::ArenaBuffer buffer(device, 8, [&](auto logical_device, size_t bytes) {
@@ -203,6 +211,7 @@ namespace {
         buffer.reserve(64);
         EXPECT_EQ(buffer.capacity(), 64u);
     }
+
     TEST_F(ArenaBufferVulkanIntegrationTest, SavedUploadUsesTheCurrentGenerationAtInvokeAndReleasesItAfterCompletion) {
         auto manager = make_manager();
         std::weak_ptr<void> owner;
@@ -230,6 +239,7 @@ namespace {
         output.read_into(std::as_writable_bytes(std::span(result)));
         EXPECT_EQ(result, (std::array<std::uint32_t, 4>{2, 4, 6, 8}));
     }
+
     TEST_F(ArenaBufferVulkanIntegrationTest, CopyFailureDoesNotPublishTheCandidateGeneration) {
         auto manager = make_manager();
         auto pending = manager.start_phase<vsl::ComputePhase>();
@@ -257,6 +267,7 @@ namespace {
         pending.cancel();
         EXPECT_TRUE(candidate.expired());
     }
+
     TEST_F(ArenaBufferVulkanIntegrationTest, SnapshotDoesNotRetainFactoryConfigurationOrTheLatestGeneration) {
         std::weak_ptr<int> context;
         std::optional<r::BufferSnapshot> old;
@@ -278,6 +289,7 @@ namespace {
         EXPECT_NO_THROW(old->read_into(result));
         old.reset();
     }
+
     TEST_F(ArenaBufferVulkanIntegrationTest, ExplicitSnapshotImportKeepsItsFixedCapacityAndOldGeneration) {
         auto growing = r::make_arena_buffer(device, 4);
         const std::uint32_t initial = 7, changed = 23;
@@ -298,6 +310,7 @@ namespace {
         EXPECT_EQ(fixed.size(), 0u);
         EXPECT_EQ(growing.size(), 4u);
     }
+
     TEST_F(ArenaBufferVulkanIntegrationTest, SharedArenaSlotsKeepTheirCanonicalOwnerAndRetainItOnce) {
         const std::array<vsl::BufferCreateInfo, 2> infos{{{4, r::detail::STANDARD_BUFFER_USAGE}, {4, r::detail::STANDARD_BUFFER_USAGE}}};
         vsl::lifetime::BufferArena arena(device, infos);
@@ -329,11 +342,13 @@ namespace {
         EXPECT_FALSE(first.busy());
         EXPECT_FALSE(second.busy());
     }
+
     TEST_F(ArenaBufferVulkanIntegrationTest, ReturnedOwnerKeepsResourceDependenciesAfterTheFactoryIsReleased) {
         struct Storage {
             std::shared_ptr<int> dependency;
             vsl::lifetime::BufferArena arena;
         };
+
         std::weak_ptr<int> dependency;
         std::optional<r::BufferSnapshot> snapshot;
         {
@@ -352,6 +367,7 @@ namespace {
         snapshot.reset();
         EXPECT_TRUE(dependency.expired());
     }
+
     TEST_F(ArenaBufferVulkanIntegrationTest, FactoryCannotReuseTheCurrentImplOrDropRequiredUsage) {
         const vsl::BufferCreateInfo info{128, r::detail::STANDARD_BUFFER_USAGE};
         auto root = vsl::lifetime::BufferArena(device, std::span(&info, 1)).view(0);
@@ -367,6 +383,7 @@ namespace {
         EXPECT_THROW(buffer.reserve(64), std::invalid_argument);
         EXPECT_EQ(buffer.capacity(), 8u);
     }
+
     TEST_F(ArenaBufferVulkanIntegrationTest, SnapshotUsesTheOriginalPhysicalStateAndWritableStorage) {
         auto buffer = r::make_arena_buffer(device, 16);
         auto binding = buffer.binding();

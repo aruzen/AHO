@@ -10,12 +10,16 @@ namespace VSL_NAMESPACE::storage {
 
     public:
         constexpr explicit SwapchainLayout(size_t image_count, PresentFencePolicy policy = PresentFencePolicy::LEGACY);
+
         constexpr size_t images() const { return _count; }
         constexpr size_t bytes() const { return _bytes; }
         constexpr size_t alignment() const { return _alignment; }
         constexpr bool has_present_fences() const { return _present_fences; }
+
         constexpr size_t present_fence_offset() const;
+
         constexpr size_t finished_semaphore_offset() const { return _semaphores_begin; }
+
         constexpr size_t image_offset(size_t index) const;
         constexpr void require_region(size_t bytes, size_t alignment) const;
     };
@@ -47,16 +51,19 @@ namespace VSL_NAMESPACE::storage {
         if (!std::is_constant_evaluated())
             detail::require_resource_layout(std::integral_constant<std::uint64_t, RESOURCE_LAYOUT_ABI>{});
     }
+
     constexpr size_t SwapchainLayout::present_fence_offset() const {
         if (!_present_fences)
             throw std::logic_error("CPU layout has no present fences");
         return _fences_begin;
     }
+
     constexpr size_t SwapchainLayout::image_offset(size_t index) const {
         if (index >= _count)
             throw std::out_of_range("Swapchain image slot index");
         return _images_begin + index * _stride;
     }
+
     constexpr void SwapchainLayout::require_region(size_t bytes, size_t alignment) const {
         if (!std::is_constant_evaluated())
             detail::require_resource_layout(std::integral_constant<std::uint64_t, RESOURCE_LAYOUT_ABI>{});

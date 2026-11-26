@@ -10,6 +10,7 @@ namespace {
 
 namespace VSL_NAMESPACE::lifetime {
     static_assert(std::is_nothrow_default_constructible_v<impl::PipelineLayoutImpl>);
+
     namespace {
         struct HeapPipelineLayoutOwner {
             DependencyNode node;
@@ -19,16 +20,19 @@ namespace VSL_NAMESPACE::lifetime {
                                     std::span<const PushConstantRange> ranges);
             ~HeapPipelineLayoutOwner();
         };
+
         HeapPipelineLayoutOwner::HeapPipelineLayoutOwner(LogicalDeviceAccessor device, std::span<impl::ResourceBindingLayoutImpl* const> layouts,
                                                          std::span<const PushConstantRange> ranges) : device(device) {
             require_device_owner(device);
             construct_pipeline_layout(storage, *StartupAccess::Owned(device), layouts, ranges);
         }
+
         HeapPipelineLayoutOwner::~HeapPipelineLayoutOwner() {
             node.retire();
             destroy_pipeline_layout(storage);
         }
     } // namespace
+
     size_t retain_recipe_owner(std::vector<OwnerRef>& owners, OwnerRef owner) {
         detail::retain_owner(owners, owner);
         for (size_t i = 0; i < owners.size(); ++i)
@@ -36,11 +40,13 @@ namespace VSL_NAMESPACE::lifetime {
                 return i;
         throw std::logic_error("Recipe source owner was not retained");
     }
+
     void construct_pipeline_layout(void* storage, LogicalDeviceAccessor device,
                                    std::span<impl::ResourceBindingLayoutImpl* const> layouts, std::span<const PushConstantRange> ranges) {
         require_device_owner(device);
         construct_pipeline_layout(storage, *StartupAccess::Owned(device), layouts, ranges);
     }
+
     void construct_pipeline_layout(void* storage, impl::LogicalDeviceImpl& device,
                                    std::span<impl::ResourceBindingLayoutImpl* const> layouts, std::span<const PushConstantRange> ranges) {
         if (!device.device)
@@ -55,13 +61,16 @@ namespace VSL_NAMESPACE::lifetime {
             throw;
         }
     }
+
     impl::PipelineLayoutImpl& pipeline_layout_at(void* storage) {
         return *std::launder(reinterpret_cast<impl::PipelineLayoutImpl*>(static_cast<PipelineLayoutSlotStorage*>(storage)->value));
     }
+
     void destroy_pipeline_layout(void* storage) noexcept {
         std::destroy_at(&pipeline_layout_at(storage));
         std::destroy_at(static_cast<PipelineLayoutSlotStorage*>(storage));
     }
+
     std::shared_ptr<impl::PipelineLayoutImpl> make_heap_pipeline_layout(LogicalDeviceAccessor device,
                                                                         std::span<impl::ResourceBindingLayoutImpl* const> layouts, std::span<const PushConstantRange> ranges) {
         auto owner = std::make_shared<HeapPipelineLayoutOwner>(device, layouts, ranges);

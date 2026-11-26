@@ -29,7 +29,9 @@ namespace VSL_NAMESPACE {
         bool wait(std::uint64_t timeout_ns = UINT64_MAX) const;
         void retain(const std::shared_ptr<void>& resource) const;
         void retain(std::shared_ptr<void>&& resource) const;
+
         explicit operator bool() const { return bool(data_); }
+
         bool operator==(const Completion&) const = default;
     };
 

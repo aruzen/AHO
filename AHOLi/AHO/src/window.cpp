@@ -1,7 +1,9 @@
 #include "engine/engine_access.hpp"
+
 namespace {
     using AHO_NAMESPACE::engine::detail::EngineAccess;
 }
+
 #include <AHO/window.hpp>
 #include "window_impl.hpp"
 #include <VSL/lifetime/startup_arena.hpp>
@@ -48,6 +50,7 @@ AHO_NAMESPACE::d2::VectorI AHO_NAMESPACE::window::get_monitor_size() {
 
 namespace {
     thread_local std::vector<std::shared_ptr<AHO_NAMESPACE::window::WindowData>> RECREATING_WINDOWS;
+
     struct RetiredWindowResources {
         std::shared_ptr<VSL_NAMESPACE::Surface> surface;
         VSL_NAMESPACE::SwapchainAccessor swapchain;
@@ -59,6 +62,7 @@ namespace {
         std::optional<AHO_NAMESPACE::window::WindowGenerationCandidate> pending;
         explicit RetiredWindowResources(AHO_NAMESPACE::window::WindowData& data) noexcept;
     };
+
     struct GraphicsClose : VSL_NAMESPACE::PureWindow::Plugin, VSL_NAMESPACE::PureWindow::OnUpdate {
         VSL_NAMESPACE::WeakWindow native;
         std::weak_ptr<AHO_NAMESPACE::window::WindowData> drawing;
@@ -68,6 +72,7 @@ namespace {
                       VSL_NAMESPACE::LogicalDeviceAccessor device, VSL_NAMESPACE::Surface surface);
         bool on_update(VSL_NAMESPACE::PureWindow window) override;
     };
+
     thread_local const AHO_NAMESPACE::window::detail::FrameBufferQuery* ACTIVE_FRAME_QUERY = nullptr;
     constexpr std::array<VSL_NAMESPACE::typed::ResourceRequest, 3> WINDOW_SYNC_REQUESTS{{{{0}, VSL_NAMESPACE::storage::ResourceKind::SEMAPHORE},
                                                                                          {{1}, VSL_NAMESPACE::storage::ResourceKind::FENCE},
@@ -83,9 +88,11 @@ namespace {
         data.swapchain = {};
         data.deferred_usage.reset();
     }
+
     GraphicsClose::GraphicsClose(VSL_NAMESPACE::PureWindow* window, std::shared_ptr<AHO_NAMESPACE::window::WindowData> drawing,
                                  VSL_NAMESPACE::LogicalDeviceAccessor device, VSL_NAMESPACE::Surface surface)
         : native(window->weak()), drawing(drawing), device(device.weak()), surface(surface.weak()) {}
+
     bool GraphicsClose::on_update(VSL_NAMESPACE::PureWindow window) {
         const auto data = native.lock();
         const auto target = drawing.lock();
@@ -119,22 +126,27 @@ namespace {
             throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "A booted engine is required");
         return name;
     }
+
     bool matches_request(const VSL_NAMESPACE::SwapchainCreateInfo& a, const VSL_NAMESPACE::SwapchainCreateInfo& b) noexcept {
         return a.width == b.width && a.height == b.height && a.usage == b.usage && a.present_fences == b.present_fences;
     }
+
     bool replaceable(const VSL_NAMESPACE::SwapchainAccessor& chain) {
         return chain.state() == VSL_NAMESPACE::SwapchainState::ACTIVE || chain.state() == VSL_NAMESPACE::SwapchainState::RECOVERY_REQUIRED;
     }
+
     void replace_candidate(std::optional<AHO_NAMESPACE::window::WindowGenerationCandidate>& current,
                            AHO_NAMESPACE::window::WindowGenerationCandidate next) noexcept {
         auto replacement = std::make_optional(std::move(next));
         static_assert(std::is_nothrow_swappable_v<decltype(current)>);
         current.swap(replacement);
     }
+
     VSL_NAMESPACE::ImageType requested_usage(const AHO_NAMESPACE::window::WindowData& drawing, VSL_NAMESPACE::ImageType additional) {
         return (drawing.pending_generation ? drawing.pending_generation->request.usage : drawing.swapchain.image(0).get_usage()) |
                drawing.deferred_usage.value_or(VSL_NAMESPACE::ImageType::NONE) | additional;
     }
+
     VSL_NAMESPACE::ImageType validated_recreation_usage(const AHO_NAMESPACE::window::WindowData& drawing, VSL_NAMESPACE::ImageType additional) {
         const auto usage = requested_usage(drawing, additional);
         const auto chain = drawing.swapchain;
@@ -218,6 +230,7 @@ AHO_NAMESPACE::window::Window::Window(std::string name, int width, int height, A
         auto surface = detail::make_window_surface(native, engine_.instance());
         if (!call.active() || !native || native != *this)
             throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "Window changed during Surface creation");
+
         auto drawing = detail::make_window_data(engine_, std::move(surface), present_fences);
         if (!call.active() || !native || native != *this)
             throw VSL_NAMESPACE::exceptions::RuntimeException("Window", "Window closed during drawing resource creation");
@@ -239,6 +252,7 @@ AHO_NAMESPACE::window::Window::Window(engine::EngineAccessor engine, VSL_NAMESPA
 bool AHO_NAMESPACE::window::Window::resize(int width, int height) {
     if (width <= 0 || height <= 0)
         throw std::invalid_argument("Window size must be positive");
+
     Call call(*this);
     check_recreation_allowed();
     VSL_NAMESPACE::PureWindow native = *this;
@@ -279,9 +293,11 @@ bool AHO_NAMESPACE::window::Window::recreate_swapchain(VSL_NAMESPACE::ImageType 
         return false;
     // callbackがwindowを閉じても、共有状態を生存させて確実にガードを解除する。
     RECREATING_WINDOWS.push_back(drawing);
+
     struct RecreationGuard {
         ~RecreationGuard() { RECREATING_WINDOWS.pop_back(); }
     } guard;
+
     const auto before = detail::frame_buffer_size(os.native_handle());
     if (!current())
         return false;
@@ -291,6 +307,7 @@ bool AHO_NAMESPACE::window::Window::recreate_swapchain(VSL_NAMESPACE::ImageType 
             drawing->deferred_usage = usage;
         return false;
     }
+
     manager.wait_idle();
     if (!current())
         return false;
@@ -303,6 +320,7 @@ bool AHO_NAMESPACE::window::Window::recreate_swapchain(VSL_NAMESPACE::ImageType 
             drawing->deferred_usage = usage;
         return false;
     }
+
     const auto width = size.value.x.value, height = size.value.y.value;
     const auto usage = requested_usage(*drawing, additional_usage);
     const VSL_NAMESPACE::SwapchainCreateInfo info{.width = static_cast<std::uint32_t>(width), .height = static_cast<std::uint32_t>(height), .usage = usage, .present_fences = drawing->swapchain.present_fences()};
@@ -330,6 +348,7 @@ bool AHO_NAMESPACE::window::Window::recreate_swapchain(VSL_NAMESPACE::ImageType 
             throw;
         }
     }
+
     if (!current())
         return false;
     drawing->deferred_usage.reset();
@@ -346,6 +365,7 @@ bool AHO_NAMESPACE::window::Window::recreate_swapchain(VSL_NAMESPACE::ImageType 
     if (!current())
         return false;
     const auto hooks = native.plugin_snapshot();
+
     // 旧ownerは全fieldの交換が済んでから解放し、破棄時の再入でも混合世代を見せない。
     using std::swap;
     static_assert(std::is_nothrow_swappable_v<decltype(next)> && std::is_nothrow_swappable_v<decltype(pass)> &&
@@ -355,6 +375,7 @@ bool AHO_NAMESPACE::window::Window::recreate_swapchain(VSL_NAMESPACE::ImageType 
     swap(drawing->frame_buffer, frames);
     swap(drawing->render_finished, finished);
     pending.reset();
+
     for (const auto& [id, candidate] : hooks) {
         if (!current())
             break;

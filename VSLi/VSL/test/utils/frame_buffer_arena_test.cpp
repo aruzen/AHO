@@ -28,6 +28,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace {
     namespace t = vsl::typed;
     namespace l = vsl::lifetime;
@@ -36,6 +37,7 @@ namespace {
     constexpr std::array<t::ResourceRequest, 1> REQUESTS{{{{1}, s::ResourceKind::FRAME_BUFFER}}};
     constexpr t::ResourcePlan<1> PLAN(REQUESTS);
     using vsl_test::DeferredAction;
+
     struct NativeFailure {
         size_t fail_at = 0, calls = 0;
         std::vector<vk::Framebuffer> created, destroyed;
@@ -43,17 +45,21 @@ namespace {
         static vk::Framebuffer Create(void* context, vk::Device device, const vk::FramebufferCreateInfo& info);
         static void Destroy(void* context, vk::Device device, vk::Framebuffer framebuffer) noexcept;
     };
+
     class FrameBufferArenaVulkanIntegrationTest : public vsl_test::RenderVulkanIntegrationTest {
     protected:
         bool validate_vulkan() const override { return true; }
+
         l::FrameBufferInit input() const;
         void prime_callback(vsl::CommandManager& manager, const DeferredAction& action);
         void expect_clear(vsl::CommandManager manager, vsl::ImageAccessor image, std::array<std::uint8_t, 4> expected);
     };
+
     NativeFailure::NativeFailure(size_t fail_at) : fail_at(fail_at) {
         created.reserve(4);
         destroyed.reserve(4);
     }
+
     vk::Framebuffer NativeFailure::Create(void* context, vk::Device device, const vk::FramebufferCreateInfo& info) {
         auto& value = *static_cast<NativeFailure*>(context);
         if (++value.calls == value.fail_at)
@@ -62,14 +68,17 @@ namespace {
         value.created.push_back(framebuffer);
         return framebuffer;
     }
+
     void NativeFailure::Destroy(void* context, vk::Device device, vk::Framebuffer framebuffer) noexcept {
         auto& value = *static_cast<NativeFailure*>(context);
         value.destroyed.push_back(framebuffer);
         device.destroyFramebuffer(framebuffer);
     }
+
     l::FrameBufferInit FrameBufferArenaVulkanIntegrationTest::input() const {
         return {vsl::RenderPassAccessor{*pass}, WIDTH, HEIGHT, 1, {{vsl::ImageAccessor{*color}}}};
     }
+
     void FrameBufferArenaVulkanIntegrationTest::prime_callback(vsl::CommandManager& manager, const DeferredAction& action) {
         auto hook = action.owner();
         auto phase = manager.start_phase<vsl::ComputePhase>();
@@ -80,12 +89,14 @@ namespace {
         // 結果をpollせず、次のImage使用登録で完了callbackを実行させる。
         StartupAccess::Owned(device)->device.waitIdle();
     }
+
     void FrameBufferArenaVulkanIntegrationTest::expect_clear(vsl::CommandManager manager, vsl::ImageAccessor image, std::array<std::uint8_t, 4> expected) {
         const auto bytes = vsl_test::read_image(manager, image, vsl::ImageLayout::GENERAL);
         ASSERT_EQ(bytes.size(), WIDTH * HEIGHT * 4);
         for (size_t i = 0; i < bytes.size(); ++i)
             EXPECT_EQ(std::to_integer<std::uint8_t>(bytes[i]), expected[i % 4]);
     }
+
     TEST_F(FrameBufferArenaVulkanIntegrationTest, PassGetterPreservesTheCompositeOwnersDependencyNodeAndLifetime) {
         std::weak_ptr<void> weak_parent, weak_arena;
         vsl::RenderPassAccessor kept;
@@ -119,6 +130,7 @@ namespace {
         EXPECT_TRUE(weak_parent.expired());
         EXPECT_TRUE(weak_arena.expired());
     }
+
     TEST(FrameBufferPlacementTest, SlotIncludesLifetimeContextAndSatisfiesTheExactLayout) {
         static_assert(s::ResourceSlotLayout<vsl::impl::FrameBufferImpl>::USE_OFFSET == s::NO_SEPARATE_USE);
         static_assert(std::is_standard_layout_v<l::FrameBufferSlotStorage>);
@@ -131,6 +143,7 @@ namespace {
         EXPECT_THROW(PLAN.require_region(s::FRAME_BUFFER_IMPL_SIZE, PLAN.alignment()), std::invalid_argument);
         EXPECT_THROW(PLAN.require_region(PLAN.bytes(), PLAN.alignment() / 2), std::invalid_argument);
     }
+
     TEST(FrameBufferPlacementTest, EmptyFacadeHasNoFramesOrOwnerAndRejectsGetters) {
         const vsl::FrameBufferAccessor empty;
         EXPECT_EQ(empty.frame_count(), 0u);
@@ -138,10 +151,12 @@ namespace {
         EXPECT_THROW(empty.get_device(), std::invalid_argument);
         EXPECT_THROW(empty.get_render_pass(), std::invalid_argument);
     }
+
     TEST_F(FrameBufferArenaVulkanIntegrationTest, HeapGraphicsResourcesExposeTheirDirectDeviceEdge) {
         vsl_test::expect_fixed_parent(pipeline->owner_ref(), device.owner_ref());
         vsl_test::expect_fixed_parent(framebuffer->owner_ref(), device.owner_ref());
     }
+
     TEST_F(FrameBufferArenaVulkanIntegrationTest, MixedSlotsAndRowsShareOneOwnerAndUseTheDeclaredImages) {
         constexpr std::array<t::ResourceRequest, 5> requests{{{{1}, s::ResourceKind::FRAME_BUFFER}, {{2}, s::ResourceKind::FRAME_BUFFER}, {{3}, s::ResourceKind::RENDER_PASS}, {{4}, s::ResourceKind::IMAGE}, {{5}, s::ResourceKind::IMAGE}}};
         constexpr t::ResourcePlan<5> plan(requests);
@@ -180,6 +195,7 @@ namespace {
         expect_clear(manager, arena.image({4}), {255, 0, 0, 255});
         expect_clear(manager, arena.image({5}), {0, 255, 0, 255});
     }
+
     TEST_F(FrameBufferArenaVulkanIntegrationTest, ExternalGetterKeepsOnlyTheOriginalPassAndDeviceOwners) {
         std::weak_ptr<void> target_owner, image_owner, pass_owner;
         vsl::RenderPassAccessor kept;
@@ -209,6 +225,7 @@ namespace {
         EXPECT_TRUE(pass_owner.expired());
         EXPECT_EQ(StartupAccess::Owned(device_only), StartupAccess::Owned(device));
     }
+
     TEST_F(FrameBufferArenaVulkanIntegrationTest, DirectPassAndImageEdgesAndFramebufferImportsRejectReverseDependencies) {
         using Set = t::DescriptorSet<0, t::UniformBinding<0, std::uint32_t, vsl::ShaderFlag::FRAGMENT>>;
         using View = t::TypedResourceBufferView<std::uint32_t, vsl::graphic_resource::Type::UNIFORM_BUFFER>;
@@ -254,6 +271,7 @@ namespace {
             EXPECT_TRUE(b.expired());
         }
     }
+
     TEST_F(FrameBufferArenaVulkanIntegrationTest, LaterSlotFailureReleasesEarlierFramesAndAllowsTheSameRegionToBeReused) {
         constexpr std::array<t::ResourceRequest, 2> requests{{{{1}, s::ResourceKind::FRAME_BUFFER}, {{2}, s::ResourceKind::FRAME_BUFFER}}};
         constexpr t::ResourcePlan<2> plan(requests);
@@ -277,6 +295,7 @@ namespace {
         inputs[1] = valid;
         EXPECT_NO_THROW((l::ResourceArena(device, plan, inputs, memory)));
     }
+
     TEST_F(FrameBufferArenaVulkanIntegrationTest, NativeBatchFailureDestroysSuccessfulRowsInReverseAndCanBeRetried) {
         for (const size_t fail_at : {size_t(2), size_t(4)}) {
             NativeFailure failure(fail_at);
@@ -293,6 +312,7 @@ namespace {
             EXPECT_THROW(vsl::operation::initialize_frame_buffer(target, *StartupAccess::Owned(device), definition), std::logic_error);
         }
     }
+
     TEST_F(FrameBufferArenaVulkanIntegrationTest, DirectInputsAndImportsRejectNonowningAccessors) {
         auto invalid = input();
         invalid.pass = GraphicsAccess::FromShared(std::shared_ptr<vsl::impl::RenderPassImpl>(std::shared_ptr<void>{}, GraphicsAccess::Owned(*(pass)).get()));
@@ -309,6 +329,7 @@ namespace {
         EXPECT_THROW((l::ResourceArena(device, plan, imported)), std::invalid_argument);
         EXPECT_THROW((vsl::FrameBuffer(*pass, WIDTH, HEIGHT, {std::get<vsl::ImageAccessor>(invalid.attachments[0][0])})), std::invalid_argument);
     }
+
     TEST_F(FrameBufferArenaVulkanIntegrationTest, SavedBeginAndTypedDrawKeepTheArenaUntilCompletionAndSlotReplacement) {
         using Draw = t::TypedDraw<t::TypedVertexInput<>, t::ResourceSchema<>, t::PushSchema<>>;
         std::optional<vsl::command::RenderPassBegin> begin;
@@ -348,6 +369,7 @@ namespace {
         EXPECT_TRUE(owner.expired());
         EXPECT_EQ(completion.status(), vsl::Completion::Status::COMPLETE);
     }
+
     TEST_F(FrameBufferArenaVulkanIntegrationTest, PollCanDestroyTheBeginAndOriginalFacadeWithoutInvalidatingTheRecordedTarget) {
         auto previous = make_manager(), manager = make_manager();
         std::optional<vsl::command::RenderPassBegin> begin;
@@ -374,6 +396,7 @@ namespace {
         }
         expect_clear(manager, *color, {255, 0, 0, 255});
     }
+
     TEST_F(FrameBufferArenaVulkanIntegrationTest, PollCancellationRejectsNativeRecordingAndReleasesTheTargetAfterThePhase) {
         auto previous = make_manager(), manager = make_manager();
         std::weak_ptr<void> owner;
@@ -398,6 +421,7 @@ namespace {
         EXPECT_TRUE(owner.expired());
         EXPECT_EQ(completion.status(), vsl::Completion::Status::CANCELLED);
     }
+
     TEST_F(FrameBufferArenaVulkanIntegrationTest, PollRejectsAnotherBeginOnTheSameBufferAndTheGuardIsReleasedAfterward) {
         auto previous = make_manager(), manager = make_manager();
         vsl::command::RenderPassBegin begin(*framebuffer);
@@ -417,6 +441,7 @@ namespace {
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         ASSERT_TRUE(phase.completion().wait());
     }
+
     TEST_F(FrameBufferArenaVulkanIntegrationTest, MultipleRowsAndAttachmentsUseThePhysicalImageStateAndClearTypes) {
         ColorImage ids0(device, WIDTH, HEIGHT, vsl::data_format::UNSIGNED_INT);
         ColorImage ids1(device, WIDTH, HEIGHT, vsl::data_format::UNSIGNED_INT);
@@ -448,6 +473,7 @@ namespace {
             }
         }
     }
+
     TEST_F(FrameBufferArenaVulkanIntegrationTest, MutableLegacyFieldsAreRevalidatedBeforeNativeRecording) {
         auto manager = make_manager();
         auto phase = manager.start_phase<vsl::ComputePhase>();
@@ -466,6 +492,7 @@ namespace {
         ASSERT_EQ(phase.submit(), vsl::ComputePhase::SubmitResult::SUCCESS);
         ASSERT_TRUE(phase.completion().wait());
     }
+
     TEST_F(FrameBufferArenaVulkanIntegrationTest, ReplacementKeepsOldCommandsAndACompatibleTypedPipelineWithoutPinningOldAttachments) {
         constexpr std::array<t::ResourceRequest, 3> requests{{{{1}, s::ResourceKind::FRAME_BUFFER}, {{2}, s::ResourceKind::RENDER_PASS}, {{3}, s::ResourceKind::IMAGE}}};
         constexpr t::ResourcePlan<3> plan(requests);

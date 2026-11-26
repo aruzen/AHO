@@ -24,6 +24,7 @@ namespace {
         EXPECT_EQ(color.format(), vsl::data_format::SRGB8_RGBA);
         EXPECT_THROW((resource::Texture(device, 1, 1, vsl::data_format::FLOAT_RGBA)), std::invalid_argument);
     }
+
     TEST_F(ExperimentalTextureVulkanIntegrationTest, NativeImageUseBlocksAHOUpdatesAndBothEntrypointsSharePhysicalState) {
         aho::x::resource::Texture texture(device, 1, 1);
         aho::resource::Buffer<aho::resource::BufferType::GENERAL> pixels(4);
@@ -46,6 +47,7 @@ namespace {
         EXPECT_FALSE(image.use_state().busy());
         EXPECT_FALSE(use.constraint_state->busy());
     }
+
     TEST_F(ExperimentalTextureVulkanIntegrationTest, ManagedLogicalOwnerKeepsTheImageWithoutAnOwnershipCycle) {
         std::optional<aho::x::resource::Texture> texture(std::in_place, device, 1, 1);
         std::optional<vsl::ImageAccessor> image(texture->image());
@@ -67,6 +69,7 @@ namespace {
         image.reset();
         EXPECT_TRUE(physical.expired());
     }
+
     TEST_F(ExperimentalTextureVulkanIntegrationTest, UnknownUpdateRejectsCachedBindingsAfterIdleAndBeforeAnotherNativeSubmit) {
         aho::x::resource::Texture texture(device, 1, 1);
         aho::resource::Buffer<aho::resource::BufferType::GENERAL> pixels(4);

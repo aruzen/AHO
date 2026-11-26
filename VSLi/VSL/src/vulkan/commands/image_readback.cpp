@@ -15,6 +15,7 @@ namespace {
 namespace {
     using VSL_NAMESPACE::lifetime::CommandAccess;
 }
+
 namespace VSL_NAMESPACE::command {
     ImageReadback::ImageReadback(BufferAccessor* destination, ImageAccessor image, ImageLayout current_layout,
                                  ImageRegion region)

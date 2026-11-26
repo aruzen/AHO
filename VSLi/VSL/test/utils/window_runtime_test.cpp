@@ -1,7 +1,9 @@
 #include "../../src/private/VSL/lifetime/window_access.hpp"
+
 namespace {
     using VSL_NAMESPACE::lifetime::detail::WindowAccess;
 }
+
 #include "support/window_fixture.hpp"
 #include <VSL/lifetime/window_runtime.hpp>
 #include <VSL/window_plugin.hpp>
@@ -10,15 +12,20 @@ namespace {
 
 namespace {
     namespace l = vsl::lifetime;
+
     struct RetirementProbe : l::GLFWRetirement {
         std::vector<int>& events;
         int value;
         RetirementProbe* following = nullptr;
         std::thread::id disposed_on;
+
         RetirementProbe(std::vector<int>& events, int value) : events(events), value(value) { dispose = Dispose; }
+
         static void Dispose(l::GLFWRetirement* input) noexcept;
     };
+
     class WindowRuntimeVulkanIntegrationTest : public vsl_test::WindowIntegrationTest {};
+
     void RetirementProbe::Dispose(l::GLFWRetirement* input) noexcept {
         auto& probe = *static_cast<RetirementProbe*>(input);
         probe.disposed_on = std::this_thread::get_id();
@@ -26,6 +33,7 @@ namespace {
         if (probe.following)
             l::retire_glfw(*probe.following);
     }
+
     TEST(WindowRuntimeTest, CallbackExitDoesNotDrainWithoutAnOuterNativeBoundary) {
         l::GLFWLease::Drain();
         std::vector<int> events;
@@ -41,6 +49,7 @@ namespace {
         l::GLFWLease::Drain();
         EXPECT_EQ(events, std::vector<int>{1});
     }
+
     TEST(WindowRuntimeTest, OuterCallDrainsNestedAndNewlyRetiredObjectsInTheSameLoop) {
         l::GLFWLease::Drain();
         std::vector<int> events;
@@ -57,6 +66,7 @@ namespace {
         }
         EXPECT_EQ(events, (std::vector<int>{1, 2}));
     }
+
     TEST(WindowRuntimeTest, WorkerOnlyQueuesAndMainThreadPerformsDisposal) {
         l::GLFWLease::Drain();
         std::vector<int> events;
@@ -68,6 +78,7 @@ namespace {
         EXPECT_EQ(events, std::vector<int>{1});
         EXPECT_EQ(retired.disposed_on, std::this_thread::get_id());
     }
+
     TEST(WindowRuntimeTest, NoThrowNativeUnregistrationDefersDisposalToAnExplicitBoundary) {
         static_assert(std::is_nothrow_constructible_v<l::GLFWCallScope, std::nothrow_t>);
         l::GLFWLease::Drain();
@@ -81,6 +92,7 @@ namespace {
         l::GLFWLease::Drain();
         EXPECT_EQ(events, std::vector<int>{1});
     }
+
     TEST_F(WindowRuntimeVulkanIntegrationTest, LiveLeasesShareOneRuntimeAndDrainNeverForcesTheirRelease) {
         const auto a = l::GLFWLease::Acquire(), b = l::GLFWLease::Acquire();
         const auto first = a.owner_ref(), second = b.owner_ref();
@@ -91,6 +103,7 @@ namespace {
         EXPECT_NO_THROW(l::GLFWLease::Drain());
         EXPECT_TRUE(l::glfw_runtime_active());
     }
+
     TEST_F(WindowRuntimeVulkanIntegrationTest, RetiringRuntimeCannotBeReinitializedBeforeTheOuterScopeDrains) {
         ASSERT_TRUE(window->close());
         const auto previous = glfw_lease.owner_ref().weak();
@@ -111,6 +124,7 @@ namespace {
         glfw_lease = l::GLFWLease::Acquire();
         EXPECT_TRUE(l::glfw_runtime_active());
     }
+
     TEST_F(WindowRuntimeVulkanIntegrationTest, UnregisteredRetirementCannotEraseTheCurrentRuntime) {
         ASSERT_TRUE(window->close());
         glfw_lease = {};
@@ -130,6 +144,7 @@ namespace {
         EXPECT_FALSE(owner.owner_before(next));
         EXPECT_FALSE(next.owner_before(owner));
     }
+
     TEST_F(WindowRuntimeVulkanIntegrationTest, NativeCallbackCloseQueuesTheWindowUntilTheCallerReturns) {
         const auto os = window->window_owner().owner_ref().weak();
         auto hook = window->add_plugin<vsl::window_plugin::HookResize>([os](vsl::PureWindow current, int, int) {

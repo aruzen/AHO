@@ -6,6 +6,7 @@
 
 namespace {
     namespace l = vsl::lifetime;
+
     struct OwnerRoot {
         l::DependencyNode node;
         std::vector<l::OwnerRef> dependencies;
@@ -15,22 +16,27 @@ namespace {
         ~OwnerRoot();
         static void Visit(const void* input, l::DependencyNode::EdgeVisitor visitor, void* context);
     };
+
     std::shared_ptr<OwnerRoot> make_root();
     void connect(const std::shared_ptr<OwnerRoot>& root, std::vector<l::OwnerRef> owners);
+
     OwnerRoot::~OwnerRoot() {
         node.retire();
         if (released)
             released();
     }
+
     void OwnerRoot::Visit(const void* input, l::DependencyNode::EdgeVisitor visitor, void* context) {
         for (const auto& owner : static_cast<const OwnerRoot*>(input)->dependencies)
             visitor(context, owner);
     }
+
     std::shared_ptr<OwnerRoot> make_root() {
         auto root = std::make_shared<OwnerRoot>();
         root->node.publish(root, root.get(), OwnerRoot::Visit);
         return root;
     }
+
     void connect(const std::shared_ptr<OwnerRoot>& root, std::vector<l::OwnerRef> owners) {
         root->node.begin_update();
         try {
@@ -42,6 +48,7 @@ namespace {
         }
         root->node.end_update();
     }
+
     TEST(OwnerDependencyTest, AliasesMovesAndExplicitLegacyEscapePreserveTheOwnerContract) {
         auto root = make_root();
         auto value = root->node.ref(root).alias(&root->value);
@@ -62,6 +69,7 @@ namespace {
         EXPECT_FALSE(moved.owner_before(opaque));
         EXPECT_FALSE(opaque.owner_before(moved));
     }
+
     TEST(OwnerDependencyTest, AssignmentAndResetPublishBothPartsBeforeTheOldOwnerCallback) {
         auto old = make_root(), next = make_root();
         auto value = old->node.ref(old).alias(&old->value);
@@ -85,6 +93,7 @@ namespace {
         value.reset();
         EXPECT_EQ(calls, 2u);
     }
+
     TEST(OwnerDependencyTest, CanonicalControlIdentityRejectsAnotherRootAndDuplicateKnownNodes) {
         auto first = make_root(), second = make_root();
         EXPECT_THROW(first->node.ref(second), std::invalid_argument);
@@ -96,6 +105,7 @@ namespace {
         EXPECT_EQ(owners.size(), 1u);
         EXPECT_EQ(l::detail::OwnerAccess::Node(owners.front()), &first->node);
     }
+
     TEST(OwnerDependencyTest, WeakAliasesKeepProvenanceWithoutExtendingTheRootLifetime) {
         l::WeakOwnedRef<const int> weak;
         l::WeakOwnerRef null_weak;
@@ -117,6 +127,7 @@ namespace {
         EXPECT_EQ(weak.lock().use_count(), 0);
         EXPECT_FALSE(null_weak.lock().managed());
     }
+
     TEST(OwnerDependencyTest, WeakMovesSwapsResetAndOpaqueInputsKeepPointerAndNodeTogether) {
         static_assert(!std::is_convertible_v<std::weak_ptr<int>, l::WeakOwnedRef<int>>);
         auto first = make_root(), second = make_root();
@@ -135,6 +146,7 @@ namespace {
         EXPECT_TRUE(next.expired());
         EXPECT_EQ(l::detail::OwnerAccess::Node(next.lock()), nullptr);
     }
+
     TEST(OwnerDependencyTest, DedupUpgradesOpaqueAliasesWithoutLosingKnownEdgesOrNullOwners) {
         auto source = make_root(), target = make_root();
         connect(target, {source->node.owner_ref()});
@@ -148,6 +160,7 @@ namespace {
         EXPECT_TRUE(source->dependencies.empty());
         EXPECT_EQ(target->dependencies.size(), 1u);
     }
+
     TEST(OwnerDependencyTest, CyclesInBothDirectionsAreRejectedAndRemovingAnEdgeAllowsTheUpdate) {
         auto first = make_root(), second = make_root(), third = make_root();
         connect(first, {second->node.owner_ref()});
@@ -166,6 +179,7 @@ namespace {
         EXPECT_TRUE(b.expired());
         EXPECT_TRUE(c.expired());
     }
+
     TEST(OwnerDependencyTest, PendingMutationAndRetirementRejectReentrantIncomingEdges) {
         auto first = make_root(), second = make_root();
         first->node.begin_update();
@@ -180,6 +194,7 @@ namespace {
         second->node.visit_edges([](void* value, const l::OwnerRef&) { ++*static_cast<size_t*>(value); }, &count);
         EXPECT_EQ(count, 0u);
     }
+
     TEST(OwnerDependencyTest, SameStateIdentityKeepsADifferentOwnerWhileFlatteningMatchingPhysicalUses) {
         auto a = make_root(), b = make_root();
         const vsl::ResourceUse physical{a->node.ref(a).alias(&a->state), a->node.owner_ref()};

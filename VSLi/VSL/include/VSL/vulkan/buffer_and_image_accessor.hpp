@@ -2,6 +2,7 @@
 #define AHO_ALL_BUFFER_AND_IMAGE_ACCESSOR_H
 
 #include "../define.hpp"
+#include "../arena.hpp"
 #include "pv.hpp"
 
 #include "../format.hpp"
@@ -277,6 +278,10 @@ namespace VSL_NAMESPACE {
         static std::shared_ptr<impl::BufferImpl>
         MakeBuffer(VSL_NAMESPACE::LogicalDeviceAccessor device, size_t size, MemoryType mem_type,
                    MemoryProperty mem_property, SharingMode sharing_mode);
+        // arenaがnullptrならheapへ配置する。
+        static std::shared_ptr<impl::BufferImpl>
+        MakeBuffer(Arena* arena, VSL_NAMESPACE::LogicalDeviceAccessor device, size_t size, MemoryType mem_type,
+                   MemoryProperty mem_property, SharingMode sharing_mode);
 
         static void
         FlushBuffer(LocalBufferHolder& holder, MemoryType mem_type, MemoryProperty mem_property, SharingMode sharing_mode);
@@ -307,6 +312,10 @@ namespace VSL_NAMESPACE {
                                                           std::uint32_t height,
                                                           data_format::Format format,
                                                           std::uint32_t count, SampleCount samples = SampleCount::ONE);
+        // arenaがnullptrならheapへ配置する。
+        static std::shared_ptr<impl::ImageImpl> MakeImage(Arena* arena, ImageType type, MemoryProperty prop, ImageLayout layout,
+                                                          LogicalDeviceAccessor device, std::uint32_t width, std::uint32_t height,
+                                                          data_format::Format format, std::uint32_t count, SampleCount samples = SampleCount::ONE);
 
         static void TransformLayout(CommandManager manager,
                                     std::shared_ptr<impl::ImageImpl> data,

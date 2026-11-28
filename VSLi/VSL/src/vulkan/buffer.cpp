@@ -163,46 +163,52 @@ void VSL_NAMESPACE::BufferAccessor::LocalBufferHolder::write(std::span<const std
 std::shared_ptr<VSL_NAMESPACE::impl::BufferImpl>
 VSL_NAMESPACE::BufferAccessor::MakeBuffer(LogicalDeviceAccessor device, size_t size, MemoryType mem_type,
                                           MemoryProperty mem_property, SharingMode sharing_mode) {
+    return MakeBuffer(nullptr, device, size, mem_type, mem_property, sharing_mode);
+}
+
+std::shared_ptr<VSL_NAMESPACE::impl::BufferImpl>
+VSL_NAMESPACE::BufferAccessor::MakeBuffer(Arena* arena, LogicalDeviceAccessor device, size_t size, MemoryType mem_type,
+                                          MemoryProperty mem_property, SharingMode sharing_mode) {
     if (!device.data_ || !device.data_->device || !size || mem_type == MemoryType::NONE)
         throw std::invalid_argument("Buffer requires a device, positive size and usage");
-    auto data = std::make_shared<impl::BufferImpl>();
-    data->device = device.data_;
-    data->usage = mem_type;
-    data->requirement_size = size;
-    vk::BufferCreateInfo info{.size = size, .usage = vk::BufferUsageFlags{static_cast<unsigned int>(mem_type)}, .sharingMode = static_cast<vk::SharingMode>(sharing_mode)};
-    const std::uint32_t families[] = {device.data_->graphics_family, device.data_->present_family};
-    if (sharing_mode == SharingMode::CONCURRENT) {
-        if (families[0] == families[1])
-            info.sharingMode = vk::SharingMode::eExclusive;
-        else {
-            info.queueFamilyIndexCount = 2;
-            info.pQueueFamilyIndices = families;
+    return place<impl::BufferImpl>(arena, [&](impl::BufferImpl& data) {
+        data.device = device.data_;
+        data.usage = mem_type;
+        data.requirement_size = size;
+        vk::BufferCreateInfo info{.size = size, .usage = vk::BufferUsageFlags{static_cast<unsigned int>(mem_type)}, .sharingMode = static_cast<vk::SharingMode>(sharing_mode)};
+        const std::uint32_t families[] = {device.data_->graphics_family, device.data_->present_family};
+        if (sharing_mode == SharingMode::CONCURRENT) {
+            if (families[0] == families[1])
+                info.sharingMode = vk::SharingMode::eExclusive;
+            else {
+                info.queueFamilyIndexCount = 2;
+                info.pQueueFamilyIndices = families;
+            }
         }
-    }
-    data->buffer = data->device->device.createBuffer(info);
-    const auto requirements = data->device->device.getBufferMemoryRequirements(data->buffer);
-    const auto properties = device.data_->parent_device->device.getMemoryProperties();
-    const auto required = vk::MemoryPropertyFlags{static_cast<unsigned int>(mem_property)};
-    std::optional<std::uint32_t> selected;
-    for (std::uint32_t i = 0; i < properties.memoryTypeCount; ++i) {
-        const auto flags = properties.memoryTypes[i].propertyFlags;
-        if (!(requirements.memoryTypeBits & (1u << i)) || (flags & required) != required)
-            continue;
+        data.buffer = data.device->device.createBuffer(info);
+        const auto requirements = data.device->device.getBufferMemoryRequirements(data.buffer);
+        const auto properties = device.data_->parent_device->device.getMemoryProperties();
+        const auto required = vk::MemoryPropertyFlags{static_cast<unsigned int>(mem_property)};
+        std::optional<std::uint32_t> selected;
+        for (std::uint32_t i = 0; i < properties.memoryTypeCount; ++i) {
+            const auto flags = properties.memoryTypes[i].propertyFlags;
+            if (!(requirements.memoryTypeBits & (1u << i)) || (flags & required) != required)
+                continue;
+            if (!selected)
+                selected = i;
+            if (contain(mem_property, MemoryProperty::HOST_VISIBLE) && (flags & vk::MemoryPropertyFlagBits::eHostCoherent)) {
+                selected = i;
+                break;
+            }
+        }
         if (!selected)
-            selected = i;
-        if (contain(mem_property, MemoryProperty::HOST_VISIBLE) && (flags & vk::MemoryPropertyFlagBits::eHostCoherent)) {
-            selected = i;
-            break;
-        }
-    }
-    if (!selected)
-        throw exceptions::RuntimeException("MemoryTypeNotFound", "No memory type satisfies the buffer requirements");
-    data->properties = static_cast<MemoryProperty>(static_cast<unsigned int>(properties.memoryTypes[*selected].propertyFlags));
-    data->allocated_size = requirements.size;
-    data->atom_size = device.data_->parent_device->device.getProperties().limits.nonCoherentAtomSize;
-    data->device_mem = data->device->device.allocateMemory({.allocationSize = requirements.size, .memoryTypeIndex = *selected});
-    data->device->device.bindBufferMemory(data->buffer, data->device_mem, 0);
-    return data;
+            throw exceptions::RuntimeException("MemoryTypeNotFound", "No memory type satisfies the buffer requirements");
+        data.properties = static_cast<MemoryProperty>(static_cast<unsigned int>(properties.memoryTypes[*selected].propertyFlags));
+        data.allocated_size = requirements.size;
+        data.atom_size = device.data_->parent_device->device.getProperties().limits.nonCoherentAtomSize;
+        data.device_mem = data.device->device.allocateMemory({.allocationSize = requirements.size, .memoryTypeIndex = *selected});
+        data.device->device.bindBufferMemory(data.buffer, data.device_mem, 0);
+    });
 }
 
 void VSL_NAMESPACE::BufferAccessor::FlushBuffer(LocalBufferHolder& holder, MemoryType, MemoryProperty mem_property, SharingMode) {

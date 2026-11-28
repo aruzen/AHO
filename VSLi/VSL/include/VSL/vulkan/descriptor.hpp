@@ -13,6 +13,7 @@
 #include "buffer.hpp"
 #include "image.hpp"
 #include "sampler.hpp"
+#include "../arena.hpp"
 
 namespace VSL_NAMESPACE::graphic_resource {
     constexpr size_t MAX_POOL_SIZE = 200;
@@ -74,6 +75,9 @@ namespace VSL_NAMESPACE::graphic_resource {
 
         BindingLayout(LogicalDeviceAccessor device, const std::vector<BindingPoint>& points);
 
+        // Implをarenaへ配置する。寿命はarena全体と共有する。
+        BindingLayout(Arena& arena, LogicalDeviceAccessor device, const std::vector<BindingPoint>& points);
+
         [[nodiscard]] std::vector<BindingPoint> get_binding_points() const;
 
         std::shared_ptr<impl::ResourceBindingLayoutImpl> data_;
@@ -85,6 +89,9 @@ namespace VSL_NAMESPACE::graphic_resource {
         std::shared_ptr<impl::GraphicResourcePoolImpl> data_;
 
         std::tuple<bool, Resource> bind(BindingLayout layout);
+
+        // descriptor setのImplをarenaへ配置する。poolの容量不足ではfalseを返し、arenaを消費しない。
+        std::tuple<bool, Resource> bind(Arena& arena, BindingLayout layout);
 
         std::tuple<bool, std::vector<Resource>> bind(size_t n, BindingLayout layout);
 

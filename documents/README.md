@@ -12,3 +12,4 @@
 - [Typedの読み方](typed-readability.md)・[資源割当](typed-resource-allocation.md)・[フレーム資源](typed-frame-resources.md)・[使用例](typed-example.md)
 - [TypedとAHOのBuffer連携](typed-buffer-interop.md)・[master統合](typed-master-integration.md)
 - [RenderPassの構成](VSL/render-pass-composition.md)・[commandの資源寿命](VSL/command-resource-lifetime.md)・[画像同期](VSL/image-shader-visibility.md)
+- [Arena配置の試験導入](VSL/arena-pilot.md)

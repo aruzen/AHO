@@ -21,6 +21,9 @@ namespace VSL_NAMESPACE {
     struct Image : public ImageAccessor {
         Image(LogicalDeviceAccessor device, std::uint32_t width, std::uint32_t height,
               data_format::Format format = data_format::SRGB8_RGBA, std::uint32_t count = 1, SampleCount samples = SampleCount::ONE);
+        // Implをarenaへ配置する。寿命はarena全体と共有する。
+        Image(Arena& arena, LogicalDeviceAccessor device, std::uint32_t width, std::uint32_t height,
+              data_format::Format format = data_format::SRGB8_RGBA, std::uint32_t count = 1, SampleCount samples = SampleCount::ONE);
 
         template<MemoryType mem_type, MemoryProperty mem_property, SharingMode share_mode>
         bool copy_by_buffer(CommandManager manager, Buffer<mem_type, mem_property, share_mode>& buffer);
@@ -31,6 +34,12 @@ template<VSL_NAMESPACE::ImageType usage, VSL_NAMESPACE::MemoryProperty mem_prop,
 VSL_NAMESPACE::Image<usage, mem_prop, layout>::Image(VSL_NAMESPACE::LogicalDeviceAccessor device, std::uint32_t width, std::uint32_t height,
                                                      data_format::Format format, std::uint32_t count, SampleCount samples) {
     data_ = MakeImage(usage, mem_prop, layout, device, width, height, format, count, samples);
+}
+
+template<VSL_NAMESPACE::ImageType usage, VSL_NAMESPACE::MemoryProperty mem_prop, VSL_NAMESPACE::ImageLayout layout>
+VSL_NAMESPACE::Image<usage, mem_prop, layout>::Image(Arena& arena, VSL_NAMESPACE::LogicalDeviceAccessor device, std::uint32_t width, std::uint32_t height,
+                                                     data_format::Format format, std::uint32_t count, SampleCount samples) {
+    data_ = MakeImage(&arena, usage, mem_prop, layout, device, width, height, format, count, samples);
 }
 
 #endif

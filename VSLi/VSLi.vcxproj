@@ -143,6 +143,7 @@
     <ClInclude Include="VSL\include\VSL\concepts.hpp" />
     <ClInclude Include="VSL\include\VSL\consteval_string.hpp" />
     <ClInclude Include="VSL\include\VSL\define.hpp" />
+    <ClInclude Include="VSL\include\VSL\arena.hpp" />
     <ClInclude Include="VSL\include\VSL\dimension.hpp" />
     <ClInclude Include="VSL\include\VSL\exceptions.hpp" />
     <ClInclude Include="VSL\include\VSL\format.hpp" />

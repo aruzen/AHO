@@ -1,5 +1,6 @@
 #pragma once
 #include "../define.hpp"
+#include "../arena.hpp"
 
 #include "buffer_and_image_accessor.hpp"
 
@@ -26,6 +27,9 @@ namespace VSL_NAMESPACE {
         constexpr static SharingMode MODE = share_mode;
 
         Buffer(LogicalDeviceAccessor device, size_t size, std::optional<CommandManager> manager = std::nullopt);
+
+        // Implをarenaへ配置する。寿命はarena全体と共有する。
+        Buffer(Arena& arena, LogicalDeviceAccessor device, size_t size);
 
         template<typename T>
         requires(!std::is_integral_v<T>) && (VSL_NAMESPACE::contain<mem_property, MemoryProperty::HOST_VISIBLE>())
@@ -278,6 +282,11 @@ namespace VSL_NAMESPACE {
     template<VSL_NAMESPACE::MemoryType mem_type, VSL_NAMESPACE::MemoryProperty mem_property, VSL_NAMESPACE::SharingMode sharing_mode>
     VSL_NAMESPACE::Buffer<mem_type, mem_property, sharing_mode>::Buffer(LogicalDeviceAccessor device, size_t size, std::optional<CommandManager> manager) {
         data_ = this->MakeBuffer(device, size, mem_type, mem_property, sharing_mode);
+    }
+
+    template<VSL_NAMESPACE::MemoryType mem_type, VSL_NAMESPACE::MemoryProperty mem_property, VSL_NAMESPACE::SharingMode sharing_mode>
+    VSL_NAMESPACE::Buffer<mem_type, mem_property, sharing_mode>::Buffer(Arena& arena, LogicalDeviceAccessor device, size_t size) {
+        data_ = this->MakeBuffer(&arena, device, size, mem_type, mem_property, sharing_mode);
     }
 
     template<MemoryType mem_type, MemoryProperty mem_property, SharingMode sharing_mode>

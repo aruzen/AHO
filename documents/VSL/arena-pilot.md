@@ -66,7 +66,7 @@ masterには既に次の仕組みがあった。
 ## 使用例
 
 ```cpp
-vsl::Arena frame(4096);  // または Arena::bytes_for<Impl>(n) で見積もる
+vsl::Arena frame(4096);  // または Arena::BytesFor<Impl>(n) で見積もる
 vsl::graphic_resource::BindingLayout layout(frame, device, {{0, Type::UNIFORM_BUFFER, ShaderFlag::COMPUTE}});
 auto [ok, set] = pool.bind(frame, layout);
 vsl::Buffer<MemoryType::UNIFORM_BUFFER, MemoryProperty::HOST_VISIBLE> uniform(frame, device, 256);
@@ -90,10 +90,10 @@ set.update(&uniform);     // 同じArena内なので非所有で結ばれる
 
 1. この形で読めるか。語彙は`Arena`・`place`・`link`・`expose`の4つ。
 2. 残りの資源(Shader、Pipeline、FrameBuffer、Command、同期、起動資源)へ同じ形で広げたいか。
-3. 測定の結果を踏まえ、arenaを続ける価値があるか。続けるなら、Typedのschemaから`bytes_for`を計算し、フレームごとのArenaを作る段階へ進む。
+3. 測定の結果を踏まえ、arenaを続ける価値があるか。続けるなら、Typedのschemaから`BytesFor`を計算し、フレームごとのArenaを作る段階へ進む。
 
 ## 既知の制限
 
 - Arena単位でしか解放できない。資源を個別に作り直す用途(resizeで作り直すFrameBufferなど)は、heapか別のArenaに置く。
-- 容量はバイト数で指定する。`Arena::bytes_for<Impl>(n)`で見積もれるが、Impl型を名前で指定する必要がある。
+- 容量はバイト数で指定する。`Arena::BytesFor<Impl>(n)`で見積もれるが、Impl型を名前で指定する必要がある。
 - `Pool::bind`の複数版(`bind(n, layout)`、`bind(layouts)`)と、DescriptorPool自体の配置は未対応。

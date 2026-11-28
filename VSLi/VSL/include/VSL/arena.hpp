@@ -44,7 +44,7 @@ namespace VSL_NAMESPACE {
             }
         };
 
-        static constexpr std::size_t align_up(std::size_t value, std::size_t alignment) {
+        static constexpr std::size_t AlignUp(std::size_t value, std::size_t alignment) {
             return (value + alignment - 1) / alignment * alignment;
         }
 
@@ -61,39 +61,11 @@ namespace VSL_NAMESPACE {
         // Tを既定構築し、init(T&)で初期化する。initが例外を送出した場合は
         // Tを破棄して領域を巻き戻し、例外をそのまま伝える。
         template<typename T, typename Init>
-        std::shared_ptr<T> emplace(Init&& init) {
-            static_assert(alignof(T) <= BASE_ALIGNMENT, "Arena cannot satisfy this alignment");
-            static_assert(std::is_nothrow_destructible_v<T>);
-            auto& block = *_block;
-            if (block.constructing)
-                throw std::logic_error("Arena::emplace cannot be nested inside init");
-            const auto header_offset = align_up(block.used, alignof(Header));
-            const auto object_offset = align_up(header_offset + sizeof(Header), alignof(T));
-            const auto end = object_offset + sizeof(T);
-            if (end > block.capacity)
-                throw std::length_error("Arena capacity exceeded");
-
-            auto* object = std::construct_at(reinterpret_cast<T*>(block.storage + object_offset));
-            block.constructing = true;
-            try {
-                std::forward<Init>(init)(*object);
-            } catch (...) {
-                block.constructing = false;
-                std::destroy_at(object);
-                throw;
-            }
-            block.constructing = false;
-            auto* header = std::construct_at(reinterpret_cast<Header*>(block.storage + header_offset),
-                                             Header{[](void* p) noexcept { std::destroy_at(static_cast<T*>(p)); }, object, block.last});
-            block.last = header;
-            block.used = end;
-            ++block.count;
-            return std::shared_ptr<T>(_block, object);
-        }
+        std::shared_ptr<T> emplace(Init&& init);
 
         // 型Tをn個配置するのに必要な最大バイト数。容量の見積もりに使う。
         template<typename T>
-        static constexpr std::size_t bytes_for(std::size_t n = 1) {
+        static constexpr std::size_t BytesFor(std::size_t n = 1) {
             return n * ((alignof(Header) - 1) + sizeof(Header) + (alignof(T) - 1) + sizeof(T));
         }
 
@@ -101,6 +73,37 @@ namespace VSL_NAMESPACE {
         std::size_t used() const { return _block->used; }
         std::size_t count() const { return _block->count; }
     };
+
+    template<typename T, typename Init>
+    std::shared_ptr<T> Arena::emplace(Init&& init) {
+        static_assert(alignof(T) <= BASE_ALIGNMENT, "Arena cannot satisfy this alignment");
+        static_assert(std::is_nothrow_destructible_v<T>);
+        auto& block = *_block;
+        if (block.constructing)
+            throw std::logic_error("Arena::emplace cannot be nested inside init");
+        const auto header_offset = AlignUp(block.used, alignof(Header));
+        const auto object_offset = AlignUp(header_offset + sizeof(Header), alignof(T));
+        const auto end = object_offset + sizeof(T);
+        if (end > block.capacity)
+            throw std::length_error("Arena capacity exceeded");
+
+        auto* object = std::construct_at(reinterpret_cast<T*>(block.storage + object_offset));
+        block.constructing = true;
+        try {
+            std::forward<Init>(init)(*object);
+        } catch (...) {
+            block.constructing = false;
+            std::destroy_at(object);
+            throw;
+        }
+        block.constructing = false;
+        auto* header = std::construct_at(reinterpret_cast<Header*>(block.storage + header_offset),
+                                         Header{[](void* p) noexcept { std::destroy_at(static_cast<T*>(p)); }, object, block.last});
+        block.last = header;
+        block.used = end;
+        ++block.count;
+        return std::shared_ptr<T>(_block, object);
+    }
 
     // heapとarenaで共通の生成入口。arenaがnullptrならheapへ配置する。
     template<typename T, typename Init>

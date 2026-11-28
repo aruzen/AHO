@@ -13,6 +13,8 @@
 #include <ranges>
 
 namespace {
+    struct PoolExhausted {};
+
     void validate_pool(const std::shared_ptr<VSL_NAMESPACE::impl::GraphicResourcePoolImpl>& pool) {
         if (!pool || !pool->descriptor_pool)
             throw std::logic_error("Descriptor pool has been destroyed");
@@ -26,6 +28,54 @@ namespace {
     void validate_resource(const std::shared_ptr<VSL_NAMESPACE::impl::GraphicResourceImpl>& resource) {
         if (!resource || !resource->pool || !resource->pool->descriptor_pool || !resource->descriptor_set)
             throw std::logic_error("Descriptor resource has been destroyed");
+    }
+
+    std::shared_ptr<VSL_NAMESPACE::impl::ResourceBindingLayoutImpl>
+    make_binding_layout(VSL_NAMESPACE::Arena* arena, VSL_NAMESPACE::LogicalDeviceAccessor device,
+                        const std::vector<VSL_NAMESPACE::graphic_resource::BindingPoint>& points) {
+        return VSL_NAMESPACE::place<VSL_NAMESPACE::impl::ResourceBindingLayoutImpl>(arena, [&](auto& layout) {
+            layout.device = device.data_;
+
+            layout.layout_bindings.resize(points.size());
+            for (size_t i = 0; i < points.size(); i++) {
+                auto& point = points[i];
+                layout.layout_bindings[i].binding = point.binding == (std::uint32_t)-1 ? (std::uint32_t)i : point.binding;
+                layout.layout_bindings[i].descriptorType = (vk::DescriptorType)point.binding_type;
+                layout.layout_bindings[i].stageFlags = (vk::ShaderStageFlagBits)point.shader_type;
+                layout.layout_bindings[i].descriptorCount = point.amount;
+            }
+
+            vk::DescriptorSetLayoutCreateInfo layout_create_info;
+            layout_create_info.bindingCount = layout.layout_bindings.size();
+            layout_create_info.pBindings = layout.layout_bindings.data();
+
+            layout.layout = layout.device->device.createDescriptorSetLayout(layout_create_info);
+        });
+    }
+
+    std::tuple<bool, VSL_NAMESPACE::graphic_resource::Resource>
+    bind_one(VSL_NAMESPACE::Arena* arena, const std::shared_ptr<VSL_NAMESPACE::impl::GraphicResourcePoolImpl>& pool,
+             const VSL_NAMESPACE::graphic_resource::BindingLayout& layout) {
+        validate_pool(pool);
+        validate_layout(pool, layout);
+        std::shared_ptr<VSL_NAMESPACE::impl::GraphicResourceImpl> result;
+        try {
+            result = VSL_NAMESPACE::place<VSL_NAMESPACE::impl::GraphicResourceImpl>(arena, [&](auto& resource) {
+                vk::DescriptorSetAllocateInfo alloc_info;
+                alloc_info.descriptorPool = pool->descriptor_pool;
+                alloc_info.descriptorSetCount = 1;
+                alloc_info.pSetLayouts = &layout.data_->layout;
+                if (pool->device->device.allocateDescriptorSets(&alloc_info, &resource.descriptor_set) != vk::Result::eSuccess)
+                    throw PoolExhausted{};
+            });
+        } catch (const PoolExhausted&) {
+            return {false, {}};
+        }
+        // デストラクタがpoolを使うため、構築直後に結ぶ。
+        result->pool = VSL_NAMESPACE::link(result, pool);
+        result->layout = VSL_NAMESPACE::link(result, layout.data_);
+        pool->resources.push_back(result);
+        return {true, {result}};
     }
 } // namespace
 
@@ -51,31 +101,6 @@ VSL_NAMESPACE::graphic_resource::BindingLayout::BindingLayout(LogicalDeviceAcces
 
     data_->layout = device.data_->device.createDescriptorSetLayout(layout_create_info);
 }
-
-namespace {
-    std::shared_ptr<VSL_NAMESPACE::impl::ResourceBindingLayoutImpl>
-    make_binding_layout(VSL_NAMESPACE::Arena* arena, VSL_NAMESPACE::LogicalDeviceAccessor device,
-                        const std::vector<VSL_NAMESPACE::graphic_resource::BindingPoint>& points) {
-        return VSL_NAMESPACE::place<VSL_NAMESPACE::impl::ResourceBindingLayoutImpl>(arena, [&](auto& layout) {
-            layout.device = device.data_;
-
-            layout.layout_bindings.resize(points.size());
-            for (size_t i = 0; i < points.size(); i++) {
-                auto& point = points[i];
-                layout.layout_bindings[i].binding = point.binding == (std::uint32_t)-1 ? (std::uint32_t)i : point.binding;
-                layout.layout_bindings[i].descriptorType = (vk::DescriptorType)point.binding_type;
-                layout.layout_bindings[i].stageFlags = (vk::ShaderStageFlagBits)point.shader_type;
-                layout.layout_bindings[i].descriptorCount = point.amount;
-            }
-
-            vk::DescriptorSetLayoutCreateInfo layout_create_info;
-            layout_create_info.bindingCount = layout.layout_bindings.size();
-            layout_create_info.pBindings = layout.layout_bindings.data();
-
-            layout.layout = layout.device->device.createDescriptorSetLayout(layout_create_info);
-        });
-    }
-} // namespace
 
 VSL_NAMESPACE::graphic_resource::BindingLayout::BindingLayout(VSL_NAMESPACE::LogicalDeviceAccessor device,
                                                               const std::vector<BindingPoint>& points)
@@ -111,35 +136,6 @@ VSL_NAMESPACE::graphic_resource::ManagerInterface* VSL_NAMESPACE::graphic_resour
     auto identity = data_ ? data_->manager.lock() : nullptr;
     return identity ? identity->manager : nullptr;
 }
-
-namespace {
-    struct PoolExhausted {};
-
-    std::tuple<bool, VSL_NAMESPACE::graphic_resource::Resource>
-    bind_one(VSL_NAMESPACE::Arena* arena, const std::shared_ptr<VSL_NAMESPACE::impl::GraphicResourcePoolImpl>& pool,
-             const VSL_NAMESPACE::graphic_resource::BindingLayout& layout) {
-        validate_pool(pool);
-        validate_layout(pool, layout);
-        std::shared_ptr<VSL_NAMESPACE::impl::GraphicResourceImpl> result;
-        try {
-            result = VSL_NAMESPACE::place<VSL_NAMESPACE::impl::GraphicResourceImpl>(arena, [&](auto& resource) {
-                vk::DescriptorSetAllocateInfo alloc_info;
-                alloc_info.descriptorPool = pool->descriptor_pool;
-                alloc_info.descriptorSetCount = 1;
-                alloc_info.pSetLayouts = &layout.data_->layout;
-                if (pool->device->device.allocateDescriptorSets(&alloc_info, &resource.descriptor_set) != vk::Result::eSuccess)
-                    throw PoolExhausted{};
-            });
-        } catch (const PoolExhausted&) {
-            return {false, {}};
-        }
-        // デストラクタがpoolを使うため、構築直後に結ぶ。
-        result->pool = VSL_NAMESPACE::link(result, pool);
-        result->layout = VSL_NAMESPACE::link(result, layout.data_);
-        pool->resources.push_back(result);
-        return {true, {result}};
-    }
-} // namespace
 
 std::tuple<bool, VSL_NAMESPACE::graphic_resource::Resource>
 VSL_NAMESPACE::graphic_resource::Pool::bind(VSL_NAMESPACE::graphic_resource::BindingLayout layout) {

@@ -9,22 +9,26 @@ namespace {
     struct Recorder {
         std::vector<std::string>* log = nullptr;
         std::string name;
-        ~Recorder() {
-            if (log)
-                log->push_back(name);
-        }
+        ~Recorder();
     };
 
     struct Node {
         std::shared_ptr<Node> parent;
         std::vector<std::string>* log = nullptr;
         std::string name;
-        ~Node() {
-            // 構築時に結んだ親は、子の破棄中も生存している。
-            if (log)
-                log->push_back(name + (parent ? "<-" + parent->name : ""));
-        }
+        ~Node();
     };
+
+    Recorder::~Recorder() {
+        if (log)
+            log->push_back(name);
+    }
+
+    Node::~Node() {
+        // 構築時に結んだ親は、子の破棄中も生存している。
+        if (log)
+            log->push_back(name + (parent ? "<-" + parent->name : ""));
+    }
 
     auto record(std::vector<std::string>& log, std::string name) {
         return [&log, name = std::move(name)](Recorder& r) {
@@ -80,7 +84,7 @@ namespace {
     }
 
     TEST(ArenaTest, RejectsOverflowAndNestedEmplaceWithoutConstructing) {
-        vsl::Arena small(vsl::Arena::bytes_for<int>(1));
+        vsl::Arena small(vsl::Arena::BytesFor<int>(1));
         small.emplace<int>([](int&) {});
         bool constructed = false;
         EXPECT_THROW(small.emplace<int>([&](int&) { constructed = true; }), std::length_error);
@@ -92,7 +96,7 @@ namespace {
     }
 
     TEST(ArenaTest, BytesForIsEnoughForTheRequestedCount) {
-        vsl::Arena arena(vsl::Arena::bytes_for<Recorder>(8));
+        vsl::Arena arena(vsl::Arena::BytesFor<Recorder>(8));
         for (int i = 0; i < 8; ++i)
             arena.emplace<Recorder>([](Recorder&) {});
         EXPECT_EQ(arena.count(), 8u);

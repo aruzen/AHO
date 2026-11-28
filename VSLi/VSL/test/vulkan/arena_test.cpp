@@ -8,13 +8,13 @@ namespace {
         bool validate_vulkan() const override;
     };
 
-    bool ArenaVulkanIntegrationTest::validate_vulkan() const {
-        return true;
-    }
-
     using HostBuffer = vsl::Buffer<vsl::MemoryType::TRANSFER_SOURCE | vsl::MemoryType::TRANSFER_DESTINATION | vsl::MemoryType::UNIFORM_BUFFER,
                                    vsl::MemoryProperty::HOST_VISIBLE>;
     constexpr std::size_t ARENA_BYTES = 4096;
+
+    bool ArenaVulkanIntegrationTest::validate_vulkan() const {
+        return true;
+    }
 
     TEST_F(ArenaVulkanIntegrationTest, SamplerIsPlacedAndDestroyedWithTheArena) {
         std::weak_ptr<vsl::impl::SamplerImpl> weak;

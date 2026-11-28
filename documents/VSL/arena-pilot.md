@@ -53,6 +53,16 @@ masterには既に次の仕組みがあった。
 
 既存の呼び出し側と既存テストは変更していない。
 
+### 4つ目の資源(Image)で確かめたこと
+
+「資源を1種類足すとき、触るのはその資源の生成処理とテストだけ」という基準を確かめるため、Imageを別コミットで追加した。
+
+| 資源 | 公開API | 実装の変更 |
+| --- | --- | --- |
+| Image | `Image(Arena&, device, width, height, ...)` | image.cpp +23 / −16、ヘッダー +13 |
+
+`arena.hpp`と他の資源の変更は不要だった。同じArenaに置いたImage・Sampler・COMBINED_IMAGE_SAMPLERのsetも、循環なしで破棄される。Swapchainが持つImageは対象外で、heapのまま。このコミットは評価用なので、不要なら外してよい。
+
 ## 使用例
 
 ```cpp
@@ -79,7 +89,7 @@ set.update(&uniform);     // 同じArena内なので非所有で結ばれる
 ## 判断していただくこと
 
 1. この形で読めるか。語彙は`Arena`・`place`・`link`・`expose`の4つ。
-2. 残りの資源(Image、Shader、Pipeline、FrameBuffer、Command、同期、起動資源)へ同じ形で広げたいか。
+2. 残りの資源(Shader、Pipeline、FrameBuffer、Command、同期、起動資源)へ同じ形で広げたいか。
 3. 測定の結果を踏まえ、arenaを続ける価値があるか。続けるなら、Typedのschemaから`bytes_for`を計算し、フレームごとのArenaを作る段階へ進む。
 
 ## 既知の制限

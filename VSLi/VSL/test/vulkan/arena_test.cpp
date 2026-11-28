@@ -136,4 +136,29 @@ namespace {
         EXPECT_TRUE(weak_heap_buffer.expired());
         EXPECT_FALSE(has_validation_errors());
     }
+
+    TEST_F(ArenaVulkanIntegrationTest, ImageSamplerAndCombinedDescriptorInOneArenaHaveNoCycle) {
+        using vsl::graphic_resource::Type;
+        using SampledImage = vsl::Image<vsl::ImageType::SAMPLED | vsl::ImageType::TRANSFER_DST>;
+        vsl::GraphicResourceManager manager(device);
+        auto pool = manager.make({{Type::COMBINED_IMAGE_SAMPLER, 4}});
+        std::weak_ptr<vsl::impl::ImageImpl> weak_image;
+        std::weak_ptr<vsl::impl::GraphicResourceImpl> weak_set;
+        {
+            vsl::Arena arena(ARENA_BYTES);
+            SampledImage image(arena, device, 4, 4, vsl::data_format::UNSIGNED_INT8_RGBA);
+            vsl::Sampler sampler(arena, device, vsl::SamplingMode::NEAREST, vsl::EdgeMode::CLAMP_TO_EDGE);
+            vsl::graphic_resource::BindingLayout layout(arena, device, {{0, Type::COMBINED_IMAGE_SAMPLER, vsl::ShaderFlag::COMPUTE}});
+            auto [ok, set] = pool.bind(arena, layout);
+            ASSERT_TRUE(ok);
+            set.update(image, sampler);
+            EXPECT_EQ(arena.count(), 4u);
+            EXPECT_TRUE(image.data_->view);
+            weak_image = image.data_;
+            weak_set = set.data_;
+        }
+        EXPECT_TRUE(weak_set.expired());
+        EXPECT_TRUE(weak_image.expired());
+        EXPECT_FALSE(has_validation_errors());
+    }
 } // namespace

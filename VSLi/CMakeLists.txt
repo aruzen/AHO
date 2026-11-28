@@ -153,6 +153,7 @@ add_library(VSL STATIC
         VSL/include/VSL/format.hpp
         VSL/include/VSL/vsl.hpp
         VSL/include/VSL/define.hpp
+        VSL/include/VSL/arena.hpp
         VSL/src/vulkan/commands/draw_indexed_instance.cpp
         VSL/src/vulkan/stages/id_picking.cpp
 )

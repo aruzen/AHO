@@ -6,6 +6,7 @@
 #define AHO_ALL_SAMPLER_H
 
 #include "image.hpp"
+#include "../arena.hpp"
 
 namespace VSL_NAMESPACE {
     enum class SamplingMode {
@@ -27,6 +28,11 @@ namespace VSL_NAMESPACE {
 
     struct Sampler : public SamplerAccessor {
         Sampler(LogicalDeviceAccessor device, SamplingMode sampling = SamplingMode::LINEAR, EdgeMode edge = EdgeMode::CLAMP_TO_BORDER);
+        // Implをarenaへ配置する。寿命はarena全体と共有する。
+        Sampler(Arena& arena, LogicalDeviceAccessor device, SamplingMode sampling = SamplingMode::LINEAR, EdgeMode edge = EdgeMode::CLAMP_TO_BORDER);
+
+    private:
+        Sampler(Arena* arena, LogicalDeviceAccessor device, SamplingMode sampling, EdgeMode edge);
     };
 } // namespace VSL_NAMESPACE
 

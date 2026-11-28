@@ -62,6 +62,9 @@ namespace VSL_NAMESPACE::typed::detail {
         write.descriptorCount = point.amount;
         write.pBufferInfo = buffers.empty() ? nullptr : buffers.data();
         write.pImageInfo = images.empty() ? nullptr : images.data();
+        // 同じArena内の資源は非所有で結び、循環を避ける。
+        for (auto& owner : owners)
+            owner = link(target, std::move(owner));
         target->bindings[point.binding] = std::move(owners);
         device->device.updateDescriptorSets(write, {});
     }

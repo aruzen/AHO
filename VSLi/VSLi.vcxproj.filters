@@ -219,6 +219,9 @@
     <ClInclude Include="VSL\include\VSL\define.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="VSL\include\VSL\arena.hpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClInclude Include="VSL\include\VSL\dimension.hpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
